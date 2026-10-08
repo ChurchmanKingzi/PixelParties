@@ -97,27 +97,6 @@ def hurdle():
     return c
 
 
-def balance_beam():
-    """dicker Baumstamm auf zwei Boecken (46 x 18), Hirnholz links"""
-    c = Canvas(46, 18)
-    for x0 in (6, 34):
-        c.line(x0, 16, x0 + 3, 9, 'wood', 2)
-        c.line(x0 + 5, 16, x0 + 2, 9, 'wood', 3)
-        c.line(x0 + 1, 16, x0 + 4, 9, 'wood', 1)
-    thick_line(c, 4, 7, 42, 7, 8.0, 'wood', lo=1, hi=4)
-    for x in range(8, 40, 6):
-        c.put_ramp(x, 5, 'wood', 1)
-        c.put_ramp(x + 2, 8, 'wood', 1)
-        c.put_ramp(x + 3, 9, 'wood', 2)
-    for x in range(6, 42):
-        c.put_ramp(x, 3, 'wood', 5 if x % 3 else 4)
-    ellipse(c, 4.5, 7.5, 2.6, 4.0, 'wood', lo=3, hi=5)
-    c.put_ramp(4, 7, 'wood', 2)
-    c.put_ramp(5, 8, 'wood', 2)
-    c.outline()
-    return c
-
-
 def climb_wall():
     """Kletterwand aus Brettern mit Haltetau (28 x 34)"""
     c = Canvas(28, 34)
@@ -136,25 +115,6 @@ def climb_wall():
     for k in range(20):
         c.put_ramp(14 + (1 if (k // 3) % 2 else 0), 12 + k, 'dirt', 4 if k % 2 else 3)
     c.rect(11, 4, 17, 5, 'wood', 4)
-    c.outline()
-    return c
-
-
-def tyre_hoop():
-    """Reifen im Gestell (Durchsprung) (22 x 24)"""
-    c = Canvas(22, 24)
-    c.rect(2, 22, 19, 23, 'wood', 2)
-    c.rect(2, 22, 19, 22, 'wood', 3)
-    c.rect(10, 18, 11, 22, 'wood', 3)
-    for y in range(0, 20):
-        for x in range(0, 22):
-            d = math.hypot((x - 10.5) / 10.0, (y - 9.5) / 9.2)
-            if 0.74 <= d <= 1.0:
-                ang = math.atan2(y - 9.5, x - 10.5)
-                i = 4 if (ang < -0.5 and ang > -2.6) else (2 if ang > 0.3 and ang < 2.4 else 3)
-                if int((ang + 3.2) * 5) % 2 == 0:
-                    i = max(1, i - 1)
-                c.put_ramp(x, y, 'coal', min(4, i))
     c.outline()
     return c
 

@@ -148,11 +148,13 @@ def shout_bubble(f=0):
             if r <= spike * 0.9:
                 c.put_ramp(x, y, 'bone', 5 if (x + y * 1.4) < 26 else 4)
     poly(c, [(9, 17), (3, 27), (16, 20)], 'bone', lo=4, hi=5)
-    for k in range(3):
+    for k in range(3):                                   # Ausrufezeichen: oben breit, unten schmal, Punkt
         x = 11 + k * 7
-        c.rect(x, 3, x + 2, 11, 'fire', 2)
-        c.rect(x, 3, x, 11, 'fire', 3)
+        c.rect(x, 3, x + 2, 7, 'fire', 2)
+        c.rect(x, 3, x, 7, 'fire', 3)
+        c.rect(x + 1, 8, x + 1, 11, 'fire', 2)
         c.rect(x, 14, x + 2, 16, 'fire', 2)
+        c.put_ramp(x, 14, 'fire', 3)
     c.outline(dark=0, lit=1)
     return c
 

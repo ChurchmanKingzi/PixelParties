@@ -76,13 +76,15 @@ def spr_big_bertha(anim='idle', f=0):
     c.rect(hx + 5, 14, hx + 6, 16, 'gold', 4)
     c.put_ramp(hx + 5, 15, 'coal', 1)
     # ---- Schnurrbart unter der Muendung (Handlebar mit hochgezwirbelten Spitzen)
-    mx, my = 52, 19
-    segs = (((mx, my - 1), (mx - 4, my + 1), 4.0), ((mx - 4, my + 1), (mx - 8, my + 1), 3.4), ((mx - 8, my + 1), (mx - 10, my - 2), 2.4),
-            ((mx, my - 1), (mx + 3, my + 1), 4.0), ((mx + 3, my + 1), (mx + 6, my + 1), 3.2), ((mx + 6, my + 1), (mx + 8, my - 2), 2.4))
+    mx, my = 51, 20
+    segs = (((mx, my - 1), (mx - 4, my + 1), 4.4), ((mx - 4, my + 1), (mx - 8, my + 1), 3.8), ((mx - 8, my + 1), (mx - 10, my - 2), 2.8),
+            ((mx - 10, my - 2), (mx - 9, my - 4), 2.0),
+            ((mx, my - 1), (mx + 3, my + 1), 4.4), ((mx + 3, my + 1), (mx + 7, my + 1), 3.6), ((mx + 7, my + 1), (mx + 9, my - 2), 2.6),
+            ((mx + 9, my - 2), (mx + 8, my - 4), 2.0))
     for (a, b, w) in segs:
-        thick_line(c, a[0], a[1], b[0], b[1], w, 'wood', lo=0, hi=3, ambient=0.4)
-    for (x, y) in ((mx - 9, my - 3), (mx + 7, my - 3), (mx - 5, my), (mx + 2, my)):
-        c.put_ramp(x, y, 'wood', 4)
+        thick_line(c, a[0], a[1], b[0], b[1], w, 'wood', lo=2, hi=5, ambient=0.4)
+    for (x, y) in ((mx - 9, my - 4), (mx + 8, my - 4), (mx - 5, my), (mx + 2, my), (mx - 2, my - 1), (mx + 5, my)):
+        c.put_ramp(x, y, 'wood', 5)
     # ---- Auspuff hinten
     c.rect(4, 21, 7, 28, 'metal', 2)
     c.rect(4, 21, 4, 28, 'metal', 4)

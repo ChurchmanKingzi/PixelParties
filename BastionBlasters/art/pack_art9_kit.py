@@ -24,17 +24,6 @@ def vline(c, x, y0, y1, ramp, i):
         c.put_ramp(x, y, ramp, i)
 
 
-def checker(c, x0, y0, x1, y1, ramp, a, b, ramp2=None):
-    """Schachbrett-Dither zweier Töne"""
-    r2 = ramp2 or ramp
-    for y in range(int(y0), int(y1) + 1):
-        for x in range(int(x0), int(x1) + 1):
-            if (x + y) % 2 == 0:
-                c.put_ramp(x, y, ramp, a)
-            else:
-                c.put_ramp(x, y, r2, b)
-
-
 def block(c, x0, y0, x1, y1, ramp, hi=4, mid=3, lo=2, deep=1):
     """Vorderansicht eines Blocks: Lichtkante oben/links, Schatten rechts/unten, Dither im Übergang"""
     for y in range(int(y0), int(y1) + 1):
@@ -50,55 +39,11 @@ def block(c, x0, y0, x1, y1, ramp, hi=4, mid=3, lo=2, deep=1):
             c.put_ramp(x, y, ramp, i)
 
 
-def tint_over(c, x0, y0, x1, y1, ramp, idx, every=2):
-    """Dither-Schleier (Glas, Dampf): nur jeder `every`-te Pixel"""
-    for y in range(int(y0), int(y1) + 1):
-        for x in range(int(x0), int(x1) + 1):
-            if (x + y) % every == 0 and c.alpha(x, y):
-                c.put_ramp(x, y, ramp, idx)
-
-
-def put_if(c, x, y, ramp, idx):
-    if c.alpha(x, y):
-        c.put_ramp(x, y, ramp, idx)
-
-
-def rot_poly(cx, cy, pts, deg):
-    a = math.radians(deg)
-    ca, sa = math.cos(a), math.sin(a)
-    return [(cx + px * ca - py * sa, cy + px * sa + py * ca) for (px, py) in pts]
-
-
-# --------------------------------------------------------------------------- Weltpixel-Effekte (liegen über allem)
-
-
 def wput(world, x, y, ramp, i, key=9000):
     x, y = int(x), int(y)
     if 0 <= x < world.w and 0 <= y < world.h:
         world.px[y, x, :3] = RAMPS[ramp][max(0, min(5, i))]
         world.depth[y, x] = key
-
-
-def wline(world, x0, y0, x1, y1, ramp, i, key=9000, dashed=False):
-    x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
-    dx, dy = abs(x1 - x0), -abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx + dy
-    n = 0
-    while True:
-        if not dashed or n % 2 == 0:
-            wput(world, x0, y0, ramp, i, key)
-        n += 1
-        if x0 == x1 and y0 == y1:
-            break
-        e2 = 2 * err
-        if e2 >= dy:
-            err += dy
-            x0 += sx
-        if e2 <= dx:
-            err += dx
-            y0 += sy
 
 
 def wrope(world, p0, p1, sag=4, key=9000, ramp='dirt', hi=5, lo=3):
@@ -124,10 +69,6 @@ def wsparkle(world, x, y, ramp='gold', key=9100, big=False):
             wput(world, x + dx, y + dy, ramp, 3, key)
 
 
-def wdot(world, x, y, ramp, i, key=9100):
-    wput(world, x, y, ramp, i, key)
-
-
 def wblit(world, spr, x, y, key=9050, flip=False):
     world.draw(spr, int(x), int(y), key, flip)
 
@@ -141,10 +82,6 @@ def _rgb(c):
 
 def floor_cobble(seed, base='stone', tone=(2, 3), mortar=1, hi=4):
     return _rgb(tile_cobble(seed, 32, base=base, tone=tone, mortar=mortar, hi=hi))
-
-
-def floor_planks(seed, tone=(2, 3, 4)):
-    return _rgb(tile_planks(seed, 32, tone=tone))
 
 
 def floor_wood(seed=1, tones=(1, 2), nails=False, rowh=8):

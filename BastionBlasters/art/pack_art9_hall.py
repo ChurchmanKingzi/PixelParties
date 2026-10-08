@@ -78,23 +78,6 @@ def plaque_skull():
     return c
 
 
-def plaque_bear():
-    """Bärenkopf mit Schal auf Schild (20 x 22)"""
-    c = Canvas(20, 22)
-    _plaque(c, 20, 22)
-    ellipse(c, 4.5, 6.5, 2.8, 2.8, 'fur', lo=2, hi=4)
-    ellipse(c, 15.5, 6.5, 2.8, 2.8, 'fur', lo=3, hi=5)
-    ellipse(c, 10, 11, 6.4, 5.6, 'fur', lo=2, hi=5)
-    ellipse(c, 10, 14, 3.4, 2.6, 'fur', lo=4, hi=5)
-    c.rect(7, 9, 8, 10, 'coal', 1)
-    c.rect(12, 9, 13, 10, 'coal', 1)
-    c.rect(9, 13, 11, 14, 'coal', 1)
-    hline(c, 4, 15, 17, 'teamA', 3)
-    hline(c, 4, 15, 18, 'teamA', 2)
-    c.outline()
-    return c
-
-
 def trophy_cup(h=16, col='gold'):
     """Pokal auf rotem Kissen und Steinsockel (16 x h+10)"""
     c = Canvas(16, h + 11)
@@ -211,26 +194,6 @@ def trophy_banner():
     c.put_ramp(2, 4, 'metal', 4)
     c.put_ramp(3, 3, 'metal', 3)
     c.rect(7, 10, 8, 11, 'gold', 5)
-    c.outline()
-    return c
-
-
-def cup_shelf(n=3):
-    """Wandbord mit kleinen Pokalen (30 x 14), Pokale stehen auf dem Brett"""
-    c = Canvas(30, 14)
-    for k in range(n):
-        cx = 6 + k * 9
-        c.rect(cx - 2, 3, cx + 2, 3, 'gold', 4)
-        for yy in range(4, 7):
-            c.rect(cx - 2 + (yy - 4) // 2, yy, cx + 2 - (yy - 4) // 2, yy, 'gold', 4 if yy < 6 else 3)
-        c.put_ramp(cx - 2, 3, 'gold', 5)
-        c.rect(cx, 7, cx, 8, 'gold', 3)
-        c.rect(cx - 1, 9, cx + 1, 9, 'gold', 3)
-        c.put_ramp(cx - 1, 4, 'bone', 5)
-    c.rect(0, 10, 29, 11, 'wood', 4)
-    c.rect(0, 12, 29, 12, 'wood', 2)
-    c.rect(2, 13, 3, 13, 'wood', 1)
-    c.rect(26, 13, 27, 13, 'wood', 1)
     c.outline()
     return c
 

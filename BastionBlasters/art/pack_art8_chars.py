@@ -150,14 +150,16 @@ def patient_waiting(f=0):
     ellipse(c, 13, 11 + bob, 3.6, 3.2, 'skin', lo=3, hi=5)
     c.put_ramp(13, 10 + bob, 'fire', 4)
     c.put_ramp(14, 11 + bob, 'fire', 3)
-    # Verband: senkrechtes Band von Kinn über den Scheitel, Knoten mit Hasenohren
-    for y in range(2, 15):
-        for x in (8, 9, 10):
-            c.put_ramp(x, y + bob, 'bone', 5 if x == 8 else (4 if x == 9 else 3))
-    for x in range(8, 11):
-        c.put_ramp(x, 14 + bob, 'bone', 2)
-    poly(c, [(6, 3 + bob), (3, -1 + bob), (8, 2 + bob)], 'bone', lo=3, hi=5)
-    poly(c, [(10, 2 + bob), (14, -2 + bob), (12, 3 + bob)], 'bone', lo=2, hi=4)
+    # Verband: gebogenes Band von Kinn über den Scheitel, Knoten mit zwei Schlaufen
+    thick_line(c, 11, 15 + bob, 8, 3 + bob, 3.0, 'bone', lo=3, hi=5)
+    for y in range(4, 15):
+        c.put_ramp(8 + (y - 4) // 4 + (0 if y < 9 else 1), y + bob, 'bone', 5)
+    ellipse(c, 5.5, 2 + bob, 2.6, 2.2, 'bone', lo=3, hi=5)
+    ellipse(c, 11.5, 0.5 + bob, 2.6, 2.2, 'bone', lo=2, hi=4)
+    c.put_ramp(8, 3 + bob, 'bone', 2)
+    c.put_ramp(9, 2 + bob, 'bone', 2)
+    c.put_ramp(7, 0 + bob, 'bone', 5)
+    c.put_ramp(3, 4 + bob, 'bone', 3)
     # Gesicht: zusammengekniffenes Auge, Schmerzbrauen, Tränchen, Mundlinie
     c.rect(13, 7 + bob, 14, 7 + bob, 'coal', 1)
     c.put_ramp(12, 5 + bob, 'coal', 2)

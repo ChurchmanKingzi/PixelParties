@@ -166,25 +166,6 @@ def armchair_reader():
     return c
 
 
-def tea_table():
-    """Beistelltisch mit dampfender Tasse und einer Kerze (14 x 22)"""
-    c = Canvas(14, 24)
-    ellipse(c, 7, 14, 6.0, 2.6, 'wood', lo=3, hi=5)
-    c.rect(6, 16, 7, 21, 'wood', 2)
-    hline(c, 3, 10, 22, 'wood', 1)
-    hline(c, 4, 9, 21, 'wood', 2)
-    # Tasse
-    round_rect(c, 4, 9, 9, 13, 'bone', lo=3, hi=5, radius=1)
-    c.put_ramp(10, 10, 'bone', 4)
-    c.put_ramp(10, 11, 'bone', 3)
-    hline(c, 5, 8, 9, 'leaf', 3)
-    # Dampf
-    for (x, y) in ((6, 7), (7, 5), (6, 3), (7, 1)):
-        c.put_ramp(x, y, 'bone', 4)
-    c.outline()
-    return c
-
-
 def skull_niche():
     """Nische mit Schaedelstapel (22 x 20), Rundbogen"""
     c = Canvas(22, 20)

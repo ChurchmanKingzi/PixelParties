@@ -9,7 +9,7 @@ from pack_art9_kit import *
 # =========================================================================== Zahnraeder
 
 
-def gear(r=10, ramp='gold', teeth=10, spokes=5, hub=True, seed=1):
+def gear(r=10, ramp='gold', teeth=10, spokes=5):
     """Zahnrad von vorn (Durchmesser 2r+5)"""
     n = int(2 * r + 6)
     c = Canvas(n, n)
@@ -37,12 +37,6 @@ def gear(r=10, ramp='gold', teeth=10, spokes=5, hub=True, seed=1):
             if d < r * 0.45:
                 L += 0.1
             c.put_ramp(x, y, ramp, quant(max(0.0, min(1.0, L)), 1, 5, x, y))
-    if hub:
-        for y in range(n):
-            for x in range(n):
-                d = math.hypot(x - cx, y - cy)
-                if d < r * 0.30:
-                    pass
     c.outline()
     return c
 
@@ -96,27 +90,6 @@ def blueprint():
     # Reissnaegel
     for (x, y) in ((1, 1), (20, 1), (1, 15), (20, 15)):
         c.put_ramp(x, y, 'metal', 5)
-    c.outline()
-    return c
-
-
-def tool_board():
-    """Lochwand mit Werkzeug-Silhouetten (30 x 18): Hammer, Zange, Saege, Schluessel"""
-    c = Canvas(30, 18)
-    block(c, 0, 0, 29, 17, 'wood', hi=4, mid=3, lo=2, deep=1)
-    # Hammer
-    c.rect(4, 3, 4, 13, 'wood', 1)
-    c.rect(2, 2, 7, 4, 'metal', 4)
-    # Schluessel
-    c.rect(12, 4, 12, 14, 'metal', 3)
-    ellipse(c, 12, 4, 2.4, 2.4, 'metal', lo=2, hi=5)
-    c.put_ramp(12, 4, 'wood', 1)
-    # Saege
-    poly(c, [(17, 3), (24, 3), (24, 6), (17, 12)], 'metal', lo=2, hi=5)
-    c.rect(24, 3, 26, 5, 'wood', 1)
-    # Zange
-    c.line(21, 8, 24, 15, 'wood', 1)
-    c.line(24, 8, 21, 15, 'wood', 1)
     c.outline()
     return c
 
@@ -260,15 +233,7 @@ def gnome(pose='pull', hat='teamA', beard='bone', coat='ice', seed=0):
     poly(c, [(bx - 4, by - 7), (bx + 6, by - 7), (bx + 3, by - 14), (bx - 3, by - 13), (bx - 8, by - 9)], hat, lo=1, hi=4)
     hline(c, bx - 4, bx + 6, by - 7, hat, 1)
     c.put_ramp(bx - 1, by - 9, hat, 5)
-    if hat == 'metal':
-        pass
     c.outline()
-    return c
-
-
-def gnome_goggles(coat='ice'):
-    """Ingenieur-Gnom: Schweisserbrille ueber der Muetze, Schraubenschluessel (wie work, mit Brille)"""
-    c = gnome('work', hat='metal', beard='fire', coat=coat)
     return c
 
 
@@ -414,36 +379,3 @@ def seesaw_mallet():
     return c
 
 
-def workbench():
-    """Werkbank mit Schraubstock, Plan und Zahnraedern (36 x 22)"""
-    c = Canvas(36, 22)
-    block(c, 1, 9, 34, 13, 'wood', hi=5, mid=4, lo=3, deep=2)
-    block(c, 3, 14, 6, 21, 'wood', hi=3, mid=2, lo=1, deep=0)
-    block(c, 29, 14, 32, 21, 'wood', hi=3, mid=2, lo=1, deep=0)
-    block(c, 7, 15, 28, 18, 'wood', hi=3, mid=2, lo=1, deep=0)
-    # Schraubstock
-    block(c, 3, 3, 9, 8, 'metal', hi=5, mid=4, lo=2, deep=1)
-    c.rect(1, 5, 2, 6, 'metal', 3)
-    # Plan (aufgerollt)
-    ellipse(c, 17, 7, 5.0, 2.4, 'bone', lo=3, hi=5)
-    c.put_ramp(20, 7, 'ice', 3)
-    # Zahnrad-Stapel
-    for (x, y, col) in ((26, 8, 'gold'), (30, 7, 'metal')):
-        ellipse(c, x, y, 2.8, 2.0, col, lo=2, hi=5)
-        c.put_ramp(x, y, 'coal', 1)
-    c.outline()
-    return c
-
-
-def wrench_big():
-    """riesiger Schraubenschluessel an Haken (10 x 22)"""
-    c = Canvas(10, 22)
-    thick_line(c, 5, 6, 5, 20, 3.0, 'metal', lo=2, hi=5)
-    ellipse(c, 5, 4, 4.0, 4.0, 'metal', lo=1, hi=5)
-    c.rect(4, 0, 6, 3, 'coal', 0)
-    ellipse(c, 5, 20, 2.4, 2.4, 'metal', lo=1, hi=4)
-    c.outline()
-    return c
-
-
-from pack_art9_hall import pad_bottom   # noqa: E402  (fuer Wanddeko)

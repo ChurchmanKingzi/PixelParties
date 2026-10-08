@@ -216,15 +216,6 @@ def snow_drift(w=26, h=10, seed=1):
     return c
 
 
-def ice_stool():
-    c = Canvas(14, 14)
-    block(c, 2, 4, 11, 11, 'ice', hi=5, mid=4, lo=3, deep=2)
-    hline(c, 1, 12, 3, 'bone', 5)
-    hline(c, 1, 12, 4, 'bone', 4)
-    c.outline()
-    return c
-
-
 def welcome_mat():
     c = Canvas(24, 10)
     for y in range(10):

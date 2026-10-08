@@ -102,41 +102,6 @@ def rune_circle(r=21):
     return c
 
 
-def orrery():
-    """Orrery / Armillarsphaere auf Messingfuss (30 x 38): Ringe, Sonne, Planeten"""
-    c = Canvas(30, 38)
-    cx, cy = 15, 15
-    # Fuss
-    c.rect(14, 24, 15, 34, 'gold', 3)
-    c.rect(14, 24, 14, 34, 'gold', 4)
-    poly(c, [(15, 30), (7, 36), (23, 36)], 'gold', lo=1, hi=4)
-    c.rect(6, 36, 24, 37, 'gold', 2)
-    c.rect(6, 36, 24, 36, 'gold', 4)
-    # Ringe (Ellipsen-Umrisse, verschieden geneigt)
-    def ring(rx, ry, ang_deg, col, i0, i1, step=1):
-        a = math.radians(ang_deg)
-        for k in range(0, 360, step * 3):
-            t = math.radians(k)
-            x = rx * math.cos(t)
-            y = ry * math.sin(t)
-            xr = cx + x * math.cos(a) - y * math.sin(a)
-            yr = cy + x * math.sin(a) + y * math.cos(a)
-            c.put_ramp(int(round(xr)), int(round(yr)), col, i1 if (k < 180) else i0)
-    ring(13, 4.5, 0, 'gold', 3, 5)
-    ring(13, 4.5, 60, 'gold', 3, 5)
-    ring(13, 4.5, 120, 'gold', 3, 5)
-    ring(8, 8, 0, 'metal', 3, 5)
-    # Sonne
-    ellipse(c, cx, cy, 3.4, 3.4, 'fire', lo=3, hi=5)
-    c.put_ramp(cx - 1, cy - 1, 'gold', 5)
-    # Planeten
-    ellipse(c, 25, 11, 2.0, 2.0, 'ice', lo=2, hi=5)
-    ellipse(c, 6, 19, 1.8, 1.8, 'leaf', lo=2, hi=5)
-    ellipse(c, 17, 24, 1.4, 1.4, 'skin', lo=2, hi=5)
-    c.outline()
-    return c
-
-
 def apprentice():
     """Zauberlehrling (24 x 32): Hut viel zu gross (haengt ueber die Augen), Sternenrobe, Zauberstab, staunt (Mund 'o')"""
     c = Canvas(24, 32)
@@ -178,9 +143,3 @@ def apprentice():
     return c
 
 
-def star_trail(world, x, y, n=5, ramp='gold'):
-    """kleine Sternschweife (Weltpixel)"""
-    for k in range(n):
-        wput(world, x - k * 2, y + k, ramp, 5 - k // 2, 9100)
-        if k % 2 == 0:
-            wput(world, x - k * 2 - 1, y + k, ramp, 3, 9100)

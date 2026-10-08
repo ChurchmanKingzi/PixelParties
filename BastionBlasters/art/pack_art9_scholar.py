@@ -127,16 +127,6 @@ def winged_book(cover='teamA', f=0):
     return c
 
 
-def closed_book(cover='teamA', w=12, h=5):
-    c = Canvas(w, h + 2)
-    block(c, 0, 0, w - 1, h - 1, cover, hi=4, mid=3, lo=2, deep=1)
-    hline(c, 1, w - 2, h, 'bone', 4)
-    hline(c, 1, w - 2, h + 1, 'bone', 2)
-    c.put_ramp(2, 2, 'gold', 5)
-    c.outline()
-    return c
-
-
 def owl_librarian():
     """Eule mit Brille (16 x 20)"""
     c = Canvas(16, 20)
@@ -294,13 +284,3 @@ def candle_sconce():
     return c
 
 
-def ladder_tall(h=34):
-    c = Canvas(12, h)
-    for x in (1, 9):
-        vline(c, x, 0, h - 1, 'wood', 4)
-        vline(c, x + 1, 0, h - 1, 'wood', 2)
-    for y in range(4, h - 2, 6):
-        hline(c, 2, 8, y, 'wood', 4)
-        hline(c, 2, 8, y + 1, 'wood', 2)
-    c.outline()
-    return c

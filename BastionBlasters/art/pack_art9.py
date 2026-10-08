@@ -4,10 +4,20 @@ Sprites und Einrichtung liegen in den Helfermodulen pack_art9_*.py."""
 from __future__ import annotations
 
 from cards_art import *          # helpers, ART registry, pixl / scenekit / landscape / assets_*
+import math
 import random
+
 from pack_art9_kit import *
 from pack_art9_hall import pad_bottom
 import pack_art9_scholar as SC
+import pack_art9_hall as HL
+import pack_art9_yard as YD
+import pack_art9_crypt as CR
+import pack_art9_ice as IC
+import pack_art9_tech as TC
+import pack_art9_arcane as AR
+import pack_art9_beasts as BE
+import pack_art9_flora as FL
 
 
 # =========================================================================== BW-08 Academy of Forbidden Books
@@ -41,8 +51,6 @@ def _art_bw08():
 
 
 # =========================================================================== BW-07 Drill Yard
-
-import pack_art9_yard as YD
 
 
 def _earth_patch(world, x0, y0, x1, y1, seed):
@@ -94,12 +102,10 @@ def _art_bw07():
 
 # =========================================================================== BW-09 Trophy Hall
 
-import pack_art9_hall as HL
-
 
 def furnish_trophy(ctx):
     W = ctx.W
-    # Wand: Schilde mit Trophaeen, Banner, Pokalbrett
+    # Wand: zwei Trophaeenschilde und ein Banner
     draw_wall(ctx, HL.plaque_goblin(), 17)
     draw_wall(ctx, HL.plaque_skull(), W - 17)
     draw_wall(ctx, HL.trophy_banner(), W // 2)
@@ -107,9 +113,9 @@ def furnish_trophy(ctx):
     draw_floor(ctx, rug(18, 48, 'teamA'), W // 2 - 9, 10)
     draw_prop(ctx, HL.gnome_medal(), W // 2 - 9, 2)
     draw_prop(ctx, HL.stuffed_bear(), 8, 8)
-    draw_prop(ctx, HL.trophy_cup(14), W - 8 - 16, 20)
+    draw_prop(ctx, HL.trophy_cup(14), W - 8 - 16, 8)
     draw_prop(ctx, HL.trophy_cup(12), 32, 30)
-    draw_prop(ctx, HL.coin_pile(), W - 30, 36)
+    draw_prop(ctx, HL.coin_pile(), W - 32, 36)
 
 
 THEME_TROPHY = {'floor': floor_cobble(5, base='bone', tone=(2, 3), mortar=1, hi=4), 'furnish': furnish_trophy, 'low': False}
@@ -126,8 +132,8 @@ def _art_bw09():
 
 def furnish_kitchen(ctx):
     W = ctx.W
-    draw_wall(ctx, HL.pad_bottom(HL.potion_shelf(), 8), 22)
-    draw_wall(ctx, HL.pad_bottom(HL.herb_rail(), 0), W - 22)
+    draw_wall(ctx, pad_bottom(HL.potion_shelf(), 8), 22)
+    draw_wall(ctx, HL.herb_rail(), W - 22)
     draw_prop(ctx, HL.kitchen_table(), W - 36, 4)
     draw_prop(ctx, HL.cauldron_big(), 30, 8)
     draw_prop(ctx, HL.black_cat(), 10, 28)
@@ -163,9 +169,6 @@ def _art_bw10():
 
 # =========================================================================== BF-05 Crypt
 
-import pack_art9_crypt as CR
-from pack_art9_hall import pad_bottom
-
 
 def furnish_crypt(ctx):
     W = ctx.W
@@ -195,8 +198,6 @@ def _art_bf05():
 
 # =========================================================================== BF-06 Ice Grotto
 
-import pack_art9_ice as IC
-
 
 def furnish_ice(ctx):
     W = ctx.W
@@ -222,8 +223,6 @@ def _art_bf06():
 
 
 # =========================================================================== BW-11 The Great Hammer
-
-import pack_art9_tech as TC
 
 
 def furnish_hammer(ctx):
@@ -286,7 +285,6 @@ THEME_SIEGE = {'floor': floor_plates('metal', 1, 2, 6), 'furnish': furnish_siege
 @card_art('BF-04')
 def _art_bf04():
     world, X0, Y0, out = room_world('V', THEME_SIEGE, '3x3', 'dirt', 4)
-    ox, oy = 8, 6
     # Dampf aus dem Kamin des Kessels
     bx, by = X0 + 5 + 28, Y0 - 8
     for k, (dx, dy, f, sz) in enumerate(((0, -13, 0, 1), (9, -12, 2, 1), (19, -9, 4, 1))):
@@ -296,9 +294,6 @@ def _art_bf04():
 
 
 # =========================================================================== BF-02 Arcanum
-
-import pack_art9_arcane as AR
-import pack_art9_ice as IC2
 
 
 def furnish_arcanum(ctx):
@@ -328,8 +323,6 @@ def _art_bf02():
 
 # =========================================================================== BF-03 Menagerie
 
-import pack_art9_beasts as BE
-
 
 def furnish_menagerie(ctx):
     W = ctx.W
@@ -357,8 +350,6 @@ def _art_bf03():
 
 
 # =========================================================================== BF-07 Greenhouse
-
-import pack_art9_flora as FL
 
 
 def furnish_greenhouse(ctx):

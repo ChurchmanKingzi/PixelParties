@@ -221,18 +221,18 @@ def _art_us08():
     wall = stone_wall_piece(144)
     w.draw(wall, 0, 20 - wall.h + 1, 20)
     shadow(w, 72, 24, 70, 3)
-    for (sp, x, y) in ((barrel(), 16, 52), (crate(), 128, 54)):
+    for (sp, x, y) in ((barrel(), 14, 60), (crate(), 130, 56)):
         prop_at(w, sp, x, y)
-    hx, hy = 80, 76
+    hx, hy = 78, 80
     # Maulwurfsspur im Hof zum Loch
-    for (x, y, b) in ((28, 34, 0), (42, 45, 0), (58, 57, 1)):
+    for (x, y, b) in ((26, 34, 0), (40, 46, 0), (55, 59, 1)):
         prop_at(w, spr_molehill(b), x, y)
     w.draw(spr_dirt_hole(), hx - 17, hy - 9, hy)
     w.draw(spr_burrow_gnome(), hx - 15, hy + 2 - 38, hy + 2)
     w.draw(spr_dirt_lip(), hx - 17, hy - 1, hy + 6)
-    for (i, (x, y)) in enumerate(((66, 52), (104, 48), (70, 40), (98, 62), (56, 66), (108, 70))):
+    for (i, (x, y)) in enumerate(((64, 56), (102, 52), (68, 44), (98, 66), (54, 70), (106, 76), (88, 40), (60, 82))):
         w.draw(spr_chunk(i), x, y, 9100)
-    sparkles(w, [(hx + 28, hy - 44), (hx + 22, hy - 48)], ramp='bone', key=9100)
+    sparkles(w, [(hx + 27, hy - 44), (hx + 21, hy - 49)], ramp='bone', key=9100)
     unit_at(w, citizen('cloth', 1), 122, 84, flip=True, sh=(5, 2))
     return finish(w)
 
@@ -318,7 +318,7 @@ def _art_us10():
     w = _beach_ground(3)
     for (sp, x, y) in ((rock(3), 14, 56), (rock(1), 132, 60), (bush(2), 134, 92), (rock(2, True), 14, 94)):
         prop_at(w, sp, x, y)
-    cx, cy = 58, 84
+    cx, cy = 62, 82
     rcx, rcy = cx - 30 + 48, cy - 39 + 12              # Mitte des Schluesselrings
     cit = citizen('cloth', 0)
     w.draw(cit, int(rcx - 8), int(rcy - 12), cy - 3)    # Buerger im Ring: der Ring liegt davor

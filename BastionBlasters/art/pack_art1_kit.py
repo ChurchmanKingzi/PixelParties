@@ -150,8 +150,6 @@ def barrel_tube(c, x0, y0, x1, y1, w, ramp='gold', lo=1, hi=4, bands=(), band_ra
     ln = math.hypot(ux, uy)
     for t in bands:
         bx, by = x0 + ux * t, y0 + uy * t
-        for (a, b, idx) in ((0, w * 0.5 + 0.3, 1), (1, w * 0.5 + 0.3, 2)):
-            pass
         p0, p1 = axis_pts(bx, by, ux, uy, [(0, -w / 2 - 0.5), (0, w / 2 + 0.5)])
         c.line(p0[0], p0[1], p1[0], p1[1], band_ramp or ramp, 5 if hi >= 4 else hi)
         q0, q1 = axis_pts(bx, by, ux, uy, [(1.4, -w / 2 - 0.5), (1.4, w / 2 + 0.5)])

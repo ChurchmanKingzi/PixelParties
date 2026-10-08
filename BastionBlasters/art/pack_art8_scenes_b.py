@@ -68,16 +68,19 @@ def _art_bw03():
     world, c, out, geom = build_room('P', THEME_POWDER, 2, 2, seed=1)
     MX, MY, MW, MH = geom
     g = powder_gnome()
-    _feet(world, g, MX + 46, MY + 49, flip=True)
-    # Fliege kreist um ein Fass, glühende Asche fällt auf die Pulverspur
+    _feet(world, g, MX + 42, MY + 49)
+    # Fliege kreist um ein Fass, Rauch steigt aus der Pfeife, glühende Asche fällt auf die Pulverspur
     wdraw(world, fly(), MX + 26, MY + 2)
     for (dx, dy) in ((22, 6), (24, 4), (26, 2), (30, 5), (32, 6)):
         wpix(world, MX + dx, MY + dy + 2, 'coal', 3)
-    wdraw(world, ember_spark('gold'), MX + 33, MY + 40)
-    wdraw(world, smoke_wisp(0), MX + 26, MY + 6)
-    wdraw(world, smoke_wisp(1), MX + 20, MY - 6)
+    wdraw(world, smoke_wisp(0), MX + 50, MY + 12)
+    wdraw(world, smoke_wisp(1), MX + 50, MY + 0)
+    wdraw(world, ember_spark('gold'), MX + 52, MY + 24)
+    wdraw(world, ember_spark('fire'), MX + 49, MY + 34)
+    wdraw(world, ember_spark('gold'), MX + 35, MY + 41)
     prop_at(world, bush(1), MX - 20, MY + 24)
-    prop_at(world, rock(2), MX + MW + 22, MY + 66)
+    prop_at(world, bath_bucket(), MX + MW + 14, MY + 66)
+    prop_at(world, rock(2), MX + MW + 26, MY + 80)
     prop_at(world, bush(3, True), MX + MW + 20, MY + 24)
     return _fin(world, geom)
 
@@ -111,9 +114,11 @@ def _art_bw04():
     _feet(world, fireworks_worker(), MX + 54, MY + 49, flip=True)
     for (x, y, col) in ((MX + 10, MY + 4, 'gold'), (MX + 56, MY + 0, 'leaf'), (MX + 24, MY - 4, 'purple')):
         spark(world, x, y, col)
-    prop_at(world, bush(2), MX - 20, MY + 24)
-    prop_at(world, rock(1), MX + MW + 22, MY + 68)
-    prop_at(world, bush(3), MX + MW + 20, MY + 26)
+    for (dx, dy, col, r) in ((-20, 8, 'gold', 5), (MW + 20, 10, 'ice', 5), (-12, 52, 'purple', 4), (MW + 12, 56, 'leaf', 4)):
+        wdraw(world, star_burst(col, r), MX + dx - r, MY + dy - r)
+    prop_at(world, bush(2), MX - 20, MY + 34)
+    prop_at(world, rock(1), MX + MW + 22, MY + 72)
+    prop_at(world, bush(3), MX + MW + 20, MY + 36)
     return _fin(world, geom)
 
 
@@ -171,7 +176,8 @@ def _art_bw06():
         wdraw(world, rune_glyph(k, 'purple', 3), MX + dx + 1, MY + dy + 1, 8990)
         wdraw(world, rune_glyph(k, 'purple', 5), MX + dx, MY + dy)
     wdraw(world, star_burst('purple', 4), MX + 22, MY + 25)
-    prop_at(world, bush(1), MX - 20, MY + 24)
-    prop_at(world, rock(2), MX + MW + 22, MY + 66)
-    prop_at(world, bush(3, True), MX + MW + 20, MY + 24)
+    prop_at(world, crystal_cluster('purple'), MX - 20, MY + 36)
+    prop_at(world, bush(1), MX - 18, MY + 76)
+    prop_at(world, rock(2), MX + MW + 22, MY + 68)
+    prop_at(world, crystal_cluster('purple'), MX + MW + 20, MY + 34)
     return _fin(world, geom)

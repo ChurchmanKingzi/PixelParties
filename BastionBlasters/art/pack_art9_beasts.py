@@ -97,22 +97,6 @@ def hay_bale(w=24, h=16):
     return c
 
 
-def hay_pile(w=26, h=16):
-    c = Canvas(w, h)
-    ellipse(c, w / 2.0, h * 0.62, w * 0.48, h * 0.55, 'gold', lo=2, hi=5, ambient=0.25)
-    for k in range(10):
-        x = 4 + k * 2
-        c.line(x, h - 3, x + (k % 3) - 1, 3 + (k * 5) % 5, 'gold', 5 if k % 2 else 3)
-    # Heugabel steckt drin
-    c.line(w - 6, 2, w - 9, h - 2, 'wood', 3)
-    c.line(w - 5, 2, w - 8, h - 2, 'wood', 4)
-    for dx in (-1, 0, 1):
-        c.put_ramp(w - 6 + dx * 2, 0, 'metal', 5)
-        c.put_ramp(w - 6 + dx * 2, 1, 'metal', 3)
-    c.outline()
-    return c
-
-
 def manure_pile():
     """Haeufchen mit Fliegen (14 x 12)"""
     c = Canvas(14, 12)

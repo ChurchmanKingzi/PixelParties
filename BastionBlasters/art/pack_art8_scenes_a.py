@@ -105,9 +105,11 @@ def _art_bh07():
     for (dx, dy, col) in ((6, -6, 'gold'), (11, -10, 'fire'), (8, -15, 'gold'), (16, -8, 'gold'), (20, -14, 'fire'), (14, -19, 'gold')):
         wdraw(world, ember_spark(col), bx + dx, by + dy)
     # Quiek-Strahlen vor dem Schnabel
-    for (x0, y0, x1, y1) in ((4, -4, 8, -7), (6, 0, 11, 0), (4, 4, 8, 7)):
-        for k in range(4):
-            wpix(world, bx + x0 + (x1 - x0) * k // 3, by + y0 + (y1 - y0) * k // 3, 'bone', 5 if k < 3 else 4)
+    for (x0, y0, x1, y1) in ((6, -5, 12, -10), (8, 0, 15, 0), (6, 5, 12, 10)):
+        for k in range(6):
+            xx, yy = bx + x0 + (x1 - x0) * k // 5, by + y0 + (y1 - y0) * k // 5
+            wpix(world, xx, yy, 'bone', 5 if k < 4 else 4)
+            wpix(world, xx, yy + 1, 'gold', 4)
     for (dx, dy) in ((-30, -10), (-18, -22), (26, -18), (36, -6), (-36, 8)):
         wdraw(world, ember_spark('gold'), nx + 38 + dx, ny + dy)
     unit_at(world, citizen('cloth', 0), MX + MW - 10, MY + 68, flip=True, sh=(5, 2))

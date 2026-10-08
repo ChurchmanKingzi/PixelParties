@@ -139,12 +139,12 @@ def _art_ua05():
     ox, oy = _origin(spr, 36, 86)
     mx, my = ox + 51, oy + 13                              # Mündung
     w.draw(smoke_sprite(24, 16, 11, 3), mx + 8, my - 20, 9000)
-    pts = arc_pts(mx + 8, my - 4, 114, 80, 34, 14)
+    pts = arc_pts(mx + 8, my - 4, 114, 80, 28, 14)
     zielschatten(w, 114, 82, 17, 2)
     trail(w, pts[1:7], 'bone', 1, 2, 5, 3)
     op = pts[8]
     put(w, proj_orc(), op[0], op[1], 9100)
-    put(w, shout_bubble(), op[0] + 25, op[1] - 4, 9200)
+    put(w, shout_bubble(), op[0] + 19, op[1] - 13, 9200)
     for (x, y) in ((mx + 4, my - 2),):
         burst(w, x, y, 'fire', 10, 7, 3)
     return finish(w)
@@ -315,8 +315,8 @@ def _art_ua11():
     for (sp, x, y) in ((anvil(), 16, 36), (barrel(), 132, 34), (crate(), 132, 92)):
         prop_at(w, sp, x, y)
     spr = spr_coil_witch()
-    unit_at(w, spr, 30, 88, sh=(15, 4))
-    ox, oy = _origin(spr, 30, 88)
+    unit_at(w, spr, 30, 85, sh=(15, 4))
+    ox, oy = _origin(spr, 30, 85)
     tip = (ox + 40, oy + 19)                                   # Stabkugel
     g1 = guard('idle', 0)
     g2 = guard('idle', 1)
@@ -349,7 +349,6 @@ def _art_ua12():
     unit_at(w, spr, 34, 80, sh=(18, 4))
     # Rumpeln am Mörser: Erschütterungslinien
     for (x0, y0, x1, y1) in ((48, 82, 53, 84), (50, 78, 55, 79), (14, 82, 9, 84)):
-        w.draw(Canvas(1, 1), x0, y0, 0)
         for t in range(6):
             put_px(w, x0 + (x1 - x0) * t / 5.0, y0 + (y1 - y0) * t / 5.0, 'dirt', 5, 9000)
     # unterirdische Bohrspur: Erdhügel von der Kanone zur Mauer, werden niedriger

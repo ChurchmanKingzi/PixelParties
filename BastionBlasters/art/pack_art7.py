@@ -35,15 +35,16 @@ def stamp_wall(fp, kd, ht, x0, y0, x1, y1, h, kind=1):
 def beetle(kind='ladybug'):
     """winziger Käfer (6 x 5), blickt nach rechts"""
     c = Canvas(6, 5)
-    shell = {'ladybug': ('teamA', 3), 'gold': ('gold', 4), 'blue': ('ice', 3), 'green': ('leaf', 3)}[kind]
-    c.rect(1, 1, 4, 3, shell[0], shell[1])
-    c.put_ramp(1, 1, shell[0], shell[1] + 1)
-    c.put_ramp(2, 1, shell[0], shell[1] + 1)
-    c.put_ramp(5, 2, 'coal', 1)
-    c.put_ramp(3, 2, 'coal', 1) if kind == 'ladybug' else None
-    for x in (1, 3):
+    ramp, idx = {'ladybug': ('teamA', 3), 'gold': ('gold', 4), 'blue': ('ice', 3), 'green': ('leaf', 3)}[kind]
+    c.rect(1, 1, 4, 3, ramp, idx)
+    c.put_ramp(1, 1, ramp, idx + 1)                      # Glanzpunkt
+    c.put_ramp(2, 1, ramp, idx + 1)
+    c.put_ramp(5, 2, 'coal', 1)                          # Kopf
+    if kind == 'ladybug':
+        c.put_ramp(3, 2, 'coal', 1)                      # Punkte
+        c.put_ramp(2, 3, 'coal', 1)
+    for x in (1, 3):                                     # Beinchen
         c.put_ramp(x, 4, 'coal', 1)
-    c.put_ramp(2, 0, 'coal', 1) if kind == 'ladybug' else None
     return c
 
 
@@ -215,10 +216,12 @@ def _art_bs04():
     for k in range(7):
         wpx(w, 46 - k * 5, 92 - k * 5, 'purple', 3 + (k % 2), 9000)
         wpx(w, 47 - k * 5, 92 - k * 5, 'purple', 2, 9000)
-    wdisc(w, 56, 66, 3.5, 'purple', 4, 9100)
-    wdisc(w, 55, 65, 1.6, 'purple', 5, 9101)
-    ripple(w, 58, 62, 6)
-    ripple(w, 58, 62, 10)
+    wdisc(w, 54, 68, 5.2, 'purple', 3, 9100)
+    wdisc(w, 54, 68, 4.0, 'purple', 4, 9101)
+    wdisc(w, 53, 67, 2.2, 'purple', 5, 9102)
+    wpx(w, 52, 66, 'bone', 5, 9103)
+    ripple(w, 58, 60, 7)
+    ripple(w, 58, 60, 12)
     bolt = [(122, 4), (117, 12), (122, 18), (114, 26), (119, 31), (108, 40)]
     for (a_, b_) in zip(bolt, bolt[1:]):
         wline(w, a_[0], a_[1], b_[0], b_[1], 'gold', 4, 9000)
@@ -353,7 +356,6 @@ def _art_bs09():
         wpx(w, x, y, 'ice', 5, 9000)
         wpx(w, x, y + 1, 'ice', 3, 9000)
     # gelöschter Gegner rechts (rußig, dampft)
-    sk2 = tint_ramp(skeleton('idle', 0), 'stone', 0)
     unit_at(w, skeleton('idle', 0), 120, 84, flip=True, sh=(8, 3))
     c = puff(12, 9, 5, 'bone', 3, 5)
     w.draw(c, 120 - 6, 84 - 40, 9000)
@@ -430,7 +432,7 @@ def _puddle(w, x, y, rx, ry, ramp='slime'):
 
 @card_art('BT-02')
 def _art_bt02():
-    t = TW('grass', 3, gloop_tower())
+    t = TW('dirt', 3, gloop_tower())
     for (sp, x, y) in ((bush(2), 128, 52), (rock(2), 14, 90), (tree_pine(1), 138, 36)):
         t.prop(sp, x, y)
     # Schleimbälle fliegen in hohem Bogen auf den Gegner
@@ -449,7 +451,7 @@ def _art_bt02():
         t.px(x, y, 'slime', 4)
         t.px(x, y + 1, 'slime', 3)
     t.burst(111, 62, False, 'slime')
-    t.unit(skeleton('walk', 2), 92, 91, flip=True, sh=(8, 3))
+    t.unit(goblin('walk', 2), 90, 91, flip=True, sh=(8, 3))
     return t.done()
 
 
@@ -510,24 +512,22 @@ def _art_bt04():
     for (sp, x, y) in ((tree_round(2), 134, 42), (bush(2, True), 12, 56), (rock(2), 14, 90)):
         t.prop(sp, x, y)
     eye = (62, 57)
-    far = (140, 83)
+    far = (141, 84)
     targets = [(92, 79), (110, 85), (128, 91)]
-    for (x, y) in targets:
-        t.shadow(x, y, (8, 3))
-    # Strahl: lila Mantel (Dither), Kern hell, durchschlägt alle drei; Zirp-Wellen als Bögen
+    for k, (x, y) in enumerate(targets):
+        t.unit(skeleton('idle', k % 2), x, y, flip=True, top=True)
+    # Strahl durchschlägt alle drei (liegt über den Körpern): Mantel (Dither), lila Kern, heller Faden; Zirp-Wellen als Bögen
     for (x, y) in _beam_pts(eye, far):
-        for dy in (-3, -2, -1, 0, 1, 2, 3):
-            if abs(dy) == 3 and int(x + y) % 2:
+        for dy in (-2, -1, 0, 1, 2):
+            if abs(dy) == 2 and int(x + y) % 2:
                 continue
-            if abs(dy) == 3:
-                ramp, idx = 'purple', 3
-            elif abs(dy) == 2:
+            if abs(dy) == 2:
                 ramp, idx = 'purple', 4
             elif abs(dy) == 1:
                 ramp, idx = 'purple', 5
             else:
                 ramp, idx = 'bone', 5
-            t.px(x, y + dy, ramp, idx, 5000)
+            t.px(x, y + dy, ramp, idx, 9500)
     ang = math.atan2(far[1] - eye[1], far[0] - eye[0])
     for k in range(5):
         d = 14 + k * 13
@@ -536,13 +536,11 @@ def _art_bt04():
             aa = ang + math.radians(a)
             px_ = cx + math.cos(aa) * (6 + k * 0.7)
             py_ = cy + math.sin(aa) * (6 + k * 0.7)
-            t.px(px_, py_, 'purple', 5, 5002)
-            t.px(px_ + 1, py_, 'purple', 3, 5002)
-    for (x, y) in targets:
-        t.unit(skeleton('idle', 0 if x != 110 else 1), x, y, flip=True, top=True, shade=False)
+            t.px(px_, py_, 'purple', 5, 9502)
+            t.px(px_ + 1, py_, 'purple', 3, 9502)
     for (x, y) in targets:
         t.burst(x, y - 13, False, 'purple')
-        t.burst(x - 7, y - 24 if x != 92 else y - 26, False, 'bone')
+        t.burst(x - 8, y - 25, False, 'bone')
     return t.done()
 
 
@@ -591,8 +589,8 @@ def _art_bt06():
     chain2 = zigzag(B[0], B[1] - 14, C[0], C[1] - 14, 3, 3, 8)
     for pts in (main, chain1, chain2):
         for (a, b) in zip(pts, pts[1:]):
-            t.line(a[0], a[1], b[0], b[1], 'gold', 4, 5000)
-            t.line(a[0] + 1, a[1], b[0] + 1, b[1], 'gold', 3, 5000)
+            t.line(a[0] - 1, a[1], b[0] - 1, b[1], 'gold', 3, 5000)
+            t.line(a[0] + 1, a[1], b[0] + 1, b[1], 'gold', 4, 5000)
             t.line(a[0], a[1], b[0], b[1], 'bone', 5, 5001)
     t.unit(skeleton('idle', 0), A[0], A[1], flip=True, top=True, shade=False)
     t.unit(goblin('idle', 1), B[0], B[1], flip=True, top=True, shade=False)
