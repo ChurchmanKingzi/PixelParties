@@ -19,7 +19,7 @@ from PIL import Image
 from anim_common import rgb, save_outputs
 
 N = 48
-SW, SH = 28, 38                                     # Sprite-Leinwand
+SW, SH = 22, 28                                     # Sprite-Leinwand
 PL, PR, PT, PB = 4, 4, 3, 2                         # Rand in der Animation
 H, W = SH + PT + PB, SW + PL + PR
 
@@ -113,10 +113,10 @@ def curve(base_pts, i, amp, cycles, ph):
 
 
 # --- Teile (Ruhepose) --------------------------------------------------------
-EAR_L = [(3.0, 8.0), (2.0, 13.0), (1.6, 18.5), (1.9, 24.5)]
-EAR_R = [(10.6, 9.0), (10.2, 14.0), (9.9, 19.0), (10.3, 24.5)]
-TAIL = [(16.5, 27.0), (21.0, 28.5), (24.5, 25.0), (25.5, 19.5), (24.0, 14.5)]
-TAIL_R = [3.4, 3.2, 2.7, 2.0, 0.9]
+EAR_L = [(2.4, 6.5), (1.6, 10.5), (1.3, 15.0), (1.5, 19.5)]
+EAR_R = [(9.6, 8.0), (9.3, 12.0), (9.1, 15.5), (9.4, 19.5)]
+TAIL = [(12.5, 23.0), (15.5, 23.5), (18.0, 21.0), (18.8, 17.0), (17.8, 13.5)]
+TAIL_R = [2.2, 2.1, 1.7, 1.3, 0.7]
 
 
 def render(i):
@@ -129,14 +129,14 @@ def render(i):
     tp = curve(TAIL, i, 2.4, 2, 0.4)
     paint(img, strand(tp, TAIL_R), white)
     # Beine (lang), unten fest
-    for x0, x1 in ((7, 10), (14, 17)):
-        paint(img, rect(x0, 22 + bob, x1, SH - 1), white)
+    for x0, x1 in ((6, 9), (11, 14)):
+        paint(img, rect(x0, 18 + bob, x1, SH - 1), white)
         paint(img, rect(x0 - 1, SH - 3, x1 + 1, SH - 1), white)
     # Rumpf
-    torso = ellipse(11.8, 19.5 + bob, 5.4, 6.4)
+    torso = ellipse(9.8, 16.0 + bob, 4.4, 4.9)
     paint(img, torso, white)
     # Kyubeys roter Kreis am RÜCKEN (rechte Rumpfseite, zum Schwanz hin)
-    mx, my = 13, 16 + bob
+    mx, my = 10, 13 + bob
     for dx, dy in ((1, 0), (2, 0), (0, 1), (3, 1), (0, 2), (3, 2), (1, 3), (2, 3)):
         if 0 <= my + dy < SH and 0 <= mx + dx < SW and torso[my + dy, mx + dx]:
             img[my + dy, mx + dx] = C['M']
@@ -156,34 +156,34 @@ def render(i):
             img[ty - 1, tx] = C['R']
     # Papiertüten-Kopf (rechts)
     flap = int(round(math.sin(2 * math.pi * 3 * i / N))) if i else 0
-    bag = rect(12, 4 + kb, 22, 15 + kb)
-    for (x0, y0, x1, y1) in ((13, 2, 15, 4), (19, 1, 22, 4), (15, 3, 19, 4), (16 + flap, 0, 18 + flap, 3)):
+    bag = rect(10, 3 + kb, 18, 12 + kb)
+    for (x0, y0, x1, y1) in ((11, 1, 13, 3), (16, 0, 18, 3), (13, 2, 16, 3), (13 + flap, 0, 15 + flap, 2)):
         bag |= rect(x0, y0 + kb, x1, y1 + kb)
     def bagc(x, y, m):
-        if (x in (14, 18, 21) and y > 9 + kb) or y == 14 + kb:
+        if (x in (12, 15, 17) and y > 8 + kb) or y == 11 + kb:
             return C['n']
-        if x <= 13:
+        if x <= 11:
             return C['b']
         return C['B']
     paint(img, bag, bagc)
     glow = (i // 2) % 4
-    for hx in (14, 18):
-        img[8 + kb, hx] = C['K']; img[8 + kb, hx + 1] = C['K']; img[9 + kb, hx] = C['K']
-        img[9 + kb, hx + 1] = C['r'] if glow in (0, 1) else C['K'] if glow == 2 else C['E']
+    for hx in (11, 15):
+        img[6 + kb, hx] = C['K']; img[6 + kb, hx + 1] = C['K']; img[7 + kb, hx] = C['K']
+        img[7 + kb, hx + 1] = C['r'] if glow in (0, 1) else C['K'] if glow == 2 else C['E']
     # Kyubey-Kopf (links)
-    paint(img, poly([(2.2, 7.0 + kb), (3.0, 1.8 + kb), (6.2, 5.0 + kb)]), white)           # Katzenohr links
-    paint(img, poly([(10.8, 7.0 + kb), (10.0, 1.8 + kb), (6.8, 5.0 + kb)]), white)         # Katzenohr rechts
-    paint(img, ellipse(6.5, 9.5 + kb, 4.9, 4.5), white)
-    for (x, y) in ((4, 4 + kb), (4, 5 + kb), (9, 4 + kb), (9, 5 + kb)):
+    paint(img, poly([(1.4, 6.0 + kb), (2.0, 1.4 + kb), (5.0, 4.4 + kb)]), white)           # Katzenohr links
+    paint(img, poly([(9.6, 6.0 + kb), (9.0, 1.4 + kb), (6.0, 4.4 + kb)]), white)         # Katzenohr rechts
+    paint(img, ellipse(5.5, 8.0 + kb, 4.3, 4.0), white)
+    for (x, y) in ((3, 3 + kb), (3, 4 + kb), (8, 3 + kb), (8, 4 + kb)):
         img[y, x] = C['P']
-    for xx in (3, 8):
+    for xx in (2, 6):
         for (dx, dy, c) in ((0, 0, 'e'), (1, 0, 'E'), (0, 1, 'E'), (1, 1, 'E')):
             if blink:
-                img[9 + kb, xx + dx] = C['O']
-                img[8 + kb, xx + dx] = C['W']
+                img[7 + kb, xx + dx] = C['O']
+                img[6 + kb, xx + dx] = C['W']
             else:
-                img[8 + kb + dy, xx + dx] = C[c]
-    img[11 + kb, 6] = C['O']; img[11 + kb, 7] = C['O']; img[12 + kb, 5] = C['O']; img[12 + kb, 8] = C['O']   # ω-Mund
+                img[6 + kb + dy, xx + dx] = C[c]
+    img[9 + kb, 5] = C['O']; img[9 + kb, 6] = C['O']; img[10 + kb, 4] = C['O']; img[10 + kb, 7] = C['O']   # ω-Mund
     # Goldene Reifen UM die Ohren (Rückseite dunkel oben, Vorderseite hell unten)
     for cp in ears:
         cx, cy = int(round(cp[2][0])), int(round(cp[2][1]))
