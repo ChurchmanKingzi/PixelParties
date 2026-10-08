@@ -33008,19 +33008,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
   const pendingEndTurnRef = useRef(null); // stores the target phase for deferred advance
 
-  // ── Tutorial 1: kein Phasenwechsel ──
-  // Einzige Ausnahme: zur Action Phase (3) — und die erst, wenn Ida
+  // ── Tutorial: kein Phasenwechsel von Hand ──
+  // Skripte mit `nurActionPhase` (Tutorial 1 und 3) erlauben nur den Sprung
+  // in die Action Phase (3). In Tutorial 1 zusaetzlich erst, wenn Ida
   // Destruction Magic auf Stufe 3 angelegt hat. Gilt fuer alle Wege
   // (Phasenleiste, Next Phase, End Turn, Leertaste), weil sie alle ueber
   // `tryAdvancePhase` laufen; die Knoepfe sperren sich zusaetzlich optisch.
-  const tutorial1Phasensperre = !!(gameState.isTutorial && window._currentTutorialNum === 1);
+  const tutorialPhasensperre = !!(gameState.isTutorial && (window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.nurActionPhase);
   const tutorial1DestructionMagic = (() => {
-    if (!tutorial1Phasensperre) return 0;
+    if (!tutorialPhasensperre || window._currentTutorialNum !== 1) return 0;
     const idaIdx = me.heroes.findIndex(h => h?.name && h.name.startsWith('Ida'));
     if (idaIdx < 0) return 0;
     return (me.abilityZones[idaIdx] || []).flat().filter(n => n === 'Destruction Magic').length;
   })();
-  const tutorialPhaseErlaubt = (ziel) => !tutorial1Phasensperre || (ziel === 3 && tutorial1DestructionMagic >= 3);
+  const tutorialSprungOk = window._currentTutorialNum !== 1 || tutorial1DestructionMagic >= 3;
+  const tutorialPhaseErlaubt = (ziel) => !tutorialPhasensperre || (ziel === 3 && tutorialSprungOk);
 
   // ★ Als Befund 8.10. („This Action is not possible right now" mitten im
   // Tutorial, nicht reproduzierbar): Ein Doppelklick auf einen Phasenkasten
@@ -33040,7 +33042,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Shared phase advance with optional end-turn confirmation
   const tryAdvancePhase = useCallback((targetPhase) => {
-    if (tutorial1Phasensperre && !(targetPhase === 3 && tutorial1DestructionMagic >= 3)) return;
+    if (tutorialPhasensperre && !(targetPhase === 3 && tutorialSprungOk)) return;
     if (phasenWunschDoppelt(targetPhase)) return;
     if (targetPhase === 5 && askBeforeEndTurn) {
       pendingEndTurnRef.current = targetPhase;
@@ -33048,7 +33050,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     } else {
       socket.emit('advance_phase', { roomId: gameState.roomId, targetPhase });
     }
-  }, [askBeforeEndTurn, gameState.roomId, tutorial1Phasensperre, tutorial1DestructionMagic]);
+  }, [askBeforeEndTurn, gameState.roomId, tutorialPhasensperre, tutorialSprungOk]);
 
   const confirmEndTurn = useCallback(() => {
     const target = pendingEndTurnRef.current;
@@ -46766,8 +46768,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
 
           {/* Phase tracker — positioned absolutely, left edge */}
-          {/* Tutorial 1: Phasenwechsel gesperrt, nur die Action Phase ist
-              (mit Destruction Magic 3) erlaubt — siehe `tutorialPhaseErlaubt`. */}
+          {/* Tutorial (nurActionPhase): Phasenwechsel gesperrt, nur die Action Phase
+              ist erlaubt — siehe `tutorialPhaseErlaubt`. */}
           <div className="phase-column">
             {gameState.skillTest && window.StTurnPanel ? <window.StTurnPanel gameState={gameState} myIdx={myIdx} isSpectator={isSpectator} focusSeat={stMulti ? oppIdx : null} onFocus={stMulti ? setStFocusPin : null} /> : <>
             <div className="board-phase-tracker">
@@ -46781,7 +46783,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 );
                 return (
                   <div key={i}
-                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '') + (canClick && tutorial1Phasensperre && i === 3 ? ' phase-item-hinweis' : '')}
+                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '') + (canClick && tutorialPhasensperre && i === 3 ? ' phase-item-hinweis' : '')}
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>

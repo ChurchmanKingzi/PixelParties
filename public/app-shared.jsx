@@ -8393,8 +8393,44 @@ function TextBox() {
 //  TUTORIAL SCRIPTS — Intro/outro dialogue for each tutorial stage
 //  Keyed by tutorial number (1, 2, 3...)
 // ═══════════════════════════════════════════════════════════════
+/**
+ * Zaehlt die ATK-Anzeige eines Helden ueber `dauer` ms von `von` auf `nach`
+ * hoch (Tutorial 3: Willys Boost auf 9999). Der Server setzt den Wert sofort;
+ * hier steigt nur die ANZEIGE sichtbar an. Geschrieben wird direkt in den
+ * Textknoten der Zahl (`nodeValue`) — React haelt eine Referenz darauf und
+ * aktualisiert ihn weiter, ein `textContent` haette ihn ersetzt. Der Selektor
+ * trifft auch den Highlight-Klon im Overlay, der sonst den alten Wert zeigte.
+ */
+function zaehleAtkHoch(heldSelektor, von, nach, dauer) {
+  const t0 = performance.now();
+  const schritt = () => {
+    const t = Math.min(1, (performance.now() - t0) / dauer);
+    const wert = Math.round(von + (nach - von) * (1 - Math.pow(1 - t, 2.2)));
+    document.querySelectorAll(heldSelektor + ' .board-card-atk-num').forEach(el => {
+      const tn = el.firstChild;
+      if (tn && tn.nodeType === 3) tn.nodeValue = String(wert);
+      el.classList.toggle('atk-zaehlt', t < 1);
+    });
+    if (t < 1) requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+}
+
+/** Tutorial 3: Antonias „Gefallen" — Willy bekommt 9999 ATK (Server), die
+ *  Anzeige zaehlt ueber ~3 s hoch. */
+function tutorial3WillyBoost() {
+  const sel = '[data-hero-owner="me"][data-hero-name*="Willy"]';
+  const el = document.querySelector(sel + ' .board-card-atk-num');
+  const von = el ? (parseInt(el.textContent, 10) || 0) : 0;
+  socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
+  zaehleAtkHoch(sel, von, 9999, 3200);
+}
+
 const TUTORIAL_SCRIPTS = {
   1: {
+    // Phasenwechsel von Hand nur von Main 1 in die Action Phase — und erst mit
+    // Destruction Magic 3 an Ida (s. Board).
+    nurActionPhase: true,
     // Regieanweisungen des Skripts: ein Highlight gilt ab der Seite, vor
     // der es steht, bis zur naechsten Anweisung. Highlights pulsieren
     // standardmaessig leicht (s. TextBox).
@@ -8488,102 +8524,62 @@ const TUTORIAL_SCRIPTS = {
       { text: 'See you next lesson, beep-boop!' },
     ],
   },
-  3: {
+  3: (() => {
+    // Antonia (rechts): als „Jetpack Raccoon" gefuehrt, bis sie sich in
+    // Tutorial 5 vorstellt; ALLE ihre Texte wackeln (`shakeText`).
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true, ...extra });
+    // Monia im Epilog: ausgebremst, daher Silber statt Rot.
+    const M = (text) => ({ text, speakerName: 'Monia Bot', nameColor: 'silver' });
+    return {
     opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    // Phasenwechsel von Hand nur von Main 1 in die Action Phase (s. Board).
+    nurActionPhase: true,
     intro: [
-      { text: 'Heya, welcome back to the battlefield!' },
-      { text: "{green:**Creatures**} are great for spreading damage, but there's more efficient ways to deal with a single strong target!",
+      { text: 'Heya!\nWelcome back to the battlefield!' },
+      { text: "{green:**Creatures**} are great for spreading damage, but there are more efficient ways to deal with individual powerful targets!" },
+      { text: 'Just look at-' },
+      // ── Antonia tritt auf, die Musik wechselt (`enterRight`) ──
+      A('Khekeke! You wants da **damage**?', { enterRight: true }),
+      A('I gots da **damages** for ya!'),
+      A("Listen, kiddo!\nDa real **big damages** aren't done with Blah-Blah-Spells or Who-Cares-Creatures, ya hear me?"),
+      A("{red:**Attacks!**}\nDat's what it's all abouts, ya get me?!"),
+      A("Can't go wrong with da **BEEG BONK** for da beeg damages, right?"),
+      // ── Highlight Willy; sein Angriffswert steigt ueber einige Sekunden auf
+      //    9999, dazu der Buff-Klang (kommt vom Server-Log `atk_grant`) ──
+      A("Dere ya go - I've done ya a little somethin' of a favor, ya see?\nYour eternal gratitudes are appreciated, kheke!", {
+        onShow: () => tutorial3WillyBoost(),
         highlights: [
-          { selector: '[data-hero-owner="opp"][data-hero-name*="Fiona"]', pulse: true },
-        ] },
-      { text: 'Just look at -', enterRight: true },
-      { text: 'Khekhekhe! You want da damage?', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: 'I got da damages for ya!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Listen, kiddo! Da real **big** damages aren't done with Blah-Blah-Spells or Who-Cares-Creatures!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "{red:**Attacks!**}\nDat's what it's all about, ya get me?!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      // Der Boost (Sound + Stat-Aenderung + Highlight) sitzt auf DIESER
-      // Seite, nicht mehr auf der "Dere"-Seite darunter: Al will Highlight
-      // und Update zeitgleich mit dem Sound sehen, also BEVOR Antonia den
-      // Gefallen ankuendigt. Vorher lief alles erst mit ihrer Ansage los,
-      // wodurch der Stat-Sprung dem Text hinterherhinkte.
-      { text: "Can't go wrong with da BONK for **big** damages, right?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
-        onShow: () => {
-          socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
-          const el = document.querySelector('[data-hero-owner="me"][data-hero-name*="Willy"]');
-          if (el) { el.classList.add('tutorial-boost-anim'); setTimeout(() => el.classList.remove('tutorial-boost-anim'), 2500); }
-        },
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+        ] }),
+      A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost'll help ya hit **real hard**!", {
         highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
-        ] },
-      // KEIN Highlight mehr: der Boost samt Hervorhebung ist auf der Seite
-      // davor passiert, hier waere es nur eine zweite pulsierende Schicht
-      // ueber derselben Karte.
-      { text: "Dere - I've done ya a little somethin' of a favor, ya see?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Attacks do harder BONKs when your Heroes got higher BONK stats, so dis lil' boost'll help you hit real hard!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+          '[data-hero-owner="me"][data-hero-name*="Willy"]',
+        ] }),
+      // ── Highlight Hammer Throw ──
+      A("Now use dat {red:**Attack**} in ya hand to break some bonez.\nOr all of dem, khehe!", {
         highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
-          { selector: '[data-ability-owner="me"][data-card-name="Fighting"]', pulse: true },
-        ] },
-      { text: "Now use dat {red:**Attack**} in your hand to break some bones or somethin'!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          '.game-hand-me .hand-slot',
-        ] },
-      { text: '...' },
-      { text: "But that's not even...!" },
+          '.game-hand-me [data-card-name="Hammer Throw"]',
+        ] }),
+      // Das Hammer-Throw-Highlight haelt bis zum Ende der Einleitung.
+      { text: '...', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
+      { text: 'What?', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
+      { text: 'But - that wasn\'t even necessary-!', highlights: ['.game-hand-me [data-card-name="Hammer Throw"]'] },
     ],
     outro: [
-      { text: "Not bad, eh? Dat poor princess'll feel dat one for a while, khekhe...!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
-      { text: "Or ... not feel it at all anymore, being *dead* an' all.", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Khekhekhekhe, you're fun to bozz around, Imma be back for ya later!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', exitRight: true, shakeText: true },
-      { text: '... you could have...', speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: "... this wasn't even...!", speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: '...', speakerName: 'Monia Bot', nameColor: 'silver' },
-      { text: 'Okay. Attacks. Big strong. See you next lesson.', speakerName: 'Monia Bot', nameColor: 'silver' },
+      A('Khehehe, nice show!', { enterRight: true }),
+      A("Not bad, eh? Felt dat satisfyin' **CRUNCH**?\nDat poor princess'll feel dat one for a while!"),
+      A("Or ... not feel it, being *dead* 'n' all.\nKhekekekeke!"),
+      A("Hey? You're one fun lil' minion to bozz around!\nImma be back for ya later!"),
+      A('See ya, khekeke!', { exitRight: true }),
+      M('... what...? What *was*...?\nYou - you could have just...'),
+      M("This really wasn't even necessary...!"),
+      M('...'),
+      M('Okay. Fine.\n{red:**Attacks**}. Big strong.\nWhatever that *stupid* raccoon said.'),
+      M('...'),
+      M('See you next lesson.'),
     ],
-  },
-  5: {
-    opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
-    intro: [
-      { text: 'Heya, welcome back! This time, let me tell you a bit about {#ffd700:**Gold**}.' },
-      // Textboxes 2–4: still called "Jetpack Raccoon" — she hasn't revealed
-      // her real name yet.
-      { text: 'KHEKHEKHE - GOLD?! I LOVE Gold! Wheah?!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', enterRight: true, shakeText: true },
-      { text: '...' },
-      { text: 'Again? What even **are** you?!' },
-      // Textbox 5: Antonia drops the alias — her portrait label flips to
-      // "Antonia" from this page on (and sticks, thanks to the sticky
-      // name logic).
-      { text: 'Khekhekhe - I am the GRRRRREAT Antonia! If you have Gold, it actually belongs to me!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: '... is that so?' },
-      { text: 'Aye! But the GRRRREAT Antonia is nothing if not **generous**!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "Oi, amateur! Dere! Take some of dis pocket change I gots lyin' around!", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        onShow: () => {
-          socket.emit('tutorial_modify', { type: 'tutorial5_gold' });
-        } },
-      { text: 'Gold is resource - Gold is POWAH! With dis, just go murk dem enemies khekhekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: 'See de number on dose Artifact cards?', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
-        ] },
-      { text: "It's dere Cost! Pay dat much Gold to use de Artifact! Easy, right?", side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '.game-hand-me [data-card-type="Artifact"]', pulse: true },
-        ] },
-      { text: 'Some other effects are also greedy and want my hard-earned Golds!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true,
-        highlights: [
-          { selector: '[data-ability-owner="me"][data-card-name="Alchemy"]', pulse: true },
-        ] },
-      { text: 'But just dis once, you are allowed to spend as much as you can khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true },
-      { text: "But ... that's... there's no learning when you just give out..." },
-    ],
-    outro: [
-      { text: 'Khekhe, good job! You be a GRRRREAT waster of my Golds! Now you owe me khekhe!', side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', enterRight: true, exitRight: true, shakeText: true },
-      { text: '...' },
-      { text: "Seriously, you didn't NEED that extra Gold, all the necessary resources were already..." },
-      { text: 'Welp. Looks like you have a raccoon loan now.' },
-      { text: 'See you next time beep-boop.' },
-    ],
-  },
+    };
+  })(),
   4: {
     intro: [
       { text: '...' },
