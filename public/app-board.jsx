@@ -2855,6 +2855,25 @@ function HeroStatusPartikel({ effekte, kern, s, mitteX, fw, fh, saat }) {
   );
 }
 
+/**
+ * Quetscht eine Heldenzone UND die animierte Figur darauf — gleicher Effekt,
+ * gleiche Dauer. Die Figur lebt in einer eigenen Ebene und bekommt die
+ * Klasse der Zone nicht mit, deshalb setzt das Attribut `data-squash` an
+ * ihrem Platz dieselbe Bewegung (CSS: `.hero-idle-platz[data-squash]`).
+ * Als Attribut statt Klasse, damit ein Neu-Rendern es nicht wegraeumt.
+ * Hat die Zone keine Figur (Held ohne Spritesheet, Kreatur), bleibt es bei
+ * der Zonenklasse.
+ */
+function ppZonenSquash(zone, klasse, ms) {
+  zone.classList.add(klasse);
+  const platz = zone._ppFigurPlatz;
+  if (platz) platz.setAttribute('data-squash', '1');
+  setTimeout(() => {
+    zone.classList.remove(klasse);
+    if (platz) platz.removeAttribute('data-squash');
+  }, ms);
+}
+
 // Eine Idle-Animation, die auf dem oberen Kartendrittel einer Heldenzone
 // steht. In der Zone selbst liegt nur ein unsichtbarer Anker; die Figur
 // wird in die Sprite-Ebene portiert und folgt der Zone dort (Lage,
@@ -2901,6 +2920,8 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     const cv = canvasRef.current, platz = platzRef.current, anker = ankerRef.current;
     if (!eintrag || !ebene || !cv || !platz || !anker) return;
     const zone = anker.parentElement;
+    // Die Zone kennt ihre Figur (`ppZonenSquash` quetscht beide gemeinsam).
+    zone._ppFigurPlatz = platz;
     const ctx = cv.getContext('2d');
     const { meta, img } = eintrag;
     const fw = meta.frameWidth, fh = meta.frameHeight;
@@ -3085,6 +3106,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     } catch { ro = null; }
     return () => {
       abmelden();
+      if (zone._ppFigurPlatz === platz) delete zone._ppFigurPlatz;
       if (ro) ro.disconnect();
       zone.removeEventListener('mouseenter', hoverMelden);
       zone.removeEventListener('mouseleave', hoverMelden);
@@ -16959,10 +16981,7 @@ const ANIM_REGISTRY = {
             const d = Math.abs(cx - x) + Math.abs(cy - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
-          if (best && bestDist < 80) {
-            best.classList.add('magic-hammer-squashed');
-            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 650);
-          }
+          if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 650);
         }, 330);
         return () => clearTimeout(timer);
       }, []);
@@ -17025,10 +17044,7 @@ const ANIM_REGISTRY = {
             const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
             if (d < bestDist) { bestDist = d; best = el; }
           });
-          if (best && bestDist < 80) {
-            best.classList.add('magic-hammer-squashed');
-            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 550);
-          }
+          if (best && bestDist < 80) ppZonenSquash(best, 'magic-hammer-squashed', 550);
         }, 300);
         return () => clearTimeout(timer);
       }, []);
