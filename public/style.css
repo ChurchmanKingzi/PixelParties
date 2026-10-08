@@ -3762,6 +3762,87 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   80%  { transform: scaleY(1.03); }
   100% { opacity: 1; transform: none; }
 }
+/* ── Aufstiegs-Morph (HeroIdleSprite `aufstieg`, GameBoard `ascMorph`) ──
+   Waehrend `hero_ascension` stehen die alte und die neue Figur an derselben
+   Stelle. Die Weissfaerbung malt der Sprite selbst ins Canvas (JS, ascWeiss);
+   hier laeuft die Ueberblendung samt Quetschen/Strecken, das Licht um die
+   Figur und der Blitz ueber der Karte. Dauer 2 s = ASC_DAUER_MS (app-board);
+   der Server haelt den Sync bis ~45 % zurueck (ASCENSION_MORPH_SYNC_MS). */
+/* Kein „Aufsteigen aus der Karte" waehrend des Morphs — und NICHT `animation: none`:
+   beim Entfernen der Klasse finge `heroIdleAuftritt` sonst von vorn an (die Figur
+   stiege nach dem Morph noch einmal aus der Karte). Dauer 0 s laesst sie fertig. */
+.hero-idle-aufstieg .hero-idle-canvas { animation-duration: 0s; }
+.hero-idle-aufstieg-alt .hero-idle-holo { animation: heroAufstiegAlt 2s linear both; }
+.hero-idle-aufstieg-neu .hero-idle-holo { animation: heroAufstiegNeu 2s linear both; }
+@keyframes heroAufstiegAlt {
+  0%   { opacity: 1; transform: none; }
+  30%  { opacity: 1; transform: scale(1.02); }
+  44%  { opacity: 1; transform: scale(1.07, .97); }
+  58%  { opacity: .6; transform: scale(.94, 1.1); }
+  70%  { opacity: 0; transform: scale(.86, 1.2); }
+  100% { opacity: 0; transform: scale(.86, 1.2); }
+}
+@keyframes heroAufstiegNeu {
+  0%, 36% { opacity: 0; transform: scale(1.14, .86); }
+  50%  { opacity: .85; transform: scale(.96, 1.08); }
+  60%  { opacity: 1; transform: scale(1.04, .97); }
+  72%  { opacity: 1; transform: scale(.99, 1.01); }
+  82%  { opacity: 1; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+.hero-idle-licht {
+  /* Die Lichtkugel bleibt INNERHALB der Figurenbox und blendet zu deren Rand
+     auf 0 aus: ueber die Box hinaus schnitt die 3D-Ebene das Licht an der
+     linken Kante hart ab (sichtbare senkrechte Kante). */
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(closest-side ellipse at 50% 55%, rgba(255,255,255,.98) 0%, rgba(255,255,255,.7) 38%, rgba(255,255,255,0) 100%);
+  opacity: 0;
+  animation: heroAufstiegLicht 2s ease-in-out both;
+}
+@keyframes heroAufstiegLicht {
+  0%   { opacity: 0;   transform: scale(.35); }
+  25%  { opacity: .55; transform: scale(.7); }
+  44%  { opacity: 1;   transform: scale(1); }
+  58%  { opacity: .95; transform: scale(1); }
+  80%  { opacity: .3;  transform: scale(.96); }
+  100% { opacity: 0;   transform: scale(.9); }
+}
+.hero-idle-licht-funke {
+  position: absolute;
+  bottom: 22%;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(255,255,255,.9);
+  opacity: 0;
+  animation: heroAufstiegFunke 1.2s ease-out both;
+}
+@keyframes heroAufstiegFunke {
+  0%   { opacity: 0; transform: translateY(0) scale(.6); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(calc(-1 * var(--lf-hoehe, 80px))) scale(1); }
+}
+.hero-aufstieg-karte {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, #fff 0%, rgba(255,255,255,.85) 38%, rgba(255,255,255,0) 78%);
+  opacity: 0;
+  animation: heroAufstiegKarte 2s ease-in-out both;
+}
+@keyframes heroAufstiegKarte {
+  0%, 12% { opacity: 0; }
+  36%  { opacity: .5; }
+  44%  { opacity: 1; }
+  58%  { opacity: .95; }
+  82%  { opacity: .25; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-idle-licht-funke { display: none; }
+}
 /* ── Eiskruste um eingefrorene Figuren (v1457, Kruste seit v1458) ─────
    Pixelbild in Sprite-Auflösung (maleEiskruste), deckungsgleich mit der
    Figur und IN ihrer Hülle: steht mit ihr aufrecht und zieht sich beim

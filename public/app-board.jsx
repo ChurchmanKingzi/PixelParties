@@ -2882,7 +2882,45 @@ function ppZonenSquash(zone, klasse, ms) {
 // `versteinert`: zusätzlich Steinoptik (kriecht von unten nach oben).
 // `eingefroren`: zusätzlich eine Eiskruste um die Figur (v1457/v1458).
 // `effekte`: weitere Status als Leerzeichen-Liste (Tönung + Partikel, v1459).
-function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet }) {
+// ── Aufstiegs-Morph (Als Vorgabe: „Ein weisses Licht huellt den vorigen
+// animierten Sprite ein, der morpht dann und transitioned zum neuen
+// animierten Sprite des Ascended Heroes") ───────────────────────────────
+// Waehrend `hero_ascension` stehen ZWEI Figuren an derselben Stelle: die
+// alte (`rolle: 'alt'`) und die neue (`'neu'`). Die Weissfaerbung malt der
+// Sprite selbst in sein Canvas (`source-atop`, Alpha bleibt) — pixelgenau
+// statt per CSS-Filter, der auf dem Steher ohnehin den 3D-Stand nicht
+// vertruege. Alt: wird bis ~42 % ganz weiss, ueberblendet dann (CSS,
+// `.hero-idle-aufstieg-alt`) zur neuen Figur, die als weisse Silhouette
+// erscheint und ab der Haelfte ihre Farben zurueckbekommt. Der Server
+// haelt den Sync bis ~45 % zurueck (ASCENSION_MORPH_SYNC_MS in der
+// Engine), der Kartenwechsel faellt also in den weissen Hoehepunkt.
+// ASC_DAUER_MS und die CSS-Dauer (`heroAufstiegAlt/Neu`) gehoeren zusammen.
+const ASC_DAUER_MS = 2000;
+const ascGlatt = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+function ascWeiss(rolle, u) {
+  const w = rolle === 'alt' ? ascGlatt(u / 0.42) : 1 - ascGlatt((u - 0.5) / 0.45);
+  return Math.round(w * 20) / 20;
+}
+// Weisse Funken im Licht um die neue Figur (zufaellig, einmal je Morph).
+function HeroAufstiegLicht() {
+  const funken = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
+    x: 18 + Math.random() * 64, d: 0.25 + Math.random() * 0.55,
+    h: 40 + Math.random() * 90, g: 2 + Math.random() * 3, t: 0.9 + Math.random() * 0.8,
+  })), []);
+  return (
+    <>
+      <div className="hero-idle-licht" />
+      {funken.map((f, i) => (
+        <span key={i} className="hero-idle-licht-funke" style={{
+          left: f.x + '%', width: f.g + 'px', height: f.g + 'px',
+          animationDelay: (f.d * ASC_DAUER_MS * 0.5) + 'ms', animationDuration: (f.t * 1000) + 'ms',
+          '--lf-hoehe': f.h + 'px',
+        }} />
+      ))}
+    </>
+  );
+}
+function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekte, unsichtbar, eingeklappt, abgeblendet, aufstieg }) {
   const key = HeroIdleAnims.slug(cardName);
   // Eisblock: 'da' solange Frozen, danach kurz 'schmilzt' (zerspringt),
   // dann 'weg'.
@@ -2913,6 +2951,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   zustand.current.angehalten = !!angehalten;
   zustand.current.versteinert = !!versteinert;
   zustand.current.effekte = effekte || '';
+  zustand.current.aufstieg = aufstieg || null;
   if (zustand.current.eingeklappt !== !!eingeklappt) HeroIdleAnims.markiere();
   zustand.current.eingeklappt = !!eingeklappt;
 
@@ -2984,6 +3023,16 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         }
         ctx.restore();
       }
+      // Aufstiegs-Morph: weisse Silhouette (nicht ueber Stein)
+      const weiss = zustand.current.weiss || 0;
+      if (weiss > 0 && !stein) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = `rgba(255,255,255,${weiss})`;
+        ctx.fillRect(0, 0, fw, fh);
+        ctx.restore();
+      }
+      st.weissGemalt = weiss;
       st.gemalt = st.frame;
       st.steinGemalt = st.stein;
       st.effekteGemalt = eff;
@@ -3085,8 +3134,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         const welle = Math.pow(Math.max(0, Math.sin(phase * Math.PI * 2)), 2);
         st.puls = Math.round(welle * 8);
       } else st.puls = 0;
+      // Aufstiegs-Morph: Weissanteil nach der Zeit seit dem Ereignis
+      const asc = zustand.current.aufstieg;
+      zustand.current.weiss = asc ? ascWeiss(asc.rolle, (performance.now() - asc.t0) / ASC_DAUER_MS) : 0;
       if (st.frame !== st.gemalt || st.stein !== st.steinGemalt
-        || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt) sicher('Malen', male);
+        || effNun !== st.effekteGemalt || st.puls !== st.pulsGemalt
+        || (zustand.current.weiss || 0) !== (st.weissGemalt || 0)) sicher('Malen', male);
     }, { held: meta.hero || '?', frames, st, zustand });
     sicher('Zonenlage', folgeZone);
     sicher('Malen', male);
@@ -3179,7 +3232,7 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       {anker}
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
-          className={'hero-idle-platz' + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
+          className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
           <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
@@ -3190,6 +3243,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
               )}
             </div>
           </div>
+          {aufstieg && aufstieg.rolle === 'neu' && (
+            <div className="hero-idle-fx hero-idle-aufstieg-fx" style={fxStil}>
+              <HeroAufstiegLicht />
+            </div>
+          )}
           {effekte && (
             <div className="hero-idle-fx" style={fxStil}>
               <HeroStatusPartikel effekte={effekte} kern={kern} s={s} mitteX={mitteX}
@@ -28476,6 +28534,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // danach lautlos ab. Reines ANZEIGE-Vorziehen — der Spielstand
   // wechselt weiterhin genau dann, wenn die Engine ihn wechselt.
   const [formPreview, setFormPreview] = useState(null);
+  // Aufstiegs-Morph (s. HeroIdleSprite): { id, ownerLabel, heroIdx, oldHero, newHero, t0 }
+  const [ascMorph, setAscMorph] = useState(null);
   // Alle Allianzen auf dem Brett, aus dem Spielstand abgeleitet: die
   // Karte liegt beim NUTZER und traegt den Verbuendeten in ihren
   // Zaehlern. Beide Spieler sehen dieselbe Liste — die Verbindung ist
@@ -34307,11 +34367,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setAbilityBlockFlash(null), 1800);
     };
     socket.on('ability_block_flash', onAbilityBlockFlash);
-    const onHeroAscension = ({ owner, heroIdx, oldHero, newHero }) => {
+    const onHeroAscension = ({ owner, heroIdx, oldHero, newHero, descend, skipMorph }) => {
       setFormPreview(null);   // v1188: der echte Wechsel loest das Vorziehen ab
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
+      // ── Aufstieg: weisses Licht huellt die alte Figur ein, sie morpht zur
+      // neuen (s. HeroIdleSprite / `.hero-aufstieg-karte`). Der Abstieg und
+      // Helden mit eigener Evolutions-Animation (Waflav) behalten ihre
+      // bisherige Darstellung weiter unten.
+      if (!descend && !skipMorph && window._playAnimations !== false) {
+        const id = Date.now() + Math.random();
+        // Beide Gestalten schon laden, damit die neue zum Zeitpunkt der
+        // Ueberblendung da ist.
+        if (oldHero) HeroIdleAnims.hole(HeroIdleAnims.slug(oldHero));
+        if (newHero) HeroIdleAnims.hole(HeroIdleAnims.slug(newHero));
+        setAscMorph({ id, ownerLabel, heroIdx, oldHero, newHero, t0: performance.now() });
+        // Landung: Verstaerkungs-Cue, wenn die neue Gestalt ihre Farben zurueckbekommt.
+        setTimeout(() => { if (window.playSFX) window.playSFX('buff', { dedupe: 0, volume: 0.8 }); }, ASC_DAUER_MS * 0.55);
+        setTimeout(() => setAscMorph(cur => (cur && cur.id === id ? null : cur)), ASC_DAUER_MS + 60);
+        return;
+      }
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
@@ -44328,6 +44404,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
           const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
           const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
+          // Aufstiegs-Morph dieses Helden (s. HeroIdleSprite): alte und neue Figur stehen zugleich da.
+          const aufstiegHier = !!(ascMorph && ascMorph.ownerLabel === ownerLabel && ascMorph.heroIdx === i);
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
@@ -44589,7 +44667,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (
+                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (() => {
+                  const skinFuer = (n) => { const sk = n ? p?.deckSkins?.[n] : null; return (sk && HeroIdleAnims.hatAnimation(sk)) ? sk : n; };
+                  const basis = (
                   <HeroIdleSprite
                     cardName={figurName}
                     eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}
@@ -44618,7 +44698,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     abgeblendet={!!(abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim
                       || (stExhausted && !stBonus && !stActing)
                       || (summonPickAktiv && !(abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry)))} />
-                )}
+                  );
+                  // Immer ein Feld mit Schluesseln: die Hauptfigur behaelt ihre Identitaet,
+                  // wenn die alte Figur fuer den Morph dazukommt und wieder geht.
+                  return aufstiegHier ? [
+                    React.cloneElement(basis, { key: 'alt', cardName: skinFuer(ascMorph.oldHero), aufstieg: { rolle: 'alt', t0: ascMorph.t0 } }),
+                    React.cloneElement(basis, { key: 'haupt', cardName: skinFuer(ascMorph.newHero), aufstieg: { rolle: 'neu', t0: ascMorph.t0 } }),
+                  ] : [React.cloneElement(basis, { key: 'haupt' })];
+                })()}
+                {/* Aufstiegs-Morph: weisses Licht ueber der Karte; der Kartenwechsel (Sync) faellt in den Hoehepunkt. */}
+                {aufstiegHier && hero?.name && <div className="hero-aufstieg-karte" />}
                 {/* v1462: mit animierter Figur (`figurDa`) übernimmt die Figur
                     die Darstellung; die Gift-Stapelzahl bleibt als Zahl. */}
                 {hero?.name && !figurDa && isFrozen && <FrozenOverlay />}

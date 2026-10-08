@@ -24,6 +24,10 @@ const ScTracking = require('./_sc-tracking');   // v1381
 // Testen auf „ab sofort" aus (31.8., zurueckgebaut am selben Tag).
 // Endregel: NUR der gestempelte Zug — „during your next turn".
 const ASCENSION_GRANT_TESTFENSTER = false;
+// Aufstiegs-Morph (Client: HeroIdleSprite/ASC_DAUER_MS = 2000 ms): so lange bleibt der
+// Sync nach `hero_ascension` aus — der Kartenwechsel faellt in den weissen Hoehepunkt
+// bei ~45 % der Animation.
+const ASCENSION_MORPH_SYNC_MS = 900;
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // Safety caps to terminate runaway trigger fan-out / infinite summons
@@ -48442,7 +48446,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Wege auseinanderhalten.
     this.log(opts.notAnAscension ? 'hero_form_placed' : 'hero_ascension',
       { player: ps.username, oldHero: oldName, newHero: cardName });
-    this._broadcastEvent('hero_ascension', { owner: hs, heroIdx, oldHero: oldName, newHero: cardName });
+    // ★ Aufstiegs-Morph (Als Vorgabe: weisses Licht huellt die alte Figur ein,
+    // sie morpht zur neuen). Der Client spielt ihn ueber ~2 s; der Sync mit
+    // dem neuen Namen/der neuen Karte wird bis zum weissen Hoehepunkt
+    // (ASCENSION_MORPH_SYNC_MS) zurueckgehalten, damit der Kartenwechsel im
+    // Licht verschwindet. Helden mit eigener Evolutions-Animation (Waflav)
+    // behalten diese (`skipMorph`), die haelt den Sync ohnehin zurueck.
+    const _morph = !ascendedScript?.evolutionAnimation;
+    this._broadcastEvent('hero_ascension', { owner: hs, heroIdx, oldHero: oldName, newHero: cardName, ...(_morph ? {} : { skipMorph: true }) });
     // ── Form stack ──
     // Cards that can Descend need to know what they came FROM. Pushed
     // for every Ascension of a stack-forming card so a later Descend
@@ -48478,6 +48489,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         direction: 'ascend', duration: 1600,
       });
       await this._delay(1600);
+    } else if (_morph && !this._fastMode && !this._inMctsSim) {
+      await this._delay(ASCENSION_MORPH_SYNC_MS);
     }
     this.sync();
     await this._delay(800);
