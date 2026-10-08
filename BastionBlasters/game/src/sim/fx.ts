@@ -51,7 +51,7 @@ export interface UnitFx {
   onAttack?: (w: World, u: Unit, target: Unit) => void;
   // Auren
   auraEnemy?: { r: number; speed?: number; atk?: number };
-  auraAlly?: { r: number; dmgDealt?: number; dmgTaken?: number; atk?: number; fearImmune?: boolean; room?: boolean };
+  auraAlly?: { r: number; dmgDealt?: number; dmgTaken?: number; atk?: number; fearImmune?: boolean; room?: boolean; civ?: boolean };
   taunt?: number;
   controlZone?: number;
   // Zivilisten

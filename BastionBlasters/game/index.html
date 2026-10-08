@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bastion Blasters</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Playable combat prototype of Bastion Blasters: build a bastion, send troops, freeze time every two waves.">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #efe6d2;
+  --panel: #f8f1e0;
+  --panel2: #e6dbc2;
+  --ink: #2a2118;
+  --muted: #6b5d48;
+  --line: #3a2e20;
+  --accent: #b5412f;
+  --accent2: #2a8f86;
+  --good: #3f8f3f;
+  --warn: #c58a1a;
+  --bad: #b83a3a;
+  --gold: #d6a21e;
+  --p1: #e0484c;
+  --p2: #35c1b4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17131f;
+    --panel: #251e33;
+    --panel2: #30283f;
+    --ink: #f1e8d6;
+    --muted: #a99bbd;
+    --line: #0d0a14;
+    --accent: #ef6a52;
+    --accent2: #4fd6c6;
+    --good: #62d26f;
+    --warn: #e5c14a;
+    --bad: #ef5a5a;
+    --gold: #f0c04a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17131f; --panel: #251e33; --panel2: #30283f; --ink: #f1e8d6; --muted: #a99bbd; --line: #0d0a14;
+  --accent: #ef6a52; --accent2: #4fd6c6; --good: #62d26f; --warn: #e5c14a; --bad: #ef5a5a; --gold: #f0c04a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 700 12px/1.35 ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+}
+button, select, input {
+  font: inherit; color: var(--ink); background: var(--panel2); border: 2px solid var(--line); padding: 4px 8px; border-radius: 0; cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: #fff; }
+button.primary:hover:not(:disabled) { filter: brightness(1.12); }
+button.on { background: var(--accent2); color: #08201e; }
+#app { display: grid; height: 100%; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 260px; grid-template-areas: "top top" "stage side" "tray tray"; gap: 0; }
+#top { grid-area: top; display: flex; gap: 12px; align-items: center; padding: 6px 12px; background: var(--panel); border-bottom: 2px solid var(--line); flex-wrap: wrap; }
+#stage { grid-area: stage; position: relative; min-height: 0; min-width: 0; background: #15281b; }
+#stage canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; width: 100%; height: 100%; }
+#side { grid-area: side; background: var(--panel); border-left: 2px solid var(--line); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+#tray { grid-area: tray; background: var(--panel); border-top: 2px solid var(--line); padding: 6px 12px; display: flex; gap: 10px; align-items: flex-end; overflow-x: auto; min-height: 44px; }
+.bar { position: relative; height: 14px; background: #0006; border: 2px solid var(--line); min-width: 130px; }
+.bar > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--p1); }
+.bar > span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 10px; color: #fff; text-shadow: 1px 1px 0 #000; }
+.bar.p2 > i { background: var(--p2); }
+.bar.thin { height: 8px; min-width: 130px; }
+.bar.conq > i { background: var(--gold); }
+.grp { display: flex; flex-direction: column; gap: 3px; }
+.lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.sp { flex: 1; }
+.tag { padding: 1px 6px; border: 2px solid var(--line); background: var(--panel2); }
+.panel { border: 2px solid var(--line); background: var(--panel2); padding: 6px; }
+.panel h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+#feed { height: 140px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; font-size: 11px; }
+#feed div { opacity: .95; }
+#feed .t0 { color: var(--p1); } #feed .t1 { color: var(--p2); } #feed .tn { color: var(--muted); }
+.card { position: relative; flex: 0 0 auto; width: 128px; image-rendering: pixelated; cursor: pointer; transition: transform .08s; }
+.card img { width: 100%; display: block; image-rendering: pixelated; border: 0; box-shadow: 0 2px 0 var(--line), 0 0 0 2px var(--line); }
+.card:hover { transform: translateY(-6px) scale(1.04); z-index: 5; }
+.card.sel img { box-shadow: 0 0 0 3px var(--gold), 0 0 12px 3px var(--gold); }
+.card.dim { opacity: .45; }
+.card .badge { position: absolute; left: 4px; top: 4px; background: #000a; color: #fff; padding: 0 5px; font-size: 10px; }
+.card.big { width: 200px; }
+#overlay { position: absolute; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg) 88%, transparent); padding: 16px; overflow: auto; }
+#overlay.show { display: flex; }
+#overlay .box { background: var(--panel); border: 3px solid var(--line); box-shadow: 6px 6px 0 var(--line); padding: 18px; max-width: min(1200px, 100%); max-height: 100%; overflow: auto; }
+#overlay h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: .04em; }
+#overlay h2 { margin: 0 0 8px; font-size: 15px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 12px 0; }
+.hint { color: var(--muted); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 11px; }
+.kv b { color: var(--muted); font-weight: 700; }
+.ent { display: grid; grid-template-columns: 52px 1fr; gap: 6px; padding: 4px; border: 2px solid var(--line); background: var(--panel); }
+.ent .th { width: 52px; height: 40px; overflow: hidden; background: #000; }
+.ent .th img { width: 52px; image-rendering: pixelated; margin-top: -9px; }
+.ent select { padding: 1px 2px; font-size: 10px; }
+.ent.replace { outline: 3px dashed var(--gold); cursor: pointer; }
+#toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: var(--panel); border: 2px solid var(--line); padding: 6px 12px; z-index: 30; display: none; box-shadow: 3px 3px 0 var(--line); }
+#hudmsg { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 2px solid var(--line); padding: 4px 10px; z-index: 10; display: none; max-width: 90%; text-align: center; }
+#stage.frozen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 5; box-shadow: inset 0 0 140px 24px rgba(150,210,255,.5); background-image: repeating-conic-gradient(rgba(190,230,255,.08) 0% 25%, transparent 0% 50%); background-size: 4px 4px; }
+.legend span { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid var(--line); vertical-align: -1px; }
+@media (max-width: 760px) {
+  #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; grid-template-areas: "top" "stage" "tray" "side"; }
+  #side { border-left: 0; border-top: 2px solid var(--line); max-height: 36vh; }
+  #top { padding: 6px 16px; }
+  #tray { padding: 6px 16px; }
+  .card { width: 96px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top"></header>
+  <main id="stage">
+    <div id="toast"></div>
+    <div id="hudmsg"></div>
+    <div id="overlay"><div class="box" id="box"></div></div>
+  </main>
+  <aside id="side"></aside>
+  <footer id="tray"></footer>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

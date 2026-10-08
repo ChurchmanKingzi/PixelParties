@@ -1,5 +1,6 @@
 // Ein Simulationsschritt (30 Hz). Reihenfolge laut GDD 11: Spawn, Navigation, Targeting, Kampf, Geschosse, Status, XP, Personal, Heilung, Eroberung, Sieg.
 
+import './unitfx';
 import { TPS, WAVE_GAP_S, type Team } from './constants';
 import { unitStep } from './ai';
 import { buildingsTick, modEff } from './bfx';
@@ -17,7 +18,7 @@ function auras(world: World) {
     const fx = unitFx(s.cid);
     if (fx.auraAlly) {
       const a = fx.auraAlly;
-      for (const o of world.near(s.x, s.y, a.r, (o) => o.team === s.team && !o.dead && o.id !== s.id)) {
+      for (const o of world.near(s.x, s.y, a.r, (o) => o.team === s.team && !o.dead && o.id !== s.id && (!a.civ || o.cat === 'civilian' || o.cat === 'citizen'))) {
         if (a.dmgDealt) o.mods.dmgDealt *= a.dmgDealt;
         if (a.dmgTaken) o.mods.dmgTaken *= a.dmgTaken;
         if (a.atk) o.mods.atkSpeed *= a.atk;

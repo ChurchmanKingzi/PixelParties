@@ -171,7 +171,7 @@ export function attackUnit(world: World, u: Unit, t: Unit) {
       continue;
     }
     for (let h = 0; h < hits; h++) {
-      const base = (def.dmg ?? 0) * u.mods.dmgDealt * mult;
+      const base = (u.s.dmgOverride ?? def.dmg ?? 0) * u.mods.dmgDealt * mult;
       if (o.dead) break;
       dealtTotal += hurt(world, o, base, dtype, u, { melee });
     }
@@ -236,7 +236,7 @@ export function attackStruct(world: World, u: Unit, tgt: NonNullable<Unit['tstru
   if (u.invisible) u.invisible = false;
   const dtype = pickType(world, def);
   const sf = (def.structFactor ?? 0.4) * (fx.structBonus ?? 1);
-  const base = (def.dmg ?? 0) * u.mods.dmgDealt * sf * (def.hits ?? 1);
+  const base = (u.s.dmgOverride ?? def.dmg ?? 0) * u.mods.dmgDealt * sf * (def.hits ?? 1);
   if (tgt.kind === 'wall') {
     const w = world.walls.get(tgt.id);
     if (w) {
@@ -460,6 +460,18 @@ function hasBlind(u: Unit): boolean {
 
 function applyFog(world: World, p: Projectile) {
   const enemy: Team = p.team === 0 ? 1 : 0;
+  if (p.kind !== 'under') {
+    for (const u of world.units) {
+      if (u.dead || u.team !== enemy || u.cid !== 'UZ-15') continue;
+      if (dist(u.x, u.y, p.x1, p.y1) <= 2.2 && world.rng.chance(0.35)) {
+        const a = world.rng.next() * Math.PI * 2;
+        p.x1 += Math.cos(a) * 1.4;
+        p.y1 += Math.sin(a) * 1.4;
+        world.emit({ t: 'text', x: u.x, y: u.y - 0.8, text: 'foresight', color: '#c8f0ff' });
+        break;
+      }
+    }
+  }
   for (const m of world.modules.values()) {
     if (m.owner !== enemy || m.destroyed || m.card !== 'BA-02' || m.buildEnd > world.tick) continue;
     const c = modCenter(m);
