@@ -148,6 +148,9 @@ module.exports = {
           ? 'Pick one of your Creatures NOT summoned this turn to swap OUT.'
           : 'Pick one of your own Creatures to swap OUT.',
         cancellable: true,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!picked) { gs._spellCancelled = true; return; }
       const chosenInst = pickable.find(i =>

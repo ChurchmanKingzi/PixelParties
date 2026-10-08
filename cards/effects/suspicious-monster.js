@@ -160,6 +160,9 @@ module.exports = {
         description: `Sacrifice a Creature (not summoned this turn) to summon ${CARD_NAME} into its Support Zone?`,
         confirmLabel: '🗡️ Sacrifice & Summon',
         cancellable: true,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!picked) return false; // cancel → abort (card back to hand, Action kept)
       const pickSide = (isSeat(gs, picked.owner)) ? picked.owner : pi;

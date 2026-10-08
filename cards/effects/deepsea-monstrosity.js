@@ -94,6 +94,9 @@ module.exports = {
         title: CARD_NAME,
         description: 'Pick a Deepsea Creature to bounce (its on-summon will copy onto this one).',
         cancellable: true,
+        // Es wird eine KARTE gewaehlt, nicht ein Platz: ein Klick auf den Helden
+        // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
+        heroShortcut: false,
       });
       if (!picked) return;
 
