@@ -16811,7 +16811,7 @@
     "hp": 400,
     "atk": 80,
     "cost": null,
-    "effect": "Whenever a player summons a Creature, you may choose any target on the board and inflict 1 Poison Stack to it.",
+    "effect": "Whenever a Creature is placed into one of your Heroes' Support Zones, you may choose any target on the board and inflict 1 Poison Stack to it.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
