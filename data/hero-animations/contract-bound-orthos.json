@@ -1,17 +1,17 @@
 {
   "hero": "Contract-bound Orthos",
   "sheet": "contract-bound-orthos.png",
-  "frameWidth": 30,
-  "frameHeight": 33,
+  "frameWidth": 88,
+  "frameHeight": 70,
   "frames": 48,
   "frameMs": 90,
   "loop": true,
   "layout": "horizontal",
   "skinOf": "Orthos, the Loyal Guard Dog",
-  "padTop": 3,
-  "padLeft": 4,
-  "padRight": 4,
-  "padBottom": 2,
-  "faceX": 13.5,
-  "footY": 30.0
+  "padTop": 22,
+  "padLeft": 30,
+  "padRight": 28,
+  "padBottom": 20,
+  "faceX": 42.0,
+  "footY": 44.0
 }
