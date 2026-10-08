@@ -27439,7 +27439,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const boardCenterRef = useRef(null);
   const [areaPositions, setAreaPositions] = useState([undefined, undefined]);
 
-  useEffect(() => {
+  // ★ Layout-Effekt (Als Befund: beim Betreten zuckte das ganze Feld auf der
+  // x-Achse). Bis zur ersten Messung stehen die Area-Zonen an ihrem
+  // Standardplatz ganz links — die Ueberstand-Messung des Bretts (`check()`
+  // unten) hielt sie fuer echten Inhalt, reservierte Platz fuer sie und lief
+  // damit ueber Zwischenstaende in einen falschen Zustand, bis die Area-
+  // Positionen nachgezogen wurden. Jetzt wird vor dem ersten Bild gemessen.
+  useLayoutEffect(() => {
     const container = boardCenterRef.current;
     if (!container) return;
     const measure = () => {
@@ -27490,8 +27496,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const versatzRechts = (heroes[0]?.offsetWidth || 68) / 2;
       const mid01 = (mitten[0] + mitten[1]) / 2 - halfZone + mittenVersatz + versatzRechts;
       const mid12 = (mitten[1] + mitten[2]) / 2 - halfZone + mittenVersatz + versatzRechts;
-      setAreaPositions([mid01, mid12]);
+      // Unveraendert: kein neues Array, sonst rendert das ganze Brett umsonst.
+      setAreaPositions(prev => (prev[0] === mid01 && prev[1] === mid12 ? prev : [mid01, mid12]));
     };
+    container._ppAreaMessen = measure;
     // Defer the initial measure one frame so the board auto-scaling
     // ResizeObserver (defined in the effect below) has a chance to apply
     // its scale before we compute area-zone positions. Without this, the
@@ -27520,7 +27528,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [gameState.turn, gameState.players[0]?.islandZoneCount, gameState.players[1]?.islandZoneCount]);
 
   // ── Board auto-scaling: fit board to available width ──
-  useEffect(() => {
+  // ★ Layout-Effekt: ein normaler Effekt laeuft NACH dem ersten Bild — das
+  // Brett wurde erst bei Massstab 1 gemalt und sprang dann auf seinen
+  // echten Massstab.
+  useLayoutEffect(() => {
     const container = boardCenterRef.current;
     if (!container) return;
     // px at scale 1.0 — matches full-size reference layout.
@@ -27618,6 +27629,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       document.documentElement.style.setProperty('--board-scale', '1');
       document.documentElement.style.setProperty('--board-scale-live', '1');
     };
+  }, []);
+
+  // Area-Zonen vor dem ersten Bild an ihren Platz: Massstab steht (Effekt
+  // darueber), die Heldenzonen haben ihre Layout-Offsets, `check()` unten
+  // bekommt damit echte statt Standard-Positionen zu sehen.
+  useLayoutEffect(() => {
+    const c = boardCenterRef.current;
+    if (c && c._ppAreaMessen) c._ppAreaMessen();
   }, []);
 
   // ★ v1257 — LEISTENHOEHEN FUER DIE OVERLAY-LEISTEN (nur Telefon).
@@ -41502,7 +41521,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, []);
 
   // ── Scrollable battlefield detection + centering offset ──
-  useEffect(() => {
+  // ★ Layout-Effekt, und `check()` iteriert bis zur Konvergenz in demselben
+  // Bild (s. dort): vorher lief jeder Folgedurchgang in einem eigenen
+  // Animationsbild, das Feld rutschte beim Betreten ueber drei, vier
+  // Zwischenstaende (-4, -128, -89 px) auf seinen Platz.
+  useLayoutEffect(() => {
     const el = boardCenterRef.current;
     if (!el) return;
     const checkRaw = () => {
@@ -41725,11 +41748,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return sig;
     };
     const ausgabeSig = () => el.style.cssText + '|' + el.className + '|' + (el.scrollLeft | 0);
+    // Bis zu SYNC_DURCHGAENGE Messungen am Stueck: jede liest ohnehin ein
+    // frisch erzwungenes Layout, ein Animationsbild dazwischen bringt nichts
+    // ausser einem sichtbaren Zwischenstand. Was dann noch wackelt, laeuft
+    // wie bisher ueber den begrenzten Nachlauf im naechsten Bild.
+    const SYNC_DURCHGAENGE = 6;
     const check = () => {
-      const vorher = ausgabeSig();
-      checkRaw();
-      el._ppCheckSig = geoSig();
-      if (ausgabeSig() !== vorher) {
+      let stabil = false;
+      for (let i = 0; i < SYNC_DURCHGAENGE && !stabil; i++) {
+        const vorher = ausgabeSig();
+        checkRaw();
+        el._ppCheckSig = geoSig();
+        stabil = ausgabeSig() === vorher;
+      }
+      // Der Mittelversatz fliesst in die Area-Positionen ein.
+      if (el._ppAreaMessen) el._ppAreaMessen();
+      if (!stabil) {
         if ((el._ppCheckNach || 0) < 8) { el._ppCheckNach = (el._ppCheckNach || 0) + 1; checkBald(); }
       } else {
         el._ppCheckNach = 0;
@@ -41779,7 +41813,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // musste. Dieser Effekt hat kein Dependency-Array und baut sich nach
     // JEDEM Render neu auf; frueher holte der bedingungslose Aufruf hier
     // alles nach, jetzt traegt `_ppCheckAusstehend` es ueber den Neustart.
-    if (el._ppCheckAusstehend || el._ppCheckSig !== geoSig()) {
+    // Allererste Messung erst, wenn die Area-Zonen ihre Plaetze haben (der
+    // Layout-Effekt dafuer hat gerade `setAreaPositions` gerufen, der
+    // Re-Render folgt noch VOR dem ersten Bild und fuehrt diesen Effekt
+    // erneut aus). Kommt keiner, springt der naechste Animationsframe ein.
+    if (!el._ppAreaGewartet && areaPositions[0] == null && el.querySelector('[data-area-zone]')) {
+      el._ppAreaGewartet = true;
+      el._ppCheckAusstehend = true;
+      checkBald();
+    } else if (el._ppCheckAusstehend || el._ppCheckSig !== geoSig()) {
       el._ppCheckAusstehend = false;
       checkGedrosselt();
     }
@@ -41807,6 +41849,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; el._ppCheckAusstehend = true; }
     };
   });
+
+  // ── Uebergaenge in den ersten Momenten aus ──
+  // Der Massstab wird vor dem ersten Bild gesetzt (Layout-Effekt oben), aber
+  // das Lesen von `--board-scale` erzwingt davor schon einen Stilabgleich bei
+  // Massstab 1. Elemente mit `transition: all` (Phasenleiste, Zonen ...)
+  // tweenten danach sichtbar auf ihr echtes Mass. `data-pp-neu` schaltet
+  // Uebergaenge unterhalb des Layouts aus (CSS), solange sich das Brett setzt.
+  useEffect(() => {
+    const layout = (boardCenterRef.current && boardCenterRef.current.closest('.game-layout'))
+      || document.querySelector('.game-layout');
+    if (!layout) return undefined;
+    const t = setTimeout(() => layout.removeAttribute('data-pp-neu'), 700);
+    return () => { clearTimeout(t); layout.removeAttribute('data-pp-neu'); };
+  }, []);
 
   /** Play a visual animation at a DOM element's position. */
   const playAnimation = (type, selector, options = {}) => {
@@ -46417,7 +46473,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ersatzlos gestrichen; fuer Zuschauer bleibt ein kleines
           👁-Zeichen am Knopf. Gilt fuer Desktop UND Mobile. */}
 
-      <div className="game-layout">
+      <div className="game-layout" data-pp-neu="1">
         {showEndBubbles && bubbleAnchors && (
           <>
             {renderEndBubble(oppBubbleMsg, endOppWon, 'up', bubbleAnchors.opp)}
