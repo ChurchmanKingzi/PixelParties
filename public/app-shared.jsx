@@ -8586,49 +8586,73 @@ const TUTORIAL_SCRIPTS = {
     ],
     };
   })(),
-  4: {
+  4: (() => {
+    const REIZA = '[data-hero-owner="me"][data-hero-name*="Reiza"]';
+    const MEDEA = '[data-hero-owner="me"][data-hero-name*="Medea"]';
+    const GIFT = '.game-hand-me [data-card-name="Divine Gift of Fire"]';
+    const QUICK = '.game-hand-me [data-card-name="Quick Attack"]';
+    const BLOW = '.game-hand-me [data-card-name="Blow of the Venom Snake"]';
+    return {
+    // Kein `nurActionPhase`: die Statusschaeden ticken erst am Zugende, das
+    // Tutorial braucht also den manuellen Phasenwechsel bis ans Ende.
+    // Regieanweisungen: ein Highlight gilt ab der Seite, vor der es steht,
+    // bis zur naechsten Anweisung.
     intro: [
       { text: '...' },
-      { text: '... is ... that raccoon gone?' },
+      { text: 'Is ... is that raccoon gone?' },
       { text: '...' },
-      { text: 'Good.' },
-      { text: '...', speed: 80 },
+      { text: 'Okay. Good.' },
+      { text: '...' },
+      { text: 'Ahem.' },
       { text: 'Heya! Welcome back!' },
-      { text: "What I was **trying** to say last time was that thing's interference wasn't even necessary.",
+      { text: "What I was **trying** to say last time was that this *thing's* interference really was not necessary.",
         onShow: () => { socket.emit('tutorial_modify', { type: 'tutorial4_suppress_reiza' }); } },
-      { text: "There are a few status effects in this game that can help you win." },
-      { text: "{#88ddff:**Freeze**} and {yellow:**Stun**} are the most common to stop your opponent." },
-      { text: "But if one wears off naturally, its target becomes {silver:**immune**} to those effects for a turn!" },
-      { text: "And {purple:**Poison**} and {orange:**Burn**} are used to weaken targets - or even finish them off!" },
-      { text: "{orange:**Burn**} is {orange:**60**} damage a turn, {purple:**Poison**} {purple:**30**} ... but it {purple:**stacks**}!" },
-      { text: "Your Hero {purple:**Medea**} even **doubles** any Poison damage dealt to your opponent!",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Medea"]', pulse: true },
-        ] },
-      { text: "So! See your Hero {purple:**Reiza**}?",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
-        ] },
-      { text: "She Stuns AND Poisons anything she hits with an Attack!",
-        highlights: [
-          { selector: '[data-hero-owner="me"][data-hero-name*="Reiza"]', pulse: true },
-        ] },
-      { text: "And the cards in your hand? More than enough status damage to defeat all enemy Heroes!",
-        highlights: [
-          '.game-hand-me .hand-slot',
-          '[data-hero-owner="opp"]',
-        ] },
-      { text: "And see that {silver:**Quick Attack**}? That thing can be used as an {red:**additional Action**}!",
-        highlights: [
-          { selector: '.game-hand-me [data-card-name="Quick Attack"]', pulse: true },
-        ] },
-      { text: "So you can use it even outside your {red:**Action Phase**}! You can use it and **not** use up your one main Action per turn!" },
-      { text: 'Go ahead - apply as much status as you can and make the enemy Heroes succumb to it, beep-boop!' },
+      { text: 'With the cards you had access to, you were fully capable of winning that game on your own!' },
+      { text: "Not purely with the damage of your Attack - but with **status effects**.\nLet's look at those properly here." },
+      // ── Highlight: Reiza ──
+      { text: 'Your Hero {purple:**Reiza**} applies {purple:**Poison**} and {yellow:**Stun**} to whatever she hits.',
+        highlights: [REIZA] },
+      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions. You can use it to control your opponent's options.",
+        highlights: [REIZA] },
+      { text: 'And Poison is 30 bonus damage every turn.',
+        highlights: [REIZA] },
+      // ── Highlight: Medea ──
+      { text: 'And look - your Hero {purple:**Medea**} **doubles** any Poison damage your opponent suffers!',
+        highlights: [MEDEA] },
+      { text: '**Poison** comes in **Stacks**, so each individual Stack is now 60 damage thanks to Medea!',
+        highlights: [MEDEA] },
+      { text: "And that's not your *only* source of status damage!",
+        highlights: [MEDEA] },
+      // ── Highlight: Divine Gift of Fire ──
+      { text: 'With your {red:**Divine Gift of Fire**}, you can also apply a {orange:**Burn**} effect - which is another flat 60 damage each turn!',
+        highlights: [GIFT] },
+      // ── Highlight: Quick Attack und Gift of Fire ──
+      { text: 'Also - see these two cards?\nThey can both be used as **additional Actions**!',
+        highlights: [QUICK, GIFT] },
+      { text: 'That means you can use them **outside your Action Phase**, without spending your Action on them - for free!',
+        highlights: [QUICK, GIFT] },
+      // ── Highlight: Reiza ──
+      { text: 'And since {red:**Quick Attack**} is an Attack - it will trigger your Reiza...',
+        highlights: [REIZA] },
+      // ── Highlight: Blow of the Venom Snake ──
+      { text: '... and count as a previous Attack for your {red:**Blow of the Venom Snake**}!',
+        highlights: [BLOW] },
+      { text: 'With all that, you should have plenty of status and Attack damage available to beat my poor Heroes.',
+        highlights: [BLOW] },
+      { text: 'Good luck, beep-boop!',
+        highlights: [BLOW] },
     ],
     outro: [
-      { text: "Perfect! You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting effects to slow your opponent down while {purple:**Poison**} and {orange:**Burn**} whittle them down!" },
+      { text: 'Perfect, beep-boop!' },
+      { text: 'You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
+      { text: 'But one word of warning!' },
+      { text: 'After an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
+      { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
+      { text: 'You got that?\nNice!' },
+      { text: 'See you next lesson!' },
     ],
-  },
+    };
+  })(),
   6: {
     // Antonia is the sole speaker and lives on the LEFT side throughout —
     // no enter / exit animation, no Monia Bot involvement. Per-line
