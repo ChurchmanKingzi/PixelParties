@@ -324,13 +324,11 @@ def furnish_menagerie(ctx):
     W = ctx.W
     draw_wall(ctx, BE.chain_decor(), W // 2)
     for k, kind in enumerate(('bear', 'eyes', 'wolf')):
-        draw_prop(ctx, BE.cage(kind), 4 + k * 30, -4)
-    draw_floor(ctx, BE.straw_patch(40, 22, 1), 26, 36)
-    draw_floor(ctx, BE.straw_patch(30, 16, 2), 60, 34)
-    draw_prop(ctx, BE.hay_bale(), 6, 38)
-    draw_prop(ctx, BE.hay_bale(22, 14), 12, 49)
+        draw_prop(ctx, BE.cage(kind), 4 + k * 29, -4)
+    draw_floor(ctx, BE.straw_patch(36, 20, 1), 28, 38)
+    draw_prop(ctx, BE.hay_bale(), 6, 40)
+    draw_prop(ctx, BE.hay_bale(22, 14), 10, 52)
     draw_prop(ctx, BE.feed_sack(), W - 22, 40)
-    draw_prop(ctx, BE.hay_pile(), W - 36, 50)
 
 
 THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dirt', 1, 10), ('gold', 3, 10)]), 'furnish': furnish_menagerie, 'low': False}
@@ -340,8 +338,8 @@ THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dir
 def _art_bf03():
     world, X0, Y0, out = room_world('G', THEME_MENAGERIE, '3x3', 'grass', 6)
     ox, oy = 8, 6
-    cx, cy = 56 + ox, 72 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 56, 72)
+    cx, cy = 58 + ox, 74 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 58, 74)
     unit_at(world, TC.gnome('shovel', 'leaf', 'dirt', 'cloth'), cx, cy, sh=(10, 3))
-    prop_at(world, BE.manure_pile(), cx + 17, cy - 1)
-    BE.stink_lines(world, cx + 17, cy - 12, 14)
+    prop_at(world, BE.manure_pile(), cx + 21, cy - 1)
+    BE.stink_lines(world, cx + 21, cy - 12, 14)
     return finish(window_of(world))

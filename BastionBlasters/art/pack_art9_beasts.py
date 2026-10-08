@@ -15,68 +15,63 @@ def _bars(c, x0, x1, y0, y1, col='metal'):
 
 
 def cage(kind='bear', seed=1):
-    """Kaefig von vorn (32 x 36): Holzrahmen, Eisenstaebe, Tier dahinter. kind: bear | eyes | wolf"""
-    c = Canvas(32, 36)
+    """Kaefig von vorn (28 x 36): Holzrahmen, Eisenstaebe, Tier dahinter. kind: bear | eyes | wolf"""
+    c = Canvas(28, 36)
+    o = -2                      # Tiere sind auf Breite 32 entworfen -> um 2 nach links
     # Innenraum (dunkel) + Stroh
     for y in range(4, 31):
-        for x in range(2, 30):
+        for x in range(2, 26):
             c.put_ramp(x, y, 'coal', 0 if (x + y) % 6 else 1)
-    for x in range(2, 30):
+    for x in range(2, 26):
         for y in range(26, 31):
             if (x * 3 + y * 5) % 5 < 3:
                 c.put_ramp(x, y, 'gold', 2 if (x + y) % 2 else 3)
-    for (x, y) in ((6, 25), (13, 26), (22, 25), (27, 27), (9, 29)):
+    for (x, y) in ((6, 25), (13, 26), (20, 25), (23, 27), (9, 29)):
         c.put_ramp(x, y, 'gold', 4)
         c.put_ramp(x + 1, y, 'gold', 3)
-    # Tier
     if kind == 'bear':
-        ellipse(c, 16, 24, 8.4, 6.6, 'fur', lo=1, hi=5)
-        ellipse(c, 16, 25, 4.4, 4.0, 'fur', lo=3, hi=5)
-        ellipse(c, 9.4, 16, 2.6, 2.6, 'fur', lo=2, hi=4)
-        ellipse(c, 22.6, 16, 2.6, 2.6, 'fur', lo=3, hi=5)
-        ellipse(c, 16, 19, 6.2, 5.2, 'fur', lo=2, hi=5)
-        ellipse(c, 16, 21, 3.0, 2.2, 'fur', lo=4, hi=5)
-        c.rect(12, 17, 13, 18, 'coal', 1)
-        c.rect(19, 17, 20, 18, 'coal', 1)
-        c.rect(15, 20, 17, 21, 'coal', 1)
-        c.put_ramp(9, 16, 'skin', 3)
-        c.put_ramp(23, 16, 'skin', 3)
-        # Schlafmuetze? nein: Schal in Teamfarbe
-        hline(c, 11, 21, 25, 'teamA', 3)
-        hline(c, 11, 21, 26, 'teamA', 2)
+        ellipse(c, 16 + o, 24, 8.4, 6.6, 'fur', lo=1, hi=5)
+        ellipse(c, 16 + o, 25, 4.4, 4.0, 'fur', lo=3, hi=5)
+        ellipse(c, 9.4 + o, 16, 2.6, 2.6, 'fur', lo=2, hi=4)
+        ellipse(c, 22.6 + o, 16, 2.6, 2.6, 'fur', lo=3, hi=5)
+        ellipse(c, 16 + o, 19, 6.2, 5.2, 'fur', lo=2, hi=5)
+        ellipse(c, 16 + o, 21, 3.0, 2.2, 'fur', lo=4, hi=5)
+        c.rect(12 + o, 17, 13 + o, 18, 'coal', 1)
+        c.rect(19 + o, 17, 20 + o, 18, 'coal', 1)
+        c.rect(15 + o, 20, 17 + o, 21, 'coal', 1)
+        c.put_ramp(9 + o, 16, 'skin', 3)
+        c.put_ramp(23 + o, 16, 'skin', 3)
+        hline(c, 11 + o, 21 + o, 25, 'teamA', 3)
+        hline(c, 11 + o, 21 + o, 26, 'teamA', 2)
     elif kind == 'eyes':
         for (x, y) in ((11, 17), (12, 17), (19, 17), (20, 17), (11, 18), (12, 18), (19, 18), (20, 18)):
-            c.put_ramp(x, y, 'gold', 5 if y == 17 else 4)
-        c.put_ramp(12, 17, 'coal', 0)
-        c.put_ramp(20, 17, 'coal', 0)
-        # Zaehne
+            c.put_ramp(x + o, y, 'gold', 5 if y == 17 else 4)
+        c.put_ramp(12 + o, 17, 'coal', 0)
+        c.put_ramp(20 + o, 17, 'coal', 0)
         for x in (13, 15, 17):
-            c.put_ramp(x, 24, 'bone', 5)
-            c.put_ramp(x, 25, 'bone', 4)
+            c.put_ramp(x + o, 24, 'bone', 5)
+            c.put_ramp(x + o, 25, 'bone', 4)
     else:
-        # Wolf (grau), spitze Ohren, Schnauze
-        ellipse(c, 16, 24, 8.0, 6.2, 'stone', lo=1, hi=4)
-        poly(c, [(9, 15), (10, 8), (14, 14)], 'stone', lo=1, hi=4)
-        poly(c, [(23, 15), (22, 8), (18, 14)], 'stone', lo=2, hi=5)
-        ellipse(c, 16, 18.5, 6.4, 5.0, 'stone', lo=2, hi=5)
-        ellipse(c, 16, 21, 3.6, 2.8, 'bone', lo=3, hi=5)
-        c.rect(12, 17, 13, 17, 'goblin', 5)
-        c.rect(19, 17, 20, 17, 'goblin', 5)
-        c.rect(15, 20, 17, 21, 'coal', 1)
-        c.put_ramp(16, 23, 'fire', 4)
-        c.put_ramp(16, 24, 'fire', 3)
-    # Staebe (davor) + Rahmen
-    _bars(c, 4, 28, 4, 30)
+        ellipse(c, 16 + o, 24, 8.0, 6.2, 'stone', lo=1, hi=4)
+        poly(c, [(9 + o, 15), (10 + o, 8), (14 + o, 14)], 'stone', lo=1, hi=4)
+        poly(c, [(23 + o, 15), (22 + o, 8), (18 + o, 14)], 'stone', lo=2, hi=5)
+        ellipse(c, 16 + o, 18.5, 6.4, 5.0, 'stone', lo=2, hi=5)
+        ellipse(c, 16 + o, 21, 3.6, 2.8, 'bone', lo=3, hi=5)
+        c.rect(12 + o, 17, 13 + o, 17, 'goblin', 5)
+        c.rect(19 + o, 17, 20 + o, 17, 'goblin', 5)
+        c.rect(15 + o, 20, 17 + o, 21, 'coal', 1)
+        c.put_ramp(16 + o, 23, 'fire', 4)
+        c.put_ramp(16 + o, 24, 'fire', 3)
+    _bars(c, 4, 24, 4, 30)
     for y in (5, 6):
-        hline(c, 1, 30, y, 'wood', 4 if y == 5 else 2)
-    block(c, 0, 0, 31, 4, 'wood', hi=5, mid=4, lo=3, deep=2)
+        hline(c, 1, 26, y, 'wood', 4 if y == 5 else 2)
+    block(c, 0, 0, 27, 4, 'wood', hi=5, mid=4, lo=3, deep=2)
     block(c, 0, 4, 2, 32, 'wood', hi=4, mid=3, lo=2, deep=1)
-    block(c, 29, 4, 31, 32, 'wood', hi=3, mid=2, lo=1, deep=1)
-    block(c, 0, 30, 31, 34, 'wood', hi=4, mid=3, lo=2, deep=1)
-    # Schloss
-    c.rect(14, 18 if False else 31, 17, 33, 'gold', 4)
-    c.put_ramp(14, 31, 'gold', 5)
-    c.put_ramp(15, 32, 'coal', 1)
+    block(c, 25, 4, 27, 32, 'wood', hi=3, mid=2, lo=1, deep=1)
+    block(c, 0, 30, 27, 34, 'wood', hi=4, mid=3, lo=2, deep=1)
+    c.rect(12, 31, 15, 33, 'gold', 4)
+    c.put_ramp(12, 31, 'gold', 5)
+    c.put_ramp(13, 32, 'coal', 1)
     c.outline()
     return c
 
@@ -185,7 +180,7 @@ def straw_patch(w=34, h=20, seed=1):
         d = math.hypot((x - w / 2.0) / (w / 2.0), (y - h / 2.0) / (h / 2.0))
         if d > 0.9 + 0.1 * rnd.random():
             continue
-        i = rnd.choice([3, 4, 4, 5, 2])
+        i = rnd.choice([2, 3, 3, 4])
         ln = rnd.choice([2, 2, 3])
         for k in range(ln):
             c.put_ramp(x + k, y + (k // 2) * (1 if seed % 2 else 0), 'gold', i)

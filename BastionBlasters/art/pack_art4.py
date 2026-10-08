@@ -36,13 +36,13 @@ def _art_uv02():
 @card_art('UV-03')
 def _art_uv03():
     w = ground_world('cobble', 5)
-    a4_slime_trail(w, [(-6, 80), (14, 76), (34, 79), (50, 75), (62, 74)], width=9, seed=3)
-    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 126, 38), (rack(), 124, 90)):
+    a4_slime_trail(w, [(-6, 80), (14, 76), (34, 79), (52, 75), (66, 74)], width=9, seed=3)
+    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 128, 38), (plant(), 56, 36), (plant(), 98, 38), (rack(), 128, 66)):
         prop_at(w, sp, x, y)
-    unit_at(w, skeleton('walk', 1), 26, 82, sh=(8, 3))
-    unit_at(w, spr_slime_snail(), 90, 82, sh=(22, 4))
+    unit_at(w, skeleton('walk', 1), 28, 82, sh=(8, 3))
+    unit_at(w, spr_slime_snail(), 88, 84, sh=(22, 4))
     # Schleimtropfen am Fuss des Skeletts
-    for (x, y) in ((20, 82), (31, 83), (24, 85)):
+    for (x, y) in ((22, 83), (33, 84), (26, 86)):
         a4_over_put(w, x, y, 'slime', 4, 9000)
         a4_over_put(w, x + 1, y, 'slime', 5, 9000)
     return finish(w)
@@ -54,19 +54,22 @@ def _art_uv03():
 @card_art('UV-04')
 def _art_uv04():
     w = ground_world('slab', 2)
-    prop_at(w, core(ring_team='teamA'), 120, 58)
-    zielschatten(w, 50, 76, 26, 1)
-    unit_at(w, spr_turtle_dwarves(), 52, 84, sh=(28, 4))
-    # Felsbrocken faellt herab, Schweif aus Punkten
-    for k in range(1, 7):
-        tx, ty = 82 - k * 5, 8 + k * 2
+    prop_at(w, core(ring_team='teamA'), 122, 56)
+    zielschatten(w, 56, 78, 28, 1)
+    unit_at(w, spr_turtle_dwarves(), 58, 86, sh=(28, 4))
+    # Felsbrocken faellt auf die Gruppe, Schweif aus Punkten
+    for k in range(1, 8):
+        tx, ty = 96 - k * 5, 6 + k * 2
         dot = Canvas(3, 3)
-        dot.put_ramp(1, 1, 'bone' if k > 2 else 'fire', 5)
+        dot.put_ramp(1, 1, 'bone' if k > 3 else 'fire', 5)
         dot.put_ramp(0, 1, 'bone', 4)
         dot.put_ramp(2, 1, 'bone', 4)
+        dot.put_ramp(1, 0, 'bone', 4)
+        dot.put_ramp(1, 2, 'bone', 4)
         w.draw(dot, tx - 1, ty - 1, 9000 - k)
-    st = stone_projectile_small()
-    w.draw(st, 44 - st.w // 2, 24 - st.h // 2, 9000)
+    st = a4_boulder()
+    w.draw(st, 56 - st.w // 2, 26 - st.h // 2, 9000)
+    spark(w, 40, 16, 'fire')
     return finish(w)
 
 
@@ -119,9 +122,9 @@ def _art_uv07():
         prop_at(w, sp, x, y)
     unit_at(w, spr_root_ent(), 56, 86, sh=(22, 4))
     # Skelett steckt im Wurzelgriff
-    w.draw(a4_root_grip(False), 106 - 21, 82 - 39, 80)
+    w.draw(a4_root_grip(False), 106 - 19, 84 - 33, 80)
     unit_at(w, skeleton('attack', 1), 106, 82, flip=True, sh=(8, 3))
-    w.draw(a4_root_grip(True), 106 - 21, 88 - 39, 88)
+    w.draw(a4_root_grip(True), 106 - 19, 86 - 33, 88)
     return finish(w)
 
 
@@ -159,7 +162,7 @@ def _art_uv09():
     prop_at(w, a4_bowl(), 22, 88)
     unit_at(w, spr_three_headed_poodle(), 62, 84, sh=(26, 4))
     a4_leash(w, 76, 60, 118, 46, sag=8)
-    a4_bark(w, 76, 40, 3)
+    a4_bark(w, 79, 42, 3)
     # Feind flieht
     unit_at(w, goblin('walk', 2), 118, 90, sh=(8, 3))
     a4_sweat(w, 128, 72)
@@ -172,13 +175,13 @@ def _art_uv09():
 @card_art('UV-10')
 def _art_uv10():
     w = ground_world('slab', 5)
-    prop_at(w, core(ring_team='teamA'), 124, 56)
-    a4_frost_ring(w, 62, 80, 52, seed=3)
-    prop_at(w, a4_ice_crystal(1, 16), 22, 52)
-    prop_at(w, a4_ice_crystal(2, 12), 104, 66)
-    unit_at(w, spr_glacier_elder(), 62, 88, sh=(26, 4))
-    unit_at(w, skeleton('walk', 2), 112, 90, flip=True, sh=(8, 3))
-    for (x, y, b) in ((20, 30, True), (46, 14, False), (86, 22, True), (104, 40, False), (30, 70, False), (96, 78, True), (14, 86, False)):
+    prop_at(w, core(ring_team='teamA'), 20, 54)
+    a4_frost_ring(w, 76, 80, 54, seed=3)
+    prop_at(w, a4_ice_cluster(1), 120, 46)
+    prop_at(w, a4_ice_cluster(2), 104, 70)
+    unit_at(w, spr_glacier_elder(), 74, 88, sh=(26, 4))
+    unit_at(w, skeleton('walk', 2), 124, 90, flip=True, sh=(8, 3))
+    for (x, y, b) in ((60, 14, True), (46, 30, False), (104, 22, True), (128, 40, False), (30, 74, False), (112, 80, True), (10, 88, False)):
         a4_snowflake(w, x, y, b)
     return finish(w)
 
@@ -189,14 +192,13 @@ def _art_uv10():
 @card_art('UV-11')
 def _art_uv11():
     w = ground_world('slab', 6)
-    wall = stone_wall_piece(144, 22)
-    shadow(w, 72, 36, 72, 3)
-    w.draw(wall, 0, 34 - wall.h + 1, 34)
-    for cx in (28, 116):
-        w.draw(crest('teamA'), cx - 6, 8, 36)
-    unit_at(w, spr_salamander_warden('breath'), 38, 82, sh=(26, 4))
-    cone = a4_flame_cone(66, 20, seed=2)
-    w.draw(cone, 66, 60 - cone.h // 2 + 8, 9000)
-    unit_at(w, skeleton('walk', 1), 122, 84, flip=True, sh=(8, 3))
-    w.draw(a4_flames_small(3), 122 - 7, 84 - 36, 9100)
+    prop_at(w, core(ring_team='teamA'), 22, 52)
+    a4_heat_glow(w, 96, 86, 36, 12, seed=2)
+    unit_at(w, spr_salamander_warden('breath'), 50, 84, sh=(26, 4))
+    cone = a4_flame_cone(58, 19, seed=2)
+    w.draw(cone, 86, 66 - cone.h // 2, 83)
+    unit_at(w, skeleton('walk', 1), 128, 90, flip=True, sh=(8, 3))
+    w.draw(a4_flames_small(3), 128 - 7, 90 - 34, 9100)
+    for (x, y) in ((118, 66), (134, 74), (112, 50)):
+        spark(w, x, y, 'gold')
     return finish(w)
