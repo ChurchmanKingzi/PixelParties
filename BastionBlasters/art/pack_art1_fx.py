@@ -136,24 +136,23 @@ def proj_orc(f=0):
 
 def shout_bubble(f=0):
     """zackige Brüll-Sprechblase mit drei Ausrufezeichen (nur Symbole, kein Text)"""
-    W, H = 34, 24
+    W, H = 38, 28
     c = Canvas(W, H)
-    cx, cy = 17.0, 10.0
+    cx, cy = 19.0, 11.0
     for y in range(H):
         for x in range(W):
-            dx, dy = (x + 0.5 - cx) / 15.0, (y + 0.5 - cy) / 9.0
+            dx, dy = (x + 0.5 - cx) / 17.0, (y + 0.5 - cy) / 10.5
             a = math.atan2(dy, dx)
             r = math.hypot(dx, dy)
-            spike = 1.0 + 0.16 * (1.0 if math.cos(a * 9) > 0.35 else -0.5)
+            spike = 1.0 + 0.17 * (1.0 if math.cos(a * 9) > 0.3 else -0.5)
             if r <= spike * 0.9:
-                c.put_ramp(x, y, 'bone', 5 if (x + y * 1.4) < 24 else 4)
-    # Schwanz zur Kanone (links unten)
-    poly(c, [(8, 15), (3, 23), (14, 17)], 'bone', lo=4, hi=5)
+                c.put_ramp(x, y, 'bone', 5 if (x + y * 1.4) < 26 else 4)
+    poly(c, [(9, 17), (3, 27), (16, 20)], 'bone', lo=4, hi=5)
     for k in range(3):
-        x = 10 + k * 7
-        c.rect(x, 4, x + 2, 11, 'fire', 3)
-        c.rect(x, 4, x, 11, 'fire', 4)
-        c.rect(x, 13, x + 2, 15, 'fire', 3)
+        x = 11 + k * 7
+        c.rect(x, 4, x + 2, 13, 'coal', 1)
+        c.rect(x, 4, x, 13, 'coal', 2)
+        c.rect(x, 16, x + 2, 18, 'coal', 1)
     c.outline(dark=0, lit=1)
     return c
 
@@ -162,7 +161,7 @@ def shout_bubble(f=0):
 
 
 def icicle_shape(length, width, ramp='ice'):
-    """senkrecht stehender Eiszapfen (Spitze oben): Canvas (width, length)"""
+    """senkrecht stehender Eiszapfen (Spitze oben): Canvas (width, length), mit dunklem Saum"""
     c = Canvas(width, length)
     cx = (width - 1) / 2.0
     for y in range(length):
@@ -173,25 +172,30 @@ def icicle_shape(length, width, ramp='ice'):
             if abs(d) <= 1.0 or (y == 0 and x == int(cx)):
                 idx = 5 if d < -0.35 else (4 if d < 0.2 else (3 if d < 0.65 else 2))
                 c.put_ramp(x, y, ramp, idx)
+    c.outline()
     return c
 
 
 def icicle_at(world, x0, y0, x1, y1, width=4, key=9000):
-    """Eiszapfen, dessen Spitze bei (x1, y1) liegt und dessen Basis bei (x0, y0) liegt (Flugrichtung)"""
+    """Eiszapfen von Basis (x0, y0) zu Spitze (x1, y1): dunkler Saum, helle Mitte"""
     L = int(math.hypot(x1 - x0, y1 - y0))
-    for k in range(L):
-        t = k / float(max(1, L - 1))
+    nx, ny = -(y1 - y0) / max(1.0, L), (x1 - x0) / max(1.0, L)
+    for k in range(L + 1):
+        t = k / float(max(1, L))
         x = x0 + (x1 - x0) * t
         y = y0 + (y1 - y0) * t
-        hw = max(0.4, (1.0 - t) * width / 2.0 + 0.3)
-        nx, ny = -(y1 - y0) / max(1.0, L), (x1 - x0) / max(1.0, L)
-        for s in range(-int(hw + 1), int(hw + 1) + 1):
-            if abs(s) > hw:
+        hw = max(0.3, (1.0 - t) * width / 2.0)
+        for s in range(-int(hw + 2), int(hw + 2) + 1):
+            if abs(s) > hw + 1.0:
                 continue
-            idx = 5 if s < 0 else (4 if s == 0 else 3)
-            if t > 0.75:
-                idx = 5 if s <= 0 else 4
-            put_px(world, x + nx * s, y + ny * s, 'ice', idx, key)
+            if abs(s) > hw:
+                put_px(world, x + nx * s, y + ny * s, 'ice', 1, key - 1)
+                continue
+            idx = 5 if s <= 0 else 3
+            if abs(s) < 0.6:
+                idx = 5
+            put_px(world, x + nx * s, y + ny * s, 'ice', idx if t < 0.85 else 5, key)
+    put_px(world, x1, y1, 'ice', 5, key)
 
 
 # --------------------------------------------------------------------------- Blitz

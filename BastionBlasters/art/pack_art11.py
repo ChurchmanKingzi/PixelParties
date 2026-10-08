@@ -117,15 +117,24 @@ def _art_bu07():
     w = ground_world('cobble', 9)
     sl = slide_sprite()
     fx, fy = 26, 78                      # linke Kante, Bodenlinie des Sprites
+    # nasser Boden um die Pfuetze
+    H, W = w.h, w.w
+    Y, X = np.mgrid[0:H, 0:W]
+    dd = np.hypot((X - (fx + 80)) / 30.0, (Y - (fy - 2)) / 10.0)
+    ground = w.depth < -40
+    shade_mask(w, (dd < 1.0) & ground & (((X + Y) % 2) == 0), -1)
+    shade_mask(w, (dd < 0.6) & ground, -1)
     shadow(w, fx + 18, fy - 4, 18, 3)
     w.draw(sl, fx, fy - sl.h + 4, fy)
     # Rutscher auf der Bahn (Bahn: Suedkante y_a + (x - x_a) * slope)
     sx, sy = fx + 28 + 18, fy - sl.h + 4 + 22 + 10
     w.draw(spr_slider(), sx - 11, sy - 18, fy + 2)
     w.draw(spr_slider(kind='teamA', species='goblin'), fx + 28 + 46 - 16, fy - sl.h + 4 + 22 + 25 - 20, fy + 3)
-    splash_drops(w, fx + 78, fy - 6)
-    unit_at(w, citizen('cloth', 1), 30, 92, sh=(5, 2))
-    for (sp, x, y) in ((barrel(), 14, 34), (crate(), 128, 34), (duck(), fx + 78, fy - 3)):
+    splash_drops(w, fx + 80, fy - 7)
+    d = duck()
+    w.draw(d, fx + 84, fy - 14, fy + 4)
+    unit_at(w, spr_cheer_citizen(kind='dirt'), 30, 92, sh=(5, 2))
+    for (sp, x, y) in ((barrel(), 14, 34), (crate(), 128, 34)):
         prop_at(w, sp, x, y)
     return finish(w)
 
@@ -190,6 +199,8 @@ def _art_ba01():
     w.draw(shell, ix - 5, iy - 8, 9900)
     star(w, ix + 4, iy - 10, 'gold', True, 9950)
     star(w, ix - 9, iy + 1, 'fire', False, 9950)
+    for (x, y) in ((28, 30), (124, 62), (42, 78), (96, 14)):
+        star(w, x, y, 'ice', False, 9950)
     return finish(w)
 
 
@@ -310,6 +321,8 @@ def _art_ba04():
     draw_bolt(world, bolt_points(pts[2][0], pts[2][1], 84, 50, rng, jag=3, steps=3))
     # Blitzschein ueber der Szene
     lighten_disc(world, tipx, tipy + 10, 36, 1, ring=0.45)
+    # Buerger im Hof: Haare zu Berge
+    unit_at(world, spr_cheer_citizen(kind='cloth', shocked=True), 66, 100, sh=(5, 2))
     # Funken sprueht es von der Kugel
     for (x, y, big) in ((tipx - 14, tipy + 6, False), (tipx + 12, tipy + 4, False), (tipx - 9, tipy + 20, False), (tipx + 15, tipy + 16, False),
                         (tipx - 4, tipy - 4, True)):

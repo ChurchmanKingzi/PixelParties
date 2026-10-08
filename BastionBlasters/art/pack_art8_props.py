@@ -1499,13 +1499,15 @@ def cannonball_pile():
 
 
 def rune_glyph(kind=0, ramp='purple', idx=5):
-    """abstrakte Rune (keine Buchstaben): 7x7"""
+    """abstrakte Rune (Zeichen, keine Buchstaben): 7x7"""
     shapes = [
-        [(3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (1, 2), (2, 1), (5, 2), (4, 1)],            # Baum-Zacken
-        [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (6, 0), (5, 1), (4, 2), (2, 4), (1, 5), (0, 6)],  # Kreuz
+        [(3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (1, 2), (2, 1), (5, 2), (4, 1)],                  # Pfeil nach oben
         [(3, 0), (2, 1), (4, 1), (1, 2), (5, 2), (0, 3), (6, 3), (1, 4), (5, 4), (2, 5), (4, 5), (3, 6), (3, 3)],  # Raute mit Punkt
-        [(1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (1, 1), (1, 2), (1, 3), (5, 1), (5, 2), (5, 3), (3, 4), (3, 5), (3, 6), (2, 4), (4, 4)],  # Becher
+        [(0, 6), (1, 5), (2, 4), (3, 3), (4, 2), (5, 1), (6, 0), (0, 5), (6, 1), (3, 4), (3, 2)],                    # Blitz-Streifen
         [(0, 3), (1, 2), (2, 1), (3, 0), (4, 1), (5, 2), (6, 3), (1, 4), (2, 5), (3, 6), (4, 5), (5, 4), (3, 3)],  # Auge
+        [(2, 0), (3, 0), (4, 0), (1, 1), (5, 1), (0, 2), (6, 2), (0, 3), (3, 3), (6, 3), (0, 4), (6, 4), (1, 5), (5, 5), (2, 6), (3, 6), (4, 6)],  # Sonne
+        [(0, 0), (1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (2, 2), (1, 2), (1, 3), (1, 4), (2, 4), (3, 4), (4, 4), (5, 4), (5, 5), (5, 6)],        # Spirale
+        [(0, 1), (1, 2), (2, 3), (3, 2), (4, 1), (5, 2), (6, 3), (0, 5), (1, 6), (2, 5), (3, 4), (4, 5), (5, 6)],  # Wellen
     ]
     c = Canvas(7, 7)
     for (x, y) in shapes[kind % len(shapes)]:
@@ -1514,50 +1516,46 @@ def rune_glyph(kind=0, ramp='purple', idx=5):
 
 
 def rune_press():
-    """Schraubenpresse: Holzrahmen, dicke Spindel mit Kreuzgriff, leuchtende Stempelplatte (44 x 50)"""
-    W, H = 46, 52
+    """Schraubenpresse (kompakt, 36 x 46): Holzrahmen, dicke Spindel mit Kreuzgriff, leuchtende Stempelplatte, Papier mit Runen"""
+    W, H = 38, 48
     c = Canvas(W, H)
     # Tisch / Sockel
-    round_rect(c, 3, 34, 42, 51, 'wood', lo=1, hi=4, radius=2)
-    for y in (39, 45):
-        for x in range(3, 43):
+    round_rect(c, 2, 32, 35, 47, 'wood', lo=1, hi=4, radius=2)
+    for y in (37, 42):
+        for x in range(2, 36):
             c.put_ramp(x, y, 'wood', 1)
     # Druckbett mit Papier
-    round_rect(c, 8, 28, 37, 35, 'stone', lo=1, hi=5, radius=1)
-    c.rect(11, 29, 34, 31, 'bone', 4)
-    c.rect(11, 29, 34, 29, 'bone', 5)
+    round_rect(c, 6, 26, 31, 33, 'stone', lo=1, hi=5, radius=1)
+    c.rect(9, 27, 28, 29, 'bone', 4)
+    c.rect(9, 27, 28, 27, 'bone', 5)
     # Rahmenpfosten
-    for (x0, x1) in ((6, 10), (35, 39)):
-        c.rect(x0, 6, x1, 36, 'wood', 3)
-        c.rect(x0, 6, x0, 36, 'wood', 4)
-        c.rect(x1, 6, x1, 36, 'wood', 1)
+    for (x0, x1) in ((4, 7), (30, 33)):
+        c.rect(x0, 5, x1, 34, 'wood', 3)
+        c.rect(x0, 5, x0, 34, 'wood', 4)
+        c.rect(x1, 5, x1, 34, 'wood', 1)
         c.rect(x0 + 1, 8, x0 + 1, 8, 'metal', 5)
     # Querbalken oben
-    round_rect(c, 3, 3, 42, 11, 'wood', lo=1, hi=4, radius=2)
-    c.rect(3, 3, 42, 3, 'wood', 5)
+    round_rect(c, 2, 2, 35, 9, 'wood', lo=1, hi=4, radius=2)
+    c.rect(2, 2, 35, 2, 'wood', 5)
     # Spindel
-    c.rect(21, 11, 24, 24, 'metal', 3)
-    c.rect(21, 11, 21, 24, 'metal', 5)
-    c.rect(24, 11, 24, 24, 'metal', 1)
-    for y in range(12, 24, 3):
-        for x in range(21, 25):
+    c.rect(17, 9, 20, 22, 'metal', 3)
+    c.rect(17, 9, 17, 22, 'metal', 5)
+    c.rect(20, 9, 20, 22, 'metal', 1)
+    for y in range(10, 22, 3):
+        for x in range(17, 21):
             c.put_ramp(x, y, 'metal', 1)
-    # Griffkreuz (Hebel) oben
-    thick_line(c, 4, 4, 41, 4, 2.4, 'metal', lo=1, hi=4)
-    ellipse(c, 4, 4, 2.6, 2.6, 'gold', lo=2, hi=5)
-    ellipse(c, 41, 4, 2.6, 2.6, 'gold', lo=1, hi=4)
+    # Griffkreuz (Hebel) oben, schräg
+    thick_line(c, 2, 0, 35, 4, 2.2, 'metal', lo=1, hi=4)
+    ellipse(c, 2, 0.5, 2.4, 2.4, 'gold', lo=2, hi=5)
+    ellipse(c, 35, 4, 2.4, 2.4, 'gold', lo=1, hi=4)
     # Stempelplatte mit Runen-Glut
-    round_rect(c, 12, 22, 33, 28, 'metal', lo=1, hi=4, radius=1)
-    c.rect(14, 26, 31, 27, 'purple', 3)
-    for k, x in enumerate((16, 21, 26, 29)):
-        c.put_ramp(x, 26, 'purple', 5)
-        c.put_ramp(x + 1, 27, 'purple', 5)
-    # Glühen am Papier
-    for x in range(12, 34):
-        c.put_ramp(x, 30, 'purple', 4 if x % 2 else 5)
-    # Kristall am Rahmen
-    poly(c, [(40, 14), (43, 14), (44, 20), (42, 24), (40, 20)], 'purple', lo=2, hi=5)
-    c.put_ramp(41, 16, 'purple', 5)
+    round_rect(c, 10, 20, 27, 26, 'metal', lo=1, hi=4, radius=1)
+    c.rect(11, 24, 26, 25, 'purple', 3)
+    for x in (13, 17, 21, 24):
+        c.put_ramp(x, 24, 'purple', 5)
+        c.put_ramp(x + 1, 25, 'purple', 5)
+    for x in range(9, 29):
+        c.put_ramp(x, 29, 'purple', 4 if x % 2 else 5)
     c.outline()
     return c
 
@@ -1620,6 +1618,37 @@ def crystal_cluster(col='purple', big=True):
     prism(11, 25, 14, 3, 4)
     prism(5, 25, 22, 4, 5)
     prism(14, 25, 10, 3, 4)
+    c.outline()
+    return c
+
+
+def blueprint():
+    """Wandplan: Kanonen-Bauzeichnung auf blauem Papier (24 x 20)"""
+    c = Canvas(26, 22)
+    round_rect(c, 0, 0, 25, 21, 'ice', lo=0, hi=2, radius=1)
+    c.rect(1, 1, 24, 20, 'ice', 1)
+    # Rohr-Umriss in Weiß
+    for x in range(4, 20):
+        t = (x - 4) / 15.0
+        hh = int(4 - 1.5 * t)
+        c.put_ramp(x, 9 - hh, 'bone', 5)
+        c.put_ramp(x, 9 + hh, 'bone', 5)
+    c.put_ramp(3, 8, 'bone', 5)
+    c.put_ramp(3, 9, 'bone', 5)
+    c.put_ramp(3, 10, 'bone', 5)
+    for y in range(6, 13):
+        c.put_ramp(20, y, 'bone', 5)
+    for x in (9, 13):
+        for y in (5, 6, 12, 13):
+            c.put_ramp(x, y, 'bone', 4)
+    # Maßlinie und Kreise
+    for x in range(4, 20):
+        if x % 2 == 0:
+            c.put_ramp(x, 16, 'ice', 5)
+    c.put_ramp(4, 15, 'ice', 5)
+    c.put_ramp(19, 15, 'ice', 5)
+    for (x, y) in ((22, 4), (23, 4), (22, 3), (23, 3)):
+        c.put_ramp(x, y, 'ice', 4)
     c.outline()
     return c
 

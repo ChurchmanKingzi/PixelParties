@@ -6,6 +6,7 @@ from pack_art8_kit import *
 from pack_art8_props import *
 from pack_art8_chars import *
 import pack_art8_scenes_a      # noqa: F401
+import pack_art8_scenes_b      # noqa: F401
 
 
 def _view(geom, y0=6):

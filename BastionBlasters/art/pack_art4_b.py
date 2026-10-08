@@ -572,21 +572,26 @@ def spr_salamander_warden(anim='idle', f=0):
     # Unterkiefer
     ellipse(c, hx + 6.0, hy + 5.0 + jaw_open, 7.0, 2.8, 'coal', lo=0, hi=3, ambient=0.2)
     if breath:
-        # Rachen: dunkel mit Glut, Zaehne oben und unten
-        for y in range(hy + 3, hy + 6 + jaw_open):
-            for x in range(hx + 1, hx + 14):
-                if not (c.alpha(x, y) or True):
-                    continue
-                t = (x - hx - 1) / 13.0
-                idx = 2 if (x + y) % 2 else 3
-                if t > 0.5:
-                    idx = 4 if (x + y) % 2 else 5
-                if y == hy + 3 or y == hy + 5 + jaw_open:
-                    idx = 1
-                c.put_ramp(x, y, 'fire', idx)
-        for x in range(hx + 2, hx + 14, 3):
-            c.put_ramp(x, hy + 4, 'bone', 5)
-            c.put_ramp(x, hy + 4 + jaw_open, 'bone', 4)
+        # Rachen: Keil zwischen Oberkiefer (oben) und Unterkiefer (unten), Glut waechst zur Schnauzenspitze
+        for x in range(hx + 1, hx + 15):
+            t = (x - (hx + 1)) / 13.0
+            top = hy + 4
+            bot = hy + 5 + int(round(jaw_open * t)) + 1
+            for y in range(top, bot + 1):
+                if y == top:
+                    idx_, ramp_ = 1, 'fire'
+                elif y == bot:
+                    idx_, ramp_ = 2, 'fire'
+                else:
+                    ramp_ = 'fire'
+                    L = 0.15 + 0.85 * t
+                    idx_ = quant(L, 1, 5, x, y)
+                    if idx_ >= 5:
+                        ramp_, idx_ = 'gold', 5
+                c.put_ramp(x, y, ramp_, idx_)
+            if x % 3 == 0:
+                c.put_ramp(x, top + 1, 'bone', 5)
+                c.put_ramp(x, bot - 1, 'bone', 4)
     else:
         for x in range(hx + 3, hx + 14):
             c.put_ramp(x, hy + 4, 'coal', 0)

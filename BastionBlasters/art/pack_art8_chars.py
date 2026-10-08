@@ -175,7 +175,7 @@ def patient_waiting(f=0):
 
 def powder_gnome(f=0):
     """Pulver-Gnom: rußiges Gesicht, abstehendes Brandhaar, Schutzbrille auf der Stirn, Lederschürze, rauchende Pfeife (30 x 36)"""
-    c = ShiftCanvas(32, 40, 2, 8)
+    c = ShiftCanvas(32, 44, 2, 8)
     bob = [0, -1][f % 2]
     # Beine, Stiefel
     thick_line(c, 11, 27, 11, 32, 3.0, 'wood', lo=1, hi=3)
@@ -224,7 +224,7 @@ def powder_gnome(f=0):
 
 def fireworks_worker(f=0):
     """Feuerwerker: Partyhut mit Streifen, Wunderkerze in der Hand, Rakete unterm Arm, Funken am Kittel (34 x 38)"""
-    c = ShiftCanvas(36, 44, 4, 10)
+    c = ShiftCanvas(36, 48, 4, 10)
     bob = [0, -1][f % 2]
     # Beine, Stiefel
     thick_line(c, 12, 28, 12, 33, 3.0, 'cloth', lo=1, hi=3)
@@ -328,7 +328,7 @@ def foundry_worker(f=0):
 
 def rune_apprentice(f=0):
     """Runen-Lehrling: schiefer Spitzhut mit Stern, violette Robe, tintenfleckige Nase, hält einen frisch gedruckten leuchtenden Zettel hoch (34 x 40)"""
-    c = ShiftCanvas(34, 46, 2, 10)
+    c = ShiftCanvas(34, 50, 2, 10)
     bob = [0, -1][f % 2]
     # Robe (ausgestellt)
     poly(c, [(8, 18 + bob), (21, 18 + bob), (25, 34), (4, 34)], 'purple', lo=1, hi=4)

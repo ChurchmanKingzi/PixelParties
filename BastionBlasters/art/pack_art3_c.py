@@ -307,23 +307,26 @@ def spr_mirror_twin(anim='idle', f=0):
         x, y = 19 + k, int(gcy - 3) + k
         if ((x - gcx) / grx) ** 2 + ((y - gcy) / gry) ** 2 < 0.9:
             c.put_ramp(x, y, 'fur', 5)
-    # Rahmenzier: Krone oben, Fuss unten
-    for (x, y, i) in ((19, 12, 5), (18, 13, 4), (20, 13, 4), (17, 14, 3), (21, 14, 3)):
+    # Rahmenzier: Krone oben (zwischen Kopf und Rahmen)
+    for (x, y, i) in ((19, 11, 5), (18, 12, 4), (20, 12, 4), (17, 13, 3), (21, 13, 3), (16, 14, 3), (22, 14, 3)):
         c.put_ramp(x, y + bob, 'gold', i)
-    ellipse(c, 19, 12 + bob, 1.8, 1.8, 'gold', lo=3, hi=5)
-    c.put_ramp(19, 12 + bob, 'fire', 4)
+    ellipse(c, 19, 11.5 + bob, 1.9, 1.9, 'gold', lo=3, hi=5)
+    c.put_ramp(19, 11 + bob, 'fire', 4)
+    # Schultern (Goldspangen)
+    for sx in (11, 27):
+        ellipse(c, sx, 17 + bob, 2.8, 2.2, 'gold', lo=2, hi=5)
     # Bein vorn
     thick_line(c, 23, 35 + bob, 26 + st, 43, 4.4, 'metal', lo=2, hi=5)
     ellipse(c, 27 + st, 44, 4.6, 1.9, 'metal', lo=3, hi=5)
     # Kopf: spiegelnde Glatze mit Sprung
-    ellipse(c, 20, 8 + bob, 5.8, 6.4, 'metal', lo=2, hi=5, ambient=0.3)
-    for y in range(3, 10):
-        c.put_ramp(21 + (y - 3) // 3, y + bob, 'sky', 4 if y < 7 else 3)
-    _glint(c, 16, 4 + bob, 4, 'fur', 5)
-    c.line(24, 4 + bob, 23, 8 + bob, 'metal', 1)
-    c.line(23, 8 + bob, 25, 11 + bob, 'metal', 1)
-    c.rect(22, 8 + bob, 22, 9 + bob, 'coal', 1)
-    c.rect(25, 8 + bob, 25, 9 + bob, 'coal', 1)
+    ellipse(c, 19.5, 6 + bob, 5.4, 5.6, 'metal', lo=2, hi=5, ambient=0.3)
+    for y in range(2, 8):
+        c.put_ramp(21 + (y - 2) // 3, y + bob, 'sky', 4 if y < 5 else 3)
+    _glint(c, 15, 3 + bob, 4, 'fur', 5)
+    c.line(23, 2 + bob, 22, 6 + bob, 'metal', 1)
+    c.line(22, 6 + bob, 24, 9 + bob, 'metal', 1)
+    c.rect(21, 6 + bob, 21, 7 + bob, 'coal', 1)
+    c.rect(24, 6 + bob, 24, 7 + bob, 'coal', 1)
     # Arm vorn mit Spiegelscherbe als Schwert
     thick_line(c, 26, 19 + bob, 33, 22 + bob, 3.2, 'metal', lo=2, hi=5)
     blade(c, (33, 22 + bob), (39, 10 + bob), 3.8, 'metal', 3, 5)

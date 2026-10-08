@@ -196,10 +196,11 @@ def slide_sprite():
     c = Canvas(W, H)
     gy = H - 4                      # Bodenlinie
     # --- Pfuetze am Ende (Boden)
-    ellipse(c, 78, gy - 1, 14, 4.2, 'ice', lo=2, hi=5, ambient=0.4, flatness=0.5)
-    for (x, y) in ((70, gy - 2), (73, gy), (79, gy - 3), (84, gy), (88, gy - 2)):
+    ellipse(c, 78, gy - 1, 15, 4.6, 'ice', lo=2, hi=5, ambient=0.4, flatness=0.5)
+    for (x, y) in ((68, gy - 2), (72, gy + 1), (79, gy - 3), (84, gy), (88, gy - 2), (75, gy - 1)):
         c.put_ramp(x, y, 'bone', 5)
         c.put_ramp(x + 1, y, 'bone', 4)
+        c.put_ramp(x + 2, y, 'bone', 3)
     # --- Strebe unter der Rutsche
     for x in (50, 68):
         t = (x - 28) / 46.0
@@ -290,10 +291,11 @@ def slide_sprite():
 
 
 def splash_drops(world, cx, cy, key=9100):
-    """Wasserspritzer ueber der Pfuetze"""
-    pts = [(-9, -6, 5), (-6, -11, 4), (-2, -14, 5), (3, -12, 5), (7, -8, 4), (10, -4, 5), (0, -7, 4), (-4, -4, 5), (5, -3, 5)]
-    for (dx, dy, i) in pts:
-        px_at(world, cx + dx, cy + dy, 'bone' if i == 5 else 'ice', 5 if i == 5 else 4, key)
+    """Wasserspritzer ueber der Pfuetze: Tropfen (2 px) in Fontaenen-Form"""
+    pts = [(-10, -4), (-8, -9), (-5, -13), (-1, -16), (3, -15), (7, -12), (10, -8), (12, -3), (-3, -8), (4, -7), (0, -11), (-12, 0), (14, 1)]
+    for (dx, dy) in pts:
+        px_at(world, cx + dx, cy + dy, 'bone', 5, key)
+        px_at(world, cx + dx + 1, cy + dy, 'ice', 5, key)
         px_at(world, cx + dx, cy + dy + 1, 'ice', 4, key)
 
 

@@ -146,15 +146,15 @@ def _art_bs03():
     w.draw(right, 124, wall_y - right.h + 1, wall_y)
     for (sp, x, y) in ((barrel(), 14, 34), (crate(), 128, 33)):
         prop_at(w, sp, x, y)
-    for (sp, x, y) in ((rock(2), 14, 88), (bush(1), 132, 90)):
+    for (sp, x, y) in ((rock(2), 14, 88),):
         prop_at(w, sp, x, y)
     # Skelett drischt mit dem Löffel auf die Platte, Funken
     unit_at(w, skeleton('attack', 1), 44, 78, sh=(8, 3))
     burst(w, 57, 58, True, 'bone')
     burst(w, 57, 58, False, 'metal')
     # Felsbrocken prallt ab (Flugbahn gestrichelt), Beule; Gift-Spritzer rinnt wirkungslos ab
-    w.draw(stone_projectile_small(), 112 - 7, 72 - 7, 9000)
-    wline(w, 92, 53, 106, 64, 'bone', 4, 9000, dash=2)
+    w.draw(stone_projectile_small(), 104 - 7, 70 - 7, 9000)
+    wline(w, 92, 53, 99, 62, 'bone', 4, 9000, dash=2)
     burst(w, 89, 52, False, 'gold')
     for (x, y, i) in ((78, 52, 4), (79, 52, 3), (77, 53, 3), (78, 54, 4), (80, 54, 3), (79, 55, 4), (77, 56, 3)):
         wpx(w, x, y, 'goblin', i)
@@ -162,7 +162,7 @@ def _art_bs03():
         wpx(w, 78, 56 + k, 'goblin', 3 if k % 2 else 4)
     wpx(w, 78, 63, 'goblin', 5)
     wpx(w, 80, 48, 'goblin', 5)
-    unit_at(w, skeleton('walk', 1), 124, 90, flip=True, sh=(8, 3))
+    unit_at(w, skeleton('walk', 1), 130, 91, flip=True, sh=(8, 3))
     return finish(w)
 
 
@@ -263,5 +263,97 @@ def _art_bs07():
     for (sp, x, y) in ((barrel(), 14, 40), (crate(), 130, 40)):
         prop_at(w, sp, x, y)
     for (sp, x, y) in ((bush(2), 18, 90), (rock(1), 124, 90)):
+        prop_at(w, sp, x, y)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BS-05 Spike Strip
+
+
+def sweat(world, x, y):
+    """Schweißtropfen / Ouch-Funken über dem Kopf"""
+    for (dx, dy, i) in ((0, 0, 5), (0, 1, 4), (-1, 1, 4), (1, 1, 4), (0, 2, 3)):
+        wpx(world, x + dx, y + dy, 'ice', i, 9200)
+
+
+@card_art('BS-05')
+def _art_bs05():
+    w = ground_world('cobble', 5)
+    for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 36)):
+        prop_at(w, sp, x, y)
+    strip = spike_strip()
+    sx, sy = 74, 66                                         # Fußpunkt (Mitte unten) der Stachelflur
+    shadow(w, sx + 1, sy - 1, 15, 3)
+    # Gegner läuft darüber: Stacheln stehen vor seinen Füßen
+    unit_at(w, skeleton('walk', 0), sx + 1, sy - 5, sh=(8, 2))
+    w.draw(strip, sx - strip.w // 2, sy - strip.h + 1, sy)
+    # Autsch-Funken und Tempo-Bremse (kurze Striche hinter ihm)
+    burst(w, sx - 4, sy - 36, False, 'gold')
+    burst(w, sx + 12, sy - 32, False, 'bone')
+    sweat(w, sx + 9, sy - 38)
+    for k in range(3):
+        wline(w, sx - 22 - k * 2, sy - 18 + k * 4, sx - 16 - k * 2, sy - 18 + k * 4, 'bone', 4 - (k % 2), 9000)
+    # wartender Zweiter
+    unit_at(w, skeleton('idle', 1), 28, 84, sh=(8, 3))
+    unit_at(w, goblin('walk', 2), 118, 82, flip=True, sh=(8, 3))
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BS-08 Revolving-Door Maze
+
+
+@card_art('BS-08')
+def _art_bs08():
+    w = ground_world('cobble', 7)
+    maze = revolving_maze()
+    mx, my = 40, 30                                         # linke obere Ecke
+    foot = my + maze.h - 1
+    shadow(w, mx + 32, foot - 1, 36, 4)
+    w.draw(maze, mx, my, foot)
+    # Verwirrter Gegner torkelt in der Trommel, Sterne kreisen
+    g = goblin('walk', 1)
+    unit_at(w, g, mx + 14, foot - 3, flip=False, sh=(8, 2))
+    w.draw(g, 0, 0, 0) if False else None
+    dizzy(w, mx + 16, foot - 31, 8, 3, 3, 0.6, 9200)
+    # einsamer Hut auf dem Boden
+    w.draw(hat(), mx + 52, foot - 9, 9000)
+    # zweiter Gegner kommt von rechts
+    unit_at(w, skeleton('walk', 2), 118, 84, flip=True, sh=(8, 3))
+    unit_at(w, citizen('cloth', 0), 20, 82, sh=(5, 2))
+    for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 34)):
+        prop_at(w, sp, x, y)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BS-09 Quench Pond
+
+
+@card_art('BS-09')
+def _art_bs09():
+    w = ground_world('cobble', 8)
+    pond = quench_pond()
+    px_, py_ = 82, 66
+    shadow(w, px_ + 1, py_ - 1, 15, 3)
+    w.draw(pond, px_ - pond.w // 2, py_ - pond.h + 1, py_)
+    # Brennendes Skelett rennt zum Teich: Flammen auf Helm, Rücken und Löffel
+    sk = skeleton('walk', 1)
+    fx_, fy_ = 42, 78
+    unit_at(w, sk, fx_, fy_, sh=(8, 3))
+    x0, y0 = fx_ - 16, fy_ - 31
+    for (fl, dx, dy) in ((flame(11, 0.3), 14, -7), (flame(9, 1.7), 8, 12), (flame(8, 2.4), 24, 1)):
+        w.draw(fl, x0 + dx, y0 + dy + 3, 9000)
+    # Dampf steigt aus dem Teich, Spritzer
+    for (x, y, sd) in ((px_ - 10, py_ - 36, 1), (px_ + 4, py_ - 44, 2), (px_ + 14, py_ - 32, 3)):
+        c = puff(14, 10, sd, 'bone', 3, 5)
+        w.draw(c, x - c.w // 2, y - c.h // 2, 9000)
+    for (x, y) in ((px_ - 18, py_ - 22), (px_ - 16, py_ - 26), (px_ + 18, py_ - 24), (px_ + 12, py_ - 28)):
+        wpx(w, x, y, 'ice', 5, 9000)
+        wpx(w, x, y + 1, 'ice', 3, 9000)
+    # gelöschter Gegner rechts (rußig, dampft)
+    sk2 = tint_ramp(skeleton('idle', 0), 'stone', 0)
+    unit_at(w, skeleton('idle', 0), 120, 84, flip=True, sh=(8, 3))
+    c = puff(12, 9, 5, 'bone', 3, 5)
+    w.draw(c, 120 - 6, 84 - 40, 9000)
+    for (sp, x, y) in ((barrel(), 16, 34), (crate(), 128, 34)):
         prop_at(w, sp, x, y)
     return finish(w)

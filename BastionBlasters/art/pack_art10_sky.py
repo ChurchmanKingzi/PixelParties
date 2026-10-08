@@ -246,33 +246,36 @@ def cloud_anchor_tower(team='teamA'):
 
 
 def rain_cannon():
-    """kleine Kanone auf der Wolke, schiesst einen Regentropfen, 26 x 18"""
-    c = Canvas(26, 18)
-    ellipse(c, 6, 14, 3.4, 3.4, 'wood', lo=1, hi=4)
-    ellipse(c, 6, 14, 1.4, 1.4, 'wood', lo=0, hi=2)
-    round_rect(c, 3, 9, 12, 13, 'wood', lo=1, hi=4, radius=1)
-    poly(c, [(3, 6), (3, 12), (19, 10), (19, 4)], 'metal', lo=0, hi=4)
-    c.rect(18, 3, 20, 11, 'metal', 4)
-    c.rect(20, 5, 20, 9, 'coal', 0)
-    ellipse(c, 2.5, 8.5, 2.2, 2.2, 'metal', lo=1, hi=4)
-    # Regentropfen als Kugel
-    drop_c = Canvas(8, 9)
-    drop(drop_c, 4, 1, 'ice', True)
-    c.blit(drop_c, 19, 0)
+    """kleine Kanone auf der Wolke (Eisen/Stein), schiesst einen Regentropfen, 30 x 20"""
+    c = Canvas(30, 20)
+    ellipse(c, 6, 16, 3.4, 3.4, 'stone', lo=0, hi=4)
+    ellipse(c, 6, 16, 1.4, 1.4, 'metal', lo=3, hi=5)
+    round_rect(c, 2, 11, 13, 15, 'stone', lo=1, hi=5, radius=1)
+    poly(c, [(2, 8), (2, 14), (20, 12), (20, 6)], 'coal', lo=1, hi=4)
+    for x in range(4, 20):
+        c.put_ramp(x, 8 - (x - 4) // 8, 'coal', 5 if x % 3 else 4)
+    c.rect(19, 5, 21, 13, 'coal', 3)
+    c.rect(19, 5, 19, 13, 'coal', 4)
+    c.rect(21, 7, 21, 11, 'coal', 0)
+    ellipse(c, 2.5, 10.5, 2.2, 2.2, 'coal', lo=1, hi=4)
+    # Regentropfen als Kugel, fliegt rechts davon
+    d = Canvas(8, 10)
+    drop(d, 4, 1, 'ice', True)
+    c.blit(d, 22, 0)
     c.outline()
     return c
 
 
 def rain_mortar():
-    """kleiner Moerser, der einen Tropfen nach oben spuckt, 18 x 20"""
-    c = Canvas(18, 20)
-    round_rect(c, 3, 11, 14, 18, 'wood', lo=1, hi=4, radius=2)
-    poly(c, [(5, 4), (12, 4), (14, 12), (3, 12)], 'metal', lo=0, hi=4)
-    c.rect(4, 3, 13, 4, 'metal', 4)
-    c.rect(5, 3, 12, 3, 'coal', 0)
-    d = Canvas(8, 9)
+    """kleiner Moerser (Eisen/Stein) mit aufsteigendem Regentropfen, 18 x 26"""
+    c = Canvas(18, 26)
+    round_rect(c, 3, 17, 14, 24, 'stone', lo=1, hi=5, radius=2)
+    poly(c, [(5, 10), (12, 10), (14, 18), (3, 18)], 'coal', lo=1, hi=4)
+    c.rect(4, 9, 13, 10, 'coal', 4)
+    c.rect(5, 9, 12, 9, 'coal', 0)
+    d = Canvas(8, 10)
     drop(d, 4, 1, 'ice', True)
-    c.blit(d, 5, -4 + 4 - 4) if False else None
+    c.blit(d, 5, 0)
     c.outline()
     return c
 
@@ -321,8 +324,13 @@ def floating_island(team='teamA'):
         c.put_ramp(x - 1, y + 1, ramp, 5)
     # ---------------- Oberflaeche: Gras-Plateau (Ellipse)
     ellipse(c, cx, 36, 59, 9, 'grass', lo=1, hi=4, ambient=0.32, flatness=0.5)
+    # Teich (rechts)
+    ellipse(c, 106, 37, 12, 4.6, 'sky', lo=1, hi=4, ambient=0.3, flatness=0.3)
+    for x in range(96, 117):
+        if x % 3 == 0:
+            c.put_ramp(x, 37, 'sky', 5)
     # Zinnenmauer (Vorderseite, Suedansicht)
-    wx0, wx1, wy0, wy1 = 30, 94, 28, 40
+    wx0, wx1, wy0, wy1 = 30, 77, 28, 40
     for y in range(wy0, wy1 + 1):
         for x in range(wx0, wx1 + 1):
             row = (y - wy0) // 4
@@ -340,7 +348,7 @@ def floating_island(team='teamA'):
                 idx = 1
             c.put_ramp(x, y, 'stone', idx)
     # Zinnen (Zaehne) mit Gesichtern
-    for k in range(0, 6):
+    for k in range(0, 4):
         mx = wx0 + 3 + k * 11
         c.rect(mx, wy0 - 6, mx + 6, wy0, 'stone', 4)
         c.rect(mx, wy0 - 6, mx + 6, wy0 - 6, 'stone', 5)
@@ -352,15 +360,16 @@ def floating_island(team='teamA'):
         c.put_ramp(mx + 3, wy0 - 1, 'stone', 1)
         c.put_ramp(mx + 4, wy0 - 1, 'stone', 1)
     # Tor
-    poly(c, [(cx - 5, wy1), (cx + 5, wy1), (cx + 5, wy0 + 6), (cx, wy0 + 2), (cx - 5, wy0 + 6)], 'wood', lo=0, hi=3)
-    c.rect(cx, wy0 + 3, cx, wy1, 'wood', 0)
+    gx0 = 53
+    poly(c, [(gx0 - 5, wy1), (gx0 + 5, wy1), (gx0 + 5, wy0 + 6), (gx0, wy0 + 2), (gx0 - 5, wy0 + 6)], 'wood', lo=0, hi=3)
+    c.rect(gx0, wy0 + 3, gx0, wy1, 'wood', 0)
     # Kanonenrohre hinter den Zinnen
-    for gx in (39, 83):
+    for gx in (36, 58):
         thick_line(c, gx, wy0 - 3, gx + 9, wy0 - 11, 4.4, 'coal', lo=0, hi=4)
         ellipse(c, gx + 9.5, wy0 - 11.5, 2.8, 2.8, 'coal', lo=0, hi=2)
         c.put_ramp(gx + 3, wy0 - 8, 'coal', 5)
     # Tuerme links und rechts
-    for tx in (22, 102):
+    for tx in (22, 86):
         tx0, tx1 = tx - 8, tx + 8
         for y in range(18, 42):
             for x in range(tx0, tx1 + 1):

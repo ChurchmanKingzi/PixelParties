@@ -358,13 +358,14 @@ def chaos_cabinet():
     c.put_ramp(31, 35, 'coal', 1)
     c.put_ramp(37, 35, 'coal', 1)
     # Nudeln quellen aus dem unteren Fach heraus und haengen ueber die Kante
-    for k, x in enumerate((16, 19, 22, 25)):
+    for k, x in enumerate((15, 19, 23)):
         for y in range(41, 58):
-            xx = x + int(round(1.6 * math.sin((y + k * 3) / 2.2)))
-            c.put_ramp(xx, y, 'gold', 5 if (y + k) % 3 else 4)
-            c.put_ramp(xx + 1, y, 'gold', 3)
-    c.rect(18, 43, 19, 44, 'fire', 3)
-    c.put_ramp(24, 49, 'fire', 3)
+            xx = x + int(round(1.8 * math.sin((y + k * 4) / 2.4)))
+            c.put_ramp(xx, y, 'gold', 5 if (y + k) % 4 else 4)
+            c.put_ramp(xx + 1, y, 'dirt', 4)
+    ellipse(c, 19.5, 46.5, 2.8, 2.6, 'wood', lo=1, hi=4)          # Fleischbaellchen
+    c.rect(16, 52, 18, 53, 'fire', 3)
+    c.put_ramp(22, 50, 'fire', 4)
     # roter Clownsschuh ragt heraus
     ellipse(c, 33.5, 47.5, 5.4, 2.8, 'teamA', lo=2, hi=5)
     c.rect(28, 44, 31, 46, 'teamA', 3)

@@ -92,11 +92,12 @@ def bunker(team='teamA'):
     c.rect(sx0 - 1, sy0 - 2, sx0 - 1, sy1 + 2, 'stone', 4)
     c.rect(sx1 + 1, sy0, sx1 + 1, sy1 + 2, 'stone', 1)
     # Rohr: schaut aus der Scharte schraeg nach vorn rechts
-    thick_line(c, 33, 41, 49, 53, 7.0, 'coal', lo=1, hi=4)
-    thick_line(c, 33, 39, 47, 50, 2.0, 'coal', lo=4, hi=5)
-    ellipse(c, 50.5, 54.5, 4.4, 4.0, 'coal', lo=2, hi=4)
+    thick_line(c, 33, 41, 49, 53, 7.4, 'metal', lo=0, hi=4)
+    thick_line(c, 33, 39, 47, 50, 2.0, 'metal', lo=4, hi=5)
+    for (rx_, ry_) in ((38, 44), (43, 48)):
+        c.rect(rx_, ry_ - 1, rx_ + 1, ry_ + 2, 'metal', 5)
+    ellipse(c, 50.5, 54.5, 4.8, 4.4, 'metal', lo=1, hi=5)
     ellipse(c, 51, 55, 2.6, 2.4, 'coal', lo=0, hi=0)
-    c.rect(36, 40, 37, 47, 'coal', 2)
     # Tuer (eiserne Luke links)
     round_rect(c, 9, 44, 17, 56, 'metal', lo=1, hi=4, radius=1)
     c.put_ramp(15, 50, 'gold', 5)

@@ -268,11 +268,11 @@ def a4_heat_glow(world, cx, cy, rx, ry, seed=1):
                 continue
             n = texture_noise(x, y, seed)
             L = (1.0 - d) * 1.1 + (n - 0.5) * 0.5
-            if L > 0.75 and (x + y) % 2 == 0:
-                a4_ground_put(world, x, y, 'fire', 3)
-            elif L > 0.5 and (x + y) % 2 == 0:
+            if L > 0.7 and (x + y) % 2 == 0:
                 a4_ground_put(world, x, y, 'fire', 2)
-            elif L > 0.3 and (x % 2 == 0 and y % 2 == 0):
+            elif L > 0.45 and (x % 2 == 0 and y % 2 == 0):
+                a4_ground_put(world, x, y, 'fire', 1)
+            elif L > 0.3 and (x % 3 == 0 and y % 3 == 0):
                 a4_ground_put(world, x, y, 'fire', 1)
 
 

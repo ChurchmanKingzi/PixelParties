@@ -136,9 +136,10 @@ def spr_rubber_golem(anim='idle', f=0):
         ellipse(c, 38, 8.5, 5, 4.8, 'cloth', lo=2, hi=5, ambient=0.2)
         _crease(c, 34, 14, 3.4, 1.8, a0=-10, a1=190)
     else:
-        thick_line(c, 29, 23 - sq // 2, 36, 19 + sq // 2, 5.8, 'cloth', lo=2, hi=5)
-        ellipse(c, 38, 18 + sq // 2, 5, 4.8, 'cloth', lo=2, hi=5, ambient=0.2)
-        c.put_ramp(36, 16 + sq // 2, 'cloth', 5)
+        thick_line(c, 29, 26 - sq // 2, 36, 30 + sq // 2, 5.8, 'cloth', lo=2, hi=5)
+        ellipse(c, 38, 31 + sq // 2, 5, 4.8, 'cloth', lo=2, hi=5, ambient=0.2)
+        c.put_ramp(36, 29 + sq // 2, 'cloth', 5)
+        _crease(c, 33, 28 + sq // 2, 3.2, 1.6, a0=-10, a1=190)
     # Das eine Glibber-Auge
     ex, ey = 24, int(hy + 0.5)
     ellipse(c, ex, ey, 5.2, 4.8, 'bone', lo=3, hi=5, ambient=0.3)

@@ -13,7 +13,7 @@ def _leg(c, pts, w=2.4, lo=1, hi=3):
 
 
 def spr_pincer_crab(anim='idle', f=0):
-    c = Canvas(56, 40)
+    c = Canvas(60, 40)
     st = [0, 1][f % 2]
     # ---- Beine (3 je Seite), hinten dunkler
     _leg(c, [(14, 26), (6, 27 - st), (3, 34)], lo=0, hi=2)
@@ -66,15 +66,15 @@ def spr_pincer_crab(anim='idle', f=0):
         c.put_ramp(31 - k, 9 - (1 if 1 < k < 5 else 0) + (1 if k > 5 else 0), 'teamA', 4 if k < 3 else 3)
         c.put_ramp(31 - k, 10 - (1 if 1 < k < 5 else 0) + (1 if k > 5 else 0), 'teamA', 3 if k < 4 else 2)
     # ---- grosse Ringzange rechts (Schluesselring) mit Armgelenk
-    _leg(c, [(36, 25), (44, 24), (46, 18)], w=4.0, lo=1, hi=4)
-    ring = m_ellipse(c, 47, 11, 6.4, 6.4) & ~m_ellipse(c, 47, 11, 3.2, 3.2)
-    ring &= ~m_poly(c, [(46, 4), (52, 7), (49, 11), (46, 8)])           # Spalt oben rechts
+    _leg(c, [(36, 25), (44, 25), (47, 20)], w=4.2, lo=1, hi=4)
+    ring = m_ellipse(c, 48, 12, 7.6, 7.6) & ~m_ellipse(c, 48, 12, 4.5, 4.5)
+    ring &= ~m_poly(c, [(46, 3), (56, 6), (51, 12), (47, 8)])           # Spalt oben rechts
     shade_mask(c, ring, 'fire', 1, 5, r=1, passes=1, strength=3.0, ambient=0.35)
-    tip_a = m_poly(c, [(46, 5), (51, 5), (52, 9), (49, 7)])
+    tip_a = m_poly(c, [(46, 4), (53, 4), (55, 9), (51, 7)])
     shade_mask(c, tip_a, 'fire', 2, 5, r=1, passes=1, strength=2.0)
-    c.put_ramp(50, 5, 'bone', 5)
+    c.put_ramp(51, 4, 'bone', 5)
     # kleine Schluessel am Ring
-    for (kx, ky, n) in ((53, 16, 0), (50, 19, 1)):
+    for (kx, ky) in ((53, 20), (56, 17)):
         c.line(kx, ky, kx, ky + 4, 'gold', 4)
         c.put_ramp(kx + 1, ky + 3, 'gold', 3)
         c.put_ramp(kx + 1, ky + 4, 'gold', 3)

@@ -503,13 +503,13 @@ def landing_ring():
             ang = math.atan2(y + 0.5 - cy, x + 0.5 - cx)
             if 15.0 < d <= 17.5:
                 if int((ang + 3.2) * 5.5) % 2 == 0 or d < 16:
-                    c.put_ramp(x, y, 'bone', 4 if (x + y) % 2 else 5)
+                    c.put_ramp(x, y, 'ice', 3 if (x + y) % 2 else 4)
             elif 8.5 < d <= 10.0:
-                c.put_ramp(x, y, 'sky', 4 if (x + y) % 2 else 3)
+                c.put_ramp(x, y, 'sky', 3 if (x + y) % 2 else 2)
     for k in range(-13, 14):
         if abs(k) > 6 or abs(k) < 3:
-            c.put_ramp(int(cx + k), int(cy), 'bone', 4)
-            c.put_ramp(int(cx), int(cy + k), 'bone', 4)
+            c.put_ramp(int(cx + k), int(cy), 'ice', 3)
+            c.put_ramp(int(cx), int(cy + k), 'ice', 3)
     c.rect(17, 17, 20, 20, 'teamA', 3)
     c.rect(17, 17, 18, 18, 'teamA', 4)
     return c
@@ -571,12 +571,12 @@ def furnish_airdock(ctx):
     X0, Y0, W, H = ctx.X0, ctx.Y0, ctx.W, ctx.H
     P = ctx.P
     cx = X0 + W // 2
-    ctx.floor_deco(landing_ring(), cx - 12, Y0 + 20)
+    ctx.floor_deco(landing_ring(), X0 + 13, Y0 + 20)
     ctx.floor_deco(hazard_strip(30), X0 + 6, Y0 + H - 26)
     ctx.floor_deco(hazard_strip(30), X0 + W - 36, Y0 + H - 26)
     ctx.prop(mooring_mast(), X0 + W - 30, Y0 + 32 - 56 + 8)
-    ctx.prop(gas_tank(), X0 + 6, Y0 + 20)
-    ctx.prop(gas_tank(), X0 + 17, Y0 + 24)
+    ctx.prop(gas_tank(), X0 + 3, Y0 + 20)
+    ctx.prop(gas_tank(), X0 + 13, Y0 + 24)
     ctx.prop(P['crate'], X0 + W - 20, Y0 + 36)
 
 

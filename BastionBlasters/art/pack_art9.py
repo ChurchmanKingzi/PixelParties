@@ -343,3 +343,33 @@ def _art_bf03():
     prop_at(world, BE.manure_pile(), cx + 21, cy - 1)
     BE.stink_lines(world, cx + 21, cy - 12, 14)
     return finish(window_of(world))
+
+
+# =========================================================================== BF-07 Greenhouse
+
+import pack_art9_flora as FL
+
+
+def furnish_greenhouse(ctx):
+    W = ctx.W
+    draw_wall(ctx, FL.vines(W - 8, 22), W // 2)
+    draw_wall(ctx, FL.glass_arch(40, 22), W // 2)
+    draw_floor(ctx, FL.flower_bed(36, 18, 1), 6, 12)
+    draw_floor(ctx, FL.flower_bed(36, 18, 2), W - 42, 12)
+    draw_prop(ctx, FL.giant_flower('sun', 54, False), 6, -12)
+    draw_prop(ctx, FL.giant_flower('pink', 46, False), W - 42, -4)
+    draw_prop(ctx, FL.bell_jar(30), W // 2 - 12, 20)
+    draw_prop(ctx, FL.venus_trap(), W - 30, 36)
+
+
+THEME_GREENHOUSE = {'floor': floor_cobble(13, base='stone', tone=(3, 4), mortar=2, hi=5), 'furnish': furnish_greenhouse, 'low': False}
+
+
+@card_art('BF-07')
+def _art_bf07():
+    world, X0, Y0, out = room_world('E', THEME_GREENHOUSE, '3x3', 'grass', 7)
+    ox, oy = 8, 6
+    rx, ry = 38 + ox, 76 + oy
+    unit_at(world, FL.watering_robot(), rx, ry, sh=(11, 3))
+    FL.water_arc(world, rx + 15, ry - 22, rx + 24, ry - 46, n=7)
+    return finish(window_of(world))

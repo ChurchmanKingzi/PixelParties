@@ -66,7 +66,7 @@ def _art_ua15():
     sparkles(w, [(tx - 12, ty - 8), (tx + 13, ty - 12), (tx + 6, ty - 20)])
     unit_at(w, spr_sky_organ(), 48, 86, sh=(24, 4))
     # Engelschor im Hintergrund auf Wolken
-    for (ax, ay) in ((18, 40), (30, 26), (66, 24), (78, 38)):
+    for (ax, ay) in ((16, 42), (30, 26), (84, 26), (94, 44)):
         cp = _cloud_puff(8, ax)
         w.draw(cp, ax - cp.w // 2, ay + 8, 3)
         w.draw(spr_angel(), ax - 8, ay - 8, 4)
@@ -79,7 +79,7 @@ def _art_ua15():
 @card_art('UA-16')
 def _art_ua16():
     w = ground_world('grass', 5)
-    for (sp, x, y) in ((bush(2, True), 14, 48), (tree_pine(2), 134, 58), (rock(2), 126, 92)):
+    for (sp, x, y) in ((bush(2, True), 14, 48), (tree_pine(2), 134, 58), (rock(2), 80, 94)):
         prop_at(w, sp, x, y)
     unit_at(w, spr_star_wizard(), 32, 86, sh=(11, 3))
     # Meteor mit Schweif faellt auf die markierte Zelle
@@ -126,7 +126,7 @@ def _art_ua17():
 @card_art('UA-18')
 def _art_ua18():
     w = ground_world('grass', 6)
-    for (sp, x, y) in ((tree_round(1), 128, 46), (bush(1), 130, 92), (rock(2), 16, 94)):
+    for (sp, x, y) in ((tree_round(1), 128, 46), (bush(1), 136, 40), (rock(2), 16, 94)):
         prop_at(w, sp, x, y)
     unit_at(w, spr_whale_catapult(), 40, 88, sh=(28, 4))
     tx, ty = 112, 78
@@ -184,9 +184,9 @@ def _art_us05():
         prop_at(w, sp, x, y)
     gate = spr_cracked_gate()
     prop_at(w, gate, 118, 74)
-    unit_at(w, spr_ram_orc(), 56, 86, sh=(22, 4))
-    speed_lines(w, 22, 62, n=3, length=11, seed=2, ramp='bone', idx=4)
-    dust(w, 28, 84, 6, 'dirt', 3, 5, seed=1)
+    unit_at(w, spr_ram_orc(), 76, 86, sh=(22, 4))
+    speed_lines(w, 38, 64, n=3, length=11, seed=2, ramp='bone', idx=4)
+    dust(w, 46, 84, 6, 'dirt', 3, 5, seed=1)
     for (i, (x, y)) in enumerate(((102, 30), (96, 44), (100, 58), (108, 24), (92, 52))):
         w.draw(spr_splinter(i), x, y, 9100)
     return finish(w)
@@ -272,10 +272,9 @@ def _art_us10():
     w = ground_world('sand', 3)
     for (sp, x, y) in ((rock(3), 16, 46), (rock(1), 128, 44), (bush(2), 132, 92), (rock(2, True), 14, 94)):
         prop_at(w, sp, x, y)
-    cx, cy = 54, 84
-    unit_at(w, spr_pincer_crab(), cx, cy, sh=(26, 4))
-    # ein Buerger haengt im Schluesselring
+    cx, cy = 62, 82
     rx, ry = cx - 28 + 47, cy - 39 + 11
     cit = citizen('cloth', 0)
-    w.draw(cit, rx - 8, ry - 12, cy + 1)
+    w.draw(cit, rx - 8, ry - 11, cy - 3)
+    unit_at(w, spr_pincer_crab(), cx, cy, sh=(26, 4))
     return finish(w)

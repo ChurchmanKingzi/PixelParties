@@ -40,11 +40,11 @@ def _burning(world, spr, fx, fy, flames, seed=1):
 @card_art('UA-02')
 def _art_ua02():
     w = ground_world('grass', 3)
-    for (sp, x, y) in ((bush(2), 18, 38), (rock(2), 100, 92), (bush(1, True), 70, 30)):
+    for (sp, x, y) in ((bush(2), 18, 38), (rock(2), 12, 91), (bush(1, True), 70, 30)):
         prop_at(w, sp, x, y)
     spr = spr_spark_mage()
-    unit_at(w, spr, 36, 80)
-    ox, oy = _origin(spr, 36, 80)
+    unit_at(w, spr, 40, 80)
+    ox, oy = _origin(spr, 40, 80)
     tipx, tipy = ox + 36, oy + 12                       # Streichholzkopf
     # brennende Holzkisten rechts (Ziel) + Zielschatten
     zielschatten(w, 114, 76, 17, 1)
@@ -61,4 +61,239 @@ def _art_ua02():
         put_px(w, tipx + 8 + t * 18 + (k % 2), tipy + 3 + t * 6, 'fire', 4 if k % 2 else 5, 9000)
     for (x, y) in ((70, 52), (66, 60), (74, 62), (60, 48), (92, 50)):
         put_px(w, x, y, 'gold', 5, 9000)
+    return finish(w)
+
+
+# =========================================================================== UA-03 Zwergen-Donnerbüchse
+
+
+@card_art('UA-03')
+def _art_ua03():
+    w = ground_world('cobble', 4)
+    for (sp, x, y) in ((barrel(), 16, 36), (crate(), 134, 30), (rock(1), 12, 92)):
+        prop_at(w, sp, x, y)
+    spr = spr_dwarf_blunderbuss()
+    unit_at(w, spr, 40, 80, sh=(13, 3))
+    ox, oy = _origin(spr, 40, 80)
+    mx, my = ox + 40, oy + 5                              # Mündung
+    # angeschlagene Mauer als Ziel: Risse, Brocken, Staub
+    wall = stone_wall_piece(46, 24)
+    zielschatten(w, 118, 82, 15, 1)
+    shadow(w, 120, 66, 26, 3)
+    w.draw(wall, 96, 66 - wall.h + 1, 66)
+    crack_lines(w, [(108, 45), (111, 49), (109, 53), (113, 58), (112, 63)], 9000)
+    crack_lines(w, [(122, 46), (120, 51), (124, 55), (123, 61)], 9000)
+    crack_lines(w, [(111, 49), (116, 50)], 9000)
+    for (x, y) in ((98, 69), (138, 69)):
+        put(w, rock(1), x, y, 9000)
+    # Mündungsfeuer + Qualm + Streuschuss (Kügelchen fächern auf)
+    burst(w, mx + 5, my, 'fire', 10, 7, 4)
+    w.draw(smoke_sprite(26, 14, 4, 3), mx - 2, my - 24, 9000)
+    rnd = random.Random(7)
+    for k in range(26):
+        a = math.radians(rnd.uniform(-9, 9) + 6)
+        d = rnd.uniform(10, 52)
+        x, y = mx + 8 + math.cos(a) * d, my + 2 + math.sin(a) * d
+        dot_world(w, x, y, 'coal', 1, 2, 9000)
+        put_px(w, x, y, 'bone', 4, 9001)
+    for (x, y) in ((96, 52), (98, 56), (97, 60), (95, 48), (100, 50)):
+        burst(w, x, y, 'gold', 5, 3, x + y)
+    return finish(w)
+
+
+# =========================================================================== UA-04 Goblin-Kanone
+
+
+@card_art('UA-04')
+def _art_ua04():
+    w = ground_world('mud', 2)
+    for (sp, x, y) in ((tree_pine(1), 130, 46), (bush(3), 14, 36), (rock(1), 96, 38)):
+        prop_at(w, sp, x, y)
+    spr = spr_goblin_cannon()
+    unit_at(w, spr, 38, 82, sh=(22, 4))
+    ox, oy = _origin(spr, 38, 82)
+    mx, my = ox + 44, oy + 10                              # Mündung (der kleine Goblin guckt heraus)
+    w.draw(smoke_sprite(24, 14, 9, 3), mx + 6, my - 26, 9000)
+    pts = arc_pts(mx + 8, my - 2, 112, 76, 40, 14)
+    zielschatten(w, 112, 78, 15, 2)
+    trail(w, pts[1:7], 'bone', 1, 2, 5, 3)
+    gp = pts[8]
+    put(w, proj_goblin(), gp[0], gp[1], 9100)
+    # schon gelandeter Goblin + erschrockener Bürger am Ziel
+    unit_at(w, mini_goblin(0), 128, 84, flip=True, sh=(6, 2))
+    unit_at(w, citizen('cloth', 1), 98, 72, sh=(5, 2))
+    for (x, y) in ((108, 60), (120, 66), (126, 70)):
+        burst(w, x, y, 'gold', 4, 3, x)
+    return finish(w)
+
+
+# =========================================================================== UA-05 Ork-Kanone
+
+
+@card_art('UA-05')
+def _art_ua05():
+    w = ground_world('sand', 5)
+    for (sp, x, y) in ((cactus(1), 132, 46), (rock(1), 136, 90), (cactus(2), 14, 40)):
+        prop_at(w, sp, x, y)
+    spr = spr_orc_cannon()
+    unit_at(w, spr, 36, 86, sh=(26, 4))
+    ox, oy = _origin(spr, 36, 86)
+    mx, my = ox + 51, oy + 13                              # Mündung
+    w.draw(smoke_sprite(24, 16, 11, 3), mx + 8, my - 20, 9000)
+    pts = arc_pts(mx + 8, my - 4, 114, 80, 34, 14)
+    zielschatten(w, 114, 82, 17, 2)
+    trail(w, pts[1:7], 'bone', 1, 2, 5, 3)
+    op = pts[8]
+    put(w, proj_orc(), op[0], op[1], 9100)
+    put(w, shout_bubble(), op[0] + 25, op[1] - 4, 9200)
+    for (x, y) in ((mx + 4, my - 2),):
+        burst(w, x, y, 'fire', 10, 7, 3)
+    return finish(w)
+
+
+# =========================================================================== UA-06 Eiszapfen-Mörser
+
+
+@card_art('UA-06')
+def _art_ua06():
+    w = ground_world('snow', 6)
+    for (sp, x, y) in ((tree_pine(0), 12, 44), (tree_pine(1), 132, 42), (rock(2), 20, 92)):
+        prop_at(w, sp, x, y)
+    spr = spr_icicle_mortar()
+    unit_at(w, spr, 40, 88, sh=(20, 4))
+    ox, oy = _origin(spr, 40, 88)
+    fx_, fy_ = ox + 36, oy + 27                              # Trichtermitte
+    # weitere Zapfen fliegen senkrecht hoch / fallen auf das Ziel
+    for (x, y0, y1) in ((fx_ - 6, fy_ - 30, fy_ - 46), (fx_ + 8, fy_ - 36, fy_ - 54)):
+        icicle_at(w, x, y0 + 8, x + 1, y1, 4, 9000)
+    zielschatten(w, 112, 78, 17, 1)
+    # Frostfläche auf dem Boden am Ziel
+    for y in range(60, 94):
+        for x in range(92, 134):
+            d = math.hypot((x - 112) / 21.0, (y - 78) / 15.0)
+            if d < 1.0 and w.depth[y, x] < -40 and ((x + y) % 2 == 0 or d < 0.6):
+                w.px[y, x, :3] = RAMPS['ice'][5 if d < 0.45 and (x + y) % 3 == 0 else 4]
+    zielschatten(w, 112, 78, 17, 1)
+    for (x, y, h) in ((100, 82, 14), (110, 86, 18), (122, 82, 13), (116, 74, 10)):
+        w.draw(icicle_shape(h, 5), x - 2, y - h + 1, y)
+    for (x0, y0, x1, y1) in ((104, 24, 107, 56), (118, 18, 120, 52), (126, 30, 125, 60)):
+        icicle_at(w, x0, y0, x1, y1, 4, 9000)
+    for (x, y) in ((107, 60), (120, 56), (112, 68), (126, 64)):
+        burst(w, x, y, 'ice', 6, 4, x)
+    return finish(w)
+
+
+# =========================================================================== UA-07 Sporenschleuder
+
+
+@card_art('UA-07')
+def _art_ua07():
+    w = ground_world('grass', 4)
+    for (sp, x, y) in ((giant_mushroom(2, 'fire'), 130, 40), (bush(2, True), 14, 38)):
+        prop_at(w, sp, x, y)
+    spr = spr_spore_slinger()
+    unit_at(w, spr, 38, 88, sh=(20, 4))
+    ox, oy = _origin(spr, 38, 88)
+    mx, my = ox + 49, oy + 13
+    pts = arc_pts(mx + 6, my - 2, 108, 72, 30, 14)
+    for k, (x, y) in enumerate(pts[2:12]):
+        dot_world(w, x, y, 'leaf', 5 if k % 2 else 4, 3 if k % 3 == 0 else 2, 9000)
+        put_px(w, x + 2, y - 2, 'goblin', 5, 9001)
+    zielschatten(w, 110, 80, 17, 1)
+    w.draw(spore_cloud(46, 30, 3), 87, 58, 60)                       # Wolke hinter den Bürgern
+    unit_at(w, citizen('cloth', 0), 100, 82, sh=(5, 2))
+    unit_at(w, citizen('dirt', 1), 122, 78, flip=True, sh=(5, 2))
+    w.draw(spore_cloud(30, 14, 8), 96, 74, 9300)                     # dünner Schleier davor
+    for (x, y) in ((98, 70), (118, 66), (108, 62), (124, 72), (104, 88), (116, 86)):
+        put_px(w, x, y, 'leaf', 5, 9400)
+        put_px(w, x + 1, y, 'goblin', 5, 9400)
+    for (x, y) in ((102, 70), (120, 72)):                            # Husten
+        for (dx, dy) in ((0, 0), (2, -1), (4, 0), (1, -3), (3, -3)):
+            put_px(w, x + dx, y + dy, 'bone', 5, 9500)
+    return finish(w)
+
+
+# =========================================================================== UA-08 Kalmar-Kanone
+
+
+@card_art('UA-08')
+def _art_ua08():
+    w = ground_world('grass', 6)
+    for (sp, x, y) in ((tree_round(2), 134, 38), (bush(3), 12, 36), (rock(2), 128, 92)):
+        prop_at(w, sp, x, y)
+    spr = spr_squid_cannon()
+    unit_at(w, spr, 36, 86, sh=(22, 4))
+    ox, oy = _origin(spr, 36, 86)
+    sx, sy = ox + 54, oy + 20                                 # Tintenstrahl-Ende am Sprite
+    # Pfeilturm (Gegner) mit Tintenspritzern: Blendung
+    tw = arrow_tower('teamB')
+    zielschatten(w, 112, 88, 16, 1)
+    unit_at(w, tw, 112, 84, sh=(15, 4))
+    tx, ty = _origin(tw, 112, 84)
+    # fliegende Tintentropfen (flach, wird schmaler)
+    rnd = random.Random(8)
+    for k in range(9):
+        t = k / 8.0
+        x = sx + 6 + t * (tx + 6 - sx - 6)
+        y = sy + 4 + t * (ty + 34 - sy - 4) - 16 * t * (1 - t)
+        r = 3.2 - 1.4 * t + rnd.uniform(-0.4, 0.4)
+        put(w, ink_blob(max(1.2, r), 10 + k), x, y, 9000)
+    for (dx, dy, r) in ((8, 14, 4), (19, 20, 3), (14, 28, 3), (24, 34, 2), (6, 36, 2), (20, 10, 2)):
+        put(w, ink_blob(r, dx + dy), tx + dx, ty + dy, 9200)
+    for (x, y) in ((100, 56), (126, 50), (132, 64)):
+        put_px(w, x, y, 'coal', 1, 9300)
+        put_px(w, x + 1, y, 'purple', 2, 9300)
+    return finish(w)
+
+
+# =========================================================================== UA-09 Fledermaus-Hexe
+
+
+@card_art('UA-09')
+def _art_ua09():
+    w = ground_world('dark', 3)
+    for (sp, x, y) in ((tombstone(0), 14, 40), (dead_tree(1), 130, 48), (tombstone(1), 28, 92), (tombstone(0), 134, 92)):
+        prop_at(w, sp, x, y)
+    spr = spr_bat_witch()
+    shadow(w, 42, 86, 17, 3)
+    w.draw(spr, 6, 18, 60)                                   # schwebt über dem Boden
+    # Zielgebiet 3x3: mehrere Zielmarken, Fledermäuse stürzen darauf
+    zones = ((96, 74, 8), (118, 66, 8), (110, 86, 8), (130, 78, 7), (88, 90, 7))
+    for (x, y, r) in zones:
+        zielschatten(w, x, y, r, 1)
+    for k, (x, y, r) in enumerate(zones):
+        b = bat_spr(k % 2, big=(k % 2 == 0))
+        put(w, b, x + (k % 3) * 2 - 2, y - 14 - (k % 2) * 6, 9100)
+        for j in range(1, 4):
+            put_px(w, x - j * 2 + 3, y - 14 - (k % 2) * 6 + j * 3, 'purple', 4, 9000)
+    unit_at(w, citizen('cloth', 1), 116, 82, sh=(5, 2))
+    return finish(w)
+
+
+# =========================================================================== UA-10 Nagelbrett-Ballista
+
+
+@card_art('UA-10')
+def _art_ua10():
+    w = ground_world('planks', 5)
+    for (sp, x, y) in ((barrel(), 14, 34), (rack(), 132, 32), (crate(), 14, 94)):
+        prop_at(w, sp, x, y)
+    spr = spr_nailboard_ballista()
+    unit_at(w, spr, 36, 84, sh=(26, 4))
+    ox, oy = _origin(spr, 36, 84)
+    by = oy + 20                                              # Höhe des geladenen Bolzens
+    # drei Kisten hintereinander, vom Bolzen durchschlagen (Spur wird schwächer)
+    ys = by + 8
+    for k, (x, kind) in enumerate(((82, 0), (101, 1), (120, 0))):
+        sp = crate() if kind == 0 else barrel()
+        prop_at(w, sp, x, ys + (1 if kind else 0))
+        for (dx, dy) in ((8, -4), (9, 2), (10, -1), (-8, -2)):
+            put_px(w, x + dx, by + dy + 1, 'wood', 5, 9300)
+            put_px(w, x + dx + 1, by + dy + 1, 'wood', 3, 9300)
+        burst(w, x + 7, by + 3, 'gold', 6, 4, x)
+    bolt = proj_bolt()
+    put(w, bolt, 108, by + 2, 9200)
+    for k in range(6):
+        put_px(w, 78 - k * 4, by + 3, 'bone', 3 if k > 2 else 5, 9100)
+    zielschatten(w, 120, ys + 12, 14, 1)
     return finish(w)

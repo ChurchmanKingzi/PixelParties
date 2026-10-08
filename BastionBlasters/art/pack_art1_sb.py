@@ -17,7 +17,7 @@ def spr_icicle_mortar(anim='idle', f=0):
     rnd = random.Random(61)
     mx, my = 36, 28                                  # Trichtermitte
     # --- Eiszapfen-Fächer (aus dem Trichter, hinter dem Trichterrand)
-    for (ang, ln_, w_) in ((-48, 12, 3.4), (-26, 19, 3.8), (-8, 24, 4.2), (12, 21, 4.0), (32, 16, 3.6), (52, 11, 3.2)):
+    for (ang, ln_, w_) in ((-50, 12, 5.4), (-27, 19, 6.0), (-8, 24, 6.8), (12, 21, 6.4), (33, 16, 5.8), (54, 11, 5.0)):
         a_ = math.radians(ang)
         tx, ty = mx + math.sin(a_) * ln_, my - 1 - math.cos(a_) * ln_
         nx_, ny_ = math.cos(a_), math.sin(a_)

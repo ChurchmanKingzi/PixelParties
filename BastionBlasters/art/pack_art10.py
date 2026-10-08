@@ -32,16 +32,15 @@ def _art_bf08():
     world, c, out = _room('A', THEME_AIRDOCK, 8)
     zep = zeppelin()
     zx, zy = 28, 12
-    shadow(world, 70, 66, 27, 6)
+    shadow(world, 64, 70, 26, 6)
     world.draw(zep, zx, zy, 9000)
     # Tau von der Nase zum Anlegemast und Leine zum Lotsen
     rp = Canvas(40, 30)
     rope(rp, 0, 4, 16, 1, sag=3, ramp='bone', hi=5, lo=3)
     world.draw(rp, zx + 70, zy + 12, 9001)
-    pil = pilot_gnome()
-    unit_at(world, pil, 90, 80, flip=True, sh=(6, 2))
-    rp2 = Canvas(40, 40)
-    rope(rp2, 0, 0, 22, 20, sag=6, ramp='bone', hi=5, lo=3)
+    unit_at(world, pilot_gnome(), 66, 78, sh=(6, 2))
+    rp2 = Canvas(20, 30)
+    rope(rp2, 0, 0, 9, 21, sag=3, ramp='bone', hi=5, lo=3)
     world.draw(rp2, zx + 36, zy + 32, 9001)
     for (sp, x, y) in ((bush(2), 140, 140), (rock(1), 14, 148)):
         prop_at(world, sp, x, y)
@@ -117,8 +116,10 @@ def _art_bu03():
     for (x, y) in ((92, 12), (95, 15), (93, 18)):
         world_sparkle(world, x, y, 'gold')
     prop_at(world, brick_pile(), 66, 80)
-    prop_at(world, bush(2), 190, 140)
-    return finish(crop_world(world, 56, 6))
+    prop_at(world, bush(2), 192, 100)
+    prop_at(world, rock(2), 176, 130)
+    prop_at(world, crate(), 178, 70)
+    return finish(crop_world(world, 48, 6))
 
 
 @card_art('BP-03')
@@ -127,10 +128,10 @@ def _art_bp03():
     world = ground_world('grass', 3, 160, 160)
     c, out = mini_castle(rows, 0, 0, world, tw=observatory_tower())
     # Mond guckt zurueck, Sterne, Sterngucker
-    world.draw(moon_face(), 104, 10, 9000)
-    for (x, y) in ((100, 14), (124, 36), (96, 30), (128, 12)):
+    world.draw(moon_face(), 106, 14, 9000)
+    for (x, y) in ((100, 17), (131, 40), (96, 34), (132, 20)):
         world_sparkle(world, x, y, 'gold')
-    unit_at(world, astronomer(), 106, 94, sh=(6, 2))
+    unit_at(world, astronomer(), 108, 94, sh=(6, 2))
     for (sp, x, y) in ((bush(2), 140, 140), (rock(1), 14, 148)):
         prop_at(world, sp, x, y)
     return finish(crop_world(world, 8, 8))
@@ -138,17 +139,17 @@ def _art_bp03():
 
 @card_art('BP-04')
 def _art_bp04():
-    rows = [".....", ".hhh.", ".hhT.", ".hhh.", "....."]
+    rows = [".....", ".hhh.", ".hhh.", ".hhT.", "....."]
     world = ground_world('grass', 4, 192, 160)
     c, out = mini_castle(rows, 0, 0, world, tw=cloud_anchor_tower())
-    # Schatten der Wolke auf dem Hof
-    shadow(world, 118, 90, 30, 7)
-    ox, oy = 112 - 36, 99 - 84 + 1
-    world.draw(rain_cannon(), ox + 22 - 8, oy + 15 - 16, 9000)
-    world.draw(rain_mortar(), ox + 50 - 8, oy + 15 - 18, 9000)
-    for (sp, x, y) in ((bush(2), 172, 140), (rock(1), 14, 148)):
+    # Schatten der Wolke auf dem Hof, Waffen auf den Wolkenplaetzen
+    shadow(world, 120, 124, 30, 7)
+    ox, oy = 112 - 36, 131 - 84 + 1
+    world.draw(rain_cannon(), ox + 22 - 8, oy + 15 - 17, 9000)
+    world.draw(rain_mortar(), ox + 50 - 8, oy + 15 - 23, 9000)
+    for (sp, x, y) in ((bush(2), 172, 150), (rock(1), 168, 90)):
         prop_at(world, sp, x, y)
-    return finish(crop_world(world, 40, 6))
+    return finish(crop_world(world, 40, 41))
 
 
 @card_art('BP-05')
@@ -169,10 +170,34 @@ def _art_bp05():
 def _art_bp06():
     world = ground_world('grass', 6)
     shadow(world, 74, 80, 52, 11)
-    wf = upward_waterfall()
-    world.draw(wf, 72 - wf.w // 2, 40 - wf.h + 12, 20)
+    wf = upward_waterfall(h=44, w=14)
+    ox, oy = 10, 8
+    world.draw(wf, ox + 106 - wf.w // 2, oy + 38 - wf.h + 12, 20)
     isl = floating_island()
-    world.draw(isl, 10, 2, 40)
-    for (sp, x, y) in ((bush(2), 130, 90), (rock(1), 14, 90)):
+    world.draw(isl, ox, oy, 40)
+    for (sp, x, y) in ((bush(2), 132, 90), (rock(1), 14, 90)):
+        prop_at(world, sp, x, y)
+    return finish(world)
+
+
+@card_art('BU-04')
+def _art_bu04():
+    world = ground_world('cobble', 7)
+    fr = bell_frame(2)
+    fx, fy = 40, 17
+    shadow(world, 74, 82, 30, 5)
+    world.draw(fr, fx, fy, 82)
+    # Glocken-Zwerg am Seil
+    world.draw(bell_gnome(), fx + 46, fy + 41, 85)
+    # Schallwellen
+    arcs = Canvas(144, 96)
+    sound_arcs(arcs, fx + 20, 40, side=-1, n=3)
+    sound_arcs(arcs, fx + 46, 40, side=1, n=3)
+    world.draw(arcs, 0, 0, 9000)
+    # markierter Eindringling und fliehender Buerger
+    unit_at(world, goblin('walk', 1), 126, 74, flip=True)
+    world.draw(mark_arrow(), 122, 36, 9000)
+    unit_at(world, citizen('cloth', 0), 16, 82, flip=True, sh=(5, 2))
+    for (sp, x, y) in ((barrel(), 16, 38), (crate(), 128, 90)):
         prop_at(world, sp, x, y)
     return finish(world)

@@ -541,15 +541,20 @@ def _art_us22():
 
 
 def _mirrorize(spr):
-    """Spiegelkopie: alle Toene auf Silber/Himmel umgesetzt (Rampenindex bleibt), dazu Glanzdiagonalen"""
-    m = {'gold': 'metal', 'metal': 'sky', 'teamA': 'ice', 'bone': 'fur', 'skin': 'metal', 'wood': 'stone', 'fire': 'sky',
-         'dirt': 'stone', 'coal': 'coal'}
-    out = recolor(spr, lambda n, i: (m.get(n, n), i))
+    """Spiegelkopie: alle Toene auf Stahl/Silber umgesetzt (Rampenindex bleibt), dazu Glanzpunkte"""
+    m = {'gold': ('metal', 0), 'metal': ('metal', -1), 'teamA': ('sky', 0), 'bone': ('fur', 0), 'skin': ('metal', 0),
+         'wood': ('coal', 1), 'fire': ('sky', 0), 'dirt': ('coal', 1)}
+
+    def fn(n, i):
+        if n in m:
+            nn, d = m[n]
+            return (nn, max(0, min(5, i + d)))
+        return None
+    out = recolor(spr, fn)
     for y in range(out.h):
         for x in range(out.w):
             if out.alpha(x, y) and (x - y) % 17 == 0 and out.rid[y, x] >= 0:
-                n = RAMP_NAMES[out.rid[y, x]]
-                if n not in ('coal',):
+                if RAMP_NAMES[out.rid[y, x]] not in ('coal',):
                     out.put_ramp(x, y, 'fur', 5)
     return out
 

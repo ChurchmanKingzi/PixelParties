@@ -73,15 +73,30 @@ def spr_angel(f=0):
 
 def spr_meteor():
     """Sternschnuppe: gluehender Felsbrocken (20 x 20)"""
-    c = Canvas(20, 20)
-    ellipse(c, 10, 10, 8.4, 8.4, 'fire', lo=2, hi=5, ambient=0.25)
-    ellipse(c, 9, 9, 6.2, 6.0, 'coal', lo=0, hi=3, ambient=0.3)
-    for (x0, y0, x1, y1) in ((6, 6, 9, 9), (9, 9, 13, 8), (9, 9, 10, 14), (7, 12, 5, 14)):
-        c.line(x0, y0, x1, y1, 'fire', 4)
-    for (x, y) in ((8, 7), (11, 8), (8, 12)):
+    c = Canvas(26, 26)
+    rnd = random.Random(11)
+    cx, cy = 15.0, 15.0                              # Kopf fliegt nach unten rechts, Flammen zeigen nach oben links
+    rock_pts = []
+    for k in range(14):
+        a = math.radians(k * 360 / 14)
+        r = 6.4 + rnd.uniform(-1.1, 1.1)
+        rock_pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    flame_pts = []
+    for k in range(28):
+        a = math.radians(k * 360 / 28)
+        back = max(0.0, -(math.cos(a) * 0.6 + math.sin(a) * 0.8))      # 1 = genau nach hinten
+        r = 8.4 + back * 5.5 * (1.0 if k % 2 else 0.45) + rnd.uniform(-0.5, 0.5)
+        flame_pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    flame = m_poly(c, flame_pts)
+    shade_mask(c, flame, 'fire', 2, 5, r=2, passes=1, strength=2.0, ambient=0.5)
+    inner = m_poly(c, [(cx + (x - cx) * 0.78, cy + (y - cy) * 0.78) for (x, y) in flame_pts]) & flame
+    flat_mask(c, inner, 'gold', 4)
+    rock = m_poly(c, rock_pts)
+    shade_mask(c, rock, 'coal', 0, 3, r=2, passes=2, strength=5.0, ambient=0.3)
+    for (x0, y0, x1, y1) in ((11, 11, 14, 14), (14, 14, 18, 13), (14, 14, 15, 19), (12, 17, 10, 19), (13, 10, 16, 9)):
+        c.line(x0, y0, x1, y1, 'fire', 5 if (x0 + y0) % 2 else 4)
+    for (x, y) in ((12, 12), (17, 12), (13, 17)):
         c.put_ramp(x, y, 'gold', 5)
-    c.put_ramp(12, 14, 'gold', 4)
-    c.put_ramp(14, 12, 'gold', 4)
     c.outline()
     return c
 

@@ -315,3 +315,39 @@ def spr_duster_citizen(anim='idle', f=0, kind='teamA'):
     c.put_ramp(8, o + 1, kind, 3)
     c.outline()
     return c
+
+
+def spr_cheer_citizen(anim='idle', f=0, kind='cloth', shocked=False):
+    """Buerger mit hochgerissenen Armen, Mund offen: jubelt (Rutschbahn) oder hat Haare zu Berge (Blitzableiter) (18 x 24)"""
+    c = Canvas(18, 24)
+    o = 4
+    thick_line(c, 7, o + 15, 5, o + 19, 2.2, 'wood', lo=1, hi=3)
+    thick_line(c, 11, o + 15, 13, o + 19, 2.2, 'wood', lo=2, hi=4)
+    round_rect(c, 5, o + 9, 12, o + 16, kind, lo=1, hi=4, radius=2)
+    c.rect(5, o + 13, 12, o + 13, 'gold', 2)
+    # Arme hoch
+    thick_line(c, 5, o + 10, 2, o + 3, 1.9, 'skin', lo=1, hi=4)
+    thick_line(c, 12, o + 10, 15, o + 3, 1.9, 'skin', lo=3, hi=5)
+    c.put_ramp(1, o + 2, 'skin', 3)
+    c.put_ramp(16, o + 2, 'skin', 5)
+    ellipse(c, 8.5, o + 6, 3.8, 3.5, 'skin', lo=2, hi=5)
+    c.put_ramp(10, o + 5, 'coal', 1)
+    c.put_ramp(10, o + 6, 'coal', 1)
+    c.put_ramp(7, o + 5, 'coal', 1)
+    c.put_ramp(7, o + 6, 'coal', 1)
+    c.rect(8, o + 8, 9, o + 8, 'coal', 1)
+    if shocked:
+        for (x, y, i) in ((4, o + 1, 5), (5, o - 1, 4), (7, o - 3, 5), (9, o - 3, 4), (11, o - 2, 5), (12, o, 4), (13, o + 2, 4), (8, o - 1, 3)):
+            c.put_ramp(x, y, 'wood', 4)
+            c.put_ramp(x, y - 1, 'gold', i)
+        c.rect(5, o + 2, 12, o + 2, 'wood', 3)
+        for (x, y) in ((0, o + 1), (17, o + 1), (1, o - 1), (16, o - 1)):
+            c.put_ramp(x, y, 'gold', 5)
+    else:
+        for x in range(5, 12):
+            c.put_ramp(x, o + 2, 'wood', 2 if x > 7 else 1)
+        c.put_ramp(6, o + 1, 'wood', 3)
+        c.put_ramp(7, o + 1, 'wood', 3)
+        c.put_ramp(10, o + 1, 'wood', 3)
+    c.outline()
+    return c
