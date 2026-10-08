@@ -7292,7 +7292,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
         {Array.isArray(card._liveOrbs) && card._liveOrbs.length > 0 && (
           <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
             <div style={{ color: 'var(--text2)', fontWeight: 700 }}>
-              {card._liveOrbs.every(o => o.collected) ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend'}
+              {card._liveOrbs.every(o => o.collected) ? 'All Spell Schools collected — ready to Ascend!' : 'Collect all Spell School orbs to Ascend'}
             </div>
             {card._liveOrbs.map(o => (
               <div key={o.school} style={{ color: o.collected ? o.color : 'var(--text2)' }}>
