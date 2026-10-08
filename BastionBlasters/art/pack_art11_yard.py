@@ -537,7 +537,7 @@ def dome_overlay(world, cx, cy, rx, ry, impact=None, key=9800):
                     continue
                 if (t // 6 + k) % 2 == 0 and k >= 2:
                     continue
-                px_at(world, x, y, 'bone' if k < 2 else 'ice', 5 if k < 2 else 4, key + 10)
+                px_at(world, x, y, 'bone' if k < 2 else 'ice', 5, key + 10)
 
 
 # =========================================================================== Fangnetz-Schleuder (BA-03)
