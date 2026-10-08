@@ -8443,27 +8443,40 @@ const TUTORIAL_SCRIPTS = {
     ],
   },
   2: {
+    // Regieanweisungen wie in Tutorial 1: ein Highlight gilt ab der Seite,
+    // vor der es steht, bis zur naechsten Anweisung.
     intro: [
-      { text: 'Heya!' },
-      { text: "In a real game, just defeating one Hero won't be enough - there's three of them for you to get rid of!" },
-      { text: "Doing so with a single Spell will be very difficult, but {green:**Creatures**} can be used to deal lots of damage to multiple targets!" },
-      { text: "Here, the {green:**Cosmic Skeletons**} can each deal 150 damage to a target.",
+      { text: 'Heya! Welcome back, beep-boop!' },
+      { text: "Last time, you only had to squish a single Hero. But in a real game, that won't be enough - there's **three of them** to get rid of!" },
+      { text: "With just a single Spell, taking out multiple Heroes won't be easy.\nBut {green:**Creatures**} can be used to spread lots of damage between different targets!" },
+      // ── Highlight: die Cosmic Skeletons ──
+      { text: 'Look at your board.\nYour {green:**Cosmic Skeletons**} can each deal **150 damage** to one target.',
         highlights: [
-          { selector: '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]', pulse: true },
+          '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]',
         ] },
-      { text: "Let's go send them onto the enemy Heroes and turn them into burnt spots on the ground, beep-boop!" },
-      { text: 'To activate a Creature\'s active effect, just click on it during either {red:**Main Phase**}!',
+      // ── Highlight: die gegnerischen Helden ──
+      { text: 'And look - my three Heroes are all already weakened and only have **150 HP left**.',
         highlights: [
-          '[data-phase-name="Main Phase 1"]',
-          '[data-phase-name="Main Phase 2"]',
+          '[data-hero-owner="opp"][data-hero-name]',
+        ] },
+      { text: "So - let's go!\nSend your Skeletons against my Heroes and turn them into charred spots on the ground, beep-boop!",
+        highlights: [
+          '[data-hero-owner="opp"][data-hero-name]',
+        ] },
+      { text: "To activate a Creature's active effect, just click on it during either of your **Main Phases**!",
+        highlights: [
+          '[data-hero-owner="opp"][data-hero-name]',
         ] },
     ],
     outro: [
-      { text: "Cool!" },
-      { text: "The big upside of Creatures is that they can use their active effects every single turn." },
-      { text: "So if you didn't win already - next turn, there'd be even more pain and lasers in your opponent's future!" },
-      { text: "But the big downside is that Creatures cannot use their active effects the turn that they are summoned." },
-      { text: "These Cosmic Skeletons already survived from a previous turn - you'll have to find ways to keep yours alive!" },
+      { text: 'Cool!' },
+      { text: 'The great thing about Creatures is that they can use their effects again and again, every turn!' },
+      { text: 'So your Skeletons will be a constant source of damage!' },
+      { text: "If you hadn't already won - you could just try again next turn! More pain, more **lasers**!" },
+      { text: 'But the big **downside** of Creatures is that they cannot activate their active effects the turn you summon them.' },
+      { text: "These Skeletons? They already survived a full turn, otherwise they wouldn't be usable!\nSo you'll need to find ways to keep your fragile little Creatures alive!" },
+      { text: 'You got all that?\nGreat!' },
+      { text: 'See you next lesson, beep-boop!' },
     ],
   },
   3: {
