@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.1 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.2 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -10,23 +10,29 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 
 ## 10. Präsentation
 
-### 10.1 Pixel-Art-Richtlinien 🟦/🟨
+### 10.1 Pixel-Art-Richtlinien (16-Bit) 🟦/🟨 ✔ entschieden: Claude erstellt alle Grafiken
+
+**Perspektive und Look**
+- **Schräge Draufsicht (3/4)** wie in 16-Bit-Rollenspielen: Der Boden wird von oben gezeigt, Wände und Gebäude zeigen ihre Vorderseite (8–16 px Höhe über dem Zellenfeld). Dächer sind abgenommen, man blickt in jeden Raum. Türme ragen über ihre Zelle hinaus und werfen einen Schatten nach unten rechts.
+- **Einheiten:** 3/4-Seitenansicht mit **zwei Blickrichtungen** (rechts gezeichnet, links gespiegelt); Bewegung nach oben und unten nutzt dieselben Frames mit leichter Neigung. Zusätzlich eine **Frontpose** (für Karten und Idle in der Pause). Das hält den Zeichenaufwand klein.
+- **Look:** SNES/Mega-Drive-Stil: kräftige Farbrampen, Selbst-Outlines, bewusstes Dithering, glänzende Highlights, 4–6 Töne pro Fläche, comichafte Proportionen (große Köpfe, übertriebene Werkzeuge).
 
 **Raster und Auflösung**
-- **Interne Auflösung 960 × 540**, nur **ganzzahlig skaliert** (×2 = 1920 × 1080, ×3 = 2880 × 1620). Reste werden als Letterbox gezeigt, nie gestreckt.
-- **Zelle = 32 × 32 px.** Passt: Bastion 8 Zellen · Niemandsland ≈ 12 · Bastion 8 = 28 Zellen = 896 px.
-- **Sprite-Größenklassen:** **S** 16 × 16 (Bürger, Goblins, Frösche) · **M** 32 × 32 (Standard) · **L** 48 × 48 (Bären, Trolle, Golems) · **XL** 64 × 64 bis 96 × 96 (Riesen, Dicke Berta, Zeppelin). Bauteile füllen ihre Zellen exakt (2 × 2 = 64 × 64).
+- **Interne Auflösung 960 × 540**, nur **ganzzahlig skaliert** (×2 = 1920 × 1080, ×3 = 2880 × 1620). Reste als Letterbox, nie gestreckt.
+- **Zelle = 32 × 32 px.** Bastion bis 8 Zellen breit · Niemandsland ≈ 12 Zellen · Bastion bis 8 Zellen = ≈ 28 Zellen = 896 px.
+- **Sprite-Größenklassen:** **S** 16 × 16 (Bürger, Goblins, Frösche) · **M** 32 × 32 (Standard) · **L** 48 × 48 (Bären, Trolle, Golems) · **XL** 64 × 64 bis 96 × 96 (Riesen, Dicke Berta, Zeppelin). Bauteile füllen ihre Zellen (2 × 2 = 64 × 64) plus bis zu 16 px Überstand nach oben.
 
-**Palette**
-- Maximal **64 Farben** insgesamt, aufgebaut aus **Farbrampen** zu je 5–7 Tönen mit **Hue-Shift** (Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler).
-- Rampen: Stein · Holz · Flora · Haut (2 Varianten) · Metall · Magie-Violett · Feuer · Eis · Schleim-Grün · Knochen · Himmel (Tag/Dämmerung/Nacht) · **Team P1** (Karmin/Gold) · **Team P2** (Türkis/Violett).
-- **Teamfarben per Palette-Swap:** Banner, Zierleisten, Umhänge, Schulterplatten und Lichter sind in einer Index-Farbe gezeichnet und werden zur Laufzeit durch die Teamrampe ersetzt. Eine Grafik, zwei Teams.
+**16-Bit-Disziplin (Palette)**
+- Farbraum **RGB555** (32 Stufen je Kanal, wie beim SNES).
+- **Höchstens 16 Farben pro Sprite** (15 + Transparenz), gezogen aus einem **Master-Satz von Farbrampen** zu je 5–7 Tönen mit **Hue-Shift** (Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler). Pro Tileset höchstens 4 Rampen.
+- Rampen: Stein · Holz · Gras/Flora · Erde · Haut (2 Varianten) · Knochen · Metall · Magie-Violett · Feuer · Eis · Schleim-Grün · **Team P1** (Karmin/Gold) · **Team P2** (Türkis/Violett).
+- **Teamfarben per Palette-Swap:** Banner, Zierleisten, Umhänge, Schulterplatten und Lichter sind in einer Index-Rampe gezeichnet und werden zur Laufzeit durch die Teamrampe ersetzt. Eine Grafik, zwei Teams.
 
 **Dithering und Shading (Kern des Looks)**
-- **Verläufe** (Himmel, Nebel, Schatten, Glühen) immer per **geordnetem Dithering (Bayer 2 × 2 / 4 × 4)**, nie als weicher Alpha-Verlauf.
+- **Verläufe** (Boden, Nebel, Schatten, Glühen) immer per **geordnetem Dithering** (Schachbrett, Bayer 2 × 2 / 4 × 4), nie als weicher Alpha-Verlauf.
 - **Schachbrett-Dither (50 %)** für Transparenz (Geister, Blaupausen, Schild-Blasen). **Rauschen-Dither** für Rauch und Staub.
-- Licht kommt von **oben links**. Jede Fläche hat **3–4 Töne** (Basis, Licht, Schatten, Glanz). **Selbst-Outline (Sel-Out):** Konturen sind ein dunklerer Ton des Objekts, nie reines Schwarz. **Rim-Light** in Magie- oder Teamfarbe für Silhouettenschärfe.
-- **Okklusions-Dither** in den Ecken der Zellen, damit die Bastion Tiefe bekommt. Fensterlicht warm, Magie kalt.
+- Licht kommt von **oben links**. Jede Fläche hat **4–6 Töne** (Basis, Licht, Schatten, Glanz, Reflexlicht). **Selbst-Outline (Sel-Out):** Konturen sind ein dunklerer Ton des Objekts, nie reines Schwarz. **Rim-Light** in Magie- oder Teamfarbe für Silhouettenschärfe.
+- **Okklusions-Dither** an den Fußkanten der Wände, damit der Grundriss Tiefe bekommt. Fensterlicht warm, Magie kalt.
 - **Post-Processing im Pixelraster:** Ein Shader quantisiert die FX-Ebene (Glühen, Nebel, Frost) auf die Palette und wendet eine Bayer-Matrix an; so bleiben auch Effekte „echtes“ Pixelart.
 
 **Animation und Juice**
@@ -34,11 +40,11 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 - **Übertriebenes Squash & Stretch**, Idle mit Persönlichkeit (gähnen, kratzen, winken).
 - **Hit-Stop** 3–5 Frames bei großen Treffern, **1-Frame-Weißblitz**, kleines Screenshake (1–2 px; Kernexplosion 6 px).
 - **Partikel:** 1–3 px große Quadrate aus der Palette, kein Alpha-Blending, nur Dither-Transparenz.
-- Zerstörung: Zellen brechen in 3–5 Teile (Schutt, Holz, Fahnenfetzen), nicht in Zufallspixel.
+- Zerstörung: Zellen brechen in 3–5 Teile (Schutt, Holz, Fahnenfetzen), nicht in Zufallspixel. **Zielschatten** sind pulsierende Dither-Kreise am Boden.
 
 **Welt**
-- Parallax-Himmel mit 3–4 Ebenen: Wolken, schwebende Inseln, Mond (je nach Welt-Laune), ein kaputter Himmelsriss, der langsam wandert.
-- Niemandsland je nach Biom (GDD §2), mit liegengebliebenen Dingen (Skelette, Hüte, ein Schuh).
+- Bodenkacheln (Gras, Erde, Pflaster, Schlamm) mit Dither-Übergängen, Dekoration (Hüte, Knochen, Pilze, ein Schuh). Das Biom (GDD §2) bestimmt Farbstimmung und Details.
+- **Kulisse statt Parallax:** Schatten ziehender Wolken wandern über den Boden, schwebende Inseln am Bildrand, der Himmelsriss als Lichtstreif.
 
 **Lesbarkeit (Regeln für jede neue Karte)**
 1. **Silhouette zuerst:** Jede Einheit ist im Schwarzbild von jeder anderen unterscheidbar.
@@ -46,7 +52,12 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 3. **Zustände sichtbar:** Verwaist (Spinnweben), Brennen, Eingefroren, Fliehend (Schweißtropfen und Tempolinien), Todesmut (rote Augen) werden am Sprite gezeigt, nicht nur im Icon.
 4. **Teamfarbe nie weglassen.**
 
-**Asset-Pipeline** 🟨: Aseprite (`.aseprite`) → Spritesheet + JSON (Tags = Animationen) → Atlas. Namensschema `{id}_{anim}_{frames}`, z. B. `UA-01_attack_6`. **Prototyp:** Platzhalter aus Farbblöcken mit Kurznamen, optional aus Code erzeugte Pixelmuster; echte Grafik ab Meilenstein M5.
+**Pixel-Werkstatt (Asset-Pipeline, von Claude betrieben)** 🟨
+- **Erzeugung per Code** (Python mit Pillow und numpy): Farbrampen, schattierte Grundformen (Kugel-, Quader-, Zylinder-Shading mit Bayer-Dither), automatische Selbst-Outline, Schatten-Dither, Palette-Prüfung (RGB555, ≤ 16 Farben pro Sprite).
+- **Teilebasierte Figuren:** Körper, Kopf, Hut, Waffe, Werkzeug als Bausteine; Animation durch Teilversatz und Frame-Tausch; handgesetzte Detail-Patches (Gesichter, Muster).
+- **Ausgabe:** PNG-Spritesheets + JSON-Atlas (Tags = Animationen) + **Kontaktbögen** zur Qualitätskontrolle. Alles liegt versioniert im Repo, der Code ist deterministisch (gleicher Code = gleiche Pixel), jede Änderung ist ein Diff.
+- **Qualitätsschleife:** Stilprobe → deine Freigabe → Batches nach Priorität (P0-Karten zuerst, Tier IV zuletzt), verwandte Einheiten teilen Recolor-Basen. Du gibst Feedback am Kontaktbogen („Gesichter größer“, „Rüstung zu grau“), ich passe Rampen oder Bausteine an und erzeuge alles neu.
+- **Ehrliche Grenzen:** Es wird ein konsistenter, stilisierter 16-Bit-Look mit viel Persönlichkeit, kein handgemaltes Einzelstück-Niveau. Tier-IV-Karten und Schlüsselmotive (Kern, Explosion) bekommen mehr Handarbeit als Massenware.
 
 ### 10.2 Kamera & Regie in der Schlacht 🟨
 
@@ -112,27 +123,27 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 - **Kontingent-Leiste:** je Karte lebend/Soll, ★-Rang, Durchschnittsrang der lebenden Einheiten.
 - **Kern-Fähigkeit** unten rechts mit Abklingzeit.
 
-**Bastion-Screen** (Wireframe):
+**Bastion-Screen** (Wireframe, Draufsicht):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ ⏳ 0:18        ZEITSTOPP — Ausbau        Pause 3                 [✔ Bereit] Gegner: ✔  │
 ├────────────────┬─────────────────────────────────────────────────────────────────────┤
-│ KONTINGENT     │          ┌──┬──┬──┬──┬──┬──┐                                         │
-│ ▢ UA-01 ★1     │          │  │  │  │  │  │  │   Raster                                │
-│ ▢ US-01 ★2     │          ├──┼──┼──┼──┼──┼──┤   Hover = Vorschau + Nachbarschaft      │
-│ ▢ UV-01 ★1     │          │  │  │ KERN │  │  │   Rechtsklick = Info                    │
-│ ▢ UZ-01 ★1     │          ├──┤  │      ├──┼──┤                                         │
-│ ▢ (frei)       │          │  │  │      │  │TO│                                         │
-│ Befehle ▾      │          └──┴──┴──────┴──┴──┘                                         │
+│ KONTINGENT     │        ▓▓ ▓▓ ▓▓ ▓▓ ▓▓ ▓▓                                            │
+│ ▢ UA-01 ★1     │        ▓▓  ·  ·  ·  ·  ▓▓      Grundriss der Bastion                │
+│ ▢ US-01 ★2     │        ▓▓  · [KERN] ·  TOR     Hover = Vorschau + Nachbarschaft     │
+│ ▢ UV-01 ★1     │        ▓▓  · [KERN] ·  TOR     R = drehen · L = Schusslinien        │
+│ ▢ UZ-01 ★1     │        ▓▓  ·  ·  ·  ·  ▓▓      Rechtsklick = Info                   │
+│ ▢ (frei)       │        ▓▓ ▓▓ ▓▓ ▓▓ ▓▓ ▓▓                                            │
+│ Befehle ▾      │   (Die eingefrorene Schlacht bleibt als dunkles Diorama dahinter)   │
 ├────────────────┴─────────────────────────────────────────────────────────────────────┤
-│ HAND: [Karte] [Karte] [Karte] [Karte] [Karte]    gezogen 5 · behalten 3 · Reroll 1    │
+│ DEINE HAND (frisch): [Karte] [Karte] [Karte] [Karte] [Karte]   behalten 3 · Reroll 1  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Ziehen-Phase:** 5 Karten offen, 3 anklicken (Rest wird ausgegraut).
-- **Platzierung:** Ghost-Sprite folgt der Maus; gültige Zellen leuchten, ungültige sind schraffiert; Synergie-Nachbarn werden grün/rot markiert; ein Tooltip nennt Posten und Effekt.
-- **Warnungen** (nicht verbietend): „Raum vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
+- **Platzierung:** Ghost-Sprite folgt der Maus, **R dreht** das Bauteil; gültige Zellen leuchten, ungültige sind schraffiert; Synergie-Nachbarn werden grün/rot markiert; ein Tooltip nennt Posten und Effekt.
+- **Warnungen** (nicht verbietend): „Lücke in der Ringmauer“, „Raum vom Tor abgeschnitten“, „Kein Heiler vorhanden“, „Keine Geschützplätze“, „Pulverkammer neben Wohnhaus“.
 
 **Karten-Layout** (160 × 224 px, gleiches Pixelraster):
 
@@ -165,14 +176,26 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 
 ## 11. Technische Leitplanken 🟨
 
-**Empfehlung** (❓ Q7): Browser, TypeScript, Vite, Rendering über **PixiJS** oder **Phaser** (beide sind gut für pixelgenaue 2D-Darstellung). Ganzzahl-Skalierung mit `image-rendering: pixelated`; ein Post-Processing-Shader für Dither und Palette.
+**Empfehlung** (❓ Q7): **Web-Spiel mit TypeScript, Vite und PixiJS** (oder reinem Canvas), pixelgenau über Ganzzahl-Skalierung und `image-rendering: pixelated`, plus ein Post-Processing-Shader für Dither und Palette.
+
+| Kriterium | Web (TypeScript) | Godot 4 | Unity |
+|---|---|---|---|
+| Pixelgenaue 2D-Grafik | gut | **sehr gut** (Integer-Skalierung, TileMap, Shader) | möglich, aber mit Zusatzpaket |
+| Von Claude in der Cloud **bau- und testbar** | **ja:** Chromium vorinstalliert, automatische Screenshots, Bot-Simulationen in Node | eingeschränkt: Binary müsste geladen werden, Rendern ohne GPU ungewiss | **nein:** an den Editor und eine Lizenzaktivierung gebunden |
+| Spielen ohne Installation | **Link genügt** | Web-Export möglich, größer | WebGL-Export aufwendig |
+| Native Veröffentlichung (z. B. Steam) | über Electron oder Tauri | **direkt** | direkt |
+| Szenen-/Animations-Editor | keiner (Code + Daten) | **ja** | ja |
+| Kosten, Lizenz | frei | frei (MIT) | Lizenzmodell hat zuletzt mehrfach gewechselt |
+| Passt zu diesem Projekt | **empfohlen** | gute zweite Wahl | nicht empfohlen |
+
+Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das Spiel selbst sehen, ausführen und testen muss. Das geht im Web-Stack vollständig, ohne dass du etwas installierst. Die Simulation ist ohnehin engine-unabhängig (deterministisch, headless), eine spätere Portierung auf Godot wäre also möglich, die Pixelgrafik bleibt als PNG erhalten.
 
 **Architektur**
 - **Simulation strikt von der Darstellung getrennt.** Die Sim läuft mit **festem Zeitschritt (30 Hz)**, ist **deterministisch** (seed-basiertes RNG, keine Zufallswerte aus der Darstellung) und kann **headless** in Node laufen.
 - **Befehlslog + Seed = Replay.** Daraus entstehen Replays, Debugging, Fehlersuche und später Online-Synchronisation (Lockstep).
 - **Datengetrieben:** Karten stehen in JSON/YAML (siehe Anhang B). Fähigkeiten sind Bausteine (**Trigger → Bedingung → Effekt**); im Code stehen nur die Verhaltens-Archetypen (Doktrinen, Zonen, Flugbahnen).
-- **Systeme** (in fester Reihenfolge pro Tick): Spawn · Navigation · Targeting · Combat · Projectile (Exposition) · Status · XP/Rang · Staffing (Personal) · Healing/Retreat · Conquest · Win-Check. Danach Darstellung (Kamera, FX, UI).
-- **Wegfindung:** Zwei Ebenen. Im Feld eine Dimension (x-Achse). In der Bastion ein **Raumgraph** mit Kantentypen (Tür, Leiter, Aufzug, Rutsche, Portal) und Kosten (Zeit + Zerstörungsaufwand). Früh prototypen, denn hier steckt das meiste Risiko.
+- **Systeme** (in fester Reihenfolge pro Tick): Spawn · Navigation · Targeting · Combat · Projectile (Schusslinie, Streuung) · Status · XP/Rang · Staffing (Personal) · Healing/Retreat · Conquest · Win-Check. Danach Darstellung (Kamera, FX, UI).
+- **Wegfindung:** **A\* auf dem Zellenraster** (8 Richtungen, kein Ecken-Schneiden) für Bastion und Feld; Hindernisse haben Zerstörungskosten (HP/100). Gedränge im Feld über weiche Abstoßung. Sonderfälle: Flieger, Geister, Wühler (eigene Regeln). Dank Draufsicht entfällt der aufwendige Raumgraph mit Etagen; das Hauptrisiko des Querschnitts ist damit weg.
 - **Zeitstopp:** Sim-Tick pausiert, die Darstellung läuft weiter. Eingaben schreiben in eine Befehlswarteschlange (Bauteile, Kontingent, Befehle), die beim Auftauen deterministisch angewendet wird.
 - **Determinismus:** Fließkomma-Abweichungen vermeiden (Fixed-Point oder konsequent gleiche Rechenreihenfolge), damit Replays und Online-Lockstep funktionieren.
 - **Performance-Budget:** 40 Einheiten pro Seite + Geschosse + Partikel unter 16 ms/Frame auf einem Mittelklasse-Laptop. Partikellimit ⚙ 500, Sprite-Atlas, Object Pooling.
@@ -190,7 +213,7 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 | Matchlänge | 10–16 min (Median ≈ 13) |
 | Erster zerstörter Raum | 75–120 s nach dem ersten Beschuss |
 | Erster Rang-3-Elite | ca. 5–7 min |
-| Kern erstmals exponiert | meist Min. 6–9 |
+| Kern erstmals in Reichweite feindlicher Artillerie | meist Min. 5–8 |
 | Pausenanteil an der Matchzeit | ≤ 35 % |
 | Siegquote Zerstörung / Eroberung | ≈ 50 / 50 (±15) |
 | Siegquote Startspieler vs. Zweiter | 50 % ±3 (symmetrisch!) |
@@ -208,7 +231,7 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 ### 12.3 Bekannte Spannungsfelder
 
 - **Zu starke Heilung ⇒ Unsterbliche Sturmtruppen.** Gegenmittel: begrenzte Behandlungsplätze, Personal, Warteschlange, Jagd auf Fliehende (Pfeilturm +50 %).
-- **Zu starke Defensive ⇒ Patt.** Gegenmittel: Exposition, Wahnsinn, Kern-Reichweite (frühe Artillerie erreicht den Kern nicht, später ja).
+- **Zu starke Defensive ⇒ Patt.** Gegenmittel: Schusslinie, Wahnsinn, Kern-Reichweite (frühe Artillerie erreicht den Kern nicht, später ja).
 - **Zu starke Artillerie ⇒ Sturm überflüssig.** Gegenmittel: Reparatur, Schilde, kurze Reichweiten früh, Sturmtruppen als einziger Weg, Personal abzuschalten.
 
 ---
@@ -217,28 +240,29 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 
 ### 13.1 MVP (P0) — ein spielbarer Kern
 
-- Ein Kern (KE-00), Raster 6 × 4 (ohne Erweiterungen), Tor, Bürger.
+- Ein Kern (KE-00), Raster 6 × 6 (ohne Erweiterungen), Ringmauer, Tor, Bürger.
 - **18 Bauteile** (Katalog 01, Liste „P0“) und **19 Truppen** (Katalog 02, Liste „P0“).
 - Phase 1 + Kampfzyklus + Zeitstopp mit einfacher Kamerafahrt (noch ohne Dither-Effekte).
-- Simulation: Spawn/Nachschub, Navigation (Raumgraph), Artillerie (Flach + Bogen, Exposition), Sturmtruppen (Jäger, Brecher, Eroberer, Plünderer, Sprenger), Rückzug und Heilung, Verteidiger-Zonen, Personal/Bürger, Eroberung, Kern-HP, XP und Ränge (ohne Talente), beide Siegbedingungen.
-- Platzhalter-Grafik, Debug-Overlay (Zellen, Pfade, Exposition, XP), einfacher Bot-Gegner.
+- Simulation: Spawn/Nachschub, Navigation (A* auf dem Raster), Artillerie (Flach + Bogen, Schusslinie, Zielschatten), Sturmtruppen (Jäger, Brecher, Eroberer, Plünderer, Sprenger), Rückzug und Heilung, Verteidiger-Zonen, Personal/Bürger, Eroberung, Kern-HP, XP und Ränge (ohne Talente), beide Siegbedingungen.
+- Platzhalter-Grafik (später die Pixelart aus der Pixel-Werkstatt), Debug-Overlay (Zellen, Pfade, Exposition, XP), einfacher Bot-Gegner.
 
-**P1:** Erweiterungen des Rasters, Kern-Typen, restliche Linien und Karten, Kern-Fähigkeiten, Talente, Statuseffekte komplett, Materialien/Rüstungsmatrix, Zeitstopp-Regie in Pixelart, Explosion, UI-Skin, Audio.
-**P2:** Welt-Launen, Chaos-Karten, Baustile, Biom-Wechsel, Kommentator, Statik-Kollaps, Online-Modus.
+**P1:** Erweiterungen des Rasters, Fraktions-Kerne, restliche Linien und Karten, Kern-Fähigkeiten, Talente, Statuseffekte komplett, Materialien/Rüstungsmatrix, Zeitstopp-Regie in Pixelart, Explosion, UI-Skin, Audio.
+**P2:** Welt-Launen, Chaos-Karten, Baustile, Biom-Wechsel, Kommentator, Signaturkarten, Online-Modus.
 
 ### 13.2 Meilensteine
 
 | # | Meilenstein | Ergebnis („Definition of Done“) |
 |---|---|---|
-| **M0** | Entscheidungen & Daten | Offene Fragen Q1–Q8 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
-| **M1** | Kampf-Greybox | 1D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
-| **M2** | Bastion-Builder | Drag & Drop auf dem Raster mit Tags, Nachbarschaft, Validierung und Hand. Ein Mensch kann eine Bastion bauen. |
-| **M3** | Karten-Loop & Zeitstopp | Loadout, Ziehen 5/3, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
-| **M4** | Rollen vertiefen | Rückzug/Heilung, Personal, Eroberung, XP/Ränge laufen vollständig; erster Balance-Pass mit Bot-Sims. |
-| **M5** | Vertical Slice (Art) | 1 Baustil, 10 voll animierte Einheiten, Dither-Zeitstopp, Kern-Explosion, UI-Skin; ein 3-minütiges Video, das schon „nach dem Spiel“ aussieht. |
-| **M6** | Content-Welle 1 | Alle P0- und P1-Karten, Kerne, Rasterweiterungen; Balance-Pass 2. |
-| **M7** | Content-Welle 2 & Polish | Restliche Karten, Welt-Launen, Audio, Menüs, Barrierefreiheit. |
-| **M8** | Mehrspieler | Lokal (Split) und, falls gewünscht, Online. |
+| **M0** | Entscheidungen & Daten | Offene Fragen aus §14 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
+| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** |
+| **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
+| **M3** | Bastion-Builder | Drag & Drop auf dem Raster mit Drehen, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
+| **M4** | Karten-Loop & Zeitstopp | Kern-Wahl, Loadout 10/7, frische 5/3-Hand, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
+| **M5** | Rollen vertiefen | Rückzug/Heilung, Personal, Eroberung, XP/Ränge laufen vollständig; erster Balance-Pass mit Bot-Sims. |
+| **M6** | Vertical Slice (Art) | 1 Baustil, 10 voll animierte Einheiten, Dither-Zeitstopp, Kern-Explosion, UI-Skin; ein 3-minütiges Video, das schon „nach dem Spiel“ aussieht. |
+| **M7** | Content-Welle 1 | Alle P0- und P1-Karten, die ersten Fraktions-Kerne, Rasterweiterungen; Balance-Pass 2. |
+| **M8** | Content-Welle 2 & Polish | Restliche Karten und Kerne, Welt-Launen, Audio, Menüs, Barrierefreiheit. |
+| **M9** | Mehrspieler | Lokal (Split) und, falls gewünscht, Online. |
 
 ### 13.3 Risiken
 
@@ -248,8 +272,10 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 | **Autobattler wirkt passiv** | Kern-Fähigkeit, Zielprioritäten, Wachzonen, Kamera-Fokus, Pause als Spielhöhepunkt. |
 | **XP-Snowball** | Zeit-XP-Deckel (nur bis Rang 2), Rangdifferenz-Bonus, Todesmut ohne Heilung, Wahnsinn. |
 | **Unlesbares Chaos** | Silhouettenregeln, Statusicons, Einheitenlimit 40, Fokus-Highlight, Ereignisfeed. |
-| **Wegfindung in der Bastion** | Graph statt Navmesh, früh prototypen, Debug-Overlay. |
-| **Pixel-Art-Aufwand (150+ Karten)** | Platzhalter zuerst, Vertical Slice, Recolor-Basen für verwandte Einheiten, Tier IV zuletzt. |
+| **Wegfindung und Gedränge** | A* auf dem Zellenraster, Hindernisse mit Kosten, weiche Abstoßung im Feld, Debug-Overlay. |
+| **Labyrinth-Verstopfung** (Mauerwerk ist kostenlos) | Wegkosten berücksichtigen Zerstörungsaufwand, Mauern haben HP, Türme und Verteidiger sind der Gegenpol; notfalls Mauerwerk-Limit pro Pause. |
+| **Pixelart-Qualität und -Umfang** (alles von Claude) | Stilprobe vor Massenproduktion, Bausteine und Recolor-Basen, Review am Kontaktbogen, Schlüsselmotive mit Handarbeit. |
+| **Pixel-Art-Aufwand (150+ Karten)** | Platzhalter zuerst, Vertical Slice, Recolor-Basen für verwandte Einheiten, 2 Blickrichtungen statt 4, Tier IV zuletzt. |
 | **Zeitstopp-Übergang ruckelt** | Sim und Darstellung trennen, Nearest-Neighbor, pixelgenau in Ruhe. |
 | **Unfairer Zufall** | Garantien, 5/3-Auswahl, Tier-Gating, „Bekannte Gesichter“, symmetrische Basis. |
 | **Online-Determinismus** | Deterministische Sim von Anfang an, Replays als Dauertest. |
@@ -257,26 +283,30 @@ Ziel: **fließend statt Schnitt.** Die Welt wird nicht „weggeblendet“, sonde
 
 ---
 
-## 14. Offene Fragen ❓
+## 14. Fragen & Entscheidungen
 
-Jede Frage hat meinen **Default**, mit dem ich weiterarbeite, falls du nichts anderes sagst.
+✔ = entschieden, ❓ = offen (mit Default, mit dem ich weiterarbeite).
 
-| # | Frage | Default |
+| # | Frage | Status |
 |---|---|---|
-| **Q1** | Plattform und Modus: Browser, lokal 1v1 + Bot zuerst, Online später? | **Ja.** |
-| **Q2** | Perspektive: Querschnitt-Seitenansicht (aufgeschnittenes Puppenhaus) statt Draufsicht? | **Querschnitt.** |
-| **Q3** | Echtzeit-Eingriffe in der Schlacht: nur die Kern-Fähigkeit? Oder komplett passiv? | **Nur Kern-Fähigkeit** (P1). |
-| **Q4** | Ziehregel: 5 ziehen / 3 behalten (Draft-Gefühl) oder rein zufällig? | **5/3.** |
-| **Q5** | Eroberungs-Ende anders als Explosion (Palette-Swap statt Knall)? | **Ja.** |
-| **Q6** | Matchlänge 10–16 min? | **Ja.** |
-| **Q7** | Tech-Stack: TypeScript + PixiJS/Phaser, oder lieber Godot/Unity? | **TS + PixiJS.** |
-| **Q8** | Woher kommt die Pixelgrafik: eigene Hand, Asset-Pack, KI-Hilfe? Prototyp mit Platzhaltern? | **Platzhalter zuerst**, Art-Pipeline ab M5. |
-| **Q9** | Sprache: Deutsch zuerst, aber i18n-fähig? | **Ja.** |
-| **Q10** | Fraktionen (feste Asymmetrie) oder Kerne als Asymmetrie? | **Kerne.** |
-| **Q11** | Welt-Launen und Chaos-Karten: später dazu oder streichen? | **Später (P2).** |
-| **Q12** | Statik-Kollaps als optionale Zerstörungsmechanik? | **Später entscheiden (P2).** |
-| **Q13** | Eigenes Repository für das Spiel? | **Ja.** |
-| **Q14** | Name „Bastion Blasters“: Marken-/Namensprüfung? | **Offen** (ich habe nichts geprüft). |
+| **Q1** | Plattform und Modus: Browser, lokal 1v1 + Bot zuerst, Online später? | ❓ Default: **ja.** |
+| **Q2** | Perspektive | ✔ **Schräge Draufsicht.** Der Querschnitt wird nicht parallel gepflegt (Anhang D). |
+| **Q3** | Echtzeit-Eingriffe in der Schlacht | ✔ **Nur die Kern-Fähigkeit** (GDD §9.1). ❓ Abklingzeiten testen. |
+| **Q4** | Ziehregel | ✔ **Start 10/7, danach jede Pause eine komplett frische 5/3-Hand** (GDD §5.5). |
+| **Q5** | Eroberungs-Ende anders als Explosion (Palette-Swap statt Knall)? | ❓ Default: **ja.** |
+| **Q6** | Matchlänge 10–16 min? | ❓ Default: **ja.** |
+| **Q7** | Tech-Stack | ❓ Empfehlung: **Web (TypeScript + PixiJS)**, siehe §11. Godot 4 als zweite Wahl, Unity nicht. |
+| **Q8** | Woher kommt die Pixelgrafik? | ✔ **Komplett von Claude, 16-Bit-Stil** (§10.1). |
+| **Q9** | Sprache: Deutsch zuerst, aber i18n-fähig? | ❓ Default: **ja.** |
+| **Q10** | Fraktionen oder Kerne als Asymmetrie? | ✔ **Kerne sind Fraktionen** (GDD §9.1, Katalog 03). |
+| **Q11** | Welt-Launen und Chaos-Karten: später oder streichen? | ❓ Default: **später (P2).** |
+| **Q12** | Statik-Kollaps | ✘ **Entfällt** (nur im Querschnitt sinnvoll). |
+| **Q13** | Eigenes Repository für das Spiel? | ❓ Default: **ja.** |
+| **Q14** | Name „Bastion Blasters“: Marken-/Namensprüfung? | ❓ **Offen** (ich habe nichts geprüft). |
+| **Q15** | Kern-Wahl frei und verdeckt aus allen 12, oder 3 zufällig angeboten? | ❓ Default: **frei**, Zufallsmodus optional. |
+| **Q16** | Ungespielte, behaltene Karten verfallen. Mit Trostpflaster (4 % Reparatur je Karte)? | ❓ Default: **ja.** |
+| **Q17** | Mauerwerk bleibt kostenlos und unbegrenzt (Labyrinthe)? | ❓ Default: **ja**, mit Beobachtung (Risiko in §13.3). |
+| **Q18** | Einheiten mit zwei Blickrichtungen (rechts/links gespiegelt) statt vier? | ❓ Default: **ja** (spart Zeichenaufwand). |
 
 ---
 
@@ -287,7 +317,7 @@ Jede Frage hat meinen **Default**, mit dem ich weiterarbeite, falls du nichts an
 | **Abstempeln** | Neue Bauteile werden nach der Pause aus der Blaupause in echte Gebäude verwandelt. |
 | **Alarm** | Zustand, wenn Eindringlinge in der Bastion sind; verdoppelt die Leine der Verteidiger. |
 | **Artillerie** | Truppen auf Geschützplätzen, die die gegnerische Bastion beschießen. |
-| **Bastion** | Die Festung eines Spielers (Querschnitt-Raster mit Kern). |
+| **Bastion** | Die Festung eines Spielers (Grundriss-Raster mit Ringmauer und Kern). |
 | **Behandlungsplatz** | Platz in einer Heilquelle, den ein verwundeter Sturmtrupp belegt. |
 | **Beute** | Gebäude, die Plünderer ablenken (Schatztruhe, Wunschbrunnen, Trophäenhalle). |
 | **Blaupause** | Darstellung eines neu gelegten Bauteils während der Pause. |
@@ -296,10 +326,12 @@ Jede Frage hat meinen **Default**, mit dem ich weiterarbeite, falls du nichts an
 | **Doktrin** | Zielverhalten einer Sturmtruppe (Jäger, Brecher, Eroberer, Plünderer, Sprenger). |
 | **Eindringling** | Feindliche Sturmtruppe innerhalb der Bastion. |
 | **Eroberung** | Sieg durch Besetzen der Kernkammer (Leiste 100 %). |
-| **Exposition** | Eigenschaft einer Zelle, von einer Flugbahn getroffen werden zu können. |
 | **Geschützplatz (GP)** | Platz auf einer Plattform, den Artillerie benötigt. |
+| **Fraktion / Kern** | Der Kern, den man wählt, bestimmt Passive, aktive Fähigkeit, Linien-Affinitäten und Schwäche (Archetyp: Belagerer, Stürmer, Bollwerk, Tüftler). |
 | **Heilquelle** | Alles, was für die Rückzugsregel zählt (Heilgebäude, Heiler, Aura-Heilung). |
+| **Innenhof** | Leere, begehbare Zelle im Inneren der Bastion. |
 | **Kern** | Zentrum der Bastion; fällt er, wird der Besitzer besiegt. |
+| **Kern-Anbau** | Kostenloser Freischalt-Raum der Hauptlinie des Kerns (★2). |
 | **Kernkammer** | 2 × 2 Raum um den Kern; Ort der Eroberung. |
 | **Kontingent** | Armee-Leiste aus Truppen-Karten (5–8 Plätze). |
 | **Linie** | Truppen-Gruppe, die ein Freischalt-Raum freigibt (Waffen, Arkan, Tier, …). |
@@ -308,7 +340,9 @@ Jede Frage hat meinen **Default**, mit dem ich weiterarbeite, falls du nichts an
 | **Panikraum** | Raum, in dem Zivilisten unangreifbar sind. |
 | **Posten** | Arbeitsplatz in einem Raum, der Personal braucht. |
 | **Rang** | Erfahrungsstufe R0–R5 einer Einheit. |
+| **Ringmauer** | Äußerste Zellenreihe der Bastion, kostenlos mit Mauerwerk gefüllt. |
 | **Rückzug** | Verhalten einer Sturmtruppe unter 50 % HP, wenn eine Heilquelle existiert. |
+| **Schusslinie** | Gerade Linie vom Schützen zur Zielzelle, ohne andere feste Zelle des Gegners; Voraussetzung für Flach-Geschosse. |
 | **Soll (S)** | Zielstärke einer Truppen-Karte. |
 | **Strukturfaktor** | Multiplikator auf Schaden gegen Bauteile. |
 | **Tier** | Seltenheit/Stärke einer Karte (I–IV). |
@@ -320,6 +354,7 @@ Jede Frage hat meinen **Default**, mit dem ich weiterarbeite, falls du nichts an
 | **Wahnsinn** | Eskalation ab Minute 14 gegen Patts. |
 | **Zeitstopp** | Pause nach jeder 2. Welle, in der gezogen und gebaut wird. |
 | **Zelle** | Feld des Rasters, 32 × 32 px. |
+| **Zielschatten** | Markierung am Boden, die einen Bogen-/Senkrecht-Einschlag 1,2–2,0 s vorher ankündigt. |
 | **Zyklus** | 2 Wellen + 1 Zeitstopp. |
 
 ---
@@ -335,13 +370,18 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `WAVES_PER_CYCLE` | Wellen bis zum Zeitstopp | 2 | fest |
 | `FIRST_BUILD_S` | Dauer des Erstaufbaus | 120 | 90–180 |
 | `PAUSE_BUILD_S` | Bauzeit je Zeitstopp | 25 | 20–40 |
-| `DRAW_COUNT` / `KEEP_COUNT` | Ziehen / Behalten | 5 / 3 | 4–6 / 2–4 |
-| `HAND_LIMIT` | Handkarten | 10 | 8–12 |
+| `LOADOUT_DRAW` / `LOADOUT_KEEP` | Ziehen / Behalten zu Spielbeginn | 10 / 7 | 8–12 / 6–8 |
+| `PAUSE_DRAW` / `PAUSE_KEEP` | Frische Hand je Zeitstopp | 5 / 3 | 4–6 / 2–4 |
+| `LEFTOVER_REPAIR_PCT` | Reparatur je behaltene, aber nicht gespielte Karte | 4 % | 0–8 % |
 | `REROLLS` | Rerolls je Pause | 1 | 0–2 |
-| `LOADOUT_BAU` / `LOADOUT_TRUPPE` | Startkarten | 8 / 6 | – |
 | `KNOWN_FACES_PCT` | Anteil Kopien bekannter Karten beim Ziehen | 20 % | 10–30 % |
 | `KONTINGENT_START` / `_MAX` | Truppenplätze | 5 / 8 | – |
-| `GRID_START` / `GRID_MAX` | Raster | 6×4 / 8×6 | – |
+| `GRID_START` | Baugrund zu Beginn (inkl. Ringmauer) | 6×6 | – |
+| `GRID_EXPANSIONS` | Erweiterungen (Pausen 2, 4, 6), max. je Seite | 3, je Seite max. 2 | – |
+| `GATE_SIZE` | Tor | 1×2 | – |
+| `CORNER_TOWER_BONUS` | Eckturm: Reichweite / HP | +1 / +10 % | – |
+| `SHELL_SPREAD_BASE` / `_PER_CELL` | Streuung von Bogen/Senkrecht (Zellen) | 0,4 / 0,04 | – |
+| `TELEGRAPH_BOGEN_S` / `_SENKRECHT_S` | Zielschatten vor dem Einschlag | 1,2 / 2,0 | – |
 | `FIELD_GAP_CELLS` | Niemandsland | 12 | 10–14 |
 | `CORE_HP` / `CORE_REGEN` | Kern | 5000 / 2 HP/s | 3500–7000 |
 | `GATE_HP` / `WALL_HP` | Tor / Mauerwerk | 500 / 400 | – |
@@ -391,7 +431,7 @@ Vorschlag für das Austauschformat der Kataloge (YAML; JSON funktioniert genauso
   gp: 2                      # Geschützplätze
   hp: 70
   armor_class: fleisch       # fleisch | panzer | geist | knochen | pudding
-  trajectory: bogen          # flach | bogen | senkrecht | durchschlag | tunnel | streu | luft
+  trajectory: bogen          # flach | bogen | senkrecht | durchschlag | untergrund | streu | luft
   range: 18
   cooldown_s: 7.0
   damage: { struct: 60, unit: 18, type: wucht }
@@ -409,7 +449,7 @@ Vorschlag für das Austauschformat der Kataloge (YAML; JSON funktioniert genauso
   material: holz
   hp: 300
   posten: 1
-  placement: []              # z. B. [dach], [aussen], [boden], [keller], [front]
+  placement: []              # z. B. [aussen], [innen], [front], [ecke]
   tags: [heil, leicht_entflammbar]
   effects:
     - type: heal_station     # zählt als Heilquelle (Rückzugsregel)
@@ -427,3 +467,16 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | Version | Änderung |
 |---|---|
 | **0.1** | Erster Entwurf aus dem Grobkonzept: Regeln, Systeme, Kataloge (Bauteile, Einheiten, Kerne, Welt-Launen), Präsentation, Technik, Roadmap, offene Fragen. |
+| **0.2** | Antworten auf die offenen Fragen eingearbeitet: **Draufsicht** statt Querschnitt (Raster, Ringmauer, Schusslinie, Zielschatten, Tags, Wegfindung neu), **Ziehregel** 10/7 + frische 5/3, **16-Bit-Pixelart von Claude** (Pixel-Werkstatt, RGB555), **12 Fraktions-Kerne** in 4 Archetypen, Technik-Vergleich, neue Meilensteine. |
+
+---
+
+## Anhang D — Entscheidungsprotokoll
+
+| Datum | Entscheidung | Folgen |
+|---|---|---|
+| 2026-10-08 | **Draufsicht statt Querschnitt, nicht beides.** Beide Ansichten zugleich zu pflegen würde Regeln (Schusslinie, Wege, Platzierung) und die gesamte Grafik doppelt kosten. Die systemischen Teile (Karten, XP, Rückzug, Personal, Eroberung, Wellen, Zeitstopp) sind ansichtsunabhängig und bleiben. | Neues Raster mit Ringmauer, Schusslinie und Zielschatten statt Exposition, Tags ohne Etagen, Wegfindung per A*, Statik-Kollaps gestrichen. Sieben Bauteile und neun Einheiten angepasst. |
+| 2026-10-08 | **Ziehregel:** Start 10 ziehen / 7 behalten, danach jede Pause eine komplett frische 5/3-Hand. | Handlimit entfällt; ungespielte Karten verfallen (Trostpflaster 4 %); Chronoschrein auf 5/4. |
+| 2026-10-08 | **Pixelart komplett von Claude, 16-Bit-Stil.** | Pixel-Werkstatt (Code-Pipeline), RGB555, ≤ 16 Farben pro Sprite, Stilprobe vor Massenproduktion. |
+| 2026-10-08 | **Kerne sind Fraktionen.** | 12 Kerne in 4 Archetypen mit Passive, Aktive, Linien-Affinität, Kern-Anbau, Schwäche (Katalog 03). |
+| 2026-10-08 | **Tech-Stack:** Empfehlung Web (TypeScript), Godot als zweite Wahl, Unity nicht. | Bestätigung ausstehend (Q7). |
