@@ -8106,7 +8106,17 @@ function TextBox() {
           if (eigen && eigen !== ovStil.getPropertyValue(n).trim()) vars[n] = eigen;
         }
         if (!(box.width > 0 && box.height > 0)) return;
-        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html: el.outerHTML, ziel: el };
+        // `an: [Selektoren]`: Teile INNERHALB des Ziels, die im Klon „an" bleiben
+        // (`data-tb-an`, CSS) — der Rest wird ausgegraut. So liegt die ganze
+        // Phasenleiste ueber dem Schleier und nur die genannten Kaesten leuchten.
+        let html = el.outerHTML;
+        const an = typeof h === 'object' && Array.isArray(h.an) ? h.an : null;
+        if (an && an.length) {
+          const kopie = el.cloneNode(true);
+          an.forEach(a => kopie.querySelectorAll(a).forEach(n => n.setAttribute('data-tb-an', '1')));
+          html = kopie.outerHTML;
+        }
+        const basis = { pulse, vars, handkarte: el !== treffer, stapel: Number.isFinite(z) ? z : 0, html, ziel: el };
         rects.push({ ...m, ...basis });
         // ── Hover auf einer gehighlighteten HANDKARTE ──
         // Hebt sich die echte Karte unter dem Zeiger, soll die Highlight-
@@ -8426,10 +8436,10 @@ const TUTORIAL_SCRIPTS = {
           '.game-hand-me [data-card-name="Destruction Magic"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
-      // ── Highlight: komplette Phasenleiste ──
+      // ── Highlight: komplette Phasenleiste, nur die Action Phase „an" ──
       { text: 'Then, go to your **Action Phase** and drag your Magic Hammer onto the Hero that should cast it - your Ida!\nClick on your target - Beato - and watch her get squished!',
         highlights: [
-          '.board-phase-tracker',
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Action Phase"]'] },
         ] },
     ],
     outro: [
@@ -8461,11 +8471,10 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           '[data-hero-owner="opp"][data-hero-name]',
         ] },
-      // ── Highlight: beide Main Phases ──
+      // ── Highlight: komplette Phasenleiste, beide Main Phases „an" ──
       { text: "To activate a Creature's active effect, just click on it during either of your **Main Phases**!",
         highlights: [
-          '[data-phase-name="Main Phase 1"]',
-          '[data-phase-name="Main Phase 2"]',
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Main Phase 1"]', '[data-phase-name="Main Phase 2"]'] },
         ] },
     ],
     outro: [
