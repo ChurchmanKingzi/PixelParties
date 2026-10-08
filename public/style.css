@@ -15500,10 +15500,11 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone *::after {
   display: none !important;
 }
-/* Phasenleiste im Highlight (Tutorial 1, Textbox 11): die ganze Leiste
-   liegt ueber dem Schleier und pulsiert, aber nur die Action Phase ist
-   „an" — alle anderen Kaesten sind ausgegraut (auch die aktuelle Phase;
-   `!important` schlaegt den Inline-Rahmen der aktiven). */
+/* Phasenleiste im Highlight (Tutorial 1 Textbox 11, Tutorial 2 Textbox 7):
+   die ganze Leiste liegt ueber dem Schleier und pulsiert, aber nur die im
+   Skript genannten Kaesten sind „an" (`an: [...]`, Attribut `data-tb-an`) —
+   alle anderen sind ausgegraut (auch die aktuelle Phase; `!important`
+   schlaegt den Inline-Rahmen der aktiven). */
 .textbox-highlight-clone .board-phase-item {
   color: rgba(255,255,255,.3);
   background: rgba(255,255,255,.02);
@@ -15511,7 +15512,7 @@ body:has(.textbox-overlay) .tooltip {
   box-shadow: none !important;
   text-shadow: none;
 }
-.textbox-highlight-clone .board-phase-item[data-phase-name="Action Phase"] {
+.textbox-highlight-clone .board-phase-item[data-tb-an] {
   color: #fff;
   background: rgba(0,240,255,.2);
   border: 1px solid rgb(0,240,255) !important;
