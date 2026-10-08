@@ -1,4 +1,4 @@
-# Bastion Blasters — Kampf-Prototyp (v0.1)
+# Bastion Blasters — Kampf-Prototyp (v0.2)
 
 Spielbarer Prototyp des Kerns: Loadout (10/7), Erstaufbau, automatische Schlacht, Zeitstopp alle zwei Wellen mit frischer 5/3-Hand, beide Siegbedingungen (Kern zerstört oder Kernkammer erobert). Mensch gegen Bot oder Bot gegen Bot zum Zuschauen. TypeScript, Vite und PixiJS; die Simulation ist deterministisch und läuft ohne Browser in Node.
 
@@ -23,10 +23,12 @@ Die Grafiken kommen aus der Pixel-Werkstatt (`../art`): `export_game_units.py`, 
 
 | Aktion | Eingabe |
 |---|---|
-| Karte spielen | Karte im Tray anklicken (Bauteile: danach auf den Baugrund klicken), Hover zeigt die Karte groß rechts |
-| Bauteil drehen | R oder Rechtsklick; Esc bricht ab |
+| Karte spielen | Karte im Tray anklicken (Bauteile: danach auf den Baugrund klicken); beim Überfahren wächst die Handkarte, darüber erscheint eine große Vorschau mit erklärten Begriffen |
+| Begriffe erklären | Unterstrichene Wörter (Inspektor, Statusliste) und die Begriffsfelder auf der großen Kartenvorschau zeigen beim Überfahren die Erklärung aus dem Glossar |
+| Bauteil drehen | Mausrad (solange ein nicht quadratisches Gebäude in der Hand ist), R oder Rechtsklick; Esc bricht ab |
 | Mauerkarten | Maus nahe an eine Mauer, bis zu 4 zusammenhängende Segmente werden markiert |
-| Hof erweitern | „+ Courtyard cell“, dann leere Zellen neben dem Hof anklicken (12 im Erstaufbau, 6 je Zeitstopp) |
+| Hof erweitern | „+ Courtyard cell“, dann leere Zellen neben dem Hof anklicken (16 im Erstaufbau, 6 je Zeitstopp) |
+| Kapazität | Seitenleiste „Capacity“: Bürger-Limit und Kontingent-Plätze, wie man sie erweitert (Dwelling, Barracks, Zeitstopps), mit den passenden Karten zum Überfahren |
 | Umbau | Bauteil anklicken, „Pick up and move“ (im Zeitstopp ein Bauteil) |
 | Duplikat | Karte einer schon stehenden Bau-Karte spielen wertet sie auf (★) |
 | Kontingent | Troop-Karten anklicken; ist es voll, den zu ersetzenden Eintrag in der Seitenleiste anklicken; Wachzone und Zielpriorität pro Eintrag |
@@ -49,7 +51,7 @@ src/sim/      deterministische Simulation (30 Hz, seedbasiert, keine Browser-Abh
   unitfx.ts       Fähigkeiten der Einheitenkarten;  artfx.ts  Artillerie-Zusatzwirkungen
   draw.ts, commands.ts, match.ts, bot.ts   Ziehen, Befehle, Spielablauf, Bot
 src/render/   PixiJS-Darstellung (Atlanten, Bastionen, Einheiten, Geschosse, Effekte, Kamera)
-src/ui/       DOM-Oberfläche (Menü, Loadout, Tray, Seitenleiste, HUD, Inspektor)
+src/ui/       DOM-Oberfläche (Menü, Loadout, Tray, Seitenleiste, HUD, Inspektor); keywords.ts = Glossar-Tooltips und große Kartenvorschau
 tools/        headless.ts (Bot-Sim), build_game_data (../tools), embed.mjs, playtest.mjs
 ```
 
@@ -59,11 +61,13 @@ Die Karten sind datengetrieben: `src/data/cards.gen.json` entsteht aus den Katal
 
 - **Kernkammer = 4 × 4 Zellen** (Kern plus Ring von einer Zelle) im Kernhof; GDD nennt 2 × 2. Dort wird erobert, dort stehen Verteidiger der Zone „Core Chamber“.
 - Ein Standardkern, **keine Fraktions-Kerne**, keine Kern-Fähigkeit, kein Kern-Anbau.
-- Räume müssen mit mindestens einer Kante an den Hof grenzen; die Tür liegt immer zum Hof (Reihenfolge Süd, Ost, West, Nord).
+- **Layout:** Kernhof (6 × 6) hinten im Baugrund, ein 8 Zellen langer Zufahrtsgang (1 Zelle breit) führt zum Haupttor an der Front. Davor und daneben ist freier Baugrund für Räume, Türme und Hofzellen.
+- Räume müssen mit mindestens einer Kante an den Hof **oder an einen angeschlossenen Raum** grenzen; die Tür liegt zum Hof, sonst zum Nachbarraum (Reihenfolge Süd, Ost, West, Nord). Ein Raum, an dem andere hängen, lässt sich erst aufnehmen, wenn diese weg sind.
 - Wandkarten wirken auf bis zu 4 zusammenhängende Segmente (ab der angeklickten Kante). Das Tor wird durch BS-07 ersetzt.
 - Einheiten-Fernangriffe und Turmschüsse treffen sofort; nur Artillerie fliegt als echtes Geschoss.
 - **Nicht umgesetzt:** Rank-3-Talente, Fraktions-Kerne und Welt-Launen, Chaos-Karten, Dragon Egg (BC-03), Red Button (BC-09), Rutschen und Eilgang-Richtung (BU-07), Fallensteller (UZ-10), Nebel/Sichtverdeckung beim Aufbau (beide Bastionen sind immer sichtbar).
 - Zeitgeber im Prototyp: Aufbau 180 s, Zeitstopp 60 s (im Menü wählbar, GDD: 120 s / 25 s).
+- Einheiten tragen eine Umrandung und einen Fußring in der Teamfarbe (P1 rot, P2 türkis); beim Herauszoomen wird die Umrandung dicker.
 
 ## Erste Bot-Statistik (24 Partien, Seeds 100–123)
 

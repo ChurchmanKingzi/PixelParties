@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.7 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.8 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -517,6 +517,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | **0.5** | Dritte Rückmeldung: **Spielsprache Englisch**, **strenge Nomenklatur** (`NOMENCLATURE.md`, `daten/keywords.json`, Linter, englische Namen für alle 154 Karten), Regeltext nur mechanisch mit automatisch fetten Schlüsselwörtern, Flavor getrennt von der Effektbox, **Rank-3-Abzeichen** ausgeschrieben, Kartenrücken neu (großes Logo), Effektbox auf 5 Zeilen (Bildfenster 144 × 86). |
 | **0.6** | **Alle 154 Karten angelegt** (77 Bauteile, 77 Einheiten): englische Texte in `daten/card_text.json`, Illustrationen als Code in zwölf Packs (`art/pack_*.py`, Anleitung `art/ART_GUIDE.md`, Prüfung mit `art/packtool.py`), Renderer mit Platzhalterbild, 6 Effektzeilen, automatisch verdichteter Typzeile und Kontaktbögen je Gruppe (`art/sheets.py`). Glossar auf **140 Begriffe** erweitert (u. a. Knockback, Taunt, Lifesteal, Alarm, Leash, Aura, Burrowed, Chaos-born); Flugbahn **Underground → Burrowing**; Linter prüft Fähigkeitsnamen, Namens- und Typzeilenbreite. Beim Texten vereinheitlicht: **Fed** gibt überall +15 % (statt +20 % beim Eintopf-Koch), **Hardened** ist definiert, BS-01 Masonry ist eine reine Referenzkarte (wird nie gezogen). |
 | **0.7** | **Kampf-Prototyp** (`game/`, TypeScript, Vite, PixiJS): deterministische Simulation mit allen vier Truppenkategorien, sieben Flugbahnen, Auto-Mauern auf Kanten, A*, Personal, Heilung und Rückzug, Eroberung, XP und Ränge, Wellen, Zeitstopp, Ziehen 10/7 und 5/3, Bot; Browser-Oberfläche mit Loadout, Bauphase, Kontingent und Inspektor; als Einzeldatei-Artifact veröffentlicht. Vom Auftraggeber bestätigt: GDD bleibt deutsch (Q23), interne Annahmen der Kartentexte (Fed +15 %, Hardened, Knockback, Doppelbombe, Masonry als Referenzkarte) gelten. |
+| **0.8** | **Rückmeldung aus dem ersten Spieltest** (Prototyp): **Kernhof nach hinten** mit 8 Zellen langem **Zufahrtsgang** zum Haupttor (§4.1, Hof-Erweiterung 16 statt 12); **Räume dürfen an Räume anbauen** (Türen zu Nachbarräumen, Raumketten und Labyrinthe); **Glossar-Tooltips** (Begriffe im Text, Statusnamen und Kartenbilder erklären sich beim Überfahren; die Kartenrenderer exportieren dafür Begriffsfelder `art/out/cards_hotspots.json`); **große Kartenvorschau**, Handkarten wachsen beim Überfahren, Mausrad dreht Gebäude in der Hand; **Einheiten in Teamfarbe umrandet** mit Fußring; **Kapazitätsanzeige** (Bürger-Limit, Kontingent-Plätze und wie man sie erweitert); **Ton**: prozedurale SFX und Musik (§10.6, Web Audio, keine Dateien). |
 
 ---
 

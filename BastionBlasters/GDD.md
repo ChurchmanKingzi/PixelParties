@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.7 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.8 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -182,19 +182,19 @@ Die Bastion ist **keine feste Form**, sondern ein **Grundriss auf einem Zellenra
 
 **Baugrund und Start**
 - Jeder Spieler hat einen **Baugrund von 16 × 16 Zellen** (⚙ `GRID_PLOT`), P1 links, P2 rechts (gespiegelt). Dazwischen liegen **20 Zellen Niemandsland** (⚙ `FIELD_GAP_CELLS`). Was nicht bebaut ist, bleibt Wiese; im Baumodus erscheint der Baugrund als Raster.
-- **Start:** **Kernhof 6 × 6** (Hof, begehbar) mit dem **Kern (2 × 2)** in der Mitte, **Haupttor** in der Frontkante und der **Kern-Anbau** des gewählten Fraktions-Kerns (§9.1) als erstes Raum-Modul (3 × 2) an einer Außenkante des Hofs. **32 Hofzellen** sind frei (36 − 4 Kern).
-- Der Kernhof liegt an der **Frontkante** des Baugrunds, vertikal mittig: Nach hinten bleiben ≈ 10 Zellen, nach oben und unten je ≈ 5 Zellen Platz zum Anbauen. Die Bastion wächst also vor allem nach hinten und zu den Seiten, die Front bleibt kompakt.
+- **Start:** **Kernhof 6 × 6** (Hof, begehbar) mit dem **Kern (2 × 2)** in der Mitte, ein **Zufahrtsgang** (1 Zelle breit, 8 Zellen lang) vom Kernhof nach vorn bis zum **Haupttor** in der Frontkante und der **Kern-Anbau** des gewählten Fraktions-Kerns (§9.1) als erstes Raum-Modul (3 × 2) an einer Außenkante des Hofs. **32 Hofzellen** sind frei (36 − 4 Kern).
+- Der Kernhof liegt **hinten** im Baugrund (vertikal mittig), nicht an der Front: Zwischen Tor und Kern liegen ≈ 8 Zellen eigener Boden, an den Seiten je ≈ 5 Zellen. Wer ins Tor läuft oder aufs Tor schießt, trifft zuerst Gang, Türme und Räume, nie den Kern. Dort entstehen Labyrinthe, Engstellen und Kampfzonen (*v0.8, Rückmeldung aus dem ersten Spieltest: der Kern an der Front war nicht zu schützen*).
 
 **Module** 🟦/🟨
 - **Raum-Module** belegen **zusammenhängende Zellen**, mindestens **2 Zellen tief** (Möbel, Personal und Tür brauchen Platz). Größen: **2 × 2**, **3 × 2**, **3 × 3**, selten 4 × 2 oder 4 × 3 (Katalog 01). Drehbar (**R**, 90°-Schritte).
-- **Anlegen:** Ein Modul muss mit mindestens **einer Kante** an Hof, Kernhof oder ein bestehendes Modul grenzen („zusammenhängend“) und im eigenen Baugrund liegen. Kein Modul darf in die Mitte eines anderen ragen.
-- **Tür:** Jedes Modul erhält automatisch eine **Tür** (14 px) in der Mitte der ersten Kante zu Hof/Kern (Reihenfolge Süd, Ost, West, Nord); im Editor per Klick auf eine andere Kante verlegbar 🟨. Module sind untereinander nur über Hof und Türen verbunden. **Alle Einheiten passen durch jede Tür**, auch Bären und Katapulte ✔; die 14 px sind nur Optik, im Spiel zählt die Kante als offen.
+- **Anlegen:** Ein Modul muss mit mindestens **einer Kante** an Hof, Kernhof oder ein **angeschlossenes** Modul grenzen („zusammenhängend“) und im eigenen Baugrund liegen. Räume dürfen also an **Räume** anbauen (Raumketten, Labyrinthe), nicht nur an den Hof. Kein Modul darf in die Mitte eines anderen ragen. Ein Raum, der nur an Türme, den Kern oder abgeschlossene Räume grenzt, hätte keine Tür und ist nicht platzierbar.
+- **Tür:** Jedes Modul erhält automatisch eine **Tür** (14 px) in der Mitte der ersten Kante zum Hof (Reihenfolge Süd, Ost, West, Nord), sonst zu einem schon angeschlossenen Nachbarraum; im Editor per Klick auf eine andere Kante verlegbar 🟨. Module sind untereinander über Hof und Türen verbunden. Ein Raum, an dem andere Räume hängen, lässt sich beim Umbau erst aufnehmen, wenn diese weg sind. **Alle Einheiten passen durch jede Tür**, auch Bären und Katapulte ✔; die 14 px sind nur Optik, im Spiel zählt die Kante als offen.
 - **Hof-Bauteile** 🟦/🟨 ✔ entschieden: Bauteile dürfen auch **auf Hofzellen statt in Räumen** stehen. **Welche Karte welche Bauart hat, ist je Bauteil einzeln festgelegt** (Katalog 01, Spalte „Größe“: Raum, Hof, Turm, Wand, Tor), nicht nach Größe. Ein Hof-Bauteil belegt 1 × 1 bis 3 × 2 Hofzellen, hat **keine eigenen Wände und keine Tür**. Folgen:
   - **Leichter zugänglich:** Es liegt im Laufweg; Eindringlinge laufen direkt hin, Einheiten benutzen es ohne Tür, und Splash trifft es ohne Wandschutz.
   - **Leichter zerstörbar:** Die HP der Hof-Karten sind dafür niedrig angesetzt (≈ −30 % gegenüber Räumen derselben Stufe, je Karte einzeln).
   - **Ausnahme Innenhof:** Hofzellen, die man **nur durch Türen von Modulen** erreicht (ringsum von Modulen und Mauern umschlossen), sind vom Tor und von Breschen aus nicht direkt zugänglich. Dort gelten Hof-Bauteile als **geschützt** (kein Zugänglichkeitsmalus; die niedrigen HP bleiben). Hofzellen, die man ohne Tür vom Tor oder einer Bresche erreicht, heißen **Außenhof**.
   - Typische Hof-Bauteile: Fallen (Stachelflur, Fallgrube), Zelte und Gärten (Feldlazarett, Heilpilz-Garten), Brunnen, Drillplatz, Glocken, Rutschbahn, Lafetten. Typische Räume: alles, was Personal und Schutz braucht (Krankenstation, Schmiede, Kaserne, Wohnhaus).
-- **Hof-Erweiterung** 🟨: Im Erstaufbau darf jeder Spieler **kostenlos bis zu 12**, zu jedem Zeitstopp **bis zu 6 zusammenhängende Hofzellen** anlegen (⚙ `HOF_START` / `HOF_PER_PAUSE`), z. B. Gänge, Vorhöfe, Innenhöfe, Zickzackwege. Hofzellen sind begehbar, ohne Funktion; **Hof ↔ Hof hat keine Wand**.
+- **Hof-Erweiterung** 🟨: Im Erstaufbau darf jeder Spieler **kostenlos bis zu 16**, zu jedem Zeitstopp **bis zu 6 zusammenhängende Hofzellen** anlegen (⚙ `HOF_START` / `HOF_PER_PAUSE`), z. B. Gänge, Vorhöfe, Innenhöfe, Zickzackwege. Hofzellen sind begehbar, ohne Funktion; **Hof ↔ Hof hat keine Wand**.
 - **Turmzellen:** **Türme** (1 × 1) stehen auf einer Zelle an der Außenkante oder in einer Ecke (oder frei im Hof). Sie sind **massive Zellen**: Einheiten laufen nicht durch, und sie werden nicht von Wänden umschlossen. Sie überragen die Mauer.
 - **Geschützplätze:** Plattform-Module (Z) haben ihre Geschützplätze innerhalb der Fläche; sie stehen **tiefer** (Brüstung 10 px), damit Geschütze über den Rand feuern können.
 

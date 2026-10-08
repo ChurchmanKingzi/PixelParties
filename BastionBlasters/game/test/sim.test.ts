@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Match } from '../src/sim/match';
+import { checkRoom, gateConnected, placeRoom, removeModule } from '../src/sim/bastion';
+import { CHAMBER, GATE_CELL } from '../src/sim/constants';
+import { ci } from '../src/sim/world';
+import { K_YARD } from '../src/sim/types';
 
 function run(seed: number, maxMin = 8) {
   const m = new Match({ seed, bots: [true, true] });
@@ -30,5 +34,46 @@ describe('simulation', { timeout: 120_000 }, () => {
   });
   it('different seeds give different matches', () => {
     expect(fingerprint(run(21))).not.toBe(fingerprint(run(22)));
+  });
+});
+
+describe('bastion layout', () => {
+  const fresh = () => new Match({ seed: 5, bots: [true, true] }).world;
+
+  it('has the core at the back, a gate at the front and a connecting approach', () => {
+    const w = fresh();
+    for (const t of [0, 1] as const) {
+      const g = GATE_CELL[t];
+      expect(w.kind[ci(g.x, g.y)]).toBe(K_YARD);
+      expect(gateConnected(w, t)).toBe(true);
+      const ch = CHAMBER[t];
+      expect(Math.abs(g.x - ch.x0)).toBeGreaterThan(8);
+    }
+    expect([...w.walls.values()].some((x) => x.gate && x.owner === 0)).toBe(true);
+    expect([...w.walls.values()].some((x) => x.gate && x.owner === 1)).toBe(true);
+  });
+
+  it('lets rooms attach to other rooms and opens a door to the neighbour', () => {
+    const w = fresh();
+    const a = placeRoom(w, 0, 'BP-02', 10, 14, 0);
+    expect(a).not.toBeNull();
+    expect(a!.door).not.toBeNull();
+    // Raum B berührt nur Raum A, nicht den Hof
+    expect(checkRoom(w, 0, 'BF-01', 11, 16, 0).ok).toBe(true);
+    const b = placeRoom(w, 0, 'BF-01', 11, 16, 0);
+    expect(b).not.toBeNull();
+    expect(b!.door).not.toBeNull();
+    const d = b!.door!;
+    const wall = w.edgeBetween(d.x, d.y, d.x + (d.dir === 'E' ? 1 : d.dir === 'W' ? -1 : 0), d.y + (d.dir === 'S' ? 1 : d.dir === 'N' ? -1 : 0));
+    expect(wall?.door).toBe(true);
+    // A trägt B: nicht aufnehmbar, bevor B weg ist
+    expect(removeModule(w, 0, a!.id)).toBeNull();
+    expect(removeModule(w, 0, b!.id)).toBe('BF-01');
+    expect(removeModule(w, 0, a!.id)).toBe('BP-02');
+  });
+
+  it('refuses rooms that touch nothing', () => {
+    const w = fresh();
+    expect(checkRoom(w, 0, 'BP-02', 3, 7, 0).ok).toBe(false);
   });
 });
