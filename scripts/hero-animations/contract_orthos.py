@@ -11,8 +11,8 @@ Frame 0 = Ruhepose = der Sprite genau.
   Fläche (Alpha >= 160), nach der das Spiel die Figur einpasst, immer gleich.
 * gelbe Umrandung: pulsiert von 20 % bis etwa 35 % im Takt des Lichts.
 * Kyubey: federt (Kopf und Rücken heben sich um 1 px, die Beine bleiben stehen), blinzelt, beide Ohren
-  schwingen als Wellen (Reifen wandern mit).
-* Tüte: raschelt oben, die Augenlöcher glimmen rot auf.
+  schwingen als Wellen (Reifen wandern mit); alles flott (Federn 4x, Ohren 4 Zyklen pro Loop).
+* Tüte: raschelt oben, die Augenlöcher glimmen rot auf, der Kopf darunter blinzelt (2 Frames nach Kyubey).
 Aufruf (aus scripts/hero-animations):  python3 contract_orthos.py final 90
 """
 import json
@@ -57,6 +57,10 @@ BAG_PUPIL = [(y, x) for y, x in zip(*np.nonzero(BAG[:, :, 3] > 0)) if tuple(BAG[
 BAG_TOP = int(np.nonzero(BAG[:, :, 3] > 0)[0].min())
 EAR_Y = {'l': (31, 40), 'r': (30, 41)}                # Spanne der Ohren in Zeilen (Aufhängung -> Spitze)
 BLINK = {14: 'halb', 15: 'zu', 16: 'zu', 17: 'halb', 38: 'halb', 39: 'zu', 40: 'zu', 41: 'halb'}
+BAG_BLINK = {i + 2: v for i, v in BLINK.items()}      # der Tütenkopf blinzelt zwei Frames später
+HOLE = [(y, x) for y, x in zip(*np.nonzero(BAG[:, :, 3] > 0)) if tuple(BAG[y, x, :3]) in ((0, 0, 0), (112, 0, 0))]
+HOLE_ROWS = (min(y for y, _ in HOLE), max(y for y, _ in HOLE))
+BAG_FILL, BAG_LINE = (154, 106, 56, 255), (85, 59, 31, 255)
 
 
 def over(dst, src):
@@ -106,23 +110,23 @@ def shifted(layer, mask, i, spec, dy):
 
 def glow_mult(i):
     """0..1: Atmen + umlaufender Schimmer; Frame 0 = 1 (nur dunkler, nie heller als im Sprite)."""
-    breath = 1.0 - 0.16 * (1 - math.cos(2 * math.pi * 2 * i / N)) / 2
+    breath = 1.0 - 0.16 * (1 - math.cos(2 * math.pi * 4 * i / N)) / 2
     s0 = np.cos(3 * THETA - 0.13 * RAD)
-    si = np.cos(3 * THETA - 0.13 * RAD - 2 * math.pi * i / N)
+    si = np.cos(3 * THETA - 0.13 * RAD - 2 * math.pi * 2 * i / N)
     shimmer = np.minimum(1.0, 1.0 - 0.38 * (s0 - si) / 2.0)
     return np.clip(breath * shimmer, 0.0, 1.0)
 
 
 def frame(i):
     dy = int(round(0.5 + 0.5 * math.sin(2 * math.pi * i / 24 + math.pi / 2 - math.pi / 2 * 0))) if False else 0
-    k = (1 - math.cos(2 * math.pi * i / 24)) / 2                    # 0 in Frame 0, 1 nach 12 Frames
+    k = (1 - math.cos(2 * math.pi * i / 12)) / 2                    # 0 in Frame 0, 1 nach 12 Frames
     dy = 1 if k > 0.5 else 0
     out = np.zeros((H, W, 4), int)
     g = GLOW.copy()
     g[:, :, 3] = np.rint(GLOW[:, :, 3] * glow_mult(i)).astype(int)
     out = over(out, g)
     a = AURA.copy()
-    pulse = (1 - math.cos(2 * math.pi * 2 * i / N)) / 2
+    pulse = (1 - math.cos(2 * math.pi * 4 * i / N)) / 2
     a[:, :, 3] = int(round(AURA_A * (1 + 0.7 * pulse))) * (AURA[:, :, 3] > 0)
     out = over(out, a)
     # Kyubey: Ohr (hinter dem Kopf), dann Körper
@@ -140,12 +144,12 @@ def frame(i):
                     rest[y, x] = FUR_LIGHT
     ear_l = bob(ear_l, dy)
     ear_mask = ear_l[:, :, 3] > 0
-    ear_l = shifted(ear_l, ear_mask, i, (EAR_Y['l'][0] - dy, EAR_Y['l'][1] - dy, 1.9, 2, 0.0, -2, 1), dy)
+    ear_l = shifted(ear_l, ear_mask, i, (EAR_Y['l'][0] - dy, EAR_Y['l'][1] - dy, 2.4, 4, 0.0, -2, 1), dy)
     out = over(out, ear_l)
     out = over(out, bob(rest, dy))
     # Papiertüte
     bag = bob(BAG, dy)
-    flap = int(round(math.sin(2 * math.pi * 3 * i / N))) if i else 0
+    flap = int(round(math.sin(2 * math.pi * 6 * i / N))) if i else 0
     if flap:
         top = bag.copy()
         for y in range(BAG_TOP - dy, BAG_TOP - dy + 2):
@@ -154,16 +158,24 @@ def frame(i):
                 if 0 <= x - flap < W:
                     top[y, x] = bag[y, x - flap]
         bag = top
-    pupil_glow = (i % 12) in (3, 4, 5, 6)
+    pupil_glow = (i % 6) in (2, 3)
     if pupil_glow:
         for y, x in BAG_PUPIL:
             yy = y - dy if dy and y < HEAD_BOTTOM else y
             bag[yy, x] = (208, 16, 60, 255)
+    bst = BAG_BLINK.get(i)
+    if bst:
+        for y, x in HOLE:
+            yy = y - dy if dy and y < HEAD_BOTTOM else y
+            if bst == 'zu':
+                bag[yy, x] = BAG_LINE if y == HOLE_ROWS[1] else BAG_FILL
+            elif y == HOLE_ROWS[0]:
+                bag[yy, x] = BAG_FILL
     out = over(out, bag)
     # rechtes Ohr (vor der Tüte)
     er = bob(EAR, dy)
     emask = er[:, :, 3] > 0
-    er = shifted(er, emask, i, (EAR_Y['r'][0] - dy, EAR_Y['r'][1] - dy, 1.5, 2, 1.7, -1, 1), dy)
+    er = shifted(er, emask, i, (EAR_Y['r'][0] - dy, EAR_Y['r'][1] - dy, 1.8, 4, 1.7, -1, 1), dy)
     out = over(out, er)
     return out
 
