@@ -14,24 +14,33 @@ export const PLOT = [
   { x0: 38, y0: 6, x1: 54, y1: 22 },
 ] as const;
 
-/** Kernhof 6 x 6 an der Frontkante, vertikal mittig */
+/**
+ * Layout je Bastion (Spieler 1 links, Spieler 2 gespiegelt):
+ * Kernhof 6 x 6 hinten im Baugrund, davon geht ein Zufahrtsgang (1 Zelle breit) nach vorn bis zum Haupttor.
+ * Vor und neben dem Kernhof ist viel freier Baugrund für Räume, Türme und Hof-Erweiterungen (Labyrinthe).
+ */
 export const YARD_START = [
-  { x0: 12, y0: 11, x1: 18, y1: 17 },
-  { x0: 38, y0: 11, x1: 44, y1: 17 },
+  { x0: 4, y0: 11, x1: 10, y1: 17 },
+  { x0: 46, y0: 11, x1: 52, y1: 17 },
 ] as const;
 export const CORE_CELLS = [
-  { x0: 14, y0: 13 },
-  { x0: 40, y0: 13 },
+  { x0: 6, y0: 13 },
+  { x0: 48, y0: 13 },
 ] as const;
 /** Kernkammer = Kern + Ring von einer Zelle (4 x 4) */
 export const CHAMBER = [
-  { x0: 13, y0: 12, x1: 17, y1: 16 },
-  { x0: 39, y0: 12, x1: 43, y1: 16 },
+  { x0: 5, y0: 12, x1: 9, y1: 16 },
+  { x0: 47, y0: 12, x1: 51, y1: 16 },
 ] as const;
-/** Haupttor: Kante rechts (P1) bzw. links (P2) von der Zelle (gx, gy) */
+/** Haupttor: Kante rechts (P1) bzw. links (P2) von der Zelle (x, y) */
 export const GATE_CELL = [
   { x: 17, y: 13, dir: 'E' as const },
   { x: 38, y: 13, dir: 'W' as const },
+] as const;
+/** Zufahrtsgang vom Kernhof zum Tor: Zeile y, Zellen von x0 bis x1 (einschließlich) */
+export const APPROACH = [
+  { y: 13, x0: 10, x1: 17 },
+  { y: 13, x0: 38, x1: 45 },
 ] as const;
 
 export const CORE_HP = 5000;
@@ -49,7 +58,7 @@ export const SPAWN_STAGGER_S = 0.4;
 export const UNIT_LIMIT = 40;
 export const BUILD_TIME_S = 120;
 export const PAUSE_TIME_S = 25;
-export const YARD_START_CELLS = 12;
+export const YARD_START_CELLS = 16;
 export const YARD_PER_PAUSE = 6;
 
 export const RETREAT_HP = 0.5;

@@ -20,11 +20,50 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 
 from pixl import *
-from pixfont import draw_text, text_width, draw_rich, rich_width, wrap_rich
+from pixfont import draw_text, text_width, draw_rich, rich_width, wrap_rich, _glyph
 from cardicons import blit_icon
 import glossary
 
 OUT = os.path.join(HERE, 'out')
+
+# Begriffsfelder je Karte (Pixel im 160 x 224-Raster), damit das Spiel Glossarbegriffe beim Überfahren erklären kann
+HOTSPOTS: dict[str, list] = {}
+
+
+def _hs(cid, surface, x, y, w, h=9, kinds=None):
+    k = glossary.lookup(surface, kinds)
+    if k is not None:
+        HOTSPOTS.setdefault(cid, []).append({'t': k['en'], 'k': k['kind'], 'x': int(x), 'y': int(y), 'w': int(w), 'h': h})
+
+
+def _flat_info(segs):
+    """Flachtext und je Zeichen (Abschnittsnummer, Glossareintrag) für ganze fette Abschnitte, die Glossarbegriffe sind"""
+    flat = ''.join(t for t, _ in segs)
+    span = []
+    for i, (t, b) in enumerate(segs):
+        k = glossary.lookup(t.rstrip(': ')) if b else None
+        span.extend([(i, k) if k else None] * len(t))
+    return flat, span
+
+
+def _line_hotspots(cid, ln, x0, y, flat, span, p):
+    """Felder der Begriffe einer umbrochenen Zeile; p = Leseposition im Flachtext. Liefert die neue Position."""
+    chars = [(ch, b) for t, b in ln for ch in t]
+    while p < len(flat) and flat[p] == ' ' and chars and chars[0][0] != ' ':
+        p += 1                                          # beim Umbruch entfallenes Leerzeichen
+    cx = x0
+    cur = None                                          # (Abschnitt, Eintrag, x_start)
+    for j, (ch, b) in enumerate(chars):
+        sp = span[p + j] if p + j < len(span) else None
+        if cur and (sp is None or sp[0] != cur[0]):
+            HOTSPOTS.setdefault(cid, []).append({'t': cur[1]['en'], 'k': cur[1]['kind'], 'x': int(cur[2]), 'y': int(y - 2), 'w': int(cx - 1 - cur[2]), 'h': 9})
+            cur = None
+        if sp and not cur:
+            cur = (sp[0], sp[1], cx)
+        cx += _glyph(ch).shape[1] + 1 + (1 if b else 0)
+    if cur:
+        HOTSPOTS.setdefault(cid, []).append({'t': cur[1]['en'], 'k': cur[1]['kind'], 'x': int(cur[2]), 'y': int(y - 2), 'w': int(cx - 1 - cur[2]), 'h': 9})
+    return p + len(chars)
 
 CARD_W, CARD_H = 160, 224
 ROMAN = {1: 'I', 2: 'II', 3: 'III', 4: 'IV'}
@@ -208,6 +247,12 @@ def draw_type_line(img, ramp, card):
             draw_text(img, x, TYPE_Y, '·', C(ramp, 1))
             x += 1 + gap
         draw_text(img, x, TYPE_Y, t, C(ramp, 1))
+        word = t.split(' ')[0] if card['kategorie'] == 'bau' and i == 0 else t
+        if card['kategorie'] == 'bau':
+            kinds = ('build_type',) if i == 0 else ('group',)
+        else:
+            kinds = ('card_type',) if i == 0 else ('line',) if i == 1 else ('trajectory', 'doctrine', 'zone')
+        _hs(card['id'], word, x, TYPE_Y - 2, text_width(word), 10, kinds)
         x += text_width(t)
 
 
@@ -305,6 +350,8 @@ def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
     y = EFFECT_Y
     nlines = 0
     for k, (badge, segs) in enumerate(effect_blocks(tx)):
+        flat, span = _flat_info(segs)
+        rp = 0
         if badge:
             bw = text_width(badge) + 7
             if k > 0:
@@ -318,6 +365,7 @@ def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
         for i, ln in enumerate(lines):
             x0 = TEXT_X + (bw + 4 if (badge and i == 0) else 0)
             draw_rich(img, x0, y, ln, INK)
+            rp = _line_hotspots(card['id'], ln, x0, y, flat, span, rp)
             y += 9
             nlines += 1
     if nlines > EFFECT_MAX_LINES:
@@ -364,6 +412,8 @@ def main():
             print(f'WARNUNG: {cid} nutzt {bad} Farben außerhalb der Master-Palette', file=sys.stderr)
         im.save(os.path.join(outdir, f'{cid}.png'))
         rendered.append((cid, im))
+    with open(os.path.join(OUT, 'cards_hotspots.json'), 'w', encoding='utf-8') as fh:
+        json.dump(HOTSPOTS, fh, ensure_ascii=False, separators=(',', ':'))
     back = cardback.render_back()
     if palette_violations(back):
         print('WARNUNG: Kartenrücken nutzt Farben außerhalb der Master-Palette', file=sys.stderr)

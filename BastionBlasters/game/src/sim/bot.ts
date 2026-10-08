@@ -1,6 +1,6 @@
 // Einfacher Bot: wählt Karten, baut eine Bastion nach Heuristik und füllt das Kontingent
 
-import { GATE_CELL, PLOT, type Priority, type Team } from './constants';
+import { CORE_CELLS, GATE_CELL, PLOT, type Priority, type Team } from './constants';
 import {
   checkRoom, checkTower, checkWallCard, checkYardBuilding, checkYardCell, footprint, inPlot, isOuterWall,
 } from './bastion';
@@ -126,9 +126,9 @@ function growYard(world: World, team: Team): boolean {
   for (let y = r.y0; y < r.y1; y++) {
     for (let x = r.x0; x < r.x1; x++) {
       if (!checkYardCell(world, team, x, y).ok) continue;
-      // bevorzugt nach hinten, möglichst auf Höhe der Kernhofmitte
-      const back = team === 0 ? (PLOT[0].x1 - x) : (x - PLOT[1].x0);
-      const s = -Math.abs(y - 13.5) * 0.9 + back * 0.6 + world.rng.next();
+      // bevorzugt um den Zufahrtsgang herum (Mitte zwischen Kernhof und Tor), nahe der Kernhofhöhe
+      const midX = team === 0 ? 13 : 42;
+      const s = -Math.abs(y - 13.5) * 0.6 - Math.abs(x - midX) * 0.35 + world.rng.next();
       if (!best || s > best.s) best = { x, y, s };
     }
   }
@@ -149,7 +149,7 @@ function playRoom(world: World, team: Team, card: string, pref: 'front' | 'gate'
 function playYardBuilding(world: World, team: Team, card: string, pref: 'gate' | 'core'): boolean {
   const def = BUILDINGS[card];
   const gp = gatePos(team);
-  const core = { x: team === 0 ? 15 : 41, y: 14 };
+  const core = { x: CORE_CELLS[team].x0 + 1, y: CORE_CELLS[team].y0 + 1 };
   let best: Spot | null = null;
   const r = PLOT[team];
   for (let rot = 0; rot < (def.cols === def.rows ? 1 : 2); rot++) {

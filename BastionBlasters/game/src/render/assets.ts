@@ -21,8 +21,32 @@ function texFromDataUri(uri: string): Promise<Texture> {
 export interface Frame { tex: Texture; ax: number; ay: number; w: number; h: number }
 interface AtlasJson { image: string; frames: Record<string, { x: number; y: number; w: number; h: number; ax?: number; ay?: number }> }
 
+/** Alle sichtbaren Pixel eines Atlas in Weiß (für Umrandungen in Teamfarbe) */
+function makeSilhouette(base: Texture): ImageSource | null {
+  try {
+    const src = base.source.resource as CanvasImageSource;
+    const w = base.source.pixelWidth, h = base.source.pixelHeight;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    if (!g) return null;
+    g.drawImage(src, 0, 0);
+    const im = g.getImageData(0, 0, w, h);
+    const d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] > 40) { d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = 255; } else d[i + 3] = 0;
+    }
+    g.putImageData(im, 0, 0);
+    return new ImageSource({ resource: c, scaleMode: 'nearest' });
+  } catch {
+    return null;
+  }
+}
+
 class Atlas {
   frames = new Map<string, Frame>();
+  private silSrc: ImageSource | null | undefined;
+  private silFrames = new Map<string, Frame>();
   constructor(public base: Texture, public json: AtlasJson) {
     for (const [k, f] of Object.entries(json.frames)) {
       const tex = new Texture({ source: base.source, frame: new Rectangle(f.x, f.y, f.w, f.h) });
@@ -31,6 +55,19 @@ class Atlas {
   }
   get(key: string): Frame | undefined {
     return this.frames.get(key);
+  }
+  /** Umriss-Rahmen (einfarbige Silhouette) zum Rahmen `key` */
+  sil(key: string): Frame | undefined {
+    let s = this.silFrames.get(key);
+    if (s) return s;
+    const f = this.frames.get(key);
+    if (!f) return undefined;
+    if (this.silSrc === undefined) this.silSrc = makeSilhouette(this.base);
+    if (!this.silSrc) return undefined;
+    const fr = f.tex.frame;
+    s = { tex: new Texture({ source: this.silSrc, frame: new Rectangle(fr.x, fr.y, fr.width, fr.height) }), ax: f.ax, ay: f.ay, w: f.w, h: f.h };
+    this.silFrames.set(key, s);
+    return s;
   }
 }
 
@@ -65,6 +102,9 @@ export class GameAssets {
 
   unit(key: string, team: number): Frame | undefined {
     return (team === 1 ? this.unitsB : this.unitsA).get(key);
+  }
+  unitSil(key: string, team: number): Frame | undefined {
+    return (team === 1 ? this.unitsB : this.unitsA).sil(key);
   }
   /** Teilstück einer Textur (Ausschnitt in Rahmenpixeln) */
   crop(f: Frame, x: number, y: number, w: number, h: number): Texture {

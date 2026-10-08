@@ -174,6 +174,26 @@ def main():
         json.dump(out, f, ensure_ascii=False, indent=1)
         f.write('\n')
     print(f"{len(out['units'])} Einheiten, {len(out['buildings'])} Bauteile -> {os.path.relpath(OUT, ROOT)}")
+    write_glossary()
+
+
+def write_glossary():
+    """Glossar (nur die Felder, die das Spiel zeigt) und Begriffsfelder der Kartenbilder (art/out/cards_hotspots.json)"""
+    kws = json.load(open(os.path.join(ROOT, 'daten', 'keywords.json'), encoding='utf-8'))
+    keep = ('en', 'kind', 'def', 'forms', 'duration', 'abbr')
+    slim = [{k: v for k, v in x.items() if k in keep} for x in kws]
+    d = os.path.join(ROOT, 'game', 'src', 'data')
+    with open(os.path.join(d, 'keywords.gen.json'), 'w', encoding='utf-8') as f:
+        json.dump(slim, f, ensure_ascii=False, separators=(',', ':'))
+    hp = os.path.join(ROOT, 'art', 'out', 'cards_hotspots.json')
+    if os.path.exists(hp):
+        with open(hp, encoding='utf-8') as f:
+            hot = json.load(f)
+        with open(os.path.join(d, 'hotspots.gen.json'), 'w', encoding='utf-8') as f:
+            json.dump(hot, f, ensure_ascii=False, separators=(',', ':'))
+        print(f'{len(slim)} Glossarbegriffe, {sum(len(v) for v in hot.values())} Begriffsfelder -> game/src/data/')
+    else:
+        print('WARNUNG: art/out/cards_hotspots.json fehlt (erst art/cards.py ausführen)', file=sys.stderr)
 
 
 if __name__ == '__main__':

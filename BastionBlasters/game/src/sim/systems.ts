@@ -5,7 +5,7 @@ import {
   SPAWN_STAGGER_S, TPS, UNIT_LIMIT, WAVE_GAP_S, type Team,
 } from './constants';
 import { BUILDINGS, LINE_ROOM, UNITS } from './data';
-import { chamberBox, healOccupants, inChamber, postPos, zoneAnchor, gateInner } from './ai';
+import { chamberBox, healOccupants, homeAnchor, inChamber, jitterSpot, postPos, zoneAnchor, gateInner } from './ai';
 import { applySpawnBuffs, healSpecOf, modEff, moduleActive, bonusQuota } from './bfx';
 import { hurtModule, modCenter, igniteModule, rainOver } from './combat';
 import { unitFx } from './fx';
@@ -94,8 +94,8 @@ export function staffingStep(world: World) {
       world.citizenTimer[team] += DT;
       if (world.citizenTimer[team] >= regen) {
         world.citizenTimer[team] = 0;
-        const a = zoneAnchor(team, 'middle');
-        createUnit(world, team, 'citizen', a.x + world.rng.range(-0.5, 0.5), a.y + world.rng.range(-1, 1));
+        const a = jitterSpot(world, team, homeAnchor(team), 0.4, 1.4);
+        createUnit(world, team, 'citizen', a.x, a.y);
       }
     } else world.citizenTimer[team] = 0;
   }
@@ -318,9 +318,10 @@ export function spawnFromEntry(world: World, team: Team, idx: number, wave: numb
     x = g.x - (team === 0 ? 0.5 : -0.5) + world.rng.range(-0.15, 0.15);
     y = g.y + world.rng.range(-0.3, 0.3);
   } else {
-    const a = zoneAnchor(team, d.cat === 'defender' ? e.zone : 'middle');
-    x = a.x + world.rng.range(-0.8, 0.8);
-    y = a.y + world.rng.range(-1, 1);
+    const a = d.cat === 'defender' ? zoneAnchor(team, e.zone) : homeAnchor(team);
+    const sp = jitterSpot(world, team, a, 0.8, 1);
+    x = sp.x;
+    y = sp.y;
   }
   const u = createUnit(world, team, e.card, x, y, { entry: idx, wave, star: e.star, zone: e.zone, prio: e.prio });
   u.slot = slot;

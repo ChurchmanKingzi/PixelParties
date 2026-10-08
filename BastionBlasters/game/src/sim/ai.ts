@@ -21,10 +21,31 @@ import { ci, dist, type World } from './world';
 
 const mirrorX = (x: number) => MAP_W - x;
 
-/** Ankerpunkte der Wachzonen (Weltkoordinaten) */
+/** Ankerpunkte der Wachzonen (Weltkoordinaten): Tor = Ende des Zufahrtsgangs, Mitte = Gangmitte, Kern = Ostring der Kernkammer */
 export function zoneAnchor(team: Team, zone: Zone): { x: number; y: number } {
-  const p1 = { gate: { x: 16.6, y: 13.9 }, middle: { x: 12.8, y: 14.0 }, core: { x: 16.6, y: 14.0 } }[zone];
+  const p1 = { gate: { x: 16.5, y: 13.5 }, middle: { x: 12.5, y: 13.5 }, core: { x: 8.5, y: 14.0 } }[zone];
   return team === 0 ? p1 : { x: mirrorX(p1.x), y: p1.y };
+}
+
+/** Aufenthaltsort von Bürgern und Zivilisten: Streifen zwischen Kernkammer und Zufahrtsgang im Kernhof */
+export function homeAnchor(team: Team): { x: number; y: number } {
+  const p1 = { x: 9.5, y: 14.0 };
+  return team === 0 ? p1 : { x: mirrorX(p1.x), y: p1.y };
+}
+
+/** Zufallsabweichung um einen Anker, aber nur auf begehbaren Zellen der eigenen Bastion (sonst der Anker selbst) */
+export function jitterSpot(world: World, team: Team, a: { x: number; y: number }, jx: number, jy: number): { x: number; y: number } {
+  for (let k = 0; k < 6; k++) {
+    const x = a.x + world.rng.range(-jx, jx), y = a.y + world.rng.range(-jy, jy);
+    if (world.isOwned(Math.floor(x), Math.floor(y), team) && !world.solid(Math.floor(x), Math.floor(y))) return { x, y };
+  }
+  return a;
+}
+
+/** Zielpunkt im eigenen Gelände; liegt er außerhalb oder in einer festen Zelle, bleibt der Ersatzpunkt */
+export function walkSpot(world: World, team: Team, x: number, y: number, fallback: { x: number; y: number }): { x: number; y: number } {
+  const cx = Math.floor(x), cy = Math.floor(y);
+  return world.isOwned(cx, cy, team) && !world.solid(cx, cy) ? { x, y } : fallback;
 }
 
 export function chamberBox(team: Team): Box {
@@ -594,7 +615,8 @@ export function defenderStep(world: World, u: Unit) {
   const enemy = enemyOf(u.team);
   const anchor = u.s.ax !== undefined ? { x: u.s.ax, y: u.s.ay } : zoneAnchor(u.team, u.zone);
   const jitter = ((u.id * 37) % 11) / 11 - 0.5;
-  const ax = anchor.x + jitter * 1.2, ay = anchor.y + (((u.id * 53) % 7) / 7 - 0.5) * 1.6;
+  const spot = walkSpot(world, u.team, anchor.x + jitter * 1.2, anchor.y + (((u.id * 53) % 7) / 7 - 0.5) * 1.6, anchor);
+  const ax = spot.x, ay = spot.y;
   let leash = (fx.leash ?? (def.id === 'UV-09' ? 6 : 4));
   leash *= alarmFactor(world, u.team);
   if (fx.stationary) leash = Math.max(leash, 0.5);
@@ -682,7 +704,7 @@ function panicTarget(world: World, team: Team): { x: number; y: number } {
   for (const m of world.modules.values()) {
     if (m.owner === team && m.card === 'BU-05' && !m.destroyed) return modCenter(m);
   }
-  const a = zoneAnchor(team, 'middle');
+  const a = homeAnchor(team);
   return { x: a.x - (team === 0 ? 1.2 : -1.2), y: a.y };
 }
 
@@ -744,8 +766,9 @@ export function civilianStep(world: World, u: Unit) {
     }
   }
   // sonst am Anker herumstehen
-  const a = zoneAnchor(u.team, 'middle');
-  const ax = a.x + (((u.id * 29) % 13) / 13 - 0.5) * 2.4, ay = a.y + (((u.id * 41) % 9) / 9 - 0.5) * 3.2;
+  const a = homeAnchor(u.team);
+  const sp = walkSpot(world, u.team, a.x + (((u.id * 29) % 13) / 13 - 0.5) * 0.7, a.y + (((u.id * 41) % 9) / 9 - 0.5) * 3.2, a);
+  const ax = sp.x, ay = sp.y;
   if (dist(u.x, u.y, ax, ay) > 0.8) goNear(world, u, ax, ay);
   else u.state = 'idle';
 }
@@ -830,8 +853,9 @@ export function citizenStep(world: World, u: Unit) {
   const m = world.modules.get(u.post);
   if (!m || m.destroyed) {
     u.post = 0;
-    const a = zoneAnchor(u.team, 'middle');
-    const ax = a.x + (((u.id * 29) % 13) / 13 - 0.5) * 2.0, ay = a.y + (((u.id * 41) % 9) / 9 - 0.5) * 3.0;
+    const a = homeAnchor(u.team);
+    const sp = walkSpot(world, u.team, a.x + (((u.id * 29) % 13) / 13 - 0.5) * 0.7, a.y + (((u.id * 41) % 9) / 9 - 0.5) * 3.0, a);
+    const ax = sp.x, ay = sp.y;
     if (dist(u.x, u.y, ax, ay) > 0.8) goNear(world, u, ax, ay);
     else u.state = 'idle';
     return;

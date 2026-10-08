@@ -1,7 +1,7 @@
 // Bastion: Kernhof, Module, automatische Mauern auf Zellkanten, Türen, Platzierung und Prüfung
 
 import {
-  CHAMBER, CORE_CELLS, CORE_HP, GATE_CELL, GATE_HP, MAP_H, MAP_W, MASONRY_HP, PLOT, YARD_START, type Team,
+  APPROACH, CHAMBER, CORE_CELLS, CORE_HP, GATE_CELL, GATE_HP, MAP_H, MAP_W, MASONRY_HP, PLOT, YARD_START, type Team,
 } from './constants';
 import { BUILDINGS, buildingDef } from './data';
 import type { BuildingDef, EdgeDir, GunSlot, Module, Wall, WallVariant } from './types';
@@ -101,10 +101,11 @@ export function rebuildWalls(world: World, p: Team) {
       if (k === gateK) { w.gate = true; w.hp = w.maxHp = GATE_HP; w.material = 'wood'; }
     }
   }
-  // Türen: je Raum eine, bevorzugt zum Hof (Süd, Ost, West, Nord)
+  // Türen: je Raum eine, bevorzugt zum Hof, sonst zu einem schon angeschlossenen Nachbarraum (Süd, Ost, West, Nord)
+  const doors = computeDoors(world, p);
   for (const m of world.modules.values()) {
     if (m.owner !== p || m.kind !== 'room') continue;
-    const door = pickDoor(world, p, m);
+    const door = doors.get(m.id) ?? null;
     m.door = door;
     if (door) {
       const e = edgeOf(door.x, door.y, door.x + (door.dir === 'E' ? 1 : door.dir === 'W' ? -1 : 0), door.y + (door.dir === 'S' ? 1 : door.dir === 'N' ? -1 : 0));
@@ -114,15 +115,18 @@ export function rebuildWalls(world: World, p: Team) {
   }
 }
 
-function pickDoor(world: World, p: Team, m: Module): Module['door'] {
+type Door = NonNullable<Module['door']>;
+
+/** Tür eines Raums zu einer Nachbarzelle, die `accept` annimmt; eine noch gültige bisherige Tür bleibt erhalten */
+function pickDoor(world: World, m: Module, accept: (x: number, y: number) => boolean): Door | null {
   const own = new Set(m.cells);
   for (const [dx, dy, d] of DIRS) {
-    const cand: { x: number; y: number; dir: 'N' | 'S' | 'E' | 'W' }[] = [];
+    const cand: Door[] = [];
     for (const c of m.cells) {
       const x = c % MAP_W, y = Math.floor(c / MAP_W);
       const nx = x + dx, ny = y + dy;
       if (!inMap(nx, ny) || own.has(ci(nx, ny))) continue;
-      if (world.isOwned(nx, ny, p) && world.kind[ci(nx, ny)] === K_YARD) cand.push({ x, y, dir: d });
+      if (accept(nx, ny)) cand.push({ x, y, dir: d });
     }
     if (!cand.length) continue;
     if (m.door && m.door.dir === d && cand.some((c) => c.x === m.door!.x && c.y === m.door!.y)) return m.door;
@@ -131,6 +135,37 @@ function pickDoor(world: World, p: Team, m: Module): Module['door'] {
     return cand[0];
   }
   return null;
+}
+
+/**
+ * Türen aller Räume eines Spielers. Räume am Hof öffnen sich zum Hof, weitere Räume zu einem schon angeschlossenen
+ * Nachbarraum – so entstehen Ketten und Labyrinthe. null = abgeschlossener Raum (kein Zugang außer durch Mauern).
+ * `skip`: Raum, der gedanklich entfernt wird (Umbau-Prüfung).
+ */
+export function computeDoors(world: World, p: Team, skip = 0): Map<number, Door | null> {
+  const rooms = [...world.modules.values()].filter((m) => m.owner === p && m.kind === 'room' && m.id !== skip).sort((a, b) => a.id - b.id);
+  const out = new Map<number, Door | null>();
+  const yardAt = (x: number, y: number) => {
+    const i = ci(x, y);
+    return world.isOwned(x, y, p) && world.kind[i] === K_YARD && !(skip && world.mod[i] === skip);
+  };
+  const linked = new Set<number>(); // Zellen schon angeschlossener Räume
+  let rest: Module[] = [];
+  for (const m of rooms) {
+    const d = pickDoor(world, m, yardAt);
+    if (d) { out.set(m.id, d); for (const c of m.cells) linked.add(c); } else rest.push(m);
+  }
+  for (let again = true; again && rest.length;) {
+    again = false;
+    const left: Module[] = [];
+    for (const m of rest) {
+      const d = pickDoor(world, m, (x, y) => linked.has(ci(x, y)));
+      if (d) { out.set(m.id, d); for (const c of m.cells) linked.add(c); again = true; } else left.push(m);
+    }
+    rest = left;
+  }
+  for (const m of rest) out.set(m.id, null);
+  return out;
 }
 
 // ------------------------------------------------------------------ Start
@@ -143,6 +178,13 @@ export function createBastion(world: World, p: Team) {
       world.kind[i] = K_YARD;
       world.owner[i] = p;
     }
+  }
+  // Zufahrtsgang vom Kernhof zum Haupttor (1 Zelle breit; Räume, Türme und Hofzellen dürfen daran anschließen)
+  const ap = APPROACH[p];
+  for (let xx = ap.x0; xx <= ap.x1; xx++) {
+    const i = ci(xx, ap.y);
+    world.kind[i] = K_YARD;
+    world.owner[i] = p;
   }
   const c = CORE_CELLS[p];
   const core: Module = {
@@ -170,6 +212,20 @@ function touchesYard(world: World, p: Team, cells: [number, number][]): boolean 
       const nx = x + dx, ny = y + dy;
       if (!inMap(nx, ny) || own.has(ci(nx, ny))) continue;
       if (world.isOwned(nx, ny, p) && world.kind[ci(nx, ny)] === K_YARD) return true;
+    }
+  }
+  return false;
+}
+
+/** Das Feld grenzt an einen Raum, der schon eine Tür hat (also angeschlossen ist) */
+function touchesConnectedRoom(world: World, p: Team, cells: [number, number][]): boolean {
+  const own = new Set(cells.map(([x, y]) => ci(x, y)));
+  for (const [x, y] of cells) {
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy;
+      if (!inMap(nx, ny) || own.has(ci(nx, ny)) || !world.isOwned(nx, ny, p)) continue;
+      const m = world.modules.get(world.mod[ci(nx, ny)]);
+      if (m && m.kind === 'room' && m.door) return true;
     }
   }
   return false;
@@ -221,8 +277,11 @@ export function checkRoom(world: World, p: Team, card: string, x: number, y: num
     if (!inPlot(p, cx, cy)) return no('Outside your building plot');
     if (!cellFree(world, p, cx, cy)) return no('Cells are occupied');
   }
-  if (!touchesYard(world, p, fp.cells)) return no('A room must touch the courtyard');
-  return OK;
+  if (touchesYard(world, p, fp.cells) || touchesConnectedRoom(world, p, fp.cells)) return OK;
+  // erklären, was fehlt: gar kein Anschluss oder nur gesperrte Seiten (Turm, Kern, abgeschlossener Raum)
+  let touching = false;
+  for (const [cx, cy] of fp.cells) if (touchesBastion(world, p, cx, cy)) touching = true;
+  return no(touching ? 'No open side: a room needs a door to the courtyard or to a connected room' : 'Build next to your courtyard or any connected building');
 }
 
 export function checkYardBuilding(world: World, p: Team, card: string, x: number, y: number, rot: number): Check {
@@ -471,10 +530,21 @@ export function upgradeModule(world: World, p: Team, card: string): boolean {
   return true;
 }
 
+/** Nach dem Entfernen des Raums `id` bliebe kein bisher angeschlossener Raum ohne Tür zurück */
+export function dependentsOk(world: World, p: Team, id: number): boolean {
+  const after = computeDoors(world, p, id);
+  for (const m of world.modules.values()) {
+    if (m.owner !== p || m.kind !== 'room' || m.id === id) continue;
+    if (m.door && after.get(m.id) === null) return false;
+  }
+  return true;
+}
+
 /** Bauteil aufnehmen (Umbau); die Karte ist danach wieder spielbar */
 export function removeModule(world: World, p: Team, id: number): string | null {
   const m = world.modules.get(id);
   if (!m || m.owner !== p || m.kind === 'core') return null;
+  if (m.kind === 'room' && !dependentsOk(world, p, id)) return null;
   const card = m.card;
   removeModuleCells(world, id);
   rebuildWalls(world, p);

@@ -59,6 +59,25 @@ def segments(text: str):
     return [s for s in out if s[0]]
 
 
+_LOOKUP = None
+
+
+def lookup(surface: str, kinds=None):
+    """Schreibweise (auch Mehrzahl, beliebige Groß-/Kleinschreibung) -> Glossareintrag oder None.
+    kinds: nur Einträge dieser Arten (löst gleichnamige Begriffe wie Chaos als Gruppe oder Linie auf)."""
+    global _LOOKUP
+    if _LOOKUP is None:
+        _LOOKUP = {}
+        for k in KEYWORDS:
+            for f in [k['en']] + list(k.get('forms', [])):
+                for suf in ('', 's', 'es'):
+                    _LOOKUP.setdefault((f + suf).lower(), []).append(k)
+    cands = _LOOKUP.get(surface.strip().lower(), [])
+    if kinds:
+        cands = [k for k in cands if k['kind'] in kinds]
+    return cands[0] if cands else None
+
+
 def all_terms():
     """Alle erlaubten großgeschriebenen Begriffe (für den Linter)"""
     terms = set()

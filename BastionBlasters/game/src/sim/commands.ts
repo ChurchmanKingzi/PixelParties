@@ -56,7 +56,7 @@ export function applyCmd(world: World, c: Cmd): Res {
       const m = world.modules.get(c.moduleId);
       if (!m || m.owner !== c.p) return fail('Not yours');
       const card = removeModule(world, c.p, c.moduleId);
-      if (!card) return fail('Cannot pick that up');
+      if (!card) return fail(m.kind === 'core' ? 'Cannot pick that up' : 'Other rooms connect through it — pick those up first');
       if (world.phase === 'pause') pl.moveBudget--;
       pl.kept.push(card);
       const i = pl.played.indexOf(card);

@@ -1,6 +1,6 @@
 // Spielablauf: Loadout -> Erstaufbau -> Kampf -> Zeitstopp (Ziehen, Bauen) -> Kampf ... -> Sieg
 
-import { CORE_HP, type Team } from './constants';
+import { CORE_HP, YARD_PER_PAUSE, YARD_START_CELLS, type Team } from './constants';
 import { createBastion } from './bastion';
 import { botChoose, botPlay } from './bot';
 import { contingentSlots, keepCount } from './bfx';
@@ -9,7 +9,7 @@ import { drawLoadout, drawPause } from './draw';
 import { step } from './step';
 import type { Player } from './types';
 import { createUnit } from './units';
-import { zoneAnchor } from './ai';
+import { homeAnchor, jitterSpot } from './ai';
 import { World, ci } from './world';
 import { CITIZEN_START } from './constants';
 
@@ -42,8 +42,8 @@ export class Match {
     createBastion(w, 0);
     createBastion(w, 1);
     for (const t of [0, 1] as Team[]) {
-      const a = zoneAnchor(t, 'middle');
-      for (let i = 0; i < CITIZEN_START; i++) createUnit(w, t, 'citizen', a.x + w.rng.range(-0.8, 0.8), a.y + w.rng.range(-1.2, 1.2));
+      const a0 = homeAnchor(t);
+      for (let i = 0; i < CITIZEN_START; i++) { const a = jitterSpot(w, t, a0, 0.4, 1.4); createUnit(w, t, 'citizen', a.x, a.y); }
     }
     void CORE_HP;
   }
@@ -87,7 +87,7 @@ export class Match {
     w.phase = 'build';
     for (const p of w.players) {
       p.ready = false;
-      p.yardBudget = 12;
+      p.yardBudget = YARD_START_CELLS;
       p.moveBudget = 1;
       p.slotsMax = contingentSlots(w, p.team);
       p.rerolls = 0;
@@ -129,7 +129,7 @@ export class Match {
       p.played = [];
       p.keepCount = keepCount(w, p.team);
       p.rerolls = 1;
-      p.yardBudget = 6;
+      p.yardBudget = YARD_PER_PAUSE;
       p.moveBudget = 1;
       p.ready = false;
       p.slotsMax = contingentSlots(w, p.team);

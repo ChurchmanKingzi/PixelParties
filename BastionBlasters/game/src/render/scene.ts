@@ -12,11 +12,16 @@ import { GameAssets, type Frame } from './assets';
 
 const W_PX = MAP_W * CELL, H_PX = MAP_H * CELL;
 const TEAM_COL = [0xe0484c, 0x35c1b4];
+/** Umrandung und Fußring der Einheiten: etwas heller als die Teamfarbe, damit sie auf Gras und Stein leuchtet */
+const TEAM_GLOW = [0xff4a50, 0x2ef0dc];
+const OUTLINE_OFF: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
 
 interface UnitView {
   root: Container;
   body: Sprite;
   shadow: Sprite;
+  ring: Graphics;
+  outline: Sprite[];
   bar: Graphics;
   rank: Sprite;
   last: { x: number; y: number };
@@ -385,13 +390,18 @@ export class Scene {
     const shadow = new Sprite(this.a.unit('shadow', 0)?.tex);
     shadow.anchor.set(0.5);
     shadow.alpha = 0.55;
+    const col = TEAM_GLOW[u.team];
+    const ring = new Graphics();
+    const rx = Math.max(8, Math.min(18, u.radius * CELL * 0.85));
+    ring.ellipse(0, -1, rx, rx * 0.46).fill({ color: col, alpha: 0.22 }).stroke({ width: 2, color: col, alpha: 0.9 });
+    const outline = OUTLINE_OFF.map(() => { const s = new Sprite(); s.tint = col; s.alpha = 0.95; return s; });
     const body = new Sprite();
     const bar = new Graphics();
     const rank = new Sprite();
     rank.anchor.set(0.5, 1);
-    root.addChild(shadow, body, bar, rank);
+    root.addChild(shadow, ring, ...outline, body, bar, rank);
     this.objects.addChild(root);
-    return { root, body, shadow, bar, rank, last: { x: u.x, y: u.y }, born: this.frame };
+    return { root, body, shadow, ring, outline, bar, rank, last: { x: u.x, y: u.y }, born: this.frame };
   }
 
   private unitKey(u: Unit, f: number): { key: string; fr?: Frame } {
@@ -422,6 +432,21 @@ export class Scene {
       const lift = u.flying && u.state !== 'burrow' ? -5 : 0;
       const lunge = u.state === 'attack' && u.cat !== 'artillery' ? Math.sin((t + u.id) * 0.6) * 1.2 * u.face : 0;
       v.body.position.set(lunge, bob + lift);
+      // Umrandung in Teamfarbe: beim Herauszoomen dicker, damit man die Lager noch unterscheidet
+      const key = fr ? this.unitKey(u, phase).key : '';
+      const sil = fr ? this.a.unitSil(this.a.unit(key, u.team) ? key : key.replace(/#\d+$/, '#0'), u.team) : undefined;
+      const off = Math.min(2.6, Math.max(1, 0.9 / this.cam.s));
+      for (let i = 0; i < v.outline.length; i++) {
+        const o = v.outline[i];
+        o.visible = !!sil;
+        if (!sil) continue;
+        o.texture = sil.tex;
+        o.anchor.set(sil.ax / sil.w, sil.ay / sil.h);
+        o.scale.x = u.face;
+        o.position.set(lunge + OUTLINE_OFF[i][0] * off, bob + lift + OUTLINE_OFF[i][1] * off);
+        o.tint = TEAM_GLOW[u.team];
+      }
+      v.ring.scale.set(Math.min(2, Math.max(1, 0.8 / this.cam.s)));
       v.shadow.position.set(0, -1);
       v.shadow.scale.set(Math.max(0.7, u.radius * 2.6), 1);
       v.root.position.set(Math.round(u.x * CELL), Math.round(u.y * CELL));

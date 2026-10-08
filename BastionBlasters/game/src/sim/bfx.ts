@@ -3,7 +3,7 @@
 import { DT, PLOT, TPS, type DType, type Team } from './constants';
 import { BUILDINGS, UNITS } from './data';
 import { effScale } from './bastion';
-import { healOccupants, zoneAnchor, gateInner } from './ai';
+import { healOccupants, homeAnchor, jitterSpot, gateInner } from './ai';
 import { hurtModule, hurtWall, igniteModule, knockback, modCenter, enemyVisible, wallMid } from './combat';
 import { unitFx } from './fx';
 import type { Module, Unit } from './types';
@@ -488,7 +488,7 @@ export function buildingsTick(world: World) {
           const mine = world.units.filter((u) => !u.dead && u.team === owner && u.cat !== 'citizen');
           if (r < 0.35) for (const u of mine) healUnit(world, u, u.maxHp * 0.15, null);
           else if (r < 0.6) for (let k = 0; k < 3 && mine.length; k++) gainXp(world, mine.splice(world.rng.int(mine.length), 1)[0], 40);
-          else if (r < 0.8) { const a = zoneAnchor(owner, 'middle'); for (let k = 0; k < 3; k++) createUnit(world, owner, 'citizen', a.x + world.rng.range(-1, 1), a.y + world.rng.range(-1, 1)); }
+          else if (r < 0.8) { const a0 = homeAnchor(owner); for (let k = 0; k < 3; k++) { const a = jitterSpot(world, owner, a0, 0.4, 1.4); createUnit(world, owner, 'citizen', a.x, a.y); } }
           world.feed('The wishing well grants a wish', owner);
         }
         break;

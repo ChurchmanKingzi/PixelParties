@@ -6,7 +6,7 @@ import { BUILDINGS, UNITS, isBuilding } from '../sim/data';
 import { botChoose, botPlay } from '../sim/bot';
 import { checkRoom, checkTower, checkWallCard, checkYardBuilding, checkYardCell, findOwnModule, footprint, wallRun } from '../sim/bastion';
 import { entryStats, freeSlotCount, operatingDegree, citizenLimit, lineActive } from '../sim/systems';
-import { keepCount, modEff } from '../sim/bfx';
+import { contingentSlots, keepCount, modEff } from '../sim/bfx';
 import { unitFx } from '../sim/fx';
 import { buildingImpl } from '../sim/impl';
 import { modCenter } from '../sim/combat';
@@ -16,6 +16,7 @@ import { ci, type World } from '../sim/world';
 import { GameAssets } from '../render/assets';
 import { Scene, type Ghost } from '../render/scene';
 import { $, assetUrl, clear, el, fmtTime, put, save, store } from './dom';
+import { attachCardTip, closeCardTip, installKeywordTips, kwSpan, kwStatus, kwText } from './keywords';
 
 interface Settings { buildSec: number; pauseSec: number; bars: boolean; nums: boolean; speed: number; seed: number }
 
@@ -49,7 +50,6 @@ export class Game {
   pickSel: string[] = [];
   loadSel: number[] = [];
   endShown = false;
-  preview: string | null = null;
 
   static async boot(): Promise<Game> {
     const g = new Game();
@@ -61,7 +61,7 @@ export class Game {
     g.scene = new Scene(g.app);
     await g.scene.init(g.assets);
     g.scene.onFeed = (msg, team) => g.pushFeed(msg, team);
-    previewHook = (id) => { g.preview = id; g.sideT = 1; };
+    installKeywordTips();
     g.buildTop();
     g.bindPointer();
     g.bindKeys();
@@ -109,7 +109,7 @@ export class Game {
       el('div', { style: 'height:12px' }),
       el('div', { class: 'panel' },
         el('h3', {}, 'How to play'),
-        el('div', {}, '1. Loadout: draw 10 cards, keep 7.  2. Build: place buildings next to your courtyard, put troop cards into the contingent.  3. Battle: everything runs by itself. Artillery breaks walls and rooms, assault troops conquer the core chamber, defenders hold it.  4. Every 2 waves the game freezes: draw 5, keep 3 (placing is mandatory, unplayed cards are lost).'),
+        el('div', {}, '1. Loadout: draw 10 cards, keep 7.  2. Build: place buildings next to your courtyard or any connected building (the core sits at the back, enemies come through the gate at the front: build mazes of rooms, towers and courtyard cells in between), put troop cards into the contingent.  3. Battle: everything runs by itself. Artillery breaks walls and rooms, assault troops conquer the core chamber, defenders hold it.  4. Every 2 waves the game freezes: draw 5, keep 3 (placing is mandatory, unplayed cards are lost).'),
         el('div', { class: 'hint', style: 'margin-top:6px' }, 'Win by destroying the enemy core (artillery) or by conquering the core chamber. You are the left (crimson) bastion.'),
       ),
       el('div', { style: 'height:10px' }),
@@ -194,7 +194,7 @@ export class Game {
       if (this.human !== null) {
         this.scene.gridTeam = this.human;
         if (this.settings.buildSec) this.deadline = Date.now() + this.settings.buildSec * 1000;
-        hudMsg('Build phase: select a card below, place it next to your courtyard (right click rotates). Press Ready when done.');
+        hudMsg('Build phase: pick a card below and place it next to your courtyard or any connected building: build corridors and mazes in front of the core. Mouse wheel or right click rotates. Press Ready when done.');
       } else this.focusMode = 'all';
       this.applyFocus();
     } else if (phase === 'battle') {
@@ -339,14 +339,13 @@ export class Game {
     if (!m) { clear(side); return; }
     const w = m.world;
     clear(side);
-    if (this.preview) side.append(el('div', { class: 'panel' }, el('h3', {}, 'Card'), cardEl(this.preview, { w: 232 })));
-    else side.append(this.inspector(w));
-    if (this.human !== null) side.append(this.contingentPanel(w));
+    side.append(this.inspector(w));
+    if (this.human !== null) { side.append(this.capacityPanel(w)); side.append(this.contingentPanel(w)); }
     const feed = el('div', { id: 'feed' });
     for (const f of this.feed.slice(-9)) feed.append(el('div', { class: f.team === 0 ? 't0' : f.team === 1 ? 't1' : 'tn' }, f.msg));
     side.append(el('div', { class: 'panel' }, el('h3', {}, 'Event feed'), feed));
     side.append(el('div', { class: 'panel hint legend' },
-      el('div', {}, 'click: inspect · wheel: zoom · drag: pan · F: fit · space: pause'),
+      el('div', {}, 'click: inspect · wheel: zoom (rotates a building in your hand) · drag: pan · F: fit · space: pause · hover cards and underlined words for explanations'),
       el('div', {}, el('span', { style: 'background:var(--p1)' }), 'P1 crimson  ', el('span', { style: 'background:var(--p2)' }), 'P2 teal'),
     ));
   }
@@ -369,10 +368,10 @@ export class Game {
             el('b', {}, 'HP'), el('span', {}, `${Math.round(u.hp)} / ${u.maxHp}`),
             el('b', {}, 'Rank'), el('span', {}, `${RANK_NAMES[u.rank]} (${Math.round(u.xp)}/${next} XP)`),
             el('b', {}, 'State'), el('span', {}, u.state + (u.berserk ? ' (berserk)' : '')),
-            el('b', {}, 'Status'), el('span', {}, u.st.map((s) => s.id).join(', ') || '-'),
+            el('b', {}, 'Status'), statusSpan(u),
           ),
         ),
-        d ? el('div', { class: 'hint', style: 'margin-top:4px' }, abilityNote(u.cid)) : null,
+        d ? el('div', { class: 'hint', style: 'margin-top:4px' }, ...abilityNote(u.cid)) : null,
       );
     } else {
       const mod = w.modules.get(sel.id);
@@ -390,13 +389,52 @@ export class Game {
             el('b', {}, 'Rank'), el('span', {}, '★'.repeat(mod.star)),
           ),
         ),
-        def ? el('div', { class: 'hint', style: 'margin-top:4px' }, `${stripMd(def.rules || def.effectText)} [${buildingImpl(mod.card) === 'full' ? 'effects implemented' : buildingImpl(mod.card) === 'partial' ? 'effects partly implemented' : 'stats only'}]`) : null,
+        def ? el('div', { class: 'hint', style: 'margin-top:4px' }, ...kwText(`${stripMd(def.rules || def.effectText)} [${buildingImpl(mod.card) === 'full' ? 'effects implemented' : buildingImpl(mod.card) === 'partial' ? 'effects partly implemented' : 'stats only'}]`)) : null,
       );
       if (this.human === mod.owner && (w.phase === 'pause' || w.phase === 'build') && mod.kind !== 'core') {
         const pl = w.players[mod.owner];
         box.append(el('button', { style: 'margin-top:6px', disabled: w.phase === 'pause' && pl.moveBudget <= 0, onclick: () => this.pickUp(mod.id) }, w.phase === 'pause' ? `Pick up and move (${pl.moveBudget} left)` : 'Pick up and move'));
       }
     }
+    return box;
+  }
+
+  /** Bürger-Limit und Kontingent-Plätze: was sie sind und wie man sie erweitert */
+  capacityPanel(w: World): HTMLElement {
+    const h = this.human!;
+    const p = w.players[h];
+    const slots = Math.max(p.slotsMax, contingentSlots(w, h));
+    const citizens = w.units.filter((u) => !u.dead && u.team === h && u.cat === 'citizen').length;
+    const limit = citizenLimit(w, h);
+    let need = 0, have = 0;
+    for (const m of w.modules.values()) if (m.owner === h && !m.destroyed && m.posts > 0) { need += m.posts; have += Math.min(m.posts, m.staffed); }
+    const meter = (n: number, max: number) => el('div', { class: 'meter' }, ...Array.from({ length: Math.min(max, 24) }, (_, i) => el('i', { class: i < n ? (n >= max ? 'full' : 'on') : '' })));
+    const mine = (id: string) => w.modules.size ? [...w.modules.values()].filter((m) => m.owner === h && m.card === id && !m.destroyed).length : 0;
+    const mini = (id: string) => {
+      const built = mine(id), inHand = p.kept.includes(id);
+      const c = el('div', { class: 'card mini', title: '' },
+        el('img', { src: assetUrl(`cards/${id}.png`), alt: BUILDINGS[id].name, draggable: false }),
+        el('div', { class: 'have' }, built ? `built ×${built}` : inHand ? 'in hand' : 'not built'));
+      attachCardTip(c, id, 'side');
+      return c;
+    };
+    const barracks = mine('BF-01') > 0;
+    const nextSlot = !barracks ? 'Build a Barracks for +1.' : w.pauseNo < 3 ? 'The next slot comes with time stop 3.' : w.pauseNo < 6 ? 'The next slot comes with time stop 6.' : 'You have all slots.';
+    const box = el('div', { class: 'panel cap' }, el('h3', {}, 'Capacity'));
+    box.append(
+      el('div', {},
+        el('div', { class: 'row2' }, el('b', {}, 'Citizens (workers)'), el('span', {}, `${citizens} / ${limit}`)),
+        meter(citizens, limit),
+        el('div', { class: 'how' }, `They walk to the posts of your buildings (person icon on the card). Staffed posts: ${have} / ${need}. Limit 4, +3 for each Dwelling you build; a new citizen arrives every ${mine('BU-01') ? 4 : 5} s.`),
+        el('div', { class: 'cards' }, mini('BU-01')),
+      ),
+      el('div', {},
+        el('div', { class: 'row2' }, el('b', {}, 'Contingent slots'), el('span', {}, `${p.contingent.length} / ${slots}`)),
+        meter(p.contingent.length, slots),
+        el('div', { class: 'how' }, `Every troop card you play takes one slot (playing one when full replaces an entry). Slots: 5, +1 with a Barracks, +1 from time stop 3 and +1 from time stop 6 (max 8). ${nextSlot}`),
+        el('div', { class: 'cards' }, mini('BF-01')),
+      ),
+    );
     return box;
   }
 
@@ -421,7 +459,7 @@ export class Game {
       if (d.cat === 'artillery') {
         sel.push(el('select', { onchange: (ev: Event) => { this.match!.cmd({ t: 'prio', p: h, idx, prio: (ev.target as HTMLSelectElement).value as Priority }); } }, ...PRIORITIES.map((z) => el('option', { value: z, selected: e.prio === z }, PRIORITY_LABEL[z]))));
       }
-      const row = el('div', { class: 'ent' + (this.replaceCard ? ' replace' : ''), title: stripMd(d.rules), onclick: () => { if (this.replaceCard) this.doReplace(idx); } },
+      const row = el('div', { class: 'ent' + (this.replaceCard ? ' replace' : ''), onclick: () => { if (this.replaceCard) this.doReplace(idx); } },
         el('div', { class: 'th' }, el('img', { src: assetUrl(`cards/${e.card}.png`) })),
         el('div', {},
           el('div', {}, `${d.name} ${'★'.repeat(e.star)}`),
@@ -429,6 +467,7 @@ export class Game {
           ...sel,
         ),
       );
+      attachCardTip(row, e.card, 'side');
       box.append(row);
     });
     if (w.phase === 'build' || w.phase === 'pause') box.append(el('div', { class: 'hint', style: 'margin-top:4px' }, `free gun slots ${freeSlotCount(w, h)} · courtyard cells left ${p.yardBudget}`));
@@ -440,7 +479,7 @@ export class Game {
   renderTray() {
     const tray = $('tray');
     clear(tray);
-    this.preview = null;
+    closeCardTip();
     const m = this.match;
     if (!m) return;
     const w = m.world;
@@ -537,7 +576,7 @@ export class Game {
       return;
     }
     this.armed = this.armed?.card === id ? null : { card: id, rot: 0 };
-    hudMsg(this.armed ? `${def.name}: hover your plot, right click rotates, click to place, Esc cancels.` : '');
+    hudMsg(this.armed ? `${def.name}: hover your plot, ${def.kind === 'room' || def.kind === 'yard' ? 'mouse wheel or right click rotates, ' : ''}click to place, Esc cancels.` : '');
     this.refreshGhost();
     this.dirty = true;
   }
@@ -592,8 +631,15 @@ export class Game {
       if (e.button === 2) { this.rotate(); return; }
       if (e.button === 0) this.click(p.x, p.y);
     });
+    let lastSpin = 0;
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
+      if (this.canRotateArmed()) {
+        // Gebäude in der Hand: Mausrad dreht (je Raster-Rastung einmal, Touchpads nicht überdrehen)
+        const now = performance.now();
+        if (now - lastSpin > 120) { lastSpin = now; this.rotate(); }
+        return;
+      }
       const p = pos(e);
       this.scene.zoomAt(p.x, p.y, e.deltaY < 0 ? 1.15 : 1 / 1.15);
     }, { passive: false });
@@ -618,6 +664,13 @@ export class Game {
 
   rotate() {
     if (this.armed) { this.armed.rot = (this.armed.rot + 1) % 2; this.refreshGhost(); }
+  }
+
+  /** Gebäude in der Hand, dessen Grundriss sich durch Drehen ändert (nicht quadratisch, kein Turm/Mauer) */
+  canRotateArmed(): boolean {
+    if (!this.armed || this.yardMode) return false;
+    const def = BUILDINGS[this.armed.card];
+    return (def.kind === 'room' || def.kind === 'yard') && def.cols !== def.rows;
   }
 
   /** Vorschau der aktuellen Platzierung */
@@ -649,11 +702,15 @@ export class Game {
       const run = wallRun(w, h, best.x, best.y, best.dir);
       sc.setGhost({ cells: [], ok: r.ok, edges: run.map((x) => ({ x: x.x, y: x.y, dir: x.dir })) });
       this.wallHover = best;
+      this.ghostReason = r.ok ? '' : r.reason;
+      this.showGhostReason(def.name, false);
       return;
     }
     if (def.kind === 'tower') {
       const r = checkTower(w, h, card, cx, cy);
       sc.setGhost({ cells: [[cx, cy]], ok: r.ok, card, x: cx, y: cy, cols: 1, rows: 1 });
+      this.ghostReason = r.ok ? '' : r.reason;
+      this.showGhostReason(def.name, false);
       return;
     }
     const rot = this.armed.rot;
@@ -663,9 +720,16 @@ export class Game {
     const fp = footprint(def, ox, oy, rot);
     sc.setGhost({ cells: fp.cells, ok: r.ok, card, x: ox, y: oy, cols: fp.cols, rows: fp.rows, rot });
     this.ghostReason = r.ok ? '' : r.reason;
+    this.showGhostReason(def.name, def.kind === 'room' || def.kind === 'yard');
   }
   wallHover: { x: number; y: number; dir: 'E' | 'S' } | null = null;
   ghostReason = '';
+
+  /** Warum die aktuelle Stelle nicht geht (oder die Standard-Hilfe), nur bei Änderung ins HUD schreiben */
+  private showGhostReason(name: string, rotatable: boolean) {
+    const msg = this.ghostReason ? `${name}: ${this.ghostReason}` : `${name}: click to place${rotatable ? ', mouse wheel or right click rotates' : ''}, Esc cancels.`;
+    if (msg !== hudCur) hudMsg(msg);
+  }
 
   click(px: number, py: number) {
     const m = this.match;
@@ -791,26 +855,33 @@ export function stripMd(s: string): string {
   return (s || '').replace(/\*\*/g, '');
 }
 
-function abilityNote(cid: string): string {
+function abilityNote(cid: string): (Node | string)[] {
   const d = UNITS[cid];
   const fx = unitFx(cid);
   const impl = fx.impl === 'full' ? 'effects implemented' : fx.impl === 'partial' ? 'effects partly implemented' : 'stats and role only';
-  return `${stripMd(d.rules) || '(no rules text)'}${d.talent ? ' · R3: ' + stripMd(d.talent) : ''} [${impl}]`;
+  return kwText(`${stripMd(d.rules) || '(no rules text)'}${d.talent ? ' · R3: ' + stripMd(d.talent) : ''} [${impl}]`);
 }
 
-let previewHook: ((id: string | null) => void) | null = null;
+/** Statusliste einer Einheit; jeder Status erklärt sich beim Überfahren */
+function statusSpan(u: Unit): HTMLElement {
+  const s = el('span');
+  if (!u.st.length) { s.append('-'); return s; }
+  u.st.forEach((st, i) => {
+    if (i) s.append(', ');
+    const k = kwStatus(st.id);
+    s.append(kwSpan(k ? k.en : st.id, k));
+  });
+  return s;
+}
 
 function cardEl(id: string, o: { big?: boolean; sel?: boolean; dim?: boolean; badge?: string; w?: number; preview?: boolean; onClick?: () => void } = {}): HTMLElement {
   const d = UNITS[id] ?? BUILDINGS[id];
-  const c = el('div', { class: 'card' + (o.big ? ' big' : '') + (o.sel ? ' sel' : '') + (o.dim ? ' dim' : ''), title: d ? `${d.name}\n${stripMd(d.rules)}${(d as { talent?: string }).talent ? '\nRank 3: ' + stripMd((d as { talent?: string }).talent!) : ''}` : id },
+  const c = el('div', { class: 'card' + (o.big ? ' big' : '') + (o.sel ? ' sel' : '') + (o.dim ? ' dim' : '') + (o.preview ? ' hand' : '') },
     el('img', { src: assetUrl(`cards/${id}.png`), alt: d?.name ?? id, draggable: false }),
     o.badge ? el('div', { class: 'badge' }, o.badge) : null);
   if (o.w) c.style.width = o.w + 'px';
   if (o.onClick) c.addEventListener('click', o.onClick);
-  if (o.preview) {
-    c.addEventListener('mouseenter', () => previewHook?.(id));
-    c.addEventListener('mouseleave', () => previewHook?.(null));
-  }
+  attachCardTip(c, id, o.preview ? 'above' : 'side');
   return c;
 }
 
@@ -822,7 +893,9 @@ export function toast(msg: string) {
   clearTimeout(toastT);
   toastT = window.setTimeout(() => { t.style.display = 'none'; }, 2200);
 }
+let hudCur = '';
 export function hudMsg(msg: string) {
+  hudCur = msg;
   const t = $('hudmsg');
   t.textContent = msg;
   t.style.display = msg ? 'block' : 'none';

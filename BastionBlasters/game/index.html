@@ -66,7 +66,7 @@ button.on { background: var(--accent2); color: #08201e; }
 #stage { grid-area: stage; position: relative; min-height: 0; min-width: 0; background: #15281b; }
 #stage canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
 #side { grid-area: side; background: var(--panel); border-left: 2px solid var(--line); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-#tray { grid-area: tray; background: var(--panel); border-top: 2px solid var(--line); padding: 6px 12px; display: flex; gap: 10px; align-items: flex-end; overflow-x: auto; min-height: 44px; }
+#tray { grid-area: tray; background: var(--panel); border-top: 2px solid var(--line); padding: 8px 34px 6px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; min-height: 44px; position: relative; z-index: 6; }
 .bar { position: relative; height: 14px; background: #0006; border: 2px solid var(--line); min-width: 130px; }
 .bar > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--p1); }
 .bar > span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 10px; color: #fff; text-shadow: 1px 1px 0 #000; }
@@ -85,6 +85,10 @@ button.on { background: var(--accent2); color: #08201e; }
 .card { position: relative; flex: 0 0 auto; width: 128px; image-rendering: pixelated; cursor: pointer; transition: transform .08s; }
 .card img { width: 100%; display: block; image-rendering: pixelated; border: 0; box-shadow: 0 2px 0 var(--line), 0 0 0 2px var(--line); }
 .card:hover { transform: translateY(-6px) scale(1.04); z-index: 5; }
+/* Handkarten wachsen beim Überfahren deutlich nach oben (der Tray schneidet nichts ab) */
+.card.hand { transform-origin: 50% 100%; transition: transform .1s ease-out; }
+.card.hand:hover { transform: translateY(-12px) scale(1.34); z-index: 60; }
+.card.hand:hover img { box-shadow: 0 0 0 2px var(--line), 0 6px 0 var(--line), 0 10px 22px rgba(0,0,0,.55); }
 .card.sel img { box-shadow: 0 0 0 3px var(--gold), 0 0 12px 3px var(--gold); }
 .card.dim { opacity: .45; }
 .card .badge { position: absolute; left: 4px; top: 4px; background: #000a; color: #fff; padding: 0 5px; font-size: 10px; }
@@ -108,6 +112,33 @@ button.on { background: var(--accent2); color: #08201e; }
 #hudmsg { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 2px solid var(--line); padding: 4px 10px; z-index: 10; display: none; max-width: 90%; text-align: center; }
 #stage.frozen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 5; box-shadow: inset 0 0 140px 24px rgba(150,210,255,.5); background-image: repeating-conic-gradient(rgba(190,230,255,.08) 0% 25%, transparent 0% 50%); background-size: 4px 4px; }
 .legend span { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid var(--line); vertical-align: -1px; }
+.kw { border-bottom: 1px dotted currentColor; cursor: help; }
+.kw:hover { background: color-mix(in srgb, var(--gold) 35%, transparent); }
+#kwtip { position: fixed; z-index: 400; display: none; max-width: 300px; background: var(--panel); color: var(--ink); border: 2px solid var(--line); box-shadow: 4px 4px 0 var(--line); padding: 6px 9px; pointer-events: none; font-size: 12px; }
+#kwtip .kt-h { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
+#kwtip .kt-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+#kwtip .kt-d { font-weight: 400; }
+.kt-t { color: var(--muted); font-size: 11px; font-weight: 400; }
+#cardtip { position: fixed; z-index: 300; display: none; gap: 8px; align-items: flex-start; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
+#cardtip .ct-face { position: relative; flex: 0 0 auto; border: 3px solid var(--line); background: #000; }
+#cardtip img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+#cardtip .hs { position: absolute; cursor: help; border-bottom: 2px dotted rgba(255, 215, 90, .0); }
+#cardtip .hs:hover { background: rgba(255, 220, 100, .28); outline: 2px solid var(--gold); }
+#cardtip .ct-kw { flex: 0 0 auto; overflow: auto; background: var(--panel); border: 3px solid var(--line); padding: 8px 10px; font-size: 12px; }
+#cardtip .ct-kw h4 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+#cardtip .ct-k { margin-bottom: 7px; }
+#cardtip .ct-k div { font-weight: 400; }
+.cap { display: grid; gap: 6px; }
+.cap .row2 { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: baseline; }
+.cap .meter { display: flex; gap: 2px; margin: 2px 0 3px; }
+.cap .meter i { flex: 1; height: 8px; border: 1px solid var(--line); background: #0003; }
+.cap .meter i.on { background: var(--accent2); }
+.cap .meter i.full { background: var(--gold); }
+.cap .how { font-weight: 400; color: var(--muted); font-size: 11px; }
+.cap .cards { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+.cap .mini { width: 64px; cursor: help; }
+.cap .mini:hover { transform: none; }
+.cap .mini .have { text-align: center; color: var(--muted); font-size: 9px; font-weight: 700; margin-top: 3px; white-space: nowrap; }
 @media (max-width: 760px) {
   #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; grid-template-areas: "top" "stage" "tray" "side"; }
   #side { border-left: 0; border-top: 2px solid var(--line); max-height: 36vh; }
