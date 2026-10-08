@@ -972,20 +972,16 @@ def armor_stand(head='helm', plume=True, lean=0, pose=0):
 
 
 def giggle_marks():
-    """Kicher-Zeichen: je drei Schüttel-Bögen links und rechts vom Helm plus Tränchen (34 x 14)"""
-    c = Canvas(36, 16)
-    for k in range(3):
+    """Kicher-Zeichen: je zwei Schüttel-Bögen links und rechts vom Helm plus Tränchen (26 x 16)"""
+    c = Canvas(26, 16)
+    for k in range(2):
         for (dy, dx) in ((0, 1), (1, 0), (2, 0), (3, 0), (4, 1)):
-            x = 4 - k * 2 + dx
-            y = 5 + dy - 0
-            if 0 <= x < 36:
-                c.put_ramp(x, y, 'bone', 5 if k == 0 else 4)
-            x2 = 31 + k * 2 - dx
-            c.put_ramp(x2, y, 'bone', 5 if k == 0 else 4)
-    c.put_ramp(9, 12, 'ice', 5)
-    c.put_ramp(9, 13, 'ice', 4)
-    c.put_ramp(26, 12, 'ice', 5)
-    c.put_ramp(26, 13, 'ice', 4)
+            c.put_ramp(4 - k * 3 + dx, 5 + dy, 'bone', 5 if k == 0 else 4)
+            c.put_ramp(21 + k * 3 - dx, 5 + dy, 'bone', 5 if k == 0 else 4)
+    c.put_ramp(6, 12, 'ice', 5)
+    c.put_ramp(6, 13, 'ice', 4)
+    c.put_ramp(19, 12, 'ice', 5)
+    c.put_ramp(19, 13, 'ice', 4)
     return c
 
 

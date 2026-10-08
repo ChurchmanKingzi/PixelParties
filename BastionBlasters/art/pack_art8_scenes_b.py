@@ -38,7 +38,7 @@ def _art_bw02():
     MX, MY, MW, MH = geom
     # Kicher-Striche neben den Helmen
     for cx in (MX + 18, MX + 48, MX + 78):
-        wdraw(world, giggle_marks(), cx - 18, MY - 6)
+        wdraw(world, giggle_marks(), cx - 13, MY - 6)
     # Knappe mit zu großem Eimerhelm
     _feet(world, squire_bucket(), MX + 62, MY + 50, flip=True)
     prop_at(world, bush(2), MX - 18, MY + 74)
