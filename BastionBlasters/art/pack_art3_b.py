@@ -64,15 +64,18 @@ def spr_muddle_apprentice(anim='idle', f=0):
     for (dx, dy, i) in ((0, 0, 5), (-1, 0, 4), (1, 0, 4), (0, -1, 4), (0, 1, 4)):
         c.put_ramp(44 + dx, 11 + dy + bob, 'fire' if (dx or dy) else 'gold', 4 if (dx or dy) else 5)
     for k, (x, y, r) in enumerate(((43, 6, 2.0), (40, 3, 2.4), (44, 1, 1.6))):
-        ellipse(c, x, y - (f % 2) * (k % 2), r, r * 0.8, 'stone', lo=3, hi=5, ambient=0.3)
+        ellipse(c, x, y - (f % 2) * (k % 2), r, r * 0.8, 'bone', lo=2, hi=5, ambient=0.3)
     return c
 
 
 # =========================================================================== US-17 Spaghetti-Wuerger (58 x 44)
 
 
-def _noodle_arm(c, pts, w=3.0, lo=2, hi=5):
-    strand(c, pts, w, 'gold', lo=lo, hi=hi, ambient=0.25)
+def _noodle_arm(c, pts, w0=4.2, w1=2.2):
+    strand_taper(c, pts, w0, w1, 'gold', lo=2, hi=5, ambient=0.25)
+    # Strang-Struktur: dunkle Linie entlang des Arms
+    for k in range(0, len(pts) - 1, 2):
+        c.put_ramp(int(pts[k][0]) + 1, int(pts[k][1]) + 1, 'gold', 2)
     ex, ey = pts[-1]
     c.put_ramp(int(ex), int(ey), 'gold', 5)
 
@@ -80,23 +83,24 @@ def _noodle_arm(c, pts, w=3.0, lo=2, hi=5):
 def spr_spaghetti_strangler(anim='idle', f=0):
     c = Canvas(60, 46)
     ph = f % 3
-    # Fuesse: zwei Nudelbuendel
-    # Tentakel (hinter dem Knaeuel)
+    # Tentakel (hinter dem Knaeuel), mit Ringelspitzen
     arms = [
-        bezier((38, 24), (46, 10 + ph), (54, 20), (57, 8 + ph * 2), 12),
-        bezier((40, 30), (49, 28 - ph), (55, 32), (58, 26 + ph), 12),
-        bezier((34, 20), (36, 6), (46, 2 + ph), (51, 9), 12),
+        bezier((38, 24), (47, 8 + ph), (55, 22), (57, 10 + ph * 2), 14),
+        bezier((40, 31), (50, 28 - ph), (57, 34), (58, 26 + ph), 14),
+        bezier((33, 20), (35, 4), (47, 0 + ph), (52, 8), 14),
     ]
     for pts in arms:
-        _noodle_arm(c, pts, 3.2)
+        _noodle_arm(c, pts)
     # Knaeuel
-    ellipse(c, 23, 31, 21.5, 12.5, 'gold', lo=2, hi=5, ambient=0.18)
+    ellipse(c, 23, 31, 21.5, 12.5, 'gold', lo=2, hi=4, ambient=0.2)
     rnd = random.Random(11)
-    for k in range(34):
-        cx, cy = rnd.randint(6, 40), rnd.randint(22, 40)
-        r = rnd.randint(4, 9)
+    for k in range(40):
+        cx, cy = rnd.randint(4, 40), rnd.randint(21, 41)
+        r = rnd.randint(4, 10)
         a0 = rnd.randint(0, 300)
-        rim_arc(c, cx, cy, r, r * 0.75, 'gold', rnd.choice((1, 2, 2, 4, 5)), a0, a0 + rnd.randint(70, 150))
+        a1 = a0 + rnd.randint(80, 160)
+        rim_arc(c, cx, cy, r, r * 0.7, 'gold', 1 if k % 3 == 0 else 2, a0, a1)
+        rim_arc(c, cx - 1, cy - 1, r, r * 0.7, 'gold', 5, a0 + 4, a1 - 6)
     # Tomatensauce oben + Tropfen + Parmesan
     ellipse(c, 21, 21.5, 11.5, 4.6, 'fire', lo=2, hi=5, ambient=0.2)
     for (x, ln) in ((12, 4), (16, 6), (27, 4), (31, 5), (21, 3)):
@@ -105,26 +109,25 @@ def spr_spaghetti_strangler(anim='idle', f=0):
     for (x, y) in ((15, 20), (19, 19), (24, 21), (28, 22), (22, 24)):
         c.put_ramp(x, y, 'bone', 5)
         c.put_ramp(x + 1, y, 'bone', 4)
-    # Fleischbaellchen-Augen
-    for (ex, ey) in ((29, 27), (38, 27)):
-        ellipse(c, ex, ey, 4.4, 4.2, 'wood', lo=1, hi=4, ambient=0.2)
-        for (dx, dy) in ((-2, -2), (1, -2), (-1, 2), (2, 1)):
+    # Fleischbaellchen-Augen (braune Kugeln mit weissem Auge)
+    for (ex, ey) in ((29, 27), (40, 27)):
+        ellipse(c, ex, ey, 5.2, 5.0, 'wood', lo=1, hi=4, ambient=0.2)
+        for (dx, dy) in ((-3, -2), (2, -3), (-2, 3), (3, 2)):
             c.put_ramp(ex + dx, ey + dy, 'dirt', 4)
-        c.rect(ex + 1, ey - 1, ex + 2, ey + 1, 'bone', 5)
-        c.put_ramp(ex + 2, ey, 'coal', 1)
-        c.put_ramp(ex + 2, ey + 1, 'coal', 1)
+        ellipse(c, ex + 1.5, ey, 2.8, 2.9, 'bone', lo=3, hi=5, ambient=0.4)
+        c.rect(ex + 2, ey, ex + 3, ey + 1, 'coal', 1)
     # Maul mit Gabel als Zahn
-    ellipse(c, 34, 36.5, 8.5, 3.6, 'coal', lo=0, hi=2, ambient=0.4)
-    for x in range(28, 41):
-        c.put_ramp(x, 33, 'gold', 2)
+    ellipse(c, 35, 37.5, 9.0, 3.6, 'coal', lo=0, hi=2, ambient=0.4)
+    for x in range(28, 42):
+        c.put_ramp(x, 34, 'gold', 2)
     for tx in (31, 33, 35, 37):
-        for y in range(31, 38):
+        for y in range(32, 39):
             c.put_ramp(tx, y, 'metal', 5 if tx == 31 else 4 if tx < 36 else 3)
-        c.put_ramp(tx, 30, 'metal', 5)
+        c.put_ramp(tx, 31, 'metal', 5)
     for x in range(31, 38):
-        c.put_ramp(x, 37, 'metal', 3 if x % 2 else 2)
-    c.rect(33, 38, 35, 41, 'metal', 3)
-    c.rect(33, 38, 33, 41, 'metal', 5)
+        c.put_ramp(x, 38, 'metal', 3 if x % 2 else 2)
+    c.rect(33, 39, 35, 42, 'metal', 3)
+    c.rect(33, 39, 33, 42, 'metal', 5)
     # Nudelsaum unten
     for x in range(4, 44, 2):
         c.put_ramp(x, 42, 'gold', 1)
@@ -189,7 +192,7 @@ def spr_dragon_rider_dwarf(anim='idle', f=0):
     W = (19, 12 + 4 * fl)
     tipA, tipB, tipC = (6, 6 + 5 * fl), (4, 17 + 3 * fl), (9, 26 + 2 * fl)
     wing = [(27, 29), W, tipA, (10, 15 + 4 * fl), tipB, (9, 21 + 3 * fl), tipC, (19, 32)]
-    poly(c, wing, 'fire', lo=1, hi=4)
+    poly(c, wing, 'purple', lo=1, hi=4)
     for q in (tipA, tipB, tipC):
         c.line(W[0], W[1], q[0], q[1], 'goblin', 1)
     thick_line(c, 26, 29, W[0], W[1], 2.4, 'goblin', lo=1, hi=4)
@@ -218,8 +221,8 @@ def spr_dragon_rider_dwarf(anim='idle', f=0):
     c.put_ramp(56, 23, 'coal', 1)
     c.rect(48, 20, 49, 21, 'gold', 5)
     c.put_ramp(49, 21, 'coal', 1)
-    cone(c, (46, 19), (40, 12), 3.6, 'bone', 2, 5)
-    cone(c, (49, 18), (46, 10), 3.0, 'bone', 3, 5)
+    cone(c, (46, 20), (37, 17), 3.4, 'bone', 2, 5)
+    cone(c, (49, 18), (42, 13), 2.8, 'bone', 3, 5)
     for k in range(4):
         c.put_ramp(37 + k * 2, 28 + (k < 2) * 0 - 0, 'gold', 4)
     # kleines Flaemmchen am Maul
@@ -249,8 +252,8 @@ def spr_dragon_rider_dwarf(anim='idle', f=0):
     ellipse(c, 27, 11.5, 6.2, 5.2, 'metal', lo=1, hi=5, clip=lambda x, y: y <= 12)
     for x in range(21, 34):
         c.put_ramp(x, 12, 'gold', 4 if x % 2 else 3)
-    cone(c, (22, 10), (18, 4), 3.0, 'bone', 3, 5)
-    cone(c, (32, 10), (36, 4), 3.0, 'bone', 3, 5)
+    cone(c, (22, 10), (16, 7), 3.0, 'bone', 3, 5)
+    cone(c, (32, 10), (37, 7), 3.0, 'bone', 3, 5)
     # Arm vorn haelt die Zuegel
     thick_line(c, 29, 20, 35, 24, 3.0, 'metal', lo=2, hi=5)
     c.rect(35, 23, 36, 24, 'skin', 4)

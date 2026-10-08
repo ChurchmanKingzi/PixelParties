@@ -353,3 +353,33 @@ def spr_walking_crate(anim='idle', f=0):
     return c
 
 
+
+
+# =========================================================================== Nebenfigur: die Kiste als Koeder (zu US-15)
+
+
+def spr_crate_loot(anim='idle', f=0):
+    """Geschlossene Truhe, wirkt wie harmlose Beute - nur ein Auge blinzelt aus dem Deckelspalt"""
+    c = Canvas(34, 26)
+    round_rect(c, 1, 11, 32, 24, 'wood', lo=1, hi=4, radius=2)
+    ellipse(c, 16.5, 12, 15.5, 8.4, 'wood', lo=2, hi=5, clip=lambda x, y: y <= 14)
+    for x in range(2, 32):
+        c.put_ramp(x, 14, 'gold', 3 if x % 2 else 2)
+    for x in (6, 7, 26, 27):
+        for y in range(5, 25):
+            if c.alpha(x, y):
+                c.put_ramp(x, y, 'gold', 4 if x in (6, 26) else 2)
+    c.rect(15, 12, 18, 17, 'gold', 4)
+    c.rect(15, 12, 18, 12, 'gold', 5)
+    c.put_ramp(16, 15, 'coal', 1)
+    c.put_ramp(17, 15, 'coal', 1)
+    c.put_ramp(16, 16, 'coal', 1)
+    for (x, y) in ((8, 19), (24, 19), (12, 21), (21, 21)):
+        c.put_ramp(x, y, 'wood', 1)
+    # Spalt mit blinzelndem Auge
+    for x in range(21, 27):
+        c.put_ramp(x, 15, 'coal', 0)
+    c.put_ramp(23, 15, 'gold', 5)
+    c.put_ramp(24, 15, 'gold', 4)
+    c.outline()
+    return c

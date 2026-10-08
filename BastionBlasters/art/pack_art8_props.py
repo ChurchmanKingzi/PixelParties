@@ -498,13 +498,14 @@ def pliers_decor():
     return c
 
 
-def tooth_jars():
-    """Regalbrett mit Zahngläsern (30 x 18)"""
-    c = Canvas(30, 18)
-    c.rect(0, 14, 29, 16, 'wood', 3)
-    c.rect(0, 14, 29, 14, 'wood', 5)
-    c.rect(0, 16, 29, 16, 'wood', 1)
-    for k, x in enumerate((2, 10, 18)):
+def tooth_jars(n=2):
+    """Regalbrett mit Zahngläsern (8n + 2 x 18)"""
+    c = Canvas(8 * n + 2, 18)
+    c.rect(0, 14, 8 * n + 1, 16, 'wood', 3)
+    c.rect(0, 14, 8 * n + 1, 14, 'wood', 5)
+    c.rect(0, 16, 8 * n + 1, 16, 'wood', 1)
+    for k in range(n):
+        x = 2 + 8 * k
         round_rect(c, x, 3, x + 6, 13, 'ice', lo=2, hi=5, radius=2)
         c.rect(x + 1, 1, x + 5, 3, 'wood', 3)
         for (tx, ty) in ((x + 2, 8), (x + 4, 10), (x + 3, 6)):
@@ -512,9 +513,25 @@ def tooth_jars():
             c.put_ramp(tx, ty + 1, 'bone', 4)
         if k == 1:
             c.put_ramp(x + 3, 11, 'gold', 5)
-    ellipse(c, 26, 11, 2.8, 2.8, 'bone', lo=3, hi=5)
-    c.put_ramp(25, 10, 'coal', 1)
-    c.put_ramp(27, 10, 'coal', 1)
+    c.outline()
+    return c
+
+
+def dental_lamp_wall():
+    """Gelenklampe an der Wand: Platte, Doppelgelenk, Schirm mit heller Birne (26 x 24)"""
+    c = Canvas(26, 24)
+    c.rect(0, 1, 3, 9, 'metal', 3)
+    c.rect(0, 1, 0, 9, 'metal', 5)
+    c.rect(3, 1, 3, 9, 'metal', 1)
+    thick_line(c, 2, 5, 11, 2, 2.2, 'metal', lo=1, hi=4)
+    ellipse(c, 11, 2.5, 2.0, 2.0, 'gold', lo=2, hi=5)
+    thick_line(c, 11, 3, 17, 10, 2.2, 'metal', lo=1, hi=4)
+    ellipse(c, 17, 10, 2.0, 2.0, 'gold', lo=2, hi=5)
+    poly(c, [(14, 11), (21, 11), (25, 19), (10, 19)], 'metal', lo=1, hi=5)
+    for x in range(11, 25):
+        c.put_ramp(x, 19, 'metal', 0 if x % 2 else 1)
+    ellipse(c, 17.5, 20, 4.4, 2.2, 'gold', lo=4, hi=5, ambient=0.5)
+    c.rect(14, 20, 20, 21, 'gold', 5)
     c.outline()
     return c
 
@@ -532,133 +549,160 @@ def spittoon():
 
 
 def youth_fountain():
-    """Prunkbrunnen (64 x 62): Becken, Doppelschale, Greisenkopf, der Wasser spuckt. Fußpunkt unten Mitte."""
-    W, H = 70, 66
+    """Prunkbrunnen (74 x 66): Becken mit Steinwand, Säule mit Greisenkopf, der in hohem Bogen Wasser spuckt,
+    obere Schale mit Wasserschleiern, Goldkugel. Fußpunkt unten Mitte."""
+    W, H = 74, 66
     c = Canvas(W, H)
-    cx = 35
-    # --- Becken (Vorderwand + Wasserfläche)
-    by = 50           # Wasseroberfläche Mittelpunkt
-    rx, ry = 31.0, 12.5
-    # Außenwand unten
-    for y in range(by, by + 13):
+    cx, by, rx, ry, wall = 37, 52, 34.0, 11.5, 9
+    # --- Beckenwand (Zylinder), Fugen
+    for y in range(by, by + int(ry) + wall + 2):
         for x in range(W):
             dx = (x + 0.5 - cx) / rx
-            if abs(dx) > 1.0:
+            if abs(dx) >= 1.0:
                 continue
-            ye = by + math.sqrt(max(0.0, 1 - dx * dx)) * ry
-            if y <= ye + 6.5 and y >= by:
-                u = (x - (cx - rx)) / (2 * rx)
-                L = 0.85 - 0.5 * u - 0.1 * ((y - by) / 14.0)
-                idx = quant(max(0.0, min(1.0, L)), 1, 4, x, y)
-                if (y + int(x / 5)) % 6 == 5:
-                    idx = max(1, idx - 1)
-                c.put_ramp(x, y, 'stone', idx)
-    # Rand oben (Ellipsenring)
-    for y in range(by - 15, by + 16):
+            d2 = (y + 0.5 - (by + wall)) / ry
+            if dx * dx + d2 * d2 > 1.0:
+                continue
+            u = (x - (cx - rx)) / (2 * rx)
+            L = 0.92 - 0.62 * u - 0.05 * ((y - by) / 20.0)
+            idx = quant(max(0.0, min(1.0, L)), 1, 4, x, y)
+            if (y - by) % 5 == 4:
+                idx = max(1, idx - 1)
+            elif (x + 5 * ((y - by) // 5)) % 11 == 0:
+                idx = max(1, idx - 1)
+            c.put_ramp(x, y, 'stone', idx)
+    # --- Beckenoberseite: Rand + Wasser
+    for y in range(by - int(ry) - 1, by + int(ry) + 2):
         for x in range(W):
             dx = (x + 0.5 - cx) / rx
             dy = (y + 0.5 - by) / ry
             d = dx * dx + dy * dy
-            if d <= 1.0:
-                if d > 0.66:
-                    L = 0.9 - 0.45 * ((x - (cx - rx)) / (2 * rx)) - 0.2 * dy
-                    c.put_ramp(x, y, 'stone', quant(max(0.0, min(1.0, L)), 3, 5, x, y))
-                else:
-                    wave = 0.5 + 0.25 * math.sin(x * 0.6 + y * 1.3) + 0.1 * math.sin(x * 0.2)
-                    L = wave * 0.85 + 0.05 - (0.2 if dy < -0.25 else 0)
-                    c.put_ramp(x, y, 'sky', quant(L, 2, 4, x, y))
-    # Wasserfunkeln und Ringe
-    for (x, y) in ((14, 50), (15, 50), (16, 50), (52, 52), (53, 52), (24, 56), (25, 56), (44, 46), (45, 46), (20, 45)):
+            if d > 1.0:
+                continue
+            if d > 0.72:
+                u = (x - (cx - rx)) / (2 * rx)
+                L = 0.98 - 0.5 * u - 0.15 * dy
+                c.put_ramp(x, y, 'stone', quant(max(0.0, min(1.0, L)), 3, 5, x, y))
+            else:
+                wave = 0.55 + 0.22 * math.sin(x * 0.7 + y * 1.4) + 0.1 * math.sin(x * 0.25 - y * 0.5)
+                L = wave * 0.9 - (0.22 if dy < -0.35 else 0.0) - (0.1 if d > 0.6 else 0.0)
+                c.put_ramp(x, y, 'sky', quant(max(0.0, min(1.0, L)), 2, 4, x, y))
+    for (x, y) in ((12, 52), (13, 52), (14, 52), (58, 56), (59, 56), (24, 58), (25, 58), (50, 47), (51, 47), (62, 51), (26, 46)):
         c.put_ramp(x, y, 'sky', 5)
-    for (x, y) in ((cx - 7, 53), (cx - 6, 53), (cx + 6, 53), (cx + 7, 53), (cx - 8, 52), (cx + 8, 52)):
-        c.put_ramp(x, y, 'bone', 5)
-    # --- Sockel und Säule
-    for y in range(26, 52):
-        t = (y - 26) / 25.0
-        half = 5 + (4 if y > 44 else 0)
+    # --- Säule mit Fuß
+    top, foot = 22, 54
+    for y in range(top, foot):
+        half = 9 + (2 if y >= 49 else 0)
         for x in range(cx - half, cx + half + 1):
             u = (x - (cx - half)) / float(2 * half + 1)
-            idx = 4 if u < 0.25 else (3 if u < 0.55 else (2 if u < 0.85 else 1))
-            if y in (38, 39):
-                idx = max(1, idx - 1)
+            idx = 4 if u < 0.2 else (3 if u < 0.55 else (2 if u < 0.85 else 1))
+            if y in (47, 48):
+                idx = 5 if y == 47 and u < 0.6 else 1
+            if y in (26, 27):
+                idx = 5 if y == 26 and u < 0.6 else 1
             c.put_ramp(x, y, 'stone', idx)
-    # Greisenkopf (Gesicht in der Säule): Stirn, Brauen, Augen, Bart, Mund als Spund
-    ellipse(c, cx, 36, 6.8, 6.4, 'stone', lo=2, hi=5, ambient=0.25)
-    for x in range(cx - 5, cx + 6):
-        c.put_ramp(x, 33, 'stone', 1)           # Stirnfalte
-    c.rect(cx - 4, 34, cx - 2, 35, 'bone', 5)
-    c.rect(cx + 2, 34, cx + 4, 35, 'bone', 4)    # buschige Brauen
-    c.put_ramp(cx - 3, 36, 'coal', 1)
-    c.put_ramp(cx + 3, 36, 'coal', 1)
-    c.rect(cx - 1, 37, cx, 38, 'stone', 4)       # Nase
-    # Bart
-    poly(c, [(cx - 6, 39), (cx + 6, 39), (cx + 4, 48), (cx, 51), (cx - 4, 48)], 'bone', lo=3, hi=5)
-    for y in (42, 45, 48):
+    # Gesicht: helle Reliefplatte
+    ellipse(c, cx, 36.5, 8.6, 8.2, 'stone', lo=3, hi=5, ambient=0.35, flatness=0.15)
+    # buschige Brauen, Augen mit Höhle
+    for x in range(cx - 7, cx - 1):
+        c.put_ramp(x, 32, 'bone', 5)
+        c.put_ramp(x, 33, 'bone', 3)
+    for x in range(cx + 2, cx + 8):
+        c.put_ramp(x, 32, 'bone', 4)
+        c.put_ramp(x, 33, 'bone', 2)
+    c.rect(cx - 6, 34, cx - 4, 35, 'stone', 1)
+    c.rect(cx + 3, 34, cx + 5, 35, 'stone', 1)
+    c.rect(cx - 5, 35, cx - 4, 35, 'coal', 0)
+    c.rect(cx + 4, 35, cx + 5, 35, 'coal', 0)
+    # Nase (lang, hängend)
+    c.rect(cx, 35, cx + 1, 40, 'stone', 5)
+    c.rect(cx + 1, 38, cx + 2, 40, 'stone', 3)
+    c.put_ramp(cx, 41, 'stone', 1)
+    c.put_ramp(cx + 1, 41, 'stone', 1)
+    # Wangenfalten
+    for (x, y) in ((cx - 7, 37), (cx - 7, 38), (cx + 8, 37), (cx + 8, 38), (cx - 6, 39), (cx + 7, 39)):
+        c.put_ramp(x, y, 'stone', 2)
+    # Schnurrbart
+    for x in range(cx - 7, cx + 9):
+        c.put_ramp(x, 41, 'bone', 5 if x < cx else 4)
+        c.put_ramp(x, 42, 'bone', 3 if x % 2 else 2)
+    # Mund (Speiöffnung), darunter langer Bart bis ins Wasser
+    c.rect(cx - 2, 43, cx + 2, 44, 'coal', 0)
+    c.rect(cx - 2, 43, cx - 2, 43, 'coal', 1)
+    poly(c, [(cx - 6, 45), (cx + 6, 45), (cx + 4, 51), (cx, 56), (cx - 4, 51)], 'bone', lo=2, hi=5)
+    for y in (47, 50, 53):
         for x in range(cx - 4, cx + 5):
             if (x + y) % 3 == 0:
                 c.put_ramp(x, y, 'bone', 2)
-    # Mund (Spuckloch)
-    c.rect(cx - 2, 40, cx + 2, 41, 'coal', 0)
     # --- obere Schale
-    ellipse(c, cx, 27, 14, 4.6, 'stone', lo=2, hi=5, ambient=0.3, flatness=0.2)
-    ellipse(c, cx, 26, 11, 2.6, 'sky', lo=3, hi=5)
-    for x in range(cx - 14, cx + 15):
-        yy = 27 + int(2.6 * math.sqrt(max(0.0, 1 - ((x - cx) / 14.0) ** 2)))
-        c.put_ramp(x, yy + 1, 'stone', 1)
+    ellipse(c, cx, 26, 16, 5.0, 'stone', lo=1, hi=4, ambient=0.25, clip=lambda x, y: y >= 22)
+    ellipse(c, cx, 21.5, 17, 5.2, 'stone', lo=3, hi=5, ambient=0.3, flatness=0.2)
+    ellipse(c, cx, 21.5, 13.5, 3.3, 'sky', lo=3, hi=5, ambient=0.5)
+    for (x, y) in ((cx - 7, 21), (cx - 6, 21), (cx + 4, 22), (cx + 8, 21)):
+        c.put_ramp(x, y, 'bone', 5)
     # Spitze mit Goldkugel
-    c.rect(cx - 1, 14, cx + 1, 25, 'stone', 3)
-    c.rect(cx - 1, 14, cx - 1, 25, 'stone', 5)
-    ellipse(c, cx, 11, 4.0, 4.0, 'gold', lo=2, hi=5)
-    c.put_ramp(cx - 1, 9, 'gold', 5)
-    # Wasserschleier von der oberen Schale in das Becken
+    c.rect(cx - 1, 11, cx + 1, 19, 'stone', 3)
+    c.rect(cx - 1, 11, cx - 1, 19, 'stone', 5)
+    ellipse(c, cx, 7.5, 4.4, 4.4, 'gold', lo=2, hi=5)
+    c.put_ramp(cx - 2, 5, 'gold', 5)
+    c.put_ramp(cx - 1, 5, 'gold', 5)
+    # Wasserschleier von der Schale ins Becken
     for side in (-1, 1):
-        for k in range(0, 15):
-            x = cx + side * (12 + k * 0.5)
-            y = 29 + k * 1.2
-            c.put_ramp(int(x), int(y), 'sky', 5 if k % 2 == 0 else 4)
-            if k % 3 == 0:
-                c.put_ramp(int(x) + side, int(y), 'sky', 3)
-    # Strahl aus dem Mund: Bogen nach vorne rechts ins Becken
-    for k in range(0, 18):
-        x = cx + k * 0.9
-        y = 41 + (k * 0.55) + 0.025 * k * k
+        for k in range(0, 24):
+            x = cx + side * (16 + k * 0.28)
+            y = 25 + k
+            if y > 50:
+                break
+            idx = 5 if (k % 3 == 0) else 4
+            c.put_ramp(int(x), int(y), 'sky', idx)
+            if k % 2 == 0:
+                c.put_ramp(int(x) - side, int(y), 'sky', 3)
+    # Strahl aus dem Mund: hoher Bogen nach rechts ins Becken
+    for k in range(0, 22):
+        x = cx + 3 + k * 0.95
+        y = 43.5 + 0.2 * k + 0.03 * k * k
         c.put_ramp(int(x), int(y), 'sky', 5)
         c.put_ramp(int(x), int(y) + 1, 'sky', 4)
         if k % 2:
-            c.put_ramp(int(x) - 1, int(y) + 1, 'sky', 3)
+            c.put_ramp(int(x) - 1, int(y) + 1, 'bone', 5)
+    # Aufspritzen
+    for (x, y) in ((58, 57), (60, 56), (57, 55), (61, 58), (59, 55)):
+        c.put_ramp(x, y, 'bone', 5)
+    # Ringe um den Bartfuß
+    for x in range(cx - 8, cx + 9):
+        c.put_ramp(x, 57, 'bone', 5 if x % 2 else 4)
     c.outline()
     return c
 
 
 def putto(frame=0, flying=False):
-    """geflügelter Amor-Knirps (12 x 14): Pausbacken, kleine Flügel, Windel"""
-    c = Canvas(18, 16)
-    # Flügel
-    bob = 0
-    wing_up = 1 if frame % 2 else 0
-    for (x, y) in ((4, 5 - wing_up), (3, 4 - wing_up), (2, 3 - wing_up), (4, 6 - wing_up), (3, 6 - wing_up), (5, 7)):
-        c.put_ramp(x, y, 'bone', 5 if y < 5 else 4)
-    for (x, y) in ((13, 5 - wing_up), (14, 4 - wing_up), (15, 3 - wing_up), (13, 6 - wing_up), (14, 6 - wing_up), (12, 7)):
-        c.put_ramp(x, y, 'bone', 4)
+    """geflügelter Amor-Knirps (22 x 18): Pausbacken, große weiße Flügel, Windel, Heiligenschein"""
+    c = Canvas(22, 18)
+    cx = 11
+    up = 2 if frame % 2 else 0
+    # Flügel (hinter dem Körper)
+    poly(c, [(cx - 2, 11), (cx - 7, 4 - up), (cx - 10, 1 - up), (cx - 11, 5 - up), (cx - 9, 9 - up), (cx - 5, 12)], 'bone', lo=3, hi=5)
+    poly(c, [(cx + 2, 11), (cx + 7, 4 - up), (cx + 10, 1 - up), (cx + 11, 5 - up), (cx + 9, 9 - up), (cx + 5, 12)], 'bone', lo=2, hi=4)
+    for (x, y) in ((cx - 10, 7 - up), (cx - 8, 10 - up), (cx + 10, 7 - up), (cx + 8, 10 - up)):
+        c.put_ramp(x, y, 'bone', 3)
     # Körper
-    ellipse(c, 9, 10, 3.4, 3.4, 'skin', lo=3, hi=5)
-    c.rect(7, 12, 11, 13, 'bone', 4)
-    c.put_ramp(8, 13, 'bone', 2)
+    ellipse(c, cx, 11, 3.6, 3.6, 'skin', lo=3, hi=5)
+    c.rect(cx - 2, 13, cx + 2, 14, 'bone', 4)
+    c.rect(cx - 2, 14, cx + 2, 14, 'bone', 2)
     # Arme (hoch, tanzend) und Beine
-    thick_line(c, 6, 9, 4, 5 + frame % 2, 1.6, 'skin', lo=3, hi=5)
-    thick_line(c, 12, 9, 14, 6 - frame % 2, 1.6, 'skin', lo=2, hi=4)
+    thick_line(c, cx - 3, 10, cx - 6, 6 + frame % 2, 1.8, 'skin', lo=3, hi=5)
+    thick_line(c, cx + 3, 10, cx + 6, 7 - frame % 2, 1.8, 'skin', lo=2, hi=4)
     if not flying:
-        c.rect(7, 14, 8, 15, 'skin', 3)
-        c.rect(10, 14, 11, 15, 'skin', 2)
+        c.rect(cx - 2, 15, cx - 1, 17, 'skin', 3)
+        c.rect(cx + 1, 15, cx + 2, 17, 'skin', 2)
     # Kopf mit Löckchen
-    ellipse(c, 9, 5.5, 3.6, 3.4, 'skin', lo=3, hi=5)
-    c.put_ramp(10, 5, 'coal', 1)
-    c.put_ramp(11, 7, 'skin', 2)
-    for (x, y) in ((6, 3), (7, 2), (8, 2), (9, 2), (10, 2), (11, 3), (6, 4)):
-        c.put_ramp(x, y, 'gold', 4 if x < 9 else 3)
-    c.put_ramp(8, 1, 'gold', 5)
-    # Heiligenschein
-    for x in (7, 8, 9, 10, 11):
+    ellipse(c, cx, 6, 3.8, 3.5, 'skin', lo=3, hi=5)
+    c.put_ramp(cx + 1, 6, 'coal', 1)
+    c.put_ramp(cx + 2, 8, 'skin', 2)
+    for (x, y) in ((cx - 3, 4), (cx - 2, 3), (cx - 1, 3), (cx, 3), (cx + 1, 3), (cx + 2, 4), (cx - 3, 5)):
+        c.put_ramp(x, y, 'gold', 4 if x < cx else 3)
+    c.put_ramp(cx - 1, 2, 'gold', 5)
+    for x in range(cx - 2, cx + 3):
         c.put_ramp(x, 0, 'gold', 5)
     c.outline()
     return c
@@ -667,86 +711,144 @@ def putto(frame=0, flying=False):
 # =========================================================================== PHÖNIX-NEST (BH-07)
 
 
-def phoenix_nest():
-    """Riesiges Nest aus Zweigen und Federn mit Glut in der Mitte (60 x 36), Küken separat"""
-    W, H = 62, 38
+def phoenix_chick():
+    """Phönix-Küken: Federball mit Flammenschopf und Flammenschwanz, dicker offener Schnabel (30 x 36), blickt nach rechts"""
+    c = ShiftCanvas(32, 38, 1, 6)
+    # Flammenschwanz hinten links
+    for (pts, col) in (([(0, 24), (5, 17), (8, 25)], 'fire'), ([(1, 29), (3, 20), (9, 28)], 'gold'), ([(0, 20), (6, 14), (7, 20)], 'fire')):
+        poly(c, pts, col, lo=2, hi=5)
+    # Körper
+    ellipse(c, 14.5, 23, 10.4, 9.2, 'gold', lo=2, hi=5, ambient=0.2)
+    ellipse(c, 15.5, 26, 7.0, 5.4, 'fire', lo=3, hi=5, ambient=0.35)
+    for (x, y) in ((11, 22), (14, 24), (17, 22), (12, 27), (16, 28)):
+        c.put_ramp(x, y, 'gold', 5)
+    # Flügelchen mit Feuerspitzen
+    ellipse(c, 6.5, 24, 3.4, 4.6, 'fire', lo=1, hi=4)
+    ellipse(c, 22.5, 24, 3.0, 4.2, 'fire', lo=2, hi=4)
+    for (x, y) in ((4, 28), (6, 29), (8, 29)):
+        c.put_ramp(x, y, 'gold', 5)
+    # Kopf
+    ellipse(c, 15, 14, 8.0, 7.0, 'gold', lo=3, hi=5, ambient=0.2)
+    # Flammenschopf: drei Zungen
+    for (pts, col) in (([(9, 9), (9, 1), (13, 8)], 'fire'), ([(12, 8), (15, -5), (18, 7)], 'gold'), ([(16, 8), (21, 0), (22, 9)], 'fire')):
+        poly(c, pts, col, lo=2, hi=5)
+    c.put_ramp(15, -3, 'gold', 5)
+    c.put_ramp(15, -2, 'gold', 5)
+    # Augen: groß, 2x2 mit Glanz
+    c.rect(17, 12, 18, 13, 'coal', 1)
+    c.put_ramp(17, 12, 'bone', 5)
+    # Schnabel: weit offen, quiekt
+    c.rect(20, 16, 27, 20, 'coal', 1)
+    poly(c, [(20, 12), (30, 14), (20, 17)], 'fire', lo=2, hi=5)
+    poly(c, [(20, 20), (28, 22), (20, 23)], 'fire', lo=1, hi=3)
+    c.rect(21, 19, 24, 19, 'fire', 3)
+    # Beinchen
+    c.rect(11, 31, 12, 33, 'fire', 2)
+    c.rect(18, 31, 19, 33, 'fire', 3)
+    c.rect(9, 33, 13, 33, 'fire', 2)
+    c.rect(17, 33, 21, 33, 'fire', 3)
+    c.outline()
+    return c
+
+
+def phoenix_nest_full(chick=True):
+    """Riesiges Nest aus geflochtenen Zweigen mit Glutbett, Federn am Rand und dem quiekenden Küken (76 x 64).
+    Fußpunkt = Unterkante; Küken sitzt im Glutbett (zwischen hinterem und vorderem Rand)."""
+    W, H = 76, 66
     c = Canvas(W, H)
-    cx = 31
-    rnd = random.Random(7)
-    # Rückwand des Nestes (innen sichtbar)
-    ellipse(c, cx, 16, 28, 10, 'wood', lo=0, hi=3, ambient=0.2)
-    # Glutbett
-    ellipse(c, cx, 17, 22, 7, 'fire', lo=2, hi=5, ambient=0.5, flatness=0.3)
-    for (x, y) in ((cx - 10, 15), (cx + 8, 18), (cx - 3, 20), (cx + 14, 14), (cx - 16, 18)):
+    rnd = random.Random(11)
+    cx, cy = 38, 36
+    rxr, ryr = 34.0, 12.0        # Rand-Ellipse (Oberseite)
+    rxb, ryb, wall = 32.0, 11.0, 14
+    # --- Glutbett und dunkle Innenwand
+    for y in range(cy - 14, cy + 14):
+        for x in range(W):
+            dx, dy = (x + 0.5 - cx) / rxr, (y + 0.5 - cy) / ryr
+            d = dx * dx + dy * dy
+            if d > 0.80:
+                continue
+            ex, ey = (x + 0.5 - cx) / 26.0, (y + 0.5 - cy - 1) / 8.0
+            de = ex * ex + ey * ey
+            if de <= 1.0:
+                L = 0.35 + 0.55 * (1 - de) + (0.12 if ey < -0.2 else 0)
+                c.put_ramp(x, y, 'fire', quant(max(0.0, min(1.0, L)), 2, 5, x, y))
+            else:
+                c.put_ramp(x, y, 'wood', 0 if (x + y) % 2 else 1)
+    for (x, y) in ((cx - 14, cy + 2), (cx + 10, cy + 3), (cx + 18, cy - 1), (cx - 20, cy - 2), (cx - 4, cy + 5), (cx + 2, cy - 5)):
         c.put_ramp(x, y, 'gold', 5)
         c.put_ramp(x + 1, y, 'gold', 4)
-    # Wulst aus Zweigen: vorne dick, geflochten
-    for layer, (ry_, yy) in enumerate(((10, 26), (9, 29), (8, 31))):
-        for x in range(0, W):
-            dx = (x + 0.5 - cx) / 30.0
-            if abs(dx) > 1.0:
+    if chick:
+        ch = phoenix_chick()
+        c.blit(ch, cx - ch.w // 2 + 1, cy + 4 - ch.h + 1 - 1)
+    # --- Vorderwand aus Zweigen (Zylinder unter dem Rand)
+    wallmask = {}
+    for y in range(cy, cy + int(ryb) + wall + 2):
+        for x in range(W):
+            dx = (x + 0.5 - cx) / rxb
+            if abs(dx) >= 1.0:
                 continue
-            ye = yy + 0 * layer
-            top = int(ye - math.sqrt(max(0.0, 1 - dx * dx)) * (ry_ - 3))
-            bot = int(ye + 5)
-            for y in range(max(top, 17), bot):
-                if y < 18 and abs(dx) < 0.85:
-                    continue
-                u = (x - 1) / float(W)
-                idx = 4 if (y - top) < 2 else (3 if (y + x // 4) % 4 else 2)
-                if layer == 2:
-                    idx = max(1, idx - 1)
-                if (x * 3 + y * 5) % 11 == 0:
-                    idx = max(1, idx - 1)
-                c.put_ramp(x, y, 'wood', idx)
-    # diagonale Zweige
-    for k in range(10):
-        x0 = rnd.randint(2, W - 14)
-        y0 = rnd.randint(22, 33)
-        ln = rnd.randint(8, 14)
-        c.line(x0, y0, x0 + ln, y0 + rnd.randint(-2, 2) , 'wood', rnd.choice((2, 4, 5)))
-    # Federn am Rand: Glut-Orange und Gold
-    for (fx, fy, col, ang) in ((3, 24, 'fire', -1), (9, 21, 'gold', -1), (52, 22, 'fire', 1), (58, 25, 'gold', 1), (45, 20, 'gold', 1), (17, 20, 'fire', -1)):
-        for k in range(8):
-            x = fx + ang * (k // 2)
-            y = fy - k
-            c.put_ramp(x, y, col, 4 if k < 6 else 5)
-            c.put_ramp(x + ang, y, col, 3)
-        c.put_ramp(fx, fy + 1, 'wood', 3)
+            ey = (y + 0.5 - (cy + wall - 2)) / ryb
+            if dx * dx + ey * ey > 1.0:
+                continue
+            dxr, dyr = (x + 0.5 - cx) / rxr, (y + 0.5 - cy) / ryr
+            if dxr * dxr + dyr * dyr <= 0.72:
+                continue
+            wallmask[(x, y)] = True
+            u = (x - (cx - rxb)) / (2 * rxb)
+            L = 0.7 - 0.45 * u + 0.12 * math.sin(x * 0.9 + y * 0.3)
+            c.put_ramp(x, y, 'wood', quant(max(0.0, min(1.0, L)), 1, 3, x, y))
+    for _ in range(170):
+        px, py = rnd.randint(2, W - 3), rnd.randint(cy, cy + 26)
+        if (px, py) not in wallmask:
+            continue
+        ang = rnd.choice((-1, 1)) * rnd.uniform(0.35, 0.9)
+        ln = rnd.randint(5, 9)
+        tone = rnd.choice((2, 3, 3, 4, 4, 5))
+        for k in range(ln):
+            xx, yy = int(px + k * math.cos(ang)), int(py + k * math.sin(ang) * 1.0 + k * 0.4)
+            if (xx, yy) in wallmask:
+                c.put_ramp(xx, yy, 'wood', tone if k < ln - 1 else max(1, tone - 1))
+    # --- Rand: dicke geflochtene Zweige (Ellipsenring)
+    for y in range(cy - int(ryr) - 2, cy + int(ryr) + 3):
+        for x in range(W):
+            dx, dy = (x + 0.5 - cx) / rxr, (y + 0.5 - cy) / ryr
+            d = dx * dx + dy * dy
+            if 0.70 < d <= 1.0:
+                u = (x - (cx - rxr)) / (2 * rxr)
+                L = 0.95 - 0.5 * u + 0.18 * math.sin(x * 1.1 + y * 0.8) - 0.08 * dy
+                c.put_ramp(x, y, 'wood', quant(max(0.0, min(1.0, L)), 2, 5, x, y))
+    for k in range(46):
+        a = k / 46.0 * 2 * math.pi
+        px, py = cx + math.cos(a) * rxr * 0.86, cy + math.sin(a) * ryr * 0.86
+        tx, ty = -math.sin(a) * rxr, math.cos(a) * ryr
+        n = math.hypot(tx, ty)
+        tx, ty = tx / n, ty / n
+        tone = rnd.choice((1, 2, 4, 5))
+        for j in range(-3, 4):
+            c.put_ramp(int(px + tx * j), int(py + ty * j + (1 if k % 2 else 0)), 'wood', tone if j != 3 else 1)
+    # herausragende Zweige
+    for (ang, ln) in ((3.0, 7), (3.4, 8), (2.7, 6), (0.2, 7), (-0.3, 8), (0.5, 6), (4.5, 6), (5.0, 7), (3.9, 6)):
+        px, py = cx + math.cos(ang) * rxr * 0.95, cy + math.sin(ang) * ryr * 0.95
+        for j in range(ln):
+            c.put_ramp(int(px + math.cos(ang) * j * 0.9), int(py + math.sin(ang) * j * 0.6 - j * 0.35), 'wood', 4 if j < 4 else 2)
+    # --- Federn am Rand (Glut-Orange und Gold): breite Blattform mit Kiel
+    for (fx, fy, col, side) in ((5, 38, 'fire', -1), (10, 30, 'gold', -1), (66, 31, 'fire', 1), (72, 38, 'gold', 1), (58, 27, 'gold', 1), (20, 26, 'fire', -1)):
+        tx, ty = fx + side * 5, fy - 13
+        thick_line(c, fx, fy, tx, ty, 3.4, col, lo=2, hi=5)
+        thick_line(c, fx, fy, tx, ty, 1.0, col, lo=5, hi=5)
+        c.put_ramp(tx, ty - 1, col, 5)
+        c.put_ramp(fx - side, fy, 'wood', 2)
     c.outline()
     return c
 
 
-def phoenix_chick():
-    """Phönix-Küken: Feuerball mit Flammenschopf, dickem Schnabel, quiekt Funken (28 x 30)"""
-    c = Canvas(30, 32)
-    # Flammenschopf
-    for (pts, col) in (([(10, 8), (12, 0), (14, 6)], 'fire'), ([(14, 7), (17, -1), (19, 6)], 'gold'), ([(18, 8), (22, 2), (22, 8)], 'fire')):
-        poly(c, [(x, y + 3) for x, y in pts], col, lo=2, hi=5)
-    # Körper
-    ellipse(c, 14.5, 20, 10.4, 9.2, 'gold', lo=2, hi=5, ambient=0.2)
-    ellipse(c, 14.5, 23, 7.0, 5.4, 'fire', lo=3, hi=5, ambient=0.3)
-    # Flügelchen
-    ellipse(c, 6.5, 21, 3.4, 4.6, 'fire', lo=1, hi=4)
-    ellipse(c, 22.5, 21, 3.0, 4.2, 'fire', lo=2, hi=4)
-    for (x, y) in ((4, 25), (6, 26), (8, 26)):
-        c.put_ramp(x, y, 'gold', 4)
-    # Kopf
-    ellipse(c, 15, 12, 8.0, 7.0, 'gold', lo=3, hi=5, ambient=0.2)
-    # Augen (2x2, eng) mit Glanz
-    c.rect(17, 10, 18, 11, 'coal', 1)
-    c.put_ramp(17, 10, 'bone', 5)
-    # Schnabel: weit offen, quiekt
-    poly(c, [(20, 12), (28, 13), (20, 15)], 'fire', lo=2, hi=5)
-    poly(c, [(20, 16), (26, 18), (20, 18)], 'fire', lo=1, hi=3)
-    c.rect(21, 15, 25, 15, 'coal', 1)
-    # Beinchen
-    c.rect(11, 29, 12, 31, 'fire', 2)
-    c.rect(17, 29, 18, 31, 'fire', 3)
-    c.rect(9, 31, 13, 31, 'fire', 2)
-    c.rect(16, 31, 20, 31, 'fire', 3)
-    c.outline()
-    return c
+def floor_feather(col='fire', flip=False):
+    """auf dem Boden liegende Feder (12 x 6)"""
+    c = Canvas(12, 6)
+    thick_line(c, 1, 4, 10, 1, 3.0, col, lo=2, hi=5)
+    c.line(0, 5, 10, 1, col, 5)
+    c.put_ramp(11, 1, col, 4)
+    return c.flipped() if flip else c
 
 
 def ember_spark(col='gold'):
@@ -795,8 +897,8 @@ def feather_banner():
 
 
 def armor_stand(head='helm', plume=True, lean=0, pose=0):
-    """Rüstungsständer (26 x 40): Harnisch auf Holzständer; head: 'helm' | 'bucket' | 'pot'. Gesicht: Sehschlitz-Augen und Grinsen."""
-    c = Canvas(28, 42)
+    """Rüstungsständer (28 x 46): Harnisch auf Holzständer; head: 'helm' | 'bucket' | 'pot'. Gesicht: Sehschlitz-Augen und Grinsen."""
+    c = ShiftCanvas(28, 46, 0, 5)
     cx = 14
     # Ständer
     c.rect(cx - 1, 30, cx, 38, 'wood', 3)
@@ -918,8 +1020,8 @@ def helmet_shelf():
 
 
 def squire_bucket():
-    """Knappe mit zu großem Eimerhelm und Schild (20 x 24)"""
-    c = Canvas(24, 26)
+    """Knappe mit zu großem Eimerhelm und Schild (24 x 30)"""
+    c = ShiftCanvas(24, 30, 0, 4)
     # Beine
     thick_line(c, 9, 18, 9, 23, 2.6, 'cloth', lo=1, hi=3)
     thick_line(c, 14, 18, 14, 23, 2.6, 'cloth', lo=2, hi=4)
@@ -979,30 +1081,32 @@ def powder_keg(size=1, skull=True):
 
 
 def pipe_sign():
-    """Verbotsschild: durchgestrichene Pfeife (Bild, keine Schrift) (16 x 22)"""
-    c = Canvas(18, 24)
-    c.rect(8, 14, 9, 22, 'wood', 3)
-    c.rect(8, 14, 8, 22, 'wood', 4)
-    ellipse(c, 9, 8, 8.0, 8.0, 'bone', lo=3, hi=5)
-    # roter Ring
-    for y in range(0, 17):
-        for x in range(0, 18):
-            d = math.hypot(x + 0.5 - 9, y + 0.5 - 8)
-            if 5.8 < d <= 8.0:
-                c.put_ramp(x, y, 'fire', 3 if (x + y) % 3 else 4)
-    # Pfeife
-    for (x, y, r, i) in ((5, 11, 'wood', 3), (6, 11, 'wood', 3), (7, 11, 'wood', 3), (8, 10, 'wood', 2), (9, 9, 'wood', 2), (10, 9, 'wood', 3),
-                         (10, 8, 'wood', 2), (11, 7, 'wood', 3), (12, 6, 'wood', 4)):
-        c.put_ramp(x, y, r, i)
-    for (x, y) in ((11, 5), (12, 5), (12, 4)):
-        c.put_ramp(x, y, 'coal', 2)
-    # Rauchfähnchen
-    c.put_ramp(11, 3, 'stone', 4)
-    c.put_ramp(12, 2, 'stone', 3)
-    # roter Balken
-    for k in range(-6, 7):
-        c.put_ramp(9 + k, 8 + k, 'fire', 3)
-        c.put_ramp(10 + k, 8 + k, 'fire', 2)
+    """Verbotsschild: durchgestrichene Pfeife (Bild, keine Schrift) auf Pfosten (22 x 30)"""
+    c = Canvas(22, 30)
+    c.rect(10, 18, 11, 28, 'wood', 3)
+    c.rect(10, 18, 10, 28, 'wood', 4)
+    c.rect(8, 27, 13, 29, 'wood', 1)
+    ellipse(c, 11, 10, 10.0, 10.0, 'bone', lo=3, hi=5)
+    for y in range(0, 21):
+        for x in range(0, 22):
+            d = math.hypot(x + 0.5 - 11, y + 0.5 - 10)
+            if 7.2 < d <= 10.0:
+                c.put_ramp(x, y, 'fire', 3 if (x + y) % 4 else 4)
+    # Pfeife: Stiel waagerecht, Kopf rechts, Rauch
+    for x in range(5, 13):
+        c.put_ramp(x, 12, 'wood', 3)
+        c.put_ramp(x, 13, 'wood', 2)
+    c.rect(5, 11, 6, 13, 'coal', 1)
+    c.rect(12, 8, 15, 13, 'wood', 2)
+    c.rect(12, 8, 15, 8, 'wood', 4)
+    c.rect(13, 8, 14, 8, 'coal', 0)
+    for (x, y) in ((13, 6), (14, 5), (13, 4), (14, 3)):
+        c.put_ramp(x, y, 'stone', 4 if y % 2 else 3)
+    # roter Balken (links oben nach rechts unten)
+    for k in range(-8, 9):
+        c.put_ramp(11 + k, 10 + k, 'fire', 3)
+        c.put_ramp(12 + k, 10 + k, 'fire', 2)
+        c.put_ramp(10 + k, 10 + k, 'fire', 4)
     c.outline()
     return c
 
@@ -1060,20 +1164,34 @@ def sack_pile():
 FW_COLORS = ('fire', 'gold', 'leaf', 'ice', 'purple')
 
 
-def rocket(col='fire', h=22, lit=False, tilt=0):
-    """Feuerwerksrakete (8 x h): Papphülse in Farbe, Spitzkopf, Stab, Lunte"""
-    c = Canvas(10, h + 2)
-    cx = 4
+def rocket(col='fire', h=26, lit=False, tilt=0):
+    """Feuerwerksrakete (11 x h+2): farbige Hülse mit Papierband, Spitzkopf, Leitwerk, Stab, Lunte"""
+    c = Canvas(11, h + 2)
+    cx = 5
+    top = 8
+    body_h = 12
     # Stab
-    c.rect(cx, 10, cx, h, 'wood', 3)
-    # Hülse
-    round_rect(c, cx - 2, 7, cx + 2, 15, 'bone', lo=3, hi=5, radius=1)
-    for y in (9, 13):
-        c.rect(cx - 2, y, cx + 2, y, col, 3)
-    c.rect(cx - 1, 10, cx - 1, 12, col, 4)
+    c.rect(cx, top + body_h, cx, h, 'wood', 3)
+    # Leitwerk
+    poly(c, [(2, top + body_h - 5), (0, top + body_h + 1), (2, top + body_h)], col, lo=1, hi=3)
+    poly(c, [(8, top + body_h - 5), (10, top + body_h + 1), (8, top + body_h)], col, lo=1, hi=3)
+    # Hülse: Zylinder, Farbton nach Spalte
+    for y in range(top, top + body_h):
+        for x in range(2, 9):
+            u = (x - 2 + 0.5) / 7.0
+            nn = u * 2 - 1
+            nz = math.sqrt(max(0.0, 1 - nn * nn))
+            dot = nn * LIGHT[0] + nz * LIGHT[2]
+            L = 0.25 + 0.75 * max(0.0, dot)
+            c.put_ramp(x, y, col, quant(L, 1, 4, x, y))
+    for y in (top + 4, top + 5):
+        for x in range(2, 9):
+            c.put_ramp(x, y, 'bone', 5 if x < 5 else 4)
+    c.rect(2, top + body_h - 1, 8, top + body_h - 1, col, 1)
     # Spitzkopf
-    poly(c, [(cx - 2, 7), (cx + 3, 7), (cx + 0.5, 0)], col, lo=2, hi=5)
-    c.put_ramp(cx - 1, 4, col, 5)
+    poly(c, [(2, top), (9, top), (5.5, 0)], 'bone', lo=3, hi=5)
+    c.put_ramp(5, 1, col, 4)
+    c.put_ramp(5, 2, col, 3)
     # Lunte
     if lit:
         c.put_ramp(cx, h + 0, 'gold', 5)
@@ -1093,28 +1211,37 @@ def firework_fountain(col='gold'):
     return c
 
 
-def spark_fountain(col_cycle=FW_COLORS, seed=3, h=34, w=36):
-    """Funkenfontäne (Schweif) in fünf Farben, steigt aus (w//2, h-1)"""
+def spark_fountain(col_cycle=FW_COLORS, seed=3, h=44, w=44):
+    """Funkenfontäne in fünf Farben: Wurfparabeln aus einem Punkt (w//2, h-1), große Funken als Kreuze"""
     c = Canvas(w, h)
     rnd = random.Random(seed)
     cx = w // 2
-    for k in range(70):
-        t = rnd.random()
-        ang = rnd.uniform(-1.0, 1.0)
-        spread = 0.9 + 0.3 * t
-        x = cx + ang * 13 * (t ** 0.7)
-        y = (h - 2) - (h - 6) * (1 - (ang * ang) * 0.5) * math.sqrt(t) + 5 * t * t
+    base = h - 3
+    for k in range(120):
+        vx = rnd.uniform(-1.0, 1.0) * 10.5
+        vy = rnd.uniform(17.0, 33.0)
+        t = rnd.uniform(0.08, 1.0)
+        x = cx + vx * t * 1.5
+        y = base - vy * t * 1.55 + 22.0 * t * t * 1.1
         col = col_cycle[k % len(col_cycle)]
-        i = 5 if t < 0.6 else 4
-        c.put_ramp(int(x), int(y), col, i)
-        if t < 0.5:
-            c.put_ramp(int(x), int(y) + 1, col, 3)
-    # heller Kern
-    for y in range(h - 8, h - 1):
-        c.put_ramp(cx, y, 'gold', 5)
-        if y > h - 5:
-            c.put_ramp(cx - 1, y, 'fire', 4)
-            c.put_ramp(cx + 1, y, 'fire', 4)
+        xi, yi = int(round(x)), int(round(y))
+        if not (0 <= xi < w and 1 <= yi < h):
+            continue
+        c.put_ramp(xi, yi, col, 5)
+        # Schweif entgegen der Flugrichtung
+        c.put_ramp(xi - (1 if vx > 0 else -1) if t > 0.3 else xi, yi + 1, col, 4)
+        if rnd.random() < 0.45:
+            c.put_ramp(xi, yi + 2, col, 3)
+        if k % 5 == 0:
+            for (dx, dy) in ((1, 0), (-1, 0), (0, -1)):
+                c.put_ramp(xi + dx, yi + dy, col, 4)
+    # heller Kern, Düse
+    for y in range(h - 9, h - 1):
+        c.put_ramp(cx, y, 'bone', 5)
+        c.put_ramp(cx - 1, y, 'gold', 5 if y > h - 6 else 4)
+        c.put_ramp(cx + 1, y, 'gold', 4)
+    for x in range(cx - 3, cx + 4):
+        c.put_ramp(x, h - 2, 'fire', 4 if x % 2 else 3)
     return c
 
 
@@ -1269,39 +1396,52 @@ def ladle():
 
 
 def drying_cannon(kind=0, drip=True):
-    """kleine Kanonenrohr-Attrappe zum Trocknen: hängt mit Wäscheklammer an der Leine (10 x 26)"""
-    lengths = (24, 18, 21)
-    L = lengths[kind % 3]
-    w = 10 if kind != 1 else 8
-    c = Canvas(14, L + 6)
-    # Klammer
-    c.rect(5, 0, 8, 3, 'wood', 4)
-    c.rect(5, 0, 5, 3, 'wood', 5)
-    c.put_ramp(8, 3, 'wood', 2)
-    c.put_ramp(6, 2, 'metal', 3)
-    # Rohr (hängt, Mündung unten; Kugelknauf = Traube oben)
-    x0 = 7 - w // 2
-    for y in range(3, 3 + L):
-        for x in range(x0, x0 + w):
-            u = (x - x0 + 0.5) / w
-            nn = u * 2 - 1
-            nz = math.sqrt(max(0.0, 1 - nn * nn))
-            dot = nn * LIGHT[0] + nz * LIGHT[2]
-            Lm = 0.2 + 0.8 * max(0.0, dot)
-            idx = quant(Lm, 0, 4, x, y)
-            c.put_ramp(x, y, 'metal', idx)
+    """kleines Kanonenrohr, an zwei Wäscheklammern waagerecht an der Leine (32 x 20); Mündung rechts, Wassertropfen"""
+    L, hb, hm = ((26, 8, 6), (22, 7, 5), (28, 9, 6))[kind % 3]
+    ramp = ('metal', 'gold', 'metal')[kind % 3]
+    lo, hi = ((0, 4), (1, 4), (0, 4))[kind % 3]
+    c = Canvas(L + 8, 20)
+    x0 = 4
+    ytop = 5
+    # Leine
+    for x in range(0, L + 8):
+        c.put_ramp(x, 1, 'bone', 3)
+    # Rohr: Breech links (dick), Mündung rechts (dünn), Schattierung von oben
+    for x in range(x0, x0 + L):
+        t = (x - x0) / float(L - 1)
+        hh = hb + (hm - hb) * t
+        cy = ytop + hb / 2.0
+        for y in range(int(cy - hh / 2.0), int(cy + hh / 2.0) + 1):
+            v = (y - (cy - hh / 2.0)) / max(1.0, hh)
+            Lv = 0.95 - 0.8 * v
+            c.put_ramp(x, y, ramp, quant(max(0.0, min(1.0, Lv)), lo, hi, x, y))
     # Reifen
-    for y in (3 + L // 3, 3 + 2 * L // 3):
-        for x in range(x0 - 1, x0 + w + 1):
-            c.put_ramp(x, y, 'metal', 1 if x % 2 else 2)
-    # Mündungswulst
-    for x in range(x0 - 2, x0 + w + 2):
-        c.put_ramp(x, 3 + L - 1, 'metal', 3 if x < 7 else 1)
-        c.put_ramp(x, 3 + L - 2, 'metal', 4 if x < 7 else 2)
-    c.rect(x0 + 1, 3 + L, x0 + w - 2, 3 + L, 'coal', 0)
+    for rx in (x0 + L // 3, x0 + 2 * L // 3):
+        t = (rx - x0) / float(L - 1)
+        hh = hb + (hm - hb) * t
+        cy = ytop + hb / 2.0
+        for y in range(int(cy - hh / 2.0) - 1, int(cy + hh / 2.0) + 2):
+            c.put_ramp(rx, y, ramp, lo + 1)
+            c.put_ramp(rx + 1, y, ramp, hi)
+    # Knauf (Traube) links
+    ellipse(c, x0 - 1.5, ytop + hb / 2.0, 2.6, 2.6, ramp, lo=lo, hi=hi)
+    # Mündungswulst rechts
+    cy = ytop + hb / 2.0
+    for y in range(int(cy - hm / 2.0) - 1, int(cy + hm / 2.0) + 2):
+        c.put_ramp(x0 + L, y, ramp, hi if y < cy else lo + 1)
+        c.put_ramp(x0 + L - 1, y, ramp, hi if y < cy else lo + 1)
+    c.put_ramp(x0 + L, int(cy), 'coal', 0)
+    # Klammern
+    for px in (x0 + 3, x0 + L - 6):
+        c.rect(px, 0, px + 2, 4, 'wood', 4)
+        c.rect(px, 0, px, 4, 'wood', 5)
+        c.put_ramp(px + 2, 4, 'wood', 2)
+        c.put_ramp(px + 1, 2, 'metal', 3)
     if drip:
-        c.put_ramp(x0 + 2, 3 + L + 1, 'ice', 4)
-        c.put_ramp(x0 + 2, 3 + L + 2, 'ice', 3)
+        dx = x0 + L - 3
+        c.put_ramp(dx, ytop + hb + 2, 'ice', 4)
+        c.put_ramp(dx, ytop + hb + 3, 'ice', 3)
+        c.put_ramp(dx - 8, ytop + hb + 3, 'ice', 4)
     c.outline()
     return c
 

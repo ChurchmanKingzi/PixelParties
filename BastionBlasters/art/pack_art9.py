@@ -6,6 +6,7 @@ from __future__ import annotations
 from cards_art import *          # helpers, ART registry, pixl / scenekit / landscape / assets_*
 import random
 from pack_art9_kit import *
+from pack_art9_hall import pad_bottom
 import pack_art9_scholar as SC
 
 
@@ -99,11 +100,9 @@ import pack_art9_hall as HL
 def furnish_trophy(ctx):
     W = ctx.W
     # Wand: Schilde mit Trophaeen, Banner, Pokalbrett
-    draw_wall(ctx, HL.plaque_goblin(), 18)
-    draw_wall(ctx, HL.plaque_skull(), W - 18)
+    draw_wall(ctx, HL.plaque_goblin(), 17)
+    draw_wall(ctx, HL.plaque_skull(), W - 17)
     draw_wall(ctx, HL.trophy_banner(), W // 2)
-    draw_wall(ctx, HL.plaque_bear(), 34)
-    draw_wall(ctx, HL.plaque_goblin(), W - 34)
     # Boden: roter Laeufer zur Gnom-Statue
     draw_floor(ctx, rug(18, 48, 'teamA'), W // 2 - 9, 10)
     draw_prop(ctx, HL.gnome_medal(), W // 2 - 9, 2)
@@ -151,4 +150,166 @@ def _art_bw10():
     # Bewegungsstriche am Loeffel
     for (dx, dy) in ((9, -14), (10, -13), (11, -11), (12, -9)):
         wput(world, cx + dx, cy + dy, 'bone', 5)
+    return finish(window_of(world))
+
+
+# =========================================================================== BF-05 Crypt
+
+import pack_art9_crypt as CR
+from pack_art9_hall import pad_bottom
+
+
+def furnish_crypt(ctx):
+    W = ctx.W
+    draw_wall(ctx, CR.skull_niche(), 20)
+    draw_wall(ctx, CR.skull_niche(), W - 20)
+    draw_wall(ctx, CR.torch_green(), W // 2)
+    draw_wall(ctx, pad_bottom(CR.cobweb(), 8), 12)
+    draw_wall(ctx, pad_bottom(CR.cobweb(True), 8), W - 12)
+    draw_floor(ctx, CR.crypt_rug(), 40, 14)
+    draw_prop(ctx, CR.coffin('open'), 6, 6)
+    draw_prop(ctx, CR.coffin('closed'), 26, 8)
+    draw_prop(ctx, CR.armchair_reader(), 50, 10)
+    draw_prop(ctx, CR.candelabra(), 44, 18)
+    draw_prop(ctx, CR.bat_hanging(), 62, -14, key_add=0)
+
+
+THEME_CRYPT = {'floor': floor_cobble(9, base='coal', tone=(1, 2), mortar=0, hi=3), 'furnish': furnish_crypt, 'low': False}
+
+
+@card_art('BF-05')
+def _art_bf05():
+    world, X0, Y0, out = room_world('Y', THEME_CRYPT, '3x2', 'dark', 3)
+    return finish(window_of(world))
+
+
+# =========================================================================== BF-06 Ice Grotto
+
+import pack_art9_ice as IC
+
+
+def furnish_ice(ctx):
+    W = ctx.W
+    draw_wall(ctx, IC.icicles(W - 8, 22), W // 2)
+    draw_wall(ctx, IC.key_board(), W // 2)
+    draw_floor(ctx, IC.welcome_mat(), W // 2 - 12, 34)
+    draw_prop(ctx, IC.ice_crystals(34, 1, 4), 5, 6)
+    draw_prop(ctx, IC.ice_crystals(30, 7, 3), W - 5 - 25, 8)
+    draw_prop(ctx, IC.penguin_clerk(), W // 2 - 8, 2)
+    draw_prop(ctx, IC.reception_desk(), W // 2 - 26, 8)
+    draw_prop(ctx, IC.snow_drift(26, 10, 1), 4, 36)
+    draw_prop(ctx, IC.snow_drift(22, 9, 4), W - 28, 38)
+
+
+THEME_ICE = {'floor': floor_cobble(7, base='ice', tone=(3, 4), mortar=2, hi=5), 'furnish': furnish_ice, 'low': False}
+
+
+@card_art('BF-06')
+def _art_bf06():
+    world, X0, Y0, out = room_world('I', THEME_ICE, '3x2', 'snow', 2)
+    return finish(window_of(world))
+
+
+# =========================================================================== BW-11 The Great Hammer
+
+import pack_art9_tech as TC
+
+
+def furnish_hammer(ctx):
+    W = ctx.W
+    draw_wall(ctx, TC.gear(8, 'gold', 10, 4), 14)
+    draw_wall(ctx, TC.gear(5, 'metal', 8, 3), 28)
+    draw_wall(ctx, TC.blueprint(), W - 14)
+
+
+THEME_HAMMER = {'floor': floor_plates('metal', 1, 2, 3), 'furnish': furnish_hammer, 'low': False}
+
+
+def _gnome_at(world, spr, hand, flip=False):
+    """Gnom so setzen, dass seine Haende bei `hand` liegen (pull-Pose: Haende bei (20, 10) im Sprite)"""
+    hx = 20 if not flip else spr.w - 1 - 20
+    x0, y0 = hand[0] - hx, hand[1] - 10
+    foot_y = y0 + spr.h - 1
+    shadow(world, x0 + spr.w // 2, foot_y - 1, 9, 3)
+    world.draw(spr, x0, y0, foot_y, flip)
+
+
+@card_art('BW-11')
+def _art_bw11():
+    world, X0, Y0, out = room_world('M', THEME_HAMMER, '3x3', 'grass', 5)
+    ox, oy = 8, 6                                   # Fensterversatz
+    hm = TC.giant_hammer(50, 84)
+    hx0, hy0 = 72 - hm.w // 2 + ox, 2 + oy
+    # Schatten des schwebenden Hammers am Boden
+    shadow(world, 72 + ox, 88 + oy, 17, 4)
+    world.draw(hm, hx0, hy0, 9000)
+    eye = {'tl': (hx0 + 6, hy0 + 1), 'tr': (hx0 + hm.w - 7, hy0 + 1), 'bl': (hx0 + 6, hy0 + 25), 'br': (hx0 + hm.w - 7, hy0 + 25)}
+    # drei Gnome an Seilen
+    g1, g2, g3 = TC.gnome('pull', 'teamA'), TC.gnome('pull', 'leaf', 'dirt', 'cloth'), TC.gnome('pull', 'gold', 'bone', 'sky')
+    hands = [(46 + ox, 47 + oy), (53 + ox, 77 + oy), (97 + ox, 64 + oy)]
+    _gnome_at(world, g1, hands[0])
+    _gnome_at(world, g2, hands[1])
+    _gnome_at(world, g3, hands[2], flip=True)
+    wrope(world, eye['tl'], hands[0], 2, key=9050)
+    wrope(world, eye['bl'], hands[1], 2, key=9050)
+    wrope(world, eye['tr'], hands[2], 2, key=9050)
+    return finish(window_of(world))
+
+
+# =========================================================================== BF-04 Siege Workshop
+
+
+def furnish_siege(ctx):
+    W = ctx.W
+    draw_wall(ctx, pad_bottom(TC.pipe_run(W - 8, 14), 8), W // 2)
+    draw_wall(ctx, TC.gear(10, 'gold', 11, 5), 60)
+    draw_wall(ctx, TC.gear(6, 'metal', 8, 4), 79)
+    draw_prop(ctx, TC.boiler(), 5, -8)
+    draw_prop(ctx, TC.battering_ram(), 30, 26)
+    draw_prop(ctx, TC.seesaw_mallet(), 50, 8)
+
+
+THEME_SIEGE = {'floor': floor_plates('metal', 1, 2, 6), 'furnish': furnish_siege, 'low': False}
+
+
+@card_art('BF-04')
+def _art_bf04():
+    world, X0, Y0, out = room_world('V', THEME_SIEGE, '3x3', 'dirt', 4)
+    ox, oy = 8, 6
+    # Dampf aus dem Kamin des Kessels
+    bx, by = X0 + 5 + 28, Y0 - 8
+    for k, (dx, dy, f, sz) in enumerate(((0, -9, 0, 1), (4, -19, 2, 2), (10, -28, 4, 2))):
+        world.draw(TC.steam_puff(f, sz), bx + dx - 4, by + dy, 9000)
+    unit_at(world, TC.gnome('work', 'metal', 'fire'), X0 + 24, Y0 + 62, sh=(9, 3))
+    return finish(window_of(world))
+
+
+# =========================================================================== BF-02 Arcanum
+
+import pack_art9_arcane as AR
+import pack_art9_ice as IC2
+
+
+def furnish_arcanum(ctx):
+    W = ctx.W
+    arcane_cols = ['purple', 'ice', 'sky', 'cloth', 'purple', 'gold']
+    draw_prop(ctx, SC.bookshelf(26, 36, 8, arcane_cols), 5, -18)
+    draw_prop(ctx, SC.bookshelf(26, 36, 14, arcane_cols), W - 5 - 26, -18)
+    draw_wall(ctx, SC.window_night(18, 22, star=True), W // 2)
+    draw_floor(ctx, AR.rune_circle(19), W // 2 - 20, 26)
+    draw_prop(ctx, AR.crystal_ball_stand(), W // 2 - 17, 10)
+    draw_prop(ctx, AR.apprentice(), W - 12 - 24, 34)
+
+
+THEME_ARCANUM = {'floor': floor_cobble(11, base='purple', tone=(0, 1), mortar=0, hi=2), 'furnish': furnish_arcanum, 'low': False}
+
+
+@card_art('BF-02')
+def _art_bf02():
+    world, X0, Y0, out = room_world('N', THEME_ARCANUM, '3x3', 'grass', 3)
+    # schwebende Buecher mit Funkenschweif (kreisen um die Kugel)
+    for (spr, x, y) in ((SC.flying_book(0, 'teamA'), 34, 58), (SC.flying_book(1, 'gold'), 94, 52), (SC.flying_book(2, 'ice'), 40, 84)):
+        world.draw(spr, x, y, 9000)
+        wsparkle(world, x - 3, y + 12, 'purple')
+        wsparkle(world, x + 21, y - 3, 'ice')
     return finish(window_of(world))

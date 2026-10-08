@@ -101,7 +101,7 @@ def wline(world, x0, y0, x1, y1, ramp, i, key=9000, dashed=False):
             y0 += sy
 
 
-def wrope(world, p0, p1, sag=4, key=9000, ramp='dirt', hi=4, lo=2):
+def wrope(world, p0, p1, sag=4, key=9000, ramp='dirt', hi=5, lo=3):
     """durchhängendes Seil zwischen zwei Punkten (1 px, Licht oben)"""
     (x0, y0), (x1, y1) = p0, p1
     n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1

@@ -90,11 +90,12 @@ def spr_zeppelin(anim='idle', f=0):
         if abs(k) > 1:
             c.put_ramp(23, 32 + k, 'bone', 3 if (k + pf) % 2 else 4)
     # zwei Bomben (Doppelbombe)
-    c.rect(30, 36, 41, 36, 'metal', 3)
-    for bx in (32, 39):
-        ellipse(c, bx, 40, 2.9, 2.9, 'coal', lo=1, hi=4, ambient=0.3)
-        c.put_ramp(bx - 1, 38, 'coal', 5)
-        c.put_ramp(bx, 36, 'gold', 4)
-        c.put_ramp(bx + 1, 35, 'gold', 5)
+    if anim != 'drop':
+        c.rect(30, 36, 41, 36, 'metal', 3)
+        for bx in (32, 39):
+            ellipse(c, bx, 40, 2.9, 2.9, 'coal', lo=1, hi=4, ambient=0.3)
+            c.put_ramp(bx - 1, 38, 'coal', 5)
+            c.put_ramp(bx, 36, 'gold', 4)
+            c.put_ramp(bx + 1, 35, 'gold', 5)
     c.outline()
     return c

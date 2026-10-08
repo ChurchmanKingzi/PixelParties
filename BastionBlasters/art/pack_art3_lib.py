@@ -210,3 +210,11 @@ def rim_arc(c, cx, cy, rx, ry, ramp, idx, a0, a1, only_inside=True):
         x, y = int(round(cx + math.cos(a) * rx)), int(round(cy + math.sin(a) * ry))
         if (not only_inside) or c.alpha(x, y):
             c.put_ramp(x, y, ramp, idx)
+
+
+def strand_taper(c, pts, w0, w1, ramp, lo=1, hi=4, ambient=0.3):
+    """wie strand, aber die Breite wechselt linear von w0 (Anfang) nach w1 (Ende)"""
+    n = len(pts) - 1
+    for i, (a, b) in enumerate(zip(pts[:-1], pts[1:])):
+        w = w0 + (w1 - w0) * (i + 0.5) / max(1, n)
+        thick_line(c, a[0], a[1], b[0], b[1], w, ramp, lo=lo, hi=hi, ambient=ambient)

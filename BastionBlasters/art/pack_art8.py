@@ -5,6 +5,7 @@ from __future__ import annotations
 from pack_art8_kit import *
 from pack_art8_props import *
 from pack_art8_chars import *
+import pack_art8_scenes_a      # noqa: F401
 
 
 def _view(geom, y0=6):

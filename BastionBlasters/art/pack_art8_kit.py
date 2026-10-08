@@ -47,6 +47,29 @@ def light_glow(world, cx, cy, rx, ry, steps=1, core=0.45, depth_max=-40):
     sub[m] = lighten_palette(sub[m], steps)
 
 
+def light_cone(world, x0, y0, w0, x1, y1, w1, steps=1, edge_checker=True):
+    """Lichtkegel (Trapez von (x0,y0,Breite w0) nach (x1,y1,Breite w1)): Kern aufgehellt, Rand im Schachbrett.
+    Wirkt auf alle Pixel (auch Möbel, Figuren), bleibt in der Master-Palette."""
+    ya, yb = int(min(y0, y1)), int(max(y0, y1))
+    ya, yb = max(0, ya), min(world.h, yb + 1)
+    for y in range(ya, yb):
+        t = (y - y0) / float(y1 - y0) if y1 != y0 else 0.0
+        t = max(0.0, min(1.0, t))
+        cx = x0 + (x1 - x0) * t
+        hw = (w0 + (w1 - w0) * t) / 2.0
+        xa, xb = max(0, int(cx - hw)), min(world.w, int(cx + hw) + 1)
+        if xb <= xa:
+            continue
+        xs = np.arange(xa, xb)
+        rel = np.abs(xs + 0.5 - cx) / max(hw, 0.5)
+        m = (rel < 0.55) | (((xs + y) % 2 == 0) & (rel <= 1.0))
+        if not edge_checker:
+            m = rel <= 1.0
+        sel = xs[m]
+        if len(sel):
+            world.px[y, sel, :3] = lighten_palette(world.px[y, sel, :3], steps)
+
+
 def tint_glow(world, cx, cy, rx, ry, ramp, idx, depth_max=-40, sparse=False):
     """Farbiger Glut-/Magieschein auf dem Boden: Schachbrett (innen) bzw. 2x2-Raster (Rand) in Rampenfarbe"""
     x0, x1 = max(0, int(cx - rx - 1)), min(world.w, int(cx + rx + 2))
@@ -76,6 +99,29 @@ def wpix(world, x, y, ramp, idx, depth=9000):
 
 def wdraw(world, spr, x, y, key=9000, flip=False):
     world.draw(spr, int(x), int(y), key, flip)
+
+
+# --------------------------------------------------------------------------- Canvas mit Versatz
+
+
+class ShiftCanvas(Canvas):
+    """Canvas, dessen Zeichenaufrufe um (dx, dy) versetzt landen (damit Werkzeuge über die Oberkante hinausragen dürfen)"""
+
+    def __init__(self, w, h, dx=0, dy=0):
+        super().__init__(w, h)
+        self.dx, self.dy = dx, dy
+
+    def put(self, x, y, color, rid=-1):
+        super().put(int(x) + self.dx, int(y) + self.dy, color, rid)
+
+    def alpha(self, x, y):
+        return super().alpha(int(x) + self.dx, int(y) + self.dy)
+
+    def outline(self, dark=0, lit=1):
+        dx, dy = self.dx, self.dy
+        self.dx = self.dy = 0
+        super().outline(dark, lit)
+        self.dx, self.dy = dx, dy
 
 
 # --------------------------------------------------------------------------- ASCII-Sprites

@@ -174,3 +174,80 @@ def wheel2(c, cx, cy, r=7.0, ramp='wood', hub='metal', spokes=6, phase=15):
         x1, y1 = cx + math.cos(a) * (r - 1.6), cy + math.sin(a) * (r - 1.6)
         c.line(cx, cy, int(round(x1)), int(round(y1)), ramp, 4 if math.cos(a) + math.sin(a) < 0.3 else 3)
     ellipse(c, cx, cy, max(1.5, r * 0.28), max(1.5, r * 0.28), hub, lo=1, hi=5)
+
+
+def bat_spr(flap=0, outline=True, big=False):
+    """Fledermaus mit Mini-Zähnen und roten Augen (15 x 10; big: 19 x 13). flap 0: Flügel oben, 1: Flügel unten"""
+    k = 1.0 if not big else 1.28
+    W, H = (15, 11) if not big else (19, 14)
+    c = Canvas(W, H)
+    cx, cy = W // 2, H // 2
+    lift = 1.2 if flap else -3.6
+    for sgn in (-1, 1):
+        def X(v):
+            return cx + sgn * v * k
+        sh = (X(1.5), cy - 1)
+        tip1 = (X(7.2), cy + lift * k)
+        n1 = (X(5.0), cy + lift * 0.1 * k + 0.6)
+        tip2 = (X(6.0), cy + lift * 0.2 * k + 3.0 * k)
+        n2 = (X(3.6), cy + 1.8 * k)
+        tip3 = (X(3.2), cy + 3.8 * k)
+        pts = [sh, tip1, n1, tip2, n2, tip3, (X(1.2), cy + 2.5)]
+        poly(c, pts, 'purple', lo=1, hi=4 if sgn < 0 else 3)
+        c.line(int(round(sh[0])), int(round(sh[1])), int(round(tip1[0])), int(round(tip1[1])), 'purple', 5 if sgn < 0 else 4)
+    ellipse(c, cx, cy + 0.5, 2.2 * k, 2.8 * k, 'coal', lo=0, hi=2)
+    c.put_ramp(cx - 1, cy - int(round(3.4 * k)), 'coal', 1)                 # Öhrchen
+    c.put_ramp(cx + 1, cy - int(round(3.4 * k)), 'coal', 1)
+    c.put_ramp(cx - 1, cy - 1, 'fire', 4)                                    # rote Augen
+    c.put_ramp(cx + 1, cy - 1, 'fire', 4)
+    c.put_ramp(cx - 1, cy + 1, 'bone', 5)                                    # Mini-Zähne
+    c.put_ramp(cx + 1, cy + 1, 'bone', 5)
+    if outline:
+        c.outline()
+    return c
+
+
+def mini_bat(flap=0):
+    """winzige Fledermaus (7 x 4) für Schwärme in der Ferne"""
+    c = Canvas(7, 4)
+    if flap == 0:
+        for (x, y) in ((0, 0), (1, 1), (2, 1), (4, 1), (5, 1), (6, 0), (1, 2), (5, 2)):
+            c.put_ramp(x, y, 'purple', 3 if x < 3 else 2)
+    else:
+        for (x, y) in ((0, 2), (1, 1), (2, 1), (4, 1), (5, 1), (6, 2), (0, 1), (6, 1)):
+            c.put_ramp(x, y, 'purple', 3 if x < 3 else 2)
+    for (x, y) in ((3, 1), (3, 2), (2, 0), (4, 0)):
+        c.put_ramp(x, y, 'coal', 1)
+    c.put_ramp(3, 1, 'fire', 4)
+    return c
+
+
+def smoke_blob(c, cx, cy, r, ramp='stone'):
+    """Rauchballen mit durchscheinendem Rand (Schachbrett): Kern 4, Rand 3, Saum 2"""
+    for y in range(int(cy - r - 1), int(cy + r + 2)):
+        for x in range(int(cx - r - 1), int(cx + r + 2)):
+            d = math.hypot(x + 0.5 - cx, (y + 0.5 - cy) * 1.1) / r
+            if d > 1.0:
+                continue
+            if d < 0.55:
+                idx = 4 if (x + y) % 2 == 0 or d < 0.35 else 3
+            elif d < 0.8:
+                idx = 3 if (x + y) % 2 == 0 else -1
+            else:
+                idx = 2 if (x + y) % 2 == 0 else -1
+            if idx >= 0 and not (idx == 4 and x + 0.5 > cx + r * 0.2 and y + 0.5 > cy):
+                c.put_ramp(x, y, ramp, idx)
+            elif idx >= 0:
+                c.put_ramp(x, y, ramp, 3)
+
+
+def smoke_sprite(h=30, w=16, seed=1, n=4, r0=2.4):
+    """aufsteigende, durchscheinende Rauchsäule (Sprite, Fuß unten Mitte)"""
+    c = Canvas(w, h)
+    rnd = random.Random(seed)
+    for k in range(n):
+        r = r0 + k * 0.9
+        x = w / 2.0 + rnd.uniform(-1.5, 1.5) + (k * 0.6)
+        y = h - r - 1 - k * (h - 2 * r0 - 2) / max(1, n - 1) * 0.9
+        smoke_blob(c, x, y, r)
+    return c

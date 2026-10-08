@@ -36,7 +36,7 @@ def _art_bu05():
 def _art_bu08():
     rows = [".......", ".hOOh..", ".hOOh..", ".hhhh..", "......."]
     world, c, out = _room_world(rows, {'O': THEME_OFFICE}, seed=4, size=(192, 160))
-    unit_at(world, spr_recruit(), 66, 82, flip=True, sh=(6, 2))
+    unit_at(world, spr_recruit(), 86, 80, sh=(6, 2))
     # linker Hof: Warteschlange; rechter Hof: Waffenstaender
     unit_at(world, skeleton('idle', 1), 46, 100, sh=(8, 3))
     prop_at(world, signpost(), 36, 66)
@@ -104,3 +104,210 @@ def _art_bu06():
     for (sp, x, y) in ((barrel(), 16, 28), (crate(), 128, 30)):
         prop_at(w, sp, x, y)
     return finish(w)
+
+
+# --------------------------------------------------------------------------- BU-07 Slide
+
+
+@card_art('BU-07')
+def _art_bu07():
+    w = ground_world('cobble', 9)
+    sl = slide_sprite()
+    fx, fy = 26, 78                      # linke Kante, Bodenlinie des Sprites
+    shadow(w, fx + 18, fy - 4, 18, 3)
+    w.draw(sl, fx, fy - sl.h + 4, fy)
+    # Rutscher auf der Bahn (Bahn: Suedkante y_a + (x - x_a) * slope)
+    sx, sy = fx + 28 + 18, fy - sl.h + 4 + 22 + 10
+    w.draw(spr_slider(), sx - 11, sy - 18, fy + 2)
+    w.draw(spr_slider(kind='teamA', species='goblin'), fx + 28 + 46 - 16, fy - sl.h + 4 + 22 + 25 - 20, fy + 3)
+    splash_drops(w, fx + 78, fy - 6)
+    unit_at(w, citizen('cloth', 1), 30, 92, sh=(5, 2))
+    for (sp, x, y) in ((barrel(), 14, 34), (crate(), 128, 34), (duck(), fx + 78, fy - 3)):
+        prop_at(w, sp, x, y)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BU-09 Recall Portal
+
+
+@card_art('BU-09')
+def _art_bu09():
+    w = ground_world('cobble', 11)
+    pt = portal_sprite()
+    px0, py_foot = 82, 82
+    shadow(w, px0 + 2, py_foot - 4, 30, 5)
+    w.draw(pt, px0 - pt.w // 2, py_foot - pt.h + 1, py_foot)
+    # Wirbel-Leuchten: Boden rund ums Portal etwas heller
+    lighten_disc(w, px0, py_foot - 6, 26, 1, ring=0.5)
+    # verletztes Skelett loest sich auf und strudelt ins Portal
+    rng = random.Random(5)
+    sk, parts = dissolve_sprite(bandaged_skeleton(2), rng, 12, 1.15)
+    sx, sy = 36, 90
+    w.draw(sk, sx - sk.w // 2, sy - sk.h + 1, sy)
+    tx, ty = px0 - 4, py_foot - 34
+    for (x, y, t) in parts:
+        wx, wy = sx - sk.w // 2 + x, sy - sk.h + 1 + y
+        f = 0.12 + 0.8 * t
+        qx, qy = wx + (tx - wx) * f, wy + (ty - wy) * f - 5 * math.sin(f * math.pi)
+        px_at(w, int(qx), int(qy), 'ice' if rng.random() < 0.5 else 'bone', 5 if rng.random() < 0.6 else 4, 9000)
+    for (x, y) in ((62, 46), (74, 34), (96, 30)):
+        star(w, x, y, 'ice', False)
+    prop_at(w, portal_sign(), 30, 54)
+    for (sp, x, y) in ((barrel(), 128, 28), (crate(), 16, 90)):
+        prop_at(w, sp, x, y)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BA-01 Shield Dome Generator
+
+
+@card_art('BA-01')
+def _art_ba01():
+    w = ground_world('cobble', 13)
+    g = dome_generator()
+    gx, gy = 72, 66
+    shadow(w, gx + 3, gy - 4, 16, 4)
+    w.draw(g, gx - g.w // 2, gy - g.h + 1, gy)
+    # Buerger unter der Kuppel schauen hoch
+    unit_at(w, citizen('cloth', 0), 44, 74, sh=(5, 2))
+    unit_at(w, citizen('dirt', 1), 104, 70, flip=True, sh=(5, 2))
+    for (sp, x, y) in ((barrel(), 20, 34), (crate(), 126, 90)):
+        prop_at(w, sp, x, y)
+    # Granate kommt von rechts oben und prallt an der Kuppel ab
+    ix, iy = 118, 30
+    shell = stone_projectile_small()
+    for (x, y) in arc_points(144, 0, ix + 4, iy - 3, 10, 10)[:-1]:
+        px_at(w, int(x), int(y), 'fire', 4, 9700)
+        px_at(w, int(x) + 1, int(y), 'bone', 5, 9700)
+    dome_overlay(w, 72, 50, 56, 39, impact=(ix, iy))
+    w.draw(shell, ix - 5, iy - 8, 9900)
+    star(w, ix + 4, iy - 10, 'gold', True, 9950)
+    star(w, ix - 9, iy + 1, 'fire', False, 9950)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BA-03 Net Launcher
+
+
+@card_art('BA-03')
+def _art_ba03():
+    w = ground_world('cobble', 15)
+    nl = net_launcher()
+    nx, nfoot = 42, 82
+    shadow(w, nx, nfoot - 5, 24, 4)
+    w.draw(nl, nx - nl.w // 2, nfoot - nl.h + 3, nfoot)
+    # Frosch wirft zurueck zum Schuetzen (gegnerisches Katapult rechts)
+    unit_at(w, spr_frog(), 84, 82, sh=(10, 3))
+    cat = catapult('load', 0)
+    unit_at(w, cat, 118, 80, flip=True, team_swap=True, sh=(20, 4))
+    ball_s = ball(3.2)
+    pts = arc_points(96, 62, 118, 60, 16, 9)
+    for (x, y) in pts[1:-1]:
+        px_at(w, int(x), int(y), 'bone', 5, 9000)
+        px_at(w, int(x) + 1, int(y), 'bone', 3, 9000)
+    w.draw(ball_s, 104 - ball_s.w // 2, 49 - ball_s.h // 2, 9100)
+    zielschatten(w, 118, 80, 12, 1)
+    for (sp, x, y) in ((barrel(), 14, 34), (crate(), 130, 32)):
+        prop_at(w, sp, x, y)
+    return finish(w)
+
+
+# --------------------------------------------------------------------------- BA-02 Smog Chimney
+
+
+@card_art('BA-02')
+def _art_ba02():
+    world = ground_world('grass', 17, 192, 160)
+    rows = [".....", ".Thh.", ".hhh.", "....."]
+    c, out = mini_castle(rows, 0, 1, world, tw=chimney_tower())
+    cr = Canvas(24, 14)
+    ellipse(cr, 12, 7, 10, 5, 'coal', lo=0, hi=2)
+    ellipse(cr, 12, 7, 6, 3, 'coal', lo=0, hi=1)
+    cr.outline()
+    world.draw(cr, 80 - 12, 98 - 7, -48)
+    # Nebelbank ueber dem Hof (rosa getoent: innen voll, aussen Schachbrett)
+    H, W = world.h, world.w
+    Y, X = np.mgrid[0:H, 0:W]
+    nz = 0.5 * smooth_noise(W, H, 14, 5) + 0.5 * smooth_noise(W, H, 7, 6)
+    d = np.hypot((X - 112) / 46.0, (Y - 92) / 24.0) + (nz - 0.5) * 0.9
+    ground = world.depth < -40
+    tint_pink(world, (d < 0.62) & ground, 1)
+    tint_pink(world, (d >= 0.62) & (d < 0.95) & ground & (((X + Y) % 2) == 0), 1)
+    # Zielmarke (gedachter Einschlag) im Nebel, Einschlag eine Zelle daneben
+    zielschatten(world, 112, 90, 12, 1)
+    # Rauchfahne: Schlotoeffnung ca. (48, 46) in Weltkoordinaten, treibt nach rechts
+    plume = [(48, 43, 4), (50, 37, 6), (58, 32, 8), (70, 30, 9), (84, 32, 9), (98, 37, 9), (110, 45, 9), (118, 57, 8)]
+    low = [(134, 76, 7), (100, 90, 6)]
+    smog_puffs(world, plume + low)
+    # Schuss kommt von rechts oben, verschwindet im Nebel, Einschlag daneben
+    ix, iy = 80, 98
+    for (x, y) in arc_points(190, 28, ix + 2, iy - 8, 30, 24)[3:-1]:
+        px_at(world, int(x), int(y), 'bone', 5, 9500)
+        px_at(world, int(x) + 1, int(y), 'fire', 4, 9500)
+    shell = stone_projectile_small()
+    world.draw(shell, ix - 7, iy - 22, 9600)
+    for (dx, dy, i) in ((0, 0, 5), (-2, -1, 4), (2, -1, 4), (-1, 2, 4), (1, 2, 3)):
+        px_at(world, ix + dx + 6, iy + dy - 9, 'fire', i, 9600)
+    return finish(crop_world(world, 8, 17))
+
+
+# --------------------------------------------------------------------------- BA-04 Lightning Rod
+
+
+@card_art('BA-04')
+def _art_ba04():
+    world = ground_world('grass', 19, 192, 160)
+    rows = [".....", ".hhT.", ".hhh.", "....."]
+    c, out = mini_castle(rows, 0, 1, world, tw=rod_tower())
+    rng = random.Random(4)
+    # Gewitterstimmung: alles eine Stufe dunkler, Wolkenband am oberen Rand
+    dim_world(world, 1)
+    H, W = world.h, world.w
+    Y, X = np.mgrid[0:H, 0:W]
+    nz = 0.6 * smooth_noise(W, H, 16, 8) + 0.4 * smooth_noise(W, H, 8, 9)
+    edge = 22 + (nz - 0.5) * 26
+    chk = ((X + Y) % 2 == 0)
+    cl = np.array(RAMPS['coal'], np.uint8)
+    full = (Y < edge - 3)
+    half = (Y < edge + 1) & ~full & chk
+    dark = (Y < edge - 10) & chk
+    world.px[:, :, :3][full] = cl[2]
+    world.px[:, :, :3][half] = cl[2]
+    world.px[:, :, :3][dark] = cl[1]
+    m = full | half
+    world.depth[m] = np.maximum(world.depth[m], 8000)
+    # Arkan-Geschoss (lila) wird zur Spitze hin abgelenkt (die Bahn knickt ein)
+    tipx, tipy = 112, 26
+    p0, p1, p2 = (8, 126), (70, 104), (tipx - 5, tipy + 9)
+    trail = []
+    for k in range(0, 31):
+        t = k / 30.0
+        x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0]
+        y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]
+        trail.append((x, y))
+    for k, (x, y) in enumerate(trail[:-4]):
+        if k % 2 == 0:
+            px_at(world, int(x), int(y), 'purple', 2 + min(3, k // 8), 9300)
+            if k > 12:
+                px_at(world, int(x), int(y) - 1, 'purple', 4, 9300)
+                px_at(world, int(x) + 1, int(y), 'purple', 3, 9300)
+    ox, oy = trail[-5]
+    orb = Canvas(11, 11)
+    ellipse(orb, 5.5, 5.5, 4.4, 4.4, 'purple', lo=2, hi=5)
+    orb.rect(4, 4, 6, 6, 'bone', 5)
+    orb.outline()
+    world.draw(orb, int(ox) - 5, int(oy) - 5, 9310)
+    # Blitz aus dem Wolkenband direkt in die Nadel, kurzer Nebenast
+    pts = bolt_points(94, 14, tipx, tipy - 1, rng, jag=5, steps=5)
+    draw_bolt(world, pts, thick=True)
+    draw_bolt(world, bolt_points(pts[2][0], pts[2][1], 84, 50, rng, jag=3, steps=3))
+    # Blitzschein ueber der Szene
+    lighten_disc(world, tipx, tipy + 10, 36, 1, ring=0.45)
+    # Funken sprueht es von der Kugel
+    for (x, y, big) in ((tipx - 14, tipy + 6, False), (tipx + 12, tipy + 4, False), (tipx - 9, tipy + 20, False), (tipx + 15, tipy + 16, False),
+                        (tipx - 4, tipy - 4, True)):
+        star(world, x, y, 'gold' if not big else 'bone', big, 9900)
+    for (x, y) in ((tipx - 17, tipy + 13), (tipx + 18, tipy + 10), (tipx - 12, tipy + 30), (tipx + 7, tipy - 8)):
+        px_at(world, x, y, 'bone', 5, 9900)
+        px_at(world, x + 1, y + 1, 'ice', 4, 9900)
+    return finish(crop_world(world, 8, 10))

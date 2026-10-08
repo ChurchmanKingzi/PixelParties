@@ -123,12 +123,15 @@ def spr_mic_troll(f=0) -> Canvas:
     hline(c, 8, 27, 33, 'coal', 1)
     c.rect(16, 32, 20, 34, 'gold', 5)
     c.rect(17, 33, 19, 33, 'coal', 2)
-    # vorderer Arm mit Mikro
-    thick_line(c, 27, 22, 28, 17, 4.6, 'gold', lo=2, hi=5)
-    ellipse(c, 28.5, 15.5, 2.6, 2.4, 'purple', lo=3, hi=5)
-    thick_line(c, 28, 15, 26, 11, 1.6, 'metal', lo=1, hi=3)
-    ellipse(c, 25.5, 10, 2.1, 2.1, 'metal', lo=2, hi=5)
-    c.put_ramp(24, 9, 'bone', 5)
+    # vorderer Arm mit Mikro (vor dem Mund)
+    thick_line(c, 26, 25, 31, 24, 4.4, 'gold', lo=2, hi=5)
+    ellipse(c, 32.0, 23.5, 2.6, 2.6, 'purple', lo=3, hi=5)
+    thick_line(c, 31, 22, 29.5, 18, 1.6, 'metal', lo=1, hi=3)
+    ellipse(c, 29.0, 16.8, 2.5, 2.5, 'metal', lo=2, hi=5)
+    c.put_ramp(28, 15, 'bone', 5)
+    c.put_ramp(29, 15, 'bone', 4)
+    for x in range(27, 31):
+        c.put_ramp(x, 17, 'metal', 1)
     # Kopf
     ellipse(c, 18, 12, 8.5, 7.5, 'purple', lo=1, hi=5, ambient=0.18)
     # grosse Nase

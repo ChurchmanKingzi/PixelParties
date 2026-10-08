@@ -223,10 +223,7 @@ def spr_beekeeper(anim='idle', f=0):
     c.rect(8, 25, 22, 25, 'wood', 1)
     c.put_ramp(15, 24, 'gold', 5)
     c.put_ramp(16, 24, 'gold', 4)
-    for y in (28, 30):
-        for x in range(9, 22):
-            if x % 3 == 0:
-                c.put_ramp(x, y, 'bone', 1)
+    c.rect(14, 26, 15, 30, 'bone', 2)
     # linker Arm: Handschuh
     thick_line(c, 8, 20 + bob, 6, 26, 3.6, 'bone', lo=2, hi=4)
     c.rect(5, 26, 7, 28, 'dirt', 3)
@@ -340,15 +337,16 @@ def spr_juggler_clown(anim='idle', f=0):
     ellipse(c, 6, 11 + bob, 4.4, 4.4, 'leaf', lo=2, hi=5)
     ellipse(c, 23, 9 + bob, 4.0, 4.2, 'leaf', lo=1, hi=4)
     ellipse(c, 15, 5 + bob, 5.2, 3.6, 'leaf', lo=2, hi=5)
-    ellipse(c, 15, 12 + bob, 6.0, 5.6, 'bone', lo=3, hi=5)
-    ellipse(c, 19.5, 13 + bob, 2.6, 2.6, 'teamA', lo=2, hi=5, ambient=0.3)
-    c.put_ramp(19, 12 + bob, 'bone', 5)
-    c.rect(11, 13 + bob, 12, 14 + bob, 'skin', 3)
-    eye(c, 16, 9 + bob)
-    c.put_ramp(15, 9 + bob, 'coal', 1)
-    c.put_ramp(15, 9 + bob, 'coal', 1)
-    for (x, y, i) in ((12, 15, 3), (13, 16, 3), (14, 16, 3), (15, 16, 3), (16, 16, 3), (17, 15, 3)):
-        c.put_ramp(x, y + bob, 'fire', i)
+    ellipse(c, 14.5, 12 + bob, 6.4, 5.6, 'bone', lo=3, hi=5)
+    ellipse(c, 15, 13 + bob, 2.5, 2.5, 'fire', lo=1, hi=4, ambient=0.3)
+    c.put_ramp(14, 12 + bob, 'bone', 5)
+    for ex in (11, 18):
+        c.put_ramp(ex, 9 + bob, 'coal', 1)
+        c.put_ramp(ex, 10 + bob, 'coal', 1)
+    for (x, y) in ((10, 14), (11, 15), (12, 16), (13, 17), (14, 17), (15, 17), (16, 17), (17, 16), (18, 15), (19, 14)):
+        c.put_ramp(x, y + bob, 'fire', 3)
+    c.rect(9, 12 + bob, 10, 13 + bob, 'skin', 3)
+    c.rect(20, 12 + bob, 21, 13 + bob, 'skin', 2)
     # Keulen im Wurf (drei Phasen)
     pos = [((8, 8), (5, 3), 'ice'), ((15, 2), (20, 0), 'fire'), ((27, 6), (31, 2), 'gold')]
     pos = pos[ph:] + pos[:ph]

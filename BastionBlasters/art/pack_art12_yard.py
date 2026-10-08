@@ -582,3 +582,23 @@ def warning_sign() -> Canvas:
     c.put_ramp(9, 13, 'coal', 2)
     c.outline()
     return c
+
+
+def coin_pile(w=22, h=12, seed=1) -> Canvas:
+    """Haeufchen Goldmuenzen mit Edelstein (Koeder)"""
+    c = Canvas(w, h)
+    ellipse(c, w / 2.0, h - 4.5, w / 2.0 - 1.5, 4.8, 'gold', lo=1, hi=5, ambient=0.2, flatness=0.2,
+            clip=lambda x, y: y <= h - 3)
+    ellipse(c, w / 2.0 - 1, h - 7, w / 3.0, 3.6, 'gold', lo=2, hi=5, ambient=0.25)
+    rnd = random.Random(seed)
+    for _ in range(9):
+        x, y = rnd.randint(3, w - 5), rnd.randint(h - 9, h - 4)
+        if c.alpha(x, y):
+            c.put_ramp(x, y, 'gold', 5)
+            c.put_ramp(x + 1, y, 'gold', 4)
+            c.put_ramp(x, y + 1, 'gold', 2)
+    gx = w - 7
+    poly(c, [(gx, 4), (gx + 3, 2), (gx + 5, 4), (gx + 3, 7)], 'ice', lo=2, hi=5)
+    c.put_ramp(gx + 2, 3, 'bone', 5)
+    c.outline()
+    return c

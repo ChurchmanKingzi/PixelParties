@@ -55,16 +55,24 @@ def spr_armorer_dwarf(anim='idle', f=0):
     hline(c, 27, 29, 9 + bob, 'dirt', 1)
     ellipse(c, 31.5, 12 + bob, 2.4, 2.1, 'skin', lo=3, hi=5)
     c.put_ramp(31, 12 + bob, 'fire', 3)
-    # Bart (braun mit Straehnen), Schnurrbart-Flaeche und Goldring am Zopf
-    poly(c, [(17, 13 + bob), (32, 13 + bob), (31, 19 + bob), (28, 25 + bob), (21, 25 + bob), (18, 19 + bob)], 'dirt', lo=2, hi=5)
-    for x in (20, 23, 26, 29):
-        vline(c, x, 17 + bob, 23 + bob, 'dirt', 1, only_filled=True)
-    for x in (21, 24, 27):
-        vline(c, x, 15 + bob, 21 + bob, 'dirt', 5, only_filled=True)
-    poly(c, [(21, 12 + bob), (32, 12 + bob), (33, 14 + bob), (28, 15 + bob), (21, 15 + bob)], 'dirt', lo=3, hi=5)
-    hline(c, 22, 30, 12 + bob, 'dirt', 5)
-    c.rect(23, 24 + bob, 26, 25 + bob, 'gold', 4)
-    c.put_ramp(24, 25 + bob, 'gold', 2)
+    # Bart (rotbraun): breite Flaeche, Scheitel, zwei Zoepfe mit Goldringen
+    for y in range(12, 26):
+        t = (y - 12) / 13.0
+        half = 7.4 * (1 - t ** 1.8) + (0.6 if y > 20 else 0)
+        for x in range(int(24.5 - half), int(24.5 + half) + 1):
+            u = (x - (24.5 - half)) / (2 * half + 1)
+            tone = quant(0.9 - 0.45 * u - 0.15 * t, 2, 5, x, y)
+            c.put_ramp(x, y + bob, 'wood', tone)
+    vline(c, 24, 14 + bob, 21 + bob, 'wood', 1)
+    for x in (21, 27):
+        for y in range(20, 27):
+            c.put_ramp(x, y + bob, 'wood', 4 if (y + x) % 2 else 2)
+            c.put_ramp(x + 1, y + bob, 'wood', 3)
+        c.rect(x, 26 + bob, x + 1, 26 + bob, 'gold', 4)
+    for (x, y) in ((19, 16), (20, 18), (28, 16), (29, 18), (22, 15), (26, 15)):
+        c.put_ramp(x, y + bob, 'wood', 1)
+    poly(c, [(20, 12 + bob), (32, 12 + bob), (33, 14 + bob), (28, 15 + bob), (21, 15 + bob)], 'wood', lo=3, hi=5)
+    hline(c, 21, 31, 12 + bob, 'wood', 5)
     # Helm mit Hoernern
     def cap(x, y):
         return y <= 8 + bob
@@ -158,56 +166,61 @@ def spr_stew_cook(anim='idle', f=0):
 
 
 def spr_fire_marshal_kobold(anim='idle', f=0):
-    c = Canvas(40, 32)
+    c = Canvas(46, 34)
     bob = [0, -1][f % 2] if anim == 'idle' else 0
-    # Schwanz
-    for k, (x, y) in enumerate(((8, 24), (7, 25), (5, 25), (4, 24), (3, 23), (3, 21), (4, 20), (5, 20))):
-        c.put_ramp(x, y + bob, 'purple', 3 if k % 2 else 2)
-        c.put_ramp(x, y + 1 + bob, 'purple', 1)
-    # Stiefel
-    for x0 in (9, 16):
-        round_rect(c, x0, 27, x0 + 5, 31, 'coal', lo=1, hi=4, radius=1)
-        c.put_ramp(x0 + 2, 27, 'coal', 5)
-    # Mantel in Feuerwehr-Gelb mit Reflexstreifen
-    round_rect(c, 8, 16 + bob, 21, 28 + bob, 'gold', lo=1, hi=4, radius=2)
-    dither_box(c, 18, 18 + bob, 20, 27 + bob, 'gold', 1, 2)
-    hline(c, 8, 21, 21 + bob, 'bone', 5)
-    hline(c, 8, 21, 25 + bob, 'bone', 4)
-    pts(c, [(14, 17 + bob), (14, 18 + bob)], 'coal', 2)
-    # Ohr (gross, nach hinten spitz)
-    poly(c, [(10, 8 + bob), (0, 4 + bob), (9, 15 + bob)], 'purple', lo=1, hi=4)
-    pts(c, [(3, 5 + bob), (4, 6 + bob), (5, 7 + bob), (6, 9 + bob)], 'cloth', 4)
-    # Kopf + kurze Schnauze
-    ellipse(c, 15, 11 + bob, 6.2, 5.6, 'purple', lo=2, hi=5)
-    ellipse(c, 21, 13 + bob, 3.4, 2.6, 'purple', lo=3, hi=5)
-    pts(c, [(23, 12 + bob), (24, 12 + bob)], 'coal', 0)
-    hline(c, 19, 23, 15 + bob, 'purple', 1)
-    c.rect(18, 9 + bob, 19, 10 + bob, 'gold', 5)
-    c.put_ramp(19, 10 + bob, 'coal', 0)
-    # Feuerwehrhelm: Kuppel, Kamm, langer Nackenschutz, Abzeichen vorn
+    # Schwanz (Ringel)
+    for k, (x, y) in enumerate(((9, 26), (8, 27), (6, 27), (5, 26), (4, 25), (4, 23), (5, 22), (6, 22))):
+        c.put_ramp(x, y + bob, 'ice', 3 if k % 2 else 2)
+        c.put_ramp(x, y + 1 + bob, 'ice', 1)
+    # Beine + Stiefel
+    for x0 in (11, 19):
+        c.rect(x0 + 1, 28, x0 + 3, 30, 'ice', 2)
+        round_rect(c, x0, 30, x0 + 6, 33, 'coal', lo=1, hi=4, radius=1)
+        c.put_ramp(x0 + 3, 30, 'coal', 5)
+    # Mantel (Feuerwehr-Gelb) mit Reflexstreifen
+    round_rect(c, 9, 17 + bob, 25, 30 + bob, 'gold', lo=1, hi=4, radius=3)
+    dither_box(c, 21, 19 + bob, 24, 29 + bob, 'gold', 1, 2)
+    hline(c, 9, 25, 23 + bob, 'bone', 5)
+    hline(c, 9, 25, 27 + bob, 'bone', 4)
+    for y in (19, 20):
+        c.put_ramp(17, y + bob, 'coal', 2)
+    # grosses Ohr nach hinten (hinter dem Kopf)
+    poly(c, [(13, 7 + bob), (1, 4 + bob), (13, 15 + bob)], 'ice', lo=1, hi=4)
+    pts(c, [(4, 5 + bob), (5, 6 + bob), (6, 7 + bob), (7, 9 + bob), (8, 10 + bob)], 'skin', 3)
+    # Kopf + Schnauze
+    ellipse(c, 18, 11 + bob, 6.8, 6.0, 'ice', lo=2, hi=5)
+    ellipse(c, 25, 13.5 + bob, 4.2, 3.0, 'ice', lo=3, hi=5)
+    c.rect(28, 12 + bob, 29, 13 + bob, 'coal', 0)
+    hline(c, 22, 27, 16 + bob, 'ice', 1)
+    c.rect(22, 9 + bob, 23, 11 + bob, 'coal', 1)
+    c.put_ramp(22, 9 + bob, 'bone', 5)
+    # Feuerwehrhelm: Kuppel mit hohem Kamm, Abzeichen vorn, langer Nackenschutz
     def cap(x, y):
-        return y <= 8 + bob
-    ellipse(c, 15, 8 + bob, 7.4, 6.2, 'teamA', lo=1, hi=5, clip=cap)
-    poly(c, [(8, 7 + bob), (15, 7 + bob), (15, 9 + bob), (6, 17 + bob), (3, 16 + bob)], 'teamA', lo=1, hi=4)
-    hline(c, 8, 22, 8 + bob, 'teamA', 0)
-    hline(c, 9, 22, 9 + bob, 'gold', 3)
-    c.rect(11, 1 + bob, 20, 2 + bob, 'teamA', 4)
-    hline(c, 11, 20, 2 + bob, 'teamA', 2)
-    hline(c, 12, 19, 1 + bob, 'teamA', 5)
-    poly(c, [(17, 3 + bob), (22, 3 + bob), (22, 7 + bob), (19.5, 9 + bob), (17, 7 + bob)], 'gold', lo=2, hi=5)
-    pts(c, [(19, 5 + bob), (20, 5 + bob), (19, 6 + bob)], 'fire', 3)
+        return y <= 7 + bob
+    ellipse(c, 18, 6 + bob, 8.0, 6.0, 'teamA', lo=1, hi=5, clip=cap)
+    poly(c, [(11, 6 + bob), (17, 6 + bob), (17, 8 + bob), (7, 17 + bob), (3, 16 + bob)], 'teamA', lo=1, hi=4)
+    hline(c, 10, 28, 7 + bob, 'teamA', 0)
+    hline(c, 11, 28, 6 + bob, 'teamA', 2)
+    hline(c, 11, 25, 5 + bob, 'gold', 3)
+    pts(c, [(26, 6 + bob), (27, 6 + bob), (28, 6 + bob)], 'gold', 4)
+    for x in range(12, 25):
+        yy = int(round(6 - 6.4 * math.sqrt(max(0.0, 1 - ((x - 18) / 8.2) ** 2)))) + bob
+        c.put_ramp(x, yy, 'gold', 4)
+        c.put_ramp(x, yy + 1, 'teamA', 3)
+    poly(c, [(20, 2 + bob), (25, 2 + bob), (25, 6 + bob), (22.5, 8 + bob), (20, 6 + bob)], 'gold', lo=2, hi=5)
+    pts(c, [(22, 4 + bob), (23, 4 + bob), (22, 5 + bob)], 'fire', 3)
     # Giesskanne: Bauch, Baender, Henkel, langer Ausguss, Brause
-    round_rect(c, 20, 19 + bob, 32, 29 + bob, 'metal', lo=1, hi=4, radius=2)
-    hline(c, 21, 31, 19 + bob, 'metal', 5)
-    hline(c, 20, 32, 22 + bob, 'gold', 3)
-    hline(c, 20, 32, 26 + bob, 'gold', 2)
-    for (x, y) in ((22, 18), (22, 17), (23, 16), (24, 15), (25, 15), (26, 15), (27, 16), (27, 17), (27, 18)):
-        c.put_ramp(x, y + bob, 'metal', 4 if x < 25 else 2)
-    thick_line(c, 31, 24 + bob, 36, 13 + bob, 2.6, 'metal', lo=1, hi=5)
-    poly(c, [(33, 9 + bob), (39, 11 + bob), (38, 16 + bob), (33, 14 + bob)], 'gold', lo=2, hi=5)
-    pts(c, [(35, 11 + bob), (37, 12 + bob), (36, 14 + bob)], 'coal', 1)
+    round_rect(c, 22, 22 + bob, 35, 32 + bob, 'metal', lo=1, hi=4, radius=2)
+    hline(c, 23, 34, 22 + bob, 'metal', 5)
+    hline(c, 22, 35, 25 + bob, 'gold', 3)
+    hline(c, 22, 35, 29 + bob, 'gold', 2)
+    for (x, y) in ((24, 21), (24, 20), (25, 19), (26, 18), (27, 18), (28, 18), (29, 19), (29, 20), (29, 21)):
+        c.put_ramp(x, y + bob, 'metal', 4 if x < 27 else 2)
+    thick_line(c, 34, 27 + bob, 40, 16 + bob, 2.8, 'metal', lo=1, hi=5)
+    poly(c, [(37, 11 + bob), (44, 13 + bob), (43, 19 + bob), (37, 17 + bob)], 'gold', lo=2, hi=5)
+    pts(c, [(39, 13 + bob), (41, 14 + bob), (40, 16 + bob), (42, 17 + bob)], 'coal', 1)
     # Arm zur Kanne
-    thick_line(c, 19, 19 + bob, 22, 21 + bob, 3.0, 'purple', lo=2, hi=5)
+    thick_line(c, 18, 20 + bob, 24, 24 + bob, 3.2, 'ice', lo=2, hi=5)
     c.outline()
     return c
 
@@ -216,55 +229,54 @@ def spr_fire_marshal_kobold(anim='idle', f=0):
 
 
 def spr_fanfare_bard(anim='idle', f=0):
-    c = Canvas(40, 36)
+    c = Canvas(42, 38)
     bob = [0, -1][f % 2] if anim == 'idle' else 0
     # Dudelsack-Pfeifen: drei Bordune mit Messingtrichtern ragen hinter der Schulter hoch
-    for (x0, y0, x1, y1) in ((11, 19, 6, 7), (13, 18, 11, 3), (15, 18, 16, 5)):
+    for (x0, y0, x1, y1) in ((12, 22, 6, 8), (14, 21, 11, 4), (16, 20, 17, 8)):
         thick_line(c, x0, y0 + bob, x1, y1 + bob, 1.8, 'wood', lo=1, hi=4)
         ellipse(c, x1, y1 + bob, 2.2, 1.8, 'gold', lo=2, hi=5)
         c.put_ramp(x1, y1 + bob, 'coal', 1)
-    # Beine, Schnabelschuhe
-    for x0 in (14, 20):
-        c.rect(x0, 27, x0 + 2, 31, 'leaf', 3)
-        c.rect(x0, 27, x0, 31, 'leaf', 4)
-        poly(c, [(x0 - 1, 31), (x0 + 4, 31), (x0 + 8, 33), (x0 + 9, 31), (x0 + 10, 34), (x0 - 1, 34)], 'wood', lo=0, hi=3)
+    # Beine + Schnabelschuhe
+    for x0 in (15, 22):
+        c.rect(x0, 30, x0 + 2, 34, 'leaf', 3)
+        c.rect(x0, 30, x0, 34, 'leaf', 4)
+        poly(c, [(x0 - 1, 34), (x0 + 4, 34), (x0 + 8, 35), (x0 + 9, 33), (x0 + 10, 37), (x0 - 1, 37)], 'wood', lo=0, hi=3)
     # Tunika (Violett) mit Goldsaum und Guertel
-    poly(c, [(12, 19 + bob), (25, 19 + bob), (27, 29 + bob), (10, 29 + bob)], 'purple', lo=1, hi=4)
-    dither_box(c, 22, 21 + bob, 26, 28 + bob, 'purple', 1, 2)
-    for x in range(10, 28, 2):
-        c.put_ramp(x, 29 + bob, 'gold', 4)
-        c.put_ramp(x + 1, 29 + bob, 'gold', 2)
-    hline(c, 12, 25, 25 + bob, 'wood', 2)
-    c.put_ramp(18, 25 + bob, 'gold', 5)
+    poly(c, [(12, 18 + bob), (27, 18 + bob), (29, 31 + bob), (10, 31 + bob)], 'purple', lo=1, hi=4)
+    dither_box(c, 24, 20 + bob, 28, 30 + bob, 'purple', 1, 2)
+    for x in range(10, 30, 2):
+        c.put_ramp(x, 31 + bob, 'gold', 4)
+        c.put_ramp(x + 1, 31 + bob, 'gold', 2)
+    hline(c, 12, 27, 27 + bob, 'wood', 2)
     # Sack aus Schweineblase: rosa, Ohren, Ruessel, Ringelschwanz, Hufe
-    for (hx, hy) in ((15, 28), (18, 29), (22, 29), (25, 28)):
+    for (hx, hy) in ((17, 30), (20, 31), (25, 31), (28, 30)):
         c.rect(hx, hy + bob, hx + 1, hy + 2 + bob, 'cloth', 3)
         c.put_ramp(hx, hy + 2 + bob, 'coal', 1)
-    ellipse(c, 21, 22 + bob, 9.4, 6.8, 'cloth', lo=2, hi=5, ambient=0.4, flatness=0.15)
-    poly(c, [(13, 18 + bob), (17, 15 + bob), (17, 19 + bob)], 'cloth', lo=1, hi=4)
-    poly(c, [(22, 15 + bob), (26, 16 + bob), (24, 20 + bob)], 'cloth', lo=1, hi=4)
-    ellipse(c, 30.5, 23 + bob, 3.0, 2.6, 'cloth', lo=3, hi=5, ambient=0.4)
-    pts(c, [(30, 23 + bob), (32, 23 + bob)], 'cloth', 0)
-    pts(c, [(11, 23 + bob), (10, 22 + bob), (9, 21 + bob), (9, 20 + bob), (10, 19 + bob), (11, 19 + bob), (11, 20 + bob)], 'cloth', 4)
-    c.put_ramp(19, 20 + bob, 'cloth', 0)
-    # Anblasrohr
-    thick_line(c, 24, 19 + bob, 26, 13 + bob, 1.6, 'wood', lo=2, hi=4)
+    ellipse(c, 23, 25 + bob, 10.0, 6.4, 'cloth', lo=2, hi=5, ambient=0.4, flatness=0.15)
+    poly(c, [(15, 21 + bob), (19, 18 + bob), (19, 22 + bob)], 'cloth', lo=1, hi=4)
+    poly(c, [(25, 18 + bob), (29, 19 + bob), (27, 23 + bob)], 'cloth', lo=1, hi=4)
+    ellipse(c, 33.5, 26 + bob, 3.0, 2.6, 'cloth', lo=3, hi=5, ambient=0.4)
+    pts(c, [(33, 26 + bob), (35, 26 + bob)], 'cloth', 0)
+    pts(c, [(13, 27 + bob), (12, 26 + bob), (11, 25 + bob), (11, 24 + bob), (12, 23 + bob), (13, 23 + bob), (13, 24 + bob)], 'cloth', 4)
+    c.put_ramp(22, 23 + bob, 'cloth', 0)
+    # Anblasrohr bis zum Mund
+    thick_line(c, 26, 20 + bob, 27, 14 + bob, 1.6, 'wood', lo=2, hi=4)
     # Arm, das den Sack drueckt
-    thick_line(c, 13, 21 + bob, 21, 23 + bob, 3.2, 'purple', lo=1, hi=4)
-    ellipse(c, 22, 23 + bob, 2.0, 2.0, 'skin', lo=2, hi=5)
+    thick_line(c, 14, 22 + bob, 22, 26 + bob, 3.4, 'purple', lo=1, hi=4)
+    ellipse(c, 23, 26 + bob, 2.0, 2.0, 'skin', lo=2, hi=5)
     # Kopf mit dicken Pausbacken
-    ellipse(c, 20, 12 + bob, 5.6, 5.2, 'skin', lo=2, hi=5)
-    ellipse(c, 25.5, 15 + bob, 3.4, 3.1, 'skin', lo=3, hi=5)
-    hline(c, 21, 23, 10 + bob, 'coal', 1)
-    pts(c, [(25, 15 + bob), (26, 15 + bob)], 'fire', 3)
-    pts(c, [(26, 13 + bob)], 'skin', 5)
+    ellipse(c, 22, 12 + bob, 5.8, 5.4, 'skin', lo=2, hi=5)
+    ellipse(c, 27, 15 + bob, 3.4, 3.2, 'skin', lo=3, hi=5)
+    hline(c, 23, 25, 11 + bob, 'coal', 1)
+    pts(c, [(27, 16 + bob), (28, 16 + bob)], 'fire', 3)
+    pts(c, [(28, 14 + bob)], 'skin', 5)
     # Spitzhut mit Feder
-    poly(c, [(14, 9 + bob), (27, 9 + bob), (23, 2 + bob), (17, 2 + bob)], 'leaf', lo=1, hi=4)
-    hline(c, 13, 28, 9 + bob, 'leaf', 1)
-    hline(c, 13, 28, 8 + bob, 'leaf', 3)
-    hline(c, 14, 26, 7 + bob, 'gold', 3)
-    for k in range(9):
-        x = 23 + (k // 2) - (1 if k > 6 else 0)
+    poly(c, [(16, 9 + bob), (29, 9 + bob), (26, 2 + bob), (19, 2 + bob)], 'leaf', lo=1, hi=4)
+    hline(c, 15, 30, 9 + bob, 'leaf', 1)
+    hline(c, 15, 30, 8 + bob, 'leaf', 3)
+    hline(c, 16, 28, 7 + bob, 'gold', 3)
+    for k in range(10):
+        x = 26 + (k // 2) - (1 if k > 7 else 0)
         y = 3 + bob - k
         if y >= 0:
             c.put_ramp(x, y, 'teamA', 4 if k % 2 else 3)

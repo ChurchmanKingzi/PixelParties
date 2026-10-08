@@ -112,3 +112,51 @@ def heal_cross(world, x, y, ramp='leaf', depth=9000):
         wput(world, x + dx, y + dy, ramp, 5 if (dx, dy) == (0, 0) else 4, depth)
     for (dx, dy) in ((-2, 0), (2, 0), (0, -2), (0, 2)):
         wput(world, x + dx, y + dy, ramp, 3, depth)
+
+
+_LIGHT_LUT = {}
+
+
+def lighten_palette(rgb, steps=1):
+    """Gegenstueck zu pixl.darken_palette: hellt Pixel um `steps` Rampenstufen auf (bleibt in der Master-Palette)"""
+    if not _LIGHT_LUT:
+        for name, ramp in RAMPS.items():
+            for i, col in enumerate(ramp):
+                _LIGHT_LUT.setdefault(tuple(int(v) for v in col), (name, i))
+    out = rgb.copy()
+    flat = out.reshape(-1, 3)
+    cache = {}
+    for k in range(flat.shape[0]):
+        key = (int(flat[k, 0]), int(flat[k, 1]), int(flat[k, 2]))
+        if key not in cache:
+            hit = _LIGHT_LUT.get(key)
+            cache[key] = key if hit is None else RAMPS[hit[0]][min(5, hit[1] + steps)]
+        flat[k] = cache[key]
+    return out
+
+
+def light_pool(world, cx, cy, rx, ry, steps=1):
+    """Lichtkegel am Boden: Boden-Pixel in der Ellipse werden heller, am Rand per Schachbrett"""
+    y0, y1 = max(0, int(cy - ry - 1)), min(world.h, int(cy + ry + 2))
+    x0, x1 = max(0, int(cx - rx - 1)), min(world.w, int(cx + rx + 2))
+    Y, X = np.mgrid[y0:y1, x0:x1]
+    d = ((X + 0.5 - cx) / rx) ** 2 + ((Y + 0.5 - cy) / ry) ** 2
+    m = ((d < 0.62) | ((d < 1.0) & ((X + Y) % 2 == 0))) & (world.depth[y0:y1, x0:x1] < -40)
+    sub = world.px[y0:y1, x0:x1, :3]
+    sub[m] = lighten_palette(sub[m], steps)
+
+
+def rain_streaks(world, rng, n, box=(0, 4, 143, 90), depth=9000):
+    for _ in range(n):
+        x, y = rng.randint(box[0] + 2, box[2]), rng.randint(box[1], box[3])
+        wput(world, x, y, 'sky', 5, depth)
+        wput(world, x, y + 1, 'sky', 4, depth)
+        wput(world, x - 1, y + 2, 'sky', 4, depth)
+
+
+def dot2(world, x, y, ramp, depth=9000):
+    """gut sichtbarer 2 x 2 Punkt (Schweif, Funke)"""
+    wput(world, x, y, ramp, 5, depth)
+    wput(world, x + 1, y, ramp, 4, depth)
+    wput(world, x, y + 1, ramp, 4, depth)
+    wput(world, x + 1, y + 1, ramp, 3, depth)

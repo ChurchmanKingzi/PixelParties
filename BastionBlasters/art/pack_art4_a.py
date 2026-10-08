@@ -98,8 +98,6 @@ def spr_owl_gargoyle(anim='idle', f=0):
         # Pupille 2x2
         c.rect(lx, ly - 1, lx + 1, ly, 'coal', 1)
         c.put_ramp(lx - 1, ly - 2, 'bone', 5)
-        if awake:
-            c.rect(lx, ly - 1, lx + 1, ly, 'fire', 5)
     c.rect(18, 12, 22, 12, 'gold', 3)               # Brueckenbuegel
     poly(c, [(18, 14), (22, 14), (20, 19)], 'bone', lo=3, hi=5)
     c.put_ramp(20, 19, 'stone', 1)

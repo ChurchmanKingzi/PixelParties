@@ -118,7 +118,7 @@ def spr_cogwheel_centurion(anim='idle', f=0):
 
 def spr_paladin_penguin(anim='idle', f=0):
     c = Canvas(44, 48)
-    bob = [0, -1][f % 2] if anim == 'idle' else 0
+    bob = 2 + ([0, -1][f % 2] if anim == 'idle' else 0)
     # Pfuetze + Eisscholle
     ellipse(c, 22, 43, 20.5, 4.4, 'sky', lo=1, hi=3, ambient=0.3, flatness=0.5)
     for y in range(36, 45):
@@ -379,6 +379,11 @@ def spr_tooth_door(anim='idle', f=0):
     hline(c, 21, 27, 16, 'wood', 1)
     c.put_ramp(14, 14, 'wood', 0)
     c.put_ramp(21, 14, 'wood', 0)
+    # Holzfuesse
+    for (x0, x1) in ((6, 15), (21, 30)):
+        round_rect(c, x0, 46, x1, 50, 'wood', lo=1, hi=4, radius=2)
+        hline(c, x0 + 1, x1 - 2, 46, 'wood', 5)
+        c.rect(x1 - 2, 48, x1 - 1, 49, 'wood', 2)
     # Maul
     my0, my1 = 28, 40
     def in_mouth(x, y):
@@ -401,28 +406,11 @@ def spr_tooth_door(anim='idle', f=0):
                 if dx * dx + dy * dy <= 1.0:
                     c.put_ramp(x, y, 'fire', 3 if (x + y) % 2 == 0 or dy > 0 else 2)
     c.line(18, 37, 19, 42, 'fire', 1)
-    # geschluckter Feind (nur 'gulp'): Beine ragen aus dem Maul
-    if anim == 'gulp':
-        for (x0, x1, k) in ((14, 10, 0), (20, 25, 1)):
-            thick_line(c, x0, 33, x1, 44, 3.6, 'leaf', lo=1, hi=4)
-            for y in range(36, 44, 3):
-                c.put_ramp(x0 + (x1 - x0) * (y - 33) // 11, y, 'leaf', 5)
-            round_rect(c, x1 - 3, 44, x1 + 2, 47, 'coal', lo=0, hi=3, radius=1)
-            hline(c, x1 - 3, x1 + 2, 47, 'bone', 3)
-    # Zahnreihen (oben nach unten, unten nach oben, versetzt)
     def yt(x):
         return my0 + int(round(2.0 * ((x - 17.5) / 11.5) ** 2))
     def yb(x):
         return my1 - int(round(5.0 * ((x - 17.5) / 11.5) ** 2))
-    for cxu in (9, 13, 17, 21, 25):
-        for k, half in enumerate((1, 1, 1, 0)):
-            for xx in range(cxu - half, cxu + half + 1):
-                y = yt(xx) + k
-                if 7 <= xx <= 28:
-                    tone = 5 if xx <= cxu else 4
-                    if k == 3:
-                        tone = 4
-                    c.put_ramp(xx, y, 'bone', tone)
+    # Unterzaehne
     for cxl in (11, 15, 19, 23, 27):
         for k, half in enumerate((1, 1, 0)):
             for xx in range(cxl - half, cxl + half + 1):
@@ -430,6 +418,25 @@ def spr_tooth_door(anim='idle', f=0):
                 if 8 <= xx <= 27:
                     tone = 5 if xx <= cxl else 3
                     if k == 2:
+                        tone = 4
+                    c.put_ramp(xx, y, 'bone', tone)
+    # geschluckter Feind (nur 'gulp'): zwei strampelnde Beine ragen aus dem Maul
+    if anim == 'gulp':
+        for (x0, x1, y1) in ((15, 9, 44), (21, 27, 43)):
+            thick_line(c, x0, 32, x1, y1, 4.2, 'teamB', lo=1, hi=4)
+            for y in range(35, y1 - 1, 3):
+                c.put_ramp(x0 + (x1 - x0) * (y - 32) // (y1 - 32), y, 'teamB', 5)
+            round_rect(c, x1 - 3, y1, x1 + 3, y1 + 4, 'coal', lo=0, hi=3, radius=1)
+            hline(c, x1 - 2, x1 + 2, y1, 'stone', 4)
+            hline(c, x1 - 3, x1 + 3, y1 + 4, 'bone', 3)
+    # Oberzaehne (ueber den Beinen: sie klemmen)
+    for cxu in (9, 13, 17, 21, 25):
+        for k, half in enumerate((1, 1, 1, 0)):
+            for xx in range(cxu - half, cxu + half + 1):
+                y = yt(xx) + k
+                if 7 <= xx <= 28:
+                    tone = 5 if xx <= cxu else 4
+                    if k == 3:
                         tone = 4
                     c.put_ramp(xx, y, 'bone', tone)
     # Lippen (Holzwulst)
@@ -455,11 +462,6 @@ def spr_tooth_door(anim='idle', f=0):
         c.put_ramp(int(round(x - 0.5)) + 1, int(round(y - 0.5)), 'gold', 4 if lit else 2)
     c.put_ramp(17, 27, 'gold', 2)
     c.put_ramp(18, 27, 'gold', 2)
-    # Holzfuesse
-    for (x0, x1) in ((6, 15), (21, 30)):
-        round_rect(c, x0, 46, x1, 50, 'wood', lo=1, hi=4, radius=2)
-        hline(c, x0 + 1, x1 - 2, 46, 'wood', 5)
-        c.rect(x1 - 2, 48, x1 - 1, 49, 'wood', 2)
     c.outline()
     return c
 

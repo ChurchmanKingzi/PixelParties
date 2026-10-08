@@ -111,3 +111,39 @@ def spr_whale_catapult(anim='idle', f=0):
     thick_line(c, 47, 25, 53, 25, 1.8, 'metal', lo=1, hi=3)
     c.outline()
     return c
+
+
+def spr_whale_ball(f=0):
+    """der gelangweilte Wal als Geschoss, fliegt nach rechts (30 x 18)"""
+    c = Canvas(30, 18)
+
+    def yc(u):
+        return 9.5 - 4.0 * (1 - u) ** 2.0
+
+    def tt(u):
+        if u < 0.6:
+            return 1.0 + 4.6 * (u / 0.6) ** 0.9
+        return 5.6 * math.sqrt(max(0.0, 1 - ((u - 0.6) / 0.4) ** 2))
+    whale = whale_shape(c, 4, 27, yc, tt)
+    fl = m_poly(c, [(7, 7), (2, 2), (1, 5), (5, 8)])
+    fl2 = m_poly(c, [(8, 8), (4, 12), (2, 10), (6, 7)])
+    shade_mask(c, fl, 'ice', 1, 3, r=1, passes=1, strength=3.0)
+    shade_mask(c, fl2, 'ice', 2, 4, r=1, passes=1, strength=3.0)
+    shade_mask(c, whale, 'ice', 1, 4, r=2, passes=2, strength=6.0, ambient=0.3)
+    belly = m_new(c)
+    for x in range(8, 27):
+        u = (x - 4) / 23.0
+        yb = int(round(yc(u) + tt(u) * 0.3 + 1))
+        for y in range(yb, c.h):
+            if whale[y, x]:
+                belly[y, x] = True
+    shade_mask(c, belly, 'sky', 3, 5, r=1, passes=1, strength=2.0, ambient=0.5)
+    flat_mask(c, m_ellipse(c, 21.5, 7.6, 2.6, 1.8), 'coal', 1)       # Sonnenbrille
+    c.put_ramp(20, 7, 'ice', 5)
+    for x in range(14, 19):
+        c.put_ramp(x, 7, 'coal', 1)
+    for x in range(20, 27):
+        c.put_ramp(x, 12 - (1 if x > 24 else 0), 'coal', 1)
+    ellipse(c, 19, 14, 2.6, 1.6, 'ice', lo=2, hi=5)
+    c.outline()
+    return c

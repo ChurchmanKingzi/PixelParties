@@ -253,3 +253,71 @@ def spr_squid_cannon(anim='idle', f=0):
         c.put_ramp(x, y, 'purple', 3)
     c.outline()
     return c
+
+
+# =========================================================================== UA-09 Fledermaus-Hexe (XL, 70 x 52)
+
+
+def spr_bat_witch(anim='idle', f=0):
+    c = Canvas(70, 52)
+    Y = 9
+    bob = [0, -1][f % 2] if anim == 'idle' else 0
+    Yb = Y + bob
+    # --- Besen: Reisigbüschel hinten (fächert), Stiel mit Bindung
+    for (ex, ey) in ((1, 24), (0, 28), (1, 32), (2, 36), (4, 40)):
+        thick_line(c, 14, 31 + Y, ex + 1, ey + Y, 2.8, 'gold', lo=1, hi=4)
+    # --- Umhang (flattert zerfranst nach hinten)
+    poly(c, [(23, 15 + Yb), (12, 17 + Yb), (5, 24 + Yb), (11, 24 + Yb), (8, 31 + Yb), (16, 29 + Yb), (15, 34 + Yb), (23, 30 + Yb)], 'coal', lo=0, hi=3)
+    # Beine: vorn angewinkelt, hinten hängend; Schnabelschuhe
+    thick_line(c, 30, 29 + Yb, 36, 30 + Yb, 4.4, 'cloth', lo=1, hi=3)
+    thick_line(c, 36, 30 + Yb, 37, 37 + Yb, 4.4, 'cloth', lo=1, hi=3)
+    poly(c, [(34, 37 + Yb), (41, 37 + Yb), (44, 39 + Yb), (34, 41 + Yb)], 'coal', lo=1, hi=3)
+    thick_line(c, 26, 29 + Yb, 25, 37 + Yb, 4.4, 'cloth', lo=0, hi=2)
+    poly(c, [(23, 37 + Yb), (30, 37 + Yb), (33, 39 + Yb), (23, 41 + Yb)], 'coal', lo=0, hi=2)
+    # Besenstiel vor dem Bein
+    thick_line(c, 12, 31 + Y, 54, 24 + Y, 3.6, 'wood', lo=1, hi=4)
+    c.put_ramp(55, 23 + Y, 'wood', 5)
+    for (x, i) in ((13, 2), (15, 4), (17, 2)):
+        c.line(x, 28 + Y, x + 1, 35 + Y, 'dirt', i)
+    # Rumpf
+    poly(c, [(23, 14 + Yb), (33, 14 + Yb), (36, 29 + Yb), (22, 30 + Yb)], 'cloth', lo=1, hi=4)
+    for x in range(22, 37):
+        c.put_ramp(x, 23 + Yb, 'gold', 2 if x % 2 else 3)
+    c.rect(28, 22 + Yb, 30, 24 + Yb, 'gold', 4)
+    poly(c, [(25, 13 + Yb), (33, 13 + Yb), (30, 18 + Yb)], 'bone', lo=3, hi=5)           # Kragen
+    # Arm vorn greift den Stiel
+    thick_line(c, 31, 18 + Yb, 40, 25 + Yb, 3.8, 'cloth', lo=1, hi=4)
+    c.rect(40, 24 + Yb, 42, 26 + Yb, 'skin', 3)
+    # Zauberarm erhoben, offene Hand (Finger gespreizt)
+    thick_line(c, 28, 17 + Yb, 38, 10 + Yb, 3.6, 'cloth', lo=2, hi=4)
+    ellipse(c, 40, 9 + Yb, 2.4, 2.4, 'skin', lo=3, hi=5)
+    for (dx, dy) in ((3, -3), (4, -1), (4, 1), (3, 3)):
+        c.put_ramp(40 + dx, 9 + dy + Yb, 'skin', 4)
+    # Kopf: Hakennase, ein Auge, Grinsen
+    ellipse(c, 29, 10 + Yb, 5.8, 5.2, 'skin', lo=2, hi=5)
+    poly(c, [(33, 9 + Yb), (40, 12 + Yb), (33, 13 + Yb)], 'skin', lo=3, hi=5)
+    c.rect(32, 8 + Yb, 33, 9 + Yb, 'coal', 1)
+    for x in range(29, 33):
+        c.put_ramp(x, 14 + Yb, 'coal', 1)
+    c.put_ramp(31, 15 + Yb, 'bone', 5)
+    # Haare: wilde rote Strähnen nach hinten
+    for (ex, ey) in ((15, 6), (13, 11), (14, 16), (18, 20)):
+        thick_line(c, 25, 9 + Yb, ex, ey + Yb, 3.0, 'fire', lo=2, hi=4)
+    # Hut: Krempe, Kegel mit abgeknickter Spitze, Teamband
+    ellipse(c, 28, 5 + Yb, 11.0, 3.0, 'cloth', lo=0, hi=3)
+    poly(c, [(22, 4 + Yb), (34, 4 + Yb), (32, -1 + Yb), (28, -6 + Yb), (22, -6 + Yb), (24, -1 + Yb)], 'cloth', lo=0, hi=3)
+    thick_line(c, 25, -5 + Yb, 17, -4 + Yb, 3.2, 'cloth', lo=0, hi=2)
+    thick_line(c, 17, -4 + Yb, 15, 1 + Yb, 2.4, 'cloth', lo=0, hi=2)
+    for x in range(22, 35):
+        c.put_ramp(x, 3 + Yb, 'teamA', 3 if x % 2 else 2)
+    c.rect(27, 2 + Yb, 28, 4 + Yb, 'gold', 4)
+    # Fledermausschwarm aus der Hand: rote Augen, Mini-Zähne
+    for (bx, by, fl, big) in ((54, 4, 0, True), (61, 14, 1, False)):
+        b = bat_spr(fl if (f % 2 == 0) else 1 - fl, outline=False, big=big)
+        c.blit(b, bx - b.w // 2, by + Y - b.h // 2)
+    for (x, y, fl) in ((46, 22, 0), (64, 24, 1), (66, 4, 0)):
+        c.blit(mini_bat((f + fl) % 2), x - 3, y + Y - 2)
+    for (x, y) in ((47, 9), (50, 14), (46, 14), (58, 18)):
+        c.put_ramp(x, y + Y, 'purple', 4)
+    c.outline()
+    return c
