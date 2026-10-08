@@ -33,6 +33,9 @@ const PHASE_RESOURCE = 1;
 const PHASE_ACTION = 3;
 
 const stOf = (engine) => engine.gs.skillTest;
+
+// So viele frische Rounds in Folge ohne jeden Akteur, bis die Partie als Patt endet
+const EMPTY_ROUNDS_LIMIT = 3;
 /** `gs.turn` einer Round: 2 je Round (siehe Kopfkommentar). Round 1 → 1, damit Erstzug-Regeln („Turn 1") weiter greifen. */
 const roundTurn = (round) => Math.max(0, 2 * round - 1);
 const seatCount = (engine) => engine.gs.players.length;
@@ -66,21 +69,38 @@ function isIncapacitated(h) {
   return !!(s.frozen || s.stunned || s.webbed || s.bound);
 }
 
-/** Creatures mit aktivem Effekt, die jetzt (für diesen Sitz) aktivierbar sind. */
+/**
+ * Creatures mit aktivem Effekt, die jetzt (für diesen Sitz) aktivierbar sind. Eine Creature, deren Effekt gerade nicht geht (kein legales Ziel,
+ * Kartenbedingung nicht erfüllt, gesperrt …), ist KEIN Akteur: `getActivatableCreatures` führt sie mit `canActivate: false` auf, damit die
+ * Oberfläche sie ausgegraut zeigt — für einen Zug zählt sie nicht.
+ */
 function creatureActors(engine, seat) {
   const st = stOf(engine);
   if ((st.surrendered || []).includes(seat)) return [];   // wer aufgegeben hat, handelt nicht mehr
   let list = [];
   try { list = engine.getActivatableCreatures(seat) || []; } catch (e) { list = []; }
-  return list.filter(c => !st.exhaustedCreatures[c.instId ?? c.id]);
+  return list.filter(c => c.canActivate !== false && !st.exhaustedCreatures[c.instId ?? c.id]);
 }
 
 /**
- * Hat dieser Sitz noch einen Akteur? Die Creature-Liste setzt voraus, dass der Sitz
- * gerade `activePlayer` ist — der Aufrufer stellt das sicher.
+ * Aktive Effekte der eigenen Heroes (gedruckter Effekt, z. B. Broghan), die jetzt nutzbar sind. Sie kosten den Zug, aber nicht den Hero —
+ * ein Sitz, dessen Heroes alle gehandelt haben, hat mit einem ungenutzten Hero-Effekt also noch eine Aktion (er verfiele sonst bis zur
+ * nächsten Round). Ausrüstungs-Effekte und geliehene Heroes zählen nicht.
+ */
+function heroEffectActors(engine, seat) {
+  const st = stOf(engine);
+  if ((st.surrendered || []).includes(seat)) return [];
+  let list = [];
+  try { list = engine.getActiveHeroEffects(seat) || []; } catch (e) { list = []; }
+  return list.filter(e => !e.equippedCard && e.charmedOwner == null);
+}
+
+/**
+ * Hat dieser Sitz noch eine mögliche Aktion (Hero, Creature mit nutzbarem Effekt, Hero-Effekt)? Die Creature- und Effekt-Listen setzen voraus,
+ * dass der Sitz gerade `activePlayer` ist — der Aufrufer stellt das sicher.
  */
 function hasActor(engine, seat) {
-  return heroActors(engine, seat).length > 0 || creatureActors(engine, seat).length > 0;
+  return heroActors(engine, seat).length > 0 || creatureActors(engine, seat).length > 0 || heroEffectActors(engine, seat).length > 0;
 }
 
 function withActive(engine, seat, fn) {
@@ -90,8 +110,16 @@ function withActive(engine, seat, fn) {
   try { return fn(); } finally { gs.activePlayer = prev; }
 }
 
+/**
+ * Kann dieser Sitz in dieser Round noch handeln? Wer nichts mehr tun kann (alle Heroes erschöpft oder handlungsunfähig und keine Creature mit
+ * nutzbarem Effekt), bekommt keinen Zug mehr — er müsste ihn sonst nur absitzen. Geprüft wird in der Action Phase: Creatures, deren Effekt eine
+ * Aktion kostet (Spawn Mother …), stehen nur dort in der Liste; nach einem freien Effekt steht die Engine sonst noch in der Main Phase.
+ */
 function seatHasActor(engine, seat) {
-  return !stOf(engine).passed[seat] && withActive(engine, seat, () => hasActor(engine, seat));
+  if (stOf(engine).passed[seat]) return false;
+  const gs = engine.gs, prevPhase = gs.currentPhase;
+  gs.currentPhase = PHASE_ACTION;
+  try { return withActive(engine, seat, () => hasActor(engine, seat)); } finally { gs.currentPhase = prevPhase; }
 }
 
 // ── Eliminierung ───────────────────────────────────────────────────
@@ -165,6 +193,16 @@ async function endRound(engine) {
   }
 }
 
+/** Im Protokoll vermerken (einmal je Sitz und Round), dass ein Sitz übersprungen wird, weil er nichts mehr tun kann (nicht: weil er gepasst hat). */
+function noteNoActions(engine, seat) {
+  const st = stOf(engine);
+  if (st.passed[seat] || !seatAlive(engine, seat) || (st.eliminated || []).includes(seat) || (st.surrendered || []).includes(seat)) return;
+  const noted = st.noActionsNoted || (st.noActionsNoted = {});
+  if (noted[seat] === st.round) return;
+  noted[seat] = st.round;
+  engine.log && engine.log('skilltest_no_actions', { seat, round: st.round });
+}
+
 /** Den nächsten Sitz bestimmen, der noch einen Akteur hat (nach `afterSeat` in der Round-Reihenfolge). */
 function pickNextSeat(engine, afterSeat) {
   const st = stOf(engine), order = st.order;
@@ -172,6 +210,7 @@ function pickNextSeat(engine, afterSeat) {
   for (let k = 0; k < order.length; k++) {
     const seat = order[(startPos + k) % order.length];
     if (seatHasActor(engine, seat)) return seat;
+    noteNoActions(engine, seat);
   }
   return null;
 }
@@ -239,11 +278,15 @@ async function advance(engine, host, afterSeat) {
       engine.onGameOver(engine.room, resolveStalemateWinner(engine), 'round_limit');
       return false;
     }
-    // Falls auch in der frischen Round niemand handeln kann (alle Sitze ohne Akteure), abbrechen.
+    // Falls auch in der frischen Round niemand handeln kann (alle Sitze ohne Akteure), abbrechen — aber erst nach ein paar leeren Rounds:
+    // Betäubung, Frost und Co. enden mit der Round, und Creatures ohne nutzbaren Effekt zählen nicht mehr als Akteur (siehe creatureActors).
     if (!st.order.some(s => seatHasActor(engine, s))) {
-      if (!gs.result) engine.onGameOver(engine.room, resolveStalemateWinner(engine), 'no_actors');
-      return false;
-    }
+      st.emptyRounds = (st.emptyRounds || 0) + 1;
+      if (st.emptyRounds >= EMPTY_ROUNDS_LIMIT) {
+        if (!gs.result) engine.onGameOver(engine.room, resolveStalemateWinner(engine), 'no_actors');
+        return false;
+      }
+    } else st.emptyRounds = 0;
   }
   return false;
 }
@@ -519,7 +562,7 @@ async function skipWithCreature(room, pi, params, host) {
 
 module.exports = {
   act, playBaseAttack, actedHeroesOf, passRound, skipWithCreature, setWatch, CONSUMING_KINDS, METER_HOOKS, requiredPhase, setPhaseFor,
-  roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, hasActor, seatHasActor,
+  roundOrder, nextStarter, heroKey, heroAlive, heroActors, creatureActors, heroEffectActors, hasActor, seatHasActor,
   seatAlive, livingSeats, withActive,
   startRound, endRound, beginTurn, advance, pickNextSeat, isIncapacitated, roundTurn,
   PHASE_ACTION,

@@ -376,6 +376,80 @@
 - Inverted Levitation
 - Enhanced Guard Dog
 
+## Search-Karten (Nutzer 8.10.): Karten, deren Effekt ausdrücklich ein Suchen im Deck ist („search your deck for …“) — Spider Dance, Masterpiece, Aufdeck-/Such-Creatures wie die zehn Harpyformer, Hell Fox, Pinaxolotl, The Egg of God und Helden, deren Effekt das Suchen ist (Alex, Garius, Madaga, Monsieur Pete, Sabrina, Cute Annoyance Mini). Der Skill Test hat kein Deck, das Suchen findet nie etwas. NICHT gesperrt: die Idej Lords (ihr Paket kommt über die Spawn-Regel), Karten, die Suchen nur einschränken oder verändern (Krates, Koperniko, Cats of the Pharaoh, Cybug BEE).
+
+- Alex, Trainer of Heroes
+- Cute Annoyance Mini
+- Garius, the Great Reformer
+- Madaga, the Forsaken Seafarer
+- Monsieur Pete, the Booty Raider
+- Sabrina, the Psychic Witch
+- Aquanian Orkallion
+- Ballad Harpyformer
+- Classical Harpyformer
+- Country Harpyformer
+- Grunge Harpyformer
+- Harpyformer Choir
+- Metal Harpyformer
+- Rap Harpyformer
+- Shanty Harpyformer
+- Ska Harpyformer
+- Techno Harpyformer
+- Box Spider
+- Cute Dog
+- Deepsea Witch
+- Elusive Hind
+- Hell Fox
+- Life-Searcher from the Cosmic Depths
+- Loyal Shepherd
+- Motharch Squire
+- Pinaxolotl
+- Rebelliokai Camouflaged Kappa
+- Soul Shard Ka
+- Steam Dwarf Diver
+- Tamed Hell Fox
+- The Egg of God
+- Masterpiece
+- Spider Dance
+- The Cosmic Depths
+
+## Reine Mill-Karten (Nutzer 8.10.): ihr Effekt ist ausschließlich, Karten vom Deck in die Ablage zu schicken (Pillage, Dead Guardian, Magic Emerald, Gravedigger's Shovel, Sky Shaman, Cute Nerd Magenta, Jean, Cute Cat, Gravedigger). Der Skill Test hat kein Deck. NICHT gesperrt: Karten, die nur nebenbei mill’en (Deepsea Skeleton, Guardian's Appearance, Soul Shard Shut, Codumbus) und Trade (löscht oberste Karten nur als Preis für Gold).
+
+- Pillage
+- Dead Guardian
+- Magic Emerald
+- Gravedigger's Shovel
+- Sky Shaman
+- Cute Nerd Magenta
+- Jean, the Pillaging Knight
+- Cute Cat
+- Gravedigger
+
+## Alle Paraseed-Karten (Nutzer 8.10.): Paraseed, Paraseed Control und Paraseed Zombie waren schon gesperrt, jetzt auch Paraseed Greenhouse (und damit die ganze Paraseed-Familie samt Bloom).
+
+- Paraseed Greenhouse
+
+## Tanuki (Nutzer 8.10.): Rebelliokai Timid Tanuki und Tanuki Escape. Das Tanuki-Paket hängt an der Ablage und am Zurückmischen ins Deck.
+
+- Rebelliokai Timid Tanuki
+- Tanuki Escape
+
+## Cycling Demons (Nutzer 8.10.): alle fünf (Bouldor, Herbithorn, Hydrogen, Infernous, Serpentous Demon) — jeder holt beim Fallen den nächsten der Kette aus dem DECK, das es im Skill Test nicht gibt.
+
+- Bouldor Demon
+- Herbithorn Demon
+- Hydrogen Demon
+- Infernous Demon
+- Serpentous Demon
+
+## Sandy Blob (Nutzer 8.10.).
+
+- Sandy Blob
+
+## Festive Werz (Nutzer 8.10.): zahlt „deinem Gegner“ Gold — mit mehreren Gegnern gibt es nicht DEN Gegner.
+
+- Festive Werz
+
 ## Alle Future-Tech-Karten (Archetyp „Future Tech“): sie brauchen eine gefüllte Ablage, um gut zu funktionieren — im Skill Test gibt es keine Decks und kaum Ablage.
 
 - Blueprints
