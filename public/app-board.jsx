@@ -33003,9 +33003,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   })();
   const tutorialPhaseErlaubt = (ziel) => !tutorial1Phasensperre || (ziel === 3 && tutorial1DestructionMagic >= 3);
 
+  // ★ Als Befund 8.10. („This Action is not possible right now" mitten im
+  // Tutorial, nicht reproduzierbar): Ein Doppelklick auf einen Phasenkasten
+  // (oder Klick + Leertaste) schickt `advance_phase` zweimal mit demselben
+  // Ziel. Der Server fuehrt das erste aus; das zweite ist dann ungueltig
+  // (Phase schon erreicht), wird still verworfen — und der Verwerfungs-
+  // Waechter meldet es nach 2 s als Fehler, obwohl alles geklappt hat.
+  // Derselbe Wunsch innerhalb von 1 s wird deshalb gar nicht erst gesendet.
+  const letzterPhasenWunsch = useRef({ ziel: -1, zeit: 0 });
+  const phasenWunschDoppelt = (ziel) => {
+    const jetzt = Date.now();
+    const l = letzterPhasenWunsch.current;
+    if (l.ziel === ziel && jetzt - l.zeit < 1000) return true;
+    letzterPhasenWunsch.current = { ziel, zeit: jetzt };
+    return false;
+  };
+
   // Shared phase advance with optional end-turn confirmation
   const tryAdvancePhase = useCallback((targetPhase) => {
     if (tutorial1Phasensperre && !(targetPhase === 3 && tutorial1DestructionMagic >= 3)) return;
+    if (phasenWunschDoppelt(targetPhase)) return;
     if (targetPhase === 5 && askBeforeEndTurn) {
       pendingEndTurnRef.current = targetPhase;
       setShowEndTurnConfirm(true);
@@ -33024,6 +33041,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const cancelEndTurn = useCallback(() => {
     pendingEndTurnRef.current = null;
     setShowEndTurnConfirm(false);
+    // Abbrechen: ein sofortiger neuer Klick auf End Turn ist ein neuer Wunsch.
+    letzterPhasenWunsch.current = { ziel: -1, zeit: 0 };
   }, []);
 
   // Listen for opponent card reveal
@@ -44305,8 +44324,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // Die Namen stehen oben im Tooltip, die vollen Texte
                     // im vorhandenen „Inherited Effects"-Block darunter.
                     const _kopiert = Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [];
+                    // ── Ascension Orbs (Beato) ──
+                    // ★ Als Befund 8.10.: Die Orbs lagen als GESCHWISTER ueber der
+                    // Karte. Jede Orb unter dem Zeiger beendete damit den Hover der
+                    // Karte — der Karten-Tooltip verschwand genau dort, wo die Orbs
+                    // liegen. Jetzt sind sie KINDER der Karte (`children`): die Karte
+                    // bleibt "gehovert", ihr Tooltip bleibt stehen, und die Orbs
+                    // zeigen zusaetzlich ihren eigenen Hinweis.
+                    const orbsEl = (hero.ascensionOrbs && (
+                        <div className="ascension-orbs-container"
+                          onMouseEnter={e => showGameTooltip(e, hero.ascensionReady ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend')}
+                          onMouseLeave={hideGameTooltip}>
+                          {hero.ascensionOrbs.map((orb, oi) => {
+                            const count = hero.ascensionOrbs.length;
+                            const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
+                            const radius = 22;
+                            const cx = 50 + Math.cos(angle) * radius;
+                            const cy = 50 + Math.sin(angle) * radius;
+                            return (
+                              <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
+                                style={{
+                                  left: cx + '%', top: cy + '%',
+                                  background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
+                                  boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
+                                }}
+                                onMouseEnter={e => { e.stopPropagation(); showGameTooltip(e, `${orb.school}${orb.collected ? ' ✓' : ''}`); }}
+                                onMouseLeave={hideGameTooltip}
+                              />
+                            );
+                          })}
+                        </div>
+                    ));
                     const heroCardProps = {
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
+                      children: orbsEl || undefined,
                       skins: p.deckSkins ? { ...gameSkins, ...p.deckSkins } : gameSkins, abilities: p.abilityZones?.[i],
                       copiedHeroes: _kopiert,
                       inheritedEffects: _kopiert
@@ -44721,31 +44772,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     </div>
                   );
                 })()}
-                {/* ── Ascension Orbs ── */}
-                {hero?.name && hero.ascensionOrbs && (
-                  <div className="ascension-orbs-container"
-                    onMouseEnter={e => showGameTooltip(e, hero.ascensionReady ? 'All schools collected — ready to Ascend!' : 'Collect all spell school orbs to Ascend')}
-                    onMouseLeave={hideGameTooltip}>
-                    {hero.ascensionOrbs.map((orb, oi) => {
-                      const count = hero.ascensionOrbs.length;
-                      const angle = (oi / count) * 2 * Math.PI - Math.PI / 2;
-                      const radius = 22;
-                      const cx = 50 + Math.cos(angle) * radius;
-                      const cy = 50 + Math.sin(angle) * radius;
-                      return (
-                        <div key={oi} className={'ascension-orb' + (orb.collected ? ' ascension-orb-collected' : '')}
-                          style={{
-                            left: cx + '%', top: cy + '%',
-                            background: orb.collected ? orb.color : 'rgba(60,60,60,.7)',
-                            boxShadow: orb.collected ? `0 0 8px ${orb.color}, 0 0 16px ${orb.color}55` : 'none',
-                          }}
-                          onMouseEnter={e => { e.stopPropagation(); showGameTooltip(e, `${orb.school}${orb.collected ? ' ✓' : ''}`); }}
-                          onMouseLeave={hideGameTooltip}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
                 {/* ── Ascension drag highlight ── */}
                 {/* v673: der pickHandCard-Drag auf eine Heldenzone nutzt
                     denselben Schein — aus Spielersicht ist es derselbe

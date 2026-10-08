@@ -15364,12 +15364,13 @@ body:has(.textbox-overlay) .tooltip {
   width: 100%;
   text-shadow: 2px 2px 0 rgba(0, 0, 0, .7);
 }
+/* Fett und kursiv bleiben in der normalen Textfarbe (Weiss), wie der Rest
+   des Textes (Als Vorgabe 8.10.) — vorher Cyan bzw. Gelb. Farbige
+   Woerter kommen weiter ueber `{farbe:…}` im Skript. */
 .textbox-text strong {
-  color: var(--accent);
   font-weight: 700;
 }
 .textbox-text em {
-  color: #ffcc66;
   font-style: italic;
 }
 /* Shake text — each character bobs independently */
@@ -15486,14 +15487,23 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone *::after {
   display: none !important;
 }
-/* Phasenleiste im Highlight: die Beschriftungen sind im Original gedimmt
-   (40 % Weiss) — ueber dem Schleier sollen alle sechs klar lesbar sein. */
+/* Phasenleiste im Highlight (Tutorial 1, Textbox 11): die ganze Leiste
+   liegt ueber dem Schleier und pulsiert, aber nur die Action Phase ist
+   „an" — alle anderen Kaesten sind ausgegraut (auch die aktuelle Phase;
+   `!important` schlaegt den Inline-Rahmen der aktiven). */
 .textbox-highlight-clone .board-phase-item {
-  color: rgba(255,255,255,.92);
-  background: rgba(255,255,255,.1);
-  border-color: rgba(255,255,255,.3);
+  color: rgba(255,255,255,.3);
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.1) !important;
+  box-shadow: none !important;
+  text-shadow: none;
 }
-.textbox-highlight-clone .board-phase-item.active { background: rgba(255,255,255,.18); }
+.textbox-highlight-clone .board-phase-item[data-phase-name="Action Phase"] {
+  color: #fff;
+  background: rgba(0,240,255,.2);
+  border: 1px solid rgb(0,240,255) !important;
+  box-shadow: 0 0 10px rgba(0,240,255,.6) !important;
+}
 /* Der Klon steht ausserhalb seines Kontexts — Groessenregeln wie die
    der Handkarten (`.game-hand … > .board-card`) greifen dort nicht.
    Der Kasten ist bereits exakt so gross wie das Original, die Karte

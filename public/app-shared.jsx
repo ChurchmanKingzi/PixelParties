@@ -8374,8 +8374,7 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Heya! Welcome to the battlefield!' },
       { text: "I'm Monia Bot, the coolest Bot there is, beep-boop!\nI'll show you the ropes and make you a Pixel-Powerhouse!" },
       { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!" },
-      // „and" bleibt in der normalen Textfarbe (sonst waere fetter Text Cyan).
-      { text: 'To do that, you deal damage to them until their HP drop to 0. You usually use {red:**Attacks, Spells**} {var(--text):**and**} {green:**Creatures**} for that!' },
+      { text: 'To do that, you deal damage to them until their HP drop to 0. You usually use {red:**Attacks, Spells**} **and** {green:**Creatures**} for that!' },
       // ── Highlight: Beato und Magic Hammer ──
       { text: "Let's try hitting my {purple:**Beato**} with the big, strong {red:**Magic Hammer**} Spell in your hand!",
         highlights: [
