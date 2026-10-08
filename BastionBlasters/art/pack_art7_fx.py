@@ -288,3 +288,84 @@ def swim_duck_small():
     ring(True)
     c.outline()
     return c
+
+
+# --------------------------------------------------------------------------- Strahlen, Kegel, Flugbahnen
+
+
+def parabola(p0, p1, height, n):
+    """n+1 Punkte einer Wurfparabel von p0 nach p1 (height = Scheitel über der Sehne)"""
+    pts = []
+    for k in range(n + 1):
+        t = k / float(n)
+        x = p0[0] + (p1[0] - p0[0]) * t
+        y = p0[1] + (p1[1] - p0[1]) * t - 4.0 * height * t * (1 - t)
+        pts.append((x, y))
+    return pts
+
+
+def dither_fill(world, pts, colors, key=5000, mode='check'):
+    """Polygon halbdurchsichtig füllen (Schachbrett); colors(x, y) -> (ramp, idx) oder None"""
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    for y in range(max(0, int(min(ys))), min(world.h, int(max(ys)) + 1)):
+        for x in range(max(0, int(min(xs))), min(world.w, int(max(xs)) + 1)):
+            if not point_in_poly(x + 0.5, y + 0.5, pts):
+                continue
+            col = colors(x, y)
+            if col is None:
+                continue
+            if mode == 'check' and (x + y) % 2:
+                continue
+            wpx(world, x, y, col[0], col[1], key)
+
+
+def zigzag(x0, y0, x1, y1, n, amp, seed=0):
+    """Blitz-Zickzack zwischen zwei Punkten"""
+    rnd = random.Random(seed)
+    pts = [(x0, y0)]
+    dx, dy = x1 - x0, y1 - y0
+    ln = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / ln, dx / ln
+    for k in range(1, n):
+        t = k / float(n)
+        off = amp * (1 if k % 2 else -1) * (0.6 + 0.4 * rnd.random())
+        pts.append((x0 + dx * t + nx * off, y0 + dy * t + ny * off))
+    pts.append((x1, y1))
+    return pts
+
+
+def draw_bolt(world, pts, key=9300, core='bone', glow='gold', thick=True):
+    """Blitz entlang eines Linienzugs: goldener Mantel, heller Kern"""
+    for (a, b) in zip(pts, pts[1:]):
+        wline(world, round(a[0]), round(a[1]), round(b[0]), round(b[1]), glow, 4, key)
+        wline(world, round(a[0]) + 1, round(a[1]), round(b[0]) + 1, round(b[1]), glow, 3, key)
+        wline(world, round(a[0]), round(a[1]), round(b[0]), round(b[1]), core, 5, key + 1)
+
+
+def ghostly(spr, ramp='fur'):
+    """halbdurchsichtige Geisterfassung (Schachbrett-Alpha), Farbton auf `ramp`"""
+    out = tint_ramp(spr, ramp, 1)
+    for y in range(out.h):
+        for x in range(out.w):
+            if (x + y) % 2:
+                out.px[y, x, 3] = 0
+                out.rid[y, x] = -1
+    return out
+
+
+def smiling_bolt():
+    """lächelnder Blitz (Figur), 11 x 17: dicker Zickzack mit zwei Augen und Lächeln"""
+    c = Canvas(11, 17)
+    body = [(5, 0), (9, 0), (7, 6), (10, 6), (3, 16), (5, 9), (2, 9)]
+    poly(c, body, 'gold', lo=3, hi=5, flat=None)
+    for (x, y) in ((4, 3), (7, 3)):
+        c.put_ramp(x, y, 'coal', 0)
+    for (x, y) in ((4, 5), (5, 6), (6, 6), (7, 5)):
+        pass
+    c.put_ramp(4, 4, 'coal', 1)
+    c.put_ramp(7, 4, 'coal', 1)
+    c.put_ramp(5, 5, 'coal', 1)
+    c.put_ramp(6, 5, 'coal', 1)
+    c.outline()
+    return c

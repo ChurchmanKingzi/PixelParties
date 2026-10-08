@@ -972,11 +972,20 @@ def armor_stand(head='helm', plume=True, lean=0, pose=0):
 
 
 def giggle_marks():
-    """kleine Kicher-Striche (Bewegungslinien + Tränchen) für die Rüstungen (28 x 10)"""
-    c = Canvas(30, 12)
-    for (x, y, i) in ((2, 6, 4), (1, 4, 5), (3, 8, 4), (2, 2, 5), (26, 6, 4), (27, 4, 5), (25, 8, 4), (26, 2, 5)):
-        c.put_ramp(x, y, 'bone', i)
-        c.put_ramp(x + (1 if x < 10 else -1), y, 'bone', i - 1)
+    """Kicher-Zeichen: je drei Schüttel-Bögen links und rechts vom Helm plus Tränchen (34 x 14)"""
+    c = Canvas(36, 16)
+    for k in range(3):
+        for (dy, dx) in ((0, 1), (1, 0), (2, 0), (3, 0), (4, 1)):
+            x = 4 - k * 2 + dx
+            y = 5 + dy - 0
+            if 0 <= x < 36:
+                c.put_ramp(x, y, 'bone', 5 if k == 0 else 4)
+            x2 = 31 + k * 2 - dx
+            c.put_ramp(x2, y, 'bone', 5 if k == 0 else 4)
+    c.put_ramp(9, 12, 'ice', 5)
+    c.put_ramp(9, 13, 'ice', 4)
+    c.put_ramp(26, 12, 'ice', 5)
+    c.put_ramp(26, 13, 'ice', 4)
     return c
 
 
@@ -1107,6 +1116,31 @@ def pipe_sign():
         c.put_ramp(11 + k, 10 + k, 'fire', 3)
         c.put_ramp(12 + k, 10 + k, 'fire', 2)
         c.put_ramp(10 + k, 10 + k, 'fire', 4)
+    c.outline()
+    return c
+
+
+def pipe_plaque():
+    """Verbotsschild als Wandplakette: rot durchgestrichene Pfeife (22 x 22), keine Schrift"""
+    c = Canvas(22, 22)
+    ellipse(c, 11, 11, 10.0, 10.0, 'bone', lo=3, hi=5)
+    for y in range(0, 22):
+        for x in range(0, 22):
+            d = math.hypot(x + 0.5 - 11, y + 0.5 - 11)
+            if 7.2 < d <= 10.0:
+                c.put_ramp(x, y, 'fire', 3 if (x + y) % 4 else 4)
+    for x in range(5, 13):
+        c.put_ramp(x, 13, 'wood', 1)
+        c.put_ramp(x, 14, 'wood', 2)
+    c.rect(5, 12, 6, 14, 'coal', 1)
+    c.rect(12, 9, 15, 14, 'wood', 1)
+    c.rect(13, 9, 14, 9, 'coal', 0)
+    for (x, y) in ((13, 7), (14, 6), (13, 5), (14, 4)):
+        c.put_ramp(x, y, 'stone', 3 if y % 2 else 2)
+    for k in range(-8, 9):
+        c.put_ramp(11 + k, 11 + k, 'fire', 3)
+        c.put_ramp(12 + k, 11 + k, 'fire', 2)
+        c.put_ramp(10 + k, 11 + k, 'fire', 4)
     c.outline()
     return c
 

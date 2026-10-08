@@ -38,7 +38,7 @@ def _art_bw02():
     MX, MY, MW, MH = geom
     # Kicher-Striche neben den Helmen
     for cx in (MX + 18, MX + 48, MX + 78):
-        wdraw(world, giggle_marks(), cx - 15, MY - 3)
+        wdraw(world, giggle_marks(), cx - 18, MY - 6)
     # Knappe mit zu großem Eimerhelm
     _feet(world, squire_bucket(), MX + 62, MY + 50, flip=True)
     prop_at(world, bush(2), MX - 18, MY + 74)
@@ -51,14 +51,13 @@ def _art_bw02():
 
 def furnish_powder(ctx):
     X0, Y0, W, H = ctx.X0, ctx.Y0, ctx.W, ctx.H
-    ctx.decor(hanging_lantern(), X0 + 22)
-    ctx.prop(powder_keg(1), X0 + 28, Y0 + 12)
-    ctx.prop(powder_keg(1), X0 + 44, Y0 + 12)
-    ctx.prop(powder_keg(1), X0 + 36, Y0 - 3)
-    ctx.prop(powder_keg(2), X0 + 6, Y0 + 8)
-    ctx.floor_deco(powder_trail(26), X0 + 24, Y0 + 36)
-    ctx.prop(sack_pile(), X0 + 22, Y0 + 30)
-    ctx.prop(pipe_sign(), X0 + 5, Y0 + 20)
+    ctx.decor(pipe_plaque(), X0 + 16)
+    ctx.decor(hanging_lantern(), X0 + 40)
+    ctx.prop(powder_keg(2), X0 + 4, Y0 + 10)
+    ctx.prop(powder_keg(1), X0 + 26, Y0 + 14)
+    ctx.prop(powder_keg(1), X0 + 15, Y0 - 3)
+    ctx.floor_deco(powder_trail(24), X0 + 12, Y0 + 40)
+    ctx.prop(sack_pile(), X0 + 5, Y0 + 36)
 
 
 THEME_POWDER = {'floor': floor_dark_planks(), 'furnish': furnish_powder, 'low': False}
@@ -69,12 +68,12 @@ def _art_bw03():
     world, c, out, geom = build_room('P', THEME_POWDER, 2, 2, seed=3)
     MX, MY, MW, MH = geom
     g = powder_gnome()
-    _feet(world, g, MX + 46, MY + 47, flip=True)
+    _feet(world, g, MX + 46, MY + 49, flip=True)
     # Fliege kreist um ein Fass, glühende Asche fällt auf die Pulverspur
-    wdraw(world, fly(), MX + 35, MY + 6)
-    for (dx, dy) in ((38, 10), (40, 8), (41, 6)):
-        wpix(world, MX + dx - 2, MY + dy + 2, 'coal', 3)
-    wdraw(world, ember_spark('gold'), MX + 40, MY + 36)
+    wdraw(world, fly(), MX + 26, MY + 2)
+    for (dx, dy) in ((22, 6), (24, 4), (26, 2), (30, 5), (32, 6)):
+        wpix(world, MX + dx, MY + dy + 2, 'coal', 3)
+    wdraw(world, ember_spark('gold'), MX + 33, MY + 40)
     prop_at(world, bush(1), MX - 20, MY + 24)
     prop_at(world, rock(2), MX + MW + 22, MY + 66)
     prop_at(world, bush(3, True), MX + MW + 20, MY + 24)

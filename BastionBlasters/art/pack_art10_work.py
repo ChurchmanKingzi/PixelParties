@@ -8,63 +8,63 @@ from pack_art10_kit import *
 
 
 def troll():
-    """schunkelnder Troll: grosser Bauch, Schuerze, Humpen, Hauer, Schwindelsterne. Blick nach rechts, 40 x 46"""
-    c = Canvas(40, 46)
+    """schunkelnder Troll: grosser Bauch, Schuerze, Humpen, Hauer. Blick nach rechts, 44 x 46"""
+    c = Canvas(44, 46)
     # Beine (breit, taumelnd)
-    thick_line(c, 14, 31, 10, 41, 6.4, 'slime', lo=1, hi=3)
-    thick_line(c, 24, 31, 30, 41, 6.4, 'slime', lo=2, hi=4)
-    ellipse(c, 9, 43, 5.4, 2.6, 'slime', lo=0, hi=3)
-    ellipse(c, 31, 43, 6.0, 2.6, 'slime', lo=2, hi=4)
-    for x in (5, 8, 11):
+    thick_line(c, 15, 31, 11, 41, 6.4, 'slime', lo=1, hi=3)
+    thick_line(c, 25, 31, 31, 41, 6.4, 'slime', lo=2, hi=4)
+    ellipse(c, 10, 43, 5.4, 2.6, 'slime', lo=0, hi=3)
+    ellipse(c, 32, 43, 6.0, 2.6, 'slime', lo=2, hi=4)
+    for x in (6, 9, 12):
         c.put_ramp(x, 44, 'bone', 3)
-    for x in (28, 31, 34):
+    for x in (29, 32, 35):
         c.put_ramp(x, 44, 'bone', 4)
     # Lendenschurz
-    poly(c, [(11, 30), (28, 30), (30, 36), (9, 36)], 'wood', lo=1, hi=3)
+    poly(c, [(12, 30), (29, 30), (31, 36), (10, 36)], 'wood', lo=1, hi=3)
     # Bauch und Brust
-    ellipse(c, 19.5, 24, 12.5, 10.5, 'slime', lo=1, hi=4)
+    ellipse(c, 20.5, 24, 12.5, 10.5, 'slime', lo=1, hi=4)
     # Schuerze mit Suppenflecken
-    poly(c, [(12, 17), (27, 17), (28, 31), (11, 31)], 'bone', lo=2, hi=5)
-    c.rect(12, 17, 27, 17, 'bone', 5)
-    for (x, y, w_, col, i) in ((14, 21, 3, 'fire', 3), (21, 24, 4, 'gold', 3), (16, 27, 3, 'fire', 2), (24, 20, 2, 'leaf', 3), (19, 18, 2, 'dirt', 3)):
+    poly(c, [(13, 18), (28, 18), (29, 31), (12, 31)], 'bone', lo=2, hi=5)
+    c.rect(13, 18, 28, 18, 'bone', 5)
+    for (x, y, w_, col, i) in ((15, 22, 3, 'fire', 3), (22, 25, 4, 'gold', 3), (17, 28, 3, 'fire', 2), (25, 21, 2, 'leaf', 3), (20, 19, 2, 'dirt', 3)):
         c.rect(x, y, x + w_ - 1, y + 1, col, i)
-    c.rect(18, 30, 24, 30, 'bone', 2)
-    # Nabel-Knopf
-    c.put_ramp(19, 22, 'gold', 5)
-    # rechter Arm hoch mit Humpen
-    thick_line(c, 28, 21, 33, 12, 5.0, 'slime', lo=2, hi=4)
-    round_rect(c, 31, 1, 39, 12, 'wood', lo=1, hi=4, radius=1)
-    c.rect(31, 4, 39, 4, 'metal', 3)
-    c.rect(31, 9, 39, 9, 'metal', 2)
-    c.rect(37, 3, 40, 3, 'wood', 4)
-    c.rect(40, 3, 40, 9, 'wood', 3)
-    for (x, y) in ((32, 0), (34, 0), (36, 0), (38, 0), (33, 1), (35, 1), (37, 1)):      # Schaum
-        c.put_ramp(x, y, 'bone', 5)
-    c.put_ramp(31, 12, 'slime', 4)
-    ellipse(c, 33, 13, 2.6, 2.4, 'slime', lo=2, hi=5)
+    c.rect(19, 30, 25, 30, 'bone', 2)
+    c.put_ramp(20, 23, 'gold', 5)
     # linker Arm mit Kelle
-    thick_line(c, 10, 21, 5, 29, 5.0, 'slime', lo=1, hi=3)
-    thick_line(c, 5, 29, 3, 17, 1.6, 'wood', lo=2, hi=4)
-    ellipse(c, 3, 15.5, 3.0, 2.6, 'metal', lo=1, hi=5)
-    c.put_ramp(3, 16, 'fire', 3)
+    thick_line(c, 11, 22, 6, 30, 5.0, 'slime', lo=1, hi=3)
+    thick_line(c, 6, 30, 4, 18, 1.6, 'wood', lo=2, hi=4)
+    ellipse(c, 4, 16.5, 3.0, 2.6, 'metal', lo=1, hi=5)
+    c.put_ramp(4, 17, 'fire', 3)
+    # Hals / Schultern
+    ellipse(c, 21, 18, 9.5, 4.0, 'slime', lo=1, hi=4)
+    # rechter Arm hoch mit Humpen
+    thick_line(c, 29, 22, 35, 16, 5.0, 'slime', lo=2, hi=4)
+    round_rect(c, 33, 2, 41, 13, 'wood', lo=1, hi=4, radius=1)
+    c.rect(33, 5, 41, 5, 'metal', 3)
+    c.rect(33, 10, 41, 10, 'metal', 2)
+    c.rect(42, 4, 43, 4, 'wood', 4)
+    c.rect(43, 4, 43, 10, 'wood', 3)
+    c.rect(42, 10, 43, 10, 'wood', 2)
+    for (x, y) in ((34, 1), (36, 1), (38, 1), (40, 1), (35, 2), (37, 2), (39, 2), (36, 0), (39, 0)):      # Schaum
+        c.put_ramp(x, y, 'bone', 5)
+    ellipse(c, 35, 15, 2.8, 2.6, 'slime', lo=2, hi=5)
     # Kopf
-    ellipse(c, 21, 10, 7.4, 6.4, 'slime', lo=2, hi=5)
-    poly(c, [(14, 8), (7, 3), (15, 13)], 'slime', lo=1, hi=3)           # Ohr
-    c.put_ramp(9, 5, 'skin', 3)
-    ellipse(c, 28.5, 12, 3.2, 2.8, 'slime', lo=3, hi=5)                 # Knollennase
-    c.put_ramp(29, 12, 'slime', 1)
+    ellipse(c, 20, 10, 7.2, 6.2, 'slime', lo=2, hi=5)
+    poly(c, [(14, 8), (8, 3), (15, 13)], 'slime', lo=1, hi=3)           # Ohr
+    c.put_ramp(10, 5, 'skin', 3)
+    ellipse(c, 28, 12, 3.2, 2.8, 'slime', lo=3, hi=5)                   # Knollennase
+    c.put_ramp(29, 13, 'slime', 1)
     c.put_ramp(30, 12, 'slime', 1)
-    # schlaefriges Auge + Schwindel
+    # schlaefriges Auge
     c.rect(24, 8, 25, 9, 'coal', 1)
     c.put_ramp(24, 8, 'bone', 5)
     c.rect(23, 7, 26, 7, 'slime', 1)
-    for x in range(21, 29):                                              # Mund (schief)
-        c.put_ramp(x, 15 if x < 26 else 14, 'coal', 1)
-    # Hauer
-    c.rect(24, 14, 25, 17, 'bone', 5)
-    c.put_ramp(24, 17, 'bone', 3)
-    c.rect(21, 14, 21, 16, 'bone', 4)
-    # Haarsträhnen
+    # Mund mit zwei Hauern
+    for x in range(21, 28):
+        c.put_ramp(x, 15, 'coal', 1)
+    c.rect(22, 13, 23, 14, 'bone', 5)
+    c.rect(26, 13, 26, 14, 'bone', 4)
+    # Haarstraehnen
     for (x, y) in ((17, 3), (20, 2), (23, 3)):
         c.rect(x, y, x, y + 1, 'coal', 2)
     c.outline()

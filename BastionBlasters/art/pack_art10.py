@@ -107,15 +107,15 @@ def _art_bu03():
     c, out = mini_castle(rows, 0, 0, world, themes={'R': THEME_REPAIR})
     # Mauerflicken an der Nordwand des Hofs, Leiter und Bau-Zwerg
     rep = wall_repair()
-    world.draw(rep, 44, 14, 36)
+    world.draw(rep, 56, 14, 36)
     lad = ladder(40)
-    world.draw(lad, 76, 24, 62)
+    world.draw(lad, 70, 24, 62)
     unit_at(world, fixer_gnome(), 84, 36, sh=(0.1, 0.1)) if False else None
     g = fixer_gnome()
-    world.draw(g, 74, 11, 63)
-    for (x, y) in ((92, 12), (95, 15), (93, 18)):
+    world.draw(g, 68, 11, 63)
+    for (x, y) in ((87, 12), (90, 16), (88, 20)):
         world_sparkle(world, x, y, 'gold')
-    prop_at(world, brick_pile(), 66, 80)
+    prop_at(world, brick_pile(), 62, 82)
     prop_at(world, bush(2), 192, 100)
     prop_at(world, rock(2), 176, 130)
     prop_at(world, crate(), 178, 70)

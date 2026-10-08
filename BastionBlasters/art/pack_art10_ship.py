@@ -307,7 +307,7 @@ def furnish_gundeck(ctx):
     wd = ctx.world
     # Schanzkleid statt Steinwaenden
     wd.draw(bulwark_front(W - 8, 19), X0 + 4, Y0 - 4 - 10 + 1, Y0 + 4)
-    side = bulwark_side(H + 18)
+    side = bulwark_side(H + 22)
     wd.draw(side, X0 - 4, Y0 - 4 - 10 + 1, 98)
     wd.draw(side, X0 + W - 4, Y0 - 4 - 10 + 1, 98)
     sy = Y0 + H - 4 - 10 + 1

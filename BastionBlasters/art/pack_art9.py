@@ -161,17 +161,17 @@ from pack_art9_hall import pad_bottom
 
 def furnish_crypt(ctx):
     W = ctx.W
-    draw_wall(ctx, CR.skull_niche(), 20)
-    draw_wall(ctx, CR.skull_niche(), W - 20)
+    draw_wall(ctx, CR.skull_niche(), 22)
+    draw_wall(ctx, CR.skull_niche(), W - 22)
     draw_wall(ctx, CR.torch_green(), W // 2)
-    draw_wall(ctx, pad_bottom(CR.cobweb(), 8), 12)
-    draw_wall(ctx, pad_bottom(CR.cobweb(True), 8), W - 12)
+    draw_wall(ctx, pad_bottom(CR.cobweb(), 4), 13)
+    draw_wall(ctx, pad_bottom(CR.cobweb(True), 4), W - 13)
+    draw_floor(ctx, CR.glow_disc(20, 'slime', 1), W // 2 - 20, -4)
     draw_floor(ctx, CR.crypt_rug(), 40, 14)
     draw_prop(ctx, CR.coffin('open'), 6, 6)
     draw_prop(ctx, CR.coffin('closed'), 26, 8)
     draw_prop(ctx, CR.armchair_reader(), 50, 10)
     draw_prop(ctx, CR.candelabra(), 44, 18)
-    draw_prop(ctx, CR.bat_hanging(), 62, -14, key_add=0)
 
 
 THEME_CRYPT = {'floor': floor_cobble(9, base='coal', tone=(1, 2), mortar=0, hi=3), 'furnish': furnish_crypt, 'low': False}
@@ -180,6 +180,8 @@ THEME_CRYPT = {'floor': floor_cobble(9, base='coal', tone=(1, 2), mortar=0, hi=3
 @card_art('BF-05')
 def _art_bf05():
     world, X0, Y0, out = room_world('Y', THEME_CRYPT, '3x2', 'dark', 3)
+    prop_at(world, CR.tombstone(1), 16, 84)
+    prop_at(world, CR.tombstone(2), 145, 66)
     return finish(window_of(world))
 
 
@@ -191,17 +193,18 @@ import pack_art9_ice as IC
 def furnish_ice(ctx):
     W = ctx.W
     draw_wall(ctx, IC.icicles(W - 8, 22), W // 2)
-    draw_wall(ctx, IC.key_board(), W // 2)
-    draw_floor(ctx, IC.welcome_mat(), W // 2 - 12, 34)
-    draw_prop(ctx, IC.ice_crystals(34, 1, 4), 5, 6)
-    draw_prop(ctx, IC.ice_crystals(30, 7, 3), W - 5 - 25, 8)
-    draw_prop(ctx, IC.penguin_clerk(), W // 2 - 8, 2)
-    draw_prop(ctx, IC.reception_desk(), W // 2 - 26, 8)
+    draw_wall(ctx, IC.key_board(), 24)
+    draw_wall(ctx, IC.snowflake_crest(), W - 24)
+    draw_floor(ctx, IC.welcome_mat(), W // 2 - 12, 38)
+    draw_prop(ctx, IC.ice_crystals(34, 1, 4), 3, -6)
+    draw_prop(ctx, IC.ice_crystals(30, 7, 3), W - 3 - 25, -4)
+    draw_prop(ctx, IC.penguin_clerk(), W // 2 - 11, -6)
+    draw_prop(ctx, IC.reception_desk(), W // 2 - 26, 12)
     draw_prop(ctx, IC.snow_drift(26, 10, 1), 4, 36)
-    draw_prop(ctx, IC.snow_drift(22, 9, 4), W - 28, 38)
+    draw_prop(ctx, IC.snow_drift(22, 9, 4), W - 28, 40)
 
 
-THEME_ICE = {'floor': floor_cobble(7, base='ice', tone=(3, 4), mortar=2, hi=5), 'furnish': furnish_ice, 'low': False}
+THEME_ICE = {'floor': floor_cobble(7, base='ice', tone=(2, 3), mortar=1, hi=4), 'furnish': furnish_ice, 'low': False}
 
 
 @card_art('BF-06')
@@ -328,7 +331,8 @@ def furnish_menagerie(ctx):
     draw_floor(ctx, BE.straw_patch(36, 20, 1), 28, 38)
     draw_prop(ctx, BE.hay_bale(), 6, 40)
     draw_prop(ctx, BE.hay_bale(22, 14), 10, 52)
-    draw_prop(ctx, BE.feed_sack(), W - 22, 40)
+    draw_prop(ctx, BE.feed_sack(), W - 20, 38)
+    draw_prop(ctx, trough(), W - 34, 54)
 
 
 THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dirt', 1, 10), ('gold', 3, 10)]), 'furnish': furnish_menagerie, 'low': False}
@@ -338,7 +342,7 @@ THEME_MENAGERIE = {'floor': floor_noise('dirt', 2, 3, 7, [('dirt', 4, 12), ('dir
 def _art_bf03():
     world, X0, Y0, out = room_world('G', THEME_MENAGERIE, '3x3', 'grass', 6)
     ox, oy = 8, 6
-    cx, cy = 58 + ox, 74 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 58, 74)
+    cx, cy = 56 + ox, 88 + oy                  # Gnom (Fussstelle in Fensterkoordinaten 56, 88)
     unit_at(world, TC.gnome('shovel', 'leaf', 'dirt', 'cloth'), cx, cy, sh=(10, 3))
     prop_at(world, BE.manure_pile(), cx + 21, cy - 1)
     BE.stink_lines(world, cx + 21, cy - 12, 14)
