@@ -15263,6 +15263,15 @@ body:has(.textbox-overlay) .tooltip {
   box-shadow: -2px 0 0 var(--pp-kontur);
   animation: textbox-portrait-enter .5s ease-out;
 }
+/* Antonia tritt nach dem Tackle an Monias Stelle: Ankunfts-Aufleuchten. */
+.textbox-portrait-ankunft {
+  animation: textbox-portrait-ankunft .5s ease-out;
+}
+@keyframes textbox-portrait-ankunft {
+  0%   { transform: scale(1.5); filter: brightness(3); }
+  60%  { transform: scale(.94); filter: brightness(1.5); }
+  100% { transform: scale(1);   filter: none; }
+}
 /* Wer gerade schweigt, tritt zurueck: entsaettigt und abgedunkelt. */
 .textbox-portrait-inactive {
   opacity: 0.5;

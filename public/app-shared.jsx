@@ -7715,7 +7715,7 @@ const MONIA_PORTRAIT = '/MoniaBot.png';
  *  der Sprechername („Jetpack Raccoon" ist Antonia vor ihrer Enthuellung). */
 function tutorialSprecherDerSeite(opts, page) {
   const rechts = (page?.side || 'left') === 'right';
-  const portraet = rechts ? opts?.rightSpeaker : (opts?.speaker || MONIA_PORTRAIT);
+  const portraet = (!rechts && page?.portrait) || (rechts ? opts?.rightSpeaker : (opts?.speaker || MONIA_PORTRAIT));
   if (portraet === ANTONIA_PORTRAIT) return 'antonia';
   if (portraet === MONIA_PORTRAIT) return 'monia';
   const name = String(page?.speakerName || (rechts ? opts?.rightSpeakerName : opts?.speakerName) || '');
@@ -7941,6 +7941,11 @@ function measureHighlight(el) {
   };
 }
 
+// Tackle-Szene (s. TextBox): Flugzeit bis zum Einschlag und Vorlauf, nach dem
+// der Text der Seite zu tippen beginnt.
+const TACKLE_FLUG_MS = 700;
+const TACKLE_VORLAUF_MS = 1300;
+
 function TextBox() {
   const [opts, setOpts] = useState(null);
   const [pages, setPages] = useState([]);
@@ -7957,6 +7962,11 @@ function TextBox() {
   const [leftVisible, setLeftVisible] = useState(true);
   const [leftExiting, setLeftExiting] = useState(false);
   const [fading, setFading] = useState(false);
+  // Tackle-Szene (Tutorial 5, Epilog): `tackleAus` wird im Augenblick des
+  // Einschlags wahr — erst dann tauscht das linke Portraet auf Antonia.
+  // `vorlaufRef` sperrt das Weiterklicken, solange die Szene laeuft.
+  const [tackleAus, setTackleAus] = useState(false);
+  const vorlaufRef = useRef(false);
   const timerRef = useRef(null);
   const parsedRef = useRef({ segments: [], plainText: '' });
   const bodyRef = useRef(null);
@@ -7976,7 +7986,7 @@ function TextBox() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
+    if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); setTackleAus(false); onShowFiredRef.current = new Set(); return; }
 
     // Linke Dauer-Rolle: sie steht ab der ersten Seite da, es gibt kein
     // `enterLeft`, an dem man haengen koennte.
@@ -8051,13 +8061,84 @@ function TextBox() {
     // der Browser kurz (Brettaufbau, Animationen), holt der Text auf, statt
     // jeden verpassten Takt als Pause stehen zu lassen.
     const speed = (opts && opts.speed) || 12;
-    const t0 = performance.now();
-    timerRef.current = setInterval(() => {
-      const n = Math.floor((performance.now() - t0) / speed) + 1;
-      if (n >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
-      else setCharCount(n);
-    }, Math.min(speed, 16));
-    return () => clearInterval(timerRef.current);
+    const tippen = () => {
+      vorlaufRef.current = false;
+      const t0 = performance.now();
+      timerRef.current = setInterval(() => {
+        const n = Math.floor((performance.now() - t0) / speed) + 1;
+        if (n >= len) { setCharCount(len); setDone(true); clearInterval(timerRef.current); }
+        else setCharCount(n);
+      }, Math.min(speed, 16));
+    };
+    // Seiten mit Tackle-Szene tippen erst, wenn die Szene gelaufen ist.
+    let vorT = null;
+    setTackleAus(false);
+    if (page?.tackle) { vorlaufRef.current = true; vorT = setTimeout(tippen, TACKLE_VORLAUF_MS); }
+    else tippen();
+    return () => { clearInterval(timerRef.current); if (vorT) clearTimeout(vorT); vorlaufRef.current = false; };
+  }, [pages, pageIdx]);
+
+  // ── Tackle-Szene (Tutorial 5, Epilog) ────────────────────────────
+  // „Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und wirft
+  // sie aus dem Bild; Antonia steht danach links, wo Monia stand."
+  // Die Flieger sind feste Elemente im Overlay (nicht in der Textbox, die
+  // abschneidet) und laufen per Web Animations API: Antonia 650 ms von
+  // ausserhalb des Bildschirms auf das linke Portraet, beim Einschlag fliegt
+  // Monias Portraetrahmen drehend aus dem Bild, die Box wackelt, ein Blitz
+  // leuchtet — und das Portraet in der Box wird Antonia.
+  useEffect(() => {
+    const page = pages[pageIdx];
+    if (!page?.tackle) return undefined;
+    const overlay = document.querySelector('.textbox-overlay');
+    const frame = document.querySelector('.textbox-portrait-left .textbox-portrait-frame');
+    const box = document.querySelector('.textbox');
+    if (!overlay || !frame) { setTackleAus(true); return undefined; }
+    // Antonia betritt die Buehne: die Musik wechselt.
+    setAntoniaPresent(true);
+    const r = frame.getBoundingClientRect();
+    const angelegt = [];
+    const timers = [];
+    const fest = (el, extra) => {
+      Object.assign(el.style, { position: 'fixed', left: '0px', top: '0px', pointerEvents: 'none', zIndex: 90500, ...extra });
+      overlay.appendChild(el); angelegt.push(el); return el;
+    };
+    const mx = r.left + r.width / 2, my = r.top + r.height / 2;
+    const flieger = document.createElement('img');
+    flieger.src = ANTONIA_PORTRAIT; flieger.draggable = false;
+    fest(flieger, { width: '104px', height: '104px', imageRendering: 'pixelated', filter: 'drop-shadow(3px 3px 0 rgba(0,0,0,.55))' });
+    // Die Textbox sitzt am oberen Bildrand — der Flug bleibt auf Hoehe des Portraets.
+    const startX = window.innerWidth + 60, zielX = mx - 52, y0 = my - 52 - 8, y1 = my - 52;
+    if (window.playSFX) window.playSFX('attack_ram', { dedupe: 100 });
+    flieger.animate([
+      { transform: `translate(${startX}px, ${y0}px) rotate(12deg) scale(1)` },
+      { transform: `translate(${(startX + zielX) / 2}px, ${y0 + 10}px) rotate(-8deg) scale(1.25)`, offset: 0.55 },
+      { transform: `translate(${zielX}px, ${y1}px) rotate(-16deg) scale(1.1)` },
+    ], { duration: TACKLE_FLUG_MS, easing: 'cubic-bezier(.25,.15,.8,.75)', fill: 'forwards' });
+    timers.push(setTimeout(() => {
+      // Einschlag
+      flieger.remove();
+      if (window.playSFX) window.playSFX('heavy_impact', { dedupe: 100 });
+      setTackleAus(true);
+      // Monias Portraetrahmen fliegt aus dem Bild (nach oben links).
+      const wurf = frame.cloneNode(true);
+      wurf.style.setProperty('--tb-seite', getComputedStyle(frame).getPropertyValue('--tb-seite') || '#ff4444');
+      fest(wurf, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: '0' });
+      wurf.animate([
+        { transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1 },
+        { transform: `translate(${-(r.left + 320)}px, ${-(r.top + 460)}px) rotate(-1000deg) scale(.45)`, opacity: 1 },
+      ], { duration: 1000, easing: 'cubic-bezier(.2,.7,.4,1)', fill: 'forwards' });
+      // Blitz am Einschlagpunkt
+      const blitz = document.createElement('div');
+      fest(blitz, { left: (mx - 90) + 'px', top: (my - 90) + 'px', width: '180px', height: '180px', borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,210,120,.7) 35%, rgba(255,120,60,0) 70%)' });
+      blitz.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 380, easing: 'ease-out', fill: 'forwards' });
+      // Die Box wackelt.
+      if (box) box.animate([
+        { transform: 'translateX(0)' }, { transform: 'translateX(-12px)' }, { transform: 'translateX(9px)' },
+        { transform: 'translateX(-5px)' }, { transform: 'translateX(0)' },
+      ], { duration: 340, easing: 'ease-out' });
+    }, TACKLE_FLUG_MS));
+    return () => { timers.forEach(clearTimeout); angelegt.forEach(el => el.remove()); };
   }, [pages, pageIdx]);
 
   // Box waechst mit langen Seiten. Die Standardbox fasst drei Zeilen; eine
@@ -8174,7 +8255,7 @@ function TextBox() {
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
-    if (!opts || fading) return;
+    if (!opts || fading || vorlaufRef.current) return;
     if (window.playSFX) window.playSFX('ui_click', { dedupe: 80, volume: 0.5 });
     if (!done) {
       clearInterval(timerRef.current);
@@ -8286,8 +8367,8 @@ function TextBox() {
   // side is currently talking. This lets tutorials introduce Antonia as
   // "Jetpack Raccoon" and later switch to "Antonia" without the label
   // flashing back to opts.rightSpeakerName whenever Monia interjects.
-  const findLastName = (isRight) => {
-    for (let i = pageIdx; i >= 0; i--) {
+  const findLastName = (isRight, ab = pageIdx) => {
+    for (let i = ab; i >= 0; i--) {
       const p = pages[i];
       const pSide = p?.side || 'left';
       if ((pSide === 'right') !== isRight) continue;
@@ -8295,7 +8376,18 @@ function TextBox() {
     }
     return null;
   };
-  const leftSticky = findLastName(false);
+  // Tackle-Seite: bis zum Einschlag gilt noch alles von der Seite davor
+  // (Monias Portraet, Name und Farbe), erst dann das neue.
+  const tackleVor = !!page?.tackle && !tackleAus;
+  const leftSticky = findLastName(false, tackleVor ? pageIdx - 1 : pageIdx);
+  // Linkes Portraet: das letzte `portrait` einer linken Seite, sonst der Sprecher.
+  const linksPortrait = (() => {
+    for (let i = tackleVor ? pageIdx - 1 : pageIdx; i >= 0; i--) {
+      const q = pages[i];
+      if (q?.portrait && (q.side || 'left') === 'left') return q.portrait;
+    }
+    return opts.speaker;
+  })();
   const rightSticky = findLastName(true);
   const leftName = leftSticky?.name || opts.speakerName;
   const rightName = rightSticky?.name || opts.rightSpeakerName;
@@ -8374,8 +8466,8 @@ function TextBox() {
       <div className="textbox pp-fenster" style={farbStil}>
         {opts.speaker && leftVisible && (
           <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
-            <div className="textbox-portrait-frame">
-              <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
+            <div className={'textbox-portrait-frame' + (page?.tackle && tackleAus ? ' textbox-portrait-ankunft' : '')}>
+              <img src={linksPortrait} alt={leftName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
             {leftName && <span className="textbox-speaker-name">{leftName}</span>}
@@ -8672,6 +8764,91 @@ const TUTORIAL_SCRIPTS = {
       { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
       { text: 'You got that?\nNice!' },
       { text: 'See you next lesson!' },
+    ],
+    };
+  })(),
+  5: (() => {
+    const BOOK = '.game-hand-me [data-card-name="Book of Doom"]';
+    const HOWITZER = '.game-hand-me [data-card-name="Lifeforce Howitzer"]';
+    const ALCHEMY = '[data-ability-owner="me"][data-card-name="Alchemy"]';
+    // Antonia (rechts), alle Texte wackeln. Bis zu ihrer Vorstellung heisst
+    // sie „Jetpack Raccoon", danach „Antonia".
+    const A = (text, extra) => ({ text, side: 'right', speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    const AJ = (text, extra) => A(text, { speakerName: 'Jetpack Raccoon', ...extra });
+    // Antonia im Epilog: LINKS, an Monias Stelle, nachdem sie sie umgerannt hat.
+    const AL = (text, extra) => ({ text, portrait: ANTONIA_PORTRAIT, speakerName: 'Antonia', nameColor: '#ff4444', shakeText: true, ...extra });
+    return {
+    opts: { rightSpeaker: '/Antonia.png', rightSpeakerName: 'Antonia' },
+    // Kein `nurActionPhase`: das Raetsel handelt vom Gold-Einkommen — das
+    // fliesst in der Resource Phase, also braucht es den Zugwechsel.
+    // Regieanweisungen: ein Highlight gilt ab der Seite, vor der es steht,
+    // bis zur naechsten Anweisung.
+    intro: [
+      { text: 'Heya!\nWelcome back!' },
+      { text: "So far, we've looked at different ways for your Heroes to deal damage or summon Creatures to do that for you." },
+      // ── Highlight: Book of Doom und Lifeforce Howitzer ──
+      { text: 'However, there are also other ways.\n{#ffd700:**Artifacts**} are cards that you play by spending **Gold**...',
+        highlights: [BOOK, HOWITZER] },
+      // ── Antonia tritt rechts auf, die Musik wechselt, alle Highlights aus ──
+      AJ("**GOLDS???**\nWhere's de Gold?\nI wants itttt!", { enterRight: true }),
+      { text: '...' },
+      { text: "Oh.\nIt's *you* again.\nThat raccoon." },
+      A('Youse can call Antonia the **GRRRRREAT Antonia!**\nPleasure\'s all yours!'),
+      { text: '... if you say so.' },
+      A("So! What's dis about **Golds**?"),
+      // ── Highlight: Alchemy ──
+      { text: '**Gold** is earned every turn. You can spend it on Artifacts or **certain active effects**, like...',
+        highlights: [ALCHEMY] },
+      A("'Earned'? Whatever would you *mean* by dat?"),
+      { text: '... you gain **4 Gold** during your **Resource Phase** each turn, along with drawing a card. You can save that up between turns to-' },
+      A('No wayyyy...!\nIs dat where **my Golds** keep disappearing to???'),
+      { text: '... *your* Gold?' },
+      A('Of course!\n**All Golds dere is belongs to the GRRRRREAT Antonia!**'),
+      A('So **you** be de one stealing from **my** vault???'),
+      { text: '...' },
+      A('Khehehe, I finally caught dem thieves red-handed, how nice!'),
+      A('But worry not - for the GRRRRREAT Antonia is nothing if not *merciful*, khehe!'),
+      A('Youse can **keep spending MY Golds** in your games.'),
+      A("You just ... **owe me a big ol' loan.**"),
+      A('Sounds fair?\nKhehehe, I know it does!'),
+      A('...'),
+      A("And what's dis?"),
+      A("Some kinda puzzle or somethin'?"),
+      A("You tryin' to learn how to spend *my Golds*?"),
+      A('...'),
+      A("Well, dis one really isn't too hard.\nJust **find how you gain Golds in this setup.**"),
+      // ── Highlight: Book of Doom, Howitzer UND Alchemy ──
+      A("And don't forget that ya can spend Golds not just on **Artifacts**, but some effects too.",
+        { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      A('Well - try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      // ── Antonia geht rechts ab (`exitRight`), danach keine Highlights mehr ──
+      A("I'll see ya around ... to collect the debt, khehehehehe!", { highlights: [BOOK, HOWITZER, ALCHEMY], exitRight: true }),
+      { text: '...' },
+      { text: '...' },
+      { text: "... at least this time, it didn't ruin the setup by giving you infinite Gold or some nonsense." },
+      { text: 'Okay...' },
+      { text: "Well, you heard the raccoon.\nUmmm ... 'Antonia'." },
+      { text: 'Try to defeat my Heroes using your Gold!' },
+      { text: 'Good luck, beep-boop!' },
+    ],
+    outro: [
+      { text: '...' },
+      { text: 'Does it ... *stay* away?' },
+      { text: '...' },
+      { text: 'Good.' },
+      { text: 'So!\nYou did it! Great job, beep-boop!' },
+      { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison!' },
+      // ── Highlight: Alchemy ──
+      { text: 'And **Alchemy** and the **Potions** it provides can be incredibly valuable cards as well!',
+        highlights: [ALCHEMY] },
+      { text: "I feel like you're really starting to get a hang of things!\nNext time-",
+        highlights: [ALCHEMY] },
+      // ── Antonia fliegt von rechts ueber die Textbox, rammt Monia Bot und
+      //    wirft sie aus dem Bild; danach steht sie links (`tackle`, `portrait`) ──
+      AL('Khehehehe!', { tackle: true }),
+      AL('Good job!'),
+      AL('Me be very proud of ya!'),
+      AL('Now, the GRRRRREAT Antonia will take you under her wing.\nRejoice, khehehehehe!'),
     ],
     };
   })(),
