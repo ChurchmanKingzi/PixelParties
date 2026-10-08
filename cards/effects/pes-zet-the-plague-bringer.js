@@ -2,11 +2,15 @@
 //  CARD EFFECT: "Pes'zet, the Plague Bringer"
 //  Hero — Biomancy / Decay Magic
 //
-//  Whenever ANY player summons a Creature
-//  (enters a Support Zone from anywhere),
-//  this hero's controller may choose any
-//  target on the board and inflict 1 Poison
-//  Stack to it.
+//  Whenever a Creature is placed into one of
+//  your Heroes' Support Zones, you may choose
+//  any target on the board and inflict 1
+//  Poison Stack to it.
+//
+//  Trigger: onCardEnterZone, filtered to
+//  Creatures entering this player's own support
+//  zones — nach Kontrolle (enteringCard.controller
+//  ?? owner) === cardOwner, wie bei Ingo.
 //
 //  Animation: thick black gas/smoke.
 // ═══════════════════════════════════════════
@@ -19,18 +23,18 @@ module.exports = {
   activeIn: ['hero'],
 
   // CPU threat assessment (damage supporter). Pes'zet inflicts 1 Poison
-  // stack on ANY Creature summon. Per-turn value scales with "how many
-  // summons are happening" — we approximate this with (total creatures on
-  // the board) / (turn number), i.e. the running average summon rate.
+  // stack on every Creature placed into one of the owner's own Support
+  // Zones. Per-turn value scales with "how many summons are happening" —
+  // we approximate this with (own creatures on the board) / (turn number),
+  // i.e. the running average summon rate (same proxy as Ingo's).
   // Each stack is ~30 damage over its lifetime; so damage per turn trigger
   // ≈ 30 × estSummonsPerTurn.
   supportYield(ctx) {
     const gs = ctx.engine.gs;
+    const ps = gs.players[ctx.pi];
     let total = 0;
-    for (const ps of gs.players) {
-      for (const heroZones of (ps?.supportZones || [])) {
-        for (const z of (heroZones || [])) if ((z || []).length > 0) total++;
-      }
+    for (const heroZones of (ps?.supportZones || [])) {
+      for (const z of (heroZones || [])) if ((z || []).length > 0) total++;
     }
     const avg = total / Math.max(1, gs.turn || 1);
     return { damagePerTurn: 30 * avg };
@@ -49,6 +53,9 @@ module.exports = {
       // Check that the entering card is a Creature
       const enteringCard = ctx.enteringCard || ctx.card;
       if (!enteringCard) return;
+      // Nur Kreaturen, die in die Support Zones EIGENER Helden kommen —
+      // nach Kontrolle statt Brettseite (Styx 28.9.), wie bei Ingo.
+      if ((enteringCard.controller ?? enteringCard.owner) !== pi) return;
       const cd = engine.getEffectiveCardData(enteringCard) || engine._getCardDB()[enteringCard.name];
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
@@ -88,7 +95,7 @@ module.exports = {
       // Prompt the Pes'zet controller to select a target (cancellable)
       const selectedIds = await engine.promptEffectTarget(pi, targets, {
         title: "Pes'zet — Plague Spread",
-        description: `A Creature was summoned! Choose any target to inflict 1 Poison Stack.`,
+        description: `A Creature was placed into one of your Support Zones! Choose any target to inflict 1 Poison Stack.`,
         confirmLabel: '☠️ Poison!',
         confirmClass: 'btn-danger',
         cancellable: true,
