@@ -28,6 +28,7 @@ Benötigt Python 3 mit `Pillow` und `numpy`. Für Beschriftungen in den Planungs
 | `cards_art.py` | Bildfenster der Karten (144 × 96, nativ): Hilfsfunktionen (`ground_world`, `unit_at`, `prop_at`, `finish`, `mini_castle` mit Raum-Themes), Registry `ART` mit `@card_art('ID')`, Platzhalter für Karten ohne Bild, Dioramen der ersten 17 Karten |
 | `pack_*.py` | **Illustrations-Packs:** je ein Modul (plus Hilfsmodule) mit den Sprites und Dioramen einer Kartengruppe; werden vom Kartenrenderer automatisch importiert und tragen ihre Bilder in `ART` ein |
 | `packtool.py` | Prüft ein Pack (Größe 144 × 96, nur Master-Palette, deterministisch), schreibt Kontaktbogen `out/packs/<pack>.png` und Einzelbilder ×4 |
+| `export_game_units.py`, `export_game_rooms.py`, `export_game_world.py` | Exporte für den Prototyp: Einheiten-Atlas (A/B), Raum-Innenansichten, Böden, Mauern, Tore, Türme, Hof-Bauteile, Hintergrund, Etiketten; schreiben nach `../game/public/` (Vertrag: `../game/ASSET_SPEC.md`) |
 | `sheets.py` | Kontaktbögen der fertigen Karten je Gruppe (×2): `out/sheets/*.png` (Artillery, Assault, Defenders, Civilians, vier Bauteil-Gruppen) |
 | `ART_GUIDE.md` | Regeln und Spickzettel für das Zeichnen von Karten-Illustrationen (Palette, Perspektive, Größenklassen, Raum-Themes, Qualitätsmaßstab) |
 | `cards.py` | **Kartenrenderer** (160 × 224): Rahmen, Namensband, abgeleitete Typzeile, Werteleiste, Effektbox mit automatisch fetten Glossarbegriffen, `RANK 3`-Abzeichen, Flavor, Übersicht |

@@ -1,6 +1,22 @@
 // Laden der Atlanten (units_a/b, rooms, world, bg_field) und Zugriff auf Texturen mit Anker
 
-import { Assets, Rectangle, Texture, TextureStyle } from 'pixi.js';
+import { Assets, ImageSource, Rectangle, Texture, TextureStyle } from 'pixi.js';
+
+declare global {
+  interface Window { __BB_ASSETS__?: { files: Record<string, string>; json: Record<string, unknown> } }
+}
+
+function texFromDataUri(uri: string): Promise<Texture> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const source = new ImageSource({ resource: img, scaleMode: 'nearest' });
+      res(new Texture({ source }));
+    };
+    img.onerror = () => rej(new Error('image failed to load'));
+    img.src = uri;
+  });
+}
 
 export interface Frame { tex: Texture; ax: number; ay: number; w: number; h: number }
 interface AtlasJson { image: string; frames: Record<string, { x: number; y: number; w: number; h: number; ax?: number; ay?: number }> }
@@ -32,12 +48,11 @@ export class GameAssets {
   static async load(base = './assets/'): Promise<GameAssets> {
     TextureStyle.defaultOptions.scaleMode = 'nearest';
     const a = new GameAssets();
-    const json = async (f: string) => (await fetch(base + f)).json();
+    const emb = window.__BB_ASSETS__;
+    const json = async (f: string) => (emb ? emb.json[f] : await (await fetch(base + f)).json()) as never;
+    const tex = (f: string): Promise<Texture> => (emb ? texFromDataUri(emb.files[f]) : Assets.load(base + f));
     const [uj, rj, wj, bj] = await Promise.all([json('units.json'), json('rooms.json'), json('world.json'), json('bg_field.json')]);
-    const [ua, ub, rt, wt, bg] = await Promise.all([
-      Assets.load(base + 'units_a.png'), Assets.load(base + 'units_b.png'), Assets.load(base + 'rooms.png'),
-      Assets.load(base + 'world.png'), Assets.load(base + 'bg_field.png'),
-    ]);
+    const [ua, ub, rt, wt, bg] = await Promise.all([tex('units_a.png'), tex('units_b.png'), tex('rooms.png'), tex('world.png'), tex('bg_field.png')]);
     for (const t of [ua, ub, rt, wt, bg]) t.source.scaleMode = 'nearest';
     a.unitsA = new Atlas(ua, uj);
     a.unitsB = new Atlas(ub, uj);

@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 1: Spieldesign** · Version 0.6 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
+**Teil 1: Spieldesign** · Version 0.7 · Entwurf zur Abnahme · Perspektive: **Draufsicht** · Kerne = **Fraktionen** · Bastionen **modular**, große Karte
 
 Teil 2 (Präsentation, Technik, Roadmap, offene Fragen): [`GDD-Praesentation-Technik.md`](GDD-Praesentation-Technik.md)
 Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
@@ -238,7 +238,7 @@ Jedes Bauteil hat: **Tier**, **Material** (bestimmt Resistenzen, §7.3), **HP**,
 ### 4.3 Der Kern & die Kernkammer 🟦
 
 - **Kern-HP:** ⚙ 5000. Der Kern **regeneriert** langsam (⚙ 2 HP/s) und kann von Bau-Gnomen repariert werden.
-- **Kernkammer:** 2 × 2 Raum, in dem der Kern pulsiert. Hier wird **erobert** (§7.6) und hier kämpfen die Verteidiger. Nur sie zählt für die Eroberung.
+- **Kernkammer:** 2 × 2 Raum, in dem der Kern pulsiert. Hier wird **erobert** (§7.6) und hier kämpfen die Verteidiger. Nur sie zählt für die Eroberung. *Prototyp (v0.7): Kernkammer = Kern plus ein Ring von einer Zelle (4 × 4), weil der Kern selbst eine massive Zelle ist.*
 - **Treffbar:** Der Kern ist ein Ziel wie jede andere Zelle. Flach-Geschosse brauchen eine freie **Schusslinie** zu ihm, Bogen- und Senkrecht-Geschosse treffen ihn, sobald er in Reichweite liegt (§7.2). Seine 5000 HP, Reparatur und Schilde sind die Gegenmittel.
 - **Nur Artillerie** (und Chaos-Effekte) verletzt den Kern. Sturmtruppen können ihn **erobern, nicht beschädigen**. So bleiben die Rollen sauber getrennt.
 - **Kern-Fähigkeit** 🟨 (P1): Jeder Kern hat eine aktive Fähigkeit mit Abklingzeit; siehe §9.1.

@@ -4,7 +4,7 @@ Pixelart-Duell zweier verrückter Festungen in schräger Draufsicht: Fraktions-K
 
 > **Eigenständiges Projekt.** Dieser Ordner hat nichts mit dem Spiel zu tun, in dessen Repository er gerade liegt. Er berührt keine Dateien außerhalb von `BastionBlasters/` und lässt sich unverändert in ein eigenes Repository kopieren.
 
-**Stand:** GDD **v0.6** (modulare Bastionen, große Karte, Hof-Bauteile, strenge englische Nomenklatur) mit Kartenkatalogen, Pixelart-Stilprobe und **allen 154 Karten** (Text, Illustration, Renderer). Noch kein Spielcode. Tech-Stack entschieden: Web (TypeScript, Vite, PixiJS).
+**Stand:** GDD **v0.7** (modulare Bastionen, große Karte, Hof-Bauteile, strenge englische Nomenklatur) mit Kartenkatalogen, Pixelart-Stilprobe und **allen 154 Karten** (Text, Illustration, Renderer) sowie einem **spielbaren Kampf-Prototyp** (`game/`). Tech-Stack entschieden: Web (TypeScript, Vite, PixiJS).
 
 ## Dateien
 
@@ -17,6 +17,7 @@ Pixelart-Duell zweier verrückter Festungen in schräger Draufsicht: Fraktions-K
 | [`NOMENCLATURE.md`](NOMENCLATURE.md) | **Strenge Nomenklatur (englisch):** Spielbegriffe, Regeltext-Grammatik, Zahlenformate, Kartenaufbau. Erzeugt aus `daten/keywords.json`. |
 | [`daten/`](daten) | **Maschinenlesbare Daten:** `cards.json` (alle 154 Karten, erzeugt aus den Katalogen mit `tools/export_cards.py`), `keywords.json` (Glossar), `card_text.json` (englische Kartentexte aller 154 Karten). |
 | [`tools/`](tools) | Export (`export_cards.py`), Glossar-Helfer, **Linter** für die Nomenklatur (`lint_card_text.py`), Generator für `NOMENCLATURE.md`, Prüfung der Design-Dokumente (`check_catalogs.py`). |
+| [`game/`](game) | **Kampf-Prototyp** (TypeScript, Vite, PixiJS): Simulation, Bot, Browser-Oberfläche; Anleitung und Annahmen in `game/README.md`. |
 | [`art/`](art) | **Pixel-Werkstatt:** Python-Code für alle Grafiken, Illustrations-Packs (`pack_*.py`, Anleitung `art/ART_GUIDE.md`), Kartenrenderer; Ergebnisse in `art/out/` (Szenen, Einheiten, `cards/` mit allen 154 Karten, `cards_overview.png`). |
 | [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md) | **12 Fraktions-Kerne** in 4 Archetypen, 13 Welt-Launen, 8 Chaos-Karten, 6 Baustile. |
 

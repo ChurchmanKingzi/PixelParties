@@ -509,6 +509,7 @@ function impact(world: World, p: Projectile) {
   const src = world.byId.get(p.src) ?? null;
   const srcAlive = src && !src.dead ? src : null;
   const hp = p as HitListProj;
+  if (defenseIntercept(world, p, enemy, srcAlive)) return;
   // Schutzkuppel (BA-01)
   if (absorbByDome(world, p, enemy)) {
     world.emit({ t: 'impact', x: p.x1, y: p.y1, r: 1, vis: 'dome' });
@@ -573,6 +574,46 @@ function impact(world: World, p: Projectile) {
   }
   if (p.kind !== 'under') personnel(world, p, enemy, target, p.x1, p.y1, 1, srcAlive);
   if (afx?.onImpact) afx.onImpact(world, p, p.x1, p.y1, srcAlive);
+}
+
+/** Blitzableiter, Fangnetz und Spiegel der Vergeltung fangen Geschosse ab */
+function defenseIntercept(world: World, p: Projectile, enemy: Team, src: Unit | null): boolean {
+  if (p.kind === 'under') return false;
+  for (const m of world.modules.values()) {
+    if (m.owner !== enemy || m.destroyed || m.buildEnd > world.tick) continue;
+    const c = modCenter(m);
+    const d = dist(c.x, c.y, p.x1, p.y1);
+    const eff = m.posts ? Math.max(0, m.staffed / m.posts) : 1;
+    if (eff <= 0) continue;
+    if (m.card === 'BA-04' && d <= 4.5 && (p.dtype === 'B' || p.dtype === 'A')) {
+      hurtModule(world, m, p.structDmg * 0.5, p.dtype, src, p.team);
+      world.emit({ t: 'impact', x: c.x, y: c.y - 1, r: 1, vis: 'bolt' });
+      return true;
+    }
+    const reflectable = p.kind === 'flat' || p.kind === 'arc' || p.kind === 'pierce';
+    if (m.card === 'BA-03' && reflectable && d <= 4.5 && world.tick >= (m.s.cd ?? 0)) {
+      m.s.cd = world.tick + 8 * TPS;
+      throwBack(world, p, src, 0.4);
+      world.emit({ t: 'text', x: c.x, y: c.y - 1, text: 'caught!', color: '#ffe9a8' });
+      return true;
+    }
+    if (m.card === 'BA-06' && reflectable && d <= 5.5) {
+      if (world.tick >= (m.s.nextAt ?? 0)) { m.s.mirrorUntil = world.tick + 6 * TPS; m.s.nextAt = world.tick + 25 * TPS; }
+      if (world.tick < (m.s.mirrorUntil ?? 0)) {
+        throwBack(world, p, src, 0.6);
+        world.emit({ t: 'text', x: c.x, y: c.y - 1, text: 'reflected!', color: '#c8f0ff' });
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function throwBack(world: World, p: Projectile, src: Unit | null, k: number) {
+  if (!src) return;
+  const sp = slotPos(world, src);
+  world.emit({ t: 'shot', x0: p.x1, y0: p.y1, x1: sp.x, y1: sp.y, fly: 14, vis: p.vis, team: p.team === 0 ? 1 : 0, cid: p.cid });
+  hurt(world, src, (p.structDmg * 0.5 + p.personDmg) * k, p.dtype, null);
 }
 
 function absorbByDome(world: World, p: Projectile, enemy: Team): boolean {

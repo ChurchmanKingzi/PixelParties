@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import { Game } from './ui/game';
 
 Game.boot().then((g) => { (window as unknown as { game: Game }).game = g; }).catch((e) => {

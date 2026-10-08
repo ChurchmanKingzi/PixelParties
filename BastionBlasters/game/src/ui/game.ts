@@ -8,13 +8,14 @@ import { checkRoom, checkTower, checkWallCard, checkYardBuilding, checkYardCell,
 import { entryStats, freeSlotCount, operatingDegree, citizenLimit, lineActive } from '../sim/systems';
 import { keepCount, modEff } from '../sim/bfx';
 import { unitFx } from '../sim/fx';
+import { buildingImpl } from '../sim/impl';
 import { modCenter } from '../sim/combat';
 import { Match } from '../sim/match';
 import type { Module, Unit } from '../sim/types';
 import { ci, type World } from '../sim/world';
 import { GameAssets } from '../render/assets';
 import { Scene, type Ghost } from '../render/scene';
-import { $, clear, el, fmtTime, put, save, store } from './dom';
+import { $, assetUrl, clear, el, fmtTime, put, save, store } from './dom';
 
 interface Settings { buildSec: number; pauseSec: number; bars: boolean; nums: boolean; speed: number; seed: number }
 
@@ -54,7 +55,7 @@ export class Game {
     const g = new Game();
     const stage = $('stage');
     g.app = new Application();
-    await g.app.init({ resizeTo: stage, background: '#15281b', antialias: false, resolution: 1, autoDensity: false, preference: 'webgl' });
+    await g.app.init({ width: Math.max(320, stage.clientWidth), height: Math.max(240, stage.clientHeight), background: '#15281b', antialias: false, resolution: 1, autoDensity: false, preference: 'webgl' });
     stage.insertBefore(g.app.canvas, stage.firstChild);
     g.assets = await GameAssets.load();
     g.scene = new Scene(g.app);
@@ -64,7 +65,7 @@ export class Game {
     g.buildTop();
     g.bindPointer();
     g.bindKeys();
-    window.addEventListener('resize', () => g.onResize());
+    new ResizeObserver(() => g.onResize()).observe(stage);
     g.onResize();
     g.showMenu();
     g.app.ticker.add(() => g.frame());
@@ -73,7 +74,10 @@ export class Game {
 
   onResize() {
     const s = $('stage');
-    this.scene.setView(s.clientWidth, s.clientHeight);
+    const w = s.clientWidth, h = s.clientHeight;
+    if (w < 100 || h < 100) return;
+    this.app.renderer.resize(w, h);
+    this.scene.setView(w, h);
     this.applyFocus(true);
   }
 
@@ -278,7 +282,7 @@ export class Game {
       el('button', { id: 'tBars', title: 'HP bars', onclick: () => { this.scene.showBars = !this.scene.showBars; this.settings.bars = this.scene.showBars; save('settings', this.settings); } }, 'bars'),
       el('button', { id: 'tNums', title: 'Damage numbers', onclick: () => { this.scene.showNumbers = !this.scene.showNumbers; this.settings.nums = this.scene.showNumbers; save('settings', this.settings); } }, 'numbers'),
       el('button', { title: 'Fit map (F)', onclick: () => { this.focusMode = 'all'; this.applyFocus(); } }, 'fit'),
-      el('button', { onclick: () => { if (confirm('Leave this match?')) this.showMenu(); } }, 'menu'),
+      el('button', { onclick: () => this.showMenu() }, 'menu'),
     );
     top.append(
       el('div', { class: 'grp' }, el('span', { class: 'lbl', style: 'color:var(--p1)' }, 'P1 core'), b0.d, c0.d),
@@ -386,7 +390,7 @@ export class Game {
             el('b', {}, 'Rank'), el('span', {}, '★'.repeat(mod.star)),
           ),
         ),
-        def ? el('div', { class: 'hint', style: 'margin-top:4px' }, stripMd(def.rules || def.effectText)) : null,
+        def ? el('div', { class: 'hint', style: 'margin-top:4px' }, `${stripMd(def.rules || def.effectText)} [${buildingImpl(mod.card) === 'full' ? 'effects implemented' : buildingImpl(mod.card) === 'partial' ? 'effects partly implemented' : 'stats only'}]`) : null,
       );
       if (this.human === mod.owner && (w.phase === 'pause' || w.phase === 'build') && mod.kind !== 'core') {
         const pl = w.players[mod.owner];
@@ -418,7 +422,7 @@ export class Game {
         sel.push(el('select', { onchange: (ev: Event) => { this.match!.cmd({ t: 'prio', p: h, idx, prio: (ev.target as HTMLSelectElement).value as Priority }); } }, ...PRIORITIES.map((z) => el('option', { value: z, selected: e.prio === z }, PRIORITY_LABEL[z]))));
       }
       const row = el('div', { class: 'ent' + (this.replaceCard ? ' replace' : ''), title: stripMd(d.rules), onclick: () => { if (this.replaceCard) this.doReplace(idx); } },
-        el('div', { class: 'th' }, el('img', { src: `cards/${e.card}.png` })),
+        el('div', { class: 'th' }, el('img', { src: assetUrl(`cards/${e.card}.png`) })),
         el('div', {},
           el('div', {}, `${d.name} ${'★'.repeat(e.star)}`),
           el('div', { class: 'hint' }, `${d.cat} · ${d.line} · alive ${alive}/${S} · +${N}/wave${inactive ? ' · LOCKED (room missing)' : ''}${d.cat === 'artillery' ? ` · gp ${d.gp}` : ''}`),
@@ -436,6 +440,7 @@ export class Game {
   renderTray() {
     const tray = $('tray');
     clear(tray);
+    this.preview = null;
     const m = this.match;
     if (!m) return;
     const w = m.world;
@@ -798,7 +803,7 @@ let previewHook: ((id: string | null) => void) | null = null;
 function cardEl(id: string, o: { big?: boolean; sel?: boolean; dim?: boolean; badge?: string; w?: number; preview?: boolean; onClick?: () => void } = {}): HTMLElement {
   const d = UNITS[id] ?? BUILDINGS[id];
   const c = el('div', { class: 'card' + (o.big ? ' big' : '') + (o.sel ? ' sel' : '') + (o.dim ? ' dim' : ''), title: d ? `${d.name}\n${stripMd(d.rules)}${(d as { talent?: string }).talent ? '\nRank 3: ' + stripMd((d as { talent?: string }).talent!) : ''}` : id },
-    el('img', { src: `cards/${id}.png`, alt: d?.name ?? id, draggable: false }),
+    el('img', { src: assetUrl(`cards/${id}.png`), alt: d?.name ?? id, draggable: false }),
     o.badge ? el('div', { class: 'badge' }, o.badge) : null);
   if (o.w) c.style.width = o.w + 'px';
   if (o.onClick) c.addEventListener('click', o.onClick);

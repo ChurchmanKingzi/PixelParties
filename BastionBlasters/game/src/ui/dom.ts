@@ -42,3 +42,9 @@ export function save(key: string, v: unknown) {
 export function put(parent: HTMLElement, ...kids: Child[]) {
   for (const c of kids) if (c !== null && c !== undefined && c !== false) parent.append(c as Node | string);
 }
+
+/** URL einer Spieldatei: eingebettete Daten (Einzeldatei-Build) oder relativer Pfad */
+export function assetUrl(path: string): string {
+  const emb = (window as unknown as { __BB_ASSETS__?: { files: Record<string, string> } }).__BB_ASSETS__;
+  return emb?.files[path] ?? path;
+}

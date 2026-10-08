@@ -1,6 +1,6 @@
 # Bastion Blasters — Game Design Document
 
-**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.6 · Entwurf zur Abnahme
+**Teil 2: Präsentation, Technik, Balancing, Roadmap** · Version 0.7 · Entwurf zur Abnahme
 
 Teil 1 (Regeln und Systeme): [`GDD.md`](GDD.md) · Kataloge: [`katalog/01-gebaeude.md`](katalog/01-gebaeude.md) · [`katalog/02-einheiten.md`](katalog/02-einheiten.md) · [`katalog/03-kerne-und-weltlaunen.md`](katalog/03-kerne-und-weltlaunen.md)
 
@@ -280,7 +280,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 |---|---|---|
 | **M0** | Entscheidungen & Daten | Offene Fragen aus §14 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
 | **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe **v0.3** (große Karte, modulare Burgen, vereinfachte Gesichter, Kürbis in 3/4-Ansicht, reichere Landschaft) und die **ersten 17 Karten** (Layout, Pixelfont, Dioramen, Kartenrücken) liegen in `art/out/` vor und warten auf deine Freigabe.* |
-| **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
+| **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. *Stand: **erledigt als Prototyp** (`game/`): Bot gegen Bot läuft bis zum Sieg (Terminal und Browser), deterministisch getestet; dazu sind Teile von M3 und M4 spielbar (Mensch gegen Bot, Bauen per Klick, Loadout, Zeitstopp mit 5/3-Hand).* |
 | **M3** | Bastion-Builder | Module an Kanten anlegen, Drehen, Auto-Mauern und Türen, Hof-Erweiterung, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
 | **M4** | Karten-Loop & Zeitstopp | Kern-Wahl, Loadout 10/7, frische 5/3-Hand, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
 | **M5** | Rollen vertiefen | Rückzug/Heilung, Personal, Eroberung, XP/Ränge laufen vollständig; erster Balance-Pass mit Bot-Sims. |
@@ -337,7 +337,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | **Q20** | Hof-Erweiterung: 12 Zellen im Erstaufbau, danach 6 je Zeitstopp, kostenlos? | ❓ Default: **ja** (⚙ `HOF_START` / `HOF_PER_PAUSE`). |
 | **Q21** | Große Einheiten (L/XL) und Türen | ✔ **Alle Einheiten dürfen durch jede Tür**; die 14 px sind nur Optik. |
 | **Q22** | Bauteile auf Hofzellen statt in Räumen | ✔ **Ja, je Bauteil einzeln entschieden** (nicht nach Größe). Hof-Bauteile sind leichter zugänglich (außer im Innenhof) und leichter zerstörbar (GDD §4.1, Katalog 01). |
-| **Q23** | Design-Dokumente (`GDD*.md`, Kataloge) ebenfalls ins Englische übersetzen? | ❓ Default: **nein, vorerst deutsch** (Übersetzung ist mit einer Tabelle „Design-Begriff (DE) → Spielbegriff (EN)“ in `NOMENCLATURE.md` abgedeckt); Entscheidung vor dem Code-Start. |
+| **Q23** | Design-Dokumente (`GDD*.md`, Kataloge) ebenfalls ins Englische übersetzen? | ✔ **Nein, das GDD bleibt deutsch** (Entscheidung des Auftraggebers); die Spielsprache bleibt Englisch. |
 
 ---
 
@@ -516,6 +516,7 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | **0.4** | Zweite Rückmeldung: Gesichter von Goblin, Eisbär, Hexe und Gnom weiter vereinfacht; **Tech-Stack bestätigt**; **Hof-Bauteile** (Bauart je Bauteil einzeln, zugänglicher und fragiler, Innenhof geschützt); **alle Einheiten passen durch jede Tür**; erste Karten (Kartenlayout, Pixelfont, Datenexport). |
 | **0.5** | Dritte Rückmeldung: **Spielsprache Englisch**, **strenge Nomenklatur** (`NOMENCLATURE.md`, `daten/keywords.json`, Linter, englische Namen für alle 154 Karten), Regeltext nur mechanisch mit automatisch fetten Schlüsselwörtern, Flavor getrennt von der Effektbox, **Rank-3-Abzeichen** ausgeschrieben, Kartenrücken neu (großes Logo), Effektbox auf 5 Zeilen (Bildfenster 144 × 86). |
 | **0.6** | **Alle 154 Karten angelegt** (77 Bauteile, 77 Einheiten): englische Texte in `daten/card_text.json`, Illustrationen als Code in zwölf Packs (`art/pack_*.py`, Anleitung `art/ART_GUIDE.md`, Prüfung mit `art/packtool.py`), Renderer mit Platzhalterbild, 6 Effektzeilen, automatisch verdichteter Typzeile und Kontaktbögen je Gruppe (`art/sheets.py`). Glossar auf **140 Begriffe** erweitert (u. a. Knockback, Taunt, Lifesteal, Alarm, Leash, Aura, Burrowed, Chaos-born); Flugbahn **Underground → Burrowing**; Linter prüft Fähigkeitsnamen, Namens- und Typzeilenbreite. Beim Texten vereinheitlicht: **Fed** gibt überall +15 % (statt +20 % beim Eintopf-Koch), **Hardened** ist definiert, BS-01 Masonry ist eine reine Referenzkarte (wird nie gezogen). |
+| **0.7** | **Kampf-Prototyp** (`game/`, TypeScript, Vite, PixiJS): deterministische Simulation mit allen vier Truppenkategorien, sieben Flugbahnen, Auto-Mauern auf Kanten, A*, Personal, Heilung und Rückzug, Eroberung, XP und Ränge, Wellen, Zeitstopp, Ziehen 10/7 und 5/3, Bot; Browser-Oberfläche mit Loadout, Bauphase, Kontingent und Inspektor; als Einzeldatei-Artifact veröffentlicht. Vom Auftraggeber bestätigt: GDD bleibt deutsch (Q23), interne Annahmen der Kartentexte (Fed +15 %, Hardened, Knockback, Doppelbombe, Masonry als Referenzkarte) gelten. |
 
 ---
 
@@ -538,3 +539,5 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 | 2026-10-08 | **Flavor gehört nie in die Effektbox.** Rein beschreibende Sätze („Billiger Massenstürmer“) entfallen oder wandern in die Flavor-Zeile. | Vanilla-Einheiten haben eine leere Effektbox bis auf das Rank-3-Talent. |
 | 2026-10-08 | **Alle 154 Karten sind angelegt.** Illustrationen entstehen als Code in Packs (je eine Kartengruppe), geprüft auf Größe 144 × 96, Master-Palette und Determinismus. | Neue Einheiten haben vorerst nur ein Ruhebild (`idle`); Animationen (Gehen, Angriff, Tod) folgen mit dem Kampf-Greybox. Kerne (Katalog 03) und Chaos-/Weltlaunen-Karten haben noch keine Karten. |
 | 2026-10-08 | **Typzeile darf nie überlaufen:** Trennpunkte rücken automatisch enger zusammen; reicht das nicht, warnen Renderer und Linter. Flugbahn **Underground** heißt **Burrowing** (passt zum Status Burrowed). | Kein Karteninhalt wurde gekürzt; die Namen der Spielbegriffe bleiben die einzige Quelle (`daten/keywords.json`). |
+| 2026-10-08 | **Der Prototyp zuerst als Kampf-Greybox mit echter Grafik.** Ein Spielstand, der im Browser läuft, ersetzt weitere Papierarbeit: Regeln werden am Spiel getestet, nicht diskutiert. | `game/` mit Simulation, Darstellung und Bot; Artifact-Link zum Testen; Bot-Statistik als Balance-Grundlage. |
+| 2026-10-08 | **Prototyp-Annahmen (vom Karten-Designer bestätigt):** Kernkammer = Kern plus ein Ring von einer Zelle (4 × 4); ein Standardkern ohne Fraktions-Fähigkeiten; Wandkarten wirken auf bis zu 4 zusammenhängende Segmente; Fernangriffe von Einheiten und Türmen treffen sofort; Zeitgeber 180 s Aufbau und 60 s Zeitstopp (im Menü einstellbar). | Siehe `game/README.md`, Abschnitt Annahmen. Erste Bot-Zahlen: Eroberung gewinnt zu oft gegen Zerstörung (18 : 6), Stellschrauben dokumentiert. |
