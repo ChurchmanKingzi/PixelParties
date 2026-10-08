@@ -128,6 +128,7 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   Modnir, Swellpnir, Ragnarock), Deckbau-Regelkarten (Secret Spices, Secret Spice Jar, The Sacred Blade), Deck-Karten (Surprise Party, Overcharge,
   Ladder to the Sky, …) und Karten für Ascended Heroes (Audience with a hostile King, Open Invitation). Karten, die bei passender Lage funktionieren
   (Spontaneous Reappearance, Kirin Firebreath, Tengu Windstorm, Liberation, Shapeshift …), bleiben — ihre geringe Nutzung kommt aus den Bot-Prioritäten.
+  Ebenfalls gesperrt: **Bill, Hel, Sid und Kassaran** (Spielbeginn-Effekte vor dem Ziehen der Starthand brauchen ein Deck).
 - **Kartenskripte** dürfen nie `pi === 0 ? 1 : 0` o. Ä. schreiben. Stattdessen:
   `engine.opponentOf(pi)` (EIN Gegner: Fokus bzw. nächster lebender Sitz), `engine.opponentsOf(pi)` (alle Gegner),
   `engine.playerCount()`. Im Normalspiel liefern sie bit-identisch das alte Verhalten. `node scripts/check-n-player.js`
@@ -146,6 +147,45 @@ Alles, was im Normalspiel „pro Turn" gilt, gilt hier **pro Round und Held** (`
 Hauptaktion und Zusatzaktionen zählen je Held, nicht je Spieler; die Action Phase eines Sitzes beginnt (Phasenbeginn-Effekte,
 Reaktionsfenster, Vergabe von Zusatzaktionen) nur bei seinem ersten Zug der Round und endet mit der Round (`endRound`,
 Phasenende-Effekte → Zusatzaktions-Gewährungen verfallen). `advanceToPhase` ist im Modus ein No-op (außer zur End Phase).
+
+### Fristen: `gs.turn` zählt 2 je Round
+
+Kartentexte rechnen in Spielerzügen („bis zum Ende des nächsten gegnerischen Zuges" = `gs.turn + 2`, „bis zum Ende dieses Zuges" = `+1`).
+Damit solche Fristen im Modus **genau den Rest der laufenden Round** treffen (nicht eine Round länger), steht `gs.turn` in Round R auf
+`2R − 1` (`rounds.js` `roundTurn`; Round 1 → 1, 2 → 3, …) — eine Round ist so ein Spielerzug-Paar des Normalspiels. Folge:
+`+1` und `+2` laufen zu Beginn der nächsten Round ab, `+3`/`+4` eine Round später. Ungerade Fristen liegen zwischen zwei Round-Werten; die
+Ablauf-Sweeps (`engine._ablaufFaellig`) prüfen im Modus deshalb `<=` statt `===` (Normalspiel unverändert). Anzeigen nennen die Round
+(`gameState.skillTest.round`), nicht `gs.turn`. Test: `scripts/skilltest-e2e/duration.test.js` (Pink Sky über die Rundengrenze, +1/+2/+3).
+
+### CPU-Sitze: anonym bis zum Kampfbeginn
+
+In Lobby und Vorbereitung heißen CPU-Sitze „CPU n" und erscheinen als schwarze Pixelart-Kachel mit Fragezeichen (`StUnknownTile`).
+Erst `battle.js nameBots` gibt ihnen beim Kampfstart Namen und Aussehen ihres mittleren Heroes (nur der reine Name, `hero-name.js`;
+das Portrait zeigt die Oberfläche als Bildausschnitt des mittleren Heroes). Test: `hero-name.test.js` (Server-/Client-Kurznamen gleich).
+
+### Hand-Garantien und Recycler (`hand-rules.js`)
+
+- **Heldenpartner:** Nennt ein Hero einen Spell im Text (Luna → Firewall, Sol Rym → Chain Lightning, Damus → Armageddon, Natas → The Master's Plan) oder steht er in
+  `CONFIG.HERO_PARTNERS` (Mary → Cute Phoenix, Baaliel → Horned Demon, Damus → Ifrit, Arthor → The White Eye), liegt der Partner garantiert mit ihm auf der Hand.
+  `CONFIG.HERO_RANDOM_PARTNERS`: Tsu'Ki bringt 1–3 verschiedene Lunatic-Ausrüstungen mit. Partner sind im Pool **reserviert** (`CardPool.reserved`): andere Spieler
+  und der Recycler bekommen sie nie.
+- **Nie mehr als 18 Karten:** Reicht der Platz nicht, fliegen zufällige andere Karten (keine Heroes, keine garantierten) zurück in den Pool.
+- **Spell Schools** (Magic Arts, Decay, Support, Destruction; nicht Summoning): Spells dieser Schulen mit Gesamtlevel 1–5 (zufällig) in der Starthand; hat ein Hero zwei
+  verschiedene Schulen, zusätzlich je Schule ein Lv-3-Spell (wirkungsvollster von dreien nach gelerntem Kartenwert). Garantien greifen je Hero/Schule einmal.
+- **Recycler:** Spells nur aus Schulen der Board-Heroes (falls möglich); der Inhalt wandert zu Spielbeginn in die eigene Ablage (`recycledCards`, auch für Bots).
+
+### Ziehen und Mulligan (`engine-ext.js installDraws`)
+
+Keine Decks, aber Ziehen funktioniert: vor dem Ziehen erscheinen X **zufällige neue Karten** (aus dem Rest des Pools, `room.skillTest.pool`) im Deck bzw. Potion Deck und
+fliegen mit den normalen Animationen zur Hand. Heroes sind ausgeschlossen, das Potion Deck gibt nur Potions, das Deck nie; Spell-School-Abilities nur, wenn der Spieler sie
+nicht schon hat. Mulligan: die zurückgemischten Karten fliegen sichtbar zum Deck und mischen; X neue Karten ersetzen sie (die alten gehen in den Pool zurück und können
+wiederkommen). Im Lookahead wird der Pool nur gelesen. Reine Draw- und Mulligan-Karten (Alchemy, Wheels, Haste, Leadership, Horn in a Bottle, Staff of the Teleporter …) sind
+im Pool; Karten, die suchen (Tutoren), bleiben gesperrt. Tests: `draws.test.js`, `draw-cards.test.js`.
+
+### Dream Lander
+
+Creatures mit `attachableHeroes` (Goff, Clausss, Smugbeth, Vullary, Wolflesia, Stellin, Antonia) starten mit dem Hero angelegt — beim Ausspielen im Kampf und wenn sie schon im
+Aufbau stehen (`engine._stAutoAttachHero`). Test: `dream-lander.test.js`. Logan (`logan.test.js`): Auszahlung am Rundenende je Sitz; CPU-Sitze investieren und zahlen aus.
 
 ## Karten mit Sonderregeln
 

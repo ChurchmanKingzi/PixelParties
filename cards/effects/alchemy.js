@@ -47,7 +47,7 @@ module.exports = {
     const ps = gs.players?.[pi];
     if (!ps) return 0;
     if (gs.hoptUsed?.[`free-ability:Alchemy:${pi}`] === gs.turn) return 0;
-    if ((ps.potionDeck || []).length === 0) return 0;
+    if (engine.deckLeer(pi, 'potion')) return 0;
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return 0;
     if (hero.statuses?.frozen || hero.statuses?.stunned) return 0;
@@ -69,7 +69,7 @@ module.exports = {
     const ps = ctx.players[ctx.cardOwner];
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
     if ((ps.gold || 0) < goldCost) return false;
-    if ((ps.potionDeck || []).length === 0) return false;
+    if (ctx._engine.deckLeer(ctx.cardOwner, 'potion')) return false;
     return true;
   },
 
@@ -101,7 +101,7 @@ module.exports = {
     }
 
     // Draw 1 from potion deck
-    if ((ps.potionDeck || []).length === 0) return false; // Safety
+    if (engine.deckLeer(pi, 'potion')) return false; // Safety
     await engine.actionDrawFromPotionDeck(pi, 1);
 
     engine.sync();

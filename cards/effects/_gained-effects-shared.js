@@ -159,7 +159,9 @@ function heroScriptOf(hero) {
 
   const key = `${hero.name}|${gewonnen.join('|')}`;
   const cache = hero._gainedScriptCache;
-  if (cache && cache.key === key) return cache.script;
+  // `_pruefeLebt` ist eine Funktion: eine JSON-Kopie des Helden (Snapshot/Restore der Suche) behielte die Flaggen des Skripts, verlöre aber alle
+  // Funktionen — dann gilt der Zwischenspeicher als tot und wird neu gebaut.
+  if (cache && cache.key === key && cache.script && typeof cache.script._pruefeLebt === 'function') return cache.script;
 
   const eigen = loadCardEffect(hero.name) || null;
   const merged = {};
@@ -178,7 +180,9 @@ function heroScriptOf(hero) {
   merged._istVerschmolzen = true;
   merged._eigenesSkript = eigen;
   merged._gewonneneNamen = gewonnen.slice();
-  hero._gainedScriptCache = { key, script: merged };
+  merged._pruefeLebt = () => true;
+  // Nicht aufzählbar: der Zwischenspeicher gehört nicht in Kopien/Schnappschüsse des Helden (JSON, Lookahead-Snapshots).
+  Object.defineProperty(hero, '_gainedScriptCache', { value: { key, script: merged }, writable: true, configurable: true, enumerable: false });
   return merged;
 }
 

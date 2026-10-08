@@ -26383,7 +26383,6 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
       wirt.appendChild(klon);
     }
   }, []);
-  const buchstaben = String(title).split('');
   // ★ v1400 (Al 25.9.): Münzregen im Sieg-Bildschirm — SC-Sprites fallen,
   // drehen sich und funkeln. Einmal ausgewürfelt (useMemo), sonst sprängen
   // die Münzen bei jedem Zählerschritt an neue Plätze.
@@ -26422,12 +26421,14 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
           ))}
         </div>
       )}
-      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
-        <div className="pp-cer-titel pixel-font" style={{ color: farbe }}>
-          {buchstaben.map((b, i) => (
+      {/* Der Titel steht OHNE Umbruch und ohne Beschneidung über der Spalte: er darf breiter werden als der Inhalt (max. 640 px) darunter. */}
+      <div className="pp-cer-spalte">
+        <div className="pp-cer-titel pixel-font" style={{ color: farbe, '--cer-n': Math.max(1, [...String(title)].length) }}>
+          {[...String(title)].map((b, i) => (
             <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
           ))}
         </div>
+      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
         {subtitle && <div className={'pp-cer-unter' + (/^(💀|☠️)/.test(subtitle) ? ' pp-cer-unter-grund' : '')}>{subtitle}</div>}
         {cpuProgress && cpuProgress.wins > 0 && (
           <div className="pp-cer-sieg">
@@ -26497,6 +26498,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
         )}
         {fertig && <div className="pp-cer-fade">{children}</div>}
         {!fertig && <div className="pp-cer-hinweis">click to skip</div>}
+      </div>
       </div>
     </div>
   );
@@ -43230,7 +43232,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     /** Render a status/buff name in its color, capitalized */
     const styledStatus = (s) => <strong style={{ color: statusColor(s) }}>{capStatus(s)}</strong>;
     try {
-      if (t === 'turn_start') { const p = playerByName(entry.username); return <span className="log-info">── Turn {entry.turn} ({pName(p.name, p.color)}) ──</span>; }
+      // Skill Test: gs.turn zählt 2 je Round (skilltest/rounds.js `roundTurn`) — das Protokoll nennt die Round.
+      if (t === 'turn_start') { const p = playerByName(entry.username); return <span className="log-info">── {gameState.skillTest ? `Round ${Math.ceil((entry.turn || 1) / 2)}` : `Turn ${entry.turn}`} ({pName(p.name, p.color)}) ──</span>; }
       if (t === 'spell_played') {
         const p = playerByName(entry.player);
         const verb = entry.type === 'Attack' || (entry.cardType || entry.type2) === 'Attack' ? 'used' : 'played';
@@ -45489,6 +45492,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              // Skill Test: eigene Kreatur OHNE aktiven Effekt — ein Klick benutzt sie (ergraut) und gibt den Zug weiter.
+              const stCanSkipWith = !!(gameState.skillTest && !isOpp && !isSpectator && isMyTurn && !result && !gameState.skillTest.busy
+                && cards.length > 0 && !creatureEffectEntry && !(gameState.skillTest.eliminated || []).includes(myIdx)
+                && (window.CARDS_BY_NAME[cards[0]] || {}).cardType === 'Creature'
+                && !(gameState.skillTest.exhaustedSlots || []).includes(pi + ':' + i + ':' + z));
               // Geteilte Zone? Der Server schickt die Kopien einzeln in
               // `supportStacks`, Schluessel wie bei `creatureCounters`.
               const stackHere = (gameState.supportStacks || {})[`${pi}-${i}-${z}`];
@@ -45692,6 +45700,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
                   } : (isEquipActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_equip_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z });
+                  } : stCanSkipWith ? () => {
+                    // Skill Test: eine Kreatur ohne aktiven Effekt anklicken = benutzt (ergraut), der Zug geht weiter
+                    if (window.playSFX) window.playSFX('ui_click');
+                    socket.emit('st_creature_skip', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z });
                   } : isProviderZone ? () => {
                     const provider = pendingAdditionalPlay.providers.find(p => p.heroIdx === i && p.zoneSlot === z);
                     if (provider) {
@@ -45705,7 +45717,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     }
                   } : isZonePickTarget ? () => respondToPrompt({ owner: pi, heroIdx: i, slotIdx: z }) : isValidEquipTarget ? () => equipTargetIds.forEach(id => togglePotionTarget(id)) : undefined}
                   style={zsMerge('support', {
-                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
+                    ...((isCsppEmptySlot || isSummonPickZone || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid || stCanSkipWith) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
                   ref={(el) => {
@@ -46640,14 +46652,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 nicht; `key` startet den kurzen Pop bei jedem Zugwechsel. */}
             <div className="board-util-mid">
               {(gameState.turn || 0) > 0 && (() => {
+                // Skill Test: gs.turn zählt 2 je Round — angezeigt wird die Round (stInfo.round).
+                const zaehlerWert = stInfo ? (stInfo.round || 1) : gameState.turn;
                 const amZug = activePlayer === myIdx ? me : opp;
                 const farbe = amZug.color || (activePlayer === myIdx ? '#00f0ff' : '#ff5577');
                 return (
-                  <div key={gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
+                  <div key={stInfo ? zaehlerWert + ':' + activePlayer : gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
                     {/* v1473 (Als Vorgabe 28.9.): gezaehlt wird jeder Zug beider
                         Spieler — die Beschriftung heisst deshalb „TURN", nicht „ROUND". */}
-                    <span className="board-round-counter-label">TURN</span>
-                    <span className="board-round-counter-zahl">{gameState.turn}</span>
+                    <span className="board-round-counter-label">{stInfo ? 'ROUND' : 'TURN'}</span>
+                    <span className="board-round-counter-zahl">{zaehlerWert}</span>
                   </div>
                 );
               })()}

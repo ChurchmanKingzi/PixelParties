@@ -12,7 +12,13 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   const origErr = console.error; const errs = [];
   console.error = (...a) => { errs.push(a.join(' ')); };
   async function reform(deck) {
-    const out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 3 });
+    let out, seed = 3;
+    for (; seed < 40; seed++) {
+      out = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed });
+      const hs = out.gs.players.map(p => p.heroes.map(h => h && h.name));
+      // Heragas zieht beim Tod einer Kreatur und nähme die Deck-Karte vor Garius weg (der Hook gehört der ursprünglichen Karteninstanz).
+      if (!hs.some(row => row.includes('Heragas, the Monster Slayer'))) break;
+    }
     const { room, host, gs, engine } = out;
     const seat = gs.activePlayer, ps = gs.players[seat];
     gs.turn = 5;

@@ -13,7 +13,7 @@ const env = { cards, areaLimitOf: () => undefined };
   console.log('Kassaran: keine Namensabfrage ohne Deck');
   const t0 = Date.now();
   const out = await runGame({
-    seats: 3, setupOnly: true,
+    seats: 3, setupOnly: true, seed: 12,        // fester Tisch: andere Helden mit Eröffnungs-Verzögerung (Vena 3,8 s) würden die Zeitmessung verfälschen
     mutatePrep: (prep) => {
       const ps = prep.players[0]; ps.ready = false;
       ps.hand.push('Kassaran, Seer of Everything');

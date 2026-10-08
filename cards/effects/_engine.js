@@ -11415,6 +11415,20 @@ class GameEngine {
    * Draw cards from a player's Potion Deck. Triggers surprise draw checks
    * (e.g. Pure Advantage Camel) just like regular draws.
    */
+  /**
+   * Ist das Deck (`'main'` | `'potion'`) leer? Im Skill Test sind die Decks im Ruhezustand leer und es wird von außerhalb des Spiels gezogen
+   * (skilltest/engine-ext.js installDraws) — „leer“ heißt dort: im Pool liegt nichts Ziehbares mehr. Normalspiel: Länge 0.
+   */
+  deckLeer(playerIdx, kind = 'main') {
+    const ps = this.gs.players[playerIdx];
+    const deck = kind === 'potion' ? (ps?.potionDeck || []) : (ps?.mainDeck || []);
+    if (!this.gs.skillTest) return deck.length === 0;
+    if (deck.length > 0) return false;
+    const pool = this.room?.skillTest?.pool;
+    if (!pool) return true;
+    return pool.listWhere((n, b) => kind === 'potion' ? b === 'potion' : (b !== 'hero' && b !== 'potion')).length === 0;
+  }
+
   async actionDrawFromPotionDeck(playerIdx, count) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -14451,6 +14465,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * Skill Test (Nutzer 8.10.): Creatures, die per Effekt einen bestimmten Hero an sich anlegen (Dream Lander: `attachableHeroes`), starten mit diesem Hero
+   * bereits angelegt — ohne dass der Hero in Hand oder Deck liegen muss (der Modus hat kein Deck). Der Bonus der Creature (`onAttachHero`, z. B. +200 HP)
+   * greift sofort. Im Normalspiel tut die Funktion nichts.
+   */
+  _stAutoAttachHero(inst) {
+    if (!this.gs.skillTest || !inst || inst.zone !== 'support' || inst.counters?.attachedHero) return false;
+    const script = loadCardEffect(inst.name);
+    const heroes = script && script.attachableHeroes;
+    if (!Array.isArray(heroes) || heroes.length === 0) return false;
+    const heroName = heroes[0];
+    if (!inst.counters) inst.counters = {};
+    inst.counters.attachedHero = heroName;
+    if (typeof script.onAttachHero === 'function') {
+      try { script.onAttachHero(this, this._createContext(inst, { heroName, source: 'Skill Test' })); }
+      catch (err) { console.error(`[attachHero] ${inst.name}.onAttachHero (Skill Test) threw:`, err.message); }
+    }
+    this.log('hero_attached_to_creature', { hero: heroName, creature: inst.name, from: 'skill_test', player: this.gs.players[inst.owner]?.username, by: 'Skill Test' });
+    return true;
+  }
+
   summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
     this._trailWrite('summon', { cardName, note: `p${playerIdx}/h${heroIdx}` });
     const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, { coverNested: !!opts.coverNested, controller: opts.controller });
@@ -14468,6 +14503,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Enforce summoning sickness — belt-and-suspenders with _trackCard
     inst.turnPlayed = this.gs.turn || 0;
+
+    // Skill Test: Dream Lander kommen mit ihrem Hero bereits angelegt ins Spiel.
+    this._stAutoAttachHero(inst);
 
     // Propagate guardian immunity to newly summoned creatures
     this._syncGuardianImmunity(inst, playerIdx);
@@ -16792,6 +16830,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // Keine Erneuerung eines laufenden Stun/Frost (siehe `_statusErneuerungGesperrt`).
+    if (this._statusErneuerungGesperrt(target, statusName, opts)) {
+      this.log('status_blocked', { target: target.name || this._heroLabel(target), status: statusName, reason: 'already_active' });
+      return false;
+    }
+
     // v1399: ein bestehendes Gift behaelt den Verursacher des ERSTEN Stapels.
     const _vorher = target.statuses[statusName];
     target.statuses[statusName] = { ...opts, appliedTurn: this.gs.turn };
@@ -17516,6 +17560,18 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Ist ein befristeter Eintrag (`expiresAtTurn` / `expiresForPlayer`) jetzt faellig?
+   * Normalspiel: genau im benannten Zug des benannten Spielers. Skill Test: `gs.turn` zaehlt dort 2 je Round
+   * (skilltest/rounds.js `roundTurn`), damit „+2" (der naechste eigene Zug) die NAECHSTE Round trifft statt der
+   * uebernaechsten; ungerade Fristen („+1", „+3") liegen zwischen zwei Round-Werten und sind deshalb ab dann faellig (`<=`).
+   */
+  _ablaufFaellig(expiresAtTurn, expiresForPlayer, currentTurn, activePlayer) {
+    if (expiresForPlayer !== activePlayer) return false;
+    if (this.gs.skillTest) return typeof expiresAtTurn === 'number' && expiresAtTurn <= currentTurn;
+    return expiresAtTurn === currentTurn;
+  }
+
+  /**
    * Process buff expiry at the start of a turn.
    * Removes buffs whose expiresAtTurn matches the current turn
    * and expiresForPlayer matches the active player.
@@ -17538,7 +17594,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const hero = ps.heroes[hi];
         if (!hero?.buffs) continue;
         for (const [buffName, buffData] of Object.entries(hero.buffs)) {
-          if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+          if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
           await this.actionRemoveBuff(hero, pi, hi, buffName);
@@ -17559,7 +17615,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!Array.isArray(hero?._tempAtkGrants) || hero._tempAtkGrants.length === 0) continue;
           const keep = [];
           for (const g of hero._tempAtkGrants) {
-            if (g.expiresAtTurn === currentTurn && g.expiresForPlayer === activePlayer) {
+            if (this._ablaufFaellig(g.expiresAtTurn, g.expiresForPlayer, currentTurn, activePlayer)) {
               // ★ v1087: war eine WORTGLEICHE Nachbildung des Trichters
               // — beide Zweige tun exakt das, was `_applyHeroAtkDelta`
               // ohnehin tut (Zwischenspeicher bei Fluch, sonst sichtbar
@@ -17580,7 +17636,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT || !inst.counters?.buffs) continue;
       for (const [buffName, buffData] of Object.entries(inst.counters.buffs)) {
-        if (buffData.expiresAtTurn !== currentTurn || buffData.expiresForPlayer !== activePlayer) continue;
+        if (!this._ablaufFaellig(buffData.expiresAtTurn, buffData.expiresForPlayer, currentTurn, activePlayer)) continue;
         if (filterEarly === true && !buffData.expiresBeforeStatusDamage) continue;
         if (filterEarly === false && buffData.expiresBeforeStatusDamage) continue;
         // Snapshot the post-cleanse-immunity flag BEFORE the buff is
@@ -17624,7 +17680,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!hero?.statuses) continue;
         for (const [statusName, statusData] of Object.entries(hero.statuses)) {
           if (!statusData || typeof statusData !== 'object') continue;
-          if (statusData.expiresAtTurn !== currentTurn || statusData.expiresForPlayer !== activePlayer) continue;
+          if (!this._ablaufFaellig(statusData.expiresAtTurn, statusData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
           await this.removeHeroStatus(pi, hi, statusName);
@@ -43752,6 +43808,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     return require('./_ability-verwahrung-shared').versiegelt(this.gs, playerIdx, heroIdx, 'support', slotIdx);
   }
 
+  /**
+   * ★ Keine Erneuerung von Betäubung/Frost: Hat ein Held `stunned`/`frozen` schon, ersetzt ein neuer Auftrag den laufenden Status
+   * NICHT (ein 1-Runden-Stun wird nicht gegen einen frischen 2+-Runden-Stun getauscht, die Laufzeit beginnt nicht von vorn).
+   * Ausnahme nur, wenn die Karte es ausdrücklich verlangt (`opts.renew === true`). Verlängerungen, die einen Status gezielt
+   * verlängern (z. B. Frost-Verlängerung in `_frost-shared.js`), schreiben die Laufzeit selbst und laufen nicht über diesen Weg.
+   * Kreaturen erneuern ohnehin nicht (`applyCreatureStatus`: bestehender Status → `false`).
+   */
+  _statusErneuerungGesperrt(target, statusName, opts = {}) {
+    if (statusName !== 'stunned' && statusName !== 'frozen') return false;
+    if (opts.renew === true) return false;
+    return !!(target && target.statuses && target.statuses[statusName]);
+  }
+
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
@@ -43949,6 +44018,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         playBlockedAnim();
         return;
       }
+    }
+
+    // Keine Erneuerung eines laufenden Stun/Frost (siehe `_statusErneuerungGesperrt`).
+    if (this._statusErneuerungGesperrt(hero, statusName, opts)) {
+      this.log('status_blocked', { target: hero.name, status: statusName, reason: 'already_active' });
+      return;
     }
 
     // Poison stacking: if already poisoned, add/set stacks

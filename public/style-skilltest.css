@@ -263,6 +263,12 @@
 .st-seat.is-player { border-color: var(--accent2); }
 .st-seat-art { flex: 0 0 64px; width: 100%; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
 .st-seat-art img { height: 64px; max-width: 100%; object-fit: contain; image-rendering: pixelated; border-radius: 4px; }
+/* Anonymer CPU-Sitz: schwarze Kachel, Pixelart-Fragezeichen (StUnknownTile) */
+.st-unknown { display: block; width: 100%; height: 100%; line-height: 0; border: 2px solid #1c1a2e; border-radius: 4px; background: #050507; box-sizing: border-box; overflow: hidden; image-rendering: pixelated; }
+.st-unknown svg { display: block; width: 100%; height: 100%; }
+.st-seat-art .st-unknown { width: 64px; height: 64px; }
+.st-chip .st-unknown { width: 20px; height: 20px; border-width: 1px; border-radius: 2px; }
+.st-player-ava .st-unknown { border: 0; border-radius: 0; }
 .st-seat-name {
   width: 100%; font-weight: 700; font-size: 11px; line-height: 1.25; color: var(--text); overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

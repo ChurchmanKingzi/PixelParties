@@ -22,12 +22,12 @@ const MAX_PROMPT_REPEATS = 24;     // so oft darf EINE Karte in einer Aktion den
 
 const DEFAULT_WEIGHTS = {
   aggression: 1.0,          // wie bereitwillig angreifen statt Effekte zu nutzen
-  lowestHp: 1.0,            // Vorliebe für Ziele mit wenig HP
-  killBonus: 2.0,           // Vorliebe für tödliche Treffer
-  focusLeader: 0.0,         // >0: stärkste Gegner bevorzugen; <0: Schwache
+  lowestHp: 0.0,            // Vorliebe für Ziele mit wenig HP (ausgeliefert: 0 — „zuerst die Schwachen“ verliert gegen „zuerst die Gefährlichen“)
+  killBonus: 1.0,           // Vorliebe für tödliche Treffer
+  focusLeader: 1.5,         // >0: stärkste Gegner bevorzugen; <0: Schwache
   heroEffect: 0.6,          // Neigung, aktive Hero-Effekte zu nutzen
   creatureEffect: 0.8,      // Neigung, Creature-Effekte zu nutzen
-  spell: 1.0,               // Neigung, Handzauber/-angriffe zu spielen
+  spell: 1.5,               // Neigung, Handzauber/-angriffe zu spielen (ausgeliefert: 1,5 — zweimal gemessen +1,2…1,7 Punkte Siegquote)
   summon: 0.9,              // Neigung, Creatures zu beschwören
   equip: 1.0,               // Neigung, Artifacts auszurüsten (frei)
   potion: 1.0,              // Neigung, Tränke zu trinken (frei)
@@ -44,7 +44,34 @@ const DEFAULT_WEIGHTS = {
   keepBias: 0.0,            // verschiebt die Schwelle „behalten gegen recyceln" (> 0: eher behalten, < 0: eher recyceln; Einheit: Platzierungsgüte)
   heroHp: 1.0,              // Gewicht der Helden-HP bei der Heldenwahl
   heroAtk: 2.0,             // Gewicht des Helden-ATK bei der Heldenwahl
+  // Informierte Zielwahl im Kampf (siehe `targetInfo`/`chooseTargets`). Die Ziele, die der Bot bekommt, tragen keine HP; `tgtModel: 0` ist die
+  // bisherige Wahl (praktisch: irgendein Gegner, Helden etwas bevorzugt), `1` liest HP, Angriffswert und Zustand aus dem Spielstand.
+  tgtModel: 1,              // 0 = bisherige Zielwahl, 1 = informiert
+  tHero: 0,                 // Aufschlag für Helden gegenüber Kreaturen (Helden sind Akteure: ihr Tod nimmt dem Gegner Aktionen)
+  tTempo: 0,                // Aufschlag für Helden, die in dieser Round noch nicht gehandelt haben (treffen, bevor sie handeln)
+  tThreat: 4,               // Aufschlag je 100 Angriffswert des Ziels
+  tElim: 0,                 // Aufschlag, wenn der Treffer den LETZTEN Helden des Spielers besiegt (Ausscheiden)
+  tOverkill: 0,             // Abschlag für verschwendeten Schaden (Treffer weit über den HP des Ziels)
+  tStick: 0,                // Aufschlag für den Spieler, den dieser Sitz zuletzt gewählt hat (Fokus halten); negativ = streuen
+  sAtk: 3,                  // Stärke eines Spielers (für focusLeader) = Helden-HP + sAtk × Helden-ATK; 0 = nur HP
+  cLow: 0,                  // Gewicht der Wenig-HP-Vorliebe für KREATUREN als Ziel (Helden: lowestHp voll); 0 = HP von Kreaturen locken nicht
+  cKill: 0,                 // Gewicht des Tötungs-Aufschlags für Kreaturen (Helden: killBonus voll)
+  // Reihenfolge der Aktionen im Kampf (siehe `actionBonus`): was zuerst gespielt wird, wirkt vor den Zügen der anderen.
+  aDmg: 1,                  // Aufschlag je 100 geschätzten Schaden einer Angriffs-/Zauber-Aktion (stärkste Treffer zuerst)
+  aKill: 3,                 // Aufschlag, wenn die Aktion einen gegnerischen Helden besiegen kann (ein letzter Held zählt anderthalbfach)
+  aHeal: 0,                 // Aufschlag für Heil-/Schutz-Aktionen, je fehlendem Anteil der HP der eigenen Helden
 };
+
+/**
+ * Ausgelieferte Kampf-Zielwahl und Aktionsreihenfolge (Messung auf Sieg, gepaart, 480 Partien je Vergleich; docs/skilltest-night/win-tuning.md):
+ * zuerst die Stärksten und Gefährlichsten treffen (Helden-HP + 3 × ATK), nie „zuerst die Schwachen“, Tötungen und die stärksten Treffer zuerst.
+ * Gegen die gelernten Live-Personas +10,2 Prozentpunkte Siegquote (z 5,4); spielen alle CPUs so, bleibt der Stil gegen abweichende Spieler
+ * mindestens ebenbürtig (+1,7 Punkte). Die gelernten Personas überschreiben diese Werte NICHT mehr (`shipped`): ihre Zielwahl war auf Platzierung
+ * gezüchtet, nicht auf Sieg, und neigte zu „Schwächste zuerst“ (lowestHp Ø 1,46).
+ */
+const SHIPPED_TARGETING = { tgtModel: 1, lowestHp: 0, killBonus: 1, focusLeader: 1.5, tThreat: 4, aKill: 3, aDmg: 1, sAtk: 3, spell: 1.5 };
+/** Gewichte einer Persona mit der ausgelieferten Zielwahl (für CPU-Sitze im Live-Spiel und in der Simulation). */
+function shipped(w) { return Object.assign({}, w, SHIPPED_TARGETING); }
 
 function weightsOf(room, seat) {
   const st = room.gameState.skillTest;
@@ -144,6 +171,74 @@ function chooseTribute(cands, config, seat) {
   return list.filter((_, i) => best & (1 << i)).map(t => t.id);
 }
 
+// ── Informierte Zielwahl ───────────────────────────────────────────
+/** Zustand eines Ziels aus dem Spielstand (die Zielobjekte der Prompts tragen keine HP). `null`, wenn nicht lesbar. */
+function targetInfo(engine, seat, t) {
+  const gs = engine.gs, st = gs.skillTest || {};
+  const owner = t.owner != null ? t.owner : seat;
+  if (t.type === 'hero') {
+    const ps = gs.players[owner], h = ps && ps.heroes && ps.heroes[t.heroIdx];
+    if (!h || !h.name || !(h.hp > 0)) return null;
+    const living = (ps.heroes || []).filter(x => x && x.name && x.hp > 0).length;
+    const s = h.statuses || {};
+    return { kind: 'hero', owner, hp: h.hp, maxHp: h.maxHp || h.hp, atk: h.atk || 0, living, last: living <= 1,
+      exhausted: !!(st.exhaustedHeroes || {})[owner + ':' + t.heroIdx], incapacitated: !!(s.frozen || s.stunned || s.webbed || s.bound) };
+  }
+  if ((t.type === 'equip' || t.type === 'creature') && t.cardInstance) {
+    const inst = t.cardInstance, c = inst.counters || {}, cd = getCardDB()[inst.name] || {};
+    const maxHp = c.maxHp ?? cd.hp ?? 0;
+    return { kind: 'creature', owner, hp: c.currentHp ?? maxHp, maxHp, atk: 0, living: 0, last: false, exhausted: false, incapacitated: false };
+  }
+  return null;
+}
+
+const _dmgText = new Map();
+/** Schaden des gerade ausgeführten Zugs (für „tödlich?"/Überschaden): Basisangriff = ATK des Helden; Karten mit „deal N damage" im Text; sonst unbekannt (`null`). */
+function estimateDamage(engine, cardName, atkOverride) {
+  const st = engine.gs.skillTest || {}, a = st.acting;
+  const h = a && !a.creature ? engine.gs.players[a.seat] && engine.gs.players[a.seat].heroes[a.hi] : null;
+  const atk = atkOverride != null ? (atkOverride || null) : (h && h.atk ? h.atk : null);
+  if (!cardName || cardName === 'Attack') return atk;
+  if (!_dmgText.has(cardName)) {
+    const cd = getCardDB()[cardName], t = (cd && cd.effect) || '';
+    const m = /deals?\s+(\d+)\s+damage/i.exec(t);
+    _dmgText.set(cardName, m ? { n: +m[1] } : (/\battack stat\b|\battack of the (user|hero)\b/i.test(t) ? { atk: true } : null));
+  }
+  const d = _dmgText.get(cardName);
+  return d ? (d.atk ? atk : d.n) : null;
+}
+
+// ── Reihenfolge der Aktionen ───────────────────────────────────────
+/** Kann ein Treffer von `dmg` einen gegnerischen Helden besiegen? 0 = nein, 1 = ja, 1.5 = ja und es wäre der letzte Held seines Spielers. */
+function killReach(engine, seat, dmg) {
+  const gs = engine.gs, st = gs.skillTest || {};
+  let best = 0;
+  gs.players.forEach((ps, o) => {
+    if (o === seat || (st.eliminated || []).includes(o)) return;
+    const alive = (ps.heroes || []).filter(h => h && h.name && h.hp > 0);
+    for (const h of alive) if (h.hp <= dmg) best = Math.max(best, alive.length <= 1 ? 1.5 : 1);
+  });
+  return best;
+}
+
+/** Anteil fehlender HP der eigenen Helden (0 … 1; der schlimmste Held zählt). */
+function missingHpRatio(engine, seat) {
+  let worst = 0;
+  for (const h of (engine.gs.players[seat].heroes || [])) if (h && h.name && h.hp > 0 && h.maxHp) worst = Math.max(worst, 1 - h.hp / h.maxHp);
+  return worst;
+}
+
+/** Zuschlag auf den Rang einer Aktion nach Lage: Schaden, Tötungsmöglichkeit, Heilbedarf. */
+function actionBonus(engine, seat, w, dmg, beneficial) {
+  let b = 0;
+  if (dmg && !beneficial) {
+    if (w.aDmg) b += w.aDmg * dmg / 100;
+    if (w.aKill) b += w.aKill * killReach(engine, seat, dmg);
+  }
+  if (beneficial && w.aHeal) b += w.aHeal * 6 * missingHpRatio(engine, seat);
+  return b;
+}
+
 /** Zielwahl: Gegner (Seiten ≥ 0 außer dem eigenen Sitz), niedrige HP, tödliche Treffer; Heil-/Buff-Karten wählen eigene Ziele. */
 function chooseTargets(engine, seat, validTargets, config, base) {
   if (!validTargets || !validTargets.length) return [];
@@ -176,7 +271,7 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   const st = engine.gs.skillTest;
   const focus = engine._stFocus && engine._stFocus.by === seat ? engine._stFocus : null;
   if (engine._stActing === seat && validTargets.some(t => (t.owner != null ? t.owner : seat) !== seat)) engine._stTargetPrompts = (engine._stTargetPrompts || 0) + 1;   // Zielwahl unter Gegnern kam vor
-  const strength = (i) => (engine.gs.players[i].heroes || []).reduce((a, h) => a + (h && h.name && h.hp > 0 ? h.hp : 0), 0);
+  const strength = (i) => (engine.gs.players[i].heroes || []).reduce((a, h) => a + (h && h.name && h.hp > 0 ? h.hp + w.sAtk * (h.atk || 0) : 0), 0);
   const scored = validTargets.filter(t => !t.ineligible).map(t => {
     const ownerSeat = t.owner != null ? t.owner : seat;
     const enemy = ownerSeat !== seat;
@@ -191,10 +286,24 @@ function chooseTargets(engine, seat, validTargets, config, base) {
         if (st && st.eliminated.includes(ownerSeat)) score -= 4;                 // ausgeschiedene Spieler: Creatures nur nachrangig
         score += w.focusLeader * (strength(ownerSeat) / 200);
       }
-      const hp = t.hp ?? t.currentHp ?? null;
+      const inf = w.tgtModel > 0 && enemy ? targetInfo(engine, seat, t) : null;
+      const hp = inf ? inf.hp : (t.hp ?? t.currentHp ?? null);
+      const dmg = inf ? estimateDamage(engine, cardName) : (config.damage || null);
+      // Informiert: HP- und Tötungs-Terme gelten für Helden voll, für Kreaturen nur skaliert (cLow/cKill) — sonst lockt jede 20-HP-Kreatur mehr als ein Held.
+      const hpScale = inf && inf.kind === 'creature' ? w.cLow : 1, killScale = inf && inf.kind === 'creature' ? w.cKill : 1;
       if (hp != null) {
-        score += w.lowestHp * (200 / Math.max(20, hp));
-        if (config.damage && hp <= config.damage) score += w.killBonus * 3;       // tödlicher Treffer
+        score += hpScale * w.lowestHp * (200 / Math.max(20, hp));
+        if (dmg && hp <= dmg) score += killScale * w.killBonus * 3;               // tödlicher Treffer
+      }
+      if (inf) {
+        if (inf.kind === 'hero') {
+          score += w.tHero;
+          if (!inf.exhausted && !inf.incapacitated) score += w.tTempo;
+          score += w.tThreat * (inf.atk / 100);
+          if (dmg && hp <= dmg && inf.last) score += w.tElim;
+        }
+        if (dmg && dmg > hp) score -= w.tOverkill * 4 * Math.min(1, (dmg - hp) / dmg);
+        if (st && st.lastTarget && st.lastTarget[seat] === ownerSeat) score += w.tStick;
       }
     }
     if (t.type === 'hero') score += 2;
@@ -205,7 +314,13 @@ function chooseTargets(engine, seat, validTargets, config, base) {
   const minNeeded = Math.max(config.cancellable ? 0 : 1, config.minRequired || 0);
   const maxAllowed = config.maxTotal ?? scored.length;
   const count = Math.min(Math.max(minNeeded, 1), maxAllowed, scored.length);
-  return scored.slice(0, count).map(s => s.id);
+  const chosen = scored.slice(0, count).map(s => s.id);
+  if (w.tgtModel > 0 && !bene && st && chosen.length) {
+    const first = validTargets.find(t => t.id === chosen[0]);
+    const o = first && first.owner != null ? first.owner : null;
+    if (o != null && o !== seat) (st.lastTarget || (st.lastTarget = {}))[seat] = o;
+  }
+  return chosen;
 }
 
 /** Welchen Gegner trifft ein Flächenschaden? Standard: den mit den wenigsten Gesamt-HP (focusLeader>0: den stärksten). */
@@ -302,7 +417,8 @@ function rankActions(room, seat, host) {
       for (const hi of casters) {
         const params = { cardName: name, handIndex, heroIdx: hi };
         if (sub === 'attachment') params.attachHeroIdx = hi;                 // Anhänger-Zauber: an den Wirker (die Karte fragt sonst selbst nach dem Ziel)
-        out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5, kind: 'spell', key, card: name, hero: hi,
+        const sBonus = actionBonus(engine, seat, w, estimateDamage(engine, name, ps.heroes[hi] && ps.heroes[hi].atk), isBeneficial(name));
+        out.push({ score: base + learnedBonus(prof, w, key) + Math.random() * 1.5 + sBonus, kind: 'spell', key, card: name, hero: hi,
           run: () => rounds.act(room, seat, 'play_spell', params, () => host.doPlaySpell(room, seat, params), host) });
       }
     } else if (c.cardType === 'Creature' && sub === 'normal' && host.doPlayCreature) {
@@ -319,7 +435,8 @@ function rankActions(room, seat, host) {
   });
 
   for (const hi of [...heroes, ...bonusHeroesFor(engine, seat, 'attack')]) {
-    out.push({ score: w.aggression * 6 + Math.random() * 2 - (heroes.includes(hi) ? 0 : 0.5), kind: 'attack', key: cardKey('attack', 'Attack'),
+    const hAtk = ps.heroes[hi] && ps.heroes[hi].atk || 0;
+    out.push({ score: w.aggression * 6 + Math.random() * 2 - (heroes.includes(hi) ? 0 : 0.5) + actionBonus(engine, seat, w, hAtk, false), kind: 'attack', key: cardKey('attack', 'Attack'),
       run: () => rounds.playBaseAttack(room, seat, hi, host) });
   }
   return out.sort((a, b) => b.score - a.score);
@@ -578,6 +695,6 @@ function prepareBase({ env, ps, room, idx, pool, noProfile, weights, record }) {
 
 module.exports = {
   prepareBase, castableInHand, useArtifactEffect,
-  DEFAULT_WEIGHTS, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
-  stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes,
+  DEFAULT_WEIGHTS, SHIPPED_TARGETING, shipped, weightsOf, chooseTargets, chooseTribute, choosePlayer, rankActions, freeActions,
+  stateValue, sideValue, isBeneficial, cardKey, reactionVerdict, reactionHeuristic, saysYes, targetInfo, estimateDamage,
 };

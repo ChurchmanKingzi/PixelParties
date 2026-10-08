@@ -45,9 +45,18 @@ class CardPool {
     this.rng = rng || Math.random;
     this.buckets = Object.fromEntries(BUCKETS.map(b => [b, []]));
     const hasImage = imageFilter(cardDB);
+    this.names = new Set();                                  // alle Karten, die im Pool vorkommen dürfen (auch wenn schon ausgegeben)
     for (const c of Object.values(cardDB)) {
       const b = bucketOf(c);
-      if (b && hasImage(c.name)) this.buckets[b].push(c.name);
+      if (b && hasImage(c.name)) { this.buckets[b].push(c.name); this.names.add(c.name); }
+    }
+    // Partnerkarten von Heroes (hand-rules.js: Luna → Firewall, Mary → Cute Phoenix, Tsu'Ki → Lunatic-Ausrüstungen …) sind reserviert, solange ihr Hero im
+    // Pool ist: sie kommen NUR zusammen mit ihrem Hero (`takeNamed`), nie in die Hand eines anderen Spielers und nie aus dem Recycler.
+    this.reserved = new Set();
+    {
+      const HR = require('./hand-rules');
+      for (const hero of this.buckets.hero) for (const p of HR.partnersOf(cardDB, hero)) if (this.names.has(p)) this.reserved.add(p);
+      for (const b of BUCKETS) this.buckets[b] = this.buckets[b].filter(n => !this.reserved.has(n));
     }
     // Rotation: von den Cardinal Beasts ist in dieser Partie eines gesperrt (zufällig), die übrigen bleiben im Pool.
     this.banned = [];
@@ -57,6 +66,54 @@ class CardPool {
       this.buckets.creature = this.buckets.creature.filter(n => n !== ban);
       this.banned.push(ban);
     }
+  }
+
+  /** Darf diese Karte in dieser Partie vorkommen (legal, mit Bild, nicht rotiert)? */
+  has(name) { return this.names.has(name) && !this.banned.includes(name); }
+
+  /** Genau diese Karte aus dem Pool nehmen (null, wenn sie schon vergeben ist). */
+  takeNamed(name) {
+    if (this.reserved.has(name)) { this.reserved.delete(name); return name; }
+    for (const b of BUCKETS) {
+      const arr = this.buckets[b];
+      const i = arr.indexOf(name);
+      if (i >= 0) { arr[i] = arr[arr.length - 1]; arr.pop(); return name; }
+    }
+    return null;
+  }
+
+  /** Eine zufällige Karte eines Topfes nehmen, die `pred(name)` erfüllt (null, wenn keine passt). */
+  takeWhere(bucket, pred) {
+    const arr = this.buckets[bucket] || [];
+    const idx = [];
+    for (let i = 0; i < arr.length; i++) if (pred(arr[i])) idx.push(i);
+    if (!idx.length) return null;
+    const i = idx[Math.floor(this.rng() * idx.length)];
+    const name = arr[i];
+    arr[i] = arr[arr.length - 1];
+    arr.pop();
+    return name;
+  }
+
+  /** Alle Karten (Namen) des Pools, die `pred(name, bucket)` erfüllen — Töpfe `buckets` (Standard: alle). */
+  listWhere(pred, buckets) {
+    const out = [];
+    for (const b of (buckets || BUCKETS)) for (const n of this.buckets[b] || []) if (pred(n, b)) out.push([b, n]);
+    return out;
+  }
+
+  /** Eine zufällige Karte (gleichverteilt über alle passenden) NEHMEN; null, wenn keine passt. Für Ziehen/Mulligan im Kampf („von außerhalb des Spiels“). */
+  takeRandom(pred, buckets) {
+    const c = this.listWhere(pred, buckets);
+    if (!c.length) return null;
+    const [b, n] = c[Math.floor(this.rng() * c.length)];
+    return this.takeNamed(n) && n;
+  }
+
+  /** Wie `takeRandom`, aber ohne die Karte zu entnehmen (Lookahead-Simulationen dürfen den Pool nicht verändern). */
+  peekRandom(pred, buckets) {
+    const c = this.listWhere(pred, buckets);
+    return c.length ? c[Math.floor(this.rng() * c.length)][1] : null;
   }
 
   /** Eine Karte zurück in ihren Topf legen (z. B. wenn die Hand-Regeln sie nicht erlauben). */
@@ -145,7 +202,7 @@ function takeHeroes(pool, count) {
 }
 
 /** Eine Startkarten-Hand aus dem Pool ziehen (Karten verlassen den Pool). */
-function dealHand(pool, rng = Math.random) {
+function dealHand(pool, rng = Math.random, ctx = null) {
   const shape = sampleHandShape(rng);
   const hand = [];
   let missing = 0;
@@ -160,6 +217,11 @@ function dealHand(pool, rng = Math.random) {
   while (missing-- > 0) {
     const name = pool.takeAny({ creature: 1, artifact: 1, attackSpell: 1, potion: 1 });
     if (name) hand.push(name);
+  }
+  // Hand-Garantien (hand-rules.js): Heldenpartner und Spells der Schulen der Heroes — nur mit `ctx = { cards, ps }` (der Zustand landet in ps.rules).
+  if (ctx && ctx.cards && ctx.ps) {
+    ctx.ps.rules = ctx.ps.rules || {};
+    require('./hand-rules').onHeroesInHand({ pool, cards: ctx.cards, hand, state: ctx.ps.rules, rng });
   }
   // Mischen (Fisher-Yates), damit die Hand nicht nach Typ sortiert ankommt.
   for (let i = hand.length - 1; i > 0; i--) {

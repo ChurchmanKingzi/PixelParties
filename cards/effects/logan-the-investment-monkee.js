@@ -361,6 +361,19 @@ module.exports = {
     },
   },
 
+  // ── CPU-Antworten auf Logans Abfragen ─────────────────────────────
+  // Ohne diese Antworten lehnt die CPU jede abbrechbare Abfrage ab: sie hat nie investiert und nie ausgezahlt (Logan war fuer CPU-Sitze
+  // ein Held ohne Effekt, Skill-Test-Nutzer 8.10.). Einzahlen: etwa die Haelfte des Golds, mindestens 1 Gold bleibt uebrig (bei 0 Gold
+  // verfielen alle Zaehler). Auszahlen: Schaden (die Zaehler bleiben liegen, der Schaden wiederholt sich jede Round); ohne Ziele Gold.
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'generic' || !payload || payload.type !== 'optionPicker') return undefined;
+    const ids = (payload.options || []).map(o => o.id);
+    if (ids.includes('damage') || ids.includes('gold')) return { optionId: ids.includes('damage') ? 'damage' : 'gold' };
+    const gold = Number.isFinite(payload.sliderMax) ? payload.sliderMax : ids.length;
+    const betrag = Math.min(gold - 1, Math.ceil(gold / 2));
+    return betrag >= 1 ? { optionId: String(betrag) } : null;        // 1 Gold: nicht investieren (sonst verfielen alle Zaehler)
+  },
+
   // ── CPU-Bewertungshinweis ─────────────────────────────────────────
   // Investierte Zaehler sind gebundenes Gold mit Auszahlung am Zugende.
   // Der Bewerter kennt das Feld nicht von allein; ohne diesen Hinweis
