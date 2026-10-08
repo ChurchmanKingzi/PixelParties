@@ -79,7 +79,7 @@ def gloop_tower():
     return c
 
 
-def gloop_ball(big=True):
+def gloop_ball():
     """Schleimball (10 x 10) mit Glanz"""
     c = Canvas(10, 10)
     ellipse(c, 5, 5, 4.4, 4.4, 'slime', lo=1, hi=5, ambient=0.2)
@@ -484,12 +484,6 @@ def pelican_nest():
     for y in (40, 52):                                         # Seilbunde
         for x in range(16, 28):
             c.put_ramp(x, y, 'bone', 3 if x % 2 else 2)
-    # Fisch-Eimer am Fuß
-    # Nest-Rückseite (Hinterer Rand)
-    for k in range(40):
-        a = rnd.uniform(math.pi * 1.05, math.pi * 1.95)
-        x0 = 22 + math.cos(a) * 19
-        y0 = 34 + math.sin(a) * 4.5
     # Pelikan sitzt im Nest (zuerst, dann der vordere Nestrand davor)
     c.blit(pelican(True), 0, 6)
     # Nest: Schale aus Reisig
@@ -532,7 +526,7 @@ def pelican_nest():
 RAINBOW = [('fire', 4), ('gold', 5), ('leaf', 4), ('ice', 4), ('purple', 4)]
 
 
-def gull(f=0):
+def gull():
     """kleine Möwe (Wetterfahne), 10 x 6, blickt nach rechts"""
     c = Canvas(10, 6)
     ellipse(c, 4.6, 3.4, 3.8, 2.0, 'bone', lo=3, hi=5, ambient=0.3)
