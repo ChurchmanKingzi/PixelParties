@@ -42,8 +42,11 @@ pixel-parties/
 ├── public/
 │   ├── index.html     # Entry point (loads React + Socket.io)
 │   ├── style.css      # Full stylesheet
-│   └── app.jsx        # React frontend (compiled in-browser by Babel)
-├── cards/
+│   ├── app.jsx        # React frontend (compiled in-browser by Babel)
+│   ├── card-render.js # Draws cards at runtime (frame, icons, text, art) — see docs/karten-renderer.md
+│   ├── card-image-shim.js # Maps /cards/*.png image sources to the renderer (blob: URLs)
+│   └── cardgen/       # Sprites, glyph outlines and the art atlas used by the renderer
+├── cards/             # No card images any more — cards are drawn in the browser
 │   └── effects/
 │       ├── _engine.js   # Card effect engine (hooks, chains, game actions)
 │       ├── _hooks.js    # Hook points, speed levels, status/buff registries
@@ -52,7 +55,9 @@ pixel-parties/
 │       ├── CARD_API.md  # Full API reference for card authors
 │       └── *.js         # Individual card effect scripts
 ├── data/
-│   └── cards.json     # Card database (1,385 cards)
+│   ├── cards.json     # Card database (1,385 cards)
+│   ├── card-art/      # Source of the art atlas (native-resolution motifs + index)
+│   └── card-render.json # Per-card rendering data (rarity, frame, special cases, skin names)
 └── README.md
 ```
 

@@ -1,0 +1,5134 @@
+{
+"\"Bloom\", the Continent Corruptor": {
+"id": "Bloom_the_Continent_Corruptor",
+"kind": "a"
+},
+"3-Headed Giant": {
+"id": "3_Headed_Giant",
+"kind": "a"
+},
+"500 Piranhas in a Monster Suit": {
+"id": "500_Piranhas_in_a_Monster_Suit",
+"kind": "a"
+},
+"???, the Shapeshifter": {
+"id": "the_Shapeshifter",
+"kind": "a"
+},
+"???, the Throne Robber": {
+"id": "the_Throne_Robber",
+"kind": "a"
+},
+"Accusation": {
+"id": "Accusation",
+"kind": "a"
+},
+"Acid Rain": {
+"id": "Acid_Rain",
+"kind": "a"
+},
+"Acid Vial": {
+"id": "Acid_Vial",
+"kind": "a"
+},
+"Adventurousness": {
+"id": "Adventurousness",
+"kind": "a"
+},
+"Afflicted Pests": {
+"id": "Afflicted_Pests",
+"kind": "a"
+},
+"Afflicted Vermin": {
+"id": "Afflicted_Vermin",
+"kind": "a"
+},
+"Aggressive Town Guard": {
+"id": "Aggressive_Town_Guard",
+"kind": "b"
+},
+"Albrecht, the Nerd": {
+"id": "Albrecht_the_Nerd",
+"kind": "a"
+},
+"Alchemic Journal": {
+"id": "Alchemic_Journal",
+"kind": "a"
+},
+"Alchemy": {
+"id": "Alchemy",
+"kind": "a"
+},
+"Alex, Trainer of Heroes": {
+"id": "Alex_Trainer_of_Heroes",
+"kind": "a"
+},
+"Alice, the Puppeteer Girl": {
+"id": "Alice_the_Puppeteer_Girl",
+"kind": "a"
+},
+"Alice, the Transfer Student": {
+"id": "Alice_the_Transfer_Student",
+"kind": "a"
+},
+"Aligning Goals": {
+"id": "Aligning_Goals",
+"kind": "a"
+},
+"Alleria, the Queen of Spiders": {
+"id": "Alleria_the_Queen_of_Spiders",
+"kind": "a"
+},
+"Alliance": {
+"id": "Alliance",
+"kind": "a"
+},
+"Alluring Light": {
+"id": "Alluring_Light",
+"kind": "a"
+},
+"Ambush the Scout": {
+"id": "Ambush_the_Scout",
+"kind": "b"
+},
+"Analyzer from the Cosmic Depths": {
+"id": "Analyzer_from_the_Cosmic_Depths",
+"kind": "a"
+},
+"Ancient Tech Infinite Energy Core": {
+"id": "Ancient_Tech_Infinite_Energy_Core",
+"kind": "a"
+},
+"Andras, the Human Weapon": {
+"id": "Andras_the_Human_Weapon",
+"kind": "a"
+},
+"Angelfeather Arrow": {
+"id": "Angelfeather_Arrow",
+"kind": "a"
+},
+"Angler Angel": {
+"id": "Angler_Angel",
+"kind": "a"
+},
+"Angry Cheese": {
+"id": "Angry_Cheese",
+"kind": "a"
+},
+"Anti Magic": {
+"id": "Anti_Magic",
+"kind": "a"
+},
+"Anti Magic Enchantment": {
+"id": "Anti_Magic_Enchantment",
+"kind": "a"
+},
+"Anti Magic Shield": {
+"id": "Anti_Magic_Shield",
+"kind": "a"
+},
+"Anti Magic Zone": {
+"id": "Anti_Magic_Zone",
+"kind": "a"
+},
+"Anti-Magnet": {
+"id": "Anti_Magnet",
+"kind": "a"
+},
+"Anti-Magnetic Armor": {
+"id": "Anti_Magnetic_Armor",
+"kind": "a"
+},
+"Aquanian Orkallion": {
+"id": "Aquanian_Orkallion",
+"kind": "a"
+},
+"Aquatic Arrows": {
+"id": "Aquatic_Arrows",
+"kind": "a"
+},
+"Aquatic Shield": {
+"id": "Aquatic_Shield",
+"kind": "a"
+},
+"Aquatic Spear": {
+"id": "Aquatic_Spear",
+"kind": "a"
+},
+"Arcane Lamp": {
+"id": "Arcane_Lamp",
+"kind": "a"
+},
+"Archer": {
+"id": "Archer",
+"kind": "b"
+},
+"Archer of Teocuilatl": {
+"id": "Archer_of_Teocuilatl",
+"kind": "a"
+},
+"Archibald, the Archmage": {
+"id": "Archibald_the_Archmage",
+"kind": "a"
+},
+"Argos, the Eye of the Cosmos": {
+"id": "Argos_the_Eye_of_the_Cosmos",
+"kind": "a"
+},
+"Armageddon": {
+"id": "Armageddon",
+"kind": "a"
+},
+"Army of the Cute": {
+"id": "Army_of_the_Cute",
+"kind": "a"
+},
+"Arrival from the Cosmic Depths": {
+"id": "Arrival_from_the_Cosmic_Depths",
+"kind": "a"
+},
+"Arrow Slit": {
+"id": "Arrow_Slit",
+"kind": "a"
+},
+"Arthor, Inheritor of the Barbarian Sword": {
+"id": "Arthor_Inheritor_of_the_Barbarian_Sword",
+"kind": "a"
+},
+"Arthor, the King of Blackport": {
+"id": "Arthor_the_King_of_Blackport",
+"kind": "a"
+},
+"Ash Worms": {
+"id": "Ash_Worms",
+"kind": "a"
+},
+"Asriel, the Sapling Sacrificer": {
+"id": "Asriel_the_Sapling_Sacrificer",
+"kind": "a"
+},
+"Attack": {
+"id": "Attack",
+"kind": "a"
+},
+"Audience with a hostile King": {
+"id": "Audience_with_a_hostile_King",
+"kind": "a"
+},
+"Aurora Borealis": {
+"id": "Aurora_Borealis",
+"kind": "a"
+},
+"Baaliel, the Demon General": {
+"id": "Baaliel_the_Demon_General",
+"kind": "a"
+},
+"Baby Spider": {
+"id": "Baby_Spider",
+"kind": "a"
+},
+"Bakhm, the Desert Digger": {
+"id": "Bakhm_the_Desert_Digger",
+"kind": "a"
+},
+"Ballad Harpyformer": {
+"id": "Ballad_Harpyformer",
+"kind": "a"
+},
+"Bamboo Shield": {
+"id": "Bamboo_Shield",
+"kind": "a"
+},
+"Bamboo Staff": {
+"id": "Bamboo_Staff",
+"kind": "a"
+},
+"Barkeeper": {
+"id": "Barkeeper",
+"kind": "a"
+},
+"Barker, the Monster Tamer": {
+"id": "Barker_the_Monster_Tamer",
+"kind": "a"
+},
+"Barrier of Faith": {
+"id": "Barrier_of_Faith",
+"kind": "a"
+},
+"Barrier of Undying": {
+"id": "Barrier_of_Undying",
+"kind": "a"
+},
+"Basketskull": {
+"id": "Basketskull",
+"kind": "a"
+},
+"Beato, the Butterfly Witch": {
+"id": "Beato_the_Butterfly_Witch",
+"kind": "a"
+},
+"Beato, the Eternal Butterfly": {
+"id": "Beato_the_Eternal_Butterfly",
+"kind": "a"
+},
+"Beer": {
+"id": "Beer",
+"kind": "a"
+},
+"Berserk": {
+"id": "Berserk",
+"kind": "a"
+},
+"Bifab, Bridge to Coolness": {
+"id": "Bifab_Bridge_to_Coolness",
+"kind": "a"
+},
+"Big Gwen Guard": {
+"id": "Big_Gwen_Guard",
+"kind": "a"
+},
+"Bill, the Angry Auctioneer": {
+"id": "Bill_the_Angry_Auctioneer",
+"kind": "a"
+},
+"Biomancy": {
+"id": "Biomancy",
+"kind": "a"
+},
+"Bird": {
+"id": "Bird",
+"kind": "a"
+},
+"Birthday Present": {
+"id": "Birthday_Present",
+"kind": "a"
+},
+"Bishop of Kings [B]": {
+"id": "Bishop_of_Kings",
+"kind": "a"
+},
+"Black Marketeer": {
+"id": "Black_Marketeer",
+"kind": "a"
+},
+"Blackstache, Scourge of the Pixel Seas": {
+"id": "Blackstache_Scourge_of_the_Pixel_Seas",
+"kind": "a"
+},
+"Blade of the Frostbringer": {
+"id": "Blade_of_the_Frostbringer",
+"kind": "a"
+},
+"Blade of the Swamp Witch": {
+"id": "Blade_of_the_Swamp_Witch",
+"kind": "a"
+},
+"Blind Destruction": {
+"id": "Blind_Destruction",
+"kind": "a"
+},
+"Blood Moon under the Sea": {
+"id": "Blood_Moon_under_the_Sea",
+"kind": "a"
+},
+"Blood Rock": {
+"id": "Blood_Rock",
+"kind": "a"
+},
+"Blood-Soaked Coin": {
+"id": "Blood_Soaked_Coin",
+"kind": "a"
+},
+"Bloom, the Maniacal Botanist": {
+"id": "Bloom_the_Maniacal_Botanist",
+"kind": "a"
+},
+"Blow of the Venom Snake": {
+"id": "Blow_of_the_Venom_Snake",
+"kind": "a"
+},
+"Blue-Ice Dragon": {
+"id": "Blue_Ice_Dragon",
+"kind": "a"
+},
+"Blueprints": {
+"id": "Blueprints",
+"kind": "a"
+},
+"Bluff": {
+"id": "Bluff",
+"kind": "b"
+},
+"Board of Kings": {
+"id": "Board_of_Kings",
+"kind": "a"
+},
+"Boiling Oil": {
+"id": "Boiling_Oil",
+"kind": "a"
+},
+"Bomb Arrow": {
+"id": "Bomb_Arrow",
+"kind": "a"
+},
+"Bomb Berserker Bartas": {
+"id": "Bomb_Berserker_Bartas",
+"kind": "a"
+},
+"Bomb Mite": {
+"id": "Bomb_Mite",
+"kind": "a"
+},
+"Bomblebee": {
+"id": "Bomblebee",
+"kind": "a"
+},
+"Bomblebee Cluster": {
+"id": "Bomblebee_Cluster",
+"kind": "a"
+},
+"Bonded Companion Humby": {
+"id": "Bonded_Companion_Humby",
+"kind": "a"
+},
+"Bonded Companion Mellvy": {
+"id": "Bonded_Companion_Mellvy",
+"kind": "a"
+},
+"Bonded Companion Orphy": {
+"id": "Bonded_Companion_Orphy",
+"kind": "a"
+},
+"Bonded Companion Thuly": {
+"id": "Bonded_Companion_Thuly",
+"kind": "a"
+},
+"Booby Trap": {
+"id": "Booby_Trap",
+"kind": "a"
+},
+"Book of Doom": {
+"id": "Book_of_Doom",
+"kind": "a"
+},
+"Boomerang": {
+"id": "Boomerang",
+"kind": "a"
+},
+"Boots of Hermes": {
+"id": "Boots_of_Hermes",
+"kind": "a"
+},
+"Boris, the Guardian of Blackport": {
+"id": "Boris_the_Guardian_of_Blackport",
+"kind": "a"
+},
+"Bottled Flame": {
+"id": "Bottled_Flame",
+"kind": "a"
+},
+"Bottled Lightning": {
+"id": "Bottled_Lightning",
+"kind": "a"
+},
+"Boulder in a Bottle": {
+"id": "Boulder_in_a_Bottle",
+"kind": "a"
+},
+"Bouldor Demon": {
+"id": "Bouldor_Demon",
+"kind": "a"
+},
+"Bow Sniper Darge": {
+"id": "Bow_Sniper_Darge",
+"kind": "a"
+},
+"Box Spider": {
+"id": "Box_Spider",
+"kind": "a"
+},
+"Brackle, the Catapulting Turtle": {
+"id": "Brackle_the_Catapulting_Turtle",
+"kind": "a"
+},
+"Brain Spider": {
+"id": "Brain_Spider",
+"kind": "a"
+},
+"Brainstorming": {
+"id": "Brainstorming",
+"kind": "a"
+},
+"Breaking Strike": {
+"id": "Breaking_Strike",
+"kind": "a"
+},
+"Brilliant Idea": {
+"id": "Brilliant_Idea",
+"kind": "a"
+},
+"Broghan, the Frozen Guardian of the North": {
+"id": "Broghan_the_Frozen_Guardian_of_the_North",
+"kind": "a"
+},
+"Bubbles, the Bouncy Bunny": {
+"id": "Bubbles_the_Bouncy_Bunny",
+"kind": "a"
+},
+"Bunny Bombs": {
+"id": "Bunny_Bombs",
+"kind": "a"
+},
+"Burned Contract": {
+"id": "Burned_Contract",
+"kind": "b"
+},
+"Burning Finger": {
+"id": "Burning_Finger",
+"kind": "a"
+},
+"Burning Fuse": {
+"id": "Burning_Fuse",
+"kind": "a"
+},
+"Burning Skeleton": {
+"id": "Burning_Skeleton",
+"kind": "a"
+},
+"Butterfly Cloud": {
+"id": "Butterfly_Cloud",
+"kind": "a"
+},
+"Cactus Creature": {
+"id": "Cactus_Creature",
+"kind": "a"
+},
+"Calamitusk, the Chaorc War Chief": {
+"id": "Calamitusk_the_Chaorc_War_Chief",
+"kind": "a"
+},
+"Call for Help": {
+"id": "Call_for_Help",
+"kind": "a"
+},
+"Call of the Deepsea": {
+"id": "Call_of_the_Deepsea",
+"kind": "a"
+},
+"Calm Diatribe": {
+"id": "Calm_Diatribe",
+"kind": "a"
+},
+"Candlestick Squire": {
+"id": "Candlestick_Squire",
+"kind": "a"
+},
+"Cannibalism": {
+"id": "Cannibalism",
+"kind": "a"
+},
+"Cannon Tower": {
+"id": "Cannon_Tower",
+"kind": "b"
+},
+"Capture Net": {
+"id": "Capture_Net",
+"kind": "a"
+},
+"Card Game Player Inya": {
+"id": "Card_Game_Player_Inya",
+"kind": "a"
+},
+"Cardinal Beast Baihu": {
+"id": "Cardinal_Beast_Baihu",
+"kind": "a"
+},
+"Cardinal Beast Qinglong": {
+"id": "Cardinal_Beast_Qinglong",
+"kind": "a"
+},
+"Cardinal Beast Xuanwu": {
+"id": "Cardinal_Beast_Xuanwu",
+"kind": "a"
+},
+"Cardinal Beast Zhuque": {
+"id": "Cardinal_Beast_Zhuque",
+"kind": "a"
+},
+"Carpet Bomblebee": {
+"id": "Carpet_Bomblebee",
+"kind": "a"
+},
+"Carris, the Time Keeper": {
+"id": "Carris_the_Time_Keeper",
+"kind": "a"
+},
+"Castling": {
+"id": "Castling",
+"kind": "a"
+},
+"Cataclysm": {
+"id": "Cataclysm",
+"kind": "a"
+},
+"Cats of the Pharaoh": {
+"id": "Cats_of_the_Pharaoh",
+"kind": "a"
+},
+"Cavalry": {
+"id": "Cavalry",
+"kind": "a"
+},
+"Cecilia, the Harrowing Crusader": {
+"id": "Cecilia_the_Harrowing_Crusader",
+"kind": "a"
+},
+"Censpartan War Counselor": {
+"id": "Censpartan_War_Counselor",
+"kind": "a"
+},
+"Chain Lightning": {
+"id": "Chain_Lightning",
+"kind": "a"
+},
+"Challenge": {
+"id": "Challenge",
+"kind": "a"
+},
+"Champion, the Stormbringer": {
+"id": "Champion_the_Stormbringer",
+"kind": "a"
+},
+"Chaorc Cannon Fodder": {
+"id": "Chaorc_Cannon_Fodder",
+"kind": "a"
+},
+"Chaorc Corpse Cannibal": {
+"id": "Chaorc_Corpse_Cannibal",
+"kind": "a"
+},
+"Chaorc Friendly Fireballer": {
+"id": "Chaorc_Friendly_Fireballer",
+"kind": "a"
+},
+"Chaorc Interception": {
+"id": "Chaorc_Interception",
+"kind": "a"
+},
+"Chaorc Pyre Grill Master": {
+"id": "Chaorc_Pyre_Grill_Master",
+"kind": "a"
+},
+"Chaorc Rider Warg": {
+"id": "Chaorc_Rider_Warg",
+"kind": "a"
+},
+"Chaorc Ruin Mourner": {
+"id": "Chaorc_Ruin_Mourner",
+"kind": "a"
+},
+"Chaos Magic": {
+"id": "Chaos_Magic",
+"kind": "a"
+},
+"Chaos-Diamond, the Cracked Keeper": {
+"id": "Chaos_Diamond_the_Cracked_Keeper",
+"kind": "a"
+},
+"Charm of Balance": {
+"id": "Charm_of_Balance",
+"kind": "a"
+},
+"Charme": {
+"id": "Charme",
+"kind": "a"
+},
+"Chasing the Legend": {
+"id": "Chasing_the_Legend",
+"kind": "a"
+},
+"Chatty Town Guard": {
+"id": "Chatty_Town_Guard",
+"kind": "a"
+},
+"Cheat Chair": {
+"id": "Cheat_Chair",
+"kind": "a"
+},
+"Cheeky Monkee": {
+"id": "Cheeky_Monkee",
+"kind": "a"
+},
+"Chosen Sacrifice": {
+"id": "Chosen_Sacrifice",
+"kind": "a"
+},
+"Chuck, the Crazy Veteran": {
+"id": "Chuck_the_Crazy_Veteran",
+"kind": "a"
+},
+"Chuck, the Storyteller": {
+"id": "Chuck_the_Storyteller",
+"kind": "a"
+},
+"Classical Harpyformer": {
+"id": "Classical_Harpyformer",
+"kind": "a"
+},
+"Clausss, the No-Nonsense Cultist": {
+"id": "Clausss_the_No_Nonsense_Cultist",
+"kind": "a"
+},
+"Cleansing of the Land": {
+"id": "Cleansing_of_the_Land",
+"kind": "a"
+},
+"Clever Puppet Saras": {
+"id": "Clever_Puppet_Saras",
+"kind": "a"
+},
+"Cloak of Edge": {
+"id": "Cloak_of_Edge",
+"kind": "a"
+},
+"Cloud Pillow": {
+"id": "Cloud_Pillow",
+"kind": "a"
+},
+"Cloud in a Bottle": {
+"id": "Cloud_in_a_Bottle",
+"kind": "a"
+},
+"Cloudy Slime": {
+"id": "Cloudy_Slime",
+"kind": "a"
+},
+"Club of Gobbo": {
+"id": "Club_of_Gobbo",
+"kind": "a"
+},
+"Codumbus, the Clueless Voyager": {
+"id": "Codumbus_the_Clueless_Voyager",
+"kind": "a"
+},
+"Coffee": {
+"id": "Coffee",
+"kind": "a"
+},
+"Cold Coffin": {
+"id": "Cold_Coffin",
+"kind": "a"
+},
+"Cold-Hearted Yuki-Onna": {
+"id": "Cold_Hearted_Yuki_Onna",
+"kind": "a"
+},
+"Communication Device": {
+"id": "Communication_Device",
+"kind": "a"
+},
+"Compulsory Body Swap": {
+"id": "Compulsory_Body_Swap",
+"kind": "a"
+},
+"Controlled Attack": {
+"id": "Controlled_Attack",
+"kind": "a"
+},
+"Cool Cheese": {
+"id": "Cool_Cheese",
+"kind": "a"
+},
+"Cool Presents": {
+"id": "Cool_Presents",
+"kind": "a"
+},
+"Cool Repair": {
+"id": "Cool_Repair",
+"kind": "a"
+},
+"Cool Rescue": {
+"id": "Cool_Rescue",
+"kind": "a"
+},
+"Cool Rescuer Monia": {
+"id": "Cool_Rescuer_Monia",
+"kind": "a"
+},
+"Cool Tech Jetpack": {
+"id": "Cool_Tech_Jetpack",
+"kind": "a"
+},
+"Cooldin, King of Coolness": {
+"id": "Cooldin_King_of_Coolness",
+"kind": "a"
+},
+"Coolness Overcharge": {
+"id": "Coolness_Overcharge",
+"kind": "a"
+},
+"Core Explosion": {
+"id": "Core_Explosion",
+"kind": "a"
+},
+"Coreling": {
+"id": "Coreling",
+"kind": "a"
+},
+"Corpse Explosion": {
+"id": "Corpse_Explosion",
+"kind": "a"
+},
+"Cosmic Malfunction": {
+"id": "Cosmic_Malfunction",
+"kind": "a"
+},
+"Cosmic Manipulation": {
+"id": "Cosmic_Manipulation",
+"kind": "a"
+},
+"Cosmic Skeleton": {
+"id": "Cosmic_Skeleton",
+"kind": "a"
+},
+"Cottage at the Forest's Edge": {
+"id": "Cottage_at_the_Forests_Edge",
+"kind": "a"
+},
+"Country Harpyformer": {
+"id": "Country_Harpyformer",
+"kind": "a"
+},
+"Create Illusion": {
+"id": "Create_Illusion",
+"kind": "a"
+},
+"Creative Puppet Brammi": {
+"id": "Creative_Puppet_Brammi",
+"kind": "a"
+},
+"Creativity": {
+"id": "Creativity",
+"kind": "a"
+},
+"Creepy Villager": {
+"id": "Creepy_Villager",
+"kind": "a"
+},
+"Criminal Monkee": {
+"id": "Criminal_Monkee",
+"kind": "a"
+},
+"Crimson Skull Spider": {
+"id": "Crimson_Skull_Spider",
+"kind": "a"
+},
+"Crimson Web": {
+"id": "Crimson_Web",
+"kind": "a"
+},
+"Critical Strike": {
+"id": "Critical_Strike",
+"kind": "a"
+},
+"Crum, the Class Pet": {
+"id": "Crum_the_Class_Pet",
+"kind": "a"
+},
+"Crusader's Arm-Cannon": {
+"id": "Crusaders_Arm_Cannon",
+"kind": "a"
+},
+"Crusader's Cutlass": {
+"id": "Crusaders_Cutlass",
+"kind": "a"
+},
+"Crusader's Flintlock": {
+"id": "Crusaders_Flintlock",
+"kind": "a"
+},
+"Crusader's Hookshot": {
+"id": "Crusaders_Hookshot",
+"kind": "a"
+},
+"Crushing Defeat": {
+"id": "Crushing_Defeat",
+"kind": "a"
+},
+"Crystal Well": {
+"id": "Crystal_Well",
+"kind": "a"
+},
+"Cure": {
+"id": "Cure",
+"kind": "a"
+},
+"Curse": {
+"id": "Curse",
+"kind": "a"
+},
+"Cute Angel Molinda": {
+"id": "Cute_Angel_Molinda",
+"kind": "a"
+},
+"Cute Annoyance Mini": {
+"id": "Cute_Annoyance_Mini",
+"kind": "a"
+},
+"Cute Bird": {
+"id": "Cute_Bird",
+"kind": "a"
+},
+"Cute Bunny": {
+"id": "Cute_Bunny",
+"kind": "a"
+},
+"Cute Camera": {
+"id": "Cute_Camera",
+"kind": "a"
+},
+"Cute Cat": {
+"id": "Cute_Cat",
+"kind": "a"
+},
+"Cute Cheese": {
+"id": "Cute_Cheese",
+"kind": "a"
+},
+"Cute Conversion": {
+"id": "Cute_Conversion",
+"kind": "a"
+},
+"Cute Ditz Monami": {
+"id": "Cute_Ditz_Monami",
+"kind": "a"
+},
+"Cute Dog": {
+"id": "Cute_Dog",
+"kind": "a"
+},
+"Cute Familiar": {
+"id": "Cute_Familiar",
+"kind": "a"
+},
+"Cute Hydra": {
+"id": "Cute_Hydra",
+"kind": "a"
+},
+"Cute Meanie Melissa": {
+"id": "Cute_Meanie_Melissa",
+"kind": "a"
+},
+"Cute Nerd Magenta": {
+"id": "Cute_Nerd_Magenta",
+"kind": "a"
+},
+"Cute Phoenix": {
+"id": "Cute_Phoenix",
+"kind": "a"
+},
+"Cute Princess Mary": {
+"id": "Cute_Princess_Mary",
+"kind": "a"
+},
+"Cute Spider": {
+"id": "Cute_Spider",
+"kind": "a"
+},
+"Cute Starlet Megu": {
+"id": "Cute_Starlet_Megu",
+"kind": "a"
+},
+"Cute Wings": {
+"id": "Cute_Wings",
+"kind": "a"
+},
+"Cuteness Sensor": {
+"id": "Cuteness_Sensor",
+"kind": "a"
+},
+"Cybug ANTS": {
+"id": "Cybug_ANTS",
+"kind": "a"
+},
+"Cybug BEE": {
+"id": "Cybug_BEE",
+"kind": "a"
+},
+"Cybug CENTIPEDE": {
+"id": "Cybug_CENTIPEDE",
+"kind": "a"
+},
+"Cybug LADYBUG": {
+"id": "Cybug_LADYBUG",
+"kind": "a"
+},
+"Cybug LOCUST": {
+"id": "Cybug_LOCUST",
+"kind": "a"
+},
+"Cybug RHINOCEROS": {
+"id": "Cybug_RHINOCEROS",
+"kind": "a"
+},
+"Cybug SCARAB": {
+"id": "Cybug_SCARAB",
+"kind": "a"
+},
+"Cykyran War Counselor": {
+"id": "Cykyran_War_Counselor",
+"kind": "a"
+},
+"Dajan, Conqueror of the Treasure Cave": {
+"id": "Dajan_Conqueror_of_the_Treasure_Cave",
+"kind": "a"
+},
+"Damus, the Prophet of Apocalypse": {
+"id": "Damus_the_Prophet_of_Apocalypse",
+"kind": "a"
+},
+"Dance of the Flame Pillars": {
+"id": "Dance_of_the_Flame_Pillars",
+"kind": "a"
+},
+"Dangerous Knowledge": {
+"id": "Dangerous_Knowledge",
+"kind": "a"
+},
+"Dante, the Wanderer of Hell": {
+"id": "Dante_the_Wanderer_of_Hell",
+"kind": "a"
+},
+"Dark Deal": {
+"id": "Dark_Deal",
+"kind": "a"
+},
+"Dark Deepsea God": {
+"id": "Dark_Deepsea_God",
+"kind": "a"
+},
+"Dark Gear": {
+"id": "Dark_Gear",
+"kind": "a"
+},
+"Dark Ocean": {
+"id": "Dark_Ocean",
+"kind": "a"
+},
+"Debt-O-Tron Damage Fees": {
+"id": "Debt_O_Tron_Damage_Fees",
+"kind": "a"
+},
+"Debt-O-Tron Model Backup Duplicator": {
+"id": "Debt_O_Tron_Model_Backup_Duplicator",
+"kind": "a"
+},
+"Debt-O-Tron Model Loan Shredder": {
+"id": "Debt_O_Tron_Model_Loan_Shredder",
+"kind": "a"
+},
+"Debt-O-Tron Model Missing Parts": {
+"id": "Debt_O_Tron_Model_Missing_Parts",
+"kind": "a"
+},
+"Debt-O-Tron Model Money Printer": {
+"id": "Debt_O_Tron_Model_Money_Printer",
+"kind": "a"
+},
+"Debt-O-Tron Model Scrap Plow": {
+"id": "Debt_O_Tron_Model_Scrap_Plow",
+"kind": "a"
+},
+"Decapitating Strike": {
+"id": "Decapitating_Strike",
+"kind": "b"
+},
+"Decay Magic": {
+"id": "Decay_Magic",
+"kind": "a"
+},
+"Decisive Defeat": {
+"id": "Decisive_Defeat",
+"kind": "a"
+},
+"Deep-Drowned Waflav": {
+"id": "Deep_Drowned_Waflav",
+"kind": "a"
+},
+"Deepsea Bats": {
+"id": "Deepsea_Bats",
+"kind": "a"
+},
+"Deepsea Castle": {
+"id": "Deepsea_Castle",
+"kind": "a"
+},
+"Deepsea Encounter": {
+"id": "Deepsea_Encounter",
+"kind": "a"
+},
+"Deepsea Horror Clown": {
+"id": "Deepsea_Horror_Clown",
+"kind": "a"
+},
+"Deepsea Idol": {
+"id": "Deepsea_Idol",
+"kind": "a"
+},
+"Deepsea Jack O' Lantern": {
+"id": "Deepsea_Jack_O_Lantern",
+"kind": "a"
+},
+"Deepsea Monstrosity": {
+"id": "Deepsea_Monstrosity",
+"kind": "a"
+},
+"Deepsea Mummy": {
+"id": "Deepsea_Mummy",
+"kind": "a"
+},
+"Deepsea Pirate": {
+"id": "Deepsea_Pirate",
+"kind": "a"
+},
+"Deepsea Poltergeister": {
+"id": "Deepsea_Poltergeister",
+"kind": "a"
+},
+"Deepsea Primordium": {
+"id": "Deepsea_Primordium",
+"kind": "a"
+},
+"Deepsea Reaper": {
+"id": "Deepsea_Reaper",
+"kind": "a"
+},
+"Deepsea Siren": {
+"id": "Deepsea_Siren",
+"kind": "a"
+},
+"Deepsea Skeleton": {
+"id": "Deepsea_Skeleton",
+"kind": "a"
+},
+"Deepsea Spores": {
+"id": "Deepsea_Spores",
+"kind": "a"
+},
+"Deepsea Stein": {
+"id": "Deepsea_Stein",
+"kind": "a"
+},
+"Deepsea Succubus": {
+"id": "Deepsea_Succubus",
+"kind": "a"
+},
+"Deepsea Treasure": {
+"id": "Deepsea_Treasure",
+"kind": "a"
+},
+"Deepsea Werewolf": {
+"id": "Deepsea_Werewolf",
+"kind": "a"
+},
+"Deepsea Witch": {
+"id": "Deepsea_Witch",
+"kind": "a"
+},
+"Deepsea Zombie": {
+"id": "Deepsea_Zombie",
+"kind": "a"
+},
+"Defending the Gate": {
+"id": "Defending_the_Gate",
+"kind": "b"
+},
+"Demon's Gate": {
+"id": "Demons_Gate",
+"kind": "a"
+},
+"Destruction Magic": {
+"id": "Destruction_Magic",
+"kind": "a"
+},
+"Destructive Puppet Shishi": {
+"id": "Destructive_Puppet_Shishi",
+"kind": "a"
+},
+"Detection": {
+"id": "Detection",
+"kind": "a"
+},
+"Devlin, the Masked Butcher": {
+"id": "Devlin_the_Masked_Butcher",
+"kind": "a"
+},
+"Diamond Spider": {
+"id": "Diamond_Spider",
+"kind": "a"
+},
+"Diamond, the Bulwark of Peace": {
+"id": "Diamond_the_Bulwark_of_Peace",
+"kind": "a"
+},
+"Diamond, the Keeper of Peace": {
+"id": "Diamond_the_Keeper_of_Peace",
+"kind": "a"
+},
+"Dichotomy of Luna and Tempeste": {
+"id": "Dichotomy_of_Luna_and_Tempeste",
+"kind": "a"
+},
+"Difficulty Lever": {
+"id": "Difficulty_Lever",
+"kind": "a"
+},
+"Diplomacy": {
+"id": "Diplomacy",
+"kind": "a"
+},
+"Dirty Smuggler": {
+"id": "Dirty_Smuggler",
+"kind": "a"
+},
+"Disgruntled Forest Warden": {
+"id": "Disgruntled_Forest_Warden",
+"kind": "a"
+},
+"Disruption Ray": {
+"id": "Disruption_Ray",
+"kind": "a"
+},
+"Distracting Crystal": {
+"id": "Distracting_Crystal",
+"kind": "a"
+},
+"Dive Bomblebee": {
+"id": "Dive_Bomblebee",
+"kind": "a"
+},
+"Dive Down": {
+"id": "Dive_Down",
+"kind": "a"
+},
+"Diver Helmet": {
+"id": "Diver_Helmet",
+"kind": "a"
+},
+"Divine Awakening": {
+"id": "Divine_Awakening",
+"kind": "a"
+},
+"Divine Gift of Balance": {
+"id": "Divine_Gift_of_Balance",
+"kind": "a"
+},
+"Divine Gift of Biseria": {
+"id": "Divine_Gift_of_Biseria",
+"kind": "a"
+},
+"Divine Gift of Coolness": {
+"id": "Divine_Gift_of_Coolness",
+"kind": "a"
+},
+"Divine Gift of Creation": {
+"id": "Divine_Gift_of_Creation",
+"kind": "a"
+},
+"Divine Gift of Death": {
+"id": "Divine_Gift_of_Death",
+"kind": "a"
+},
+"Divine Gift of Edge": {
+"id": "Divine_Gift_of_Edge",
+"kind": "a"
+},
+"Divine Gift of Equality": {
+"id": "Divine_Gift_of_Equality",
+"kind": "a"
+},
+"Divine Gift of Fire": {
+"id": "Divine_Gift_of_Fire",
+"kind": "a"
+},
+"Divine Gift of Forgetting": {
+"id": "Divine_Gift_of_Forgetting",
+"kind": "a"
+},
+"Divine Gift of Magic": {
+"id": "Divine_Gift_of_Magic",
+"kind": "a"
+},
+"Divine Gift of Rain": {
+"id": "Divine_Gift_of_Rain",
+"kind": "a"
+},
+"Divine Gift of Sacrifice": {
+"id": "Divine_Gift_of_Sacrifice",
+"kind": "a"
+},
+"Divine Gift of Skill": {
+"id": "Divine_Gift_of_Skill",
+"kind": "a"
+},
+"Divine Gift of The Light": {
+"id": "Divine_Gift_of_The_Light",
+"kind": "a"
+},
+"Divine Gift of Time": {
+"id": "Divine_Gift_of_Time",
+"kind": "a"
+},
+"Divine Gift of the Deepsea": {
+"id": "Divine_Gift_of_the_Deepsea",
+"kind": "a"
+},
+"Divine Gift of the Guardian": {
+"id": "Divine_Gift_of_the_Guardian",
+"kind": "a"
+},
+"Divine Punishment": {
+"id": "Divine_Punishment",
+"kind": "a"
+},
+"Divine Zeal": {
+"id": "Divine_Zeal",
+"kind": "a"
+},
+"Divinity": {
+"id": "Divinity",
+"kind": "a"
+},
+"Doctor Fester": {
+"id": "Doctor_Fester",
+"kind": "a"
+},
+"Don Quisto, the Gold Seeker": {
+"id": "Don_Quisto_the_Gold_Seeker",
+"kind": "a"
+},
+"Doom Clock": {
+"id": "Doom_Clock",
+"kind": "a"
+},
+"Doom Prophecy": {
+"id": "Doom_Prophecy",
+"kind": "a"
+},
+"Doomed Town Guard": {
+"id": "Doomed_Town_Guard",
+"kind": "a"
+},
+"Dragolfin": {
+"id": "Dragolfin",
+"kind": "a"
+},
+"Draw": {
+"id": "Draw",
+"kind": "a"
+},
+"Dream Dust": {
+"id": "Dream_Dust",
+"kind": "a"
+},
+"Dream World Portal": {
+"id": "Dream_World_Portal",
+"kind": "a"
+},
+"Dream World Switcheroo": {
+"id": "Dream_World_Switcheroo",
+"kind": "a"
+},
+"Drill Sergeant": {
+"id": "Drill_Sergeant",
+"kind": "b"
+},
+"Duigno, the Flaming Phoenix": {
+"id": "Duigno_the_Flaming_Phoenix",
+"kind": "a"
+},
+"Earth-Shattering Hammer, Relic of Deri": {
+"id": "Earth_Shattering_Hammer_Relic_of_Deri",
+"kind": "a"
+},
+"Elana, the Rocky Rebel": {
+"id": "Elana_the_Rocky_Rebel",
+"kind": "a"
+},
+"Elixir of Cold": {
+"id": "Elixir_of_Cold",
+"kind": "a"
+},
+"Elixir of Immortality": {
+"id": "Elixir_of_Immortality",
+"kind": "a"
+},
+"Elixir of Mana": {
+"id": "Elixir_of_Mana",
+"kind": "a"
+},
+"Elixir of Quickness": {
+"id": "Elixir_of_Quickness",
+"kind": "a"
+},
+"Elixir of Recovery": {
+"id": "Elixir_of_Recovery",
+"kind": "a"
+},
+"Elixir of Strength": {
+"id": "Elixir_of_Strength",
+"kind": "a"
+},
+"Ellie, the Class President": {
+"id": "Ellie_the_Class_President",
+"kind": "a"
+},
+"Elusive Hind": {
+"id": "Elusive_Hind",
+"kind": "a"
+},
+"Elven Archer": {
+"id": "Elven_Archer",
+"kind": "a"
+},
+"Elven Druid": {
+"id": "Elven_Druid",
+"kind": "a"
+},
+"Elven Forager": {
+"id": "Elven_Forager",
+"kind": "a"
+},
+"Elven Leader": {
+"id": "Elven_Leader",
+"kind": "a"
+},
+"Elven Rider": {
+"id": "Elven_Rider",
+"kind": "a"
+},
+"Emergency Spell Armor": {
+"id": "Emergency_Spell_Armor",
+"kind": "b"
+},
+"Empty Armor": {
+"id": "Empty_Armor",
+"kind": "b"
+},
+"End of the Future": {
+"id": "End_of_the_Future",
+"kind": "a"
+},
+"Energy Aura": {
+"id": "Energy_Aura",
+"kind": "a"
+},
+"Energy Drain": {
+"id": "Energy_Drain",
+"kind": "a"
+},
+"Enhanced Guard Dog": {
+"id": "Enhanced_Guard_Dog",
+"kind": "b"
+},
+"Enigma, the Seller of Secrets": {
+"id": "Enigma_the_Seller_of_Secrets",
+"kind": "a"
+},
+"Eraser Beam": {
+"id": "Eraser_Beam",
+"kind": "a"
+},
+"Escape": {
+"id": "Escape",
+"kind": "b"
+},
+"Ethan, the Prodigy": {
+"id": "Ethan_the_Prodigy",
+"kind": "a"
+},
+"Excavator Bucket": {
+"id": "Excavator_Bucket",
+"kind": "a"
+},
+"Experimental Potion": {
+"id": "Experimental_Potion",
+"kind": "a"
+},
+"Exploding Skull": {
+"id": "Exploding_Skull",
+"kind": "a"
+},
+"Explosion": {
+"id": "Explosion",
+"kind": "a"
+},
+"Explosive Drone": {
+"id": "Explosive_Drone",
+"kind": "a"
+},
+"Explosivo's Sword": {
+"id": "Explosivos_Sword",
+"kind": "a"
+},
+"Fairy Queen Crestina, the Creation Fairy": {
+"id": "Fairy_Queen_Crestina_the_Creation_Fairy",
+"kind": "a"
+},
+"Ferocious Jaguar Warrior": {
+"id": "Ferocious_Jaguar_Warrior",
+"kind": "a"
+},
+"Ferocious Tiger Kick": {
+"id": "Ferocious_Tiger_Kick",
+"kind": "a"
+},
+"Festive Werz": {
+"id": "Festive_Werz",
+"kind": "a"
+},
+"Fiedel, the Mercenary Mage": {
+"id": "Fiedel_the_Mercenary_Mage",
+"kind": "a"
+},
+"Field Cannon": {
+"id": "Field_Cannon",
+"kind": "a"
+},
+"Field Standard": {
+"id": "Field_Standard",
+"kind": "a"
+},
+"Fiery Slime": {
+"id": "Fiery_Slime",
+"kind": "a"
+},
+"Fighting": {
+"id": "Fighting",
+"kind": "a"
+},
+"Fiona, the Empty Vessel of a Forgotten Sorceress": {
+"id": "Fiona_the_Empty_Vessel_of_a_Forgotten_Sorceress",
+"kind": "a"
+},
+"Fiona, the Princess of Blackport": {
+"id": "Fiona_the_Princess_of_Blackport",
+"kind": "a"
+},
+"Fire Bolts": {
+"id": "Fire_Bolts",
+"kind": "a"
+},
+"Fire Bomb": {
+"id": "Fire_Bomb",
+"kind": "b"
+},
+"Fireball": {
+"id": "Fireball",
+"kind": "a"
+},
+"Fireshield": {
+"id": "Fireshield",
+"kind": "a"
+},
+"Firewall": {
+"id": "Firewall",
+"kind": "a"
+},
+"Flame Arrow": {
+"id": "Flame_Arrow",
+"kind": "a"
+},
+"Flame Avalanche": {
+"id": "Flame_Avalanche",
+"kind": "a"
+},
+"Flamebathed Waflav": {
+"id": "Flamebathed_Waflav",
+"kind": "a"
+},
+"Flaming Dragonegg": {
+"id": "Flaming_Dragonegg",
+"kind": "a"
+},
+"Flashbang": {
+"id": "Flashbang",
+"kind": "a"
+},
+"Flooding": {
+"id": "Flooding",
+"kind": "a"
+},
+"Flying Island in the Sky": {
+"id": "Flying_Island_in_the_Sky",
+"kind": "a"
+},
+"Forbidden Curse of Aging": {
+"id": "Forbidden_Curse_of_Aging",
+"kind": "a"
+},
+"Forbidden Grimoire of a Forgotten Sorceress": {
+"id": "Forbidden_Grimoire_of_a_Forgotten_Sorceress",
+"kind": "a"
+},
+"Forbidden Zone": {
+"id": "Forbidden_Zone",
+"kind": "a"
+},
+"Forceful Revival": {
+"id": "Forceful_Revival",
+"kind": "a"
+},
+"Foresta, the Guard": {
+"id": "Foresta_the_Guard",
+"kind": "a"
+},
+"Freshya, Beauty of Coolness": {
+"id": "Freshya_Beauty_of_Coolness",
+"kind": "a"
+},
+"Friedhelm, the Misled Avenger": {
+"id": "Friedhelm_the_Misled_Avenger",
+"kind": "a"
+},
+"Friendship": {
+"id": "Friendship",
+"kind": "a"
+},
+"Frolake": {
+"id": "Frolake",
+"kind": "a"
+},
+"Frost Rune": {
+"id": "Frost_Rune",
+"kind": "a"
+},
+"Fun-Fun Circus Clown": {
+"id": "Fun_Fun_Circus_Clown",
+"kind": "a"
+},
+"Fun-Fun Circus Director": {
+"id": "Fun_Fun_Circus_Director",
+"kind": "a"
+},
+"Fun-Fun Circus Elephant": {
+"id": "Fun_Fun_Circus_Elephant",
+"kind": "a"
+},
+"Fun-Fun Circus Strongman": {
+"id": "Fun_Fun_Circus_Strongman",
+"kind": "a"
+},
+"Furious Anger": {
+"id": "Furious_Anger",
+"kind": "b"
+},
+"Future Tech Barrage": {
+"id": "Future_Tech_Barrage",
+"kind": "a"
+},
+"Future Tech Battery": {
+"id": "Future_Tech_Battery",
+"kind": "a"
+},
+"Future Tech Bazooka": {
+"id": "Future_Tech_Bazooka",
+"kind": "a"
+},
+"Future Tech Bomb": {
+"id": "Future_Tech_Bomb",
+"kind": "a"
+},
+"Future Tech Control Device": {
+"id": "Future_Tech_Control_Device",
+"kind": "a"
+},
+"Future Tech Copy Device": {
+"id": "Future_Tech_Copy_Device",
+"kind": "a"
+},
+"Future Tech Database": {
+"id": "Future_Tech_Database",
+"kind": "a"
+},
+"Future Tech Doomsday Bomb": {
+"id": "Future_Tech_Doomsday_Bomb",
+"kind": "a"
+},
+"Future Tech Doping": {
+"id": "Future_Tech_Doping",
+"kind": "a"
+},
+"Future Tech Drone": {
+"id": "Future_Tech_Drone",
+"kind": "a"
+},
+"Future Tech Escape Device": {
+"id": "Future_Tech_Escape_Device",
+"kind": "a"
+},
+"Future Tech Fists": {
+"id": "Future_Tech_Fists",
+"kind": "a"
+},
+"Future Tech Gear": {
+"id": "Future_Tech_Gear",
+"kind": "a"
+},
+"Future Tech Gun": {
+"id": "Future_Tech_Gun",
+"kind": "a"
+},
+"Future Tech Gunslinger Riffel": {
+"id": "Future_Tech_Gunslinger_Riffel",
+"kind": "a"
+},
+"Future Tech Jetpack": {
+"id": "Future_Tech_Jetpack",
+"kind": "a"
+},
+"Future Tech Lamp": {
+"id": "Future_Tech_Lamp",
+"kind": "a"
+},
+"Future Tech Laser Cannon": {
+"id": "Future_Tech_Laser_Cannon",
+"kind": "a"
+},
+"Future Tech Magic Modifier": {
+"id": "Future_Tech_Magic_Modifier",
+"kind": "a"
+},
+"Future Tech Mech": {
+"id": "Future_Tech_Mech",
+"kind": "a"
+},
+"Future Tech Organnon": {
+"id": "Future_Tech_Organnon",
+"kind": "a"
+},
+"Future Tech Potion Launcher": {
+"id": "Future_Tech_Potion_Launcher",
+"kind": "a"
+},
+"Future Tech Prototypes": {
+"id": "Future_Tech_Prototypes",
+"kind": "a"
+},
+"Future Tech Weathercock": {
+"id": "Future_Tech_Weathercock",
+"kind": "a"
+},
+"Gangster Angel": {
+"id": "Gangster_Angel",
+"kind": "a"
+},
+"Garius, the Great Reformer": {
+"id": "Garius_the_Great_Reformer",
+"kind": "a"
+},
+"Gate to the Armory": {
+"id": "Gate_to_the_Armory",
+"kind": "a"
+},
+"Gatherer from the Cosmic Depths": {
+"id": "Gatherer_from_the_Cosmic_Depths",
+"kind": "a"
+},
+"Gathering Storm": {
+"id": "Gathering_Storm",
+"kind": "b"
+},
+"Gerrymander": {
+"id": "Gerrymander",
+"kind": "a"
+},
+"Ghazma, the Worm Feeder": {
+"id": "Ghazma_the_Worm_Feeder",
+"kind": "a"
+},
+"Ghoul Guard": {
+"id": "Ghoul_Guard",
+"kind": "a"
+},
+"Ghuanjun, the Undead Martial Artist": {
+"id": "Ghuanjun_the_Undead_Martial_Artist",
+"kind": "a"
+},
+"Giant Exploding Skull": {
+"id": "Giant_Exploding_Skull",
+"kind": "a"
+},
+"Giga Steroids": {
+"id": "Giga_Steroids",
+"kind": "a"
+},
+"Gigantisaur Ankylos": {
+"id": "Gigantisaur_Ankylos",
+"kind": "a"
+},
+"Gigantisaur Brachion": {
+"id": "Gigantisaur_Brachion",
+"kind": "a"
+},
+"Gigantisaur Chimera": {
+"id": "Gigantisaur_Chimera",
+"kind": "a"
+},
+"Gigantisaur King Trex": {
+"id": "Gigantisaur_King_Trex",
+"kind": "a"
+},
+"Gigantisaur Pteranos": {
+"id": "Gigantisaur_Pteranos",
+"kind": "a"
+},
+"Gigantisaur Raptoren": {
+"id": "Gigantisaur_Raptoren",
+"kind": "a"
+},
+"Gigantisaur Skull": {
+"id": "Gigantisaur_Skull",
+"kind": "a"
+},
+"Gigantisaur Spinor": {
+"id": "Gigantisaur_Spinor",
+"kind": "a"
+},
+"Gigantisaur Stegon": {
+"id": "Gigantisaur_Stegon",
+"kind": "a"
+},
+"Gigantisaur Stomp": {
+"id": "Gigantisaur_Stomp",
+"kind": "a"
+},
+"Gigantisaur Triceras": {
+"id": "Gigantisaur_Triceras",
+"kind": "a"
+},
+"Glass Sword": {
+"id": "Glass_Sword",
+"kind": "a"
+},
+"Glass of Marbles": {
+"id": "Glass_of_Marbles",
+"kind": "a"
+},
+"Glimpse of the Future": {
+"id": "Glimpse_of_the_Future",
+"kind": "a"
+},
+"Glorious Rebirth": {
+"id": "Glorious_Rebirth",
+"kind": "a"
+},
+"Gobbo, Chief of Goblin": {
+"id": "Gobbo_Chief_of_Goblin",
+"kind": "a"
+},
+"Goff, the Burnbringer": {
+"id": "Goff_the_Burnbringer",
+"kind": "a"
+},
+"Gold Trap": {
+"id": "Gold_Trap",
+"kind": "a"
+},
+"Golden Ankh": {
+"id": "Golden_Ankh",
+"kind": "a"
+},
+"Golden Apple": {
+"id": "Golden_Apple",
+"kind": "b"
+},
+"Golden Arrow": {
+"id": "Golden_Arrow",
+"kind": "b"
+},
+"Golden Bananas": {
+"id": "Golden_Bananas",
+"kind": "a"
+},
+"Golden Exploding Skull": {
+"id": "Golden_Exploding_Skull",
+"kind": "a"
+},
+"Golden Ladybug": {
+"id": "Golden_Ladybug",
+"kind": "a"
+},
+"Golden Vermin": {
+"id": "Golden_Vermin",
+"kind": "a"
+},
+"Golden Wings": {
+"id": "Golden_Wings",
+"kind": "a"
+},
+"Goldify": {
+"id": "Goldify",
+"kind": "a"
+},
+"Golem Smash": {
+"id": "Golem_Smash",
+"kind": "a"
+},
+"Gon, the Frostbringer": {
+"id": "Gon_the_Frostbringer",
+"kind": "a"
+},
+"Gorinthian War Counselor": {
+"id": "Gorinthian_War_Counselor",
+"kind": "a"
+},
+"Grand Inquisitor Karian": {
+"id": "Grand_Inquisitor_Karian",
+"kind": "a"
+},
+"Grasp the Future": {
+"id": "Grasp_the_Future",
+"kind": "a"
+},
+"Grave Worm": {
+"id": "Grave_Worm",
+"kind": "a"
+},
+"Gravedigger": {
+"id": "Gravedigger",
+"kind": "b"
+},
+"Gravedigger Slap": {
+"id": "Gravedigger_Slap",
+"kind": "a"
+},
+"Gravedigger's Shovel": {
+"id": "Gravediggers_Shovel",
+"kind": "a"
+},
+"Graveyard Gathering": {
+"id": "Graveyard_Gathering",
+"kind": "a"
+},
+"Graveyard of Limited Power": {
+"id": "Graveyard_of_Limited_Power",
+"kind": "a"
+},
+"Great Detective Doq": {
+"id": "Great_Detective_Doq",
+"kind": "a"
+},
+"Great Offensive": {
+"id": "Great_Offensive",
+"kind": "a"
+},
+"Greatmaw Remora": {
+"id": "Greatmaw_Remora",
+"kind": "a"
+},
+"Greatmaw Shark": {
+"id": "Greatmaw_Shark",
+"kind": "a"
+},
+"Greatmaw Siren": {
+"id": "Greatmaw_Siren",
+"kind": "a"
+},
+"Green Dragoneer": {
+"id": "Green_Dragoneer",
+"kind": "a"
+},
+"Grinning Cat": {
+"id": "Grinning_Cat",
+"kind": "a"
+},
+"Grisgar, Emissary of the Demon Lord": {
+"id": "Grisgar_Emissary_of_the_Demon_Lord",
+"kind": "a"
+},
+"Grunge Harpyformer": {
+"id": "Grunge_Harpyformer",
+"kind": "a"
+},
+"Guard Change": {
+"id": "Guard_Change",
+"kind": "b"
+},
+"Guard Duty": {
+"id": "Guard_Duty",
+"kind": "a"
+},
+"Guardian Angel": {
+"id": "Guardian_Angel",
+"kind": "a"
+},
+"Guardian Beast Gou": {
+"id": "Guardian_Beast_Gou",
+"kind": "a"
+},
+"Guardian Beast Hou": {
+"id": "Guardian_Beast_Hou",
+"kind": "a"
+},
+"Guardian Beast Hu": {
+"id": "Guardian_Beast_Hu",
+"kind": "a"
+},
+"Guardian Beast Ji": {
+"id": "Guardian_Beast_Ji",
+"kind": "a"
+},
+"Guardian Beast Long": {
+"id": "Guardian_Beast_Long",
+"kind": "a"
+},
+"Guardian Beast Ma": {
+"id": "Guardian_Beast_Ma",
+"kind": "a"
+},
+"Guardian Beast Niu": {
+"id": "Guardian_Beast_Niu",
+"kind": "a"
+},
+"Guardian Beast She": {
+"id": "Guardian_Beast_She",
+"kind": "a"
+},
+"Guardian Beast Shu": {
+"id": "Guardian_Beast_Shu",
+"kind": "a"
+},
+"Guardian Beast Tu": {
+"id": "Guardian_Beast_Tu",
+"kind": "a"
+},
+"Guardian Beast Yang": {
+"id": "Guardian_Beast_Yang",
+"kind": "a"
+},
+"Guardian Beast Zhu": {
+"id": "Guardian_Beast_Zhu",
+"kind": "a"
+},
+"Guardian of Teocuilatl": {
+"id": "Guardian_of_Teocuilatl",
+"kind": "a"
+},
+"Guardian's Appearance": {
+"id": "Guardians_Appearance",
+"kind": "a"
+},
+"Güldefaber, the King of Dwarfs": {
+"id": "G_ldefaber_the_King_of_Dwarfs",
+"kind": "a"
+},
+"Hammer Skeleton": {
+"id": "Hammer_Skeleton",
+"kind": "a"
+},
+"Hammer Throw": {
+"id": "Hammer_Throw",
+"kind": "b"
+},
+"Hand of Death": {
+"id": "Hand_of_Death",
+"kind": "a"
+},
+"Hardy Slime": {
+"id": "Hardy_Slime",
+"kind": "a"
+},
+"Haressassin": {
+"id": "Haressassin",
+"kind": "a"
+},
+"Harpthenean War Counselor": {
+"id": "Harpthenean_War_Counselor",
+"kind": "a"
+},
+"Harpyformer Choir": {
+"id": "Harpyformer_Choir",
+"kind": "a"
+},
+"Haste": {
+"id": "Haste",
+"kind": "a"
+},
+"Hat of Madness": {
+"id": "Hat_of_Madness",
+"kind": "a"
+},
+"Hatusbal, the Leader of Tusca": {
+"id": "Hatusbal_the_Leader_of_Tusca",
+"kind": "a"
+},
+"Heal": {
+"id": "Heal",
+"kind": "a"
+},
+"Healing Melody": {
+"id": "Healing_Melody",
+"kind": "a"
+},
+"Healing Potion": {
+"id": "Healing_Potion",
+"kind": "a"
+},
+"Heart of Cards": {
+"id": "Heart_of_Cards",
+"kind": "a"
+},
+"Heart of Ice": {
+"id": "Heart_of_Ice",
+"kind": "a"
+},
+"Heart of the Mountain": {
+"id": "Heart_of_the_Mountain",
+"kind": "a"
+},
+"Heart-Shaped Bow, the Final Proof of Cuteness": {
+"id": "Heart_Shaped_Bow_the_Final_Proof_of_Cuteness",
+"kind": "a"
+},
+"Heat Wave": {
+"id": "Heat_Wave",
+"kind": "a"
+},
+"Heavy Hit": {
+"id": "Heavy_Hit",
+"kind": "a"
+},
+"Hel, the Bound Specter": {
+"id": "Hel_the_Bound_Specter",
+"kind": "a"
+},
+"Hell Fox": {
+"id": "Hell_Fox",
+"kind": "a"
+},
+"Heragas, the Monster Slayer": {
+"id": "Heragas_the_Monster_Slayer",
+"kind": "a"
+},
+"Herbithorn Demon": {
+"id": "Herbithorn_Demon",
+"kind": "a"
+},
+"Hipdall, Protector of Coolness": {
+"id": "Hipdall_Protector_of_Coolness",
+"kind": "a"
+},
+"Hive's Crown": {
+"id": "Hives_Crown",
+"kind": "a"
+},
+"Hole in the Sky": {
+"id": "Hole_in_the_Sky",
+"kind": "a"
+},
+"Holy Cheese": {
+"id": "Holy_Cheese",
+"kind": "a"
+},
+"Holy Selection": {
+"id": "Holy_Selection",
+"kind": "a"
+},
+"Homerun!": {
+"id": "Homerun",
+"kind": "a"
+},
+"Horn in a Bottle": {
+"id": "Horn_in_a_Bottle",
+"kind": "a"
+},
+"Horned Demon": {
+"id": "Horned_Demon",
+"kind": "a"
+},
+"Howling in the Night": {
+"id": "Howling_in_the_Night",
+"kind": "a"
+},
+"Hunting": {
+"id": "Hunting",
+"kind": "a"
+},
+"Hydra Blood Arrow": {
+"id": "Hydra_Blood_Arrow",
+"kind": "a"
+},
+"Hydrogen Demon": {
+"id": "Hydrogen_Demon",
+"kind": "a"
+},
+"Hymn of Rebirth": {
+"id": "Hymn_of_Rebirth",
+"kind": "a"
+},
+"Ice Sculpture Garden": {
+"id": "Ice_Sculpture_Garden",
+"kind": "a"
+},
+"Iceage": {
+"id": "Iceage",
+"kind": "a"
+},
+"Icebolt": {
+"id": "Icebolt",
+"kind": "a"
+},
+"Icy Dragonegg": {
+"id": "Icy_Dragonegg",
+"kind": "a"
+},
+"Icy Grave": {
+"id": "Icy_Grave",
+"kind": "a"
+},
+"Icy Slime": {
+"id": "Icy_Slime",
+"kind": "a"
+},
+"Ida, the Adept of Destruction": {
+"id": "Ida_the_Adept_of_Destruction",
+"kind": "a"
+},
+"Idej Blade - Gensui": {
+"id": "Idej_Blade_Gensui",
+"kind": "a"
+},
+"Idej Blade - Hakai": {
+"id": "Idej_Blade_Hakai",
+"kind": "a"
+},
+"Idej Blade - Manabi": {
+"id": "Idej_Blade_Manabi",
+"kind": "a"
+},
+"Idej Blade - Naosu": {
+"id": "Idej_Blade_Naosu",
+"kind": "a"
+},
+"Idej Lord Daiyo": {
+"id": "Idej_Lord_Daiyo",
+"kind": "a"
+},
+"Idej Lord Nobunakin": {
+"id": "Idej_Lord_Nobunakin",
+"kind": "a"
+},
+"Idej Lord Shoguwana": {
+"id": "Idej_Lord_Shoguwana",
+"kind": "a"
+},
+"Idej Lord Todugawin": {
+"id": "Idej_Lord_Todugawin",
+"kind": "a"
+},
+"Idej Projection": {
+"id": "Idej_Projection",
+"kind": "a"
+},
+"Idej Projector": {
+"id": "Idej_Projector",
+"kind": "a"
+},
+"Idej Sword - Kogarasu": {
+"id": "Idej_Sword_Kogarasu",
+"kind": "a"
+},
+"Idej Sword - Kunagi": {
+"id": "Idej_Sword_Kunagi",
+"kind": "a"
+},
+"Idej Sword - Muras": {
+"id": "Idej_Sword_Muras",
+"kind": "a"
+},
+"Idej Sword - Onima": {
+"id": "Idej_Sword_Onima",
+"kind": "a"
+},
+"Idol of Crestina": {
+"id": "Idol_of_Crestina",
+"kind": "a"
+},
+"Ifrit": {
+"id": "Ifrit",
+"kind": "a"
+},
+"Inconspicuous Lawn Gnome": {
+"id": "Inconspicuous_Lawn_Gnome",
+"kind": "a"
+},
+"Infected Greatmaw": {
+"id": "Infected_Greatmaw",
+"kind": "a"
+},
+"Infected Squirrel": {
+"id": "Infected_Squirrel",
+"kind": "a"
+},
+"Infernous Demon": {
+"id": "Infernous_Demon",
+"kind": "a"
+},
+"Infiltration": {
+"id": "Infiltration",
+"kind": "b"
+},
+"Infinitely Reproducing Slime": {
+"id": "Infinitely_Reproducing_Slime",
+"kind": "a"
+},
+"Informant": {
+"id": "Informant",
+"kind": "a"
+},
+"Ingo, Investor of Evil": {
+"id": "Ingo_Investor_of_Evil",
+"kind": "a"
+},
+"Initiation Ritual": {
+"id": "Initiation_Ritual",
+"kind": "a"
+},
+"Instant Cryo Stasis": {
+"id": "Instant_Cryo_Stasis",
+"kind": "a"
+},
+"Interference": {
+"id": "Interference",
+"kind": "a"
+},
+"Intrude": {
+"id": "Intrude",
+"kind": "a"
+},
+"Invader Token": {
+"id": "Invader_Token",
+"kind": "a"
+},
+"Invader from the Cosmic Depths": {
+"id": "Invader_from_the_Cosmic_Depths",
+"kind": "a"
+},
+"Inventing": {
+"id": "Inventing",
+"kind": "a"
+},
+"Invisibility": {
+"id": "Invisibility",
+"kind": "a"
+},
+"Invisibility Cloak": {
+"id": "Invisibility_Cloak",
+"kind": "b"
+},
+"Iterative Testing": {
+"id": "Iterative_Testing",
+"kind": "a"
+},
+"Javelin Throw": {
+"id": "Javelin_Throw",
+"kind": "a"
+},
+"Jean, the Pillaging Knight": {
+"id": "Jean_the_Pillaging_Knight",
+"kind": "a"
+},
+"Jenny, the Class Fairy": {
+"id": "Jenny_the_Class_Fairy",
+"kind": "a"
+},
+"Johanna, Crusader of Light": {
+"id": "Johanna_Crusader_of_Light",
+"kind": "a"
+},
+"Juice": {
+"id": "Juice",
+"kind": "a"
+},
+"Jump in the River": {
+"id": "Jump_in_the_River",
+"kind": "a"
+},
+"Jumper Spider": {
+"id": "Jumper_Spider",
+"kind": "a"
+},
+"Jumpscare": {
+"id": "Jumpscare",
+"kind": "a"
+},
+"Junshi, the Tactical Genius": {
+"id": "Junshi_the_Tactical_Genius",
+"kind": "a"
+},
+"Kappa Sword Slash": {
+"id": "Kappa_Sword_Slash",
+"kind": "a"
+},
+"Kasperov, the King of Kings [B]": {
+"id": "Kasperov_the_King_of_Kings",
+"kind": "a"
+},
+"Kassaran, Seer of Everything": {
+"id": "Kassaran_Seer_of_Everything",
+"kind": "a"
+},
+"Kazena, the Storming Rebel": {
+"id": "Kazena_the_Storming_Rebel",
+"kind": "a"
+},
+"Kent, the Indebted Apprentice": {
+"id": "Kent_the_Indebted_Apprentice",
+"kind": "a"
+},
+"Key, the Cursed Thief": {
+"id": "Key_the_Cursed_Thief",
+"kind": "a"
+},
+"Kirin Firebreath": {
+"id": "Kirin_Firebreath",
+"kind": "a"
+},
+"Kit, the Shark Researcher": {
+"id": "Kit_the_Shark_Researcher",
+"kind": "a"
+},
+"Kitsune Transformation": {
+"id": "Kitsune_Transformation",
+"kind": "a"
+},
+"Klaus, the Cult Leader": {
+"id": "Klaus_the_Cult_Leader",
+"kind": "a"
+},
+"Knife Throw": {
+"id": "Knife_Throw",
+"kind": "a"
+},
+"Knight of Kings [B]": {
+"id": "Knight_of_Kings",
+"kind": "a"
+},
+"Kohta, Master of Super-Killing": {
+"id": "Kohta_Master_of_Super_Killing",
+"kind": "a"
+},
+"Kohta, the Silent Observer": {
+"id": "Kohta_the_Silent_Observer",
+"kind": "a"
+},
+"Koperniko, the Stargazer": {
+"id": "Koperniko_the_Stargazer",
+"kind": "a"
+},
+"Krates, the Smartass": {
+"id": "Krates_the_Smartass",
+"kind": "a"
+},
+"Kyli, the Deceptive Sapling": {
+"id": "Kyli_the_Deceptive_Sapling",
+"kind": "a"
+},
+"Ladder to the Sky": {
+"id": "Ladder_to_the_Sky",
+"kind": "a"
+},
+"Land Sharks": {
+"id": "Land_Sharks",
+"kind": "a"
+},
+"Laser Volley": {
+"id": "Laser_Volley",
+"kind": "a"
+},
+"Last Resort": {
+"id": "Last_Resort",
+"kind": "a"
+},
+"Layn, Defender of Deri": {
+"id": "Layn_Defender_of_Deri",
+"kind": "a"
+},
+"Layn, Master of Deri's Relic": {
+"id": "Layn_Master_of_Deris_Relic",
+"kind": "a"
+},
+"Leadership": {
+"id": "Leadership",
+"kind": "a"
+},
+"Learning": {
+"id": "Learning",
+"kind": "a"
+},
+"Legendary Explorer Dajan": {
+"id": "Legendary_Explorer_Dajan",
+"kind": "a"
+},
+"Legendary Sword of a Barbarian King": {
+"id": "Legendary_Sword_of_a_Barbarian_King",
+"kind": "b"
+},
+"Lesson in the Arts": {
+"id": "Lesson_in_the_Arts",
+"kind": "a"
+},
+"Lethe, the Forgetful Fixer": {
+"id": "Lethe_the_Forgetful_Fixer",
+"kind": "a"
+},
+"Letter of Misinformations": {
+"id": "Letter_of_Misinformations",
+"kind": "b"
+},
+"Liberation": {
+"id": "Liberation",
+"kind": "a"
+},
+"Life Serum": {
+"id": "Life_Serum",
+"kind": "a"
+},
+"Life-Searcher from the Cosmic Depths": {
+"id": "Life_Searcher_from_the_Cosmic_Depths",
+"kind": "a"
+},
+"Lifeforce Howitzer": {
+"id": "Lifeforce_Howitzer",
+"kind": "a"
+},
+"Light Ball": {
+"id": "Light_Ball",
+"kind": "a"
+},
+"Lilly, the Charming Infiltrator": {
+"id": "Lilly_the_Charming_Infiltrator",
+"kind": "a"
+},
+"Living Illusion": {
+"id": "Living_Illusion",
+"kind": "a"
+},
+"Lizbeth, the Reaper of the Light": {
+"id": "Lizbeth_the_Reaper_of_the_Light",
+"kind": "a"
+},
+"Local Idol": {
+"id": "Local_Idol",
+"kind": "a"
+},
+"Locke, the Unseen Saboteur": {
+"id": "Locke_the_Unseen_Saboteur",
+"kind": "a"
+},
+"Logan, the Investment Monkee": {
+"id": "Logan_the_Investment_Monkee",
+"kind": "a"
+},
+"Lolek, Mender of the Shattered Trident": {
+"id": "Lolek_Mender_of_the_Shattered_Trident",
+"kind": "a"
+},
+"Lolek, the Shard Knight": {
+"id": "Lolek_the_Shard_Knight",
+"kind": "a"
+},
+"Lolki, Trickstar of Coolness": {
+"id": "Lolki_Trickstar_of_Coolness",
+"kind": "a"
+},
+"Lone Survivor": {
+"id": "Lone_Survivor",
+"kind": "a"
+},
+"Looming Threat": {
+"id": "Looming_Threat",
+"kind": "a"
+},
+"Loot the Leftovers": {
+"id": "Loot_the_Leftovers",
+"kind": "a"
+},
+"Lord Mithuru, the Rotten Mastermind": {
+"id": "Lord_Mithuru_the_Rotten_Mastermind",
+"kind": "a"
+},
+"Love Shot": {
+"id": "Love_Shot",
+"kind": "a"
+},
+"Lovely Teddy": {
+"id": "Lovely_Teddy",
+"kind": "a"
+},
+"Loving Puppet Pavi": {
+"id": "Loving_Puppet_Pavi",
+"kind": "a"
+},
+"Loyal Beagle": {
+"id": "Loyal_Beagle",
+"kind": "a"
+},
+"Loyal Bone Dog": {
+"id": "Loyal_Bone_Dog",
+"kind": "a"
+},
+"Loyal Hountriever": {
+"id": "Loyal_Hountriever",
+"kind": "a"
+},
+"Loyal Labradoodle": {
+"id": "Loyal_Labradoodle",
+"kind": "a"
+},
+"Loyal Pinpom": {
+"id": "Loyal_Pinpom",
+"kind": "a"
+},
+"Loyal Rottweiler": {
+"id": "Loyal_Rottweiler",
+"kind": "a"
+},
+"Loyal Shepherd": {
+"id": "Loyal_Shepherd",
+"kind": "a"
+},
+"Loyal Terrier": {
+"id": "Loyal_Terrier",
+"kind": "a"
+},
+"Luck": {
+"id": "Luck",
+"kind": "a"
+},
+"Lucky Puppet Laki": {
+"id": "Lucky_Puppet_Laki",
+"kind": "a"
+},
+"Luna Kiai": {
+"id": "Luna_Kiai",
+"kind": "a"
+},
+"Luna Pele, the Flame Dancer": {
+"id": "Luna_Pele_the_Flame_Dancer",
+"kind": "a"
+},
+"Luna, the Flame Fairy": {
+"id": "Luna_the_Flame_Fairy",
+"kind": "a"
+},
+"Lunar Eclipse": {
+"id": "Lunar_Eclipse",
+"kind": "a"
+},
+"Lunatic Cycle - Crescent Moon": {
+"id": "Lunatic_Cycle_Crescent_Moon",
+"kind": "a"
+},
+"Lunatic Cycle - Full Moon": {
+"id": "Lunatic_Cycle_Full_Moon",
+"kind": "a"
+},
+"Lunatic Cycle - Gibbous Moon": {
+"id": "Lunatic_Cycle_Gibbous_Moon",
+"kind": "a"
+},
+"Lunatic Cycle - Half Moon": {
+"id": "Lunatic_Cycle_Half_Moon",
+"kind": "a"
+},
+"Lunatic Cycle - New Moon": {
+"id": "Lunatic_Cycle_New_Moon",
+"kind": "a"
+},
+"Lunatic Golem": {
+"id": "Lunatic_Golem",
+"kind": "a"
+},
+"Lunatic Hawk": {
+"id": "Lunatic_Hawk",
+"kind": "a"
+},
+"MOE Bomb": {
+"id": "MOE_Bomb",
+"kind": "a"
+},
+"MOE Shield": {
+"id": "MOE_Shield",
+"kind": "a"
+},
+"Madaga, the Forsaken Seafarer": {
+"id": "Madaga_the_Forsaken_Seafarer",
+"kind": "a"
+},
+"Madame Guillotine, the Great Equalizer": {
+"id": "Madame_Guillotine_the_Great_Equalizer",
+"kind": "a"
+},
+"Magic Amber": {
+"id": "Magic_Amber",
+"kind": "a"
+},
+"Magic Amethyst": {
+"id": "Magic_Amethyst",
+"kind": "a"
+},
+"Magic Arts": {
+"id": "Magic_Arts",
+"kind": "a"
+},
+"Magic Cobalt": {
+"id": "Magic_Cobalt",
+"kind": "a"
+},
+"Magic Emerald": {
+"id": "Magic_Emerald",
+"kind": "a"
+},
+"Magic Hammer": {
+"id": "Magic_Hammer",
+"kind": "a"
+},
+"Magic Lamp": {
+"id": "Magic_Lamp",
+"kind": "a"
+},
+"Magic Mirror": {
+"id": "Magic_Mirror",
+"kind": "a"
+},
+"Magic Ruby": {
+"id": "Magic_Ruby",
+"kind": "a"
+},
+"Magic Sapphire": {
+"id": "Magic_Sapphire",
+"kind": "a"
+},
+"Magic Topaz": {
+"id": "Magic_Topaz",
+"kind": "a"
+},
+"Magnetic Glove": {
+"id": "Magnetic_Glove",
+"kind": "a"
+},
+"Magnetic Potion": {
+"id": "Magnetic_Potion",
+"kind": "a"
+},
+"Maho, the Cute Magical Girl": {
+"id": "Maho_the_Cute_Magical_Girl",
+"kind": "a"
+},
+"Mana Absorbing Crystal": {
+"id": "Mana_Absorbing_Crystal",
+"kind": "a"
+},
+"Mana Beacon": {
+"id": "Mana_Beacon",
+"kind": "a"
+},
+"Mana Mining": {
+"id": "Mana_Mining",
+"kind": "a"
+},
+"Mao, the Vengeful Guardian": {
+"id": "Mao_the_Vengeful_Guardian",
+"kind": "a"
+},
+"Market Crash": {
+"id": "Market_Crash",
+"kind": "a"
+},
+"Martyry": {
+"id": "Martyry",
+"kind": "a"
+},
+"Mary Crestmas": {
+"id": "Mary_Crestmas",
+"kind": "a"
+},
+"Mass Multiplication": {
+"id": "Mass_Multiplication",
+"kind": "a"
+},
+"Mass Routing": {
+"id": "Mass_Routing",
+"kind": "a"
+},
+"Massacre": {
+"id": "Massacre",
+"kind": "a"
+},
+"Mausoleum Worm": {
+"id": "Mausoleum_Worm",
+"kind": "a"
+},
+"Maya, the Nature Fairy": {
+"id": "Maya_the_Nature_Fairy",
+"kind": "a"
+},
+"Medea, the Swamp Witch": {
+"id": "Medea_the_Swamp_Witch",
+"kind": "a"
+},
+"Medusa's Curse": {
+"id": "Medusas_Curse",
+"kind": "a"
+},
+"Memory Blast": {
+"id": "Memory_Blast",
+"kind": "b"
+},
+"Memory Wipe": {
+"id": "Memory_Wipe",
+"kind": "a"
+},
+"Metal Harpyformer": {
+"id": "Metal_Harpyformer",
+"kind": "a"
+},
+"Meteor Crash": {
+"id": "Meteor_Crash",
+"kind": "a"
+},
+"Midnight Assault": {
+"id": "Midnight_Assault",
+"kind": "a"
+},
+"Minocrete War Counselor": {
+"id": "Minocrete_War_Counselor",
+"kind": "a"
+},
+"Mirjam, the Fallen Cute Angel": {
+"id": "Mirjam_the_Fallen_Cute_Angel",
+"kind": "a"
+},
+"Mischief Invasion": {
+"id": "Mischief_Invasion",
+"kind": "a"
+},
+"Mischief Militia - Banner Bearer": {
+"id": "Mischief_Militia_Banner_Bearer",
+"kind": "a"
+},
+"Mischief Militia - Bear Rider": {
+"id": "Mischief_Militia_Bear_Rider",
+"kind": "a"
+},
+"Mischief Militia - Chilly Dog": {
+"id": "Mischief_Militia_Chilly_Dog",
+"kind": "a"
+},
+"Mischief Militia - Chilly Wizard": {
+"id": "Mischief_Militia_Chilly_Wizard",
+"kind": "a"
+},
+"Mischief Militia - Colored Snow": {
+"id": "Mischief_Militia_Colored_Snow",
+"kind": "a"
+},
+"Mischief Militia - Heli Troopers": {
+"id": "Mischief_Militia_Heli_Troopers",
+"kind": "a"
+},
+"Mischief Militia - SnowItAll": {
+"id": "Mischief_Militia_SnowItAll",
+"kind": "a"
+},
+"Mischief Militia - Thaw Blader": {
+"id": "Mischief_Militia_Thaw_Blader",
+"kind": "a"
+},
+"Misfire": {
+"id": "Misfire",
+"kind": "a"
+},
+"Missing People": {
+"id": "Missing_People",
+"kind": "a"
+},
+"Mission of the Light Brigade": {
+"id": "Mission_of_the_Light_Brigade",
+"kind": "a"
+},
+"Modnir, Hammer of Coolness": {
+"id": "Modnir_Hammer_of_Coolness",
+"kind": "a"
+},
+"Molinda, the Cutest Being in the Sky": {
+"id": "Molinda_the_Cutest_Being_in_the_Sky",
+"kind": "a"
+},
+"Monia Bot, the Foretold Rescuer of Coolness": {
+"id": "Monia_Bot_the_Foretold_Rescuer_of_Coolness",
+"kind": "a"
+},
+"Monsieur Pete, the Booty Raider": {
+"id": "Monsieur_Pete_the_Booty_Raider",
+"kind": "a"
+},
+"Monster Nest": {
+"id": "Monster_Nest",
+"kind": "a"
+},
+"Monster in a Bottle": {
+"id": "Monster_in_a_Bottle",
+"kind": "a"
+},
+"Moonlight Butterfly": {
+"id": "Moonlight_Butterfly",
+"kind": "a"
+},
+"Mountain Boars": {
+"id": "Mountain_Boars",
+"kind": "a"
+},
+"Mountain Tear River": {
+"id": "Mountain_Tear_River",
+"kind": "a"
+},
+"Mr. Jiggles": {
+"id": "Mr_Jiggles",
+"kind": "a"
+},
+"Mummy Maker Machine": {
+"id": "Mummy_Maker_Machine",
+"kind": "a"
+},
+"Mummy Token": {
+"id": "Mummy_Token",
+"kind": "a"
+},
+"Muscle Training": {
+"id": "Muscle_Training",
+"kind": "a"
+},
+"Mysterious Core": {
+"id": "Mysterious_Core",
+"kind": "a"
+},
+"Mystery Box": {
+"id": "Mystery_Box",
+"kind": "a"
+},
+"Nao, the Barrier Priestess": {
+"id": "Nao_the_Barrier_Priestess",
+"kind": "a"
+},
+"Natas, the Master of Hell": {
+"id": "Natas_the_Master_of_Hell",
+"kind": "a"
+},
+"Navigation": {
+"id": "Navigation",
+"kind": "a"
+},
+"Necromancy": {
+"id": "Necromancy",
+"kind": "b"
+},
+"Nerdy Cheese": {
+"id": "Nerdy_Cheese",
+"kind": "a"
+},
+"Nero Zira, the Mastermind": {
+"id": "Nero_Zira_the_Mastermind",
+"kind": "a"
+},
+"Nicolas, the Hidden Alchemist": {
+"id": "Nicolas_the_Hidden_Alchemist",
+"kind": "a"
+},
+"Nieht, the Blitz Blade": {
+"id": "Nieht_the_Blitz_Blade",
+"kind": "a"
+},
+"Nimble Monkee": {
+"id": "Nimble_Monkee",
+"kind": "a"
+},
+"No Retreat!": {
+"id": "No_Retreat",
+"kind": "a"
+},
+"Noble Mummy Guards": {
+"id": "Noble_Mummy_Guards",
+"kind": "a"
+},
+"Nomu, Wanderer of Worlds": {
+"id": "Nomu_Wanderer_of_Worlds",
+"kind": "a"
+},
+"Non-Fungible Monkee": {
+"id": "Non_Fungible_Monkee",
+"kind": "a"
+},
+"Null Zone": {
+"id": "Null_Zone",
+"kind": "a"
+},
+"Null, the Mage Slayer": {
+"id": "Null_the_Mage_Slayer",
+"kind": "a"
+},
+"Occultism": {
+"id": "Occultism",
+"kind": "a"
+},
+"Off Duty": {
+"id": "Off_Duty",
+"kind": "a"
+},
+"Old Couple": {
+"id": "Old_Couple",
+"kind": "a"
+},
+"Omikron, the Faceless Illusionist": {
+"id": "Omikron_the_Faceless_Illusionist",
+"kind": "a"
+},
+"Open Invitation": {
+"id": "Open_Invitation",
+"kind": "a"
+},
+"Orthos, the Loyal Guard Dog": {
+"id": "Orthos_the_Loyal_Guard_Dog",
+"kind": "a"
+},
+"Outbreak": {
+"id": "Outbreak",
+"kind": "a"
+},
+"Overcharge": {
+"id": "Overcharge",
+"kind": "a"
+},
+"Overflowing Chalice": {
+"id": "Overflowing_Chalice",
+"kind": "a"
+},
+"Overheal Shock": {
+"id": "Overheal_Shock",
+"kind": "a"
+},
+"Pangaia, the Dino Domain": {
+"id": "Pangaia_the_Dino_Domain",
+"kind": "a"
+},
+"Paraseed": {
+"id": "Paraseed",
+"kind": "a"
+},
+"Paraseed Control": {
+"id": "Paraseed_Control",
+"kind": "a"
+},
+"Paraseed Greenhouse": {
+"id": "Paraseed_Greenhouse",
+"kind": "a"
+},
+"Paraseed Zombie": {
+"id": "Paraseed_Zombie",
+"kind": "a"
+},
+"Pawn Chain": {
+"id": "Pawn_Chain",
+"kind": "a"
+},
+"Pawn Sacrifice": {
+"id": "Pawn_Sacrifice",
+"kind": "a"
+},
+"Pawn of Kings [B]": {
+"id": "Pawn_of_Kings",
+"kind": "a"
+},
+"Perfect Disguise": {
+"id": "Perfect_Disguise",
+"kind": "a"
+},
+"Performance": {
+"id": "Performance",
+"kind": "a"
+},
+"Perilous Journey": {
+"id": "Perilous_Journey",
+"kind": "a"
+},
+"Pes'zet, the Plague Bringer": {
+"id": "Peszet_the_Plague_Bringer",
+"kind": "a"
+},
+"Pet Snake": {
+"id": "Pet_Snake",
+"kind": "a"
+},
+"Peter Röll, the Protagonist": {
+"id": "Peter_R_ll_the_Protagonist",
+"kind": "a"
+},
+"Petrification Break": {
+"id": "Petrification_Break",
+"kind": "a"
+},
+"Petrifier": {
+"id": "Petrifier",
+"kind": "a"
+},
+"Petrifying Potion": {
+"id": "Petrifying_Potion",
+"kind": "a"
+},
+"Phalanx Pike": {
+"id": "Phalanx_Pike",
+"kind": "a"
+},
+"Pharaoh, the Lone Living Being": {
+"id": "Pharaoh_the_Lone_Living_Being",
+"kind": "a"
+},
+"Phatnir, Prototype of Coolness": {
+"id": "Phatnir_Prototype_of_Coolness",
+"kind": "a"
+},
+"Philosopher's Stone": {
+"id": "Philosophers_Stone",
+"kind": "a"
+},
+"Phoenix Bombardment": {
+"id": "Phoenix_Bombardment",
+"kind": "a"
+},
+"Phoenix Tackle": {
+"id": "Phoenix_Tackle",
+"kind": "a"
+},
+"Piercer of Heavens": {
+"id": "Piercer_of_Heavens",
+"kind": "a"
+},
+"Pillage": {
+"id": "Pillage",
+"kind": "a"
+},
+"Pillar of Light": {
+"id": "Pillar_of_Light",
+"kind": "a"
+},
+"Pink Sky": {
+"id": "Pink_Sky",
+"kind": "a"
+},
+"Planet in a Bottle": {
+"id": "Planet_in_a_Bottle",
+"kind": "a"
+},
+"Plant Golem": {
+"id": "Plant_Golem",
+"kind": "b"
+},
+"Play Money": {
+"id": "Play_Money",
+"kind": "a"
+},
+"Pocket Catapult": {
+"id": "Pocket_Catapult",
+"kind": "a"
+},
+"Poison Pollen": {
+"id": "Poison_Pollen",
+"kind": "a"
+},
+"Poison Vial": {
+"id": "Poison_Vial",
+"kind": "a"
+},
+"Poisoned Arrow": {
+"id": "Poisoned_Arrow",
+"kind": "a"
+},
+"Poisoned Meat": {
+"id": "Poisoned_Meat",
+"kind": "a"
+},
+"Poisoned Well": {
+"id": "Poisoned_Well",
+"kind": "b"
+},
+"Pollution Piranha": {
+"id": "Pollution_Piranha",
+"kind": "a"
+},
+"Pollution Spewer": {
+"id": "Pollution_Spewer",
+"kind": "a"
+},
+"Pollution Token": {
+"id": "Pollution_Token",
+"kind": "a"
+},
+"Populated Island Turtle": {
+"id": "Populated_Island_Turtle",
+"kind": "a"
+},
+"Potion of Greed": {
+"id": "Potion_of_Greed",
+"kind": "a"
+},
+"Powder Keg": {
+"id": "Powder_Keg",
+"kind": "a"
+},
+"Prayer": {
+"id": "Prayer",
+"kind": "a"
+},
+"Premonition": {
+"id": "Premonition",
+"kind": "a"
+},
+"Preserving Puppet Vinny": {
+"id": "Preserving_Puppet_Vinny",
+"kind": "a"
+},
+"Pressed Skill": {
+"id": "Pressed_Skill",
+"kind": "a"
+},
+"Pressure Projectile": {
+"id": "Pressure_Projectile",
+"kind": "a"
+},
+"Priest of Luna": {
+"id": "Priest_of_Luna",
+"kind": "a"
+},
+"Priest of Tempeste": {
+"id": "Priest_of_Tempeste",
+"kind": "a"
+},
+"Prophecy of Coolness": {
+"id": "Prophecy_of_Coolness",
+"kind": "a"
+},
+"Prophecy of Tempeste": {
+"id": "Prophecy_of_Tempeste",
+"kind": "a"
+},
+"Pseudonia, the Skill Devourer": {
+"id": "Pseudonia_the_Skill_Devourer",
+"kind": "a"
+},
+"Psychic Scout": {
+"id": "Psychic_Scout",
+"kind": "a"
+},
+"Punch in the Box": {
+"id": "Punch_in_the_Box",
+"kind": "a"
+},
+"Pure Advantage Camel": {
+"id": "Pure_Advantage_Camel",
+"kind": "a"
+},
+"Pusher": {
+"id": "Pusher",
+"kind": "b"
+},
+"Pyraga": {
+"id": "Pyraga",
+"kind": "a"
+},
+"Pyroblast": {
+"id": "Pyroblast",
+"kind": "a"
+},
+"Queen of Kings [B]": {
+"id": "Queen_of_Kings",
+"kind": "a"
+},
+"Quest of the Chosen One": {
+"id": "Quest_of_the_Chosen_One",
+"kind": "a"
+},
+"Quetzahuitl, Receiver of Sacrifices": {
+"id": "Quetzahuitl_Receiver_of_Sacrifices",
+"kind": "a"
+},
+"Quick Attack": {
+"id": "Quick_Attack",
+"kind": "a"
+},
+"Racket Arrow": {
+"id": "Racket_Arrow",
+"kind": "a"
+},
+"Rafflesia, the Poison Princess": {
+"id": "Rafflesia_the_Poison_Princess",
+"kind": "a"
+},
+"Ragnarock": {
+"id": "Ragnarock",
+"kind": "a"
+},
+"Rain Viola": {
+"id": "Rain_Viola",
+"kind": "a"
+},
+"Rain of Arrows": {
+"id": "Rain_of_Arrows",
+"kind": "a"
+},
+"Rain of Death": {
+"id": "Rain_of_Death",
+"kind": "a"
+},
+"Rain of Spores": {
+"id": "Rain_of_Spores",
+"kind": "a"
+},
+"Rainbow's Arrow": {
+"id": "Rainbows_Arrow",
+"kind": "a"
+},
+"Raise the Minions!": {
+"id": "Raise_the_Minions",
+"kind": "a"
+},
+"Rakah, the Loan Shark": {
+"id": "Rakah_the_Loan_Shark",
+"kind": "a"
+},
+"Rap Harpyformer": {
+"id": "Rap_Harpyformer",
+"kind": "a"
+},
+"Reality Crack": {
+"id": "Reality_Crack",
+"kind": "a"
+},
+"Realmniversal Emperor": {
+"id": "Realmniversal_Emperor",
+"kind": "a"
+},
+"Rebelliokai Backup Bakus": {
+"id": "Rebelliokai_Backup_Bakus",
+"kind": "a"
+},
+"Rebelliokai Camouflaged Kappa": {
+"id": "Rebelliokai_Camouflaged_Kappa",
+"kind": "a"
+},
+"Rebelliokai Courtly Kirin": {
+"id": "Rebelliokai_Courtly_Kirin",
+"kind": "a"
+},
+"Rebelliokai Kind Kitsune": {
+"id": "Rebelliokai_Kind_Kitsune",
+"kind": "a"
+},
+"Rebelliokai Oblivious Oni": {
+"id": "Rebelliokai_Oblivious_Oni",
+"kind": "a"
+},
+"Rebelliokai Terror Tengu": {
+"id": "Rebelliokai_Terror_Tengu",
+"kind": "a"
+},
+"Rebelliokai Timid Tanuki": {
+"id": "Rebelliokai_Timid_Tanuki",
+"kind": "a"
+},
+"Red Dragoneer": {
+"id": "Red_Dragoneer",
+"kind": "a"
+},
+"Refreshing Night": {
+"id": "Refreshing_Night",
+"kind": "a"
+},
+"Reincarnation": {
+"id": "Reincarnation",
+"kind": "a"
+},
+"Reiza, the Chief Tormentor": {
+"id": "Reiza_the_Chief_Tormentor",
+"kind": "a"
+},
+"Relic in the Sky": {
+"id": "Relic_in_the_Sky",
+"kind": "a"
+},
+"Remote Detonator": {
+"id": "Remote_Detonator",
+"kind": "a"
+},
+"Renewable Energy": {
+"id": "Renewable_Energy",
+"kind": "a"
+},
+"Rescued Damsel Cecilia": {
+"id": "Rescued_Damsel_Cecilia",
+"kind": "a"
+},
+"Resilient Monkee": {
+"id": "Resilient_Monkee",
+"kind": "a"
+},
+"Resistance": {
+"id": "Resistance",
+"kind": "a"
+},
+"Resuscitation Potion": {
+"id": "Resuscitation_Potion",
+"kind": "a"
+},
+"Rewrite History": {
+"id": "Rewrite_History",
+"kind": "a"
+},
+"Rha'Bi, the Living Skeleton": {
+"id": "RhaBi_the_Living_Skeleton",
+"kind": "a"
+},
+"Ricochet": {
+"id": "Ricochet",
+"kind": "a"
+},
+"Riffel, Master of the Ultimate Gun": {
+"id": "Riffel_Master_of_the_Ultimate_Gun",
+"kind": "a"
+},
+"Rioting Village": {
+"id": "Rioting_Village",
+"kind": "a"
+},
+"Rocket Fist": {
+"id": "Rocket_Fist",
+"kind": "a"
+},
+"Rocket Sneeze": {
+"id": "Rocket_Sneeze",
+"kind": "a"
+},
+"Rockfall": {
+"id": "Rockfall",
+"kind": "a"
+},
+"Rocky Slime": {
+"id": "Rocky_Slime",
+"kind": "a"
+},
+"Rolling Boulder": {
+"id": "Rolling_Boulder",
+"kind": "a"
+},
+"Rook of Kings [B]": {
+"id": "Rook_of_Kings",
+"kind": "a"
+},
+"Rool, the Troll Guard": {
+"id": "Rool_the_Troll_Guard",
+"kind": "a"
+},
+"Royal Corgi": {
+"id": "Royal_Corgi",
+"kind": "a"
+},
+"Royal Treasury": {
+"id": "Royal_Treasury",
+"kind": "b"
+},
+"Rubin, the Dragoneer Champion": {
+"id": "Rubin_the_Dragoneer_Champion",
+"kind": "a"
+},
+"Rusting Crystal": {
+"id": "Rusting_Crystal",
+"kind": "a"
+},
+"Rusty Touch": {
+"id": "Rusty_Touch",
+"kind": "a"
+},
+"Sabrina, the Psychic Witch": {
+"id": "Sabrina_the_Psychic_Witch",
+"kind": "a"
+},
+"Sacred Hammer of the Volcano": {
+"id": "Sacred_Hammer_of_the_Volcano",
+"kind": "a"
+},
+"Sacrifice to Divinity": {
+"id": "Sacrifice_to_Divinity",
+"kind": "a"
+},
+"Sacrificial Dagger": {
+"id": "Sacrificial_Dagger",
+"kind": "a"
+},
+"Saint Nicolas": {
+"id": "Saint_Nicolas",
+"kind": "a"
+},
+"Salute to the Fallen": {
+"id": "Salute_to_the_Fallen",
+"kind": "a"
+},
+"Sandy Blob": {
+"id": "Sandy_Blob",
+"kind": "a"
+},
+"Santa Klaus": {
+"id": "Santa_Klaus",
+"kind": "a"
+},
+"Sarcophagus of Sealed Magic": {
+"id": "Sarcophagus_of_Sealed_Magic",
+"kind": "a"
+},
+"Sas'Za, the Snaka Adventurer": {
+"id": "SasZa_the_Snaka_Adventurer",
+"kind": "a"
+},
+"Saya, the Plant Princess": {
+"id": "Saya_the_Plant_Princess",
+"kind": "a"
+},
+"Scavenging Crane": {
+"id": "Scavenging_Crane",
+"kind": "a"
+},
+"Sculpture Guards": {
+"id": "Sculpture_Guards",
+"kind": "a"
+},
+"Sculpture Theft": {
+"id": "Sculpture_Theft",
+"kind": "a"
+},
+"Secret Blue Spice": {
+"id": "Secret_Blue_Spice",
+"kind": "a"
+},
+"Secret Golden Spice": {
+"id": "Secret_Golden_Spice",
+"kind": "a"
+},
+"Secret Green Spice": {
+"id": "Secret_Green_Spice",
+"kind": "a"
+},
+"Secret Red Spice": {
+"id": "Secret_Red_Spice",
+"kind": "a"
+},
+"Secret Spice Jar": {
+"id": "Secret_Spice_Jar",
+"kind": "a"
+},
+"Sentient Bomb Golems": {
+"id": "Sentient_Bomb_Golems",
+"kind": "a"
+},
+"Serpentous Demon": {
+"id": "Serpentous_Demon",
+"kind": "a"
+},
+"Sett, the Adept of Necromancy": {
+"id": "Sett_the_Adept_of_Necromancy",
+"kind": "a"
+},
+"Shadowy Slime": {
+"id": "Shadowy_Slime",
+"kind": "a"
+},
+"Shamanic Curse": {
+"id": "Shamanic_Curse",
+"kind": "a"
+},
+"Shanty Harpyformer": {
+"id": "Shanty_Harpyformer",
+"kind": "a"
+},
+"Shapeshift": {
+"id": "Shapeshift",
+"kind": "a"
+},
+"Shard of Chaos": {
+"id": "Shard_of_Chaos",
+"kind": "a"
+},
+"Shared Blood Tanks": {
+"id": "Shared_Blood_Tanks",
+"kind": "a"
+},
+"Shattered Trident, Treasure of the Deepsea": {
+"id": "Shattered_Trident_Treasure_of_the_Deepsea",
+"kind": "a"
+},
+"Shattering Strike": {
+"id": "Shattering_Strike",
+"kind": "b"
+},
+"Shield of Death": {
+"id": "Shield_of_Death",
+"kind": "a"
+},
+"Shield of Life": {
+"id": "Shield_of_Life",
+"kind": "a"
+},
+"Shield of Wisdom": {
+"id": "Shield_of_Wisdom",
+"kind": "a"
+},
+"Shiny Slime": {
+"id": "Shiny_Slime",
+"kind": "a"
+},
+"Shooting Star": {
+"id": "Shooting_Star",
+"kind": "a"
+},
+"Shu'Chaku, the Blood Moon Projection": {
+"id": "ShuChaku_the_Blood_Moon_Projection",
+"kind": "a"
+},
+"Sickly Cheese": {
+"id": "Sickly_Cheese",
+"kind": "a"
+},
+"Sid, the King of Thieves": {
+"id": "Sid_the_King_of_Thieves",
+"kind": "a"
+},
+"Siege": {
+"id": "Siege",
+"kind": "a"
+},
+"Silence": {
+"id": "Silence",
+"kind": "a"
+},
+"Silent Water Mizune": {
+"id": "Silent_Water_Mizune",
+"kind": "a"
+},
+"Singing": {
+"id": "Singing",
+"kind": "a"
+},
+"Siphem, the Deepsea Demon": {
+"id": "Siphem_the_Deepsea_Demon",
+"kind": "a"
+},
+"Ska Harpyformer": {
+"id": "Ska_Harpyformer",
+"kind": "a"
+},
+"Skeleton Archer": {
+"id": "Skeleton_Archer",
+"kind": "a"
+},
+"Skeleton Bard": {
+"id": "Skeleton_Bard",
+"kind": "a"
+},
+"Skeleton Death Knight": {
+"id": "Skeleton_Death_Knight",
+"kind": "a"
+},
+"Skeleton Demon": {
+"id": "Skeleton_Demon",
+"kind": "a"
+},
+"Skeleton Healer": {
+"id": "Skeleton_Healer",
+"kind": "a"
+},
+"Skeleton King Skullmael": {
+"id": "Skeleton_King_Skullmael",
+"kind": "a"
+},
+"Skeleton Mage": {
+"id": "Skeleton_Mage",
+"kind": "a"
+},
+"Skeleton Necromancer": {
+"id": "Skeleton_Necromancer",
+"kind": "a"
+},
+"Skeleton Priest": {
+"id": "Skeleton_Priest",
+"kind": "a"
+},
+"Skeleton Reaper": {
+"id": "Skeleton_Reaper",
+"kind": "a"
+},
+"Skeleton Skull Bat": {
+"id": "Skeleton_Skull_Bat",
+"kind": "a"
+},
+"Skeleton Wizard": {
+"id": "Skeleton_Wizard",
+"kind": "a"
+},
+"Skull Carpet Bombing": {
+"id": "Skull_Carpet_Bombing",
+"kind": "a"
+},
+"Skull Necklace": {
+"id": "Skull_Necklace",
+"kind": "a"
+},
+"Skullmael's Greatsword": {
+"id": "Skullmaels_Greatsword",
+"kind": "a"
+},
+"Sleeping Beauty": {
+"id": "Sleeping_Beauty",
+"kind": "a"
+},
+"Slime Rancher": {
+"id": "Slime_Rancher",
+"kind": "a"
+},
+"Slimy Slime": {
+"id": "Slimy_Slime",
+"kind": "a"
+},
+"Slippery Fridge": {
+"id": "Slippery_Fridge",
+"kind": "a"
+},
+"Slippery Ice": {
+"id": "Slippery_Ice",
+"kind": "a"
+},
+"Slippery Narw": {
+"id": "Slippery_Narw",
+"kind": "a"
+},
+"Slippery Pengu": {
+"id": "Slippery_Pengu",
+"kind": "a"
+},
+"Slippery Polar": {
+"id": "Slippery_Polar",
+"kind": "a"
+},
+"Slippery Skates": {
+"id": "Slippery_Skates",
+"kind": "a"
+},
+"Slippery Snobbit": {
+"id": "Slippery_Snobbit",
+"kind": "a"
+},
+"Slippery Snowman": {
+"id": "Slippery_Snowman",
+"kind": "a"
+},
+"Slippery Spikeblock": {
+"id": "Slippery_Spikeblock",
+"kind": "a"
+},
+"Slippery Whoolmoth": {
+"id": "Slippery_Whoolmoth",
+"kind": "a"
+},
+"Slow": {
+"id": "Slow",
+"kind": "a"
+},
+"Smoke Vial": {
+"id": "Smoke_Vial",
+"kind": "a"
+},
+"Smug Coin": {
+"id": "Smug_Coin",
+"kind": "a"
+},
+"Smug Mastermind Antonia": {
+"id": "Smug_Mastermind_Antonia",
+"kind": "a"
+},
+"Smugbeth, the Rebel of no Rules": {
+"id": "Smugbeth_the_Rebel_of_no_Rules",
+"kind": "a"
+},
+"Smuggler's Pier": {
+"id": "Smugglers_Pier",
+"kind": "a"
+},
+"Smugness": {
+"id": "Smugness",
+"kind": "a"
+},
+"Snow Cannon": {
+"id": "Snow_Cannon",
+"kind": "a"
+},
+"Snowstorm Mischief": {
+"id": "Snowstorm_Mischief",
+"kind": "a"
+},
+"Sol Rym, the Thunder Djinn": {
+"id": "Sol_Rym_the_Thunder_Djinn",
+"kind": "a"
+},
+"Sorbereus, the Adapting Dragon": {
+"id": "Sorbereus_the_Adapting_Dragon",
+"kind": "a"
+},
+"Sorin, the Warden of Blood Rock": {
+"id": "Sorin_the_Warden_of_Blood_Rock",
+"kind": "a"
+},
+"Soul Shard Ba": {
+"id": "Soul_Shard_Ba",
+"kind": "a"
+},
+"Soul Shard Ib": {
+"id": "Soul_Shard_Ib",
+"kind": "a"
+},
+"Soul Shard Ka": {
+"id": "Soul_Shard_Ka",
+"kind": "a"
+},
+"Soul Shard Khet": {
+"id": "Soul_Shard_Khet",
+"kind": "a"
+},
+"Soul Shard Ren": {
+"id": "Soul_Shard_Ren",
+"kind": "a"
+},
+"Soul Shard Sah": {
+"id": "Soul_Shard_Sah",
+"kind": "a"
+},
+"Soul Shard Sekhem": {
+"id": "Soul_Shard_Sekhem",
+"kind": "a"
+},
+"Soul Shard Shut": {
+"id": "Soul_Shard_Shut",
+"kind": "a"
+},
+"Soul Transmigration Ritual": {
+"id": "Soul_Transmigration_Ritual",
+"kind": "a"
+},
+"Sparkfly Architect": {
+"id": "Sparkfly_Architect",
+"kind": "a"
+},
+"Sparkfly Attendant": {
+"id": "Sparkfly_Attendant",
+"kind": "a"
+},
+"Sparkfly Queen": {
+"id": "Sparkfly_Queen",
+"kind": "a"
+},
+"Sparkfly Worker": {
+"id": "Sparkfly_Worker",
+"kind": "a"
+},
+"Sparky Slime": {
+"id": "Sparky_Slime",
+"kind": "a"
+},
+"Spatial Crevice": {
+"id": "Spatial_Crevice",
+"kind": "a"
+},
+"Spectral Armor": {
+"id": "Spectral_Armor",
+"kind": "a"
+},
+"Spice Mortar": {
+"id": "Spice_Mortar",
+"kind": "a"
+},
+"Spider Avalanche": {
+"id": "Spider_Avalanche",
+"kind": "a"
+},
+"Spider Dance": {
+"id": "Spider_Dance",
+"kind": "a"
+},
+"Spider Hive": {
+"id": "Spider_Hive",
+"kind": "a"
+},
+"Spider Silk Bridge": {
+"id": "Spider_Silk_Bridge",
+"kind": "a"
+},
+"Spike Trap": {
+"id": "Spike_Trap",
+"kind": "b"
+},
+"Spiky Armor": {
+"id": "Spiky_Armor",
+"kind": "a"
+},
+"Spirit of the Barbarian Sword": {
+"id": "Spirit_of_the_Barbarian_Sword",
+"kind": "a"
+},
+"Spirit of the Forbidden Grimoire": {
+"id": "Spirit_of_the_Forbidden_Grimoire",
+"kind": "a"
+},
+"Spirit of the Heart Bow": {
+"id": "Spirit_of_the_Heart_Bow",
+"kind": "a"
+},
+"Spirit of the Relic Hammer": {
+"id": "Spirit_of_the_Relic_Hammer",
+"kind": "a"
+},
+"Spirit of the Shattered Trident": {
+"id": "Spirit_of_the_Shattered_Trident",
+"kind": "a"
+},
+"Spirit of the Super-Killing Knife": {
+"id": "Spirit_of_the_Super_Killing_Knife",
+"kind": "a"
+},
+"Spirit of the Ultimate Gun": {
+"id": "Spirit_of_the_Ultimate_Gun",
+"kind": "a"
+},
+"Splashy Slime": {
+"id": "Splashy_Slime",
+"kind": "a"
+},
+"Spontaneous Reappearance": {
+"id": "Spontaneous_Reappearance",
+"kind": "a"
+},
+"Spreading Rumor": {
+"id": "Spreading_Rumor",
+"kind": "a"
+},
+"Staff of Illusions": {
+"id": "Staff_of_Illusions",
+"kind": "a"
+},
+"Staff of Uncontrollable Destruction": {
+"id": "Staff_of_Uncontrollable_Destruction",
+"kind": "a"
+},
+"Staff of the Teleporter": {
+"id": "Staff_of_the_Teleporter",
+"kind": "a"
+},
+"Stealth": {
+"id": "Stealth",
+"kind": "b"
+},
+"Stealthy Pursuit": {
+"id": "Stealthy_Pursuit",
+"kind": "a"
+},
+"Steam Dwarf Brewer": {
+"id": "Steam_Dwarf_Brewer",
+"kind": "a"
+},
+"Steam Dwarf Diver": {
+"id": "Steam_Dwarf_Diver",
+"kind": "a"
+},
+"Steam Dwarf Dragon Pilot": {
+"id": "Steam_Dwarf_Dragon_Pilot",
+"kind": "a"
+},
+"Steam Dwarf Engineer": {
+"id": "Steam_Dwarf_Engineer",
+"kind": "a"
+},
+"Steam Dwarf Exterminator": {
+"id": "Steam_Dwarf_Exterminator",
+"kind": "a"
+},
+"Steam Dwarf Miner": {
+"id": "Steam_Dwarf_Miner",
+"kind": "a"
+},
+"Stellan, the Calm Cat": {
+"id": "Stellan_the_Calm_Cat",
+"kind": "a"
+},
+"Stellin, the Calm Dictator": {
+"id": "Stellin_the_Calm_Dictator",
+"kind": "a"
+},
+"Sticky Wand": {
+"id": "Sticky_Wand",
+"kind": "a"
+},
+"Stinky Stables": {
+"id": "Stinky_Stables",
+"kind": "a"
+},
+"Storm Piano": {
+"id": "Storm_Piano",
+"kind": "a"
+},
+"Storm Ring": {
+"id": "Storm_Ring",
+"kind": "a"
+},
+"Stormkissed Waflav": {
+"id": "Stormkissed_Waflav",
+"kind": "a"
+},
+"Stowaway": {
+"id": "Stowaway",
+"kind": "a"
+},
+"Stranglehold": {
+"id": "Stranglehold",
+"kind": "a"
+},
+"String of Fine": {
+"id": "String_of_Fine",
+"kind": "a"
+},
+"Strong Ox Headbutt": {
+"id": "Strong_Ox_Headbutt",
+"kind": "a"
+},
+"Strong Shield": {
+"id": "Strong_Shield",
+"kind": "a"
+},
+"Styx, the Gate to the Spirit World": {
+"id": "Styx_the_Gate_to_the_Spirit_World",
+"kind": "a"
+},
+"Styx, the Opened Gate": {
+"id": "Styx_the_Opened_Gate",
+"kind": "a"
+},
+"Summoning Circle": {
+"id": "Summoning_Circle",
+"kind": "a"
+},
+"Summoning Instructions": {
+"id": "Summoning_Instructions",
+"kind": "a"
+},
+"Summoning Magic": {
+"id": "Summoning_Magic",
+"kind": "b"
+},
+"Sun Beam": {
+"id": "Sun_Beam",
+"kind": "a"
+},
+"Super-Killing Knife, the Tool of Liquidation": {
+"id": "Super_Killing_Knife_the_Tool_of_Liquidation",
+"kind": "a"
+},
+"Supply Chain": {
+"id": "Supply_Chain",
+"kind": "b"
+},
+"Support Magic": {
+"id": "Support_Magic",
+"kind": "a"
+},
+"Surefire Shot": {
+"id": "Surefire_Shot",
+"kind": "a"
+},
+"Surprise Party": {
+"id": "Surprise_Party",
+"kind": "a"
+},
+"Suspicious Monster": {
+"id": "Suspicious_Monster",
+"kind": "a"
+},
+"Swagdri, Forger of Coolness": {
+"id": "Swagdri_Forger_of_Coolness",
+"kind": "a"
+},
+"Swampborne Waflav": {
+"id": "Swampborne_Waflav",
+"kind": "a"
+},
+"Swellpnir, Mount of Coolness": {
+"id": "Swellpnir_Mount_of_Coolness",
+"kind": "a"
+},
+"Swift Eagle Warrior": {
+"id": "Swift_Eagle_Warrior",
+"kind": "a"
+},
+"Sword in a Bottle": {
+"id": "Sword_in_a_Bottle",
+"kind": "a"
+},
+"Taio, Absorber of the Mountain's Heart": {
+"id": "Taio_Absorber_of_the_Mountains_Heart",
+"kind": "a"
+},
+"Taio, the Sun Fencer": {
+"id": "Taio_the_Sun_Fencer",
+"kind": "a"
+},
+"Tamed Hell Fox": {
+"id": "Tamed_Hell_Fox",
+"kind": "a"
+},
+"Tamed Primordium": {
+"id": "Tamed_Primordium",
+"kind": "a"
+},
+"Tanuki Escape": {
+"id": "Tanuki_Escape",
+"kind": "a"
+},
+"Tarleinn the Traveler": {
+"id": "Tarleinn_the_Traveler",
+"kind": "a"
+},
+"Tarleinn's Floating Island": {
+"id": "Tarleinns_Floating_Island",
+"kind": "a"
+},
+"Tazune, the Angry Hot-Blood": {
+"id": "Tazune_the_Angry_Hot_Blood",
+"kind": "a"
+},
+"Tea": {
+"id": "Tea",
+"kind": "a"
+},
+"Teal Fishing Rod": {
+"id": "Teal_Fishing_Rod",
+"kind": "a"
+},
+"Tears of Creation": {
+"id": "Tears_of_Creation",
+"kind": "a"
+},
+"Techno Harpyformer": {
+"id": "Techno_Harpyformer",
+"kind": "a"
+},
+"Telekinesis": {
+"id": "Telekinesis",
+"kind": "a"
+},
+"Teleportal": {
+"id": "Teleportal",
+"kind": "a"
+},
+"Teleportation Powder": {
+"id": "Teleportation_Powder",
+"kind": "a"
+},
+"Tempeluna, the Convergence Fairy": {
+"id": "Tempeluna_the_Convergence_Fairy",
+"kind": "a"
+},
+"Tempeste Moana, the Rain Singer": {
+"id": "Tempeste_Moana_the_Rain_Singer",
+"kind": "a"
+},
+"Tempeste, the Weather Fairy": {
+"id": "Tempeste_the_Weather_Fairy",
+"kind": "a"
+},
+"Temple of Sacrifice": {
+"id": "Temple_of_Sacrifice",
+"kind": "a"
+},
+"Tengu Windstorm": {
+"id": "Tengu_Windstorm",
+"kind": "a"
+},
+"Teocuilatl, the Embodiment of Gods": {
+"id": "Teocuilatl_the_Embodiment_of_Gods",
+"kind": "a"
+},
+"Teppes, the Deepsea Vampire": {
+"id": "Teppes_the_Deepsea_Vampire",
+"kind": "a"
+},
+"Terror": {
+"id": "Terror",
+"kind": "a"
+},
+"Thalia, the Fun Fairy": {
+"id": "Thalia_the_Fun_Fairy",
+"kind": "a"
+},
+"Tharx, the Never-Losing General": {
+"id": "Tharx_the_Never_Losing_General",
+"kind": "a"
+},
+"Tharxian Horse": {
+"id": "Tharxian_Horse",
+"kind": "a"
+},
+"The Bonegrinder": {
+"id": "The_Bonegrinder",
+"kind": "a"
+},
+"The Brewer's Blade": {
+"id": "The_Brewers_Blade",
+"kind": "a"
+},
+"The Core's Awakening": {
+"id": "The_Cores_Awakening",
+"kind": "a"
+},
+"The Cosmic Depths": {
+"id": "The_Cosmic_Depths",
+"kind": "a"
+},
+"The Egg of God": {
+"id": "The_Egg_of_God",
+"kind": "a"
+},
+"The Eighth Circle of Hell": {
+"id": "The_Eighth_Circle_of_Hell",
+"kind": "a"
+},
+"The Eye of Ren": {
+"id": "The_Eye_of_Ren",
+"kind": "a"
+},
+"The Fifth Circle of Hell": {
+"id": "The_Fifth_Circle_of_Hell",
+"kind": "a"
+},
+"The Final Trial": {
+"id": "The_Final_Trial",
+"kind": "a"
+},
+"The First Circle of Hell": {
+"id": "The_First_Circle_of_Hell",
+"kind": "a"
+},
+"The Fourth Circle of Hell": {
+"id": "The_Fourth_Circle_of_Hell",
+"kind": "a"
+},
+"The Golden Abomination": {
+"id": "The_Golden_Abomination",
+"kind": "a"
+},
+"The Great Clock Tower \"Big Gwen\"": {
+"id": "The_Great_Clock_Tower_Big_Gwen",
+"kind": "a"
+},
+"The Great Wall of Deri": {
+"id": "The_Great_Wall_of_Deri",
+"kind": "a"
+},
+"The Hands of Big Gwen": {
+"id": "The_Hands_of_Big_Gwen",
+"kind": "a"
+},
+"The Master's Key": {
+"id": "The_Masters_Key",
+"kind": "a"
+},
+"The Master's Plan": {
+"id": "The_Masters_Plan",
+"kind": "a"
+},
+"The Master's Sword": {
+"id": "The_Masters_Sword",
+"kind": "a"
+},
+"The Nornstellar, Foretellers of Coolness": {
+"id": "The_Nornstellar_Foretellers_of_Coolness",
+"kind": "a"
+},
+"The Root of all Evil": {
+"id": "The_Root_of_all_Evil",
+"kind": "a"
+},
+"The Sacred Blade": {
+"id": "The_Sacred_Blade",
+"kind": "a"
+},
+"The Sacred Jewel": {
+"id": "The_Sacred_Jewel",
+"kind": "a"
+},
+"The Sacred Mirror": {
+"id": "The_Sacred_Mirror",
+"kind": "a"
+},
+"The Second Circle of Hell": {
+"id": "The_Second_Circle_of_Hell",
+"kind": "a"
+},
+"The Seventh Circle of Hell": {
+"id": "The_Seventh_Circle_of_Hell",
+"kind": "a"
+},
+"The Sixth Circle of Hell": {
+"id": "The_Sixth_Circle_of_Hell",
+"kind": "a"
+},
+"The Spawn Mother": {
+"id": "The_Spawn_Mother",
+"kind": "a"
+},
+"The Stormblade": {
+"id": "The_Stormblade",
+"kind": "a"
+},
+"The Sun Sword": {
+"id": "The_Sun_Sword",
+"kind": "a"
+},
+"The Thing in the Ship": {
+"id": "The_Thing_in_the_Ship",
+"kind": "a"
+},
+"The Third Circle of Hell": {
+"id": "The_Third_Circle_of_Hell",
+"kind": "a"
+},
+"The Warlord's Bite": {
+"id": "The_Warlords_Bite",
+"kind": "a"
+},
+"The Weather Orchestra": {
+"id": "The_Weather_Orchestra",
+"kind": "a"
+},
+"The White Army": {
+"id": "The_White_Army",
+"kind": "a"
+},
+"The White Eye": {
+"id": "The_White_Eye",
+"kind": "a"
+},
+"The Yeeting": {
+"id": "The_Yeeting",
+"kind": "a"
+},
+"Thebinxan War Counselor": {
+"id": "Thebinxan_War_Counselor",
+"kind": "a"
+},
+"Thep, the Court Scribe": {
+"id": "Thep_the_Court_Scribe",
+"kind": "a"
+},
+"Thicket": {
+"id": "Thicket",
+"kind": "a"
+},
+"Thieving": {
+"id": "Thieving",
+"kind": "a"
+},
+"Thieving Strike": {
+"id": "Thieving_Strike",
+"kind": "a"
+},
+"Thorad, Strength of Coolness": {
+"id": "Thorad_Strength_of_Coolness",
+"kind": "a"
+},
+"Thrysh, Robber of Coolness": {
+"id": "Thrysh_Robber_of_Coolness",
+"kind": "a"
+},
+"Thunder Trumpet": {
+"id": "Thunder_Trumpet",
+"kind": "a"
+},
+"Thunderstruck Waflav": {
+"id": "Thunderstruck_Waflav",
+"kind": "a"
+},
+"Time Bomblebee": {
+"id": "Time_Bomblebee",
+"kind": "a"
+},
+"Timeless King Zi": {
+"id": "Timeless_King_Zi",
+"kind": "a"
+},
+"Tobi, the Average Student": {
+"id": "Tobi_the_Average_Student",
+"kind": "a"
+},
+"Tool Freezer": {
+"id": "Tool_Freezer",
+"kind": "a"
+},
+"Toras, Master of all Weapons": {
+"id": "Toras_Master_of_all_Weapons",
+"kind": "a"
+},
+"Torchure": {
+"id": "Torchure",
+"kind": "a"
+},
+"Toughness": {
+"id": "Toughness",
+"kind": "a"
+},
+"Toxic Fumes": {
+"id": "Toxic_Fumes",
+"kind": "a"
+},
+"Toxic Trap": {
+"id": "Toxic_Trap",
+"kind": "a"
+},
+"Trade": {
+"id": "Trade",
+"kind": "a"
+},
+"Training": {
+"id": "Training",
+"kind": "a"
+},
+"Trample Sounds in the Forest": {
+"id": "Trample_Sounds_in_the_Forest",
+"kind": "a"
+},
+"Transdimensional Stab": {
+"id": "Transdimensional_Stab",
+"kind": "b"
+},
+"Trapping": {
+"id": "Trapping",
+"kind": "a"
+},
+"Traveler from the Future": {
+"id": "Traveler_from_the_Future",
+"kind": "a"
+},
+"Treacherous Crystal": {
+"id": "Treacherous_Crystal",
+"kind": "a"
+},
+"Treasure Chest": {
+"id": "Treasure_Chest",
+"kind": "a"
+},
+"Treasure Hunter's Backpack": {
+"id": "Treasure_Hunters_Backpack",
+"kind": "a"
+},
+"Treasure Huntress Semi": {
+"id": "Treasure_Huntress_Semi",
+"kind": "a"
+},
+"Treasure Skeleton": {
+"id": "Treasure_Skeleton",
+"kind": "a"
+},
+"Tri Ad, the Puppet Mistress": {
+"id": "Tri_Ad_the_Puppet_Mistress",
+"kind": "a"
+},
+"Tri Fecta, the Puppet Master": {
+"id": "Tri_Fecta_the_Puppet_Master",
+"kind": "a"
+},
+"Trial of Annoyance": {
+"id": "Trial_of_Annoyance",
+"kind": "a"
+},
+"Trial of Coolness": {
+"id": "Trial_of_Coolness",
+"kind": "a"
+},
+"Trial of Dominance": {
+"id": "Trial_of_Dominance",
+"kind": "a"
+},
+"Trial of Knowledge": {
+"id": "Trial_of_Knowledge",
+"kind": "a"
+},
+"Trial of Loyalty": {
+"id": "Trial_of_Loyalty",
+"kind": "a"
+},
+"Troop Annihilation": {
+"id": "Troop_Annihilation",
+"kind": "a"
+},
+"True Fairy Crestina, the Primordial Goddess": {
+"id": "True_Fairy_Crestina_the_Primordial_Goddess",
+"kind": "a"
+},
+"Trunk Sand": {
+"id": "Trunk_Sand",
+"kind": "a"
+},
+"Truth-Seeing Eye": {
+"id": "Truth_Seeing_Eye",
+"kind": "b"
+},
+"Tryse, the Shadow Slayer": {
+"id": "Tryse_the_Shadow_Slayer",
+"kind": "a"
+},
+"Tsu'Ki, the Lunatic Princess": {
+"id": "TsuKi_the_Lunatic_Princess",
+"kind": "a"
+},
+"Tuscan Aristocrat": {
+"id": "Tuscan_Aristocrat",
+"kind": "a"
+},
+"Tuscan Artist": {
+"id": "Tuscan_Artist",
+"kind": "a"
+},
+"Tuscan Mystic": {
+"id": "Tuscan_Mystic",
+"kind": "a"
+},
+"Tuscan Prisoner": {
+"id": "Tuscan_Prisoner",
+"kind": "a"
+},
+"Ultimate Weapon Experiment": {
+"id": "Ultimate_Weapon_Experiment",
+"kind": "a"
+},
+"Undurdle": {
+"id": "Undurdle",
+"kind": "a"
+},
+"Unsettling Opportunist Vullary": {
+"id": "Unsettling_Opportunist_Vullary",
+"kind": "a"
+},
+"Unwanted Audience": {
+"id": "Unwanted_Audience",
+"kind": "a"
+},
+"Ushabti of the Great Pharaoh": {
+"id": "Ushabti_of_the_Great_Pharaoh",
+"kind": "a"
+},
+"Vacarn, the Dark Goblin Necromancer": {
+"id": "Vacarn_the_Dark_Goblin_Necromancer",
+"kind": "a"
+},
+"Vampiric Sword": {
+"id": "Vampiric_Sword",
+"kind": "a"
+},
+"Vena, the Bounty Huntress": {
+"id": "Vena_the_Bounty_Huntress",
+"kind": "a"
+},
+"Venom Infusion": {
+"id": "Venom_Infusion",
+"kind": "a"
+},
+"Very Special Prisoner": {
+"id": "Very_Special_Prisoner",
+"kind": "a"
+},
+"Victorica, the Eternal Empress": {
+"id": "Victorica_the_Eternal_Empress",
+"kind": "a"
+},
+"Victory Phoenix Cannon": {
+"id": "Victory_Phoenix_Cannon",
+"kind": "a"
+},
+"Vinepire": {
+"id": "Vinepire",
+"kind": "a"
+},
+"Visionary Genius Heinz": {
+"id": "Visionary_Genius_Heinz",
+"kind": "a"
+},
+"Voice in your Head": {
+"id": "Voice_in_your_Head",
+"kind": "a"
+},
+"Waflav, the Metamorphing Monstrosity": {
+"id": "Waflav_the_Metamorphing_Monstrosity",
+"kind": "a"
+},
+"Waitress": {
+"id": "Waitress",
+"kind": "a"
+},
+"Wall Breaker General Ralzish": {
+"id": "Wall_Breaker_General_Ralzish",
+"kind": "a"
+},
+"Wanted Poster": {
+"id": "Wanted_Poster",
+"kind": "a"
+},
+"War Chest": {
+"id": "War_Chest",
+"kind": "a"
+},
+"War Council Gathering Place": {
+"id": "War_Council_Gathering_Place",
+"kind": "a"
+},
+"Warhorse": {
+"id": "Warhorse",
+"kind": "b"
+},
+"Warrior of Teocuilatl": {
+"id": "Warrior_of_Teocuilatl",
+"kind": "a"
+},
+"Water Golem": {
+"id": "Water_Golem",
+"kind": "a"
+},
+"Wavilion": {
+"id": "Wavilion",
+"kind": "a"
+},
+"Weakening Crystal": {
+"id": "Weakening_Crystal",
+"kind": "a"
+},
+"Wealth": {
+"id": "Wealth",
+"kind": "a"
+},
+"Weapon Absorption": {
+"id": "Weapon_Absorption",
+"kind": "a"
+},
+"Weapon Collecting Wight": {
+"id": "Weapon_Collecting_Wight",
+"kind": "a"
+},
+"Weapon Storm": {
+"id": "Weapon_Storm",
+"kind": "a"
+},
+"Weapon Unleashing": {
+"id": "Weapon_Unleashing",
+"kind": "a"
+},
+"Weird Doll": {
+"id": "Weird_Doll",
+"kind": "a"
+},
+"Wheels": {
+"id": "Wheels",
+"kind": "a"
+},
+"Whirlwind Strike": {
+"id": "Whirlwind_Strike",
+"kind": "a"
+},
+"Wildur, the Shining Coolness": {
+"id": "Wildur_the_Shining_Coolness",
+"kind": "a"
+},
+"Willy, the Valiant Leprechaun": {
+"id": "Willy_the_Valiant_Leprechaun",
+"kind": "a"
+},
+"Winged Skeleton": {
+"id": "Winged_Skeleton",
+"kind": "a"
+},
+"Wire Hatchling": {
+"id": "Wire_Hatchling",
+"kind": "a"
+},
+"Wisdom": {
+"id": "Wisdom",
+"kind": "a"
+},
+"Wolflesia, the Canine Flower": {
+"id": "Wolflesia_the_Canine_Flower",
+"kind": "a"
+},
+"Wowhalla, the Hall of the Cool": {
+"id": "Wowhalla_the_Hall_of_the_Cool",
+"kind": "a"
+},
+"Wowkyrie, Bringer of Coolness": {
+"id": "Wowkyrie_Bringer_of_Coolness",
+"kind": "a"
+},
+"Xal, the Animated Armor": {
+"id": "Xal_the_Animated_Armor",
+"kind": "a"
+},
+"Xalibur": {
+"id": "Xalibur",
+"kind": "a"
+},
+"Xiong, the Bamboo Guardian": {
+"id": "Xiong_the_Bamboo_Guardian",
+"kind": "a"
+},
+"Yolomungandr, Ender of Coolness": {
+"id": "Yolomungandr_Ender_of_Coolness",
+"kind": "a"
+},
+"Yukana, the Scholar on the Run": {
+"id": "Yukana_the_Scholar_on_the_Run",
+"kind": "a"
+},
+"Zamorin, the Spice Rajah": {
+"id": "Zamorin_the_Spice_Rajah",
+"kind": "a"
+},
+"Zhigao, the Heavenly Emperor": {
+"id": "Zhigao_the_Heavenly_Emperor",
+"kind": "a"
+},
+"Zombified Assault": {
+"id": "Zombified_Assault",
+"kind": "a"
+},
+"Zsos'Ssar, the Serpent Warlord": {
+"id": "ZsosSsar_the_Serpent_Warlord",
+"kind": "a"
+},
+"skin/Absolute Moron Tempeste": {
+"id": "skin_Absolute_Moron_Tempeste",
+"kind": "a"
+},
+"skin/Alchemic Xal": {
+"id": "skin_Alchemic_Xal",
+"kind": "a"
+},
+"skin/Alice the Wonderous Girl": {
+"id": "skin_Alice_the_Wonderous_Girl",
+"kind": "a"
+},
+"skin/Alien Invader Bartas": {
+"id": "skin_Alien_Invader_Bartas",
+"kind": "a"
+},
+"skin/Alleria the Octo Princess": {
+"id": "skin_Alleria_the_Octo_Princess",
+"kind": "a"
+},
+"skin/Ancient Hatusbal": {
+"id": "skin_Ancient_Hatusbal",
+"kind": "a"
+},
+"skin/Barker the Monster Trainer": {
+"id": "skin_Barker_the_Monster_Trainer",
+"kind": "a"
+},
+"skin/Beato the Golden Witch": {
+"id": "skin_Beato_the_Golden_Witch",
+"kind": "a"
+},
+"skin/Berserking Null": {
+"id": "skin_Berserking_Null",
+"kind": "a"
+},
+"skin/Bills Worst Nightmare": {
+"id": "skin_Bills_Worst_Nightmare",
+"kind": "a"
+},
+"skin/Blue Ralzish": {
+"id": "skin_Blue_Ralzish",
+"kind": "a"
+},
+"skin/Bravo Arnold": {
+"id": "skin_Bravo_Arnold",
+"kind": "a"
+},
+"skin/Broghan the Ancient Golem": {
+"id": "skin_Broghan_the_Ancient_Golem",
+"kind": "a"
+},
+"skin/Captain-Commander Damus": {
+"id": "skin_Captain_Commander_Damus",
+"kind": "a"
+},
+"skin/Cecilia the Clown": {
+"id": "skin_Cecilia_the_Clown",
+"kind": "a"
+},
+"skin/Classmate Hel": {
+"id": "skin_Classmate_Hel",
+"kind": "a"
+},
+"skin/Contract-Bound Orthos": {
+"id": "skin_Contract_Bound_Orthos",
+"kind": "a"
+},
+"skin/Creepy Villager Girl Semi": {
+"id": "skin_Creepy_Villager_Girl_Semi",
+"kind": "a"
+},
+"skin/Dad of the Year Von Pixmarck": {
+"id": "skin_Dad_of_the_Year_Von_Pixmarck",
+"kind": "a"
+},
+"skin/Dark Garius": {
+"id": "skin_Dark_Garius",
+"kind": "a"
+},
+"skin/Dark Maho": {
+"id": "skin_Dark_Maho",
+"kind": "a"
+},
+"skin/Dead Singer Molinda": {
+"id": "skin_Dead_Singer_Molinda",
+"kind": "a"
+},
+"skin/Delusional Monia": {
+"id": "skin_Delusional_Monia",
+"kind": "a"
+},
+"skin/Division Captain Lolek": {
+"id": "skin_Division_Captain_Lolek",
+"kind": "a"
+},
+"skin/Dr. Heinz N. Stein": {
+"id": "skin_Dr_Heinz_N_Stein",
+"kind": "a"
+},
+"skin/Duke Omikron": {
+"id": "skin_Duke_Omikron",
+"kind": "a"
+},
+"skin/ELEGANT Ingo": {
+"id": "skin_ELEGANT_Ingo",
+"kind": "a"
+},
+"skin/Elana the Digital Diva": {
+"id": "skin_Elana_the_Digital_Diva",
+"kind": "a"
+},
+"skin/Emperor Arthor": {
+"id": "skin_Emperor_Arthor",
+"kind": "a"
+},
+"skin/Empress of Hearts Victorica": {
+"id": "skin_Empress_of_Hearts_Victorica",
+"kind": "a"
+},
+"skin/Explosive Tazune": {
+"id": "skin_Explosive_Tazune",
+"kind": "a"
+},
+"skin/Extra Edgy Cuberto": {
+"id": "skin_Extra_Edgy_Cuberto",
+"kind": "a"
+},
+"skin/Extraterrestrial Serket": {
+"id": "skin_Extraterrestrial_Serket",
+"kind": "a"
+},
+"skin/Fern the Elf Slave": {
+"id": "skin_Fern_the_Elf_Slave",
+"kind": "a"
+},
+"skin/Fiona the Ghost Princess": {
+"id": "skin_Fiona_the_Ghost_Princess",
+"kind": "a"
+},
+"skin/Fullmetal Nicolas": {
+"id": "skin_Fullmetal_Nicolas",
+"kind": "a"
+},
+"skin/Gabby the Chosen Girl": {
+"id": "skin_Gabby_the_Chosen_Girl",
+"kind": "a"
+},
+"skin/Gabby the Moonlight Warrior": {
+"id": "skin_Gabby_the_Moonlight_Warrior",
+"kind": "a"
+},
+"skin/Gamer Champion Pharaoh": {
+"id": "skin_Gamer_Champion_Pharaoh",
+"kind": "a"
+},
+"skin/Gon the Half-Frozen": {
+"id": "skin_Gon_the_Half_Frozen",
+"kind": "a"
+},
+"skin/Grey Mage Archibald": {
+"id": "skin_Grey_Mage_Archibald",
+"kind": "a"
+},
+"skin/Güldefaber of the Fellowship": {
+"id": "skin_G_ldefaber_of_the_Fellowship",
+"kind": "a"
+},
+"skin/Hatmaker George": {
+"id": "skin_Hatmaker_George",
+"kind": "a"
+},
+"skin/Holy Styx": {
+"id": "skin_Holy_Styx",
+"kind": "a"
+},
+"skin/Ida the Fire Princess": {
+"id": "skin_Ida_the_Fire_Princess",
+"kind": "a"
+},
+"skin/Imperfect Pseudonia": {
+"id": "skin_Imperfect_Pseudonia",
+"kind": "a"
+},
+"skin/Kaito Sid the Phantom Thief": {
+"id": "skin_Kaito_Sid_the_Phantom_Thief",
+"kind": "a"
+},
+"skin/Kasperov the King of the East": {
+"id": "skin_Kasperov_the_King_of_the_East",
+"kind": "a"
+},
+"skin/Kasperov the King of the East1": {
+"id": "skin_Kasperov_the_King_of_the_East1",
+"kind": "a"
+},
+"skin/Kyli the True Mastermind": {
+"id": "skin_Kyli_the_True_Mastermind",
+"kind": "a"
+},
+"skin/Lightning-Fast Monia": {
+"id": "skin_Lightning_Fast_Monia",
+"kind": "a"
+},
+"skin/Little Carris": {
+"id": "skin_Little_Carris",
+"kind": "a"
+},
+"skin/Lizbeth the Hunter of Souls": {
+"id": "skin_Lizbeth_the_Hunter_of_Souls",
+"kind": "a"
+},
+"skin/Mad Scientist Heinz": {
+"id": "skin_Mad_Scientist_Heinz",
+"kind": "a"
+},
+"skin/Magical Girl Riffel": {
+"id": "skin_Magical_Girl_Riffel",
+"kind": "a"
+},
+"skin/Mass Murderer Devlin": {
+"id": "skin_Mass_Murderer_Devlin",
+"kind": "a"
+},
+"skin/Mega-Priestess Johanna": {
+"id": "skin_Mega_Priestess_Johanna",
+"kind": "a"
+},
+"skin/Mega-Warrior Karian": {
+"id": "skin_Mega_Warrior_Karian",
+"kind": "a"
+},
+"skin/Mega-Weapon Andras": {
+"id": "skin_Mega_Weapon_Andras",
+"kind": "a"
+},
+"skin/Monster King Siphem": {
+"id": "skin_Monster_King_Siphem",
+"kind": "a"
+},
+"skin/Monster Prince Asriel": {
+"id": "skin_Monster_Prince_Asriel",
+"kind": "a"
+},
+"skin/Mutated Teenager Brackle": {
+"id": "skin_Mutated_Teenager_Brackle",
+"kind": "a"
+},
+"skin/Nieht the Yellow Flash": {
+"id": "skin_Nieht_the_Yellow_Flash",
+"kind": "a"
+},
+"skin/Nomu of the Dawn": {
+"id": "skin_Nomu_of_the_Dawn",
+"kind": "a"
+},
+"skin/Non-Believer Doq": {
+"id": "skin_Non_Believer_Doq",
+"kind": "a"
+},
+"skin/Normal Nero Zira": {
+"id": "skin_Normal_Nero_Zira",
+"kind": "a"
+},
+"skin/One Chuck Man": {
+"id": "skin_One_Chuck_Man",
+"kind": "a"
+},
+"skin/Overlord Baaliel": {
+"id": "skin_Overlord_Baaliel",
+"kind": "a"
+},
+"skin/Parasytic ???": {
+"id": "skin_Parasytic",
+"kind": "a"
+},
+"skin/Quetzahuitl the Emerald Dragon": {
+"id": "skin_Quetzahuitl_the_Emerald_Dragon",
+"kind": "a"
+},
+"skin/Reaping Lethe": {
+"id": "skin_Reaping_Lethe",
+"kind": "a"
+},
+"skin/Regional Champ Mizune": {
+"id": "skin_Regional_Champ_Mizune",
+"kind": "a"
+},
+"skin/RhaBi the Human Hunter": {
+"id": "skin_RhaBi_the_Human_Hunter",
+"kind": "a"
+},
+"skin/SOS Crestina": {
+"id": "skin_SOS_Crestina",
+"kind": "a"
+},
+"skin/Saya the Grass Princess": {
+"id": "skin_Saya_the_Grass_Princess",
+"kind": "a"
+},
+"skin/Sett Dunking on You": {
+"id": "skin_Sett_Dunking_on_You",
+"kind": "a"
+},
+"skin/Shrunken Prodigy Peter Röll": {
+"id": "skin_Shrunken_Prodigy_Peter_R_ll",
+"kind": "a"
+},
+"skin/Sickly Mary": {
+"id": "skin_Sickly_Mary",
+"kind": "a"
+},
+"skin/Space Huntress Vena": {
+"id": "skin_Space_Huntress_Vena",
+"kind": "a"
+},
+"skin/Stellan the Calm Easter Bunny": {
+"id": "skin_Stellan_the_Calm_Easter_Bunny",
+"kind": "a"
+},
+"skin/Student Council President Nao": {
+"id": "skin_Student_Council_President_Nao",
+"kind": "a"
+},
+"skin/Tapu Jenny": {
+"id": "skin_Tapu_Jenny",
+"kind": "a"
+},
+"skin/Teocuilatl the Platinum Star": {
+"id": "skin_Teocuilatl_the_Platinum_Star",
+"kind": "a"
+},
+"skin/Teppesman the Deepsea Knight": {
+"id": "skin_Teppesman_the_Deepsea_Knight",
+"kind": "a"
+},
+"skin/Tharx the King of Conquerors": {
+"id": "skin_Tharx_the_King_of_Conquerors",
+"kind": "a"
+},
+"skin/The Eye of Argos": {
+"id": "skin_The_Eye_of_Argos",
+"kind": "a"
+},
+"skin/The Little Seaserpent": {
+"id": "skin_The_Little_Seaserpent",
+"kind": "a"
+},
+"skin/Thunder God Sol Rym": {
+"id": "skin_Thunder_God_Sol_Rym",
+"kind": "a"
+},
+"skin/Titan Slayer Friedhelm": {
+"id": "skin_Titan_Slayer_Friedhelm",
+"kind": "a"
+},
+"skin/Toras the Battle Maniac": {
+"id": "skin_Toras_the_Battle_Maniac",
+"kind": "a"
+},
+"skin/Ultimate Despair Inya": {
+"id": "skin_Ultimate_Despair_Inya",
+"kind": "a"
+},
+"skin/Vengeful Hunter Mao": {
+"id": "skin_Vengeful_Hunter_Mao",
+"kind": "a"
+},
+"skin/W. D. Kerthwack": {
+"id": "skin_W_D_Kerthwack",
+"kind": "a"
+},
+"skin/WAHflav the Uninvited Fighter": {
+"id": "skin_WAHflav_the_Uninvited_Fighter",
+"kind": "a"
+},
+"skin/World Eater Bakhm": {
+"id": "skin_World_Eater_Bakhm",
+"kind": "a"
+},
+"skin/ZsosSsar the Worm Soldier": {
+"id": "skin_ZsosSsar_the_Worm_Soldier",
+"kind": "a"
+},
+"Bishop of Kings [W]": {
+"id": "Bishop_of_Kings_1",
+"kind": "a"
+},
+"Kasperov, the King of Kings [W]": {
+"id": "Kasperov_the_King_of_Kings_1",
+"kind": "a"
+},
+"Knight of Kings [W]": {
+"id": "Knight_of_Kings_1",
+"kind": "a"
+},
+"Pawn of Kings [W]": {
+"id": "Pawn_of_Kings_1",
+"kind": "a"
+},
+"Queen of Kings [W]": {
+"id": "Queen_of_Kings_1",
+"kind": "a"
+},
+"Rook of Kings [W]": {
+"id": "Rook_of_Kings_1",
+"kind": "a"
+}
+}

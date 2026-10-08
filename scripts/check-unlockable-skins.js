@@ -2,15 +2,16 @@
 // ════════════════════════════════════════════════════════════════
 //  WÄCHTER: FREISCHALTBARE SKINS BLEIBEN AUS SHOP UND CPU-HAND
 //
-//  Skins in `cards/skins/unlockable/` stehen NICHT im Shop, sondern
+//  Freischaltbare Skins (Kunst im Atlas public/cardgen, Kennzeichen `unlockable: true` in
+//  data/card-render.json; früher Bilder in `cards/skins/unlockable/`) stehen NICHT im Shop, sondern
 //  werden über Ereignisse frei (Regeln: unlockable-skins.js):
 //    • Bills Worst Nightmare → Tutorial geschafft
 //    • Dr. Heinz N. Stein    → am 31.10. (lokale Uhr) eine Partie gewonnen
 //  CPUs/Bots dürfen sie NIEMALS tragen.
 //
 //  Geprüft wird:
-//   1. Jede Regel hat ihr Bild in unlockable/ und einen Eintrag in
-//      data/skins.json — und jedes Bild dort hat eine Regel.
+//   1. Jede Regel hat ihr Bild (Atlas bzw. unlockable/) und einen Eintrag in
+//      data/skins.json — und jedes freischaltbare Bild hat eine Regel.
 //   2. Kein freischaltbarer Skin liegt zusätzlich in cards/skins/
 //      (sonst stünde er im Shop).
 //   3. server.js: `scanSkinFiles()` wird nur von `shopSkinNames()`
@@ -36,12 +37,14 @@ const ok = (cond, msg) => { if (!cond) fehler(msg); };
 // 1 + 2: Dateien und Regeln
 const skinsData = JSON.parse(fs.readFileSync(path.join(WURZEL, 'data', 'skins.json'), 'utf-8'));
 const dateien = U.unlockableSkinNames();
+const mitKunst = new Set(require('../card-images').skinFileList(U.SKINS_DIR).map(f => path.basename(f, path.extname(f))));
 for (const name of Object.keys(U.RULES)) {
-  ok(dateien.has(name), `Regel „${name}“ hat kein Bild in cards/skins/unlockable/`);
+  ok(dateien.has(name), `Regel „${name}“ ist nicht als freischaltbar gekennzeichnet (unlockable: true in data/card-render.json)`);
+  ok(mitKunst.has(name) || fs.existsSync(path.join(U.SKINS_DIR, 'unlockable', name + '.png')), `Regel „${name}“ hat kein Bild (Atlas public/cardgen/art.json oder cards/skins/unlockable/)`);
   ok(U.heroOfSkin(skinsData, name), `„${name}“ steht in keiner Heldenliste von data/skins.json`);
 }
-for (const name of dateien) ok(U.RULES[name], `cards/skins/unlockable/${name} hat keine Freischalt-Regel (unlockable-skins.js RULES)`);
-const oben = new Set(fs.readdirSync(U.SKINS_DIR).map(f => path.basename(f, path.extname(f))));
+for (const name of dateien) ok(U.RULES[name], `freischaltbarer Skin „${name}“ hat keine Freischalt-Regel (unlockable-skins.js RULES)`);
+const oben = new Set((fs.existsSync(U.SKINS_DIR) ? fs.readdirSync(U.SKINS_DIR) : []).map(f => path.basename(f, path.extname(f))));
 for (const name of dateien) ok(!oben.has(name), `„${name}“ liegt auch direkt in cards/skins/ und wäre im Shop kaufbar`);
 ok(U.allTutorialIds().length > 0, 'keine Tutorial-Stufen gefunden (data/puzzles/tutorial/)');
 
