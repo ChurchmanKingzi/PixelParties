@@ -156,6 +156,51 @@ console.log('Kampfstart: erschienene Karten sind echte Support-Karten der Engine
     const hero = gs.players[0].heroes[0];
     check('Held in der Spalte ist der Idej Lord', hero && hero.name === 'Idej Lord Nobunakin', hero && hero.name);
   } catch (e) { fails++; console.log('  ✗ Kampfstart-Test:', e && e.stack || e); }
+
+  console.log('Bot-Aufbau: jeder aufgestellte Idej Lord hat sein volles Paket im Kampf');
+  try {
+    const { runGame } = require('../../skilltest/sim');
+    const oL = console.log, oE = console.error;
+    const seen = {};
+    for (let seed = 1; seed <= 20; seed++) {
+      console.log = () => {}; console.error = () => {};
+      let o; try { o = await runGame({ seats: 4, setupOnly: true, noProfileSeats: [0, 1, 2, 3], seed }); } finally { console.log = oL; console.error = oE; }
+      o.gs.players.forEach((p, i) => (p.heroes || []).forEach((h, hi) => {
+        if (!h || !/^Idej Lord/.test(h.name || '')) return;
+        const col = (p.supportZones[hi] || []).map(z => z && z[0]).filter(Boolean);
+        const pack = PACK[h.name];
+        const proj = col.filter(n => n === Rules.IDEJ_PROJECTION).length, bl = col.filter(n => Rules.IDEJ_BLADES.includes(n));
+        (seen[h.name] = seen[h.name] || []).push(proj === pack.proj && bl.length === pack.blade && new Set(bl).size === bl.length);
+      }));
+    }
+    const total = Object.values(seen).reduce((a, v) => a + v.length, 0);
+    check('Bots stellen Idej Lords auf (' + total + ' in 20 Partien)', total >= 3, seen);
+    check('…jeder mit exakt dem Paket seines Effekts (Projections/Blades, Blades verschieden)', Object.values(seen).every(v => v.every(Boolean)), seen);
+  } catch (e) { fails++; console.log('  ✗ Bot-Aufbau-Test:', e && e.stack || e); }
+
+  console.log('Kampf: erschienene Idej Projections wirken (negieren Schaden, bis sie verbraucht sind)');
+  try {
+    const { runGame } = require('../../skilltest/sim');
+    const oL = console.log, oE = console.error;
+    console.log = () => {}; console.error = () => {};
+    let o;
+    try {
+      o = await runGame({ seats: 3, setupOnly: true, noProfileSeats: [0, 1, 2], seed: 5, mutatePrep: (prep) => {
+        const ps = prep.players[1]; ps.ready = false; ps.hand.push('Idej Lord Daiyo');
+        const r = Rules.applyMove(env, ps, { type: 'place', from: { kind: 'hand', idx: ps.hand.indexOf('Idej Lord Daiyo') }, to: { kind: 'hero', hi: 0 } });
+        if (!r.ok) throw new Error(r.reason);
+        prep.players[1] = Object.assign(r.ps, { ready: true });
+      } });
+    } finally { console.log = oL; console.error = oE; }
+    const { gs, engine } = o;
+    const hero = gs.players[1].heroes[0];
+    const hp = hero.hp, left = () => gs.players[1].supportZones[0].filter(z => z[0] === Rules.IDEJ_PROJECTION).length;
+    check('Daiyo startet mit 3 Projections', hero.name === 'Idej Lord Daiyo' && left() === 3, [hero.name, left()]);
+    for (let i = 1; i <= 3; i++) await engine.actionDealDamage({ name: 'Test Attack', owner: 0 }, hero, 40, 'attack');
+    check('Die ersten 3 Treffer werden negiert (HP unverändert, alle Projections verbraucht)', hero.hp === hp && left() === 0, [hp, hero.hp, left()]);
+    await engine.actionDealDamage({ name: 'Test Attack', owner: 0 }, hero, 40, 'attack');
+    check('Der vierte Treffer wirkt', hero.hp === hp - 40, [hp, hero.hp]);
+  } catch (e) { fails++; console.log('  ✗ Projection-Test:', e && e.stack || e); }
   console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Idej-/Pool-Tests grün');
   process.exit(fails ? 1 : 0);
 })();
