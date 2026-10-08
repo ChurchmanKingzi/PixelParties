@@ -8044,20 +8044,19 @@ function TextBox() {
   // unten abgeschnitten. Gemessen wird an einer unsichtbaren Kopie des
   // GANZEN Seitentexts (`.textbox-sizer`, gleiche Auszeichnung, gleiche
   // Breite) — nicht am Tipptext, der erst waehrend des Tippens waechst.
-  // Passt der Text in die Standardbox, bleibt alles wie es war.
+  // Die Spalte streckt sich auf die Hoehe der Box (CSS `min-height`), ihre
+  // Hoehe ohne Zutun ist also das, was die Box ohnehin hat.
+  // Seitenzaehler und Weiter-Pfeil sitzen am unteren Rand (ca. 28 px hoch);
+  // der Text darf sie nicht beruehren — dafuer 26 px Zuschlag auf den Text-
+  // bedarf (gemessen: 18 liess null Luft zwischen letzter Zeile und Zaehler).
+  // Passt alles, bleibt die Box unveraendert.
   useLayoutEffect(() => {
     const body = bodyRef.current, sizer = sizerRef.current;
     if (!body || !sizer || !pages.length) return undefined;
     const anpassen = () => {
       body.style.height = '';
-      body.style.paddingBottom = '';
-      const noetig = sizer.offsetHeight;
-      if (noetig > body.clientHeight) {
-        // 18 px mehr unten: so liegt die letzte Zeile ueber dem
-        // Seitenzaehler und dem Weiter-Pfeil.
-        body.style.paddingBottom = '28px';
-        body.style.height = Math.ceil(noetig + 18) + 'px';
-      }
+      const noetig = sizer.offsetHeight + 26;
+      if (noetig > body.clientHeight) body.style.height = Math.ceil(noetig) + 'px';
     };
     anpassen();
     window.addEventListener('resize', anpassen);
@@ -8065,7 +8064,6 @@ function TextBox() {
     return () => {
       window.removeEventListener('resize', anpassen);
       body.style.height = '';
-      body.style.paddingBottom = '';
     };
   }, [pages, pageIdx, opts]);
 
@@ -8455,17 +8453,19 @@ const TUTORIAL_SCRIPTS = {
           '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]',
         ] },
       // ── Highlight: die gegnerischen Helden ──
-      { text: 'And look - my three Heroes are all already weakened and only have **150 HP left**.',
+      { text: 'And look at my Heroes - all three of them are already weakened and only have **150 HP left**!',
         highlights: [
           '[data-hero-owner="opp"][data-hero-name]',
         ] },
-      { text: "So - let's go!\nSend your Skeletons against my Heroes and turn them into charred spots on the ground, beep-boop!",
+      { text: "A perfect setup - let's go!\nSend your Skeletons against my Heroes and turn them into charred spots on the ground, beep-boop!",
         highlights: [
           '[data-hero-owner="opp"][data-hero-name]',
         ] },
+      // ── Highlight: beide Main Phases ──
       { text: "To activate a Creature's active effect, just click on it during either of your **Main Phases**!",
         highlights: [
-          '[data-hero-owner="opp"][data-hero-name]',
+          '[data-phase-name="Main Phase 1"]',
+          '[data-phase-name="Main Phase 2"]',
         ] },
     ],
     outro: [
