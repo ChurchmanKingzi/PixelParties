@@ -621,12 +621,12 @@ Kern-HP ⚙ 5000. Er wird nur durch Artillerie, Chaos-Effekte und Welt-Ereigniss
 
 **Hilfe** bis zum nächsten Zeitstopp (⚙ Stufen `AID`, Anzeige im Spiel unter „Comeback aid“):
 
-| Stufe | Rückstand ab | Behalten | Neuwurf | Ziehgewichte | Freier Wiederaufbau | XP aller Einheiten |
-|---|---|---|---|---|---|---|
-| 0 | – | 3 | 1 | normal | 0 | – |
-| 1 | 0,12 | +1 | +0 | normal | 1 | +15 % |
-| 2 | 0,25 | +1 | +1 | wie 1 Zeitstopp später | 2 | +30 % |
-| 3 | 0,40 | +2 | +1 | wie 2 Zeitstopps später | 3 | +50 % |
+| Stufe | Rückstand ab | Behalten | Neuwurf | Ziehgewichte | Freier Wiederaufbau | XP | Reparatur zum Zeitstopp | Verstärkung (Soll und Nachschub je Sturm-/Verteidiger-Eintrag) | Bauteile nehmen weniger Schaden | Eigene Artillerie |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | – | 3 | 1 | normal | 0 | – | – | – | – | – |
+| 1 | 0,12 | +1 | +0 | normal | 1 | +15 % | 8 % Max-HP | – | −10 % | +10 % Schaden |
+| 2 | 0,25 | +1 | +1 | wie 1 Zeitstopp später | 2 | +30 % | 15 % | +1 | −20 % | +20 % |
+| 3 | 0,40 | +2 | +1 | wie 2 Zeitstopps später | 3 | +50 % | 25 % | +2 | −35 % | +35 % |
 
 - **Freier Wiederaufbau:** Im Zeitstopp darf der Spieler zerstörte Bauteile (Ruinen, grün umrandet) ohne Karte wiederherstellen: **50 % HP, 3 s Bauzeit**, Rang und Platz bleiben. Ruinen lassen sich nicht mehr aufnehmen (das gab vorher heimlich die Karte zurück).
 - Das Ziel ist eine **Comeback-Chance ≥ 25 %** (§12.1). Die Bot-Sim misst sie (`comeback:` am Ende von `npm run sim`) und vergleicht mit `BB_NOAID=1` ohne Hilfe.

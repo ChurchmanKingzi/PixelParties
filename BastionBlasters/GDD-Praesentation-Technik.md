@@ -461,7 +461,7 @@ Alle Startwerte zum Ausprobieren; diese Tabelle soll später als Datei (z. B. `t
 | `SEGMENT_WAVES_BASE` / `_STEP` / `_MAX` | Wellen je Kampfabschnitt | 2 / +1 je Zeitstopp / 9 | – |
 | `SLOT_BASE` / `UNIT_ROOM_SLOT` / `SLOT_MAX` | Kontingent-Plätze | 5 (+1 je Zeitstopp) / ½ je Einheiten-Raum / 16 | – |
 | `AID[1..3].from` | Aufholhilfe ab Rückstand | 0,12 / 0,25 / 0,40 | 0,08–0,6 |
-| `AID[].keep` / `reroll` / `tier` / `rebuild` / `xp` | Aufholhilfe je Stufe | 1/0/0/1/15 %, 1/1/1/2/30 %, 2/1/2/3/50 % | – |
+| `AID[].keep` / `reroll` / `tier` / `rebuild` / `xp` / `repair` / `surge` / `shield` / `arty` | Aufholhilfe je Stufe | 1/0/0/1/15 %/8 %/0/10 %/10 %, 1/1/1/2/30 %/15 %/1/20 %/20 %, 2/1/2/3/50 %/25 %/2/35 %/35 % | – |
 | `CIV_SLOT_BASE` / `CIV_SLOT_MAX` | Zivilisten-Plätze | 2 (+1 je Zeitstopp) / 8 | – |
 | `CONQUEST_PER_UNIT` / `_DECAY` | Eroberung | 1,5 %/s je Eindringling / −3 %/s | – |
 | `FOUNDATION` | Fundament-Karten zum Start | 7 Räume, 2 Fallen, 2 Türme, 1 frei | – |
