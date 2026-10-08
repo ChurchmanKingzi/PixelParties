@@ -8592,6 +8592,7 @@ const TUTORIAL_SCRIPTS = {
     const GIFT = '.game-hand-me [data-card-name="Divine Gift of Fire"]';
     const QUICK = '.game-hand-me [data-card-name="Quick Attack"]';
     const BLOW = '.game-hand-me [data-card-name="Blow of the Venom Snake"]';
+    const GEGNER = '[data-hero-owner="opp"][data-hero-name]';
     return {
     // Kein `nurActionPhase`: die Statusschaeden ticken erst am Zugende, das
     // Tutorial braucht also den manuellen Phasenwechsel bis ans Ende.
@@ -8637,16 +8638,16 @@ const TUTORIAL_SCRIPTS = {
       // ── Highlight: Blow of the Venom Snake ──
       { text: '... and count as a previous Attack for your {red:**Blow of the Venom Snake**}!',
         highlights: [BLOW] },
+      // ── Highlight: Monias drei Helden ──
       { text: 'With all that, you should have plenty of status and Attack damage available to beat my poor Heroes.',
-        highlights: [BLOW] },
+        highlights: [GEGNER] },
       { text: 'Good luck, beep-boop!',
-        highlights: [BLOW] },
+        highlights: [GEGNER] },
     ],
     outro: [
       { text: 'Perfect, beep-boop!' },
       { text: 'You can use {yellow:**Stun**}, {#88ddff:**Freeze**} and other inhibiting status effects to slow your opponent down, while {purple:**Poison**} and {orange:**Burn**} whittle them down!' },
-      { text: 'But one word of warning!' },
-      { text: 'After an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
+      { text: 'With one caveat:\nAfter an inhibiting status effect runs out on a target, it becomes **immune** to further non-damaging status effects for 1 turn!' },
       { text: 'You have to time your status effects properly if you want to truly control the flow of the battle!' },
       { text: 'You got that?\nNice!' },
       { text: 'See you next lesson!' },

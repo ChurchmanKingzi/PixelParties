@@ -15144,6 +15144,20 @@ body:has(.modal-overlay) .tooltip {
 /* ═══════════════════════════════════════════════════════════════
    TEXTBOX — Dialogue overlay with typewriter effect
    ═══════════════════════════════════════════════════════════════ */
+/* Der gemeinsame Puls-Takt aller Highlights: EINE animierte Eigenschaft auf
+   dem Overlay, die alle Klone erben (`--tb-puls`, 0 → 1 → 0). Jeder Klon
+   leitet Groesse und Schein daraus ab — damit pulsieren mehrere Highlights
+   zwangslaeufig im Gleichtakt, egal wann welcher Klon eingehaengt wurde
+   (eigene Animationen je Klon liefen je nach Einhaengezeit versetzt). */
+@property --tb-puls {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+@keyframes textbox-puls-takt {
+  0%, 100% { --tb-puls: 0; }
+  50%      { --tb-puls: 1; }
+}
 .textbox-overlay {
   position: fixed;
   inset: 0;
@@ -15154,11 +15168,11 @@ body:has(.modal-overlay) .tooltip {
   padding-top: 18px;
   background: rgba(0,0,0,.45);
   pointer-events: none;
-  animation: textbox-fade-in .25s ease-out;
+  animation: textbox-fade-in .25s ease-out, textbox-puls-takt 1.4s ease-in-out infinite;
 }
 @keyframes textbox-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .textbox-fading {
-  animation: textbox-fade-out 1s ease-in forwards;
+  animation: textbox-fade-out 1s ease-in forwards, textbox-puls-takt 1.4s ease-in-out infinite;
   pointer-events: none !important;
 }
 @keyframes textbox-fade-out { from { opacity: 1; } to { opacity: 0; } }
@@ -15552,16 +15566,16 @@ body:has(.textbox-overlay) .tooltip {
   0%, 100% { box-shadow: 0 0 16px rgba(0,240,255,.6), 0 0 30px rgba(0,240,255,.25); }
   50%      { box-shadow: 0 0 24px rgba(0,240,255,.8), 0 0 40px rgba(0,240,255,.4); }
 }
+/* Jedes Highlight pulsiert leicht (TextBox setzt `.textbox-highlight-pulse`):
+   ein paar Prozent Groesse und ein atmender Schein — beides aus dem
+   gemeinsamen Takt `--tb-puls` des Overlays, also immer synchron. */
 .textbox-highlight-pulse {
-  animation: textbox-hl-pulse 1.4s ease-in-out infinite;
+  animation: none;
+  transform: scale(calc(1 + .035 * var(--tb-puls)));
+  box-shadow:
+    0 0 calc(16px + 10px * var(--tb-puls)) rgba(0,240,255, calc(.6 + .2 * var(--tb-puls))),
+    0 0 calc(30px + 12px * var(--tb-puls)) rgba(0,240,255, calc(.25 + .15 * var(--tb-puls)));
 }
-/* Jedes Highlight pulsiert (TextBox setzt `.textbox-highlight-pulse`),
-   darum bewusst leicht: ein paar Prozent Groesse, ruhiger Takt. */
-@keyframes textbox-hl-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 16px rgba(0,240,255,.6), 0 0 30px rgba(0,240,255,.25); }
-  50%      { transform: scale(1.035); box-shadow: 0 0 26px rgba(0,240,255,.8), 0 0 42px rgba(0,240,255,.4); }
-}
-
 /* ── Responsive ── */
 @media (max-height: 500px) {
   .textbox-overlay { padding-top: 6px; }
