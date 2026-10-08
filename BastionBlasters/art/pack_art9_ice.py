@@ -115,34 +115,49 @@ def reception_desk():
 
 
 def penguin_clerk(f=0):
-    """Pinguin am Empfang (16 x 24): Fliege, kleine Portiermuetze"""
-    c = Canvas(16, 24)
+    """Pinguin am Empfang (22 x 32): Fliege, Portiersmuetze, Flossen auf dem Tresen"""
+    c = Canvas(22, 32)
     # Fuesse
-    c.rect(4, 22, 7, 23, 'gold', 3)
-    c.rect(9, 22, 12, 23, 'gold', 3)
+    c.rect(5, 30, 9, 31, 'gold', 3)
+    c.rect(12, 30, 16, 31, 'gold', 3)
     # Flossen
-    poly(c, [(2, 11), (4, 11), (4, 19), (1, 17)], 'coal', lo=0, hi=3)
-    poly(c, [(13, 11), (11, 11), (11, 19), (14, 17)], 'coal', lo=0, hi=3)
+    poly(c, [(2, 14), (5, 14), (5, 25), (1, 22)], 'coal', lo=0, hi=3)
+    poly(c, [(19, 14), (16, 14), (16, 25), (20, 22)], 'coal', lo=0, hi=3)
     # Koerper
-    ellipse(c, 8, 15, 6.2, 8.0, 'coal', lo=0, hi=3, ambient=0.2)
-    ellipse(c, 8.5, 16.5, 3.8, 6.0, 'bone', lo=3, hi=5)
+    ellipse(c, 11, 21, 8.4, 10.4, 'coal', lo=0, hi=3, ambient=0.2)
+    ellipse(c, 11.5, 22.5, 5.4, 8.2, 'bone', lo=3, hi=5)
     # Kopf
-    ellipse(c, 8, 7, 5.4, 5.0, 'coal', lo=0, hi=3, ambient=0.2)
-    c.rect(5, 7, 6, 8, 'bone', 5)
-    c.rect(10, 7, 11, 8, 'bone', 5)
-    c.put_ramp(6, 7, 'coal', 0)
-    c.put_ramp(10, 7, 'coal', 0)
-    poly(c, [(7, 9), (11, 9), (9.5, 12)], 'gold', lo=3, hi=5)
+    ellipse(c, 11, 10, 7.4, 6.6, 'coal', lo=0, hi=3, ambient=0.2)
+    c.rect(6, 9, 8, 11, 'bone', 5)
+    c.rect(13, 9, 15, 11, 'bone', 5)
+    c.rect(7, 10, 8, 11, 'coal', 1)
+    c.rect(13, 10, 14, 11, 'coal', 1)
+    poly(c, [(9, 12), (14, 12), (11.5, 16)], 'gold', lo=3, hi=5)
     # Fliege
-    poly(c, [(6, 13), (8, 14), (6, 15)], 'teamA', lo=2, hi=4)
-    poly(c, [(11, 13), (9, 14), (11, 15)], 'teamA', lo=1, hi=3)
-    c.put_ramp(8, 14, 'gold', 4)
-    # Muetze
-    c.rect(4, 2, 12, 3, 'teamA', 3)
-    c.rect(4, 2, 12, 2, 'teamA', 4)
-    c.rect(5, 0, 11, 1, 'teamA', 2)
-    c.rect(3, 4, 13, 4, 'coal', 2)
-    c.put_ramp(8, 2, 'gold', 5)
+    poly(c, [(7, 17), (11, 18.5), (7, 20)], 'teamA', lo=2, hi=4)
+    poly(c, [(16, 17), (12, 18.5), (16, 20)], 'teamA', lo=1, hi=3)
+    c.put_ramp(11, 18, 'gold', 4)
+    c.put_ramp(11, 19, 'gold', 3)
+    # Portiersmuetze
+    c.rect(6, 3, 16, 5, 'teamA', 3)
+    c.rect(6, 3, 16, 3, 'teamA', 4)
+    c.rect(7, 1, 15, 2, 'teamA', 2)
+    c.rect(5, 5, 17, 5, 'coal', 2)
+    c.rect(10, 3, 12, 4, 'gold', 4)
+    c.put_ramp(11, 3, 'gold', 5)
+    c.outline()
+    return c
+
+
+def snowflake_crest():
+    """Wappen mit Schneeflocke (16 x 18)"""
+    c = Canvas(16, 18)
+    poly(c, [(1, 1), (14, 1), (14, 10), (7.5, 17), (1, 10)], 'ice', lo=1, hi=4)
+    cx, cy = 7, 8
+    for (dx, dy) in ((0, 0), (0, 1), (0, -1), (1, 0), (-1, 0), (0, 2), (0, -2), (2, 0), (-2, 0), (0, 3), (0, -3), (3, 0), (-3, 0),
+                     (2, 2), (-2, 2), (2, -2), (-2, -2), (1, 1), (-1, 1), (1, -1), (-1, -1)):
+        c.put_ramp(cx + dx, cy + dy, 'bone', 5)
+    c.rect(3, 2, 11, 2, 'ice', 5)
     c.outline()
     return c
 

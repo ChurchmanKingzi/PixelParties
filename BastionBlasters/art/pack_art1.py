@@ -252,21 +252,22 @@ def _art_ua08():
 @card_art('UA-09')
 def _art_ua09():
     w = ground_world('dark', 3)
-    for (sp, x, y) in ((tombstone(0), 14, 40), (dead_tree(1), 130, 48), (tombstone(1), 28, 92), (tombstone(0), 134, 92)):
+    for (sp, x, y) in ((tombstone(0), 14, 40), (dead_tree(1), 132, 46), (tombstone(1), 26, 93), (tombstone(0), 136, 90)):
         prop_at(w, sp, x, y)
     spr = spr_bat_witch()
     shadow(w, 42, 86, 17, 3)
     w.draw(spr, 6, 18, 60)                                   # schwebt über dem Boden
     # Zielgebiet 3x3: mehrere Zielmarken, Fledermäuse stürzen darauf
-    zones = ((96, 74, 8), (118, 66, 8), (110, 86, 8), (130, 78, 7), (88, 90, 7))
+    zones = ((100, 66, 6), (124, 62, 6), (112, 80, 6), (88, 84, 5), (130, 84, 5))
     for (x, y, r) in zones:
         zielschatten(w, x, y, r, 1)
     for k, (x, y, r) in enumerate(zones):
         b = bat_spr(k % 2, big=(k % 2 == 0))
-        put(w, b, x + (k % 3) * 2 - 2, y - 14 - (k % 2) * 6, 9100)
+        bx, by = x + 1, y - 13 - (k % 2) * 4
+        put(w, b, bx, by, 9100)
         for j in range(1, 4):
-            put_px(w, x - j * 2 + 3, y - 14 - (k % 2) * 6 + j * 3, 'purple', 4, 9000)
-    unit_at(w, citizen('cloth', 1), 116, 82, sh=(5, 2))
+            put_px(w, bx - j * 2, by - 2 + j * 2, 'purple', 4, 9000)
+    unit_at(w, citizen('cloth', 1), 118, 74, flip=True, sh=(5, 2))
     return finish(w)
 
 
@@ -276,24 +277,57 @@ def _art_ua09():
 @card_art('UA-10')
 def _art_ua10():
     w = ground_world('planks', 5)
-    for (sp, x, y) in ((barrel(), 14, 34), (rack(), 132, 32), (crate(), 14, 94)):
+    for (sp, x, y) in ((barrel(), 14, 34), (rack(), 132, 32), (crate(), 16, 94)):
         prop_at(w, sp, x, y)
     spr = spr_nailboard_ballista()
-    unit_at(w, spr, 36, 84, sh=(26, 4))
-    ox, oy = _origin(spr, 36, 84)
+    unit_at(w, spr, 34, 86, sh=(26, 4))
+    ox, oy = _origin(spr, 34, 86)
     by = oy + 20                                              # Höhe des geladenen Bolzens
-    # drei Kisten hintereinander, vom Bolzen durchschlagen (Spur wird schwächer)
-    ys = by + 8
-    for k, (x, kind) in enumerate(((82, 0), (101, 1), (120, 0))):
-        sp = crate() if kind == 0 else barrel()
-        prop_at(w, sp, x, ys + (1 if kind else 0))
-        for (dx, dy) in ((8, -4), (9, 2), (10, -1), (-8, -2)):
-            put_px(w, x + dx, by + dy + 1, 'wood', 5, 9300)
-            put_px(w, x + dx + 1, by + dy + 1, 'wood', 3, 9300)
-        burst(w, x + 7, by + 3, 'gold', 6, 4, x)
+    zielschatten(w, 102, 84, 17, 1)
+    # drei Barrikaden (Zellen) hintereinander: Einschussloch wird kleiner (-20 % je Zelle)
+    fy = by + 28
+    for k, (x, hole) in enumerate(((78, 4.2), (99, 3.2), (120, 2.2))):
+        bar = barricade(hole)
+        prop_at(w, bar, x, fy)
+        hy = fy - bar.h + 1 + bar.h // 3 + 1
+        for (dx, dy) in ((11, -5), (12, 3), (10, 7)):
+            put_px(w, x + dx, hy + dy, 'wood', 5, 9300)
+            put_px(w, x + dx + 1, hy + dy, 'wood', 3, 9300)
+        burst(w, x + 11, hy, 'gold', 6, 4, x)
+    hy = fy - 38 + 1 + 38 // 3 + 1
     bolt = proj_bolt()
-    put(w, bolt, 108, by + 2, 9200)
-    for k in range(6):
-        put_px(w, 78 - k * 4, by + 3, 'bone', 3 if k > 2 else 5, 9100)
-    zielschatten(w, 120, ys + 12, 14, 1)
+    put(w, bolt, 104, hy, 9200)
+    for k in range(7):
+        put_px(w, 60 - k * 3, hy, 'bone', 3 if k > 3 else 5, 9100)
+    return finish(w)
+
+
+# =========================================================================== UA-11 Blitzspulen-Hexe
+
+
+@card_art('UA-11')
+def _art_ua11():
+    w = ground_world('slab', 4)
+    for (sp, x, y) in ((anvil(), 16, 36), (barrel(), 132, 34), (crate(), 16, 94)):
+        prop_at(w, sp, x, y)
+    spr = spr_coil_witch()
+    unit_at(w, spr, 30, 88, sh=(15, 4))
+    ox, oy = _origin(spr, 30, 88)
+    tip = (ox + 40, oy + 19)                                   # Stabkugel
+    g1 = guard('idle', 0)
+    g2 = guard('idle', 1)
+    sk = skeleton('idle', 1)
+    unit_at(w, g1, 80, 80, flip=True, team_swap=True)
+    unit_at(w, sk, 106, 66, flip=True)
+    unit_at(w, g2, 126, 86, flip=True, team_swap=True)
+    c1, c2, c3 = (78, 66), (105, 54), (124, 71)               # Körpermitten der Ziele
+    lightning(w, [tip, c1], 3)
+    lightning(w, [c1, c2], 5)
+    lightning(w, [c2, c3], 8)
+    for (x, y, r) in ((c1[0], c1[1], 5), (c2[0], c2[1], 4), (c3[0], c3[1], 5)):
+        burst(w, x, y, 'gold', 8, r + 2, x, 9900)
+    burst(w, tip[0], tip[1], 'ice', 8, 6, 2, 9900)
+    for (x, y) in ((86, 54), (122, 58), (72, 76), (110, 78)):                 # Funken (Kurzschluss)
+        put_px(w, x, y, 'gold', 5, 9800)
+        put_px(w, x + 1, y + 1, 'ice', 5, 9800)
     return finish(w)

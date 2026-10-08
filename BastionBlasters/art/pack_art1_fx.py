@@ -402,3 +402,34 @@ def dirt_mound(w=14, h=7, seed=1):
             c.put_ramp(x, y, 'dirt', rnd.choice([1, 2]))
     c.outline()
     return c
+
+
+def barricade(hole=3.5, h=38):
+    """Holzbarrikade aus senkrechten Bohlen (Zielzelle für den Bolzen); hole = Radius des Einschussloches (0 = keins)"""
+    c = Canvas(18, h)
+    for k in range(4):
+        x0 = 1 + k * 4
+        top = 2 + (k % 2) * 2
+        for x in range(x0, x0 + 4):
+            for y in range(top, h - 1):
+                u = (x - x0) / 3.0
+                idx = 4 if u < 0.3 else (3 if u < 0.7 else 2)
+                if (y + k) % 7 == 0:
+                    idx -= 1
+                c.put_ramp(x, y, 'wood', idx)
+        c.put_ramp(x0 + 1, top - 1, 'wood', 3)
+        c.put_ramp(x0 + 2, top - 1, 'wood', 3)
+    for y in (h // 4, 3 * h // 4):
+        for x in range(0, 17):
+            c.put_ramp(x, y, 'wood', 1 if x % 2 else 2)
+            c.put_ramp(x, y + 1, 'wood', 3)
+        c.put_ramp(2, y, 'metal', 5)
+        c.put_ramp(14, y, 'metal', 5)
+    if hole > 0:
+        cy = h // 3 + 1
+        ellipse(c, 9, cy, hole + 1.6, hole + 1.6, 'wood', lo=4, hi=5)
+        ellipse(c, 9, cy, hole, hole, 'coal', lo=0, hi=1, ambient=0.2)
+        for (dx, dy) in ((-int(hole) - 2, -3), (int(hole) + 2, 2), (-int(hole) - 1, 4)):
+            c.put_ramp(9 + dx, cy + dy, 'wood', 5)
+    c.outline()
+    return c

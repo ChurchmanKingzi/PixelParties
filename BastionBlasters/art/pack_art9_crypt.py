@@ -122,15 +122,15 @@ def armchair_reader():
     """Skelett im Ohrensessel liest Zeitung (36 x 36), Pantoffeln, Teetasse auf der Lehne"""
     c = Canvas(36, 36)
     # Sessel hinten (Lehne)
-    round_rect(c, 3, 4, 28, 30, 'cloth', lo=1, hi=4, radius=4)
-    round_rect(c, 0, 14, 7, 32, 'cloth', lo=1, hi=4, radius=2)     # linke Armlehne
-    round_rect(c, 25, 14, 32, 32, 'cloth', lo=0, hi=3, radius=2)    # rechte Armlehne
+    round_rect(c, 3, 4, 28, 30, 'cloth', lo=0, hi=3, radius=4)
+    round_rect(c, 0, 14, 7, 32, 'cloth', lo=0, hi=3, radius=2)     # linke Armlehne
+    round_rect(c, 25, 14, 32, 32, 'cloth', lo=0, hi=2, radius=2)    # rechte Armlehne
     for y in (10, 18, 26):
         for x in range(8, 24):
             if (x + y) % 4 == 0:
                 c.put_ramp(x, y, 'cloth', 1)
     # Sitzkissen
-    round_rect(c, 6, 26, 26, 33, 'cloth', lo=2, hi=5, radius=2)
+    round_rect(c, 6, 26, 26, 33, 'cloth', lo=1, hi=4, radius=2)
     hline(c, 7, 25, 33, 'cloth', 0)
     # Beine: ein Bein ueberschlagen, Pantoffel
     thick_line(c, 12, 28, 12, 33, 3.0, 'bone', lo=1, hi=4)
@@ -211,27 +211,27 @@ def skull_niche():
 
 
 def cobweb(flip=False):
-    """Spinnennetz in der Ecke (14 x 14), nur Fäden"""
-    c = Canvas(14, 14)
-    for k in range(0, 14):
-        c.put_ramp(k, 0, 'bone', 3 if k % 2 else 4)
-        c.put_ramp(0, k, 'bone', 3 if k % 2 else 4)
-    for k in range(0, 14):
-        c.put_ramp(k, k, 'bone', 3 if k % 2 else 4)
-    c.line(0, 0, 13, 6, 'bone', 3)
-    c.line(0, 0, 6, 13, 'bone', 3)
-    for r in (4, 8, 11):
-        for a in range(0, 91, 6):
+    """Spinnennetz in der Ecke (18 x 18): Faeden + Spinne"""
+    n = 18
+    c = Canvas(n, n)
+    for k in range(n):
+        c.put_ramp(k, 0, 'bone', 5 if k % 2 else 4)
+        c.put_ramp(0, k, 'bone', 5 if k % 2 else 4)
+        c.put_ramp(k, k, 'bone', 4 if k % 2 else 3)
+    c.line(0, 0, n - 1, 8, 'bone', 4)
+    c.line(0, 0, 8, n - 1, 'bone', 4)
+    for r in (5, 9, 13, 16):
+        for a in range(0, 91, 4):
             x = int(round(r * math.cos(math.radians(a))))
             y = int(round(r * math.sin(math.radians(a))))
-            if r == 8:
-                x, y = x - 0, y
-            if (a // 6) % 2 == 0 or r == 4:
-                c.put_ramp(x, y, 'bone', 4 if r < 8 else 3)
-    # Spinne
-    c.put_ramp(6, 7, 'coal', 2)
-    c.put_ramp(7, 7, 'coal', 2)
-    c.put_ramp(6, 8, 'coal', 1)
+            if (a // 4) % 2 == 0 or r == 5:
+                c.put_ramp(x, y, 'bone', 5 if r < 10 else 4)
+    # Spinne am Faden
+    c.line(11, 11, 11, 15, 'bone', 3)
+    c.rect(10, 15, 12, 16, 'coal', 2)
+    c.put_ramp(9, 16, 'coal', 2)
+    c.put_ramp(13, 16, 'coal', 2)
+    c.put_ramp(11, 15, 'fire', 3)
     return c.flipped() if flip else c
 
 
@@ -278,4 +278,43 @@ def crypt_rug():
         c.put_ramp(10, y, 'bone', 3)
         c.put_ramp(9, y + 1, 'bone', 2)
         c.put_ramp(11, y + 1, 'bone', 2)
+    return c
+
+
+def tombstone(seed=1):
+    """Grabstein (16 x 22)"""
+    c = Canvas(16, 22)
+    for y in range(2, 22):
+        for x in range(1, 15):
+            if y < 8:
+                dx = (x - 7.5) / 6.5
+                dy = (y - 8) / 6.0
+                if dx * dx + dy * dy > 1.0:
+                    continue
+            u = (x - 1) / 13.0
+            i = 4 if u < 0.2 else (3 if u < 0.6 else 2)
+            if texture_noise(x, y, seed) > 0.85:
+                i -= 1
+            c.put_ramp(x, y, 'stone', max(1, i))
+    vline(c, 7, 6, 15, 'stone', 1)
+    hline(c, 5, 10, 9, 'stone', 1)
+    for x in range(2, 14):
+        c.put_ramp(x, 20, 'grass', 2 if x % 2 else 3)
+    c.put_ramp(4, 19, 'grass', 3)
+    c.put_ramp(11, 19, 'grass', 3)
+    c.outline()
+    return c
+
+
+def glow_disc(r=14, ramp='slime', idx=1, idx2=None):
+    """weicher Lichtfleck als Bodendeko: innen dichter, aussen Schachbrett"""
+    n = 2 * r + 1
+    c = Canvas(n, n)
+    for y in range(n):
+        for x in range(n):
+            d = math.hypot(x - r, y - r) / float(r)
+            if d < 0.45:
+                c.put_ramp(x, y, ramp, idx if (x + y) % 3 else (idx2 if idx2 is not None else idx))
+            elif d < 1.0 and (x + y) % 2 == 0:
+                c.put_ramp(x, y, ramp, idx if d < 0.75 else max(0, idx - 1))
     return c
