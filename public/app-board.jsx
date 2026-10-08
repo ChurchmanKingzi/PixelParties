@@ -41808,63 +41808,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   });
 
-  // ── Brett erst zeigen, wenn die Geometrie steht ──
-  // Beim Betreten eines Spiels (Tutorial, Puzzle, Partie) rutschte das ganze
-  // Feld ueber drei, vier Zwischenstaende auf seinen Platz (Als Befund: „zuckt
-  // auf der x-Achse"): Massstab, Mittelversatz, Scroll-Modus, Anker, Area-
-  // Positionen und Phasenspalte bestimmen sich nacheinander, jeder Durchgang
-  // in einem eigenen Bild (s. `checkBald`). Das Layout bleibt deshalb
-  // unsichtbar (`data-pp-messen`, CSS), bis sich die Lage des Bretts ein paar
-  // Bilder lang nicht mehr aendert.
-  //   • Erst wenn Massstab und Anker einmal gesetzt sind (vorher steht das
-  //     Brett nur scheinbar still — die Messungen laufen erst nach dem
-  //     ersten Bild an), zaehlt Ruhe.
-  //   • Dann ein einmaliges `resize`: die Phasenspalte (sonst erst der
-  //     400-ms-Takt), Area (sonst erst der 200-ms-Takt) und Scroll-Modus
-  //     messen noch einmal, und es muss noch einmal Ruhe einkehren.
-  // Notbremse: nach 1,5 s wird freigegeben, und CSS zeigt das Layout
-  // spaetestens nach 1,8 s auch ohne diesen Effekt.
-  useEffect(() => {
-    const el = boardCenterRef.current;
-    const layout = (el && el.closest('.game-layout')) || document.querySelector('.game-layout');
-    if (!layout) return undefined;
-    if (!el || !layout.hasAttribute('data-pp-messen')) { layout.removeAttribute('data-pp-messen'); return undefined; }
-    const t0 = performance.now();
-    const wurzel = document.documentElement.style;
-    let raf = 0, gleich = 0, letzte = '', stufe = 0;
-    const lage = () => {
-      const h = el.querySelector('[data-hero-zone][data-hero-owner="me"][data-hero-idx="1"]');
-      const a = el.querySelector('[data-area-zone]');
-      const rh = h ? h.getBoundingClientRect() : null;
-      const ra = a ? a.getBoundingClientRect() : null;
-      return [
-        wurzel.getPropertyValue('--board-scale'), wurzel.getPropertyValue('--phase-col-x'),
-        el.style.cssText, el.className, el.scrollLeft | 0,
-        rh ? rh.left.toFixed(1) + ',' + rh.width.toFixed(1) : '',
-        ra ? ra.left.toFixed(1) : '',
-      ].join('|');
-    };
-    const frei = () => { if (raf) cancelAnimationFrame(raf); raf = 0; layout.removeAttribute('data-pp-messen'); };
-    const schritt = () => {
-      raf = requestAnimationFrame(schritt);
-      const jetzt = performance.now() - t0;
-      const l = lage();
-      gleich = l === letzte ? gleich + 1 : 0;
-      letzte = l;
-      if (jetzt >= 1500) { frei(); return; }
-      const bereit = wurzel.getPropertyValue('--board-scale') !== ''
-        && el.style.getPropertyValue('--board-anchor-x') !== '';
-      if (stufe === 0 && bereit && gleich >= 3) {
-        stufe = 1; gleich = 0;
-        window.dispatchEvent(new Event('resize'));
-      } else if (stufe === 1 && gleich >= 3) {
-        frei();
-      }
-    };
-    raf = requestAnimationFrame(schritt);
-    return frei;
-  }, []);
-
   /** Play a visual animation at a DOM element's position. */
   const playAnimation = (type, selector, options = {}) => {
     // Hard short-circuit when animations are disabled. The global CSS
@@ -46474,7 +46417,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ersatzlos gestrichen; fuer Zuschauer bleibt ein kleines
           👁-Zeichen am Knopf. Gilt fuer Desktop UND Mobile. */}
 
-      <div className="game-layout" data-pp-messen="1">
+      <div className="game-layout">
         {showEndBubbles && bubbleAnchors && (
           <>
             {renderEndBubble(oppBubbleMsg, endOppWon, 'up', bubbleAnchors.opp)}
