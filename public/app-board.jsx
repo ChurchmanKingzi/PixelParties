@@ -41793,6 +41793,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (Komet) kosten auf einer kalten Seite Hunderte Millisekunden — der Komet kam dann spaeter als die
   // Schadenszahlen. Einmal kurz UNSICHTBAR (opacity 0, volle Masse) eingehaengt, liegen die Bilder im
   // Zwischenspeicher, bevor der erste echte Zauber faellt.
+  //
+  // Im Tutorial frueher (150 statt 1200 ms): Das Vorwaermen blockiert den
+  // Browser gut eine halbe bis ganze Sekunde, und die Tutorial-Textbox
+  // beginnt 600 ms nach dem Brettaufbau zu tippen — bei 1200 ms fror der
+  // Text mitten in „Heya! Welcome to the ba…" ein. Jetzt ist die Arbeit
+  // erledigt, bevor die Textbox erscheint (ihr Timer wartet den Block ab),
+  // und das Tippen laeuft ungestoert.
+  const vorwaermVerzoegerung = gameState.isTutorial ? 150 : 1200;
   useEffect(() => {
     if (window._playAnimations === false) return undefined;
     const t = setTimeout(() => {
@@ -41803,7 +41811,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           _gemountet: () => setTimeout(() => setGameAnims(p => p.filter(a => a.id !== id)), 300),
         }]);
       }
-    }, 1200);
+    }, vorwaermVerzoegerung);
     return () => clearTimeout(t);
   }, []);
 
@@ -46732,7 +46740,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 );
                 return (
                   <div key={i}
-                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '')}
+                    className={'board-phase-item' + (isActive ? ' active' : '') + (canClick ? ' clickable' : '') + (canClick && tutorial1Phasensperre && i === 3 ? ' phase-item-hinweis' : '')}
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>

@@ -6657,6 +6657,20 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   color: rgba(255,255,255,.7);
   border-style: dashed;
 }
+/* Tutorial 1: sobald die Action Phase freigeschaltet ist, leuchtet und
+   pulsiert ihr Kasten — dort soll man hinklicken. */
+.board-phase-item.phase-item-hinweis {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  background: rgba(0,240,255,.18);
+  border: 1px solid rgb(0,240,255);
+  animation: phase-hinweis-puls 1.4s ease-in-out infinite;
+}
+@keyframes phase-hinweis-puls {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(0,240,255,.6), 0 0 20px rgba(0,240,255,.25); }
+  50%      { transform: scale(1.08); box-shadow: 0 0 18px rgba(0,240,255,.85), 0 0 32px rgba(0,240,255,.4); }
+}
 .board-phase-item.clickable:hover {
   color: #fff;
   background: rgba(255,255,255,.06);
@@ -15203,7 +15217,10 @@ body:has(.textbox-overlay) .tooltip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Oben angeheftet, nicht zentriert: waechst die Box mit einer langen
+     Seite, bleibt das Portraet an seiner Stelle (in der Standardhoehe
+     fuellt es die Spalte ohnehin, dort aendert sich nichts). */
+  justify-content: flex-start;
   gap: 9px;
   padding: 12px 10px 10px;
   background:
@@ -15484,6 +15501,15 @@ body:has(.textbox-overlay) .tooltip {
 .textbox-highlight-clone > .board-card {
   width: 100%;
   height: 100%;
+}
+/* Zeiger auf einer gehighlighteten Handkarte: die ECHTE Karte (samt Rand,
+   Schein und Level-Plakette) bleibt unsichtbar — an ihrer Stelle waechst
+   der Highlight-Klon mit (TextBox, `data-tb-hover`). Per `opacity`, nicht
+   `visibility`: das Element muss den Zeiger weiter annehmen, sonst
+   ginge der Hover sofort wieder verloren und die Karte flackerte. */
+[data-tb-hover],
+[data-tb-hover] + .hand-badge-layer {
+  opacity: 0 !important;
 }
 /* Handkarten (Als Befund 26.9.): Umrandung wie beim Hover in der Hand —
    harte 2-px-Kante direkt auf dem Kartenrand, eckig wie die Karte
@@ -23762,7 +23788,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *):not(.card-tooltip 
   pointer-events: auto;
 }
 .first-choice-panel.panel-zielwahl[data-durchsicht] {
-  opacity: .25;
+  /* ★ Als Vorgabe 8.10.: „die Transparenz ist da aktuell zu stark" —
+     vorher .25, jetzt etwas deckender. */
+  opacity: .45;
 }
 /* ★ v1488 (Als Vorgabe 29.9.: Box überall verschiebbar, wo sie deckend
    ist und kein Knopf unter dem Zeiger liegt): Das Skript setzt
