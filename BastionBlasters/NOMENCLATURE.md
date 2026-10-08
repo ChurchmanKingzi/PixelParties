@@ -72,11 +72,11 @@ weak, massive, incredibly, extremely, also, simply, just, basically, greatly.*
 
 1. **Header:** tier plaque (I–IV), ID, then Gun Slots (cannon) / Squad (person) / Reinforce (arrow, written `+N`) or Crew (person) for buildings, then the star rank.
 2. **Art window:** 144 × 86 diorama in game graphics.
-3. **Name band:** English card name in Title Case, hyphenated compounds, at most 28 characters.
+3. **Name band:** English card name in Title Case, hyphenated compounds, at most 136 px wide (about 26 characters; the linter measures it).
 4. **Type line, derived from data:** `CARD TYPE · Line · Trajectory | Doctrine | Guard zone` for units, `BUILD TYPE size · Group` for buildings.
 5. **Stat strip, in this order:** heart = HP (+ armor class abbreviation for units, + material for buildings), sword = damage (blade color = damage type), clock = attack interval in seconds, target = range or radius, boot = speed in cells per second.
-6. **Effect box:** at most 5 lines. First the rules text, then the **Rank 3 Talent** behind the gold `RANK 3` badge (the Talent is unlocked when the unit reaches Rank 3, "Elite", at 300 XP).
-7. **Flavor line:** at most 2 lines, below the dotted divider, never bold, never mechanical.
+6. **Effect box:** at most 6 lines (5 are the norm; with 6 lines the flavor shrinks to one line). First the rules text, then the **Rank 3 Talent** behind the gold `RANK 3` badge (the Talent is unlocked when the unit reaches Rank 3, "Elite", at 300 XP).
+7. **Flavor line:** at most 2 lines (1 line when the effect box has 6), below the dotted divider, never bold, never mechanical.
 
 ## 5. Naming
 
@@ -269,6 +269,8 @@ Temporary or permanent conditions on units and buildings.
 | **Swallowed** | Verschluckt | Removed from the field. Cannot act. | 5s |
 | **Floating** | Schwebend | −50% speed. Cannot attack. Falls afterwards. | 3s |
 | **Rune Skin** | Runenhaut | Ignores the first Stun, Fear or Confusion. +20% Arcane resistance. | permanent |
+| **Burrowed** | Eingegraben | Moves underground and cannot be targeted. | until it surfaces |
+| **Chaos-born** | Chaosgeboren | Random bonus: ×1.3 damage, ×1.3 HP, +30% speed or 2 HP/s regeneration. | permanent |
 
 ### Game terms
 
@@ -281,7 +283,7 @@ Core terms of the rules.
 | **Retreat** | Rückzug | Assault units below 50% HP run to the nearest Healing Source if one exists. |
 | **Fleeing** | Fliehend | +30% speed. Does not attack. Targeted first by towers and Assault units. |
 | **Last Stand** | Todesmut | No Healing Source: fights to the death, +15% damage. |
-| **Flying** | Flieger | Crosses walls and traps. Hit by Flat shots only from towers with anti-air. |
+| **Flying** | Flieger | Crosses walls and traps. Can only be hit by Flying units and towers with range 8 or more. |
 | **Loot** | Beute | Distracts Looters. |
 | **Block** | Block | Reduces damage taken from the front. |
 | **Splash** | Splash | Damages cells within the radius: 50% structure damage; units in the impact room take full damage. |
@@ -311,6 +313,12 @@ Core terms of the rules.
 | **Wave** | Welle | Spawn event of all deployed troop cards. |
 | **Flammable** | Leicht entflammbar | Catches Burning from Fire damage and spreads it. |
 | **Explosive** | Sprengstoff | Explodes when destroyed. |
+| **Knockback** | Rückstoß | Pushes the target away from the source by N cells. |
+| **Taunt** | Spott | Enemies in range prefer to attack this unit. |
+| **Lifesteal** | Lebensraub | Heals the attacker for N% of the damage dealt. |
+| **Alarm** | Alarm | State while enemies are inside the bastion: Defender Leash ×2. |
+| **Leash** | Leine | Maximum distance a Defender or summoned unit may move from its zone or owner. |
+| **Aura** | Aura | Effect on all matching units or buildings within the stated radius or room. Does not stack with itself. |
 
 ### Ranks
 
@@ -327,4 +335,4 @@ Experience ranks of units. Rank 3 (Elite) unlocks the Talent.
 
 ---
 
-*132 terms. Bold terms are set in bold automatically on cards.*
+*140 terms. Bold terms are set in bold automatically on cards.*

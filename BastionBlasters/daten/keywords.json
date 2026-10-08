@@ -710,7 +710,7 @@
   "de": "Flieger",
   "kind": "keyword",
   "bold": true,
-  "def": "Crosses walls and traps. Hit by Flat shots only from towers with anti-air."
+  "def": "Crosses walls and traps. Can only be hit by Flying units and towers with range 8 or more."
  },
  {
   "en": "Loot",
@@ -970,5 +970,63 @@
   "bold": false,
   "def": "Rank at 900 XP. +50% and aura (+8% damage within 3 cells).",
   "xp": 900
+ },
+ {
+  "en": "Knockback",
+  "de": "Rückstoß",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Pushes the target away from the source by N cells."
+ },
+ {
+  "en": "Taunt",
+  "de": "Spott",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Enemies in range prefer to attack this unit."
+ },
+ {
+  "en": "Lifesteal",
+  "de": "Lebensraub",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Heals the attacker for N% of the damage dealt."
+ },
+ {
+  "en": "Alarm",
+  "de": "Alarm",
+  "kind": "keyword",
+  "bold": true,
+  "def": "State while enemies are inside the bastion: Defender Leash ×2."
+ },
+ {
+  "en": "Leash",
+  "de": "Leine",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Maximum distance a Defender or summoned unit may move from its zone or owner."
+ },
+ {
+  "en": "Burrowed",
+  "de": "Eingegraben",
+  "kind": "status",
+  "bold": true,
+  "def": "Moves underground and cannot be targeted.",
+  "duration": "until it surfaces"
+ },
+ {
+  "en": "Chaos-born",
+  "de": "Chaosgeboren",
+  "kind": "status",
+  "bold": true,
+  "def": "Random bonus: ×1.3 damage, ×1.3 HP, +30% speed or 2 HP/s regeneration.",
+  "duration": "permanent"
+ },
+ {
+  "en": "Aura",
+  "de": "Aura",
+  "kind": "keyword",
+  "bold": true,
+  "def": "Effect on all matching units or buildings within the stated radius or room. Does not stack with itself."
  }
 ]

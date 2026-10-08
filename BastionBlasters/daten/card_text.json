@@ -1,4 +1,1030 @@
 {
+ "BA-01": {
+  "stats": [
+   [
+    "heart",
+    "250 Crystal"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "**Dome** (radius 3): Absorbs 400 damage. After it breaks: 20s recharge.",
+  "flavor": "It hums at a very specific pitch."
+ },
+ "BA-02": {
+  "stats": [
+   [
+    "heart",
+    "250 Stone"
+   ],
+   [
+    "target",
+    "4"
+   ]
+  ],
+  "rules": "Shots at cells within 4 cells: Spread ×2 and 30% chance to miss by one cell.",
+  "flavor": "Smells like burnt toast and victory."
+ },
+ "BA-03": {
+  "stats": [
+   [
+    "heart",
+    "220 Wood"
+   ],
+   [
+    "target",
+    "4"
+   ]
+  ],
+  "rules": "Every 8s: catches one Flat or Arc shot aimed within 4 cells and throws it back at the shooter for 40% damage. Flammable.",
+  "flavor": "Catch. Throw. Smile."
+ },
+ "BA-04": {
+  "stats": [
+   [
+    "heart",
+    "250 Metal"
+   ],
+   [
+    "target",
+    "4"
+   ]
+  ],
+  "rules": "Attracts Lightning and Arcane shots within 4 cells: takes 50% of the damage, the rest fizzles.",
+  "flavor": "It stands very still and pretends to be a tree."
+ },
+ "BA-05": {
+  "stats": [
+   [
+    "heart",
+    "200 Pudding"
+   ],
+   [
+    "target",
+    "2"
+   ]
+  ],
+  "rules": "Arc and Vertical damage within 2 cells −50%. Flying units cannot land here.",
+  "flavor": "Boing. Boing. Boing."
+ },
+ "BA-06": {
+  "stats": [
+   [
+    "heart",
+    "300 Crystal"
+   ],
+   [
+    "target",
+    "5"
+   ]
+  ],
+  "rules": "Every 25s for 6s: reflects Flat and Arc shots within 5 cells at the shooter for 60% damage.",
+  "flavor": "Look who is hit now."
+ },
+ "BC-01": {
+  "stats": [
+   [
+    "heart",
+    "250 Stone"
+   ]
+  ],
+  "rules": "Each wave, one random effect: 35% allies +30% healing, 25% +40 XP for 3 units, 20% +3 Citizens, 20% nothing. Loot.",
+  "flavor": "A frog appears. That is the nothing."
+ },
+ "BC-02": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "clock",
+    "30"
+   ]
+  ],
+  "rules": "Every 30s: the invader closest to the Core teleports to the gate and is Stunned 2s. Flammable.",
+  "flavor": "Cuckoo. Cuckoo. Get out."
+ },
+ "BC-03": {
+  "stats": [
+   [
+    "heart",
+    "500 Organic"
+   ]
+  ],
+  "rules": "After 2 Timestops: hatches a dragon whelp (Assault, gains 1 Rank every 40s up to Rank 3). If it falls, a new egg takes 2 Timestops. Flammable.",
+  "flavor": "Do not rush the egg."
+ },
+ "BC-04": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ]
+  ],
+  "rules": "Enemies in the room and adjacent rooms: Dancing 2s every 8s. Flammable.",
+  "flavor": "Left arm in. Right arm out. Everyone shake."
+ },
+ "BC-05": {
+  "stats": [
+   [
+    "heart",
+    "550 Metal"
+   ]
+  ],
+  "rules": "Enemies in the room and adjacent rooms: Floating 3s, then fall for 40 Impact damage. Cooldown 15s.",
+  "flavor": "Up is a feeling."
+ },
+ "BC-06": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ],
+   [
+    "sword",
+    "120"
+   ]
+  ],
+  "rules": "The first enemy that opens it takes 120 Impact damage and is Swallowed 5s. Loot. Flammable.",
+  "flavor": "Do not open. Do not look at its teeth."
+ },
+ "BC-07": {
+  "stats": [
+   [
+    "heart",
+    "300 Pudding"
+   ]
+  ],
+  "rules": "Every 4s: enemies in the room are knocked back 2 cells. Allies are unaffected.",
+  "flavor": "Best next to the Core Chamber."
+ },
+ "BC-08": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ]
+  ],
+  "rules": "Enemies in the room: −35% speed and attack speed. Allies: +10%. Flammable.",
+  "flavor": "Tea time is always now. Slowly."
+ },
+ "BC-09": {
+  "stats": [
+   [
+    "heart",
+    "200 Metal"
+   ]
+  ],
+  "rules": "Once per match, on click: all invaders teleport to the gate and are Stunned 3s. Own buildings lose 15% HP.",
+  "flavor": "Please do not press the red button."
+ },
+ "BF-01": {
+  "stats": [
+   [
+    "heart",
+    "400 Stone"
+   ],
+   [
+    "person",
+    "+1"
+   ]
+  ],
+  "rules": "Unlocks the Weapons line. +1 Roster slot.",
+  "flavor": "The tuba plays reveille. With burps."
+ },
+ "BF-02": {
+  "stats": [
+   [
+    "heart",
+    "550 Crystal"
+   ]
+  ],
+  "rules": "Unlocks the Arcane line. Arcane Artillery: +10% range.",
+  "flavor": "The books whisper. The shelves argue."
+ },
+ "BF-03": {
+  "stats": [
+   [
+    "heart",
+    "500 Wood"
+   ]
+  ],
+  "rules": "Unlocks the Beast line. Beast units +10% HP. Crew in adjacent rooms −10%. Flammable.",
+  "flavor": "Smells like a very large cat. Several."
+ },
+ "BF-04": {
+  "stats": [
+   [
+    "heart",
+    "600 Metal"
+   ],
+   [
+    "cannon",
+    "+1"
+   ]
+  ],
+  "rules": "Unlocks the Tech line. +1 Gun Slot (workshop roof).",
+  "flavor": "Measure twice. Fire once."
+ },
+ "BF-05": {
+  "stats": [
+   [
+    "heart",
+    "400 Stone"
+   ]
+  ],
+  "rules": "Unlocks the Crypt line. 15% of fallen allied Assault and Defender units in the bastion rise as skeletons (12s, 50% HP).",
+  "flavor": "The door creaks. On purpose."
+ },
+ "BF-06": {
+  "stats": [
+   [
+    "heart",
+    "350 Ice"
+   ]
+  ],
+  "rules": "Unlocks the Frost line. Fire damage to adjacent buildings −25%. Frost units +10% damage.",
+  "flavor": "Cold, quiet, slightly judgmental."
+ },
+ "BF-07": {
+  "stats": [
+   [
+    "heart",
+    "450 Organic"
+   ],
+   [
+    "plus",
+    "1/s"
+   ]
+  ],
+  "rules": "Unlocks the Flora line. Buildings within 2 cells regenerate 1 HP/s.",
+  "flavor": "Please do not feed the plants. They ask."
+ },
+ "BF-08": {
+  "stats": [
+   [
+    "heart",
+    "350 Wood"
+   ],
+   [
+    "cannon",
+    "+1"
+   ]
+  ],
+  "rules": "Unlocks the Air line. +1 Gun Slot (Air Artillery only). Flammable.",
+  "flavor": "Tied up with a very long rope."
+ },
+ "BF-09": {
+  "stats": [
+   [
+    "heart",
+    "500 Stone"
+   ]
+  ],
+  "rules": "Unlocks the Blessing line. Each wave, 2 random allies get Blessed (40).",
+  "flavor": "Mandatory fun starts at noon."
+ },
+ "BF-10": {
+  "stats": [
+   [
+    "heart",
+    "300 Pudding"
+   ]
+  ],
+  "rules": "Unlocks the Chaos line. 10% of newly spawned units are Chaos-born: random ×1.3 damage, ×1.3 HP, +30% speed or 2 HP/s regeneration.",
+  "flavor": "Open drawer three. No, not that one."
+ },
+ "BH-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "plus",
+    "3×6 HP/s"
+   ]
+  ],
+  "rules": "3 Treatment Slots, 6 HP/s each. Healing Source. Flammable.",
+  "flavor": "The thermometer is also the flag."
+ },
+ "BH-02": {
+  "stats": [
+   [
+    "heart",
+    "180 Wood"
+   ],
+   [
+    "plus",
+    "8 HP/s"
+   ]
+  ],
+  "rules": "1 Treatment Slot, 8 HP/s. Healing Source. Flammable.",
+  "flavor": "The accordion is the alarm."
+ },
+ "BH-03": {
+  "stats": [
+   [
+    "heart",
+    "350 Stone"
+   ],
+   [
+    "plus",
+    "4 HP/s"
+   ]
+  ],
+  "rules": "4 Treatment Slots, 4 HP/s. Entering removes Burning, Poisoned, Slimed and Cursed, then +8% speed for 20s. Healing Source.",
+  "flavor": "Rubber duck included."
+ },
+ "BH-04": {
+  "stats": [
+   [
+    "heart",
+    "160 Organic"
+   ],
+   [
+    "plus",
+    "3/s"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "Aura (radius 3): Allies heal 3 HP/s. Holds 2 units. Healing Source. Flammable. Fire damage taken ×2.",
+  "flavor": "The mushrooms hum. Nobody knows the tune."
+ },
+ "BH-05": {
+  "stats": [
+   [
+    "heart",
+    "260 Metal"
+   ],
+   [
+    "plus",
+    "20 HP/s"
+   ]
+  ],
+  "rules": "1 Treatment Slot, 20 HP/s. Patient gains 8 XP and loses all debuffs. Healing Source.",
+  "flavor": "Pain makes you stronger. Allegedly."
+ },
+ "BH-06": {
+  "stats": [
+   [
+    "heart",
+    "400 Stone"
+   ],
+   [
+    "plus",
+    "6×5 HP/s"
+   ]
+  ],
+  "rules": "6 Treatment Slots, 5 HP/s. Aura (radius 3): Allies heal 2 HP/s. Healing Source.",
+  "flavor": "The water tastes like a second chance."
+ },
+ "BH-07": {
+  "stats": [
+   [
+    "heart",
+    "450 Organic"
+   ],
+   [
+    "plus",
+    "6×6 HP/s"
+   ]
+  ],
+  "rules": "6 Treatment Slots, 6 HP/s. Healing Source. **Rebirth**: Dead units return after 5s with 50% HP and Rank (once per wave). Fire damage taken ×2.",
+  "flavor": "Warm. Very warm."
+ },
+ "BP-01": {
+  "stats": [
+   [
+    "heart",
+    "350 Stone"
+   ],
+   [
+    "cannon",
+    "2"
+   ]
+  ],
+  "rules": "2 Gun Slots. Artillery on it takes −25% Splash damage.",
+  "flavor": "The merlons have faces. They look stern."
+ },
+ "BP-02": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "cannon",
+    "3"
+   ]
+  ],
+  "rules": "3 Gun Slots. Flammable.",
+  "flavor": "Planks, ropes, and a very serious flag."
+ },
+ "BP-03": {
+  "stats": [
+   [
+    "heart",
+    "300 Crystal"
+   ],
+   [
+    "cannon",
+    "1"
+   ]
+  ],
+  "rules": "1 Gun Slot. Artillery in this bastion: +4 range, Spread −30%.",
+  "flavor": "The moon looks back."
+ },
+ "BP-04": {
+  "stats": [
+   [
+    "heart",
+    "150 Organic"
+   ],
+   [
+    "cannon",
+    "2"
+   ]
+  ],
+  "rules": "2 Gun Slots on a floating cloud: Flat shots cannot hit them.",
+  "flavor": "The cannonballs are raindrops."
+ },
+ "BP-05": {
+  "stats": [
+   [
+    "heart",
+    "350 Stone"
+   ],
+   [
+    "cannon",
+    "1"
+   ]
+  ],
+  "rules": "1 Gun Slot. Flat shots cannot hit the Artillery on it.",
+  "flavor": "A garden gnome sits on the roof."
+ },
+ "BP-06": {
+  "stats": [
+   [
+    "heart",
+    "400 Crystal"
+   ],
+   [
+    "cannon",
+    "4"
+   ]
+  ],
+  "rules": "4 Gun Slots. Floats above the bastion: Flat shots cannot hit it. Artillery on it: +8 range.",
+  "flavor": "The waterfall flows upward. Nobody asks."
+ },
+ "BS-01": {
+  "stats": [
+   [
+    "heart",
+    "300/seg Stone"
+   ],
+   [
+    "wall",
+    "auto"
+   ]
+  ],
+  "rules": "Automatic on every outer edge and between modules. Blocks movement and Line of Fire.",
+  "flavor": "Every crack has a beetle living in it."
+ },
+ "BS-02": {
+  "stats": [
+   [
+    "heart",
+    "260/seg"
+   ],
+   [
+    "wall",
+    "≤4"
+   ]
+  ],
+  "rules": "Replaces up to 4 wall segments. Splash damage does not pass through. Attackers get −20% speed. Fire damage taken ×1.3.",
+  "flavor": "A cherry on top. That is tactics."
+ },
+ "BS-03": {
+  "stats": [
+   [
+    "heart",
+    "450/seg Metal"
+   ],
+   [
+    "wall",
+    "≤4"
+   ]
+  ],
+  "rules": "Replaces up to 4 wall segments. Impact and Poison damage taken −30%.",
+  "flavor": "There is a face in one of the rivets."
+ },
+ "BS-04": {
+  "stats": [
+   [
+    "heart",
+    "260/seg Crystal"
+   ],
+   [
+    "wall",
+    "≤4"
+   ]
+  ],
+  "rules": "Replaces up to 4 wall segments. Arcane and Lightning damage taken −50%.",
+  "flavor": "The runes pulse. Slowly. Judgmentally."
+ },
+ "BS-05": {
+  "stats": [
+   [
+    "heart",
+    "250 Metal"
+   ],
+   [
+    "sword",
+    "10/s"
+   ]
+  ],
+  "rules": "Enemies crossing it take 10 Impact damage/s and −20% speed. Allies are unaffected.",
+  "flavor": "Sign: “Mind the bed.”"
+ },
+ "BS-06": {
+  "stats": [
+   [
+    "heart",
+    "200 Stone"
+   ],
+   [
+    "sword",
+    "60"
+   ]
+  ],
+  "rules": "The first 2 enemies each wave fall in: 60 Impact damage, Stunned 4s. Does not affect Flying or Spirit units.",
+  "flavor": "“Please don't,” the sign said."
+ },
+ "BS-07": {
+  "stats": [
+   [
+    "heart",
+    "500 Metal"
+   ],
+   [
+    "sword",
+    "100"
+   ],
+   [
+    "clock",
+    "30"
+   ]
+  ],
+  "rules": "Replaces the main Gate. Every 30s with an enemy in the gateway: 100 Impact damage to all below, gateway closed 5s.",
+  "flavor": "The chains squeak. The teeth do not."
+ },
+ "BS-08": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ]
+  ],
+  "rules": "Enemies crossing it: Confused 3s, then immune for 10s.",
+  "flavor": "A lone hat lies on the floor. Nobody asks."
+ },
+ "BS-09": {
+  "stats": [
+   [
+    "heart",
+    "250 Stone"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "Removes Burning from units and buildings within 3 cells. Fire damage to buildings within 3 cells −50%.",
+  "flavor": "The duck wears a lifebuoy."
+ },
+ "BT-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "sword",
+    "12"
+   ],
+   [
+    "clock",
+    "1.2"
+   ],
+   [
+    "target",
+    "7"
+   ]
+  ],
+  "rules": "Shoots enemy units. +50% damage vs Fleeing units. Flammable.",
+  "flavor": "The archer waves. It is part of the job."
+ },
+ "BT-02": {
+  "stats": [
+   [
+    "heart",
+    "300 Pudding"
+   ],
+   [
+    "sword_poison",
+    "6"
+   ],
+   [
+    "clock",
+    "2"
+   ],
+   [
+    "target",
+    "5"
+   ]
+  ],
+  "rules": "Splash 1. Applies Slimed 4s.",
+  "flavor": "Do not lick the tower."
+ },
+ "BT-03": {
+  "stats": [
+   [
+    "heart",
+    "300 Ice"
+   ],
+   [
+    "sword_ice",
+    "14/s"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "Cone attack. Applies Chilled 4s.",
+  "flavor": "The chimney sneezes."
+ },
+ "BT-04": {
+  "stats": [
+   [
+    "heart",
+    "280 Crystal"
+   ],
+   [
+    "sword_arcane",
+    "22"
+   ],
+   [
+    "clock",
+    "2"
+   ],
+   [
+    "target",
+    "6"
+   ]
+  ],
+  "rules": "Pierces 3 targets in a line.",
+  "flavor": "It chirps. Something chirps back."
+ },
+ "BT-05": {
+  "stats": [
+   [
+    "heart",
+    "260 Organic"
+   ],
+   [
+    "sword",
+    "4"
+   ],
+   [
+    "clock",
+    "0.8"
+   ],
+   [
+    "target",
+    "6"
+   ]
+  ],
+  "rules": "Summons 3 hornets: Flying, 12 HP, Leash 6 cells. Lost hornets return every 8s.",
+  "flavor": "The hornets pay rent in stings."
+ },
+ "BT-06": {
+  "stats": [
+   [
+    "heart",
+    "350 Metal"
+   ],
+   [
+    "sword_lightning",
+    "55"
+   ],
+   [
+    "clock",
+    "4"
+   ],
+   [
+    "target",
+    "7"
+   ]
+  ],
+  "rules": "Targets a random enemy. Chains to 2 more at 50%. ×1.5 damage vs Wet. Immune to Lightning.",
+  "flavor": "Do not stand near the pointy bit."
+ },
+ "BT-07": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ],
+   [
+    "sword",
+    "18"
+   ],
+   [
+    "clock",
+    "1.5"
+   ],
+   [
+    "target",
+    "8"
+   ]
+  ],
+  "rules": "Only targets Flying units. Damage ×2. Flammable.",
+  "flavor": "The pelican has opinions about airships."
+ },
+ "BT-08": {
+  "stats": [
+   [
+    "heart",
+    "320 Crystal"
+   ],
+   [
+    "target",
+    "8"
+   ]
+  ],
+  "rules": "Beam sweeps the field: Confused 2s (once per 6s per target). Reveals Invisible units.",
+  "flavor": "It blinks. Everyone gets confused."
+ },
+ "BU-01": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ],
+   [
+    "person",
+    "+3"
+   ]
+  ],
+  "rules": "+3 Citizen cap. Citizens respawn every 4s instead of 5s. Flammable.",
+  "flavor": "The dog snores. So does everyone else."
+ },
+ "BU-02": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ]
+  ],
+  "rules": "Units in the room and adjacent rooms get Fed. Crew in range work +20% faster. Flammable.",
+  "flavor": "Today: troll stew."
+ },
+ "BU-03": {
+  "stats": [
+   [
+    "heart",
+    "250 Wood"
+   ],
+   [
+    "wall",
+    "8/s"
+   ]
+  ],
+  "rules": "Repairs adjacent buildings for 8 HP/s. Repair units within 5 cells work +25% faster.",
+  "flavor": "Please take a number. And a nail."
+ },
+ "BU-04": {
+  "stats": [
+   [
+    "heart",
+    "200 Metal"
+   ]
+  ],
+  "rules": "Alarm: Defender Leash ×2, Citizens flee to shelter, enemies in the bastion are marked.",
+  "flavor": "It rings. Then it rings again."
+ },
+ "BU-05": {
+  "stats": [
+   [
+    "heart",
+    "700 Stone"
+   ]
+  ],
+  "rules": "4 Civilian slots. Occupants are untargetable while the door (350 HP) stands. Citizens do not work here.",
+  "flavor": "Locked from the inside. Politely."
+ },
+ "BU-06": {
+  "stats": [
+   [
+    "heart",
+    "300 Metal"
+   ],
+   [
+    "boot",
+    "×3"
+   ]
+  ],
+  "rules": "Allies on it move ×3 faster. Enemies avoid it.",
+  "flavor": "Hold on. Do not hold on."
+ },
+ "BU-07": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ],
+   [
+    "boot",
+    "×2"
+   ]
+  ],
+  "rules": "Pulls all units on it, enemies too, in the arrow direction at ×2 speed.",
+  "flavor": "Wheee. Splat."
+ },
+ "BU-08": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ]
+  ],
+  "rules": "+1 Reinforce per wave for all Assault cards.",
+  "flavor": "Join today. Regret tomorrow."
+ },
+ "BU-09": {
+  "stats": [
+   [
+    "heart",
+    "250 Crystal"
+   ]
+  ],
+  "rules": "Fleeing allies (Retreat) teleport to the nearest free Healing Source.",
+  "flavor": "It hums. It does not explain."
+ },
+ "BU-10": {
+  "stats": [
+   [
+    "heart",
+    "250 Stone"
+   ]
+  ],
+  "rules": "+1 Squad for all Defender and Civilian cards.",
+  "flavor": "Everything in here is useful. Somehow."
+ },
+ "BU-11": {
+  "stats": [
+   [
+    "heart",
+    "350 Crystal"
+   ]
+  ],
+  "rules": "At Timestop: +1 kept card (draw 5, keep 4) and +10s build time. Multiple shrines do not stack.",
+  "flavor": "Time is a suggestion."
+ },
+ "BW-01": {
+  "stats": [
+   [
+    "heart",
+    "350 Metal"
+   ]
+  ],
+  "rules": "Newly spawned Assault and Defender units gain Hardened.",
+  "flavor": "The furnace grins. That is normal."
+ },
+ "BW-02": {
+  "stats": [
+   [
+    "heart",
+    "350 Metal"
+   ]
+  ],
+  "rules": "Newly spawned Assault and Defender units take −15% damage.",
+  "flavor": "Every helmet has a dent. On purpose."
+ },
+ "BW-03": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ],
+   [
+    "sword_fire",
+    "80"
+   ],
+   [
+    "target",
+    "1"
+   ]
+  ],
+  "rules": "Artillery: −12% reload time. Explosive (80 Fire damage, radius 1). Flammable.",
+  "flavor": "Do not smoke. Do not argue with the sign."
+ },
+ "BW-04": {
+  "stats": [
+   [
+    "heart",
+    "200 Wood"
+   ],
+   [
+    "sword_fire",
+    "120"
+   ],
+   [
+    "target",
+    "1"
+   ]
+  ],
+  "rules": "Artillery hits additionally apply Burning 3s. Explosive (120 Fire damage, radius 1).",
+  "flavor": "Every day is a festival. Briefly."
+ },
+ "BW-05": {
+  "stats": [
+   [
+    "heart",
+    "400 Metal"
+   ]
+  ],
+  "rules": "Artillery: +15% Structure damage.",
+  "flavor": "Cannons are cast with feeling."
+ },
+ "BW-06": {
+  "stats": [
+   [
+    "heart",
+    "300 Crystal"
+   ]
+  ],
+  "rules": "Newly spawned Defender and Civilian units gain Rune Skin.",
+  "flavor": "Stamp. Glow. Stamp."
+ },
+ "BW-07": {
+  "stats": [
+   [
+    "heart",
+    "200 Stone"
+   ]
+  ],
+  "rules": "Newly spawned units start with +25 XP. Units standing here gain +0.6 XP/s.",
+  "flavor": "Left. Left. Left, I said."
+ },
+ "BW-08": {
+  "stats": [
+   [
+    "heart",
+    "300 Wood"
+   ]
+  ],
+  "rules": "All allied units gain +25% XP from all sources. Flammable.",
+  "flavor": "Do not read the margins."
+ },
+ "BW-09": {
+  "stats": [
+   [
+    "heart",
+    "350 Stone"
+   ]
+  ],
+  "rules": "Kill XP ×2. The killer gains +10% speed for 5s. Loot.",
+  "flavor": "Third shelf: one very large tooth."
+ },
+ "BW-10": {
+  "stats": [
+   [
+    "heart",
+    "300 Metal"
+   ]
+  ],
+  "rules": "Newly spawned units get a random potion: +25% damage, +25% speed, +25% HP, or Invisible until the first hit (max 4s).",
+  "flavor": "Stir clockwise. Unless it asks otherwise."
+ },
+ "BW-11": {
+  "stats": [
+   [
+    "heart",
+    "600 Metal"
+   ]
+  ],
+  "rules": "Newly spawned Assault and Defender units start at Rank 2 (140 XP) and are Hardened.",
+  "flavor": "It does not hit things. Things happen near it."
+ },
  "UA-01": {
   "stats": [
    [
@@ -21,6 +1047,397 @@
   "rules": "Splash 1.",
   "talent": "**Double Throw**: Every 4th shot fires twice.",
   "flavor": "It wobbles. It works."
+ },
+ "UA-02": {
+  "stats": [
+   [
+    "heart",
+    "40 FLS"
+   ],
+   [
+    "sword_fire",
+    "30/12"
+   ],
+   [
+    "clock",
+    "4.5"
+   ],
+   [
+    "target",
+    "26"
+   ]
+  ],
+  "rules": "Applies Burning to hit Wood and Organic buildings.",
+  "flavor": "His hat smokes. So does he.",
+  "talent": "**Spark Jump**: Burning spreads to 1 adjacent cell."
+ },
+ "UA-03": {
+  "stats": [
+   [
+    "heart",
+    "55 FLS"
+   ],
+   [
+    "sword",
+    "45/10"
+   ],
+   [
+    "clock",
+    "6"
+   ],
+   [
+    "target",
+    "30"
+   ]
+  ],
+  "rules": "",
+  "flavor": "Loud, cheap, and the beard is smoking.",
+  "talent": "**Sights**: +25% damage to cells below 75% HP."
+ },
+ "UA-04": {
+  "stats": [
+   [
+    "heart",
+    "80 ARM"
+   ],
+   [
+    "sword",
+    "25/10"
+   ],
+   [
+    "clock",
+    "9"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "Fires a goblin: 25 HP, 6 damage/s, lives 12s. Counts half for Conquest.",
+  "flavor": "One goblin waves from the muzzle.",
+  "talent": "**Double Gobbo**: Fires 2 goblins."
+ },
+ "UA-05": {
+  "stats": [
+   [
+    "heart",
+    "140 ARM"
+   ],
+   [
+    "sword",
+    "40/20"
+   ],
+   [
+    "clock",
+    "14"
+   ],
+   [
+    "target",
+    "38"
+   ]
+  ],
+  "rules": "Fires an orc: 70 HP, 14 damage/s, lives 20s, Structure ×2.",
+  "flavor": "The speech bubble says WAAAGH.",
+  "talent": "**Armored Orcs**: Orcs gain +30% HP."
+ },
+ "UA-06": {
+  "stats": [
+   [
+    "heart",
+    "60 FLS"
+   ],
+   [
+    "sword_ice",
+    "50/14"
+   ],
+   [
+    "clock",
+    "8"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "Applies Frozen 5s to buildings and Chilled to units in the impact room.",
+  "flavor": "The yeti holds the funnel. Gently.",
+  "talent": "**Frost Nova**: Every 3rd shot has radius 2."
+ },
+ "UA-07": {
+  "stats": [
+   [
+    "heart",
+    "65 FLS"
+   ],
+   [
+    "sword_poison",
+    "20/6"
+   ],
+   [
+    "clock",
+    "6"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "**Spore Cloud** (8s): 6 Poison damage/s in the room. Citizens work at −50%.",
+  "flavor": "Tiny things live in it.",
+  "talent": "**Spore Drift**: Cloud spreads to the next room."
+ },
+ "UA-08": {
+  "stats": [
+   [
+    "heart",
+    "90 PUD"
+   ],
+   [
+    "sword",
+    "12/4"
+   ],
+   [
+    "clock",
+    "5"
+   ],
+   [
+    "target",
+    "30"
+   ]
+  ],
+  "rules": "**Ink**: Towers and ranged units within radius 1 get Blinded 8s.",
+  "flavor": "The squid lives in a barrel. Rent is ink.",
+  "talent": "**Sticky Ink**: Adds −15% speed."
+ },
+ "UA-09": {
+  "stats": [
+   [
+    "heart",
+    "45 FLS"
+   ],
+   [
+    "sword_poison",
+    "6×8/12"
+   ],
+   [
+    "clock",
+    "6"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "6 bats hit random cells in a 3×3 area. Prefers staffed rooms.",
+  "flavor": "Bats with tiny teeth. Tiny. Teeth.",
+  "talent": "**Bloodsucker**: Bats heal the witch."
+ },
+ "UA-10": {
+  "stats": [
+   [
+    "heart",
+    "110 ARM"
+   ],
+   [
+    "sword",
+    "90/24"
+   ],
+   [
+    "clock",
+    "10"
+   ],
+   [
+    "target",
+    "42"
+   ]
+  ],
+  "rules": "Pierces 3 obstacles.",
+  "flavor": "The bolt comes with a bow on it.",
+  "talent": "**Longer Bolt**: Pierces 1 more obstacle."
+ },
+ "UA-11": {
+  "stats": [
+   [
+    "heart",
+    "70 FLS"
+   ],
+   [
+    "sword_lightning",
+    "40/20"
+   ],
+   [
+    "clock",
+    "5.5"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "Chains to up to 3 cells. ×1.5 damage vs Metal. 20% chance: Shorted 3s.",
+  "flavor": "Her hair stands on end. All of it.",
+  "talent": "**More Links**: +2 chains."
+ },
+ "UA-12": {
+  "stats": [
+   [
+    "heart",
+    "100 ARM"
+   ],
+   [
+    "sword",
+    "80/15"
+   ],
+   [
+    "clock",
+    "9"
+   ],
+   [
+    "target",
+    "38"
+   ]
+  ],
+  "rules": "",
+  "flavor": "The mole wears goggles. For the dust.",
+  "talent": "**Drill**: Splash 1 on buildings."
+ },
+ "UA-13": {
+  "stats": [
+   [
+    "heart",
+    "75 FLS"
+   ],
+   [
+    "sword",
+    "20/0"
+   ],
+   [
+    "clock",
+    "11"
+   ],
+   [
+    "target",
+    "34"
+   ]
+  ],
+  "rules": "Units up to 150 HP and Civilians in the impact room become Frogged 6s.",
+  "flavor": "The tongue is the throwing arm.",
+  "talent": "**Long Croak**: +3s."
+ },
+ "UA-14": {
+  "stats": [
+   [
+    "heart",
+    "120 ARM"
+   ],
+   [
+    "sword",
+    "70/20"
+   ],
+   [
+    "clock",
+    "8"
+   ],
+   [
+    "target",
+    "46"
+   ]
+  ],
+  "rules": "Flying. Hovers 10 cells in front of the bastion. Drops bombs as Arc shots.",
+  "flavor": "Shaped like a whale. Behaves like one.",
+  "talent": "**Double Bomb**: Always drops 2 bombs."
+ },
+ "UA-15": {
+  "stats": [
+   [
+    "heart",
+    "85 FLS"
+   ],
+   [
+    "sword_arcane",
+    "75/30"
+   ],
+   [
+    "clock",
+    "11"
+   ],
+   [
+    "target",
+    "38"
+   ]
+  ],
+  "rules": "×2 damage to Bone and Spirit units.",
+  "flavor": "One pipe coughs. The choir ignores it.",
+  "talent": "**Fortissimo**: Every 3rd beam has radius 2."
+ },
+ "UA-16": {
+  "stats": [
+   [
+    "heart",
+    "60 FLS"
+   ],
+   [
+    "sword_arcane",
+    "220/40"
+   ],
+   [
+    "clock",
+    "20"
+   ],
+   [
+    "target",
+    "46"
+   ]
+  ],
+  "rules": "Splash 2.",
+  "flavor": "Slippers. Pajamas. Meteor.",
+  "talent": "**Tail**: 3 shards after impact."
+ },
+ "UA-17": {
+  "stats": [
+   [
+    "heart",
+    "220 ARM"
+   ],
+   [
+    "sword",
+    "260/60"
+   ],
+   [
+    "clock",
+    "24"
+   ],
+   [
+    "target",
+    "50"
+   ]
+  ],
+  "rules": "Pierces 5 obstacles. ×1.3 damage to the Core.",
+  "flavor": "Moustache. Top hat. Menace.",
+  "talent": "**Quick Reload**: −20% reload time."
+ },
+ "UA-18": {
+  "stats": [
+   [
+    "heart",
+    "260 PUD"
+   ],
+   [
+    "sword",
+    "180/60"
+   ],
+   [
+    "clock",
+    "22"
+   ],
+   [
+    "target",
+    "42"
+   ]
+  ],
+  "rules": "Splash 2. Rolls on 3 cells for 50% damage. Ends Burning. Units in the room get Wet.",
+  "flavor": "Bored whale. Sunglasses.",
+  "talent": "**Spring Tide**: Knockback 3."
  },
  "US-01": {
   "stats": [
@@ -91,6 +1508,56 @@
   "talent": "**Pumpkin Seeds**: 30 Fire damage to adjacent cells.",
   "flavor": "Heads up. Fuse too."
  },
+ "US-04": {
+  "stats": [
+   [
+    "heart",
+    "35 FLS"
+   ],
+   [
+    "sword",
+    "7"
+   ],
+   [
+    "clock",
+    "1.1"
+   ],
+   [
+    "target",
+    "5"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "**Hop**: Dodges one melee attack every 5s.",
+  "flavor": "Aims with one eye. Hops with the other.",
+  "talent": "**Two Bolts**: Hits 2 targets in a line."
+ },
+ "US-05": {
+  "stats": [
+   [
+    "heart",
+    "95 FLS"
+   ],
+   [
+    "sword",
+    "14"
+   ],
+   [
+    "clock",
+    "1.2"
+   ],
+   [
+    "boot",
+    "1.0"
+   ]
+  ],
+  "rules": "Structure ×2.5.",
+  "flavor": "Knocking is for other people.",
+  "talent": "**Run-Up**: First hit ×2."
+ },
  "US-06": {
   "stats": [
    [
@@ -114,6 +1581,405 @@
   "talent": "**Ice Trail**: Enemies on the trail get −20% speed.",
   "flavor": "Belly first is also a plan."
  },
+ "US-07": {
+  "stats": [
+   [
+    "heart",
+    "60 FLS"
+   ],
+   [
+    "sword",
+    "9"
+   ],
+   [
+    "clock",
+    "0.8"
+   ],
+   [
+    "boot",
+    "3.0"
+   ]
+  ],
+  "rules": "Jumps over traps and 1-cell walls.",
+  "flavor": "The goose is the dangerous one.",
+  "talent": "**Egg Bomb**: On hit, lays an egg: 20 Fire damage after 2s."
+ },
+ "US-08": {
+  "stats": [
+   [
+    "heart",
+    "55 ARM"
+   ],
+   [
+    "sword",
+    "10"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "Burrowed until it surfaces 2 cells behind the outer wall.",
+  "flavor": "The mole hill has a doorbell.",
+  "talent": "**Open Tunnel**: Allies can follow for 20s."
+ },
+ "US-09": {
+  "stats": [
+   [
+    "heart",
+    "50 SPR"
+   ],
+   [
+    "sword_arcane",
+    "7"
+   ],
+   [
+    "clock",
+    "0.9"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "Ignores walls and traps. On hit (Civilian): 20% chance of Feared.",
+  "flavor": "Not haunting. Rearranging.",
+  "talent": "**Poltergeist**: Throws objects (range 3)."
+ },
+ "US-10": {
+  "stats": [
+   [
+    "heart",
+    "140 ARM"
+   ],
+   [
+    "sword",
+    "16"
+   ],
+   [
+    "clock",
+    "1.5"
+   ],
+   [
+    "boot",
+    "1.0"
+   ]
+  ],
+  "rules": "On hit: Rooted 1.5s.",
+  "flavor": "Pinches first. Thinks later.",
+  "talent": "**Shell Strike**: −20% damage taken."
+ },
+ "US-11": {
+  "stats": [
+   [
+    "heart",
+    "80 PUD"
+   ],
+   [
+    "sword_ice",
+    "10"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "Applies Chilled on hit. On death: slush 3s, −20% speed.",
+  "flavor": "Melts under pressure.",
+  "talent": "**Carrot Throw**: Ranged attack (range 3)."
+ },
+ "US-12": {
+  "stats": [
+   [
+    "heart",
+    "130 PUD"
+   ],
+   [
+    "sword",
+    "11"
+   ],
+   [
+    "clock",
+    "1.2"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "Immune to Knockback and Stunned. Reflects 25% of Flat damage.",
+  "flavor": "It bounces back. Literally.",
+  "talent": "**Boing**: Jumps to the nearest enemy."
+ },
+ "US-13": {
+  "stats": [
+   [
+    "heart",
+    "50 FLS"
+   ],
+   [
+    "sword_poison",
+    "7"
+   ],
+   [
+    "clock",
+    "0.8"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "On death: spore cloud 5s, 4 Poison damage/s.",
+  "flavor": "Smells like a basement.",
+  "talent": "**Spore Trail**: Leaves small clouds while running."
+ },
+ "US-14": {
+  "stats": [
+   [
+    "heart",
+    "100 ARM"
+   ],
+   [
+    "sword",
+    "9"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "**Wound Up**: +5% attack speed per second in combat (max +50%). Resets out of combat.",
+  "flavor": "Tick. Tock. Tick. Tock.",
+  "talent": "**Overdrive**: Starts at full speed once."
+ },
+ "US-15": {
+  "stats": [
+   [
+    "heart",
+    "90 FLS"
+   ],
+   [
+    "sword",
+    "8"
+   ],
+   [
+    "clock",
+    "0.9"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "Disguised as Loot: revealed only when adjacent. First bite ×3.",
+  "flavor": "Crate. Then it blinked.",
+  "talent": "**Gold Teeth**: Swallows enemies up to 30 HP."
+ },
+ "US-16": {
+  "stats": [
+   [
+    "heart",
+    "40 FLS"
+   ],
+   [
+    "sword",
+    "11"
+   ],
+   [
+    "clock",
+    "1.2"
+   ],
+   [
+    "target",
+    "5"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "**Chaos Bolt**: Random damage type. 10% misfire: Frogged 3s, 50% on itself.",
+  "flavor": "Skipped the safety chapter.",
+  "talent": "**Mastery**: No misfires. Picks the best type."
+ },
+ "US-17": {
+  "stats": [
+   [
+    "heart",
+    "120 FLS"
+   ],
+   [
+    "sword",
+    "6"
+   ],
+   [
+    "clock",
+    "0.5"
+   ],
+   [
+    "target",
+    "3"
+   ],
+   [
+    "boot",
+    "1.0"
+   ]
+  ],
+  "rules": "**Noodle Net**: Rooted on up to 3 targets. Eats Rooted Civilians.",
+  "flavor": "Al dente. For you.",
+  "talent": "**Parmesan Armor**: −25% damage taken."
+ },
+ "US-18": {
+  "stats": [
+   [
+    "heart",
+    "70 FLS"
+   ],
+   [
+    "sword_poison",
+    "5"
+   ],
+   [
+    "clock",
+    "0.5"
+   ],
+   [
+    "boot",
+    "3.0"
+   ]
+  ],
+  "rules": "Flying. Lifesteal 50%.",
+  "flavor": "Do not swat. Do not swat.",
+  "talent": "**Night Vision**: Ignores Blinded and fog."
+ },
+ "US-19": {
+  "stats": [
+   [
+    "heart",
+    "100 ARM"
+   ],
+   [
+    "sword_fire",
+    "15"
+   ],
+   [
+    "clock",
+    "0.8"
+   ],
+   [
+    "boot",
+    "2.2"
+   ]
+  ],
+  "rules": "Flying. Lands in the yard near its target. **Fire Breath**: Cone 2. Structure ×1.",
+  "flavor": "The dragon is a rental.",
+  "talent": "**Dive**: First attack from the air ×2."
+ },
+ "US-20": {
+  "stats": [
+   [
+    "heart",
+    "55 FLS"
+   ],
+   [
+    "sword",
+    "14"
+   ],
+   [
+    "clock",
+    "0.6"
+   ],
+   [
+    "boot",
+    "3.0"
+   ]
+  ],
+  "rules": "Invisible until its first attack. First attack ×3 vs Civilians.",
+  "flavor": "Masked. Obviously.",
+  "talent": "**Smoke Bomb**: Invisible again for 2s after the first attack."
+ },
+ "US-21": {
+  "stats": [
+   [
+    "heart",
+    "420 FLS"
+   ],
+   [
+    "sword",
+    "30"
+   ],
+   [
+    "clock",
+    "1.8"
+   ],
+   [
+    "boot",
+    "0.8"
+   ]
+  ],
+  "rules": "**Stomp**: Splash 2, Knockback 1. Throws goblins: range 8, 20 damage. Structure ×1.2.",
+  "flavor": "That is just his face.",
+  "talent": "**Headbutt**: Stunned 1s."
+ },
+ "US-22": {
+  "stats": [
+   [
+    "heart",
+    "360 FLS"
+   ],
+   [
+    "sword_fire",
+    "22"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "2.2"
+   ]
+  ],
+  "rules": "Flying, lands in the yard. Cone 3. Structure ×1.3. **Roar** (8s): Feared within 3 cells.",
+  "flavor": "Please step back.",
+  "talent": "**Sea of Flames**: Burning spreads."
+ },
+ "US-23": {
+  "stats": [
+   [
+    "heart",
+    "200 FLS"
+   ],
+   [
+    "sword",
+    "12"
+   ],
+   [
+    "clock",
+    "1.0"
+   ],
+   [
+    "boot",
+    "1.5"
+   ]
+  ],
+  "rules": "**Mimicry**: On first contact, copies HP and attack of the strongest enemy unit within 3 cells ×1.2.",
+  "flavor": "Which one is the twin?",
+  "talent": "**Perfect Copy**: Copies its Talent as well."
+ },
  "UV-01": {
   "stats": [
    [
@@ -132,6 +1998,314 @@
   "rules": "Block: −30% damage from the front.",
   "talent": "**Pan Whirl**: Every 6s hits all adjacent enemies.",
   "flavor": "The fried-egg crest is serious business."
+ },
+ "UV-02": {
+  "stats": [
+   [
+    "heart",
+    "220 ARM"
+   ],
+   [
+    "sword",
+    "12"
+   ],
+   [
+    "clock",
+    "1.2"
+   ]
+  ],
+  "rules": "**Petrify**: Rests as a statue (−50% Impact damage taken, Poison immune) until an enemy is within 3 cells.",
+  "flavor": "It blinks. Rarely.",
+  "talent": "**Dive**: On Alarm, flies to the Core Chamber."
+ },
+ "UV-03": {
+  "stats": [
+   [
+    "heart",
+    "200 PUD"
+   ],
+   [
+    "sword_poison",
+    "8"
+   ],
+   [
+    "clock",
+    "1.0"
+   ]
+  ],
+  "rules": "**Slime Trail**: enemies in its cell get −35% speed.",
+  "flavor": "Slow is a strategy.",
+  "talent": "**Thick Skin**: −20% damage taken."
+ },
+ "UV-04": {
+  "stats": [
+   [
+    "heart",
+    "260 ARM"
+   ],
+   [
+    "sword",
+    "11"
+   ],
+   [
+    "clock",
+    "1.1"
+   ]
+  ],
+  "rules": "**Shield Wall**: −25% damage taken per adjacent Defender (max −50%).",
+  "flavor": "Five shells. One opinion.",
+  "talent": "**Shell Dome**: Splash damage −50% for the group."
+ },
+ "UV-05": {
+  "stats": [
+   [
+    "heart",
+    "360 FLS"
+   ],
+   [
+    "sword",
+    "18"
+   ],
+   [
+    "clock",
+    "1.5"
+   ]
+  ],
+  "rules": "**Control Zone**: Enemies in the same room cannot pass.",
+  "flavor": "Not on the list. Not coming in.",
+  "talent": "**Eviction**: Knockback 3."
+ },
+ "UV-06": {
+  "stats": [
+   [
+    "heart",
+    "300 ARM"
+   ],
+   [
+    "sword",
+    "13"
+   ],
+   [
+    "clock",
+    "1.4"
+   ]
+  ],
+  "rules": "At 0 HP: leaves Rubble (blocks 5s), then reforms with 40% HP (once per wave).",
+  "flavor": "Fired once. Fired up forever.",
+  "talent": "**Kiln**: +20% max HP."
+ },
+ "UV-07": {
+  "stats": [
+   [
+    "heart",
+    "280 FLS"
+   ],
+   [
+    "sword",
+    "14"
+   ],
+   [
+    "clock",
+    "1.4"
+   ]
+  ],
+  "rules": "Every 6s: Rooted 2s on one target. Fire damage taken ×1.5.",
+  "flavor": "He was here before the walls.",
+  "talent": "**Bark**: Removes the Fire weakness."
+ },
+ "UV-08": {
+  "stats": [
+   [
+    "heart",
+    "240 SPR"
+   ],
+   [
+    "sword",
+    "12"
+   ],
+   [
+    "clock",
+    "1.0"
+   ]
+  ],
+  "rules": "Immune to Feared, Poisoned and Stunned. On death: pile of armor (blocks 4s).",
+  "flavor": "Nobody is home.",
+  "talent": "**Clank**: Applies Feared in radius 2."
+ },
+ "UV-09": {
+  "stats": [
+   [
+    "heart",
+    "210 FLS"
+   ],
+   [
+    "sword",
+    "3×6"
+   ],
+   [
+    "clock",
+    "0.8"
+   ],
+   [
+    "boot",
+    "2.2"
+   ]
+  ],
+  "rules": "**Bark**: 15% chance of Feared. Leash ×1.5.",
+  "flavor": "Good boy. Good boy. Good boy.",
+  "talent": "**Fourth Head**: 4 attacks per hit."
+ },
+ "UV-10": {
+  "stats": [
+   [
+    "heart",
+    "400 PUD"
+   ],
+   [
+    "sword_ice",
+    "15"
+   ],
+   [
+    "clock",
+    "1.6"
+   ]
+  ],
+  "rules": "Aura (radius 3): Enemies get −30% speed and attack speed.",
+  "flavor": "Retired. Still cold.",
+  "talent": "**Frozen Pension**: Aura radius 4."
+ },
+ "UV-11": {
+  "stats": [
+   [
+    "heart",
+    "330 FLS"
+   ],
+   [
+    "sword_fire",
+    "20"
+   ],
+   [
+    "clock",
+    "1.0"
+   ]
+  ],
+  "rules": "**Fire Breath**: Cone 3, applies Burning. Fire immune.",
+  "flavor": "Do not pet. Do not feed.",
+  "talent": "**Hot Streak**: +30% damage below 50% HP."
+ },
+ "UV-12": {
+  "stats": [
+   [
+    "heart",
+    "350 ARM"
+   ],
+   [
+    "sword",
+    "5"
+   ],
+   [
+    "clock",
+    "0.2"
+   ],
+   [
+    "target",
+    "5"
+   ]
+  ],
+  "rules": "Stationary. Overheats after 8s of fire: 2s pause.",
+  "flavor": "Wind it up. Duck.",
+  "talent": "**Cooling Fins**: No overheating."
+ },
+ "UV-13": {
+  "stats": [
+   [
+    "heart",
+    "380 FLS"
+   ],
+   [
+    "sword",
+    "16"
+   ],
+   [
+    "clock",
+    "1.3"
+   ]
+  ],
+  "rules": "Aura (room): Conquest progress −50%, allies +15% damage.",
+  "flavor": "Waddles with purpose.",
+  "talent": "**Holy Slide**: Charges to allies."
+ },
+ "UV-14": {
+  "stats": [
+   [
+    "heart",
+    "450 FLS"
+   ],
+   [
+    "sword",
+    "20"
+   ],
+   [
+    "clock",
+    "1.8"
+   ]
+  ],
+  "rules": "Taunt (radius 3). Civilians in the room take −30% damage.",
+  "flavor": "May I take your coat?",
+  "talent": "**Very Well, Sir**: Taunt affects ranged units."
+ },
+ "UV-15": {
+  "stats": [
+   [
+    "heart",
+    "250 FLS"
+   ],
+   [
+    "sword",
+    "60"
+   ]
+  ],
+  "rules": "Disguised as a door. Swallows one enemy up to 150 HP: Swallowed 8s.",
+  "flavor": "Please use the other door.",
+  "talent": "**Greed**: Swallows two."
+ },
+ "UV-16": {
+  "stats": [
+   [
+    "heart",
+    "750 ARM"
+   ],
+   [
+    "sword",
+    "28"
+   ],
+   [
+    "clock",
+    "1.6"
+   ]
+  ],
+  "rules": "**Last Muster**: Revives once at 50% HP. While alive, Conquest is fully blocked.",
+  "flavor": "The last of his order. The first to arrive.",
+  "talent": "**Oath**: +20% damage vs Conquerors."
+ },
+ "UV-17": {
+  "stats": [
+   [
+    "heart",
+    "600 ARM"
+   ],
+   [
+    "sword",
+    "22"
+   ],
+   [
+    "clock",
+    "1.8"
+   ]
+  ],
+  "rules": "Repairs buildings in the room for 10 HP/s. Taunt (same room).",
+  "flavor": "He knows every door. He mops after.",
+  "talent": "**Key Ring**: +50% repair speed."
  },
  "UZ-01": {
   "stats": [
@@ -167,134 +2341,219 @@
   "talent": "**Quick Mortar**: +50% repair speed.",
   "flavor": "Mortar is a lifestyle."
  },
- "BH-01": {
+ "UZ-03": {
   "stats": [
    [
     "heart",
-    "300 Wood"
-   ],
-   [
-    "plus",
-    "3×6 HP/s"
+    "50"
    ]
   ],
-  "rules": "3 Treatment Slots, 6 HP/s each. Healing Source. Flammable.",
-  "flavor": "The thermometer is also the flag."
+  "rules": "Aura (same and adjacent rooms): Allies take −15% damage and deal +10% damage.",
+  "flavor": "Hammer. Measure. Hammer.",
+  "talent": "**Masterpiece**: Aura reaches 1 more room."
  },
- "BW-01": {
+ "UZ-04": {
   "stats": [
    [
     "heart",
-    "350 Metal"
+    "40"
    ]
   ],
-  "rules": "Newly spawned Assault and Defender units gain Hardened.",
-  "flavor": "The furnace grins. That is normal."
+  "rules": "Every 10s: Allies in the room get Fed.",
+  "flavor": "Everything is soup.",
+  "talent": "**Secret Ingredient**: Fed gives +10% damage."
  },
- "BU-01": {
+ "UZ-05": {
   "stats": [
    [
     "heart",
-    "300 Wood"
-   ],
-   [
-    "person",
-    "+3"
+    "35"
    ]
   ],
-  "rules": "+3 Citizen cap. Citizens respawn every 4s instead of 5s. Flammable.",
-  "flavor": "The dog snores. So does everyone else."
+  "rules": "Removes Burning in the room and adjacent rooms. Fire damage to buildings within 2 cells −40%.",
+  "flavor": "Helmet bigger than fire.",
+  "talent": "**Water Cannon**: Range +2."
  },
- "BF-01": {
+ "UZ-06": {
   "stats": [
    [
     "heart",
-    "400 Stone"
-   ],
-   [
-    "person",
-    "+1"
-   ]
-  ],
-  "rules": "Unlocks the Weapons line. +1 Roster slot.",
-  "flavor": "The tuba plays reveille. With burps."
- },
- "BP-01": {
-  "stats": [
-   [
-    "heart",
-    "350 Stone"
-   ],
-   [
-    "cannon",
-    "2"
-   ]
-  ],
-  "rules": "2 Gun Slots. Artillery on it takes −25% Splash damage.",
-  "flavor": "The merlons have faces. They look stern."
- },
- "BT-01": {
-  "stats": [
-   [
-    "heart",
-    "300 Wood"
-   ],
-   [
-    "sword",
-    "12"
-   ],
-   [
-    "clock",
-    "1.2"
+    "35"
    ],
    [
     "target",
-    "7"
+    "3"
    ]
   ],
-  "rules": "Shoots enemy units. +50% damage vs Fleeing units. Flammable.",
-  "flavor": "The archer waves. It is part of the job."
+  "rules": "Aura (3 cells): Allies get Spurred and are immune to Feared.",
+  "flavor": "The bagpipe is a pig bladder.",
+  "talent": "**Encore**: Aura radius 5."
  },
- "BS-02": {
+ "UZ-07": {
   "stats": [
    [
     "heart",
-    "260/seg"
-   ],
-   [
-    "wall",
-    "≤4"
+    "30"
    ]
   ],
-  "rules": "Replaces up to 4 wall segments. Splash damage does not pass through. Attackers get −20% speed. Fire damage taken ×1.3.",
-  "flavor": "A cherry on top. That is tactics."
+  "rules": "**Class**: Up to 2 pupils in the same room gain 1.2 XP/s. Patients in healing rooms count.",
+  "flavor": "Page 1: Do not die.",
+  "talent": "**Habilitation**: 4 pupils."
  },
- "BS-06": {
+ "UZ-08": {
   "stats": [
    [
     "heart",
-    "200 Stone"
-   ],
-   [
-    "sword",
-    "60"
+    "40"
    ]
   ],
-  "rules": "The first 2 enemies each wave fall in: 60 Impact damage, Stunned 4s. Does not affect Flying or Spirit units.",
-  "flavor": "“Please don't,” the sign said."
+  "rules": "Applies Blessed to allies, once per target every 15s.",
+  "flavor": "Her prayers come with confetti.",
+  "talent": "**Double Blessing**: 2 targets at once."
  },
- "BH-02": {
+ "UZ-09": {
   "stats": [
    [
     "heart",
-    "180 Wood"
+    "35"
    ],
    [
-    "plus",
-    "8 HP/s"
+    "target",
+    "4"
    ]
   ],
-  "rules": "1 Treatment Slot, 8 HP/s. Healing Source. Flammable.",
-  "flavor": "The accordion is the alarm."
+  "rules": "Every 12s: Random potion on an ally within 4 cells: +25% damage for 10s, +25% speed, heal 40 or shield 30.",
+  "flavor": "Shake. Label. Hope.",
+  "talent": "**Aimed Potion**: Picks the fitting potion."
+ },
+ "UZ-10": {
+  "stats": [
+   [
+    "heart",
+    "35"
+   ]
+  ],
+  "rules": "Sets up to 3 traps in corridors: 50 Impact damage, Rooted 2s. Rebuilds them.",
+  "flavor": "Careful. She is behind you.",
+  "talent": "**Poison Dart Traps**: Applies Poisoned 4s."
+ },
+ "UZ-11": {
+  "stats": [
+   [
+    "heart",
+    "35"
+   ]
+  ],
+  "rules": "**Hive**: 4 bees sting invaders in the room (3 Impact damage/s each). Honey heals allies in the room for 3 HP/s.",
+  "flavor": "The bees are paid in honey.",
+  "talent": "**Queen Bee**: 8 bees."
+ },
+ "UZ-12": {
+  "stats": [
+   [
+    "heart",
+    "45"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "**Decoy**: 30% of enemies within 3 cells target it. Dodges 50% of attacks.",
+  "flavor": "Balls. Pins. Questions.",
+  "talent": "**Pie in the Face**: Blinded 1.5s."
+ },
+ "UZ-13": {
+  "stats": [
+   [
+    "heart",
+    "25"
+   ]
+  ],
+  "rules": "Fleeing allies +20% speed. Alarm triggers 2s earlier. Defender Leash +1.",
+  "flavor": "Coo. Run. Coo.",
+  "talent": "**Express Courier**: Fleeing allies +30% speed instead."
+ },
+ "UZ-14": {
+  "stats": [
+   [
+    "heart",
+    "35"
+   ]
+  ],
+  "rules": "20% of fallen allied Assault and Defender units rise as skeletons (15s, 50% HP).",
+  "flavor": "She talks to the roses.",
+  "talent": "**Rose of Rest**: 30% chance."
+ },
+ "UZ-15": {
+  "stats": [
+   [
+    "heart",
+    "30"
+   ],
+   [
+    "target",
+    "2"
+   ]
+  ],
+  "rules": "**Foresight**: Enemy shots at cells within 2 cells have a 35% chance to miss.",
+  "flavor": "It saw this coming. Obviously.",
+  "talent": "**Second Sight**: 50% chance."
+ },
+ "UZ-16": {
+  "stats": [
+   [
+    "heart",
+    "40"
+   ],
+   [
+    "target",
+    "5"
+   ]
+  ],
+  "rules": "**Rain** (radius 5, 60s): Burning impossible. Enemies get Wet.",
+  "flavor": "A very polite cloud.",
+  "talent": "**Thunderstorm**: Every 5s, 20 Lightning damage to one target."
+ },
+ "UZ-17": {
+  "stats": [
+   [
+    "heart",
+    "55"
+   ]
+  ],
+  "rules": "Each wave: +1 Reinforce for 2 random troop cards. Spawns are staggered 25% faster.",
+  "flavor": "She knitted them all.",
+  "talent": "**Maternal Pride**: +2 Reinforce."
+ },
+ "UZ-18": {
+  "stats": [
+   [
+    "heart",
+    "50"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "Buildings within 3 cells: +20% max HP. Repairs adjacent buildings 8 HP/s.",
+  "flavor": "Everything is a spare part.",
+  "talent": "**Scrap Golem**: Rubble becomes a golem (150 HP, 8/s, 20s)."
+ },
+ "UZ-19": {
+  "stats": [
+   [
+    "heart",
+    "40"
+   ],
+   [
+    "target",
+    "3"
+   ]
+  ],
+  "rules": "Once per wave: Fully heals the most wounded ally, +60 XP. Repairs buildings within 3 cells 15%. Healing Source.",
+  "flavor": "It was in the soup.",
+  "talent": "**Lead to Gold**: +1 Citizen each time."
  }
 }

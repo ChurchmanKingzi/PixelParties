@@ -154,9 +154,38 @@ class Textures:
 # --------------------------------------------------------------------------- Burg
 
 
+class FurnishCtx:
+    """Einrichtungs-Kontext eines Raum-Moduls (Weltpixel): X0, Y0 = linke obere Ecke, W, H = Maße in px.
+    decor(spr, cx): Wanddeko an der Nordwand (Mitte cx); prop(spr, x, y): Möbel mit linker oberer Ecke (x, y);
+    platform(x, y): Geschützplatz-Mitte melden; north_door: True, wenn die Tür in der Nordwand liegt."""
+
+    def __init__(self, world, m, X0, Y0, W, H, P, out):
+        self.world, self.m, self.X0, self.Y0, self.W, self.H, self.P, self.out = world, m, X0, Y0, W, H, P, out
+        self.door_side = m['door'][0] if m['door'] else None
+        self.wall_base = Y0 + T // 2
+        self.north_door = self.door_side == 'N'
+
+    def decor(self, spr, cx):
+        if self.door_side == 'N':
+            return
+        self.world.draw(spr, int(cx - spr.w / 2), self.wall_base - spr.h + 1, self.wall_base + 1)
+
+    def prop(self, spr, x, y, key_add=0, flip=False):
+        self.world.draw(spr, int(x), int(y), int(y + spr.h) + key_add, flip)
+
+    def floor_deco(self, spr, x, y):
+        """Bodendekor (Teppich, Fliesenmuster): liegt direkt über dem Boden und unter allen Möbeln und Einheiten"""
+        self.world.draw(spr, int(x), int(y), -49)
+
+    def platform(self, x, y):
+        self.out['platforms'].append((int(x), int(y)))
+
+
 class Castle:
-    def __init__(self, rows, ox, oy, team='teamA', gates=(), name=''):
+    def __init__(self, rows, ox, oy, team='teamA', gates=(), name='', themes=None):
+        """themes: {Buchstabe: {'floor': ndarray 32x32x3 | None, 'furnish': fn(FurnishCtx), 'low': bool}} für eigene Raumtypen"""
         self.team = team
+        self.themes = themes or {}
         self.ox, self.oy = ox, oy
         self.name = name
         self.cells = {}
@@ -169,7 +198,7 @@ class Castle:
         self.modules = []
         seen = set()
         for c, ch in self.cells.items():
-            if ch in ROOM_LETTERS and c not in seen:
+            if (ch in ROOM_LETTERS or ch in self.themes) and c not in seen:
                 stack, cs = [c], set()
                 while stack:
                     p = stack.pop()
@@ -260,7 +289,7 @@ class Castle:
                     wall = True
             if not wall:
                 continue
-            platform = any(self.cells.get(c) == 'Z' for c in (a, b))
+            platform = any(self.cells.get(c) == 'Z' or self.themes.get(self.cells.get(c), {}).get('low') for c in (a, b))
             if orient == 'h':
                 if ka is None:
                     tall = True          # Nordkante der Burg: Innenansicht
@@ -337,7 +366,8 @@ class Castle:
     def paint_floors(self, world: World, tiles):
         for (x, y), ch in self.cells.items():
             X, Y = (self.ox + x) * CELL, (self.oy + y) * CELL
-            tl = tiles.floor(ch, x, y)
+            th = self.themes.get(ch)
+            tl = th['floor'] if th and th.get('floor') is not None else tiles.floor(ch, x, y)
             world.px[Y:Y + CELL, X:X + CELL, :3] = tl
             world.depth[Y:Y + CELL, X:X + CELL] = -50
 
@@ -380,16 +410,8 @@ class Castle:
 
     def _furnish(self, world, m, X0, Y0, W, Hh, P, out):
         L = m['letter']
-        door_side = m['door'][0] if m['door'] else None
-        wall_base = Y0 + T // 2
-        # Wanddeko an der Nordwand (Vorderseite, Unterkante knapp über dem Boden)
-        def decor(spr, cx):
-            if door_side == 'N':
-                return
-            world.draw(spr, int(cx - spr.w / 2), wall_base - spr.h + 1, wall_base + 1)
-
-        def prop(spr, x, y, key_add=0):
-            world.draw(spr, int(x), int(y), int(y + spr.h) + key_add)
+        ctx = FurnishCtx(world, m, X0, Y0, W, Hh, P, out)
+        decor, prop = ctx.decor, ctx.prop
 
         if L == 'K':
             decor(P['banner_cross'], X0 + 16)
@@ -425,6 +447,8 @@ class Castle:
             prop(P['crate'], X0 + 8, Y0 + Hh - 20)
             prop(P['crate'], X0 + W - 24, Y0 + Hh - 20)
             out['platforms'].append((X0 + W // 2, Y0 + Hh // 2 + 8))
+        elif L in self.themes:
+            self.themes[L]['furnish'](ctx)
         out['rooms'].append((L, X0, Y0, W, Hh))
 
 

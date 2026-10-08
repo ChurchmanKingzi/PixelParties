@@ -653,7 +653,7 @@
  {
   "id": "BW-08",
   "name": "Akademie der verbotenen Bücher",
-  "name_en": "Academy of Forbidden Books",
+  "name_en": "Forbidden Book Academy",
   "kategorie": "bau",
   "gruppe": "Werkstätten",
   "category_en": "Building",
@@ -1100,7 +1100,7 @@
  {
   "id": "BU-02",
   "name": "Kantine „Zum Taumelnden Troll“",
-  "name_en": "Canteen \"The Staggering Troll\"",
+  "name_en": "Staggering Troll Canteen",
   "kategorie": "bau",
   "gruppe": "Utility",
   "category_en": "Building",
@@ -2501,7 +2501,7 @@
  {
   "id": "US-22",
   "name": "Kuchenfeuer, der Geburtstagsdrache",
-  "name_en": "Cakefire, the Birthday Dragon",
+  "name_en": "Cakefire, Birthday Dragon",
   "kategorie": "sturm",
   "category_en": "Assault",
   "line_en": "Air",
@@ -2860,7 +2860,7 @@
  {
   "id": "UV-16",
   "name": "Sir Reginald, der Letzte Ritter",
-  "name_en": "Sir Reginald, the Last Knight",
+  "name_en": "Sir Reginald, Last Knight",
   "kategorie": "verteidiger",
   "category_en": "Defender",
   "line_en": "Weapons",

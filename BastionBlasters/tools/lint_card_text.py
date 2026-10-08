@@ -21,8 +21,10 @@ ICONS = {'heart', 'sword', 'sword_fire', 'sword_ice', 'sword_lightning', 'sword_
 FORBIDDEN = {'cheap', 'powerful', 'mighty', 'huge', 'tiny', 'very', 'quickly', 'slowly', 'nice', 'brave', 'fierce', 'mass',
              'strong', 'weak', 'massive', 'incredibly', 'extremely', 'also', 'simply', 'just', 'basically', 'greatly'}
 # großgeschriebene Wörter, die auch ohne Glossareintrag erlaubt sind (Einheiten und Kürzel)
-EXTRA_CAPS = {'HP', 'XP', 'HP/s'}
+EXTRA_CAPS = {'HP', 'XP', 'HP/s', 'XP/s'}
 STAT_WORDS = glossary.all_terms()
+GENERIC_SUBJECTS = {'Allies', 'Enemies', 'Units', 'Buildings', 'Citizens'}
+TRIGGER_WORDS = {'On', 'Every', 'While', 'Once', 'At', 'Each', 'After', 'Entering', 'Aura'}
 ABBR = set(glossary.abbreviations())
 
 
@@ -57,6 +59,17 @@ def check_text(cid, field, text, problems):
         problems.append(f'{where}: Minuszeichen "−" (U+2212) statt Bindestrich vor Zahlen')
     if '≈' in plain or '~' in plain:
         problems.append(f'{where}: Keine ungefähren Werte ("≈", "~"), exakte Zahl angeben')
+    # "Name: ..." am Satzanfang: Ein Name aus 1-3 großgeschriebenen Wörtern ist ein Fähigkeitsname und muss fett sein.
+    # Auslöser ("On kill:"), Glossarbegriffe ("Block:", "Aura (...)") und Zielbeschreibungen ("Allies:") sind ausgenommen.
+    for sent in re.split(r'(?<=\.) ', text):
+        m = re.match(r'^([A-Z][\w\-]*(?: [A-Z][\w\-]*){0,2})( \([^)]*\))?: ', sent)
+        if m and not sent.startswith('**'):
+            name = m.group(1)
+            first = name.split(' ')[0]
+            clause = (first in TRIGGER_WORDS or first in GENERIC_SUBJECTS or name in STAT_WORDS
+                      or first in STAT_WORDS or (first.endswith('s') and first[:-1] in STAT_WORDS))
+            if not clause:
+                problems.append(f'{where}: Fähigkeitsname "{name}" muss fett sein (**{name}**)')
     # Großgeschriebene Wörter außerhalb von Satzanfängen müssen Glossarbegriffe sein
     toks = re.findall(r"[\w/'’×%−+.:()—-]+", plain)
     prev = ''
@@ -110,6 +123,13 @@ def main():
         # Flavor gehört nicht in die Effektbox: Regeltext darf keine Erzählsätze enthalten
         if t.get('talent') and not t['talent'].startswith('**'):
             problems.append(f'{cid}.talent muss mit **Fähigkeitsname**: beginnen')
+    # Namen müssen ins Namensband passen (Breite im Pixelfont)
+    sys.path.insert(0, os.path.join(ROOT, 'art'))
+    from pixfont import text_width
+    for cid, c in CARDS.items():
+        w = text_width(c['name_en'])
+        if w > 136:
+            problems.append(f"{cid}: Name \"{c['name_en']}\" ist {w} px breit (höchstens 136)")
     kinds = {k['kind'] for k in glossary.KEYWORDS}
     ens = [(k['kind'], k['en']) for k in glossary.KEYWORDS]
     if len(ens) != len(set(ens)):

@@ -39,9 +39,9 @@ TYPE_Y = 125
 STRIP_Y0, STRIP_Y1 = 133, 146
 STRIP_TEXT_Y = 136
 EFFECT_Y = 149
-EFFECT_MAX_LINES = 5
-DIVIDER_Y = 198
-FLAVOR_Y = (202, 211)
+EFFECT_MAX_LINES = 6                    # ab 6 Zeilen rückt die Trennlinie nach unten und der Flavor hat nur eine Zeile
+DIVIDER_Y, DIVIDER_Y_LONG = 198, 206
+FLAVOR_Y, FLAVOR_Y_LONG = (202, 211), 209
 TEXT_X, TEXT_W = 8, 144
 
 
@@ -254,15 +254,20 @@ def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
         for x in range(8, 152):
             dot(img, x, y, C('stone', 1) if y in (STRIP_Y0, STRIP_Y1) else C('stone', 0))
     stats = tx.get('stats', [])
-    total = sum(7 + 2 + text_width(t) for _, t in stats)
+    ig = 2                                           # Abstand Symbol -> Wert; bei vollen Leisten 1 px
+    total = sum(7 + ig + text_width(t) for _, t in stats)
     gap = min(16, (136 - total) / (len(stats) - 1)) if len(stats) > 1 else 0
-    x = 8 + (144 - (total + gap * max(0, len(stats) - 1))) / 2
     if gap < 3 and len(stats) > 1:
-        print(f'WARNUNG: Werteleiste sehr eng: {card["id"]} (Lücke {gap:.1f})', file=sys.stderr)
+        ig = 1
+        total = sum(7 + ig + text_width(t) for _, t in stats)
+        gap = min(16, (136 - total) / (len(stats) - 1))
+        if gap < 2:
+            print(f'WARNUNG: Werteleiste sehr eng: {card["id"]} (Lücke {gap:.1f})', file=sys.stderr)
+    x = 8 + (144 - (total + gap * max(0, len(stats) - 1))) / 2
     for ic, t in stats:
         blit_icon(img, ic, int(round(x)), STRIP_TEXT_Y)
-        draw_text(img, int(round(x)) + 9, STRIP_TEXT_Y, t, WHITE)
-        x += 7 + 2 + text_width(t) + gap
+        draw_text(img, int(round(x)) + 7 + ig, STRIP_TEXT_Y, t, WHITE)
+        x += 7 + ig + text_width(t) + gap
     # --- Effektbox: nur mechanischer Text (Flavor steht unter der Trennlinie)
     y = EFFECT_Y
     nlines = 0
@@ -284,14 +289,19 @@ def render_card(card: dict, tx: dict, art: Image.Image) -> Image.Image:
             nlines += 1
     if nlines > EFFECT_MAX_LINES:
         print(f'WARNUNG: Effekttext zu lang: {card["id"]} ({nlines} Zeilen)', file=sys.stderr)
-    # --- Flavor
+    # --- Flavor (bei 6 Effektzeilen nur eine Zeile)
+    long_effect = nlines >= 6
+    div_y = DIVIDER_Y_LONG if long_effect else DIVIDER_Y
     for x in range(8, 152):
         if x % 2 == 0:
-            dot(img, x, DIVIDER_Y, C('bone', 2))
+            dot(img, x, div_y, C('bone', 2))
     fl = balanced_two_lines(tx['flavor'])
-    if len(fl) > 2:
-        print(f'WARNUNG: Flavor zu lang: {card["id"]}', file=sys.stderr)
-    first = FLAVOR_Y[0] if len(fl) > 1 else (FLAVOR_Y[0] + FLAVOR_Y[1]) // 2
+    if len(fl) > (1 if long_effect else 2):
+        print(f'WARNUNG: Flavor zu lang: {card["id"]} ({len(fl)} Zeilen bei {nlines} Effektzeilen)', file=sys.stderr)
+    if long_effect:
+        first = FLAVOR_Y_LONG
+    else:
+        first = FLAVOR_Y[0] if len(fl) > 1 else (FLAVOR_Y[0] + FLAVOR_Y[1]) // 2
     for k, ln in enumerate(fl[:2]):
         w = rich_width(ln)
         draw_rich(img, (CARD_W - w) // 2, first + 9 * k, ln, C('stone', 1))
@@ -305,12 +315,16 @@ def main():
     texts = json.load(open(os.path.join(ROOT, 'daten', 'card_text.json'), encoding='utf-8'))
     import cards_art
     import cardback
+    import glob
+    import importlib
+    for f in sorted(glob.glob(os.path.join(HERE, 'pack_*.py'))):
+        importlib.import_module(os.path.basename(f)[:-3])      # Packs registrieren ihre Kartenbilder in cards_art.ART
     outdir = os.path.join(OUT, 'cards')
     os.makedirs(outdir, exist_ok=True)
     rendered = []
     for cid in texts:
         card = cards[cid]
-        art = cards_art.art_unit(cid) if card['kategorie'] != 'bau' else cards_art.art_building(cid)
+        art = cards_art.art_for(cid)
         im = render_card(card, texts[cid], art)
         bad = palette_violations(im)
         if bad:

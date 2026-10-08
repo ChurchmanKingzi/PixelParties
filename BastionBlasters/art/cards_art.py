@@ -22,23 +22,66 @@ WIN_W, WIN_H = 144, 96
 # --------------------------------------------------------------------------- Grundlagen
 
 
+def _noise_rgb(ramp, lo, hi, seed, w, h, cells=(48, 20), spread=1.0):
+    """Boden aus zwei Rauschfeldern, auf Rampenindizes lo..hi quantisiert (Schachbrett-Dither)"""
+    Y, X = np.mgrid[0:h, 0:w]
+    n = 0.6 * smooth_noise(w, h, cells[0], seed) + 0.4 * smooth_noise(w, h, cells[1], seed + 1)
+    L = np.clip((n - n.min()) / (n.max() - n.min() + 1e-6), 0, 1)
+    L = np.clip(0.5 + (L - 0.5) * spread, 0, 1)
+    return np.array(RAMPS[ramp], np.uint8)[quant_vec(L, lo, hi, X, Y)]
+
+
+def _glints(rgb, rng, count, ramp, idx):
+    h, w = rgb.shape[:2]
+    for _ in range(count):
+        x, y = rng.randint(2, w - 3), rng.randint(2, h - 3)
+        rgb[y, x] = RAMPS[ramp][idx]
+
+
+GROUND_KINDS = ('grass', 'dirt', 'cobble', 'snow', 'dark', 'sand', 'cloud', 'purple', 'slab', 'planks', 'mud')
+
+
 def ground_world(kind='grass', seed=1, w=WIN_W, h=WIN_H):
-    """Boden als World; kind: grass | cobble | dirt | snow"""
+    """Boden als World. kind: grass | dirt | cobble | snow | dark (Gruft) | sand | cloud | purple (Chaos) | slab | planks | mud"""
     world = World(w, h)
-    if kind == 'cobble':
-        tile = tile_cobble(seed, 32, base='dirt', tone=(3, 4), mortar=2, hi=5)
+    rng = random.Random(seed)
+    if kind in ('cobble', 'slab', 'planks'):
+        if kind == 'cobble':
+            tile = tile_cobble(seed, 32, base='dirt', tone=(3, 4), mortar=2, hi=5)
+        elif kind == 'slab':
+            tile = tile_cobble(seed, 32, base='stone', tone=(3, 4), mortar=2, hi=5)
+        else:
+            tile = tile_planks(seed, 32, tone=(2, 3, 4))
         for y in range(0, h, 32):
             for x in range(0, w, 32):
                 sub = tile.px[:min(32, h - y), :min(32, w - x), :3]
                 world.px[y:y + sub.shape[0], x:x + sub.shape[1], :3] = sub
-    else:
+    elif kind in ('grass', 'dirt'):
         paths = []
         if kind == 'dirt':
             paths = [([(-20, h * 0.62), (w * 0.5, h * 0.55), (w + 20, h * 0.66)], 52)]
         G, water, pathm = make_ground(w, h, seed, paths, [])
-        rng = random.Random(seed)
         scatter_ground_decals(G, rng, int(w * h / 90), water | pathm)
         world.px[:, :, :3] = G
+    else:
+        spec = {'snow': ('ice', 3, 5, 18), 'dark': ('stone', 0, 2, 22), 'sand': ('dirt', 3, 5, 26), 'cloud': ('sky', 3, 5, 24),
+                'purple': ('purple', 1, 3, 20), 'mud': ('dirt', 1, 3, 22)}[kind]
+        rgb = _noise_rgb(spec[0], spec[1], spec[2], seed, w, h, cells=(spec[3] * 2, spec[3]))
+        if kind == 'snow':
+            _glints(rgb, rng, 60, 'ice', 5)
+        elif kind == 'dark':
+            _glints(rgb, rng, 40, 'bone', 3)
+            _glints(rgb, rng, 30, 'grass', 1)
+        elif kind == 'sand':
+            _glints(rgb, rng, 40, 'gold', 4)
+        elif kind == 'cloud':
+            _glints(rgb, rng, 70, 'bone', 5)
+        elif kind == 'purple':
+            _glints(rgb, rng, 50, 'purple', 5)
+            _glints(rgb, rng, 20, 'gold', 5)
+        elif kind == 'mud':
+            _glints(rgb, rng, 30, 'dirt', 4)
+        world.px[:, :, :3] = rgb
     world.depth[:] = -100
     return world
 
@@ -85,13 +128,7 @@ def art_unit(cid: str) -> Image.Image:
     rnd = random.Random(seed)
     ground = {'UA-01': 'grass', 'US-01': 'dirt', 'US-02': 'dirt', 'US-03': 'dirt', 'US-06': 'snow',
               'UV-01': 'cobble', 'UZ-01': 'grass', 'UZ-02': 'cobble'}[cid]
-    w = ground_world('grass' if ground == 'snow' else ground, seed % 7 + 1)
-    if ground == 'snow':
-        # Schnee: Boden aufhellen (Eis-Rampe), Schachbrett-Flecken
-        Y, X = np.mgrid[0:WIN_H, 0:WIN_W]
-        nz = smooth_noise(WIN_W, WIN_H, 18, seed)
-        idx = quant_vec(np.clip(0.55 + 0.7 * (nz - 0.5), 0, 1), 3, 5, X, Y)
-        w.px[:, :, :3] = np.array(RAMPS['ice'], np.uint8)[idx]
+    w = ground_world(ground, seed % 7 + 1)
     cx = WIN_W // 2
     if cid == 'UA-01':
         for (sp, x, y) in ((fence(2), 12, 36), (bush(1), 118, 40), (rock(2), 128, 84), (bush(3, True), 16, 88)):
@@ -168,7 +205,7 @@ def stone_projectile_small():
 # --------------------------------------------------------------------------- Bauteil-Dioramen
 
 
-def _props(team):
+def props_for(team):
     pr = {'bed': bed(), 'bunk': bunk(), 'anvil': anvil(), 'barrel': barrel(), 'trough': trough(),
           'crate': crate(), 'rack': rack(), 'herb_table': herb_table(), 'chest': chest(), 'plant': plant(),
           'rug': rug(36, 20, team), 'window': window(), 'banner_cross': banner_cross(), 'crest': crest(team),
@@ -179,9 +216,9 @@ def _props(team):
     return pr
 
 
-def mini_castle(rows, ox, oy, world, team='teamA', gates=(), tw=None):
+def mini_castle(rows, ox, oy, world, team='teamA', gates=(), tw=None, themes=None):
     """Baut eine kleine Burg in `world` (Boden, Wände, Möbel, Türme) und liefert (Burg, place_objects-Ergebnis)"""
-    c = Castle(rows, ox, oy, team, gates=gates, name='card')
+    c = Castle(rows, ox, oy, team, gates=gates, name='card', themes=themes)
     tiles, tex = FloorTiles(), Textures()
     fp = np.zeros((world.h, world.w), bool)
     kd = np.zeros((world.h, world.w), np.uint8)
@@ -190,7 +227,7 @@ def mini_castle(rows, ox, oy, world, team='teamA', gates=(), tw=None):
     c.paint_gates(world)
     c.add_walls(fp, kd, ht)
     wall_shadows(world, fp)
-    out = c.place_objects(world, tw or tower(team), core(ring_team=team), _props(team))
+    out = c.place_objects(world, tw or tower(team), core(ring_team=team), props_for(team))
     draw_walls(world, fp, kd, ht, tex)
     return c, out
 
@@ -321,3 +358,39 @@ def art_building(cid: str) -> Image.Image:
             prop_at(world, sp, x, y)
         return finish(world)
     raise KeyError(cid)
+
+
+# --------------------------------------------------------------------------- Registry für Kartenbilder
+
+ART = {}
+
+
+def card_art(cid):
+    """Dekorator: registriert eine Funktion () -> Image (144 x 96, RGBA) als Kartenbild für `cid`"""
+    def deco(fn):
+        ART[cid] = fn
+        return fn
+    return deco
+
+
+def placeholder_art(cid):
+    """Platzhalter für Karten ohne Bild: Chaos-Boden mit großem Fragezeichen (nur zur Entwicklung)"""
+    w = ground_world('purple', sum(ord(c) for c in cid) % 9 + 1)
+    from pixfont import GLYPHS
+    g = np.kron(GLYPHS['?'], np.ones((5, 5), bool))[10:45]
+    ys, xs = np.nonzero(g)
+    for y, x in zip(ys, xs):
+        X, Y = 60 + x, 28 + y
+        w.px[Y, X, :3] = RAMPS['gold'][4 if (x + y) % 2 else 5]
+        w.depth[Y, X] = 9000
+    return finish(w)
+
+
+def art_for(cid):
+    if cid in ART:
+        return ART[cid]()
+    if cid in ('UA-01', 'US-01', 'US-02', 'US-03', 'US-06', 'UV-01', 'UZ-01', 'UZ-02'):
+        return art_unit(cid)
+    if cid in ('BH-01', 'BW-01', 'BU-01', 'BF-01', 'BP-01', 'BT-01', 'BS-02', 'BS-06', 'BH-02'):
+        return art_building(cid)
+    return placeholder_art(cid)
