@@ -24,9 +24,10 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 
 **16-Bit-Disziplin (Palette)**
 - Farbraum **RGB555** (32 Stufen je Kanal, wie beim SNES).
-- **Höchstens 16 Farben pro Sprite** (15 + Transparenz), gezogen aus einem **Master-Satz von Farbrampen** zu je 5–7 Tönen mit **Hue-Shift** (Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler). Pro Tileset höchstens 4 Rampen.
-- Rampen: Stein · Holz · Gras/Flora · Erde · Haut (2 Varianten) · Knochen · Metall · Magie-Violett · Feuer · Eis · Schleim-Grün · **Team P1** (Karmin/Gold) · **Team P2** (Türkis/Violett).
-- **Teamfarben per Palette-Swap:** Banner, Zierleisten, Umhänge, Schulterplatten und Lichter sind in einer Index-Rampe gezeichnet und werden zur Laufzeit durch die Teamrampe ersetzt. Eine Grafik, zwei Teams.
+- **Master-Palette mit 122 Farben:** 20 **Farbrampen** zu je 6 Tönen (Hue-Shift: Schatten kühler und violetter, Licht wärmer und gelber, nie nur dunkler) plus Tinte und Weiß. **Jede Grafik darf nur Farben daraus verwenden.** Die Stilprobe nutzt 99 davon.
+- **Pro Sprite typischerweise 20–40 Farben** (Stilprobe: 22–42). Die harte SNES-Grenze von 16 Farben pro Sprite wird **bewusst nicht erzwungen**: Mit ihr ließen sich Selbst-Outlines, Dithering und mehrere Materialien je Figur kaum mehr zeigen. Der 16-Bit-Look entsteht aus der geschlossenen Palette, dem Schachbrett-Dithering, den farbigen Outlines und den kräftigen Rampen.
+- Rampen: Stein · Holz · Gras · Erde · Goblin-Grün · Haut · Knochen · Metall · Gold · Feuer · Eis · Magie-Violett · Fell · Blatt · Schleim · Kohle · Himmel · Stoff · **Team P1** (Karmin/Gold) · **Team P2** (Türkis).
+- **Teamfarben per Palette-Swap:** Teamfarbige Pixel stehen in der Team-Rampe und werden zur Laufzeit 1:1 gegen die andere Team-Rampe getauscht (Index für Index). Eine Grafik, zwei Teams. Die Stilprobe tut genau das (P2 in Türkis).
 
 **Dithering und Shading (Kern des Looks)**
 - **Verläufe** (Boden, Nebel, Schatten, Glühen) immer per **geordnetem Dithering** (Schachbrett, Bayer 2 × 2 / 4 × 4), nie als weicher Alpha-Verlauf.
@@ -53,7 +54,7 @@ Legende wie in Teil 1: 🟦 aus deinem Konzept · 🟨 meine Ergänzung · ❓ o
 4. **Teamfarbe nie weglassen.**
 
 **Pixel-Werkstatt (Asset-Pipeline, von Claude betrieben)** 🟨
-- **Erzeugung per Code** (Python mit Pillow und numpy): Farbrampen, schattierte Grundformen (Kugel-, Quader-, Zylinder-Shading mit Bayer-Dither), automatische Selbst-Outline, Schatten-Dither, Palette-Prüfung (RGB555, ≤ 16 Farben pro Sprite).
+- **Erzeugung per Code** (Python mit Pillow und numpy, Ordner `art/`): Farbrampen, schattierte Grundformen (Kugel, Polygon, Zylinder mit Schachbrett-Dither), automatische Selbst-Outline (hell auf der Lichtseite, dunkel auf der Schattenseite), Schatten-Dither, Palette-Prüfung (RGB555, nur Master-Palette) und Farbzählung je Sprite.
 - **Teilebasierte Figuren:** Körper, Kopf, Hut, Waffe, Werkzeug als Bausteine; Animation durch Teilversatz und Frame-Tausch; handgesetzte Detail-Patches (Gesichter, Muster).
 - **Ausgabe:** PNG-Spritesheets + JSON-Atlas (Tags = Animationen) + **Kontaktbögen** zur Qualitätskontrolle. Alles liegt versioniert im Repo, der Code ist deterministisch (gleicher Code = gleiche Pixel), jede Änderung ist ein Diff.
 - **Qualitätsschleife:** Stilprobe → deine Freigabe → Batches nach Priorität (P0-Karten zuerst, Tier IV zuletzt), verwandte Einheiten teilen Recolor-Basen. Du gibst Feedback am Kontaktbogen („Gesichter größer“, „Rüstung zu grau“), ich passe Rampen oder Bausteine an und erzeuge alles neu.
@@ -254,7 +255,7 @@ Begründung: Entscheidend ist, dass ich die Pixelgrafik selbst erzeuge und das S
 | # | Meilenstein | Ergebnis („Definition of Done“) |
 |---|---|---|
 | **M0** | Entscheidungen & Daten | Offene Fragen aus §14 beantwortet; Kataloge als JSON/YAML exportiert; Tuning-Tabelle als Datei. |
-| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** |
+| **M1** | Pixel-Werkstatt & Stilprobe | Code-Pipeline für 16-Bit-Pixelart (Rampen, Shading, Dither, Outline, Palette-Prüfung); Stilprobe mit Kontaktbogen, ersten Bauteilen, Einheiten und einer Szenen-Montage; **deine Freigabe des Stils.** *Stand: Stilprobe liegt in `art/out/` vor und wartet auf deine Freigabe.* |
 | **M2** | Kampf-Greybox | 2D-Feld und Bastion-Raster mit Platzhalterquadraten; Einheiten spawnen, laufen, kämpfen; eine **komplette Bot-gegen-Bot-Partie** läuft bis zum Sieg und ist als Replay abspielbar. |
 | **M3** | Bastion-Builder | Drag & Drop auf dem Raster mit Drehen, Tags, Nachbarschaft, Validierung. Ein Mensch kann eine Bastion bauen. |
 | **M4** | Karten-Loop & Zeitstopp | Kern-Wahl, Loadout 10/7, frische 5/3-Hand, Kontingent, Pausenablauf mit einfacher Kamerafahrt. Eine **komplette Partie ist spielbar** (Mensch vs. Bot). |
@@ -477,6 +478,6 @@ Neue Effekt-Bausteine entstehen nur, wenn mehrere Karten sie brauchen. Alles and
 |---|---|---|
 | 2026-10-08 | **Draufsicht statt Querschnitt, nicht beides.** Beide Ansichten zugleich zu pflegen würde Regeln (Schusslinie, Wege, Platzierung) und die gesamte Grafik doppelt kosten. Die systemischen Teile (Karten, XP, Rückzug, Personal, Eroberung, Wellen, Zeitstopp) sind ansichtsunabhängig und bleiben. | Neues Raster mit Ringmauer, Schusslinie und Zielschatten statt Exposition, Tags ohne Etagen, Wegfindung per A*, Statik-Kollaps gestrichen. Sieben Bauteile und neun Einheiten angepasst. |
 | 2026-10-08 | **Ziehregel:** Start 10 ziehen / 7 behalten, danach jede Pause eine komplett frische 5/3-Hand. | Handlimit entfällt; ungespielte Karten verfallen (Trostpflaster 4 %); Chronoschrein auf 5/4. |
-| 2026-10-08 | **Pixelart komplett von Claude, 16-Bit-Stil.** | Pixel-Werkstatt (Code-Pipeline), RGB555, ≤ 16 Farben pro Sprite, Stilprobe vor Massenproduktion. |
+| 2026-10-08 | **Pixelart komplett von Claude, 16-Bit-Stil.** | Pixel-Werkstatt (Code-Pipeline), RGB555, Master-Palette mit 122 Farben (statt harter 16-Farben-Grenze je Sprite), Stilprobe vor Massenproduktion. |
 | 2026-10-08 | **Kerne sind Fraktionen.** | 12 Kerne in 4 Archetypen mit Passive, Aktive, Linien-Affinität, Kern-Anbau, Schwäche (Katalog 03). |
 | 2026-10-08 | **Tech-Stack:** Empfehlung Web (TypeScript), Godot als zweite Wahl, Unity nicht. | Bestätigung ausstehend (Q7). |

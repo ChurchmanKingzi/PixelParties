@@ -1,0 +1,126 @@
+{
+  "US-01 Topfhelm-Skelett": {
+    "file": "sprites/us-01.png",
+    "frame_w": 32,
+    "frame_h": 32,
+    "facing": "right",
+    "anims": {
+      "idle": {
+        "start": 0,
+        "frames": 2
+      },
+      "walk": {
+        "start": 2,
+        "frames": 4
+      },
+      "attack": {
+        "start": 6,
+        "frames": 3
+      }
+    }
+  },
+  "US-02 Beute-Goblin": {
+    "file": "sprites/us-02.png",
+    "frame_w": 32,
+    "frame_h": 32,
+    "facing": "right",
+    "anims": {
+      "idle": {
+        "start": 0,
+        "frames": 2
+      },
+      "walk": {
+        "start": 2,
+        "frames": 4
+      },
+      "attack": {
+        "start": 6,
+        "frames": 3
+      }
+    }
+  },
+  "US-06 Rutsch-Bär": {
+    "file": "sprites/us-06.png",
+    "frame_w": 56,
+    "frame_h": 38,
+    "facing": "right",
+    "anims": {
+      "slide": {
+        "start": 0,
+        "frames": 3
+      }
+    }
+  },
+  "UV-01 Bratpfannen-Büttel": {
+    "file": "sprites/uv-01.png",
+    "frame_w": 32,
+    "frame_h": 32,
+    "facing": "right",
+    "anims": {
+      "idle": {
+        "start": 0,
+        "frames": 2
+      },
+      "attack": {
+        "start": 2,
+        "frames": 3
+      }
+    }
+  },
+  "UZ-01 Kräuterhexe": {
+    "file": "sprites/uz-01.png",
+    "frame_w": 40,
+    "frame_h": 36,
+    "facing": "right",
+    "anims": {
+      "stir": {
+        "start": 0,
+        "frames": 4
+      }
+    }
+  },
+  "UA-01 Rumpel-Katapult": {
+    "file": "sprites/ua-01.png",
+    "frame_w": 48,
+    "frame_h": 44,
+    "facing": "right",
+    "anims": {
+      "load": {
+        "start": 0,
+        "frames": 1
+      },
+      "fire": {
+        "start": 1,
+        "frames": 3
+      }
+    }
+  },
+  "US-03 Kürbis-Bomber": {
+    "file": "sprites/us-03.png",
+    "frame_w": 32,
+    "frame_h": 32,
+    "facing": "right",
+    "anims": {
+      "run": {
+        "start": 0,
+        "frames": 4
+      }
+    }
+  },
+  "UZ-02 Bau-Gnom": {
+    "file": "sprites/uz-02.png",
+    "frame_w": 32,
+    "frame_h": 32,
+    "facing": "right",
+    "anims": {
+      "idle": {
+        "start": 0,
+        "frames": 2
+      },
+      "work": {
+        "start": 2,
+        "frames": 3
+      }
+    }
+  }
+}

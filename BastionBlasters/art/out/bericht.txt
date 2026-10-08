@@ -1,0 +1,9 @@
+Gesamtfarben aller Einheiten: 99 (Master-Palette: 122)
+US-01 Topfhelm-Skelett: 22 Farben
+US-02 Beute-Goblin: 35 Farben
+US-06 Rutsch-Bär: 36 Farben
+UV-01 Bratpfannen-Büttel: 34 Farben
+UZ-01 Kräuterhexe: 42 Farben
+UA-01 Rumpel-Katapult: 29 Farben
+US-03 Kürbis-Bomber: 30 Farben
+UZ-02 Bau-Gnom: 41 Farben
