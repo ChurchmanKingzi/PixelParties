@@ -6628,8 +6628,10 @@ async function puzzleEndGame(room, winnerIdx, reason) {
           );
           console.log(`[Tutorial] ${winner.username} cleared ${puzzleId}`);
         }
-        // Alle Stufen geschafft? -> Tutorial-Skin freischalten (mit Freischalt-Animation).
-        await grantTutorialSkinIfDone(userId);
+        // Alle Stufen geschafft? Der Tutorial-Skin wird NICHT hier freigeschaltet:
+        // sein Popup wuerde mitten im Epilog erscheinen. Der Client meldet nach
+        // Feuerwerk und Ausblenden `tutorial_finale_done` (unten); wer vorher
+        // schliesst, bekommt ihn beim naechsten Anmelden (grantTutorialSkinIfDone).
       } catch (err) {
         console.error('[Tutorial] completion tracking error:', err.message);
       }
@@ -18699,6 +18701,15 @@ io.on('connection', (socket) => {
         socket.emit('puzzle_error', 'Failed to load tutorial: ' + err.message);
       }
     })();
+  });
+
+  // ── Finale des letzten Tutorials ist vorbei (Feuerwerk + Ausblenden) ──
+  // Schaltet den Tutorial-Skin frei, falls alle Stufen geschafft und er noch
+  // nicht im Besitz ist (die Pruefung steckt in `grantTutorialSkinIfDone`, ein
+  // erfundenes Ereignis schaltet also nichts frei).
+  socket.on('tutorial_finale_done', () => {
+    if (!currentUser?.userId) return;
+    grantTutorialSkinIfDone(currentUser.userId).catch(() => {});
   });
 
   // ── Retry puzzle/tutorial: clean up current game and immediately restart ──
