@@ -26966,6 +26966,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const tutorialGegnerDaten = (window.useTutorialGegner || (() => null))();
   const tutorialGegner = gameState?.isTutorial ? tutorialGegnerDaten : null;
 
+  // ── Tutorial: Helden-Figuren erst nach dem Gespraech ──
+  // Solange die Einleitung laeuft, stehen die animierten Figuren noch nicht
+  // auf den Karten (`setTutorialFigurenGesperrt` in app-shared). Fallen sie
+  // weg, werden die `HeroIdleSprite` neu gemountet und spielen ihre
+  // Auftritts-Animation — die Figuren steigen aus den Karten.
+  const tutorialFigurenGesperrt = (window.useTutorialFigurenGesperrt || (() => false))();
+  const heldenFigurenZeigen = heldenAnzeigen && !(gameState?.isTutorial && tutorialFigurenGesperrt);
+  // Die Sheets schon waehrend des Gespraechs laden, damit die Figuren beim
+  // Aufsteigen nicht erst noch auf ihr Bild warten.
+  useEffect(() => {
+    if (!heldenAnzeigen || !gameState?.isTutorial || !tutorialFigurenGesperrt) return;
+    for (const sp of (gameState.players || [])) {
+      for (const h of (sp?.heroes || [])) {
+        if (!h?.name) continue;
+        HeroIdleAnims.hole(HeroIdleAnims.slug(h.name));
+        const skin = sp.deckSkins?.[h.name];
+        if (skin) HeroIdleAnims.hole(HeroIdleAnims.slug(skin));
+      }
+    }
+  }, [heldenAnzeigen, gameState?.isTutorial, gameState?.roomId, tutorialFigurenGesperrt]);
+
   // ── Tutorial outro: show textbox before victory screen ──
   const [tutorialOutroPending, setTutorialOutroPending] = useState(false);
   const [resultFading, setResultFading] = useState(false);
@@ -44094,7 +44115,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // Ohne Sheet fuer den Skin faellt es auf den Basis-Helden zurueck.
           const _figurSkin = figurBasisName ? p?.deckSkins?.[figurBasisName] : null;
           const figurName = (_figurSkin && HeroIdleAnims.hatAnimation(_figurSkin)) ? _figurSkin : figurBasisName;
-          const figurDa = !!(heldenAnzeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
+          const figurDa = !!(heldenFigurenZeigen && hero?.name && !isDead && !isRamming && HeroIdleAnims.hatAnimation(figurName));
           // Chain target pick
           const isChainPickValid = chainPickValidIds.has(heroTargetId);
           const isChainPickSelected = chainPickSelectedIds.has(heroTargetId);
@@ -44328,7 +44349,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     Gelähmt (Frozen/Stunned/Webbed) → Frame steht still;
                     versteinert → zusätzlich Steinoptik. Name wie auf der
                     Karte (vorgezogene Gestalt, Shapeshifter-Kopie). */}
-                {heldenAnzeigen && hero?.name && !isDead && !isRamming && (
+                {heldenFigurenZeigen && hero?.name && !isDead && !isRamming && (
                   <HeroIdleSprite
                     cardName={figurName}
                     eingeklappt={heldenDynamisch && (isTargeting || !!chainPickData)}

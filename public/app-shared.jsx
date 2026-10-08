@@ -7665,8 +7665,10 @@ function tutorialStartsWithAntonia(num) {
 // Gegner stehen. Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
 // mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
 // getrennt lesen und schreiben.
+// Beide tragen die Gegnerfarbe (`NICHT_MENSCH_FARBE` im Server, #ff4444):
+// die Textbox soll in der Farbe der Gegnerseite stehen, nicht in Cyan.
 const TUTORIAL_GEGNER = {
-  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#00f0ff' },
+  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#ff4444' },
   antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#ff4444' },
 };
 const MONIA_PORTRAIT = '/MoniaBot.png';
@@ -7736,6 +7738,36 @@ function useTutorialGegner() {
     return () => { _tutorialGegnerSubs.delete(setKey); };
   }, []);
   return key ? TUTORIAL_GEGNER[key] : null;
+}
+
+// ── Tutorial: Helden-Figuren erst nach dem Gespraech ────────────────
+// Solange im Tutorial die Einleitung laeuft, stehen die animierten
+// Helden-Figuren (`HeroIdleSprite`) noch nicht auf den Karten. Sobald
+// der Text durch ist, werden sie eingeblendet und steigen mit ihrer
+// normalen Auftritts-Animation aus den Karten auf.
+// Gesperrt wird VOR dem Brettaufbau (`startTutorialAttempt` in
+// app-screens), damit die Figuren nicht einen Augenblick aufblitzen;
+// freigegeben wird, wenn die letzte Seite der Einleitung geschlossen
+// wird (Textbox), beim Verlassen und bei einem Fehler. Wie
+// `_tutorialGegner` ein Mini-Abo, weil Textbox (app-shared), Ablauf
+// (app-screens) und Brett (app-board) den Zustand getrennt lesen und
+// schreiben.
+let _tutorialFigurenGesperrt = false;
+const _tutorialFigurenSubs = new Set();
+function setTutorialFigurenGesperrt(v) {
+  const val = !!v;
+  if (_tutorialFigurenGesperrt === val) return;
+  _tutorialFigurenGesperrt = val;
+  for (const fn of _tutorialFigurenSubs) { try { fn(val); } catch {} }
+}
+function useTutorialFigurenGesperrt() {
+  const [gesperrt, setGesperrt] = useState(_tutorialFigurenGesperrt);
+  useEffect(() => {
+    _tutorialFigurenSubs.add(setGesperrt);
+    setGesperrt(_tutorialFigurenGesperrt);
+    return () => { _tutorialFigurenSubs.delete(setGesperrt); };
+  }, []);
+  return gesperrt;
 }
 
 // ── Sprecherfarben der Textbox ──────────────────────────────────────
@@ -7891,6 +7923,7 @@ function TextBox() {
   const timerRef = useRef(null);
   const parsedRef = useRef({ segments: [], plainText: '' });
   const bodyRef = useRef(null);
+  const sizerRef = useRef(null);
   const onShowFiredRef = useRef(new Set());
 
   useEffect(() => { _textBoxSetter = setOpts; return () => { _textBoxSetter = null; }; }, []);
@@ -7986,6 +8019,36 @@ function TextBox() {
     return () => clearInterval(timerRef.current);
   }, [pages, pageIdx]);
 
+  // Box waechst mit langen Seiten. Die Standardbox fasst drei Zeilen; eine
+  // Seite mit mehr (Zeilenumbrueche im Skript, lange Saetze) wurde bisher
+  // unten abgeschnitten. Gemessen wird an einer unsichtbaren Kopie des
+  // GANZEN Seitentexts (`.textbox-sizer`, gleiche Auszeichnung, gleiche
+  // Breite) — nicht am Tipptext, der erst waehrend des Tippens waechst.
+  // Passt der Text in die Standardbox, bleibt alles wie es war.
+  useLayoutEffect(() => {
+    const body = bodyRef.current, sizer = sizerRef.current;
+    if (!body || !sizer || !pages.length) return undefined;
+    const anpassen = () => {
+      body.style.height = '';
+      body.style.paddingBottom = '';
+      const noetig = sizer.offsetHeight;
+      if (noetig > body.clientHeight) {
+        // 18 px mehr unten: so liegt die letzte Zeile ueber dem
+        // Seitenzaehler und dem Weiter-Pfeil.
+        body.style.paddingBottom = '28px';
+        body.style.height = Math.ceil(noetig + 18) + 'px';
+      }
+    };
+    anpassen();
+    window.addEventListener('resize', anpassen);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(anpassen).catch(() => {});
+    return () => {
+      window.removeEventListener('resize', anpassen);
+      body.style.height = '';
+      body.style.paddingBottom = '';
+    };
+  }, [pages, pageIdx, opts]);
+
   // Highlights
   useEffect(() => {
     if (!pages.length) { setHighlightRects([]); return; }
@@ -8062,6 +8125,9 @@ function TextBox() {
       if (window._currentTutorialNum) {
         const wer = tutorialMehrGesprochen(opts, pages);
         if (wer) setTutorialGegner(wer);
+        // Der Text ist durch: die Helden-Figuren steigen aus den Karten
+        // (waehrend die Textbox noch ausblendet, nicht erst danach).
+        setTutorialFigurenGesperrt(false);
       }
       // Fade out then dismiss
       setFading(true);
@@ -8216,6 +8282,11 @@ function TextBox() {
           </div>
         )}
         <div className="textbox-body" ref={bodyRef}>
+          {/* Unsichtbare Kopie des ganzen Seitentexts — nur zum Messen
+              (s. `useLayoutEffect` „Box waechst mit langen Seiten"). */}
+          <div className="textbox-sizer" ref={sizerRef} aria-hidden="true">
+            <span className="textbox-text">{(() => { const s = parseInlineMarkdown((typeof page === 'string' ? page : page?.text) || ''); return renderMarkdownSlice(s.segments, s.plainText.length); })()}</span>
+          </div>
           <span className="textbox-text">{(() => { const els = renderMarkdownSlice(parsedRef.current.segments, charCount); return page?.shakeText ? applyShake(els) : els; })()}</span>
           {done && <span className={'textbox-advance' + (isLastPage ? ' textbox-advance-ende' : '')} aria-label={isLastPage ? 'Close' : 'Next'} />}
           {pages.length > 1 && (
@@ -8245,37 +8316,59 @@ function TextBox() {
 // ═══════════════════════════════════════════════════════════════
 const TUTORIAL_SCRIPTS = {
   1: {
+    // Regieanweisungen des Skripts: ein Highlight gilt ab der Seite, vor
+    // der es steht, bis zur naechsten Anweisung. `pulse` nur auf der Seite,
+    // auf der es zum ersten Mal erscheint.
     intro: [
       { text: 'Heya! Welcome to the battlefield!' },
-      { text: "To win a game of Pixel Parties, you must defeat all your opponent's Heroes by dropping their HP to 0!",
-        highlights: ['[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]'] },
-      { text: 'To do that, you can use {red:**Attacks**} or {red:**Spells**} to deal direct damage with your own Heroes, or summon {red:**Creatures**} to do the job for you.',
-        highlights: ['.game-hand-me [data-card-name="Magic Hammer"]'] },
-      { text: "Let's try hitting the opponent's {purple:*Beato*} with your big, strong {red:*Magic Hammer*} Spell!",
+      { text: "I'm Monia Bot, the coolest Bot there is, beep-boop!\nI'll show you the ropes and make you a Pixel-Powerhouse!" },
+      { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!" },
+      // „and" bleibt in der normalen Textfarbe (sonst waere fetter Text Cyan).
+      { text: 'To do that, you deal damage to them until their HP drop to 0.\nYou usually use {red:**Attacks, Spells**} {var(--text):**and**} {green:**Creatures**} for that!' },
+      // ── Highlight: Beato und Magic Hammer ──
+      { text: "Let's try hitting my {purple:**Beato**} with the big, strong {red:**Magic Hammer**} Spell in your hand!",
         highlights: [
           { selector: '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]', pulse: true },
           { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
         ] },
-      { text: "But ... your {red:*Ida*} currently can't use that Spell.",
-        highlights: ['[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]'] },
-      { text: "Its level is too high for her!" },
-      { text: 'To use an Attack or Spell or summon a Creature with a Hero, it needs the correct {#88ccee:**Ability**} at an appropriate level first.' },
-      { text: 'For Magic Hammer, that Ability is {#88ccee:**Destruction Magic**}, which Ida currently has 2 copies of attached to her.',
+      { text: 'Well ... that would be **amazing**, beep-boop - but your Hero {purple:**Ida**} cannot use Magic Hammer yet.\nIts level is too high for her!',
         highlights: [
+          '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+        ] },
+      // ── Highlight: Magic Hammer und Destruction Magic ──
+      { text: "See the number **3** on your Magic Hammer? That's its level. So you need a Hero that can use Spells with level 3!",
+        highlights: [
+          { selector: '.game-hand-me [data-card-name="Magic Hammer"]', pulse: true },
+          { selector: '[data-ability-owner="me"][data-card-name="Destruction Magic"]', pulse: true },
+        ] },
+      { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
+        highlights: [
+          '.game-hand-me [data-card-name="Magic Hammer"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
-      { text: "So her Destruction Magic is at {red:**level 2**}. But Magic Hammer is a {red:**level 3**} Spell! Ida needs one more Destruction Magic!" },
-      { text: 'Attach it to her from your hand, then go into the Action Phase to actually cast your Spell with her and defeat Beato!',
+      { text: 'To be able to use a level 3 Spell like Magic Hammer, she needs a third copy!\nGood thing you have just that in your hand, beep-boop!',
         highlights: [
-          '[data-hero-owner="me"][data-hero-name="Ida, the Adept of Destruction"]',
-          '.game-hand-me .hand-slot',
-          '[data-phase-name="Action Phase"]',
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      { text: 'Okay - time to hammer that Beato!\nAttach the third Destruction Magic from your hand to your Ida!',
+        highlights: [
+          '.game-hand-me [data-card-name="Magic Hammer"]',
+          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
+        ] },
+      // ── Highlight: Action-Phase-Button ──
+      { text: 'Then, go to your **Action Phase** and drag your Magic Hammer onto the Hero that should cast it - your Ida!\nClick on your target - Beato - and watch her get squished!',
+        highlights: [
+          { selector: '[data-phase-name="Action Phase"]', pulse: true },
         ] },
     ],
     outro: [
       { text: 'Excellent job, beep-boop!' },
-      { text: 'To use Attacks or Spells or summon Creatures, you need to spend {red:**Actions**}.' },
-      { text: 'That is done during the {red:**Action Phase**} - but you only get one Action per Action Phase, so use it wisely!' },
+      { text: 'To use Attacks or Spells, or to summon Creatures, you need to spend **Actions**.\nDuring your Action Phase, you only get one of those per turn - so spend it wisely, beep-boop!' },
+      { text: 'How you choose to spend your Actions will decide your entire game!' },
+      { text: "Alrighty - you've mastered how Spells are cast, how Abilities are stacked and how to win - pretty good progress, beep-boop!" },
+      { text: 'Meet me again for Lesson 2!' },
     ],
   },
   2: {
@@ -8565,6 +8658,9 @@ window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;
 window.setTutorialGegner = setTutorialGegner;
 window.useTutorialGegner = useTutorialGegner;
 window.tutorialErsterSprecher = tutorialErsterSprecher;
+// Tutorial: Helden-Figuren erst nach dem Gespraech (s. `setTutorialFigurenGesperrt`).
+window.setTutorialFigurenGesperrt = setTutorialFigurenGesperrt;
+window.useTutorialFigurenGesperrt = useTutorialFigurenGesperrt;
 // v809: bisher nur ueber die zufaellige Sichtbarkeit oberster
 // Deklarationen zwischen den Bundles erreichbar. Ausdruecklich
 // weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.

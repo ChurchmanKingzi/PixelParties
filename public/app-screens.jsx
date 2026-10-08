@@ -101,7 +101,12 @@ function useTutorialFlow(open) {
         setTutorialAttemptState(state);
       }
     };
-    const onError = (msg) => notify('Tutorial error: ' + msg, 'error');
+    const onError = (msg) => {
+      // Der Start ist gescheitert: die Figuren-Sperre (s. startTutorialAttempt)
+      // darf nicht auf ein Gespraech warten, das nie kommt.
+      if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
+      notify('Tutorial error: ' + msg, 'error');
+    };
     socket.on('game_state', onGameState);
     socket.on('puzzle_error', onError);
     return () => { socket.off('game_state', onGameState); socket.off('puzzle_error', onError); };
@@ -116,6 +121,7 @@ function useTutorialFlow(open) {
       // Kein Tutorial mehr: der angezeigte Gegner faellt zurueck auf "CPU".
       tutorialRoomIdRef.current = null;
       if (window.setTutorialGegner) window.setTutorialGegner(null);
+      if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
       return;
     }
     if (tutorialAttemptState.result) return;
@@ -125,6 +131,10 @@ function useTutorialFlow(open) {
       // Neuer Durchgang (auch ein Retry): Gegner ist, wer zuerst spricht.
       if (window.setTutorialGegner && window.tutorialErsterSprecher) {
         window.setTutorialGegner(window.tutorialErsterSprecher(window._currentTutorialNum));
+      }
+      // ... und die Helden-Figuren warten wieder auf das Ende der Einleitung.
+      if (window.setTutorialFigurenGesperrt) {
+        window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[window._currentTutorialNum]?.intro);
       }
     }
     const num = window._currentTutorialNum;
@@ -149,6 +159,12 @@ function useTutorialFlow(open) {
     window._currentTutorialNum = tutorial.num;
     window._currentTutorialRetryId = tutorial.tutorialId;
     window._tutorialGaveUp = false;
+    // Die Helden-Figuren bleiben aus den Karten, bis die Einleitung durch
+    // ist. Gesperrt wird HIER, noch vor dem Brettaufbau — im Zustands-Effekt
+    // unten waere das Brett schon einen Augenblick mit Figuren gezeichnet.
+    if (window.setTutorialFigurenGesperrt) {
+      window.setTutorialFigurenGesperrt(!!(window.TUTORIAL_SCRIPTS || {})[tutorial.num]?.intro);
+    }
     socket.emit('start_tutorial_attempt', { tutorialId: tutorial.tutorialId });
   }, []);
 
@@ -160,6 +176,7 @@ function useTutorialFlow(open) {
     tutorialAttemptRoom.current = null;
     tutorialIntroShownRef.current = null;
     window._currentTutorialNum = null;
+    if (window.setTutorialFigurenGesperrt) window.setTutorialFigurenGesperrt(false);
     socket.emit('get_tutorials');
     if (result) {
       const success = result.isPuzzle && result.puzzleResult === 'success';

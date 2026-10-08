@@ -15160,7 +15160,7 @@ body:has(.textbox-overlay) .tooltip {
    Dieselbe Rahmensprache wie die Menue-Fenster (`.pp-fenster`: Licht-
    kante, Doppelring, Eck-Schnoerkel, harter Schatten), aber in der
    Farbe des GERADE SPRECHENDEN (`--tb-farbe`, inline aus der Textbox;
-   Monia cyan, Antonia rot, Kampagne ueber `speakerColor`). Jede
+   Monia und Antonia in der Gegnerfarbe Rot, Kampagne ueber `speakerColor`). Jede
    Portraetseite traegt ihre eigene Farbe (`--tb-links` / `--tb-rechts`)
    fuer Portraetrahmen und Namensschild. Beim Sprecherwechsel blendet
    der Rahmen ueber — dafuer ist `--tb-farbe` als Farbe registriert,
@@ -15325,6 +15325,17 @@ body:has(.textbox-overlay) .tooltip {
   overflow: hidden;
   /* Feine Zeilenstruktur wie auf einem alten Bildschirm. */
   background: repeating-linear-gradient(180deg, rgba(255,255,255,.022) 0 2px, transparent 2px 4px);
+}
+/* Unsichtbare Kopie des ganzen Seitentexts: gleiche Breite und gleicher
+   Innenabstand wie die Box, damit sich daran die noetige Hoehe ablesen
+   laesst (siehe TextBox in app-shared.jsx). */
+.textbox-sizer {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  padding: inherit;
+  box-sizing: border-box;
+  visibility: hidden;
+  pointer-events: none;
 }
 .textbox-text {
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
