@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Skin „Contract-bound Orthos“ (Kyubey aus Madoka Magica) für Orthos, the Loyal Guard Dog — Idle-Animation
+"""Skin „Contract-Bound Orthos“ (Kyubey aus Madoka Magica) für Orthos, the Loyal Guard Dog — Idle-Animation
 mit Lichtschein, auf dem Sprite des Users (Ebenen: glow, aura, body, bag, ear; alle 88x70, deckungsgleich).
 
 Ebenen (unten -> oben): glow (weißer Lichtschein mit Strahlen), aura (gelbe Umrandung, 20 % deckend),
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     ys, xs = np.nonzero(core)
     eye_x = (np.nonzero(EYE_M)[1].min() + np.nonzero(EYE_M)[1].max() + 1) / 2
     foot = int(np.nonzero(BODY[:, :, 3] > 0)[0].max()) + 1
-    meta = {"hero": "Contract-bound Orthos", "sheet": f"{NAME}.png", "frameWidth": W, "frameHeight": H, "frames": N, "frameMs": ms,
+    meta = {"hero": "Contract-Bound Orthos", "sheet": f"{NAME}.png", "frameWidth": W, "frameHeight": H, "frames": N, "frameMs": ms,
             "loop": True, "layout": "horizontal", "skinOf": "Orthos, the Loyal Guard Dog",
             "padTop": int(ys.min()), "padLeft": int(xs.min()), "padRight": int(W - 1 - xs.max()), "padBottom": int(H - 1 - ys.max()),
             "faceX": float(eye_x), "footY": float(foot)}
