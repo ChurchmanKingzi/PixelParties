@@ -169,6 +169,9 @@ function DeckBuilder() {
   // Load decks + sample decks
   useEffect(() => {
     (async () => {
+      // Die Beispiel-Decks haengen nicht von den eigenen ab: gleichzeitig anfragen statt hintereinander (ein Roundtrip weniger,
+      // bevor das Kartengitter erscheint). Ausgewertet wird weiter erst nach den eigenen Decks.
+      const sampleReq = api('/sample-decks/owned').catch(() => null);
       try {
         const data = await api('/decks');
         if (data.decks && data.decks.length > 0) {
@@ -189,7 +192,7 @@ function DeckBuilder() {
           setDecks([nd.deck]);
         }
       } catch (e) { notify(e.message, 'error'); }
-      try { const sd = await api('/sample-decks/owned'); setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
+      try { const sd = await sampleReq; if (sd) setSampleDecks(sd.decks || []); } catch (e) { /* ignore */ }
       setLoaded(true);
     })();
   }, []);

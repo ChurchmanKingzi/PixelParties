@@ -229,7 +229,7 @@ Der Cache allein reichte nicht; drei Dinge standen davor:
    (je Kachel doppelt im DOM = ~140 `<img>`) — fast alle nie gecacht, ~164 Zeichnungen je F5, die vor den Deck-Editor-Karten in der
    Warteschlange standen. Jetzt gibt es einen **Tages-Pool** (`MENU_BG_POOL = 90`, mit dem Datum als Samen gemischt): dieselben
    Karten den ganzen Tag, nach dem ersten Besuch kommt die Wand komplett aus dem Cache.
-2. **Dekoration darf nichts aufhalten:** Bilder mit `data-card-low` laufen in der eigenen Stufe 3 der Warteschlange, hinter allem,
+2. **Dekoration darf nichts aufhalten:** Bilder mit `data-card-low` laufen in der eigenen Stufe 4 der Warteschlange, hinter allem,
    was jemand ansehen will. Aufträge für Bilder, die nicht mehr in der Seite stehen (Menü verlassen), werden übersprungen
    (`stats.dropped`) und beim Wiedereinhängen vom MutationObserver (`adopt`) nachgeholt.
 3. **PNG-Kodierung im Worker:** `canvas.toBlob` kodiert im Leerlauf des Hauptthreads. Auf einer belebten Seite (Menü-Animation)
@@ -248,9 +248,37 @@ Messung im echten Spiel (Headless-Chromium ohne GPU, also pessimistisch; Anmeldu
 | + Tages-Pool und Stufe 3 | 0,9–1,2 s | — |
 | + Kodierung im Worker (F5, Cache warm) | 0,4–0,7 s | 0,6–0,9 s |
 
-Die Kartenwand im Menü ist nach F5 (kalter Cache, 90 Karten rendern + kodieren) nach ~5 s vollständig, bei warmem Cache und
-nach dem Zurückwechseln aus dem Deck Editor nach ~2,5–3,5 s (darin stecken 1,2 s Wartezeit des Vorrenderns). Der Rest der
-Verzögerung beim Öffnen des Deck Editors ist Stil-/Paint-Arbeit des Browsers, nicht die Kartenerzeugung (JS ~50 ms).
+Die Kartenwand im Menü ist nach F5 (kalter Cache, 90 Karten rendern + kodieren) nach ~5 s vollständig; nach dem Zurückwechseln aus
+dem Deck Editor stehen sofort ~60 % aus dem Speicher da, der Rest folgt in Schüben des Leerlauf-Vorrenderns (`vorrendern`, wartet
+bis zu 1,2 s + 4 s auf Leerlauf) — reine Dekoration, deshalb bewusst nicht beschleunigt.
+
+### Vorwärmen im Hauptmenü
+
+Auch mit warmem Cache kostet jede Karte beim Öffnen eines Bildschirms Warteschlange, IndexedDB-Lesen, Blob-URL und Dekodieren —
+und das passierte sichtbar *nach* dem Aufbau (Platzhalter → Karte, gestaffelt über 100–200 ms, bei Puzzle-Creator/Deck Editor mit
+Nachläufern bis ~2 s). Darum bereitet der Shim die ersten Karten der Bildschirme **im Hauptmenü** vor:
+
+* **Merken:** `note()` (aus `handle()`) notiert je Bildschirm (`window.__ppScreen`, gesetzt in `App` in `app-main.jsx`; die Eltern
+  rendern vor den Kindern) die ersten 30 verschiedenen Karten in der Reihenfolge ihres Erscheinens — ohne Dekoration
+  (`data-card-low`) und ohne `new Image()`. Gespeichert in `localStorage['pp-card-warm']` (höchstens 6 Bildschirme, der zuletzt
+  besuchte steht hinten), beim Wechsel, bei 30 Karten, `pagehide` und `visibilitychange`.
+* **Vorwärmen:** 1,2 s nach dem Start bzw. nach jeder Rückkehr ins Menü, im Leerlauf (`requestIdleCallback`, Timeout 3 s), holt
+  `warm()` bis zu 60 Karten (zuletzt besuchte Bildschirme zuerst) als Aufträge der **Stufe 3** (vor der Dekoration, hinter allem
+  Sichtbaren): Blob-URL aus dem dauerhaften Cache in den Speicher-Cache (`handle()` setzt sie dann beim Einhängen *synchron*) und ein
+  festgehaltenes, per `decode()` angestoßenes `Image` (`pinned`, höchstens 60). Fehlt eine Karte im dauerhaften Cache (nach einem
+  Update), wird sie hier im Hintergrund gezeichnet statt später vor aller Augen.
+* **Robust:** eine beschädigte oder fremde Merkliste (`5`, `[1,2]`, `null`, Müll-IDs) wird ignoriert bzw. ersetzt; ohne
+  `localStorage` bleibt alles beim Alten. Das Hauptmenü selbst wird nie gemerkt.
+* **Messung** (echtes Spiel, Headless, ohne GPU; Element-Timing = tatsächlich gemalte Karten, Deck Editor, Läufe 2–6): mit Vorwärmen
+  stehen alle 20 Karten im selben Frame wie das Gitter (Abstand erste → 16. Karte ~10 ms, vorher ~150 ms; das 1,9-s-Nachlaufen
+  der letzten Karten entfällt); beim Einhängen haben 20/20 Karten ihre Blob-URL (Puzzle-Creator: 30 von 120 — die ersten, sichtbaren).
+  Bei leerem Cache (Update) zeichnet das Menü die 20 Karten im Hintergrund in ~4–5 s; der Editor braucht dann 0 eigene Aufträge.
+* **Was das nicht abkürzt:** der Aufbau des Bildschirms selbst. Trace der ersten Sekunde nach dem Klick (Deck Editor, Headless):
+  Hauptthread ~180 ms Style/Layout/PrePaint (+ ~60 ms Layout, ~45 ms Commit, ~70 ms JS), dazu ~250 ms PNG-Dekodierung der 20 Karten
+  auf Worker-Threads (750×1050 Pixel je Karte). Das ist Browserarbeit; weniger würde nur kleinere Bilder bringen (dann ändert sich
+  `naturalWidth/Height`, auf die Layouts bauen) oder weniger DOM.
+* **Deck Editor:** `/api/sample-decks/owned` wird jetzt gleichzeitig mit `/api/decks` angefragt statt danach (ein Roundtrip weniger
+  vor dem Kartengitter; Auswertung und Reihenfolge der State-Updates unverändert).
 
 ## Hinweise
 
