@@ -28,7 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
-  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule' };
+  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -404,6 +404,50 @@
     }
   }
 
+  // Bildmaske der Vollbild-Karten mit VOLL DECKENDEN Umrissen. Die Masken des Templates (`mask.fullart`, `mask.hero`) haben drei
+  // Stufen: 0 = Umrisslinie der Boxen (Bild verdeckt, Rahmen voll sichtbar), 51 = Fuellung der Boxen (das Bild scheint zu
+  // 20 % durch), 255 = Bildflaeche. Direkt INNEN an der Umrisslinie liegen aber noch die Bevel-Zeilen der Box (dunkle und
+  // helle Innenkante) auf Stufe 51 — durch sie schien das Bild und machte die Umrandung fleckig. Hier werden sie hart:
+  // Pixel im Abstand 1 zur Umrisslinie werden 0, im Abstand 2 jene, die nicht die Fuellfarbe der Box haben (zweite
+  // Bevel-Zeile). Die Fuellung weiter innen (samt Dithering) bleibt halbtransparent. Einmal je Maske gerechnet (75x105 Pixel).
+  const HARD_FRAME = { 'mask.fullart': 'frame.fullartHero', 'mask.hero': 'frame.superhero' };
+  const hardMasks = new Map();
+  function hardMask(maskKey) {
+    if (hardMasks.has(maskKey)) return hardMasks.get(maskKey);
+    let out = null;
+    const mr = sprites.rects[maskKey], fr = sprites.rects[HARD_FRAME[maskKey]];
+    if (HARD_FRAME[maskKey] && mr && fr && mr[2] === fr[2] && mr[3] === fr[3]) {
+      const w = mr[2], h = mr[3];
+      const read = r => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(sprites.img, r[0], r[1], w, h, 0, 0, w, h); return { g, im: g.getImageData(0, 0, w, h) }; };
+      const m = read(mr), f = read(fr), a = m.im.data, c = f.im.data;
+      const col = i => (c[i * 4] << 16) | (c[i * 4 + 1] << 8) | c[i * 4 + 2];
+      // Fuellfarbe der Boxen = haeufigste Farbe auf Stufe 51
+      const cnt = new Map();
+      for (let i = 0; i < w * h; i++) if (a[i * 4 + 3] > 0 && a[i * 4 + 3] < 255) cnt.set(col(i), (cnt.get(col(i)) || 0) + 1);
+      let fill = -1, best = 0;
+      for (const [k, v] of cnt) if (v > best) { best = v; fill = k; }
+      const zero = (x, y) => x >= 0 && y >= 0 && x < w && y < h && a[(y * w + x) * 4 + 3] === 0;
+      const near = (x, y, d) => { for (let yy = y - d; yy <= y + d; yy++) for (let xx = x - d; xx <= x + d; xx++) if (zero(xx, yy)) return true; return false; };
+      const drop = [];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x, al = a[i * 4 + 3];
+        if (al === 0 || al === 255) continue;
+        if (near(x, y, 1) || (col(i) !== fill && near(x, y, 2))) drop.push(i);
+      }
+      for (const i of drop) a[i * 4 + 3] = 0;
+      m.g.putImageData(m.im, 0, 0);
+      out = m.g.canvas;
+    }
+    hardMasks.set(maskKey, out);
+    return out;
+  }
+  /** Maske des Bildfelds auf `lc` (destination-in), Vollbild-Karten mit deckenden Umrissen (OPT.hardOutlines). */
+  function artMaskSprite(lc, maskKey, dw, dh) {
+    const hm = OPT.hardOutlines ? hardMask(maskKey) : null;
+    if (hm) { lc.imageSmoothingEnabled = false; lc.drawImage(hm, 0, 0, hm.width, hm.height, 0, 0, dw, dh); }
+    else sprite(lc, maskKey, 0, 0, dw, dh);
+  }
+
   // ═════════════ Karte zeichnen ═════════════
   // spec: { type, rarity, name, text, skillBox, skillBox2, hp, atk, level, school, kind }
   // art:  { src: CanvasImageSource, sx, sy, sw, sh } | null
@@ -430,7 +474,7 @@
       lc.imageSmoothingEnabled = false;
       lc.drawImage(art.src, art.sx || 0, art.sy || 0, art.sw || art.src.width, art.sh || art.src.height, 0, 0, box[2], box[3]);
       lc.globalCompositeOperation = 'destination-in';
-      sprite(lc, maskKey, 0, 0, box[2], box[3]);
+      artMaskSprite(lc, maskKey, box[2], box[3]);
       ctx.drawImage(layer, box[0], box[1]);
     }
 

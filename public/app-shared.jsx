@@ -5086,8 +5086,9 @@ function FoilName({ card, tone }) {
 }
 
 /**
- * Schraffur fuer Karten OHNE Skin: Fullart-Karten sowie Super und Diamond Rares — nur auf dem Bild (dieselbe Schicht wie
- * beim Skin-Holo, ohne Glanzband und Namen; der Namensglanz der Rares kommt von FoilName).
+ * Bild-Foil fuer Karten OHNE Skin: Fullart-Karten sowie Super und Diamond Rares — Schraffur UND Glanzband, nur auf dem
+ * Bild (dieselben Schichten wie beim Skin-Holo, ohne Namen; der Namensglanz der Rares kommt von FoilName). Bei Fullarts
+ * liegt beides auf der ganzen Flaeche ausser den Textfeldern (hart ausgeschnittene Maske, card-render.js `artMask`).
  */
 function FoilHatch({ card }) {
   const [ref, breit] = useEffektHuelle(ppIstTouch() ? ppEffektMin() : HATCH_MIN_BREITE);
@@ -5106,7 +5107,10 @@ function FoilHatch({ card }) {
   return (
     <div ref={ref} className="skin-holo skin-holo-nur-hatch" style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && (
-        <div className="skin-holo-art"><div className="skin-holo-hatch"><i /></div></div>
+        <div className="skin-holo-art">
+          <div className="skin-holo-hatch"><i /></div>
+          <div className="skin-holo-glint"><i /></div>
+        </div>
       )}
     </div>
   );
