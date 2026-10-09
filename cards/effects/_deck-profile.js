@@ -930,6 +930,30 @@ function heroEffectTimingPrior(engine, pi, heroName) {
 }
 
 /**
+ * Zahlen der HARTEN Deck-Regeln (`cpuMeta.forcePlay` der Kartenskripte).
+ *
+ * Eine Regel wie "Armageddon mit extrem hoher Wahrscheinlichkeit, wenn es
+ * den Helden mit den meisten HP in zwei Schlaegen toetet" traegt ihre Zahl
+ * (0,97) als Vorgabe im Kartenskript. Diese Funktion ist die Naht, an der
+ * ein GELERNTER Wert sie spaeter ersetzt: steht im Profil des Decks
+ * `ruleParams["<regel>"]` (Zahl), gilt der — ohne Profil, ohne Eintrag oder
+ * mit etwas anderem als einer endlichen Zahl bleibt es bei `fallback`.
+ *
+ * Bewusst NICHT confidence-gemischt wie die Handwerte: eine Regelzahl ist
+ * ein Schalter des Decks, kein Rauschen, das man schrumpfen muss. Wer sie
+ * lernt, schreibt den fertigen Wert ins Profil (der A/B-Spiegel bleibt der
+ * Schiedsrichter). Schluessel: "<karte>.<regel>", z. B.
+ * "armageddon.zweiHitWahrscheinlichkeit".
+ */
+function ruleParam(engine, pi, key, fallback) {
+  try {
+    const v = profileFor(engine, pi)?.ruleParams?.[key];
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+  } catch { /* Profil ist optional */ }
+  return fallback;
+}
+
+/**
  * Gelernter Same-Hero-Synergie-Bonus für die Platzierung: Summe der
  * boardPairs-Werte zwischen `cardName` und allen Karten, die bereits
  * an Held `heroIdx` liegen (Support-Slots + Ability-Zonen).
@@ -3482,6 +3506,7 @@ module.exports = {
   costDiscardTags,
   startHandScore,
   heroEffectTimingPrior,
+  ruleParam,
   boardPairBonus,
   reloadProfiles,
   clusterOfFingerprint,

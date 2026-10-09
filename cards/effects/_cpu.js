@@ -1188,6 +1188,27 @@ async function runActionPhase(engine, helpers) {
     }
   }
 
+  // Karten-Vertrag `cpuMeta.forcePlay`: harte Deck-Regeln der CPU
+  // ("Armageddon IMMER, wenn es die Gegnerseite ausloescht", "jede Runde
+  // eine Ifrit"). Erzwungene Kandidaten stehen VOR allem anderen — auch
+  // vor dem MCTS-Ranking, den Aufstiegs-Kandidaten und der
+  // ε-Exploration (sonst bräche das Training die Regel mit Wahrscheinlichkeit ε); untereinander
+  // gilt die Rangzahl der Karte, bei Gleichstand die bisherige Ordnung.
+  if (!engine._inMctsSim && candidates.length > 0) {
+    const forced = [];
+    const rest = [];
+    for (const c of candidates) {
+      const prio = (c.cardType === 'Spell' || c.cardType === 'Attack' || c.cardType === 'Creature')
+        ? cpuForcePlay(engine, cpuIdx, c.cardName, c.heroIdx) : 0;
+      if (prio > 0) forced.push({ c, prio }); else rest.push(c);
+    }
+    if (forced.length > 0) {
+      forced.sort((a, b) => b.prio - a.prio);   // stabil: gleiche Rangzahl behaelt die MCTS-Reihenfolge
+      candidates = [...forced.map(f => f.c), ...rest];
+      cpuLog(`  [forcePlay] ${[...new Set(forced.map(f => `${f.c.cardName}(Rang ${f.prio})`))].join(', ')} per Deck-Regel an die Spitze`);
+    }
+  }
+
   // Design-Regel (Al): Eine verfügbare Aktion soll, sofern irgendein
   // Kandidat spielbar ist, IMMER genutzt werden — sie verfallen zu
   // lassen ist praktisch nie richtig. Deshalb greift der Deadline-Bail
@@ -1945,8 +1966,13 @@ async function activateHeroEffects(engine, helpers) {
     cpuLog(`      → activate hero effect hero=${pickIdx}`);
     // Formzustand VOR der Aktivierung — siehe Fortschritts-Riegel unten.
     const formBefore = engine.gs?.players?.[cpuIdx]?.heroes?.[pickIdx]?.name || null;
+    // Deck-Regel `cpuMeta.forcePlay` am Heldenskript (Damus: jede Runde eine
+    // Ifrit): kein Wert-Gate und keine Recon — die Entscheidung steht, es
+    // gibt keinen Zielplan zu optimieren.
+    const forceHero = cpuForcePlayHero(engine, cpuIdx, ps.heroes[pickIdx], pickIdx) > 0;
     const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
-      () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }));
+      () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
+      forceHero ? { alwaysCommit: true, commitWithoutRecon: true } : {});
     // Vorher wurde `JSON.stringify(gs.hoptUsed)` vor/nach verglichen —
     // ein Helden-Effekt mit MEHREREN Nutzungen pro Runde (Kassaran, 3×)
     // lässt die Sperre offen und sah damit aus wie "nicht gefeuert".
@@ -3915,7 +3941,9 @@ async function fireAdditionalActions(engine, helpers) {
     const pickAlwaysCommit = !!pickScript?.blockedByHandLock
       || (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
       ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
-      : !!pickScript?.cpuMeta?.alwaysCommit);
+      : !!pickScript?.cpuMeta?.alwaysCommit)
+      // Deck-Regel `cpuMeta.forcePlay`: kein Wert-Gate, die Karte wird gespielt.
+      || cpuForcePlay(engine, cpuIdx, pick.cardName, pick.heroIdx) > 0;
     // Rafflesia-Chain: Ein per Chain-Grant geschenkter Folgezauber ist
     // GRATIS — das Standard-Gate bewertet ihn aber wie einen normalen
     // Play und lässt ihn bei marginal negativem Score verfallen.
@@ -8796,6 +8824,51 @@ function isTargetImmune(engine, target) {
 // gecharmt, submerged und den Erstzug-Schild ab. Bewusst ein Objekt:
 // weitere Helfer lassen sich ergänzen, ohne jede Signatur anzufassen.
 const CPU_META_HELPERS = { isTargetImmune };
+
+// ─── Karten-Vertrag `cpuMeta.forcePlay` (Deck-Regeln der CPU) ─────────
+//
+// `forcePlay(engine, pi, heroIdx, helpers) → true | Zahl > 0 | falsy`
+// ist eine HARTE Spielregel des Kartenskripts ("spiele mich jetzt"),
+// kein Wert fuer die Bewertung: sie umgeht Ranking (Action Phase) bzw.
+// Wert-Gate (Zusatzaktionen, Helden-Effekte). Eine Zahl ist die Rang-
+// folge unter mehreren erzwungenen Karten (groesser = frueher, `true`
+// zaehlt 1) — wer das Spiel entscheidet, gehoert vor "Pflichtbeschwoerung".
+//
+// Bewusst NICHT `cpuMeta.alwaysCommit` wiederverwendet: das tragen
+// heute ~40 Karten (Spells und Kreaturen darunter) als Gate-Bypass, und
+// ein Vorziehen im Ranking haette ihr Verhalten still verschoben.
+//
+// Nur im echten Zug (`_inMctsSim` → 0): Rollouts bewerten Kandidaten
+// weiter wie bisher, die Regel greift erst bei der Auswahl. Das Training
+// (Self-Play) ist KEIN Rollout und spielt die Regeln mit.
+function cpuForcePlay(engine, pi, cardName, heroIdx) {
+  if (engine._inMctsSim || !cardName) return 0;
+  const fn = loadCardEffect(cardName)?.cpuMeta?.forcePlay;
+  if (typeof fn !== 'function') return 0;
+  try {
+    const v = fn(engine, pi, heroIdx, CPU_META_HELPERS);
+    if (v === true) return 1;
+    return (Number.isFinite(v) && v > 0) ? v : 0;
+  } catch (err) {
+    console.error(`[cpu] cpuMeta.forcePlay ${cardName} threw:`, err.message);
+    return 0;
+  }
+}
+
+/**
+ * Wie `cpuForcePlay`, aber fuer einen HELDEN: sein eigenes Skript UND die
+ * Effekte, die er gewonnen hat ("This Hero gains the effects of …",
+ * Pseudonia). Ein Erbe feuert den Effekt ueber einen Traeger — ohne diesen
+ * Blick liefe die Deck-Regel nur fuer das Original.
+ */
+function cpuForcePlayHero(engine, pi, hero, heroIdx) {
+  if (!hero?.name) return 0;
+  let best = cpuForcePlay(engine, pi, hero.name, heroIdx);
+  for (const n of (Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [])) {
+    best = Math.max(best, cpuForcePlay(engine, pi, n, heroIdx));
+  }
+  return best;
+}
 
 function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
   const gs = engine.gs;

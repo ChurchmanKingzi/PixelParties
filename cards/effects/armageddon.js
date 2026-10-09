@@ -43,11 +43,25 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //
 //  ── ④ „IMMEDIATELY END YOUR TURN" ────────────────────────────────
 //  Zuletzt, und nur wenn das Spiel ueberhaupt weitergeht.
+//
+//  ── ⑤ CPU-DECK-REGELN (Al, fuer das kommende Structure Deck) ──────
+//  `cpuMeta.forcePlay` (siehe unten), zwei harte Regeln:
+//    • AUSLOESCHUNG: Richtet Armageddon mit seinem Gesamtschaden (50 + 100
+//      je Ifrit auf dem Brett) genug an, um ALLE Helden der Gegnerseite zu
+//      toeten, wird es IMMER gewirkt.
+//    • ZWEI SCHLAEGE: Toetet es den Helden mit den meisten HP in zwei
+//      Schlaegen (2 × Schaden >= HP), wird es mit extrem hoher Wahrschein-
+//      lichkeit gewirkt (Vorgabe 0,97, ersetzbar durch einen gelernten Wert
+//      im Profil: `ruleParams["armageddon.zweiHitWahrscheinlichkeit"]`).
+//  Beide gelten NICHT, wenn der Schlag die CPU selbst verlieren liesse
+//  (alle eigenen Helden tot und nicht mehr Kreaturen als der Gegner —
+//  Gleichstand heisst: der Wirker verliert). „IMMER" meint „immer, wenn es
+//  die Gegnerseite ausloescht", nicht „auch wenn es die Partie kostet".
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
 const { hasCardType } = require('./_hooks');
-const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt } = require('./_apocalypse-shared');
+const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt, damusPlatzierungOffen } = require('./_apocalypse-shared');
 
 const CARD_NAME = ARMAGEDDON;
 const GRUNDSCHADEN = 50;
@@ -120,7 +134,120 @@ function heldGefeit(engine, pi, heroIdx) {
   return ifritsOf(engine, engine.heroSideOf(pi, hero)).length > 0;
 }
 
+// ─── CPU-Deck-Regeln ──────────────────────────────────────────────────
+
+/** Rangfolge unter erzwungenen Karten (groesser = frueher; Ifrit-Rueckfall = 1). */
+const RANG_AUSLOESCHUNG = 3;
+const RANG_ZWEI_HIT = 2;
+
+/**
+ * Vorgabe der Zwei-Schlaege-Regel. Eine Setzung, kein gelernter Wert: das
+ * Profil des Decks ersetzt sie ueber `ruleParams[REGEL_ZWEI_HIT]`
+ * (`_deck-profile.ruleParam`) — dort ist die Naht fuer spaeteres Lernen.
+ */
+const REGEL_ZWEI_HIT = 'armageddon.zweiHitWahrscheinlichkeit';
+const ZWEI_HIT_WAHRSCHEINLICHKEIT = 0.97;
+
+/** Wie viele Kreaturen von `p` stehen NACH einem Schlag mit `dmg` noch? (nur lesen) */
+function kreaturenNachSchlag(engine, p, dmg) {
+  let n = 0;
+  for (let seite = 0; seite < engine.playerCount(); seite++) {
+    const ps = engine.gs.players[seite];
+    (ps?.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
+      const name = (slot || [])[0];
+      if (!name) return;
+      const inst = engine.cardInstances.find(c => c.zone === 'support'
+        && c.owner === seite && c.heroIdx === hi && c.zoneSlot === si);
+      const basis = engine._getCardDB()[name] || {};
+      const kreatur = inst ? istKreatur(engine, inst)
+        : (hasCardType(basis, 'Creature') || hasCardType(basis, 'Token'));
+      if (!kreatur) return;
+      if (((inst ? (inst.controller ?? inst.owner) : seite)) !== p) return;
+      // Verdeckte Karten trifft Armageddon nicht (siehe onPlay).
+      const gefeit = !!inst?.faceDown
+        || (loadCardEffect(name)?.immuneToSourceNames || []).some(x => ARMAGEDDON.includes(x) || x.includes(ARMAGEDDON));
+      const hp = (inst ? engine.getEffectiveCardData(inst)?.hp : null) ?? basis.hp ?? Infinity;
+      const rest = hp - (inst?.counters?.damageTaken || 0);
+      if (gefeit || rest > dmg) n++;
+    }));
+  }
+  return n;
+}
+
+/**
+ * Was passierte, wenn `pi` Armageddon JETZT wirkte? Reine Lesefunktion.
+ * Beruecksichtigt den Gesamtschaden (Ifrit-Aufschlag), Damus' Immunitaet
+ * und die Ziel-Immunitaeten der CPU (`isTargetImmune`: Erstzug-Schutz,
+ * Immun-Status, Versteinerung, Charme, Abtauchen). Nicht abgebildet:
+ * Schadensminderung durch Karten und Reaktionen des Gegners — die Regel
+ * ist eine Vorhersage, kein Beweis.
+ */
+function vorschau(engine, pi, helpers) {
+  const dmg = schaden(engine);
+  const v = { dmg, eigeneLebend: 0, eigeneUeberleben: 0, gegnerLebend: 0, gegnerTot: 0,
+    gegnerMaxHp: 0, gegnerMaxHpImmun: false };
+  for (let p = 0; p < engine.playerCount(); p++) {
+    (engine.gs.players[p]?.heroes || []).forEach((hero, hi) => {
+      if (!hero?.name || hero.hp <= 0) return;
+      const immun = heldGefeit(engine, p, hi)
+        || !!helpers?.isTargetImmune?.(engine, { type: 'hero', owner: p, heroIdx: hi });
+      const stirbt = !immun && hero.hp <= dmg;
+      if (engine.heroSideOf(p, hero) === pi) {
+        v.eigeneLebend++;
+        if (!stirbt) v.eigeneUeberleben++;
+      } else {
+        v.gegnerLebend++;
+        if (stirbt) v.gegnerTot++;
+        if (hero.hp > v.gegnerMaxHp) { v.gegnerMaxHp = hero.hp; v.gegnerMaxHpImmun = immun; }
+      }
+    });
+  }
+  return v;
+}
+
+/** Wuerde die CPU durch den Schlag die Partie verlieren? (Gleichstand = ja) */
+function waereSelbstmord(engine, pi, v) {
+  const gegnerUeber = v.gegnerLebend - v.gegnerTot;
+  if (gegnerUeber > 0) return v.eigeneUeberleben === 0;   // wir tot, sie nicht
+  if (v.eigeneUeberleben > 0) return false;                // sie tot, wir nicht → Sieg
+  // Totale Ausloeschung: die Kreaturen entscheiden, Gleichstand verliert der Wirker.
+  const meine = kreaturenNachSchlag(engine, pi, v.dmg);
+  const seine = kreaturenNachSchlag(engine, engine.opponentOf(pi), v.dmg);
+  return !(meine > seine);
+}
+
+/** Einmaliger Wurf je (Zug, Spieler, Regel) — ohne Cache wuerfe jede Abfrage neu. */
+function wurfJeZug(engine, pi, regel) {
+  const key = `${engine.gs.turn || 0}:${pi}:${regel}`;
+  if (!engine._regelWuerfe) engine._regelWuerfe = new Map();
+  if (!engine._regelWuerfe.has(key)) engine._regelWuerfe.set(key, Math.random());
+  return engine._regelWuerfe.get(key);
+}
+
 module.exports = {
+  /**
+   * ★ CPU-Deck-Regeln (⑤ oben). Siehe `cpuMeta.forcePlay` in _cpu.js.
+   * Rueckgabe: Rangzahl (Ausloeschung 3, zwei Schlaege 2) oder false.
+   */
+  cpuMeta: {
+    forcePlay(engine, pi, heroIdx, helpers) {
+      const v = vorschau(engine, pi, helpers);
+      if (v.gegnerLebend === 0) return false;
+      if (waereSelbstmord(engine, pi, v)) return false;
+      // ① Gegnerseite komplett tot → IMMER.
+      if (v.gegnerTot === v.gegnerLebend) return RANG_AUSLOESCHUNG;
+      // ② Held mit den meisten HP in zwei Schlaegen tot → fast immer.
+      // Steht Damus' Ifrit-Platzierung dieses Zuges noch aus, kommt sie zuerst:
+      // Armageddon beendet den Zug, die „jede Runde eine Ifrit"-Regel waere
+      // verletzt. (Ifrit macht den Schlag ausserdem 100 staerker.)
+      if (damusPlatzierungOffen(engine, pi)) return false;
+      if (!(v.gegnerMaxHp > 0) || v.gegnerMaxHpImmun) return false;   // gefeiter Tank: nie zu toeten
+      if (2 * v.dmg < v.gegnerMaxHp) return false;
+      const p = require('./_deck-profile').ruleParam(engine, pi, REGEL_ZWEI_HIT, ZWEI_HIT_WAHRSCHEINLICHKEIT);
+      return wurfJeZug(engine, pi, REGEL_ZWEI_HIT) < p ? RANG_ZWEI_HIT : false;
+    },
+  },
+
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
