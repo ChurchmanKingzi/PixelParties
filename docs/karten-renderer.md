@@ -322,6 +322,47 @@ Verhalten (Kopien laufen je nach Einhängezeit; die Zufallswerte sind trotzdem j
 `foilBorderPulse` auf dem Karten-Element selbst (nur ohne `:has`/`overflow-clip-margin`) liegt außerhalb der Foil-Hüllen und wird nicht
 synchronisiert.
 
+## Funken-Schein ohne Filter (Performance)
+
+**Befund.** Die 12 Funken je Foil-Karte trugen einen *festen* `filter: drop-shadow(0 0 3px) drop-shadow(0 0 7px)` (seit v1403 nicht mehr
+animiert). Das genügt trotzdem, um die Bildrate zu zerlegen: ein Filter auf einer animierten Ebene muss der Compositor in jedem Frame auf
+eine eigene Zwischenfläche anwenden (zwei Weichzeichner je Funke). Gemessen im Test-Harness (8 Foil-Karten à 130 px, 197 Animationen,
+Headless ohne GPU, Software-Compositing → absolute Werte pessimistisch):
+
+| Funken-Schein | fps |
+|---|---|
+| zwei `drop-shadow` (bis v1403+) | 21–24 |
+| ein `drop-shadow` | 36 |
+| `box-shadow` | 59 |
+| Schein im Hintergrund (jetzt) | 59 |
+| gar kein Schein | 59 |
+
+Entfernt man nur den Filter, laufen alle 197 Animationen weiter — und die Bildrate springt trotzdem von 23 auf 59 fps: der Aufwand hing am
+Filter, nicht an der Zahl der Animationen. Der Aufwand wuchs außerdem linear mit der Zahl animierter Foil-Karten (alt: ca. 5,7 ms
+Frame-Zeit je Karte bei 130 px; 4 Karten 45 fps, 8 Karten 20, 16 Karten 11).
+
+**Lösung.** `box-shadow` war gleich schnell, malt aber nur *außerhalb* des Elements; der Verlauf des Funkens läuft innen fast durchsichtig
+aus, dazwischen entsteht ein dünner dunkler Ring um den Kern (bei 3-fachem Zoom sichtbar). Deshalb steckt der Schein jetzt im Hintergrund
+des Funkens (`style.css`, `@supports (color: color-mix(...))` hinter den Funken-Regeln): das Element ist 5-mal so groß wie der Funke (Mitte
+unverändert per `margin`), der Kern ist derselbe Verlauf wie zuvor, dahinter liegt ein weicher Hof (zweiter Verlauf, in Stufen
+auslaufend, 2,4 Funkengrößen; größer würde hart abgeschnitten). Die Spitzen behalten ihre Länge, nur ihre Lage ist umgerechnet. Alles wird
+einmal in die Ebene gemalt, danach nur noch skaliert/ein- und ausgeblendet. Browser ohne `color-mix` behalten `box-shadow` als Rückfall.
+Die Kleinansicht (`.foil-klein`) hatte nie einen Schein und bleibt unverändert (gleiche berechnete Werte, pixelgleich).
+
+**Abstimmung.** Hof-Stärke und -Radius wurden per Pixelvergleich gegen das alte Filter-Aussehen gesucht (gleiche Animationszeit, 3-facher
+Zoom, Summe der Pixelabweichung): `box-shadow` 2418, Hintergrund-Schein 1892 (22 % näher dran, kein Ring). Unterschied bleibt: der Filter
+ließ auch die dünnen Spitzen nachleuchten, der Hintergrund-Schein umgibt nur den Kern.
+
+**Messung** (alt → neu, Headless ohne GPU): 8 Karten à 130 px 21 → 59 fps; 16 Karten 11 → 25 fps; 12 Karten à 90 px (Brettgröße) 18 → 60 fps;
+8 Karten bei 4-facher CPU-Drosselung 16 → 26 fps. Die Last verteilt sich seither auf mehrere Teile (16 Karten: ohne Funken 32 fps, ohne
+Schimmer 30, ohne Staub 27, ohne Rahmen-Ringe 24; ohne jeden Foil-Effekt 60). Echte Geräte (GPU, Handy/iOS) nicht gemessen.
+
+**Warum Kopien derselben Karte den Effekt nicht teilen können.** Ein DOM-Element kann nicht an zwei Stellen stehen, und Browser teilen
+Animationen nicht zwischen Elementen; ein Spiegeln per Canvas kostet je Kopie und Frame mehr als die Compositor-Animation. Möglich wäre
+nur, Kopien ab der zweiten ohne Effekt zu zeigen (Test mit 6 Karten × 2 Kopien: 13,6 → 29 fps), aber das nützt nur, wo Kopien gleichzeitig
+sichtbar sind, und eine Foil-Karte ohne Effekt widerspricht dem einheitlichen Zustand (siehe oben). Der Tooltip ist ohnehin einmalig: im
+Spiel ein gemeinsamer Tooltip (`_boardTooltipSetter`), im Deck Editor nur während des Hoverns eingehängt.
+
 ## Hinweise
 
 * Server: `card-images.js` kennt „Karte hat Bild" jetzt aus `public/cardgen/art.json` (zusätzlich zu

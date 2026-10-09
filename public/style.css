@@ -823,11 +823,14 @@ select optgroup {
      schreibt den Wert ohnehin. */
   opacity: 0;
   background: radial-gradient(circle, #ffffff 0%, currentColor 40%, transparent 72%);
-  /* ★ v1403: Das Leuchten ist ein FESTER Schein (vorher ein animiertes
-     `filter: drop-shadow` — die teuerste Schicht, jeden Frame neu
-     gemalt). Er wird mit dem Funken skaliert und ein-/ausgeblendet, das
-     macht der Compositor allein; der Funke blitzt dadurch gleich auf. */
-  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 7px currentColor);
+  /* ★ v1403: Das Leuchten ist ein FESTER Schein (vorher ein animiertes `filter: drop-shadow` — die teuerste Schicht, jeden
+     Frame neu gemalt). Er wird mit dem Funken skaliert und ein-/ausgeblendet, das macht der Compositor allein.
+     ★ Kein `filter`, auch kein fester: ein Filter auf einer animierten Ebene muss der Compositor in jedem Frame auf eine eigene
+     Zwischenflaeche anwenden (zwei Weichzeichner je Funke, 12 Funken je Karte). Gemessen (8 Foil-Karten a 130 px, 197 Animationen,
+     Headless ohne GPU): 22 fps mit zwei Filtern, 36 fps mit einem, 59 fps ohne. Hier der Rueckfall `box-shadow`; Browser mit
+     `color-mix` bekommen unten den Schein im Hintergrund des Funkens (ohne dunklen Ring um den Kern, den `box-shadow` zeichnet,
+     weil er nur AUSSERHALB des Elements malt). */
+  box-shadow: 0 0 3px currentColor, 0 0 7px currentColor;
   animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite;
   animation-delay: var(--sp-delay, 0s);
   will-change: transform, opacity;
@@ -853,6 +856,34 @@ select optgroup {
 .foil-shine-diamond .foil-sparkle { width: calc(var(--sp-size, 5px) + 1px); height: calc(var(--sp-size, 5px) + 1px); }
 .foil-shine-diamond .foil-sparkle::before { width: 1.4px; height: 520%; top: -210%; }
 .foil-shine-diamond .foil-sparkle::after  { height: 1.4px; width: 520%; left: -210%; }
+
+/* ★ Funken-Schein im Hintergrund (grosse Ansicht): das Element ist 5x so gross wie der Funke (Mitte unveraendert, `margin`),
+   der Kern ist derselbe Verlauf wie zuvor, dahinter liegt ein weicher Hof (zweiter Verlauf, in Stufen auslaufend). Alles wird
+   einmal in die Ebene gemalt; kein Filter, kein Schatten. Abgestimmt auf das fruehere `drop-shadow(0 0 3px) drop-shadow(0 0 7px)`:
+   Pixelvergleich gegen den Filter 22 % naeher dran als `box-shadow`. Die Spitzen (`::before`/`::after`) behalten ihre Laenge
+   (4,4 bzw. 5,2 Funkengroessen), nur ihre Lage wird auf das groessere Element umgerechnet. Die Kleinansicht (`.foil-klein`) hat
+   weiter keinen Schein. Der Hof ist 2,4 Funkengroessen gross — mehr passt nicht in das Element (2,5), sonst wird er hart abgeschnitten. */
+@supports (color: color-mix(in srgb, red, blue)) {
+  .foil-shine-overlay:not(.foil-klein) .foil-sparkle {
+    --s: var(--sp-size, 5px);
+    width: calc(var(--s) * 5); height: calc(var(--s) * 5);
+    margin: calc(var(--s) * -2) 0 0 calc(var(--s) * -2);
+    box-shadow: none;
+    background:
+      radial-gradient(circle calc(var(--s) * .7071), #ffffff 0%, currentColor 40%, transparent 72%),
+      radial-gradient(circle calc(var(--s) * 2.4),
+        color-mix(in srgb, currentColor 80%, transparent) 0%,
+        color-mix(in srgb, currentColor 40%, transparent) 30%,
+        color-mix(in srgb, currentColor 20%, transparent) 60%,
+        color-mix(in srgb, currentColor 5%, transparent) 85%,
+        transparent 100%);
+  }
+  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle { --s: calc(var(--sp-size, 5px) + 1px); }
+  .foil-shine-overlay:not(.foil-klein) .foil-sparkle::before { top: calc(var(--s) * .3); height: calc(var(--s) * 4.4); }
+  .foil-shine-overlay:not(.foil-klein) .foil-sparkle::after  { left: calc(var(--s) * .3); width: calc(var(--s) * 4.4); }
+  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle::before { top: calc(var(--s) * -.1); height: calc(var(--s) * 5.2); }
+  .foil-shine-overlay.foil-shine-diamond:not(.foil-klein) .foil-sparkle::after  { left: calc(var(--s) * -.1); width: calc(var(--s) * 5.2); }
+}
 
 .foil-mote {
   position: absolute;
@@ -22306,7 +22337,7 @@ body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
 .foil-klein .foil-band { will-change: auto; }
 .foil-klein .foil-band::after { display: none; }
 .foil-klein .foil-band::before { filter: none; }
-.foil-klein .foil-sparkle { animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); filter: none; }
+.foil-klein .foil-sparkle { animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); box-shadow: none; }
 /* v1403: die Kleinansicht wandert weiterhin nicht, sie pulsiert nur. */
 .foil-klein .foil-iridescent::before, .foil-klein .foil-iridescent-diamond::before { animation: none; will-change: auto; }
 /* Rahmen: fester Schein statt pulsierendem `box-shadow` (Malarbeit je
