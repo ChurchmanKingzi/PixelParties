@@ -604,43 +604,48 @@ function isArtifactCreature(cd) {
 }
 
 /**
- * ALS RULING (17.8., spielweit): **eine Artifact Creature ist NUR auf dem
- * Spielfeld eine Creature.** Ausserhalb — Hand, Deck, Ablagestapel,
- * Loeschstapel, Side Deck — zaehlt sie ausschliesslich als Artifact.
+ * Ist diese Karte in einem STAPEL (Hand, Deck, Ablage, Loeschstapel, Side
+ * Deck) eine Creature?
  *
- * Das ist keine neue Erfindung, sondern die Verallgemeinerung des
- * gedruckten Textes: Pollution Spewer sagt "Place this into the free
- * Support Zone of a Hero you control **as a Creature**", und Powder Keg
- * sagte es bis zum Rewording vom 9.10. woertlich ("**While this card is
- * placed into a Support Zone**, it is treated as a Creature") — der Satz
- * steht nicht mehr auf der Karte, die Regel gilt unveraendert weiter (die
- * Karte traegt weiter `subtype: 'Creature'` und 1 HP). Die Kartenwerdung
- * haengt also an der Support Zone. Ab jetzt gilt derselbe Satz fuer alle
- * sieben Artifact-Creatures und fuer jede kuenftige.
+ * ★ RULING VOM 17.8. AUFGEHOBEN (Als Ruling 9.10.): bis dahin zaehlte eine
+ * Artifact Creature (Powder Keg, Pollution Spewer, die fuenf Debt-O-Trons)
+ * ausserhalb einer Support Zone NUR als Artifact; Cute Cheese, Suchen,
+ * Wiederbelebungen und Zaehler uebergingen sie. Jetzt ist sie ueberall eine
+ * Creature — der Helfer bleibt, weil 35 Skripte ihn aufrufen und die Frage
+ * „Creature im Stapel?" eine eigene Antwortstelle verdient, falls das
+ * Ruling je wieder anders ausfaellt.
  *
- * DIE GRENZE IST DIE SUPPORT ZONE, nicht "das Brett": in der Surprise
- * Zone liegt die Karte verdeckt und ist noch in keiner Support Zone.
+ * Gefallen sind damit auch die zentralen Riegel, die Artifact Creatures
+ * von fremden Beschwoerungen ausnahmen (`artifact_creature_summon_blocked`
+ * in `summonCreatureWithHooks`, `artifact_creature_place_blocked` in
+ * `actionPlaceCreature`) und die Opt-in-Flagge `selfPlacement`.
  *
- * WANN DIESEN HELFER NEHMEN: immer dann, wenn ein Effekt einen STAPEL
- * nach Creatures durchsucht, zaehlt oder daraus beschwoert/belebt —
- * Tutor-Suchen, Wiederbelebungen aus der Ablage, "je Creature in deinem
- * Ablagestapel". Fuer Karten, die bereits IN einer Support Zone liegen
- * (Instanz-Scans ueber `cardInstances`, `supportZones`, Todesereignisse),
- * bleibt `hasCardType(cd, 'Creature')` richtig — dort IST sie eine
- * Creature.
+ * ★ WAS BLEIBT: der eigene SPIELWEG aus der Hand (Gold, keine Aktion, kein
+ * Level — `doPlayArtifact`), die Beschwoerungssperre (`summonLocked` gilt
+ * auch fuer sie) und die Gegnerseiten-Sperre: eine Karte mit
+ * `placesOnOpponentBoard` (Powder Keg) darf nie auf der EIGENEN Seite
+ * landen. Wer aus einem Stapel BESCHWOERT oder PLATZIERT, nimmt deshalb
+ * `isSummonablePileCreature` — wer nur sucht oder zaehlt (Cute Cheese,
+ * „je Creature im Ablagestapel"), nimmt `isPileCreature`.
  *
- * Merkhilfe fuer den Unterschied: `hasCardType` fragt "was steht auf der
- * Karte?", `isPileCreature` fragt "was ist sie DORT, wo sie liegt?".
- *
- * Karten mit `cardType === 'Creature'` sind nicht betroffen — der Fall
- * entsteht ausschliesslich ueber den `subtype`-Zweig in `hasCardType`.
- * Creature-TOKEN behalten ihre Creature-Eigenschaft ueberall: sie sind
- * keine Artifacts.
+ * Merkhilfe fuer den Unterschied zu `hasCardType`: das fragt „was steht
+ * auf der Karte?", dies fragt „ist sie DORT, wo sie liegt, eine Creature?".
+ * Creature-TOKEN waren nie betroffen: sie sind keine Artifacts.
  */
 function isPileCreature(cd) {
   if (!cd) return false;
-  if (isArtifactCreature(cd)) return false;
   return hasCardType(cd, 'Creature');
+}
+
+/**
+ * Creature im Stapel, die auf der EIGENEN Brettseite beschworen oder
+ * platziert werden darf — `isPileCreature` plus Gegnerseiten-Sperre
+ * (`isOwnSideSummonableCreature`). Fuer jeden Pool, aus dem ein Effekt
+ * etwas aufs Brett legt (Beschwoerungen, Wiederbelebungen, Platzierungen),
+ * damit Powder Keg dort nicht angeboten wird, wo es nie landen darf.
+ */
+function isSummonablePileCreature(cd, cardName) {
+  return isPileCreature(cd) && isOwnSideSummonableCreature(cd, cardName);
 }
 
 /**
@@ -1073,6 +1078,7 @@ module.exports = {
   kontrollRechteVon,
   KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
+  isSummonablePileCreature,
   resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

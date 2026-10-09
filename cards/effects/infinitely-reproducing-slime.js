@@ -186,7 +186,6 @@ module.exports = {
       const placed = await engine.actionPlaceCreature(CARD_NAME, pi, dest.heroIdx, dest.slotIdx, {
         source,
         sourceName: CARD_NAME,
-        selfPlacement: true,
         heldSeite: dest.owner,   // Kontrolle statt Seite (Styx 28.9.)
         ...(source === 'deck' ? { hookExtras: engine.deckHookExtras() } : {}),   // v1393
       });

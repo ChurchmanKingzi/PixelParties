@@ -6275,6 +6275,18 @@ await engine.actionAddCardFromDeckToHand(pi, gewaehlt, {
 });
 ```
 
+**★ Artifact Creatures sind in Stapeln Creatures (Als Ruling 9.10.; das
+Ruling vom 17.8. „nur auf dem Brett eine Creature" ist aufgehoben).**
+`isPileCreature(cd)` ist damit wahr für Powder Keg, Pollution Spewer und
+die Debt-O-Trons; Cute Cheese, Suchen und Zähler finden sie. Wer aus einem
+Stapel BESCHWÖRT oder PLATZIERT, nimmt `isSummonablePileCreature(cd)` —
+das ergänzt die Gegnerseiten-Sperre (`placesOnOpponentBoard`: Powder Keg
+darf nie auf die eigene Seite). Die zentralen Riegel
+`artifact_creature_summon_blocked` / `artifact_creature_place_blocked`
+und die Flagge `selfPlacement` gibt es nicht mehr. Unverändert: der
+Spielweg aus der Hand (`doPlayArtifact`), `summonLocked` und die strenge
+`cardType === 'Creature'`-Regel der Necromancy-Familie (siehe unten).
+
 Gelesen von Karten, die eine Suche VERDOPPELN („an additional card
 with … the same specifications" — Koperniko, the Stargazer). Die
 Engine fuehrt dazu je Quelle eine Strichliste (`engine._deckAddTally`,

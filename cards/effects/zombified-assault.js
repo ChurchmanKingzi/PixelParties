@@ -31,7 +31,7 @@
 //  den Spell gewirkt (Demon's Gate), trifft er sie — dieselbe Routung
 //  wie Spiky Armor / Fireshield.
 // ═══════════════════════════════════════════
-const { hasCardType, isArtifactCreature, isCreatureSource, resolveSourceCreature } = require('./_hooks');
+const { isSummonablePileCreature, isCreatureSource, resolveSourceCreature } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Zombified Assault';
@@ -56,7 +56,7 @@ function durchGegnerAttackOderSpell(engine, pi, d) {
 /** Kann diese Karte ueberhaupt als Creature zurueck aufs Brett? */
 function belebbar(engine, name) {
   const cd = engine._getCardDB()[name];
-  if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) return false;
+  if (!cd || !isSummonablePileCreature(cd, name)) return false;
   // v1389: zentrale Sperre (Ifrit, Gigantisaur „cannot be revived").
   if (!engine.darfAusAblageAufsFeld(name)) return false;
   return true;

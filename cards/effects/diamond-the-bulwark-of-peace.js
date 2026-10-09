@@ -34,7 +34,7 @@
 //    danach Effekt 2.
 // ═══════════════════════════════════════════
 
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');
 
 const CARD_NAME = 'Diamond, the Bulwark of Peace';
@@ -48,7 +48,7 @@ function kandidaten(engine, pi, ausser) {
   for (const n of (engine.gs.players[pi]?.deletedPile || [])) {
     if (n === ausser) continue;
     const cd = db[n];
-    if (!cd || !isPileCreature(cd) || cd.level !== 0) continue;
+    if (!cd || !isSummonablePileCreature(cd) || cd.level !== 0) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);
   }
   return [...zaehler.entries()]
@@ -67,7 +67,7 @@ function bonusKandidaten(engine, pi) {
     if ((pile === 'deck' || pile === 'discard') && !engine.pileOutAllowed(pi, pile, { source: { name: CARD_NAME, owner: pi } })) continue;
     const zaehler = new Map();
     for (const n of arr || []) {
-      if (!isPileCreature(db[n])) continue;
+      if (!isSummonablePileCreature(db[n])) continue;
       zaehler.set(n, (zaehler.get(n) || 0) + 1);
     }
     for (const [name, count] of [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b))) {

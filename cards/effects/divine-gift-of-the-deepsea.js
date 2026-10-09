@@ -36,7 +36,7 @@
 //  Forceful Revival's pattern).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType, baseCardName } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, baseCardName } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 function getOwnControlledCreatureInsts(engine, pi) {
@@ -69,7 +69,7 @@ function buildReplacementGallery(engine, ps, pi, maxLevel, excludeName) {
     if (seen.has(baseCardName(cn))) return;
     if (excludeName && baseCardName(cn) === baseCardName(excludeName)) return;   // v876
     const cd = cardDB[cn];
-    if (!cd || !isPileCreature(cd)) return;
+    if (!cd || !isSummonablePileCreature(cd)) return;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') return;
     const lvl = engine.effectiveCardLevel(cd, pi);
     if (lvl > maxLevel) return;
@@ -222,7 +222,7 @@ module.exports = {
         return;
       }
       const repCd = cardDB[repName];
-      if (!repCd || !isPileCreature(repCd)
+      if (!repCd || !isSummonablePileCreature(repCd)
           || engine.effectiveCardLevel(repCd, pi) > bouncedLevel) {
         engine.sync();
         return;

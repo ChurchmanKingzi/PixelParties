@@ -30,7 +30,7 @@
 //  · Bild: Tiefsee-Strudel auf dem Platz beim Ausloesen
 //    (`deepsea_summon_whirlpool`), danach der normale Beschwoerungsflug.
 // ═══════════════════════════════════════════
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const { canHeroSummon } = require('./_summon-eligibility');
 
@@ -51,7 +51,7 @@ function kandidaten(engine, pi, heroIdx, ausserName, seite = pi) {
     for (const n of pool) {
       if (n === ausserName) continue;
       const cd = db[n];
-      if (!cd || !isPileCreature(cd)) continue;
+      if (!cd || !isSummonablePileCreature(cd)) continue;
       // Kontrolle statt Seite (Styx 28.9.): Held an seiner physischen Adresse.
       if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true, physOwner: seite })) continue;
       if (!engine.isCreatureSummonable(n, seite, heroIdx)) continue;

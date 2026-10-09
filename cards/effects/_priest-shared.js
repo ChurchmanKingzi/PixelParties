@@ -11,7 +11,7 @@
 //      discard pile back into your deck" — beide ueber `waehleUndMischen`.
 // ═══════════════════════════════════════════
 
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 /** Creatures der Ablage, entdoppelt nach Namen (Galerie-Form). */
 function ablageKreaturen(engine, pi, ausser = []) {
@@ -21,7 +21,7 @@ function ablageKreaturen(engine, pi, ausser = []) {
   for (const n of (ps?.discardPile || [])) {
     if (ausser.includes(n)) continue;
     const cd = db[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);
   }
   return [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, source: 'discard', count }));

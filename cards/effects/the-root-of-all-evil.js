@@ -25,7 +25,7 @@
 //    (`play_pile_transfer`, `deck_to_discard_animation`, einzelne `mill_center_reveal`). Eine auf dem Brett besiegte
 //    Creature bekommt zusaetzlich den schwarzen Nebel `root_evil_mist`; die Beschwoerung zeigt `necromancy_summon`.
 // ═══════════════════════════════════════════
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME = 'The Root of all Evil';
 
@@ -38,7 +38,7 @@ function kandidaten(engine, pi) {
     if (n === CARD_NAME) continue;
     if (!engine.darfAusAblageAufsFeld(n)) continue;
     const cd = db[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);
   }
   return [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, source: 'discard', count }));
