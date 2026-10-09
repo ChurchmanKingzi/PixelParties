@@ -876,7 +876,50 @@
   const holoWait = new Map();        // Skin -> Promise (in Arbeit)
   const nameDone = new Map();        // Kartenname -> { vars, urls }
   let holoChain = Promise.resolve();
-  const toBlob = cv => new Promise(res => cv.toBlob(b => res(b || null), 'image/png'));
+  // PNG-Kodierung. `canvas.toBlob` kodiert im Leerlauf des Hauptthreads: auf einer belebten Seite (Animationen im Menue,
+  // Deck-Editor beim Aufbauen) wartet jede Karte dadurch 1-6 s, obwohl die Kodierung selbst nur Millisekunden braucht — und
+  // die Arbeiter der Warteschlange stehen die ganze Zeit still. Ein Web Worker kodiert unabhaengig vom Hauptthread
+  // (gemessen: ~20 ms statt ~2,7 s je Karte). Er bekommt eine ImageBitmap-Kopie; wo Worker/OffscreenCanvas fehlen oder etwas
+  // schiefgeht, faellt jede Karte einzeln auf `canvas.toBlob` zurueck.
+  const ENC = { w: null, dead: false, n: 0, fails: 0, pend: new Map() };
+  const ENC_SRC = 'self.onmessage=async e=>{const d=e.data;let blob=null;try{const o=new OffscreenCanvas(d.bmp.width,d.bmp.height);' +
+    'o.getContext("2d").drawImage(d.bmp,0,0);blob=await o.convertToBlob({type:"image/png"})}catch(_){}try{d.bmp.close()}catch(_){}' +
+    'self.postMessage({id:d.id,blob})}';
+  function encRetire() {
+    ENC.dead = true;
+    if (ENC.w) { try { ENC.w.terminate(); } catch (e) {} ENC.w = null; }
+    for (const r of ENC.pend.values()) r(null);
+    ENC.pend.clear();
+  }
+  function encoder() {
+    if (ENC.w || ENC.dead) return ENC.w;
+    try {
+      if (typeof Worker !== 'function' || typeof OffscreenCanvas !== 'function' || typeof createImageBitmap !== 'function' ||
+          !(OffscreenCanvas.prototype && 'convertToBlob' in OffscreenCanvas.prototype)) throw new Error('kein Worker-Encoder');
+      const w = new Worker(URL.createObjectURL(new Blob([ENC_SRC], { type: 'text/javascript' })));
+      w.onmessage = e => {
+        const res = ENC.pend.get(e.data.id); if (!res) return;
+        ENC.pend.delete(e.data.id);
+        if (!e.data.blob && ++ENC.fails >= 3) encRetire();
+        res(e.data.blob || null);
+      };
+      w.onerror = () => encRetire();
+      ENC.w = w;
+    } catch (e) { ENC.dead = true; }
+    return ENC.w;
+  }
+  const toBlobMain = cv => new Promise(res => cv.toBlob(b => res(b || null), 'image/png'));
+  async function toBlob(cv) {
+    const w = encoder();
+    if (w) {
+      try {
+        const bmp = await createImageBitmap(cv);
+        const b = await new Promise(res => { const id = ++ENC.n; ENC.pend.set(id, res); w.postMessage({ id, bmp }, [bmp]); });
+        if (b) return b;
+      } catch (e) { /* weiter mit dem Hauptthread */ }
+    }
+    return toBlobMain(cv);
+  }
   const urlOf = b => URL.createObjectURL(b);
   const pc = (v, t) => (v / t * 100) + '%';
   function lru(map, key, val, max) {
@@ -1052,5 +1095,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
 })(typeof window !== 'undefined' ? window : globalThis);

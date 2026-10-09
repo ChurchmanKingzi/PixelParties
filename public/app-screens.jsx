@@ -972,6 +972,24 @@ function AuthScreen() {
 const MENU_BG_COLS = 10;
 const MENU_BG_CARD_ASPECT = 1050 / 750; // card art is 750×1050
 
+// ── Tages-Pool der Kartenwand (Performance) ──
+// Die Wand zeigte bei JEDEM Besuch ~70 neu gewuerfelte Karten aus allen ~1.190. Jede davon musste im Browser gezeichnet werden
+// (~40-60 ms je Karte, auf dem Handy ein Vielfaches) und war nie im dauerhaften Cache (card-image-shim.js), weil sie beim
+// naechsten Besuch eine andere war — gemessen ~70 Zeichenauftraege je F5, die obendrein die Karten des Deck-Editors aufhielten.
+// Jetzt stammt die Wand aus einem Pool von MENU_BG_POOL Karten, der fuer den ganzen Tag gleich ist (Datum als Startwert):
+// nach dem ersten Besuch des Tages kommt sie aus dem Cache. Die ANORDNUNG wird weiter bei jedem Besuch gewuerfelt, und der
+// Pool wechselt taeglich — die Wand bleibt abwechslungsreich, kostet aber nichts.
+const MENU_BG_POOL = 90;
+function menuBgRng(seed) {                                // mulberry32
+  return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function menuBgPoolUrls(urls) {
+  const d = new Date(), rnd = menuBgRng(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate());
+  const a = [...urls].sort();                              // gleiche Ausgangsreihenfolge, egal wie die Karten geladen wurden
+  for (let i = a.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a.slice(0, Math.min(MENU_BG_POOL, a.length));
+}
+
 // Pick a random url not in `forbidden` (a Set). With ~700 cards and a
 // forbidden set of ≤8 neighbours, rejection sampling converges instantly.
 function menuBgPick(urls, forbidden) {
@@ -1061,7 +1079,7 @@ function MenuCardBackground() {
   }, []);
 
   const grid = useMemo(
-    () => (urls.length && rows ? buildMenuBgGrid(urls, rows) : null),
+    () => (urls.length && rows ? buildMenuBgGrid(menuBgPoolUrls(urls), rows) : null),
     [urls, rows]
   );
 
@@ -1074,7 +1092,7 @@ function MenuCardBackground() {
       {grid.map((row, r) =>
         row.map((src, c) => (
           <div className="menu-card-bg-cell" key={r + '-' + c}>
-            <img src={src} alt="" draggable="false" decoding="async" />
+            <img src={src} alt="" draggable="false" decoding="async" data-card-low="1" />
           </div>
         ))
       )}
