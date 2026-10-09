@@ -279,7 +279,7 @@ function getDailyHeroPool() {
       const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
       const stripped = {};
       getCardArray().forEach(c => { stripped[c.name.replace(/[^a-zA-Z0-9 ]/g, '')] = c.name; });
-      for (const f of fs.readdirSync(cardsDir)) {
+      for (const f of require('./card-images').cardFileList(cardsDir)) {
         if (!exts.has(path.extname(f).toLowerCase())) continue;
         const stem = path.basename(f, path.extname(f));
         const real = stripped[stem.replace(/[^a-zA-Z0-9 ]/g, '')] || stem;
@@ -3813,10 +3813,8 @@ function scanShopDir(subdir) {
 
 // Scan skins directory (nur die oberste Ebene — `unlockable/` ist ein Ordner und faellt durch den Filter)
 function scanSkinFiles() {
-  const dir = path.join(__dirname, 'cards', 'skins');
-  try {
-    return fs.readdirSync(dir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()));
-  } catch { return []; }
+  // Bilder in cards/skins plus Skins, die nur als Kunst im Atlas (public/cardgen) stehen — Karten entstehen zur Laufzeit.
+  return require('./card-images').skinFileList(path.join(__dirname, 'cards', 'skins'));
 }
 
 // ===== FREISCHALTBARE SKINS =====
@@ -3913,7 +3911,7 @@ function getAvailableSkins() {
   // Only include skins for heroes whose card images exist in ./cards
   const cardsDir = path.join(__dirname, 'cards');
   let heroFiles = [];
-  try { heroFiles = fs.readdirSync(cardsDir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase())); } catch {}
+  heroFiles = require('./card-images').cardFileList(cardsDir);
   const heroSet = new Set(heroFiles.map(f => {
     const stem = path.basename(f, path.extname(f));
     // ★ 28.8.: hier stand `nameByStripped[stem]` — der ROHE Stamm gegen
@@ -3948,7 +3946,7 @@ app.get('/api/shop/catalog', (req, res) => {
   // Skins: only for heroes whose cards exist in ./cards
   const cardsDir = path.join(__dirname, 'cards');
   let heroFiles = [];
-  try { heroFiles = fs.readdirSync(cardsDir).filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase())); } catch {}
+  heroFiles = require('./card-images').cardFileList(cardsDir);
   const heroSet = new Set(heroFiles.map(f => {
     const stem = path.basename(f, path.extname(f));
     // ★ 28.8.: hier stand `nameByStripped[stem]` — der ROHE Stamm gegen

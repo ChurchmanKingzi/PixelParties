@@ -1,0 +1,16 @@
+{
+  "hero": "Layn Summoner of Weapons",
+  "sheet": "layn-summoner-of-weapons.png",
+  "frameWidth": 28,
+  "frameHeight": 35,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "skinOf": "Layn, Defender of Deri",
+  "padTop": 4,
+  "padLeft": 3,
+  "padRight": 3,
+  "padBottom": 2,
+  "faceX": 15.5
+}
