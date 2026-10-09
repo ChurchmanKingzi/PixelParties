@@ -3055,6 +3055,9 @@ function applyPixelHoverCursor(hex) {
 function App() {
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('menu');
+  // Der Kartenbild-Shim (card-image-shim.js) merkt sich je Bildschirm, welche Karten zuerst gezeigt wurden, und waermt sie im
+  // Hauptmenue vor. Die Eltern rendern vor den Kindern, also steht der Name schon da, wenn deren <img> ihre Quelle setzen.
+  window.__ppScreen = screen;
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
   // bgmMode: ein Schluessel von _bgmTracks ('menu', 'battle', 'shop',

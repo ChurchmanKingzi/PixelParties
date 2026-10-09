@@ -153,13 +153,14 @@
   }
 
   // ── Warteschlange ──
-  // Vier Stufen: sichtbare Bilder zuerst, dann `new Image()` (Animationen warten auf onload), dann solche, die nur in der
-  // Naehe des Bildschirms liegen, ganz zuletzt reine DEKORATION (`data-card-low`, z. B. die Kartenwand des Hauptmenues): sie
-  // darf nie die Karten aufhalten, die jemand gerade ansehen will. Drei Arbeiter ueberlappen Zeichnen (Hauptthread) und
+  // Fuenf Stufen: sichtbare Bilder zuerst, dann `new Image()` (Animationen warten auf onload), dann solche, die nur in der
+  // Naehe des Bildschirms liegen, dann das VORWAERMEN der Karten, die der naechste Bildschirm zuerst zeigt, ganz zuletzt reine
+  // DEKORATION (`data-card-low`, z. B. die Kartenwand des Hauptmenues): sie darf nie die Karten aufhalten, die jemand gerade
+  // ansehen will. Drei Arbeiter ueberlappen Zeichnen (Hauptthread) und
   // PNG-Kodierung (im Hintergrund); zwischen zwei Karten bekommt die Oberflaeche Luft.
-  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0, persisted: 0, recovered: 0, dropped: 0 };
+  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0, persisted: 0, recovered: 0, dropped: 0, warmed: 0 };
   const fromStore = new Set();       // blob:-URLs, die aus dem dauerhaften Cache stammen (zum Erkennen kaputter Eintraege)
-  const queues = [[], [], [], []];     // 0 sichtbar, 1 `new Image()`, 2 in der Naehe/Leerlauf, 3 Dekoration (`data-card-low`)
+  const queues = [[], [], [], [], []];     // 0 sichtbar, 1 `new Image()`, 2 in der Naehe/Leerlauf, 3 Vorwaermen (Hauptmenue), 4 Dekoration (`data-card-low`)
   let workers = 0;
   const WORKERS = 3;
   function enqueue(job, tier) { if (job.queued) return; job.queued = true; stats.enqueued++; queues[tier].push(job); while (workers < WORKERS) { workers++; work().finally(() => { workers--; }); } }
@@ -167,6 +168,12 @@
   async function work() {
     await boot();
     for (let job; (job = nextJob());) {
+      if (job.warm) {                                                           // Vorwaermen: nur in den Speicher holen, kein <img>
+        if (!failed) { const url = await blobFor(job.m); if (url) pin(job.m.id, url); }
+        warming.delete(job.m.id); stats.warmed++;
+        await new Promise(r => setTimeout(r, 0));
+        continue;
+      }
       if (job.img.__cardTok !== job.tok) { stats.stale++; continue; }       // inzwischen anderes Bild
       // Das Bild steht gar nicht mehr in der Seite (z. B. das Hauptmenue wurde verlassen): nicht zeichnen. Kommt es wieder in
       // die Seite, holt der MutationObserver unten den Auftrag nach. `new Image()` hat nie einen Platz in der Seite.
@@ -199,7 +206,7 @@
       if (!job || e.target.__cardTok !== job.tok) continue;
       const r = e.boundingClientRect;
       const visible = r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
-      enqueue(job, job.low ? 3 : visible ? 0 : 2);
+      enqueue(job, job.low ? 4 : visible ? 0 : 2);
     }
   }, { rootMargin: '700px' }) : null;
 
@@ -217,7 +224,7 @@
         const img = job.img;
         if (job.queued || img.__cardTok !== job.tok || !img.isConnected) return;
         io.unobserve(img);
-        enqueue(job, job.low ? 3 : 2);
+        enqueue(job, job.low ? 4 : 2);
       };
       if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 4000 }); else run();
     }, 1200);
@@ -227,7 +234,7 @@
     if (img.__cardTok !== job.tok) return;
     job.low = img.hasAttribute('data-card-low');
     if (io && img.isConnected) { io.observe(img); vorrendern(job); return; }
-    if (img.__viaCtor || tries > 90 || !io) { enqueue(job, job.low ? 3 : 1); return; }
+    if (img.__viaCtor || tries > 90 || !io) { enqueue(job, job.low ? 4 : 1); return; }
     requestAnimationFrame(() => place(job, tries + 1));
   }
   function handle(img, value) {
@@ -237,6 +244,7 @@
     const tok = img.__cardTok = (img.__cardTok || 0) + 1;
     if (!m || failed) { img.__cardOrig = null; return setReal(img, orig); }
     img.__cardOrig = orig;
+    queueMicrotask(() => note(img, m));        // erst danach: React setzt `data-card-low` nach `src`
     if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); return setReal(img, u); }
     const job = img.__cardJob = { img, m, tok, orig };
     // Eingebaute Bilder zeigen bis zum Rendern eine durchsichtige Fläche (kein Alt-Text-Flackern); `new Image()`
@@ -287,6 +295,71 @@
       }
     }).observe(document, { childList: true, subtree: true });
   }
+
+  // ── Vorwaermen ──
+  // Wer das Hauptmenue verlaesst, oeffnet fast immer einen Bildschirm voller Karten (Deck Editor, Puzzle-Creator ...). Frisch
+  // gerendert wird dort dank des dauerhaften Caches nichts mehr — aber jede Karte kostet trotzdem Warteschlange, IndexedDB-Lesen,
+  // Blob-URL und Dekodieren, und das spielt sich sichtbar NACH dem Aufbau des Bildschirms ab (Platzhalter -> Karte). Darum merkt
+  // sich der Shim je Bildschirm (`window.__ppScreen`), welche Karten er zuerst gezeigt hat, und holt genau diese im Hauptmenue im
+  // Leerlauf bereit: Blob-URL im Speicher (dann setzt `handle` sie beim Einhaengen sofort) und das Bild schon dekodiert.
+  // Fehlt eine Karte im dauerhaften Cache (z. B. nach einem Update), wird sie hier im Hintergrund gezeichnet statt spaeter vor aller Augen.
+  const WARM_KEY = 'pp-card-warm', WARM_PER_SCREEN = 30, WARM_SCREENS = 6, WARM_TOTAL = 60, PIN_MAX = 60;
+  let warmLists = {};                // Bildschirm -> [Karten-ID], in der Reihenfolge des Erscheinens
+  try { warmLists = JSON.parse(localStorage.getItem(WARM_KEY)) || {}; } catch (e) { warmLists = {}; }
+  if (!warmLists || typeof warmLists !== 'object' || Array.isArray(warmLists)) warmLists = {};   // beschaedigt: von vorn anfangen
+  const warming = new Set();         // IDs, die gerade in der Warteschlange stehen
+  const pinned = new Map();          // ID -> Image: haelt die dekodierte Karte im Speicher des Browsers
+  let rec = { screen: null, ids: [], seen: new Set() };
+  let warmTimer = 0;
+  function saveWarm() { try { localStorage.setItem(WARM_KEY, JSON.stringify(warmLists)); } catch (e) { /* privat/voll: dann eben ohne */ } }
+  function flushRec() {
+    if (!rec.screen || rec.screen === 'menu' || !rec.ids.length) return;
+    delete warmLists[rec.screen];                       // Reihenfolge der Schluessel = Aktualitaet: der zuletzt besuchte Bildschirm steht hinten
+    warmLists[rec.screen] = rec.ids.slice();
+    for (const k of Object.keys(warmLists).slice(0, -WARM_SCREENS)) delete warmLists[k];
+    saveWarm();
+  }
+  function note(img, m) {
+    const sc = window.__ppScreen || '';
+    if (sc !== rec.screen) { flushRec(); rec = { screen: sc, ids: [], seen: new Set() }; if (sc === 'menu') scheduleWarm(); }
+    if (!sc || sc === 'menu' || rec.ids.length >= WARM_PER_SCREEN || rec.seen.has(m.id)) return;
+    if (img.__viaCtor || img.hasAttribute('data-card-low')) return;           // Animationen und Dekoration zaehlen nicht
+    rec.seen.add(m.id); rec.ids.push(m.id);
+    if (rec.ids.length >= WARM_PER_SCREEN) flushRec();
+  }
+  addEventListener('pagehide', flushRec);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushRec(); });
+  function pin(id, url) {
+    if (pinned.has(id)) return;
+    const im = new NativeImage();
+    setReal(im, url);
+    pinned.set(id, im);
+    if (pinned.size > PIN_MAX) pinned.delete(pinned.keys().next().value);
+    if (im.decode) im.decode().catch(() => {});
+  }
+  function scheduleWarm() {
+    if (warmTimer) return;
+    warmTimer = setTimeout(() => {
+      warmTimer = 0;
+      if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 3000 }); else warm();
+    }, 1200);
+  }
+  function warm() {
+    if (failed) return;
+    const ids = [];                                                            // zuletzt besuchte Bildschirme zuerst, bis WARM_TOTAL erreicht ist
+    for (const l of Object.values(warmLists).reverse()) {
+      if (!Array.isArray(l)) continue;
+      for (const id of l) if (!ids.includes(id)) ids.push(id);
+      if (ids.length >= WARM_TOTAL) break;
+    }
+    for (const id of ids.slice(0, WARM_TOTAL)) {
+      if (typeof id !== 'string' || !/^(card|skin):./.test(id)) continue;
+      if (warming.has(id) || (cache.has(id) && pinned.has(id))) continue;
+      warming.add(id);
+      enqueue({ warm: true, m: { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: id.slice(5), id } }, 3);
+    }
+  }
+  boot().then(scheduleWarm);
 
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
