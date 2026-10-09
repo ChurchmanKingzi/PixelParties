@@ -4730,6 +4730,12 @@ class GameEngine {
         const pi = effectiveController;
         const oppIdx = engine.opponentOf(pi);
         const targets = [];
+        // ★ Im TUTORIAL duerfen Creature-Effekte nur gegnerische Ziele waehlen (Tester:
+        // Neulinge klickten die eigenen Helden/Creatures an). `side: 'any'` wird dort
+        // zu 'enemy'; Karten, die ausdruecklich 'my' wollen (Heilung u. ae.), bleiben.
+        if (gs.isTutorial && config.damageType === 'creature' && (!config.side || config.side === 'any')) {
+          config = { ...config, side: 'enemy' };
+        }
 
         // ── Forced auto-target (one-shot) ──
         // Set `gs._forcedDamageTarget` to a target object BEFORE

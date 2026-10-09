@@ -8315,7 +8315,8 @@ function TextBox() {
     if (!opts) return;
     const onKey = (e) => {
       if (fensterDarueber()) return;
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleAdvance(); }
+      // Leertaste, Enter und Pfeil rechts: weiter; Pfeil links / Backspace: zurueck.
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleAdvance(); }
       else if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && pageIdx > 0) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); handleBack(); }
     };
     window.addEventListener('keydown', onKey, true);
@@ -8557,7 +8558,7 @@ const TUTORIAL_SCRIPTS = {
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
       // ── Highlight: Destruction Magic in der Hand (Magic Hammer faellt weg) ──
-      { text: 'Okay - time to hammer that Beato!\nAttach the third Destruction Magic from your hand to your Ida!',
+      { text: 'Okay - time to hammer that Beato!\nAttach the third Destruction Magic from your hand to your Ida by clicking on it or dragging it onto her!',
         highlights: [
           '.game-hand-me [data-card-name="Destruction Magic"]',
           '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
@@ -8583,17 +8584,17 @@ const TUTORIAL_SCRIPTS = {
       { text: 'Heya! Welcome back, beep-boop!' },
       { text: "Last time, you only had to squish a single Hero. But in a real game, that won't be enough - there's **three of them** to get rid of!" },
       { text: "With just a single Spell, taking out multiple Heroes won't be easy.\nBut {green:**Creatures**} can be used to spread lots of damage between different targets!" },
-      // ── Highlight: die Cosmic Skeletons ──
-      { text: 'Look at your board.\nYour {green:**Cosmic Skeletons**} can each deal **150 damage** to one target.',
+      // ── Highlight: die Haressassins ──
+      { text: 'Look at your board.\nYour {green:**Haressassins**} can each deal **150 damage** to one target.',
         highlights: [
-          '[data-support-owner="me"][data-card-name="Cosmic Skeleton"]',
+          '[data-support-owner="me"][data-card-name="Haressassin"]',
         ] },
       // ── Highlight: die gegnerischen Helden ──
       { text: 'And look at my Heroes - all three of them are already weakened and only have **150 HP left**!',
         highlights: [
           '[data-hero-owner="opp"][data-hero-name]',
         ] },
-      { text: "A perfect setup - let's go!\nSend your Skeletons against my Heroes and turn them into charred spots on the ground, beep-boop!",
+      { text: "A perfect setup - let's go!\nSend your Haressassins after my Heroes and slice them to ribbons, beep-boop!",
         highlights: [
           '[data-hero-owner="opp"][data-hero-name]',
         ] },
@@ -8606,10 +8607,10 @@ const TUTORIAL_SCRIPTS = {
     outro: [
       { text: 'Cool!' },
       { text: 'The great thing about Creatures is that they can use their effects again and again, every turn!' },
-      { text: 'So your Skeletons will be a constant source of damage!' },
-      { text: "If you hadn't already won - you could just try again next turn! More pain, more **lasers**!" },
+      { text: 'So your Haressassins will be a constant source of damage!' },
+      { text: "If you hadn't already won - you could just try again next turn! More pain, more **slashing**!" },
       { text: 'But the big **downside** of Creatures is that they cannot activate their active effects the turn you summon them.' },
-      { text: "These Skeletons? They already survived a full turn, otherwise they wouldn't be usable!\nSo you'll need to find ways to keep your fragile little Creatures alive!" },
+      { text: "These Haressassins? They already survived a full turn, otherwise they wouldn't be usable!\nSo you'll need to find ways to keep your fragile little Creatures alive!" },
       { text: 'You got all that?\nGreat!' },
       { text: 'See you next lesson, beep-boop!' },
     ],
@@ -8641,7 +8642,7 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           '[data-hero-owner="me"][data-hero-name*="Willy"]',
         ] }),
-      A("Attacks do more ouchie de higher your Hero's **BONK stat** is.\nDis lil' boost I gave ya will help him hit **real hard!**", {
+      A("Attacks do more ouchie de higher your Hero's **Attack stat** is - for bigger **BONK**!\nDis lil' boost I gave ya will help him hit **real hard!**", {
         highlights: [
           '[data-hero-owner="me"][data-hero-name*="Willy"]',
         ] }),
@@ -8705,7 +8706,7 @@ const TUTORIAL_SCRIPTS = {
         highlights: [REIZA] },
       { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions. You can use it to control your opponent's options.",
         highlights: [REIZA] },
-      { text: 'And Poison is 30 bonus damage every turn.',
+      { text: 'And Poison is 30 bonus damage every turn - dealt at the **start of the poisoned player\'s turn**.',
         highlights: [REIZA] },
       // ── Highlight: Medea ──
       { text: 'And look - your Hero {purple:**Medea**} **doubles** any Poison damage your opponent suffers!',
@@ -8748,6 +8749,8 @@ const TUTORIAL_SCRIPTS = {
     const BOOK = '.game-hand-me [data-card-name="Book of Doom"]';
     const HOWITZER = '.game-hand-me [data-card-name="Lifeforce Howitzer"]';
     const ALCHEMY = '[data-ability-owner="me"][data-card-name="Alchemy"]';
+    const ADVENTUROUSNESS = '[data-ability-owner="me"][data-card-name="Adventurousness"]';
+    const FRIENDSHIP = '[data-ability-owner="me"][data-card-name="Friendship"]';
     // Alle Karten auf dem Brett (Helden, Abilities, Creatures ... — `zone-has-card`)
     // und in der eigenen Hand.
     const ALLE_KARTEN = ['.zone-has-card', '.game-hand-me [data-card-name]'];
@@ -8801,6 +8804,11 @@ const TUTORIAL_SCRIPTS = {
       // ── Highlight: Book of Doom, Howitzer UND Alchemy ──
       A("And don't forget that ya can spend Golds not just on **Artifacts**, but some effects too.",
         { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      // ── Tipp (Tester: das Raetsel verlangt drei Abilities, die man noch nie brauchte) ──
+      A("Want a lil' hint, minion...? Khehehe! Some {#4488ff:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
+        { highlights: [ALCHEMY, ADVENTUROUSNESS] }),
+      A("And some Abilities let ya do cool passive stuff in ya **Main Phase**! Okay - enough makin' things easy for ya, khehe - show me what ya can do!",
+        { highlights: [FRIENDSHIP] }),
       A('Well - try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),
       // ── Antonia geht rechts ab (`exitRight`), danach keine Highlights mehr ──
       A("I'll see ya around ... to collect the debt, khehehehehe!", { highlights: [BOOK, HOWITZER, ALCHEMY], exitRight: true }),

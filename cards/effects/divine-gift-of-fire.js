@@ -96,6 +96,8 @@ module.exports = {
         title: 'Divine Gift of Fire',
         description: 'Choose a player. All targets they control are Burned.',
         allowedPlayers: engine.gs.skillTest ? engine.gs.players.map((_, i) => i) : undefined,
+        // Man waehlt fast immer den GEGNER: er steht oben, man selbst unten (Tester-Rueckmeldung).
+        opponentFirst: true,
         cancellable: true,
       });
 
