@@ -110,7 +110,9 @@ dutzende zugleich. Darum gilt (gemessen, siehe unten):
   (gemessen: Bild mit und ohne pixelgleich), kosteten aber je Schicht eine zusätzliche Offscreen-Fläche.
 * **Rahmen-Ringe bleiben auf Skin-Karten:** hat die Basiskarte ein Foil, braucht die Karte die billigen `foil-rahmen`-
   Ringe, sonst fällt das CSS auf den alten `box-shadow`-Puls zurück (der teuerste Dauerläufer einer Foil-Karte).
-* **Alter Diagonalglanz** der Foil-Karten (Bänder): 2 statt 5 Bänder (Diamond 1 statt 3) mit ~3× längerem Takt.
+* **Alter Diagonalglanz** der Foil-Karten (Bänder, `.foil-band`): **abgestellt** (`FOIL_DIAGONALGLANZ = false` in
+  app-shared.jsx; `makeFoilBands` liefert dann keine Bänder). Der Code bleibt stehen, `true` schaltet ihn wieder ein
+  (dann 2 statt 5 Bänder, Diamond 1 statt 3, mit ~3× längerem Takt). Funken, Staub, Schimmer und Rahmen-Ringe laufen weiter.
 * Textur-Berechnung ~20–50 ms je Skin (in Blöcken mit Atempausen), Rahmenmasken höchstens 5 für alle Karten.
 
 Messung (Headless-Chromium, Software-Rendering, Median aus 3 Läufen; Handy-Profil: 390×844, Touch, CPU 4× gedrosselt;
@@ -122,7 +124,9 @@ Szenen mit `CardMini` aus den gebauten Bundles, „Holo AUS“ = `CardRender.HOL
 | Galerie, 12 Karten à 150 px | 61 fps | 25 fps | 33 fps |
 | Tooltip, 1 Karte à 360 px | 61 fps | 61 fps | 60 fps (+10 Ebenen) |
 
-Die Last in „Holo AUS“ stammt vom **bestehenden** Foil der Super/Diamond Rares (rund 28 Animationen je Karte); die neuen
+Nach dem Abstellen des Diagonalglanzes (zuletzt 2 Bänder je Karte) liegen Brett und Galerie bei 19 bzw. 29 fps mit 161 bzw.
+111 Ebenen (vorher 171 bzw. 118): ein kleiner Gewinn, die Bänder waren meist unsichtbar. Die Last in „Holo AUS“ stammt vom
+**bestehenden** Foil der Super/Diamond Rares — heute vor allem Funken (je 11) und Staub (je 6) je Karte; die neuen
 Schichten legen in Massenansichten nichts obendrauf. Worst Case Desktop (6 Karten à 210 px, alles aktiv): 37 → 28 fps
 bei reinem Software-Rendering; teuerster Einzelposten ist der Rahmenglanz (Maske über die ganze Karte).
 
