@@ -8964,7 +8964,7 @@ const TUTORIAL_SCRIPTS = {
       { text: '...' },
       { text: 'Good.' },
       { text: 'So!\nYou did it! Great job, beep-boop!' },
-      { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison!' },
+      { text: 'As you can see, **Gold** can be an excellent way to apply damage, along with many other things! It can even be worth inflicting your own Hero with Poison to get access to more of it.' },
       // ── Highlight: Alchemy ──
       { text: 'And **Alchemy** and the {#a0703c:**Potions**} it provides can be incredibly valuable cards as well!',
         highlights: [ALCHEMY] },
