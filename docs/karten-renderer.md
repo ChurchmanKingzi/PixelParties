@@ -280,6 +280,48 @@ Nachläufern bis ~2 s). Darum bereitet der Shim die ersten Karten der Bildschirm
 * **Deck Editor:** `/api/sample-decks/owned` wird jetzt gleichzeitig mit `/api/decks` angefragt statt danach (ein Roundtrip weniger
   vor dem Kartengitter; Auswertung und Reihenfolge der State-Updates unverändert).
 
+## Gleiche Karte = gleicher Foil-Zustand
+
+Bis hierher würfelte jede Kopie ihre eigene Phase (`Math.random`) und startete ihre CSS-Animationen erst beim Einhängen: Wer in der
+Hand, im Deck Editor oder im Tooltip zwischen zwei Exemplaren derselben Karte wechselte, sah Glanzband, Schimmer, Funken und
+Rahmen-Ringe jedes Mal an anderer Stelle (im echten Spiel: Tooltip gegen Karte bis zu 33 % eines Takts daneben; im Test bis ~50 %,
+dem möglichen Maximum). Zwei Dinge in `app-shared.jsx` ändern das:
+
+1. **Zufall je Karte, nicht je Kopie** (`foilZufall(Schlüssel)`, mulberry32 mit FNV-1a-Samen): Funkenorte, -größen und -phasen, Staub,
+   Schimmerversatz und `--sh-phase` entstehen aus dem Schlüssel `card:<Name>` bzw. `skin:<Skin>` (`CardFoil` → `fkey`). Gleiche Karte =
+   gleiche Zahlenfolge, verschiedene Karten bleiben verschieden. `klein` ändert nur, was gezeigt wird, nicht die Folge davor.
+   Funken-Verzögerungen sind jetzt **negativ** (Phase statt Wartezeit): ein später eingehängtes Exemplar funkelt sofort mit, statt bis
+   zu 4 s zu warten, während die anderen Kopien schon funkeln.
+2. **Gemeinsame Foil-Uhr** (`foilUhrStellen`): jede Foil-Schicht trägt `data-foil-key`; ein `animationstart`-Handler am Dokument merkt
+   die Hülle vor, und **einmal je Frame** wird jede endlose CSS-Animation darin auf die Zeitleiste des Dokuments gelegt
+   (`animation.startTime = -Versatz(Schlüssel)`, Versatz 0–12 s aus dem Schlüssel). Damit zählt nicht mehr der Einhängezeitpunkt:
+   Tooltip, Seitenwechsel, wieder sichtbar gewordene Karten (`.sh-ausserhalb` startet die Animationen neu) und Karten, die während
+   eines Dialogs (`pp-dialog-offen`, pausiert) dazukamen, stehen in derselben Phase wie alle anderen Kopien; nach dem Freigeben eines
+   Dialogs wird die Uhr für alle neu gestellt. Verschiedene Karten sind um ihren festen Versatz verschoben, laufen also nicht im
+   Gleichschritt.
+
+Der Wächter `scripts/check-foil.js` verbietet `Math.random()` im Foil-Abschnitt und verlangt `data-foil-key` an allen Schichten.
+
+**Messung** (Test-Harness mit `CardMini`/`CardTooltipContent`; Phase = `getComputedTiming().progress`, gleiche Animation in allen
+Kopien, größte zirkuläre Abweichung): vier zu verschiedenen Zeiten (0 / 0,7 / 1,9 / 3,1 s) eingehängte Kopien, Mini + Tooltip +
+Kleinansicht, Skin-Karten (170 und 330 px, mit Schraffur und Namens-Regenbogen), Aus- und Wiedereinblenden, Dialog-Pause mit neuer
+Kopie, erneutes Einhängen: **0,000 %** (vorher 33–50 %). Verschiedene Karten haben verschiedene Phasen. Echtes Spiel, Deck Editor:
+Tooltip gegen Karte 0,000 % (vorher 33 %).
+
+**Kosten — kein Gewinn, aber auch kein Verlust.** Gleiche Phasen sparen *keine* Laufzeit: jede Kopie bleibt ein eigenes DOM-Element mit
+eigener Compositor-Animation; die Browser teilen nichts zwischen Elementen. Gemessen (40 Foil-Karten à 130 px, 982 Animationen,
+Headless ohne GPU): laufender Betrieb unverändert (Skript 4,1 → 4,8 ms/s, Style 138 → 134 ms/s, Layout 0, fps gleich; 4-fach gedrosselt
+ebenso); einmalig beim Einhängen von 40 Karten auf einmal **+53 ms** (≈ 1,3 ms je Karte). Warum so wenig: erst ein erster Entwurf
+(Handler liest *und* schreibt je Ereignis; danach `getAnimations({ subtree: true })` je Hülle) kostete 7 ms je Ereignis bzw. 365 ms
+für 200 Hüllen, weil jeder Aufruf alle Animationen des Dokuments durchsucht und jedes Schreiben die nächste Lesung verteuert.
+Jetzt: Handler merkt nur vor, ein `document.getAnimations()` je Frame, danach erst alle Schreibzugriffe (982 Startzeiten = 2 ms).
+
+**Grenzen:** das erste Bild eines neu eingehängten Exemplars läuft ein bis zwei Frames in der Phase seiner Einhängezeit, bis die Uhr
+greift (der Handler feuert mit dem ersten Frame der Animation). Browser ohne `CSSAnimation`/`document.getAnimations` behalten das alte
+Verhalten (Kopien laufen je nach Einhängezeit; die Zufallswerte sind trotzdem je Karte gleich). Der alte Rahmenpuls
+`foilBorderPulse` auf dem Karten-Element selbst (nur ohne `:has`/`overflow-clip-margin`) liegt außerhalb der Foil-Hüllen und wird nicht
+synchronisiert.
+
 ## Hinweise
 
 * Server: `card-images.js` kennt „Karte hat Bild" jetzt aus `public/cardgen/art.json` (zusätzlich zu

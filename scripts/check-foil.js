@@ -73,4 +73,25 @@ for (const teil of ROHTEILE) {
     process.exit(1);
   }
 }
-console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil), auch für Skin-Holo und Namensglanz.');
+// ── Gleiche Karte = gleicher Foil-Zustand ──
+// Alles Gewürfelte der Foil-Schichten muss aus `foilZufall(<Schlüssel der Karte>)` kommen, nie aus `Math.random()`: sonst sieht
+// jede Kopie einer Karte anders aus und läuft in anderer Phase (Nutzerbefund: der Foil-Zustand springt beim Wechsel zwischen Kopien).
+// Erlaubt ist nur der Standardwert `rnd = Math.random` (ohne Klammern) der Hilfsfunktionen.
+{
+  const q = fs.readFileSync(path.join(PUBLIC, 'app-shared.jsx'), 'utf8');
+  const von = q.indexOf('function foilSamen(');
+  const bis = q.indexOf('\nfunction ppUmrissFarbe(');
+  if (von < 0 || bis < 0) { console.error('[check-foil] Foil-Abschnitt in app-shared.jsx nicht gefunden (foilSamen … ppUmrissFarbe).'); process.exit(1); }
+  const abschnitt = q.slice(von, bis);
+  let n = 0;
+  abschnitt.split('\n').forEach((zeile, i) => {
+    const code = zeile.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+    if (/Math\.random\s*\(/.test(code)) { console.error(`[check-foil] Math.random() im Foil-Abschnitt (app-shared.jsx, Zeile ${q.slice(0, von).split('\n').length + i}): foilZufall(<Kartenschlüssel>) verwenden, sonst unterscheiden sich Kopien derselben Karte.`); n++; }
+  });
+  if (n > 0) process.exit(1);
+  if (!/data-foil-key=\{fkey\}/.test(abschnitt) || (abschnitt.match(/data-foil-key=/g) || []).length < 6) {
+    console.error('[check-foil] Foil-Schichten ohne data-foil-key: die gemeinsame Foil-Uhr (foilUhrStellen) erkennt sie sonst nicht.');
+    process.exit(1);
+  }
+}
+console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil), auch für Skin-Holo und Namensglanz; Zufall nur je Karte, alle Schichten an der Foil-Uhr.');

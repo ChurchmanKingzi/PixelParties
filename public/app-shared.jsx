@@ -4737,6 +4737,92 @@ const DIAMOND_BAND_GRADIENTS = [
   'linear-gradient(to right, transparent 0%, rgba(120,235,245,.06) 12%, rgba(45,175,205,.36) 28%, rgba(120,250,235,.44) 44%, rgba(80,200,255,.36) 60%, rgba(140,245,230,.26) 74%, transparent 100%)',
 ];
 
+// ═══════════════════════════════════════════════════════════════
+//  ★ GLEICHE KARTE = GLEICHER FOIL-ZUSTAND
+//
+//  Bis hierher wuerfelte jede Kopie einer Karte ihre eigene Phase (`Math.random`) UND startete ihre CSS-Animationen erst beim
+//  Einhaengen: wer in der Hand, im Deck-Editor oder im Tooltip zwischen zwei Exemplaren derselben Karte wechselte, sah Glanzband,
+//  Schimmer, Funken und Rahmen jedes Mal an anderer Stelle. Zwei Dinge machen sie jetzt deckungsgleich:
+//   1) Alles Gewuerfelte kommt aus einem Zufallsstrom, der vom Schluessel der Karte abhaengt (`foilZufall`): gleiche Karte =
+//      gleiche Funkenorte, -groessen, Verzoegerungen, Phasen. Verschiedene Karten bleiben verschieden.
+//   2) Eine gemeinsame Uhr (`foilUhrStellen`): jede endlose Animation in einer Foil-Huelle (`data-foil-key`) wird beim Start
+//      auf die Zeitleiste des Dokuments gelegt (`startTime = -Versatz(Schluessel)`), statt auf ihren Einhaengezeitpunkt. Ein neu
+//      eingehaengtes Exemplar (Tooltip, Seitenwechsel, wieder sichtbar gewordene Karte) steht damit sofort in derselben Phase wie
+//      alle anderen — und verschiedene Karten sind um einen festen, vom Schluessel abhaengigen Versatz verschoben, laufen also
+//      nicht im Gleichschritt.
+//  Das aendert die Kosten je Bild nicht (jede Kopie behaelt ihre eigene Compositor-Animation, siehe docs/karten-renderer.md).
+// ═══════════════════════════════════════════════════════════════
+function foilSamen(key) {
+  let h = 2166136261;                                    // FNV-1a
+  const t = String(key);
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+/** Zufallsstrom (mulberry32), der nur vom Schluessel abhaengt: gleicher Schluessel = gleiche Zahlenfolge. */
+function foilZufall(key) {
+  let a = foilSamen(key);
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const FOIL_VERSATZ_MS = 12000;                           // Versatz je Karte: 0 ... 12 s (laengster Takt der Foil-Animationen: 14 s)
+const foilVersatz = key => foilSamen('uhr|' + key) % FOIL_VERSATZ_MS;
+/**
+ * Die endlosen CSS-Animationen der angegebenen Foil-Huellen (Set; null = alle) auf die gemeinsame Uhr legen. Gemessen (40
+ * Foil-Karten, 200 Huellen, 982 Animationen): `huelle.getAnimations({ subtree: true })` kostet je Aufruf rund 1,8 ms (es durch-
+ * sucht jedes Mal alle Animationen des Dokuments = 365 ms zusammen), EIN `document.getAnimations()` rund 30 ms, das Schreiben
+ * aller 982 Startzeiten 2 ms. Darum: einmal alles holen und nach Huelle filtern, erst danach schreiben (ein Schreiben macht die
+ * Animation fuer die naechste Lesung "schmutzig" — Lesen und Schreiben im Wechsel wird quadratisch).
+ */
+function foilUhrStellen(huellen) {
+  const versatz = new Map(), liste = [];
+  for (const a of document.getAnimations()) {
+    if (!(a instanceof CSSAnimation) || a.playState === 'paused') continue;      // angehalten (Dialog): `foilUhrAlle` holt es nach
+    const w = a.effect, ziel = w && w.target;
+    const h = ziel && ziel.closest && ziel.closest('[data-foil-key]');
+    if (!h || (huellen && !huellen.has(h)) || !h.isConnected) continue;
+    if (w.getComputedTiming().iterations !== Infinity) continue;
+    const key = h.getAttribute('data-foil-key');
+    if (!versatz.has(key)) versatz.set(key, -foilVersatz(key));
+    const start = versatz.get(key);
+    if (a.startTime !== start) liste.push([a, start]);
+  }
+  for (const [a, start] of liste) a.startTime = start;
+}
+const foilUhrWartend = new Set();
+let foilUhrGeplant = false;
+function foilUhrMerken(huelle) {
+  foilUhrWartend.add(huelle);
+  if (foilUhrGeplant) return;
+  foilUhrGeplant = true;
+  requestAnimationFrame(() => {                        // ein Durchlauf je Frame, egal wie viele Karten gerade entstanden sind
+    foilUhrGeplant = false;
+    const h = new Set(foilUhrWartend); foilUhrWartend.clear();
+    try { foilUhrStellen(h); } catch (e) { /* Browser ohne Web-Animations-Details: die Kopien laufen dann je nach Einhaengezeit */ }
+  });
+}
+function foilUhrAlle() { foilUhrStellen(null); }
+if (typeof CSSAnimation !== 'undefined' && typeof document.getAnimations === 'function') {
+  // `animationstart` feuert fuer jede (auch neu eingehaengte oder wieder sichtbar gewordene) Animation und sitzt am Dokument:
+  // keine Stelle in den Foil-Schichten muss davon wissen. Der Handler selbst tut fast nichts (eine Huelle vormerken).
+  document.addEventListener('animationstart', e => {
+    const el = e.target;
+    const huelle = el && el.closest && el.closest('[data-foil-key]');
+    if (huelle) foilUhrMerken(huelle);
+  }, true);
+  // Ein offener Karten-Dialog haelt die Hintergrund-Animationen an (style.css `body.pp-dialog-offen`); beim Freigeben ruecken alle
+  // um die Standzeit nach — dann wird die Uhr neu gestellt.
+  let foilDialogWarOffen = false;
+  new MutationObserver(() => {
+    const offen = document.body.classList.contains('pp-dialog-offen');
+    if (foilDialogWarOffen && !offen) requestAnimationFrame(() => requestAnimationFrame(() => { try { foilUhrAlle(); } catch (e) {} }));
+    foilDialogWarOffen = offen;
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+}
+
 // Sparkle positions — secret rare (warm)
 const SPARKLE_POSITIONS = [
   { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
@@ -4805,49 +4891,49 @@ const FOIL_MOTE_COUNT = 6;
  * GLEITET, statt Folie, die blitzt. ★ v1205: dass Diamond ueberhaupt
  * Baender bekommt, ist neu (vorher nur Schimmer und Funken).
  */
-function makeFoilBands(isDiamond) {
+function makeFoilBands(isDiamond, rnd = Math.random) {
   if (!FOIL_DIAGONALGLANZ) return [];   // abgestellt, siehe FOIL_DIAGONALGLANZ
   const palette = isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS;
   const anzahl = isDiamond ? FOIL_DIAMOND_BAND_COUNT : FOIL_BAND_COUNT;
   return Array.from({ length: anzahl }, (_, i) => {
-    const w = isDiamond ? 26 + Math.random() * 30 : 14 + Math.random() * 26;
+    const w = isDiamond ? 26 + rnd() * 30 : 14 + rnd() * 26;
     return {
       w,
-      grad: Math.floor(Math.random() * palette.length),
-      o: isDiamond ? 0.45 + Math.random() * 0.3 : 0.35 + Math.random() * 0.35,
+      grad: Math.floor(rnd() * palette.length),
+      o: isDiamond ? 0.45 + rnd() * 0.3 : 0.35 + rnd() * 0.35,
       // Gestaffelt statt frei gewuerfelt: so kann kein Satz entstehen,
       // in dem alle fuenf fast gleich schnell sind und im Pulk laufen.
-      dur: isDiamond ? 12 + i * 3 + Math.random() * 3
-                     : 7 + i * 3.4 + Math.random() * 1.6,
-      delay: -Math.random() * 12,                    // Phase verwuerfeln
-      rot: isDiamond ? 8 + Math.random() * 8 : 16 + Math.random() * 11,
-      from: -200 - Math.random() * 100,              // in % der BANDbreite
-      to: Math.ceil(10000 / w) + 200 + Math.random() * 100,
+      dur: isDiamond ? 12 + i * 3 + rnd() * 3
+                     : 7 + i * 3.4 + rnd() * 1.6,
+      delay: -rnd() * 12,                    // Phase verwuerfeln
+      rot: isDiamond ? 8 + rnd() * 8 : 16 + rnd() * 11,
+      from: -200 - rnd() * 100,              // in % der BANDbreite
+      to: Math.ceil(10000 / w) + 200 + rnd() * 100,
     };
   });
 }
 
 /** Staubkoerner, die langsam durch das Licht steigen. */
-function makeFoilMotes(isDiamond) {
+function makeFoilMotes(isDiamond, rnd = Math.random) {
   return Array.from({ length: FOIL_MOTE_COUNT }, (_, i) => ({
-    x: 5 + Math.random() * 90,
-    y: 30 + Math.random() * 65,                      // starten unten
+    x: 5 + rnd() * 90,
+    y: 30 + rnd() * 65,                      // starten unten
     color: isDiamond ? (i % 2 ? '#8ff3e4' : '#7fd8f5') : (i % 2 ? '#ffe6a8' : '#ffd0f0'),
-    size: 1.5 + Math.random() * 1.5,
-    dur: 4.5 + Math.random() * 4.5,
-    delay: -Math.random() * 9,
-    dx: -14 + Math.random() * 28,
-    dy: -50 + Math.random() * 32,
-    o: 0.45 + Math.random() * 0.5,
+    size: 1.5 + rnd() * 1.5,
+    dur: 4.5 + rnd() * 4.5,
+    delay: -rnd() * 9,
+    dx: -14 + rnd() * 28,
+    dy: -50 + rnd() * 32,
+    o: 0.45 + rnd() * 0.5,
   }));
 }
 
 /** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
-function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein }) {
+function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein, fkey }) {
   const isDiamond = foilType === 'diamond_rare';
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   return (
-    <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')}>
+    <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')} data-foil-key={fkey}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
              sie ist die Oberflaeche, auf der das Licht der Baender
              etwas zu tun hat. */}
@@ -5031,10 +5117,10 @@ function useEffektHuelle(min) {
   }, []);
   return [ref, breit];
 }
-/** Phase je Karte EINMAL gewuerfelt, sonst laufen alle Karten im Gleichtakt. */
-const usePhase = (key) => useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [key]);
+/** Phase je Karte (nicht je Kopie): aus dem Schluessel der Karte abgeleitet, sonst liefen alle Karten im Gleichtakt und Kopien auseinander. */
+const usePhase = (key) => useMemo(() => (-foilZufall('phase|' + key)() * 12).toFixed(2) + 's', [key]);
 
-function SkinHolo({ skin }) {
+function SkinHolo({ skin, fkey }) {
   const klein = useContext(FoilKleinContext);
   const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => (skin && window.CardRender && window.CardRender.holoCached(skin)) || null);
@@ -5048,11 +5134,12 @@ function SkinHolo({ skin }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [skin, breit, klein]);
-  const phase = usePhase(skin);
+  fkey = fkey || 'skin:' + skin;
+  const phase = usePhase(fkey);
   // Kleinansicht (Piles, Galerien): gar nichts — der goldene Name steckt schon im Kartenbild.
   if (!skin || klein) return null;
   return (
-    <div ref={ref} className="skin-holo" style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+    <div ref={ref} className="skin-holo" data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && (
         <>
           <div className="skin-holo-art">
@@ -5071,7 +5158,7 @@ window.SkinHolo = SkinHolo;
  * Namensglanz der Karten mit Foil (Super Rare = gold, Diamond Rare = tuerkis): dieselbe Schicht wie der Name der
  * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil. In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
-function FoilName({ card, tone }) {
+function FoilName({ card, tone, fkey }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
   useEffect(() => {
@@ -5084,9 +5171,10 @@ function FoilName({ card, tone }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [card?.name, breit]);
-  const phase = usePhase(card?.name);
+  fkey = fkey || 'card:' + (card?.name || '');
+  const phase = usePhase(fkey);
   return (
-    <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+    <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
     </div>
   );
@@ -5097,7 +5185,7 @@ function FoilName({ card, tone }) {
  * Bild (dieselben Schichten wie beim Skin-Holo, ohne Namen; der Namensglanz der Rares kommt von FoilName). Bei Fullarts
  * liegt beides auf der ganzen Flaeche ausser den Textfeldern (hart ausgeschnittene Maske, card-render.js `artMask`).
  */
-function FoilHatch({ card }) {
+function FoilHatch({ card, fkey }) {
   const [ref, breit] = useEffektHuelle(ppIstTouch() ? ppEffektMin() : HATCH_MIN_BREITE);
   const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.hatchCached(card)) || null);
   useEffect(() => {
@@ -5110,9 +5198,10 @@ function FoilHatch({ card }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [card?.name, breit]);
-  const phase = usePhase(card?.name);
+  fkey = fkey || 'card:' + (card?.name || '');
+  const phase = usePhase(fkey);
   return (
-    <div ref={ref} className="skin-holo skin-holo-nur-hatch" style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+    <div ref={ref} className="skin-holo skin-holo-nur-hatch" data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && (
         <div className="skin-holo-art">
           <div className="skin-holo-hatch"><i /></div>
@@ -5128,7 +5217,7 @@ function FoilHatch({ card }) {
  * leuchtet nur auf dem Rahmen auf (Maske = Form des Rahmens, `CardRender.rimFor`; es gibt nur 5 Formen, alle Karten
  * teilen sie). `rim` kommt aus `CardRender.rimKind(card, skin)`.
  */
-function FoilRim({ rim }) {
+function FoilRim({ rim, fkey }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => window.CardRender.rimCached(rim));
   useEffect(() => {
@@ -5141,9 +5230,10 @@ function FoilRim({ rim }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [rim.kind, breit]);
-  const phase = usePhase(rim.kind);
+  fkey = fkey || 'rim:' + rim.kind;
+  const phase = usePhase(fkey);
   return (
-    <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+    <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && <div className="skin-holo-rim"><i /></div>}
     </div>
   );
@@ -5153,29 +5243,33 @@ function CardFoil({ card, foilType, skin }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
-  // Je Karte EINMAL gewuerfelt: Baender, Staub, Schimmerphase und der
-  // Versatz der Funken. `card?.name` im Schluessel, damit ein Tooltip
-  // beim Wechsel auf die naechste Karte nicht deren Takt uebernimmt —
-  // sonst laeuft die zweite Karte synchron zur ersten und der Zufall
-  // sieht wie ein Muster aus.
+  // Je KARTE (nicht je Kopie) gewuerfelt: Baender, Staub, Schimmerphase und der Versatz der Funken kommen aus einem Zufallsstrom,
+  // der vom Schluessel der Karte abhaengt — alle Exemplare derselben Karte (Hand, Deck-Editor, Tooltip ...) sehen gleich aus und
+  // laufen auf der gemeinsamen Foil-Uhr (siehe `foilUhrStellen`); verschiedene Karten unterscheiden sich weiterhin. `klein` aendert
+  // nur, was gezeigt wird (weniger Baender/Funken, kein Staub), nicht die Zahlenfolge davor.
+  const holoSkin = !!skin && skinHoloAktiv();
+  const fkey = holoSkin ? 'skin:' + skin : 'card:' + (card?.name || '');
   const meta = useMemo(() => {
     if (!isFoil) return null;
     const isDiamond = type === 'diamond_rare';
     const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
+    const rnd = foilZufall(fkey + '|' + type);
     return {
-      shimmerOffset: `${-Math.random() * 5000}ms`,
+      shimmerOffset: `${-rnd() * 5000}ms`,
       // Groesse je Funken streuen: ein paar grosse Glanzpunkte zwischen
       // vielen kleinen liest sich als Lichtbrechung, zwoelf gleich
       // grosse Punkte als Raster.
+      // NEGATIVE Verzoegerung = Phase im Takt: ein Exemplar, das spaeter dazukommt, funkelt sofort mit (eine positive Verzoegerung
+      // wuerde es bis zu 4 s warten lassen, waehrend die schon laufenden Kopien funkeln, und die gemeinsame Foil-Uhr greift erst
+      // mit `animationstart`, also nach dieser Wartezeit).
       sparkles: posn.map(sp => ({
-        delay: sp.delay + Math.random() * 2,
-        size: 3 + Math.random() * 4,
+        delay: -(sp.delay + rnd() * 2),
+        size: 3 + rnd() * 4,
       })),
-      bands: makeFoilBands(isDiamond).slice(0, klein ? FOIL_KLEIN_BAENDER[isDiamond ? 'diamond' : 'secret'] : undefined),
-      motes: klein ? [] : makeFoilMotes(isDiamond),
+      bands: makeFoilBands(isDiamond, rnd).slice(0, klein ? FOIL_KLEIN_BAENDER[isDiamond ? 'diamond' : 'secret'] : undefined),
+      motes: klein ? [] : makeFoilMotes(isDiamond, rnd),
     };
-  }, [type, isFoil, card?.name, klein]);
-  const holoSkin = !!skin && skinHoloAktiv();
+  }, [type, isFoil, fkey, klein]);
   // Schraffur: Fullart-Karten sowie Super/Diamond Rares; Rahmenglanz: Gold-/Silber-/Diamant-Rahmen. Beides nur in der
   // grossen Ansicht; die Entscheidung nach Kartentyp und Seltenheit trifft card-render.js.
   const schraffur = !holoSkin && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
@@ -5194,18 +5288,18 @@ function CardFoil({ card, foilType, skin }) {
   return (
     <>
       {ringe && (
-        <div className={'foil-rahmen ' + (type === 'diamond_rare' ? 'foil-rahmen-diamond' : 'foil-rahmen-secret')} aria-hidden="true">
+        <div className={'foil-rahmen ' + (type === 'diamond_rare' ? 'foil-rahmen-diamond' : 'foil-rahmen-secret')} data-foil-key={fkey} aria-hidden="true">
           <i /><i /><i /><i />
         </div>
       )}
       {foilSchicht && (
         <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} />
+          sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} fkey={fkey} />
       )}
-      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} />}
-      {holoSkin && <SkinHolo skin={skin} />}
-      {schraffur && <FoilHatch card={card} />}
-      {rahmen && <FoilRim rim={rahmen} />}
+      {foilSchicht && !klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} fkey={fkey} />}
+      {holoSkin && <SkinHolo skin={skin} fkey={fkey} />}
+      {schraffur && <FoilHatch card={card} fkey={fkey} />}
+      {rahmen && <FoilRim rim={rahmen} fkey={fkey} />}
     </>
   );
 }
