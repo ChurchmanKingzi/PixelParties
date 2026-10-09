@@ -682,6 +682,71 @@
     return draw(spec, art);
   }
 
+  // ═════════════ DAUERHAFTER CACHE (IndexedDB) ═════════════
+  //  Karten entstehen im Browser (siehe oben). Ohne Gedaechtnis muss nach JEDEM Refresh jede sichtbare Karte neu gezeichnet und als
+  //  PNG kodiert werden (gemessen ~35-60 ms je Karte, auf dem Handy ein Vielfaches). Darum heben `card-image-shim.js` und die
+  //  Foil-Funktionen unten ihre fertigen Bilder/Texturen als Blobs in IndexedDB auf und holen sie beim naechsten Besuch zurueck.
+  //
+  //  GUELTIGKEIT: der Server liefert einen Fingerabdruck aller Dateien, aus denen Karten entstehen (`/api/render-version`,
+  //  render-version.js). Weicht der gemerkte Wert vom aktuellen ab, wird der ganze Vorrat verworfen — Updates gelten sofort,
+  //  wie es server.js vorgibt. Ohne Version (Server alt, Fehler) oder ohne IndexedDB (privates Fenster, gesperrt) bleibt alles
+  //  beim Alten: gezeichnet wird dann wie bisher, nur eben jedes Mal.
+  //  GRENZE: hoechstens PC_MAX Byte (alle ~1.200 Karten waeren ~110 MB; gemerkt wird nur, was je angezeigt wurde). Ein
+  //  Schreibfehler (Speicher voll) schaltet das Merken fuer die Sitzung ab.
+  const PC = { db: null, on: false, used: 0, hits: 0, puts: 0, full: 0 };
+  const PC_MAX = 170 * 1048576;
+  const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error); });
+  /** Cache oeffnen; bei neuer Render-Version den alten Vorrat leeren. @returns {Promise<boolean>} true, wenn gemerkt wird */
+  async function openCache(version) {
+    PC.on = false; PC.db = null;
+    if (!version || typeof indexedDB === 'undefined') return false;
+    try {
+      const db = await new Promise((res, rej) => {
+        const r = indexedDB.open('pp-render-cache', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blockiert'));
+      });
+      const old = await idbReq(db.transaction('kv', 'readonly').objectStore('kv').get('__v'));
+      if (old !== version) {
+        const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv');
+        st.clear(); st.put(version, '__v');
+        await idbDone(tx);
+      }
+      PC.db = db; PC.used = 0; PC.on = true;
+      try { const e = await navigator.storage.estimate(); PC.used = e.usage || 0; if (e.quota && e.quota < 64 * 1048576) PC.on = false; } catch (e) { /* ohne Schaetzung: ohne Pruefung */ }
+    } catch (e) { PC.on = false; }
+    return PC.on;
+  }
+  /** Gemerkten Wert holen (Blob, Objekt mit Blobs …) oder null. */
+  function cacheGet(key) {
+    if (!PC.on) return Promise.resolve(null);
+    return new Promise(res => {
+      try {
+        const r = PC.db.transaction('kv', 'readonly').objectStore('kv').get(key);
+        r.onsuccess = () => { if (r.result != null) PC.hits++; res(r.result == null ? null : r.result); };
+        r.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+  }
+  /** Wert merken (ohne zu warten). `size` = grobe Groesse in Byte fuer die Obergrenze. */
+  function cachePut(key, val, size) {
+    if (!PC.on) return;
+    size = size || 0;
+    if (PC.used + size > PC_MAX) { PC.full++; return; }
+    try {
+      const tx = PC.db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(val, key);
+      tx.onabort = tx.onerror = () => { PC.used -= size; if (tx.error && /quota/i.test(tx.error.name + ' ' + tx.error.message)) PC.on = false; };
+      PC.used += size; PC.puts++;
+    } catch (e) { PC.on = false; }
+  }
+  function cacheDel(key) {
+    if (!PC.on) return;
+    try { PC.db.transaction('kv', 'readwrite').objectStore('kv').delete(key); } catch (e) { /* egal */ }
+  }
+  function cacheStats() { return { on: PC.on, hits: PC.hits, puts: PC.puts, voll: PC.full, belegtMB: +(PC.used / 1048576).toFixed(1) }; }
+
   // ═════════════ HOLO FUER SKINS UND FOIL-NAMEN ═════════════
   //  Skin-Karten bekommen ein eigenes Foil, das NUR Kunst und Namen betrifft (Rahmen, Werte und Text bleiben
   //  ruhig). Der Name steht golden auf der Karte; Super Rare und Diamond Rare tragen denselben Namensglanz.
@@ -705,11 +770,13 @@
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
   const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 
+  /** Telefon im Querformat (Lite, wie in style.css)? Dann rechnen die Texturen in halber Aufloesung (und werden so gemerkt). */
+  const holoLite = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
   /** Geometrie je Kartentyp: Bildfeld (Kartenpixel), Rahmenmaske, Namenszeile */
   function holoGeometry(type) {
     const full = isFullart(type);
     // Telefone (Lite-Modus, wie in style.css): halbe Textur-Aufloesung
-    const lite = typeof matchMedia === 'function' && matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
+    const lite = holoLite();
     return {
       box: full ? [0, 0, W, H] : [70, 170, 610, 400],
       maskKey: type === 'superhero' ? 'mask.hero' : type === 'fullartHero' ? 'mask.fullart' : 'mask.art',
@@ -809,7 +876,8 @@
   const holoWait = new Map();        // Skin -> Promise (in Arbeit)
   const nameDone = new Map();        // Kartenname -> { vars, urls }
   let holoChain = Promise.resolve();
-  const toUrl = cv => new Promise(res => cv.toBlob(b => res(b ? URL.createObjectURL(b) : null), 'image/png'));
+  const toBlob = cv => new Promise(res => cv.toBlob(b => res(b || null), 'image/png'));
+  const urlOf = b => URL.createObjectURL(b);
   const pc = (v, t) => (v / t * 100) + '%';
   function lru(map, key, val, max) {
     map.set(key, val);
@@ -829,11 +897,18 @@
     if (holoWait.has(skin)) return holoWait.get(skin);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const L = await holoLayers(card, { skin });
-      if (!L) return null;
-      const [all, name] = await Promise.all([L.all, L.nameMask].map(toUrl));
-      if (!all || !name) return null;
-      const b = L.box, s = L.nameStrip;
+      // Dauerhafter Cache: Texturen aus einem frueheren Besuch (gleiche Render-Version) statt neu zu rechnen
+      const ck = 'h:' + skin + (holoLite() ? ':l' : '');
+      let rec = await cacheGet(ck);
+      if (!(rec && rec.all instanceof Blob && rec.name instanceof Blob && rec.box && rec.strip)) {
+        const L = await holoLayers(card, { skin });
+        if (!L) return null;
+        const [all, name] = await Promise.all([L.all, L.nameMask].map(toBlob));
+        if (!all || !name) return null;
+        rec = { all, name, box: L.box, strip: L.nameStrip };
+        cachePut(ck, rec, all.size + name.size);
+      }
+      const all = urlOf(rec.all), name = urlOf(rec.name), b = rec.box, s = rec.strip;
       return lru(holoDone, skin, {
         vars: {
           '--sh-ax': pc(b[0], W), '--sh-ay': pc(b[1], H), '--sh-aw': pc(b[2], W), '--sh-ah': pc(b[3], H),
@@ -872,11 +947,17 @@
     if (holoWait.has(key)) return holoWait.get(key);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const L = await holoLayers(card, {});
-      if (!L) return null;
-      const all = await toUrl(L.all);
-      if (!all) return null;
-      const b = L.box;
+      const ck = 'a:' + card.name + (holoLite() ? ':l' : '');
+      let rec = await cacheGet(ck);
+      if (!(rec && rec.all instanceof Blob && rec.box)) {
+        const L = await holoLayers(card, {});
+        if (!L) return null;
+        const all = await toBlob(L.all);
+        if (!all) return null;
+        rec = { all, box: L.box };
+        cachePut(ck, rec, all.size);
+      }
+      const all = urlOf(rec.all), b = rec.box;
       return lru(hatchDone, card.name, {
         vars: { '--sh-ax': pc(b[0], W), '--sh-ay': pc(b[1], H), '--sh-aw': pc(b[2], W), '--sh-ah': pc(b[3], H), '--sh-all': 'url(' + all + ')' },
         urls: [all],
@@ -918,13 +999,19 @@
     if (rimWait.has(rk.kind)) return rimWait.get(rk.kind);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const full = document.createElement('canvas'); full.width = W; full.height = H;
-      drawRim(full.getContext('2d'), { type: rk.type, rarity: rk.rarity });
-      const half = document.createElement('canvas'); half.width = W / 2; half.height = H / 2;
-      const g = half.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-      g.drawImage(full, 0, 0, W / 2, H / 2);
-      const url = await toUrl(half);
-      if (!url) return null;
+      const ck = 'r:' + rk.kind;
+      let png = await cacheGet(ck);
+      if (!(png instanceof Blob)) {
+        const full = document.createElement('canvas'); full.width = W; full.height = H;
+        drawRim(full.getContext('2d'), { type: rk.type, rarity: rk.rarity });
+        const half = document.createElement('canvas'); half.width = W / 2; half.height = H / 2;
+        const g = half.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+        g.drawImage(full, 0, 0, W / 2, H / 2);
+        png = await toBlob(half);
+        if (!png) return null;
+        cachePut(ck, png, png.size);
+      }
+      const url = urlOf(png);
       const out = { vars: { '--sh-rim': 'url(' + url + ')' }, urls: [url] };
       rimDone.set(rk.kind, out);
       return out;
@@ -945,10 +1032,17 @@
     if (holoWait.has(key)) return holoWait.get(key);
     const job = holoChain.then(async () => {
       await new Promise(r => setTimeout(r, 0));
-      const L = nameLayer(card), url = await toUrl(L.nameMask);
-      if (!url) return null;
+      const ck = 'n:' + card.name;
+      let rec = await cacheGet(ck);
+      if (!(rec && rec.name instanceof Blob && rec.strip)) {
+        const L = nameLayer(card), name = await toBlob(L.nameMask);
+        if (!name) return null;
+        rec = { name, strip: L.nameStrip };
+        cachePut(ck, rec, name.size);
+      }
+      const url = urlOf(rec.name), strip = rec.strip;
       return lru(nameDone, card.name, {
-        vars: { '--sh-ny': pc(L.nameStrip.y, H), '--sh-nh': pc(L.nameStrip.h, H), '--sh-name': 'url(' + url + ')' },
+        vars: { '--sh-ny': pc(strip.y, H), '--sh-nh': pc(strip.h, H), '--sh-name': 'url(' + url + ')' },
         urls: [url],
       }, NAME_MAX);
     }).catch(err => { console.warn('[card-render] Namensglanz', card.name, err && err.message); return null; })
@@ -958,5 +1052,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
 })(typeof window !== 'undefined' ? window : globalThis);

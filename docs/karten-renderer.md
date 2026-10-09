@@ -196,6 +196,31 @@ Neue Karte: Motiv im nativen Raster als `data/card-art/native/<id>.png` ablegen,
 (Standard: häufig, Rahmen passend zum Kartentyp aus `cards.json`). Neuer Skin: dasselbe mit dem
 Schlüssel `skin/<Skinname>`; der Name muss in `data/skins.json` stehen.
 
+## Dauerhafter Cache (IndexedDB)
+
+Karten entstehen im Browser. Ohne Gedächtnis müsste nach **jedem Refresh** jede sichtbare Karte neu gezeichnet und als PNG
+kodiert werden (gemessen ~37 ms je Karte auf dem Desktop, auf dem Handy ein Vielfaches). Der Karten-Cache im Shim
+(`cache`, LRU 400) lebt nur im Arbeitsspeicher; darum heben `card-image-shim.js` und die Foil-Funktionen ihre fertigen
+Bilder/Texturen zusätzlich dauerhaft in IndexedDB (`pp-render-cache`, Store `kv`) auf und holen sie beim nächsten Besuch zurück.
+
+* **Was:** jede gezeichnete Karte (`c:<id>`, PNG-Blob, im Mittel 96 KB), die Skin-Maske samt Namensumriss (`h:<Skin>`), Schraffur-
+  Masken (`a:<Karte>`), Namensumrisse der Rares (`n:<Karte>`) und die Rahmenmasken (`r:<Art>`). Lite-Geräte merken ihre halbaufgelösten
+  Texturen unter eigenem Schlüssel (`:l`).
+* **Gültigkeit:** `/api/render-version` (server.js, `render-version.js`) liefert einen **Inhalts**-Fingerabdruck von `card-render.js`,
+  `card-image-shim.js`, Sprites, Schrift, Kunst-Atlas (samt Einzelbildern), `cards.json`, `card-render.json` und `skins.json`.
+  Weicht der im Browser gemerkte Wert ab, wird der ganze Vorrat geleert — ein Update gilt sofort für alle (Vorgabe in server.js).
+  Inhalt statt Zeitstempel, damit ein Deploy ohne Änderung den Cache nicht entwertet; je Datei wird nur neu gehasht, wenn sich Zeit
+  oder Größe ändern (kalt ~50 ms, danach ~1 ms).
+* **Grenzen und Rückfall:** höchstens 170 MB (`PC_MAX`; alle ~1.190 Karten wären ~112 MB, gemerkt wird nur, was je angezeigt wurde);
+  Schreibfehler/„Speicher voll“ schalten das Merken für die Sitzung ab; ohne Version, ohne IndexedDB (privates Fenster, gesperrt) oder
+  bei Quote < 64 MB bleibt alles beim Alten (jedes Mal zeichnen). Ein beschädigter Eintrag (nicht dekodierbar) wird beim `error` der
+  Karte verworfen und die Karte neu gezeichnet (`CardImageShim.stats.recovered`).
+* **Messung** (Headless-Chromium, 60 Karten, derselbe Browser-Kontext): kalt 2.205 ms (36,8 ms/Karte), Refresh 309 ms (5,1 ms/Karte),
+  alle 60 aus dem Cache, 0 neu geschrieben. Gecachte Karten sind pixelgleich mit frisch gezeichneten (6 Karten, 18,9 Mio. Werte, 0 Abweichungen).
+  `CardImageShim.cacheStats()` zeigt Treffer, Schreibvorgänge und Belegung.
+* **Dateien** (Rahmen, Schrift, Atlas, Daten) werden unverändert bei jedem Aufruf per ETag nachgefragt (`maxAge: 0`, 304 ohne Inhalt):
+  das ist die bindende Vorgabe „Updates sofort“ aus server.js und kostet nur Anfragen, keine Zeichenarbeit.
+
 ## Hinweise
 
 * Server: `card-images.js` kennt „Karte hat Bild" jetzt aus `public/cardgen/art.json` (zusätzlich zu

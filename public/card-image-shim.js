@@ -11,7 +11,9 @@
 //  `img.src` liefert weiterhin die Karten-URL zurück.
 //
 //  Ablauf je Bild: Quelle -> Karte bestimmen (cards.json / skins.json) ->
-//  Canvas -> PNG-Blob -> `blob:`-URL (gemerkt, 400 Stück). Bilder im sichtbaren
+//  [dauerhafter Cache: IndexedDB, siehe CardRender.openCache] -> Canvas -> PNG-Blob -> `blob:`-URL (gemerkt, 400 Stück).
+//  Eine einmal gezeichnete Karte wird dauerhaft aufgehoben und beim naechsten Besuch (Refresh!) aus dem Speicher geholt statt
+//  neu gezeichnet; ein neuer Stand der Dateien (render-version.js) verwirft den Vorrat. Bilder im sichtbaren
 //  Bereich werden zuerst gerendert, solche weit außerhalb erst beim Scrollen.
 //  Gibt es zu einer Quelle keine Kunst im Atlas (oder fehlt Path2D/Canvas), wird die
 //  ursprüngliche URL ganz normal vom Server geladen.
@@ -45,12 +47,15 @@
   function boot() {
     if (ready) return ready;
     ready = (async () => {
-      const [cards] = await Promise.all([
+      const [cards, version] = await Promise.all([
         fetch('/data/cards.json').then(r => r.json()),
+        // Fingerabdruck aller Dateien, aus denen Karten entstehen (render-version.js): gilt als Schluessel des dauerhaften Caches
+        fetch('/api/render-version', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(j => (j && j.v) || null).catch(() => null),
         CardRender.init({ base: '/cardgen/' }),
         CardRender.loadMeta('/data/card-render.json'),
         CardRender.loadArtIndex(),
       ]);
+      await CardRender.openCache(version);     // ohne Version oder ohne IndexedDB: false, dann wird wie bisher jedes Mal gezeichnet
       cardsByName = Object.create(null);
       cardByStem = Object.create(null);
       for (const c of cards) {
@@ -123,10 +128,21 @@
     const p = (async () => {
       const r = resolve(m);
       if (!r) return null;
+      // Dauerhafter Cache: die Karte aus einem frueheren Besuch (gleiche Render-Version) statt neu zu zeichnen
+      const key = 'c:' + m.id;
+      const hit = await CardRender.cacheGet(key);
+      if (hit instanceof Blob) {
+        stats.persisted++;
+        const url = URL.createObjectURL(hit);
+        fromStore.add(url);
+        remember(m.id, url);
+        return url;
+      }
       const cv = await CardRender.renderCard(r.card, r.skin ? { skin: r.skin } : null);
       if (!cv) return null;
       const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
       if (!blob) return null;
+      CardRender.cachePut(key, blob, blob.size);          // fuer den naechsten Besuch (ohne zu warten)
       const url = URL.createObjectURL(blob);
       remember(m.id, url);
       return url;
@@ -140,7 +156,8 @@
   // Drei Stufen: sichtbare Bilder zuerst, dann `new Image()` (Animationen warten auf onload), zuletzt solche,
   // die nur in der Naehe des Bildschirms liegen. Drei Arbeiter ueberlappen Zeichnen (Hauptthread) und
   // PNG-Kodierung (im Hintergrund); zwischen zwei Karten bekommt die Oberflaeche Luft.
-  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0 };
+  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0, persisted: 0, recovered: 0 };
+  const fromStore = new Set();       // blob:-URLs, die aus dem dauerhaften Cache stammen (zum Erkennen kaputter Eintraege)
   const queues = [[], [], []];
   let workers = 0;
   const WORKERS = 3;
@@ -156,6 +173,15 @@
       if (job.img.__cardTok !== job.tok) { stats.stale++; continue; }
       if (url) stats.applied++; else stats.fallback++;
       setReal(job.img, url || job.orig);                                  // ohne Kunst: ganz normal die Datei vom Server
+      // Ein gemerkter Eintrag, der sich nicht dekodieren laesst (beschaedigt), wird verworfen und die Karte neu gezeichnet
+      if (url && fromStore.has(url)) job.img.addEventListener('error', () => {
+        if (protoDesc.get.call(job.img) !== url) return;                  // inzwischen ein anderes Bild
+        stats.recovered++;
+        CardRender.cacheDel('c:' + job.m.id);
+        const alt = cache.get(job.m.id); if (alt === url) cache.delete(job.m.id);
+        fromStore.delete(url);
+        handle(job.img, job.orig);
+      }, { once: true });
       await new Promise(r => setTimeout(r, 0));
     }
   }
@@ -259,6 +285,6 @@
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
   // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
   async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
-  window.CardImageShim = { boot, skinBase, parse, cacheSize: () => cache.size, stats, queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  window.CardImageShim = { boot, skinBase, parse, cacheSize: () => cache.size, stats, cacheStats: () => CardRender.cacheStats(), queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();
