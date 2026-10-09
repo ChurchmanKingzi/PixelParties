@@ -61,6 +61,7 @@ THEMES = [
 HERO_TITLES = {
     'chaosdiamond': ('Chaos-Diamond, the Cracked Keeper', 'Critical Meltdown'),
     'bubbles': ('Bubbles, the Bouncy Bunny', 'Big Bunny Bounce'),
+    'damus': ('Damus, the Prophet of Apocalypse', 'The Hour of Ashes'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
