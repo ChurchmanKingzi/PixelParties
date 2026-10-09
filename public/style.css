@@ -25689,7 +25689,13 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
    `--sh-nh`); SkinHolo / FoilName (app-shared.jsx) setzen sie.
 
    Bau: Alles Bewegte laeuft per `transform` UNTER statischen Masken (so haelt
-   der Compositor es allein, wie bei den Foil-Baendern, v1403):
+   der Compositor es allein, wie bei den Foil-Baendern, v1403). Bewusst OHNE
+   `mix-blend-mode`: die Huelle `.skin-holo` ist ein Stacking-Kontext, die Blends
+   wirkten nur in eine leere Gruppe (gemessen: Bild pixelgleich) — kosteten aber je
+   Schicht eine zusaetzliche Offscreen-Flaeche.
+   PERFORMANCE: die Schichten werden erst ab 120 px Kartenbreite (Touch: 240 px)
+   angelegt, halten ausserhalb des Bildschirms an (`.sh-ausserhalb`), und auf
+   Touch-Geraeten steht der wandernde Regenbogen still (siehe unten).
      • Schraffur  — feine Schraegstriche ueber dem Bild (Maske aus
                     `repeating-linear-gradient`, Breite in `cqw`: waechst mit
                     der Karte, geschnitten mit `--sh-all`), darunter ein
@@ -25701,8 +25707,8 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
                     Hauch wandernder Pastellfarben und ein weisser Glanz, der
                     noch oefter laeuft, beides durch die Buchstabenmaske
                     beschnitten.
-   Kleinansicht (FoilKleinContext, Pile/Galerie): nur der ruhige Name, keine
-   Schraffur, kein Glanz. Telefone (Lite) und „Play Animations: aus" zeigen
+   Kleinansicht (FoilKleinContext, Pile/Galerie): nichts (der goldene Name steckt
+   im Kartenbild). Telefone (Lite) und „Play Animations: aus" zeigen
    die Schraffur still, ohne Glanz.
    ═══════════════════════════════════════════════════════════════════ */
 .skin-holo {
@@ -25719,7 +25725,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
    helleren Flaechen liegen — dunkle Umrisse und Schatten bleiben unberuehrt. */
 .skin-holo-hatch {
   position: absolute; inset: 0; overflow: hidden;
-  mix-blend-mode: overlay; opacity: .5;
+  opacity: .5;
   -webkit-mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw), var(--sh-all);
   mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw), var(--sh-all);
   -webkit-mask-size: 100% 100%, 100% 100%; mask-size: 100% 100%, 100% 100%;
@@ -25737,7 +25743,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 
 /* Glanzband: alle ~2 s ein Durchgang (vorher 5,5 s); der Durchgang belegt den groesseren Teil des Takts. */
 .skin-holo-glint {
-  position: absolute; inset: 0; mix-blend-mode: screen;
+  position: absolute; inset: 0;
   -webkit-mask-image: var(--sh-all); mask-image: var(--sh-all);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
 }
@@ -25758,7 +25764,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   position: absolute; left: 0; width: 100%; top: var(--sh-ny); height: var(--sh-nh);
   -webkit-mask-image: var(--sh-name); mask-image: var(--sh-name);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
-  overflow: hidden; mix-blend-mode: screen;
+  overflow: hidden;
 }
 /* Gold bleibt der Grundton; Pastellrosa, Eisblau, Mint und Perlmutt wandern nur als Hauch hindurch. */
 .skin-holo-name .sh-rb {
@@ -25796,7 +25802,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .foil-rim-silver  { --rim-rgb: 205, 220, 240; --rim-hi: 255, 255, 255; }
 .foil-rim-diamond { --rim-rgb: 120, 240, 236; --rim-hi: 222, 255, 255; }
 .skin-holo-rim {
-  position: absolute; inset: 0; mix-blend-mode: screen;
+  position: absolute; inset: 0;
   -webkit-mask-image: var(--sh-rim); mask-image: var(--sh-rim);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
 }
@@ -25813,8 +25819,24 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   75%, 100% { transform: translateX(380%) skewX(-20deg); }
 }
 
-/* Kleinansicht: nur der ruhige Name (Schraffur und Glanz sind gar nicht erst im DOM). */
-.skin-holo-klein .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
+/* Mittelgrosse Karten (Galerien, Deck-Editor; < 300 px breit): der wandernde Regenbogen der Schraffur und das Farbwandern des
+   Namens stehen still — gemessen kostete jede dieser Dauerbewegungen eine eigene Ebene je Karte (Desktop-Profil, sechs
+   Karten a 210 px: 38 -> 25 fps mit allem aktiv). Es animieren nur die drei Glanzdurchlaeufe (Bild, Rahmen, Name); die vollen
+   Verlaeufe laufen nur auf grossen Karten (Tooltip, Grossansichten). */
+@container (max-width: 299px) {
+  .skin-holo-hatch i { animation: none; will-change: auto; }
+  .skin-holo-name .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
+}
+
+/* Karte ausserhalb des Bildschirms (IntersectionObserver, app-shared `useEffektHuelle`): Schichten weg, nichts laeuft. */
+.skin-holo.sh-ausserhalb > * { display: none; }
+
+/* Touch-Geraete (auch Telefone im Hochformat, die nicht unter die Lite-Regel fallen): der wandernde Regenbogen der
+   Schraffur und das Farbwandern des Namens stehen still — die Glanzdurchlaeufe bleiben (nur auf grossen Karten, s. o.). */
+@media (pointer: coarse) {
+  .skin-holo-hatch i { animation: none; will-change: auto; }
+  .skin-holo-name .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
+}
 
 /* Telefone (Lite): Schraffur steht still, kein Glanz — Glanz, Regenbogen und Namensglanz sind je ein Layer mit Blend-Modus. */
 @media (pointer: coarse) and (max-height: 600px) {
