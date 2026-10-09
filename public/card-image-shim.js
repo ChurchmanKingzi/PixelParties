@@ -140,7 +140,7 @@
       }
       const cv = await CardRender.renderCard(r.card, r.skin ? { skin: r.skin } : null);
       if (!cv) return null;
-      const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+      const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
       CardRender.cachePut(key, blob, blob.size);          // fuer den naechsten Besuch (ohne zu warten)
       const url = URL.createObjectURL(blob);
@@ -153,12 +153,13 @@
   }
 
   // ── Warteschlange ──
-  // Drei Stufen: sichtbare Bilder zuerst, dann `new Image()` (Animationen warten auf onload), zuletzt solche,
-  // die nur in der Naehe des Bildschirms liegen. Drei Arbeiter ueberlappen Zeichnen (Hauptthread) und
+  // Vier Stufen: sichtbare Bilder zuerst, dann `new Image()` (Animationen warten auf onload), dann solche, die nur in der
+  // Naehe des Bildschirms liegen, ganz zuletzt reine DEKORATION (`data-card-low`, z. B. die Kartenwand des Hauptmenues): sie
+  // darf nie die Karten aufhalten, die jemand gerade ansehen will. Drei Arbeiter ueberlappen Zeichnen (Hauptthread) und
   // PNG-Kodierung (im Hintergrund); zwischen zwei Karten bekommt die Oberflaeche Luft.
-  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0, persisted: 0, recovered: 0 };
+  const stats = { handled: 0, enqueued: 0, applied: 0, stale: 0, fallback: 0, renderMs: 0, renders: 0, persisted: 0, recovered: 0, dropped: 0 };
   const fromStore = new Set();       // blob:-URLs, die aus dem dauerhaften Cache stammen (zum Erkennen kaputter Eintraege)
-  const queues = [[], [], []];
+  const queues = [[], [], [], []];     // 0 sichtbar, 1 `new Image()`, 2 in der Naehe/Leerlauf, 3 Dekoration (`data-card-low`)
   let workers = 0;
   const WORKERS = 3;
   function enqueue(job, tier) { if (job.queued) return; job.queued = true; stats.enqueued++; queues[tier].push(job); while (workers < WORKERS) { workers++; work().finally(() => { workers--; }); } }
@@ -167,6 +168,9 @@
     await boot();
     for (let job; (job = nextJob());) {
       if (job.img.__cardTok !== job.tok) { stats.stale++; continue; }       // inzwischen anderes Bild
+      // Das Bild steht gar nicht mehr in der Seite (z. B. das Hauptmenue wurde verlassen): nicht zeichnen. Kommt es wieder in
+      // die Seite, holt der MutationObserver unten den Auftrag nach. `new Image()` hat nie einen Platz in der Seite.
+      if (!job.img.__viaCtor && !job.img.isConnected) { job.img.__cardDropped = true; job.queued = false; stats.dropped++; continue; }
       const t0 = performance.now();
       const url = failed ? null : await blobFor(job.m);
       stats.renders++; stats.renderMs += performance.now() - t0;
@@ -195,7 +199,7 @@
       if (!job || e.target.__cardTok !== job.tok) continue;
       const r = e.boundingClientRect;
       const visible = r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
-      enqueue(job, visible ? 0 : 2);
+      enqueue(job, job.low ? 3 : visible ? 0 : 2);
     }
   }, { rootMargin: '700px' }) : null;
 
@@ -213,7 +217,7 @@
         const img = job.img;
         if (job.queued || img.__cardTok !== job.tok || !img.isConnected) return;
         io.unobserve(img);
-        enqueue(job, 2);
+        enqueue(job, job.low ? 3 : 2);
       };
       if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 4000 }); else run();
     }, 1200);
@@ -221,8 +225,9 @@
   function place(job, tries) {
     const img = job.img;
     if (img.__cardTok !== job.tok) return;
+    job.low = img.hasAttribute('data-card-low');
     if (io && img.isConnected) { io.observe(img); vorrendern(job); return; }
-    if (img.__viaCtor || tries > 90 || !io) { enqueue(job, 1); return; }
+    if (img.__viaCtor || tries > 90 || !io) { enqueue(job, job.low ? 3 : 1); return; }
     requestAnimationFrame(() => place(job, tries + 1));
   }
   function handle(img, value) {
@@ -265,6 +270,7 @@
   // Überschreibungen oben. Sobald so ein Bild in die Seite kommt, übernehmen wir es nachträglich; die schon
   // angestoßene Anfrage wird durch die neue Quelle verworfen.
   function adopt(img) {
+    if (img.__cardDropped) { img.__cardDropped = false; if (img.__cardOrig != null) handle(img, img.__cardOrig); return; }   // wieder in der Seite: Auftrag nachholen
     if (img.__cardOrig != null) return;
     const src = nativeGetAttr.call(img, 'src');
     if (!src || src.charCodeAt(0) === 98 /* b */ || src.charCodeAt(0) === 100 /* d */) return;    // blob: / data:

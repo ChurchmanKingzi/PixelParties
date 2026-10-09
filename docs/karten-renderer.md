@@ -221,6 +221,37 @@ Bilder/Texturen zusätzlich dauerhaft in IndexedDB (`pp-render-cache`, Store `kv
 * **Dateien** (Rahmen, Schrift, Atlas, Daten) werden unverändert bei jedem Aufruf per ETag nachgefragt (`maxAge: 0`, 304 ohne Inhalt):
   das ist die bindende Vorgabe „Updates sofort“ aus server.js und kostet nur Anfragen, keine Zeichenarbeit.
 
+### Warum F5 trotz Cache langsam sein konnte (im echten Spiel gemessen)
+
+Der Cache allein reichte nicht; drei Dinge standen davor:
+
+1. **Zufällige Kartenwand im Hauptmenü** (`MenuCardBackground`, `app-screens.jsx`): jeder Besuch zog ~70 *andere* zufällige Karten
+   (je Kachel doppelt im DOM = ~140 `<img>`) — fast alle nie gecacht, ~164 Zeichnungen je F5, die vor den Deck-Editor-Karten in der
+   Warteschlange standen. Jetzt gibt es einen **Tages-Pool** (`MENU_BG_POOL = 90`, mit dem Datum als Samen gemischt): dieselben
+   Karten den ganzen Tag, nach dem ersten Besuch kommt die Wand komplett aus dem Cache.
+2. **Dekoration darf nichts aufhalten:** Bilder mit `data-card-low` laufen in der eigenen Stufe 3 der Warteschlange, hinter allem,
+   was jemand ansehen will. Aufträge für Bilder, die nicht mehr in der Seite stehen (Menü verlassen), werden übersprungen
+   (`stats.dropped`) und beim Wiedereinhängen vom MutationObserver (`adopt`) nachgeholt.
+3. **PNG-Kodierung im Worker:** `canvas.toBlob` kodiert im Leerlauf des Hauptthreads. Auf einer belebten Seite (Menü-Animation)
+   dauerte das 1–6,7 s je Karte (Ø 2,7 s), und weil der Arbeiter während dessen seinen Platz hielt, blockierten drei solcher
+   Kodierungen **alle** Arbeiter — auch die für sichtbare Karten. `CardRender.toBlob` kodiert jetzt in einem Web Worker
+   (`createImageBitmap` → `OffscreenCanvas.convertToBlob`): Ø 20–33 ms je Karte, pixelgleich zum Hauptthread-Ergebnis
+   (30 Karten, 94,5 Mio. Werte, 0 Abweichungen, gleiche Dateigröße). Ohne Worker/OffscreenCanvas fällt jede Karte auf
+   `canvas.toBlob` zurück; nach drei Fehlschlägen wird der Worker abgeschaltet. Gilt für alle Aufrufer (Karten, Skin-Masken,
+   Schraffur, Namensumrisse, Rahmen).
+
+Messung im echten Spiel (Headless-Chromium ohne GPU, also pessimistisch; Anmeldung → F5 → Deck Editor öffnen):
+
+| | erste Karte sichtbar | alle 16 sichtbaren |
+|---|---|---|
+| Cache an, aber Zufallswand im Menü | 7,5–10,7 s | — |
+| + Tages-Pool und Stufe 3 | 0,9–1,2 s | — |
+| + Kodierung im Worker (F5, Cache warm) | 0,4–0,7 s | 0,6–0,9 s |
+
+Die Kartenwand im Menü ist nach F5 (kalter Cache, 90 Karten rendern + kodieren) nach ~5 s vollständig, bei warmem Cache und
+nach dem Zurückwechseln aus dem Deck Editor nach ~2,5–3,5 s (darin stecken 1,2 s Wartezeit des Vorrenderns). Der Rest der
+Verzögerung beim Öffnen des Deck Editors ist Stil-/Paint-Arbeit des Browsers, nicht die Kartenerzeugung (JS ~50 ms).
+
 ## Hinweise
 
 * Server: `card-images.js` kennt „Karte hat Bild" jetzt aus `public/cardgen/art.json` (zusätzlich zu
