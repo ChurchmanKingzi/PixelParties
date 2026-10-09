@@ -8528,7 +8528,12 @@ const TUTORIAL_SCRIPTS = {
     intro: [
       { text: 'Heya! Welcome to the battlefield!' },
       { text: "I'm Monia Bot, the coolest Bot there is, beep-boop!\nI'll show you the ropes and make you a Pixel-Powerhouse!" },
-      { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!" },
+      // ── Highlight (NUR diese Box): Beato und die beiden leeren gegnerischen Heldenzonen ──
+      { text: "Let's start with the basics:\nTo win a game of Pixel Parties, you must defeat all of your opponent's Heroes!",
+        highlights: [
+          '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
+          '[data-hero-zone][data-hero-owner="opp"][data-hero-name=""]',
+        ] },
       { text: 'To do that, you deal damage to them until their HP drop to 0. You usually use {red:**Attacks, Spells**} **and** {green:**Creatures**} for that!' },
       // ── Highlight: Beato und Magic Hammer ──
       { text: "Let's try hitting my {purple:**Beato**} with the big, strong {red:**Magic Hammer**} Spell in your hand!",
@@ -8541,11 +8546,10 @@ const TUTORIAL_SCRIPTS = {
           '[data-hero-owner="opp"][data-hero-name="Beato, the Butterfly Witch"]',
           '.game-hand-me [data-card-name="Magic Hammer"]',
         ] },
-      // ── Highlight: Magic Hammer und Destruction Magic (auf Ida) ──
+      // ── Highlight: NUR Magic Hammer; Destruction Magic (auf Ida) kommt in der naechsten Box dazu ──
       { text: "See the number **3** on your Magic Hammer? That's its level. So you need a Hero that can use Spells with level 3!",
         highlights: [
           '.game-hand-me [data-card-name="Magic Hammer"]',
-          '[data-ability-owner="me"][data-card-name="Destruction Magic"]',
         ] },
       { text: 'And see your Ida? She has {#88ccee:**Destruction Magic**}, so she CAN use **Destruction Spells** like Magic Hammer - but her Ability is only at level 2. She only has 2 copies of it attached to her.',
         highlights: [
