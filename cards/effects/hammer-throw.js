@@ -4,10 +4,13 @@
 //
 //  Deal damage equal to attacker's ATK stat.
 //  If the attack is not negated, the target's
-//  controller is Itemlocked (cannot use
-//  Artifacts from hand) for the rest of their
-//  next turn.
-//  Does NOT apply on Turn 1.
+//  controller is Itemlocked for their next
+//  turn: whenever they play an Artifact, they
+//  must delete a card from their hand
+//  ("Item Lock Cost", server.js).
+//  A player can only be affected every other
+//  turn. Not applied on Turn 1 (the card text
+//  no longer mentions it).
 //
 //  Animation: spinning hammer projectile →
 //  impact slash on target.
