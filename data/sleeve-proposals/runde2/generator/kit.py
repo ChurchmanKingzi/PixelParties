@@ -27,6 +27,17 @@ def raw(name):
 
 @functools.lru_cache(None)
 def _nat(name):
+    # Seit die Kartenbilder nicht mehr als ganze Karten in cards/ liegen, gibt es die Kartenkunst direkt in
+    # Originalpixeln unter data/card-art/native/<id>.png (Zuordnung Name → id in data/card-art/index.json).
+    art = os.path.join(ROOT, 'data', 'card-art')
+    try:
+        import json
+        e = json.load(open(os.path.join(art, 'index.json'), encoding='utf-8')).get(name)
+        p = os.path.join(art, 'native', e['id'] + '.png') if e else None
+        if p and os.path.exists(p):
+            return np.array(Image.open(p).convert('RGB'))
+    except (OSError, ValueError, KeyError):
+        pass
     a, info = pp.native2(name)
     return a
 
