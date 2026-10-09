@@ -316,7 +316,7 @@ function PpfHeroCard({ card, skins, onTip }) {
         ppfSfx('ui_click', { dedupe: 60 });
         if (touch()) onTip(t => (t && t.card === card ? null : { card, imageUrl }));
       }}>
-      {CardFoil && <CardFoil card={card} />}
+      {CardFoil && <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imageUrl) : null} />}
       {imageUrl
         ? <img src={imageUrl} alt={card.name} draggable={false} />
         : <div className="ppf-card-name">{card.name}</div>}

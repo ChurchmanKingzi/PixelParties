@@ -4961,7 +4961,71 @@ function HintergrundPause() {
 window.HintergrundPause = HintergrundPause;
 const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 
-function CardFoil({ card, foilType }) {
+// ═══════════════════════════════════════════════════════════════
+//  ★ SKIN-HOLO — das Foil exklusiv fuer Skin-Karten
+//
+//  Es betrifft NUR Kunst und Namen (Rahmen, Werte, Regeltext bleiben ruhig)
+//  und ist keine Kachel, sondern aus der Kunst des Skins gerechnet
+//  (`CardRender.holoFor`, card-render.js): Echolinien, die den Konturen der
+//  Zeichnung folgen, eine Praegung aus ihrer Helligkeit und die Umrisse der
+//  Namensbuchstaben. Hier wird daraus eine DOM-Lage (Aufbau und Animation:
+//  style.css, „SKIN-HOLO“). Wie CardFoil hat sie keinen Zeitgeber und keinen
+//  Zustand ausser dem einmaligen Laden — alles Bewegte laeuft per CSS.
+//
+//  Angeschlossen wird sie NICHT einzeln, sondern ueber CardFoil: eine Karte
+//  mit Skin ruft `<CardFoil card={…} skin={…} />`, und der Skin ersetzt dort
+//  die Foil-Schicht der Seltenheit (zwei Foils uebereinander waeren unruhig).
+// ═══════════════════════════════════════════════════════════════
+
+/** Skin-Name aus einer Skin-Bild-URL (`/cards/skins/<Name>.png`, wie `skinImageUrl` sie baut) — sonst null. */
+function skinOfUrl(url) {
+  if (typeof url !== 'string' || !url.startsWith('/cards/skins/')) return null;
+  try { return decodeURIComponent(url.slice(13).split(/[?#]/)[0]).replace(/^unlockable\//, '').replace(/\.png$/i, '') || null; }
+  catch (e) { return null; }
+}
+window.skinOfUrl = skinOfUrl;
+
+/** Skin-Holo ueberhaupt verfuegbar? (Renderer geladen und nicht abgeschaltet: `CardRender.HOLO.on = false`) */
+function skinHoloAktiv() { return !!(window.CardRender && window.CardRender.HOLO && window.CardRender.HOLO.on && window.CardImageShim); }
+
+function SkinHolo({ skin }) {
+  const klein = useContext(FoilKleinContext);
+  const [daten, setDaten] = useState(() => (skin && window.CardRender && window.CardRender.holoCached(skin)) || null);
+  useEffect(() => {
+    let lebt = true;
+    if (!skin) { setDaten(null); return undefined; }
+    const fertig = window.CardRender.holoCached(skin);
+    if (fertig) { setDaten(fertig); return undefined; }
+    setDaten(null);
+    window.CardImageShim.skinBase(skin)
+      .then(basis => basis && window.CardRender.holoFor(basis, skin))
+      .then(d => { if (lebt) setDaten(d || null); });
+    return () => { lebt = false; };
+  }, [skin]);
+  // Phase je Karte EINMAL gewuerfelt, sonst laufen alle Skin-Karten im Gleichtakt.
+  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [skin]);
+  if (!skin || !daten) return null;
+  return (
+    <div className={'skin-holo' + (klein ? ' skin-holo-klein' : '')} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
+      <div className="skin-holo-art">
+        <i className="skin-holo-relief" />
+        {/* Drei Abzuege derselben Linien, um 0/120/240° im Farbton gedreht und per Deckkraft ineinander
+            geblendet: der Regenbogen laeuft ueber die Linien, ohne dass je Frame neu gemalt wird. */}
+        <i className="skin-holo-lines sh-l0" />
+        {!klein && <i className="skin-holo-lines sh-l1" />}
+        {!klein && <i className="skin-holo-lines sh-l2" />}
+        {!klein && <div className="skin-holo-glint"><i /></div>}
+      </div>
+      <div className="skin-holo-name">
+        <i className="sh-rb" />
+        {!klein && <i className="sh-gl" />}
+      </div>
+    </div>
+  );
+}
+window.SkinHolo = SkinHolo;
+
+function CardFoil({ card, foilType, skin }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
   const klein = useContext(FoilKleinContext);
@@ -4987,6 +5051,7 @@ function CardFoil({ card, foilType }) {
       motes: klein ? [] : makeFoilMotes(isDiamond),
     };
   }, [type, isFoil, card?.name, klein]);
+  if (skin && skinHoloAktiv()) return <SkinHolo skin={skin} />;
   if (!isFoil || !meta) return null;
   // ★ v1403: Rahmen-Ringe (Kreuzblende per Deckkraft statt animiertem
   // box-shadow). Sie greifen nur, wo die Karte selbst die Foil-Klasse
@@ -6177,7 +6242,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onContextMenu={handleContextMenu}
         onMouseEnter={show} onMouseLeave={hide}
         data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
-        <CardFoil card={card} />
+        <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         {imgUrl ? (
           <img src={imgUrl} alt={card.name} loading="lazy" decoding="async"
             style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:1 }}
@@ -6245,7 +6310,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: ttBorderColor
           }} />
-          <CardFoil card={card} />
+          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
@@ -7265,7 +7330,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
           }} />
-          <CardFoil card={card} />
+          <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
       )}
       <div style={{ padding: '10px 12px' }}>

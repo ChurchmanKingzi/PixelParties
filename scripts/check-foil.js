@@ -36,8 +36,10 @@ const PUBLIC = path.join(WURZEL, 'public');
 // verweisen darauf) — er wird nicht ausgeliefert und nicht geprüft.
 const TOT = new Set(['app.jsx']);
 
+// `<FoilOverlay>` (Foil der Seltenheit) und `<SkinHolo>` (Foil der Skin-Karten) haengen beide NUR an CardFoil.
+const ROHTEILE = ['FoilOverlay', 'SkinHolo'];
 let funde = 0;
-let anschluesse = 0;
+const anschluesse = Object.fromEntries(ROHTEILE.map(n => [n, 0]));
 
 for (const name of fs.readdirSync(PUBLIC)) {
   if (!name.endsWith('.jsx') || TOT.has(name)) continue;
@@ -45,14 +47,15 @@ for (const name of fs.readdirSync(PUBLIC)) {
   quelle.split('\n').forEach((zeile, i) => {
     // Kommentare zählen nicht — dort steht die Erklärung.
     const code = zeile.replace(/\/\/.*$/, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
-    if (/<FoilOverlay[\s/>]/.test(code)) {
+    for (const teil of ROHTEILE) {
+      if (!new RegExp('<' + teil + '[\\s/>]').test(code)) continue;
       // Die eine erlaubte Stelle: der Rumpf von CardFoil.
       const davor = quelle.slice(0, quelle.indexOf(zeile));
       const letzteFn = davor.lastIndexOf('function ');
       const inCardFoil = davor.slice(letzteFn).startsWith('function CardFoil(');
-      if (inCardFoil) { anschluesse++; return; }
-      console.error(`[check-foil] KOPIE: public/${name}:${i + 1} rendert <FoilOverlay> direkt.`);
-      console.error('             Foil-Karten werden über <CardFoil card={…} /> angeschlossen.');
+      if (inCardFoil) { anschluesse[teil]++; continue; }
+      console.error(`[check-foil] KOPIE: public/${name}:${i + 1} rendert <${teil}> direkt.`);
+      console.error('             Foil-Karten werden über <CardFoil card={…} skin={…} /> angeschlossen.');
       funde++;
     }
   });
@@ -62,8 +65,10 @@ if (funde > 0) {
   console.error(`[check-foil] ${funde} Stelle(n) am zentralen Anschluss vorbei.`);
   process.exit(1);
 }
-if (anschluesse !== 1) {
-  console.error(`[check-foil] CardFoil rendert <FoilOverlay> ${anschluesse}× — erwartet: genau 1×.`);
-  process.exit(1);
+for (const teil of ROHTEILE) {
+  if (anschluesse[teil] !== 1) {
+    console.error(`[check-foil] CardFoil rendert <${teil}> ${anschluesse[teil]}× — erwartet: genau 1×.`);
+    process.exit(1);
+  }
 }
-console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil).');
+console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil), auch für Skin-Holo.');

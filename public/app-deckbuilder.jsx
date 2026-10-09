@@ -1940,7 +1940,11 @@ function DeckBuilder() {
               {skinGallery.options.map(skinName => (
                 <div key={skinName} className={'skin-gallery-item' + (currentDeck?.skins?.[skinGallery.cardName] === skinName ? ' skin-selected' : '')}
                   onClick={() => { setSkin(skinGallery.cardName, skinName); setSkinGallery(null); }}>
-                  <img src={skinImageUrl(skinName)} draggable={false} />
+                  {/* Skin-Karten tragen ihr eigenes Holo-Foil (CardFoil → SkinHolo): hier sieht man es vor der Wahl. */}
+                  <div style={{ position: 'relative' }}>
+                    <img src={skinImageUrl(skinName)} draggable={false} />
+                    {window.CardFoil && <window.CardFoil skin={skinName} />}
+                  </div>
                   <div className="skin-gallery-label">{skinName}</div>
                 </div>
               ))}

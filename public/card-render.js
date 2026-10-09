@@ -320,6 +320,14 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  // Goldener Verlauf fuer Skin-Namen (oben hell, unten tief; harte Kante in der Mitte wie bei gebuerstetem Gold)
+  function goldFill(ctx, top, height) {
+    const g = ctx.createLinearGradient(0, top + height * 0.12, 0, top + height * 0.88);
+    g.addColorStop(0, '#fffbd2'); g.addColorStop(0.4, '#ffe469'); g.addColorStop(0.5, '#ffc61c');
+    g.addColorStop(0.54, '#fff1a3'); g.addColorStop(1, '#f5b800');
+    return g;
+  }
+
   // ═════════════ Farben je Karte ═════════════
   function nameColor(s) {
     const t = s.type, r = s.rarity;
@@ -395,7 +403,7 @@
     const sup = isSuperhero(t);
     drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: nameColor(spec),
+      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
     });
 
     // 4) Faehigkeiten-Felder der Helden
@@ -616,8 +624,262 @@
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
+    // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
+    // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
+    if (skin && holoOn(skin)) spec.nameGold = true;
     return draw(spec, art);
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  // ═════════════ HOLO-TEXTUR FUER SKINS ═════════════
+  //  Skin-Karten bekommen ein eigenes Foil, das NUR Kunst und Namen betrifft (Rahmen, Werte und Text bleiben
+  //  ruhig). Das Muster ist keine Kachel, die ueber das Bild gelegt wird, sondern wird aus der Kunst selbst
+  //  gerechnet — so folgt es den Linien der Karte:
+  //    1. Konturen finden: auf dem NATIVEN Pixelraster der Kunst (meist 76x51) ist jedes Pixel eine Kontur,
+  //       wenn es dunkler ist als ein Nachbar (die dunkle Seite einer Kante; Staerke = Helligkeitssprung).
+  //    2. Abstandsfeld: fuer jeden Punkt des Bildfelds der Abstand zur naechsten Kontur (Felzenszwalb-EDT,
+  //       staerkere Konturen zaehlen, als laegen sie naeher). Schwache Kanten (Dithering, Verlaeufe) starten
+  //       dadurch erst weiter weg, kraeftige Umrisse sofort.
+  //    3. Linien im Abstandsfeld: Echolinien, die jede Kontur wie Hoehenlinien umlaufen und die Kunst
+  //       gravurartig ueberziehen. Je Linie und Ort ein anderer Farbton (Regenbogen), nach aussen schwaecher.
+  //    4. Praegung: aus der geglaetteten Helligkeit (= Hoehe) ein Relief mit Licht von links oben.
+  //  Alles landet in drei Canvas: `holo` (Linien, farbig), `relief` (Hell-/Dunkel-Praegung), `nameMask`
+  //  (Umriss der Namensbuchstaben). Das Spiel legt sie als CSS-Masken/-Hintergruende an die richtige Stelle und
+  //  laesst Licht ueber sie wandern; hier entsteht nur das Standbild, einmal je Skin.
+  const HOLO = {
+    on: true,
+    period: 13,          // Abstand zweier Echolinien in Pixeln des Bildfelds (610 px breit)
+    width: 0.30,         // Linienbreite (Anteil der halben Periode)
+    reach: 70,           // Reichweite der Linien (px): so weit, bis sie auf 1/e verblassen
+    floor: 0.22,         // Mindeststaerke weit weg von jeder Kontur (flache Flaechen bleiben etwas gemustert)
+    seed: 0.15,          // ab diesem Helligkeitssprung zaehlt ein Pixel als Kontur
+    relief: 2.6,         // Staerke der Praegung
+  };
+  /** Gilt das Holo fuer diesen Skin? (`data/card-render.json` -> skins[Name].holo = false schaltet es ab) */
+  function holoOn(skinMeta) { return HOLO.on && !(skinMeta && skinMeta.holo === false); }
+
+  // Felzenszwalb: quadrierter euklidischer Abstand, zeilen-/spaltenweise. f = Anfangswerte (0 = Kontur).
+  function edt1d(f, n, d, v, z) {
+    let k = 0; v[0] = 0; z[0] = -1e20; z[1] = 1e20;
+    for (let q = 1; q < n; q++) {
+      let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+      k++; v[k] = q; z[k] = s; z[k + 1] = 1e20;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) {
+      while (z[k + 1] < q) k++;
+      d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+    }
+  }
+  // Zwei Etappen (Spalten, dann Zeilen) mit einer Atempause dazwischen, damit kein Block laenger als ~15 ms rechnet.
+  async function edt2dAsync(f, w, h) {
+    const n = Math.max(w, h), col = new Float64Array(n), out = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h; y++) col[y] = f[y * w + x];
+      edt1d(col, h, out, v, z);
+      for (let y = 0; y < h; y++) f[y * w + x] = out[y];
+    }
+    await new Promise(r => setTimeout(r, 0));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) col[x] = f[y * w + x];
+      edt1d(col, w, out, v, z);
+      for (let x = 0; x < w; x++) f[y * w + x] = Math.sqrt(out[x]);
+    }
+    return f;
+  }
+  const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+  const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  function hsl2rgb(h, s, l) {                    // h 0..1
+    const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h * 12) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+    return [f(0) * 255, f(8) * 255, f(4) * 255];
+  }
+
+  /** Geometrie je Kartentyp: Bildfeld (Kartenpixel), Rahmenmaske, Namenszeile */
+  function holoGeometry(type) {
+    const full = isFullart(type);
+    // Telefone (Lite-Modus, wie in style.css): halbe Textur-Aufloesung = ein Viertel der Rechenarbeit
+    const lite = typeof matchMedia === 'function' && matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
+    return {
+      box: full ? [0, 0, W, H] : [70, 170, 610, 400],
+      maskKey: type === 'superhero' ? 'mask.hero' : type === 'fullartHero' ? 'mask.fullart' : 'mask.art',
+      scale: (full ? 0.6 : 1) * (lite ? 0.5 : 1),
+      nameBox: { left: isSuperhero(type) ? 48 : 103, top: 48, width: isSuperhero(type) ? 654 : 544, height: 55 },
+    };
+  }
+
+  /**
+   * Die Holo-Texturen eines Skins als Canvas. null, wenn es zur Kunst nichts zu zeichnen gibt.
+   * @returns {Promise<null|{ type, box, nameStrip, holo, relief, nameMask }>}  Koordinaten in Kartenpixeln (750x1050)
+   */
+  async function holoLayers(card, o) {
+    o = o || {};
+    if (!o.skin) return null;
+    const art = await getArt('skin/' + o.skin);
+    if (!art) return null;
+    const skinMeta = meta.skins[o.skin] || {};
+    if (!holoOn(skinMeta)) return null;
+    const m = Object.assign({}, meta.cards[card.name]);
+    if (skinMeta.r) m.r = skinMeta.r; if (skinMeta.f) m.f = skinMeta.f;
+    const spec = specFromCard(card, m, { name: skinMeta.name || o.skin });
+    const geo = holoGeometry(spec.type);
+    const tw = Math.round(geo.box[2] * geo.scale), th = Math.round(geo.box[3] * geo.scale);
+    const k = tw / geo.box[2];                                      // Texturpixel je Kartenpixel
+
+    // — natives Raster der Kunst (grosse Vollbilder auf <= 160 Pixel Breite herunterrechnen) —
+    const sw = art.sw || art.src.width, sh = art.sh || art.src.height;
+    const sc = sw > 160 ? 160 / sw : 1, nw = Math.max(1, Math.round(sw * sc)), nh = Math.max(1, Math.round(sh * sc));
+    const nc = document.createElement('canvas'); nc.width = nw; nc.height = nh;
+    const nx = nc.getContext('2d'); nx.imageSmoothingEnabled = sc < 1;
+    nx.drawImage(art.src, art.sx || 0, art.sy || 0, sw, sh, 0, 0, nw, nh);
+    const px = nx.getImageData(0, 0, nw, nh).data;
+    const L = new Float32Array(nw * nh);
+    for (let i = 0; i < nw * nh; i++) L[i] = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255 * (px[i * 4 + 3] / 255);
+    const at = (x, y) => L[Math.min(nh - 1, Math.max(0, y)) * nw + Math.min(nw - 1, Math.max(0, x))];
+
+    // — 1) Konturen: die dunklere Seite jeder Kante; Staerke = Helligkeitssprung (0..1) —
+    const edge = new Float32Array(nw * nh);
+    for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) {
+      const l = L[y * nw + x];
+      const dmax = Math.max(at(x - 1, y) - l, at(x + 1, y) - l, at(x, y - 1) - l, at(x, y + 1) - l);
+      edge[y * nw + x] = dmax > HOLO.seed ? clamp01(dmax / 0.5) : 0;
+    }
+
+    // — 2) Abstandsfeld im Bildfeld (Texturaufloesung): Konturpixel als Bloecke; staerkere liegen "naeher" —
+    const f = new Float64Array(tw * th), OFF = 26 * k;
+    const seedSq = new Float64Array(nw * nh);                       // quadrierter Startwert je natives Pixel
+    for (let i = 0; i < nw * nh; i++) seedSq[i] = edge[i] > 0 ? (OFF * (1 - edge[i])) * (OFF * (1 - edge[i])) : 1e12;
+    const colOf = new Uint16Array(tw);
+    for (let x = 0; x < tw; x++) colOf[x] = Math.min(nw - 1, Math.floor((x + 0.5) * nw / tw));
+    for (let y = 0; y < th; y++) {
+      const row = Math.min(nh - 1, Math.floor((y + 0.5) * nh / th)) * nw, o = y * tw;
+      for (let x = 0; x < tw; x++) f[o + x] = seedSq[row + colOf[x]];
+    }
+    const D = await edt2dAsync(f, tw, th);
+
+    // — Rahmenmaske (Ecken des Bildfelds) —
+    const mc = document.createElement('canvas'); mc.width = tw; mc.height = th;
+    const mx = mc.getContext('2d'); mx.imageSmoothingEnabled = false;
+    sprite(mx, geo.maskKey, 0, 0, tw, th);
+    const ma = mx.getImageData(0, 0, tw, th).data;
+
+    // — 3) Echolinien, 4) Relief —
+    // Rechenzeit: ~250.000 Pixel je Skin auf dem Hauptthread. Darum: Farb- und Abfalltabellen statt exp()/hsl je Pixel,
+    // leere Pixel (zwischen den Linien) gar nicht erst anfassen, das Relief (weich, ohnehin unscharf) in halber Aufloesung,
+    // und die Zeilen in Bloecken mit Atempausen dazwischen.
+    const holo = document.createElement('canvas'); holo.width = tw; holo.height = th;
+    const ho = holo.getContext('2d').createImageData(tw, th), hd = ho.data;
+    const P = HOLO.period * k, REACH = HOLO.reach * k;
+    const wLo = HOLO.width - 0.12, wHi = HOLO.width + 0.12;
+    const FADE = new Float32Array(1024);                            // Abfall ueber dem Abstand, Schritt 0,5 px
+    for (let i = 0; i < FADE.length; i++) FADE[i] = HOLO.floor + (1 - HOLO.floor) * Math.exp(-(i / 2) / REACH);
+    const PAL = new Uint8Array(1024 * 3);                           // Regenbogen, 1024 Toene
+    for (let i = 0; i < 1024; i++) { const c = hsl2rgb(i / 1024, 1, 0.62); PAL[i * 3] = c[0]; PAL[i * 3 + 1] = c[1]; PAL[i * 3 + 2] = c[2]; }
+    const tick = () => new Promise(r => setTimeout(r, 0));
+    const BLOCK = 70;                                               // Zeilen je Block
+    for (let y0 = 0; y0 < th; y0 += BLOCK) {
+      for (let y = y0, ye = Math.min(th, y0 + BLOCK); y < ye; y++) {
+        const hy = (y / th) * 0.55;
+        for (let x = 0; x < tw; x++) {
+          const i = y * tw + x, d = D[i];
+          const ph = d / P, tri = Math.abs(ph - Math.floor(ph + 0.5)) * 2;
+          if (tri >= wHi) continue;                                  // zwischen den Linien: durchsichtig
+          const ma_ = ma[i * 4 + 3];
+          if (ma_ < 230) continue;                                   // nur das volle Bild; Felder, durch die es blass scheint, bleiben frei
+          const t = (tri - wLo) / (wHi - wLo), line = tri <= wLo ? 1 : 1 - t * t * (3 - 2 * t);
+          // Ton wandert mit der Linie (Abstand) und quer ueber das Feld — ein Regenbogen, der den Kanten folgt
+          const hue = (ph * 0.11 + (x / tw) * 0.42 + hy) % 1, pi = ((hue * 1024) | 0) * 3;
+          hd[i * 4] = PAL[pi]; hd[i * 4 + 1] = PAL[pi + 1]; hd[i * 4 + 2] = PAL[pi + 2];
+          hd[i * 4 + 3] = (255 * line * FADE[Math.min(1023, (d * 2) | 0)] * ma_ / 255) | 0;
+        }
+      }
+      if (y0 + BLOCK < th) await tick();
+    }
+    holo.getContext('2d').putImageData(ho, 0, 0);
+
+    // Relief: Hoehe = bilinear geglaettete Helligkeit; Licht von links oben, hell auf zugewandten, dunkel auf
+    // abgewandten Flanken. Gerechnet in halber Aufloesung (rw x rh), das CSS streckt es aufs Bildfeld.
+    const rw = Math.max(1, Math.round(tw / 2)), rh = Math.max(1, Math.round(th / 2));
+    const relief = document.createElement('canvas'); relief.width = rw; relief.height = rh;
+    const ro = relief.getContext('2d').createImageData(rw, rh), rd = ro.data;
+    const Hf = new Float32Array(rw * rh);
+    for (let y = 0; y < rh; y++) {
+      const v = (y + 0.5) * nh / rh - 0.5, yy = Math.floor(v), fy = v - yy;
+      for (let x = 0; x < rw; x++) {
+        const u = (x + 0.5) * nw / rw - 0.5, xx = Math.floor(u), fx = u - xx;
+        Hf[y * rw + x] = (at(xx, yy) * (1 - fx) + at(xx + 1, yy) * fx) * (1 - fy) + (at(xx, yy + 1) * (1 - fx) + at(xx + 1, yy + 1) * fx) * fy;
+      }
+    }
+    const st = Math.max(1, Math.round(rw / nw / 2));
+    const hf = (x, y) => Hf[(y < 0 ? 0 : y >= rh ? rh - 1 : y) * rw + (x < 0 ? 0 : x >= rw ? rw - 1 : x)];
+    for (let y0 = 0; y0 < rh; y0 += 50) {
+      for (let y = y0, ye = Math.min(rh, y0 + 50); y < ye; y++) {
+        const my = Math.min(th - 1, y * 2) * tw;
+        for (let x = 0; x < rw; x++) {
+          if (ma[(my + Math.min(tw - 1, x * 2)) * 4 + 3] < 230) continue;
+          const r = -(hf(x + st, y) - hf(x - st, y) + hf(x, y + st) - hf(x, y - st)) * 0.7071 * HOLO.relief;
+          const ra = r < 0 ? -r : r;
+          if (ra < 0.004) continue;
+          const o = (y * rw + x) * 4;
+          rd[o] = rd[o + 1] = rd[o + 2] = r > 0 ? 255 : 0; rd[o + 3] = (255 * (ra > 1 ? 1 : ra)) | 0;
+        }
+      }
+      if (y0 + 50 < rh) await tick();
+    }
+    relief.getContext('2d').putImageData(ro, 0, 0);
+
+    // — Namensmaske: nur die Buchstaben, in einem Streifen ueber die ganze Kartenbreite (Hoehe 110 ab y = 20) —
+    const strip = { x: 0, y: 20, w: W, h: 110 };
+    const nmc = document.createElement('canvas'); nmc.width = strip.w; nmc.height = strip.h;
+    const nmx = nmc.getContext('2d');
+    drawLine(nmx, spec.name, {
+      left: geo.nameBox.left, top: geo.nameBox.top - strip.y, width: geo.nameBox.width, height: geo.nameBox.height,
+      size: 50, min: 48, align: 'center', color: '#fff',
+    });
+    return { type: spec.type, box: geo.box, nameStrip: strip, holo, relief, nameMask: nmc };
+  }
+
+  // Fertige Schichten fuers DOM: PNG-Blobs + die Lage in Prozent der Karte als CSS-Variablen. Je Skin einmal gerechnet
+  // und gemerkt (LRU); zwei Skins gleichzeitig zu rechnen waere Verschwendung, darum reiht `holoFor` sie hintereinander ein
+  // und laesst dem Browser zwischen zwei Skins Luft.
+  const HOLO_MAX = 40;
+  const holoDone = new Map();        // Skin -> { vars, ... } (fertig)
+  const holoWait = new Map();        // Skin -> Promise (in Arbeit)
+  let holoChain = Promise.resolve();
+  const toUrl = cv => new Promise(res => cv.toBlob(b => res(b ? URL.createObjectURL(b) : null), 'image/png'));
+  function holoCached(skin) { return holoDone.get(skin) || null; }
+  function holoFor(card, skin) {
+    if (!HOLO.on || !card || !skin) return Promise.resolve(null);
+    const hit = holoDone.get(skin);
+    if (hit) { holoDone.delete(skin); holoDone.set(skin, hit); return Promise.resolve(hit); }
+    if (holoWait.has(skin)) return holoWait.get(skin);
+    const job = holoChain.then(async () => {
+      await new Promise(r => setTimeout(r, 0));
+      const L = await holoLayers(card, { skin });
+      if (!L) return null;
+      const [holo, relief, name] = await Promise.all([toUrl(L.holo), toUrl(L.relief), toUrl(L.nameMask)]);
+      if (!holo || !relief || !name) return null;
+      const pc = (v, t) => (v / t * 100) + '%', b = L.box, s = L.nameStrip;
+      const out = {
+        vars: {
+          '--sh-ax': pc(b[0], W), '--sh-ay': pc(b[1], H), '--sh-aw': pc(b[2], W), '--sh-ah': pc(b[3], H),
+          '--sh-ny': pc(s.y, H), '--sh-nh': pc(s.h, H),
+          '--sh-holo': 'url(' + holo + ')', '--sh-relief': 'url(' + relief + ')', '--sh-name': 'url(' + name + ')',
+        },
+        urls: [holo, relief, name],
+      };
+      holoDone.set(skin, out);
+      if (holoDone.size > HOLO_MAX) {
+        const old = holoDone.keys().next().value, o = holoDone.get(old);
+        holoDone.delete(old);
+        setTimeout(() => o.urls.forEach(u => URL.revokeObjectURL(u)), 60000);   // Karten, die ihn noch zeigen, behalten das Bild
+      }
+      return out;
+    }).catch(err => { console.warn('[card-render] Holo', skin, err && err.message); return null; })
+      .finally(() => holoWait.delete(skin));
+    holoChain = job.catch(() => {});
+    holoWait.set(skin, job);
+    return job;
+  }
+
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
 })(typeof window !== 'undefined' ? window : globalThis);
