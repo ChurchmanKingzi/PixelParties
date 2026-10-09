@@ -53,12 +53,11 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
 
 * **Name:** `renderCard` zeichnet den Skin-Namen in einem Goldverlauf (`goldFill`), das gilt überall, wo die
   Karte als Bild erscheint. Darüber legt das Spiel einen Hauch wandernder Pastellfarben und einen weißen Glanz
-  (mehrere Bänder zugleich, ein Band kreuzt jeden Punkt alle ~0,6 s), beschnitten durch die Umrisse der Buchstaben
-  (`nameMask`). **Super Rare**
+  (ein Band kreuzt jeden Punkt alle ~1 s), beschnitten durch die Umrisse der Buchstaben (`nameMask`). **Super Rare**
   (gold) und **Diamond Rare** (türkis) tragen denselben Namensglanz (`FoilName`, `CardRender.nameShimmerFor`);
   in Kleinansichten entfällt er dort.
-* **Kunst:** feine Schrägstriche (Schraffur) mit wanderndem Pastell-Regenbogen und Glanzbänder, die zu
-  mehreren zugleich über das Bild laufen (ein Band kreuzt jeden Punkt alle ~0,7 s). Beides liegt nur auf den helleren Flächen: `CardRender.holoLayers` rechnet dafür eine
+* **Kunst:** feine Schrägstriche (Schraffur) mit wanderndem Pastell-Regenbogen und Glanzbänder, die ruhig über
+  das Bild gleiten (ein Band kreuzt jeden Punkt alle ~1,2 s, ein bis zwei Bänder zugleich). Beides liegt nur auf den helleren Flächen: `CardRender.holoLayers` rechnet dafür eine
   **Maske** aus dem nativen Pixelraster der Kunst (meist 76×51, gleiche Streckung wie `draw`, keine Unschärfe),
   je Pixel eine Stärke aus Helligkeit und Sättigung (Graustufen schwächer); dunkle Pixel (Umrisse, Schatten) bleiben
   frei, die Zeichnung bleibt scharf. Einmal je Skin, ~20 ms. Heraus kommen zwei PNG-Blobs (`all`, `nameMask`) plus
@@ -85,8 +84,8 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
   auf Brett, Hand und in Galerien kostet sie nichts. Bei Fullarts liegen beide Schichten auf der ganzen Fläche
   außer Namensleiste, Fähigkeitenfeldern, Regeltext und Werten (die Rahmenmaske ist hart ausgeschnitten; gemessen:
   0 geänderte Pixel innerhalb der Textfelder).
-* **Rahmenglanz:** Gold-, Silber- und Diamant-Rahmen glänzen in ihrer Farbe: mehrere Lichtbänder zugleich (ein Band kreuzt
-  jeden Punkt alle ~0,9 s) laufen über die Karte und leuchten nur auf dem Rahmen auf (`FoilRim`). Welche Farbe, entscheidet `CardRender.rimKind` aus Kartentyp
+* **Rahmenglanz:** Gold-, Silber- und Diamant-Rahmen glänzen in ihrer Farbe: Lichtbänder (ein Band kreuzt
+  jeden Punkt alle ~1,5 s) laufen über die Karte und leuchten nur auf dem Rahmen auf (`FoilRim`). Welche Farbe, entscheidet `CardRender.rimKind` aus Kartentyp
   und Seltenheit (Superhelden/Fullart-Helden und Super Rare = Gold, Rare = Silber, Diamond = Türkis; bei Skins gelten
   deren Werte). Die Maske ist die Form des Rahmens in halber Kartengröße (`drawRim`, derselbe Code wie das Kartenbild) und
   hängt nur von Kartentyp und Seltenheit ab — es gibt höchstens 5 Stück, alle Karten teilen sie. Erst ab 120 px Breite;
@@ -95,15 +94,22 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
 
 ### Glanzbänder: Streifenmuster statt Einzelband
 
-Bild-, Namens- und Rahmenglanz sind kein einzelnes Band mehr, das alle paar Sekunden durchläuft, sondern ein Element mit
+Bild-, Namens- und Rahmenglanz sind kein einzelnes Band, das alle paar Sekunden durchläuft, sondern ein Element mit
 sich wiederholendem Streifenmuster (`background-size` = Kachel, `repeat-x`), das sich linear um genau eine Kachel
-verschiebt (`skewX(-20deg) translateX(-Kachel)`): mehrere Bänder sind gleichzeitig sichtbar, und die Frequenz steigt
-stark, **ohne zusätzliche Ebenen** (weiter eine animierte Ebene je Glanz). Kachel und Takt: Bild 0,5 Bildbreiten / 0,7 s
-(`--sh-gl-takt`), Name 0,4 Namensbreiten / 0,6 s, Rahmen 0,6 Kartenbreiten / 0,9 s (vorher: ein Durchgang alle 2 s, 1,3 s
-bzw. 2,4 s). Das Element ist 180 % so breit wie sein Feld (Platz für Kachel und Schräge), die Prozentwerte in
-`@keyframes` folgen daraus. Grundzustand `opacity: 0`: ohne Animation (Lite, „Play Animations: aus“) steht kein Muster.
-Kosten: der Compositor zeichnet jetzt die ganze Fläche statt eines schmalen Bandes (Software-Rendering: etwa doppelte
-Zeichenzeit am Tooltip, 60 fps bleiben; Desktop-Worst-Case mit 6 aktiven 210-px-Karten 27 → 24 fps).
+verschiebt (`skewX(-20deg) translateX(-Kachel)`): ein bis zwei Bänder sind gleichzeitig sichtbar, und die Frequenz lässt
+sich ändern, **ohne zusätzliche Ebenen** (weiter eine animierte Ebene je Glanz). Zwei CSS-Variablen stellen es ein:
+
+| Glanz | `--kachel` (Abstand in Feldbreiten) | `--takt` (ein Band kreuzt jeden Punkt alle …) | vorher |
+| --- | --- | --- | --- |
+| Bild (`.skin-holo-glint i`) | 0,75 Bildbreiten | 1,2 s | 2 s |
+| Name (`.skin-holo-name .sh-gl`) | 0,6 Namensbreiten | 1,0 s | 1,3 s |
+| Rahmen (`.skin-holo-rim i`) | 0,9 Kartenbreiten | 1,5 s | 2,4 s |
+
+Geschwindigkeit = `--kachel` / `--takt`. Zwischenstand zum Feinjustieren: eine Fassung mit 0,5 / 0,7 s (Bild), 0,4 / 0,6 s
+(Name) und 0,6 / 0,9 s (Rahmen) war deutlich zu hektisch. Das Element ist (1,4 + `--kachel`) Feldbreiten breit (Platz für
+Schräge und Verschiebung), Breite, Kachelgröße und Verschiebung folgen per `calc()` daraus. Grundzustand `opacity: 0`:
+ohne Animation (Lite, „Play Animations: aus“) steht kein Muster. Kosten: der Compositor zeichnet die ganze Fläche statt
+eines schmalen Bandes (Software-Rendering: etwa doppelte Zeichenzeit am Tooltip, 60 fps bleiben).
 
 ### Performance der Foil-Schichten
 
