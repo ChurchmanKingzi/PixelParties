@@ -4965,9 +4965,9 @@ const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 //  ★ SKIN-HOLO — das Foil exklusiv fuer Skin-Karten
 //
 //  Es betrifft NUR Kunst und Namen (Rahmen, Werte, Regeltext bleiben ruhig)
-//  und laesst das Motiv lesbar: Leuchtlinien auf den Umrissen, ein Highlight
-//  je Farbflaeche und eine feine Schraffur ueber dem Bild, dazu die Umrisse der
-//  Namensbuchstaben — alles aus der Kunst des Skins gerechnet
+//  und laesst das Motiv lesbar: eine feine Schraffur und ein oft ueberlaufendes
+//  Glanzband liegen auf den helleren Flaechen des Bildes (Maske aus der Kunst
+//  des Skins), dazu der Namensglanz ueber den Umrissen der Buchstaben
 //  (`CardRender.holoFor`, card-render.js). Hier wird daraus eine DOM-Lage (Aufbau und Animation:
 //  style.css, „SKIN-HOLO“). Wie CardFoil hat sie keinen Zeitgeber und keinen
 //  Zustand ausser dem einmaligen Laden — alles Bewegte laeuft per CSS.
@@ -5007,12 +5007,12 @@ function SkinHolo({ skin }) {
   if (!skin || !daten) return null;
   return (
     <div className={'skin-holo' + (klein ? ' skin-holo-klein' : '')} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
-      <div className="skin-holo-art">
-        <i className="skin-holo-areas" />
-        {!klein && <div className="skin-holo-hatch"><i /></div>}
-        <i className="skin-holo-edges" />
-        {!klein && <div className="skin-holo-glint"><i /></div>}
-      </div>
+      {!klein && (
+        <div className="skin-holo-art">
+          <div className="skin-holo-hatch"><i /></div>
+          <div className="skin-holo-glint"><i /></div>
+        </div>
+      )}
       <div className="skin-holo-name">
         <i className="sh-rb" />
         {!klein && <i className="sh-gl" />}
