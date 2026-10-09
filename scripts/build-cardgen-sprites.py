@@ -23,6 +23,7 @@ from PIL import Image
 ap = argparse.ArgumentParser()
 ap.add_argument('--src', required=True, help='Ordner mit den Dateien des MSE-Styles (…/PixelParties-standard.mse-style)')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'public', 'cardgen'))
+ap.add_argument('--symbols', default=None, help='Ordner der Symbolschrift (…/PixelParties-text-replacements.mse-symbol-font); Standard: neben dem Style-Ordner')
 args = ap.parse_args()
 
 def find(name):
@@ -105,6 +106,24 @@ KIND = {
     'areaPotion': 'icon_area_potion.png', 'attachmentPotion': 'icon_attach_potion.png',
 }
 for k, f in KIND.items(): add('kind.' + k, load(f))
+
+# Symbole fuer den Kartentext (Symbolschrift „PixelParties-text-replacements“): Zauberschulen-Namen im Text werden
+# zu diesen Bildern (siehe SYMBOLS in card-render.js). Die Bilder sind Pixel-Art in 10x10-Bloecken; gespeichert
+# wird je Block ein Pixel, der Renderer skaliert sie wie MSE weich auf die Textgroesse.
+SYMBOL_FILES = {
+    'destruction': 'symbol_destruction.png', 'summoning': 'symbol_summoning.png', 'arts': 'symbol_arts.png',
+    'support': 'symbol_support.png', 'decay': 'symbol_decay.png', 'fighting': 'symbol_fighting.png',
+}
+sym_dir = args.symbols or os.path.join(os.path.dirname(os.path.abspath(args.src)), 'PixelParties-text-replacements.mse-symbol-font')
+for k, f in SYMBOL_FILES.items():
+    p = os.path.join(sym_dir, f)
+    if not os.path.exists(p): sys.exit('fehlt in der Symbolschrift: ' + p)
+    a = np.asarray(Image.open(p).convert('RGBA'))
+    h, w = a.shape[0] // 10, a.shape[1] // 10
+    assert a.shape[0] % 10 == 0 and a.shape[1] % 10 == 0, f + ': Groesse kein Vielfaches von 10'
+    small = a[::10, ::10][:h, :w].copy()
+    assert (np.repeat(np.repeat(small, 10, axis=0), 10, axis=1) == a).all(), f + ': keine reine 10x10-Pixel-Art'
+    add('sym.' + k, Image.fromarray(small, 'RGBA'))
 
 # Regelmaessiges Regalpacking (Zeilen), Breite 256
 keys = sorted(SPRITES, key=lambda k: (-SPRITES[k].height, k))

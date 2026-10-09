@@ -28,7 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
-  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space' };
+  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0 };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -38,9 +38,33 @@
   const SPACE_U = 1000;
   // '*' ist in den Karten ein Aufzaehlungszeichen: im Template ein Symbol-Zeichen ohne Bild, belegt keine Breite.
   const ZERO_WIDTH = '*';
+
+  // ── Symbole im Kartentext ──
+  // Die Symbolschrift des Templates („PixelParties-text-replacements“) ersetzt die Namen der Zauberschulen im Text
+  // durch ein Bild: aus „Destruction Magic“ wird das Flammen-Symbol usw. Vor dem Satz werden die Namen durch
+  // Zeichen aus dem privaten Unicode-Bereich ersetzt; sie verhalten sich im Umbruch wie ein einzelnes Zeichen.
+  // Bildgroesse wie in MSE: Symbolgroesse (Textfeld: 8.5, Faehigkeitsfelder: 10.5) / `image font size` (30) Pixel
+  // je Bildpixel bei Schriftgroesse 20 — sie schrumpft mit dem Text mit.
+  const SYMBOLS = [
+    ['Destruction Magic', 'destruction'], ['Summoning Magic', 'summoning'], ['Magic Arts', 'arts'],
+    ['Support Magic', 'support'], ['Decay Magic', 'decay'], ['Fighting', 'fighting'],
+  ];
+  const SYM_FONT = 30, SYM_SPACE = 2;            // `image font size`, `horizontal space` der Symbolschrift
+  const SYM_KEY = Object.create(null), SYM_CH = Object.create(null);
+  SYMBOLS.forEach(([name, key], i) => { const ch = String.fromCharCode(0xE000 + i); SYM_KEY[ch] = key; SYM_CH[name] = ch; });
+  const SYM_RE = new RegExp('\\b(' + SYMBOLS.map(x => x[0]).join('|') + ')\\b', 'g');
+  const symbolize = t => String(t == null ? '' : t).replace(SYM_RE, m => SYM_CH[m]);
+  let symSize = 8.5;                              // Symbolgroesse des Textfelds, das gerade gesetzt wird
+  function symAdv(ch) {                           // Breite in Font-Einheiten (haengt nicht von der Schriftgroesse ab)
+    const r = sprites && sprites.rects['sym.' + SYM_KEY[ch]];
+    if (!r) return 1400;
+    return (r[2] * 10 + SYM_SPACE) * (symSize / SYM_FONT) * UPM / (20 * PT);
+  }
+
   function adv(ch) {
     if (ch === ' ') return SPACE_U;
     if (ZERO_WIDTH.includes(ch)) return 0;
+    if (SYM_KEY[ch]) return symAdv(ch);
     const g = GL[ch];
     return g ? g.a : 1400;
   }
@@ -109,6 +133,55 @@
     return true;
   }
 
+  // Symbolbild in Zielgroesse: Flaechenmittel aus den 10x10-Bloecken des Originals (MSE skaliert weich);
+  // einmal je Symbol und Groesse berechnet.
+  const symBitmaps = new Map();
+  function symbolBitmap(key, tw, th) {
+    const id = key + ':' + tw + 'x' + th;
+    let c = symBitmaps.get(id);
+    if (c) return c;
+    const r = sprites.rects['sym.' + key], bw = r[2], bh = r[3];
+    const src = document.createElement('canvas'); src.width = bw; src.height = bh;
+    const sctx = src.getContext('2d');
+    sctx.drawImage(sprites.img, r[0], r[1], bw, bh, 0, 0, bw, bh);
+    const sd = sctx.getImageData(0, 0, bw, bh).data;
+    c = document.createElement('canvas'); c.width = tw; c.height = th;
+    const cx = c.getContext('2d'), out = cx.createImageData(tw, th), od = out.data;
+    const fx = bw / tw, fy = bh / th;
+    for (let j = 0; j < th; j++) {
+      const y0 = j * fy, y1 = y0 + fy;
+      for (let i = 0; i < tw; i++) {
+        const x0 = i * fx, x1 = x0 + fx;
+        let R = 0, G = 0, B = 0, A = 0, T = 0;
+        for (let sy = Math.floor(y0); sy < Math.ceil(y1); sy++) {
+          const wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
+          for (let sx = Math.floor(x0); sx < Math.ceil(x1); sx++) {
+            const w = (Math.min(x1, sx + 1) - Math.max(x0, sx)) * wy, p = (sy * bw + sx) * 4, a = sd[p + 3] / 255;
+            R += sd[p] * a * w; G += sd[p + 1] * a * w; B += sd[p + 2] * a * w; A += a * w; T += w;
+          }
+        }
+        const o = (j * tw + i) * 4;
+        if (A > 0) { od[o] = R / A; od[o + 1] = G / A; od[o + 2] = B / A; od[o + 3] = 255 * A / T; }
+      }
+    }
+    cx.putImageData(out, 0, 0);
+    symBitmaps.set(id, c);
+    return c;
+  }
+  // Ein Symbol in die Textzeile mit Grundlinie `baseY`: waagrecht in seiner Breite zentriert, senkrecht mittig
+  // in der Zeilenhoehe (Ausrichtung „middle center“ der Symbolschrift).
+  function putSymbol(ctx, ch, x, baseY, pt) {
+    const key = SYM_KEY[ch], r = sprites.rects['sym.' + key];
+    if (!r) return;
+    const sc = symSize / SYM_FONT * pt / 20;
+    const tw = Math.max(1, Math.floor(r[2] * 10 * sc)), th = Math.max(1, Math.floor(r[3] * 10 * sc));   // MSE schneidet ab
+    const em = pt * PT;
+    const cy = baseY - em * ASC / UPM + em * LINE_U / UPM / 2 + OPT.symDy;
+    const boxW = adv(ch) * em / UPM;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(symbolBitmap(key, tw, th), Math.round(x + (boxW - tw) / 2 + OPT.symDx), Math.round(cy - th / 2));
+  }
+
   // ═════════════ Textsatz ═════════════
   // Absaetze -> Woerter (in Font-Einheiten); bricht an Leerzeichen um.
   function wrapPara(words, limitU, spaceU) {
@@ -155,7 +228,8 @@
 
   // Zeichnet einen Textblock in eine Box (Regeltext, Faehigkeiten, Namensfelder mit Umbruch).
   function drawBlock(ctx, text, o) {
-    const paras = paragraphs(text, o.soft);
+    symSize = o.symSize || 8.5;
+    const paras = paragraphs(symbolize(text), o.soft);
     if (!paras.length || !paras[0].length) return;
     const innerW = o.width - (o.padL || 0) - (o.padR || 0) - OPT.slack;
     const innerH = o.height - (o.padT || 0) - (o.padB || 0);
@@ -186,7 +260,7 @@
       if (o.align === 'center') x = x0 + (innerW - lineU * em / UPM) / 2;
       for (let wi = 0; wi < l.words.length; wi++) {
         for (const ch of l.words[wi].s) {
-          putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
+          if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt); else putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
           x += adv(ch) * k;
         }
         x += gapU * k;
@@ -360,7 +434,7 @@
       const boxes = [[605, 115, 0.9], [745, 115, 0.8], [885, 105, 0.9]];
       boxes.forEach(([top, height, lh], i) => drawBlock(ctx, spec.abilities && spec.abilities[i], {
         left: 80, top, width: 590, height, padL: 1, padT: 2, padR: 0, padB: 0,
-        size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: lh, color: C.white,
+        size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: lh, color: C.white, symSize: 10.5,
       }));
     } else {
       const rule = {
@@ -415,6 +489,10 @@
    * @param {object} [meta] reine Darstellungsdaten (data/card-render.json, cards[Name]): { r: Seltenheit, f: Rahmen, sb, sb2, soft: Zeilenumbrueche im Text sind nur Leerstellen }
    * @param {object} [over] { name } — Skins ersetzen nur Namen (und Kunst)
    */
+  // Das Foil-Kennzeichen aus cards.json ist die Seltenheit, die das Spiel kennt (Foil-Effekt, Rahmenfarbe):
+  // „diamond_rare“ -> Diamond, „secret_rare“ -> Super Rare. Es geht der aus alten Kartenbildern abgeleiteten
+  // Seltenheit (card-render.json `r`) vor.
+  const FOIL_RARITY = { diamond_rare: 'diamond', secret_rare: 'super rare' };
   function specFromCard(c, meta, over) {
     meta = meta || {}; over = over || {};
     let type;
@@ -433,7 +511,7 @@
     const asc = c.cardType === 'Ascended Hero';
     return {
       type,
-      rarity: meta.r || 'common',
+      rarity: FOIL_RARITY[c.foil] || meta.r || 'common',
       name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
