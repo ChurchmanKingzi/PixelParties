@@ -8834,7 +8834,7 @@ const TUTORIAL_SCRIPTS = {
       // ── Highlight: Reiza ──
       { text: 'Your Hero {purple:**Reiza**} applies {purple:**Poison**} and {yellow:**Stun**} to whatever she hits.',
         highlights: [REIZA] },
-      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions. You can use it to control your opponent's options.",
+      { text: "Stun, as well as {#88ddff:**Freeze**}, prevents a target from taking Actions and negates its effects and Abilities. You can use it to control your opponent's options.",
         highlights: [REIZA] },
       { text: 'And Poison is 30 bonus damage every turn - dealt at the **start of the poisoned player\'s turn**.',
         highlights: [REIZA] },
@@ -8913,7 +8913,11 @@ const TUTORIAL_SCRIPTS = {
       { text: '**Gold** is earned every turn. You can spend it on Artifacts or **certain active effects**, like...',
         highlights: [ALCHEMY] },
       A("'Earned'? Whatever would you *mean* by dat?"),
-      { text: '... you gain **4 Gold** during your **Resource Phase** each turn, along with drawing a card. You can save that up between turns to-' },
+      // ── Highlight: komplette Phasenleiste, nur die Resource Phase „an" (nur diese Seite) ──
+      { text: '... you gain **4 Gold** during your **Resource Phase** each turn, along with drawing a card. You can save that up between turns to-',
+        highlights: [
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Resource Phase"]'] },
+        ] },
       A('No wayyyy...!\nIs dat where **my Golds** keep disappearing to???'),
       { text: '... *your* Gold?' },
       A('Of course!\n**All Golds dere is belongs to the GRRRRREAT Antonia!**'),
@@ -8935,8 +8939,12 @@ const TUTORIAL_SCRIPTS = {
       A("And don't forget that ya can spend Golds not just on **Artifacts**, but some effects too.",
         { highlights: [BOOK, HOWITZER, ALCHEMY] }),
       // ── Tipp (Tester: das Raetsel verlangt drei Abilities, die man noch nie brauchte) ──
-      A("Want a lil' hint, minion...? Khehehe! Some {#4488ff:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
-        { highlights: [ALCHEMY, ADVENTUROUSNESS] }),
+      // ── Highlight: Alchemy, Adventurousness UND beide Main Phases in der Phasenleiste ──
+      A("Want a lil' hint...? Khehehe! Some {#4488ff:**Abilities**} can be activated during da **Main Phase** or even da **Action Phase**!",
+        { highlights: [
+          ALCHEMY, ADVENTUROUSNESS,
+          { selector: '.board-phase-tracker', an: ['[data-phase-name="Main Phase 1"]', '[data-phase-name="Main Phase 2"]'] },
+        ] }),
       A("And some Abilities let ya do cool passive stuff in ya **Main Phase**! Okay - enough makin' things easy for ya, khehe - show me what ya can do!",
         { highlights: [FRIENDSHIP] }),
       A('Well - try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),

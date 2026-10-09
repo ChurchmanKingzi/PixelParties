@@ -46886,7 +46886,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </div>
         {/* Board */}
-        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '') + (pt?.config?.goldSelect ? ' golden-targeting' : '')}>
+        <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '') + (pt?.config?.goldSelect ? ' golden-targeting' : '') + (sidebarCollapsed ? ' chat-eingeklappt' : '')}>
           {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
           {(() => {
             const debuffs = [];

@@ -16927,6 +16927,7 @@ body:has(.textbox-overlay) .tooltip {
     background: rgba(8, 8, 14, .8);
     border-radius: 6px 0 0 6px;
   }
+  .game-board.chat-eingeklappt > .board-center { margin-left: 0 !important; }
 
   /* Separate player halves */
   .board-side-opp { padding-bottom: 2px; }
@@ -17397,6 +17398,14 @@ body:has(.textbox-overlay) .tooltip {
   flex-shrink: 0;
   cursor: pointer;
 }
+/* Die eingeklappte Lasche (28px) sitzt nur RECHTS neben dem Brett — links
+   gibt es kein Gegenstueck, also lag `.board-center` (und damit das ganze
+   Schlachtfeld samt Textbox-Bezug) um die halbe Laschenbreite (14px) links
+   der Fenstermitte. Ein gleich grosser Rand links gleicht das aus: das Brett
+   ist dann exakt zur Fenstermitte (und zu Textbox, Handzeilen, Heldenspalte)
+   zentriert. Ausgeklappt (324px) bleibt es wie bisher; die Overlay-Varianten
+   (Telefon quer) nehmen die Lasche aus dem Fluss und setzen den Rand zurueck. */
+.game-board.chat-eingeklappt > .board-center { margin-left: 28px; }
 .sidebar-toggle-btn {
   background: none;
   border: none;
