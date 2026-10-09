@@ -99,7 +99,7 @@
   // ── Farben (Style-Skript des Templates) ──
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
-    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
+    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
     supArti: 'rgb(255,125,0)', rare: 'rgb(173,97,0)',
   };
 
@@ -426,9 +426,18 @@
     // (213,185,76) und (196,156,0) zu den Randfarben (255,231,76)/(255,221,0) — hier 80 % bzw. 70 % des Cyans.
     if (spec.rarity === 'diamond') {
       const T = 14, S = 15;
-      ctx.fillStyle = C.diamond;
-      ctx.fillRect(0, 0, W, T); ctx.fillRect(0, H - T, W, T);
-      ctx.fillRect(0, T, S, H - 2 * T); ctx.fillRect(W - S, T, S, H - 2 * T);
+      // Rand wie beim Goldrahmen in Zellen (hier 15 x 14 px, also ein Raster aus 50 x 75 Zellen) mit abwechselnd
+      // zwei Toenen: ab der dritten Zelle jede zweite heller (Gold: (255,231,76) und (255,221,0)). Der Rand zwischen
+      // den Eckbloecken ist die Basisfarbe; die hellere Zelle ist 30 % zum Weiss hin gemischt.
+      const cols = W / S, rows = H / T;
+      for (let i = 2; i < cols - 2; i++) {
+        ctx.fillStyle = i % 2 === 0 ? C.diamondLight : C.diamond;
+        ctx.fillRect(i * S, 0, S, T); ctx.fillRect(i * S, H - T, S, T);
+      }
+      for (let j = 2; j < rows - 2; j++) {
+        ctx.fillStyle = j % 2 === 0 ? C.diamondLight : C.diamond;
+        ctx.fillRect(0, j * T, S, T); ctx.fillRect(W - S, j * T, S, T);
+      }
       [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(([cx, cy, sx, sy]) => {
         [[0, 0, C.diamondMuted], [1, 0, C.diamondDark], [0, 1, C.diamondDark], [1, 1, C.diamondMuted]].forEach(([bx, by, col]) => {
           const x0 = cx + sx * bx * S, x1 = cx + sx * (bx + 1) * S, y0 = cy + sy * by * T, y1 = cy + sy * (by + 1) * T;
