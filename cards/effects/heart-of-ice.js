@@ -54,7 +54,8 @@ async function vergelten(engine, heart, ziel) {
   const ktrl = engine.effektiveSeiten(heart).controller ?? heart.owner;
   await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ktrl });
   eisblockAnimation(engine, [ziel]);
-  const ok = await einfrieren(engine, ziel, { dauer: 1, appliedBy: ktrl, source: CARD_NAME });
+  // Vergeltung gegen den Angreifer: das Ziel steht fest (Als Ruling 9.10.).
+  const ok = await einfrieren(engine, ziel, { dauer: 1, appliedBy: ktrl, source: CARD_NAME, festesZiel: true });
   if (ok) engine.log('heart_of_ice', { player: engine.gs.players[ktrl]?.username, target: ziel.name });
   engine.sync();
 }

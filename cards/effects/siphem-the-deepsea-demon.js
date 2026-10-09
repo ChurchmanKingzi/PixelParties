@@ -84,8 +84,8 @@ module.exports = {
       }
       for (const inst of (engine.cardInstances || [])) {
         if (inst.controller !== opp || inst.zone !== 'support' || inst.faceDown) continue;
-        const cd = DB[inst.name];
-        if (!cd || !String(cd.cardType || '').includes('Creature')) continue;
+        const cd = engine.getEffectiveCardData(inst) || DB[inst.name];   // wirksame Daten (Als Sweep 9.10.)
+        if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
         const hp = inst.counters?.hp ?? cd.hp ?? 0;
         if (hp > 0) targets.push({ kind: 'creature', hp });
       }

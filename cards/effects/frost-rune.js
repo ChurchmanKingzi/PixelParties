@@ -103,6 +103,7 @@ module.exports = {
         await engine._delay(300);
         await engine.addHeroStatus(sourceInfo.owner, sourceInfo.heroIdx, 'frozen', {
           appliedBy: ownerIdx, duration: FREEZE_DURATION,
+          festesZiel: true,   // Vergeltung trifft immer den Angreifer (Als Ruling 9.10.)
         });
         engine.log('freeze', { target: attacker.name, by: CARD_NAME, type: 'hero' });
       }

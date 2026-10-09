@@ -55,8 +55,10 @@ function allBoardTargets(engine) {
   return out;
 }
 
-/** 80 Spell-Schaden auf ein Helden- oder Kreaturenziel. */
-async function strike(engine, pi, hostHeroIdx, tgt, hostSeite = pi) {
+/** 80 Spell-Schaden auf ein Helden- oder Kreaturenziel.
+ *  `festesZiel`: der Folgetreffer auf „that target" (Surprise) steht fest — Submerged/Stealth
+ *  & Co. schuetzen nicht (Als Ruling 9.10.); die freie Wahl beim Abgang bleibt ohne. */
+async function strike(engine, pi, hostHeroIdx, tgt, hostSeite = pi, { festesZiel = false } = {}) {
   const source = { name: CARD_NAME, owner: pi, heroIdx: hostHeroIdx, heroOwner: hostSeite };
   const zoneSlot = tgt.kind === 'creature' || tgt.type === 'equip' ? (tgt.slotIdx ?? -1) : -1;
   // v698 (Als Vorgabe): NEBEN dem Wasser auch der Speer, der das Ziel
@@ -79,7 +81,7 @@ async function strike(engine, pi, hostHeroIdx, tgt, hostSeite = pi) {
   } else {
     const hero = engine.gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
     if (!hero || hero.hp <= 0) return false;
-    await engine.actionDealDamage(source, hero, DAMAGE, 'destruction_spell');
+    await engine.actionDealDamage(source, hero, DAMAGE, 'destruction_spell', festesZiel ? { festesZiel: true } : undefined);
   }
   return true;
 }
@@ -133,7 +135,7 @@ module.exports = {
     };
     if (tgt.owner == null || tgt.heroIdx == null) return null;
 
-    const ok = await strike(engine, pi, ctx.cardHeroIdx ?? -1, tgt, ctx.cardHeroOwner ?? pi);
+    const ok = await strike(engine, pi, ctx.cardHeroIdx ?? -1, tgt, ctx.cardHeroOwner ?? pi, { festesZiel: true });
     engine.log('aquatic_spear_followup', {
       player: engine.gs.players[pi]?.username,
       target: sourceInfo?.targetCardName, hit: ok,

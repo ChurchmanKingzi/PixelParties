@@ -152,7 +152,9 @@ module.exports = {
       await engine._delay(600);
 
       // Deal 100 damage to the attacker hero
-      await ctx.dealDamage(attacker, 100, 'destruction_spell');
+      // `festesZiel`: Vergeltung trifft immer den Angreifer — kein anderes Ziel
+      // (Als Ruling 9.10.: Submerged/Dive Down schuetzen dann nicht).
+      await ctx.dealDamage(attacker, 100, 'destruction_spell', { festesZiel: true });
       engine.sync();
       await engine._delay(400);
 

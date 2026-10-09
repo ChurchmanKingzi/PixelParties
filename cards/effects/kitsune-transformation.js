@@ -99,7 +99,7 @@ const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
 
 // v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
 // Kosmetik (siehe CARD_API, „Namen vergleichen").
-const { baseCardName } = require('./_hooks');
+const { baseCardName, isPileCreature } = require('./_hooks');   // Stapel-Suche: Artifact Creatures zaehlen als Creature (Als Ruling 9.10.)
 const CARD_NAME    = 'Kitsune Transformation';
 const KITSUNE_NAME = 'Rebelliokai Kind Kitsune';
 const MAX_PICK     = 3;
@@ -189,7 +189,7 @@ module.exports = {
     for (const cn of (ps.mainDeck || [])) {
       if (cn === KITSUNE_NAME) continue;
       const cd = cardDB[cn];
-      if (cd?.cardType === 'Creature') return true;
+      if (isPileCreature(cd)) return true;
     }
     return false;
   },
@@ -228,7 +228,7 @@ module.exports = {
         if (distinctNames.has(baseCardName(cn))) continue;
         const cd = cardDB[cn];
         if (!cd) continue;
-        if (cd.cardType !== 'Creature') continue;
+        if (!isPileCreature(cd)) continue;
         distinctNames.add(cn);
       }
       // Sort with Kitsune at the top so the required pick is the first
@@ -263,7 +263,7 @@ module.exports = {
       const deckCreatureSet = new Set();
       for (const cn of (ps.mainDeck || [])) {
         const cd = cardDB[cn];
-        if (cd?.cardType === 'Creature') deckCreatureSet.add(cn);
+        if (isPileCreature(cd)) deckCreatureSet.add(cn);
       }
       const gallery = galleryNames.map(name => ({
         name,
@@ -328,7 +328,7 @@ module.exports = {
         if (recycledSet.has(cn)) continue;
         const cd = cardDB[cn];
         if (!cd) continue;
-        if (cd.cardType !== 'Creature') continue;
+        if (!isPileCreature(cd)) continue;
         deckCounts[cn] = (deckCounts[cn] || 0) + 1;
       }
       const deckGallery = Object.entries(deckCounts)

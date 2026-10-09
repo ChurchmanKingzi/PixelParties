@@ -44,6 +44,8 @@
 //  to pick, no prompt, no bonus, no draw).
 // ═══════════════════════════════════════════
 
+const { isArtifactCreature } = require('./_hooks');
+
 const CARD_NAME = 'Great Detective Doq';
 const ATK_BONUS = 150;
 const DRAW_ON_HIT = 2;
@@ -55,7 +57,8 @@ const TYPE_GROUPS = [
     id: 'action',
     label: '⚔️ Attack / Spell / Creature',
     description: 'Any Attack-, Spell-, or Creature-type card.',
-    match: (cd) => cd?.cardType === 'Attack' || cd?.cardType === 'Spell' || cd?.cardType === 'Creature',
+    // Artifact Creatures (Powder Keg, Debt-O-Trons …) sind in der Hand BEIDES: Artifact und Creature (Als Ruling 9.10.).
+    match: (cd) => cd?.cardType === 'Attack' || cd?.cardType === 'Spell' || cd?.cardType === 'Creature' || isArtifactCreature(cd),
   },
   {
     id: 'artifact',

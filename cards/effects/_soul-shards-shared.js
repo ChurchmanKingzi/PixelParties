@@ -44,6 +44,8 @@
 //  never loaded as a card.
 // ═══════════════════════════════════════════
 
+const { isPileCreature } = require('./_hooks');
+
 const ARCHETYPE = 'Soul Shards';
 
 const SOUL_SHARD_NAMES = new Set([
@@ -108,7 +110,7 @@ function distinctCreatureNamesInDiscard(engine, pi) {
     if (seen.has(name)) continue;
     const cd = cardDB[name];
     if (!cd) continue;
-    if (cd.cardType !== 'Creature') continue;
+    if (!isPileCreature(cd)) continue;   // Ablage-Zaehlung: Artifact Creatures zaehlen (Als Ruling 9.10.)
     seen.add(name);
   }
   return seen.size;

@@ -22,13 +22,17 @@
 //      calling context about the redirect
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType, baseCardName } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Deepsea Encounter';
 
-function _isCreatureTarget(t) {
-  return t?.type === 'equip' && t.cardInstance;
+function _isCreatureTarget(t, engine) {
+  if (!(t?.type === 'equip' && t.cardInstance)) return false;
+  // „level up to 1 higher than the returned Creature's": Artifact Creatures
+  // haben kein Level (Als Ruling 9.10.) — sie sind hier kein Ziel.
+  const cd = engine?.getEffectiveCardData?.(t.cardInstance) || engine?._getCardDB?.()[t.cardInstance.name];
+  return !isArtifactCreature(cd);
 }
 
 module.exports = {
@@ -66,7 +70,7 @@ module.exports = {
 
     // At least one target must be a Creature in one of OUR Support Zones.
     const ownCreatureTargets = targetedHeroes.filter(t =>
-      _isCreatureTarget(t) && t.owner === pi
+      _isCreatureTarget(t, engine) && t.owner === pi
     );
     if (ownCreatureTargets.length === 0) return false;
 
@@ -84,7 +88,7 @@ module.exports = {
         if (baseCardName(name) === baseCardName(bouncedName)) continue;   // v876
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
-        if (!cd || !isPileCreature(cd)) continue;
+        if (!cd || !isSummonablePileCreature(cd)) continue;
         // Effective level honours hand-active reducers (Whoolmoth, …).
         if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         return true;
@@ -100,7 +104,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     // Pick the first own creature-target from the list.
-    const tgt = targetedHeroes.find(t => _isCreatureTarget(t) && t.owner === pi);
+    const tgt = targetedHeroes.find(t => _isCreatureTarget(t, engine) && t.owner === pi);
     if (!tgt) return null;
     const bouncedInst = tgt.cardInstance;
     const bouncedName = bouncedInst.name;
@@ -123,7 +127,7 @@ module.exports = {
       if (n === bouncedName) continue;
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];
-      if (!cd || !isPileCreature(cd)) continue;
+      if (!cd || !isSummonablePileCreature(cd)) continue;
       const lvl = engine.effectiveCardLevel(cd, pi);
       if (lvl > maxLevel) continue;
       seen.add(n);

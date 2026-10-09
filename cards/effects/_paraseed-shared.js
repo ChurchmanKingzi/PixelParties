@@ -106,6 +106,7 @@ async function syncParaseedPoison(engine, physOwner, heroIdx, ignoreInstId) {
     }
     await engine.addHeroStatus(physOwner, heroIdx, 'poisoned', {
       unhealable: true, _paraseed: true, permanent: true,
+      festesZiel: true,   // „that Hero is Poisoned": der Held der Zone steht fest (Als Ruling 9.10.)
       // v1067: Quelle ist Pflicht (siehe _affected-shared). Der Wirker
       // ist der KONTROLLEUR der Paraseed, nicht der Besitzer des
       // vergifteten Helden — beide koennen verschieden sein, seit die

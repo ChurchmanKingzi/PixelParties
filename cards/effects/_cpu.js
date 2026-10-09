@@ -14,8 +14,10 @@ const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./
 // wo es um Karten AUF DEM FELD geht: eine Artifact Creature (Powder Keg,
 // Pollution Spewer, die Debt-O-Trons) ist in einer Support Zone eine Creature
 // und muss in Brettbewertung und Fingerabdruck mitzaehlen. Fuer HANDkarten
-// bleibt der strenge Vergleich richtig — dort ist sie ein Artifact (Als Ruling
-// 17.8., Auslegung in `isPileCreature`).
+// bleibt der strenge Vergleich dort richtig, wo es um den SPIELWEG geht: eine
+// Artifact Creature wird ueber `doPlayArtifact` gespielt (Gold, keine Aktion,
+// kein Level), nicht ueber die Creature-Beschwoerung. Als Creature im Sinne
+// von Suchen/Zaehlen gilt sie seit dem 9.10. ueberall (`isPileCreature`).
 // Learned per-deck profiles (ML-trained via scripts/train-deck-profile.js).
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
@@ -10153,7 +10155,7 @@ function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
  */
 function mctsEnemyCreatureValue(engine, inst) {
   if (!inst) return 1.0;
-  const cd = engine._getCardDB()[inst.name];
+  const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
   if (!cd) return 1.0;
   let value = 1.0;
   const lvl = cd.level || 0;

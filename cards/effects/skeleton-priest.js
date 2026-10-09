@@ -125,14 +125,14 @@ module.exports = {
     const origDealDamage = spellCtx.dealDamage;
     const origDealTrueDamage = spellCtx.dealTrueDamage;
     const origHealHero = spellCtx.healHero;
-    spellCtx.dealDamage = async (target, amount, type) => {
+    spellCtx.dealDamage = async (target, amount, type, opts) => {
       if (target && target === castingHero) {
         return engine.actionDealCreatureDamage(
           spellInst, priestInst, amount, type || 'other',
           { sourceOwner: pi, canBeNegated: false },
         );
       }
-      return origDealDamage(target, amount, type);
+      return origDealDamage(target, amount, type, opts);   // opts (festesZiel …) durchreichen
     };
     spellCtx.dealTrueDamage = async (target, amount, type, opts) => {
       if (target && target === castingHero) {

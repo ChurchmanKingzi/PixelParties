@@ -7,7 +7,7 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -45,7 +45,7 @@ module.exports = {
       for (const name of (ps.hand || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && isPileCreature(c) && (c.level || 0) === 0) {
+        if (c && isSummonablePileCreature(c) && (c.level || 0) === 0) {
           seen.add(name);
           eligibleCards.push({ name, source: 'hand' });
         }
@@ -112,7 +112,7 @@ module.exports = {
           if (currentSeen.has(name)) continue;
           if (ohneZone.has(name)) continue;
           const c = cardDB[name];
-          if (c && isPileCreature(c) && (c.level || 0) === 0) {
+          if (c && isSummonablePileCreature(c) && (c.level || 0) === 0) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'hand' });
           }

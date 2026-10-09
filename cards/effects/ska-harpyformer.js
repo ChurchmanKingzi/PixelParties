@@ -138,6 +138,7 @@ module.exports = {
         } else {
           await engine.actionDealDamage(source, hostSim, 50, 'other', {
             _skipReactionCheck: true,
+            festesZiel: true,   // wie der echte Pfad (Selbstkosten, Als Ruling 9.10.)
           });
           if (hostSim.hp <= 0) {
             hostAliveAfter = false;
@@ -208,7 +209,7 @@ module.exports = {
       // Ziel, sondern eine Selbstverletzung des eigenen Helden als
       // Suchkosten. Waere sie `creature`, wuerde Angler Angel die
       // eigenen Kosten um 50 verteuern. Nicht „korrigieren"!
-      await ctx.dealDamage(hero, 50, 'other');
+      await ctx.dealDamage(hero, 50, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
 
       // Die Suche haengt NUR am bezahlten Schaden, nicht daran, dass der
       // Held ihn ueberlebt (Kartentext: „deal 50 damage … to search").

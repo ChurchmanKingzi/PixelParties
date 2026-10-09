@@ -34,7 +34,7 @@ function gegnerZiele(engine, oi) {
     if ((inst.controller ?? inst.owner) !== oi || inst.zone !== 'support') continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;   // "all targets": Tokens/Artifact Creatures zaehlen (Als Sweep 9.10.)
     // `owner` = physische Seite (fuer Animationen): gestohlene Kreaturen
     // bleiben beim Besitzer stehen, dauerhaft versetzte beim Kontrolleur.
     const seite = inst.stolenBy != null ? inst.owner : (inst.controller ?? inst.owner);
@@ -43,12 +43,14 @@ function gegnerZiele(engine, oi) {
   return out;
 }
 
-async function einfrieren(engine, ziel, { dauer = 1, appliedBy = -1, source = null } = {}) {
+// `festesZiel`: das Ziel steht fest (Vergeltung gegen den Angreifer, Heart of Ice) —
+// Submerged/Stealth & Co. („solange es andere Ziele gibt") schuetzen dann nicht (Als Ruling 9.10.).
+async function einfrieren(engine, ziel, { dauer = 1, appliedBy = -1, source = null, festesZiel = false } = {}) {
   const gs = engine.gs;
   if (ziel.type === 'hero') {
     const h = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
     if (!h?.name || h.hp <= 0) return false;
-    await engine.addHeroStatus(ziel.owner, ziel.heroIdx, 'frozen', { duration: dauer, appliedBy, source });
+    await engine.addHeroStatus(ziel.owner, ziel.heroIdx, 'frozen', { duration: dauer, appliedBy, source, ...(festesZiel ? { festesZiel: true } : {}) });
     return !!h.statuses?.frozen;
   }
   if (!ziel.inst || ziel.inst.zone !== 'support') return false;

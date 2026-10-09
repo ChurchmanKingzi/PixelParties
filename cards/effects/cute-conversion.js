@@ -37,6 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { opponentOfGs } = require('./_opp');
+const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Cute Conversion';
 
 /** Kreaturen des Gegners, die man sich holen kann. */
@@ -49,7 +50,7 @@ function beuteliste(engine, oi) {
     if (inst.stolenBy != null) continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;   // "all Creatures": Tokens/Artifact Creatures zaehlen auf dem Brett (Als Sweep 9.10.)
     out.push(inst);
   }
   return out;

@@ -37,6 +37,8 @@
 //  Einzelzerstoerung.
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 const CARD_NAME = 'Giant Exploding Skull';
 
 /**
@@ -53,7 +55,7 @@ function vonKreaturEffekt(engine, ctx) {
   if (!name) return false;
   const cd = engine._getCardDB()[name];
   if (!cd) return false;
-  return cd.cardType === 'Creature' || cd.cardType === 'Token';
+  return hasCardType(cd, 'Creature') || hasCardType(cd, 'Token');
 }
 
 /** Alle Kreaturen auf dem Brett, beide Seiten. */
@@ -65,8 +67,7 @@ function alleKreaturen(engine) {
     if (inst.faceDown) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd) continue;
-    const typ = (cd.cardType || '');
-    if (typ !== 'Creature' && typ !== 'Token') continue;
+    if (!hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token')) continue;   // 'Creature/Token', Artifact Creatures (Als Sweep 9.10.)
     out.push(inst);
   }
   return out;

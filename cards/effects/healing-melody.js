@@ -112,8 +112,8 @@ module.exports = {
             c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
           );
           if (!inst) continue;
-          const cd = engine._getCardDB()[inst.name];
-          if (!cd || (cd.cardType !== 'Creature' && !(cd.subtype || '').toLowerCase().includes('creature'))) continue;
+          const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
+          if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
           allTargets.push({ type: 'creature', heroIdx: hi, zoneSlot: si, inst, ownerIdx: pi });
         }
       }

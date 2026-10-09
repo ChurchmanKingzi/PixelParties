@@ -33,9 +33,11 @@
 //      – Equipment          → wird ueber `equipArtifactToHero` sofort
 //                             an einen gewaehlten Helden gelegt (mit
 //                             `onPlay`/`onCardEnterZone`).
-//      – Artifact/Creature  → wird ueber `actionPlaceCreature` sofort
-//                             in eine gewaehlte Support Zone gesetzt.
-//      – alles andere       → bekommt den Nullpreis-Vermerk
+//      – alles andere       → (auch Artifact Creatures: Powder Keg,
+//                             Debt-O-Trons … haben feste Beschwoerungs-
+//                             bedingungen, die ein fremder Effekt nicht
+//                             umgehen darf — Als Ruling 9.10.)
+//                             bekommt den Nullpreis-Vermerk
 //                             (`_freeArtifactNames`, Misfire-Vertrag)
 //                             und wird vom Spieler im selben Zug
 //                             regulaer, aber KOSTENLOS gespielt. Deren
@@ -61,9 +63,6 @@ const FLUG_MS      = ZUR_MITTE_MS + HALT_MS + ZUR_HAND_MS;
 const VERSATZ_MS   = 560;   // Abstand zwischen den drei Karten
 
 function istArtefakt(cd) { return !!cd && hasCardType(cd, 'Artifact'); }
-function istArtefaktKreatur(cd) {
-  return istArtefakt(cd) && (cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature');
-}
 
 module.exports = {
   requiresTarget: false,
@@ -173,39 +172,13 @@ module.exports = {
           continue;
         }
 
-        // ── Artefakt-Kreatur: sofort in eine Support Zone ────────
-        if (istArtefaktKreatur(cd)) {
-          const zonen = [];
-          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            const held = ps.heroes[hi];
-            if (!held?.name || held.hp <= 0) continue;
-            for (let si = 0; si < 3; si++) {
-              if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
-                zonen.push({ heroIdx: hi, slotIdx: si, owner: pi, label: `${held.name} · Slot ${si + 1}` });
-              }
-            }
-          }
-          if (zonen.length === 0) {
-            engine.log('deepsea_treasure_skip', { card: name, reason: 'kein_platz' });
-            continue;
-          }
-          const platz = await ctx.promptZonePick(zonen, {
-            title: name,
-            description: `Place ${name} into which Support Zone?`,
-            cancellable: true,
-          });
-          if (!platz) continue;
-          const idx = (ps.hand || []).indexOf(name);
-          if (idx < 0) continue;
-          engine.takeFromPileSync(ps, 'hand', idx);
-          engine.notePlayedFromHand(pi);
-          await engine.actionPlaceCreature(name, pi, platz.heroIdx, platz.slotIdx, {
-            source: 'external', sourceName: CARD_NAME, fireHooks: true,
-          });
-          engine.log('deepsea_treasure_played', { player: ps.username, card: name, as: 'creature' });
-          engine.sync();
-          continue;
-        }
+        // ── Artifact Creatures: NICHT hier platzieren ────────────
+        // Powder Keg, Pollution Spewer und die Debt-O-Trons haben feste
+        // Beschwoerungsbedingungen (Gegnerseite, Kreditrahmen …), die kein
+        // fremder Effekt umgehen darf (Als Ruling 9.10.) — die Engine weist
+        // `actionPlaceCreature` fuer sie ab, und die Karte war dann weg.
+        // Sie bekommen deshalb wie jedes andere Artefakt den Nullpreis-
+        // Vermerk und werden ueber ihren EIGENEN Spielweg gratis gespielt.
 
         // ── Alles andere: Nullpreis-Vermerk (s. Kopf) ────────────
         ps._freeArtifactNames = ps._freeArtifactNames || {};

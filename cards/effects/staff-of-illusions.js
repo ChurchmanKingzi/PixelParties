@@ -20,7 +20,7 @@
 //  discard zone (activeIn includes 'discard').
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME  = 'Staff of Illusions';
 const COST_PER_LEVEL = 10;
@@ -35,14 +35,14 @@ function buildCreatureGallery(ps, cardDB, engine, pi) {
 
   for (const cn of (ps.mainDeck || [])) {
     const cd = cardDB[cn];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     const lvl = effLvl(cd);
     if (lvl > MAX_LEVEL) continue;
     if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'deck', level: lvl });
   }
   for (const cn of (ps.hand || [])) {
     const cd = cardDB[cn];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     const lvl = effLvl(cd);
     if (lvl > MAX_LEVEL) continue;
     if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'hand', level: lvl });

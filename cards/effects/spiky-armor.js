@@ -108,7 +108,8 @@ async function _recoil(engine, ownerPi, source, amount) {
   } else {
     const srcHero = gs.players[source.owner]?.heroes?.[source.heroIdx];
     if (srcHero && srcHero.hp > 0) {
-      await engine.actionDealDamage(recoilSrc, srcHero, amount, 'other');
+      // `festesZiel`: Rueckstoss trifft immer den Angreifer — kein anderes Ziel.
+      await engine.actionDealDamage(recoilSrc, srcHero, amount, 'other', { festesZiel: true });
     }
     engine.log('spiky_armor_recoil', {
       player: ps?.username, attacker: srcHero?.name || '?', amount,

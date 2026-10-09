@@ -23,7 +23,7 @@
 //  Animation: white doves from hero to target.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 const MAX_LEVEL = [1, 2, 3];   // index 0 = Lv1, etc.
 const GOLD_COST = [20, 10, 5]; // index 0 = Lv1, etc.
@@ -87,6 +87,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     // Compare against the target's CURRENT level — Whoolmoth-style
     // reducers fire from opp's own board state, so a rebated Whoolmoth
     // (Lv0) becomes a legal Diplomacy target. Level is read from opp's

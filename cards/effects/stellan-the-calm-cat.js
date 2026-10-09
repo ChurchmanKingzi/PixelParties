@@ -39,7 +39,7 @@
 // ═══════════════════════════════════════════
 
 const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
-const { hasCardType, STATUS_EFFECTS } = require('./_hooks');
+const { hasCardType, isSummonablePileCreature, STATUS_EFFECTS } = require('./_hooks');
 
 const CARD_NAME   = 'Stellan, the Calm Cat';
 const HOPT_KEY    = 'stellanTriggeredThisTurn';
@@ -89,7 +89,7 @@ function levelZeroCreatureNames(engine, playerIdx, source) {
   for (const cn of (source || [])) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isSummonablePileCreature(cd, cn)) continue;   // Pool zum Beschwoeren: keine Artifact Creatures (Als Ruling 9.10.)
     const raw = cd.level || 0;
     // Fast path: already Lv0 on the card face, no walk needed.
     if (raw === 0) { seen.add(cn); result.push(cn); continue; }

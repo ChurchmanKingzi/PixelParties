@@ -244,7 +244,8 @@ module.exports = {
             heroIdx: sourceInfo.heroIdx, zoneSlot: -1,
           });
           await engine._delay(200);
-          await ctx.dealDamage(attacker, damage, 'attack');
+          // `festesZiel`: Vergeltung trifft immer den Angreifer (Als Ruling 9.10.).
+          await ctx.dealDamage(attacker, damage, 'attack', { festesZiel: true });
           if (beforeHp > 0 && attacker.hp <= 0) attackerDefeated = true;
         }
       }

@@ -397,7 +397,8 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx, kitSeite = pi) {
       if (t.type === 'hero') {
         const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];   // Brettseite (Styx 28.9.)
         if (!hero?.name || hero.hp <= 0) continue;
-        await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero');
+        // `festesZiel`: der Gegner waehlt die Ziele selbst ("make your opponent choose", Als Ruling 9.10.).
+        await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero', { festesZiel: true });
       } else if (t.cardInstance) {
         await engine.actionDealCreatureDamage(
           source, t.cardInstance, MODE_B_DAMAGE, 'other',

@@ -26,7 +26,7 @@
 //    beim Zugbeginn).
 //  · Einziger Effekt ist eine Entnahme aus der Ablage → `blockedByPileLock`.
 // ═══════════════════════════════════════════
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Lone Survivor';
 const MAX_LEVEL = 3;
@@ -50,7 +50,7 @@ function kandidaten(engine, pi) {
   for (const n of (ps?.discardPile || [])) {
     if (!engine.darfAusAblageAufsFeld(n)) continue;   // v1389: Gigantisaur, Ifrit
     const cd = db[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > MAX_LEVEL) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);
   }

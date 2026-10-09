@@ -93,6 +93,7 @@ module.exports = {
               permanent: true,
               appliedBy: pi,
               _skipReactionCheck: true,
+              festesZiel: true,   // „it is also Burned": dasselbe Ziel, das eben vergiftet wurde (Als Ruling 9.10.)
             });
             engine.log('luna_pele_burn_apply', {
               player: gs.players[pi]?.username,

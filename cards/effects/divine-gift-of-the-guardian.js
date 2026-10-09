@@ -17,6 +17,8 @@
 //  creatures (like Nao's overheal barrier).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -135,8 +137,8 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (inst.faceDown) continue;
-        const cd = cardDB[inst.name];
-        if (!cd || !cd.cardType?.includes('Creature')) continue;
+        const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
 
         // Set immunity counter
         inst.counters._guardianImmune = true;

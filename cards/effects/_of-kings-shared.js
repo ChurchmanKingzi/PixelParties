@@ -25,7 +25,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //    [W] nur, solange ein Board of Kings liegt. Das gilt fuer die
 //    Zaehlungen dieser Familie (Als Ruling 6.9., Frage 18).
 // ═══════════════════════════════════════════════════════════════════
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isArtifactCreature } = require('./_hooks');
 
 const OF_KINGS = 'of Kings';
 const BOARD  = 'Board of Kings';
@@ -187,12 +187,16 @@ function coveredByBoardOfKings(engine, inst, sourceOwner, source) {
   const controller = inst.controller ?? inst.owner;
   if (sourceOwner == null || sourceOwner === controller) return false;
   if (!boardOfKingsOnBoard(engine)) return false;
+  // „a lower level": Artifact Creatures haben kein Level (Als Ruling 9.10.) — weder
+  // koennen sie geschuetzt sein noch als Schuetzer mit niedrigerer Stufe dienen.
+  if (isArtifactCreature(_cd(engine, inst))) return false;
   const myLevel = boardLevel(engine, inst);
   for (const adj of adjacentSlots(inst.heroIdx, inst.zoneSlot)) {
     const n = instAtSlot(engine, controller, adj.heroIdx, adj.slot);
     if (!n) continue;
     const cd = _cd(engine, n);
     if (!cd || (!hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token'))) continue;
+    if (isArtifactCreature(cd)) continue;
     if (boardLevel(engine, n) >= myLevel) continue;
     if (!protectorAffectable(engine, n, source || { owner: sourceOwner })) continue;
     return true;

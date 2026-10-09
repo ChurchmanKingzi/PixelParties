@@ -84,7 +84,9 @@ async function kettenblitz(engine, cfg) {
       if (tgt.type === 'hero') {
         const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
         if (hero && hero.hp > 0) {
-          const r = await engine.actionDealDamage(quelle, hero, dmg, typ);
+          // `festesZiel`: der GEGNER waehlt diese Ziele selbst ("your opponent has to choose")
+          // — kein Schutz der Bauart "solange es andere Ziele gibt" (Als Ruling 9.10.).
+          const r = await engine.actionDealDamage(quelle, hero, dmg, typ, { festesZiel: true });
           negiert = !!(r?.surpriseNegated || r?.effectNegated);
         }
       } else {

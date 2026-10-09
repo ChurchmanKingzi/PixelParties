@@ -32,7 +32,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  ⑤ BILDER (Als Vorgabe): goldene Partikel auf der Egg beim Erscheinen und
 //     beim Ausloesen ihres Effekts — Zonen-Animation `egg_of_god_glow`.
 // ═══════════════════════════════════════════
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME = 'The Egg of God';
 const TRIBUTES = 1;
@@ -106,7 +106,7 @@ function suchKandidaten(engine, pi, heroIdx, seite = pi) {
   for (const n of (ps?.mainDeck || [])) {
     if (n === CARD_NAME) continue;
     const cd = db[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
     if (heroIdx != null && !engine.isCreatureSummonable(n, seite, heroIdx, { _bypassBeforeSummon: true })) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);

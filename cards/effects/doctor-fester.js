@@ -98,7 +98,7 @@ module.exports = {
         cancellable: true,
       });
       if (!engine._confirmSaidYes(ok)) return false;
-      const bled = await bleedHero(engine, pi, hi, CARD_NAME, pi, { animationType: 'bloody_cut' });
+      const bled = await bleedHero(engine, ctx.cardHeroOwner ?? pi, hi, CARD_NAME, pi, { animationType: 'bloody_cut', festesZiel: true });   // Selbstkosten (Als Ruling 9.10.); Brettseite des (ggf. geliehenen) Helden, wie `hero` oben
       if (!bled) return false;
     }
     engine.log('doctor_fester_bleed_summon', { player: engine.gs.players[pi]?.username, heroIdx: hi });

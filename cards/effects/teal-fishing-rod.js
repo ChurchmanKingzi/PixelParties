@@ -19,7 +19,7 @@
 //  · „1 per turn": harte Sperre je Spieler und Zug (`gs.hoptUsed['teal-fishing-rod:<pi>']`), erst nach der
 //    Bestaetigung der Wahl verbraucht — ein Abbruch verbrennt sie nicht.
 // ═══════════════════════════════════════════
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME = 'Teal Fishing Rod';
 const HOPT = (pi) => `teal-fishing-rod:${pi}`;
@@ -35,7 +35,7 @@ function kandidaten(engine, pi) {
     if (!start.has(n)) continue;                                  // in diesem Zug abgelegt → nicht waehlbar
     if (!engine.darfAusAblageAufsFeld(n)) continue;               // Gigantisaur, Ifrit …
     const cd = db[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     if (cd.level == null) continue;
     if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) !== 0) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);

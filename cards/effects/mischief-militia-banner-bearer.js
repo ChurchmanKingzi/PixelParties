@@ -128,6 +128,7 @@ module.exports = {
           appliedBy: ownerIdx,
           duration: FREEZE_DURATION,
           animationType: 'freeze',
+          festesZiel: true,   // „the target": das getroffene Ziel steht fest (Als Ruling 9.10.)
         });
       }
     } else if (target.inst) {

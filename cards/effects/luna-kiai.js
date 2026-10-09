@@ -146,6 +146,7 @@ module.exports = {
     await engine.addHeroStatus(chosen.owner, chosen.heroIdx, 'burned', {
       permanent: true,
       appliedBy: pi,
+      festesZiel: true,   // Selbstkosten des eigenen Helden (Als Ruling 9.10.)
     });
 
     engine.log('luna_kiai_reveal_burn', {

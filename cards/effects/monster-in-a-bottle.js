@@ -10,7 +10,7 @@
 //  Deleted after use (standard Potion behavior).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const { getCardDB: _getCardDB } = require('./_card-db');
 
@@ -83,7 +83,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
     for (const name of list) {
       if (seen.has(name + ':' + source)) continue;
       const cd = cardDB[name];
-      if (!cd || !isPileCreature(cd)) continue;
+      if (!cd || !isSummonablePileCreature(cd)) continue;
       if (effLvl(cd, source) > 3) continue;
       if (summonBlocked.includes(name)) continue;
       if (source === 'discard' && engine && !engine.darfAusAblageAufsFeld(name)) continue;   // v1389
@@ -154,7 +154,7 @@ module.exports = {
         for (const name of list) {
           if (seen.has(name + ':' + source)) continue;
           const cd = cardDB[name];
-          if (!cd || !isPileCreature(cd)) continue;
+          if (!cd || !isSummonablePileCreature(cd)) continue;
           if (effLvl(cd, source) > 3) continue;
           if (summonBlocked.includes(name)) continue;
           if (source === 'discard' && !engine.darfAusAblageAufsFeld(name)) continue;   // v1389

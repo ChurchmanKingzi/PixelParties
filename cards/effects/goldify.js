@@ -33,24 +33,21 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 // Walk the board for any Creature whose level is ≤ 1. Used both by
 // inherentAction (Main-Phase eligibility) and onPlay (target filtering).
 function hasLowLevelCreatureTarget(gs, engine) {
   if (!engine) return false;
   const cardDB = engine._getCardDB();
-  for (const ps of gs.players) {
-    if (!ps) continue;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      for (let si = 0; si < 3; si++) {
-        const slot = ps.supportZones?.[hi]?.[si] || [];
-        if (slot.length === 0) continue;
-        const cd = cardDB[slot[0]];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if ((cd.level || 0) <= 1) return true;
-      }
-    }
+  // Ueber die INSTANZEN, nicht ueber die Slot-Namen: ein Biomancy-Token liegt unter dem
+  // Namen seiner Potion in der Zone (Als Sweep 9.10.).
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
+    if ((cd.level || 0) <= 1) return true;
   }
   return false;
 }
@@ -125,6 +122,7 @@ module.exports = {
           if (!inst) return false;
           const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
           if (!cd || !hasCardType(cd, 'Creature')) return false;
+          if (!hasNumericCreatureLevel(cd)) return false;   // Gold = 5 x Level: Artifact Creatures haben keins (Als Ruling 9.10.)
           if (restrictToLowLevel && (cd.level || 0) > 1) return false;
           return true;
         },
@@ -144,7 +142,7 @@ module.exports = {
         return;
       }
 
-      const creatureCd = cardDB[inst.name];
+      const creatureCd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten (Als Sweep 9.10.)
       const creatureLevel = creatureCd?.level || 0;
       const goldGain = 5 * creatureLevel;
 

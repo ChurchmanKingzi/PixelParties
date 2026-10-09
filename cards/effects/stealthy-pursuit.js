@@ -113,7 +113,7 @@ function andererWaehlbarerHeld(engine, info) {
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
     if (istVerborgen(gs, h)) continue;                 // gleich geschuetzt zaehlt nicht
     // Kennt der Picker die legalen Ziele der Quelle, entscheidet die Liste.
-    if (liste && !liste.some(t => t?.type === 'hero' && t.owner === physOwner && t.heroIdx === hi)) continue;
+    if (liste && !liste.some(t => t?.type === 'hero' && !t.ineligible && t.owner === physOwner && t.heroIdx === hi)) continue;
     let geblockt = false;
     try {
       const { blocker, ...rest } = info;

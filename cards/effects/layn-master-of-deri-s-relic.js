@@ -66,7 +66,7 @@
 //    spent).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME      = 'Layn, Master of Deri\'s Relic';
 const TARGET_LEVEL   = 1;
@@ -76,7 +76,7 @@ const MAX_PLACEMENTS = 3;
 function hasEligibleCreature(ps, cardDB) {
   return (ps.discardPile || []).some(cn => {
     const cd = cardDB[cn];
-    return cd && isPileCreature(cd) && (cd.level ?? 0) === TARGET_LEVEL;
+    return cd && isSummonablePileCreature(cd) && (cd.level ?? 0) === TARGET_LEVEL;
   });
 }
 
@@ -141,7 +141,7 @@ module.exports = {
     for (const cn of (ps.discardPile || [])) {
       if (!engine.darfAusAblageAufsFeld(cn)) continue;   // v1389
       const cd = cardDB[cn];
-      if (!cd || !isPileCreature(cd) || (cd.level ?? 0) !== TARGET_LEVEL) continue;
+      if (!cd || !isSummonablePileCreature(cd) || (cd.level ?? 0) !== TARGET_LEVEL) continue;
       counts[cn] = (counts[cn] || 0) + 1;
     }
     const galleryCards = Object.entries(counts)

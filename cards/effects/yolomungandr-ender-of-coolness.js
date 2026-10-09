@@ -139,7 +139,7 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   } else {
     for (const inst of engine.cardInstances) {
       if ((inst.controller ?? inst.owner) === oppIdx && inst.zone === 'support') {   // Kontrolle statt Seite
-        const cd = engine._getCardDB()[inst.name];
+        const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
         if (cd && hasCardType(cd, 'Creature')) ziele.push({ type: 'creature', inst });
       }
     }

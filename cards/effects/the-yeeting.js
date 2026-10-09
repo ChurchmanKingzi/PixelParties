@@ -285,7 +285,7 @@ module.exports = {
     }
 
     // ── Deal 150 artifact damage to the Hero ──
-    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact');
+    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
     engine.sync();
     await engine._delay(400);
 
@@ -349,7 +349,7 @@ function _scoreEnemyCard(engine, target) {
   const inst = target._cardInstance;
   if (!inst) return 0;
   const cardDB = engine._getCardDB();
-  const cd = cardDB[inst.name];
+  const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten (Als Sweep 9.10.)
   if (!cd) return 0;
   const gs = engine.gs;
   const oppIdx = inst.owner;
@@ -399,8 +399,7 @@ function _scoreEnemyCard(engine, target) {
     // HINWEIS (Als Klarstellung 5.8.): The Yeeting zielt auf JEDE
     // Nicht-Hero-Karte — die Unterscheidung Artifact/Ability ist hier
     // gar nicht noetig, Cloak of Edge ist ohnehin waehlbar.
-    const isCreature = cd.cardType === 'Creature'
-      || (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'));
+    const isCreature = engine.isChoosableAsCreature(inst, cd);   // Creature, Token, Artifact Creature auf dem Brett
     if (isCreature) {
       // Prefer the real damage-dealt ledger from the CPU stats system
       // (creature instance counters, updated by recordDamageDealt).

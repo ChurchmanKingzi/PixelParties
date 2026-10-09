@@ -8,7 +8,7 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -58,7 +58,7 @@ module.exports = {
       for (const name of (ps.discardPile || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && isPileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+        if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
           seen.add(name);
           eligibleCards.push({ name, source: 'discard' });
         }
@@ -104,7 +104,7 @@ module.exports = {
         for (const name of (ps.discardPile || [])) {
           if (currentSeen.has(name)) continue;
           const c = cardDB[name];
-          if (c && isPileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+          if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'discard' });
           }

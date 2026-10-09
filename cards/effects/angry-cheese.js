@@ -90,7 +90,7 @@ module.exports = {
     // der die Quelle einem Spieler zuordnet) sah darin eine besitzerlose
     // Quelle und liess die 100 durch — die CPU hat sich damit einen
     // Tazune bei 60 HP selbst getoetet.
-    await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other');
+    await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
     engine.sync();
     await engine._delay(400);
 

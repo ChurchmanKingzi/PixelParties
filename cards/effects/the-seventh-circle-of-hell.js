@@ -25,7 +25,9 @@ const CARD_NAME = 'The Seventh Circle of Hell';
 const ENDE = 100;
 const ABGANG = 150;
 
-async function schadenAuf(engine, quelle, ziel, betrag) {
+// `festesZiel`: der Zugspieler waehlt SEINE eigenen Ziele selbst (Zugende-Zweig) — Submerged/Stealth
+// & Co. („solange es andere Ziele gibt") schuetzen dann nicht (Als Ruling 9.10.).
+async function schadenAuf(engine, quelle, ziel, betrag, { festesZiel = false } = {}) {
   engine._broadcastEvent('play_zone_animation', {
     type: 'lava_fountain', owner: ziel.owner, heroIdx: ziel.heroIdx,
     zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
@@ -33,7 +35,7 @@ async function schadenAuf(engine, quelle, ziel, betrag) {
   await engine._delay(650);
   if (ziel.type === 'hero') {
     const h = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
-    if (h && h.hp > 0) await engine.actionDealDamage(quelle, h, betrag, 'other');
+    if (h && h.hp > 0) await engine.actionDealDamage(quelle, h, betrag, 'other', festesZiel ? { festesZiel: true } : undefined);
   } else if (ziel.cardInstance && ziel.cardInstance.zone === 'support') {
     await engine.actionDealCreatureDamage(quelle, ziel.cardInstance, betrag, 'other',
       { sourceOwner: quelle.owner, canBeNegated: true });
@@ -73,7 +75,7 @@ module.exports = {
       });
       const ziel = ziele.find(t => t.id === gewaehlt?.[0]) || ziele[0];
       const quelle = { name: CARD_NAME, owner: ctx.cardOwner, controller: ctx.cardOwner, heroIdx: -1 };
-      await schadenAuf(engine, quelle, ziel, ENDE);
+      await schadenAuf(engine, quelle, ziel, ENDE, { festesZiel: true });
       engine.log('seventh_circle_end', { player: engine.gs.players[tp]?.username, target: ziel.cardName, damage: ENDE });
       engine.sync();
     },

@@ -115,7 +115,7 @@ module.exports = {
     let bestCreature = creatures[0];
     let bestCreatureScore = -Infinity;
     for (const c of creatures) {
-      const cd = cardDB[c.name];
+      const cd = engine.getEffectiveCardData(c.inst) || cardDB[c.name];   // wirksame Daten (Als Sweep 9.10.)
       const lvl = cd?.level || 0;
       const hp = cd?.hp || 0;
       const sc = lvl * 100 + hp;
@@ -169,10 +169,13 @@ module.exports = {
     const zones = ps?.supportZones?.[hi] || [];
     const cardDB = engine._getCardDB();
     let equipCount = 0;
-    for (const slot of zones) {
+    for (let z = 0; z < zones.length; z++) {
+      const slot = zones[z];
       if (!slot || slot.length === 0) continue;
-      const cd = cardDB[slot[0]];
-      if (cd && cd.cardType !== 'Creature') equipCount++;
+      const inst = (engine.cardInstances || []).find(c => c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === z
+        && c.name === slot[0] && engine.physicalSide(c) === pi);
+      const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];   // wirksame Daten (Als Sweep 9.10.)
+      if (cd && !engine.isChoosableAsCreature(inst, cd)) equipCount++;
     }
     return maxLvl * 100 - equipCount;
   },
@@ -361,12 +364,12 @@ function _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur = null) {
     const slot = (ps.supportZones[heroIdx] || [])[zi] || [];
     if (slot.length === 0) continue;
     const name = slot[0];
-    const cd = cardDB[name];
-    if (!cd || cd.cardType !== 'Creature') continue;
     const inst = engine.cardInstances.find(c =>
       c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === name
     );
     if (!inst || inst.faceDown) continue;
+    const cd = engine.getEffectiveCardData(inst) || cardDB[name];   // wirksame Daten (Als Sweep 9.10.)
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;   // "move a Creature": Tokens/Artifact Creatures zaehlen
     // Styx 28.9.: verschiebbar ist nur, was der Nutzer der Skates
     // kontrolliert (Kreaturen gehen bei Uebernahme nicht mit).
     if (kontrolleur != null && (engine.effektiveSeiten(inst).controller ?? inst.owner) !== kontrolleur) continue;

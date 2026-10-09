@@ -45,7 +45,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const DEEPSEA_ARCHETYPE = 'Deepsea';
 
@@ -69,9 +69,12 @@ const DEEPSEA_ARCHETYPE = 'Deepsea';
 function isDeepseaCreature(cardName, engine, inst = null) {
   if (!cardName || !engine) return false;
   const cardDB = engine._getCardDB();
-  const cd = cardDB[cardName];
+  // Auf dem Brett zaehlen die WIRKSAMEN Daten (Tokens unter Potion-Namen, Artifact Creatures,
+  // Als Sweep 9.10.); ausserhalb bleibt es beim strikten Kartentyp.
+  const onBoard = !!(inst && inst.zone === 'support');
+  const cd = (onBoard ? engine.getEffectiveCardData(inst) : null) || cardDB[cardName];
   if (!cd) return false;
-  if (cd.cardType !== 'Creature') return false;
+  if (onBoard ? !hasCardType(cd, 'Creature') : cd.cardType !== 'Creature') return false;
 
   // ── BOARD-ONLY-ZUGEHÖRIGKEIT (Als Ruling 1.8.) ───────────────────
   // Karten mit `isDeepseaOnBoard` zählen AUSSCHLIESSLICH als Deepsea,
@@ -882,9 +885,12 @@ async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
 // mid-flight. Factored out of deepsea-castle.js so future cards can
 // reuse the exact animation + hook sequence.
 
-/** All own Creatures in support zones (any archetype, any turn-played). */
-function ownSupportCreatures(engine, pi) {
-  const { hasCardType } = require('./_hooks');
+/** All own Creatures in support zones (any archetype, any turn-played).
+ *  `opts.needsLevel`: der Aufrufer rechnet mit der STUFE der Creature (Deepsea
+ *  Castle, Shapeshift: „level <= that Creature's") — Artifact Creatures haben
+ *  keine (Als Ruling 9.10.) und bleiben dann draussen. */
+function ownSupportCreatures(engine, pi, opts = {}) {
+  const { hasCardType, isArtifactCreature } = require('./_hooks');
   const cardDB = engine._getCardDB();
   const out = [];
   for (const inst of engine.cardInstances) {
@@ -893,6 +899,7 @@ function ownSupportCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (opts.needsLevel && isArtifactCreature(cd)) continue;
     out.push(inst);
   }
   return out;
@@ -917,7 +924,7 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
     if (seen.has(n)) continue;
     if (n === excludeName) continue;
     const cd = cardDB[n];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     // Effective level — per-slot offsets + active `reduceCardLevel`
     // hooks (Whoolmoth, etc.) flow through here.
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });

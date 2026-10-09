@@ -269,6 +269,7 @@ module.exports = {
         // on the Hero is helpful so the player can see the spread.
         animationType: statusName === 'frozen' ? 'freeze' : undefined,
         _viaChillyWizard: true,
+        festesZiel: true,   // „the corresponding Hero": die Zone legt es fest (Als Ruling 9.10.)
       });
       engine.log('chilly_wizard_mirror', {
         target: hostHero.name, status: statusName,

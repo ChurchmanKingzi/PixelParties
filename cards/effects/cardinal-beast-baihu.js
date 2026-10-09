@@ -62,8 +62,8 @@ module.exports = {
     for (const inst of engine.cardInstances) {
       if ((inst.controller ?? inst.owner) !== oppIdx || inst.zone !== 'support' || inst.faceDown) continue;
       if (inst.counters._baihuStunned) continue; // Already stunned
-      const cd = cardDB[inst.name];
-      if (!cd || cd.cardType !== 'Creature') continue;
+      const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
+      if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
       const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
       if (hp <= 0) continue;
       targets.push({

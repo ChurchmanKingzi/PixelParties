@@ -17533,7 +17533,7 @@
     "hp": 1,
     "atk": null,
     "cost": 4,
-    "effect": "Place this card into an opponent's Hero's Support Zone. While this card is placed into a Support Zone, it is treated as a Creature with 1 HP and the following effect: \n\"When this Creature is defeated, deal 150 damage to all Creatures in the corresponding Hero's other Support Zones.\"",
+    "effect": "Place this card into an opponent's Hero's Support Zone. When this Creature is defeated, deal 150 damage to all Creatures in the corresponding Hero's other Support Zones.",
     "archetype": "",
     "setID": "PP SOB",
     "banned": "",

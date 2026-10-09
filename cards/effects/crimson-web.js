@@ -274,6 +274,7 @@ module.exports = {
     await engine.addHeroStatus(attackerOwner, attackerHi, 'webbed', {
       permanent: true,
       appliedBy: ownerIdx,
+      festesZiel: true,   // trifft immer den Angreifer (Als Ruling 9.10.)
     });
 
     engine.log('crimson_web_attached', {

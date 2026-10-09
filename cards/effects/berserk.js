@@ -118,6 +118,7 @@ module.exports = {
           appliedBy: pi,
           source: CARD_NAME,
           animationType: 'dark_swarm',
+          festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewaehlt (Als Ruling 9.10.)
         });
       } else {
         engine.log('berserk_extra_copy_noop', {

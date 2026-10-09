@@ -118,6 +118,7 @@ module.exports = {
     await engine._delay(300);
     await engine.actionDealDamage(source, hero, SELF_DAMAGE, 'other', {
       _skipReactionCheck: true, selfInflicted: true,
+      festesZiel: true,   // Selbstkosten (Als Ruling 9.10.)
     });
 
     // Splice the Crystal out of hand and route to deleted pile. Use

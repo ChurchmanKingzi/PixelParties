@@ -604,41 +604,45 @@ function isArtifactCreature(cd) {
 }
 
 /**
- * ALS RULING (17.8., spielweit): **eine Artifact Creature ist NUR auf dem
- * Spielfeld eine Creature.** Ausserhalb — Hand, Deck, Ablagestapel,
- * Loeschstapel, Side Deck — zaehlt sie ausschliesslich als Artifact.
+ * Ist diese Karte in einem STAPEL (Hand, Deck, Ablage, Loeschstapel, Side
+ * Deck) eine Creature — fuer SUCHEN, ZAEHLEN und ZEIGEN?
  *
- * Das ist keine neue Erfindung, sondern die Verallgemeinerung des
- * gedruckten Textes: Powder Keg sagt woertlich "**While this card is
- * placed into a Support Zone**, it is treated as a Creature", und
- * Pollution Spewer "Place this into the free Support Zone of a Hero you
- * control **as a Creature**". Die Kartenwerdung haengt also an der
- * Support Zone. Ab jetzt gilt derselbe Satz fuer alle sieben
- * Artifact-Creatures und fuer jede kuenftige.
+ * ★ Artifact Creatures zaehlen hier mit (Als Ruling 9.10.; das Ruling vom
+ * 17.8. „ausserhalb des Bretts nur Artifact" ist fuer diese Fragen
+ * aufgehoben): Powder Keg, Pollution Spewer und die fuenf Debt-O-Trons
+ * werden von Cute Cheese & Co. gefunden und zaehlen bei „je Creature in
+ * deinem Ablagestapel" mit.
  *
- * DIE GRENZE IST DIE SUPPORT ZONE, nicht "das Brett": in der Surprise
- * Zone liegt die Karte verdeckt und ist noch in keiner Support Zone.
+ * ★ BESCHWOEREN und PLATZIEREN ist etwas anderes: dafuer nimm
+ * `isSummonablePileCreature`. Artifact Creatures haben feste
+ * Beschwoerungsbedingungen (Gold, Kreditrahmen, Gegnerseite …), die ein
+ * fremder Effekt nicht umgehen darf — die zentralen Riegel in
+ * `summonCreatureWithHooks` / `actionPlaceCreature` weisen sie ab
+ * (`artifact_creature_summon_blocked` / `_place_blocked`), nur der eigene
+ * Spielweg der Karte (`opts.selfPlacement`) darf sie setzen.
  *
- * WANN DIESEN HELFER NEHMEN: immer dann, wenn ein Effekt einen STAPEL
- * nach Creatures durchsucht, zaehlt oder daraus beschwoert/belebt —
- * Tutor-Suchen, Wiederbelebungen aus der Ablage, "je Creature in deinem
- * Ablagestapel". Fuer Karten, die bereits IN einer Support Zone liegen
- * (Instanz-Scans ueber `cardInstances`, `supportZones`, Todesereignisse),
- * bleibt `hasCardType(cd, 'Creature')` richtig — dort IST sie eine
- * Creature.
- *
- * Merkhilfe fuer den Unterschied: `hasCardType` fragt "was steht auf der
- * Karte?", `isPileCreature` fragt "was ist sie DORT, wo sie liegt?".
- *
- * Karten mit `cardType === 'Creature'` sind nicht betroffen — der Fall
- * entsteht ausschliesslich ueber den `subtype`-Zweig in `hasCardType`.
- * Creature-TOKEN behalten ihre Creature-Eigenschaft ueberall: sie sind
- * keine Artifacts.
+ * Merkhilfe fuer den Unterschied zu `hasCardType`: das fragt „was steht
+ * auf der Karte?", dies fragt „ist sie DORT, wo sie liegt, eine Creature?".
+ * Creature-TOKEN waren nie betroffen: sie sind keine Artifacts.
  */
 function isPileCreature(cd) {
   if (!cd) return false;
-  if (isArtifactCreature(cd)) return false;
   return hasCardType(cd, 'Creature');
+}
+
+/**
+ * Creature im Stapel, die ein FREMDER Effekt auf die EIGENE Brettseite
+ * beschwoeren oder platzieren darf: `isPileCreature`, aber ohne Artifact
+ * Creatures (feste Beschwoerungsbedingungen, s. dort) und ohne Karten mit
+ * `placesOnOpponentBoard` (Powder Keg darf nie auf die eigene Seite).
+ * Fuer jeden Pool, aus dem ein Effekt etwas aufs Brett legt —
+ * Beschwoerungen, Wiederbelebungen, Platzierungen. Wer nur sucht oder
+ * zaehlt, nimmt `isPileCreature`.
+ */
+function isSummonablePileCreature(cd, cardName) {
+  return isPileCreature(cd)
+    && !isArtifactCreature(cd)
+    && isOwnSideSummonableCreature(cd, cardName);
 }
 
 /**
@@ -1071,6 +1075,7 @@ module.exports = {
   kontrollRechteVon,
   KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
+  isSummonablePileCreature,
   resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

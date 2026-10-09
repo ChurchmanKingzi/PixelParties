@@ -37,7 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
-const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
 
 /**
@@ -134,7 +134,7 @@ module.exports = {
       const effLevels = {};
       for (const name of deck) {
         const cd = cardDB[name];
-        if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
+        if (!cd || !isSummonablePileCreature(cd, name)) continue;
         const lvl = engine.effectiveCardLevel(cd, pi);
         if (lvl > 3) continue;
         if (!engine.isCreatureSummonable(name, pi, userHeroIdx)) continue;

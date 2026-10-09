@@ -157,7 +157,7 @@ function alleZiele(engine) {
   const { hasCardType } = require('./_hooks');
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
-    if (!hasCardType(cardDB[inst.name], 'Creature')) continue;
+    { const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name]; if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue; }   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
     ziele.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,

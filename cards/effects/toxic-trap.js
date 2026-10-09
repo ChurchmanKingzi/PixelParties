@@ -148,6 +148,7 @@ module.exports = {
 
       await engine.addHeroStatus(attackerOwner, attackerHeroIdx, 'poisoned', {
         addStacks: 1, appliedBy: pi,
+        festesZiel: true,   // Vergeltung trifft immer den Angreifer (Als Ruling 9.10.)
       });
 
       engine.log('poison_applied', {

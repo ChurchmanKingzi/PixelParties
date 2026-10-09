@@ -89,7 +89,7 @@ function makeLv1SacrificeSpec(engine) {
   const notFresh = notSummonedThisTurn(engine);
   return {
     ...makeSacrificeSpec(engine),
-    filter: (c) => notFresh(c) && (c.level || 0) <= 1,
+    filter: (c) => notFresh(c) && c.hasLevel && (c.level || 0) <= 1,   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     description: 'Sacrifice 2 or more Level 1 or lower Creatures (not summoned this turn) with combined max HP ≥ 300.',
   };
 }

@@ -128,6 +128,7 @@ module.exports = {
       const source = { name: CARD_NAME, owner: ownerPi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner };
       await engine.actionDealDamage(source, attacker, SPIKE_DAMAGE, 'other', {
         _skipReactionCheck: true,
+        festesZiel: true,   // Vergeltung trifft immer den Angreifer (Als Ruling 9.10.)
       });
     }
 

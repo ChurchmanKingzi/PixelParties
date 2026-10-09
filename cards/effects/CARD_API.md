@@ -188,6 +188,89 @@ damit Flächenschaden abprallen, obwohl ihr Text nur „chosen" sagt
 (v634 hatte das bewusst ausgenommen). Stand: Stealth und Stealthy
 Pursuit = nur Wahl; Future Tech Jetpack und Dive Down = Wahl und Treffer.
 
+**★ Einzelziel-Quellen und Rückstoß — „solange es andere Ziele gibt" gilt
+nicht gegen sie (Als Ruling 9.10.):** „while you control other targets
+that can be chosen / hit / affected **by them**" meint die Ziele DIESER
+Quelle. Eine Quelle, die von Natur aus nur einen Helden treffen kann
+(Slippery Spikeblock, Slippery Snowman, Moonlight Butterfly: immer das
+Gegenüber), hat kein anderes Ziel — Submerged (Jump in the River) und
+Dive Down schützen dann nicht. **Rückstoß** gilt immer so: wen er trifft,
+bestimmt der Effekt selbst (Wirker, Angreifer, eigene Wahl), nicht der
+Gegner (Fire Bolts, Phoenix Tackle, Victory Phoenix Cannon, Fireshield,
+Spiky Armor, Stegon, Phoenix Bombardment). **Vergeltung** gegen den
+Angreifer ist ebenfalls immer so (Als Ruling 9.10.) — der Angreifer ist das
+einzige Ziel: Booby Trap, Firewall, Frost Rune, Mountain Tear River
+(nur der Angreifer, nicht die zwei Zusatzziele), Spike Trap, Tharxian
+Horse, Toxic Trap, Crimson Web. **Wählt der GEGNER seine Ziele selbst**
+(„your opponent has to choose …"), gilt es ebenso: Chain Lightning, Bottled
+Lightning und Cardinal Beast Qinglong (zusammen über `_kettenblitz-shared`),
+Gathering Storm, Kits zweiter Modus, Ghoul Guards Bleed-Wahl — und Party
+Crasher („to your opponent's chosen Hero") sowie Cyclson, sobald sie ein
+Skript bekommen. Das Opfer kann sich sonst über Submerged oder Dive Down
+herauswählen. Wählt dagegen der SPIELER das Ziel (Telekinesis, Lunas
+Firewall-Ziele, Smugness, Shield of Death, Assault Eagle), gibt es
+Alternativen und `festesZiel` bleibt aus.
+
+Die Quelle sagt es an: `actionDealDamage(src, hero, n, type, { festesZiel:
+true })`, `addHeroStatus(pi, hi, status, { festesZiel: true })`,
+`ctx.dealDamage(hero, n, type, { festesZiel: true })`. Der Schadenstyp
+`'recoil'` zählt von selbst; bucht eine Karte ihren Rückstoß unter
+`'other'` oder `'destruction_spell'`, setzt sie die Option. Nur setzen, wenn
+es wirklich KEINE Alternative gibt (Whoolmoths Stomp: nur ohne Creature in
+der Spalte). **Eine Stelle für die Frage:** `engine.istEinzelzielTreffer(type,
+opts)` — Engine, `isSubmergedProtected(owner, hero, { festesZiel })` und
+Nachbauten der Immunität (Bubbles' `predictedDamage`, Chuck the Crazy
+Veterans Schild über `ctx.festesZiel`) lesen sie, nie die Bedingung
+nachbauen. Der `info` des Schadenspfads trägt `festesZiel`; ein neuer
+Schutz der Bauart „while other targets" steigt bei `info.festesZiel` aus.
+
+**Gemeinsame Helfer reichen die Option mit:** `bleedHero(…, { festesZiel })`
+(`_bleed-shared`), `einfrieren(engine, ziel, { festesZiel })`
+(`_frost-shared`; Heart of Ice setzt sie, die Flächen Iceage und Yuki-Onna
+nicht), `kettenblitz(…)`. Wer `ctx.dealDamage` umbiegt (Demon's Gate,
+Skeleton Priest/Wizard), muss das vierte Argument `opts` durchreichen —
+sonst geht `festesZiel` auf dem Weg verloren. **Feste Ziele aus dem Sweep
+9.10.:** „the corresponding Hero" (500 Piranhas in a Monster Suit,
+Rha'Bi — die Zone der Karte legt es fest), Vergeltung gegen den Angreifer
+(Heart of Ice, Zombified Assault), und der Zugspieler, der SEINE Ziele
+selbst wählen muss (The Seventh Circle of Hell, Zugende-Zweig).
+
+**Selbstkosten (Entscheidung 9.10.: ja, alle).** Zahlt der Wirker Schaden
+oder einen Status an einem EIGENEN Helden als Preis oder Nachteil — Angry
+Cheese, Empty Armor, Diamond the Keeper of Peace, Mana Absorbing Crystal,
+Luna Kiai, Ska Harpyformer, The Yeeting, Torchure, Zsos'sar, Forceful
+Revival, Doctor Fester, Performance (der Schaden beim Anlegen) —, gilt es
+wie Rückstoß: `festesZiel: true`. Auch die CPU-Simulation einer solchen
+Karte (Ska) gibt die Option mit.
+
+**An einen Helden gebundene Effekte (Entscheidung 9.10.: ja, wo der Text
+den Helden festlegt).** „That Hero / the target / it / the corresponding
+Hero / the Hero this Spell is attached to" — der Held steht durch Karte,
+Zone, frühere Wahl oder den auslösenden Treffer fest: Vena (Kopfgeld-Held),
+Aquatic Spear (Surprise-Folgetreffer; die freie Wahl beim Abgang bleibt
+ohne), Berserk, Luna Pele (der Folge-Burn), Mischief Militia Banner Bearer
+und Chilly Wizard, Paraseed, Sleeping Beauty, Reiza, Flame/Poisoned/Hydra
+Blood Arrow, Refreshing Night. **Umleitungen** (Bubbles, Johanna, Prophecy
+of Tempeste, Puppets/Bonded Companions, Overheal Shock) bleiben ohne: die
+Quelle hat ihr Ziel schon gewählt und den Schutz bestanden.
+
+Bei der WAHL entscheidet dieselbe Frage die Liste der legalen Ziele
+(`info.allTargets`): Stealth, Dive Down, Stealthy Pursuit und Alliance
+zählen nur Helden/Creatures als Ausweichziel, die die Quelle auch anbietet
+(Spalten-Filter, `condition`). Alle drei Zielwähler reichen sie mit —
+`promptDamageTarget`, `promptMultiTarget` und der Dispatcher
+`promptEffectTarget`. Der Dispatcher wertet erst die ganze Liste aus und
+markiert danach (`ineligible`): würde jedes Ziel sofort markiert, sähe das
+nächste es als „schon gesperrt" und das Ergebnis hinge von der Reihenfolge ab.
+**`untargetable` / `invisible` gelten an allen drei Zielwählern** (Als Ruling
+9.10.): bis dahin nur in `promptDamageTarget` und `promptMultiTarget` — eine
+Karte, die ihre Heldenliste selbst baut und an `promptEffectTarget` reicht,
+konnte einen Butterfly-Cloud- oder Invisibility-Helden wählen. Der Dispatcher
+fragt jetzt `engine._untargetableHeroIds(validTargets, pi)`: je Seite gilt
+ein Held als geschützt, solange die Quelle einen ungeschützten derselben Seite
+anbietet; bietet sie nur den geschützten an, oder sind alle geschützt, bricht
+der Schutz zusammen (Chuck hebt ihn für seine Seite auf).
+
 **Liegt die regelgebende Karte nicht mehr auf dem Brett** (eine
 Reaction, die sich selbst löscht), hängt sie ihre Regel an den Helden:
 `engine.addHeroTargetBlocker(pi, heroIdx, 'Dive Down', { untilTurn })`.
@@ -6272,6 +6355,79 @@ Karten, die ihren Zugriff aus historischen Gruenden VON HAND buchen,
 rufen `engine.noteDeckTutor(pi, cardName, source, spec)` zusaetzlich —
 sonst sind sie fuer Verdoppler unsichtbar. Besser ist der kanonische
 Helfer; Graveyard Gathering wurde bei diesem Sweep darauf umgestellt.
+
+**★ Artifact Creatures in Stapeln: suchen ja, beschwören nein (Als Ruling
+9.10.).** Das Ruling vom 17.8. „ausserhalb des Bretts nur Artifact" gilt
+für SUCHEN, ZÄHLEN und ZEIGEN nicht mehr: `isPileCreature(cd)` ist wahr
+für Powder Keg, Pollution Spewer und die Debt-O-Trons, Cute Cheese & Co.
+finden sie. **Beschwören und Platzieren bleibt ihnen durch fremde Effekte
+verwehrt** — sie haben feste Beschwörungsbedingungen (Gold, Kreditrahmen,
+Gegnerseite …), die ein fremder Effekt nicht umgehen darf. Die zentralen
+Riegel (`artifact_creature_summon_blocked` in `summonCreatureWithHooks`,
+`artifact_creature_place_blocked` in `actionPlaceCreature`) gelten
+unverändert; nur der Eigenweg der Karte setzt `opts.selfPlacement`.
+
+**Regel für Pool-Bauer:** wer aus einem Stapel etwas aufs Brett legt
+(Beschwören, Wiederbeleben, Platzieren), nimmt
+`isSummonablePileCreature(cd)` — das ist `isPileCreature` ohne Artifact
+Creatures und ohne `placesOnOpponentBoard` (Powder Keg). Wer nur sucht
+oder zählt, nimmt `isPileCreature`. Sonst bietet die Galerie Karten an, die
+die Engine danach abweist.
+
+**★ Artifact Creatures haben kein Level — Effekte, die ein Creature-Level
+erfordern, funktionieren bei ihnen nicht (Als Ruling 9.10.).** Powder Keg,
+Pollution Spewer und die Debt-O-Trons tragen `level: null`. Jeder Effekt,
+der das Level einer Creature braucht — Stufen-Grenze („level 2 or lower"),
+Stufen-Gleichheit („the same level"), Stufen-Summe (Tribut, Budget),
+Kosten oder Ertrag nach Stufe, die Stufe des Opfers —, nimmt sie nicht als
+Ziel, Opfer oder Kandidat. Das gilt auch für Necromancy und die Familie
+(strikt `cardType === 'Creature'`, dazu die Riegel gegen fremde
+Beschwörungen). **Dafür `hasNumericCreatureLevel(cd)` aus `_hooks.js`
+nehmen** — nie `cd.level || 0` oder `cd.level ?? 0`: das macht aus „kein
+Level" ein „Level 0" und lässt die Karte durch jedes „≤ N". Vorbilder:
+Diplomacy, Goldify, Sabrina, Old Couple, Dark Deepsea God, Spirit of the
+Forbidden Grimoire, Dark Gear, Singing, Surprise Party (`99` statt `0`).
+
+**Wo das Level der Creature steckt — die Stellen, die der Sweep 9.10.
+umgestellt hat (Vorbilder für neue Karten):**
+
+- **Opfer-Listen:** `engine.getSacrificableCreatures(pi)` liefert je Eintrag
+  `hasLevel` (`false` für Artifact Creatures). `level` bleibt für die
+  Rechnerei `0`; jeder Filter, der die Stufe des Opfers auswertet (Garius,
+  Ladder to the Sky, Soul Transmigration Ritual, Steam Dwarf Dragon
+  Pilot), verlangt zuerst `c.hasLevel`.
+- **Brett-Sammler mit Stufe:** `ownSupportCreatures(engine, pi, { needsLevel:
+  true })` (`_deepsea-shared.js`) lässt Artifact Creatures weg — Deepsea
+  Castle, Shapeshift. Ohne die Option (Slippery Ice: „move a Creature",
+  keine Stufe) sind sie dabei.
+- **„Original level"-Schutz im Schadensstapel:** `entry.originalLevel` ist
+  für Artifact Creatures `null` (nicht `0`) — Diamond und Psychic Scout
+  fragen `=== 0`.
+- **Stufen-Mengen und Bounce-Ziele** (The Cosmic Depths, Divine Gift of the
+  Deepsea, Deepsea Encounter, Board of Kings) überspringen Artifact
+  Creatures über `isArtifactCreature(cd)` der **wirksamen** Kartendaten
+  (Tokens ohne eigenes Level, z. B. Fantasy Buddy, behalten ihr bisheriges
+  Verhalten).
+- **Zählen mit „Level 0"** (Shiny/Splashy Slime): wirksame Kartendaten,
+  `hasCardType(cd, 'Creature')` und kein Artifact — Puppets („wählbar als
+  Creature") und Artifact Creatures zählen nicht.
+
+**Kartentyp deklarieren** (Great Detective Doq, Sparkfly Queen): eine
+Artifact Creature in Hand oder Deck trifft BEIDE Gruppen — „Attack / Spell /
+Creature" und „Artifact" (Als Ruling 9.10.). Neue Typ-Deklarationen
+ergänzen `|| isArtifactCreature(cd)` in der Creature-Gruppe.
+
+**Direkte Platzierer** (`_trackCard` / `supportZones[...] = [...]`: Bottle,
+Barker, Slimes, Create Illusion, Layn, Staff of Illusions, Omikron, Army of
+the Cute) umgehen die zentralen Riegel — ihr Pool muss selbst
+`isSummonablePileCreature` (bzw. `!isArtifactCreature && isOwnSideSummonableCreature`)
+fragen.
+
+**Brett-Erkennung bei Tokens:** ein Biomancy-Token trägt den Namen einer
+Potion; „ist das eine Creature?" liest die **wirksamen** Daten
+(`engine.getEffectiveCardData(inst) || cardDB[inst.name]`), nie nur
+`cardDB[inst.name]`. „Alle Creatures" → `hasCardType(cd, 'Creature')`;
+„wählbares Ziel" → `engine.isChoosableAsCreature(inst, cd)` (Puppets).
 
 ## Abwurf-Kosten: kein Ja/Nein-Vorspann (v718, Als Vorgabe 4.9. — STANDARD)
 

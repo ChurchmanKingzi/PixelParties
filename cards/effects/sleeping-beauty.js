@@ -127,7 +127,8 @@ module.exports = {
       const linkedHero = gs.players[linkedOwner]?.heroes?.[linkedIdx];
       if (!linkedHero?.name || linkedHero.hp <= 0) return; // Already dead.
       const source = { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: -1 };
-      await engine.actionDealDamage(source, linkedHero, ON_DEFEAT_DAMAGE, 'creature');
+      // „that Hero": der beim Beschwoeren gewaehlte Held steht fest (Als Ruling 9.10.).
+      await engine.actionDealDamage(source, linkedHero, ON_DEFEAT_DAMAGE, 'creature', { festesZiel: true });
       engine.log('sleeping_beauty_death_damage', {
         owner: linkedOwner, hero: linkedHero.name,
         amount: ON_DEFEAT_DAMAGE,

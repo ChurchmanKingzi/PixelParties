@@ -30,7 +30,7 @@
 //  Spell to hand, nothing wasted).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { heroHasCuteWings } = require('./_cute-shared');
 
 const CARD_NAME = 'Army of the Cute';
@@ -41,7 +41,8 @@ const CARD_NAME = 'Army of the Cute';
  *  qualifies. (`heroIdx == null` → no Wings context, printed-Cute only.) */
 // Als Befund 29.9.: `hs` = Brettseite des Nutzers (geliehener Held), Standard `pi`.
 function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
-  if (!cd || !hasCardType(cd, 'Creature')) return false;
+  // Platziert wird direkt (Splice/_trackCard) — die zentralen Riegel greifen nicht, also hier filtern.
+  if (!cd || !isSummonablePileCreature(cd, cd.name)) return false;
   if (cd.archetype === 'Cute') return true;
   return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, hs, heroIdx);
 }

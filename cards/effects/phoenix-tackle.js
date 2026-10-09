@@ -115,7 +115,9 @@ module.exports = {
       if (hero.hp > 0) {
         engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
         await engine._delay(200);
-        await ctx.dealDamage(hero, recoil, 'other');
+        // `festesZiel`: Rueckstoss trifft immer den Wirker — kein Schutz der Bauart
+        // „solange es andere Ziele gibt" (Submerged, Dive Down, …) greift.
+        await ctx.dealDamage(hero, recoil, 'other', { festesZiel: true });
         engine.sync();
       }
     },

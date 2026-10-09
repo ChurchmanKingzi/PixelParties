@@ -318,7 +318,8 @@ module.exports = {
               // `source` als Schluessel: ein Flaechenschlag reicht dasselbe
               // Objekt an jeden Treffer weiter → EIN Auftritt, nicht je Ziel.
               await engine.announceHookActivation(CARD_NAME, ownerIdx, { source });
-              await engine.actionDealDamage(source, tgtHero, dmg, 'destruction_spell');
+              // `festesZiel`: der Gegner waehlt seine Ziele selbst (Als Ruling 9.10.).
+              await engine.actionDealDamage(source, tgtHero, dmg, 'destruction_spell', { festesZiel: true });
             }
           } else {
             const inst = t.cardInstance || engine.cardInstances.find(c =>

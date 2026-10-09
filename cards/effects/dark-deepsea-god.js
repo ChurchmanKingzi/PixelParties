@@ -65,7 +65,7 @@
 //      no valid tribute set is available.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Dark Deepsea God';
@@ -95,6 +95,8 @@ function _collectTributeCandidates(engine, playerIdx, selfId) {
   // DDG enforces it here.
   const currentTurn = engine.gs.turn || 0;
   cs = cs.filter(c => c.inst.turnPlayed !== currentTurn);
+  // Der Tribut zaehlt Levels zusammen — Artifact Creatures haben keins (Als Ruling 9.10.).
+  cs = cs.filter(c => hasNumericCreatureLevel(engine.getEffectiveCardData(c.inst) || engine._getCardDB()[c.inst.name]));
   return cs;
 }
 

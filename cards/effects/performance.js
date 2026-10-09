@@ -75,7 +75,7 @@ module.exports = {
       // Kopie-Wirkung darunter (Fighting-ATK usw.) laeuft trotzdem.
       const hero = ctx._verwahrungRueckkehr ? null : ctx.attachedHero;
       if (hero) {
-        await ctx.dealDamage(hero, 50);
+        await ctx.dealDamage(hero, 50, undefined, { festesZiel: true });   // „the Hero you attach this Ability to": Preis des Anlegens (Als Ruling 9.10.)
       }
 
       // Performance copies the ability below it — delegate to that ability's onPlay.

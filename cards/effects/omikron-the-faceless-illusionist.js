@@ -29,7 +29,7 @@
 //  HOPT enforced by engine (heroEffect: true).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isArtifactCreature, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Omikron, the Faceless Illusionist';
 
@@ -76,7 +76,8 @@ module.exports = {
     // auto-sacrifice can't run.
 
     const galleryCards = Object.values(cardDB)
-      .filter(cd => hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
+      // Artifact Creatures (feste Beschwoerungsbedingungen) und Powder Keg (Gegnerseite) nie: Omikron platziert direkt, die Engine-Riegel greifen nicht.
+      .filter(cd => hasCardType(cd, 'Creature') && !isArtifactCreature(cd) && isOwnSideSummonableCreature(cd, cd.name) && !hasCardType(cd, 'Token') && cd.subtype !== 'Token' && !!loadCardEffect(cd.name))
       .filter(cd => !usedNames.has(cd.name))
       .filter(cd => engine.isCreatureSummonable(cd.name, feld, heroIdx, { _bypassBeforeSummon: true, beschwoerer: pi }))
       .sort((a, b) => a.name.localeCompare(b.name))

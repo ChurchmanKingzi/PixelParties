@@ -63,6 +63,7 @@ const CARD_NAME = 'Great Offensive';
  */
 function eigeneAktivKreaturen(engine, pi) {
   const { loadCardEffect } = require('./_loader');
+  const { hasNumericCreatureLevel } = require('./_hooks');
   const out = [];
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
@@ -73,8 +74,14 @@ function eigeneAktivKreaturen(engine, pi) {
     // ★★ v1167 (Balancing, Al 17.9.): „All LEVEL 2 AND LOWER Creatures".
     // Massgeblich ist die Karte, die gerade wirkt — bei geliehener
     // Identitaet (`_cardDataOverride`, Copy Device) also deren Stufe.
-    const cd = engine._getCardDB()[inst.counters?._cardDataOverride || inst.counters?._effectOverride || inst.name];
-    if ((cd?.level ?? 99) > 2) continue;
+    // `_cardDataOverride` ist ein DATENOBJEKT (kein DB-Schluessel) — Lawn Gnome,
+    // Copy Device und Biomancy-Token fielen frueher ueber `cardDB[objekt]` raus.
+    // Aktuelle Stufe = Grundstufe + `counters.level` (Slimes, Rocky Slime & Co.).
+    // Artifact Creatures haben kein Level (Als Ruling 9.10.) — nie dabei.
+    const cd = inst.counters?._cardDataOverride
+      || engine._getCardDB()[inst.counters?._effectOverride || inst.name];
+    if (!hasNumericCreatureLevel(cd)) continue;
+    if (Math.max(0, cd.level + (inst.counters?.level || 0)) > 2) continue;
     out.push(inst);
   }
   out.sort((a, b) => (a.heroIdx - b.heroIdx) || (a.zoneSlot - b.zoneSlot));
