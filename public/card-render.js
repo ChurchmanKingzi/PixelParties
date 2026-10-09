@@ -63,10 +63,16 @@
   const SYM_SEP = '(?:\\s*,\\s*|\\s+(?:or|and)\\s+)';
   const SYM_RE = new RegExp('\\b(' + SYM_ALT + ')(?=(?:' + SYM_SEP + '(?:' + SYM_ALT + '))*\\s+Spells?\\b)', 'g');
   const SYM_RE_ALL = new RegExp('\\b(' + SYMBOLS.slice(0, 6).map(x => x[0]).join('|') + ')\\b', 'g');   // nur zum Vergleichen (OPT.symMode = 'all')
+  // Fighting nutzt sein Schwert-Symbol statt „Spells“ fuer Attacks: „Fighting Attacks“ und auf der Faehigkeitskarte
+  // Fighting („Allows the use of Attacks up to Level 1 …“, in jeder Stufe) steht das Symbol vor „Attacks“.
+  const SYM_FIGHT_RE = /\bFighting(?=\s+Attacks?\b)/g;
+  const SYM_FIGHT_USE_RE = /(Allows the use of )(?=Attacks?\b)/g;
   const symbolize = t => {
     t = String(t == null ? '' : t);
     if (OPT.symMode === 'none') return t;
-    return t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
+    t = t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
+    if (OPT.symMode === 'all') return t;
+    return t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
   };
   let symSize = 8.5;                              // Symbolgroesse des Textfelds, das gerade gesetzt wird
   function symAdv(ch) {                           // Breite in Font-Einheiten (haengt nicht von der Schriftgroesse ab)
