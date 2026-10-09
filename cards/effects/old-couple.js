@@ -49,7 +49,7 @@
 //  wird er zurueckgenommen.
 // ═══════════════════════════════════════════
 
-const { hasCardType, sameCardName, cardVariantTag } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel, sameCardName, cardVariantTag } = require('./_hooks');
 
 const CARD_NAME = 'Old Couple';
 
@@ -114,6 +114,7 @@ function partnerImDeck(engine, pi, heroIdx, level, ausgeschlossenerName) {
     if (sameCardName(name, ausgeschlossenerName)) continue;   // „a different name" (Basisname)
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!hasNumericCreatureLevel(cd)) continue;          // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     if ((cd.level ?? 0) !== level) continue;            // „the same level"
     if (!beschwoerbar(engine, pi, heroIdx, name, cd)) continue;
     out.push(name);
@@ -144,6 +145,9 @@ function fensterPasst(gs, pi, engine, chainCtx) {
   // eigener Held mit Support Magic), nicht zwingend vom Beschwoerer.
   const stufe = besteWirkerStufe(engine, pi);
   if (stufe <= 0) return null;
+  // Die beschworene Creature braucht ein Level — Artifact Creatures haben keins (Als Ruling 9.10.).
+  const _beschworen = engine._getCardDB()[h.cardName];
+  if (_beschworen && !hasNumericCreatureLevel(_beschworen)) return null;
   const level = h.level ?? 0;
   if (level > stufe) return null;
 

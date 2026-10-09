@@ -201,9 +201,15 @@ Spiky Armor, Stegon, Phoenix Bombardment). **Vergeltung** gegen den
 Angreifer ist ebenfalls immer so (Als Ruling 9.10.) — der Angreifer ist das
 einzige Ziel: Booby Trap, Firewall, Frost Rune, Mountain Tear River
 (nur der Angreifer, nicht die zwei Zusatzziele), Spike Trap, Tharxian
-Horse, Toxic Trap, Crimson Web. Wählt der Spieler das Ziel (Telekinesis,
-Lunas Firewall-Ziele, Smugness, Shield of Death), gibt es Alternativen und
-`festesZiel` bleibt aus.
+Horse, Toxic Trap, Crimson Web. **Wählt der GEGNER seine Ziele selbst**
+(„your opponent has to choose …"), gilt es ebenso: Chain Lightning, Bottled
+Lightning und Cardinal Beast Qinglong (zusammen über `_kettenblitz-shared`),
+Gathering Storm, Kits zweiter Modus, Ghoul Guards Bleed-Wahl — und Party
+Crasher („to your opponent's chosen Hero") sowie Cyclson, sobald sie ein
+Skript bekommen. Das Opfer kann sich sonst über Submerged oder Dive Down
+herauswählen. Wählt dagegen der SPIELER das Ziel (Telekinesis, Lunas
+Firewall-Ziele, Smugness, Shield of Death, Assault Eagle), gibt es
+Alternativen und `festesZiel` bleibt aus.
 
 Die Quelle sagt es an: `actionDealDamage(src, hero, n, type, { festesZiel:
 true })`, `addHeroStatus(pi, hi, status, { festesZiel: true })`,
@@ -6329,6 +6335,20 @@ unverändert; nur der Eigenweg der Karte setzt `opts.selfPlacement`.
 Creatures und ohne `placesOnOpponentBoard` (Powder Keg). Wer nur sucht
 oder zählt, nimmt `isPileCreature`. Sonst bietet die Galerie Karten an, die
 die Engine danach abweist.
+
+**★ Artifact Creatures haben kein Level — Effekte, die ein Creature-Level
+erfordern, funktionieren bei ihnen nicht (Als Ruling 9.10.).** Powder Keg,
+Pollution Spewer und die Debt-O-Trons tragen `level: null`. Jeder Effekt,
+der das Level einer Creature braucht — Stufen-Grenze („level 2 or lower"),
+Stufen-Gleichheit („the same level"), Stufen-Summe (Tribut, Budget),
+Kosten oder Ertrag nach Stufe, die Stufe des Opfers —, nimmt sie nicht als
+Ziel, Opfer oder Kandidat. Das gilt auch für Necromancy und die Familie
+(strikt `cardType === 'Creature'`, dazu die Riegel gegen fremde
+Beschwörungen). **Dafür `hasNumericCreatureLevel(cd)` aus `_hooks.js`
+nehmen** — nie `cd.level || 0` oder `cd.level ?? 0`: das macht aus „kein
+Level" ein „Level 0" und lässt die Karte durch jedes „≤ N". Vorbilder:
+Diplomacy, Goldify, Sabrina, Old Couple, Dark Deepsea God, Spirit of the
+Forbidden Grimoire, Dark Gear, Singing, Surprise Party (`99` statt `0`).
 
 ## Abwurf-Kosten: kein Ja/Nein-Vorspann (v718, Als Vorgabe 4.9. — STANDARD)
 

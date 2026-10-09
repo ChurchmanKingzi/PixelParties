@@ -44,7 +44,7 @@
 //    Telekinesis's gate.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Sabrina, the Psychic Witch';
@@ -82,6 +82,7 @@ function ownControlledCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!hasNumericCreatureLevel(cd)) continue;   // das Level der Opfer-Creature zaehlt — Artifact Creatures haben keins (Als Ruling 9.10.)
     out.push({ inst, level: cd.level || 0 });
   }
   return out;

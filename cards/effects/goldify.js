@@ -33,7 +33,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 // Walk the board for any Creature whose level is ≤ 1. Used both by
 // inherentAction (Main-Phase eligibility) and onPlay (target filtering).
@@ -48,6 +48,7 @@ function hasLowLevelCreatureTarget(gs, engine) {
         if (slot.length === 0) continue;
         const cd = cardDB[slot[0]];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
         if ((cd.level || 0) <= 1) return true;
       }
     }
@@ -125,6 +126,7 @@ module.exports = {
           if (!inst) return false;
           const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
           if (!cd || !hasCardType(cd, 'Creature')) return false;
+          if (!hasNumericCreatureLevel(cd)) return false;   // Gold = 5 x Level: Artifact Creatures haben keins (Als Ruling 9.10.)
           if (restrictToLowLevel && (cd.level || 0) > 1) return false;
           return true;
         },

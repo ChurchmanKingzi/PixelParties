@@ -78,7 +78,8 @@ module.exports = {
         _skipRedirectCheck: true, _skipPostTargetReactions: true, ignoreUntargetable: true,
       });
       const chosen = (pick && pick.length) ? options.find(t => t.id === pick[0]) : options[0];
-      if (chosen && await bleedTarget(engine, chosen, CARD_NAME, pi, { animationType: 'bloody_cut' })) {
+      // `festesZiel`: der Gegner hat sein Ziel selbst gewaehlt (Als Ruling 9.10.).
+      if (chosen && await bleedTarget(engine, chosen, CARD_NAME, pi, { animationType: 'bloody_cut', festesZiel: true })) {
         engine.log('ghoul_guard_bleed', { player: gs.players[pi]?.username, target: chosen.cardName });
       }
       engine.sync();

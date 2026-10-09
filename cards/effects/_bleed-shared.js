@@ -46,6 +46,8 @@ async function bleedHero(engine, ownerIdx, heroIdx, sourceName, appliedBy, opts 
   await engine.addHeroStatus(ownerIdx, heroIdx, 'bleeding', {
     permanent: true, appliedBy, source: sourceName, _skipReactionCheck: true,
     animationType: opts.animationType || DEFAULT_BLEED_ANIM,
+    // `opts.festesZiel`: der Gegner hat dieses Ziel selbst gewaehlt (Ghoul Guard).
+    ...(opts.festesZiel ? { festesZiel: true } : {}),
   });
   return !!hero.statuses?.bleeding;
 }

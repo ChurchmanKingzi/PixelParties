@@ -40,7 +40,7 @@
 //  ihn nicht noch einmal leihen.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 const { GRIMOIRE_NAME, hasGrimoire } = require('./_fiona-shared');
 
 const CARD_NAME = 'Spirit of the Forbidden Grimoire';
@@ -88,6 +88,7 @@ function sammleKandidaten(engine) {
     let grund = null;
     if (inst.counters?.negated || inst.counters?.nulled) grund = 'negated';
     else if (inst.counters?._effectLockedTurn === engine.gs.turn) grund = 'used this turn';
+    else if (!hasNumericCreatureLevel(cd)) grund = 'no level';   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     else if (levelVon(engine, inst) > MAX_SUMME) grund = `level ${levelVon(engine, inst)}`;
     else if (typeof script.canActivateCreatureEffect === 'function') {
       try {
