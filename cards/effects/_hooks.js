@@ -609,12 +609,14 @@ function isArtifactCreature(cd) {
  * Loeschstapel, Side Deck — zaehlt sie ausschliesslich als Artifact.
  *
  * Das ist keine neue Erfindung, sondern die Verallgemeinerung des
- * gedruckten Textes: Powder Keg sagt woertlich "**While this card is
- * placed into a Support Zone**, it is treated as a Creature", und
- * Pollution Spewer "Place this into the free Support Zone of a Hero you
- * control **as a Creature**". Die Kartenwerdung haengt also an der
- * Support Zone. Ab jetzt gilt derselbe Satz fuer alle sieben
- * Artifact-Creatures und fuer jede kuenftige.
+ * gedruckten Textes: Pollution Spewer sagt "Place this into the free
+ * Support Zone of a Hero you control **as a Creature**", und Powder Keg
+ * sagte es bis zum Rewording vom 9.10. woertlich ("**While this card is
+ * placed into a Support Zone**, it is treated as a Creature") — der Satz
+ * steht nicht mehr auf der Karte, die Regel gilt unveraendert weiter (die
+ * Karte traegt weiter `subtype: 'Creature'` und 1 HP). Die Kartenwerdung
+ * haengt also an der Support Zone. Ab jetzt gilt derselbe Satz fuer alle
+ * sieben Artifact-Creatures und fuer jede kuenftige.
  *
  * DIE GRENZE IST DIE SUPPORT ZONE, nicht "das Brett": in der Surprise
  * Zone liegt die Karte verdeckt und ist noch in keiner Support Zone.
