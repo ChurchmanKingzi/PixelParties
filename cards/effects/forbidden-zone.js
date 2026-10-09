@@ -144,7 +144,7 @@ module.exports = {
               if (!stillOn || stillOn.zone !== 'support' || hpJetzt <= 0) continue;
               if (!(hpJetzt < hpVorher.get(`c${z.inst.id}`))) continue;           // Schaden verpufft
               if (!engine.canApplyCreatureStatus(stillOn, 'negated')) continue;
-              await engine.actionNegateCreature(stillOn, CARD_NAME, { expiresAtTurn, expiresForPlayer });
+              await engine.actionNegateCreature(stillOn, CARD_NAME, { expiresAtTurn, expiresForPlayer, cleansable: true });   // „This counts as a negative status effect."
             }
           }
         },

@@ -5357,18 +5357,10 @@ function sendGameState(room, playerIdx, extra) {
     // Fridge ghost-card race.
     _spellResolutionDepth: gs._spellResolutionDepth || 0,
     terrorCount: gs.activePlayer != null ? (gs._terrorTracking?.[gs.activePlayer] || []).length : 0,
+    // Dieselbe Schwelle wie die Engine (`terrorSchwelle`) — vorher eigene Formel (10 - Stufe).
     terrorThreshold: room.engine ? (() => {
-      let threshold = Infinity;
-      for (let sp = 0; sp < gs.players.length; sp++) {
-        const sps = gs.players[sp]; if (!sps) continue;
-        for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
-          const h = sps.heroes[hi];
-          if (!h?.name || h.hp <= 0 || h.statuses?.negated) continue;
-          let tc = 0; for (const z of (sps.abilityZones[hi] || [])) for (const n of (z || [])) if (n === 'Terror') tc++;
-          if (tc > 0) { const t = 10 - tc; if (t < threshold) threshold = t; }
-        }
-      }
-      return threshold === Infinity ? null : threshold;
+      const { threshold } = room.engine.terrorSchwelle();
+      return Number.isFinite(threshold) ? threshold : null;
     })() : null,
     bonusActions: gs.players[playerIdx]?.bonusActions || null,
     bonusMainActions: gs.players[playerIdx]?._bonusMainActions || 0,

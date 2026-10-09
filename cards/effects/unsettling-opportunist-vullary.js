@@ -158,6 +158,7 @@ module.exports = {
     await engine.applyCreatureStatus(res.inst, 'negated', {
       sourceOwner: pi,
       source: CARD_NAME,
+      keinStatus: true,   // „negate its effects until …" — kein Statuseffekt, nicht heilbar
     });
     res.inst.counters.negated_placement = 1;
     await engine.actionAddCreatureBuff(res.inst, NEGATED_BUFF, {

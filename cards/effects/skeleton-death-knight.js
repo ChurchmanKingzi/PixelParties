@@ -149,6 +149,7 @@ module.exports = {
         await engine.actionNegateCreature(inst, CARD_NAME, {
           expiresAtTurn: gs.turn + 2,
           expiresForPlayer: pi,
+          cleansable: true,   // „This counts as a status effect."
         });
         // Stamp the "Silenced" cosmetic marker. The StatusBadges
         // renderer checks for `c._dkSilenced` and renders the

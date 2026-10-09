@@ -60,8 +60,9 @@ function getTargetCleansableStatuses(target, engine) {
   if (target.type === 'equip') {
     const inst = target.cardInstance;
     if (!inst?.counters) return [];
-    return getCleansableStatuses()
-      .filter(k => inst.counters[k])
+    // Instanz-bewusst: eine Negation, die kein Statuseffekt ist (Cosmic Depths, Dark Gear …),
+    // ist nicht heilbar und darf weder als Ziel noch als Kosten der Karte dienen.
+    return engine.getCleansableCreatureStatusKeys(inst)
       .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
   }
   return [];
@@ -91,7 +92,7 @@ function buildOwnStatusedTargets(engine, pi) {
   const negKeys = getCleansableStatuses();
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
-    if (!negKeys.some(k => inst.counters?.[k])) continue;
+    if (engine.getCleansableCreatureStatusKeys(inst).length === 0) continue;   // nur, was die Engine wirklich heilt
     // Styx 28.9.: geliehene Helden der Gegenspalte — eine dort beschworene
     // Kreatur steht physisch bei `inst.owner` (eigene: identisch zu pi).
     targets.push({

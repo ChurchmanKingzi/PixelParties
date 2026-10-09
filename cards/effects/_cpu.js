@@ -8962,8 +8962,8 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
     if (t.type === 'equip' || t.type === 'creature') {
       const inst = t.cardInstance || findSupportInstance(engine, t);
       if (!inst?.counters) return false;
-      const negKeys = getCleansableStatuses();
-      return negKeys.some(k => inst.counters[k]);
+      // Kreaturen: nur, was ein Reiniger wirklich nimmt (eine Cosmic-Depths-Negation ist kein Status).
+      return engine.getCleansableCreatureStatusKeys(inst).length > 0;
     }
     return false;
   };
@@ -9397,7 +9397,7 @@ function hasCleansableOwnTarget(engine) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== cpuIdx) continue;
-    if (negKeys.some(k => inst.counters?.[k])) return true;
+    if (engine.getCleansableCreatureStatusKeys(inst).length > 0) return true;   // nur, was ein Reiniger wirklich nimmt
   }
   return false;
 }
