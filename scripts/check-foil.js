@@ -37,8 +37,9 @@ const PUBLIC = path.join(WURZEL, 'public');
 const TOT = new Set(['app.jsx']);
 
 // `<FoilOverlay>` (Foil der Seltenheit), `<SkinHolo>` (Foil der Skin-Karten) und `<FoilName>` (Namensglanz der
-// Super-/Diamond-Rare-Karten) haengen alle NUR an CardFoil.
-const ROHTEILE = ['FoilOverlay', 'SkinHolo', 'FoilName'];
+// Super-/Diamond-Rare-Karten) `<FoilHatch>` (Schraffur der Fullart-/Super-/Diamond-Rare-Karten) und `<FoilRim>` (Rahmenglanz) haengen
+// alle NUR an CardFoil.
+const ROHTEILE = ['FoilOverlay', 'SkinHolo', 'FoilName', 'FoilHatch', 'FoilRim'];
 let funde = 0;
 const anschluesse = Object.fromEntries(ROHTEILE.map(n => [n, 0]));
 
