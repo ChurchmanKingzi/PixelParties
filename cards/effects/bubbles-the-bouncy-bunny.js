@@ -121,7 +121,8 @@ function predictedDamage(engine, hero, pi, entry, piercing) {
   if (hero.statuses?.charmed && engine._charmBlocksFrom(hero, entry?.sourceOwner ?? entry?.source?.owner ?? null, { loveShotOhneSchutz: true })) return 0;
   if (hero.statuses?.stunned?._baihuPetrify) return 0;
   // v1385: Submerged-Regel zentral in der Engine.
-  if (hero.buffs?.submerged && engine.isSubmergedProtected(pi, hero)) return 0;
+  // Einzelziel-Treffer und Rueckstoss umgehen Submerged — gleiche Frage wie der Schadenspfad.
+  if (hero.buffs?.submerged && engine.isSubmergedProtected(pi, hero, { festesZiel: engine.istEinzelzielTreffer(entry.type, entry) })) return 0;
   if (!piercing.cannotBeNegated && hero.buffs?.magic_immune && entry.source?.name) {
     const cd = engine._getCardDB()[entry.source.name];
     if (cd?.cardType === 'Spell') {

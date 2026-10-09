@@ -63,7 +63,7 @@ const CARD_NAME = 'Chuck, the Crazy Veteran';
  * qualify, otherwise Chuck would lose his shield against any source
  * his team has even partial mitigation for.
  */
-function _isImmuneToSource(hero, type, engine) {
+function _isImmuneToSource(hero, type, engine, festesZiel = false) {
   if (!hero) return true;
   // Tot zaehlt als immun — AUSSER der Tod ist im laufenden
   // Flaechenschlag nur vorgemerkt: dann steht der Held fuer die
@@ -73,7 +73,9 @@ function _isImmuneToSource(hero, type, engine) {
   // 0 damage from the engine's pipeline.
   if (hero.statuses?.shielded) return true;
   if (hero.buffs?.gou_protected) return true;
-  if (hero.buffs?.submerged) return true;
+  // Submerged schuetzt nicht gegen Einzelziel-Quellen und Rueckstoss
+  // (`engine.istEinzelzielTreffer`, Als Ruling 9.10.).
+  if (hero.buffs?.submerged && !festesZiel) return true;
   // Generic immune (post-CC `immune` status, e.g. after a Frozen wears off).
   if (hero.statuses?.immune) return true;
   // Per-status immune flag, routed via the damage type. STATUS_EFFECTS
@@ -155,7 +157,7 @@ module.exports = {
         // Mitspieler, der frueher im selben Flaechenschlag gefallen ist,
         // ist nur vorgemerkt und zaehlt hier noch als lebend.
         if (!h?.name || (h.hp <= 0 && !engine.heldTodAufgeschoben(h))) continue;
-        if (!_isImmuneToSource(h, ctx.type, engine)) {
+        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel)) {
           anyVulnerable = true;
           verwundbarerName = h.name;
           break;
@@ -167,7 +169,7 @@ module.exports = {
       } else {
         _diag('schild-faellt', {
           mitspieler: heroes.map(h => (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine) ? ' IMMUN' : ''}` : 'leer')),
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },

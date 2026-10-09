@@ -197,7 +197,8 @@ module.exports = {
       if (hero.hp > 0) {
         engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
         await engine._delay(200);
-        await ctx.dealDamage(hero, 200, 'other');
+        // `festesZiel`: Rueckstoss trifft immer den Wirker (s. Phoenix Tackle).
+        await ctx.dealDamage(hero, 200, 'other', { festesZiel: true });
         engine.log('recoil', { hero: hero.name, amount: 200, by: 'Victory Phoenix Cannon' });
         engine.sync();
       }

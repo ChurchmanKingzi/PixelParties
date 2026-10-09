@@ -188,25 +188,38 @@ damit Flächenschaden abprallen, obwohl ihr Text nur „chosen" sagt
 (v634 hatte das bewusst ausgenommen). Stand: Stealth und Stealthy
 Pursuit = nur Wahl; Future Tech Jetpack und Dive Down = Wahl und Treffer.
 
-**★ Einzelziel-Quellen — „solange es andere Ziele gibt" gilt nicht gegen
-sie (Als Ruling 9.10.):** „while you control other targets that can be
-chosen / hit / affected **by them**" meint die Ziele DIESER Quelle. Eine
-Quelle, die von Natur aus nur einen Helden treffen kann (Slippery
-Spikeblock, Slippery Snowman, Moonlight Butterfly: immer das Gegenüber),
-hat kein anderes Ziel — Submerged (Jump in the River) und Dive Down
-schützen dann nicht. Die Quelle sagt es selbst an:
-`actionDealDamage(src, hero, n, type, { festesZiel: true })` bzw.
-`addHeroStatus(pi, hi, status, { festesZiel: true })`. Nur setzen, wenn es
-wirklich KEINE Alternative gibt (Whoolmoths Stomp: nur ohne Creature in
-der Spalte). `isSubmergedProtected(owner, hero, { festesZiel })` und der
-`info` des Schadenspfads tragen die Angabe weiter; ein neuer Schutz der
-Bauart „while other targets" liest `info.festesZiel` und steigt aus.
+**★ Einzelziel-Quellen und Rückstoß — „solange es andere Ziele gibt" gilt
+nicht gegen sie (Als Ruling 9.10.):** „while you control other targets
+that can be chosen / hit / affected **by them**" meint die Ziele DIESER
+Quelle. Eine Quelle, die von Natur aus nur einen Helden treffen kann
+(Slippery Spikeblock, Slippery Snowman, Moonlight Butterfly: immer das
+Gegenüber), hat kein anderes Ziel — Submerged (Jump in the River) und
+Dive Down schützen dann nicht. **Rückstoß** gilt immer so: wen er trifft,
+bestimmt der Effekt selbst (Wirker, Angreifer, eigene Wahl), nicht der
+Gegner (Fire Bolts, Phoenix Tackle, Victory Phoenix Cannon, Fireshield,
+Spiky Armor, Stegon, Phoenix Bombardment).
+
+Die Quelle sagt es an: `actionDealDamage(src, hero, n, type, { festesZiel:
+true })`, `addHeroStatus(pi, hi, status, { festesZiel: true })`,
+`ctx.dealDamage(hero, n, type, { festesZiel: true })`. Der Schadenstyp
+`'recoil'` zählt von selbst; bucht eine Karte ihren Rückstoß unter
+`'other'` oder `'destruction_spell'`, setzt sie die Option. Nur setzen, wenn
+es wirklich KEINE Alternative gibt (Whoolmoths Stomp: nur ohne Creature in
+der Spalte). **Eine Stelle für die Frage:** `engine.istEinzelzielTreffer(type,
+opts)` — Engine, `isSubmergedProtected(owner, hero, { festesZiel })` und
+Nachbauten der Immunität (Bubbles' `predictedDamage`, Chuck the Crazy
+Veterans Schild über `ctx.festesZiel`) lesen sie, nie die Bedingung
+nachbauen. Der `info` des Schadenspfads trägt `festesZiel`; ein neuer
+Schutz der Bauart „while other targets" steigt bei `info.festesZiel` aus.
+
 Bei der WAHL entscheidet dieselbe Frage die Liste der legalen Ziele
-(`info.allTargets`, v871): Stealth, Dive Down, Stealthy Pursuit und
-Alliance zählen nur Helden/Creatures als Ausweichziel, die die Quelle
-auch anbietet (Spalten-Filter, `condition`). Der Dispatcher
-(`promptEffectTarget`) reicht diese Liste noch nicht mit — dort gilt
-weiter der Brett-Scan.
+(`info.allTargets`): Stealth, Dive Down, Stealthy Pursuit und Alliance
+zählen nur Helden/Creatures als Ausweichziel, die die Quelle auch anbietet
+(Spalten-Filter, `condition`). Alle drei Zielwähler reichen sie mit —
+`promptDamageTarget`, `promptMultiTarget` und der Dispatcher
+`promptEffectTarget`. Der Dispatcher wertet erst die ganze Liste aus und
+markiert danach (`ineligible`): würde jedes Ziel sofort markiert, sähe das
+nächste es als „schon gesperrt" und das Ergebnis hinge von der Reihenfolge ab.
 
 **Liegt die regelgebende Karte nicht mehr auf dem Brett** (eine
 Reaction, die sich selbst löscht), hängt sie ihre Regel an den Helden:

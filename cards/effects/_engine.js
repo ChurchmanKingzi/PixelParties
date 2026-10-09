@@ -3973,8 +3973,8 @@ class GameEngine {
       },
 
       // ── Game Actions (each fires its own hooks) ──
-      async dealDamage(target, amount, type) {
-        return engine.actionDealDamage(cardInstance, target, amount, type);
+      async dealDamage(target, amount, type, opts) {
+        return engine.actionDealDamage(cardInstance, target, amount, type, opts);
       },
       /**
        * Deal damage that bypasses all reductions, multipliers, and negations.
@@ -7802,6 +7802,28 @@ class GameEngine {
   // Gegenueber), gibt es fuer sie kein anderes Ziel — Submerged schuetzt
   // dann nicht. Die Quelle sagt das selbst an: `festesZiel: true` in den
   // `opts` von `actionDealDamage` / `addHeroStatus`.
+  //
+  // ★ RUECKSTOSS gilt immer so (Als Ruling 9.10.): Fire Bolts, Phoenix
+  // Tackle, Victory Phoenix Cannon, Fireshield, Spiky Armor … — wen der
+  // Rueckstoss trifft, bestimmt der Effekt selbst (Wirker, Angreifer,
+  // eigene Wahl), nicht der Gegner. Stealth, Submerged, Dive Down & Co.
+  // sollen ihn nie abfangen. Der Schadenstyp `'recoil'` zaehlt von selbst
+  // (`istEinzelzielTreffer`); Karten, die ihren Rueckstoss unter einem
+  // anderen Typ buchen (`'other'`, `'destruction_spell'`), geben
+  // `festesZiel: true` mit.
+
+  /**
+   * Hat dieser Treffer KEIN alternatives Ziel? Dann greift kein Schutz
+   * der Bauart „solange es andere Ziele gibt" (Submerged, Dive Down).
+   * Wahr bei `opts.festesZiel` und bei Rueckstoss (`type === 'recoil'`).
+   * EINE Stelle fuer Engine, CPU und Karten-Spiegelungen
+   * (Bubbles' `predictedDamage`) — nie die Bedingung nachbauen.
+   * @param {string} type  Schadenstyp des Treffers
+   * @param {object} [opts] `actionDealDamage`-opts bzw. ein Schadenseintrag
+   */
+  istEinzelzielTreffer(type, opts) {
+    return !!(opts?.festesZiel || type === 'recoil');
+  }
 
   /**
    * Ist `hero` (Besitzer `owner`) gerade durch Submerged geschuetzt?
@@ -8206,7 +8228,7 @@ class GameEngine {
         // Die Quelle trifft von Natur aus NUR diesen Helden — Schutz der
         // Bauart „solange es andere Ziele gibt" (Dive Down) greift dann
         // nicht (Als Ruling 9.10., s. `isSubmergedProtected`).
-        festesZiel: opts?.festesZiel,
+        festesZiel: this.istEinzelzielTreffer(type, opts),
       })) {
         this.log('targeting_blocked', { hero: this._heroLabel(target), source: source?.name || null });
         this._flashHeroDamageZero(target);   // verhinderter Schaden zeigt „0" (Als Regel 17.9.)
@@ -8361,7 +8383,8 @@ class GameEngine {
       amount = await this._fireAttackDeclare(source, target, amount);
     }
 
-    const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false };
+    const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false,
+      festesZiel: this.istEinzelzielTreffer(type, opts) };   // Einzelziel/Rueckstoss — Spiegelungen der Immunitaet lesen es
     // Eingangsbetrag fuer den Null-Floater am Ende (Al 1.9.: wird
     // Schaden auf 0 reduziert, IMMER eine 0 zeigen — egal wodurch).
     const _eingangsBetrag = amount;
@@ -8729,7 +8752,7 @@ class GameEngine {
     // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
     if (target?.buffs?.submerged && target.hp !== undefined) {
       const ownerIdx = this._findHeroOwner(target);
-      if (ownerIdx >= 0 && this.isSubmergedProtected(ownerIdx, target, { festesZiel: opts?.festesZiel })) {
+      if (ownerIdx >= 0 && this.isSubmergedProtected(ownerIdx, target, { festesZiel: this.istEinzelzielTreffer(type, opts) })) {
         this.log('damage_blocked', { target: this._heroLabel(target), reason: 'submerged' });
         return { dealt: 0, cancelled: true };
       }
@@ -15664,7 +15687,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (target.type === 'hero') {
       const hero = this.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {
-        await this.actionDealDamage({ name: cardName, owner: ownerIdx, heroIdx }, hero, damage, damageType);
+        await this.actionDealDamage({ name: cardName, owner: ownerIdx, heroIdx }, hero, damage, damageType,
+          { festesZiel: true });   // Rueckstoss — s. `istEinzelzielTreffer`
       }
     } else if (target.cardInstance) {
       await this.actionDealCreatureDamage(
@@ -27474,6 +27498,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
 
+      // ★ ZIELLISTE MITGEBEN, MARKIERT WIRD ERST DANACH (Als Ruling 9.10.).
+      // Schutz der Bauart „solange es andere Ziele gibt" (Stealth, Dive
+      // Down, Stealthy Pursuit, Alliance) zaehlt nur, was DIESE Quelle
+      // auch anbietet — dieselbe Liste, die `promptDamageTarget` und
+      // `promptMultiTarget` als `allTargets` reichen. Frueher fehlte sie
+      // hier, und der Brett-Scan hielt jeden anderen eigenen Helden fuer
+      // ein Ausweichziel, auch wenn die Karte ihn gar nicht anbot.
+      // Markiert wird erst NACH der Schleife: wuerde jedes geschuetzte Ziel
+      // sofort `ineligible`, saehe das naechste es in der Liste als
+      // „schon gesperrt" und das Ergebnis haenge von der Reihenfolge ab.
+      const _geblockt = [];
       for (const t of validTargets) {
         if (!t || t.type !== 'hero' || t.ineligible) continue;
         if (this.heroBlocksTargeting(t.owner, t.heroIdx, {
@@ -27482,8 +27517,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           chooserIdx: playerIdx,
           chooserHeroIdx: config.chooserHeroIdx ?? -1,
           damageType: config.damageType,
-        })) t.ineligible = true;
+          allTargets: validTargets,
+        })) _geblockt.push(t);
       }
+      for (const t of _geblockt) t.ineligible = true;
     }
 
     // Non-damage opponent shield filter (The Great Wall of Deri, any

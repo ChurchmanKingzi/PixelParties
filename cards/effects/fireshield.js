@@ -94,7 +94,8 @@ module.exports = {
       if (srcHero && srcHero.hp > 0) {
         await engine.actionDealDamage(
           { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
-          srcHero, recoil, 'other'
+          srcHero, recoil, 'other',
+          { festesZiel: true },   // Rueckstoss trifft immer den Angreifer
         );
       }
       engine.log('fireshield_recoil', {
