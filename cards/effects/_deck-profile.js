@@ -1189,7 +1189,7 @@ function classifyStatusHealContext(engine, pi) {
       if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
       const c = inst.counters || {};
       for (const k of negKeys) {
-        if (c[k]) {
+        if (c[k] && engine._creatureStatusCleansable?.(inst, k) !== false) {
           total++;
           if (k === 'poisoned') poisonMax = Math.max(poisonMax, typeof c[k] === 'number' ? c[k] : 1);
         }

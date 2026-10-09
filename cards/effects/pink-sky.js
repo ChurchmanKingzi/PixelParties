@@ -123,6 +123,7 @@ module.exports = {
         expiresAtTurn,
         expiresForPlayer,
         buffKey: '_pink_sky_negated',
+        cleansable: true,   // „This counts as a negative status effect."
       });
       getroffen++;
     }

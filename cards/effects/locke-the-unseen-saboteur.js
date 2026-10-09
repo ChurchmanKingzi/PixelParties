@@ -70,6 +70,7 @@ module.exports = {
         await engine.actionNegateCreature(target.cardInstance, CARD_NAME, {
           expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
           buffKey: 'locke_negated', removeAnim: 'status_remove',
+          cleansable: true,   // „This counts as a negative status effect."
         });
       }
       engine.log('locke_sabotage', { player: gs.players[pi]?.username, target: target.cardName, side: oppIdx });

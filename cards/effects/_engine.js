@@ -17103,8 +17103,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `<key>Cleansable` override (Unwanted Audience), which opts
       // THIS instance's status into Beer / Juice-style healing while
       // leaving every other negation uncleansable.
-      if (STATUS_EFFECTS[key]?.cleansable === false
-          && !inst.counters[key + 'Cleansable']) continue;
+      if (!this._creatureStatusCleansable(inst, key)) continue;
       // Stinky Stables: poison stays while the Area is up.
       if (key === 'poisoned' && poisonLocked) continue;
       delete inst.counters[key];
@@ -17297,6 +17296,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // as the "this status is on me" gate. Engine reads (frozen, stunned,
     // burned, negated, poisoned, etc.) all test truthiness of this flag.
     inst.counters[statusName] = 1;
+    // `negated` ueber die Status-Schiene (Null, Sparky Slime …) IST ein Statuseffekt und
+    // heilbar; ein Aufrufer, dessen Text keinen Status meint, gibt `keinStatus: true`.
+    if (statusName === 'negated') {
+      if (opts.keinStatus) delete inst.counters.negatedCleansable;
+      else inst.counters.negatedCleansable = 1;
+    }
     // Stack-bearing statuses get a SEPARATE companion counter — poison
     // is the only stacking creature status today, and `poisonStacks` is
     // the canonical name. Burn / Freeze / Stun are non-stacking.
@@ -17399,10 +17404,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return negativeKeys.filter(key =>
       inst.counters[key]
       && !inst.counters[key + 'Unhealable']
-      // Globally-cleansable, OR this instance carries the per-instance
-      // `<key>Cleansable` override (Unwanted Audience's negation).
-      && (STATUS_EFFECTS[key]?.cleansable !== false
-          || inst.counters[key + 'Cleansable'])
+      && this._creatureStatusCleansable(inst, key)
     );
   }
 
@@ -17424,9 +17426,29 @@ this._deathWatch = (this._deathWatchStack || []).length
     return negativeKeys.filter(key =>
       inst.counters[key]
       && !inst.counters[key + 'Unhealable']
-      && (STATUS_EFFECTS[key]?.cleansable !== false
-          || inst.counters[key + 'Cleansable'])
+      && this._creatureStatusCleansable(inst, key)
     );
+  }
+
+  /**
+   * Darf ein Reiniger (Beer, Juice, Cure, Tea …) den Status `key` von dieser
+   * KREATUR nehmen? EINE Stelle fuer alle Kreaturen-Reinigungswege.
+   *
+   * ★ `negated` auf einer Kreatur ist nur dann ein Statuseffekt, wenn der
+   * Kartentext es sagt („This counts as a (negative) status effect": Null,
+   * Sparky Slime, Forbidden Zone, Locke, Pink Sky, Skeleton Death Knight,
+   * Unwanted Audience). Die uebrigen Negationen — Dark Gear, Diplomacy,
+   * Necromancy, The Cosmic Depths, Loyal Shepherd, Mao, Soul Shard Ka,
+   * Omikron … — sind KEIN Status und bleiben bis zum Ablauf. Der globale
+   * Eintrag `STATUS_EFFECTS.negated.cleansable` (seit v1168 wahr, damit
+   * Nulls Held-Negation heilbar ist) gilt deshalb nur fuer HELDEN; bei
+   * Kreaturen entscheidet die Marke `negatedCleansable`, die der Wirker
+   * setzt (`actionNegateCreature(..., { cleansable: true })` bzw. jedes
+   * `applyCreatureStatus(inst, 'negated')`).
+   */
+  _creatureStatusCleansable(inst, key) {
+    if (key === 'negated') return !!inst?.counters?.negatedCleansable;
+    return STATUS_EFFECTS[key]?.cleansable !== false || !!inst?.counters?.[key + 'Cleansable'];
   }
 
   /**
@@ -17855,7 +17877,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `<statusKey>Cleansable` flag (read by cleanseCreatureStatuses /
     // getCleansableCreatureStatusKeys). Cleared on natural expiry too
     // (added to clearCountersOnExpire below).
+    // Bei JEDER Anwendung neu setzen: eine zweite, nicht heilbare Negation darf
+    // keine Marke der ersten erben (heilt man die erste, faellt sonst die zweite mit).
     if (opts.cleansable) inst.counters[statusKey + 'Cleansable'] = 1;
+    else delete inst.counters[statusKey + 'Cleansable'];
     // Fire ON_STATUS_APPLIED so listeners observe creature negation
     // (Bear Rider's hand-level recompute, Chilly Wizard's mirror,
     // future status-aware Creatures). Deferred to a microtask in non-
@@ -28039,23 +28064,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Check whether any in-play ability with
-   * `forceEndTurnOnUniqueResolves` has reached its threshold. If so,
-   * set the flag that forces the turn to End Phase. Walks both
-   * sides' ability zones; for each ability slot whose top card opts
-   * in, computes the threshold via the script's
-   * `getThresholdFromCopies(copies)` and tracks the LOWEST. Terror is
-   * the canonical user.
-   *
-   * `_blackstacheBlocksTurnEnd` still applies — a Hero with
-   * `immuneToTerror: true` on `playerIdx`'s side blocks the
-   * force-end. The source name passed to that gate is the ability
-   * name itself (e.g. 'Terror'), so opt-out flags can match it.
+   * Die niedrigste Schwelle aller Karten mit `forceEndTurnOnUniqueResolves` auf dem
+   * Brett (beide Seiten, lebende, nicht negierte Helden) und die Karte, von der sie
+   * stammt. EINE Stelle fuer die Engine (`_checkTerrorThreshold`) UND die Anzeige im
+   * Client (`terrorThreshold` im Spielzustand) — die Anzeige rechnete bis 9.10. mit
+   * eigener Formel (`10 - Stufe`: 9/8/7) und zeigte so andere Zahlen, als die Engine
+   * ausloeste (7/6/5, Kartentext).
+   * @returns {{ threshold: number, sourceName: string|null }} `Infinity`, wenn keine Karte zaehlt
    */
-  _checkTerrorThreshold(playerIdx) {
-    const count = (this.gs._terrorTracking?.[playerIdx] || []).length;
-    if (count === 0) return;
-
+  terrorSchwelle() {
     let threshold = Infinity;
     let sourceName = null;
     for (let pi = 0; pi < this.playerCount(); pi++) {
@@ -28086,6 +28103,28 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
     }
+    return { threshold, sourceName };
+  }
+
+  /**
+   * Check whether any in-play ability with
+   * `forceEndTurnOnUniqueResolves` has reached its threshold. If so,
+   * set the flag that forces the turn to End Phase. Walks both
+   * sides' ability zones; for each ability slot whose top card opts
+   * in, computes the threshold via the script's
+   * `getThresholdFromCopies(copies)` and tracks the LOWEST. Terror is
+   * the canonical user.
+   *
+   * `_blackstacheBlocksTurnEnd` still applies — a Hero with
+   * `immuneToTerror: true` on `playerIdx`'s side blocks the
+   * force-end. The source name passed to that gate is the ability
+   * name itself (e.g. 'Terror'), so opt-out flags can match it.
+   */
+  _checkTerrorThreshold(playerIdx) {
+    const count = (this.gs._terrorTracking?.[playerIdx] || []).length;
+    if (count === 0) return;
+
+    const { threshold, sourceName } = this.terrorSchwelle();
 
     // `== null` statt Wahrheitsprüfung: Spielerindex 0 ist FALSY. Mit
     // `!this.gs._terrorForceEndTurn` blieb der Riegel für Spieler 0

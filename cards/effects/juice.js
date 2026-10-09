@@ -69,7 +69,7 @@ module.exports = {
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
       if ((inst.controller ?? inst.owner) !== pi) continue;
-      if (negKeys.some(k => inst.counters?.[k])) return true;
+      if (engine.getCleansableCreatureStatusKeys(inst).length > 0) return true;   // nur, was Juice wirklich heilt
     }
     return false;
   },
