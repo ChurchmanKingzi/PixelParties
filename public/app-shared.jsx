@@ -3899,6 +3899,11 @@ function preloadAllCardArt() {
   _cardArtPreloadStarted = true;
   if (_preloadDeferOnSlowConn()) return;
 
+  // Seit der dynamischen Kartenerzeugung (public/card-image-shim.js) gibt es keine ~1.200 Karten-PNGs mehr
+  // aufzuwaermen: Rahmen, Schrift und der Kunst-Atlas liegen schon im Speicher, jede Karte entsteht beim
+  // ersten Anzeigen. Es bleiben nur die Shop-Grafiken (Avatare, Huellen, Bretter).
+  if (window.CardImageShim) { preloadShopAssets(); return; }
+
   const urls = [...new Set(
     Object.values(window.AVAILABLE_MAP || {}).map(f => '/cards/' + encodeURIComponent(f))
   )];
@@ -3925,7 +3930,8 @@ function preloadShopAssets() {
   fetchCatalog.then(cat => {
     if (!cat) return;
     const urls = [];
-    for (const s of (cat.skins   || [])) urls.push('/cards/skins/'       + encodeURIComponent(s.skinName) + '.png');
+    // Skin-Karten entstehen wie alle Karten beim Anzeigen (card-image-shim.js) — nur ohne Shim als Datei aufwaermen
+    if (!window.CardImageShim) for (const s of (cat.skins   || [])) urls.push('/cards/skins/'       + encodeURIComponent(s.skinName) + '.png');
     for (const a of (cat.avatars || [])) urls.push('/data/shop/avatars/' + encodeURIComponent(a.file));
     for (const s of (cat.sleeves || [])) urls.push('/data/shop/sleeves/' + encodeURIComponent(s.file));
     for (const b of (cat.boards  || [])) urls.push('/data/shop/boards/'  + encodeURIComponent(b.file));

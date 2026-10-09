@@ -149,11 +149,12 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `toras.py` | `final` | `toras_idle_final_sheet.png` | `toras-master-of-all-weapons` |
 | `deri.py` | `final 90 shapeshifter` | `shapeshifter_idle_final_sheet.png` | `the-shapeshifter` |
 | `parasyte.py` (+ `parasyte_sprite.py`) | `final 90` | `parasyte_idle_final_sheet.png` | `parasytic` (Skin „Parasytic ???“) |
+| `contract_orthos.py` | `final 90` | `contract_orthos_idle_final_sheet.png` | `contract-bound-orthos` (Skin „Contract-Bound Orthos“, Kyubey; Ebenen vom User als `-glow`, `-aura` (gelbe Umrandung, 20 % deckend), `-body`, `-bag`, `-ear`) |
 | `deri.py` | `final 90 robber` | `robber_idle_final_sheet.png` | `the-throne-robber` |
 | `deri.py` | `final 90 darge` | `darge_idle_final_sheet.png` | `bow-sniper-darge` |
 | `deri.py` | `final 90 jean` | `jean_idle_final_sheet.png` | `jean-the-pillaging-knight` |
 | `deri.py` | `final 90 layn` | `layn_idle_final_sheet.png` | `layn-defender-of-deri` |
-| `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summonr-of-weapons` (Skin) |
+| `deri.py` | `final 90 summoner` | `summoner_idle_final_sheet.png` | `layn-summoner-of-weapons` (Skin) |
 | `deri.py` | `final 90 ascended` | `ascended_idle_final_sheet.png` | `layn-master-of-deri-s-relic` |
 | `deri.py` | `final 90 tharx` | `tharx_idle_final_sheet.png` | `tharx-the-never-losing-general` |
 | `gn.py` | `final 90 andras` | `andras_idle_final_sheet.png` | `andras-the-human-weapon` |

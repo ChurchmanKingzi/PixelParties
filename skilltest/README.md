@@ -47,7 +47,7 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
 | `learn/` | Lernsystem: `profile.js` (Profil-Datei), `personas.js` (Spielstile), `keepmodel.js` (Behalten/Recyceln mit Kontext), `train.js` (Selbstspiel/Liga), `ranking.js` (Kartenliste, Verlauf, Vergleichsspiele), `background.js` (Dauerbetrieb). |
 | `sim.js` / `sim-bridge.js` | Headless-Spiele ohne Server (Tests, Training). |
 | `../public/skilltest-art.js` | Pixelart der Vorbereitung, programmatisch gemalt (Recycler mit Mund-Deckel, Fackeln, Dielenbrett, Kerkerwand, Münze; Verläufe nur über Bayer-Dithering). |
-| `../card-images.js` | Karte → Bilddatei in `./cards` (Deckbuilder-Endpoint `/api/cards/available`, Kartenpool, Personas). |
+| `../card-images.js` | Karte → Bilddatei bzw. Kunst im Atlas `public/cardgen/art.json` (Karten werden zur Laufzeit gezeichnet, siehe `docs/karten-renderer.md`; Deckbuilder-Endpoint `/api/cards/available`, Kartenpool, Personas). |
 
 ## Bots und Lernsystem
 

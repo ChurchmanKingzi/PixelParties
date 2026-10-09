@@ -135,6 +135,10 @@
        so it sets window.Profanity / window.containsProfanity before the
        bundles run. -->
   <script defer src="/profanity.js"></script>
+  <!-- Karten entstehen zur Laufzeit (Rahmen + Kunst-Atlas + Schrift) statt als 1.200 fertige PNGs.
+       card-render.js zeichnet, card-image-shim.js haengt es an die <img>-Quellen /cards/…. -->
+  <script defer src="/card-render.js"></script>
+  <script defer src="/card-image-shim.js"></script>
   <script defer src="/dist/app-shared.js"></script>
   <script defer src="/dist/app-areas.js"></script>
   <script defer src="/dist/app-screens.js"></script>

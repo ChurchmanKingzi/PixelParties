@@ -15,7 +15,7 @@ src/<slug>-<teil>.png.
   layn-defender-of-deri             die Figur aus „Layn“ + Hände „Layn #1“ + ein
                                     schmales Stück Zinnen („Layn“/„Zinnen“, 2 px
                                     breiter als sie)
-  layn-summonr-of-weapons           Skin („Layn Summonr of Weapons“ in skins.json):
+  layn-summoner-of-weapons           Skin („Layn Summoner of Weapons“ in skins.json):
                                     „Ebene #62“
   layn-master-of-deri-s-relic       „Ascended Layn“ (ohne Aura)
   tharx-the-never-losing-general    „Tharx“ (stehend)
@@ -99,7 +99,7 @@ def main(path):
         a[:, x1 + 1:] = 0
         a[:296] = 0
     save_parts('layn-defender-of-deri', [('hands', g('Layn #1')), ('body', fig), ('wall', wall), ('zinnen', zin)])
-    save_parts('layn-summonr-of-weapons', [('body', g('Ebene #62'))])
+    save_parts('layn-summoner-of-weapons', [('body', g('Ebene #62'))])
     save_parts('layn-master-of-deri-s-relic', [('body', g('Ascended Layn'))])
     save_parts('tharx-the-never-losing-general', [('body', g('Tharx'))])
 

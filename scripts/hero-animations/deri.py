@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Idle-Animationen für die MotiveDeri-Heroes und den Skin Layn Summonr of
+"""Idle-Animationen für die MotiveDeri-Heroes und den Skin Layn Summoner of
 Weapons.
 
 Aufruf: python3 deri.py <tag> [ms] <variante>
@@ -27,7 +27,7 @@ Dazu:
             Kopf hebt sich beim Atmen um 1 px (die braune Kinnlinie bleibt
             1 px, darunter rückt der Kragen nach), sie blinzelt, der Helm
             blitzt.
-* summoner: Layn Summonr of Weapons: Federn, Blinzeln, der Kopfschmuck blitzt.
+* summoner: Layn Summoner of Weapons: Federn, Blinzeln, der Kopfschmuck blitzt.
 * ascended: Layn, Master of Deri's Relic: Federn, Blinzeln, der Edelstein der
             Hellebarde funkelt; zweimal pro Loop schließt sie den Mund.
 * tharx:    Tharx (stehend): die äußersten Spitzen seines Schulterumhangs
@@ -55,7 +55,7 @@ V_ = {
                  line=[(24, 11), (25, 11), (28, 11), (29, 11)]),
     'layn': dict(slug='layn-defender-of-deri', head=17, glint=(8, 4, 30, GOLD),
                  lid=[((14, 12), 'f5ce88'), ((15, 12), 'f5ce88')], line=[(14, 13), (15, 13)]),
-    'summoner': dict(slug='layn-summonr-of-weapons', knee=25, glint=(10, 0, 30, GOLD),
+    'summoner': dict(slug='layn-summoner-of-weapons', knee=25, glint=(10, 0, 30, GOLD),
                      lid=[((12, 12), 'f5ce88'), ((13, 12), 'f5ce88')], line=[(12, 13), (13, 13)]),
     'ascended': dict(slug='layn-master-of-deri-s-relic', knee=34, glint=(6, 6, 30, ('b2f6ff', 'e0ffff')),
                      lid=[((13, 21), '125acf'), ((14, 21), 'acd6ff')], line=[(13, 21), (14, 21)]),

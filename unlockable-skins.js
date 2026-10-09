@@ -39,11 +39,21 @@ const RULES = {
 
 /** Namen (ohne Endung) aller Bilder in `cards/skins/unlockable/`. */
 function unlockableSkinNames(dir = UNLOCKABLE_DIR) {
+  const names = new Set();
   try {
-    return new Set(fs.readdirSync(dir)
-      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
-      .map(f => path.basename(f, path.extname(f))));
-  } catch { return new Set(); }
+    for (const f of fs.readdirSync(dir)) {
+      if (IMAGE_EXTS.has(path.extname(f).toLowerCase())) names.add(path.basename(f, path.extname(f)));
+    }
+  } catch {}
+  // Karten entstehen zur Laufzeit aus dem Kunst-Atlas: freischaltbare Skins stehen dort mit `unlockable: true`
+  // in data/card-render.json (skins) — auch wenn es keine Bilddatei in cards/skins/unlockable/ (mehr) gibt.
+  if (dir === UNLOCKABLE_DIR) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-render.json'), 'utf8'));
+      for (const [skin, m] of Object.entries(meta.skins || {})) if (m && m.unlockable) names.add(skin);
+    } catch {}
+  }
+  return names;
 }
 
 function isUnlockableSkin(skinName, dir) { return unlockableSkinNames(dir).has(skinName); }
