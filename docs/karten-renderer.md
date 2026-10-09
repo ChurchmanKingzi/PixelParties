@@ -65,8 +65,8 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
 * **Anzeige:** `SkinHolo` (app-shared.jsx) legt die Schichten übers Bild; Animation nur per `transform` unter
   statischen Masken (style.css, „SKIN-HOLO“): Schraffur (Maske aus `repeating-linear-gradient` in `cqw`, wächst mit
   der Karte, geschnitten mit der Flächenmaske; unter 150 px Kartenbreite aus), Glanzband (dieselbe Maske) und
-  Namensglanz. Kleinansicht (`FoilKleinContext`): nur der ruhige Name. Telefone (Lite) und „Play Animations: aus“:
-  Schraffur still, kein Glanz.
+  Namensglanz. Kleinansicht (`FoilKleinContext`): nichts (der goldene Name steckt im Kartenbild). Telefone (Lite)
+  und „Play Animations: aus“: Schraffur still, kein Glanz.
 * **Anschluss:** nur über `CardFoil` — `<CardFoil card={…} skin={…} />`; der Skin lässt sich aus einer
   Bild-URL lesen (`skinOfUrl(url)`), deshalb greift es automatisch in `CardMini`, `BoardCard`, den Tooltips
   (`CardSideTooltip`, `CardTooltipContent`), dem Spielerprofil und der Skin-Galerie des Deck-Editors.
@@ -89,6 +89,40 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
   hängt nur von Kartentyp und Seltenheit ab — es gibt höchstens 5 Stück, alle Karten teilen sie. Erst ab 120 px Breite;
   nicht in Kleinansichten und im Lite-Modus.
 * Beides hängt wie alles andere nur an `CardFoil`; `scripts/check-foil.js` prüft `<FoilHatch>` und `<FoilRim>` mit.
+
+### Performance der Foil-Schichten
+
+Jede dieser Schichten ist eine Maske mit laufender Animation; auf Brett, Hand und in Galerien stehen davon sonst
+dutzende zugleich. Darum gilt (gemessen, siehe unten):
+
+* **Nur wo man sie sieht:** Skin-Holo, Namensglanz und Rahmenglanz werden erst ab **120 px** Kartenbreite angelegt und
+  ihre Texturen erst dann gerechnet (Schraffur: 150 px); auf **Touch-Geräten** (`pointer: coarse`) erst ab **240 px**
+  — dort bleiben Tooltip und Großansichten (`ppEffektMin`, `useEffektHuelle` in app-shared.jsx). Kleinansichten
+  (`FoilKleinContext`) bekommen nichts.
+* **Außerhalb des Bildschirms** halten die Schichten an (`.sh-ausserhalb`, ein gemeinsamer `IntersectionObserver`; ein
+  gemeinsamer `ResizeObserver` für alle Karten).
+* **Mittelgroße Karten** (< 300 px) und alle Touch-Geräte: der wandernde Regenbogen der Schraffur und das Farbwandern des
+  Namens stehen still; es animieren nur die Glanzdurchläufe (Bild, Rahmen, Name — je ein `transform`). Telefone im
+  Querformat (Lite): auch die Glanzdurchläufe aus.
+* **Kein `mix-blend-mode`:** die Hülle `.skin-holo` ist ein Stacking-Kontext, die Blends wirkten nur in eine leere Gruppe
+  (gemessen: Bild mit und ohne pixelgleich), kosteten aber je Schicht eine zusätzliche Offscreen-Fläche.
+* **Rahmen-Ringe bleiben auf Skin-Karten:** hat die Basiskarte ein Foil, braucht die Karte die billigen `foil-rahmen`-
+  Ringe, sonst fällt das CSS auf den alten `box-shadow`-Puls zurück (der teuerste Dauerläufer einer Foil-Karte).
+* **Alter Diagonalglanz** der Foil-Karten (Bänder): 2 statt 5 Bänder (Diamond 1 statt 3) mit ~3× längerem Takt.
+* Textur-Berechnung ~20–50 ms je Skin (in Blöcken mit Atempausen), Rahmenmasken höchstens 5 für alle Karten.
+
+Messung (Headless-Chromium, Software-Rendering, Median aus 3 Läufen; Handy-Profil: 390×844, Touch, CPU 4× gedrosselt;
+Szenen mit `CardMini` aus den gebauten Bundles, „Holo AUS“ = `CardRender.HOLO.on = false`):
+
+| Szene | normale Karten | Holo AUS | Holo AN |
+| --- | --- | --- | --- |
+| Brett, 12 Karten à 82 px | 61 fps | 18 fps | 20 fps |
+| Galerie, 12 Karten à 150 px | 61 fps | 25 fps | 33 fps |
+| Tooltip, 1 Karte à 360 px | 61 fps | 61 fps | 60 fps (+10 Ebenen) |
+
+Die Last in „Holo AUS“ stammt vom **bestehenden** Foil der Super/Diamond Rares (rund 28 Animationen je Karte); die neuen
+Schichten legen in Massenansichten nichts obendrauf. Worst Case Desktop (6 Karten à 210 px, alles aktiv): 37 → 28 fps
+bei reinem Software-Rendering; teuerster Einzelposten ist der Rahmenglanz (Maske über die ganze Karte).
 
 ## Dateien
 

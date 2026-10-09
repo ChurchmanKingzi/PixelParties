@@ -4786,8 +4786,10 @@ const DIAMOND_SPARKLE_POSITIONS = [
 //  dem ersten Render KEINE React-Arbeit mehr.
 // ═══════════════════════════════════════════════════════════════
 
-const FOIL_BAND_COUNT = 5;
-const FOIL_DIAMOND_BAND_COUNT = 3;
+// ★ Skin-Holo/Rahmenglanz (neu): der alte Diagonalglanz laeuft deutlich seltener — 2 statt 5 Baender (Diamond 1 statt 3),
+// jedes mit rund dreimal so langem Takt. Das gleicht die neuen Effekte aus und spart je Karte drei Ebenen.
+const FOIL_BAND_COUNT = 2;
+const FOIL_DIAMOND_BAND_COUNT = 1;
 const FOIL_MOTE_COUNT = 6;
 
 /**
@@ -4808,8 +4810,8 @@ function makeFoilBands(isDiamond) {
       o: isDiamond ? 0.45 + Math.random() * 0.3 : 0.35 + Math.random() * 0.35,
       // Gestaffelt statt frei gewuerfelt: so kann kein Satz entstehen,
       // in dem alle fuenf fast gleich schnell sind und im Pulk laufen.
-      dur: isDiamond ? 5.2 + i * 1.7 + Math.random() * 1.2
-                     : 2.4 + i * 0.95 + Math.random() * 0.9,
+      dur: isDiamond ? 12 + i * 3 + Math.random() * 3
+                     : 7 + i * 3.4 + Math.random() * 1.6,
       delay: -Math.random() * 12,                    // Phase verwuerfeln
       rot: isDiamond ? 8 + Math.random() * 8 : 16 + Math.random() * 11,
       from: -200 - Math.random() * 100,              // in % der BANDbreite
@@ -4988,35 +4990,71 @@ window.skinOfUrl = skinOfUrl;
 /** Skin-Holo ueberhaupt verfuegbar? (Renderer geladen und nicht abgeschaltet: `CardRender.HOLO.on = false`) */
 function skinHoloAktiv() { return !!(window.CardRender && window.CardRender.HOLO && window.CardRender.HOLO.on && window.CardImageShim); }
 
+// ── Gemeinsame Beobachter der Foil-Schichten (Skin-Holo, Namensglanz, Schraffur, Rahmenglanz) ──
+// PERFORMANCE (gemessen, Telefon-Profil, CPU 4x gedrosselt): jede dieser Schichten ist eine Maske mit laufender
+// Animation, und auf Brett, in der Hand und in Galerien stehen davon dutzende zugleich — dort sieht man sie nicht
+// einmal (Name 5 px hoch, Rahmen 1-2 px dick). Darum:
+//   • sie werden erst gezeichnet UND ihre Texturen erst gerechnet, wenn die Karte breit genug erscheint
+//     (`ppEffektMin`: 120 px, auf Touch-Geraeten 240 px — dort bleiben nur Tooltip und Grossansichten);
+//   • sie halten an, solange die Karte ausserhalb des Bildschirms liegt (Klasse `sh-ausserhalb`, style.css).
+// EIN ResizeObserver und EIN IntersectionObserver fuer alle Karten (statt je Karte einer).
+const ppFoilBeob = { ro: null, io: null, pruefen: new WeakMap() };
+const ppIstTouch = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+/** Mindestbreite einer Karte (px), ab der Glanz-Schichten laufen. Touch: nur Tooltip und Grossansichten (>= 240 px). */
+const ppEffektMin = () => (ppIstTouch() ? 240 : 120);
+const HATCH_MIN_BREITE = 150;   // Schraffur: = `@container (max-width: 150px)` in style.css (Touch: wie ppEffektMin)
+/** [ref, breit]: ref an die Foil-Huelle haengen; `breit` wird true, sobald die Huelle (= die Karte) mindestens `min` px breit ist. */
+function useEffektHuelle(min) {
+  const ref = useRef(null);
+  const [breit, setBreit] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const B = ppFoilBeob;
+    if (!B.ro && typeof ResizeObserver === 'function') B.ro = new ResizeObserver(es => { for (const e of es) { const f = B.pruefen.get(e.target); if (f) f(); } });
+    if (!B.io && typeof IntersectionObserver === 'function') {
+      B.io = new IntersectionObserver(es => { for (const e of es) e.target.classList.toggle('sh-ausserhalb', !e.isIntersecting); }, { rootMargin: '100px' });
+    }
+    const pruefen = () => { if (el.offsetWidth >= min) setBreit(true); };
+    B.pruefen.set(el, pruefen);
+    pruefen();
+    if (B.ro) B.ro.observe(el);
+    if (B.io) B.io.observe(el);
+    return () => { B.pruefen.delete(el); if (B.ro) B.ro.unobserve(el); if (B.io) B.io.unobserve(el); };
+  }, []);
+  return [ref, breit];
+}
+/** Phase je Karte EINMAL gewuerfelt, sonst laufen alle Karten im Gleichtakt. */
+const usePhase = (key) => useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [key]);
+
 function SkinHolo({ skin }) {
   const klein = useContext(FoilKleinContext);
+  const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => (skin && window.CardRender && window.CardRender.holoCached(skin)) || null);
   useEffect(() => {
     let lebt = true;
-    if (!skin) { setDaten(null); return undefined; }
+    if (!skin || !breit || klein) return undefined;
     const fertig = window.CardRender.holoCached(skin);
     if (fertig) { setDaten(fertig); return undefined; }
-    setDaten(null);
     window.CardImageShim.skinBase(skin)
       .then(basis => basis && window.CardRender.holoFor(basis, skin))
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
-  }, [skin]);
-  // Phase je Karte EINMAL gewuerfelt, sonst laufen alle Skin-Karten im Gleichtakt.
-  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [skin]);
-  if (!skin || !daten) return null;
+  }, [skin, breit, klein]);
+  const phase = usePhase(skin);
+  // Kleinansicht (Piles, Galerien): gar nichts — der goldene Name steckt schon im Kartenbild.
+  if (!skin || klein) return null;
   return (
-    <div className={'skin-holo' + (klein ? ' skin-holo-klein' : '')} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
-      {!klein && (
-        <div className="skin-holo-art">
-          <div className="skin-holo-hatch"><i /></div>
-          <div className="skin-holo-glint"><i /></div>
-        </div>
+    <div ref={ref} className="skin-holo" style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+      {daten && breit && (
+        <>
+          <div className="skin-holo-art">
+            <div className="skin-holo-hatch"><i /></div>
+            <div className="skin-holo-glint"><i /></div>
+          </div>
+          <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>
+        </>
       )}
-      <div className="skin-holo-name">
-        <i className="sh-rb" />
-        {!klein && <i className="sh-gl" />}
-      </div>
     </div>
   );
 }
@@ -5027,54 +5065,32 @@ window.SkinHolo = SkinHolo;
  * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil. In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
 function FoilName({ card, tone }) {
+  const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
   useEffect(() => {
     let lebt = true;
-    if (!card) { setDaten(null); return undefined; }
+    if (!card || !breit) return undefined;
     const fertig = window.CardRender.nameCached(card);
     if (fertig) { setDaten(fertig); return undefined; }
-    setDaten(null);
     window.CardImageShim.boot()
       .then(() => window.CardRender.nameShimmerFor(card))
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
-  }, [card?.name]);
-  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [card?.name]);
-  if (!card || !daten) return null;
+  }, [card?.name, breit]);
+  const phase = usePhase(card?.name);
   return (
-    <div className={'skin-holo skin-holo-nur-name foil-name-' + tone} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
-      <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>
+    <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+      {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
     </div>
   );
 }
 
 /**
  * Schraffur fuer Karten OHNE Skin: Fullart-Karten sowie Super und Diamond Rares — nur auf dem Bild (dieselbe Schicht wie
- * beim Skin-Holo, ohne Glanzband und Namen; der Namensglanz der Rares kommt von FoilName). Die Textur wird erst
- * geladen, wenn die Karte breit genug gezeichnet wird, dass die Schraffur ueberhaupt zu sehen ist (CSS blendet sie
- * unter 150 px Kartenbreite aus: `@container (max-width: 150px)`) — auf dem Brett, in der Hand und in Galerien kostet
- * sie also nichts.
+ * beim Skin-Holo, ohne Glanzband und Namen; der Namensglanz der Rares kommt von FoilName).
  */
-const HATCH_MIN_BREITE = 150;   // = `@container (max-width: 150px)` in style.css
-const RIM_MIN_BREITE = 120;     // darunter ist der Rahmen nur 1-2 px dick, ein Glanz darauf nicht zu sehen
-/** [ref, breit]: wird true, sobald das Element (die Foil-Huelle ueber der Karte) mindestens `min` px breit gezeichnet wird. */
-function useAbBreite(min) {
-  const ref = useRef(null);
-  const [breit, setBreit] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    const pruefen = () => { if (el.offsetWidth >= min) setBreit(true); };
-    pruefen();
-    if (typeof ResizeObserver !== 'function') return undefined;
-    const ro = new ResizeObserver(pruefen);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, breit];
-}
 function FoilHatch({ card }) {
-  const [ref, breit] = useAbBreite(HATCH_MIN_BREITE);
+  const [ref, breit] = useEffektHuelle(ppIstTouch() ? ppEffektMin() : HATCH_MIN_BREITE);
   const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.hatchCached(card)) || null);
   useEffect(() => {
     let lebt = true;
@@ -5086,7 +5102,7 @@ function FoilHatch({ card }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [card?.name, breit]);
-  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [card?.name]);
+  const phase = usePhase(card?.name);
   return (
     <div ref={ref} className="skin-holo skin-holo-nur-hatch" style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && (
@@ -5099,10 +5115,10 @@ function FoilHatch({ card }) {
 /**
  * Rahmenglanz: Gold-, Silber- und Diamant-Rahmen glaenzen in ihrer Farbe. Ein Lichtband laeuft ueber die Karte und
  * leuchtet nur auf dem Rahmen auf (Maske = Form des Rahmens, `CardRender.rimFor`; es gibt nur 5 Formen, alle Karten
- * teilen sie). `rim` kommt aus `CardRender.rimKind(card, skin)`. Erst ab RIM_MIN_BREITE, damit Brett und Hand nichts kosten.
+ * teilen sie). `rim` kommt aus `CardRender.rimKind(card, skin)`.
  */
 function FoilRim({ rim }) {
-  const [ref, breit] = useAbBreite(RIM_MIN_BREITE);
+  const [ref, breit] = useEffektHuelle(ppEffektMin());
   const [daten, setDaten] = useState(() => window.CardRender.rimCached(rim));
   useEffect(() => {
     let lebt = true;
@@ -5114,7 +5130,7 @@ function FoilRim({ rim }) {
       .then(d => { if (lebt) setDaten(d || null); });
     return () => { lebt = false; };
   }, [rim.kind, breit]);
-  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [rim.kind]);
+  const phase = usePhase(rim.kind);
   return (
     <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && <div className="skin-holo-rim"><i /></div>}
@@ -5154,7 +5170,11 @@ function CardFoil({ card, foilType, skin }) {
   const schraffur = !holoSkin && !klein && skinHoloAktiv() && window.CardRender.hatchEligible(card);
   const rahmen = !klein && skinHoloAktiv() ? window.CardRender.rimKind(card, holoSkin ? skin : null) : null;
   const foilSchicht = !holoSkin && isFoil && !!meta;
-  if (!holoSkin && !foilSchicht && !schraffur && !rahmen) return null;
+  // Rahmen-Ringe (Seltenheit) bleiben auch auf einer Skin-Karte, deren Basiskarte Super/Diamond Rare ist: ohne sie
+  // faellt das CSS auf den alten Rahmenpuls (`foilBorderPulse`, animiertes `box-shadow`) zurueck — gemessen der teuerste
+  // Dauerlaeufer einer Foil-Karte (v1403 hat ihn genau dafuer durch die Ringe ersetzt).
+  const ringe = isFoil && !klein;
+  if (!holoSkin && !foilSchicht && !schraffur && !rahmen && !ringe) return null;
   // ★ v1403: Rahmen-Ringe (Kreuzblende per Deckkraft statt animiertem
   // box-shadow). Sie greifen nur, wo die Karte selbst die Foil-Klasse
   // traegt (CSS `.foil-…-rare > .foil-rahmen`) — im Tooltip-Bild, das
@@ -5162,7 +5182,7 @@ function CardFoil({ card, foilType, skin }) {
   // Kleinansicht hat einen festen Rahmen (`foil-ruhig`) und keine Ringe.
   return (
     <>
-      {foilSchicht && !klein && (
+      {ringe && (
         <div className={'foil-rahmen ' + (type === 'diamond_rare' ? 'foil-rahmen-diamond' : 'foil-rahmen-secret')} aria-hidden="true">
           <i /><i /><i /><i />
         </div>
