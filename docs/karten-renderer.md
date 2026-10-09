@@ -29,12 +29,16 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   Alle anderen Karten nehmen `r` aus `data/card-render.json` (aus den früheren Kartenbildern abgeleitet).
 * **Diamond-Rahmen:** 14 px oben/unten, 15 px links/rechts (Template-`diafoil.png`), mit den Ecken des Gold-/
   Silberrahmens: je Ecke 2×2 Blöcke (Eckblock und diagonal innen gedämpft, die zwei Nachbarn am Rand dunkler).
-* **Symbole im Text:** Die Namen der Zauberschulen im Effekt- und Fähigkeitentext werden durch die Bilder der
-  Symbolschrift „PixelParties-text-replacements“ ersetzt (`SYMBOLS` in `card-render.js`: Fighting,
-  Magic Arts, Destruction Magic, Summoning Magic, Support Magic, Decay Magic). Größe und Lage wie in MSE
+* **Symbole im Text:** Zauberschulen werden im Effekt- und Fähigkeitentext nur **im Zusammenhang mit Spells**
+  durch die Bilder der Symbolschrift „PixelParties-text-replacements“ ersetzt: „Magic Arts Spells“ →
+  „[Symbol] Spells“, ebenso Kurzformen („Destruction Spells“) und Aufzählungen („Decay or Support Spell“,
+  „Destruction or Decay Magic Spell“: jede Schule davor). Wird die Fähigkeit selbst gemeint („Magic Arts 1“,
+  „Fighting level“, „a Support Magic Ability“, „Support Zone“), bleibt der Name Text. Die Regel steht in
+  `SYMBOLS`/`SYM_RE` in `card-render.js` und stimmt mit den alten MSE-Karten überein (Abgleich aller
+  Karten mit Schulnamen im Text gegen die früheren PNGs). Größe und Lage wie in MSE
   (Symbolgröße 8,5 bzw. 10,5 / `image font size` 30, Flächenmittel-Skalierung, mittig in der Zeile); ein
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
-  Weitere Ersetzungen: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
+  Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
 
 ## Dateien
 

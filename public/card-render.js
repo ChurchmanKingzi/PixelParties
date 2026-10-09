@@ -28,7 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
-  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0 };
+  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule' };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -48,12 +48,26 @@
   const SYMBOLS = [
     ['Destruction Magic', 'destruction'], ['Summoning Magic', 'summoning'], ['Magic Arts', 'arts'],
     ['Support Magic', 'support'], ['Decay Magic', 'decay'], ['Fighting', 'fighting'],
+    // Kurzformen („Destruction Spells“, „Decay or Support Spell“) tragen dasselbe Symbol
+    ['Destruction', 'destruction'], ['Summoning', 'summoning'], ['Support', 'support'], ['Decay', 'decay'],
   ];
   const SYM_FONT = 30, SYM_SPACE = 2;            // `image font size`, `horizontal space` der Symbolschrift
   const SYM_KEY = Object.create(null), SYM_CH = Object.create(null);
-  SYMBOLS.forEach(([name, key], i) => { const ch = String.fromCharCode(0xE000 + i); SYM_KEY[ch] = key; SYM_CH[name] = ch; });
-  const SYM_RE = new RegExp('\\b(' + SYMBOLS.map(x => x[0]).join('|') + ')\\b', 'g');
-  const symbolize = t => String(t == null ? '' : t).replace(SYM_RE, m => SYM_CH[m]);
+  const SYM_KEYS = [...new Set(SYMBOLS.map(x => x[1]))];
+  SYMBOLS.forEach(([name, key]) => { SYM_CH[name] = String.fromCharCode(0xE000 + SYM_KEYS.indexOf(key)); });
+  SYM_KEYS.forEach((key, i) => { SYM_KEY[String.fromCharCode(0xE000 + i)] = key; });
+  // Das Symbol steht nur im Zusammenhang mit Spells („Magic Arts Spells“ -> „[Symbol] Spells“, auch „Decay or
+  // Support Spell“ und „Destruction or Decay Magic Spell“: jede Schule der Aufzaehlung). Wird die Faehigkeit selbst
+  // gemeint („Magic Arts 1“, „Fighting level“, „a Support Magic Ability“, „Support Zone“), bleibt der Name Text.
+  const SYM_ALT = SYMBOLS.map(x => x[0]).join('|');       // laengere Namen stehen vor ihren Kurzformen
+  const SYM_SEP = '(?:\\s*,\\s*|\\s+(?:or|and)\\s+)';
+  const SYM_RE = new RegExp('\\b(' + SYM_ALT + ')(?=(?:' + SYM_SEP + '(?:' + SYM_ALT + '))*\\s+Spells?\\b)', 'g');
+  const SYM_RE_ALL = new RegExp('\\b(' + SYMBOLS.slice(0, 6).map(x => x[0]).join('|') + ')\\b', 'g');   // nur zum Vergleichen (OPT.symMode = 'all')
+  const symbolize = t => {
+    t = String(t == null ? '' : t);
+    if (OPT.symMode === 'none') return t;
+    return t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
+  };
   let symSize = 8.5;                              // Symbolgroesse des Textfelds, das gerade gesetzt wird
   function symAdv(ch) {                           // Breite in Font-Einheiten (haengt nicht von der Schriftgroesse ab)
     const r = sprites && sprites.rects['sym.' + SYM_KEY[ch]];
