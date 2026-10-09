@@ -77,11 +77,13 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
 
 ### Schraffur auf Fullart-/Rare-Karten und Rahmenglanz
 
-* **Schraffur ohne Skin:** dieselbe Schraffur (ohne Glanzband und Namen) liegt auf dem Bild aller **Fullart-Karten**
+* **Schraffur und Glanzband ohne Skin:** dieselbe Schraffur und dasselbe Glanzband (ohne Namen) liegen auf dem Bild aller **Fullart-Karten**
   (Ascended Heroes und Fullart-Helden, nach Kartentyp: `CardRender.hatchEligible`) sowie aller **Super und Diamond
   Rares** (Foil-Kennzeichen). Die Maske kommt aus der Kunst der Karte selbst (`CardRender.hatchFor`, LRU 80). Die
-  Textur wird erst geladen, wenn die Karte mindestens 150 px breit gezeichnet wird (`FoilHatch`, `useAbBreite`) —
-  auf Brett, Hand und in Galerien kostet sie nichts.
+  Textur wird erst geladen, wenn die Karte mindestens 150 px breit gezeichnet wird (`FoilHatch`, `useEffektHuelle`) —
+  auf Brett, Hand und in Galerien kostet sie nichts. Bei Fullarts liegen beide Schichten auf der ganzen Fläche
+  außer Namensleiste, Fähigkeitenfeldern, Regeltext und Werten (die Rahmenmaske ist hart ausgeschnitten; gemessen:
+  0 geänderte Pixel innerhalb der Textfelder).
 * **Rahmenglanz:** Gold-, Silber- und Diamant-Rahmen glänzen in ihrer Farbe: ein Lichtband (alle ~2,4 s) läuft über die
   Karte und leuchtet nur auf dem Rahmen auf (`FoilRim`). Welche Farbe, entscheidet `CardRender.rimKind` aus Kartentyp
   und Seltenheit (Superhelden/Fullart-Helden und Super Rare = Gold, Rare = Silber, Diamond = Türkis; bei Skins gelten
@@ -123,6 +125,16 @@ Szenen mit `CardMini` aus den gebauten Bundles, „Holo AUS“ = `CardRender.HOL
 Die Last in „Holo AUS“ stammt vom **bestehenden** Foil der Super/Diamond Rares (rund 28 Animationen je Karte); die neuen
 Schichten legen in Massenansichten nichts obendrauf. Worst Case Desktop (6 Karten à 210 px, alles aktiv): 37 → 28 fps
 bei reinem Software-Rendering; teuerster Einzelposten ist der Rahmenglanz (Maske über die ganze Karte).
+
+### Vollbild-Karten: deckende Umrisse
+
+Bei Fullart-Karten (Ascended Heroes, Fullart-Helden) scheint das Bild blass durch die Boxen (Name, Fähigkeiten, Effekt,
+Werte). Die Masken des Templates (`mask.fullart`, `mask.hero`) haben drei Stufen: 0 = Umrisslinie der Box (Rahmen voll
+sichtbar), 51 = Füllung (20 % Bild), 255 = Bildfläche. Direkt innen an der Umrisslinie lagen aber noch die Bevel-Zeilen
+(dunkle/helle Innenkante) auf Stufe 51 — durch sie schien das Bild und machte die Umrandung fleckig. `hardMask`
+(card-render.js) macht sie hart: Pixel im Abstand 1 zur Umrisslinie werden deckend (Maske 0), im Abstand 2 jene, die nicht
+die Füllfarbe haben. Die Füllung weiter innen (samt Dithering) bleibt halbtransparent. Einmal je Maske gerechnet;
+`CardRender.OPT.hardOutlines = false` schaltet es ab.
 
 ## Dateien
 
