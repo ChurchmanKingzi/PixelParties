@@ -1199,7 +1199,7 @@ async function runActionPhase(engine, helpers) {
     const rest = [];
     for (const c of candidates) {
       const prio = (c.cardType === 'Spell' || c.cardType === 'Attack' || c.cardType === 'Creature')
-        ? cpuForcePlay(engine, cpuIdx, c.cardName, c.heroIdx) : 0;
+        ? await cpuForcePlay(engine, cpuIdx, c.cardName, c.heroIdx) : 0;
       if (prio > 0) forced.push({ c, prio }); else rest.push(c);
     }
     if (forced.length > 0) {
@@ -1969,7 +1969,7 @@ async function activateHeroEffects(engine, helpers) {
     // Deck-Regel `cpuMeta.forcePlay` am Heldenskript (Damus: jede Runde eine
     // Ifrit): kein Wert-Gate und keine Recon — die Entscheidung steht, es
     // gibt keinen Zielplan zu optimieren.
-    const forceHero = cpuForcePlayHero(engine, cpuIdx, ps.heroes[pickIdx], pickIdx) > 0;
+    const forceHero = (await cpuForcePlayHero(engine, cpuIdx, ps.heroes[pickIdx], pickIdx)) > 0;
     const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
       () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }),
       forceHero ? { alwaysCommit: true, commitWithoutRecon: true } : {});
@@ -3938,12 +3938,13 @@ async function fireAdditionalActions(engine, helpers) {
     //    payoff is invisible to the eval (future-turn synergy, no
     //    immediate state delta). Same flag used by activateFreeAbilities.
     const pickScript = loadCardEffect(pick.cardName);
+    // Deck-Regel `cpuMeta.forcePlay`: kein Wert-Gate, die Karte wird gespielt.
+    const pickForced = (await cpuForcePlay(engine, cpuIdx, pick.cardName, pick.heroIdx)) > 0;
     const pickAlwaysCommit = !!pickScript?.blockedByHandLock
       || (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
       ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
       : !!pickScript?.cpuMeta?.alwaysCommit)
-      // Deck-Regel `cpuMeta.forcePlay`: kein Wert-Gate, die Karte wird gespielt.
-      || cpuForcePlay(engine, cpuIdx, pick.cardName, pick.heroIdx) > 0;
+      || pickForced;
     // Rafflesia-Chain: Ein per Chain-Grant geschenkter Folgezauber ist
     // GRATIS — das Standard-Gate bewertet ihn aber wie einen normalen
     // Play und lässt ihn bei marginal negativem Score verfallen.
@@ -8823,7 +8824,56 @@ function isTargetImmune(engine, target) {
 // duplizieren — `isTargetImmune` deckt tot, immun, Baihu-Petrify,
 // gecharmt, submerged und den Erstzug-Schild ab. Bewusst ein Objekt:
 // weitere Helfer lassen sich ergänzen, ohne jede Signatur anzufassen.
-const CPU_META_HELPERS = { isTargetImmune };
+const CPU_META_HELPERS = { isTargetImmune, dryRun: cpuDryRun };
+
+/**
+ * ★ TROCKENLAUF IM SANDKASTEN (fuer Karten-Vertraege wie `forcePlay`).
+ *
+ * Fuehrt `fn` (async) im selben Sandkasten aus wie die MCTS-Rollouts:
+ * Snapshot, `_inMctsSim`, Fast Mode — danach wird ALLES zurueckgesetzt
+ * (Spielzustand, Fast Mode, Prompt-Zyklus, Schadenszaehler). Der Aufrufer
+ * bekommt den Rueckgabewert von `fn`; er darf den Zustand darin beliebig
+ * veraendern und echte Engine-Pfade benutzen (z. B. `dealDamageToTargets`),
+ * damit sichtbare Schadensminderung (Tempeste, Resistance, Schilde, Status …)
+ * so einfliesst, wie die Engine sie wirklich rechnet — statt sie nachzubauen.
+ *
+ * VERDECKTE INFORMATION gehoert NICHT hinein: wer den Gegner simuliert,
+ * blendet dessen Surprises und Handkarten VOR dem Lauf aus. Die CPU soll nur
+ * einrechnen, was sie sehen kann.
+ *
+ * Wirft `fn`, wirft diese Funktion nicht: Rueckgabe `undefined` (der
+ * Aufrufer faellt auf seine Handrechnung zurueck).
+ */
+async function cpuDryRun(engine, fn) {
+  const snap = engine.snapshot();
+  const prevInSim = engine._inMctsSim;
+  const prevStart = engine._mctsRolloutStartT;
+  const prevSilent = _cpuLogSilent;
+  const prevCalls = [engine._damageCallsThisTurn, engine._damageCallsTotal];
+  engine._inMctsSim = true;
+  engine._mctsRolloutStartT = Date.now();
+  engine.enterFastMode();
+  engine._mctsTargetRecord = [];
+  engine._mctsRecordOverflowed = false;
+  _cpuLogSilent = true;
+  try {
+    return await fn();
+  } catch {
+    return undefined;
+  } finally {
+    delete engine._mctsTargetRecord;
+    _cpuLogSilent = prevSilent;
+    engine.exitFastMode();
+    engine.restore(snap);
+    resetPromptCycle(engine);
+    engine._inMctsSim = prevInSim;
+    engine._mctsRolloutStartT = prevStart;
+    // Der Trockenlauf ist kein echter Schaden: die Obergrenze je Zug (Schutz vor
+    // Kaskaden) soll durch ihn nicht naeher ruecken.
+    engine._damageCallsThisTurn = prevCalls[0];
+    engine._damageCallsTotal = prevCalls[1];
+  }
+}
 
 // ─── Karten-Vertrag `cpuMeta.forcePlay` (Deck-Regeln der CPU) ─────────
 //
@@ -8841,12 +8891,13 @@ const CPU_META_HELPERS = { isTargetImmune };
 // Nur im echten Zug (`_inMctsSim` → 0): Rollouts bewerten Kandidaten
 // weiter wie bisher, die Regel greift erst bei der Auswahl. Das Training
 // (Self-Play) ist KEIN Rollout und spielt die Regeln mit.
-function cpuForcePlay(engine, pi, cardName, heroIdx) {
+async function cpuForcePlay(engine, pi, cardName, heroIdx) {
   if (engine._inMctsSim || !cardName) return 0;
   const fn = loadCardEffect(cardName)?.cpuMeta?.forcePlay;
   if (typeof fn !== 'function') return 0;
   try {
-    const v = fn(engine, pi, heroIdx, CPU_META_HELPERS);
+    // `await`: eine Karte darf den Trockenlauf (`helpers.dryRun`) nutzen und ein Promise liefern.
+    const v = await fn(engine, pi, heroIdx, CPU_META_HELPERS);
     if (v === true) return 1;
     return (Number.isFinite(v) && v > 0) ? v : 0;
   } catch (err) {
@@ -8861,11 +8912,11 @@ function cpuForcePlay(engine, pi, cardName, heroIdx) {
  * Pseudonia). Ein Erbe feuert den Effekt ueber einen Traeger — ohne diesen
  * Blick liefe die Deck-Regel nur fuer das Original.
  */
-function cpuForcePlayHero(engine, pi, hero, heroIdx) {
+async function cpuForcePlayHero(engine, pi, hero, heroIdx) {
   if (!hero?.name) return 0;
-  let best = cpuForcePlay(engine, pi, hero.name, heroIdx);
+  let best = await cpuForcePlay(engine, pi, hero.name, heroIdx);
   for (const n of (Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [])) {
-    best = Math.max(best, cpuForcePlay(engine, pi, n, heroIdx));
+    best = Math.max(best, await cpuForcePlay(engine, pi, n, heroIdx));
   }
   return best;
 }
@@ -14326,5 +14377,5 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // verdichtet beide zu Tags und soll sie NICHT nachbauen — eine
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
+module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
   _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS } };

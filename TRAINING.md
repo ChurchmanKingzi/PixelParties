@@ -1111,15 +1111,26 @@ der Hand oder ohne Caster für Summoning Magic Lv2 ist die Regel unerfüllbar; d
 Tutor-Wert).
 
 **② Armageddon** (`armageddon.js`). Gesamtschaden = 50 + 100 je Ifrit auf dem Brett, beide Seiten gezählt.
-- **Auslöschung → IMMER (Rang 3):** jeder lebende Gegner-Held stirbt (`hp <= Schaden`; gefeite Helden — Damus hinter
-  seiner Ifrit — und Ziel-Immune nach `isTargetImmune` sterben nicht).
-- **Zwei Schläge → fast immer (Rang 2):** `2 × Schaden >= HP` des Gegner-Helden mit den meisten (aktuellen) HP, und dieser
-  Held ist nicht gefeit. Wahrscheinlichkeit 0,97, EIN Wurf je (Zug, Spieler), damit die Antwort über alle Abfragen eines
+- **Auslöschung → IMMER (Rang 3):** jeder lebende Gegner-Held stirbt. Ob er stirbt, rechnet NICHT dieser Code, sondern
+  die Engine: die Vorschau führt den echten Schlag (`dealDamageToTargets`, dieselbe Zielliste wie `onPlay`,
+  `sammleZiele`) im Sandkasten der Suche aus (`helpers.dryRun` = `cpuDryRun` in `_cpu.js`: Snapshot,
+  `_inMctsSim`, Fast Mode, danach vollständige Wiederherstellung inkl. Schadenszähler) und liest die HP ab. So fließt jede
+  SICHTBARE Schadensänderung von selbst ein — Tempeste (−100 auf ihre anderen Helden, ihr eigener Schaden unreduzierbar),
+  Resistance & Co., Schilde, Status, Immunitäten, Todesaufschub. Geprüft mit der echten Engine
+  (`scripts/check-cpu-deck-rules.js`): 150 Schaden töten drei 140-HP-Helden, aber nicht, wenn einer Tempeste ist (die beiden
+  anderen nehmen nur 50).
+- **Zwei Schläge → fast immer (Rang 2):** `2 × (was wirklich ankommt) >= HP` des Gegner-Helden mit den meisten (aktuellen)
+  HP; „was ankommt" ist die vom Sandkasten gemessene Wirkung nach Minderung. Bei HP-Gleichstand müssen alle Betroffenen es
+  sein; ein Held, dem der Schlag gar nichts tut (gefeit), ist nie zu töten. Wahrscheinlichkeit 0,97, EIN Wurf je (Zug, Spieler), damit die Antwort über alle Abfragen eines
   Zuges stabil bleibt. Steht Damus' Ifrit-Platzierung des Zuges noch aus, wartet die Regel (Armageddon beendet den Zug).
 - **Selbstmord-Schutz (nicht aus der Vorgabe, Entscheidung beim Bau):** beide Regeln gelten nicht, wenn der Schlag die CPU
   verlieren ließe — alle eigenen Helden tot bei lebendem Gegner, oder Doppel-K.o. ohne MEHR Kreaturen (Gleichstand verliert
   der Wirker). „IMMER" heißt hier „immer, wenn es die Gegnerseite auslöscht und die Partie nicht kostet".
-- Nicht abgebildet: Schadensminderung durch Karten und gegnerische Reaktionen. Es ist eine Vorhersage, kein Beweis.
+- **Nur Sichtbares (Vorgabe):** Im Sandkasten haben die Gegner weder Surprises noch Handkarten — die CPU rechnet keine
+  Reaktion ein, die sie nicht sehen kann (kein Hellsehen durch den Trockenlauf). Dafür kann ein verdeckter Konter den Cast
+  trotzdem kippen; das ist gewollt. Scheitert der Trockenlauf, rechnet `vorschauRechnung` von Hand (HP gegen Schaden,
+  Damus-Immunität, `isTargetImmune`) — dann OHNE Schadensminderung durch Karten. Ergebnis je Lage zwischengespeichert
+  (`lageSignatur`), ein Lauf je Wirker-Kandidat und Änderung des Bretts.
 
 **③ Pseudonia** (`pseudonia-…js`, `_hero-effect-seen-shared.js`). Die Aufnahme-Frage trägt jetzt `devour` (Kontext). CPU:
 eigener Held gefallen → IMMER aufnehmen; Gegner-Held gefallen → höchstens EINER pro Partie (`hero._pseudoniaFremd`).

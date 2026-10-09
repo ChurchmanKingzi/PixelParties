@@ -2214,6 +2214,12 @@ cpuMeta: {
   //   • Zusatzaktionen (`fireAdditionalActions`): wirkt wie `alwaysCommit`,
   //   • Helden-Effekte (Skript des Helden UND seine gewonnenen Effekte):
   //     Gate und Recon entfallen.
+  // `forcePlay` darf `async` sein (der Pilot `await`et). Für Entscheidungen, die von
+  // Schadensminderung & Co. abhängen, NICHT nachrechnen, sondern `helpers.dryRun(engine, async () => …)`
+  // benutzen: derselbe Sandkasten wie die MCTS-Rollouts (Snapshot → echte Engine-Pfade, z. B.
+  // `dealDamageToTargets` → Wiederherstellung). Verdecktes (gegnerische Hand, Surprises) vorher im
+  // Sandkasten leeren — die CPU rechnet nur ein, was sie sehen kann. Beispiel: armageddon.js
+  // (`vorschauSimuliert`). Scheitert der Lauf, liefert `dryRun` `undefined` → Rückfall auf Handrechnung.
   // Nur im echten Zug, nie im MCTS-Rollout. Zahlen, die später gelernt werden
   // sollen (Wahrscheinlichkeiten, Schwellen), NICHT hart einbauen, sondern über
   // `require('./_deck-profile').ruleParam(engine, pi, '<karte>.<regel>', vorgabe)`
