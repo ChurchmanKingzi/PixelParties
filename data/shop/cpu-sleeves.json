@@ -229,6 +229,11 @@
       "deckId": "planned:bubbles",
       "id": "fluffy-bulwark",
       "name": "Fluffy Bulwark"
+    },
+    {
+      "deckId": "sample-Structure Deck End of the World",
+      "id": "prophecy-fulfilled",
+      "name": "Prophecy Fulfilled"
     }
   ]
 }

@@ -59,6 +59,7 @@ Rahmen + Shop: `generator/build_frames_r6.py` (erzeugt `frames_r6.json` aus den 
 | 44 | Sakura Mirror | Grand Rebellion! | Champion, the Stormbringer | sakura-mirror.png | wave/lacquer/rose |
 | 45 | Spellstorm | Chaos-Diamond (geplant, Deck spielt viele Zauber) | Chaos-Diamond, the Cracked Keeper | spellstorm.png | cosmic/gothic/ruby/amethyst |
 | 46 | Fluffy Bulwark | Bubbles (geplant, Fun-Fun-Circus-Archetyp) | Bubbles, the Bouncy Bunny | fluffy-bulwark.png | card/lacquer/rose/sapphire |
+| 47 | Prophecy Fulfilled | End of the World (Armageddon + Ifrits) | Damus, the Prophet of Apocalypse | prophecy-fulfilled.png | filigree/bronze/ruby/amber |
 
 45 und 46 gehören zu geplanten Gegnern, deren Decks es noch nicht gibt: Sie stehen unter den Platzhalter-IDs `planned:chaos-diamond` bzw. `planned:bubbles` in `data/shop/cpu-sleeves.json` (nicht käuflich, im Spiel noch unsichtbar). Sobald die Decks existieren, dort die `deckId` auf die echte Deck-ID umstellen (bzw. in `BRIEF.md` und `frame_r6.py` neu laufen lassen).
 

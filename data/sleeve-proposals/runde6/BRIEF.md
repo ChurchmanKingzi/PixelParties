@@ -86,6 +86,7 @@ aus `../runde5/BRIEF.md`. Abweichungen/Ergänzungen unten gehen vor.
 44 | `sample-Structure Deck_ Grand Rebellion` | Grand Rebellion! | **Champion, the Stormbringer** | Johanna, Crusader of Light; Cute Nerd Magenta | Rebelliokai Courtly Kirin
 45 | `planned:chaos-diamond` | Chaos-Diamond (geplant, Deck spielt viele Zauber) | **Chaos-Diamond, the Cracked Keeper** | – | –
 46 | `planned:bubbles` | Bubbles (geplant, Fun-Fun-Circus-Archetyp) | **Bubbles, the Bouncy Bunny** | – | –
+47 | `sample-Structure Deck End of the World` | End of the World (Armageddon + Ifrits) | **Damus, the Prophet of Apocalypse** | Kazena, the Storming Rebel; Pseudonia, the Skill Devourer | Armageddon
 
 ## Werkzeuge
 Wie Runde 4, aber alles unter `runde6/`: Skripte in `runde6/generator/` mit `from common import *` (Sprite-Cache
@@ -114,3 +115,8 @@ F.apply('../NN_name.png', '/tmp/claude-0/-home-user-PixelParties/957fee25-d4dc-5
 Zwei CPU-Gegner sind geplant, ihre Decks existieren noch nicht. Ihre Sleeves werden schon jetzt gebaut und unter den
 Platzhalter-IDs `planned:…` in `data/shop/cpu-sleeves.json` eingetragen (nicht käuflich, im Spiel noch unsichtbar).
 Sobald das Deck existiert, wird dort nur die `deckId` auf die echte Deck-ID umgestellt.
+
+## Nachtrag: Kartenbilder
+Die Kartenbilder liegen nicht mehr als ganze Karten in /home/user/PixelParties/cards/, sondern als Kartenkunst in
+Originalpixeln unter /home/user/PixelParties/data/card-art/native/<id>.png (Name → id in data/card-art/index.json).
+`nat('<Kartenname>')` aus kit.py liest sie automatisch von dort, damit funktioniert auch findcards.py weiter.
