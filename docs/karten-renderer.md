@@ -24,12 +24,23 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   so liegt jede Zeile auf jedem Gerät an derselben Stelle. Die Schriftgröße des Effekttexts wird wie
   in MSE per Binärsuche (7 Schritte, 7–20 pt) an die Textbox angepasst.
 * Karten mit Skin = Basiskarte mit anderem Bild und Namen (`CardRender.renderCard(karte, { skin })`).
+* **Seltenheit:** Das Foil-Kennzeichen aus `cards.json` gilt als Seltenheit, die das Spiel kennt
+  (`diamond_rare` → Diamond, `secret_rare` → Super Rare) und bestimmt Rahmen, Textfarbe und Ecken-Stempel.
+  Alle anderen Karten nehmen `r` aus `data/card-render.json` (aus den früheren Kartenbildern abgeleitet).
+* **Diamond-Rahmen:** 14 px oben/unten, 15 px links/rechts (Template-`diafoil.png`), mit den Ecken des Gold-/
+  Silberrahmens: je Ecke 2×2 Blöcke (Eckblock und diagonal innen gedämpft, die zwei Nachbarn am Rand dunkler).
+* **Symbole im Text:** Die Namen der Zauberschulen im Effekt- und Fähigkeitentext werden durch die Bilder der
+  Symbolschrift „PixelParties-text-replacements“ ersetzt (`SYMBOLS` in `card-render.js`: Fighting,
+  Magic Arts, Destruction Magic, Summoning Magic, Support Magic, Decay Magic). Größe und Lage wie in MSE
+  (Symbolgröße 8,5 bzw. 10,5 / `image font size` 30, Flächenmittel-Skalierung, mittig in der Zeile); ein
+  Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
+  Weitere Ersetzungen: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
 
 ## Dateien
 
 | Pfad | Inhalt |
 | --- | --- |
-| `public/cardgen/sprites.png` + `.json` | alle Rahmen, Masken, Symbole, Ecken-Stempel (Pixelraster 1/10, ~25 KB) |
+| `public/cardgen/sprites.png` + `.json` | alle Rahmen, Masken, Symbole (auch die Text-Symbole), Ecken-Stempel (Pixelraster 1/10, ~25 KB) |
 | `public/cardgen/glyphs.json` | Schrift-Umrisse (aus `data/Pixel Intv.otf`) |
 | `public/cardgen/art.png` + `.json` | **Atlas** der Kunst: ~1.240 Motive im NATIVEN Pixelraster (meist 76×51) |
 | `public/cardgen/art/<id>.webp` | wenige Motive (Archer, Cannon Tower, …), die kein sauberes Raster haben — in Vollauflösung |
@@ -43,7 +54,8 @@ nur die goldenen Rahmenelemente sind übernommen, die Foil-Effekte macht das Spi
 ## Skripte
 
 ```bash
-# Sprites aus dem MSE-Style-Ordner (liegt außerhalb des Repos)
+# Sprites aus dem MSE-Style-Ordner (liegt außerhalb des Repos); die Symbolschrift
+# (PixelParties-text-replacements.mse-symbol-font) wird neben dem Style-Ordner gesucht, sonst --symbols <Ordner>
 python scripts/build-cardgen-sprites.py --src <…/PixelParties-standard.mse-style>
 # Schrift-Umrisse (benötigt fonttools)
 python scripts/build-cardgen-glyphs.py
