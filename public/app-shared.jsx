@@ -8947,7 +8947,7 @@ const TUTORIAL_SCRIPTS = {
         ] }),
       A("And some Abilities let ya do cool passive stuff in ya **Main Phase**! Okay - enough makin' things easy for ya, khehe - show me what ya can do!",
         { highlights: [FRIENDSHIP] }),
-      A('Well - try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),
+      A('And try not to spend *all* my Golds at once.', { highlights: [BOOK, HOWITZER, ALCHEMY] }),
       // ── Antonia geht rechts ab (`exitRight`), danach keine Highlights mehr ──
       A("I'll see ya around ... to collect the debt, khehehehehe!", { highlights: [BOOK, HOWITZER, ALCHEMY], exitRight: true }),
       { text: '...' },
