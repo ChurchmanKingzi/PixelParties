@@ -85,7 +85,7 @@
   // ── Farben (Style-Skript des Templates) ──
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
-    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
+    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
     supArti: 'rgb(255,125,0)', rare: 'rgb(173,97,0)',
   };
 
@@ -406,11 +406,22 @@
     else if (t === 'fullartHero') sprite(ctx, 'rim.goldFullart', 0, 0, W, H);
     else if (spec.rarity === 'super rare') sprite(ctx, 'rim.superRare', 0, 0, W, H);
     else if (OPT.silverRim && spec.rarity === 'rare') sprite(ctx, 'rim.rare', 0, 0, W, H);
-    // Diamond: der Rahmen aus dem Template (14 px oben/unten, 15 px links/rechts, Cyan); die Textur darueber entfaellt
+    // Diamond: der Rahmen aus dem Template (14 px oben/unten, 15 px links/rechts, Cyan); die Textur darueber entfaellt.
+    // Die Ecken sind wie beim Gold-/Silberrahmen gebaut: je Ecke 2x2 Bloecke (Randstaerke), Eckblock und der
+    // diagonal innen liegende Block gedaempft, die beiden Nachbarn am Rand dunkler. Beim Goldrahmen sind das
+    // (213,185,76) und (196,156,0) zu den Randfarben (255,231,76)/(255,221,0) — hier 80 % bzw. 70 % des Cyans.
     if (spec.rarity === 'diamond') {
+      const T = 14, S = 15;
       ctx.fillStyle = C.diamond;
-      ctx.fillRect(0, 0, W, 14); ctx.fillRect(0, H - 14, W, 14);
-      ctx.fillRect(0, 14, 15, H - 28); ctx.fillRect(W - 15, 14, 15, H - 28);
+      ctx.fillRect(0, 0, W, T); ctx.fillRect(0, H - T, W, T);
+      ctx.fillRect(0, T, S, H - 2 * T); ctx.fillRect(W - S, T, S, H - 2 * T);
+      [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(([cx, cy, sx, sy]) => {
+        [[0, 0, C.diamondMuted], [1, 0, C.diamondDark], [0, 1, C.diamondDark], [1, 1, C.diamondMuted]].forEach(([bx, by, col]) => {
+          const x0 = cx + sx * bx * S, x1 = cx + sx * (bx + 1) * S, y0 = cy + sy * by * T, y1 = cy + sy * (by + 1) * T;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), S, T);
+        });
+      });
     }
 
     // 7) Werte (HP, Angriff / Kosten)

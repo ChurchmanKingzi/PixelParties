@@ -27,6 +27,8 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
 * **Seltenheit:** Das Foil-Kennzeichen aus `cards.json` gilt als Seltenheit, die das Spiel kennt
   (`diamond_rare` → Diamond, `secret_rare` → Super Rare) und bestimmt Rahmen, Textfarbe und Ecken-Stempel.
   Alle anderen Karten nehmen `r` aus `data/card-render.json` (aus den früheren Kartenbildern abgeleitet).
+* **Diamond-Rahmen:** 14 px oben/unten, 15 px links/rechts (Template-`diafoil.png`), mit den Ecken des Gold-/
+  Silberrahmens: je Ecke 2×2 Blöcke (Eckblock und diagonal innen gedämpft, die zwei Nachbarn am Rand dunkler).
 * **Symbole im Text:** Die Namen der Zauberschulen im Effekt- und Fähigkeitentext werden durch die Bilder der
   Symbolschrift „PixelParties-text-replacements“ ersetzt (`SYMBOLS` in `card-render.js`: Fighting,
   Magic Arts, Destruction Magic, Summoning Magic, Support Magic, Decay Magic). Größe und Lage wie in MSE
