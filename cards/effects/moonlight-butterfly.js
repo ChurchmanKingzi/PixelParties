@@ -124,7 +124,8 @@ module.exports = {
       await engine.actionDealDamage(
         { name: CARD_NAME, owner: pi, heroIdx },
         ziel, SCHADEN, 'creature',
-        { sourceOwner: pi, canBeNegated: true },
+        // `festesZiel`: nur der Held in derselben Position — kein anderes Ziel.
+        { sourceOwner: pi, canBeNegated: true, festesZiel: true },
       );
 
       engine.log('moonlight_butterfly', {

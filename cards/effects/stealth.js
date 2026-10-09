@@ -65,9 +65,15 @@ function otherChoosableHero(engine, info, ctrl) {
   const liste = typeof engine.heroesControlledBy === 'function'
     ? engine.heroesControlledBy(ctrl)
     : (engine.gs.players[info.heroOwner]?.heroes || []).map((hero, heroIdx) => ({ physOwner: info.heroOwner, heroIdx, hero }));
+  // „Heroes that can be chosen" — von DIESER Quelle. Kennt der Zielwaehler
+  // ihre legalen Ziele (`info.allTargets`, v871), entscheidet die Liste: ein
+  // Held, den sie gar nicht anbietet (Spalten-Filter, `condition`), ist kein
+  // Ausweichziel, und der Stealth-Held bleibt waehlbar (Als Ruling 9.10.).
+  const legale = Array.isArray(info.allTargets) ? info.allTargets : null;
   for (const { physOwner, heroIdx: hi, hero: h } of liste) {
     if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
     if (!h?.name || h.hp <= 0) continue;
+    if (legale && !legale.some(t => t?.type === 'hero' && !t.ineligible && t.owner === physOwner && t.heroIdx === hi)) continue;
     if (h.statuses?.untargetable || h.statuses?.invisible) continue;
     if (coveredBy(engine, stealthLevel(engine, physOwner, hi), info, ctrl)) continue; // selbst per Stealth geschuetzt
     return true;

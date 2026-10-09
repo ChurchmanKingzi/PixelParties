@@ -188,6 +188,26 @@ damit Flächenschaden abprallen, obwohl ihr Text nur „chosen" sagt
 (v634 hatte das bewusst ausgenommen). Stand: Stealth und Stealthy
 Pursuit = nur Wahl; Future Tech Jetpack und Dive Down = Wahl und Treffer.
 
+**★ Einzelziel-Quellen — „solange es andere Ziele gibt" gilt nicht gegen
+sie (Als Ruling 9.10.):** „while you control other targets that can be
+chosen / hit / affected **by them**" meint die Ziele DIESER Quelle. Eine
+Quelle, die von Natur aus nur einen Helden treffen kann (Slippery
+Spikeblock, Slippery Snowman, Moonlight Butterfly: immer das Gegenüber),
+hat kein anderes Ziel — Submerged (Jump in the River) und Dive Down
+schützen dann nicht. Die Quelle sagt es selbst an:
+`actionDealDamage(src, hero, n, type, { festesZiel: true })` bzw.
+`addHeroStatus(pi, hi, status, { festesZiel: true })`. Nur setzen, wenn es
+wirklich KEINE Alternative gibt (Whoolmoths Stomp: nur ohne Creature in
+der Spalte). `isSubmergedProtected(owner, hero, { festesZiel })` und der
+`info` des Schadenspfads tragen die Angabe weiter; ein neuer Schutz der
+Bauart „while other targets" liest `info.festesZiel` und steigt aus.
+Bei der WAHL entscheidet dieselbe Frage die Liste der legalen Ziele
+(`info.allTargets`, v871): Stealth, Dive Down, Stealthy Pursuit und
+Alliance zählen nur Helden/Creatures als Ausweichziel, die die Quelle
+auch anbietet (Spalten-Filter, `condition`). Der Dispatcher
+(`promptEffectTarget`) reicht diese Liste noch nicht mit — dort gilt
+weiter der Brett-Scan.
+
 **Liegt die regelgebende Karte nicht mehr auf dem Brett** (eine
 Reaction, die sich selbst löscht), hängt sie ihre Regel an den Helden:
 `engine.addHeroTargetBlocker(pi, heroIdx, 'Dive Down', { untilTurn })`.

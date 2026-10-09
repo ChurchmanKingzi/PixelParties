@@ -7795,9 +7795,20 @@ class GameEngine {
   // zaehlten nicht als „andere Ziele" — stand neben dem getauchten Helden
   // nur noch eine Creature, kam Gift trotzdem an. „Andere Ziele" sind
   // deshalb eigene Helden UND Creatures.
+  //
+  // ★ EINZELZIEL-QUELLEN (Als Ruling 9.10.): „other targets that can be
+  // affected by THEM" meint die Ziele DIESER Quelle. Trifft sie von
+  // Natur aus nur diesen einen Helden (Slippery Spikeblock: immer das
+  // Gegenueber), gibt es fuer sie kein anderes Ziel — Submerged schuetzt
+  // dann nicht. Die Quelle sagt das selbst an: `festesZiel: true` in den
+  // `opts` von `actionDealDamage` / `addHeroStatus`.
 
-  /** Ist `hero` (Besitzer `owner`) gerade durch Submerged geschuetzt? */
-  isSubmergedProtected(owner, hero) {
+  /**
+   * Ist `hero` (Besitzer `owner`) gerade durch Submerged geschuetzt?
+   * `opts.festesZiel`: die wirkende Quelle kann NUR diesen Helden treffen.
+   */
+  isSubmergedProtected(owner, hero, opts = {}) {
+    if (opts.festesZiel) return false;
     if (!hero?.buffs?.submerged || !hero.name || !(hero.hp > 0)) return false;
     if (!this.gs.players[owner]) return false;
     // Als Vorgabe 29.9. (Runde 3): „you control" = der KONTROLLEUR des
@@ -8192,6 +8203,10 @@ class GameEngine {
         // Pursuit) steigt hier aus, „cannot be chosen OR HIT" (Jetpack,
         // Dive Down) nicht — siehe CARD_API ⑥.
         hit: true,
+        // Die Quelle trifft von Natur aus NUR diesen Helden — Schutz der
+        // Bauart „solange es andere Ziele gibt" (Dive Down) greift dann
+        // nicht (Als Ruling 9.10., s. `isSubmergedProtected`).
+        festesZiel: opts?.festesZiel,
       })) {
         this.log('targeting_blocked', { hero: this._heroLabel(target), source: source?.name || null });
         this._flashHeroDamageZero(target);   // verhinderter Schaden zeigt „0" (Als Regel 17.9.)
@@ -8714,7 +8729,7 @@ class GameEngine {
     // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
     if (target?.buffs?.submerged && target.hp !== undefined) {
       const ownerIdx = this._findHeroOwner(target);
-      if (ownerIdx >= 0 && this.isSubmergedProtected(ownerIdx, target)) {
+      if (ownerIdx >= 0 && this.isSubmergedProtected(ownerIdx, target, { festesZiel: opts?.festesZiel })) {
         this.log('damage_blocked', { target: this._heroLabel(target), reason: 'submerged' });
         return { dealt: 0, cancelled: true };
       }
@@ -43990,7 +44005,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
     if (hero.buffs?.submerged) {
-      if (this.isSubmergedProtected(playerIdx, hero)) {
+      if (this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'submerged' });
         playBlockedAnim();
         return;
@@ -44083,6 +44098,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const statusOpts = { appliedTurn: this.gs.turn, ...opts };
     this._heldenStatusVerursacher(statusOpts, opts);   // v1399
     delete statusOpts._skipReactionCheck; // Internal flag, not stored on hero
+    delete statusOpts.festesZiel;         // Aufrufer-Hinweis, kein Statusfeld
     if (statusName === 'poisoned') {
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
       delete statusOpts.addStacks; // Clean up

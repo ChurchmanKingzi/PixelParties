@@ -95,6 +95,7 @@ module.exports = {
       await engine.addHeroStatus(oi, myHeroIdx, 'frozen', {
         duration: 1,
         appliedBy: pi,
+        festesZiel: true,   // nur das Gegenueber — kein anderes Ziel (Als Ruling 9.10.)
       });
 
       const ps = engine.gs.players[pi];

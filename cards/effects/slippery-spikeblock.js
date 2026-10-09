@@ -55,7 +55,9 @@ module.exports = {
       await engine._delay(380);
 
       const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.card.heroIdx };
-      await engine.actionDealDamage(source, oppHero, HIT_DAMAGE, 'creature');
+      // `festesZiel`: trifft immer exakt das Gegenueber — kein anderes
+      // Ziel, also schuetzt weder Submerged noch Dive Down (Als Ruling 9.10.).
+      await engine.actionDealDamage(source, oppHero, HIT_DAMAGE, 'creature', { festesZiel: true });
 
       const ps = engine.gs.players[pi];
       engine.log('slippery_spikeblock_hit', {

@@ -165,7 +165,10 @@ module.exports = {
       if (target.type === 'hero') {
         const h = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (h && h.hp > 0) {
-          await engine.actionDealDamage(source, h, HIT_DAMAGE, 'creature');
+          // Steht in der Spalte keine Creature, ist der Held das EINZIGE
+          // legale Ziel — dann schuetzt weder Submerged noch Dive Down.
+          await engine.actionDealDamage(source, h, HIT_DAMAGE, 'creature',
+            hasOppCreature ? undefined : { festesZiel: true });
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(

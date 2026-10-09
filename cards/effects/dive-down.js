@@ -85,6 +85,13 @@ function gedeckteQuelle(info, kontrolleur = info.heroOwner) {
  */
 function andereWaehlbareZiele(engine, info, kontrolleur = info.heroOwner) {
   const gs = engine.gs;
+  // „that can be chosen or hit" meint die Ziele DIESER Quelle. Kennt der
+  // Zielwaehler ihre legalen Ziele (`info.allTargets`, v871), entscheidet
+  // die Liste: was die Quelle gar nicht anbietet (Spalten-Filter,
+  // `condition`), ist kein Ausweichziel (Als Ruling 9.10.). Ohne Liste
+  // (Treffer, Dispatcher) bleibt es beim Brett-Scan.
+  const liste = Array.isArray(info.allTargets)
+    ? info.allTargets.filter(t => t && !t.ineligible) : null;
   // Andere Helden — Als Vorgabe 29.9.: alle, die der Kontrolleur fuehrt.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(kontrolleur)) {
     if (physOwner === info.heroOwner && hi === info.heroIdx) continue;
@@ -93,6 +100,7 @@ function andereWaehlbareZiele(engine, info, kontrolleur = info.heroOwner) {
     // Ein zweiter getauchter Held zaehlt nicht — sonst schuetzten sich
     // zwei gegenseitig ins Nichts (Stealth-Lehre).
     if (istGetaucht(gs, h)) continue;
+    if (liste && !liste.some(t => t.type === 'hero' && t.owner === physOwner && t.heroIdx === hi)) continue;
     return true;
   }
   // Kreaturen des Kontrolleurs
@@ -103,6 +111,9 @@ function andereWaehlbareZiele(engine, info, kontrolleur = info.heroOwner) {
     if (inst.counters?.untargetable_by_opponent) continue;
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
     if (!cd || !(hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) continue;
+    if (liste && !liste.some(t => (t.type === 'equip' || t.type === 'creature') && (t.cardInstance
+      ? t.cardInstance.id === inst.id
+      : (t.owner === engine.physicalSide(inst) && t.heroIdx === inst.heroIdx && t.slotIdx === inst.zoneSlot)))) continue;
     return true;
   }
   return false;
@@ -136,6 +147,10 @@ module.exports = {
   blocksTargeting(gs, engine, info) {
     // Wahrheitssehendes Auge & Co. heben jeden Zielschutz auf.
     if (info._truthSeeingEye || info.ignoreUntargetable) return false;
+    // Einzelziel-Quelle (Slippery Spikeblock & Co.): sie trifft nur diesen
+    // Helden, hat also kein anderes Ziel — „while you control other
+    // targets that can be … hit" ist nicht erfuellt (Als Ruling 9.10.).
+    if (info.festesZiel) return false;
     const hero = gs.players?.[info.heroOwner]?.heroes?.[info.heroIdx];
     if (!istGetaucht(gs, hero)) return false;
     const kontrolleur = engine.heroSideOf(info.heroOwner, hero);   // Als Vorgabe 29.9.
