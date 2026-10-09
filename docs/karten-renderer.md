@@ -47,40 +47,33 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
 
 Skin-Karten tragen ein eigenes Holo-Foil, das **nur Kunst und Namen** betrifft (Rahmen, Werte, Regeltext
 bleiben ruhig; bei Vollbild-Helden bleiben die Textfelder frei). Es ersetzt auf einer Karte mit Skin die
-Foil-Schicht der Seltenheit. Vorbild ist ein Full-Art-Holo: leuchtende Konturen, feine Schraffur über dem
-ganzen Bild, das Motiv bleibt klar erkennbar — die Farben sind bewusst gedämpft.
+Foil-Schicht der Seltenheit. Vorbild ist ein Full-Art-Holo: feine Schraffur über dem ganzen Bild, das Motiv
+bleibt klar erkennbar, die Farben sind bewusst gedämpft. (Konturen-Leuchtlinien, Flächen-Tönung, Echolinien und
+Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig bzw. verwaschen.)
 
 * **Name:** `renderCard` zeichnet den Skin-Namen in einem Goldverlauf (`goldFill`), das gilt überall, wo die
   Karte als Bild erscheint. Darüber legt das Spiel einen Hauch wandernder Pastellfarben und einen weißen Glanz
-  (alle ~2,6 s ein Durchgang), beschnitten durch die Umrisse der Buchstaben (`nameMask`). **Super Rare**
+  (alle ~1,3 s ein Durchgang), beschnitten durch die Umrisse der Buchstaben (`nameMask`). **Super Rare**
   (gold) und **Diamond Rare** (türkis) tragen denselben Namensglanz (`FoilName`, `CardRender.nameShimmerFor`);
   in Kleinansichten entfällt er dort.
-* **Kunst:** keine Kachel, sondern aus der Kunst selbst gerechnet (`CardRender.holoLayers`, einmal je Skin,
-  ~20–50 ms), alles Pixel für Pixel auf dem **nativen Pixelraster** (meist 76×51, gleiche Streckung wie `draw`,
-  keine Unschärfe):
-  1. **Konturen:** wo zwei Nachbarpixel stark verschieden sind (`HOLO.edge`), liegt auf der Pixelgrenze eine dünne
-     Leuchtlinie (weicher Hof, harter Kern), Gold-Grundton mit bunten Ausreißern.
-  2. **Flächen:** jedes Pixel bekommt EINEN Highlight-Ton aus seiner eigenen Farbe (Farbton leicht verschoben,
-     Sättigung der Fläche beibehalten, Farbton in 24 Stufen gerastert; Graustufen nach Helligkeit). Dunkle Pixel
-     (Umrisse, Schatten) bekommen nichts, die Zeichnung bleibt scharf.
-  3. **Schraffur:** feine Schrägstriche über dem ganzen Bild; sie braucht keine Textur, nur die Flächen/Konturen als
-     Maske (CSS).
-  Heraus kommen vier PNG-Blobs (`areas`, `edges`, `all`, `nameMask`) plus die Lage in Prozent der Karte als
-  CSS-Variablen (`CardRender.holoFor`, LRU 40).
-* **Anzeige:** `SkinHolo` (app-shared.jsx) legt die Schichten übers Bild; Animation nur per `transform`/`opacity`
-  unter statischen Masken (style.css, „SKIN-HOLO“): Flächen (`soft-light`, dezent pulsierend), Schraffur
-  (Maske aus `repeating-linear-gradient` in `cqw`, wächst mit der Karte; darunter ein wandernder Pastell-Regenbogen;
-  unter 150 px Kartenbreite aus), Konturen, ein Glanzband, das nur auf Flächen und Konturen aufleuchtet, und der
-  Namensglanz. Kleinansicht (`FoilKleinContext`), Telefone (Lite) und „Play Animations: aus“ zeigen einen
-  ruhigen Zustand (Flächen und Konturen, keine Schraffur, kein Glanz).
+* **Kunst:** feine Schrägstriche (Schraffur) mit wanderndem Pastell-Regenbogen und ein Glanzband, das alle ~2 s
+  über das Bild läuft. Beides liegt nur auf den helleren Flächen: `CardRender.holoLayers` rechnet dafür eine
+  **Maske** aus dem nativen Pixelraster der Kunst (meist 76×51, gleiche Streckung wie `draw`, keine Unschärfe),
+  je Pixel eine Stärke aus Helligkeit und Sättigung (Graustufen schwächer); dunkle Pixel (Umrisse, Schatten) bleiben
+  frei, die Zeichnung bleibt scharf. Einmal je Skin, ~20 ms. Heraus kommen zwei PNG-Blobs (`all`, `nameMask`) plus
+  die Lage in Prozent der Karte als CSS-Variablen (`CardRender.holoFor`, LRU 40).
+* **Anzeige:** `SkinHolo` (app-shared.jsx) legt die Schichten übers Bild; Animation nur per `transform` unter
+  statischen Masken (style.css, „SKIN-HOLO“): Schraffur (Maske aus `repeating-linear-gradient` in `cqw`, wächst mit
+  der Karte, geschnitten mit der Flächenmaske; unter 150 px Kartenbreite aus), Glanzband (dieselbe Maske) und
+  Namensglanz. Kleinansicht (`FoilKleinContext`): nur der ruhige Name. Telefone (Lite) und „Play Animations: aus“:
+  Schraffur still, kein Glanz.
 * **Anschluss:** nur über `CardFoil` — `<CardFoil card={…} skin={…} />`; der Skin lässt sich aus einer
   Bild-URL lesen (`skinOfUrl(url)`), deshalb greift es automatisch in `CardMini`, `BoardCard`, den Tooltips
   (`CardSideTooltip`, `CardTooltipContent`), dem Spielerprofil und der Skin-Galerie des Deck-Editors.
   `scripts/check-foil.js` hält fest, dass `<SkinHolo>` und `<FoilName>` nur in `CardFoil` stehen.
-* **Stellschrauben:** `CardRender.HOLO` (`on`, `dark`, `full`, `neutral`, `hueShift`, `steps`, `edge`,
-  `edgeWidth`) und die Deckkraft-/Blend-Werte im CSS-Block „SKIN-HOLO“; `HOLO.on = false` schaltet alles ab
-  (auch den goldenen Namen und den Namensglanz); `data/card-render.json` → `skins[<Name>].holo = false` nimmt einen
-  einzelnen Skin aus.
+* **Stellschrauben:** `CardRender.HOLO` (`on`, `dark`, `full`, `neutral`) und die Deckkraft-/Takt-Werte im
+  CSS-Block „SKIN-HOLO“; `HOLO.on = false` schaltet alles ab (auch den goldenen Namen und den Namensglanz);
+  `data/card-render.json` → `skins[<Name>].holo = false` nimmt einen einzelnen Skin aus.
 
 ## Dateien
 

@@ -634,37 +634,24 @@
   //  Skin-Karten bekommen ein eigenes Foil, das NUR Kunst und Namen betrifft (Rahmen, Werte und Text bleiben
   //  ruhig). Der Name steht golden auf der Karte; Super Rare und Diamond Rare tragen denselben Namensglanz.
   //
-  //  Die KUNST bleibt lesbar — das Foil liegt auf ihren Flaechen und Umrissen, nicht ueber dem Motiv:
-  //    · Konturen: wo auf dem NATIVEN Pixelraster der Kunst (meist 76x51) zwei Nachbarpixel stark verschieden sind
-  //      (Umrisse, Kanten), liegt eine duenne Leuchtlinie auf der Pixelgrenze, in Regenbogenfarben.
-  //    · Flaechen: jedes Pixel bekommt EINEN Highlight-Ton aus seiner eigenen Farbe (Farbton leicht verschoben, voll
-  //      gesaettigt; Graustufen nach Helligkeit). Gleiche Farbe = gleicher Highlight. Dunkle Pixel (Umrisse, Schatten)
-  //      bekommen nichts, die Zeichnung bleibt scharf.
-  //    · Schraffur: eine feine Linienstruktur ueber dem ganzen Bild — sie braucht keine Textur, nur diese Flaechen
-  //      als Maske (CSS, SkinHolo).
-  //  Alle Texturen sind Pixel fuer Pixel auf die Kunst ausgerichtet (gleiche Streckung wie `draw`, nearest neighbour,
-  //  keine Unschaerfe). Heraus kommen PNG-Blobs: `areas`, `edges`, `all` (Vereinigung beider als Maske fuers Glanzband
-  //  und die Schraffur), `nameMask` (Umriss der Namensbuchstaben); das Spiel legt sie als CSS-Hintergruende/-Masken
-  //  an die richtige Stelle (SkinHolo, app-shared.jsx).
+  //  Die KUNST bekommt eine feine Schraffur und ein periodisch ueberlaufendes Glanzband. Beides liegt nur auf den
+  //  helleren Flaechen des Bildes — dunkle Pixel (Umrisse, Schatten) bleiben unberuehrt, die Zeichnung bleibt scharf.
+  //  Dafuer rechnet `holoLayers` eine MASKE aus dem NATIVEN Pixelraster der Kunst (meist 76x51): je Pixel eine
+  //  Staerke aus seiner Helligkeit und Saettigung (Graustufen schwaecher), Pixel fuer Pixel auf die Kunst ausgerichtet
+  //  (gleiche Streckung wie `draw`, nearest neighbour, keine Unschaerfe). Schraffur und Glanz selbst sind CSS.
+  //  Heraus kommen zwei PNG-Blobs: `all` (die Maske) und `nameMask` (Umriss der Namensbuchstaben); das Spiel legt sie
+  //  als CSS-Masken an die richtige Stelle (SkinHolo, app-shared.jsx).
   const HOLO = {
     on: true,
-    dark: 0.16,          // unterhalb dieser Helligkeit (0..1) bekommt ein Pixel keinen Flaechen-Highlight
-    full: 0.46,          // ab dieser Helligkeit voller Highlight
+    dark: 0.16,          // unterhalb dieser Helligkeit (0..1) liegt nichts auf einem Pixel (Umrisse, Schatten)
+    full: 0.46,          // ab dieser Helligkeit volle Staerke
     neutral: 0.50,       // Staerke fuer Graustufen (Farben: bis 1,0, je nach Saettigung)
-    hueShift: 0.05,      // Verschiebung des Farbtons gegenueber der Flaeche (Anteil des Farbkreises)
-    steps: 24,           // Farbton in so viele Stufen gerastert: Flaechen gleicher Farbe bekommen exakt denselben Ton
-    edge: 0.22,          // ab diesem Farbabstand (0..1) zweier Nachbarpixel liegt eine Kontur dazwischen
-    edgeWidth: 0.5,      // Breite der Leuchtlinie in Anteilen eines nativen Pixels
   };
   /** Gilt das Holo fuer diesen Skin? (`data/card-render.json` -> skins[Name].holo = false schaltet es ab) */
   function holoOn(skinMeta) { return HOLO.on && !(skinMeta && skinMeta.holo === false); }
 
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
   const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-  function hsl2rgb(h, s, l) {                    // h 0..1
-    const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h * 12) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
-    return [f(0) * 255, f(8) * 255, f(4) * 255];
-  }
 
   /** Geometrie je Kartentyp: Bildfeld (Kartenpixel), Rahmenmaske, Namenszeile */
   function holoGeometry(type) {
@@ -709,7 +696,7 @@
 
   /**
    * Die Holo-Schichten eines Skins als Canvas. null, wenn es zur Kunst nichts zu zeichnen gibt.
-   * @returns {Promise<null|{ type, box, nameStrip, areas, edges, all, nameMask }>}  Koordinaten in Kartenpixeln (750x1050)
+   * @returns {Promise<null|{ type, box, nameStrip, all, nameMask }>}  Koordinaten in Kartenpixeln (750x1050)
    */
   async function holoLayers(card, o) {
     o = o || {};
@@ -732,79 +719,28 @@
     nx.drawImage(art.src, art.sx || 0, art.sy || 0, sw, sh, 0, 0, nw, nh);
     const px = nx.getImageData(0, 0, nw, nh).data;
 
-    // — Flaechen: je Pixel EIN Highlight-Ton aus der eigenen Farbe —
-    const mk = () => { const c = document.createElement('canvas'); c.width = nw; c.height = nh; const g = c.getContext('2d'); return { c, g, im: g.createImageData(nw, nh) }; };
-    const areas = mk(), union = mk();
-    const STEPS = HOLO.steps;
+    // — Maske: je Pixel eine Staerke aus Helligkeit und Saettigung; dunkle Pixel bleiben frei —
+    const c0 = document.createElement('canvas'); c0.width = nw; c0.height = nh;
+    const g0 = c0.getContext('2d'), im = g0.createImageData(nw, nh), u = im.data;
     for (let i = 0; i < nw * nh; i++) {
       const r = px[i * 4] / 255, g = px[i * 4 + 1] / 255, b = px[i * 4 + 2] / 255, al = px[i * 4 + 3] / 255;
       if (al < 0.5) continue;
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b), L = (mx + mn) / 2, d = mx - mn;
-      const gate = smooth(HOLO.dark, HOLO.full, L);            // Umrisse und Schatten bleiben frei
+      const gate = smooth(HOLO.dark, HOLO.full, L);
       if (gate <= 0) continue;
       const S = d === 0 ? 0 : d / (1 - Math.abs(2 * L - 1));
-      let h;
-      if (S >= 0.18) {                                           // Farbflaeche: Farbton der Flaeche, ein Stueck weitergedreht
-        h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-        h = (h / 6 + HOLO.hueShift) % 1;
-      } else {                                                   // Grau/Weiss: helle Flaechen eisig, dunklere violett
-        h = 0.5 + 0.3 * (1 - L);
-      }
-      h = Math.round(h * STEPS) / STEPS % 1;
       const strength = gate * (HOLO.neutral + (1 - HOLO.neutral) * clamp01(S / 0.5));
-      // Der Highlight behaelt die Saettigung der eigenen Farbe (Graustufen: ein Hauch) — er hebt die Flaeche an,
-      // faerbt sie nicht um; volle Saettigung machte das Bild schrill.
-      const rgb = hsl2rgb(h, clamp01(0.22 + 0.55 * S), 0.58), t = areas.im.data, u = union.im.data;
-      t[i * 4] = rgb[0]; t[i * 4 + 1] = rgb[1]; t[i * 4 + 2] = rgb[2]; t[i * 4 + 3] = Math.round(255 * strength);
       u[i * 4] = u[i * 4 + 1] = u[i * 4 + 2] = 255; u[i * 4 + 3] = Math.round(255 * strength);
     }
-
-    // — Konturen: Pixelgrenzen zwischen stark verschiedenen Nachbarn (Staerke = Farbabstand) —
-    const segs = [];                                             // [x, y, vertikal?, Staerke] — Lage in nativen Pixelkanten
-    const cdist = (i, j) => Math.hypot(px[i * 4] - px[j * 4], px[i * 4 + 1] - px[j * 4 + 1], px[i * 4 + 2] - px[j * 4 + 2]) / 441.67;
-    for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) {
-      const i = y * nw + x;
-      if (x + 1 < nw) { const d = cdist(i, i + 1); if (d >= HOLO.edge) segs.push([x + 1, y, true, clamp01((d - HOLO.edge) / 0.4)]); }
-      if (y + 1 < nh) { const d = cdist(i, i + nw); if (d >= HOLO.edge) segs.push([x, y + 1, false, clamp01((d - HOLO.edge) / 0.4)]); }
-    }
-    const cw = tw / nw, ch = th / nh, lw = Math.max(2, Math.round(Math.min(cw, ch) * HOLO.edgeWidth));
-    // Leuchtlinie: weicher Hof, harter Kern; Farbton laeuft quer ueber das Bild (Regenbogen)
-    const paintEdges = (g, rainbow) => {
-      for (const pass of [0, 1]) for (const [x, y, vert, e] of segs) {
-        const X = x * cw, Y = y * ch, grow = pass === 0 ? lw : 0;       // Hof: doppelt so breit
-        const a = pass === 0 ? 0.22 * e : 0.45 + 0.4 * e;
-        // Gold-Grundton mit bunten Ausreissern (Rosa, Tuerkis, Blau), wie auf einer echten Holo-Folie: der Ton haengt
-        // an der Lage, nicht an der Kontur
-        if (rainbow) { const w = 0.5 + 0.5 * Math.sin(6.2832 * ((X / tw) * 1.1 + (Y / th) * 0.7)), c = hsl2rgb((0.12 + 0.62 * w * w) % 1, 0.82, 0.74); g.fillStyle = 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a.toFixed(3) + ')'; }
-        else g.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
-        if (vert) g.fillRect(X - lw / 2 - grow / 2, Y - grow / 2, lw + grow, ch + grow);
-        else g.fillRect(X - grow / 2, Y - lw / 2 - grow / 2, cw + grow, lw + grow);
-      }
-    };
+    g0.putImageData(im, 0, 0);
 
     // — auf Texturgroesse strecken (nearest wie `draw`), mit der harten Rahmenmaske beschneiden —
-    const mask = artMask(geo.maskKey, tw, th);
-    const finish = c => {
-      const g = c.getContext('2d');
-      g.globalCompositeOperation = 'destination-in';
-      g.drawImage(mask, 0, 0);
-      return c;
-    };
-    const stretch = layer => {
-      layer.g.putImageData(layer.im, 0, 0);
-      const c = document.createElement('canvas'); c.width = tw; c.height = th;
-      const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-      g.drawImage(layer.c, 0, 0, tw, th);
-      return c;
-    };
-    const edges = document.createElement('canvas'); edges.width = tw; edges.height = th;
-    paintEdges(edges.getContext('2d'), true);
-    const all = stretch(union);
-    paintEdges(all.getContext('2d'), false);
-    return {
-      type: spec.type, box: geo.box, nameStrip: NAME_STRIP,
-      areas: finish(stretch(areas)), edges: finish(edges), all: finish(all), nameMask: nameMaskCanvas(spec, geo),
-    };
+    const all = document.createElement('canvas'); all.width = tw; all.height = th;
+    const ga = all.getContext('2d'); ga.imageSmoothingEnabled = false;
+    ga.drawImage(c0, 0, 0, tw, th);
+    ga.globalCompositeOperation = 'destination-in';
+    ga.drawImage(artMask(geo.maskKey, tw, th), 0, 0);
+    return { type: spec.type, box: geo.box, nameStrip: NAME_STRIP, all, nameMask: nameMaskCanvas(spec, geo) };
   }
 
   /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
@@ -843,17 +779,16 @@
       await new Promise(r => setTimeout(r, 0));
       const L = await holoLayers(card, { skin });
       if (!L) return null;
-      const [areas, edges, all, name] = await Promise.all([L.areas, L.edges, L.all, L.nameMask].map(toUrl));
-      if (!areas || !edges || !all || !name) return null;
+      const [all, name] = await Promise.all([L.all, L.nameMask].map(toUrl));
+      if (!all || !name) return null;
       const b = L.box, s = L.nameStrip;
       return lru(holoDone, skin, {
         vars: {
           '--sh-ax': pc(b[0], W), '--sh-ay': pc(b[1], H), '--sh-aw': pc(b[2], W), '--sh-ah': pc(b[3], H),
           '--sh-ny': pc(s.y, H), '--sh-nh': pc(s.h, H),
-          '--sh-areas': 'url(' + areas + ')', '--sh-edges': 'url(' + edges + ')',
           '--sh-all': 'url(' + all + ')', '--sh-name': 'url(' + name + ')',
         },
-        urls: [areas, edges, all, name],
+        urls: [all, name],
       }, HOLO_MAX);
     }).catch(err => { console.warn('[card-render] Holo', skin, err && err.message); return null; })
       .finally(() => holoWait.delete(skin));
