@@ -29,7 +29,7 @@
 //      hit. If it kills the user, that is intended.
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Forceful Revival';
 
@@ -140,7 +140,7 @@ module.exports = {
       // Re-validate (state may have shifted during the prompt).
       const cardDB = engine._getCardDB();
       const cd = cardDB[chosenName];
-      if (!cd || !isPileCreature(cd) || engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > lvl) {
+      if (!cd || !isSummonablePileCreature(cd) || engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > lvl) {
         gs._spellCancelled = true;
         return;
       }

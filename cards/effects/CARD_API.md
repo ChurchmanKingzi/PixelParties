@@ -197,7 +197,13 @@ Gegenüber), hat kein anderes Ziel — Submerged (Jump in the River) und
 Dive Down schützen dann nicht. **Rückstoß** gilt immer so: wen er trifft,
 bestimmt der Effekt selbst (Wirker, Angreifer, eigene Wahl), nicht der
 Gegner (Fire Bolts, Phoenix Tackle, Victory Phoenix Cannon, Fireshield,
-Spiky Armor, Stegon, Phoenix Bombardment).
+Spiky Armor, Stegon, Phoenix Bombardment). **Vergeltung** gegen den
+Angreifer ist ebenfalls immer so (Als Ruling 9.10.) — der Angreifer ist das
+einzige Ziel: Booby Trap, Firewall, Frost Rune, Mountain Tear River
+(nur der Angreifer, nicht die zwei Zusatzziele), Spike Trap, Tharxian
+Horse, Toxic Trap, Crimson Web. Wählt der Spieler das Ziel (Telekinesis,
+Lunas Firewall-Ziele, Smugness, Shield of Death), gibt es Alternativen und
+`festesZiel` bleibt aus.
 
 Die Quelle sagt es an: `actionDealDamage(src, hero, n, type, { festesZiel:
 true })`, `addHeroStatus(pi, hi, status, { festesZiel: true })`,
@@ -6275,18 +6281,6 @@ await engine.actionAddCardFromDeckToHand(pi, gewaehlt, {
 });
 ```
 
-**★ Artifact Creatures sind in Stapeln Creatures (Als Ruling 9.10.; das
-Ruling vom 17.8. „nur auf dem Brett eine Creature" ist aufgehoben).**
-`isPileCreature(cd)` ist damit wahr für Powder Keg, Pollution Spewer und
-die Debt-O-Trons; Cute Cheese, Suchen und Zähler finden sie. Wer aus einem
-Stapel BESCHWÖRT oder PLATZIERT, nimmt `isSummonablePileCreature(cd)` —
-das ergänzt die Gegnerseiten-Sperre (`placesOnOpponentBoard`: Powder Keg
-darf nie auf die eigene Seite). Die zentralen Riegel
-`artifact_creature_summon_blocked` / `artifact_creature_place_blocked`
-und die Flagge `selfPlacement` gibt es nicht mehr. Unverändert: der
-Spielweg aus der Hand (`doPlayArtifact`), `summonLocked` und die strenge
-`cardType === 'Creature'`-Regel der Necromancy-Familie (siehe unten).
-
 Gelesen von Karten, die eine Suche VERDOPPELN („an additional card
 with … the same specifications" — Koperniko, the Stargazer). Die
 Engine fuehrt dazu je Quelle eine Strichliste (`engine._deckAddTally`,
@@ -6317,6 +6311,24 @@ Karten, die ihren Zugriff aus historischen Gruenden VON HAND buchen,
 rufen `engine.noteDeckTutor(pi, cardName, source, spec)` zusaetzlich —
 sonst sind sie fuer Verdoppler unsichtbar. Besser ist der kanonische
 Helfer; Graveyard Gathering wurde bei diesem Sweep darauf umgestellt.
+
+**★ Artifact Creatures in Stapeln: suchen ja, beschwören nein (Als Ruling
+9.10.).** Das Ruling vom 17.8. „ausserhalb des Bretts nur Artifact" gilt
+für SUCHEN, ZÄHLEN und ZEIGEN nicht mehr: `isPileCreature(cd)` ist wahr
+für Powder Keg, Pollution Spewer und die Debt-O-Trons, Cute Cheese & Co.
+finden sie. **Beschwören und Platzieren bleibt ihnen durch fremde Effekte
+verwehrt** — sie haben feste Beschwörungsbedingungen (Gold, Kreditrahmen,
+Gegnerseite …), die ein fremder Effekt nicht umgehen darf. Die zentralen
+Riegel (`artifact_creature_summon_blocked` in `summonCreatureWithHooks`,
+`artifact_creature_place_blocked` in `actionPlaceCreature`) gelten
+unverändert; nur der Eigenweg der Karte setzt `opts.selfPlacement`.
+
+**Regel für Pool-Bauer:** wer aus einem Stapel etwas aufs Brett legt
+(Beschwören, Wiederbeleben, Platzieren), nimmt
+`isSummonablePileCreature(cd)` — das ist `isPileCreature` ohne Artifact
+Creatures und ohne `placesOnOpponentBoard` (Powder Keg). Wer nur sucht
+oder zählt, nimmt `isPileCreature`. Sonst bietet die Galerie Karten an, die
+die Engine danach abweist.
 
 ## Abwurf-Kosten: kein Ja/Nein-Vorspann (v718, Als Vorgabe 4.9. — STANDARD)
 

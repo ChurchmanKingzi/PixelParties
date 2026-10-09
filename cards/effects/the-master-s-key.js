@@ -28,7 +28,7 @@
 //    (`selfCostReduction`, wie Future Tech Laser Cannon).
 // ═══════════════════════════════════════════
 
-const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { hasCardType, isArtifactCreature, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = "The Master's Key";
 const STUFE = 3;
@@ -42,7 +42,7 @@ function kandidaten(engine, pi) {
   const zaehler = new Map();
   for (const n of (ps?.hand || [])) {
     const cd = db[n];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) continue;
     if (!isOwnSideSummonableCreature(cd, n)) continue;
     if ((cd.level || 0) !== STUFE) continue;
     zaehler.set(n, (zaehler.get(n) || 0) + 1);

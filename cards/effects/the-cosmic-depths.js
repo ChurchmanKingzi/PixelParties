@@ -34,7 +34,7 @@
 //  represented on their side.
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'The Cosmic Depths';
 
@@ -109,7 +109,7 @@ function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
   for (const cn of (ps?.mainDeck || [])) {
     if (excludeName && cn === excludeName) continue;
     const cd = cardDB[cn];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     if (ownedLevels.has(cd.level ?? 0)) continue;
     // Must be summonable by at least one of the activator's living,
     // unfrozen / unstunned / unbound Heroes with the level + spell

@@ -27,7 +27,7 @@
 //     option so the picker only highlights Spider Creatures.
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 const {
   countSpiderCreaturesControlled,
   isSpiderCreature,
@@ -125,7 +125,7 @@ module.exports = {
       // qualify, and auto-summons when only one does.
       const hasSpiderInHand = (ps.hand || []).some(n => {
         const cd = cardDB[n];
-        return cd && isPileCreature(cd) && isSpiderCreature(n, engine);
+        return cd && isSummonablePileCreature(cd) && isSpiderCreature(n, engine);
       });
       if (hasSpiderInHand) {
         await ctx.performImmediateActionAnyHero({

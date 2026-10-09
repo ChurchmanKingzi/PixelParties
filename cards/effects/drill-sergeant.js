@@ -19,7 +19,7 @@
 //    Zones — Basisplaetze UND Inselzonen (Flying Island in the Sky;
 //    `getFreeSupportZones` zaehlt die seit v607 mit).
 //  · „level 1 or lower" liest den gedruckten Level der Handkarte;
-//    nur echte Kreaturen (`isPileCreature`: keine Artifact
+//    nur echte Kreaturen (`isSummonablePileCreature`: keine Artifact
 //    Creatures, keine Tokens).
 //  · Aktiver Effekt ohne Aktionskosten (`creatureEffect`), soft once
 //    per turn — die Engine stempelt `creature-effect:<id>`. Abbruch
@@ -30,7 +30,7 @@
 //    von dort — wie Deepsea Bats und Dark Gear.
 // ═══════════════════════════════════════════
 
-const { isPileCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME = 'Drill Sergeant';
 const MAX_LEVEL = 1;
@@ -42,7 +42,7 @@ function eligibleHandCards(engine, pi) {
   const counts = new Map();
   for (const name of (ps?.hand || [])) {
     const cd = db[name];
-    if (!cd || !isPileCreature(cd)) continue;
+    if (!cd || !isSummonablePileCreature(cd)) continue;
     if (typeof cd.level !== 'number' || cd.level > MAX_LEVEL) continue;
     counts.set(name, (counts.get(name) || 0) + 1);
   }

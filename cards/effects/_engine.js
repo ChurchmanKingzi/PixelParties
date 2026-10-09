@@ -14784,8 +14784,34 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    // (Der Artifact-Creature-Riegel aus dem Ruling vom 17.8. ist seit 9.10.
-    // aufgehoben: Artifact Creatures sind ueberall Creatures — `isPileCreature`.)
+    // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
+    // Eine Artifact Creature ist NUR in einer Support Zone eine Creature
+    // (siehe `isPileCreature` in `_hooks.js`). Solange sie in Hand, Deck,
+    // Ablage- oder Loeschstapel liegt, ist sie ein Artifact — ein fremder
+    // Effekt darf sie also nicht als Creature beschwoeren oder beleben.
+    //
+    // Der Riegel steht ZENTRAL hier, aus demselben Grund wie die
+    // Cross-Side-Sperre darueber: die Pool-Bauer der einzelnen Karten
+    // sind zwar alle nachgezogen, aber ein neuer Pool-Bauer koennte die
+    // Regel morgen wieder vergessen. Hier kann er das nicht.
+    //
+    // Ausnahme: die Karte, die sich SELBST platziert (Powder Keg). Sie
+    // opted per `opts.selfPlacement` ein — dieselbe Bauart wie
+    // `crossSidePlacement`, damit die Ausnahme sichtbar an der Aufrufstelle
+    // steht und nicht an einer Namensliste haengt. Der normale Spielweg
+    // aus der Hand laeuft ohnehin nicht hier durch, sondern ueber
+    // `doPlayArtifact` in server.js.
+    if (!opts.selfPlacement) {
+      const _acCd = this._getCardDB()[cardName];
+      if (isArtifactCreature(_acCd)) {
+        this.log('artifact_creature_summon_blocked', {
+          card: cardName,
+          player: this.gs.players[playerIdx]?.username,
+          source: opts.source || null,
+        });
+        return null;
+      }
+    }
 
     // Pre-placement gate: if the card defines a `beforeSummon(ctx)` async
     // hook (sacrifice costs etc.) and the summon path isn't opted out via
@@ -25458,7 +25484,29 @@ this._deathWatch = (this._deathWatchStack || []).length
       return null;
     }
 
-    // (Artifact-Creature-Riegel: aufgehoben am 9.10., s. `isPileCreature`.)
+    // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
+    // Dieselbe Sperre wie in `summonCreatureWithHooks`. Sie MUSS hier
+    // zweimal stehen, weil das Spiel ZWEI unabhaengige Primitive fuer
+    // "Creature aufs Feld" hat: `summonCreatureWithHooks` (57 Nutzer)
+    // und dieses hier (22 Nutzer, u.a. Monster in a Bottle, Barker,
+    // Alice, Elixir of Immortality, jeder Deepsea-Bounce-Place, Dark
+    // Deepsea God). Das eine ruft das andere NICHT auf — wer nur eines
+    // absichert, laesst genau die Haelfte offen. (v438 hatte genau
+    // diesen Fehler; gefunden ueber Als Hinweis auf Create Illusion.)
+    //
+    // Und ausgerechnet dieser Pfad heisst "place" — das Verb, das auf
+    // Powder Keg und Pollution Spewer gedruckt steht.
+    if (!opts.selfPlacement) {
+      const _acCd = this._getCardDB()[cardName];
+      if (isArtifactCreature(_acCd)) {
+        this.log('artifact_creature_place_blocked', {
+          card: cardName,
+          player: ps.username,
+          source: opts.sourceName || opts.source || null,
+        });
+        return null;
+      }
+    }
 
     if (ps.summonLocked) {
       this.log('placement_blocked', {

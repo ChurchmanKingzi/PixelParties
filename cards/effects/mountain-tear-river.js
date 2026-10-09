@@ -68,10 +68,11 @@ function countDestructionMagic(ps, heroIdx) {
   return n;
 }
 
-async function burnHero(engine, owner, heroIdx, appliedBy) {
+async function burnHero(engine, owner, heroIdx, appliedBy, opts = {}) {
   await engine.addHeroStatus(owner, heroIdx, 'burned', {
     appliedBy,
     _skipReactionCheck: true,
+    ...opts,
   });
 }
 
@@ -183,7 +184,9 @@ module.exports = {
     } else {
       const attacker = gs.players[attackerOwner]?.heroes?.[attackerHeroIdx];
       if (attacker?.name && attacker.hp > 0) {
-        await burnHero(engine, attackerOwner, attackerHeroIdx, pi);
+        // `festesZiel`: der Angreifer ist das einzige Ziel dieses Teils (die zwei
+        // Zusatzziele darunter waehlt der Spieler) — Als Ruling 9.10.
+        await burnHero(engine, attackerOwner, attackerHeroIdx, pi, { festesZiel: true });
         engine.log('mountain_tear_river_burn', {
           target: attacker.name, type: 'hero',
           player: ps.username,

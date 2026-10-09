@@ -69,7 +69,7 @@
 //    accurate for "summoned this turn" reads).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Garius, the Great Reformer';
 
@@ -114,10 +114,10 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName, se
     if (excludeName && baseCardName(cn) === baseCardName(excludeName)) continue;   // v876
     const cd = cardDB[cn];
     if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
-    // Dieselbe Eignung wie die Pruefung nach der Wahl (`isPileCreature`): Artifact-Creatures (Debt-O-Tron-Modelle,
+    // Dieselbe Eignung wie die Pruefung nach der Wahl (`isSummonablePileCreature`): Artifact-Creatures (Debt-O-Tron-Modelle,
     // Pollution Spewer) laesst die Engine hier nicht setzen — als Galerie-Eintrag waeren sie nicht waehlbar
     // (CPU-Spieler liefen endlos zurueck zur Opferwahl) bzw. koennten ein Opfer ohne Ersatz kosten.
-    if (!isPileCreature(cd)) continue;
+    if (!isSummonablePileCreature(cd)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;
@@ -293,7 +293,7 @@ module.exports = {
       const repName = repPick.cardName;
       if (repName === sacName) continue;
       const repCd = cardDB[repName];
-      if (!repCd || !isPileCreature(repCd)
+      if (!repCd || !isSummonablePileCreature(repCd)
           || engine.effectiveCardLevel(repCd, pi) > sacLevel) continue;
       if ((ps.mainDeck || []).indexOf(repName) < 0) continue;
       // Defensive canSummon re-check — gallery filter ran at picker

@@ -605,28 +605,21 @@ function isArtifactCreature(cd) {
 
 /**
  * Ist diese Karte in einem STAPEL (Hand, Deck, Ablage, Loeschstapel, Side
- * Deck) eine Creature?
+ * Deck) eine Creature — fuer SUCHEN, ZAEHLEN und ZEIGEN?
  *
- * ★ RULING VOM 17.8. AUFGEHOBEN (Als Ruling 9.10.): bis dahin zaehlte eine
- * Artifact Creature (Powder Keg, Pollution Spewer, die fuenf Debt-O-Trons)
- * ausserhalb einer Support Zone NUR als Artifact; Cute Cheese, Suchen,
- * Wiederbelebungen und Zaehler uebergingen sie. Jetzt ist sie ueberall eine
- * Creature — der Helfer bleibt, weil 35 Skripte ihn aufrufen und die Frage
- * „Creature im Stapel?" eine eigene Antwortstelle verdient, falls das
- * Ruling je wieder anders ausfaellt.
+ * ★ Artifact Creatures zaehlen hier mit (Als Ruling 9.10.; das Ruling vom
+ * 17.8. „ausserhalb des Bretts nur Artifact" ist fuer diese Fragen
+ * aufgehoben): Powder Keg, Pollution Spewer und die fuenf Debt-O-Trons
+ * werden von Cute Cheese & Co. gefunden und zaehlen bei „je Creature in
+ * deinem Ablagestapel" mit.
  *
- * Gefallen sind damit auch die zentralen Riegel, die Artifact Creatures
- * von fremden Beschwoerungen ausnahmen (`artifact_creature_summon_blocked`
- * in `summonCreatureWithHooks`, `artifact_creature_place_blocked` in
- * `actionPlaceCreature`) und die Opt-in-Flagge `selfPlacement`.
- *
- * ★ WAS BLEIBT: der eigene SPIELWEG aus der Hand (Gold, keine Aktion, kein
- * Level — `doPlayArtifact`), die Beschwoerungssperre (`summonLocked` gilt
- * auch fuer sie) und die Gegnerseiten-Sperre: eine Karte mit
- * `placesOnOpponentBoard` (Powder Keg) darf nie auf der EIGENEN Seite
- * landen. Wer aus einem Stapel BESCHWOERT oder PLATZIERT, nimmt deshalb
- * `isSummonablePileCreature` — wer nur sucht oder zaehlt (Cute Cheese,
- * „je Creature im Ablagestapel"), nimmt `isPileCreature`.
+ * ★ BESCHWOEREN und PLATZIEREN ist etwas anderes: dafuer nimm
+ * `isSummonablePileCreature`. Artifact Creatures haben feste
+ * Beschwoerungsbedingungen (Gold, Kreditrahmen, Gegnerseite …), die ein
+ * fremder Effekt nicht umgehen darf — die zentralen Riegel in
+ * `summonCreatureWithHooks` / `actionPlaceCreature` weisen sie ab
+ * (`artifact_creature_summon_blocked` / `_place_blocked`), nur der eigene
+ * Spielweg der Karte (`opts.selfPlacement`) darf sie setzen.
  *
  * Merkhilfe fuer den Unterschied zu `hasCardType`: das fragt „was steht
  * auf der Karte?", dies fragt „ist sie DORT, wo sie liegt, eine Creature?".
@@ -638,14 +631,18 @@ function isPileCreature(cd) {
 }
 
 /**
- * Creature im Stapel, die auf der EIGENEN Brettseite beschworen oder
- * platziert werden darf — `isPileCreature` plus Gegnerseiten-Sperre
- * (`isOwnSideSummonableCreature`). Fuer jeden Pool, aus dem ein Effekt
- * etwas aufs Brett legt (Beschwoerungen, Wiederbelebungen, Platzierungen),
- * damit Powder Keg dort nicht angeboten wird, wo es nie landen darf.
+ * Creature im Stapel, die ein FREMDER Effekt auf die EIGENE Brettseite
+ * beschwoeren oder platzieren darf: `isPileCreature`, aber ohne Artifact
+ * Creatures (feste Beschwoerungsbedingungen, s. dort) und ohne Karten mit
+ * `placesOnOpponentBoard` (Powder Keg darf nie auf die eigene Seite).
+ * Fuer jeden Pool, aus dem ein Effekt etwas aufs Brett legt —
+ * Beschwoerungen, Wiederbelebungen, Platzierungen. Wer nur sucht oder
+ * zaehlt, nimmt `isPileCreature`.
  */
 function isSummonablePileCreature(cd, cardName) {
-  return isPileCreature(cd) && isOwnSideSummonableCreature(cd, cardName);
+  return isPileCreature(cd)
+    && !isArtifactCreature(cd)
+    && isOwnSideSummonableCreature(cd, cardName);
 }
 
 /**

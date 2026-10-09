@@ -7850,11 +7850,24 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // true` runs onPlay + onCardEnterZone while skipping host-
           // incapacitation gates (Powder Keg's text explicitly allows
           // dead / Frozen / Stunned hosts).
+          // `selfPlacement: true` — DIES IST DER EIGENE SPIELWEG der Karte
+          // aus der Hand, nicht ein Fremdeffekt. Ohne die Fahne greift der
+          // Artifact-Creature-Riegel in `summonCreatureWithHooks` (v438)
+          // und `placed` wird null; der Block darunter legt die Karte dann
+          // in den Ablagestapel. Genau so sah Als Regressionsbericht aus:
+          // „drag/droppe ich eine in eine Support Zone, geht sie in den
+          // Discard, statt beschworen zu werden."
+          //
+          // Mein v438-Denkfehler: ich hatte behauptet, der Handweg der
+          // sieben laufe nicht durch `summonCreatureWithHooks`. Geprueft
+          // hatte ich nur die KARTENSKRIPTE (Powder Keg) — nicht diesen
+          // Zweig hier, der genau das tut. Dritte Auflage derselben Lehre.
           const placed = await room.engine.summonCreatureWithHooks(
             cardName, placementOwner, heroIdx, finalSlot,
             {
               source: 'Artifact-Creature play',
               isPlacement: _isCrossSideArtifact,
+              selfPlacement: true,
               // ★ v857 (Als Befund): Powder Keg landete effektlos in der
               // Ablage. Die zentrale Cross-Side-Sperre in
               // `summonCreatureWithHooks` laesst eine Karte mit
@@ -7862,9 +7875,11 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
               // durch — ihr eigener Kommentar sagt „die Karte selbst
               // platziert sich ueber denselben Helfer und opted per
               // opts.crossSidePlacement ein", nur hat es diese eine
-              // Aufrufstelle nie mitgegeben. Ergebnis war
-              // `summonCreatureWithHooks` → null und der Fizzle-Zweig
-              // schob die Karte in den Ablagestapel.
+              // Aufrufstelle nie mitgegeben. `selfPlacement` deckt den
+              // Artifact-Creature-Riegel DARUNTER ab, nicht die
+              // Cross-Side-Sperre darueber: zwei Riegel, zwei Fahnen.
+              // Ergebnis war `summonCreatureWithHooks` → null und der
+              // Fizzle-Zweig schob die Karte in den Ablagestapel.
               crossSidePlacement: _isCrossSideArtifact,
               // Zustand SOFORT nach dem Setzen versenden, VOR Glanz und
               // Hooks (Als Report 17.8. zum Drag&Drop). Ohne das zeigt der

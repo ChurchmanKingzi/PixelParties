@@ -241,7 +241,8 @@ module.exports = {
       });
       await engine._delay(400);
 
-      const heroDmgResult = await ctx.dealDamage(attacker, dmg, 'destruction_spell');
+      // `festesZiel`: Vergeltung trifft immer den Angreifer (Als Ruling 9.10.).
+      const heroDmgResult = await ctx.dealDamage(attacker, dmg, 'destruction_spell', { festesZiel: true });
 
       // Burn if still alive AND the damage actually landed — Idej
       // Projection / Spectral Armor / Anti Magic void all skip the
@@ -249,6 +250,7 @@ module.exports = {
       if (!heroDmgResult?.cancelled && attacker.hp > 0) {
         await engine.addHeroStatus(attackerOwner, attackerHeroIdx, 'burned', {
           permanent: true, appliedBy: ctx.cardOwner, _skipReactionCheck: true,
+          festesZiel: true,
         });
       }
 

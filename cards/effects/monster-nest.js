@@ -37,7 +37,7 @@
 //  Aktivierung — der Text nennt keine Aktionskosten.
 // ═══════════════════════════════════════════
 
-const { isSummonablePileCreature, ZONES } = require('./_hooks');
+const { isPileCreature, isArtifactCreature, ZONES } = require('./_hooks');
 const nest = require('./_nest-shared');
 
 const CARD_NAME = 'Monster Nest';
@@ -52,9 +52,10 @@ const MAX_LEVEL = 3;
  * laesst Level-Senker wie Elven Forager mitzaehlen — dieselbe Zahl,
  * die der Rest des Spiels fuer diese Karte sieht.
  *
- * Artifact Creatures zaehlen mit (Ruling vom 17.8. am 9.10. aufgehoben),
- * ausser denen, die nie auf die eigene Seite duerfen (Powder Keg) —
- * dafuer steht `isSummonablePileCreature`.
+ * Artifact Creatures fallen raus: sie sind NUR in einer Support Zone
+ * Kreaturen (Als Ruling 17.8.), im Deck also Artefakte. Der zentrale
+ * Riegel in `summonCreatureWithHooks` wuerde sie ohnehin abweisen —
+ * die Galerie soll aber gar nicht erst luegen.
  */
 function eligibleFromDeck(engine, pi) {
   const ps = engine.gs.players[pi];
@@ -64,7 +65,8 @@ function eligibleFromDeck(engine, pi) {
   for (const cn of (ps.mainDeck || [])) {
     const cd = cardDB[cn];
     if (!cd) continue;
-    if (!isSummonablePileCreature(cd)) continue;
+    if (!isPileCreature(cd)) continue;
+    if (isArtifactCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
     zaehler.set(cn, (zaehler.get(cn) || 0) + 1);
   }
