@@ -210,7 +210,8 @@ module.exports = {
         const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: hs };   // Als Befund 29.9.: Brettseite des Angreifers
         const selfTarget = { type: 'hero', owner: hs, heroIdx, cardName: userHero.name };   // Als Befund 29.9.: Brettseite des Nutzers
         const finalDmg = await engine._fireAttackDeclare(attackSource, selfTarget, maxHp);
-        await engine.actionDealDamage(attackSource, userHero, finalDmg, 'attack');
+        // Selbstkosten des Nutzers: kein 'Ziel' unter mehreren — Submerged/Stealth & Co. schuetzen nicht (Als Ruling 9.10.).
+        await engine.actionDealDamage(attackSource, userHero, finalDmg, 'attack', { festesZiel: true });
       }
 
       engine.log('forceful_revival', {

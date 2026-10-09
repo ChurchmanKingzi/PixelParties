@@ -360,8 +360,9 @@ function resolveTargetLocation(engine, target) {
 
 async function applyBurnToTarget(engine, pi, loc, sourceLabel) {
   if (loc.kind === 'hero') {
+    // „the target" des Angriffs steht fest (Als Ruling 9.10.).
     await engine.addHeroStatus(loc.owner, loc.heroIdx, 'burned', {
-      appliedBy: pi, _skipReactionCheck: true,
+      appliedBy: pi, _skipReactionCheck: true, festesZiel: true,
     });
   } else if (loc.kind === 'creature' && loc.inst) {
     const applied = await engine.applyCreatureStatus(loc.inst, 'burned', {
@@ -376,7 +377,7 @@ async function applyPoisonStacksToTarget(engine, pi, loc, stacks, sourceLabel) {
   if (stacks <= 0) return;
   if (loc.kind === 'hero') {
     await engine.addHeroStatus(loc.owner, loc.heroIdx, 'poisoned', {
-      addStacks: stacks, appliedBy: pi, _skipReactionCheck: true,
+      addStacks: stacks, appliedBy: pi, _skipReactionCheck: true, festesZiel: true,   // „the target" des Angriffs (Als Ruling 9.10.)
     });
   } else if (loc.kind === 'creature' && loc.inst) {
     await engine.applyCreatureStatus(loc.inst, 'poisoned', {

@@ -119,6 +119,7 @@ module.exports = {
       await engine.addHeroStatus(ziel.owner, ziel.heroIdx, 'stunned', {
         duration: 1, source: CARD_NAME,
         appliedBy: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
+        festesZiel: true,   // „Stun it": der eben geheilte, gewaehlte Held (Als Ruling 9.10.)
       });
 
       engine.sync();

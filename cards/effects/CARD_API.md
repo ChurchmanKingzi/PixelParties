@@ -235,6 +235,25 @@ Rha'Bi — die Zone der Karte legt es fest), Vergeltung gegen den Angreifer
 (Heart of Ice, Zombified Assault), und der Zugspieler, der SEINE Ziele
 selbst wählen muss (The Seventh Circle of Hell, Zugende-Zweig).
 
+**Selbstkosten (Entscheidung 9.10.: ja, alle).** Zahlt der Wirker Schaden
+oder einen Status an einem EIGENEN Helden als Preis oder Nachteil — Angry
+Cheese, Empty Armor, Diamond the Keeper of Peace, Mana Absorbing Crystal,
+Luna Kiai, Ska Harpyformer, The Yeeting, Torchure, Zsos'sar, Forceful
+Revival, Doctor Fester, Performance (der Schaden beim Anlegen) —, gilt es
+wie Rückstoß: `festesZiel: true`. Auch die CPU-Simulation einer solchen
+Karte (Ska) gibt die Option mit.
+
+**An einen Helden gebundene Effekte (Entscheidung 9.10.: ja, wo der Text
+den Helden festlegt).** „That Hero / the target / it / the corresponding
+Hero / the Hero this Spell is attached to" — der Held steht durch Karte,
+Zone, frühere Wahl oder den auslösenden Treffer fest: Vena (Kopfgeld-Held),
+Aquatic Spear (Surprise-Folgetreffer; die freie Wahl beim Abgang bleibt
+ohne), Berserk, Luna Pele (der Folge-Burn), Mischief Militia Banner Bearer
+und Chilly Wizard, Paraseed, Sleeping Beauty, Reiza, Flame/Poisoned/Hydra
+Blood Arrow, Refreshing Night. **Umleitungen** (Bubbles, Johanna, Prophecy
+of Tempeste, Puppets/Bonded Companions, Overheal Shock) bleiben ohne: die
+Quelle hat ihr Ziel schon gewählt und den Schutz bestanden.
+
 Bei der WAHL entscheidet dieselbe Frage die Liste der legalen Ziele
 (`info.allTargets`): Stealth, Dive Down, Stealthy Pursuit und Alliance
 zählen nur Helden/Creatures als Ausweichziel, die die Quelle auch anbietet
@@ -6392,6 +6411,11 @@ umgestellt hat (Vorbilder für neue Karten):**
 - **Zählen mit „Level 0"** (Shiny/Splashy Slime): wirksame Kartendaten,
   `hasCardType(cd, 'Creature')` und kein Artifact — Puppets („wählbar als
   Creature") und Artifact Creatures zählen nicht.
+
+**Kartentyp deklarieren** (Great Detective Doq, Sparkfly Queen): eine
+Artifact Creature in Hand oder Deck trifft BEIDE Gruppen — „Attack / Spell /
+Creature" und „Artifact" (Als Ruling 9.10.). Neue Typ-Deklarationen
+ergänzen `|| isArtifactCreature(cd)` in der Creature-Gruppe.
 
 **Direkte Platzierer** (`_trackCard` / `supportZones[...] = [...]`: Bottle,
 Barker, Slimes, Create Illusion, Layn, Staff of Illusions, Omikron, Army of

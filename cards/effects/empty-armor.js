@@ -92,7 +92,7 @@ async function preisZahlen(ctx) {
   const hi = ctx.cardHeroIdx;
   const hero = engine.gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[hi];   // Styx 28.9.: Brettseite
   if (!hero?.name || hero.hp <= 0) return false;
-  await ctx.dealDamage(hero, PREIS, 'other');
+  await ctx.dealDamage(hero, PREIS, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
   engine.log('empty_armor_summon', { player: engine.gs.players[pi]?.username, hero: hero.name, damage: PREIS });
   engine.sync();
   return true;

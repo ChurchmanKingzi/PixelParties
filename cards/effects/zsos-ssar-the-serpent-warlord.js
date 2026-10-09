@@ -130,6 +130,7 @@ module.exports = {
       await engine.addHeroStatus(targetOwner, targetHeroIdx, 'poisoned', {
         addStacks: 2,
         appliedBy: pi,
+        festesZiel: true,   // Selbstkosten des eigenen Helden (Als Ruling 9.10.)
       });
 
       const targetName = gs.players[targetOwner]?.heroes?.[targetHeroIdx]?.name;

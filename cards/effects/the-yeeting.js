@@ -285,7 +285,7 @@ module.exports = {
     }
 
     // ── Deal 150 artifact damage to the Hero ──
-    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact');
+    await engine.actionDealDamage(dmgSource, hero, 150, 'artifact', { festesZiel: true });   // Selbstkosten des gewaehlten eigenen Helden (Als Ruling 9.10.)
     engine.sync();
     await engine._delay(400);
 

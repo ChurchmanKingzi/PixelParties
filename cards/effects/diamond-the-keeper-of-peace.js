@@ -158,7 +158,7 @@ module.exports = {
       // v845: Quelle mit Besitzer (siehe Angry Cheese) — sonst zaehlt der
       // Selbstschaden fuer Hooks wie Tazunes Schild als besitzerlos.
       const hpVorher = hero.hp;
-      await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace', owner: pi, controller: pi }, hero, selfDamage, 'other');
+      await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace', owner: pi, controller: pi }, hero, selfDamage, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
       // Aufstiegsbedingung der Bulwark-Form: HP, die sie durch DIESEN
       // Effekt wirklich verloren hat (Schilde/Kuerzungen zaehlen nicht mit).
       const verloren = Math.max(0, hpVorher - Math.max(0, hero.hp));

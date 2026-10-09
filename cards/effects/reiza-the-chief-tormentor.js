@@ -93,11 +93,12 @@ module.exports = {
         if (!tHero || tHero.hp <= 0) return;
 
         // Stun and Poison are INDEPENDENT — one failing doesn't block the other
+        // „that target": das getroffene Ziel steht fest (Als Ruling 9.10.).
         await engine.addHeroStatus(target.owner, target.heroIdx, 'stunned', {
-          duration: 1, appliedBy: pi,
+          duration: 1, appliedBy: pi, festesZiel: true,
         });
         await engine.addHeroStatus(target.owner, target.heroIdx, 'poisoned', {
-          addStacks: 1, appliedBy: pi,
+          addStacks: 1, appliedBy: pi, festesZiel: true,
         });
 
         engine.log('reiza_torment', {

@@ -57,7 +57,7 @@
 //  activation UI greys out for the rest of the turn.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isArtifactCreature } = require('./_hooks');
 const {
   QUEEN_NAME,
   SPARKFLY_NAMES,
@@ -69,7 +69,8 @@ const CARD_NAME = QUEEN_NAME;
 
 const TYPE_BUCKETS = [
   { id: 'attack-spell-creature', label: 'Attack / Spell / Creature',
-    matches: cd => ['Attack', 'Spell', 'Creature'].includes(cd?.cardType),
+    // Artifact Creatures sind im Deck BEIDES: Artifact und Creature (Als Ruling 9.10.).
+    matches: cd => ['Attack', 'Spell', 'Creature'].includes(cd?.cardType) || isArtifactCreature(cd),
     deck: 'main' },
   { id: 'ability',  label: 'Ability',  matches: cd => cd?.cardType === 'Ability',  deck: 'main' },
   { id: 'artifact', label: 'Artifact', matches: cd => cd?.cardType === 'Artifact', deck: 'main' },

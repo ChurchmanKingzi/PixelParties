@@ -362,7 +362,8 @@ module.exports = {
         type: 'gunshot_barrage', owner: nochDa.owner, heroIdx: nochDa.heroIdx, zoneSlot: -1,
       });
       await engine._delay(320);
-      await engine.actionDealDamage(quelle, nochDa.hero, BOUNTY_DAMAGE, 'hero');
+      // „that Hero": der Kopfgeld-Held steht fest — Submerged/Stealth & Co. schuetzen nicht (Als Ruling 9.10.).
+      await engine.actionDealDamage(quelle, nochDa.hero, BOUNTY_DAMAGE, 'hero', { festesZiel: true });
       engine.log('vena_bounty_damage', {
         hunter: ps.username, target: nochDa.hero.name, amount: BOUNTY_DAMAGE,
       });
@@ -416,6 +417,7 @@ module.exports = {
     if (modus === 'stun') {
       await engine.addHeroStatus(nochDa.owner, nochDa.heroIdx, 'stunned', {
         duration: 1, appliedBy: pi, source: CARD_NAME,
+        festesZiel: true,   // „that Hero" (Als Ruling 9.10.)
       });
       engine.log('vena_bounty_stun', { hunter: ps.username, target: nochDa.hero.name });
       engine.sync();

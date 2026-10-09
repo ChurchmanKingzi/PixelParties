@@ -86,6 +86,7 @@ module.exports = {
         permanent: true,
         _torchure: { owner: pi, turn: gs.turn },
         appliedBy: pi,   // v1067: eigener Held — loest korrekt KEINEN Gegner-Trigger aus
+        festesZiel: true,   // Selbstkosten des eigenen Helden (Als Ruling 9.10.)
       });
 
       engine.log('torchure_poison', {
