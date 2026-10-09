@@ -25790,12 +25790,35 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   background: linear-gradient(90deg, transparent, rgba(215,255,255,.95) 50%, transparent);
 }
 
+/* Rahmenglanz: Gold-, Silber- und Diamant-Rahmen glaenzen in ihrer Farbe. Ein Lichtband laeuft ueber die Karte und
+   leuchtet nur auf dem Rahmen auf (Maske = Form des Rahmens, halbe Kartengroesse). */
+.foil-rim-gold    { --rim-rgb: 255, 224, 110; --rim-hi: 255, 248, 205; }
+.foil-rim-silver  { --rim-rgb: 205, 220, 240; --rim-hi: 255, 255, 255; }
+.foil-rim-diamond { --rim-rgb: 120, 240, 236; --rim-hi: 222, 255, 255; }
+.skin-holo-rim {
+  position: absolute; inset: 0; mix-blend-mode: screen;
+  -webkit-mask-image: var(--sh-rim); mask-image: var(--sh-rim);
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+}
+.skin-holo-rim i {
+  position: absolute; top: -40%; bottom: -40%; left: 0; width: 34%;
+  transform: translateX(-170%) skewX(-20deg);
+  background: linear-gradient(90deg, transparent 0, rgba(var(--rim-rgb), .55) 28%, rgb(var(--rim-hi)) 50%, rgba(var(--rim-rgb), .55) 72%, transparent 100%);
+  animation: skinHoloRim 2.4s ease-in-out infinite;
+  animation-delay: var(--sh-phase, 0s);
+  will-change: transform;
+}
+@keyframes skinHoloRim {
+  0% { transform: translateX(-170%) skewX(-20deg); }
+  75%, 100% { transform: translateX(380%) skewX(-20deg); }
+}
+
 /* Kleinansicht: nur der ruhige Name (Schraffur und Glanz sind gar nicht erst im DOM). */
 .skin-holo-klein .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
 
 /* Telefone (Lite): Schraffur steht still, kein Glanz — Glanz, Regenbogen und Namensglanz sind je ein Layer mit Blend-Modus. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .skin-holo-glint, .skin-holo-name .sh-gl { display: none; }
+  .skin-holo-glint, .skin-holo-rim, .skin-holo-name .sh-gl { display: none; }
   .skin-holo-hatch i { animation: none; will-change: auto; }
   .skin-holo-name .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
 }

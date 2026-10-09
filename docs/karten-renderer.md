@@ -75,6 +75,21 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
   CSS-Block „SKIN-HOLO“; `HOLO.on = false` schaltet alles ab (auch den goldenen Namen und den Namensglanz);
   `data/card-render.json` → `skins[<Name>].holo = false` nimmt einen einzelnen Skin aus.
 
+### Schraffur auf Fullart-/Rare-Karten und Rahmenglanz
+
+* **Schraffur ohne Skin:** dieselbe Schraffur (ohne Glanzband und Namen) liegt auf dem Bild aller **Fullart-Karten**
+  (Ascended Heroes und Fullart-Helden, nach Kartentyp: `CardRender.hatchEligible`) sowie aller **Super und Diamond
+  Rares** (Foil-Kennzeichen). Die Maske kommt aus der Kunst der Karte selbst (`CardRender.hatchFor`, LRU 80). Die
+  Textur wird erst geladen, wenn die Karte mindestens 150 px breit gezeichnet wird (`FoilHatch`, `useAbBreite`) —
+  auf Brett, Hand und in Galerien kostet sie nichts.
+* **Rahmenglanz:** Gold-, Silber- und Diamant-Rahmen glänzen in ihrer Farbe: ein Lichtband (alle ~2,4 s) läuft über die
+  Karte und leuchtet nur auf dem Rahmen auf (`FoilRim`). Welche Farbe, entscheidet `CardRender.rimKind` aus Kartentyp
+  und Seltenheit (Superhelden/Fullart-Helden und Super Rare = Gold, Rare = Silber, Diamond = Türkis; bei Skins gelten
+  deren Werte). Die Maske ist die Form des Rahmens in halber Kartengröße (`drawRim`, derselbe Code wie das Kartenbild) und
+  hängt nur von Kartentyp und Seltenheit ab — es gibt höchstens 5 Stück, alle Karten teilen sie. Erst ab 120 px Breite;
+  nicht in Kleinansichten und im Lite-Modus.
+* Beides hängt wie alles andere nur an `CardFoil`; `scripts/check-foil.js` prüft `<FoilHatch>` und `<FoilRim>` mit.
+
 ## Dateien
 
 | Pfad | Inhalt |

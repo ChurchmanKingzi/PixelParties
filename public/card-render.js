@@ -369,6 +369,41 @@
 
   const STAMP = { common: 'common', uncommon: 'uncommon', rare: 'rare', 'super rare': 'superRare', diamond: 'diamond', sapphire: 'sapphire' };
 
+  // Gold-/Silber-/Diamant-Rahmen einer Karte (Schritt 6 von `draw`); auch fuer die Rahmenmaske des Rahmenglanzes (`rimLayer`)
+  function drawRim(ctx, spec) {
+    const t = spec.type;
+    if (t === 'superhero') sprite(ctx, 'rim.goldSuperhero', 0, 0, W, H);
+    else if (t === 'fullartHero') sprite(ctx, 'rim.goldFullart', 0, 0, W, H);
+    else if (spec.rarity === 'super rare') sprite(ctx, 'rim.superRare', 0, 0, W, H);
+    else if (OPT.silverRim && spec.rarity === 'rare') sprite(ctx, 'rim.rare', 0, 0, W, H);
+    // Diamond: der Rahmen aus dem Template (14 px oben/unten, 15 px links/rechts, Cyan); die Textur darueber entfaellt.
+    // Die Ecken sind wie beim Gold-/Silberrahmen gebaut: je Ecke 2x2 Bloecke (Randstaerke), Eckblock und der
+    // diagonal innen liegende Block gedaempft, die beiden Nachbarn am Rand dunkler. Beim Goldrahmen sind das
+    // (213,185,76) und (196,156,0) zu den Randfarben (255,231,76)/(255,221,0) — hier 80 % bzw. 70 % des Cyans.
+    if (spec.rarity === 'diamond') {
+      const T = 14, S = 15;
+      // Rand wie beim Goldrahmen in Zellen (hier 15 x 14 px, also ein Raster aus 50 x 75 Zellen) mit abwechselnd
+      // zwei Toenen: ab der dritten Zelle jede zweite heller (Gold: (255,231,76) und (255,221,0)). Der Rand zwischen
+      // den Eckbloecken ist die Basisfarbe; die hellere Zelle ist 30 % zum Weiss hin gemischt.
+      const cols = W / S, rows = H / T;
+      for (let i = 2; i < cols - 2; i++) {
+        ctx.fillStyle = i % 2 === 0 ? C.diamondLight : C.diamond;
+        ctx.fillRect(i * S, 0, S, T); ctx.fillRect(i * S, H - T, S, T);
+      }
+      for (let j = 2; j < rows - 2; j++) {
+        ctx.fillStyle = j % 2 === 0 ? C.diamondLight : C.diamond;
+        ctx.fillRect(0, j * T, S, T); ctx.fillRect(W - S, j * T, S, T);
+      }
+      [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(([cx, cy, sx, sy]) => {
+        [[0, 0, C.diamondMuted], [1, 0, C.diamondDark], [0, 1, C.diamondDark], [1, 1, C.diamondMuted]].forEach(([bx, by, col]) => {
+          const x0 = cx + sx * bx * S, x1 = cx + sx * (bx + 1) * S, y0 = cy + sy * by * T, y1 = cy + sy * (by + 1) * T;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), S, T);
+        });
+      });
+    }
+  }
+
   // ═════════════ Karte zeichnen ═════════════
   // spec: { type, rarity, name, text, skillBox, skillBox2, hp, atk, level, school, kind }
   // art:  { src: CanvasImageSource, sx, sy, sw, sh } | null
@@ -430,36 +465,7 @@
     }
 
     // 6) Goldene Rahmenelemente (die uebrigen Foil-Layer entfallen)
-    if (t === 'superhero') sprite(ctx, 'rim.goldSuperhero', 0, 0, W, H);
-    else if (t === 'fullartHero') sprite(ctx, 'rim.goldFullart', 0, 0, W, H);
-    else if (spec.rarity === 'super rare') sprite(ctx, 'rim.superRare', 0, 0, W, H);
-    else if (OPT.silverRim && spec.rarity === 'rare') sprite(ctx, 'rim.rare', 0, 0, W, H);
-    // Diamond: der Rahmen aus dem Template (14 px oben/unten, 15 px links/rechts, Cyan); die Textur darueber entfaellt.
-    // Die Ecken sind wie beim Gold-/Silberrahmen gebaut: je Ecke 2x2 Bloecke (Randstaerke), Eckblock und der
-    // diagonal innen liegende Block gedaempft, die beiden Nachbarn am Rand dunkler. Beim Goldrahmen sind das
-    // (213,185,76) und (196,156,0) zu den Randfarben (255,231,76)/(255,221,0) — hier 80 % bzw. 70 % des Cyans.
-    if (spec.rarity === 'diamond') {
-      const T = 14, S = 15;
-      // Rand wie beim Goldrahmen in Zellen (hier 15 x 14 px, also ein Raster aus 50 x 75 Zellen) mit abwechselnd
-      // zwei Toenen: ab der dritten Zelle jede zweite heller (Gold: (255,231,76) und (255,221,0)). Der Rand zwischen
-      // den Eckbloecken ist die Basisfarbe; die hellere Zelle ist 30 % zum Weiss hin gemischt.
-      const cols = W / S, rows = H / T;
-      for (let i = 2; i < cols - 2; i++) {
-        ctx.fillStyle = i % 2 === 0 ? C.diamondLight : C.diamond;
-        ctx.fillRect(i * S, 0, S, T); ctx.fillRect(i * S, H - T, S, T);
-      }
-      for (let j = 2; j < rows - 2; j++) {
-        ctx.fillStyle = j % 2 === 0 ? C.diamondLight : C.diamond;
-        ctx.fillRect(0, j * T, S, T); ctx.fillRect(W - S, j * T, S, T);
-      }
-      [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(([cx, cy, sx, sy]) => {
-        [[0, 0, C.diamondMuted], [1, 0, C.diamondDark], [0, 1, C.diamondDark], [1, 1, C.diamondMuted]].forEach(([bx, by, col]) => {
-          const x0 = cx + sx * bx * S, x1 = cx + sx * (bx + 1) * S, y0 = cy + sy * by * T, y1 = cy + sy * (by + 1) * T;
-          ctx.fillStyle = col;
-          ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), S, T);
-        });
-      });
-    }
+    drawRim(ctx, spec);
 
     // 7) Werte (HP, Angriff / Kosten)
     const stat = statColor(spec);
@@ -601,9 +607,11 @@
 
   // ═════════════ Metadaten (Seltenheit, Rahmen, Faehigkeitstexte, Skin-Namen) ═════════════
   let meta = { cards: {}, skins: {} };
+  let metaReady = false;               // Metadaten geladen (Voraussetzung fuer Entscheidungen nach Kartentyp)
   async function loadMeta(url) {
     try { meta = await fetch(url || '/data/card-render.json').then(r => r.json()); } catch (e) { /* ohne Metadaten: alles Common */ }
     meta.cards = meta.cards || {}; meta.skins = meta.skins || {};
+    metaReady = true;
     return meta;
   }
 
@@ -696,18 +704,18 @@
 
   /**
    * Die Holo-Schichten eines Skins als Canvas. null, wenn es zur Kunst nichts zu zeichnen gibt.
-   * @returns {Promise<null|{ type, box, nameStrip, all, nameMask }>}  Koordinaten in Kartenpixeln (750x1050)
+   * @returns {Promise<null|{ type, box, nameStrip, all, nameMask }>}  Koordinaten in Kartenpixeln (750x1050); `nameMask` nur bei Skins
    */
   async function holoLayers(card, o) {
     o = o || {};
-    if (!o.skin) return null;
-    const art = await getArt('skin/' + o.skin);
+    const art = await getArt(o.skin ? 'skin/' + o.skin : card.name);
     if (!art) return null;
-    const skinMeta = meta.skins[o.skin] || {};
+    // Skin: eigener Name/Rahmen aus card-render.json; ohne Skin (Fullart-, Super- und Diamond-Rare-Karten) die Karte selbst
+    const skinMeta = o.skin ? (meta.skins[o.skin] || {}) : null;
     if (!holoOn(skinMeta)) return null;
     const m = Object.assign({}, meta.cards[card.name]);
-    if (skinMeta.r) m.r = skinMeta.r; if (skinMeta.f) m.f = skinMeta.f;
-    const spec = specFromCard(card, m, { name: skinMeta.name || o.skin });
+    if (skinMeta) { if (skinMeta.r) m.r = skinMeta.r; if (skinMeta.f) m.f = skinMeta.f; }
+    const spec = specFromCard(card, m, skinMeta ? { name: skinMeta.name || o.skin } : null);
     const geo = holoGeometry(spec.type);
     const tw = Math.round(geo.box[2] * geo.scale), th = Math.round(geo.box[3] * geo.scale);
 
@@ -740,7 +748,7 @@
     ga.drawImage(c0, 0, 0, tw, th);
     ga.globalCompositeOperation = 'destination-in';
     ga.drawImage(artMask(geo.maskKey, tw, th), 0, 0);
-    return { type: spec.type, box: geo.box, nameStrip: NAME_STRIP, all, nameMask: nameMaskCanvas(spec, geo) };
+    return { type: spec.type, box: geo.box, nameStrip: NAME_STRIP, all, nameMask: o.skin ? nameMaskCanvas(spec, geo) : null };
   }
 
   /** Nur der Namensumriss einer Karte (Super Rare / Diamond Rare tragen den Namensglanz ebenfalls). */
@@ -796,6 +804,94 @@
     holoWait.set(skin, job);
     return job;
   }
+  // — Schraffur fuer Karten OHNE Skin: Fullart-Karten (Ascended Heroes, Fullart-Helden) sowie Super und Diamond Rares.
+  //   Nur das Bild (kein Name, kein Glanzband): dieselbe Maske wie beim Skin, aus der Kunst der Karte selbst. —
+  const HATCH_MAX = 80;
+  const hatchDone = new Map();       // Kartenname -> { vars, urls }
+  const fullartMemo = new Map();     // Kartenname -> bool (haengt von den Metadaten ab, erst nach loadMeta gueltig)
+  function isFullartCard(card) {
+    let v = fullartMemo.get(card.name);
+    if (v === undefined) { v = isFullart(specFromCard(card, meta.cards[card.name]).type); fullartMemo.set(card.name, v); }
+    return v;
+  }
+  /** Bekommt die Karte die Schraffur? Fullart (nach Kartentyp) oder Super/Diamond Rare (Foil-Kennzeichen). Vor loadMeta: nein. */
+  function hatchEligible(card) {
+    if (!HOLO.on || !metaReady || !card || !card.name) return false;
+    return card.foil === 'secret_rare' || card.foil === 'diamond_rare' || isFullartCard(card);
+  }
+  function hatchCached(card) { return hatchDone.get(card.name) || null; }
+  function hatchFor(card) {
+    if (!HOLO.on || !card) return Promise.resolve(null);
+    const hit = hatchDone.get(card.name);
+    if (hit) return Promise.resolve(hit);
+    const key = 'h:' + card.name;
+    if (holoWait.has(key)) return holoWait.get(key);
+    const job = holoChain.then(async () => {
+      await new Promise(r => setTimeout(r, 0));
+      const L = await holoLayers(card, {});
+      if (!L) return null;
+      const all = await toUrl(L.all);
+      if (!all) return null;
+      const b = L.box;
+      return lru(hatchDone, card.name, {
+        vars: { '--sh-ax': pc(b[0], W), '--sh-ay': pc(b[1], H), '--sh-aw': pc(b[2], W), '--sh-ah': pc(b[3], H), '--sh-all': 'url(' + all + ')' },
+        urls: [all],
+      }, HATCH_MAX);
+    }).catch(err => { console.warn('[card-render] Schraffur', card.name, err && err.message); return null; })
+      .finally(() => holoWait.delete(key));
+    holoChain = job.catch(() => {});
+    holoWait.set(key, job);
+    return job;
+  }
+  // — Rahmenglanz: Gold-, Silber- und Diamant-Rahmen glaenzen in ihrer Farbe. Die Maske ist die Form des Rahmens und
+  //   haengt nur von Kartentyp und Seltenheit ab — es gibt hoechstens 5 Stueck, von allen Karten geteilt. —
+  const rimMemo = new Map();         // Kartenname|Skin -> { kind, tone } | null
+  const rimDone = new Map();         // kind -> { vars, urls }
+  const rimWait = new Map();         // kind -> Promise
+  /** Welchen Rahmen hat die Karte? -> { kind (Schluessel der Maske), tone: 'gold' | 'silver' | 'diamond' } oder null. Vor loadMeta: null. */
+  function rimKind(card, skin) {
+    if (!HOLO.on || !metaReady || !card || !card.name) return null;
+    const id = card.name + '|' + (skin || '');
+    if (rimMemo.has(id)) return rimMemo.get(id);
+    const sk = skin ? (meta.skins[skin] || {}) : null;
+    const m = Object.assign({}, meta.cards[card.name]);
+    if (sk) { if (sk.r) m.r = sk.r; if (sk.f) m.f = sk.f; }
+    const spec = specFromCard(card, m, null);
+    const goldType = spec.type === 'superhero' || spec.type === 'fullartHero';
+    let tone = null;
+    if (spec.rarity === 'diamond') tone = 'diamond';
+    else if (goldType || spec.rarity === 'super rare') tone = 'gold';
+    else if (OPT.silverRim && spec.rarity === 'rare') tone = 'silver';
+    const out = tone ? { kind: (goldType ? spec.type : 'n') + ':' + spec.rarity, tone, type: spec.type, rarity: spec.rarity } : null;
+    rimMemo.set(id, out);
+    return out;
+  }
+  /** Rahmenmaske zu einer Rahmenart (halbe Kartengroesse): nur der Rahmen, undurchsichtig. */
+  function rimFor(rk) {
+    if (!rk) return Promise.resolve(null);
+    const hit = rimDone.get(rk.kind);
+    if (hit) return Promise.resolve(hit);
+    if (rimWait.has(rk.kind)) return rimWait.get(rk.kind);
+    const job = holoChain.then(async () => {
+      await new Promise(r => setTimeout(r, 0));
+      const full = document.createElement('canvas'); full.width = W; full.height = H;
+      drawRim(full.getContext('2d'), { type: rk.type, rarity: rk.rarity });
+      const half = document.createElement('canvas'); half.width = W / 2; half.height = H / 2;
+      const g = half.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      g.drawImage(full, 0, 0, W / 2, H / 2);
+      const url = await toUrl(half);
+      if (!url) return null;
+      const out = { vars: { '--sh-rim': 'url(' + url + ')' }, urls: [url] };
+      rimDone.set(rk.kind, out);
+      return out;
+    }).catch(err => { console.warn('[card-render] Rahmenglanz', rk.kind, err && err.message); return null; })
+      .finally(() => rimWait.delete(rk.kind));
+    holoChain = job.catch(() => {});
+    rimWait.set(rk.kind, job);
+    return job;
+  }
+  function rimCached(rk) { return (rk && rimDone.get(rk.kind)) || null; }
+
   /** Namensglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Umriss der Buchstaben + Lage. */
   function nameShimmerFor(card) {
     if (!HOLO.on || !card) return Promise.resolve(null);
@@ -818,5 +914,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
 })(typeof window !== 'undefined' ? window : globalThis);
