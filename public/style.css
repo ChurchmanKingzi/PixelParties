@@ -18241,6 +18241,18 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
                     scale(1.3) rotate(320deg); }
 }
 
+/* Solange ein Tutorial-Highlight steht (TextBox setzt `body[data-tb-hl]`), zoomt die echte
+   Brettzone unter dem Schleier nicht beim Hovern: das Highlight ist ein Klon in Ruhegroesse,
+   ein daneben hochgezoomtes Original gaebe ein Doppelbild (grafischer Glitch). Ebenso
+   die animierte Figur (sie zoomt mit ihrer Zone). */
+body[data-tb-hl] .board-plane .board-zone.zone-has-card:hover,
+body[data-tb-hl] .pz-board-plane .board-zone:has(.board-card):hover {
+  scale: none;
+  outline: none;
+  box-shadow: none;
+}
+body[data-tb-hl] .hero-idle-platz.hero-idle-hover { scale: none; }
+
 /* Mess-Fenster für Tutorial-Highlights: schaltet Perspektive und
    Ebenen-Transform für einen Frame ab, damit `getBoundingClientRect()`
    Layout- statt Projektionskoordinaten liefert. Spiegelbild der

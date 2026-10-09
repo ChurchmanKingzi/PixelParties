@@ -7896,8 +7896,23 @@ function measureHighlight(el) {
   clip.classList.add(TB_FLAT_CLASS);
   const cr = clip.getBoundingClientRect();
   const pr = plane.getBoundingClientRect();
-  const er = el.getBoundingClientRect();
+  let er = el.getBoundingClientRect();
   clip.classList.remove(TB_FLAT_CLASS);
+  // ★ Hovert der Zeiger gerade ueber der Zone, ist sie hochgezoomt (`scale`,
+  // `--board-hover-scale`, mit Uebergang) — das Highlight bekam diese Hover-
+  // Groesse, das geklonte Kartenbild aber blieb in Ruhegroesse: der Rahmen
+  // sass zu gross um die Karte (Als Befund: „Hovere ich ueber eine Karte,
+  // waehrend deren Highlight initiiert wird, gibt das einen grafischen
+  // Glitch"). Zurueckgerechnet auf die Ruhegroesse (um die Mitte, wie
+  // `scale` wirkt) — auch mitten im Uebergang stimmt es, denn die Rechnung
+  // nimmt den aktuellen Wert.
+  {
+    const sk = parseFloat(getComputedStyle(el).scale);
+    if (Number.isFinite(sk) && sk > 0 && Math.abs(sk - 1) > 0.001) {
+      const w = er.width / sk, h = er.height / sk;
+      er = { left: er.left + (er.width - w) / 2, top: er.top + (er.height - h) / 2, width: w, height: h };
+    }
+  }
 
   const cs = getComputedStyle(plane);
   const clipCs = getComputedStyle(clip);
@@ -8156,6 +8171,11 @@ function TextBox() {
     const page = pages[pageIdx];
     const hl = page?.highlights;
     if (!hl || !hl.length) { setHighlightRects([]); return; }
+    // Solange ein Highlight steht, zoomt die echte Zone unter dem Schleier nicht
+    // mehr beim Hovern (CSS `body[data-tb-hl]`): das Highlight ist ein Klon in
+    // Ruhegroesse, ein daneben hochgezoomtes Original waere ein Doppelbild.
+    // VOR dem Messen setzen, damit ein laufender Hover-Zoom schon abklingt.
+    document.body.setAttribute('data-tb-hl', '1');
     const rects = [];
     const aufraeumen = [];
     for (const h of hl) {
@@ -8232,7 +8252,7 @@ function TextBox() {
       });
     }
     setHighlightRects(rects);
-    return () => { aufraeumen.forEach(f => f()); };
+    return () => { aufraeumen.forEach(f => f()); document.body.removeAttribute('data-tb-hl'); };
   }, [pages, pageIdx]);
 
   const handleAdvance = useCallback(() => {
@@ -8322,6 +8342,31 @@ function TextBox() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [opts, handleAdvance, handleBack, pageIdx]);
+
+  // ★ Im TUTORIAL ist das Spiel waehrend des Dialogs gesperrt (Als Befund: in
+  // Tutorial 2 liess sich ein Haressassin anklicken und ausloesen, waehrend Monia
+  // noch sprach). Die Textbox laesst Zeigerereignisse durch (`pointer-events: none`),
+  // also faengt dieser Wachposten sie vor dem Spiel ab: Karten auf dem Brett, in der
+  // Hand und die Phasenleiste bekommen weder Klick noch Zug. Ein Klick darauf
+  // blaettert die Textbox trotzdem weiter ("irgendwo klicken = weiter"). Ausgenommen
+  // bleiben die Textbox selbst, Fenster ueber ihr und die Gruppe mit dem Exit-Knopf.
+  useEffect(() => {
+    if (!opts || fading || !window._currentTutorialNum) return undefined;
+    const GESPERRT = '.board-plane, .board-plane-clip, .game-hand-cards, .hand-slot, [data-hand-idx], .phase-column';
+    const AUSNAHME = '.textbox, .textbox-overlay, .modal-overlay, .game-hand-topright';
+    const sperren = (e) => {
+      const t = e.target;
+      if (!t || !t.closest || !t.closest(GESPERRT) || t.closest(AUSNAHME)) return;
+      if (fensterDarueber()) return;
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      if (e.cancelable) e.preventDefault();
+      if (e.type === 'mousedown' || e.type === 'touchstart') handleAdvance();
+    };
+    const TYPEN = ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'dragstart', 'contextmenu'];
+    TYPEN.forEach(t => window.addEventListener(t, sperren, { capture: true, passive: false }));
+    return () => TYPEN.forEach(t => window.removeEventListener(t, sperren, true));
+  }, [opts, fading, handleAdvance]);
 
   useEffect(() => {
     if (!opts) return;
