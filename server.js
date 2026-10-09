@@ -11953,11 +11953,23 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
       // Trainings-Recorder für diese Potions blind. Kein Pile-Push
       // hier: die Karte hat ihren Zonen-Transfer bereits selbst erledigt.
       if (!chainResult.negated && !chainResult.resolveResult?.cancelled) {
-        await room.engine.runHooks('afterPotionUsed', {
+        const selbstHookCtx = {
           potionName: cardName, potionOwner: pi,
           fromHandIndex: -1,
           placed: !!chainResult.resolveResult?.placed, _skipReactionCheck: true,
-        });
+        };
+        const warSchonPlatziert = selbstHookCtx.placed;
+        await room.engine.runHooks('afterPotionUsed', selbstHookCtx);
+        // ★ Biomancy-Bug (Als Befund 9.10.): Elixir of Quickness legt sich VOR dem
+        // Ziehen selbst in den Deleted Pile (damit der Flug stimmt). Uebernimmt jetzt
+        // ein Listener die verbrauchte Potion (Biomancy: Token aufs Brett, Saint
+        // Nicolas: Hand des Gegners), darf KEINE Kopie im Deleted Pile bleiben — die
+        // eine Potion IST der Token. Die uebrigen Wege (oben) pushen erst NACH dem Hook.
+        if (selbstHookCtx.placed && !warSchonPlatziert) {
+          room.engine.takeFromPileSync(pi, 'deleted', cardName, {
+            last: true, _verwahrungFreigabe: true, source: 'afterPotionUsed',
+          });
+        }
       }
       if (!chainResult.negated && !chainResult.resolveResult?.placed) checkPotionLock(ps, gs, pi);
     }
