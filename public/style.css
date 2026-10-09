@@ -15594,6 +15594,82 @@ body:has(.textbox-overlay) .tooltip {
   color: #ffd34d !important;
   text-shadow: 0 0 6px #ffae00, 0 0 12px rgba(255, 174, 0, .6);
 }
+/* ── Tutorial 3: grosser ATK-Zaehler beim Boost auf 9999 (atkWowStart, app-shared) ──
+   Der Zaehler schwebt ueber dem Helden, Ringe und Funken gehen von ihm aus, am Ende
+   blitzt der ganze Schirm. Liegt ueber der Textbox (90000) und ihren Highlight-Klonen. */
+.atk-wow { position: fixed; width: 0; height: 0; z-index: 90500; pointer-events: none; }
+.atk-wow-zahl {
+  position: absolute; left: 0;
+  transform: translate(-50%, -100%);
+  display: flex; flex-direction: column; align-items: center;
+  font-family: var(--font-display, 'Pixel Intv'), sans-serif; font-weight: 900;
+  white-space: nowrap; line-height: 1;
+  animation: atkWowEin .38s cubic-bezier(.2, 1.7, .4, 1) both;
+}
+.atk-wow-label {
+  font-size: .42em; letter-spacing: .3em; margin-bottom: .15em; color: #fff;
+  text-shadow: 0 0 10px #ffae00, 0 0 22px #ff6a00, 0 2px 0 #000;
+}
+.atk-wow-wert {
+  color: #ffd34d;
+  text-shadow: 0 0 8px #ff9a00, 0 0 22px #ff6a00, 0 0 46px rgba(255, 70, 0, .85), 3px 3px 0 #7a1f00;
+  animation: atkWowPuls .2s ease-in-out infinite alternate;
+}
+.atk-wow-fertig .atk-wow-wert {
+  color: #fff;
+  text-shadow: 0 0 10px #fff, 0 0 26px #ffcc33, 0 0 54px #ff5a1f, 0 0 90px rgba(255, 60, 0, .9), 3px 3px 0 #7a1f00;
+  animation: atkWowEnde .9s ease-out both;
+}
+.atk-wow-aus { animation: atkWowAus .6s ease-in forwards; }
+@keyframes atkWowEin   { from { transform: translate(-50%, -100%) scale(.15); opacity: 0; } to { transform: translate(-50%, -100%) scale(1); opacity: 1; } }
+@keyframes atkWowPuls  { from { transform: scale(1); } to { transform: scale(1.14); } }
+@keyframes atkWowEnde  {
+  0%   { transform: scale(2.1); filter: brightness(2.4); }
+  35%  { transform: scale(.9);  filter: brightness(1.5); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes atkWowAus   { to { opacity: 0; transform: translateY(-14px); } }
+.atk-wow-ring {
+  position: absolute; left: 0; top: 0;
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 3px solid #ffd34d;
+  box-shadow: 0 0 22px #ff9a00, inset 0 0 18px rgba(255, 170, 0, .55);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: atkWowRing 1.1s ease-out both;
+}
+@keyframes atkWowRing {
+  0%   { width: 10px; height: 10px; opacity: 0; }
+  12%  { opacity: .95; }
+  100% { width: var(--ring-groesse, 360px); height: var(--ring-groesse, 360px); opacity: 0; }
+}
+.atk-wow-funke {
+  position: absolute; left: 0; top: 0;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--c); box-shadow: 0 0 10px var(--c), 0 0 20px var(--c);
+  opacity: 0;
+  animation: atkWowFunke 1s ease-out both;
+}
+@keyframes atkWowFunke {
+  0%   { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.2); opacity: 0; }
+}
+.atk-wow-blitz {
+  position: fixed; inset: 0; z-index: 90499; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(255, 210, 90, 0) 38%, rgba(255, 140, 0, .5) 100%);
+  animation: atkWowBlitz .9s ease-out forwards;
+}
+.atk-wow-blitz-stark {
+  background: radial-gradient(ellipse at 50% 55%, rgba(255, 255, 255, .55) 0%, rgba(255, 190, 60, .4) 40%, rgba(255, 90, 0, .65) 100%);
+  animation-duration: 1s;
+}
+@keyframes atkWowBlitz { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .atk-wow-wert, .atk-wow-fertig .atk-wow-wert { animation: none; }
+  .atk-wow-blitz { display: none; }
+}
+
 /* Tutorial boost — card grows dramatically */
 .tutorial-boost-anim {
   animation: tutorial-card-grow 2s ease-out !important;
