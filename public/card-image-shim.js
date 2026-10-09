@@ -21,7 +21,11 @@
   if (!window.CardRender || typeof Path2D === 'undefined' || !HTMLImageElement) return;
   window.__cardImageShim = true;
 
-  const PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+  // Durchsichtiger Platzhalter in Kartengröße (750x1050): Bis die Karte fertig ist, hat das <img> dieselbe
+  // natürliche Größe wie später. Ein 1x1-Pixel würde Layouts verfälschen, die von der Bildgröße abhängen
+  // (z. B. der absolut positionierte Ausschnitt in HeroArtCrop liegt dann ganz außerhalb seines Rahmens,
+  // der IntersectionObserver meldet ihn nie als sichtbar, und die Karte würde nie gezeichnet).
+  const PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1050"/>');
   const MAX_CACHE = 400;
 
   // Dateinamen verlieren Satzzeichen („Hello, World“ -> „Hello World.png“): gleiche Regel wie card-images.js
@@ -140,7 +144,7 @@
   const queues = [[], [], []];
   let workers = 0;
   const WORKERS = 3;
-  function enqueue(job, tier) { stats.enqueued++; queues[tier].push(job); while (workers < WORKERS) { workers++; work().finally(() => { workers--; }); } }
+  function enqueue(job, tier) { if (job.queued) return; job.queued = true; stats.enqueued++; queues[tier].push(job); while (workers < WORKERS) { workers++; work().finally(() => { workers--; }); } }
   function nextJob() { for (const q of queues) if (q.length) return q.shift(); return null; }
   async function work() {
     await boot();
@@ -174,10 +178,24 @@
   const NativeImage = window.Image;
   window.Image = function Image(w, h) { const i = new NativeImage(w, h); i.__viaCtor = true; return i; };
   window.Image.prototype = NativeImage.prototype;
+  // Bilder, die in der Seite stehen, aber (noch) nicht sichtbar sind — etwa weiter unten in einem Scrollbereich,
+  // dessen Rand der IntersectionObserver nicht weitet —, werden in Leerlaufzeiten nachgezeichnet, damit sie beim
+  // Scrollen schon fertig sind. Sichtbare kommen vorher dran (Stufe 0), diese zuletzt (Stufe 2).
+  function vorrendern(job) {
+    setTimeout(() => {
+      const run = () => {
+        const img = job.img;
+        if (job.queued || img.__cardTok !== job.tok || !img.isConnected) return;
+        io.unobserve(img);
+        enqueue(job, 2);
+      };
+      if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 4000 }); else run();
+    }, 1200);
+  }
   function place(job, tries) {
     const img = job.img;
     if (img.__cardTok !== job.tok) return;
-    if (io && img.isConnected) { io.observe(img); return; }
+    if (io && img.isConnected) { io.observe(img); vorrendern(job); return; }
     if (img.__viaCtor || tries > 90 || !io) { enqueue(job, 1); return; }
     requestAnimationFrame(() => place(job, tries + 1));
   }
@@ -190,7 +208,7 @@
     img.__cardOrig = orig;
     if (cache.has(m.id)) { const u = cache.get(m.id); cache.delete(m.id); cache.set(m.id, u); return setReal(img, u); }
     const job = img.__cardJob = { img, m, tok, orig };
-    // Eingebaute Bilder zeigen bis zum Rendern ein durchsichtiges Pixel (kein Alt-Text-Flackern); `new Image()`
+    // Eingebaute Bilder zeigen bis zum Rendern eine durchsichtige Fläche (kein Alt-Text-Flackern); `new Image()`
     // bleibt leer, damit onload erst mit der fertigen Karte feuert.
     if (!img.__viaCtor) setReal(img, PLACEHOLDER);
     setTimeout(() => place(job, 0), 0);

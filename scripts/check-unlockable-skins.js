@@ -19,6 +19,9 @@
 //      den Shop-Bestand); jede CPU-Deckkopie filtert die Skins.
 //   4. Die Datums-Logik („31.10. nach der lokalen Uhr“) stimmt in
 //      allen Zeitzonen.
+//   5. Tutorial-Skin: Freischaltung nach dem Finale der letzten Stufe
+//      (`tutorial_finale_done`) bzw. beim nächsten Anmelden; Ids und die
+//      als Finale markierte Stufe passen zusammen.
 //
 //  Aufruf:  node scripts/check-unlockable-skins.js
 //  Rückgabe 0 = sauber, 1 = mindestens ein Befund.
@@ -58,9 +61,30 @@ ok(rohkopien === 1, `${rohkopien} Deckkopien übernehmen d.skins ungefiltert (er
 ok(/cpuSnapshot\.skins\s*=\s*withoutUnlockableSkins\(cpuSnapshot\.skins\)/.test(server), 'createCpuBattle filtert die Skins der CPU-Seite nicht');
 ok(/deckSkins:\s*String\(userId\)\.startsWith\('cpu-'\)\s*\?\s*withoutUnlockableSkins/.test(server), 'Puzzle: die CPU-Seite filtert freischaltbare Skins nicht');
 ok(/pool\s*=\s*\(SKINS_DATA\[heroName\]\s*\|\|\s*\[\]\)\.filter\(n\s*=>\s*skinHasImage\(n,\s*skinFiles\)\s*&&\s*!isUnlockableSkin\(n\)\)/.test(server), 'rollCpuSkin filtert freischaltbare Skins nicht');
-for (const aufruf of ['onHumanWonGame(winner.userId)', "onHumanWonGame(room.players?.[0]?.userId)", 'grantTutorialSkinIfDone(userId)']) {
+for (const aufruf of ['onHumanWonGame(winner.userId)', "onHumanWonGame(room.players?.[0]?.userId)"]) {
   ok(server.includes(aufruf), `server.js: Freischalt-Aufruf fehlt: ${aufruf}`);
 }
+// Tutorial-Skin: nicht mehr direkt beim Abschluss der Stufe (das Popup käme mitten im Epilog), sondern wenn der
+// Client nach Feuerwerk und Ausblenden `tutorial_finale_done` meldet — und für alle, die vorher schließen, beim
+// nächsten Anmelden. Beide Wege fragen über `grantTutorialSkinIfDone`, ob wirklich ALLE Stufen geschafft sind.
+ok(/socket\.on\('tutorial_finale_done',\s*\(\)\s*=>\s*\{[^}]*grantTutorialSkinIfDone\(currentUser\.userId\)/s.test(server),
+  "server.js: `tutorial_finale_done` ruft grantTutorialSkinIfDone(currentUser.userId) nicht auf");
+ok(/socket\.emit\('auth_ok',\s*session\);\s*grantTutorialSkinIfDone\(session\.userId,\s*\d+\)/s.test(server),
+  'server.js: die Anmeldung (`auth`) liefert den Tutorial-Skin nicht nach (grantTutorialSkinIfDone(session.userId, <Verzögerung>))');
+ok(/const tutorialId = 'tutorial\/' \+ base;/.test(server) && /puzzleId = gs\._puzzleAttemptId/.test(server),
+  'server.js: die Tutorial-Id (`tutorial/<Datei>`) in puzzle_completions weicht von allTutorialIds() ab');
+const board = fs.readFileSync(path.join(WURZEL, 'public', 'app-board.jsx'), 'utf-8');
+ok(/if \(finaleErfolg\) socket\.emit\('tutorial_finale_done'\)/.test(board), 'app-board.jsx: der Client meldet `tutorial_finale_done` nach dem Finale nicht');
+// Das Finale gehört zur LETZTEN Stufe: genau ein Tutorial-Skript trägt `isFinalTutorial`, und es hat die höchste Nummer.
+const shared = fs.readFileSync(path.join(WURZEL, 'public', 'app-shared.jsx'), 'utf-8');
+const finale = [...shared.matchAll(/isFinalTutorial:\s*true/g)];
+ok(finale.length === 1, `app-shared.jsx: ${finale.length} Tutorial-Skripte tragen isFinalTutorial (erlaubt: genau 1, die letzte Stufe)`);
+if (finale.length === 1) {
+  const nummern = [...shared.slice(0, finale[0].index).matchAll(/\n  (\d+): \(\(\) => \{/g)].map(m => Number(m[1]));
+  const hoechste = Math.max(0, ...U.allTutorialIds().map(id => Number((/tutorial(\d+)/i.exec(id) || [])[1]) || 0));
+  ok(nummern.length && nummern[nummern.length - 1] === hoechste, `isFinalTutorial steht in Stufe ${nummern[nummern.length - 1]}, die letzte Tutorial-Stufe ist ${hoechste}`);
+}
+ok(U.RULES[U.TUTORIAL_SKIN] === 'tutorial' && U.heroOfSkin(skinsData, U.TUTORIAL_SKIN), 'Tutorial-Skin: Regel oder Held in data/skins.json fehlt');
 const skilltest = fs.readFileSync(path.join(WURZEL, 'skilltest', 'battle.js'), 'utf-8');
 ok(skilltest.includes('host.onHumanWon'), 'skilltest/battle.js: der Sieg eines Menschen wird nicht gemeldet (host.onHumanWon)');
 
