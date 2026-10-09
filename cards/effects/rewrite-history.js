@@ -27,7 +27,7 @@
 //    `revive` der Ablage-Stelle (kein onPlay/onCardEnterZone, nur `onRevive`).
 // ═══════════════════════════════════════════
 
-const { isOwnSideSummonableCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Rewrite History';
 
@@ -50,7 +50,7 @@ function kandidaten(engine, pi, maxLevel) {
     if (!(ps.discardPile || []).includes(e.name)) continue;
     if (!engine.darfAusAblageAufsFeld(e.name)) continue;
     const cd = db[e.name];
-    if (!cd || !isOwnSideSummonableCreature(cd, e.name)) continue;
+    if (!cd || !isSummonablePileCreature(cd, e.name)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const level = engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' });
     if (level > maxLevel) continue;

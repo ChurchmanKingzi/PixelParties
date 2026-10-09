@@ -45,7 +45,7 @@
 const { DISCARD_SOURCE_TAG } = require('./_rebelliokai-shared');
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
-const { baseCardName } = require('./_hooks');
+const { baseCardName, isPileCreature } = require('./_hooks');   // Stapel-Suche: Artifact Creatures sind Creatures (Als Ruling 9.10.)
 const CARD_NAME = 'Rebelliokai Kind Kitsune';
 
 module.exports = {
@@ -103,7 +103,7 @@ module.exports = {
       for (const cn of (ps.discardPile || [])) {
         const cd = cardDB[cn];
         if (!cd) continue;
-        if (cd.cardType === 'Creature') continue;
+        if (isPileCreature(cd)) continue;
         counts[cn] = (counts[cn] || 0) + 1;
       }
       const gallery = Object.entries(counts)
@@ -127,7 +127,7 @@ module.exports = {
       // the prompt (rare — but a parallel reaction could move it).
       if ((ps.discardPile || []).indexOf(chosenName) < 0) return;
       const cd = cardDB[chosenName];
-      if (!cd || cd.cardType === 'Creature') return;
+      if (!cd || isPileCreature(cd)) return;
 
       // Pile-transfer animation: chosen card visibly flies from the
       // discard pile rect into the controller's hand slot, mirroring

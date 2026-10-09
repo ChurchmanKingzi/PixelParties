@@ -102,7 +102,7 @@ async function faedenZiehen(engine, pi, heroIdx, gewaehlt) {
 function opferSpec(zielHeroIdx) {
   return {
     minCount: OPFER, maxCount: OPFER,
-    filter: c => aktuellesLevel(c) === 0,
+    filter: c => c.hasLevel && aktuellesLevel(c) === 0,   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     showFilteredAsIneligible: true,
     title: `${CARD_NAME} — Sacrifice`,
     description: `Sacrifice ${OPFER} level 0 Creatures you control to perform the ritual.`,

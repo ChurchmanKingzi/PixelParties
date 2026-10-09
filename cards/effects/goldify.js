@@ -40,18 +40,14 @@ const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 function hasLowLevelCreatureTarget(gs, engine) {
   if (!engine) return false;
   const cardDB = engine._getCardDB();
-  for (const ps of gs.players) {
-    if (!ps) continue;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      for (let si = 0; si < 3; si++) {
-        const slot = ps.supportZones?.[hi]?.[si] || [];
-        if (slot.length === 0) continue;
-        const cd = cardDB[slot[0]];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
-        if ((cd.level || 0) <= 1) return true;
-      }
-    }
+  // Ueber die INSTANZEN, nicht ueber die Slot-Namen: ein Biomancy-Token liegt unter dem
+  // Namen seiner Potion in der Zone (Als Sweep 9.10.).
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!hasNumericCreatureLevel(cd)) continue;   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
+    if ((cd.level || 0) <= 1) return true;
   }
   return false;
 }
@@ -146,7 +142,7 @@ module.exports = {
         return;
       }
 
-      const creatureCd = cardDB[inst.name];
+      const creatureCd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten (Als Sweep 9.10.)
       const creatureLevel = creatureCd?.level || 0;
       const goldGain = 5 * creatureLevel;
 

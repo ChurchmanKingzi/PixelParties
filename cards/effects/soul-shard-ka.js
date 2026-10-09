@@ -35,7 +35,7 @@ const {
   soulShardEffectActivates_FromDiscard,
   markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
-const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME = 'Soul Shard Ka';
 
@@ -125,7 +125,7 @@ module.exports = {
       for (const [name, count] of Object.entries(counts)) {
         if (seen.has(name)) continue;
         const cd = cardDB[name];
-        if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
+        if (!cd || !isSummonablePileCreature(cd, name)) continue;
         if (engine.effectiveCardLevel(cd, pi) > levelCap) continue;
         // `_bypassBeforeSummon: true` — Ka summons via direct splice
         // + _trackCard, not summonCreatureWithHooks, so beforeSummon

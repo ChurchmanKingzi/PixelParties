@@ -10155,7 +10155,7 @@ function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
  */
 function mctsEnemyCreatureValue(engine, inst) {
   if (!inst) return 1.0;
-  const cd = engine._getCardDB()[inst.name];
+  const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
   if (!cd) return 1.0;
   let value = 1.0;
   const lvl = cd.level || 0;

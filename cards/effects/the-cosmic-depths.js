@@ -34,7 +34,7 @@
 //  represented on their side.
 // ═══════════════════════════════════════════
 
-const { isSummonablePileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, isArtifactCreature } = require('./_hooks');
 
 const CARD_NAME = 'The Cosmic Depths';
 
@@ -48,6 +48,7 @@ function getOwnedCreatureLevels(engine, pi) {
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (isArtifactCreature(cd)) continue;   // kein Level (Als Ruling 9.10.) — taucht in der Stufen-Menge nicht auf
     levels.add(cd.level ?? 0);
   }
   return levels;

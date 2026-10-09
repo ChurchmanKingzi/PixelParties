@@ -26,7 +26,7 @@
 //     nicht erfasst.
 // ═══════════════════════════════════════════
 
-const { isOwnSideSummonableCreature } = require('./_hooks');
+const { isSummonablePileCreature } = require('./_hooks');
 
 const CARD_NAME        = 'Psychic Scout';
 const DAMAGE_REDUCTION = 50;
@@ -54,7 +54,7 @@ function summonableHandIndices(engine, pi, heroIdx, feld) {
   for (let i = 0; i < (ps?.hand || []).length; i++) {
     const cn = ps.hand[i];
     const cd = cardDB[cn];
-    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
+    if (!cd || !isSummonablePileCreature(cd, cn)) continue;
     if (engine.effectiveCardLevel(cd, pi, { handIdx: i }) !== 0) continue;   // „level 0"
     if (!heroCanHost(engine, pi, heroIdx, cd, cn, feld, i)) continue;
     out.push(i);

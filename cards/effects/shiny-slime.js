@@ -8,6 +8,8 @@
 // ═══════════════════════════════════════════
 
 
+const { hasCardType, isArtifactCreature } = require('./_hooks');
+
 module.exports = {
   activeIn: ['support'],
 
@@ -26,8 +28,11 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const uniqueNames = new Set();
       for (const t of engine.getCreatureTargets(pi)) {
-        const c = cardDB[t.cardName];
-        if (c && (c.level || 0) === 0) uniqueNames.add(t.cardName);
+        // Wirksame Kartendaten (Biomancy-Token tragen den Namen einer Potion).
+        // Puppets (nur „waehlbar als Creature") und Artifact Creatures (kein
+        // Level — Als Ruling 9.10.) zaehlen nicht als „Creature mit Level 0".
+        const c = (t.cardInstance ? engine.getEffectiveCardData(t.cardInstance) : null) || cardDB[t.cardName];
+        if (c && hasCardType(c, 'Creature') && !isArtifactCreature(c) && (c.level || 0) === 0) uniqueNames.add(t.cardName);
       }
 
       const count = uniqueNames.size;

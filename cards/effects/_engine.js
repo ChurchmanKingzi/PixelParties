@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, hasNumericCreatureLevel, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -10092,7 +10092,7 @@ class GameEngine {
         return;
       }
     }
-    const cd = this._getCardDB()[target.name];
+    const cd = this.getEffectiveCardData(target) || this._getCardDB()[target.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
     const baseHp = target.counters.maxHp ?? cd?.hp ?? 0;
     if (baseHp <= 0) return;
 
@@ -12313,7 +12313,7 @@ class GameEngine {
     // Monia-style creature protection
     let isCreatureTarget = false;
     if (targetCard.zone === 'support') {
-      const cd = this._getCardDB()[targetCard.name];
+      const cd = this.getEffectiveCardData(targetCard) || this._getCardDB()[targetCard.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cd && hasCardType(cd, 'Creature')) {
         isCreatureTarget = true;
         const hookCtx = {
@@ -12380,7 +12380,7 @@ class GameEngine {
     // Abbruchpfade oben sind durch), der Kadaver aber noch nicht
     // abgelegt und der Flug dorthin noch nicht gesendet.
     if (targetCard.zone === ZONES.SUPPORT && !targetCard._deathClaim) {
-      const cdZ = this._getCardDB()[targetCard.name];
+      const cdZ = this.getEffectiveCardData(targetCard) || this._getCardDB()[targetCard.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cdZ && hasCardType(cdZ, 'Creature')) {
         await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
           creature: {
@@ -13189,7 +13189,7 @@ class GameEngine {
 
     // Monia-style creature protection for control changes (not destruction — that's handled in actionDestroyCard)
     if (fromZone === 'support' && toZone !== ZONES.DISCARD && toZone !== ZONES.DELETED) {
-      const cd = this._getCardDB()[cardInstance.name];
+      const cd = this.getEffectiveCardData(cardInstance) || this._getCardDB()[cardInstance.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cd && hasCardType(cd, 'Creature')) {
         const hookCtx = { creature: cardInstance, effectType: 'move', source: null, cancelled: false, _skipReactionCheck: true };
         await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
@@ -13464,7 +13464,7 @@ class GameEngine {
     if (!shouldFireDeath
         && fromZone === ZONES.SUPPORT
         && (toZone === ZONES.DISCARD || toZone === ZONES.DELETED)) {
-      const cd = this._getCardDB()[cardInstance.name];
+      const cd = this.getEffectiveCardData(cardInstance) || this._getCardDB()[cardInstance.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (cd && hasCardType(cd, 'Creature')) shouldFireDeath = true;
     }
     if (shouldFireDeath) {
@@ -15650,8 +15650,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
       if ((inst.owner !== ownerIdx && inst.controller !== ownerIdx) || inst.zone !== 'support' || inst.faceDown) continue;
-      const cd = cardDB[inst.name];
-      if (!cd || cd.cardType !== 'Creature') continue;
+      const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
+      if (!cd || !this.isChoosableAsCreature(inst, cd)) continue;   // Tokens/Artifact Creatures auf dem Brett sind Creatures
       targets.push({ id: `equip-${ownerIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: ownerIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
     }
     if (targets.length === 0) return;
@@ -26048,7 +26048,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!isCreature) continue;
       const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
       const level = cd.level || 0;
-      results.push({ inst, maxHp, level, cardName: inst.name });
+      // `hasLevel`: Artifact Creatures haben KEIN Level (Als Ruling 9.10.) — `level` bleibt 0 fuer
+      // die Rechnerei, aber jeder Effekt, der ein Level verlangt, fragt `hasLevel` zuerst.
+      results.push({ inst, maxHp, level, hasLevel: hasNumericCreatureLevel(cd), cardName: inst.name });
     }
     return results;
   }
@@ -26105,7 +26107,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const cd = cardDB[inst.name];
       const maxHp = inst.counters?.maxHp ?? cd?.hp ?? 0;
       const level = cd?.level || 0;
-      out.push({ inst, maxHp, level, cardName: inst.name, _fromHand: true });
+      out.push({ inst, maxHp, level, hasLevel: hasNumericCreatureLevel(cd), cardName: inst.name, _fromHand: true });
     }
     return out;
   }
@@ -45627,8 +45629,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       const cd = cardDB[e.inst.name];
       const maxHp = e.inst.counters.maxHp ?? cd?.hp ?? 0;
       if (!e.inst.counters.currentHp) e.inst.counters.currentHp = maxHp;
-      // Store original card level for Effect 1 type checks
-      e.originalLevel = cd?.level ?? 0;
+      // Store original card level for Effect 1 type checks.
+      // Wirksame Kartendaten (Biomancy-Token tragen den Namen einer Potion);
+      // Artifact Creatures haben KEIN Level (Als Ruling 9.10.) -> `null`, damit
+      // „original level 0"-Schutz (Diamond, Psychic Scout) sie nicht erfasst.
+      const _ecd = this.getEffectiveCardData(e.inst) || cd;
+      e.originalLevel = isArtifactCreature(_ecd) ? null : (_ecd?.level ?? 0);
       // Track which hero dealt this damage (from source.heroIdx if available)
       e.sourceHeroIdx = e.source?.heroIdx ?? -1;
     }

@@ -77,8 +77,9 @@ const CARD_NAME = 'Garius, the Great Reformer';
  *  sickness filter. Pure read, side-effect-free. */
 function _eligibleSacrificeCandidates(engine, pi) {
   const turn = engine.gs.turn || 0;
+  // Die Stufe des Opfers zaehlt — Artifact Creatures haben keine (Als Ruling 9.10.).
   return engine.getSacrificableCreatures(pi).filter(c =>
-    c.inst.turnPlayed !== turn,
+    c.inst.turnPlayed !== turn && c.hasLevel,
   );
 }
 

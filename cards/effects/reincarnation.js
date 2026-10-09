@@ -32,7 +32,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
-const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { canReviveHero } = require('./_revive-shared');
 
 // Free-zone requirements per mode. Reincarnation always costs 2 Pollution
@@ -85,7 +85,7 @@ function getRestoreCandidates(ps, cardDB, engine, pi) {
   for (const name of (ps?.discardPile || [])) {
     if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
     const cd = cardDB[name];
-    if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
+    if (!cd || !isSummonablePileCreature(cd, name)) continue;
     // Effective level (Whoolmoth-style reducers etc. + Lethe's
     // per-pile +1 stamps via `pileSide: 'discard'`).
     const lvl = engine?.effectiveCardLevel

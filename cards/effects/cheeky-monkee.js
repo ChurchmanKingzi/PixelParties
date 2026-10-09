@@ -50,7 +50,7 @@ function alleBrettZiele(engine) {
   const db = engine._getCardDB ? engine._getCardDB() : {};
   for (const inst of (engine.cardInstances || [])) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
-    if (!hasCardType(db[inst.name], 'Creature')) continue;
+    { const cd = engine.getEffectiveCardData(inst) || db[inst.name]; if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue; }   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
     ziele.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
       owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,

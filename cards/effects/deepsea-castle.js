@@ -48,7 +48,7 @@ const CARD_NAME = 'Deepsea Castle';
 // excludes any in a Diver-Helmet Hero's Support Zones (those are
 // "unaffected by Areas").
 function swappableCreatures(engine, pi) {
-  return ownSupportCreatures(engine, pi).filter(inst => !isAreaImmuneInst(engine, inst));
+  return ownSupportCreatures(engine, pi, { needsLevel: true }).filter(inst => !isAreaImmuneInst(engine, inst));
 }
 
 // Effective level of a board Creature instance, with all live reducer

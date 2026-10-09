@@ -166,7 +166,7 @@ module.exports = {
           if (inst.zone !== 'support') continue;
           if ((inst.controller ?? inst.owner) !== p) continue;
           if (inst.faceDown) continue;
-          const cd = engine._getCardDB()[inst.name];
+          const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
           if (!cd || !hasCardType(cd, 'Creature')) continue;
           engine._broadcastEvent('play_zone_animation', {
             type: 'dark_swarm', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
@@ -198,7 +198,7 @@ module.exports = {
       for (const inst of allInsts) {
         if (inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
-        const cd = engine._getCardDB()[inst.name];
+        const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         await applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer);
       }
@@ -231,7 +231,7 @@ module.exports = {
       if (!entering) return;
       if (ctx.toZone !== 'support') return;
       const engine = ctx._engine;
-      const cd = engine._getCardDB()[entering.name];
+      const cd = engine.getEffectiveCardData(entering) || engine._getCardDB()[entering.name];   // wirksame Daten (Als Sweep 9.10.)
       if (!cd || !hasCardType(cd, 'Creature')) return;
       if (entering.faceDown) return; // Bakhm face-down placement — not yet active
 

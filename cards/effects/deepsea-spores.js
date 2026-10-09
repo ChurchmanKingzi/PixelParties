@@ -24,6 +24,7 @@
 // ═══════════════════════════════════════════
 
 const { activateDeepseaSpores } = require('./_deepsea-shared');
+const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Deepsea Spores';
 // Matches _engine.js HOOK_DESCRIPTIONS['onTurnStart'] — kept here as a
@@ -63,7 +64,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const hasCreature = engine.cardInstances.some(c =>
       c.zone === 'support' && !c.faceDown &&
-      (cardDB[c.name]?.cardType === 'Creature')
+      hasCardType(engine.getEffectiveCardData(c) || cardDB[c.name], 'Creature')   // Tokens/Artifact Creatures zaehlen auf dem Brett (Als Sweep 9.10.)
     );
     return hasCreature;
   },

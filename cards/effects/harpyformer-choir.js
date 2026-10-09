@@ -18,6 +18,7 @@
 // ═══════════════════════════════════════════
 
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
+const { hasCardType } = require('./_hooks');
 
 const CARD_NAME    = 'Harpyformer Choir';
 const ABILITY_NAME = 'Summoning Magic';
@@ -120,7 +121,7 @@ module.exports = {
       if ((c.controller ?? c.owner) !== pi || c.zone !== 'support' || c.faceDown) return false;
       if (engine.isEquipInZone(c.name, c)) return false;
       const cd = engine.getEffectiveCardData(c);
-      return !!cd && cd.cardType === 'Creature';
+      return !!cd && hasCardType(cd, 'Creature');   // Tokens/Artifact Creatures zaehlen (Als Sweep 9.10.)
     });
     return eigene;
   },

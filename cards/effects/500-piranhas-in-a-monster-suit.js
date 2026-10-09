@@ -276,7 +276,8 @@ module.exports = {
         name: FULL_NAME, owner: sourceOwner, heroIdx: inst.heroIdx,
         cardInstance: inst,
       };
-      await engine.actionDealDamage(source, host, HOST_DAMAGE, 'creature');
+      // „The corresponding Hero takes 80 damage": der Host steht fest (Als Ruling 9.10.).
+      await engine.actionDealDamage(source, host, HOST_DAMAGE, 'creature', { festesZiel: true });
 
       engine.log('piranhas_tick', {
         host: host.name, dmg: HOST_DAMAGE, controller,

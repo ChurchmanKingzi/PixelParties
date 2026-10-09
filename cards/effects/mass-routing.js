@@ -35,6 +35,7 @@
 // ═══════════════════════════════════════════
 
 const { isCardinalBeastByName } = require('./_cardinal-shared');
+const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 const CARD_NAME = 'Mass Routing';
 const SCHULE = 'Decay Magic';
@@ -52,7 +53,8 @@ function betroffene(engine, maxLevel) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if (engine.isEquipInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst);
-    if (!cd || cd.cardType !== 'Creature') continue;
+    if (!cd || !hasCardType(cd, 'Creature')) continue;   // 'Creature/Token' zaehlt (Als Sweep 9.10.)
+    if (!hasNumericCreatureLevel(cd)) continue;          // Artifact Creatures haben kein Level
     if ((cd.level || 0) > maxLevel) continue;
     out.push(inst);
   }

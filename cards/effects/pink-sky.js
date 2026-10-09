@@ -45,7 +45,7 @@ function alleKreaturen(engine) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = engine._getCardDB()[inst.name];
+    const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     raus.push(inst);
   }

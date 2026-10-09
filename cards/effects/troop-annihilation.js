@@ -91,7 +91,7 @@ function eigeneKreaturen(engine, pi, ausserInstId) {
     if (c._deathResolved) return false;
     const slot = ((engine.gs.players[c.owner]?.supportZones || [])[c.heroIdx] || [])[c.zoneSlot];
     if (!Array.isArray(slot) || !slot.includes(c.name)) return false;
-    const cd = cardDB[c.name];
+    const cd = engine.getEffectiveCardData(c) || cardDB[c.name];   // wirksame Daten (Als Sweep 9.10.)
     return !!(cd && hasCardType(cd, 'Creature'));
   });
 }

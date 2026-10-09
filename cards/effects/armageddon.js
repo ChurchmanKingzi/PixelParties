@@ -46,6 +46,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { hasCardType } = require('./_hooks');
 const { IFRIT, ARMAGEDDON, ifritsOf, damusEffektWirkt } = require('./_apocalypse-shared');
 
 const CARD_NAME = ARMAGEDDON;
@@ -86,10 +87,10 @@ function zaehleKreaturen(engine, p) {
     (ps?.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
       const name = (slot || [])[0];
       if (!name) return;
-      const cd = engine._getCardDB()[name] || {};
-      if (cd.cardType !== 'Creature' && cd.cardType !== 'Token') return;
       const inst = engine.cardInstances.find(c => c.zone === 'support'
         && c.owner === seite && c.heroIdx === hi && c.zoneSlot === si);
+      const cd = (inst ? engine.getEffectiveCardData(inst) : null) || engine._getCardDB()[name] || {};   // wirksame Daten (Als Sweep 9.10.)
+      if (!hasCardType(cd, 'Creature') && !hasCardType(cd, 'Token')) return;
       if ((inst ? (inst.controller ?? inst.owner) : seite) === p) n++;
     }));
   }
@@ -106,8 +107,8 @@ function zaehleKreaturen(engine, p) {
 function istKreatur(engine, inst) {
   const basis = engine._getCardDB()[inst.name] || {};
   const ueber = engine.getEffectiveCardData(inst) || {};
-  const typ = ueber.cardType || basis.cardType || '';
-  return typ === 'Creature' || typ === 'Token';
+  const cdE = ueber.cardType ? ueber : basis;
+  return hasCardType(cdE, 'Creature') || hasCardType(cdE, 'Token');   // 'Creature/Token', 'Spell/Creature', Artifact Creatures (Als Sweep 9.10.)
 }
 
 function heldGefeit(engine, pi, heroIdx) {

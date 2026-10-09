@@ -843,7 +843,7 @@ function costDiscardTags(engine, pi, opts = {}) {
         let bestWert = null, bestAnteil = 1;
         for (const inst of eigene) {
           const cd = engine.getEffectiveCardData(inst);
-          if (!cd || cd.cardType !== 'Creature') continue;
+          if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;   // Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
           // Gelernter Kartenwert; ohne Profil traegt der Rueckfall
           // (0) nur die HP-Frage — besser als gar kein Tag.
           const wert = learnedCardValue(engine, pi, inst.name, 0) || 0;

@@ -224,6 +224,17 @@ Veterans Schild über `ctx.festesZiel`) lesen sie, nie die Bedingung
 nachbauen. Der `info` des Schadenspfads trägt `festesZiel`; ein neuer
 Schutz der Bauart „while other targets" steigt bei `info.festesZiel` aus.
 
+**Gemeinsame Helfer reichen die Option mit:** `bleedHero(…, { festesZiel })`
+(`_bleed-shared`), `einfrieren(engine, ziel, { festesZiel })`
+(`_frost-shared`; Heart of Ice setzt sie, die Flächen Iceage und Yuki-Onna
+nicht), `kettenblitz(…)`. Wer `ctx.dealDamage` umbiegt (Demon's Gate,
+Skeleton Priest/Wizard), muss das vierte Argument `opts` durchreichen —
+sonst geht `festesZiel` auf dem Weg verloren. **Feste Ziele aus dem Sweep
+9.10.:** „the corresponding Hero" (500 Piranhas in a Monster Suit,
+Rha'Bi — die Zone der Karte legt es fest), Vergeltung gegen den Angreifer
+(Heart of Ice, Zombified Assault), und der Zugspieler, der SEINE Ziele
+selbst wählen muss (The Seventh Circle of Hell, Zugende-Zweig).
+
 Bei der WAHL entscheidet dieselbe Frage die Liste der legalen Ziele
 (`info.allTargets`): Stealth, Dive Down, Stealthy Pursuit und Alliance
 zählen nur Helden/Creatures als Ausweichziel, die die Quelle auch anbietet
@@ -6357,6 +6368,42 @@ nehmen** — nie `cd.level || 0` oder `cd.level ?? 0`: das macht aus „kein
 Level" ein „Level 0" und lässt die Karte durch jedes „≤ N". Vorbilder:
 Diplomacy, Goldify, Sabrina, Old Couple, Dark Deepsea God, Spirit of the
 Forbidden Grimoire, Dark Gear, Singing, Surprise Party (`99` statt `0`).
+
+**Wo das Level der Creature steckt — die Stellen, die der Sweep 9.10.
+umgestellt hat (Vorbilder für neue Karten):**
+
+- **Opfer-Listen:** `engine.getSacrificableCreatures(pi)` liefert je Eintrag
+  `hasLevel` (`false` für Artifact Creatures). `level` bleibt für die
+  Rechnerei `0`; jeder Filter, der die Stufe des Opfers auswertet (Garius,
+  Ladder to the Sky, Soul Transmigration Ritual, Steam Dwarf Dragon
+  Pilot), verlangt zuerst `c.hasLevel`.
+- **Brett-Sammler mit Stufe:** `ownSupportCreatures(engine, pi, { needsLevel:
+  true })` (`_deepsea-shared.js`) lässt Artifact Creatures weg — Deepsea
+  Castle, Shapeshift. Ohne die Option (Slippery Ice: „move a Creature",
+  keine Stufe) sind sie dabei.
+- **„Original level"-Schutz im Schadensstapel:** `entry.originalLevel` ist
+  für Artifact Creatures `null` (nicht `0`) — Diamond und Psychic Scout
+  fragen `=== 0`.
+- **Stufen-Mengen und Bounce-Ziele** (The Cosmic Depths, Divine Gift of the
+  Deepsea, Deepsea Encounter, Board of Kings) überspringen Artifact
+  Creatures über `isArtifactCreature(cd)` der **wirksamen** Kartendaten
+  (Tokens ohne eigenes Level, z. B. Fantasy Buddy, behalten ihr bisheriges
+  Verhalten).
+- **Zählen mit „Level 0"** (Shiny/Splashy Slime): wirksame Kartendaten,
+  `hasCardType(cd, 'Creature')` und kein Artifact — Puppets („wählbar als
+  Creature") und Artifact Creatures zählen nicht.
+
+**Direkte Platzierer** (`_trackCard` / `supportZones[...] = [...]`: Bottle,
+Barker, Slimes, Create Illusion, Layn, Staff of Illusions, Omikron, Army of
+the Cute) umgehen die zentralen Riegel — ihr Pool muss selbst
+`isSummonablePileCreature` (bzw. `!isArtifactCreature && isOwnSideSummonableCreature`)
+fragen.
+
+**Brett-Erkennung bei Tokens:** ein Biomancy-Token trägt den Namen einer
+Potion; „ist das eine Creature?" liest die **wirksamen** Daten
+(`engine.getEffectiveCardData(inst) || cardDB[inst.name]`), nie nur
+`cardDB[inst.name]`. „Alle Creatures" → `hasCardType(cd, 'Creature')`;
+„wählbares Ziel" → `engine.isChoosableAsCreature(inst, cd)` (Puppets).
 
 ## Abwurf-Kosten: kein Ja/Nein-Vorspann (v718, Als Vorgabe 4.9. — STANDARD)
 

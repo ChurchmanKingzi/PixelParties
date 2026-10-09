@@ -360,7 +360,8 @@ module.exports = {
           engine._broadcastEvent('play_zone_animation', {
             type: 'bloody_cut', owner: zielOwner, heroIdx: zielHeroIdx, zoneSlot: -1,
           });
-          await engine.actionDealDamage(quelle, opfer, SCHADEN, 'hero');
+          // „the corresponding Heroes": die Zone der Karte legt das Ziel fest (Als Ruling 9.10.).
+          await engine.actionDealDamage(quelle, opfer, SCHADEN, 'hero', { festesZiel: true });
         }
 
         // ── ④ Rha'Bi bekommt SOFORT seine 100 ────────────────────────

@@ -58,7 +58,7 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if ((inst.controller ?? inst.owner) !== oppIdx) continue;
         if (inst.faceDown) continue;
-        if (!hasCardType(cardDB[inst.name], 'Creature')) continue;
+        { const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name]; if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue; }   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (inst.counters?.frozen) continue;
         if (typeof engine.canApplyCreatureStatus === 'function'
             && !engine.canApplyCreatureStatus(inst, 'frozen', { name: 'Snow Cannon' })) continue;

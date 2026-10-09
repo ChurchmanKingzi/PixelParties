@@ -14,6 +14,8 @@ const SPELL_SCHOOL_ABILITY_NAMES = new Set([
   'Destruction Magic', 'Decay Magic', 'Magic Arts', 'Support Magic', 'Summoning Magic',
 ]);
 
+const { hasCardType, isPileCreature } = require('./_hooks');
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -76,7 +78,7 @@ module.exports = {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd) continue;
-      if (cd.cardType !== 'Spell' && cd.cardType !== 'Creature') continue;
+      if (!hasCardType(cd, 'Spell') && !isPileCreature(cd)) continue;   // Deck-Suche: Artifact Creatures zaehlen als Creature (Als Ruling 9.10.)
       seen.add(cardName);
       galleryCards.push({ name: cardName, source: 'deck' });
     }

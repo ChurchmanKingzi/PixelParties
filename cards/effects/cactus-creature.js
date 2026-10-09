@@ -76,11 +76,11 @@ module.exports = {
       for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
-        const cd = cardDB[slot[0]];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
         const inst = engine.cardInstances.find(c =>
           c.owner === ownerIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
+        const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];   // wirksame Daten (Als Sweep 9.10.)
+        if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
         if (inst?.counters?.[sName]) {
           if (sName === 'poisoned' && newStacks > (inst.counters.poisonStacks || 1)) return true;
         } else {
@@ -123,10 +123,10 @@ module.exports = {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;
           const cn = slot[0];
-          const cd = cardDB[cn];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
           const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si);
           if (!inst || inst.faceDown) continue;
+          const cd = engine.getEffectiveCardData(inst) || cardDB[cn];   // wirksame Daten (Als Sweep 9.10.)
+          if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
           const creatureStatuses = negStatuses.filter(s => inst.counters?.[s]);
           if (creatureStatuses.length > 0) {
             sources.push({ id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: cn, cardInstance: inst, statuses: creatureStatuses, isHero: false });
@@ -164,10 +164,10 @@ module.exports = {
           const slot = (ps.supportZones[hi] || [])[si] || [];
           if (slot.length === 0) continue;
           const cn = slot[0];
-          const cd = cardDB[cn];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
           const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si);
           if (!inst || inst.faceDown) continue;
+          const cd = engine.getEffectiveCardData(inst) || cardDB[cn];   // wirksame Daten (Als Sweep 9.10.)
+          if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
           if (!src.isHero && src.heroIdx === hi && src.slotIdx === si) continue; // Exclude source
           const canReceiveC = src.statuses.some(s => !inst.counters?.[s] || (s === 'poisoned'));
           if (canReceiveC) {
@@ -272,11 +272,11 @@ module.exports = {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) continue;
         const cardName = slot[0];
-        const cd = cardDB[cardName];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
+        const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[cardName];   // wirksame Daten (Als Sweep 9.10.)
+        if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
         if (inst?.faceDown) continue; // Face-down surprises are not targetable
         // Check if creature already has this status
         if (inst?.counters?.[statusName]) {

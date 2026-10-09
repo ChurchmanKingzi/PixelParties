@@ -36,7 +36,7 @@
 //  Forceful Revival's pattern).
 // ═══════════════════════════════════════════
 
-const { isSummonablePileCreature, hasCardType, baseCardName } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 function getOwnControlledCreatureInsts(engine, pi) {
@@ -52,6 +52,7 @@ function getOwnControlledCreatureInsts(engine, pi) {
     if (inst.faceDown) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (isArtifactCreature(cd)) continue;   // „same or lower level": kein Level (Als Ruling 9.10.)
     out.push(inst);
   }
   return out;
