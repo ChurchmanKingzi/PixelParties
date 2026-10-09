@@ -30,10 +30,29 @@ const CARD_NAME = 'Slippery Whoolmoth';
 const HIT_DAMAGE = 120;
 
 /**
+ * Liegt in dieser Support Zone eine Creature?
+ *
+ * Gelesen werden die EFFEKTIVEN Kartendaten der Instanz, nicht der rohe
+ * Datenbankeintrag unter `slot[0]`: ein Biomancy-Token steht in der Zone
+ * unter dem NAMEN SEINER POTION und ist nur ueber
+ * `counters._cardDataOverride` (cardType 'Creature/Token') eine Creature.
+ * Wer `cardDB[slot[0]]` fragt, sieht eine Potion und uebergeht jeden
+ * Token — Whoolmoths Rabatt griff dadurch nie, wenn ein Held nur einen
+ * Token als Creature hatte (und Monster in a Bottle blieb gesperrt).
+ */
+function slotHoldsCreature(engine, cardDB, ownerIdx, heroIdx, slotIdx, slot) {
+  const inst = engine.cardInstances?.find(c =>
+    c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === slotIdx
+    && (c.owner === ownerIdx || c.controller === ownerIdx));
+  const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
+  return !!cd && hasCardType(cd, 'Creature');
+}
+
+/**
  * True iff every ALIVE Hero of `ownerIdx` has at least one Creature
- * (any owner) in their Support Zones. Dead / missing Hero slots are
- * skipped — they can't logically "have a Creature" in a meaningful
- * sense, and gating on them would otherwise lock the discount
+ * (any owner, Tokens included) in their Support Zones. Dead / missing
+ * Hero slots are skipped — they can't logically "have a Creature" in a
+ * meaningful sense, and gating on them would otherwise lock the discount
  * permanently after a Hero dies.
  */
 function eachAliveHeroHasCreature(engine, ownerIdx) {
@@ -47,10 +66,10 @@ function eachAliveHeroHasCreature(engine, ownerIdx) {
     anyAlive = true;
     const zones = ps.supportZones?.[hi] || [];
     let hasCreature = false;
-    for (const slot of zones) {
+    for (let si = 0; si < zones.length; si++) {
+      const slot = zones[si];
       if (!slot || slot.length === 0) continue;
-      const cd = cardDB[slot[0]];
-      if (cd && hasCardType(cd, 'Creature')) { hasCreature = true; break; }
+      if (slotHoldsCreature(engine, cardDB, ownerIdx, hi, si, slot)) { hasCreature = true; break; }
     }
     if (!hasCreature) return false;
   }
@@ -107,8 +126,7 @@ module.exports = {
       for (let si = 0; si < (oppPs?.supportZones?.[heroIdx] || []).length; si++) {
         const slot = (oppPs.supportZones[heroIdx] || [])[si] || [];
         if (slot.length === 0) continue;
-        const cd = cardDB[slot[0]];
-        if (cd && hasCardType(cd, 'Creature')) { hasOppCreature = true; break; }
+        if (slotHoldsCreature(engine, cardDB, oppIdx, heroIdx, si, slot)) { hasOppCreature = true; break; }
       }
       if (!hasAliveOppHero && !hasOppCreature) return;
 
