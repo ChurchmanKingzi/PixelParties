@@ -3711,6 +3711,13 @@ let SKINS_DATA = {};
 try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skins.json'), 'utf-8')); } catch {}
 // `unlockable`: Skins, die nicht im Shop stehen, sondern ueber Ereignisse freigeschaltet werden (cards/skins/unlockable/).
 app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA, unlockable: [...unlockableSkinNames()] }));
+// Fingerabdruck der Dateien, aus denen der Browser Karten zeichnet (render-version.js). Der Browser hebt gezeichnete
+// Karten dauerhaft auf (IndexedDB) und verwirft sie, sobald sich dieser Wert aendert — Updates gelten sofort.
+const { renderVersion } = require('./render-version');
+app.get('/api/render-version', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  try { res.json({ v: renderVersion(__dirname) }); } catch (e) { res.status(500).json({ error: 'render-version' }); }
+});
 
 // ===== HELDEN-IDLE-ANIMATIONEN =====
 // ★ v1450: Verzeichnis der Spritesheets in `data/hero-animations/`
