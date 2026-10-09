@@ -8537,7 +8537,7 @@ function TextBox() {
  * aktualisiert ihn weiter, ein `textContent` haette ihn ersetzt. Der Selektor
  * trifft auch den Highlight-Klon im Overlay, der sonst den alten Wert zeigte.
  */
-function zaehleAtkHoch(heldSelektor, von, nach, dauer) {
+function zaehleAtkHoch(heldSelektor, von, nach, dauer, wow) {
   const t0 = performance.now();
   const schritt = () => {
     const t = Math.min(1, (performance.now() - t0) / dauer);
@@ -8547,9 +8547,89 @@ function zaehleAtkHoch(heldSelektor, von, nach, dauer) {
       if (tn && tn.nodeType === 3) tn.nodeValue = String(wert);
       el.classList.toggle('atk-zaehlt', t < 1);
     });
+    if (wow) { if (t < 1) wow.tick(wert); else wow.ende(wert); }
     if (t < 1) requestAnimationFrame(schritt);
   };
   requestAnimationFrame(schritt);
+}
+
+/**
+ * Grosser „ATK"-Zaehler ueber dem Helden, waehrend sein Angriffswert hochzaehlt
+ * (Tester/Als Vorgabe: Antonias Boost auf 9999 soll man auf KEINEN Fall verpassen).
+ * Die kleine Zahl auf der Karte reicht dafuer nicht: ein grosser Zaehler schwebt
+ * ueber dem Helden, beim Start schiessen Ringe und Funken heraus, beim Erreichen
+ * von 9999 gibt es einen Blitz ueber den ganzen Schirm, einen Knall und Funken.
+ * Alles liegt im Overlay ueber der Textbox (z-index 90500), ohne Zeigerereignisse.
+ * Liefert `{ tick(wert), ende(wert) }` oder null (Animationen aus / Held fehlt).
+ */
+function atkWowStart(heldSelektor) {
+  if (window._playAnimations === false) return null;
+  const zone = document.querySelector(heldSelektor);
+  if (!zone) return null;
+  const r = zone.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const wurzel = document.createElement('div');
+  wurzel.className = 'atk-wow';
+  wurzel.style.left = cx + 'px';
+  wurzel.style.top = cy + 'px';
+  const schrift = Math.max(30, Math.min(58, r.width * 0.8));
+  const zahl = document.createElement('div');
+  zahl.className = 'atk-wow-zahl';
+  zahl.style.fontSize = schrift + 'px';
+  zahl.style.top = (-(r.height / 2) - 6) + 'px';
+  zahl.innerHTML = '<span class="atk-wow-label">ATK</span><span class="atk-wow-wert">0</span>';
+  wurzel.appendChild(zahl);
+  document.body.appendChild(wurzel);
+  const wertEl = zahl.querySelector('.atk-wow-wert');
+  const FARBEN = ['#ffd34d', '#ff9a00', '#ff5a1f', '#ffffff', '#ffe9a0'];
+  const ring = (verzoegerung, groesse) => {
+    const e = document.createElement('div');
+    e.className = 'atk-wow-ring';
+    e.style.animationDelay = verzoegerung + 'ms';
+    e.style.setProperty('--ring-groesse', groesse + 'px');
+    wurzel.appendChild(e);
+  };
+  const funken = (anzahl, weit) => {
+    for (let i = 0; i < anzahl; i++) {
+      const e = document.createElement('div');
+      e.className = 'atk-wow-funke';
+      const w = Math.random() * Math.PI * 2, d = weit * (0.45 + Math.random() * 0.55);
+      e.style.setProperty('--c', FARBEN[i % FARBEN.length]);
+      e.style.setProperty('--dx', Math.cos(w) * d + 'px');
+      e.style.setProperty('--dy', Math.sin(w) * d + 'px');
+      e.style.animationDelay = Math.round(Math.random() * 120) + 'ms';
+      wurzel.appendChild(e);
+    }
+  };
+  const blitz = (stark) => {
+    const b = document.createElement('div');
+    b.className = 'atk-wow-blitz' + (stark ? ' atk-wow-blitz-stark' : '');
+    document.body.appendChild(b);
+    setTimeout(() => b.remove(), 1100);
+  };
+  ring(0, 300); ring(180, 380); ring(360, 460);
+  funken(28, 220);
+  blitz(false);
+  let fertig = false;
+  return {
+    tick(wert) { if (!fertig) wertEl.textContent = String(wert); },
+    ende(wert) {
+      if (fertig) return;
+      fertig = true;
+      wertEl.textContent = String(wert);
+      wurzel.classList.add('atk-wow-fertig');
+      ring(0, 420); ring(140, 560);
+      funken(40, 300);
+      blitz(true);
+      if (window.playSFX) {
+        window.playSFX('critical_strike', { volume: 0.9, dedupe: 0 });
+        window.playSFX('heavy_impact', { volume: 0.6, dedupe: 0, delay: 40 });
+      }
+      // Kurz stehen lassen, dann ausblenden und aufraeumen.
+      setTimeout(() => wurzel.classList.add('atk-wow-aus'), 2100);
+      setTimeout(() => wurzel.remove(), 2700);
+    },
+  };
 }
 
 /** Tutorial 3: Antonias „Gefallen" — Willy bekommt 9999 ATK (Server), die
@@ -8558,8 +8638,9 @@ function tutorial3WillyBoost() {
   const sel = '[data-hero-owner="me"][data-hero-name*="Willy"]';
   const el = document.querySelector(sel + ' .board-card-atk-num');
   const von = el ? (parseInt(el.textContent, 10) || 0) : 0;
+  const wow = atkWowStart(sel);
   socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
-  zaehleAtkHoch(sel, von, 9999, 1600);
+  zaehleAtkHoch(sel, von, 9999, 1600, wow);
 }
 
 const TUTORIAL_SCRIPTS = {
