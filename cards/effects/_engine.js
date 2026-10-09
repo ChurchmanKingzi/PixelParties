@@ -27355,6 +27355,55 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
   }
 
+
+  /**
+   * `untargetable` / `invisible` am Flaschenhals (Als Ruling 9.10.).
+   *
+   * „Cannot be chosen" (Butterfly Cloud, Perfect Disguise, Golden Wings der
+   * Helden, Invisibility) galt bisher NUR in `promptDamageTarget` und
+   * `promptMultiTarget`. Jede Karte, die ihre Heldenliste selbst baut und
+   * direkt an `promptEffectTarget` reicht, bot den geschuetzten Helden
+   * weiter an — dieselbe Luecke, die v919 fuer `blocksTargeting` schloss.
+   *
+   * Gleiche Regel wie dort: je Seite (Kontrolleur) zaehlt ein Held als
+   * geschuetzt, solange es auf dieser Seite einen NICHT geschuetzten gibt,
+   * den die Quelle auch anbietet; sind alle geschuetzt, bricht der Schutz
+   * zusammen. Die eigene Seite des Waehlers wird nie gefiltert; Chuck
+   * (`ignoresOppUntargetable`) hebt den Schutz seiner Seite auf.
+   * Markiert wird erst vom Aufrufer (`ineligible`), nicht hier.
+   *
+   * @returns {Set<string>} Ids der Ziele, die nicht gewaehlt werden duerfen
+   */
+  _untargetableHeroIds(validTargets, pi) {
+    const gs = this.gs;
+    const ids = new Set();
+    const byOwner = {};
+    for (const t of validTargets) {
+      if (!t || t.type !== 'hero' || t.ineligible) continue;
+      const k = this.zielSeite(t, t.owner);
+      (byOwner[k] || (byOwner[k] = [])).push(t);
+    }
+    const tagged = (t) => {
+      const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+      return !!h?.statuses?.untargetable || !!h?.statuses?.invisible;
+    };
+    for (const [ownerStr, group] of Object.entries(byOwner)) {
+      const owner = parseInt(ownerStr);
+      if (owner === pi) continue;
+      let chuckActive = false;
+      for (const { hero: h, physOwner, heroIdx: hi } of this.heroesControlledBy(owner)) {
+        if (!h?.name || h.hp <= 0) continue;
+        if (h.statuses?.frozen || (h.statuses?.stunned || h.statuses?.webbed) || h.statuses?.negated) continue;
+        if (this._isHeroMummified?.(physOwner, hi)) continue;
+        if (this.heroScript(h)?.ignoresOppUntargetable) { chuckActive = true; break; }
+      }
+      if (chuckActive) continue;
+      if (!group.some(t => !tagged(t))) continue;   // alle geschuetzt: Schutz bricht zusammen
+      for (const t of group) if (tagged(t)) ids.add(t.id);
+    }
+    return ids;
+  }
+
   /** Welche Bilder hat die laufende Aufloesung schon gesendet? { zone:Set<Typ>, proj:bool } */
   _schonGezeigt() {
     const jetzt = Date.now();
@@ -27509,8 +27558,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // sofort `ineligible`, saehe das naechste es in der Liste als
       // „schon gesperrt" und das Ergebnis haenge von der Reihenfolge ab.
       const _geblockt = [];
+      // `untargetable` / `invisible` (Status) — s. `_untargetableHeroIds`.
+      const _statusGeschuetzt = this._untargetableHeroIds(validTargets, playerIdx);
       for (const t of validTargets) {
         if (!t || t.type !== 'hero' || t.ineligible) continue;
+        if (_statusGeschuetzt.has(t.id)) { _geblockt.push(t); continue; }
         if (this.heroBlocksTargeting(t.owner, t.heroIdx, {
           sourceData: _srcData,
           cardName: _quelle,

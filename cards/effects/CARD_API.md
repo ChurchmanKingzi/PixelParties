@@ -232,6 +232,14 @@ zählen nur Helden/Creatures als Ausweichziel, die die Quelle auch anbietet
 `promptEffectTarget`. Der Dispatcher wertet erst die ganze Liste aus und
 markiert danach (`ineligible`): würde jedes Ziel sofort markiert, sähe das
 nächste es als „schon gesperrt" und das Ergebnis hinge von der Reihenfolge ab.
+**`untargetable` / `invisible` gelten an allen drei Zielwählern** (Als Ruling
+9.10.): bis dahin nur in `promptDamageTarget` und `promptMultiTarget` — eine
+Karte, die ihre Heldenliste selbst baut und an `promptEffectTarget` reicht,
+konnte einen Butterfly-Cloud- oder Invisibility-Helden wählen. Der Dispatcher
+fragt jetzt `engine._untargetableHeroIds(validTargets, pi)`: je Seite gilt
+ein Held als geschützt, solange die Quelle einen ungeschützten derselben Seite
+anbietet; bietet sie nur den geschützten an, oder sind alle geschützt, bricht
+der Schutz zusammen (Chuck hebt ihn für seine Seite auf).
 
 **Liegt die regelgebende Karte nicht mehr auf dem Brett** (eine
 Reaction, die sich selbst löscht), hängt sie ihre Regel an den Helden:
