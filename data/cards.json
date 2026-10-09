@@ -11069,7 +11069,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target and deal damage equal to the attacker's Attack stat to it. The target's controller cannot use any Artifacts from their hand during their next turn. A player can only be affected by this effect every other turn. Does not apply on Turn 1.",
+    "effect": "Choose a target and deal damage equal to the attacker's Attack stat to it. The target's controller must delete a card from their hand whenever they play an Artifact during their next turn. A player can only be affected by this effect every other turn.",
     "archetype": "",
     "setID": "PP SOD",
     "banned": "",
