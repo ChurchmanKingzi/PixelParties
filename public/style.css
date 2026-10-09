@@ -25747,8 +25747,8 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
      --takt    Zeit, die ein Band fuer eine Kachel braucht = ein Band kreuzt jeden Punkt alle `--takt`
    Geschwindigkeit = --kachel / --takt (Feldbreiten je Sekunde). Das Element ist (1,4 + --kachel) Feldbreiten breit (Platz
    fuer Schraege und Verschiebung); der Grundzustand ist unsichtbar (`opacity: 0`), damit ohne Animation (Lite, „Play
-   Animations: aus") kein Streifenmuster auf dem Bild steht. Verlauf: Bild alle 2 s ein Band (erste Fassung), dann
-   0,7 s (zu hektisch), jetzt 1,2 s mit grossem Abstand und ruhigerem Gleiten. */
+   Animations: aus") kein Streifenmuster auf dem Bild steht. Verlauf Bild: alle 2 s ein Band (erste Fassung), dann 0,7 s
+   und 1,2 s (beides zu hektisch), jetzt 1,8 s bei Abstand 1,0 und ruhigem Gleiten (0,56 Feldbreiten je Sekunde). */
 .skin-holo-glint i, .skin-holo-name .sh-gl, .skin-holo-rim i {
   --breite: calc(1.4 + var(--kachel));
   position: absolute; top: 0; bottom: 0; left: -20%; width: calc(var(--breite) * 100%);
@@ -25758,9 +25758,11 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   animation-delay: var(--sh-phase, 0s);
   will-change: transform;
 }
+/* Richtung: von OBEN-LINKS nach UNTEN-RECHTS. Die Streifen stehen als „/" (`skewX(-20deg)`); verschiebt sich das Muster nach
+   rechts, wandert jedes Band senkrecht zu seiner Linie nach unten-rechts. Darum von -Kachel nach 0 (nicht umgekehrt). */
 @keyframes skinHoloBand {
-  from { opacity: 1; transform: skewX(-20deg) translateX(0); }
-  to   { opacity: 1; transform: skewX(-20deg) translateX(calc(var(--kachel) / (1.4 + var(--kachel)) * -100%)); }
+  from { opacity: 1; transform: skewX(-20deg) translateX(calc(var(--kachel) / (1.4 + var(--kachel)) * -100%)); }
+  to   { opacity: 1; transform: skewX(-20deg) translateX(0); }
 }
 .skin-holo-glint {
   position: absolute; inset: 0;
@@ -25768,7 +25770,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
 }
 .skin-holo-glint i {
-  --kachel: .75; --takt: 1.2s;
+  --kachel: 1; --takt: 1.8s;
   background-image: linear-gradient(90deg, transparent 0, rgba(255,255,255,.35) 38%, #fff 50%, rgba(255,255,255,.35) 62%, transparent 100%);
 }
 
@@ -25787,9 +25789,9 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   will-change: transform;
 }
 @keyframes skinHoloNameRb { 0% { transform: translateX(0); } 100% { transform: translateX(-66.667%); } }
-/* Namensglanz: Streifenmuster wie oben (Kachel 0,6 Namensbreiten, ein Band kreuzt jeden Punkt alle 1 s). */
+/* Namensglanz: Streifenmuster wie oben (Kachel 0,8 Namensbreiten, ein Band kreuzt jeden Punkt alle 1,5 s). */
 .skin-holo-name .sh-gl {
-  --kachel: .6; --takt: 1s;
+  --kachel: .8; --takt: 1.5s;
   background-image: linear-gradient(90deg, transparent 0, rgba(255,255,255,.9) 50%, transparent 100%);
 }
 /* Diamond Rare: tuerkis statt gold (der Name selbst ist es schon, `C.diamond`). */
@@ -25810,9 +25812,9 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   -webkit-mask-image: var(--sh-rim); mask-image: var(--sh-rim);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
 }
-/* Streifenmuster wie oben (Kachel 0,9 Kartenbreiten, ein Band kreuzt jeden Punkt alle 1,5 s); die Maske beschneidet auf den Rahmen. */
+/* Streifenmuster wie oben (Kachel 1,2 Kartenbreiten, ein Band kreuzt jeden Punkt alle 2,4 s); die Maske beschneidet auf den Rahmen. */
 .skin-holo-rim i {
-  --kachel: .9; --takt: 1.5s;
+  --kachel: 1.2; --takt: 2.4s;
   background-image: linear-gradient(90deg, transparent 0, rgba(var(--rim-rgb), .55) 36%, rgb(var(--rim-hi)) 50%, rgba(var(--rim-rgb), .55) 64%, transparent 100%);
 }
 
