@@ -4790,6 +4790,12 @@ const DIAMOND_SPARKLE_POSITIONS = [
 // jedes mit rund dreimal so langem Takt. Das gleicht die neuen Effekte aus und spart je Karte drei Ebenen.
 const FOIL_BAND_COUNT = 2;
 const FOIL_DIAMOND_BAND_COUNT = 1;
+// ★ DIAGONALGLANZ AUS. Der urspruengliche Lichtstreifen, der diagonal ueber die GANZE Foil-Karte laeuft (`.foil-band`), wird
+// nicht mehr angewendet: die neuen Schichten (Schraffur, Glanzband auf dem Bild, Rahmen- und Namensglanz) sind schoener,
+// und jedes Band war eine eigene animierte Ebene mit Blend-Modus je Karte — Leistung, die der alte Effekt nicht mehr
+// verdient. Code, Paletten und CSS bleiben unveraendert stehen; `true` schaltet den Effekt wieder ein (Takt und
+// Bandzahl: siehe oben und makeFoilBands). Funken, Staub, Schimmer und Rahmen-Ringe der Foil-Karten sind davon nicht betroffen.
+const FOIL_DIAGONALGLANZ = false;
 const FOIL_MOTE_COUNT = 6;
 
 /**
@@ -4800,6 +4806,7 @@ const FOIL_MOTE_COUNT = 6;
  * Baender bekommt, ist neu (vorher nur Schimmer und Funken).
  */
 function makeFoilBands(isDiamond) {
+  if (!FOIL_DIAGONALGLANZ) return [];   // abgestellt, siehe FOIL_DIAGONALGLANZ
   const palette = isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS;
   const anzahl = isDiamond ? FOIL_DIAMOND_BAND_COUNT : FOIL_BAND_COUNT;
   return Array.from({ length: anzahl }, (_, i) => {
