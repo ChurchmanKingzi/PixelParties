@@ -49341,7 +49341,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose a Player'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {(Array.isArray(ep.allowedPlayers) && ep.allowedPlayers.length ? ep.allowedPlayers : gameState.players.map((_, i) => i)).map(pIdx => {
+            {(Array.isArray(ep.allowedPlayers) && ep.allowedPlayers.length ? ep.allowedPlayers : gameState.players.map((_, i) => i))
+              // `opponentFirst`: die Gegner zuerst, man selbst zuletzt (Divine Gift of Fire)
+              .slice().sort((a, b) => (ep.opponentFirst ? (a === myIdx) - (b === myIdx) : 0))
+              .map(pIdx => {
               const p = pIdx === myIdx ? me : (gameState.players[pIdx] || opp);
               const isMe = pIdx === myIdx;
               const clr = isMe ? 'var(--success)' : 'var(--danger)';
