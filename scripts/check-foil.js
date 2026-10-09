@@ -36,8 +36,9 @@ const PUBLIC = path.join(WURZEL, 'public');
 // verweisen darauf) — er wird nicht ausgeliefert und nicht geprüft.
 const TOT = new Set(['app.jsx']);
 
-// `<FoilOverlay>` (Foil der Seltenheit) und `<SkinHolo>` (Foil der Skin-Karten) haengen beide NUR an CardFoil.
-const ROHTEILE = ['FoilOverlay', 'SkinHolo'];
+// `<FoilOverlay>` (Foil der Seltenheit), `<SkinHolo>` (Foil der Skin-Karten) und `<FoilName>` (Namensglanz der
+// Super-/Diamond-Rare-Karten) haengen alle NUR an CardFoil.
+const ROHTEILE = ['FoilOverlay', 'SkinHolo', 'FoilName'];
 let funde = 0;
 const anschluesse = Object.fromEntries(ROHTEILE.map(n => [n, 0]));
 
@@ -71,4 +72,4 @@ for (const teil of ROHTEILE) {
     process.exit(1);
   }
 }
-console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil), auch für Skin-Holo.');
+console.log('[check-foil] OK — die Foil-Schicht hat genau eine Anschlussstelle (CardFoil), auch für Skin-Holo und Namensglanz.');
