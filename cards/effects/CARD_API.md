@@ -2203,6 +2203,34 @@ cpuMeta: {
   // two passes: non-deferred cards first, deferred cards only when
   // the first pass finds nothing.
   cpuDeferUntilLast: true,
+
+  // HARTE Deck-Regel der CPU: „spiele mich jetzt" — keine Bewertung, sondern
+  // eine Vorgabe des Deck-Designs (Beispiele: Damus' Platzierung jede Runde,
+  // Armageddon bei Auslöschung der Gegnerseite). Rückgabe: true | Zahl > 0
+  // (Rangfolge unter mehreren erzwungenen Karten, größer = früher; true = 1)
+  // | falsy (keine Vorgabe → die CPU entscheidet wie sonst). Gelesen für
+  //   • Spells/Attacks/Creatures in der Action Phase: der Kandidat rückt vor
+  //     das MCTS-Ranking, die Aufstiegs-Kandidaten und die ε-Exploration,
+  //   • Zusatzaktionen (`fireAdditionalActions`): wirkt wie `alwaysCommit`,
+  //   • Helden-Effekte (Skript des Helden UND seine gewonnenen Effekte):
+  //     Gate und Recon entfallen.
+  // `forcePlay` darf `async` sein (der Pilot `await`et). Für Entscheidungen, die von
+  // Schadensminderung & Co. abhängen, NICHT nachrechnen, sondern `helpers.dryRun(engine, async () => …)`
+  // benutzen: derselbe Sandkasten wie die MCTS-Rollouts (Snapshot → echte Engine-Pfade, z. B.
+  // `dealDamageToTargets` → Wiederherstellung). Verdecktes (gegnerische Hand, Surprises) vorher im
+  // Sandkasten leeren — die CPU rechnet nur ein, was sie sehen kann. Beispiel: armageddon.js
+  // (`vorschauSimuliert`). Scheitert der Lauf, liefert `dryRun` `undefined` → Rückfall auf Handrechnung.
+  // Nur im echten Zug, nie im MCTS-Rollout. Zahlen, die später gelernt werden
+  // sollen (Wahrscheinlichkeiten, Schwellen), NICHT hart einbauen, sondern über
+  // `require('./_deck-profile').ruleParam(engine, pi, '<karte>.<regel>', vorgabe)`
+  // lesen — das Profil des Decks ersetzt sie dann über `ruleParams`.
+  // Bewusst nicht `alwaysCommit` wiederverwendet: das tragen ~40 Karten.
+  forcePlay(engine, pi, heroIdx, helpers) → true | number | falsy,
+
+  // Helden: Vorgabewert des Effekts für Pseudonias CPU-Entscheidung
+  // („welchen Gegner-Effekt aufnehmen?", `_hero-effect-seen-shared.js`).
+  // Ohne Angabe: aktiver Effekt 6, passiver 3; dazu +10 je gesehener Aktivierung.
+  effectWorth: <number>,
 }
 ```
 

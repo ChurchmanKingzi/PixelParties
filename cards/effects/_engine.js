@@ -40560,6 +40560,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._setPendingPlayLog('hero_effect_activated', {
       player: this.gs.players[pi].username, hero: hero.name, effect: chosen.name,
       actionCost: !!isActionCost,
+      pi,   // Sitz des Aktivierenden (Benutzername ist im Self-Play nicht eindeutig) — `_hero-effect-seen-shared`
     });
 
     // Hero-Effekt-Timing-Lernkanal: Aktivierungs-ENTSCHEIDUNG mit
@@ -48193,6 +48194,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // das actionLog bliebe dort leer. Rollouts zählen nicht (`_inMctsSim`).
     if (type === 'spell_played' || type === 'creature_summoned' || type === 'ability_activated') {
       require('./_ability-worth-shared').noteUsage(this, type, data);
+    } else if (type === 'hero_effect_activated') {
+      // Gesehene Gegner-Effekte (Pseudonia-Regel der CPU), aus demselben Grund VOR dem Fast-Mode-Ausstieg.
+      require('./_hero-effect-seen-shared').note(this, type, data);
     }
     if (this._fastMode) return; // Skip logging during simulations — huge perf win.
     const entry = { id: ++this.eventId, type, turn: this.gs.turn, phase: PHASE_NAMES[this.gs.currentPhase || 0], ...data };

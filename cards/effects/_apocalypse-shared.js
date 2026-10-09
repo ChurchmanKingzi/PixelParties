@@ -82,7 +82,41 @@ function damusEffektWirkt(engine, pi, hi) {
   return !engine._isHeroEffectSilenced(pi, hi);
 }
 
+/**
+ * ★ CPU-Deck-Regel (Al): „Spielt die CPU Damus, beschwoert sie JEDE Runde
+ * mindestens eine Ifrit." — ist diese Pflicht in diesem Zug schon erfuellt?
+ * Eine Ifrit, die in DIESEM Zug aufs Brett kam (Damus' Platzierung ODER
+ * eine normale Beschwoerung), erfuellt sie; `turnPlayed` stempelt die Engine
+ * bei jedem Betreten der Support Zone.
+ */
+function ifritDiesenZugAufsBrett(engine, pi) {
+  const zug = engine.gs?.turn || 0;
+  return ifritsOf(engine, pi).some(i => i.turnPlayed === zug);
+}
+
+/**
+ * Steht Damus' Platzierung fuer `pi` in diesem Zug noch offen UND ist sie
+ * ausfuehrbar (Ifrit auf der Hand, freie Zone, Effekt nicht schon benutzt)?
+ * Damus selbst oder ein Erbe seines Effekts (Pseudonia): die Sperre haengt am
+ * Kartennamen und am Spieler (`engine.heroHoptKey`), nicht am Traeger.
+ */
+function damusPlatzierungOffen(engine, pi) {
+  const gs = engine.gs;
+  const ps = gs?.players?.[pi];
+  if (!(ps?.hand || []).includes(IFRIT)) return false;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hatDamusEffekt(hero) || hero.hp <= 0) continue;     // Damus selbst ODER Erbe des Effekts
+    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+    if (engine._isHeroEffectSilenced(pi, hi)) continue;
+    if (gs.hoptUsed?.[engine.heroHoptKey(DAMUS, pi)] === gs.turn) continue;
+    if (engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true }).length > 0) return true;
+  }
+  return false;
+}
+
 module.exports = {
   IFRIT, ARMAGEDDON, DAMUS,
   ifritsOf, damusActive, damusEffektWirkt, hatDamusEffekt, isArmageddon, sourceSide,
+  ifritDiesenZugAufsBrett, damusPlatzierungOffen,
 };

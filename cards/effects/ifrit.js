@@ -30,7 +30,7 @@
 //  Schadenszugang nach dem Namen der Quelle.
 // ═══════════════════════════════════════════
 
-const { ARMAGEDDON } = require('./_apocalypse-shared');
+const { ARMAGEDDON, damusActive, ifritDiesenZugAufsBrett } = require('./_apocalypse-shared');
 
 const CARD_NAME = 'Ifrit';
 
@@ -46,4 +46,26 @@ module.exports = {
 
   // ② Jede Ifrit erhoeht den Armageddon-Schaden um 100, egal wessen.
   armageddonBonus: 100,
+
+  /**
+   * ★ CPU-Deck-Regel (Al): „Wenn die CPU den Hero Damus spielt, soll sie
+   * jede Runde mindestens einen Ifrit beschwoeren."
+   *
+   * Der Normalfall ist Damus' freie Platzierung (damus-the-prophet-of-
+   * apocalypse.js, laeuft in der Main Phase VOR der Action Phase). Diese
+   * Karte ist der RUECKFALL: lebt Damus, kann seinen Effekt aber in diesem
+   * Zug nicht nutzen (betaeubt, eingefroren, negiert, Sperre belegt) und ist
+   * noch keine Ifrit aufs Brett gekommen, wird sie als normale Beschwoerung
+   * an die Spitze der Action Phase gezogen. Ist die Pflicht schon erfuellt,
+   * entscheidet die CPU wie sonst — mehr als EINE ist nicht verlangt.
+   *
+   * Rang 1: Armageddon-Entscheidungen (Rang 2/3) gehen vor, sie beenden den
+   * Zug bzw. das Spiel.
+   */
+  cpuMeta: {
+    forcePlay(engine, pi) {
+      if (!damusActive(engine, pi)) return false;
+      return !ifritDiesenZugAufsBrett(engine, pi);
+    },
+  },
 };

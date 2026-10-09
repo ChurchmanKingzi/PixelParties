@@ -1085,6 +1085,75 @@ aktuellen Build (mit Castability-Gate) einfach WIEDERHOLEN — gleiches
 Profil, kein Neutraining. Erwartung: deutliche Erholung; das Ergebnis
 landet automatisch im Profil und hebt bzw. bestätigt die Quarantäne.
 
+## Harte Deck-Regeln der CPU: `cpuMeta.forcePlay` (Apocalypse-Deck)
+
+Für das Structure Deck um **Damus / Pseudonia** gelten drei Vorgaben des Deck-Designs. Sie sind KEINE gelernten Werte,
+sondern harte Regeln im Kartenskript (Architektur-Regel: kein Kartenname im Piloten). Der Pilot kennt nur den Vertrag
+`cpuMeta.forcePlay(engine, pi, heroIdx, helpers) → true | Rang > 0 | falsy` (Beschreibung in `CARD_API.md`) und ruft ihn
+an drei Stellen:
+
+| Stelle in `_cpu.js` | Wirkung |
+|---|---|
+| `runActionPhase`, NACH Ranking, Aufstiegs-Vorrang und ε-Exploration | erzwungene Kandidaten stehen vorn; untereinander gilt die Rangzahl, bei Gleichstand die MCTS-Ordnung. Die ε-Exploration kann die Regel im Training nicht brechen |
+| `fireAdditionalActions` | wirkt wie `alwaysCommit` (kein Wert-Gate) |
+| `activateHeroEffects` | `alwaysCommit` + `commitWithoutRecon`; geprüft wird das Heldenskript UND jeder gewonnene Effekt (`cpuForcePlayHero`), sonst liefe die Regel nicht für Pseudonia mit geerbtem Damus-Effekt |
+
+Im MCTS-Rollout ist der Vertrag aus (`_inMctsSim`): Kandidaten werden dort wie bisher bewertet, die Regel greift bei der
+echten Auswahl. Das Self-Play-Training ist kein Rollout — es spielt die Regeln mit. Das Log zeigt jede Erzwingung als
+`[forcePlay] Armageddon(Rang 3) per Deck-Regel an die Spitze`.
+
+**① Damus — „jede Runde mindestens eine Ifrit"** (`damus-…js`, `ifrit.js`, `_apocalypse-shared.js`).
+Damus' Platzierung ist ein freier Heldeneffekt; `forcePlay` umgeht das Gate. Das war nötig: im Test lehnte das Gate sie
+ab (`skip=-1503.9 best=-1501.9 threshold=3 → SKIP`, die Platzierung hat im Eval kaum Sofort-Ertrag). Rückfall: lebt Damus
+(oder ein Erbe seines Effekts), konnte aber in diesem Zug keine Ifrit legen (betäubt, eingefroren, negiert), rückt die
+Ifrit als normale Beschwörung vor (Rang 1) — solange in diesem Zug noch keine aufs Brett kam (`turnPlayed`). Ohne Ifrit auf
+der Hand oder ohne Caster für Summoning Magic Lv2 ist die Regel unerfüllbar; die CPU holt Ifrits NICHT gezielt (kein
+Tutor-Wert).
+
+**② Armageddon** (`armageddon.js`). Gesamtschaden = 50 + 100 je Ifrit auf dem Brett, beide Seiten gezählt.
+- **Auslöschung → IMMER (Rang 3):** jeder lebende Gegner-Held stirbt. Ob er stirbt, rechnet NICHT dieser Code, sondern
+  die Engine: die Vorschau führt den echten Schlag (`dealDamageToTargets`, dieselbe Zielliste wie `onPlay`,
+  `sammleZiele`) im Sandkasten der Suche aus (`helpers.dryRun` = `cpuDryRun` in `_cpu.js`: Snapshot,
+  `_inMctsSim`, Fast Mode, danach vollständige Wiederherstellung inkl. Schadenszähler) und liest die HP ab. So fließt jede
+  SICHTBARE Schadensänderung von selbst ein — Tempeste (−100 auf ihre anderen Helden, ihr eigener Schaden unreduzierbar),
+  Resistance & Co., Schilde, Status, Immunitäten, Todesaufschub. Geprüft mit der echten Engine
+  (`scripts/check-cpu-deck-rules.js`): 150 Schaden töten drei 140-HP-Helden, aber nicht, wenn einer Tempeste ist (die beiden
+  anderen nehmen nur 50).
+- **Zwei Schläge → fast immer (Rang 2):** `2 × (was wirklich ankommt) >= HP` des Gegner-Helden mit den meisten (aktuellen)
+  HP; „was ankommt" ist die vom Sandkasten gemessene Wirkung nach Minderung. Bei HP-Gleichstand müssen alle Betroffenen es
+  sein; ein Held, dem der Schlag gar nichts tut (gefeit), ist nie zu töten. Wahrscheinlichkeit 0,97, EIN Wurf je (Zug, Spieler), damit die Antwort über alle Abfragen eines
+  Zuges stabil bleibt. Steht Damus' Ifrit-Platzierung des Zuges noch aus, wartet die Regel (Armageddon beendet den Zug).
+- **Selbstmord-Schutz (nicht aus der Vorgabe, Entscheidung beim Bau):** beide Regeln gelten nicht, wenn der Schlag die CPU
+  verlieren ließe — alle eigenen Helden tot bei lebendem Gegner, oder Doppel-K.o. ohne MEHR Kreaturen (Gleichstand verliert
+  der Wirker). „IMMER" heißt hier „immer, wenn es die Gegnerseite auslöscht und die Partie nicht kostet".
+- **Nur Sichtbares (Vorgabe):** Im Sandkasten haben die Gegner weder Surprises noch Handkarten — die CPU rechnet keine
+  Reaktion ein, die sie nicht sehen kann (kein Hellsehen durch den Trockenlauf). Dafür kann ein verdeckter Konter den Cast
+  trotzdem kippen; das ist gewollt. Scheitert der Trockenlauf, rechnet `vorschauRechnung` von Hand (HP gegen Schaden,
+  Damus-Immunität, `isTargetImmune`) — dann OHNE Schadensminderung durch Karten. Ergebnis je Lage zwischengespeichert
+  (`lageSignatur`), ein Lauf je Wirker-Kandidat und Änderung des Bretts.
+
+**③ Pseudonia** (`pseudonia-…js`, `_hero-effect-seen-shared.js`). Die Aufnahme-Frage trägt jetzt `devour` (Kontext). CPU:
+eigener Held gefallen → IMMER aufnehmen; Gegner-Held gefallen → höchstens EINER pro Partie (`hero._pseudoniaFremd`).
+Die CPU kann nur nehmen oder warten, nicht wählen: sie nimmt den Gefallenen, wenn kein noch lebender Gegner-Held einen
+höheren Effektwert hat oder dieser mindestens 80 % des besten beträgt, sonst wartet sie auf einen besseren.
+*Effektwert* = Vorgabe (`cpuMeta.effectWorth`, sonst aktiv 6 / passiv 3) + 10 je GESEHENER Aktivierung des Effekts bei
+einer anderen Seite. Gezählt wird in `engine.log('hero_effect_activated')` (der Eintrag trägt jetzt `pi`), live und im
+Self-Play, nicht im Rollout. **Grenze:** passive Effekte feuern nicht als Aktivierung und bleiben bei ihrer Vorgabe; die
+Zahl misst gesehene NUTZUNG, nicht Wirkung.
+
+**Austausch durch gelernte Werte.** Die Zahlen lesen sich über `_deck-profile.ruleParam(engine, pi, key, vorgabe)`; steht
+im Profil des Decks `ruleParams[key]` (Zahl), gilt dieser Wert. Schlüssel: `armageddon.zweiHitWahrscheinlichkeit` (0,97),
+`pseudonia.warteSchwelle` (0,8), `pseudonia.aktivierungsWert` (10). Der Trainer erzeugt `ruleParams` noch nicht; das Profil
+muss den Wert (von Hand oder künftig vom Trainer) liefern. Ein Neutraining übernimmt vorhandene `ruleParams` aus der alten
+Profildatei (`train-deck-profile.js`), solange es selbst keine schreibt. Wie jedes Profil greift er nur, wenn Profile aktiv sind — in
+der Datensammlung (`PP_DISABLE_PROFILES` erzwungen) gelten die Vorgaben, was für unverfälschte Trainingsdaten gewollt ist.
+
+**Prüfen.** `node scripts/check-cpu-deck-rules.js` (gebaute Situationen: Auslöschung, Immunität, Selbstmord-Schutz,
+Wahrscheinlichkeit 0/1/0,97, Damus-Ifrit-Pflicht inkl. Erbe, Pseudonia-Entscheidungen). Live: Testdeck mit Damus,
+Pseudonia, Ida + Ifrit/Armageddon in `data/SampleDecks/` anlegen und mit `PP_TRAIN=1 PP_TRAIN_VERBOSE=1` spielen. Der
+Headless-Lauf braucht eine initialisierte Datenbank (sonst `no such table: users`): `PP_DB_PATH=<wegwerf.db>` und den Server
+einmal normal starten, damit das Schema entsteht.
+
 ## Bekannte Grenzen (ehrlich)
 
 - **Aufzeichnungs-Abdeckung** (Stand nach den Recorder-Fixes): Erfasst

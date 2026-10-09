@@ -35,6 +35,18 @@
 //    Ausloeser mit dem Original auf derselben Seite (pro SPIELER, nicht
 //    spielerübergreifend) — `engine.heroHoptKey` / `_hero-hopt-shared.js`.
 //
+//  ── CPU-Deck-Regel (Al) ──
+//  „Kopiere mit Pseudonia IMMER deine eigenen zwei Heroes, falls diese
+//  sterben, und EINEN Gegner-Hero im Verlauf des Spiels; welchen, soll von
+//  der im Laufe des Spiels gesehenen Wertigkeit seines Effekts abhaengen."
+//  Umgesetzt in `cpuResponse` (unten) auf die Aufnahme-Frage:
+//    • eigener Held gefallen → IMMER aufnehmen,
+//    • Gegner-Held gefallen  → hoechstens EINER pro Partie. Die CPU kann
+//      nicht waehlen, nur nehmen oder warten: sie nimmt den Gefallenen,
+//      wenn kein noch lebender Gegner-Held einen klar hoeheren Effektwert
+//      hat (`_hero-effect-seen-shared.seenValue`, Schwelle 0,8), sonst
+//      wartet sie auf einen besseren.
+//
 //  ── Anzeige ──
 //  Zaehler oben rechts auf der Heldenkarte (app-board.jsx, Muster der
 //  anderen Heldenzaehler): `hero._pseudoniaAbsorbiert` = Liste der
@@ -43,6 +55,14 @@
 
 const CARD_NAME = 'Pseudonia, the Skill Devourer';
 const MAX_AUFNAHMEN = 3;
+
+// CPU-Regel: so viele GEGNER-Helden darf die CPU in einer Partie aufnehmen
+// (die uebrigen Plaetze gehoeren den eigenen Helden), und ab welchem Anteil
+// des besten noch lebenden Gegner-Effekts sie nicht mehr auf einen besseren
+// wartet. Vorgaben; die Schwelle ersetzt das Profil unter
+// `ruleParams["pseudonia.warteSchwelle"]`.
+const MAX_GEGNER_AUFNAHMEN = 1;
+const WARTE_SCHWELLE = 0.8;
 
 /**
  * Spalte und Platz eines Heldenobjekts suchen.
@@ -106,6 +126,8 @@ async function verschlinge(engine, spalte, hi, fragender, eintrag) {
     confirmLabel: '🦷 Devour!',
     cancelLabel: 'No',
     cancellable: true,
+    // Kontext fuer die CPU-Entscheidung (`cpuResponse`); der Client ignoriert ihn.
+    devour: { effect: eintrag.name, deadPi: eintrag.pi, deadHi: eintrag.hi, spalte, hi, fragender },
   });
   if (!engine._confirmSaidYes(antwort)) return false;
   if (!bereit(engine, spalte, hi) || !aufnehmbar(selbst, eintrag.name)) return false;
@@ -125,6 +147,10 @@ async function verschlinge(engine, spalte, hi, fragender, eintrag) {
   const traeger = engine.grantHeroEffect(spalte, hi, eintrag.name);
   if (!traeger) return false;
   selbst._pseudoniaAbsorbiert = [...(selbst._pseudoniaAbsorbiert || []), eintrag.name];
+  // Wie viele davon stammen von GEGNER-Helden? (CPU-Regel: hoechstens einer)
+  if (eintrag.pi != null && eintrag.pi !== spalte) {
+    selbst._pseudoniaFremd = [...(selbst._pseudoniaFremd || []), eintrag.name];
+  }
   await engine.finishGainedHeroEffects(spalte, hi);
 
   engine.log('pseudonia_devour', {
@@ -152,6 +178,39 @@ async function arbeiteVormerkungenAb(ctx, opts = {}) {
   for (const eintrag of offen) {
     await verschlinge(engine, spalte, hi, ctx.cardOwner, eintrag);
   }
+}
+
+/**
+ * Soll die CPU den Effekt des gefallenen Helden aufnehmen?
+ * `d` = der Kontext aus `verschlinge` ({ effect, deadPi, deadHi, spalte, hi, fragender }).
+ */
+function cpuSollAufnehmen(engine, d) {
+  const selbst = engine.gs.players[d.spalte]?.heroes?.[d.hi];
+  if (!selbst) return true;
+  // Eigener Held: IMMER (er stirbt hoechstens einmal je Effekt, `aufnehmbar` sperrt Doppelte).
+  if (d.deadPi == null || d.deadPi === d.spalte) return true;
+  // Gegner-Held: der eine Gegner-Platz.
+  if ((selbst._pseudoniaFremd || []).length >= MAX_GEGNER_AUFNAHMEN) return false;
+  // Lebt noch ein Gegner-Held mit klar hoeherem Effektwert? Dann auf ihn warten —
+  // sonst ist dieser der Beste (oder gleichauf) bzw. der letzte seiner Seite.
+  const seen = require('./_hero-effect-seen-shared');
+  const mein = seen.seenValue(engine, d.fragender, d.effect);
+  let bester = -Infinity;
+  for (let p = 0; p < engine.gs.players.length; p++) {
+    if (p === d.spalte) continue;
+    (engine.gs.players[p]?.heroes || []).forEach((h, hi) => {
+      if (!h?.name || h.hp <= 0) return;
+      if (p === d.deadPi && hi === d.deadHi) return;           // der Gefallene selbst
+      const name = engine.heroEffectIdentity(p, hi);
+      if (!name || (selbst._pseudoniaAbsorbiert || []).includes(name)) return;
+      bester = Math.max(bester, seen.seenValue(engine, d.fragender, name));
+    });
+  }
+  if (!(bester > mein)) return true;
+  let schwelle = WARTE_SCHWELLE;
+  try { schwelle = require('./_deck-profile').ruleParam(engine, d.fragender, 'pseudonia.warteSchwelle', WARTE_SCHWELLE); }
+  catch { /* Profil optional */ }
+  return mein >= schwelle * bester;     // fast so gut wie der Beste: lieber den Spatz in der Hand
 }
 
 module.exports = {
@@ -233,14 +292,21 @@ module.exports = {
         await engine.revokeHeroEffect(spalte, hi, name, 'pseudoniaFormLost');
       }
       delete selbst._pseudoniaAbsorbiert;
+      delete selbst._pseudoniaFremd;
       delete selbst._pseudoniaVormerk;
       engine.sync();
     },
   },
 
-  /** CPU: nimmt jeden angebotenen Effekt (der Preis ist nur ein Platz von drei). */
+  /**
+   * CPU-Deck-Regel (siehe Kopf): eigene Helden IMMER, vom Gegner genau
+   * einen — den, dessen Effekt (gesehene Nutzung) am meisten wert ist.
+   * Ohne Kontext im Prompt (Alt-Aufrufer) gilt wie frueher: alles nehmen.
+   */
   cpuResponse(engine, kind, promptData) {
-    if (kind === 'generic' && promptData?.type === 'confirm') return { confirmed: true };
-    return undefined;
+    if (kind !== 'generic' || promptData?.type !== 'confirm') return undefined;
+    const d = promptData.devour;
+    if (!d) return { confirmed: true };
+    return { confirmed: cpuSollAufnehmen(engine, d) };
   },
 };

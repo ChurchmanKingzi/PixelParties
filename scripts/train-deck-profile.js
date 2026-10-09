@@ -3623,6 +3623,21 @@ function main() {
     argOutDir || process.env.PP_PROFILE_OUT_DIR || path.join('data', 'cpu-profiles'));
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, `${slug}.json`);
+  // ── Regel-Parameter überleben das Neutraining ──────────────────────
+  // `ruleParams` (Zahlen der harten Deck-Regeln, siehe TRAINING.md
+  // „Harte Deck-Regeln") sind Vorgaben des Deck-Designs bzw. spaeter
+  // gelernte Werte — KEINE Statistik dieses Datensatzes. Erzeugt der Trainer
+  // selbst keine, bleiben die der bisherigen Datei erhalten; sonst gingen
+  // sie beim naechsten Lauf still verloren.
+  if (profile.ruleParams === undefined) {
+    try {
+      const alt = JSON.parse(fs.readFileSync(outPath, { encoding: 'utf-8' }));
+      if (alt && alt.ruleParams && typeof alt.ruleParams === 'object' && Object.keys(alt.ruleParams).length > 0) {
+        profile.ruleParams = alt.ruleParams;
+        console.log(`  ruleParams aus dem bisherigen Profil übernommen: ${Object.keys(alt.ruleParams).join(', ')}`);
+      }
+    } catch { /* kein altes Profil */ }
+  }
   // Atomares Schreiben (tmp + rename): Bei PARALLELEN Trainings-Batches
   // (mehrere Decks gleichzeitig) lädt der startende Sammelprozess von
   // Batch B alle Profile, während Batch A seines schreibt —

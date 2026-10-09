@@ -187,6 +187,27 @@ module.exports = {
     return true;
   },
 
+  /**
+   * ★ CPU-Deck-Regel (Al): „Wenn die CPU den Hero Damus spielt, soll sie
+   * jede Runde mindestens einen Ifrit beschwoeren."
+   *
+   * Damus' Platzierung ist ein FREIER Heldeneffekt (keine Aktion, keine
+   * Kosten) — es gibt keinen Grund, sie je auszulassen. Ohne die Regel
+   * haengt sie am Wert-Gate der CPU, das fuer eine Platzierung ohne
+   * Sofort-Ertrag gern ablehnt. `forcePlay` umgeht dieses Gate (und die
+   * Recon); die Voraussetzungen (Ifrit auf der Hand, freie Zone) prueft
+   * `canActivateHeroEffect` schon vor dem Aufruf. Faellt der Effekt
+   * aus (Damus betaeubt, eingefroren, negiert), uebernimmt Ifrit selbst
+   * als normale Beschwoerung (siehe ifrit.js).
+   */
+  cpuMeta: {
+    forcePlay(engine, pi, heroIdx) {
+      const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+      // Auch der Erbe des Effekts (Pseudonia mit gewonnenem Damus-Effekt).
+      return hatEffekt(hero, CARD_NAME) && hero.hp > 0;
+    },
+  },
+
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
     if (promptData.type !== 'zonePick') return undefined;
