@@ -257,6 +257,8 @@
   }
 
   // Für Hintergrund-Aufwärmer: Kunstindex und Rahmen schon vor den ersten Karten holen
-  window.CardImageShim = { boot, parse, cacheSize: () => cache.size, stats, queued: () => queues.reduce((n, q) => n + q.length, 0) };
+  // Skin -> Basiskarte (fuer das Skin-Holo: es braucht den Kartentyp des Helden). Wartet auf boot().
+  async function skinBase(skin) { await boot(); return (window.__cardShimSkinBase && window.__cardShimSkinBase[skin]) || null; }
+  window.CardImageShim = { boot, skinBase, parse, cacheSize: () => cache.size, stats, queued: () => queues.reduce((n, q) => n + q.length, 0) };
   boot();
 })();

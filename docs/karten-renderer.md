@@ -43,6 +43,36 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
   Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
 
+## Skin-Holo (Foil nur für Skin-Karten)
+
+Skin-Karten tragen ein eigenes Holo-Foil, das **nur Kunst und Namen** betrifft (Rahmen, Werte, Regeltext
+bleiben ruhig; bei Vollbild-Helden bleiben die Textfelder frei). Es ersetzt auf einer Karte mit Skin die
+Foil-Schicht der Seltenheit.
+
+* **Name:** `renderCard` zeichnet den Skin-Namen in einem Goldverlauf (`goldFill`), das gilt überall, wo die
+  Karte als Bild erscheint. Darüber legt das Spiel einen Hauch wandernder Pastellfarben und einen weißen Glanz,
+  beschnitten durch die Umrisse der Buchstaben (`nameMask`).
+* **Kunst:** Das Muster ist keine Kachel, sondern wird aus der Kunst selbst gerechnet (`CardRender.holoLayers`,
+  einmal je Skin, ~80–150 ms in mehreren Blöcken mit Atempausen): (1) Konturen auf dem nativen Pixelraster
+  (die dunklere Seite jeder Kante, Stärke = Helligkeitssprung), (2) Abstandsfeld zur nächsten Kontur
+  (Felzenszwalb-EDT; kräftige Umrisse zählen, als lägen sie näher), (3) Echolinien im Abstandsfeld —
+  sie umlaufen jede Kontur wie Höhenlinien und erhalten je Linie und Ort einen anderen Farbton,
+  (4) Prägung aus der geglätteten Helligkeit (Licht von links oben). Heraus kommen drei PNG-Blobs
+  (`holo`, `relief`, `nameMask`) plus die Lage in Prozent der Karte als CSS-Variablen (`CardRender.holoFor`,
+  LRU 40).
+* **Anzeige:** `SkinHolo` (app-shared.jsx) legt die Schichten übers Bild; Animation nur per `transform`/`opacity`
+  unter statischen Masken (style.css, „SKIN-HOLO“): Prägung (fest), drei im Farbton gedrehte Linienabzüge,
+  die per Deckkraft ineinander geblendet werden, ein Glanzband, das nur auf den Linien aufleuchtet, und der
+  Namensglanz. Kleinansicht (`FoilKleinContext`), Telefone (Lite) und „Play Animations: aus“ zeigen einen
+  ruhigen Zustand (ein Linienabzug, kein Glanz).
+* **Anschluss:** nur über `CardFoil` — `<CardFoil card={…} skin={…} />`; der Skin lässt sich aus einer
+  Bild-URL lesen (`skinOfUrl(url)`), deshalb greift es automatisch in `CardMini`, `BoardCard`, den Tooltips
+  (`CardSideTooltip`, `CardTooltipContent`), dem Spielerprofil und der Skin-Galerie des Deck-Editors.
+  `scripts/check-foil.js` hält fest, dass `<SkinHolo>` nur in `CardFoil` steht.
+* **Stellschrauben:** `CardRender.HOLO` (`on`, `period`, `width`, `reach`, `floor`, `seed`, `relief`);
+  `HOLO.on = false` schaltet alles ab (auch den goldenen Namen); `data/card-render.json` →
+  `skins[<Name>].holo = false` nimmt einen einzelnen Skin aus.
+
 ## Dateien
 
 | Pfad | Inhalt |

@@ -373,7 +373,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      <CardFoil card={card} />
+      <CardFoil card={card} skin={window.skinOfUrl ? window.skinOfUrl(imgUrl) : null} />
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : imgUrl ? (
