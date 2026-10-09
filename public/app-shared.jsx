@@ -4965,10 +4965,10 @@ const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
 //  ★ SKIN-HOLO — das Foil exklusiv fuer Skin-Karten
 //
 //  Es betrifft NUR Kunst und Namen (Rahmen, Werte, Regeltext bleiben ruhig)
-//  und ist keine Kachel, sondern aus der Kunst des Skins gerechnet
-//  (`CardRender.holoFor`, card-render.js): Echolinien, die den Konturen der
-//  Zeichnung folgen, eine Praegung aus ihrer Helligkeit und die Umrisse der
-//  Namensbuchstaben. Hier wird daraus eine DOM-Lage (Aufbau und Animation:
+//  und laesst das Motiv lesbar: Leuchtlinien auf den Umrissen, ein Highlight
+//  je Farbflaeche und eine feine Schraffur ueber dem Bild, dazu die Umrisse der
+//  Namensbuchstaben — alles aus der Kunst des Skins gerechnet
+//  (`CardRender.holoFor`, card-render.js). Hier wird daraus eine DOM-Lage (Aufbau und Animation:
 //  style.css, „SKIN-HOLO“). Wie CardFoil hat sie keinen Zeitgeber und keinen
 //  Zustand ausser dem einmaligen Laden — alles Bewegte laeuft per CSS.
 //
@@ -5008,12 +5008,9 @@ function SkinHolo({ skin }) {
   return (
     <div className={'skin-holo' + (klein ? ' skin-holo-klein' : '')} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
       <div className="skin-holo-art">
-        <i className="skin-holo-relief" />
-        {/* Drei Abzuege derselben Linien, um 0/120/240° im Farbton gedreht und per Deckkraft ineinander
-            geblendet: der Regenbogen laeuft ueber die Linien, ohne dass je Frame neu gemalt wird. */}
-        <i className="skin-holo-lines sh-l0" />
-        {!klein && <i className="skin-holo-lines sh-l1" />}
-        {!klein && <i className="skin-holo-lines sh-l2" />}
+        <i className="skin-holo-areas" />
+        {!klein && <div className="skin-holo-hatch"><i /></div>}
+        <i className="skin-holo-edges" />
         {!klein && <div className="skin-holo-glint"><i /></div>}
       </div>
       <div className="skin-holo-name">
@@ -5024,6 +5021,32 @@ function SkinHolo({ skin }) {
   );
 }
 window.SkinHolo = SkinHolo;
+
+/**
+ * Namensglanz der Karten mit Foil (Super Rare = gold, Diamond Rare = tuerkis): dieselbe Schicht wie der Name der
+ * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil. In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
+ */
+function FoilName({ card, tone }) {
+  const [daten, setDaten] = useState(() => (card && window.CardRender && window.CardRender.nameCached(card)) || null);
+  useEffect(() => {
+    let lebt = true;
+    if (!card) { setDaten(null); return undefined; }
+    const fertig = window.CardRender.nameCached(card);
+    if (fertig) { setDaten(fertig); return undefined; }
+    setDaten(null);
+    window.CardImageShim.boot()
+      .then(() => window.CardRender.nameShimmerFor(card))
+      .then(d => { if (lebt) setDaten(d || null); });
+    return () => { lebt = false; };
+  }, [card?.name]);
+  const phase = useMemo(() => (-Math.random() * 12).toFixed(2) + 's', [card?.name]);
+  if (!card || !daten) return null;
+  return (
+    <div className={'skin-holo skin-holo-nur-name foil-name-' + tone} style={{ ...daten.vars, '--sh-phase': phase }} aria-hidden="true">
+      <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>
+    </div>
+  );
+}
 
 function CardFoil({ card, foilType, skin }) {
   const type = foilType || card?.foil || null;
@@ -5067,6 +5090,7 @@ function CardFoil({ card, foilType, skin }) {
       )}
       <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
         sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} />
+      {!klein && skinHoloAktiv() && <FoilName card={card} tone={type === 'diamond_rare' ? 'diamond' : 'gold'} />}
     </>
   );
 }

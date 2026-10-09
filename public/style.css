@@ -25677,64 +25677,81 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .profile-identity-col { background: none; border-right: none; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SKIN-HOLO — das Foil exklusiv fuer Skin-Karten
+   SKIN-HOLO — das Foil exklusiv fuer Skin-Karten (und der Namensglanz der
+   Super-/Diamond-Rare-Karten)
 
    Es betrifft NUR Kunst und Namen; Rahmen, Werte und Regeltext bleiben
-   ruhig. Das Muster ist aus der Kunst des Skins gerechnet (card-render.js,
-   `holoFor`): Echolinien, die den Konturen der Zeichnung folgen, in
-   Regenbogenfarben, dazu eine Praegung aus der Helligkeit des Bildes und
-   die Umrisse der Namensbuchstaben. Die Texturen kommen als CSS-Variablen
-   (`--sh-holo`, `--sh-relief`, `--sh-name`) samt Lage in Prozent der
-   Karte (`--sh-ax` … `--sh-nh`); SkinHolo (app-shared.jsx) setzt sie.
+   ruhig. Das Motiv bleibt klar lesbar: das Foil liegt auf den Flaechen und
+   den Umrissen der Kunst, nicht darueber. Die Texturen kommen aus
+   card-render.js (`holoFor`), Pixel fuer Pixel auf das Raster der Kunst
+   ausgerichtet, als CSS-Variablen (`--sh-areas`, `--sh-edges`, `--sh-all`,
+   `--sh-name`) samt Lage in Prozent der Karte (`--sh-ax` … `--sh-nh`);
+   SkinHolo / FoilName (app-shared.jsx) setzen sie.
 
-   Bau: Alles Bewegte laeuft per `transform`/`opacity` UNTER einer
-   statischen Maske (so haelt der Compositor es allein, wie bei den
-   Foil-Baendern, v1403):
-     • Praegung      — fest, `overlay`.
-     • Linien        — drei Abzuege derselben Textur, im Farbton um
-                       0/120/240° gedreht (`hue-rotate`, fest) und per
-                       Deckkraft ineinander geblendet: der Regenbogen
-                       laeuft ueber die Linien.
-     • Glanz         — ein Lichtband, das nur dort aufleuchtet, wo die
-                       Linien liegen (dieselbe Textur als Maske).
-     • Name          — gold schon im Kartenbild; darueber ein Hauch
-                       wandernder Pastellfarben und ein weisser Glanz,
-                       beides durch die Buchstabenmaske beschnitten.
-   Kleinansicht (FoilKleinContext, Pile/Galerie): ein Linienabzug, kein
-   Glanz, nichts bewegt sich. Telefone (Lite) und „Play Animations: aus"
-   zeigen denselben ruhigen Zustand.
+   Bau: Alles Bewegte laeuft per `transform`/`opacity` UNTER statischen
+   Masken (so haelt der Compositor es allein, wie bei den Foil-Baendern, v1403):
+     • Flaechen   — jede Farbe in ihrem eigenen Highlight-Ton, `overlay`,
+                    dezent pulsierend. Dunkle Pixel (Umrisse) bleiben frei.
+     • Schraffur  — feine Schraegstriche ueber dem ganzen Bild (Maske aus
+                    `repeating-linear-gradient`, Breite in `cqw`: waechst mit
+                    der Karte), darunter ein wandernder Regenbogen. Nur auf den
+                    helleren Flaechen (Schnitt mit `--sh-all`), damit Umrisse
+                    scharf bleiben. Unter 150 px Kartenbreite entfaellt sie.
+     • Konturen   — duenne Leuchtlinien auf den Pixelgrenzen der Umrisse,
+                    Regenbogen quer ueber das Bild.
+     • Glanz      — ein Lichtband, das nur auf Flaechen und Konturen aufleuchtet.
+     • Name       — gold schon im Kartenbild (Diamond: tuerkis); darueber ein
+                    Hauch wandernder Pastellfarben und ein weisser Glanz,
+                    beides durch die Buchstabenmaske beschnitten.
+   Kleinansicht (FoilKleinContext, Pile/Galerie): Flaechen und Konturen
+   stehen still, keine Schraffur, kein Glanz. Telefone (Lite) und „Play
+   Animations: aus" zeigen denselben ruhigen Zustand.
    ═══════════════════════════════════════════════════════════════════ */
 .skin-holo {
   position: absolute; inset: 0; overflow: hidden;
   pointer-events: none; z-index: 2;
-  --sh-hue-dur: 9s;
+  container-type: inline-size;   /* `cqw` = Breite der Karte: die Schraffur waechst mit ihr */
 }
 .skin-holo-art {
   position: absolute; overflow: hidden;
   left: var(--sh-ax); top: var(--sh-ay); width: var(--sh-aw); height: var(--sh-ah);
 }
-.skin-holo-relief, .skin-holo-lines {
+.skin-holo-areas, .skin-holo-edges {
   position: absolute; inset: 0;
   background-size: 100% 100%; background-repeat: no-repeat;
 }
-.skin-holo-relief { background-image: var(--sh-relief); mix-blend-mode: overlay; opacity: .6; }
-.skin-holo-lines {
-  background-image: var(--sh-holo); mix-blend-mode: hard-light;
-  /* Grundwert (ohne Animation): nur der erste Abzug steht, halb stark */
-  opacity: 0;
-  animation: skinHoloHue var(--sh-hue-dur) linear infinite;
-  animation-delay: var(--sh-phase, 0s);
+.skin-holo-areas {
+  /* `soft-light` + niedrige Deckkraft: die Farben des Bildes bleiben, die Flaeche bekommt nur einen Schimmer */
+  background-image: var(--sh-areas); mix-blend-mode: soft-light; opacity: .26;
+  animation: skinHoloPulse 6s ease-in-out infinite; animation-delay: var(--sh-phase, 0s);
   will-change: opacity;
 }
-.skin-holo-lines.sh-l0 { opacity: .55; }
-.skin-holo-lines.sh-l1 { filter: hue-rotate(120deg); animation-delay: calc(var(--sh-phase, 0s) - var(--sh-hue-dur) / 3); }
-.skin-holo-lines.sh-l2 { filter: hue-rotate(240deg); animation-delay: calc(var(--sh-phase, 0s) - var(--sh-hue-dur) * 2 / 3); }
-/* Drei Dreieckswellen, je ein Drittel versetzt: die Summe der Deckkraefte bleibt gleich, nur der Farbton wandert. */
-@keyframes skinHoloHue { 0% { opacity: .8; } 33.333% { opacity: 0; } 66.667% { opacity: 0; } 100% { opacity: .8; } }
+@keyframes skinHoloPulse { 0%, 100% { opacity: .14; } 50% { opacity: .34; } }
+.skin-holo-edges { background-image: var(--sh-edges); mix-blend-mode: screen; opacity: .85; }
+
+/* Schraffur: Striche als Maske, darunter wandert ein Regenbogen. Der Schnitt mit `--sh-all` laesst sie nur auf Flaechen
+   und Konturen liegen — dunkle Umrisse und Schatten bleiben unberuehrt. */
+.skin-holo-hatch {
+  position: absolute; inset: 0; overflow: hidden;
+  mix-blend-mode: overlay; opacity: .5;
+  -webkit-mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw), var(--sh-all);
+  mask-image: repeating-linear-gradient(118deg, #000 0, #000 .24cqw, transparent .34cqw, transparent .78cqw), var(--sh-all);
+  -webkit-mask-size: 100% 100%, 100% 100%; mask-size: 100% 100%, 100% 100%;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+.skin-holo-hatch i {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 300%;
+  /* gedaempfte Pastelltoene: laut waere die Schraffur schrill und wuerde das Bild uebertoenen */
+  background: linear-gradient(112deg, #e98aa0 0%, #eec27e 8%, #ece28c 16%, #94d6a8 25%, #8ccbe0 34%, #9d9fe8 42%, #cc98e6 50%, #e98aa0 58%, #eec27e 66%, #ece28c 75%, #94d6a8 83%, #8ccbe0 92%, #9d9fe8 100%);
+  animation: skinHoloHatch 14s linear infinite; animation-delay: var(--sh-phase, 0s);
+  will-change: transform;
+}
+@keyframes skinHoloHatch { 0% { transform: translateX(0); } 100% { transform: translateX(-66.667%); } }
+@container (max-width: 150px) { .skin-holo-hatch { display: none; } }
 
 .skin-holo-glint {
   position: absolute; inset: 0; mix-blend-mode: screen;
-  -webkit-mask-image: var(--sh-holo); mask-image: var(--sh-holo);
+  -webkit-mask-image: var(--sh-all); mask-image: var(--sh-all);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
 }
 .skin-holo-glint i {
@@ -25765,27 +25782,35 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   will-change: transform;
 }
 @keyframes skinHoloNameRb { 0% { transform: translateX(0); } 100% { transform: translateX(-66.667%); } }
+/* Der Namensglanz laeuft oft: alle ~2,6 s ein Durchgang (vorher 4,2 s), der den groesseren Teil des Takts belegt. */
 .skin-holo-name .sh-gl {
   position: absolute; top: -30%; bottom: -30%; left: 0; width: 22%;
   transform: translateX(-200%) skewX(-20deg);
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.9) 50%, transparent);
-  animation: skinHoloNameGl 4.2s ease-in-out infinite;
+  animation: skinHoloNameGl 2.6s ease-in-out infinite;
   animation-delay: var(--sh-phase, 0s);
   will-change: transform;
 }
 @keyframes skinHoloNameGl {
   0% { transform: translateX(-200%) skewX(-20deg); }
-  60%, 100% { transform: translateX(520%) skewX(-20deg); }
+  75%, 100% { transform: translateX(520%) skewX(-20deg); }
+}
+/* Diamond Rare: tuerkis statt gold (der Name selbst ist es schon, `C.diamond`). */
+.foil-name-diamond .skin-holo-name .sh-rb {
+  background: linear-gradient(100deg, #8ff3e4 0%, #c8ffff 10%, #8ff3e4 20%, #9fd8ff 30%, #8ff3e4 42%, #d8fff4 52%, #8ff3e4 62%, #a8e8ff 72%, #8ff3e4 84%, #c8ffff 100%);
+}
+.foil-name-diamond .skin-holo-name .sh-gl {
+  background: linear-gradient(90deg, transparent, rgba(215,255,255,.95) 50%, transparent);
 }
 
-/* Kleinansicht: ein Linienabzug, alles steht still. */
-.skin-holo-klein .skin-holo-lines { animation: none; will-change: auto; }
+/* Kleinansicht: Flaechen und Konturen stehen still, keine Schraffur, kein Glanz. */
+.skin-holo-klein .skin-holo-areas { animation: none; will-change: auto; opacity: .3; }
 .skin-holo-klein .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
 
-/* Telefone (Lite): derselbe ruhige Zustand — Glanz, Abzuege und Namensglanz sind je ein Layer mit Blend-Modus. */
+/* Telefone (Lite): derselbe ruhige Zustand — Schraffur und Glanz sind je ein Layer mit Maske und Blend-Modus. */
 @media (pointer: coarse) and (max-height: 600px) {
-  .skin-holo-glint, .skin-holo-lines.sh-l1, .skin-holo-lines.sh-l2, .skin-holo-name .sh-gl { display: none; }
-  .skin-holo-lines.sh-l0 { animation: none; will-change: auto; opacity: .55; }
+  .skin-holo-glint, .skin-holo-hatch, .skin-holo-name .sh-gl { display: none; }
+  .skin-holo-areas { animation: none; will-change: auto; opacity: .3; }
   .skin-holo-name .sh-rb { animation: none; will-change: auto; transform: none; width: 100%; opacity: .35; }
 }
 /* Hinter einem grossen Karten-Dialog stehen die Endlos-Animationen still (wie die Foil-Schichten, HintergrundPause);
