@@ -48,9 +48,12 @@ function nimmbar(engine, inst) {
   const c = inst.counters || {};
   if (c.immovable || c._gainedEffectOnly || c._cardinalImmune) return false;
   if (isCardinalBeastByName(inst.name)) return false;
-  const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+  const roh = engine._getCardDB()[inst.name];
+  const cd = engine.getEffectiveCardData(inst) || roh;
   if (!cd) return false;
-  if (hasCardType(cd, 'Token')) return false;
+  // Token sind keine Karten: nie auf die Hand (Pollution, Biomancy — dessen Token liegen unter dem Namen einer Potion mit
+  // `_cardDataOverride.cardType = 'Creature/Token'` —, Mummy, Puppet …). Beide Lesarten prüfen: wirksame UND rohe Daten.
+  if (hasCardType(cd, 'Token') || hasCardType(roh, 'Token') || c._effectOverride === 'Biomancy Token') return false;
   return true;
 }
 

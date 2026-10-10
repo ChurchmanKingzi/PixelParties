@@ -172,6 +172,35 @@ const imZug = (ps, name) => ps.supportZones.some(h => h.some(z => z.includes(nam
     check('ein Held, der nur Schaden nimmt und überlebt, öffnet kein Fenster', !angeboten(t) && t.p0.heroes[1].hp > 0);
   }
 
+  console.log('Token sind nie wählbar (Pollution, Biomancy, Mummy, Puppets, Invader, Leprochaun)');
+  {
+    const { biomancyTokenCounters } = require('../../cards/effects/_biomancy-shared');
+    const t = await fresh({ mensch: true });
+    // Biomancy-Token: liegt unter dem Namen einer Potion, die wirksamen Kartendaten sagen Creature/Token
+    const potion = pick(c => c.cardType === 'Potion');
+    const bio = lege(t, 0, 1, 0, potion);
+    bio.counters = { ...(bio.counters || {}), ...biomancyTokenCounters(DB[potion], 2) };
+    await toedlich(t, 0, 1);
+    check('Biomancy-Token (Potion-Name, wirksam Creature/Token) allein am fallenden Helden: kein Angebot, die Hand bleibt', !angeboten(t) && t.p0.hand.length === 1, t.prompts.map(p => p.title));
+  }
+  for (const tok of ['Pollution Token', 'Mummy Token', 'Creative Puppet Brammi', 'Invader Token', 'Leprochaun Token']) {
+    const t = await fresh({ mensch: true });
+    lege(t, 0, 1, 0, tok); lege(t, 0, 1, 1, ARTEFAKT);
+    await toedlich(t, 0, 1);
+    check(`${tok} und eine Ausrüstung: nur die Ausrüstung steht zur Wahl`, t.picks.length === 1 && t.picks[0].ziele.map(z => z.cardName).join() === ARTEFAKT, t.picks.map(p => p.ziele.map(z => z.cardName)));
+  }
+  {
+    const { biomancyTokenCounters } = require('../../cards/effects/_biomancy-shared');
+    const t = await fresh({ mensch: true });
+    const potion = pick(c => c.cardType === 'Potion');
+    const bio = lege(t, 0, 1, 0, potion);
+    bio.counters = { ...(bio.counters || {}), ...biomancyTokenCounters(DB[potion], 3) };
+    lege(t, 0, 1, 1, KREATUR);
+    await toedlich(t, 0, 1);
+    check('Biomancy-Token und eine Kreatur: nur die Kreatur steht zur Wahl (der Token bleibt, wird wie sonst aufgeräumt)', t.picks.length === 1 && t.picks[0].ziele.length === 1 && t.picks[0].ziele[0].cardName === KREATUR, t.picks.map(p => p.ziele.map(z => z.cardName)));
+    check('kein Token in der Hand', !t.p0.hand.includes(potion) && !t.p0.hand.includes('Biomancy Token'), t.p0.hand);
+  }
+
   console.log('„Up to 2“ erlaubt auch null Karten');
   {
     const t = await fresh({ mensch: true });
