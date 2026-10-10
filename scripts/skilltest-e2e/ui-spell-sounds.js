@@ -1,7 +1,7 @@
 'use strict';
-// UI-Test: Zauber mit EIGENEM Socket-Kanal spielen im ECHTEN Browser ihren Klang (Als Befund 10.10.: „bei Burning Finger fehlt
-// der Slash-Sound, bei Heal der Laser-Sound"). Mitgeschrieben wird, welche Audio-Puffer der Browser WIRKLICH startet
-// (`AudioBufferSourceNode.start`); erkannt werden sie an der Dauer der Klangdatei (`/sounds/<name>.ogg`).
+// UI-Test: Zauber/Effekte mit eigenem Bild spielen im ECHTEN Browser ihren Klang (Als Befund 10.10.: „bei Burning Finger fehlt
+// der Slash-Sound, bei Heal der Laser-Sound, bei Burning Skeleton der Slash"). Mitgeschrieben wird, welche Audio-Puffer der Browser
+// WIRKLICH startet (`AudioBufferSourceNode.start`); erkannt werden sie an der Dauer der Klangdatei (`/sounds/<name>.ogg`).
 //   NODE_PATH=/tmp/st-tools/node_modules:/opt/node22/lib/node_modules node scripts/skilltest-e2e/ui-spell-sounds.js
 const { chromium } = require('playwright');
 const { startServer, BASE, sleep, createAccount, check, finish } = require('./lib');
@@ -9,8 +9,11 @@ const fs = require('fs');
 const path = require('path');
 const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => fs.existsSync(path.join(d, 'react', 'umd')));
 
-/** Ein Puzzle mit einem Zauber auf der Hand; der Zauber wird auf ein Ziel gespielt, danach die gestarteten Klänge zurück. */
-async function spiele(browser, zauber, eigenesZiel) {
+/**
+ * Ein Puzzle mit einem Zauber auf der Hand (oder, mit `kreatur`, einer Creature mit aktivem Effekt auf dem Brett); der Zauber bzw. der
+ * Effekt wird auf ein Ziel gespielt, danach die gestarteten Klänge zurück.
+ */
+async function spiele(browser, zauber, eigenesZiel, kreatur = false) {
   const acc = await createAccount('UiSnd' + Date.now().toString(36) + Math.floor(Math.random() * 1e4));
   const ctx = await browser.newContext({ viewport: { width: 1652, height: 700 } });
   try {
@@ -46,7 +49,7 @@ async function spiele(browser, zauber, eigenesZiel) {
       }
       return out;
     });
-    await page.evaluate((hand) => {
+    await page.evaluate(([hand, kreatur]) => {
       window.__gs = null; window.socket.on('game_state', (g) => { window.__gs = g; });
       const C = window.CARDS_BY_NAME;
       const helden = Object.keys(C).filter(n => C[n].cardType === 'Hero' && !/Zhigao|Quetzahuitl/.test(n));
@@ -57,16 +60,22 @@ async function spiele(browser, zauber, eigenesZiel) {
         surpriseZones: [[], [], []], supportZones: [0, 1, 2].map(() => [[], [], []]), mainDeck: kre.slice(), potionDeck: [], sideDeck: [],
         discardPile: [], deletedPile: [], gold: 10, islandZoneCount: [0, 0, 0], permanents: [],
       });
-      window.socket.emit('start_puzzle', { players: [seite(0), seite(3)], areaZones: [[], []], doomCounters: [0, 0], hand, oppHand: [], playerDebuffs: [[], []] });
-    }, [zauber]);
+      const meine = seite(0);
+      if (kreatur) meine.supportZones[0][0] = [kreatur];
+      window.socket.emit('start_puzzle', { players: [meine, seite(3)], areaZones: [[], []], doomCounters: [0, 0], hand, oppHand: [], playerDebuffs: [[], []] });
+    }, [kreatur ? [] : [zauber], kreatur ? zauber : null]);
     await page.waitForSelector('.board-center', { timeout: 30000 });
     await sleep(2500);
     const my = await page.evaluate(() => window.__gs.myIndex);
-    await page.evaluate(() => window.socket.emit('advance_phase', { roomId: window.__gs.roomId, targetPhase: 3 }));
-    await sleep(1200);
+    // Zauber spielt man in der Action Phase, Creature-Effekte in der Main Phase (das Puzzle beginnt dort)
+    if (!kreatur) {
+      await page.evaluate(() => window.socket.emit('advance_phase', { roomId: window.__gs.roomId, targetPhase: 3 }));
+      await sleep(1200);
+    }
     await page.evaluate(() => { window.__snd.length = 0; });
     const heroIdx = zauber === 'Heal' ? 1 : 0;
-    await page.evaluate(([n, he]) => window.socket.emit('play_spell', { roomId: window.__gs.roomId, cardName: n, handIndex: 0, heroIdx: he }), [zauber, heroIdx]);
+    if (kreatur) await page.evaluate(() => window.socket.emit('activate_creature_effect', { roomId: window.__gs.roomId, heroIdx: 0, zoneSlot: 0 }));
+    else await page.evaluate(([n, he]) => window.socket.emit('play_spell', { roomId: window.__gs.roomId, cardName: n, handIndex: 0, heroIdx: he }), [zauber, heroIdx]);
     let gewaehlt = false;
     for (let k = 0; k < 40 && !gewaehlt; k++) {
       const ziele = await page.evaluate(() => window.__gs && window.__gs.potionTargeting && (window.__gs.potionTargeting.validTargets || []).map(t => [t.id, t.owner]));
@@ -97,6 +106,11 @@ const hat = (klaenge, dauer) => klaenge.some(k => Math.abs(k.dur - dauer) < 0.00
     const he = await spiele(browser, 'Heal', true);
     check('Ziel gewählt, Zauber lief', he.gewaehlt);
     check('der Browser startet den LASER-Klang, wenn der Strahl von oben herunterkommt', hat(he.klaenge, he.dauern.laser), [he.dauern.laser, he.klaenge.map(k => k.dur)]);
+
+    console.log('Burning Skeleton');
+    const bs = await spiele(browser, 'Burning Skeleton', false, true);
+    check('Ziel gewählt, Effekt lief', bs.gewaehlt);
+    check('der Browser startet den SLASH-Klang beim roten diagonalen Schnitt (`red_cut`)', hat(bs.klaenge, bs.dauern.slash), [bs.dauern.slash, bs.klaenge.map(k => k.dur)]);
   } finally {
     await browser.close(); srv.child.kill();
   }

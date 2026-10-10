@@ -3737,6 +3737,10 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   left: 0; top: 0; width: 0; height: 0;
   pointer-events: none;
   transform-style: preserve-3d;
+  /* ★ 10.10. (Als Vorgabe): die Figuren liegen UEBER der Phasenleiste (`.phase-column`, z-index 50) — die Ebene hat keinen Zeiger
+     (`pointer-events: none`), die Leiste bleibt also klickbar; faehrt der Zeiger auf sie, ziehen sich die darueber ragenden Figuren
+     ein (`HeroIdleAnims`, `folgeZone`). */
+  z-index: 51;
 }
 .hero-idle-anker { display: none; }
 .hero-idle-platz {
@@ -17441,6 +17445,12 @@ body:has(.textbox-overlay) .tooltip {
    zentriert. Ausgeklappt (324px) bleibt es wie bisher; die Overlay-Varianten
    (Telefon quer) nehmen die Lasche aus dem Fluss und setzen den Rand zurueck. */
 .game-board.chat-eingeklappt > .board-center { margin-left: 28px; }
+/* ★ 10.10.: der Tooltip deckt immer die AUSGEKLAPPTE Chat-Spalte; bei eingeklapptem Chat wuerden Zonen darunter liegen. Das Feld
+   verzichtet auf diese Strecke (`--tt-reserve`, gemessen von GameBoard) — der schmalere Kasten scrollt frueher horizontal. Telefone haben
+   einen Overlay-Tooltip und behalten die volle Breite. */
+@media (min-width: 901px) and (min-height: 561px) {
+  .game-board > .board-center { margin-right: var(--tt-reserve, 0px); }
+}
 .sidebar-toggle-btn {
   background: none;
   border: none;
@@ -17569,6 +17579,10 @@ body:has(.textbox-overlay) .tooltip {
    (rotateX without perspective would still squash vertically, so the
    transform must be reset too, not just the perspective.) */
 .board-center.board-flat-measure .board-plane-clip { perspective: none; }
+/* ★ 10.10.: Die Sprite-Ebene traegt die Neigung/Vergroesserung der Brettebene weiter (JS kopiert sie) — im FLACHEN Messfenster
+   blaeht sie `scrollWidth` damit um ~100 px auf. Im alten, breiten Kasten fiel das nicht auf; im jetzt schmaleren (Tooltip-
+   Reserve) liess es den Scrollmodus schon bei einem ganz normalen Brett einrasten. Zum Messen steht sie nicht im Layout. */
+.board-center.board-flat-measure .hero-sprite-ebene { display: none; }
 .board-center.board-flat-measure .board-plane {
   transform: none !important;
   padding-inline: 0 !important; /* overhang padding is transform-derived —

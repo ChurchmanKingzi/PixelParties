@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 const board = fs.readFileSync(path.join(__dirname, '..', 'public', 'app-board.jsx'), 'utf8');
+const shared = fs.readFileSync(path.join(__dirname, '..', 'public', 'app-shared.jsx'), 'utf8');
 
 // Socket-Ereignis → Handlername, geforderter Klang
 const KANAELE = [
@@ -25,7 +26,30 @@ const KANAELE = [
   { ereignis: 'play_heal_beam', handler: 'onHealBeam', klang: 'laser', karte: 'Heal' },
 ];
 
+// Handler, die ihren Klang ueber die TABELLE holen (`playSFXForZoneAnim('ev_…')`, Eintrag in ZONE_ANIM_SFX) — Sweep 10.10.
+const TABELLEN_KANAELE = [
+  ['onWillyLeprechaun', 'ev_willy_leprechaun'], ['onAlleriaSpiderRedirect', 'ev_alleria_spider_redirect'], ['onPusherFling', 'ev_pusher_fling'],
+  ['onBaihuPetrify', 'ev_baihu_petrify'], ['onCardinalBeastWin', 'ev_cardinal_beast_win'], ['onCooldinTerraform', 'ev_cooldin_terraform'],
+  ['onBigGwenClockActivation', 'ev_big_gwen_clock'], ['onTempesteRainStart', 'ev_tempeste_rain_start'], ['onSmugCoinSave', 'ev_smug_coin_save'],
+  ['onTearsOfCreation', 'ev_tears_of_creation'], ['onHandSteal', 'ev_hand_steal'], ['onCloakVanish', 'ev_cloak_vanish'], ['onSkullBurst', 'ev_skull_burst'],
+  ['onGuardianAngel', 'ev_guardian_angel'], ['onChaosScreen', 'ev_chaos_screen'], ['onBrackleCatapult', 'ev_catapult_fire'],
+];
+const tabelle = (() => { const a = shared.indexOf('const ZONE_ANIM_SFX = '); return shared.slice(a, shared.indexOf('\n};', a)); })();
+
 const fehler = [];
+for (const [handler, key] of TABELLEN_KANAELE) {
+  const a = board.indexOf(`const ${handler} = `);
+  if (a < 0) { fehler.push(`Handler ${handler} nicht gefunden — Eintrag in TABELLEN_KANAELE prüfen.`); continue; }
+  const rumpf = board.slice(a, a + 6000);
+  if (!rumpf.includes(`playSFXForZoneAnim('${key}')`)) fehler.push(`${handler}: ruft playSFXForZoneAnim('${key}') nicht mehr — das Bild läuft stumm.`);
+  const eintrag = (tabelle.match(new RegExp(`^ {2}${key}:\\s*(.*)$`, 'm')) || [])[1];
+  if (eintrag === undefined || /^null\b/.test(eintrag.trim())) fehler.push(`ZONE_ANIM_SFX hat keinen Klang für '${key}' (${handler}).`);
+}
+// Der Einschlag des Katapults laeuft ueber einen DIREKTEN playAnimation-Aufruf und muss den `explosion`-Klang selbst anstossen.
+{
+  const a = board.indexOf('const onBrackleCatapult');
+  if (!board.slice(a, a + 8000).includes("playSFXForZoneAnim('explosion')")) fehler.push("onBrackleCatapult: der Einschlag (`explosion`) ist stumm.");
+}
 for (const k of KANAELE) {
   const a = board.indexOf(`const ${k.handler} = `);
   const b = board.indexOf(`socket.on('${k.ereignis}', ${k.handler})`, a);
@@ -40,4 +64,4 @@ if (fehler.length) {
   for (const f of fehler) console.error('[check-event-sounds] ' + f);
   process.exit(1);
 }
-console.log(`[check-event-sounds] OK — ${KANAELE.length} Socket-Animationen mit eigenem Klang (category: null).`);
+console.log(`[check-event-sounds] OK — ${KANAELE.length} Socket-Animationen mit eigenem Klang (category: null), ${TABELLEN_KANAELE.length} über die Tabelle.`);
