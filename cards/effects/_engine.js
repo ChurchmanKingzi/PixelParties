@@ -35444,10 +35444,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (!confirmed) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
+        // ★ 10.10. (Test Flight): `fensterInfo` reicht das Zielfenster an `reactionCasterAllowed` weiter — „a Hero you control that
+        // can use this Spell would be hit" bindet den Wirker an einen GETROFFENEN Helden. Bisher bekam das Skript hier `null`;
+        // keine bestehende Post-Target-Karte definiert `reactionCasterAllowed`, das Verhalten aller anderen bleibt gleich.
+        let castingSeite = pi;
         if (!isArtifact) {
           const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
-          if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan))) continue;
+          if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan,
+            { fensterInfo: { postTarget: true, targetedHeroes, sourceCard, damageType, dealsDamage } }))) continue;
           castingHeroIdx = _plan.casterIdx;
+          castingSeite = _plan.casterSeite ?? pi;
         }
 
         // Per-copy discount alignment: when `dynamicCost` charged a
@@ -35548,7 +35554,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         let resolveResult = null;
         try {
           if (script.postTargetResolve) {
-            resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard, { damageType, dealsDamage });
+            // `casterIdx` / `casterSeite`: der gewaehlte Wirker (Test Flight: der geschuetzte Held IST der Wirker).
+            resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard,
+              { damageType, dealsDamage, casterIdx: isArtifact ? null : castingHeroIdx, casterSeite: castingSeite });
           }
         } finally {
           this._inPostTargetReaction = false;

@@ -2748,6 +2748,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_water',   opts: { rate: 1.1, volume: 0.75, delay: 740, category: null, dedupe: 0 } },
     { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.5, delay: 1500, category: null, dedupe: 0 } },
   ],
+  // Test Flight (10.10.) — Duesenrucksack: Zuenden der Flammen (Feuer-Klang), dazu das Rauschen des Luftstroms ein Stueck
+  // spaeter; die Flammen brennen bis ~640 ms, der Rauch zieht bis zum Ende (920 ms). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  test_flight: [
+    { name: 'elem_fire', opts: { rate: 1.1, volume: 0.9 } },
+    { name: 'elem_wind', opts: { rate: 0.85, volume: 0.7, delay: 140, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

@@ -24288,6 +24288,158 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Test Flight — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — ein Held mit
+  //  Duesenrucksack, Flammen an den Seiten, eine Rauchfahne darunter)
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten: zwei Duesen (kleiner Block mit heller Oberkante) zuenden am Ruecken des Helden — die Flamme waechst in 110 ms auf 12
+  //  Pixel Laenge (weiss → gelb → orange → rot, der Rand eine Stufe dunkler, die Spitze gedithert, jedes Bild ein anderes Flackern),
+  //  brennt, schrumpft ab ~640 ms und ist bei ~840 ms aus. Aus jeder Flammenspitze steigen Rauchpuffe (grau, werden groesser und
+  //  dunkler, blenden gedithert aus) und ziehen als Fahne nach unten; Funken springen aus den Duesen; helle Windstreifen laufen
+  //  an den Kartenraendern vorbei nach unten — der Treffer geht darunter durch. Alles blendet ueber Bayer-Dithering aus statt
+  //  ueber Alpha. Die Wurzel traegt `data-pp-px="aus"`: die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an).
+  //  Massstab folgt der Heldenzone (`w`/`h`), Lebensdauer < 1 s (deckt sich mit FLUG_MS in test-flight.js).
+  // ═════════════════════════════════════════════════════════════════
+  test_flight: (() => {
+    const KONTUR = ppHex('#1b1626'), DUESE = ppHex('#4a4a58'), DUESE_HELL = ppHex('#a4a4b8');
+    const FLAMME = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e', '#e0481c', '#8c2412'].map(ppHex);
+    const RAUCH = ['#cfcfd6', '#aeaeb9', '#8a8a97', '#666673'].map(ppHex);
+    const WIND = ['#ffffff', '#d8efff', '#a8d4f4'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const S = 3, TAKT = 33, ENDE = 980;
+    const PADX = 22, PAD_OBEN = 16, PAD_UNTEN = 48;              // Platz um die Karte (Rasterpixel): Flammen/Rauch ragen darunter
+    const ZUENDEN = 110, BRENNT_BIS = 640, AUS = 840, LAENGE = 14;
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    // Flammenlaenge zur Zeit t (ms), ohne Flackern.
+    const laenge = (t) => t < ZUENDEN ? 3 + (LAENGE - 3) * (t / ZUENDEN)
+      : t < BRENNT_BIS ? LAENGE : t < AUS ? LAENGE * (1 - (t - BRENNT_BIS) / (AUS - BRENNT_BIS)) : 0;
+    return function TestFlightEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const teile = useMemo(() => {
+        const abstand = Math.max(4, Math.round(kw * 0.27));
+        const jy = CY - Math.round(kh * 0.04);
+        const duesen = [{ jx: CX - abstand, jy }, { jx: CX + abstand, jy }];
+        const rauch = [], funken = [];
+        duesen.forEach((d, di) => {
+          for (let k = 0; k < ppFxN(14); k++) {
+            rauch.push({
+              di, born: 80 + k * 42 + Math.random() * 20, vx: (Math.random() - 0.5) * 16 + (di === 0 ? -3 : 3), vy: 22 + Math.random() * 16,
+              r0: 1.3 + Math.random() * 0.7, r1: 3.0 + Math.random() * 1.6, life: 420 + Math.random() * 140,
+            });
+          }
+          for (let k = 0; k < ppFxN(6); k++) {
+            funken.push({
+              di, born: 70 + Math.random() * 300, vx: (Math.random() - 0.5) * 40, vy: 20 + Math.random() * 30,
+              life: 160 + Math.random() * 160, lang: Math.random() < 0.5,
+            });
+          }
+        });
+        const wind = Array.from({ length: ppFxN(12) }, () => ({
+          wx: CX - kw / 2 - 6 + Math.random() * (kw + 12), born: 60 + Math.random() * 480, len: 3 + Math.floor(Math.random() * 4),
+          v: 150 + Math.random() * 90, farbe: Math.floor(Math.random() * WIND.length),
+        }));
+        return { duesen, rauch, funken, wind };
+      }, []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        const block = (px, py, bw, bh, c, a = 1) => { for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) put(px + i, py + j, c, a); };
+        const scheibe = (cx, cy, r, c, a = 1) => {
+          const R = Math.ceil(r);
+          for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r * r) put(cx + i, cy + j, c, a);
+        };
+        const zeichne = (t, fr) => {
+          const aus = t > ENDE - 200 ? Math.max(0, 1 - (t - (ENDE - 200)) / 200) : 1;      // Ausblenden am Ende (gedithert)
+          // ── Windstreifen: laufen an der Karte vorbei nach unten ──
+          for (const wi of teile.wind) {
+            const age = t - wi.born;
+            if (age < 0) continue;
+            const wy = CY - kh / 2 - 8 + (age / 1000) * wi.v;
+            if (wy > GH + 6) continue;
+            for (let k = 0; k < wi.len; k++) put(wi.wx, wy - k, WIND[Math.min(WIND.length - 1, wi.farbe + (k > wi.len - 2 ? 1 : 0))], Math.max(0, 1 - k / (wi.len + 1)) * aus);
+          }
+          // ── Rauch: von der Flammenspitze nach unten, wird groesser und dunkler ──
+          for (const r of teile.rauch) {
+            const age = t - r.born;
+            if (age < 0 || age > r.life) continue;
+            const u = age / r.life, d = teile.duesen[r.di], sek = age / 1000;
+            const startY = d.jy + laenge(r.born) - 1;
+            const px = d.jx + r.vx * sek, py = startY + r.vy * sek;
+            scheibe(px, py, r.r0 + (r.r1 - r.r0) * u, RAUCH[Math.min(RAUCH.length - 1, Math.floor(u * RAUCH.length))], (1 - u * u * u) * aus);
+          }
+          // ── Flammen ──
+          const L = laenge(t);
+          if (L > 0.5) {
+            for (const d of teile.duesen) {
+              const Ln = Math.round(L + (t >= ZUENDEN && t < BRENNT_BIS ? (rausch(fr, d.jx) - 0.5) * 3 : 0));
+              for (let k = 0; k < Ln; k++) {
+                const u = k / Math.max(1, Ln);
+                const idx = Math.min(5, Math.floor(u * 5.4));
+                const breit = k < 2 || (k < Ln * 0.55) ? 1 : 0;            // oben drei Spalten, unten eine
+                const sx = k > 4 ? Math.round((rausch(fr, k + d.jx * 3) - 0.5) * 1.8) : 0;     // Flackern der unteren Flamme
+                put(d.jx + sx, d.jy + 1 + k, FLAMME[idx]);
+                if (breit) {
+                  const rand = FLAMME[Math.min(5, idx + 1)];
+                  put(d.jx + sx - 1, d.jy + 1 + k, rand, k < 2 ? 1 : 1 - u * 0.35);
+                  put(d.jx + sx + 1, d.jy + 1 + k, rand, k < 2 ? 1 : 1 - u * 0.35);
+                }
+              }
+              put(d.jx + Math.round((rausch(fr, 99 + d.jx) - 0.5) * 2), d.jy + 1 + Ln, FLAMME[4], 0.7);       // flackernde Spitze
+            }
+          }
+          // ── Duesen (kleiner Block, helle Oberkante, dunkle Konturpixel) ──
+          for (const d of teile.duesen) {
+            block(d.jx - 1, d.jy - 1, 3, 2, DUESE);
+            block(d.jx - 1, d.jy - 1, 3, 1, DUESE_HELL);
+            put(d.jx - 2, d.jy - 1, KONTUR); put(d.jx - 2, d.jy, KONTUR); put(d.jx + 2, d.jy - 1, KONTUR); put(d.jx + 2, d.jy, KONTUR);
+            put(d.jx - 1, d.jy + 1, KONTUR); put(d.jx + 1, d.jy + 1, KONTUR);
+          }
+          // ── Funken aus den Duesen ──
+          for (const f of teile.funken) {
+            const age = t - f.born;
+            if (age < 0 || age > f.life) continue;
+            const sek = age / 1000, d = teile.duesen[f.di];
+            const fx = d.jx + f.vx * sek, fy = d.jy + 2 + f.vy * sek + 0.5 * 90 * sek * sek;
+            const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor((age / f.life) * FUNKEN.length))];
+            put(fx, fy, c, aus);
+            if (f.lang && age < f.life * 0.7) put(fx - Math.sign(f.vx || 1), fy - 1, FUNKEN[Math.min(FUNKEN.length - 1, 1 + Math.floor((age / f.life) * 3))], aus);
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t, fr); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
