@@ -835,6 +835,10 @@
 "id": "Critical_Strike",
 "kind": "a"
 },
+"Crocodile Race Boat": {
+"id": "Crocodile_Race_Boat",
+"kind": "a"
+},
 "Crum, the Class Pet": {
 "id": "Crum_the_Class_Pet",
 "kind": "a"
@@ -1597,6 +1601,10 @@
 },
 "Friendship": {
 "id": "Friendship",
+"kind": "a"
+},
+"Frog Race Boat": {
+"id": "Frog_Race_Boat",
 "kind": "a"
 },
 "Frolake": {
@@ -3783,6 +3791,10 @@
 "id": "Smugness",
 "kind": "a"
 },
+"Snake Race Boat": {
+"id": "Snake_Race_Boat",
+"kind": "a"
+},
 "Snow Cannon": {
 "id": "Snow_Cannon",
 "kind": "a"
@@ -4653,6 +4665,10 @@
 },
 "Weird Doll": {
 "id": "Weird_Doll",
+"kind": "a"
+},
+"Whale Race Boat": {
+"id": "Whale_Race_Boat",
 "kind": "a"
 },
 "Wheels": {
