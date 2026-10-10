@@ -23917,131 +23917,206 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Opfer-Messer — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~33 Bilder/s), feste Palette,
+  //  KEINE Unschärfe, KEIN Leuchten, KEINE Drehung um krumme Winkel: ein handgezeichnetes Dolch-Sprite (Spitze nach
+  //  unten, Kontur + dreistufige Klinge) fällt mit Fallstreifen, setzt auf, schlägt ein Plus-Blitz und einen flachen
+  //  Bodenring, Funken fliegen mit Schwerkraft, Blut spritzt und bleibt als Flecken liegen, glimmende Reste steigen auf.
+  //  Alles blendet über Bayer-Dithering aus statt über Alpha. (Der Dolch trug früher einen weichen Schein; der
+  //  Pixelierer machte daraus einen schrägen Ring um die Klinge — der ist jetzt weg: die Wurzel trägt
+  //  `data-pp-px="aus"`, die Grafik IST schon Pixelart.) Lebensdauer < 1 s (Standard der Zonen-Animationen).
+  // ═══════════════════════════════════════════════════════════════════
   knife_sacrifice: (() => {
+    const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const SPRITE_FARBE = {
+      k: hex('#1b1626'),                                                    // Kontur
+      p: hex('#f2b632'), q: hex('#b9791a'),                                 // Knauf
+      g: hex('#7a3b1e'), h: hex('#4a2410'),                                 // Griff
+      G: hex('#f2b632'), H: hex('#b9791a'),                                 // Parierstange
+      W: hex('#ffffff'), L: hex('#d8ecff'), M: hex('#9fc3e6'), D: hex('#6a8db3'),   // Klinge: Glanzkante, hell, mittel, dunkel
+    };
+    // Spitze NACH UNTEN. 9 × 23 Pixel; `SPITZE` = Spalte/Zeile der Klingenspitze.
+    const DOLCH = [
+      '...kkk...',
+      '..kpppk..',
+      '..kpqpk..',
+      '...kkk...',
+      '...kgk...',
+      '...khk...',
+      '...kgk...',
+      '...khk...',
+      '.kkkkkkk.',
+      'kGGGGGGGk',
+      'kHHHHHHHk',
+      '.kkkkkkk.',
+      '..kWLMk..',
+      '..kWLMk..',
+      '..kWLDk..',
+      '..kWLDk..',
+      '..kWLDk..',
+      '..kLMDk..',
+      '..kLMDk..',
+      '...kMDk..',
+      '...kMDk..',
+      '....kDk..',
+      '.....k...',
+    ];
+    const SPITZE = [5, 22];
+    const BLUT = ['#d62a2a', '#b01414', '#8b0a0a', '#6b0505'].map(hex);
+    const FUNKEN = ['#ffffff', '#fff1b8', '#ffc864', '#ff8a4a', '#c8501e'].map(hex);
+    const RESTE = ['#ffe2d6', '#ffb09a', '#ff6a5a', '#d63a3a'].map(hex);
+    const STREIFEN = hex('#bcd4ee');
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+    const S = 3;                                  // Bildschirmpixel je Rasterpixel
+    const GW = 80, GH = 72;                       // Raster
+    const CX = 40, CY = 52;                       // Einschlagpunkt im Raster
+    const FALL = 380;                             // Aufsetzen (ms) — deckt sich mit dem Klang `slash` (delay 360)
+    const ENDE = 960;                             // alles ist vor der Standard-Lebensdauer (1000 ms) verschwunden
+    const GRAV = 170;                             // Rasterpixel / s²
     return function KnifeSacrificeEffect({ x, y }) {
-      // v727 (Als Vorgabe 4.9.: „auch die Sacrifice-Animation sollte
-      // Blut spritzen lassen"): aus 14 zaghaften Tropfen werden 30 in
-      // breiterem Bogen, groesser und schneller — plus die Spritzer
-      // unten, die als Flecken liegenbleiben und langsam verblassen.
-      const droplets = useMemo(() => Array.from({ length: ppFxN(30) }, () => {
-        const angle = -Math.PI + Math.random() * Math.PI; // -180° bis 0°: nach aussen und oben
-        const speed = 38 + Math.random() * 58;
-        return {
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed * 0.55 + 10 + Math.random() * 18,
-          size: 5 + Math.random() * 8,
-          delay: 370 + Math.random() * 150,
-          dur: 420 + Math.random() * 280,
-          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a', '#8b0000'][Math.floor(Math.random() * 5)],
+      const cvs = useRef(null);
+      // Teilchen einmal würfeln. Zahlen über `ppFxN` (Effekt-Dichte, Lite-Modus).
+      const teile = useMemo(() => {
+        const funken = Array.from({ length: ppFxN(24) }, () => {
+          const w = -Math.PI + Math.random() * Math.PI;                  // obere Halbseite
+          const v = 34 + Math.random() * 56;
+          return { vx: Math.cos(w) * v, vy: Math.sin(w) * v * 0.9, born: FALL - 8 + Math.random() * 50, life: 260 + Math.random() * 240, lang: Math.random() < 0.45 };
+        });
+        const blut = Array.from({ length: ppFxN(26) }, () => {
+          const w = -Math.PI + Math.random() * Math.PI;
+          const v = 14 + Math.random() * 30;
+          const vx = Math.cos(w) * v, vy = Math.sin(w) * v * 0.6 - 6;
+          const boden = 7 + Math.random() * 14;                          // Landehöhe unter dem Einschlag
+          // Landezeit aus y(t) = vy·t + ½·g·t² = boden
+          const tl = (-vy + Math.sqrt(vy * vy + 2 * GRAV * boden)) / GRAV;
+          return {
+            vx, vy, born: FALL - 4 + Math.random() * 90, tl: tl * 1000, groesse: Math.random() < 0.55 ? 1 : (Math.random() < 0.7 ? 2 : 3),
+            farbe: Math.floor(Math.random() * BLUT.length), boden, fleckBis: 760 + Math.random() * 120,
+          };
+        });
+        const flecken = Array.from({ length: ppFxN(9) }, () => ({
+          fx: Math.round(-11 + Math.random() * 22), fy: Math.round(1 + Math.random() * 9),
+          w: 2 + Math.floor(Math.random() * 5), h: 1 + Math.floor(Math.random() * 3),
+          born: FALL + 20 + Math.random() * 90, farbe: 1 + Math.floor(Math.random() * 3),
+        }));
+        const reste = Array.from({ length: ppFxN(12) }, () => ({
+          rx: Math.round(-8 + Math.random() * 16), rise: 12 + Math.random() * 22, sway: Math.round(-3 + Math.random() * 6),
+          born: FALL + 60 + Math.random() * 200, life: 380 + Math.random() * 220, farbe: Math.floor(Math.random() * RESTE.length),
+        }));
+        return { funken, blut, flecken, reste };
+      }, []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        // Ein Pixel setzen; bei a < 1 per Bayer-Matrix gedithert (kein Alpha-Verlauf).
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && BAYER[(Y & 3) * 4 + (X & 3)] >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
         };
-      }), []);
-      // Drehung, die die SPITZE nach UNTEN bringt.
-      //
-      // GEMESSEN (Als Rueckmeldung 4.9.): mit 135° fiel der Dolch
-      // „genau falsch rum, Griff vorn" — also exakt 180° daneben.
-      // Richtig sind demnach 315°. Dass hier derselbe Wert steht wie
-      // beim Wurf oben, ist kein Zufall: 🗡️ zeigt von Haus aus nach
-      // unten LINKS (135°), 🔪 nach unten rechts (45°) — die Ziele
-      // unterscheiden sich um genau denselben Betrag wie die
-      // Ausgangslagen. Zeichnet eine Schrift den Dolch anders, ist es
-      // wieder nur diese eine Zahl.
-      const SPITZE_UNTEN = 315;
-      // Liegenbleibende Flecken um die Einschlagstelle.
-      const flecken = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
-        fx: -30 + Math.random() * 60,
-        fy: 2 + Math.random() * 26,
-        size: 7 + Math.random() * 13,
-        delay: 400 + Math.random() * 130,
-        color: ['#7f0808', '#a01010', '#6b0505'][Math.floor(Math.random() * 3)],
-      })), []);
+        const block = (px, py, w, h, c, a = 1) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); };
+        const zeichne = (t) => {
+          buf.fill(0);
+          const aus = t > ENDE - 220 ? Math.max(0, 1 - (t - (ENDE - 220)) / 220) : 1;   // Ausblenden am Ende (gedithert)
+          // ── Bodenring + Plus-Blitz beim Aufsetzen ──
+          if (t >= FALL) {
+            const u = (t - FALL) / 480;
+            if (u < 1) {
+              const r = 1 + u * 15;
+              const n = Math.ceil(r * 7);
+              for (let k = 0; k < n; k++) {                                    // flacher Ring (Ellipse) um den Einschlag
+                const w = (k / n) * Math.PI * 2;
+                put(CX + Math.cos(w) * r, CY + 2 + Math.sin(w) * r * 0.42, BLUT[0], (1 - u) * aus);
+              }
+            }
+            const f = (t - FALL) / 110;
+            if (f < 1) {
+              const r = 1 + Math.round(f * 7);
+              for (let k = -r; k <= r; k++) { put(CX + k, CY + 1, FUNKEN[0], 1 - f); put(CX, CY + 1 + k, FUNKEN[0], 1 - f); }
+              if (f < 0.5) block(CX - 1, CY, 3, 3, FUNKEN[0]);
+            }
+          }
+          // ── Flecken: bleiben liegen, am Ende gedithert weg ──
+          for (const fl of teile.flecken) {
+            if (t < fl.born) continue;
+            const a = Math.min(1, (t - fl.born) / 60) * (t > 760 ? Math.max(0, 1 - (t - 760) / 200) : 1);
+            block(CX + fl.fx - (fl.w >> 1), CY + fl.fy, fl.w, fl.h, BLUT[fl.farbe], a);
+          }
+          // ── Blut: Bogen, Landung, Fleck ──
+          for (const b of teile.blut) {
+            if (t < b.born) continue;
+            const tt = (t - b.born) / 1000;
+            if (t - b.born < b.tl) {
+              const bx = CX + b.vx * tt, by = CY + 1 + b.vy * tt + 0.5 * GRAV * tt * tt;
+              const c = BLUT[Math.min(BLUT.length - 1, b.farbe + (tt > 0.3 ? 1 : 0))];
+              if (b.groesse === 1) put(bx, by, c);
+              else if (b.groesse === 2) block(bx, by, 2, 2, c);
+              else { block(bx, by + 1, 3, 1, c); block(bx + 1, by, 1, 3, c); }  // 3er-Tropfen als Plus (kein Eckpixel)
+            } else {
+              const tl = b.tl / 1000;
+              const lx = CX + b.vx * tl, ly = CY + 1 + b.boden;
+              const a = t > b.fleckBis ? Math.max(0, 1 - (t - b.fleckBis) / 180) : 1;
+              block(lx, ly, b.groesse + 1, 1, BLUT[2], a);
+            }
+          }
+          // ── Funken: schnell, hell, von weiß nach dunkelorange ──
+          for (const f of teile.funken) {
+            const age = t - f.born;
+            if (age < 0 || age > f.life) continue;
+            const tt = age / 1000;
+            const fx = CX + f.vx * tt, fy = CY + 1 + f.vy * tt + 0.5 * GRAV * tt * tt;
+            const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor((age / f.life) * FUNKEN.length))];
+            put(fx, fy, c);
+            if (f.lang && age < f.life * 0.7) put(fx - Math.sign(f.vx) * 1, fy - Math.sign(f.vy || -1) * 1, FUNKEN[Math.min(FUNKEN.length - 1, 1 + Math.floor((age / f.life) * 3))]);
+          }
+          // ── Glimmende Reste steigen auf ──
+          for (const r of teile.reste) {
+            const age = t - r.born;
+            if (age < 0 || age > r.life) continue;
+            const u = age / r.life;
+            put(CX + r.rx + Math.round(r.sway * u), CY - r.rise * u, RESTE[r.farbe], Math.min(1, (1 - u) * 1.6));
+          }
+          // ── Dolch ──
+          const stoss = t >= 400 && t < 450 ? 1 : 0;                           // kurzes Nachfedern beim Aufsetzen
+          const u = Math.min(1, t / FALL);
+          const spitze = Math.round((CY - 36) + (37 + stoss) * (u * u));       // Spitzenhöhe; u² = Beschleunigung
+          const dolchA = Math.min(1, t / 70) * aus;                            // Einblenden (gedithert)
+          if (t < FALL) {                                                       // Fallstreifen hinter dem Knauf
+            const oben = spitze - 23;
+            for (const [dx, laenge] of [[-2, 9], [0, 13], [2, 7]]) {
+              for (let i = 1; i <= Math.round(laenge * u); i++) put(CX + dx - 1, oben - i, STREIFEN, Math.max(0, 1 - i / (laenge + 1)) * dolchA);
+            }
+          }
+          for (let r = 0; r < DOLCH.length; r++) for (let c = 0; c < DOLCH[r].length; c++) {
+            const ch = DOLCH[r][c];
+            if (ch !== '.') put(CX - SPITZE[0] + c, spitze - SPITZE[1] + r, SPRITE_FARBE[ch], dolchA);
+          }
+          ctx.putImageData(img, 0, 0);
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / 30);                          // ~33 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; zeichne(t); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
       return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          {/* Dagger — falls from ~80px above to the centre, then sticks */}
-          <div style={{
-            position: 'absolute', left: -20, top: 0,
-            fontSize: 56, lineHeight: '40px',
-            filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.85)) drop-shadow(0 0 3px rgba(255,255,255,0.4))',
-            '--ksDeg': SPITZE_UNTEN + 'deg',
-            '--ksDegKipp': (SPITZE_UNTEN - 13) + 'deg',
-            '--ksDegKipp2': (SPITZE_UNTEN - 7) + 'deg',
-            animation: 'knifeSacPlunge 480ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
-          }}>🗡️</div>
-          {/* Impact flash + dust ring on contact */}
-          <div style={{
-            position: 'absolute', left: -28, top: -4,
-            width: 56, height: 56, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(255,200,200,0.4) 40%, transparent 75%)',
-            opacity: 0,
-            animation: 'knifeSacImpact 320ms ease-out 380ms forwards',
-          }} />
-          {/* Outer crimson shockwave */}
-          <div style={{
-            position: 'absolute', left: -16, top: -2,
-            width: 32, height: 32, borderRadius: '50%',
-            border: '3px solid rgba(180, 20, 20, 0.85)',
-            opacity: 0,
-            animation: 'knifeSacShockwave 480ms ease-out 380ms forwards',
-          }} />
-          {/* Blood droplets — burst outward from the impact point */}
-          {droplets.map((d, i) => (
-            <div key={'kbd' + i} style={{
-              position: 'absolute', left: 0, top: 0,
-              width: d.size + 'px', height: d.size + 'px',
-              borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
-              background: `radial-gradient(circle at 35% 30%, ${d.color}, ${d.color}aa 70%)`,
-              boxShadow: `0 0 ${d.size * 1.5}px ${d.color}88`,
-              opacity: 0,
-              '--ksDx': d.dx + 'px',
-              '--ksDy': d.dy + 'px',
-              animation: `knifeSacDroplet ${d.dur}ms ease-out ${d.delay}ms forwards`,
-            }} />
-          ))}
-          {/* Flecken — bleiben liegen und verblassen langsam */}
-          {flecken.map((f, i) => (
-            <div key={'kbs' + i} style={{
-              position: 'absolute', left: f.fx + 'px', top: f.fy + 'px',
-              width: f.size + 'px', height: (f.size * 0.7) + 'px',
-              borderRadius: '55% 45% 60% 40% / 65% 55% 45% 35%',
-              background: f.color,
-              boxShadow: `0 0 ${f.size}px ${f.color}66`,
-              opacity: 0,
-              animation: `knifeSacStain 900ms ease-out ${f.delay}ms forwards`,
-            }} />
-          ))}
-          <style>{`
-            @keyframes knifeSacStain {
-              0%   { opacity: 0; transform: scale(0.2); }
-              20%  { opacity: 0.95; transform: scale(1.1); }
-              65%  { opacity: 0.8; transform: scale(1); }
-              100% { opacity: 0; transform: scale(1); }
-            }
-            @keyframes knifeSacPlunge {
-              /* SPITZE NACH UNTEN (v727): das Emoji zeigt von Haus aus
-                 nach oben rechts (−45°), fuer „nach unten" (+90°)
-                 braucht es 135°. Vorher stand hier 20° → 0°, das
-                 Messer stach also schraeg nach oben statt nach unten
-                 (Als Befund 4.9.). Der kleine Ueberschwung von 148° auf
-                 135° bleibt als Kippen beim Aufsetzen. */
-              0%   { transform: translate(0, -90px) rotate(var(--ksDegKipp)); opacity: 0; }
-              25%  { transform: translate(0, -45px) rotate(var(--ksDegKipp2)); opacity: 1; }
-              80%  { transform: translate(0, 4px)   rotate(var(--ksDeg)); opacity: 1; }
-              100% { transform: translate(0, 6px)   rotate(var(--ksDeg)); opacity: 1; }
-            }
-            @keyframes knifeSacImpact {
-              0%   { opacity: 0; transform: scale(0.4); }
-              30%  { opacity: 1; transform: scale(1.1); }
-              100% { opacity: 0; transform: scale(1.6); }
-            }
-            @keyframes knifeSacShockwave {
-              0%   { opacity: 0.95; transform: scale(0.5); border-width: 3px; }
-              100% { opacity: 0; transform: scale(3.2); border-width: 0.5px; }
-            }
-            @keyframes knifeSacDroplet {
-              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
-              25%  { opacity: 1; transform: translate(calc(var(--ksDx) * 0.3), calc(var(--ksDy) * 0.3)) scale(1); }
-              100% { opacity: 0; transform: translate(var(--ksDx), var(--ksDy)) scale(0.6); }
-            }
-          `}</style>
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y + 6 - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
         </div>
       );
     };
@@ -39500,8 +39575,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // the server pacing line up 1:1.
     // `dest` (optional, Als Vorgabe 21.8. fuer Future Tech Lamp) waehlt
     // das Flugziel NACH dem Umdrehen in der Mitte: 'discard' (Vorgabe),
-    // 'deleted', 'deck' (zurueck ins Deck) oder 'hand'. Ohne das Feld
-    // bleibt alles wie bisher.
+    // 'deleted', 'deck' (zurueck ins Deck), 'potionDeck' (zurueck ins
+    // Potion Deck, Gegenstueck zu `from: 'potionDeck'`), 'hand' oder
+    // 'support' (mit destHeroIdx/destSlotIdx). Ohne das Feld bleibt
+    // alles wie bisher.
     const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, from }) => {
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       const isMe    = owner === myIdx;
@@ -39594,6 +39671,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           discard: isMe ? '[data-my-discard]' : '[data-opp-discard]',
           deleted: isMe ? '[data-my-deleted]' : '[data-opp-deleted]',
           deck:    isMe ? '[data-my-deck]'    : '[data-opp-deck]',
+          potionDeck: isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]',
         };
         const pileEl = document.querySelector(selMap[ziel] || selMap.discard);
         if (pileEl) {

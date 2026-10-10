@@ -10747,6 +10747,10 @@ body:has(.modal-overlay) .board-tooltip,
 body:has(.modal-overlay) .tooltip {
   z-index: 10086;
 }
+/* Puzzle-Editor: sein Tooltip traegt den Ebenenwert inline (ueber der Staging-Hand, 10020) — ueber die Variable
+   steigt er mit, sobald ein Dialog-Schleier offen ist (sonst lag der Karten-Tooltip einer Stapelansicht unter
+   dem Grauschleier). */
+body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 
 /* ===== NOTIFICATION ===== */
 .notification {

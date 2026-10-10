@@ -14687,6 +14687,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         return true;
       };
     }
+    // „as an additional Action" (durch einen FREMDEN Effekt) sehen auch die Karte selbst und ihre Hooks:
+    // `ctx._alsZusatzaktion` — z. B. fragt Blue-Ice Dragon dann nicht mehr, ob er als inhaerente Zusatzaktion
+    // beschworen werden soll (die Beschwoerung IST schon eine).
+    if (alsZusatzaktion) rest.hookExtras = { ...(rest.hookExtras || {}), _alsZusatzaktion: true };
     const ergebnis = await this._summonCreatureWithHooksKern(cardName, playerIdx, heroIdx, zoneSlot, rest);
     if (alsZusatzaktion && ergebnis?.inst) {
       // Die Aktion gehoert dem BESCHWOERER (`controller`), nicht der
@@ -18749,7 +18753,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!taken) return null;
     const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx, ...(feld !== pi ? { toOwner: feld } : {}) };
     if (pile === 'hand') flight.fromHandIdx = taken.idx;
-    this._pileFlight(pi, taken.name, pile, 'support', flight);
+    // `opts.flug: false`: der Aufrufer hat den Flug schon selbst gezeigt (z. B. Aufdecken ueber die Mitte des
+    // Feldes, `mill_center_reveal` mit `dest: 'support'`) — kein zweiter Flug von der Quelle.
+    if (opts.flug !== false) this._pileFlight(pi, taken.name, pile, 'support', flight);
     const summon = await this.summonCreatureWithHooks(taken.name, feld, heroIdx, slotIdx, {
       source: opts.source || 'summonFromPile', hookExtras: { _summonedFromPile: pile, ...(opts.hookExtras || {}) },
       alsZusatzaktion: !!opts.alsZusatzaktion,   // v1349
@@ -26421,6 +26427,12 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async resolveSacrificeCost(ctx, spec) {
     delete this.gs._opferFizzle;   // v1313: nur Rettungen DIESES Opfers zaehlen
+    // ★ VORGEGEBENE OPFER (Pinta): wer die Karte beschwoert, kann bestimmte Kreaturen als Opfer VORGEBEN
+    // (`hookExtras._requiredSacrificeInstIds`: „die Creature in dieser Zone wird automatisch zu einem der
+    // Opfer"). Sie zaehlen als Pflicht-Tribute (`spec.requiredInstIds`) und werden unten OHNE Auswahl geopfert.
+    if (Array.isArray(ctx._requiredSacrificeInstIds) && ctx._requiredSacrificeInstIds.length > 0) {
+      spec = { ...spec, requiredInstIds: [...new Set([...(spec.requiredInstIds || []), ...ctx._requiredSacrificeInstIds])] };
+    }
     const pi = ctx.cardOwner;
     const selfId = ctx.card?.id;
     const candidates = this._collectSacrificeCandidates(pi, spec, selfId);
@@ -26529,12 +26541,26 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const cancellable = spec.cancellable !== false;
     let picked = null;
+    // ── Pflicht-Tribute (`spec.requiredInstIds`) werden NICHT gewaehlt, sondern automatisch geopfert: der Waehler
+    // zeigt nur den Rest (Anzahl, Summen und „mind. ein Opfer von diesem Helden" um die Pflicht-Tribute gekuerzt).
+    // Ohne Pflicht-Tribute laeuft alles wie bisher.
+    const requiredSet = new Set(spec.requiredInstIds || []);
+    const forced = requiredSet.size > 0 ? targets.filter(t => t.cardInstance && requiredSet.has(t.cardInstance.id)) : [];
+    const nForced = forced.length;
+    const pickable = nForced > 0 ? targets.filter(t => !forced.includes(t)) : targets;
+    const restMinHp = Math.max(0, (spec.minMaxHp || 0) - forced.reduce((n, t) => n + (t._meta.maxHp || 0), 0));
+    const restMinLvl = Math.max(0, (spec.minSumLevel || 0) - forced.reduce((n, t) => n + (t._meta.level || 0), 0));
+    const restMustHero = nForced > 0 && spec.mustIncludeFromHeroIdx != null
+      && forced.some(t => t.cardInstance && this._vomPflichtHelden(t.cardInstance, spec));
     // CPU/Schnellmodus: Eine deterministische Auswahl, die die Bedingung verfehlt, wiederholt sich endlos (Skill Test: Steam Dwarf Dragon Pilot,
     // Nachttraining) — nach drei Fehlversuchen zählt es als Abbruch (nur im Skill Test; Menschen werden unbegrenzt neu gefragt).
     let _cpuFehl = 0;
     const _cpuGibtAuf = () => cancellable && this.gs.isSkillTest && (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) && ++_cpuFehl >= 3;
     while (true) {
-      const ids = await this.promptEffectTarget(pi, targets, {
+      // Reichen die Pflicht-Tribute schon (genau so viele wie gefordert), gibt es nichts mehr zu waehlen.
+      const nichtsMehrZuWaehlen = nForced > 0 && nForced >= spec.minCount && restMinHp === 0 && restMinLvl === 0
+        && (spec.maxCount != null ? spec.maxCount - nForced <= 0 : pickable.length === 0);
+      const ids = nichtsMehrZuWaehlen ? [] : await this.promptEffectTarget(pi, pickable, {
         title: spec.title || `${ctx.cardName} — Sacrifice`,
         description: spec.description || defaultDesc,
         confirmLabel: spec.confirmLabel || '🗡️ Sacrifice!',
@@ -26545,16 +26571,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         // sacrifice-as-many-as-you-want behaviour for cards like
         // Sacrifice to Divinity. Cards that demand an exact count
         // (Clausss → exactly one) pass `maxCount: 1`.
-        maxTotal: spec.maxCount != null ? spec.maxCount : targets.length,
-        minRequired: spec.minCount,
-        minSumMaxHp: spec.minMaxHp || undefined,
-        minSumLevel: spec.minSumLevel || undefined,
+        maxTotal: spec.maxCount != null ? Math.max(0, spec.maxCount - nForced) : pickable.length,
+        minRequired: Math.max(0, spec.minCount - nForced),
+        minSumMaxHp: (nForced > 0 ? restMinHp : spec.minMaxHp) || undefined,
+        minSumLevel: (nForced > 0 ? restMinLvl : spec.minSumLevel) || undefined,
         // "Mindestens ein Opfer von DIESEM Helden" — bis 8.8. wurde die
         // Bedingung erst NACH dem Bestaetigen geprueft, und die Schleife
         // unten oeffnete den Waehler kommentarlos erneut. Jetzt kennt der
         // Client sie und sperrt die falschen Kreaturen schon vorher.
-        mustIncludeFromHeroIdx: spec.mustIncludeFromHeroIdx,
-        ...(spec.mustIncludeFromHeroOwner != null ? { mustIncludeFromHeroOwner: spec.mustIncludeFromHeroOwner } : {}),
+        mustIncludeFromHeroIdx: restMustHero ? undefined : spec.mustIncludeFromHeroIdx,
+        ...(spec.mustIncludeFromHeroOwner != null && !restMustHero ? { mustIncludeFromHeroOwner: spec.mustIncludeFromHeroOwner } : {}),
         // Sacrifice-flavor red highlight on every eligible target. All
         // engine-driven sacrifice prompts route through this helper, so
         // setting it here covers the whole codebase: Sacrifice to
@@ -26579,8 +26605,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           .find(t => t && extraIds.has(t.id));
         if (extra) return { extraPicked: extra };
       }
-      if (!ids || ids.length < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
-      const chosen = ids.map(id => targets.find(t => t.id === id)).filter(Boolean);
+      if (!ids || ids.length + nForced < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
+      const chosen = [...forced, ...ids.map(id => pickable.find(t => t.id === id)).filter(Boolean)];
       if (chosen.length < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       if (spec.minMaxHp) {
         const sumMax = chosen.reduce((s, t) => s + (t._meta.maxHp || 0), 0);

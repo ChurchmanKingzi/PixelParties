@@ -54,6 +54,13 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  Haste. Deshalb ist Haste der Standard und wird
 //  nur auf dem selbstgewählten Gratisweg unterdrückt.
 //
+//  Beschwört ein fremder Effekt ihn selbst "as an
+//  additional Action" (Pinta, Kasperov, …;
+//  `ctx._alsZusatzaktion`), ist die Zusatzaktion schon
+//  vergeben: KEINE Rückfrage, und er bekommt Haste,
+//  als wäre eine Aktion für ihn ausgegeben worden
+//  (Als Ruling 10.10.).
+//
 //  ── ③ Aktiv-Effekt (einmal pro Zug, Main Phase) ──
 //  Ziel auf dem Feld wählen: ist es bereits Frozen,
 //  300 Schaden — sonst Frozen für 2 Züge. Die
@@ -186,6 +193,11 @@ function targetIsFrozen(engine, target) {
 }
 
 module.exports = {
+  // Vertrag fuer Effekte, die eine Creature mit Opferkosten in einen BELEGTEN Platz beschwoeren (Pinta): die
+  // Kostenbeschreibung, wie `resolveSacrificeCost` sie versteht. Mit `requiredInstIds` fragt der Effekt per
+  // `engine.canSatisfySacrifice`, ob die Creature in einer bestimmten Zone als Opfer taugt.
+  summonSacrificeSpec: (engine) => makeSacrificeSpec(engine),
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
@@ -264,8 +276,12 @@ module.exports = {
     // ── Beschwörungsart ──
     // `ctx.isInherentAction` ist bereits true, wenn der Gratisweg
     // erzwungen war; dann gibt es nichts zu fragen.
-    let freeSummon = !!ctx.isInherentAction;
-    if (!freeSummon) {
+    // Beschwört ein FREMDER Effekt ihn „as an additional Action" (Pinta, Kasperov …; `ctx._alsZusatzaktion`),
+    // ist die Zusatzaktion schon vergeben: keine Rückfrage, und er zählt NICHT als „by its own effect" —
+    // er bekommt Haste wie nach einer ausgegebenen Aktion (Als Ruling 10.10.).
+    const fremdeZusatzaktion = !!ctx._alsZusatzaktion;
+    let freeSummon = !fremdeZusatzaktion && !!ctx.isInherentAction;
+    if (!freeSummon && !fremdeZusatzaktion) {
       const choice = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
