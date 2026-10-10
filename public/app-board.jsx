@@ -7922,6 +7922,102 @@ const SOG_FLUG_MS = 820;
 
 // ppFxN (Partikel-Deckel fuer Telefone) lebt seit v1410 in app-shared.jsx.
 
+// ═══════════════════════════════════════════════════════════════════
+//  PIXELART-SALVEN — Quelle → ALLE Ziele gleichzeitig
+//  (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!" — Assault Eagle: Pistolenschuesse, Welle)
+//
+//  Gemeinsame Huelle fuer Brett-Animationen (`play_zone_animation` mit `zoneType: 'board'`, `originOwner` /
+//  `originHeroIdx` [/ `originZoneSlot`] und `targets`): `onZoneAnim` rechnet sie in Bildschirmpunkte um und reicht
+//  `ox`/`oy` (Ursprung) und `targetPoints` (Ziele, mit Mass) an die Komponente. Hier steht nur, was jede Salve
+//  gleich braucht: ein Canvas, gerade so gross, dass Quelle und ALLE Ziele samt Rand hineinpassen; ein Rasterpixel =
+//  3 Bildschirmpixel (`image-rendering: pixelated`); feste Paletten, Bayer-Dithering statt Alpha, ~30 Bilder/s; KEIN
+//  Filter, KEIN Schein (der Pixelierer macht aus einem weichen Schein einen schraegen Ring — Messer-Befund); die
+//  Wurzel traegt `data-pp-px="aus"`, die Grafik IST schon Pixelart.
+//
+//    ppSalve(malen, ende, vorbereiten?) → Komponente
+//      vorbereiten(sz)        → Zufallsdaten (einmal gewuerfelt; `teile`, je Ziel eine Eintragung)
+//      malen(g, t, sz, teile) → zeichnet das Bild zur Zeit `t` (ms seit Einhaengen)
+//      `g`  Pinsel: put(x, y, farbe, deckung?)  block(x, y, w, h, farbe, deckung?)  ring(cx, cy, rx, ry, farbe, deckung?)
+//           disc(cx, cy, r, farbe, deckung?)   — alles in RASTERkoordinaten, Deckung < 1 = Bayer-gedithert
+//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }] }
+//           dx/dy = Einheitsrichtung Quelle → Ziel; `selbst` = die Quelle IST das Ziel (z. B. Assault Eagle waehlt sich selbst)
+//  Alle Ziele laufen im selben Takt — „gleichzeitig" ist Sache der Zeichenfunktion (gleiche Zeit, nicht gleiche Geschwindigkeit).
+// ═══════════════════════════════════════════════════════════════════
+// (Bayer-Matrix: `ppBayer(x, y)` aus app-shared.jsx)
+const ppHex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function ppSalve(malen, ende, vorbereiten) {
+  const S = 3, PAD = 60, TAKT = 33;
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt }) {
+    const cvs = useRef(null);
+    const sz = useMemo(() => {
+      if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
+      // Welt-Effekte tragen FELD-Koordinaten (Fenster + Scrollstand des Feldes), s. ppFxWeltAnker; Ursprung und Ziele
+      // kommen als Fensterpunkte und werden hier in dieselbe Sprache gebracht (am Desktop ohne Scrollen: 0).
+      const off = welt && window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      const O = { x: ox + off.dx, y: oy + off.dy };
+      const T = targetPoints.map(p => ({ x: p.x + off.dx, y: p.y + off.dy, w: p.w || 64, h: p.h || 90 }));
+      const xs = [O.x, ...T.map(p => p.x)], ys = [O.y, ...T.map(p => p.y)];
+      const links = Math.floor(Math.min(...xs) - PAD), oben = Math.floor(Math.min(...ys) - PAD);
+      const gw = Math.ceil((Math.max(...xs) + PAD - links) / S), gh = Math.ceil((Math.max(...ys) + PAD - oben) / S);
+      const o = { x: (O.x - links) / S, y: (O.y - oben) / S };
+      const ziele = T.map(p => {
+        const q = { x: (p.x - links) / S, y: (p.y - oben) / S };
+        const len = Math.hypot(q.x - o.x, q.y - o.y);
+        return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
+          dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
+      });
+      return { links, oben, gw, gh, O: o, ziele };
+    }, []);
+    const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || !sz || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(sz.gw, sz.gh);
+      const buf = img.data, gw = sz.gw, gh = sz.gh;
+      const put = (px, py, c, a = 1) => {
+        const X = Math.round(px), Y = Math.round(py);
+        if (X < 0 || Y < 0 || X >= gw || Y >= gh || a <= 0) return;
+        if (a < 1 && ppBayer(X, Y) >= a) return;
+        const i = (Y * gw + X) * 4;
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+      };
+      const g = {
+        put,
+        block(px, py, w, h, c, a = 1) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) put(px + i, py + j, c, a); },
+        ring(cx, cy, rx, ry, c, a = 1) {
+          const n = Math.max(16, Math.ceil((rx + ry) * 3.4));
+          for (let k = 0; k < n; k++) { const w = (k / n) * Math.PI * 2; put(cx + Math.cos(w) * rx, cy + Math.sin(w) * ry, c, a); }
+        },
+        disc(cx, cy, r, c, a = 1) {
+          const R = Math.ceil(r);
+          for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r * r) put(cx + i, cy + j, c, a);
+        },
+      };
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);                  // ~30 Bilder/s: ruhige Pixelart-Taktung
+        if (fr !== letzte) { letzte = fr; buf.fill(0); malen(g, t, sz, teile); ctx.putImageData(img, 0, 0); }
+        if (t < ende) raf = requestAnimationFrame(schritt);
+        else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = requestAnimationFrame(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, [sz]);
+    if (!sz) return null;
+    return (
+      <div aria-hidden="true" data-pp-px="aus"
+        style={{ position: 'fixed', left: sz.links, top: sz.oben, pointerEvents: 'none', zIndex: 10110 }}>
+        <canvas ref={cvs} width={sz.gw} height={sz.gh}
+          style={{ width: sz.gw * S, height: sz.gh * S, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -24125,6 +24221,167 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Pistolenschuesse (Assault Eagle, erste Haelfte) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
+  //
+  //  Je Ziel drei Schuss im Abstand von 105 ms, alle Ziele im selben Takt: Muendungsfeuer an der Quelle (Kreuz mit
+  //  Strahlen in Schussrichtung, drei Bilder), Geschoss (2×2, weiss-gelb, mit gedithertem Schweif) fliegt in 190 ms auf
+  //  einen leicht gestreuten Punkt der Zielkarte, am Ziel Einschlagkreuz, Funken mit Schwerkraft und eine graue
+  //  Rauchwolke, die gedithert ausduennt; an der Quelle fliegt je Schuss eine Huelse aus. Der letzte Einschlag liegt bei
+  //  ~400 ms — der Schaden folgt danach (assault-eagle.js: GUNFIRE_HIT_MS). Ist die Quelle selbst das Ziel, gibt es
+  //  Muendungsfeuer und Einschlag am selben Platz.
+  // ═══════════════════════════════════════════════════════════════════
+  gunfire_volley: (() => {
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a'), ORANGE = ppHex('#ff9b2f'), DUNKEL = ppHex('#c2551a'), ROT = ppHex('#7a2a14');
+    const GOLD = ppHex('#f2b632'), GOLD2 = ppHex('#b9791a'), RAUCH = [ppHex('#b9b9c4'), ppHex('#8a8a96'), ppHex('#5e5e6a')];
+    const FUNKEN = [WEISS, GELB, ORANGE, DUNKEL, ROT];
+    const FLUG = 190, LUECKE = 105, SCHUESSE = 3, G = 150;
+    const vorbereiten = (sz) => sz.ziele.map(z => ({
+      schuss: Array.from({ length: SCHUESSE }, () => ({
+        sx: (Math.random() - 0.5) * z.w * 0.56, sy: (Math.random() - 0.5) * z.h * 0.5,
+        funken: Array.from({ length: ppFxN(7) }, () => ({ w: Math.random() * Math.PI * 2, v: 28 + Math.random() * 46, leben: 170 + Math.random() * 150 })),
+        huelse: { vx: 22 + Math.random() * 16, vy: -(30 + Math.random() * 22) },
+      })),
+    }));
+    const malen = (g, t, sz, teile) => {
+      sz.ziele.forEach((z, zi) => {
+        const px = -z.dy, py = z.dx;                                   // Senkrechte zur Schussrichtung
+        for (let k = 0; k < SCHUESSE; k++) {
+          const alter = t - k * LUECKE;
+          if (alter < 0) continue;
+          const s = teile[zi].schuss[k];
+          const ex = z.x + s.sx, ey = z.y + s.sy;                      // Einschlagpunkt
+          const sx0 = sz.O.x + z.dx * 8, sy0 = sz.O.y + z.dy * 8;     // Geschoss startet vor dem Lauf
+          const gx = ex - sx0, gy = ey - sy0, strecke = Math.hypot(gx, gy);
+          const rx = strecke > 0.01 ? gx / strecke : z.dx, ry = strecke > 0.01 ? gy / strecke : z.dy;
+          // Muendungsfeuer: drei Bilder (gross → klein)
+          if (alter < 90) {
+            const f = alter < 30 ? 0 : alter < 60 ? 1 : 2;
+            const lang = [8, 6, 4][f], breit = [4, 3, 2][f];
+            const mx = sz.O.x + z.dx * 6, my = sz.O.y + z.dy * 6;
+            if (f < 2) g.block(mx - 1, my - 1, 3, 3, WEISS); else g.put(mx, my, WEISS);
+            for (let i = 1; i <= lang; i++) g.put(mx + z.dx * i, my + z.dy * i, i <= 2 ? WEISS : i <= 5 ? GELB : ORANGE);
+            for (let i = 1; i <= breit; i++) {
+              g.put(mx + z.dx * i * 0.5 + px * i, my + z.dy * i * 0.5 + py * i, GELB);
+              g.put(mx + z.dx * i * 0.5 - px * i, my + z.dy * i * 0.5 - py * i, GELB);
+            }
+          }
+          // Huelse: fliegt seitlich aus, faellt, verloeschen
+          if (alter < 440) {
+            const sek = alter / 1000;
+            const hx = sz.O.x + px * 3 + (px >= 0 ? 1 : -1) * s.huelse.vx * sek, hy = sz.O.y + py * 3 + s.huelse.vy * sek + 0.5 * 230 * sek * sek;
+            if (alter < 90) g.block(hx, hy, 2, 1, GOLD); else g.put(hx, hy, alter < 300 ? GOLD : GOLD2, alter < 340 ? 1 : 0.5);
+          }
+          // Geschoss im Flug
+          if (alter < FLUG && !z.selbst) {
+            const u = alter / FLUG, bx = sx0 + gx * u, by = sy0 + gy * u;
+            g.block(bx - 1, by - 1, 2, 2, WEISS);
+            g.put(bx - rx * 2, by - ry * 2, GELB);
+            const gelaufen = u * strecke;
+            for (let j = 3; j <= 10; j++) {
+              if (j > gelaufen) break;
+              g.put(bx - rx * j, by - ry * j, j < 5 ? GELB : j < 8 ? ORANGE : DUNKEL, Math.max(0, 1 - (j - 2) / 9));
+            }
+          }
+          // Einschlag
+          const ia = alter - FLUG;
+          if (ia >= 0) {
+            if (ia < 90) {
+              const r = ia < 45 ? 4 : 2;
+              for (let i = -r; i <= r; i++) { g.put(ex + i, ey, i === 0 ? WEISS : GELB); g.put(ex, ey + i, i === 0 ? WEISS : GELB); }
+              if (ia < 45) { g.put(ex - 1, ey - 1, ORANGE); g.put(ex + 1, ey - 1, ORANGE); g.put(ex - 1, ey + 1, ORANGE); g.put(ex + 1, ey + 1, ORANGE); }
+              g.block(ex - 1, ey - 1, 2, 2, WEISS);
+            }
+            for (const f of s.funken) {
+              if (ia >= f.leben) continue;
+              const sek = ia / 1000;
+              const fx = ex + Math.cos(f.w) * f.v * sek, fy = ey + Math.sin(f.w) * f.v * sek + 0.5 * G * sek * sek;
+              const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor((ia / f.leben) * FUNKEN.length))];
+              g.put(fx, fy, c);
+              if (ia < f.leben * 0.45) g.put(fx - Math.cos(f.w), fy - Math.sin(f.w), FUNKEN[Math.min(FUNKEN.length - 1, 1 + Math.floor((ia / f.leben) * 3))]);
+            }
+            if (ia >= 30 && ia < 390) {
+              const u = (ia - 30) / 360, r = 1 + u * 3.4;
+              g.disc(ex, ey - u * 5, r, RAUCH[u < 0.35 ? 0 : u < 0.7 ? 1 : 2], 0.75 * (1 - u));
+            }
+          }
+        }
+      });
+    };
+    return ppSalve(malen, 820, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Welle (Assault Eagle, zweite Haelfte) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
+  //
+  //  Von der Quelle laeuft je Ziel ein gewoelbter Wellenkamm (vier gestaffelte Boegen weiss → hellblau → blau, am Rand
+  //  gedithert ausduennt, der Kamm wird breiter, je weiter er kommt) und erreicht ALLE Ziele im selben Augenblick
+  //  (460 ms — gleiche Zeit, nicht gleiche Geschwindigkeit); dort Blitzkreuz, zwei flache Druckringe und blaue Funken.
+  //  An der Quelle zuckt zum Start ein Druckring. Ist die Quelle selbst das Ziel, gibt es nur den Druckring und den
+  //  Einschlag am selben Platz. Der Schaden folgt nach dem Einschlag (assault-eagle.js: WAVE_HIT_MS).
+  // ═══════════════════════════════════════════════════════════════════
+  shockwave_volley: (() => {
+    const WEISS = ppHex('#ffffff'), HELL = ppHex('#c9f3ff'), MITTEL = ppHex('#6fd0ff'), BLAU = ppHex('#2f8be0'), TIEF = ppHex('#1b4fa8');
+    const BOEGEN = [WEISS, HELL, MITTEL, BLAU], DECKUNG = [1, 0.9, 0.65, 0.4];
+    const T_HIT = 460;
+    const vorbereiten = (sz) => sz.ziele.map(() => ({
+      funken: Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() * Math.PI * 2, v: 36 + Math.random() * 40, leben: 250 + Math.random() * 130 })),
+    }));
+    const malen = (g, t, sz, teile) => {
+      // Druckring an der Quelle
+      if (t < 340) {
+        const u = t / 340, r = 3 + u * 22;
+        g.ring(sz.O.x, sz.O.y, r, r * 0.55, u < 0.4 ? HELL : MITTEL, 1 - u);
+        if (u < 0.45) g.ring(sz.O.x, sz.O.y, r - 1, (r - 1) * 0.55, WEISS, 1 - u * 1.8);
+      }
+      sz.ziele.forEach((z, zi) => {
+        const px = -z.dy, py = z.dx;
+        // Wellenkamm unterwegs
+        if (!z.selbst && t < T_HIT) {
+          const u = Math.max(0, t / T_HIT);
+          const fx = sz.O.x + z.dx * z.len * u, fy = sz.O.y + z.dy * z.len * u;
+          const hw = 5 + 8 * u, R = hw * 2;
+          for (let b = 0; b < BOEGEN.length; b++) {
+            const zurueck = b * 3.2;
+            for (let s = -hw; s <= hw; s += 0.45) {
+              const entlang = -(s * s) / (2 * R) - zurueck;
+              const X = fx + z.dx * entlang + px * s, Y = fy + z.dy * entlang + py * s;
+              if ((X - sz.O.x) * z.dx + (Y - sz.O.y) * z.dy < 0) continue;      // nie hinter der Quelle
+              const rand = Math.abs(s) / hw;
+              const a = DECKUNG[b] * (1 - 0.6 * rand * rand);
+              g.put(X, Y, BOEGEN[b], a);
+              if (b === 0) g.put(X + z.dx, Y + z.dy, BOEGEN[1], a);               // Kamm: zwei Pixel dick
+            }
+          }
+        }
+        // Einschlag
+        const alter = t - T_HIT;
+        if (alter >= 0) {
+          if (alter < 100) {
+            const r = alter < 50 ? 6 : 3;
+            for (let i = -r; i <= r; i++) { g.put(z.x + i, z.y, i === 0 ? WEISS : HELL); g.put(z.x, z.y + i, i === 0 ? WEISS : HELL); }
+            if (alter < 50) g.block(z.x - 1, z.y - 1, 3, 3, WEISS);
+          }
+          if (alter < 400) {                                   // grosser Druckring, beginnt schon weit genug aussen (kein Klumpen)
+            const u = alter / 400, r = 6 + u * 17, c = alter < 80 ? WEISS : alter < 200 ? HELL : MITTEL;
+            g.ring(z.x, z.y, r, r * 0.62, c, 1 - u * 0.9);
+            if (alter < 60) g.ring(z.x, z.y, r - 1, (r - 1) * 0.62, HELL, 1 - u);
+          }
+          if (alter >= 110 && alter < 430) {                   // zweiter, kleinerer Ring folgt
+            const u = (alter - 110) / 320, r = 3 + u * 12;
+            g.ring(z.x, z.y, r, r * 0.62, u < 0.5 ? MITTEL : BLAU, 1 - u);
+          }
+          for (const f of teile[zi].funken) {
+            if (alter >= f.leben) continue;
+            const sek = alter / 1000, bremse = 1 - 0.35 * (alter / f.leben);
+            const fx = z.x + Math.cos(f.w) * f.v * sek * bremse, fy = z.y + Math.sin(f.w) * f.v * sek * bremse * 0.7;
+            g.put(fx, fy, alter < f.leben * 0.4 ? WEISS : alter < f.leben * 0.75 ? MITTEL : BLAU);
+            if (alter < f.leben * 0.4) g.put(fx - Math.cos(f.w), fy - Math.sin(f.w) * 0.7, HELL);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, 940, vorbereiten);
+  })(),
   // ── Hell Fox death: black-flame eruption ───────────────────────────
   // When a Hell Fox is defeated, a column of pitch-black flames erupts
   // from its support slot. Stacks a few jagged flame sprites with
@@ -33495,7 +33752,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (typeof rest.originHeroIdx === 'number' && rest.originHeroIdx >= 0
               && (rest.originOwner === 0 || rest.originOwner === 1)) {
             const lbl = ownerLbl(rest.originOwner, myIdx);
-            const held = document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${rest.originHeroIdx}"]`);
+            // ★ 10.10. (Assault Eagle): optional `originZoneSlot` — der Ursprung ist dann eine CREATURE-Zone
+            // dieses Helden statt der Held selbst (die Schuesse beginnen am Platz der Karte, auch wenn sie dort
+            // gerade faellt: der Platz bleibt im Brett). Ohne Platz oder ohne gefundene Zone: der Held wie bisher.
+            const platz = (typeof rest.originZoneSlot === 'number' && rest.originZoneSlot >= 0)
+              ? document.querySelector(`[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${rest.originHeroIdx}"][data-support-slot="${rest.originZoneSlot}"]`)
+              : null;
+            const held = platz || document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${rest.originHeroIdx}"]`);
             if (held) {
               const q = held.getBoundingClientRect();
               extra.ox = q.left + q.width / 2;
