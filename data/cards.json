@@ -17172,7 +17172,7 @@
     "hp": 400,
     "atk": 0,
     "cost": null,
-    "effect": "When this is one of your starting Heroes, your Potion Deck must consist of exactly 15 Creatures with different names whose total levels do not exceed 15. You may once per turn reveal the top card of your Potion Deck and immediately summon it with this Hero as an additional Action, if possible. You can only activate this effect if this was one of your starting Heroes. If this is one of your starting Heroes, you can never draw cards from your Potion Deck.",
+    "effect": "When this is one of your starting Heroes, your Potion Deck must consist of exactly 15 Creatures with different names whose total levels do not exceed 15. You may once per turn reveal the top card of your Potion Deck and immediately summon it with this Hero as an additional Action, if possible. Shuffle your Potion Deck afterwards. You can only activate this effect if this was one of your starting Heroes. If this is one of your starting Heroes, you can never draw cards from your Potion Deck.",
     "archetype": "",
     "setID": "PP MSIN",
     "banned": "",

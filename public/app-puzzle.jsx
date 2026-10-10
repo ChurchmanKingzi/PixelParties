@@ -4803,7 +4803,10 @@ function PuzzleCreator() {
         // eine Anhebung dort koennte andere Ebenen stoeren. 10020 liegt
         // ueber Hand (10000) und Debuff-Klappe (10001), aber unter dem
         // Entfernen-Knopf (999999).
-        <div className="board-tooltip" style={{ zIndex: 10020, ...(tooltipSide === 'right'
+        // Offener Dialog (Stapelansicht, Bearbeiten …): der Schleier steht dann auf 10085 und der Tooltip
+        // gehoert DARUEBER (v1269-Regel `body:has(.modal-overlay) .board-tooltip`, 10086). Der Inline-Wert
+        // schlug sie bisher — deshalb liegt er jetzt in einer Variable, die diese Regel mit anhebt.
+        <div className="board-tooltip" style={{ zIndex: 'var(--pz-tooltip-z, 10020)', ...(tooltipSide === 'right'
           ? { left: PZ_PANEL_W, right: 'auto', borderLeft: '1px solid var(--accent)', borderRight: 'none' }
           : {
               // Deckungsgleich mit der Card Gallery statt "ungefaehr

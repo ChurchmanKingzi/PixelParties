@@ -33,8 +33,18 @@ async function fresh({ heroes = [PINTA], potion = ['Barkeeper', 'Baby Spider', '
   for (const hz of ps.supportZones) for (let i = 0; i < hz.length; i++) hz[i] = [];
   ps.potionDeck = potion.slice();
   if (abilities) ps.abilityZones[0] = abilities;
-  return { room, host, engine, gs, seat, ps, other: gs.players[seat === 0 ? 1 : 0] };
+  const t = { room, host, engine, gs, seat, ps, other: gs.players[seat === 0 ? 1 : 0], shuffles: [], prompts: [], events: [], echtesMischen: false };
+  // Mitschreiben statt nachbauen: Mischen (ohne die Reihenfolge anzutasten, solange `echtesMischen` aus ist, damit die
+  // Reihenfolge-Pruefungen planbar bleiben), Auswahl-Abfragen und gesendete Ereignisse.
+  const origShuffle = engine.shuffleDeck.bind(engine);
+  engine.shuffleDeck = (pi, kind) => { t.shuffles.push([pi, kind]); if (t.echtesMischen) return origShuffle(pi, kind); };
+  const origPrompt = engine.promptGeneric.bind(engine);
+  engine.promptGeneric = (pi, d, ...r) => { t.prompts.push(d); return origPrompt(pi, d, ...r); };
+  const origBc = engine._broadcastEvent.bind(engine);
+  engine._broadcastEvent = (ev, data, ...r) => { t.events.push({ ev, data }); return origBc(ev, data, ...r); };
+  return t;
 }
+const reveals = (t) => t.events.filter(e => e.ev === 'mill_center_reveal').map(e => e.data);
 const onPinta = (t) => t.engine.cardInstances.filter(c => c.zone === 'support' && c.owner === t.seat && c.heroIdx === 0).map(c => c.name);
 const activate = (t) => t.host.doActivateHeroEffect(t.room, t.seat, { heroIdx: 0 });
 const angebot = (t) => t.engine.getActiveHeroEffects(t.seat).some(e => e.heroName === PINTA);
@@ -92,6 +102,10 @@ const SUMMONING = [['Navigation'], ['Singing'], ['Summoning Magic']];
     check('einmal pro Zug: der Effekt wird nicht mehr angeboten', !angebot(t));
     t.gs.turn++; t.gs.hoptUsed = {};
     check('…im naechsten Zug wieder', angebot(t));
+    check('KEINE Zonenwahl: drei freie Zonen, Pinta nimmt die ERSTE (Slot 1)', !t.prompts.some(p => p.type === 'zonePick') && inst && inst.zoneSlot === 0 && inst.heroIdx === 0, { prompts: t.prompts.map(p => p.type), slot: inst && inst.zoneSlot });
+    const rv = reveals(t);
+    check('Aufdecken ueber die MITTE des Feldes: mill_center_reveal vom Potion Deck, weiter auf Pintas Platz', rv.length === 1 && rv[0].from === 'potionDeck' && rv[0].dest === 'support' && rv[0].destHeroIdx === 0 && rv[0].destSlotIdx === 0 && rv[0].cardNames[0] === 'Barkeeper' && rv[0].owner === t.seat, rv);
+    check('…danach wird das Potion Deck gemischt', t.shuffles.some(([pi, k]) => pi === t.seat && k === 'potion'), t.shuffles);
   }
 
   console.log('Pinta: „if possible" — die Karte bleibt oben liegen');
@@ -102,6 +116,9 @@ const SUMMONING = [['Navigation'], ['Singing'], ['Summoning Magic']];
     check('Arcane Eyes (Level 1) kann Pinta nicht beschwoeren', onPinta(t).length === 0, onPinta(t));
     check('…sie bleibt OBEN im Potion Deck', JSON.stringify(t.ps.potionDeck) === JSON.stringify(['Arcane Eyes', 'Barkeeper']), t.ps.potionDeck);
     check('…der Effekt ist trotzdem verbraucht (aufgedeckt ist aufgedeckt)', !angebot(t) && res !== false, { res });
+    const rv2 = reveals(t);
+    check('…die aufgedeckte Karte fliegt aus der Mitte ZURUECK ins Potion Deck (dest potionDeck), nicht auf den Platz', rv2.length === 1 && rv2[0].dest === 'potionDeck' && rv2[0].from === 'potionDeck' && rv2[0].cardNames[0] === 'Arcane Eyes', rv2);
+    check('…und das Potion Deck wird trotzdem gemischt (damit sie nicht mehrere Runden blockiert)', t.shuffles.some(([pi, k]) => pi === t.seat && k === 'potion'), t.shuffles);
     // Mit Summoning Magic klappt dieselbe Karte.
     t.gs.turn++; t.gs.hoptUsed = {};
     t.ps.abilityZones[0] = SUMMONING;
@@ -150,6 +167,88 @@ const SUMMONING = [['Navigation'], ['Singing'], ['Summoning Magic']];
     t.engine.summonCreatureWithHooks = async () => ({ inst: null });
     await activate(t);
     check('Beschwoerung scheitert nach dem Aufdecken: Karte wieder an IHREM Platz (oben)', JSON.stringify(t.ps.potionDeck) === JSON.stringify(['Barkeeper', 'Baby Spider', 'Archer']), t.ps.potionDeck);
+  }
+
+  console.log('Pinta: echtes Mischen');
+  {
+    const t = await fresh({ potion: ['Arcane Eyes', 'Barkeeper', 'Baby Spider', 'Archer', 'Cute Bunny', 'Rocky Slime'] });
+    t.echtesMischen = true;
+    await activate(t);
+    check('das Potion Deck wird wirklich gemischt: dieselben Karten, ohne dass etwas verloren geht', [...t.ps.potionDeck].sort().join() === ['Arcane Eyes', 'Barkeeper', 'Baby Spider', 'Archer', 'Cute Bunny', 'Rocky Slime'].sort().join(), t.ps.potionDeck);
+    check('…und das Misch-Ereignis (Ruetteln am Potion Deck) geht an den Client', t.events.some(e => e.ev === 'deck_shuffle' && e.data.owner === t.seat && e.data.deckType === 'potion'), t.events.map(e => e.ev));
+  }
+
+  console.log('Pinta: alle Zonen belegt, Opfer-Creature (Blue-Ice Dragon)');
+  const MIT_SUMMONING = [['Navigation'], ['Singing'], ['Summoning Magic', 'Summoning Magic', 'Summoning Magic']];
+  /** Pintas drei Zonen mit alten Creatures fuellen (Held 1 optional mit einer weiteren). */
+  function belegen(t, namen, { frisch = [], held1 = null } = {}) {
+    namen.forEach((n, z) => {
+      t.ps.supportZones[0][z] = [n];
+      const inst = t.engine._trackCard(n, t.seat, 'support', 0, z);
+      inst.turnPlayed = frisch.includes(z) ? t.gs.turn : 1;
+    });
+    if (held1) {
+      t.ps.supportZones[1][0] = [held1];
+      const inst = t.engine._trackCard(held1, t.seat, 'support', 1, 0);
+      inst.turnPlayed = 1;
+    }
+  }
+  const BID = 'Blue-Ice Dragon';
+  {
+    const t = await fresh({ potion: [BID, 'Barkeeper'], abilities: MIT_SUMMONING });
+    belegen(t, ['Barkeeper', 'Archer', 'Baby Spider']);
+    check('Gegenprobe: ohne Opferweg haette Pinta keine freie Zone', loadCardEffect(PINTA)._test.moeglicheZonen(t.engine, t.seat, t.seat, 0, BID).length === 0);
+    const opfer = loadCardEffect(PINTA)._test.opferZonen(t.engine, t.seat, t.seat, 0, BID);
+    check('alle drei Zonen belegt + Opfer-Creature: drei Zonen stehen zur Wahl (jede Creature taugt als Opfer)', opfer.length === 3 && opfer.every(z => !!z.opferInstId), opfer);
+    await activate(t);
+    const zp = t.prompts.filter(p => p.type === 'zonePick');
+    check('der Spieler waehlt die Zone (zonePick) — nach dem Aufdecken, nicht abbrechbar, mit Kartenvorschau', zp.length === 1 && zp[0].cancellable === false && zp[0].previewCardName === BID && zp[0].heroShortcut === false && zp[0].zones.length === 3, zp.map(p => [p.zones && p.zones.length, p.cancellable, p.previewCardName]));
+    const rv = reveals(t);
+    check('…aufgedeckt wird ueber die Mitte und fliegt ZURUECK ins Potion Deck, solange die Zone offen ist', rv.length === 1 && rv[0].dest === 'potionDeck' && rv[0].cardNames[0] === BID, rv);
+    const drache = t.engine.cardInstances.find(c => c.name === BID && c.zone === 'support' && c.owner === t.seat);
+    const uebrig = onPinta(t);
+    check('Blue-Ice Dragon steht auf Pintas Brett', !!drache && drache.heroIdx === 0, uebrig);
+    check('…zwei Creatures wurden geopfert (die in der gewaehlten Zone automatisch), eine bleibt', uebrig.filter(n => n !== BID).length === 1, uebrig);
+    check('…er fragt NICHT nach „inherent additional Action" (confirm), die Beschwoerung IST schon eine', !t.prompts.some(p => p.type === 'confirm' && p.title === BID), t.prompts.filter(p => p.type === 'confirm').map(p => p.title));
+    check('…und er bekommt Haste, als waere eine Aktion fuer ihn ausgegeben worden', !!drache && drache.counters && drache.counters._hasHaste === true, drache && drache.counters);
+    check('…die Karte hat das Potion Deck verlassen', t.ps.potionDeck.join() === 'Barkeeper', t.ps.potionDeck);
+  }
+  {
+    // Die gewaehlte Zone bestimmt das erste Opfer: die Wahl des Spielers lenkt, wer geopfert wird.
+    const t = await fresh({ potion: [BID, 'Barkeeper'], abilities: MIT_SUMMONING });
+    belegen(t, ['Barkeeper', 'Archer', 'Baby Spider']);
+    const orig = t.engine.promptGeneric;
+    t.engine.promptGeneric = async (pi, d, ...r) => (d.type === 'zonePick' ? { heroIdx: 0, slotIdx: 2 } : orig(pi, d, ...r));
+    await activate(t);
+    const drache = t.engine.cardInstances.find(c => c.name === BID && c.zone === 'support' && c.owner === t.seat);
+    check('Zone 3 gewaehlt: Blue-Ice Dragon steht dort, Baby Spider (dort) ist weg', !!drache && drache.zoneSlot === 2 && !onPinta(t).includes('Baby Spider'), { slot: drache && drache.zoneSlot, brett: onPinta(t) });
+  }
+  {
+    // Nur EINE Zone taugt (zwei Creatures wurden in diesem Zug beschworen, ein zweites Opfer steht bei Held 2): keine Wahl.
+    const t = await fresh({ potion: [BID, 'Barkeeper'], abilities: MIT_SUMMONING });
+    belegen(t, ['Barkeeper', 'Archer', 'Baby Spider'], { frisch: [1, 2], held1: 'Cute Bunny' });
+    const opfer = loadCardEffect(PINTA)._test.opferZonen(t.engine, t.seat, t.seat, 0, BID);
+    check('nur die Creature, die nicht in diesem Zug beschworen wurde, taugt als Opfer: genau eine Zone', opfer.length === 1 && opfer[0].slotIdx === 0, opfer);
+    await activate(t);
+    const rv = reveals(t);
+    check('…KEINE Zonenwahl, die Karte fliegt gleich in diese Zone', !t.prompts.some(p => p.type === 'zonePick') && rv.length === 1 && rv[0].dest === 'support' && rv[0].destSlotIdx === 0, { prompts: t.prompts.map(p => p.type), rv });
+    const drache = t.engine.cardInstances.find(c => c.name === BID && c.zone === 'support' && c.owner === t.seat);
+    check('…Blue-Ice Dragon steht in Zone 1; Barkeeper (dort) und Cute Bunny (Held 2) sind die Opfer', !!drache && drache.zoneSlot === 0 && !onPinta(t).includes('Barkeeper') && !t.engine.cardInstances.some(c => c.name === 'Cute Bunny' && c.zone === 'support'), { brett: onPinta(t) });
+  }
+  {
+    // Alle Creatures wurden in diesem Zug beschworen: keine taugt als Opfer → nichts beschworen, nur Reveal + Mischen.
+    const t = await fresh({ potion: [BID, 'Barkeeper'], abilities: MIT_SUMMONING });
+    belegen(t, ['Barkeeper', 'Archer', 'Baby Spider'], { frisch: [0, 1, 2] });
+    await activate(t);
+    check('keine Creature taugt als Opfer: nicht beschworen, Reveal + Mischen, Effekt verbraucht', !onPinta(t).includes(BID) && t.ps.potionDeck.includes(BID) && t.shuffles.length > 0 && !angebot(t), { brett: onPinta(t), deck: t.ps.potionDeck });
+  }
+  {
+    // Gewoehnliche Creature, alle Zonen belegt: kein Opferweg, nichts passiert (Reveal + Mischen).
+    const t = await fresh({ potion: ['Cute Bunny', 'Barkeeper'] });
+    belegen(t, ['Barkeeper', 'Archer', 'Baby Spider']);
+    await activate(t);
+    check('gewoehnliche Creature bei voller Aufstellung: kein Opferweg, nicht beschworen', !onPinta(t).includes('Cute Bunny') && t.ps.potionDeck.includes('Cute Bunny'), { brett: onPinta(t) });
+    check('…und keine Zonenwahl', !t.prompts.some(p => p.type === 'zonePick'));
   }
 
   console.log('Pinta: nur als Starthelden');
