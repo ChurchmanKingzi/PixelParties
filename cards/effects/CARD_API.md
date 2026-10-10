@@ -338,6 +338,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-gallery-entries` | Galerie-Einträge mit `cardName` statt `name` |
 | `check-flight-targets` | Flüge ins Brett ohne `toHeroIdx`/`toSlotIdx` |
 | `check-anim-keyframes` | Animationen, deren Keyframes nirgends stehen |
+| `check-summon-sound` | Eine Animation, die als Beschwörungs-KOSTEN läuft (Opfer-Messer), darf den Slot `'effect'` nicht belegen — sonst verschluckt ihr Schlag den `summon`-Klang der Creature (`ZONE_ANIM_NONEFFECT`, Als Befund 10.10.) |
 | `check-anim-sounds` | **Jede** Animation in `ANIM_REGISTRY` braucht einen Klang in `ZONE_ANIM_SFX`; neue stumme Animationen fallen durch. Altbestand steht in `scripts/anim-sounds-baseline.json` (Ratsche — darf nur schrumpfen; `--update` nach dem Ergänzen eines Klangs) |
 | `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
 | `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
@@ -18962,6 +18963,8 @@ Hero (`PP MSIN`, 400 HP / 0 ATK, Navigation + Singing). Text: Potion-Deck-Klause
 **Stolperstein:** Der Pixelierer (`ppPixeliererAnhaengen`, app-shared.jsx) rastert ALLES, was er findet — auch einen weichen `drop-shadow` unter einem gedrehten Emoji. Heraus kommt ein gepunkteter, schräger Ring um das Motiv. Das war das „schwarze schräge Oval" um das Opfer-Messer. Wer ein Emoji dreht oder rund beschattet, bekommt diesen Ring; also entweder ein eigenes Pixel-Sprite zeichnen (wie hier) oder den Schein weglassen.
 
 `ANIM_REGISTRY.knife_sacrifice` (app-board.jsx): ein handgezeichnetes 9×23-Dolch-Sprite (Spitze nach unten, Kontur + dreistufige Klinge, goldene Parierstange/Knauf) fällt mit Fallstreifen, setzt bei 380 ms auf (deckt sich mit dem Klang `slash`, `delay: 360`), dazu Plus-Blitz und flacher Bodenring, Funken mit Schwerkraft, Blutspritzer, die als Flecken liegen bleiben, und glimmende Reste, die aufsteigen. Ausblenden per Dithering; alles ist nach 960 ms weg (Standard-Lebensdauer der Zonen-Animationen: 1000 ms). Teilchenzahlen laufen über `ppFxN` (Effekt-Dichte, Lite-Modus); bei `window._playAnimations === false` zeichnet sie nichts. Die Animation gilt für jedes Opfer, das den Standard nutzt (`resolveSacrificeCost`, Teocuilatl, Sacrificial Dagger, …).
+
+**Klang (Als Befund 10.10.: „Beim Beschwören fehlt noch ein Sound!")**: `creature_summoned` spielt `summon` im Sammel-Slot `'effect'` (400 ms Sperre). Der Messerschlag (`slash`) belegte denselben Slot und kam ~100 ms vor dem Erscheinen der Creature — jede Beschwörung mit Opfer (Blue-Ice Dragon, auch über Pinta) blieb stumm. `knife_sacrifice` steht jetzt in `ZONE_ANIM_NONEFFECT` (`app-shared.jsx`): Schlag und Beschwörungs-Klang liegen übereinander. Wer eine weitere Kosten-Animation einführt (`spec.sacrificeAnimation`), trägt sie dort ein; `check-summon-sound` hält das fest.
 
 ## ★ PUZZLE-EDITOR: KARTEN-TOOLTIP LIEGT ÜBER DEM DIALOG-SCHLEIER (Als Vorgabe 10.10.)
 

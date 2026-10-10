@@ -3323,6 +3323,13 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // (400 ms, ein Klang pro Wirkung) verschluckt. Er ist eine eigene
   // Rueckmeldung und darf sich darueberlegen.
   'doom_counter',
+  // Als Befund 10.10. („Beim Beschwoeren fehlt noch ein Sound"): das Opfer-Messer
+  // ist der PREIS einer Beschwoerung, nicht ihr Cast-Klang. Der Schlag (`slash`,
+  // ~460 ms nach dem Ereignis) belegte den 'effect'-Slot, und das `creature_summoned`-
+  // Log der Creature kam kurz danach (Blue-Ice Dragon: nach dem letzten Opfer, ~100 ms) —
+  // das Erscheinen in der Zone blieb stumm. Jede Beschwoerung mit Opfer war betroffen.
+  // Jetzt legen sich Schlag und Beschwoerungs-Klang uebereinander.
+  'knife_sacrifice',
 ]);
 
 // Vorlauf zwischen dem `play_zone_animation`-Ereignis und dem Start der
