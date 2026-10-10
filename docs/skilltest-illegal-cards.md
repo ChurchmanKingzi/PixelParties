@@ -319,6 +319,10 @@
 
 - Pinta, the Singing Ship
 
+## Kerthwack, the Reality Breaker (Nutzer 10.10.): reine Deckbau-Karte („your Potion Deck may contain any card …“), im Spiel ohne Wirkung — der Skill Test hat kein Potion Deck, übrig bliebe ein Held ohne Effekt.
+
+- Kerthwack, the Reality Breaker
+
 ## Reaktionen mit extrem engen, seltenen oder unwahrscheinlichen Bedingungen (Nutzer 7.10., nach eigenem Ermessen): hängen an bestimmten Karten/Archetypen, am Deck, an Surprises, Freeze, Ascend, Heldenstufen oder Sonderlagen, die im Skill Test praktisch nie eintreten.
 
 - Arrow Slit

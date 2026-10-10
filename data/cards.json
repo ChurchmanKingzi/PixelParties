@@ -13088,7 +13088,7 @@
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
-    "skilltestLegal": true,
+    "skilltestLegal": false,
     "startingAbility1": "Alchemy",
     "startingAbility2": "Magic Arts",
     "spellSchool1": "",
