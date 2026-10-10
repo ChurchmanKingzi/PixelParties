@@ -13,6 +13,7 @@ const { CONFIG } = require('./config');
 const rounds = require('./rounds');
 const ext = require('./engine-ext');
 const { getCardDB } = require('../cards/effects/_card-db');
+const { K: ELO_K, placementDelta } = require('../placement-elo');
 
 /** Startspieler: wer die meisten Karten recycelt hat; bei Gleichstand der Zufall. */
 function pickStarter(prep) {
@@ -143,6 +144,7 @@ async function start(room, host, prep) {
     phase: 'battle', round: 0, firstStarter: starter, starter, order: [], turnSeat: null,
     exhaustedHeroes: {}, exhaustedCreatures: {}, passed: {}, eliminated: [], eliminatedRound: {}, eliminatedWith: {},
     turnsTaken: {}, busy: false, botSeats: room.players.map((p, i) => (p.isBot ? i : -1)).filter(i => i >= 0),
+    deserters: [],   // Menschen, die lebend gegangen und bis zum Ende nicht zurück sind (Ranked: −K, siehe applyRankedElo)
     recycled: prep.players.map(p => p.recycled), startedAt: Date.now(),
     turnTimerSec: st.turnTimerDisabled ? 0 : st.turnTimerSec,
   };
@@ -315,6 +317,36 @@ function scFor(gs, seat, winnerIdx, place) {
   return p.roundsSc + p.outlastedSc + p.winSc;
 }
 
+/**
+ * Ranked-Elo auf die NORMALE `elo` (placement-elo.js): Platzierung unter den Menschen, CPUs zählen nicht.
+ * Ohne mindestens zwei Menschen keine Wertung (sonst ließe sich gegen CPUs Elo farmen). Wer lebend gegangen und nicht
+ * zurückgekommen ist (`st.deserters`), bekommt −K, egal was die CPU auf seinem Sitz erreicht, und zählt beim Rang der
+ * anderen nicht mit. → `[{ username, oldElo, newElo }]` oder `null` (nicht gewertet).
+ */
+async function applyRankedElo(room, gs, place, host) {
+  if (room.type !== 'ranked') return null;
+  const humans = [];
+  room.players.forEach((p, seat) => { if (!p.isBot && p.userId) humans.push({ seat, p }); });
+  if (humans.length < 2) return null;
+  const deserters = new Set(gs.skillTest.deserters || []);
+  const finishers = humans.filter(h => !deserters.has(h.seat));
+  const changes = [];
+  for (const h of humans) {
+    const rank = 1 + finishers.filter(o => place[o.seat] < place[h.seat]).length;   // gleiche Platzierung → gleicher Rang
+    const delta = deserters.has(h.seat) ? -ELO_K : placementDelta(rank, humans.length);
+    const before = await host.db.get('SELECT elo FROM users WHERE id = ?', [h.p.userId]);
+    await host.db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [delta, h.p.userId]);
+    const after = await host.db.get('SELECT elo FROM users WHERE id = ?', [h.p.userId]);
+    const oldElo = before && before.elo != null ? before.elo : 1000;
+    const newElo = after && after.elo != null ? after.elo : Math.max(0, oldElo + delta);
+    changes.push({ username: h.p.username, oldElo, newElo });
+    // Auch an einen, der den Raum schon verlassen hat (`socketId` ist dann null): jede lebende Verbindung des Nutzers.
+    for (const sock of host.io.sockets.sockets.values()) if (sock.data && sock.data.userId === h.p.userId) sock.emit('user_stats_updated', { elo: newElo });
+  }
+  host.io.emit('leaderboard_updated');
+  return changes;
+}
+
 async function finishGame(room, winnerIdx, reason, host) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
@@ -329,6 +361,11 @@ async function finishGame(room, winnerIdx, reason, host) {
   if (room.engine) { room.engine._aborted = false; }
   const ms = room.skillTest && room.skillTest.mctsStats;
   console.log(`[skilltest] Raum ${room.id}: Ende nach ${st.round} Rounds, Sieger ${gs.players[winnerIdx] ? gs.players[winnerIdx].username : '–'} (${reason})${ms ? ` — Lookahead: ${ms.searches} Suchen, ${ms.rollouts} Rollouts, ${ms.ms} ms, ${ms.changed} Entscheidungen geändert` : ''}`);
+  // Ranked: Elo nach Platzierung unter den Menschen, BEVOR der Endstand rausgeht — die Zeremonie zeigt `eloChanges`.
+  try {
+    const eloChanges = await applyRankedElo(room, gs, place, host);
+    if (eloChanges) { gs.result.isRanked = true; gs.result.eloChanges = eloChanges; }
+  } catch (e) { console.error('[skilltest] Elo-Vergabe fehlgeschlagen:', e && e.message); }
   // SC an Menschen (Spieler-Vorgabe 6.10.): 1/Round + 5 je überlebtem Gegner + 5 für den Sieg.
   for (let seat = 0; seat < room.players.length; seat++) {
     const p = room.players[seat];
@@ -365,6 +402,7 @@ function seatAway(room, seat, host, { permanent = false } = {}) {
   const gs = room.gameState, st = gs && gs.skillTest;
   if (!st || gs.result || seat < 0 || !gs.players[seat]) return;
   if (!st.botSeats.includes(seat)) st.botSeats.push(seat);
+  if (!st.eliminated.includes(seat) && !st.deserters.includes(seat)) st.deserters.push(seat);   // lebend gegangen (Ranked: zählt als Aufgabe)
   gs.players[seat].disconnected = true;
   if (permanent) {
     gs.players[seat].left = true;
@@ -382,6 +420,7 @@ function seatBack(room, seat, host) {
   if (!st || gs.result || seat < 0 || !gs.players[seat]) return;
   if (room.players[seat].isBot || gs.players[seat].left) return;
   st.botSeats = st.botSeats.filter(s => s !== seat);
+  st.deserters = st.deserters.filter(s => s !== seat);
   gs.players[seat].disconnected = false;
   if (gs.activePlayer === seat) armTurnTimer(room, host);
   if (room.engine) room.engine.sync();
