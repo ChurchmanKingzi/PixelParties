@@ -30,14 +30,17 @@
 //
 //  Bilder (Als Vorgabe 10.10., PIXELART)
 //  ─────────────────────────────────────
-//  Beide Haelften sind Brett-Animationen (`zoneType: 'board'`) mit dem
-//  Eagle als URSPRUNG (`originOwner`/`originHeroIdx`/`originZoneSlot`) und
-//  allen Zielen in `targets` — Quelle → ALLE Ziele GLEICHZEITIG:
-//    1. `gunfire_volley`   Pistolenschuesse (drei Schuss je Ziel) — Haelfte 1
-//    2. `shockwave_volley` eine Welle je Ziel, alle treffen im selben
-//                          Augenblick — Haelfte 2
-//  Die Verzoegerungen bis zum Schaden (`*_HIT_MS`) liegen hinter dem
-//  letzten Einschlag der Animation (Mount-Vorlauf 100 ms eingerechnet).
+//  BEIDE Haelften zeigen Pistolenschuesse (`gunfire_volley`): eine Brett-
+//  Animation (`zoneType: 'board'`) mit dem Eagle als URSPRUNG (`originOwner`/
+//  `originHeroIdx`/`originZoneSlot`) und allen Zielen der jeweiligen Wahl in
+//  `targets` — Quelle → ALLE Ziele GLEICHZEITIG, auch die vom GEGNER gewaehlten
+//  (Als Vorgabe 10.10.: die Welle der ersten Fassung ist gestrichen). Die
+//  Verzoegerung bis zum Schaden (`GUNFIRE_HIT_MS`) liegt hinter dem letzten
+//  Einschlag der Animation (Mount-Vorlauf 100 ms eingerechnet).
+//
+//  CPU (Als Befund 10.10.): Im Puzzle-Modus laeuft kein CPU-Gehirn, und die
+//  Engine nimmt bei „bis zu N" nur die Mindestzahl (1 Ziel). `cpuResponse`
+//  waehlt dort so viele FEIND-Ziele wie erlaubt; mit Gehirn entscheidet es.
 // ═══════════════════════════════════════════
 
 const CARD_NAME     = 'Assault Eagle';
@@ -45,11 +48,9 @@ const MAX_TARGETS   = 3;
 const FIRST_DAMAGE  = 100;
 const ANSWER_DAMAGE = 50;
 
-// Zeiten (ms) — gehoeren zu den Animationen `gunfire_volley` / `shockwave_volley` (app-board.jsx).
-const GUNFIRE_MS  = 960;     // Lebensdauer der Schuss-Animation
+// Zeiten (ms) — gehoeren zur Animation `gunfire_volley` (app-board.jsx).
+const GUNFIRE_MS     = 960;  // Lebensdauer der Schuss-Animation
 const GUNFIRE_HIT_MS = 560;  // letzter Einschlag bei ~500 ms (inkl. Mount-Vorlauf) → danach der Schaden
-const WAVE_MS     = 1000;    // Lebensdauer der Wellen-Animation
-const WAVE_HIT_MS = 600;     // Wellenfront erreicht die Ziele bei ~560 ms (inkl. Mount-Vorlauf)
 
 /** Ziele einer Wahl als Nutzlast der Brett-Animation (Held: zoneSlot -1). */
 function zielPunkte(targets) {
@@ -94,6 +95,22 @@ module.exports = {
 
   canActivateCreatureEffect() { return true; },
 
+  /**
+   * CPU ohne Gehirn (Puzzle-Modus): „bis zu N" voll ausschoepfen. Ohne diese Antwort nimmt die Engine bei einer
+   * abbrechbaren Wahl nur `minRequired` (1) Ziel. Gewaehlt werden FEIND-Ziele des Waehlenden — nie die eigene Seite —,
+   * Helden (niedrigste HP zuerst) vor Creatures. Mit CPU-Gehirn (`engine.isPuzzle` aus) entscheidet dessen Zielwahl.
+   */
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget' || !engine.isPuzzle) return undefined;
+    const { validTargets, config, playerIdx } = payload || {};
+    if (!Array.isArray(validTargets)) return undefined;
+    const hp = (t) => engine.gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp ?? Infinity;
+    const feinde = validTargets.filter(t => t.owner !== playerIdx);
+    const helden = feinde.filter(t => t.type === 'hero').sort((a, b) => hp(a) - hp(b));
+    const creatures = feinde.filter(t => t.type !== 'hero');
+    return [...helden, ...creatures].slice(0, config?.maxTotal ?? MAX_TARGETS).map(t => t.id);
+  },
+
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -126,7 +143,7 @@ module.exports = {
     // Abbruch vor der Wahl kostet nichts: `false` haelt die Engine davon ab, die Sperre zu stempeln.
     if (!first || first.length === 0) return false;
 
-    // Pistolenschuesse: von dem Eagle auf ALLE gewaehlten Ziele gleichzeitig.
+    // Pistolenschuesse: vom Eagle auf ALLE gewaehlten Ziele gleichzeitig.
     engine._broadcastEvent('play_zone_animation', {
       type: 'gunfire_volley', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1,
       duration: GUNFIRE_MS, targets: zielPunkte(first), ...ursprung,
@@ -156,17 +173,17 @@ module.exports = {
       noSpellCancel: true,
     });
     if (answer && answer.length > 0) {
-      // Eine Welle je Ziel, alle treffen im selben Augenblick.
+      // Auch die Ziele des Gegners bekommen Pistolenschuesse — vom Eagle, auf alle gleichzeitig.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'shockwave_volley', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1,
-        duration: WAVE_MS, targets: zielPunkte(answer), ...ursprung,
+        type: 'gunfire_volley', zoneType: 'board', owner: seite, heroIdx: -1, zoneSlot: -1,
+        duration: GUNFIRE_MS, targets: zielPunkte(answer), ...ursprung,
       });
-      await engine._delay(WAVE_HIT_MS);
+      await engine._delay(GUNFIRE_HIT_MS);
       await schlagen(ctx, answer, ANSWER_DAMAGE, source);
       engine.log('assault_eagle_answer', {
         player: gs.players[oppPi]?.username, targets: answer.map(t => t.cardName), damage: ANSWER_DAMAGE,
       });
-      await engine._delay(Math.max(0, WAVE_MS - WAVE_HIT_MS));
+      await engine._delay(Math.max(0, GUNFIRE_MS - GUNFIRE_HIT_MS));
     }
 
     engine.sync();

@@ -98,7 +98,7 @@ const aufBrett = (t, name) => t.engine.cardInstances.some(c => c.name === name &
     check('die Schuesse kommen VOR dem Schaden', t.events.findIndex(e => e.data && e.data.type === 'gunfire_volley') < t.events.findIndex(e => e.ev === 'AOE'));
     check('zweite Wahl: der GEGNER, bis zu 3, 50 Schaden', t.prompts[1] && t.prompts[1].pi === t.B && t.prompts[1].cfg.maxTotal === 3 && t.prompts[1].cfg.baseDamage === 50, t.prompts[1] && [t.prompts[1].pi, t.prompts[1].cfg.maxTotal, t.prompts[1].cfg.baseDamage]);
     check('…„may": abbrechbar, ohne Zauber-Abbruchmarke', t.prompts[1].cfg.cancellable === true && t.gs._spellCancelled !== true);
-    check('Gegner verzichtet: keine Welle', anims(t, 'shockwave_volley').length === 0);
+    check('Gegner verzichtet: keine zweite Salve', anims(t, 'gunfire_volley').length === 1);
     // einmal pro Zug
     t.antworten = [() => [`hero-${t.B}-0`], () => []];
     check('einmal pro Zug: die zweite Aktivierung wird abgelehnt', (await aktivieren(t)) === false && heroHp(t, t.B, 0) === hp0 - 100);
@@ -118,15 +118,17 @@ const aufBrett = (t, name) => t.engine.cardInstances.some(c => c.name === name &
     check('…ausdruecklich das Assault Eagle selbst ist waehlbar', p2.ids.includes(`equip-${t.A}-0-0`) && p2.eligible.includes(`equip-${t.A}-0-0`), p2.ids);
     check('…50 Schaden: das Eagle (50 HP) faellt, der gewaehlte Held verliert 50', !aufBrett(t, EAGLE) && heroHp(t, t.A, 0) === ownHp - 50, [aufBrett(t, EAGLE), ownHp, heroHp(t, t.A, 0)]);
     check('…die erste Haelfte traf wie gewaehlt (Held −100, Archer faellt)', heroHp(t, t.B, 0) === bHp - 100 && !aufBrett(t, 'Archer'));
-    const w = anims(t, 'shockwave_volley');
-    check('Welle: EINE Brett-Animation mit BEIDEN Zielen, Ursprung = Platz des Eagles (auch wenn es selbst Ziel ist)',
-      w.length === 1 && w[0].zoneType === 'board' && w[0].originOwner === t.A && w[0].originZoneSlot === 0 && w[0].targets.length === 2
-        && w[0].targets.some(x => x.owner === t.A && x.heroIdx === 0 && x.zoneSlot === 0), w);
+    const sal = anims(t, 'gunfire_volley');
+    check('zweite Hälfte: AUCH Pistolenschuesse (zwei Salven insgesamt), keine Welle', sal.length === 2 && t.events.every(e => !(e.data && e.data.type === 'shockwave_volley')), sal.length);
+    const w = sal[1];
+    check('…die Salve der Gegner-Ziele: EINE Brett-Animation mit BEIDEN Zielen, Ursprung = Platz des Eagles (auch wenn es selbst Ziel ist)',
+      w.zoneType === 'board' && w.originOwner === t.A && w.originZoneSlot === 0 && w.targets.length === 2
+        && w.targets.some(x => x.owner === t.A && x.heroIdx === 0 && x.zoneSlot === 0), w);
     const ix = (f) => t.events.findIndex(f);
-    const i1 = ix(e => e.data && e.data.type === 'gunfire_volley'), a1 = ix(e => e.ev === 'AOE' && e.data.amount === 100);
-    const i2 = ix(e => e.data && e.data.type === 'shockwave_volley'), a2 = ix(e => e.ev === 'AOE' && e.data.amount === 50);
-    check('Reihenfolge: Schuesse → 100 Schaden → Welle → 50 Schaden', i1 >= 0 && i1 < a1 && a1 < i2 && i2 < a2, [i1, a1, i2, a2]);
-    check('…die Welle trifft 2 Ziele in EINEM Flaechenschlag', t.events.find(e => e.ev === 'AOE' && e.data.amount === 50).data.n === 2);
+    const salven = t.events.map((e, i) => (e.data && e.data.type === 'gunfire_volley') ? i : -1).filter(i => i >= 0);
+    const a1 = ix(e => e.ev === 'AOE' && e.data.amount === 100), a2 = ix(e => e.ev === 'AOE' && e.data.amount === 50);
+    check('Reihenfolge: Salve → 100 Schaden → Salve → 50 Schaden', salven.length === 2 && salven[0] < a1 && a1 < salven[1] && salven[1] < a2, [salven, a1, a2]);
+    check('…die zweite Salve trifft 2 Ziele in EINEM Flaechenschlag', t.events.find(e => e.ev === 'AOE' && e.data.amount === 50).data.n === 2);
   }
 
   console.log('Sonderfaelle');
@@ -141,8 +143,8 @@ const aufBrett = (t, name) => t.engine.cardInstances.some(c => c.name === name &
     await aktivieren(t);
     check('das Eagle darf sich selbst waehlen und faellt', !aufBrett(t, EAGLE));
     check('„Then": die zweite Haelfte laeuft trotzdem — der Gegner hat gewaehlt', t.prompts.length === 2 && heroHp(t, t.A, 0) === ownHp - 50, [t.prompts.length, ownHp, heroHp(t, t.A, 0)]);
-    const w = anims(t, 'shockwave_volley');
-    check('…und die Welle beginnt am Platz des gefallenen Eagles (Platz 3)', w.length === 1 && w[0].originZoneSlot === 2, w);
+    const sal = anims(t, 'gunfire_volley');
+    check('…und die zweite Salve beginnt am Platz des gefallenen Eagles (Platz 3)', sal.length === 2 && sal[1].originZoneSlot === 2, sal.map(x => x.originZoneSlot));
   }
   {
     // Abbruch vor der ersten Wahl kostet nichts.
@@ -173,6 +175,41 @@ const aufBrett = (t, name) => t.engine.cardInstances.some(c => c.name === name &
     const id = `equip-${t.A}-1-0`;
     check('der Kontrolleur (Wahl 1) sieht seine eigene geschuetzte Creature', t.prompts[0].ids.includes(id), t.prompts[0].ids);
     check('der Gegner (Wahl 2) kann sie NICHT waehlen — Zielschutz aus SEINER Sicht (chooser)', !t.prompts[1].ids.includes(id), t.prompts[1].ids);
+  }
+
+  console.log('CPU als Gegner (zweite Hälfte)');
+  {
+    // Puzzle-Modus: KEIN CPU-Gehirn. Die Engine nimmt bei „bis zu N" sonst nur `minRequired` (1) Ziel.
+    const t = await fresh();
+    t.stelle(t.A, 'Baby Spider', 1, 0);
+    t.engine.isPuzzle = true; t.engine._cpuPlayerIdx = t.B;
+    const orig = t.engine.promptEffectTarget;
+    t.engine.promptEffectTarget = async (pi, z, cfg) => { if (pi === t.A) return orig(pi, z, cfg); t.prompts.push({ pi, ids: z.map(x => x.id), cfg }); return t.engine._getCpuTargetResponse(z.filter(x => !x.ineligible), cfg, pi); };
+    t.antworten = [() => [`hero-${t.B}-0`, `hero-${t.B}-1`, `equip-${t.B}-0-0`]];
+    const wahl = [];
+    const unter = t.engine._getCpuTargetResponse.bind(t.engine);
+    t.engine._getCpuTargetResponse = (z, cfg, pi) => { const r = unter(z, cfg, pi); if (pi === t.B) wahl.push(r); return r; };
+    await aktivieren(t);
+    const r = wahl[0] || [];
+    check('Puzzle-CPU wählt GENAUSO viele Ziele wie erlaubt (3), nicht nur eines', r.length === 3, r);
+    check('…nur Ziele des Gegners (des Kontrolleurs), nie die eigene Seite', r.every(id => id.includes(`-${t.A}-`)), r);
+    check('…Helden zuerst', r.slice(0, 2).every(id => id.startsWith('hero-')), r);
+  }
+  {
+    // Mit CPU-Gehirn entscheidet dessen Zielwahl — auch sie füllt bis `maxTotal` auf.
+    const { installCpuBrain } = require('../../cards/effects/_cpu');
+    const t = await fresh();
+    t.stelle(t.A, 'Baby Spider', 1, 0);
+    t.engine._cpuPlayerIdx = t.B; t.engine._isSelfPlay = false;
+    installCpuBrain(t.engine);
+    const orig = t.engine.promptEffectTarget;
+    let cpuWahl = null;
+    t.engine.promptEffectTarget = async (pi, z, cfg) => {
+      if (pi === t.A) return [`hero-${t.B}-0`, `hero-${t.B}-1`, `hero-${t.B}-2`];
+      cpuWahl = await orig(pi, z, cfg); return cpuWahl;
+    };
+    await aktivieren(t);
+    check('CPU mit Gehirn: wählt ebenfalls 3 Ziele — nur auf der Seite des Kontrolleurs', cpuWahl && cpuWahl.length === 3 && cpuWahl.every(id => id.includes(`-${t.A}-`)), cpuWahl);
   }
 
   console.log(fails === 0 ? '\n✓ Assault-Eagle-Tests grün' : `\n✗ ${fails} Fehler`);

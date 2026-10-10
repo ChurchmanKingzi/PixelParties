@@ -7924,7 +7924,7 @@ const SOG_FLUG_MS = 820;
 
 // ═══════════════════════════════════════════════════════════════════
 //  PIXELART-SALVEN — Quelle → ALLE Ziele gleichzeitig
-//  (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!" — Assault Eagle: Pistolenschuesse, Welle)
+//  (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!" — Assault Eagle: Pistolenschuesse)
 //
 //  Gemeinsame Huelle fuer Brett-Animationen (`play_zone_animation` mit `zoneType: 'board'`, `originOwner` /
 //  `originHeroIdx` [/ `originZoneSlot`] und `targets`): `onZoneAnim` rechnet sie in Bildschirmpunkte um und reicht
@@ -24222,14 +24222,14 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ═══════════════════════════════════════════════════════════════════
-  //  Pistolenschuesse (Assault Eagle, erste Haelfte) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
+  //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
   //  Je Ziel drei Schuss im Abstand von 105 ms, alle Ziele im selben Takt: Muendungsfeuer an der Quelle (Kreuz mit
   //  Strahlen in Schussrichtung, drei Bilder), Geschoss (2×2, weiss-gelb, mit gedithertem Schweif) fliegt in 190 ms auf
   //  einen leicht gestreuten Punkt der Zielkarte, am Ziel Einschlagkreuz, Funken mit Schwerkraft und eine graue
   //  Rauchwolke, die gedithert ausduennt; an der Quelle fliegt je Schuss eine Huelse aus. Der letzte Einschlag liegt bei
   //  ~400 ms — der Schaden folgt danach (assault-eagle.js: GUNFIRE_HIT_MS). Ist die Quelle selbst das Ziel, gibt es
-  //  Muendungsfeuer und Einschlag am selben Platz.
+  //  Muendungsfeuer und Einschlag am selben Platz. Dieselbe Salve zeigt die Ziele des Kontrolleurs UND die des Gegners.
   // ═══════════════════════════════════════════════════════════════════
   gunfire_volley: (() => {
     const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a'), ORANGE = ppHex('#ff9b2f'), DUNKEL = ppHex('#c2551a'), ROT = ppHex('#7a2a14');
@@ -24309,78 +24309,6 @@ const ANIM_REGISTRY = {
       });
     };
     return ppSalve(malen, 820, vorbereiten);
-  })(),
-  // ═══════════════════════════════════════════════════════════════════
-  //  Welle (Assault Eagle, zweite Haelfte) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
-  //
-  //  Von der Quelle laeuft je Ziel ein gewoelbter Wellenkamm (vier gestaffelte Boegen weiss → hellblau → blau, am Rand
-  //  gedithert ausduennt, der Kamm wird breiter, je weiter er kommt) und erreicht ALLE Ziele im selben Augenblick
-  //  (460 ms — gleiche Zeit, nicht gleiche Geschwindigkeit); dort Blitzkreuz, zwei flache Druckringe und blaue Funken.
-  //  An der Quelle zuckt zum Start ein Druckring. Ist die Quelle selbst das Ziel, gibt es nur den Druckring und den
-  //  Einschlag am selben Platz. Der Schaden folgt nach dem Einschlag (assault-eagle.js: WAVE_HIT_MS).
-  // ═══════════════════════════════════════════════════════════════════
-  shockwave_volley: (() => {
-    const WEISS = ppHex('#ffffff'), HELL = ppHex('#c9f3ff'), MITTEL = ppHex('#6fd0ff'), BLAU = ppHex('#2f8be0'), TIEF = ppHex('#1b4fa8');
-    const BOEGEN = [WEISS, HELL, MITTEL, BLAU], DECKUNG = [1, 0.9, 0.65, 0.4];
-    const T_HIT = 460;
-    const vorbereiten = (sz) => sz.ziele.map(() => ({
-      funken: Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() * Math.PI * 2, v: 36 + Math.random() * 40, leben: 250 + Math.random() * 130 })),
-    }));
-    const malen = (g, t, sz, teile) => {
-      // Druckring an der Quelle
-      if (t < 340) {
-        const u = t / 340, r = 3 + u * 22;
-        g.ring(sz.O.x, sz.O.y, r, r * 0.55, u < 0.4 ? HELL : MITTEL, 1 - u);
-        if (u < 0.45) g.ring(sz.O.x, sz.O.y, r - 1, (r - 1) * 0.55, WEISS, 1 - u * 1.8);
-      }
-      sz.ziele.forEach((z, zi) => {
-        const px = -z.dy, py = z.dx;
-        // Wellenkamm unterwegs
-        if (!z.selbst && t < T_HIT) {
-          const u = Math.max(0, t / T_HIT);
-          const fx = sz.O.x + z.dx * z.len * u, fy = sz.O.y + z.dy * z.len * u;
-          const hw = 5 + 8 * u, R = hw * 2;
-          for (let b = 0; b < BOEGEN.length; b++) {
-            const zurueck = b * 3.2;
-            for (let s = -hw; s <= hw; s += 0.45) {
-              const entlang = -(s * s) / (2 * R) - zurueck;
-              const X = fx + z.dx * entlang + px * s, Y = fy + z.dy * entlang + py * s;
-              if ((X - sz.O.x) * z.dx + (Y - sz.O.y) * z.dy < 0) continue;      // nie hinter der Quelle
-              const rand = Math.abs(s) / hw;
-              const a = DECKUNG[b] * (1 - 0.6 * rand * rand);
-              g.put(X, Y, BOEGEN[b], a);
-              if (b === 0) g.put(X + z.dx, Y + z.dy, BOEGEN[1], a);               // Kamm: zwei Pixel dick
-            }
-          }
-        }
-        // Einschlag
-        const alter = t - T_HIT;
-        if (alter >= 0) {
-          if (alter < 100) {
-            const r = alter < 50 ? 6 : 3;
-            for (let i = -r; i <= r; i++) { g.put(z.x + i, z.y, i === 0 ? WEISS : HELL); g.put(z.x, z.y + i, i === 0 ? WEISS : HELL); }
-            if (alter < 50) g.block(z.x - 1, z.y - 1, 3, 3, WEISS);
-          }
-          if (alter < 400) {                                   // grosser Druckring, beginnt schon weit genug aussen (kein Klumpen)
-            const u = alter / 400, r = 6 + u * 17, c = alter < 80 ? WEISS : alter < 200 ? HELL : MITTEL;
-            g.ring(z.x, z.y, r, r * 0.62, c, 1 - u * 0.9);
-            if (alter < 60) g.ring(z.x, z.y, r - 1, (r - 1) * 0.62, HELL, 1 - u);
-          }
-          if (alter >= 110 && alter < 430) {                   // zweiter, kleinerer Ring folgt
-            const u = (alter - 110) / 320, r = 3 + u * 12;
-            g.ring(z.x, z.y, r, r * 0.62, u < 0.5 ? MITTEL : BLAU, 1 - u);
-          }
-          for (const f of teile[zi].funken) {
-            if (alter >= f.leben) continue;
-            const sek = alter / 1000, bremse = 1 - 0.35 * (alter / f.leben);
-            const fx = z.x + Math.cos(f.w) * f.v * sek * bremse, fy = z.y + Math.sin(f.w) * f.v * sek * bremse * 0.7;
-            g.put(fx, fy, alter < f.leben * 0.4 ? WEISS : alter < f.leben * 0.75 ? MITTEL : BLAU);
-            if (alter < f.leben * 0.4) g.put(fx - Math.cos(f.w), fy - Math.sin(f.w) * 0.7, HELL);
-          }
-        }
-      });
-    };
-    return ppSalve(malen, 940, vorbereiten);
   })(),
   // ── Hell Fox death: black-flame eruption ───────────────────────────
   // When a Hell Fox is defeated, a column of pitch-black flames erupts
