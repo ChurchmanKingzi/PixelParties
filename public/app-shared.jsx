@@ -4134,8 +4134,14 @@ function potionDeckAccepts(deck, card) {
 function potionClauseLevel(name) {
   return PDC.levelOf(window.CARDS_BY_NAME[name]);
 }
+/** Verbietet die Potion-Deck-Klausel dieses Helden das Team? (Er schliesst einen Klausel-Helden im Team aus.) */
+function potionClauseTeamConflict(deck, heroName) {
+  const mit = PDC.activeClauses([...(deck?.heroes || []), { hero: heroName }], sameCopyFamily);
+  return PDC.conflictProblem(mit, window.CARDS_BY_NAME);
+}
 window.potionClauses = potionClauses;
 window.potionDeckAccepts = potionDeckAccepts;
+window.potionClauseTeamConflict = potionClauseTeamConflict;
 
 function isDeckLegal(deck) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
@@ -4165,7 +4171,10 @@ function isDeckLegal(deck) {
   if (klauseln.length > 0) {
     // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): genaue
     // Kartenzahl, nur passende Karten, verschiedene Namen, Gesamtlevel-Grenze.
-    reasons.push(...PDC.problems(klauseln, deck.potionDeck || [], n => window.CARDS_BY_NAME[n], copyFamilyKey));
+    // Schliessen die Klausel-Helden einander aus (Chaos-Diamond + Pinta), ist das EINE klare Meldung wert.
+    const konflikt = PDC.conflictProblem(klauseln, window.CARDS_BY_NAME);
+    if (konflikt) reasons.push(konflikt);
+    else reasons.push(...PDC.problems(klauseln, deck.potionDeck || [], n => window.CARDS_BY_NAME[n], copyFamilyKey));
   } else {
     if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
     if ((deck.potionDeck || []).some(n => window.CARDS_BY_NAME[n]?.cardType !== 'Potion')) reasons.push('Potion Deck may only contain Potions');
@@ -4569,6 +4578,8 @@ function canAddCard(deck, cardName, section) {
     if (ct !== 'Hero') return false;
     if (isNonStartingHero(cardName)) return false; // v704: „cannot be one of your Starting Heroes"
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
+    // Potion-Deck-Klauseln: Chaos-Diamond und Pinta schliessen einander aus (das Potion Deck passt nur zu einem).
+    if (potionClauseTeamConflict(deck, cardName)) return false;
     // ★ Zhigao-Grenze (v991): mit ihm im Team sind es ZWEI Helden. Ist
     // die Zahl erreicht, geht kein weiterer mehr hinein — und Zhigao
     // selbst passt nicht mehr dazu, wenn schon zwei andere stehen.

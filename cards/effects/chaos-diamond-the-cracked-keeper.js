@@ -26,7 +26,11 @@
 //     gekommener Chaos-Diamond (Wiederbelebung, Gabby-artige Wege) traegt
 //     den Stempel nicht: kein Effekt, KEINE Zieh-Sperre. Die Sperre haengt
 //     am SPIELER statt am Helden, damit sie auch bleibt, wenn der Held
-//     faellt (der Text sagt „never").
+//     faellt (der Text sagt „never"). Ein UEBERNOMMENER Chaos-Diamond
+//     (Charme, Controlled Attack) laesst sich nur aktivieren, wenn das
+//     Potion Deck des Uebernehmers zufaellig auf ihn zugeschnitten ist
+//     (`darfAktivieren`: der Uebernehmer ist selbst mit einem Chaos-Diamond
+//     gestartet und uebernimmt den gegnerischen).
 //
 //  3) EFFEKT (Aktion): die obersten 2 Karten des Potion Decks (oder die
 //     eine, die noch da ist) fliegen vom Potion Deck in die Mitte des
@@ -77,12 +81,13 @@ module.exports = {
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
-    const pi = ctx.cardOwner;
-    const feld = ctx.cardHeroOwner ?? pi;
+    const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
     const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    // „You can only activate this effect if this was one of your starting Heroes."
-    if (!starthelden.istStartheldVon(hero, pi)) return false;
+    const pi = starthelden.kontrolleur(hero, ctx.cardOwner);   // wer mit ihm handelt (auch Controlled Attack)
+    // „You can only activate this effect if this was one of your starting Heroes." — ein übernommener
+    // Chaos-Diamond nur, wenn das Potion Deck des Übernehmers zufällig auf ihn zugeschnitten ist.
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
     return oberste(engine, pi).length > 0;
   },
 
@@ -90,7 +95,7 @@ module.exports = {
     const hi = (engine?.gs?.players?.[pi]?.heroes || []).findIndex(h => h?.name === CARD_NAME);
     if (hi < 0) return false;
     const hero = engine.gs.players[pi].heroes[hi];
-    if (!starthelden.istStartheldVon(hero, pi) || hero.hp <= 0) return false;
+    if (!starthelden.darfAktivieren(engine, hero, pi, pi, CARD_NAME) || hero.hp <= 0) return false;
     return oberste(engine, pi).some(k => k.istSpell);
   },
 
@@ -102,6 +107,9 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     const feld = ctx.cardHeroOwner ?? pi;
+    // Dieselbe Pruefung wie in `canActivateHeroEffect` (Starthero bzw. zugeschnittenes Potion Deck des Uebernehmers).
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
 
     const aufgedeckt = oberste(engine, pi);
     if (aufgedeckt.length === 0) return false;

@@ -48953,6 +48953,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             : (fromPool === 'hero' && toPool === 'side') ? toName : null;
           if (einHeld && PDCl.heroSwapProblem({ potionDeck: potionCards, potionClauseMemory: dk.potionClauseMemory }, einHeld, kartenDaten)) return false;
           const klauseln = window.potionClauses(simDeck);
+          if (einHeld && PDCl.conflictProblem(klauseln, CARDS_BY_NAME)) return false;   // Chaos-Diamond und Pinta schliessen einander aus
           if ((fromPool === 'potion' || toPool === 'potion') && klauseln.length > 0) {
             const pd = [...potionCards];
             const pi2 = fromPool === 'potion' ? fromIdx : toIdx;

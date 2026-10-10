@@ -19,7 +19,11 @@
 //  2) „STARTING HERO" + „you can never draw": das gemeinsame Geruest
 //     `_potion-deck-hero-shared.js` (Stempel beim Spielstart, Zieh-Sperre
 //     am Spieler). Ein spaeter ins Spiel gekommener Pinta traegt den
-//     Stempel nicht: kein Effekt, keine Sperre.
+//     Stempel nicht: kein Effekt, keine Sperre. Eine UEBERNOMMENE Pinta
+//     (Charme, Controlled Attack) laesst sich nur aktivieren, wenn das
+//     Potion Deck des Uebernehmers zufaellig auf sie zugeschnitten ist
+//     (er ist selbst mit Pinta gestartet): `darfAktivieren`. Der Effekt
+//     greift dann auf SEIN Potion Deck.
 //
 //  3) EFFEKT (frei, Main Phase, hart einmal pro Zug und Spieler — die
 //     Engine stempelt `heroHoptKey`): die oberste Karte des Potion Decks
@@ -81,12 +85,13 @@ module.exports = {
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
-    const pi = ctx.cardOwner;
-    const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+    const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite des Helden
     const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    // „You can only activate this effect if this was one of your starting Heroes."
-    if (!starthelden.istStartheldVon(hero, pi)) return false;
+    const pi = starthelden.kontrolleur(hero, ctx.cardOwner);   // wer mit ihm handelt (auch Controlled Attack)
+    // „You can only activate this effect if this was one of your starting Heroes." — eine übernommene
+    // Pinta nur, wenn das Potion Deck des Übernehmers zufällig auf sie zugeschnitten ist.
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
     return starthelden.obersteKarten(engine, pi, 1).length > 0;
   },
 
@@ -94,7 +99,7 @@ module.exports = {
   cpuShouldUseHeroEffect(engine, pi, heroIdx) {
     const hi = heroIdx ?? (engine?.gs?.players?.[pi]?.heroes || []).findIndex(h => h?.name === CARD_NAME);
     const hero = engine?.gs?.players?.[pi]?.heroes?.[hi];
-    if (!hero?.name || hero.hp <= 0 || !starthelden.istStartheldVon(hero, pi)) return false;
+    if (!hero?.name || hero.hp <= 0 || !starthelden.darfAktivieren(engine, hero, pi, pi, CARD_NAME)) return false;
     const oben = starthelden.obersteKarten(engine, pi, 1)[0];
     return !!oben && moeglicheZonen(engine, pi, pi, hi, oben).length > 0;
   },
@@ -108,8 +113,9 @@ module.exports = {
     const feld = ctx.cardHeroOwner ?? pi;
     const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
     if (!ps || !hero?.name) return false;
-    // Ein uebernommener Pinta (Charme, Controlled Attack) ist KEIN Starthero des Uebernehmers.
-    if (!starthelden.istStartheldVon(hero, pi)) return false;
+    // Ein uebernommener Pinta (Charme, Controlled Attack) ist KEIN Starthero des Uebernehmers: nur, wenn sein
+    // Potion Deck zufaellig auf sie zugeschnitten ist (er selbst also mit Pinta gestartet ist).
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
     const oben = starthelden.obersteKarten(engine, pi, 1)[0];
     if (!oben) return false;
 

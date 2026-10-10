@@ -161,8 +161,66 @@ const SUMMONING = [['Navigation'], ['Singing'], ['Summoning Magic']];
   }
   {
     const t = await fresh();
-    t.ps.heroes[0]._startingHeroOf = t.seat === 0 ? 1 : 0;       // Starthelden des GEGNERS (uebernommen)
-    check('uebernommener Pinta (Starthelden des anderen Spielers): nicht anbietbar', !angebot(t));
+    t.ps.heroes[0]._startingHeroOf = undefined;
+    check('eigener Pinta, der spaeter ins Spiel kam (kein Stempel), obwohl das Potion Deck passt: nicht anbietbar', !angebot(t));
+  }
+
+  console.log('Uebernommene Pinta (Charme): nur mit zugeschnittenem Potion Deck');
+  /** Spieler am Zug uebernimmt die Pinta des Gegners; die eigene Pinta (Held 0) verliert den Stempel, damit nur die geliehene zaehlt. */
+  async function geliehen(eigenesPotionDeck, gegnerPotionDeck = ['Archer', 'Cute Bunny']) {
+    const t = await fresh({ potion: eigenesPotionDeck });
+    const oi = t.seat === 0 ? 1 : 0;
+    for (const hz of t.other.supportZones) for (let i = 0; i < hz.length; i++) hz[i] = [];
+    t.other.potionDeck = gegnerPotionDeck.slice();
+    delete t.ps.heroes[0]._startingHeroOf;
+    t.other.heroes[0].charmedBy = t.seat;
+    t.oi = oi;
+    t.geliehenAngebot = () => t.engine.getActiveHeroEffects(t.seat).some(e => e.heroName === PINTA && e.charmedOwner === oi);
+    return t;
+  }
+  {
+    const t = await geliehen(['Barkeeper', 'Baby Spider']);
+    check('Uebernehmer ist selbst mit Pinta gestartet (Potion Deck aus Creatures): die geliehene Pinta ist anbietbar', t.geliehenAngebot());
+    const res = await t.host.doActivateHeroEffect(t.room, t.seat, { heroIdx: 0, charmedOwner: t.oi });
+    const steht = t.engine.cardInstances.find(c => c.name === 'Barkeeper' && c.zone === 'support');
+    check('…sie deckt das Potion Deck des UEBERNEHMERS auf (nicht das des Besitzers)', JSON.stringify(t.ps.potionDeck) === JSON.stringify(['Baby Spider']) && JSON.stringify(t.other.potionDeck) === JSON.stringify(['Archer', 'Cute Bunny']), { eigenes: t.ps.potionDeck, besitzer: t.other.potionDeck, res });
+    check('…beschwoert auf Pintas Zone (Brettseite des Besitzers), die Kreatur gehoert dem Uebernehmer', !!steht && steht.owner === t.oi && (steht.controller ?? steht.owner) === t.seat, steht && [steht.owner, steht.controller]);
+  }
+  {
+    const t = await geliehen(['Planet in a Bottle', 'Planet in a Bottle']);
+    check('normales Potion Deck aus Potions (nicht zugeschnitten): die geliehene Pinta ist NICHT anbietbar', !t.geliehenAngebot());
+  }
+  {
+    const t = await geliehen(['Fire Bolts', 'Arms Trade']);
+    check('Potion Deck aus Spells (auf Chaos-Diamond zugeschnitten, nicht auf Pinta): nicht anbietbar', !t.geliehenAngebot());
+  }
+  {
+    const t = await geliehen(['Barkeeper', 'Barkeeper']);
+    check('Potion Deck mit doppeltem Namen (nicht nach der Klausel gebaut): nicht anbietbar', !t.geliehenAngebot());
+  }
+  {
+    const t = await geliehen([]);
+    check('leeres Potion Deck: nicht anbietbar', !t.geliehenAngebot());
+  }
+
+  console.log('Uebernommener Chaos-Diamond: dieselbe Regel');
+  {
+    const chaosScript = loadCardEffect(CHAOS);
+    const mk = async (potion) => {
+      const t = await fresh({ heroes: [CHAOS], potion });
+      const oi = t.seat === 0 ? 1 : 0;
+      delete t.ps.heroes[0]._startingHeroOf;                   // der eigene Chaos zaehlt nicht: nur der geliehene
+      t.other.heroes[0].charmedBy = t.seat;
+      const inst = t.engine.cardInstances.find(c => c.zone === 'hero' && c.owner === oi && c.heroIdx === 0);
+      const ctx = t.engine._createContext(inst, { event: 'canHeroEffectCheck' });
+      return { t, ok: chaosScript.canActivateHeroEffect(ctx), ctx };
+    };
+    let r = await mk(['Fire Bolts', 'Arms Trade']);
+    check('Uebernehmer mit Spell-Potion-Deck (selbst mit Chaos-Diamond gestartet): geliehener Chaos-Diamond aktivierbar', r.ok === true && r.ctx.cardOwner === r.t.seat, [r.ok, r.ctx.cardOwner]);
+    r = await mk(['Barkeeper', 'Baby Spider']);
+    check('Uebernehmer mit Creature-Potion-Deck (Pinta): geliehener Chaos-Diamond nicht aktivierbar', r.ok === false);
+    r = await mk(['Planet in a Bottle']);
+    check('Uebernehmer mit normalem Potion Deck: nicht aktivierbar', r.ok === false);
   }
   {
     const t = await fresh({ potion: [] });

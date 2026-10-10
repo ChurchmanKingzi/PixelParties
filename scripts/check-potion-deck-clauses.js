@@ -78,6 +78,21 @@ check('poolOk (ohne Groessenforderung): 3 Creatures ok, doppelter Name nicht', P
 check('poolOk: Level-Grenze', !P.poolOk(pinta, creatures3.slice(0, 6), cardOf) && P.poolOk(pinta, creatures3.slice(0, 5), cardOf));
 check('ohne Klausel ist nichts zu pruefen', P.problems([], ['egal'], cardOf).length === 0 && P.poolOk([], ['egal'], cardOf));
 
+console.log('Ausschluss: das Potion Deck passt nur zu EINEM Klausel-Helden');
+check('Chaos-Diamond + Pinta vertragen sich nicht (keine Karte erfuellt beide accepts)', P.compatible(beide, DB) === false);
+check('…die Meldung nennt beide Helden', /Chaos-Diamond, the Cracked Keeper and Pinta, the Singing Ship exclude each other/.test(P.conflictProblem(beide, DB) || ''), P.conflictProblem(beide, DB));
+check('…zweimal gefragt (Zwischenspeicher): dasselbe Ergebnis', P.compatible(beide, DB) === false && P.conflictProblem(beide, DB) === P.conflictProblem(beide, DB));
+check('ein einzelner Klausel-Held oder keiner: kein Ausschluss', P.compatible(chaos, DB) && P.compatible(pinta, DB) && P.compatible([], DB) && P.conflictProblem(pinta, DB) === null);
+check('Held ohne Klausel neben Pinta: kein Ausschluss', P.compatible(P.activeClauses([OTHER, PINTA]), DB));
+{
+  // Zwei erfundene Klauseln mit ueberlappender Kartenart vertragen sich, mit verschiedener Groesse nicht.
+  const a = { hero: 'A', size: 15, maxLevel: 15, distinct: true, accepts: { anyType: 'Creature' }, noun: 'x', nounShort: 'x' };
+  const b = { hero: 'B', size: 15, maxLevel: 15, distinct: true, accepts: { cardType: 'Creature', subtypes: ['Normal'] }, noun: 'y', nounShort: 'y' };
+  const c = { hero: 'C', size: 10, maxLevel: 15, distinct: true, accepts: { anyType: 'Creature' }, noun: 'z', nounShort: 'z' };
+  check('ueberlappende Kartenarten vertragen sich', P.compatible([a, b], DB) === true);
+  check('verschiedene Kartenzahlen vertragen sich nie', P.compatible([a, c], DB) === false);
+}
+
 console.log('Seitenwechsel: Held raus / rein');
 {
   const deck = { potionDeck: gut.slice() };

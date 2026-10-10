@@ -3018,7 +3018,10 @@ function potionClausesOf(heroes) {
   return PotionDeckClauses.activeClauses(heroes || []);
 }
 function potionDeckGroesseOk(heroes, pc) {
-  return PotionDeckClauses.sizeOk(potionClausesOf(heroes), pc);
+  const klauseln = potionClausesOf(heroes);
+  // Chaos-Diamond und Pinta schliessen einander aus: kein Potion Deck passt zu beiden.
+  if (!PotionDeckClauses.compatible(klauseln, getCardDB())) return false;
+  return PotionDeckClauses.sizeOk(klauseln, pc);
 }
 
 function heldenzahlOk(heroes) {
@@ -15498,7 +15501,11 @@ io.on('connection', (socket) => {
       const newAbility1 = newHeroData.startingAbility1 || null;
       const newAbility2 = newHeroData.startingAbility2 || null;
 
-      // ── Potion-Deck-Klauseln: Merkliste, Leeren und Wiederherstellen ──
+      // ── Potion-Deck-Klauseln: Ausschluss, Merkliste, Leeren und Wiederherstellen ──
+      // Chaos-Diamond und Pinta schliessen einander aus: das Team NACH dem Tausch darf keine
+      // zwei unvertraeglichen Klausel-Helden enthalten.
+      const klauselKonflikt = PotionDeckClauses.conflictProblem(potionClausesOf(simHeroes), cardDB);
+      if (klauselKonflikt) return sideDeckAblehnen(socket, klauselKonflikt);
       const klauselGrund = potionClauseHeldentausch(cardDB, deck, oldHeroName, sideCardName);
       if (klauselGrund) return sideDeckAblehnen(socket, klauselGrund);
 

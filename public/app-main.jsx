@@ -572,6 +572,8 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       const slots = [...prev];
       const empty = slots.findIndex(s => !s?.hero);
       if (empty < 0) return prev;
+      // Potion-Deck-Klauseln: Chaos-Diamond und Pinta schliessen einander aus.
+      if (window.potionClauseTeamConflict && window.potionClauseTeamConflict({ heroes: slots }, name)) return prev;
       const cd = cardDB[name];
       slots[empty] = { hero: name, ability1: cd?.startingAbility1 || null, ability2: cd?.startingAbility2 || null };
       return slots;

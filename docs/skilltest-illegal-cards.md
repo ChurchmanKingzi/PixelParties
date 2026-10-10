@@ -315,6 +315,10 @@
 
 - Chaos-Diamond, the Cracked Keeper
 
+## Pinta, the Singing Ship (Nutzer 10.10.): Potion-Deck-Held wie Chaos-Diamond — ihr Effekt deckt die oberste Karte des Potion Decks auf und beschwört sie; der Skill Test hat kein Potion Deck.
+
+- Pinta, the Singing Ship
+
 ## Reaktionen mit extrem engen, seltenen oder unwahrscheinlichen Bedingungen (Nutzer 7.10., nach eigenem Ermessen): hängen an bestimmten Karten/Archetypen, am Deck, an Surprises, Freeze, Ascend, Heldenstufen oder Sonderlagen, die im Skill Test praktisch nie eintreten.
 
 - Arrow Slit

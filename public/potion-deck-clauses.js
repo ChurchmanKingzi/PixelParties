@@ -25,10 +25,12 @@
 //    accepts   welche Karten ins Potion Deck duerfen (siehe `cardFits`)
 //    noun      wie der Held die Karten nennt (Fehlermeldungen)
 //    nounShort Kurzform davon (Meldungen des Seitenwechsels)
-//  Stehen mehrere Klauseln-Helden im Team, gilt jede davon: ein Potion
-//  Deck, das ALLE erfuellt, gibt es dann nur, wenn eine Karte alle
-//  `accepts` zugleich erfuellt — bei Chaos-Diamond (Spells) zusammen mit
-//  Pinta (Creatures) also nie, das Team ist dann nicht spielbar.
+//  Klausel-Helden schliessen einander aus, wenn kein Potion Deck beide
+//  zugleich erfuellen kann (keine Karte erfuellt beide `accepts`): das Potion
+//  Deck kann nur auf EINEN von ihnen zugeschnitten sein. Chaos-Diamond (Spells)
+//  und Pinta (Creatures) gehen darum nie ins selbe Team — `compatible` /
+//  `conflictProblem` rechnen das aus der Tabelle, kein Heldenpaar ist
+//  fest verdrahtet.
 //
 //  Die Laufzeit-Haelfte (Starthero-Stempel, Zieh-Sperre fuer das Potion
 //  Deck) steht im Kartenskript bzw. in `cards/effects/_potion-deck-hero-
@@ -125,6 +127,37 @@
     if (!card) return false;
     if (!clauses || clauses.length === 0) return card.cardType === 'Potion';
     return clauses.every(function (c) { return cardFits(c, card); });
+  }
+
+  // ── Vertraeglichkeit ──────────────────────────────────────────────
+  // Das Potion Deck kann nur auf EINE Klausel zugeschnitten sein. Zwei Klausel-
+  // Helden vertragen sich nur, wenn mindestens eine Karte beide `accepts`
+  // erfuellt (und beide dieselbe Kartenzahl verlangen) — Chaos-Diamond (Spells)
+  // und Pinta (Creatures) schliessen einander darum aus. Das Ergebnis haengt nur
+  // von der Tabelle und dem (festen) Kartenbestand ab, nicht vom Deck: je Kartenbestand
+  // und Klausel-Menge einmal gerechnet.
+  var compatCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+
+  /**
+   * Gibt es ein Potion Deck, das ALLE diese Klauseln zugleich erfuellen koennte?
+   * @param {object} db  Kartenbestand `{ name: Kartendaten }`
+   */
+  function compatible(clauses, db) {
+    if (!clauses || clauses.length < 2) return true;
+    if (requiredSize(clauses) === -1) return false;
+    var key = clauses.map(function (c) { return c.hero; }).sort().join('|');
+    var perDb = compatCache && db && typeof db === 'object' ? (compatCache.get(db) || compatCache.set(db, {}).get(db)) : null;
+    if (perDb && key in perDb) return perDb[key];
+    var names = Object.keys(db || {});
+    var ok = names.some(function (n) { return accepts(clauses, db[n]); });
+    if (perDb) perDb[key] = ok;
+    return ok;
+  }
+
+  /** Ablehnungsgrund, wenn sich die Klausel-Helden gegenseitig ausschliessen; sonst null. */
+  function conflictProblem(clauses, db) {
+    if (compatible(clauses, db)) return null;
+    return heroesOf(clauses).split(' + ').join(' and ') + ' exclude each other: the Potion Deck can only be tailored to one of them.';
   }
 
   /** Wie die Klauseln die erlaubten Karten nennen („Normal or Attachment Spells" / „Creatures"). */
@@ -241,6 +274,8 @@
     cardFits: cardFits,
     accepts: accepts,
     requiredSize: requiredSize,
+    compatible: compatible,
+    conflictProblem: conflictProblem,
     maxLevel: maxLevel,
     needsDistinct: needsDistinct,
     nounOf: nounOf,

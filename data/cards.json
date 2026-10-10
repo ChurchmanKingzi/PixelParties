@@ -17176,7 +17176,7 @@
     "archetype": "",
     "setID": "PP MSIN",
     "banned": "",
-    "skilltestLegal": true,
+    "skilltestLegal": false,
     "startingAbility1": "Navigation",
     "startingAbility2": "Singing",
     "spellSchool1": "",
