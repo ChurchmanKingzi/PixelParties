@@ -7874,6 +7874,7 @@ const REAKTIONS_ANLAESSE = {
   creatures_defeated_reaction:    'Creatures were defeated',   // v1292 Sammel-Fenster
   board_discard_reaction:         'their card was sent to the discard pile',   // v1336 Furious Anger
   hero_defeated_reaction:         'their Hero was defeated',   // v1340 Cheat Chair
+  hero_defeat_window_reaction:    'a Hero was being defeated',   // v1490 Surprising Opportunity
   after_damage_reaction:          'damage had landed',
   after_creature_damage_reaction: 'a Creature had taken damage',
   creature_damage_batch_reaction: 'Creatures had taken damage',
@@ -24418,6 +24419,129 @@ const ANIM_REGISTRY = {
             put(fx, fy, c, aus);
             if (f.lang && age < f.life * 0.7) put(fx - Math.sign(f.vx || 1), fy - 1, FUNKEN[Math.min(FUNKEN.length - 1, 1 + Math.floor((age / f.life) * 3))], aus);
           }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t, fr); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Surprising Opportunity — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild —
+  //  ein weisses Fragezeichen mit dunkler Kontur ueber dem Kopf der Figur)
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten: ueber dem faellenden Helden springt ein 5×7-Fragezeichen (doppelt gross, weiss, 1 Pixel dunkle Kontur) in 200 ms mit
+  //  kleinem Ueberschwinger auf, schwebt in Rasterschritten (ein Pixel auf und ab), ein heller Glanzpunkt wandert ueber den Bogen.
+  //  Aus der unteren Kartenhaelfte (dort stehen die Support Zones) stieben goldene Vier-Punkt-Funken nach oben, zuerst weiss, dann
+  //  gelb, orange. Ab ~700 ms blendet alles ueber Bayer-Dithering aus (statt Alpha), bei 1000 ms ist es weg. Die Wurzel traegt
+  //  `data-pp-px="aus"`: die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an). Massstab folgt der Heldenzone (`w`/`h`),
+  //  Lebensdauer 1 s (deckt sich mit BILD_MS in surprising-opportunity.js).
+  // ═════════════════════════════════════════════════════════════════
+  surprising_opportunity: (() => {
+    const KONTUR = ppHex('#1b1626');
+    const WEISS = ppHex('#ffffff'), SCHATTEN = ppHex('#c9cfe0');
+    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const FRAGEZEICHEN = ['.###.', '#...#', '....#', '..##.', '..#..', '.....', '..#..'];
+    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 200, AUS_AB = 700;
+    const PADX = 18, PAD_OBEN = 42, PAD_UNTEN = 10;               // Platz um die Karte (Rasterpixel): das Fragezeichen steht darueber
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    // Aufsprung mit kleinem Ueberschwinger (0 → 1.12 → 1)
+    const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.12 : 1.12 - 0.12 * ((u - 0.7) / 0.3));
+    return function SurprisingOpportunityEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const teile = useMemo(() => {
+        const funken = [];
+        for (let k = 0; k < ppFxN(14); k++) {
+          funken.push({
+            fx: CX + (Math.random() - 0.5) * (kw * 0.9), fy: CY + kh * (0.05 + Math.random() * 0.45),
+            born: 120 + Math.random() * 380, life: 380 + Math.random() * 260,
+            vx: (Math.random() - 0.5) * 14, vy: -(16 + Math.random() * 22), gross: Math.random() < 0.45,
+          });
+        }
+        return { funken };
+      }, []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        // Fragezeichen: Glyph doppelt gross, dann dunkle Kontur um jedes weisse Pixel
+        const GROSS = 2;
+        const maske = new Set();
+        FRAGEZEICHEN.forEach((zeile, gy) => [...zeile].forEach((ch, gx) => {
+          if (ch !== '#') return;
+          for (let j = 0; j < GROSS; j++) for (let i = 0; i < GROSS; i++) maske.add((gx * GROSS + i) + ',' + (gy * GROSS + j));
+        }));
+        const breite = 5 * GROSS, hoehe = 7 * GROSS;
+        const kontur = new Set();
+        maske.forEach((k) => {
+          const [mx, my] = k.split(',').map(Number);
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+            const nk = (mx + i) + ',' + (my + j);
+            if (!maske.has(nk)) kontur.add(nk);
+          }
+        });
+        const frageZeichnen = (ox, oy, t, aus) => {
+          kontur.forEach((k) => { const [mx, my] = k.split(',').map(Number); put(ox + mx, oy + my, KONTUR, aus); });
+          maske.forEach((k) => {
+            const [mx, my] = k.split(',').map(Number);
+            // untere Haelfte des Bogens eine Stufe dunkler: kleiner Verlauf statt flacher Flaeche
+            put(ox + mx, oy + my, (my >= hoehe - 4 && my < hoehe - 2) || my === hoehe - 1 ? SCHATTEN : WEISS, aus);
+          });
+          // wandernder Glanzpunkt auf dem Bogen
+          const pfad = [[0, 2], [1, 0], [3, 0], [5, 0], [7, 0], [8, 1], [9, 3]];
+          const gp = pfad[Math.floor(t / 90) % pfad.length];
+          if (t > AUFSPRUNG) put(ox + gp[0], oy + gp[1], FUNKEN[0], aus);
+        };
+        const stern = (px, py, c, gross, a) => {
+          put(px, py, c, a);
+          put(px - 1, py, c, a); put(px + 1, py, c, a); put(px, py - 1, c, a); put(px, py + 1, c, a);
+          if (gross) { put(px - 2, py, c, a * 0.7); put(px + 2, py, c, a * 0.7); put(px, py - 2, c, a * 0.7); put(px, py + 2, c, a * 0.7); }
+        };
+        const zeichne = (t, fr) => {
+          const aus = t > AUS_AB ? Math.max(0, 1 - (t - AUS_AB) / (ENDE - AUS_AB)) : 1;      // Ausblenden am Ende (gedithert)
+          // ── Funken: aus der unteren Kartenhaelfte nach oben, Farbe weiss → gelb → orange ──
+          for (const f of teile.funken) {
+            const age = t - f.born;
+            if (age < 0 || age > f.life) continue;
+            const u = age / f.life, sek = age / 1000;
+            const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor(u * FUNKEN.length))];
+            stern(f.fx + f.vx * sek, f.fy + f.vy * sek, c, f.gross && u < 0.6, (1 - u * u) * aus);
+          }
+          // ── Fragezeichen: springt auf, schwebt in Rasterschritten ──
+          const sprung = springe(t / AUFSPRUNG);
+          const schweben = t > AUFSPRUNG ? (Math.floor(t / 160) % 2 === 0 ? 0 : -1) : 0;
+          const ox = CX - Math.floor(breite / 2);
+          const grund = CY - Math.floor(kh / 2) - hoehe - 9;                    // Unterkante ueber dem Kopf der Heldenfigur (sie ragt aus der Karte)
+          const oy = Math.round(grund + (1 - sprung) * 10 + schweben);
+          frageZeichnen(ox, oy, t, aus);
         };
         const t0 = performance.now();
         let raf = 0, letzte = -1;
@@ -44476,6 +44600,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
       if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }
       // v1340: Cheat Chair
+      if (t === 'surprising_opportunity') {
+        const p = playerByName(entry.player);
+        const karten = Array.isArray(entry.cards) ? entry.cards : [];
+        return <span className="log-status">✨ {cName('Surprising Opportunity')} — {pName(p.name, p.color)} adds {karten.map((k, i) => <React.Fragment key={i}>{i > 0 ? ' and ' : ''}{cName(k)}</React.Fragment>)} from {entry.hero}'s Support Zones to their hand before it is defeated.</span>;
+      }
+      if (t === 'test_flight') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">✨ {cName('Test Flight')} — {pName(p.name, p.color)}'s {entry.hero} takes off and dodges {cName(entry.negated)}!</span>;
+      }
       if (t === 'cheat_chair') { const p = playerByName(entry.player); return <span className="log-heal">✨ {cName('Cheat Chair')} — {pName(p.name, p.color)}'s {entry.hero} rises again at <span className="log-amount">{entry.hp}</span> HP and takes no damage for the rest of the turn!</span>; }
       // v1336: Furious Anger
       if (t === 'furious_anger') { const p = playerByName(entry.player); return entry.spell

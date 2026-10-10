@@ -3911,6 +3911,37 @@ eigenes Abzeichen 🪑). Ein neuer Schutz dieser Art = ein neuer Statuseintrag.
 `play_zone_animation`-Ereignis mitgeben (bei `actionReviveHero`: `animDuration`)
 — ohne Angabe räumt der Client sie nach 1000 ms ab.
 
+#### ★ Hand-Fenster „Held wird besiegt — VOR dem Aufräumen" — `isHeroDefeatWindowReaction` (v1490, Surprising Opportunity)
+
+```js
+isHeroDefeatWindowReaction: true,
+heroDefeatWindowCondition(gs, pi, engine, info) → bool,
+async heroDefeatWindowResolve(engine, pi, info, { casterIdx, casterSeite })
+// optional: reactionCasterAllowed(gs, pi, heroIdx, engine, info)
+// info = { hero, heroIdx, heroOwner, reactorIdx, source, sourceOwner }
+```
+
+Läuft in `_runHeroDefeatSequence` **ganz vorn** (nur im ersten Durchlauf je Tod, `!target._koProcessed`), nachdem
+`ON_HERO_KO` seine Chance hatte (Guardian Angel & Co.) und **vor** Todes-Aufräumen und Lösch-Ersatz: Ausrüstungen und
+Anhängsel liegen noch in den Support Zones, Statuswerte und Buffs sind noch da, der Held steht bei 0 HP. Das Gegenstück zu
+`isHeroDefeatedReaction` (läuft NACH dem Aufräumen, nur für den Besitzer, kann wiederbeleben).
+
+- **Angebot an BEIDE Seiten:** der Besitzer des fallenden Helden zuerst, danach die übrigen Sitze. Jede Kopie auf der Hand
+  wird einzeln angeboten (bis 8 Runden), eine Absage gilt für alle Kopien desselben Namens in diesem Fenster. Was ein
+  Spieler genommen hat, steht dem nächsten nicht mehr zur Verfügung — die Bedingung wird je Angebot neu gefragt.
+- **Sperren** wie in den anderen Hand-Fenstern: Erst-Runden-Schutz, Dark Ocean, Hand-Spielsperre, Reaktionssperre/Status/
+  Schule/Wisdom über `_rxCastPlan` (der fallende Held kann nie wirken, `hp <= 0`).
+- Log-Typ `hero_defeat_window_reaction` (`REAKTIONS_ANLAESSE` im Client).
+- Aufruf unterdrücken: `opts.skipDefeatWindow` an `_runHeroDefeatSequence`.
+
+**`actionMoveCard(inst, 'hand', -1, -1, { toPlayer, _bypassDeadHeroFilter })` (v1490):**
+- `toPlayer`: schickt eine Brettkarte in die Hand eines ANDEREN Spielers als ihres Besitzers (nur Support → Hand). Besitzer
+  und Kontrolleur der Instanz wechseln (gleicher Weg wie die Heimkehr seitenfremder Kreaturen, `play_pile_transfer` trägt
+  `fromOwner`/`toOwner`); der urspruengliche Besitzer wird per `_tagHandCardOrigin` vermerkt — die Karte landet später in
+  SEINER Ablage, wie eine gestohlene Handkarte.
+- `_bypassDeadHeroFilter`: die Austritts-Haken (`onCardLeaveZone`) laufen auch für Karten an einem Helden mit 0 HP (sonst
+  filtert `runHooks` sie; im Todes-Aufräumen setzt die Engine das selbst).
+
 #### ★ Auftritt eines Gusses außerhalb des Spielwegs — `gussAuftrittBeginnen/-Beenden` (v1339)
 
 Wer eine Spell- oder Attack-Karte SELBST auflöst (eigene `runHooks('onPlay')`-
@@ -18974,6 +19005,22 @@ Spell (Reaction, Lv1, Magic Arts, `PP GBT`, `skilltestLegal: false`): „Play th
 - **Kunst:** die 594×394-Vorlage des Nutzers ist ein vergrößertes 76×51-Raster (7,82 × 7,73 Bildschirmpixel je Rasterpixel); die Zellmitten ergeben `data/card-art/native/Test_Flight.png` (+ Index, `python scripts/build-card-art.py`).
 
 **Wächter:** `scripts/skilltest-e2e/test-flight.test.js` (Post-Target-Fenster mit gescripteten Antworten: Stufenregel strikt, Attack und Spell, Quellen ohne Katalogeintrag, Wirker = getroffener Held, Picker bei mehreren, eingefrorener Held, „No", Bot-Vorstufe, echter Schadenspfad) und im echten Browser `scripts/skilltest-e2e/ui-test-flight.js` (Puzzle-Spiel: Burning Finger auf den eigenen Helden, Abfrage, Animation auf der Zone mit bemaltem Canvas, beide Klänge, Held verliert keine HP, Karte in der Ablage; Gegenprobe gleiche Stufe → kein Angebot).
+
+## ★ SURPRISING OPPORTUNITY — Karten aus den Support Zones eines fallenden Helden auf die Hand (Als Vorgabe 10.10.)
+
+Spell (Reaction, Lv1, **Decay Magic + Magic Arts**, `PP GBT`): „Play this card immediately when a Hero (yours or your opponent's) is defeated. Choose up to 2 cards from that Hero's Support Zones and add them to your hand before the Hero is defeated." (Vorher: Magic Arts, „cards that were attached or equipped".) Zwei Schulen: wie bei jedem Zwei-Schulen-Spell genügt EINE davon in Stufe 1 (`heroMeetsLevelReq`).
+
+- **Fenster:** `isHeroDefeatWindowReaction` (siehe oben) — „before the Hero is defeated" heißt: Ausrüstung/Anhängsel liegen noch im Feld. Beide Seiten bekommen das Angebot, der Besitzer des Helden zuerst.
+- **Was gewählt werden darf:** alles in den Support Zones dieses Helden — Kreaturen, Ausrüstung, Anhängsel, Heldenkarten als Ausrüstung. Nicht: **Token jeder Art** (Pollution, Mummy, Puppets, Invader, Leprochaun und Biomancy Tokens — letztere liegen unter dem Namen einer Potion mit `_cardDataOverride.cardType = 'Creature/Token'`; geprüft werden wirksame UND rohe Kartendaten), `immovable` (Divine Gift of Coolness), die unsichtbare Trägerin gewonnener Heldeneffekte (`_gainedEffectOnly`), verdeckte Karten, Cardinal Beasts; Karten mit „cannot be chosen"-Schutz (`untargetable_all`, Great Wall of Deri) fallen für den Wirker heraus. Gibt es nichts Wählbares, wird die Karte gar nicht angeboten.
+- **Auswahl:** Mensch: `promptEffectTarget` mit Zielen `type: 'equip'` (jede Support-Zonen-Karte), `maxTotal: 2`, `minRequired: 1`, abbrechbar als „Take nothing“ („up to 2“ erlaubt auch null Karten). Bot / `_fastMode` / MCTS: die zwei wertvollsten (Kosten, Level, Ausrüstung vor Kreatur, plus `_cpuEstimateHandValue`).
+- **„Your hand":** immer die Hand des SPIELERS, der die Karte gespielt hat (`toPlayer`), auch bei Karten vom Helden des Gegners. Fremde Karten bleiben Eigentum ihres Besitzers (Ablage später dort).
+- **Rückkehr-Hooks:** `onCardsReturnedToHand` (Teppes, Siphem, Blood Moon …) feuert nur, wenn die Karten von den EIGENEN Helden kamen (deren Text: „from your Heroes' Support Zones"), mit `fromHeroIdxs`/`fromZoneSlots`.
+- **Danach:** nicht gewählte Ausrüstung wird im normalen Todes-Aufräumen abgeräumt; Kreaturen bleiben wie bei jedem Heldentod in ihren Zonen.
+- **Bild und Klang:** `play_zone_animation` `surprising_opportunity` (ANIM_REGISTRY, Pixelart): weißes 5×7-Fragezeichen (doppelt groß, dunkle Kontur) springt über dem Helden auf, schwebt in Rasterschritten, goldene Vier-Punkt-Funken steigen aus der unteren Kartenhälfte, Ausblenden gedithert nach 1 s (`data-pp-px="aus"`). Klang `ZONE_ANIM_SFX.surprising_opportunity`: `ping` + `reveal` (260 ms später). Danach fliegen die Karten (Engine-Flug `play_pile_transfer`) in die Hand, im Abstand von 380 ms.
+- **CPU:** immer (`cpuMeta.reactionHeuristic`), jede geholte Karte ist Gewinn.
+- **Kunst:** noch offen (das Bild des Nutzers kam nicht als Datei an) — die Karte läuft ohne Bild.
+
+**Wächter:** `scripts/skilltest-e2e/surprising-opportunity.test.js` (echter Todesweg per `actionDealDamage`: Fenster vor dem Aufräumen, eigene/gegnerische Helden, Reihenfolge der Angebote, Auswahlregeln, Wirker/Schulen/Sperren, Herkunft der Handkarten, Hooks) und im echten Browser `scripts/skilltest-e2e/ui-surprising-opportunity.js` (Puzzle-Spiel, beide Seiten: Bestätigung, Pixelart-Canvas, Klänge, Zielwahl, Karten in der Hand, Log-Zeile).
 
 ## ★ PINTA, THE SINGING SHIP — Aufdecken und Beschwören aus dem Potion Deck
 

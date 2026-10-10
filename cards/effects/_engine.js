@@ -9512,6 +9512,12 @@ class GameEngine {
       ScTracking.heldTod(this.gs._scTracking, ownerIdx, this.gs.players);   // v1399: Verlierer-Boni
     }
 
+    // ★ v1490: HAND-FENSTER „Held wird besiegt" (Surprising Opportunity) — VOR jedem Aufraeumen und auch vor dem
+    // Loesch-Ersatz: Ausruestungen und Anhaengsel liegen noch im Feld. Nur im ersten Durchlauf je Tod.
+    if (!target._koProcessed && !opts.skipDefeatWindow) {
+      await this._checkHeroDefeatWindowReactions(target, source, ownerIdx);
+    }
+
     // ★ v1329/v1330 — LOESCH-ERSATZ BEIM BESIEGEN (Soul Transmigration
     // Ritual). Traegt der Held einen Status, dessen Typ
     // `deletesHeroOnDefeat` fuehrt (Soul Transmitted), wird er beim
@@ -12857,6 +12863,103 @@ class GameEngine {
   }
 
   /**
+   * ★ v1490 — HAND-FENSTER „ein Held (deiner ODER der des Gegners) wird besiegt — VOR dem Aufraeumen".
+   *
+   * Karten-Vertrag (Vorbild Surprising Opportunity):
+   *   isHeroDefeatWindowReaction: true,
+   *   heroDefeatWindowCondition(gs, pi, engine, info) → bool,
+   *   async heroDefeatWindowResolve(engine, pi, info, { casterIdx, casterSeite }),
+   *   // optional: reactionCasterAllowed(gs, pi, heroIdx, engine, info)
+   * `info` = { hero, heroIdx, heroOwner, reactorIdx, source, sourceOwner } — `reactorIdx` ist der Spieler, dem das
+   * Fenster gerade angeboten wird.
+   *
+   * ZEITPUNKT: ganz vorn im Besiegen-Ablauf, NACHDEM feststeht, dass der Held faellt (Guardian Angel & Co. haben in
+   * `ON_HERO_KO` schon ihre Chance gehabt) und VOR `handleHeroDeathCleanup` — Ausruestungen und Anhaengsel liegen
+   * noch im Feld, Statuswerte und Buffs sind noch da („before the Hero is defeated"). Das Gegenstueck zu
+   * `isHeroDefeatedReaction`, das NACH dem Aufraeumen laeuft und nur dem Besitzer offensteht.
+   *
+   * ANGEBOT: JEDEM Spieler, der eine solche Karte auf der Hand hat — der Besitzer des fallenden Helden zuerst, danach
+   * die uebrigen in Sitzreihenfolge (wie das Post-Target-Fenster: der Betroffene zuerst). Jeder darf so viele Kopien
+   * spielen, wie die Bedingung hergibt; was ein Spieler genommen hat, steht dem naechsten nicht mehr zur Verfuegung.
+   * Eine Absage gilt fuer alle Kopien desselben Namens in diesem Fenster. Sperren wie in den uebrigen Hand-Fenstern:
+   * Erst-Runden-Schutz, Dark Ocean, Hand-Spielsperre, Reaktionssperre (ueber `_canHeroActivateSurprise`).
+   */
+  async _checkHeroDefeatWindowReactions(target, source, ownerIdx) {
+    if (this._inHeroDefeatWindow) return;
+    if (this.gs.result) return;
+    const heroOwner = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
+    const hps = this.gs.players[heroOwner];
+    if (!hps || !target) return;
+    const heroIdx = (hps.heroes || []).indexOf(target);
+    if (heroIdx < 0) return;
+
+    const roh = source?.controller ?? source?.owner;
+    const sourceOwner = (isSeat(this, roh)) ? roh : this._deriveEffectOwner({ source }, heroOwner);
+    const allCards = this._getCardDB();
+    const order = [heroOwner];
+    for (let i = 0; i < this.playerCount(); i++) if (i !== heroOwner) order.push(i);
+
+    this._inHeroDefeatWindow = true;
+    try {
+      for (const pi of order) {
+        const ps = this.gs.players[pi];
+        if (!ps) continue;
+        if (this.gs.firstTurnProtectedPlayer === pi) continue;
+        if (this.darkOceanBlocksReaction(pi, null)) continue;
+        const info = { hero: target, heroIdx, heroOwner, reactorIdx: pi, source: source || null, sourceOwner };
+        const abgelehnt = new Set();
+        for (let runde = 0; runde < 8; runde++) {
+          if (this.gs.result) return;
+          let gespielt = false;
+          for (const cardName of [...new Set(ps.hand || [])]) {
+            if (abgelehnt.has(cardName)) continue;
+            if (this._handPlayLockedFor(ps, cardName)) continue;
+            const script = loadCardEffect(cardName);
+            if (!script?.isHeroDefeatWindowReaction) continue;
+            this._noteRxWindow(ps, cardName, 'seen');
+            if (script.heroDefeatWindowCondition
+                && !script.heroDefeatWindowCondition(this.gs, pi, this, info)) continue;
+            const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
+            if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
+            const cost = allCards[cardName]?.cost || 0;
+            if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+            const confirmed = await this.promptGeneric(pi, {
+              type: 'confirm',
+              title: cardName,
+              _handReactionWindow: true,
+              message: `${target.name} is being defeated! Activate ${cardName}?`,
+              showCard: cardName,
+              showCardLeft: target.name,
+              confirmLabel: '✨ Activate!',
+              cancelLabel: 'No',
+              cancellable: true,
+            });
+            if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
+            if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
+            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) { abgelehnt.add(cardName); continue; }
+            this.log('hero_defeat_window_reaction', { card: cardName, player: ps.username, target: target.name });
+            try {
+              if (script.heroDefeatWindowResolve) {
+                await script.heroDefeatWindowResolve(this, pi, info,
+                  { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+              }
+            } catch (err) {
+              console.error(`[HeroDefeatWindow] ${cardName} threw:`, err.message);
+            }
+            await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
+            this.sync();
+            gespielt = true;
+            break;
+          }
+          if (!gespielt) break;
+        }
+      }
+    } finally {
+      this._inHeroDefeatWindow = false;
+    }
+  }
+
+  /**
    * ★ v1340 — HAND-FENSTER „ein Held, den du kontrollierst, wurde besiegt".
    *
    * Karten-Vertrag (Vorbild Cheat Chair):
@@ -13252,6 +13355,9 @@ class GameEngine {
       // v1363: die Quelle der Bewegung (fuer `entferntVon`, siehe runHooks).
       source: opts.deathSource || opts.source || null,
       ...(typeof opts.sourceOwner === 'number' ? { sourceOwner: opts.sourceOwner } : {}),
+      // v1490 (Surprising Opportunity): im Todesfenster liegen die Ausruestungen noch an einem Helden mit 0 HP — ihre
+      // Austritts-Haken (ATK-Bonus zurueck, Inselzonen, …) muessen trotzdem laufen, wie im Todes-Aufraeumen.
+      ...(opts._bypassDeadHeroFilter ? { _bypassDeadHeroFilter: true } : {}),
     });
 
     // Cards can set _returnToHand = true in onCardLeaveZone to redirect
@@ -13372,9 +13478,16 @@ class GameEngine {
     // Styx 28.9.: eine ueber einen geliehenen Helden beschworene Kreatur
     // liegt beim Brettbesitzer (`owner`), die Karte gehoert aber dem
     // Beschwoerer (`originalOwner`) — sie fliegt in DESSEN Hand.
-    const _heimkehr = (fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT
-      && cardInstance.counters?.crossSideControlled != null)
-      ? (cardInstance.originalOwner ?? cardInstance.controller ?? cardInstance.owner) : null;
+    // v1490 (Surprising Opportunity: „add them to YOUR hand"): `opts.toPlayer` schickt eine Brettkarte in die Hand eines
+    // ANDEREN Spielers als ihres Besitzers. Gleicher Weg wie die Heimkehr — Besitzer und Kontrolleur wechseln, die Hand
+    // ist die des Empfaengers; der urspruengliche Besitzer wird unten als Herkunft vermerkt (Ablage-Pile, Steal-Regel).
+    const _zuFremderHand = (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND && Number.isInteger(opts.toPlayer)
+      && opts.toPlayer !== cardInstance.owner) ? opts.toPlayer : null;
+    const _herkunftVorWechsel = cardInstance.originalOwner ?? cardInstance.owner;
+    const _heimkehr = _zuFremderHand != null ? _zuFremderHand
+      : (fromZone === ZONES.SUPPORT && toZone !== ZONES.SUPPORT
+        && cardInstance.counters?.crossSideControlled != null)
+        ? (cardInstance.originalOwner ?? cardInstance.controller ?? cardInstance.owner) : null;
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.HAND) {
       const owner = _heimkehr ?? cardInstance.owner;
       const handForOwner = this.gs.players[owner]?.hand || [];
@@ -13646,6 +13759,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
       delete cardInstance._ppSchonGelandet;
       this._addCardToState(cardInstance);
+    }
+    if (_zuFremderHand != null && toZone === ZONES.HAND && _herkunftVorWechsel !== _zuFremderHand) {
+      // Die Karte gehoert weiter ihrem Besitzer (landet spaeter in SEINER Ablage); ohne Vermerk zaehlte sie wie eine
+      // eigene. `originalOwner` kurz auf den Halter, damit `_tagHandCardOrigin` DIESE Instanz als „unmarkiert" findet
+      // und markiert, statt eine zweite anzulegen.
+      cardInstance.originalOwner = _zuFremderHand;
+      this._tagHandCardOrigin(_zuFremderHand, cardInstance.name, _herkunftVorWechsel,
+        (this.gs.players[_zuFremderHand]?.hand?.length || 1) - 1);
     }
 
     if (_auraAbgleichNoetig) this.syncAlleAtkAuren();   // v1166
