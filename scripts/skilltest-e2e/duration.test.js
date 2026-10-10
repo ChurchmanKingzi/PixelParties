@@ -15,6 +15,11 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   console.log = oL; console.error = oE;
   const { host, gs, engine } = out;
   const st = gs.skillTest;
+  // Der Test misst Fristen, keine Surprises: eine verdeckte Karte der Gegner (z. B. Skull Carpet Bombing) löst beim Rundenwechsel
+  // zufällig aus und zerstört die Test-Kreaturen. Welche Surprises der Seed-Pool verteilt, ist Zufall (jede neue Karte mit Bild
+  // verschiebt ihn) — deshalb sind die Surprise-Zonen hier leer.
+  for (const ps of gs.players) ps.surpriseZones = (ps.surpriseZones || []).map(() => []);
+  for (const i of engine.cardInstances.filter(c => c.zone === 'surprise')) engine._untrackCard(i.id);
   const place = (seat, name, hi, slot) => {
     for (const i of engine.cardInstances.filter(c => c.zone === 'support' && c.owner === seat && c.heroIdx === hi && c.zoneSlot === slot)) engine._untrackCard(i.id);
     gs.players[seat].supportZones[hi][slot] = [name];
@@ -45,7 +50,12 @@ const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else
   check('Round zählt weiter', st.round === 2 && gs.turn === 3, { round: st.round, turn: gs.turn });
 
   console.log('Fristen +1 / +2 / +3 (Hero-Buffs)');
-  const hero = gs.players[caster].heroes[0];
+  // Der Test-Buff wird per `actionRemoveBuff` abgelöst — und das fragt `BEFORE_HERO_EFFECT`: ein Held mit Resistance (Lizbeth,
+  // Resistance-Ability) blockt solche Effekte auf sich bis zu seinem Budget. Wer als erster Held des Wirkers aus dem Seed-Pool
+  // kommt, ist Zufall (jede neue Karte mit Bild verschiebt den Pool) — der Test nimmt deshalb einen Helden ohne Resistance.
+  const heroIdx = gs.players[caster].heroes.findIndex(h => h && h.name && !/^Lizbeth/.test(h.name));
+  gs.players[caster].abilityZones[heroIdx] = (gs.players[caster].abilityZones[heroIdx] || []).map(z => (z || []).filter(a => a !== 'Resistance'));
+  const hero = gs.players[caster].heroes[heroIdx];
   const t0 = gs.turn;
   const setBuff = (key, d) => { hero.buffs = hero.buffs || {}; hero.buffs[key] = { expiresAtTurn: t0 + d, expiresForPlayer: caster, source: 'test' }; };
   setBuff('t_plus1', 1); setBuff('t_plus2', 2); setBuff('t_plus3', 3);
