@@ -12963,6 +12963,11 @@ function cubeStartTournament(room, io) {
   const cd = room.cubeDraft;
   if (!cd) return;
   cd.phase = 'tournament';
+  // Die Clients ziehen ihren Bildschirm aus `lobby.cubeDraft.phase`. Ohne diese Meldung blieb dort
+  // 'building' stehen: sobald KEIN Spiel angezeigt wurde (zwischen zwei Runden, nach dem Ausscheiden,
+  // nach einem Verbindungsabriss), erschien statt des Turnierbaums „BUILD YOUR DECK — Deck submitted!
+  // Waiting for other drafters" und blieb bis zum Neuladen stehen.
+  io.to('room:' + room.id).emit('room_update', sanitizeRoom(room));
   cubeTournamentBuild(room, io);
 }
 
@@ -13090,9 +13095,56 @@ async function cubeTournamentBuild(room, io) {
   cubeTournamentStartCurrentRound(room, io);
 }
 
+/** Die LEBENDE Socket-ID eines Turnierteilnehmers. Die Sitze/Zuschauer des
+ *  Turnierraums merken sich die Socket-ID vom Beitritt; verliert der Browser
+ *  zwischendurch die Verbindung (Handy, Tab im Hintergrund, Netzwechsel), baut
+ *  socket.io einen NEUEN Socket auf, und der Eintrag zeigt ins Leere — der
+ *  naechste Rundenstart und alle Turnier-Aktualisierungen gingen an dem Spieler
+ *  vorbei, bis er per F5 neu einstieg. Lebt die gemerkte Socket-ID noch, bleibt
+ *  sie unangetastet (ein zweiter Tab desselben Nutzers klaut nichts). */
+function cubeLiveSocketId(member) {
+  if (!member || member.isBot || !member.userId) return member?.socketId || null;
+  const sockets = io.sockets.sockets;
+  if (member.socketId && sockets.has(member.socketId)) return member.socketId;
+  let found = null;
+  for (const [id, s] of sockets) if (s.data?.userId === member.userId) found = id;   // juengster Socket gewinnt
+  return found || member.socketId || null;
+}
+
+/** Heilt tote Socket-IDs der Teilnehmer des Turnierraums (siehe `cubeLiveSocketId`)
+ *  und holt den neuen Socket in den Raumkanal zurueck. */
+function cubeRefreshSockets(room) {
+  for (const member of [...room.players, ...room.spectators]) {
+    if (member.isBot || !member.userId) continue;
+    const live = cubeLiveSocketId(member);
+    if (!live || live === member.socketId) continue;
+    member.socketId = live;
+    io.sockets.sockets.get(live)?.join('room:' + room.id);
+  }
+}
+
+/** Ein Nutzer hat sich (neu) angemeldet — z.B. nach einem Verbindungsabriss, den der Client mit
+ *  einem neuen Socket und erneutem `auth` beantwortet. Steckt er in einem laufenden Cube-Turnier,
+ *  wird sein Eintrag im Turnierraum auf den neuen Socket umgestellt (lebende Eintraege bleiben:
+ *  zweiter Tab). Ein Zuschauerplatz in einem laufenden Match ist beim Abriss schon weg
+ *  (`handleLeaveRoom` im Trennungs-Handler) — ein Ausgeschiedener ohne Match wird deshalb wieder
+ *  an ein laufendes Match angebunden. Die Spielerplaetze in Kindraeumen kennt der `auth`-Handler selbst. */
+function cubeRebindUser(userId, socket) {
+  for (const room of rooms.values()) {
+    if (!room.cubeDraft || room.cubeDraft.phase !== 'tournament' || !room.cubeDraft.bracket) continue;
+    if (![...room.players, ...room.spectators].some(m => m.userId === userId)) continue;
+    cubeRefreshSockets(room);
+    for (const child of rooms.values()) {
+      if (child.parentCubeRoomId === room.id && child.gameState && !child.gameState.result) cubeAutoSpectate(room, child);
+    }
+    cubeTournamentBroadcast(room, io);
+  }
+}
+
 function cubeTournamentBroadcast(room, io) {
   const cd = room.cubeDraft;
   if (!cd?.bracket) return;
+  cubeRefreshSockets(room);
   const view = {
     phase: cd.phase,
     cubeName: cd.cubeName,
@@ -13176,7 +13228,12 @@ function cubeTournamentStartCurrentRound(room, io) {
 
 async function cubeStartMatch(room, match, io) {
   const cd = room.cubeDraft;
-  if (match.resolved || match.childRoomId) return;
+  // `starting` ist der Riegel fuer die Zeit ZWISCHEN dem Aufruf und der Vergabe von
+  // `match.childRoomId` (zwei Datenbankabfragen weiter unten). Ohne ihn lief ein zweiter
+  // Aufruf in genau diesem Fenster ungehindert durch den `childRoomId`-Test und legte
+  // einen zweiten Kindraum fuer dasselbe Match an: beide Spieler sassen in zwei Spielen,
+  // und die Zuschauer klebten am Spiel, das niemand spielte.
+  if (match.resolved || match.childRoomId || match.starting) return;
   if (match.p1Seat == null || match.p2Seat == null) {
     // Pure bye — already auto-resolved at bracket build. Defensive.
     match.resolved = true;
@@ -13204,8 +13261,18 @@ async function cubeStartMatch(room, match, io) {
     }
     return rows[0]?.id || null; // fallback: most recent drafted deck
   };
-  const p1DeckId = await findDraftedDeckId(p1.userId);
-  const p2DeckId = await findDraftedDeckId(p2.userId);
+  match.starting = true;
+  let p1DeckId, p2DeckId;
+  try {
+    p1DeckId = await findDraftedDeckId(p1.userId);
+    p2DeckId = await findDraftedDeckId(p2.userId);
+  } catch (err) {
+    match.starting = false;   // ein spaeterer Versuch darf es erneut probieren
+    throw err;
+  }
+  // Beide Spieler mit der Verbindung von JETZT ansprechen (siehe `cubeLiveSocketId`):
+  // die Socket-ID aus dem Turnierraum kann seit dem letzten Match veraltet sein.
+  cubeRefreshSockets(room);
 
   // Spawn a child room running the standard 2-player engine.
   const childRoomId = uuidv4().substring(0, 8);
@@ -13237,6 +13304,7 @@ async function cubeStartMatch(room, match, io) {
   };
   rooms.set(childRoomId, childRoom);
   match.childRoomId = childRoomId;
+  match.starting = false;
 
   // Move both players into the child room socket-wise. They keep
   // membership in the parent room too — `socket.join` is additive.
@@ -13263,15 +13331,25 @@ async function cubeStartMatch(room, match, io) {
   const activePlayer = Math.random() < 0.5 ? 0 : 1;
   try {
     await setupGameState(childRoom);
-    await startGameEngine(childRoom, childRoomId, activePlayer);
+    // `startGameEngine` kehrt erst zurueck, wenn alle Abfragen „zu Spielbeginn" (Bill, Hel,
+    // Sid, Idej, ...) beantwortet sind. Zuschauer und Tab-Leiste duerfen nicht so lange
+    // warten: Vorher blieb der Ausgeschiedene waehrend einer offenen Startabfrage ohne
+    // Spiel und ohne Tab, bis die Spieler fertig waren. Die Engine existiert nach dem
+    // synchronen Teil von `startGameEngine`, ein Zuschauer kann also sofort ran.
+    const engineStart = startGameEngine(childRoom, childRoomId, activePlayer);
+    try {
+      cubeAutoSpectate(room, childRoom);
+      cubeTournamentBroadcast(room, io);
+    } catch (err) {
+      console.error('[cubeStartMatch] Zuschauer-Anbindung:', err.message);
+    }
+    await engineStart;
   } catch (err) {
     console.error('[cubeStartMatch] engine error:', err.message);
     // Fallback: give the win to p1 so the bracket can advance.
     await cubeMatchEnd(room, match, match.p1Seat, io);
     return;
   }
-
-  cubeAutoSpectate(room, childRoom);
 
   console.log(`[cube_tournament] room ${room.id} round ${cd.bracket.currentRoundIdx} match ${match.matchIdx} started in child ${childRoomId}: ${p1.username} vs ${p2.username} (Bo${match.bo})`);
   cubeTournamentBroadcast(room, io);
@@ -13282,6 +13360,7 @@ async function cubeStartMatch(room, match, io) {
  *  Match mit. Wer schon ein anderes Match schaut (parallele Spiele), bleibt dort —
  *  per Tab laesst sich jederzeit wechseln. */
 function cubeAutoSpectate(parent, childRoom) {
+  cubeRefreshSockets(parent);
   const childRooms = [...rooms.values()].filter(r => r.parentCubeRoomId === parent.id);
   let attached = 0;
   for (const member of [...parent.players, ...parent.spectators]) {
@@ -13327,6 +13406,17 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
         const sock = io.sockets.sockets.get(member.socketId);
         if (sock) sock.leave('room:' + match.childRoomId);
       }
+      // Kindraum-Spieler als „im Spiel" austragen (wie `cleanupRoom`), aber nur, wenn
+      // der Eintrag noch auf DIESES Match zeigt: sonst bliebe etwa der Aufgebende bis
+      // zum Serverneustart in `activeGames` haengen (Herausforderungen scheitern mit
+      // „is currently in a game"), und ein ausstehender Trennungs-Timer wuerde nach
+      // dem Abbau noch ein Spiel in einem toten Raum beenden.
+      for (const p of childRoom.players) {
+        if (!p.userId || activeGames.get(p.userId) !== match.childRoomId) continue;
+        activeGames.delete(p.userId);
+        const t = disconnectTimers.get(p.userId);
+        if (t) { clearTimeout(t); disconnectTimers.delete(p.userId); }
+      }
       destroyRoom(match.childRoomId);
     }
   }
@@ -13352,12 +13442,18 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
   }
 
   cubeTournamentBroadcast(room, io);
+  const roundBefore = cd.bracket.currentRoundIdx;
   await cubeTournamentAdvanceIfReady(room, io);
 
   // Consecutive flow: when one match ends, start the next in the round.
-  if (cd.flow === 'consecutive' && cd.phase === 'tournament') {
+  // Nur, wenn die Runde NICHT weitergeschaltet wurde: schaltet sie weiter, hat
+  // `cubeTournamentStartCurrentRound` das erste Match der neuen Runde schon angestossen.
+  // Dieser Zweig startete es hier ein zweites Mal (Datenbank-Fenster in cubeStartMatch,
+  // `childRoomId` war noch leer) — zwei Kindraeume fuer dasselbe Finale.
+  if (cd.flow === 'consecutive' && cd.phase === 'tournament' && cd.bracket.currentRoundIdx === roundBefore) {
     const r = cd.bracket.rounds[cd.bracket.currentRoundIdx];
-    const next = r?.find(m => !m.resolved && !m.childRoomId);
+    const laeuftNoch = r?.some(m => !m.resolved && (m.childRoomId || m.starting));
+    const next = laeuftNoch ? null : r?.find(m => !m.resolved && !m.childRoomId && !m.starting);
     if (next) cubeStartMatch(room, next, io);
   }
 }
@@ -14022,6 +14118,7 @@ io.on('connection', (socket) => {
       socket.emit('auth_ok', session);
       grantTutorialSkinIfDone(session.userId, 4000);   // wer das Tutorial schon geschafft hat, bekommt den Skin nachtraeglich
       social.onAuth(socket, session);
+      try { cubeRebindUser(session.userId, socket); } catch (err) { console.error('[auth] cubeRebindUser:', err.message); }
       // Reconnect to active game
       const activeRoomId = activeGames.get(session.userId);
       if (activeRoomId) {
@@ -14449,19 +14546,25 @@ io.on('connection', (socket) => {
     if (target) {
       const isPlayer = target.players.some(p => p.userId === currentUser.userId);
       if (!isPlayer) {
-        const isSpec = target.spectators.some(s => s.userId === currentUser.userId);
-        if (!isSpec) {
+        const specEntry = target.spectators.find(s => s.userId === currentUser.userId);
+        if (!specEntry) {
           target.spectators.push({
             username: currentUser.username, userId: currentUser.userId,
             socketId: socket.id, color: currentUser.color || '#888',
             avatar: currentUser.avatar || null,
           });
+        } else {
+          // Schon eingetragen (automatisch angebunden), aber evtl. mit der Socket-ID VOR einem
+          // Verbindungsabriss — dann gingen alle Zustaende ins Leere, auch nach dem Tab-Klick.
+          specEntry.socketId = socket.id;
         }
       }
       socket.join('room:' + childRoomId);
       // Push the current state of that match so the spectator's UI
-      // mounts the GameBoard.
-      socket.emit('room_joined', sanitizeRoom(target, currentUser.username));
+      // mounts the GameBoard. KEIN `room_joined` fuer den Kindraum: der Client
+      // setzt damit seine `lobby` — der Zuschauer sass nach dem Ende des Matches
+      // in der toten Lobby des (abgebauten) Kindraums, statt bei der Siegerehrung
+      // des Turniers. Automatisch angebundene Zuschauer bekommen es ebenfalls nicht.
       if (target.gameState) {
         sendSpectatorGameState(target);
       }
