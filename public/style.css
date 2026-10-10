@@ -3739,8 +3739,23 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   transform-style: preserve-3d;
   /* ★ 10.10. (Als Vorgabe): die Figuren liegen UEBER der Phasenleiste (`.phase-column`, z-index 50) — die Ebene hat keinen Zeiger
      (`pointer-events: none`), die Leiste bleibt also klickbar; faehrt der Zeiger auf sie, ziehen sich die darueber ragenden Figuren
-     ein (`HeroIdleAnims`, `folgeZone`). */
+     ein (`HeroIdleAnims`, `folgeZone`). Im Gefecht zaehlt dafuer der z-index der HUELLE (unten): nur sie steht im selben
+     Stapelkontext wie die Spalte. */
   z-index: 51;
+}
+/* ★ 10.10. (Als Befund: „Noch nicht ALLE Elemente der Phasen-Bar und der darunterliegenden Buttons liegen unter den Heroes"):
+   Huelle der Sprite-Ebene im Gefecht. Die Phasenspalte sitzt AUSSERHALB von `.board-center` im Kontext des Spielfelds; was in
+   `.board-center` isoliert steckt, liegt komplett darunter — die Figuren deckten nur die Platte hinter der Leiste (die im
+   Clip sitzt), nicht ihre Beschriftung und die Knoepfe. Deshalb steht die Huelle als Geschwister des Clips direkt in
+   `.board-center` (das KEIN Stapelkontext mehr ist; der Clip ist isoliert) mit z-index 51 > 50. Sie spiegelt den Clip: Box
+   (JS, `ebeneAbgleichen`), Perspektive und im Scrollmodus die waagerechte Kappung. Kein Zeiger. */
+.hero-sprite-huelle {
+  position: absolute;
+  left: 0; top: 0; width: 0; height: 0;
+  pointer-events: none;
+  z-index: 51;
+  perspective: var(--board-persp);
+  perspective-origin: var(--board-anchor-x, 50%) 30%;
 }
 .hero-idle-anker { display: none; }
 .hero-idle-platz {
@@ -17582,7 +17597,8 @@ body:has(.textbox-overlay) .tooltip {
 /* ★ 10.10.: Die Sprite-Ebene traegt die Neigung/Vergroesserung der Brettebene weiter (JS kopiert sie) — im FLACHEN Messfenster
    blaeht sie `scrollWidth` damit um ~100 px auf. Im alten, breiten Kasten fiel das nicht auf; im jetzt schmaleren (Tooltip-
    Reserve) liess es den Scrollmodus schon bei einem ganz normalen Brett einrasten. Zum Messen steht sie nicht im Layout. */
-.board-center.board-flat-measure .hero-sprite-ebene { display: none; }
+.board-center.board-flat-measure .hero-sprite-ebene,
+.board-center.board-flat-measure .hero-sprite-huelle { display: none; }
 .board-center.board-flat-measure .board-plane {
   transform: none !important;
   padding-inline: 0 !important; /* overhang padding is transform-derived —
@@ -17618,6 +17634,11 @@ body:has(.textbox-overlay) .tooltip {
      relative + z-index:auto creates no stacking context, so the
      overlays' z-indices keep resolving against .board-center. */
   position: relative;
+  /* ★ 10.10.: der Clip ist der Stapelkontext fuer Atmosphaere, Platten, Karten und Permanents. Vorher war es `.board-center`
+     (`isolation: isolate` am Element); das hielt aber auch die Sprite-Ebene fest, die ueber der Phasenspalte (z-index 50,
+     ausserhalb von `.board-center`) stehen muss — und eine Ebene im isolierten Kasten liegt IMMER unter ihr. Die Sprite-Huelle
+     (`.hero-sprite-huelle`) steht deshalb als Geschwister des Clips direkt in `.board-center`, im Kontext der Spalte. */
+  isolation: isolate;
   /* The wrapper is the plane's direct parent, so the perspective MUST
      sit here (see .board-center note). Its box spans the same area the
      plane occupied before the wrapper existed — the sides, mid row and
@@ -17631,11 +17652,12 @@ body:has(.textbox-overlay) .tooltip {
      laterally unskewed axis, however asymmetric islands widen the box. */
   perspective-origin: var(--board-anchor-x, 50%) 30%;
 }
-.board-center.can-scroll .board-plane-clip {
-  min-width: min-content;
+.board-center.can-scroll .board-plane-clip,
+.board-center.can-scroll .hero-sprite-huelle {
   overflow-x: clip;
   overflow-y: visible;
 }
+.board-center.can-scroll .board-plane-clip { min-width: min-content; }
 /* can-scroll keeps the tilt (v10, Al): with extra zones in play (Flying
    Island in the Sky) the board legitimately scrolls horizontally — the
    3D projection stays on and the scrollbar appears. The magnified near
@@ -17658,7 +17680,7 @@ body:has(.textbox-overlay) .tooltip {
    range (base rule sets overflow-x: auto for the scroll feature). */
 .board-center:not(.can-scroll) { overflow-x: clip; }
 @media (max-width: 900px), (max-height: 560px) {
-  .board-plane-clip { perspective: none; }
+  .board-plane-clip, .hero-sprite-huelle { perspective: none; }
   .board-plane { transform: none; }
 }
 
