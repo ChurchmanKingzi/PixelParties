@@ -49598,6 +49598,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             pd[pi2] = fromPool === 'potion' ? toName : fromName;
             if (!PDCl.poolOk(klauseln, pd, kartenDaten)) return false;
           }
+          // Erlaubnisse (Kerthwack, Spiegel der Pruefungen in server.js): verlaesst der Held das Team, duerfen im Potion Deck
+          // nur noch Karten liegen, die dann noch hineindurfen; und je Name hoechstens so viele Kopien, wie die Erlaubnis sagt.
+          if (einHeld) {
+            const altName = fromPool === 'hero' ? fromName : toName;
+            if (PDCl.swapPotionDeckProblem({ potionDeck: potionCards, potionClauseMemory: dk.potionClauseMemory }, altName, einHeld, simDeck.heroes, kartenDaten)) return false;
+          }
+          if ((fromPool === 'potion' || toPool === 'potion') && klauseln.length === 0) {
+            const erlaubnisse = window.potionPermissions(simDeck);
+            if (erlaubnisse.length > 0) {
+              const pd = [...potionCards];
+              const pi2 = fromPool === 'potion' ? fromIdx : toIdx;
+              pd[pi2] = fromPool === 'potion' ? toName : fromName;
+              if (!PDCl.permissionPoolOk(klauseln, erlaubnisse, pd, kartenDaten)) return false;
+            }
+          }
           // Use canCardTypeEnterSection to validate both directions
           const canEnter = window.canCardTypeEnterSection;
           if (!canEnter(simDeck, fromName, toPool)) return false;

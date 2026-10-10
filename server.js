@@ -3017,6 +3017,11 @@ function benoetigteHeldenzahl(heroes) {
 function potionClausesOf(heroes) {
   return PotionDeckClauses.activeClauses(heroes || []);
 }
+// Erlaubnisse (Kerthwack: „your Potion Deck may contain any card, but only up to 2 copies of each card"): sie verbieten nichts, sie
+// erweitern nur, was ins Potion Deck darf, und aendern die Kartenzahl nicht (0 oder 5–15) — `potionDeckGroesseOk` kennt sie darum nicht.
+function potionPermissionsOf(heroes) {
+  return PotionDeckClauses.activePermissions(heroes || []);
+}
 function potionDeckGroesseOk(heroes, pc) {
   const klauseln = potionClausesOf(heroes);
   // Chaos-Diamond und Pinta schliessen einander aus: kein Potion Deck passt zu beiden.
@@ -6420,6 +6425,9 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
 function deckPotionClauses(deck) {
   return potionClausesOf(deck?.heroes);
 }
+function deckPotionPermissions(deck) {
+  return potionPermissionsOf(deck?.heroes);
+}
 /**
  * Held-Tausch im Seitenwechsel (mutiert `deck`): Merkliste anlegen bzw. das
  * Potion Deck wiederherstellen.
@@ -6457,7 +6465,7 @@ function canCardTypeEnterPool(cardDB, deck, cardName, pool) {
     }
     return true;
   }
-  if (pool === 'potion') return PotionDeckClauses.accepts(deckPotionClauses(deck), card);   // Klausel-Held im Team: deren Karten, sonst Potions
+  if (pool === 'potion') return PotionDeckClauses.accepts(deckPotionClauses(deck), card, deckPotionPermissions(deck));   // Klausel-Held im Team: deren Karten; sonst Potions plus, was eine Erlaubnis (Kerthwack) freigibt
   if (pool === 'hero') return ct === 'Hero' && !isNonStartingHero(cardName); // v704
   if (pool === 'side') return true;
   return false;
@@ -15506,6 +15514,10 @@ io.on('connection', (socket) => {
       // zwei unvertraeglichen Klausel-Helden enthalten.
       const klauselKonflikt = PotionDeckClauses.conflictProblem(potionClausesOf(simHeroes), cardDB);
       if (klauselKonflikt) return sideDeckAblehnen(socket, klauselKonflikt);
+      // Verlaesst ein Held mit Erlaubnis (Kerthwack) das Team: das Potion Deck darf danach nur Karten enthalten, die noch
+      // hineindurfen — sonst erst herausnehmen (wie die Potions im Main Deck ohne Nicolas).
+      const erlaubnisGrund = PotionDeckClauses.swapPotionDeckProblem(deck, oldHeroName, sideCardName, simHeroes, (n) => cardDB[n]);
+      if (erlaubnisGrund) return sideDeckAblehnen(socket, erlaubnisGrund);
       const klauselGrund = potionClauseHeldentausch(cardDB, deck, oldHeroName, sideCardName);
       if (klauselGrund) return sideDeckAblehnen(socket, klauselGrund);
 
@@ -15560,6 +15572,17 @@ io.on('connection', (socket) => {
         pd[idx] = from === 'potion' ? toCardName : fromCardName;
         if (!PotionDeckClauses.poolOk(potionKlauseln, pd, (n) => cardDB[n])) {
           return sideDeckAblehnen(socket, `With ${PotionDeckClauses.heroesOf(potionKlauseln)} the Potion Deck needs ${PotionDeckClauses.nounOf(potionKlauseln)} with different names and total levels of ${PotionDeckClauses.maxLevel(potionKlauseln)} or less.`);
+        }
+      }
+
+      // Erlaubnis (Kerthwack, ohne strenge Klausel): Karten, die nur dank ihr im Potion Deck liegen, hoechstens 2 Kopien je Name.
+      const potionErlaubnisse = deckPotionPermissions(deck);
+      if (potionKlauseln.length === 0 && potionErlaubnisse.length > 0 && (from === 'potion' || to === 'potion')) {
+        const pd = [...(deck.potionDeck || [])];
+        const idx = from === 'potion' ? fromIdx : toIdx;
+        pd[idx] = from === 'potion' ? toCardName : fromCardName;
+        if (!PotionDeckClauses.permissionPoolOk(potionKlauseln, potionErlaubnisse, pd, (n) => cardDB[n])) {
+          return sideDeckAblehnen(socket, `With ${PotionDeckClauses.heroesOf(potionErlaubnisse)} the Potion Deck may contain at most ${PotionDeckClauses.copyCap(potionErlaubnisse)} copies of each card.`);
         }
       }
 
@@ -15623,6 +15646,15 @@ io.on('connection', (socket) => {
     const outgoingFrom = (from === 'main' || from === 'potion');
     if (cardIsPotion && incomingTo && !outgoingFrom) {
       if (countCombinedPotions(cardDB, deck) >= 15) return;
+    }
+
+    // Erlaubnis (Kerthwack): auch beim Hineinlegen gilt die je-Name-Grenze im Potion Deck.
+    const moveErlaubnisse = deckPotionPermissions(deck);
+    if (to === 'potion' && moveErlaubnisse.length > 0) {
+      const pd = [...(deck.potionDeck || []), cardName];
+      if (!PotionDeckClauses.permissionPoolOk([], moveErlaubnisse, pd, (n) => cardDB[n])) {
+        return sideDeckAblehnen(socket, `With ${PotionDeckClauses.heroesOf(moveErlaubnisse)} the Potion Deck may contain at most ${PotionDeckClauses.copyCap(moveErlaubnisse)} copies of each card.`);
+      }
     }
 
     const card = fromPool.splice(fromIdx, 1)[0];

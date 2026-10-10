@@ -758,6 +758,10 @@ function DeckBuilder() {
       // mechanic) up to 4 copies. Always offer the option; canAddCard
       // disables it when the cap or 60-card limit is hit.
       items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
+      // Kerthwack: „your Potion Deck may contain any card" — auch Helden.
+      if (potionDeckAccepts(currentDeck, card)) {
+        items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
+      }
     } else if (card.cardType === 'Potion') {
       items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       if (hasNicolasHero(currentDeck)) {
@@ -765,8 +769,9 @@ function DeckBuilder() {
       }
     } else {
       items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
-      // Starthelden mit Potion-Deck-Klausel (Chaos-Diamond, Pinta, …): ihre Karten duerfen ins Potion Deck.
-      if (potionClauses(currentDeck).length > 0 && potionDeckAccepts(currentDeck, card)) {
+      // Starthelden mit Potion-Deck-Klausel (Chaos-Diamond, Pinta, …): ihre Karten duerfen ins Potion Deck; mit einer
+      // Erlaubnis (Kerthwack) jede Karte. Ohne beides lehnt `potionDeckAccepts` jede Nicht-Potion ab.
+      if (potionDeckAccepts(currentDeck, card)) {
         items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       }
     }
@@ -1782,7 +1787,8 @@ function DeckBuilder() {
 
             {/* ── POTION DECK ── */}
             <DropSection sectionId="potion" onDrop={(d, mx, my) => handleDrop('potion', d, mx, my)} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="potion" color="#c8a060" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15} note="(0 or 5–15)"
+              <SecHeader sec="potion" color="#c8a060" icon="🧪" label="POTION DECK" count={(currentDeck?.potionDeck||[]).length} max={15}
+                note={potionPermissions(currentDeck).length > 0 && potionClauses(currentDeck).length === 0 ? '(0 or 5–15 · any card, max 2 each)' : '(0 or 5–15)'}
                 extra={<TipBtn tip="Sort" className="btn" style={{ padding:'2px 6px', fontSize:8 }} onClick={() => sortSec('potion')}>↕</TipBtn>} />
               <div className="deck-section-body" data-deck-section="potion">
                 {buildDeckDisplay('potion', currentDeck?.potionDeck || []).map((item, idx) => {

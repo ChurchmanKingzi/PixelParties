@@ -4422,9 +4422,17 @@ const PDC = window.PotionDeckClauses;
 function potionClauses(deck) {
   return PDC.activeClauses(deck?.heroes || [], sameCopyFamily);
 }
-/** Darf diese Karte ins Potion Deck dieses Decks? (Mit Klausel: Klauselkarten, sonst Potions.) */
+/**
+ * Die Erlaubnisse, die fuer die Starthelden dieses Decks gelten (Kerthwack: „your Potion Deck may contain any card, but only up to
+ * 2 copies of each card …"). Sie verbieten nichts, sie erweitern nur — mit einer STRENGEN Klausel im Team gilt allein deren Auswahl.
+ * Die Tabelle steht in `public/potion-deck-clauses.js` (PERMISSIONS).
+ */
+function potionPermissions(deck) {
+  return PDC.activePermissions(deck?.heroes || [], sameCopyFamily);
+}
+/** Darf diese Karte ins Potion Deck dieses Decks? (Mit Klausel: Klauselkarten, sonst Potions plus, was eine Erlaubnis freigibt.) */
 function potionDeckAccepts(deck, card) {
-  return PDC.accepts(potionClauses(deck), card);
+  return PDC.accepts(potionClauses(deck), card, potionPermissions(deck));
 }
 function potionClauseLevel(name) {
   return PDC.levelOf(window.CARDS_BY_NAME[name]);
@@ -4435,6 +4443,7 @@ function potionClauseTeamConflict(deck, heroName) {
   return PDC.conflictProblem(mit, window.CARDS_BY_NAME);
 }
 window.potionClauses = potionClauses;
+window.potionPermissions = potionPermissions;
 window.potionDeckAccepts = potionDeckAccepts;
 window.potionClauseTeamConflict = potionClauseTeamConflict;
 
@@ -4472,7 +4481,10 @@ function isDeckLegal(deck) {
     else reasons.push(...PDC.problems(klauseln, deck.potionDeck || [], n => window.CARDS_BY_NAME[n], copyFamilyKey));
   } else {
     if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
-    if ((deck.potionDeck || []).some(n => window.CARDS_BY_NAME[n]?.cardType !== 'Potion')) reasons.push('Potion Deck may only contain Potions');
+    // Ohne strenge Klausel: Potions — und, was eine Erlaubnis (Kerthwack) freigibt, je Name hoechstens so oft, wie sie sagt.
+    const erlaubnisse = potionPermissions(deck);
+    if ((deck.potionDeck || []).some(n => !PDC.accepts([], window.CARDS_BY_NAME[n], erlaubnisse))) reasons.push('Potion Deck may only contain Potions');
+    reasons.push(...PDC.permissionProblems([], erlaubnisse, deck.potionDeck || [], n => window.CARDS_BY_NAME[n], copyFamilyKey));
   }
   // Potions im Main Deck brauchen Nicolas ODER einen Gewuerz-Platz
   // („Secret Spice"-Artefakte, siehe spiceMainDeckAllowance).
@@ -4506,7 +4518,13 @@ window.copyFamilyKey = copyFamilyKey;
 function countInDeck(deck, cardName, excludeSection) {
   let count = 0;
   if (excludeSection !== 'main') count += (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
-  if (excludeSection !== 'potion') count += (deck.potionDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
+  if (excludeSection !== 'potion') {
+    // Kerthwack: „Copies of cards played in your Potion Deck, except Potions, do not count towards the number of copies of those
+    // cards in your deck." — Kopien dort zaehlen (ausser Potions) nicht zu den Kopien im Deck, auch nicht fuer Sacred Jewel & Co.
+    // Mit Nicolas im Team zaehlen die Potions weiter ueber beide Decks (2 Kopien, 15 Stueck) — sie sind ja ausgenommen von der Ausnahme.
+    const erlaubnisse = potionPermissions(deck);
+    count += (deck.potionDeck || []).filter(n => sameCopyFamily(n, cardName) && PDC.potionCopyCounts(erlaubnisse, window.CARDS_BY_NAME[n])).length;
+  }
   if (excludeSection !== 'side') count += (deck.sideDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
   if (excludeSection !== 'heroes') {
     (deck.heroes || []).forEach(h => { if (h && sameCopyFamily(h.hero, cardName)) count++; });
@@ -4848,6 +4866,10 @@ function canAddCard(deck, cardName, section) {
     // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): nur
     // Klauselkarten, je Name eine Kopie, genaue Kartenzahl, Gesamtlevel-Grenze.
     const klauseln = potionClauses(deck);
+    const erlaubnisse = potionPermissions(deck);
+    // Kerthwack: eine Nicht-Potion im Potion Deck zaehlt nicht zu den Kopien im Deck (`countInDeck`) — ihre eigene Grenze
+    // ist die je-Name-Grenze der Erlaubnis (oder, mit strenger Klausel, deren „je Name 1x").
+    const ausgenommen = !PDC.potionCopyCounts(erlaubnisse, card);
     if (klauseln.length > 0) {
       if (!PDC.accepts(klauseln, card)) return false;
       const pd = deck.potionDeck || [];
@@ -4855,11 +4877,16 @@ function canAddCard(deck, cardName, section) {
       if (soll === -1 || pd.length >= soll) return false;
       if (PDC.needsDistinct(klauseln) && pd.some(n => sameCopyFamily(n, cardName))) return false;
       if (pd.reduce((n, name) => n + potionClauseLevel(name), 0) + potionClauseLevel(cardName) > PDC.maxLevel(klauseln)) return false;
-      if (countInDeck(deck, cardName) >= effMax) return false;
+      if (!ausgenommen && countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
-    if (ct !== 'Potion') return false;
+    if (!PDC.accepts([], card, erlaubnisse)) return false;
     if ((deck.potionDeck || []).length >= 15) return false;
+    if (ct !== 'Potion') {
+      // Nur dank der Erlaubnis im Potion Deck: je Name hoechstens `maxCopies` (Kerthwack: 2), sonst keine Grenze.
+      if ((deck.potionDeck || []).filter(n => sameCopyFamily(n, cardName)).length >= PDC.copyCap(erlaubnisse)) return false;
+      return true;
+    }
     // Gemeinsame Grenze ueber Main- und Potion-Deck: hoechstens 15
     // Potions. Was ueber einen Gewuerz-Platz im Main Deck liegt, zaehlt
     // dabei NICHT mit (Als Vorgabe 12.9.) — das Potion Deck bleibt also
@@ -4938,9 +4965,13 @@ function trimOverLimitCopies(deck) {
     // Remove excess from side → potion → main (heroes stay put; hero
     // max is 1 so excess here shouldn't occur in practice).
     const sections = ['sideDeck', 'potionDeck', 'mainDeck'];
+    // Kerthwack: Kopien im Potion Deck, die nicht mitzaehlen (`countInDeck`), tragen auch nicht zum Ueberschuss bei —
+    // sie bleiben stehen, sonst wuerde ein Aufraeumen das Potion Deck leerraeumen, ohne die Grenze zu senken.
+    const erlaubnisse = potionPermissions(out);
+    const zaehlt = (sk, n) => sk !== 'potionDeck' || PDC.potionCopyCounts(erlaubnisse, window.CARDS_BY_NAME[n]);
     for (const sk of sections) {
       for (let i = out[sk].length - 1; i >= 0 && count > max; i--) {
-        if (out[sk][i] === cardName) {
+        if (out[sk][i] === cardName && zaehlt(sk, cardName)) {
           out[sk].splice(i, 1);
           count--;
         }

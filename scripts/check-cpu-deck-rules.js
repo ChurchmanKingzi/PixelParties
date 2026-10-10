@@ -229,6 +229,14 @@ console.log('Armageddon — sichtbare Schadensminderung (echte Engine, echte Tem
   const { engine, gs } = out;
   engine._deckProfileCache = [null, null];
   gs.turn = 5;
+  // ★ 10.10.: Das Zufallsbrett dieses Seeds haengt vom KARTENPOOL ab — jede neue Karte mit Kunst (z. B. Kerthwack) verschiebt es. Dann stand dort
+  // zufaellig etwas, das Schaden senkt oder hebt (Resistance, Ruestung …), und die Rechnung „150 − 100 = 50" kippte. Beide Seiten werden deshalb bis auf
+  // die Helden geleert: ueber den Schaden entscheiden nur noch Ifrit, Tempeste und Ida.
+  for (const c of engine.cardInstances.filter(c => c.zone !== 'hero')) engine._untrackCard(c.id);
+  for (const p of gs.players) {
+    p.supportZones = p.supportZones.map(hz => hz.map(() => []));
+    p.abilityZones = p.abilityZones.map(hz => hz.map(() => []));
+  }
   const TEMPESTE = 'Tempeste, the Weather Fairy';
   const setHero = (side, hi, name, hp) => {
     const h = gs.players[side].heroes[hi];
