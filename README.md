@@ -45,6 +45,7 @@ pixel-parties/
 │   ├── app.jsx        # React frontend (compiled in-browser by Babel)
 │   ├── card-render.js # Draws cards at runtime (frame, icons, text, art) — see docs/karten-renderer.md
 │   ├── card-image-shim.js # Maps /cards/*.png image sources to the renderer (blob: URLs)
+│   ├── potion-deck-clauses.js # Potion Deck rules of Heroes like Chaos-Diamond and Pinta (one table, read by client and server)
 │   └── cardgen/       # Sprites, glyph outlines and the art atlas used by the renderer
 ├── cards/             # No card images any more — cards are drawn in the browser
 │   └── effects/

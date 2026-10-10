@@ -4114,30 +4114,34 @@ function requiredHeroCount(deck) {
 }
 window.requiredHeroCount = requiredHeroCount;
 
-// ── „Chaos-Diamond, the Cracked Keeper" ─────────────────────────────
+// ── Potion-Deck-Klauseln der Helden (Chaos-Diamond, Pinta, …) ───────
 // „When this is one of your starting Heroes, your Potion Deck must
-// consist of exactly 15 Normal or Attachment Spells with different
-// names whose total levels do not exceed 15." — mit ihm im Team liegen
-// im Potion Deck SPELLS statt Potions. `deck.heroes` sind die Starthelden.
-const CHAOS_DIAMOND = 'Chaos-Diamond, the Cracked Keeper';
-const CHAOS_POTION_DECK_SIZE = 15;
-const CHAOS_MAX_TOTAL_LEVEL = 15;
-function hasChaosDiamond(deck) {
-  return (deck?.heroes || []).some(h => h && sameCopyFamily(h.hero, CHAOS_DIAMOND));
+// consist of exactly 15 <Kartenart> with different names whose total
+// levels do not exceed 15." — mit so einem Helden im Team liegen im
+// Potion Deck andere Karten als Potions. Die Tabelle steht in
+// `public/potion-deck-clauses.js` (auch der Server liest sie); hier
+// stehen nur die Anschluesse an `deck.heroes` = Starthelden. KEIN
+// Heldenname in dieser Datei: ein neuer Held ist eine Zeile dort.
+const PDC = window.PotionDeckClauses;
+/** Die Klauseln, die fuer die Starthelden dieses Decks gelten (leer = normale Potions). */
+function potionClauses(deck) {
+  return PDC.activeClauses(deck?.heroes || [], sameCopyFamily);
 }
-/** Normal- oder Attachment-SPELL (keine Attacks, Creatures, Reactions, Surprises, Areas). */
-function isChaosPotionSpell(card) {
-  return !!card && card.cardType === 'Spell' && (card.subtype === 'Normal' || card.subtype === 'Attachment');
+/** Darf diese Karte ins Potion Deck dieses Decks? (Mit Klausel: Klauselkarten, sonst Potions.) */
+function potionDeckAccepts(deck, card) {
+  return PDC.accepts(potionClauses(deck), card);
 }
-function chaosSpellLevel(name) {
-  const lv = window.CARDS_BY_NAME[name]?.level;
-  return typeof lv === 'number' ? lv : 0;
+function potionClauseLevel(name) {
+  return PDC.levelOf(window.CARDS_BY_NAME[name]);
 }
-function chaosTotalLevel(names) {
-  return (names || []).reduce((n, name) => n + chaosSpellLevel(name), 0);
+/** Verbietet die Potion-Deck-Klausel dieses Helden das Team? (Er schliesst einen Klausel-Helden im Team aus.) */
+function potionClauseTeamConflict(deck, heroName) {
+  const mit = PDC.activeClauses([...(deck?.heroes || []), { hero: heroName }], sameCopyFamily);
+  return PDC.conflictProblem(mit, window.CARDS_BY_NAME);
 }
-window.hasChaosDiamond = hasChaosDiamond;
-window.isChaosPotionSpell = isChaosPotionSpell;
+window.potionClauses = potionClauses;
+window.potionDeckAccepts = potionDeckAccepts;
+window.potionClauseTeamConflict = potionClauseTeamConflict;
 
 function isDeckLegal(deck) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
@@ -4163,15 +4167,14 @@ function isDeckLegal(deck) {
       : 'Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
   }
   const pc = (deck.potionDeck || []).length;
-  if (hasChaosDiamond(deck)) {
-    // Chaos-Diamond: genau 15 Normal-/Attachment-Spells, alle verschieden,
-    // Gesamtlevel hoechstens 15.
-    const pd = deck.potionDeck || [];
-    if (pc !== CHAOS_POTION_DECK_SIZE) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck needs exactly ' + CHAOS_POTION_DECK_SIZE + ' Spells (' + pc + '/' + CHAOS_POTION_DECK_SIZE + ')');
-    if (pd.some(n => !isChaosPotionSpell(window.CARDS_BY_NAME[n]))) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck may only contain Normal or Attachment Spells');
-    if (new Set(pd.map(copyFamilyKey)).size !== pd.length) reasons.push('With ' + CHAOS_DIAMOND + ' the Potion Deck needs Spells with different names');
-    const lvl = chaosTotalLevel(pd);
-    if (lvl > CHAOS_MAX_TOTAL_LEVEL) reasons.push('With ' + CHAOS_DIAMOND + ' the Spells\' total levels cannot exceed ' + CHAOS_MAX_TOTAL_LEVEL + ' (' + lvl + '/' + CHAOS_MAX_TOTAL_LEVEL + ')');
+  const klauseln = potionClauses(deck);
+  if (klauseln.length > 0) {
+    // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): genaue
+    // Kartenzahl, nur passende Karten, verschiedene Namen, Gesamtlevel-Grenze.
+    // Schliessen die Klausel-Helden einander aus (Chaos-Diamond + Pinta), ist das EINE klare Meldung wert.
+    const konflikt = PDC.conflictProblem(klauseln, window.CARDS_BY_NAME);
+    if (konflikt) reasons.push(konflikt);
+    else reasons.push(...PDC.problems(klauseln, deck.potionDeck || [], n => window.CARDS_BY_NAME[n], copyFamilyKey));
   } else {
     if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
     if ((deck.potionDeck || []).some(n => window.CARDS_BY_NAME[n]?.cardType !== 'Potion')) reasons.push('Potion Deck may only contain Potions');
@@ -4547,14 +4550,16 @@ function canAddCard(deck, cardName, section) {
     return true;
   }
   if (section === 'potion') {
-    // Chaos-Diamond: das Potion Deck nimmt NUR Normal-/Attachment-Spells,
-    // je Name eine Kopie, Gesamtlevel hoechstens 15.
-    if (hasChaosDiamond(deck)) {
-      if (!isChaosPotionSpell(card)) return false;
+    // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): nur
+    // Klauselkarten, je Name eine Kopie, genaue Kartenzahl, Gesamtlevel-Grenze.
+    const klauseln = potionClauses(deck);
+    if (klauseln.length > 0) {
+      if (!PDC.accepts(klauseln, card)) return false;
       const pd = deck.potionDeck || [];
-      if (pd.length >= CHAOS_POTION_DECK_SIZE) return false;
-      if (pd.some(n => sameCopyFamily(n, cardName))) return false;
-      if (chaosTotalLevel(pd) + chaosSpellLevel(cardName) > CHAOS_MAX_TOTAL_LEVEL) return false;
+      const soll = PDC.requiredSize(klauseln);
+      if (soll === -1 || pd.length >= soll) return false;
+      if (PDC.needsDistinct(klauseln) && pd.some(n => sameCopyFamily(n, cardName))) return false;
+      if (pd.reduce((n, name) => n + potionClauseLevel(name), 0) + potionClauseLevel(cardName) > PDC.maxLevel(klauseln)) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
@@ -4573,6 +4578,8 @@ function canAddCard(deck, cardName, section) {
     if (ct !== 'Hero') return false;
     if (isNonStartingHero(cardName)) return false; // v704: „cannot be one of your Starting Heroes"
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
+    // Potion-Deck-Klauseln: Chaos-Diamond und Pinta schliessen einander aus (das Potion Deck passt nur zu einem).
+    if (potionClauseTeamConflict(deck, cardName)) return false;
     // ★ Zhigao-Grenze (v991): mit ihm im Team sind es ZWEI Helden. Ist
     // die Zahl erreicht, geht kein weiterer mehr hinein — und Zhigao
     // selbst passt nicht mehr dazu, wenn schon zwei andere stehen.
@@ -6701,6 +6708,7 @@ window.hasSacredJewelArtifactBonus = hasSacredJewelArtifactBonus;
  * Used by both the deck builder and side-deck phase for rule validation.
  * When adding new card effects that modify deckbuilding rules, update THIS function
  * AND the server-side mirror: canCardTypeEnterPool() in server.js.
+ * (Potion-Deck-Klauseln von Helden: nur eine Zeile in public/potion-deck-clauses.js.)
  */
 function canCardTypeEnterSection(deck, cardName, section) {
   const card = window.CARDS_BY_NAME[cardName];
@@ -6713,8 +6721,8 @@ function canCardTypeEnterSection(deck, cardName, section) {
     return true;
   }
   if (section === 'potion') {
-    // Chaos-Diamond im Team: Normal-/Attachment-Spells statt Potions.
-    return hasChaosDiamond(deck) ? isChaosPotionSpell(card) : ct === 'Potion';
+    // Starthelden mit Potion-Deck-Klausel (Chaos-Diamond, Pinta, …): deren Karten statt Potions.
+    return potionDeckAccepts(deck, card);
   }
   if (section === 'hero') {
     return ct === 'Hero' && !isNonStartingHero(cardName); // v704

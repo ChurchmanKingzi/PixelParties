@@ -61,6 +61,8 @@ const { heroScriptOf, eigenesHeldenSkript } = require('./cards/effects/_gained-e
 const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool } = require('./cards/effects/_hooks');
 const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
+// Potion-Deck-Klauseln der Helden (Chaos-Diamond, Pinta, …) — dieselbe Tabelle liest der Deckbau im Client.
+const PotionDeckClauses = require('./public/potion-deck-clauses.js');
 
 
 const { sendMail } = require('./mailer');
@@ -3008,13 +3010,18 @@ function benoetigteHeldenzahl(heroes) {
   // Kopien-Familie: „Zhigao, the Heavenly Emperor (2)" & Co. zaehlen mit.
   return namen.some(n => n === ZHIGAO_HELD || n.startsWith(ZHIGAO_HELD + ' (')) ? 2 : 3;
 }
-// „Chaos-Diamond, the Cracked Keeper": „When this is one of your starting
-// Heroes, your Potion Deck must consist of exactly 15 Normal or Attachment
-// Spells …" — mit ihm im Team ist die Potion-Deck-Groesse GENAU 15.
-const CHAOS_DIAMOND_HELD = 'Chaos-Diamond, the Cracked Keeper';
+// Helden mit Potion-Deck-Klausel („When this is one of your starting Heroes,
+// your Potion Deck must consist of exactly 15 …": Chaos-Diamond, Pinta, …):
+// mit ihnen im Team ist die Potion-Deck-Groesse GENAU die der Klausel. Die
+// Tabelle steht in public/potion-deck-clauses.js (der Client liest dieselbe).
+function potionClausesOf(heroes) {
+  return PotionDeckClauses.activeClauses(heroes || []);
+}
 function potionDeckGroesseOk(heroes, pc) {
-  const mitChaos = (heroes || []).some(h => h && (typeof h === 'string' ? h : h.hero) === CHAOS_DIAMOND_HELD);
-  return mitChaos ? pc === 15 : (pc === 0 || (pc >= 5 && pc <= 15));
+  const klauseln = potionClausesOf(heroes);
+  // Chaos-Diamond und Pinta schliessen einander aus: kein Potion Deck passt zu beiden.
+  if (!PotionDeckClauses.compatible(klauseln, getCardDB())) return false;
+  return PotionDeckClauses.sizeOk(klauseln, pc);
 }
 
 function heldenzahlOk(heroes) {
@@ -6402,81 +6409,42 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
   }
 }
 
-/**
- * Server-side mirror of canCardTypeEnterSection (app-shared.jsx).
- * Checks if a card's TYPE is compatible with a deck pool.
- * Only type rules — no copy limits or deck size checks.
- * IMPORTANT: When adding new card effects that modify deckbuilding rules,
- * update BOTH this function AND canCardTypeEnterSection() in app-shared.jsx.
- */
-// ── Chaos-Diamond im Seitenwechsel ──────────────────────────────────
-// Mit Chaos-Diamond im Team besteht das Potion Deck aus Normal-/Attachment-
-// Spells (je Name 1x, Gesamtlevel ≤ 15, genau 15). Aussiden leert es (der
-// Wortlaut merkt sich die EXAKTEN Spells in `deck.chaosSpellMemory`),
-// Einsiden stellt sie wieder her. Ohne Merkliste (Satz nicht mit einem
-// Chaos-tauglichen Potion Deck begonnen) ist Einsiden gesperrt.
-function deckHasChaos(deck) {
-  return (deck?.heroes || []).some(h => h && h.hero === CHAOS_DIAMOND_HELD);
-}
-function isChaosSpellCard(cd) {
-  return !!cd && cd.cardType === 'Spell' && (cd.subtype === 'Normal' || cd.subtype === 'Attachment');
-}
-/** Ist diese Liste ein taugliches Chaos-Potion-Deck? (genau 15, nur Spells, verschieden, Level ≤ 15) */
-function chaosPotionDeckOk(cardDB, names) {
-  const list = names || [];
-  if (list.length !== 15) return false;
-  if (new Set(list).size !== list.length) return false;
-  let lvl = 0;
-  for (const n of list) {
-    const cd = cardDB[n];
-    if (!isChaosSpellCard(cd)) return false;
-    lvl += typeof cd.level === 'number' ? cd.level : 0;
-  }
-  return lvl <= 15;
-}
-/** Wie `chaosPotionDeckOk`, aber ohne Groessenforderung (Tausch mitten im Seitenwechsel). */
-function chaosPotionPoolRegelOk(cardDB, names) {
-  const list = names || [];
-  if (new Set(list).size !== list.length) return false;
-  let lvl = 0;
-  for (const n of list) {
-    const cd = cardDB[n];
-    if (!isChaosSpellCard(cd)) return false;
-    lvl += typeof cd.level === 'number' ? cd.level : 0;
-  }
-  return lvl <= 15;
+// ── Potion-Deck-Klauseln im Seitenwechsel ───────────────────────────
+// Mit einem Helden mit Potion-Deck-Klausel im Team (Chaos-Diamond, Pinta, …)
+// besteht das Potion Deck aus den Karten der Klausel (Kartenart, je Name 1x,
+// Gesamtlevel-Grenze, genaue Kartenzahl). Aussiden leert es (die EXAKTEN
+// Karten merkt sich `deck.potionClauseMemory[Held]`), Einsiden stellt sie
+// wieder her. Ohne Merkliste (Satz nicht mit einem tauglichen Potion Deck
+// begonnen) ist Einsiden gesperrt. Die Regeln selbst stehen in
+// public/potion-deck-clauses.js — hier nur der Anschluss an den Seitenwechsel.
+function deckPotionClauses(deck) {
+  return potionClausesOf(deck?.heroes);
 }
 /**
- * Chaos-Diamond beim Heldentausch im Seitenwechsel (mutiert `deck`).
- *   Rein: nur mit gemerkter Spell-Liste (Satzbeginn mit tauglichem Potion
- *   Deck) UND leerem Potion Deck; die EXAKT selben Spells kehren zurueck.
- *   Raus: das Potion Deck wird (sofern aus Spells) geleert und gemerkt.
+ * Held-Tausch im Seitenwechsel (mutiert `deck`): Merkliste anlegen bzw. das
+ * Potion Deck wiederherstellen.
  * @returns {string|null} Ablehnungsgrund oder null
  */
-function chaosHeldentausch(cardDB, deck, oldHeroName, sideCardName) {
-  if (sideCardName === CHAOS_DIAMOND_HELD) {
-    const gemerkt = deck.chaosSpellMemory;
-    if (!Array.isArray(gemerkt) || !chaosPotionDeckOk(cardDB, gemerkt)) {
-      return 'Chaos-Diamond can only be sided in if you started the set with a suitable Potion Deck of 15 Spells.';
-    }
-    if ((deck.potionDeck || []).length > 0) {
-      return 'Empty your Potion Deck first: Chaos-Diamond brings back his 15 Spells.';
-    }
-    deck.potionDeck = [...gemerkt];
-    delete deck.chaosSpellMemory;
-  } else if (oldHeroName === CHAOS_DIAMOND_HELD) {
-    const pd = deck.potionDeck || [];
-    if (pd.length > 0 && pd.every(n => isChaosSpellCard(cardDB[n]))) {
-      deck.chaosSpellMemory = [...pd];
-      deck.potionDeck = [];
-    }
-  }
+function potionClauseHeldentausch(cardDB, deck, oldHeroName, sideCardName) {
+  const cardOf = (n) => cardDB[n];
+  const grund = PotionDeckClauses.heroSwapProblem(deck, sideCardName, cardOf);
+  if (grund) return grund;
+  PotionDeckClauses.applyHeroSwap(deck, oldHeroName, sideCardName, cardOf);
   return null;
 }
 function sideDeckAblehnen(socket, grund) {
   if (socket) socket.emit('side_deck_rejected', { reason: grund });
 }
 
+/**
+ * Server-side mirror of canCardTypeEnterSection (app-shared.jsx).
+ * Checks if a card's TYPE is compatible with a deck pool.
+ * Only type rules — no copy limits or deck size checks.
+ * IMPORTANT: When adding new card effects that modify deckbuilding rules,
+ * update BOTH this function AND canCardTypeEnterSection() in app-shared.jsx.
+ * (Potion-Deck-Klauseln von Helden stehen NICHT hier, sondern in der Tabelle
+ * public/potion-deck-clauses.js — dort genuegt eine neue Zeile.)
+ */
 function canCardTypeEnterPool(cardDB, deck, cardName, pool) {
   const card = cardDB[cardName];
   if (!card) return false;
@@ -6489,7 +6457,7 @@ function canCardTypeEnterPool(cardDB, deck, cardName, pool) {
     }
     return true;
   }
-  if (pool === 'potion') return deckHasChaos(deck) ? isChaosSpellCard(card) : ct === 'Potion';
+  if (pool === 'potion') return PotionDeckClauses.accepts(deckPotionClauses(deck), card);   // Klausel-Held im Team: deren Karten, sonst Potions
   if (pool === 'hero') return ct === 'Hero' && !isNonStartingHero(cardName); // v704
   if (pool === 'side') return true;
   return false;
@@ -6505,7 +6473,7 @@ function countCombinedPotions(cardDB, deck) {
   for (const cn of (deck.mainDeck || [])) {
     if (cardDB[cn]?.cardType === 'Potion') n++;
   }
-  // Nur echte Potions — mit Chaos-Diamond liegen Spells im Potion Deck.
+  // Nur echte Potions — mit einer Potion-Deck-Klausel liegen dort andere Karten.
   for (const cn of (deck.potionDeck || [])) {
     if (cardDB[cn]?.cardType === 'Potion') n++;
   }
@@ -12941,9 +12909,13 @@ function validateDraftedDeck(deck, pool, cardDB) {
     return { ok: false, reason: `Main deck must be exactly 60 cards (currently ${mainDeck.length})` };
   }
 
-  // Potion Deck: 0 oder 5–15 (mit Chaos-Diamond genau 15); Side Deck: hoechstens 15.
-  if (!potionDeckGroesseOk(heroes.filter(h => h && h.hero), potionDeck.length)) {
-    return { ok: false, reason: `Potion Deck must be 0 or 5–15 cards (currently ${potionDeck.length})` };
+  // Potion Deck: 0 oder 5–15 (mit Potion-Deck-Klausel eines Starthelden genau deren Groesse); Side Deck: hoechstens 15.
+  const potionHeroes = heroes.filter(h => h && h.hero);
+  if (!potionDeckGroesseOk(potionHeroes, potionDeck.length)) {
+    const klauselGroesse = PotionDeckClauses.requiredSize(potionClausesOf(potionHeroes));
+    return { ok: false, reason: klauselGroesse > 0
+      ? `Potion Deck must be exactly ${klauselGroesse} cards (currently ${potionDeck.length})`
+      : `Potion Deck must be 0 or 5–15 cards (currently ${potionDeck.length})` };
   }
   if (sideDeck.length > 15) {
     return { ok: false, reason: `Side Deck may have at most 15 cards (currently ${sideDeck.length})` };
@@ -15529,9 +15501,13 @@ io.on('connection', (socket) => {
       const newAbility1 = newHeroData.startingAbility1 || null;
       const newAbility2 = newHeroData.startingAbility2 || null;
 
-      // ── Chaos-Diamond: Merkliste, Leeren und Wiederherstellen ──
-      const chaosGrund = chaosHeldentausch(cardDB, deck, oldHeroName, sideCardName);
-      if (chaosGrund) return sideDeckAblehnen(socket, chaosGrund);
+      // ── Potion-Deck-Klauseln: Ausschluss, Merkliste, Leeren und Wiederherstellen ──
+      // Chaos-Diamond und Pinta schliessen einander aus: das Team NACH dem Tausch darf keine
+      // zwei unvertraeglichen Klausel-Helden enthalten.
+      const klauselKonflikt = PotionDeckClauses.conflictProblem(potionClausesOf(simHeroes), cardDB);
+      if (klauselKonflikt) return sideDeckAblehnen(socket, klauselKonflikt);
+      const klauselGrund = potionClauseHeldentausch(cardDB, deck, oldHeroName, sideCardName);
+      if (klauselGrund) return sideDeckAblehnen(socket, klauselGrund);
 
       // Swap hero into side deck, side card into hero slot
       deck.heroes[heroSlotIdx] = { hero: sideCardName, ability1: newAbility1, ability2: newAbility2 };
@@ -15575,14 +15551,15 @@ io.on('connection', (socket) => {
         || (to === 'side' && (from === 'main' || from === 'potion') && toIsPotion && !fromIsPotion);
       if (enteringMainOrPotion && countCombinedPotions(cardDB, deck) >= 15) return;
 
-      // Chaos-Diamond: das Potion Deck bleibt ein taugliches Spell-Deck
-      // (verschiedene Namen, Gesamtlevel ≤ 15).
-      if (deckHasChaos(deck) && (from === 'potion' || to === 'potion')) {
+      // Potion-Deck-Klausel eines Starthelden: das Potion Deck bleibt ein taugliches
+      // Klausel-Deck (Kartenart, verschiedene Namen, Gesamtlevel-Grenze).
+      const potionKlauseln = deckPotionClauses(deck);
+      if (potionKlauseln.length > 0 && (from === 'potion' || to === 'potion')) {
         const pd = [...(deck.potionDeck || [])];
         const idx = from === 'potion' ? fromIdx : toIdx;
         pd[idx] = from === 'potion' ? toCardName : fromCardName;
-        if (!chaosPotionPoolRegelOk(cardDB, pd)) {
-          return sideDeckAblehnen(socket, 'With Chaos-Diamond the Potion Deck needs Normal/Attachment Spells with different names and total levels of 15 or less.');
+        if (!PotionDeckClauses.poolOk(potionKlauseln, pd, (n) => cardDB[n])) {
+          return sideDeckAblehnen(socket, `With ${PotionDeckClauses.heroesOf(potionKlauseln)} the Potion Deck needs ${PotionDeckClauses.nounOf(potionKlauseln)} with different names and total levels of ${PotionDeckClauses.maxLevel(potionKlauseln)} or less.`);
         }
       }
 
@@ -15630,9 +15607,10 @@ io.on('connection', (socket) => {
 
     // No direct main↔potion
     if ((from === 'main' && to === 'potion') || (from === 'potion' && to === 'main')) return;
-    // Chaos-Diamond: das Potion Deck hat genau 15 Karten — nur Tauschen.
-    if (deckHasChaos(deck) && (from === 'potion' || to === 'potion')) {
-      return sideDeckAblehnen(socket, 'With Chaos-Diamond the Potion Deck must stay at exactly 15 Spells — swap cards instead.');
+    // Potion-Deck-Klausel eines Starthelden: das Potion Deck hat eine feste Kartenzahl — nur Tauschen.
+    const klauselnMove = deckPotionClauses(deck);
+    if (klauselnMove.length > 0 && (from === 'potion' || to === 'potion')) {
+      return sideDeckAblehnen(socket, `With ${PotionDeckClauses.heroesOf(klauselnMove)} the Potion Deck must stay at exactly ${PotionDeckClauses.requiredSize(klauselnMove)} ${PotionDeckClauses.nounOf(klauselnMove)} — swap cards instead.`);
     }
     // Validate using shared type rules
     if (!canCardTypeEnterPool(cardDB, deck, cardName, to)) return;

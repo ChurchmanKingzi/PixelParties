@@ -572,6 +572,8 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       const slots = [...prev];
       const empty = slots.findIndex(s => !s?.hero);
       if (empty < 0) return prev;
+      // Potion-Deck-Klauseln: Chaos-Diamond und Pinta schliessen einander aus.
+      if (window.potionClauseTeamConflict && window.potionClauseTeamConflict({ heroes: slots }, name)) return prev;
       const cd = cardDB[name];
       slots[empty] = { hero: name, ability1: cd?.startingAbility1 || null, ability2: cd?.startingAbility2 || null };
       return slots;
@@ -642,14 +644,17 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   const filledHeroes = heroes.filter(h => h?.hero).length;
   const heroOk = filledHeroes === requiredHeroes;
   const mainOk = mainDeck.length === 60;
-  const hasChaos = !!(window.hasChaosDiamond && window.hasChaosDiamond({ heroes }));
-  const potionOk = hasChaos ? potionDeck.length === 15 : (potionDeck.length === 0 || (potionDeck.length >= 5 && potionDeck.length <= 15));
+  // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): genaue Kartenzahl statt 0 oder 5–15.
+  const potionKlauseln = window.potionClauses ? window.potionClauses({ heroes }) : [];
+  const hasChaos = potionKlauseln.length > 0;
+  const potionSoll = hasChaos ? window.PotionDeckClauses.requiredSize(potionKlauseln) : null;
+  const potionOk = hasChaos ? potionDeck.length === potionSoll : (potionDeck.length === 0 || (potionDeck.length >= 5 && potionDeck.length <= 15));
   const mainPotionsOk = hasChaos || (window.hasNicolasHero && window.hasNicolasHero({ heroes })) || !mainDeck.some(n => cardDB[n]?.cardType === 'Potion');
   const deckLegal = heroOk && mainOk && potionOk && mainPotionsOk && deckName.trim().length > 0;
   const deckProblems = [];
   if (!heroOk) deckProblems.push(`Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (have ${filledHeroes})`);
   if (!mainOk) deckProblems.push(`Main deck must be 60 cards (have ${mainDeck.length})`);
-  if (!potionOk) deckProblems.push(hasChaos ? `Potion Deck must be exactly 15 (have ${potionDeck.length})` : `Potion Deck must be 0 or 5–15 (have ${potionDeck.length})`);
+  if (!potionOk) deckProblems.push(hasChaos ? `Potion Deck must be exactly ${potionSoll} (have ${potionDeck.length})` : `Potion Deck must be 0 or 5–15 (have ${potionDeck.length})`);
   if (!mainPotionsOk) deckProblems.push('Potions in the Main Deck need Nicolas');
   if (!deckName.trim()) deckProblems.push('Deck needs a name');
 

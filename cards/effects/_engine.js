@@ -18756,7 +18756,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       ...(opts.summonOpts || {}),
       ...(feld !== pi ? { controller: pi } : {}),
     });
-    if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, pile === 'hand' ? taken.idx : null); this.sync(); return null; }
+    // Hand und Potion Deck sind geordnete Stapel ohne Mischen: scheitert die Beschwoerung, liegt die
+    // Karte wieder an IHREM Platz (das Potion Deck behaelt seine Reihenfolge, die oberste Karte bleibt oben).
+    if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, (pile === 'hand' || pile === 'potionDeck') ? taken.idx : null); this.sync(); return null; }
     return summon.inst;
   }
 

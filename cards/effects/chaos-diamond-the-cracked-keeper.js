@@ -16,16 +16,21 @@
 //  1) DECKBAU (Client `isDeckLegal`/`canAddCard` in app-shared.jsx,
 //     Server `potionDeckGroesseOk`): mit ihm im Team nimmt das Potion
 //     Deck NUR Normal-/Attachment-Spells, je Name eine Kopie, genau 15,
-//     Gesamtlevel ≤ 15. Dort steht die Regel, nicht im Kartenskript.
+//     Gesamtlevel ≤ 15. Dort steht die Regel, nicht im Kartenskript:
+//     eine Zeile in der Tabelle `public/potion-deck-clauses.js`.
 //
-//  2) „STARTING HERO": `onGameStart` stempelt `hero._chaosStarting` — alle
-//     Helden, die beim Spielstart auf dem Brett stehen, sind Starthelden.
-//     Ein spaeter ins Spiel gekommener Chaos-Diamond (Wiederbelebung,
-//     Gabby-artige Wege) traegt den Stempel nicht: kein Effekt, KEINE
-//     Zieh-Sperre. Dieselbe Stelle setzt `ps.potionDrawBanned`, das
-//     `engine.actionDrawFromPotionDeck` liest („you can never draw") —
-//     am SPIELER statt am Helden, damit die Sperre auch bleibt, wenn
-//     der Held faellt (der Text sagt „never").
+//  2) „STARTING HERO" + „you can never draw": das gemeinsame Geruest fuer
+//     Helden mit Potion-Deck-Klausel, `_potion-deck-hero-shared.js`
+//     (`onGameStart` stempelt den Starthelden und setzt `ps.potionDrawBanned`,
+//     das `engine.actionDrawFromPotionDeck` liest). Ein spaeter ins Spiel
+//     gekommener Chaos-Diamond (Wiederbelebung, Gabby-artige Wege) traegt
+//     den Stempel nicht: kein Effekt, KEINE Zieh-Sperre. Die Sperre haengt
+//     am SPIELER statt am Helden, damit sie auch bleibt, wenn der Held
+//     faellt (der Text sagt „never"). Ein UEBERNOMMENER Chaos-Diamond
+//     (Charme, Controlled Attack) laesst sich nur aktivieren, wenn das
+//     Potion Deck des Uebernehmers zufaellig auf ihn zugeschnitten ist
+//     (`darfAktivieren`: der Uebernehmer ist selbst mit einem Chaos-Diamond
+//     gestartet und uebernimmt den gegnerischen).
 //
 //  3) EFFEKT (Aktion): die obersten 2 Karten des Potion Decks (oder die
 //     eine, die noch da ist) fliegen vom Potion Deck in die Mitte des
@@ -42,6 +47,8 @@
 //     jedem Fall verbraucht. Beim Aktivieren zeigt der Held einen roten
 //     Lichtblitz (`red_lightning`, Client: app-board.jsx ANIM_REGISTRY).
 // ═══════════════════════════════════════════
+
+const { starthelden } = require('./_potion-deck-hero-shared');
 
 const CARD_NAME = 'Chaos-Diamond, the Cracked Keeper';
 const REVEAL_COUNT = 2;
@@ -74,12 +81,13 @@ module.exports = {
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
-    const pi = ctx.cardOwner;
-    const feld = ctx.cardHeroOwner ?? pi;
+    const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
     const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    // „You can only activate this effect if this was one of your starting Heroes."
-    if (!hero._chaosStarting) return false;
+    const pi = starthelden.kontrolleur(hero, ctx.cardOwner);   // wer mit ihm handelt (auch Controlled Attack)
+    // „You can only activate this effect if this was one of your starting Heroes." — ein übernommener
+    // Chaos-Diamond nur, wenn das Potion Deck des Übernehmers zufällig auf ihn zugeschnitten ist.
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
     return oberste(engine, pi).length > 0;
   },
 
@@ -87,7 +95,7 @@ module.exports = {
     const hi = (engine?.gs?.players?.[pi]?.heroes || []).findIndex(h => h?.name === CARD_NAME);
     if (hi < 0) return false;
     const hero = engine.gs.players[pi].heroes[hi];
-    if (!hero._chaosStarting || hero.hp <= 0) return false;
+    if (!starthelden.darfAktivieren(engine, hero, pi, pi, CARD_NAME) || hero.hp <= 0) return false;
     return oberste(engine, pi).some(k => k.istSpell);
   },
 
@@ -99,6 +107,9 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     const feld = ctx.cardHeroOwner ?? pi;
+    // Dieselbe Pruefung wie in `canActivateHeroEffect` (Starthero bzw. zugeschnittenes Potion Deck des Uebernehmers).
+    const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
+    if (!starthelden.darfAktivieren(engine, hero, pi, feld, CARD_NAME)) return false;
 
     const aufgedeckt = oberste(engine, pi);
     if (aufgedeckt.length === 0) return false;
@@ -166,16 +177,7 @@ module.exports = {
   },
 
   hooks: {
-    // „starting Heroes": alles, was beim Spielstart auf dem Brett steht.
-    onGameStart: (ctx) => {
-      const engine = ctx._engine;
-      const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
-      const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
-      if (!hero) return;
-      hero._chaosStarting = true;
-      // „you can never draw cards from your Potion Deck" — am Spieler.
-      const ps = engine.gs.players[ctx.cardOwner];
-      if (ps) ps.potionDrawBanned = true;
-    },
+    // „starting Heroes" + „you can never draw cards from your Potion Deck".
+    onGameStart: starthelden.onGameStart,
   },
 };
