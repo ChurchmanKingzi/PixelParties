@@ -765,8 +765,8 @@ function DeckBuilder() {
       }
     } else {
       items.push({ label: 'Add to Main Deck', icon: '📋', color: '#44aaff', disabled: !canAddCard(currentDeck, cardName, 'main'), action: () => addCardTo(cardName, 'main') });
-      // Chaos-Diamond: Normal-/Attachment-Spells duerfen ins Potion Deck.
-      if (hasChaosDiamond(currentDeck) && isChaosPotionSpell(card)) {
+      // Starthelden mit Potion-Deck-Klausel (Chaos-Diamond, Pinta, …): ihre Karten duerfen ins Potion Deck.
+      if (potionClauses(currentDeck).length > 0 && potionDeckAccepts(currentDeck, card)) {
         items.push({ label: 'Add to Potion Deck', icon: '🧪', color: '#44ffaa', disabled: !canAddCard(currentDeck, cardName, 'potion'), action: () => addCardTo(cardName, 'potion') });
       }
     }

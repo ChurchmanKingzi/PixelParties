@@ -48941,23 +48941,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             simDeck.heroes[toIdx] = { hero: fromName, ability1: null, ability2: null };
             simDeck.sideDeck[fromIdx] = toName;
           }
-          // ── Chaos-Diamond (Spiegel von server.js `side_deck_swap`) ──
-          // Rein: nur mit gemerkter Spell-Liste und leerem Potion Deck.
-          // Potion Deck mit Chaos: Tausch muss verschiedene Namen und
-          // Gesamtlevel ≤ 15 halten; Verschieben ist gesperrt.
-          const CHAOS = 'Chaos-Diamond, the Cracked Keeper';
-          if ((fromPool === 'side' && toPool === 'hero' && fromName === CHAOS)
-              || (fromPool === 'hero' && toPool === 'side' && toName === CHAOS)) {
-            const gemerkt = dk.chaosSpellMemory;
-            if (!Array.isArray(gemerkt) || gemerkt.length !== 15) return false;
-            if (potionCards.length > 0) return false;
-          }
-          if ((fromPool === 'potion' || toPool === 'potion') && window.hasChaosDiamond(simDeck)) {
+          // ── Potion-Deck-Klauseln (Spiegel von server.js `side_deck_swap`) ──
+          // Rein (Held mit Klausel, z. B. Chaos-Diamond, Pinta): nur mit
+          // gemerktem Potion Deck und leerem Potion Deck. Potion Deck mit
+          // Klausel: Tausch muss die Klauselregeln halten (Kartenart,
+          // verschiedene Namen, Level-Grenze); Verschieben ist gesperrt.
+          // Die Regeln stehen in public/potion-deck-clauses.js.
+          const PDCl = window.PotionDeckClauses;
+          const kartenDaten = (nm) => CARDS_BY_NAME[nm];
+          const einHeld = (fromPool === 'side' && toPool === 'hero') ? fromName
+            : (fromPool === 'hero' && toPool === 'side') ? toName : null;
+          if (einHeld && PDCl.heroSwapProblem({ potionDeck: potionCards, potionClauseMemory: dk.potionClauseMemory }, einHeld, kartenDaten)) return false;
+          const klauseln = window.potionClauses(simDeck);
+          if ((fromPool === 'potion' || toPool === 'potion') && klauseln.length > 0) {
             const pd = [...potionCards];
             const pi2 = fromPool === 'potion' ? fromIdx : toIdx;
             pd[pi2] = fromPool === 'potion' ? toName : fromName;
-            if (new Set(pd).size !== pd.length) return false;
-            if (pd.reduce((n, nm) => n + (CARDS_BY_NAME[nm]?.level || 0), 0) > 15) return false;
+            if (!PDCl.poolOk(klauseln, pd, kartenDaten)) return false;
           }
           // Use canCardTypeEnterSection to validate both directions
           const canEnter = window.canCardTypeEnterSection;
