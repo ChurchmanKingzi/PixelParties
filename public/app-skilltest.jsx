@@ -57,6 +57,9 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
         <button className="btn btn-danger" onClick={leaveRoom}>{isHost ? 'CLOSE ROOM' : 'LEAVE'}</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🎯 SKILL TEST LOBBY</h2>
         <span className="badge" style={{ background: 'rgba(0,240,255,.12)', color: 'var(--accent)' }}>2–8 PLAYERS</span>
+        <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          {(lobby.type || 'unranked').toUpperCase()}
+        </span>
         <a className="btn" href="/skilltest-learning.html" target="_blank" rel="noopener" style={{ textDecoration: 'none', fontSize: 12 }}
           title="What the CPUs have learned: card values and test games against untrained CPUs">📊 BOT LEARNING</a>
         <VolumeControl />
@@ -94,6 +97,11 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
           <div style={{ background: 'var(--bg2)', borderRadius: 4, padding: '8px 12px', marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11, color: 'var(--text2)' }}>
             <div>🛠 Preparation timer: <strong style={{ color: 'var(--text)' }}>{cfg.prepTimerDisabled ? 'Off' : `${cfg.prepTimerSec}s`}</strong></div>
             <div>⏱ Turn timer: <strong style={{ color: 'var(--text)' }}>{cfg.turnTimerDisabled ? 'Off' : `${cfg.turnTimerSec}s`}</strong></div>
+            {lobby.type === 'ranked' && (
+              <div style={{ gridColumn: '1 / -1', color: '#ffbb33' }}>
+                🏆 Ranked — placement among the human players changes your Ranked Elo (needs at least 2 humans; CPUs don't count).
+              </div>
+            )}
           </div>
 
           {(lobby.spectators || []).length > 0 && (
@@ -148,7 +156,7 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
 }
 
 // ── Einstellungen im „Create Game"-Dialog ──────────────────────────
-function SkillTestCreateOptions({ opts, setOpts }) {
+function SkillTestCreateOptions({ opts, setOpts, ranked }) {
   const set = (k, v) => setOpts(o => ({ ...o, [k]: v }));
   return (
     <>
@@ -156,6 +164,13 @@ function SkillTestCreateOptions({ opts, setOpts }) {
         2–8 players (humans and CPUs). Everyone prepares a base from 18 random cards, then
         takes turns acting with one Hero or Creature at a time. No deck needed.
       </div>
+      {ranked && (
+        <div style={{ fontSize: 11, color: '#ffbb33', lineHeight: 1.5, padding: '6px 8px', border: '1px solid rgba(255,170,0,.35)', borderRadius: 4, background: 'rgba(255,170,0,.06)' }}>
+          Ranked: your placement among the human players changes your normal Ranked Elo
+          (1st +24 … last −24). CPUs don't count, and without at least 2 human players
+          nothing is rated. Dropping out of a running game and not coming back costs −24.
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8 }}>
         {[['prepTimerSec', 'Preparation time (s)', 30, 1800], ['turnTimerSec', 'Time per turn (s)', 15, 600]].map(([key, label, lo, hi]) => {
           const off = Number(opts[key]) === 0;

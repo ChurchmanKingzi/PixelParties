@@ -70,6 +70,7 @@ const { sendMail } = require('./mailer');
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
+const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
 
 /**
@@ -13551,12 +13552,10 @@ async function cubeFinalizeTournament(room, io) {
     // (keine eigene Draft-Wertung); ein Turnier zaehlt als ein Ranked-Spiel (`ranked_games`, Bestenliste).
     // Higher placement = bigger gain; lowest = biggest loss.
     if (isRanked) {
-      // Placement 1 → +K, 2 → +K/2, etc. Last → -K.
-      const K = 24;
-      const norm = Math.max(0, Math.min(1, (humanCount - s.placement) / Math.max(1, humanCount - 1))); // 1.0 for 1st, 0.0 for last
-      let delta = Math.round(K * (norm - 0.5) * 2); // -K..+K range
+      // Placement 1 → +K, 2 → +K/2, etc. Last → -K (geteilt mit dem Skill Test: placement-elo.js).
+      let delta = placementDelta(s.placement, humanCount);
       // Vote-kicked players take a flat -K loss regardless of placement.
-      if (player.cubeKickLoss) delta = -K;
+      if (player.cubeKickLoss) delta = -ELO_K;
       try {
         await db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [delta, player.userId]);
         eloGeaendert = true;
@@ -13570,7 +13569,7 @@ async function cubeFinalizeTournament(room, io) {
   if (isRanked && !unumkaempft) {
     for (const p of room.players) {
       if (!p.cubeKickLoss || !p.userId || String(p.userId).startsWith('bot:')) continue;
-      try { await db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [-24, p.userId]); eloGeaendert = true; }
+      try { await db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [-ELO_K, p.userId]); eloGeaendert = true; }
       catch (err) { console.error('[cubeFinalize] Kick-ELO error:', err.message); }
     }
   }
@@ -14239,13 +14238,13 @@ io.on('connection', (socket) => {
     }
 
     const isCubeDraft = !!cubeDraftConfig;
-    // Skill Test: bis zu 8 Sitze (Menschen + CPUs), kein eigenes Deck, immer unranked.
+    // Skill Test: bis zu 8 Sitze (Menschen + CPUs), kein eigenes Deck; wahlweise ranked (Elo nach Platzierung unter den Menschen).
     const skillTestConfig = (!isCubeDraft && skillTestRaw) ? skillTest.buildRoomConfig(skillTestRaw) : null;
     const room = {
       id: roomId,
       host: currentUser.username,
       hostId: currentUser.userId,
-      type: skillTestConfig ? 'unranked' : (type || 'unranked'),
+      type: skillTestConfig ? (type === 'ranked' ? 'ranked' : 'unranked') : (type || 'unranked'),
       format: isCubeDraft ? (cubeDraftConfig.prelimsBo) : fmt,
       // For cube draft, `winsNeeded` and `setScore` apply per individual
       // tournament match, not to the room. They get reset per match in M4.

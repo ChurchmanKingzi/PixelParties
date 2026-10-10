@@ -31,6 +31,12 @@ markierte Skill-Test-Zweige (`gs.skillTest`).
    Akteur hat; hat in drei frischen Rounds in Folge niemand einen (alle betäubt/gefroren, nichts nutzbar), endet die Partie als Patt (`no_actors`).
 5. **Ende** (`battle.js` `finishGame`): Wer alle Helden verliert, scheidet aus (Creatures handeln weiter). Letzter
    Überlebender gewinnt. SC: 1 je Round + 5 je ausgestochenem Spieler + 5 für den Sieg (`config.js`).
+6. **Ranked** (Raumoption „Ranked", `room.type === 'ranked'`): `battle.js` `applyRankedElo` bucht die Platzierung unter den
+   **Menschen** auf die normale Ranked-`elo` (`../placement-elo.js`, geteilt mit dem Ranked-Draft): Platz 1 → +24 … letzter → −24,
+   gleiche Platzierung → gleicher Wert. CPUs zählen nicht mit; mit weniger als zwei Menschen wird nicht gewertet (sonst Elo-Farmen
+   gegen CPUs). Wer lebend gegangen und bis zum Ende nicht zurück ist (`gs.skillTest.deserters`, gesetzt in `seatAway`, gelöscht in
+   `seatBack`), bekommt −24 und zählt beim Rang der anderen nicht mit; Aufgeben zählt als Ausscheiden zu diesem Zeitpunkt. Jede
+   Wertung zählt als ein Ranked-Spiel (`ranked_games`, Bestenliste). Der Endstand trägt `result.eloChanges` (die Zeremonie zeigt sie).
 
 ## Dateien
 

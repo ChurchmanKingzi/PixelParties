@@ -1440,7 +1440,7 @@ function PlayScreen() {
   const createGame = () => {
     if (gameMode === 'skilltest') {
       socket.emit('create_room', {
-        type: 'unranked', format: 1,
+        type: gameType, format: 1,
         playerPw: playerPw || null, specPw: specPw || null,
         skillTest: { ...skillTestOpts },
       });
@@ -1952,7 +1952,6 @@ function PlayScreen() {
                   </button>
                 </div>
               </div>
-              {gameMode !== 'skilltest' && (
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Game Type</div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1960,8 +1959,7 @@ function PlayScreen() {
                   <button className={'btn btn-accent2' + (gameType === 'ranked' ? ' glow-border' : '')} onClick={() => setGameType('ranked')} style={{ flex: 1 }}>RANKED</button>
                 </div>
               </div>
-              )}
-              {gameMode === 'skilltest' && <SkillTestCreateOptions opts={skillTestOpts} setOpts={setSkillTestOpts} />}
+              {gameMode === 'skilltest' && <SkillTestCreateOptions opts={skillTestOpts} setOpts={setSkillTestOpts} ranked={gameType === 'ranked'} />}
               {gameMode === 'constructed' && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Format</div>
