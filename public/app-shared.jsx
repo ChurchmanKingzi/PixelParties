@@ -2719,7 +2719,7 @@ const ZONE_ANIM_SFX = {
   // 10 Schaden je Ziel, und die Salve laeuft auf ALLEN Zielen
   // gleichzeitig — bei fuenf Zielen sonst fuenf Schuesse uebereinander.
   gunshot_barrage:         { name: 'projectile', opts: { rate: 1.35, volume: 0.5, dedupe: 200 } },
-  // Assault Eagle (10.10.) — Pistolenschuesse (`gunfire_volley`): drei Schuss im Abstand von 105 ms (Muendungsfeuer
+  // Assault Eagle (10.10.) — Pistolenschuesse (`gunfire_volley`, BEIDE Haelften): drei Schuss im Abstand von 105 ms (Muendungsfeuer
   // beim Einhaengen, die Delays sind animationsrelativ), jeweils 190 ms spaeter der Einschlag. Der erste Schuss uebernimmt
   // die Sammelkategorie 'effect', die uebrigen nicht (sonst schluckt ihn die Sperre), alle ohne Namens-Dedupe: die
   // Salve laeuft auf ALLEN Zielen gleichzeitig, der Klang gilt der Salve, nicht jedem Ziel.
@@ -2730,12 +2730,6 @@ const ZONE_ANIM_SFX = {
     { name: 'damage',     opts: { rate: 1.3, volume: 0.45, delay: 190, category: null, dedupe: 0 } },
     { name: 'damage',     opts: { rate: 1.2, volume: 0.45, delay: 295, category: null, dedupe: 0 } },
     { name: 'damage',     opts: { rate: 1.1, volume: 0.5, delay: 400, category: null, dedupe: 0 } },
-  ],
-  // Assault Eagle (10.10.) — Welle (`shockwave_volley`): ein Rauschen beim Ablauf, der Aufprall liegt bei 460 ms
-  // (Wellenfront erreicht ALLE Ziele zugleich, s. app-board.jsx).
-  shockwave_volley: [
-    { name: 'elem_wind',    opts: { rate: 1.1, volume: 0.8, delay: 0 } },
-    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.7, delay: 455, category: null, dedupe: 0 } },
   ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
