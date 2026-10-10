@@ -239,6 +239,9 @@ console.log('Armageddon — sichtbare Schadensminderung (echte Engine, echte Tem
   };
   engine._trackCard('Ifrit', 0, 'support', 0, 0); gs.players[0].supportZones[0][0] = ['Ifrit'];   // 150 Schaden
   setHero(1, 0, TEMPESTE, 140); setHero(1, 1, IDA, 140); setHero(1, 2, BARTAS, 140);
+  // Die Fähigkeiten der umbenannten Helden stammen aus der Seed-Ziehung (jede neue Karte mit Bild verschiebt den Pool). Resistance,
+  // Interference & Co. würden den Schlag im Trockenlauf schlucken — die Prüfung gilt Tempeste, nicht der Ziehung.
+  gs.players[1].abilityZones = gs.players[1].abilityZones.map(() => [[], [], []]);
   gs.players[1].hand = ['Heal', 'Icebolt'];
   const hps = () => gs.players.map(p => p.heroes.map(h => h.hp).join('/')).join(' | ');
   const vorher = hps();

@@ -24564,6 +24564,155 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Capture — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — ein rotes
+  //  Ausrufezeichen ueber der ertappten Figur)
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten: ueber der Zielkreatur springt ein rotes 2×6-Ausrufezeichen (doppelt gross, dunkle Kontur, Lichtkante links) mit
+  //  kleinem Ueberschwinger auf. Ab ~140 ms legt sich eine Seilschlinge (zwei Pixel dick, Faserung in drei Brauntoenen, Lichtkante
+  //  oben links, Knoten mit Seilende) um die Karte: sie startet 1,6-fach gross, zieht sich in ~380 ms auf die Kartengroesse zusammen
+  //  und zuckt beim Zuziehen noch einen Pixel enger. Im Moment des Zuziehens blitzt die Karte kurz (Bayer-Raster, weiss) und
+  //  goldene Vier-Punkt-Funken stieben nach aussen. Ab ~700 ms blendet alles ueber Bayer-Dithering aus (statt Alpha), bei 1000 ms
+  //  ist es weg — danach fliegt die Kreatur (Engine-Flug) in die Zone des neuen Kontrolleurs. Die Wurzel traegt `data-pp-px="aus"`:
+  //  die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an). Massstab folgt der Zielzone (`w`/`h`), Lebensdauer 1 s
+  //  (deckt sich mit LASSO_MS in capture.js).
+  // ═════════════════════════════════════════════════════════════════
+  capture_lasso: (() => {
+    const KONTUR = ppHex('#1b1626');
+    const ROT = ['#ff6a5c', '#d81f26', '#8a1018'].map(ppHex);              // Lichtkante, Flaeche, Schatten
+    const SEIL = ['#f3d9a4', '#cfa05e', '#9a6c34', '#5f3f1d'].map(ppHex);  // Licht, hell, mittel, dunkel
+    const FUNKEN = ['#ffffff', '#fff3a0', '#ffc93a', '#ff8a1e'].map(ppHex);
+    const AUSRUF = ['##', '##', '##', '##', '..', '##'];
+    const S = 3, TAKT = 33, ENDE = 1000, AUFSPRUNG = 190, AUS_AB = 700;
+    const SCHLINGE_AB = 140, ZU_BIS = 520, ENGER_BIS = 640, BLITZ_BIS = 700;
+    const PADX = 22, PAD_OBEN = 50, PAD_UNTEN = 26;              // Platz um die Karte (Rasterpixel): Ausrufezeichen oben, Schlinge ringsum
+    const GROSS = 2;
+    const springe = (u) => u >= 1 ? 1 : (u < 0.7 ? (u / 0.7) * 1.15 : 1.15 - 0.15 * ((u - 0.7) / 0.3));
+    return function CaptureLassoEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const funken = useMemo(() => {
+        const out = [];
+        const n = ppFxN(10);
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2 + Math.random() * 0.4;
+          out.push({ a, v: 26 + Math.random() * 26, born: ZU_BIS - 10 + Math.random() * 60, life: 300 + Math.random() * 200, gross: Math.random() < 0.4 });
+        }
+        return out;
+      }, []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        // Ausrufezeichen: Glyph doppelt gross, dunkle Kontur um jedes Pixel
+        const maske = new Set();
+        AUSRUF.forEach((zeile, gy) => [...zeile].forEach((ch, gx) => {
+          if (ch !== '#') return;
+          for (let j = 0; j < GROSS; j++) for (let i = 0; i < GROSS; i++) maske.add((gx * GROSS + i) + ',' + (gy * GROSS + j));
+        }));
+        const breite = 2 * GROSS, hoehe = 6 * GROSS;
+        const kontur = new Set();
+        maske.forEach((k) => {
+          const [mx, my] = k.split(',').map(Number);
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+            const nk = (mx + i) + ',' + (my + j);
+            if (!maske.has(nk)) kontur.add(nk);
+          }
+        });
+        const ausrufZeichnen = (ox, oy, aus) => {
+          kontur.forEach((k) => { const [mx, my] = k.split(',').map(Number); put(ox + mx, oy + my, KONTUR, aus); });
+          maske.forEach((k) => {
+            const [mx, my] = k.split(',').map(Number);
+            put(ox + mx, oy + my, mx === 0 ? ROT[0] : (mx === breite - 1 ? ROT[2] : ROT[1]), aus);
+          });
+        };
+        const stern = (px, py, c, gross, a) => {
+          put(px, py, c, a);
+          put(px - 1, py, c, a); put(px + 1, py, c, a); put(px, py - 1, c, a); put(px, py + 1, c, a);
+          if (gross) { put(px - 2, py, c, a * 0.7); put(px + 2, py, c, a * 0.7); put(px, py - 2, c, a * 0.7); put(px, py + 2, c, a * 0.7); }
+        };
+        // Schlinge: Ellipse um die Karte, Massstab k (1 = anliegend), zwei Pixel dick, Faserung wechselt alle zwei Pixel
+        const schlinge = (k, a) => {
+          const rx = (kw / 2 + 2) * k, ry = (kh / 2 + 2) * k;
+          const n = Math.ceil(Math.PI * 2 * Math.max(rx, ry) * 1.3);
+          for (let i = 0; i < n; i++) {
+            const w2 = (i / n) * Math.PI * 2;
+            const px = CX + Math.cos(w2) * rx, py = CY + Math.sin(w2) * ry;
+            const licht = Math.sin(w2) < -0.55 && Math.cos(w2) < 0.35;          // oben links: Lichtkante
+            const farbe = licht ? SEIL[0] : (((i >> 1) & 1) ? SEIL[2] : SEIL[1]);
+            const schatten = Math.sin(w2) > 0.6;                                // unten: Schattenfaser
+            put(px, py, schatten ? SEIL[3] : farbe, a);
+            put(px + 1, py, schatten ? SEIL[3] : farbe, a);
+            put(px, py + 1, SEIL[3], a);
+          }
+          // Knoten oben rechts samt Seilende, das nach aussen haengt
+          const kx = CX + Math.cos(-0.7) * rx, ky = CY + Math.sin(-0.7) * ry;
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) put(kx + i, ky + j, (i === 0 && j === 0) ? SEIL[1] : SEIL[3], a);
+          for (let m = 2; m < 9; m++) put(kx + m * 0.7 + (m % 3 === 0 ? 1 : 0), ky - m * 0.5, ((m >> 1) & 1) ? SEIL[2] : SEIL[1], a);
+        };
+        const zeichne = (t) => {
+          const aus = t > AUS_AB ? Math.max(0, 1 - (t - AUS_AB) / (ENDE - AUS_AB)) : 1;      // Ausblenden am Ende (gedithert)
+          // ── Funken ──
+          for (const f of funken) {
+            const age = t - f.born;
+            if (age < 0 || age > f.life) continue;
+            const u = age / f.life, sek = age / 1000;
+            const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor(u * FUNKEN.length))];
+            stern(CX + Math.cos(f.a) * f.v * sek * 1.5, CY + Math.sin(f.a) * f.v * sek * 1.2 - 4 * sek, c, f.gross && u < 0.6, (1 - u * u) * aus);
+          }
+          // ── Schlinge ──
+          if (t >= SCHLINGE_AB) {
+            let k;
+            if (t < ZU_BIS) { const u = (t - SCHLINGE_AB) / (ZU_BIS - SCHLINGE_AB); k = 1 + 0.6 * Math.pow(1 - u, 3); }
+            else if (t < ENGER_BIS) { const u = (t - ZU_BIS) / (ENGER_BIS - ZU_BIS); k = 1 - 0.07 * Math.sin(u * Math.PI); }
+            else k = 1;
+            const einblenden = Math.min(1, (t - SCHLINGE_AB) / 90);
+            schlinge(k, einblenden * aus);
+          }
+          // ── Blitz beim Zuziehen: weisses Bayer-Raster ueber der Karte ──
+          if (t >= ZU_BIS && t < BLITZ_BIS) {
+            const a = (1 - (t - ZU_BIS) / (BLITZ_BIS - ZU_BIS)) * 0.45 * aus;
+            for (let j = 0; j < kh; j++) for (let i = 0; i < kw; i++) put(CX - kw / 2 + i, CY - kh / 2 + j, FUNKEN[0], a);
+          }
+          // ── Ausrufezeichen: springt auf, haelt ──
+          const sprung = springe(t / AUFSPRUNG);
+          const ox = CX - Math.floor(breite / 2);
+          const grund = CY - Math.floor(kh / 2) - hoehe - 5;
+          ausrufZeichnen(ox, Math.round(grund + (1 - sprung) * 10), aus);
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
@@ -44600,6 +44749,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
       if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }
       // v1340: Cheat Chair
+      if (t === 'capture_control') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🪢 {cName('Capture')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
+      }
+      if (t === 'capture_fizzle') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🪢 {cName('Capture')} — {pName(p.name, p.color)} could not take control of {cName(entry.creature)}.</span>;
+      }
       if (t === 'surprising_opportunity') {
         const p = playerByName(entry.player);
         const karten = Array.isArray(entry.cards) ? entry.cards : [];
