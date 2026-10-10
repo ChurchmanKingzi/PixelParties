@@ -2761,6 +2761,13 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',   opts: { rate: 1.25, volume: 0.8 } },
     { name: 'reveal', opts: { rate: 1.35, volume: 0.45, delay: 260, category: null, dedupe: 0 } },
   ],
+  // Capture (10.10.) — Lasso: Rauschen des Seils, wenn die Schlinge ausgeworfen wird, dumpfes Zuziehen (~520 ms), wenn sie die Karte
+  // erreicht. BEIDE Teile ohne Sammelkategorie: der Anlauf des Helden (`play_ram_animation`) hat ~200 ms vorher schon einen Klang der
+  // Kategorie 'effect' gespielt, der erste Teil wuerde sonst als Doppelung verschluckt.
+  capture_lasso: [
+    { name: 'elem_wind', opts: { rate: 1.45, volume: 0.7, category: null, dedupe: 0 } },
+    { name: 'placement', opts: { rate: 0.85, volume: 0.9, delay: 440, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

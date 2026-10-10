@@ -535,6 +535,10 @@
 "id": "Cannon_Tower",
 "kind": "b"
 },
+"Capture": {
+"id": "Capture",
+"kind": "b"
+},
 "Capture Net": {
 "id": "Capture_Net",
 "kind": "a"

@@ -2956,7 +2956,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a level 1/2/3 or lower Creature your opponent controls and take permanent control of it. Place it in one of the user's free Support Zones.",
+    "effect": "Choose a level 1/2/3 or lower Creature your opponent controls and take permanent control of it. Place it in one of the user's free Support Zones. If the user is equipped with \"Truth-Seeing Eye\", this counts as an additional Action.",
     "archetype": "",
     "setID": "PP SOB",
     "banned": "",

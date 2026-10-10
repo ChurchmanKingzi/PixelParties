@@ -125,15 +125,20 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
     mutatePrep: (prep) => { prep.players[0].hand = [...dead, 'Horn in a Bottle']; } });      // die Hand gehört dem Test: sonst zieht eine andere Karte dazwischen
   console.log = oL; console.error = oE;
   const gp = g.gs.players[0], pool = g.room.skillTest.pool;
-  const handBefore = [...gp.hand], poolBefore = pool.remaining();
+  const handBefore = [...gp.hand];
   const deadIn = dead.filter(n => gp.hand.includes(n)).length;
   check('Vorbereitung: tote Karten und Horn liegen auf der Hand', deadIn === 3 && gp.hand.includes('Horn in a Bottle'), handBefore);
   let guard = 0;
   while (g.gs.activePlayer !== 0 && guard++ < 6) await bot.takeTurn(g.room, g.gs.activePlayer, g.host);
+  // Pool-Stand erst NACH den Zügen der anderen Sitze: deren eigene Ziehungen (je nach Seed-Pool auch Effekte mit Ziehen) gehören nicht zu Sitz 0.
+  const poolBefore = pool.remaining();
+  // Wie viele der toten Karten gelten VOR dem Zug von Sitz 0 als schwach? Die Züge der anderen Sitze verändern sein Brett je nach Seed-Pool
+  // zufällig — der Bot gibt genau die zurück, die dann einen negativen Behalten-Wert haben.
+  const schwachVorZug = (() => { const v = M.keepValues(g.engine, 0, null); return gp.hand.filter((n, i) => dead.includes(n) && v[i] < 0).length; })();
   await bot.takeTurn(g.room, 0, g.host);
   const stillDead = dead.filter(n => gp.hand.includes(n)).length;
   const log = (g.gs.skillTest.mullLog || []).find(m => m.src === 'Horn in a Bottle');
-  check('Der Bot hat Horn in a Bottle ausgespielt (Entscheidung „weak“ protokolliert)', !!log && log.arm === 'weak' && log.nw >= 3, g.gs.skillTest.mullLog);
+  check('Der Bot hat Horn in a Bottle ausgespielt (Entscheidung „weak“ protokolliert, alle schwachen toten Karten zurück)', !!log && log.arm === 'weak' && log.nw >= 1 && log.nw === schwachVorZug, { log: g.gs.skillTest.mullLog, schwachVorZug });
   check('Die toten Karten sind aus der Hand', stillDead === 0 || stillDead < deadIn, { stillDead, hand: gp.hand });
   check('Horn ist verbraucht', !gp.hand.includes('Horn in a Bottle'));
   check('Gezogene Karten zählen: 3 Ersatzkarten wurden gegengerechnet, nur der Bonus-Zug bleibt', gp._stDrawn === 1, gp._stDrawn);
@@ -148,10 +153,20 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   check('Leadership liegt als Lv3-Ability auf dem Brett', g2p.abilityZones[0][0] && g2p.abilityZones[0][0].length === 3 && g2p.abilityZones[0][0][0] === 'Leadership', g2p.abilityZones[0][0]);
   guard = 0;
   while (g2.gs.activePlayer !== 0 && guard++ < 6) await bot.takeTurn(g2.room, g2.gs.activePlayer, g2.host);
+  // Ziehungen durch Leadership zählen (Sitz 0): 3 Ersatzkarten + 1 Bonus. Die Resthand taugt nicht als Beleg — der Bot spielt die
+  // gezogenen Karten je nach Seed-Pool in derselben Runde aus (Zauber, Ausrüstung, Ability, Area …).
+  const gezogen = [];
+  const schwachVorZug2 = (() => { const v = M.keepValues(g2.engine, 0, null); return g2p.hand.filter((n, i) => dead.includes(n) && v[i] < 0).length; })();
+  const origLog2 = g2.engine.log.bind(g2.engine);
+  g2.engine.log = (t, d) => { if (t === 'draw' && d && d.source === 'Leadership' && d.player === g2.gs.players[0].username) gezogen.push(d.card); return origLog2(t, d); };
   await bot.takeTurn(g2.room, 0, g2.host);
-  const log2 = (g2.gs.skillTest.mullLog || []).find(m => /^Leadership/.test(m.src));
-  check('Der Bot nutzt Leadership (Entscheidung „weak“, 3 schwache Karten, Bonus-Zug)', !!log2 && log2.arm === 'weak' && log2.nw === 3 && log2.bonus === 1, g2.gs.skillTest.mullLog);
-  check('Die toten Karten sind weg, die Hand hat Ersatz plus Bonus (3 + 1; der Bot darf danach schon neue Karten gespielt haben: eine freie Ausrüstung und die Zug-Aktion)', dead.every(n => !g2p.hand.includes(n)) && g2p.hand.length >= 2 && g2p.hand.length <= 4, g2p.hand);
+  // Der Eintrag von SITZ 0 — andere Sitze mit Leadership (je nach Seed-Pool) stehen vor ihm im Protokoll.
+  const log2 = (g2.gs.skillTest.mullLog || []).find(m => m.seat === 0 && /^Leadership/.test(m.src));
+  // Wie viele der drei Karten der Bot als „schwach“ wertet, hängt vom Brett ab, auf dem er sie bewertet — und das verändern die Züge der anderen
+  // Sitze vor ihm (je nach Seed-Pool) zufällig. Der Ablauf zählt: schwache Karten zurück, genauso viele Ersatzkarten, plus der Bonus.
+  check('Der Bot nutzt Leadership (Entscheidung „weak“, alle schwachen toten Karten, Bonus-Zug)', !!log2 && log2.arm === 'weak' && log2.nw >= 1 && log2.nw === schwachVorZug2 && log2.bonus === 1, { log: g2.gs.skillTest.mullLog, schwachVorZug2 });
+  check('Die als schwach gewerteten toten Karten sind weg (eine nicht zurückgegebene darf der Bot inzwischen gespielt haben), und Leadership hat Ersatz plus Bonus gezogen (nw + 1)',
+    !!log2 && dead.filter(n => g2p.hand.includes(n)).length <= 3 - log2.nw && gezogen.length === log2.nw + log2.bonus, { hand: g2p.hand, gezogen, log2 });
   void Rules; void host; void room; void gs; void st;
 
   console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Mulligan-Tests grün');
