@@ -2354,17 +2354,32 @@ const HeroIdleAnims = (() => {
   function ebeneAbgleichen() {
     const el = ebeneEl;
     if (!el || !el.isConnected) return;
+    // ★ 10.10.: Im Gefecht steht die Ebene in einer eigenen HUELLE (`.hero-sprite-huelle`, `HeroSpriteEbene ueber`) als Geschwister von
+    // `.board-plane-clip` statt darin — nur so liegt sie im Stapelkontext AUSSERHALB von `.board-center` und kann ueber der
+    // Phasenspalte (z-index 50) stehen. Die Huelle ist das Spiegelbild des Clips (Box, Perspektive); im Skill Test haengt die
+    // Ebene wie frueher direkt im Clip.
+    const huelle = el.parentElement && el.parentElement.classList.contains('hero-sprite-huelle') ? el.parentElement : null;
     if (!ebenePlane || !ebenePlane.isConnected) {
-      ebenePlane = el.parentElement ? el.parentElement.querySelector(':scope > .board-plane') : null;
+      const clipEl = huelle ? (huelle.parentElement && huelle.parentElement.querySelector(':scope > .board-plane-clip')) : el.parentElement;
+      ebenePlane = clipEl ? clipEl.querySelector(':scope > .board-plane') : null;
       beobachteEbene(ebenePlane);
     }
     const plane = ebenePlane;
     if (!plane) return;
     const cs = getComputedStyle(plane);
     const t = cs.transform || 'none', o = cs.transformOrigin;
-    const stand = `${plane.offsetLeft}|${plane.offsetTop}|${plane.offsetWidth}|${plane.offsetHeight}|${t}|${o}`;
+    const clip = plane.parentElement;
+    const huellenBox = huelle && clip ? `${clip.offsetLeft}|${clip.offsetTop}|${clip.offsetWidth}|${clip.offsetHeight}` : '';
+    const stand = `${plane.offsetLeft}|${plane.offsetTop}|${plane.offsetWidth}|${plane.offsetHeight}|${t}|${o}|${huellenBox}`;
     if (stand === ebeneStand) return;
     ebeneStand = stand;
+    if (huelle && clip) {
+      const hs = huelle.style;
+      hs.left = clip.offsetLeft + 'px';
+      hs.top = clip.offsetTop + 'px';
+      hs.width = clip.offsetWidth + 'px';
+      hs.height = clip.offsetHeight + 'px';
+    }
     const st = el.style;
     st.left = plane.offsetLeft + 'px';
     st.top = plane.offsetTop + 'px';
@@ -2522,11 +2537,15 @@ const HeroIdleAnims = (() => {
   };
 })();
 
-// Die Sprite-Ebene selbst — letztes Kind von `.board-plane-clip`, direkt
-// hinter `.board-plane` (siehe Kopfkommentar). Stabiler Ref-Callback,
-// damit React ihn nicht bei jedem Render ab- und wieder anmeldet.
-function HeroSpriteEbene() {
-  return <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
+// Die Sprite-Ebene selbst. Ohne `ueber` (Skill Test) letztes Kind von `.board-plane-clip`, direkt hinter `.board-plane` (siehe
+// Kopfkommentar). Mit `ueber` (Gefecht) in einer Huelle als Geschwister des Clips direkt in `.board-center`: `.board-center`
+// ist KEIN eigener Stapelkontext mehr, die Huelle (z-index 51) steht damit im selben Kontext wie die Phasenspalte (z-index 50)
+// und liegt ueber deren Beschriftung und Knoepfen — nicht nur ueber der Platte dahinter (Als Befund 10.10.: „Noch nicht ALLE
+// Elemente der Phasen-Bar und der darunterliegenden Buttons liegen unter den Heroes"). Stabiler Ref-Callback, damit React ihn
+// nicht bei jedem Render ab- und wieder anmeldet.
+function HeroSpriteEbene({ ueber }) {
+  const ebene = <div className="hero-sprite-ebene" ref={HeroIdleAnims.setzeEbene} aria-hidden="true" />;
+  return ueber ? <div className="hero-sprite-huelle" aria-hidden="true">{ebene}</div> : ebene;
 }
 
 // ★ v1457 — EIS um eingefrorene Figuren (Als Vorgabe 27.9.: „bei Frozen
@@ -27856,9 +27875,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ── UNTERLAGE DER PHASENSPALTE (v792, Als Vorgabe 5.9.) ────────
       // Die Platte muss HINTER den Karten und VOR den Area-Hintergruenden
       // liegen. Beide sind Geschwister INNERHALB von `.board-plane-clip`,
-      // und `.board-center` ist ein eigener Stapelkontext
-      // (`isolation: isolate`) — von aussen kann man sich zwischen die
-      // beiden nicht schieben. Die Spalte selbst bleibt trotzdem
+      // und der Clip ist ein eigener Stapelkontext (`isolation: isolate`,
+      // style.css) — von aussen kann man sich zwischen die beiden nicht
+      // schieben. (Bis 10.10. war es `.board-center`; die Sprite-Huelle
+      // steht seither ausserhalb des Clips im Kontext der Spalte.) Die Spalte selbst bleibt trotzdem
       // draussen: sie ist bedienbar und darf beim Insel-Scrollen nicht
       // aus dem Bild wandern.
       //
@@ -47698,7 +47718,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               eingerastet bleibt, kam der Streifen auch nach „Retry"
               nicht wieder. Der Kommentar in style.css sagte selbst, der
               Platzhalter existiere „only for visual symmetry". */}
-          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative', isolation: 'isolate' }}>
+          {/* ★ 10.10.: KEIN `isolation: isolate` mehr — die Isolation sitzt jetzt an `.board-plane-clip` (style.css), damit die
+              Sprite-Huelle (letztes Kind) im Kontext der Phasenspalte steht und ueber ihr liegt. */}
+          <div className="board-center" ref={boardCenterRef} style={{ position: 'relative' }}>
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             {/* ── Pseudo-3D ground plane ─────────────────────────────────
                 ONE wrapper around both player sides + the area zones +
@@ -47987,10 +48009,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
             </div>{/* /board-plane */}
-            {/* ★ v1451: Sprite-Ebene der Helden-Idle-Animationen —
-                Zwilling der Brettebene, in dem die Figuren in echtem 3D
-                aufrecht stehen (siehe HeroIdleAnims). */}
-            <HeroSpriteEbene />
+            {/* (Die Sprite-Ebene der Helden-Idle-Animationen steht seit 10.10. NACH dem Clip, direkt in `.board-center` —
+                siehe `<HeroSpriteEbene ueber />` unten.) */}
             {/* ★ v1257: Die Permanents-Spalten (Extra-Zonen: Elixir of
                 Immortality & Co. + Coolness Stack) sind von .board-center in
                 DIESE Huelle (.board-plane-clip) umgezogen — derselbe Umzug,
@@ -48184,6 +48204,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             )}
             </div>{/* /board-plane-clip */}
+            {/* ★ v1451: Sprite-Ebene der Helden-Idle-Animationen — Zwilling der Brettebene, in dem die Figuren in echtem 3D
+                aufrecht stehen (siehe HeroIdleAnims). ★ 10.10.: ausserhalb des Clips, in eigener Huelle, damit sie im Stapelkontext
+                der Phasenspalte steht und ueber ihr liegt (`.board-plane-clip` ist dafuer selbst isoliert, `.board-center` nicht). */}
+            <HeroSpriteEbene ueber />
           </div>
 
           <div className={'chat-log-column' + (sidebarCollapsed ? ' chat-log-collapsed' : '')}>

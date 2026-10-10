@@ -6,7 +6,9 @@
 //      der Mittelheld rueckt dafuer aus der Fenstermitte. Ohne Inseln bleibt alles mittig wie bisher.
 //   3. Der Bereich unter dem Tooltip ist fuer das Feld GESPERRT (`--tt-reserve`): der Brettkasten endet an der Tooltip-Spalte und
 //      scrollt frueher horizontal, statt Zonen abzuschneiden oder unter den Tooltip zu legen.
-//   4. Die Figuren liegen ueber der Phasenleiste; faehrt der Zeiger auf die Leiste, ziehen sich die darueber ragenden ein.
+//   4. Die Figuren liegen ueber der Phasenleiste (Phasen, Knoepfe, „Confirm end" — echte Malreihenfolge per `elementsFromPoint`, nicht
+//      per z-index-Zahl: die Spalte steht in einem anderen Stapelkontext als `.board-center`); faehrt der Zeiger auf die Leiste,
+//      ziehen sich die darueber ragenden ein.
 //   NODE_PATH=/tmp/st-tools/node_modules:/opt/node22/lib/node_modules node scripts/skilltest-e2e/ui-board-island.js [/pfad/ordner]
 const { chromium } = require('playwright');
 const { startServer, BASE, sleep, createAccount, check, finish } = require('./lib');
@@ -141,8 +143,39 @@ async function vermiss(browser, viewport, islMe, islOpp) {
           eingefahrenUeber: sprites.filter(x => x.ueber && x.weg).length, eingefahrenAndere: sprites.filter(x => !x.ueber && x.weg).length };
       });
       const v = await lage();
-      check('die Sprite-Ebene liegt über der Phasenleiste (z-index)', v.spriteZ > v.barZ, [v.spriteZ, v.barZ]);
       check('mindestens eine Figur ragt über die Leiste (Testaufbau)', v.ragen >= 1, v);
+      // ★ 10.10. (Als Befund: „nicht ALLE Elemente der Phasenleiste und der Knöpfe darunter liegen unter den Figuren"): `z-index`-Zahlen
+      // aus verschiedenen Stapelkontexten sagen nichts. Geprueft wird die echte Malreihenfolge: die Figuren werden fuer den Test
+      // trefferfaehig gemacht, `elementsFromPoint` liefert die Stapel von oben nach unten.
+      const reihenfolge = await page.evaluate(() => {
+        const st = document.createElement('style');
+        st.textContent = '.hero-sprite-ebene, .hero-sprite-ebene * { pointer-events: auto !important; }';
+        document.head.appendChild(st);
+        try {
+          const boxen = [...document.querySelectorAll('.hero-idle-steher')].map(e => e.getBoundingClientRect());
+          const arten = [['Phase', '.board-phase-item'], ['Knopf', '.phase-buttons-row button'], ['Kaestchen', '.phase-end-check']];
+          const aus = [];
+          for (const [art, sel] of arten) {
+            for (const t of document.querySelectorAll('.phase-column ' + sel)) {
+              const r = t.getBoundingClientRect();
+              for (const s of boxen) {
+                const l = Math.max(r.left, s.left), rr = Math.min(r.right, s.right), o = Math.max(r.top, s.top), u = Math.min(r.bottom, s.bottom);
+                if (rr - l < 4 || u - o < 4) continue;
+                const stapel = document.elementsFromPoint((l + rr) / 2, (o + u) / 2);
+                const iS = stapel.findIndex(e => e.closest('.hero-sprite-ebene'));
+                const iP = stapel.findIndex(e => e.closest('.phase-column'));
+                aus.push({ art, text: (t.textContent || '').trim().slice(0, 14), iS, iP, ok: iS >= 0 && iP >= 0 && iS < iP });
+              }
+            }
+          }
+          return aus;
+        } finally { st.remove(); }
+      });
+      const arten = (a) => reihenfolge.filter(x => x.art === a);
+      for (const a of ['Phase', 'Knopf']) {
+        check(`Malreihenfolge: wo eine Figur ein Element „${a}" der Phasenleiste überdeckt, liegt sie DAVOR`, arten(a).length >= 1 && arten(a).every(x => x.ok), arten(a));
+      }
+      check('Malreihenfolge: auch das Kästchen „Confirm end" (falls überdeckt) liegt darunter', arten('Kaestchen').every(x => x.ok), arten('Kaestchen'));
       check('ohne Hover bleiben sie ausgefahren', v.eingefahrenUeber === 0, v);
       const ziel = await page.evaluate(() => { const r = document.querySelector('.phase-column').getBoundingClientRect(); return [r.left + 30, r.top + r.height / 2]; });
       await page.mouse.move(ziel[0], ziel[1]); await sleep(900);
