@@ -28,6 +28,12 @@ for (const typ of KOSTEN_ANIMATIONEN) {
   const ohneSlot = new RegExp(`'${typ}'`).test(nonEffect) || /category:\s*null/.test(eintrag);
   if (!ohneSlot) fehler.push(`Kosten-Animation '${typ}' belegt den 'effect'-Slot und verschluckt den Beschwoerungs-Klang: in ZONE_ANIM_NONEFFECT eintragen.`);
 }
+// Der Aufdeck-Flug auf einen Brettplatz (`mill_center_reveal`, dest 'support') ist kein Abwurf: sein `discard` bei 75 %
+// verschluckte den Beschwoerungs-Klang der gelandeten Creature (10.10.).
+const board = fs.readFileSync(path.join(__dirname, '..', 'public', 'app-board.jsx'), 'utf8');
+if (!/dest === 'support' \? 0 : setTimeout\(\(\) => sfx\('discard'\)/.test(board)) {
+  fehler.push("`KassaranFlipCard` spielt bei `dest: 'support'` wieder `discard` und verschluckt damit den Beschwoerungs-Klang (app-board.jsx).");
+}
 if (fehler.length) {
   for (const f of fehler) console.error('[check-summon-sound] ' + f);
   process.exit(1);

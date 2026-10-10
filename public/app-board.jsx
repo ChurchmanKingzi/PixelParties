@@ -915,7 +915,7 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 // just sets the start / center / end CSS vars and the cardback / face-up
 // images. Auto-removed by the scheduler that mounted it after the
 // keyframes complete.
-function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs }) {
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs, dest }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   // ★ v1259 (Als Befund 20.9.): die Deck-oben-Umdreh-Animation (Chaos
@@ -931,8 +931,12 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
     const sfx = (name) => { if (window.playSFX) window.playSFX(name, { dedupe: 60, category: 'effect' }); };
     sfx('draw');
     const t1 = setTimeout(() => sfx('reveal'), dur * 0.25);
-    const t2 = setTimeout(() => sfx('discard'), dur * 0.75);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // ★ Als Befund 10.10. („Beim Beschwoeren spielt kein Klang, wenn er in der Support Zone landet"): ein Flug
+    // auf einen Brettplatz ist KEIN Abwurf, und der `discard` bei 75 % belegte den 'effect'-Slot bis kurz
+    // vor der Landung — der `summon`-Klang der Creature (`creature_summoned`) fiel in die 400-ms-Sperre. Die
+    // Landung auf dem Brett hat ihren eigenen Klang (Beschwoerung/Platzierung aus dem Log), hier also keinen.
+    const t2 = dest === 'support' ? 0 : setTimeout(() => sfx('discard'), dur * 0.75);
+    return () => { clearTimeout(t1); if (t2) clearTimeout(t2); };
   }, []);
   return (
     <div className="kassaran-flip-card"
@@ -28670,6 +28674,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Vorlauf, um den das Aufdecken der Zielkarte VOR ihrer Landung kommt
   // (Neuaufbau des Bretts braucht Zeit; die Flugkopie deckt den Platz noch).
   const PILE_AUFDECKEN_VORLAUF_MS = 90;
+  // Wie lange die Aufdeck-Kopie (`mill_center_reveal`, `dest: 'support'`) nach Flugende am Brettplatz liegen
+  // bleibt, bis die echte Karte dort steht (Netz + Neuaufbau des Bretts).
+  const MILL_REVEAL_HALTE_AM_PLATZ_MS = 220;
 
   // Helper: create anims from board rects for unmatched pile entries
   const animsFromBoard = (entries, boardRects, dest, destSelector, side) => {
@@ -39694,11 +39701,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setKassaranFlips(prev => [...prev, {
             id, startX: sx, startY: sy, centerX: cx, centerY: cy,
             endX: ex, endY: ey, cardName, cardbackUrl,
-            durationMs: perCard,
+            durationMs: perCard, dest: ziel,
           }]);
+          // ★ Landet die Karte auf einem BRETTPLATZ, bleibt die Kopie noch kurz am Ziel liegen
+          // (`forwards`: letztes Keyframe). Der Zustand mit der echten Creature trifft nach Netz und
+          // Neuaufbau des Bretts erst nach dem Flugende ein — ohne Halten war der Platz ~100 ms leer
+          // („kurzer Cut", Als Befund 10.10.). Die Kopie deckt die Lücke, dann steht die Karte darunter.
+          const halteMs = ziel === 'support' ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
           setTimeout(() => {
             setKassaranFlips(prev => prev.filter(a => a.id !== id));
-          }, perCard);
+          }, perCard + halteMs);
         }, (startDelayMs || 0) + i * perCard);
       });
     };
@@ -48156,7 +48168,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           centerX={anim.centerX} centerY={anim.centerY}
           endX={anim.endX} endY={anim.endY}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl}
-          durationMs={anim.durationMs} />
+          durationMs={anim.durationMs} dest={anim.dest} />
       ))}
       {brackleCatapults.map(b => (
         <BrackleCatapultCard key={b.id}
