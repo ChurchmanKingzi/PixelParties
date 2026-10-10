@@ -201,7 +201,10 @@ module.exports = {
       dest: direkt ? 'support' : 'potionDeck',
       ...(direkt ? { destHeroIdx: ziel.heroIdx, destSlotIdx: ziel.slotIdx } : {}),
     });
-    await engine._delay(REVEAL_MS + 100);
+    // Direkt auf den Platz: Umbuchen genau zur Landung (die Kopie am Ziel haelt die Luecke, s. Client
+    // `MILL_REVEAL_HALTE_AM_PLATZ_MS`) — Klang und Erscheinen fallen mit dem Aufsetzen zusammen. Zurueck ins
+    // Potion Deck: erst abwarten, bis die Karte dort liegt.
+    await engine._delay(direkt ? REVEAL_MS : REVEAL_MS + 100);
 
     // ③ Mehrere Opfer-Zonen: jetzt, mit der Karte vor Augen, waehlen. Nicht abbrechbar („immediately").
     if (zuWaehlen) {
