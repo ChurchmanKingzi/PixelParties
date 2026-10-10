@@ -116,5 +116,70 @@ console.log('Seitenwechsel: Held raus / rein');
   check('Merkliste eines ANDEREN Klausel-Helden hilft nicht', /sided in/.test(P.heroSwapProblem({ potionDeck: [], potionClauseMemory: { [CHAOS]: spells15 } }, PINTA, cardOf) || ''));
 }
 
+// ════════════════════════════════════════════════════════════════
+//  ERLAUBNISSE — Kerthwack, the Reality Breaker (10.10.)
+//  „… your Potion Deck may contain any card, but only up to 2 copies of each card. Copies of cards played in your Potion
+//   Deck, except Potions, do not count towards the number of copies of those cards in your deck."
+// ════════════════════════════════════════════════════════════════
+const KERTH = 'Kerthwack, the Reality Breaker';
+const POTION = 'Planet in a Bottle';
+const heroCard = OTHER;
+console.log('Erlaubnis: Kerthwack');
+{
+  const erl = P.activePermissions([KERTH]);
+  check('die Tabelle kennt Kerthwack, die strengen Klauseln nicht', erl.length === 1 && P.clauseOfHero(KERTH) === null && P.permissionOfHero(KERTH) === erl[0]);
+  check('activePermissions liest Namen UND { hero }-Eintraege, Kopienfamilie wird benutzt',
+    P.activePermissions(['x', { hero: KERTH }]).length === 1 && P.activePermissions([{ hero: KERTH + ' [B]' }], (a, b) => a.replace(/ \[B\]$/, '') === b).length === 1);
+  check('Held ohne Erlaubnis: keine', P.activePermissions([OTHER, PINTA, CHAOS]).length === 0);
+  check('Kerthwack ist KEINE strenge Klausel (activeClauses bleibt leer, kein Ausschluss, keine feste Kartenzahl)',
+    P.activeClauses([KERTH]).length === 0 && P.requiredSize(P.activeClauses([KERTH])) === null && P.sizeOk(P.activeClauses([KERTH]), 0) && P.sizeOk(P.activeClauses([KERTH]), 5) && !P.sizeOk(P.activeClauses([KERTH]), 3));
+
+  console.log('Was ins Potion Deck darf');
+  check('ohne Erlaubnis bleibt es dabei: nur Potions', !P.accepts([], cardOf(creatures0[0]), []) && P.accepts([], cardOf(POTION), []));
+  check('mit Erlaubnis: JEDE Karte (Creature, Spell, Attack, Artifact, Held …)',
+    [creatures0[0], normalSpells[0], attack, reaktion, area, artifactCreature, 'The Sacred Jewel', heroCard].every(n => P.accepts([], cardOf(n), erl)));
+  check('…und Potions bleiben erlaubt (Erlaubnis, kein Verbot)', P.accepts([], cardOf(POTION), erl));
+  check('Zwei Argumente wie bisher: Erlaubnis nicht gereicht = nur Potions', !P.accepts([], cardOf(creatures0[0])));
+
+  console.log('Kopien');
+  check('Potions zaehlen zu den Kopien im Deck, alles andere im Potion Deck nicht', P.potionCopyCounts(erl, cardOf(POTION)) === true && P.potionCopyCounts(erl, cardOf(creatures0[0])) === false && P.potionCopyCounts(erl, cardOf(heroCard)) === false);
+  check('ohne Erlaubnis zaehlt jede Kopie', P.potionCopyCounts([], cardOf(creatures0[0])) === true && P.potionCopyCounts(null, cardOf(POTION)) === true);
+  check('unbekannte Karte zaehlt (nichts erfinden)', P.potionCopyCounts(erl, undefined) === true);
+  check('Grenze je Name: 2', P.copyCap(erl) === 2 && P.copyCap([]) === 0);
+  const zwei = [creatures0[0], creatures0[0], creatures0[1], POTION, POTION, POTION];
+  check('zwei Kopien je Karte: in Ordnung; Potions fallen NICHT unter diese Grenze (ihre eigene gilt: 2 ueber beide Decks)', P.permissionProblems([], erl, zwei, cardOf).length === 0, P.permissionProblems([], erl, zwei, cardOf));
+  check('drei Kopien einer Nicht-Potion: abgelehnt, mit Namen und Zahl', P.permissionProblems([], erl, [creatures0[0], creatures0[0], creatures0[0]], cardOf).some(t => /at most 2 copies/.test(t) && t.includes(creatures0[0]) && /x3/.test(t)));
+  check('Kopienfamilie zaehlt als derselbe Name (keyOf)', P.permissionProblems([], erl, [creatures0[0], creatures0[0] + ' [W]', creatures0[0]], cardOf, n => n.replace(/ \[W\]$/, '')).length > 0);
+  check('permissionPoolOk: dieselbe Rechnung als Ja/Nein', P.permissionPoolOk([], erl, zwei, cardOf) && !P.permissionPoolOk([], erl, [heroCard, heroCard, heroCard], cardOf));
+  check('ohne Erlaubnis nichts zu pruefen', P.permissionProblems([], [], [creatures0[0], creatures0[0], creatures0[0]], cardOf).length === 0);
+
+  console.log('Strenge Klausel ueberschreibt die laxe');
+  const mitChaos = P.activeClauses([CHAOS, KERTH]);
+  const mitPinta = P.activeClauses([PINTA, KERTH]);
+  check('Kerthwack schliesst Chaos-Diamond / Pinta NICHT aus (kein Konflikt, vertraeglich)', P.compatible(mitChaos, DB) && P.compatible(mitPinta, DB) && P.conflictProblem(mitChaos, DB) === null);
+  check('Chaos-Diamond + Kerthwack: es gilt allein Chaos — Spells ja, Creatures nein, auch Potions nein',
+    P.accepts(mitChaos, cardOf(normalSpells[0]), erl) && !P.accepts(mitChaos, cardOf(creatures0[0]), erl) && !P.accepts(mitChaos, cardOf(POTION), erl));
+  check('Pinta + Kerthwack: Creatures ja, Spells und Potions nein', P.accepts(mitPinta, cardOf(creatures0[0]), erl) && !P.accepts(mitPinta, cardOf(normalSpells[0]), erl) && !P.accepts(mitPinta, cardOf(POTION), erl));
+  check('…Groesse (genau 15), je Name 1x und Gesamtlevel bleiben streng', P.requiredSize(mitPinta) === 15 && P.problems(mitPinta, gut.slice(0, 14), cardOf).some(t => /exactly 15/.test(t)) && P.problems(mitPinta, doppelt, cardOf).some(t => /different names/.test(t)));
+  check('…die Erlaubnis-Pruefung schweigt dann (die strenge sagt „je Name 1x")', P.permissionProblems(mitPinta, erl, doppelt, cardOf).length === 0);
+  check('Chaos + Pinta + Kerthwack: Chaos und Pinta schliessen einander weiter aus', P.compatible(P.activeClauses([CHAOS, PINTA, KERTH]), DB) === false);
+
+  console.log('Seitenwechsel: Kerthwack raus');
+  const cd = (pd) => ({ potionDeck: pd.slice() });
+  const ohneKerth = [{ hero: OTHER }, { hero: 'x' }];
+  check('Potion Deck nur aus Potions: Kerthwack darf raus', P.swapPotionDeckProblem(cd([POTION, POTION]), KERTH, OTHER, ohneKerth, cardOf) === null);
+  check('mit einer Nicht-Potion darin: gesperrt, die Meldung nennt Kerthwack', /Take the non-Potion cards out.*without Kerthwack/.test(P.swapPotionDeckProblem(cd([POTION, creatures0[0]]), KERTH, OTHER, ohneKerth, cardOf) || ''));
+  check('leeres Potion Deck: frei', P.swapPotionDeckProblem(cd([]), KERTH, OTHER, ohneKerth, cardOf) === null);
+  check('Strenge Klausel bleibt im Team (Chaos-Diamond): deren Karten bleiben liegen, kein Hinderungsgrund', P.swapPotionDeckProblem(cd(spells15), KERTH, OTHER, [{ hero: CHAOS }, { hero: OTHER }], cardOf) === null);
+  check('anderer Held geht raus: Kerthwack-Regel greift nicht (auch bei schon unzulaessigem Deck)', P.swapPotionDeckProblem(cd([creatures0[0]]), OTHER, 'x', ohneKerth, cardOf) === null);
+  check('Kerthwack rein: nie gesperrt', P.swapPotionDeckProblem(cd([creatures0[0]]), OTHER, KERTH, [{ hero: KERTH }], cardOf) === null);
+  check('das Potion Deck wird beim Pruefen nicht veraendert', (() => { const d = cd([POTION, creatures0[0]]); P.swapPotionDeckProblem(d, KERTH, OTHER, ohneKerth, cardOf); return d.potionDeck.length === 2 && !d.potionClauseMemory; })());
+  check('Kerthwack raus, aber ein zweiter Erlaubnis-Held bliebe: Karten bleiben erlaubt', (() => {
+    // Eine erfundene zweite Erlaubnis ueber dieselbe Tabelle: darf Kerthwacks Karten uebernehmen.
+    P.PERMISSIONS.push({ hero: 'Zweiter', accepts: { any: true }, maxCopies: 2, exemptsDeckCount: true, noun: 'any card' });
+    try { return P.swapPotionDeckProblem(cd([creatures0[0]]), KERTH, OTHER, [{ hero: 'Zweiter' }], cardOf) === null; } finally { P.PERMISSIONS.pop(); }
+  })());
+}
+
 console.log(fails ? `\n✗ ${fails} Fehler` : '\n✓ Potion-Deck-Klauseln grün');
 process.exit(fails ? 1 : 0);

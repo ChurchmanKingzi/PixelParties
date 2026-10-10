@@ -35,6 +35,29 @@
 //  Die Laufzeit-Haelfte (Starthero-Stempel, Zieh-Sperre fuer das Potion
 //  Deck) steht im Kartenskript bzw. in `cards/effects/_potion-deck-hero-
 //  shared.js`, nicht hier.
+//
+//  ── ERLAUBNISSE (laxe Klauseln) — Kerthwack ───────────────────────
+//  Neben den STRENGEN Klauseln (Chaos-Diamond, Pinta: das Potion Deck MUSS aus
+//  genau diesen Karten bestehen) gibt es ERLAUBNISSE:
+//    „When this is one of your starting Heroes, your Potion Deck may contain
+//     any card, but only up to 2 copies of each card. Copies of cards played in
+//     your Potion Deck, except Potions, do not count towards the number of
+//     copies of those cards in your deck."   (Kerthwack, the Reality Breaker)
+//  Eine Erlaubnis VERBIETET nichts: Potions duerfen weiter ins Potion Deck, es
+//  kommen nur andere Karten dazu (Tabelle PERMISSIONS, je Zeile `hero`, `accepts`,
+//  `maxCopies`, `exemptsDeckCount`). Sie schreibt auch keine Kartenzahl vor — es
+//  bleibt bei 0 oder 5–15.
+//    • Mit einer STRENGEN Klausel im Team gilt allein die strenge: ihre Auswahl
+//      (Kartenart, je Name 1x, Level-Grenze, genau 15) ueberschreibt die laxere,
+//      und die Erlaubnis schliesst den Klausel-Helden nicht aus (nur strenge
+//      Klauseln schliessen einander aus — `compatible` kennt Erlaubnisse nicht).
+//    • Was die Erlaubnis ZUSAETZLICH tut, gilt immer, solange der Held im Team
+//      steht: Kopien im Potion Deck zaehlen — ausser Potions — nicht zu den
+//      Kopien dieser Karten im Deck (`potionCopyCounts`). Auch Karten einer
+//      strengen Klausel tragen damit nicht zu den Main-Deck-Grenzen bei.
+//    • Potions zaehlen immer mit: mit Nicolas im Team gilt weiter „hoechstens 15
+//      Potions und 2 Kopien je Potion ueber Main und Potion Deck zusammen".
+//  Neuer Held mit so einem Text? Eine Zeile in PERMISSIONS.
 // ════════════════════════════════════════════════════════════════
 (function (root, factory) {
   var api = factory();
@@ -58,6 +81,20 @@
       size: 15, maxLevel: 15, distinct: true,
       accepts: { anyType: 'Creature' },
       noun: 'Creatures', nounShort: 'Creatures',
+    },
+  ];
+
+  // ERLAUBNISSE (laxe Klauseln): erweitern, was ins Potion Deck darf, ohne etwas zu verbieten.
+  //   accepts          { any: true } = jede Karte (zusaetzlich zu Potions), sonst wie bei CLAUSES
+  //   maxCopies        je Name hoechstens so oft im Potion Deck (Karten, die NUR dank der Erlaubnis dort liegen)
+  //   exemptsDeckCount diese Kopien (ausser Potions) zaehlen nicht zu den Kopien im Deck
+  var PERMISSIONS = [
+    {
+      hero: 'Kerthwack, the Reality Breaker',
+      accepts: { any: true },
+      maxCopies: 2,
+      exemptsDeckCount: true,
+      noun: 'any card',
     },
   ];
 
@@ -87,14 +124,22 @@
    * @param {Function} [sameHero]  (gespeicherterName, klauselName) → bool; Standard: gleicher
    *   Name. Der Client reicht seine Kopienfamilie durch (`sameCopyFamily`).
    */
-  function activeClauses(heroes, sameHero) {
+  function activeOf(table, heroes, sameHero) {
     var same = sameHero || function (a, b) { return a === b; };
     var out = [];
-    for (var i = 0; i < CLAUSES.length; i++) {
-      var c = CLAUSES[i];
+    for (var i = 0; i < table.length; i++) {
+      var c = table[i];
       if ((heroes || []).some(function (h) { var n = heroName(h); return !!n && same(n, c.hero); })) out.push(c);
     }
     return out;
+  }
+  function activeClauses(heroes, sameHero) {
+    return activeOf(CLAUSES, heroes, sameHero);
+  }
+
+  /** Die Erlaubnisse (Kerthwack), die fuer diese Starthelden gelten — Argumente wie `activeClauses`. */
+  function activePermissions(heroes, sameHero) {
+    return activeOf(PERMISSIONS, heroes, sameHero);
   }
 
   /** Die Klausel dieses Helden (oder null) — fuer den Seitenwechsel. */
@@ -122,11 +167,67 @@
     return (clauses || []).some(function (c) { return c.distinct; });
   }
 
-  /** Duerfen diese Karte ins Potion Deck? Mit Klauseln: alle `accepts` zugleich; sonst nur Potions. */
-  function accepts(clauses, card) {
+  /** Passt diese Karte zu einer Erlaubnis? (`{ any: true }` = jede Karte.) */
+  function permissionFits(p, card) {
+    var a = p.accepts || {};
+    return a.any ? !!card : cardFits(p, card);
+  }
+
+  /**
+   * Duerfen diese Karte ins Potion Deck? Mit strengen Klauseln: alle `accepts` zugleich (die strenge Auswahl
+   * ueberschreibt jede Erlaubnis); sonst Potions UND, was eine Erlaubnis (`permissions`, optional) zusaetzlich freigibt.
+   */
+  function accepts(clauses, card, permissions) {
     if (!card) return false;
-    if (!clauses || clauses.length === 0) return card.cardType === 'Potion';
+    if (!clauses || clauses.length === 0) {
+      if (card.cardType === 'Potion') return true;
+      return (permissions || []).some(function (p) { return permissionFits(p, card); });
+    }
     return clauses.every(function (c) { return cardFits(c, card); });
+  }
+
+  /**
+   * Zaehlt diese Kopie im Potion Deck zu den Kopien der Karte im Deck? Mit einer Erlaubnis, die es ausnimmt (Kerthwack):
+   * nur Potions zaehlen mit. Gilt auch fuer Karten einer strengen Klausel. Unbekannte Karte: zaehlt.
+   */
+  function potionCopyCounts(permissions, card) {
+    if (!card) return true;
+    var frei = (permissions || []).some(function (p) { return p.exemptsDeckCount; });
+    return !frei || card.cardType === 'Potion';
+  }
+
+  /** Hoechstzahl je Name im Potion Deck fuer Karten, die nur dank einer Erlaubnis dort liegen (Potions ausgenommen). */
+  function copyCap(permissions) {
+    var m = 0;
+    (permissions || []).forEach(function (p) { if (p.maxCopies > m) m = p.maxCopies; });
+    return m;
+  }
+
+  /**
+   * Verstoesse eines Potion Decks gegen die Erlaubnisse (leer = in Ordnung): Karten, die nur dank der Erlaubnis dort
+   * liegen (also keine Potions), hoechstens `copyCap` je Name. Mit strenger Klausel nichts zu pruefen (dort gilt „je Name 1x").
+   */
+  function permissionProblems(clauses, permissions, names, cardOf, keyOf) {
+    var out = [];
+    if (!permissions || permissions.length === 0 || (clauses && clauses.length > 0)) return out;
+    var key = keyOf || function (n) { return n; };
+    var cap = copyCap(permissions);
+    var n = {};
+    (names || []).forEach(function (nm) {
+      var c = cardOf(nm);
+      if (c && c.cardType === 'Potion') return;
+      var k = key(nm);
+      n[k] = (n[k] || 0) + 1;
+    });
+    Object.keys(n).forEach(function (k) {
+      if (n[k] > cap) out.push('With ' + heroesOf(permissions) + ' the Potion Deck may contain at most ' + cap + ' copies of each card (' + k + ' x' + n[k] + ')');
+    });
+    return out;
+  }
+
+  /** Haelt ein Potion Deck die Erlaubnis-Grenze je Name? (Tausch/Verschieben im Seitenwechsel.) */
+  function permissionPoolOk(clauses, permissions, names, cardOf, keyOf) {
+    return permissionProblems(clauses, permissions, names, cardOf, keyOf).length === 0;
   }
 
   // ── Vertraeglichkeit ──────────────────────────────────────────────
@@ -266,9 +367,45 @@
     }
   }
 
+  /** Die Erlaubnis dieses Helden (oder null). */
+  function permissionOfHero(name) {
+    for (var i = 0; i < PERMISSIONS.length; i++) if (PERMISSIONS[i].hero === name) return PERMISSIONS[i];
+    return null;
+  }
+
+  /**
+   * Seitenwechsel: Darf der Held `alt` (raus) gegen `neu` (rein) getauscht werden, ohne dass das Potion Deck unzulaessig wird?
+   * Verlaesst ein Held mit Erlaubnis (Kerthwack) das Team, duerfen im Potion Deck nur noch Karten liegen, die dann noch
+   * hineindurfen (ohne strenge Klausel: Potions, mit einer anderen Erlaubnis deren Karten) — der Spieler muss die uebrigen
+   * zuerst herausnehmen, wie bei Nicolas und den Potions im Main Deck. Strenge Klausel-Helden regeln ihr Potion Deck selbst
+   * (`heroSwapProblem` / `applyHeroSwap`). Liefert den Ablehnungsgrund oder null.
+   * @param {Array} heroesAfter  Starthelden NACH dem Tausch (Namen oder `{ hero }`)
+   */
+  function swapPotionDeckProblem(deck, alt, neu, heroesAfter, cardOf, keyOf) {
+    if (!alt || !permissionOfHero(alt)) return null;
+    if (activeClauses(heroesAfter).length > 0) return null;     // mit strenger Klausel gilt deren eigene Regel
+    var probe = { potionDeck: ((deck && deck.potionDeck) || []).slice(), potionClauseMemory: JSON.parse(JSON.stringify((deck && deck.potionClauseMemory) || {})) };
+    applyHeroSwap(probe, alt, neu, cardOf);
+    var perms = activePermissions(heroesAfter);
+    if (probe.potionDeck.some(function (n) { return !accepts([], cardOf(n), perms); })) {
+      return 'Take the non-Potion cards out of your Potion Deck first: without ' + alt + ' it may only contain Potions.';
+    }
+    var p = permissionProblems([], perms, probe.potionDeck, cardOf, keyOf);
+    return p.length ? p[0] : null;
+  }
+
   return {
     CLAUSES: CLAUSES,
+    PERMISSIONS: PERMISSIONS,
     activeClauses: activeClauses,
+    activePermissions: activePermissions,
+    permissionOfHero: permissionOfHero,
+    permissionFits: permissionFits,
+    potionCopyCounts: potionCopyCounts,
+    copyCap: copyCap,
+    permissionProblems: permissionProblems,
+    permissionPoolOk: permissionPoolOk,
+    swapPotionDeckProblem: swapPotionDeckProblem,
     clauseOfHero: clauseOfHero,
     hasType: hasType,
     cardFits: cardFits,

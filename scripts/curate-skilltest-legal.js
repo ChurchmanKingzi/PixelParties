@@ -101,6 +101,8 @@ const GROUPS = [
     cards: ['Chaos-Diamond, the Cracked Keeper'] },
   { why: 'Pinta, the Singing Ship (Nutzer 10.10.): Potion-Deck-Held wie Chaos-Diamond — ihr Effekt deckt die oberste Karte des Potion Decks auf und beschwört sie; der Skill Test hat kein Potion Deck.',
     cards: ['Pinta, the Singing Ship'] },
+  { why: 'Kerthwack, the Reality Breaker (Nutzer 10.10.): reine Deckbau-Karte („your Potion Deck may contain any card …“), im Spiel ohne Wirkung — der Skill Test hat kein Potion Deck, übrig bliebe ein Held ohne Effekt.',
+    cards: ['Kerthwack, the Reality Breaker'] },
   { why: 'Reaktionen mit extrem engen, seltenen oder unwahrscheinlichen Bedingungen (Nutzer 7.10., nach eigenem Ermessen): hängen an bestimmten Karten/Archetypen, am Deck, an Surprises, Freeze, Ascend, Heldenstufen oder Sonderlagen, die im Skill Test praktisch nie eintreten.',
     cards: [
       // an bestimmte Karten / Archetypen gebunden

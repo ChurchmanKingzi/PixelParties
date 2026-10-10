@@ -596,6 +596,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     if (potionDeck.length >= POTION_MAX) return false;
     if (remainingFor(name) <= 0) return false;
     if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'potion')) return false;
+    // Erlaubnis (Kerthwack: „any card, but only up to 2 copies of each card"): Karten, die nur dank ihr im Potion Deck liegen,
+    // höchstens `copyCap` Kopien je Name (ohne strenge Klausel; Potions haben ihre eigene Grenze).
+    if (window.potionPermissions && cardDB[name]?.cardType !== 'Potion' && window.potionClauses({ heroes }).length === 0) {
+      const erl = window.potionPermissions({ heroes });
+      if (erl.length > 0 && potionDeck.filter(n => window.copyFamilyKey(n) === window.copyFamilyKey(name)).length >= window.PotionDeckClauses.copyCap(erl)) return false;
+    }
     setPotionDeck(prev => [...prev, name]);
     sfx('draw');
     return true;
