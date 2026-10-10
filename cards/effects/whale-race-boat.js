@@ -14,8 +14,9 @@
 //    Held ausfuehrt. Ist diese Aktion die Beschwoerung einer Creature, zaehlt
 //    die NEUE Creature schon fuer den Schaden: der Haken feuert erst NACH der
 //    Aktion (`onAnyActionResolved`), gezaehlt wird dann.
-//  · Die Animation ist eine gewaltige Pixelart-Welle (`tidal_wave`), die die
-//    komplette GEGNERSEITE ueberschwemmt.
+//  · Die Animation ist eine gewaltige Pixelart-Welle (`tidal_wave`), die das
+//    KOMPLETTE BRETT ueberrollt (beide Seiten): das Boot trifft alle Ziele auf
+//    dem ganzen Board, also laeuft auch die Welle ueber das ganze Board.
 //
 //  ── Auslegung ─────────────────────────────────────────────────────────
 //  · „performs an Action": ueber den gemeinsamen Ausloeser `handlungsHooks`
@@ -45,8 +46,8 @@ const PRO_KREATUR = 30;
 const ZAEHLER = { key: 'WhaleRaceBoat', max: 1 };
 
 // Zeiten (ms) — gehoeren zur Animation `tidal_wave` (app-board.jsx).
-const WELLE_MS = 2100;          // Lebensdauer der Animation
-const WELLE_TREFFER_MS = 700;   // Front erreicht die Mitte der Gegnerseite bei ~600 ms (inkl. Mount-Vorlauf)
+const WELLE_MS = 2400;          // Lebensdauer der Animation
+const WELLE_TREFFER_MS = 760;   // Front erreicht die Mitte des Bretts bei ~725 ms (inkl. Mount-Vorlauf)
 const NACH_TREFFER_MS = 450;    // so lange wartet die Aufloesung nach dem Schaden, dann laeuft das Spiel weiter
 
 /** Alle Ziele ausser dem ausgeruesteten Helden, als Eintraege fuer `dealDamageToTargets`. */
@@ -86,12 +87,10 @@ async function beiAktion(ctx) {
   const ziele = andereZiele(engine, t);
   if (ziele.length === 0) { engine.sync(); return; }
 
-  const gegnerSeite = engine.opponentOf(ctrl);
-  // Die Welle ueberschwemmt die komplette Gegnerseite; alle getroffenen Ziele stehen in `targets` (die ausserhalb
-  // der Gegnerseite bekommen einen Gischt-Einschlag).
+  // Die Welle ueberrollt das GANZE Brett (`regionAll`); alle getroffenen Ziele stehen in `targets`.
   engine._broadcastEvent('play_zone_animation', {
     type: 'tidal_wave', zoneType: 'board', owner: t.seite, heroIdx: -1, zoneSlot: -1,
-    duration: WELLE_MS, regionOwner: gegnerSeite,
+    duration: WELLE_MS, regionAll: true,
     originOwner: t.seite, originHeroIdx: t.heroIdx,
     targets: ziele.map(z => ({ owner: z.owner, heroIdx: z.heroIdx, zoneSlot: z.type === 'hero' ? -1 : z.zoneSlot, cardName: z.cardName })),
   });

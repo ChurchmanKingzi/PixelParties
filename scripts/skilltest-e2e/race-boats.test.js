@@ -239,8 +239,8 @@ const heldenAktionen = (t) => t.sofort.map(x => ({ d: { heroIdx: x.heroIdx, ...x
     const aoe = t.events.filter(e => e.ev === 'AOE').map(e => e.data);
     check('EIN Flächenschlag mit Schaden 100', aoe.length === 1 && aoe[0].amount === 100 && aoe[0].n >= 2, aoe);
     const w = t.events.filter(e => e.ev === 'play_zone_animation' && e.data.type === 'tidal_wave').map(e => e.data);
-    check('Animation: brettweite Pixelart-Welle (`tidal_wave`) über die komplette GEGNERSEITE, Ursprung = der Wal-Held',
-      w.length === 1 && w[0].zoneType === 'board' && w[0].regionOwner === t.B && w[0].originOwner === t.A && w[0].originHeroIdx === 0, w);
+    check('Animation: brettweite Pixelart-Welle (`tidal_wave`) über das KOMPLETTE BRETT (`regionAll`, keine einzelne Seite), Ursprung = der Wal-Held',
+      w.length === 1 && w[0].zoneType === 'board' && w[0].regionAll === true && w[0].regionOwner === undefined && w[0].originOwner === t.A && w[0].originHeroIdx === 0, w);
     check('…alle getroffenen Ziele stehen als {owner, heroIdx, zoneSlot} darin (der Wal-Held nicht)',
       w[0].targets.length >= 5 && !w[0].targets.some(x => x.owner === t.A && x.heroIdx === 0 && x.zoneSlot === -1), w[0].targets.length);
     check('die Welle kommt VOR dem Schaden', t.events.findIndex(e => e.data && e.data.type === 'tidal_wave') >= 0 && t.events.findIndex(e => e.data && e.data.type === 'tidal_wave') < t.events.findIndex(e => e.ev === 'AOE'));
@@ -298,14 +298,52 @@ const heldenAktionen = (t) => t.sofort.map(x => ({ d: { heroIdx: x.heroIdx, ...x
     const doppelt = await S.onEquipEffect(t.engine._createContext(boot, {}));
     check('derselbe Name zweimal gewählt zählt nur einmal → nicht exakt X, nichts geschieht', doppelt === false && ps.hand.length === 0);
     // richtig
-    t.prompts.length = 0;
-    t.antwort = (pi, d) => (d.type === 'cardGalleryMulti' ? { selectedCards: ['Archer', 'Barkeeper', 'Baby Spider'] } : undefined);
+    t.prompts.length = 0; t.events.length = 0;
+    t.antwort = (pi, d) => (d.type === 'cardGalleryMulti' ? { selectedCards: ['Archer', 'Barkeeper', 'Baby Spider'] } : d.type === 'deckSearchReveal' ? {} : undefined);
     const ok = await S.onEquipEffect(t.engine._createContext(boot, {}));
     const galerie = t.prompts.find(p => p.d.type === 'cardGalleryMulti').d;
     check('Galerie: GENAU X (3) verschiedene Namen, Bestätigen erst bei X (`minSelect = selectCount = 3`), abbrechbar',
       galerie.selectCount === 3 && galerie.minSelect === 3 && galerie.cancellable === true && galerie.cards.length === 3 && new Set(galerie.cards.map(c => c.name)).size === 3, [galerie.selectCount, galerie.minSelect, galerie.cards.length]);
     check('…die drei kommen auf die Hand, aus dem Deck (je eine Kopie), und die Aktivierung ist verbraucht (true)',
       ok === true && ps.hand.slice().sort().join() === 'Archer,Baby Spider,Barkeeper' && ps.mainDeck.filter(n => n === 'Archer').length === 1 && ps.mainDeck.length === 3, [ok, ps.hand, ps.mainDeck]);
+    // Aufdecken wie bei jeder Suche: der GEGNER bestätigt JEDE gesuchte Karte (`deckSearchReveal`)
+    const reveals = t.prompts.filter(p => p.d.type === 'deckSearchReveal');
+    check('der Gegner bekommt für JEDE gesuchte Karte das Bestätigungsfenster (3 × `deckSearchReveal`, Spieler = Gegner)',
+      reveals.length === 3 && reveals.every(r => r.pi === t.B) && reveals.map(r => r.d.cardName).sort().join() === 'Archer,Baby Spider,Barkeeper', reveals.map(r => [r.pi, r.d.cardName]));
+    check('…und es nennt die Karte als Quelle („Snake Race Boat") sowie den Suchenden', reveals.every(r => r.d.title === SNAKE && r.d.searcherName === ps.username), reveals.map(r => [r.d.title, r.d.searcherName]));
+    check('…jede Karte fliegt einzeln aus dem Deck (3 × `deck_search_add`)', t.events.filter(e => e.ev === 'deck_search_add').length === 3);
+    // Das Bild links neben dem Brett: auch der AKTIVIERENDE bekommt es (der Gegner über den Standardweg des aktiven Einsatzes)
+    const bild = t.events.filter(e => e.ev === 'card_reveal' && e.data.cardName === SNAKE);
+    check('das Kartenbild („card_reveal") geht auch an den Aktivierenden', bild.length === 1 && bild[0].data.playerIdx === t.A, bild);
+  }
+  {
+    // Server-Weg: der Klick läuft über `doActivateEquipEffect`; der Gegner bekommt sein Bild, das Aufdecken geht je Karte durch
+    const t = await fresh();
+    t.stelle(t.A, SNAKE, 0, 2); t.stelle(t.A, 'Cute Bunny', 0, 0); t.stelle(t.A, 'Barkeeper', 0, 1);
+    t.gs.players[t.A].mainDeck = ['Archer', 'Archer', 'Barkeeper', 'Baby Spider', 'Fireball', 'Heal'];
+    t.antwort = (pi, d) => (d.type === 'cardGalleryMulti' ? { selectedCards: d.cards.slice(0, d.selectCount).map(c => c.name) } : d.type === 'deckSearchReveal' ? {} : undefined);
+    const opp = require('../../cards/effects/_opp');
+    const orig = opp.emitToOpponentsGs; const gesendet = [];
+    opp.emitToOpponentsGs = (g, io, owner, ev, d) => { gesendet.push({ owner, ev, d }); };
+    let res;
+    try { res = await t.host.doActivateEquipEffect(t.room, t.A, { heroIdx: 0, zoneSlot: 2 }); } finally { opp.emitToOpponentsGs = orig; }
+    check('Klick auf das Boot: Aktivierung läuft durch, 2 Karten (2 Creatures) auf der Hand', res === true && t.gs.players[t.A].hand.length === 2, [res, t.gs.players[t.A].hand]);
+    check('der GEGNER bekommt das Bild des Bootes („card_reveal", wie jeder aktive Effekt)', gesendet.some(x => x.ev === 'card_reveal' && x.d.cardName === SNAKE && x.owner === t.A), gesendet);
+    check('einmal pro Zug: die zweite Aktivierung geht nicht', (await t.host.doActivateEquipEffect(t.room, t.A, { heroIdx: 0, zoneSlot: 2 })) === false && t.gs.players[t.A].hand.length === 2);
+  }
+
+  console.log('Race Boats: Zonen ausgrauen (`equipEligibleHeroes`)');
+  {
+    const t = await fresh();
+    t.stelle(t.A, FROG, 0, 2);
+    t.stelle(t.A, SNAKE, 2, 2);
+    t.gs.players[t.A].hand = [CROC, WHALE, SNAKE, FROG];
+    const e = t.engine.getEquipEligibleHeroes(t.A);
+    check('für jedes der vier Boote nennt der Server nur die Helden OHNE Race Boat (der Client graut deren Zonen aus)',
+      [CROC, WHALE, SNAKE, FROG].every(n => Array.isArray(e[n]) && e[n].join() === '1'), e);
+    t.gs.players[t.A].supportZones[0][2] = []; t.engine._untrackCard(t.engine.cardInstances.find(c => c.name === FROG).id);
+    const e2 = t.engine.getEquipEligibleHeroes(t.A);
+    check('ist das Boot weg, ist der Held wieder frei', e2[CROC].join() === '0,1', e2);
   }
 
   console.log(fails === 0 ? '\n✓ Race-Boat-Tests grün' : `\n✗ ${fails} Fehler`);

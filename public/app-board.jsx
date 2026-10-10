@@ -270,6 +270,14 @@ function besterEquipHeldRabatt(me, handIdx) {
   const m = ((me && me.handEquipHeroReductions) || {})[handIdx];
   return m ? Math.max(0, ...Object.values(m)) : 0;
 }
+/** Laesst die KARTE selbst diesen Helden zu? Der Server veroeffentlicht je Handkarte mit eigener Ausruestregel
+ *  (`canEquipToHero` im Skript: Crusader's, Race Boats, Lunatic Cycle …) die erlaubten eigenen Helden in
+ *  `equipEligibleHeroes`; fuer alles andere (und fuer fremde Seiten) gibt es keine Einschraenkung. */
+function equipHeldErlaubt(gameState, myIdx, cardName, ownerIdx, heroIdx) {
+  if (ownerIdx !== myIdx) return true;
+  const erlaubt = ((gameState && gameState.equipEligibleHeroes) || {})[cardName];
+  return !Array.isArray(erlaubt) || erlaubt.includes(heroIdx);
+}
 /** Ist die Ausruestung `cardName` (Handplatz `handIdx`) auf dem Helden
  *  `heroIdx` der Seite `ownerIdx` bezahlbar? Zielheld-Rabatte gibt es
  *  nur fuer eigene Helden — so rechnet auch der Server. */
@@ -2387,7 +2395,22 @@ const HeroIdleAnims = (() => {
     if (!zone || !plane) return null;
     let x = 0, y = 0, e = zone;
     while (e && e !== plane) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
-    return e === plane ? { x, y, w: zone.offsetWidth, h: zone.offsetHeight, plane } : null;
+    if (e !== plane) return null;
+    // ★ 10.10. (Als Befund: „wenn das Layout sich wegen Flying Island verschiebt, sind die Hero-Sprites nicht mehr auf den
+    // Hero-Zonen"): `offsetLeft/Top` kennen KEINE Transforms. Die Seiten und die Mittelreihe tragen aber die Mittelung als
+    // `translateX(var(--center-offset))` (style.css) — bei mittigem Brett ~0, mit Inseln (der Mittelheld wird auf die
+    // Fenstermitte geruckt) deutlich mehr. Reine Verschiebungen der Vorfahren zaehlen deshalb mit; andere Transforms
+    // (Skalierung, Neigung) bleiben aussen vor — die Neigung traegt die Sprite-Ebene ohnehin selbst.
+    for (let p = zone.parentElement; p && p !== plane; p = p.parentElement) {
+      const t = getComputedStyle(p).transform;
+      if (!t || t === 'none' || t.indexOf('matrix(') !== 0) continue;
+      const v = t.slice(7, -1).split(',').map(parseFloat);
+      if (v.length === 6 && v.every(Number.isFinite)
+          && Math.abs(v[0] - 1) < 1e-3 && Math.abs(v[3] - 1) < 1e-3 && Math.abs(v[1]) < 1e-3 && Math.abs(v[2]) < 1e-3) {
+        x += v[4]; y += v[5];
+      }
+    }
+    return { x, y, w: zone.offsetWidth, h: zone.offsetHeight, plane };
   }
 
   // ── Steinfassung eines Sheets ────────────────────────────────
@@ -24315,21 +24338,23 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, 820, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
-  //  Gezeitenwelle (Whale Race Boat) — PIXELART, ueberschwemmt die KOMPLETTE Gegnerseite
+  //  Gezeitenwelle (Whale Race Boat) — PIXELART, ueberrollt das KOMPLETTE BRETT (Als Vorgabe 10.10.: „trifft alle Ziele
+  //  auf dem kompletten Board, also soll die Welle das komplette Board ueberrollen")
   //
-  //  Eine gewaltige Welle rollt vom Wal-Helden aus ueber die ganze Flaeche der Gegnerseite (`regionBox`): steile, dunkel
-  //  umrandete Frontflaeche, ueberhaengende Schaumlippe, Gischt, die der Kamm hochwirft; dahinter steht das Wasser als
-  //  Flut (gestufte Blautoene mit Bayer-Dithering, Schaumsaum, funkelnde Lichter) und laeuft am Ende gedithert ab.
-  //  Ziele AUSSERHALB der Gegnerseite (eigene Creatures und Helden, die der Schlag mittrifft) bekommen einen flachen
-  //  Gischtring mit Tropfen, wenn der Kamm die Mitte erreicht. Die Welle laeuft in der Richtung vom Ursprung weg: kommt der
-  //  Wal von links, rollt sie nach rechts. Der Schaden folgt, wenn die Front die Mitte erreicht (whale-race-boat.js:
-  //  WELLE_TREFFER_MS). Ohne Flaeche (Region fehlt im DOM) flutet sie das Feld der Ziele.
+  //  Eine gewaltige Welle rollt vom Wal-Helden aus ueber die GANZE Flaeche des Bretts (`regionBox`: beide Seiten samt Mitte):
+  //  steile, dunkel umrandete Frontflaeche fast in Brettshoehe, ueberhaengende Schaumlippe, Gischt, die der Kamm hochwirft;
+  //  dahinter steht das Wasser als Flut (gestufte Blautoene mit Bayer-Dithering, Schaumsaum, funkelnde Lichter) und laeuft am
+  //  Ende gedithert ab. Alle Masse (Frontflaeche, Kamm, Lippe, Gischt) wachsen mit der Flaechenhoehe (`sk`), damit die Welle
+  //  auf dem grossen Brett nicht duenn wirkt. Ziele AUSSERHALB der Flaeche (nur falls das Brett nicht gemessen werden
+  //  konnte) bekommen einen flachen Gischtring mit Tropfen, wenn der Kamm die Mitte erreicht. Die Welle laeuft in der Richtung
+  //  vom Ursprung weg: kommt der Wal von links, rollt sie nach rechts. Der Schaden folgt, wenn die Front die Mitte erreicht
+  //  (whale-race-boat.js: WELLE_TREFFER_MS). Ohne Flaeche (Region fehlt im DOM) flutet sie das Feld der Ziele.
   // ═══════════════════════════════════════════════════════════════════
   tidal_wave: (() => {
     const SCHAUM = ppHex('#ffffff'), SCHAUM2 = ppHex('#e4f6ff'), HELL = ppHex('#a8e2ff'), MITTEL = ppHex('#4fb1ee');
     const BLAU = ppHex('#2a76cc'), TIEF = ppHex('#1b4a9c'), KONTUR = ppHex('#0f2152');
-    const SWEEP = 1050, HALTEN_BIS = 1500, ENDE = 2000, RAND = 34;
-    const FACE = 6, ABKLING = 20, SPLASH_T = 600, G = 170;
+    const SWEEP = 1250, HALTEN_BIS = 1750, ENDE = 2300, RAND = 40;
+    const FACE = 6, ABKLING = 20, SPLASH_T = 700, G = 170;
     const glatt = (u) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
     const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
     const vorbereiten = (sz) => {
@@ -24338,28 +24363,31 @@ const ANIM_REGISTRY = {
       const start = richtung > 0 ? reg.x0 - RAND : reg.x0 + reg.w + RAND;
       const weg = (reg.w + 2 * RAND) * richtung;
       const kamm = (t) => start + weg * glatt(t / SWEEP);
+      // Massstab: die kleine Gegnerseite (~85 Rasterpixel hoch) war die Grundlage der Masse; das ganze Brett ist ~2,4-mal so hoch.
+      const sk = Math.min(2.6, Math.max(1, reg.h / 85));
       // Zeit, zu der der Kamm die Spalte x erreicht (Halbierung auf der glatten Kurve)
       const zeitBei = (x) => {
         let lo = 0, hi = SWEEP;
         for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if ((kamm(m) - x) * richtung < 0) lo = m; else hi = m; }
         return (lo + hi) / 2;
       };
-      const gischt = Array.from({ length: ppFxN(46) }, () => {
+      const gischt = Array.from({ length: ppFxN(Math.round(46 * sk * 1.3)) }, () => {
         const x = reg.x0 + Math.random() * reg.w;
-        return { x, geboren: zeitBei(x), vx: richtung * (8 + Math.random() * 34), vy: -(34 + Math.random() * 54), leben: 420 + Math.random() * 360, farbe: Math.random() < 0.55 ? 0 : 1 };
+        return { x, geboren: zeitBei(x), vx: richtung * (8 + Math.random() * 34) * sk, vy: -(34 + Math.random() * 54) * (0.7 + 0.5 * sk), leben: 420 + Math.random() * 360 + 160 * (sk - 1), farbe: Math.random() < 0.55 ? 0 : 1 };
       });
       const aussen = sz.ziele.map(z => {
         const drin = z.x >= reg.x0 && z.x <= reg.x0 + reg.w && z.y >= reg.y0 && z.y <= reg.y0 + reg.h;
         return { drin, tropfen: Array.from({ length: ppFxN(9) }, () => ({ w: -Math.PI * (0.1 + Math.random() * 0.8), v: 26 + Math.random() * 40, leben: 300 + Math.random() * 220 })) };
       });
-      return { reg, richtung, kamm, gischt, aussen };
+      return { reg, richtung, kamm, gischt, aussen, sk };
     };
     const malen = (g, t, sz, teile) => {
-      const { reg, richtung, kamm, gischt, aussen } = teile;
+      const { reg, richtung, kamm, gischt, aussen, sk } = teile;
+      const face = FACE * sk, abkling = ABKLING * sk;
       const rb = Math.round(reg.y0 + reg.h);                       // Wasserlinie unten
       const x0 = Math.max(0, Math.floor(reg.x0)), x1 = Math.min(sz.gw - 1, Math.ceil(reg.x0 + reg.w));
       const hMax = reg.h * 0.94;
-      const flut = reg.h * 0.4;
+      const flut = reg.h * 0.5;
       const ablauf = t > HALTEN_BIS ? Math.min(1, (t - HALTEN_BIS) / (ENDE - HALTEN_BIS)) : 0;
       const cx = kamm(t);
       const kammAktiv = t < SWEEP + 80;
@@ -24367,20 +24395,20 @@ const ANIM_REGISTRY = {
       for (let x = x0; x <= x1; x++) {
         const d = (cx - x) * richtung;                              // Abstand HINTER dem Kamm (negativ: davor)
         let h;
-        if (d < -FACE) h = 0;
-        else if (d < 0) h = hMax * glatt((d + FACE) / FACE);        // steile Frontflaeche
+        if (d < -face) h = 0;
+        else if (d < 0) h = hMax * glatt((d + face) / face);        // steile Frontflaeche
         else {
           const fl = flut * (1 - ablauf);
           // schmaler Kamm + nachlaufende Duenung (zwei, drei flache Wellenberge hinter ihm)
-          h = fl + (hMax - fl) * Math.exp(-d / ABKLING)
-            + (ablauf < 0.4 ? hMax * 0.2 * Math.exp(-d / 70) * Math.max(0, Math.sin(d * 0.11 - 0.7)) : 0);
+          h = fl + (hMax - fl) * Math.exp(-d / abkling)
+            + (ablauf < 0.4 ? hMax * 0.2 * Math.exp(-d / (70 * sk)) * Math.max(0, Math.sin(d * 0.11 / sk - 0.7)) : 0);
         }
         if (h < 0.6) continue;
-        h += 1.1 * Math.sin(d * 0.42 - t * 0.014) * (d > 0 ? 1 : 0);
+        h += (0.9 + 0.5 * sk) * Math.sin(d * 0.42 / Math.sqrt(sk) - t * 0.014) * (d > 0 ? 1 : 0);
         const oben = Math.round(rb - h);
-        const nahKamm = d > -FACE && d < 14;
-        const schaum = nahKamm ? 3 : 2;
-        const deckung = (d < 6 ? 1 : 0.84 - 0.1 * Math.sin(t * 0.004 + x * 0.3)) * (1 - ablauf * 0.55);
+        const nahKamm = d > -face && d < 14 * sk;
+        const schaum = Math.round((nahKamm ? 3 : 2) * (0.6 + 0.4 * sk));
+        const deckung = (d < 6 * sk ? 1 : 0.84 - 0.1 * Math.sin(t * 0.004 + x * 0.3)) * (1 - ablauf * 0.55);
         for (let y = rb - 1; y >= oben; y--) {
           const sd = y - oben;
           let c;
@@ -24395,33 +24423,36 @@ const ANIM_REGISTRY = {
           g.put(x, y, c, deckung);
         }
         // Konturlinie oben an der Frontflaeche und an ihrer Kante
-        if (d > -FACE - 1 && d < 3) g.put(x, oben - 1, KONTUR, deckung);
-        if (d >= -FACE - 1 && d < -FACE + 0.8) for (let y = rb - 1; y >= oben; y--) g.put(x - richtung, y, KONTUR, 1);
+        if (d > -face - 1 && d < 3) g.put(x, oben - 1, KONTUR, deckung);
+        if (d >= -face - 1 && d < -face + 0.8) for (let y = rb - 1; y >= oben; y--) g.put(x - richtung, y, KONTUR, 1);
         // Schaumbroeckel hinter dem Kamm
-        if (d > 2 && d < 70 && ablauf < 0.9 && rausch(x, Math.floor(t / 90)) > 0.8) g.put(x, oben - 1, SCHAUM, 0.9 * (1 - ablauf));
+        if (d > 2 && d < 70 * sk && ablauf < 0.9 && rausch(x, Math.floor(t / 90)) > 0.8) g.put(x, oben - 1, SCHAUM, 0.9 * (1 - ablauf));
         // Funkeln auf der Flut
-        if (d > 40 && ablauf < 0.8 && rausch(x + 17, Math.floor(t / 70)) > 0.985) g.put(x, oben + 1, SCHAUM, 1);
+        if (d > 40 * sk && ablauf < 0.8 && rausch(x + 17, Math.floor(t / 70)) > 0.985) g.put(x, oben + 1, SCHAUM, 1);
       }
       // ── Schaumlippe: der Kamm kippt nach vorn ──
       if (kammAktiv && cx >= reg.x0 - RAND && cx <= reg.x0 + reg.w + RAND) {
         const ytop = rb - hMax;
-        for (let i = 0; i <= 19; i++) {
-          const lx = cx + richtung * i * 1.05, ly = ytop - 9 * Math.sin((i / 19) * Math.PI) + i * 0.7;
-          g.block(lx - (richtung > 0 ? 0 : 1), ly, 3, 2, i < 13 ? SCHAUM : SCHAUM2);
+        const n = Math.round(19 * sk), bw = Math.round(2 + sk), bh = Math.round(1 + sk);
+        for (let i = 0; i <= n; i++) {
+          const u = i / n;
+          const lx = cx + richtung * u * 19 * sk * 1.05, ly = ytop - 9 * sk * Math.sin(u * Math.PI) + u * 19 * 0.7 * sk;
+          g.block(lx - (richtung > 0 ? 0 : bw - 1), ly, bw, bh, u < 0.68 ? SCHAUM : SCHAUM2);
           g.put(lx, ly - 1, KONTUR);
         }
-        for (let i = 0; i < 8; i++) g.put(cx + richtung * (19 + i * 1.2), ytop + 10 + i * 0.9 + (i % 2), SCHAUM2, 0.85 - i * 0.1);
+        for (let i = 0; i < 8 * sk; i++) g.put(cx + richtung * (19 * sk + i * 1.2 * sk), ytop + (10 + i * 0.9) * sk + (i % 2), SCHAUM2, Math.max(0.1, 0.85 - i * 0.1 / sk));
       }
       // ── Gischt, vom Kamm hochgeworfen ──
       for (const f of gischt) {
         const alter = t - f.geboren;
         if (alter < 0 || alter > f.leben) continue;
         const sek = alter / 1000;
-        const px = f.x + f.vx * sek, py = rb - hMax * 0.82 + f.vy * sek + 0.5 * G * sek * sek;
+        const px = f.x + f.vx * sek, py = rb - hMax * 0.82 + f.vy * sek + 0.5 * G * sk * sek * sek;
         g.put(px, py, f.farbe ? HELL : SCHAUM, alter > f.leben * 0.75 ? 0.6 : 1);
+        if (sk > 1.6) g.put(px + 1, py, f.farbe ? HELL : SCHAUM, alter > f.leben * 0.75 ? 0.6 : 1);
         if (alter < f.leben * 0.5) g.put(px - Math.sign(f.vx), py + 1, SCHAUM2, 0.7);
       }
-      // ── Einschlaege ausserhalb der Gegnerseite ──
+      // ── Einschlaege ausserhalb der Flaeche ──
       sz.ziele.forEach((z, i) => {
         const e = aussen[i];
         if (e.drin) return;
@@ -32003,7 +32034,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const hostAliveNeeded = !isCrossSideEquip;
         // Nur Helden, auf denen die Ausruestung bezahlbar ist (Tsu'Ki-
         // Rabatt gilt nur fuer SIE, Als Befund 26.9.).
-        const bezahlbarAuf = (owner, hi) => equipBezahlbarAuf(me, myIdx, cardName, card, idx, owner, hi);
+        const bezahlbarAuf = (owner, hi) => equipBezahlbarAuf(me, myIdx, cardName, card, idx, owner, hi)
+          && equipHeldErlaubt(gameState, myIdx, cardName, owner, hi);   // + kartenEIGENE Heldenregel (Race Boat: nur 1 je Held)
         let targetHero = -1, targetSlot = -1, targetOwner;
         // Check hero zones first (auto-place in first free base support zone)
         const heroEls = document.querySelectorAll('[data-hero-zone]');
@@ -33837,6 +33869,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (q.width > 0) extra.regionBox = { x: q.left, y: q.top, w: q.width, h: q.height };
             }
           }
+          // ★ 10.10. (Whale Race Boat, Als Vorgabe: „komplettes Board"): `regionAll` — das GANZE Brett als Flaeche, also die
+          // Vereinigung beider Seiten (Gegnerseite oben, eigene Seite unten, samt Mitte). Faellt zurueck auf den Kasten des Bretts.
+          if (rest.regionAll === true) {
+            const kaesten = ['.board-side-opp', '.board-side-me']
+              .map(sel => document.querySelector(sel)).filter(Boolean)
+              .map(el => el.getBoundingClientRect()).filter(q => q.width > 0);
+            if (kaesten.length) {
+              const l = Math.min(...kaesten.map(q => q.left)), o = Math.min(...kaesten.map(q => q.top));
+              const r = Math.max(...kaesten.map(q => q.right)), u = Math.max(...kaesten.map(q => q.bottom));
+              extra.regionBox = { x: l, y: o, w: r - l, h: u - o };
+            } else {
+              const q = brett.getBoundingClientRect();
+              if (q.width > 0) extra.regionBox = { x: q.left, y: q.top, w: q.width, h: q.height };
+            }
+          }
           // ★★ v1215: ZIELE einer Brett-Animation. „Flame Avalanche"
           // schiesst Flammen vom Wirker auf JEDES Ziel — dafuer braucht
           // die Komponente deren Bildschirmpunkte. Der Server schickt
@@ -35344,7 +35391,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('hero_effect_reaction', onHeroEffectReaction);
     const onBurningFingerSlash = ({ owner, heroIdx, zoneSlot }) => {
-      if (window.playSFX) window.playSFX('slash', { category: 'effect' });
+      // KLANG (Als Befund 10.10.: „bei Burning Finger fehlt der Slash-Sound"): ohne `category`, damit kein
+      // anderer Effektklang der Sammelkategorie 'effect' (400-ms-Sperre) den Schnitt verschluckt; der Verzug
+      // trifft den Moment, in dem die Flammenklinge steht (fierySlash: voll sichtbar ab ~30 %, ~105 ms).
+      if (window.playSFX) window.playSFX('slash', { category: null, dedupe: 150, delay: 90, rate: 1.1 });
       const ownerLabel = ownerLbl(owner, myIdx);
       const sel = zoneSlot >= 0
         ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`
@@ -41651,6 +41701,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => beam.remove(), 600);
       }
       if (phase === 'strike' && tgtEl) {
+        // KLANG (Als Befund 10.10.: „bei Heal fehlt der Laser-Sound, wenn der Strahl von oben herunterkommt"):
+        // `laser` — der Strahl faellt ~350 ms; ohne Sammelkategorie, damit er neben dem Heilklang
+        // (`heal_sparkle`, 'effect') und dem Zauberklang nicht verschluckt wird.
+        if (window.playSFX) window.playSFX('laser', { category: null, dedupe: 250, rate: 1.2, volume: 0.9 });
         const tr = tgtEl.getBoundingClientRect();
         const beam = document.createElement('div');
         beam.className = 'heal-beam heal-beam-strike';
@@ -42180,6 +42234,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // box) and published as a px origin for both origins in CSS.
       const midHero = el.querySelector('[data-hero-zone][data-hero-owner="me"][data-hero-idx="1"]');
       const planeEl = el.querySelector('.board-plane');
+      let ankerFlach = null;   // der gemessene Anker VOR der Mittelkorrektur (s. u.: er muss der ENDGUELTIGEN Heldenlage folgen)
       if (midHero && planeEl) {
         const hrFlat = midHero.getBoundingClientRect();
         const plFlat = planeEl.getBoundingClientRect();
@@ -42194,6 +42249,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // which the every-render re-run + deadband settles.
         const padLLive = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
         const anchorX = hrFlat.left + hrFlat.width / 2 - plFlat.left + padLLive;
+        ankerFlach = anchorX;
         const prevAnchor = parseFloat(el.style.getPropertyValue('--board-anchor-x')) || -1;
         if (Math.abs(anchorX - prevAnchor) > 0.5) {
           el.style.setProperty('--board-anchor-x', anchorX.toFixed(1) + 'px');
@@ -42210,12 +42266,59 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // runs every render.
       if (!el.classList.contains('can-scroll') && midHero) {
         const hr = midHero.getBoundingClientRect();
-        const delta = viewportCenter - (hr.left + hr.width / 2);
-        if (Math.abs(delta) > 0.5) {
-          const cur = parseFloat(el.style.getPropertyValue('--center-offset')) || 0;
-          const corrected = (cur + delta).toFixed(1) + 'px';
-          el.style.setProperty('--center-offset', corrected);
-          if (layout) layout.style.setProperty('--center-offset', corrected);
+        const zentriert = viewportCenter - (hr.left + hr.width / 2);   // so weit muesste das Brett wandern, damit der Mittelheld MITTIG steht
+        const cur = parseFloat(el.style.getPropertyValue('--center-offset')) || 0;
+        // ★ 10.10. (Als Befund: „bei einer Flying Island liegen Karten direkt unter dem Hover-Tooltip", Vorschlag: „das
+        // Board nach LINKS statt nach rechts expandieren lassen"): Inseln haengen rechts an ihren Helden und schieben den
+        // Inhalt ueber die Mittelachse hinaus nach rechts — bis unter die Tooltip-Spalte (`--tt-col-w`, rechtsbuendig,
+        // volle Hoehe), die jede gehoverte Karte dort verdeckt. Rechts wird nichts mehr gewonnen, links ist Platz: Reicht der
+        // zentrierte Inhalt in die Tooltip-Spalte, wandert das Brett um den Ueberstand nach LINKS — hoechstens so weit, wie
+        // links noch Luft ist (der Inhalt bleibt im Feld). Die Haende (`.game-layout`) bleiben mittig unter dem Mittelhelden;
+        // nur das Brett (`board-center`) rueckt. Passt alles, aendert sich nichts.
+        let delta = zentriert;
+        const ttBreite = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tt-col-w')) || 0;
+        const zonenRand = () => {
+          let l = Infinity, r = -Infinity;
+          el.querySelectorAll('.board-plane .board-zone').forEach(z => {
+            const q = z.getBoundingClientRect();
+            if (!q.width) return;
+            if (q.left < l) l = q.left;
+            if (q.right > r) r = q.right;
+          });
+          return r > l ? { l, r } : null;
+        };
+        const grenzeR = window.innerWidth - ttBreite - 10;
+        const grenzeL = rect.left + 6;
+        if (ttBreite > 0) {
+          const m = zonenRand();
+          if (m) {
+            const ueber = (m.r + zentriert) - grenzeR;
+            const luft = (m.l + zentriert) - grenzeL;
+            if (ueber > 0 && luft > 0) delta = zentriert - Math.min(ueber, luft);
+          }
+        }
+        if (Math.abs(delta) > 0.5 || Math.abs(zentriert) > 0.5) {
+          el.style.setProperty('--center-offset', (cur + delta).toFixed(1) + 'px');
+          if (layout) layout.style.setProperty('--center-offset', (cur + zentriert).toFixed(1) + 'px');
+          // Die Brettebene projiziert nicht 1:1 (Naehe vergroessert): eine Nachmessung gleicht den Rest aus, sodass der
+          // rechte Rand wirklich vor der Tooltip-Spalte endet (eine Stufe genuegt; die Differenz ist klein).
+          if (delta !== zentriert && ttBreite > 0) {
+            const m2 = zonenRand();
+            if (m2 && m2.r > grenzeR + 1 && m2.l > grenzeL + 1) {
+              const extra = Math.min(m2.r - grenzeR, m2.l - grenzeL);
+              delta -= extra;
+              el.style.setProperty('--center-offset', (cur + delta).toFixed(1) + 'px');
+            }
+          }
+        }
+        // Der Perspektiv-Anker folgt der ENDGUELTIGEN Lage des Mittelhelden (er wurde bei `offset` gemessen; alles, was
+        // danach verschoben wurde, gehoert dazu) — sonst steht die „unverzerrte Achse" neben dem Helden, der Held kippt
+        // seitlich, und die Figuren der Sprite-Ebene folgen der falschen Lage.
+        if (ankerFlach != null) {
+          const gesamt = (parseFloat(el.style.getPropertyValue('--center-offset')) || 0) - offset;
+          const neu = ankerFlach + gesamt;
+          const alt = parseFloat(el.style.getPropertyValue('--board-anchor-x')) || -1;
+          if (Math.abs(neu - alt) > 0.5) el.style.setProperty('--board-anchor-x', neu.toFixed(1) + 'px');
         }
       }
       // v18: two-sided, content-based overhang. With the anchor on the
@@ -44558,7 +44661,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
             return !canHeroReceiveAbility(p, i, abilityDrag.cardName);
           })();
-          const equipIneligible = (!isOpp || playDrag?.isFreeSideEquip) && playDrag && playDrag.isEquip && (() => {
+          // Equip-Wahl: Drag ODER Klick-Platzieren (`crossSidePlayPick`) — beide graut dieselbe Regel aus.
+          const equipPickSrc = playDrag?.isEquip ? playDrag : (crossSidePlayPick?.isEquip ? crossSidePlayPick : null);
+          const equipIneligible = (!isOpp || equipPickSrc?.isFreeSideEquip) && equipPickSrc && (() => {
             const hero = heroes[i];
             // Wirtsregel zentral (tot / eingefroren / bezaubert). Vorher
             // stand hier eine Teilpruefung ohne `charmed` — ein bezauberter
@@ -44569,7 +44674,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // die Kartenskripte nicht kennt. Nur Karten MIT Beschraenkung
             // stehen in der Liste — fuer alle anderen aendert sich nichts.
             if (!isOpp) {
-              const erlaubt = (gameState.equipEligibleHeroes || {})[playDrag.cardName];
+              const erlaubt = (gameState.equipEligibleHeroes || {})[equipPickSrc.cardName];
               if (Array.isArray(erlaubt) && !erlaubt.includes(i)) return true;
             }
             const supZ = supZones[i] || [];
@@ -44854,6 +44959,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             || (!isOpp && ((gameState.effectPrompt?.heroIndicesByCard || {})[crossSidePlayPick.cardName] || []).includes(i));
           const _csppHeroEligible = !!crossSidePlayPick && _csppArmOk && hero?.hp > 0
             && (!_csppIsEquip || ((!isOpp || _csppIsFreeSideEquip) && !hero?.statuses?.frozen
+              && equipHeldErlaubt(gameState, myIdx, crossSidePlayPick.cardName, pi, i)
               && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
           const _csppHeroFreeSlot = _csppHeroEligible
             ? (() => {
@@ -46231,9 +46337,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Die GEGNERseite bleibt aussen vor: dort gelten eigene
               // Pfade, und Cross-Side-Equip (Powder Keg) darf laut
               // Kartentext ausdruecklich auf tote/eingefrorene Wirte.
-              const isEquipZoneDim = !isOpp && !!playDrag?.isEquip && (() => {
+              const _equipPickSrc = playDrag?.isEquip ? playDrag : (crossSidePlayPick?.isEquip ? crossSidePlayPick : null);
+              const isEquipZoneDim = !isOpp && !!_equipPickSrc && (() => {
                 if (!canHeroHostEquip((p.heroes || [])[i])) return true;
-                const erlaubt = (gameState.equipEligibleHeroes || {})[playDrag.cardName];
+                const erlaubt = (gameState.equipEligibleHeroes || {})[_equipPickSrc.cardName];
                 return Array.isArray(erlaubt) && !erlaubt.includes(i);
               })();
               const isDragInvalidZone = ((isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget)
@@ -46341,6 +46448,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && (_csppSide.heroes?.[i]?.hp > 0)
                 && z < ((_csppSide.supportZones?.[i] || []).length || 3)
                 && (!_csppSlotIsEquip || ((!isOpp || _csppSlotIsFreeSideEquip) && !_csppSide.heroes?.[i]?.statuses?.frozen && z < 3
+                  && equipHeldErlaubt(gameState, myIdx, crossSidePlayPick.cardName, pi, i)
                   && equipBezahlbarAuf(me, myIdx, crossSidePlayPick.cardName, crossSidePlayPick.card, crossSidePlayPick.handIndex, pi, i)));
               // Creature-originated ram (Bear Rider's dash, etc.) —
               // hide the Creature inside this Support Zone for the
