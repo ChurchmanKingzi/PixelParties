@@ -961,11 +961,8 @@ async function initDatabase() {
   // (single section, no heroes / potions / side). Default 'standard' keeps
   // every existing row unchanged.
   try { await db.execute("ALTER TABLE decks ADD COLUMN mode TEXT DEFAULT 'standard'"); } catch {}
-  // Separate ELO bucket for Cube Draft tournaments. Constructed games
-  // continue to use the original `elo` column; cube-draft tournament
-  // results route to `elo_cube` so the two formats don't bleed into
-  // each other's leaderboards.
-  try { await db.execute("ALTER TABLE users ADD COLUMN elo_cube INTEGER DEFAULT 1000"); } catch {}
+  // (Frueher gab es hier eine eigene Spalte `elo_cube` fuer Cube-Draft-Turniere. Ranked-Draft zaehlt
+  // jetzt in die normale Ranked-`elo`; bestehende Datenbanken behalten die Spalte, sie wird nicht mehr gelesen.)
   // Drafted-deck metadata. JSON blob: { cubeName, draftedAt, roomId }.
   // Marks decks saved at the end of a Cube Draft run so the deck list
   // can group them under a "Drafted Decks" header. Standard decks
@@ -2040,7 +2037,7 @@ function parseHeroSkins(raw) {
   } catch { return {}; }
 }
 function sanitizeUser(u) {
-  return { id: u.id, username: u.username, elo: u.elo, eloCube: u.elo_cube == null ? 1000 : u.elo_cube, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
+  return { id: u.id, username: u.username, elo: u.elo, color: u.color, avatar: liveShopRef(u.avatar, 'avatars'), cardback: liveShopRef(u.cardback, 'sleeves'), board: u.board || null, battleTrack: u.battle_track || null, heroSkins: parseHeroSkins(u.hero_skins), bio: u.bio || '', victoryMsg: u.victory_msg || '', defeatMsg: u.defeat_msg || '', wins: u.wins || 0, losses: u.losses || 0, sc: u.sc || 0, created_at: u.created_at, hide_tutorial: u.hide_tutorial || 0, play_animations: u.play_animations == null ? 1 : (u.play_animations ? 1 : 0), display_heroes: u.display_heroes == null ? 1 : (u.display_heroes ? 1 : 0), dynamic_heroes: (u.display_heroes === 0) ? 0 : (u.dynamic_heroes == null ? 1 : (u.dynamic_heroes ? 1 : 0)), defaultSampleDeckId: u.default_sample_deck_id || null, email: u.email || null, emailVerified: !!u.email_verified, isGuest: !!u.is_guest };
 }
 
 // ===== PROFILE ROUTES =====
@@ -2322,7 +2319,6 @@ app.get('/api/profile/export', authMiddleware, async (req, res) => {
   const payload = {
     username: user.username,
     elo: user.elo,
-    eloCube: user.elo_cube == null ? 1000 : user.elo_cube,
     color: user.color,
     bio: user.bio || '',
     wins: user.wins || 0,
@@ -6239,8 +6235,8 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
   if (gs._endGameLaeuft && !nurSatzende) return;
   gs._endGameLaeuft = true;
   // Cube-Turnierspiele (Kindraeume) erben `type: 'ranked'` vom Turnier, zaehlen
-  // aber NICHT fuers normale Elo/`ranked_games` — dafuer gibt es das Cube-Elo
-  // (`cubeFinalizeTournament`).
+  // aber NICHT einzeln fuers Elo/`ranked_games` — das Turnier bucht EINMAL nach Platzierung
+  // auf die normale Ranked-Elo (`cubeFinalizeTournament`).
   const isRanked = room.type === 'ranked' && !room.parentCubeRoomId;
   const loserIdx = winnerIdx === 0 ? 1 : 0;
   const winner = gs.players[winnerIdx];
@@ -6321,7 +6317,7 @@ async function endGame(room, winnerIdx, reason, opts = {}) {
     const userId = gs.players[i]?.userId;
     const sid = gs.players[i]?.socketId;
     if (userId && sid) {
-      const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
+      const updated = await db.get('SELECT wins, losses, elo, sc FROM users WHERE id = ?', [userId]);
       if (updated) io.to(sid).emit('user_stats_updated', updated);
     }
   }
@@ -6773,7 +6769,7 @@ function endCpuBattle(room, winnerIdx, reason) {
           if (prog) gs.result.cpuProgress = prog;
         } catch { /* Anzeige-Hilfe */ }
         if (entry.total > 0 && sid) io.to(sid).emit('sc_earned', entry);
-        const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
+        const updated = await db.get('SELECT wins, losses, elo, sc FROM users WHERE id = ?', [userId]);
         if (updated && sid) io.to(sid).emit('user_stats_updated', updated);
       } catch (err) {
         console.error('[CPU battle] SC award error:', err.message);
@@ -12330,7 +12326,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
 //       per-pack time bank that ticks down only during open windows.
 //    5. Disconnected humans suspend the draft; (re)connect or vote-kick
 //       to a bot replacement resumes it. Vote-kicked = treated as a
-//       loss for cube ELO purposes (handled in M5).
+//       loss for Ranked-Elo purposes (handled in cubeFinalizeTournament).
 // ═══════════════════════════════════════════
 
 const CUBE_PACK_SIZE = 16;
@@ -12984,7 +12980,7 @@ function cubeNextPowerOf2(n) {
   return p;
 }
 
-/** Bracket builder. Seeds by Cube ELO if game is ranked; otherwise
+/** Bracket builder. Seeds by Ranked-Elo if game is ranked; otherwise
  *  random. Within ±50 ELO of each other, players are shuffled (no
  *  seed advantage). Byes are placed at RANDOM positions even on
  *  seeded brackets — per spec, top seeds shouldn't always inherit
@@ -12998,12 +12994,12 @@ async function cubeBuildSeededBracket(room) {
 
   let seedList;
   if (isRanked) {
-    // Fetch cube ELO for each human seat.
+    // Fetch the Ranked-Elo for each human seat.
     const elos = {};
     for (const e of humanSeats) {
       try {
-        const u = await db.get('SELECT elo_cube FROM users WHERE id = ?', [e.player.userId]);
-        elos[e.seat] = u?.elo_cube ?? 1000;
+        const u = await db.get('SELECT elo FROM users WHERE id = ?', [e.player.userId]);
+        elos[e.seat] = u?.elo ?? 1000;
       } catch { elos[e.seat] = 1000; }
     }
     // Sort by elo desc.
@@ -13437,7 +13433,7 @@ async function cubeMatchEnd(room, match, winnerSeat, io) {
     // Erster Platz des Verlierer-Blocks dieser Runde: Bracket 4 → Runde 0: 3
     // (Platz 3-4); Bracket 8 → Runde 0: 5, Runde 1: 3. (Bugfix: der Exponent
     // war um 1 zu gross — Platz 5 statt 3 bei drei Spielern, und im Ranked-
-    // Cube-Elo ein Delta jenseits von -K.)
+    // Ranked-Elo ein Delta jenseits von -K.)
     cd.standings[match.loserSeat] = isFinalRound ? 2 : Math.pow(2, totalRounds - cd.bracket.currentRoundIdx - 1) + 1;
   }
 
@@ -13538,6 +13534,7 @@ async function cubeFinalizeTournament(room, io) {
   // zweiten Konto — Raum starten, Konto trennen, Vote-Kick — in einer Minute
   // der Erstplatz-Bonus abholen (Cube-Test).
   const unumkaempft = humanCount < 2;
+  let eloGeaendert = false;
   for (const s of (unumkaempft ? [] : standings)) {
     const player = room.players[s.seat];
     let scAward = 0;
@@ -13550,7 +13547,8 @@ async function cubeFinalizeTournament(room, io) {
         if (player.socketId) io.to(player.socketId).emit('cube_sc_award', { amount: scAward, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] SC error:', err.message); }
     }
-    // Cube ELO update (ranked only): simple K-factor based on placement.
+    // Ranked-Elo (nur Ranked-Draft): einfacher K-Faktor nach Platzierung auf die NORMALE `elo`
+    // (keine eigene Draft-Wertung); ein Turnier zaehlt als ein Ranked-Spiel (`ranked_games`, Bestenliste).
     // Higher placement = bigger gain; lowest = biggest loss.
     if (isRanked) {
       // Placement 1 → +K, 2 → +K/2, etc. Last → -K.
@@ -13560,7 +13558,8 @@ async function cubeFinalizeTournament(room, io) {
       // Vote-kicked players take a flat -K loss regardless of placement.
       if (player.cubeKickLoss) delta = -K;
       try {
-        await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [delta, player.userId]);
+        await db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [delta, player.userId]);
+        eloGeaendert = true;
         if (player.socketId) io.to(player.socketId).emit('cube_elo_update', { delta, placement: s.placement });
       } catch (err) { console.error('[cubeFinalize] ELO error:', err.message); }
     }
@@ -13571,10 +13570,12 @@ async function cubeFinalizeTournament(room, io) {
   if (isRanked && !unumkaempft) {
     for (const p of room.players) {
       if (!p.cubeKickLoss || !p.userId || String(p.userId).startsWith('bot:')) continue;
-      try { await db.run('UPDATE users SET elo_cube = MAX(0, elo_cube + ?) WHERE id = ?', [-24, p.userId]); }
+      try { await db.run('UPDATE users SET elo = MAX(0, elo + ?), ranked_games = ranked_games + 1 WHERE id = ?', [-24, p.userId]); eloGeaendert = true; }
       catch (err) { console.error('[cubeFinalize] Kick-ELO error:', err.message); }
     }
   }
+  // Wie bei jedem Ranked-Satz: alle Clients laden die Bestenliste neu.
+  if (eloGeaendert) io.emit('leaderboard_updated');
   cubeTournamentBroadcast(room, io);
   console.log(`[cube_tournament] room ${room.id} complete — winner ${standings[0]?.username}`);
 }
