@@ -5430,12 +5430,18 @@ class GameEngine {
        *   min: number (minimum targets required, default 1),
        *   max: number (maximum targets allowed),
        *   title, description, confirmLabel, confirmClass, cancellable,
-       *   condition: (target, engine) => bool
+       *   condition: (target, engine) => bool,
+       *   chooser: number   // ein ANDERER Spieler waehlt die Ziele (s. unten)
        * }
+       * `chooser` (Als Ruling 10.10., Assault Eagle: „your opponent may choose up to the same number of targets"):
+       * Spieler, der waehlt und dem die Wahl angezeigt wird. Alle Regeln, die vom Waehlenden abhaengen
+       * (Untargetable-Filter, „von meinem Gegner nicht waehlbar", Board of Kings, Seite des CPU-Pickers),
+       * gelten aus SEINER Sicht; Quelle, Schaden und Reaktionsfenster bleiben die der Karte. Ohne `chooser`
+       * waehlt der Kontrolleur wie immer.
        * @returns {Array} selected target objects
        */
       async promptMultiTarget(config = {}) {
-        const pi = effectiveController;
+        const pi = config.chooser ?? effectiveController;
         const oppIdx = engine.opponentOf(pi);
         const targets = [];
         // Same alias normalization as promptDamageTarget — accept 'own'
@@ -5819,7 +5825,9 @@ class GameEngine {
         });
 
         if (!selectedIds || selectedIds.length === 0) {
-          if (config.cancellable !== false) gs._spellCancelled = true;
+          // `noSpellCancel` wie in `promptDamageTarget`: ein Abbruch ausserhalb eines Zaubers (Kreatureneffekt,
+          // freiwillige Wahl des Gegners) darf keine Zauber-Abbruchmarke hinterlassen.
+          if (config.cancellable !== false && !config.noSpellCancel) gs._spellCancelled = true;
           return [];
         }
 
