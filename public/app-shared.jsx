@@ -2731,6 +2731,15 @@ const ZONE_ANIM_SFX = {
     { name: 'damage',     opts: { rate: 1.2, volume: 0.45, delay: 295, category: null, dedupe: 0 } },
     { name: 'damage',     opts: { rate: 1.1, volume: 0.5, delay: 400, category: null, dedupe: 0 } },
   ],
+  // Whale Race Boat (10.10.) — Gezeitenwelle (`tidal_wave`): Rauschen beim Anrollen, dumpfer Aufprall und Gischt, wenn die
+  // Front die Mitte der Gegnerseite erreicht (~600 ms), das Zurueckfliessen als leises Rauschen. Nur der erste Teil
+  // uebernimmt die Sammelkategorie 'effect'.
+  tidal_wave: [
+    { name: 'elem_water',   opts: { rate: 0.8, volume: 0.9, delay: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.85, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_water',   opts: { rate: 1.15, volume: 0.7, delay: 640, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.6, volume: 0.5, delay: 1350, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

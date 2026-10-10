@@ -7939,7 +7939,8 @@ const SOG_FLUG_MS = 820;
 //      malen(g, t, sz, teile) → zeichnet das Bild zur Zeit `t` (ms seit Einhaengen)
 //      `g`  Pinsel: put(x, y, farbe, deckung?)  block(x, y, w, h, farbe, deckung?)  ring(cx, cy, rx, ry, farbe, deckung?)
 //           disc(cx, cy, r, farbe, deckung?)   — alles in RASTERkoordinaten, Deckung < 1 = Bayer-gedithert
-//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }] }
+//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null }
+//           `region` = die optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite), sonst `null`
 //           dx/dy = Einheitsrichtung Quelle → Ziel; `selbst` = die Quelle IST das Ziel (z. B. Assault Eagle waehlt sich selbst)
 //  Alle Ziele laufen im selben Takt — „gleichzeitig" ist Sache der Zeichenfunktion (gleiche Zeit, nicht gleiche Geschwindigkeit).
 // ═══════════════════════════════════════════════════════════════════
@@ -7947,7 +7948,7 @@ const SOG_FLUG_MS = 820;
 const ppHex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 function ppSalve(malen, ende, vorbereiten) {
   const S = 3, PAD = 60, TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt }) {
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
@@ -7956,17 +7957,20 @@ function ppSalve(malen, ende, vorbereiten) {
       const off = welt && window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const O = { x: ox + off.dx, y: oy + off.dy };
       const T = targetPoints.map(p => ({ x: p.x + off.dx, y: p.y + off.dy, w: p.w || 64, h: p.h || 90 }));
-      const xs = [O.x, ...T.map(p => p.x)], ys = [O.y, ...T.map(p => p.y)];
+      // Optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite): gehoert mit in den Canvas.
+      const R = regionBox ? { x: regionBox.x + off.dx, y: regionBox.y + off.dy, w: regionBox.w, h: regionBox.h } : null;
+      const xs = [O.x, ...T.map(p => p.x), ...(R ? [R.x, R.x + R.w] : [])], ys = [O.y, ...T.map(p => p.y), ...(R ? [R.y, R.y + R.h] : [])];
       const links = Math.floor(Math.min(...xs) - PAD), oben = Math.floor(Math.min(...ys) - PAD);
       const gw = Math.ceil((Math.max(...xs) + PAD - links) / S), gh = Math.ceil((Math.max(...ys) + PAD - oben) / S);
       const o = { x: (O.x - links) / S, y: (O.y - oben) / S };
+      const region = R ? { x0: (R.x - links) / S, y0: (R.y - oben) / S, w: R.w / S, h: R.h / S } : null;
       const ziele = T.map(p => {
         const q = { x: (p.x - links) / S, y: (p.y - oben) / S };
         const len = Math.hypot(q.x - o.x, q.y - o.y);
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele };
+      return { links, oben, gw, gh, O: o, ziele, region };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -24310,6 +24314,136 @@ const ANIM_REGISTRY = {
     };
     return ppSalve(malen, 820, vorbereiten);
   })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Gezeitenwelle (Whale Race Boat) — PIXELART, ueberschwemmt die KOMPLETTE Gegnerseite
+  //
+  //  Eine gewaltige Welle rollt vom Wal-Helden aus ueber die ganze Flaeche der Gegnerseite (`regionBox`): steile, dunkel
+  //  umrandete Frontflaeche, ueberhaengende Schaumlippe, Gischt, die der Kamm hochwirft; dahinter steht das Wasser als
+  //  Flut (gestufte Blautoene mit Bayer-Dithering, Schaumsaum, funkelnde Lichter) und laeuft am Ende gedithert ab.
+  //  Ziele AUSSERHALB der Gegnerseite (eigene Creatures und Helden, die der Schlag mittrifft) bekommen einen flachen
+  //  Gischtring mit Tropfen, wenn der Kamm die Mitte erreicht. Die Welle laeuft in der Richtung vom Ursprung weg: kommt der
+  //  Wal von links, rollt sie nach rechts. Der Schaden folgt, wenn die Front die Mitte erreicht (whale-race-boat.js:
+  //  WELLE_TREFFER_MS). Ohne Flaeche (Region fehlt im DOM) flutet sie das Feld der Ziele.
+  // ═══════════════════════════════════════════════════════════════════
+  tidal_wave: (() => {
+    const SCHAUM = ppHex('#ffffff'), SCHAUM2 = ppHex('#e4f6ff'), HELL = ppHex('#a8e2ff'), MITTEL = ppHex('#4fb1ee');
+    const BLAU = ppHex('#2a76cc'), TIEF = ppHex('#1b4a9c'), KONTUR = ppHex('#0f2152');
+    const SWEEP = 1050, HALTEN_BIS = 1500, ENDE = 2000, RAND = 34;
+    const FACE = 6, ABKLING = 20, SPLASH_T = 600, G = 170;
+    const glatt = (u) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const vorbereiten = (sz) => {
+      const reg = sz.region || { x0: 0, y0: 0, w: sz.gw, h: sz.gh };
+      const richtung = sz.O.x <= reg.x0 + reg.w / 2 ? 1 : -1;
+      const start = richtung > 0 ? reg.x0 - RAND : reg.x0 + reg.w + RAND;
+      const weg = (reg.w + 2 * RAND) * richtung;
+      const kamm = (t) => start + weg * glatt(t / SWEEP);
+      // Zeit, zu der der Kamm die Spalte x erreicht (Halbierung auf der glatten Kurve)
+      const zeitBei = (x) => {
+        let lo = 0, hi = SWEEP;
+        for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if ((kamm(m) - x) * richtung < 0) lo = m; else hi = m; }
+        return (lo + hi) / 2;
+      };
+      const gischt = Array.from({ length: ppFxN(46) }, () => {
+        const x = reg.x0 + Math.random() * reg.w;
+        return { x, geboren: zeitBei(x), vx: richtung * (8 + Math.random() * 34), vy: -(34 + Math.random() * 54), leben: 420 + Math.random() * 360, farbe: Math.random() < 0.55 ? 0 : 1 };
+      });
+      const aussen = sz.ziele.map(z => {
+        const drin = z.x >= reg.x0 && z.x <= reg.x0 + reg.w && z.y >= reg.y0 && z.y <= reg.y0 + reg.h;
+        return { drin, tropfen: Array.from({ length: ppFxN(9) }, () => ({ w: -Math.PI * (0.1 + Math.random() * 0.8), v: 26 + Math.random() * 40, leben: 300 + Math.random() * 220 })) };
+      });
+      return { reg, richtung, kamm, gischt, aussen };
+    };
+    const malen = (g, t, sz, teile) => {
+      const { reg, richtung, kamm, gischt, aussen } = teile;
+      const rb = Math.round(reg.y0 + reg.h);                       // Wasserlinie unten
+      const x0 = Math.max(0, Math.floor(reg.x0)), x1 = Math.min(sz.gw - 1, Math.ceil(reg.x0 + reg.w));
+      const hMax = reg.h * 0.94;
+      const flut = reg.h * 0.4;
+      const ablauf = t > HALTEN_BIS ? Math.min(1, (t - HALTEN_BIS) / (ENDE - HALTEN_BIS)) : 0;
+      const cx = kamm(t);
+      const kammAktiv = t < SWEEP + 80;
+      // ── Wassersaeulen ──
+      for (let x = x0; x <= x1; x++) {
+        const d = (cx - x) * richtung;                              // Abstand HINTER dem Kamm (negativ: davor)
+        let h;
+        if (d < -FACE) h = 0;
+        else if (d < 0) h = hMax * glatt((d + FACE) / FACE);        // steile Frontflaeche
+        else {
+          const fl = flut * (1 - ablauf);
+          // schmaler Kamm + nachlaufende Duenung (zwei, drei flache Wellenberge hinter ihm)
+          h = fl + (hMax - fl) * Math.exp(-d / ABKLING)
+            + (ablauf < 0.4 ? hMax * 0.2 * Math.exp(-d / 70) * Math.max(0, Math.sin(d * 0.11 - 0.7)) : 0);
+        }
+        if (h < 0.6) continue;
+        h += 1.1 * Math.sin(d * 0.42 - t * 0.014) * (d > 0 ? 1 : 0);
+        const oben = Math.round(rb - h);
+        const nahKamm = d > -FACE && d < 14;
+        const schaum = nahKamm ? 3 : 2;
+        const deckung = (d < 6 ? 1 : 0.84 - 0.1 * Math.sin(t * 0.004 + x * 0.3)) * (1 - ablauf * 0.55);
+        for (let y = rb - 1; y >= oben; y--) {
+          const sd = y - oben;
+          let c;
+          if (sd < schaum - 1) c = SCHAUM;
+          else if (sd < schaum) c = SCHAUM2;
+          else if (sd < schaum + 3) c = HELL;
+          else {
+            const tiefe = (sd - schaum - 3) / Math.max(12, h * 0.72);
+            const v = tiefe + (ppBayer(x, y) - 0.5) * 0.42 + 0.07 * Math.sin(x * 0.5 + y * 0.9 + t * 0.011);
+            c = v < 0.3 ? MITTEL : v < 0.64 ? BLAU : TIEF;
+          }
+          g.put(x, y, c, deckung);
+        }
+        // Konturlinie oben an der Frontflaeche und an ihrer Kante
+        if (d > -FACE - 1 && d < 3) g.put(x, oben - 1, KONTUR, deckung);
+        if (d >= -FACE - 1 && d < -FACE + 0.8) for (let y = rb - 1; y >= oben; y--) g.put(x - richtung, y, KONTUR, 1);
+        // Schaumbroeckel hinter dem Kamm
+        if (d > 2 && d < 70 && ablauf < 0.9 && rausch(x, Math.floor(t / 90)) > 0.8) g.put(x, oben - 1, SCHAUM, 0.9 * (1 - ablauf));
+        // Funkeln auf der Flut
+        if (d > 40 && ablauf < 0.8 && rausch(x + 17, Math.floor(t / 70)) > 0.985) g.put(x, oben + 1, SCHAUM, 1);
+      }
+      // ── Schaumlippe: der Kamm kippt nach vorn ──
+      if (kammAktiv && cx >= reg.x0 - RAND && cx <= reg.x0 + reg.w + RAND) {
+        const ytop = rb - hMax;
+        for (let i = 0; i <= 19; i++) {
+          const lx = cx + richtung * i * 1.05, ly = ytop - 9 * Math.sin((i / 19) * Math.PI) + i * 0.7;
+          g.block(lx - (richtung > 0 ? 0 : 1), ly, 3, 2, i < 13 ? SCHAUM : SCHAUM2);
+          g.put(lx, ly - 1, KONTUR);
+        }
+        for (let i = 0; i < 8; i++) g.put(cx + richtung * (19 + i * 1.2), ytop + 10 + i * 0.9 + (i % 2), SCHAUM2, 0.85 - i * 0.1);
+      }
+      // ── Gischt, vom Kamm hochgeworfen ──
+      for (const f of gischt) {
+        const alter = t - f.geboren;
+        if (alter < 0 || alter > f.leben) continue;
+        const sek = alter / 1000;
+        const px = f.x + f.vx * sek, py = rb - hMax * 0.82 + f.vy * sek + 0.5 * G * sek * sek;
+        g.put(px, py, f.farbe ? HELL : SCHAUM, alter > f.leben * 0.75 ? 0.6 : 1);
+        if (alter < f.leben * 0.5) g.put(px - Math.sign(f.vx), py + 1, SCHAUM2, 0.7);
+      }
+      // ── Einschlaege ausserhalb der Gegnerseite ──
+      sz.ziele.forEach((z, i) => {
+        const e = aussen[i];
+        if (e.drin) return;
+        const alter = t - SPLASH_T;
+        if (alter < 0) return;
+        if (alter < 90) {
+          const r = alter < 45 ? 5 : 3;
+          for (let k = -r; k <= r; k++) { g.put(z.x + k, z.y, k === 0 ? SCHAUM : HELL); g.put(z.x, z.y + k, k === 0 ? SCHAUM : HELL); }
+        }
+        if (alter < 420) {
+          const u = alter / 420, r = 5 + u * 15;
+          g.ring(z.x, z.y, r, r * 0.55, alter < 140 ? SCHAUM : alter < 260 ? HELL : MITTEL, 1 - u * 0.9);
+        }
+        for (const tr of e.tropfen) {
+          if (alter >= tr.leben) continue;
+          const sek = alter / 1000;
+          g.put(z.x + Math.cos(tr.w) * tr.v * sek, z.y + Math.sin(tr.w) * tr.v * sek + 0.5 * G * sek * sek, alter < tr.leben * 0.6 ? SCHAUM : HELL);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
   // ── Hell Fox death: black-flame eruption ───────────────────────────
   // When a Hell Fox is defeated, a column of pitch-black flames erupts
   // from its support slot. Stacks a few jagged flame sprites with
@@ -33691,6 +33825,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const q = held.getBoundingClientRect();
               extra.ox = q.left + q.width / 2;
               extra.oy = q.top + q.height / 2;
+            }
+          }
+          // ★ 10.10. (Whale Race Boat): optional `regionOwner` — eine GANZE Brettseite als Flaeche der Animation
+          // (die Welle ueberschwemmt die Gegnerseite). Aufgeloest wie die Ziele erst hier: nur der Client kennt
+          // `myIdx` und das DOM. Die Komponente bekommt den Bildschirmkasten als `regionBox`.
+          if (typeof rest.regionOwner === 'number') {
+            const seiteEl = document.querySelector(ownerLbl(rest.regionOwner, myIdx) === 'opp' ? '.board-side-opp' : '.board-side-me');
+            if (seiteEl) {
+              const q = seiteEl.getBoundingClientRect();
+              if (q.width > 0) extra.regionBox = { x: q.left, y: q.top, w: q.width, h: q.height };
             }
           }
           // ★★ v1215: ZIELE einer Brett-Animation. „Flame Avalanche"
