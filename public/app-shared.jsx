@@ -1949,7 +1949,10 @@ const SFX_MASTER_MULTIPLIER = 0.33;
 // don't all have to remember `{ dedupe: 80 }` themselves — the
 // resulting double-/triple-fire of the cancel chime is one of the
 // most-reported QoL papercuts.
-const _AUTO_DEDUPE_SFX = { ui_cancel: 250, ui_click: 60 };
+// `spell_cast` (10.10.): der Zauberklang belegt den Slot 'effect' nicht mehr (s. `spell_played`) — damit Zonen-Eintraege, die selbst
+// `spell_cast` spielen (music_notes, time_rewind …), nicht zum zweiten Mal direkt nach dem Log-Klang erklingen, gilt hier dieselbe
+// 400-ms-Faltung wie zuvor ueber die Kategorie.
+const _AUTO_DEDUPE_SFX = { ui_cancel: 250, ui_click: 60, spell_cast: 400 };
 
 function playSFX(name, opts = {}) {
   if (!name) return;
@@ -2353,7 +2356,12 @@ function playSFXForLog(entry) {
     // zone-animation sounds and status-apply cues within the dedupe window
     // are suppressed).
     case 'spell_played':
-      playSFX('spell_cast', { category: 'effect' });
+      // ★ 10.10. (Sweep stummer Effekte): der Zauberklang belegt den Slot 'effect' NICHT mehr. Bei Zaubern mit Zielwahl loggt der
+      // Server `spell_played` im Moment der BESTAETIGTEN Zielwahl (`_firePendingPlayLog`) — also ~100-300 ms VOR dem Bild; der Klang
+      // hielt den Slot 400 ms besetzt und verschluckte damit den Klang der Animation selbst (Burning Finger: stummer Slash; dasselbe
+      // traf jeden aelteren Zauber, dessen Animationsklang frueh sitzt). Jetzt sind beide hoerbar; `dedupe` faltet das Doppel aus
+      // Kettenaufloesung und Log weiter zu EINEM Zauberklang.
+      playSFX('spell_cast', { dedupe: 400 });
       return;
     case 'card_played': {
       const ct = entry.cardType;
@@ -2371,7 +2379,7 @@ function playSFXForLog(entry) {
     }
     case 'immediate_action': {
       const ct = entry.cardType;
-      if (ct === 'Spell') { playSFX('spell_cast', { category: 'effect' }); return; }
+      if (ct === 'Spell') { playSFX('spell_cast', { dedupe: 400 }); return; }   // ohne Slot 'effect' — s. `spell_played`
       if (ct === 'Artifact' || ct === 'Permanent') { playSFX('placement'); return; }
       return; // Creature handled by 'creature_summoned'; Potions rely on zone-anim sound
     }
@@ -3267,6 +3275,264 @@ const ZONE_ANIM_SFX = {
   pressed_skill_rain:      { name: 'elem_holy', opts: { rate: 1.1, volume: 0.7 } },
   lunar_eclipse_pulse:     { name: 'elem_dark', opts: { rate: 0.8 } },
   silence_cut:             { name: 'negate' },
+  // Roter diagonaler Schnitt (`red_cut`, Als Befund 10.10.: Burning Skeleton lief stumm). Gemeinsames Bild von Burning
+  // Skeleton, Crusader's Cutlass, Gigantisaur Brachion, Gravedigger Slap, Mana Absorbing Crystal, Skull Necklace und Spike Trap.
+  // Ohne Sammelkategorie: bei Burning Skeleton belegte ein Aktivierungsklang ~170 ms davor den Slot 'effect' (400-ms-Sperre) und
+  // haette den Schnitt verschluckt (dieselbe Falle wie bei Burning Finger). Der Verzug trifft die voll stehende Klinge
+  // (`red-cut-blade`: Vollbild bei 30 % von 480 ms ≈ 145 ms nach dem Einhaengen; der Mount-Vorlauf kommt dazu).
+  red_cut:                 { name: 'slash', opts: { rate: 1.05, volume: 1, delay: 40, category: null, dedupe: 250 } },
+  // ══ SWEEP STUMMER EFFEKTE (Als Vorgabe 10.10.: „Burning Skeleton fehlt ein Slash-Sound … das koennte noch einige andere, vor allem
+  // aeltere Karten betreffen — kompletter Sweep durch die Karteneffekte") ══════════════════════════════════════════════════
+  // Jede Animation, die vorher stumm war (Baseline `anim-sounds-baseline.json`), bekommt hier einen Klang, der zu ihrem Bild passt.
+  // Regeln: (1) OHNE Sammelkategorie (`category: null`) — der Aktivierungs-/Zauberklang einer Karte belegt den Slot 'effect' meist
+  // ~0-200 ms VOR der Animation und verschluckte sie (Burning Finger, Burning Skeleton); `dedupe` haelt Mehrfachziele davon ab, den
+  // Klang zu stapeln. (2) Der Verzug sitzt auf dem Treffer: bei Animationen mit `_delay(N)` in der Karte ist es ~N − 100 (der
+  // Mount-Vorlauf kommt von `playSFXForZoneAnim` dazu). (3) Absichtlich stumm bleiben: Dauerschleifen und Deko (`dark_gear_spin_*`,
+  // Dampf, Blasen, Wolken, `anger_mark` …: `null`, begruendet oben bei den Eintraegen), die Kleinst-Animation des Weakening Crystal
+  // (`crystal_drain`, laeuft zu JEDEM Rundenbeginn), `equip_flash` (begleitet den `card_reveal`-Klang des Ausloesers),
+  // `creature_death`/`deck_shuffle_fx` (Klang kommt aus Log bzw. `deck_shuffle`).
+  anklage: [
+    { name: 'reveal', opts: { rate: 0.9, volume: 0.7, delay: 150, category: null, dedupe: 250 } },
+    { name: 'critical_strike', opts: { rate: 0.8, volume: 0.9, delay: 1350, category: null, dedupe: 250 } },
+  ],
+  ankylo_tail_smash:       { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.95, delay: 420, category: null, dedupe: 250 } },
+  arrow_impact:            { name: 'damage', opts: { rate: 1.5, volume: 0.5, category: null, dedupe: 250 } },
+  baby_spider_opfer:       { name: 'creature_destroyed', opts: { rate: 1.25, volume: 0.7, delay: 520, category: null, dedupe: 250 } },
+  battle_axe_cleave: [
+    { name: 'slash', opts: { rate: 0.7, volume: 1.0, delay: 300, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 330, category: null, dedupe: 250 } },
+  ],
+  black_flame_strike: [
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 1.0, delay: 60, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 0.6, volume: 0.7, delay: 90, category: null, dedupe: 250 } },
+  ],
+  blood_hearts:            { name: 'elem_dark', opts: { rate: 0.65, volume: 0.9, delay: 80, category: null, dedupe: 250 } },
+  blue_ice_flames: [
+    { name: 'elem_ice', opts: { rate: 0.8, volume: 0.9, delay: 80, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 0.9, volume: 0.7, delay: 220, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.8, delay: 700, category: null, dedupe: 250 } },
+  ],
+  bomblebee_carpet: [
+    { name: 'projectile', opts: { rate: 0.7, volume: 0.6, delay: 0, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.7, delay: 380, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.7, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_fire', opts: { rate: 0.8, volume: 0.6, delay: 400, category: null, dedupe: 250 } },
+  ],
+  bomblebee_fuse: [
+    { name: 'burn', opts: { rate: 1.3, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 1.0, volume: 0.6, delay: 300, category: null, dedupe: 250 } },
+  ],
+  cannibalism_chomp:       { name: 'slash', opts: { rate: 0.6, volume: 1.0, delay: 180, category: null, dedupe: 250 } },
+  cold_strike_apply:       { name: 'elem_ice', opts: { rate: 1.1, volume: 0.7, category: null, dedupe: 250 } },
+  core_explosion: [
+    { name: 'heavy_impact', opts: { rate: 0.5, volume: 1.0, delay: 360, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 0.7, volume: 0.8, delay: 380, category: null, dedupe: 250 } },
+  ],
+  cosmic_invader_strike: [
+    { name: 'elem_dark', opts: { rate: 1.1, volume: 0.8, delay: 80, category: null, dedupe: 250 } },
+    { name: 'critical_strike', opts: { rate: 1.2, volume: 0.8, delay: 280, category: null, dedupe: 250 } },
+  ],
+  cosmic_summon:           { name: 'ddg_manifest', opts: { rate: 1.3, volume: 0.8, delay: 120, category: null, dedupe: 250 } },
+  cosmic_token_drop:       { name: 'placement', opts: { rate: 1.2, volume: 0.8, delay: 120, category: null, dedupe: 250 } },
+  crescent_reap: [
+    { name: 'slash', opts: { rate: 0.65, volume: 1.0, delay: 150, category: null, dedupe: 250 } },
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6, delay: 200, category: null, dedupe: 250 } },
+  ],
+  crimson_web:             { name: 'negate', opts: { rate: 0.85, volume: 0.9, delay: 200, category: null, dedupe: 250 } },
+  diamond_sparkle:         { name: 'elem_holy', opts: { rate: 1.4, volume: 0.6, delay: 80, category: null, dedupe: 250 } },
+  dino_bite: [
+    { name: 'slash', opts: { rate: 0.6, volume: 1.0, delay: 330, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.6, delay: 340, category: null, dedupe: 250 } },
+  ],
+  disruption_impact: [
+    { name: 'elem_acid', opts: { rate: 0.7, volume: 0.9, delay: 60, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 80, category: null, dedupe: 250 } },
+  ],
+  empowered_strike_apply:  { name: 'buff', opts: { rate: 0.9, volume: 0.8, category: null, dedupe: 250 } },
+  flame_engulf:            { name: 'elem_fire', opts: { rate: 0.75, volume: 1.0, delay: 100, category: null, dedupe: 250 } },
+  flame_slash: [
+    { name: 'slash', opts: { rate: 1.0, volume: 1.0, delay: 150, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 0.9, volume: 0.8, delay: 200, category: null, dedupe: 250 } },
+  ],
+  flame_strike:            { name: 'elem_fire', opts: { rate: 0.85, volume: 0.9, delay: 80, category: null, dedupe: 250 } },
+  freeze:                  { name: 'elem_ice', opts: { rate: 1.0, volume: 0.9, delay: 100, category: null, dedupe: 250 } },
+  furious_anger: [
+    { name: 'elem_fire', opts: { rate: 0.6, volume: 0.8, delay: 450, category: null, dedupe: 250 } },
+    { name: 'critical_strike', opts: { rate: 0.7, volume: 0.8, delay: 560, category: null, dedupe: 250 } },
+  ],
+  gewaltsame_erweckung:    { name: 'revive', opts: { rate: 0.9, volume: 0.9, category: null, dedupe: 250 } },
+  giant_dino_stomp:        { name: 'heavy_impact', opts: { rate: 0.45, volume: 1.0, delay: 800, category: null, dedupe: 250 } },
+  gift_shower:             { name: 'gold_gain', opts: { rate: 0.9, volume: 0.7, delay: 180, category: null, dedupe: 250 } },
+  golden_banana_rain:      { name: 'gold_gain', opts: { rate: 1.2, volume: 0.7, delay: 280, category: null, dedupe: 250 } },
+  golden_feathers: [
+    { name: 'elem_wind', opts: { rate: 1.2, volume: 0.5, delay: 0, category: null, dedupe: 250 } },
+    { name: 'gold_gain', opts: { rate: 1.4, volume: 0.6, delay: 350, category: null, dedupe: 250 } },
+  ],
+  golden_scale:            { name: 'elem_holy', opts: { rate: 0.9, volume: 0.8, delay: 700, category: null, dedupe: 250 } },
+  grave_worm_burrow:       { name: 'elem_dark', opts: { rate: 0.7, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+  hand_of_death_strike: [
+    { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9, delay: 500, category: null, dedupe: 250 } },
+    { name: 'critical_strike', opts: { rate: 0.8, volume: 0.9, delay: 790, category: null, dedupe: 250 } },
+  ],
+  ice_block_crash: [
+    { name: 'elem_ice', opts: { rate: 0.8, volume: 0.9, delay: 150, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.7, delay: 280, category: null, dedupe: 250 } },
+  ],
+  icy_grave_strike: [
+    { name: 'elem_ice', opts: { rate: 0.7, volume: 0.9, delay: 700, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 0.6, delay: 780, category: null, dedupe: 250 } },
+  ],
+  lightning_rain: [
+    { name: 'elem_lightning', opts: { rate: 0.9, volume: 0.8, delay: 100, category: null, dedupe: 0 } },
+    { name: 'elem_lightning', opts: { rate: 0.95, volume: 0.8, delay: 330, category: null, dedupe: 0 } },
+    { name: 'elem_lightning', opts: { rate: 0.85, volume: 0.8, delay: 560, category: null, dedupe: 0 } },
+  ],
+  lure_beacon: [
+    { name: 'elem_holy', opts: { rate: 1.1, volume: 0.8, delay: 100, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.6, delay: 1200, category: null, dedupe: 250 } },
+  ],
+  mammoth_stomp:           { name: 'heavy_impact', opts: { rate: 0.5, volume: 1.0, delay: 380, category: null, dedupe: 250 } },
+  memory_wipe:             { name: 'negate', opts: { rate: 1.1, volume: 0.9, delay: 500, category: null, dedupe: 250 } },
+  meteor_crash: [
+    { name: 'heavy_impact', opts: { rate: 0.4, volume: 1.0, delay: 440, category: null, dedupe: 250 } },
+    { name: 'elem_fire', opts: { rate: 0.7, volume: 0.8, delay: 450, category: null, dedupe: 250 } },
+  ],
+  pink_sky_puff: [
+    { name: 'negate', opts: { rate: 1.3, volume: 0.8, delay: 100, category: null, dedupe: 250 } },
+    { name: 'elem_wind', opts: { rate: 0.8, volume: 0.5, delay: 100, category: null, dedupe: 250 } },
+  ],
+  piranha_bites: [
+    { name: 'slash', opts: { rate: 1.3, volume: 0.55, delay: 250, category: null, dedupe: 0 } },
+    { name: 'slash', opts: { rate: 1.35, volume: 0.55, delay: 380, category: null, dedupe: 0 } },
+    { name: 'slash', opts: { rate: 1.25, volume: 0.55, delay: 500, category: null, dedupe: 0 } },
+    { name: 'slash', opts: { rate: 1.4, volume: 0.55, delay: 620, category: null, dedupe: 0 } },
+  ],
+  poisoned_well:           { name: 'poison', opts: { rate: 1.0, volume: 1.0, delay: 300, category: null, dedupe: 250 } },
+  // Wird CLIENTSEITIG gestartet (`onRainOfSporesActivated`, app-board.jsx) und spielt seinen Klang (`elem_water`) dort selbst.
+  rain_of_spores_rain:     null,
+  ruestkammer_tor:         { name: 'ddg_manifest', opts: { rate: 0.7, volume: 0.8, delay: 150, category: null, dedupe: 250 } },
+  sand_burst:              { name: 'elem_wind', opts: { rate: 1.1, volume: 0.8, delay: 200, category: null, dedupe: 250 } },
+  shield_bubble:           { name: 'buff', opts: { rate: 1.5, volume: 0.8, delay: 100, category: null, dedupe: 250 } },
+  silence_seal:            { name: 'negate', opts: { rate: 0.9, volume: 0.9, delay: 100, category: null, dedupe: 250 } },
+  snake_bite: [
+    { name: 'slash', opts: { rate: 0.85, volume: 1.0, delay: 330, category: null, dedupe: 250 } },
+    { name: 'poison', opts: { rate: 1.2, volume: 0.5, delay: 380, category: null, dedupe: 250 } },
+  ],
+  spectral_armor:          { name: 'buff', opts: { rate: 0.8, volume: 0.9, delay: 120, category: null, dedupe: 250 } },
+  spiked_club_smash:       { name: 'heavy_impact', opts: { rate: 0.75, volume: 1.0, delay: 380, category: null, dedupe: 250 } },
+  stun_strike: [
+    { name: 'critical_strike', opts: { rate: 1.0, volume: 1.0, delay: 330, category: null, dedupe: 250 } },
+    { name: 'elem_lightning', opts: { rate: 1.3, volume: 0.5, delay: 340, category: null, dedupe: 250 } },
+  ],
+  styx_gate_revival: [
+    { name: 'elem_dark', opts: { rate: 0.6, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+    { name: 'revive', opts: { rate: 0.75, volume: 0.9, delay: 150, category: null, dedupe: 250 } },
+  ],
+  super_aura:              { name: 'buff', opts: { rate: 0.6, volume: 0.9, delay: 0, category: null, dedupe: 250 } },
+  super_saiyan_aura: [
+    { name: 'buff', opts: { rate: 0.7, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+    { name: 'status_remove', opts: { rate: 1.0, volume: 0.8, delay: 300, category: null, dedupe: 250 } },
+  ],
+  telekinese: [
+    { name: 'elem_wind', opts: { rate: 0.8, volume: 0.7, delay: 100, category: null, dedupe: 250 } },
+    { name: 'reveal', opts: { rate: 1.0, volume: 0.8, delay: 1700, category: null, dedupe: 250 } },
+  ],
+  thaw: [
+    { name: 'elem_fire', opts: { rate: 1.2, volume: 0.6, delay: 50, category: null, dedupe: 250 } },
+    { name: 'status_remove', opts: { rate: 1.1, volume: 0.8, delay: 250, category: null, dedupe: 250 } },
+  ],
+  todesgabe_erweckung:     { name: 'revive', opts: { rate: 0.8, volume: 0.9, category: null, dedupe: 250 } },
+  torchure: [
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.8, delay: 150, category: null, dedupe: 250 } },
+    { name: 'poison', opts: { rate: 1.0, volume: 0.8, delay: 1100, category: null, dedupe: 250 } },
+  ],
+  water_wave: [
+    { name: 'elem_water', opts: { rate: 0.85, volume: 0.9, delay: 80, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.7, volume: 0.6, delay: 330, category: null, dedupe: 250 } },
+  ],
+  weird_doll_grow: [
+    { name: 'elem_dark', opts: { rate: 1.2, volume: 0.6, delay: 100, category: null, dedupe: 250 } },
+    { name: 'discard', opts: { rate: 0.9, volume: 0.7, delay: 600, category: null, dedupe: 250 } },
+  ],
+  // ── Karten-Bilder mit EIGENEM Socket-Handler (kein `play_zone_animation`): der Handler ruft `playSFXForZoneAnim('ev_…')`.
+  //    Gold-Bilder (`play_gold_coins`, `gold_steal_burst`) klingen ueber den Log (`gold_gain`/`gold_steal`), Fluege ueber ihre Stapel-
+  //    und Platzierungsklaenge, Zahlen-Floater und reine Anzeigen bleiben stumm.
+  // Willy: Klee, Regenbogen, Muenzen um den Helden
+  ev_willy_leprechaun: [
+    { name: 'buff', opts: { rate: 1.4, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+    { name: 'gold_gain', opts: { rate: 1.2, volume: 0.6, delay: 200, category: null, dedupe: 250 } },
+  ],
+  // Alleria: Spinnenfaden lenkt den Zauber um
+  ev_alleria_spider_redirect: [
+    { name: 'projectile', opts: { rate: 0.9, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+    { name: 'elem_biomancy', opts: { rate: 1.1, volume: 0.6, delay: 250, category: null, dedupe: 250 } },
+  ],
+  // Pusher schleudert die Karte nach oben
+  ev_pusher_fling: [
+    { name: 'elem_wind', opts: { rate: 1.0, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.6, delay: 60, category: null, dedupe: 250 } },
+  ],
+  // Baihu: Versteinerung
+  ev_baihu_petrify: [
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 0.85, delay: 120, category: null, dedupe: 250 } },
+  ],
+  // Cardinal Beasts: die vier Tiere umkreisen die Mitte
+  ev_cardinal_beast_win: [
+    { name: 'ascension', opts: { rate: 1.0, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+  ],
+  // Cooldin formt das Feld um
+  ev_cooldin_terraform: [
+    { name: 'heavy_impact', opts: { rate: 0.5, volume: 0.9, delay: 0, category: null, dedupe: 250 } },
+    { name: 'ddg_manifest', opts: { rate: 0.8, volume: 0.7, delay: 150, category: null, dedupe: 250 } },
+  ],
+  // Big Gwen: die Uhr schlaegt
+  ev_big_gwen_clock: [
+    { name: 'doom_tick', opts: { rate: 1.0, volume: 1.4, delay: 0, category: null, dedupe: 250 } },
+    { name: 'doom_tick', opts: { rate: 0.9, volume: 1.4, delay: 500, category: null, dedupe: 250 } },
+    { name: 'ability_activate', opts: { rate: 0.7, volume: 0.7, delay: 900, category: null, dedupe: 250 } },
+  ],
+  // Tempeste: Regen beginnt
+  ev_tempeste_rain_start: [
+    { name: 'elem_water', opts: { rate: 1.3, volume: 0.45, delay: 0, category: null, dedupe: 250 } },
+  ],
+  // Smug Coin rettet den Helden
+  ev_smug_coin_save: [
+    { name: 'gold_gain', opts: { rate: 1.5, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+    { name: 'buff', opts: { rate: 1.3, volume: 0.7, delay: 150, category: null, dedupe: 250 } },
+  ],
+  // Tears of Creation: Traenen fliegen zu den Zielen
+  ev_tears_of_creation: [
+    { name: 'elem_water', opts: { rate: 1.4, volume: 0.5, delay: 0, category: null, dedupe: 250 } },
+    { name: 'buff', opts: { rate: 1.2, volume: 0.7, delay: 700, category: null, dedupe: 250 } },
+  ],
+  // Handkarten wandern zum Dieb
+  ev_hand_steal: [
+    { name: 'draw', opts: { rate: 0.8, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+  ],
+  // Die Kreatur verschwindet unter dem Mantel
+  ev_cloak_vanish: [
+    { name: 'elem_wind', opts: { rate: 1.3, volume: 0.7, delay: 0, category: null, dedupe: 250 } },
+  ],
+  // Venom Infusion: Totenkopf ueber dem Helden
+  ev_skull_burst: [
+    { name: 'poison', opts: { rate: 0.8, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+    { name: 'elem_dark', opts: { rate: 0.9, volume: 0.5, delay: 100, category: null, dedupe: 250 } },
+  ],
+  // Guardian Angel steigt herab
+  ev_guardian_angel: [
+    { name: 'elem_holy', opts: { rate: 1.0, volume: 0.9, delay: 0, category: null, dedupe: 250 } },
+    { name: 'buff', opts: { rate: 1.2, volume: 0.6, delay: 300, category: null, dedupe: 250 } },
+  ],
+  // Shard of Chaos: Bildschirmstoerung
+  ev_chaos_screen: [
+    { name: 'elem_lightning', opts: { rate: 0.6, volume: 0.8, delay: 0, category: null, dedupe: 250 } },
+    { name: 'elem_dark', opts: { rate: 0.7, volume: 0.8, delay: 50, category: null, dedupe: 250 } },
+  ],
+  // Brackle: das Katapult feuert (der Einschlag klingt ueber `explosion`)
+  ev_catapult_fire: [
+    { name: 'projectile', opts: { rate: 0.7, volume: 0.9, delay: 0, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.5, delay: 60, category: null, dedupe: 250 } },
+  ],
   deepsea_idol_negate:     { name: 'negate', opts: { rate: 0.8 } },
   // Beschwoerungs- / Verwandlungsauftritte
   coolness_summon:         { name: 'summon', opts: { rate: 1.1 } },

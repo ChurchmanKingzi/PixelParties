@@ -2283,6 +2283,14 @@ const HeroIdleAnims = (() => {
     window.addEventListener('resize', markiere, { passive: true });
     window.addEventListener('orientationchange', markiere, { passive: true });
   }
+  // ★ 10.10.: Die Figuren liegen UEBER der Phasenleiste (style.css `.hero-sprite-ebene`) und ragen mitunter ueber sie. Faehrt der
+  // Zeiger auf die Leiste, ziehen sich alle Figuren ein, die darueber ragen — wie beim Hover der Heldenkarte selbst (`folgeZone`).
+  // Hier nur die Meldung „Hover hat gewechselt"; die Entscheidung trifft der gemeinsame Takt.
+  if (typeof document !== 'undefined') {
+    const phasenHover = (e) => { const t = e.target; if (t && t.closest && t.closest('.phase-column')) markiere(); };
+    document.addEventListener('mouseover', phasenHover, { passive: true, capture: true });
+    document.addEventListener('mouseout', phasenHover, { passive: true, capture: true });
+  }
   // Konsolenhilfe (v1456): Zustand aller Figuren auf dem Brett.
   if (typeof window !== 'undefined') {
     window.ppHeldenAnimationen = () => {
@@ -3092,7 +3100,20 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
         st.skaliert = hover;
         platz.classList.toggle('hero-idle-hover', hover);
       }
-      const weg = hover || !!zustand.current.eingeklappt;
+      // Phasenleiste unter dem Zeiger UND diese Figur ragt darueber: einfahren. Verglichen wird mit dem Kasten des `Stehers` — er
+      // bleibt beim Einfahren stehen (die Bewegung steckt in `.hero-idle-holo`), damit die Antwort nicht hin- und herspringt.
+      let phasenHover = false;
+      if (l && !l.plane.hasAttribute('data-pp-dragging')) {
+        const leiste = document.querySelector('.phase-column');
+        if (leiste && leiste.matches(':hover')) {
+          const steher = platz.querySelector('.hero-idle-steher');
+          if (steher) {
+            const a = steher.getBoundingClientRect(), b = leiste.getBoundingClientRect();
+            phasenHover = a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+          }
+        }
+      }
+      const weg = hover || phasenHover || !!zustand.current.eingeklappt;
       if (weg !== st.weg) {
         st.weg = weg;
         // ★ v1452 (Als Vorgabe 27.9.): Hovert man die Heldenkarte, zieht
@@ -27944,6 +27965,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // exakt das alte Ergebnis (`innerWidth - r.left`).
       const abstandRechts = Math.max(0, window.innerWidth - r.right);
       root.style.setProperty('--tt-col-w', (abstandRechts + breite) + 'px');
+      // ★ 10.10. (Als Vorgabe: „den Bereich direkt unter dem Tooltip fuer das Board sperren und stattdessen den — jetzt
+      // schmaleren — Board-Container frueher horizontal scrollbar machen"): der Tooltip deckt immer die AUSGEKLAPPTE Spalte; bei
+      // eingeklapptem Chat reicht das Feld aber bis kurz vor die 28-px-Lasche und damit ~290 px unter ihn. Diese Strecke wird dem
+      // Feld weggenommen (`--tt-reserve` → `margin-right`, style.css): ein schmalerer Container, der frueher scrollt, statt Zonen
+      // unter dem Tooltip. Gemessen wird der NATUERLICHE rechte Rand (aktueller Rand + schon abgezogene Reserve), damit die
+      // Rechnung stabil bleibt. Nur im Desktop-Layout (Telefone haben einen Overlay-Tooltip).
+      const brett = document.querySelector('.game-board > .board-center');
+      const aktuell = parseFloat(root.style.getPropertyValue('--tt-reserve')) || 0;
+      let reserve = 0;
+      if (brett && window.matchMedia && window.matchMedia('(min-width: 901px) and (min-height: 561px)').matches) {
+        const natuerlich = brett.getBoundingClientRect().right + aktuell;
+        reserve = Math.max(0, Math.round(natuerlich - (window.innerWidth - (abstandRechts + breite))));
+      }
+      if (Math.abs(reserve - aktuell) > 0.5) root.style.setProperty('--tt-reserve', reserve + 'px');
     };
     apply();
     const col = document.querySelector('.chat-log-column');
@@ -27957,6 +27992,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       window.removeEventListener('resize', apply);
       clearInterval(poll);
       document.documentElement.style.removeProperty('--tt-col-w');
+      document.documentElement.style.removeProperty('--tt-reserve');
     };
   }, []);
 
@@ -33680,7 +33716,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const onChainResolvingStart = () => {}; // Chain is about to resolve
     const onChainLinkResolving = ({ linkIndex }) => {
-      if (window.playSFX) window.playSFX('spell_cast', { category: 'effect' });
+      if (window.playSFX) window.playSFX('spell_cast', { dedupe: 400 });   // ohne Slot 'effect' (s. `spell_played` in app-shared.jsx)
       setReactionChain(prev => prev?.map((l, i) => i === linkIndex ? { ...l, status: 'resolving' } : l));
     };
     const onChainLinkResolved = ({ linkIndex }) => {
@@ -35005,6 +35041,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_evolution_animation', onEvolutionAnimation);
     const onWillyLeprechaun = ({ owner, heroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_willy_leprechaun');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -35044,6 +35081,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('willy_leprechaun', onWillyLeprechaun);
     const onAlleriaSpiderRedirect = ({ srcOwner, srcHeroIdx, tgtOwner, tgtHeroIdx, alleriaOwner, alleriaHeroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_alleria_spider_redirect');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const srcLabel = ownerLbl(srcOwner, myIdx);
       const tgtLabel = ownerLbl(tgtOwner, myIdx);
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${srcHeroIdx}"]`);
@@ -35501,6 +35539,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // React-state slot-mask so the real card stays hidden across the
     // re-renders that happen mid-flight (damage application etc.).
     const onPusherFling = ({ owner, heroIdx, zoneSlot, cardName, duration }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_pusher_fling');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
       const el = document.querySelector(sel);
@@ -35567,6 +35606,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_pusher_fling', onPusherFling);
     const onBaihuPetrify = ({ owner, heroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_baihu_petrify');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -35579,6 +35619,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('baihu_petrify', onBaihuPetrify);
     const onCardinalBeastWin = ({ owner }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_cardinal_beast_win');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;z-index:20000;pointer-events:none;overflow:hidden;';
       // Animals: Tiger, Dragon, Turtle, Phoenix
@@ -36261,6 +36302,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //  spreading verdant/golden ripples, with bits of earth/stone glyphs
     //  cresting and dissolving — the feel of reality being rewritten.
     const onCooldinTerraform = ({ owner, cardName }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_cooldin_terraform');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const container = document.querySelector('.board-center') || document.body;
       const r = container.getBoundingClientRect();
       const cx = r.left + r.width / 2;
@@ -36372,6 +36414,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //    two hands ticking from 11:55 to 12:00 exactly. Not anchored to any
     //    zone — it sits centered above the board-center element.
     const onBigGwenClockActivation = ({ owner }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_big_gwen_clock');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const container = document.querySelector('.board-center');
       if (!container) return;
       const r = container.getBoundingClientRect();
@@ -37050,6 +37093,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // entry keyed by instance id, `tempeste_rain_stop` removes it. The
     // <TempesteRainOverlay/> component renders one per active entry.
     const onTempesteRainStart = ({ instId }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_tempeste_rain_start');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       if (instId == null) return;
       setTempesteRainInsts(prev => prev.includes(instId) ? prev : [...prev, instId]);
     };
@@ -37877,6 +37921,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('butterfly_cloud_animation', onButterflyCloud);
     const onSmugCoinSave = ({ owner, heroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_smug_coin_save');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const heroEl = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!heroEl) return;
@@ -40268,8 +40313,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const explSel = (targetType === 'creature' || targetType === 'equip') && targetZoneSlot != null
           ? `[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`
           : `[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`;
+        if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('explosion');   // Einschlag (der direkte playAnimation-Aufruf umgeht die Klangtabelle)
         playAnimation('explosion', explSel, { duration: 700 });
       }, loadHoldFireMs);
+      // Abschuss: nach Aufladen und Halten (Als Befund 10.10.: der Katapultschuss war stumm)
+      setTimeout(() => { if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_catapult_fire'); }, (loadMs || 0) + (holdMs || 0));
 
       // Pre-suppress the diff-based discard-flight detector for THIS
       // creature's name on the destination side. Without this, when
@@ -41432,6 +41480,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('punch_box_animation', onPunchBox);
     const onTearsOfCreation = ({ owner, targets }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_tears_of_creation');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const ownerLabel = ownerLbl(owner, myIdx);
       const goldEl = document.querySelector(`[data-gold-player="${owner}"]`);
       if (!goldEl || !targets || targets.length === 0) return;
@@ -41497,6 +41546,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('tears_of_creation_animation', onTearsOfCreation);
     const onHandSteal = ({ fromPlayer, toPlayer, indices, cardNames, count, duration, highlightMs: hlMs }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_hand_steal');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       stealInProgressRef.current = true;
       const iAmVictim = fromPlayer === myIdx;
       const fromLabel = ownerLbl(fromPlayer, myIdx);
@@ -41640,6 +41690,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('blind_pick_highlight', onBlindPickHighlight);
     const onCloakVanish = ({ owner, heroIdx, zoneSlot, fadeMs, holdMs }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_cloak_vanish');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       // v618: `fadeMs`/`holdMs` optional — Chasing the Legend laesst die
       // Kreatur schneller verschwinden und nicht wieder auftauchen (sie
       // geht auf die Hand; die dann LEERE Zone wird nur wieder sichtbar).
@@ -41659,6 +41710,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_cloak_vanish', onCloakVanish);
     const onSkullBurst = ({ owner, heroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_skull_burst');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const label = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -41777,6 +41829,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('ziel_marke_blitz', onZielMarkeBlitz);
     const onGuardianAngel = ({ owner, heroIdx }) => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_guardian_angel');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const label = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -41856,6 +41909,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('yolomungandr_manifest', onYolomungandrManifest);
     const onChaosScreen = () => {
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_chaos_screen');   // Als Befund 10.10.: war stumm (Sweep, ZONE_ANIM_SFX)
       const overlay = document.createElement('div');
       overlay.className = 'chaos-screen-overlay';
       document.body.appendChild(overlay);
@@ -42206,6 +42260,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // modus fuer den Rest der Partie an (z.B. nachdem Flying Islands
       // wieder verschwunden waren). Passt der Inhalt, entscheidet jetzt
       // seine gemessene Breite: erste bis letzte Zone jeder Reihe, flach.
+      // ★ 10.10.: die Breite des INHALTS ohne den Mittelversatz messen. Der Versatz (`translateX` der Seiten) schiebt den Inhalt
+      // rechts ueber den Kasten hinaus und liesse `scrollWidth` damit ueberlaufen, obwohl der Inhalt selbst hineinpasst — bei dem
+      // jetzt schmaleren Kasten (Tooltip-Reserve) verriegelte das den Scrollmodus viel zu frueh. Der Riegel soll an der echten
+      // Breite haengen; der Versatz kommt danach wieder drauf.
+      el.style.setProperty('--center-offset', '0px');
       let inhaltW = window.ppEchterUeberstand(el);
       if (!inhaltW) {
         const _er = el.getBoundingClientRect();
@@ -42217,7 +42276,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (w > inhaltW) inhaltW = w;
         });
       }
-      if (window.ppHScrollRiegel(inhaltW, el.clientWidth, wasScrollMode)) {
+      el.style.setProperty('--center-offset', offset + 'px');
+      // ★ 10.10.: ... und an der PROJIZIERTEN Breite. Die Neigung vergroessert die nahen Reihen (`--board-plane-zoom`), der Inhalt ragt
+      // also ueber seine flache Breite hinaus — im jetzt schmaleren Kasten (Tooltip-Reserve) wurde dieser Rest am Rand abgeschnitten
+      // (`overflow-x: clip`), ohne dass der Scrollmodus einrastete (die FLACHE Breite passte noch). Die projizierte Zonenbreite
+      // (`_ppProjW`, am Ende des Durchlaufs gemessen, in beiden Modi gleich) entscheidet deshalb mit; 16 px Luft, damit das Verschieben
+      // nach links (s. u.) auch einen Rand hat. KEINE Haltezone fuer dieses Mass: die projizierte Zonenbreite aendert sich beim
+      // Moduswechsel nicht, ein Flattern ist also ausgeschlossen — und eine Haltezone hielte ein Brett im Scrollmodus fest, das nach
+      // dem ersten Massstab-Durchgang laengst passt.
+      const projRiegel = (el._ppProjW || 0) > 0 && (el._ppProjW || 0) + 16 > el.clientWidth;
+      if (window.ppHScrollRiegel(inhaltW, el.clientWidth, wasScrollMode) || projRiegel) {
         el.classList.add('can-scroll');
         // In scroll mode, disable centering transform to avoid layout confusion
         el.style.setProperty('--center-offset', '0px');
@@ -42256,6 +42324,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       el.classList.remove('board-flat-measure');
+      // Projizierte Zonen-Ausdehnung (links/rechts) — fuer Mittelkorrektur, Tooltip-Platz und den Scroll-Riegel.
+      const zonenRand = () => {
+        let l = Infinity, r = -Infinity;
+        el.querySelectorAll('.board-plane .board-zone').forEach(z => {
+          const q = z.getBoundingClientRect();
+          if (!q.width) return;
+          if (q.left < l) l = q.left;
+          if (q.right > r) r = q.right;
+        });
+        return r > l ? { l, r } : null;
+      };
       // ── Middle-hero anchoring (v17, Al) ──────────────────────────
       // The MIDDLE hero zones are the battlefield's true midpoint —
       // with asymmetrically placed Flying Islands the board box's
@@ -42277,16 +42356,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // nur das Brett (`board-center`) rueckt. Passt alles, aendert sich nichts.
         let delta = zentriert;
         const ttBreite = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tt-col-w')) || 0;
-        const zonenRand = () => {
-          let l = Infinity, r = -Infinity;
-          el.querySelectorAll('.board-plane .board-zone').forEach(z => {
-            const q = z.getBoundingClientRect();
-            if (!q.width) return;
-            if (q.left < l) l = q.left;
-            if (q.right > r) r = q.right;
-          });
-          return r > l ? { l, r } : null;
-        };
         const grenzeR = window.innerWidth - ttBreite - 10;
         const grenzeL = rect.left + 6;
         if (ttBreite > 0) {
@@ -42383,6 +42452,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (el.scrollLeft !== target) el.scrollLeft = target;
         }
       }
+      // Projizierte Zonenbreite dieses Durchlaufs — der Scroll-Riegel des NAECHSTEN Durchlaufs liest sie (s. `projRiegel`).
+      const mEnde = zonenRand();
+      el._ppProjW = mEnde ? Math.round(mEnde.r - mEnde.l) : 0;
     };
     // ★ Perf (Telefon-Befund: „unspielbar") — `checkRaw` liefen nach
     // JEDEM Render, und jeder Lauf schaltet `board-flat-measure` zweimal
@@ -42407,7 +42479,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       el.querySelectorAll('.board-plane .board-row').forEach(row => { sig += ',' + row.children.length; });
       return sig;
     };
-    const ausgabeSig = () => el.style.cssText + '|' + el.className + '|' + (el.scrollLeft | 0);
+    const ausgabeSig = () => el.style.cssText + '|' + el.className + '|' + (el.scrollLeft | 0) + '|' + (el._ppProjW | 0);
     // Bis zu SYNC_DURCHGAENGE Messungen am Stueck: jede liest ohnehin ein
     // frisch erzwungenes Layout, ein Animationsbild dazwischen bringt nichts
     // ausser einem sichtbaren Zwischenstand. Was dann noch wackelt, laeuft
@@ -43412,7 +43484,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // a once-per-turn effect a second time during the async window between
   // "activation sent to the chain" and "HOPT counter incremented on return"
   // — the Alchemy-during-Cure-chain race.
-  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || summonOrRevealPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
+  // ★ 10.10. (Als Befund: „Ich klicke auf ein Race Boat auf meiner Hand, alle Helden ausser Pinta werden gehighlightet, ich klicke
+  // testweise auf Pinta — und das loest IHREN EFFEKT aus"): waehrend der Spieler im KLICK-PFAD einer Handkarte ist — Held waehlen
+  // (`spellHeroPick`), Zielplatz klicken (`crossSidePlayPick`: Summon/Equip), Bounce-Platz (`pendingBouncePick`), Beschwoerer
+  // (`summonerPick`), Ability anlegen (`abilityAttachPick`), Summon-oder-Aufdecken, Zusatzaktions-Geber, Ability-Stufe — gehoert jeder
+  // Klick auf dem Brett der Wahl. ALLE On-Klick-Trigger (Helden-, Creature-, Ausruestungs-, Ability-, Area-, Permanent-Effekte, Ushabti,
+  // Coolness-Stapel, Treacherous Crystal …) sind in dieser Zeit tot, und ihr Leuchten ist aus. `crossSidePlayPick`, `pendingBouncePick`
+  // und `summonerPick` fehlten in der Sperre; Ability im Support-Zonen-Klick und Skill-Test-Zug hatten gar keine.
+  const klickPfadOffen = !!(spellHeroPick || pendingBouncePick || crossSidePlayPick || summonerPick || abilityAttachPick
+    || summonOrRevealPick || pendingAdditionalPlay || pendingAbilityActivation);
+  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || klickPfadOffen || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
   // ── "Mindestens ein Opfer von DIESEM Helden" ──
   // Tribut-Beschwoerung auf einen vollen Helden: das Opfern schafft erst
   // den Platz, in dem die Kreatur landet — mindestens eine der Auswahlen
@@ -44890,7 +44971,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             && gameState.effectPrompt?.ownerIdx === myIdx)
             ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i)
             : null;
-          const isHeroEffectActive = !!heroEffectEntry || !!heroActionEffectEntry;
+          const isHeroEffectActive = (!!heroEffectEntry || !!heroActionEffectEntry) && !klickPfadOffen;   // Klick-Pfad einer Handkarte: kein Heldeneffekt (s. klickPfadOffen)
           // Skill Test: bereit (noch nicht erschöpft) / erschöpft — gilt für alle Spieler (Vorschau der Round).
           const stOwner = isOpp ? oppIdx : myIdx;
           const stExhausted = !!(gameState.skillTest && gameState.skillTest.exhaustedHeroes && gameState.skillTest.exhaustedHeroes[stOwner + ':' + i]);
@@ -44986,7 +45067,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const klickHeilungOffen = !isSpectator
             && gameState.activePlayer === myIdx
             && !gameState.effectPrompt && !gameState.potionTargeting
-            && !spellHeroPick && !crossSidePlayPick && !abilityAttachPick
+            && !klickPfadOffen
             && Object.values(hero?.statuses || {}).some(st =>
               st && typeof st === 'object' && st._klickHeilung?.by === myIdx);
           const onHeroClick = spellPickEntry
@@ -45832,7 +45913,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // hier nicht (das war der Absturz in v224).
                 const isBorisBlockedAbility = !isOpp && cards.length > 0
                   && ((gameState.borisBlocked?.abilities) || []).includes(cards[0]);
-                const canActivate = !isBorisBlockedAbility
+                const canActivate = !klickPfadOffen && !isBorisBlockedAbility
                   && (isActivatable || isHeroActionActivatable || isFreeActivatable);
                 const isFlashing = abilityFlash && abilityFlash.zoneKind !== 'support'
                   && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
@@ -46108,7 +46189,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // es aufheben kann. Stunned/Webbed sind eindeutig.
               const isFrozenOrStunnedSup = !!heldHier
                 && (heldHier.statuses?.stunned || heldHier.statuses?.webbed);
-              const supportAbilityEntry = !isOpp
+              const supportAbilityEntry = (!isOpp && !klickPfadOffen)
                 ? ((gameState.activatableAbilities || []).find(a =>
                       a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z)
                    || (gameState.freeActivatableAbilities || []).find(a =>
@@ -46354,9 +46435,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const creatureEffectEntry = cards.length > 0 && (gameState.activatableCreatures || []).find(c =>
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
-              const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              const isCreatureActivatable = creatureEffectEntry?.canActivate === true && !klickPfadOffen;
               // Skill Test: eigene Kreatur OHNE aktiven Effekt — ein Klick benutzt sie (ergraut) und gibt den Zug weiter.
-              const stCanSkipWith = !!(gameState.skillTest && !isOpp && !isSpectator && isMyTurn && !result && !gameState.skillTest.busy
+              const stCanSkipWith = !!(gameState.skillTest && !klickPfadOffen && !isOpp && !isSpectator && isMyTurn && !result && !gameState.skillTest.busy
                 && cards.length > 0 && !creatureEffectEntry && !(gameState.skillTest.eliminated || []).includes(myIdx)
                 && (window.CARDS_BY_NAME[cards[0]] || {}).cardType === 'Creature'
                 && !(gameState.skillTest.exhaustedSlots || []).includes(pi + ':' + i + ':' + z));
@@ -46393,7 +46474,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z
                 && (c.crossSide ? (isOpp && c.owner === oppIdx) : !isOpp)
               );
-              const isEquipActivatable = equipEffectEntry?.canActivate === true;
+              const isEquipActivatable = equipEffectEntry?.canActivate === true && !klickPfadOffen;
               // Bakhm surprise drag highlight — highlighted while ANY
               // Surprise Creature is being dragged, regardless of cursor
               // position, so the eligible slots stay visible.
