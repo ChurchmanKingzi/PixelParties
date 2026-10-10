@@ -28,11 +28,14 @@
 //  · „different names": Basisnamen (`baseCardName`, „[B]"/„[W]" sind Kosmetik);
 //    `cardGalleryMulti` liefert ohnehin nur Verschiedene.
 //  · Karten, die „Creature" sind und aus dem Deck kommen duerfen (`isPileCreature`).
-//  · Hinzufuegen wie Trial of Loyalty: je Karte einzeln ueber
-//    `actionAddCardFromDeckToHand` (Flug, `ON_CARD_ADDED_TO_HAND`, Such-Sperren),
-//    kein zweiter Reveal-Durchlauf (`reveal: false`, der Gegner sieht Flug und
-//    Log); Krates & Co. greifen nur bei Ein-Karten-Suchen (`_noKrates`).
-//    Nicht gemischt: der Text nennt kein Mischen.
+//  · Hinzufuegen je Karte einzeln ueber `actionAddCardFromDeckToHand` (Flug,
+//    `ON_CARD_ADDED_TO_HAND`, Such-Sperren) MIT dem ueblichen Aufdecken: nach jedem
+//    Flug bestaetigt der GEGNER die gesuchte Karte (`deckSearchReveal`, Als Vorgabe
+//    10.10. „wie bei anderen Searches"). Krates & Co. greifen nur bei
+//    Ein-Karten-Suchen (`_noKrates`). Nicht gemischt: der Text nennt kein Mischen.
+//  · Das BILD der Karte links neben dem Brett sehen BEIDE Spieler (Als Vorgabe
+//    10.10.): der Gegner ueber den Standardweg des aktiven Einsatzes, der Aktivierende
+//    ueber einen eigenen `card_reveal` an ihn (Regel 12.9 haelt ihn sonst heraus).
 //  · Such-Sperren (`handLocked`, Hand-/Deck-Sperre): ist das Hinzufuegen gesperrt,
 //    ist die Karte nicht aktivierbar.
 // ═══════════════════════════════════════════
@@ -117,20 +120,25 @@ module.exports = {
     }
     if (gewaehlt.length !== n) return false;
 
+    // Das Bild der Karte links neben dem Brett — Als Vorgabe 10.10.: an BEIDE Spieler. Der Gegner bekommt es ueber den
+    // ueblichen Weg des aktiven Einsatzes (`_pendingCardReveal`, feuert mit der bestaetigten Galerie); der AKTIVIERENDE
+    // sieht es hier zusaetzlich (sonst bekaeme er nach Regel 12.9 kein Bild seines eigenen Einsatzes).
+    engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi }, { toPlayers: [pi] });
+
+    // Je Karte einzeln, wie jede Deck-Suche: Flug Deck → Hand, dann bestaetigt der GEGNER, was gesucht wurde
+    // (`deckSearchReveal`, Standard von `actionAddCardFromDeckToHand` — `reveal` bleibt AN).
     const hinzu = [];
     for (const name of gewaehlt) {
       // Der Eintrag im Deck heisst evtl. anders als der Basisname („[B]"-Fassung): den echten Namen nehmen.
       const echt = ps.mainDeck.find(x => baseCardName(x) === baseCardName(name));
       if (!echt) continue;
       const ok = await engine.actionAddCardFromDeckToHand(pi, echt, {
-        source: CARD_NAME, _noKrates: true, reveal: false,
+        source: CARD_NAME, _noKrates: true, revealDelayMs: 350,
       });
       if (!ok) continue;
       hinzu.push(echt);
       engine.noteKnownCard(engine.opponentOf(pi), echt, 'deck');
       engine.noteKnownCard(engine.opponentOf(pi), echt, 'hand');
-      engine.sync();
-      await engine._delay(350);
     }
     engine.log('snake_race_boat', { player: ps.username, hero: t.hero.name, creatures: n, added: hinzu });
     engine.sync();

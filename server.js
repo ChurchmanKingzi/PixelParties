@@ -21426,4 +21426,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState } };
