@@ -2775,6 +2775,23 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Embodiment of Biseria (10.10.) — Eisfaust: Sausen der fallenden Faust, beim Aufprall (400 ms) dumpfer Schlag mit tiefem Eisklirren, Splitter
+  // hinterher. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  biseria_fist: [
+    { name: 'elem_wind',    opts: { rate: 0.85, volume: 0.8 } },
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 1.2, delay: 400, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 0.75, volume: 1.4, delay: 400, category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 1.5,  volume: 0.9, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Embodiment of Biseria — Blizzard ueber der Gegnerhaelfte: Wind schwillt an und ab, Eisklirren, beim Einfrieren (~1150 ms) der Frost-Knack.
+  biseria_blizzard: [
+    { name: 'elem_wind',    opts: { rate: 0.8,  volume: 1.0 } },
+    { name: 'elem_ice',     opts: { rate: 1.0,  volume: 0.7, delay: 120,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.2,  volume: 0.8, delay: 450,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.65, volume: 0.9, delay: 900,  category: null, dedupe: 0 } },
+    { name: 'elem_ice',     opts: { rate: 0.9,  volume: 1.3, delay: 1150, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.8, delay: 1180, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

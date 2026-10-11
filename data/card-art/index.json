@@ -1423,6 +1423,10 @@
 "id": "Elven_Rider",
 "kind": "a"
 },
+"Embodiment of Biseria": {
+"id": "Embodiment_of_Biseria",
+"kind": "a"
+},
 "Emergency Spell Armor": {
 "id": "Emergency_Spell_Armor",
 "kind": "b"
