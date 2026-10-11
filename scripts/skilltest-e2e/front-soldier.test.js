@@ -140,6 +140,7 @@ const aufBrett = (t, seat, name = FS) => t.engine.cardInstances.find(c => c.name
     check('Bedingung: ein späteres Kettenglied des Gegners IST eine Reaction', s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ isInitialCard: true, owner: 0, cardName: 'Fireball' }), link({})] }) === true);
     check('…ein eigenes Glied nicht', s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ owner: 1 })] }) === false);
     check('…eine als Erstes gespielte Karte des Gegners nur, wenn sie eine Reaction ist (The Melting ja, Fireball nein)', s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ isInitialCard: true })] }) === true && s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ isInitialCard: true, cardName: 'Fireball' })] }) === false);
+    check('…eine Reaction-CREATURE als erstes Glied (Beschwörungsfenster) zählt nicht (sie gilt über `onReactionPlayed`)', s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ isInitialCard: true, cardName: 'Explosive Drone', cardType: 'Creature' })] }) === false);
     check('…ein Helden-Effekt des Gegners zählt nicht', s.reactionCondition(t.gs, 1, t.engine, { chain: [link({ fromHero: true })] }) === false);
     check('…leere Kette: nein', s.reactionCondition(t.gs, 1, t.engine, { chain: [] }) === false);
   }
@@ -212,6 +213,57 @@ const aufBrett = (t, seat, name = FS) => t.engine.cardInstances.find(c => c.name
     setzeHand(t2, [REAKTION, FS], 0);
     const ok2 = await t2.engine._rxHandkarteEinsetzen(0, REAKTION, loadCardEffect(REAKTION), { casterIdx: 0 });
     check('der Soldat auf der EIGENEN Hand ändert nichts (`true`, kein Angebot)', ok2 === true && angebote(t2, 0).length === 0, ok2);
+  }
+
+  console.log('④ Reaction-CREATURES aus der Hand (Doomed Town Guard, Explosive Drone, Enhanced Guard Dog, Chaorc Rider Warg, Elven Rider) sind „gespielte Reactions" — der Soldat negiert sie');
+  for (const name of ['Doomed Town Guard', 'Explosive Drone', 'Enhanced Guard Dog', 'Chaorc Rider Warg', 'Elven Rider']) {
+    const t = await fresh();
+    setzeHand(t, [name], 0); setzeHand(t, [FS], 1);
+    const handIdx = t.p0.hand.indexOf(name);
+    t.engine.takeFromPileSync(t.p0, 'hand', handIdx);            // so ruft jede der fünf Karten die Beschwörung: erst aus der Hand nehmen …
+    const res = await t.engine.summonCreatureWithHooks(name, 0, 1, 0, { source: name, fromHandIdx: handIdx, summonWindow: true });   // … dann beschwören
+    check(`${name}: negiert — `+ '`summonCreatureWithHooks` meldet `{ negated: true, inst: null }` (der Aufrufer beendet seinen Effekt ohne Wirkung)', !!res && res.negated === true && res.inst === null, res);
+    check(`${name}: die Karte liegt in der Ablage, NICHT auf dem Brett; der Soldat steht bei Sitz 1; beide haben 2 gezogen`, t.p0.discardPile.includes(name) && !t.engine.cardInstances.some(c => c.name === name && c.zone === 'support') && !!aufBrett(t, 1) && t.p0.hand.length === 2 && t.p1.hand.length === 2, { abl: t.p0.discardPile, h0: t.p0.hand, h1: t.p1.hand });
+    check(`${name}: Logs `+ '`reaction_negated` und `front_soldier` (via reaction)', log(t, 'reaction_negated').some(l => l.negator === FS && l.negated === name) && log(t, 'front_soldier').some(l => l.via === 'reaction' && l.negated === name), { neg: log(t, 'reaction_negated'), fs: log(t, 'front_soldier') });
+  }
+  {
+    // Gegenprobe: ohne Soldat beim Gegner beschwört sich der Drohne wie bisher
+    const t = await fresh();
+    setzeHand(t, ['Explosive Drone'], 0);
+    const handIdx = 0;
+    t.engine.takeFromPileSync(t.p0, 'hand', handIdx);
+    const res = await t.engine.summonCreatureWithHooks('Explosive Drone', 0, 1, 0, { source: 'Explosive Drone', fromHandIdx: handIdx, summonWindow: true });
+    check('ohne Front Soldat beim Gegner: die Drohne landet auf dem Brett wie bisher', !!res && !!res.inst && !t.p0.discardPile.includes('Explosive Drone'), res && { neg: res.negated, inst: !!res.inst });
+    const t2 = await fresh();
+    setzeHand(t2, ['Explosive Drone', FS], 0);
+    t2.engine.takeFromPileSync(t2.p0, 'hand', 0);
+    const res2 = await t2.engine.summonCreatureWithHooks('Explosive Drone', 0, 1, 0, { source: 'Explosive Drone', fromHandIdx: 0, summonWindow: true });
+    check('der Soldat auf der EIGENEN Hand ändert nichts (kein Angebot, die Drohne landet)', !!res2 && !!res2.inst && angebote(t2, 0).length === 0, res2 && { neg: res2.negated });
+    const t3 = await fresh();
+    setzeHand(t3, ['Doomed Town Guard'], 0); setzeHand(t3, [FS], 1);
+    t3.engine.takeFromPileSync(t3.p0, 'hand', 0);
+    const res3 = await t3.engine.summonCreatureWithHooks('Doomed Town Guard', 0, 1, 0, { source: 'Doomed Town Guard', fromHandIdx: 0 });     // ohne `summonWindow`: keine Reaction-Hand-Beschwörung (z. B. ein Effekt, der sie platziert)
+    check('eine Reaction-Creature, die NICHT als Hand-Reaction beschworen wird (kein `summonWindow`), wird nicht angeboten — auch nicht über das Beschwörungsfenster „A creature was just summoned“', !!res3 && !!res3.inst && angebote(t3, 1).length === 0, res3 && { neg: res3.negated, inst: !!res3.inst, prompts: t3.prompts.map(p => p.pi + ':' + p.d.title + ':' + (p.d.message || '').slice(0, 60)) });
+  }
+  {
+    // „Pass" beim Soldaten: GENAU EINE Abfrage — nicht noch einmal im Beschwörungsfenster nach dem Landen
+    const t = await fresh();
+    setzeHand(t, ['Explosive Drone'], 0); setzeHand(t, [FS], 1);
+    t.antwort = (pi, d) => (pi === 1 && d.title === FS) ? false : true;
+    t.engine.takeFromPileSync(t.p0, 'hand', 0);
+    const res = await t.engine.summonCreatureWithHooks('Explosive Drone', 0, 1, 0, { source: 'Explosive Drone', fromHandIdx: 0, summonWindow: true });
+    check('Soldat sagt „Pass": die Drohne landet, und der Soldat wurde NUR EINMAL gefragt (keine Doppelabfrage im Beschwörungsfenster)', !!res && !!res.inst && angebote(t, 1).length === 1 && t.p1.hand.includes(FS), { n: angebote(t, 1).length, neg: res && res.negated });
+  }
+  {
+    // Echter Weg: der Gegner besiegt meine Kreatur → Explosive Drone antwortet → der Soldat des Gegners negiert die Drohne
+    const t = await fresh({ aktiv: 1 });
+    setzeHand(t, ['Explosive Drone'], 0); setzeHand(t, [FS], 1);
+    const opfer = lege(t, 0, 1, 0);
+    t.prompts.length = 0;
+    await t.engine.actionDealCreatureDamage({ name: 'Testquelle', owner: 1, heroIdx: 0, heroOwner: 1 }, opfer, 9999, 'creature', { sourceOwner: 1 });
+    const d = angebote(t, 0, 'Explosive Drone'), f = angebote(t, 1);
+    check('echter Weg: meine Kreatur stirbt durch den Gegner → die Drohne wird mir angeboten, danach DEM GEGNER der Soldat', d.length === 1 && f.length === 1 && /Explosive Drone/.test(f[0].d.message), { d: d.length, f: f.length, prompts: t.prompts.map(p => p.pi + ':' + p.d.title) });
+    check('…die Drohne ist negiert (Ablage, nicht auf dem Brett), der Soldat steht beim Gegner, beide haben 2 gezogen', t.p0.discardPile.includes('Explosive Drone') && !t.engine.cardInstances.some(c => c.name === 'Explosive Drone' && c.zone === 'support') && !!aufBrett(t, 1) && t.p0.hand.length === 2 && t.p1.hand.length === 2, { abl: t.p0.discardPile, h0: t.p0.hand, h1: t.p1.hand });
   }
 
   console.log('CPU');

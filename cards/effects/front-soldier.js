@@ -29,8 +29,11 @@
 //  Frozen/Stunned/Webbed/Bound/Negated, keine Beschwörungs-/Aktionssperre), freie Zone — ohne die ist die Handfalle nicht einsetzbar. Die
 //  Beschwörung ist die Zusatzaktion (`alsZusatzaktion`), keine Aktion des Zuges. Mehrere mögliche Zonen: der Spieler wählt.
 //
-//  Grenze (Als Annahme): Reaction-CREATURES mit eigenem Hand-Fenster (Enhanced Guard Dog, Doomed Town Guard …) beschwören sich über ihren
-//  eigenen Weg und gehen an diesen drei Stellen vorbei — sie sind für den Soldaten nicht negierbar.
+//  ★ REACTION-CREATURES AUS DER HAND GELTEN AUCH ALS „GESPIELTE REACTIONS" (Als Korrektur 10.10.): Doomed Town Guard, Explosive Drone, Enhanced Guard
+//  Dog, Chaorc Rider Warg und Elven Rider beschwören sich über ihren EIGENEN Hook-Weg — aber alle fünf rufen `summonCreatureWithHooks` mit
+//  `fromHandIdx` + `summonWindow: true`. Genau dort (Engine, vor dem Landen) feuert `onReactionPlayed` (Weg ③); der Soldat negiert: die Karte geht in
+//  die Ablage statt aufs Brett, der Aufrufer sieht `{ negated: true, inst: null }` und beendet seinen Effekt ohne Wirkung (derselbe Vertrag wie bei Off Duty).
+//  Rebelliokai Courtly Kirin ist ein Kettenglied (Weg ①). „Wendy, the Shy Girl" hat noch kein Skript.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `play_zone_animation` `front_soldier_block` (Pixelart, Brett-Animation, Hülle `ppSalve`; Vorlage: das Kartenbild — der gepanzerte Wächter): am
@@ -39,6 +42,7 @@
 // ═══════════════════════════════════════════
 
 const { eligibleSummonZones, sofortAusHandBeschwoeren } = require('./_summon-eligibility');
+const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Front Soldier';
 const DRAW = 2;
@@ -53,8 +57,10 @@ function zonen(engine, pi) {
 function gegnerReaktion(engine, pi, link) {
   if (!link || link.owner === pi || link.fromHero) return false;
   if (!link.isInitialCard) return true;                        // jedes spätere Glied einer Kette IST eine Reaction
-  const cd = engine._getCardDB()[link.cardName];               // als Erstes gespielt: nur eine Karte mit Untertyp Reaction
-  return !!cd && (cd.subtype || '') === 'Reaction';
+  const cd = engine._getCardDB()[link.cardName];               // als Erstes gespielt: nur eine Karte mit Untertyp Reaction …
+  // … und KEINE Creature: der erste Glied eines Beschwörungsfensters („A creature was just summoned") ist die Beschwörung selbst. Reaction-Creatures
+  // aus der Hand gelten über `onReactionPlayed` (Weg ③) als gespielt — hier zusätzlich zuzugreifen hieße, dieselbe Entscheidung zweimal zu fragen.
+  return !!cd && (cd.subtype || '') === 'Reaction' && !hasCardType(cd, 'Creature');
 }
 
 /** „Then, both players draw 2 cards." — der Besitzer zuerst, dann der Gegner. */

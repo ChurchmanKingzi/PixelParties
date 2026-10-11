@@ -20,8 +20,10 @@
 //    • Ist sie ein ARTIFACT und spielbar → Abfrage „kostenlos spielen?". Ja: Equipment liegt sofort an einem gewählten Helden
 //      (`equipArtifactToHero`), alles andere kommt mit Nullpreis-Vermerk auf die Hand und wird über den eigenen Spielweg kostenlos gespielt
 //      (Deepsea-Treasure-Vertrag, Als Ruling 9.10.: Artifact Creatures werden nicht von fremden Effekten platziert).
-//    • Sonst („Otherwise") — kein Artifact, nicht spielbar (Equipment ohne freien Platz, Artifact-Sperre, Hand gesperrt) oder abgelehnt —
-//      legt der Spieler die Karte oben oder unten auf das Deck. (Als Annahme: „Otherwise" gilt für jede nicht gespielte Karte.)
+//    • Ein ARTIFACT, das nicht gespielt wird — der Spieler lehnt ab ODER es ist nicht spielbar (Equipment ohne freien Platz, Artifact-Sperre,
+//      Hand gesperrt) —, geht einfach zurück ins Deck, wo es lag (oben): abgelehnt wird behandelt, als wäre es unspielbar gewesen
+//      (Als Korrektur 10.10.: „Entscheidet der Spieler sich dagegen, das Artifact zu spielen, geht es wieder zurück ins Deck"). KEINE Oben/Unten-Wahl.
+//    • „Otherwise" = die aufgedeckte Karte ist KEIN Artifact: dann legt der Spieler sie oben oder unten auf das Deck (eigene Wahl).
 //  Aufdecken ist keine Suche (keine Such-Sperre). Ohne Karte im Deck ist der Effekt nicht aktivierbar.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -73,8 +75,9 @@ module.exports = {
     await engine._delay(DIG_MS);
 
     // „If it is an Artifact, you may immediately play it without paying its Cost."
+    const istArtifact = hasCardType(engine._getCardDB()[top], 'Artifact');
     let gespielt = null;
-    if (hasCardType(engine._getCardDB()[top], 'Artifact') && spielweg(engine, pi, top)) {
+    if (istArtifact && spielweg(engine, pi, top)) {
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
@@ -88,11 +91,12 @@ module.exports = {
       if (ja && !ja.cancelled) gespielt = await spieleKostenlos(engine, pi, top, { source: CARD_NAME });
     }
 
-    // „Otherwise, put it on top or bottom of your deck (your choice)."
+    // Nicht gespielt: die Karte geht zurück ins Deck (Aufdeck-Flug). „Otherwise, put it on top or bottom of your deck (your choice)." gilt NUR für
+    // Karten, die kein Artifact sind — ein Artifact (abgelehnt oder unspielbar) bleibt, wo es lag: oben.
     let lage = null;
     if (!gespielt) {
       await decke(engine, pi, top, { source: CARD_NAME, dest: 'deck' });
-      lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+      if (!istArtifact) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
     }
     engine.log('sky_archeologist', { player: ps.username, card: top, played: gespielt, placed: lage });
     engine.sync();
