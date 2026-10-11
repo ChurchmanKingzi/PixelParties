@@ -138,5 +138,17 @@ module.exports = {
       if (!hero) return;
       hero.bypassLevelReq = { maxLevel: 99, types: ['Spell', 'Creature'] };
     },
+
+    /**
+     * ★ Wiederbelebung (Als Befund 10.10., Triumphant Return): ein Held, der TOT ins Spiel kommt (Puzzle-Aufbau mit 0 HP), bekommt
+     * `onGameStart` nie — der Tote-Helden-Filter lässt den Haken nicht durch —, und damit nie sein Passiv. Wurde Beato dann
+     * wiederbelebt, konnte sie keinen einzigen Zauber wirken („any Spell or Creature, regardless of level or school" galt nicht),
+     * und Triumphant Return fand für sie keine Aktion. Das Passiv hier nachholen; mehrfaches Setzen schadet nicht.
+     */
+    onHeroRevive: (ctx) => {
+      const hero = ctx.hero;
+      if (!hero || hero.name !== 'Beato, the Eternal Butterfly') return;
+      hero.bypassLevelReq = { maxLevel: 99, types: ['Spell', 'Creature'] };
+    },
   },
 };

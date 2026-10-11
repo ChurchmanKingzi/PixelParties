@@ -25344,13 +25344,13 @@ const ANIM_REGISTRY = {
           waehle(d, 2, (u - cx) / (FW / 8), 10 + i); if (d <= 0 && !daumen) form = 1;
         }
         const vArm = -(FH + FW * 0.38);                                                       // Handgelenk
-        const dManschette = sdBox(u, v - (vArm - 1), FWh * 0.62, 4, 1.8);                     // Frostmanschette
-        waehle(dManschette, 3, u / (FWh * 0.62), 40); if (dManschette <= 0 && art === 3) form = 4;
+        const dManschette = sdBox(u, v - (vArm - 1), FWh * 0.88, 4, 1.8);                     // Frostmanschette (etwas breiter als der Arm)
+        waehle(dManschette, 3, u / (FWh * 0.88), 40); if (dManschette <= 0 && art === 3) form = 4;
         const rTop = -(FH + FW * 0.4), rBot = -FH * 0.72;                                     // Handruecken: ueberlappt die Finger oben etwas
         const dRuecken = sdBox(u, v - (rTop + rBot) / 2, FWh * 0.92, (rBot - rTop) / 2, FW * 0.13);
         waehle(dRuecken, 4, u / FWh, 20); if (dRuecken <= 0 && art === 4) form = 2;
-        const dArm = Math.max(Math.abs(u) - FWh * 0.42, v - vArm);                            // Arm: nach oben offen
-        waehle(dArm, 5, u / (FWh * 0.42), 30); if (dArm <= 0 && art === 5) form = 3;
+        const dArm = Math.max(Math.abs(u) - FWh * 0.74, v - vArm);                            // Arm: nach oben offen (kraeftig — vier Fuenftel der Handbreite)
+        waehle(dArm, 5, u / (FWh * 0.74), 30); if (dArm <= 0 && art === 5) form = 3;
         art = form;
         if (best > 0) return null;
         const rim = daumen ? dDaumen > -1.05 : best > -1.05;

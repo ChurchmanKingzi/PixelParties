@@ -158,6 +158,25 @@ const anims = (t, typ) => t.events.filter(e => e.ev === 'play_zone_animation' &&
     check('Abbruch des Fensters: nichts gespielt, der Zauber bleibt auf der Hand (aufgespart wird nichts)', t.p0.hand.includes(SPELL) && t.logs.some(l => l.type === 'triumphant_return' && l.d.acted === false), { hand: t.p0.hand });
   }
 
+  console.log('Beato, the Eternal Butterfly kommt TOT ins Spiel (Puzzle-Aufbau) — ihr Passiv kommt mit der Wiederbelebung');
+  {
+    const t = await fresh({ echteAktion: true });
+    const h = t.p0.heroes[1];
+    h.name = 'Beato, the Eternal Butterfly';
+    const inst = t.engine.cardInstances.find(c => c.zone === 'hero' && c.owner === 0 && c.heroIdx === 1);
+    if (inst) { inst.name = h.name; inst.script = loadCardEffect(h.name); }
+    t.engine._clearHeroScriptCache?.(h);
+    delete h.bypassLevelReq;                                         // tot gestartet: `onGameStart` ist nie gelaufen
+    t.p0.abilityZones[1] = [[], [], []];                              // keine Schule — nur ihr Passiv kann einen Zauber freigeben
+    setzeHand(t, [TR, 'Flame Avalanche']);
+    check('vor der Wiederbelebung hat sie kein Passiv (Voraussetzung des Falls)', !h.bypassLevelReq);
+    await wiederbeleben(t);
+    check('die Wiederbelebung setzt `bypassLevelReq` (any Spell or Creature, regardless of level or school)', !!h.bypassLevelReq && h.bypassLevelReq.maxLevel >= 99 && h.bypassLevelReq.types.includes('Spell'), h.bypassLevelReq);
+    const w = t.prompts.filter(p => p.d.type === 'heroAction');
+    check('Triumphant Return öffnet SOFORT das Aktionsfenster für Beato — mit Flame Avalanche (Lv3, Destruction Magic) zur Wahl', w.length === 1 && w[0].d.heroIdx === 1 && w[0].d.eligibleCards.includes('Flame Avalanche'), w.map(x => [x.d.heroIdx, x.d.eligibleCards]));
+    check('…das Fenster wird nicht übersprungen: genau EIN Aktionsfenster (nicht still verfallen)', w.length === 1, w.length);
+  }
+
   console.log(fails ? `${fails} Prüfung(en) FEHLGESCHLAGEN` : '✓ Triumphant-Return-Tests grün');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
