@@ -187,6 +187,9 @@ async function uebernimm(engine, pi, inst, ergebnis) {
 
 module.exports = {
   isTargetingArtifact: false,
+  // BEWUSST `false`: der Lader erkennt die Karte wegen des Ziehsatzes als „nur Hand-Zuwachs" und sperrte sie unter einer Hand-Sperre ganz. Die Übernahme ist aber der
+  // Haupteffekt und geht auch dann; nur der Ersatzeffekt „draw 1" fizzelt still an der Hand-Sperre (`actionDrawCards`). Eine eigene Angabe schlägt die Erkennung.
+  blockedByHandLock: false,
   // BEWUSST ohne `takesControlOfTargets: true`: die Flagge sperrt die Karte in `validateActionPlay` IMMER, wenn der Gegner einen wirksamen Boris hat — hier soll nur die
   // ÜBERNAHME gesperrt sein, der Ersatzeffekt „draw 1 card" ist keine Übernahme (siehe `boris()`).
 

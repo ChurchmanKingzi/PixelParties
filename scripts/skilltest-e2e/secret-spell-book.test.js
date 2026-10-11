@@ -229,6 +229,22 @@ const imSupport = (t, seat, hi, slot) => (t.gs.players[seat].supportZones[hi][sl
     check(`meine Area Zone ist voll (Limit ${limit}, ${EIGENE_AREA} liegt dort): die fremde Area bleibt liegen`, limit === 1 && t.gs.areaZones[1].includes('Doom Clock') && t.gs.areaZones[0].length === 1 && area.owner === 1, { z: t.gs.areaZones, limit });
   }
 
+  console.log('Hand-Sperre: die Übernahme geht trotzdem');
+  {
+    const t = await fresh();
+    t.p0.handLocked = true;
+    const inst = gegnerKarte(t, KRE, 1, 1);
+    check('`blockedByHandLock` ist ausdrücklich aus (die Auto-Erkennung wegen des Ziehsatzes greift nicht)', loadCardEffect(CARD).blockedByHandLock === false);
+    const r = await spiele(t);
+    check('unter einer Hand-Sperre wird die Karte trotzdem gespielt und die Kreatur übernommen', r === true && inst.controller === 0 && t.p0.hand.length === 0, { r, c: inst.controller, hand: t.p0.hand });
+  }
+  {
+    const t = await fresh();
+    t.p0.handLocked = true;
+    const r = await spiele(t);
+    check('ohne Betroffene fizzelt das Ziehen still an der Hand-Sperre (Karte gespielt, keine Karte gezogen)', r === true && t.p0.hand.length === 0 && t.p0.discardPile.includes(CARD), { r, hand: t.p0.hand });
+  }
+
   console.log('Boris-Sperre');
   {
     const t = await fresh();
