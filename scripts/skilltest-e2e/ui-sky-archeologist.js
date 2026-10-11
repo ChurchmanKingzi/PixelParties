@@ -174,6 +174,8 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         });
         check('die aufgedeckte Karte LIEGT mittig (waagerecht in der Bildmitte), solange gefragt wird', !!mitte && Math.abs(mitte.cx - mitte.W) <= 8 && mitte.oben >= 0, mitte);
         check('…und sie liegt OBERHALB der Abfrage: das Fragefenster verdeckt sie nicht', !!mitte && mitte.panelOben != null && mitte.unten <= mitte.panelOben + 2, mitte);
+        if (outDir && spiel) { try { await page.screenshot({ path: path.join(outDir, 'sky-archeologist-frage.png') }); } catch { /* egal */ } }
+        if (spiel) await antwort(page, spiel.id, { confirmed: true });
         const zp = await warteAufPrompt(page, 'zonePick');
         check('die Zonenwahl bietet freie Plätze mehrerer Helden an', !!zp && zp.zones.length > 1, zp);
         const nochDa = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card.kf-in'));
