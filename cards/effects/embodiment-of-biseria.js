@@ -182,13 +182,15 @@ module.exports = {
     await engine._delay(BLIZZARD_FREEZE_MS);
 
     let eingefroren = 0;
-    for (const z of ziele) {
-      if (z.inst.zone !== 'support') continue;
-      const ok = await engine.applyCreatureStatus(z.inst, 'frozen', {
-        duration: FREEZE_TURNS, sourceOwner: pi, source: CARD_NAME, animationType: 'ice_encase',
-      });
-      if (ok !== false) eingefroren++;
-    }
+    await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)
+      for (const z of ziele) {
+        if (z.inst.zone !== 'support') continue;
+        const ok = await engine.applyCreatureStatus(z.inst, 'frozen', {
+          duration: FREEZE_TURNS, sourceOwner: pi, source: CARD_NAME, animationType: 'ice_encase',
+        });
+        if (ok !== false) eingefroren++;
+      }
+    });
     engine.log('biseria_blizzard', { player: ps.username, frozen: eingefroren, targets: ziele.length });
     engine.sync();
     await engine._delay(BLIZZARD_AFTER_MS);

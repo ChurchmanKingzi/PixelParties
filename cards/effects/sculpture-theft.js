@@ -47,12 +47,13 @@ module.exports = {
     const hc = chainCtx.hookCtx || {};
     const statusName = hc.statusName || hc.status;
     if (statusName !== 'frozen') return false;
-    if (!hc._onCreature) return false;
-    // Verify the freshly-Frozen Creature is still around to bounce —
+    // Ein Massen-Freeze (`engine.batchStatusWindow`) bringt alle Ziele in `hc.targets`; sonst ist es das eine `hc.target`.
+    const kandidaten = (Array.isArray(hc.targets) && hc.targets.length)
+      ? hc.targets.filter(en => en.onCreature).map(en => en.target)
+      : (hc._onCreature && hc.target ? [hc.target] : []);
+    // Verify a freshly-Frozen Creature is still around to bounce —
     // a subsequent same-tick effect might have already removed it.
-    const justFrozen = hc.target;
-    if (!justFrozen || justFrozen.zone !== 'support') return false;
-    if (!justFrozen.counters?.frozen) return false;
+    if (!kandidaten.some(inst => inst && inst.zone === 'support' && inst.counters?.frozen)) return false;
 
     // At least one Hero on pi's side must be able to cast Sculpture
     // Theft (Magic Arts Lv1). Mirrors Cure's gate.

@@ -23575,7 +23575,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this card immediately when one or more targets you control are Frozen by an opponent's effect during their turn. Heal 1 target you control from its Freeze. If the user has at least Destruction Magic 1, immediately end your opponent's turn afterwards.",
+    "effect": "Play this card immediately when one or more targets are Frozen. Heal all Frozen targets on the board from their Freeze. If the user has at least Destruction Magic 1 and the Freeze effect was an opponent's effect during the opponent's turn, immediately end their turn.",
     "archetype": "",
     "setID": "PP MSRU",
     "banned": "",

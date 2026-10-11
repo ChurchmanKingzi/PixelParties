@@ -119,15 +119,18 @@ module.exports = {
 
       // ── Jedes Ziel in seinen Eisblock ───────────────────────────
       let getroffen = 0;
-      for (const z of ziele) {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'ice_encase', owner: oi,
-          heroIdx: z.heroIdx, zoneSlot: z.type === 'hero' ? -1 : z.slotIdx,
-        });
-        await einfrieren(engine, z, { dauer, appliedBy: pi, source: CARD_NAME });
-        getroffen++;
-        await engine._delay(120);
-      }
+      // „one or more targets are Frozen" (The Melting, Sculpture Theft): EIN Reaktionsfenster nach dem ganzen Effekt
+      await engine.batchStatusWindow('frozen', async () => {
+        for (const z of ziele) {
+          engine._broadcastEvent('play_zone_animation', {
+            type: 'ice_encase', owner: oi,
+            heroIdx: z.heroIdx, zoneSlot: z.type === 'hero' ? -1 : z.slotIdx,
+          });
+          await einfrieren(engine, z, { dauer, appliedBy: pi, source: CARD_NAME });
+          getroffen++;
+          await engine._delay(120);
+        }
+      });
 
       engine.log('iceage', {
         player: gs.players[pi]?.username, targets: getroffen, duration: dauer,
