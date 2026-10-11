@@ -25481,6 +25481,119 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Detonation (Point-Blank Annihilation) — PIXELART, ALLE Gegner-Kreaturen, Mittelpunkt ist der NUTZER (Als Vorgabe 10.10.: „eine
+  //  gewaltige Detonation mit dem User als Mittelpunkt")
+  //
+  //  Brett-Animation (`zoneType: 'board'`, `regionAll`, `originOwner/-HeroIdx` = der Nutzer, `targets` = die Kreaturen; Hülle `ppSalve`).
+  //  Ein weißer Blitz am Nutzer (0–220 ms), ein Feuerball aus drei überlappenden, unruhig gefransten Scheiben wächst gewaltig (bis ~760 ms)
+  //  und kühlt über Bayer-Dithering von weiß über gelb und orange nach rot und dunklen Rauch ab; zwei flache Druckwellen (Ellipsen) laufen
+  //  über das ganze Brett, die zweite 150 ms später; Funken und Trümmer fliegen mit Schwerkraft aus der Mitte. Erreicht die erste
+  //  Druckwelle eine Gegner-Kreatur (Entfernung / Wellengeschwindigkeit), platzt dort ein Feuerball mit Funken und Rauch. Die Kreaturen
+  //  fallen, wenn die Welle durch ist (point-blank-annihilation.js: HIT_MS). Alles blendet ab ~1500 ms über Bayer-Dithering aus, bei
+  //  2100 ms ist es weg. Alle Masse folgen der Flächenhöhe (`sk`).
+  // ═══════════════════════════════════════════════════════════════════
+  point_blank_blast: (() => {
+    const PAL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14', '#5c4f49', '#443a36', '#2d2624'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#ffe27a', '#ff9a1e', '#e8531a'].map(ppHex);
+    const WELLE = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e'].map(ppHex);
+    const ENDE = 2100, FADE_AB = 1500, WELLE_V = 0.3, WELLE_ANF = 200, G = 210;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const stufe = (X, Y, f) => { let i = Math.floor(f); if (ppBayer(X, Y) < f - i) i++; return PAL[klemme(i, 0, PAL.length - 1)]; };
+    const vorbereiten = (sz) => {
+      const reg = sz.region || { x0: 0, y0: 0, w: sz.gw, h: sz.gh };
+      const sk = Math.min(2.6, Math.max(1, reg.h / 85));
+      const funken = Array.from({ length: ppFxN(Math.round(70 * sk)) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 50 + Math.random() * 170, born: 60 + Math.random() * 240, leben: 600 + Math.random() * 700,
+      }));
+      const ziele = sz.ziele.map(z => ({
+        treffer: WELLE_ANF + Math.hypot(z.x - sz.O.x, (z.y - sz.O.y) / 0.6) / WELLE_V,
+        funken: Array.from({ length: ppFxN(16) }, () => ({ w: Math.random() * Math.PI * 2, v: 26 + Math.random() * 60, leben: 320 + Math.random() * 340 })),
+      }));
+      return { reg, sk, funken, ziele };
+    };
+    const malen = (g, t, sz, teile) => {
+      const { reg, sk, funken, ziele } = teile;
+      const O = sz.O;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const kuehl = klemme((t - 500) / 1000, 0, 1);
+      // ── Blitz am Nutzer ──
+      if (t < 240) {
+        const k = t / 240, r = (8 + Math.min(1, t / 160) * 30) * sk, R = Math.ceil(r);
+        for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+          const d = Math.hypot(i, j * 1.1);
+          if (d <= r) g.put(O.x + i, O.y + j, PAL[Math.min(2, Math.floor((d / r) * 2.8))], (1 - k) * 0.95);
+        }
+      }
+      // ── Feuerball: drei überlappende, gefranste Scheiben ──
+      if (t >= 40) {
+        const u = klemme((t - 40) / 720, 0, 1), e = 1 - Math.pow(1 - u, 3);
+        const R0 = (6 + 34 * e) * sk;
+        const lobes = [[0, 0, 1], [-0.45, -0.12, 0.7], [0.45, -0.1, 0.72], [0.1, -0.5, 0.6]];
+        const x0 = Math.floor(O.x - R0 * 1.8), x1 = Math.ceil(O.x + R0 * 1.8), y0 = Math.floor(O.y - R0 * 1.8), y1 = Math.ceil(O.y + R0 * 1.2);
+        for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++) {
+          let dd = 9;
+          for (const [ox, oy, rr] of lobes) dd = Math.min(dd, Math.hypot(X - (O.x + ox * R0), (Y - (O.y + oy * R0)) * 1.08) / (R0 * rr));
+          dd += (rausch(X, Y) - 0.5) * 0.2;
+          if (dd >= 1) continue;
+          const rand = dd > 0.84 ? (1 - (dd - 0.84) / 0.16) : 1;
+          g.put(X, Y, stufe(X, Y, dd * 4.2 + kuehl * 4.6 + Math.max(0, (Y - O.y) / R0) * 0.5), rand * aus);
+        }
+      }
+      // ── Zwei Druckwellen über das ganze Brett ──
+      for (const [versatz, dicke] of [[0, 2], [150, 1]]) {
+        const k = t - WELLE_ANF - versatz;
+        if (k < 0) continue;
+        const rx = 8 * sk + k * WELLE_V, ry = rx * 0.6;
+        if (rx > reg.w * 1.1 + 40) continue;
+        const a = (1 - clampW(rx / (reg.w * 1.05))) * aus;
+        const c = WELLE[Math.min(3, Math.floor(k / 260))];
+        const n = Math.ceil(Math.PI * 2 * rx * 1.15);
+        for (let i = 0; i < n; i++) {
+          const w = (i / n) * Math.PI * 2;
+          for (let d = 0; d < dicke; d++) g.put(O.x + Math.cos(w) * (rx - d), O.y + Math.sin(w) * (ry - d * 0.6), c, a);
+        }
+      }
+      function clampW(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+      // ── Funken und Trümmer aus der Mitte ──
+      for (const f of funken) {
+        const alter = t - f.born;
+        if (alter < 0 || alter > f.leben) continue;
+        const sek = alter / 1000, k = alter / f.leben;
+        const px = O.x + Math.cos(f.w) * f.v * sek * sk, py = O.y + Math.sin(f.w) * f.v * sek * 0.6 * sk - 28 * sek * sk + 0.5 * G * sek * sek;
+        const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor(k * FUNKEN.length))];
+        g.put(px, py, c, (1 - k * k) * aus);
+        if (k < 0.5) g.put(px, py - 1, FUNKEN[1], (1 - k) * aus);
+      }
+      // ── Einschläge an den Gegner-Kreaturen, wenn die Welle sie erreicht ──
+      sz.ziele.forEach((z, i) => {
+        const e = ziele[i];
+        const alter = t - e.treffer;
+        if (alter < 0) return;
+        if (alter < 200) {                                           // Blitz
+          const k = alter / 200, r = 3 + k * Math.max(z.w, z.h) * 0.7, R = Math.ceil(r);
+          for (let j = -R; j <= R; j++) for (let ii = -R; ii <= R; ii++) {
+            const d = Math.hypot(ii, j * 1.1);
+            if (d <= r) g.put(z.x + ii, z.y + j, PAL[Math.min(3, Math.floor((d / r) * 3.4))], (1 - k) * 0.95 * aus);
+          }
+        }
+        if (alter < 640) {                                           // Feuerball und Rauch
+          const u = alter / 640, r = (3 + 11 * (1 - Math.pow(1 - Math.min(1, u * 1.4), 2))) , R = Math.ceil(r + 2);
+          for (let j = -R; j <= R; j++) for (let ii = -R; ii <= R; ii++) {
+            const d = Math.hypot(ii, j * 1.05) / r + (rausch(z.x + ii, z.y + j) - 0.5) * 0.25;
+            if (d < 1) g.put(z.x + ii, z.y + j, stufe(z.x + ii, z.y + j, d * 3.4 + u * 5), (1 - u * u) * aus);
+          }
+        }
+        for (const f of e.funken) {
+          if (alter >= f.leben) continue;
+          const sek = alter / 1000, k = alter / f.leben;
+          g.put(z.x + Math.cos(f.w) * f.v * sek, z.y + Math.sin(f.w) * f.v * sek * 0.8 + 0.5 * G * sek * sek, FUNKEN[Math.min(3, Math.floor(k * 4))], (1 - k) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
   //  Je Ziel drei Schuss im Abstand von 105 ms, alle Ziele im selben Takt: Muendungsfeuer an der Quelle (Kreuz mit
@@ -45536,6 +45649,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'triumphant_return') {
         const p = playerByName(entry.player);
         return <span className="log-status">🎺 {cName('Triumphant Return')} — {pName(p.name, p.color)}'s {entry.hero} {entry.acted ? 'performs an additional Action right away!' : 'has no Action available — the additional Action lapses.'}</span>;
+      }
+      if (t === 'point_blank_annihilation') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">💥 {cName('Point-Blank Annihilation')} — {pName(p.name, p.color)}'s {entry.hero} detonates: {entry.defeated} of {entry.of} Creature{entry.of !== 1 ? 's' : ''} defeated before the Hero falls.</span>;
       }
       if (t === 'capture_control') {
         const p = playerByName(entry.player);

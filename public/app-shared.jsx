@@ -2805,6 +2805,16 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_holy',  opts: { rate: 1.3,  volume: 0.7, delay: 160, category: null, dedupe: 0 } },
     { name: 'gold_gain',  opts: { rate: 1.1,  volume: 0.6, delay: 420, category: null, dedupe: 0 } },
   ],
+  // Point-Blank Annihilation (10.10.) — gewaltige Detonation: tiefer Schlag mit Feuerrauschen, Nachbeben, dann der Reihe nach das Bersten der Gegner-Kreaturen
+  // (die Druckwelle erreicht sie nach ~500–900 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  point_blank_blast: [
+    { name: 'heavy_impact',       opts: { rate: 0.45, volume: 1.3 } },
+    { name: 'elem_fire',          opts: { rate: 0.6,  volume: 1.0, delay: 90,  category: null, dedupe: 0 } },
+    { name: 'damage',             opts: { rate: 0.4,  volume: 0.9, delay: 180, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',       opts: { rate: 0.75, volume: 0.9, delay: 520, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 0.9,  volume: 0.9, delay: 760, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.1,  volume: 0.8, delay: 900, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

@@ -3175,6 +3175,10 @@
 "id": "Pocket_Catapult",
 "kind": "a"
 },
+"Point-Blank Annihilation": {
+"id": "Point_Blank_Annihilation",
+"kind": "a"
+},
 "Poison Pollen": {
 "id": "Poison_Pollen",
 "kind": "a"
