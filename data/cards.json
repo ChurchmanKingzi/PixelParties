@@ -15379,7 +15379,7 @@
     "name": "Mimic",
     "cardType": "Creature",
     "subtype": "Normal",
-    "level": 1,
+    "level": 0,
     "hp": 50,
     "atk": null,
     "cost": null,
