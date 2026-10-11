@@ -34826,6 +34826,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Die Quellenangabe, die jede Surprise im „Held wurde gewaehlt"-Fenster sieht (`surpriseTrigger(…, sourceInfo, …)`, `onSurpriseActivate(ctx, sourceInfo)`).
+   * EINE Stelle fuer das gewoehnliche Fenster und das Geheimraum-Fenster (Create Secret Room, `_secret-room-shared.js`).
+   */
+  _surpriseSourceInfo(sourceCard, opts, viaCreature, target) {
+    return {
+      cardName: sourceCard?.name,
+      owner: sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1,
+      // Als Vorgabe 29.9.: handelnder SPIELER (geliehener Held → Kontrolleur)
+      // fuer „opponent's …"-Vergleiche; `owner` bleibt die Brettseite.
+      controller: this._surpriseQuellenSpieler(sourceCard),
+      heroIdx: sourceCard?.heroIdx ?? -1,
+      cardInstance: sourceCard,
+      damageType: opts?.damageType,
+      // v703: gesetzt, wenn nicht der Held, sondern eine Kreatur in
+      // seiner Support Zone gewaehlt wurde (sonst null).
+      chosenCreature: viaCreature ? target : null,
+    };
+  }
+
+  /**
    * @param {Array} targetedHeroes - hero targets the source card is hitting
    * @param {object} sourceCard - the source card / synthetic source
    * @param {object} [opts] - { damageType?: string } — caller can mark
@@ -34923,6 +34943,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (candidates.length === 0) continue;
 
+      // ★ 11.10. (Create Secret Room): eine als „Geheimraum" abgelegte Karte reagiert auf „chosen by an opponent's card or effect" mit „add to hand" oder
+      // „activate now" — vor den gewoehnlichen Surprise-Ausloesern. Ein behandelter Kandidat wird nicht noch einmal gewoehnlich angeboten.
+      {
+        const srSource = this._surpriseSourceInfo(sourceCard, opts, viaCreature, target);
+        const SR = require('./_secret-room-shared');
+        for (let ci = candidates.length - 1; ci >= 0; ci--) {
+          const r = await SR.onHeroChosen(this, {
+            tOwner, tHeroIdx, hostHeroIdx: candidates[ci].hostHeroIdx, sourceInfo: srSource, sourceCard, viaCreature,
+          });
+          if (!r.handled) continue;
+          candidates.splice(ci, 1);
+          if (r.effectNegated) return { effectNegated: true };
+        }
+        if (candidates.length === 0) continue;
+      }
+
       for (const cand of candidates) {
         const surpriseCardName = cand.cardName;
         const hostHeroIdx = cand.hostHeroIdx;
@@ -34963,19 +34999,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Hero. `heroOwner` is null for ordinary casts, so the
         // fallback to `controller`/`owner` keeps non-charmedOwner
         // behaviour identical.
-        const sourceInfo = {
-          cardName: sourceCard?.name,
-          owner: sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1,
-          // Als Vorgabe 29.9.: handelnder SPIELER (geliehener Held → Kontrolleur)
-          // fuer „opponent's …"-Vergleiche; `owner` bleibt die Brettseite.
-          controller: this._surpriseQuellenSpieler(sourceCard),
-          heroIdx: sourceCard?.heroIdx ?? -1,
-          cardInstance: sourceCard,
-          damageType: opts.damageType,
-          // v703: gesetzt, wenn nicht der Held, sondern eine Kreatur in
-          // seiner Support Zone gewaehlt wurde (sonst null).
-          chosenCreature: viaCreature ? target : null,
-        };
+        const sourceInfo = this._surpriseSourceInfo(sourceCard, opts, viaCreature, target);
 
         // Ein Held loest seine Surprise nie GEGEN SICH SELBST aus: trifft er sich z.B. mit Cataclysm
         // selbst, bleibt seine Booby Trap zu. Ein verbuendeter Held (gleicher Spieler, anderer Held)
