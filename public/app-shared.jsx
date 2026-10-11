@@ -2775,6 +2775,14 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Slave Trader (10.10.) — die goldene Kette schnellt um die Karte (~0–400 ms: Kettenrasseln), zieht sich bei ~520 ms zu und klirrt (Eisen auf Eisen, hell),
+  // dazu der Klang des Zuschnappens. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  slave_chains: [
+    { name: 'elem_wind',    opts: { rate: 1.6,  volume: 0.5 } },
+    { name: 'placement',    opts: { rate: 1.3,  volume: 0.7, delay: 200, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 0.9,  volume: 0.8, delay: 520, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.5, delay: 540, category: null, dedupe: 0 } },
+  ],
   // Sky Archeologist (10.10.) — zwei Spitzhackenschläge (~280 und ~600 ms: Eisen auf Stein mit dumpfem Nachhall), beim zweiten blitzt der Fund auf (~620 ms).
   // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sky_dig: [

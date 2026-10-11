@@ -25434,6 +25434,72 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Slave Trader: Ketten — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Händler mit der
+  //  goldenen Kette)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Händler als Ursprung UND Ziel (`selbst`): eine goldene Kette (Glieder
+  //  im Wechsel quer und hochkant, dunkler Rand, heller Glanzpunkt) schnellt in einem Ellipsenring um die Karte — der Ring wächst von ~0 bis
+  //  ~400 ms rundherum —, zieht sich bei ~500 ms zu und klirrt (Funken an jedem dritten Glied, ein Kreuzblitz am Verschluss). Ab ~800 ms blendet
+  //  alles über Dithering aus (slave-trader.js: CHAIN_MS 800 — Einbau-Versatz 100 ms eingerechnet), bei 1200 ms ist es weg. Feste Palette,
+  //  KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
+  // ═════════════════════════════════════════════════════════════════
+  slave_chains: (() => {
+    const GOLD = ['#fff6c0', '#ffd94a', '#e8a33a', '#a35a24', '#5c3414'].map(ppHex);
+    const EISEN = ['#f3f7fa', '#b9c4cc', '#7d8c97', '#3a4852'].map(ppHex);
+    const ENDE = 1200, FADE_AB = 800, KLIRR = 520;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({ w0: Math.random() * Math.PI * 2, funken: Array.from({ length: ppFxN(14) }, () => ({ w: Math.random() * Math.PI * 2, v: 20 + Math.random() * 40, leben: 260 + Math.random() * 180, farbe: Math.floor(Math.random() * 3) })) });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 80, 0, 1));
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = z.w / 2, HH = z.h / 2;
+      const wachs = klemme(t / 400, 0, 1), zu = klemme((t - KLIRR) / 140, 0, 1);
+      const RX = HW * (1.02 - 0.12 * zu), RY = HH * (0.98 - 0.12 * zu);
+      const N = Math.max(22, Math.round((RX + RY) * 1.35));                                  // Glieder rundherum
+      const bis = Math.round(N * wachs);
+      for (let k = 0; k < bis; k++) {
+        const w = teile.w0 + (k / N) * Math.PI * 2 + t * 0.0012;
+        const x = CX + Math.cos(w) * RX, y = CY + Math.sin(w) * RY;
+        const tx = -Math.sin(w) * RX, ty = Math.cos(w) * RY;
+        const waag = Math.abs(tx) >= Math.abs(ty);                                          // Tangente eher waagerecht → Glied liegt quer
+        const quer = (k % 2 === 0) === waag;
+        const hinten = Math.sin(w) < 0;
+        const dim = hinten ? 0.78 : 1;
+        // Glied: 4×3 bzw. 3×4 Ring, Mitte hohl
+        const bw = quer ? 4 : 3, bh = quer ? 3 : 4;
+        for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
+          const rand = i === 0 || j === 0 || i === bw - 1 || j === bh - 1;
+          if (!rand) continue;
+          const col = (i === 0 && j === 0) ? GOLD[0] : (j === bh - 1 || i === bw - 1) ? GOLD[3] : GOLD[1 + ((k >> 1) % 2)];
+          g.put(x - bw / 2 + i, y - bh / 2 + j, col, a * dim);
+        }
+      }
+      // ── Klirren: Verschluss (Eisenschloss unten rechts) mit Kreuzblitz, Funken an jedem dritten Glied ──
+      const wl = teile.w0 + (0.62) * Math.PI * 2, sx = CX + Math.cos(wl) * RX, sy = CY + Math.sin(wl) * RY;
+      if (t > 360) {
+        g.block(sx - 2, sy - 2, 4, 4, EISEN[3], a); g.block(sx - 1, sy - 1, 2, 2, EISEN[1], a); g.put(sx - 1, sy - 1, EISEN[0], a);
+      }
+      const al = t - KLIRR;
+      if (al > 0 && al < 180) {
+        const k = al / 180, L = Math.round(3 + k * 7);
+        for (let i = 1; i <= L; i++) {
+          const c = i < 4 ? GOLD[0] : GOLD[1];
+          g.put(sx - i, sy, c, (1 - k) * a); g.put(sx + i, sy, c, (1 - k) * a);
+          g.put(sx, sy - i, c, (1 - k) * a); g.put(sx, sy + i, c, (1 - k) * a);
+        }
+      }
+      if (al > 0) for (const f of teile.funken) {
+        if (al > f.leben) continue;
+        const k = al / f.leben, sek = al / 1000;
+        const px = CX + Math.cos(f.w) * RX + Math.cos(f.w) * f.v * sek, py = CY + Math.sin(f.w) * RY + Math.sin(f.w) * f.v * sek;
+        g.put(px, py, f.farbe === 0 ? GOLD[0] : f.farbe === 1 ? GOLD[1] : EISEN[0], (1 - k) * a);
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
   //  Zahnrachen)
   //
@@ -46323,6 +46389,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'the_melting') {
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('The Melting')} — {pName(p.name, p.color)}'s flame thaws <span className="log-amount">{entry.healed}</span> Frozen target{entry.healed !== 1 ? 's' : ''}{entry.endedTurn ? ' and ends the opponent\'s turn on the spot!' : entry.blocked ? ' — but the opponent\'s turn cannot be ended.' : '.'}</span>;
+      }
+      if (t === 'slave_trader') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⛓️ {cName('Slave Trader')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.summoned ? ' and summons it as an additional Action!' : entry.placed === 'bottom' ? ' — it cannot be summoned and goes to the bottom of the deck.' : ' — it cannot be summoned and stays on top of the deck.'}</span>;
       }
       if (t === 'sky_archeologist') {
         const p = playerByName(entry.player);
