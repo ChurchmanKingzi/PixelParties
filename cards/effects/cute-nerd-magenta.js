@@ -15,7 +15,7 @@
 //  (holdDuration: 900 on actionMillCards).
 // ═══════════════════════════════════════════
 
-const { loadCardEffect } = require('./_loader');
+const { cpuBesteMillKarte } = require('./_mill-pick-shared');
 
 const CARD_NAME = 'Cute Nerd Magenta';
 
@@ -30,106 +30,20 @@ module.exports = {
   },
 
   /**
-   * CPU prompt response for the deck-mill cardGallery (Step 2 below).
-   * The default `pickBestGalleryCard` scores candidates by
-   * `estimateHandCardValueFor` — which is the "if it were in hand"
-   * value, the OPPOSITE of what a mill prompt wants (we want the
-   * candidate whose move from deck → discard creates the most value).
-   * Use `evaluateState` delta directly: snapshot, splice the candidate
-   * from deck onto discard, score, restore. Picks the highest delta.
-   *
-   * For a controller with any pileFuel-armed source (Soul Shards →
-   * `SOUL_SHARD_PILE_FUEL.discardFilter` matches Shards in discard),
-   * milling a Soul Shard from deck flips evaluator-positive without
-   * any per-archetype hardcoding here — just the pileFuel declaration
-   * on the relevant cards.
-   *
-   * Skipped during MCTS rollouts (per-candidate eval inside an outer
-   * rollout would be O(N) extra eval calls per gallery prompt). The
-   * gate at the call site (`engine._inMctsSim` defers to the default).
+   * CPU prompt response for the deck-mill cardGallery (Step 2 below). Die Wahl selbst steht seit Sky Shaman in `_mill-pick-shared.js`
+   * (`cpuBesteMillKarte`: `evaluateState`-Delta statt „Handwert", Selbstlöscher und `onMillBenefit` inklusive); Magenta liefert nur die
+   * Ausnahme, die zu ihr gehört: Schritt 1 (Hand-Abwurf) hat den Kartennamen schon auf die Ablage gelegt — der Mill soll einen ANDEREN
+   * Namen dazulegen, sonst bringt der Effekt nur einen einzigen Namen in die Ablage (hartes Gebot, kein Heuristik-Bonus: der Auswerter
+   * würde in Stapel-Decks dieselbe Kopie gern wählen).
    */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     if (promptData?.type !== 'cardGallery') return undefined;
     if (promptData?.title !== CARD_NAME) return undefined;
-    if (engine._inMctsSim) return undefined;
-    const pi = engine._cpuPlayerIdx;
-    const ps = engine.gs.players?.[pi];
+    const ps = engine.gs.players?.[engine._cpuPlayerIdx];
     if (!ps) return undefined;
-    const cards = promptData.cards || [];
-    if (!cards.length) return undefined;
-    const evalState = engine._cpuEvaluateState;
-    if (typeof evalState !== 'function') return undefined;
-    // Magenta's Step 1 (hand-discard) has already pushed the chosen
-    // card name onto the top of the discard pile by the time this
-    // gallery prompt fires. Excluding that exact name from the deck-
-    // mill candidate set ensures the two halves of Magenta's effect
-    // contribute DIFFERENT names to discard — milling the same name
-    // would just stack a second copy that the deck already had to
-    // give up, halving the unique-name yield. The eval-delta scorer
-    // would happily pick the same name in pileFuel-stacking decks
-    // (each copy in discard scores separately), so this filter is a
-    // hard rule, not a heuristic.
     const justDiscardedName = ps.discardPile?.[ps.discardPile.length - 1] || null;
-    // Exclude:
-    //   • The just-discarded name (Step 1 cost) so the mill yields a
-    //     DIFFERENT name in discard and doubles the unique-name churn.
-    //   • Cards that opt into `selfDeleteOnExternalDiscard` (Rebelliokai
-    //     archetype). Milling these routes the card straight to the
-    //     deleted pile via the engine's external-discard redirect — it
-    //     never lands in discard, so any "feed the discard pile"
-    //     calculus the eval-delta scorer captures over-credits the mill.
-    //     The resolver's snapshot doesn't replicate the redirect, so the
-    //     scorer would happily target a Rebelliokai. Hard skip is
-    //     simpler and correct: the CPU should never elect to mill a
-    //     self-deleting card.
-    const eligibleCards = cards.filter(c => {
-      if (justDiscardedName && c.name === justDiscardedName) return false;
-      const cs = loadCardEffect(c.name);
-      if (cs?.selfDeleteOnExternalDiscard) return false;
-      return true;
-    });
-    // Defensive: if filtering would empty the pool (deck contains only
-    // copies of the just-discarded name or self-deleting cards —
-    // pathological), fall back to the full pool so the prompt still
-    // resolves. The CPU shouldn't soft-lock on an unwinnable choice.
-    const pool = eligibleCards.length > 0 ? eligibleCards : cards;
-    let best = null;
-    let bestScore = -Infinity;
-    for (const c of pool) {
-      const name = c.name;
-      const _taken_idx = engine.takeFromPileSync(ps, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_idx) continue;
-      const idx = _taken_idx.idx;
-      ps.discardPile.push(name);
-      let score = -Infinity;
-      try { score = evalState(pi); } catch {}
-      ps.discardPile.pop();
-      engine.returnToPile(ps, 'deck', name, idx);   // v820: Stapel-Schicht
-
-      // Declarative `cpuMeta.onMillBenefit` — eval-delta above only
-      // captures "card moved from deck to discard"; it does NOT fire
-      // the would-be `onMill` hook (no `actionMillCards` call inside
-      // the snapshot frame, since that's async + side-effecting).
-      // Cards whose mill triggers a beneficial payoff (Mystery Box's
-      // "draw 2 when milled", any future similar trigger) advertise
-      // their post-mill value via this field so the picker correctly
-      // rewards selecting them as targets. Number or function form
-      // both supported — function gets `(engine, pi)` so the card
-      // can self-gate on HOPT / per-turn-once / etc.
-      const cs = loadCardEffect(name);
-      const benefit = cs?.cpuMeta?.onMillBenefit;
-      let benefitValue = 0;
-      if (typeof benefit === 'number') benefitValue = benefit;
-      else if (typeof benefit === 'function') {
-        try { benefitValue = benefit(engine, pi) || 0; } catch { benefitValue = 0; }
-      }
-      score += benefitValue;
-
-      if (score > bestScore) { bestScore = score; best = c; }
-    }
-    if (!best) return undefined;
-    return { cardName: best.name, source: best.source };
+    return cpuBesteMillKarte(engine, promptData, { source: CARD_NAME, ausschliessen: justDiscardedName });
   },
 
   canActivateHeroEffect(ctx) {

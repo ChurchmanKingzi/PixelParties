@@ -2775,6 +2775,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Sky Shaman (10.10.) — Federn-Beschwörung: leises Windrauschen beim Aufsteigen der Federn, ein heller Ton, wenn der Lichtstrahl in den Himmel schießt
+  // (~600 ms), Funkeln beim Verglühen (~780 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  sky_shaman_chant: [
+    { name: 'elem_wind',    opts: { rate: 1.3,  volume: 0.7 } },
+    { name: 'buff',         opts: { rate: 1.2,  volume: 0.6, delay: 560, category: null, dedupe: 0 } },
+    { name: 'elem_holy',    opts: { rate: 1.5,  volume: 0.5, delay: 760, category: null, dedupe: 0 } },
+  ],
   // Mimic (10.10.) — zwei Bisse der Truhe: ein Probebiss (~260 ms), dann der harte Biss (~560 ms) mit dumpfem Aufschlag; die Münzen klingen über das Log
   // (`gold_steal`). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   mimic_chomp: [
