@@ -25500,6 +25500,101 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Front Soldier: Schild-Schlag — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der
+  //  gepanzerte Wächter)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Soldaten als Ursprung UND Ziel (`selbst`): ein Wappenschild aus Stahl (heller
+  //  Rand, Messingbuckel, Querbalken) kracht von oben auf den Platz — im Fall beschleunigt —, beim Aufprall bei ~280 ms (front-soldier.js: BLOCK_MS
+  //  560 — Einbau-Versatz 100 ms eingerechnet; der Server wartet 560 ms) blitzen Kreuzfunken, ein Schlagring weitet sich über die Karte,
+  //  Funken und Staub spritzen. Der Schild bleibt kurz stehen, ab ~700 ms blendet alles über Dithering aus, bei 1060 ms ist es weg. Feste Palette,
+  //  KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
+  // ═════════════════════════════════════════════════════════════════
+  front_soldier_block: (() => {
+    const STAHL = ['#f3f7fa', '#c9d4dc', '#97a6b2', '#667886', '#3a4852', '#222b33'].map(ppHex);
+    const MESSING = ['#fff1a8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#fff1a8', '#ffd94a', '#e8a33a'].map(ppHex);
+    const STAUB = ['#c9c2b4', '#a39b8a', '#7d7566'].map(ppHex);
+    const ENDE = 1060, FADE_AB = 700, AUFPRALL = 280;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const vorbereiten = () => ({
+      funken: Array.from({ length: ppFxN(16) }, (_, i) => {
+        const w = (i / 16) * Math.PI * 2 + Math.random() * 0.3, v = 40 + Math.random() * 70;
+        return { vx: Math.cos(w) * v, vy: Math.sin(w) * v * 0.8 - 12, leben: 260 + Math.random() * 200, farbe: Math.floor(Math.random() * 4) };
+      }),
+      staub: Array.from({ length: ppFxN(8) }, () => ({ sx: (Math.random() - 0.5) * 22, vx: (Math.random() - 0.5) * 20, ab: Math.random() * 60, leben: 420 + Math.random() * 200, r0: 2 + Math.random() * 1.5 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y);
+      const BW = klemme(Math.round(z.w * 0.62), 12, 24), BH = Math.round(BW * 1.28);
+      const fall = t < AUFPRALL ? Math.pow(1 - t / AUFPRALL, 2) * 56 : 0;      // beschleunigter Fall: am Anfang weit oben
+      const nachbeben = (t >= AUFPRALL && t < AUFPRALL + 120) ? Math.round(Math.sin((t - AUFPRALL) * 0.09) * 1.5 * (1 - (t - AUFPRALL) / 120)) : 0;
+      const oben = Math.round(CY - BH * 0.5 - fall + nachbeben), links = CX - Math.floor(BW / 2);
+      // ── Schild: Wappenform (gerade Seiten bis 58 %, dann Spitze), Rand dunkel, Stahlkörper mit Lichtkante links ──
+      for (let j = 0; j < BH; j++) {
+        const rel = j / (BH - 1);
+        const halb = rel < 0.58 ? BW / 2 : (BW / 2) * Math.max(0, 1 - Math.pow((rel - 0.58) / 0.42, 1.25));
+        const X0 = Math.round(CX - halb), X1 = Math.round(CX + halb - (BW % 2 ? 0 : 1));
+        for (let X = X0; X <= X1; X++) {
+          const rand = (X === X0 || X === X1 || j === 0 || j === BH - 1 || (rel >= 0.58 && X <= X0 + 1 + Math.floor((rel - 0.58) * 6) && X > X0));
+          let col;
+          if (X === X0 || X === X1 || j === 0) col = STAHL[5];
+          else if (X === X0 + 1 || j === 1) col = STAHL[0];                         // helle Kante
+          else if (X === X1 - 1) col = STAHL[4];                                    // Schattenkante
+          else col = STAHL[2 + ((X + j * 2) % 7 === 0 ? 1 : 0) + (X > CX ? 1 : 0)]; // Körper, rechts dunkler, leichte Schraffur
+          g.put(X, oben + j, col, aus);
+          void rand;
+        }
+      }
+      // Querbalken (Messing) und Buckel
+      const by = oben + Math.round(BH * 0.38);
+      for (let X = CX - Math.floor(BW / 2) + 2; X <= CX + Math.floor(BW / 2) - 3; X++) { g.put(X, by, MESSING[1], aus); g.put(X, by + 1, MESSING[2], aus); }
+      g.disc(CX, by + 0.5, Math.max(2, BW * 0.17), MESSING[1], aus);
+      g.put(CX - 1, by - 1, MESSING[0], aus); g.put(CX, by - 1, MESSING[0], aus);
+      g.put(CX + 1, by + 1, MESSING[3], aus);
+      // ── Aufprall: Kreuzfunken, Schlagring, Funken, Staub ──
+      const al = t - AUFPRALL;
+      if (al >= 0) {
+        const my = CY + Math.round(BH * 0.12);
+        if (al < 140) {
+          const k = al / 140, L = Math.round(5 + k * 12);
+          for (let i = 1; i <= L; i++) {
+            const a = (1 - k) * aus;
+            g.put(CX - i, my, FUNKEN[i < 4 ? 0 : 1], a); g.put(CX + i, my, FUNKEN[i < 4 ? 0 : 1], a);
+            if (i < L * 0.7) { g.put(CX, my - i, FUNKEN[1], a); g.put(CX, my + i, FUNKEN[2], a); }
+          }
+        }
+        if (al < 330) {
+          const k = al / 330, r = 4 + k * Math.max(14, z.w * 0.6);
+          const n = Math.max(24, Math.round(r * 5));
+          for (let q = 0; q < n; q++) {
+            const w = (q / n) * Math.PI * 2;
+            g.put(CX + Math.cos(w) * r, my + Math.sin(w) * r * 0.55, k < 0.5 ? STAHL[0] : STAHL[2], (1 - k) * aus);
+          }
+        }
+        for (const f of teile.funken) {
+          if (al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000;
+          g.put(CX + f.vx * sek, my + f.vy * sek + 0.5 * 220 * sek * sek, FUNKEN[f.farbe], (1 - k) * aus);
+        }
+        for (const s of teile.staub) {
+          const a2 = al - s.ab;
+          if (a2 < 0 || a2 > s.leben) continue;
+          const k = a2 / s.leben, r = s.r0 + k * 4, R = Math.ceil(r), cx = CX + s.sx + s.vx * a2 / 1000, cy = oben + BH - 1 - k * 5;
+          for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+            const dd = Math.hypot(i, j * 1.2) / r + (rausch(Math.round(cx) + i, Math.round(cy) + j) - 0.5) * 0.35;
+            if (dd >= 1) continue;
+            g.put(cx + i, cy + j, STAUB[klemme(Math.floor(dd * 2 + k * 1.5), 0, 2)], (1 - k) * 0.8 * (1 - dd * 0.5) * aus);
+          }
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
   //  Zahnrachen)
   //
@@ -46397,6 +46492,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'sky_archeologist') {
         const p = playerByName(entry.player);
         return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for free!' : ' and may play it for free this turn!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : ' and keeps it on top of the deck.'}</span>;
+      }
+      if (t === 'front_soldier') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🛡️ {cName('Front Soldier')} — {pName(p.name, p.color)}'s soldier steps in as an additional Action and negates {cName(entry.negated)}{entry.via === 'surprise' ? ' (Surprise)' : entry.via === 'reaction' ? ' (Reaction)' : ''}. Both players draw 2 cards.</span>;
       }
       if (t === 'sky_shaman') {
         const p = playerByName(entry.player);

@@ -33081,6 +33081,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.sync();
     this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
     await this._delay(300);
+    // ★ „When your opponent PLAYS A REACTION" (Front Soldier, Als Vorgabe 10.10.): die Reaction ist bezahlt und aufgedeckt, ihre Wirkung steht noch aus.
+    // Hand-Zuhörer des GEGNERS dürfen sie jetzt negieren (`ctx.setFlag('_reactionNegated', true)`) — dann fällt die Wirkung aus: der Aufrufer sieht
+    // `false` und überspringt sie, die Karte liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte). Gilt für ALLE Hand-
+    // Reaktionsfenster der Engine (Held besiegt, vor Schaden, Board-Karte in die Ablage …); Kettenreaktionen laufen über ihr eigenes Kettenfenster.
+    const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardData?.cardType || null, _skipReactionCheck: true };
+    await this.runHooks('onReactionPlayed', rxHook);
+    if (rxHook._reactionNegated) {
+      this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
+      await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
+      this.sync();
+      return false;
+    }
     return true;
   }
 

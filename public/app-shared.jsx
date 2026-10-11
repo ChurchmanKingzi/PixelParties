@@ -2792,6 +2792,13 @@ const ZONE_ANIM_SFX = {
     { name: 'heavy_impact', opts: { rate: 1.0,  volume: 0.7, delay: 610, category: null, dedupe: 0 } },
     { name: 'ping',         opts: { rate: 1.5,  volume: 0.7, delay: 640, category: null, dedupe: 0 } },
   ],
+  // Front Soldier (10.10.) — Schild-Schlag: Sausen des fallenden Schildes, beim Aufprall (~280 ms) tiefer Schlag mit hellem Verneinungs-Ton. Nur der erste
+  // Teil uebernimmt die Sammelkategorie 'effect'.
+  front_soldier_block: [
+    { name: 'elem_wind',    opts: { rate: 0.9,  volume: 0.6 } },
+    { name: 'heavy_impact', opts: { rate: 0.7,  volume: 1.1, delay: 270, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 1.0,  volume: 0.8, delay: 290, category: null, dedupe: 0 } },
+  ],
   // Sky Shaman (10.10.) — Federn-Beschwörung: leises Windrauschen beim Aufsteigen der Federn, ein heller Ton, wenn der Lichtstrahl in den Himmel schießt
   // (~600 ms), Funkeln beim Verglühen (~780 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sky_shaman_chant: [
