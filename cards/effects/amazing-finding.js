@@ -3,7 +3,7 @@
 //  CARD EFFECT: "Amazing Finding"
 //  Attack (Fighting Lv0, Normal)
 //
-//  „Reveal the top card of your deck until you reveal something other than an Artifact. Add all cards revealed by this effect to your hand. You cannot reveal
+//  „Reveal the top card of your deck until you reveal something other than an Artifact. Add all Artifacts revealed by this effect to your hand. You cannot reveal
 //   more than 3 cards with this effect. Shuffle the first Non-Artifact card you reveal back into your deck. If this is the first Attack you use this turn, this
 //   counts as an additional Action."
 //
@@ -17,10 +17,9 @@
 //  Nach 3 Artefakten in Folge gibt es kein Nicht-Artefakt: dann wird nichts gemischt.
 //  „Artifact" = Karten vom Typ Artifact (auch Artefakt-Kreaturen und Ausrüstung); das Wortspiel „something other than an Artifact" gilt für JEDEN anderen Typ.
 //
-//  ── ANNAHME: ADD ALL … / SHUFFLE THE FIRST NON-ARTIFACT BACK ────────────
-//  Der Text widerspricht sich für die erste Nicht-Artefakt-Karte (sie ist „revealed by this effect", soll aber zurück ins Deck). Gewählte Auslegung: der
-//  spezielle Satz geht vor — die Nicht-Artefakt-Karte wird NICHT auf die Hand genommen, sondern ins Deck gemischt; alle aufgedeckten ARTEFAKTE gehen auf die Hand.
-//  Ist das Deck leer, bevor drei Karten aufgedeckt sind, endet die Schleife.
+//  ── „ADD ALL ARTIFACTS" (Korrektur 11.10.) ─────────────────────────────
+//  Der Text lautete zuerst „Add all cards revealed …"; gemeint war „Add all ARTIFACTS revealed …". Damit ist der scheinbare Widerspruch aufgelöst: nur die Artefakte
+//  kommen auf die Hand, die erste Nicht-Artefakt-Karte geht ins Deck zurück. Ist das Deck leer, bevor drei Karten aufgedeckt sind, endet die Schleife.
 //
 //  ── ZUSATZAKTION ────────────────────────────────────────────────────────
 //  „If this is the first Attack you use this turn, this counts as an additional Action" → `inherentAction` als FUNKTION: wahr, solange der Spieler in diesem Zug

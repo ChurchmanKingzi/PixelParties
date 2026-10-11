@@ -1,7 +1,7 @@
 'use strict';
 // Secret Spell Book (Artifact, Normal, Kosten 2): „Take permanent control of all cards on the board that are originally owned by you. You may place any Creatures, Spells and
 // Artifacts affected by this effect into the Support Zones of any Heroes you control. If you activate this card while your opponent controls no cards originally owned by
-// you, draw 1 card instead." Geprueft wird der ECHTE Spielweg (`host.doUseArtifactEffect`, der Weg aller Normal-Artefakte) mit gescripteter Zonenwahl.
+// you, draw 1 card instead." Auch HELDEN, die dauerhaft (Paraseed Control) oder voruebergehend gestohlen wurden, gehen zurueck (Vorgabe 11.10.). Geprueft wird der ECHTE Spielweg (`host.doUseArtifactEffect`, der Weg aller Normal-Artefakte) mit gescripteter Zonenwahl.
 //   node scripts/skilltest-e2e/secret-spell-book.test.js
 process.env.PP_ST_SIM = '1';
 const { runGame } = require('../../skilltest/sim');
@@ -245,6 +245,64 @@ const imSupport = (t, seat, hi, slot) => (t.gs.players[seat].supportZones[hi][sl
     check('ohne Betroffene fizzelt das Ziehen still an der Hand-Sperre (Karte gespielt, keine Karte gezogen)', r === true && t.p0.hand.length === 0 && t.p0.discardPile.includes(CARD), { r, hand: t.p0.hand });
   }
 
+  console.log('Helden');
+  {
+    // Dauerhaft gestohlen (Paraseed Control): der Held steht in MEINER Spalte, wird aber vom Gegner kontrolliert.
+    const t = await fresh();
+    await t.engine.actionTakeHeroPermanently(1, 0, 1, { sourceName: 'Paraseed Control' });
+    const hero = t.p0.heroes[1];
+    check('Vorher: der Gegner kontrolliert meinen Helden dauerhaft (`heroSideOf` = 1, Support-Sperre gesetzt)', t.engine.heroSideOf(0, hero) === 1 && hero.permaControlBy === 1 && t.gs._charmedSupportLocked.some(e => e.owner === 0 && e.heroIdx === 1), { pcb: hero.permaControlBy });
+    check('…und die Karte ist spielbar (auch ohne betroffene Karte)', loadCardEffect(CARD).canActivate(t.gs, 0, t.engine) === true);
+    const r = await spiele(t);
+    check('der Zug läuft durch, KEINE Karte gezogen (ein Held war betroffen)', r === true && t.p0.hand.length === 0 && log(t) && log(t).data.drew === 0, { r, l: log(t) });
+    check('der Held gehört wieder mir: `heroSideOf` = 0, ALLE Kontrollmarken weg', t.engine.heroSideOf(0, hero) === 0 && ['permaControlBy', 'permaControlFrom', 'permaControlHeroIdx', 'charmedBy', 'charmedFromOwner', 'charmedHeroIdx', 'controlledBy'].every(k => hero[k] == null) && !hero.statuses.charmed, { hero: { pcb: hero.permaControlBy, cb: hero.charmedBy } });
+    check('…die Support-Zonen-Sperre ist weg, auch nach dem Neuaufbau zum Zugbeginn', !t.gs._charmedSupportLocked.some(e => e.owner === 0 && e.heroIdx === 1) && (t.engine._rebuildPermanentSupportLocks(), !t.gs._charmedSupportLocked.some(e => e.owner === 0 && e.heroIdx === 1)), t.gs._charmedSupportLocked);
+    check('Log: Held in `heroes`, nichts in `taken`; Log `hero_control_returned`; Animation mit dem Helden als Ziel (Heldenzone, Seite 0, Held 1)', log(t).data.heroes[0] === hero.name && log(t).data.taken.length === 0 && t.logs.some(l => l.type === 'hero_control_returned' && l.data.target === hero.name) && anim(t).length === 1 && anim(t)[0].data.targets.some(x => x.owner === 0 && x.heroIdx === 1 && x.zoneSlot === -1), { l: log(t), an: anim(t) });
+  }
+  {
+    // Vorübergehend gestohlen (Charme 3): Marken weg, Charme-Status weg.
+    const t = await fresh();
+    t.engine.actionStealHero(1, 0, 2, { sourceName: 'Charme' });
+    const hero = t.p0.heroes[2];
+    check('Vorher: Charme-Marke und -Status', hero.charmedBy === 1 && !!hero.statuses.charmed);
+    await spiele(t);
+    check('der vorübergehend gestohlene (Charme) Held ist zurück: keine `charmedBy`, kein Charme-Status, `heroSideOf` = 0', t.engine.heroSideOf(0, hero) === 0 && hero.charmedBy == null && !hero.statuses.charmed && !t.gs._charmedSupportLocked?.some(e => e.owner === 0 && e.heroIdx === 2), { cb: hero.charmedBy });
+  }
+  {
+    // FTCD / Controlled Attack: `controlledBy`.
+    const t = await fresh();
+    t.p0.heroes[0].controlledBy = 1;
+    await spiele(t);
+    check('`controlledBy` (FTCD, Controlled Attack) wird gelöscht', t.p0.heroes[0].controlledBy == null && log(t).data.heroes.length === 1, { l: log(t) });
+  }
+  {
+    // Ein KO-Held zählt ebenfalls.
+    const t = await fresh();
+    await t.engine.actionTakeHeroPermanently(1, 0, 0, { sourceName: 'Paraseed Control' });
+    t.p0.heroes[0].hp = 0;
+    await spiele(t);
+    check('auch ein besiegter (KO) Held geht zurück', t.engine.heroSideOf(0, t.p0.heroes[0]) === 0 && log(t).data.heroes.length === 1, { l: log(t) });
+  }
+  {
+    // Ein Held, den ICH kontrolliere (in der Gegnerspalte), ist nicht betroffen; kein Held fremd → es wird gezogen.
+    const t = await fresh();
+    await t.engine.actionTakeHeroPermanently(0, 1, 0, { sourceName: 'Paraseed Control' });
+    const fremd = t.p1.heroes[0];
+    await spiele(t);
+    check('ein Held in der GEGNERspalte, den ich dauerhaft kontrolliere, bleibt bei mir; nichts betroffen → es wird gezogen', t.engine.heroSideOf(1, fremd) === 0 && fremd.permaControlBy === 0 && log(t).data.drew === 1 && log(t).data.heroes.length === 0, { l: log(t) });
+  }
+  {
+    // Mehrere Helden und Karten zugleich; der zurückgeholte Held zählt bei der Platzfrage der Ausrüstung schon als „mein" Held.
+    const t = await fresh({ pick: (z) => z.find(x => x.heroIdx === 0 && x.slotIdx === 0) || null });
+    await t.engine.actionTakeHeroPermanently(1, 0, 0, { sourceName: 'Paraseed Control' });
+    t.p0.heroes[1].statuses.frozen = { duration: 1 }; t.p0.heroes[2].hp = 0;     // Held 1 Frozen, Held 2 tot: als Träger NICHT tauglich — nur der zurückgeholte Held 0
+    const eq = gegnerKarte(t, EQ, 0, 0);
+    await spiele(t);
+    check('Helden zuerst: die Platzfrage für die Ausrüstung bietet die Zonen des eben zurückgeholten Helden 0 an (sonst gäbe es keinen Träger)', t.zonen.length === 1 && t.zonen[0].zonen.length === 3 && t.zonen[0].zonen.every(z => z.startsWith('0:0:')), t.zonen);
+    check('…die Ausrüstung hängt danach an Held 0 (von mir kontrolliert), der Held ist zurück', t.p0.supportZones[0][0][0] === EQ && eq.controller === 0 && t.engine.heroSideOf(0, t.p0.heroes[0]) === 0, { sup: t.p0.supportZones[0] });
+    check('Log nennt Held UND Karte', log(t).data.heroes.length === 1 && log(t).data.taken.includes(EQ), log(t));
+  }
+
   console.log('Boris-Sperre');
   {
     const t = await fresh();
@@ -254,6 +312,12 @@ const imSupport = (t, seat, hi, slot) => (t.gs.players[seat].supportZones[hi][sl
     check('mit betroffener Karte: gesperrt (kein Kontrollwechsel gegen Boris)', loadCardEffect(CARD).canActivate(t.gs, 0, t.engine) === false);
     const r = await spiele(t);
     check('…der Zug schlägt fehl: Karte bleibt auf der Hand, nichts übernommen', r !== true && t.p0.hand.includes(CARD) && t.zonen.length === 0, { r });
+  }
+  {
+    const t = await fresh();
+    t.p1.heroes[0].name = 'Boris, the Guardian of Blackport';
+    await t.engine.actionTakeHeroPermanently(1, 0, 1, { sourceName: 'Paraseed Control' });
+    check('Boris beim Gegner, betroffen ist nur ein HELD: gesperrt (kein Kontrollwechsel gegen Boris), die Karte nicht spielbar', loadCardEffect(CARD).canActivate(t.gs, 0, t.engine) === false && (await spiele(t)) !== true && t.engine.heroSideOf(0, t.p0.heroes[1]) === 1);
   }
 
   console.log('CPU-Entscheidung der Karte');

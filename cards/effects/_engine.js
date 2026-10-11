@@ -11661,7 +11661,8 @@ class GameEngine {
     const inst = opts.ohneInstanz ? null : this._trackCard(cardName, pi, ZONES.HAND);
     if (opts.originalOwner != null && opts.originalOwner !== pi) this._tagHandCardOrigin(pi, cardName, opts.originalOwner, idx);
     this._autoRevealOnEnterHand(pi, idx, cardName);
-    this.log('card_added_to_hand', { player: ps.username, card: cardName, by: opts.source || null, from: opts.von || null });
+    // `opts.geheim` (Create Secret Room, „an keiner Stelle revealed"): die Logzeile geht an BEIDE Spieler — ohne Kartennamen.
+    this.log('card_added_to_hand', { player: ps.username, ...(opts.geheim ? {} : { card: cardName }), by: opts.source || null, from: opts.von || null });
     this.sync();
     return inst;
   }
@@ -18956,7 +18957,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (idx < 0 || idx >= arr.length) return null;
     const name = arr[idx];
     if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
-      this.log('pile_out_blocked', { player: ps.username, pile, card: name, by: opts.source || null });
+      this.log('pile_out_blocked', { player: ps.username, pile, ...(opts.geheim ? {} : { card: name }), by: opts.source || null });
       return null;
     }
     // ★★ v1349: verwahrte Abilities (Madame Guillotine) koennen den
@@ -19048,7 +19049,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (pile === 'deck' && opts.shuffle) this.shuffleDeck(pi, 'main');
     if (pile === 'potionDeck' && opts.shuffle) this.shuffleDeck(pi, 'potion');   // v1361
-    this.log('pile_take', { player: ps.username, pile, card: name, by: opts.source || null });
+    // `opts.geheim`: verdeckte Zuege (Create Secret Room) schreiben den Kartennamen NICHT ins Log, das an beide Spieler geht.
+    this.log('pile_take', { player: ps.username, pile, ...(opts.geheim ? {} : { card: name }), by: opts.source || null });
     return { name, idx };
   }
 
@@ -25749,6 +25751,50 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     await this.runHooks('onTakeControl', {
       controllerPi: newControllerPi,
+      originalOwnerPi: heroOwnerPi,
+      targetType: 'hero',
+      targetName: hero.name,
+      targetHero: hero,
+      heroIdx,
+      kind: 'permanent',
+      sourceName: opts.sourceName || 'Control',
+    });
+    return true;
+  }
+
+  /**
+   * ★ 11.10. (Secret Spell Book: „Take permanent control of all cards on the board that are originally owned by you" — auch HELDEN, z. B. nach Paraseed Control)
+   * — EINEN HELDEN DAUERHAFT AN SEINEN URSPRUNGSBESITZER ZURUECKGEBEN.
+   *
+   * Ein Held steht immer in der Spalte seines urspruenglichen Besitzers (`heroOwnerPi`); wer ihn kontrolliert, steht nur an den Kontrollmarken (`heroSideOf`:
+   * `charmedBy` > `permaControlBy`; dazu `controlledBy` von FTCD/Controlled Attack). Zurueckgeben heisst: ALLE Marken weg — die dauerhafte Uebernahme
+   * (`permaControlBy/From/HeroIdx`) UND die Charme-Marken (`charmedBy/FromOwner/HeroIdx`, Status `charmed`), `controlledBy`, Styx' „bis zum Tod"-Kontrolle und die Rechte der
+   * temporaeren Uebernahme — und die Support-Zonen-Sperre dieses Helden (`gs._charmedSupportLocked`) faellt mit. Anders als `actionTakeHeroPermanently` setzt das
+   * KEINE Marke: der Held ist danach wieder ein ganz gewoehnlicher eigener Held.
+   *
+   * @returns {Promise<boolean>} true, wenn sich etwas geaendert hat (der Held stand vorher unter fremder Kontrolle)
+   */
+  async actionReturnHeroControl(heroOwnerPi, heroIdx, opts = {}) {
+    const gs = this.gs;
+    const hero = gs.players[heroOwnerPi]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const vorher = this.heroSideOf(heroOwnerPi, hero);
+    const gesteuert = hero.controlledBy != null && hero.controlledBy !== heroOwnerPi;
+    if (vorher === heroOwnerPi && !gesteuert) return false;
+    for (const k of ['permaControlBy', 'permaControlFrom', 'permaControlHeroIdx', 'charmedBy', 'charmedFromOwner', 'charmedHeroIdx',
+      'controlledBy', '_kontrolleBisZumTod', '_kontrollRechte']) delete hero[k];
+    if (hero.statuses?.charmed) delete hero.statuses.charmed;
+    if (Array.isArray(gs._charmedSupportLocked)) {
+      gs._charmedSupportLocked = gs._charmedSupportLocked.filter(e => !(e.owner === heroOwnerPi && e.heroIdx === heroIdx));
+    }
+    this.log('hero_control_returned', {
+      by: opts.sourceName || 'Control', target: hero.name,
+      controller: gs.players[heroOwnerPi]?.username, from: gs.players[vorher]?.username,
+    });
+    if (typeof this.syncAlleAtkAuren === 'function') this.syncAlleAtkAuren();
+    this.sync();
+    await this.runHooks('onTakeControl', {
+      controllerPi: heroOwnerPi,
       originalOwnerPi: heroOwnerPi,
       targetType: 'hero',
       targetName: hero.name,

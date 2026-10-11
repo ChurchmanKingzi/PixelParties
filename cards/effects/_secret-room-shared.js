@@ -15,6 +15,17 @@
 //    onHeroChosen(engine, …) → das Fenster „Held wurde von einer gegnerischen Karte/einem Effekt GEWÄHLT": `engine._checkSurpriseWindow` ruft es vor den
 //                             gewöhnlichen Surprise-Auslösern; ein Treffer nimmt die Karte aus dem normalen Ablauf (kein zweites Angebot).
 //
+//  ── KEIN REVEAL, NIRGENDS (Als Vorgabe 11.10.: „der Gegner soll die Karte NICHT sehen, sie wird an keiner Stelle revealed!") ─────────────────
+//  Weder beim Einlegen noch beim Zurücknehmen erfährt irgendjemand ausser dem Einsetzenden, welche Karte es ist (die EINZIGE Ausnahme ist das Aktivieren einer Surprise:
+//  ihr Aufdecken ist ein gewöhnliches Aktivieren). Das heisst im Einzelnen:
+//    • keine `card_reveal`, kein `deckSearchReveal`-Angebot an den Gegner, KEIN `knownToOpponent` an der Karte (der Zustandsversand maskiert sie ihm als „?");
+//    • `takeFromPile` und `handZugangSync` laufen mit `geheim: true`: ihre Logzeilen (`pile_take`, `card_added_to_hand`) tragen dann KEINEN Kartennamen (sie gehen an BEIDE
+//      Spieler); `actionSetSurpriseFromDeck` wird gar nicht benutzt (sein Flug trüge den Namen); die eigenen Logzeilen (`secret_room_set`, `secret_room_hand`) tragen keinen
+//      Kartennamen;
+//    • die Flüge (`play_pile_transfer`) gehen an den Einsetzenden mit der echten Karte, an alle anderen (Gegner, Zuschauer) verdeckt und OHNE Namen (`flugVerdeckt`);
+//    • die privaten Abfragen (Kartenwahl, Auslöse-Angebot) tragen `_privat: true`: der Zustandsversand schickt ihren Inhalt (Galerie, Karte, Optionen) nur an den
+//      Besitzer (`effectPromptFuer` in server.js).
+//
 //  ── AUSLÖSER (Als Vorgabe 11.10.) ───────────────────────────────────────
 //  „Die Aktivierung regardless of condition erfolgt, wenn der Hero anvisiert wird, genau wie das Auf-die-Hand-Nehmen; dafür dann bei Surprises zwei Optionen,
 //  add to hand oder activate now." Das Fenster ist dasselbe wie für jede Surprise („is targeting …", `_checkSurpriseWindow`): jede Wahl des Helden durch eine
@@ -22,7 +33,7 @@
 //  Effekten, einem Helden, den der Einsetzende gerade nicht kontrolliert, und einem Helden, der keine Surprise auslösen darf (tot, Frozen, Stunned, Webbed, Negated).
 //
 //  ── DIE ZWEI (DREI) OPTIONEN ────────────────────────────────────────────
-//    • „Add to hand": die Karte geht auf die Hand des Einsetzenden (Flug Surprise Zone → Hand). Immer möglich.
+//    • „Add to hand": die Karte geht auf die Hand des Einsetzenden (Flug Surprise Zone → Hand, für alle anderen verdeckt). Immer möglich.
 //    • „Activate now" (nur bei einer SURPRISE, die der Held auch nutzen kann — `_canHeroActivateSurprise`: Stufe, Schule, Zustand, freier Platz bei Creatures):
 //      die Karte dreht sich um und wird über den NORMALEN Aktivierungsweg (`_activateSurprise`) ausgelöst, als wäre ihr Auslöser erfüllt: ohne
 //      `surpriseTrigger`-Prüfung, aber mit der echten Quelle (`sourceInfo`) des wählenden Effekts. Danach gilt das Übliche (Ablage bzw. Creature ins Feld).
@@ -59,8 +70,19 @@ function istAktivierbareSurprise(engine, name) {
 }
 
 /**
+ * Ein Kartenflug, den NUR der Einsetzende erkennen darf: er bekommt das Ereignis mit der echten Karte, alle anderen (Gegner, Zuschauer) eine verdeckte Karte
+ * ohne Namen (`cardName: '?'`, `faceDown: true` — der Client zeichnet dann den Kartenrücken und liest den Namen nicht).
+ */
+function flugVerdeckt(engine, placer, daten) {
+  const andere = [];
+  for (let i = 0; i < engine.playerCount(); i++) if (i !== placer) andere.push(i);
+  engine._broadcastEvent('play_pile_transfer', daten, { toPlayers: [placer], toSpectators: false });
+  engine._broadcastEvent('play_pile_transfer', { ...daten, cardName: '?', faceDown: true }, { toPlayers: andere });
+}
+
+/**
  * Legt `cardName` aus dem Deck des Spielers `pi` verdeckt in die (freie) Surprise Zone des Helden `heroIdx` auf der Brettseite `seite`.
- * Der Aufrufer hat Wahl, Such-Bestätigung und Mischen schon erledigt. Gibt die Instanz zurück oder null (Zone belegt, Karte nicht im Deck, Stapelsperre).
+ * Der Aufrufer hat Wahl und Mischen übernommen. Gibt die Instanz zurück oder null (Zone belegt, Karte nicht im Deck, Stapelsperre).
  */
 async function place(engine, o) {
   const { pi, seite, heroIdx, cardName, source = CARD_NAME } = o;
@@ -70,24 +92,24 @@ async function place(engine, o) {
   const hero = zonePs?.heroes?.[heroIdx];
   if (!deckPs || !zonePs || !hero?.name || hero.hp <= 0) return null;
   if (!zonePs.surpriseZones) zonePs.surpriseZones = [[], [], []];
-  if ((zonePs.surpriseZones[heroIdx] || []).length > 0) return null;          // die Zone muss FREI sein (auch bei Bakhm: nicht seine Support Zones)
+  if ((zonePs.surpriseZones[heroIdx] || []).length > 0) return null;          // die Zone muss FREI sein (auch bei Bakhm: nicht seine Support Zonen)
   if (!(deckPs.mainDeck || []).includes(cardName)) return null;
-  // Stapel-Schicht (Sperren wie Knight [B], Tracking, Log) — wie Trapping.
-  if (!(await engine.takeFromPile(deckPs, 'deck', cardName, { source }))) return null;
+  // Stapel-Schicht (Stapelsperren wie Knight [B], Tracking) — mit `geheim`: die Logzeile `pile_take` trägt keinen Kartennamen.
+  if (!(await engine.takeFromPile(pi, 'deck', cardName, { source, geheim: true }))) return null;
 
   zonePs.surpriseZones[heroIdx] = [cardName];
   const inst = engine._trackCard(cardName, seite, ZONES.SURPRISE, heroIdx, 0);
   inst.faceDown = true;
-  inst.knownToOpponent = true;            // der Gegner hat die Suche gesehen (wie Trapping): halbtransparent sichtbar
+  delete inst.knownToOpponent;            // niemand ausser dem Einsetzenden kennt die Karte
   if (seite !== pi) inst.originalOwner = pi;          // geliehener Held: die Karte bleibt die des Einsetzenden (Ablage, Hand)
   inst.counters = inst.counters || {};
   inst.counters[MARKE] = { placer: pi, turn: gs.turn || 0, by: source };
 
-  engine._broadcastEvent('play_pile_transfer', {
-    owner: seite, cardName, from: 'deck', to: 'surprise', toHeroIdx: heroIdx, toSlotIdx: 0, faceDown: true,
+  flugVerdeckt(engine, pi, {
+    owner: seite, cardName, from: 'deck', to: 'surprise', toHeroIdx: heroIdx, toSlotIdx: 0,
     ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
   });
-  engine.log('secret_room_set', { player: deckPs.username, hero: hero.name, card: cardName });
+  engine.log('secret_room_set', { player: deckPs.username, hero: hero.name });      // KEIN Kartenname
   engine.sync();
   await engine._delay(FLUG_MS);
 
@@ -106,23 +128,25 @@ function heldDarfReagieren(engine, seite, heroIdx, reaktor) {
   return true;
 }
 
-/** Die Karte aus der Surprise Zone auf die Hand des Einsetzenden. */
+/** Die Karte aus der Surprise Zone auf die Hand des Einsetzenden — ohne Reveal (kein Kartenname im Flug an Dritte, keine Logzeile mit Namen). */
 async function aufDieHand(engine, inst, placer) {
   const gs = engine.gs;
   const seite = inst.owner, heroIdx = inst.heroIdx, name = inst.name;
   const zonePs = gs.players[seite];
   const handPs = gs.players[placer];
   const handIdx = (handPs.hand || []).length;
-  engine._broadcastEvent('play_pile_transfer', {
-    owner: placer, cardName: name, from: 'surprise', to: 'hand', fromHeroIdx: heroIdx, toHandIdx: handIdx, faceDown: true,
+  flugVerdeckt(engine, placer, {
+    owner: placer, cardName: name, from: 'surprise', to: 'hand', fromHeroIdx: heroIdx, toHandIdx: handIdx,
     ...(seite !== placer ? { fromOwner: seite, toOwner: placer } : {}),
   });
   await engine._delay(FLUG_MS * 0.6);
   const z = zonePs.surpriseZones?.[heroIdx];
   if (Array.isArray(z)) { const i = z.indexOf(name); if (i >= 0) z.splice(i, 1); }
+  const herkunft = inst.originalOwner;
   delete inst.counters[MARKE];
   engine._untrackCard(inst.id);
-  engine.handZugangSync(placer, name, { von: 'surprise', source: CARD_NAME, ...(inst.originalOwner != null && inst.originalOwner !== placer ? { originalOwner: inst.originalOwner } : {}) });
+  // Über die Stapel-Schicht auf die Hand; `geheim`: die Logzeile `card_added_to_hand` trägt keinen Kartennamen.
+  engine.handZugangSync(placer, name, { von: 'surprise', source: CARD_NAME, geheim: true, ...(herkunft != null && herkunft !== placer ? { originalOwner: herkunft } : {}) });
   engine.sync();
 }
 
@@ -147,7 +171,6 @@ async function onHeroChosen(engine, o) {
   if (!heldDarfReagieren(engine, tOwner, tHeroIdx, reaktor)) return { handled: false };
 
   const name = inst.name;
-  const cd = engine._getCardDB()[name];
   const heroName = engine.gs.players[tOwner].heroes[tHeroIdx].name;
   const kannAktivieren = istAktivierbareSurprise(engine, name)
     && engine._canHeroActivateSurprise(tOwner, tHeroIdx, name, { reaktor });
@@ -158,7 +181,7 @@ async function onHeroChosen(engine, o) {
   options.push({ id: 'no', label: '🚪 Leave it', description: 'The card stays in the Surprise Zone.', color: '#888888' });
   const srcName = sourceInfo?.cardName || 'An effect';
   const wahl = await engine.promptGeneric(reaktor, {
-    type: 'optionPicker', title: CARD_NAME, showCard: name,
+    type: 'optionPicker', title: CARD_NAME, showCard: name, _privat: true,        // `_privat`: Inhalt nur für den Besitzer (effectPromptFuer)
     description: `${srcName} is choosing ${heroName}! ${kannAktivieren ? 'Add the hidden card to your hand or activate it now?' : 'Add the hidden card to your hand?'}`,
     options, cancellable: true, _hostSeite: tOwner,
   });
@@ -176,11 +199,12 @@ async function onHeroChosen(engine, o) {
 
   if (id === 'hand') {
     await aufDieHand(engine, inst, placer);
-    engine.log('secret_room_hand', { player: engine.gs.players[placer]?.username, hero: heroName, card: name, by: srcName });
+    engine.log('secret_room_hand', { player: engine.gs.players[placer]?.username, hero: heroName, by: srcName });      // KEIN Kartenname
     return { handled: true };
   }
   if (id === 'activate' && kannAktivieren) {
     delete inst.counters[MARKE];      // die Karte ist ab jetzt eine gewöhnliche Surprise im Ablauf
+    // Aktivieren deckt die Surprise auf (gewöhnliches `_activateSurprise`) — erst DANN darf der Name ins Log.
     engine.log('secret_room_activate', { player: engine.gs.players[placer]?.username, hero: heroName, card: name, by: srcName });
     const script = loadCardEffect(name);
     const res = await engine._activateSurprise(
@@ -192,4 +216,4 @@ async function onHeroChosen(engine, o) {
   return { handled: true };
 }
 
-module.exports = { CARD_NAME, MARKE, istGeheimraumKarte, zonenInstanz, istAktivierbareSurprise, place, heldDarfReagieren, aufDieHand, onHeroChosen };
+module.exports = { CARD_NAME, MARKE, istGeheimraumKarte, zonenInstanz, istAktivierbareSurprise, place, heldDarfReagieren, aufDieHand, onHeroChosen, flugVerdeckt };
