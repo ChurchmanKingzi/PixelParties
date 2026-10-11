@@ -2704,6 +2704,9 @@ function PuzzleCreator() {
   }, [updatePlayer, viewPile, players]);
 
   const movePileCard = useCallback((si, key, fromIdx, toIdx) => {
+    // Klang beim Umsortieren (Als Befund 10.10.: „Wenn man im Puzzle-Editor Karten im Deck per Drag/Drop umsortiert, gibt es kein Geräusch"): derselbe
+    // Umsortier-Klang wie in der Hand (`playCardDragSFX('reorder')`) — für JEDEN Stapel (Deck, Ablage, Gelöscht, Trank-Deck, Coolness Stack …).
+    window.playCardDragSFX?.('reorder');
     updatePlayer(si, pp => {
       const card = pp[key].splice(fromIdx, 1)[0];
       pp[key].splice(toIdx, 0, card);

@@ -74,11 +74,13 @@ async function haltenImZentrum(engine, pi, name, opts = {}) {
  */
 async function gibFrei(engine, pi, key, name, opts = {}) {
   const dest = opts.dest || 'deck';
+  // Zurück ins Deck: das Aufdecken läuft RÜCKWÄRTS (die Karte dreht sich wieder um) — gleiche Dauer wie das Aufdecken.
+  const dauer = dest === 'deck' ? HALT_EIN_MS : FREIGABE_MS;
   engine._broadcastEvent('mill_center_release', {
-    owner: pi, holdKey: key, cardName: name, dest, revealMs: FREIGABE_MS,
+    owner: pi, holdKey: key, cardName: name, dest, revealMs: dauer,
     ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
   });
-  await engine._delay(FREIGABE_MS + 100);
+  await engine._delay(dauer + 100);
 }
 
 /** CPU: behält eine gute Karte oben, schickt eine schwache nach unten. */
