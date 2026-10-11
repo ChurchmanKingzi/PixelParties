@@ -8846,7 +8846,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "Immediately summon this Creature from your hand as an additional Action when your opponent plays a Reaction or activates a Surprise. Negate that Reaction or Surprise. Your opponent draws 2 cards.",
+    "effect": "Immediately summon this Creature from your hand as an additional Action when your opponent plays a Reaction or activates a Surprise. Negate that Reaction or Surprise. Then, both players draw 2 cards.",
     "archetype": "",
     "setID": "PP SOD",
     "banned": "",
