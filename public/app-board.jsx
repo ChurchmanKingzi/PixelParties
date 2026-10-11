@@ -25248,6 +25248,122 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Jonglierte Tränke (Potion Juggler, Effekt „oberste 2 Karten löschen, 1 ziehen") — PIXELART (Als Vorgabe 10.10.: „Alle Animationen
+  //  sollen Pixelart sein!")
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEIN Filter, KEIN Leuchten.
+  //  Drei Tränke (rot, grün, blau; kleine Flaschen mit Kork, dunkler Kontur und Glanzpunkt) kreisen als liegende Acht über der Karte
+  //  des Jonglierers — jeder Trank um ein Drittel der Bahn versetzt, mit eigener Drehung —, dazu funkeln kleine Sterne. Nach ~150 ms
+  //  eingeblendet (Bayer-Dithering statt Alpha), bei ~1000 ms blendet alles über Dithering aus, bei 1200 ms ist es weg. Die Karten
+  //  fliegen erst danach (potion-juggler.js: JUGGLE_MS). Die Wurzel trägt `data-pp-px="aus"`: die Grafik IST schon Pixelart.
+  //  Massstab folgt der Zielzone (`w`/`h`).
+  // ═══════════════════════════════════════════════════════════════════
+  potion_juggle: (() => {
+    const FARBEN = [
+      { glas: ppHex('#f0405a'), hell: ppHex('#ff9aa8'), dunkel: ppHex('#9a1030') },
+      { glas: ppHex('#3cc860'), hell: ppHex('#a4f0b0'), dunkel: ppHex('#1a7a36') },
+      { glas: ppHex('#3d86f0'), hell: ppHex('#a6cdff'), dunkel: ppHex('#1c4a9c') },
+    ];
+    const KONTUR = ppHex('#160e2a'), KORK = ppHex('#c08a48'), KORK2 = ppHex('#8a5a28'), GLANZ = ppHex('#ffffff');
+    const STERN = [ppHex('#ffffff'), ppHex('#ffe27a'), ppHex('#9ad8ff')];
+    const S = 3, TAKT = 33, ENDE = 1200, EIN = 150, FADE_AB = 1000;
+    const PADX = 34, PAD_OBEN = 44, PAD_UNTEN = 8;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Flasche in lokalen Koordinaten (u nach rechts, v nach unten, Ursprung = Mitte): Körper (Ellipse), Hals, Kork — gibt eine Farbstufe zurück
+    // 0 = nichts, 1 = Kontur, 2 = Kork, 3 = Glas, 4 = Glanz, 5 = Schatten (unten), 6 = Korkschatten
+    const flasche = (u, v) => {
+      const kx = u / 4.2, ky = (v - 2.2) / 4.6;
+      const inK = kx * kx + ky * ky;
+      const imHals = Math.abs(u) <= 1.6 && v >= -5.2 && v <= -1.2;
+      const imKork = Math.abs(u) <= 1.7 && v >= -7.2 && v < -5.2;
+      if (imKork) return Math.abs(u) > 1.2 || v < -6.6 ? 1 : (v > -6.2 ? 6 : 2);
+      if (inK <= 1) {
+        if (inK > 0.62) return 1;
+        if (u < -1.2 && u > -2.6 && v > -0.6 && v < 2.6) return 4;           // Glanzstrich links
+        if (v > 3.4) return 5;
+        return 3;
+      }
+      if (imHals) return Math.abs(u) > 1.0 ? 1 : 3;
+      return 0;
+    };
+    return function PotionJuggleEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const BAHN_X = Math.max(11, kw * 0.52), BAHN_Y = 9;
+      const MITTE_Y = CY - Math.floor(kh / 2) - 8;                      // über dem Kartenrand
+      const sterne = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
+        px: (Math.random() - 0.5) * (kw + 26), py: MITTE_Y + (Math.random() - 0.7) * 26, ab: 120 + Math.random() * 600, leben: 260 + Math.random() * 240, farbe: Math.floor(Math.random() * 3),
+      })), []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        const zeichneFlasche = (cx, cy, winkel, f, a) => {
+          const cs = Math.cos(winkel), sn = Math.sin(winkel);
+          for (let Y = -9; Y <= 9; Y++) for (let X = -9; X <= 9; X++) {
+            // Rückdrehung des Pixels in lokale Koordinaten
+            const u = X * cs + Y * sn, v = -X * sn + Y * cs;
+            const k = flasche(u, v);
+            if (!k) continue;
+            const c = k === 1 ? KONTUR : k === 2 ? KORK : k === 6 ? KORK2 : k === 4 ? GLANZ : k === 5 ? f.dunkel : (u < 0 ? f.glas : f.glas);
+            put(cx + X, cy + Y, k === 3 && u < -0.4 && v < 1 ? f.hell : c, a);
+          }
+        };
+        const zeichne = (t) => {
+          const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+          const ein = klemme(t / EIN, 0, 1);
+          const a = Math.min(aus, ein);
+          if (a <= 0) return;
+          const omega = (t / 1000) * Math.PI * 2 * 0.95;
+          for (let i = 0; i < 3; i++) {
+            const th = omega + (i * Math.PI * 2) / 3;
+            // liegende Acht: x folgt sin(θ), y folgt sin(2θ) → die Flaschen steigen am Rand auf und kreuzen sich in der Mitte
+            const px = CX + Math.sin(th) * BAHN_X;
+            const py = MITTE_Y - ((Math.cos(2 * th) + 1) / 2) * BAHN_Y * 1.5 + 3;
+            zeichneFlasche(px, py, th * 1.7, FARBEN[i], a);
+          }
+          for (const st of sterne) {
+            const alter = t - st.ab;
+            if (alter < 0 || alter > st.leben) continue;
+            const k = alter / st.leben, fa = (1 - k) * aus;
+            const r = k < 0.5 ? 1 : 2;
+            put(CX + st.px, st.py, STERN[st.farbe], fa);
+            if (r === 2 || k < 0.3) { put(CX + st.px - 1, st.py, STERN[st.farbe], fa); put(CX + st.px + 1, st.py, STERN[st.farbe], fa); put(CX + st.px, st.py - 1, STERN[st.farbe], fa); put(CX + st.px, st.py + 1, STERN[st.farbe], fa); }
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
   //  Je Ziel drei Schuss im Abstand von 105 ms, alle Ziele im selben Takt: Muendungsfeuer an der Quelle (Kreuz mit
@@ -45294,6 +45410,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'biseria_blizzard') {
         const p = playerByName(entry.player);
         return <span className="log-status">❄️ {cName('Embodiment of Biseria')} — an icy blizzard engulfs {pName(p.name, p.color)}'s opponent: {entry.frozen} of {entry.targets} Creature{entry.targets !== 1 ? 's' : ''} Frozen for 1 turn.</span>;
+      }
+      if (t === 'potion_juggler') {
+        const p = playerByName(entry.player);
+        const karten = Array.isArray(entry.deleted) ? entry.deleted : [];
+        return <span className="log-status">🤹 {cName('Potion Juggler')} — {pName(p.name, p.color)} deletes the top {karten.length} cards of their Potion Deck ({karten.map((k, i) => <React.Fragment key={i}>{i > 0 ? ' and ' : ''}{cName(k)}</React.Fragment>)}) and draws a card from it.</span>;
       }
       if (t === 'capture_control') {
         const p = playerByName(entry.player);

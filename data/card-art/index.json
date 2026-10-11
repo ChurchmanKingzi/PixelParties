@@ -3211,6 +3211,10 @@
 "id": "Populated_Island_Turtle",
 "kind": "a"
 },
+"Potion Juggler": {
+"id": "Potion_Juggler",
+"kind": "a"
+},
 "Potion of Greed": {
 "id": "Potion_of_Greed",
 "kind": "a"

@@ -2792,6 +2792,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_ice',     opts: { rate: 0.9,  volume: 1.3, delay: 1150, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.8, delay: 1180, category: null, dedupe: 0 } },
   ],
+  // Potion Juggler (10.10.) — jonglierte Traenke: Mischen und Klirren der Flaschen, ein heller Biomancy-Ton, wenn die Karten fliegen (~900 ms).
+  potion_juggle: [
+    { name: 'shuffle',        opts: { rate: 1.3, volume: 0.8 } },
+    { name: 'elem_biomancy',  opts: { rate: 1.1, volume: 0.7, delay: 200, category: null, dedupe: 0 } },
+    { name: 'elem_ice',       opts: { rate: 1.6, volume: 0.45, delay: 520, category: null, dedupe: 0 } },
+    { name: 'draw',           opts: { rate: 1.0, volume: 0.8, delay: 900, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.
