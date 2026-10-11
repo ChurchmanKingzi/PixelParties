@@ -17286,7 +17286,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Play this card immediately when the user is defeated by an opponent's Creature effect. Defeat all Creatures your opponent controls.",
+    "effect": "Play this card immediately when the user would be defeated by an opponent's Creature effect. Defeat all Creatures your opponent controls before the user is defeated.",
     "archetype": "",
     "setID": "PP MSRU",
     "banned": "",
