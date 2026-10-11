@@ -5419,6 +5419,9 @@ function sendGameState(room, playerIdx, extra) {
     effectPrompt: effectPromptFuer(gs.effectPrompt, playerIdx),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
+    // Wessen Hand-Reaktion gerade aufgeloest wird (Index) — der andere Client zeigt dazu „Waiting for opponent…" und
+    // sperrt das Brett (sonst wirkt es frei bedienbar, obwohl der Server wegen der laufenden Reaktion alles verwirft).
+    reactionBusy: room.engine?.rxBusyIdx?.() ?? null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       const currentTurn = gs.turn || 0;
@@ -6139,6 +6142,9 @@ function sendSpectatorGameState(room) {
     effectPrompt: effectPromptFuer(gs.effectPrompt, -1),
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
+    // Wessen Hand-Reaktion gerade aufgeloest wird (Index) — der andere Client zeigt dazu „Waiting for opponent…" und
+    // sperrt das Brett (sonst wirkt es frei bedienbar, obwohl der Server wegen der laufenden Reaktion alles verwirft).
+    reactionBusy: room.engine?.rxBusyIdx?.() ?? null,
     creatureCounters: room.engine ? (() => {
       const cc = {};
       const currentTurn = gs.turn || 0;

@@ -30340,6 +30340,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // the ability, opp's Gerrymander prevented it, the slot is spent.
     const promptType = this.gs.effectPrompt?.type;
     const wasGerryRewritten = !!this.gs.effectPrompt?._gerryRewritten;
+    // ★ Hand-Reaktion zugesagt → der Besitzer loest sie jetzt auf. Schon in DIESEM Push merken (siehe `_rxBusySetzen`), damit
+    // der Gegner ohne Luecke vom „wartet auf Bestaetigung" zum „loest gerade auf" wechselt.
+    if (this.gs.effectPrompt?._handReactionWindow && promptType === 'confirm'
+        && !response?.cancelled && response?.confirmed !== false
+        && Number.isInteger(this.gs.effectPrompt.ownerIdx)) {
+      this._rxBusySetzen(this.gs.effectPrompt.ownerIdx);
+    }
     this._pendingGenericPrompt = null;
     // Naechsten wartenden Prompt (siehe promptGeneric) freigeben.
     const _wartend = this._genericPromptQueue?.shift();
@@ -36193,6 +36200,14 @@ this._deathWatch = (this._deathWatchStack || []).length
    *                                 `afterSpellResolved` schon selbst feuert
    */
   async _rxAufgeloest(ps, cardName, casterIdx, opts = {}) {
+    try {
+      return await this._rxAufgeloestRoh(ps, cardName, casterIdx, opts);
+    } finally {
+      this._rxBusyIdx = null;   // die Reaktion ist fertig (auch bei Fehler): der Gegner wartet nicht mehr
+    }
+  }
+
+  async _rxAufgeloestRoh(ps, cardName, casterIdx, opts = {}) {
     const pi = this._rxOwnerIdx(ps, '_rxAufgeloest');
     if (pi < 0) return;
     if (typeof casterIdx !== 'number' || casterIdx < 0) return;
@@ -36306,6 +36321,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    * die niedrigsten Wisdom-Kosten.
    */
   async _rxCastWirkerWaehlen(ps, cardName, script, plan, opts = {}) {
+    const ok = await this._rxCastWirkerWaehlenRoh(ps, cardName, script, plan, opts);
+    // Ab hier ist die Reaktion beschlossen — CPU wie Mensch. Der Gegner sieht „loest gerade eine Reaktion auf",
+    // bis `_rxAufgeloest` (oder das Ende des Fensters) sie wieder loescht.
+    if (ok) {
+      const pi = this._rxOwnerIdx(ps, '_rxCastWirkerWaehlen');
+      if (pi >= 0) this._rxBusySetzen(pi);
+    }
+    return ok;
+  }
+
+  async _rxCastWirkerWaehlenRoh(ps, cardName, script, plan, opts = {}) {
     if (!plan || plan.casterIdx == null) return true;
     const pi = this._rxOwnerIdx(ps, '_rxCastWirkerWaehlen');
     if (pi < 0) return true;
@@ -36720,6 +36746,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _activateSurprise(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
+    // Waehrend die Surprise aufloest, wartet der Gegner (siehe `_rxBusySetzen`) — ihr Besitzer sieht dort nur Aufdecken/Animation.
+    return this._alsReaktor(playerIdx, () => this._activateSurpriseRoh(playerIdx, heroIdx, cardName, sourceInfo, script, opts));
+  }
+
+  async _activateSurpriseRoh(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
     // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
@@ -49786,6 +49817,56 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     return false;
   }
+
+  // ── WER LOEST GERADE EINE REAKTION AUF? ────────────────────────────────
+  // (Als Befund: Punch in the Box beim Gegner — man sah kein „Waiting for opponent" und konnte scheinbar frei klicken.)
+  // Hand-Reaktionen laufen in kurzen Etappen OHNE Prompt (Karte aufdecken, Animation, Schaden), in denen der Client sonst
+  // nichts vom Gegner erfaehrt. Der Reaktor wird gemerkt, sobald die Reaktion zugesagt ist (Mensch: `resolveGenericPrompt`,
+  // CPU und Mensch: `_rxCastWirkerWaehlen`) und vergessen, wenn sie aufgeloest ist (`_rxAufgeloest`) bzw. das umschliessende
+  // Reaktionsfenster endet (Mantel unten). Veroeffentlicht wird er nur INNERHALB eines Fensters — ein verirrter Wert kann
+  // das Brett des Gegners also nie dauerhaft sperren.
+  _rxBusySetzen(pi) {
+    if (this._inMctsSim || this._fastMode) return;
+    if (Number.isInteger(pi) && pi >= 0) this._rxBusyIdx = pi;
+  }
+
+  /** Fuehrt `fn` als aufgeloeste Reaktion von `pi` aus (Surprises) — Gegenstueck zum Mantel um die Hand-Reaktionsfenster. */
+  async _alsReaktor(pi, fn) {
+    if (!(this._rxFensterTiefe > 0)) this._rxBusyIdx = null;
+    const vorher = this._rxBusyIdx ?? null;
+    this._rxFensterTiefe = (this._rxFensterTiefe || 0) + 1;
+    this._rxBusySetzen(pi);
+    try {
+      return await fn();
+    } finally {
+      this._rxFensterTiefe = Math.max(0, (this._rxFensterTiefe || 1) - 1);
+      this._rxBusyIdx = vorher;
+    }
+  }
+
+  /** Index des Spielers, dessen Hand-Reaktion gerade aufgeloest wird — sonst null. */
+  rxBusyIdx() {
+    return ((this._rxFensterTiefe || 0) > 0 && Number.isInteger(this._rxBusyIdx)) ? this._rxBusyIdx : null;
+  }
+}
+
+// Mantel um JEDES Hand-Reaktionsfenster (`_check…Reactions`, Pre-Defeat-Fenster): zaehlt die Verschachtelung mit und stellt den
+// Reaktor beim Verlassen wieder her. Per Namensmuster statt Liste, damit auch kuenftige Fenster automatisch erfasst sind.
+for (const name of Object.getOwnPropertyNames(GameEngine.prototype)) {
+  if (!/^_check\w*Reactions$/.test(name) && name !== '_preDefeatFensterSeite') continue;
+  const roh = GameEngine.prototype[name];
+  if (typeof roh !== 'function' || roh.constructor?.name !== 'AsyncFunction') continue;
+  GameEngine.prototype[name] = async function (...args) {
+    if (!(this._rxFensterTiefe > 0)) this._rxBusyIdx = null;   // aeusserstes Fenster: kein Rest von frueher
+    const vorher = this._rxBusyIdx ?? null;
+    this._rxFensterTiefe = (this._rxFensterTiefe || 0) + 1;
+    try {
+      return await roh.apply(this, args);
+    } finally {
+      this._rxFensterTiefe = Math.max(0, (this._rxFensterTiefe || 1) - 1);
+      this._rxBusyIdx = vorher;
+    }
+  };
 }
 
 module.exports = { GameEngine, CardInstance, SPEED, STATUS_EFFECTS, getNegativeStatuses };

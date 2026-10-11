@@ -345,6 +345,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
 | `check-hero-hopt` | Heldenskript mit „once per turn", das seine Sperre an Heldenplatz oder Instanz bindet statt pro Spieler (v1275) |
 | `check-action-hook` | Ein Server-Aktionsweg feuert `onAnyActionResolved` nicht (v1284) |
+| `check-reaction-windows` | Hand-Reaktionsfenster (`_handReactionWindow: true`) außerhalb des „Gegner wartet“-Mantels — der andere Spieler sähe dort kein „Waiting for opponent…“ |
 | `check-damage-types` · `check-no-splice` · `check-areas` · … | siehe die jeweiligen Kopfkommentare |
 
 **Vor jeder Auslieferung laufen alle**, nicht nur die passenden:

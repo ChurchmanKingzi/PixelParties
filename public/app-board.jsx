@@ -33630,6 +33630,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // depth gate must too.
     const anyResolving = !!me.resolvingCard
       || !!opp?.resolvingCard
+      || (gameState.reactionBusy != null && gameState.reactionBusy !== myIdx)
       || (gameState._spellResolutionDepth || 0) > 0
       || !!reactionChain;
     if (anyResolving && !isOwnHandInteractionPrompt) return;
@@ -45664,7 +45665,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // und `summonerPick` fehlten in der Sperre; Ability im Support-Zonen-Klick und Skill-Test-Zug hatten gar keine.
   const klickPfadOffen = !!(spellHeroPick || pendingBouncePick || crossSidePlayPick || summonerPick || abilityAttachPick
     || summonOrRevealPick || pendingAdditionalPlay || pendingAbilityActivation);
-  const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || klickPfadOffen || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
+  // ★ Der GEGNER loest gerade eine Hand-Reaktion auf (Punch in the Box, Fireshield …): Der Server verwirft in der Zeit jede Eingabe.
+  // Ohne diese Sperre sah das Brett bedienbar aus und Klicks verpufften wortlos (Als Befund). Dazu zeigt das Warte-Panel unten
+  // „Waiting for opponent…". `reactionBusy` ist der Index des Reaktors (nur innerhalb eines Reaktionsfensters gesetzt).
+  const gegnerLoestReaktionAuf = !isSpectator && !result && gameState.reactionBusy != null && gameState.reactionBusy !== myIdx;
+  const isEffectLocked = !!(gegnerLoestReaktionAuf || isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || klickPfadOffen || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
   // ── "Mindestens ein Opfer von DIESEM Helden" ──
   // Tribut-Beschwoerung auf einen vollen Helden: das Opfern schafft erst
   // den Platz, in dem die Kreatur landet — mindestens eine der Auswahlen
@@ -49879,7 +49884,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               {['Start Phase', 'Resource Phase', 'Main Phase 1', 'Action Phase', 'Main Phase 2', 'End Phase'].map((phase, i) => {
                 const isActive = currentPhase === i;
                 const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-                const canClick = tutorialPhaseErlaubt(i) && isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
+                const canClick = tutorialPhaseErlaubt(i) && isMyTurn && !result && !gegnerLoestReaktionAuf && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && (
                   (currentPhase === 2 && (i === 3 || i === 5)) ||
                   (currentPhase === 3 && (i === 4 || i === 5)) ||
                   (currentPhase === 4 && i === 5)
@@ -49901,7 +49906,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Ida's target prompt), phase advance is refused. Greying out
               // the buttons here avoids the confusing silent reject.
               const spellResolving = (gameState._spellResolutionDepth || 0) > 0;
-              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && currentPhase >= 2 && currentPhase <= 4;
+              const canAdvance = isMyTurn && !result && !gameState.effectPrompt && !gameState.potionTargeting && !gameState.mulliganPending && !gameState.heroEffectPending && !spellHeroPick && !pendingAdditionalPlay && !pendingAbilityActivation && !showSurrender && !showEndTurnConfirm && !spellResolving && !gegnerLoestReaktionAuf && currentPhase >= 2 && currentPhase <= 4;
               const nextMap = { 2: 3, 3: 4, 4: 5 };
               const canNext = canAdvance && tutorialPhaseErlaubt(nextMap[currentPhase]);
               const canEnd = canAdvance && tutorialPhaseErlaubt(5);
@@ -52874,72 +52879,76 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </DraggablePanel>
       )}
 
-      {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
-      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && ep?.type !== 'birthdayPresentPick' && ep?.type !== 'deckPeekPick' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
-          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
-            {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
-             ep.type === 'deckSearchReveal' ? '🔍 Opponent is viewing...' :
-             ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
-             ep.type === 'creationDiscard' ? (ep.opponentTitle || '🗑 Opponent is deleting a placed card...') :
-             ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
-             ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
-             ep.type === 'pickFromOppHand' ? '✉️ Opponent is reading your hand...' :
-             ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
-             ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
-             ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :
-             '⏳ Waiting for opponent...'}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-            {ep.type === 'cardGallery' ? 'Waiting for opponent to choose a card...' :
-             ep.type === 'cardGalleryMulti' ? 'Waiting for opponent to select cards...' :
-             ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
-             ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
-             ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
-             ep.type === 'slipperyMove' ? 'Waiting for opponent to slide their Slippery Creatures...' :
-             ep.type === 'guardChangeMove' ? 'Waiting for opponent to reposition their Creatures...' :
-             ep.type === 'pengueAbilityMove' ? 'Waiting for opponent to move an Ability...' :
-             ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
-             ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
-             ep.type === 'creationDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to choose a card from their Creation Zone...') :
-             ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
-             ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
-             ep.type === 'pickHandCard' ? (ep.opponentSubtitle || 'Waiting for opponent to pick a card from their hand...') :
-             ep.type === 'pickFromOppHand' ? 'Opponent is taking a card from your hand...' :
-             ep.type === 'handPick' ? 'Waiting for opponent to select cards...' :
-             ep.type === 'optionPicker' ? 'Waiting for opponent to choose an option...' :
-             ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
-             ep.type === 'statusSelect' ? 'Waiting for opponent to choose a status...' :
-             ep.type === 'abilityAttach' ? 'Waiting for opponent to attach an ability...' :
-             ep.type === 'blindHandPick' ? 'Opponent is choosing cards from your hand...' :
-             ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
-             ep.type === 'cardNamePicker' ? 'Waiting for opponent to declare a card name...' :
-             'Waiting for opponent...'}
-          </div>
-        </DraggablePanel>
-      )}
-
-      {/* ── ★ v1372 (Als Befund, Madame Guillotine): der Gegner waehlt ein
-          ZIEL, waehrend ICH am Zug bin. Die Zielwahl laeuft ueber
-          `potionTargeting`, nicht ueber `effectPrompt` — und das Warte-
-          Panel darueber schliesst `potionTargeting` ausdruecklich aus. Wer
-          am Zug ist, sass deshalb vor einem blockierten Brett ohne
-          Hinweis. Im Zug des Gegners bleibt es wie bisher still (dort
-          wartet ohnehin niemand auf ihn). ── */}
-      {!isSpectator && !result && gameState.potionTargeting
-        && gameState.potionTargeting.ownerIdx !== myIdx
-        && gameState.activePlayer === myIdx && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
-          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
-            🎯 Opponent is choosing...
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-            {gameState.potionTargeting.potionName
-              ? `Waiting for opponent to choose a target for ${gameState.potionTargeting.potionName}...`
-              : 'Waiting for opponent to choose a target...'}
-          </div>
-        </DraggablePanel>
-      )}
+      {/* ── Waiting for opponent ──
+          EIN Panel fuer alle Faelle (Prompt des Gegners / Zielwahl des Gegners / Gegner loest eine Reaktion auf), damit es beim
+          Uebergang zwischen den Faellen nicht neu eingeblendet wird (flackert sonst). Die Faelle:
+            • 'prompt'  — der Gegner hat einen Effekt-Prompt offen (wie bisher),
+            • 'target'  — v1372 (Als Befund, Madame Guillotine): der Gegner waehlt ein ZIEL, waehrend ICH am Zug bin
+                          (laeuft ueber `potionTargeting`, nicht ueber `effectPrompt`),
+            • 'reaction'— ★ Als Befund (Punch in the Box): der Gegner loest eine Hand-Reaktion auf. Zwischen Zusage, Animation und
+                          Schaden gibt es KEINEN Prompt — das Brett wirkte frei bedienbar, jede Eingabe verpuffte. `reactionBusy`
+                          kommt vom Server (nur innerhalb eines Reaktionsfensters), gilt auch fuer CPU-Gegner und fuer den
+                          Spieler, der gerade NICHT am Zug ist. ── */}
+      {(() => {
+        const ausgenommen = ep?.type === 'birthdayPresentPick' || ep?.type === 'deckPeekPick';
+        const pt = gameState.potionTargeting;
+        const modus =
+          ((isOppEffectPrompt || isActivePlayerPromptForOpp) && !pt && !ausgenommen) ? 'prompt'
+          : (!isSpectator && !result && pt && pt.ownerIdx !== myIdx && gameState.activePlayer === myIdx) ? 'target'
+          : (gegnerLoestReaktionAuf && !gameState.heroEffectPending && !isMyEffectPrompt && !ausgenommen
+              && !(pt && pt.ownerIdx === myIdx)) ? 'reaction'
+          : null;
+        if (!modus) return null;
+        return (
+          <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
+            <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+              {modus === 'target' ? '🎯 Opponent is choosing...'
+               : modus === 'reaction' ? '⏳ Waiting for opponent...'
+               : ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
+                 ep.type === 'deckSearchReveal' ? '🔍 Opponent is viewing...' :
+                 ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
+                 ep.type === 'creationDiscard' ? (ep.opponentTitle || '🗑 Opponent is deleting a placed card...') :
+                 ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
+                 ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
+                 ep.type === 'pickFromOppHand' ? '✉️ Opponent is reading your hand...' :
+                 ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
+                 ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
+                 ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :
+                 '⏳ Waiting for opponent...'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+              {modus === 'target' ? (pt.potionName
+                  ? `Waiting for opponent to choose a target for ${pt.potionName}...`
+                  : 'Waiting for opponent to choose a target...')
+               : modus === 'reaction' ? 'Opponent is resolving a reaction...'
+               : ep.type === 'cardGallery' ? 'Waiting for opponent to choose a card...' :
+                 ep.type === 'cardGalleryMulti' ? 'Waiting for opponent to select cards...' :
+                 ep.type === 'confirm' ? 'Waiting for opponent to confirm...' :
+                 ep.type === 'zonePick' ? 'Waiting for opponent to select a zone...' :
+                 ep.type === 'skatesMove' ? 'Waiting for opponent to move a creature...' :
+                 ep.type === 'slipperyMove' ? 'Waiting for opponent to slide their Slippery Creatures...' :
+                 ep.type === 'guardChangeMove' ? 'Waiting for opponent to reposition their Creatures...' :
+                 ep.type === 'pengueAbilityMove' ? 'Waiting for opponent to move an Ability...' :
+                 ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
+                 ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
+                 ep.type === 'creationDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to choose a card from their Creation Zone...') :
+                 ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
+                 ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
+                 ep.type === 'pickHandCard' ? (ep.opponentSubtitle || 'Waiting for opponent to pick a card from their hand...') :
+                 ep.type === 'pickFromOppHand' ? 'Opponent is taking a card from your hand...' :
+                 ep.type === 'handPick' ? 'Waiting for opponent to select cards...' :
+                 ep.type === 'optionPicker' ? 'Waiting for opponent to choose an option...' :
+                 ep.type === 'playerPicker' ? 'Waiting for opponent to pick a player...' :
+                 ep.type === 'statusSelect' ? 'Waiting for opponent to choose a status...' :
+                 ep.type === 'abilityAttach' ? 'Waiting for opponent to attach an ability...' :
+                 ep.type === 'blindHandPick' ? 'Opponent is choosing cards from your hand...' :
+                 ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
+                 ep.type === 'cardNamePicker' ? 'Waiting for opponent to declare a card name...' :
+                 'Waiting for opponent...'}
+            </div>
+          </DraggablePanel>
+        );
+      })()}
 
       {/* ── Waiting for opponent's pre-game hero effect (Bill, etc.) ── */}
       {!isSpectator && !result && gameState.heroEffectPending && gameState.heroEffectPending.ownerIdx !== myIdx && (
