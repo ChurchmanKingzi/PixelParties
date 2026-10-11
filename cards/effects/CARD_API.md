@@ -19143,6 +19143,38 @@ Spell (Normal, Lv1, **Decay Magic + Destruction Magic**): „Choose a Frozen tar
 
 **Wächter:** `scripts/skilltest-e2e/frost-breaker.test.js` (Zeitpunkt-Helfer inkl. Puzzle-Rückdatierung und Aufräumen, nur gefrorene Ziele beider Seiten, Heilen + Schaden auf Held/Kreatur/eigene Kreatur, Skalierung über beide Schulen mit Deckel, Abbruch, Zusatzaktion je Ziel in Action Phase / Main Phase 1 / Main Phase 2 / nach verbrauchter Aktion) und im echten Browser `scripts/skilltest-e2e/ui-frost-breaker.js` (Puzzle-Spiel: alter Freeze → Zusatzaktion mit offener Action Phase; junger Freeze → Aktion verbraucht; nichts gefroren → abgelehnt; gefrorene Kreatur; Animation bemalt, Klänge, Log).
 
+## ★ STATUS-FENSTER IM STAPEL — `engine.batchStatusWindow` und `engine.reactionWindowEvent()` (The Melting, Als Vorgabe 10.10.)
+
+Jede Status-Anwendung (`applyCreatureStatus`, `addHeroStatus`) öffnet ihr EIGENES generisches Kettenfenster auf `onStatusApplied` (Sculpture Theft, The Melting). Wirkt EIN Effekt auf mehrere Ziele, ist das falsch herum: „one or more targets are Frozen" meint den Effekt als Ganzes, und eine Reaktion nach dem ersten Ziel ließe den Rest hinterher noch einfrieren. Für solche Effekte:
+
+```js
+await engine.batchStatusWindow('frozen', async () => {
+  for (const z of ziele) await einfrieren(engine, z, { dauer, appliedBy: pi, source: CARD_NAME });
+});
+```
+
+- Während des Stapels laufen die Status-Hooks wie immer (jeder Listener sieht jedes Ziel, auch Resistance & Co.), nur das **Reaktionsfenster wird zurückgestellt**.
+- Danach öffnet **EIN** Fenster. `hookCtx.targets = [{ target, onCreature, heroOwner?, heroIdx?, opts }]` (nur Ziele, deren Status noch liegt), `hookCtx.target` = das letzte davon, `_batch: true`. Reaktionen, die `hookCtx.target` lesen, müssen `targets` mitdenken (Sculpture Theft tut es).
+- Verschachtelt sammelt der äußere Stapel; wirft der Effekt, wird der Stapel ohne Fenster geräumt; in MCTS/Fast-Mode und mitten in einer Kette (`_inReactionCheck`) öffnet kein Fenster — wie `runHooks`.
+- Gebündelt sind die Massen-Freezes: Iceage, Cold-Hearted Yuki-Onna, Embodiment of Biseria (Blizzard), Snowstorm Mischief, Mischief Invasion, The White Army. Einzelziel-Freezes (Frost Rune, Icebolt, Cold Coffin …) bleiben beim Einzelfenster. **Neue Massen-Freezes gehören in den Stapel** (Wächter: `the-melting.test.js` prüft die sechs Quellen).
+- Folge für Sculpture Theft: bei einem Massen-Freeze wird die Karte jetzt EINMAL nach dem ganzen Effekt angeboten (vorher: je Kreatur), und der Spieler wählt unter allen gefrorenen Kreaturen.
+
+`engine.reactionWindowEvent()` liefert das gerade offene Hook-Fenster `{ hookName, hookCtx }` (oder `null`) — von der Eröffnung bis nach der Auflösung der Kette, geschachtelte Fenster stellen den äußeren Stand wieder her. Reaktionen lesen es in `onChainAdd(engine, pi, chain, link)` (das Kettenglied steht, das Fenster ist noch offen) und legen ihr Ergebnis am Glied ab; `resolve(engine, pi, null, null, chain, idx)` bekommt nur die Kette — der Wirker steht in `chain[idx].casterHeroIdx` (+ `casterOwner`, falls der Held geliehen ist).
+
+## ★ THE MELTING — alles Gefrorene taut; Gegner-Zug endet (Als Vorgabe 10.10.)
+
+Spell (Reaction, Lv1, Support Magic): „Play this card immediately when one or more targets are Frozen. Heal all Frozen targets on the board from their Freeze. If the user has at least Destruction Magic 1 and the Freeze effect was an opponent's effect during the opponent's turn, immediately end their turn." — **Text geändert** (vorher: nur eigene Ziele, nur Gegner-Eis, ein Ziel heilen, Zug-Ende immer mit Destruction Magic). Die Schule (Support Magic), Lv1 und „Reaction" sind unverändert; `skilltestLegal` bleibt falsch.
+
+- **Fenster:** das generische Kettenfenster auf `onStatusApplied` (`isReaction`, `canActivate: () => false`, `reactionCondition`: Hook `onStatusApplied`, Status `frozen`, und noch etwas Gefrorenes auf dem Brett). Jeder Freeze öffnet es — Held wie Kreatur, auch beim Eis des eigenen Effekts und auf fremden Zielen (der Text sagt „targets"); Massen-Freezes als EIN Fenster nach dem ganzen Effekt (siehe oben). Angeboten wird sie jedem Spieler mit der Karte auf der Hand und einem Wirker (Support Magic Lv1; **ein eingefrorener Held wirkt nicht** — ein Massen-Freeze, der alle eigenen Helden trifft, lässt das Fenster leer).
+- **Heilen:** ALLE gefrorenen Helden und Kreaturen BEIDER Seiten (`alleGefrorenen` in `_frost-shared.js`), über `cleanseHeroStatuses`/`cleanseCreatureStatuses(['frozen'])` — Sperren wie „status effects cannot be removed" gelten. Bild: Brett-Animation `the_melting`; aufgetaut wird bei `HEAL_MS` 880.
+- **Zug beenden:** Destruction Magic 1+ des WIRKENDEN Helden (`effectiveSchoolLevelForCaster`, „as if" zählt; bei zwei möglichen Wirkern entscheidet die Wahl des Spielers) **und** mindestens ein Auslöse-Ziel wurde von einem GEGNER des Nutzers eingefroren (`engine.statusVerursacher`), der gerade am Zug ist. Das Ergebnis steht beim Aktivieren fest (`onChainAdd`, `link._gegnerEis`). Dann `gs._terrorForceEndTurn = <Gegner am Zug>` + `gs._terrorForceEndSource = { name: 'The Melting', owner: Nutzer }` — der kanonische Hebel (Phoenix Bombardment, Doom Prophecy …): server.js wartet, bis nichts mehr aufgelöst wird, und beendet dann den Zug. Blackstache und Tuscan Prisoner schützen (`_blackstacheBlocksTurnEnd`, Log `turn_end_blocked`); geheilt wird trotzdem.
+- **CPU:** `cpuMeta.reactionHeuristic`: spielen, wenn mindestens ein eigenes Ziel gefroren ist und die eigenen nicht seltener sind als die fremden (alles Gefrorene taut, auch das des Gegners).
+- **Bild und Klang:** `the_melting` (Brett-Animation `zoneType: 'board'`, `regionAll`, `targets` = alle gefrorenen Ziele; Hülle `ppSalve`, Pixelart, 1,45 s; Vorlage: Flamme neben einem Schneemann): an jedem Ziel schmilzt die Eiskruste (Rauschkörnung, heller nasser Rand; bei Helden samt Sprite) von oben nach unten ab, einzelne Spalten hängen als Tropfnasen länger, daneben brennt eine kleine Flamme, Tropfen fallen und spritzen, eine Pfütze wächst, Dampf steigt; bei ~760 ms blitzen Funkelsterne. Klang `ZONE_ANIM_SFX.the_melting`: `elem_fire` + `elem_water` (250 ms) + `elem_ice` (450 ms) + `status_remove` (760 ms) + `heal`.
+- **Log:** `the_melting` (`healed`, `endedTurn`, `blocked`).
+- **Kunst:** 76×51 nativ, `kind: 'a'`.
+
+**Wächter:** `scripts/skilltest-e2e/the-melting.test.js` (Fenster für Held und Kreatur, eigenes und fremdes Eis, alles Gefrorene taut, Hand-/Wirker-Regeln, „Nein"; Zug-Ende nur mit Destruction Magic UND Gegner-Eis im Gegner-Zug, in allen Gegenproben, Blackstache, Wirkerwahl; Stapel: ein Fenster, ohne Stapel je Eis eines, alle Helden gefroren → kein Wirker, verschachtelt, Wurf; Sculpture Theft einzeln und im Stapel; CPU-Heuristik) und im echten Browser `scripts/skilltest-e2e/ui-the-melting.js` (Brett-Animation bemalt, Klänge, weg nach 1,5 s; Puzzle-Spiel mit Instant Cryo Stasis gegen eine CPU, die The Melting hält: sie spielt sie, alles taut, mein Zug endet sofort).
+
 ## ★ PINTA, THE SINGING SHIP — Aufdecken und Beschwören aus dem Potion Deck
 
 Hero (`PP MSIN`, 400 HP / 0 ATK, Navigation + Singing). Text: Potion-Deck-Klausel (15 Creatures, verschiedene Namen, Gesamtlevel ≤ 15), „You may once per turn reveal the top card of your Potion Deck and immediately summon it with this Hero as an additional Action, if possible. **Shuffle your Potion Deck afterwards.**", nur als Starthero, nie aus dem Potion Deck ziehen.

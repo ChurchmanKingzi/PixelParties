@@ -85,7 +85,9 @@ module.exports = {
       let feinde = gegnerZiele(engine, oi);
       eisblockAnimation(engine, feinde);
       await engine._delay(300);
-      for (const z of feinde) await einfrieren(engine, z, { dauer: 1, appliedBy: pi, source: CARD_NAME });
+      await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)
+        for (const z of feinde) await einfrieren(engine, z, { dauer: 1, appliedBy: pi, source: CARD_NAME });
+      });
       engine.sync();
       await engine._delay(350);
 

@@ -94,11 +94,13 @@ module.exports = {
       ps._whiteArmyUsedTurn = gs.turn;
 
       let frozenCount = 0;
-      for (const id of picked) {
-        const t = candidates.find(c => c.id === id);
-        if (!t) continue;
-        if (await applyFreezeToTarget(engine, t, 1, pi)) frozenCount++;
-      }
+      await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)
+        for (const id of picked) {
+          const t = candidates.find(c => c.id === id);
+          if (!t) continue;
+          if (await applyFreezeToTarget(engine, t, 1, pi)) frozenCount++;
+        }
+      });
       await engine._delay(300);
       engine.log('the_white_army', {
         player: ps.username, frozen: frozenCount,

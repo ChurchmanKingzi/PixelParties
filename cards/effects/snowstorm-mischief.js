@@ -57,15 +57,17 @@ module.exports = {
       // Bear Rider's hand-level recompute and Chilly Wizard's mirror
       // observe each freeze).
       let frozenCount = 0;
-      for (const inst of targets) {
-        const applied = await engine.applyCreatureStatus(inst, 'frozen', {
-          duration: 2,
-          sourceOwner: pi,
-          source: CARD_NAME,
-          animationType: 'ice_encase',
-        });
-        if (applied) frozenCount++;
-      }
+      await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)
+        for (const inst of targets) {
+          const applied = await engine.applyCreatureStatus(inst, 'frozen', {
+            duration: 2,
+            sourceOwner: pi,
+            source: CARD_NAME,
+            animationType: 'ice_encase',
+          });
+          if (applied) frozenCount++;
+        }
+      });
       await engine._delay(400);
 
       engine.log('snowstorm_mischief', {

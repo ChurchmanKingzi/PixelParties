@@ -472,11 +472,13 @@ module.exports = {
       });
       let frozenCount2 = 0;
       if (freezePick) {
-        for (const id of freezePick) {
-          const t = freezeCandidates.find(c => c.id === id);
-          if (!t) continue;
-          if (await applyFreezeToTarget(engine, t, 1, pi)) frozenCount2++;
-        }
+        await engine.batchStatusWindow('frozen', async () => {   // EIN Reaktionsfenster nach dem ganzen Effekt (The Melting)
+          for (const id of freezePick) {
+            const t = freezeCandidates.find(c => c.id === id);
+            if (!t) continue;
+            if (await applyFreezeToTarget(engine, t, 1, pi)) frozenCount2++;
+          }
+        });
       }
 
       engine.log('mischief_invasion', {

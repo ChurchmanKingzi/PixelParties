@@ -80,6 +80,32 @@ function frostVerlaengern(engine, ziel, plus) {
   return true;
 }
 
+/**
+ * ALLE Gefrorenen auf dem Brett, beide Seiten — Helden (lebend) und Kreaturen (Support Zones, aufgedeckt, nicht Ausruestung):
+ * `[{ type: 'hero'|'creature', owner (physische Seite), heroIdx, slotIdx (-1 beim Helden), obj (Held bzw. Instanz), name }]`.
+ * Frost Breaker und The Melting.
+ */
+function alleGefrorenen(engine) {
+  const gs = engine.gs;
+  const out = [];
+  for (let p = 0; p < (gs.players || []).length; p++) {
+    const helden = gs.players[p]?.heroes || [];
+    for (let hi = 0; hi < helden.length; hi++) {
+      const h = helden[hi];
+      if (h?.name && h.hp > 0 && h.statuses?.frozen) out.push({ type: 'hero', owner: p, heroIdx: hi, slotIdx: -1, obj: h, name: h.name });
+    }
+  }
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown || !inst.counters?.frozen) continue;
+    if (engine.isEquipInZone(inst.name, inst)) continue;
+    const cd = engine.getEffectiveCardData(inst);
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+    const seite = inst.stolenBy != null ? inst.owner : (inst.controller ?? inst.owner);
+    out.push({ type: 'creature', owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, obj: inst, name: inst.name });
+  }
+  return out;
+}
+
 function eisblockAnimation(engine, ziele) {
   for (const z of ziele) {
     engine._broadcastEvent('play_zone_animation', {
@@ -88,4 +114,4 @@ function eisblockAnimation(engine, ziele) {
   }
 }
 
-module.exports = { gegnerZiele, einfrieren, istGefroren, frostVerlaengern, eisblockAnimation };
+module.exports = { gegnerZiele, einfrieren, istGefroren, frostVerlaengern, eisblockAnimation, alleGefrorenen };

@@ -2775,6 +2775,15 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // The Melting (10.10.) — Flamme am Eis, alles taut: Feuerrauschen, Plätschern der Tropfen, leises Eisknacken, beim Funkeln (~760 ms) der Klang des Auftauens
+  // mit einem hellen Heilton. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  the_melting: [
+    { name: 'elem_fire',     opts: { rate: 0.85, volume: 0.7 } },
+    { name: 'elem_water',    opts: { rate: 1.0,  volume: 0.8, delay: 250, category: null, dedupe: 0 } },
+    { name: 'elem_ice',      opts: { rate: 1.3,  volume: 0.5, delay: 450, category: null, dedupe: 0 } },
+    { name: 'status_remove', opts: { rate: 1.0,  volume: 0.9, delay: 760, category: null, dedupe: 0 } },
+    { name: 'heal',          opts: { rate: 1.3,  volume: 0.5, delay: 800, category: null, dedupe: 0 } },
+  ],
   // Frost Breaker (10.10.) — Flammen am Eis: Feuerrauschen, feines Eisknistern beim Reissen, beim Bersten (~540 ms) lauter Eisklirren mit Schlag
   // und dem Klang des Auftauens, danach Zischen der Tropfen. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   frost_breaker: [

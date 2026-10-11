@@ -17627,12 +17627,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // MCTS / fast-mode short-circuit the hook entirely — `_delay` is
     // a no-op there anyway, so the reaction window can't open.
     if (!this._inMctsSim && !this._fastMode) {
+      // Stapel (`batchStatusWindow`): das Fenster wartet auf das Ende des ganzen Effekts
+      const stapel = !opts?._skipReactionCheck ? this._statusStapelFuer(statusName) : null;
+      if (stapel) stapel.eintraege.push({ target: inst, onCreature: true, opts });
       try {
         await this.runHooks(HOOKS.ON_STATUS_APPLIED, {
           target: inst, statusName, status: statusName,
           _onCreature: true,
           opts,
-          _skipReactionCheck: !!opts?._skipReactionCheck,
+          _skipReactionCheck: !!opts?._skipReactionCheck || !!stapel,
         });
       } catch (err) {
         console.error('[applyCreatureStatus hook fire]', err.message);
@@ -37341,6 +37344,57 @@ this._deathWatch = (this._deathWatchStack || []).length
    * If reactions fire, builds a chain and resolves LIFO.
    * Replaces the old sequential reaction processing.
    */
+  /**
+   * ★ Das gerade offene HOOK-Reaktionsfenster: `{ hookName, hookCtx }` — oder `null`. Gilt von der Eroeffnung bis nach der Aufloesung der
+   * Kette. Reaktionen, die wissen muessen, WORAUF sie reagieren (The Melting: wer hat eingefroren?), lesen es in `onChainAdd`; die
+   * Aufloesung bekommt nur die Kette. Ineinandergeschachtelte Fenster stellen den aeusseren Stand wieder her.
+   */
+  reactionWindowEvent() {
+    return this._reactionWindowEvent || null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  STATUS-FENSTER IM STAPEL — „one or more targets are Frozen" (The Melting, Sculpture Theft)
+  // ═══════════════════════════════════════════════════════════════
+  // Jede Status-Anwendung oeffnet ihr EIGENES Reaktionsfenster (`onStatusApplied`). Wirkt EIN Effekt auf mehrere Ziele (Iceage, Yuki-Onna …),
+  // ist das falsch herum: „one or more targets" meint den Effekt als Ganzes, und eine Reaktion nach dem ersten Ziel liesse den Rest des Effekts
+  // hinterher noch einfrieren. Wer mehrere Ziele auf einmal trifft, wickelt die Schleife in `engine.batchStatusWindow('frozen', async () => …)`:
+  //   • waehrend des Stapels laufen die Status-Hooks wie immer (Listener sehen jedes Ziel), nur das Reaktionsfenster wird zurueckgestellt;
+  //   • danach oeffnet EIN Fenster mit `hookCtx.targets = [{ target, onCreature, heroOwner?, heroIdx?, opts }]` (nur Ziele, deren Status noch
+  //     liegt); `hookCtx.target` ist das letzte davon, `_batch: true`;
+  //   • verschachtelt sammelt der aeussere Stapel; ein Wurf im Effekt raeumt den Stapel ohne Fenster.
+  async batchStatusWindow(statusName, fn) {
+    if (this._statusBatch) return await fn();
+    const stapel = { statusName, eintraege: [] };
+    this._statusBatch = stapel;
+    let res;
+    try { res = await fn(); }
+    finally { this._statusBatch = null; }
+    await this._statusStapelFenster(stapel);
+    return res;
+  }
+
+  /** Der offene Stapel, falls er diesen Status sammelt. */
+  _statusStapelFuer(statusName) {
+    return this._statusBatch && this._statusBatch.statusName === statusName ? this._statusBatch : null;
+  }
+
+  async _statusStapelFenster(stapel) {
+    const { statusName } = stapel;
+    const noch = stapel.eintraege.filter(en => (en.onCreature
+      ? (en.target.zone === 'support' && !!en.target.counters?.[statusName])
+      : !!en.target.statuses?.[statusName]));
+    if (noch.length === 0) return;
+    if (this._inMctsSim || this._fastMode || this.gs.result) return;
+    if (this._inReactionCheck) return;                 // wie `runHooks`: mitten in einer Kette oeffnet kein neues Fenster
+    const letzter = noch[noch.length - 1];
+    await this._checkReactionCards(HOOKS.ON_STATUS_APPLIED, {
+      target: letzter.target, statusName, status: statusName, _onCreature: letzter.onCreature,
+      ...(letzter.onCreature ? {} : { heroOwner: letzter.heroOwner, heroIdx: letzter.heroIdx }),
+      opts: letzter.opts, targets: noch, _batch: true,
+    });
+  }
+
   async _checkReactionCards(hookName, hookCtx) {
     if (GameEngine.REACTION_SKIP_HOOKS.has(hookName)) return;
     if (!GameEngine.HOOK_DESCRIPTIONS[hookName]) return;
@@ -37373,7 +37427,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Vorgaenger sichern: ein verschachteltes Fenster (On-Summon mitten in
     // einer Kette) darf das Flag der aeusseren Kette nicht loeschen.
     const _aeussereKette = this._inReactionCheck;
+    const _aeusseresFenster = this._reactionWindowEvent;
     this._inReactionCheck = true;
+    this._reactionWindowEvent = { hookName, hookCtx };
     try {
       // Forward the hookName + hookCtx so reactions can inspect the
       // precise event (e.g. Sculpture Theft only fires on
@@ -37384,6 +37440,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     } finally {
       this._inReactionCheck = _aeussereKette;
+      this._reactionWindowEvent = _aeusseresFenster;
     }
     // NOTE: deliberately NO `_runPostChainActions()` here.
     // `_checkReactionCards` runs from `runHooks` for nearly every
@@ -44544,11 +44601,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // when they remove the status off the apply edge — without this,
     // the status never appears in synced state and the client's
     // diff-detector misses the animation entirely.
+    // Stapel (`batchStatusWindow`): das Fenster wartet auf das Ende des ganzen Effekts
+    const stapel = !opts._skipReactionCheck ? this._statusStapelFuer(statusName) : null;
+    if (stapel) stapel.eintraege.push({ target: hero, onCreature: false, heroOwner: playerIdx, heroIdx, opts });
     await this.runHooks(HOOKS.ON_STATUS_APPLIED, {
       target: hero, heroOwner: playerIdx, heroIdx, statusName, status: statusName,
       animationType: opts.animationType || _DEFAULT_STATUS_ANIM_HERO[statusName] || null,
       opts,
-      _skipReactionCheck: opts._skipReactionCheck,
+      _skipReactionCheck: opts._skipReactionCheck || !!stapel,
     });
     this.sync();
   }

@@ -37,7 +37,7 @@
 //  lecken am Eis, Risse laufen, das Eis birst in Splitter, Dampf und Tropfen. Klänge in ZONE_ANIM_SFX.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { alleGefrorenen } = require('./_frost-shared');
 
 const CARD_NAME = 'Frost Breaker';
 const SCHULEN = ['Decay Magic', 'Destruction Magic'];
@@ -45,27 +45,6 @@ const DAMAGE = { 1: 100, 2: 200, 3: 300 };
 const DAUER_MS = 1500;       // Länge der Animation (deckt sich mit `frost_breaker` im Client)
 const HIT_MS = 640;          // Eis birst bei ~540 ms der Animation (+100 ms Einbau-Versatz des Clients)
 const NACH_MS = 420;         // Dampf noch ein Stück aufsteigen lassen, bevor der Zauber endet
-
-/** Alle gefrorenen Ziele auf dem Brett (beide Seiten): [{ type, owner, heroIdx, slotIdx, obj }]. */
-function gefrorene(engine) {
-  const gs = engine.gs;
-  const out = [];
-  for (let p = 0; p < (gs.players || []).length; p++) {
-    const helden = gs.players[p]?.heroes || [];
-    for (let hi = 0; hi < helden.length; hi++) {
-      const h = helden[hi];
-      if (h?.name && h.hp > 0 && h.statuses?.frozen) out.push({ type: 'hero', owner: p, heroIdx: hi, slotIdx: -1, obj: h });
-    }
-  }
-  for (const inst of engine.cardInstances) {
-    if (inst.zone !== 'support' || inst.faceDown || !inst.counters?.frozen) continue;
-    if (engine.isEquipInZone(inst.name, inst)) continue;
-    const cd = engine.getEffectiveCardData(inst);
-    if (!cd || !hasCardType(cd, 'Creature') || !engine.isChoosableAsCreature(inst, cd)) continue;
-    out.push({ type: 'creature', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, obj: inst });
-  }
-  return out;
-}
 
 /** War dieses Ziel schon in `pi`s letztem eigenen Zug Frozen (und ist es noch)? */
 function altGenug(engine, pi, obj) {
@@ -94,13 +73,13 @@ module.exports = {
   /** „If the target was already Frozen during your last turn, this counts as an additional Action" — irgendein solches Ziel genügt. */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    return gefrorene(engine).some(z => altGenug(engine, pi, z.obj));
+    return alleGefrorenen(engine).some(z => altGenug(engine, pi, z.obj));
   },
 
   /** Grau, solange nichts gefroren ist. */
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return false;
-    return gefrorene(engine).length > 0;
+    return alleGefrorenen(engine).length > 0;
   },
 
   hooks: {
