@@ -31,7 +31,8 @@ for (const typ of KOSTEN_ANIMATIONEN) {
 // Der Aufdeck-Flug auf einen Brettplatz (`mill_center_reveal`, dest 'support') ist kein Abwurf: sein `discard` bei 75 %
 // verschluckte den Beschwoerungs-Klang der gelandeten Creature (10.10.).
 const board = fs.readFileSync(path.join(__dirname, '..', 'public', 'app-board.jsx'), 'utf8');
-if (!/dest === 'support' \? 0 : setTimeout\(\(\) => sfx\('discard'\)/.test(board)) {
+// (Seit Super Fan fliegt der Aufdeck-Flug auch in eine Ability Zone — `dest: 'ability'` teilt sich die Ausnahme mit 'support'.)
+if (!/\(?dest === 'support'(?: \|\| dest === 'ability')?\)? \? 0 : setTimeout\(\(\) => sfx\('discard'\)/.test(board)) {
   fehler.push("`KassaranFlipCard` spielt bei `dest: 'support'` wieder `discard` und verschluckt damit den Beschwoerungs-Klang (app-board.jsx).");
 }
 if (fehler.length) {

@@ -2785,6 +2785,50 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',         opts: { rate: 0.9,  volume: 0.8, delay: 520, category: null, dedupe: 0 } },
     { name: 'heavy_impact', opts: { rate: 1.3,  volume: 0.5, delay: 540, category: null, dedupe: 0 } },
   ],
+  // Spearman (10.10.) — der Speer zischt (0), fährt in das Ziel (170 ms), Aufschlag (320 ms), das Verbotszeichen blitzt auf (400 ms)
+  spearman_thrust: [
+    { name: 'projectile', opts: { rate: 1.25, volume: 0.6, delay: 60, category: null, dedupe: 250 } },
+    { name: 'slash', opts: { rate: 1.1, volume: 0.7, delay: 220, category: null, dedupe: 250 } },
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.55, delay: 330, category: null, dedupe: 250 } },
+    { name: 'negate', opts: { rate: 1.0, volume: 0.7, delay: 410, category: null, dedupe: 250 } },
+  ],
+  // The Creepy Clown of Heaven (10.10.) — die Nase quietscht auf (0 und ~200 ms, hoher Ping), platzt bei ~430 ms (Schlag, Konfetti-Rauschen), dazu der dunkle
+  // Verneinungs-Ton der erlöschenden Aura. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  clown_pop: [
+    { name: 'ping',         opts: { rate: 1.8,  volume: 0.45 } },
+    { name: 'ping',         opts: { rate: 2.3,  volume: 0.4, delay: 200, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.5,  volume: 0.6, delay: 430, category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 1.9,  volume: 0.35, delay: 450, category: null, dedupe: 0 } },
+    { name: 'negate',       opts: { rate: 0.9,  volume: 0.6, delay: 520, category: null, dedupe: 0 } },
+  ],
+  // Cute Crown (10.10.) — die Flügel schlagen (Wind, 0 / ~110 / ~220 ms), das Juwel klingt hell (~300 ms), Herzen steigen auf (~520 ms). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  crown_flutter: [
+    { name: 'elem_wind', opts: { rate: 2.0, volume: 0.4 } },
+    { name: 'elem_wind', opts: { rate: 2.2, volume: 0.35, delay: 110, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 2.4, volume: 0.3, delay: 220, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.2, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.6, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
+  ],
+  // The Oracle of Heaven (10.10.) — vier Augenpaare erwachen nacheinander (leise Pings, ~100/210/320/430 ms), der Kristall steigt auf (Wind, ~250 ms) und blitzt bei ~640 ms
+  // (heller Ton). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  oracle_vision: [
+    { name: 'ping',      opts: { rate: 1.3, volume: 0.35, delay: 100 } },
+    { name: 'ping',      opts: { rate: 1.5, volume: 0.35, delay: 210, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.7, volume: 0.35, delay: 320, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.9, volume: 0.35, delay: 430, category: null, dedupe: 0 } },
+    { name: 'elem_wind', opts: { rate: 0.8, volume: 0.45, delay: 250, category: null, dedupe: 0 } },
+    { name: 'reveal',    opts: { rate: 1.2, volume: 0.6, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Super Fan (10.10.) — der Leuchtstab schwingt zweimal (Wischen bei 0 und ~330 ms), die Herzen steigen mit hellen Pings auf (~260, 480, 700 ms). Nur der erste Teil
+  // uebernimmt die Sammelkategorie 'effect'.
+  fan_cheer: [
+    { name: 'elem_wind', opts: { rate: 1.7, volume: 0.45 } },
+    { name: 'elem_wind', opts: { rate: 2.0, volume: 0.4, delay: 330, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 1.7, volume: 0.5, delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.1, volume: 0.5, delay: 480, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.5, volume: 0.45, delay: 700, category: null, dedupe: 0 } },
+  ],
   // Sky Archeologist (10.10.) — zwei Spitzhackenschläge (~280 und ~600 ms: Eisen auf Stein mit dumpfem Nachhall), beim zweiten blitzt der Fund auf (~620 ms).
   // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sky_dig: [

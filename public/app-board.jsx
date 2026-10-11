@@ -946,7 +946,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
     }
     // ★ Ziel Deck (Als Vorgabe 10.10.): die Karte spielt das Aufdecken RÜCKWÄRTS — sie dreht sich wieder um (CSS `kf-zurueck`) und fliegt verdeckt ins Deck.
     if (phase === 'out') {
-      const to = (dest === 'support' || dest === 'center') ? 0 : setTimeout(() => sfx(dest === 'deck' ? 'draw' : 'discard'), dur * 0.6);
+      const to = (dest === 'support' || dest === 'ability' || dest === 'center') ? 0 : setTimeout(() => sfx(dest === 'deck' ? 'draw' : 'discard'), dur * 0.6);
       return () => { if (to) clearTimeout(to); };
     }
     sfx('draw');
@@ -955,7 +955,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
     // auf einen Brettplatz ist KEIN Abwurf, und der `discard` bei 75 % belegte den 'effect'-Slot bis kurz
     // vor der Landung — der `summon`-Klang der Creature (`creature_summoned`) fiel in die 400-ms-Sperre. Die
     // Landung auf dem Brett hat ihren eigenen Klang (Beschwoerung/Platzierung aus dem Log), hier also keinen.
-    const t2 = dest === 'support' ? 0 : setTimeout(() => sfx('discard'), dur * 0.75);
+    const t2 = (dest === 'support' || dest === 'ability') ? 0 : setTimeout(() => sfx('discard'), dur * 0.75);
     return () => { clearTimeout(t1); if (t2) clearTimeout(t2); };
   }, []);
   return (
@@ -26544,6 +26544,429 @@ const ANIM_REGISTRY = {
     };
     return ppSalve(malen, 820, vorbereiten);
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Spearman: Speerstich — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Speerträger)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Speerkämpfer als URSPRUNG und der angreifenden Creature als ZIEL: der Speer
+  //  (Holzschaft, Stahlspitze, rotes Fähnchen) wird erst ein Stück zurückgezogen (0–170 ms), schießt dann auf die Zielmitte (170–320 ms) und
+  //  schlägt bei ~320 ms ein (spearman.js: TREFFER_MS 420 — Einbau-Versatz 100 ms eingerechnet): Kreuzblitz, Funken, Splitter. Der Speer bleibt zitternd
+  //  stecken, ein rotes Verbotszeichen (Ring mit Schrägstrich) pulsiert ab ~380 ms über dem Ziel. Ab ~800 ms blendet alles über Dithering aus, bei
+  //  1100 ms ist es weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
+  // ═════════════════════════════════════════════════════════════════
+  spearman_thrust: (() => {
+    const HOLZ = ['#d49a52', '#a8693a', '#6d4122'].map(ppHex);
+    const STAHL = ['#ffffff', '#d3dce3', '#93a4b1', '#4d5b67'].map(ppHex);
+    const ROT = ['#ff7a68', '#d62f3e', '#7a1427'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a'), ORANGE = ppHex('#ff9b2f');
+    const ENDE = 1100, FADE_AB = 800, AUS = 170, FLUG = 150, TREFFER = AUS + FLUG, RING = 380;
+    const LAENGE = 19;                                                        // Speerlänge in Rasterpixeln
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => ({
+      funken: Array.from({ length: ppFxN(10) }, () => ({ w: Math.random() * Math.PI * 2, v: 24 + Math.random() * 46, leben: 200 + Math.random() * 180, farbe: Math.floor(Math.random() * 3) })),
+      splitter: Array.from({ length: ppFxN(5) }, () => ({ vx: (Math.random() - 0.5) * 50, vy: -(18 + Math.random() * 30), leben: 300 + Math.random() * 180 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 60, 0, 1));
+      if (a <= 0) return;
+      const O = sz.O, ex = z.x, ey = z.y;                                      // Einschlag = Zielmitte
+      const dx = z.dx, dy = z.dy, px = -dy, py = dx;                            // Richtung und Senkrechte
+      // ── Lage der Speerspitze und Neigung des Schafts ──
+      let tx, ty, ang = 0;
+      if (t < AUS) {                                                             // zurückziehen
+        const u = t / AUS, k = 10 - 6 * u * u;
+        tx = O.x + dx * k; ty = O.y + dy * k;
+      } else if (t < TREFFER) {                                                  // stechen
+        const u = Math.pow((t - AUS) / FLUG, 1.4);
+        const x0 = O.x + dx * 4, y0 = O.y + dy * 4;
+        tx = x0 + (ex - x0) * u; ty = y0 + (ey - y0) * u;
+      } else {                                                                   // steckt und zittert
+        tx = ex; ty = ey;
+        const ab = t - TREFFER;
+        ang = Math.sin(ab / 38) * 0.22 * Math.max(0, 1 - ab / 330);
+      }
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const rx = dx * ca - dy * sa, ry = dx * sa + dy * ca;                      // Speerrichtung (Spitze zeigt zum Ziel)
+      const qx = -ry, qy = rx;
+      // ── Schaft von der Spitze nach hinten: Stahl, dann Holz, am Ende das Fähnchen ──
+      for (let s = 0; s <= LAENGE; s++) {
+        const x = tx - rx * s, y = ty - ry * s;
+        if (s <= 1) { g.put(x, y, STAHL[0], a); continue; }
+        if (s <= 4) {                                                            // Stahlblatt: zwei Pixel breit
+          const c = s === 2 ? STAHL[0] : STAHL[1];
+          g.put(x, y, c, a); g.put(x + qx, y + qy, STAHL[2], a); g.put(x - qx, y - qy, s === 3 ? STAHL[2] : STAHL[3], a);
+          continue;
+        }
+        if (s === 5) { g.put(x, y, STAHL[3], a); g.put(x + qx, y + qy, STAHL[3], a); continue; }   // Zwinge
+        g.put(x, y, HOLZ[s % 4 === 0 ? 1 : 0], a);                               // Holzschaft: Lichtkante + Maserung
+        g.put(x + qx, y + qy, HOLZ[2], a * 0.9);
+      }
+      // Fähnchen am Schaftende (flattert beim Flug, hängt im Stecken)
+      const fx = tx - rx * (LAENGE - 1), fy = ty - ry * (LAENGE - 1);
+      const flat = t < TREFFER ? 1.4 : 0.6;
+      for (let i = 1; i <= 4; i++) {
+        const w = Math.sin(t / 55 + i * 0.9) * flat * (i / 4);
+        g.put(fx + qx * (i * 0.9 + 0.5) - rx * i * 0.4, fy + qy * (i * 0.9 + 0.5) - ry * i * 0.4 + w, i < 3 ? ROT[0] : ROT[1], a);
+        if (i < 4) g.put(fx + qx * (i * 0.9 + 0.5) - rx * i * 0.4 + qx * 0.3, fy + qy * (i * 0.9 + 0.5) - ry * i * 0.4 + w + 1, ROT[2], a);
+      }
+      // Flugschweif
+      if (t >= AUS && t < TREFFER) {
+        for (let j = 1; j <= 6; j++) g.put(tx - rx * (LAENGE + j * 1.5), ty - ry * (LAENGE + j * 1.5), j < 3 ? STAHL[1] : STAHL[2], a * (1 - j / 7));
+      }
+      // ── Einschlag: Kreuzblitz, Funken, Splitter ──
+      const ia = t - TREFFER;
+      if (ia >= 0) {
+        if (ia < 100) {
+          const r = ia < 50 ? 6 : 3;
+          for (let i = -r; i <= r; i++) { g.put(ex + i, ey, i === 0 ? WEISS : GELB, a); g.put(ex, ey + i, i === 0 ? WEISS : GELB, a); }
+          if (ia < 50) { g.put(ex - 1, ey - 1, ORANGE, a); g.put(ex + 1, ey - 1, ORANGE, a); g.put(ex - 1, ey + 1, ORANGE, a); g.put(ex + 1, ey + 1, ORANGE, a); }
+          g.block(ex - 1, ey - 1, 2, 2, WEISS, a);
+        }
+        for (const f of teile.funken) {
+          if (ia >= f.leben) continue;
+          const sek = ia / 1000, k = ia / f.leben;
+          g.put(ex + Math.cos(f.w) * f.v * sek, ey + Math.sin(f.w) * f.v * sek + 0.5 * 140 * sek * sek, f.farbe === 0 ? WEISS : f.farbe === 1 ? GELB : ORANGE, (1 - k) * a);
+        }
+        for (const s of teile.splitter) {
+          if (ia >= s.leben) continue;
+          const sek = ia / 1000, k = ia / s.leben;
+          g.put(ex + s.vx * sek, ey + s.vy * sek + 0.5 * 220 * sek * sek, STAHL[k < 0.5 ? 1 : 2], (1 - k) * a);
+        }
+      }
+      // ── Verbotszeichen: Ring mit Schrägstrich pulsiert über dem Ziel ──
+      const ra = t - RING;
+      if (ra >= 0) {
+        const grund = Math.min(z.w, z.h) * 0.42;
+        const wachs = klemme(ra / 130, 0, 1), puls = 1 + Math.sin(ra / 70) * 0.06 * (1 - klemme(ra / 420, 0, 1));
+        const r = grund * (0.45 + 0.55 * wachs) * puls;
+        const ra2 = a * klemme(ra / 60, 0, 1);
+        g.ring(ex, ey, r, r, ROT[1], ra2);
+        g.ring(ex, ey, r - 1, r - 1, ROT[1], ra2);
+        g.ring(ex, ey, r + 1, r + 1, ROT[2], ra2 * 0.8);
+        for (let i = -Math.floor(r * 0.72); i <= Math.floor(r * 0.72); i++) {
+          g.put(ex + i, ey - i, ROT[1], ra2); g.put(ex + i + 1, ey - i, ROT[1], ra2);
+          g.put(ex + i, ey - i - 1, ROT[0], ra2 * 0.55);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  The Creepy Clown of Heaven — PIXELART, die rote Nase platzt (Als Vorgabe 10.10.)
+  //
+  //  Am Platz des Clowns: die rote Nase bläht sich auf (Quetschen und Dehnen, vor dem Platzen blinkt sie weiß), bei ~420 ms
+  //  knallt sie — weißer Kreuzblitz mit Ring, Konfetti in Regenbogenfarben, flatternde Luftschlangen und ein gedithertes
+  //  Rauchringlein. Ausgelöst vom Tod des Clowns (the-creepy-clown-of-heaven.js: POP_MS, Einbau-Versatz 100 ms eingerechnet).
+  // ═══════════════════════════════════════════════════════════════════
+  clown_pop: (() => {
+    const NASE = ['#ff9a90', '#e5303f', '#8a1230'].map(ppHex);
+    const KONFETTI = ['#ff4fd8', '#ffe14a', '#3fe0ff', '#59e36b', '#ff9b2f', '#ffffff'].map(ppHex);
+    const RAUCH = ['#f6efff', '#c4b2e8', '#8f78c4'].map(ppHex);
+    const WEISS = ppHex('#ffffff'), GELB = ppHex('#ffe27a');
+    const ENDE = 1100, FADE_AB = 800, PLATZT = 420, SCHLAG = 110, RAUCH_MS = 420;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = () => {
+      const nK = ppFxN(26), nS = ppFxN(6);                                         // (Array.from reicht der Abbildung nur Wert und Index, kein Feld)
+      return {
+        konfetti: Array.from({ length: nK }, (_, i) => ({
+          w: (i / nK) * Math.PI * 2 + Math.random() * 0.45, v: 34 + Math.random() * 66,
+          leben: 520 + Math.random() * 320, farbe: Math.floor(Math.random() * KONFETTI.length), phase: Math.random() * 6,
+        })),
+        schlangen: Array.from({ length: nS }, (_, i) => ({
+          w: -Math.PI / 2 + (i - (nS - 1) / 2) * 0.62 + (Math.random() - 0.5) * 0.2,
+          laenge: 14 + Math.random() * 10, farbe: Math.floor(Math.random() * 4), schwung: 0.6 + Math.random() * 0.5,
+        })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 60, 0, 1));
+      if (a <= 0) return;
+      const cx = z.x, cy = z.y - z.h * 0.04;
+      const R = Math.max(4, Math.min(z.w, z.h) * 0.3);
+      // ── die Nase bläht sich auf ──
+      if (t < PLATZT) {
+        const u = t / PLATZT;
+        const wob = Math.sin(t / 38) * 0.11 * u;
+        const rx = R * (0.3 + 0.7 * Math.pow(u, 1.4)) * (1 + wob), ry = R * (0.3 + 0.7 * Math.pow(u, 1.4)) * (1 - wob);
+        const blink = u > 0.78 && Math.floor(t / 33) % 2 === 0;
+        const bx = Math.ceil(rx), by = Math.ceil(ry);
+        for (let j = -by; j <= by; j++) for (let i = -bx; i <= bx; i++) {
+          const e = (i * i) / (rx * rx) + (j * j) / (ry * ry);
+          if (e > 1) continue;
+          const gl = ((i + 0.35 * rx) * (i + 0.35 * rx)) / (rx * rx) + ((j + 0.35 * ry) * (j + 0.35 * ry)) / (ry * ry);
+          let c = gl < 0.22 ? NASE[0] : (i * 0.5 + j * 0.8 > R * 0.32 ? NASE[2] : NASE[1]);
+          if (e > 0.78) c = NASE[2];
+          if (blink && e <= 0.78) c = gl < 0.5 ? WEISS : NASE[0];
+          g.put(cx + i, cy + j, c, a);
+        }
+        return;
+      }
+      const ia = t - PLATZT;
+      // ── Knall: weißer Kreuzblitz mit Ring ──
+      if (ia < SCHLAG) {
+        const k = ia / SCHLAG, arm = Math.round(R * (2.4 - 1.2 * k));
+        for (let i = -arm; i <= arm; i++) { g.put(cx + i, cy, i === 0 ? WEISS : GELB, a * (1 - k * 0.5)); g.put(cx, cy + i, i === 0 ? WEISS : GELB, a * (1 - k * 0.5)); }
+        g.block(cx - 1, cy - 1, 3, 3, WEISS, a * (1 - k));
+        const rr = R * (1 + 2.2 * k);
+        g.ring(cx, cy, rr, rr, WEISS, a * (1 - k * 0.6));
+      }
+      // ── Rauchring ──
+      if (ia > 20 && ia < 20 + RAUCH_MS) {
+        const k = (ia - 20) / RAUCH_MS, rr = R * (1.2 + 1.5 * k), al = (1 - k) * 0.8 * a;
+        g.ring(cx, cy, rr, rr * 0.9, RAUCH[1], al); g.ring(cx, cy, rr - 1, rr * 0.9 - 1, RAUCH[0], al); g.ring(cx, cy, rr + 1, rr * 0.9 + 1, RAUCH[2], al * 0.7);
+      }
+      // ── Luftschlangen ──
+      for (const s of teile.schlangen) {
+        const wachs = klemme(ia / 240, 0, 1), sa = ia > 400 ? a * Math.max(0, 1 - (ia - 400) / 420) : a;
+        if (sa <= 0) continue;
+        const cw = Math.cos(s.w), sw = Math.sin(s.w), L = s.laenge * wachs;
+        for (let p = 0; p <= L; p += 0.8) {
+          const flatt = Math.sin(p * 0.55 + ia / 90) * 2.1 * s.schwung * Math.min(1, p / 6);
+          const x = cx + cw * (R + p) - sw * flatt, y = cy + sw * (R + p) + cw * flatt + p * p * 0.012 * (ia / 100);
+          g.put(x, y, KONFETTI[(s.farbe + Math.floor(p / 2)) % 4], sa);
+        }
+      }
+      // ── Konfetti ──
+      for (const k of teile.konfetti) {
+        if (ia >= k.leben) continue;
+        const sek = ia / 1000, f = ia / k.leben;
+        const x = cx + Math.cos(k.w) * k.v * sek, y = cy + Math.sin(k.w) * k.v * sek + 0.5 * 150 * sek * sek;
+        const quer = Math.floor(ia / 90 + k.phase) % 2 === 0;
+        g.block(x, y, quer ? 2 : 1, quer ? 1 : 2, KONFETTI[k.farbe], (1 - f * f) * a);
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Super Fan — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — der Fan mit dem Leuchtstab, rosa und grüne Herzen)
+  //
+  //  Ein türkisfarbener Leuchtstab schwingt über dem Deck hin und her (Nachzieh-Schweif, gelbe Funkenstrahlen an der Spitze),
+  //  dazu steigen rosa und grüne Herzen vom Deck auf, wiegen sich und verblassen; weiße Sternchen blitzen. Danach deckt der Fan die
+  //  oberste Karte auf (super-fan.js: FAN_MS, Einbau-Versatz 100 ms eingerechnet).
+  // ═══════════════════════════════════════════════════════════════════
+  fan_cheer: (() => {
+    const GLOW = ['#ffffff', '#b8f6ff', '#3fe0ff', '#1b8fc4', '#0b4f7a'].map(ppHex);
+    const FLARE = ['#fff7c2', '#ffe14a', '#ffb02e'].map(ppHex);
+    const ROSA = ['#ffd0ec', '#ff5fc4', '#c2308c'].map(ppHex);
+    const GRUEN = ['#c8ffd0', '#4be06a', '#1f9a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, FADE_AB = 820;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // 7×6-Herz: 1 = Körper, die Lichtkante oben links und der Schatten unten kommen aus der Lage im Muster
+    const HERZ = ['.11.11.', '1111111', '1111111', '.11111.', '..111..', '...1...'];
+    const herz = (g, cx, cy, pal, a) => {
+      for (let j = 0; j < HERZ.length; j++) for (let i = 0; i < 7; i++) {
+        if (HERZ[j][i] !== '1') continue;
+        const c = (j === 0 && i <= 2) || (j === 1 && i === 1) ? pal[0] : (j >= 3 || i >= 5 ? pal[2] : pal[1]);
+        g.put(cx - 3 + i, cy - 3 + j, c, a);
+      }
+    };
+    // Winkel des Stabs (Grad, 0 = senkrecht nach oben): schwingt hin und her, wird mit der Zeit etwas ruhiger
+    const winkel = (t) => Math.sin(t / 105) * 58 * klemme(t / 110, 0, 1) * (1 - 0.25 * klemme(t / 800, 0, 1));
+    const vorbereiten = () => ({
+      herzen: Array.from({ length: ppFxN(7) }, (_, i) => ({
+        x0: (Math.random() - 0.5) * 0.8, ab: 90 + i * 85 + Math.random() * 40, leben: 620 + Math.random() * 220,
+        v: 30 + Math.random() * 18, phase: Math.random() * 6, farbe: i % 2,
+      })),
+      sterne: Array.from({ length: ppFxN(12) }, () => ({
+        ab: 60 + Math.random() * 640, leben: 160 + Math.random() * 120, x: (Math.random() - 0.5) * 1.5, y: (Math.random() - 0.9) * 1.1,
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 80, 0, 1));
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      const PX = CX, PY = CY + Math.round(HH * 0.7), LH = Math.round(HH * 1.25);          // Drehpunkt unten am Deck, Stablänge
+      // ── Herzen steigen auf ──
+      for (const h of teile.herzen) {
+        const al = t - h.ab; if (al < 0 || al > h.leben) continue;
+        const k = al / h.leben, sek = al / 1000;
+        const x = CX + h.x0 * HW + Math.sin(sek * 6 + h.phase) * 3, y = CY + HH * 0.5 - h.v * sek * 1.5 - k * 6;
+        herz(g, x, y, h.farbe ? GRUEN : ROSA, (1 - k * k) * a);
+      }
+      // ── Leuchtstab mit Schweif ──
+      const zeichneStab = (th, deck, schweif) => {
+        const rad = th * Math.PI / 180, dx = Math.sin(rad), dy = -Math.cos(rad), nx = -dy, ny = dx;
+        for (let s = 4; s <= LH; s++) {
+          const x = PX + dx * s, y = PY + dy * s;
+          if (schweif) { g.put(x, y, GLOW[2], deck); continue; }
+          g.put(x, y, GLOW[0], a);
+          g.put(x + nx, y + ny, GLOW[2], a); g.put(x - nx, y - ny, GLOW[3], a);
+          if (s % 5 === 0) { g.put(x + nx * 2, y + ny * 2, GLOW[1], a * 0.6); g.put(x - nx * 2, y - ny * 2, GLOW[4], a * 0.6); }
+        }
+        return { tx: PX + dx * LH, ty: PY + dy * LH, dx, dy, nx, ny };
+      };
+      zeichneStab(winkel(t - 70), 0.35 * a, true);
+      zeichneStab(winkel(t - 35), 0.6 * a, true);
+      const spitze = zeichneStab(winkel(t), a, false);
+      // Griff: dunkler Fuß
+      g.block(PX - 1, PY - 1, 3, 3, GLOW[4], a);
+      // Spitze: heller Knauf und gelbe Funkenstrahlen (flackern)
+      g.block(Math.round(spitze.tx) - 1, Math.round(spitze.ty) - 1, 3, 3, GLOW[0], a);
+      if (Math.floor(t / 66) % 2 === 0) {
+        for (const w of [-0.9, -0.3, 0.35, 0.95]) {
+          const ax = spitze.dx * Math.cos(w) - spitze.dy * Math.sin(w), ay = spitze.dx * Math.sin(w) + spitze.dy * Math.cos(w);
+          for (let r = 3; r <= 7; r++) g.put(spitze.tx + ax * r, spitze.ty + ay * r, r > 5 ? FLARE[2] : FLARE[r > 4 ? 1 : 0], a * (1 - (r - 3) / 6));
+        }
+      }
+      // ── Sternchen ──
+      for (const st of teile.sterne) {
+        const al = t - st.ab; if (al < 0 || al > st.leben) continue;
+        const k = al / st.leben, r = k < 0.5 ? 2 : 1, x = CX + st.x * HW, y = CY + st.y * HH, d = (1 - k) * a;
+        g.put(x, y, WEISS, d);
+        for (let i = 1; i <= r; i++) { g.put(x + i, y, GLOW[1], d); g.put(x - i, y, GLOW[1], d); g.put(x, y + i, GLOW[1], d); g.put(x, y - i, GLOW[1], d); }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  The Oracle of Heaven — PIXELART auf dem DECK (Als Vorgabe 10.10.; Vorlage: das Kartenbild — die Orakelfigur mit dem violetten Kristall zwischen vier steinernen
+  //  Wächtern mit gelben, grünen, roten und blauen Augen)
+  //
+  //  Bleiche Lichtstrahlen fallen auf das Deck, die vier Augenpaare erwachen nacheinander (gelb, grün, rot, blau), ein violetter Kristall steigt auf, pulsiert und
+  //  wird von kreisenden Funken umtanzt; bei ~640 ms blitzt er auf — dann wird die oberste Karte aufgedeckt (the-oracle-of-heaven.js: VISION_MS, Einbau-Versatz 100 ms
+  //  eingerechnet).
+  // ═══════════════════════════════════════════════════════════════════
+  oracle_vision: (() => {
+    const AUGEN = [['#fff3a0', '#ffe14a', '#c79a12'], ['#c6ffd2', '#4be06a', '#1f9a3e'], ['#ffc1b8', '#ff4a3a', '#a01e14'], ['#c6e4ff', '#4a9bff', '#1f56b8']].map(pal => pal.map(ppHex));
+    const KRISTALL = ['#f6e6ff', '#c78bff', '#8a3fd6', '#4b1d8a'].map(ppHex);
+    const STRAHL = ppHex('#e8e4ff'), WEISS = ppHex('#ffffff');
+    const ENDE = 1150, FADE_AB = 850, BLITZ = 640;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const ECKEN = [[-0.78, -0.72], [0.78, -0.72], [-0.78, 0.78], [0.78, 0.78]];
+    const vorbereiten = () => ({
+      strahlen: Array.from({ length: 5 }, (_, i) => ({ x: (i - 2) * 0.34 + (Math.random() - 0.5) * 0.08, phase: Math.random() * 6 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 80, 0, 1));
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      // ── Lichtstrahlen von oben (gedithert, pulsierend) ──
+      const strahl = klemme(t / 220, 0, 1) * (t > 520 ? Math.max(0, 1 - (t - 520) / 320) : 1);
+      for (const st of teile.strahlen) {
+        const al = strahl * (0.28 + 0.16 * Math.sin(t / 90 + st.phase)) * a;
+        const x = CX + Math.round(st.x * HW);
+        for (let y = CY - Math.round(HH * 1.35); y <= CY + Math.round(HH * 0.25); y++) g.put(x, y, STRAHL, al * (1 - (y - (CY - HH * 1.35)) / (HH * 1.65) * 0.5));
+      }
+      // ── Augenpaare erwachen nacheinander ──
+      ECKEN.forEach(([ex, ey], i) => {
+        const ab = 90 + i * 110, al = t - ab;
+        if (al < 0) return;
+        const hoch = al < 90 ? 1 : 2, flackern = al < 160 && Math.floor(al / 33) % 2 === 1;
+        const x = CX + Math.round(ex * HW), y = CY + Math.round(ey * HH), pal = AUGEN[i];
+        for (const dx of [-3, 2]) {
+          g.block(x + dx, y, 2, hoch, flackern ? pal[0] : pal[1], a);
+          g.put(x + dx, y + hoch, pal[2], a * 0.8);
+          g.put(x + dx + (dx < 0 ? 0 : 1), y, pal[0], a);
+          // Lichthof (gedithert)
+          for (const [ox, oy] of [[-1, 0], [2, 0], [0, -1], [1, -1], [0, hoch + 1], [1, hoch + 1]]) g.put(x + dx + ox, y + oy, pal[1], a * 0.28);
+        }
+      });
+      // ── der Kristall ──
+      const k0 = 250;
+      if (t >= k0) {
+        const u = klemme((t - k0) / 250, 0, 1);
+        const r = 1 + 3 * u + (t > BLITZ ? 0.8 : 0);
+        const hub = Math.sin(t / 130) * 1.6 * u;
+        const kx = CX, ky = CY - 2 + hub;
+        g.disc(kx, ky, r + 1, KRISTALL[3], a);
+        g.disc(kx, ky, r, KRISTALL[2], a);
+        g.disc(kx - 0.5, ky - 0.5, Math.max(0.6, r - 1.4), KRISTALL[1], a);
+        g.put(kx - 1, ky - 1, KRISTALL[0], a); g.put(kx, ky - 1, KRISTALL[0], a * 0.8);
+        // pulsierender Ring
+        const ph = (t - k0) % 420 / 420;
+        g.ring(kx, ky, r + 3 + ph * 9, (r + 3 + ph * 9) * 0.8, KRISTALL[1], (1 - ph) * 0.7 * a);
+        // kreisende Funken
+        for (let i = 0; i < 6; i++) {
+          const w = t / 190 + i * Math.PI / 3, rr = 8 + 2 * Math.sin(t / 150 + i), sx = kx + Math.cos(w) * rr, sy = ky + Math.sin(w) * rr * 0.75;
+          g.put(sx, sy, i % 2 ? WEISS : KRISTALL[0], a * u);
+          if (i % 2 === 0) { g.put(sx + 1, sy, KRISTALL[1], a * u * 0.6); g.put(sx - 1, sy, KRISTALL[1], a * u * 0.6); }
+        }
+        // Blitz: weißes Kreuz kurz vor dem Aufdecken
+        const bl = t - BLITZ;
+        if (bl >= 0 && bl < 130) {
+          const arm = Math.round(7 * (1 - bl / 130)) + 2;
+          for (let i = -arm; i <= arm; i++) { g.put(kx + i, ky, i === 0 ? WEISS : KRISTALL[0], a); g.put(kx, ky + i, i === 0 ? WEISS : KRISTALL[0], a); }
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Cute Crown — PIXELART am Platz der Krone (Als Vorgabe 10.10.; Vorlage: das Kartenbild — die goldene Krone mit den zwei weißen Flügeln)
+  //
+  //  Wird die Ladung verbraucht (eine Cute Creature wird als Zusatzaktion beschworen), schlagen die Flügel schnell, die Krone hebt sich und senkt sich wieder, goldene
+  //  Sternchen stieben auseinander und zwei kleine rosa Herzen steigen auf.
+  // ═══════════════════════════════════════════════════════════════════
+  crown_flutter: (() => {
+    const GOLD = ['#fff7c2', '#ffd94a', '#e8a33a', '#a8661c'].map(ppHex);
+    const FEDER = ['#ffffff', '#dfe9f2', '#a9bccd', '#6d84a0'].map(ppHex);
+    const ROSA = ['#ffd0ec', '#ff5fc4', '#c2308c'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, FADE_AB = 800;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const HERZ = ['.1.1.', '11111', '.111.', '..1..'];
+    const vorbereiten = () => {
+      const nS = ppFxN(14);                                                        // (Array.from reicht der Abbildung nur Wert und Index, kein Feld)
+      return {
+        sterne: Array.from({ length: nS }, (_, i) => ({
+          w: (i / nS) * Math.PI * 2 + Math.random() * 0.5, v: 22 + Math.random() * 40, ab: 80 + Math.random() * 360, leben: 360 + Math.random() * 260,
+        })),
+        herzen: [0, 1].map((i) => ({ ab: 220 + i * 170, x: (i ? 1 : -1) * (3 + Math.random() * 4), leben: 560 + Math.random() * 120 })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const a = Math.min(aus, klemme(t / 70, 0, 1));
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y);
+      const heb = t < 700 ? Math.sin(klemme(t / 700, 0, 1) * Math.PI) * 5 : 0;      // die Krone hebt sich und senkt sich wieder
+      const ky = CY - Math.round(heb);
+      // ── Flügel: ein Fächer aus fünf Federn je Seite, schnell schlagend ──
+      const schlag = t < 640 ? Math.sin(t / 55) : Math.sin(t / 55) * Math.max(0, 1 - (t - 640) / 200);
+      for (const seite of [-1, 1]) {
+        const wurzelX = CX + seite * 5, wurzelY = ky - 1;
+        for (let f = 0; f < 5; f++) {
+          const ang = -0.35 - f * 0.28 + schlag * 0.42;                              // nach oben außen aufgefächert, schlagend
+          const len = 10 - f * 1.4;
+          const dx = Math.cos(ang) * seite, dy = Math.sin(ang);
+          for (let r = 1; r <= len; r++) {
+            const spitze = r > len - 2;
+            g.put(wurzelX + dx * r, wurzelY + dy * r, f === 0 ? (spitze ? FEDER[1] : FEDER[0]) : (spitze ? FEDER[2] : FEDER[1]), a);
+            if (r > 2 && f % 2 === 0) g.put(wurzelX + dx * r, wurzelY + dy * r + 1, FEDER[3], a * 0.55);   // Schattenkante
+          }
+        }
+      }
+      // ── Krone: Reif, drei Zacken, rosa Juwel ──
+      g.block(CX - 4, ky, 9, 3, GOLD[1], a);
+      g.block(CX - 4, ky, 9, 1, GOLD[0], a);
+      g.block(CX - 4, ky + 2, 9, 1, GOLD[2], a);
+      for (const zx of [-4, 0, 4]) { g.block(CX + zx - 1, ky - 3, 3, 1, GOLD[1], a); g.put(CX + zx, ky - 4, GOLD[0], a); g.put(CX + zx - 1, ky - 2, GOLD[1], a); g.put(CX + zx + 1, ky - 2, GOLD[2], a); }
+      g.put(CX, ky + 1, ROSA[1], a); g.put(CX - 3, ky + 1, GOLD[3], a); g.put(CX + 3, ky + 1, GOLD[3], a);
+      // ── goldene Sternchen ──
+      for (const st of teile.sterne) {
+        const al = t - st.ab; if (al < 0 || al > st.leben) continue;
+        const k = al / st.leben, sek = al / 1000, x = CX + Math.cos(st.w) * st.v * sek, y = ky - 1 + Math.sin(st.w) * st.v * sek * 0.8 + 0.5 * 40 * sek * sek, d = (1 - k) * a;
+        g.put(x, y, k < 0.5 ? WEISS : GOLD[0], d);
+        if (k < 0.55) { g.put(x + 1, y, GOLD[1], d); g.put(x - 1, y, GOLD[1], d); g.put(x, y + 1, GOLD[1], d); g.put(x, y - 1, GOLD[1], d); }
+      }
+      // ── kleine rosa Herzen ──
+      for (const h of teile.herzen) {
+        const al = t - h.ab; if (al < 0 || al > h.leben) continue;
+        const k = al / h.leben, hx = CX + h.x + Math.sin(al / 90 + h.x) * 1.6, hy = ky - 8 - k * 20;
+        for (let j = 0; j < HERZ.length; j++) for (let i = 0; i < 5; i++) if (HERZ[j][i] === '1') g.put(hx - 2 + i, hy + j, j === 0 && i === 1 ? ROSA[0] : (j >= 2 ? ROSA[2] : ROSA[1]), (1 - k * k) * a);
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Gezeitenwelle (Whale Race Boat) — PIXELART, ueberrollt das KOMPLETTE BRETT (Als Vorgabe 10.10.: „trifft alle Ziele
   //  auf dem kompletten Board, also soll die Welle das komplette Board ueberrollen")
@@ -42257,6 +42680,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ey = hr.top;
           }
         }
+      } else if (ziel === 'ability' && destHeroIdx != null && destSlotIdx != null) {
+        // Super Fan: die aufgedeckte Ability fliegt aus der Mitte in ihre ABILITY ZONE (`destSide` = Brettseite des Helden).
+        const ow = (destSide === 0 || destSide === 1) ? (destSide === myIdx ? 'me' : 'opp') : (isMe ? 'me' : 'opp');
+        const zoneEl = document.querySelector(
+          `[data-ability-zone][data-ability-owner="${ow}"][data-ability-hero="${destHeroIdx}"][data-ability-slot="${destSlotIdx}"]`);
+        if (zoneEl) {
+          const zr = zoneEl.getBoundingClientRect();
+          ex = zr.left;
+          ey = zr.top;
+        }
       } else if (ziel === 'support' && destHeroIdx != null && destSlotIdx != null) {
         // v896 (Surprise Party): Ziel ist eine SUPPORT ZONE. Die
         // aufgedeckte Creature fliegt aus der Mitte weiter an ihren
@@ -42362,7 +42795,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // (`forwards`: letztes Keyframe). Der Zustand mit der echten Creature trifft nach Netz und
           // Neuaufbau des Bretts erst nach dem Flugende ein — ohne Halten war der Platz ~100 ms leer
           // („kurzer Cut", Als Befund 10.10.). Die Kopie deckt die Lücke, dann steht die Karte darunter.
-          const halteMs = ziel === 'support' ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
+          const halteMs = (ziel === 'support' || ziel === 'ability') ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
           setTimeout(() => {
             setKassaranFlips(prev => prev.filter(a => a.id !== id));
           }, perCard + halteMs);
@@ -42382,7 +42815,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (ziel === 'hand' && isMe) stealSkipDrawRef.current += 1;
       const { ex, ey } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide);
       const id = 'rel-' + holdKey + '-' + Date.now();
-      const halteMs = ziel === 'support' ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
+      const halteMs = (ziel === 'support' || ziel === 'ability') ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
       setKassaranFlips(prev => [...prev.filter(a => a.holdKey !== holdKey), {
         id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey,
         cardName: cardName || (prev.find(a => a.holdKey === holdKey) || {}).cardName, cardbackUrl: isMe ? me.cardback : opp.cardback, durationMs: dur, dest: ziel,
@@ -46432,6 +46865,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
       if (t === 'hero_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} activated their effect!</span>; }
       if (t === 'creature_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
+      // Spearman: negiert den aktiven Effekt einer Gegner-Creature und sticht zu (spearman.js)
+      if (t === 'spearman_negate') { const p = playerByName(entry.player); return <span className="log-status">🔱 {pName(p.name, p.color)}'s {cName('Spearman')} negated the effect of {cName(entry.target)} and dealt {entry.damage} damage to it!</span>; }
+      if (t === 'spearman_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName('Spearman')} was too late — nothing to negate.</span>; }
+      // Super Fan / The Oracle of Heaven: aufdecken (super-fan.js, the-oracle-of-heaven.js)
+      if (t === 'super_fan') { const p = playerByName(entry.player); return <span className="log-status">📣 {pName(p.name, p.color)}'s {cName('Super Fan')} revealed {cName(entry.card)}{entry.attachedTo ? <> and attached it to {entry.attachedTo} as an additional attachment!</> : entry.placed ? <> — put on the {entry.placed} of the deck.</> : '.'}</span>; }
+      if (t === 'oracle_declare') { const p = playerByName(entry.player); return <span className="log-status">🔮 {pName(p.name, p.color)}'s {cName('The Oracle of Heaven')} declared {cName(entry.declared)}!</span>; }
+      if (t === 'oracle_reveal') { const p = playerByName(entry.player); return <span className="log-status">🔮 {pName(p.name, p.color)} revealed {cName(entry.revealed)} — {entry.hit ? 'a hit!' : 'a miss.'}</span>; }
+      if (t === 'oracle_of_heaven') { const p = playerByName(entry.player); return entry.hit ? <span className="log-status">🔮 {pName(p.name, p.color)} added {cName(entry.revealed)} to their hand and draws 2 cards!</span> : <span className="log-info">🔮 {pName(p.name, p.color)} sent {(entry.milled || []).length} card{(entry.milled || []).length === 1 ? '' : 's'} from the deck to the discard pile.</span>; }
+      // Cute Crown: Zusatzaktion verbraucht (cute-crown.js)
+      if (t === 'cute_crown_summon') { const p = playerByName(entry.player); return <span className="log-status">👑 {pName(p.name, p.color)}'s {cName('Cute Crown')} grants an additional Action{entry.hero ? <> to {entry.hero}</> : null} for a "Cute" Creature!</span>; }
+      // The Creepy Clown of Heaven: Aktion zum Besiegen / Nachwirkung (the-creepy-clown-of-heaven.js)
+      if (t === 'creepy_clown_popped') { const p = playerByName(entry.player); return <span className="log-status">🎪 {pName(p.name, p.color)} spent an Action to defeat {cName('The Creepy Clown of Heaven')}!</span>; }
+      if (t === 'creepy_clown_defeated') { return <span className="log-status">🎪 {cName('The Creepy Clown of Heaven')} was defeated — the effects of all Creatures stay {styledStatus('negated')} for the rest of the turn!</span>; }
       // v653: Level-Rabatte „for the rest of the turn" (Fiona, the Empty Vessel; Divine Gift of Magic hatte bisher keinen Client-Fall).
       if (t === 'fiona_vessel_spell') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} took {cName(entry.spell)} from the deck — its level is reduced by {entry.amount} this turn.</span>; }
       if (t === 'riffel_ultimate') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Riffel took {cName(entry.card)} from the deck{entry.milled ? ` and sent ${entry.milled} more cop${entry.milled === 1 ? 'y' : 'ies'} to the discard pile` : ''}.</span>; }
