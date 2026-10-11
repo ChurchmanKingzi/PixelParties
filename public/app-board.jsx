@@ -7875,6 +7875,7 @@ const REAKTIONS_ANLAESSE = {
   board_discard_reaction:         'their card was sent to the discard pile',   // v1336 Furious Anger
   hero_defeated_reaction:         'their Hero was defeated',   // v1340 Cheat Chair
   hero_defeat_window_reaction:    'a Hero was being defeated',   // v1490 Surprising Opportunity
+  hero_revived_window_reaction:   'their Hero was revived',   // v1491 Triumphant Return
   after_damage_reaction:          'damage had landed',
   after_creature_damage_reaction: 'a Creature had taken damage',
   creature_damage_batch_reaction: 'Creatures had taken damage',
@@ -25340,6 +25341,122 @@ const ANIM_REGISTRY = {
             const r = k < 0.5 ? 1 : 2;
             put(CX + st.px, st.py, STERN[st.farbe], fa);
             if (r === 2 || k < 0.3) { put(CX + st.px - 1, st.py, STERN[st.farbe], fa); put(CX + st.px + 1, st.py, STERN[st.farbe], fa); put(CX + st.px, st.py - 1, STERN[st.farbe], fa); put(CX + st.px, st.py + 1, STERN[st.farbe], fa); }
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Triumphale Rückkehr (Triumphant Return) — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!")
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEIN Filter, KEIN Leuchten.
+  //  Über dem wiederbelebten Helden steigt eine goldene Lichtsäule auf (Bayer-gedithert, von der Mitte zu den Rändern ausdünnend), ein
+  //  Strahlenkranz dreht sich hinter ihm, vier große Sterne blitzen nacheinander auf, und Konfetti (rot, gold, blau, weiß) schießt
+  //  nach oben und flattert mit Schwerkraft zurück. Eingeblendet in ~120 ms, ab ~1000 ms blendet alles über Dithering aus, bei 1300 ms
+  //  ist es weg. Die Aktionswahl erscheint danach (triumphant-return.js: BILD_MS). Die Wurzel trägt `data-pp-px="aus"`: die Grafik IST
+  //  schon Pixelart. Massstab folgt der Zielzone (`w`/`h`).
+  // ═══════════════════════════════════════════════════════════════════
+  triumphant_return: (() => {
+    const GOLD = ['#ffffff', '#fff6b8', '#ffe27a', '#ffc83a', '#f0a020', '#b8741a'].map(ppHex);
+    const KONF = ['#ff4a5a', '#ffd23a', '#3d9cff', '#ffffff', '#5ae070'].map(ppHex);
+    const S = 3, TAKT = 33, ENDE = 1300, EIN = 120, FADE_AB = 1000;
+    const PADX = 40, PAD_OBEN = 92, PAD_UNTEN = 16;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    return function TriumphantReturnEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const konfetti = useMemo(() => Array.from({ length: ppFxN(34) }, () => ({
+        vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), ab: 80 + Math.random() * 420, leben: 700 + Math.random() * 400,
+        farbe: Math.floor(Math.random() * KONF.length), dreh: Math.random() * 6, ox: (Math.random() - 0.5) * kw * 0.5,
+      })), []);
+      const sterne = useMemo(() => [
+        { px: -kw * 0.62, py: -kh * 0.35, ab: 160 }, { px: kw * 0.66, py: -kh * 0.5, ab: 300 },
+        { px: -kw * 0.3, py: -kh * 0.95, ab: 440 }, { px: kw * 0.28, py: -kh * 0.8, ab: 560 },
+      ], []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        const stern = (cx, cy, r, c, a) => {
+          for (let i = -r; i <= r; i++) { put(cx + i, cy, c, a); put(cx, cy + i, c, a); }
+          for (let i = -Math.floor(r / 2); i <= Math.floor(r / 2); i++) { put(cx + i, cy + i, GOLD[2], a * 0.8); put(cx + i, cy - i, GOLD[2], a * 0.8); }
+          put(cx, cy, GOLD[0], a);
+        };
+        const zeichne = (t) => {
+          const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+          const ein = klemme(t / EIN, 0, 1);
+          const a = Math.min(aus, ein);
+          if (a <= 0) return;
+          const baseY = CY + Math.floor(kh / 2) - 2;
+          // ── Strahlenkranz: ein gedrehter Fächer hinter dem Helden ──
+          const R = Math.max(kw, kh * 0.9) * 0.95, wi = (t / 1000) * 0.9;
+          for (let i = 0; i < 12; i++) {
+            const ang = wi + (i * Math.PI * 2) / 12;
+            const dx = Math.cos(ang), dy = Math.sin(ang) * 0.9;
+            const len = R * (i % 2 ? 0.7 : 1);
+            for (let k = 5; k < len; k++) {
+              const c = k < len * 0.5 ? GOLD[1] : GOLD[3], fa = a * (1 - k / len);
+              put(CX + dx * k, CY + dy * k, c, fa); put(CX + dx * k + dy * 1.2, CY + dy * k - dx * 1.2, c, fa * 0.8);   // Strahl, 2 Pixel breit
+            }
+          }
+          // ── Lichtsäule: gedithert, in der Mitte dicht, zu den Rändern dünn ──
+          const sauleBreit = Math.max(6, kw * 0.55);
+          for (let Y = 0; Y < GH; Y++) {
+            const hoehe = klemme((baseY - Y) / (kh + 60), 0, 1);
+            if (baseY - Y < -2) continue;
+            for (let X = Math.floor(CX - sauleBreit); X <= Math.ceil(CX + sauleBreit); X++) {
+              const d = Math.abs(X - CX) / sauleBreit;
+              const dichte = (1 - d) * (1 - hoehe * 0.8) * a * 0.9;
+              if (dichte > 0.04 && rausch(X * 1.3, Y * 1.7 + Math.floor(t / 100)) < dichte) put(X, Y, d < 0.35 ? GOLD[1] : GOLD[2]);   // Gestöber aus Lichtpunkten statt Schachbrett
+            }
+          }
+          // ── Sterne ──
+          for (const st of sterne) {
+            const alter = t - st.ab;
+            if (alter < 0 || alter > 520) continue;
+            const k = alter / 520, r = Math.round(2 + 4 * Math.sin(k * Math.PI));
+            stern(Math.round(CX + st.px), Math.round(CY + st.py), r, k < 0.5 ? GOLD[0] : GOLD[1], (1 - k * k) * aus);
+          }
+          // ── Konfetti ──
+          for (const f of konfetti) {
+            const alter = t - f.ab;
+            if (alter < 0 || alter > f.leben) continue;
+            const sek = alter / 1000, k = alter / f.leben;
+            const px = CX + f.ox + f.vx * sek * 0.6 + Math.sin(sek * 7 + f.dreh) * 2.5;
+            const py = baseY - 8 + f.vy * sek * 0.6 + 0.5 * 190 * sek * sek * 0.6;
+            const c = KONF[f.farbe], fa = (1 - k * k) * aus;
+            put(px, py, c, fa);
+            if (Math.floor(alter / 90 + f.dreh) % 2) put(px + 1, py, c, fa); else put(px, py + 1, c, fa);
           }
         };
         const t0 = performance.now();
@@ -45415,6 +45532,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const p = playerByName(entry.player);
         const karten = Array.isArray(entry.deleted) ? entry.deleted : [];
         return <span className="log-status">🤹 {cName('Potion Juggler')} — {pName(p.name, p.color)} deletes the top {karten.length} cards of their Potion Deck ({karten.map((k, i) => <React.Fragment key={i}>{i > 0 ? ' and ' : ''}{cName(k)}</React.Fragment>)}) and draws a card from it.</span>;
+      }
+      if (t === 'triumphant_return') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🎺 {cName('Triumphant Return')} — {pName(p.name, p.color)}'s {entry.hero} {entry.acted ? 'performs an additional Action right away!' : 'has no Action available — the additional Action lapses.'}</span>;
       }
       if (t === 'capture_control') {
         const p = playerByName(entry.player);

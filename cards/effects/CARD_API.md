@@ -3934,6 +3934,25 @@ Anhängsel liegen noch in den Support Zones, Statuswerte und Buffs sind noch da,
 - Log-Typ `hero_defeat_window_reaction` (`REAKTIONS_ANLAESSE` im Client).
 - Aufruf unterdrücken: `opts.skipDefeatWindow` an `_runHeroDefeatSequence`.
 
+#### ★ Hand-Fenster „Held wurde wiederbelebt" — `isHeroRevivedReaction` (v1491, Triumphant Return)
+
+```js
+isHeroRevivedReaction: true,
+heroRevivedCondition(gs, pi, engine, info) → bool,
+async heroRevivedResolve(engine, pi, info, { casterIdx, casterSeite })
+// optional: reactionCasterAllowed(gs, pi, heroIdx, engine, info, seite)   // z. B. „except the user"
+// info = { hero, heroIdx, heroOwner, controller, source, reactorIdx }
+```
+
+`engine._checkHeroRevivedHandReactions(hero, heroOwner, source)` läuft nach JEDER echten Wiederbelebung: am Ende von `actionReviveHero`
+(Golden Ankh, Hymn, Cheat Chair, Resuscitation Potion … — NACH den `ON_HERO_REVIVE`-Haken, der Held steht mit voller neuer Lage da) und im Besiegen-Ablauf
+nach einem verbrauchten Extra Life (Trial of Coolness, Cecilia). Der Aufstieg aus dem Tod (Bloom, Chuck) öffnet es NICHT — er hat sein eigenes
+Aufstiegs-Fenster. Angeboten wird nur dem KONTROLLEUR des Helden (`heroSideOf`, Kontrolle statt Seite); `info.controller` = er. Wirker, Kosten, Flug, Auftritt
+und `_rxAufgeloest` wie in allen Hand-Fenstern (`_rxCastPlan`/`_rxCastWirkerWaehlen`/`_rxHandkarteEinsetzen`); `reactionCasterAllowed` schließt Wirker aus
+(Triumphant Return: nie der Wiederbelebte). Jede Kopie auf der Hand wird einzeln angeboten (bis 8 Runden), eine Absage gilt für alle Kopien desselben Namens in
+diesem Fenster. Das Fenster ist wiederholbar (eine Wiederbelebung INNERHALB der Auflösung darf ein zweites Angebot auslösen), aber auf vier Ebenen gedeckelt
+(`_heroRevivedWindowDepth`). Dark Ocean sperrt es für den Reagierenden. Log-Typ `hero_revived_window_reaction` (`REAKTIONS_ANLAESSE` im Client).
+
 **`actionMoveCard(inst, 'hand', -1, -1, { toPlayer, _bypassDeadHeroFilter })` (v1490):**
 - `toPlayer`: schickt eine Brettkarte in die Hand eines ANDEREN Spielers als ihres Besitzers (nur Support → Hand). Besitzer
   und Kontrolleur der Instanz wechseln (gleicher Weg wie die Heimkehr seitenfremder Kreaturen, `play_pile_transfer` trägt
@@ -19082,6 +19101,18 @@ Creature (Normal, Lv1, 50 HP, Summoning Magic): „You may delete a Potion from 
 - **Kunst:** 76×51 nativ (die zwei Flaschen sind bewegungsunscharf — Rückprojektion mean 5,9), `kind: 'a'`.
 
 **Wächter:** `scripts/skilltest-e2e/potion-juggler.test.js` (`inherentAction` je Lage, Main Phase aus Hand und Ablage, Abbruch, ohne Potion, Stufenpflicht, Action Phase: „Special"/„Normal"/Aktion schon verbraucht/ohne Potion, Effekt mit Deck ≥ 3, < 3, Zieh-Sperre, Chaos-Diamant, Skill-Test-Füllung, CPU-Wahl) und im echten Browser `scripts/skilltest-e2e/ui-potion-juggler.js` (Puzzle-Spiel: Galerie aus Hand und Ablage, Potion gelöscht, Juggler auf dem Brett; Jonglage bemalt, Klänge, 2 gelöscht + 1 gezogen, Log, zweiter Einsatz ohne Wirkung).
+
+## ★ TRIUMPHANT RETURN — Wiederbelebung, sofortige Zusatzaktion des WIEDERBELEBTEN (Als Vorgabe 10.10.)
+
+Spell (Reaction, Lv1, Magic Arts): „Play this card immediately when a Hero you control, except the user, is revived. Immediately perform an additional Action with that Hero." — Text unverändert; Klarstellungen vom Nutzer: der Held, der die Karte SPIELT, ist nie der wiederbelebte („except the user"); die Zusatzaktion gehört IMMER dem wiederbelebten Helden und ist SOFORT auszuführen; hat er in dem Moment keine legitime Aktion (auch Senken wie Adventurousness zählen als legitim), verfällt sie.
+
+- **Fenster:** das neue `isHeroRevivedReaction` (siehe Engine-Vertrag oben): nach jeder Wiederbelebung (`actionReviveHero`, Extra Life), nur für den Kontrolleur des wiederbelebten Helden.
+- **Wer spielt:** `reactionCasterAllowed` schließt den Wiederbelebten aus (`seite ?? pi === info.heroOwner && heroIdx === info.heroIdx`); ein ANDERER eigener Held mit Magic Arts Lv1 (lebend, nicht eingefroren, Wisdom zählt) muss da sein, sonst wird die Karte gar nicht angeboten.
+- **Wer handelt:** `performImmediateAction(pi, info.heroIdx, { title, description })` mit dem WIEDERBELEBTEN (geliehene Helden über `heroOwner`) — mitten in der Auflösung der Wiederbelebung, auch im Zug des Gegners. Die Engine liefert `{ played: false }` ohne Frage, wenn weder spielbare Karte noch aktivierbare Ability (`getActivatableAbilities`, Aktionskosten) noch Heldeneffekt mit Aktionskosten da ist: die Bonus-Aktion VERFÄLLT, die Karte ist trotzdem verbraucht; auch der Abbruch des Auswahlfensters verfällt sie (aufgespart wird nichts). Log `triumphant_return` (`acted`).
+- **Bild und Klang:** `play_zone_animation` `triumphant_return` (Pixelart, ANIM_REGISTRY, 1,3 s, `data-pp-px="aus"`) am wiederbelebten Helden: goldene Lichtsäule (Gestöber aus Lichtpunkten, kein Schachbrett), Strahlenkranz, vier aufblitzende Sterne, Konfetti (rot/gold/blau/weiß/grün) mit Schwerkraft, Ausblenden über Dithering; die Aktionswahl erscheint nach 700 ms. Klang `ZONE_ANIM_SFX.triumphant_return`: `revive` + `elem_holy` (160 ms) + `gold_gain` (420 ms).
+- **Kunst:** 76×51 nativ, `kind: 'a'`.
+
+**Wächter:** `scripts/skilltest-e2e/triumphant-return.test.js` (Angebot und Zusatzaktion des Wiederbelebten statt des Wirkers, „except the user" in beiden Richtungen, nur der Kontrolleur, Absage, Extra Life als Wiederbelebung, Verfall ohne legitime Aktion mit der ECHTEN `performImmediateAction`, Aktionsfenster mit spielbarem Zauber) und im echten Browser `scripts/skilltest-e2e/ui-triumphant-return.js` (Puzzle-Spiel: Golden Ankh → Angebot → Fanfare bemalt → sofort Aktionsfenster für Held 1 mit Burning Finger; ohne spielbare Karte kein Fenster, Log).
 
 ## ★ PINTA, THE SINGING SHIP — Aufdecken und Beschwören aus dem Potion Deck
 

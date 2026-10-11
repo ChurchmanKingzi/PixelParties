@@ -2799,6 +2799,12 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_ice',       opts: { rate: 1.6, volume: 0.45, delay: 520, category: null, dedupe: 0 } },
     { name: 'draw',           opts: { rate: 1.0, volume: 0.8, delay: 900, category: null, dedupe: 0 } },
   ],
+  // Triumphant Return (10.10.) — Fanfare fuer den wiederbelebten Helden: heller Heil-/Wiederbelebungs-Klang, Sternenglitzern, ein goldener Nachklang (~700 ms).
+  triumphant_return: [
+    { name: 'revive',     opts: { rate: 1.15, volume: 1.0 } },
+    { name: 'elem_holy',  opts: { rate: 1.3,  volume: 0.7, delay: 160, category: null, dedupe: 0 } },
+    { name: 'gold_gain',  opts: { rate: 1.1,  volume: 0.6, delay: 420, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.
