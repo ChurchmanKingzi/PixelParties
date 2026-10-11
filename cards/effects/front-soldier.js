@@ -99,6 +99,7 @@ async function handfalle(ctx, { gegnerKarte, gegnerName, art, schon, negiere }) 
     type: 'confirm',
     title: CARD_NAME,
     message: `Your opponent ${art === 'surprise' ? 'activated' : 'played'} "${gegnerName}". Summon ${CARD_NAME} as an additional Action to negate it? Then both players draw ${DRAW} cards.`,
+    showCardLeft: CARD_NAME,                                        // links der Soldat selbst (die Reaktionskarte), rechts der Auslöser — wie im Kettenfenster
     showCard: gegnerName || undefined,
     confirmLabel: '🛡️ Negate!',
     cancelLabel: 'Pass',

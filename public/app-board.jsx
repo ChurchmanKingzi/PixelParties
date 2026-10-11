@@ -923,7 +923,7 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 // just sets the start / center / end CSS vars and the cardback / face-up
 // images. Auto-removed by the scheduler that mounted it after the
 // keyframes complete.
-function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs, dest }) {
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs, dest, phase }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   // ★ v1259 (Als Befund 20.9.): die Deck-oben-Umdreh-Animation (Chaos
@@ -937,6 +937,17 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
   useEffect(() => {
     const dur = durationMs || 2000;
     const sfx = (name) => { if (window.playSFX) window.playSFX(name, { dedupe: 60, category: 'effect' }); };
+    // ★ Phase 'in'/'out' (Als Vorgabe 10.10., Slave Trader / Sky Archeologist): die aufgedeckte Karte BLEIBT in der Bildmitte, bis der Spieler entschieden
+    // hat (`mill_center_reveal` mit `hold`), und fliegt danach von dort weiter (`mill_center_release`). 'in' = Deck → Mitte + Umdrehen, 'out' = Mitte → Ziel.
+    if (phase === 'in') {
+      sfx('draw');
+      const tr = setTimeout(() => sfx('reveal'), dur * 0.55);
+      return () => clearTimeout(tr);
+    }
+    if (phase === 'out') {
+      const to = (dest === 'support' || dest === 'center') ? 0 : setTimeout(() => sfx(dest === 'deck' ? 'draw' : 'discard'), dur * 0.6);
+      return () => { if (to) clearTimeout(to); };
+    }
     sfx('draw');
     const t1 = setTimeout(() => sfx('reveal'), dur * 0.25);
     // ★ Als Befund 10.10. („Beim Beschwoeren spielt kein Klang, wenn er in der Support Zone landet"): ein Flug
@@ -947,7 +958,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
     return () => { clearTimeout(t1); if (t2) clearTimeout(t2); };
   }, []);
   return (
-    <div className="kassaran-flip-card"
+    <div className={'kassaran-flip-card' + (phase === 'in' ? ' kf-in' : phase === 'out' ? ' kf-out' : '')}
       style={{
         '--sx': startX + 'px', '--sy': startY + 'px',
         '--cx': centerX + 'px', '--cy': centerY + 'px',
@@ -8011,8 +8022,11 @@ const SOG_FLUG_MS = 820;
 // ═══════════════════════════════════════════════════════════════════
 // (Bayer-Matrix: `ppBayer(x, y)` aus app-shared.jsx)
 const ppHex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-function ppSalve(malen, ende, vorbereiten) {
-  const S = 3, PAD = 60, TAKT = 33;
+function ppSalve(malen, ende, vorbereiten, opts) {
+  // `opts.extra` (Als Befund 10.10., Sky Shaman: „die Animation ist auf die Karte begrenzt und abgeschnitten"): zusaetzlicher Rand in Bildschirmpixeln um
+  // Ursprung und Ziele. Der Canvas misst sich von den MITTEN der Ziele aus — alles, was weiter als ~10 px ueber die Kartenkante hinausragt (Federn, Strahl, ein
+  // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
+  const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
   return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
@@ -25331,7 +25345,7 @@ const ANIM_REGISTRY = {
         if (k < 0.5) { g.put(px - 1, py, WEISS[0], (1 - k * 2) * a); g.put(px + 1, py, WEISS[0], (1 - k * 2) * a); g.put(px, py - 1, WEISS[0], (1 - k * 2) * a); }
       }
     };
-    return ppSalve(malen, ENDE + 40, vorbereiten);
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 110 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Sky Archeologist: Grabung — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Archäologe
@@ -25431,7 +25445,7 @@ const ANIM_REGISTRY = {
         }
       }
     };
-    return ppSalve(malen, ENDE + 40, vorbereiten);
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Slave Trader: Ketten — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Händler mit der
@@ -25497,7 +25511,7 @@ const ANIM_REGISTRY = {
         g.put(px, py, f.farbe === 0 ? GOLD[0] : f.farbe === 1 ? GOLD[1] : EISEN[0], (1 - k) * a);
       }
     };
-    return ppSalve(malen, ENDE + 40, vorbereiten);
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Front Soldier: Schild-Schlag — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der
@@ -25592,7 +25606,7 @@ const ANIM_REGISTRY = {
         }
       }
     };
-    return ppSalve(malen, ENDE + 40, vorbereiten);
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 110 });
   })(),
   // ═════════════════════════════════════════════════════════════════
   //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
@@ -36050,7 +36064,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // los und rollt von dort ueber das Brett).
         setTimeout(() => {
           const extra = {};
-          if (typeof rest.originHeroIdx === 'number' && rest.originHeroIdx >= 0
+          // ★ 10.10. (Slave Trader / Sky Archeologist, Als Vorgabe: „Die Animationen sollen auf dem DECK angezeigt werden"): `originDeck` — der Ursprung ist
+          // das Deck des Spielers `originOwner` statt eines Helden oder einer Creature-Zone.
+          if (rest.originDeck === true && (rest.originOwner === 0 || rest.originOwner === 1)) {
+            const dEl = document.querySelector(ownerLbl(rest.originOwner, myIdx) === 'me' ? '[data-my-deck]' : '[data-opp-deck]');
+            if (dEl) {
+              const q = dEl.getBoundingClientRect();
+              extra.ox = q.left + q.width / 2;
+              extra.oy = q.top + q.height / 2;
+            }
+          } else if (typeof rest.originHeroIdx === 'number' && rest.originHeroIdx >= 0
               && (rest.originOwner === 0 || rest.originOwner === 1)) {
             const lbl = ownerLbl(rest.originOwner, myIdx);
             // ★ 10.10. (Assault Eagle): optional `originZoneSlot` — der Ursprung ist dann eine CREATURE-Zone
@@ -36102,7 +36125,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const punkte = [];
             for (const t of rest.targets) {
               const lbl2 = ownerLbl(t.owner, myIdx);
-              const sel2 = (t.zoneSlot == null || t.zoneSlot < 0)
+              const sel2 = t.deck === true
+                ? (lbl2 === 'me' ? '[data-my-deck]' : '[data-opp-deck]')           // ★ 10.10.: das Deck selbst ist das Ziel
+                : (t.zoneSlot == null || t.zoneSlot < 0)
                 ? `[data-hero-zone][data-hero-owner="${lbl2}"][data-hero-idx="${t.heroIdx}"]`
                 : `[data-support-zone][data-support-owner="${lbl2}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`;
               const el2 = document.querySelector(sel2);
@@ -42187,43 +42212,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Potion Deck, Gegenstueck zu `from: 'potionDeck'`), 'hand' oder
     // 'support' (mit destHeroIdx/destSlotIdx). Ohne das Feld bleibt
     // alles wie bisher.
-    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, from }) => {
-      if (!Array.isArray(cardNames) || cardNames.length === 0) return;
-      const isMe    = owner === myIdx;
-      const perCard = revealMs || 1100;
-      // Deck→pile handshake: the piles were already mutated + synced
-      // server-side before this event, so register every card in the
-      // pending bucket — otherwise the pile-growth auto-detector
-      // name-matches them against same-named cards on the board
-      // (typically Abilities) and spawns phantom board→pile flights.
-      const ziel = dest || (deleteMode ? 'deleted' : 'discard');
-      // ★ Fliegt die Karte zur HAND, hat der Auto-Erkenner spaeter
-      // „Hand groesser, Deck kleiner" vor sich und wuerde EINE ZWEITE
-      // Ziehanimation starten (Als Befund 21.8.). Derselbe Zaehler wie
-      // beim Stehlen unterdrueckt sie — je Karte einer.
-      if (ziel === 'hand' && isMe) stealSkipDrawRef.current += cardNames.length;
-      // Der Stapelwachstums-Handschlag gilt NUR fuer Ablage/Geloescht —
-      // bei 'hand' und 'deck' waechst kein Stapel, den der
-      // Auto-Erkenner faelschlich als Flug deuten koennte.
-      if (ziel === 'discard' || ziel === 'deleted') {
-        // v896: nur fuer STAPEL-Ziele vormerken — eine Support Zone hat
-        // keinen Stapel-Erkenner, und `pending['support']` gaebe es gar
-        // nicht.
-        const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
-        if (pending[ziel]) pending[ziel].push(...cardNames);
-      }
-      // `from: 'potionDeck'` (Chaos-Diamond): Start am TRANK-Deck; ist es
-      // gerade leer gespielt (Element nicht eingehaengt), am Hauptdeck.
-      const deckEl = (from === 'potionDeck'
-          ? document.querySelector(isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]')
-          : null)
-        || document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
-      if (!deckEl) return;
-      const dr = deckEl.getBoundingClientRect();
-      const sx = dr.left;
-      const sy = dr.top;
-      const cx = window.innerWidth / 2 - 32;
-      const cy = window.innerHeight / 2 - 45;
+    // ★ Endpunkt eines Aufdeck-Flugs (Stapel, Hand-Platz, Brett-Zone) — einmal ausgeschrieben, damit der Flug MIT Zwischenhalt (`hold` → `release`) dieselbe
+    // Rechnung nutzt wie der durchgehende Flug.
+    const aufdeckEndpunkt = (ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide) => {
       // End point = the destination pile; centre-fade fallback if the
       // pile element isn't mounted (mirrors onChaosMagicReveal).
       let ex = cx, ey = cy;
@@ -42266,7 +42257,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // aufgedeckte Creature fliegt aus der Mitte weiter an ihren
         // Platz auf dem Brett, statt in einen Stapel. Gleiche Bauart
         // wie die Stapel-Ziele darunter, nur mit Zonen-Selektor.
-        const ow = isMe ? 'me' : 'opp';
+        // `destSide` (Als Vorgabe 10.10.): die BRETTSEITE des Platzes, falls er nicht auf der Seite des Aufdeckenden liegt (uebernommener Held).
+        const ow = (destSide === 0 || destSide === 1) ? (destSide === myIdx ? 'me' : 'opp') : (isMe ? 'me' : 'opp');
         const zoneEl = document.querySelector(
           `[data-support-zone][data-support-owner="${ow}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destSlotIdx}"]`);
         if (zoneEl) {
@@ -42288,6 +42280,63 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ey = pr.top;
         }
       }
+      return { ex, ey };
+    };
+    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, destSide, from, hold, holdKey }) => {
+      if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      const isMe    = owner === myIdx;
+      const perCard = revealMs || 1100;
+      // ★ `hold` (Slave Trader / Sky Archeologist, Als Vorgabe 10.10.): die Karte fliegt vom Deck in die Bildmitte, dreht sich um und BLEIBT dort, bis
+      // `mill_center_release` (gleicher `holdKey`) sie weiterschickt — der Spieler entscheidet mit der Karte vor Augen, wohin sie soll.
+      if (hold) {
+        const deckEl0 = document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+        if (!deckEl0) return;
+        const dr0 = deckEl0.getBoundingClientRect();
+        // Die Karte liegt ÜBER der Mitte (Mittelpunkt 160 px oberhalb): die Abfrage (`.first-choice-panel`, mittig, ~160 px hoch) darf sie nicht verdecken.
+        const cx0 = window.innerWidth / 2 - 32, cy0 = window.innerHeight / 2 - 205;
+        const id0 = 'hold-' + holdKey;
+        setKassaranFlips(prev => [...prev.filter(a => a.holdKey !== holdKey), {
+          id: id0, holdKey, phase: 'in', startX: dr0.left, startY: dr0.top, centerX: cx0, centerY: cy0,
+          endX: cx0, endY: cy0, cardName: cardNames[0], cardbackUrl: isMe ? me.cardback : opp.cardback, durationMs: perCard, dest: 'center',
+        }]);
+        // Sicherheitsnetz: eine nie freigegebene Karte (Verbindungsabbruch, Fehler im Effekt) bleibt nicht ewig liegen.
+        setTimeout(() => setKassaranFlips(prev => prev.filter(a => a.holdKey !== holdKey)), 90000);
+        return;
+      }
+      // Deck→pile handshake: the piles were already mutated + synced
+      // server-side before this event, so register every card in the
+      // pending bucket — otherwise the pile-growth auto-detector
+      // name-matches them against same-named cards on the board
+      // (typically Abilities) and spawns phantom board→pile flights.
+      const ziel = dest || (deleteMode ? 'deleted' : 'discard');
+      // ★ Fliegt die Karte zur HAND, hat der Auto-Erkenner spaeter
+      // „Hand groesser, Deck kleiner" vor sich und wuerde EINE ZWEITE
+      // Ziehanimation starten (Als Befund 21.8.). Derselbe Zaehler wie
+      // beim Stehlen unterdrueckt sie — je Karte einer.
+      if (ziel === 'hand' && isMe) stealSkipDrawRef.current += cardNames.length;
+      // Der Stapelwachstums-Handschlag gilt NUR fuer Ablage/Geloescht —
+      // bei 'hand' und 'deck' waechst kein Stapel, den der
+      // Auto-Erkenner faelschlich als Flug deuten koennte.
+      if (ziel === 'discard' || ziel === 'deleted') {
+        // v896: nur fuer STAPEL-Ziele vormerken — eine Support Zone hat
+        // keinen Stapel-Erkenner, und `pending['support']` gaebe es gar
+        // nicht.
+        const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+        if (pending[ziel]) pending[ziel].push(...cardNames);
+      }
+      // `from: 'potionDeck'` (Chaos-Diamond): Start am TRANK-Deck; ist es
+      // gerade leer gespielt (Element nicht eingehaengt), am Hauptdeck.
+      const deckEl = (from === 'potionDeck'
+          ? document.querySelector(isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]')
+          : null)
+        || document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+      if (!deckEl) return;
+      const dr = deckEl.getBoundingClientRect();
+      const sx = dr.left;
+      const sy = dr.top;
+      const cx = window.innerWidth / 2 - 32;
+      const cy = window.innerHeight / 2 - 45;
+      const { ex, ey } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide);
       const cardbackUrl = isMe ? me.cardback : opp.cardback;
       cardNames.forEach((cardName, i) => {
         const id = Date.now() + Math.random();
@@ -42315,7 +42364,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }, (startDelayMs || 0) + i * perCard);
       });
     };
+    // ★ Freigabe der gehaltenen Karte: von der Bildmitte weiter zum Ziel (Deck, Ablage, Gelöscht, Brett-Zone, Hand).
+    const onMillCenterRelease = ({ owner, holdKey, cardName, dest, destHeroIdx, destSlotIdx, destSide, revealMs }) => {
+      const isMe = owner === myIdx;
+      const dur = revealMs || 650;
+      const ziel = dest || 'deck';
+      const cx = window.innerWidth / 2 - 32, cy = window.innerHeight / 2 - 205;   // dieselbe Haltestelle wie in `onMillCenterReveal` (`hold`)
+      if ((ziel === 'discard' || ziel === 'deleted') && cardName) {
+        const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+        if (pending[ziel]) pending[ziel].push(cardName);
+      }
+      if (ziel === 'hand' && isMe) stealSkipDrawRef.current += 1;
+      const { ex, ey } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide);
+      const id = 'rel-' + holdKey + '-' + Date.now();
+      const halteMs = ziel === 'support' ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
+      setKassaranFlips(prev => [...prev.filter(a => a.holdKey !== holdKey), {
+        id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey,
+        cardName: cardName || (prev.find(a => a.holdKey === holdKey) || {}).cardName, cardbackUrl: isMe ? me.cardback : opp.cardback, durationMs: dur, dest: ziel,
+      }]);
+      setTimeout(() => setKassaranFlips(prev => prev.filter(a => a.id !== id)), dur + halteMs);
+    };
     socket.on('mill_center_reveal', onMillCenterReveal);
+    socket.on('mill_center_release', onMillCenterRelease);
     // ── Mischen sichtbar machen (Als Vorgabe 21.8.) ──
     // Kurzes Ruetteln auf dem betroffenen Stapel plus Klang. Die
     // Engine feuert das an EINER Stelle (`shuffleDeck`), hier landet
@@ -44288,6 +44358,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('chaos_magic_reveal', onChaosMagicReveal);
       socket.off('mill_center_reveal', onMillCenterReveal);
+      socket.off('mill_center_release', onMillCenterRelease);
       socket.off('deck_peek_reveal', onDeckPeekReveal);
       socket.off('deck_peek_clear', onDeckPeekClear);
       socket.off('hand_card_materialize', onHandMaterialize);
@@ -46491,7 +46562,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (t === 'sky_archeologist') {
         const p = playerByName(entry.player);
-        return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for free!' : ' and may play it for free this turn!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : ' and keeps it on top of the deck.'}</span>;
+        return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for 0 Gold!' : ' and plays it right away for 0 Gold!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : entry.placed === 'top' ? ' and keeps it on top of the deck.' : ' — it goes back on top of the deck.'}</span>;
       }
       if (t === 'front_soldier') {
         const p = playerByName(entry.player);
@@ -50939,7 +51010,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           centerX={anim.centerX} centerY={anim.centerY}
           endX={anim.endX} endY={anim.endY}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl}
-          durationMs={anim.durationMs} dest={anim.dest} />
+          durationMs={anim.durationMs} dest={anim.dest} phase={anim.phase} />
       ))}
       {brackleCatapults.map(b => (
         <BrackleCatapultCard key={b.id}

@@ -1,10 +1,12 @@
 'use strict';
 // UI-Test: Slave Trader im ECHTEN Browser.
-//   • Lauf A (Client): die Brett-Animation `slave_chains` (Pixelart-Canvas, Hülle `ppSalve`) wird wie ein Server-Ereignis eingespeist: der Canvas wird
-//     bemalt, die Klänge starten (`elem_wind`, `placement`, `ping`, `heavy_impact`), nach ~1,3 s ist er weg, keine JS-Fehler.
+//   • Lauf A (Client): die Brett-Animation `slave_chains` (Pixelart-Canvas, Hülle `ppSalve`) wird wie ein Server-Ereignis eingespeist — Ursprung und Ziel ist
+//     das DECK (`originDeck`, `{ deck: true }`): der Canvas wird bemalt UND liegt mittig auf dem Deck, die Klänge starten (`elem_wind`, `placement`, `ping`,
+//     `heavy_impact`), nach ~1,3 s ist er weg, keine JS-Fehler.
 //   • Lauf B (echter Spielweg): in der Main Phase liegen der Händler und eine Lv-3-Creature (3-Headed Giant) auf der Hand — `play_creature` verlangt den
 //     Abwurf (Hand-Karte anklicken), der Händler landet auf dem Brett (Zusatzaktion). Dann deckt der Händler auf dem Brett die oberste Deckkarte auf (eine
-//     Creature): Zonenwahl mit Kartenvorschau, die Creature steht in der gewählten Zone, das Log nennt es; ein zweiter Einsatz im selben Zug geschieht nicht.
+//     Creature): die Karte liegt in der Bildmitte (`kf-in`, oberhalb der Frage), die Zonenwahl läuft bei liegender Karte, danach fliegt sie auf den
+//     Platz (`kf-out`) und steht in der gewählten Zone, das Log nennt es; ein zweiter Einsatz im selben Zug geschieht nicht.
 //   • Lauf C (echter Spielweg): oben liegt ein Spell — keine Beschwörung, nur „oben oder unten?“; „Bottom“ legt ihn unter das Deck (Log).
 //   NODE_PATH=…uitools/node_modules:/tmp/st-tools/node_modules:/opt/node22/lib/node_modules node scripts/skilltest-e2e/ui-slave-trader.js [/pfad/ordner]
 const { chromium } = require('playwright');
@@ -65,7 +67,7 @@ async function messen(page, grenze = 400) {
       const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
       let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
       const q = cv.getBoundingClientRect();
-      return { bemalt: n, w: Math.round(q.width), h: Math.round(q.height) };
+      return { bemalt: n, w: Math.round(q.width), h: Math.round(q.height), cx: Math.round(q.left + q.width / 2), cy: Math.round(q.top + q.height / 2) };
     });
     if (m) { spur = spur || m; maximum = Math.max(maximum, m.bemalt); }
     if (maximum > grenze && k > 8) break;
@@ -123,7 +125,7 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         await page.evaluate(() => { window.__snd.length = 0; });
         await page.evaluate(({ my }) => {
           const ev = { type: 'slave_chains', zoneType: 'board', owner: my, heroIdx: -1, zoneSlot: -1, duration: 1200,
-            targets: [{ owner: my, heroIdx: 1, zoneSlot: 0, cardName: 'Slave Trader' }], originOwner: my, originHeroIdx: 1, originZoneSlot: 0 };
+            targets: [{ owner: my, deck: true }], originOwner: my, originDeck: true };
           window.socket.listeners('play_zone_animation').forEach(f => f(ev));
         }, { my });
         const spur = await messen(page, 500);
@@ -132,6 +134,8 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         const klaenge = await page.evaluate(() => window.__snd.slice());
         const weg = await page.evaluate(() => !document.querySelector('[data-pp-px="aus"] canvas'));
         check('die Pixelart-Animation (Canvas) ist bemalt', !!spur && spur.bemalt > 100, spur);
+        const deck = await page.evaluate(() => { const q = document.querySelector('[data-my-deck]').getBoundingClientRect(); return { cx: Math.round(q.left + q.width / 2), cy: Math.round(q.top + q.height / 2) }; });
+        check('…und liegt MITTIG AUF DEM DECK (nicht auf einer Creature)', !!spur && Math.abs(spur.cx - deck.cx) <= 6 && Math.abs(spur.cy - deck.cy) <= 6, { spur, deck });
         check('die Klänge starten: Rasseln (`elem_wind`, `placement`) und Klirren (`ping`, `heavy_impact`)', hat(klaenge, s.dauern.elem_wind) && hat(klaenge, s.dauern.placement) && hat(klaenge, s.dauern.ping) && hat(klaenge, s.dauern.heavy_impact), [s.dauern, klaenge]);
         check('nach ~1,3 s ist die Animation wieder weg', weg === true);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
@@ -159,8 +163,19 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         await page.evaluate(() => window.socket.emit('activate_creature_effect', { roomId: window.__gs.roomId, heroIdx: 1, zoneSlot: 0 }));
         const zp = await warteAufPrompt(page, 'zonePick');
         check('die Zonenwahl (nach dem Aufdecken) bietet freie Plätze mehrerer Helden an', !!zp && zp.titel === 'Slave Trader' && zp.zones.length > 3, zp);
+        await sleep(800);
+        const mitte = await page.evaluate(() => {
+          const k = document.querySelector('.kassaran-flip-card.kf-in');
+          if (!k) return null;
+          const q = k.getBoundingClientRect();
+          return { cx: Math.round(q.left + q.width / 2), W: window.innerWidth / 2, oben: Math.round(q.top) };
+        });
+        check('…und die aufgedeckte Karte LIEGT währenddessen in der Bildmitte (waagerecht mittig)', !!mitte && Math.abs(mitte.cx - mitte.W) <= 8 && mitte.oben >= 0, mitte);
         if (outDir && zp) { try { await page.screenshot({ path: path.join(outDir, 'slave-trader-zonenwahl.png') }); } catch { /* egal */ } }
         if (zp) await antwort(page, zp.id, { heroIdx: 2, slotIdx: 1 });
+        let flug = false;
+        for (let k = 0; k < 20 && !flug; k++) { flug = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card.kf-out')); if (!flug) await sleep(50); }
+        check('nach der Wahl fliegt sie aus der Mitte weiter (`kf-out`)', flug === true);
         await sleep(3500);
         const r = await page.evaluate((my) => ({
           zonen: window.__gs.players[my].supportZones.map(h => h.map(z => (z || [])[0] || null)),
@@ -174,6 +189,8 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         await sleep(2000);
         const zweit = await page.evaluate(() => ({ prompt: !!(window.__gs.effectPrompt && (window.__gs.effectPrompt.type === 'zonePick' || window.__gs.effectPrompt.type === 'confirm')) }));
         check('ein zweiter Einsatz im selben Zug öffnet keine Frage', zweit.prompt === false, zweit);
+        const haengt = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card'));
+        check('es bleibt keine Karte in der Bildmitte liegen', haengt === false);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
       } finally { await s.ctx.close(); }
     }

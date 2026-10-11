@@ -154,7 +154,7 @@ const aufBrett = (t, seat, name = FS) => t.engine.cardInstances.find(c => c.name
     check('die Surprise ist negiert (`_surpriseNegated`, `_surpriseNegatedBy`)', hookCtx._surpriseNegated === true && hookCtx._surpriseNegatedBy === FS, hookCtx);
     check('der Soldat steht auf dem Brett von Sitz 1, beide haben 2 Karten gezogen', !!aufBrett(t, 1) && t.p1.hand.length === 2 && t.p0.hand.length === 2, { h1: t.p1.hand, h0: t.p0.hand });
     const q = angebote(t, 1);
-    check('die Frage nennt die Surprise und ist gerrymander-fähig (echtes „may“)', q.length === 1 && /Booby Trap/.test(q[0].d.message) && q[0].d.gerrymanderEligible === true && q[0].d.showCard === 'Booby Trap', q.map(p => p.d));
+    check('die Frage nennt die Surprise (rechts), zeigt den Soldaten selbst LINKS und ist gerrymander-fähig (echtes „may“)', q.length === 1 && /Booby Trap/.test(q[0].d.message) && q[0].d.gerrymanderEligible === true && q[0].d.showCard === 'Booby Trap' && q[0].d.showCardLeft === FS, q.map(p => p.d));
     check('Log `front_soldier` (via surprise)', log(t, 'front_soldier').some(l => l.via === 'surprise' && l.negated === 'Booby Trap'), log(t, 'front_soldier'));
   }
   {

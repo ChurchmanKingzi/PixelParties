@@ -19,6 +19,8 @@ const arts = Object.values(DB).filter(c => c.cardType === 'Artifact').sort((a, b
 const GROSS = arts.find(c => c.subtype === 'Normal' && (c.cost || 0) >= 10 && !c.name.includes('Token')).name;           // Artifact mit Cost ≥ 10 (Normal)
 const GROSS_EQ = arts.find(c => c.subtype === 'Equipment' && (c.cost || 0) >= 10).name;                                   // Equipment mit Cost ≥ 10
 const KLEIN = arts.find(c => c.subtype === 'Normal' && (c.cost || 0) > 0 && (c.cost || 0) < 10).name;                     // Artifact mit Cost < 10
+const BANANEN = 'Golden Bananas';                                                                                          // Normal-Artifact ohne Ziel: +12 Gold
+const DOOM = 'Book of Doom';                                                                                              // Zielkarte mit eigener Kostenrechnung (4 Gold je Ziel)
 const SPELL = Object.values(DB).filter(c => c.cardType === 'Spell' && c.subtype === 'Normal' && c.level <= 1).sort((a, b) => a.name.localeCompare(b.name))[0].name;
 
 /** `phase` 2 = Main, 3 = Action. Held 0 trägt keine Fähigkeiten (Lv0-Creature braucht keine). */
@@ -170,14 +172,18 @@ const oben = () => t.p0.mainDeck[0];
     check('Action Phase ohne Artifact: der normale Weg (kostet die Aktion, keine Frage)', aufBrett(t) && t.p0.heroesActedThisTurn.length === 1 && t.prompts.length === 0, { acted: t.p0.heroesActedThisTurn, prompts: t.prompts.map(p => p.d.type) });
   }
 
-  console.log('Einmal pro Zug: oberste Karte aufdecken');
+  console.log('Einmal pro Zug: oberste Karte aufdecken, in der Mitte halten');
+  const halten = () => reveal().filter(r => r.hold === true);
+  const frei = () => t.events.filter(e => e.ev === 'mill_center_release').map(e => e.data);
+  const imEventStrom = (a, b) => t.events.findIndex(e => e.ev === a) < t.events.findIndex(e => e.ev === b);   // a kam vor b
   {
-    // Equipment, ein freier Platz bei jedem Helden → Zonenwahl
+    // Equipment: Karte liegt in der Mitte, Zonenwahl, Flug aus der Mitte auf den Platz
     t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL, SPELL] });
     legeSA();
     check('Vorbedingung: das Equipment hat Plätze', equipDestinations(t.engine, 0, GROSS_EQ).length > 0);
+    let beiWahl = null;
     t.antwort = (pi, d) => {
-      if (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) return true;
+      if (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) { beiWahl = { halten: halten().length, frei: frei().length }; return true; }
       if (d.type === 'zonePick' && d.title === SA) return { heroIdx: 1, slotIdx: 0 };
       return undefined;
     };
@@ -187,23 +193,112 @@ const oben = () => t.p0.mainDeck[0];
     check('die Aktivierung läuft', r !== false, r);
     check('das Equipment liegt am gewählten Helden (Held 1, Platz 0) — OHNE Gold zu zahlen', !!ausgeruestet && ausgeruestet.heroIdx === 1 && ausgeruestet.zoneSlot === 0 && t.p0.gold === 77, ausgeruestet && { h: ausgeruestet.heroIdx, z: ausgeruestet.zoneSlot });
     check('es verließ das Deck (die nächste Karte ist oben), nicht die Ablage', oben() === SPELL && t.p0.mainDeck.length === 2 && !t.p0.discardPile.includes(GROSS_EQ), { deck: t.p0.mainDeck, abl: t.p0.discardPile });
-    const rv = reveal();
-    check('Aufdecken: Flug Deck → Mitte → auf den Brettplatz (`dest: support`, Held 1, Platz 0)', rv.length === 1 && rv[0].cardNames[0] === GROSS_EQ && rv[0].dest === 'support' && rv[0].destHeroIdx === 1 && rv[0].destSlotIdx === 0 && rv[0].owner === 0, rv);
+    check('die Karte wird in der Bildmitte GEHALTEN, noch bevor gefragt wird (`mill_center_reveal` mit `hold`, ohne Ziel: `dest: center`)', halten().length === 1 && halten()[0].cardNames[0] === GROSS_EQ && halten()[0].dest === 'center' && halten()[0].owner === 0 && typeof halten()[0].holdKey === 'string', halten());
+    check('…und beim Fragen ist sie noch NICHT freigegeben', beiWahl && beiWahl.halten === 1 && beiWahl.frei === 0, beiWahl);
+    const f = frei();
+    check('Freigabe: Flug aus der Mitte auf den Brettplatz (`dest: support`, Held 1, Platz 0, Seite 0), gleicher Schlüssel', f.length === 1 && f[0].dest === 'support' && f[0].destHeroIdx === 1 && f[0].destSlotIdx === 0 && f[0].destSide === 0 && f[0].holdKey === halten()[0].holdKey && f[0].cardName === GROSS_EQ, f);
     const a = anims('sky_dig');
-    check('Animation `sky_dig` als Brett-Animation mit dem Archäologen als Ursprung UND Ziel', a.length === 1 && a[0].zoneType === 'board' && a[0].originHeroIdx === 0 && a[0].originZoneSlot === 0 && a[0].targets[0].zoneSlot === 0, a);
+    check('Animation `sky_dig` läuft auf dem DECK (Ursprung `originDeck`, Ziel `deck: true`), nicht auf der Creature', a.length === 1 && a[0].zoneType === 'board' && a[0].originDeck === true && a[0].originOwner === 0 && a[0].targets.length === 1 && a[0].targets[0].deck === true && a[0].targets[0].owner === 0 && a[0].originHeroIdx === undefined && a[0].targets[0].zoneSlot === undefined, a);
     check('Log `sky_archeologist` nennt Karte und Spielweg', log('sky_archeologist').some(l => l.card === GROSS_EQ && l.played === 'equip'), log('sky_archeologist'));
     const r2 = await aktivieren();
     check('ein zweiter Einsatz DESSELBEN Archäologen im selben Zug ist gesperrt', r2 === false || t.p0.mainDeck.length === 2, { r2, deck: t.p0.mainDeck });
   }
   {
-    // Nicht-Equipment: Hand + Nullpreis-Vermerk
-    t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
+    // Normal-Artifact ohne Ziel: wirkt SOFORT, ohne Hand, ohne Gold, Ablage
+    t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
     legeSA();
     t.antwort = ja('Play it right now');
+    t.p0.gold = 5;
     await aktivieren();
-    check('Normal-Artifact: kommt auf die HAND und trägt den Nullpreis-Vermerk (`_freeArtifactNames`) — der Spieler spielt es kostenlos über den eigenen Weg', t.p0.hand.includes(GROSS) && t.p0._freeArtifactNames && t.p0._freeArtifactNames[GROSS] === true && t.p0.mainDeck.length === 1, { hand: t.p0.hand, frei: t.p0._freeArtifactNames, deck: t.p0.mainDeck });
-    check('Aufdecken: Flug zur HAND (`dest: hand`)', reveal().length === 1 && reveal()[0].dest === 'hand', reveal());
-    check('Log: `free_in_hand`', log('sky_archeologist').some(l => l.played === 'hand'), log('sky_archeologist'));
+    check('Golden Bananas wirkt SOFORT (+12 Gold) — und kostet KEINE 4 Gold', t.p0.gold === 17, t.p0.gold);
+    check('es kommt NICHT auf die Hand (kein Nullpreis-Vermerk), sondern nach der Wirkung in die Ablage; das Deck hat sie verlassen', !t.p0.hand.includes(BANANEN) && !t.p0._freeArtifactNames && t.p0.discardPile.join() === BANANEN && t.p0.mainDeck.join() === SPELL, { hand: t.p0.hand, frei: t.p0._freeArtifactNames, abl: t.p0.discardPile, deck: t.p0.mainDeck });
+    const f = frei();
+    check('Freigabe: Flug aus der Mitte zur ABLAGE (`dest: discard`) — die Karte blieb während der Wirkung in der Mitte', halten().length === 1 && f.length === 1 && f[0].dest === 'discard' && f[0].cardName === BANANEN && f[0].holdKey === halten()[0].holdKey && imEventStrom('mill_center_reveal', 'play_gold_coins') && imEventStrom('play_gold_coins', 'mill_center_release'), { f, ev: t.events.map(e => e.ev) });
+    check('Log: gespielt als Artifact', log('sky_archeologist').some(l => l.card === BANANEN && l.played === 'artifact'), log('sky_archeologist'));
+    check('Log: `free_artifact_played`', log('free_artifact_played').some(l => l.card === BANANEN && l.as === 'artifact'), log('free_artifact_played'));
+  }
+  {
+    // Zielkarte mit EIGENER Kostenrechnung (Book of Doom, 4 Gold je Ziel): gratis, mit Zielwahl
+    t = await fresh({ phase: 2, deck: [DOOM, SPELL] });
+    legeSA();
+    t.p0.gold = 0;
+    const lebenVorher = t.p1.heroes[0].hp;
+    let ziele = null;
+    t.engine.promptEffectTarget = async (pi, valid, config) => { ziele = { n: valid.length, titel: config.title, max: config.maxTotal }; return [valid.find(v => v.type === 'hero' && v.owner === 1).id]; };
+    t.antwort = ja('Play it right now');
+    await aktivieren();
+    check('Book of Doom mit 0 Gold: die Zielwahl wird angeboten (Budget unbegrenzt)', ziele && ziele.n > 0 && ziele.max === 99, ziele);
+    check('…sein Schaden (50) trifft SOFORT den gewählten Helden', t.p1.heroes.some(h => h.hp === lebenVorher - 50), { vorher: lebenVorher, hp: t.p1.heroes.map(h => h.hp) });
+    check('…und es kostet NICHTS (Gold bleibt 0, nicht negativ)', t.p0.gold === 0, t.p0.gold);
+    check('…danach liegt es in der Ablage, nicht auf der Hand', t.p0.discardPile.join() === DOOM && !t.p0.hand.includes(DOOM) && t.p0.mainDeck.join() === SPELL, { abl: t.p0.discardPile, hand: t.p0.hand, deck: t.p0.mainDeck });
+    check('…und der Gratis-Scope ist wieder zu', !t.engine._kostenlosScope && !t.engine.canAffordGold(0, 4, DOOM), t.engine._kostenlosScope);
+  }
+  {
+    // Der ECHTE Zielwähler (`promptEffectTarget` → Engine-Dispatcher, in der Sim beantwortet ihn die CPU-Logik): Book of Doom
+    t = await fresh({ phase: 2, deck: [DOOM, SPELL] });
+    legeSA();
+    t.p0.gold = 0;
+    t.antwort = ja('Play it right now');
+    const echt = t.engine.promptEffectTarget.bind(t.engine);
+    let cfg = null, zustand = null;
+    t.engine.promptEffectTarget = async (pi, valid, config) => {
+      cfg = { titel: config.title, abbrechbar: config.cancellable, text: config.description, max: config.maxTotal, quelle: config.sourceCardName };
+      zustand = { deck: t.p0.mainDeck[0], gehalten: halten().length, frei: frei().length };
+      return echt(pi, valid, config);
+    };
+    await aktivieren();
+    check('die Zielwahl: Titel = Karte, abbrechbar, Hinweis „without paying its Cost“, bis zu 99 Ziele (kein Gold nötig), Quelle benannt', !!cfg && cfg.abbrechbar === true && /without paying its Cost/.test(cfg.text) && cfg.max === 99 && cfg.quelle === DOOM && cfg.titel === DOOM, cfg);
+    check('…während sie offen ist, liegt die Karte noch oben im Deck und in der Mitte (gehalten, nicht freigegeben)', zustand && zustand.deck === DOOM && zustand.gehalten === 1 && zustand.frei === 0, zustand);
+    check('…danach: 0 Gold gezahlt, Karte in der Ablage, Deck weiter', t.p0.gold === 0 && t.p0.discardPile.join() === DOOM && t.p0.mainDeck.join() === SPELL, { gold: t.p0.gold, abl: t.p0.discardPile });
+  }
+  {
+    // Abbruch in der Zielwahl → zurück ins Deck, nichts passiert
+    t = await fresh({ phase: 2, deck: [DOOM, SPELL] });
+    legeSA();
+    t.p0.gold = 9;
+    t.engine.promptEffectTarget = async () => null;
+    t.antwort = ja('Play it right now');
+    await aktivieren();
+    check('Abbruch der Zielwahl: das Artifact liegt unverändert OBEN im Deck, nichts in der Ablage, kein Gold bewegt, nichts auf der Hand', t.p0.mainDeck.join() === [DOOM, SPELL].join() && t.p0.discardPile.length === 0 && t.p0.hand.length === 0 && t.p0.gold === 9, { deck: t.p0.mainDeck, abl: t.p0.discardPile, gold: t.p0.gold });
+    const f = frei();
+    check('…die Karte fliegt aus der Mitte zurück ins Deck (`dest: deck`)', f.length === 1 && f[0].dest === 'deck' && f[0].cardName === DOOM, f);
+    check('…und es gibt KEINE Oben/Unten-Frage (es ist ein Artifact)', !t.prompts.some(p => p.d._topOrBottom));
+  }
+  {
+    // `resolve` meldet „cancelled" (Spieler bricht eine innere Abfrage ab) → die Karte liegt wieder oben
+    t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
+    legeSA();
+    const sk = loadCardEffect(BANANEN), alt = sk.resolve;
+    sk.resolve = async () => ({ cancelled: true });
+    t.antwort = ja('Play it right now');
+    try { await aktivieren(); } finally { sk.resolve = alt; }
+    check('`cancelled` aus dem resolve: die Karte liegt wieder OBEN im Deck (nicht in der Ablage)', t.p0.mainDeck.join() === [BANANEN, SPELL].join() && t.p0.discardPile.length === 0, { deck: t.p0.mainDeck, abl: t.p0.discardPile });
+  }
+  {
+    // Zugende-Reiter (Open-Invitation-Vertrag): `gs._spellEndsTurn` beendet den Zug nach der Wirkung
+    t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
+    legeSA();
+    const sk = loadCardEffect(BANANEN), alt = sk.resolve;
+    sk.resolve = async () => { t.gs._spellEndsTurn = true; return true; };
+    t.antwort = ja('Play it right now');
+    let ende = null;
+    const altAdv = t.engine.advanceToPhase.bind(t.engine);
+    t.engine.advanceToPhase = async (pi, ph, o) => { ende = { pi, ph, quelle: o && o.turnEndSource && o.turnEndSource.name }; return altAdv(pi, ph, o); };
+    try { await aktivieren(); } finally { sk.resolve = alt; t.engine.advanceToPhase = altAdv; }
+    check('`_spellEndsTurn`: der Zug endet nach der Wirkung (Phase 5), Quelle = das gespielte Artifact', ende && ende.pi === 0 && ende.ph === 5 && ende.quelle === BANANEN && !t.gs._spellEndsTurn, ende);
+  }
+  {
+    // Das Kettenfenster kann das Artifact NEGIEREN → Ablage, keine Wirkung
+    t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
+    legeSA();
+    t.p0.gold = 5;
+    const altKette = t.engine.executeCardWithChain.bind(t.engine);
+    let kettenInfo = null;
+    t.engine.executeCardWithChain = async (info) => { if (info.cardName === BANANEN) { kettenInfo = info; return { negated: true, chainFormed: true, resolveResult: null }; } return altKette(info); };
+    t.antwort = ja('Play it right now');
+    await aktivieren();
+    check('negiert: keine Wirkung (Gold bleibt 5), die Karte landet in der Ablage, nicht auf der Hand', t.p0.gold === 5 && t.p0.discardPile.join() === BANANEN && !t.p0.hand.includes(BANANEN) && t.p0.mainDeck.join() === SPELL, { gold: t.p0.gold, abl: t.p0.discardPile, deck: t.p0.mainDeck });
+    check('…das Kettenfenster lief als Artifact-Spiel NICHT aus der Hand (`fromBoard`), zu 0 Gold', kettenInfo && kettenInfo.cardType === 'Artifact' && kettenInfo.fromBoard === true && kettenInfo.goldCost === 0 && kettenInfo.owner === 0, kettenInfo && { t: kettenInfo.cardType, fb: kettenInfo.fromBoard, g: kettenInfo.goldCost });
   }
   {
     // Abgelehnt → geht zurück ins Deck, als wäre es unspielbar gewesen (KEINE Oben/Unten-Wahl: die gilt nur für Nicht-Artifacts)
@@ -212,15 +307,31 @@ const oben = () => t.p0.mainDeck[0];
     t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) ? false : undefined;
     await aktivieren();
     check('abgelehnt: KEINE „oben oder unten“-Frage — das Artifact bleibt, wo es lag (oben), wie bei einem unspielbaren', !t.prompts.some(p => p.d._topOrBottom) && t.p0.mainDeck.join() === [GROSS_EQ, SPELL, KLEIN].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support'), { deck: t.p0.mainDeck, prompts: t.prompts.map(p => (p.d.message || '').slice(0, 40)) });
-    check('der Flug des Aufdeckens geht zurück ins DECK (`dest: deck`)', reveal().length === 1 && reveal()[0].dest === 'deck', reveal());
+    const f = frei();
+    check('die Karte lag in der Mitte und fliegt von dort ZURÜCK ins DECK (`dest: deck`)', halten().length === 1 && f.length === 1 && f[0].dest === 'deck' && f[0].holdKey === halten()[0].holdKey, { h: halten(), f });
     check('Log: nicht gespielt, nirgendwohin gelegt (`played`/`placed` leer)', log('sky_archeologist').some(l => l.card === GROSS_EQ && !l.played && !l.placed), log('sky_archeologist'));
   }
   {
+    // Abbruch der Platzwahl (Equipment) → zurück ins Deck
+    t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL] });
+    legeSA();
+    t.antwort = (pi, d) => {
+      if (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) return true;
+      if (d.type === 'zonePick' && d.title === SA) return { cancelled: true };
+      return undefined;
+    };
+    await aktivieren();
+    check('Abbruch der Platzwahl: das Equipment bleibt oben im Deck, liegt nicht am Helden, fliegt zurück ins Deck', t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support') && frei().length === 1 && frei()[0].dest === 'deck', { deck: t.p0.mainDeck, f: frei() });
+  }
+  {
+    // Karte, die kein Artifact ist: „Otherwise" — oben/unten, die Karte liegt dabei in der Mitte
     t = await fresh({ phase: 2, deck: [SPELL, GROSS, KLEIN] });
     legeSA();
-    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? true : undefined;      // „Top“
+    let beiFrage = null;
+    t.antwort = (pi, d) => { if (d.type === 'confirm' && d.title === SA && d._topOrBottom) { beiFrage = { halten: halten().length, frei: frei().length }; return true; } return undefined; };      // „Top“
     await aktivieren();
     check('Spell oben (kein Artifact): KEINE Spielfrage, nur oben/unten — „Top“ lässt sie oben liegen', t.p0.mainDeck.join() === [SPELL, GROSS, KLEIN].join() && !t.prompts.some(p => /Play it right now/.test(p.d.message || '')), { deck: t.p0.mainDeck, prompts: t.prompts.map(p => p.d.type + ':' + (p.d.message || '').slice(0, 30)) });
+    check('…die Frage kommt BEI LIEGENDER Karte (gehalten, noch nicht freigegeben); danach fliegt sie zurück ins Deck', beiFrage && beiFrage.halten === 1 && beiFrage.frei === 0 && frei().length === 1 && frei()[0].dest === 'deck', { beiFrage, f: frei() });
   }
   {
     t = await fresh({ phase: 2, deck: [SPELL, GROSS] });
@@ -240,19 +351,31 @@ const oben = () => t.p0.mainDeck[0];
   }
   {
     // Artifact-Sperre (Boomerang)
-    t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
+    t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
     legeSA();
     t.p0._artifactLockTurn = t.gs.turn;
     await aktivieren();
-    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join() && !t.p0.hand.includes(GROSS), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [BANANEN, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
-    // Hand-Sperre: das Artifact müsste auf die Hand
+    // Zielkarte ohne gültiges Ziel / Spielbarkeits-Tor der Karte (Coffee: nur mit alten Status)
     t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
     legeSA();
-    t.p0.handLocked = true;
     await aktivieren();
-    check('Hand-Sperre: ein Normal-Artifact (läuft über die Hand) ist nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+    check('Coffee ohne Status auf den Helden: das kartenseitige Tor sperrt — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+  }
+  {
+    // Nicht spielbare Unterarten: Reaction ohne `proactivePlay`, Area, Surprise, Artifact Creature
+    t = await fresh({ phase: 2, deck: [SPELL] });
+    const artSub = (f) => Object.values(DB).find(c => c.cardType.includes('Artifact') && f(c));
+    const reaktion = artSub(c => (c.subtype || '').toLowerCase() === 'reaction' && !(loadCardEffect(c.name) || {}).proactivePlay);
+    const flaeche = artSub(c => (c.subtype || '').toLowerCase() === 'area');
+    const ueberraschung = artSub(c => (c.subtype || '').toLowerCase() === 'surprise');
+    const kreatur = artSub(c => /creature/i.test(c.cardType + '/' + (c.subtype || '')));
+    const sw = require('../../cards/effects/_free-artifact-shared').spielweg;
+    for (const [bez, k] of [['Reaction ohne proactivePlay', reaktion], ['Area', flaeche], ['Surprise', ueberraschung], ['Artifact Creature', kreatur]]) {
+      if (k) check(`${bez} (${k.name}) ist nicht spielbar`, sw(t.engine, 0, k.name) === null, sw(t.engine, 0, k.name));
+    }
   }
   {
     t = await fresh({ phase: 2, deck: [] });

@@ -164,10 +164,14 @@ function findeBeschwoerbare() {
     check('die aufgedeckte Creature steht in der EINZIGEN freien Zone (Held 1, Platz 1) — ohne Zonenwahl', !!inst && !t.prompts.some(p => p.d.type === 'zonePick'), inst && { h: inst.heroIdx, z: inst.zoneSlot });
     check('sie kam vom Deck (nächste Karte oben, Deck um eins kürzer), das Deck wurde NICHT gemischt', t.p0.mainDeck.join() === [SPELL, SPELL, SPELL].join(), t.p0.mainDeck);
     check('es war eine Zusatzaktion: der Held gilt nicht als gehandelt', t.p0.heroesActedThisTurn.length === 0, t.p0.heroesActedThisTurn);
-    const rv = reveal();
-    check('Aufdecken: Flug Deck → Mitte → auf den Brettplatz (`dest: support`, Held 1, Platz 1)', rv.length === 1 && rv[0].cardNames[0] === KRE && rv[0].dest === 'support' && rv[0].destHeroIdx === 1 && rv[0].destSlotIdx === 1, rv);
+    const hl = reveal().filter(r => r.hold === true);
+    const fr = t.events.filter(e => e.ev === 'mill_center_release').map(e => e.data);
+    check('Aufdecken: die Karte fliegt vom Deck in die Mitte und wird GEHALTEN (`hold`, `dest: center`)', hl.length === 1 && hl[0].cardNames[0] === KRE && hl[0].dest === 'center' && hl[0].owner === 0 && typeof hl[0].holdKey === 'string', reveal());
+    check('Freigabe: Flug aus der Mitte auf den Brettplatz (`dest: support`, Held 1, Platz 1, Seite 0), gleicher Schlüssel', fr.length === 1 && fr[0].dest === 'support' && fr[0].destHeroIdx === 1 && fr[0].destSlotIdx === 1 && fr[0].destSide === 0 && fr[0].holdKey === hl[0].holdKey && fr[0].cardName === KRE, fr);
+    check('…die Reihenfolge stimmt: erst halten, dann freigeben', t.events.findIndex(e => e.ev === 'mill_center_reveal') < t.events.findIndex(e => e.ev === 'mill_center_release'));
+    check('…und nur EIN Flug: keine zweite Deck → Platz-Flug (`play_pile_transfer`)', !t.events.some(e => e.ev === 'play_pile_transfer' && e.data.cardName === KRE && e.data.from === 'deck'), t.events.filter(e => e.ev === 'play_pile_transfer').map(e => e.data));
     const a = anims('slave_chains');
-    check('Animation `slave_chains` als Brett-Animation mit dem Händler als Ursprung UND Ziel', a.length === 1 && a[0].zoneType === 'board' && a[0].originHeroIdx === 0 && a[0].originZoneSlot === 0 && a[0].targets[0].zoneSlot === 0, a);
+    check('Animation `slave_chains` läuft auf dem DECK (Ursprung `originDeck`, Ziel `deck: true`), nicht auf der Creature', a.length === 1 && a[0].zoneType === 'board' && a[0].originDeck === true && a[0].originOwner === 0 && a[0].targets.length === 1 && a[0].targets[0].deck === true && a[0].targets[0].owner === 0 && a[0].originHeroIdx === undefined && a[0].targets[0].zoneSlot === undefined, a);
     check('Log `slave_trader`: beschworen', log('slave_trader').some(l => l.card === KRE && l.summoned === true), log('slave_trader'));
     check('keine „oben oder unten“-Frage, wenn beschworen wurde', !t.prompts.some(p => p.d._topOrBottom));
     const r2 = await aktivieren();
@@ -179,19 +183,29 @@ function findeBeschwoerbare() {
     t.p0.mainDeck = [KRE, SPELL];
     legeST(0, 0);
     t.engine._fastMode = false; t.engine._delay = async () => {};     // die Sim steht auf Fast-Mode: dort gibt es keine Stapelflüge (`_pileFlight`)
-    t.antwort = (pi, d) => d.type === 'zonePick' && d.title === ST ? { heroIdx: 2, slotIdx: 1 } : undefined;
+    let beiWahl = null;
+    t.antwort = (pi, d) => {
+      if (d.type === 'zonePick' && d.title === ST) {
+        beiWahl = { gehalten: reveal().filter(r => r.hold).length, frei: t.events.filter(e => e.ev === 'mill_center_release').length, deck: t.p0.mainDeck[0] };
+        return { heroIdx: 2, slotIdx: 1 };
+      }
+      return undefined;
+    };
     await aktivieren();
     const zp = t.prompts.filter(p => p.d.type === 'zonePick' && p.d.title === ST);
-    check('mehrere mögliche Zonen: der Spieler wählt NACH dem Aufdecken (Zonenwahl mit Kartenvorschau, nicht abbrechbar)', zp.length === 1 && zp[0].d.previewCardName === KRE && zp[0].d.cancellable === false && zp[0].d.zones.length > 3, zp.map(p => ({ prev: p.d.previewCardName, n: p.d.zones.length })));
+    check('mehrere mögliche Zonen: der Spieler wählt BEI LIEGENDER Karte (Zonenwahl, nicht abbrechbar)', zp.length === 1 && zp[0].d.cancellable === false && zp[0].d.zones.length > 3 && beiWahl && beiWahl.gehalten === 1 && beiWahl.frei === 0 && beiWahl.deck === KRE, { n: zp.map(p => p.d.zones.length), beiWahl });
     check('die Creature steht in der gewählten Zone (Held 2, Platz 1)', !!karteAuf(KRE, 2, 1), t.engine.cardInstances.filter(c => c.name === KRE).map(c => [c.zone, c.heroIdx, c.zoneSlot]));
-    check('der Aufdeck-Flug ging zurück ins Deck (`dest: deck`), danach flog sie aus dem Deck an ihren Platz', reveal().length === 1 && reveal()[0].dest === 'deck' && t.events.some(e => e.ev === 'play_pile_transfer' && e.data.cardName === KRE && e.data.from === 'deck' && e.data.to === 'support'), reveal());
+    const fr = t.events.filter(e => e.ev === 'mill_center_release').map(e => e.data);
+    check('nach der Wahl fliegt sie aus der MITTE direkt auf den gewählten Platz (`dest: support`, Held 2, Platz 1) — kein Umweg über das Deck', fr.length === 1 && fr[0].dest === 'support' && fr[0].destHeroIdx === 2 && fr[0].destSlotIdx === 1 && !t.events.some(e => e.ev === 'play_pile_transfer' && e.data.cardName === KRE && e.data.from === 'deck'), fr);
   }
   {
     // „if possible" scheitert: Lv-3-Creature, aber kein Held hat die Schule → oben/unten
     t = await fresh({ phase: 2, deck: [LV3, SPELL, SPELL] });
     legeST(0, 0);
-    t.antwort = topBottom(false);
+    let beiFrage = null;
+    t.antwort = (pi, d) => { if (d._topOrBottom) beiFrage = { gehalten: reveal().filter(r => r.hold).length, frei: t.events.filter(e => e.ev === 'mill_center_release').length }; return topBottom(false)(pi, d); };
     await aktivieren();
+    check('…die Karte liegt dabei in der Mitte (gehalten) und fliegt danach zurück ins Deck (`dest: deck`)', beiFrage && beiFrage.gehalten === 1 && beiFrage.frei === 0 && t.events.filter(e => e.ev === 'mill_center_release').length === 1 && t.events.find(e => e.ev === 'mill_center_release').data.dest === 'deck', { beiFrage, f: t.events.filter(e => e.ev === 'mill_center_release').map(e => e.data) });
     check('unbeschwörbare Creature (kein Held erfüllt Lv3): nicht beschworen, die Frage „oben oder unten?“ folgt', !aufBrett(LV3) && t.prompts.filter(p => p.d._topOrBottom).length === 1, t.prompts.map(p => p.d.type));
     check('„Bottom“: die Karte liegt unten im Deck', t.p0.mainDeck.join() === [SPELL, SPELL, LV3].join(), t.p0.mainDeck);
     check('Log: nicht beschworen, unten', log('slave_trader').some(l => l.card === LV3 && l.summoned === false && l.placed === 'bottom'), log('slave_trader'));

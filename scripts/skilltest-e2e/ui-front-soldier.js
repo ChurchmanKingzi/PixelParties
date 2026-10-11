@@ -132,6 +132,7 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         const klaenge = await page.evaluate(() => window.__snd.slice());
         const weg = await page.evaluate(() => !document.querySelector('[data-pp-px="aus"] canvas'));
         check('die Pixelart-Animation (Canvas) ist bemalt', !!spur && spur.bemalt > 150, spur);
+        check('…und der Canvas reicht weit über die Kartenkante hinaus (Rand ≥ 110 px: Federn/Strahl/Schild werden nicht abgeschnitten)', !!spur && spur.w >= 340 && spur.h >= 340, spur);
         check('die Klänge starten: Sausen (`elem_wind`), Aufprall (`heavy_impact`), Verneinung (`negate`)', hat(klaenge, s.dauern.elem_wind) && hat(klaenge, s.dauern.heavy_impact) && hat(klaenge, s.dauern.negate), [s.dauern, klaenge]);
         check('nach ~1,2 s ist die Animation wieder weg', weg === true);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);

@@ -15,26 +15,30 @@
 //
 //  ── ② EINMAL PRO ZUG: OBERSTE KARTE AUFDECKEN, CREATURE SOFORT BESCHWÖREN (`_deck-top-shared.js`) ───
 //  `onCreatureEffect` (engine-HOPT je Instanz, bei nicht-`false`-Rückgabe; der Effekt kostet keine Aktion — die BESCHWÖRUNG ist die
-//  Zusatzaktion, `alsZusatzaktion`): die oberste Deckkarte wird aufgedeckt. Ist sie eine Creature, wird sie SOFORT (kein „may") mit einem
-//  beliebigen deiner Helden beschworen, „if possible":
+//  Zusatzaktion, `alsZusatzaktion`): die oberste Deckkarte fliegt in die Bildmitte, dreht sich um und BLEIBT dort liegen, bis entschieden ist, wohin sie
+//  kommt (Als Vorgabe 10.10.; beide Spieler sehen sie). Ist sie eine Creature, wird sie SOFORT (kein „may") mit einem beliebigen deiner Helden beschworen,
+//  „if possible":
 //    • tauglicher Beschwörer (lebendig, nicht Frozen/Stunned/Webbed/Bound/Negated, Level-/Schulanforderung der Karte erfüllt, keine
 //      Beschwörungs-/Aktionssperre), eine freie Zone, die Karte darf aus einem Stapel beschworen werden (keine Artifact Creatures, nichts
 //      „nur aus der Hand") und erfüllt ihre eigenen Bedingungen (`canSummon`) — dieselbe Prüfung wie Pinta.
-//    • Mehrere mögliche Zonen: der Spieler wählt NACH dem Aufdecken (Zonenwahl mit Kartenvorschau, nicht abbrechbar); genau eine → direkt.
-//    • Kein Platz / unbeschwörbar / Beschwörung scheitert („Otherwise") → der Spieler legt die Karte oben oder unten auf das Deck.
+//    • Mehrere mögliche Zonen: der Spieler wählt bei liegender Karte (Zonenwahl, nicht abbrechbar); genau eine → direkt. Dann fliegt die Karte aus der Mitte
+//      auf den Platz und wird beschworen.
+//    • Kein Platz / unbeschwörbar / Beschwörung scheitert („Otherwise") → der Spieler legt die Karte oben oder unten auf das Deck (sie liegt dabei in der
+//      Mitte und fliegt danach zurück ins Deck).
 //  Aufdecken ist keine Suche (keine Such-Sperre). Das Beschwören aus dem Deck mischt NICHT (`shuffle: false`). Ohne Karte im Deck ist der
 //  Effekt nicht aktivierbar.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `play_zone_animation` `slave_chains` (Pixelart, Brett-Animation mit dem Händler als Ursprung und Ziel, Hülle `ppSalve`; Vorlage: das Kartenbild — der Händler mit der goldenen Kette): eine Kette
-//  schnellt aus dem Platz des Händlers, klirrt, und Goldfunken stieben. Klänge in ZONE_ANIM_SFX; Log `slave_trader`.
+//  `play_zone_animation` `slave_chains` (Pixelart, Hülle `ppSalve`; Vorlage: das Kartenbild — der Händler mit der goldenen Kette) läuft AUF DEM DECK (Als
+//  Vorgabe 10.10.: „auf dem Deck angezeigt, nicht auf den Creatures selbst"; `originDeck` + Ziel `{ owner, deck: true }`): eine Kette schnellt über das Deck,
+//  klirrt, und Goldfunken stieben. Klänge in ZONE_ANIM_SFX; Log `slave_trader`.
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { eligibleSummonZones } = require('./_summon-eligibility');
 const { makeDiscardCostSummon } = require('./_extra-summon-shared');
-const { oberste, decke, obenOderUnten, cpuBehaeltOben } = require('./_deck-top-shared');
+const { oberste, haltenImZentrum, gibFrei, obenOderUnten, cpuBehaeltOben } = require('./_deck-top-shared');
 
 const CARD_NAME = 'Slave Trader';
 const COST_LEVEL = 3;
@@ -72,57 +76,55 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const inst = ctx.card;
     const ps = engine.gs.players[pi];
     const top = oberste(engine, pi);
     if (!ps || !top) return false;
 
-    // Die Kette klirrt.
+    // Die Kette klirrt über dem DECK.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'slave_chains', zoneType: 'board', owner: inst.owner, heroIdx: -1, zoneSlot: -1, duration: CHAIN_MS + 400,
-      targets: [{ owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, cardName: CARD_NAME }],
-      originOwner: inst.owner, originHeroIdx: inst.heroIdx, originZoneSlot: inst.zoneSlot,
+      type: 'slave_chains', zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1, duration: CHAIN_MS + 400,
+      targets: [{ owner: pi, deck: true }],
+      originOwner: pi, originDeck: true,
     });
     await engine._delay(CHAIN_MS);
 
-    // ① PLAN — wohin soll die Creature? Genau eine Zone → direkt; mehrere → der Spieler wählt nach dem Aufdecken.
-    const zonen = moeglicheZonen(engine, pi, top);
-    const direkt = zonen.length === 1 ? zonen[0] : null;
-
-    // ② AUFDECKEN — direkt auf den Platz, sonst zurück ins Deck.
-    await decke(engine, pi, top, {
-      source: CARD_NAME,
-      dest: direkt ? 'support' : 'deck',
-      ...(direkt ? { destHeroIdx: direkt.heroIdx, destSlotIdx: direkt.slotIdx } : {}),
-    });
-
-    // ③ „immediately summon it as an additional Action with any of your Heroes, if possible."
-    let ziel = direkt;
-    if (!ziel && zonen.length > 1) {
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'zonePick', title: CARD_NAME,
-        description: `Summon ${top} with which of your Heroes? (as an additional Action)`,
-        previewCardName: top,
-        zones: zonen, cancellable: false, heroShortcut: false,
-      });
-      ziel = zonen.find(z => z.heroIdx === wahl?.heroIdx && z.slotIdx === wahl?.slotIdx && (z.owner ?? pi) === (wahl?.owner ?? pi)) || zonen[0];
-    }
+    // Aufdecken: die Karte liegt in der Bildmitte, bis entschieden ist, wohin sie kommt.
+    const key = await haltenImZentrum(engine, pi, top, { source: CARD_NAME });
     let beschworen = null;
-    if (ziel && oberste(engine, pi) === top) {
-      const feld = ziel.owner ?? pi;
-      beschworen = await engine.summonFromDeck(pi, top, ziel.heroIdx, ziel.slotIdx, {
-        source: CARD_NAME,
-        shuffle: false,                                    // „reveal" mischt nicht
-        flug: !direkt,                                     // direkt: der Weg aus der Mitte war schon der Flug
-        hookExtras: { _isNormalSummon: false },
-        summonOpts: { alsZusatzaktion: true },             // „as an additional Action" ist eine Aktion
-        ...(feld !== pi ? { heldSeite: feld } : {}),
-      });
-    }
-
-    // „Otherwise, put it on top or bottom of your deck (your choice)."
     let lage = null;
-    if (!beschworen?.inst && oberste(engine, pi) === top) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+    let freigegeben = false;
+    try {
+      // „immediately summon it as an additional Action with any of your Heroes, if possible." — genau eine Zone → direkt; mehrere → der Spieler wählt.
+      const zonen = moeglicheZonen(engine, pi, top);
+      let ziel = zonen.length === 1 ? zonen[0] : null;
+      if (!ziel && zonen.length > 1) {
+        const wahl = await engine.promptGeneric(pi, {
+          type: 'zonePick', title: CARD_NAME,
+          description: `Summon ${top} with which of your Heroes? (as an additional Action)`,
+          zones: zonen, cancellable: false, heroShortcut: false,
+        });
+        ziel = zonen.find(z => z.heroIdx === wahl?.heroIdx && z.slotIdx === wahl?.slotIdx && (z.owner ?? pi) === (wahl?.owner ?? pi)) || zonen[0];
+      }
+      if (ziel && oberste(engine, pi) === top) {
+        const feld = ziel.owner ?? pi;
+        // Die Karte fliegt aus der Mitte auf ihren Platz; gebucht wird mit der Landung.
+        await gibFrei(engine, pi, key, top, { dest: 'support', destHeroIdx: ziel.heroIdx, destSlotIdx: ziel.slotIdx, destSide: feld });
+        freigegeben = true;
+        beschworen = await engine.summonFromDeck(pi, top, ziel.heroIdx, ziel.slotIdx, {
+          source: CARD_NAME,
+          shuffle: false,                                    // „reveal" mischt nicht
+          flug: false,                                       // der Weg aus der Mitte war schon der Flug
+          hookExtras: { _isNormalSummon: false },
+          summonOpts: { alsZusatzaktion: true },             // „as an additional Action" ist eine Aktion
+          ...(feld !== pi ? { heldSeite: feld } : {}),
+        });
+      }
+      // „Otherwise, put it on top or bottom of your deck (your choice)."
+      if (!beschworen?.inst && oberste(engine, pi) === top) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+    } finally {
+      // Liegt die Karte noch in der Mitte (nicht beschworen, auch wenn oben etwas schiefging), fliegt sie zurück ins Deck.
+      if (!freigegeben) await gibFrei(engine, pi, key, top, { dest: 'deck' });
+    }
     engine.log('slave_trader', { player: ps.username, card: top, summoned: !!beschworen?.inst, placed: lage });
     engine.sync();
     return true;
