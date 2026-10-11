@@ -45,6 +45,20 @@ const COOLNESS_LANDE_MS = 560;
 const COOLNESS_LUECKE_MS = 90;
 const MAX_CARD_INSTANCES = 2000;
 
+// Aura-Quellen (Skript-Flag `negatesOtherCreatureEffects`, The Creepy Clown
+// of Heaven) — je Skriptname einmal ermittelt: die Aura-Pruefung steckt im
+// Kreatur-Praedikat und laeuft bei JEDER Hook-Zustellung.
+const _creatureAuraMemo = new Map();
+function hatCreatureAura(effectName) {
+  if (!effectName) return false;
+  let r = _creatureAuraMemo.get(effectName);
+  if (r === undefined) {
+    r = !!loadCardEffect(effectName)?.negatesOtherCreatureEffects;
+    _creatureAuraMemo.set(effectName, r);
+  }
+  return r;
+}
+
 // ── HEAP / SNAPSHOT GUARDS ──────────────────────────────────────────────
 // The earlier guard checked only `process.memoryUsage().heapUsed > 2500MB`
 // — the wrong metric. V8 keeps `heapUsed` artificially low under
@@ -18728,6 +18742,55 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ AURA-NEGATION (The Creepy Clown of Heaven): „While you control this
+   * Creature, negate the effects of all other Creatures on the board … When
+   * this Creature is defeated, the effects of all Creatures stay negated for
+   * the rest of the turn."
+   *
+   * Zwei Quellen, beide ABGELEITET (kein Zaehler an der Kreatur, also keine
+   * Aufraeumarbeit, wenn die Quelle geht):
+   *   1. eine wirksame Aura-Quelle auf dem Brett — Skript-Flag
+   *      `negatesOtherCreatureEffects`, selbst nicht stummgeschaltet
+   *      (Negated/Frozen/… legen auch die Aura lahm). Aura-Quellen
+   *      neutralisieren sich gegenseitig NICHT: jede ignoriert die Aura der
+   *      anderen (sonst waeren zwei Clowns zwei tote Karten).
+   *   2. die Nachwirkung `gs._creatureEffectsNegated = { turn, source }` —
+   *      die Aura-Quelle setzt sie beim eigenen Tod; sie gilt fuer ALLE
+   *      Kreaturen (auch die Aura-Quellen und spaeter beschworene) bis
+   *      Zugende.
+   * Ein Negations-Waechter (Queen of Kings [B]: „cannot be negated by …
+   * your opponent's effects") schuetzt gegen die Aura einer FREMDEN Quelle.
+   */
+  creatureAuraNegiert(inst) {
+    return !!this.creatureAuraInfo(inst);
+  }
+
+  /**
+   * Wie `creatureAuraNegiert`, nur mit dem Grund — fuer die Anzeige (Abzeichen „Lasts while X remains on the board" vs. „rest of the turn"):
+   * `{ typ: 'aura', quelle: <Kartenname der Aura-Quelle> }` | `{ typ: 'nachwirkung' }` | `null`.
+   */
+  creatureAuraInfo(inst) {
+    if (!inst || inst.zone !== ZONES.SUPPORT) return null;
+    const gs = this.gs;
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (!this.isChoosableAsCreature(inst, cd)) return null;
+    const seite = inst.controller ?? inst.owner;
+    const nach = gs._creatureEffectsNegated;
+    if (nach && nach.turn === (gs.turn || 0)) {
+      if (nach.source === seite || !this._creatureNegationProof(inst)) return { typ: 'nachwirkung' };
+    }
+    if (hatCreatureAura(inst.counters?._effectOverride || inst.name)) return null;
+    for (const g of this.cardInstances) {
+      if (g.zone !== ZONES.SUPPORT || g.id === inst.id || g.faceDown) continue;
+      if (!hatCreatureAura(g.counters?._effectOverride || g.name)) continue;
+      if (this.isCreatureEffectSuppressed(g, { ignoriereAura: true })) continue;
+      if ((g.controller ?? g.owner) !== seite && this._creatureNegationProof(inst)) continue;
+      return { typ: 'aura', quelle: g.name };
+    }
+    return null;
+  }
+
+  /**
    * EIN Praedikat (v818): sind die EFFEKTE dieser Kreatur stummgeschaltet?
    * Vorher stand dieselbe Frage an ~10 Stellen als verstreute
    * `negated/nulled/frozen/stunned`-Abfragen. CC-Eimer: negated, nulled,
@@ -18739,6 +18802,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   isCreatureEffectSuppressed(inst, opts = {}) {
     if (!inst) return true;
     if (inst.faceDown) return true;
+    // ★ Aura-Negation (The Creepy Clown of Heaven): kein Status, sondern
+    // abgeleitet — ein einziger Aufruf deckt Hook-Verteiler, Aktivierung,
+    // Reaktionsfenster und Schutzauren ab. `ignoriereAura` gibt es nur fuer
+    // die Wirksamkeitspruefung der Aura-Quelle selbst (siehe unten).
+    if (!opts.ignoriereAura && this.creatureAuraNegiert(inst)) return true;
     const c = inst.counters || {};
     // ★ v1280: `ignoriereFrozen` — NUR fuer die Wirksamkeitspruefung des
     // Chilly Dog selbst („including this one"): sein eigener Frost darf
@@ -37798,6 +37866,30 @@ this._deathWatch = (this._deathWatchStack || []).length
         countByName.set(hero.name, 1);
       }
 
+      // ── Board-Creature-Reaktionen (Als Vorgabe 10.10., Spearman) ───
+      // Eine Creature auf dem Brett, deren Skript `isCreatureReaction` + `creatureReactionCondition(gs, pi, engine, chainCtx, inst)` traegt,
+      // nimmt am selben Fenster teil — ohne Handkarte, ohne Zone, wie die Helden-Reaktion darueber. Nur kontrolliert von `pi`, aufgedeckt und
+      // nicht stummgeschaltet (Frozen/Stunned/Negated …: `isCreatureEffectSuppressed`). Je NAME ein Angebot (die erste taugliche Kopie).
+      // Der Link traegt `fromCreature` und `creatureInstId`; `creatureReactionResolve(engine, pi, chain, myIndex, inst)` loest ihn auf,
+      // `payActivationCost(engine, pi, chainCtx, inst)` (optional, `false` = nicht bezahlt) stempelt z. B. die Rundengrenze.
+      for (const cInst of this.cardInstances) {
+        if (cInst.zone !== ZONES.SUPPORT || cInst.faceDown) continue;
+        if ((cInst.controller ?? cInst.owner) !== pi) continue;
+        if (eligibleByName.has(cInst.name)) continue;
+        const cScript = loadCardEffect(cInst.counters?._effectOverride || cInst.name);
+        if (!cScript?.isCreatureReaction || typeof cScript.creatureReactionCondition !== 'function') continue;
+        if (this.isCreatureEffectSuppressed(cInst)) continue;
+        let okC = false;
+        try { okC = !!cScript.creatureReactionCondition(this.gs, pi, this, chainCtx, cInst); } catch { okC = false; }
+        if (!okC) continue;
+        eligibleByName.set(cInst.name, {
+          handIdx: -1, cost: 0, script: cScript, cardData: allCards[cInst.name] || null, cardName: cInst.name,
+          eligibleHeroIdxs: [cInst.heroIdx], wisdomCost: 0,
+          fromCreature: { instId: cInst.id }, source: 'board',
+        });
+        countByName.set(cInst.name, 1);
+      }
+
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -37834,6 +37926,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             name,
             source: eligibleByName.get(name)?.source || 'hand',
             count: countByName.get(name) || 1,
+            ...(eligibleByName.get(name)?.fromCreature ? { label: 'BOARD' } : {}),
           }));
         const picked = await this.promptGeneric(pi, {
           type: 'cardGallery',
@@ -37886,6 +37979,41 @@ this._deathWatch = (this._deathWatchStack || []).length
           fromHero: true,
           resolve: typeof script.heroReactionResolve === 'function'
             ? async (ch, idx) => script.heroReactionResolve(engine, pi, ch, idx, hHeroIdx)
+            : null,
+          script,
+        };
+        chain.push(link);
+        if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        await this.runHooks('onReactionActivated', {
+          reactionCardName: chosenName, reactionOwner: pi, chain,
+          _skipReactionCheck: true, _isReaction: true,
+        });
+        this.sync();
+        return true;
+      }
+
+      // ── Board-Creature-Reaktion aktivieren (Als Vorgabe 10.10., Spearman) ──
+      // Kein Kartenflug, keine Ablage: die Creature bleibt, wo sie ist. `payActivationCost` stempelt die Rundengrenze; `false` = keine Reaktion.
+      if (info.fromCreature) {
+        const cInst = this.cardInstances.find(c => c.id === info.fromCreature.instId);
+        if (!cInst || cInst.zone !== ZONES.SUPPORT) continue;
+        if (typeof script.payActivationCost === 'function') {
+          const paid = await script.payActivationCost(this, pi, chainCtx, cInst);
+          if (paid === false) continue;
+        }
+        await this.showTriggeredEffect(chosenName, { replace: true, delayMs: 300 });
+        this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'creature' });
+        const engine = this;
+        const link = {
+          id: uuidv4().substring(0, 12),
+          cardName: chosenName, owner: pi,
+          cardType: 'Creature Reaction',
+          casterHeroIdx: cInst.heroIdx, heroIdx: cInst.heroIdx,
+          goldCost: 0, wisdomCost: 0,
+          isInitialCard: false, negated: false, chainClosed: false,
+          fromCreature: true, creatureInstId: cInst.id,
+          resolve: typeof script.creatureReactionResolve === 'function'
+            ? async (ch, idx) => script.creatureReactionResolve(engine, pi, ch, idx, cInst)
             : null,
           script,
         };
@@ -38217,8 +38345,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `skipPostResolveDiscard` cards (surprise reactions that
         // remain in their zone until end-of-chain) are routed by the
         // post-chain cleanup instead, so skip them here.
-        if (link.fromHero) {
-          // Helden-Effekt-Link (v691): nichts abzulegen.
+        if (link.fromHero || link.fromCreature) {
+          // Helden-Effekt-Link (v691) / Board-Creature-Link: nichts abzulegen.
         } else if (!link.isInitialCard
             && Number.isInteger(link._negatedToHandOf)
             && this.gs.players[link._negatedToHandOf]) {
@@ -38350,7 +38478,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // — a negated Reaction Creature paid its cost but didn't
         // actually land, so the discard pile is its correct
         // destination there.
-        if (!link.isInitialCard && !link.fromHero) {   // v691: Helden-Links haben keine Karte
+        if (!link.isInitialCard && !link.fromHero && !link.fromCreature) {   // v691: Helden-Links (und Board-Creature-Links) haben keine Karte
           const linkScript = loadCardEffect(link.cardName);
           // `gs._spellPlacedOnBoard` lets a hook fired during this
           // link's resolve (e.g. Card Game Player Inya turning the
@@ -39624,7 +39752,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const cardName of (ps.hand || [])) {
         if (seen.has(cardName)) continue;
         const cardData = allCards[cardName];
-        if (cardData && config.filter(cardData)) {
+        // Kontext je Anbieter (siehe `findAdditionalActionForCard`): taugt die Karte fuer IRGENDEINEN Anbieter dieses Typs?
+        if (cardData && entry.providers.some(pr => config.filter(cardData, { engine: this, playerIdx, heroIdx: pr.heroIdx }))) {
           seen.add(cardName);
           entry.eligibleHandCards.push(cardName);
         }
@@ -39946,8 +40075,9 @@ this._deathWatch = (this._deathWatchStack || []).length
               : (inst.zone !== 'hand' && this.physicalSide(inst) !== heroOwner)))) continue;
         // Check category
         if (config.allowedCategories && !config.allowedCategories.includes(category)) continue;
-        // Check specific filter
-        if (config.filter && !config.filter(cardData)) continue;
+        // Check specific filter — der 2. Parameter (Kontext) ist rein additiv: Filter, die ihn nicht lesen, merken nichts
+        // (Cute Crown: „Cute" gilt mit Cute Wings auch fuer jede andere Kreatur des Trägers).
+        if (config.filter && !config.filter(cardData, { engine: this, playerIdx, heroIdx: inst.heroIdx, provider: inst })) continue;
         return typeId;
       }
     }
@@ -41809,6 +41939,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Universal negative-status immunity (Lunatic Golem 2+) keeps
         // the creature activatable despite the CC it still carries.
         if (this.istHartNegiert(inst)) continue;   // v1444
+        if (this.creatureAuraNegiert(inst)) continue;   // Creepy Clown: Aura / Nachwirkung
         if (!this._creatureNegStatusImmune(inst)
             && (inst.counters?.frozen || inst.counters?.stunned
                 || inst.counters?.negated || inst.counters?.nulled)) continue;
@@ -41850,7 +41981,63 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ── „EITHER PLAYER MAY SPEND AN ACTION …" (The Creepy Clown of Heaven) ──
+    // Skript-Flag `activatableByAnyPlayer`: der Effekt darf auch von dem
+    // Spieler ausgeloest werden, dem die Kreatur NICHT gehoert. Er steht auf
+    // der Gegenseite, ist nicht verliehen und kostet eine Aktion
+    // (`creatureActionCost`). Ausgefuehrt von `doActivateCreatureEffect` mit
+    // `charmedOwner` = Gegenseite, aber ohne Kontrollwechsel.
+    if (oppPs) {
+      const actHero = this.anyPlayerActorHero(playerIdx);
+      for (const inst of this.cardInstances) {
+        if (inst.zone !== 'support' || inst.faceDown) continue;
+        if (this.physicalSide(inst) !== oi || inst.stolenBy === playerIdx) continue;
+        const effectName = inst.counters?._effectOverride || inst.name;
+        const script = loadCardEffect(effectName);
+        if (!script?.activatableByAnyPlayer || !script.creatureEffect) continue;
+        if (this.isCreatureEffectSuppressed(inst)) continue;
+        if (actionsBlockedCr) continue;
+        if (!isActionPhase && !hasAdditionalForActionCost) continue;
+        const hoptKey = `creature-effect:${inst.id}`;
+        const exhausted = this.gs.hoptUsed?.[hoptKey] === this.gs.turn;
+        let canActivate = !exhausted && actHero != null;
+        if (canActivate && isActionPhase) {
+          // Die Grundaktion ist verbraucht? Dann braucht es einen Zusatzaktions-Anbieter.
+          const verbraucht = (ps.heroesActedThisTurn?.length || 0) > 0
+            && !this.bonusAktionFuer(playerIdx, actHero, playerIdx)
+            && !((ps._bonusMainActions || 0) > 0 && (ps._actionsPlayedThisPhase || 0) === 1);
+          if (verbraucht && !this.findAdditionalActionForCategory(playerIdx, 'ability_activation', actHero, playerIdx)) canActivate = false;
+        } else if (canActivate) {
+          if (!this.findAdditionalActionForCategory(playerIdx, 'ability_activation', actHero, playerIdx)) canActivate = false;
+        }
+        if (canActivate) canActivate = this.creatureEffectScriptAllows(inst);
+        result.push({
+          owner: oi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          cardName: inst.name, canActivate, exhausted,
+          instId: inst.id, actionCost: true,
+          charmedOwner: oi, anyPlayer: true,
+        });
+      }
+    }
+
     return result;
+  }
+
+  /**
+   * Welcher EIGENE Held fuehrt die Aktion aus, wenn ein Spieler eine fremde
+   * Kreatur per `activatableByAnyPlayer` aktiviert (The Creepy Clown of
+   * Heaven)? Der erste lebende Held, der Aktionen ausfuehren darf; `null`,
+   * wenn keiner kann (dann gibt es auch keine Aktion zu bezahlen).
+   */
+  anyPlayerActorHero(pi) {
+    const ps = this.gs.players[pi];
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      if (!this.canHeroPerformAction(pi, hi)) continue;
+      return hi;
+    }
+    return null;
   }
 
   /**
@@ -42542,7 +42729,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Zonenfeld. Der Server-Pfad in server.js sendet dasselbe Event
     // ueber `broadcastHandToBoard` und ruft diesen Helfer nicht, also
     // gibt es keinen Doppelflug.
-    if (!this._fastMode) {
+    // `opts.keinFlug`: der Aufrufer hat den Flug schon selbst gezeigt (Super Fan: Bildmitte → Ability Zone) — kein zweiter von der Hand.
+    if (!this._fastMode && !opts.keinFlug) {
       this._broadcastEvent('hand_to_board_fly', {
         ownerIdx: playerIdx, cardName, handIndex: verifyIdx,
         zoneType: 'ability', heroIdx, slotIdx: targetZone,

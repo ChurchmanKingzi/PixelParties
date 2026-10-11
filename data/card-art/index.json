@@ -915,6 +915,10 @@
 "id": "Cute_Conversion",
 "kind": "a"
 },
+"Cute Crown": {
+"id": "Cute_Crown",
+"kind": "a"
+},
 "Cute Ditz Monami": {
 "id": "Cute_Ditz_Monami",
 "kind": "a"
@@ -3923,6 +3927,10 @@
 "id": "Spatial_Crevice",
 "kind": "a"
 },
+"Spearman": {
+"id": "Spearman",
+"kind": "a"
+},
 "Spectral Armor": {
 "id": "Spectral_Armor",
 "kind": "a"
@@ -4111,6 +4119,10 @@
 "id": "Sun_Beam",
 "kind": "a"
 },
+"Super Fan": {
+"id": "Super_Fan",
+"kind": "a"
+},
 "Super-Killing Knife, the Tool of Liquidation": {
 "id": "Super_Killing_Knife_the_Tool_of_Liquidation",
 "kind": "a"
@@ -4283,6 +4295,10 @@
 "id": "The_Cosmic_Depths",
 "kind": "a"
 },
+"The Creepy Clown of Heaven": {
+"id": "The_Creepy_Clown_of_Heaven",
+"kind": "a"
+},
 "The Egg of God": {
 "id": "The_Egg_of_God",
 "kind": "a"
@@ -4345,6 +4361,10 @@
 },
 "The Nornstellar, Foretellers of Coolness": {
 "id": "The_Nornstellar_Foretellers_of_Coolness",
+"kind": "a"
+},
+"The Oracle of Heaven": {
+"id": "The_Oracle_of_Heaven",
 "kind": "a"
 },
 "The Root of all Evil": {

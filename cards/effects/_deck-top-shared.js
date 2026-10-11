@@ -8,7 +8,7 @@
 //
 //    oberste(engine, pi)                            → Name der obersten Deckkarte | null
 //    haltenImZentrum(engine, pi, name, { source })  → Flug Deck → Bildmitte (umgedreht); die Karte BLEIBT dort liegen. Gibt den Halte-Schlüssel zurück
-//    gibFrei(engine, pi, key, name, { dest, … })    → die gehaltene Karte fliegt von der Bildmitte weiter (`deck` | `discard` | `deleted` | `hand` | `support` | `center`)
+//    gibFrei(engine, pi, key, name, { dest, … })    → die gehaltene Karte fliegt von der Bildmitte weiter (`deck` | `discard` | `deleted` | `hand` | `support` | `ability` | `center`)
 //    decke(engine, pi, name, { source, dest, … })   → Flug Deck → Bildmitte (umgedreht) → Ziel in EINEM Zug (ohne Halt); wartet bis zur Landung; Log `hand_card_revealed`
 //    obenOderUnten(engine, pi, name, { source })    → Abfrage „oben oder unten?"; legt die Karte bei „unten" unter das Deck. `'top' | 'bottom'`
 //
@@ -70,7 +70,7 @@ async function haltenImZentrum(engine, pi, name, opts = {}) {
 
 /**
  * Die gehaltene Karte fliegt von der Bildmitte zum Ziel. `dest`: `'deck'` (zurück), `'discard'` / `'deleted'` (Stapel; der Aufrufer bucht die Karte erst NACH
- * dem Flug um), `'hand'`, `'support'` (+ `destHeroIdx`/`destSlotIdx`, `destSide` = Brettseite des Platzes) oder `'center'` (ausblenden). Wartet, bis die Karte angekommen ist.
+ * dem Flug um), `'hand'`, `'support'` / `'ability'` (+ `destHeroIdx`/`destSlotIdx`, `destSide` = Brettseite des Platzes; `'ability'` = Ability Zone, Super Fan) oder `'center'` (ausblenden). Wartet, bis die Karte angekommen ist.
  */
 async function gibFrei(engine, pi, key, name, opts = {}) {
   const dest = opts.dest || 'deck';
@@ -78,7 +78,7 @@ async function gibFrei(engine, pi, key, name, opts = {}) {
   const dauer = dest === 'deck' ? HALT_EIN_MS : FREIGABE_MS;
   engine._broadcastEvent('mill_center_release', {
     owner: pi, holdKey: key, cardName: name, dest, revealMs: dauer,
-    ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
+    ...((dest === 'support' || dest === 'ability') ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
   });
   await engine._delay(dauer + 100);
 }

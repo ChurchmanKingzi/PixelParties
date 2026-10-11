@@ -5471,8 +5471,18 @@ function sendGameState(room, playerIdx, extra) {
         // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
         // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
         const _zoneAura = zoneAuraFuer(room, physicalSide, inst);
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura) {
+        // Aura-Negation (The Creepy Clown of Heaven) ist abgeleitet, kein Zaehler —
+        // fuer die Anzeige wird sie als `negated` mitgeschickt, damit die Karte
+        // genauso verstummt aussieht wie bei einem echten Negated-Status.
+        const _auraInfo = (!isFaceDown && !inst.counters?.negated) ? room.engine.creatureAuraInfo(inst) : null;
+        const _auraNegiert = !!_auraInfo;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert) {
           cc[key] = { ...inst.counters };
+          if (_auraNegiert) {
+            cc[key].negated = 1;
+            // Aura: das Abzeichen sagt „Lasts while <Clown> remains on the board" (quellgebunden); die Nachwirkung ist rundengebunden wie ein gewoehnliches Negated.
+            if (_auraInfo.typ === 'aura') cc[key].negatedSourceBound = _auraInfo.quelle;
+          }
           if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
@@ -6191,8 +6201,18 @@ function sendSpectatorGameState(room) {
         // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
         // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
         const _zoneAura = zoneAuraFuer(room, physicalSide, inst);
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura) {
+        // Aura-Negation (The Creepy Clown of Heaven) ist abgeleitet, kein Zaehler —
+        // fuer die Anzeige wird sie als `negated` mitgeschickt, damit die Karte
+        // genauso verstummt aussieht wie bei einem echten Negated-Status.
+        const _auraInfo = (!isFaceDown && !inst.counters?.negated) ? room.engine.creatureAuraInfo(inst) : null;
+        const _auraNegiert = !!_auraInfo;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp || _zoneAura || _auraNegiert) {
           cc[key] = { ...inst.counters };
+          if (_auraNegiert) {
+            cc[key].negated = 1;
+            // Aura: das Abzeichen sagt „Lasts while <Clown> remains on the board" (quellgebunden); die Nachwirkung ist rundengebunden wie ein gewoehnliches Negated.
+            if (_auraInfo.typ === 'aura') cc[key].negatedSourceBound = _auraInfo.quelle;
+          }
           if (_zoneAura) cc[key]._zoneAura = _zoneAura;
           if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
@@ -8964,7 +8984,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // is empty (e.g. left behind by Quetzahuitl's mass-delete). For
   // charmed-side activations we still need a real Hero whose charm
   // status this player owns, since an empty slot can't be charmed.
-  if (charmedOwner != null && !hero?.name) return false;
+  // (Die Pruefung folgt unten, nach `anyPlayer` — die Aktivierung durch
+  // den Nicht-Besitzer braucht keinen Helden auf der fremden Seite.)
 
   const slot = (ps.supportZones[heroIdx] || [])[zoneSlot] || [];
   if (slot.length === 0) return false;
@@ -8982,6 +9003,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     ? slotInsts.find(c => c.id === instId)
     : slotInsts[0];
   if (!inst) return false;
+  // ★ „EITHER PLAYER MAY SPEND AN ACTION" (The Creepy Clown of Heaven):
+  // Skript-Flag `activatableByAnyPlayer` — die Kreatur steht auf der Gegen-
+  // seite, gehoert dem Gegner und ist nicht geliehen, darf aber trotzdem von
+  // `pi` ausgeloest werden. Ohne Kontrollwechsel; die Aktion bezahlt ein
+  // EIGENER Held (`actHero`), nicht der Wirt der fremden Kreatur.
+  const anyPlayer = charmedOwner != null && charmedOwner !== pi
+    && !!loadCardEffect(inst.counters?._effectOverride || creatureName)?.activatableByAnyPlayer
+    && inst.stolenBy !== pi && (inst.controller ?? inst.owner) !== pi;
+  if (charmedOwner != null && !anyPlayer && !hero?.name) return false;
+  const actHero = anyPlayer ? room.engine.anyPlayerActorHero(pi) : heroIdx;
+  if (anyPlayer && actHero == null) return false;
+  const actHeroOwner = anyPlayer ? pi : (charmedOwner ?? pi);
   // CC-locked creatures cannot fire their own effects — mirrors the
   // engine-side filter in getActivatableCreatures and the hook gate in
   // runHooks. Defensive: a stale activate request from a client whose
@@ -8998,7 +9031,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   void chillyDogLiftsForCreature;
   if (room.engine.isCreatureEffectSuppressed(inst)) return false;   // v818: EIN Praedikat
 
-  if (charmedOwner != null
+  if (charmedOwner != null && !anyPlayer
       && hero.charmedBy !== pi && hero.controlledBy !== pi
       && inst.stolenBy !== pi) return false;
   // ★★ v1197 (Als Ruling 18.9.): eine Kreatur geht NICHT mit dem
@@ -9007,7 +9040,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // hat (`stolenBy`, Deepsea Succubus / Cute Conversion). Ohne diesen
   // Riegel kaeme der Klick trotz der gestrichenen Angebotsliste durch,
   // weil das Tor darueber den Charme ausdruecklich durchlaesst.
-  if (charmedOwner != null && inst.stolenBy !== pi
+  if (charmedOwner != null && !anyPlayer && inst.stolenBy !== pi
       && (inst.controller ?? inst.owner) !== pi) return false;
   // Cardinal Beast immunity — Cardinals + Golden-Wings wearers
   // resist Treacherous Crystal's lend. Check by counter AND name:
@@ -9068,11 +9101,11 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     if (isActionPhase) {
       const acPs = gs.players[pi];
       const actionsPlayedThisPhase = acPs._actionsPlayedThisPhase || 0;
-      const hasBonusAlready = room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
+      const hasBonusAlready = room.engine.bonusAktionFuer(pi, actHero, actHeroOwner)
         || ((acPs._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1);
       const actionAlreadyUsed = (acPs.heroesActedThisTurn?.length > 0) && !hasBonusAlready;
       if (actionAlreadyUsed) {
-        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
+        const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', actHero, actHeroOwner);
         if (!typeId) return false;
         consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
         if (!consumedAdditionalCreatureInst) return false;
@@ -9082,7 +9115,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         creatureEffectIsMainAction = true;
       }
     } else if (isMainPhase) {
-      const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, charmedOwner ?? pi);
+      const typeId = room.engine.findAdditionalActionForCategory(pi, 'ability_activation', actHero, actHeroOwner);
       if (!typeId) return false;
       consumedAdditionalCreatureInst = room.engine.consumeAdditionalAction(pi, typeId);
       if (!consumedAdditionalCreatureInst) return false;
@@ -9103,7 +9136,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // Frozen own-controlled Creature, mirroring the engine helper —
   // this catches puzzle-mode boards where Chilly Dog spawned
   // pre-frozen-sick allies without firing the haste-grant hook.
-  if (inst.turnPlayed === (gs.turn || 0) && !gs.skillTest && !inst.counters?._hasHaste) {
+  // (Der Nicht-Besitzer einer `activatableByAnyPlayer`-Kreatur kennt keinen Beschwoerungs-Schlaf: sie ist nicht seine.)
+  if (inst.turnPlayed === (gs.turn || 0) && !gs.skillTest && !inst.counters?._hasHaste && !anyPlayer) {
     const ctrlForCD = inst.controller ?? inst.owner;
     const chillyDogLiftsSickness = inst.counters?.frozen
       && ctrlForCD === pi
@@ -9135,7 +9169,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // "first Action this turn" (Tengu Windstorm) filter on this so a
   // FREE creature-effect activation doesn't poison the count.
   room.engine._setPendingPlayLog('creature_effect_activated', {
-    player: gs.players[pi].username, card: creatureName, hero: hero.name,
+    player: gs.players[pi].username, card: creatureName,
+    hero: (anyPlayer ? gs.players[pi].heroes?.[actHero] : hero)?.name,
     actionCost: !!isActionCost,
   });
   // Clear any leftover Gerrymander-decline marker so we only catch
@@ -9145,7 +9180,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
 
   try {
     const isStolenByPi = inst.stolenBy === pi && inst.controller === pi;
-    const charmedHeroCreature = charmedOwner != null && !isStolenByPi;
+    const charmedHeroCreature = charmedOwner != null && !isStolenByPi && !anyPlayer;
 
     const origController = inst.controller;
     const origOwner = inst.owner;
@@ -9335,7 +9370,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         }
         if (creatureEffectIsMainAction) {
           if (!acPs.heroesActedThisTurn) acPs.heroesActedThisTurn = [];
-          if (!acPs.heroesActedThisTurn.includes(heroIdx)) acPs.heroesActedThisTurn.push(heroIdx);
+          if (!acPs.heroesActedThisTurn.includes(actHero)) acPs.heroesActedThisTurn.push(actHero);
         }
         await room.engine.advanceToPhase(pi, 4);
       }
@@ -9777,6 +9812,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     ? room.engine.findAdditionalActionForCard(pi, cardName, heroIdx, charmedOwner ?? pi)
     : null;
   const usingAdditional = !!additionalTypeId;
+  // ★ Zusatzaktions-Typ mit `freeInActionPhase` (Cute Crown: „… ohne dabei die Action zu verbrauchen“): in der Action Phase ist so ein Zug GRATIS wie eine inhaerente
+  // Aktion — er zaehlt nicht als Aktion der Phase und schaltet sie nicht weiter. Die Ladung wird trotzdem verbraucht (`consumeAdditionalAction`).
+  const additionalIsFree = usingAdditional && !!room.engine._additionalActionTypes?.[additionalTypeId]?.freeInActionPhase;
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
@@ -9905,7 +9943,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // the counter and the bonus-action slot.
   let actionCounterIncrementedHere = false;
   let bonusMainActionsConsumedHere = false;
-  if (isActionPhase && !isReactionSubtype) {
+  if (isActionPhase && !isReactionSubtype && !additionalIsFree) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
     actionCounterIncrementedHere = true;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
@@ -10003,7 +10041,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       if (isActionPhase && !usingAdditional && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
-      if (isActionPhase && usingAdditional) {
+      if (isActionPhase && usingAdditional && !additionalIsFree) {
         const hasMoreSecondAction = room.engine.cardInstances.some(c => {
           if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
           const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
@@ -10242,7 +10280,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // zaehlt die naechste echte Aktion als „zweite" und die Phase endet.
       ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
     }
-    if (isActionPhase && usingAdditional) {
+    if (isActionPhase && usingAdditional && !additionalIsFree) {
       // Only `isSecondActionGrant` providers gate the post-action-2
       // advance — see the doPlaySpell counterpart for rationale.
       // ★ v991: „noch ein Zuschlag" reicht NICHT — er muss auch

@@ -22,6 +22,7 @@
 //      cardName: 'Slave Trader',
 //      eligible: (engine, pi, handName, handIdx, cd) => …,   // taugt diese Handkarte als Kosten?
 //      description: 'Discard a level 3 Creature …',
+//      count: 1,                                              // optional: wie viele Karten (Super Fan: 2)
 //    });
 //    module.exports = { …, canSummon: kosten.canSummon, inherentAction: kosten.inherentAction, beforeSummon: kosten.beforeSummon,
 //                       cpuResponse: kosten.cpuResponse };
@@ -44,7 +45,7 @@ function erzwungen(gs, pi, heroIdx) {
   return main || !aktionFrei(gs, pi, heroIdx);
 }
 
-function makeDiscardCostSummon({ cardName, eligible, description }) {
+function makeDiscardCostSummon({ cardName, eligible, description, count = 1 }) {
   /** Handplätze, deren Karte als Abwurfkosten taugt. */
   const kostenPlaetze = (engine, pi) => {
     const ps = engine.gs.players[pi];
@@ -57,10 +58,44 @@ function makeDiscardCostSummon({ cardName, eligible, description }) {
     });
     return out;
   };
-  const bezahlbar = (engine, pi) => kostenPlaetze(engine, pi).length > 0;
+  const bezahlbar = (engine, pi) => kostenPlaetze(engine, pi).length >= count;
+
+  /**
+   * Mehrere Karten (`count` > 1, Super Fan: „discard two Ability cards"): EINE Auswahl mit Bestätigen (`handPick`, genau `count` Karten) — wer nach
+   * der ersten Karte abbrechen könnte, hätte schon bezahlt. Abgeworfen wird erst nach der Bestätigung, von hinten nach vorn (die Indizes bleiben gültig).
+   */
+  async function zahleKostenMehrere(engine, pi) {
+    const eligibleIndices = kostenPlaetze(engine, pi);
+    if (eligibleIndices.length < count) return false;
+    const ps = engine.gs.players[pi];
+    const result = await engine.promptGeneric(pi, {
+      type: 'handPick',
+      costFor: cardName,
+      title: cardName,
+      description,
+      eligibleIndices,
+      minSelect: count, maxSelect: count,
+      confirmLabel: `🗑️ Discard ${count}`,
+      cancellable: true,
+    });
+    const gewaehlt = result && !result.cancelled && Array.isArray(result.selectedCards) ? result.selectedCards : [];
+    if (gewaehlt.length !== count) return false;
+    // Nur, was wirklich als Kosten taugt: verschiedene Plätze, taugliche Karten, Name stimmt (der Server glaubt dem Client nicht).
+    const plaetze = new Set();
+    for (const g of gewaehlt) {
+      if (!g || !eligibleIndices.includes(g.handIndex) || ps.hand[g.handIndex] !== g.cardName || plaetze.has(g.handIndex)) return false;
+      plaetze.add(g.handIndex);
+    }
+    if (await engine.borisVerzicht(pi, count, { source: cardName })) return true;
+    for (const g of [...gewaehlt].sort((x, y) => y.handIndex - x.handIndex)) {
+      if (!(await engine.actionDiscardHandCard(pi, g.cardName, g.handIndex, { source: cardName, selfInflicted: true }))) return false;
+    }
+    return true;
+  }
 
   /** Kosten zahlen: eine taugliche Handkarte anklicken und abwerfen. `false` = abgebrochen / nicht gezahlt. */
   async function zahleKosten(engine, pi) {
+    if (count > 1) return zahleKostenMehrere(engine, pi);
     const eligibleIndices = kostenPlaetze(engine, pi);
     if (eligibleIndices.length === 0) return false;
     const result = await engine.promptGeneric(pi, {
