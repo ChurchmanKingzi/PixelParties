@@ -64,7 +64,7 @@ function SkillTestLobby({ lobby, user, leaveRoom, playerJoined, setPlayerJoined 
           title="What the CPUs have learned: card values and test games against untrained CPUs">📊 BOT LEARNING</a>
         <VolumeControl />
       </div>
-      <div className="lobby-raum lobby-content animate-in">
+      <div className="lobby-raum lobby-content animate-in" style={{ '--lobby-w': '760px' }}>
         {user && !user.isGuest && window.SocialSidePanel && <window.SocialSidePanel meId={user.id} room={lobby} isHost={isHost} />}
         <div className="lobby-raum-mitte">
         <div className="panel" style={{ width: 760, maxWidth: '94%' }}>
