@@ -2775,6 +2775,15 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Sky Archeologist (10.10.) — zwei Spitzhackenschläge (~280 und ~600 ms: Eisen auf Stein mit dumpfem Nachhall), beim zweiten blitzt der Fund auf (~620 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  sky_dig: [
+    { name: 'slash',        opts: { rate: 0.8,  volume: 0.7, delay: 250 } },
+    { name: 'heavy_impact', opts: { rate: 1.1,  volume: 0.6, delay: 290, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.7,  volume: 0.8, delay: 570, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.0,  volume: 0.7, delay: 610, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.5,  volume: 0.7, delay: 640, category: null, dedupe: 0 } },
+  ],
   // Sky Shaman (10.10.) — Federn-Beschwörung: leises Windrauschen beim Aufsteigen der Federn, ein heller Ton, wenn der Lichtstrahl in den Himmel schießt
   // (~600 ms), Funkeln beim Verglühen (~780 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   sky_shaman_chant: [

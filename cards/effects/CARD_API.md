@@ -19127,6 +19127,37 @@ Spell (Reaction, Lv1, Destruction Magic): „Play this card immediately when the
 
 **Wächter:** `scripts/skilltest-e2e/point-blank-annihilation.test.js` (tödlicher Creature-Treffer: alle Gegner-Kreaturen fallen, eigene bleiben, der Nutzer fällt trotzdem, Reihenfolge Karte → `hero_ko`; Insta-Kill; der ECHTE Pfeil eines Skeleton Archers; nicht tödlich, Zauber, eigene Kreatur, keine Gegner-Kreatur, keine Destruction Magic, „Nein" → kein Angebot) und im echten Browser `scripts/skilltest-e2e/ui-point-blank-annihilation.js` (Brett-Animation bemalt und brettbreit, Klänge, nach 2,1 s weg — die Server-Seite lässt sich im Puzzle-Spiel nicht auf Knopfdruck auslösen).
 
+## ★ SKY ARCHEOLOGIST — Abwurf-Beschwörung als Zusatzaktion; 1×/Zug oberste Karte aufdecken, Artifact kostenlos spielen (Als Vorgabe 10.10.)
+
+Creature (Normal, Lv0, 50 HP, Summoning Magic): „You may discard an Artifact with a Cost of 10 or more to summon this Creature as an additional Action. You may once per turn reveal the top card of your deck. If it is an Artifact, you may immediately play it without paying its Cost. Otherwise, put it on top or bottom of your deck (your choice)." — **Text geändert** (neu: der Abwurf-Satz).
+
+### ★ Gemeinsamer Baustein `_extra-summon-shared.js` (`makeDiscardCostSummon`) — „You may discard X to summon this Creature as an additional Action"
+
+Die Bauform von Potion Juggler / Big Gwen Guard, einmal ausgeschrieben für Karten mit Abwurfkosten aus der HAND (Sky Archeologist, Slave Trader). Liefert `canSummon`, `inherentAction`, `beforeSummon`, `cpuResponse` und `_test`; die Karte gibt nur `eligible(engine, pi, handName, handIdx, cd)` („taugt diese Handkarte als Kosten?") und den Aufforderungstext.
+
+**Die Regel (Als Vorgabe 10.10.): die optionalen Additional-Action-Kosten MÜSSEN bezahlt werden, wenn man keine Aktion hat; mit einer verfügbaren Aktion hat man die Wahl** — wie bei anderen bedingten Zusatzaktionen:
+- **Main Phase ODER Action Phase ohne freie Aktion (verbraucht, kein Bonus):** die Zusatzaktion ist der EINZIGE Weg — `inherentAction` ist wahr (sobald die Kosten bezahlbar sind), die Kosten werden verlangt (Anklicken der markierten Handkarte, `forceDiscardCancellable`); Abbruch lehnt die Beschwörung ab, nichts ist verbraucht.
+- **Action Phase mit freier Aktion UND bezahlbaren Kosten:** `inherentAction` ist falsch (die Engine zieht die Aktion ein), `beforeSummon` fragt „Special (pay the cost, free Action)" / „Normal (use the Hero's Action)" (`equalButtons`, nicht gerrymander-fähig). „Special" zahlt und stempelt `gs._summonModeUpgradedToInherent` — server.js erstattet die Aktion.
+- **Ohne bezahlbare Kosten:** nur der normale Weg. **Effekt-Beschwörungen** (Living Illusion, Wiederbelebung …) zahlen nichts (`ctx._isNormalSummon`). Boris darf die Kosten auslassen (`borisVerzicht`).
+- Der Server prüft die Kosten-Antwort nach (Index in der markierten Menge, Name stimmt).
+
+### ★ Gemeinsamer Baustein `_deck-top-shared.js` — „Reveal the top card of your deck … Otherwise, put it on top or bottom (your choice)"
+
+`oberste(engine, pi)`, `decke(engine, pi, name, { source, dest, destHeroIdx, destSlotIdx })` (Flug Deck → Bildmitte → Ziel `'deck' | 'hand' | 'support'` über `mill_center_reveal`, beide Spieler sehen die Karte, Log `hand_card_revealed`, wartet bis zur Landung), `obenOderUnten(engine, pi, name, { source })` (Abfrage „Top/Bottom of the deck", unten = ans Ende von `mainDeck` über `moveWithinDeck`, `deckTopVisible` fällt weg wie bei `reorderDeck`; Log `deck_top_or_bottom`), `cpuBehaeltOben` (CPU: Handwert ≥ Deckdurchschnitt → oben). **Aufdecken ist keine Suche** (keine Such-Sperre). **Annahme:** „Otherwise" gilt für JEDE nicht gespielte/beschworene Karte (auch ein unspielbares oder abgelehntes Artifact bzw. eine unbeschwörbare Creature) — sonst bliebe die Karte ungefragt oben liegen.
+
+### ★ Gemeinsamer Baustein `_free-artifact-shared.js` — „play it immediately without paying its Cost" für ein Artifact aus dem Deck
+
+`spielweg(engine, pi, name)` → `'equip' | 'hand' | null`, `spieleKostenlos(engine, pi, name, { source })`. Je Unterart (Deepsea Treasure / Misfire, Als Ruling 9.10.): **Equipment** wird sofort an einen gewählten Helden gelegt (`equipArtifactToHero`, `onPlay`/`onCardEnterZone`; Zonenwahl bei mehreren Plätzen; ohne freien Platz NICHT spielbar). **Alles andere** (Normal/Reaction/Area/Surprise, auch Artifact Creatures — fremde Effekte platzieren sie nicht) kommt auf die HAND mit Nullpreis-Vermerk (`ps._freeArtifactNames[name]`, verfällt am Zugende) und wird vom Spieler über den EIGENEN Spielweg kostenlos gespielt — ein Skript kann den Server-Spielweg (Kettenfenster, Zielwahl, Zahlstellen) nicht nachbauen; wer es nicht mehr spielt, behält die Karte auf der Hand. **Nicht spielbar** außerdem bei Boomerangs Artifact-Sperre (`_artifactLockTurn`) und Hand-Sperre (`handZugangGesperrt`).
+
+### Die Karte
+
+- **Kosten:** ein Artifact mit GEDRUCKTEN Kosten (Cost) ≥ 10 aus der Hand — jede Unterart, auch Equipment und Artifact Creatures; die Ablage zählt nicht. Siehe Regel oben.
+- **Einmal pro Zug (`onCreatureEffect`, engine-HOPT je Instanz, nur bei nicht-`false`-Rückgabe; keine Aktion):** Grab-Animation, dann die oberste Deckkarte aufdecken. Ist sie ein Artifact und spielbar → Abfrage „kostenlos spielen?" (`Play it for free!` / `Not now`; bei Ja: `spieleKostenlos`). Sonst — kein Artifact, nicht spielbar oder abgelehnt — „oben oder unten?". Ohne Karte im Deck nicht aktivierbar.
+- **Bild und Klang:** `play_zone_animation` `sky_dig` (Brett-Animation `zoneType: 'board'`, Archäologe als Ursprung UND Ziel, Hülle `ppSalve`, Pixelart, 1,2 s; Vorlage: das Kartenbild, der Archäologe mit der Spitzhacke): eine Spitzhacke (Holzstiel, Eisenkopf mit zwei Spitzen) schlägt zweimal vorn unten zu, Steinsplitter und Staub, beim zweiten Schlag (~600 ms) blitzt ein Fund auf und eine kleine Karte steigt aus dem Boden. Klang `ZONE_ANIM_SFX.sky_dig`: zwei Schläge (`slash` + `heavy_impact`) und `ping` beim Fund.
+- **Log:** `sky_archeologist` (`card`, `played`: `'equip' | 'hand' | null`, `placed`: `'top' | 'bottom' | null`). **Kunst:** 76×51 nativ, `kind: 'a'`.
+
+**Wächter:** `scripts/skilltest-e2e/sky-archeologist.test.js` (Karte/Text/Kunst; `inherentAction` je Lage; Main-Phase-Abwurf samt markierten Karten, Abbruch, nicht spielbar; Action Phase: Special/Normal, Pflicht ohne Aktion, ohne Artifact; Aufdecken: Equipment mit Zonenwahl und ohne Gold, Normal-Artifact mit Nullpreis-Vermerk, abgelehnt → oben/unten, Spell oben, Equipment ohne Platz, Artifact-Sperre, Hand-Sperre, leeres Deck, zwei Archäologen; CPU-Antworten) und im echten Browser `scripts/skilltest-e2e/ui-sky-archeologist.js` (Animation bemalt, Klänge; Abwurf-Beschwörung, Frage + Zonenwahl + Equipment, Log, zweiter Einsatz gesperrt; Spell oben → „oben oder unten").
+
 ## ★ SKY SHAMAN — eine Deckkarte in die Ablage schicken, 1×/Zug (Als Vorgabe 10.10.)
 
 Creature (Normal, Lv0, 50 HP, Summoning Magic; `skilltestLegal` bleibt falsch): „You may once per turn choose a card from your deck and send it to your discard pile." — Text unverändert, neu ist das Skript.
