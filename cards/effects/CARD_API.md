@@ -10061,6 +10061,20 @@ Ein neuer Anzeigeweg für „decke N Karten auf und wähle daraus":
   der Canvas misst sich sonst von den Ziel-MITTEN aus (±60 px) und schnitte
   alles ab, was weiter als ~10 px über die Kartenkante hinausragt (Sky
   Shaman: `extra: 110`; Front Soldier: 110; Sky Archeologist/Slave Trader: 40).
+* **Zurück ins Deck = das Aufdecken rückwärts (Als Vorgabe 10.10.):** jede
+  Karte, die per Aufdeck-Flug ins DECK zurückgeht (`mill_center_release`
+  mit `dest: 'deck'` — Slave Trader, Sky Archeologist —, aber auch
+  `mill_center_reveal` mit `dest: 'deck'`), dreht sich unterwegs wieder um
+  und landet verdeckt (CSS `kf-zurueck`: gehaltene Karte erst umdrehen
+  (0–45 %), dann weiterfliegen; Flug in einem Zug nach dem Halten
+  zurückdrehen). Flüge auf Plätze, Stapel (Ablage/Gelöscht) und in die Hand
+  bleiben aufgedeckt. `gibFrei(…, { dest: 'deck' })` dauert deshalb so lange
+  wie das Aufdecken (800 ms).
+* **Puzzle-Editor, Stapel umsortieren:** das Umsortieren per Drag & Drop im
+  Stapel-Fenster (`movePileCard`; Deck, Ablage, Gelöscht, Trank-Deck, Side
+  Deck, Coolness Stack, Vorrat) spielt wie das Umsortieren der Hand den
+  Klang `playCardDragSFX('reorder')` (`draw`, Tonhöhe 1,12). Wächter:
+  `scripts/skilltest-e2e/ui-puzzle-pile-sounds.js`.
 
 Beide Spieler sehen die Karten; nur wer den Prompt hat, wählt. Die
 CPU-Antwort geht auf `deckPeekPick` und nimmt den ersten Eintrag mit

@@ -103,6 +103,27 @@ const AUFBAU = (extra) => ({
 });
 
 const hat = (klaenge, dauer) => klaenge.some(k => Math.abs(k.dur - dauer) < 0.005);
+/** Misst über `dauer` ms den Drehzustand der fliegenden Karte (`selektor`): cos(rotateY) — −1 = Vorderseite sichtbar, +1 = Rückseite. */
+async function drehProbe(page, selektor, dauer = 1400, takt = 40) {
+  const werte = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < dauer) {
+    const m = await page.evaluate((sel) => {
+      const k = document.querySelector(sel);
+      if (!k) return null;
+      const inner = k.querySelector('.kassaran-flip-inner');
+      const tr = getComputedStyle(inner).transform;
+      if (!tr || tr === 'none') return 1;
+      const v = tr.match(/matrix3d\((.+)\)/);
+      if (v) return parseFloat(v[1].split(',')[0]);
+      const w = tr.match(/matrix\((.+)\)/);
+      return w ? parseFloat(w[1].split(',')[0]) : 1;
+    }, selektor);
+    if (m != null) werte.push(+m.toFixed(2));
+    await sleep(takt);
+  }
+  return werte;
+}
 const warteAufPrompt = async (page, typ, teil) => {
   let ep = null;
   for (let k = 0; k < 50 && !ep; k++) {
@@ -139,6 +160,13 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         check('…und liegt MITTIG AUF DEM DECK (nicht auf einer Creature)', !!spur && Math.abs(spur.cx - deck.cx) <= 6 && Math.abs(spur.cy - deck.cy) <= 6, { spur, deck });
         check('die Klänge starten: Schläge (`slash`, `heavy_impact`) und Fund (`ping`)', hat(klaenge, s.dauern.slash) && hat(klaenge, s.dauern.heavy_impact) && hat(klaenge, s.dauern.ping), [s.dauern, klaenge]);
         check('nach ~1,3 s ist die Animation wieder weg', weg === true);
+        // Ein Aufdeck-Flug, der ins DECK zurückgeht (`dest: deck`), spielt das Aufdecken rückwärts: erst Vorderseite, am Ende wieder die Rückseite.
+        await page.evaluate(({ my }) => {
+          const ev = { owner: my, cardNames: ['Fireball'], revealMs: 1100, dest: 'deck' };
+          window.socket.listeners('mill_center_reveal').forEach(f => f(ev));
+        }, { my });
+        const w1 = await drehProbe(page, '.kassaran-flip-card.kf-zurueck:not(.kf-in):not(.kf-out)', 1500);
+        check('Flug ins Deck (ein Zug): die Karte wird aufgedeckt (Vorderseite) und am Ende wieder UMGEDREHT (Rückseite)', w1.length > 5 && Math.min(...w1) < -0.9 && w1[w1.length - 1] > 0.9, w1);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
       } finally { await s.ctx.close(); }
     }
@@ -186,6 +214,8 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         let flug = false;
         for (let k = 0; k < 20 && !flug; k++) { flug = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card.kf-out')); if (!flug) await sleep(50); }
         check('nach der Wahl fliegt sie aus der Mitte weiter (`kf-out`)', flug === true);
+        const platzFlug = await page.evaluate(() => { const k = document.querySelector('.kassaran-flip-card.kf-out'); return k ? { zurueck: k.classList.contains('kf-zurueck') } : null; });
+        check('…auf den Platz fliegt sie aufgedeckt (kein Zurückdrehen: `kf-zurueck` fehlt)', !platzFlug || platzFlug.zurueck === false, platzFlug);
         await sleep(3000);
         const r = await page.evaluate((my) => ({
           zonen: window.__gs.players[my].supportZones.map(h => h.map(z => (z || [])[0] || null)),
@@ -248,7 +278,9 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         check('…die Karte liegt dabei noch in der Bildmitte', liegt === true);
         if (outDir && tb) { try { await page.screenshot({ path: path.join(outDir, 'sky-archeologist-notnow-oben-unten.png') }); } catch { /* egal */ } }
         if (tb) await antwort(page, tb.id, { cancelled: true });                            // „Bottom“
-        await sleep(2500);
+        const w2 = await drehProbe(page, '.kassaran-flip-card.kf-out.kf-zurueck', 1100, 30);
+        check('die Karte fliegt ins Deck zurück und spielt das Aufdecken RÜCKWÄRTS: erst Vorderseite, dann wieder UMGEDREHT (Rückseite)', w2.length > 5 && w2[0] < -0.3 && w2[w2.length - 1] > 0.9, w2);
+        await sleep(1500);
         const r = await page.evaluate((my) => { const p = window.__gs.players[my]; return { gold: p.gold, hand: p.hand.slice(), abl: p.discardPile.slice(),
           log: [...document.querySelectorAll('.log-status, .log-info, [class*="log"]')].map(e => e.textContent).filter(t => /Sky Archeologist/.test(t)) }; }, my);
         check('das Artifact wurde NICHT gespielt (Gold unverändert, nicht in der Ablage oder auf der Hand)', r.gold === gold0 && !r.abl.includes('Golden Bananas') && !r.hand.includes('Golden Bananas'), r);

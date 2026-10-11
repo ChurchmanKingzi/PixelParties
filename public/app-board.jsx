@@ -944,6 +944,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
       const tr = setTimeout(() => sfx('reveal'), dur * 0.55);
       return () => clearTimeout(tr);
     }
+    // ★ Ziel Deck (Als Vorgabe 10.10.): die Karte spielt das Aufdecken RÜCKWÄRTS — sie dreht sich wieder um (CSS `kf-zurueck`) und fliegt verdeckt ins Deck.
     if (phase === 'out') {
       const to = (dest === 'support' || dest === 'center') ? 0 : setTimeout(() => sfx(dest === 'deck' ? 'draw' : 'discard'), dur * 0.6);
       return () => { if (to) clearTimeout(to); };
@@ -958,7 +959,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
     return () => { clearTimeout(t1); if (t2) clearTimeout(t2); };
   }, []);
   return (
-    <div className={'kassaran-flip-card' + (phase === 'in' ? ' kf-in' : phase === 'out' ? ' kf-out' : '')}
+    <div className={'kassaran-flip-card' + (phase === 'in' ? ' kf-in' : phase === 'out' ? ' kf-out' : '') + (dest === 'deck' && phase !== 'in' ? ' kf-zurueck' : '')}
       style={{
         '--sx': startX + 'px', '--sy': startY + 'px',
         '--cx': centerX + 'px', '--cy': centerY + 'px',
