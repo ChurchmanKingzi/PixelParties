@@ -81,7 +81,11 @@ const aufBrett = (t, seat, name = FS) => t.engine.cardInstances.find(c => c.name
     check('Kartentext: „Then, both players draw 2 cards.“ (vorher: nur der Gegner)', cd && /Negate that Reaction or Surprise\. Then, both players draw 2 cards\.$/.test(cd.effect) && /plays a Reaction or activates a Surprise/.test(cd.effect), cd && cd.effect);
     check('Skript: Reaction-Creature (`isReaction`, `skipPostResolveDiscard`, Hand), Bedingung, Auflösung, Surprise- und Reaction-Hook', s.isReaction === true && s.skipPostResolveDiscard === true && s.activeIn.includes('hand') && typeof s.reactionCondition === 'function' && typeof s.resolve === 'function' && typeof s.hooks.onSurpriseActivated === 'function' && typeof s.hooks.onReactionPlayed === 'function');
     const idx = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/card-art/index.json'), 'utf8'));
-    check('Kunst nativ 76×51 im Index und als Datei', idx[FS] && idx[FS].kind === 'a' && fs.existsSync(path.join(__dirname, '../../data/card-art/native', idx[FS].id + '.png')));
+    check('Kunst im Index und als Datei', idx[FS] && idx[FS].kind === 'a' && fs.existsSync(path.join(__dirname, '../../data/card-art/native', idx[FS].id + '.png')));
+    // Größe aus dem PNG-Kopf (IHDR: Breite/Höhe an Byte 16/20) — ohne Zusatzpaket
+    const kopf = fs.readFileSync(path.join(__dirname, '../../data/card-art/native', idx[FS].id + '.png'));
+    const bw = kopf.readUInt32BE(16), bh = kopf.readUInt32BE(20);
+    check('…im NATIVEN Quellraster 96×65 (Als Korrektur 10.10.: das Herunterrechnen auf 76×51 verlor Details — Visier, Brustplatte, Kistenlatten)', bw === 96 && bh === 65, [bw, bh]);
   }
   console.log(`(Testkreatur: ${KRE})`);
 
