@@ -7,6 +7,7 @@ const KM = require('../../skilltest/learn/keepmodel');
 const Rules = require('../../public/skilltest-rules.js');
 const { runGame } = require('../../skilltest/sim');
 const bot = require('../../skilltest/bot');
+const { loadCardEffect } = require('../../cards/effects/_loader');
 let fails = 0;
 const check = (name, cond, info) => { if (cond) console.log('  ✓', name); else { fails++; console.log('  ✗', name, info !== undefined ? '→ ' + JSON.stringify(info).slice(0, 300) : ''); } };
 
@@ -150,6 +151,11 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
     mutatePrep: (prep) => { prep.players[0].hand = [...dead]; prep.players[0].abilityZones[0][0] = { n: 'Leadership', s: 0, c: true }; } });
   console.log = oL; console.error = oE;
   const g2p = g2.gs.players[0];
+  // Je nach Seed-Pool liegt eine Kreatur auf dem Brett, die aktive Ability-Effekte sperrt („The Thing in the Ship“) — dann könnte kein Sitz Leadership nutzen.
+  for (const inst of g2.engine.cardInstances.filter(c => c.zone === 'support' && loadCardEffect(c.name)?.blocksAbilityActivation)) {
+    g2.engine._untrackCard(inst.id);
+    g2.gs.players[inst.owner].supportZones[inst.heroIdx][inst.zoneSlot] = [];
+  }
   check('Leadership liegt als Lv3-Ability auf dem Brett', g2p.abilityZones[0][0] && g2p.abilityZones[0][0].length === 3 && g2p.abilityZones[0][0][0] === 'Leadership', g2p.abilityZones[0][0]);
   guard = 0;
   while (g2.gs.activePlayer !== 0 && guard++ < 6) await bot.takeTurn(g2.room, g2.gs.activePlayer, g2.host);
