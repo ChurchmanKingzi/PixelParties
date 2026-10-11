@@ -2768,6 +2768,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_wind', opts: { rate: 1.45, volume: 0.7, category: null, dedupe: 0 } },
     { name: 'placement', opts: { rate: 0.85, volume: 0.9, delay: 440, category: null, dedupe: 0 } },
   ],
+  // Big Oopsie (10.10.) — Pilzwolke: dumpfer Schlag mit dem Blitz am Boden, Feuerrauschen, das mit dem Aufsteigen anschwillt, ein tiefer
+  // Nachschlag fuer den Schaden (~520 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  big_oopsie: [
+    { name: 'heavy_impact', opts: { rate: 0.6, volume: 1.0 } },
+    { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
+    { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
+  ],
   // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
   // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
   // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.

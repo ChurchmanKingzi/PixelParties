@@ -24713,6 +24713,161 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Big Oopsie — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — eine Pilzwolke
+  //  ueber dem Ziel, Flammen ringsum)
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten: ein weisser Blitz am Boden des Ziels (0–140 ms), eine flache Bodenwelle laeuft nach aussen (110–640 ms), der Feuerball
+  //  steigt als Pilz auf — Hut aus drei ueberlappenden Scheiben, Stiel aus der Bodenglut, beide Pixel fuer Pixel ueber Bayer-Dithering
+  //  von weiss ueber gelb und orange nach rot und dann in dunklen Rauch eingefaerbt (die Wolke kuehlt ab: Glut → Rauch ab ~450 ms).
+  //  Der Rand franst ueber ein festes Pixelrauschen aus, ein Ring Bodenstaub schiebt sich unter dem Stiel weg, Funken fliegen mit
+  //  Schwerkraft nach oben und fallen zurueck. Ab ~1050 ms blendet alles ueber Bayer-Dithering aus (statt Alpha), bei 1500 ms ist es
+  //  weg. Der Schaden faellt bei ~520 ms (big-oopsie.js: HIT_MS), wenn Welle und Hut den Boden erreicht haben. Die Wurzel traegt
+  //  `data-pp-px="aus"`: die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an). Massstab folgt der Zielzone (`w`/`h`).
+  // ═════════════════════════════════════════════════════════════════
+  big_oopsie: (() => {
+    // Waerme-Palette: weiss → hellgelb → gelb → orange → rotorange → rot → dunkelrot → Rauch (hell → dunkel)
+    const PAL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14', '#5c4f49', '#443a36', '#2d2624'].map(ppHex);
+    const FUNKEN = ['#ffffff', '#ffe27a', '#ff9a1e', '#e8531a'].map(ppHex);
+    const WELLE = ['#ffffff', '#fff6b8', '#ffd94a'].map(ppHex);
+    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1050;
+    const PADX = 40, PAD_OBEN = 64, PAD_UNTEN = 12;
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return function BigOopsieEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const BY = CY + Math.floor(kh / 2) - 2;                       // Boden des Ziels
+      const RCAP = Math.round(kw * 0.72 + 10), HUB = Math.round(kh * 0.5 + 22);
+      const funken = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
+        vx: (Math.random() - 0.5) * 120, vy: -(70 + Math.random() * 110), born: 60 + Math.random() * 260, life: 520 + Math.random() * 380,
+      })), []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        // Farbe aus der Waerme-Palette mit Bayer-Uebergang zwischen zwei Stufen (f = Gleitkomma-Index)
+        const stufe = (X, Y, f) => {
+          let i = Math.floor(f);
+          if (ppBayer(X, Y) < f - i) i++;
+          return PAL[klemme(i, 0, PAL.length - 1)];
+        };
+        const zeichne = (t) => {
+          const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+          const kuehl = klemme((t - 450) / 900, 0, 1);              // 0 = heiss, 1 = Rauch
+          // ── Bodenwelle: flache Ellipse, laeuft nach aussen ──
+          if (t >= 110 && t < 700) {
+            const u = (t - 110) / 590, rx = kw * 0.4 + u * (kw * 1.1 + 18), ry = 2 + u * 3;
+            const n = Math.ceil(Math.PI * 2 * rx * 1.1);
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * Math.PI * 2;
+              const c = WELLE[Math.min(2, Math.floor(u * 3))];
+              put(CX + Math.cos(a) * rx, BY + 1 + Math.sin(a) * ry, c, (1 - u) * aus);
+              if (u < 0.5) put(CX + Math.cos(a) * rx, BY + 2 + Math.sin(a) * ry, c, (0.5 - u) * aus);
+            }
+          }
+          // ── Stiel und Hut ──
+          const u = klemme((t - 60) / 800, 0, 1), e = 1 - Math.pow(1 - u, 3);          // easeOutCubic
+          if (t >= 40) {
+            const capR = 4 + (RCAP - 4) * e;
+            const capY = BY - 6 - e * HUB;
+            const lobeR = capR * 0.62, lobeDX = capR * 0.78, lobeDY = capR * 0.3;
+            const stielHalb = (Y) => {
+              const k = klemme((Y - capY) / Math.max(1, BY - capY), 0, 1);
+              return (0.12 * RCAP + 1.5) * (0.55 + 0.9 * k) * (0.35 + 0.65 * e);
+            };
+            const x0 = Math.max(0, Math.floor(CX - lobeDX - lobeR - 2)), x1 = Math.min(GW - 1, Math.ceil(CX + lobeDX + lobeR + 2));
+            const y0 = Math.max(0, Math.floor(capY - capR * 1.15 - 2)), y1 = Math.min(GH - 1, BY + 1);
+            for (let Y = y0; Y <= y1; Y++) {
+              for (let X = x0; X <= x1; X++) {
+                const rn = (rausch(X, Y) - 0.5) * 0.18;
+                // Hut: drei Scheiben (leicht abgeflacht)
+                const d0 = Math.hypot(X - CX, (Y - capY) * 1.12) / capR;
+                const d1 = Math.hypot(X - (CX - lobeDX), Y - (capY + lobeDY)) / lobeR;
+                const d2 = Math.hypot(X - (CX + lobeDX), Y - (capY + lobeDY)) / lobeR;
+                const dd = Math.min(d0, d1, d2) + rn;
+                if (dd < 1) {
+                  const rand = dd > 0.84 ? (1 - (dd - 0.84) / 0.16) : 1;       // Rand franst aus
+                  const f = dd * 4.4 + kuehl * 4.2 + Math.max(0, (Y - capY) / capR) * 0.7;
+                  put(X, Y, stufe(X, Y, f), rand * aus);
+                  continue;
+                }
+                // Stiel: unterhalb der Hutmitte bis zum Boden
+                if (Y > capY + capR * 0.35 && Y <= BY) {
+                  const half = stielHalb(Y) * (1 + rn);
+                  const dx = Math.abs(X - CX);
+                  if (dx <= half) {
+                    const k = (BY - Y) / Math.max(1, BY - capY);                 // 0 unten (heiss), 1 oben
+                    const f = 1.6 + k * 3.2 + (dx / Math.max(1, half)) * 1.5 + kuehl * 4;
+                    put(X, Y, stufe(X, Y, f), (dx > half - 1 ? 0.7 : 1) * aus);
+                  }
+                }
+              }
+            }
+            // Staubring unter dem Stiel
+            if (t >= 150 && t < 1000) {
+              const k = klemme((t - 150) / 850, 0, 1);
+              const rx = kw * 0.45 + k * (kw * 0.8 + 10);
+              const n = Math.ceil(rx * 5);
+              for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2;
+                put(CX + Math.cos(a) * rx, BY + 2 + Math.sin(a) * 2.2, PAL[4 + Math.min(4, Math.floor(k * 5))], (1 - k) * 0.9 * aus);
+              }
+            }
+          }
+          // ── Blitz am Boden ──
+          if (t < 200) {
+            const k = t / 200, r = 3 + Math.min(1, t / 140) * (kw * 0.7);
+            const R = Math.ceil(r);
+            for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+              const d = Math.hypot(i, j * 1.2);
+              if (d <= r) put(CX + i, BY - 2 + j, PAL[Math.min(2, Math.floor((d / r) * 2.6))], (1 - k) * aus);
+            }
+          }
+          // ── Funken ──
+          for (const f of funken) {
+            const age = t - f.born;
+            if (age < 0 || age > f.life) continue;
+            const sek = age / 1000, k = age / f.life;
+            const fx = CX + f.vx * sek * 0.55, fy = BY - 4 + f.vy * sek * 0.55 + 0.5 * 230 * sek * sek * 0.55;
+            const c = FUNKEN[Math.min(FUNKEN.length - 1, Math.floor(k * FUNKEN.length))];
+            put(fx, fy, c, (1 - k * k) * aus);
+            if (k < 0.55) put(fx, fy - 1, FUNKEN[Math.min(FUNKEN.length - 1, 1 + Math.floor(k * 3))], (1 - k) * aus);
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
@@ -44749,6 +44904,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
       if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }
       // v1340: Cheat Chair
+      if (t === 'big_oopsie') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">💥 {cName('Big Oopsie')} — {entry.chooser} chooses {entry.target} and it takes <span className="log-amount">{entry.damage}</span> damage ({pName(p.name, p.color)}'s Spell).</span>;
+      }
       if (t === 'capture_control') {
         const p = playerByName(entry.player);
         return <span className="log-status">🪢 {cName('Capture')} — {pName(p.name, p.color)}'s {entry.hero} takes permanent control of {cName(entry.creature)}{entry.from ? ` from ${entry.from}` : ''}!</span>;
