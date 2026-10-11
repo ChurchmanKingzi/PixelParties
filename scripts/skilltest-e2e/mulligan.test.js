@@ -136,13 +136,15 @@ const prompt = (title, extra = {}) => Object.assign({ type: 'handPick', title, d
   // Wie viele der toten Karten gelten VOR dem Zug von Sitz 0 als schwach? Die Züge der anderen Sitze verändern sein Brett je nach Seed-Pool
   // zufällig — der Bot gibt genau die zurück, die dann einen negativen Behalten-Wert haben.
   const schwachVorZug = (() => { const v = M.keepValues(g.engine, 0, null); return gp.hand.filter((n, i) => dead.includes(n) && v[i] < 0).length; })();
+  // Ziehungen, die Sitz 0 VOR seinem Zug schon hat (je nach Seed-Pool zieht er zuvor schon eine Karte), zaehlen nicht zum Mulligan.
+  const stDrawnVorZug = gp._stDrawn || 0;
   await bot.takeTurn(g.room, 0, g.host);
   const stillDead = dead.filter(n => gp.hand.includes(n)).length;
   const log = (g.gs.skillTest.mullLog || []).find(m => m.src === 'Horn in a Bottle');
   check('Der Bot hat Horn in a Bottle ausgespielt (Entscheidung „weak“ protokolliert, alle schwachen toten Karten zurück)', !!log && log.arm === 'weak' && log.nw >= 1 && log.nw === schwachVorZug, { log: g.gs.skillTest.mullLog, schwachVorZug });
   check('Die toten Karten sind aus der Hand', stillDead === 0 || stillDead < deadIn, { stillDead, hand: gp.hand });
   check('Horn ist verbraucht', !gp.hand.includes('Horn in a Bottle'));
-  check('Gezogene Karten zählen: 3 Ersatzkarten wurden gegengerechnet, nur der Bonus-Zug bleibt', gp._stDrawn === 1, gp._stDrawn);
+  check('Gezogene Karten zählen: 3 Ersatzkarten wurden gegengerechnet, nur der Bonus-Zug bleibt', (gp._stDrawn || 0) - stDrawnVorZug === 1, { vorher: stDrawnVorZug, nachher: gp._stDrawn });
   check('Der Pool ist nicht geschrumpft (3 zurückgemischt = 3 neue, +1 Bonus)', pool.remaining() <= poolBefore && pool.remaining() >= poolBefore - 1, { vorher: poolBefore, nachher: pool.remaining() });
 
   console.log('Ablauf im Spiel (Bot mit Leadership Lv3 auf dem Brett)');

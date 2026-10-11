@@ -24868,6 +24868,385 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Eisfaust (Embodiment of Biseria, Schadensmodus) — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!";
+  //  Vorgabe der Karte: „eine riesige Eis-Faust, die das Ziel zerschmettert")
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten. Eine gewaltige Faust aus Eis — vier Finger mit Knoecheln nach unten, der Daumen quer darueber, Handruecken, ein
+  //  Frostmanschette am Handgelenk, der Arm verliert sich oben im Nebel — faellt mit Fahrtstreifen auf das Ziel (0–400 ms, kubisch
+  //  beschleunigt) und schlaegt auf der Mitte der Karte ein. Gezeichnet wird sie ueber Rundeck-Abstandsfelder pro Finger; die Farbe
+  //  kommt aus einer 8-stufigen Eispalette (hell links oben → dunkel rechts unten) mit Bayer-Dithering zwischen den Stufen, gestuften
+  //  Kristallflaechen (festes Pixelrauschen je 2,6er-Block), diagonalen Glanzstrichen und einer dunkelblauen Kontur. Beim Aufprall
+  //  (400 ms): weisser Blitz auf der Karte, Rissnetz (neun gezackte Linien wachsen in ~230 ms nach aussen), flache Bodenwelle,
+  //  Eissplitter fliegen mit Schwerkraft nach oben und fallen zurueck; die Faust ruckelt, drueckt zwei Pixel nach und zerfaellt ab
+  //  ~820 ms Pixel fuer Pixel (Rauschschwelle), die Risse blenden bis 1500 ms ueber Bayer-Dithering aus. Der Schaden faellt beim
+  //  Aufprall (embodiment-of-biseria.js: FIST_HIT_MS — Einbau-Versatz 100 ms eingerechnet). Die Wurzel traegt `data-pp-px="aus"`: die Grafik IST
+  //  schon Pixelart (der Pixelierer fasst sie nicht an). Massstab folgt der Zielzone (`w`/`h`).
+  // ═════════════════════════════════════════════════════════════════
+  biseria_fist: (() => {
+    // Eispalette: weiss → hellblau → mittelblau → tiefblau (hell → dunkel)
+    const PAL = ['#ffffff', '#e4f8ff', '#b9ecff', '#86d4f7', '#58aee9', '#3a82d2', '#2a58aa', '#1c3a7e'].map(ppHex);
+    const KONTUR = ppHex('#0d1b45');
+    const SPLITTER = ['#ffffff', '#c9f1ff', '#86d4f7', '#58aee9'].map(ppHex);
+    const RISS = ppHex('#f2ffff'), RISS2 = ppHex('#6fb6e8');
+    const WELLE = ['#ffffff', '#c9f1ff', '#86d4f7'].map(ppHex);
+    const S = 3, TAKT = 33, ENDE = 1500, TREFFER = 400, ZERFALL_AB = 820, ZERFALL_BIS = 1180, FADE_AB = 1100;
+    const PADX = 50, PAD_OBEN = 118, PAD_UNTEN = 14;
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Vorzeichenbehafteter Abstand zu einem Rundeck (negativ = innen)
+    const sdBox = (px, py, hw, hh, r) => {
+      const qx = Math.abs(px) - (hw - r), qy = Math.abs(py) - (hh - r);
+      return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+    };
+    return function BiseriaFistEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const FW = Math.max(46, Math.round(kw * 2.2)), FWh = FW / 2;          // Faustbreite
+      const FH = Math.round(FW * 0.5);                                       // Fingerhoehe
+      const TY = CY + Math.round(kh * 0.22);                                 // Aufprallhoehe (Knoechel unten)
+      const START_Y = TY - 100;
+      const daten = useMemo(() => ({
+        // Rissnetz: neun Linien vom Aufprallpunkt, jede aus kurzen Stuecken mit schwankender Richtung (flach, wie von schraeg oben gesehen)
+        risse: Array.from({ length: 9 }, (_, i) => {
+          let a = (i / 9) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+          const pts = [[0, 0]];
+          let px = 0, py = 0;
+          const stuecke = 4 + Math.floor(Math.random() * 3);
+          for (let k = 0; k < stuecke; k++) {
+            a += (Math.random() - 0.5) * 0.9;
+            const l = 3 + Math.random() * 2.4;
+            px += Math.cos(a) * l; py += Math.sin(a) * l * 0.6;
+            pts.push([px, py]);
+          }
+          return { pts, ab: i * 12 };
+        }),
+        splitter: Array.from({ length: ppFxN(30) }, () => ({
+          vx: (Math.random() - 0.5) * 150, vy: -(70 + Math.random() * 130), ab: Math.random() * 60,
+          leben: 520 + Math.random() * 420, gr: Math.random() < 0.35 ? 3 : 2, ox: (Math.random() - 0.5) * kw * 0.6,
+        })),
+        streifen: [-0.92, -0.62, 0.56, 0.94, -0.3, 0.28].map((f, i) => ({ f, laenge: 9 + (i % 3) * 5, versatz: 3 + (i % 3) * 5 })),
+      }), []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          const i = (Y * GW + X) * 4;
+          buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        };
+        const stufe = (X, Y, f) => {
+          let i = Math.floor(f);
+          if (ppBayer(X, Y) < f - i) i++;
+          return PAL[klemme(i, 0, PAL.length - 1)];
+        };
+        const linie = (x0, y0, x1, y1, c, a) => {
+          const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+          for (let i = 0; i <= n; i++) put(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, c, a);
+        };
+        // Faust-Position: kubisch beschleunigt bis zum Aufprall, danach zwei Pixel nachdruecken und wieder lockern
+        const faustY = (t) => {
+          if (t < TREFFER) { const u = t / TREFFER; return START_Y + (TY - START_Y) * u * u * u; }
+          const k = t - TREFFER;
+          return TY + (k < 90 ? 2 * (k / 90) : 2 - Math.min(1, (k - 90) / 200));
+        };
+        const faustX = (t) => {
+          if (t < TREFFER) return CX;
+          const k = t - TREFFER;
+          return CX + (k < 180 ? (Math.floor(k / 33) % 2 ? 1 : -1) : 0);          // kurzes Ruckeln
+        };
+      // Ein Faustpixel: { sid, rim, f } oder null
+      const faustPixel = (X, Y, fx, fy) => {
+        const u = X - fx, v = Y - fy;                          // v < 0: oberhalb der Knoechel
+        // Teile nach Vorrang: Daumen > Finger > Manschette > Handruecken > Arm. Die Kontur laeuft um die VEREINIGUNG (kleinster Abstand).
+        let best = 1e9, art = 0, lokal = 0, sid = 0;
+        const waehle = (d, a, l, id) => { if (d < best) best = d; if (d <= 0 && (art === 0 || a < art)) { art = a; lokal = l; sid = id; } };
+        // Rangfolge ueber die Teilenummer: kleiner = weiter vorn; Daumen ist 1, Finger 2, Manschette 3, Handruecken 4, Arm 5 (Farbe/Beleuchtung folgt `form`)
+        let form = 0;
+        const dDaumen = sdBox(u + FWh * 0.36, v + FH * 0.5, FWh * 0.6, FW * 0.085, FW * 0.085);   // Daumen quer ueber den Fingern
+        const daumen = dDaumen <= 0;
+        if (daumen) { waehle(dDaumen, 1, (u + FWh * 0.36) / (FWh * 0.6), 50); form = 5; }
+        else best = Math.min(best, dDaumen);
+        for (let i = 0; i < 4; i++) {                          // vier Finger, Knoechel nach unten
+          const cx = -FWh + FW * (i + 0.5) / 4;
+          const bo = (i === 0 || i === 3) ? -2 : (i === 1 ? 0 : 0.5);
+          const d = sdBox(u - cx, v - (bo - FH / 2), FW / 8 - 0.3, FH / 2, FW * 0.1);
+          waehle(d, 2, (u - cx) / (FW / 8), 10 + i); if (d <= 0 && !daumen) form = 1;
+        }
+        const vArm = -(FH + FW * 0.38);                                                       // Handgelenk
+        const dManschette = sdBox(u, v - (vArm - 1), FWh * 0.62, 4, 1.8);                     // Frostmanschette
+        waehle(dManschette, 3, u / (FWh * 0.62), 40); if (dManschette <= 0 && art === 3) form = 4;
+        const rTop = -(FH + FW * 0.4), rBot = -FH * 0.72;                                     // Handruecken: ueberlappt die Finger oben etwas
+        const dRuecken = sdBox(u, v - (rTop + rBot) / 2, FWh * 0.92, (rBot - rTop) / 2, FW * 0.13);
+        waehle(dRuecken, 4, u / FWh, 20); if (dRuecken <= 0 && art === 4) form = 2;
+        const dArm = Math.max(Math.abs(u) - FWh * 0.42, v - vArm);                            // Arm: nach oben offen
+        waehle(dArm, 5, u / (FWh * 0.42), 30); if (dArm <= 0 && art === 5) form = 3;
+        art = form;
+        if (best > 0) return null;
+        const rim = daumen ? dDaumen > -1.05 : best > -1.05;
+        if (rim) return { rim: true, sid };
+        let f;
+        if (art === 1) f = 1.4 + (lokal + 1) * 1.25 + klemme((v + FH * 0.3) / (FH * 0.3), 0, 1) * 1.0;
+        else if (art === 5) f = 0.7 + (lokal + 1) * 0.9 + klemme(((v + FH * 0.5) / (FW * 0.085) + 1) / 2, 0, 1) * 1.1;
+        else if (art === 4) f = 1.1 + (lokal + 1) * 1.1;
+        else if (art === 3) f = 1.8 + (lokal + 1) * 1.2;
+        else f = 1.9 + lokal * 1.3 + klemme((v + FH + FW * 0.5) / FW, 0, 1.4) * 0.6;
+        f += (rausch(Math.floor(X / 2.6), Math.floor(Y / 2.6) + art * 7) - 0.5) * 1.4;           // Kristallflaechen
+        if (((X + Math.floor(Y * 1.4)) % 13) === 0 && f > 1 && f < 4.2) f = 0.2;                 // Glanzstriche
+        return { f, sid };
+      };
+        const zeichne = (t) => {
+          const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+          const zerfall = t > ZERFALL_AB ? klemme((t - ZERFALL_AB) / (ZERFALL_BIS - ZERFALL_AB), 0, 1) : 0;
+          // ── Risse und Bodenwelle (unter der Faust) ──
+          if (t >= TREFFER) {
+            const k = t - TREFFER;
+            for (const r of daten.risse) {
+              const wachs = klemme((k - r.ab) / 230, 0, 1);
+              if (wachs <= 0) continue;
+              const bis = wachs * (r.pts.length - 1);
+              for (let s = 0; s < r.pts.length - 1; s++) {
+                if (s >= bis) break;
+                const f = Math.min(1, bis - s);
+                const [ax, ay] = r.pts[s], [bx, by] = r.pts[s + 1];
+                linie(CX + ax, TY - 1 + ay + 1, CX + ax + (bx - ax) * f, TY - 1 + ay + (by - ay) * f + 1, RISS2, aus);
+                linie(CX + ax, TY - 1 + ay, CX + ax + (bx - ax) * f, TY - 1 + ay + (by - ay) * f, RISS, aus);
+              }
+            }
+            if (k < 560) {                                                    // flache Bodenwelle
+              const u = k / 560, rx = 5 + u * (kw * 1.3 + 14), ry = rx * 0.26;
+              const n = Math.ceil(Math.PI * 2 * rx * 1.1);
+              for (let i = 0; i < n; i++) {
+                const a = (i / n) * Math.PI * 2;
+                put(CX + Math.cos(a) * rx, TY + 1 + Math.sin(a) * ry, WELLE[Math.min(2, Math.floor(u * 3))], (1 - u) * aus);
+              }
+            }
+          }
+          // ── Faust ──
+          const fy = faustY(t), fx = faustX(t);
+          const fx0 = Math.max(0, Math.floor(fx - FWh - 3)), fx1 = Math.min(GW - 1, Math.ceil(fx + FWh + 3));
+          const fh = Math.min(GH - 1, Math.ceil(fy) + 2) + 1, fb = fx1 - fx0 + 1;
+          const raster = new Array(fb * fh);
+          for (let Y = 0; Y < fh; Y++) for (let X = fx0; X <= fx1; X++) raster[Y * fb + (X - fx0)] = faustPixel(X, Y, fx, fy);
+          const rast = (X, Y) => (X < fx0 || X > fx1 || Y < 0 || Y >= fh) ? null : raster[Y * fb + (X - fx0)];
+          const oben = 30;                                                    // der Arm verliert sich oben im Nebel (gedithert)
+          for (let Y = 0; Y < fh; Y++) {
+            const nebel = Y < oben ? Y / oben : 1;
+            if (nebel <= 0) continue;
+            for (let X = fx0; X <= fx1; X++) {
+              const p = raster[Y * fb + (X - fx0)];
+              if (!p) continue;
+              if (zerfall > 0 && rausch(X * 1.7, Y * 2.3) < zerfall) continue;
+              let c;
+              if (p.rim) c = KONTUR;
+              else {
+                // Innenkonturen: dort, wo ein anderes Teil (Finger, Daumen, Hand, Arm) beginnt, eine dunkle Linie
+                const r = rast(X + 1, Y), d = rast(X, Y + 1);
+                const kante = (r && !r.rim && r.sid !== p.sid && r.sid >= p.sid) || (d && !d.rim && d.sid !== p.sid && d.sid >= p.sid)
+                  || (r && !r.rim && r.sid > 49 && p.sid <= 49) || (d && !d.rim && d.sid > 49 && p.sid <= 49);
+                c = kante ? PAL[7] : stufe(X, Y, p.f);
+              }
+              put(X, Y, c, nebel);
+            }
+          }
+          // ── Fahrtstreifen beim Fall ──
+          if (t < TREFFER) {
+            const stark = klemme(t / 200, 0, 1) * (1 - klemme((t - 300) / 100, 0, 1));
+            const oberkante = fy - (FH * 0.5 + FW * 0.62);
+            for (const s of daten.streifen) {
+              const sx = fx + s.f * FWh, sy = oberkante + 4 - s.versatz;
+              for (let j = 0; j < s.laenge; j++) put(sx, sy - j, j < 2 ? PAL[0] : PAL[1], stark * (1 - j / s.laenge) * 0.9);
+            }
+          }
+          // ── Blitz auf der Karte beim Aufprall ──
+          if (t >= TREFFER && t < TREFFER + 140) {
+            const k = (t - TREFFER) / 140, r = 3 + Math.min(1, (t - TREFFER) / 100) * (kw * 0.75);
+            const R = Math.ceil(r);
+            for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+              const d = Math.hypot(i, j * 1.15);
+              if (d <= r) put(CX + i, TY - 2 + j, WELLE[Math.min(2, Math.floor((d / r) * 2.6))], (1 - k) * 0.95);
+            }
+          }
+          // ── Eissplitter ──
+          if (t >= TREFFER) {
+            daten.splitter.forEach((sp, idx) => {
+              const alter = t - TREFFER - sp.ab;
+              if (alter < 0 || alter > sp.leben) return;
+              const sek = alter / 1000, k = alter / sp.leben;
+              const px = CX + sp.ox + sp.vx * sek * 0.6, py = TY - 3 + sp.vy * sek * 0.6 + 0.5 * 300 * sek * sek * 0.6;
+              const c = SPLITTER[idx % SPLITTER.length];
+              const a = (1 - k * k) * aus;
+              put(px, py, c, a); put(px + 1, py, c, a);
+              if (sp.gr === 3) { put(px, py + 1, c, a); put(px + 1, py + 1, SPLITTER[(idx + 2) % SPLITTER.length], a); }
+            });
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Eis-Blizzard (Embodiment of Biseria, Frostmodus) — PIXELART, huellt die GANZE Gegnerhaelfte ein (Als Vorgabe 10.10.:
+  //  „ein eisiger Blizzard, der die gesamte gegnerische Board-Haelfte einhuellt")
+  //
+  //  Brett-Animation (`zoneType: 'board'`, `regionOwner` = die Gegnerseite, `originOwner/-HeroIdx/-ZoneSlot` = Biseria, `targets` = die
+  //  eingefrorenen Kreaturen; Huelle `ppSalve`). Von Biseria geht ein Kaeltering aus (0–400 ms), dann fegt der Sturm ueber die Flaeche:
+  //  ein Frostschleier aus Bayer-gedithertem Hellblau, der von den Raendern her dichter wird; Boeen — breite, schraege weisse Baender,
+  //  die in Windrichtung (vom Ursprung weg) ueber die Flaeche ziehen; Schneestreifen (1-Pixel-Linien mit Schweif, in drei Helligkeiten)
+  //  und wirbelnde Flocken. Um jedes Ziel zieht sich ab ~700 ms ein Wirbel zusammen (ein Ring Flocken, der enger und schneller wird);
+  //  bei ~1150 ms — wenn der Frost landet (embodiment-of-biseria.js: BLIZZARD_FREEZE_MS) — blitzt ein weisses Kreuz auf, Eiskristalle
+  //  wachsen von den Kartenraendern. Ab ~1700 ms flaut der Sturm ab (alles blendet ueber Bayer-Dithering aus), bei 2400 ms ist er
+  //  weg. Ohne Flaeche (Region fehlt im DOM) umhuellt er die Ziele samt Rand. Alle Masse folgen der Flaechenhoehe.
+  // ═══════════════════════════════════════════════════════════════════
+  biseria_blizzard: (() => {
+    const WEISS = ppHex('#ffffff'), EIS1 = ppHex('#e4f8ff'), EIS2 = ppHex('#b9ecff'), EIS3 = ppHex('#86d4f7'), EIS4 = ppHex('#58aee9');
+    const ENDE = 2400, FROST_MS = 1150, ABFLAUEN_AB = 1700;
+    const glatt = (u) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => {
+      let reg = sz.region;
+      if (!reg) {                                                      // Fallback: die Ziele samt Rand
+        const xs = sz.ziele.map(z => z.x), ys = sz.ziele.map(z => z.y);
+        const x0 = Math.min(...xs, sz.O.x) - 30, y0 = Math.min(...ys, sz.O.y) - 30;
+        reg = { x0, y0, w: Math.max(...xs, sz.O.x) + 30 - x0, h: Math.max(...ys, sz.O.y) + 30 - y0 };
+      }
+      const richtung = sz.O.x <= reg.x0 + reg.w / 2 ? 1 : -1;       // Wind vom Ursprung weg
+      const sk = Math.min(2.2, Math.max(0.8, reg.h / 85));
+      const flocken = Array.from({ length: ppFxN(Math.min(520, Math.round(reg.w * reg.h / 70))) }, () => ({
+        fx: Math.random(), fy: Math.random(), v: 70 + Math.random() * 190, dv: 12 + Math.random() * 46,
+        laenge: 3 + Math.floor(Math.random() * 5), hell: Math.random() < 0.45 ? 0 : Math.random() < 0.6 ? 1 : 2, ab: Math.random() * 500,
+      }));
+      const boeen = Array.from({ length: 5 }, (_, i) => ({
+        ab: 120 + i * 230 + Math.random() * 120, dauer: 800 + Math.random() * 300, y: reg.y0 + reg.h * (0.12 + 0.76 * Math.random()),
+        breite: 14 + Math.random() * 14, neigung: 0.35 + Math.random() * 0.4,
+      }));
+      const ziele = sz.ziele.map(() => ({
+        phase: Math.random() * Math.PI * 2,
+        kristalle: Array.from({ length: 10 }, (_, k) => ({ kante: k % 4, pos: Math.random(), laenge: 3 + Math.floor(Math.random() * 6) })),
+      }));
+      return { reg, richtung, sk, flocken, boeen, ziele };
+    };
+    const malen = (g, t, sz, teile) => {
+      const { reg, richtung, sk, flocken, boeen, ziele } = teile;
+      // Gesamtstaerke: schnell hoch, lange oben, dann abflauen
+      const stark = t < 600 ? glatt(t / 600) : t < ABFLAUEN_AB ? 1 : 1 - glatt((t - ABFLAUEN_AB) / (ENDE - ABFLAUEN_AB));
+      if (stark <= 0.01) return;
+      const x0 = Math.max(0, Math.floor(reg.x0)), x1 = Math.min(sz.gw - 1, Math.ceil(reg.x0 + reg.w));
+      const y0 = Math.max(0, Math.floor(reg.y0)), y1 = Math.min(sz.gh - 1, Math.ceil(reg.y0 + reg.h));
+      // ── Kaeltering am Ursprung ──
+      if (t < 480) {
+        const u = t / 480, r = 3 + u * 26 * sk;
+        g.ring(sz.O.x, sz.O.y, r, r * 0.7, u < 0.4 ? WEISS : EIS2, 1 - u);
+        g.ring(sz.O.x, sz.O.y, r * 0.7, r * 0.5, EIS3, (1 - u) * 0.8);
+      }
+      // Weicher Rand: ausserhalb der Flaeche nichts, zum Rand hin ausduennend (kein sichtbares Rechteck)
+      const weich = (X, Y) => {
+        const nx = (X - reg.x0) / reg.w, ny = (Y - reg.y0) / reg.h;
+        return glatt(Math.min(nx, 1 - nx, ny, 1 - ny) / 0.16);
+      };
+      // ── Frostschleier: ein Gestoeber aus einzelnen hellen Punkten (Rauschschwelle statt Bayer-Schachbrett), driftet mit dem Wind ──
+      for (let Y = y0; Y <= y1; Y++) {
+        for (let X = x0; X <= x1; X++) {
+          const drift = 0.5 + 0.5 * Math.sin(X * 0.09 - richtung * t * 0.006 + Math.sin(Y * 0.13 + t * 0.002) * 1.7);
+          const dichte = stark * weich(X, Y) * (0.06 + 0.2 * drift) * 1.05;
+          if (dichte > 0.015 && rausch(X * 1.37, Y * 1.91) < dichte) g.put(X, Y, rausch(X * 0.7, Y * 1.1) < 0.55 ? EIS1 : EIS2);
+        }
+      }
+      // ── Boeen: schraege weisse Baender in Windrichtung ──
+      for (const b of boeen) {
+        const alter = t - b.ab;
+        if (alter < 0 || alter > b.dauer) continue;
+        const u = alter / b.dauer;
+        const mitte = richtung > 0 ? reg.x0 - 20 + u * (reg.w + 80) : reg.x0 + reg.w + 20 - u * (reg.w + 80);
+        const halb = b.breite * sk, a = Math.sin(u * Math.PI) * stark;
+        for (let Y = Math.max(y0, Math.floor(b.y - 22 * sk)); Y <= Math.min(y1, Math.ceil(b.y + 22 * sk)); Y++) {
+          const schief = (Y - b.y) * b.neigung * richtung;
+          for (let X = Math.max(x0, Math.floor(mitte + schief - halb)); X <= Math.min(x1, Math.ceil(mitte + schief + halb)); X++) {
+            const d = Math.abs(X - mitte - schief) / halb;
+            const hoehe = 1 - Math.abs(Y - b.y) / (22 * sk);
+            const dichte = (1 - d) * Math.max(0, hoehe) * a * weich(X, Y) * 0.8;
+            if (dichte > 0.04 && rausch(X * 2.1 + 5, Y * 1.3) < dichte * 1.5) g.put(X, Y, d < 0.35 ? WEISS : EIS1);
+          }
+        }
+      }
+      // ── Schneestreifen und Flocken ──
+      const winkel = Math.atan2(0.42, 1);                                       // flach nach unten
+      const dx = richtung * Math.cos(winkel), dy = Math.sin(winkel);
+      for (const f of flocken) {
+        const alter = t - f.ab;
+        if (alter < 0) continue;
+        const sek = alter / 1000;
+        const px = reg.x0 + ((f.fx * (reg.w + 60) + richtung * f.v * sek * (0.8 + 0.4 * stark) + (reg.w + 60) * 4) % (reg.w + 60)) - 30;
+        const py = reg.y0 + ((f.fy * reg.h + f.dv * sek + reg.h * 4) % reg.h);
+        const a = stark * glatt(weich(px, py) * 1.5);
+        if (a <= 0.05) continue;
+        const fb = f.hell === 0 ? WEISS : f.hell === 1 ? EIS1 : EIS2;
+        for (let k = 0; k < f.laenge; k++) g.put(px - dx * k, py - dy * k, k === 0 ? WEISS : k < f.laenge * 0.5 ? fb : EIS3, a * (1 - k / (f.laenge + 1)));
+      }
+      // ── Wirbel um jedes Ziel, Frostblitz und Eiskristalle ──
+      sz.ziele.forEach((z, i) => {
+        const e = ziele[i];
+        if (t >= 650 && t < FROST_MS + 250) {
+          const u = klemme((t - 650) / (FROST_MS - 650), 0, 1);
+          const r = Math.max(z.w, z.h * 0.6) * (0.95 - 0.5 * u);
+          const n = 18;
+          for (let k = 0; k < n; k++) {
+            const a = e.phase + u * 6.4 + (k / n) * Math.PI * 2;
+            g.put(z.x + Math.cos(a) * r, z.y + Math.sin(a) * r * 0.62, k % 3 === 0 ? WEISS : k % 3 === 1 ? EIS2 : EIS3, stark * (t < FROST_MS ? 1 : 0.5));
+            g.put(z.x + Math.cos(a + 0.14) * r * 1.12, z.y + Math.sin(a + 0.14) * r * 0.7, EIS1, stark * 0.7);
+          }
+        }
+        if (t >= FROST_MS) {
+          const k = t - FROST_MS;
+          if (k < 200) {                                                        // weisses Kreuz beim Einfrieren
+            const r = 4 + (k / 200) * Math.max(z.w, z.h) * 0.55, a = 1 - k / 200;
+            for (let j = -Math.ceil(r); j <= Math.ceil(r); j++) { g.put(z.x + j, z.y, j === 0 ? WEISS : EIS1, a); g.put(z.x, z.y + j, j === 0 ? WEISS : EIS1, a); }
+          }
+          const wachs = glatt(k / 380), aus = t > ABFLAUEN_AB ? stark : 1;      // Kristalle wachsen von den Kartenraendern nach innen
+          const hw = z.w / 2, hh = z.h / 2;
+          for (const c of e.kristalle) {
+            const L = Math.round(c.laenge * wachs);
+            for (let s = 0; s < L; s++) {
+              let px, py, ex, ey;
+              if (c.kante === 0) { px = z.x - hw + c.pos * z.w; py = z.y - hh; ex = 0.35; ey = 1; }
+              else if (c.kante === 1) { px = z.x - hw + c.pos * z.w; py = z.y + hh; ex = -0.35; ey = -1; }
+              else if (c.kante === 2) { px = z.x - hw; py = z.y - hh + c.pos * z.h; ex = 1; ey = 0.35; }
+              else { px = z.x + hw; py = z.y - hh + c.pos * z.h; ex = -1; ey = -0.35; }
+              g.put(px + ex * s, py + ey * s, s < 2 ? WEISS : s < 4 ? EIS1 : EIS3, aus);
+              if (s < L - 2) g.put(px + ex * s + (ey ? 1 : 0), py + ey * s + (ex ? 1 : 0), EIS4, 0.8 * aus);
+            }
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Pistolenschuesse (Assault Eagle, BEIDE Haelften) — PIXELART, Quelle → ALLE Ziele GLEICHZEITIG
   //
@@ -44907,6 +45286,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'big_oopsie') {
         const p = playerByName(entry.player);
         return <span className="log-status">💥 {cName('Big Oopsie')} — {entry.chooser} chooses {entry.target} and it takes <span className="log-amount">{entry.damage}</span> damage ({pName(p.name, p.color)}'s Spell).</span>;
+      }
+      if (t === 'biseria_smash') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🧊 {cName('Embodiment of Biseria')} — {pName(p.name, p.color)}'s giant fist of ice smashes {entry.target} for <span className="log-amount">{entry.damage}</span> damage.</span>;
+      }
+      if (t === 'biseria_blizzard') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">❄️ {cName('Embodiment of Biseria')} — an icy blizzard engulfs {pName(p.name, p.color)}'s opponent: {entry.frozen} of {entry.targets} Creature{entry.targets !== 1 ? 's' : ''} Frozen for 1 turn.</span>;
       }
       if (t === 'capture_control') {
         const p = playerByName(entry.player);
