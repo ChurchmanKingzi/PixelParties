@@ -463,7 +463,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Reveal the top card of your deck until you reveal something other than an Artifact. Add all cards revealed by this effect to your hand. You cannot reveal more than 3 cards with this effect. Shuffle the first Non-Artifact card you reveal back into your deck. If this is the first Attack you use this turn, this counts as an additional Action.",
+    "effect": "Reveal the top card of your deck until you reveal something other than an Artifact. Add all Artifacts revealed by this effect to your hand. You cannot reveal more than 3 cards with this effect. Shuffle the first Non-Artifact card you reveal back into your deck. If this is the first Attack you use this turn, this counts as an additional Action.",
     "archetype": "",
     "setID": "PP MOE",
     "banned": "",

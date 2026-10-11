@@ -57,7 +57,7 @@ const glint = (t) => t.events.filter(e => e.ev === 'play_zone_animation' && e.da
   {
     const s = loadCardEffect(CARD), cd = DB[CARD];
     check('Attack, Normal, Lv0, Fighting', cd && cd.cardType === 'Attack' && cd.subtype === 'Normal' && cd.level === 0 && cd.spellSchool1 === 'Fighting', cd);
-    check('Kartentext: bis zu 3 aufdecken, Artefakte auf die Hand, erstes Nicht-Artefakt mischen, Zusatzaktion bei der ersten Attack', cd && /^Reveal the top card of your deck until you reveal something other than an Artifact\. Add all cards revealed by this effect to your hand\. You cannot reveal more than 3 cards with this effect\. Shuffle the first Non-Artifact card you reveal back into your deck\. If this is the first Attack you use this turn, this counts as an additional Action\.$/.test(cd.effect), cd && cd.effect);
+    check('Kartentext: bis zu 3 aufdecken, Artefakte auf die Hand, erstes Nicht-Artefakt mischen, Zusatzaktion bei der ersten Attack', cd && /^Reveal the top card of your deck until you reveal something other than an Artifact\. Add all Artifacts revealed by this effect to your hand\. You cannot reveal more than 3 cards with this effect\. Shuffle the first Non-Artifact card you reveal back into your deck\. If this is the first Attack you use this turn, this counts as an additional Action\.$/.test(cd.effect), cd && cd.effect);
     check('`inherentAction` als FUNKTION (Quick-Attack-Vertrag)', typeof s.inherentAction === 'function');
   }
   console.log(`(Testkarten: Artefakte ${A1}, ${A2}, ${A3}, ${A4}; Ausrüstung ${EQ}; Artefakt-Kreatur ${ACR}; Kreatur ${KRE}; Spell ${SPELL})`);

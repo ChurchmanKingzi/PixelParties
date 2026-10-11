@@ -18,10 +18,11 @@
 //  Held mit Bakhm-Plätzen ändert daran nichts. Der Nutzer muss leben. Für einen geliehenen Held (Charme, Love Shot) liegt die Zone auf dessen Brettseite, die Karte
 //  stammt aus dem Deck des Wirkenden (`place` unterscheidet beides, die Karte bleibt „seine": Hand und Ablage).
 //
-//  ── WAHL ────────────────────────────────────────────────────────────────
+//  ── WAHL — OHNE REVEAL (Als Vorgabe 11.10.) ──────────────────────────────
 //  „A card from your deck": JEDE Karte des Hauptdecks (auch eine, die nie eine Surprise war) — Galerie der verschiedenen Namen, abbrechbar (dann bleibt die Karte
-//  auf der Hand). Wie jede Deck-Suche (Trapping): der Gegner sieht die gewählte Karte und bestätigt sie (`deckSearchReveal`), die Karte liegt danach verdeckt
-//  — halbtransparent für ihn sichtbar (`knownToOpponent`) —, das Deck wird gemischt. Geheimraum-Marke und alles Weitere: `_secret-room-shared.js`.
+//  auf der Hand). **Der Gegner sieht die Karte NICHT, sie wird an keiner Stelle revealed:** kein `card_reveal`, kein `deckSearchReveal`-Angebot an ihn (anders als bei
+//  Trapping), kein `knownToOpponent` an der Karte, Flüge für ihn verdeckt, Logzeilen ohne Kartennamen, die Galerie ist eine private Abfrage (`_privat: true`). Alles
+//  Nähere: `_secret-room-shared.js`. Danach wird das Deck gemischt.
 //
 //  ── AUSLÖSER ────────────────────────────────────────────────────────────
 //  `_secret-room-shared.js` → `onHeroChosen`: „Whenever the user is chosen by an opponent's card or effect" (das gewöhnliche Surprise-Fenster `_checkSurpriseWindow`),
@@ -36,7 +37,7 @@
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `play_zone_animation` `secret_room_open` (Pixelart, ANIM_REGISTRY, auf der Surprise Zone): Ziegelwand schiebt sich zur Seite, dahinter ein dunkler Raum mit
-//  goldenem Schein, schliesst sich wieder. Klänge in ZONE_ANIM_SFX; Logs `secret_room_set`, `secret_room_hand`, `secret_room_activate`.
+//  goldenem Schein, schliesst sich wieder. Klänge in ZONE_ANIM_SFX; Logs `secret_room_set`, `secret_room_hand` (beide ohne Kartennamen), `secret_room_activate` (mit Namen: die Surprise wird dabei aufgedeckt).
 // ═══════════════════════════════════════════
 
 const { selbstsenkungZaehlt } = require('./_hooks');
@@ -112,21 +113,12 @@ module.exports = {
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery',
         cards: namen.map(name => ({ name, source: 'deck' })),
-        title: CARD_NAME,
+        title: CARD_NAME, _privat: true,        // die Galerie zeigt dein Deck NUR dir (effectPromptFuer)
         description: `Choose a card from your deck to place face-down into ${hero.name}'s Surprise Zone.`,
         cancellable: true,
       });
       if (!wahl || wahl.cancelled || !wahl.cardName || !namen.includes(wahl.cardName)) { gs._spellCancelled = true; return; }
       const name = wahl.cardName;
-
-      // ── Der Gegner sieht die Suche (wie Trapping) ──
-      const oi = engine.opponentOf(pi);
-      engine._broadcastEvent('card_reveal', { cardName: name });
-      engine.sync();
-      await engine._delay(500);
-      await engine.promptGeneric(oi, {
-        type: 'deckSearchReveal', cardName: name, searcherName: ps.username || 'Opponent', title: CARD_NAME, cancellable: false,
-      });
 
       // ── Tür öffnet sich, die Karte fliegt hinein ──
       engine._broadcastEvent('play_zone_animation', {

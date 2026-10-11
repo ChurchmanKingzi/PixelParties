@@ -15,10 +15,17 @@
 //  „Betroffen" ist jede Karte auf dem Brett, die ursprünglich MIR gehört (`originalOwner ?? owner === pi`, das Feld, das jede Übernahme unverändert lässt — dieselbe
 //  Messlatte wie Liberation, Memory Blast) und die jemand ANDERES kontrolliert (`controller ?? owner !== pi`; das gilt auch für eine nur vorübergehend gestohlene Karte,
 //  `stolenBy`). Karten, die ich schon kontrolliere — auch eine eigene Kreatur auf der Gegenseite, die ich über einen geliehenen Helden beschworen habe —, sind nicht betroffen.
-//  Erfasst werden alle Karten in Support Zones (Kreaturen aller Arten, Ausrüstung, Anhängsel/Spells, sonstige Artefakte) und Areas. Nicht erfasst (nur: gibt es auf
-//  dem Brett nicht, bzw. keine Rückgabe-Mechanik): Helden, Ability- und Surprise-Zonen-Karten. Karten, deren Kontrolle sich nicht ändern lässt (Cardinal Beasts,
-//  „Control of this Creature cannot change", Omni-Immunität), sind keine Betroffenen.
-//  „Your opponent controls no cards …" = es gibt keine Betroffenen.
+//  Erfasst werden alle Karten in Support Zones (Kreaturen aller Arten, Ausrüstung, Anhängsel/Spells, sonstige Artefakte), Areas und **HELDEN** (Korrektur 11.10.: „Heroes
+//  sollten inbegriffen sein! Es gibt (Paraseed Control) Wege, Heroes permanent zu stehlen"). Nicht erfasst (gibt es dort nicht): Ability- und Surprise-Zonen-Karten. Karten, deren
+//  Kontrolle sich nicht ändern lässt (Cardinal Beasts, „Control of this Creature cannot change", Omni-Immunität), sind keine Betroffenen.
+//  „Your opponent controls no cards …" = es gibt keine Betroffenen (Karten ODER Helden).
+//
+//  ── HELDEN ──────────────────────────────────────────────────────────────
+//  Ein Held steht immer in der Spalte seines urspruenglichen Besitzers — „originally owned by you" = er steht in MEINER Spalte. Betroffen ist er, wenn ihn jemand anderes kontrolliert:
+//  dauerhaft (`permaControlBy`, Paraseed Control), durch Charme-Marken (`charmedBy`, Charme 3, Golden Apple, Little Lyta, Styx) oder durch `controlledBy` (FTCD, Controlled Attack) — auch ein
+//  KO-Held. Die Kontrolle geht dauerhaft zurück: `engine.actionReturnHeroControl` löscht ALLE Kontrollmarken samt Support-Zonen-Sperre; der Held ist danach ein gewöhnlicher eigener Held
+//  (kein Umsetzen, keine Platzfrage). Helden werden ZUERST zurückgeholt, damit sie bei den Platzfragen der Karten schon als „Helden, die du kontrollierst" zählen. Ein Held, den ICH
+//  kontrolliere (auch in der Gegnerspalte), ist nicht betroffen.
 //
 //  ── ÜBERNAHME UND PLATZ ─────────────────────────────────────────────────
 //  Kontrollwechsel auf die EIGENE Seite ist immer Pflicht („take permanent control of all"); das Umsetzen ist optional („you may place"):
@@ -74,6 +81,19 @@ function istBetroffen(engine, pi, inst) {
   if ((inst.controller ?? inst.owner) === pi) return false;
   if (engine.isOmniImmune(inst) || engine.controlIsLocked(inst)) return false;
   return true;
+}
+
+/** Helden in MEINER Spalte, die jemand anderes kontrolliert (dauerhaft, Charme-Marken oder `controlledBy`) — auch KO-Helden. */
+function betroffeneHelden(engine, pi) {
+  const out = [];
+  const heroes = engine.gs.players[pi]?.heroes || [];
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const hero = heroes[hi];
+    if (!hero?.name) continue;
+    const fremd = engine.heroSideOf(pi, hero) !== pi || (hero.controlledBy != null && hero.controlledBy !== pi);
+    if (fremd) out.push({ heroIdx: hi, hero });
+  }
+  return out;
 }
 
 /** Alle betroffenen Karten, in fester Reihenfolge (Brettseite, Held, Zone). */
@@ -196,7 +216,7 @@ module.exports = {
   /** Immer spielbar (ohne Betroffene zieht sie); nur eine Boris-Sperre macht die Übernahme unmöglich. */
   canActivate(gs, pi, engine) {
     if (!engine) return true;
-    if (betroffene(engine, pi).length === 0) return true;
+    if (betroffene(engine, pi).length === 0 && betroffeneHelden(engine, pi).length === 0) return true;
     return !borisSperrt(engine, pi);
   },
 
@@ -205,20 +225,21 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
     const ziele = betroffene(engine, pi);
-    if (ziele.length > 0 && borisSperrt(engine, pi)) return { cancelled: true };
+    const helden = betroffeneHelden(engine, pi);
+    if ((ziele.length > 0 || helden.length > 0) && borisSperrt(engine, pi)) return { cancelled: true };
 
     // Ursprung der Animation: der erste lebende eigene Held (Artefakte haben keinen Nutzer).
     const heroIdx = (ps.heroes || []).findIndex(h => h?.name && h.hp > 0);
 
     // ── Ersatzeffekt: keine betroffene Karte → 1 Karte ziehen ──
-    if (ziele.length === 0) {
+    if (ziele.length === 0 && helden.length === 0) {
       engine._broadcastEvent('play_zone_animation', {
         type: 'spellbook_pages', zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1, duration: SEITEN_MS,
         targets: [{ owner: pi, deck: true }], originOwner: pi, originDeck: true,
       });
       await engine._delay(FLUG_MS);
       await engine.actionDrawCards(pi, 1, { source: CARD_NAME });
-      engine.log('secret_spell_book', { player: ps.username, taken: [], placed: [], drew: 1 });
+      engine.log('secret_spell_book', { player: ps.username, taken: [], heroes: [], placed: [], drew: 1 });
       engine.sync();
       return { ok: true };
     }
@@ -226,16 +247,23 @@ module.exports = {
     // ── Übernahme: Seiten flattern von jeder betroffenen Karte zum Wirker ──
     engine._broadcastEvent('play_zone_animation', {
       type: 'spellbook_pages', zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1, duration: SEITEN_MS,
-      targets: ziele.map(i => (i.zone === 'area'
-        ? { owner: i.owner, heroIdx: -1, zoneType: 'area', cardName: i.name }
-        : { owner: engine.physicalSide(i), heroIdx: i.heroIdx, zoneSlot: i.zoneSlot, cardName: i.name })),
+      targets: [
+        ...helden.map(h => ({ owner: pi, heroIdx: h.heroIdx, zoneSlot: -1, cardName: h.hero.name })),
+        ...ziele.map(i => (i.zone === 'area'
+          ? { owner: i.owner, heroIdx: -1, zoneType: 'area', cardName: i.name }
+          : { owner: engine.physicalSide(i), heroIdx: i.heroIdx, zoneSlot: i.zoneSlot, cardName: i.name })),
+      ],
       ...(heroIdx >= 0 ? { originOwner: pi, originHeroIdx: heroIdx, originZoneSlot: -1 } : { originOwner: pi, originDeck: true }),
     });
     await engine._delay(FLUG_MS);
 
-    const ergebnis = { uebernommen: [], umgesetzt: [] };
+    const ergebnis = { uebernommen: [], umgesetzt: [], helden: [] };
+    // Helden zuerst: wer wieder mir gehört, zählt bei den Platzfragen der Karten als „Held, den ich kontrolliere".
+    for (const h of helden) {
+      if (await engine.actionReturnHeroControl(pi, h.heroIdx, { sourceName: CARD_NAME })) ergebnis.helden.push(h.hero.name);
+    }
     for (const inst of ziele) await uebernimm(engine, pi, inst, ergebnis);
-    engine.log('secret_spell_book', { player: ps.username, taken: ergebnis.uebernommen, placed: ergebnis.umgesetzt, drew: 0 });
+    engine.log('secret_spell_book', { player: ps.username, taken: ergebnis.uebernommen, heroes: ergebnis.helden, placed: ergebnis.umgesetzt, drew: 0 });
     engine.sync();
     return { ok: true };
   },

@@ -2,7 +2,8 @@
 // Create Secret Room (Spell, Magic Arts Lv1): „Choose a card from your deck and place it into the user's Surprise Zone face-down. Whenever the user is chosen by an
 // opponent's card or effect, you may add the card you placed to your hand. If the card is a Surprise and the user can use it, you may flip it face-up and activate it
 // instead as if its activation condition was fulfilled. If the user has at least Trapping 1, this Spell's level is treated as 0 and it counts as an additional Action."
-// Geprueft wird der ECHTE Spielweg (`host.doPlaySpell`), das Surprise-Fenster `_checkSurpriseWindow` und die Einsatzregeln (Trapping, freie Surprise Zone, Bakhm).
+// Geprueft wird der ECHTE Spielweg (`host.doPlaySpell`), das Surprise-Fenster `_checkSurpriseWindow` und die Einsatzregeln (Trapping, freie Surprise Zone, Bakhm) —
+// und dass die Karte NIRGENDS revealed wird (Als Vorgabe 11.10.): keine Reveals, verdeckte Fluege, Logs ohne Namen, private Abfragen.
 //   node scripts/skilltest-e2e/create-secret-room.test.js
 process.env.PP_ST_SIM = '1';
 const { runGame } = require('../../skilltest/sim');
@@ -41,13 +42,13 @@ async function fresh(opts = {}) {
   p0.mainDeck = [SURP, SURP, KRE, SURP_HOCH, ...(opts.deck || [])];
   const t = { room, host, engine, gs, p0, p1, events: [], logs: [], optionen: [], antwort: 'hand', waehle: SURP, gallerien: [], reveals: [] };
   engine.promptGeneric = async (pi, d) => {
-    if (d.type === 'cardGallery') { t.gallerien.push(d.cards.map(c => c.name)); return t.waehle ? { cardName: t.waehle } : { cancelled: true }; }
+    if (d.type === 'cardGallery') { t.gallerien.push(d.cards.map(c => c.name)); t.privat = t.privat || []; t.privat.push(d._privat === true); return t.waehle ? { cardName: t.waehle } : { cancelled: true }; }
     if (d.type === 'deckSearchReveal') { t.reveals.push(d.cardName); return { confirmed: true }; }
-    if (d.type === 'optionPicker') { t.optionen.push(d.options.map(o => o.id)); return { optionId: t.antwort }; }
+    if (d.type === 'optionPicker') { t.optionen.push(d.options.map(o => o.id)); t.privat = t.privat || []; t.privat.push(d._privat === true); t.zeigt = d.showCard; return { optionId: t.antwort }; }
     return undefined;
   };
   const origBc = engine._broadcastEvent.bind(engine);
-  engine._broadcastEvent = (ev, data, ...r) => { t.events.push({ ev, data }); return origBc(ev, data, ...r); };
+  engine._broadcastEvent = (ev, data, opts) => { t.events.push({ ev, data, opts }); return origBc(ev, data, opts); };
   const origLog = engine.log.bind(engine);
   engine.log = (type, data) => { t.logs.push({ type, data }); return origLog(type, data); };
   return t;
@@ -77,14 +78,19 @@ const waehle = (t, o = {}) => t.engine._checkSurpriseWindow(
     const deckVorher = t.p0.mainDeck.length;
     const r = await spiele(t);
     check('der Zauber läuft durch', r === true, r);
-    check('Galerie: die verschiedenen Karten des Decks (auch Nicht-Surprises)', t.gallerien.length === 1 && t.gallerien[0].includes(SURP) && t.gallerien[0].includes(KRE) && new Set(t.gallerien[0]).size === t.gallerien[0].length, t.gallerien);
+    check('Galerie (privat): die verschiedenen Karten des Decks (auch Nicht-Surprises)', t.gallerien.length === 1 && t.gallerien[0].includes(SURP) && t.gallerien[0].includes(KRE) && new Set(t.gallerien[0]).size === t.gallerien[0].length, t.gallerien);
     check('die Karte liegt VERDECKT in der Surprise Zone von Held 0', zone(t).length === 1 && zone(t)[0] === SURP && zInst(t) && zInst(t).faceDown === true, { z: zone(t) });
     check('Geheimraum-Marke an der Instanz (Einsetzender = Sitz 0)', zInst(t).counters.secretRoom && zInst(t).counters.secretRoom.placer === 0, zInst(t).counters);
     check('eine Kopie weniger im Deck', t.p0.mainDeck.length === deckVorher - 1 && zaehle(t.p0.mainDeck, SURP) === 1, { n: t.p0.mainDeck.length });
-    check('der Gegner hat die Suche gesehen (`deckSearchReveal`) und die Karte ist ihm halbtransparent bekannt', t.reveals.length === 1 && t.reveals[0] === SURP && zInst(t).knownToOpponent === true, { rv: t.reveals });
+    check('KEIN Reveal: kein `deckSearchReveal`-Angebot, kein `card_reveal`, die Karte ist dem Gegner NICHT bekannt (`knownToOpponent` fehlt)', t.reveals.length === 0 && !t.events.some(e => e.ev === 'card_reveal') && zInst(t).knownToOpponent !== true, { rv: t.reveals });
+    const flug = t.events.filter(e => e.ev === 'play_pile_transfer' && e.data.from === 'deck' && e.data.to === 'surprise');
+    const andereFlug = flug.filter(e => e.opts && Array.isArray(e.opts.toPlayers) && !e.opts.toPlayers.includes(0));
+    const eigenFlug = flug.filter(e => e.opts && Array.isArray(e.opts.toPlayers) && e.opts.toPlayers.includes(0));
+    check('Der Flug Deck → Surprise Zone geht verdeckt an alle ANDEREN (Name „?“, `faceDown`) und mit der echten Karte nur an den Einsetzenden', andereFlug.length === 1 && andereFlug[0].data.cardName === '?' && andereFlug[0].data.faceDown === true && eigenFlug.length === 1 && eigenFlug[0].data.cardName === SURP && !eigenFlug[0].opts.toSpectators, { flug: flug.map(e => ({ n: e.data.cardName, o: e.opts })) });
+    check('…und KEIN an alle gesendetes Ereignis nennt die Karte (Wortsuche über alle ungerichteten Ereignisse und Logzeilen)', !t.events.filter(e => !(e.opts && e.opts.toPlayers)).some(e => JSON.stringify(e.data).includes(SURP)) && !t.logs.some(l => JSON.stringify(l.data).includes(SURP)), { ev: t.events.filter(e => !(e.opts && e.opts.toPlayers) && JSON.stringify(e.data).includes(SURP)).map(e => e.ev), lg: t.logs.filter(l => JSON.stringify(l.data).includes(SURP)).map(l => l.type) });
     check('Animation `secret_room_open` auf der Surprise Zone (Ziel mit zoneType surprise)', tuer(t).length === 1 && tuer(t)[0].data.targets[0].zoneType === 'surprise' && tuer(t)[0].data.targets[0].owner === 0 && tuer(t)[0].data.targets[0].heroIdx === 0, tuer(t));
     check('Create Secret Room liegt in der Ablage', t.p0.discardPile.includes(CARD) && t.p0.hand.length === 0, t.p0.discardPile);
-    check('Log `secret_room_set`', t.logs.some(l => l.type === 'secret_room_set' && l.data.card === SURP), t.logs.map(l => l.type));
+    check('Log `secret_room_set` (Held, OHNE Kartenname)', t.logs.some(l => l.type === 'secret_room_set' && !('card' in l.data) && l.data.hero), t.logs.filter(l => /secret/.test(l.type)));
   }
   {
     const t = await fresh({ ma: 1 });
@@ -97,6 +103,23 @@ const waehle = (t, o = {}) => t.engine._checkSurpriseWindow(
     t.waehle = null;
     const r = await spiele(t);
     check('Galerie abgebrochen: nichts platziert, die Karte bleibt auf der Hand', r === true && t.p0.hand.includes(CARD) && zone(t).length === 0 && tuer(t).length === 0, { r, hand: t.p0.hand });
+  }
+
+  console.log('Private Abfragen: der Gegner sieht ihren Inhalt nicht');
+  {
+    const t = await fresh();
+    await spiele(t);
+    t.antwort = 'no';
+    await waehle(t);
+    check('Kartenwahl und Auslöse-Angebot sind als `_privat` gekennzeichnet', t.privat && t.privat.length === 2 && t.privat.every(Boolean), t.privat);
+    const { effectPromptFuer } = require('../../server.js').skillTestHandlers;
+    const ep = { type: 'cardGallery', ownerIdx: 0, promptId: 7, title: CARD, cards: [{ name: SURP }, { name: KRE }], description: 'secret', _privat: true };
+    const fuerBesitzer = effectPromptFuer(ep, 0), fuerGegner = effectPromptFuer(ep, 1), fuerZuschauer = effectPromptFuer(ep, -1);
+    check('`effectPromptFuer`: der Besitzer sieht die Galerie, der Gegner und die Zuschauer eine leere Hülle (Typ und Titel bleiben)', fuerBesitzer.cards.length === 2 && fuerGegner.cards.length === 0 && fuerZuschauer.cards.length === 0 && fuerGegner.type === 'cardGallery' && fuerGegner.title === CARD && fuerGegner.description === '' && !JSON.stringify(fuerGegner).includes(SURP), { fuerGegner });
+    const op = { type: 'optionPicker', ownerIdx: 0, promptId: 8, title: CARD, showCard: SURP, description: SURP, options: [{ id: 'hand', label: 'Add ' + SURP }, { id: 'no', label: 'No' }], _privat: true };
+    const og = effectPromptFuer(op, 1);
+    check('…ebenso das Angebot: keine Karte (`showCard`), keine Beschriftung — nur die Optionen-IDs', !('showCard' in og) && og.options.map(o => o.id).join() === 'hand,no' && !JSON.stringify(og).includes(SURP), { og });
+    check('…Abfragen OHNE `_privat` bleiben unverändert für alle', effectPromptFuer({ type: 'confirm', ownerIdx: 0, message: 'x', showCard: SURP }, 1).showCard === SURP);
   }
 
   console.log('Nur mit FREIER Surprise Zone (auch bei Bakhm)');
@@ -163,7 +186,10 @@ const waehle = (t, o = {}) => t.engine._checkSurpriseWindow(
     check('Der Gegner wählt den Helden: Angebot an den Besitzer (Hand / Aktivieren / Nein)', t.optionen.length === 1 && t.optionen[0].includes('hand') && t.optionen[0].includes('activate') && t.optionen[0].includes('no'), t.optionen);
     check('„Add to hand“: die Karte ist auf der Hand, die Zone leer, die Marke weg, nichts negiert', t.p0.hand.includes(SURP) && zone(t).length === 0 && !zInst(t) && (r === null || r.effectNegated !== true), { hand: t.p0.hand, z: zone(t), r });
     check('…Flug Surprise Zone → Hand und Tür-Animation', t.events.some(e => e.ev === 'play_pile_transfer' && e.data.from === 'surprise' && e.data.to === 'hand') && tuer(t).length === 1, t.events.map(e => e.ev));
-    check('…Log `secret_room_hand`', t.logs.some(l => l.type === 'secret_room_hand' && l.data.card === SURP && l.data.by === 'Test Attack'), t.logs.filter(l => /secret/.test(l.type)));
+    check('…Log `secret_room_hand` (Held, Quelle) OHNE Kartenname', t.logs.some(l => l.type === 'secret_room_hand' && !('card' in l.data) && l.data.by === 'Test Attack'), t.logs.filter(l => /secret/.test(l.type)));
+    const hflug = t.events.filter(e => e.ev === 'play_pile_transfer' && e.data.from === 'surprise' && e.data.to === 'hand');
+    check('…der Flug zur Hand ist für alle anderen verdeckt („?“) und zeigt die echte Karte nur dem Einsetzenden', hflug.length === 2 && hflug.filter(e => e.data.cardName === '?' && e.data.faceDown === true && !e.opts.toPlayers.includes(0)).length === 1 && hflug.filter(e => e.data.cardName === SURP && e.opts.toPlayers.includes(0)).length === 1, hflug.map(e => ({ n: e.data.cardName, o: e.opts })));
+    check('…keine Logzeile `card_added_to_hand`/`pile_take` mit dem Kartennamen, und keine ungerichtete Meldung nennt ihn', !t.logs.some(l => /card_added_to_hand|pile_take/.test(l.type) && l.data.card === SURP) && !t.logs.some(l => JSON.stringify(l.data).includes(SURP)) && !t.events.filter(e => !(e.opts && e.opts.toPlayers)).some(e => JSON.stringify(e.data).includes(SURP)), { lg: t.logs.filter(l => JSON.stringify(l.data).includes(SURP)).map(l => l.type) });
   }
   {
     const t = await fresh();

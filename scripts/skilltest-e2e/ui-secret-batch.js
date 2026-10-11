@@ -7,6 +7,7 @@
 //   • Lauf D (echter Spielweg): Amazing Finding — Artefakte auf die Hand, das erste Nicht-Artefakt wird ins Deck gemischt.
 //   • Lauf E (echter Spielweg): Create Secret Room — Kartenwahl aus dem Deck, die Karte liegt verdeckt in der Surprise Zone, Tür-Animation.
 //   • Lauf F (echter Spielweg): Secret Spell Book — ohne Betroffene zieht das Buch 1 Karte (Animation über dem Deck).
+//   • Lauf G (echter Spielweg): Secret Spell Book — ein dauerhaft gestohlener eigener Held kommt zurück (Kontrollmarken weg, kein Ziehen).
 //   NODE_PATH=…uitools/node_modules:/tmp/st-tools/node_modules:/opt/node22/lib/node_modules node scripts/skilltest-e2e/ui-secret-batch.js [/pfad/ordner]
 const { chromium } = require('playwright');
 const { startServer, BASE, sleep, createAccount, check, finish } = require('./lib');
@@ -57,13 +58,13 @@ const AUFBAU = (extra) => ({
     window.__gs = null; window.__anims = []; window.__events = [];
     window.socket.on('game_state', (g) => { window.__gs = g; });
     window.socket.on('play_zone_animation', (e) => { window.__anims.push(e && e.type); });
-    for (const ev of ['mill_center_reveal', 'mill_center_release', 'play_pile_transfer']) window.socket.on(ev, (d) => { window.__events.push({ ev, d }); });
+    for (const ev of ['mill_center_reveal', 'mill_center_release', 'play_pile_transfer', 'card_reveal']) window.socket.on(ev, (d) => { window.__events.push({ ev, d }); });
     const C = window.CARDS_BY_NAME;
     const helden = Object.keys(C).filter(n => C[n].cardType === 'Hero' && !/Zhigao|Quetzahuitl|Kerthwack|Boris|Codumbus|Bakhm/.test(n));
     const kre = Object.keys(C).filter(n => C[n].cardType === 'Creature' && C[n].level === 0 && C[n].subtype === 'Normal' && !/Token|Race Boat|Spearman|Super Fan|Oracle|Creepy|Slave Trader|Aggressive T/.test(n));
     const L = () => [[], [], []];
     const mk = (off, eigene) => ({
-      heroes: [0, 1, 2].map(i => ({ name: helden[off + i], hp: 500, maxHp: 500, atk: 10, baseAtk: 10, statuses: {} })),
+      heroes: [0, 1, 2].map(i => ({ name: helden[off + i], hp: 500, maxHp: 500, atk: 10, baseAtk: 10, statuses: {}, ...((eigene && extra.heldenFelder && extra.heldenFelder[i]) || {}) })),
       abilityZones: eigene ? [[extra.ab || [], [], []], L(), L()] : [L(), L(), L()],
       surpriseZones: eigene ? [[], [], []] : (extra.gegnerSurprises || [[], [], []]),
       supportZones: (eigene ? extra.eigeneZonen : extra.gegnerZonen) || [L(), L(), L()],
@@ -267,6 +268,8 @@ const spielerZustand = (page) => page.evaluate(() => { const my = window.__gs.my
         await sleep(3500);
         const nach = await spielerZustand(page);
         check('Animation `secret_room_open` vom Server (Canvas bemalt)', spur && spur.bemalt > 100 && (await page.evaluate(() => window.__anims.includes('secret_room_open'))), spur);
+        const reveals = await page.evaluate(() => window.__events.filter(e => e.ev === 'card_reveal').length);
+        check('KEIN Reveal: kein `card_reveal` und keine Kartenansicht des Gegners (der Gegner wird nicht gefragt)', reveals === 0, reveals);
         check('die Karte liegt in der Surprise Zone von Held 0 (für mich sichtbar), Create Secret Room in der Ablage', nach.eigSurprise[0] === 'Booby Trap' && nach.abl.includes('Create Secret Room'), nach);
         const log = await logZeilen(page, 'secret room|Secret Room');
         check('das Log meldet das Verstecken', log.some(t => /hid a card/.test(t)), log);
@@ -291,6 +294,29 @@ const spielerZustand = (page) => page.evaluate(() => { const my = window.__gs.my
         check('1 Karte gezogen, 2 Gold bezahlt, das Buch liegt in der Ablage', nach.hand.length === 1 && nach.hand[0] === 'Fireball' && nach.gold === vorher.gold - 2 && nach.abl.includes('Secret Spell Book'), { nach, vorher });
         const log = await logZeilen(page, 'Secret Spell Book');
         check('das Log meldet das Ziehen', log.some(t => /drew 1 card/.test(t)), log);
+        check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
+      } finally { await s.ctx.close(); }
+    }
+
+    console.log('Lauf G: Secret Spell Book — ein dauerhaft gestohlener Held kommt zurück');
+    {
+      const s = await seite(browser, AUFBAU({ deck: ['Fireball', 'Fireball'], hand: ['Secret Spell Book'], gold: 10,
+        heldenFelder: { 1: { permaControlBy: 1, permaControlFrom: 0, permaControlHeroIdx: 1 } } }));
+      try {
+        const { page } = s;
+        await oeffneLog(page);
+        const vorher = await page.evaluate(() => { const my = window.__gs.myIndex; const h = window.__gs.players[my].heroes[1]; return { name: h.name, pcb: h.permaControlBy }; });
+        check('Aufbau: der Gegner kontrolliert meinen Helden 1 (dauerhaft)', vorher.pcb === 1, vorher);
+        await page.evaluate(() => { window.__snd.length = 0; window.__anims.length = 0; });
+        await page.evaluate(() => window.socket.emit('use_artifact_effect', { roomId: window.__gs.roomId, cardName: 'Secret Spell Book', handIndex: 0 }));
+        const spur = await messen(page, 100);
+        if (outDir && spur) { await sleep(200); try { await page.screenshot({ path: path.join(outDir, 'spellbook-held.png') }); } catch { /* egal */ } }
+        await sleep(3500);
+        const nach = await page.evaluate(() => { const my = window.__gs.myIndex; const p = window.__gs.players[my]; const h = p.heroes[1]; return { pcb: h.permaControlBy, hand: p.hand.slice(), abl: p.discardPile.slice() }; });
+        check('Animation `spellbook_pages` mit dem Helden als Ziel (Canvas bemalt)', spur && spur.bemalt > 60 && (await page.evaluate(() => window.__anims.includes('spellbook_pages'))), spur);
+        check('der Held gehört wieder mir (keine Kontrollmarken), und es wurde NICHT gezogen', nach.pcb == null && nach.hand.length === 0 && nach.abl.includes('Secret Spell Book'), nach);
+        const log = await logZeilen(page, 'Secret Spell Book');
+        check('das Log meldet die Übernahme des Helden', log.some(t => /took permanent control of/.test(t) && t.includes(vorher.name)), log);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
       } finally { await s.ctx.close(); }
     }

@@ -2774,8 +2774,18 @@ function mainDeckSizeOk(main, side) {
  * des EIGENEN Decks) schicken ihre Karten NUR an den Besitzer — Gegner und Zuschauer sehen sie nicht.
  */
 function effectPromptFuer(ep, empfaengerIdx) {
-  if (!ep || ep.type !== 'cardReorder' || ep.ownerIdx === empfaengerIdx) return ep || null;
-  return { ...ep, cards: [], description: '' };
+  if (!ep || ep.ownerIdx === empfaengerIdx) return ep || null;
+  if (ep.type === 'cardReorder') return { ...ep, cards: [], description: '' };
+  // ★ 11.10. (Create Secret Room, „an keiner Stelle revealed"): eine Abfrage mit `_privat: true` zeigt ihren Inhalt (Kartengalerie, gezeigte Karte, Beschriftungen) nur ihrem
+  // Besitzer; Gegner und Zuschauer sehen eine leere Hülle (Typ und Titel genügen dem Client für „Opponent is deciding …").
+  if (ep._privat === true) {
+    const { showCard, previewCardName, cardName, ...rest } = ep;
+    return {
+      ...rest, cards: [], description: '', message: '',
+      options: Array.isArray(ep.options) ? ep.options.map(o => ({ id: o.id, label: '…' })) : ep.options,
+    };
+  }
+  return ep;
 }
 
 function campaignDeckLegal(deck) {
@@ -16164,6 +16174,16 @@ io.on('connection', (socket) => {
         if (typeof h._shapeshiftBase === 'string' && h._shapeshiftBase) {
           out._shapeshiftBase = h._shapeshiftBase;
         }
+        // Dauerhaft uebernommener Held (Paraseed Control, Love Shot ...):
+        // der Slot bleibt in der Spalte des urspruenglichen Besitzers, der
+        // Kontrolleur steht in `permaControlBy`. Ohne diese Zeilen liesse
+        // sich nicht aufsetzen, dass ein Held bereits gestohlen ist (etwa
+        // fuer Secret Spell Book, das ihn zurueckholt).
+        if (typeof h.permaControlBy === 'number') {
+          out.permaControlBy = h.permaControlBy;
+          out.permaControlFrom = typeof h.permaControlFrom === 'number' ? h.permaControlFrom : (h.permaControlBy === 0 ? 1 : 0);
+          if (typeof h.permaControlHeroIdx === 'number') out.permaControlHeroIdx = h.permaControlHeroIdx;
+        }
         return out;
       });
       while (heroes.length < 3) heroes.push({ name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} });
@@ -21638,4 +21658,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer } };
