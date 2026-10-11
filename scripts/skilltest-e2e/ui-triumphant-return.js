@@ -16,7 +16,7 @@ const toolsDir = (process.env.NODE_PATH || '').split(path.delimiter).find(d => f
 const outDir = process.argv[2];
 const TR = 'Triumphant Return';
 
-async function spiele(browser, { mitZauber, name }) {
+async function spiele(browser, { mitZauber, name, beato }) {
   const acc = await createAccount('UiTr' + Date.now().toString(36) + Math.floor(Math.random() * 1e4));
   const ctx = await browser.newContext({ viewport: { width: 1652, height: 800 } });
   try {
@@ -52,23 +52,23 @@ async function spiele(browser, { mitZauber, name }) {
       }
       return out;
     });
-    await page.evaluate(({ TR, mitZauber }) => {
+    await page.evaluate(({ TR, mitZauber, beato }) => {
       window.__gs = null; window.socket.on('game_state', (g) => { window.__gs = g; });
       const C = window.CARDS_BY_NAME;
       const helden = Object.keys(C).filter(n => C[n].cardType === 'Hero' && !/Zhigao|Quetzahuitl|Kerthwack|Boris/.test(n));
       const kre = Object.keys(C).filter(n => C[n].cardType === 'Creature' && C[n].level === 0 && C[n].subtype === 'Normal').slice(0, 12);
       const leer = () => [[], [], []];
       const seite = (off, eigene) => ({
-        heroes: [0, 1, 2].map(i => ({ name: helden[off + i], hp: (eigene && i === 1) ? 0 : 500, maxHp: 500, atk: 10, baseAtk: 10, statuses: {} })),
-        abilityZones: eigene ? [[['Magic Arts'], [], []], [['Destruction Magic'], [], []], leer()] : [leer(), leer(), leer()],
+        heroes: [0, 1, 2].map(i => ({ name: (beato && eigene && i === 1) ? 'Beato, the Eternal Butterfly' : helden[off + i], hp: (eigene && i === 1) ? 0 : 500, maxHp: 500, atk: 10, baseAtk: 10, statuses: {} })),
+        abilityZones: eigene ? [[['Magic Arts'], [], []], beato ? leer() : [['Destruction Magic'], [], []], leer()] : [leer(), leer(), leer()],
         surpriseZones: [[], [], []], supportZones: [leer(), leer(), leer()],
         mainDeck: kre.slice(), potionDeck: [], sideDeck: [], discardPile: [], deletedPile: [], gold: 99, islandZoneCount: [0, 0, 0], permanents: [],
       });
       window.socket.emit('start_puzzle', {
         players: [seite(0, true), seite(3, false)], areaZones: [[], []], doomCounters: [0, 0],
-        hand: mitZauber ? ['Golden Ankh', TR, 'Burning Finger'] : ['Golden Ankh', TR], oppHand: [], playerDebuffs: [[], []],
+        hand: mitZauber ? ['Golden Ankh', TR, ...(beato ? ['Flame Avalanche'] : []), 'Burning Finger'] : ['Golden Ankh', TR], oppHand: [], playerDebuffs: [[], []],
       });
-    }, { TR, mitZauber });
+    }, { TR, mitZauber, beato });
     await page.waitForSelector('.board-center', { timeout: 30000 });
     await sleep(2500);
     const my = await page.evaluate(() => window.__gs.myIndex);
@@ -129,7 +129,14 @@ async function spiele(browser, { mitZauber, name }) {
     r.heldNamen = await page.evaluate((my) => window.__gs.players[my].heroes.map(h => h.name), my);
     if (outDir && aktion) { try { await page.screenshot({ path: path.join(outDir, 'triumphant-return-' + name + '-aktion.png') }); } catch { /* egal */ } }
     r.klaenge = await page.evaluate(() => window.__snd.slice());
-    if (aktion) await page.evaluate(([id]) => window.socket.emit('effect_prompt_response', { roomId: window.__gs.roomId, response: { cancelled: true }, promptId: id }), [aktion.id]);
+    r.gegnerHpVorher = await page.evaluate((my) => window.__gs.players[1 - my].heroes.map(h => h.hp), my);
+    if (aktion && beato) {
+      // Beato wirkt Flame Avalanche aus dem Aktionsfenster
+      const idx = await page.evaluate(() => window.__gs.players[window.__gs.myIndex].hand.indexOf('Flame Avalanche'));
+      await page.evaluate(([id, idx]) => window.socket.emit('effect_prompt_response', { roomId: window.__gs.roomId, response: { cardName: 'Flame Avalanche', handIndex: idx, fromCreation: false, heroIdx: 1 }, promptId: id }), [aktion.id, idx]);
+      await sleep(3500);
+      r.gegnerHpDanach = await page.evaluate((my) => window.__gs.players[1 - my].heroes.map(h => h.hp), my);
+    } else if (aktion) await page.evaluate(([id]) => window.socket.emit('effect_prompt_response', { roomId: window.__gs.roomId, response: { cancelled: true }, promptId: id }), [aktion.id]);
     await sleep(1800);
     r.hpDanach = await page.evaluate((my) => window.__gs.players[my].heroes.map(h => h.hp), my);
     r.hand = await page.evaluate((my) => window.__gs.players[my].hand, my);
@@ -164,6 +171,14 @@ const hat = (klaenge, dauer) => klaenge.some(k => Math.abs(k.dur - dauer) < 0.00
     check('es öffnet sich KEIN Aktionsfenster (keine legitime Aktion), die Bonus-Aktion verfällt', b.aktion === null, b.aktion);
     check('die Karte ist verbraucht, das Log meldet den Verfall', b.ablage.includes(TR) && b.log.some(t => /lapses/.test(t)), { abl: b.ablage, log: b.log });
     check('keine JS-Fehler im Browser', b.fehler.length === 0, b.fehler);
+
+    console.log('Lauf C: Beato, the Eternal Butterfly kommt TOT ins Spiel — jeden Zauber, auch Flame Avalanche');
+    const c = await spiele(browser, { mitZauber: true, name: 'C', beato: true });
+    check('Triumphant Return wird für Beato angeboten', !!c.angebot && /Beato, the Eternal Butterfly was revived/.test(c.angebot.msg), c.angebot);
+    check('SOFORT öffnet sich das Aktionsfenster für Beato (Held 1) — nicht stillschweigend verfallen', !!c.aktion && c.aktion.heroIdx === 1 && c.aktion.heroName === 'Beato, the Eternal Butterfly', c.aktion);
+    check('…und es bietet Flame Avalanche (Lv3) UND Burning Finger an: sie kann „any Spell … regardless of level or school"', !!c.aktion && c.aktion.karten.includes('Flame Avalanche') && c.aktion.karten.includes('Burning Finger'), c.aktion);
+    check('Beato wirkt Flame Avalanche aus dem Aktionsfenster: alle Ziele des Gegners verlieren 150 HP, die Karte liegt in der Ablage', !!c.gegnerHpDanach && c.gegnerHpVorher.every((h, i) => h - c.gegnerHpDanach[i] === 150) && c.ablage.includes('Flame Avalanche') && !c.hand.includes('Flame Avalanche'), { vor: c.gegnerHpVorher, nach: c.gegnerHpDanach, abl: c.ablage });
+    check('keine JS-Fehler im Browser', c.fehler.length === 0, c.fehler);
   } finally { await browser.close(); srv.child.kill(); }
   finish();
 })().catch(e => { console.error(e); process.exit(1); });
