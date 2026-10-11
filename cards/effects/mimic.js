@@ -26,7 +26,7 @@
 //  Nur wenn wirklich etwas zu holen ist, schnappt die Mimic: `play_zone_animation` `mimic_chomp` (Pixelart, Brett-Animation mit der
 //  Mimic als Ursprung UND Ziel, Hülle `ppSalve`; Vorlage: das Kartenbild, die Truhe mit dem Zahnrachen): Kiefer klappen zweimal zu, beim
 //  zweiten Zuschnappen (~560 ms) springen Münzen aus dem Maul; im selben Moment fliegt der Münzstrom (`gold_steal_burst`) vom Gegner zu
-//  dir. Klänge: `ZONE_ANIM_SFX.mimic_chomp` (zwei Bisse), die Münzen klingen über das Log (`gold_steal`).
+//  dir. Klänge: `ZONE_ANIM_SFX.mimic_chomp` (zwei Bisse); der Münzstrom klingt im Client über `ev_gold_steal_burst` (zwei Münzklänge, Abheben und Landung — für jeden Goldraub).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Mimic';

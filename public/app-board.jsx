@@ -25351,8 +25351,8 @@ const ANIM_REGISTRY = {
   //  Sky Archeologist: Grabung — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Archäologe
   //  mit der Spitzhacke auf der schwebenden Insel)
   //
-  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Archäologen als Ursprung UND Ziel (`selbst`): eine Spitzhacke (Holzstiel,
-  //  Eisenkopf mit zwei Spitzen) wird über die Schulter geschwungen und schlägt zweimal vorn unten zu; jeder Einschlag wirft Steinsplitter und
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`): eine Spitzhacke (Holzstiel,
+  //  GERADER Eisenkopf quer zum Stiel, an beiden Enden zur Spitze verjüngt) wird über die Schulter geschwungen und schlägt zweimal vorn unten zu; jeder Einschlag wirft Steinsplitter und
   //  Staub auf. Beim zweiten Schlag (~600 ms; sky-archeologist.js: DIG_MS 800 — Einbau-Versatz 100 ms eingerechnet) blitzt im Loch ein Fund auf:
   //  vierstrahliger Stern, dazu steigt eine kleine Karte aus dem Boden. Ab ~900 ms blendet alles über Dithering aus, bei 1200 ms ist es weg.
   //  Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
@@ -25397,16 +25397,17 @@ const ANIM_REGISTRY = {
         g.put(x + 1, y, HOLZ[s % 4 === 2 ? 0 : 1], a);
         g.put(x + 1, y + 1, HOLZ[2], a * 0.9);
       }
-      // ── Kopf: Eisenbogen quer zum Stiel (zwei Pixel dick), beide Spitzen zeigen in Schlagrichtung ──
+      // ── Kopf: GERADE Eisenstange quer zum Stiel (Als Befund 10.10.: nicht „halbmondförmig, sondern gerade"), in der Mitte vier Pixel dick und zu beiden Seiten zu
+      //    Spitzen verjüngt; Vorderkante hell, Rückseite dunkel ──
       const KX = PX + Math.cos(th) * LH, KY = PY + Math.sin(th) * LH;
       const nx = -Math.sin(th), ny = Math.cos(th), dx = Math.cos(th), dy = Math.sin(th);
-      for (let u = -8; u <= 8; u++) {
-        const kr = Math.pow(Math.abs(u) / 8, 1.7) * 4;                                      // Spitzen biegen nach vorn
-        const x = KX + nx * u + dx * kr, y = KY + ny * u + dy * kr;
-        const col = Math.abs(u) > 5 ? EISEN[0] : (u < 0 ? EISEN[1] : EISEN[2]);
-        g.put(x, y, col, a);
-        g.put(x - dx, y - dy, EISEN[Math.abs(u) > 5 ? 1 : 3], a);
-        g.put(x - 2 * dx, y - 2 * dy, EISEN[3], a * (Math.abs(u) < 4 ? 1 : 0.6));
+      for (let u = -10; u <= 10; u++) {
+        const dicke = Math.max(1, Math.round(4 - 3 * Math.abs(u) / 10));                    // 4 in der Mitte → 1 an den Spitzen
+        for (let k = 0; k < dicke; k++) {
+          const off = k - (dicke - 1) / 2;                                                  // symmetrisch um die Achse des Kopfes, KEINE Krümmung
+          const col = k === dicke - 1 ? (Math.abs(u) > 6 ? EISEN[1] : EISEN[0]) : (k === 0 ? EISEN[3] : (u < 0 ? EISEN[1] : EISEN[2]));
+          g.put(KX + nx * u + dx * off, KY + ny * u + dy * off, col, a * (dicke === 1 && Math.abs(u) === 10 ? 0.85 : 1));
+        }
       }
       g.block(KX - 1, KY - 1, 3, 3, EISEN[4], a); g.put(KX, KY, EISEN[2], a);
       // ── Einschläge: Splitter und Staub ──
@@ -38884,6 +38885,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!fromEl || !toEl) return;
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
+      // ★ 10.10.: der Muenzflug klingt (zwei Muenzklaenge: Abheben und Landung); der Log-Klang des Diebstahls schweigt danach kurz (`_goldStealSfxAt`).
+      window._goldStealSfxAt = performance.now();
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim('ev_gold_steal_burst');
       // Flash both counters with gold_sparkle for a quick pop.
       setTimeout(() => playAnimation('gold_sparkle', fromSel, { duration: 900 }), 50);
       setTimeout(() => playAnimation('gold_sparkle', toSel,   { duration: 900 }), 180);
@@ -46562,7 +46566,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (t === 'sky_archeologist') {
         const p = playerByName(entry.player);
-        return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for 0 Gold!' : ' and plays it right away for 0 Gold!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : entry.placed === 'top' ? ' and keeps it on top of the deck.' : ' — it goes back on top of the deck.'}</span>;
+        return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for 0 Gold!' : ' and plays it right away for 0 Gold!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : ' and keeps it on top of the deck.'}</span>;
       }
       if (t === 'front_soldier') {
         const p = playerByName(entry.player);
