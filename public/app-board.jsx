@@ -25231,6 +25231,109 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Sky Shaman: Federn-Beschwörung — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der
+  //  Schamane mit dem Federschmuck in Rot, Weiß und Türkis vor dem blauen Himmel)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Schamanen als Ursprung UND Ziel (`selbst`): am Fuß der Karte pulsiert ein
+  //  Runenring aus gestrichelten Punkten (türkis/golden, dreht sich), aus dem Ring steigen Federn (rot am Kiel, weiß an der Spitze, einzelne
+  //  türkis) in einer Spirale um die Karte auf; ab ~600 ms schießt ein heller Lichtstrahl in den Himmel, bei ~780 ms (sky-shaman.js: CHANT_MS —
+  //  Einbau-Versatz 100 ms eingerechnet) verglühen die Federn in Funken. Ab ~950 ms blendet alles über Dithering aus, bei 1300 ms ist es
+  //  weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
+  // ═════════════════════════════════════════════════════════════════
+  sky_shaman_chant: (() => {
+    const FED_ROT = ['#8f1a1a', '#c8302a', '#e8553d'].map(ppHex);
+    const WEISS = ['#ffffff', '#e9e1cf', '#bdb29a'].map(ppHex);
+    const TUERKIS = ['#d8fff9', '#33d1c4', '#1f9e96', '#146e69'].map(ppHex);
+    const GOLD = ['#fff6b8', '#ffd94a', '#e8a33a'].map(ppHex);
+    const ENDE = 1300, FADE_AB = 950, STRAHL_AB = 600, FUNKEN_AB = 780;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => {
+      const z = sz.ziele[0];
+      return {
+        federn: Array.from({ length: ppFxN(20) }, (_, i) => ({
+          w0: (i / 20) * Math.PI * 2 + Math.random() * 0.3, ab: Math.random() * 380, leben: 620 + Math.random() * 220,
+          farbe: Math.random() < 0.25 ? 3 : Math.random() < 0.5 ? 1 : 0, laenge: 7 + Math.floor(Math.random() * 4), dreh: Math.random() < 0.5 ? -1 : 1,
+        })),
+        funken: Array.from({ length: ppFxN(18) }, () => ({
+          sx: (Math.random() - 0.5) * z.w * 0.9, sy: -Math.random() * z.h * 0.8, vx: (Math.random() - 0.5) * 36, vy: -(14 + Math.random() * 40),
+          ab: FUNKEN_AB + Math.random() * 120, leben: 280 + Math.random() * 200, farbe: Math.floor(Math.random() * 3),
+        })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const ein = klemme(t / 120, 0, 1);
+      const a = Math.min(aus, ein);
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      const BY = CY + HH - 3, OB = CY - HH;
+      const RX = HW * 0.95, RY = Math.max(3, HH * 0.16);
+      // ── Runenring am Fuss: gestrichelt, dreht sich, pulsiert ──
+      const puls = 0.6 + 0.4 * Math.sin(t * 0.012);
+      const n = 64;
+      for (let k = 0; k < n; k++) {
+        const w = (k / n) * Math.PI * 2 + t * 0.004;
+        if (k % 4 === 3) continue;                                   // Luecken: Runenstriche statt Vollring
+        const x = CX + Math.cos(w) * RX, y = BY + Math.sin(w) * RY;
+        const hinten = Math.sin(w) < 0;                               // hinterer Bogen dunkler
+        const col = hinten ? TUERKIS[2] : (k % 2 ? TUERKIS[1] : GOLD[1]);
+        g.put(x, y, col, a * (hinten ? 0.8 : 1));
+        g.put(x, y + 1, hinten ? TUERKIS[3] : TUERKIS[2], a * (hinten ? 0.7 : puls));
+        if (!hinten && k % 4 === 0) { g.put(x, y - 1, TUERKIS[0], a * puls); g.put(x, y - 2, GOLD[0], a * puls * 0.8); }   // Runenzacken
+      }
+      // ── Lichtstrahl in den Himmel ──
+      if (t > STRAHL_AB) {
+        const k = klemme((t - STRAHL_AB) / 180, 0, 1), hoehe = Math.round((HH * 2 + 18) * k);
+        for (let j = 0; j < hoehe; j++) {
+          const Y = BY - j, rel = j / Math.max(1, hoehe), br = 1 + Math.round(2 * (1 - rel));      // oben schmaler
+          for (let i = -br; i <= br; i++) {
+            const kern = Math.abs(i) <= (br > 1 ? 1 : 0);
+            g.put(CX + i, Y, kern ? WEISS[0] : TUERKIS[i % 2 ? 0 : 1], a * (kern ? 1 - rel * 0.4 : (1 - rel) * 0.75));
+          }
+        }
+      }
+      // ── Federn in der Spirale ──
+      for (const f of teile.federn) {
+        const al = t - f.ab;
+        if (al < 0 || al > f.leben) continue;
+        const k = al / f.leben;
+        const w = f.w0 + f.dreh * k * 3.4;
+        const r = RX * (1 - k * 0.55);
+        const px = CX + Math.cos(w) * r, py = BY - k * (BY - OB + 8) + Math.sin(w) * RY * (1 - k);
+        const hinten = Math.sin(w) < 0;
+        const fa = a * (k > 0.8 ? (1 - k) / 0.2 : 1) * (hinten ? 0.75 : 1);
+        const kippe = Math.cos(w) > 0 ? 1 : -1;                       // Neigung folgt der Drehrichtung
+        const LN = f.laenge;
+        for (let j = 0; j < LN; j++) {
+          const rel = j / Math.max(1, LN - 1);
+          const sx = px + kippe * Math.round(j * 0.3), sy = py - j;
+          const schaft = f.farbe === 3 ? TUERKIS[rel < 0.5 ? 2 : 1] : f.farbe === 1 ? (rel < 0.4 ? FED_ROT[1] : WEISS[0]) : (rel < 0.4 ? FED_ROT[0] : WEISS[1]);
+          g.put(sx, sy, schaft, fa);
+          // Fahne: beidseitig, im mittleren Teil am breitesten, zur Spitze spitz
+          if (j >= 1 && j < LN - 1) {
+            const breit = (j < LN * 0.6) ? 1 : 0;
+            const fahne = f.farbe === 3 ? TUERKIS[(j % 2) ? 1 : 0] : f.farbe === 1 ? WEISS[(j % 2) ? 0 : 1] : (rel < 0.45 ? FED_ROT[(j % 2) ? 2 : 1] : WEISS[(j % 2) ? 1 : 0]);
+            g.put(sx - 1, sy, fahne, fa * 0.95);
+            if (breit) g.put(sx + 1, sy, fahne, fa * 0.95);
+            else g.put(sx + 1, sy + 1, fahne, fa * 0.7);
+          }
+        }
+        g.put(px, py + 1, FED_ROT[0], fa);                              // Kiel
+      }
+      // ── Funken: die Federn verglühen ──
+      for (const s of teile.funken) {
+        const al = t - s.ab;
+        if (al < 0 || al > s.leben) continue;
+        const k = al / s.leben, sek = al / 1000;
+        const px = CX + s.sx + s.vx * sek, py = BY + s.sy + s.vy * sek;
+        g.put(px, py, s.farbe === 0 ? GOLD[0] : s.farbe === 1 ? TUERKIS[0] : GOLD[1], (1 - k) * a);
+        if (k < 0.5) { g.put(px - 1, py, WEISS[0], (1 - k * 2) * a); g.put(px + 1, py, WEISS[0], (1 - k * 2) * a); g.put(px, py - 1, WEISS[0], (1 - k * 2) * a); }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
   //  Zahnrachen)
   //
@@ -46120,6 +46223,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'the_melting') {
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('The Melting')} — {pName(p.name, p.color)}'s flame thaws <span className="log-amount">{entry.healed}</span> Frozen target{entry.healed !== 1 ? 's' : ''}{entry.endedTurn ? ' and ends the opponent\'s turn on the spot!' : entry.blocked ? ' — but the opponent\'s turn cannot be ended.' : '.'}</span>;
+      }
+      if (t === 'sky_shaman') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🪶 {cName('Sky Shaman')} — {pName(p.name, p.color)} sends {cName(entry.card)} from the deck to the discard pile.</span>;
       }
       if (t === 'frost_breaker') {
         const p = playerByName(entry.player);
