@@ -9571,6 +9571,8 @@ class GameEngine {
       delete target.diedOnTurn;
       delete target._koProcessed;
       this.sync();
+      // ★ v1491: auch ein Extra Life ist eine Wiederbelebung (Hand-Fenster Triumphant Return).
+      await this._checkHeroRevivedHandReactions(target, ownerIdx, 'Extra Life');
       return true;
     }
 
@@ -10276,6 +10278,8 @@ class GameEngine {
     await this._delay(Math.max(0, (opts.animDelay != null ? opts.animDelay : 1200) - vorlauf));
 
     await this.runHooks(HOOKS.ON_HERO_REVIVE, { playerIdx, heroIdx, hero, hp: reviveHp, source: opts.source });
+    // ★ v1491: Hand-Fenster „ein Held, den du kontrollierst, wurde wiederbelebt" (Triumphant Return) — nach den Wiederbelebungs-Haken.
+    await this._checkHeroRevivedHandReactions(hero, playerIdx, opts.source);
     return true;
   }
 
@@ -12956,6 +12960,88 @@ class GameEngine {
       }
     } finally {
       this._inHeroDefeatWindow = false;
+    }
+  }
+
+  /**
+   * ★ v1491 — HAND-FENSTER „ein Held, den du kontrollierst, wurde wiederbelebt" (Triumphant Return).
+   *
+   * Karten-Vertrag:
+   *   isHeroRevivedReaction: true,
+   *   heroRevivedCondition(gs, pi, engine, info) → bool,
+   *   async heroRevivedResolve(engine, pi, info, { casterIdx, casterSeite }),
+   *   optional: reactionCasterAllowed(gs, pi, heroIdx, engine, info, seite)   // z. B. „except the user"
+   * `info` = { hero, heroIdx, heroOwner, controller, source, reactorIdx }.
+   *
+   * Alle echten Wiederbelebungen laufen hier durch: `actionReviveHero` (Golden Ankh, Hymn, Cheat Chair …) nach den
+   * Wiederbelebungs-Haken, und das Extra Life (Trial of Coolness, Cecilia) im Besiegen-Ablauf. Nur der KONTROLLEUR des
+   * Helden bekommt das Angebot (Kontrolle statt Seite). Wirker, Kosten, Flug und Auftritt: `_rxHandkarteEinsetzen`. Das
+   * Fenster ist wiederholbar (eine Wiederbelebung INNERHALB der Aufloesung darf ein zweites Angebot ausloesen), aber auf
+   * vier Ebenen gedeckelt.
+   */
+  async _checkHeroRevivedHandReactions(hero, heroOwner, source) {
+    if (this.gs.result || !hero || !(hero.hp > 0)) return;
+    if ((this._heroRevivedWindowDepth || 0) >= 4) return;
+    const hps = this.gs.players[heroOwner];
+    const heroIdx = (hps?.heroes || []).indexOf(hero);
+    if (heroIdx < 0) return;
+    const pi = this.heroSideOf(heroOwner, hero);
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    if (this.darkOceanBlocksReaction(pi, null)) return;
+    const allCards = this._getCardDB();
+    const info = { hero, heroIdx, heroOwner, controller: pi, source: source || null, reactorIdx: pi };
+
+    this._heroRevivedWindowDepth = (this._heroRevivedWindowDepth || 0) + 1;
+    try {
+      const abgelehnt = new Set();
+      for (let runde = 0; runde < 8; runde++) {
+        if (this.gs.result || !(hero.hp > 0)) return;
+        let gespielt = false;
+        for (const cardName of [...new Set(ps.hand || [])]) {
+          if (abgelehnt.has(cardName)) continue;
+          if (this._handPlayLockedFor(ps, cardName)) continue;
+          const script = loadCardEffect(cardName);
+          if (!script?.isHeroRevivedReaction) continue;
+          this._noteRxWindow(ps, cardName, 'seen');
+          if (script.heroRevivedCondition
+              && !script.heroRevivedCondition(this.gs, pi, this, info)) continue;
+          const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
+          if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
+          const cost = allCards[cardName]?.cost || 0;
+          if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+          const confirmed = await this.promptGeneric(pi, {
+            type: 'confirm',
+            title: cardName,
+            _handReactionWindow: true,
+            message: `${hero.name} was revived! Activate ${cardName}?`,
+            showCard: cardName,
+            showCardLeft: hero.name,
+            confirmLabel: '✨ Activate!',
+            cancelLabel: 'No',
+            cancellable: true,
+          });
+          if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
+          if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
+          if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) { abgelehnt.add(cardName); continue; }
+          this.log('hero_revived_window_reaction', { card: cardName, player: ps.username, target: hero.name });
+          try {
+            if (script.heroRevivedResolve) {
+              await script.heroRevivedResolve(this, pi, info,
+                { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
+            }
+          } catch (err) {
+            console.error(`[HeroRevivedWindow] ${cardName} threw:`, err.message);
+          }
+          await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
+          this.sync();
+          gespielt = true;
+          break;
+        }
+        if (!gespielt) break;
+      }
+    } finally {
+      this._heroRevivedWindowDepth = Math.max(0, (this._heroRevivedWindowDepth || 1) - 1);
     }
   }
 
