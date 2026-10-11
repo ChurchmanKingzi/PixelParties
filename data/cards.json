@@ -20459,7 +20459,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "You may once per turn reveal the top card of your deck. If it is a Creature, immediately summon it as an additional Action with any of your Heroes, if possible. Otherwise, put it on top or bottom of your deck (your choice).",
+    "effect": "You may discard a level 3 Creature from your hand to summon this Creature as an additional Action. You may once per turn reveal the top card of your deck. If it is a Creature, immediately summon it as an additional Action with any of your Heroes, if possible. Otherwise, put it on top or bottom of your deck (your choice).",
     "archetype": "",
     "setID": "PP MOE",
     "banned": "",

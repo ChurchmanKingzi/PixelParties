@@ -16,6 +16,8 @@
  * und prueft, ob das zugehoerige Skript den Kanal bedient:
  *   • `costFor:` am Prompt (selbst gesetzt), ODER
  *   • `harpyformerDiscardCost(…)` (setzt es fuer die Familie), ODER
+ *   • `makeDiscardCostSummon(…)` (`_extra-summon-shared.js`: „discard X to summon this Creature as an additional Action" —
+ *     der Baustein setzt `costFor` selbst), ODER
  *   • die ausdrueckliche Abmeldung `COST-DISCARD-CHANNEL: n/a`
  *     samt Begruendung im Skript — fuer Faelle, in denen der Abwurf
  *     KEINE frei gewaehlte Kosten ist (erzwungener Abwurf, Abwurf als
@@ -50,6 +52,7 @@ for (const c of karten) {
   const quelle = fs.readFileSync(datei, 'utf8');
   if (/costFor\s*:/.test(quelle)) continue;
   if (/harpyformerDiscardCost\s*\(/.test(quelle)) continue;
+  if (/makeDiscardCostSummon\s*\(/.test(quelle)) continue;      // Bausteine setzen `costFor` selbst (_extra-summon-shared.js)
   if (/COST-DISCARD-CHANNEL:\s*n\/a/.test(quelle)) continue;
   treffer.push(c.name);
 }
