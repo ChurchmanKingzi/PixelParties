@@ -18,6 +18,14 @@
 //    aktiv → AFK nach der Erstellung lässt sie verfallen.
 //  • Blockieren: beide Seiten können einander weder schreiben noch
 //    herausfordern; in der Liste erscheinen sie weiterhin.
+//  • Raum-Einladungen: der Besitzer eines noch offenen Raums (Lobby) lädt
+//    einen Online-Spieler gezielt ein (`room_invite_send`). Die Einladung
+//    liegt nur im Speicher, gilt für genau diesen Raum und ersetzt beim
+//    Beitritt das Raum-Passwort (`hasRoomInvite` / `consumeRoomInvite`).
+//    Welche Räume einladbar sind, entscheidet server.js (`roomInviteInfo`).
+//    Wer eine Einladung ablehnt, wird für DIESEN Raum nicht noch einmal eingeladen.
+//    Der Client zeigt Einladungen nur im Hauptmenü und hebt sie sonst auf; vor dem
+//    Anzeigen fragt er mit `room_invite_check` nach, ob sie noch gilt.
 //
 //  Spielstart bei „Accept“ gehört dem Server (server.js) und wird als
 //  `startChallengeGame` hereingereicht.
@@ -31,14 +39,22 @@ const MAX_TEXT = 500;
 const HISTORY_LIMIT = 200;
 const RATE_WINDOW_MS = 10 * 1000;
 const RATE_MAX = 8;
+const INVITE_TTL_MS = 15 * 60 * 1000;   // so lange gilt eine Raum-Einladung (und ihr Passwort-Ersatz)
+const INVITE_RATE_MAX = 10;             // Einladungen je Absender und RATE_WINDOW_MS
 
-function createSocial({ db, io, uuidv4, isInGame, startChallengeGame }) {
+function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInviteInfo, isBusyInRoom }) {
   /** userId -> { id, username, color, online, afk, sockets: Map(socketId -> { lastActive }), offlineTimer } */
   const presence = new Map();
   /** socketId -> userId */
   const socketUser = new Map();
   /** userId -> Zeitstempel der letzten Nachrichten (Ratenbegrenzung) */
   const rate = new Map();
+  /** `<empfaengerId>:<raumId>` -> { id, roomId, from, to, at } — offene Raum-Einladungen (nur im Speicher) */
+  const invites = new Map();
+  /** userId -> Zeitstempel der letzten Einladungen (Ratenbegrenzung) */
+  const inviteRate = new Map();
+  /** `<empfaengerId>:<raumId>` -> Zeitstempel — dieser Spieler hat die Einladung in diesen Raum abgelehnt */
+  const inviteDeclined = new Map();
   let lastBroadcast = '';
   let broadcastTimer = null;
 
@@ -177,6 +193,8 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame }) {
     return rows.length;
   }
 
+  const roomExists = (roomId) => !!(roomInviteInfo && roomInviteInfo(roomId));
+
   // ── Anwesenheit ───────────────────────────────────────────────────
   function computeAfk(u, now) {
     for (const s of u.sockets.values()) if (now - s.lastActive < AFK_MS) return false;
@@ -195,6 +213,9 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame }) {
         expireChallengesFor(u.id);
       } else if (!afk && u.afk) { u.afk = false; dirty = true; }
     }
+    for (const [k, inv] of invites) if (now - inv.at > INVITE_TTL_MS || !roomExists(inv.roomId)) invites.delete(k);
+    // Ablehnungen gelten, solange der Raum existiert.
+    for (const k of inviteDeclined.keys()) if (!roomExists(k.slice(k.indexOf(':') + 1))) inviteDeclined.delete(k);
     // Ob jemand in eine Partie gekommen / aus ihr heraus ist, steht nur im Vergleich der Liste.
     broadcastPresence(false);
     return dirty;
@@ -401,6 +422,65 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame }) {
       }
     });
 
+    // Raum-Einladung: nur der Besitzer eines noch offenen, nicht vollen Raums, nur an Online-Spieler.
+    socket.on('room_invite_send', async (data, ack) => {
+      const uid = me(); if (!uid) return reply(ack, { error: 'Not signed in.' });
+      try {
+        const info = roomInviteInfo ? roomInviteInfo(String(data?.roomId || '')) : null;
+        if (!info) return reply(ack, { error: 'Room not found.' });
+        if (info.hostId !== uid) return reply(ack, { error: 'Only the room owner can invite players.' });
+        if (!info.open) return reply(ack, { error: 'This room is no longer open for invitations.' });
+        if (info.full) return reply(ack, { error: 'The room is full.' });
+        const peer = await loadPeer(String(data?.to || ''));
+        if (!peer || peer.id === uid) return reply(ack, { error: 'Player not found.' });
+        if (await isBlockedEitherWay(uid, peer.id)) return reply(ack, { error: "You can't invite this player." });
+        const pu = presence.get(peer.id);
+        if (!pu || !pu.online) return reply(ack, { error: peer.username + ' is offline.' });
+        if (info.memberIds.includes(peer.id)) return reply(ack, { error: peer.username + ' is already in this room.' });
+        if (inviteDeclined.has(peer.id + ':' + String(data.roomId))) return reply(ack, { error: peer.username + ' declined an invitation to this room.' });
+        const busy = (isInGame && isInGame(peer.id)) ? 'in a game' : (isBusyInRoom ? isBusyInRoom(peer.id) : null);
+        if (busy) return reply(ack, { error: peer.username + ' is ' + (typeof busy === 'string' ? busy : 'busy') + '.' });
+        const now = Date.now();
+        const hist = (inviteRate.get(uid) || []).filter(t => now - t < RATE_WINDOW_MS);
+        if (hist.length >= INVITE_RATE_MAX) return reply(ack, { error: 'Slow down a little.' });
+        hist.push(now); inviteRate.set(uid, hist);
+        const inv = { id: uuidv4(), roomId: String(data.roomId), from: uid, to: peer.id, at: now };
+        invites.set(peer.id + ':' + inv.roomId, inv);   // je Spieler und Raum nur eine: die neue ersetzt die alte
+        const me_ = presence.get(uid);
+        emitToUser(peer.id, 'room_invite', {
+          id: inv.id, roomId: inv.roomId, kind: info.kind, label: info.label, type: info.type, at: now,
+          from: { id: uid, name: (me_ && me_.username) || '?', color: (me_ && me_.color) || '#00f0ff' },
+        });
+        reply(ack, { ok: true });
+      } catch (err) {
+        console.error('[social] room_invite_send:', err.message);
+        reply(ack, { error: 'Could not send the invitation.' });
+      }
+    });
+
+    // Abgelehnt: die Einladung verschwindet, und derselbe Raum kann diesen Spieler nicht noch einmal einladen.
+    socket.on('room_invite_decline', (data) => {
+      const uid = me(); if (!uid) return;
+      for (const [k, inv] of invites) {
+        if (inv.to !== uid || inv.id !== String(data?.id || '')) continue;
+        invites.delete(k);
+        inviteDeclined.set(k, Date.now());
+      }
+    });
+
+    // Gilt eine (beim Empfänger aufgehobene) Einladung noch? Raum da, noch Lobby, nicht voll, Einladung nicht verfallen.
+    socket.on('room_invite_check', (data, ack) => {
+      const uid = me(); if (!uid) return reply(ack, { ok: false });
+      for (const [k, inv] of invites) {
+        if (inv.to !== uid || inv.id !== String(data?.id || '')) continue;
+        const info = roomInviteInfo ? roomInviteInfo(inv.roomId) : null;
+        const alive = !!info && info.open && !info.full && !info.memberIds.includes(uid) && Date.now() - inv.at <= INVITE_TTL_MS;
+        if (!alive) invites.delete(k);
+        return reply(ack, { ok: alive });
+      }
+      reply(ack, { ok: false });
+    });
+
     socket.on('block_set', async (data, ack) => {
       const uid = me(); if (!uid) return reply(ack, { error: 'Not signed in.' });
       try {
@@ -423,7 +503,18 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame }) {
     socket.on('disconnect', () => detach(socket.id));
   }
 
-  return { init, onConnection, onAuth, refreshIdentity, bestSocketOf, statusOf: (id) => statusOf(presence.get(id)), _sweep: sweep };
+  /** Hat `userId` eine gültige Einladung für diesen Raum? (ersetzt das Spieler-Passwort beim Beitritt) */
+  function hasRoomInvite(userId, roomId) {
+    const inv = invites.get(userId + ':' + roomId);
+    return !!inv && Date.now() - inv.at <= INVITE_TTL_MS;
+  }
+  /** Einladung verbrauchen (nach dem Beitritt). */
+  function consumeRoomInvite(userId, roomId) { invites.delete(userId + ':' + roomId); }
+
+  return {
+    init, onConnection, onAuth, refreshIdentity, bestSocketOf, statusOf: (id) => statusOf(presence.get(id)),
+    hasRoomInvite, consumeRoomInvite, _sweep: sweep,
+  };
 }
 
 module.exports = { createSocial, AFK_MS };

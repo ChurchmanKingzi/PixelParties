@@ -8,6 +8,15 @@
 //                                    im laufenden Duell.
 //    • <WhosOnlineList />            Liste im Hauptmenü (Tab neben „Top Players“)
 //    • <DmChatWindow />              privates Chatfenster mit Challenge-Buttons
+//    • <SocialSidePanel room isHost/> dieselbe Liste als Kasten links in Online-Lobbys; der Raumbesitzer
+//                                    lädt per Klick → „Invite“ Spieler in seinen (offenen, nicht vollen) Raum ein
+//    • Einladungen                   Der Empfänger sieht sie als Fenster in der Bildschirmmitte, der Rest des
+//                                    Hauptmenüs ist abgedunkelt (JOIN / DECLINE). In jedem anderen Menü (Deck
+//                                    Editor, Shop, Online-Lobby …) werden sie aufgehoben und erscheinen erst, wenn
+//                                    der Spieler ins Hauptmenü zurückkehrt — vorher fragt der Client den Server,
+//                                    ob sie noch gelten. JOIN führt in die Online-Lobby und tritt dem Raum bei
+//                                    (`window._ppPendingInvite`, PlayScreen). DECLINE: derselbe Raum lädt den
+//                                    Spieler nicht noch einmal ein (Server).
 //    • useSocial()                   liest den gemeinsamen Zustand
 //
 //  Lämpchen: grün = online, orange = AFK (5 Min. ohne Eingabe), rot = In-Game,
@@ -28,8 +37,10 @@ const _social = {
   state: { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] },
   msgs: {},            // peerId -> Nachrichten (nur, was geladen wurde)
   chatPeer: null,      // offenes Chatfenster ({ id, name, color }) — gilt für Hauptmenü UND Online-Lobby
+  invites: [],         // eingegangene Raum-Einladungen ({ id, roomId, kind, label, type, at, got, valid, from: { id, name, color } })
   listeners: new Set(),
 };
+const SOCIAL_INVITE_KEEP_MS = 10 * 60 * 1000;   // so lange hebt der Client eine Einladung auf (der Server lässt sie nach 15 Min. verfallen)
 function _socialChanged() { _social.listeners.forEach(f => f()); }
 
 function useSocial() {
@@ -40,6 +51,19 @@ function useSocial() {
     return () => { _social.listeners.delete(f); };
   }, []);
   return _social;
+}
+
+/** Einladung annehmen: merken und in die Online-Lobby wechseln — der PlayScreen tritt dem Raum bei. */
+function socialAcceptInvite(inv, openPlay) {
+  _social.invites = _social.invites.filter(i => i.id !== inv.id);
+  _socialChanged();
+  window._ppPendingInvite = inv;   // der PlayScreen liest sie beim Einhängen und tritt dem Raum bei
+  if (openPlay) openPlay();
+}
+function socialDeclineInvite(inv) {
+  _social.invites = _social.invites.filter(i => i.id !== inv.id);
+  _socialChanged();
+  socket.emit('room_invite_decline', { id: inv.id });
 }
 
 function socialOpenChat(peer) { _social.chatPeer = peer ? { id: peer.id, name: peer.name, color: peer.color } : null; _socialChanged(); }
@@ -85,16 +109,20 @@ function socialBuildRows(meId) {
 // ═══════════════════════════════════════════
 //  HOST — Ereignisse, Aktivitätsmeldung, Ton
 // ═══════════════════════════════════════════
-function SocialHost({ user, bgmMode }) {
+function SocialHost({ user, bgmMode, screen, onOpenPlay }) {
   const inDuelRef = useRef(false);
   // „Laufendes Duell“: Kampfmusik, Puzzle, Tutorial, Kampagne. Das Ergebnis-Thema (win/defeat) zählt nicht mehr.
   inDuelRef.current = /^(battle|puzzleAttempt|tutorial|campaign)/.test(String(bgmMode || ''));
+  // Einladungen erscheinen nur im Hauptmenü (siehe Kopfkommentar); überall sonst bleiben sie liegen.
+  const canShowInvite = screen === 'menu' && !inDuelRef.current;
+  const canShowRef = useRef(false);
+  canShowRef.current = canShowInvite;
   const active = !!user && !user.isGuest;
   const meId = user ? user.id : null;
 
   useEffect(() => {
     if (!active) {
-      _social.presence = []; _social.msgs = {}; _social.chatPeer = null;
+      _social.presence = []; _social.msgs = {}; _social.chatPeer = null; _social.invites = [];
       _social.state = { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] };
       _socialChanged();
       return;
@@ -117,10 +145,19 @@ function SocialHost({ user, bgmMode }) {
       _socialUpsertMessage(m.from === meId ? m.to : m.from, m);
       _socialChanged();
     };
+    const onInvite = (inv) => {
+      if (!inv || !inv.id || !inv.from) return;
+      // Pro Raum und Einlader nur die neueste Einladung. Frisch im Hauptmenü eingetroffen = gültig;
+      // sonst wird sie erst beim Anzeigen beim Server nachgefragt (RoomInviteModal).
+      _social.invites = [..._social.invites.filter(i => !(i.roomId === inv.roomId && i.from.id === inv.from.id)),
+        { ...inv, got: Date.now(), valid: canShowRef.current }];
+      _socialChanged();
+    };
     socket.on('social_presence', onPresence);
     socket.on('social_state', onState);
     socket.on('dm_message', onMessage);
     socket.on('dm_update', onUpdate);
+    socket.on('room_invite', onInvite);
     socket.emit('social_sync');
 
     // Eingaben melden (der Server entscheidet über AFK). Die erste Eingabe nach einer Pause geht sofort raus.
@@ -145,6 +182,7 @@ function SocialHost({ user, bgmMode }) {
       socket.off('social_state', onState);
       socket.off('dm_message', onMessage);
       socket.off('dm_update', onUpdate);
+      socket.off('room_invite', onInvite);
       socket.off('connect', onConnect);
       evts.forEach(e => window.removeEventListener(e, ping, { capture: true }));
       document.removeEventListener('visibilitychange', onVis);
@@ -152,7 +190,67 @@ function SocialHost({ user, bgmMode }) {
     };
   }, [active, meId]);
 
-  return null;
+  return active ? <RoomInviteModal canShow={canShowInvite} onOpenPlay={onOpenPlay} /> : null;
+}
+
+// ═══════════════════════════════════════════
+//  EINLADUNG (Fenster in der Mitte, Rest des Hauptmenüs abgedunkelt)
+// ═══════════════════════════════════════════
+function RoomInviteModal({ canShow, onOpenPlay }) {
+  useSocial();
+  const announced = useRef(new Set());
+  // Abgelaufene Einladungen nach und nach aufräumen.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const now = Date.now();
+      const keep = _social.invites.filter(i => now - (i.got || now) < SOCIAL_INVITE_KEEP_MS);
+      if (keep.length !== _social.invites.length) { _social.invites = keep; _socialChanged(); }
+    }, 15000);
+    return () => clearInterval(iv);
+  }, []);
+  // Im Hauptmenü: aufgehobene (nicht frische) Einladungen beim Server nachfragen, ungültige verwerfen.
+  const pendingCheck = _social.invites.filter(i => !i.valid && !i.checking).map(i => i.id).join(',');
+  useEffect(() => {
+    if (!canShow) return;
+    for (const inv of _social.invites) {
+      if (inv.valid || inv.checking) continue;
+      inv.checking = true;
+      socket.emit('room_invite_check', { id: inv.id }, (res) => {
+        inv.checking = false;
+        if (res && res.ok) inv.valid = true;
+        else _social.invites = _social.invites.filter(i => i.id !== inv.id);
+        _socialChanged();
+      });
+    }
+  }, [canShow, pendingCheck]);
+  const shown = canShow ? _social.invites.filter(i => i.valid) : [];
+  const inv = shown[0] || null;
+  // Klang, sobald eine Einladung wirklich sichtbar wird (nicht schon beim Eintreffen in einem anderen Menü).
+  useEffect(() => {
+    if (!inv || announced.current.has(inv.id)) return;
+    announced.current.add(inv.id);
+    if (window.playSFX) window.playSFX('match_found', { dedupe: 400 });
+  }, [inv ? inv.id : null]);
+  if (!inv) return null;
+  return (
+    <div className="modal-overlay social-invite-overlay" role="dialog" aria-modal="true" aria-label="Room invitation">
+      <div className="modal animate-in social-invite">
+        <div className="social-invite-icon">✉</div>
+        <div className="social-invite-title">
+          <span style={{ color: inv.from.color || 'var(--accent)' }}>{inv.from.name}</span> invited you
+        </div>
+        <div className="social-invite-what">
+          {inv.kind === 'draft' ? '🧊' : inv.kind === 'skilltest' ? '🎯' : '⚔'} {String(inv.label || 'Game').toUpperCase()}
+          {' · '}<span className={inv.type === 'ranked' ? 'ranked' : ''}>{String(inv.type || 'unranked').toUpperCase()}</span>
+        </div>
+        {shown.length > 1 && <div className="social-invite-more">+{shown.length - 1} more invitation{shown.length === 2 ? '' : 's'}</div>}
+        <div className="social-invite-btns">
+          <button className="btn social-accept" autoFocus onClick={() => socialAcceptInvite(inv, onOpenPlay)}>JOIN</button>
+          <button className="btn social-decline" onClick={() => socialDeclineInvite(inv)}>DECLINE</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════
@@ -162,22 +260,64 @@ function SocialLamp({ status }) {
   return <span className={'social-lamp social-lamp--' + status} title={SOCIAL_STATUS_LABEL[status] || ''} />;
 }
 
-function WhosOnlineList({ meId, onOpen }) {
+/**
+ * `invite` (nur in Lobbys, nur für den Raumbesitzer, solange der Raum offen und nicht voll ist):
+ *   { roomId, members: [Namen im Raum] } — ein Klick auf eine Zeile klappt dann „Invite / Chat“ auf,
+ *   statt sofort den Chat zu öffnen.
+ */
+function WhosOnlineList({ meId, onOpen, invite }) {
   useSocial();
+  const [openId, setOpenId] = useState(null);      // aufgeklappte Zeile (nur im Einladungs-Modus)
+  const [invited, setInvited] = useState({});      // userId -> true, sobald der Server die Einladung angenommen hat
+  const [busyId, setBusyId] = useState(null);
+  const [err, setErr] = useState('');
+  const roomId = invite ? invite.roomId : null;
+  useEffect(() => { setInvited({}); setOpenId(null); setErr(''); }, [roomId]);
   const rows = socialBuildRows(meId);
   if (rows.length === 0) return <div className="menu-side-empty">Nobody else is online right now.</div>;
+
+  const sendInvite = (r) => {
+    setErr(''); setBusyId(r.id);
+    socket.emit('room_invite_send', { to: r.id, roomId }, (res) => {
+      setBusyId(null);
+      if (res && res.error) { setErr(res.error); if (window.playSFX) window.playSFX('ui_error'); return; }
+      setInvited(m => ({ ...m, [r.id]: true }));
+    });
+  };
+
   return (
     <ul className="social-list">
-      {rows.map(r => (
-        <li key={r.id} className={'social-row' + ((r.unread > 0 || r.challenge) ? ' has-news' : '')}
-            role="button" tabIndex={0} onClick={() => onOpen(r)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(r); } }}>
-          <SocialLamp status={r.status} />
-          <span className="social-name" style={{ color: r.color || 'var(--accent)' }}>{r.name}</span>
-          {r.challenge && <span className="social-badge social-badge--challenge" title="Open challenge">!</span>}
-          {r.unread > 0 && <span className="social-badge" title="Unread messages">{r.unread > 99 ? '99+' : r.unread}</span>}
-        </li>
-      ))}
+      {rows.map(r => {
+        const inRoom = !!invite && invite.members.includes(r.name);
+        const canInviteRow = !!invite && !inRoom && (r.status === 'online' || r.status === 'afk');
+        const open = !!invite && openId === r.id;
+        const click = () => { if (invite) { setErr(''); setOpenId(open ? null : r.id); } else onOpen(r); };
+        return (
+          <li key={r.id} className={'social-row-wrap' + (open ? ' is-open' : '')}>
+            <div className={'social-row' + ((r.unread > 0 || r.challenge) ? ' has-news' : '')}
+                 role="button" tabIndex={0} onClick={click}
+                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(); } }}>
+              <SocialLamp status={r.status} />
+              <span className="social-name" style={{ color: r.color || 'var(--accent)' }}>{r.name}</span>
+              {inRoom && <span className="social-tag" title="Already in this room">IN ROOM</span>}
+              {!inRoom && invited[r.id] && <span className="social-tag social-tag--sent" title="Invitation sent">INVITED</span>}
+              {r.challenge && <span className="social-badge social-badge--challenge" title="Open challenge">!</span>}
+              {r.unread > 0 && <span className="social-badge" title="Unread messages">{r.unread > 99 ? '99+' : r.unread}</span>}
+            </div>
+            {open && (
+              <div className="social-row-menu">
+                <button className="btn social-invite-btn" disabled={!canInviteRow || busyId === r.id}
+                        title={inRoom ? 'Already in this room' : (r.status === 'ingame' ? r.name + ' is in a game' : (r.status === 'offline' ? r.name + ' is offline' : 'Invite to your room'))}
+                        onClick={() => sendInvite(r)}>
+                  {invited[r.id] ? '✉ INVITE AGAIN' : '✉ INVITE'}
+                </button>
+                <button className="btn" onClick={() => onOpen(r)}>💬 CHAT</button>
+                {err && <div className="social-row-error" role="alert">{err}</div>}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -354,9 +494,13 @@ function SocialChatWindow({ meId }) {
 
 /** Eigenständiger Kasten (Online-Lobby): dieselbe Liste und dieselben Chats wie im Hauptmenü.
  *  Das Chatfenster deckt den Kasten in voller Höhe und Breite ab. */
-function SocialSidePanel({ meId }) {
+function SocialSidePanel({ meId, room, isHost }) {
   const counts = socialTabCounts(meId);
   useSocial();
+  // Einladen darf nur der Besitzer, solange der Raum noch offen (Lobby) und nicht voll ist.
+  const cap = room ? (room.maxPlayers || 2) : 0;
+  const canInvite = !!(room && isHost && (room.players || []).length < cap);
+  const invite = canInvite ? { roomId: room.id, members: [...(room.players || []), ...(room.spectators || [])] } : null;
   return (
     <div className="lobby-spalte lobby-social ornate-frame pp-menuekasten" style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -364,8 +508,13 @@ function SocialSidePanel({ meId }) {
         WHO'S ONLINE ({counts.online})
         {counts.unread > 0 && <span className="social-badge">{counts.unread > 99 ? '99+' : counts.unread}</span>}
       </div>
+      {room && isHost && (
+        <div className="social-invite-hint">
+          {canInvite ? 'Click a player to invite them to your room.' : 'Your room is full.'}
+        </div>
+      )}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
-        <WhosOnlineList meId={meId} onOpen={socialOpenChat} />
+        <WhosOnlineList meId={meId} onOpen={socialOpenChat} invite={invite} />
       </div>
       <SocialChatWindow meId={meId} />
     </div>

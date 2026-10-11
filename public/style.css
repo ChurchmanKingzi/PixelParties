@@ -25684,6 +25684,51 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 /* Online-Lobby: schmaler Kasten ganz links mit Spielerliste (app-social.jsx) */
 .lobby-spalte.lobby-social { flex: 0 0 300px; width: 300px; }
 
+/* Lobbys (Draft, Skill Test, Spiel): Spielerliste links, Raum EXAKT in der Bildschirmmitte.
+   Drei Spalten: links die Liste (300 px), Mitte der Raum, rechts eine gleich breite Leerspalte — so bleibt
+   die Mitte auf der x-Achse zentriert. Der Raum nimmt seine Wunschbreite (`--lobby-w`) und schrumpft erst,
+   wenn der Platz zwischen den Seitenspalten kleiner wird; der Abstand zur Liste (Rest der Mittelspalte
+   neben dem Raum + Lücke) schrumpft also mit der Fensterbreite. */
+.lobby-raum {
+  flex: 1; min-height: 0; overflow: hidden;
+  display: grid; align-items: stretch;
+  grid-template-columns: 300px minmax(0, 1fr) 300px;
+}
+.lobby-raum > .lobby-social { grid-column: 1; }
+.lobby-raum > .lobby-raum-mitte { grid-column: 2; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: auto; }
+.lobby-raum-mitte > .panel { width: min(var(--lobby-w, 720px), 100%) !important; max-width: none !important; box-sizing: border-box; }
+
+/* Raum-Einladungen: Zeilenmenü in der Liste (Besitzer) und Hinweis beim Empfänger */
+.social-row-wrap { display: flex; flex-direction: column; }
+.social-row-wrap.is-open > .social-row { border-color: color-mix(in srgb, var(--player-color, #00f0ff) 55%, transparent); }
+.social-row-menu {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px 8px; margin-top: 1px;
+  background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .06); border-top: none;
+}
+.social-row-menu .btn { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+.social-invite-btn { border-color: var(--success) !important; color: var(--success) !important; background: rgba(51, 255, 136, .08) !important; }
+.social-invite-btn:disabled { opacity: .4; cursor: not-allowed; }
+.social-row-error { flex-basis: 100%; padding: 5px 7px; font-size: 12px; color: #fff; background: rgba(255, 51, 102, .25); border: 1px solid var(--danger); }
+.social-tag {
+  flex-shrink: 0; padding: 0 5px; font-size: 10px; letter-spacing: 1px; line-height: 16px;
+  color: var(--text2); border: 1px solid rgba(255, 255, 255, .18);
+}
+.social-tag--sent { color: var(--success); border-color: rgba(51, 255, 136, .5); }
+.social-invite-hint { padding: 0 16px 6px; font-size: 11px; color: var(--text2); }
+
+/* Einladung: Fenster in der Mitte, der Rest des Hauptmenüs liegt abgedunkelt dahinter (und ist nicht bedienbar) */
+.social-invite-overlay { z-index: 10060; background: rgba(2, 3, 8, .82) !important; }
+.social-invite {
+  width: 340px; max-width: calc(100vw - 32px); text-align: center; box-sizing: border-box; padding: 22px 24px 20px;
+}
+.social-invite-icon { font-size: 34px; line-height: 1; margin-bottom: 8px; }
+.social-invite-title { font-family: var(--font-display), sans-serif; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; text-shadow: 2px 2px 0 #000; }
+.social-invite-what { font-size: 14px; letter-spacing: 1.5px; color: var(--accent); margin: 8px 0 4px; }
+.social-invite-what .ranked { color: #ffbb33; }
+.social-invite-more { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.social-invite-btns { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+.social-invite-btns .btn { padding: 8px 22px; font-size: 14px; }
+
 
 /* ═══ PROFIL: ZIERRAHMEN ═══════════════════════════════════════════════
    Als Vorgabe: „Das Profil soll grafisch aufgewertet werden; Rahmen mit
