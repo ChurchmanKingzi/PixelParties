@@ -25334,6 +25334,106 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Sky Archeologist: Grabung — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — der Archäologe
+  //  mit der Spitzhacke auf der schwebenden Insel)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit dem Archäologen als Ursprung UND Ziel (`selbst`): eine Spitzhacke (Holzstiel,
+  //  Eisenkopf mit zwei Spitzen) wird über die Schulter geschwungen und schlägt zweimal vorn unten zu; jeder Einschlag wirft Steinsplitter und
+  //  Staub auf. Beim zweiten Schlag (~600 ms; sky-archeologist.js: DIG_MS 800 — Einbau-Versatz 100 ms eingerechnet) blitzt im Loch ein Fund auf:
+  //  vierstrahliger Stern, dazu steigt eine kleine Karte aus dem Boden. Ab ~900 ms blendet alles über Dithering aus, bei 1200 ms ist es weg.
+  //  Feste Palette, KEINE Unschärfe, KEIN Leuchten; die Wurzel trägt `data-pp-px="aus"`.
+  // ═════════════════════════════════════════════════════════════════
+  sky_dig: (() => {
+    const HOLZ = ['#b8793e', '#8a5426', '#5a3417'].map(ppHex);
+    const EISEN = ['#eef3f6', '#b9c4cc', '#7d8c97', '#4a5762', '#262f37'].map(ppHex);
+    const STEIN = ['#c8c3d6', '#9a93ad', '#6c6584', '#463f5a'].map(ppHex);
+    const GOLD = ['#ffffff', '#fff1a8', '#ffd94a', '#e8a33a'].map(ppHex);
+    const KARTE = ['#2c4a9a', '#1c2f66', '#ffd94a', '#fff1a8'].map(ppHex);
+    const ENDE = 1200, FADE_AB = 900, SCHLAG1 = 280, SCHLAG2 = 600;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    // Winkel der Hacke (Grad, y nach unten): ausholen über die Schulter (-60 → -210 = vorn unten), zurück, zweiter Schlag
+    const winkel = (t) => {
+      if (t < SCHLAG1 - 140) return -60 + (-20) * klemme(t / (SCHLAG1 - 140), 0, 1);                      // Ausholen
+      if (t < SCHLAG1) return -80 - 130 * Math.pow(klemme((t - (SCHLAG1 - 140)) / 140, 0, 1), 1.6);       // Schlag
+      if (t < SCHLAG1 + 140) return -210 + 120 * klemme((t - SCHLAG1) / 140, 0, 1);                       // zurück
+      if (t < SCHLAG2) return -90 - 120 * Math.pow(klemme((t - SCHLAG1 - 140) / (SCHLAG2 - SCHLAG1 - 140), 0, 1), 1.6);   // zweiter Schlag
+      return -210;
+    };
+    const vorbereiten = () => ({
+      splitter: [SCHLAG1, SCHLAG2].flatMap(ab => Array.from({ length: ppFxN(7) }, () => ({
+        ab, vx: (Math.random() - 0.5) * 70 - 14, vy: -(24 + Math.random() * 46), leben: 360 + Math.random() * 200, farbe: Math.floor(Math.random() * 4),
+      }))),
+      staub: [SCHLAG1, SCHLAG2].flatMap(ab => Array.from({ length: ppFxN(5) }, () => ({ ab, sx: (Math.random() - 0.5) * 10, vx: (Math.random() - 0.5) * 26, leben: 460 + Math.random() * 200, r0: 3 + Math.random() * 2 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const ein = klemme(t / 100, 0, 1), a = Math.min(aus, ein);
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      const BODEN_X = CX - Math.round(HW * 0.35), BODEN_Y = CY + Math.round(HH * 0.45);     // Einschlagstelle
+      const LH = Math.round(HH * 0.8);                                                     // Stiellänge
+      const th = winkel(t) * Math.PI / 180;
+      const PX = BODEN_X - Math.round(Math.cos(-210 * Math.PI / 180) * LH), PY = BODEN_Y - Math.round(Math.sin(-210 * Math.PI / 180) * LH);   // Drehpunkt so, dass der Kopf bei -210° im Boden landet
+      // ── Stiel (zwei Pixel breit, Lichtkante) ──
+      for (let s = 0; s <= LH; s++) {
+        const x = PX + Math.cos(th) * s, y = PY + Math.sin(th) * s;
+        g.put(x, y, HOLZ[s % 4 === 0 ? 1 : 0], a);
+        g.put(x + 1, y, HOLZ[s % 4 === 2 ? 0 : 1], a);
+        g.put(x + 1, y + 1, HOLZ[2], a * 0.9);
+      }
+      // ── Kopf: Eisenbogen quer zum Stiel (zwei Pixel dick), beide Spitzen zeigen in Schlagrichtung ──
+      const KX = PX + Math.cos(th) * LH, KY = PY + Math.sin(th) * LH;
+      const nx = -Math.sin(th), ny = Math.cos(th), dx = Math.cos(th), dy = Math.sin(th);
+      for (let u = -8; u <= 8; u++) {
+        const kr = Math.pow(Math.abs(u) / 8, 1.7) * 4;                                      // Spitzen biegen nach vorn
+        const x = KX + nx * u + dx * kr, y = KY + ny * u + dy * kr;
+        const col = Math.abs(u) > 5 ? EISEN[0] : (u < 0 ? EISEN[1] : EISEN[2]);
+        g.put(x, y, col, a);
+        g.put(x - dx, y - dy, EISEN[Math.abs(u) > 5 ? 1 : 3], a);
+        g.put(x - 2 * dx, y - 2 * dy, EISEN[3], a * (Math.abs(u) < 4 ? 1 : 0.6));
+      }
+      g.block(KX - 1, KY - 1, 3, 3, EISEN[4], a); g.put(KX, KY, EISEN[2], a);
+      // ── Einschläge: Splitter und Staub ──
+      for (const s of teile.splitter) {
+        const al = t - s.ab; if (al < 0 || al > s.leben) continue;
+        const k = al / s.leben, sek = al / 1000;
+        g.put(BODEN_X + s.vx * sek, BODEN_Y + s.vy * sek + 0.5 * 240 * sek * sek, STEIN[s.farbe], (1 - k) * a);
+      }
+      for (const s of teile.staub) {
+        const al = t - s.ab; if (al < 0 || al > s.leben) continue;
+        const k = al / s.leben, r = s.r0 + k * 4, R = Math.ceil(r), cx = BODEN_X + s.sx + s.vx * al / 1000, cy = BODEN_Y - 1 - k * 5;
+        for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+          const dd = Math.hypot(i, j * 1.25) / r + (rausch(Math.round(cx) + i, Math.round(cy) + j) - 0.5) * 0.35;
+          if (dd >= 1) continue;
+          g.put(cx + i, cy + j, STEIN[klemme(Math.floor(dd * 2 + k), 0, 2)], (1 - k) * 0.75 * (1 - dd * 0.5) * a);
+        }
+      }
+      // ── Der Fund: Stern im Loch, kleine Karte steigt auf ──
+      const af = t - SCHLAG2;
+      if (af > 0) {
+        const k = klemme(af / 320, 0, 1);
+        if (af < 340) {
+          const L = Math.round(2 + k * 7), fa = (1 - k * 0.6) * a;
+          g.put(BODEN_X, BODEN_Y, GOLD[0], a);
+          for (let i = 1; i <= L; i++) {
+            const c = i < 3 ? GOLD[1] : GOLD[2];
+            g.put(BODEN_X - i, BODEN_Y, c, fa); g.put(BODEN_X + i, BODEN_Y, c, fa);
+            g.put(BODEN_X, BODEN_Y - i, c, fa); g.put(BODEN_X, BODEN_Y + (i < L * 0.5 ? i : 0), c, fa);
+          }
+        }
+        const hoch = Math.round(klemme(af / 420, 0, 1) * 13), ka = af > 560 ? Math.max(0, 1 - (af - 560) / 160) * a : a;
+        const kx = BODEN_X - 2, ky = BODEN_Y - 4 - hoch;
+        for (let j = 0; j < 7; j++) for (let i = 0; i < 5; i++) {
+          const rand = i === 0 || i === 4 || j === 0 || j === 6;
+          g.put(kx + i, ky + j, rand ? KARTE[2] : (i === 2 && j === 3 ? KARTE[3] : KARTE[(i + j) % 2]), ka);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
   //  Zahnrachen)
   //
@@ -46223,6 +46323,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'the_melting') {
         const p = playerByName(entry.player);
         return <span className="log-status">🔥 {cName('The Melting')} — {pName(p.name, p.color)}'s flame thaws <span className="log-amount">{entry.healed}</span> Frozen target{entry.healed !== 1 ? 's' : ''}{entry.endedTurn ? ' and ends the opponent\'s turn on the spot!' : entry.blocked ? ' — but the opponent\'s turn cannot be ended.' : '.'}</span>;
+      }
+      if (t === 'sky_archeologist') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">⛏️ {cName('Sky Archeologist')} — {pName(p.name, p.color)} reveals {cName(entry.card)}{entry.played ? (entry.played === 'equip' ? ' and equips it for free!' : ' and may play it for free this turn!') : entry.placed === 'bottom' ? ' and puts it on the bottom of the deck.' : ' and keeps it on top of the deck.'}</span>;
       }
       if (t === 'sky_shaman') {
         const p = playerByName(entry.player);

@@ -20421,7 +20421,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "You may once per turn reveal the top card of your deck. If it is an Artifact, you may immediately play it without paying its Cost. Otherwise, put it on top or bottom of your deck (your choice).",
+    "effect": "You may discard an Artifact with a Cost of 10 or more to summon this Creature as an additional Action. You may once per turn reveal the top card of your deck. If it is an Artifact, you may immediately play it without paying its Cost. Otherwise, put it on top or bottom of your deck (your choice).",
     "archetype": "",
     "setID": "PP MOE",
     "banned": "",
