@@ -15,25 +15,27 @@
 //  Ohne Artifact ≥ 10 auf der Hand gibt es nur den normalen Weg. Effekt-Beschwörungen zahlen nichts.
 //
 //  ── ② EINMAL PRO ZUG: OBERSTE KARTE AUFDECKEN (`_deck-top-shared.js`, `_free-artifact-shared.js`) ─────
-//  `onCreatureEffect` (engine-HOPT je Instanz, bei nicht-`false`-Rückgabe; keine Aktion): die oberste Deckkarte wird aufgedeckt (Flug Deck →
-//  Bildmitte → Ziel, beide Spieler sehen sie).
-//    • Ist sie ein ARTIFACT und spielbar → Abfrage „kostenlos spielen?". Ja: Equipment liegt sofort an einem gewählten Helden
-//      (`equipArtifactToHero`), alles andere kommt mit Nullpreis-Vermerk auf die Hand und wird über den eigenen Spielweg kostenlos gespielt
-//      (Deepsea-Treasure-Vertrag, Als Ruling 9.10.: Artifact Creatures werden nicht von fremden Effekten platziert).
-//    • Ein ARTIFACT, das nicht gespielt wird — der Spieler lehnt ab ODER es ist nicht spielbar (Equipment ohne freien Platz, Artifact-Sperre,
-//      Hand gesperrt) —, geht einfach zurück ins Deck, wo es lag (oben): abgelehnt wird behandelt, als wäre es unspielbar gewesen
-//      (Als Korrektur 10.10.: „Entscheidet der Spieler sich dagegen, das Artifact zu spielen, geht es wieder zurück ins Deck"). KEINE Oben/Unten-Wahl.
-//    • „Otherwise" = die aufgedeckte Karte ist KEIN Artifact: dann legt der Spieler sie oben oder unten auf das Deck (eigene Wahl).
+//  `onCreatureEffect` (engine-HOPT je Instanz, bei nicht-`false`-Rückgabe; keine Aktion). Ablauf (Als Vorgabe 10.10.: „genau wie Slave Trader die oberste
+//  Karte in die Bildschirmmitte ziehen und dort aufdecken"): die oberste Deckkarte fliegt in die Bildmitte, dreht sich um und BLEIBT dort liegen, bis der
+//  Spieler entschieden hat (beide Spieler sehen sie).
+//    • Ist sie ein ARTIFACT und spielbar → Abfrage „für 0 Gold spielen?". Ja: das Artifact wird SOFORT gespielt und wirkt auf der Stelle — es kommt NICHT auf die
+//      Hand: Equipment wird an einen gewählten Helden gelegt (die Karte fliegt aus der Mitte auf den Platz), alles andere läuft über Zielwahl, Kettenfenster und
+//      `resolve` im Gratis-Scope (`engine.kostenlosSpielen`) und landet danach in der Ablage (`_free-artifact-shared.js`).
+//    • Ein ARTIFACT, das nicht gespielt wird — der Spieler lehnt ab, bricht die Zielwahl ab ODER es ist nicht spielbar (Equipment ohne freien Platz,
+//      Artifact-Sperre, Reaction/Surprise/Area/Artifact Creature …) —, geht zurück ins Deck, wo es lag (oben): abgelehnt wird behandelt, als wäre es unspielbar
+//      gewesen. KEINE Oben/Unten-Wahl.
+//    • „Otherwise" = die aufgedeckte Karte ist KEIN Artifact: dann legt der Spieler sie oben oder unten auf das Deck (eigene Wahl, die Karte liegt dabei in der Mitte).
 //  Aufdecken ist keine Suche (keine Such-Sperre). Ohne Karte im Deck ist der Effekt nicht aktivierbar.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `play_zone_animation` `sky_dig` (Pixelart, Brett-Animation mit dem Archäologen als Ursprung und Ziel, Hülle `ppSalve`; Vorlage: das Kartenbild — der Archäologe mit der Spitzhacke): die Hacke schlägt
-//  zweimal zu, Staub und Steinsplitter spritzen, beim zweiten Schlag blitzt ein Fund auf. Klänge in ZONE_ANIM_SFX; Log `sky_archeologist`.
+//  `play_zone_animation` `sky_dig` (Pixelart, Hülle `ppSalve`; Vorlage: das Kartenbild — der Archäologe mit der Spitzhacke) läuft AUF DEM DECK (Als Vorgabe
+//  10.10.: „auf dem Deck angezeigt, nicht auf den Creatures selbst"; `originDeck` + Ziel `{ owner, deck: true }`): die Hacke schlägt zweimal zu, Staub und
+//  Steinsplitter spritzen, beim zweiten Schlag blitzt ein Fund auf. Klänge in ZONE_ANIM_SFX; Log `sky_archeologist`.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
 const { makeDiscardCostSummon } = require('./_extra-summon-shared');
-const { oberste, decke, obenOderUnten, cpuBehaeltOben } = require('./_deck-top-shared');
+const { oberste, haltenImZentrum, gibFrei, obenOderUnten, cpuBehaeltOben } = require('./_deck-top-shared');
 const { spielweg, spieleKostenlos } = require('./_free-artifact-shared');
 
 const CARD_NAME = 'Sky Archeologist';
@@ -61,44 +63,46 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    const inst = ctx.card;
     const ps = engine.gs.players[pi];
     const top = oberste(engine, pi);
     if (!ps || !top) return false;
 
-    // Die Hacke schlägt zu.
+    // Die Hacke schlägt auf dem DECK zu.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'sky_dig', zoneType: 'board', owner: inst.owner, heroIdx: -1, zoneSlot: -1, duration: DIG_MS + 400,
-      targets: [{ owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, cardName: CARD_NAME }],
-      originOwner: inst.owner, originHeroIdx: inst.heroIdx, originZoneSlot: inst.zoneSlot,
+      type: 'sky_dig', zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1, duration: DIG_MS + 400,
+      targets: [{ owner: pi, deck: true }],
+      originOwner: pi, originDeck: true,
     });
     await engine._delay(DIG_MS);
 
-    // „If it is an Artifact, you may immediately play it without paying its Cost."
+    // Aufdecken: die Karte liegt in der Bildmitte, bis der Spieler entschieden hat.
+    const key = await haltenImZentrum(engine, pi, top, { source: CARD_NAME });
     const istArtifact = hasCardType(engine._getCardDB()[top], 'Artifact');
-    let gespielt = null;
-    if (istArtifact && spielweg(engine, pi, top)) {
-      const ja = await engine.promptGeneric(pi, {
-        type: 'confirm',
-        title: CARD_NAME,
-        message: `${top} is an Artifact! Play it right now without paying its Cost?`,
-        showCard: top,
-        confirmLabel: '🪙 Play it for free!',
-        cancelLabel: 'Not now',
-        cancellable: true,
-        gerrymanderEligible: false,
-      });
-      if (ja && !ja.cancelled) gespielt = await spieleKostenlos(engine, pi, top, { source: CARD_NAME });
-    }
-
-    // Nicht gespielt: die Karte geht zurück ins Deck (Aufdeck-Flug). „Otherwise, put it on top or bottom of your deck (your choice)." gilt NUR für
-    // Karten, die kein Artifact sind — ein Artifact (abgelehnt oder unspielbar) bleibt, wo es lag: oben.
+    let gespielt = false;
     let lage = null;
-    if (!gespielt) {
-      await decke(engine, pi, top, { source: CARD_NAME, dest: 'deck' });
-      if (!istArtifact) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+    try {
+      // „If it is an Artifact, you may immediately play it without paying its Cost."
+      if (istArtifact && spielweg(engine, pi, top)) {
+        const ja = await engine.promptGeneric(pi, {
+          type: 'confirm',
+          title: CARD_NAME,
+          message: `${top} is an Artifact! Play it right now for 0 Gold?`,
+          showCard: top,
+          confirmLabel: '🪙 Play it for free!',
+          cancelLabel: 'Not now',
+          cancellable: true,
+          gerrymanderEligible: false,
+        });
+        if (ja && !ja.cancelled) gespielt = await spieleKostenlos(engine, pi, top, { source: CARD_NAME, key });
+      }
+      // „Otherwise, put it on top or bottom of your deck (your choice)." gilt NUR für Karten, die kein Artifact sind — ein Artifact (abgelehnt, abgebrochen
+      // oder unspielbar) bleibt, wo es lag: oben.
+      if (!gespielt && !istArtifact) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+    } finally {
+      // Nicht gespielt: die Karte fliegt aus der Mitte zurück ins Deck (auch wenn oben etwas schiefging).
+      if (!gespielt) await gibFrei(engine, pi, key, top, { dest: 'deck' });
     }
-    engine.log('sky_archeologist', { player: ps.username, card: top, played: gespielt, placed: lage });
+    engine.log('sky_archeologist', { player: ps.username, card: top, played: gespielt || null, placed: lage });
     engine.sync();
     return true;
   },
@@ -107,6 +111,11 @@ module.exports = {
   cpuResponse(engine, kind, payload) {
     const r = kosten.cpuResponse(engine, kind, payload);
     if (r !== undefined) return r;
+    // Equipment-Platz (Zonenwahl, abbrechbar): die CPU nimmt den ersten.
+    if (kind === 'generic' && payload && payload.title === CARD_NAME && payload.type === 'zonePick') {
+      const z = (payload.zones || [])[0];
+      return z ? { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx } : undefined;
+    }
     if (kind !== 'generic' || !payload || payload.title !== CARD_NAME || payload.type !== 'confirm') return undefined;
     if (/Play it right now/.test(payload.message || '')) return { confirmed: true };
     if (payload._topOrBottom) {

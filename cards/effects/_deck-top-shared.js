@@ -7,13 +7,21 @@
 //  „Wenn …" selbst; Aufdecken und „top or bottom" stehen hier EINMAL.
 //
 //    oberste(engine, pi)                            → Name der obersten Deckkarte | null
-//    decke(engine, pi, name, { source, dest, … })   → Flug Deck → Bildmitte (umgedreht) → Ziel; wartet bis zur Landung; Log `hand_card_revealed`
+//    haltenImZentrum(engine, pi, name, { source })  → Flug Deck → Bildmitte (umgedreht); die Karte BLEIBT dort liegen. Gibt den Halte-Schlüssel zurück
+//    gibFrei(engine, pi, key, name, { dest, … })    → die gehaltene Karte fliegt von der Bildmitte weiter (`deck` | `discard` | `deleted` | `hand` | `support` | `center`)
+//    decke(engine, pi, name, { source, dest, … })   → Flug Deck → Bildmitte (umgedreht) → Ziel in EINEM Zug (ohne Halt); wartet bis zur Landung; Log `hand_card_revealed`
 //    obenOderUnten(engine, pi, name, { source })    → Abfrage „oben oder unten?"; legt die Karte bei „unten" unter das Deck. `'top' | 'bottom'`
 //
 //  ── AUFDECKEN IST KEINE SUCHE ───────────────────────────────────────────
 //  Wie bei Pinta/Deepsea Treasure: keine Such-Sperre (`searchLocked`). Die Karte bleibt im Zustand, wo sie ist (oben im Deck), bis die
 //  aufrufende Karte sie bewegt; `decke` ändert nichts am Zustand, es zeigt nur das Bild (beide Spieler sehen die Karte aufgedeckt).
 //  Ziele des Flugs (`mill_center_reveal`): `'deck'` (zurück), `'hand'`, `'support'` (+ `destHeroIdx`/`destSlotIdx`, auf den Brettplatz).
+//
+//  ── DIE KARTE BLEIBT IN DER MITTE (Als Vorgabe 10.10.) ──────────────────────────────────────────────
+//  „Bei Slave Trader/Archeologist sollte die aufgedeckte Karte, wenn sie nutzbar ist, in der Screen-Mitte verbleiben, bis man entschieden hat, wohin
+//  sie beschworen/ob sie aktiviert und ggf. wohin sie equipped werden soll." → `haltenImZentrum` zeigt die Karte (`mill_center_reveal` mit `hold`), während der
+//  Spieler wählt (Zone, Ziel, Ja/Nein); erst `gibFrei` (`mill_center_release`, gleicher Schlüssel) schickt sie weiter. Der Zustand ändert sich beim Halten
+//  nicht: die Karte liegt im Deck, bis die aufrufende Karte sie bewegt.
 //
 //  ── „OTHERWISE, PUT IT ON TOP OR BOTTOM" ────────────────────────────────
 //  Welche Karten diese Wahl bekommen, entscheidet die AUFRUFENDE Karte (Als Vorgabe 10.10.):
@@ -24,6 +32,8 @@
 // ═══════════════════════════════════════════
 
 const REVEAL_MS = 1100;    // Deck → Mitte → Umdrehen → Weiterflug (wie Pinta / Chaos-Diamond)
+const HALT_EIN_MS = 800;   // Deck → Mitte → Umdrehen; danach liegt die Karte still
+const FREIGABE_MS = 650;   // Mitte → Ziel
 
 function oberste(engine, pi) {
   const ps = engine.gs.players[pi];
@@ -36,10 +46,39 @@ async function decke(engine, pi, name, opts = {}) {
   engine.log('hand_card_revealed', { player: ps?.username, card: name, by: opts.source || null });
   engine._broadcastEvent('mill_center_reveal', {
     owner: pi, cardNames: [name], revealMs: REVEAL_MS, dest,
-    ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx } : {}),
+    ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
   });
   // Zurück ins Deck: erst abwarten, bis die Karte dort liegt; auf den Platz/in die Hand: umgebucht wird genau zur Landung.
   await engine._delay(dest === 'deck' ? REVEAL_MS + 100 : REVEAL_MS);
+}
+
+/**
+ * Deckt die oberste Karte in der Bildmitte auf und LÄSST SIE DORT LIEGEN (beide Spieler sehen sie). Der Schlüssel gehört zu genau dieser Karte; `gibFrei`
+ * schickt sie weiter. Wer die Karte nicht freigibt, behält sie als Bild liegen (der Client räumt sie nach 90 s von selbst ab).
+ */
+async function haltenImZentrum(engine, pi, name, opts = {}) {
+  const ps = engine.gs.players[pi];
+  engine._haltZaehler = (engine._haltZaehler || 0) + 1;
+  const key = `${pi}-${engine.gs.turn}-${engine._haltZaehler}`;
+  engine.log('hand_card_revealed', { player: ps?.username, card: name, by: opts.source || null });
+  engine._broadcastEvent('mill_center_reveal', {
+    owner: pi, cardNames: [name], revealMs: HALT_EIN_MS, dest: 'center', hold: true, holdKey: key,
+  });
+  await engine._delay(HALT_EIN_MS + 100);
+  return key;
+}
+
+/**
+ * Die gehaltene Karte fliegt von der Bildmitte zum Ziel. `dest`: `'deck'` (zurück), `'discard'` / `'deleted'` (Stapel; der Aufrufer bucht die Karte erst NACH
+ * dem Flug um), `'hand'`, `'support'` (+ `destHeroIdx`/`destSlotIdx`, `destSide` = Brettseite des Platzes) oder `'center'` (ausblenden). Wartet, bis die Karte angekommen ist.
+ */
+async function gibFrei(engine, pi, key, name, opts = {}) {
+  const dest = opts.dest || 'deck';
+  engine._broadcastEvent('mill_center_release', {
+    owner: pi, holdKey: key, cardName: name, dest, revealMs: FREIGABE_MS,
+    ...(dest === 'support' ? { destHeroIdx: opts.destHeroIdx, destSlotIdx: opts.destSlotIdx, destSide: opts.destSide } : {}),
+  });
+  await engine._delay(FREIGABE_MS + 100);
 }
 
 /** CPU: behält eine gute Karte oben, schickt eine schwache nach unten. */
@@ -81,4 +120,4 @@ async function obenOderUnten(engine, pi, name, opts = {}) {
   return oben ? 'top' : 'bottom';
 }
 
-module.exports = { REVEAL_MS, oberste, decke, obenOderUnten, cpuBehaeltOben };
+module.exports = { REVEAL_MS, HALT_EIN_MS, FREIGABE_MS, oberste, haltenImZentrum, gibFrei, decke, obenOderUnten, cpuBehaeltOben };

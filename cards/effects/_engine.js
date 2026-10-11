@@ -24292,11 +24292,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return { rawCost, playerReduction, handReduction, heroEquipReduction, costReduction, cost };
   }
 
+  /**
+   * ★ GRATIS-SCOPE (Als Vorgabe 10.10., Sky Archeologist: „play it without paying its Cost"): solange `fn` läuft, kostet für `playerIdx` alles 0 —
+   * `canAffordGold` ist immer wahr, `goldBudget` unbegrenzt, `_payCardCost` bucht nichts ab. Artifacts mit EIGENER Kostenrechnung (`manualGoldCost`:
+   * Book of Doom, Dark Gear, Beer …) rechnen in ihrem `resolve` über genau diese drei Stellen; so bleiben sie ohne Goldtricks gratis. Gilt nur für den
+   * einen Spieler und nur, solange `fn` läuft (verschachtelt sicher).
+   */
+  async kostenlosSpielen(playerIdx, fn) {
+    const vorher = this._kostenlosScope;
+    this._kostenlosScope = { pi: playerIdx };
+    try { return await fn(); }
+    finally { this._kostenlosScope = vorher; }
+  }
+
   canAffordGold(playerIdx, cost, cardName) {
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return false;
     const betrag = Number(cost) || 0;
     if (betrag <= 0) return true;
+    if (this._kostenlosScope && this._kostenlosScope.pi === playerIdx) return true;   // Gratis-Scope (kostenlosSpielen)
     const gold = ps.gold || 0;
     if (gold >= betrag) return true;
     // BASIS ist `max(0, gold)`, nicht `gold` (Als Korrektur 16.8.).
@@ -24334,6 +24348,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   goldBudget(playerIdx, cardName) {
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return 0;
+    if (this._kostenlosScope && this._kostenlosScope.pi === playerIdx) return Infinity;   // Gratis-Scope (kostenlosSpielen)
     const limit = this.goldOverdraftLimit(playerIdx, cardName);
     if (limit === Infinity) return Infinity;
     return Math.max(0, ps.gold || 0) + limit;
@@ -24534,6 +24549,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return 0;
     const betrag = Number(cost) || 0;
     if (betrag <= 0) return 0;
+    if (this._kostenlosScope && this._kostenlosScope.pi === playerIdx) return 0;   // Gratis-Scope (kostenlosSpielen): nichts abbuchen
     const vorher = ps.gold || 0;
     // Klemme nur so weit, wie KEIN Kreditrahmen greift (Debt-O-Tron).
     // Ohne den Archetyp ist `limit` 0 und `boden` 0 — exakt das alte

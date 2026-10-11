@@ -122,6 +122,7 @@ const hat = (klaenge, dauer) => klaenge.some(k => Math.abs(k.dur - dauer) < 0.00
         const klaenge = await page.evaluate(() => window.__snd.slice());
         const weg = await page.evaluate(() => !document.querySelector('[data-pp-px="aus"] canvas'));
         check('die Pixelart-Animation (Canvas) ist bemalt', !!spur && spur.bemalt > 250, spur);
+        check('…und der Canvas reicht weit über die Kartenkante hinaus (Rand ≥ 110 px: Federn/Strahl/Schild werden nicht abgeschnitten)', !!spur && spur.w >= 340 && spur.h >= 340, spur);
         check('die Klänge starten: Wind (`elem_wind`), Strahl (`buff`), Funkeln (`elem_holy`)', hat(klaenge, s.dauern.elem_wind) && hat(klaenge, s.dauern.buff) && hat(klaenge, s.dauern.elem_holy), [s.dauern, klaenge]);
         check('nach ~1,4 s ist die Animation wieder weg', weg === true);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
