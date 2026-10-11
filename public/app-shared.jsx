@@ -2775,6 +2775,13 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Mimic (10.10.) — zwei Bisse der Truhe: ein Probebiss (~260 ms), dann der harte Biss (~560 ms) mit dumpfem Aufschlag; die Münzen klingen über das Log
+  // (`gold_steal`). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  mimic_chomp: [
+    { name: 'slash',        opts: { rate: 0.7,  volume: 0.7, delay: 230 } },
+    { name: 'slash',        opts: { rate: 0.55, volume: 1.0, delay: 540, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.9,  volume: 0.6, delay: 550, category: null, dedupe: 0 } },
+  ],
   // The Melting (10.10.) — Flamme am Eis, alles taut: Feuerrauschen, Plätschern der Tropfen, leises Eisknacken, beim Funkeln (~760 ms) der Klang des Auftauens
   // mit einem hellen Heilton. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   the_melting: [

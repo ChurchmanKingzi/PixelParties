@@ -25231,6 +25231,127 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten);
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Mimic: Kiefer-Schnappen — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — die Truhe mit dem
+  //  Zahnrachen)
+  //
+  //  Brett-Animation (`zoneType: 'board'`, Hülle `ppSalve`) mit der Mimic als Ursprung UND Ziel (`selbst`): über ihrer Karte klappen zwei Kiefer
+  //  aus dunklem Holz mit Messingkante und weißen Zähnen (Zahnreihen versetzt, sie greifen ineinander) zweimal zu — der erste Biss bei ~260 ms
+  //  ist ein Probebiss, der zweite bei ~560 ms (mimic.js: BISS_MS — Einbau-Versatz 100 ms eingerechnet) lässt Münzen aus dem Maul springen
+  //  (Pixelscheiben mit Glanzpunkt, drehen sich durch Breitenwechsel, fallen im Bogen) samt kleinen Funkelsternen. Beim Zuschnappen blitzen die
+  //  Zahnspitzen weiß auf. Ab ~800 ms blendet alles über Dithering aus, bei 1100 ms ist es weg. Feste Palette, KEINE Unschärfe, KEIN Leuchten;
+  //  die Wurzel trägt `data-pp-px="aus"` (die Grafik IST schon Pixelart).
+  // ═════════════════════════════════════════════════════════════════
+  mimic_chomp: (() => {
+    const HOLZ = ['#6b3a1c', '#4a2512', '#2e170c'].map(ppHex);
+    const MESSING = ['#fff1a8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
+    const ZAHN = ['#ffffff', '#e9e1cf', '#bdb29a'].map(ppHex);
+    const RACHEN = ['#8f1620', '#5c0c14', '#2a0508'].map(ppHex);
+    const MUENZE = ['#fff6b8', '#ffd94a', '#e8a33a', '#a35a24'].map(ppHex);
+    const ENDE = 1100, FADE_AB = 800, BISS1 = 260, BISS2 = 560;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Schliessgrad 0 (offen, Kiefer an den Kartenkanten) … 1 (zu, Kiefer treffen sich in der Mitte)
+    const schluss = (t) => {
+      if (t < BISS1 - 130) return klemme(t / (BISS1 - 130), 0, 1) * 0.55;        // holt aus
+      if (t < BISS1) return 0.55 + 0.45 * klemme((t - (BISS1 - 130)) / 130, 0, 1);   // schnappt zu
+      if (t < BISS1 + 130) return 1 - 0.7 * klemme((t - BISS1) / 130, 0, 1);       // geht halb auf
+      if (t < BISS2) return 0.3 + 0.7 * Math.pow(klemme((t - BISS1 - 130) / (BISS2 - BISS1 - 130), 0, 1), 2);   // zweiter, härterer Biss
+      if (t < BISS2 + 120) return 1;
+      return 1 - 0.9 * klemme((t - BISS2 - 120) / 220, 0, 1);                      // lässt los
+    };
+    const vorbereiten = (sz) => {
+      const z = sz.ziele[0];
+      return {
+        muenzen: Array.from({ length: ppFxN(8) }, (_, i) => ({
+          vx: (Math.random() - 0.5) * 46 + (i % 2 ? 6 : -6), vy: -(70 + Math.random() * 70),
+          ab: BISS2 + Math.random() * 60, ph: Math.random() * 6, sx: (Math.random() - 0.5) * z.w * 0.5,
+        })),
+        sterne: Array.from({ length: 5 }, () => ({ sx: (Math.random() - 0.5) * z.w * 0.8, sy: (Math.random() - 0.5) * 6, ab: BISS2 + 20 + Math.random() * 200 })),
+      };
+    };
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      const ein = klemme(t / 90, 0, 1);
+      const a = Math.min(aus, ein);
+      if (a <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y), HW = Math.floor(z.w / 2), HH = Math.floor(z.h / 2);
+      const L = CX - HW, R = CX + HW, OB = CY - HH, UN = CY + HH;
+      const c = schluss(t);
+      const BAND = 5;                                        // Dicke der Holzkiefer
+      const yO = Math.round(OB + BAND + c * (HH - BAND));     // Unterkante des Oberkiefers (Band endet hier)
+      const yU = Math.round(UN - BAND - c * (HH - BAND));     // Oberkante des Unterkiefers
+      // Rachen zwischen den Kiefern (dunkelrot, zum Rand dunkler)
+      for (let Y = yO + 1; Y < yU; Y++) {
+        for (let X = L; X <= R; X++) {
+          const rand = Math.min(X - L, R - X, Y - yO, yU - Y);
+          g.put(X, Y, RACHEN[rand < 1 ? 2 : rand < 3 ? 1 : (X + Y) % 5 === 0 ? 1 : 0], a);
+        }
+      }
+      // Holzkiefer samt Messingkante und Nieten
+      const kiefer = (kanteY, richtung) => {
+        for (let j = 0; j < BAND; j++) {
+          const Y = kanteY - richtung * j;
+          for (let X = L; X <= R; X++) {
+            let col = HOLZ[j === 0 ? 2 : j === BAND - 1 ? 2 : (X + j) % 7 === 0 ? 1 : 0];
+            if (j === 1) col = MESSING[X % 6 === 0 ? 0 : 2];
+            g.put(X, Y, col, a);
+          }
+        }
+        // Messing-Eckbeschlaege
+        for (let j = 0; j < BAND; j++) { const Y = kanteY - richtung * j; g.put(L, Y, MESSING[3], a); g.put(R, Y, MESSING[3], a); }
+      };
+      kiefer(yO, 1); kiefer(yU, -1);
+      // Zaehne (Teilung 5, Hoehen 1-2-3-2-1; die unteren sind um 2 versetzt, so greifen sie ineinander)
+      const zaehne = (kanteY, richtung, phase) => {
+        for (let X = L + 1; X < R; X++) {
+          const m = (X - L + phase) % 5;
+          const h = [1, 2, 3, 2, 1][m];
+          for (let k = 1; k <= h; k++) {
+            const spitze = k === h;
+            g.put(X, kanteY + richtung * k, spitze ? ZAHN[1] : (m === 3 || m === 4 ? ZAHN[2] : ZAHN[0]), a);
+          }
+        }
+      };
+      zaehne(yO, 1, 0); zaehne(yU, -1, 2);
+      // Aufblitzen der Zahnspitzen beim Zuschnappen
+      for (const biss of [BISS1, BISS2]) {
+        const al = t - biss;
+        if (al < 0 || al > 160) continue;
+        const k = al / 160;
+        const my = Math.round((yO + yU) / 2);
+        for (let X = L + 2; X < R - 1; X += 5) {
+          g.put(X, my, ZAHN[0], (1 - k) * a);
+          if (k < 0.5) { g.put(X - 1, my, ZAHN[0], (1 - k * 2) * a); g.put(X + 1, my, ZAHN[0], (1 - k * 2) * a); g.put(X, my - 1, ZAHN[0], (1 - k * 2) * a); g.put(X, my + 1, ZAHN[0], (1 - k * 2) * a); }
+        }
+      }
+      // Muenzen springen aus dem Maul (ab dem zweiten Biss)
+      for (const m of teile.muenzen) {
+        const al = t - m.ab;
+        if (al < 0) continue;
+        const sek = al / 1000;
+        const px = CX + m.sx + m.vx * sek, py = CY + m.vy * sek + 0.5 * 260 * sek * sek;
+        const breite = Math.abs(Math.cos(m.ph + sek * 14));          // Drehung: Scheibe schmal ↔ breit
+        const bw = breite > 0.66 ? 2 : breite > 0.33 ? 1 : 0;
+        for (let j = -2; j <= 2; j++) for (let i = -bw; i <= bw; i++) {
+          if (bw === 0 && Math.abs(j) > 2) continue;
+          const rand = Math.abs(j) === 2 || Math.abs(i) === bw;
+          g.put(px + i, py + j, MUENZE[rand ? 2 : (i + j) % 2 === 0 ? 1 : 0], a);
+        }
+        g.put(px - bw, py - 2, MUENZE[0], a);
+        if (bw >= 1) g.put(px + bw - 1, py + 1, MUENZE[3], a);
+      }
+      // Funkelsterne
+      for (const s of teile.sterne) {
+        const al = t - s.ab;
+        if (al < 0 || al > 280) continue;
+        const k = al / 280, px = CX + s.sx, py = CY + s.sy - 6 - k * 10;
+        g.put(px, py, MUENZE[0], (1 - k) * a);
+        if (k < 0.65) { g.put(px - 1, py, MUENZE[1], (1 - k) * a); g.put(px + 1, py, MUENZE[1], (1 - k) * a); g.put(px, py - 1, MUENZE[1], (1 - k) * a); g.put(px, py + 1, MUENZE[1], (1 - k) * a); }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten);
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Eisfaust (Embodiment of Biseria, Schadensmodus) — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!";
   //  Vorgabe der Karte: „eine riesige Eis-Faust, die das Ziel zerschmettert")
   //
@@ -45957,6 +46078,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'hero_defeat_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🕯️ {entry.hero} was defeated — {cName(entry.by)} deletes it and its cards, except Creatures.</span>; }
       if (t === 'hero_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🗑️ {pName(p.name, p.color)}'s {entry.hero} was deleted by {cName(entry.by)}.</span>; }
       if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.amount}</span> Gold.</span>; }
+      if (t === 'gold_steal') { const p = playerByName(entry.player); const q = playerByName(entry.from); return <span className="log-status">🪙 {cName(entry.by)} — {pName(p.name, p.color)} steals <span className="log-amount" style={{color:'#ffcc44'}}>{entry.amount}</span> Gold from {pName(q.name, q.color)}.</span>; }
+      if (t === 'gold_steal_fizzle') { return <span className="log-info">🪙 {cName(entry.by)} — there is no Gold to steal{entry.reason === 'first-turn protection' ? ' (first-turn protection)' : ''}.</span>; }
       if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#cc8844'}}>{entry.amount}</span> Gold.</span>; }
       if (t === 'forced_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
       // `forced_delete` is what `actionPromptForceDiscard` logs in
