@@ -25,7 +25,7 @@
 //
 //  ── „OTHERWISE, PUT IT ON TOP OR BOTTOM" ────────────────────────────────
 //  Welche Karten diese Wahl bekommen, entscheidet die AUFRUFENDE Karte (Als Vorgabe 10.10.):
-//    • Sky Archeologist: nur Karten, die KEIN Artifact sind. Ein nicht gespieltes Artifact (abgelehnt wie unspielbar) geht ohne Wahl zurück ins Deck.
+//    • Sky Archeologist: jede aufgedeckte Karte, die nicht gespielt wurde (kein Artifact, unspielbar, abgelehnt mit „Not now", abgebrochen).
 //    • Slave Trader: jede aufgedeckte Karte, die nicht beschworen wurde (keine Creature, unbeschwörbar).
 //  Unten = ans Ende von `mainDeck` (`engine.moveWithinDeck`), die Sichtbarkeitsmarke der obersten Karte (`deckTopVisible`) fällt dann weg wie bei
 //  `reorderDeck`. Die CPU legt eine Karte, die sie für gut hält (Handwert ≥ Durchschnitt des Decks), oben auf; sonst unten.

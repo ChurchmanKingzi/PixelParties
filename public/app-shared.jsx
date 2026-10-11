@@ -2297,6 +2297,8 @@ function playSFXForLog(entry) {
     // ── Resources ─────────────────────────────
     case 'gold_gain':
     case 'gold_steal':
+      // Ein Diebstahl klingt ueber seinen Muenzflug (`ev_gold_steal_burst`) — sein Gewinn-/Diebstahl-Log kommt gleich danach und braeuchte keinen zweiten Klang.
+      if (window._goldStealSfxAt && performance.now() - window._goldStealSfxAt < 1200) return;
     // Logan, the Investment Monkee: Einzahlen und die Gold-Auszahlung
     // benutzen denselben Muenzklang. Der Schaden-Zweig laeuft ueber die
     // normalen Schaden-Ereignisse und braucht hier nichts.
@@ -3580,8 +3582,15 @@ const ZONE_ANIM_SFX = {
     { name: 'discard', opts: { rate: 0.9, volume: 0.7, delay: 600, category: null, dedupe: 250 } },
   ],
   // ── Karten-Bilder mit EIGENEM Socket-Handler (kein `play_zone_animation`): der Handler ruft `playSFXForZoneAnim('ev_…')`.
-  //    Gold-Bilder (`play_gold_coins`, `gold_steal_burst`) klingen ueber den Log (`gold_gain`/`gold_steal`), Fluege ueber ihre Stapel-
+  //    Gold-Bilder (`play_gold_coins`) klingen ueber den Log (`gold_gain`), der Muenzflug des Diebstahls (`gold_steal_burst`) ueber `ev_gold_steal_burst`, Fluege ueber ihre Stapel-
   //    und Platzierungsklaenge, Zahlen-Floater und reine Anzeigen bleiben stumm.
+  // ★ Gold-Diebstahl (`gold_steal_burst`, Mimic & jeder andere Goldraub; Als Befund 10.10.: „fehlt ein Sound für das von A nach B fliegende Gold"):
+  //   zwei Muenzklaenge zum FLUG — beim Abheben und bei der Landung. `category: null`: kein Effekt-Klang, der von einem gleichzeitigen Biss/Schlag
+  //   verschluckt wird. Der Log-Klang (`gold_steal`/`gold_gain`) schweigt kurz danach (`_goldStealSfxAt`), damit nichts doppelt klingt.
+  ev_gold_steal_burst: [
+    { name: 'gold_gain', opts: { rate: 1.25, volume: 0.8, delay: 0, category: null, dedupe: 0 } },
+    { name: 'gold_gain', opts: { rate: 1.0, volume: 0.65, delay: 520, category: null, dedupe: 0 } },
+  ],
   // Willy: Klee, Regenbogen, Muenzen um den Helden
   ev_willy_leprechaun: [
     { name: 'buff', opts: { rate: 1.4, volume: 0.7, delay: 0, category: null, dedupe: 250 } },

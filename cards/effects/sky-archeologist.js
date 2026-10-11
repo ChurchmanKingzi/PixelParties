@@ -21,10 +21,11 @@
 //    • Ist sie ein ARTIFACT und spielbar → Abfrage „für 0 Gold spielen?". Ja: das Artifact wird SOFORT gespielt und wirkt auf der Stelle — es kommt NICHT auf die
 //      Hand: Equipment wird an einen gewählten Helden gelegt (die Karte fliegt aus der Mitte auf den Platz), alles andere läuft über Zielwahl, Kettenfenster und
 //      `resolve` im Gratis-Scope (`engine.kostenlosSpielen`) und landet danach in der Ablage (`_free-artifact-shared.js`).
-//    • Ein ARTIFACT, das nicht gespielt wird — der Spieler lehnt ab, bricht die Zielwahl ab ODER es ist nicht spielbar (Equipment ohne freien Platz,
-//      Artifact-Sperre, Reaction/Surprise/Area/Artifact Creature …) —, geht zurück ins Deck, wo es lag (oben): abgelehnt wird behandelt, als wäre es unspielbar
-//      gewesen. KEINE Oben/Unten-Wahl.
-//    • „Otherwise" = die aufgedeckte Karte ist KEIN Artifact: dann legt der Spieler sie oben oder unten auf das Deck (eigene Wahl, die Karte liegt dabei in der Mitte).
+//    • JEDE aufgedeckte Karte, die nicht gespielt wird, legt der Spieler OBEN ODER UNTEN auf das Deck (eigene Wahl, die Karte liegt dabei in der Mitte —
+//      „Otherwise, put it on top or bottom of your deck"). Das gilt für: eine Karte, die kein Artifact ist; ein Artifact, das nicht spielbar ist (Equipment ohne
+//      freien Platz, Artifact-Sperre, Reaction/Surprise/Area/Artifact Creature …); ein Artifact, das der Spieler ablehnt („Not now") oder dessen Zielwahl/Platzwahl er
+//      abbricht. Abgelehnt wird behandelt, als wäre es unspielbar gewesen (Als Vorgabe 10.10.) — beides führt zur Oben/Unten-Wahl (Als Korrektur 10.10.: „Beim
+//      Zurücklegen eines Artifacts via ‚Not now' hat mir Archeologist keine Wahl zwischen Top oder Bottom angeboten").
 //  Aufdecken ist keine Suche (keine Such-Sperre). Ohne Karte im Deck ist der Effekt nicht aktivierbar.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
@@ -95,9 +96,9 @@ module.exports = {
         });
         if (ja && !ja.cancelled) gespielt = await spieleKostenlos(engine, pi, top, { source: CARD_NAME, key });
       }
-      // „Otherwise, put it on top or bottom of your deck (your choice)." gilt NUR für Karten, die kein Artifact sind — ein Artifact (abgelehnt, abgebrochen
-      // oder unspielbar) bleibt, wo es lag: oben.
-      if (!gespielt && !istArtifact) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
+      // „Otherwise, put it on top or bottom of your deck (your choice)." — jede Karte, die nicht gespielt wurde: kein Artifact, unspielbar, abgelehnt
+      // („Not now") oder abgebrochen. Die Karte liegt dabei noch in der Bildmitte.
+      if (!gespielt) lage = await obenOderUnten(engine, pi, top, { source: CARD_NAME });
     } finally {
       // Nicht gespielt: die Karte fliegt aus der Mitte zurück ins Deck (auch wenn oben etwas schiefging).
       if (!gespielt) await gibFrei(engine, pi, key, top, { dest: 'deck' });

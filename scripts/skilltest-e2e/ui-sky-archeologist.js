@@ -8,6 +8,7 @@
 //     auf (ein Equipment): die Karte liegt in der Bildmitte (`kf-in`), die Frage „kostenlos spielen?“, die Zonenwahl (Karte bleibt liegen), danach fliegt
 //     sie auf den Platz (`kf-out`) und das Equipment liegt am gewählten Helden, das Log nennt es; ein zweiter Einsatz im selben Zug geschieht nicht.
 //   • Lauf D (echter Spielweg): oben liegt Golden Bananas — „Ja“ wirkt SOFORT (+12 Gold, 0 Gold gezahlt), die Karte liegt danach in der Ablage, NICHT auf der Hand.
+//   • Lauf E (echter Spielweg): „Not now“ bei Golden Bananas — die Oben/Unten-Frage folgt (Karte liegt in der Mitte); „Bottom“ legt es unter das Deck.
 //   • Lauf C (echter Spielweg): oben liegt ein Spell — keine Spielfrage, nur „oben oder unten?“; „Bottom“ legt ihn unter das Deck (Log).
 //   NODE_PATH=…uitools/node_modules:/tmp/st-tools/node_modules:/opt/node22/lib/node_modules node scripts/skilltest-e2e/ui-sky-archeologist.js [/pfad/ordner]
 const { chromium } = require('playwright');
@@ -225,6 +226,33 @@ const antwort = (page, id, response) => page.evaluate(([id, response]) => window
         check('…das Log: „plays it right away for 0 Gold“', r.log.some(t => /Golden Bananas/.test(t) && /plays it right away for 0 Gold/.test(t)), r.log);
         const haengt = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card'));
         check('es bleibt keine Karte in der Bildmitte liegen', haengt === false);
+        check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
+      } finally { await s.ctx.close(); }
+    }
+
+    console.log('Lauf E: echter Spielweg — „Not now“ bei einem Artifact: oben oder unten?');
+    {
+      const s = await seite(browser, 'E', AUFBAU({ deck: ['Golden Bananas', 'Fireball', 'Fireball'], aufBrett: true }));
+      try {
+        const { page } = s;
+        const my = await page.evaluate(() => window.__gs.myIndex);
+        try { await page.click('button[title="Show Log & Chat"]', { timeout: 3000 }); } catch { /* Seitenleiste schon offen */ }
+        const gold0 = await page.evaluate((my) => window.__gs.players[my].gold, my);
+        await page.evaluate(() => window.socket.emit('activate_creature_effect', { roomId: window.__gs.roomId, heroIdx: 1, zoneSlot: 0 }));
+        const spiel = await warteAufPrompt(page, 'confirm', 'Play it right now');
+        check('die Frage „für 0 Gold spielen?“ erscheint', !!spiel && /Golden Bananas/.test(spiel.msg), spiel);
+        if (spiel) await antwort(page, spiel.id, { cancelled: true });                      // „Not now“
+        const tb = await warteAufPrompt(page, 'confirm', 'top or on the bottom');
+        check('nach „Not now“ folgt die Oben/Unten-Frage für das Artifact (Knöpfe Top/Bottom)', !!tb && /Golden Bananas/.test(tb.msg), tb);
+        const liegt = await page.evaluate(() => !!document.querySelector('.kassaran-flip-card.kf-in'));
+        check('…die Karte liegt dabei noch in der Bildmitte', liegt === true);
+        if (outDir && tb) { try { await page.screenshot({ path: path.join(outDir, 'sky-archeologist-notnow-oben-unten.png') }); } catch { /* egal */ } }
+        if (tb) await antwort(page, tb.id, { cancelled: true });                            // „Bottom“
+        await sleep(2500);
+        const r = await page.evaluate((my) => { const p = window.__gs.players[my]; return { gold: p.gold, hand: p.hand.slice(), abl: p.discardPile.slice(),
+          log: [...document.querySelectorAll('.log-status, .log-info, [class*="log"]')].map(e => e.textContent).filter(t => /Sky Archeologist/.test(t)) }; }, my);
+        check('das Artifact wurde NICHT gespielt (Gold unverändert, nicht in der Ablage oder auf der Hand)', r.gold === gold0 && !r.abl.includes('Golden Bananas') && !r.hand.includes('Golden Bananas'), r);
+        check('das Log meldet: das Artifact liegt unten im Deck', r.log.some(t => /Golden Bananas/.test(t) && /bottom/.test(t)), r.log);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
       } finally { await s.ctx.close(); }
     }

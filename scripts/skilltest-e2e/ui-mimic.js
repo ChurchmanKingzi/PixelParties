@@ -41,7 +41,7 @@ async function seite(browser, name, bauen) {
   const dauern = await page.evaluate(async () => {
     const ac = new (window.AudioContext || window.webkitAudioContext)();
     const out = {};
-    for (const n of ['slash', 'heavy_impact']) {
+    for (const n of ['slash', 'heavy_impact', 'gold_gain']) {
       const buf = await (await fetch('/sounds/' + n + '.ogg')).arrayBuffer();
       out[n] = +(await ac.decodeAudioData(buf)).duration.toFixed(3);
     }
@@ -123,6 +123,19 @@ const hat = (klaenge, dauer) => klaenge.some(k => Math.abs(k.dur - dauer) < 0.00
         check('die Pixelart-Animation (Canvas) ist bemalt', !!spur && spur.bemalt > 400, spur);
         check('die Klänge starten: Bisse (`slash`) und Aufschlag (`heavy_impact`)', hat(klaenge, s.dauern.slash) && hat(klaenge, s.dauern.heavy_impact), [s.dauern, klaenge]);
         check('nach ~1,2 s ist die Animation wieder weg', weg === true);
+        // Der Münzstrom des Diebstahls (`gold_steal_burst`, vom Server gleichzeitig mit dem Biss geschickt) klingt: zwei Münzklänge — Abheben und Landung
+        const opp = 1 - my;
+        await page.evaluate(() => { window.__snd.length = 0; });
+        await page.evaluate(({ my, opp }) => { window.socket.listeners('gold_steal_burst').forEach(f => f({ fromPlayer: opp, toPlayer: my, amount: 10 })); }, { my, opp });
+        await sleep(1500);
+        const muenzen = (await page.evaluate(() => window.__snd.slice())).filter(k => Math.abs(k.dur - s.dauern.gold_gain) < 0.005);
+        check('der fliegende Münzstrom klingt: zwei Münzklänge (`gold_gain`), der zweite bei der Landung', muenzen.length === 2 && muenzen[1].t - muenzen[0].t >= 380 && muenzen[1].t - muenzen[0].t <= 900, muenzen);
+        // …und der Log-Klang des Diebstahls schweigt danach kurz (kein dritter Klang): Log-Eintrag `gold_steal` unmittelbar nach dem Flug
+        await page.evaluate(() => { window.__snd.length = 0; });
+        await page.evaluate(({ my, opp }) => { window.socket.listeners('gold_steal_burst').forEach(f => f({ fromPlayer: opp, toPlayer: my, amount: 10 })); window.playSFXForLog && window.playSFXForLog({ type: 'gold_steal' }); window.playSFXForLog && window.playSFXForLog({ type: 'gold_gain' }); }, { my, opp });
+        await sleep(1500);
+        const nach = (await page.evaluate(() => window.__snd.slice())).filter(k => Math.abs(k.dur - s.dauern.gold_gain) < 0.005);
+        check('der Gewinn-/Diebstahl-Log direkt nach dem Flug klingt NICHT zusätzlich (weiter genau zwei Münzklänge)', nach.length === 2, nach);
         check('keine JS-Fehler im Browser', s.fehler.length === 0, s.fehler);
       } finally { await s.ctx.close(); }
     }

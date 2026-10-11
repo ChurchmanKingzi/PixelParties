@@ -79,6 +79,11 @@ function legeSA(slot = 0) {
 const ja = (titelTeil) => (pi, d) => (d.type === 'confirm' && d.title === SA && new RegExp(titelTeil).test(d.message || '')) ? true : undefined;
 const nein = (titelTeil) => (pi, d) => (d.type === 'confirm' && d.title === SA && new RegExp(titelTeil).test(d.message || '')) ? false : undefined;
 const oben = () => t.p0.mainDeck[0];
+// „Top or bottom" (Als Korrektur 10.10.): JEDE nicht gespielte Karte bekommt die Wahl — die Tests beantworten sie ausdrücklich.
+const topAntwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? true : undefined;
+const botAntwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? false : undefined;
+const kombi = (...fs) => (pi, d) => { for (const f of fs) { const a = f(pi, d); if (a !== undefined) return a; } return undefined; };
+const obenFragen = () => t.prompts.filter(p => p.d._topOrBottom);
 
 (async () => {
   console.log('Karte, Kunst und Skript');
@@ -257,12 +262,12 @@ const oben = () => t.p0.mainDeck[0];
     legeSA();
     t.p0.gold = 9;
     t.engine.promptEffectTarget = async () => null;
-    t.antwort = ja('Play it right now');
+    t.antwort = kombi(ja('Play it right now'), topAntwort);
     await aktivieren();
     check('Abbruch der Zielwahl: das Artifact liegt unverändert OBEN im Deck, nichts in der Ablage, kein Gold bewegt, nichts auf der Hand', t.p0.mainDeck.join() === [DOOM, SPELL].join() && t.p0.discardPile.length === 0 && t.p0.hand.length === 0 && t.p0.gold === 9, { deck: t.p0.mainDeck, abl: t.p0.discardPile, gold: t.p0.gold });
     const f = frei();
     check('…die Karte fliegt aus der Mitte zurück ins Deck (`dest: deck`)', f.length === 1 && f[0].dest === 'deck' && f[0].cardName === DOOM, f);
-    check('…und es gibt KEINE Oben/Unten-Frage (es ist ein Artifact)', !t.prompts.some(p => p.d._topOrBottom));
+    check('…danach folgt die Oben/Unten-Wahl (nicht gespielt), die Karte liegt dabei in der Mitte', obenFragen().length === 1 && obenFragen()[0].d.showCard === DOOM, obenFragen().map(p => p.d.showCard));
   }
   {
     // `resolve` meldet „cancelled" (Spieler bricht eine innere Abfrage ab) → die Karte liegt wieder oben
@@ -270,9 +275,9 @@ const oben = () => t.p0.mainDeck[0];
     legeSA();
     const sk = loadCardEffect(BANANEN), alt = sk.resolve;
     sk.resolve = async () => ({ cancelled: true });
-    t.antwort = ja('Play it right now');
+    t.antwort = kombi(ja('Play it right now'), topAntwort);
     try { await aktivieren(); } finally { sk.resolve = alt; }
-    check('`cancelled` aus dem resolve: die Karte liegt wieder OBEN im Deck (nicht in der Ablage)', t.p0.mainDeck.join() === [BANANEN, SPELL].join() && t.p0.discardPile.length === 0, { deck: t.p0.mainDeck, abl: t.p0.discardPile });
+    check('`cancelled` aus dem resolve: die Karte liegt wieder OBEN im Deck (nicht in der Ablage), danach folgt die Oben/Unten-Wahl', t.p0.mainDeck.join() === [BANANEN, SPELL].join() && t.p0.discardPile.length === 0 && obenFragen().length === 1, { deck: t.p0.mainDeck, abl: t.p0.discardPile, fragen: obenFragen().length });
   }
   {
     // Zugende-Reiter (Open-Invitation-Vertrag): `gs._spellEndsTurn` beendet den Zug nach der Wirkung
@@ -301,15 +306,30 @@ const oben = () => t.p0.mainDeck[0];
     check('…das Kettenfenster lief als Artifact-Spiel NICHT aus der Hand (`fromBoard`), zu 0 Gold', kettenInfo && kettenInfo.cardType === 'Artifact' && kettenInfo.fromBoard === true && kettenInfo.goldCost === 0 && kettenInfo.owner === 0, kettenInfo && { t: kettenInfo.cardType, fb: kettenInfo.fromBoard, g: kettenInfo.goldCost });
   }
   {
-    // Abgelehnt → geht zurück ins Deck, als wäre es unspielbar gewesen (KEINE Oben/Unten-Wahl: die gilt nur für Nicht-Artifacts)
+    // „Not now" → die Karte wird wie eine unspielbare behandelt: Oben/Unten-Wahl (Als Korrektur 10.10.)
     t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL, KLEIN] });
     legeSA();
-    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) ? false : undefined;
+    let beiFrage = null;
+    t.antwort = kombi(nein('Play it right now'), (pi, d) => {
+      if (d.type === 'confirm' && d.title === SA && d._topOrBottom) { beiFrage = { gehalten: halten().length, frei: frei().length, msg: d.message, karte: d.showCard }; return true; }   // „Top"
+      return undefined;
+    });
     await aktivieren();
-    check('abgelehnt: KEINE „oben oder unten“-Frage — das Artifact bleibt, wo es lag (oben), wie bei einem unspielbaren', !t.prompts.some(p => p.d._topOrBottom) && t.p0.mainDeck.join() === [GROSS_EQ, SPELL, KLEIN].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support'), { deck: t.p0.mainDeck, prompts: t.prompts.map(p => (p.d.message || '').slice(0, 40)) });
+    check('abgelehnt („Not now"): die Oben/Unten-Frage kommt — genau EINE, für das aufgedeckte Artifact', obenFragen().length === 1 && obenFragen()[0].d.showCard === GROSS_EQ, obenFragen().map(p => p.d.showCard));
+    check('…die Karte liegt dabei in der Bildmitte (gehalten, noch nicht freigegeben)', beiFrage && beiFrage.gehalten === 1 && beiFrage.frei === 0, beiFrage);
+    check('„Top": das Artifact bleibt oben im Deck, liegt nicht am Helden', t.p0.mainDeck.join() === [GROSS_EQ, SPELL, KLEIN].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support'), { deck: t.p0.mainDeck });
     const f = frei();
     check('die Karte lag in der Mitte und fliegt von dort ZURÜCK ins DECK (`dest: deck`)', halten().length === 1 && f.length === 1 && f[0].dest === 'deck' && f[0].holdKey === halten()[0].holdKey, { h: halten(), f });
-    check('Log: nicht gespielt, nirgendwohin gelegt (`played`/`placed` leer)', log('sky_archeologist').some(l => l.card === GROSS_EQ && !l.played && !l.placed), log('sky_archeologist'));
+    check('Log: nicht gespielt, oben gelassen (`played` leer, `placed: top`)', log('sky_archeologist').some(l => l.card === GROSS_EQ && !l.played && l.placed === 'top'), log('sky_archeologist'));
+  }
+  {
+    // „Not now" + „Bottom" → das Artifact geht UNTER das Deck
+    t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL, KLEIN] });
+    legeSA();
+    t.antwort = kombi(nein('Play it right now'), botAntwort);
+    await aktivieren();
+    check('„Not now" + „Bottom": das Artifact liegt UNTEN im Deck', t.p0.mainDeck.join() === [SPELL, KLEIN, GROSS_EQ].join(), t.p0.mainDeck);
+    check('Log: `placed: bottom`', log('sky_archeologist').some(l => l.card === GROSS_EQ && !l.played && l.placed === 'bottom'), log('sky_archeologist'));
   }
   {
     // Abbruch der Platzwahl (Equipment) → zurück ins Deck
@@ -318,10 +338,10 @@ const oben = () => t.p0.mainDeck[0];
     t.antwort = (pi, d) => {
       if (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) return true;
       if (d.type === 'zonePick' && d.title === SA) return { cancelled: true };
-      return undefined;
+      return topAntwort(pi, d);
     };
     await aktivieren();
-    check('Abbruch der Platzwahl: das Equipment bleibt oben im Deck, liegt nicht am Helden, fliegt zurück ins Deck', t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support') && frei().length === 1 && frei()[0].dest === 'deck', { deck: t.p0.mainDeck, f: frei() });
+    check('Abbruch der Platzwahl: das Equipment bleibt oben im Deck, liegt nicht am Helden, es folgt die Oben/Unten-Wahl, dann fliegt die Karte zurück ins Deck', t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support') && obenFragen().length === 1 && frei().length === 1 && frei()[0].dest === 'deck', { deck: t.p0.mainDeck, f: frei(), fragen: obenFragen().length });
   }
   {
     // Karte, die kein Artifact ist: „Otherwise" — oben/unten, die Karte liegt dabei in der Mitte
@@ -346,23 +366,26 @@ const oben = () => t.p0.mainDeck[0];
     legeSA();
     for (let h = 0; h < 3; h++) for (let z = 0; z < 3; z++) if (!(h === 0 && z === 0)) t.p0.supportZones[h][z] = ['Platzhalter'];
     check('Vorbedingung: kein freier Platz für das Equipment', equipDestinations(t.engine, 0, GROSS_EQ).length === 0);
+    t.antwort = topAntwort;
     await aktivieren();
-    check('Equipment ohne freien Platz ist NICHT spielbar: keine Frage, die Karte bleibt oben im Deck', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+    check('Equipment ohne freien Platz ist NICHT spielbar: keine Spielfrage, aber die Oben/Unten-Wahl — „Top" lässt die Karte oben im Deck', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && obenFragen().length === 1 && t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     // Artifact-Sperre (Boomerang)
     t = await fresh({ phase: 2, deck: [BANANEN, SPELL] });
     legeSA();
     t.p0._artifactLockTurn = t.gs.turn;
+    t.antwort = topAntwort;
     await aktivieren();
-    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [BANANEN, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar — keine Spielfrage, nur die Oben/Unten-Wahl („Top": die Karte bleibt oben)', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && obenFragen().length === 1 && t.p0.mainDeck.join() === [BANANEN, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     // Zielkarte ohne gültiges Ziel / Spielbarkeits-Tor der Karte (Coffee: nur mit alten Status)
     t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
     legeSA();
+    t.antwort = topAntwort;
     await aktivieren();
-    check('Coffee ohne Status auf den Helden: das kartenseitige Tor sperrt — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
+    check('Coffee ohne Status auf den Helden: das kartenseitige Tor sperrt — keine Spielfrage, nur die Oben/Unten-Wahl („Top": die Karte bleibt oben)', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && obenFragen().length === 1 && t.p0.mainDeck.join() === [GROSS, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     // Nicht spielbare Unterarten: Reaction ohne `proactivePlay`, Area, Surprise, Artifact Creature
