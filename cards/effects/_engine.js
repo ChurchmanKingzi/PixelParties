@@ -14871,6 +14871,26 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
     const { alsZusatzaktion, summonWindow, ...rest } = opts || {};
+    // ── REACTION-CREATURES AUS DER HAND SIND „GESPIELTE REACTIONS" (Front Soldier, Als Vorgabe 10.10.) ──────────────
+    // Doomed Town Guard, Explosive Drone, Enhanced Guard Dog, Chaorc Rider Warg und Elven Rider beschwören sich über ihren EIGENEN Hook-Weg
+    // (kein Kettenfenster): nach dem Ja nehmen sie die Karte aus der Hand und rufen hier `summonCreatureWithHooks` mit `fromHandIdx` +
+    // `summonWindow`. Genau an dieser Stelle gilt die Reaction als gespielt — ein Hand-Zuhörer des Gegners (Front Soldier) darf sie
+    // negieren: die Karte, die der Aufrufer schon aus der Hand genommen hat, geht in die Ablage statt aufs Brett, und der Aufrufer sieht
+    // `{ negated: true, inst: null }` (derselbe Vertrag wie bei Off Duty — alle fünf Karten beenden ihren Effekt dann ohne Wirkung).
+    if (summonWindow && rest.fromHandIdx != null && rest.fromHandIdx >= 0 && !this._inMctsSim) {
+      const _rcd = this._getCardDB()[cardName];
+      if (_rcd && (_rcd.subtype || '') === 'Reaction' && hasCardType(_rcd, 'Creature')) {
+        const _rBesitzer = rest.controller ?? playerIdx;
+        if (await this._reaktionGespielt(_rBesitzer, cardName, 'Creature')) {
+          this._broadcastEvent('play_pile_transfer', {
+            owner: _rBesitzer, cardName, from: 'hand', to: 'discard', asPlay: true, fromHandIdx: rest.fromHandIdx,
+          });
+          this.gs.players[_rBesitzer]?.discardPile?.push(cardName);
+          this.sync();
+          return { negated: true, inst: null };
+        }
+      }
+    }
     // ── BESCHWOERUNGS-KETTENFENSTER (Off Duty & co., Ruling 3.10.) ───────
     // Opt-in `summonWindow: true` — fuer Beschwoerungen, die NICHT ueber die
     // Kette des Handspiels laufen (Reaktions-Creatures aus der Hand: Explosive
@@ -33057,6 +33077,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * der Kreaturentode (war im Einzel-Fenster inline). `false`, wenn die
    * Karte nicht mehr auf der Hand ist.
    */
+  /**
+   * ★ „When your opponent PLAYS A REACTION" (Front Soldier, Als Vorgabe 10.10.) — die EINE Stelle, an der eine Hand-Reaction als gespielt gilt.
+   * Feuert den Hook `onReactionPlayed` `{ reactionOwner, reactionCardName, reactionCardType }`; ein Hand-Zuhörer des Gegners darf sie negieren
+   * (`ctx.setFlag('_reactionNegated', true)`, `_reactionNegatedBy`). Gerufen von `_rxHandkarteEinsetzen` (Reaction-Spells/-Artifacts in den
+   * Hand-Reaktionsfenstern) und von `summonCreatureWithHooks` (Reaction-CREATURES aus der Hand: Doomed Town Guard, Explosive Drone, Enhanced Guard Dog,
+   * Chaorc Rider Warg, Elven Rider). Kettenreaktionen laufen über ihr eigenes Kettenfenster. Loggt `reaction_negated` und meldet die Negation
+   * (`ON_NEGATION_DEALT`).
+   * @returns {Promise<boolean>} true = negiert (die Wirkung der Reaction fällt aus)
+   */
+  async _reaktionGespielt(ownerIdx, cardName, cardType) {
+    if (this._inMctsSim) return false;
+    const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardType || null, _skipReactionCheck: true };
+    await this.runHooks('onReactionPlayed', rxHook);
+    if (!rxHook._reactionNegated) return false;
+    this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
+    await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
+    return true;
+  }
+
   async _rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast) {
     const ps = this.gs.players[ownerIdx];
     const cardData = this._getCardDB()[cardName];
@@ -33081,18 +33120,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.sync();
     this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
     await this._delay(300);
-    // ★ „When your opponent PLAYS A REACTION" (Front Soldier, Als Vorgabe 10.10.): die Reaction ist bezahlt und aufgedeckt, ihre Wirkung steht noch aus.
-    // Hand-Zuhörer des GEGNERS dürfen sie jetzt negieren (`ctx.setFlag('_reactionNegated', true)`) — dann fällt die Wirkung aus: der Aufrufer sieht
-    // `false` und überspringt sie, die Karte liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte). Gilt für ALLE Hand-
-    // Reaktionsfenster der Engine (Held besiegt, vor Schaden, Board-Karte in die Ablage …); Kettenreaktionen laufen über ihr eigenes Kettenfenster.
-    const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardData?.cardType || null, _skipReactionCheck: true };
-    await this.runHooks('onReactionPlayed', rxHook);
-    if (rxHook._reactionNegated) {
-      this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
-      await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
-      this.sync();
-      return false;
-    }
+    // ★ „When your opponent PLAYS A REACTION" (Front Soldier): die Reaction ist bezahlt und aufgedeckt, ihre Wirkung steht noch aus —
+    // `_reaktionGespielt` fragt die Hand-Zuhörer des Gegners. Negiert: der Aufrufer sieht `false` und überspringt die Wirkung, die Karte
+    // liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte).
+    if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType)) { this.sync(); return false; }
     return true;
   }
 

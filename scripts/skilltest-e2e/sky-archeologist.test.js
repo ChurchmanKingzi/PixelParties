@@ -206,19 +206,14 @@ const oben = () => t.p0.mainDeck[0];
     check('Log: `free_in_hand`', log('sky_archeologist').some(l => l.played === 'hand'), log('sky_archeologist'));
   }
   {
-    // Abgelehnt → oben/unten
+    // Abgelehnt → geht zurück ins Deck, als wäre es unspielbar gewesen (KEINE Oben/Unten-Wahl: die gilt nur für Nicht-Artifacts)
     t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL, KLEIN] });
     legeSA();
-    t.antwort = (pi, d) => {
-      if (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) return false;
-      if (d.type === 'confirm' && d.title === SA && d._topOrBottom) return false;      // „Bottom“
-      return undefined;
-    };
+    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && /Play it right now/.test(d.message)) ? false : undefined;
     await aktivieren();
-    const tb = t.prompts.filter(p => p.d._topOrBottom);
-    check('abgelehnt: das Artifact bleibt im Deck — die Abfrage „oben oder unten“ folgt (mit Kartenbild, Beschriftung Top/Bottom)', tb.length === 1 && tb[0].d.showCard === GROSS_EQ && /Top/.test(tb[0].d.confirmLabel) && /Bottom/.test(tb[0].d.cancelLabel), tb.map(p => p.d));
-    check('„Bottom“: die Karte liegt UNTEN im Deck (die nächste ist oben), nicht gespielt', t.p0.mainDeck.join() === [SPELL, KLEIN, GROSS_EQ].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support'), t.p0.mainDeck);
+    check('abgelehnt: KEINE „oben oder unten“-Frage — das Artifact bleibt, wo es lag (oben), wie bei einem unspielbaren', !t.prompts.some(p => p.d._topOrBottom) && t.p0.mainDeck.join() === [GROSS_EQ, SPELL, KLEIN].join() && !t.engine.cardInstances.some(c => c.name === GROSS_EQ && c.zone === 'support'), { deck: t.p0.mainDeck, prompts: t.prompts.map(p => (p.d.message || '').slice(0, 40)) });
     check('der Flug des Aufdeckens geht zurück ins DECK (`dest: deck`)', reveal().length === 1 && reveal()[0].dest === 'deck', reveal());
+    check('Log: nicht gespielt, nirgendwohin gelegt (`played`/`placed` leer)', log('sky_archeologist').some(l => l.card === GROSS_EQ && !l.played && !l.placed), log('sky_archeologist'));
   }
   {
     t = await fresh({ phase: 2, deck: [SPELL, GROSS, KLEIN] });
@@ -235,33 +230,29 @@ const oben = () => t.p0.mainDeck[0];
     check('Spell oben, „Bottom“: die Karte geht unter das Deck', t.p0.mainDeck.join() === [GROSS, SPELL].join(), t.p0.mainDeck);
   }
   {
-    // Equipment ohne freien Platz → unspielbar → direkt oben/unten
+    // Equipment ohne freien Platz → unspielbar → zurück ins Deck (ohne jede Frage)
     t = await fresh({ phase: 2, deck: [GROSS_EQ, SPELL] });
     legeSA();
     for (let h = 0; h < 3; h++) for (let z = 0; z < 3; z++) if (!(h === 0 && z === 0)) t.p0.supportZones[h][z] = ['Platzhalter'];
-    t.p0.supportZones[0][1] = ['Platzhalter']; t.p0.supportZones[0][2] = ['Platzhalter'];
-    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? true : undefined;
     check('Vorbedingung: kein freier Platz für das Equipment', equipDestinations(t.engine, 0, GROSS_EQ).length === 0);
     await aktivieren();
-    check('Equipment ohne freien Platz ist NICHT spielbar: keine Spielfrage, nur oben/unten', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && t.prompts.some(p => p.d._topOrBottom) && t.p0.mainDeck[0] === GROSS_EQ, t.prompts.map(p => p.d.message));
+    check('Equipment ohne freien Platz ist NICHT spielbar: keine Frage, die Karte bleibt oben im Deck', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS_EQ, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     // Artifact-Sperre (Boomerang)
     t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
     legeSA();
     t.p0._artifactLockTurn = t.gs.turn;
-    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? true : undefined;
     await aktivieren();
-    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar, nur oben/unten', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && t.p0.mainDeck[0] === GROSS && !t.p0.hand.includes(GROSS), t.prompts.map(p => p.d.message));
+    check('Artifact-Sperre („no Artifacts for the rest of this turn“): nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join() && !t.p0.hand.includes(GROSS), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     // Hand-Sperre: das Artifact müsste auf die Hand
     t = await fresh({ phase: 2, deck: [GROSS, SPELL] });
     legeSA();
     t.p0.handLocked = true;
-    t.antwort = (pi, d) => (d.type === 'confirm' && d.title === SA && d._topOrBottom) ? true : undefined;
     await aktivieren();
-    check('Hand-Sperre: ein Normal-Artifact (läuft über die Hand) ist nicht spielbar — nur oben/unten', !t.prompts.some(p => /Play it right now/.test(p.d.message || '')) && t.p0.mainDeck[0] === GROSS, t.prompts.map(p => p.d.message));
+    check('Hand-Sperre: ein Normal-Artifact (läuft über die Hand) ist nicht spielbar — keine Frage, die Karte bleibt oben', t.prompts.length === 0 && t.p0.mainDeck.join() === [GROSS, SPELL].join(), { prompts: t.prompts.map(p => p.d.message), deck: t.p0.mainDeck });
   }
   {
     t = await fresh({ phase: 2, deck: [] });
