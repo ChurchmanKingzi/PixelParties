@@ -23,6 +23,9 @@
 //    liegt nur im Speicher, gilt für genau diesen Raum und ersetzt beim
 //    Beitritt das Raum-Passwort (`hasRoomInvite` / `consumeRoomInvite`).
 //    Welche Räume einladbar sind, entscheidet server.js (`roomInviteInfo`).
+//    Wer eine Einladung ablehnt, wird für DIESEN Raum nicht noch einmal eingeladen.
+//    Der Client zeigt Einladungen nur im Hauptmenü und hebt sie sonst auf; vor dem
+//    Anzeigen fragt er mit `room_invite_check` nach, ob sie noch gilt.
 //
 //  Spielstart bei „Accept“ gehört dem Server (server.js) und wird als
 //  `startChallengeGame` hereingereicht.
@@ -50,6 +53,8 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
   const invites = new Map();
   /** userId -> Zeitstempel der letzten Einladungen (Ratenbegrenzung) */
   const inviteRate = new Map();
+  /** `<empfaengerId>:<raumId>` -> Zeitstempel — dieser Spieler hat die Einladung in diesen Raum abgelehnt */
+  const inviteDeclined = new Map();
   let lastBroadcast = '';
   let broadcastTimer = null;
 
@@ -188,6 +193,8 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
     return rows.length;
   }
 
+  const roomExists = (roomId) => !!(roomInviteInfo && roomInviteInfo(roomId));
+
   // ── Anwesenheit ───────────────────────────────────────────────────
   function computeAfk(u, now) {
     for (const s of u.sockets.values()) if (now - s.lastActive < AFK_MS) return false;
@@ -206,7 +213,9 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
         expireChallengesFor(u.id);
       } else if (!afk && u.afk) { u.afk = false; dirty = true; }
     }
-    for (const [k, inv] of invites) if (now - inv.at > INVITE_TTL_MS) invites.delete(k);
+    for (const [k, inv] of invites) if (now - inv.at > INVITE_TTL_MS || !roomExists(inv.roomId)) invites.delete(k);
+    // Ablehnungen gelten, solange der Raum existiert.
+    for (const k of inviteDeclined.keys()) if (!roomExists(k.slice(k.indexOf(':') + 1))) inviteDeclined.delete(k);
     // Ob jemand in eine Partie gekommen / aus ihr heraus ist, steht nur im Vergleich der Liste.
     broadcastPresence(false);
     return dirty;
@@ -428,6 +437,7 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
         const pu = presence.get(peer.id);
         if (!pu || !pu.online) return reply(ack, { error: peer.username + ' is offline.' });
         if (info.memberIds.includes(peer.id)) return reply(ack, { error: peer.username + ' is already in this room.' });
+        if (inviteDeclined.has(peer.id + ':' + String(data.roomId))) return reply(ack, { error: peer.username + ' declined an invitation to this room.' });
         const busy = (isInGame && isInGame(peer.id)) ? 'in a game' : (isBusyInRoom ? isBusyInRoom(peer.id) : null);
         if (busy) return reply(ack, { error: peer.username + ' is ' + (typeof busy === 'string' ? busy : 'busy') + '.' });
         const now = Date.now();
@@ -448,9 +458,27 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
       }
     });
 
+    // Abgelehnt: die Einladung verschwindet, und derselbe Raum kann diesen Spieler nicht noch einmal einladen.
     socket.on('room_invite_decline', (data) => {
       const uid = me(); if (!uid) return;
-      for (const [k, inv] of invites) if (inv.to === uid && inv.id === String(data?.id || '')) invites.delete(k);
+      for (const [k, inv] of invites) {
+        if (inv.to !== uid || inv.id !== String(data?.id || '')) continue;
+        invites.delete(k);
+        inviteDeclined.set(k, Date.now());
+      }
+    });
+
+    // Gilt eine (beim Empfänger aufgehobene) Einladung noch? Raum da, noch Lobby, nicht voll, Einladung nicht verfallen.
+    socket.on('room_invite_check', (data, ack) => {
+      const uid = me(); if (!uid) return reply(ack, { ok: false });
+      for (const [k, inv] of invites) {
+        if (inv.to !== uid || inv.id !== String(data?.id || '')) continue;
+        const info = roomInviteInfo ? roomInviteInfo(inv.roomId) : null;
+        const alive = !!info && info.open && !info.full && !info.memberIds.includes(uid) && Date.now() - inv.at <= INVITE_TTL_MS;
+        if (!alive) invites.delete(k);
+        return reply(ack, { ok: alive });
+      }
+      reply(ack, { ok: false });
     });
 
     socket.on('block_set', async (data, ack) => {

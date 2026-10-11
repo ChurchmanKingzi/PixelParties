@@ -10,8 +10,13 @@
 //    • <DmChatWindow />              privates Chatfenster mit Challenge-Buttons
 //    • <SocialSidePanel room isHost/> dieselbe Liste als Kasten links in Online-Lobbys; der Raumbesitzer
 //                                    lädt per Klick → „Invite“ Spieler in seinen (offenen, nicht vollen) Raum ein
-//    • Einladungen                   Empfänger sehen in jedem Menü einen Hinweis (JOIN / ✕); JOIN führt in die
-//                                    Online-Lobby und tritt dem Raum bei (`window._ppPendingInvite`, PlayScreen)
+//    • Einladungen                   Der Empfänger sieht sie als Fenster in der Bildschirmmitte, der Rest des
+//                                    Hauptmenüs ist abgedunkelt (JOIN / DECLINE). In jedem anderen Menü (Deck
+//                                    Editor, Shop, Online-Lobby …) werden sie aufgehoben und erscheinen erst, wenn
+//                                    der Spieler ins Hauptmenü zurückkehrt — vorher fragt der Client den Server,
+//                                    ob sie noch gelten. JOIN führt in die Online-Lobby und tritt dem Raum bei
+//                                    (`window._ppPendingInvite`, PlayScreen). DECLINE: derselbe Raum lädt den
+//                                    Spieler nicht noch einmal ein (Server).
 //    • useSocial()                   liest den gemeinsamen Zustand
 //
 //  Lämpchen: grün = online, orange = AFK (5 Min. ohne Eingabe), rot = In-Game,
@@ -32,10 +37,10 @@ const _social = {
   state: { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] },
   msgs: {},            // peerId -> Nachrichten (nur, was geladen wurde)
   chatPeer: null,      // offenes Chatfenster ({ id, name, color }) — gilt für Hauptmenü UND Online-Lobby
-  invites: [],         // eingegangene Raum-Einladungen ({ id, roomId, kind, label, type, at, from: { id, name, color } })
+  invites: [],         // eingegangene Raum-Einladungen ({ id, roomId, kind, label, type, at, got, valid, from: { id, name, color } })
   listeners: new Set(),
 };
-const SOCIAL_INVITE_SHOW_MS = 10 * 60 * 1000;   // so lange bleibt der Hinweis stehen (der Server lässt die Einladung nach 15 Min. verfallen)
+const SOCIAL_INVITE_KEEP_MS = 10 * 60 * 1000;   // so lange hebt der Client eine Einladung auf (der Server lässt sie nach 15 Min. verfallen)
 function _socialChanged() { _social.listeners.forEach(f => f()); }
 
 function useSocial() {
@@ -52,9 +57,8 @@ function useSocial() {
 function socialAcceptInvite(inv, openPlay) {
   _social.invites = _social.invites.filter(i => i.id !== inv.id);
   _socialChanged();
-  window._ppPendingInvite = inv;
-  window.dispatchEvent(new CustomEvent('pp:room-invite-accept', { detail: inv }));   // PlayScreen schon offen
-  if (openPlay) openPlay();                                                          // sonst: hinwechseln, er liest `_ppPendingInvite` beim Einhängen
+  window._ppPendingInvite = inv;   // der PlayScreen liest sie beim Einhängen und tritt dem Raum bei
+  if (openPlay) openPlay();
 }
 function socialDeclineInvite(inv) {
   _social.invites = _social.invites.filter(i => i.id !== inv.id);
@@ -105,10 +109,14 @@ function socialBuildRows(meId) {
 // ═══════════════════════════════════════════
 //  HOST — Ereignisse, Aktivitätsmeldung, Ton
 // ═══════════════════════════════════════════
-function SocialHost({ user, bgmMode, onOpenPlay }) {
+function SocialHost({ user, bgmMode, screen, onOpenPlay }) {
   const inDuelRef = useRef(false);
   // „Laufendes Duell“: Kampfmusik, Puzzle, Tutorial, Kampagne. Das Ergebnis-Thema (win/defeat) zählt nicht mehr.
   inDuelRef.current = /^(battle|puzzleAttempt|tutorial|campaign)/.test(String(bgmMode || ''));
+  // Einladungen erscheinen nur im Hauptmenü (siehe Kopfkommentar); überall sonst bleiben sie liegen.
+  const canShowInvite = screen === 'menu' && !inDuelRef.current;
+  const canShowRef = useRef(false);
+  canShowRef.current = canShowInvite;
   const active = !!user && !user.isGuest;
   const meId = user ? user.id : null;
 
@@ -139,10 +147,11 @@ function SocialHost({ user, bgmMode, onOpenPlay }) {
     };
     const onInvite = (inv) => {
       if (!inv || !inv.id || !inv.from) return;
-      // Pro Raum und Einlader nur die neueste Einladung.
-      _social.invites = [..._social.invites.filter(i => !(i.roomId === inv.roomId && i.from.id === inv.from.id)), { ...inv, got: Date.now() }];
+      // Pro Raum und Einlader nur die neueste Einladung. Frisch im Hauptmenü eingetroffen = gültig;
+      // sonst wird sie erst beim Anzeigen beim Server nachgefragt (RoomInviteModal).
+      _social.invites = [..._social.invites.filter(i => !(i.roomId === inv.roomId && i.from.id === inv.from.id)),
+        { ...inv, got: Date.now(), valid: canShowRef.current }];
       _socialChanged();
-      if (!inDuelRef.current && window.playSFX) window.playSFX('match_found', { dedupe: 400 });
     };
     socket.on('social_presence', onPresence);
     socket.on('social_state', onState);
@@ -181,44 +190,65 @@ function SocialHost({ user, bgmMode, onOpenPlay }) {
     };
   }, [active, meId]);
 
-  return active ? <RoomInviteToasts hidden={inDuelRef.current} onOpenPlay={onOpenPlay} /> : null;
+  return active ? <RoomInviteModal canShow={canShowInvite} onOpenPlay={onOpenPlay} /> : null;
 }
 
 // ═══════════════════════════════════════════
-//  EINLADUNGS-HINWEISE (unten rechts, in jedem Menü)
+//  EINLADUNG (Fenster in der Mitte, Rest des Hauptmenüs abgedunkelt)
 // ═══════════════════════════════════════════
-function RoomInviteToasts({ hidden, onOpenPlay }) {
+function RoomInviteModal({ canShow, onOpenPlay }) {
   useSocial();
-  const [, tick] = useState(0);
-  // Abgelaufene Hinweise nach und nach entfernen.
+  const announced = useRef(new Set());
+  // Abgelaufene Einladungen nach und nach aufräumen.
   useEffect(() => {
     const iv = setInterval(() => {
       const now = Date.now();
-      const keep = _social.invites.filter(i => now - (i.got || now) < SOCIAL_INVITE_SHOW_MS);
-      if (keep.length !== _social.invites.length) { _social.invites = keep; _socialChanged(); } else tick(v => v + 1);
+      const keep = _social.invites.filter(i => now - (i.got || now) < SOCIAL_INVITE_KEEP_MS);
+      if (keep.length !== _social.invites.length) { _social.invites = keep; _socialChanged(); }
     }, 15000);
     return () => clearInterval(iv);
   }, []);
-  if (hidden || _social.invites.length === 0) return null;
-  const inRoom = !!window._ppInLobby;   // PlayScreen meldet, ob der Spieler gerade in einer Lobby sitzt
+  // Im Hauptmenü: aufgehobene (nicht frische) Einladungen beim Server nachfragen, ungültige verwerfen.
+  const pendingCheck = _social.invites.filter(i => !i.valid && !i.checking).map(i => i.id).join(',');
+  useEffect(() => {
+    if (!canShow) return;
+    for (const inv of _social.invites) {
+      if (inv.valid || inv.checking) continue;
+      inv.checking = true;
+      socket.emit('room_invite_check', { id: inv.id }, (res) => {
+        inv.checking = false;
+        if (res && res.ok) inv.valid = true;
+        else _social.invites = _social.invites.filter(i => i.id !== inv.id);
+        _socialChanged();
+      });
+    }
+  }, [canShow, pendingCheck]);
+  const shown = canShow ? _social.invites.filter(i => i.valid) : [];
+  const inv = shown[0] || null;
+  // Klang, sobald eine Einladung wirklich sichtbar wird (nicht schon beim Eintreffen in einem anderen Menü).
+  useEffect(() => {
+    if (!inv || announced.current.has(inv.id)) return;
+    announced.current.add(inv.id);
+    if (window.playSFX) window.playSFX('match_found', { dedupe: 400 });
+  }, [inv ? inv.id : null]);
+  if (!inv) return null;
   return (
-    <div className="social-invite-stack" role="region" aria-label="Room invitations">
-      {_social.invites.map(inv => (
-        <div key={inv.id} className="social-invite ornate-frame">
-          <div className="social-invite-title">
-            ✉ <span style={{ color: inv.from.color || 'var(--accent)' }}>{inv.from.name}</span> invited you
-          </div>
-          <div className="social-invite-what">
-            {inv.kind === 'draft' ? '🧊' : inv.kind === 'skilltest' ? '🎯' : '⚔'} {String(inv.label || 'Game').toUpperCase()}
-            {' · '}<span className={inv.type === 'ranked' ? 'ranked' : ''}>{String(inv.type || 'unranked').toUpperCase()}</span>
-          </div>
-          {inRoom && <div className="social-invite-warn">Joining leaves your current room.</div>}
-          <div className="social-invite-btns">
-            <button className="btn social-accept" onClick={() => socialAcceptInvite(inv, onOpenPlay)}>JOIN</button>
-            <button className="btn social-decline" onClick={() => socialDeclineInvite(inv)}>✕</button>
-          </div>
+    <div className="modal-overlay social-invite-overlay" role="dialog" aria-modal="true" aria-label="Room invitation">
+      <div className="modal animate-in social-invite">
+        <div className="social-invite-icon">✉</div>
+        <div className="social-invite-title">
+          <span style={{ color: inv.from.color || 'var(--accent)' }}>{inv.from.name}</span> invited you
         </div>
-      ))}
+        <div className="social-invite-what">
+          {inv.kind === 'draft' ? '🧊' : inv.kind === 'skilltest' ? '🎯' : '⚔'} {String(inv.label || 'Game').toUpperCase()}
+          {' · '}<span className={inv.type === 'ranked' ? 'ranked' : ''}>{String(inv.type || 'unranked').toUpperCase()}</span>
+        </div>
+        {shown.length > 1 && <div className="social-invite-more">+{shown.length - 1} more invitation{shown.length === 2 ? '' : 's'}</div>}
+        <div className="social-invite-btns">
+          <button className="btn social-accept" autoFocus onClick={() => socialAcceptInvite(inv, onOpenPlay)}>JOIN</button>
+          <button className="btn social-decline" onClick={() => socialDeclineInvite(inv)}>DECLINE</button>
+        </div>
+      </div>
     </div>
   );
 }
