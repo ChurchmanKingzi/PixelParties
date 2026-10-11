@@ -2775,6 +2775,17 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_fire',    opts: { rate: 0.7, volume: 0.9, delay: 120, category: null, dedupe: 0 } },
     { name: 'damage',       opts: { rate: 0.5, volume: 0.7, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Frost Breaker (10.10.) — Flammen am Eis: Feuerrauschen, feines Eisknistern beim Reissen, beim Bersten (~540 ms) lauter Eisklirren mit Schlag
+  // und dem Klang des Auftauens, danach Zischen der Tropfen. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  frost_breaker: [
+    { name: 'elem_fire',     opts: { rate: 0.95, volume: 0.8 } },
+    { name: 'elem_ice',      opts: { rate: 1.45, volume: 0.5, delay: 200, category: null, dedupe: 0 } },
+    { name: 'elem_ice',      opts: { rate: 1.25, volume: 0.6, delay: 380, category: null, dedupe: 0 } },
+    { name: 'elem_ice',      opts: { rate: 0.7,  volume: 1.3, delay: 540, category: null, dedupe: 0 } },
+    { name: 'damage',        opts: { rate: 0.8,  volume: 0.8, delay: 540, category: null, dedupe: 0 } },
+    { name: 'status_remove', opts: { rate: 1.1,  volume: 0.7, delay: 580, category: null, dedupe: 0 } },
+    { name: 'elem_water',    opts: { rate: 1.3,  volume: 0.5, delay: 760, category: null, dedupe: 0 } },
+  ],
   // Embodiment of Biseria (10.10.) — Eisfaust: Sausen der fallenden Faust, beim Aufprall (400 ms) dumpfer Schlag mit tiefem Eisklirren, Splitter
   // hinterher. Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   biseria_fist: [
