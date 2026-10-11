@@ -37340,11 +37340,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Check if any player has activatable reaction cards.
-   * If reactions fire, builds a chain and resolves LIFO.
-   * Replaces the old sequential reaction processing.
-   */
-  /**
    * ★ Das gerade offene HOOK-Reaktionsfenster: `{ hookName, hookCtx }` — oder `null`. Gilt von der Eroeffnung bis nach der Aufloesung der
    * Kette. Reaktionen, die wissen muessen, WORAUF sie reagieren (The Melting: wer hat eingefroren?), lesen es in `onChainAdd`; die
    * Aufloesung bekommt nur die Kette. Ineinandergeschachtelte Fenster stellen den aeusseren Stand wieder her.
@@ -37395,6 +37390,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
   }
 
+  /**
+   * Check if any player has activatable reaction cards.
+   * If reactions fire, builds a chain and resolves LIFO.
+   * Replaces the old sequential reaction processing.
+   */
   async _checkReactionCards(hookName, hookCtx) {
     if (GameEngine.REACTION_SKIP_HOOKS.has(hookName)) return;
     if (!GameEngine.HOOK_DESCRIPTIONS[hookName]) return;
