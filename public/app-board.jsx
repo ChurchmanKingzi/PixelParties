@@ -24870,6 +24870,236 @@ const ANIM_REGISTRY = {
     };
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Frost Breaker — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!"; Vorlage: das Kartenbild — ein Lagerfeuer
+  //  zwischen schmelzenden Schneemaennern)
+  //
+  //  Prozedural auf einem kleinen Raster (Canvas, `image-rendering: pixelated`, ~30 Bilder/s), feste Palette, KEINE Unschaerfe, KEIN
+  //  Leuchten. Ueber dem gefrorenen Ziel liegt zuerst eine Eiskruste (Rauschkoernung, heller Rand, Glanzstriche; bei einem Helden samt
+  //  Sprite, daher die hoehere Flaeche). Flammen schlagen am Boden hoch (Spaltenprofil mit flackernden Zungen, Bayer-Uebergang von weiss
+  //  ueber gelb und orange nach rot, die Spitzen fransen aus) und lecken ans Eis; in 120–540 ms laufen acht gezackte Risse vom
+  //  Mittelpunkt nach aussen. Bei 540 ms birst das Eis: weisser Blitz, Eissplitter fliegen mit Schwerkraft nach aussen, Dampfwolken
+  //  (Rauschkoernung statt Schachbrett) steigen auf, Schmelztropfen fallen zum Boden und spritzen; die Flammen sinken bis ~1060 ms
+  //  zusammen, Funken steigen. Ab ~1150 ms blendet alles ueber Dithering aus (statt Alpha), bei 1500 ms ist es weg. Auftauen und
+  //  Schaden fallen beim Bersten (frost-breaker.js: HIT_MS — Einbau-Versatz 100 ms eingerechnet). Die Wurzel traegt `data-pp-px="aus"`:
+  //  die Grafik IST schon Pixelart (der Pixelierer fasst sie nicht an). Massstab folgt der Zielzone (`w`/`h`).
+  // ═════════════════════════════════════════════════════════════════
+  frost_breaker: (() => {
+    // Flammen: weiss → hellgelb → gelb → orange → rotorange → rot → dunkelrot (heiss → kalt)
+    const FL = ['#ffffff', '#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a', '#b3281a', '#6a1c14'].map(ppHex);
+    // Eis: weiss → hellblau → mittelblau → tiefblau
+    const EIS = ['#ffffff', '#e4f8ff', '#b9ecff', '#86d4f7', '#58aee9', '#3a82d2'].map(ppHex);
+    const DAMPF = ['#f4fbff', '#d6e6ee', '#aab9c2', '#7f8c95'].map(ppHex);
+    const FUNKEN = ['#fff6b8', '#ffd94a', '#ff9a1e', '#e8531a'].map(ppHex);
+    const S = 3, TAKT = 33, ENDE = 1500, FADE_AB = 1150, BERSTEN = 540;
+    const PADX = 26, PAD_UNTEN = 10;
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return function FrostBreakerEffect({ x, y, w, h }) {
+      const cvs = useRef(null);
+      const kw = Math.max(12, Math.round((w || 64) / S)), kh = Math.max(16, Math.round((h || 90) / S));
+      // Held-Zone: breiter als hoch — der Sprite steht ueber der Karte, die Kruste soll ihn mit einhuellen
+      const HOEHE = (w || 64) > (h || 90) * 1.1 ? Math.round(kw * 1.6) : kh;
+      const PAD_OBEN = Math.max(44, HOEHE - kh + 40);
+      const GW = kw + PADX * 2, GH = kh + PAD_OBEN + PAD_UNTEN;
+      const CX = Math.floor(GW / 2), CY = PAD_OBEN + Math.floor(kh / 2);
+      const BY = CY + Math.floor(kh / 2) - 1;                          // Boden der Zone
+      const OBEN = BY - HOEHE;                                         // Oberkante der Eiskruste
+      const MY = Math.round((BY + OBEN) / 2);                          // Mitte der Kruste
+      const HW = Math.floor(kw / 2);
+      const riss = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+        // Gezackter Riss: Winkel streut um den i-ten Achtelkreis, jeder Schritt knickt leicht ab; bleibt in der Kruste
+        let a = (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+        let px = CX + (Math.random() - 0.5) * 2, py = MY + (Math.random() - 0.5) * 2;
+        const pts = [], laenge = Math.round(Math.min(HW + 2, HOEHE * 0.55) * (0.75 + Math.random() * 0.45));
+        for (let k = 0; k < laenge; k++) {
+          a += (Math.random() - 0.5) * 0.55;
+          px += Math.cos(a); py += Math.sin(a);
+          const rx = Math.round(px), ry = Math.round(py);
+          if (rx < CX - HW || rx > CX + HW || ry < OBEN || ry > BY) break;
+          pts.push([rx, ry]);
+        }
+        return { pts, ab: 110 + Math.random() * 120 };
+      }), []);
+      const splitter = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
+        const wi = Math.random() * Math.PI * 2, tempo = 45 + Math.random() * 130;
+        return {
+          sx: (Math.random() - 0.5) * kw * 0.85, sy: OBEN + Math.random() * HOEHE - CY,
+          vx: Math.cos(wi) * tempo, vy: Math.sin(wi) * tempo * 0.75 - 35,
+          ab: BERSTEN + Math.random() * 40, leben: 600 + Math.random() * 320, gross: Math.random() < 0.5 ? 2 : 1,
+        };
+      }), []);
+      const dampf = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
+        sx: (Math.random() - 0.5) * kw * 0.75, sy: OBEN + HOEHE * (0.3 + Math.random() * 0.6) - CY, vy: 16 + Math.random() * 22,
+        ab: BERSTEN + 20 + Math.random() * 260, leben: 700 + Math.random() * 300, r0: 3 + Math.random() * 2, ph: Math.random() * 6,
+      })), []);
+      const tropfen = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
+        sx: (Math.random() - 0.5) * kw * 0.85, sy: OBEN + Math.random() * HOEHE * 0.6 - CY,
+        ab: BERSTEN + 30 + Math.random() * 420, farbe: 3 + Math.floor(Math.random() * 2),
+      })), []);
+      const funken = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
+        sx: (Math.random() - 0.5) * kw * 0.8, vx: (Math.random() - 0.5) * 12, vy: 26 + Math.random() * 40,
+        ab: 120 + Math.random() * 760, leben: 460 + Math.random() * 360,
+      })), []);
+      useEffect(() => {
+        const el = cvs.current;
+        if (!el || window._playAnimations === false) return undefined;
+        const ctx = el.getContext('2d');
+        const img = ctx.createImageData(GW, GH);
+        const buf = img.data;
+        const set = (X, Y, c) => { const i = (Y * GW + X) * 4; buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255; };
+        // Teiltransparenz ueber Bayer-Dithering (feste Muster — fuer Flammen und Splitter)
+        const put = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && ppBayer(X, Y) >= a) return;
+          set(X, Y, c);
+        };
+        // Teiltransparenz ueber festes Pixelrauschen (Koernung statt Schachbrett — fuer Kruste, Blitz und Dampf)
+        const putN = (px, py, c, a = 1) => {
+          const X = Math.round(px), Y = Math.round(py);
+          if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+          if (a < 1 && rausch(X * 1.7 + 7, Y * 2.3 + 3) >= a) return;
+          set(X, Y, c);
+        };
+        // Farbe aus einer Palette mit Bayer-Uebergang zwischen zwei Stufen (f = Gleitkomma-Index)
+        const stufe = (pal, X, Y, f) => {
+          let i = Math.floor(f);
+          if (ppBayer(X, Y) < f - i) i++;
+          return pal[klemme(i, 0, pal.length - 1)];
+        };
+        const zeichne = (t) => {
+          const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+          const bild = Math.floor(t / 66);                              // Flackertakt der Flammen (~15 Hz)
+          // ── Eiskruste ueber dem Ziel (bis zum Bersten) ──
+          if (t < BERSTEN) {
+            const ein = klemme(t / 130, 0, 1);
+            for (let Y = OBEN; Y <= BY; Y++) for (let X = CX - HW; X <= CX + HW; X++) {
+              const rand = X === CX - HW || X === CX + HW || Y === OBEN;
+              const v = (Y - OBEN) / Math.max(1, HOEHE);                 // 0 oben … 1 unten
+              if (rand) { putN(X, Y, EIS[1], 0.9 * ein * aus); continue; }
+              if ((X + Y * 2) % 11 === 0) { putN(X, Y, EIS[0], 0.8 * ein * aus); continue; }   // Glanzstriche
+              putN(X, Y, EIS[2 + (rausch(X, Y) < 0.5 ? 0 : 1) + (v > 0.7 ? 1 : 0)], 0.34 * ein * aus);
+            }
+          }
+          // ── Flammen: hoch bis zum Bersten, danach sinken sie zusammen ──
+          const huellkurve = t < BERSTEN ? klemme(t / 300, 0, 1) * (0.85 + 0.15 * klemme((t - 300) / 240, 0, 1))
+            : klemme(1 - (t - BERSTEN) / 520, 0, 1);
+          if (huellkurve > 0) {
+            const halb = kw * 0.48;
+            for (let X = Math.floor(CX - halb); X <= Math.ceil(CX + halb); X++) {
+              const nx = (X - CX) / halb;
+              const glocke = Math.pow(Math.max(0, 1 - nx * nx), 0.6);
+              if (glocke <= 0) continue;
+              const zunge = rausch(Math.floor(X / 3), 5) > 0.62 ? 1.35 : 1;
+              const lick = 0.5 + 0.5 * Math.sin(X * 0.9 + t * 0.018 + rausch(X, 1) * 6);
+              const lick2 = 0.5 + 0.5 * Math.sin(X * 0.37 - t * 0.011);
+              const fh = huellkurve * HOEHE * 1.0 * glocke * zunge * (0.5 + 0.3 * lick + 0.2 * lick2);
+              const top = Math.floor(BY - fh);
+              for (let Y = BY; Y >= top; Y--) {
+                const rel = (BY - Y) / Math.max(1, fh);                  // 0 unten (heiss) … 1 Spitze
+                if (rel > 0.8 && rausch(X * 1.3, Y + bild * 3) < (rel - 0.8) * 3.2) continue;   // Spitze franst aus
+                const f = rel * 5.4 + (1 - glocke) * 0.9 + (t > BERSTEN ? (1 - huellkurve) * 1.2 : 0);
+                put(X, Y, stufe(FL, X, Y, f), (rel > 0.55 ? 1 - (rel - 0.55) * 0.9 : 1) * aus);
+              }
+            }
+          }
+          // ── Risse im Eis (120–540 ms) ──
+          if (t < BERSTEN + 40) {
+            for (const r of riss) {
+              const p = klemme((t - r.ab) / (BERSTEN - 60 - r.ab), 0, 1);
+              const n = Math.floor(p * r.pts.length);
+              const hell = t > BERSTEN - 120;
+              for (let k = 0; k < n; k++) {
+                const [px, py] = r.pts[k];
+                put(px + 1, py + 1, EIS[5], aus);
+                put(px, py, hell ? EIS[0] : EIS[1], aus);
+              }
+            }
+          }
+          // ── Blitz beim Bersten ──
+          if (t >= BERSTEN && t < BERSTEN + 170) {
+            const k = (t - BERSTEN) / 170;
+            const hx = (HW + 2) * (0.6 + 0.5 * k), hy = (HOEHE / 2) * (0.6 + 0.5 * k);
+            for (let Y = Math.floor(MY - hy); Y <= Math.ceil(MY + hy); Y++) for (let X = Math.floor(CX - hx); X <= Math.ceil(CX + hx); X++) {
+              const d = Math.max(Math.abs(X - CX) / hx, Math.abs(Y - MY) / hy);
+              if (d <= 1) putN(X, Y, d < 0.55 ? EIS[0] : EIS[1], (1 - k) * (1 - d * 0.5) * aus);
+            }
+          }
+          // ── Dampf ──
+          for (const d of dampf) {
+            const alter = t - d.ab;
+            if (alter < 0 || alter > d.leben) continue;
+            const k = alter / d.leben, sek = alter / 1000;
+            const cx = CX + d.sx + Math.sin(d.ph + sek * 4) * 3, cy = CY + d.sy - d.vy * sek * 1.4;
+            const r = d.r0 + k * 6;
+            const R = Math.ceil(r);
+            for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+              const dd = Math.hypot(i, j * 1.15) / r + (rausch(Math.round(cx) + i, Math.round(cy) + j) - 0.5) * 0.35;
+              if (dd >= 1) continue;
+              putN(cx + i, cy + j, DAMPF[klemme(Math.floor(dd * 2 + k * 2), 0, 3)], (1 - k) * 0.9 * (1 - dd * 0.55) * aus);
+            }
+          }
+          // ── Eissplitter ──
+          for (const s of splitter) {
+            const alter = t - s.ab;
+            if (alter < 0 || alter > s.leben) continue;
+            const sek = alter / 1000, k = alter / s.leben;
+            const fx = CX + s.sx + s.vx * sek * 0.6, fy = CY + s.sy + s.vy * sek * 0.6 + 0.5 * 300 * sek * sek * 0.6;
+            const c = EIS[klemme(Math.floor(k * 4), 0, 4)];
+            const a = (1 - k * k) * aus;
+            put(fx, fy, EIS[Math.min(2, Math.floor(k * 3))], a);
+            if (s.gross === 2) { put(fx + 1, fy, c, a); put(fx, fy + 1, c, a); put(fx + 1, fy + 1, EIS[Math.min(5, 2 + Math.floor(k * 3))], a); }
+          }
+          // ── Schmelztropfen: fallen zum Boden, spritzen ──
+          for (const d of tropfen) {
+            const alter = t - d.ab;
+            if (alter < 0) continue;
+            const sek = alter / 1000;
+            const dy = 0.5 * 380 * sek * sek * 0.55;
+            const py = CY + d.sy + dy;
+            if (py < BY + 1) {
+              put(CX + d.sx, py, EIS[d.farbe], aus);
+              put(CX + d.sx, py - 1, EIS[Math.min(5, d.farbe + 1)], aus * 0.8);
+              if (dy < 4) put(CX + d.sx - 1, py - 1, EIS[1], aus * 0.6);   // Glanzpunkt am frischen Tropfen
+            } else {
+              const sp = (alter - Math.sqrt(Math.max(0, (BY + 1 - (CY + d.sy)) * 2 / (380 * 0.55))) * 1000) / 220;
+              if (sp >= 0 && sp < 1) {
+                put(CX + d.sx - 1 - sp * 2, BY - sp * 2, EIS[2], (1 - sp) * aus);
+                put(CX + d.sx + 1 + sp * 2, BY - sp * 2, EIS[2], (1 - sp) * aus);
+              }
+            }
+          }
+          // ── Funken ──
+          for (const f of funken) {
+            const alter = t - f.ab;
+            if (alter < 0 || alter > f.leben) continue;
+            const sek = alter / 1000, k = alter / f.leben;
+            const fx = CX + f.sx + f.vx * sek + Math.sin(sek * 7 + f.sx) * 1.5, fy = BY - 3 - f.vy * sek * 1.3;
+            put(fx, fy, FUNKEN[klemme(Math.floor(k * 4), 0, 3)], (1 - k * k) * aus);
+          }
+        };
+        const t0 = performance.now();
+        let raf = 0, letzte = -1;
+        const schritt = (jetzt) => {
+          const t = jetzt - t0;
+          const fr = Math.floor(t / TAKT);                        // ~30 Bilder/s: ruhige Pixelart-Taktung
+          if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+          if (t < ENDE) raf = requestAnimationFrame(schritt);
+          else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+        };
+        raf = requestAnimationFrame(schritt);
+        return () => cancelAnimationFrame(raf);
+      }, []);
+      return (
+        <div aria-hidden="true" data-pp-px="aus"
+          style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+          <canvas ref={cvs} width={GW} height={GH}
+            style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+        </div>
+      );
+    };
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Eisfaust (Embodiment of Biseria, Schadensmodus) — PIXELART (Als Vorgabe 10.10.: „Alle Animationen sollen Pixelart sein!";
   //  Vorgabe der Karte: „eine riesige Eis-Faust, die das Ziel zerschmettert")
   //
@@ -45632,6 +45862,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'big_oopsie') {
         const p = playerByName(entry.player);
         return <span className="log-status">💥 {cName('Big Oopsie')} — {entry.chooser} chooses {entry.target} and it takes <span className="log-amount">{entry.damage}</span> damage ({pName(p.name, p.color)}'s Spell).</span>;
+      }
+      if (t === 'frost_breaker') {
+        const p = playerByName(entry.player);
+        return <span className="log-status">🔥 {cName('Frost Breaker')} — {pName(p.name, p.color)}'s flames break the ice of {entry.target}{entry.healed ? ', healing it from its Freeze,' : ''} for <span className="log-amount">{entry.damage}</span> damage{entry.additional ? ' (an additional Action)' : ''}.</span>;
+      }
+      if (t === 'frost_breaker_no_free_action') {
+        const p = playerByName(entry.player);
+        return <span className="log-info">🔥 {cName('Frost Breaker')} — the target was not Frozen during {pName(p.name, p.color)}'s last turn: this costs an Action.</span>;
       }
       if (t === 'biseria_smash') {
         const p = playerByName(entry.player);

@@ -17328,6 +17328,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete inst.counters[key];
       delete inst.counters[key + 'Stacks'];
       delete inst.counters[key + 'AppliedBy'];
+      delete inst.counters[key + 'AppliedTurn'];
       delete inst.counters[key + 'Duration'];
       delete inst.counters[key + 'Cleansable'];
       this.log('status_remove', { target: inst.name, status: key, by: source });
@@ -17456,6 +17457,49 @@ this._deathWatch = (this._deathWatchStack || []).length
     return !!v && (isSeat(this, v.spieler)) && v.spieler !== besitzer;
   }
 
+  /**
+   * ★ Wann (Wert von `gs.turn`) wurde dieser Status gesetzt? Helden: `statuses[name].appliedTurn`; Creatures: Begleitzaehler
+   * `counters[name + 'AppliedTurn']` (gesetzt in `applyCreatureStatus`). `null` = unbekannt (Puzzle-Aufbau, Altbestand) —
+   * Aufrufer entscheiden, was das heisst („schon vor der Partie da" zaehlt bei Frost Breaker als „schon vorher").
+   */
+  statusAnwendungsZug(ziel, statusName) {
+    if (!ziel || !statusName) return null;
+    const e = ziel.statuses?.[statusName];
+    if (e && typeof e === 'object') return Number.isFinite(e.appliedTurn) ? e.appliedTurn : null;
+    const t = ziel.counters?.[statusName + 'AppliedTurn'];
+    return ziel.counters?.[statusName] && Number.isFinite(t) ? t : null;
+  }
+
+  /**
+   * ★ Wert von `gs.turn` des LETZTEN eigenen Zuges von `pi` — des juengsten, der schon begonnen hat und nicht der laufende ist.
+   * Aus `gs._zugNr` (gestempelt in `startTurn`); ohne Stempel (Test-/Puzzle-Aufbau) gilt die Zwei-Spieler-Rechnung —
+   * ist `pi` am Zug, war der letzte eigene Zug `turn - 2`, sonst `turn - 1`. `null`, wenn es noch keinen gab.
+   */
+  letzterEigenerZug(pi) {
+    const rec = this.gs._zugNr?.[pi];
+    if (rec) {
+      const aktiv = this.gs.activePlayer === pi && rec.laufend === this.gs.turn;
+      const z = aktiv ? rec.vorher : rec.laufend;
+      return Number.isFinite(z) ? z : null;
+    }
+    const t = this.gs.turn || 1;
+    const letzter = this.gs.activePlayer === pi ? t - 2 : t - 1;
+    return letzter >= 1 ? letzter : null;
+  }
+
+  /**
+   * ★ „Das Ziel war schon waehrend deines letzten Zuges Frozen (o. ae.)": der Status liegt noch und wurde spaetestens in
+   * `pi`s letztem eigenen Zug gesetzt. Unbekannter Setzzeitpunkt (Puzzle-Aufbau) zaehlt als „schon vorher da".
+   */
+  statusSeitLetztemEigenenZug(ziel, statusName, pi) {
+    const noch = ziel?.statuses?.[statusName] || ziel?.counters?.[statusName];
+    if (!noch) return false;
+    const seit = this.statusAnwendungsZug(ziel, statusName);
+    if (seit == null || seit <= 0) return true;   // unbekannt oder rueckdatiert (Puzzle-Aufbau schreibt `appliedTurn: 0`) = vor der Partie
+    const letzter = this.letzterEigenerZug(pi);
+    return letzter != null && seit <= letzter;
+  }
+
   /** Verursacher in einen Helden-Statuseintrag schreiben. */
   _heldenStatusVerursacher(eintrag, opts) {
     const v = this._statusVerursacherErmitteln(opts);
@@ -17550,6 +17594,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.counters[statusName + 'AppliedByHero'] = v.held;
       inst.counters[statusName + 'AppliedByInst'] = v.instId;
       inst.counters[statusName + 'AppliedByCard'] = v.karte;
+      inst.counters[statusName + 'AppliedTurn'] = this.gs.turn;   // Gegenstueck zu `statuses[name].appliedTurn` am Helden
       // Alte Schluessel, die Engine-Leser noch erwarten.
       if (statusName === 'poisoned') inst.counters.poisonAppliedBy = v.spieler;
       if (statusName === 'burned') inst.counters.burnAppliedBy = v.spieler;
@@ -22513,6 +22558,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (inst.counters.buffs?.anti_magic_enchanted) {
         delete inst.counters.buffs.anti_magic_enchanted.spent;
       }
+    }
+    // ★ Eigene Zugnummern merken (`letzterEigenerZug`): je Spieler der laufende und der vorherige eigene Zug — gilt fuer jede
+    // Sitzzahl (Skill Test) und uebersprungene Zuege.
+    {
+      const zn = this.gs._zugNr || (this.gs._zugNr = {});
+      const vor = zn[this.gs.activePlayer];
+      zn[this.gs.activePlayer] = { laufend: this.gs.turn, vorher: vor && vor.laufend !== this.gs.turn ? vor.laufend : (vor?.vorher ?? null) };
     }
     this.log('turn_start', { turn: this.gs.turn, activePlayer: this.gs.activePlayer, username: activePs?.username });
 
@@ -44713,6 +44765,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           delete inst.counters.frozenAppliedByHero;
           delete inst.counters.frozenAppliedByInst;
           delete inst.counters.frozenAppliedByCard;
+          delete inst.counters.frozenAppliedTurn;
           this.log('status_remove', { target: inst.name, status: 'frozen', by: 'duration' });
         }
       }
