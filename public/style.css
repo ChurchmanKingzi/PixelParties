@@ -3767,17 +3767,25 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* drei Achsen: die aufrechte Figur liegt größtenteils in der z-Achse
    der Ebene — ein zweiachsiges `scale` ließe sie gedrungen wirken */
 .hero-idle-platz.hero-idle-hover { scale: var(--board-hover-scale) var(--board-hover-scale) var(--board-hover-scale); }
-/* Die aufrechte Figur. Unterkante = Kartenmitte (seit v1453, vorher
-   Drittellinie) = Drehachse; darunter wird abgeschnitten — daraus steigt
-   der Held beim Auftritt empor, als käme er aus der Karte. */
+/* Die aufrechte Figur. Die Standlinie (`footY`, sonst Unterkante der Figur) liegt auf der Kartenmitte (seit v1453, vorher
+   Drittellinie) = Drehachse.
+   ★ 11.10. (Als Befund: „klar definierte Bottom-Linie, alles darunter wird durch eine sichtbare Linie abgetrennt"): Der Steher
+   beschneidet NICHT mehr dauerhaft (`overflow: hidden`) — was unter der Standlinie hängt (Flammen, Schlangen, Glühen, Eis), bleibt
+   sichtbar. Beschnitten wird nur noch beim AUFTRITT (`heroIdleKlipp`, unten): der Held steigt dabei aus der Karte empor, statt
+   über dem Brett einzuschweben. */
 .hero-idle-steher {
   position: absolute;
-  overflow: hidden;
   transform-origin: 50% 100%;
   transform: rotateX(calc(-1 * var(--sprite-kipp, 0deg))) scaleY(var(--sprite-streck, 1));
   /* harter 1-px-Pixelschatten löst die Figur von der Kulisse */
   filter: drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
   transition: opacity .4s ease;
+  animation: heroIdleKlipp .55s linear backwards;
+}
+/* Beschnitt nur für die Dauer des Auftritts (gleiche Dauer wie `heroIdleAuftritt` am Canvas): unten an der Steherkante, ringsum
+   großzügig offen. `backwards`: danach gilt wieder der normale Stil ohne Beschnitt. */
+@keyframes heroIdleKlipp {
+  from, to { clip-path: inset(-400px -400px 0 -400px); }
 }
 .hero-idle-canvas {
   position: absolute;
@@ -3821,7 +3829,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 /* Kein „Aufsteigen aus der Karte" waehrend des Morphs — und NICHT `animation: none`:
    beim Entfernen der Klasse finge `heroIdleAuftritt` sonst von vorn an (die Figur
    stiege nach dem Morph noch einmal aus der Karte). Dauer 0 s laesst sie fertig. */
-.hero-idle-aufstieg .hero-idle-canvas { animation-duration: 0s; }
+.hero-idle-aufstieg .hero-idle-canvas,
+.hero-idle-aufstieg .hero-idle-steher { animation-duration: 0s; }
 .hero-idle-aufstieg-alt .hero-idle-holo { animation: heroAufstiegAlt 2s linear both; }
 .hero-idle-aufstieg-neu .hero-idle-holo { animation: heroAufstiegNeu 2s linear both; }
 @keyframes heroAufstiegAlt {
@@ -3980,17 +3989,18 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   .hfx { animation: none !important; opacity: 1 !important; }
 }
 /* Unsichtbare Helden: halbtransparent wie ihre Karte */
-.hero-idle-unsichtbar .hero-idle-steher,
-.hero-idle-unsichtbar .hero-idle-schatten { opacity: .4; }
+.hero-idle-unsichtbar .hero-idle-steher { opacity: .4; }   /* der Schatten liegt im Steher und blendet mit */
 @keyframes heroIdleAuftritt {
   0%   { transform: translateY(100%); filter: brightness(2.2); }
   70%  { transform: translateY(0);    filter: brightness(1.5); }
   100% { transform: translateY(0);    filter: none; }
 }
-/* Pixel-Bodenschatten, flach auf der Kartenmitte unter den Füßen */
+/* Pixel-Bodenschatten unter den Füßen.
+   ★ 11.10. (Als Befund, siehe `.hero-idle-steher`): liegt jetzt IM Steher, hinter der Figur (Lage `left`/`top` inline, `HeroIdleSprite`).
+   Vorher lag er flach in der Brettebene — dort durchschnitt ihn die aufrecht stehende Figur an der Standlinie, und alles, was
+   darunter hing, wurde als dunkler Strich über die ganze Schattenbreite überdeckt (bei Andras quer durch beide Flammen). */
 .hero-idle-schatten {
   position: absolute;
-  top: calc(50% - 1.5px * var(--board-scale));
   height: calc(3px * var(--board-scale));
   background: radial-gradient(ellipse at center, rgba(0,0,0,.5) 0 45%, rgba(0,0,0,.22) 46% 70%, transparent 71%);
   animation: heroIdleSchatten .55s ease-out backwards;
@@ -4002,7 +4012,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-idle-canvas, .hero-idle-schatten { animation: none; }
+  .hero-idle-canvas, .hero-idle-schatten, .hero-idle-steher { animation: none; }
   /* ohne Bewegung: einfach aus- und einblenden */
   .hero-idle-weg .hero-idle-holo,
   .hero-idle-zurueck .hero-idle-holo { animation: none; }
@@ -25466,8 +25476,7 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   filter: grayscale(.85) brightness(.5) drop-shadow(0 calc(1px * var(--board-scale)) 0 rgba(0,0,0,.6));
   opacity: .55;
 }
-.hero-idle-platz.hero-idle-abgeblendet .hero-idle-schatten,
-.hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }
+.hero-idle-platz.hero-idle-abgeblendet .hero-idle-fx { opacity: .4; }   /* der Schatten liegt im Steher und blendet mit */
 
 /* ★ Surprise-Creature-Aufdecken — gruener Beschwoerungskreis um die Zone, dehnt sich aus und verblasst, dazu Partikel */
 .anim-scr-kreis {

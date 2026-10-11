@@ -2580,8 +2580,12 @@ function HeroSpriteEbene({ ueber }) {
 // Über der Figur halbtransparent (tönt sie bläulich), im Rand daneben
 // dichter, damit das Eis als Körper lesbar ist.
 const EIS_BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+// ★ 11.10. (Als Befund: „ein Freeze-Effekt überschreitet die Bottom-Linie nicht"): Die Kruste endete bisher hart an der Standlinie
+// (`footY`) und am Rahmen des Sprites. Jetzt wird sie auf einer um EIS_RAND Sprite-Pixel größeren Fläche gemalt (Silhouette +3 px,
+// Eiszacken bis 6 px) und deckt auch ab, was unter der Standlinie hängt.
+const EIS_RAND = 7;
 const EIS_TOENE = [[58, 112, 182], [96, 160, 226], [142, 202, 246], [192, 232, 255], [238, 250, 255]];
-function maleEiskruste(ctx, quelle, w, h, fussY) {
+function maleEiskruste(ctx, quelle, w, h) {
   const a = quelle.data;
   const N = w * h;
   const figur = new Uint8Array(N);
@@ -2599,9 +2603,6 @@ function maleEiskruste(ctx, quelle, w, h, fussY) {
       }
     }
   }
-  // Unter der Standlinie kein Eis (die Kruste steht auf der Karte)
-  const boden = Math.min(h, Math.max(1, Math.round(fussY)));
-  for (let y = boden; y < h; y++) for (let x = 0; x < w; x++) maske[y * w + x] = 0;
   // 2) Eiszacken auf der Oberkante, fest aus der Größe gesät
   let saat = (w * 73856093) ^ (h * 19349663) ^ 0x5bd1e995;
   const zufall = () => { saat = (Math.imul(saat, 1103515245) + 12345) | 0; return ((saat >>> 8) & 0xffff) / 65536; };
@@ -2690,7 +2691,7 @@ function maleEiskruste(ctx, quelle, w, h, fussY) {
     for (let x = 0; x < w; x++) {
       if (!maske[y * w + x]) continue;
       const obenFrei = !drin(x, y - 1), linksFrei = !drin(x - 1, y);
-      const untenFrei = !drin(x, y + 1) && y + 1 < boden, rechtsFrei = !drin(x + 1, y);
+      const untenFrei = !drin(x, y + 1), rechtsFrei = !drin(x + 1, y);
       if (obenFrei || linksFrei) setze(y * w + x, [226, 248, 255], 0.95);
       else if (untenFrei || rechtsFrei) setze(y * w + x, EIS_TOENE[0], 0.95);
     }
@@ -2700,7 +2701,7 @@ function maleEiskruste(ctx, quelle, w, h, fussY) {
 // Die Kruste wird aus dem gerade stehenden Frame der Figur gemalt. Beim
 // Aufbau laufen Kind-Effekte VOR dem Effekt, der den ersten Frame malt —
 // deshalb wird gewartet, bis die Figur sichtbar ist.
-function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
+function HeroEiskruste({ quelleRef, breite, hoehe, rand, stil, schmilzt }) {
   const ref = useRef(null);
   useEffect(() => {
     let versuche = 0, raf = 0, aus = false;
@@ -2714,13 +2715,17 @@ function HeroEiskruste({ quelleRef, breite, hoehe, fussY, stil, schmilzt }) {
         let sichtbar = false;
         for (let i = 3; i < q.data.length; i += 16) if (q.data[i] > 60) { sichtbar = true; break; }
         if (!sichtbar && versuche++ < 30) { raf = requestAnimationFrame(male); return; }
-        maleEiskruste(cv.getContext('2d'), q, breite, hoehe, fussY);
+        // Quellbild in die Mitte einer um `rand` größeren, sonst leeren Fläche setzen (die Kruste wächst über den Rahmen hinaus)
+        const bw = breite + 2 * rand, bh = hoehe + 2 * rand;
+        const gross = new ImageData(bw, bh);
+        for (let y = 0; y < hoehe; y++) gross.data.set(q.data.subarray(y * breite * 4, (y + 1) * breite * 4), ((y + rand) * bw + rand) * 4);
+        maleEiskruste(cv.getContext('2d'), gross, bw, bh);
       } catch {}
     };
     male();
     return () => { aus = true; if (raf) cancelAnimationFrame(raf); };
-  }, [quelleRef, breite, hoehe, fussY]);
-  return <canvas ref={ref} width={breite} height={hoehe}
+  }, [quelleRef, breite, hoehe, rand]);
+  return <canvas ref={ref} width={breite + 2 * rand} height={hoehe + 2 * rand}
     className={'hero-idle-eis' + (schmilzt ? ' hero-idle-eis-schmilzt' : '')} style={stil} />;
 }
 
@@ -3280,6 +3285,11 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
   // Was UNTER der Standlinie liegt (Medeas Schlangen), wird nicht mehr
   // abgeschnitten: der Steher reicht bis zum untersten deckenden Pixel,
   // gedreht wird aber um die Standlinie.
+  // ★ 11.10. (Als Befund: „Hero-Sprites haben eine klar definierte Bottom-Linie, alles darunter wird durch eine sichtbare Linie
+  // abgetrennt — auch ein Freeze-Effekt überschreitet sie nicht"): Was unter der Standlinie hängt (Andras' Flammen, Medeas
+  // Schlangen), wird nicht mehr beschnitten (der Steher hat kein `overflow: hidden` mehr, nur noch beim Auftritt, siehe style.css)
+  // und der Bodenschatten liegt nicht mehr flach in der Brettebene, wo die stehende Figur ihn an der Standlinie durchschnitt
+  // und alles darunter als Strich überdeckte, sondern IM Steher hinter der Figur (`schattenStil`).
   const fussY = zahl(meta.footY) ?? kern.y1;
   const unterkante = Math.max(fussY, kern.y1);
   const drehpunkt = `50% calc(${bs(fussY * s)})`;
@@ -3294,17 +3304,25 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
     width: `calc(${bs(fw * s)})`,
     height: `calc(${bs(fh * s)})`,
   };
-  // Eiskruste: deckungsgleich mit dem Sprite-Canvas, Drehpunkt an den
-  // Füßen (dort wächst sie beim Einfrieren hoch)
-  const eisStil = { ...canvasStil, left: 0, top: 0, transformOrigin: drehpunkt };
+  // Eiskruste: deckungsgleich mit dem Sprite-Canvas, aber ringsum um `EIS_RAND` Sprite-Pixel größer (Silhouette verbreitert, Zacken
+  // oben, Eis unter der Standlinie ragen über den Rahmen hinaus); Drehpunkt an den Füßen (dort wächst sie beim Einfrieren hoch)
+  const eisStil = {
+    width: `calc(${bs((fw + 2 * EIS_RAND) * s)})`,
+    height: `calc(${bs((fh + 2 * EIS_RAND) * s)})`,
+    left: `calc(${bs(-EIS_RAND * s)})`,
+    top: `calc(${bs(-EIS_RAND * s)})`,
+    transformOrigin: `50% calc(${bs((fussY + EIS_RAND) * s)})`,
+  };
   // Effekt-Ebene (v1459): gleiche Lage und Drehung wie der Steher, aber
   // ohne Beschnitt — Schädel steigen über den Kopf, Blitze umkreisen ihn.
   const fxStil = { left: steherStil.left, top: steherStil.top, width: steherStil.width,
     height: steherStil.height, transformOrigin: drehpunkt };
+  // Bodenschatten: Lage im Steher (Spalte `mitteX` = Zonenmitte, Zeile `fussY` = Standlinie)
   const schattenBreite = Math.max(8, cw * s * 0.8);
   const schattenStil = {
     width: `calc(${bs(schattenBreite)})`,
-    left: `calc(50% - ${bs(schattenBreite / 2)})`,
+    left: `calc(${bs(mitteX * s - schattenBreite / 2)})`,
+    top: `calc(${bs(fussY * s)} - 1.5px * var(--board-scale))`,
   };
   return (
     <>
@@ -3312,12 +3330,12 @@ function HeroIdleSprite({ cardName, angehalten, versteinert, eingefroren, effekt
       {ReactDOM.createPortal(
         <div ref={platzRef} data-held={cardName}
           className={'hero-idle-platz' + (aufstieg ? ' hero-idle-aufstieg hero-idle-aufstieg-' + aufstieg.rolle : '') + (versteinert ? ' hero-idle-stein' : '') + (angehalten ? ' hero-idle-angehalten' : '') + (unsichtbar ? ' hero-idle-unsichtbar' : '') + (abgeblendet ? ' hero-idle-abgeblendet' : '')}>
-          <div className="hero-idle-schatten" style={schattenStil} />
           <div className="hero-idle-steher" style={steherStil}>
+            <div className="hero-idle-schatten" style={schattenStil} />
             <div className="hero-idle-holo" style={{ transformOrigin: drehpunkt }}>
               <canvas ref={canvasRef} width={fw} height={fh} className="hero-idle-canvas" style={canvasStil} />
               {eisPhase !== 'weg' && (
-                <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} fussY={fussY}
+                <HeroEiskruste quelleRef={canvasRef} breite={fw} hoehe={fh} rand={EIS_RAND}
                   stil={eisStil} schmilzt={eisPhase === 'schmilzt'} />
               )}
             </div>
