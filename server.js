@@ -4340,7 +4340,44 @@ const social = require('./social').createSocial({
   db, io, uuidv4,
   isInGame: (userId) => activeGames.has(userId),
   startChallengeGame: (opts) => startChallengeGame(opts),
+  roomInviteInfo: (roomId) => roomInviteInfo(roomId),
+  isBusyInRoom: (userId) => busyInRoom(userId),
 });
+
+/** Ist ein Raum noch in der LOBBY-Phase (Sitze werden vergeben, nichts hat begonnen)? Nur Spielräume, keine CPU-/Puzzle-Räume. */
+function roomIsOpenLobby(room) {
+  if (!room || room.parentCubeRoomId) return false;
+  if (room.type !== 'ranked' && room.type !== 'unranked') return false;
+  if (room.cubeDraft) return room.cubeDraft.phase === 'lobby';
+  if (room.skillTest) return room.skillTest.phase === 'lobby';
+  return room.status === 'waiting' && !room.gameState;
+}
+
+/** Was die Einladungs-Logik (social.js) über einen Raum wissen muss; `null` = kein Raum. */
+function roomInviteInfo(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || room.parentCubeRoomId) return null;
+  return {
+    hostId: room.hostId,
+    open: roomIsOpenLobby(room),
+    full: room.players.length >= (room.maxPlayers || 2),
+    kind: room.cubeDraft ? 'draft' : (room.skillTest ? 'skilltest' : 'game'),
+    label: room.cubeDraft ? 'Cube Draft' : (room.skillTest ? 'Skill Test' : 'Game'),
+    type: room.type,
+    memberIds: [...room.players, ...room.spectators].map(m => m.userId).filter(Boolean),
+  };
+}
+
+/** Steckt der Nutzer in einem Raum, dessen Spiel/Draft/Turnier schon läuft? Dann wird er nicht eingeladen
+ *  (der Beitritt zu einem anderen Raum würde ihn mitten aus dem laufenden herausreißen). → Text oder `null`. */
+function busyInRoom(userId) {
+  for (const room of rooms.values()) {
+    if (!room.players.some(p => p.userId === userId) && !room.spectators.some(s => s.userId === userId)) continue;
+    if (room.type !== 'ranked' && room.type !== 'unranked') continue;
+    if (!roomIsOpenLobby(room)) return room.cubeDraft ? 'in a draft' : (room.skillTest ? 'in a Skill Test' : 'in a game');
+  }
+  return null;
+}
 
 /**
  * Das aktuell gewählte Standarddeck eines Nutzers samt Legalität.
@@ -14346,7 +14383,8 @@ io.on('connection', (socket) => {
         if (room.specPw && password !== room.specPw) return socket.emit('join_error', 'Game full');
         room.spectators.push({ username: currentUser.username, userId: currentUser.userId, socketId: socket.id, color: currentUser.color || '#888', avatar: currentUser.avatar || null });
       } else {
-        if (room.playerPw && password !== room.playerPw) return socket.emit('join_error', 'Wrong password');
+        // Eine Einladung des Raumbesitzers ersetzt das Spieler-Passwort (social.js `room_invite_send`).
+        if (room.playerPw && password !== room.playerPw && !social.hasRoomInvite(currentUser.userId, roomId)) return socket.emit('join_error', 'Wrong password');
         // Cube Draft players don't bring their own deck — they draft
         // one from the host's cube, so deckId is intentionally null.
         const isCubeDraftRoom = !!room.cubeDraft || !!room.skillTest;
@@ -14360,6 +14398,7 @@ io.on('connection', (socket) => {
         }
       }
     }
+    social.consumeRoomInvite(currentUser.userId, roomId);
     socket.join('room:' + roomId);
     socket.emit('room_joined', sanitizeRoom(room, currentUser.username));
     io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));

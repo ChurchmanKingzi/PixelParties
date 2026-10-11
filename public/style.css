@@ -25684,6 +25684,43 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 /* Online-Lobby: schmaler Kasten ganz links mit Spielerliste (app-social.jsx) */
 .lobby-spalte.lobby-social { flex: 0 0 300px; width: 300px; }
 
+/* Lobbys (Draft, Skill Test, Spiel): Spielerliste links, Raum in der Mitte */
+.lobby-raum { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.lobby-raum > .lobby-raum-mitte { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: auto; }
+
+/* Raum-Einladungen: Zeilenmenü in der Liste (Besitzer) und Hinweis beim Empfänger */
+.social-row-wrap { display: flex; flex-direction: column; }
+.social-row-wrap.is-open > .social-row { border-color: color-mix(in srgb, var(--player-color, #00f0ff) 55%, transparent); }
+.social-row-menu {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px 8px; margin-top: 1px;
+  background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .06); border-top: none;
+}
+.social-row-menu .btn { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+.social-invite-btn { border-color: var(--success) !important; color: var(--success) !important; background: rgba(51, 255, 136, .08) !important; }
+.social-invite-btn:disabled { opacity: .4; cursor: not-allowed; }
+.social-row-error { flex-basis: 100%; padding: 5px 7px; font-size: 12px; color: #fff; background: rgba(255, 51, 102, .25); border: 1px solid var(--danger); }
+.social-tag {
+  flex-shrink: 0; padding: 0 5px; font-size: 10px; letter-spacing: 1px; line-height: 16px;
+  color: var(--text2); border: 1px solid rgba(255, 255, 255, .18);
+}
+.social-tag--sent { color: var(--success); border-color: rgba(51, 255, 136, .5); }
+.social-invite-hint { padding: 0 16px 6px; font-size: 11px; color: var(--text2); }
+
+.social-invite-stack {
+  position: fixed; right: 16px; bottom: 16px; z-index: 10060;
+  display: flex; flex-direction: column; gap: 8px; width: 270px; max-width: calc(100vw - 32px);
+}
+.social-invite {
+  padding: 10px 12px; text-align: center; box-sizing: border-box;
+  background-color: rgb(8, 10, 18) !important; box-shadow: 0 10px 40px rgba(0, 0, 0, .7);
+}
+.social-invite-title { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.social-invite-what { font-size: 12px; letter-spacing: 1.5px; color: var(--accent); margin: 3px 0 6px; }
+.social-invite-what .ranked { color: #ffbb33; }
+.social-invite-warn { font-size: 11px; color: #ffbb33; margin-bottom: 6px; }
+.social-invite-btns { display: flex; gap: 8px; justify-content: center; }
+.social-invite-btns .btn { padding: 5px 14px; font-size: 12px; }
+
 
 /* ═══ PROFIL: ZIERRAHMEN ═══════════════════════════════════════════════
    Als Vorgabe: „Das Profil soll grafisch aufgewertet werden; Rahmen mit

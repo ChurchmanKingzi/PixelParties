@@ -1482,7 +1482,8 @@ function PlayScreen() {
   };
 
   const joinRoom = (room, asSpectator, pw) => {
-    if (!asSpectator && !room.skillTest) {
+    // Skill Test und Cube Draft brauchen kein eigenes Deck (der Server ignoriert `deckId` dort).
+    if (!asSpectator && !room.skillTest && !room.cubeDraft) {
       if (!currentDeckObj) { notify('Select a deck first', 'error'); return; }
       const v = isDeckLegal(currentDeckObj);
       if (!v.legal) { notify('Deck not legal: ' + v.reasons.join(', '), 'error'); return; }
@@ -1492,6 +1493,32 @@ function PlayScreen() {
     socket.emit('join_room', { roomId: room.id, password: pw || '', asSpectator, deckId: selectedDeck });
     setJoinTarget(null); setJoinPw('');
   };
+
+  // ── Raum-Einladung angenommen (JOIN im Hinweis, app-social.jsx) ──
+  // Ist der PlayScreen schon offen, kommt das Ereignis; sonst wechselt der Hinweis erst hierher und
+  // hinterlässt `window._ppPendingInvite`. Das Passwort ersetzt die Einladung serverseitig.
+  const acceptInvite = (inv) => {
+    window._ppPendingInvite = null;
+    if (lobby) leaveRoom();
+    joinRoom({ id: inv.roomId, hasPlayerPw: false, skillTest: inv.kind === 'skilltest' ? {} : null, cubeDraft: inv.kind === 'draft' ? {} : null }, false);
+  };
+  const acceptInviteRef = useRef(null);
+  acceptInviteRef.current = acceptInvite;
+  useEffect(() => {
+    const onAccept = (e) => { if (e.detail) acceptInviteRef.current(e.detail); };
+    window.addEventListener('pp:room-invite-accept', onAccept);
+    return () => window.removeEventListener('pp:room-invite-accept', onAccept);
+  }, []);
+  // Beim Einhängen (Hinweis hat hierher gewechselt): beitreten, sobald ein normales Spiel sein Deck kennt.
+  useEffect(() => {
+    const inv = window._ppPendingInvite;
+    if (!inv) return;
+    if (inv.kind === 'game' && !currentDeckObj) return;   // Deckliste lädt noch — der Effekt läuft danach erneut
+    acceptInviteRef.current(inv);
+  }, [currentDeckObj]);
+  // Der Hinweis fragt, ob der Spieler gerade in einer Lobby sitzt („Joining leaves your current room“).
+  useEffect(() => { window._ppInLobby = !!lobby; }, [lobby]);
+  useEffect(() => () => { window._ppInLobby = false; }, []);
 
   const leaveRoom = () => {
     if (lobby) socket.emit('leave_room', { roomId: lobby.id });
@@ -1586,7 +1613,10 @@ function PlayScreen() {
           </span>
           <VolumeControl />
         </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }} className="animate-in">
+        <div className="lobby-raum lobby-content animate-in">
+          {/* Wer ist online? Der Raumbesitzer lädt hier per Klick → Invite ein (app-social.jsx) */}
+          {user && !user.isGuest && <SocialSidePanel meId={user.id} room={lobby} isHost={isHost} />}
+          <div className="lobby-raum-mitte">
           <div className="panel" style={{ width: 720, maxWidth: '92%' }}>
             <div className="orbit-font" style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>
               {canStart ? (isHost ? '⚔️ Ready to draft — start when you like.' : '⏳ Waiting for host to start...') : '⏳ Waiting for at least one challenger...'}
@@ -1664,6 +1694,7 @@ function PlayScreen() {
               )}
             </div>
           </div>
+          </div>
         </div>
         {playerJoined && (
           <div className="modal-overlay" onClick={() => setPlayerJoined(null)}>
@@ -1696,7 +1727,9 @@ function PlayScreen() {
           </span>
           <VolumeControl />
         </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="animate-in">
+        <div className="lobby-raum lobby-content animate-in">
+          {user && !user.isGuest && <SocialSidePanel meId={user.id} room={lobby} isHost={isHost} />}
+          <div className="lobby-raum-mitte">
           <div className="panel" style={{ width: 420, textAlign: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 18, fontWeight: 700, marginBottom: 24 }}>
               {hasOpponent ? '⚔️ READY TO BATTLE!' : '⏳ Waiting for opponent...'}
@@ -1751,6 +1784,7 @@ function PlayScreen() {
                 🎮 GAME IN PROGRESS
               </div>
             )}
+          </div>
           </div>
         </div>
         {/* Player joined pop-up */}
@@ -3272,7 +3306,7 @@ function App() {
       <TextBox />
       <OpponentUnlockPopup />
       {/* Who's Online / private Chats / Herausforderungen (app-social.jsx) */}
-      <SocialHost user={user} bgmMode={bgmMode} />
+      <SocialHost user={user} bgmMode={bgmMode} onOpenPlay={() => setScreen('play')} />
       {/* v1289: Spielerprofil-Popup (Top-Spieler-Listen), app-player-profile.jsx */}
       <PlayerProfilePopupHost />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
