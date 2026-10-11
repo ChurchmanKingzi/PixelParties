@@ -2810,6 +2810,44 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',      opts: { rate: 2.2, volume: 0.5, delay: 300, category: null, dedupe: 0 } },
     { name: 'ping',      opts: { rate: 2.6, volume: 0.4, delay: 520, category: null, dedupe: 0 } },
   ],
+  // Disarm (11.10.) — der Ring spannt sich (Zauberton, 0 ms), schnappt zu (~420 ms: Verneinungs-Ton und Schlag), Splitter regnen (~480 ms). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  disarm_snap: [
+    { name: 'spell_cast',         opts: { rate: 1.2, volume: 0.45 } },
+    { name: 'debuff',             opts: { rate: 1.3, volume: 0.4,  delay: 200, category: null, dedupe: 0 } },
+    { name: 'negate',             opts: { rate: 1.4, volume: 0.55, delay: 420, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.5, volume: 0.5,  delay: 480, category: null, dedupe: 0 } },
+  ],
+  // Breakthrough (11.10.) — Risse knistern (Schnitt, 0 ms), die Scheibe birst bei ~460 ms (Schlag), Scherben klirren (~500 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  breakthrough_shatter: [
+    { name: 'slash',              opts: { rate: 1.5, volume: 0.45 } },
+    { name: 'heavy_impact',       opts: { rate: 1.25, volume: 0.6, delay: 460, category: null, dedupe: 0 } },
+    { name: 'creature_destroyed', opts: { rate: 1.6, volume: 0.5,  delay: 500, category: null, dedupe: 0 } },
+    { name: 'ping',               opts: { rate: 2.4, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Amazing Finding (11.10.) — das Fragezeichen funkelt auf (hoher Ping, 0 ms), platzt bei ~520 ms zum Stern (Aufdeck-Ton + Ping). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  finding_glint: [
+    { name: 'ping',   opts: { rate: 1.7, volume: 0.4 } },
+    { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Create Secret Room (11.10.) — die Steinwand schiebt sich auf (Platzierungston, 0 ms), goldenes Klingeln (~300 ms), die Wand schliesst sich (~640 ms). Nur der erste Teil
+  // uebernimmt die Sammelkategorie 'effect'.
+  secret_room_open: [
+    { name: 'placement',  opts: { rate: 0.7, volume: 0.55 } },
+    { name: 'ping',       opts: { rate: 1.9, volume: 0.4,  delay: 300, category: null, dedupe: 0 } },
+    { name: 'reveal',     opts: { rate: 1.4, volume: 0.35, delay: 380, category: null, dedupe: 0 } },
+    { name: 'placement',  opts: { rate: 0.6, volume: 0.5,  delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Secret Spell Book (11.10.) — Seiten rascheln los (Zieh-Ton, 0 / ~120 / ~240 ms), das Buch schlägt auf (~560 ms: Aufdeck-Ton und Ping). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  spellbook_pages: [
+    { name: 'draw',       opts: { rate: 1.3, volume: 0.45 } },
+    { name: 'draw',       opts: { rate: 1.5, volume: 0.35, delay: 120, category: null, dedupe: 0 } },
+    { name: 'draw',       opts: { rate: 1.7, volume: 0.3,  delay: 240, category: null, dedupe: 0 } },
+    { name: 'reveal',     opts: { rate: 1.1, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
+    { name: 'ping',       opts: { rate: 2.0, volume: 0.4,  delay: 620, category: null, dedupe: 0 } },
+  ],
   // The Oracle of Heaven (10.10.) — vier Augenpaare erwachen nacheinander (leise Pings, ~100/210/320/430 ms), der Kristall steigt auf (Wind, ~250 ms) und blitzt bei ~640 ms
   // (heller Ton). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   oracle_vision: [

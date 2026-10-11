@@ -26986,6 +26986,362 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  Disarm (11.10.) — PIXELART, Brett-Animation mit allen gewaehlten Artefakten als Ziel (`zoneType: 'board'`, `targets`)
+  //
+  //  Um JEDES Artefakt zieht sich ein doppelter Ring (violett aussen / gruen innen, kreisende Funken) zusammen, schnappt bei ~420 ms zu (weisser Blitz,
+  //  Kreuzstrahl) und die Karte zerfaellt in Pixelsplitter, die mit Schwerkraft nach aussen fliegen; ein gedithertes Zerfallsmuster liegt kurz auf der Karte.
+  //  Der Zauber loescht die Karten bei `SCHNAPP_MS` (disarm.js) — also genau, wenn der Ring zugeschnappt ist.
+  // ═══════════════════════════════════════════════════════════════════
+  disarm_snap: (() => {
+    const GRUEN = ['#e4ff9a', '#9bdc4a', '#5fa82a', '#2f6a1a'].map(ppHex);
+    const VIOLETT = ['#f0d4ff', '#c08cf6', '#8a48d4', '#4a2087'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, SNAPP = 420, FADE_AB = 860;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      splitter: sz.ziele.map(() => Array.from({ length: ppFxN(22) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 16 + Math.random() * 46, gross: Math.random() < 0.4 ? 2 : 1,
+        farbe: Math.floor(Math.random() * 4), hoch: 16 + Math.random() * 30, leben: 380 + Math.random() * 300,
+      }))),
+      funken: sz.ziele.map(() => Array.from({ length: 6 }, (_, i) => ({ w0: (i / 6) * Math.PI * 2 + Math.random() * 0.4, schnell: 0.009 + Math.random() * 0.004 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = z.w / 2, hh = z.h / 2;
+        const a = Math.min(aus, klemme(t / 80, 0, 1));
+        if (t < SNAPP) {
+          // ── Ring zieht sich zusammen ──
+          const k = klemme(t / SNAPP, 0, 1), e = k * k;
+          const rx = (hw + 6) - ((hw + 6) - (hw - 1)) * e, ry = (hh + 6) - ((hh + 6) - (hh - 1)) * e;
+          g.ring(CX, CY, rx, ry, VIOLETT[2], a);
+          g.ring(CX, CY, rx - 1, ry - 1, GRUEN[1], a);
+          g.ring(CX, CY, rx + 1, ry + 1, VIOLETT[3], a * 0.7);
+          for (const f of teile.funken[zi]) {
+            const w = f.w0 + t * f.schnell * 6;
+            const fx = CX + Math.cos(w) * rx, fy = CY + Math.sin(w) * ry;
+            g.put(fx, fy, WEISS, a); g.put(fx + 1, fy, VIOLETT[0], a * 0.8); g.put(fx, fy + 1, GRUEN[0], a * 0.8);
+          }
+          // Zerfallsmuster legt sich auf die Karte
+          const dm = e * 0.55;
+          for (let y = -Math.floor(hh); y <= Math.floor(hh); y++) for (let x = -Math.floor(hw); x <= Math.floor(hw); x++) {
+            if (ppBayer(CX + x, CY + y) < dm) g.put(CX + x, CY + y, ((x + y) & 1) ? GRUEN[2] : VIOLETT[2], a * 0.9);
+          }
+        } else {
+          const al = t - SNAPP;
+          // ── Blitz und Kreuzstrahl beim Zuschnappen ──
+          if (al < 140) {
+            const f = 1 - al / 140;
+            g.ring(CX, CY, hw - 1 + al / 14, hh - 1 + al / 14, WEISS, f * aus);
+            for (let r = 0; r < 12 * f + 3; r++) {
+              g.put(CX + r, CY, WEISS, f * aus); g.put(CX - r, CY, WEISS, f * aus);
+              g.put(CX, CY + r, VIOLETT[0], f * aus); g.put(CX, CY - r, VIOLETT[0], f * aus);
+            }
+            g.disc(CX, CY, 3 + 3 * f, WEISS, f * aus);
+          }
+          // ── Zerfall: das Muster verfliegt, Splitter fliegen ──
+          if (al < 260) {
+            const dm = 0.55 * (1 - al / 260);
+            for (let y = -Math.floor(hh); y <= Math.floor(hh); y++) for (let x = -Math.floor(hw); x <= Math.floor(hw); x++) {
+              if (ppBayer(CX + x, CY + y) < dm) g.put(CX + x, CY + y, ((x + y) & 1) ? GRUEN[2] : VIOLETT[2], aus * 0.9);
+            }
+          }
+          for (const s of teile.splitter[zi]) {
+            if (al > s.leben) continue;
+            const k = al / s.leben, sek = al / 1000;
+            const x = CX + Math.cos(s.w) * s.v * sek * 1.2, y = CY + Math.sin(s.w) * s.v * sek * 0.9 - s.hoch * sek + 0.5 * 120 * sek * sek;
+            const col = s.farbe === 0 ? GRUEN[0] : s.farbe === 1 ? GRUEN[1] : s.farbe === 2 ? VIOLETT[1] : VIOLETT[2];
+            g.block(x, y, s.gross, s.gross, k < 0.4 ? col : (k < 0.75 ? GRUEN[3] : VIOLETT[3]), (1 - k * k) * aus);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Breakthrough (11.10.) — PIXELART, Brett-Animation auf der gewaehlten Surprise (Surprise Zone oder Support Zone; `targets`)
+  //
+  //  Rote Risslinien laufen aus der Mitte ueber die Zone (dunkler Schatten, weisse Spitze), ein rotes Dither-Glas legt sich darueber; bei ~460 ms birst die
+  //  Scheibe: Druckring, kantige Scherben in Rot/Gold fliegen mit Schwerkraft nach aussen. Der Zauber legt die Karte bei `SHATTER_MS` (breakthrough.js) ab.
+  // ═══════════════════════════════════════════════════════════════════
+  breakthrough_shatter: (() => {
+    const ROT = ['#ffd6d0', '#e8584a', '#b0262a', '#6a1020'].map(ppHex);
+    const GOLD = ['#fff2a8', '#ffd24a', '#d99a22'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, BRUCH = 460, FADE_AB = 860;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const vorbereiten = (sz) => ({
+      risse: sz.ziele.map(() => Array.from({ length: 8 }, (_, i) => ({ w: (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, len: 11 + Math.random() * 11, sch: Math.random() * 6 }))),
+      scherben: sz.ziele.map(() => Array.from({ length: ppFxN(18) }, () => ({
+        w: Math.random() * Math.PI * 2, v: 22 + Math.random() * 52, b: 2 + Math.floor(Math.random() * 3), h: 1 + Math.floor(Math.random() * 3),
+        farbe: Math.floor(Math.random() * 4), hoch: 12 + Math.random() * 34, leben: 420 + Math.random() * 320,
+      }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        if (t < BRUCH) {
+          const k = klemme(t / BRUCH, 0, 1);
+          // rotes Dither-Glas
+          const dm = 0.1 + 0.3 * k;
+          for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) if (ppBayer(CX + x, CY + y) < dm) g.put(CX + x, CY + y, ROT[1], 0.9);
+          g.ring(CX, CY, hw, hh, ROT[3], klemme(t / 80, 0, 1));
+          // Risse wachsen
+          for (const r of teile.risse[zi]) {
+            const laenge = r.len * k;
+            for (let d = 1; d <= laenge; d++) {
+              const w = r.w + Math.sin(d * 0.9 + r.sch) * 0.22;
+              const x = CX + Math.cos(w) * d, y = CY + Math.sin(w) * d * 1.1;
+              g.put(x + 1, y + 1, ROT[3], 0.85);
+              g.put(x, y, d > laenge - 2 ? WEISS : ROT[0]);
+            }
+          }
+        } else {
+          const al = t - BRUCH;
+          if (al < 180) {
+            const f = 1 - al / 180;
+            g.ring(CX, CY, hw * 0.6 + al / 5, hh * 0.6 + al / 5, WEISS, f * aus);
+            g.ring(CX, CY, hw * 0.6 + al / 4, hh * 0.6 + al / 4, GOLD[1], f * aus * 0.8);
+            g.disc(CX, CY, 4 * f + 1, WEISS, f * aus);
+          }
+          for (const s of teile.scherben[zi]) {
+            if (al > s.leben) continue;
+            const k = al / s.leben, sek = al / 1000;
+            const x = CX + Math.cos(s.w) * s.v * sek * 1.15, y = CY + Math.sin(s.w) * s.v * sek * 0.9 - s.hoch * sek + 0.5 * 130 * sek * sek;
+            const col = s.farbe === 0 ? ROT[0] : s.farbe === 1 ? ROT[1] : s.farbe === 2 ? GOLD[1] : ROT[2];
+            g.block(x, y, s.b, s.h, col, (1 - k * k) * aus);
+            g.block(x, y + s.h, s.b, 1, ROT[3], (1 - k * k) * aus * 0.8);
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Amazing Finding (11.10.) — PIXELART, Brett-Animation auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`)
+  //
+  //  Ein weisses Fragezeichen (violette Kontur) steigt ueber dem Deck auf und pulsiert, bei ~520 ms platzt es in einen achtstrahligen Funkelstern; rosa und
+  //  weisse Funken stieben nach oben. Danach decken die Aufdeck-Fluege der Engine die Karten auf (amazing-finding.js).
+  // ═══════════════════════════════════════════════════════════════════
+  finding_glint: (() => {
+    const PINK = ['#ffe3f6', '#ff7ad0', '#c0369a'].map(ppHex);
+    const VIO = ['#d9b8ff', '#9a5cf0', '#5a2aa8'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, POP = 520, FADE_AB = 840;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const FRAGE = ['.111.', '1...1', '....1', '...1.', '..1..', '.....', '..1..'];
+    const vorbereiten = () => ({
+      funken: Array.from({ length: ppFxN(16) }, () => ({ w: -Math.PI * (0.05 + Math.random() * 0.9), v: 20 + Math.random() * 44, leben: 320 + Math.random() * 260, farbe: Math.floor(Math.random() * 3) })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const CX = Math.round(z.x), CY = Math.round(z.y);
+      if (t < POP) {
+        const k = klemme(t / POP, 0, 1), a = Math.min(aus, klemme(t / 90, 0, 1));
+        const gy = CY - 6 - Math.round(k * 12), puls = 1 + (Math.sin(t / 60) > 0.4 ? 1 : 0);
+        for (let j = 0; j < FRAGE.length; j++) for (let i = 0; i < 5; i++) {
+          if (FRAGE[j][i] !== '1') continue;
+          for (let dj = 0; dj < puls; dj++) for (let di = 0; di < puls; di++) {
+            g.put(CX - 2 + i + 1, gy + j + 1, VIO[2], a * 0.8);
+          }
+          g.put(CX - 2 + i, gy + j, j === 0 ? PINK[0] : WEISS, a);
+        }
+        g.ring(CX, CY, z.w / 2 + 2 + k * 3, z.h / 2 + 2 + k * 3, VIO[1], a * 0.45);
+      } else {
+        const al = t - POP;
+        const gy = CY - 18;
+        // Funkelstern
+        if (al < 280) {
+          const f = 1 - al / 280, r = 3 + al / 18;
+          for (let d = 0; d <= r; d++) {
+            const c = d < r * 0.5 ? WEISS : PINK[1];
+            g.put(CX + d, gy, c, f * aus); g.put(CX - d, gy, c, f * aus); g.put(CX, gy + d, c, f * aus); g.put(CX, gy - d, c, f * aus);
+            if (d < r * 0.7) { g.put(CX + d, gy + d, PINK[0], f * aus * 0.8); g.put(CX - d, gy + d, PINK[0], f * aus * 0.8); g.put(CX + d, gy - d, PINK[0], f * aus * 0.8); g.put(CX - d, gy - d, PINK[0], f * aus * 0.8); }
+          }
+          g.disc(CX, gy, 2 + 2 * f, WEISS, f * aus);
+        }
+        for (const s of teile.funken) {
+          if (al > s.leben) continue;
+          const k = al / s.leben, sek = al / 1000;
+          const x = CX + Math.cos(s.w) * s.v * sek, y = gy + Math.sin(s.w) * s.v * sek + 0.5 * 50 * sek * sek;
+          const col = s.farbe === 0 ? WEISS : s.farbe === 1 ? PINK[1] : VIO[0];
+          g.put(x, y, col, (1 - k) * aus);
+          if (k < 0.5) { g.put(x + 1, y, col, (1 - k) * aus * 0.7); g.put(x, y + 1, col, (1 - k) * aus * 0.7); }
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Create Secret Room (11.10.) — PIXELART, Brett-Animation auf der SURPRISE ZONE (Ziel `{ owner, heroIdx, zoneType: 'surprise' }`)
+  //
+  //  Eine Ziegelwand (Ziegel in vier Grautoenen, dunkle Fugen, helle Oberkanten) teilt sich in der Mitte und gleitet zur Seite; dahinter liegt ein dunkler Raum
+  //  (gedithertes Braunschwarz) mit goldenem Lichtschein und aufsteigenden Staubfunken. Bei ~640 ms schliesst sich die Wand wieder. Gespielt wird sie beim
+  //  Einlegen der Karte (create-secret-room.js) und wenn der Raum ausloest (_secret-room-shared.js).
+  // ═══════════════════════════════════════════════════════════════════
+  secret_room_open: (() => {
+    const STEIN = ['#a09dab', '#8a8794', '#767380', '#625f6c'].map(ppHex);
+    const FUGE = ppHex('#34323d'), KANTE = ppHex('#c4c1cf');
+    const RAUM = ['#1b1410', '#2b1f15', '#3d2c1a'].map(ppHex);
+    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a', '#a8741c'].map(ppHex);
+    const ENDE = 1000, AUF = 380, ZU_AB = 640, ZU_BIS = 940;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const rausch = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+    const BH = 4, BW = 8;                                   // Ziegelhoehe / -breite im Raster
+    const vorbereiten = (sz) => ({
+      staub: sz.ziele.map(() => Array.from({ length: ppFxN(10) }, () => ({ dx: (Math.random() - 0.5) * 12, v: 8 + Math.random() * 16, ab: 160 + Math.random() * 300, leben: 360 + Math.random() * 240 }))),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > ZU_BIS ? Math.max(0, 1 - (t - ZU_BIS) / (ENDE - ZU_BIS)) : 1;
+      if (aus <= 0) return;
+      const offen = t < ZU_AB ? glatt(t / AUF) : 1 - glatt((t - ZU_AB) / (ZU_BIS - ZU_AB));
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2) + 1, hh = Math.floor(z.h / 2) + 1;
+        const slide = offen * (hw + 1);
+        for (let y = -hh; y <= hh; y++) {
+          for (let x = -hw; x <= hw; x++) {
+            // Quellspalte der linken bzw. rechten Haelfte, die an dieser Bildschirmstelle liegt
+            const xl = x + slide, xr = x - slide;
+            let xs = null;
+            if (xl < 0 && xl >= -hw) xs = xl; else if (xr >= 0 && xr <= hw) xs = xr;
+            if (xs !== null) {
+              const reihe = Math.floor((y + hh) / BH), imRei = (y + hh) % BH;
+              const versatz = (reihe & 1) ? BW / 2 : 0;
+              const bx = Math.floor((xs + hw + versatz) / BW), imBx = Math.floor(xs + hw + versatz) % BW;
+              const fuge = imRei === BH - 1 || imBx === BW - 1;
+              const farbe = fuge ? FUGE : (imRei === 0 ? KANTE : STEIN[Math.floor(rausch(bx, reihe) * 4)]);
+              g.put(CX + x, CY + y, farbe, aus);
+            } else {
+              // dunkler Raum mit Goldschein
+              const d = Math.abs(x) / Math.max(1, hw);
+              const licht = (1 - d) * (0.35 + 0.65 * offen);
+              const v = licht * (1 - Math.abs(y) / (hh + 2) * 0.4);
+              const stufe = v > 0.55 ? 2 : (v > 0.28 ? 1 : 0);
+              if (ppBayer(CX + x, CY + y) < 0.35 + v) g.put(CX + x, CY + y, v > 0.62 ? GOLD[2] : RAUM[stufe], aus);
+              else g.put(CX + x, CY + y, RAUM[0], aus);
+            }
+          }
+        }
+        // Lichtstrahl in der Fuge
+        if (offen > 0.15) {
+          const bh = Math.round(hh * 2 * offen);
+          for (let y = -Math.round(bh / 2); y <= Math.round(bh / 2); y++) {
+            g.put(CX, CY + y, GOLD[0], aus * offen); g.put(CX - 1, CY + y, GOLD[1], aus * offen * 0.7); g.put(CX + 1, CY + y, GOLD[1], aus * offen * 0.7);
+          }
+        }
+        // Staubfunken
+        for (const s of teile.staub[zi]) {
+          const al = t - s.ab; if (al < 0 || al > s.leben) continue;
+          const k = al / s.leben;
+          g.put(CX + s.dx, CY + hh * 0.4 - s.v * (al / 1000), k < 0.5 ? GOLD[0] : GOLD[1], (1 - k) * aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Secret Spell Book (11.10.) — PIXELART, Brett-Animation: Buchseiten flattern von JEDER betroffenen Karte zum Wirker (`targets`, Ursprung = erster lebender Held)
+  //
+  //  Um jede Zielkarte kreist kurz ein violetter Ring, dann lösen sich weisse Seiten (4×5, mit Zeilen, flatternd zwischen voller und halber Breite) und fliegen auf
+  //  einem Bogen zum Ursprung, begleitet von violett-goldenen Funken; dort schlägt sich ein Buch auf (Ledereinband, Seiten, goldener Schein). Liegt der Ursprung auf dem
+  //  Ziel (Ersatzeffekt: Ziehen über dem Deck, `selbst`), blättert sich nur das Buch auf und eine Seite steigt auf.
+  // ═══════════════════════════════════════════════════════════════════
+  spellbook_pages: (() => {
+    const PAPIER = ['#ffffff', '#e8e2d2', '#b9b09a'].map(ppHex);
+    const LEDER = ['#9a5a2e', '#6e3a1c', '#46230f'].map(ppHex);
+    const VIO = ['#e6ccff', '#a46cf0', '#5e2ca8'].map(ppHex);
+    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a'].map(ppHex);
+    const ENDE = 1100, FLUG = 520, AUFSCHLAG = 560, FADE_AB = 860;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const vorbereiten = (sz) => ({
+      seiten: sz.ziele.map((z, ti) => Array.from({ length: z.selbst ? 1 : ppFxN(6) }, (_, i) => ({
+        ab: 120 + i * 70 + ti * 35, bogen: (Math.random() - 0.5) * 26, hoch: 10 + Math.random() * 16, flatter: Math.random() * 6,
+      }))),
+    });
+    // Das aufgeschlagene Buch (Mitte CX, CY); `offen` 0..1 = wie weit die Seiten aufgeklappt sind.
+    const buch = (g, CX, CY, offen, a, t) => {
+      const b = Math.round(7 * offen);                                   // Seitenbreite je Hälfte
+      g.block(CX - 8, CY - 2, 17, 8, LEDER[1], a);
+      g.block(CX - 8, CY + 5, 17, 1, LEDER[2], a);
+      g.block(CX - 8, CY - 2, 17, 1, LEDER[0], a);
+      if (b > 0) {
+        g.block(CX - b, CY - 4, b, 7, PAPIER[0], a); g.block(CX + 1, CY - 4, b, 7, PAPIER[0], a);
+        for (let r = 0; r < 3; r++) { g.block(CX - b + 1, CY - 3 + r * 2, Math.max(0, b - 2), 1, PAPIER[2], a); g.block(CX + 2, CY - 3 + r * 2, Math.max(0, b - 2), 1, PAPIER[2], a); }
+        g.block(CX - b, CY + 2, b, 1, PAPIER[1], a); g.block(CX + 1, CY + 2, b, 1, PAPIER[1], a);
+      }
+      g.block(CX, CY - 4, 1, 9, LEDER[2], a);
+      // Schein
+      if (offen > 0.5) {
+        const f = (0.5 + 0.5 * Math.sin(t / 90)) * offen;
+        g.ring(CX, CY - 1, 11 + f * 2, 6 + f, GOLD[1], a * 0.45 * offen);
+        g.put(CX - 3 + Math.round(f * 6), CY - 7 - Math.round(f * 3), GOLD[0], a * offen);
+      }
+    };
+    const seite = (g, x, y, breit, a) => {
+      const w = breit ? 4 : 2;
+      g.block(x, y, w, 5, PAPIER[0], a);
+      g.put(x, y + 4, PAPIER[2], a); g.put(x + w - 1, y + 4, PAPIER[2], a);
+      if (breit) { g.block(x + 1, y + 1, 2, 1, PAPIER[2], a); g.block(x + 1, y + 3, 2, 1, PAPIER[2], a); }
+    };
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const O = { x: Math.round(sz.O.x), y: Math.round(sz.O.y) };
+      let buchSichtbar = false;
+      sz.ziele.forEach((z, zi) => {
+        const X0 = Math.round(z.x), Y0 = Math.round(z.y);
+        if (z.selbst) {
+          // Ersatzeffekt: Buch über dem Deck, eine Seite steigt auf.
+          buchSichtbar = true;
+          const s = teile.seiten[zi][0];
+          const al = t - s.ab;
+          if (al > 0) {
+            const k = klemme(al / 560, 0, 1);
+            seite(g, X0 - 2 + Math.sin(al / 70) * 2, Y0 - 10 - k * 18, Math.sin(al / 55 + s.flatter) > 0, (1 - k * k) * aus);
+            if (k < 0.8) g.put(X0 + 3 + Math.cos(al / 40) * 3, Y0 - 12 - k * 16, GOLD[1], (1 - k) * aus);
+          }
+          return;
+        }
+        // Ring um die Zielkarte
+        if (t < 360) {
+          const k = t / 360, a = Math.min(aus, klemme(t / 70, 0, 1)) * (1 - k * 0.6);
+          g.ring(X0, Y0, z.w / 2 + 4 - k * 2, z.h / 2 + 4 - k * 2, VIO[1], a);
+          g.ring(X0, Y0, z.w / 2 + 2 - k * 2, z.h / 2 + 2 - k * 2, VIO[0], a * 0.6);
+        }
+        for (const s of teile.seiten[zi]) {
+          const al = t - s.ab;
+          if (al < 0 || al > FLUG) continue;
+          const k = glatt(al / FLUG);
+          const cx = (X0 + O.x) / 2 + s.bogen, cy = Math.min(Y0, O.y) - s.hoch;
+          const bx = (1 - k) * (1 - k) * X0 + 2 * (1 - k) * k * cx + k * k * O.x;
+          const by = (1 - k) * (1 - k) * Y0 + 2 * (1 - k) * k * cy + k * k * O.y;
+          // Funkenschweif
+          for (let d = 1; d <= 3; d++) {
+            const kk = glatt(Math.max(0, al - d * 28) / FLUG);
+            const tx = (1 - kk) * (1 - kk) * X0 + 2 * (1 - kk) * kk * cx + kk * kk * O.x;
+            const ty = (1 - kk) * (1 - kk) * Y0 + 2 * (1 - kk) * kk * cy + kk * kk * O.y;
+            g.put(tx + 1, ty + 2, d === 1 ? GOLD[1] : (d === 2 ? VIO[1] : VIO[2]), (1 - d * 0.26) * aus);
+          }
+          seite(g, bx - 2, by - 2, Math.sin(al / 50 + s.flatter) > 0, aus * (k > 0.92 ? (1 - k) / 0.08 : 1));
+        }
+        if (t > 400) buchSichtbar = true;
+      });
+      if (buchSichtbar && !sz.ziele.some(z => z.selbst)) buch(g, O.x, O.y - 4, glatt((t - AUFSCHLAG) / 260), aus, t);
+      else if (sz.ziele.some(z => z.selbst)) buch(g, Math.round(sz.ziele[0].x), Math.round(sz.ziele[0].y) - 2, glatt((t - 80) / 260), aus, t);
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Gezeitenwelle (Whale Race Boat) — PIXELART, ueberrollt das KOMPLETTE BRETT (Als Vorgabe 10.10.: „trifft alle Ziele
   //  auf dem kompletten Board, also soll die Welle das komplette Board ueberrollen")
   //
@@ -36570,6 +36926,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const lbl2 = ownerLbl(t.owner, myIdx);
               const sel2 = t.deck === true
                 ? (lbl2 === 'me' ? '[data-my-deck]' : '[data-opp-deck]')           // ★ 10.10.: das Deck selbst ist das Ziel
+                : t.zoneType === 'surprise'                                         // ★ 11.10. (Breakthrough, Create Secret Room): eine SURPRISE ZONE als Ziel
+                ? `[data-surprise-zone][data-surprise-owner="${lbl2}"][data-surprise-hero="${t.heroIdx}"]`
+                : t.zoneType === 'area'                                             // ★ 11.10. (Secret Spell Book): eine AREA ZONE als Ziel
+                ? `[data-area-zone][data-area-owner="${lbl2}"]`
                 : (t.zoneSlot == null || t.zoneSlot < 0)
                 ? `[data-hero-zone][data-hero-owner="${lbl2}"][data-hero-idx="${t.heroIdx}"]`
                 : `[data-support-zone][data-support-owner="${lbl2}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`;
@@ -46895,6 +47255,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'cute_crown_summon') { const p = playerByName(entry.player); return <span className="log-status">👑 {pName(p.name, p.color)}'s {cName('Cute Crown')} grants an additional Action{entry.hero ? <> to {entry.hero}</> : null} for a "Cute" Creature!</span>; }
       // The Creepy Clown of Heaven: Aktion zum Besiegen / Nachwirkung (the-creepy-clown-of-heaven.js)
       if (t === 'creepy_clown_popped') { const p = playerByName(entry.player); return <span className="log-status">🎪 {pName(p.name, p.color)} spent an Action to defeat {cName('The Creepy Clown of Heaven')}!</span>; }
+      // Breakthrough / Amazing Finding (breakthrough.js, amazing-finding.js)
+      if (t === 'breakthrough') { const p = playerByName(entry.player); return <span className="log-status">💥 {pName(p.name, p.color)}'s {cName('Breakthrough')} sent {cName(entry.card)} to the discard pile!</span>; }
+      if (t === 'amazing_finding') { const p = playerByName(entry.player); const a = entry.artifacts || []; return <span className="log-status">🔎 {pName(p.name, p.color)}'s {cName('Amazing Finding')} {a.length > 0 ? <>added {a.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>)} to their hand</> : <>found no Artifact</>}{entry.shuffled ? <> and shuffled {cName(entry.shuffled)} back into the deck</> : null}.</span>; }
+      // Create Secret Room: Karte eingelegt / auf die Hand genommen / aktiviert (create-secret-room.js, _secret-room-shared.js)
+      if (t === 'secret_room_set') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)}'s {cName('Create Secret Room')} hid a card in {entry.hero}'s Surprise Zone.</span>; }
+      if (t === 'secret_room_hand') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} took {cName(entry.card)} out of the secret room into their hand ({entry.hero} was chosen by {cName(entry.by)}).</span>; }
+      if (t === 'secret_room_activate') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} opened the secret room and activates {cName(entry.card)} ({entry.hero} was chosen by {cName(entry.by)})!</span>; }
+      // Secret Spell Book (secret-spell-book.js)
+      if (t === 'secret_spell_book') { const p = playerByName(entry.player); const g = entry.taken || []; return <span className="log-status">📖 {pName(p.name, p.color)}'s {cName('Secret Spell Book')} {g.length > 0 ? <>took permanent control of {g.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>)}{(entry.placed || []).length > 0 ? <> (placed: {(entry.placed || []).length})</> : null}</> : <>drew {entry.drew || 1} card{(entry.drew || 1) === 1 ? '' : 's'} instead</>}.</span>; }
+      if (t === 'control_in_place') { const p = playerByName(entry.player); return <span className="log-status">📖 {pName(p.name, p.color)} controls {cName(entry.card)} where it lies ({cName(entry.by)}).</span>; }
+      if (t === 'area_taken') { const p = playerByName(entry.player); return <span className="log-status">📖 {pName(p.name, p.color)} took {cName(entry.area)} into their Area Zone ({cName(entry.by)}).</span>; }
+      // Disarm: gewaehlte Artefakte eines Helden geloescht (disarm.js)
+      if (t === 'disarm') { const p = playerByName(entry.player); return <span className="log-status">🗑️ {pName(p.name, p.color)}'s {cName('Disarm')} deleted {(entry.cards || []).map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>)} equipped to {entry.hero}!</span>; }
       if (t === 'creepy_clown_defeated') { return <span className="log-status">🎪 {cName('The Creepy Clown of Heaven')} was defeated — the effects of all Creatures stay {styledStatus('negated')} for the rest of the turn!</span>; }
       // v653: Level-Rabatte „for the rest of the turn" (Fiona, the Empty Vessel; Divine Gift of Magic hatte bisher keinen Client-Fall).
       if (t === 'fiona_vessel_spell') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} took {cName(entry.spell)} from the deck — its level is reduced by {entry.amount} this turn.</span>; }

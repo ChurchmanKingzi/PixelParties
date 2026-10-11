@@ -87,6 +87,10 @@
 "id": "Alluring_Light",
 "kind": "a"
 },
+"Amazing Finding": {
+"id": "Amazing_Finding",
+"kind": "a"
+},
 "Ambush the Scout": {
 "id": "Ambush_the_Scout",
 "kind": "b"
@@ -471,6 +475,10 @@
 "id": "Breaking_Strike",
 "kind": "a"
 },
+"Breakthrough": {
+"id": "Breakthrough",
+"kind": "a"
+},
 "Brilliant Idea": {
 "id": "Brilliant_Idea",
 "kind": "a"
@@ -813,6 +821,10 @@
 },
 "Create Illusion": {
 "id": "Create_Illusion",
+"kind": "a"
+},
+"Create Secret Room": {
+"id": "Create_Secret_Room",
 "kind": "a"
 },
 "Creative Puppet Brammi": {
@@ -1209,6 +1221,10 @@
 },
 "Dirty Smuggler": {
 "id": "Dirty_Smuggler",
+"kind": "a"
+},
+"Disarm": {
+"id": "Disarm",
 "kind": "a"
 },
 "Disgruntled Forest Warden": {
@@ -3585,6 +3601,10 @@
 },
 "Secret Red Spice": {
 "id": "Secret_Red_Spice",
+"kind": "a"
+},
+"Secret Spell Book": {
+"id": "Secret_Spell_Book",
 "kind": "a"
 },
 "Secret Spice Jar": {
