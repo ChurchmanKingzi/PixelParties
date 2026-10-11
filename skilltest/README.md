@@ -178,7 +178,7 @@ Sichtbar: Kartenliste (Spalte „Keep − recycle"), Paar- und Kontext-Tabellen 
   Zuletzt dazugekommen: **Tri Ad / Tri Fecta**, **Idej Projection** (kommt nur noch über die Lords) und alle **reinen Zieh-/Such-Karten**
   (Wheels, Haste, Magnetic Potion, Elixir of Quickness, …). Erkennung: Zieh-/Such-Sperren der Engine (`blockedByHandLock`, `blockedByDrawLock`,
   `blockedBySearchLock`, Zieh-Block-Helfer) plus Handprüfung des Kartentextes — Karten mit zusätzlichem Effekt und reine **Ablage-Rückholer**
-  (Shooting Star, Boomerang, …) bleiben im Pool, weil es im Modus eine Ablage gibt. `scripts/skilltest-e2e/idej.test.js` prüft die Liste.
+  (Shooting Star, Boomerang, …) bleiben im Pool, weil es im Modus eine Ablage gibt.
   Nach dem Nachttraining (Nutzung 0 % bei Dutzenden bis Hunderten behaltener Exemplare, dann Ursache geprüft) kamen **26 Karten** dazu, deren
   Wirkung im Modus nicht eintreten kann: Coolness-Stack-Karten (der Stack bleibt immer leer: String of Fine, Glorious Rebirth, Coolness Overcharge,
   Modnir, Swellpnir, Ragnarock), Deckbau-Regelkarten (Secret Spices, Secret Spice Jar, The Sacred Blade), Deck-Karten (Surprise Party, Overcharge,
@@ -248,7 +248,7 @@ im Pool; Karten, die suchen (Tutoren), bleiben gesperrt. Tests: `draws.test.js`,
 ### Dream Lander
 
 Creatures mit `attachableHeroes` (Goff, Clausss, Smugbeth, Vullary, Wolflesia, Stellin, Antonia) starten mit dem Hero angelegt — beim Ausspielen im Kampf und wenn sie schon im
-Aufbau stehen (`engine._stAutoAttachHero`). Test: `dream-lander.test.js`. Logan (`logan.test.js`): Auszahlung am Rundenende je Sitz; CPU-Sitze investieren und zahlen aus.
+Aufbau stehen (`engine._stAutoAttachHero`). Logan: Auszahlung am Rundenende je Sitz; CPU-Sitze investieren und zahlen aus.
 
 ## Karten mit Sonderregeln
 
@@ -273,11 +273,11 @@ Aufbau stehen (`engine._stAutoAttachHero`). Test: `dream-lander.test.js`. Logan 
   also nicht. Unter **Dark Ocean** wird jeder Reaper-Schlag storniert; weil `counters.currentHp` erst beim ersten Schaden gesetzt wird
   (frische Kreaturen haben nur `maxHp`), hielt der Reaper die unversehrte Kreatur für „besiegt" und feuerte endlos weiter. Behoben im Skript
   (`hpOf` statt `currentHp || 0`, Abbruch bei stornierter Wirkung). Außerdem prüfte `isDarkOceanActive` nur die Area-Zonen von Sitz 0 und 1 —
-  jetzt alle Sitze. Test: `reaper.test.js`.
+  jetzt alle Sitze.
 - **Garius, the Great Reformer** (Fund aus dem Nachttraining, ≈ 0,5 % der Partien): Die Galerie der Deck-Kreaturen ließ Artifact-Creatures
   (Debt-O-Tron-Modelle, Pollution Spewer) zu, die anschließende Prüfung (`isPileCreature`) lehnte sie ab, und die Engine kann sie auf diesem Weg
   nicht setzen — der Effekt sprang zurück zur Opferwahl, der Bot wählte dasselbe wieder. Behoben im Skript (Galerie nutzt dieselbe Eignung); zusätzlich
-  zählt der Prompt-Wiederholungsschutz der Policy jetzt *vor* der Antwort einer Karten-`cpuResponse` (vorher umging sie ihn). Test: `garius.test.js`.
+  zählt der Prompt-Wiederholungsschutz der Policy jetzt *vor* der Antwort einer Karten-`cpuResponse` (vorher umging sie ihn).
 
 ## Reaktionen der Bots
 
@@ -339,7 +339,6 @@ Brettern, danach ergraut er) und `exhaustedSlots` (erschöpfte Creatures). Clien
   **muss nach jeder Engine-Änderung „unverändert" melden**.
 - `scripts/skilltest-e2e/usability.test.js` (headless): Start-Abilities Stufe 3, Ability-Regeln, Nutzbarkeit/Nutzung beim Behalten.
 - `scripts/skilltest-e2e/sacrifice.test.js` (headless): Opferwahl der CPU, keine ST_RUNAWAY-Schleife; `start-hooks.test.js`: Spielbeginn-Abfragen (Kassaran).
-- `scripts/skilltest-e2e/idej.test.js` (headless): Idej-Spawn-Regeln, Pool-Sperren, Kampfstart mit erschienenen Karten.
 - `scripts/skilltest-e2e/*.test.js`: Lobby, Vorbereitung, Kampf, Sitzwechsel (CPU-Übernahme/Aufgeben), Zielwahl über Sitze (per Socket,
   brauchen `socket.io-client`, siehe `lib.js`) und `learn.test.js` (Lernsystem, headless); `ui-*.shot.js` (Playwright, Screenshots).
 - Headless: `node -e "require('./skilltest/sim').runGame({seats:4}).then(console.log)"` (mit `PP_ST_SIM=1`, siehe `sim-bridge.js`).
