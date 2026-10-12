@@ -5735,7 +5735,8 @@ window.SkinHolo = SkinHolo;
 
 /**
  * Namensglanz der Karten mit Foil (Super Rare = gold, Diamond Rare = tuerkis): dieselbe Schicht wie der Name der
- * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil. In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
+ * Skin-Karten (`.skin-holo-name`), ohne Bild-Foil; in Grossansichten (>= 240 px) zusaetzlich als zweite Schicht der Glanz
+ * auf allem uebrigen Text (`.skin-holo-text`). In Kleinansichten entfaellt sie — dort ist der Name nicht lesbar.
  */
 function FoilName({ card, tone, fkey }) {
   const [ref, breit] = useEffektHuelle(ppEffektMin());
@@ -5752,10 +5753,33 @@ function FoilName({ card, tone, fkey }) {
   }, [card?.name, breit]);
   fkey = fkey || 'card:' + (card?.name || '');
   const phase = usePhase(fkey);
+  // Auch der ÜBRIGE Text der Karte (Fähigkeitsfelder, Werte, Regeltext) bekommt den Glanz (Als Vorgabe 12.10.). Eigene Hülle mit
+  // höherer Schwelle: die Maske umfasst die ganze Karte (375 x 525), das lohnt erst in Tooltip und Grossansichten. Gleiche Phase
+  // und Farbe wie der Name, damit beides als ein Glanz über die Karte läuft.
+  const textAn = !!(window.CardRender && window.CardRender.HOLO && window.CardRender.HOLO.allText);
+  const [refT, breitT] = useEffektHuelle(ppEffektMin() * 2);
+  const [datenT, setDatenT] = useState(() => (card && window.CardRender && window.CardRender.textCached(card)) || null);
+  useEffect(() => {
+    let lebt = true;
+    if (!card || !breitT || !textAn) return undefined;
+    const fertig = window.CardRender.textCached(card);
+    if (fertig) { setDatenT(fertig); return undefined; }
+    window.CardImageShim.boot()
+      .then(() => window.CardRender.textShimmerFor(card))
+      .then(d => { if (lebt) setDatenT(d || null); });
+    return () => { lebt = false; };
+  }, [card?.name, breitT, textAn]);
   return (
-    <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-      {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
-    </div>
+    <>
+      <div ref={ref} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+        {daten && breit && <div className="skin-holo-name"><i className="sh-rb" /><i className="sh-gl" /></div>}
+      </div>
+      {textAn && (
+        <div ref={refT} className={'skin-holo skin-holo-nur-name foil-name-' + tone} data-foil-key={fkey + '|text'} style={datenT ? { ...datenT.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
+          {datenT && breitT && <div className="skin-holo-name skin-holo-text"><i className="sh-rb" /><i className="sh-gl" /></div>}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -7126,7 +7150,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
         </div>
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-        <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
+        <div style={{ fontWeight: 700, marginBottom: 5, color: tooltipTypeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
           {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
           <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
@@ -7145,9 +7169,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
         </div>
         {/* Ascended Heroes: der Ascension Bonus als ganzer Satz, direkt ueber dem Effekt. */}
         {ascensionBonusText(card) && (
-          <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>
-            <span style={{ color: tooltipTypeColor('Ascended Hero'), fontWeight: 700 }}>Ascension Bonus: </span>{ascensionBonusText(card)}
-          </div>
+          <div style={{ fontSize: 14, marginTop: 6, marginBottom: 6, lineHeight: 1.5 }}>{ascensionBonusText(card)}</div>
         )}
         {card.effect &&
           <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
@@ -8117,15 +8139,18 @@ function BuffColumn({ buffs, cardName, statuses }) {
 // Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
 // Farbe seiner Kartenart (`typeColor`) — AUSSER dem Ascended Hero: dessen
 // `typeColor` (#6622aa) ist fuer Karten-Rahmen gedacht und auf dem
-// dunklen Tooltip kaum zu lesen, er bekommt das Lila des Helden.
+// dunklen Tooltip kaum zu lesen. Er bekommt ein helleres Violett, das sich
+// zugleich vom Lila des normalen Helden (#aa44ff) abhebt. Gilt fuer den
+// Namen UND die Typzeile.
 const TT_HP_COLOR = '#4ade80';
 const TT_ATK_COLOR = '#ff5555';
 const TT_COST_COLOR = '#ffd700';
+const TT_ASCENDED_COLOR = '#c88dff';
 function tooltipTypeColor(cardType) {
-  return cardType === 'Ascended Hero' ? typeColor('Hero') : typeColor(cardType);
+  return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
 }
 
-// ── Ascension-Bonus als ausformulierter Satz (Als Vorgabe 12.10.) ────
+// ── Ascension-Bonus als ausformulierter Satz, ohne Label (Als Vorgabe 12.10.) ──
 // Auf den Ascended Heroes steht der Bonus nur als Stichwort in den
 // Faehigkeitsfeldern („Fighting 3", „Any 2 Spells to your hand"). Der
 // Tooltip schreibt ihn aus. Ability-Boni („<Ability> N") baut
@@ -8218,7 +8243,7 @@ function TooltipCardImage({ card, src, hp, style }) {
  * Pure rendering component for card tooltip content.
  * Displays card image (with foil overlay), name, type, effect, stats
  * and spell schools. Ascended Heroes show their Ascension Bonus as a
- * full sentence above the effect; Heroes list no Abilities (they sit on
+ * full sentence (no label) above the effect; Heroes list no Abilities (they sit on
  * the board). Pass extra context-specific info via `children`.
  */
 function CardTooltipContent({ card, children, imageUrl }) {
@@ -8251,7 +8276,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
         </div>
       )}
       <div style={{ padding: '10px 12px' }}>
-        <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
+        <div style={{ fontWeight: 700, fontSize: 18, color: tooltipTypeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
           {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
           <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
@@ -8273,9 +8298,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
           const bonus = ascensionBonusText(card);
           if (!bonus) return null;
           return (
-            <div style={{ fontSize: 14, marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
-              <span style={{ color: tooltipTypeColor('Ascended Hero'), fontWeight: 700 }}>Ascension Bonus: </span>{bonus}
-            </div>
+            <div style={{ fontSize: 14, marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>{bonus}</div>
           );
         })()}
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
