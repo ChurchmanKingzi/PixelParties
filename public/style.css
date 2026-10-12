@@ -5394,33 +5394,15 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   100% { opacity: 0.9; transform: scale(1.2); }
 }
 /* ─── Duel: zwei Helden rammen einander (12.10.) ──────────────────────
-   Beide Heldenkarten fahren gleichzeitig aufeinander zu (`--ux/--uy` = Fahrtrichtung, `--reach` = Weg bis zum Aufprall in der Mitte, `--back` = wie weit der
-   Rückprall sie zurückwirft, `--wob` = Taumeln beim Rückprall, gegengleich für die beiden Karten). Dauer 1150 ms:
-      0–7 %   Ausholen (kurz zurück)
-      7–22.6 %  Anlauf, beschleunigend → ERSTER AUFPRALL bei 260 ms (Stauchen, kurzer Halt)
-     26–40 %  Rückprall mit Taumeln
-     40–52.2 %  zweiter Anlauf → ZWEITER AUFPRALL bei 600 ms (stärker, grösser gestaucht, längerer Halt) — hier fällt der Schaden
-     59.5–100 %  zurück auf die Zone
-   Dieselben Zeiten stehen in `_hero-duel-shared.js` (Engine) und `duel_clash` (app-board.jsx, Pixelart-Aufprall). */
+   Die Bewegung kommt NICHT aus Keyframes: `HeldenRammkarte` (app-board.jsx) setzt je Bild `transform` aus der gemeinsamen Bahn `ppHeldenRammenBahn` — erst im Duell steht
+   fest, wie viele Hits es werden. Hier nur die Hülle. */
 .ram-anim-card.ram-clash {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation-name: ramClash;
-  animation-timing-function: linear;
+  animation: none;
   filter: brightness(1.12) drop-shadow(0 0 10px rgba(255,255,255,.55));
   will-change: transform;
-}
-@keyframes ramClash {
-  0%    { transform: translate(0, 0) rotate(0deg) scale(1.04); animation-timing-function: ease-out; }
-  7%    { transform: translate(calc(var(--ux) * var(--reach) * -0.12), calc(var(--uy) * var(--reach) * -0.12)) rotate(var(--ramAngle)) scale(1.1); animation-timing-function: cubic-bezier(.6, 0, 1, .55); }
-  22.6% { transform: translate(calc(var(--ux) * var(--reach)), calc(var(--uy) * var(--reach))) rotate(var(--ramAngle)) scale(1.24); animation-timing-function: ease-out; }
-  26%   { transform: translate(calc(var(--ux) * var(--reach) * .96), calc(var(--uy) * var(--reach) * .96)) rotate(var(--ramAngle)) scale(1.14); animation-timing-function: cubic-bezier(.3, 0, .5, 1); }
-  40%   { transform: translate(calc(var(--ux) * (var(--reach) - var(--back))), calc(var(--uy) * (var(--reach) - var(--back)))) rotate(calc(var(--ramAngle) + var(--wob))) scale(1.04); animation-timing-function: cubic-bezier(.6, 0, 1, .55); }
-  52.2% { transform: translate(calc(var(--ux) * var(--reach) * 1.02), calc(var(--uy) * var(--reach) * 1.02)) rotate(var(--ramAngle)) scale(1.34); animation-timing-function: ease-out; }
-  56%   { transform: translate(calc(var(--ux) * var(--reach) * .97), calc(var(--uy) * var(--reach) * .97)) rotate(var(--ramAngle)) scale(1.18); animation-timing-function: linear; }
-  59.5% { transform: translate(calc(var(--ux) * var(--reach) * .98), calc(var(--uy) * var(--reach) * .98)) rotate(var(--ramAngle)) scale(1.12); animation-timing-function: ease-in-out; }
-  100%  { transform: translate(0, 0) rotate(0deg) scale(1); }
 }
 @keyframes ramCharge {
   0% { transform: translate(0, 0) rotate(0deg) scale(1.1); opacity: 1; }
@@ -26069,3 +26051,40 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip .skin-holo):not(.board-tooltip .skin-holo) * {
   animation-play-state: paused !important;
 }
+
+/* ─── Puzzle-Editor: kompakte Kopfzeile des Statistik-Dialogs (Als Vorgabe 12.10.) ──────────────────────────────────────────────────────────
+   HP (bei Helden auch Max HP / ATK) und ALLE Counter einer Karte stehen in EINER umbrechenden Zeile; Zahlenfelder sind vier Stellen breit (Obergrenze 9999). */
+.pz-statzeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 14px;
+  align-items: flex-end;
+}
+.pz-feld { display: flex; flex-direction: column; gap: 3px; }
+.pz-feld-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  white-space: nowrap;
+}
+.pz-feld-zeile { display: flex; align-items: center; gap: 3px; }
+.pz-feld-knopf { padding: 4px 0; font-size: 13px; width: 22px; min-width: 22px; line-height: 1; }
+/* vier Stellen sauber: Pixelschrift 12 px → 4 × 12 = 48 px + Innenabstand; die Drehpfeile fallen weg (die Knöpfe daneben übernehmen das Zählen).
+   Breite so gewählt, dass HP und zwei Counter in eine Zeile des 400-px-Dialogs passen (68 + 2 × 118 + Abstände). */
+.pz-zahl {
+  width: 68px;
+  box-sizing: border-box;
+  padding-left: 4px;
+  padding-right: 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.pz-zahl::-webkit-outer-spin-button,
+.pz-zahl::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pz-zahl-einzeln { margin-top: 0; }

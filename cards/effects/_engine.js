@@ -7473,7 +7473,7 @@ class GameEngine {
    * `loescheZielMarken(quelle)` wieder ab.
    *
    * @param {object} ziel  ein Ziel aus `getHeroTargets` / `getCreatureTargets`
-   * @param {object} [opts]  `{ leuchten: true }` — ein markierter Held pulsiert zusätzlich rot (Duel)
+   * @param {object} [opts]  `{ leuchten: true }` — NUR ein roter Pulsrahmen auf dem Helden (Duel): kein Abzeichen, kein Fadenkreuz, kein Pfad, kein Text
    */
   setzeZielMarke(ziel, label, quelle, waehler, opts = {}) {
     if (!ziel) return;
@@ -7485,12 +7485,13 @@ class GameEngine {
       // v1151: wer gewaehlt hat — der Client zeigt die Wahl des GEGNERS
       // deutlich groesser als die eigene.
       waehler: (isSeat(this, waehler)) ? waehler : null,
-      // 12.10. (Duel): `leuchten` — der HELD pulsiert zusätzlich zum Abzeichen rot (nur für Helden; die feststehende Wahl des Gegners, nach der man selbst wählt).
+      // 12.10. (Duel): `leuchten` — der HELD pulsiert rot, SONST NICHTS (nur für Helden; die feststehende Wahl des Gegners, nach der man selbst wählt)
       ...(opts && opts.leuchten ? { leuchten: true } : {}),
     };
     this.gs.zielMarken = [...(this.gs.zielMarken || []), marke];
     if (!this._inMctsSim && !this._fastMode) {
-      this._broadcastEvent('ziel_marke_blitz', marke);
+      // `leuchten`: nur der pulsierende Rahmen auf dem Helden — kein Fadenkreuz-Blitz mit Text (der Client blendet Abzeichen und Pfad für solche Marken ebenfalls aus)
+      if (!marke.leuchten) this._broadcastEvent('ziel_marke_blitz', marke);
       this.sync();
     }
   }

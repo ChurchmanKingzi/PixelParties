@@ -37,8 +37,8 @@
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  Je Runde rammen die beiden HELDEN einander (Als Vorgabe 12.10.): `play_hero_clash` schickt die Heldenkarten in die Mitte, sie prallen mit grossem Impact zusammen, werden
 //  zurückgeworfen und krachen noch einmal ineinander (hier fällt der Schaden), dann gehen sie heim; `duel_clash` (Pixelart, ANIM_REGISTRY) malt Tempolinien, Sterne, Ringe,
-//  Funken und Risse darüber. Während der Spieler wählt, trägt der gewählte Held des Gegners das Abzeichen „Duel", ein Fadenkreuz und einen roten Pulsrahmen (Zielmarke mit
-//  `leuchten`, `setzeZielMarke`; mit der Wahl des Spielers wieder weg).
+//  Funken und Risse darüber. Während der Spieler wählt, pulsiert die gewählte Heldenkarte des Gegners rot (Zielmarke mit `leuchten`, `setzeZielMarke`:
+//  nur der Rahmen, kein Schriftzug; mit der Wahl des Spielers wieder weg).
 //  Logs `duel_choose`, `duel_round`, `duel_result`; Spielende-Text `duel_draw`.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
@@ -127,8 +127,8 @@ module.exports = {
         `${ps.username} plays Duel. Choose a Hero you control — it duels the Hero ${ps.username} chooses next.`,
         { _duelPhase: 'opponent', _duelCaster: pi });
       engine.log('duel_choose', { player: ops.username, hero: wahlB.hero.name, role: 'opponent' });
-      // Die Wahl des Gegners steht fest: sein Held trägt das Abzeichen „Duel", ein Fadenkreuz rastet ein und er pulsiert rot, solange der Spieler wählt (Als Vorgabe 12.10.) —
-      // der Mechanismus der Zielmarken (Ricochet). Mit der Wahl des Spielers sind die Marken wieder weg, auch bei Fehlern.
+      // Die Wahl des Gegners steht fest: seine Heldenkarte pulsiert rot, solange der Spieler wählt (Als Vorgabe 12.10.: nur die Karte hervorheben, kein Schriftzug) — Zielmarke mit
+      // `leuchten` (`setzeZielMarke`). Mit der Wahl des Spielers ist sie wieder weg, auch bei Fehlern.
       engine.setzeZielMarke({ type: 'hero', owner: wahlB.side, heroIdx: wahlB.heroIdx }, 'Duel', CARD_NAME, oi, { leuchten: true });
       let wahlA;
       try {
