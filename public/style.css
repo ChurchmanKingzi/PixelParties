@@ -10280,9 +10280,12 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
    card.
 
    Two layouts:
-     • Default (card is wide enough): horizontal — HP on the left,
-       ATK on the right, both anchored at the card's bottom edge.
-       Matches the legacy positioning (left:5px / right:5px corners).
+     • Default (card is wide enough): horizontal — HP and ATK side by
+       side as ONE group, centred on the card and anchored at its bottom
+       edge. Als Vorgabe 12.10.: vorher `space-between` — HP klebte
+       links, ATK rechts am Rand, je nach Stellenzahl mit einer Luecke
+       dazwischen. Jetzt bleibt das Paar unabhaengig von der Anzahl der
+       Ziffern in der Kartenmitte.
      • Compact (card narrower than 55px via container query below):
        vertical — HP stacked on TOP of ATK, both horizontally
        centered. `flex-direction: column` puts the FIRST child (HP)
@@ -10298,7 +10301,8 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: center;
+  column-gap: calc(8px * var(--board-scale));
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: calc(10px * var(--board-scale));
   text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;

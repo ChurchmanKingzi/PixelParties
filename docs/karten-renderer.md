@@ -42,6 +42,14 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   (Symbolgröße 8,5 bzw. 10,5 / `image font size` 30, Flächenmittel-Skalierung, mittig in der Zeile); ein
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
   Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
+* **Werte der Helden (HP / ATK):** Die Zahlen stehen exakt mittig in ihren Rahmenfeldern — HP-Feld x 180–380,
+  ATK-Feld x 470–670 (Kartenraster 750 × 1050, Rahmen `hero` / `fullartHero` / `superhero`), unabhängig von der
+  Stellenzahl. `drawLine(…, { ink: true })` zentriert dafür die sichtbare Tinte statt des Vorschubs (die Schrift
+  lässt hinter jedem Zeichen 1 Schrift-Pixel Abstand, `INK_TRAIL_U`); gemessen: Tintenmitte = Feldmitte bei 1–4
+  Stellen. Creature-, Artifact- und Boss-Rahmen sind unverändert.
+* **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
+  Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
+  gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 

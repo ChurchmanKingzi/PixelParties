@@ -7128,30 +7128,27 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
         <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
-          {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}{card.level != null ? ' · Lv ' + card.level : ''}
+          {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
+          <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
+          {[card.subtype, card.archetype].filter(Boolean).map(t => ' · ' + t).join('')}{card.level != null ? ' · Lv ' + card.level : ''}
         </div>
-        {(card.startingAbility1 || card.startingAbility2) && (() => {
-          const order = [], counts = new Map();
-          for (const a of [card.startingAbility1, card.startingAbility2]) {
-            if (!a) continue;
-            if (!counts.has(a)) order.push(a);
-            counts.set(a, (counts.get(a) || 0) + 1);
-          }
-          return (
-            <div style={{ marginBottom: 8 }}>
-              {order.map(name => (
-                <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
-              ))}
-            </div>
-          );
-        })()}
+        {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): ihre
+            Faehigkeiten liegen sichtbar in den Ability-Zonen, und bei
+            Ascended Heroes beschreiben die startingAbility-Felder ohnehin
+            den Ascension Bonus — der steht unten als ganzer Satz. */}
         {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
           <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
         <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
-          {card.hp != null && <span>HP: {card.hp}</span>}
-          {card.atk != null && <span>ATK: {card.atk}</span>}
-          {card.cost != null && <span>Cost: {card.cost}</span>}
+          {card.hp != null && <span style={{ color: TT_HP_COLOR }}>HP: {card.hp}</span>}
+          {card.atk != null && <span style={{ color: TT_ATK_COLOR }}>ATK: {card.atk}</span>}
+          {card.cost != null && <span style={{ color: TT_COST_COLOR }}>Cost: {card.cost}</span>}
         </div>
+        {/* Ascended Heroes: der Ascension Bonus als ganzer Satz, direkt ueber dem Effekt. */}
+        {ascensionBonusText(card) && (
+          <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>
+            <span style={{ color: tooltipTypeColor('Ascended Hero'), fontWeight: 700 }}>Ascension Bonus: </span>{ascensionBonusText(card)}
+          </div>
+        )}
         {card.effect &&
           <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
       </div>
@@ -8115,11 +8112,114 @@ function BuffColumn({ buffs, cardName, statuses }) {
 //                      CardMini components trigger it automatically.
 // ═══════════════════════════════════════════
 
+// ── Farben im Karten-Tooltip (Als Vorgabe 12.10.) ───────────────────
+// HP gruen, ATK rot, Kosten (Artifacts) golden. Helle Toene, weil der
+// Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
+// Farbe seiner Kartenart (`typeColor`) — AUSSER dem Ascended Hero: dessen
+// `typeColor` (#6622aa) ist fuer Karten-Rahmen gedacht und auf dem
+// dunklen Tooltip kaum zu lesen, er bekommt das Lila des Helden.
+const TT_HP_COLOR = '#4ade80';
+const TT_ATK_COLOR = '#ff5555';
+const TT_COST_COLOR = '#ffd700';
+function tooltipTypeColor(cardType) {
+  return cardType === 'Ascended Hero' ? typeColor('Hero') : typeColor(cardType);
+}
+
+// ── Ascension-Bonus als ausformulierter Satz (Als Vorgabe 12.10.) ────
+// Auf den Ascended Heroes steht der Bonus nur als Stichwort in den
+// Faehigkeitsfeldern („Fighting 3", „Any 2 Spells to your hand"). Der
+// Tooltip schreibt ihn aus. Ability-Boni („<Ability> N") baut
+// `ascensionBonusText` selbst zusammen; alles andere steht hier einzeln,
+// nach dem, was die Karten-Skripte (cards/effects/*.js) tatsaechlich tun.
+const ASCENSION_BONUS_TEXT = {
+  '???, the Throne Robber': 'Add any Ascended Hero from outside the game to your hand.',
+  'Beato, the Eternal Butterfly': 'Add up to 2 different Spells/Creatures from your deck to your hand.',
+  'Chuck, the Storyteller': 'Attach up to 3 Abilities of your choice from outside the game to this Hero.',
+  'Dajan, Conqueror of the Treasure Cave': 'Add up to 2 different Artifacts from your deck to your hand.',
+  'Diamond, the Bulwark of Peace': 'Delete up to 3 Creatures from your hand, deck and/or discard pile.',
+  'Sparrow, the Buffoon of the Treasure Cave': 'Play the top 3 cards of your Potion Deck, if possible.',
+  'Styx, the Opened Gate': 'Add up to 2 cards of your choice from your discard pile to your hand.',
+  'Tempeluna, the Convergence Fairy': 'Add 1 "Fairy" Hero from your deck to your hand.',
+};
+
+/** Der Ascension-Bonus einer Karte als ganzer Satz — null, wenn sie keinen hat (Bloom, Waflav-Formen). */
+function ascensionBonusText(card) {
+  if (!card || card.cardType !== 'Ascended Hero') return null;
+  if (ASCENSION_BONUS_TEXT[card.name]) return ASCENSION_BONUS_TEXT[card.name];
+  const felder = [card.startingAbility1, card.startingAbility2]
+    .map(s => String(s || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (felder.length === 0) return null;
+  // „<Ability> N" mit einer echten Ability-Karte → bis zu N Kopien an den Helden legen.
+  const abilities = [];
+  for (const f of felder) {
+    const m = /^(.+?)\s+(\d+)$/.exec(f);
+    const ab = m && window.CARDS_BY_NAME?.[m[1]];
+    if (!ab || ab.cardType !== 'Ability') { abilities.length = 0; break; }
+    abilities.push({ name: m[1], n: parseInt(m[2], 10) });
+  }
+  if (abilities.length > 0) {
+    const quelle = 'from your deck, hand and/or discard pile to this Hero.';
+    if (abilities.length === 1) return `Attach up to ${abilities[0].n} copies of ${abilities[0].name} ${quelle}`;
+    // Mehrere Abilities: jede einzeln bis zu N (die Engine fragt je Ability getrennt).
+    if (abilities.every(a => a.n === abilities[0].n))
+      return `Attach up to ${abilities[0].n} copies each of ${abilities.map(a => a.name).join(' and ')} ${quelle}`;
+    return `Attach ${abilities.map(a => `up to ${a.n} copies of ${a.name}`).join(' and ')} ${quelle}`;
+  }
+  // Unbekannte Form: das Stichwort der Karte als Satz stehen lassen.
+  const text = felder.join(' ');
+  return /[.!?]$/.test(text) ? text : text + '.';
+}
+
+// ── Karte mit aktueller max. HP (Als Vorgabe 12.10.) ────────────────
+// Weicht die aktuelle max. HP eines Helden/Wesens von der gedruckten ab
+// (Buffs, Ascension, Effekte), zeigt das Tooltip-Bild die AKTUELLE Zahl
+// auf der Karte. Der Renderer zeichnet die Karte dafuer mit `hp`-Override
+// neu; bis sie fertig ist (und wenn der Renderer fehlt) bleibt das normale
+// Bild stehen. Fertige Bilder werden kurz gemerkt, damit wiederholtes
+// Hovern nicht neu zeichnet.
+const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
+const TT_HP_KARTEN_MAX = 24;
+function TooltipCardImage({ card, src, hp, style }) {
+  const skin = skinOfUrl(src);
+  const key = hp != null ? `${card.name}|${skin || ''}|${hp}` : null;
+  const [alt, setAlt] = useState(() => (key && _ttHpKarten.get(key)) || null);
+  useEffect(() => {
+    if (key == null) { setAlt(null); return; }
+    const gemerkt = _ttHpKarten.get(key);
+    if (gemerkt) { setAlt(gemerkt); return; }
+    setAlt(null);
+    const CR = window.CardRender;
+    if (!CR || typeof CR.renderCard !== 'function') return;
+    let tot = false;
+    (async () => {
+      try {
+        // Kanonische Kartendaten wie beim normalen Bild — nur die HP weicht ab.
+        const basis = window.CARDS_BY_NAME?.[card.name] || card;
+        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp });
+        if (!cv || tot) return;
+        const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+        if (!blob || tot) return;
+        const url = URL.createObjectURL(blob);
+        _ttHpKarten.set(key, url);
+        if (_ttHpKarten.size > TT_HP_KARTEN_MAX) {
+          const aeltester = _ttHpKarten.keys().next().value;
+          URL.revokeObjectURL(_ttHpKarten.get(aeltester));
+          _ttHpKarten.delete(aeltester);
+        }
+        setAlt(url);
+      } catch (e) { /* ohne Override: normales Kartenbild */ }
+    })();
+    return () => { tot = true; };
+  }, [key]);
+  return <img src={alt || src} style={style} />;
+}
+
 /**
  * Pure rendering component for card tooltip content.
- * Displays card image (with foil overlay), name, type, effect, stats,
- * starting abilities, and spell schools.
- * Pass extra context-specific info via `children`.
+ * Displays card image (with foil overlay), name, type, effect, stats
+ * and spell schools. Ascended Heroes show their Ascension Bonus as a
+ * full sentence above the effect; Heroes list no Abilities (they sit on
+ * the board). Pass extra context-specific info via `children`.
  */
 function CardTooltipContent({ card, children, imageUrl }) {
   if (!card) return null;
@@ -8134,11 +8234,15 @@ function CardTooltipContent({ card, children, imageUrl }) {
   const imgUrl = imageUrl || card._skinUrl || cardImageUrl(card.name);
   const foilType = card.foil || null;
   const displayName = card.displayName || card.name;
+  // Die HP AUF DER KARTE zeigen die aktuelle max. HP, sobald sie von der
+  // gedruckten abweicht (Als Vorgabe 12.10.). `_liveMaxHp` setzt BoardCard.
+  const liveMaxHp = Number.isFinite(card._liveMaxHp) ? card._liveMaxHp : null;
+  const bildHp = liveMaxHp != null && liveMaxHp !== card.hp ? liveMaxHp : null;
   return (
     <>
       {imgUrl && (
         <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-          <img src={imgUrl} style={{
+          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
@@ -8149,46 +8253,31 @@ function CardTooltipContent({ card, children, imageUrl }) {
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontWeight: 700, fontSize: 18, color: typeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
         <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
-          {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}
+          {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
+          <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
+          {[card.subtype, card.archetype].filter(Boolean).map(t => ' · ' + t).join('')}
           {(card._liveLevel != null || card.level != null) && (() => {
             const eff = card._liveLevel != null ? card._liveLevel : card.level;
             const bonus = card._stampBonus || 0;
             return <span style={bonus > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}> · Lv {eff}{bonus > 0 ? ` (+${bonus})` : ''}</span>;
           })()}
         </div>
-        {/* Abilities — shown directly under the "Hero · archetype" line. One
-            row per distinct Ability in the Ability colour, "<name> <level>"
-            (no prefix). Live ability-zone stacks when BoardCard threads them
-            (combining repeats + Performance copies of the same slot), else
-            the static startingAbility1/2 fallback. */}
+        {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): ihre
+            Faehigkeiten liegen sichtbar in den Ability-Zonen, und bei
+            Ascended Heroes beschreiben die startingAbility-Felder ohnehin
+            den Ascension Bonus — der steht unten als ganzer Satz. */}
+        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
+          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
+        {/* Ascended Heroes: der Ascension Bonus als ganzer Satz, direkt ueber dem Effekt. */}
         {(() => {
-          const order = [];
-          const counts = new Map();
-          const add = (name, n) => {
-            if (!name) return;
-            if (!counts.has(name)) order.push(name);
-            counts.set(name, (counts.get(name) || 0) + n);
-          };
-          const liveZones = Array.isArray(card._liveAbilities) ? card._liveAbilities : null;
-          if (liveZones) {
-            for (const slot of liveZones) {
-              if (!Array.isArray(slot) || slot.length === 0) continue;
-              add(slot[0], slot.length); // base ability for the slot
-            }
-          } else {
-            for (const a of [card.startingAbility1, card.startingAbility2]) add(a, 1);
-          }
-          if (order.length === 0) return null;
+          const bonus = ascensionBonusText(card);
+          if (!bonus) return null;
           return (
-            <div style={{ marginBottom: 8 }}>
-              {order.map(name => (
-                <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
-              ))}
+            <div style={{ fontSize: 14, marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+              <span style={{ color: tooltipTypeColor('Ascended Hero'), fontWeight: 700 }}>Ascension Bonus: </span>{bonus}
             </div>
           );
         })()}
-        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
-          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
         {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
         {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind.
             Steht im Karten-Tooltip statt in eigenen Orb-Tooltips — die Orbs
@@ -8243,13 +8332,14 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {(card._liveHp != null || card.hp != null) && (() => {
             const cur = card._liveHp != null ? card._liveHp : card.hp;
             const max = card._liveMaxHp != null ? card._liveMaxHp : null;
-            return <span style={{ color: '#ff6666' }}>♥ HP {cur}{max != null ? ` / ${max}` : ''}</span>;
+            return <span style={{ color: TT_HP_COLOR }}>♥ HP {cur}{max != null ? ` / ${max}` : ''}</span>;
           })()}
           {/* ATK — prefer live `_liveAtk` over base. */}
           {(card._liveAtk != null || card.atk != null) && (
-            <span style={{ color: '#ffaa44' }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
+            <span style={{ color: TT_ATK_COLOR }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
           )}
-          {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+          {/* Kosten gibt es nur bei Artifacts — golden wie der Kartentyp. */}
+          {card.cost != null && <span style={{ color: TT_COST_COLOR }}>◆ Cost {card.cost}</span>}
         </div>
         {children}
       </div>

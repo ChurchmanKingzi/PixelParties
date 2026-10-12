@@ -350,11 +350,10 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         : tooltipBase._copiedHeroes,
       // `_liveAbilities` is the per-Hero `abilityZones[heroIdx]`
       // shape — an array of slot arrays, each slot a stack of names
-      // (`['Fighting','Fighting']`, `['Toughness']`, `[]`). The
-      // tooltip dedupes by base name and renders `Fighting 2`
-      // instead of `Fighting, Fighting`. Falls back to the static
-      // cards.json `startingAbility1/2` only for off-board card
-      // previews where the live stack isn't available.
+      // (`['Fighting','Fighting']`, `['Toughness']`, `[]`).
+      // Seit 12.10. zeigt der Karten-Tooltip KEINE Abilities mehr
+      // (sie liegen sichtbar in den Ability-Zonen); der Wert wird von
+      // CardTooltipContent nicht mehr gelesen.
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
       // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
       _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
