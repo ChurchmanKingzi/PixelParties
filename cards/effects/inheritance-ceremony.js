@@ -17,11 +17,12 @@
 //  1. „another Hero you control": jeder andere LEBENDE Held, den der Spieler kontrolliert (`heroesControlledBy`). Ein einziger Kandidat entfällt als Frage; Abbruch bringt
 //     die Karte zurück. Der Nutzer („the user") ist der wirkende Held.
 //  2. „Move any number of cards attached or equipped to the user": Auswahl (beliebig viele, auch keine) unter den Karten in den BASIS-Support-Zonen des Nutzers, die keine
-//     Kreaturen sind (Equips und Attachments). Obergrenze = die FREIEN Basis-Support-Zonen des Ziels (versiegelte und gesperrte zählen nicht). Sie landen in den freien Zonen
-//     in der Reihenfolge ihrer alten Plätze (Annahme: der Text lässt den Platz offen). Ausgenommen:
-//       • Attachments mit `onCardLeaveZone`-Hook (Curse, Berserk, Overheal Shock, Anti Magic, Invisibility, Prophecy of Tempeste …): sie binden einen Status an ihren Wirt
-//         und lösen ihn beim Verlassen — nach dem Umhängen wäre der Effekt weg. Sie bleiben liegen (Annahme).
-//       • Karten, die der Zielheld nicht tragen darf (`canEquipCardToHero`: Crusader's-Familie, Race Boats …), `counters.immovable`, als Equip angelegte Helden.
+//     Kreaturen sind (Equips und Attachments, auch vom Gegner angelegte). Obergrenze = die FREIEN Basis-Support-Zonen des Ziels (versiegelte und gesperrte zählen nicht). Sie
+//     landen in den freien Zonen in der Reihenfolge ihrer alten Plätze (Annahme: der Text lässt den Platz offen). Ausgenommen sind nur Karten, die der Zielheld nicht tragen darf
+//     (`canEquipCardToHero`: Crusader's-Familie, Race Boats …), `counters.immovable` und als Equip angelegte Helden.
+//     ★ WIRKUNG WANDERT MIT (Vorgabe 12.10.): Anhängsel, die einen Status/Buff an ihrem Wirt halten, nehmen ihn am alten Helden zurück (`onCardLeaveZone`) und legen ihn am neuen
+//     wieder an — über den Karten-Vertrag `attachmentMovedToHost` (Curse, Berserk, Overheal Shock, Anti Magic, Invisibility, Prophecy of Tempeste, Crimson Web; die
+//     Status-Anhängsel mit `anhaengselStatusHooks` — Decisive Defeat, Forbidden Curse of Aging — binden über ihr eigenes Eintrittsereignis; Equips über `onPlay` mit `_isMove`).
 //     Der Zielheld muss ausrüstbar sein (lebend, nicht eingefroren, nicht Charme); nur auf der EIGENEN Brettseite (nutzt oder trifft der Zauber einen geliehenen Helden
 //     der Gegenseite, entfällt das Verschieben, der HP-Teil bleibt — Annahme).
 //  3. „Then, you may decrease the user's HP by any amount to heal the target's HP by the same amount": Schieberegler 0 bis min(HP des Nutzers − 1, Fehl-HP des Ziels).
@@ -35,7 +36,6 @@
 //  Ziel = Zielheld). Klänge in ZONE_ANIM_SFX; Logs `inheritance_move`, `inheritance_hp`.
 // ═══════════════════════════════════════════
 
-const { loadCardEffect } = require('./_loader');
 const { hasCardType, heroCanBeEquipped } = require('./_hooks');
 const { freieBasisZonen } = require('./_equip-shared');
 
@@ -59,15 +59,12 @@ function zielHelden(engine, pi, nutzer) {
     .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
 }
 
-/** Darf diese Karte überhaupt umgehängt werden? (Nicht-Kreatur, kein Statusbinder, nicht festgesetzt) */
+/** Darf diese Karte überhaupt umgehängt werden? (Nicht-Kreatur, nicht festgesetzt; ihre Wirkung zieht über `attachmentMovedToHost` / ihre Eintrittshaken mit) */
 function verschiebbar(engine, inst) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   if (inst.counters?.immovable || inst.counters?.treatAsEquip) return false;
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || hasCardType(cd, 'Creature')) return false;
-  const script = loadCardEffect(inst.name);
-  // Attachments, die beim Verlassen ihren Wirt aufräumen (Status/ATK am Wirt): nach dem Umhängen wäre ihre Wirkung weg — sie bleiben.
-  if (cd.cardType !== 'Artifact' && typeof script?.hooks?.onCardLeaveZone === 'function') return false;
   return true;
 }
 
@@ -77,7 +74,7 @@ function bewegbareKarten(engine, pi, nutzer, ziel) {
   if (!heroCanBeEquipped(ziel.hero)) return [];
   if (engine.isSupportZoneLocked?.(ziel.seite, ziel.heroIdx, { cardName: CARD_NAME, via: 'move' })) return [];
   return engine.cardInstances
-    .filter(c => c.zone === 'support' && c.owner === nutzer.seite && c.heroIdx === nutzer.heroIdx && c.zoneSlot >= 0 && c.zoneSlot <= 2)
+    .filter(c => c.zone === 'support' && engine.physicalSide(c) === nutzer.seite && c.heroIdx === nutzer.heroIdx && c.zoneSlot >= 0 && c.zoneSlot <= 2)
     .filter(c => verschiebbar(engine, c) && engine.canEquipCardToHero(c.name, ziel.seite, ziel.heroIdx))
     .sort((a, b) => a.zoneSlot - b.zoneSlot);
 }
@@ -142,8 +139,9 @@ module.exports = {
       let gewaehlt = [];
       if (freie.length > 0 && karten.length > 0) {
         const cap = Math.min(freie.length, karten.length);
+        const zielId = (c) => `equip-${engine.physicalSide(c)}-${c.heroIdx}-${c.zoneSlot}`;     // die Seite, auf der die Karte LIEGT (Crimson Web: nicht ihr Besitzer)
         const ids = await engine.promptEffectTarget(pi, karten.map(c => ({
-          id: `equip-${c.owner}-${c.heroIdx}-${c.zoneSlot}`, type: 'equip', owner: c.owner, heroIdx: c.heroIdx, slotIdx: c.zoneSlot, cardName: c.name, cardInstance: c,
+          id: zielId(c), type: 'equip', owner: engine.physicalSide(c), heroIdx: c.heroIdx, slotIdx: c.zoneSlot, cardName: c.name, cardInstance: c,
         })), {
           maxTotal: cap, maxPerType: { equip: cap }, minRequired: 0, alwaysConfirmable: true, cancellable: true, greenSelect: true,
           title: CARD_NAME, confirmLabel: '🕊️ Move!',
@@ -151,7 +149,7 @@ module.exports = {
         });
         if (ids == null) { gs._spellCancelled = true; return; }              // Abbruch: noch nichts geschehen
         gewaehlt = (Array.isArray(ids) ? ids : [])
-          .map(id => karten.find(c => `equip-${c.owner}-${c.heroIdx}-${c.zoneSlot}` === id)).filter(Boolean).slice(0, cap)
+          .map(id => karten.find(c => zielId(c) === id)).filter(Boolean).slice(0, cap)
           .sort((a, b) => a.zoneSlot - b.zoneSlot);
       }
 

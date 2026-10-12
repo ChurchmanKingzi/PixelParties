@@ -131,6 +131,14 @@ module.exports = {
     return attachmentHostsFor(gs, pi, engine);
   },
 
+  /**
+   * Umhaengen (Inheritance Ceremony, 12.10.): der Regen faellt jetzt ueber einem anderen Helden — die Ueberlagerung dort neu starten (am alten Wirt hat sie
+   * `onCardLeaveZone` beendet). Der Umleitungs-Effekt selbst haengt an der Zone der Karte und zieht von allein mit.
+   */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    engine._broadcastEvent('tempeste_rain_start', { instId: inst.id, owner: toOwner, heroIdx: toHeroIdx, zoneSlot: inst.zoneSlot });
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;

@@ -290,6 +290,25 @@ module.exports = {
   },
 
   /**
+   * Umhaengen (Inheritance Ceremony, 12.10.): das Netz haengt jetzt an einem anderen Helden — `webbed` dort setzen und die Sperre auf ihn umschreiben (am alten Helden hat
+   * `onCardLeaveZone` den Status genommen). Besitzer der Karte bleibt der Wirker des Netzes, die Kontrolle (= Seite der Zone) wandert.
+   */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    inst.counters = inst.counters || {};
+    inst.counters._crimsonWebLockedOwner = toOwner;
+    inst.counters._crimsonWebLockedHeroIdx = toHeroIdx;
+    const hero = engine.gs.players[toOwner]?.heroes?.[toHeroIdx];
+    if (hero?.name && hero.hp > 0 && !hero.statuses?.webbed) {
+      await engine.addHeroStatus(toOwner, toHeroIdx, 'webbed', {
+        permanent: true,
+        appliedBy: inst.owner,
+        festesZiel: true,   // das Netz haengt an genau diesem Helden (Als Ruling 9.10.)
+      });
+    }
+    engine.sync();
+  },
+
+  /**
    * "Click on it for a dialogue asking 'Discard 1 card to untangle
    * the Crimson Web?'". Routed through the engine's equipEffect
    * activation path. The locked Hero's controller is the activator

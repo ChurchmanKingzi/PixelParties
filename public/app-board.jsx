@@ -51430,7 +51430,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
               const isSelected = isBlindPick && blindPickSelected.has(i);
               const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
-              const isFull = isBlindPick && !isSelected && blindPickSelected.size >= maxSelect;
+              // `eligibleIndices` (Live Show, 12.10.: die eben verschenkten Karten sind tabu): nur diese Plaetze sind waehlbar, der Rest ist ausgegraut und tot.
+              const blindGesperrt = isBlindPick && Array.isArray(gameState.effectPrompt.eligibleIndices) && !gameState.effectPrompt.eligibleIndices.includes(i);
+              const isFull = isBlindPick && !isSelected && (blindGesperrt || blindPickSelected.size >= maxSelect);
               // Letter of Misinformations / "pick a card from opp's
               // hand" prompt. The server already populated
               // `_revealedHandIndices` for the eligible slots, so
@@ -51504,9 +51506,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // eigenen Hand (sie haengt oben am Bild).
                     ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
                     ...((oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
-                    || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
+                    || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : (((isBlindPick && !blindGesperrt) || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
                   }}
                   onClick={isBlindPick ? () => {
+                    if (blindGesperrt) return;
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
                     // updaters (StrictMode dev, batching), so the

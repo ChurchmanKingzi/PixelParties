@@ -127,7 +127,39 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
   return n;
 }
 
+/**
+ * Den Fluch an einem Helden anlegen: ATK sichern und auf 0 setzen, Status `cursed`. EINE Stelle fuer das Spielen der Karte (`onPlay`) UND das Umhaengen an einen anderen Wirt
+ * (`attachmentMovedToHost`, Inheritance Ceremony 12.10.).
+ */
+async function fluchAnlegen(engine, appliedBy, owner, heroIdx) {
+  const targetHero = engine.gs.players[owner]?.heroes?.[heroIdx];
+  if (!targetHero?.name || targetHero.hp <= 0 || targetHero.statuses?.cursed) return false;
+  // Snapshot the live ATK so the cleanse path can restore it.
+  // Subsequent grant/revoke/temp-atk while cursed will accumulate
+  // into this same slot (see _isHeroAtkSuppressed in _engine.js).
+  targetHero._cursedAtkSuppressed = targetHero.atk || 0;
+  const dropAmount = targetHero.atk || 0;
+  // ★ v1087: das ABSENKEN laeuft bewusst weiter direkt — zu
+  // diesem Zeitpunkt ist `cursed` noch NICHT gesetzt, der Trichter
+  // wuerde den Abzug also sichtbar buchen statt in den
+  // Zwischenspeicher. Der Broadcast bleibt deshalb hier; die
+  // ATK-Auren erfahren es ueber den Hook unten am Trichter, wenn
+  // der Fluch faellt.
+  targetHero.atk = 0;
+  if (dropAmount > 0) {
+    engine._broadcastEvent('fighting_atk_change', { owner, heroIdx, amount: -dropAmount });
+  }
+  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, { appliedBy, source: CARD_NAME, animationType: 'dark_swarm' });
+  return true;
+}
+
 module.exports = {
+  /** Umhaengen (Inheritance Ceremony): der Fluch liegt jetzt an einem anderen Helden — dort anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    await fluchAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    engine.sync();
+  },
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -251,28 +283,7 @@ module.exports = {
       const inst = await placeAttachment(ctx, CARD_NAME, { owner: targetOwner, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipEnterHook: true });
       if (!inst) { engine.sync(); return; }
       if (!targetHero.statuses?.cursed) {
-        // Snapshot the live ATK so the cleanse path can restore it.
-        // Subsequent grant/revoke/temp-atk while cursed will accumulate
-        // into this same slot (see _isHeroAtkSuppressed in _engine.js).
-        targetHero._cursedAtkSuppressed = targetHero.atk || 0;
-        const dropAmount = targetHero.atk || 0;
-        // ★ v1087: das ABSENKEN laeuft bewusst weiter direkt — zu
-        // diesem Zeitpunkt ist `cursed` noch NICHT gesetzt, der Trichter
-        // wuerde den Abzug also sichtbar buchen statt in den
-        // Zwischenspeicher. Der Broadcast bleibt deshalb hier; die
-        // ATK-Auren erfahren es ueber den Hook unten am Trichter, wenn
-        // der Fluch faellt.
-        targetHero.atk = 0;
-        if (dropAmount > 0) {
-          engine._broadcastEvent('fighting_atk_change', {
-            owner: targetOwner, heroIdx: targetHeroIdx, amount: -dropAmount,
-          });
-        }
-        await engine.addHeroStatus(targetOwner, targetHeroIdx, STATUS_NAME, {
-          appliedBy: pi,
-          source: CARD_NAME,
-          animationType: 'dark_swarm',
-        });
+        await fluchAnlegen(engine, pi, targetOwner, targetHeroIdx);
       } else {
         engine.log('curse_extra_copy_noop', {
           player: gs.players[pi]?.username,
