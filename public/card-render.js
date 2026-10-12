@@ -28,6 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
+  const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
   const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
@@ -307,7 +308,9 @@
     const top = o.vAlign === 'middle' ? o.top + (o.height - total) / 2 : o.top;
     ctx.fillStyle = o.color;
     lines.forEach((line, li) => {
-      const u = unitsOf(line), natural = u * k;
+      // `ink`: nur die sichtbare Tinte zaehlt, nicht der Abstand hinter dem letzten Zeichen (1 Schrift-Pixel,
+      // INK_TRAIL_U). Sonst sitzt eine zentrierte Zahl um ein halbes Schrift-Pixel zu weit links in ihrer Box.
+      const u = unitsOf(line), natural = (u - (o.ink ? INK_TRAIL_U : 0)) * k;
       const sx = natural > o.width ? o.width / natural : 1;
       const w = natural * sx;
       let x = o.left;
@@ -511,19 +514,25 @@
     // 6) Goldene Rahmenelemente (die uebrigen Foil-Layer entfallen)
     drawRim(ctx, spec);
 
-    // 7) Werte (HP, Angriff / Kosten)
+    // 7) Werte (HP, Angriff / Kosten) — `noHp` / `noAtk`: die Zahl weglassen (Brett: dort liegt der Live-Wert darueber)
     const stat = statColor(spec);
     if (isHero3(t) || sup || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature') {
       // Helden ohne feste Werte (Ascended Hero „stats equal its base Hero's“) zeigen „?“ in beiden Feldern
       const unknown = isHero3(t) || sup;
-      if (spec.hp != null || unknown) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
-        left: t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
-        top: 984, width: 194, height: 60, size: 38, min: 1, align: 'center', color: stat,
+      // Helden: die Zahlen stehen exakt mittig in ihren Feldern (HP-Feld x 180–380, Angriffs-Feld x 470–670 im
+      // Rahmen) — egal, wie viele Stellen sie haben. Frueher lagen sie ~18 px zu weit innen (HP zu weit rechts,
+      // ATK zu weit links). Boss-Rahmen: unveraendert.
+      const heroBox = (isHero3(t) || sup) && t !== 'boss';
+      if (!spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
+        left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
+        top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
       });
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
-      if (spec.atk != null || isHero3(t) || sup) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
-        left: t === 'artifact' ? 296 : 504, top: 984, width: isArti2(t) ? 150 : 94, height: 60, size: 38, min: 1, align: 'center', color: stat,
+      const heroBox = (isHero3(t) || sup) && t !== 'boss';
+      if (!spec.noAtk && (spec.atk != null || isHero3(t) || sup)) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
+        left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
+        height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
       });
     }
 
@@ -663,6 +672,8 @@
    * Komplette Karte als Canvas.
    * @param {object} card  Karte aus cards.json
    * @param {object} [o]   { skin: Skin-Name } — Skins zeigen dieselbe Karte mit eigener Kunst und eigenem Namen
+   *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
+   *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
   async function renderCard(card, o) {
@@ -676,6 +687,9 @@
     const m = Object.assign({}, meta.cards[card.name]);
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
+    if (o.hp != null) spec.hp = o.hp;
+    if (o.noHp) spec.noHp = true;
+    if (o.noAtk) spec.noAtk = true;
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
