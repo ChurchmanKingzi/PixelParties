@@ -97,7 +97,7 @@ const PENDING = [
   { name: 'Assault for Teocuilatl', kind: 'discard', via: 'engine',
     note: 'Gegner muss 2 Karten abwerfen, sonst wird die Creature besiegt.' },
   { name: 'Gather Intel', kind: 'reveal', via: 'manual',
-    note: 'Sieht die Hand AN und lässt dann wählen — eigener Ablauf, keine Standard-Primitive.' },
+    note: 'Sieht die Hand AN (Fenster `reveal`, eigener Aufruf) und lässt der Gegner die Karte hergeben (`actionStealFromHand`, Fenster `steal`) — umgesetzt 12.10.' },
   { name: 'I Found You!', kind: 'discard', via: 'manual',
     note: 'Zufällige Karte aus der Gegnerhand abwerfen — nicht die Wahl-Primitive.' },
   { name: 'Trial of Annoyance', kind: 'discard', via: 'engine',

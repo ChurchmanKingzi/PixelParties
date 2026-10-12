@@ -1379,6 +1379,10 @@
 "id": "Drill_Sergeant",
 "kind": "b"
 },
+"Duel": {
+"id": "Duel",
+"kind": "a"
+},
 "Duigno, the Flaming Phoenix": {
 "id": "Duigno_the_Flaming_Phoenix",
 "kind": "a"
@@ -1781,6 +1785,10 @@
 },
 "Gate to the Armory": {
 "id": "Gate_to_the_Armory",
+"kind": "a"
+},
+"Gather Intel": {
+"id": "Gather_Intel",
 "kind": "a"
 },
 "Gatherer from the Cosmic Depths": {

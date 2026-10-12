@@ -8034,7 +8034,7 @@ const SOG_FLUG_MS = 820;
 //      malen(g, t, sz, teile) → zeichnet das Bild zur Zeit `t` (ms seit Einhaengen)
 //      `g`  Pinsel: put(x, y, farbe, deckung?)  block(x, y, w, h, farbe, deckung?)  ring(cx, cy, rx, ry, farbe, deckung?)
 //           disc(cx, cy, r, farbe, deckung?)   — alles in RASTERkoordinaten, Deckung < 1 = Bayer-gedithert
-//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null }
+//      `sz` { gw, gh, O: {x, y}, ziele: [{ x, y, w, h, len, selbst, dx, dy }], region: {x0, y0, w, h} | null, runde }   (`runde`: Zaehler des Ereignisses, Standard 1 — Duel)
 //           `region` = die optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite), sonst `null`
 //           dx/dy = Einheitsrichtung Quelle → Ziel; `selbst` = die Quelle IST das Ziel (z. B. Assault Eagle waehlt sich selbst)
 //  Alle Ziele laufen im selben Takt — „gleichzeitig" ist Sache der Zeichenfunktion (gleiche Zeit, nicht gleiche Geschwindigkeit).
@@ -8046,7 +8046,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
   // Ursprung und Ziele. Der Canvas misst sich von den MITTEN der Ziele aus — alles, was weiter als ~10 px ueber die Kartenkante hinausragt (Federn, Strahl, ein
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
   const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
-  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox }) {
+  return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde }) {
     const cvs = useRef(null);
     const sz = useMemo(() => {
       if (typeof ox !== 'number' || typeof oy !== 'number' || !Array.isArray(targetPoints) || targetPoints.length === 0) return null;
@@ -8068,7 +8068,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
         return { x: q.x, y: q.y, w: p.w / S, h: p.h / S, len, selbst: len < 6,
           dx: len > 0.01 ? (q.x - o.x) / len : 0, dy: len > 0.01 ? (q.y - o.y) / len : -1 };
       });
-      return { links, oben, gw, gh, O: o, ziele, region };
+      return { links, oben, gw, gh, O: o, ziele, region, runde: runde || 1 };
     }, []);
     const teile = useMemo(() => (sz && vorbereiten ? vorbereiten(sz) : null), [sz]);
     useEffect(() => {
@@ -27179,6 +27179,143 @@ const ANIM_REGISTRY = {
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Gather Intel (12.10.) — PIXELART, Brett-Animation: eine Lupe gleitet vom Wirker über die HAND des Gegners (`targets: [{ owner, hand: true }]`, Ursprung = der wirkende Held)
+  //
+  //  Die Lupe (Messingring mit blauem, gedithertem Glas, Griff, weisser Glanzpunkt) fliegt auf einem Bogen zum linken Rand der Kartenreihe, tastet sie dann in einer
+  //  ruhigen Bahn von links nach rechts ab (leichtes Wippen) und lässt dabei kleine weisse und hellblaue Funkelkreuze auf der Reihe zurück; zuletzt blendet sie aus.
+  //  Gespielt wird sie, bevor die Hand aufgedeckt wird (gather-intel.js).
+  // ═════════════════════════════════════════════════════════════════
+  intel_peek: (() => {
+    const MESSING = ['#fff1b0', '#e8b94a', '#a8741c'].map(ppHex);
+    const GLAS = ['#e6f6ff', '#9ad3ff', '#4a90d9'].map(ppHex);
+    const GRIFF = ['#8a5a2e', '#5a3818'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1300, ANFLUG = 420, TASTEN_BIS = 1020;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const R = 8;
+    const vorbereiten = () => ({
+      funkeln: Array.from({ length: ppFxN(14) }, (_, i) => ({ ab: ANFLUG + 20 + i * 42, dy: (Math.random() - 0.5) * 0.7, dx: (Math.random() - 0.5) * 8, hell: Math.random() < 0.5 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const aus = t > TASTEN_BIS ? Math.max(0, 1 - (t - TASTEN_BIS) / (ENDE - TASTEN_BIS)) : 1;
+      if (aus <= 0) return;
+      const halbB = Math.max(18, z.w / 2 - 6);
+      const startX = z.x - halbB, endX = z.x + halbB;
+      // Bahn der Lupe: Bogen vom Ursprung zum linken Rand, dann entlang der Reihe
+      const bahn = (zeit) => {
+        if (zeit < ANFLUG) {
+          const k = glatt(zeit / ANFLUG);
+          return { x: sz.O.x + (startX - sz.O.x) * k, y: sz.O.y + (z.y - sz.O.y) * k - Math.sin(k * Math.PI) * 14 };
+        }
+        const k = klemme((zeit - ANFLUG) / (TASTEN_BIS - ANFLUG), 0, 1);
+        return { x: startX + (endX - startX) * glatt(k), y: z.y + Math.sin(k * Math.PI * 3) * 2 };
+      };
+      // Funkelkreuze auf der Reihe (bleiben kurz stehen)
+      for (const f of teile.funkeln) {
+        const al = t - f.ab; if (al < 0 || al > 260) continue;
+        const p = bahn(f.ab), k = al / 260, r = k < 0.5 ? 1 + k * 3 : 3 - (k - 0.5) * 4;
+        const fx = Math.round(p.x + f.dx), fy = Math.round(z.y + f.dy * z.h * 0.4);
+        const c = f.hell ? WEISS : GLAS[1];
+        for (let d = -Math.round(r); d <= Math.round(r); d++) { g.put(fx + d, fy, c, (1 - k) * aus); g.put(fx, fy + d, c, (1 - k) * aus); }
+      }
+      // Die Lupe
+      const L = bahn(t), a = Math.min(aus, klemme(t / 80, 0, 1));
+      const cx = Math.round(L.x), cy = Math.round(L.y);
+      g.disc(cx, cy, R - 1, GLAS[1], 0.38 * a);
+      g.disc(cx - 2, cy - 2, R - 4, GLAS[0], 0.28 * a);
+      g.ring(cx, cy, R, R, MESSING[1], a);
+      g.ring(cx, cy, R - 1, R - 1, MESSING[0], a);
+      g.ring(cx, cy, R + 1, R + 1, MESSING[2], a * 0.9);
+      for (let k = 0; k < 9; k++) {
+        const hx = cx + Math.round(R * 0.72) + k, hy = cy + Math.round(R * 0.72) + k;
+        g.put(hx, hy, GRIFF[0], a); g.put(hx + 1, hy, GRIFF[1], a); g.put(hx, hy + 1, GRIFF[1], a);
+      }
+      g.put(cx - 4, cy - 4, WEISS, a); g.put(cx - 3, cy - 4, WEISS, a); g.put(cx - 4, cy - 3, WEISS, a);
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
+  //  Duel (12.10.) — PIXELART, Brett-Animation je Duell-Runde: zwei Klingen schnellen von den beiden Helden (`targets[0]`, `targets[1]`) aufeinander zu
+  //
+  //  Blau-weisse Klinge vom Helden des Spielers, orange-weisse vom Helden des Gegners (je mit Parierstange und Griff, Bewegungsspur gedithert). In der Mitte zwischen beiden
+  //  treffen sie sich bei ~300 ms (achtstrahliger Funkenstern, expandierender Ring, Funkenregen — mit der Runde `runde` mehr Funken); bei ~440 ms landet auf JEDEM Helden
+  //  zugleich der Kreuzhieb (rot-weisses X). Die Engine verteilt den Schaden beider Schläge im Einschlag (_hero-duel-shared.js).
+  // ═════════════════════════════════════════════════════════════════
+  duel_clash: (() => {
+    const KL_A = ['#ffffff', '#9ad3ff', '#4a90d9'].map(ppHex);
+    const KL_B = ['#ffffff', '#ffd08a', '#e8742a'].map(ppHex);
+    const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
+    const ROT = ['#ffffff', '#ff6a5a', '#c0241a'].map(ppHex);
+    const GRIFF = ppHex('#6a4420'), MESSING = ppHex('#e8b94a');
+    const ENDE = 900, TREFF = 300, HIEB = 440, FADE_AB = 700;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const vorbereiten = (sz) => ({
+      funken: Array.from({ length: ppFxN(10 + 5 * (sz.runde || 1)) }, () => ({ w: Math.random() * Math.PI * 2, v: 26 + Math.random() * 56, leben: 260 + Math.random() * 300, farbe: Math.floor(Math.random() * 3) })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const A = sz.ziele[0], B = sz.ziele[1];
+      if (!A || !B) return;
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+      // Eine Klinge vom Helden P zum Treffpunkt Z; `k` = Weg des Klingenkopfes (0…1)
+      const klinge = (P, Z, pal, k, a) => {
+        const dx = Z.x - P.x, dy = Z.y - P.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
+        const kopf = d * k, laenge = Math.min(kopf, 17);
+        for (let s = 0; s < kopf; s += 1) g.put(P.x + ux * s, P.y + uy * s, pal[1], a * (s / Math.max(1, kopf)) * 0.55);
+        for (let s = 0; s < laenge; s += 0.7) {
+          const x = P.x + ux * (kopf - s), y = P.y + uy * (kopf - s);
+          g.put(x, y, s < 3 ? pal[0] : pal[1], a);
+          g.put(x + nx * 0.7, y + ny * 0.7, pal[2], a * 0.85);
+        }
+        const gx = P.x + ux * (kopf - laenge), gy = P.y + uy * (kopf - laenge);
+        for (let s = -2; s <= 2; s++) g.put(gx + nx * s, gy + ny * s, MESSING, a);
+        for (let s = 1; s <= 3; s++) g.put(gx - ux * s, gy - uy * s, GRIFF, a);
+      };
+      // Anflug und Halt: die Klingen verblassen, sobald der Stern sie überstrahlt
+      const flug = glatt(t / TREFF);
+      const halt = t < TREFF + 120 ? aus : aus * Math.max(0, 1 - (t - TREFF - 120) / 100);
+      if (halt > 0) { klinge(A, M, KL_A, flug, halt); klinge(B, M, KL_B, flug, halt); }
+      // Funkenstern und Ring am Treffpunkt
+      if (t >= TREFF && t < TREFF + 300) {
+        const al = t - TREFF, f = 1 - al / 300, r = 3 + al / 14;
+        for (let d = 0; d <= r; d++) {
+          const c = d < r * 0.5 ? STERN[0] : STERN[2];
+          g.put(M.x + d, M.y, c, f * aus); g.put(M.x - d, M.y, c, f * aus); g.put(M.x, M.y + d, c, f * aus); g.put(M.x, M.y - d, c, f * aus);
+          if (d < r * 0.7) { g.put(M.x + d, M.y + d, STERN[1], f * aus * 0.8); g.put(M.x - d, M.y + d, STERN[1], f * aus * 0.8); g.put(M.x + d, M.y - d, STERN[1], f * aus * 0.8); g.put(M.x - d, M.y - d, STERN[1], f * aus * 0.8); }
+        }
+        g.ring(M.x, M.y, r * 1.5, r * 1.1, STERN[1], f * aus * 0.7);
+        g.disc(M.x, M.y, 2 + 2 * f, STERN[0], f * aus);
+      }
+      for (const s of teile.funken) {
+        const al = t - TREFF; if (al < 0 || al > s.leben) continue;
+        const k = al / s.leben, sek = al / 1000;
+        const x = M.x + Math.cos(s.w) * s.v * sek, y = M.y + Math.sin(s.w) * s.v * sek + 0.5 * 90 * sek * sek;
+        const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : KL_A[1];
+        g.put(x, y, c, (1 - k) * aus);
+        if (k < 0.5) g.put(x + 1, y, c, (1 - k) * aus * 0.7);
+      }
+      // Kreuzhieb auf jedem Helden (gleichzeitig)
+      if (t >= HIEB && t < HIEB + 320) {
+        const al = t - HIEB, p = klemme(al / 90, 0, 1), f = al < 160 ? 1 : 1 - (al - 160) / 160;
+        for (const Z of [A, B]) {
+          const L = Math.max(8, Math.min(Z.w, Z.h) / 2 + 4) * p, cx = Math.round(Z.x), cy = Math.round(Z.y);
+          for (let s = -L; s <= L; s += 0.7) {
+            const c = Math.abs(s) < L * 0.35 ? ROT[0] : ROT[1];
+            g.put(cx + s, cy + s, c, f * aus); g.put(cx + s, cy - s, c, f * aus);
+            g.put(cx + s + 1, cy + s, ROT[2], f * aus * 0.7); g.put(cx + s + 1, cy - s, ROT[2], f * aus * 0.7);
+          }
+          g.ring(cx, cy, Z.w / 2 + 2 + al / 40, Z.h / 2 + 2 + al / 40, ROT[1], f * aus * 0.5);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Create Secret Room (11.10.) — PIXELART, Brett-Animation auf der SURPRISE ZONE (Ziel `{ owner, heroIdx, zoneType: 'surprise' }`)
   //
@@ -29805,6 +29942,8 @@ function ppGameOverText(reason, ich, loserName, winnerName) {
     case 'draw_resolved':
       return zuschauer ? `Both sides were wiped out — ${loserName} loses the tie!`
         : lose ? 'Both sides were wiped out — you lose the tie!' : 'Both sides were wiped out — you win the tie!';
+    case 'duel_draw':
+      return zuschauer ? `${winnerName} wins the game — the Duel ended in a draw!` : win ? 'The Duel ended in a draw — you win the game!' : 'The Duel ended in a draw — your opponent wins the game!';
     case 'final_trial':
       return zuschauer ? `${winnerName} completed The Final Trial!` : win ? 'You completed The Final Trial!' : 'Your opponent completed The Final Trial!';
     default: return '';
@@ -36924,7 +37063,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const punkte = [];
             for (const t of rest.targets) {
               const lbl2 = ownerLbl(t.owner, myIdx);
-              const sel2 = t.deck === true
+              const sel2 = t.hand === true                                         // ★ 12.10. (Gather Intel): die HAND (Kartenreihe) eines Spielers ist das Ziel
+                ? (lbl2 === 'me' ? '.game-hand-me .game-hand-cards' : '.game-hand-opp .game-hand-cards')
+                : t.deck === true
                 ? (lbl2 === 'me' ? '[data-my-deck]' : '[data-opp-deck]')           // ★ 10.10.: das Deck selbst ist das Ziel
                 : t.zoneType === 'surprise'                                         // ★ 11.10. (Breakthrough, Create Secret Room): eine SURPRISE ZONE als Ziel
                 ? `[data-surprise-zone][data-surprise-owner="${lbl2}"][data-surprise-hero="${t.heroIdx}"]`
@@ -36935,7 +37076,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : `[data-support-zone][data-support-owner="${lbl2}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`;
               const el2 = document.querySelector(sel2);
               if (!el2) continue;
-              const q2 = el2.getBoundingClientRect();
+              let q2 = el2.getBoundingClientRect();
+              // ★ 12.10. (Gather Intel): bei der HAND zaehlt der Kasten der KARTEN, nicht der (viel breitere) Behaelter der Reihe.
+              if (t.hand === true) {
+                const rs = [...el2.querySelectorAll('.hand-card, [data-hand-idx]')].map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
+                if (rs.length) {
+                  const l = Math.min(...rs.map(r => r.left)), o = Math.min(...rs.map(r => r.top)), rr = Math.max(...rs.map(r => r.right)), u = Math.max(...rs.map(r => r.bottom));
+                  q2 = { left: l, top: o, width: rr - l, height: u - o };
+                }
+              }
               if (!q2.width) continue;
               // ★★ v1347: zusaetzlich Mass, Kartenname und Element — fuer
               // Wellen, die die Karte SELBST bewegen (`einsaugen`). Alte
@@ -47263,6 +47412,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'secret_room_hand') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} took the hidden card out of the secret room into their hand ({entry.hero} was chosen by {cName(entry.by)}).</span>; }
       if (t === 'secret_room_activate') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} opened the secret room and activates {cName(entry.card)} ({entry.hero} was chosen by {cName(entry.by)})!</span>; }
       // Secret Spell Book (secret-spell-book.js)
+      if (t === 'duel_choose') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {pName(p.name, p.color)} chooses {cName(entry.hero)} for the {cName('Duel')}.</span>; }
+      if (t === 'duel_round') { const pa = playerByName(entry.a.player), pb = playerByName(entry.b.player); return <span className="log-status">⚔️ {cName('Duel')} — round {entry.round}: {cName(entry.a.hero || 'Hero')} ({pName(pa.name, pa.color)}) deals {entry.a.damage}, {cName(entry.b.hero || 'Hero')} ({pName(pb.name, pb.color)}) deals {entry.b.damage}. HP left: {entry.a.hp} / {entry.b.hp}.</span>; }
+      if (t === 'duel_result') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {cName('Duel')} ends {entry.rounds > 0 ? `after ${entry.rounds} round${entry.rounds === 1 ? '' : 's'}` : 'at once'}: {entry.result === 'draw' ? <>both Heroes are defeated — a draw! {pName(p.name, p.color)} wins the game.</> : entry.result === 'win' ? <>{cName(entry.heroB || 'Hero')} is defeated.</> : entry.result === 'lose' ? <>{cName(entry.heroA || 'Hero')} is defeated.</> : <>neither Hero is defeated.</>}</span>; }
+      if (t === 'gather_intel_look') { const p = playerByName(entry.player); return <span className="log-status">🔍 {pName(p.name, p.color)} looks at {entry.opponent}'s hand with {cName('Gather Intel')}.</span>; }
+      if (t === 'gather_intel_result') { const p = playerByName(entry.player); return <span className="log-status">🔍 {entry.opponent} {entry.choice === 'give' ? (entry.moved > 0 ? <>adds the chosen card to {pName(p.name, p.color)}'s hand</> : <>cannot hand over the chosen card</>) : <>lets {pName(p.name, p.color)} draw 2 cards</>}.</span>; }
+      if (t === 'gather_intel_lock') { const p = playerByName(entry.player); return <span className="log-status">🔒 {pName(p.name, p.color)} cannot perform other Actions for the rest of the turn ({cName('Gather Intel')}).</span>; }
       if (t === 'hero_control_returned') return <span className="log-status">↩ {entry.target} returns to {entry.controller}'s control{entry.by ? <> ({cName(entry.by)})</> : null}.</span>;
       if (t === 'secret_spell_book') { const p = playerByName(entry.player); const g = entry.taken || []; const h = entry.heroes || []; const liste = (arr) => arr.map((c, i) => <React.Fragment key={i}>{i > 0 ? ', ' : ''}{cName(c)}</React.Fragment>); return <span className="log-status">📖 {pName(p.name, p.color)}'s {cName('Secret Spell Book')} {(g.length + h.length) > 0 ? <>took permanent control of {liste([...h, ...g])}{(entry.placed || []).length > 0 ? <> (placed: {(entry.placed || []).length})</> : null}</> : <>drew {entry.drew || 1} card{(entry.drew || 1) === 1 ? '' : 's'} instead</>}.</span>; }
       if (t === 'control_in_place') { const p = playerByName(entry.player); return <span className="log-status">📖 {pName(p.name, p.color)} controls {cName(entry.card)} where it lies ({cName(entry.by)}).</span>; }
@@ -53798,7 +53953,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'creationDiscard' ? (ep.opponentTitle || '🗑 Opponent is deleting a placed card...') :
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
              ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
-             ep.type === 'pickFromOppHand' ? '✉️ Opponent is reading your hand...' :
+             ep.type === 'pickFromOppHand' ? (ep.opponentTitle || '✉️ Opponent is reading your hand...') :
              ep.type === 'abilityAttach' ? '⚡ Opponent is equipping...' :
              ep.type === 'blindHandPick' ? '🫳 Opponent is stealing...' :
              ep.type === 'cardNamePicker' ? '🍀 Opponent is declaring...' :

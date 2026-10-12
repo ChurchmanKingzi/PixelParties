@@ -24849,16 +24849,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cancellable = !!opts.cancellable;
     const defaultDesc = `Pick ${effectiveCount} card${effectiveCount > 1 ? 's' : ''} from ${oppPs.username}'s hand to steal.`;
 
-    const prompt = await this.promptGeneric(pi, {
-      type: 'blindHandPick',
-      title: opts.title || 'Steal Cards',
-      description: opts.description || defaultDesc,
-      maxSelect: effectiveCount,
-      confirmLabel: opts.confirmLabel || '🫳 Steal!',
-      oppHandCount: oppHandLen,
-      cancellable,
-      autoConfirm: effectiveCount === 1,
-    });
+    // `opts.preselectedIndices`: die Karten stehen schon fest (Gather Intel: der Spieler hat sie beim Ansehen der Hand gewaehlt, der Gegner
+    // entscheidet nur noch, ob sie wandern) — dann entfaellt die blinde Wahl, alles andere (Erstrunden-Schutz, Ambush-Fenster, Flug,
+    // Besitzwechsel, Hooks) bleibt dieselbe Strecke.
+    const prompt = Array.isArray(opts.preselectedIndices)
+      ? { selectedIndices: opts.preselectedIndices }
+      : await this.promptGeneric(pi, {
+        type: 'blindHandPick',
+        title: opts.title || 'Steal Cards',
+        description: opts.description || defaultDesc,
+        maxSelect: effectiveCount,
+        confirmLabel: opts.confirmLabel || '🫳 Steal!',
+        oppHandCount: oppHandLen,
+        cancellable,
+        autoConfirm: effectiveCount === 1,
+      });
 
     if (!prompt || prompt.cancelled) {
       return { stolen: [], cancelled: true, fizzled: false };

@@ -2831,6 +2831,25 @@ const ZONE_ANIM_SFX = {
     { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
   ],
+  // Duel (12.10.) — die Klingen zischen los (Schnitt, 0 / ~90 ms), treffen sich bei ~300 ms (Schlag und heller Klirr-Ping), dann der Kreuzhieb auf beide Helden (~440 ms: Schnitt
+  // und Schlag). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  duel_clash: [
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.5 } },
+    { name: 'slash',        opts: { rate: 1.0, volume: 0.4,  delay: 90,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.4, volume: 0.6,  delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.6, volume: 0.45, delay: 310, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.9, volume: 0.55, delay: 440, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.0, volume: 0.5,  delay: 470, category: null, dedupe: 0 } },
+  ],
+  // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
+  // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  intel_peek: [
+    { name: 'draw',   opts: { rate: 1.6, volume: 0.4 } },
+    { name: 'ping',   opts: { rate: 2.0, volume: 0.3,  delay: 460, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.3, volume: 0.3,  delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.6, volume: 0.3,  delay: 780, category: null, dedupe: 0 } },
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
+  ],
   // Create Secret Room (11.10.) — die Steinwand schiebt sich auf (Platzierungston, 0 ms), goldenes Klingeln (~300 ms), die Wand schliesst sich (~640 ms). Nur der erste Teil
   // uebernimmt die Sammelkategorie 'effect'.
   secret_room_open: [
