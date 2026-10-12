@@ -50,6 +50,11 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
 * **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
   Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
   gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
+* **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt (Helden: HP und ATK, Wesen: HP),
+  fordert es das Bild mit `?ohne=hp,atk` bzw. `?ohne=hp` an. `card-image-shim.js` liest die Variante aus der URL,
+  hängt sie an die Cache-ID (`card:Name|atk,hp`) und ruft `renderCard(karte, { noHp, noAtk })` auf — die Karte
+  entsteht ohne die gedruckte Zahl, die Box bleibt leer. Tooltip, Foil und alle Karten ohne Live-Werte (Hand,
+  Ablage, Menüs) nehmen weiter die normale URL und zeigen die gedruckten Werte.
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 

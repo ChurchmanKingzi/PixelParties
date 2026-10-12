@@ -514,7 +514,7 @@
     // 6) Goldene Rahmenelemente (die uebrigen Foil-Layer entfallen)
     drawRim(ctx, spec);
 
-    // 7) Werte (HP, Angriff / Kosten)
+    // 7) Werte (HP, Angriff / Kosten) — `noHp` / `noAtk`: die Zahl weglassen (Brett: dort liegt der Live-Wert darueber)
     const stat = statColor(spec);
     if (isHero3(t) || sup || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature') {
       // Helden ohne feste Werte (Ascended Hero „stats equal its base Hero's“) zeigen „?“ in beiden Feldern
@@ -523,14 +523,14 @@
       // Rahmen) — egal, wie viele Stellen sie haben. Frueher lagen sie ~18 px zu weit innen (HP zu weit rechts,
       // ATK zu weit links). Boss-Rahmen: unveraendert.
       const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (spec.hp != null || unknown) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
+      if (!spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
         left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
         top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
       });
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
       const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (spec.atk != null || isHero3(t) || sup) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
+      if (!spec.noAtk && (spec.atk != null || isHero3(t) || sup)) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
         height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
       });
@@ -673,6 +673,7 @@
    * @param {object} card  Karte aus cards.json
    * @param {object} [o]   { skin: Skin-Name } — Skins zeigen dieselbe Karte mit eigener Kunst und eigenem Namen
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
+   *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
   async function renderCard(card, o) {
@@ -687,6 +688,8 @@
     if (skin) { if (skin.r) m.r = skin.r; if (skin.f) m.f = skin.f; }
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
     if (o.hp != null) spec.hp = o.hp;
+    if (o.noHp) spec.noHp = true;
+    if (o.noAtk) spec.noAtk = true;
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
