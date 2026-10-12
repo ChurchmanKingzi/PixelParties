@@ -85,7 +85,9 @@ function flugVerdeckt(engine, placer, daten) {
  * Der Aufrufer hat Wahl und Mischen übernommen. Gibt die Instanz zurück oder null (Zone belegt, Karte nicht im Deck, Stapelsperre).
  */
 async function place(engine, o) {
-  const { pi, seite, heroIdx, cardName, source = CARD_NAME } = o;
+  // `o.ohneMarke` (Masterpiece, 12.10.): eine ganz GEWÖHNLICHE verdeckte Surprise aus dem Deck — ohne Geheimraum-Marke (kein „add to hand / activate now"-Angebot beim Anvisieren) —,
+  // die der Gegner trotzdem nicht sieht (verdeckte Flüge, Logzeile ohne Kartennamen). `o.logTyp`: eigene Logzeile (ohne Kartennamen).
+  const { pi, seite, heroIdx, cardName, source = CARD_NAME, ohneMarke = false, logTyp = 'secret_room_set' } = o;
   const gs = engine.gs;
   const deckPs = gs.players[pi];
   const zonePs = gs.players[seite];
@@ -103,13 +105,13 @@ async function place(engine, o) {
   delete inst.knownToOpponent;            // niemand ausser dem Einsetzenden kennt die Karte
   if (seite !== pi) inst.originalOwner = pi;          // geliehener Held: die Karte bleibt die des Einsetzenden (Ablage, Hand)
   inst.counters = inst.counters || {};
-  inst.counters[MARKE] = { placer: pi, turn: gs.turn || 0, by: source };
+  if (!ohneMarke) inst.counters[MARKE] = { placer: pi, turn: gs.turn || 0, by: source };
 
   flugVerdeckt(engine, pi, {
     owner: seite, cardName, from: 'deck', to: 'surprise', toHeroIdx: heroIdx, toSlotIdx: 0,
     ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
   });
-  engine.log('secret_room_set', { player: deckPs.username, hero: hero.name });      // KEIN Kartenname
+  engine.log(logTyp, { player: deckPs.username, hero: hero.name });      // KEIN Kartenname
   engine.sync();
   await engine._delay(FLUG_MS);
 

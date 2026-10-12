@@ -8235,6 +8235,306 @@ function ppSalve(malen, ende, vorbereiten, opts) {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════
+//  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
+//
+//  Eine Glasscheibe in Kartengrösse (hellblau, gedithert durchsichtig, weisse Kanten oben/links, blasse unten/rechts, ein heller Glanzstreifen wandert diagonal darüber).
+//   • 'up'  (Surprise ausgelöst, ~1000 ms): die Scheibe wächst vom unteren Kartenrand nach oben (leuchtende Oberkante), der Treffer prallt an ihr ab — Blitzstern, zwei
+//     Druckringe über die Fläche, Funken, die nach aussen springen — und sie blendet gedithert aus (liegt die Karte offen weiter, ist das ihre Rückseite: das Bild ist nur der Moment).
+//   • 'shatter' (offene Karte wird abgelegt, ~1000 ms): die Scheibe steht kurz, der Treffer reisst Risse hinein (gezackte Linien aus dem Treffpunkt), dann zerspringt sie in
+//     ein Raster von Splittern, die nach aussen fliegen, fallen und gedithert verschwinden.
+//  Feste Palette, kein Alpha, kein Schein; ~30 Bilder/s; die Wurzel trägt `data-pp-px="aus"`.
+// ═══════════════════════════════════════════════════════════════════
+function ppGlasWand(modus) {
+  const GLAS = ['#f4fcff', '#bfe6f7', '#86c4e6', '#4f8fc0'].map(ppHex);
+  const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
+  const S = 3, TAKT = 33, ENDE = 1000, PAD = 16;
+  const AUFBAU = 300, TREFFER = modus === 'up' ? 360 : 140, BRUCH = 420;
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
+  return function GlasWandEffekt({ x, y, w, h }) {
+    const cvs = useRef(null);
+    const kw = Math.max(14, Math.round((w || 64) / S)) + 4, kh = Math.max(18, Math.round((h || 90) / S)) + 4;       // die Scheibe überragt die Karte um 2 Pixel
+    const GW = kw + PAD * 2, GH = kh + PAD * 2;
+    const L = PAD, T = PAD, CX = L + kw / 2, CY = T + kh / 2;
+    const teile = useMemo(() => {
+      const hit = { x: L + kw * (0.55 + Math.random() * 0.2), y: T + kh * (0.28 + Math.random() * 0.2) };
+      const spalten = 6, zeilen = 8, cw = kw / spalten, ch = kh / zeilen;
+      return {
+        hit,
+        risse: Array.from({ length: 8 }, (_, i) => ({
+          w: (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, laenge: Math.max(kw, kh) * (0.55 + Math.random() * 0.35),
+          zack: Array.from({ length: 12 }, () => (Math.random() - 0.5) * 2.2),
+        })),
+        funken: Array.from({ length: ppFxN(18) }, () => ({
+          w: -Math.PI * (0.15 + Math.random() * 0.7), v: 40 + Math.random() * 70, leben: 380 + Math.random() * 260, farbe: Math.floor(Math.random() * 3),
+        })),
+        splitter: Array.from({ length: spalten * zeilen }, (_, k) => {
+          const c = k % spalten, r = Math.floor(k / spalten);
+          const px = L + (c + 0.5) * cw, py = T + (r + 0.5) * ch;
+          const dx = px - hit.x, dy = py - hit.y, d = Math.hypot(dx, dy) || 1;
+          return { px, py, cw, ch, vx: (dx / d) * (30 + Math.random() * 60) + (Math.random() - 0.5) * 20, vy: (dy / d) * (20 + Math.random() * 40) - 20 + (Math.random() - 0.5) * 20,
+            spaet: Math.random() * 60, helligkeit: Math.floor(Math.random() * 3) };
+        }),
+      };
+    }, []);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(GW, GH);
+      const buf = img.data;
+      const put = (px, py, c, a = 1) => {
+        const X = Math.round(px), Y = Math.round(py);
+        if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+        if (a < 1 && ppBayer(X, Y) >= a) return;
+        const i = (Y * GW + X) * 4;
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+      };
+      const scheibe = (cx, cy, r, c, a = 1) => {
+        const R = Math.ceil(r);
+        for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (i * i + j * j <= r * r) put(cx + i, cy + j, c, a);
+      };
+      const ring = (cx, cy, r, c, a = 1) => {
+        const n = Math.max(16, Math.ceil(r * 6.5));
+        for (let k = 0; k < n; k++) { const wi = (k / n) * Math.PI * 2; put(cx + Math.cos(wi) * r, cy + Math.sin(wi) * r, c, a); }
+      };
+      // Die Scheibe bis zur Höhe `hoehe` (von unten), Deckung `a` für alles.
+      const malePane = (t, hoehe, a) => {
+        const oben = T + kh - hoehe;
+        for (let j = 0; j < hoehe; j++) {
+          const y0 = Math.round(oben + j);
+          for (let i = 0; i < kw; i++) {
+            const diag = ((i + j * 0.6 - ((t / 6) % (kw + kh))) % (kw + kh) + (kw + kh)) % (kw + kh);
+            const streifen = diag < 5 ? 0.62 : diag < 8 ? 0.34 : 0;
+            if (i === 0 || y0 === Math.round(T)) { put(L + i, y0, GLAS[0], a); continue; }
+            if (i === kw - 1 || j === hoehe - 1 && hoehe >= kh - 0.5) { put(L + i, y0, GLAS[3], a * 0.9); continue; }
+            if (streifen > 0) put(L + i, y0, GLAS[0], a * streifen);
+            else put(L + i, y0, GLAS[1], a * 0.2);
+          }
+        }
+        // leuchtende Oberkante beim Aufbau
+        if (hoehe < kh - 0.5) for (let i = 0; i < kw; i++) put(L + i, Math.round(oben), STERN[0], a);
+      };
+      const zeichne = (t) => {
+        const aus = t > ENDE - 240 ? Math.max(0, 1 - (t - (ENDE - 240)) / 240) : 1;
+        if (aus <= 0) return;
+        const hit = teile.hit;
+        const hoehe = Math.max(1, Math.round(kh * glatt(t / AUFBAU)));
+        if (modus === 'up') {
+          malePane(t, hoehe, aus);
+          const al = t - TREFFER;
+          if (al >= 0) {
+            // Blitzstern am Treffpunkt
+            if (al < 300) {
+              const f = 1 - al / 300, r = 2 + al / 24;
+              for (let d = 0; d <= r; d++) {
+                const c = d < r * 0.5 ? STERN[0] : STERN[2];
+                put(hit.x + d, hit.y, c, f * aus); put(hit.x - d, hit.y, c, f * aus); put(hit.x, hit.y + d, c, f * aus); put(hit.x, hit.y - d, c, f * aus);
+                if (d < r * 0.7) { put(hit.x + d, hit.y + d, STERN[1], f * aus * 0.8); put(hit.x - d, hit.y + d, STERN[1], f * aus * 0.8); put(hit.x + d, hit.y - d, STERN[1], f * aus * 0.8); put(hit.x - d, hit.y - d, STERN[1], f * aus * 0.8); }
+              }
+              scheibe(hit.x, hit.y, 1.5 + 1.5 * f, STERN[0], f * aus);
+            }
+            // zwei Druckringe, die über die Fläche laufen (nur innerhalb der Scheibe)
+            for (const v of [0, 90]) {
+              const a2 = al - v; if (a2 < 0 || a2 > 480) continue;
+              const f = 1 - a2 / 480, r = 2 + a2 / 9;
+              const n = Math.ceil(r * 6.5);
+              for (let k = 0; k < n; k++) {
+                const wi = (k / n) * Math.PI * 2, px = hit.x + Math.cos(wi) * r, py = hit.y + Math.sin(wi) * r;
+                if (px < L + 1 || px > L + kw - 2 || py < T + 1 || py > T + kh - 2) continue;
+                put(px, py, STERN[0], f * aus * 0.9); put(px + 1, py, GLAS[1], f * aus * 0.6);
+              }
+            }
+            // abgeprallte Funken
+            for (const s of teile.funken) {
+              if (al > s.leben) continue;
+              const k = al / s.leben, sek = al / 1000;
+              const px = hit.x + Math.cos(s.w) * s.v * sek, py = hit.y + Math.sin(s.w) * s.v * sek + 0.5 * 110 * sek * sek;
+              const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : GLAS[1];
+              put(px, py, c, (1 - k) * aus); if (k < 0.5) put(px + 1, py, c, (1 - k) * aus * 0.7);
+            }
+          }
+        } else {
+          // 'shatter'
+          if (t < BRUCH) {
+            malePane(t, kh, aus);
+            const al = t - TREFFER;
+            if (al >= 0) {                                              // Blitz + Risse
+              if (al < 120) scheibe(hit.x, hit.y, 3 + al / 30, STERN[0], (1 - al / 120) * aus);
+              const wachs = klemme(al / 220, 0, 1);
+              for (const ri of teile.risse) {
+                let px = hit.x, py = hit.y;
+                const stuecke = Math.floor(ri.laenge * wachs);
+                for (let k = 0; k < stuecke; k++) {
+                  const wi = ri.w + ri.zack[k % ri.zack.length] * 0.35;
+                  px += Math.cos(wi); py += Math.sin(wi) * 0.9;
+                  if (px < L || px > L + kw - 1 || py < T || py > T + kh - 1) break;
+                  put(px, py, k < 3 ? STERN[0] : GLAS[0], aus); put(px + 1, py + 1, GLAS[3], aus * 0.8);
+                }
+              }
+            }
+          } else {
+            const al = t - BRUCH;
+            // Aufblitzen im Moment des Bruchs
+            if (al < 90) scheibe(hit.x, hit.y, 4 + al / 12, STERN[0], (1 - al / 90) * aus);
+            for (const sp of teile.splitter) {
+              const a2 = al - sp.spaet; if (a2 < 0) { continue; }
+              const sek = a2 / 1000, f = klemme(a2 / 520, 0, 1);
+              const px = sp.px + sp.vx * sek, py = sp.py + sp.vy * sek + 0.5 * 190 * sek * sek;
+              const bw = Math.max(1, Math.round(sp.cw * (1 - 0.55 * f))), bh = Math.max(1, Math.round(sp.ch * (1 - 0.55 * f)));
+              const deck = (1 - f * f) * aus;
+              if (deck <= 0) continue;
+              for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
+                const rand = i === 0 || j === 0 ? GLAS[0] : (i === bw - 1 || j === bh - 1 ? GLAS[3] : GLAS[1 + (sp.helligkeit % 2)]);
+                put(px - bw / 2 + i, py - bh / 2 + j, rand, deck);
+              }
+            }
+          }
+        }
+      };
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+        if (t < ENDE) raf = requestAnimationFrame(schritt);
+        else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = requestAnimationFrame(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, []);
+    return (
+      <div aria-hidden="true" data-pp-px="aus"
+        style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+        <canvas ref={cvs} width={GW} height={GH}
+          style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Looting (12.10.) — PIXELART, Held-Animation `looting_grab` (Ursprung = die Heldenzone des Wirkers, `x`/`y` Mitte, `w`/`h` Kartengrösse)
+//
+//  Ein brauner Beutesack (zugebunden, mit goldenem Taler-Zeichen) schwingt von rechts oben auf einem Bogen über den Helden, federt zweimal auf und kippt seine Öffnung zur
+//  Karte: Münzen (goldene 2×2-Blöcke mit weissem Glanzpunkt) und Funken fallen heraus, prallen am unteren Kartenrand und verschwinden gedithert; danach schwingt der Sack davon.
+//  Feste Palette, kein Alpha, kein Schein; ~30 Bilder/s; die Wurzel trägt `data-pp-px="aus"`. Dauer 900 ms (deckt sich mit BILD_MS in looting.js), die Ausrüstung fliegt
+//  nach ~560 ms aus der Ablage herüber (Flug der Engine).
+// ═══════════════════════════════════════════════════════════════════
+function ppBeute() {
+  const SACK = { '#': ppHex('#2a1a10'), b: ppHex('#8a5a2e'), l: ppHex('#b8824a'), d: ppHex('#5a3818'), g: ppHex('#ffd24a'), s: ppHex('#e8a02a') };
+  const MUENZE = ['#ffffff', '#fff3a0', '#ffd24a', '#e8a02a'].map(ppHex);
+  const FORM = [
+    '....##..##....',
+    '.....#bb#.....',
+    '.....#dd#.....',
+    '....#bllb#....',
+    '...#blllllb#..',
+    '..#bllgggllb#.',
+    '.#blllgsgllllb#',
+    '.#blllgggllllb#',
+    '.#bllllgllllb#.',
+    '..#bllgggllb#..',
+    '...#bbllllbb#..',
+    '....########...',
+  ];
+  const BW = 15, BH = FORM.length;
+  const S = 3, TAKT = 33, ENDE = 900, PAD = 20;
+  const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
+  return function BeuteEffekt({ x, y, w, h }) {
+    const cvs = useRef(null);
+    const kw = Math.max(14, Math.round((w || 64) / S)), kh = Math.max(18, Math.round((h || 90) / S));
+    const GW = kw + PAD * 2 + 16, GH = kh + PAD * 2 + 8;
+    const CX = Math.floor(GW / 2), CY = Math.floor(GH / 2) + 4;
+    const teile = useMemo(() => ({
+      muenzen: Array.from({ length: ppFxN(12) }, (_, i) => ({
+        ab: 330 + i * 38, vx: (Math.random() - 0.5) * 18, vy: -8 - Math.random() * 10, boden: CY + kh / 2 - 3 - Math.random() * (kh * 0.45), glanz: Math.random() < 0.5,
+      })),
+      funken: Array.from({ length: ppFxN(14) }, () => ({
+        ab: 320 + Math.random() * 360, vx: (Math.random() - 0.5) * 36, vy: -14 - Math.random() * 20, leben: 260 + Math.random() * 200, hell: Math.random() < 0.5,
+      })),
+    }), []);
+    useEffect(() => {
+      const el = cvs.current;
+      if (!el || window._playAnimations === false) return undefined;
+      const ctx = el.getContext('2d');
+      const img = ctx.createImageData(GW, GH);
+      const buf = img.data;
+      const put = (px, py, c, a = 1) => {
+        const X = Math.round(px), Y = Math.round(py);
+        if (X < 0 || Y < 0 || X >= GW || Y >= GH || a <= 0) return;
+        if (a < 1 && ppBayer(X, Y) >= a) return;
+        const i = (Y * GW + X) * 4;
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+      };
+      const zeichne = (t) => {
+        const aus = t > ENDE - 200 ? Math.max(0, 1 - (t - (ENDE - 200)) / 200) : 1;
+        if (aus <= 0) return;
+        // Bahn des Sacks: von rechts oben im Bogen über die Kartenmitte, zwei Federungen, am Ende davon
+        const ziel = { x: CX + 2, y: CY - kh / 2 - 6 };
+        const start = { x: CX + kw * 0.9, y: CY - kh / 2 - 26 };
+        let sx, sy, kipp = 0;
+        if (t < 300) {
+          const k = glatt(t / 300);
+          sx = start.x + (ziel.x - start.x) * k; sy = start.y + (ziel.y - start.y) * k - Math.sin(k * Math.PI) * 6;
+        } else if (t < 700) {
+          sx = ziel.x; sy = ziel.y + Math.abs(Math.sin((t - 300) / 70)) * -2 * (1 - (t - 300) / 400);
+          kipp = klemme((t - 300) / 140, 0, 1);                                 // Öffnung neigt sich zur Karte
+        } else {
+          const k = glatt((t - 700) / 200);
+          sx = ziel.x + (start.x - ziel.x) * k; sy = ziel.y + (start.y - ziel.y) * k; kipp = 1 - k;
+        }
+        // Sack zeichnen (leichte Schrägstellung über die Spaltenverschiebung: je Zeile 0..1 Pixel)
+        for (let r = 0; r < BH; r++) {
+          const schraeg = Math.round(kipp * (r - BH / 2) * -0.18);
+          for (let c = 0; c < FORM[r].length; c++) {
+            const ch = FORM[r][c]; if (ch === '.') continue;
+            put(sx - BW / 2 + c + schraeg, sy - BH / 2 + r, SACK[ch] || SACK.b, aus);
+          }
+        }
+        // Münzen: fallen aus der Sacköffnung (links unten am Sack) auf die Karte und federn am Boden
+        for (const m of teile.muenzen) {
+          const al = t - m.ab; if (al < 0 || al > 460) continue;
+          const sek = al / 1000, mx0 = ziel.x - 3, my0 = ziel.y + BH / 2 - 1;
+          let px = mx0 + m.vx * sek, py = my0 + m.vy * sek + 0.5 * 160 * sek * sek;
+          if (py > m.boden) py = m.boden - Math.abs(Math.sin(al / 60)) * 2 * Math.max(0, 1 - (al - 260) / 200);
+          const d = al > 340 ? (1 - (al - 340) / 120) * aus : aus;
+          if (d <= 0) continue;
+          put(px, py, MUENZE[2], d); put(px + 1, py, MUENZE[2], d); put(px, py + 1, MUENZE[3], d); put(px + 1, py + 1, MUENZE[3], d);
+          if (m.glanz && Math.floor(al / 70) % 2 === 0) put(px, py, MUENZE[0], d);
+        }
+        for (const f of teile.funken) {
+          const al = t - f.ab; if (al < 0 || al > f.leben) continue;
+          const k = al / f.leben, sek = al / 1000;
+          const px = ziel.x - 3 + f.vx * sek, py = ziel.y + BH / 2 + f.vy * sek + 0.5 * 90 * sek * sek;
+          put(px, py, f.hell ? MUENZE[0] : MUENZE[1], (1 - k) * aus);
+        }
+      };
+      const t0 = performance.now();
+      let raf = 0, letzte = -1;
+      const schritt = (jetzt) => {
+        const t = jetzt - t0;
+        const fr = Math.floor(t / TAKT);
+        if (fr !== letzte) { letzte = fr; buf.fill(0); zeichne(t); ctx.putImageData(img, 0, 0); }
+        if (t < ENDE) raf = requestAnimationFrame(schritt);
+        else { buf.fill(0); ctx.putImageData(img, 0, 0); }
+      };
+      raf = requestAnimationFrame(schritt);
+      return () => cancelAnimationFrame(raf);
+    }, []);
+    return (
+      <div aria-hidden="true" data-pp-px="aus"
+        style={{ position: 'fixed', left: x - CX * S, top: y - CY * S, pointerEvents: 'none', zIndex: 10100 }}>
+        <canvas ref={cvs} width={GW} height={GH}
+          style={{ width: GW * S, height: GH * S, imageRendering: 'pixelated', display: 'block' }} />
+      </div>
+    );
+  };
+}
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -27354,6 +27654,167 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
+  //  Live Show (12.10.) — PIXELART, Brett-Animation: ein Bühnenvorhang öffnet sich über der HAND des Gegners (`targets: [{ owner, hand: true }]`, Ursprung = der wirkende Held)
+  //
+  //  Ein roter Vorhang mit Falten, Goldfransen und Goldstange verdeckt die Kartenreihe, geht dann von der Mitte aus auf und rafft sich an den Rändern zusammen; zwei Scheinwerfer
+  //  an der Decke (oben links und rechts) schalten sich ein und streichen mit ihren Lichtkegeln kreuz und quer über die Reihe (heller Fleck auf den Karten); buntes Konfetti rieselt
+  //  durch die Strahlen. Zuletzt blendet alles aus. Gespielt wird sie, bevor die Hand aufgedeckt wird (live-show.js).
+  // ═════════════════════════════════════════════════════════════════
+  live_show_spot: (() => {
+    const ROT = ['#e8606a', '#b02e40', '#641628'].map(ppHex);
+    const GOLD = ['#fff1b0', '#e8b94a', '#a8741c'].map(ppHex);
+    const LICHT = ['#ffffff', '#fff3a0'].map(ppHex);
+    const KONFETTI = ['#ff6fb5', '#5fd6ff', '#ffe45e', '#7dff9a', '#b58cff'].map(ppHex);
+    const ENDE = 1300, AUF_AB = 260, AUF_BIS = 780, LICHT_AB = 360, AUS_AB = 1060;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const vorbereiten = () => ({
+      konfetti: Array.from({ length: ppFxN(70) }, () => ({
+        u: Math.random() * 2 - 1, ab: 400 + Math.random() * 420, v: 44 + Math.random() * 30, wippen: Math.random() * Math.PI * 2, farbe: Math.floor(Math.random() * KONFETTI.length),
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const z = sz.ziele[0];
+      if (!z) return;
+      const aus = t > AUS_AB ? Math.max(0, 1 - (t - AUS_AB) / (ENDE - AUS_AB)) : 1;
+      if (aus <= 0) return;
+      const halbB = Math.max(18, z.w / 2 - 4);
+      const oben = z.y - z.h / 2 - 3, unten = z.y + z.h / 2 + 3;
+      const links = z.x - halbB, rechts = z.x + halbB;
+      const ein = Math.min(aus, klemme(t / 120, 0, 1));
+      const offen = glatt((t - AUF_AB) / (AUF_BIS - AUF_AB));
+
+      // ── Vorhang: zwei Hälften, die von der Mitte nach aussen zusammenfahren (am Rand bleibt ein Faltenbündel von 9 Pixeln stehen) ──
+      const rest = 9, breit = (halbB - rest) * (1 - offen) + rest;          // Breite EINER Hälfte
+      for (const seite of [-1, 1]) {
+        const x0 = seite < 0 ? links : rechts - breit;
+        for (let i = 0; i < breit; i++) {
+          const x = Math.round(x0 + i);
+          const phase = (i / breit) * (3 + 6 * offen) * Math.PI * 2;        // gerafft = dichtere Falten
+          const s = 0.5 + 0.5 * Math.cos(phase);
+          const farbe = s > 0.7 ? ROT[0] : s > 0.35 ? ROT[1] : ROT[2];
+          for (let y = Math.round(oben) + 2; y <= unten; y++) {
+            const sack = y > unten - 3 ? Math.sin(x * 0.9) * 0.4 : 0;       // der untere Saum schwingt leicht
+            if (y > unten + sack) continue;
+            g.put(x, y, farbe, ein);
+          }
+          g.put(x, Math.round(unten) + 1, i % 2 ? GOLD[1] : GOLD[0], ein);   // Goldfransen
+        }
+      }
+      for (let x = Math.round(links) - 1; x <= Math.round(rechts) + 1; x++) {     // Goldstange oben, immer sichtbar
+        g.put(x, Math.round(oben), GOLD[0], ein); g.put(x, Math.round(oben) + 1, GOLD[1], ein);
+      }
+
+      // ── Scheinwerfer: zwei Lichtkegel von den oberen Ecken, die Flecken wandern über die Reihe ──
+      const lichtAn = Math.min(aus, klemme((t - LICHT_AB) / 160, 0, 1));
+      if (lichtAn > 0) {
+        const lampenY = oben - 12, bodenY = z.y + z.h / 2 - 2;
+        [[-1, 0], [1, 2.4]].forEach(([seite, ph]) => {
+          const lampeX = z.x + seite * halbB * 0.55;
+          const bodenX = z.x + Math.sin((t - LICHT_AB) / 240 + ph) * halbB * 0.62;
+          for (let y = Math.round(lampenY); y <= bodenY; y++) {
+            const k = (y - lampenY) / (bodenY - lampenY);
+            const mx = lampeX + (bodenX - lampeX) * k, hw = 1 + k * 11;
+            for (let dx = -Math.ceil(hw); dx <= Math.ceil(hw); dx++) {
+              const rand = Math.abs(dx) / hw; if (rand > 1) continue;
+              g.put(mx + dx, y, rand < 0.45 ? LICHT[0] : LICHT[1], lichtAn * (0.62 - 0.3 * rand));
+            }
+          }
+          g.put(lampeX, lampenY, GOLD[1], lichtAn); g.put(lampeX - 1, lampenY, GOLD[2], lichtAn); g.put(lampeX + 1, lampenY, GOLD[2], lichtAn);
+          for (let j = -4; j <= 4; j++) for (let i = -13; i <= 13; i++) {        // der Lichtfleck auf der Reihe
+            const q = (i * i) / 169 + (j * j) / 16; if (q > 1) continue;
+            g.put(bodenX + i, bodenY - 4 + j, LICHT[1], lichtAn * 0.85 * (1 - q));
+          }
+        });
+      }
+
+      // ── Konfetti rieselt durch die Strahlen ──
+      for (const f of teile.konfetti) {
+        const al = t - f.ab; if (al < 0) continue;
+        const y = oben - 10 + f.v * al / 1000;
+        if (y > unten + 2) continue;
+        const x = z.x + f.u * halbB + Math.sin(al / 130 + f.wippen) * 2.5;
+        const c = KONFETTI[f.farbe];
+        g.put(x, y, c, aus); g.put(x + 1, y, c, aus); g.put(x, y + 1, c, aus); if (Math.floor(al / 90) % 2) g.put(x + 1, y + 1, c, aus * 0.9);
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // Looting (12.10.) — Held-Animation, gebaut in `ppBeute` (s. dort): ein Beutesack schwingt über den Wirker und schüttet Münzen aus.
+  looting_grab: ppBeute(),
+  // Glass Wall (12.10.) — Held-Animationen, gebaut in `ppGlasWand` (s. dort): die Scheibe wächst und der Treffer prallt ab / die offene Scheibe zerspringt.
+  glass_wall_up: ppGlasWand('up'),
+  glass_wall_shatter: ppGlasWand('shatter'),
+  // ═════════════════════════════════════════════════════════════════
+  //  Inheritance Ceremony (12.10.) — PIXELART, Brett-Animation: Lebenskraft fliesst vom Nutzer (Ursprung) zum Zielhelden (`targets[0]`)
+  //
+  //  Ein Strom goldener Funken (14 Kugeln mit weissem Kern, im Abstand von 35 ms) löst sich vom Nutzer, fliegt auf einem Bogen zum Ziel (je 520 ms) und zieht einen kurzen Schweif
+  //  hinter sich her. Am Nutzer zieht sich zu Beginn ein heller Ring zusammen („gibt ab"); am Ziel blitzt bei jeder Landung ein kleines Kreuz auf, später steigt ein Kranz aus
+  //  Plus-Zeichen (Heilung) in goldenem Licht auf und ein Ring weitet sich um die Karte. Zuletzt blendet alles aus. Gespielt, bevor die HP umgebucht werden (inheritance-ceremony.js).
+  // ═════════════════════════════════════════════════════════════════
+  inheritance_flow: (() => {
+    const GOLD = ['#ffffff', '#fff3a0', '#ffd24a', '#e8a02a'].map(ppHex);
+    const ENDE = 1000, FLUG = 520, ABSTAND = 35, AUS_AB = 760;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const q = klemme(u, 0, 1); return q * q * (3 - 2 * q); };
+    const vorbereiten = () => ({
+      kugeln: Array.from({ length: ppFxN(14) }, (_, i) => ({ ab: 40 + i * ABSTAND, bogen: 0.8 + Math.random() * 0.6, versatz: (Math.random() - 0.5) * 5 })),
+      plus: Array.from({ length: ppFxN(8) }, (_, i) => ({ ab: 520 + i * 40, u: (i / 8) * 2 - 1 + (Math.random() - 0.5) * 0.2, v: 14 + Math.random() * 10 })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const Z = sz.ziele[0];
+      if (!Z) return;
+      const aus = t > AUS_AB ? Math.max(0, 1 - (t - AUS_AB) / (ENDE - AUS_AB)) : 1;
+      if (aus <= 0) return;
+      const O = sz.O;
+      const bahn = (u, k) => {                                   // Punkt auf dem Bogen O → Z (u 0..1), Bogenhöhe je Kugel
+        const mx = (O.x + Z.x) / 2, my = (O.y + Z.y) / 2 - (14 + 10 * k.bogen);
+        const a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+        return { x: a * O.x + b * mx + c * Z.x + k.versatz * Math.sin(u * Math.PI), y: a * O.y + b * my + c * Z.y };
+      };
+      // ── Ring am Nutzer, der sich zusammenzieht ──
+      if (t < 360) {
+        const f = 1 - t / 360, r = 3 + 12 * f;
+        g.ring(O.x, O.y, r, r * 0.8, GOLD[1], f * aus * 0.9);
+        g.ring(O.x, O.y, r + 1, r * 0.8 + 1, GOLD[3], f * aus * 0.6);
+      }
+      // ── Der Strom ──
+      for (const k of teile.kugeln) {
+        const al = t - k.ab; if (al < 0) continue;
+        const u = al / FLUG;
+        if (u <= 1) {
+          for (let s = 0; s < 5; s++) {                          // Schweif: frühere Punkte der Bahn
+            const us = klemme(u - s * 0.035, 0, 1), p = bahn(glatt(us), k);
+            g.put(p.x, p.y, s < 2 ? GOLD[1] : GOLD[2], aus * (1 - s / 5) * 0.9);
+          }
+          const p = bahn(glatt(u), k);
+          g.disc(p.x, p.y, 1.4, GOLD[2], aus);
+          g.put(p.x, p.y, GOLD[0], aus); g.put(p.x - 1, p.y, GOLD[1], aus); g.put(p.x, p.y - 1, GOLD[1], aus);
+        } else {
+          const nach = al - FLUG;                                 // Landung: kleines Kreuz am Ziel
+          if (nach < 160) {
+            const f = 1 - nach / 160, r = 1 + nach / 60, ex = Z.x + k.versatz, ey = Z.y + (Math.sin(k.ab) * Z.h * 0.18);
+            for (let d = 0; d <= r; d++) { g.put(ex + d, ey, GOLD[1], f * aus); g.put(ex - d, ey, GOLD[1], f * aus); g.put(ex, ey + d, GOLD[1], f * aus); g.put(ex, ey - d, GOLD[1], f * aus); }
+            g.put(ex, ey, GOLD[0], f * aus);
+          }
+        }
+      }
+      // ── Heilung am Ziel: Ring + aufsteigende Plus-Zeichen ──
+      const ab = t - 480;
+      if (ab > 0) {
+        const f = klemme(ab / 420, 0, 1), rx = Z.w * 0.55 * f + 2, ry = Z.h * 0.55 * f + 2;
+        g.ring(Z.x, Z.y, rx, ry, GOLD[1], (1 - f) * aus * 0.85);
+        for (const p of teile.plus) {
+          const a2 = t - p.ab; if (a2 < 0 || a2 > 480) continue;
+          const k = a2 / 480, px = Z.x + p.u * Z.w * 0.42, py = Z.y + Z.h * 0.3 - p.v * glatt(k);
+          const c = k < 0.5 ? GOLD[0] : GOLD[2], d = (1 - k) * aus;
+          g.put(px, py, c, d); g.put(px - 1, py, c, d); g.put(px + 1, py, c, d); g.put(px, py - 1, c, d); g.put(px, py + 1, c, d);
+        }
+      }
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+  })(),
+  // ═════════════════════════════════════════════════════════════════
   //  Duel (12.10.) — PIXELART, Brett-Animation JE HIT: der Aufprall, wenn die beiden Helden (`targets[0]`, `targets[1]`) in der Mitte ineinander krachen
   //
   //  Die Heldenkarten selbst fahren als DOM-Karten (`play_hero_clash` → `ppHeldenRammenBahn` / `HeldenRammkarte`): Hit 1 aus den Zonen (Ausholen, Anlauf, Aufprall bei 260 ms),
@@ -27542,6 +28003,95 @@ const ANIM_REGISTRY = {
       });
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 30 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
+  //  Masterpiece (12.10.) — PIXELART, Brett-Animation auf der SURPRISE ZONE des gewählten Helden (Ziel `{ owner, heroIdx, zoneType: 'surprise' }`)
+  //
+  //  Ein Goldrahmen mit cremefarbener Leinwand erscheint auf der Zone, ein Pinsel (Holzgriff, Borsten in der Farbe des Strichs) fährt Zeile für Zeile über die Leinwand
+  //  und malt in sieben bunten, leicht wellenden Strichen ein Bild; bei ~640 ms (masterpiece.js: MALEN_MS 640 — Einbau-Versatz 100 ms eingerechnet) streicht ein
+  //  weisser Glanz diagonal darüber, kleine Funkelkreuze blitzen; danach blendet das Bild über Dithering aus, die verdeckte Karte liegt darunter. Die Wurzel trägt
+  //  `data-pp-px="aus"`: die Grafik IST schon Pixelart.
+  // ═══════════════════════════════════════════════════════════════════
+  masterpiece_paint: (() => {
+    const GOLD = ['#fff6c2', '#ffd96a', '#e6a93a', '#a8741c'].map(ppHex);
+    const LEINWAND = ['#f6ecd0', '#e8dcb8'].map(ppHex);
+    const FARBEN = ['#e8453c', '#f28a30', '#ffd24a', '#5fc25a', '#3f8fe0', '#8a5ad8', '#f4a0c8'].map(ppHex);
+    const HOLZ = ['#8a5a2e', '#5a3818'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, RAHMEN = 140, MAL_AB = 150, STRICH = 70, STRICH_DAUER = 150, GLANZ_AB = 640, FADE_AB = 880;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
+    const vorbereiten = (sz) => ({
+      ziele: sz.ziele.map(() => ({
+        farben: FARBEN.map((f, i) => ({ f, i })).sort(() => Math.random() - 0.5).map(o => o.f),
+        wobble: Array.from({ length: 7 }, () => ({ ph: Math.random() * Math.PI * 2, amp: 0.4 + Math.random() * 0.9 })),
+        glitzer: Array.from({ length: ppFxN(7) }, () => ({ u: Math.random(), v: Math.random(), ab: GLANZ_AB + Math.random() * 160 })),
+      })),
+    });
+    const malen = (g, t, sz, teile) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const T = teile.ziele[zi];
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        const rahmenA = Math.min(1, t / RAHMEN) * aus;
+        if (rahmenA <= 0) return;
+        // Leinwand (gedithert) und Goldrahmen
+        for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) {
+          const rand = Math.abs(x) >= hw - 1 || Math.abs(y) >= hh - 1;
+          if (rand) g.put(CX + x, CY + y, (x + y) % 2 === 0 ? GOLD[1] : GOLD[2], rahmenA);
+          else g.put(CX + x, CY + y, ((x + y) & 1) ? LEINWAND[0] : LEINWAND[1], rahmenA * 0.9);
+        }
+        g.block(CX - hw, CY - hh, 2, 2, GOLD[0], rahmenA); g.block(CX + hw - 1, CY - hh, 2, 2, GOLD[0], rahmenA);
+        g.block(CX - hw, CY + hh - 1, 2, 2, GOLD[3], rahmenA); g.block(CX + hw - 1, CY + hh - 1, 2, 2, GOLD[3], rahmenA);
+        // Striche: sieben Zeilen, jede wird von links nach rechts gemalt
+        const innen = hw - 3, zeilen = T.farben.length;
+        const abstand = (z.h - 8) / zeilen;
+        let pinsel = null;
+        for (let k = 0; k < zeilen; k++) {
+          const t0 = MAL_AB + k * STRICH;
+          if (t < t0) continue;
+          const fortschritt = glatt((t - t0) / STRICH_DAUER);
+          const yMitte = CY - hh + 4 + (k + 0.5) * abstand;
+          const bis = Math.round(-innen + 2 * innen * fortschritt);
+          const w = T.wobble[k];
+          for (let x = -innen; x <= bis; x++) {
+            const wy = Math.sin(x * 0.28 + w.ph) * w.amp;
+            const farbe = T.farben[k];
+            g.put(CX + x, yMitte + wy - 1, farbe, rahmenA);
+            g.put(CX + x, yMitte + wy, farbe, rahmenA);
+            g.put(CX + x, yMitte + wy + 1, farbe, rahmenA * 0.85);
+          }
+          if (fortschritt < 1) pinsel = { x: CX + bis, y: yMitte + Math.sin(bis * 0.28 + w.ph) * w.amp, farbe: T.farben[k] };
+        }
+        // Der Pinsel am Strichkopf: Borsten in der Strichfarbe, Zwinge, schräger Holzgriff
+        if (pinsel && t < GLANZ_AB) {
+          const px = Math.round(pinsel.x), py = Math.round(pinsel.y);
+          g.block(px - 1, py - 1, 3, 3, pinsel.farbe, aus);
+          g.put(px + 2, py - 2, GOLD[1], aus); g.put(px + 3, py - 3, GOLD[2], aus);
+          for (let k = 4; k < 11; k++) { g.put(px + k, py - k, HOLZ[0], aus); g.put(px + k + 1, py - k, HOLZ[1], aus); }
+        }
+        // Glanz: eine helle Diagonale streicht über das fertige Bild, dazu Funkelkreuze
+        if (t >= GLANZ_AB) {
+          const u = (t - GLANZ_AB) / 260;
+          if (u >= 0 && u <= 1) {
+            const lage = -hw - hh + (2 * hw + 2 * hh) * u;
+            for (let y = -hh + 2; y <= hh - 2; y++) {
+              const x = Math.round(lage - y);
+              if (x >= -hw + 2 && x <= hw - 2) { g.put(CX + x, CY + y, WEISS, aus); g.put(CX + x + 1, CY + y, WEISS, aus * 0.6); }
+            }
+          }
+          for (const f of T.glitzer) {
+            const al = t - f.ab; if (al < 0 || al > 240) continue;
+            const k = al / 240, r = k < 0.5 ? 1 + k * 3 : 3 - (k - 0.5) * 4;
+            const fx = Math.round(CX - hw + 3 + f.u * (2 * hw - 6)), fy = Math.round(CY - hh + 3 + f.v * (2 * hh - 6));
+            for (let d = -Math.round(r); d <= Math.round(r); d++) { g.put(fx + d, fy, WEISS, (1 - k) * aus); g.put(fx, fy + d, WEISS, (1 - k) * aus); }
+          }
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Secret Spell Book (11.10.) — PIXELART, Brett-Animation: Buchseiten flattern von JEDER betroffenen Karte zum Wirker (`targets`, Ursprung = erster lebender Held)
@@ -47648,6 +48198,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'secret_room_set') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)}'s {cName('Create Secret Room')} hid a card in {entry.hero}'s Surprise Zone.</span>; }
       if (t === 'secret_room_hand') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} took the hidden card out of the secret room into their hand ({entry.hero} was chosen by {cName(entry.by)}).</span>; }
       if (t === 'secret_room_activate') { const p = playerByName(entry.player); return <span className="log-status">🚪 {pName(p.name, p.color)} opened the secret room and activates {cName(entry.card)} ({entry.hero} was chosen by {cName(entry.by)})!</span>; }
+      // Masterpiece (masterpiece.js): die gelegte Surprise bleibt dem Gegner verborgen — kein Kartenname
+      if (t === 'masterpiece_set') { const p = playerByName(entry.player); return <span className="log-status">🖼️ {pName(p.name, p.color)}'s {cName('Masterpiece')} placed a Surprise face-down in {entry.hero}'s Surprise Zone.</span>; }
+      if (t === 'masterpiece_none') { const p = playerByName(entry.player); return <span className="log-status">🖼️ {pName(p.name, p.color)}'s {cName('Masterpiece')} found no Surprise in the deck.</span>; }
+      if (t === 'glass_wall_negate') { const p = playerByName(entry.player); return <span className="log-status">🪟 {pName(p.name, p.color)}'s {cName('Glass Wall')} negated {entry.negated} for {entry.hero}.</span>; }
+      if (t === 'glass_wall_shatter') { const p = playerByName(entry.player); return <span className="log-status">🪟 {pName(p.name, p.color)}'s {cName('Glass Wall')} shattered: {entry.hero} is unaffected by {entry.negated}.</span>; }
+      if (t === 'inheritance_move') { const p = playerByName(entry.player); return <span className="log-status">🕊️ {pName(p.name, p.color)}'s {cName('Inheritance Ceremony')} moved {cName(entry.card)} from {entry.from} to {entry.to}.</span>; }
+      if (t === 'inheritance_hp') { const p = playerByName(entry.player); return <span className="log-status">🕊️ {pName(p.name, p.color)}'s {cName('Inheritance Ceremony')}: {entry.from} gave {entry.paid} HP, {entry.to} healed {entry.healed} HP.</span>; }
+      if (t === 'looting') { const p = playerByName(entry.player); return <span className="log-status">🎒 {pName(p.name, p.color)}'s {cName('Looting')}: {entry.hero} equipped {cName(entry.card)} from {entry.from}'s discard pile.</span>; }
+      if (t === 'live_show_look') { const p = playerByName(entry.player); return <span className="log-status">🎭 {pName(p.name, p.color)} looks at {entry.opponent}'s hand with {cName('Live Show')}.</span>; }
+      if (t === 'live_show_result') { const p = playerByName(entry.player); return <span className="log-status">🎭 {pName(p.name, p.color)}'s {cName('Live Show')}: gave {entry.gave} card{entry.gave === 1 ? '' : 's'} to {entry.opponent}{entry.took > 0 ? ` and took ${entry.took} back` : ''}.</span>; }
       // Secret Spell Book (secret-spell-book.js)
       if (t === 'duel_choose') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {pName(p.name, p.color)} chooses {cName(entry.hero)} for the {cName('Duel')}.</span>; }
       if (t === 'duel_round') { const pa = playerByName(entry.a.player), pb = playerByName(entry.b.player); return <span className="log-status">⚔️ {cName('Duel')} — round {entry.round}: {cName(entry.a.hero || 'Hero')} ({pName(pa.name, pa.color)}) deals {entry.a.damage}, {cName(entry.b.hero || 'Hero')} ({pName(pb.name, pb.color)}) deals {entry.b.damage}. HP left: {entry.a.hp} / {entry.b.hp}.</span>; }
@@ -54448,7 +55008,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Blind Hand Pick Prompt (Loot the Leftovers, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'blindHandPick' && (() => {
         const maxSel = ep.maxSelect || 2;
-        const canConfirm = blindPickSelected.size >= maxSel;
+        // `minSelect` (Live Show, 12.10.: „up to that many"): Untergrenze der Auswahl; ohne Angabe müssen es genau `maxSelect` sein (Loot the Leftovers).
+        const minSel = Number.isInteger(ep.minSelect) ? ep.minSelect : maxSel;
+        const canConfirm = blindPickSelected.size >= minSel;
         // Cancellable picks get a Cancel button (Escape is wired up by
         // the existing `cancellable !== false` effectPrompt handler).
         const cancellable = ep.cancellable === true;

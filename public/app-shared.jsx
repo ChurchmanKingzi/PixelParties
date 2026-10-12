@@ -2852,6 +2852,64 @@ const ZONE_ANIM_SFX = {
       { name: 'ping',         opts: { rate: 2.0 + 0.2 * (r - 1), volume: 0.45, delay: 132, category: null, dedupe: 0 } },
     ];
   },
+  // Masterpiece (12.10.) — der Rahmen erscheint (leiser Pinsel-Ton, 0 ms), die Striche folgen im Takt (Zieh-Töne, ~150 / ~290 / ~430 ms), der Glanz streicht bei ~640 ms (heller Ping, Aufdeck-Ton).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  masterpiece_paint: [
+    { name: 'draw',   opts: { rate: 1.5, volume: 0.35 } },
+    { name: 'draw',   opts: { rate: 1.3, volume: 0.3, delay: 150, category: null, dedupe: 0 } },
+    { name: 'draw',   opts: { rate: 1.4, volume: 0.3, delay: 290, category: null, dedupe: 0 } },
+    { name: 'draw',   opts: { rate: 1.2, volume: 0.3, delay: 430, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.3, volume: 0.4, delay: 640, category: null, dedupe: 0 } },
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.4, delay: 660, category: null, dedupe: 0 } },
+  ],
+  // Looting (12.10.) — der Sack schwingt heran (Zieh-Ton, 0 ms), federt auf (Platzierungston ~300 ms), die Münzen klirren (Pings ~340 / ~420 / ~520 / ~600 ms). Nur der erste
+  // Teil uebernimmt die Sammelkategorie 'effect'.
+  looting_grab: [
+    { name: 'draw',      opts: { rate: 1.1, volume: 0.35 } },
+    { name: 'placement', opts: { rate: 0.8, volume: 0.45, delay: 300, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.4, volume: 0.35, delay: 340, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.9, volume: 0.3,  delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 2.6, volume: 0.3,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',      opts: { rate: 3.3, volume: 0.25, delay: 600, category: null, dedupe: 0 } },
+  ],
+  // Inheritance Ceremony (12.10.) — der Ring zieht sich zusammen (Zieh-Ton, 0 ms), der goldene Strom klingelt in steigenden Pings (~120 / ~260 / ~400 ms), die Heilung landet
+  // (Aufdeck-Ton ~520 ms und hoher Ping ~560 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  inheritance_flow: [
+    { name: 'draw',   opts: { rate: 1.4, volume: 0.4 } },
+    { name: 'ping',   opts: { rate: 1.8, volume: 0.3,  delay: 120, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.2, volume: 0.3,  delay: 260, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.6, volume: 0.3,  delay: 400, category: null, dedupe: 0 } },
+    { name: 'reveal', opts: { rate: 1.5, volume: 0.4,  delay: 520, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 3.2, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
+  ],
+  // Glass Wall (12.10.) — die Scheibe wächst (Platzierungston, 0 ms), der Treffer prallt klirrend ab (heller Ping ~360 ms, Aufdeck-Ton ~380 ms). Nur der erste Teil uebernimmt die
+  // Sammelkategorie 'effect'.
+  glass_wall_up: [
+    { name: 'placement', opts: { rate: 1.6, volume: 0.45 } },
+    { name: 'ping',      opts: { rate: 3.0, volume: 0.45, delay: 360, category: null, dedupe: 0 } },
+    { name: 'reveal',    opts: { rate: 1.6, volume: 0.3,  delay: 380, category: null, dedupe: 0 } },
+  ],
+  // Glass Wall, zerspringend (12.10.) — der Treffer (Ping ~140 ms), die Risse (Zieh-Ton ~160 ms), der Bruch (Hieb ~420 ms) und das Klirren der Splitter (Pings ~450 / ~540 / ~640 ms).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  glass_wall_shatter: [
+    { name: 'ping',  opts: { rate: 2.6, volume: 0.45, delay: 140 } },
+    { name: 'draw',  opts: { rate: 2.2, volume: 0.25, delay: 160, category: null, dedupe: 0 } },
+    { name: 'slash', opts: { rate: 1.9, volume: 0.45, delay: 420, category: null, dedupe: 0 } },
+    { name: 'ping',  opts: { rate: 3.2, volume: 0.35, delay: 450, category: null, dedupe: 0 } },
+    { name: 'ping',  opts: { rate: 3.6, volume: 0.3,  delay: 540, category: null, dedupe: 0 } },
+    { name: 'ping',  opts: { rate: 2.9, volume: 0.25, delay: 640, category: null, dedupe: 0 } },
+  ],
+  // Live Show (12.10.) — der Vorhang rauscht auf (Zieh-Ton, ~260 ms), die Scheinwerfer gehen an (Ping, ~360 / ~470 ms), Konfetti klingelt (kleine Pings ~620 / ~760 / ~900 ms), der Blick
+  // sitzt (Aufdeck-Ton, ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  live_show_spot: [
+    { name: 'draw',   opts: { rate: 0.9, volume: 0.4,  delay: 260 } },
+    { name: 'ping',   opts: { rate: 1.8, volume: 0.35, delay: 360, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.1, volume: 0.35, delay: 470, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.5, volume: 0.25, delay: 620, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 2.8, volume: 0.25, delay: 760, category: null, dedupe: 0 } },
+    { name: 'ping',   opts: { rate: 3.1, volume: 0.25, delay: 900, category: null, dedupe: 0 } },
+    { name: 'reveal', opts: { rate: 1.3, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
+  ],
   // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
   // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   intel_peek: [
