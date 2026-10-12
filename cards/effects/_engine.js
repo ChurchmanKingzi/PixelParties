@@ -15645,6 +15645,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} destHeroIdx - Zielheld
    * @param {number} destSlotIdx - freier Support-Slot dort
    * @param {object} [opts] - { animDuration, skipAnimation, sourceName, quiet (nur die Karte selbst sieht den Eintritt), ignoreEquipRestriction }
+   *   Karten-Vertrag `attachmentMovedToHost(engine, inst, { fromOwner, fromHeroIdx, toOwner, toHeroIdx })`: legt die Wirkung am neuen Wirt wieder an (s. u.).
    * @returns {{ success: boolean }}
    */
   /**
@@ -15696,6 +15697,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     if (!inst || inst.zone !== ZONES.SUPPORT) return { success: false };
     const fromPlayerIdx = inst.controller ?? inst.owner;
+    // 12.10. (Inheritance Ceremony): wessen Support-Feld haelt die Karte PHYSISCH? Normalfall: `owner` (= Seite des Wirts). Ausnahme Crimson Web: `owner` ist der Wirker
+    // der Karte, die Zone liegt beim Betroffenen (`controller`) — wie in `_removeCardFromState` zaehlt zuerst die physische Seite.
+    const quellSeite = this.physicalSide(inst);
     const fromPs = gs.players[fromPlayerIdx];
     const toPs = gs.players[toPlayerIdx];
     if (!fromPs || !toPs) return { success: false };
@@ -15718,9 +15722,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcHeroIdx = inst.heroIdx;
     const srcSlotIdx = inst.zoneSlot;
 
-    // Aus der Quellzone nehmen — ueber `owner`, denn dort liegt das
-    // Feld physisch (`_removeCardFromState` rechnet genauso).
-    const srcSlot = ((gs.players[inst.owner]?.supportZones || [])[srcHeroIdx] || [])[srcSlotIdx] || [];
+    // Aus der Quellzone nehmen — erst auf der physischen Seite, dann beim Besitzer
+    // (`_removeCardFromState` rechnet genauso).
+    let srcSlot = [];
+    for (const seite of [quellSeite, inst.owner]) {
+      const arr = ((gs.players[seite]?.supportZones || [])[srcHeroIdx] || [])[srcSlotIdx];
+      if (Array.isArray(arr) && arr.indexOf(cardName) >= 0) { srcSlot = arr; break; }
+    }
     const srcIdx = srcSlot.indexOf(cardName);
     if (srcIdx >= 0) srcSlot.splice(srcIdx, 1);
     this.sync();
@@ -15746,8 +15754,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!toPs.supportZones[destHeroIdx][destSlotIdx]) toPs.supportZones[destHeroIdx][destSlotIdx] = [];
     toPs.supportZones[destHeroIdx][destSlotIdx].push(cardName);
 
+    // Crimson-Web-Modell (Besitzer ≠ Seite der Zone): der Besitzer bleibt der Wirker, nur die Kontrolle (= Seite der Zone) wandert.
+    const besitzerBleibt = quellSeite !== inst.owner;
     inst.controller = toPlayerIdx;
-    inst.owner = toPlayerIdx;
+    if (!besitzerBleibt) inst.owner = toPlayerIdx;
     inst.zone = ZONES.SUPPORT;
     inst.heroIdx = destHeroIdx;
     inst.zoneSlot = destSlotIdx;
@@ -15780,6 +15790,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
       _isMove: true,
     });
+
+    // ── Wirkung am WIRT mitnehmen (12.10., Inheritance Ceremony: „die entsprechenden Effekte müssen auf die neuen Heroes übertragen werden") ──
+    // Anhaengsel, die einen Status/Buff/Schleier an ihrem Wirt halten (Curse, Berserk, Overheal Shock, Anti Magic, Invisibility, Prophecy of Tempeste, Crimson Web …), haben
+    // ihn beim Verlassen des alten Wirts (`onCardLeaveZone`) zurueckgenommen. Ihr Skript legt ihn hier am neuen Wirt wieder an:
+    //   `attachmentMovedToHost(engine, inst, { fromOwner, fromHeroIdx, toOwner, toHeroIdx })`.
+    // Position-abgeleitete Anhaengsel (Prayer, Castling, Stoneskin …) brauchen nichts; Status-Anhaengsel mit `anhaengselStatusHooks` binden ueber ihr eigenes `onCardEnterZone`.
+    {
+      const sk = loadCardEffect(cardName);
+      if (typeof sk?.attachmentMovedToHost === 'function') {
+        try {
+          await sk.attachmentMovedToHost(this, inst, { fromOwner: quellSeite, fromHeroIdx: srcHeroIdx, toOwner: toPlayerIdx, toHeroIdx: destHeroIdx });
+        } catch (err) {
+          console.error(`[attachmentMovedToHost] ${cardName} threw:`, err.message);
+        }
+      }
+    }
 
     this.log('attachment_transfer', {
       card: cardName, from: fromPs.username, to: toPs.username,

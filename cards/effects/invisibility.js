@@ -144,6 +144,19 @@ module.exports = {
   },
   attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
 
+  /**
+   * Umhaengen (Inheritance Ceremony, 12.10.): die Unsichtbarkeit liegt jetzt an einem anderen Helden — das Flag dort setzen (am alten hat es `onCardLeaveZone` genommen,
+   * sofern keine zweite Kopie dort liegt).
+   */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    const hero = engine.gs.players[toOwner]?.heroes?.[toHeroIdx];
+    if (!hero?.name) return;
+    if (!hero.statuses) hero.statuses = {};
+    hero.statuses.invisible = true;
+    engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: toOwner, heroIdx: toHeroIdx, zoneSlot: -1 });
+    engine.sync();
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       // Self-cast gate.
