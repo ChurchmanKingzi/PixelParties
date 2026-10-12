@@ -10280,9 +10280,12 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
    card.
 
    Two layouts:
-     • Default (card is wide enough): horizontal — HP on the left,
-       ATK on the right, both anchored at the card's bottom edge.
-       Matches the legacy positioning (left:5px / right:5px corners).
+     • Default (card is wide enough): horizontal — HP and ATK side by
+       side as ONE group, centred on the card and anchored at its bottom
+       edge. Als Vorgabe 12.10.: vorher `space-between` — HP klebte
+       links, ATK rechts am Rand, je nach Stellenzahl mit einer Luecke
+       dazwischen. Jetzt bleibt das Paar unabhaengig von der Anzahl der
+       Ziffern in der Kartenmitte.
      • Compact (card narrower than 55px via container query below):
        vertical — HP stacked on TOP of ATK, both horizontally
        centered. `flex-direction: column` puts the FIRST child (HP)
@@ -10298,7 +10301,8 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: center;
+  column-gap: calc(8px * var(--board-scale));
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: calc(10px * var(--board-scale));
   text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
@@ -10311,22 +10315,18 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
 .board-card-stats-hero .board-card-hp-num { color: #1f8b3a; }
 .board-card-stats-hero .board-card-atk-num { color: #d42323; }
 
-/* Compact layout for narrow cards (low resolution / small board scale).
-   Threshold of 55px is below the default card width (64px @ scale 1.0)
-   and above the smallest practical scale that keeps cards legible at
-   all — so cards render side-by-side under normal play but stack
-   vertically the moment the player drops into a low-resolution view.
-   `flex-direction: column` + `align-items: center` produces HP-on-top
-   and ATK-below, both horizontally centered. The container's bottom
-   edge stays pinned at `bottom: 3px`; with two stacked children the
-   container's height is now ~2 lines and its top edge moves UP into
-   the card body. */
+/* Schmale Karten (kleiner Brett-Massstab: Puzzle-Editor, niedrige Aufloesung).
+   Frueher stapelte diese Regel HP ueber ATK (`flex-direction: column`). Seit
+   die gedruckten Zahlen auf dem Brett wegfallen, sah das wie ein Fehler aus
+   (Als Befund 12.10.: „im Puzzle-Editor stehen HP und ATK uebereinander statt
+   nebeneinander"). Jetzt bleiben beide NEBENEINANDER und mittig; damit auch
+   drei- bis vierstellige Werte auf die schmale Karte passen, werden Rand und
+   Luecke enger. */
 @container (max-width: 55px) {
   .board-card-stats-hero {
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    row-gap: calc(1px * var(--board-scale));
+    left: 1px;
+    right: 1px;
+    column-gap: calc(4px * var(--board-scale));
   }
 }
 .board-card-hp-creature {
@@ -26003,6 +26003,25 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 }
 .foil-name-diamond .skin-holo-name .sh-gl {
   background-image: linear-gradient(90deg, transparent 0, rgba(215,255,255,.95) 50%, transparent 100%);
+}
+
+/* Textglanz (Als Vorgabe 12.10.): auch ALLER uebrige Text der Super-/Diamond-Rare-Karten (Faehigkeitsfelder, Werte, Regeltext)
+   glaenzt, nicht nur der Name. Dieselbe Schicht wie der Name (`.skin-holo-name`), nur mit der Maske der ganzen Karte
+   (`--sh-text`, card-render.js `textLayer`) statt des Namensstreifens, nur in Grossansichten (FoilName). Der Grundton liegt
+   kaum merklich auf dem Text (der Regeltext ist lang und muss weiss und lesbar bleiben; bei .3 faerbte er ihn dauerhaft gold), und der Glanz ist farbig statt weiss — der Text
+   selbst ist weiss, ein weisses Band waere darauf unsichtbar. Das Band ist schmal (ein Fuenftel der Kachel), damit immer nur
+   ein Streifen Text glaenzt; es kreuzt jeden Punkt alle 3,6 s. */
+.skin-holo-name.skin-holo-text {
+  top: 0; height: 100%;
+  -webkit-mask-image: var(--sh-text); mask-image: var(--sh-text);
+}
+.skin-holo-name.skin-holo-text .sh-rb { opacity: .12; }
+.skin-holo-name.skin-holo-text .sh-gl {
+  --kachel: 1.4; --takt: 3.6s;
+  background-image: linear-gradient(90deg, transparent 0, transparent 40%, rgba(255,226,130,.95) 50%, transparent 60%, transparent 100%);
+}
+.foil-name-diamond .skin-holo-name.skin-holo-text .sh-gl {
+  background-image: linear-gradient(90deg, transparent 0, transparent 40%, rgba(120,240,232,.95) 50%, transparent 60%, transparent 100%);
 }
 
 /* Rahmenglanz: Gold-, Silber- und Diamant-Rahmen glaenzen in ihrer Farbe. Ein Lichtband laeuft ueber die Karte und

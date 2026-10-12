@@ -299,6 +299,12 @@ function applyCrystalCostMods(me, cardName, baseCost) {
 function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
+  // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
+  // die gedruckten Zahlen bleiben weg (Als Vorgabe 12.10.): sonst schimmern sie
+  // neben und unter den Live-Zahlen durch, sobald die Stellenzahl abweicht.
+  // Nur fuers Bild; Tooltip und Foil behalten die normale `imgUrl`.
+  const ohneGedruckt = [hp != null && hpPosition ? 'hp' : null, hpPosition === 'hero' && atk != null ? 'atk' : null].filter(Boolean);
+  const boardImgUrl = imgUrl && ohneGedruckt.length ? imgUrl + '?ohne=' + ohneGedruckt.join(',') : imgUrl;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
@@ -350,11 +356,10 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
         : tooltipBase._copiedHeroes,
       // `_liveAbilities` is the per-Hero `abilityZones[heroIdx]`
       // shape — an array of slot arrays, each slot a stack of names
-      // (`['Fighting','Fighting']`, `['Toughness']`, `[]`). The
-      // tooltip dedupes by base name and renders `Fighting 2`
-      // instead of `Fighting, Fighting`. Falls back to the static
-      // cards.json `startingAbility1/2` only for off-board card
-      // previews where the live stack isn't available.
+      // (`['Fighting','Fighting']`, `['Toughness']`, `[]`).
+      // Seit 12.10. zeigt der Karten-Tooltip KEINE Abilities mehr
+      // (sie liegen sichtbar in den Ability-Zonen); der Wert wird von
+      // CardTooltipContent nicht mehr gelesen.
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
       // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
       _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
@@ -385,7 +390,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : imgUrl ? (
-        <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        <img src={boardImgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : (
         <div className="board-card-text">{cardName || '?'}</div>
       )}

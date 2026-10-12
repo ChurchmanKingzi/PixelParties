@@ -42,6 +42,19 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   (Symbolgröße 8,5 bzw. 10,5 / `image font size` 30, Flächenmittel-Skalierung, mittig in der Zeile); ein
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
   Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
+* **Werte der Helden (HP / ATK):** Die Zahlen stehen exakt mittig in ihren Rahmenfeldern — HP-Feld x 180–380,
+  ATK-Feld x 470–670 (Kartenraster 750 × 1050, Rahmen `hero` / `fullartHero` / `superhero`), unabhängig von der
+  Stellenzahl. `drawLine(…, { ink: true })` zentriert dafür die sichtbare Tinte statt des Vorschubs (die Schrift
+  lässt hinter jedem Zeichen 1 Schrift-Pixel Abstand, `INK_TRAIL_U`); gemessen: Tintenmitte = Feldmitte bei 1–4
+  Stellen. Creature-, Artifact- und Boss-Rahmen sind unverändert.
+* **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
+  Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
+  gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
+* **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt (Helden: HP und ATK, Wesen: HP),
+  fordert es das Bild mit `?ohne=hp,atk` bzw. `?ohne=hp` an. `card-image-shim.js` liest die Variante aus der URL,
+  hängt sie an die Cache-ID (`card:Name|atk,hp`) und ruft `renderCard(karte, { noHp, noAtk })` auf — die Karte
+  entsteht ohne die gedruckte Zahl, die Box bleibt leer. Tooltip, Foil und alle Karten ohne Live-Werte (Hand,
+  Ablage, Menüs) nehmen weiter die normale URL und zeigen die gedruckten Werte.
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 
@@ -56,6 +69,14 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
   (ein Band kreuzt jeden Punkt alle ~1,5 s), beschnitten durch die Umrisse der Buchstaben (`nameMask`). **Super Rare**
   (gold) und **Diamond Rare** (türkis) tragen denselben Namensglanz (`FoilName`, `CardRender.nameShimmerFor`);
   in Kleinansichten entfällt er dort.
+* **Textglanz (nur Super/Diamond Rare, nicht Skins):** In Grossansichten (Karte ≥ 240 px breit, Touch ≥ 480 px; Tooltip,
+  Dialoge) glänzt auch aller übrige Text — Fähigkeitsfelder, Stufe, Werte, Regeltext. `CardRender.textLayer` zeichnet ihn
+  über `draw(spec, null, null, true)` (Text-only-Modus, alles weiss) als Maske in voller Kartengrösse (750 × 1050, <50 KB als
+  PNG; eine halb so grosse Maske liess die Glanzfarbe um die Buchstaben ausfransen), `textShimmerFor` lädt und cached sie
+  (IndexedDB-Schlüssel `t:<Name>`), `FoilName` legt sie als zweite Schicht (`.skin-holo-text`) über die Karte. Der Text
+  bleibt weiss; über ihn wandert nur ein schmaler goldener (Diamond: türkiser) Lichtstreif alle 3,6 s plus ein kaum
+  merklicher Farbhauch (`.sh-rb`, Deckkraft .12 — bei .3 färbte er den Regeltext dauerhaft gold). `CardRender.HOLO.allText = false`
+  schaltet nur diese Schicht ab, der Namensglanz bleibt.
 * **Kunst:** feine Schrägstriche (Schraffur) mit wanderndem Pastell-Regenbogen und Glanzbänder, die ruhig über
   das Bild gleiten (ein Band kreuzt jeden Punkt alle ~1,8 s, meist ein Band zugleich). Beides liegt nur auf den helleren Flächen: `CardRender.holoLayers` rechnet dafür eine
   **Maske** aus dem nativen Pixelraster der Kunst (meist 76×51, gleiche Streckung wie `draw`, keine Unschärfe),

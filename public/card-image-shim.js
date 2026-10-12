@@ -87,18 +87,28 @@
     if (/^https?:/i.test(url)) {
       try { const u = new URL(url); if (u.origin !== location.origin) return null; path = u.pathname; } catch (e) { return null; }
     }
+    // Variante `?ohne=hp,atk`: die Karte ohne gedruckte HP bzw. ATK (Brett — dort liegen die Live-Werte darueber).
+    const qm = /(?:^|&)ohne=([a-z,]*)/.exec(url.split('#')[0].split('?').slice(1).join('?'));
+    const ohne = qm ? ['atk', 'hp'].filter(k => qm[1].split(',').includes(k)).join(',') : '';
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
+    const sfx = ohne ? '|' + ohne : '';
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, id: 'skin:' + file };
+      return { kind: 'skin', stem: file, ohne, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, id: 'card:' + stem };
+    return { kind: 'card', stem, ohne, id: 'card:' + stem + sfx };
+  }
+  /** Karten-ID (`card:Stem` / `skin:Stem`, optional `|hp,atk`) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
+  function fromId(id) {
+    const i = id.lastIndexOf('|');
+    const ohne = i > 4 ? id.slice(i + 1) : '';
+    return { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: id.slice(5, i > 4 ? i : undefined), ohne, id };
   }
 
   function resolve(m) {
@@ -138,7 +148,10 @@
         remember(m.id, url);
         return url;
       }
-      const cv = await CardRender.renderCard(r.card, r.skin ? { skin: r.skin } : null);
+      const opts = {};
+      if (r.skin) opts.skin = r.skin;
+      if (m.ohne) { if (m.ohne.includes('hp')) opts.noHp = true; if (m.ohne.includes('atk')) opts.noAtk = true; }
+      const cv = await CardRender.renderCard(r.card, r.skin || m.ohne ? opts : null);
       if (!cv) return null;
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;
@@ -356,7 +369,7 @@
       if (typeof id !== 'string' || !/^(card|skin):./.test(id)) continue;
       if (warming.has(id) || (cache.has(id) && pinned.has(id))) continue;
       warming.add(id);
-      enqueue({ warm: true, m: { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: id.slice(5), id } }, 3);
+      enqueue({ warm: true, m: fromId(id) }, 3);
     }
   }
   boot().then(scheduleWarm);
