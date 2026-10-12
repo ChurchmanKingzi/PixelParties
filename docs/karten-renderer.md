@@ -69,6 +69,14 @@ Prägung wurden ausprobiert und verworfen — auf Pixelart wirkten sie unruhig b
   (ein Band kreuzt jeden Punkt alle ~1,5 s), beschnitten durch die Umrisse der Buchstaben (`nameMask`). **Super Rare**
   (gold) und **Diamond Rare** (türkis) tragen denselben Namensglanz (`FoilName`, `CardRender.nameShimmerFor`);
   in Kleinansichten entfällt er dort.
+* **Textglanz (nur Super/Diamond Rare, nicht Skins):** In Grossansichten (Karte ≥ 240 px breit, Touch ≥ 480 px; Tooltip,
+  Dialoge) glänzt auch aller übrige Text — Fähigkeitsfelder, Stufe, Werte, Regeltext. `CardRender.textLayer` zeichnet ihn
+  über `draw(spec, null, null, true)` (Text-only-Modus, alles weiss) als Maske in voller Kartengrösse (750 × 1050, <50 KB als
+  PNG; eine halb so grosse Maske liess die Glanzfarbe um die Buchstaben ausfransen), `textShimmerFor` lädt und cached sie
+  (IndexedDB-Schlüssel `t:<Name>`), `FoilName` legt sie als zweite Schicht (`.skin-holo-text`) über die Karte. Der Text
+  bleibt weiss; über ihn wandert nur ein schmaler goldener (Diamond: türkiser) Lichtstreif alle 3,6 s plus ein kaum
+  merklicher Farbhauch (`.sh-rb`, Deckkraft .12 — bei .3 färbte er den Regeltext dauerhaft gold). `CardRender.HOLO.allText = false`
+  schaltet nur diese Schicht ab, der Namensglanz bleibt.
 * **Kunst:** feine Schrägstriche (Schraffur) mit wanderndem Pastell-Regenbogen und Glanzbänder, die ruhig über
   das Bild gleiten (ein Band kreuzt jeden Punkt alle ~1,8 s, meist ein Band zugleich). Beides liegt nur auf den helleren Flächen: `CardRender.holoLayers` rechnet dafür eine
   **Maske** aus dem nativen Pixelraster der Kunst (meist 76×51, gleiche Streckung wie `draw`, keine Unschärfe),

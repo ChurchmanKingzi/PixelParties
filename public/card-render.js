@@ -28,6 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
+  let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
   const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
@@ -267,7 +268,7 @@
     root.CardRender.last.n = lines.length; root.CardRender.last.h = total; root.CardRender.last.H = innerH;
     let top = o.top + (o.padT || 0);
     if (o.vAlign === 'middle') top += (innerH - total) / 2;
-    ctx.fillStyle = o.color;
+    ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
     const k = em / UPM;
     const base = em * ASC / UPM;
     const x0 = o.left + (o.padL || 0);
@@ -306,7 +307,7 @@
     const em = pt * PT, k = em / UPM, pitch = em * LINE_U / UPM;
     const total = (lines.length - 1) * pitch + em * LINE_U / UPM;
     const top = o.vAlign === 'middle' ? o.top + (o.height - total) / 2 : o.top;
-    ctx.fillStyle = o.color;
+    ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
     lines.forEach((line, li) => {
       // `ink`: nur die sichtbare Tinte zaehlt, nicht der Abstand hinter dem letzten Zeichen (1 Schrift-Pixel,
       // INK_TRAIL_U). Sonst sitzt eine zentrierte Zahl um ein halbes Schrift-Pixel zu weit links in ihrer Box.
@@ -454,7 +455,7 @@
   // ═════════════ Karte zeichnen ═════════════
   // spec: { type, rarity, name, text, skillBox, skillBox2, hp, atk, level, school, kind }
   // art:  { src: CanvasImageSource, sx, sy, sw, sh } | null
-  function draw(spec, art, target) {
+  function draw(spec, art, target, textOnly) {
     if (!sprites) throw new Error('CardRender.init() fehlt');
     const t = spec.type;
     const cv = target || document.createElement('canvas');
@@ -464,10 +465,10 @@
     ctx.imageSmoothingEnabled = false;
 
     // 1) Rahmen
-    sprite(ctx, 'frame.' + t, 0, 0, W, H);
+    if (!textOnly) sprite(ctx, 'frame.' + t, 0, 0, W, H);
 
     // 2) Kunst, gestreckt in ihr Feld und mit der Maske des Rahmens beschnitten
-    if (art) {
+    if (art && !textOnly) {
       const full = isFullart(t);
       const box = full ? [0, 0, W, H] : [70, 170, 610, 400];
       const maskKey = t === 'superhero' ? 'mask.hero' : t === 'fullartHero' ? 'mask.fullart' : 'mask.art';
@@ -483,7 +484,7 @@
 
     // 3) Namenszeile (z 2) — Superhelden: breiter
     const sup = isSuperhero(t);
-    drawLine(ctx, spec.name, {
+    if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
       align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
     });
@@ -501,18 +502,18 @@
 
     // 5) Zauberschule (links) und Stufe (rechts) — Zauber und Kreaturen
     if (t === 'spell' || t === 'summon') {
-      if (spec.school) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
+      if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
       if (spec.level != null) drawLine(ctx, String(spec.level), {
         left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle', color: levelColor(spec),
       });
     }
     // Kartenart-Symbol unten links (Falle, Reaktion, Flaeche, Anhang)
-    if (spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact')) {
+    if (!textOnly && spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact')) {
       sprite(ctx, 'kind.' + spec.kind, 0, 950, 100, 100);
     }
 
     // 6) Goldene Rahmenelemente (die uebrigen Foil-Layer entfallen)
-    drawRim(ctx, spec);
+    if (!textOnly) drawRim(ctx, spec);
 
     // 7) Werte (HP, Angriff / Kosten) — `noHp` / `noAtk`: die Zahl weglassen (Brett: dort liegt der Live-Wert darueber)
     const stat = statColor(spec);
@@ -556,7 +557,7 @@
 
     // 9) Seltenheits-Stempel unten rechts
     const stamp = STAMP[spec.rarity];
-    if (stamp) {
+    if (stamp && !textOnly) {
       const white = isArti2(t) && (stamp !== 'diamond' && stamp !== 'sapphire');
       sprite(ctx, (white ? 'cornerW.' : 'corner.') + stamp, 689, 989, 45, 45);
     }
@@ -777,6 +778,7 @@
     dark: 0.16,          // unterhalb dieser Helligkeit (0..1) liegt nichts auf einem Pixel (Umrisse, Schatten)
     full: 0.46,          // ab dieser Helligkeit volle Staerke
     neutral: 0.50,       // Staerke fuer Graustufen (Farben: bis 1,0, je nach Saettigung)
+    allText: true,       // Super/Diamond Rares: auch aller uebrige Text (nicht nur der Name) bekommt den Glanz (Grossansichten)
   };
   /** Gilt das Holo fuer diesen Skin? (`data/card-render.json` -> skins[Name].holo = false schaltet es ab) */
   function holoOn(skinMeta) { return HOLO.on && !(skinMeta && skinMeta.holo === false); }
@@ -880,6 +882,18 @@
   function nameLayer(card) {
     const spec = specFromCard(card, meta.cards[card.name], null);
     return { type: spec.type, nameStrip: NAME_STRIP, nameMask: nameMaskCanvas(spec, holoGeometry(spec.type)) };
+  }
+
+  /**
+   * Maske ALLEN Textes einer Karte AUSSER dem Namen (der hat seine eigene Maske): Faehigkeitsfelder, Stufe, Werte, Regeltext —
+   * weiss auf durchsichtig, in voller Kartengroesse (750 x 1050). Eine halb so grosse Maske, weich gestreckt, liess die Glanzfarbe
+   * um jeden Buchstaben ausfransen (gemessen: Regeltext sichtbar verschmiert); in voller Aufloesung bleiben die Kanten scharf.
+   * Als PNG weniger als 50 KB. Symbole im Regeltext zaehlen mit (Alpha).
+   */
+  function textLayer(card) {
+    const spec = specFromCard(card, meta.cards[card.name], null);
+    TEXT_MASK = true;
+    try { return draw(spec, null, null, true); } finally { TEXT_MASK = false; }
   }
 
   // Fertige Schichten fuers DOM: PNG-Blobs + die Lage in Prozent der Karte als CSS-Variablen. Je Skin einmal gerechnet
@@ -1109,5 +1123,32 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  /** Textglanz fuer Karten mit Foil (Super Rare / Diamond Rare): Maske allen Textes ausser dem Namen, ueber die ganze Karte. */
+  const textDone = new Map();        // Kartenname -> { vars, urls }
+  function textCached(card) { return textDone.get(card.name) || null; }
+  function textShimmerFor(card) {
+    if (!HOLO.on || !HOLO.allText || !card) return Promise.resolve(null);
+    const hit = textDone.get(card.name);
+    if (hit) return Promise.resolve(hit);
+    const key = 't:' + card.name;
+    if (holoWait.has(key)) return holoWait.get(key);
+    const job = holoChain.then(async () => {
+      await new Promise(r => setTimeout(r, 0));
+      let rec = await cacheGet(key);
+      if (!(rec && rec.text instanceof Blob)) {
+        const text = await toBlob(textLayer(card));
+        if (!text) return null;
+        rec = { text };
+        cachePut(key, rec, text.size);
+      }
+      const url = urlOf(rec.text);
+      return lru(textDone, card.name, { vars: { '--sh-text': 'url(' + url + ')' }, urls: [url] }, NAME_MAX);
+    }).catch(err => { console.warn('[card-render] Textglanz', card.name, err && err.message); return null; })
+      .finally(() => holoWait.delete(key));
+    holoChain = job.catch(() => {});
+    holoWait.set(key, job);
+    return job;
+  }
+
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
 })(typeof window !== 'undefined' ? window : globalThis);
