@@ -93,6 +93,21 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/10-jenny-sperre-breiter-als-text.js`
 - **Vermutete Ursache:** `jenny-the-class-fairy.js` setzt `ps.handLocked = true` (die volle Sperre, wörtlich Kazena: „draw or add cards to your hand"). Mit `drawLocked` + `searchLocked` (nur Deck, `_engine.js` ~10627) träfe die Sperre genau den Text.
 
+### H02-heroes-11 · Karian: gefroren/betäubt im Gegnerzug – Reaktions-Spell nicht spielbar · Stufe C
+- **Karten:** Grand Inquisitor Karian (`grand-inquisitor-karian.js`); Spectral Armor (Reaction, Support Magic) als Messkarte
+- **Voraussetzungen / Aufbau:** Karian (Support Magic 2 + Magic Arts 2) auf Sitz 0, `onGameStart` ausgeführt, Spectral Armor auf der Hand; Sitz 1 am Zug wirkt Fireball auf Karian; Variante: Karian mit Status frozen bzw. stunned (Dauer 2).
+- **Beobachtet:** ohne Status wird Spectral Armor gespielt (150 → 75 Schaden); gefroren und betäubt: keine Reaktion, Karian nimmt 150 (gleiches Verhalten wie ein beliebiger gefrorener Held). Das Skript hebt die Starre nur in den eigenen Handlungsphasen (MAIN1/ACTION/MAIN2) auf (`onPhaseStart`, Z. 197-215).
+- **Kartentext:** „While this Hero is Stunned or Frozen, you may perform a second Action with it during your Action Phase and it is **otherwise not affected** by those effects."
+- **Frage an Al:** Soll eine gefrorene/betäubte Karian auch im Gegnerzug (und in Start-/Resource-/End-Phase) Reaktionen und Fähigkeiten nutzen können („otherwise not affected") – ja oder nein?
+- **Repro:** `docs/niche-tests/repro/H02-heroes/11-karian-gefroren-keine-reaktion-im-gegnerzug.js` (✗ = Reaktion gesperrt)
+
+### H02-heroes-12 · Karian: „Soul Transmitted" (negativer Status) wirkt trotz „Other negative status effects don't affect this Hero" · Stufe C
+- **Karten:** Grand Inquisitor Karian; Soul Transmigration Ritual (`soul-transmigration-ritual.js`, setzt `soul_transmitted` direkt; `_hooks.js:398` – `negative: true`, ohne `immuneKey`)
+- **Aufbau / Schritte:** Karian besiegt, Ritual (3 Stufe-0-Kreaturen geopfert) belebt sie wieder (800 HP, Status haftet); beim zweiten Besiegen wird sie samt Ability gelöscht.
+- **Kartentext:** „Other negative status effects don't affect this Hero." – Soul Transmitted hat die Wirkung „beim nächsten Besiegen löschen" und ist als negativ geführt.
+- **Frage an Al:** Soll Karians Immunität auch den Lösch-Ersatz von Soul Transmitted aufheben (sie bleibt dann beim zweiten Tod unversehrt) – ja oder nein?
+- **Repro:** `docs/niche-tests/repro/H02-heroes/12-karian-soul-transmitted.js` (✗ = Karian wird gelöscht)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

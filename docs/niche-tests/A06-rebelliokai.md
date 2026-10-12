@@ -163,6 +163,32 @@ Stand/Autor: Agent A06-rebelliokai, 12.10.2026. Karten: 67 in der Liste · (wird
 - **Repro:** `docs/niche-tests/repro/A06-rebelliokai/20-chilly-wizard-spiegel-bleibt.js`
 - **Frage an Al:** Soll der gespiegelte Status enden, sobald der Wizard ihn nicht mehr trägt oder das Feld verlässt („gebunden"), oder läuft er allein ab – „gebunden" oder „läuft ab"?
 
+### A06-rebelliokai-21 · Pawn Sacrifice unter Handsperre (Ice Sculpture Garden): Pawn wird geopfert, das Ziehen entfällt · Stufe C
+- **Karten:** Pawn Sacrifice (`pawn-sacrifice.js`), Ice Sculpture Garden (setzt `handLocked`)
+- **Beobachtet:** Kitsune Transformation und Tanuki Escape sperren sich bei `ps.handLocked` über `spellPlayCondition` (ausgegraut). Pawn Sacrifice prüft die Sperre nicht: der Zauber ist spielbar, der Pawn wird geopfert/gelöscht, `drawWouldBeBlocked` überspringt das Ziehen. Der Loader sperrt Spells bewusst nicht automatisch als „draw-only" (`_loader.js` ≈ Z. 410: „eine Verhaltensänderung, die Al entscheiden sollte").
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/21-pawn-sacrifice-handsperre.js`
+- **Frage an Al:** Soll Pawn Sacrifice (Nutzen nur Ziehen) bei aktiver Handsperre gesperrt sein wie Kitsune Transformation/Tanuki Escape – Ja oder Nein?
+
+### A06-rebelliokai-22 · Tengu Windstorm feuert `onCardLeaveZone` vor dem Entfernen der Karte · Stufe B
+- **Karten:** Tengu Windstorm (`tengu-windstorm.js` `_bounceToDeck`), Bishop of Kings [B], Knight of Kings [W], Board of Kings
+- **Aufbau:** Bishop [B], Knight [W] und Board auf Sitz 0 → Gegner-Helden negiert. Windstorm bounct das Board bzw. den Knight.
+- **Erwartet:** wie bei `removeArea`/Tod/Sculpture Theft wird die Karte beim Leave-Hook bereits nicht mehr als „auf dem Brett" gezählt → die Negation endet sofort.
+- **Beobachtet:** `_bounceToDeck` ruft den Leave-Hook, solange die Karte noch im Zustand steht; Bishop [B] sieht Board/Knight weiter und lässt die Negation bis zum nächsten Zugbeginn/-ende liegen.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/22-windstorm-leave-reihenfolge.js`
+
+### A06-rebelliokai-23 · Tengu Windstorm und Sculpture Theft holen Token ins Deck bzw. auf die Hand · Stufe B
+- **Karten:** Tengu Windstorm, Sculpture Theft (+ The White Army als Freeze-Quelle)
+- **Aufbau:** Mummy Token (auch Invader/Pollution Token) auf Sitz 1. Windstorm wählt ihn; bzw. er wird gefroren und Sculpture Theft nimmt ihn.
+- **Erwartet** (Konvention: Tokens gehen nie in Hand/Deck/Ablage, sondern in den Gelöscht-Stapel, z. B. `_enforceSupportZoneLock`): Token wird gelöscht oder ist nicht wählbar.
+- **Beobachtet:** „Mummy Token" liegt oben im Deck von Sitz 1 bzw. auf der Hand von Sitz 1 (der Audit bleibt still, weil der Token-Name in der DB steht).
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/23-token-in-deck-hand.js`
+
+### A06-rebelliokai-24 · Thebinxan War Counselor unter Handsperre: Ansage erzwungen, Karte kommt nicht, Nutzung verbraucht · Stufe C
+- **Karten:** Thebinxan War Counselor (`thebinxan-war-counselor.js`), Ice Sculpture Garden (Handsperre)
+- **Beobachtet:** `canActivateCreatureEffect` prüft nur „Deck nicht leer". Unter Handsperre scheitert `actionAddCardFromDeckToHand`, der Effekt endet mit `return true` (Log `thebinxan_fizzle`): der Gegner hat umsonst angesagt, kein Schaden fällt (auch bei falscher Ansage), die Einmal-Nutzung ist weg. Camouflaged Kappa und Timid Tanuki sperren sich bei Handsperre vorab.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/24-thebinxan-handsperre.js`
+- **Frage an Al:** Soll Thebinxan bei Handsperre gesperrt (nicht aktivierbar) sein – oder soll der Schaden bei falscher Ansage trotzdem fallen, weil die Karte aufgedeckt wurde? – „gesperrt" oder „Schaden trotzdem"?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

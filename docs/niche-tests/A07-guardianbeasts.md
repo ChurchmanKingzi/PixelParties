@@ -147,3 +147,19 @@ Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (w
 - **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/16-cardinal-beast-pangaia-hp.js` (✗ = Fehler tritt auf)
 - **Restunsicherheit (daher B):** Man kann „unaffected" eng auf Schaden/Statuswirkungen auslegen; die Kartenformel lautet aber „all cards and effects".
 
+### A07-17 · Zwei Clausss im selben Zug: das zweite Opfer bringt nichts und ist trotzdem erlaubt · Stufe C
+- **Karten:** Clausss, the No-Nonsense Cultist (`clausss-the-no-nonsense-cultist.js`, `ps._bonusMainActions = 1` wird nur gesetzt)
+- **Voraussetzungen / Aufbau:** Zwei Clausss mit Klaus, 3 weitere Kreaturen (nicht frisch), Main Phase 1.
+- **Beobachtet:** Beide Clausss aktivieren nacheinander; jede opfert eine Kreatur, `_bonusMainActions` bleibt 1 – das zweite Opfer ist verschwendet (4 → 3 Kreaturen, kein zusätzlicher Gewinn). `canActivateCreatureEffect` prüft den Stand nicht. (Mit einer Clausss gehen genau zwei Aktionen, bestätigt.)
+- **Warum unsicher:** Text: „… you can perform **a second Action** during this turn's Action Phase" – spricht für höchstens die eine zweite Aktion; die Engine-Konvention (Triceras/Techno: Effekt nicht aktivierbar, wenn er nichts mehr bringt) spräche für eine Sperre, alternativ wäre eine dritte Aktion denkbar.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/17-clausss-doppelt-zweites-opfer-ohne-wirkung.js` (✗ = Beobachtung tritt auf)
+- **Frage an Al:** „Soll die zweite Clausss gesperrt sein, solange die zweite Aktion schon vergeben ist – ja oder nein (alternativ: dritte Aktion)?"
+
+### A07-18 · Mao zahlt 5 Karten und negiert die Bestie, auch wenn deren Effekt gar nicht feuern kann · Stufe C
+- **Karten:** Mao, the Vengeful Guardian (`mao-the-vengeful-guardian.js:42-52, 162`), Beispiel Guardian Beast Zhu (Ablagen zu klein)
+- **Voraussetzungen / Aufbau:** Mao, Zhu frisch auf dem Brett, eigene Ablage 6, gegnerische 6.
+- **Beobachtet:** Mao ist aktivierbar (nur „≥ 5 Karten + eine frische Bestie"); er löscht 5 Karten, Zhus `onCreatureEffect` bricht intern ab (< 8 Karten), Zhu wird trotzdem bis zum nächsten Zug negiert. Log `mao_refire`, Zhu: kein Effekt. Gleiches gilt für jede Bestie, deren `canActivateCreatureEffect` falsch wäre (Gou ohne eigenes Ziel, Long bei 3 Bränden …).
+- **Warum unsicher:** Der Text sagt „to immediately activate that Creature's active effect"; ob eine Aktivierung, die gar nicht möglich ist, die Kosten verbrauchen darf, entscheidet die Konvention „unmöglich → nicht aktivierbar" (Ruling „Tuscan Artist" 16.8.) – für Mao ausdrücklich nicht entschieden.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/18-mao-zahlt-trotz-unmoeglicher-aktivierung.js` (✗ = Beobachtung tritt auf)
+- **Frage an Al:** „Soll Mao nur Bestien wählbar machen, deren Effekt gerade aktivierbar ist (wie ‚ineligible' bei den Bestien selbst) – ja oder nein?"
+

@@ -15,7 +15,7 @@ const F = H.INERT.filler;
   const R = H.runner();
 
   R.section('Zhu kann nicht feuern (eigene Ablage < 8)');
-  t = await H.fresh({ heroes: [['Mao, the Vengeful Guardian', H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], discard: [Array(6).fill(F), Array(6).fill(F)], deckSize: 20 });
+  const t = await H.fresh({ heroes: [['Mao, the Vengeful Guardian', H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], discard: [Array(6).fill(F), Array(6).fill(F)], deckSize: 20 });
   const zhu = t.put(0, 0, 0, 'Guardian Beast Zhu');
   t.gs.activePlayer = 0; t.phase(2);
   t.script.push({ match: d => d && d.type === 'cardGalleryMulti', once: true, answer: (d) => { const idx = [0,1,2,3,4]; return { selectedIndices: idx, selectedCards: idx.map(i => d.cards[i].name) }; } });
