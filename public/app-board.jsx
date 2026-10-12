@@ -4870,6 +4870,110 @@ function TodesgabeErweckungEffect({ x, y, w = 80, h = 110 }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  ZWEI HELDEN RAMMEN EINANDER (Duel, Als Vorgabe 12.10.) — die Bahn der beiden Heldenkarten
+//
+//  Eine durchgehende Choreografie über alle Hits, per Zeitleiste statt fester Keyframes, weil erst während des Duells feststeht, wie viele Hits es werden:
+//    anlauf(S)  Ausholen (80 ms), Anlauf in die Mitte → HIT 1 bei S + 260 (Stauchen, kurzer Halt, dann prallen die Karten selbsttätig zurück)
+//    folge(S)   die Karten stehen zurückgeprallt; ab S zurück ins Krachen (120 ms) → der nächste Hit, wieder Rückprall — SCHLAG AUF SCHLAG (~240 ms Abstand)
+//    heim(t)    nach dem letzten Hit: aus dem aktuellen Zustand heim auf die Zone (380 ms)
+//  `d` = Weg entlang der Fahrtrichtung (R = Weg bis zum Treffpunkt, B = Rückprallweg), `sc` Maßstab, `rf` Ausrichtung (0 = aufrecht, 1 = Oberkante zum Gegner), `w` Taumeln.
+//  Die Bahn rechnet in beliebigen Einheiten (Bildschirmpixel für die Karten, Rasterpixel im Pixelart-Aufprall `duel_clash` — derselbe Verlauf für die Tempolinien).
+// ═══════════════════════════════════════════════════════════════════
+const HR_AUSHOLEN = 80, HR_ANLAUF = 260, HR_CRASH = 120, HR_HEIM = 380;
+const HR_EASE = {
+  lin: (u) => u,
+  in: (u) => Math.pow(u, 2.2),
+  out: (u) => 1 - Math.pow(1 - u, 2.2),
+  inOut: (u) => u * u * (3 - 2 * u),
+};
+function ppHeldenRammenBahn(R, B) {
+  const pts = [];
+  const punkt = (t, d, sc, rf, w, ease) => { pts.push({ t, d, sc, rf, w, ease: ease || 'lin' }); };
+  const letzter = () => pts[pts.length - 1];
+  const bahn = {
+    beendet: false,
+    heimEnde: 0,
+    /** Zustand zur Zeit `t` (Millisekunden, beliebige gemeinsame Uhr) */
+    zustand(t) {
+      if (!pts.length) return { d: 0, sc: 1, rf: 0, w: 0 };
+      if (t <= pts[0].t) return pts[0];
+      for (let i = 1; i < pts.length; i++) {
+        if (t <= pts[i].t) {
+          const a = pts[i - 1], b = pts[i];
+          const k = (HR_EASE[b.ease] || HR_EASE.lin)((t - a.t) / Math.max(1, b.t - a.t));
+          return { d: a.d + (b.d - a.d) * k, sc: a.sc + (b.sc - a.sc) * k, rf: a.rf + (b.rf - a.rf) * k, w: a.w + (b.w - a.w) * k };
+        }
+      }
+      return letzter();
+    },
+    /** Stauchen am Aufprall `T`, dann prallen die Karten selbsttätig zurück (der Rückprall läuft, bis der nächste Hit kommt) */
+    aufprall(T, sc) {
+      punkt(T + 30, 0.96 * R, sc * 0.92, 1, 0.4, 'out');
+      punkt(T + 130, R - B, 1.04, 1, 1, 'out');
+    },
+    anlauf(S) {
+      punkt(S, 0, 1.04, 0, 0);
+      punkt(S + HR_AUSHOLEN, -0.12 * R, 1.1, 1, 0, 'out');
+      punkt(S + HR_ANLAUF, R, 1.24, 1, 0, 'in');
+      this.aufprall(S + HR_ANLAUF, 1.24);
+    },
+    /** Für den Pixelart-Aufprall eines Folge-Hits: die Karten stehen zum Zeitpunkt `t0` schon zurückgeprallt */
+    zurueckgeprallt(t0) { punkt(t0, R - B, 1.04, 1, 1); },
+    folge(S) {
+      const l = letzter();
+      const start = Math.max(S, l.t);
+      if (start > l.t) punkt(start, l.d, l.sc, l.rf, l.w);
+      punkt(start + HR_CRASH, 1.02 * R, 1.3, 1, 0, 'in');
+      this.aufprall(start + HR_CRASH, 1.3);
+    },
+    heim(jetzt) {
+      const z = this.zustand(jetzt);
+      while (pts.length && pts[pts.length - 1].t > jetzt) pts.pop();     // noch nicht gespielte Rückprallpunkte verwerfen
+      punkt(jetzt, z.d, z.sc, z.rf, z.w);
+      punkt(jetzt + HR_HEIM, 0, 1, 0, 0, 'inOut');
+      this.heimEnde = jetzt + HR_HEIM;
+      this.beendet = true;
+    },
+    letzteZeit() { return pts.length ? letzter().t : 0; },
+  };
+  return bahn;
+}
+
+/** Eine der beiden Rammkarten (Duel): folgt der gemeinsamen Bahn und räumt sich nach dem Heimweg selbst weg. */
+function HeldenRammkarte({ r }) {
+  const el = useRef(null);
+  const c = r.clash;
+  useEffect(() => {
+    let raf = 0;
+    if (!c.ctrl.angelaufen) {                                        // die erste Karte, die steht, startet die gemeinsame Bahn
+      c.ctrl.angelaufen = true;
+      if (!c.ctrl.bahn.beendet) c.ctrl.bahn.anlauf(performance.now());
+    }
+    const schritt = () => {
+      const e = el.current;
+      if (!e) return;
+      const t = performance.now();
+      const b = c.ctrl.bahn;
+      if (b.beendet && t > b.heimEnde + 30) {                        // wieder auf der Zone: Karte weg, der Held erscheint dort
+        if (!c.ctrl.entfernt) { c.ctrl.entfernt = true; c.ctrl.entfernen(); }
+        return;
+      }
+      if (!b.beendet && t > b.letzteZeit() + 10000) b.heim(t);       // Sicherung: kein Hit mehr gekommen
+      const z = b.zustand(t);
+      e.style.transform = `translate(${c.ux * z.d}px, ${c.uy * z.d}px) rotate(${z.rf * r.angle + z.w * c.wackeln}deg) scale(${z.sc})`;
+      raf = requestAnimationFrame(schritt);
+    };
+    schritt();
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div ref={el} className="ram-anim-card ram-clash" style={{ left: r.srcX - c.w / 2, top: r.srcY - c.h / 2, width: c.w, height: c.h }}>
+      <BoardCard cardName={r.cardName} noTooltip />
+    </div>
+  );
+}
+
 // ── Forceful Revival: der Crash (Als Vorgabe 26.9.) ─────────────────
 // „Forceful Revival sollte darstellen, wie der Anwender die Support
 //  Zone rammt, dort dann die Creature erscheint und beide ‚crashen'."
@@ -8060,7 +8164,10 @@ function ppSalve(malen, ende, vorbereiten, opts) {
       const T = targetPoints.map(p => ({ x: p.x + off.dx, y: p.y + off.dy, w: p.w || 64, h: p.h || 90 }));
       // Optionale Flaeche (`regionBox`, z. B. eine ganze Brettseite): gehoert mit in den Canvas.
       const R = regionBox ? { x: regionBox.x + off.dx, y: regionBox.y + off.dy, w: regionBox.w, h: regionBox.h } : null;
-      const xs = [O.x, ...T.map(p => p.x), ...(R ? [R.x, R.x + R.w] : [])], ys = [O.y, ...T.map(p => p.y), ...(R ? [R.y, R.y + R.h] : [])];
+      // ★ 12.10. (Gather Intel, Als Befund: „die Lupe liegt weiterhin unter manchen Handkarten"): der Canvas misst sich auch von den KANTEN der Ziele aus, nicht nur von ihren Mitten.
+      // Ein breites Ziel (die ganze Gegnerhand, ~900 px) ragte sonst weit über den Canvas hinaus — die Lupe, die die Reihe abtastet, wurde an dessen Kante senkrecht abgeschnitten und
+      // sah aus, als verschwände sie unter den Karten (Mitte der Reihe ± 100 px waren sichtbar).
+      const xs = [O.x, ...T.flatMap(p => [p.x - p.w / 2, p.x + p.w / 2]), ...(R ? [R.x, R.x + R.w] : [])], ys = [O.y, ...T.flatMap(p => [p.y - p.h / 2, p.y + p.h / 2]), ...(R ? [R.y, R.y + R.h] : [])];
       const links = Math.floor(Math.min(...xs) - PAD), oben = Math.floor(Math.min(...ys) - PAD);
       const gw = Math.ceil((Math.max(...xs) + PAD - links) / S), gh = Math.ceil((Math.max(...ys) + PAD - oben) / S);
       const o = { x: (O.x - links) / S, y: (O.y - oben) / S };
@@ -27242,134 +27349,123 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
-  //  Duel (12.10.) — PIXELART, Brett-Animation je Duell-Runde: der AUFPRALL, wenn die beiden Helden (`targets[0]`, `targets[1]`) ineinander rammen
+  //  Duel (12.10.) — PIXELART, Brett-Animation JE HIT: der Aufprall, wenn die beiden Helden (`targets[0]`, `targets[1]`) in der Mitte ineinander krachen
   //
-  //  Die Heldenkarten selbst fahren als DOM-Karten (`play_hero_clash` → `ramClash` in style.css: Anlauf, Aufprall in der Mitte, Rückprall, zweiter Anlauf, zweiter
-  //  Aufprall, Heimweg). Dieser Canvas liegt ÜBER den Karten und malt, was die Karten nicht können: Tempolinien hinter beiden Karten, im Treffpunkt M (Mitte zwischen den
-  //  Zonen) beim ersten Aufprall (260 ms) einen mittleren Stern mit Ring und Funken, beim zweiten (600 ms) einen grossen — weisser Blitz, achtstrahliger Stern, zwei
-  //  Druckringe, Risse im Boden, Funkenregen in Blau (Spieler) und Orange (Gegner) — mit der Runde `runde` mehr Funken. Der Schaden fällt im zweiten Aufprall
-  //  (_hero-duel-shared.js); die Zeiten stehen dort, in `ramClash` und hier (T1, T2, ENDE).
+  //  Die Heldenkarten selbst fahren als DOM-Karten (`play_hero_clash` → `ppHeldenRammenBahn` / `HeldenRammkarte`): Hit 1 aus den Zonen (Ausholen, Anlauf, Aufprall bei 260 ms),
+  //  jeder weitere Hit aus dem Rückprall (zurück ins Krachen, Aufprall bei 120 ms) — Schlag auf Schlag. Dieser Canvas liegt ÜBER den Karten und malt je Hit, was die Karten nicht
+  //  können: Tempolinien hinter beiden Karten (aus derselben Bahn gelesen) und im Treffpunkt M (Mitte zwischen den Zonen) den Aufprall — weisser Blitz, achtstrahliger Stern, zwei
+  //  Druckringe, Risse im Boden, Funkenregen in Blau (Spieler) und Orange (Gegner). Mit der Runde `runde` (→ `sz.runde`) werden Stern und Funkenregen grösser. Der Schaden fällt
+  //  im Aufprall (_hero-duel-shared.js); die Zeiten stehen dort, in `ppHeldenRammenBahn` und hier.
   // ═════════════════════════════════════════════════════════════════
   duel_clash: (() => {
     const BLAU = ['#ffffff', '#9ad3ff', '#4a90d9'].map(ppHex);
     const ORANGE = ['#ffffff', '#ffd08a', '#e8742a'].map(ppHex);
     const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
     const RISS = ['#ffffff', '#ffb35a', '#7a2a10'].map(ppHex);
-    const ENDE = 1150, T1 = 260, T2 = 600, FADE_AB = 980;
-    const AUSHOLEN = 80, RUECK_AB = 300, RUECK_BIS = 460, HEIM_AB = 684;
+    const ENDE = 900;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
-    const beschl = (u) => Math.pow(klemme(u, 0, 1), 2.2);                 // wie das beschleunigende Zeitmass des Anlaufs in `ramClash`
     const funkenSatz = (n, v0, leben0) => Array.from({ length: ppFxN(n) }, () => ({
       w: Math.random() * Math.PI * 2, v: v0 * (0.45 + Math.random() * 0.75), leben: leben0 * (0.6 + Math.random() * 0.7), farbe: Math.floor(Math.random() * 4),
     }));
     const vorbereiten = (sz) => {
       const r = sz.runde || 1;
-      return {
-        funken1: funkenSatz(10 + 3 * r, 60, 380),
-        funken2: funkenSatz(24 + 6 * r, 100, 560),
+      const A = sz.ziele[0], B = sz.ziele[1];
+      const teile = {
+        erste: r <= 1, r,
+        funken: funkenSatz(22 + 6 * Math.min(r, 4), 100, 560),
         // Risse: gezackte Linien aus dem Treffpunkt (Winkel, Länge, Zackenversatz je Teilstück)
         risse: Array.from({ length: 7 }, (_, i) => ({
           w: (i / 7) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, laenge: 12 + Math.random() * 12,
           zack: Array.from({ length: 8 }, () => (Math.random() - 0.5) * 2.4),
         })),
       };
+      if (A && B) {
+        // Geometrie und Bahn wie `onHeroClash`: halbe Ausdehnung entlang der Fahrtrichtung, 10 % Überlappung (hier in Rasterpixeln)
+        const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+        const halbe = (Z) => (Z.w / 2) * Math.abs(ux) + (Z.h / 2) * Math.abs(uy);
+        const reach = Math.max(1.3, d / 2 - 0.9 * (halbe(A) + halbe(B)) / 2);
+        const back = Math.min(reach * 0.5, 40);
+        const bahn = ppHeldenRammenBahn(reach, back);
+        if (teile.erste) bahn.anlauf(0); else { bahn.zurueckgeprallt(0); bahn.folge(0); }
+        teile.geo = { M: { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 }, ux, uy, nx: -uy, ny: ux, halbe };
+        teile.bahn = bahn;
+        teile.T = teile.erste ? HR_ANLAUF : HR_CRASH;                    // Aufprallzeit dieses Hits
+      }
+      return teile;
     };
     const malen = (g, t, sz, teile) => {
       const A = sz.ziele[0], B = sz.ziele[1];
-      if (!A || !B) return;
-      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (!A || !B || !teile.bahn) return;
+      const aus = t > ENDE - 240 ? Math.max(0, 1 - (t - (ENDE - 240)) / 240) : 1;
       if (aus <= 0) return;
-      const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
-      const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
-      // Weg der Karten (wie `onHeroClash` / `ramClash`): halbe Ausdehnung entlang der Fahrtrichtung, 10 % Überlappung
-      const halbe = (Z) => (Z.w / 2) * Math.abs(ux) + (Z.h / 2) * Math.abs(uy);
-      const reach = Math.max(1.3, d / 2 - 0.9 * (halbe(A) + halbe(B)) / 2);
-      const back = Math.min(reach * 0.5, 40);
-      // Abstand der Kartenmitte von ihrer Zone zur Zeit t (entlang der Fahrtrichtung) — nur für die Tempolinien
-      const strecke = (zeit) => {
-        if (zeit < AUSHOLEN) return -0.12 * reach * glatt(zeit / AUSHOLEN);
-        if (zeit < T1) return -0.12 * reach + (1.12 * reach) * beschl((zeit - AUSHOLEN) / (T1 - AUSHOLEN));
-        if (zeit < RUECK_AB) return reach;
-        if (zeit < RUECK_BIS) return reach - back * glatt((zeit - RUECK_AB) / (RUECK_BIS - RUECK_AB));
-        if (zeit < T2) return (reach - back) + (back + 0.02 * reach) * beschl((zeit - RUECK_BIS) / (T2 - RUECK_BIS));
-        if (zeit < HEIM_AB) return reach;
-        return reach * (1 - glatt((zeit - HEIM_AB) / (ENDE - HEIM_AB)));
-      };
+      const { M, ux, uy, nx, ny, halbe } = teile.geo;
+      const bahn = teile.bahn, T = teile.T;
 
-      // ── Tempolinien hinter beiden Karten (Anlauf 1: 80–260 ms, Anlauf 2: 460–600 ms) ──
-      const anlauf = (t >= AUSHOLEN + 40 && t < T1) || (t >= RUECK_BIS && t < T2);
-      if (anlauf) {
-        const s = strecke(t), s0 = strecke(t - 40);
-        const tempo = klemme(Math.abs(s - s0) / 5, 0, 1);
-        for (const [Z, pal, vorz] of [[A, BLAU, 1], [B, ORANGE, -1]]) {
-          const kopf = halbe(Z);
-          for (let k = -2; k <= 2; k++) {
-            const versatz = k * (Z.w / 6 + 1);
-            const laenge = 7 + 4 * tempo + ((k + 3) % 3) * 2;
-            for (let l = 0; l < laenge; l += 1) {
-              const rueck = kopf + 1 + l;                                      // hinter der Karte (entgegen der Fahrtrichtung)
-              g.put(Z.x + vorz * (ux * (s - rueck)) + nx * versatz, Z.y + vorz * (uy * (s - rueck)) + ny * versatz,
-                l < 2 ? pal[0] : pal[1], aus * tempo * (1 - l / laenge) * 0.9);
+      // ── Tempolinien hinter beiden Karten, solange sie auf den Aufprall zurasen ──
+      if (t < T) {
+        const dd = bahn.zustand(t).d - bahn.zustand(t - 30).d;
+        const tempo = klemme(dd / (bahn.zustand(T).d * 0.12 || 1), 0, 1);
+        if (tempo > 0.12) {
+          const s = bahn.zustand(t).d;
+          for (const [Z, pal, vorz] of [[A, BLAU, 1], [B, ORANGE, -1]]) {
+            const kopf = halbe(Z);
+            for (let k = -2; k <= 2; k++) {
+              const versatz = k * (Z.w / 6 + 1);
+              const laenge = 7 + 4 * tempo + ((k + 3) % 3) * 2;
+              for (let l = 0; l < laenge; l += 1) {
+                const rueck = kopf + 1 + l;                                // hinter der Karte (entgegen der Fahrtrichtung)
+                g.put(Z.x + vorz * (ux * (s - rueck)) + nx * versatz, Z.y + vorz * (uy * (s - rueck)) + ny * versatz,
+                  l < 2 ? pal[0] : pal[1], aus * tempo * (1 - l / laenge) * 0.9);
+              }
             }
           }
         }
       }
 
-      // ── Ein Aufprall: Blitz, Stern, Ringe, Risse (nur der grosse), Funken ──
-      const aufprall = (t0, gross, funken) => {
-        const al = t - t0;
-        if (al < 0 || al > 620) return;
-        const p = gross ? 1.9 : 1;
-        // weisser Blitz (die ersten ~70 ms)
-        if (al < 70) g.disc(M.x, M.y, (4 + 5 * (gross ? 1 : 0.6)) * (1 - al / 110), STERN[0], aus * (1 - al / 70));
-        // achtstrahliger Stern
-        if (al < 340) {
-          const f = 1 - al / 340, r = (3 + al / 12) * p;
-          for (let k = 0; k <= r; k++) {
-            const c = k < r * 0.5 ? STERN[0] : STERN[2];
-            g.put(M.x + k, M.y, c, f * aus); g.put(M.x - k, M.y, c, f * aus); g.put(M.x, M.y + k, c, f * aus); g.put(M.x, M.y - k, c, f * aus);
-            if (k < r * 0.7) {
-              g.put(M.x + k, M.y + k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y + k, STERN[1], f * aus * 0.8);
-              g.put(M.x + k, M.y - k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y - k, STERN[1], f * aus * 0.8);
-            }
-          }
-          g.disc(M.x, M.y, 2 + 2 * f * p, STERN[0], f * aus);
-        }
-        // Druckringe (gross: zwei, der zweite versetzt)
-        const ringe = gross ? [0, 70] : [0];
-        for (const v of ringe) {
-          const a2 = al - v; if (a2 < 0 || a2 > 420) continue;
-          const f = 1 - a2 / 420, r = (4 + a2 / 7) * (gross ? 1.1 : 0.75);
-          g.ring(M.x, M.y, r * 1.5, r, STERN[1], f * aus * 0.85);
-          g.ring(M.x, M.y, r * 1.5 + 1, r + 1, STERN[2], f * aus * 0.5);
-        }
-        // Risse im Boden (nur der grosse Aufprall): wachsen in ~120 ms, bleiben stehen, blenden aus
-        if (gross) {
-          const wachs = klemme(al / 120, 0, 1), f = al < 360 ? 1 : 1 - (al - 360) / 260;
-          if (f > 0) for (const ri of teile.risse) {
-            let x = M.x, y = M.y;
-            const stuecke = Math.floor(ri.laenge * wachs);
-            for (let k = 0; k < stuecke; k++) {
-              const w = ri.w + ri.zack[k % ri.zack.length] * 0.35;
-              x += Math.cos(w); y += Math.sin(w) * 0.85;
-              g.put(x, y, k < 3 ? RISS[0] : RISS[1], f * aus);
-              if (k > 1) g.put(x + 1, y + 1, RISS[2], f * aus * 0.8);
-            }
+      // ── Der Aufprall: Blitz, Stern, Ringe, Risse, Funken ──
+      const al = t - T;
+      if (al < 0 || al > 620) return;
+      const p = 1.6 + 0.2 * Math.min(teile.r - 1, 3);                  // spätere Hits wuchten etwas stärker
+      if (al < 70) g.disc(M.x, M.y, (4 + 5) * (1 - al / 110), STERN[0], aus * (1 - al / 70));
+      if (al < 340) {
+        const f = 1 - al / 340, r = (3 + al / 12) * p;
+        for (let k = 0; k <= r; k++) {
+          const c = k < r * 0.5 ? STERN[0] : STERN[2];
+          g.put(M.x + k, M.y, c, f * aus); g.put(M.x - k, M.y, c, f * aus); g.put(M.x, M.y + k, c, f * aus); g.put(M.x, M.y - k, c, f * aus);
+          if (k < r * 0.7) {
+            g.put(M.x + k, M.y + k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y + k, STERN[1], f * aus * 0.8);
+            g.put(M.x + k, M.y - k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y - k, STERN[1], f * aus * 0.8);
           }
         }
-        // Funken
-        for (const s of funken) {
-          if (al > s.leben) continue;
-          const k = al / s.leben, sek = al / 1000;
-          const x = M.x + Math.cos(s.w) * s.v * sek, y = M.y + Math.sin(s.w) * s.v * sek + 0.5 * 90 * sek * sek;
-          const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : s.farbe === 2 ? BLAU[1] : ORANGE[1];
-          g.put(x, y, c, (1 - k) * aus);
-          if (k < 0.5) g.put(x + 1, y, c, (1 - k) * aus * 0.7);
+        g.disc(M.x, M.y, 2 + 2 * f * p, STERN[0], f * aus);
+      }
+      for (const v of [0, 70]) {                                         // zwei Druckringe, der zweite versetzt
+        const a2 = al - v; if (a2 < 0 || a2 > 420) continue;
+        const f = 1 - a2 / 420, r = 4 + a2 / 9;
+        g.ring(M.x, M.y, r * 1.5, r, STERN[1], f * aus * 0.85);
+        g.ring(M.x, M.y, r * 1.5 + 1, r + 1, STERN[2], f * aus * 0.5);
+      }
+      {                                                                  // Risse im Boden: wachsen in ~120 ms, bleiben stehen, blenden aus
+        const wachs = klemme(al / 120, 0, 1), f = al < 360 ? 1 : 1 - (al - 360) / 260;
+        if (f > 0) for (const ri of teile.risse) {
+          let x = M.x, y = M.y;
+          const stuecke = Math.floor(ri.laenge * wachs);
+          for (let k = 0; k < stuecke; k++) {
+            const w = ri.w + ri.zack[k % ri.zack.length] * 0.35;
+            x += Math.cos(w); y += Math.sin(w) * 0.85;
+            g.put(x, y, k < 3 ? RISS[0] : RISS[1], f * aus);
+            if (k > 1) g.put(x + 1, y + 1, RISS[2], f * aus * 0.8);
+          }
         }
-      };
-      aufprall(T1, false, teile.funken1);
-      aufprall(T2, true, teile.funken2);
+      }
+      for (const s of teile.funken) {
+        if (al > s.leben) continue;
+        const k = al / s.leben, sek = al / 1000;
+        const x = M.x + Math.cos(s.w) * s.v * sek, y = M.y + Math.sin(s.w) * s.v * sek + 0.5 * 90 * sek * sek;
+        const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : s.farbe === 2 ? BLAU[1] : ORANGE[1];
+        g.put(x, y, c, (1 - k) * aus);
+        if (k < 0.5) g.put(x + 1, y, c, (1 - k) * aus * 0.7);
+      }
     };
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40, z: 10130 });
   })(),
@@ -40785,10 +40881,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_ram_animation', onRamAnimation);
 
-    // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER. Beide Heldenkarten rasen aufeinander zu, treffen sich in der Mitte zwischen den Zonen, prallen
-    // zurück und krachen noch einmal ineinander, dann gehen sie heim (`ramClash`, style.css; die Zeiten decken sich mit `_hero-duel-shared.js` und dem Pixelart-Aufprall
-    // `duel_clash`). Die Zonen verstecken ihren Helden wie beim Rammangriff (`isRamming`: `srcOwner` / `srcHeroIdx`, `srcZoneSlot` -1).
-    const onHeroClash = ({ a, b, duration }) => {
+    // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER — eine durchgehende Choreografie über alle Hits (Schlag auf Schlag): die Heldenkarten rasen aus ihren Zonen in
+    // die Mitte, krachen ineinander (Hit 1), prallen zurück, krachen wieder (Hit 2, 3), und gehen erst nach dem letzten Hit heim. Jedes `play_hero_clash` mit Phase `hit` hängt der
+    // gemeinsamen Bahn (`ppHeldenRammenBahn`) den nächsten Aufprall an; Phase `ende` schickt die Helden heim. Die Zonen verstecken ihren Helden wie beim Rammangriff (`isRamming`:
+    // `srcOwner` / `srcHeroIdx`, `srcZoneSlot` -1). Der Pixelart-Aufprall (`duel_clash`) kommt je Hit als eigenes Brett-Ereignis und steht ~100 ms nach dem Ereignis
+    // (Einbau-Versatz der Brett-Animationen) — die Karten richten sich nach demselben Versatz.
+    const aktivesRammen = {};
+    const onHeroClash = ({ a, b, phase, runde }) => {
+      const M = window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100;
+      const key = `${a.owner}-${a.heroIdx}|${b.owner}-${b.heroIdx}`;
+      const jetzt = performance.now();
+      let ctrl = aktivesRammen[key];
+      if (phase === 'ende') {
+        if (ctrl && !ctrl.bahn.beendet) ctrl.bahn.heim(jetzt);
+        delete aktivesRammen[key];
+        return;
+      }
+      if (ctrl && !ctrl.bahn.beendet && runde > 1) { ctrl.bahn.folge(jetzt + M); return; }
       const hole = (x) => document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(x.owner, myIdx)}"][data-hero-idx="${x.heroIdx}"]`);
       const elA = hole(a), elB = hole(b);
       if (!elA || !elB) return;
@@ -40796,26 +40905,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const ra = elA.getBoundingClientRect(), rb = elB.getBoundingClientRect();
       const ca = { x: ra.left + ra.width / 2, y: ra.top + ra.height / 2 }, cb = { x: rb.left + rb.width / 2, y: rb.top + rb.height / 2 };
       const d = Math.hypot(cb.x - ca.x, cb.y - ca.y) || 1, ux = (cb.x - ca.x) / d, uy = (cb.y - ca.y) / d;
-      // Jede Karte fährt so weit, dass sich die Vorderkanten in der Mitte um ~10 % überlappen (hA / hB = halbe Ausdehnung entlang der Fahrtrichtung).
+      // Jede Karte fährt so weit, dass sich die Vorderkanten in der Mitte um ~10 % überlappen (halbe Ausdehnung entlang der Fahrtrichtung).
       const halbe = (r) => (r.width / 2) * Math.abs(ux) + (r.height / 2) * Math.abs(uy);
       const reach = Math.max(4, d / 2 - 0.9 * (halbe(ra) + halbe(rb)) / 2);
       const back = Math.min(reach * 0.5, 120);
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
-      const dur = duration || 1150;
-      const id = Date.now() + Math.random();
+      const duelId = Date.now() + Math.random();
+      ctrl = { duelId, bahn: ppHeldenRammenBahn(reach, back), entfernt: false };
+      ctrl.entfernen = () => setRamAnims(prev => prev.filter(x => !(x.clash && x.clash.ctrl === ctrl)));
+      aktivesRammen[key] = ctrl;                // der Anlauf beginnt, sobald die Karten WIRKLICH stehen (`HeldenRammkarte`) — dasselbe Bild, in dem auch der Pixelart-Aufprall einsetzt
       const bau = (x, r, c, richtung, wackeln, idx) => ({
-        id: id + idx, cardName: x.cardName,
+        id: duelId + idx, cardName: x.cardName,
         srcX: c.x + _fo.dx, srcY: c.y + _fo.dy, tgtX: c.x + richtung * ux * reach + _fo.dx, tgtY: c.y + richtung * uy * reach + _fo.dy,
         srcOwner: x.owner, srcHeroIdx: x.heroIdx, srcZoneSlot: -1,
-        dur, angle: Math.atan2(richtung * uy, richtung * ux) * (180 / Math.PI) + 90,
-        clash: { ux: richtung * ux, uy: richtung * uy, reach, back, w: r.width, h: r.height, wackeln },
+        dur: 0, angle: Math.atan2(richtung * uy, richtung * ux) * (180 / Math.PI) + 90,
+        clash: { ctrl, ux: richtung * ux, uy: richtung * uy, w: r.width, h: r.height, wackeln },
       });
       const neu = [bau(a, ra, ca, 1, 14, 0), bau(b, rb, cb, -1, -14, 0.5)];
-      // Der Pixelart-Aufprall (`duel_clash`) steht erst ~100 ms nach dem Ereignis (Einbau-Versatz der Brett-Animationen): die Karten starten im selben Takt.
-      setTimeout(() => {
-        setRamAnims(prev => [...prev, ...neu]);
-        setTimeout(() => setRamAnims(prev => prev.filter(x => !neu.some(n => n.id === x.id))), dur + 30);
-      }, 100);
+      setTimeout(() => setRamAnims(prev => [...prev, ...neu]), M);      // bis dahin bleibt der Held auf seiner Zone
     };
     socket.on('play_hero_clash', onHeroClash);
 
@@ -48359,8 +48466,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && _spellTargetSideOk && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
-          // ★ 12.10. (Duel): eine Zielmarke mit `leuchten` (`engine.setzeZielMarke(…, { leuchten: true })`) lässt den Helden zusätzlich zum Abzeichen rot pulsieren —
-          // die feststehende Wahl des Gegners, nach der man selbst wählt. Kein Ziel, nur Hervorhebung.
+          // ★ 12.10. (Duel): eine Zielmarke mit `leuchten` (`engine.setzeZielMarke(…, { leuchten: true })`) lässt den Helden rot pulsieren — NUR die Karte, ohne Abzeichen oder
+          // Schrift: die feststehende Wahl des Gegners, nach der man selbst wählt. Kein Ziel, nur Hervorhebung.
           const zielMarkeLeuchtet = (gameState.zielMarken || []).some(m => m.leuchten && m.type === 'hero' && m.owner === pi && m.heroIdx === i);
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
           // ★ Geschuetzte Ziele werden AUSGEGRAUT statt verschwiegen
@@ -52290,8 +52397,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* v1151: Zielmarken, vorhergesagter Zielpfad, Wahl-Blitze
           (die Ebene ist seit v1258 selbst eine Welt-Huelle) */}
-      {((gameState.zielMarken || []).length > 0 || zielBlitz.length > 0) && (
-        <ZielMarkenEbene marken={gameState.zielMarken || []} blitze={zielBlitz} myIdx={myIdx} />
+      {/* Marken mit `leuchten` (Duel) sind nur der Pulsrahmen am Helden — kein Abzeichen, kein Pfad */}
+      {((gameState.zielMarken || []).some(m => !m.leuchten) || zielBlitz.length > 0) && (
+        <ZielMarkenEbene marken={(gameState.zielMarken || []).filter(m => !m.leuchten)} blitze={zielBlitz} myIdx={myIdx} />
       )}
 
       {/* Modular game animations — Fenster-Anteil (kein `welt`) */}
@@ -52399,14 +52507,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* v1258: Rammkarten in Welt-Huelle (Ebene 10120 = die der Karte) */}
       <div className="fx-welt-lock" style={{ zIndex: 10120 }}>
       {ramAnims.map(r => r.clash ? (
-        /* Duel (12.10.): zwei Helden rammen einander — `ramClash`, Fahrtrichtung und Wege kommen aus `onHeroClash`. */
-        <div key={r.id} className="ram-anim-card ram-clash" style={{
-          left: r.srcX - r.clash.w / 2, top: r.srcY - r.clash.h / 2, width: r.clash.w, height: r.clash.h,
-          '--ux': r.clash.ux, '--uy': r.clash.uy, '--reach': r.clash.reach + 'px', '--back': r.clash.back + 'px',
-          '--ramAngle': (r.angle || 0) + 'deg', '--wob': r.clash.wackeln + 'deg', animationDuration: r.dur + 'ms',
-        }}>
-          <BoardCard cardName={r.cardName} noTooltip />
-        </div>
+        /* Duel (12.10.): zwei Helden rammen einander — Bahn und Richtung kommen aus `onHeroClash` (`HeldenRammkarte`) */
+        <HeldenRammkarte key={r.id} r={r} />
       ) : (
         <React.Fragment key={r.id}>
           {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort

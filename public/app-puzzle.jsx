@@ -447,6 +447,27 @@ function CounterBadges({ source, defs }) {
   );
 }
 
+// ── Kompakte Kopfzeile des Statistik-Dialogs (Als Vorgabe 12.10.) ─────────────────────────────────────────────────────────────────────────────────────────
+// HP und ALLE Counter einer Karte teilen sich EINE umbrechende Zeile statt je eine volle Zeile zu belegen. Zahlenfelder sind genau vier Stellen breit; die Obergrenze
+// ist 9999 (`PZ_ZAHL_MAX`). Erklärtexte stehen im Tooltip (`title`), nicht als eigene Zeile darunter.
+const PZ_ZAHL_MAX = 9999;
+const pzKlemme = (n) => Math.max(0, Math.min(PZ_ZAHL_MAX, n));
+/** Ein Zähler als kleines Feld: Beschriftung, darunter − [Zahl] +. `schritt` > 1: die Knöpfe ändern um so viel (Diamond: 30). */
+function PzZaehlerFeld({ icon, label, wert, setze, farbe, tip, schritt = 1, onEnter }) {
+  return (
+    <div className="pz-feld" title={tip}>
+      <span className="pz-feld-label">{icon} {label}</span>
+      <div className="pz-feld-zeile">
+        <button className="btn pz-feld-knopf" disabled={(wert || 0) <= 0} onClick={() => setze(pzKlemme((wert || 0) - schritt))}>−</button>
+        <input className="input pz-zahl" type="number" min={0} max={PZ_ZAHL_MAX} value={wert ?? 0}
+          onChange={(e) => { const n = parseInt(e.target.value, 10); setze(Number.isFinite(n) ? pzKlemme(n) : 0); }}
+          onKeyDown={(e) => e.key === 'Enter' && onEnter && onEnter()} style={{ color: farbe }} />
+        <button className="btn pz-feld-knopf" disabled={(wert || 0) >= PZ_ZAHL_MAX} onClick={() => setze(pzKlemme((wert || 0) + schritt))}>+</button>
+      </div>
+    </div>
+  );
+}
+
 function PuzzleCreator() {
   const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
 
@@ -4942,12 +4963,69 @@ function PuzzleCreator() {
         const _editCards = editTarget.zt === 'support' ? (_editP.supportZones[editTarget.hi]?.[editTarget.slot] || []) : [];
         const _editCard = _editCards.length ? getCard(_editCards[0]) : null;
         const isBiomancyTokenEdit = editTarget.zt === 'support' && _editCard?.cardType === 'Potion';
+        // ── Kopfzeile: HP (bei Helden auch Max HP / ATK) und alle Counter dieser Karte ──
+        // HP-Feld nicht bei Biomancy Tokens, Abilities in Support Zonen (Xal) und reinen Ausrüstungen / Anhängseln (Equipment, Attachments ohne Creature-Subtyp — die haben keine
+        // HP; Pollution Spewer & Co. mit Creature-Subtyp behalten sie).
+        const _sub = (_editCard?.subtype || '').toLowerCase();
+        const _subIstCreature = _sub.split('/').map(x => x.trim()).includes('creature');
+        const _istAnhaengsel = editTarget.zt === 'support' && _editCard?.cardType === 'Spell' && _sub === 'attachment';
+        const _istAusruestung = editTarget.zt === 'support' && _editCard?.cardType === 'Artifact' && _sub === 'equipment';
+        const _istAbility = editTarget.zt === 'support' && _editCard?.cardType === 'Ability';
+        const hideHp = isBiomancyTokenEdit || _istAbility || ((_istAnhaengsel || _istAusruestung) && !_subIstCreature);
+        // Counter: jeder, dessen Zustand nicht `null` ist, wird ein kleines Feld (Reihenfolge = Reihenfolge hier). Die Zustände setzt `openStatEditor` je Karte; Speicherorte:
+        // `_creatureStatuses[hi-slot].<feld>` bzw. am Helden (`hero._…Counters`) — unverändert, nur die Darstellung ist neu.
+        const zaehlerFelder = [];
+        const feld = (key, icon, label, wert, setze, farbe, tip, schritt) => { if (wert != null) zaehlerFelder.push({ key, icon, label, wert, setze, farbe, tip, schritt }); };
+        feld('applause', '👏', 'Applause', editApplause, setEditApplause, '#ffd24a', 'Applause Counters on this Creature at the start of the puzzle.');
+        feld('bomb', '💣', 'Bomb', editBunnyBombCounter, setEditBunnyBombCounter, '#ff8a4c', `Bunny Bombs: explodes for ${(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated (20 per Bomb Counter).`);
+        feld('demon', '😈', 'Demon', editDemonCounter, setEditDemonCounter, '#d98cff', `Horned Demon's strike deals ${(editDemonCounter || 0) * 50} damage (50 per Demon Counter).`);
+        if (!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra') {
+          feld('head', '🐲', 'Heads', editHeadCounter, setEditHeadCounter, '#ffd5b3', "Head Counters: cap the number of different targets Hydra's once-per-turn strike can hit.");
+        }
+        feld('balance', '⚖️', 'Balance', editBalanceCounter, setEditBalanceCounter, '#f6d36b', 'Balance Counters: number of cards Charm of Balance lets the player draw on activation.');
+        feld('change', '🌌', 'Change', editChangeCounter, setEditChangeCounter, '#cf9bff', 'Change Counters: Cosmic Depths counters this card starts the puzzle with — spendable on turn 1.');
+        feld('evolution', '🧬', 'Evolution', editEvolutionCounter, setEditEvolutionCounter, '#8fffc4', 'Evolution Counters (Waflav): the archetype’s whole resource. Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4.');
+        feld('invest', '🪙', 'Invest', editInvestCounter, setEditInvestCounter, '#ffe08f', `Invest Counters (Logan): cash in at end of turn for ${editInvestCounter || 0} Gold or ${(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.`);
+        feld('luck', '🍀', 'Luck', editLuckCounter, setEditLuckCounter, '#7fdc7f', 'Luck Counters: Lucky Puppet Laki may remove ALL Luck Counters to redirect an opponent’s card or effect chosen on a lucky target.');
+        feld('preserve', '🔒', 'Preserve', editPreserveCounter, setEditPreserveCounter, '#8fc8ff', 'Preserve Counters: Preserving Puppet Vinny may remove ALL Preserve Counters to negate an opponent’s card or effect on preserved Creatures.');
+        feld('diamond', '💎', 'Self Dmg', editDiamondLoss, setEditDiamondLoss, '#7fe8ff', 'Diamond, the Keeper of Peace: Self Damage inflicted so far — HP lost due to her own effect (150+ is the Ascension condition). The buttons change it by 30.', 30);
         return (
         <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditTarget(null); }}>
           <div className="modal" style={{ maxWidth: 400, padding: 20, maxHeight: '80vh', overflowY: 'auto' }}>
             <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 14 }}>
               {isBiomancyTokenEdit ? 'EDIT BIOMANCY TOKEN' : ('EDIT ' + (editTarget.zt === 'hero' ? 'HERO' : 'CREATURE') + ' STATS')}
             </h3>
+            {(!hideHp || zaehlerFelder.length > 0) && (
+              <div className="pz-statzeile">
+                {!hideHp && (
+                  <label className="pz-feld">
+                    <span className="pz-feld-label" style={{ color: '#ff4466' }}>HP</span>
+                    <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editHp}
+                      onChange={(e) => setEditHp(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
+                      onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
+                  </label>
+                )}
+                {!hideHp && editTarget.zt === 'hero' && (
+                  <label className="pz-feld">
+                    <span className="pz-feld-label" style={{ color: '#ff8844' }}>MAX HP</span>
+                    <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editMaxHp}
+                      onChange={(e) => setEditMaxHp(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
+                      onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
+                  </label>
+                )}
+                {!hideHp && editTarget.zt === 'hero' && (
+                  <label className="pz-feld">
+                    <span className="pz-feld-label" style={{ color: '#aabbcc' }}>ATK</span>
+                    <input className="input pz-zahl pz-zahl-einzeln" type="number" max={PZ_ZAHL_MAX} value={editAtk}
+                      onChange={(e) => setEditAtk(e.target.value === '' ? '' : String(Math.min(PZ_ZAHL_MAX, parseInt(e.target.value, 10) || 0)))}
+                      onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
+                  </label>
+                )}
+                {zaehlerFelder.map(f => (
+                  <PzZaehlerFeld key={f.key} icon={f.icon} label={f.label} wert={f.wert} setze={f.setze} farbe={f.farbe} tip={f.tip} schritt={f.schritt} onEnter={saveStats} />
+                ))}
+              </div>
+            )}
             {isBiomancyTokenEdit && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Biomancy Level</span>
@@ -5031,191 +5109,6 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
-            {/* Cute Hydra Head Counter editor — visible only when the
-                edit target is a Cute Hydra. Stamps `headCounter` into
-                `_creatureStatuses[hi-slot]`, which the server's puzzle
-                loader applies as `inst.counters.headCounter` so the
-                board badge + HOPT multi-target damage cap match. */}
-            {!isBiomancyTokenEdit && editTarget.zt === 'support' && _editCard?.name === 'Cute Hydra' && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  🐲 Head Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editHeadCounter || 0) <= 0}
-                    onClick={() => setEditHeadCounter(Math.max(0, (editHeadCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editHeadCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditHeadCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffd5b3' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditHeadCounter((editHeadCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Caps the number of different targets Hydra's once-per-turn strike can hit.
-                </div>
-              </div>
-            )}
-            {/* Charm of Balance Balance Counter editor — visible only when
-                the edit target is a Charm of Balance equip. Stamps `balance`
-                into `_creatureStatuses[hi-slot]`, which the server's puzzle
-                loader applies as `inst.counters.balance` so the badge AND
-                the once-per-turn draw start at the authored value. */}
-            {editBalanceCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  ⚖️ Balance Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editBalanceCounter || 0) <= 0}
-                    onClick={() => setEditBalanceCounter(Math.max(0, (editBalanceCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editBalanceCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditBalanceCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#f6d36b' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditBalanceCounter((editBalanceCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Number of cards Charm of Balance lets the player draw on activation.
-                </div>
-              </div>
-            )}
-            {/* Applause Counter (Fun-Fun Circus) — fuer JEDE Creature. Stempelt
-                `applause` in `_creatureStatuses[hi-slot]`; der Puzzle-Loader
-                des Servers legt es auf `inst.counters.applause`, sodass Abzeichen,
-                Strongman/Elephant/Director/Clown vom eingestellten Wert starten. */}
-            {editApplause != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  👏 Applause Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editApplause || 0) <= 0}
-                    onClick={() => setEditApplause(Math.max(0, (editApplause || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editApplause ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditApplause(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffd24a' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditApplause((editApplause || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Applause Counters on this Creature at the start of the puzzle.
-                </div>
-              </div>
-            )}
-            {/* Bunny Bombs Bomb Counter editor — nur sichtbar, wenn das
-                Bearbeitungsziel eine Bunny Bombs ist. Schreibt `bunnyBombCounter`
-                in `_creatureStatuses[hi-slot]`; der Puzzle-Loader des
-                Servers legt das auf `inst.counters.bunnyBombCounter`, wovon
-                sowohl das Abzeichen auf dem Brett als auch der Schaden
-                beim Tod (20 je Zaehler) ausgehen. */}
-            {editBunnyBombCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  💣 Bomb Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editBunnyBombCounter || 0) <= 0}
-                    onClick={() => setEditBunnyBombCounter(Math.max(0, (editBunnyBombCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editBunnyBombCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditBunnyBombCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ff8a4c' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditBunnyBombCounter((editBunnyBombCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Explodes for {(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated.
-                </div>
-              </div>
-            )}
-            {/* Demon Counter editor (v601) — sichtbar fuer jede Karte, deren
-                Text Demon Counter nennt (Horned Demon; spaeter Great Vanguard
-                Demon). Schreibt `demonCounter` in `_creatureStatuses[hi-slot]`;
-                der Puzzle-Loader legt das auf `inst.counters.demonCounter`. */}
-            {editDemonCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  😈 Demon Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editDemonCounter || 0) <= 0}
-                    onClick={() => setEditDemonCounter(Math.max(0, (editDemonCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editDemonCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditDemonCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#d98cff' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditDemonCounter((editDemonCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Horned Demon's strike deals {(editDemonCounter || 0) * 50} damage (50 per Demon Counter).
-                </div>
-              </div>
-            )}
-            {/* Waflav Evolution Counter editor — visible for the base Hero
-                and all five Ascended forms. The counter is the archetype's
-                whole resource: it pays for every Ascension (1 for
-                Stormkissed up to 4 for Deep-Drowned) and Descending places
-                more back. Saved as `hero._evolutionCounters`, which the
-                shared Waflav helpers read directly. */}
             {editBountyMark != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -5258,215 +5151,6 @@ function PuzzleCreator() {
                 </label>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
                   Required for "Rescued Damsel Cecilia".
-                </div>
-              </div>
-            )}
-            {/* Diamond, the Keeper of Peace: „Self Damage inflicted so far" —
-                die HP, die sie durch ihren eigenen Effekt verloren hat.
-                150+ ist die Aufstiegsbedingung von „Diamond, the Bulwark of
-                Peace". Gespeichert als `hero._diamondSelfLoss`. */}
-            {editDiamondLoss != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  💎 Self Damage inflicted so far
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editDiamondLoss || 0) <= 0}
-                    onClick={() => setEditDiamondLoss(Math.max(0, (editDiamondLoss || 0) - 30))}>
-                    −30
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editDiamondLoss ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditDiamondLoss(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#7fe8ff' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditDiamondLoss((editDiamondLoss || 0) + 30)}>
-                    +30
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  HP lost due to her own effect so far.
-                </div>
-              </div>
-            )}
-            {editEvolutionCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  🧬 Evolution Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editEvolutionCounter || 0) <= 0}
-                    onClick={() => setEditEvolutionCounter(Math.max(0, (editEvolutionCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editEvolutionCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditEvolutionCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#8fffc4' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditEvolutionCounter((editEvolutionCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4
-                </div>
-              </div>
-            )}
-            {/* Logan's Invest Counters — the Hero pays Gold for them and
-                cashes them in at end of turn (Gold, or 5 damage each).
-                Authoring them lets a puzzle start mid-investment. Saved
-                as `hero._investCounters`. */}
-            {editInvestCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  🪙 Invest Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editInvestCounter || 0) <= 0}
-                    onClick={() => setEditInvestCounter(Math.max(0, (editInvestCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editInvestCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditInvestCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffe08f' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditInvestCounter((editInvestCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Cashes in at end of turn for {(editInvestCounter || 0)} Gold or {(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.
-                </div>
-              </div>
-            )}
-            {/* Puppets (v709): Luck Counters (Laki) — Helden, Creatures, Tokens;
-                Preserve Counters (Vinny) — Creatures, Tokens. Zahleneingabe wie
-                bei Demon/Invest Counters, beide in EINER Zeile. Sichtbar, sobald
-                der Besitzer des Ziels Tri Fecta oder Tri Ad kontrolliert. */}
-            {(editLuckCounter != null || editPreserveCounter != null) && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  🎭 Puppet Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 6, flexWrap: 'nowrap' }}>
-                  {editLuckCounter != null && (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4 }}>🍀 Luck Counters</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button className="btn"
-                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
-                          disabled={(editLuckCounter || 0) <= 0}
-                          onClick={() => setEditLuckCounter(Math.max(0, (editLuckCounter || 0) - 1))}>
-                          −
-                        </button>
-                        <input className="input" type="number" min={0}
-                          value={editLuckCounter ?? 0}
-                          onChange={(e) => {
-                            const n = parseInt(e.target.value, 10);
-                            setEditLuckCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                          }}
-                          onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                          style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#7fdc7f' }} />
-                        <button className="btn"
-                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
-                          onClick={() => setEditLuckCounter((editLuckCounter || 0) + 1)}>
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {editPreserveCounter != null && (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4 }}>🔒 Preserve Counters</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button className="btn"
-                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
-                          disabled={(editPreserveCounter || 0) <= 0}
-                          onClick={() => setEditPreserveCounter(Math.max(0, (editPreserveCounter || 0) - 1))}>
-                          −
-                        </button>
-                        <input className="input" type="number" min={0}
-                          value={editPreserveCounter ?? 0}
-                          onChange={(e) => {
-                            const n = parseInt(e.target.value, 10);
-                            setEditPreserveCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                          }}
-                          onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                          style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#8fc8ff' }} />
-                        <button className="btn"
-                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
-                          onClick={() => setEditPreserveCounter((editPreserveCounter || 0) + 1)}>
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Luck: Lucky Puppet Laki may remove ALL Luck Counters to redirect an opponent's card or effect chosen on a lucky target. Preserve: Preserving Puppet Vinny may remove ALL Preserve Counters to negate an opponent's card or effect on preserved Creatures.
-                </div>
-              </div>
-            )}
-            {/* Cosmic Depths Change Counter editor — visible when the
-                edit target is a counter-consumer (Argos hero / Analyzer /
-                Gatherer). Authors can preset the starting counter value
-                so a puzzle Argos can immediately spend e.g. 3 counters
-                to place a Lv3 CD Creature on turn 1. Saved as
-                `hero._changeCounters` for Argos and as
-                `_creatureStatuses[hi-slot].changeCounter` for the
-                Creatures — both surfaces are read by the shared cosmic
-                helpers without further server-side translation. */}
-            {editChangeCounter != null && (
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  🌌 Change Counters
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    disabled={(editChangeCounter || 0) <= 0}
-                    onClick={() => setEditChangeCounter(Math.max(0, (editChangeCounter || 0) - 1))}>
-                    −
-                  </button>
-                  <input className="input" type="number" min={0}
-                    value={editChangeCounter ?? 0}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      setEditChangeCounter(Number.isFinite(n) && n >= 0 ? n : 0);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#cf9bff' }} />
-                  <button className="btn"
-                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
-                    onClick={() => setEditChangeCounter((editChangeCounter || 0) + 1)}>
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
-                  Cosmic Depths counters this card starts the puzzle with — spendable on turn 1.
                 </div>
               </div>
             )}
@@ -5544,54 +5228,6 @@ function PuzzleCreator() {
                   <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                     Pick any combination — Hive's Crown normally grants exactly one gift per Queen, but the puzzle author can stack all three.
                   </div>
-                </div>
-              );
-            })()}
-            {/* HP / Max HP / ATK row — hidden for Biomancy Tokens
-                (level fully determines stats) AND for Attachments /
-                Equipment Artifacts that aren't ALSO subtype Creature.
-                Pollution Spewer and any other Artifact-Creature hybrid
-                keeps HP because its Creature subtype means it has a
-                real HP stat. Anti Magic / Overheal Shock / etc. — pure
-                Attachments — have no HP to edit. */}
-            {(() => {
-              const sub = (_editCard?.subtype || '').toLowerCase();
-              const subtypeIsCreature = sub.split('/').map(s => s.trim()).includes('creature');
-              const isAttachmentEdit = editTarget.zt === 'support'
-                && _editCard?.cardType === 'Spell'
-                && sub === 'attachment';
-              const isEquipEdit = editTarget.zt === 'support'
-                && _editCard?.cardType === 'Artifact'
-                && sub === 'equipment';
-              // v770: Eine Ability in einer Support Zone (Xal) hat keine
-              // HP — das Feld gehoert dort nicht hin.
-              const isAbilityEdit = editTarget.zt === 'support'
-                && _editCard?.cardType === 'Ability';
-              const hideHp = isBiomancyTokenEdit
-                || isAbilityEdit
-                || ((isAttachmentEdit || isEquipEdit) && !subtypeIsCreature);
-              if (hideHp) return null;
-              return (
-                <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                  <label style={{ flex: 1 }}>
-                    <span style={{ fontSize: 10, color: '#ff4466', fontWeight: 700 }}>HP</span>
-                    <input className="input" type="number" value={editHp} onChange={(e) => setEditHp(e.target.value)}
-                      style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} autoFocus />
-                  </label>
-                  {editTarget.zt === 'hero' && (
-                    <label style={{ flex: 1 }}>
-                      <span style={{ fontSize: 10, color: '#ff8844', fontWeight: 700 }}>MAX HP</span>
-                      <input className="input" type="number" value={editMaxHp} onChange={(e) => setEditMaxHp(e.target.value)}
-                        style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
-                    </label>
-                  )}
-                  {editTarget.zt === 'hero' && (
-                    <label style={{ flex: 1 }}>
-                      <span style={{ fontSize: 10, color: '#aabbcc', fontWeight: 700 }}>ATK</span>
-                      <input className="input" type="number" value={editAtk} onChange={(e) => setEditAtk(e.target.value)}
-                        style={{ width: '100%', marginTop: 4 }} onKeyDown={(e) => e.key === 'Enter' && saveStats()} />
-                    </label>
-                  )}
                 </div>
               );
             })()}
