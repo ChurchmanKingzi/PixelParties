@@ -26,7 +26,7 @@
 //  ── ABLAUF ──────────────────────────────────────────────────────────────
 //  1. Spielbar nur, wenn die Gegnerhand nicht leer ist, der Gegner keinen Erstrunden-Schutz hat und der Spieler nicht durch Spreading Rumor („cannot interact with your
 //     opponent's hand") gesperrt ist (`spellPlayCondition`, in `onPlay` ein zweites Mal → `_spellCancelled`).
-//  2. Animation `intel_peek` (Pixelart, Lupe gleitet über die GEGNERHAND), dann das Reaktionsfenster `onHandInteraction` Kategorie `reveal` (Ambush the Scout): negiert →
+//  2. Animation `intel_peek` (Pixelart, Lupe gleitet über die GEGNERHAND; sie läuft ganz ab, erst DANACH wird die Hand aufgedeckt — die offene Hand liegt über der Animation), dann das Reaktionsfenster `onHandInteraction` Kategorie `reveal` (Ambush the Scout): negiert →
 //     weder Ansehen noch Wegnehmen.
 //  3. Die Gegnerhand liegt für den Spieler offen (`_revealedHandIndices`, wie bei Letter of Misinformations), er wählt EINE Karte (`pickFromOppHand`, nicht abbrechbar —
 //     sonst wäre es ein kostenloser Blick).
@@ -44,7 +44,7 @@
 
 const CARD_NAME = 'Gather Intel';
 const PEEK_MS = 1300;            // Länge der Animation (deckt sich mit `intel_peek` im Client)
-const PEEK_VOR_MS = 700;         // bis die Lupe die Hand erreicht hat, dann geht das Fenster auf
+const PEEK_VOR_MS = 1450;        // die Animation läuft VOLLSTÄNDIG ab (Länge + 100 ms Einbau-Versatz + Puffer), bevor das Fenster aufgeht und die Hand aufgedeckt wird — sonst hebt die offene Hand die Karten über die Animation und die Lupe verschwindet halb unter ihnen (Als Befund 12.10.)
 
 /** Kann die Karte überhaupt etwas bewirken? (spielbar-Bedingung UND zweite Prüfung beim Auflösen) */
 function wirkbar(gs, pi, oi) {

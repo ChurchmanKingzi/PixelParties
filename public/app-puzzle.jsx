@@ -379,6 +379,18 @@ function schadensHistorieImPuzzle(players, hand, oppHand) {
   ));
 }
 
+// Gate des Applause-Counter-Editors (Als Vorgabe 12.10.): Applause Counter sind nur dann einstellbar, solange mindestens eine Fun-Fun-Karte auf einer HAND
+// oder auf dem BOARD (Support Zones) liegt — sonst sind sie nur lästig. Erkannt über den Archetyp bzw. den Kartentext („Applause Counter"), nicht über Namen; die
+// Counter wirken brettweit (Strongman, Elephant, Director), darum zählen beide Seiten.
+function funFunImPuzzle(players, hand, oppHand, getCard) {
+  const istFunFun = (n) => {
+    const c = typeof n === 'string' ? getCard(n) : null;
+    return !!c && (/^Fun-Fun/.test(c.archetype || '') || /Applause Counter/.test(c.effect || ''));
+  };
+  if ((hand || []).some(istFunFun) || (oppHand || []).some(istFunFun)) return true;
+  return (players || []).some(p => p && (p.supportZones || []).some(hz => (hz || []).some(slot => (slot || []).some(istFunFun))));
+}
+
 // Gate des Demon-Counter-Editors: jede Karte, deren Text Demon Counter
 // nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
 // spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
@@ -2771,7 +2783,7 @@ function PuzzleCreator() {
   const [editBalanceCounter, setEditBalanceCounter] = useState(null);
   // Fun-Fun Circus: Applause Counter, mit denen eine BELIEBIGE Creature ins
   // Puzzle startet (`_creatureStatuses[hi-slot].applause` → `inst.counters.applause`).
-  // Null fuer Nicht-Creatures, damit der Abschnitt verborgen bleibt.
+  // Null fuer Nicht-Creatures, damit der Abschnitt verborgen bleibt. Ebenso null, solange keine Fun-Fun-Karte auf Hand oder Board liegt.
   const [editApplause, setEditApplause] = useState(null);
   // Fuer Bunny Bombs: Anzahl Bomb Counter, mit denen die Kreatur ins
   // Puzzle startet. Gespeichert unter `_creatureStatuses[hi-slot].bunnyBombCounter`,
@@ -3017,7 +3029,8 @@ function PuzzleCreator() {
         ? (cs.balance || 0)
         : null);
       // Fun-Fun Circus: jede Creature darf Applause Counter tragen.
-      setEditApplause(String(c?.cardType || '').split('/').some(t => t.trim() === 'Creature') ? (cs.applause || 0) : null);
+      // (Als Vorgabe 12.10.: nur solange eine Fun-Fun-Karte auf Hand oder Board liegt — `funFunImPuzzle`; ohne sie bleibt der Abschnitt weg und ein alter Wert wird beim Speichern entfernt.)
+      setEditApplause(String(c?.cardType || '').split('/').some(t => t.trim() === 'Creature') && funFunImPuzzle(players, hand, oppHand, getCard) ? (cs.applause || 0) : null);
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
       setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
       // Puppets (v707): Luck/Preserve auf Creatures und Tokens.

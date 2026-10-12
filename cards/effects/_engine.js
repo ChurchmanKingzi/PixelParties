@@ -7473,8 +7473,9 @@ class GameEngine {
    * `loescheZielMarken(quelle)` wieder ab.
    *
    * @param {object} ziel  ein Ziel aus `getHeroTargets` / `getCreatureTargets`
+   * @param {object} [opts]  `{ leuchten: true }` — ein markierter Held pulsiert zusätzlich rot (Duel)
    */
-  setzeZielMarke(ziel, label, quelle, waehler) {
+  setzeZielMarke(ziel, label, quelle, waehler, opts = {}) {
     if (!ziel) return;
     const marke = {
       type: ziel.type === 'hero' ? 'hero' : 'equip',
@@ -7484,6 +7485,8 @@ class GameEngine {
       // v1151: wer gewaehlt hat — der Client zeigt die Wahl des GEGNERS
       // deutlich groesser als die eigene.
       waehler: (isSeat(this, waehler)) ? waehler : null,
+      // 12.10. (Duel): `leuchten` — der HELD pulsiert zusätzlich zum Abzeichen rot (nur für Helden; die feststehende Wahl des Gegners, nach der man selbst wählt).
+      ...(opts && opts.leuchten ? { leuchten: true } : {}),
     };
     this.gs.zielMarken = [...(this.gs.zielMarken || []), marke];
     if (!this._inMctsSim && !this._fastMode) {
@@ -48785,6 +48788,15 @@ this._deathWatch = (this._deathWatchStack || []).length
                  && data.cardNames.length && data.cardNames.every(istKreatur)) {
         data = { ...data, deleteMode: true };
       }
+    }
+    // ★ 12.10. (Amazing Finding, Als Befund: „sichtbarer Übergang zwischen ‚die Karte fliegt auf die Hand' und ‚die Karte landet an ihrer Zielposition'"):
+    // Fluege aus der Bildmitte zur HAND bekommen den Platz der kuenftigen Karte mit (`destHandIdx` = aktuelle Handgroesse; gebucht wird die Karte erst NACH
+    // dem Flug). Der Client rechnet damit den Landepunkt — sein DOM hinkt dem Zustand um einen Takt hinterher, sodass bei Folgen (Karte 2, 3) die vorige Karte
+    // zwar schon im Zustand, aber noch nicht im DOM stand und die Flugkopie einen Platz zu weit links landete. Bei Fluegen mit mehreren Karten zaehlt der Client
+    // `destHandIdx + i`.
+    if ((event === 'mill_center_reveal' || event === 'mill_center_release') && data && data.dest === 'hand' && data.destHandIdx == null) {
+      const _hand = this.gs?.players?.[data.owner]?.hand;
+      if (Array.isArray(_hand)) data = { ...data, destHandIdx: _hand.length };
     }
     // Self-play teardown nulls `this.room` to break the room↔engine ref
     // cycle, but tail-async work (a switchTurn → cpuTurn chain that was

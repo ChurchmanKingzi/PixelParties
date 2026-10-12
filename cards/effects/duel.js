@@ -35,8 +35,11 @@
 //  des Spielers aber nicht). Sonst bleibt die Karte ausgegraut.
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
-//  `duel_clash` (Pixelart, ANIM_REGISTRY, je Runde): zwei Klingen schnellen aufeinander zu, treffen sich in der Mitte (Funkenstern), danach der Kreuzhieb auf beiden Helden.
-//  Logs `duel_round`, `duel_result`; Spielende-Text `duel_draw`.
+//  Je Runde rammen die beiden HELDEN einander (Als Vorgabe 12.10.): `play_hero_clash` schickt die Heldenkarten in die Mitte, sie prallen mit grossem Impact zusammen, werden
+//  zurückgeworfen und krachen noch einmal ineinander (hier fällt der Schaden), dann gehen sie heim; `duel_clash` (Pixelart, ANIM_REGISTRY) malt Tempolinien, Sterne, Ringe,
+//  Funken und Risse darüber. Während der Spieler wählt, trägt der gewählte Held des Gegners das Abzeichen „Duel", ein Fadenkreuz und einen roten Pulsrahmen (Zielmarke mit
+//  `leuchten`, `setzeZielMarke`; mit der Wahl des Spielers wieder weg).
+//  Logs `duel_choose`, `duel_round`, `duel_result`; Spielende-Text `duel_draw`.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
 //  Die CPU wählt über eine kleine Rechnung (Angriffswert/HP, drei Runden): als Gegner den Helden, bei dem der Spieler das Beste nicht herausholen kann; als Spieler den
@@ -124,9 +127,17 @@ module.exports = {
         `${ps.username} plays Duel. Choose a Hero you control — it duels the Hero ${ps.username} chooses next.`,
         { _duelPhase: 'opponent', _duelCaster: pi });
       engine.log('duel_choose', { player: ops.username, hero: wahlB.hero.name, role: 'opponent' });
-      const wahlA = await waehle(engine, pi, kandidaten(engine, pi),
-        `${ops.username} chose ${wahlB.hero.name}. Choose a Hero you control to duel it.`,
-        { _duelPhase: 'caster', _duelCaster: pi, _duelOpp: { side: wahlB.side, heroIdx: wahlB.heroIdx } });
+      // Die Wahl des Gegners steht fest: sein Held trägt das Abzeichen „Duel", ein Fadenkreuz rastet ein und er pulsiert rot, solange der Spieler wählt (Als Vorgabe 12.10.) —
+      // der Mechanismus der Zielmarken (Ricochet). Mit der Wahl des Spielers sind die Marken wieder weg, auch bei Fehlern.
+      engine.setzeZielMarke({ type: 'hero', owner: wahlB.side, heroIdx: wahlB.heroIdx }, 'Duel', CARD_NAME, oi, { leuchten: true });
+      let wahlA;
+      try {
+        wahlA = await waehle(engine, pi, kandidaten(engine, pi),
+          `${ops.username} chose ${wahlB.hero.name}. Choose a Hero you control to duel it.`,
+          { _duelPhase: 'caster', _duelCaster: pi, _duelOpp: { side: wahlB.side, heroIdx: wahlB.heroIdx } });
+      } finally {
+        engine.loescheZielMarken(CARD_NAME);
+      }
       engine.log('duel_choose', { player: ps.username, hero: wahlA.hero.name, role: 'caster' });
 
       // ── Das Duell — Spielende-Auswertung aufgeschoben, bis das Ergebnis feststeht ──

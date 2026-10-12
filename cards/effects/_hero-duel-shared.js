@@ -5,7 +5,7 @@
 //
 //  Kartenneutral — der Kartenname, die Animation und die Rundenzahl kommen vom Aufrufer; hier steht nur die Mechanik:
 //
-//    duell(engine, { name, a, b, maxRunden, animation, einschlagMs, rundeMs })
+//    duell(engine, { name, a, b, maxRunden, animation, einschlagMs, erstEinschlagMs, rundeMs })
 //      a / b  { controller, side, heroIdx }   `controller` = wer den Helden kontrolliert (Angreifer im Sinne der Karte), `side` = Brettspalte des Helden
 //      → { runden, aGefallen, bGefallen, unentschieden }
 //
@@ -13,9 +13,10 @@
 //  1. Beide leben noch? Sonst Schluss (auch ein Held, der mitten im Duell verschwindet, beendet es).
 //  2. Der AKTUELLE Angriffswert (`hero.atk`) beider Helden wird gelesen und durch das Angriffsfenster `onAttackDeclare` geschickt (Doq & Co. — „when this Hero
 //     attacks"; je Angriff ein Quellobjekt `{ name, owner, controller, heroIdx, heroOwner?, usesHeroAtk: true }`, wie bei jedem Angriff mit Heldenwert).
-//  3. Die Animation läuft (Klinge gegen Klinge); beim Einschlag wird der Schaden BEIDER Angriffe verteilt — in der Todes-Klammer der Engine (`beginAoeStrike(1, {})` …
-//     `endMultiHit()`): erst aller Schaden, dann alle Tode. So trifft auch der Held, der im selben Moment fällt, noch („simultaneously"); `1` hält die Interference-
-//     Zählung (ab zwei Zielen) draussen — es ist kein Flächenschlag.
+//  3. Die Animation läuft (Als Vorgabe 12.10.): die beiden HELDEN rammen einander, treffen sich mit grossem Aufprall in der Mitte, prallen zurück und krachen noch einmal
+//     ineinander (`play_hero_clash` für die Heldenkarten, `duel_clash` für den Pixelart-Aufprall). Beim ZWEITEN Krachen wird der Schaden BEIDER Angriffe verteilt — in der
+//     Todes-Klammer der Engine (`beginAoeStrike(1, {})` … `endMultiHit()`): erst aller Schaden, dann alle Tode. So trifft auch der Held, der im selben Moment fällt, noch
+//     („simultaneously"); `1` hält die Interference-Zählung (ab zwei Zielen) draussen — es ist kein Flächenschlag.
 //  4. Jeder Schlag läuft über `dealDamageToTargets` (Einzeltreffer): Surprises „hit by", Hand-Reaktionen vor dem Schaden, Immunitäten, Schadensminderung, Schild —
 //     also wie ein gewöhnlicher Angriff, nur ohne Zielwahl (die Helden stehen fest; „is chosen"-Surprises öffnen darum nicht).
 //     Wird ein Schlag verhindert oder gemindert, fällt eben weniger — das Duell geht dann bis zur letzten Runde.
@@ -24,8 +25,13 @@
 //  Aufrufer hebt `gs._deferGameOverCheck`, solange das Duell läuft (sonst entschiede der erste Tod des Zweikampfs die Partie, bevor ein Unentschieden erkannt ist).
 // ═══════════════════════════════════════════════════════════════════
 
-const RUNDE_MS = 900;          // Länge der Animation je Runde (deckt sich mit `duel_clash` im Client)
-const EINSCHLAG_MS = 520;      // bis zum Einschlag (Mount-Versatz des Clients von 100 ms eingerechnet)
+// Die Zeiten decken sich mit `ramClash` (style.css) und `duel_clash` (app-board.jsx): Anlauf bis ~260 ms (erster Aufprall), Rückprall bis ~460 ms, zweiter Anlauf, zweiter
+// Aufprall bei ~600 ms (HIER fällt der Schaden), Rückkehr auf die Zone bis ~1150 ms — jeweils ab dem Einbau der Animation, also +100 ms ab dem Ereignis (Einbau-Versatz
+// des Clients; die Heldenkarten starten ebenfalls erst dann).
+const RAMM_MS = 1150;          // Dauer des Rammens selbst (`ramClash`; die Prozentstufen der Keyframes gelten für genau diese Länge)
+const RUNDE_MS = 1300;         // Länge der Runde ab dem Ereignis (Heldenkarten wieder auf ihrer Zone, ~1280 ms)
+const ERST_EINSCHLAG_MS = 360; // erster Aufprall in der Mitte (leichtes Wackeln): 260 + 100
+const EINSCHLAG_MS = 700;      // zweiter Aufprall = Moment des Schadens (starkes Wackeln): 600 + 100
 
 const held = (engine, x) => engine.gs.players[x.side]?.heroes?.[x.heroIdx] || null;
 const lebt = (h) => !!h && !!h.name && (h.hp || 0) > 0;
@@ -43,6 +49,7 @@ async function duell(engine, cfg) {
   const max = cfg.maxRunden ?? 3;
   const rundeMs = cfg.rundeMs ?? RUNDE_MS;
   const einschlagMs = cfg.einschlagMs ?? EINSCHLAG_MS;
+  const erstMs = cfg.erstEinschlagMs ?? ERST_EINSCHLAG_MS;
   let runden = 0;
 
   for (let r = 1; r <= max; r++) {
@@ -59,14 +66,20 @@ async function duell(engine, cfg) {
     const atkB = await engine._fireAttackDeclare(quelleB, zielB, Math.max(0, B.atk || 0));
 
     // ── 3. Animation, dann der Einschlag beider Schläge ──
+    engine._broadcastEvent('play_hero_clash', {
+      a: { owner: a.side, heroIdx: a.heroIdx, cardName: A.name }, b: { owner: b.side, heroIdx: b.heroIdx, cardName: B.name }, duration: RAMM_MS, runde: r,
+    });
     engine._broadcastEvent('play_zone_animation', {
       type: cfg.animation || 'duel_clash', zoneType: 'board', owner: a.controller, heroIdx: -1, zoneSlot: -1, duration: rundeMs, runde: r,
       targets: [{ owner: a.side, heroIdx: a.heroIdx, zoneSlot: -1, cardName: A.name }, { owner: b.side, heroIdx: b.heroIdx, zoneSlot: -1, cardName: B.name }],
       originOwner: a.side, originHeroIdx: a.heroIdx, originZoneSlot: -1,
     });
-    await engine._delay(einschlagMs);
+    await engine._delay(erstMs);                // erster Aufprall in der Mitte
     if (gs.result) break;
-    engine._broadcastEvent('play_screen_shake', { intensity: r >= 3 ? 'heavy' : 'medium' });
+    engine._broadcastEvent('play_screen_shake', { intensity: 'medium' });
+    await engine._delay(Math.max(0, einschlagMs - erstMs));
+    if (gs.result) break;
+    engine._broadcastEvent('play_screen_shake', { intensity: 'heavy' });
 
     await engine.beginAoeStrike(1, {});         // Todes-Klammer ohne Flächenfenster (nur zwei Treffer, kein Flächenschlag)
     try {
@@ -93,4 +106,4 @@ async function duell(engine, cfg) {
   return { runden, aGefallen, bGefallen, unentschieden: aGefallen && bGefallen };
 }
 
-module.exports = { duell, angriffsQuelle, RUNDE_MS, EINSCHLAG_MS };
+module.exports = { duell, angriffsQuelle, RUNDE_MS, EINSCHLAG_MS, ERST_EINSCHLAG_MS };
