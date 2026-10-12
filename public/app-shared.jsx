@@ -2831,15 +2831,20 @@ const ZONE_ANIM_SFX = {
     { name: 'reveal', opts: { rate: 1.2, volume: 0.5, delay: 520, category: null, dedupe: 0 } },
     { name: 'ping',   opts: { rate: 2.5, volume: 0.45, delay: 560, category: null, dedupe: 0 } },
   ],
-  // Duel (12.10.) — die Klingen zischen los (Schnitt, 0 / ~90 ms), treffen sich bei ~300 ms (Schlag und heller Klirr-Ping), dann der Kreuzhieb auf beide Helden (~440 ms: Schnitt
-  // und Schlag). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  // Duel (12.10.) — die Helden rammen einander (alle Zeiten +100 ms Einbau-Versatz der Brett-Animation): Ausholen und Anlauf (Schnitt, ~180 / ~240 ms), ERSTER Aufprall bei ~360 ms
+  // (Schlag, heller Klirr-Ping), Rückprall (leiser Schnitt, ~430 ms), zweiter Anlauf (~570 ms), ZWEITER, grosser Aufprall bei ~700 ms (doppelter Schlag, tiefer Schnitt, Klirr).
+  // Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   duel_clash: [
-    { name: 'slash',        opts: { rate: 1.3, volume: 0.5 } },
-    { name: 'slash',        opts: { rate: 1.0, volume: 0.4,  delay: 90,  category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 1.4, volume: 0.6,  delay: 300, category: null, dedupe: 0 } },
-    { name: 'ping',         opts: { rate: 2.6, volume: 0.45, delay: 310, category: null, dedupe: 0 } },
-    { name: 'slash',        opts: { rate: 0.9, volume: 0.55, delay: 440, category: null, dedupe: 0 } },
-    { name: 'heavy_impact', opts: { rate: 1.0, volume: 0.5,  delay: 470, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.3, volume: 0.45, delay: 180 } },
+    { name: 'slash',        opts: { rate: 1.0, volume: 0.4,  delay: 240, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.2, volume: 0.65, delay: 360, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 2.4, volume: 0.4,  delay: 370, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.8, volume: 0.35, delay: 430, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 1.2, volume: 0.5,  delay: 570, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.8, volume: 0.9,  delay: 700, category: null, dedupe: 0 } },
+    { name: 'slash',        opts: { rate: 0.7, volume: 0.55, delay: 706, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.1, volume: 0.6,  delay: 722, category: null, dedupe: 0 } },
+    { name: 'ping',         opts: { rate: 1.8, volume: 0.5,  delay: 730, category: null, dedupe: 0 } },
   ],
   // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
   // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.

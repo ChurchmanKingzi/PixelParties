@@ -27,7 +27,8 @@
 //
 //  ── Bild und Klang ──────────────────────────────────────────────────────
 //  `play_zone_animation` `finding_glint` (Pixelart, ANIM_REGISTRY, auf dem DECK): ein Fragezeichen steigt auf und platzt in ein Funkeln; jede aufgedeckte Karte fliegt
-//  über den Aufdeck-Flug der Engine (`mill_center_reveal`). Klänge in ZONE_ANIM_SFX; Log `amazing_finding`.
+//  über den Aufdeck-Flug der Engine (`mill_center_reveal`, mit `destHandIdx` = Landeplatz in der Hand). Klänge in ZONE_ANIM_SFX; Log `amazing_finding`.
+//  Der Zauber selbst geht VOR dem Funkeln in die Ablage (siehe `onPlay`), damit die Hand während der Flüge nicht mehr zusammenrückt.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -59,6 +60,12 @@ module.exports = {
       const db = engine._getCardDB();
       const artefakte = [];
       let gemischt = null;
+
+      // Der ausgespielte Zauber verlässt die Hand JETZT in die Ablage (`aufloesenderSpellInDieAblage`, wie Shooting Star), nicht erst nach der Auflösung.
+      // Sonst bliebe er — ausgegraut — während der Aufdeck-Flüge in der Hand liegen: die Flüge landen in einer Hand MIT ihm, und beim Abgang am Ende rückt die
+      // ganze Hand um einen Platz zusammen (Als Befund 12.10.: „sichtbarer Übergang zwischen Flug und Zielposition"). So ist die Hand beim ersten Flug schon
+      // so gross wie am Ende, und jeder Flug endet auf dem Platz, an dem die Karte bleibt. Der Server wiederholt Flug/Entnahme/Ablage dann nicht.
+      await engine.aufloesenderSpellInDieAblage(pi);
 
       // Funkeln über dem Deck, dann die Karten.
       engine._broadcastEvent('play_zone_animation', {

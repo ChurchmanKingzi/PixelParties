@@ -17,6 +17,8 @@
 //  (`spellPlayCondition`).
 //  „Artifacts equipped": Artefakt-Karten, die in der Support Zone als Ausrüstung zählen (`isEquipInZone`). Nicht gewählt werden können unbewegliche
 //  Karten (`immovable`) und Cardinal Beasts.
+//  AUSGEGRAUT (Als Vorgabe 12.10.): beide Fragen zeigen alles Übrige — Helden ohne löschbares Artefakt, Ausrüstung, Kreaturen — ausgegraut statt unangetastet
+//  (`ausgegrauteRestkarten`, `_target-dim-shared.js`), sonst klickt man intuitiv zuerst auf die Equips.
 //
 //  ── LÖSCHEN, NICHT ABWERFEN ─────────────────────────────────────────────
 //  „Delete" = `actionMoveCard(… 'deleted' …)`: die Karte geht in den Deleted Pile ihres URSPRÜNGLICHEN Besitzers (Gegenstück zu `sendBoardCardToDiscard`);
@@ -32,6 +34,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { ausgegrauteRestkarten } = require('./_target-dim-shared');
 
 const CARD_NAME = 'Disarm';
 const DAUER_MS = 1100;       // Länge der Animation (deckt sich mit `disarm_snap` im Client)
@@ -110,7 +113,8 @@ module.exports = {
         const heldZiele = helden.map(h => ({
           id: `hero-${h.seite}-${h.heroIdx}`, type: 'hero', owner: h.seite, heroIdx: h.heroIdx, cardName: h.hero.name,
         }));
-        const ids = await engine.promptEffectTarget(pi, heldZiele, {
+        // Alles andere (Ausrüstung, Kreaturen, Helden ohne löschbares Artefakt) steht AUSGEGRAUT in der Liste — sonst klickt man intuitiv erst auf die Equips.
+        const ids = await engine.promptEffectTarget(pi, [...heldZiele, ...ausgegrauteRestkarten(engine, heldZiele)], {
           title: CARD_NAME, source: CARD_NAME,
           description: 'Choose a Hero. You then choose any number of Artifacts equipped to it to delete.',
           confirmLabel: '🗡️ This Hero!', confirmClass: 'btn-danger',
@@ -128,7 +132,7 @@ module.exports = {
       const ausruestung = ausruestungAm(engine, wahl.seite, wahl.heroIdx);
       if (ausruestung.length === 0) { gs._spellCancelled = true; return; }
       const artZiele = ausruestung.map(ausruestungsZiel);
-      const gewaehlt = await engine.promptEffectTarget(pi, artZiele, {
+      const gewaehlt = await engine.promptEffectTarget(pi, [...artZiele, ...ausgegrauteRestkarten(engine, artZiele)], {
         title: CARD_NAME, source: CARD_NAME,
         description: `Choose any number of Artifacts equipped to ${wahl.hero.name} (at least 1) to delete.`,
         confirmLabel: '🗑️ Delete!', confirmClass: 'btn-danger',

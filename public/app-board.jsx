@@ -923,7 +923,7 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 // just sets the start / center / end CSS vars and the cardback / face-up
 // images. Auto-removed by the scheduler that mounted it after the
 // keyframes complete.
-function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs, dest, phase }) {
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, endScale, endRot, cardName, cardbackUrl, durationMs, dest, phase }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   // ★ v1259 (Als Befund 20.9.): die Deck-oben-Umdreh-Animation (Chaos
@@ -964,6 +964,8 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
         '--sx': startX + 'px', '--sy': startY + 'px',
         '--cx': centerX + 'px', '--cy': centerY + 'px',
         '--ex': endX + 'px', '--ey': endY + 'px',
+        ...(endScale && endScale !== 1 ? { '--es': endScale } : {}),   // Endmaßstab (Hand: Größe der echten Karte)
+        ...(endRot ? { '--er': endRot + 'deg' } : {}),                  // Endwinkel (Hand: Fächerwinkel der echten Karte)
         // Optional faster reveals (mill_center_reveal) — the CSS
         // animations read `var(--kfDur, 2000ms)`, so existing users
         // (Kassaran, Chaos Magic) keep the 2000ms default untouched.
@@ -8045,6 +8047,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
   // `opts.extra` (Als Befund 10.10., Sky Shaman: „die Animation ist auf die Karte begrenzt und abgeschnitten"): zusaetzlicher Rand in Bildschirmpixeln um
   // Ursprung und Ziele. Der Canvas misst sich von den MITTEN der Ziele aus — alles, was weiter als ~10 px ueber die Kartenkante hinausragt (Federn, Strahl, ein
   // von oben fallender Schild), wurde sonst an der Canvaskante abgeschnitten.
+  // `opts.z` (12.10., Duel): Ebene des Canvas (Standard 10110, unter den Rammkarten auf 10120) — der Aufprall zweier Heldenkarten muss UEBER ihnen liegen.
   const S = 3, PAD = 60 + ((opts && opts.extra) || 0), TAKT = 33;
   return function PixelSalveEffekt({ ox, oy, targetPoints, welt, regionBox, runde }) {
     const cvs = useRef(null);
@@ -8111,7 +8114,7 @@ function ppSalve(malen, ende, vorbereiten, opts) {
     if (!sz) return null;
     return (
       <div aria-hidden="true" data-pp-px="aus"
-        style={{ position: 'fixed', left: sz.links, top: sz.oben, pointerEvents: 'none', zIndex: 10110 }}>
+        style={{ position: 'fixed', left: sz.links, top: sz.oben, pointerEvents: 'none', zIndex: (opts && opts.z) || 10110 }}>
         <canvas ref={cvs} width={sz.gw} height={sz.gh}
           style={{ width: sz.gw * S, height: sz.gh * S, imageRendering: 'pixelated', display: 'block' }} />
       </div>
@@ -27239,82 +27242,136 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═════════════════════════════════════════════════════════════════
-  //  Duel (12.10.) — PIXELART, Brett-Animation je Duell-Runde: zwei Klingen schnellen von den beiden Helden (`targets[0]`, `targets[1]`) aufeinander zu
+  //  Duel (12.10.) — PIXELART, Brett-Animation je Duell-Runde: der AUFPRALL, wenn die beiden Helden (`targets[0]`, `targets[1]`) ineinander rammen
   //
-  //  Blau-weisse Klinge vom Helden des Spielers, orange-weisse vom Helden des Gegners (je mit Parierstange und Griff, Bewegungsspur gedithert). In der Mitte zwischen beiden
-  //  treffen sie sich bei ~300 ms (achtstrahliger Funkenstern, expandierender Ring, Funkenregen — mit der Runde `runde` mehr Funken); bei ~440 ms landet auf JEDEM Helden
-  //  zugleich der Kreuzhieb (rot-weisses X). Die Engine verteilt den Schaden beider Schläge im Einschlag (_hero-duel-shared.js).
+  //  Die Heldenkarten selbst fahren als DOM-Karten (`play_hero_clash` → `ramClash` in style.css: Anlauf, Aufprall in der Mitte, Rückprall, zweiter Anlauf, zweiter
+  //  Aufprall, Heimweg). Dieser Canvas liegt ÜBER den Karten und malt, was die Karten nicht können: Tempolinien hinter beiden Karten, im Treffpunkt M (Mitte zwischen den
+  //  Zonen) beim ersten Aufprall (260 ms) einen mittleren Stern mit Ring und Funken, beim zweiten (600 ms) einen grossen — weisser Blitz, achtstrahliger Stern, zwei
+  //  Druckringe, Risse im Boden, Funkenregen in Blau (Spieler) und Orange (Gegner) — mit der Runde `runde` mehr Funken. Der Schaden fällt im zweiten Aufprall
+  //  (_hero-duel-shared.js); die Zeiten stehen dort, in `ramClash` und hier (T1, T2, ENDE).
   // ═════════════════════════════════════════════════════════════════
   duel_clash: (() => {
-    const KL_A = ['#ffffff', '#9ad3ff', '#4a90d9'].map(ppHex);
-    const KL_B = ['#ffffff', '#ffd08a', '#e8742a'].map(ppHex);
+    const BLAU = ['#ffffff', '#9ad3ff', '#4a90d9'].map(ppHex);
+    const ORANGE = ['#ffffff', '#ffd08a', '#e8742a'].map(ppHex);
     const STERN = ['#ffffff', '#fff3a0', '#ffd24a'].map(ppHex);
-    const ROT = ['#ffffff', '#ff6a5a', '#c0241a'].map(ppHex);
-    const GRIFF = ppHex('#6a4420'), MESSING = ppHex('#e8b94a');
-    const ENDE = 900, TREFF = 300, HIEB = 440, FADE_AB = 700;
+    const RISS = ['#ffffff', '#ffb35a', '#7a2a10'].map(ppHex);
+    const ENDE = 1150, T1 = 260, T2 = 600, FADE_AB = 980;
+    const AUSHOLEN = 80, RUECK_AB = 300, RUECK_BIS = 460, HEIM_AB = 684;
     const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const glatt = (u) => { const x = klemme(u, 0, 1); return x * x * (3 - 2 * x); };
-    const vorbereiten = (sz) => ({
-      funken: Array.from({ length: ppFxN(10 + 5 * (sz.runde || 1)) }, () => ({ w: Math.random() * Math.PI * 2, v: 26 + Math.random() * 56, leben: 260 + Math.random() * 300, farbe: Math.floor(Math.random() * 3) })),
-    });
+    const beschl = (u) => Math.pow(klemme(u, 0, 1), 2.2);                 // wie das beschleunigende Zeitmass des Anlaufs in `ramClash`
+    const funkenSatz = (n, v0, leben0) => Array.from({ length: ppFxN(n) }, () => ({
+      w: Math.random() * Math.PI * 2, v: v0 * (0.45 + Math.random() * 0.75), leben: leben0 * (0.6 + Math.random() * 0.7), farbe: Math.floor(Math.random() * 4),
+    }));
+    const vorbereiten = (sz) => {
+      const r = sz.runde || 1;
+      return {
+        funken1: funkenSatz(10 + 3 * r, 60, 380),
+        funken2: funkenSatz(24 + 6 * r, 100, 560),
+        // Risse: gezackte Linien aus dem Treffpunkt (Winkel, Länge, Zackenversatz je Teilstück)
+        risse: Array.from({ length: 7 }, (_, i) => ({
+          w: (i / 7) * Math.PI * 2 + (Math.random() - 0.5) * 0.5, laenge: 12 + Math.random() * 12,
+          zack: Array.from({ length: 8 }, () => (Math.random() - 0.5) * 2.4),
+        })),
+      };
+    };
     const malen = (g, t, sz, teile) => {
       const A = sz.ziele[0], B = sz.ziele[1];
       if (!A || !B) return;
       const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
       if (aus <= 0) return;
       const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
-      // Eine Klinge vom Helden P zum Treffpunkt Z; `k` = Weg des Klingenkopfes (0…1)
-      const klinge = (P, Z, pal, k, a) => {
-        const dx = Z.x - P.x, dy = Z.y - P.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
-        const kopf = d * k, laenge = Math.min(kopf, 17);
-        for (let s = 0; s < kopf; s += 1) g.put(P.x + ux * s, P.y + uy * s, pal[1], a * (s / Math.max(1, kopf)) * 0.55);
-        for (let s = 0; s < laenge; s += 0.7) {
-          const x = P.x + ux * (kopf - s), y = P.y + uy * (kopf - s);
-          g.put(x, y, s < 3 ? pal[0] : pal[1], a);
-          g.put(x + nx * 0.7, y + ny * 0.7, pal[2], a * 0.85);
-        }
-        const gx = P.x + ux * (kopf - laenge), gy = P.y + uy * (kopf - laenge);
-        for (let s = -2; s <= 2; s++) g.put(gx + nx * s, gy + ny * s, MESSING, a);
-        for (let s = 1; s <= 3; s++) g.put(gx - ux * s, gy - uy * s, GRIFF, a);
+      const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
+      // Weg der Karten (wie `onHeroClash` / `ramClash`): halbe Ausdehnung entlang der Fahrtrichtung, 10 % Überlappung
+      const halbe = (Z) => (Z.w / 2) * Math.abs(ux) + (Z.h / 2) * Math.abs(uy);
+      const reach = Math.max(1.3, d / 2 - 0.9 * (halbe(A) + halbe(B)) / 2);
+      const back = Math.min(reach * 0.5, 40);
+      // Abstand der Kartenmitte von ihrer Zone zur Zeit t (entlang der Fahrtrichtung) — nur für die Tempolinien
+      const strecke = (zeit) => {
+        if (zeit < AUSHOLEN) return -0.12 * reach * glatt(zeit / AUSHOLEN);
+        if (zeit < T1) return -0.12 * reach + (1.12 * reach) * beschl((zeit - AUSHOLEN) / (T1 - AUSHOLEN));
+        if (zeit < RUECK_AB) return reach;
+        if (zeit < RUECK_BIS) return reach - back * glatt((zeit - RUECK_AB) / (RUECK_BIS - RUECK_AB));
+        if (zeit < T2) return (reach - back) + (back + 0.02 * reach) * beschl((zeit - RUECK_BIS) / (T2 - RUECK_BIS));
+        if (zeit < HEIM_AB) return reach;
+        return reach * (1 - glatt((zeit - HEIM_AB) / (ENDE - HEIM_AB)));
       };
-      // Anflug und Halt: die Klingen verblassen, sobald der Stern sie überstrahlt
-      const flug = glatt(t / TREFF);
-      const halt = t < TREFF + 120 ? aus : aus * Math.max(0, 1 - (t - TREFF - 120) / 100);
-      if (halt > 0) { klinge(A, M, KL_A, flug, halt); klinge(B, M, KL_B, flug, halt); }
-      // Funkenstern und Ring am Treffpunkt
-      if (t >= TREFF && t < TREFF + 300) {
-        const al = t - TREFF, f = 1 - al / 300, r = 3 + al / 14;
-        for (let d = 0; d <= r; d++) {
-          const c = d < r * 0.5 ? STERN[0] : STERN[2];
-          g.put(M.x + d, M.y, c, f * aus); g.put(M.x - d, M.y, c, f * aus); g.put(M.x, M.y + d, c, f * aus); g.put(M.x, M.y - d, c, f * aus);
-          if (d < r * 0.7) { g.put(M.x + d, M.y + d, STERN[1], f * aus * 0.8); g.put(M.x - d, M.y + d, STERN[1], f * aus * 0.8); g.put(M.x + d, M.y - d, STERN[1], f * aus * 0.8); g.put(M.x - d, M.y - d, STERN[1], f * aus * 0.8); }
-        }
-        g.ring(M.x, M.y, r * 1.5, r * 1.1, STERN[1], f * aus * 0.7);
-        g.disc(M.x, M.y, 2 + 2 * f, STERN[0], f * aus);
-      }
-      for (const s of teile.funken) {
-        const al = t - TREFF; if (al < 0 || al > s.leben) continue;
-        const k = al / s.leben, sek = al / 1000;
-        const x = M.x + Math.cos(s.w) * s.v * sek, y = M.y + Math.sin(s.w) * s.v * sek + 0.5 * 90 * sek * sek;
-        const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : KL_A[1];
-        g.put(x, y, c, (1 - k) * aus);
-        if (k < 0.5) g.put(x + 1, y, c, (1 - k) * aus * 0.7);
-      }
-      // Kreuzhieb auf jedem Helden (gleichzeitig)
-      if (t >= HIEB && t < HIEB + 320) {
-        const al = t - HIEB, p = klemme(al / 90, 0, 1), f = al < 160 ? 1 : 1 - (al - 160) / 160;
-        for (const Z of [A, B]) {
-          const L = Math.max(8, Math.min(Z.w, Z.h) / 2 + 4) * p, cx = Math.round(Z.x), cy = Math.round(Z.y);
-          for (let s = -L; s <= L; s += 0.7) {
-            const c = Math.abs(s) < L * 0.35 ? ROT[0] : ROT[1];
-            g.put(cx + s, cy + s, c, f * aus); g.put(cx + s, cy - s, c, f * aus);
-            g.put(cx + s + 1, cy + s, ROT[2], f * aus * 0.7); g.put(cx + s + 1, cy - s, ROT[2], f * aus * 0.7);
+
+      // ── Tempolinien hinter beiden Karten (Anlauf 1: 80–260 ms, Anlauf 2: 460–600 ms) ──
+      const anlauf = (t >= AUSHOLEN + 40 && t < T1) || (t >= RUECK_BIS && t < T2);
+      if (anlauf) {
+        const s = strecke(t), s0 = strecke(t - 40);
+        const tempo = klemme(Math.abs(s - s0) / 5, 0, 1);
+        for (const [Z, pal, vorz] of [[A, BLAU, 1], [B, ORANGE, -1]]) {
+          const kopf = halbe(Z);
+          for (let k = -2; k <= 2; k++) {
+            const versatz = k * (Z.w / 6 + 1);
+            const laenge = 7 + 4 * tempo + ((k + 3) % 3) * 2;
+            for (let l = 0; l < laenge; l += 1) {
+              const rueck = kopf + 1 + l;                                      // hinter der Karte (entgegen der Fahrtrichtung)
+              g.put(Z.x + vorz * (ux * (s - rueck)) + nx * versatz, Z.y + vorz * (uy * (s - rueck)) + ny * versatz,
+                l < 2 ? pal[0] : pal[1], aus * tempo * (1 - l / laenge) * 0.9);
+            }
           }
-          g.ring(cx, cy, Z.w / 2 + 2 + al / 40, Z.h / 2 + 2 + al / 40, ROT[1], f * aus * 0.5);
         }
       }
+
+      // ── Ein Aufprall: Blitz, Stern, Ringe, Risse (nur der grosse), Funken ──
+      const aufprall = (t0, gross, funken) => {
+        const al = t - t0;
+        if (al < 0 || al > 620) return;
+        const p = gross ? 1.9 : 1;
+        // weisser Blitz (die ersten ~70 ms)
+        if (al < 70) g.disc(M.x, M.y, (4 + 5 * (gross ? 1 : 0.6)) * (1 - al / 110), STERN[0], aus * (1 - al / 70));
+        // achtstrahliger Stern
+        if (al < 340) {
+          const f = 1 - al / 340, r = (3 + al / 12) * p;
+          for (let k = 0; k <= r; k++) {
+            const c = k < r * 0.5 ? STERN[0] : STERN[2];
+            g.put(M.x + k, M.y, c, f * aus); g.put(M.x - k, M.y, c, f * aus); g.put(M.x, M.y + k, c, f * aus); g.put(M.x, M.y - k, c, f * aus);
+            if (k < r * 0.7) {
+              g.put(M.x + k, M.y + k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y + k, STERN[1], f * aus * 0.8);
+              g.put(M.x + k, M.y - k, STERN[1], f * aus * 0.8); g.put(M.x - k, M.y - k, STERN[1], f * aus * 0.8);
+            }
+          }
+          g.disc(M.x, M.y, 2 + 2 * f * p, STERN[0], f * aus);
+        }
+        // Druckringe (gross: zwei, der zweite versetzt)
+        const ringe = gross ? [0, 70] : [0];
+        for (const v of ringe) {
+          const a2 = al - v; if (a2 < 0 || a2 > 420) continue;
+          const f = 1 - a2 / 420, r = (4 + a2 / 7) * (gross ? 1.1 : 0.75);
+          g.ring(M.x, M.y, r * 1.5, r, STERN[1], f * aus * 0.85);
+          g.ring(M.x, M.y, r * 1.5 + 1, r + 1, STERN[2], f * aus * 0.5);
+        }
+        // Risse im Boden (nur der grosse Aufprall): wachsen in ~120 ms, bleiben stehen, blenden aus
+        if (gross) {
+          const wachs = klemme(al / 120, 0, 1), f = al < 360 ? 1 : 1 - (al - 360) / 260;
+          if (f > 0) for (const ri of teile.risse) {
+            let x = M.x, y = M.y;
+            const stuecke = Math.floor(ri.laenge * wachs);
+            for (let k = 0; k < stuecke; k++) {
+              const w = ri.w + ri.zack[k % ri.zack.length] * 0.35;
+              x += Math.cos(w); y += Math.sin(w) * 0.85;
+              g.put(x, y, k < 3 ? RISS[0] : RISS[1], f * aus);
+              if (k > 1) g.put(x + 1, y + 1, RISS[2], f * aus * 0.8);
+            }
+          }
+        }
+        // Funken
+        for (const s of funken) {
+          if (al > s.leben) continue;
+          const k = al / s.leben, sek = al / 1000;
+          const x = M.x + Math.cos(s.w) * s.v * sek, y = M.y + Math.sin(s.w) * s.v * sek + 0.5 * 90 * sek * sek;
+          const c = s.farbe === 0 ? STERN[0] : s.farbe === 1 ? STERN[2] : s.farbe === 2 ? BLAU[1] : ORANGE[1];
+          g.put(x, y, c, (1 - k) * aus);
+          if (k < 0.5) g.put(x + 1, y, c, (1 - k) * aus * 0.7);
+        }
+      };
+      aufprall(T1, false, teile.funken1);
+      aufprall(T2, true, teile.funken2);
     };
-    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
+    return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40, z: 10130 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
   //  Create Secret Room (11.10.) — PIXELART, Brett-Animation auf der SURPRISE ZONE (Ziel `{ owner, heroIdx, zoneType: 'surprise' }`)
@@ -40728,6 +40785,40 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('play_ram_animation', onRamAnimation);
 
+    // ★ 12.10. (Duel, Als Vorgabe): ZWEI HELDEN RAMMEN EINANDER. Beide Heldenkarten rasen aufeinander zu, treffen sich in der Mitte zwischen den Zonen, prallen
+    // zurück und krachen noch einmal ineinander, dann gehen sie heim (`ramClash`, style.css; die Zeiten decken sich mit `_hero-duel-shared.js` und dem Pixelart-Aufprall
+    // `duel_clash`). Die Zonen verstecken ihren Helden wie beim Rammangriff (`isRamming`: `srcOwner` / `srcHeroIdx`, `srcZoneSlot` -1).
+    const onHeroClash = ({ a, b, duration }) => {
+      const hole = (x) => document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLbl(x.owner, myIdx)}"][data-hero-idx="${x.heroIdx}"]`);
+      const elA = hole(a), elB = hole(b);
+      if (!elA || !elB) return;
+      if (window.ppBattleCamFocus) { window.ppBattleCamFocus(elA); window.ppBattleCamFocus(elB); }
+      const ra = elA.getBoundingClientRect(), rb = elB.getBoundingClientRect();
+      const ca = { x: ra.left + ra.width / 2, y: ra.top + ra.height / 2 }, cb = { x: rb.left + rb.width / 2, y: rb.top + rb.height / 2 };
+      const d = Math.hypot(cb.x - ca.x, cb.y - ca.y) || 1, ux = (cb.x - ca.x) / d, uy = (cb.y - ca.y) / d;
+      // Jede Karte fährt so weit, dass sich die Vorderkanten in der Mitte um ~10 % überlappen (hA / hB = halbe Ausdehnung entlang der Fahrtrichtung).
+      const halbe = (r) => (r.width / 2) * Math.abs(ux) + (r.height / 2) * Math.abs(uy);
+      const reach = Math.max(4, d / 2 - 0.9 * (halbe(ra) + halbe(rb)) / 2);
+      const back = Math.min(reach * 0.5, 120);
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      const dur = duration || 1150;
+      const id = Date.now() + Math.random();
+      const bau = (x, r, c, richtung, wackeln, idx) => ({
+        id: id + idx, cardName: x.cardName,
+        srcX: c.x + _fo.dx, srcY: c.y + _fo.dy, tgtX: c.x + richtung * ux * reach + _fo.dx, tgtY: c.y + richtung * uy * reach + _fo.dy,
+        srcOwner: x.owner, srcHeroIdx: x.heroIdx, srcZoneSlot: -1,
+        dur, angle: Math.atan2(richtung * uy, richtung * ux) * (180 / Math.PI) + 90,
+        clash: { ux: richtung * ux, uy: richtung * uy, reach, back, w: r.width, h: r.height, wackeln },
+      });
+      const neu = [bau(a, ra, ca, 1, 14, 0), bau(b, rb, cb, -1, -14, 0.5)];
+      // Der Pixelart-Aufprall (`duel_clash`) steht erst ~100 ms nach dem Ereignis (Einbau-Versatz der Brett-Animationen): die Karten starten im selben Takt.
+      setTimeout(() => {
+        setRamAnims(prev => [...prev, ...neu]);
+        setTimeout(() => setRamAnims(prev => prev.filter(x => !neu.some(n => n.id === x.id))), dur + 30);
+      }, 100);
+    };
+    socket.on('play_hero_clash', onHeroClash);
+
     // Tharxian Horse: large wooden Trojan Horse rolls out of the
     // activator's flipped-face-up Surprise Zone and rams the
     // attacker (Hero zone OR specific Creature support slot). Custom
@@ -43169,36 +43260,66 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // alles wie bisher.
     // ★ Endpunkt eines Aufdeck-Flugs (Stapel, Hand-Platz, Brett-Zone) — einmal ausgeschrieben, damit der Flug MIT Zwischenhalt (`hold` → `release`) dieselbe
     // Rechnung nutzt wie der durchgehende Flug.
-    const aufdeckEndpunkt = (ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide) => {
+    const aufdeckEndpunkt = (ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, wantIdx) => {
       // End point = the destination pile; centre-fade fallback if the
       // pile element isn't mounted (mirrors onChaosMagicReveal).
-      let ex = cx, ey = cy;
+      let ex = cx, ey = cy, es = 1, er = 0;      // `es` = Endmaßstab der Flugkopie (Karte 64 px × es = Größe der Zielkarte), `er` = Endwinkel in Grad (Handfächer)
       if (ziel === 'hand') {
-        // ★ Landepunkt = die NEUE Position in der Hand, nicht deren
-        // Mitte (Als Rueckmeldung 21.8.). Die Karte ist zum Flugzeitpunkt
-        // noch NICHT in der Hand — der Aufrufer buchtet sie erst um,
-        // wenn der Flug landet. Der Zielslot existiert also noch nicht
-        // und muss projiziert werden: die Hand ist zentriert, ein
-        // zusaetzlicher Slot verschiebt die ganze Reihe. Dieselbe
-        // Rechnung wie im `play_pile_transfer`-Handler, nur immer fuer
-        // „eine Karte mehr, ganz hinten".
+        // ★ Landepunkt UND Größe = die NEUE Karte in der Hand, gemessen am ECHTEN Layout (Als Befund 12.10., Amazing Finding: „sichtbarer Übergang
+        // zwischen ‚die Karte fliegt auf die Hand' und ‚die Karte landet an ihrer Zielposition'"). Zwei Fehler steckten in der alten Rechnung:
+        //   • die Flugkopie ist 64×90 px, die Handkarte aber 64 px × `--board-scale` × `--hand-card-scale` — die Karte sprang beim Landen auf ihre echte Größe;
+        //   • die Position wurde mit „Abstand von Platz zu Platz = Kartenbreite" projiziert, im Layout schrumpfen aber alle Plätze ausser dem letzten
+        //     (`flex: 0 1 …`, `:last-child { flex: 0 0 var(--hand-card-w) }`) — die zentrierte Reihe lag um mehrere Pixel anders (je voller die Hand, desto mehr).
+        // Jetzt legt ein PROBE-PLATZ (Kopie des letzten Platzes, unsichtbar) die künftige Karte ans Ende der Reihe, der Browser rechnet das Flex-Layout samt
+        // Zentrierung, Schrumpfen und Maßstab, wir lesen ihren Kasten und nehmen den Probe-Platz noch im selben Takt wieder weg (kein Bild dazwischen).
         const base = isMe ? '.game-hand-me' : '.game-hand-opp';
+        const reihe = document.querySelector(`${base} .game-hand-cards`);
         const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
-        if (slots.length > 0) {
-          // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
-          // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
-          // Hüllkasten ist also breiter als die Karte — und genau
-          // diese Breite dient hier als ABSTAND von Platz zu Platz.
-          // Der Helfer gibt den echten Kasten zurück (und beim
-          // Handplatz ohnehin unverändert den seinen).
-          const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
-            || slots[slots.length - 1].getBoundingClientRect();
-          const cardW = lastRect.width;
-          const oldCount = slots.length;
-          const finalCount = oldCount + 1;
-          const C = (lastRect.left + lastRect.width) - (oldCount * cardW) / 2;
-          ex = C - (finalCount * cardW) / 2 + oldCount * cardW;
-          ey = lastRect.top;
+        const letzter = slots[slots.length - 1];
+        // ★ `wantIdx`: Platz der künftigen Karte in der Reihe (vom Server mitgeschickt: `destHandIdx` = Handgröße beim Senden, die Karte wird erst NACH dem
+        // Flug gebucht). Das DOM hinkt dem Zustand um einen Takt hinterher — beim zweiten und dritten Aufdecken einer Folge (Amazing Finding) stand die
+        // vorige Karte schon im Zustand, aber noch nicht im DOM, und die Kopie landete einen Platz zu weit links. Ohne Angabe: ans Ende der sichtbaren Reihe.
+        const want = Number.isInteger(wantIdx) && wantIdx >= 0 ? wantIdx : slots.length;
+        let box = null, kartenBreite = 0, rot = 0;
+        if (reihe && letzter && letzter.parentNode) {
+          const stil = window.handFanStyle ? window.handFanStyle(want, want + 1, { seite: isMe ? 'me' : 'opp' }) : null;
+          if (slots.length > want) {
+            // Der Platz steht schon im DOM: die echte Karte messen.
+            const echt = slots[want];
+            const karte = (echt.classList?.contains('board-card') ? echt : echt.querySelector('.board-card')) || echt;
+            box = karte.getBoundingClientRect();
+            kartenBreite = karte.offsetWidth || box.width;
+            rot = parseFloat(echt.style.getPropertyValue('--fan-rot')) || parseFloat(stil && stil['--fan-rot']) || 0;
+          } else {
+            // Der Platz fehlt noch: PROBE-Plätze (unsichtbare Kopien des letzten Platzes) legen die fehlenden Plätze und die künftige Karte ans Ende der Reihe;
+            // der Browser rechnet das Flex-Layout samt Zentrierung, Schrumpfen und Maßstab, wir lesen den Kasten und räumen im selben Takt wieder ab
+            // (kein Bild dazwischen). Fächerwinkel, Bogenhub und Ebene der künftigen Karte kommen vom selben Helfer wie bei den echten Plätzen.
+            const proben = [];
+            try {
+              for (let k = slots.length; k <= want; k++) {
+                const probe = letzter.cloneNode(true);
+                probe.removeAttribute('data-hand-idx');
+                probe.style.visibility = 'hidden';
+                probe.style.pointerEvents = 'none';
+                if (k === want && stil) for (const [kk, v] of Object.entries(stil)) probe.style.setProperty(kk, v);
+                letzter.parentNode.appendChild(probe);
+                proben.push(probe);
+              }
+              const probe = proben[proben.length - 1];
+              const karte = (probe.classList?.contains('board-card') ? probe : probe.querySelector('.board-card')) || probe;
+              // Der Hüllkasten einer GEDREHTEN Karte ist um deren Mitte symmetrisch: seine Mitte IST die Kartenmitte, egal um welchen Punkt gedreht wird.
+              box = karte.getBoundingClientRect();
+              kartenBreite = karte.offsetWidth || box.width;
+              rot = parseFloat(stil && stil['--fan-rot']) || 0;
+            } finally { for (const pr of proben) pr.remove(); }
+          }
+        }
+        if (box && box.width > 0) {
+          // Die Flugkopie ist 64×90 px, skaliert und dreht um ihre MITTE: Mitte auf die Mitte der Zielkarte, Endmaßstab = Zielbreite / 64, Endwinkel = Fächerwinkel.
+          ex = box.left + box.width / 2 - 32;
+          ey = box.top + box.height / 2 - 45;
+          es = Math.max(0.5, Math.min(4, kartenBreite / 64));
+          er = rot;
         } else {
           const handEl = document.querySelector(base);
           if (handEl) {
@@ -43245,9 +43366,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ey = pr.top;
         }
       }
-      return { ex, ey };
+      return { ex, ey, es, er };
     };
-    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, destSide, from, hold, holdKey }) => {
+    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, destSide, destHandIdx, from, hold, holdKey }) => {
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
       const isMe    = owner === myIdx;
       const perCard = revealMs || 1100;
@@ -43301,9 +43422,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const sy = dr.top;
       const cx = window.innerWidth / 2 - 32;
       const cy = window.innerHeight / 2 - 45;
-      const { ex, ey } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide);
       const cardbackUrl = isMe ? me.cardback : opp.cardback;
       cardNames.forEach((cardName, i) => {
+        // Endpunkt JE KARTE: bei der Hand hat jede ihren eigenen künftigen Platz (`destHandIdx` + i).
+        const { ex, ey, es, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, Number.isInteger(destHandIdx) ? destHandIdx + i : undefined);
         const id = Date.now() + Math.random();
         setTimeout(() => {
           // Woosh je Karte (Als Vorgabe 21.8.). Einen eigenen
@@ -43315,14 +43437,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           setKassaranFlips(prev => [...prev, {
             id, startX: sx, startY: sy, centerX: cx, centerY: cy,
-            endX: ex, endY: ey, cardName, cardbackUrl,
+            endX: ex, endY: ey, endScale: es, endRot: er, cardName, cardbackUrl,
             durationMs: perCard, dest: ziel,
           }]);
           // ★ Landet die Karte auf einem BRETTPLATZ, bleibt die Kopie noch kurz am Ziel liegen
           // (`forwards`: letztes Keyframe). Der Zustand mit der echten Creature trifft nach Netz und
           // Neuaufbau des Bretts erst nach dem Flugende ein — ohne Halten war der Platz ~100 ms leer
           // („kurzer Cut", Als Befund 10.10.). Die Kopie deckt die Lücke, dann steht die Karte darunter.
-          const halteMs = (ziel === 'support' || ziel === 'ability') ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
+          // (Als Befund 12.10.: auch die HAND — die Flugkopie bleibt kurz auf der Karte liegen, bis die echte dort steht; sonst blitzt die Lücke zwischen
+          // Flugende und Zustand auf. Gleiche Größe und Lage, die Kopie ist darunter unsichtbar.)
+          const halteMs = (ziel === 'support' || ziel === 'ability' || (ziel === 'hand' && isMe)) ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
           setTimeout(() => {
             setKassaranFlips(prev => prev.filter(a => a.id !== id));
           }, perCard + halteMs);
@@ -43330,7 +43454,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       });
     };
     // ★ Freigabe der gehaltenen Karte: von der Bildmitte weiter zum Ziel (Deck, Ablage, Gelöscht, Brett-Zone, Hand).
-    const onMillCenterRelease = ({ owner, holdKey, cardName, dest, destHeroIdx, destSlotIdx, destSide, revealMs }) => {
+    const onMillCenterRelease = ({ owner, holdKey, cardName, dest, destHeroIdx, destSlotIdx, destSide, destHandIdx, revealMs }) => {
       const isMe = owner === myIdx;
       const dur = revealMs || 650;
       const ziel = dest || 'deck';
@@ -43340,11 +43464,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pending[ziel]) pending[ziel].push(cardName);
       }
       if (ziel === 'hand' && isMe) stealSkipDrawRef.current += 1;
-      const { ex, ey } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide);
+      const { ex, ey, es, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, destHandIdx);
       const id = 'rel-' + holdKey + '-' + Date.now();
-      const halteMs = (ziel === 'support' || ziel === 'ability') ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
+      const halteMs = (ziel === 'support' || ziel === 'ability' || (ziel === 'hand' && isMe)) ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
       setKassaranFlips(prev => [...prev.filter(a => a.holdKey !== holdKey), {
-        id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey,
+        id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey, endScale: es, endRot: er,
         cardName: cardName || (prev.find(a => a.holdKey === holdKey) || {}).cardName, cardbackUrl: isMe ? me.cardback : opp.cardback, durationMs: dur, dest: ziel,
       }]);
       setTimeout(() => setKassaranFlips(prev => prev.filter(a => a.id !== id)), dur + halteMs);
@@ -45300,6 +45424,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('surprise_flip', onSurpriseFlip);
       socket.off('surprise_reset', onSurpriseReset);
       socket.off('play_ram_animation', onRamAnimation);
+      socket.off('play_hero_clash', onHeroClash);
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
@@ -48234,6 +48359,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && _spellTargetSideOk && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
+          // ★ 12.10. (Duel): eine Zielmarke mit `leuchten` (`engine.setzeZielMarke(…, { leuchten: true })`) lässt den Helden zusätzlich zum Abzeichen rot pulsieren —
+          // die feststehende Wahl des Gegners, nach der man selbst wählt. Kein Ziel, nur Hervorhebung.
+          const zielMarkeLeuchtet = (gameState.zielMarken || []).some(m => m.leuchten && m.type === 'hero' && m.owner === pi && m.heroIdx === i);
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
           // ★ Geschuetzte Ziele werden AUSGEGRAUT statt verschwiegen
           // (Als Vorgabe 21.8.). Der Kanal dafuer gab es schon
@@ -48476,7 +48604,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -52006,7 +52134,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <KassaranFlipCard key={anim.id}
           startX={anim.startX} startY={anim.startY}
           centerX={anim.centerX} centerY={anim.centerY}
-          endX={anim.endX} endY={anim.endY}
+          endX={anim.endX} endY={anim.endY} endScale={anim.endScale} endRot={anim.endRot}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl}
           durationMs={anim.durationMs} dest={anim.dest} phase={anim.phase} />
       ))}
@@ -52270,7 +52398,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Ram animations (hero charges to target and back) */}
       {/* v1258: Rammkarten in Welt-Huelle (Ebene 10120 = die der Karte) */}
       <div className="fx-welt-lock" style={{ zIndex: 10120 }}>
-      {ramAnims.map(r => (
+      {ramAnims.map(r => r.clash ? (
+        /* Duel (12.10.): zwei Helden rammen einander — `ramClash`, Fahrtrichtung und Wege kommen aus `onHeroClash`. */
+        <div key={r.id} className="ram-anim-card ram-clash" style={{
+          left: r.srcX - r.clash.w / 2, top: r.srcY - r.clash.h / 2, width: r.clash.w, height: r.clash.h,
+          '--ux': r.clash.ux, '--uy': r.clash.uy, '--reach': r.clash.reach + 'px', '--back': r.clash.back + 'px',
+          '--ramAngle': (r.angle || 0) + 'deg', '--wob': r.clash.wackeln + 'deg', animationDuration: r.dur + 'ms',
+        }}>
+          <BoardCard cardName={r.cardName} noTooltip />
+        </div>
+      ) : (
         <React.Fragment key={r.id}>
           {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort
               flöge er mit und stünde nicht hinter ihr. Eigene Ebene. */}
