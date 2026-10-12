@@ -1875,6 +1875,10 @@
 "id": "Glass_of_Marbles",
 "kind": "a"
 },
+"Glass Wall": {
+"id": "Glass_Wall",
+"kind": "a"
+},
 "Glimpse of the Future": {
 "id": "Glimpse_of_the_Future",
 "kind": "a"
@@ -2351,6 +2355,10 @@
 "id": "Ingo_Investor_of_Evil",
 "kind": "a"
 },
+"Inheritance Ceremony": {
+"id": "Inheritance_Ceremony",
+"kind": "a"
+},
 "Initiation Ritual": {
 "id": "Initiation_Ritual",
 "kind": "a"
@@ -2575,6 +2583,10 @@
 "id": "Lilly_the_Charming_Infiltrator",
 "kind": "a"
 },
+"Live Show": {
+"id": "Live_Show",
+"kind": "a"
+},
 "Living Illusion": {
 "id": "Living_Illusion",
 "kind": "a"
@@ -2617,6 +2629,10 @@
 },
 "Loot the Leftovers": {
 "id": "Loot_the_Leftovers",
+"kind": "a"
+},
+"Looting": {
+"id": "Looting",
 "kind": "a"
 },
 "Lord Mithuru, the Rotten Mastermind": {
@@ -2829,6 +2845,10 @@
 },
 "Massacre": {
 "id": "Massacre",
+"kind": "a"
+},
+"Masterpiece": {
+"id": "Masterpiece",
 "kind": "a"
 },
 "Mausoleum Worm": {

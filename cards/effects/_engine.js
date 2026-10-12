@@ -9583,6 +9583,9 @@ class GameEngine {
         hero: target, source, killerOwner: _toeterBesitzer, _bypassDeadHeroFilter: true,
       });
       await this._runDiscardHooks('onHeroDefeatFinal', { hero: target, source, killerOwner: _toeterBesitzer });
+      // ★ 12.10. (Looting): HAND-FENSTER „ein Held WURDE besiegt" — fuer jeden Spieler, NACH dem Aufraeumen: die Ausruestungen und Anhaengsel des Gefallenen liegen schon in
+      // den Ablagen. Vor Extra Life / Rettung: der Tod hat stattgefunden (Ruling 17.8.).
+      if (!opts.skipDefeatWindow) await this._checkHeroDefeatWindowReactions(target, source, ownerIdx, 'nach');
     }
 
     if (this._consumeExtraLife(target, ownerIdx)) {
@@ -12907,8 +12910,14 @@ class GameEngine {
    * Eine Absage gilt fuer alle Kopien desselben Namens in diesem Fenster. Sperren wie in den uebrigen Hand-Fenstern:
    * Erst-Runden-Schutz, Dark Ocean, Hand-Spielsperre, Reaktionssperre (ueber `_canHeroActivateSurprise`).
    */
-  async _checkHeroDefeatWindowReactions(target, source, ownerIdx) {
-    if (this._inHeroDefeatWindow) return;
+  async _checkHeroDefeatWindowReactions(target, source, ownerIdx, variante = 'vor') {
+    // `variante`: 'vor' = das bisherige Fenster VOR dem Aufraeumen (`isHeroDefeatWindowReaction`); 'nach' = 12.10. (Looting) dasselbe Angebot an JEDEN Spieler, aber
+    // NACH dem Aufraeumen — Ausruestungen und Anhaengsel des Gefallenen liegen schon in den Ablagen (`isAfterHeroDefeatReaction`,
+    // `afterHeroDefeatCondition(gs, pi, engine, info)`, `afterHeroDefeatResolve(engine, pi, info, { casterIdx, casterSeite })`).
+    const V = variante === 'nach'
+      ? { flag: 'isAfterHeroDefeatReaction', cond: 'afterHeroDefeatCondition', res: 'afterHeroDefeatResolve', guard: '_inAfterHeroDefeatWindow', msg: 'was defeated', log: 'after_hero_defeat_reaction' }
+      : { flag: 'isHeroDefeatWindowReaction', cond: 'heroDefeatWindowCondition', res: 'heroDefeatWindowResolve', guard: '_inHeroDefeatWindow', msg: 'is being defeated', log: 'hero_defeat_window_reaction' };
+    if (this[V.guard]) return;
     if (this.gs.result) return;
     const heroOwner = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
     const hps = this.gs.players[heroOwner];
@@ -12922,7 +12931,7 @@ class GameEngine {
     const order = [heroOwner];
     for (let i = 0; i < this.playerCount(); i++) if (i !== heroOwner) order.push(i);
 
-    this._inHeroDefeatWindow = true;
+    this[V.guard] = true;
     try {
       for (const pi of order) {
         const ps = this.gs.players[pi];
@@ -12938,10 +12947,9 @@ class GameEngine {
             if (abgelehnt.has(cardName)) continue;
             if (this._handPlayLockedFor(ps, cardName)) continue;
             const script = loadCardEffect(cardName);
-            if (!script?.isHeroDefeatWindowReaction) continue;
+            if (!script?.[V.flag]) continue;
             this._noteRxWindow(ps, cardName, 'seen');
-            if (script.heroDefeatWindowCondition
-                && !script.heroDefeatWindowCondition(this.gs, pi, this, info)) continue;
+            if (script[V.cond] && !script[V.cond](this.gs, pi, this, info)) continue;
             const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
             if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
             const cost = allCards[cardName]?.cost || 0;
@@ -12950,7 +12958,7 @@ class GameEngine {
               type: 'confirm',
               title: cardName,
               _handReactionWindow: true,
-              message: `${target.name} is being defeated! Activate ${cardName}?`,
+              message: `${target.name} ${V.msg}! Activate ${cardName}?`,
               showCard: cardName,
               showCardLeft: target.name,
               confirmLabel: '✨ Activate!',
@@ -12960,14 +12968,14 @@ class GameEngine {
             if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
             if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
             if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) { abgelehnt.add(cardName); continue; }
-            this.log('hero_defeat_window_reaction', { card: cardName, player: ps.username, target: target.name });
+            this.log(V.log, { card: cardName, player: ps.username, target: target.name });
             try {
-              if (script.heroDefeatWindowResolve) {
-                await script.heroDefeatWindowResolve(this, pi, info,
+              if (script[V.res]) {
+                await script[V.res](this, pi, info,
                   { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi });
               }
             } catch (err) {
-              console.error(`[HeroDefeatWindow] ${cardName} threw:`, err.message);
+              console.error(`[HeroDefeatWindow:${variante}] ${cardName} threw:`, err.message);
             }
             await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite ?? pi });
             this.sync();
@@ -12978,7 +12986,7 @@ class GameEngine {
         }
       }
     } finally {
-      this._inHeroDefeatWindow = false;
+      this[V.guard] = false;
     }
   }
 
@@ -15636,7 +15644,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} toPlayerIdx - Zielseite
    * @param {number} destHeroIdx - Zielheld
    * @param {number} destSlotIdx - freier Support-Slot dort
-   * @param {object} [opts] - { animDuration, skipAnimation, sourceName }
+   * @param {object} [opts] - { animDuration, skipAnimation, sourceName, quiet (nur die Karte selbst sieht den Eintritt), ignoreEquipRestriction }
    * @returns {{ success: boolean }}
    */
   /**
@@ -15746,6 +15754,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.sync();
 
     await this.runHooks('onCardEnterZone', {
+      // `opts.quiet` (Inheritance Ceremony, 12.10.: „Equips/Attachments triggern beim Verschieben KEINE On-Play-Effekte"): ein Umhaengen ist kein Anlegen — nur
+      // die verschobene Karte selbst bekommt ihr Eintritts-Ereignis (damit sie auf dem neuen Traeger wieder greift), Beobachter anderer Karten („when an Equip
+      // is attached …", Anti Magic Enchantment) bleiben stumm.
+      ...(opts.quiet ? { _onlyCard: inst } : {}),
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
       _skipReactionCheck: true,
       _isMove: true,
@@ -19379,9 +19391,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const pi of order) {
       if (this._reaktionGesperrt(pi)) continue;   // v1293 Reaktionssperre
       for (const inst of [...this.cardInstances]) {
-        if (inst.zone !== 'support' && inst.zone !== 'area') continue;
+        // 12.10. (Glass Wall): auch eine OFFEN liegende Karte in einer Surprise Zone reagiert hier (sie gehoert dem Kontrolleur des Helden, dessen Zone sie belegt).
+        if (inst.zone !== 'support' && inst.zone !== 'area' && inst.zone !== 'surprise') continue;
         // Styx 28.9.: Kontrolleur (Karte an einem uebernommenen Helden → Uebernehmer).
-        if ((this.effektiveSeiten(inst).controller ?? inst.owner) !== pi) continue;
+        const kontrolleur = inst.zone === 'surprise' ? this.surpriseKontrolleur(inst.owner, inst.heroIdx) : (this.effektiveSeiten(inst).controller ?? inst.owner);
+        if (kontrolleur !== pi) continue;
         if (inst.faceDown) continue;
         const script = loadCardEffect(inst.name);
         if (!script?.isPostTargetBoardReaction) continue;
@@ -25308,7 +25322,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert':
     // jemandem eine Karte IN die Hand zu legen zählt laut Als Ruling
     // ebenfalls als Hand-Interaktion (Letter of Misinformations).
-    if (await this.checkHandInteractionReaction(toPi, 'insert',
+    // `opts.windowChecked` (Live Show, 12.10.): der Aufrufer verschenkt MEHRERE Karten in einem Zug und hat das Fenster einmal für das ganze
+    // Geben geöffnet — ein Fenster je Karte würde den Gegner mit derselben Frage mehrfach unterbrechen.
+    if (!opts.windowChecked && await this.checkHandInteractionReaction(toPi, 'insert',
           { byPi: fromPi, count: 1, sourceName: opts.source || opts.sourceName })) {
       return false;
     }
@@ -34982,9 +34998,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       // sibling, activator is the target. Per the card text "as if
       // placed in theirs", `_activateSurprise` rebinds the inst's
       // heroIdx to the activator for resolution.
+      // 12.10. (Glass Wall): eine OFFEN liegende Surprise (`staysFaceUpOnActivation` / `stayFaceUp`) wurde schon ausgeloest — sie ist kein Kandidat dieses Fensters mehr
+      // (ihre zweite Wirkung laeuft ueber das Board-Post-Target-Fenster, `_checkPostTargetBoardReactions`).
+      const verdeckt = (seite, hi, name) => !this.cardInstances.some(c => c.owner === seite && c.zone === ZONES.SURPRISE && c.heroIdx === hi && c.name === name && c.faceDown === false);
       const candidates = [];
       const ownZone = ps.surpriseZones?.[tHeroIdx] || [];
-      if (ownZone.length > 0) {
+      if (ownZone.length > 0 && verdeckt(tOwner, tHeroIdx, ownZone[0])) {
         candidates.push({ hostHeroIdx: tHeroIdx, cardName: ownZone[0] });
       }
       if (this._controllerHasBrainSpider && this._controllerHasBrainSpider(reaktor)) {
@@ -34993,6 +35012,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const sz = ps.surpriseZones?.[hi] || [];
           if (sz.length === 0) continue;
           if (this.surpriseKontrolleur(tOwner, hi) !== reaktor) continue;   // 29.9.
+          if (!verdeckt(tOwner, hi, sz[0])) continue;
           candidates.push({ hostHeroIdx: hi, cardName: sz[0] });
         }
       }
@@ -37230,7 +37250,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // and downstream effects (an opp damage to its controller's
     // targets) can discard it through normal `actionDestroyCard`.
     // Negated Surprises ignore the flag — they're consumed normally.
-    if (!surpriseNegated && script?.staysFaceUpOnActivation && inst) {
+    // 12.10. (Glass Wall, „You may leave this activated Surprise face-up"): auch eine Entscheidung ZUR LAUFZEIT — `onSurpriseActivate` liefert `{ stayFaceUp: true }`.
+    if (!surpriseNegated && (script?.staysFaceUpOnActivation || result?.stayFaceUp) && inst) {
       inst.faceDown = false;
       inst.counters = inst.counters || {};
       inst.counters._staysFaceUp = true;

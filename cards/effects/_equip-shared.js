@@ -144,7 +144,8 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
  * Traeger nicht mehr legal, Karte weg, Stapel gesperrt).
  *
  * opts: `source` (Kartenname fuer Log/Sperren), `flug` (Standard an),
- *       `flugMs` (Wartezeit bis zur Landung, Standard 520 wie Riffel).
+ *       `flugMs` (Wartezeit bis zur Landung, Standard 520 wie Riffel),
+ *       `stapelBesitzer` (wessen Stapel; Standard `pi` — Looting nimmt auch aus der gegnerischen Ablage).
  */
 async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, opts = {}) {
   const ps = engine.gs.players[pi];
@@ -156,13 +157,17 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite)) return null;
   if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
 
-  const genommen = await engine.takeFromPile(ps, stapel, cardName, { source: opts.source });
+  // 12.10. (Looting, „from either discard pile"): `opts.stapelBesitzer` = wessen Stapel die Karte hergibt (Standard: `pi`). Die Karte gehoert dem Deck, aus dem sie
+  // stammt (`originalOwner`), und landet spaeter wieder in DESSEN Ablage.
+  const stapelBesitzer = (isSeat(engine, opts.stapelBesitzer)) ? opts.stapelBesitzer : pi;
+  const genommen = await engine.takeFromPile(engine.gs.players[stapelBesitzer], stapel, cardName,
+    { source: opts.source, ...(stapelBesitzer !== pi ? { sourceOwner: pi } : {}) });
   if (!genommen) return null;
 
   if (!zps.supportZones[heroIdx]) zps.supportZones[heroIdx] = [[], [], []];
   zps.supportZones[heroIdx][slot] = [cardName];
   const inst = engine._trackCard(cardName, seite, 'support', heroIdx, slot);
-  if (seite !== pi) inst.originalOwner = pi;
+  if (stapelBesitzer !== seite) inst.originalOwner = stapelBesitzer;
 
   const flug = opts.flug !== false;
   if (flug) {
@@ -170,7 +175,7 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
     // Stapeln wird animiert). Der Client versteckt das Ziel waehrend
     // des Flugs.
     engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, toOwner: seite, cardName,
+      owner: stapelBesitzer, toOwner: seite, cardName,
       from: stapel, to: 'support',
       toHeroIdx: heroIdx, toSlotIdx: slot,
     });
