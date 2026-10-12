@@ -7123,6 +7123,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
 function CardSideTooltip({ card, imgUrl, inGallery }) {
   if (!card) return null;
   const foilType = card.foil;
+  const bonus = ascensionBonusText(card);
+  const effectText = ttEffectText(card.effect, bonus);
   const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
   // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
   // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
@@ -7149,30 +7151,14 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
           <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
       )}
-      <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-        <div style={{ fontWeight: 700, marginBottom: 5, color: tooltipTypeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
-        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
-          {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
-          <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
-          {[card.subtype, card.archetype].filter(Boolean).map(t => ' · ' + t).join('')}{card.level != null ? ' · Lv ' + card.level : ''}
+      <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
+        <TTHeader card={card} name={card.name} level={card.level} />
+        <div style={TT_BODY}>
+          <TTStats hp={card.hp} atk={card.atk} cost={card.cost} />
+          {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
+          {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
+          <TTText text={effectText} />
         </div>
-        {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): ihre
-            Faehigkeiten liegen sichtbar in den Ability-Zonen, und bei
-            Ascended Heroes beschreiben die startingAbility-Felder ohnehin
-            den Ascension Bonus — der steht unten als ganzer Satz. */}
-        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
-          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
-        <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
-          {card.hp != null && <span style={{ color: TT_HP_COLOR }}>HP: {card.hp}</span>}
-          {card.atk != null && <span style={{ color: TT_ATK_COLOR }}>ATK: {card.atk}</span>}
-          {card.cost != null && <span style={{ color: TT_COST_COLOR }}>Cost: {card.cost}</span>}
-        </div>
-        {/* Ascended Heroes: der Ascension Bonus als ganzer Satz, direkt ueber dem Effekt. */}
-        {ascensionBonusText(card) && (
-          <div style={{ fontSize: 14, marginTop: 6, marginBottom: 6, lineHeight: 1.5 }}>{ascensionBonusText(card)}</div>
-        )}
-        {card.effect &&
-          <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
       </div>
     </div>
     </FoilKleinContext.Provider>
@@ -8150,6 +8136,125 @@ function tooltipTypeColor(cardType) {
   return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
 }
 
+// ── Aufbau des Tooltips unter dem Kartenbild (Als Vorgabe 12.10.: „nur eine grosse, zugetextete Box") ──
+// Kopf mit Name und Plaketten (Typ in Kartenfarbe, Untertyp, Archetyp, Stufe, Zauberschulen), darunter Wertekacheln,
+// ein Hinweisfeld fuer den Ascension Bonus, der Regeltext als Absaetze (nummerierte Faehigkeitsstufen, Kartennamen in
+// Anfuehrungszeichen hervorgehoben) und die Zusatzfelder (Orbs, geerbte Effekte). Beide Tooltips (Spielbrett und
+// Menues/Galerie) bauen sich aus denselben Stuecken, damit sie nicht auseinanderlaufen.
+const TT_QUOTE_COLOR = '#9ecbff';
+const TT_GOLD_NOTE = '#ffcc44';
+const TT_SCHOOL_COLORS = {   // wie die Orbs von Beato (cards/effects/beato-the-butterfly-witch.js)
+  'Destruction Magic': '#ff4444', 'Decay Magic': '#aa44ff', 'Magic Arts': '#4488ff',
+  'Support Magic': '#ffdd44', 'Summoning Magic': '#44ff88',
+};
+const TT_BODY = { padding: '12px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 };
+
+/** "#rgb" / "#rrggbb" + Deckkraft -> rgba(...) */
+function ttRgba(hex, a) {
+  let h = String(hex || '#888888').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16) || 0;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/** Kleine Plakette; mit `color` getoent und umrandet, sonst neutral. */
+function TTChip({ color, children }) {
+  const st = color
+    ? { color, background: ttRgba(color, .16), border: '1px solid ' + ttRgba(color, .55) }
+    : { color: 'var(--text)', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)' };
+  return <span style={{ ...st, display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: .3, lineHeight: 1.45 }}>{children}</span>;
+}
+
+/** Kopf: Name in Kartenfarbe auf einem Farbverlauf, darunter die Plaketten. */
+function TTHeader({ card, name, level, levelBonus }) {
+  const color = tooltipTypeColor(card.cardType);
+  const schools = card.cardType !== 'Creature' ? [card.spellSchool1, card.spellSchool2].filter(Boolean) : [];
+  return (
+    <div style={{ padding: '10px 14px 11px', borderTop: '3px solid ' + color, background: `linear-gradient(180deg, ${ttRgba(color, .24)} 0%, ${ttRgba(color, .04)} 100%)` }}>
+      <div style={{ fontWeight: 700, fontSize: 19, lineHeight: 1.25, color, textShadow: '0 1px 0 rgba(0,0,0,.65)' }}>{name}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+        <TTChip color={color}>{card.cardType}</TTChip>
+        {card.subtype && <TTChip>{card.subtype}</TTChip>}
+        {card.archetype && <TTChip>{card.archetype}</TTChip>}
+        {level != null && <TTChip color={levelBonus > 0 ? '#c4a8ff' : undefined}>Lv {level}{levelBonus > 0 ? ` (+${levelBonus})` : ''}</TTChip>}
+        {schools.map(sc => <TTChip key={sc} color={TT_SCHOOL_COLORS[sc]}>{sc}</TTChip>)}
+      </div>
+    </div>
+  );
+}
+
+/** Eine Wertekachel (HP / ATK / Cost): kleine Beschriftung, grosse Zahl. */
+function TTStat({ icon, label, color, children }) {
+  return (
+    <div style={{ flex: '1 1 0', minWidth: 0, padding: '5px 8px 6px', borderRadius: 5, textAlign: 'center', background: ttRgba(color, .12), border: '1px solid ' + ttRgba(color, .45) }}>
+      <div style={{ fontSize: 10, letterSpacing: .7, textTransform: 'uppercase', color: ttRgba(color, .85) }}>{icon} {label}</div>
+      <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.25, color }}>{children}</div>
+    </div>
+  );
+}
+
+/** Wertekacheln; `hpMax` (Live-Wert) erscheint klein hinter der aktuellen HP. Ohne Werte: nichts. */
+function TTStats({ hp, hpMax, atk, cost }) {
+  if (hp == null && atk == null && cost == null) return null;
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {hp != null && <TTStat icon="♥" label="HP" color={TT_HP_COLOR}>{hp}{hpMax != null && <span style={{ fontSize: 12, opacity: .7 }}> / {hpMax}</span>}</TTStat>}
+      {atk != null && <TTStat icon="⚔" label="ATK" color={TT_ATK_COLOR}>{atk}</TTStat>}
+      {cost != null && <TTStat icon="◆" label="Cost" color={TT_COST_COLOR}>{cost}</TTStat>}
+    </div>
+  );
+}
+
+/** Hinweisfeld mit farbigem Balken links (Ascension Bonus, Orbs, geerbte Effekte); `title` optional. */
+function TTCallout({ color, title, children }) {
+  return (
+    <div style={{ padding: '8px 10px', borderLeft: '3px solid ' + color, borderRadius: '0 5px 5px 0', background: ttRgba(color, .1), fontSize: 14, lineHeight: 1.5 }}>
+      {title && <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: .4, color, marginBottom: 4 }}>{title}</div>}
+      {children}
+    </div>
+  );
+}
+
+/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben. */
+function ttQuoted(text) {
+  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : t));
+}
+
+/**
+ * Regeltext als Absaetze. Wie im Kartenrenderer ist ein Zeilenumbruch hinter einem Leerzeichen nur ein weicher Umbruch der
+ * Vorlage (wird zum Leerzeichen), alle anderen Umbrueche sind echte Absaetze. „1) … 2) … 3) …“ (Faehigkeitsstufen) bekommen
+ * eine Nummernmarke mit haengendem Einzug.
+ */
+function TTText({ text }) {
+  const paras = String(text || '').replace(/ +\n/g, ' ').split('\n').map(t => t.trim()).filter(Boolean);
+  if (paras.length === 0) return null;
+  return (
+    <div style={{ fontSize: 14, lineHeight: 1.55 }}>
+      {paras.map((p, i) => {
+        const m = /^(\d+)\)\s*([\s\S]*)$/.exec(p);
+        const abstand = i ? 8 : 0;
+        if (!m) return <div key={i} style={{ marginTop: abstand }}>{ttQuoted(p)}</div>;
+        return (
+          <div key={i} style={{ marginTop: abstand, display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span style={{ flexShrink: 0, minWidth: 20, textAlign: 'center', padding: '0 4px', borderRadius: 3, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,.1)', color: 'var(--text)' }}>{m[1]}</span>
+            <span>{ttQuoted(m[2])}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Der Effekttext, ohne den Satz, den der Ascension-Bonus-Hinweis schon sagt (Beato steht der Bonus auch im Effekt). */
+function ttEffectText(effect, bonus) {
+  let t = String(effect || '');
+  if (bonus) {
+    const satz = 'On Ascension: ' + bonus, i = t.indexOf(satz);
+    if (i >= 0) t = t.slice(0, i) + t.slice(i + satz.length).replace(/^\s+/, '');
+  }
+  return t;
+}
+
 // ── Ascension-Bonus als ausformulierter Satz, ohne Label (Als Vorgabe 12.10.) ──
 // Auf den Ascended Heroes steht der Bonus nur als Stichwort in den
 // Faehigkeitsfeldern („Fighting 3", „Any 2 Spells to your hand"). Der
@@ -8263,6 +8368,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // gedruckten abweicht (Als Vorgabe 12.10.). `_liveMaxHp` setzt BoardCard.
   const liveMaxHp = Number.isFinite(card._liveMaxHp) ? card._liveMaxHp : null;
   const bildHp = liveMaxHp != null && liveMaxHp !== card.hp ? liveMaxHp : null;
+  const bonus = ascensionBonusText(card);
+  const effectText = ttEffectText(card.effect, bonus);
   return (
     <>
       {imgUrl && (
@@ -8275,96 +8382,53 @@ function CardTooltipContent({ card, children, imageUrl }) {
           <CardFoil card={card} skin={skinOfUrl(imgUrl)} />
         </div>
       )}
-      <div style={{ padding: '10px 12px' }}>
-        <div style={{ fontWeight: 700, fontSize: 18, color: tooltipTypeColor(card.cardType), marginBottom: 5 }}>{displayName}</div>
-        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
-          {/* Der Kartentyp in der Farbe seiner Kartenart (Hero/Ascended lila, Ability blau, Artifact gold …). */}
-          <span style={{ color: tooltipTypeColor(card.cardType), fontWeight: 700 }}>{card.cardType}</span>
-          {[card.subtype, card.archetype].filter(Boolean).map(t => ' · ' + t).join('')}
-          {(card._liveLevel != null || card.level != null) && (() => {
-            const eff = card._liveLevel != null ? card._liveLevel : card.level;
-            const bonus = card._stampBonus || 0;
-            return <span style={bonus > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}> · Lv {eff}{bonus > 0 ? ` (+${bonus})` : ''}</span>;
-          })()}
-        </div>
-        {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): ihre
-            Faehigkeiten liegen sichtbar in den Ability-Zonen, und bei
-            Ascended Heroes beschreiben die startingAbility-Felder ohnehin
-            den Ascension Bonus — der steht unten als ganzer Satz. */}
-        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
-          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
-        {/* Ascended Heroes: der Ascension Bonus als ganzer Satz, direkt ueber dem Effekt. */}
-        {(() => {
-          const bonus = ascensionBonusText(card);
-          if (!bonus) return null;
-          return (
-            <div style={{ fontSize: 14, marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>{bonus}</div>
-          );
-        })()}
-        {card.effect && <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
-        {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind.
-            Steht im Karten-Tooltip statt in eigenen Orb-Tooltips — die Orbs
-            auf der Karte nehmen den Zeiger nicht mehr an, ein Hover genau
-            darauf ist also ein ganz normaler Hover der Karte. */}
-        {Array.isArray(card._liveOrbs) && card._liveOrbs.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
-            <div style={{ color: 'var(--text2)', fontWeight: 700 }}>
-              {card._liveOrbs.every(o => o.collected) ? 'All Spell Schools collected — ready to Ascend!' : 'Collect all Spell School orbs to Ascend'}
-            </div>
-            {card._liveOrbs.map(o => (
-              <div key={o.school} style={{ color: o.collected ? o.color : 'var(--text2)' }}>
-                {o.collected ? '●' : '○'} {o.school}{o.collected ? ' ✓' : ''}
+      <div>
+        <TTHeader card={card} name={displayName}
+          level={card._liveLevel != null ? card._liveLevel : card.level} levelBonus={card._stampBonus || 0} />
+        <div style={TT_BODY}>
+          {/* Werte: live (`_liveHp` / `_liveMaxHp` / `_liveAtk`, von BoardCard auf dem Brett gesetzt) vor den Kartenwerten. */}
+          <TTStats
+            hp={card._liveHp != null ? card._liveHp : card.hp}
+            hpMax={card._liveMaxHp != null ? card._liveMaxHp : null}
+            atk={card._liveAtk != null ? card._liveAtk : card.atk}
+            cost={card.cost} />
+          {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): sie liegen sichtbar in den Ability-Zonen, und bei
+              Ascended Heroes beschreiben die startingAbility-Felder den Ascension Bonus — der steht hier als ganzer Satz. */}
+          {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
+          <TTText text={effectText} />
+          {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind. Steht im Karten-Tooltip statt in eigenen
+              Orb-Tooltips — die Orbs auf der Karte nehmen den Zeiger nicht mehr an, ein Hover genau darauf ist also ein
+              ganz normaler Hover der Karte. */}
+          {Array.isArray(card._liveOrbs) && card._liveOrbs.length > 0 && (
+            <TTCallout color={TT_ASCENDED_COLOR}
+              title={card._liveOrbs.every(o => o.collected) ? 'All Spell Schools collected — ready to Ascend!' : 'Collect all Spell School orbs to Ascend'}>
+              <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+                {card._liveOrbs.map(o => (
+                  <div key={o.school} style={{ color: o.collected ? o.color : 'var(--text2)' }}>
+                    {o.collected ? '●' : '○'} {o.school}{o.collected ? ' ✓' : ''}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-        {/* Inherited effects (Sparkfly Queen's gifts from sacrificed
-            Sparkflies — and any future card that populates
-            `_inheritedEffects` on its instance counters). Rendered as a
-            short labeled list immediately under the base rules text so
-            the player sees ALL of the card's current effects at a
-            glance, not just the printed ones. */}
-        {/* v981 (Als Vorgabe 12.9.): Wer traegt hier fremde Effekte mit?
-            Die NAMEN stehen ganz oben — direkt beim Kartentext, noch vor
-            den geerbten Texten weiter unten. */}
-        {Array.isArray(card._copiedHeroes) && card._copiedHeroes.length > 0 && (
-          <div style={{
-            marginBottom: 8, padding: '4px 8px', borderRadius: 6,
-            background: 'rgba(255,204,68,.12)', border: '1px solid rgba(255,204,68,.35)',
-            fontSize: 12, lineHeight: 1.4,
-          }}>
-            <span style={{ color: '#ffcc44', fontWeight: 700 }}>Also has the effects of: </span>
-            <span>{card._copiedHeroes.join(', ')}</span>
-          </div>
-        )}
-        {Array.isArray(card._inheritedEffects) && card._inheritedEffects.length > 0 && (
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.2)' }}>
-            <div style={{ fontSize: 12, color: '#ffcc44', fontWeight: 700, marginBottom: 4 }}>Inherited Effects</div>
-            {card._inheritedEffects.map((eff, i) => (
-              <div key={i} style={{ fontSize: 13, marginTop: i === 0 ? 0 : 6, lineHeight: 1.45 }}>
-                <span style={{ color: '#ffcc44', fontWeight: 600 }}>{eff.label}: </span>
-                <span style={{ whiteSpace: 'pre-wrap' }}>{eff.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
-          {/* HP — prefer live `_liveHp / _liveMaxHp` (set by BoardCard
-              on battle hovers) over the cards.json base value. Format
-              as "current / max" when both are available. */}
-          {(card._liveHp != null || card.hp != null) && (() => {
-            const cur = card._liveHp != null ? card._liveHp : card.hp;
-            const max = card._liveMaxHp != null ? card._liveMaxHp : null;
-            return <span style={{ color: TT_HP_COLOR }}>♥ HP {cur}{max != null ? ` / ${max}` : ''}</span>;
-          })()}
-          {/* ATK — prefer live `_liveAtk` over base. */}
-          {(card._liveAtk != null || card.atk != null) && (
-            <span style={{ color: TT_ATK_COLOR }}>⚔ ATK {card._liveAtk != null ? card._liveAtk : card.atk}</span>
+            </TTCallout>
           )}
-          {/* Kosten gibt es nur bei Artifacts — golden wie der Kartentyp. */}
-          {card.cost != null && <span style={{ color: TT_COST_COLOR }}>◆ Cost {card.cost}</span>}
+          {/* v981 (Als Vorgabe 12.9.): Wer traegt hier fremde Effekte mit? (Dangerous Knowledge, Initiation Ritual) */}
+          {Array.isArray(card._copiedHeroes) && card._copiedHeroes.length > 0 && (
+            <TTCallout color={TT_GOLD_NOTE} title="Also has the effects of:">{card._copiedHeroes.join(', ')}</TTCallout>
+          )}
+          {/* Inherited effects (Sparkfly Queen's gifts from sacrificed Sparkflies — und jede kuenftige Karte, die
+              `_inheritedEffects` an ihrer Instanz fuehrt): alle aktuellen Effekte der Karte auf einen Blick, nicht nur die gedruckten. */}
+          {Array.isArray(card._inheritedEffects) && card._inheritedEffects.length > 0 && (
+            <TTCallout color={TT_GOLD_NOTE} title="Inherited Effects">
+              {card._inheritedEffects.map((eff, i) => (
+                <div key={i} style={{ fontSize: 13, marginTop: i === 0 ? 0 : 6, lineHeight: 1.45 }}>
+                  <span style={{ color: TT_GOLD_NOTE, fontWeight: 600 }}>{eff.label}: </span>
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{eff.text}</span>
+                </div>
+              ))}
+            </TTCallout>
+          )}
+          {children}
         </div>
-        {children}
       </div>
     </>
   );
