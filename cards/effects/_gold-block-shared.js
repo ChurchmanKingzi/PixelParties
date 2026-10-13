@@ -83,6 +83,9 @@ function blockerAufDemBrett(engine, playerIdx) {
  */
 function goldGainWouldBeBlocked(engine, playerIdx) {
   if (!engine || playerIdx == null) return false;
+  // Z6 (F03-20): Gold-Sperre (Golden Arrow: "cannot gain or spend Gold") gilt immer, auch in der Resource Phase
+  // (`actionGainGold` bricht dort ebenfalls ab) - dieselbe Frage, EINE Stelle.
+  if (engine.gs?.players?.[playerIdx]?.goldLocked) return true;
   // Die eigene Resource Phase bleibt frei — dort greift Aristocrat nicht.
   const gs = engine.gs || {};
   if (gs.currentPhase === PHASES.RESOURCE && gs.activePlayer === playerIdx) return false;

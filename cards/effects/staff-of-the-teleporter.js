@@ -56,13 +56,14 @@ module.exports = {
   // overlay). The loader's auto-tagger missed it because the header
   // comment mentions `actionPlaceCreature` — a NON_DRAW substring match.
   blockedByHandLock: true,
+  blockedByDrawLock: true,   // Z6 (F03-16): auch die reine Zieh-Sperre (Sacred Jewel) laesst den Nachzug ausfallen
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Hand-locked → the staff's own draws would silently fizzle, so
     // there's no value in activating. Mirrors Leadership / similar.
-    if (ps.handLocked) return false;
+    if (ps.handLocked || ps.drawLocked) return false;   // Z6 (F03-16)
     return true;
   },
 
@@ -160,6 +161,7 @@ module.exports = {
     // Locks land AFTER our own draws complete.
     ps.handLocked = true;
     ps._discardLockedTurn = gs.turn;
+    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
 
     engine.log('staff_of_the_teleporter', {
       player: ps.username,

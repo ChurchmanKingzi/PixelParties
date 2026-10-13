@@ -2567,6 +2567,9 @@ class GameEngine {
       return false;
     }
     if (ps._discardLockedTurn !== this.gs.turn) return true;
+    // Z6 (F03-10): die HARTE Stab-Sperre (`_discardLockHard`, Staebe) hebt auch der 6-Gold-Freikauf des Eye of Ren
+    // nicht auf - gelten beide im selben Zug, gilt die strengere (der Stab hat keine Ausnahme), in beiden Reihenfolgen.
+    if (ps._discardLockHard === this.gs.turn) return false;
     const buy = ps._discardLockBuyout;
     if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
     if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
@@ -10789,6 +10792,11 @@ class GameEngine {
       deck: !!ps.searchLocked,
       discard: !!(ps.searchLocked && ps.searchLockedIncludesDiscard),
     };
+    // Z6 (S03-26, A01-37): die Hand-Sperre ist die STAERKSTE Stufe ("cannot draw or add cards") und sperrt jede
+    // Suche (`_isSearchBlocked` tut es laengst) - eine reine Such-Karte ist darunter ebenso wirkungslos; und die harte
+    // Stab-Sperre (Ablage-Ausgang) macht reine ABLAGE-Sucher wirkungslos.
+    if ((script.blockedBySearchLock || script.blockedBySearchLockDiscard) && ps.handLocked) return true;
+    if (script.blockedBySearchLockDiscard && this.isDiscardOutHardLocked?.(pi)) return true;
     if (script.blockedBySearchLock && stufe.deck) return true;
     if (script.blockedBySearchLockDiscard && stufe.discard) return true;
     return false;
@@ -19099,7 +19107,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
       const buy = ps._discardLockBuyout;
-      if (!(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
+      if (ps._discardLockHard === this.gs.turn || !(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
         this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
         return null;
       }
@@ -19408,6 +19416,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pi = (this.gs?.players || []).indexOf(ps);
     if (pi < 0) return true;
     return this.pileOutAllowed(pi, pile, opts);
+  }
+
+  /**
+   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre ohne Freikauf
+   * (Staff of the Teleporter/Uncontrollable Destruction) bzw. Stab + Eye of Ren? Synchrones Gegenstueck zu
+   * `_discardOutAllowed` fuer Spielbarkeits-Gates (die Eye-Sperre allein ist freikaufbar und zaehlt NICHT).
+   */
+  isDiscardOutHardLocked(pi) {
+    const ps = this.gs?.players?.[pi];
+    if (!ps || ps._discardLockedTurn !== this.gs.turn) return false;
+    if (ps._discardLockHard === this.gs.turn) return true;
+    const buy = ps._discardLockBuyout;
+    return !buy || buy.turn !== this.gs.turn;
   }
 
   /**

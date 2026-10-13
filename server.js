@@ -5022,7 +5022,7 @@ function sendGameState(room, playerIdx, extra) {
       // schwachen Sperre tot, Ablage-Sucher erst bei der starken.
       searchLockBlockedCards: (((room.engine?.searchLockLevel?.(pi)?.deck
         || room.engine?.searchLockLevel?.(pi)?.discard
-        || ps.searchLocked)) && pi === playerIdx) ? (() => {
+        || ps.searchLocked || ps.handLocked || room.engine?.isDiscardOutHardLocked?.(pi))) && pi === playerIdx) ? (() => {
         const blocked = new Set();
         const slDB = getCardDB();
         for (const cn of ps.hand) {
@@ -11335,6 +11335,8 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       title: 'Item Lock Cost',
       description: 'You must delete 1 card from your hand to use an Artifact.',
       source: 'Item Lock', deleteMode: true, selfInflicted: true,
+      // Z6 (F03-19): die gerade aufloesende Artefakt-Karte steht noch in der Hand, ist aber keine Kostenkarte.
+      eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => !room.engine._istAufloesendeHandkarte(ps, i, false)),
     });
   }
 
@@ -12246,6 +12248,8 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         title: 'Item Lock Cost',
         description: 'You must delete 1 card from your hand to use an Artifact.',
         source: 'Item Lock', deleteMode: true, selfInflicted: true,
+        // Z6 (F03-19): die gerade aufloesende Artefakt-Karte steht noch in der Hand, ist aber keine Kostenkarte.
+        eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => !room.engine._istAufloesendeHandkarte(ps, i, false)),
       });
     }
 

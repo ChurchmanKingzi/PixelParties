@@ -43,7 +43,13 @@ module.exports = {
     return { optionId: 'draw4' };
   },
 
+  // Z6 (F03-16): das Ziehen ist der einzige Nutzen - unter Hand-/Zieh-Sperre gar nicht spielbar (die Kosten
+  // "discard 1"/"delete 2" fielen sonst ohne Gegenleistung an).
+  blockedByHandLock: true,
+  blockedByDrawLock: true,
+
   canActivate(gs, pi) {
+    if (gs.players[pi]?.handLocked || gs.players[pi]?.drawLocked) return false;
     // HOPT check
     const hoptKey = `wheels:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
