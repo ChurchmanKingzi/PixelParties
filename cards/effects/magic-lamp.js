@@ -90,12 +90,6 @@ module.exports = {
     }
     await engine._delay(100);
 
-    // Remove chosen cards from deck
-    for (const name of chosenNames) {
-      await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
-    }
-    engine.sync();
-
     // Step 2: Opponent picks 1 of the 3
     const oppResult = await engine.promptGeneric(oppIdx, {
       type: 'cardGallery',
@@ -153,6 +147,12 @@ module.exports = {
       engine.sync();
       return;
     }
+    // Remove chosen cards from deck — erst NACH dem Reaktionsfenster (M02-18): wird das
+    // Einfügen negiert, bleiben alle drei im Deck, nichts geht verloren.
+    for (const name of chosenNames) {
+      await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
+    }
+    engine.sync();
     const oppInst = engine.handZugangSync(oppPs, oppChoice, {  });
     // Track the gifted card with a foreign-origin tag so when the
     // opponent plays it, the discard / deleted pile routes back to
