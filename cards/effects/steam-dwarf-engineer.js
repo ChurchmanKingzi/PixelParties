@@ -18,6 +18,7 @@
 
 const { attachSteamEngine } = require('./_steam-dwarf-shared');
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Steam Dwarf Engineer';
 
@@ -51,6 +52,7 @@ module.exports = attachSteamEngine({
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
       if (!isSummonablePileCreature(dcd, dcd.name)) continue;
+      if (loadCardEffect(deckCard)?.summonOnlyFromHand) continue;   // Ifrit: nie aus dem Deck (A03-futuretech-05)
       const dMax = dcd.hp || 0;
       if (dMax > 0 && dMax <= curHp) return true;
     }
@@ -77,6 +79,7 @@ module.exports = attachSteamEngine({
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
       if (!isSummonablePileCreature(dcd, dcd.name)) continue;
+      if (loadCardEffect(deckCard)?.summonOnlyFromHand) continue;   // Ifrit: nie aus dem Deck (A03-futuretech-05)
       const dMax = dcd.hp || 0;
       if (dMax <= 0 || dMax > curHp) continue;
       countMap[deckCard] = (countMap[deckCard] || 0) + 1;
