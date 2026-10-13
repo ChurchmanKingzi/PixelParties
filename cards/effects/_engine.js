@@ -46913,6 +46913,13 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
           e._nullGezeigt = true;
         }
+        // A09-22: Pfeil-Reiter (Gift/Brand) gelten wie im Heldenpfad auch bei Schaden 0 (Hydra Blood setzt ihn immer auf 0).
+        // Der Treffer ist erfolgt; `applyArrowsAfterDamage` filtert selbst auf Angriffsschaden.
+        e.realDealt = 0;
+        {
+          const { applyArrowsAfterDamage } = require('./_arrows-shared');
+          await applyArrowsAfterDamage(this, e.source, e.inst, 0, e.amount, e.type);
+        }
         continue;
       }
 
