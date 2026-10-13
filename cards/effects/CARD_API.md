@@ -1891,6 +1891,13 @@ umgeht über `ignoreUntargetable` NUR das Wählen, nie „unaffected"
 **Effekt-Immunität für Kreaturen:** `engine.grantCreatureEffectImmunity
 (inst, sourceObj)` / `creatureHasEffectImmunity(inst)` — Gegenstück zu
 `grantEffectImmunity` (Helden), gleiche Liste, gleiches Fenster.
+**Lebensdauer (Z2, A03-02):** Effekt-Immunitäten gelten „für diese
+Auflösung" und enden mit ihr — `engine.endeEffektImmunitaeten()` am
+Aktions-Ende (`onAnyActionResolved`, nur oberste Ebene, VOR den Zuhörern
+und dem Bleed), beim Zauber-Abbruch (`doPlaySpell`) und beim Betreten der
+End-Phase; Zielfenster und Zugbeginn leeren weiter als Sicherung. Eine
+Reaktion, die Immunität gewährt, schützt also die laufende Auflösung,
+nie fremden Schaden desselben Zuges (Bomb Mite, Passiv-Trigger).
 
 **Board-seitiges Post-Target-Fenster:** `isPostTargetBoardReaction:
 true`, `postTargetBoardCondition(gs, pi, engine, targets, source, inst,
@@ -16589,6 +16596,20 @@ genau diesen Zähler räumt (`clearCountersOnExpire`). Wer nur
 `counters.negated` liest, sieht eine „1" und keine Dauer. Das Badge
 sucht jetzt über `fristAusBuffs(statusKey)` auch dort nach
 `expiresAtTurn`.
+
+**Zähler teilen (Z2, A04-28/A09-21/M01-21):** mehrere Negierungs-Buffs
+derselben Kreatur teilen sich EINEN Zähler (`negated`/`nulled`).
+`actionRemoveCreatureBuff` räumt einen Zähler aus `clearCountersOnExpire`
+nur, wenn kein anderer Buff ihn noch führt; der letzte Halter räumt ab
+(und nur er vergibt `cc_immune` nach Ablauf). Eine Kreatur-Negierung mit
+Frist legt man immer über `actionNegateCreature(…, { expiresAtTurn,
+expiresForPlayer })` an — `applyCreatureStatus('negated', { duration })`
+setzt nur `negatedDuration`, und das liest niemand (Sparky Slime, Null).
+**Überspringen (Zhu):** `switchTurn` lässt beim übersprungenen Zug die
+Buff-Fristen dieses Zuges verfallen (`_processBuffExpiry`), sonst stünde
+z. B. der Niu-Bonus („this turn") im nächsten eigenen Zug noch.
+**Anhängsel-Negierung** (`_fromAttachment`/`permanent`: Decisive Defeat,
+Stowaway) räumt `processStatusExpiry('END')` NICHT; sie lebt mit der Karte.
 
 **Dasselbe Muster wie beim Frost (v1013), nur eine Ebene tiefer:** dort
 lag die Dauer in einem Geschwisterfeld (`frozenDuration`), hier in einem
