@@ -148,6 +148,10 @@ module.exports = {
           if (wisdomCost > 0 && engine.handFodderFor(pi, cardName) < wisdomCost
               && !engine.discardCostWaived(pi)) continue;
         }
+        // ★ Z7 (S03-P1): „Einmal pro Spiel" (Divine Gift …) gilt auch für den Folgezauber — Wirkung
+        // und Stempel liegen in `_castSpellImmediately`, hier fällt die verbrauchte Karte nur aus dem Angebot.
+        const _opg = loadCardEffect(cardName);
+        if ((_opg?.oncePerGame || _opg?.oncePerGameKey) && ps._oncePerGameUsed?.has(_opg.oncePerGameKey || cardName)) continue;
         seen.add(cardName);
         eligibleSpells.push({ name: cardName, source: 'hand' });
       }

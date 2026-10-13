@@ -104,6 +104,10 @@ module.exports = {
     if (cd?.cardType !== 'Artifact') return false;
     if (!ctx.card.counters) ctx.card.counters = {};
     ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    // ★ Z7 (A04-05): Abbruch/Fehlschlag VOR der Zusage verbraucht die Einmal-Nutzung NICHT (Regel 23.9) —
+    // der Zählerstempel geht zurück, und `false` hält auch die Engine-Rundensperre offen (ein blankes
+    // `return;` gilt dort als Erfolg).
+    const abbruch = () => { delete ctx.card.counters[HOPT_KEY]; return false; };
 
     const ps = engine.gs.players[pi];
 
@@ -136,7 +140,7 @@ module.exports = {
           });
         }
       }
-      if (targets.length === 0) return;
+      if (targets.length === 0) return abbruch();
       const pick = await engine.promptEffectTarget(pi, targets, {
         maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
@@ -147,9 +151,9 @@ module.exports = {
         exclusiveTypes: true,
         maxPerType: { hero: 1, equip: 1 },
       });
-      if (!pick || pick.length === 0) return;
+      if (!pick || pick.length === 0) return abbruch();
       const sel = targets.find(t => t.id === pick[0]);
-      if (!sel) return;
+      if (!sel) return abbruch();
       const heroIdx = sel.heroIdx;
       const slotIdx = sel.type === 'hero' ? sel._autoSlot : sel.slotIdx;
 
@@ -162,7 +166,7 @@ module.exports = {
       await engine._delay(620);
 
       const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
-      if (!popped) return;
+      if (!popped) return abbruch();
       const placed = engine.safePlaceInSupport(top, pi, heroIdx, slotIdx);
       if (!placed?.inst) return;
       placed.inst.zone = 'support';
@@ -197,7 +201,7 @@ module.exports = {
     // siehe Gratis-Scope weiter unten.
     const { loadCardEffect } = require('./_loader');
     const script = loadCardEffect(top);
-    if (!script) return;
+    if (!script) return abbruch();
 
     // Build validTargets + config for targeting artifacts.
     const isTargetingArtifact = !!(script.getValidTargets && script.targetingConfig);
@@ -222,15 +226,15 @@ module.exports = {
       // board targets, just deck searches) declare `alwaysConfirmable`
       // so the confirm fires with 0 selections. Don't bail on empty
       // validTargets in that case.
-      if (validTargets.length === 0 && !config.alwaysConfirmable) return;
+      if (validTargets.length === 0 && !config.alwaysConfirmable) return abbruch();
 
       const pick = await engine.promptEffectTarget(pi, validTargets, config);
-      if (pick == null) return; // null/undefined = cancel
+      if (pick == null) return abbruch(); // null/undefined = cancel
       // Empty `pick` is OK iff alwaysConfirmable (the user confirmed
       // with no selections — Magnetic Glove's deck-search flow).
-      if (pick.length === 0 && !config.alwaysConfirmable) return;
+      if (pick.length === 0 && !config.alwaysConfirmable) return abbruch();
       if (pick.length > 0 && script.validateSelection
-          && !script.validateSelection(pick, validTargets)) return;
+          && !script.validateSelection(pick, validTargets)) return abbruch();
       selectedIds = pick;
     }
 
@@ -239,7 +243,7 @@ module.exports = {
     // mode='pop' dest='board' so the client unmasks the new Stack top
     // synchronously when the next sync arrives.
     const popped = await ctx.popCoolnessStackTo(pi, 'board', { source: CARD_NAME });
-    if (!popped) return;
+    if (!popped) return abbruch();
     engine.sync();
 
     // Kosten umgehen ueber den Gratis-Scope (`engine.kostenlosSpielen`):

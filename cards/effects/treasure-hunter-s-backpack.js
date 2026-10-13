@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');
+const { loadCardEffect } = require('./_loader');
 const { waehleAusruestPlatz, ausruestTraegerMitSeite } = require('./_equip-shared');
 
 const CARD_NAME = "Treasure Hunter's Backpack";
@@ -44,6 +45,10 @@ function buildEligibleGallery(gs, pi, engine) {
     const cd = _getCardDB()[cardName];
     const cost = cd.cost || 0;
     if (cost > MAX_EQUIP_COST) continue;
+    // ★ Z7 (F03-06): das Backpack SPIELT die Ausrüstung („play it immediately") — „You can only
+    // play 1 … per game" (Smug Coin) gilt also auch hier: kein verbrauchtes Exemplar anbieten.
+    const _sc = loadCardEffect(cardName);
+    if ((_sc?.oncePerGame || _sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(_sc.oncePerGameKey || cardName)) continue;
     // ★ Als Regel 19.8.: eine Ausruestung ohne legalen Traeger ist
     // keine legale Wahl. Gibt es dadurch gar keine, ist die Karte
     // insgesamt nicht aktivierbar (siehe `canActivate` unten).
@@ -151,6 +156,14 @@ module.exports = {
 
     const inst = engine._trackCard(equipName, seite, 'support', destHeroIdx, destSlot);
     if (seite !== pi) inst.originalOwner = pi;
+    // ★ Z7 (F03-06): … und die gespielte Ausrüstung verbraucht ihre Partie-Grenze.
+    {
+      const _es = loadCardEffect(equipName);
+      if (_es?.oncePerGame || _es?.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(_es.oncePerGameKey || equipName);
+      }
+    }
 
     engine.sync();
 

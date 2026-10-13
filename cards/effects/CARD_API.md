@@ -11443,6 +11443,32 @@ Mitgeprüft und in Ordnung:
 * Ausgrauung im Client: `getBlockedSpells`,
   `getHeroEligibleActionCards` und die Projektion `oncePerGameUsed`.
 
+### ★ Z7 — Einmal-Stempel („1 pro Zug / 1 pro Spiel") bei Negation, Abbruch, Sofort-Guss (Welle 2)
+
+**Regel (eine Stelle):** Eine Spell/Attack/Artifact/Potion-Karte, die die Hand verlassen hat und
+dann **negiert** wird (oder beim Auflösen **fizzelt**, v1328), war **GESPIELT** (Ruling v1031,
+Rusty Touch „der Gegner zahlt trotzdem") — ihr „You can only play/activate 1 … per turn/game"
+ist verbraucht. Ein **Abbruch durch den Spieler** (auch die Ablehnung des Eye-of-Ren-Freikaufs)
+ist das Gegenteil: nichts ist passiert, nichts ist gestempelt.
+
+* `executeCardWithChain` ruft bei negierter/fizzelnder Initialkarte (nicht `fromBoard`, nicht
+  Platzierung, nicht Creature/Ability) `engine._noteNegatedPlay(...)`:
+  * `oncePerGame` / `oncePerGameKey` stempelt die Engine **automatisch** (`ps._oncePerGameUsed`);
+  * Rundensperren melden **Karten selbst** über den optionalen Haken
+    `onNegatedPlay({ engine, gs, pi, heroIdx, cardName, cardType })` — dieselbe Marke, die das
+    Skript sonst im `resolve`/`onPlay` setzt (meist `engine.claimHOPT(KEY, pi)`). **Wer eine neue
+    „only play 1 per turn"-Karte schreibt, ergänzt den Haken.**
+  * Hörer-Hook `afterSpellNegatedPlay` (Gegenstück zu `afterSpellResolved`, nur für Zähler wie
+    Kogarasu „1 Spell pro Zug" — nie für Wirkungen).
+* Creature-Beschwörungen stempeln `oncePerGame` weiter erst bei der **Landung** (v1030).
+* Zielende Artefakte (`doConfirmPotion`) und Normal-Artefakte (`doUseArtifactEffect`) haben jetzt
+  Tor **und** Stempel für `oncePerGame` (Perfect Disguise).
+* Sofort-Güsse: `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit `opts.pruefen`).
+* Abgelehnter Ablage-Freikauf (`_applyDiscardOutDecline`) gibt die im `resolve` gestempelten
+  Rundensperren (`gs.hoptUsed`) zurück.
+* „Up to N times per turn" (`chargesPerTurn` + `chargeKey`, z. B. 3-Headed Giant): eine negierte
+  Aktivierung verbraucht **eine** Nutzung; die Rundensperre fällt erst bei der letzten.
+
 
 ## ★ Puzzle-Editor: Tooltip lag unter der Hand (v1032, Als Befund 12.9.)
 

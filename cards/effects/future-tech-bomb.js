@@ -36,6 +36,9 @@ const JE_NAME = 20;
 const DECKEL = 100;
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('future-tech-bomb', pi); },
+
   isPotion: true,
 
   canActivate(gs, playerIdx) {
