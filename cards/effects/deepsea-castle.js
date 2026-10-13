@@ -48,7 +48,7 @@ const CARD_NAME = 'Deepsea Castle';
 // excludes any in a Diver-Helmet Hero's Support Zones (those are
 // "unaffected by Areas").
 function swappableCreatures(engine, pi) {
-  return ownSupportCreatures(engine, pi, { needsLevel: true }).filter(inst => !isAreaImmuneInst(engine, inst));
+  return ownSupportCreatures(engine, pi, { needsLevel: true, ohneLeihgabe: true }).filter(inst => !isAreaImmuneInst(engine, inst));
 }
 
 // Effective level of a board Creature instance, with all live reducer
@@ -131,10 +131,11 @@ module.exports = {
     });
     if (pickable.length === 0) return false;
     const zones = pickable.map(inst => {
-      const hero = ps.heroes[inst.heroIdx];
+      const seite = engine.physicalSide(inst);   // Held/Slot gibt es auf beiden Brettern
+      const hero = gs.players[seite]?.heroes?.[inst.heroIdx];
       const lvl = _instLevel(engine, inst);
       return {
-        heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+        owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         label: `${hero?.name || 'Hero'} — ${inst.name} (Lv${lvl}, Slot ${inst.zoneSlot + 1})`,
       };
     });
@@ -149,6 +150,7 @@ module.exports = {
     if (!picked) return false;
     const chosenInst = pickable.find(i =>
       i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx
+      && (picked.owner ?? engine.physicalSide(i)) === engine.physicalSide(i)
     );
     if (!chosenInst) return false;
     const chosenName = chosenInst.name;

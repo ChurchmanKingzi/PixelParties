@@ -100,7 +100,9 @@ module.exports = {
       });
       if (!picked) return;
 
-      const chosenInst = candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx);
+      // Held/Slot gibt es auf BEIDEN Brettern — die Brettseite (`picked.owner`) gehört zur Wahl.
+      const chosenInst = candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx
+        && (picked.owner ?? engine.physicalSide(i)) === engine.physicalSide(i));
       if (!chosenInst) return;
       const copiedName = chosenInst.name;
 

@@ -56,7 +56,7 @@ function _instLevel(engine, inst) {
 function _hasOldCreatureWithReplacement(engine, pi) {
   const gs = engine.gs;
   const turn = gs.turn || 0;
-  const creatures = ownSupportCreatures(engine, pi, { needsLevel: true });
+  const creatures = ownSupportCreatures(engine, pi, { needsLevel: true, ohneLeihgabe: true });
   for (const inst of creatures) {
     if ((inst.turnPlayed || 0) >= turn) continue;
     const lvl = _instLevel(engine, inst);
@@ -67,7 +67,7 @@ function _hasOldCreatureWithReplacement(engine, pi) {
 
 /** True if ANY own creature has an eligible replacement (no turn filter). */
 function _hasAnySwappable(engine, pi) {
-  const creatures = ownSupportCreatures(engine, pi, { needsLevel: true });
+  const creatures = ownSupportCreatures(engine, pi, { needsLevel: true, ohneLeihgabe: true });
   for (const inst of creatures) {
     const lvl = _instLevel(engine, inst);
     if (eligibleSwapReplacements(engine, pi, inst.name, lvl).length > 0) return true;
@@ -121,7 +121,7 @@ module.exports = {
       // Build the pickable-creature list — filtered by the additional-
       // action restriction when applicable.
       const turn = gs.turn || 0;
-      const allOwn = ownSupportCreatures(engine, pi, { needsLevel: true });
+      const allOwn = ownSupportCreatures(engine, pi, { needsLevel: true, ohneLeihgabe: true });
       const creatures = asAdditional
         ? allOwn.filter(inst => (inst.turnPlayed || 0) < turn)
         : allOwn;
@@ -135,10 +135,11 @@ module.exports = {
 
       // ── Step 1: pick which own Creature to bounce ─────────────────
       const zones = pickable.map(inst => {
-        const hero = ps.heroes[inst.heroIdx];
+        const seite = engine.physicalSide(inst);   // Held/Slot gibt es auf beiden Brettern
+        const hero = gs.players[seite]?.heroes?.[inst.heroIdx];
         const lvl = _instLevel(engine, inst);
         return {
-          heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+          owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
           label: `${hero?.name || 'Hero'} — ${inst.name} (Lv${lvl}, Slot ${inst.zoneSlot + 1})`,
         };
       });
@@ -155,6 +156,7 @@ module.exports = {
       if (!picked) { gs._spellCancelled = true; return; }
       const chosenInst = pickable.find(i =>
         i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx
+        && (picked.owner ?? engine.physicalSide(i)) === engine.physicalSide(i)
       );
       if (!chosenInst) { gs._spellCancelled = true; return; }
       const chosenName = chosenInst.name;
