@@ -120,6 +120,7 @@ function refreshWeakeningCrystalNegation(engine, opts = {}) {
     let neuAngelegt = 0;
     for (const hero of ps.heroes) {
       if (!hero?.name) continue;
+      if (typeof opts.onlyHero === 'number' && ps.heroes.indexOf(hero) !== opts.onlyHero) continue;   // Z2: nur dieser Held
       if (hasCrystal) {
         if (!opts.reapply) continue;               // nur aufraeumen
         const cur = hero.statuses?.negated;

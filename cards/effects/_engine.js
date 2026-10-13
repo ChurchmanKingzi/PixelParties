@@ -18138,6 +18138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
           await this.removeHeroStatus(pi, hi, statusName);
+          if (statusName === 'negated') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: pi, onlyHero: hi });   // Z2 (A08-20), s. processStatusExpiry
           expired = true;
         }
       }
@@ -45223,6 +45224,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (hero.statuses.negated && !hero.statuses.negated.sourceBound
             && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
           await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
+          // ★ Z2 (A08-20): lag eine FREMDE Negation auf dem Helden, hielt die Kristall-Anlage still (sie
+          // ueberschreibt Fremdes nicht); laeuft die Fremde ab, gilt der Kristall in der Hand wieder SOFORT
+          // (nur dieser Held — eine Heilung bleibt bis zum naechsten Rundenbeginn, Ruling v1103).
+          this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: ap, onlyHero: hi });
         }
         // Bound: same default semantics as stunned/frozen — clears at
         // end of the active player's turn unless the source applied an
