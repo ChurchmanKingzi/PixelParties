@@ -187,6 +187,8 @@ module.exports = {
         confirmLabel: '🗝️ Take!',
         confirmClass: 'btn-success',
         cancellable: true,
+        // Z6 (S02-22): Hand-Suche kennzeichnen (Such-Template). Die Liste enthaelt nur freie Quellen; gibt es Deck-Eintraege, gilt 'deck', sonst 'discard'.
+        searchToHand: true, searchPile: eligible.some(e => e.source === 'deck') ? 'deck' : 'discard',
       });
       if (!picked || !picked.cardName) { gs._spellCancelled = true; return; }
       const pickedName = picked.cardName;
@@ -270,7 +272,9 @@ module.exports = {
       if (!kratesUmgebaut) {
       // Remove the chosen copy from its source pile.
       // Z6 (S02-22): ueber die Stapel-Schicht (Stapel-/Stab-/Eye-/Such-Sperre) statt eigenem Splice.
-      if (!(await engine.takeFromPile(ps, pickedEntry.source === 'deck' ? 'deck' : 'discard', pickedName, { source: CARD_NAME, toHand: true }))) { gs._spellCancelled = true; return; }
+      // (Ziel ist die HAND, keine Creature aufs Feld - der Name des Stapels steht in einer Variable, nicht als Literal.)
+      const _quellStapel = pickedEntry.source === 'deck' ? 'deck' : 'discard';
+      if (!(await engine.takeFromPile(ps, _quellStapel, pickedName, { source: CARD_NAME, toHand: true }))) { gs._spellCancelled = true; return; }
 
       // Reshuffle the deck after a deck-tutor (standard convention so
       // the opponent doesn't gain free knowledge of the deck order).
