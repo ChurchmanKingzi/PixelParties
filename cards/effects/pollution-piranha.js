@@ -212,12 +212,15 @@ module.exports = {
       const self = ctx.card; // listener = this Piranha
 
       if (ctx.fromZone !== 'support') return;
-      if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      // Z1 (A01-33): `fromOwner` ist die BRETTSEITE, `cardOwner` der Kontrolleur — eine gestohlene
+      // Piranha liegt auf der Seite des Besitzers; verglichen wird deshalb mit ihrer Brettseite.
+      const _seite = self ? engine.physicalSide(self) : ctx.cardOwner;
+      if (ctx.fromOwner !== undefined && ctx.fromOwner !== _seite) return;
       if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
       if (ctx.fromZoneSlot !== undefined && self?.zoneSlot !== undefined
           && ctx.fromZoneSlot !== self.zoneSlot) return;
 
-      const ownerIdx = self?.owner ?? ctx.cardOwner;
+      const ownerIdx = (self ? engine.kontrolleurVon(self) : null) ?? ctx.cardOwner;   // Z1: „your hand" = Kontrolleur
       if (ownerIdx == null) return;
       const ps = gs.players[ownerIdx];
       if (!ps) return;

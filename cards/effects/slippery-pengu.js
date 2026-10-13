@@ -63,6 +63,9 @@ function eligiblePartnerCreatures(engine, pi, excludeInstId) {
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
+    // Z1 (A02-28): verschoben wird zu „your adjacent … Heroes" — nur Kreaturen auf der eigenen
+    // BRETTSEITE sind Partner (eine geliehene Gegnerkreatur liegt bei den Helden des Gegners).
+    if (engine.physicalSide(inst) !== pi) continue;
     if (inst.id === excludeInstId) continue;
     if (inst.name === CARD_NAME) continue;
     if (inst.faceDown) continue;

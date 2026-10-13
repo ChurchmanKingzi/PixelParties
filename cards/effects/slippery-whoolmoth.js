@@ -41,9 +41,10 @@ const HIT_DAMAGE = 120;
  * Token als Creature hatte (und Monster in a Bottle blieb gesperrt).
  */
 function slotHoldsCreature(engine, cardDB, ownerIdx, heroIdx, slotIdx, slot) {
-  const inst = engine.cardInstances?.find(c =>
-    c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === slotIdx
-    && (c.owner === ownerIdx || c.controller === ownerIdx));
+  // Z1 (A02-31): `ownerIdx` ist hier die BRETTSEITE der durchsuchten Zone — Instanz ueber die
+  // Brettseite, nicht ueber „Besitzer oder Kontrolleur" (sonst trifft eine geliehene Kreatur
+  // an gleicher Koordinate der Gegenseite).
+  const inst = engine.kreaturAnBrett(ownerIdx, heroIdx, slotIdx);
   const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
   return !!cd && hasCardType(cd, 'Creature');
 }

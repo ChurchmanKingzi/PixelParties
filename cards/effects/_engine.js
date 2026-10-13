@@ -16896,7 +16896,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (maxSize === undefined) {
       maxSize = 7;
       for (const inst of this.cardInstances) {
-        if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
+        // Z1 (A01-29): „Your max hand size" = KONTROLLEUR (Royal Corgi / Pollution Token), nicht Besitzer.
+        if (this.kontrolleurVon(inst) === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
           maxSize -= inst.counters.handLimitReduction || 0;
         }
       }
@@ -17026,7 +17027,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._shouldBypassHandLimit(playerIdx)) return;
     let reduction = 0;
     for (const inst of this.cardInstances) {
-      if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
+      if (this.kontrolleurVon(inst) === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {   // Z1 (A01-29): Kontrolle
         reduction += inst.counters.handLimitReduction || 0;
       }
     }

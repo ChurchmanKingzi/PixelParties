@@ -89,6 +89,9 @@ const SACRIFICE_SPEC = {
 function _collectTributeCandidates(engine, playerIdx, selfId) {
   let cs = engine.getSacrificableCreatures(playerIdx);
   if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
+  // Z1 (A02-37): „from your side of the board" — eine GELIEHENE Kreatur (Succubus & Co.) steht auf
+  // der Brettseite des Gegners und waere sonst Tribut mit Rueckkehr auf DESSEN Hand.
+  cs = cs.filter(c => c.inst.stolenBy == null);
   // DDG's text: "not summoned this turn." The generic
   // `getSacrificableCreatures` deliberately skips this filter (cards
   // like Sacrifice to Divinity sacrifice anything you control), so
