@@ -15,7 +15,8 @@ const H = require('../../lib/h.js');
     const t = await H.fresh({ hand: [['Healing Melody'], []] });
     const mine = t.put(0, 0, 0, H.INERT.creature); mine.counters.currentHp = 100;
     const theirs = t.put(1, 0, 0, H.INERT.creature); theirs.counters.currentHp = 100;
-    t.engine.actionStealCreature(0, theirs);
+    await t.engine.actionStealCreature(0, theirs);
+    await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
     await t.play(0, 'Healing Melody', { hero: 0 });
     R.check('Kontrollprobe: eigene Kreatur geheilt', mine.counters.currentHp > 100, mine.counters.currentHp);
     R.check('(a) gestohlene Kreatur, die ich kontrolliere, wird geheilt', theirs.counters.currentHp > 100, theirs.counters.currentHp);
@@ -25,7 +26,8 @@ const H = require('../../lib/h.js');
     R.section('(b) meine Kreatur, die der Gegner kontrolliert (controller=1, owner=0)');
     const t = await H.fresh({ hand: [['Healing Melody'], []] });
     const mine = t.put(0, 0, 0, H.INERT.creature); mine.counters.currentHp = 100;
-    t.engine.actionStealCreature(1, mine);
+    await t.engine.actionStealCreature(1, mine);
+    await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
     await t.play(0, 'Healing Melody', { hero: 0 });
     R.check('(b) vom Gegner kontrollierte Kreatur wird NICHT geheilt', mine.counters.currentHp === 100, mine.counters.currentHp);
   }
@@ -33,7 +35,8 @@ const H = require('../../lib/h.js');
     R.section('(c) mein Held 1, vom Gegner kontrolliert (Charme)');
     const t = await H.fresh({ hand: [['Healing Melody'], []] });
     t.hero(0, 0).hp = 300; t.hero(0, 1).hp = 300;
-    t.engine.actionStealHero(1, 0, 1);
+    await t.engine.actionStealHero(1, 0, 1);
+    await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
     await t.play(0, 'Healing Melody', { hero: 0 });
     R.check('Kontrollprobe: Held 0 geheilt', t.hp(0, 0) > 300, t.hp(0, 0));
     R.check('(c) vom Gegner kontrollierter Held wird NICHT geheilt', t.hp(0, 1) === 300, t.hp(0, 1));

@@ -252,3 +252,31 @@ Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (w
 - **Vermutete Ursache:** `unsettling-opportunist-vullary.js` übergibt `negateEffects: true` nicht an `actionPlaceCreature` (Master's Key tut es: `the-master-s-key.js:154`); `negated_placement` wird nachträglich von Hand gesetzt.
 - **Restunsicherheit (daher B):** wie bei A01-pollution-22 – die Autoren könnten „negate its effects" bewusst nur auf laufende/aktive Effekte beziehen.
 
+
+### A07-28 · Mao: die Negation „bis zum Beginn deines nächsten Zuges" endet nie · Stufe A
+- **Karten:** Mao, the Vengeful Guardian (`mao-the-vengeful-guardian.js:169-175`); Gegenbeispiel richtig gerechnet: Vullary (`unsettling-opportunist-vullary.js:165`)
+- **Voraussetzungen / Aufbau:** Mao als Held 0 (Sitz 0), Guardian Beast Ma frisch auf dem Brett, eigene Ablage 8 (3 verschiedene Guardian Beasts + 5 Füller), gegnerische 8; Zug 5.
+- **Schritte:** 1. Mao aktivieren, Ma wählen, 5 Karten löschen. 2. `t.endTurn()` (Zug 6, Gegner). 3. `t.endTurn()` (Zug 7, eigener nächster Zug). 4. Zwei weitere Runden.
+- **Erwartet** (Mao: „Negate that Creature's effects **until the beginning of your next turn** afterwards."): Ma ist in Zug 6 negiert und ab Beginn von Zug 7 nicht mehr.
+- **Beobachtet:** Ma bleibt dauerhaft negiert (Zug 7 und Zug 9 noch `counters.negated = 1`). Der Buff `mao_negated` trägt `expiresAtTurn: 6, expiresForPlayer: 0`; `_ablaufFaellig` (`_engine.js:17957`) verlangt `expiresForPlayer === activePlayer` **und** `expiresAtTurn === currentTurn`; Zug 6 gehört dem Gegner, Zug 7 ≠ 6 – die Bedingung tritt nie ein.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/28-mao-negation-endet-nie.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `mao-the-vengeful-guardian.js:169-173` setzt `expiresAtTurn: gs.turn + 1` mit `expiresForPlayer: pi`. `gs.turn` zählt je Spielerwechsel, die nächste eigene Runde ist `+2` (so rechnet Vullary mit dem Kommentar „`gs.turn` zaehlt pro Spielerwechsel"). Folge: jede mit Mao gefeuerte Bestie ist für den Rest der Partie stumm (Passiv-Hooks, Aktivierung, Siegbedingungen); zusätzlich erfüllt A07-14 (Mao → Gou) die Bedingung dauerhaft.
+
+### A07-29 · Harpyformer Choir: der gewirkte Schutz endet, sobald der Choir stirbt oder stillgelegt wird · Stufe B
+- **Karten:** Harpyformer Choir (`harpyformer-choir.js`, `beforeCreatureDamageBatch` + `counters._choirShield`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Choir (ohne Schlaf) + zweite Kreatur (1000 HP) auf dem Brett, „Summoning Magic" auf der Hand; Main Phase 1.
+- **Schritte:** 1. Choir aktivieren (Summoning Magic abwerfen → Schild gesetzt). 2. Choir negieren / einfrieren / betäuben / zerstören. 3. 150 Kreaturenschaden auf die zweite Kreatur.
+- **Erwartet** (Choir: „… discard a Summoning Magic Ability, and if you do, the next damage a Creature you control would take **until the beginning of your next turn** is reduced by 100."; Kontrolle ohne Zustand: 50 Schaden ✓): der Schutz ist ein einmal gewirkter Effekt mit eigener Frist; der Text nennt – anders als Gou („If this Creature leaves the board, this effect ends") – keine Bindung an den Choir.
+- **Beobachtet:** Negiert, gefroren, betäubt und tot: 150 Schaden, der Schild bleibt als totes Flag `_choirShield = true` am Choir-Objekt stehen. `runHooks` ruft Hooks stillgelegter/toter Kreaturen nicht auf, und der Schild sitzt ausschließlich im Choir-Hook.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/29-choir-schild-endet-mit-choir.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Schutzzustand am Verursacher statt als eigenständiger Spieler-/Zug-Eintrag (Gous Weg über `gs`-Einträge, `guardian-beast-gou.js:225-235`, ist robuster bei Negation, nicht bei Verlassen des Bretts).
+- **Restunsicherheit (daher B):** gleiche Klasse wie A07-14; dort nennt der Text das Verlassen ausdrücklich, hier nicht – deshalb die Einordnung B statt C.
+
+### A07-30 · Lizbeth: das geliehene Fighting zählt auch von gefrorenen/betäubten Gegnerhelden (und bleibt nach Mitten-im-Zug-Frost stehen) · Stufe B
+- **Karten:** Lizbeth, the Reaper of the Light (`lizbeth-the-reaper-of-the-light.js`, `recomputeFighting` ~Z. 140-170 gegenüber `maxOpponentAbilityLevel` ~Z. 80)
+- **Voraussetzungen / Aufbau:** Sitz 0: Lizbeth (Held 0, ATK 100); Sitz 1: Held 0 mit Fighting ×3 (+10/+10/+20, `atkGranted` gesetzt); Gegnerheld per `addHeroStatus(…'frozen'|'stunned', {duration: 4})`, damit der Status Lizbeths Zug erreicht; zwei `endTurn()` bis Zug 7.
+- **Erwartet** (Lizbeth: „… may use the Abilities of all Heroes your opponent controls … as if they were attached to it. … For Fighting, only the highest-level opponent Fighting contributes ATK"; Konvention im selben Skript: `maxOpponentAbilityLevel` – „capable hosts only — dead / frozen / stunned / negated opponents contribute nothing"; gemessen: `heroMeetsLevelReq` zählt einen gefrorenen Gegnerhelden ebenfalls nicht): ein gefrorener/betäubter Gegnerheld liefert kein Fighting ⇒ Lizbeth bleibt bei ATK 100.
+- **Beobachtet:** Kontrolle (arbeitender Gegnerheld) 140 ✓. Gegnerheld gefroren bzw. betäubt (Status steht in Lizbeths Zug): ATK 140. Wird der Gegnerheld erst mitten in Lizbeths Zug eingefroren, bleibt der Bonus bis zum Zugwechsel stehen (neu berechnet wird nur an Zuggrenzen und bei Tod; Tod mitten im Zug ✓ räumt auf). Ebenso bleibt der Bonus, wenn Lizbeth selbst mitten im Zug eingefroren wird (harmlos, ein gefrorener Held greift nicht an).
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/30-lizbeth-fighting-gefrorener-gegner.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `recomputeFighting` nutzt `fightingTotalForHero` (nur `hp > 0`) und filtert Frost/Betäubung/Negation der Gegnerhelden nicht, anders als `maxOpponentAbilityLevel`. Negation wurde nicht geprüft: der Status `negated` hält nicht bis in Lizbeths Zug (Zugende-Räumung des Gegners).
+- **Restunsicherheit (daher B):** Fighting wirkt beim Gegnerhelden selbst auch im gefrorenen Zustand (es ist ein ATK-Stempel, kein Hook); ob „Abilities of frozen Heroes" borrowbar sind, steht nirgends ausdrücklich – die Konvention im Skript selbst spricht dagegen.

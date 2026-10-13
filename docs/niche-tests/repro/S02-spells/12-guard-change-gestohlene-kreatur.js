@@ -13,7 +13,8 @@ const H = require('../../lib/h.js');
   const t = await H.fresh({ hand: [['Guard Change'], []] });
   t.engine.isCpuPlayer = () => false;                 // Mensch-Pfad (der Harness-Standard „beide Sitze CPU" nähme den CPU-Kurzweg)
   const Y = t.put(1, 0, 0, H.INERT.big); Y.counters.currentHp = 1000; Y.counters.maxHp = 1000;
-  t.engine.actionStealCreature(0, Y);
+  await t.engine.actionStealCreature(0, Y);
+  await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
   let offered = false, asked = 0;
   t.script.push({ match: d => d.type === 'guardChangeMove', answer: (d) => {
     asked++;

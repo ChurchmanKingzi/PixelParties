@@ -182,6 +182,76 @@ Stand/Autor: Agent A04-cute, 12.10.2026. Karten: 62 in der Liste · (wird fortla
 - **Repro:** `docs/niche-tests/repro/A04-cute/21-cooldin-spatial-crevice.js`
 - **Vermutete Ursache:** `cooldin-king-of-coolness.js:215` `canActivateHeroEffect`: `(gs.areaZones?.[pi] || []).length > 0` → `false` statt `engine.canPlaceAnotherArea(pi, name)`.
 
+### A04-cute-22 · Lunatic Hawk (Stufe 3) verdoppelt die eigenen HP bei der eigenen Beschwörung nicht · Stufe C
+- **Karten:** Lunatic Hawk; Lunatic Cycle (New/Crescent/Half Moon)
+- **Voraussetzungen / Aufbau:** 3 verschiedene Cycles auf dem Brett, Summoning Magic 3, zwei Hawks auf der Hand.
+- **Schritte:** 1. Ersten Hawk beschwören. 2. Zweiten Hawk beschwören. 3. Max-HP beider vergleichen.
+- **Erwartet** (Hawk 3+: „The current and max HP of all Creatures you summon are doubled."): „all Creatures you summon" schließt den Hawk selbst ein, oder – falls nicht gewollt – der Text sagt „other".
+- **Beobachtet:** erster Hawk bleibt bei 100 HP, der später beschworene zweite wird vom ersten auf 200 verdoppelt; Cute Bunny 20 → 40 ✓. Der Unterschied hängt allein von der Beschwörungsreihenfolge ab.
+- **Repro:** `docs/niche-tests/repro/A04-cute/22-hawk-eigene-hp.js`
+- **Vermutete Ursache:** `lunatic-hawk.js` `onCardEnterZone` ignoriert den eigenen Eintritt („ignore our own entry").
+- **Frage an Al:** Soll Hawk bei der eigenen Beschwörung (Stufe 3 liegt schon) selbst verdoppelt werden – ja oder nein?
+
+### A04-cute-23 · Non-Fungible Monkee zahlt bei Schadens-Tod eines Monkee nichts aus · Stufe A
+- **Karten:** Non-Fungible Monkee; alle Monkees (getestet: Resilient Monkee, auch Nimble/Cheeky/Criminal in der Batterie)
+- **Voraussetzungen / Aufbau:** Sitz 0: Non-Fungible Monkee (Held 0) + Resilient Monkee (Held 1); Gegner spielt Fireball auf den Monkee (echter Spielweg). Zusatzprobe: gegnerischer Monkee stirbt durch `actionDealCreatureDamage`.
+- **Erwartet** (Kartentext: „Whenever a "Monkee" Creature is placed into one of your Heroes' Support Zones or leaves the board, you gain 4 Gold."): ein gestorbener Monkee verlässt das Brett → +4 Gold (eigener wie gegnerischer – Skriptkommentar „egal auf welcher Seite").
+- **Beobachtet:** Tod durch Schaden → 0 Gold (eigen und gegnerisch). Gegenprobe `actionDestroyCard` auf denselben Monkee → +4 Gold. Platzieren (+4) und Verschieben in Hand/Gelöscht (+4) ✓.
+- **Repro:** `docs/niche-tests/repro/A04-cute/23-nfm-schadenstod.js`
+- **Vermutete Ursache:** `non-fungible-monkee.js` lauscht nur auf `onCardLeaveZone`; der Todeszweig feuert den Hook ausdrücklich mit `_onlyCard` (`_engine.js:47302`, Kommentar dort: „Other cards that want to react to creature deaths should hook onCreatureDeath instead"). Die Karte hört nicht auf `onCreatureDeath`.
+
+### A04-cute-24 · Cute Bunny / Dog / Familiar / Annoyance Mini: die Beschwörung „as an additional Action" wird nicht als Aktion gemeldet (kein Bleed, keine Aktions-Hooks) · Stufe A
+- **Karten:** Cute Bunny, Cute Dog, Cute Familiar, Cute Annoyance Mini (Gegenprobe ✓: Fun-Fun Circus Clown; Nimble/Criminal/Resilient Monkee, Hipdall/Wildur/Swagdri-Stapelbeschwörung rufen die Meldung im Skript auf)
+- **Voraussetzungen / Aufbau:** Held 0 blutet (`statuses.bleeding`); Bunny nach 2 Abwürfen (`actionPromptForceDiscard(2)`), Dog/Familiar per Handabwurf (`actionDiscardHandCard`), Mini per Heldeneffekt mit Rider; `onAnyActionResolved` wird mitgeschnitten.
+- **Schritte:** 1. Die Beschwörung auslösen und annehmen. 2. Aufrufe von `onAnyActionResolved` und Held-HP prüfen.
+- **Erwartet** (Kartentexte „summon … as an additional Action"; Ruling CARD_API.md „Bleed"-Tabelle: „Creature-Beschwörung (auch Zusatz-, Inherent-, Freiaktionen) → `onAnyActionResolved` → Bleed"; `check-action-hook` / Nimble-Vermerk „v1349: ist eine Aktion"): Meldung `actionType 'creature', isAdditional`; blutender Held −50; Aktions-Beobachter (Flashbang „first Action", Madame Guillotine, Crescent Moon „performs an Action") sehen sie.
+- **Beobachtet:** Die Kreatur steht auf dem Brett, `onAnyActionResolved` feuert nicht (4 Fälle), Held-HP bleibt 800. Gegenprobe Clown: gemeldet.
+- **Repro:** `docs/niche-tests/repro/A04-cute/24-zusatzaktion-nicht-gemeldet.js`
+- **Vermutete Ursache:** `cute-bunny.js:176` ruft `summonCreatureWithHooks` ohne `alsZusatzaktion: true`; `cute-dog.js` / `cute-familiar.js` (Abwurf-Beschwörung) und `cute-annoyance-mini.js:288` (nur `hookExtras._summonedAsAdditional`) ebenso; `meldeBeschwoerungAlsAktion` (`_engine.js` ~14972) wird nirgends aufgerufen.
+
+### A04-cute-25 · Wildur: die umgeleitete Karte hinterlässt eine Waisen-Instanz in Zone „discard" · Stufe B
+- **Karten:** Wildur, the Shining Coolness (Auslöser: Handabwurf von ZZ Filler / Fireball / Cute Cat / Cute Bunny)
+- **Voraussetzungen / Aufbau:** Wowhalla + Stack `[Cute Phoenix]`, Wildur auf dem Brett, Zugbeginn-Hook gelaufen, Hand mit zwei gleichen Karten; die erste per `actionDiscardHandCard` abwerfen.
+- **Erwartet** (Wildur: „… is placed on top of your Coolness Stack instead"): Karte nur noch im Coolness Stack, Zone ↔ Instanz konsistent (eine Instanz je Kopie).
+- **Beobachtet:** Stack-Spitze stimmt, aber `cardInstances` enthält zusätzlich eine Instanz mit `zone: 'discard'`, obwohl die Ablage die Karte nicht enthält (Zonen: discard, hand, coolnessStack). `t.audit()` meldet nichts. Bei Kreaturentod entsteht keine Waise (dort untrackt die Engine die Leiche).
+- **Repro:** `docs/niche-tests/repro/A04-cute/25-wildur-waise-discard.js`
+- **Vermutete Ursache:** `wildur-the-shining-coolness.js` (`_installRedirect`): `engine._trackCard(first, pi, 'coolnessStack')` legt eine NEUE Instanz an; die Quell-Instanz (hand → discard) wird nicht ausgebucht. Folgen sind Suchen wie `_engine.js:7611/7662/19207/37001` (`zone === 'discard'` + Name); eine Auswirkung auf ein konkretes Spielverhalten habe ich nicht belegt (daher B).
+
+### A04-cute-26 · Wildurs Umleitung wirkt auch, wenn Wildur negiert / gefroren / betäubt ist · Stufe B
+- **Karten:** Wildur, the Shining Coolness (Querschnittsklasse „Dauereffekt ignoriert Status", Vergleich: Wowkyrie, Nornstellar, Hawk halten sich an `isCreatureEffectSuppressed`; Yolomungandr ebenfalls ✓ – Frost/Betäubung mit Dauer 1 laufen vor dem Zugende-Hook ab, mit Dauer 3 bleibt er stumm)
+- **Voraussetzungen / Aufbau:** wie -25; Wildur wird per `actionNegateCreature` / `applyCreatureStatus('frozen'|'stunned')` stummgeschaltet (`isCreatureEffectSuppressed(w) === true`), dann Handabwurf.
+- **Erwartet** (CARD_API.md „EIN Stummschalt-Prädikat": negierte/gefrorene/betäubte Kreaturen sind stumm): Karte landet regulär in der Ablage.
+- **Beobachtet:** in allen drei Zuständen wird sie auf den Coolness Stack umgeleitet (Gegenprobe normal ✓).
+- **Repro:** `docs/niche-tests/repro/A04-cute/26-wildur-ignoriert-status.js`
+- **Vermutete Ursache:** `wildur-the-shining-coolness.js` – der `discardPile.push`-Override (einmal installiert, bis Wildur geht) fragt nie `isCreatureEffectSuppressed`. (Vermutung, nicht gemessen: bei stummem Wildur läuft der Zugbeginn-Reset des Zugflags über `onTurnStart` ebenfalls nicht.)
+
+### A04-cute-27 · Cute Dog: ein abgelehntes Beschwörungsangebot verbraucht das „1 pro Zug" · Stufe C
+- **Karten:** Cute Dog
+- **Voraussetzungen / Aufbau:** Zwei Cute Dog auf der Hand, Held mit Summoning Magic 1; beide nacheinander abwerfen (`actionDiscardHandCard`); erstes Angebot mit „Nein" (`null`) beantworten.
+- **Erwartet** (Kartentext: „You can only summon 1 "Cute Dog" per turn with this effect."): begrenzt wird das *Beschwören*; ein abgelehntes Angebot beschwört nichts → der zweite Hund bekommt noch ein Angebot.
+- **Beobachtet:** Der zweite Hund bekommt kein Angebot (nur 1 Frage insgesamt), kein Hund auf dem Brett.
+- **Repro:** `docs/niche-tests/repro/A04-cute/27-dog-abgelehnt-verbraucht.js`
+- **Vermutete Ursache:** `cute-dog.js` `onDiscard`: `ps._cuteDogDiscardSummonUsed = true` direkt nach dem Prompt, Kommentar „Stamp regardless of accept/decline — the offer counts as the turn's use"; ebenso gestempelt, wenn danach keine freie Zone da ist. Absicht erkennbar, aber kein Al-Ruling vermerkt.
+- **Frage an Al:** Soll schon das Angebot (auch bei „Nein") den Einmal-pro-Zug-Platz verbrauchen – ja oder nein?
+
+### A04-cute-28 · Pink Sky: beim Ablauf verschwindet die Negierung einer Kreatur auch dann, wenn eine zweite, längere Negierung noch läuft · Stufe B
+- **Karten:** Pink Sky (zweite Quelle hier mit Lockes/Necromancys Muster nachgebaut: `actionNegateCreature(..., { expiresAtTurn: turn+2 })`; gleiche Mechanik für jede befristete Kreaturen-Negierung)
+- **Voraussetzungen / Aufbau:** Zug 5 (Sitz 0) spielt Pink Sky; gegnerische Kreatur negiert. Zug 6 (Sitz 1) legt eine zweite Negierung auf dieselbe Kreatur (bis Zug 8, Sitz 1).
+- **Schritte:** 1. `t.endTurn()` bis Zug 7 (Pink Sky läuft zu Beginn ab). 2. `isCreatureEffectSuppressed` prüfen.
+- **Erwartet** (Pink Sky: „until the end of your opponent's next turn"; die andere Negierung gilt bis Zug 8): Kreatur bleibt in Zug 7 stumm.
+- **Beobachtet:** `counters.negated` ist weg, der Buff der zweiten Negierung liegt noch da → Kreatur ist aktiv, eine Runde zu früh. (Gegenprobe ohne zweite Quelle: Ablauf korrekt.)
+- **Repro:** `docs/niche-tests/repro/A04-cute/28-pinksky-loescht-fremde-negierung.js`
+- **Vermutete Ursache:** `_engine.js:17938` `actionRemoveCreatureBuff` löscht `clearCountersOnExpire: ['negated']` ohne zu prüfen, ob ein anderer Buff denselben Zähler noch braucht (nur EIN Zählerfeld `negated`). Betrifft jede Karte mit befristeter Negierung; Pink Sky ist wegen „alle Kreaturen beider Seiten" die wahrscheinlichste Überlappung. Verwandt, aber andere Stelle als C05-02 (Helden-Status in `processStatusExpiry`).
+
+### A04-cute-29 · Army of the Cute und Cute Familiar zählen Xals Ability-Stapel in den Support Zones nicht (Klasse S01-20) · Stufe B
+- **Karten:** Army of the Cute, Cute Familiar; Hero Xal, the Animated Armor (Abilities in den Support Zones)
+- **Voraussetzungen / Aufbau:** wie S01-20: Xal als Held 0 von Sitz 0; Summoning Magic ×3 (bzw. Charme ×3) liegen als Stapel in Xals erster Support Zone, Ability-Zonen leer. Vergleich: dieselben Karten in der Ability-Zone. Army: Hand mit Phoenix/Bunny; Familiar auf dem Brett (Held 1), Main Phase 1.
+- **Schritte:** 1. Army wirken (`noGrant`), Budget der Galerie lesen. 2. Familiars Heldenaktion aktivieren (`activateCreature`).
+- **Erwartet** (Army: „… combined levels do not exceed 1/2/3"; Familiar: „a Hero you control with at least Charme 2"; Xals Stapel zählen für `heroMeetsLevelReq`/`effectiveSchoolLevelForCaster`): Budget 3; Familiar aktivierbar.
+- **Beobachtet:** Ability-Zone ✓ (Budget 3, aktivierbar). Support Zone: Army-Budget 1 (der Zauber ist spielbar, die Auswahl aber auf Stufe 1 gedeckelt); Familiar-Effekt nicht aktivierbar.
+- **Repro:** `docs/niche-tests/repro/A04-cute/29-xal-support-abilities-army-familiar.js`
+- **Vermutete Ursache:** `army-of-the-cute.js:51-54` (`levelBudget` → `countAbilitiesForSchool(…, abilityZones[heroIdx])`) und `cute-familiar.js:44-56` (`countCharme` liest nur `abilityZones`); richtig wäre `engine.effectiveSchoolLevelForCaster(...)` bzw. `heroSupportAbilityStacks`. Die Familiar-Rückkehr am Zugende (`onTurnEnd`, ebenfalls `countCharme`) habe ich nicht gesondert geprüft.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

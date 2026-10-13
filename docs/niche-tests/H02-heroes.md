@@ -227,6 +227,74 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/25-layn-master-uebernommene-helden-zonen.js` (✗ = Fehler tritt auf; 2 ✗)
 - **Vermutete Ursache:** `collectFreeZones(ps)` und `canActivateHeroEffect` laufen über `ps.heroes`/`ps.supportZones` (Spalte); vorgesehen wäre `engine.heroesControlledBy(pi)` mit Brettseite (vgl. Jenny -09).
 
+### H02-heroes-26 · Dajan (Explorer): das Deck-Ausrüsten umgeht Ausrüst-Sperren der Karte („A Hero can only have 1 Race Boat") · Stufe B
+- **Karten:** Legendary Explorer Dajan (`legendary-explorer-dajan.js` `_playEquip`); Messkarte Frog Race Boat (Vertrag `canEquipToHero` / `engine.canEquipCardToHero`)
+- **Voraussetzungen / Aufbau:** Dajan als Held 0, 100 Gold, Frog Race Boat bereits an Held 0, zweites Frog Race Boat im Deck; Galerie-Antwort = Frog Race Boat, Zielwahl = freie Zone von Held 0.
+- **Erwartet** (Kartentext Race Boat: „A Hero can only have 1 „Race Boat" Artifact equipped to it."; Dajan: „play it immediately"): Held 0 bietet keine Zonen an, kein zweites Boot an Held 0. Kontrolle: der Handweg lehnt das zweite Boot ab (✓).
+- **Beobachtet:** die freien Zonen von Held 0 werden angeboten, Held 0 trägt danach 2 Race Boats.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/26-dajan-explorer-race-boat-limit.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Vermutete Ursache:** `legendary-explorer-dajan.js:117-128` `_playEquip` fragt `canEquipCardToHero` nur für fremde Ausrüst-Helden (`fremdAusruestHelden`), nicht für die eigenen.
+
+### H02-heroes-27 · Dajan (Explorer): das Deck-Spielen ignoriert die Artefakt-Sperre (Boomerang) · Stufe B
+- **Karten:** Legendary Explorer Dajan; Boomerang (`ps._artifactLockTurn = gs.turn`: „You cannot play any Artifacts for the rest of this turn"); Messkarte Diver Helmet
+- **Voraussetzungen / Aufbau:** Dajan als Held 0, 100 Gold, Deck mit Diver Helmet, Boomerang gespielt (Main 1), danach Action Phase mit Dajans Heldeneffekt.
+- **Erwartet** (Kartentext Boomerang: „You cannot play any Artifacts for the rest of this turn."): Dajan kann keinen Artefakt aus dem Deck spielen. Kontrolle: Diver Helmet aus der Hand gesperrt (✓).
+- **Beobachtet:** Diver Helmet wird aus dem Deck ausgerüstet (Gold 100 → 97).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/27-dajan-explorer-artefaktsperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `legendary-explorer-dajan.js` `onHeroEffect` prüft `ps._artifactLockTurn` nicht; `_free-artifact-shared.js:64` (andere Gratis-Artefakt-Helden) und `doPlayArtifact` prüfen es.
+
+### H02-heroes-28 · Doq: der Spieler wählt die Handkarte selbst, der Text sagt „random card" · Stufe C
+- **Karten:** Great Detective Doq (`great-detective-doq.js` `runGuess`, Hook `onAttackDeclare`)
+- **Voraussetzungen / Aufbau:** Doq als Held 0; Gegnerhand [Fireball, Diver Helmet, Fireball]; Sitz 0 spielt „Attack"; Antwort: Handindex 1, Typ „Artifact".
+- **Erwartet** (Kartentext: „choose a **random** card from your opponent's hand and declare a card type"): Zufallswahl, kein Auswahl-Prompt; bewusste Wahl einer bekannten Karte (Premonition, aufgedeckte Karten) garantiert den Treffer nicht.
+- **Beobachtet:** `pickFromOppHand` mit allen drei Indizes; die gewählte Karte trifft garantiert (Gegner −250 statt −100, 2 Karten gezogen). Negiert: kein Effekt ✓ (Hook ruht). Der Kopfkommentar nennt die Klick-Wahl ausdrücklich („cherry-pick a known card for a guaranteed correct declaration"); ein Ruling zu „random" fand ich in CARD_API.md nicht.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/28-doq-waehlt-nicht-zufaellig.js` (✗ = Abweichung vom Text; 2 ✗)
+- **Vermutete Ursache:** `great-detective-doq.js` `runGuess` (Z. 122): `pickFromOppHand` statt Zufallsindex (`engine.rand`/Seed-Zufall).
+- **Frage an Al:** Soll Doq die Gegnerkarte zufällig bestimmen (Kartentext) oder weiter vom Spieler anklicken lassen (jetziges Verhalten) – zufällig / anklicken?
+
+### H02-heroes-29 · Kit: Modus „Opponent discards random card" umgeht die Erst-Runden-Immunität · Stufe B
+- **Karten:** Kit, the Shark Researcher (`kit-the-shark-researcher.js` `_runModeC`); Engine `actionDiscardHandCard` (`_engine.js` ~14082)
+- **Voraussetzungen / Aufbau:** Kit als Held 0; Sitz 1 mit 3 Handkarten und `gs.firstTurnProtectedPlayer = 1`; Sitz 0 legt per echtem Spielweg „Fighting" an Kit an, wählt ein Deck-Creature (ZZ Dummy) und Modus C (bzw. B als Gegenprobe).
+- **Erwartet** (Kartentext: „Your opponent must discard a random card from their hand"; Regel CARD_API.md „Turn-1 Immunity": der Nicht-Zugspieler ist gegen alles immun, was der Zugspieler tun kann): Hand des geschützten Spielers bleibt 3. Kontrolle: derselbe Abwurf mit `sourceOwner` wird geblockt ✓; Modus B (50 Schaden an 2 Zielen) wird geblockt ✓.
+- **Beobachtet:** Modus C: Hand 3 → 2 (der Abwurf geschieht).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/29-kit-modus-c-erstrunden-immunitaet.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `kit-the-shark-researcher.js:435` `engine.actionDiscardHandCard(oppPi, name, idx, { source: CARD_NAME })` nennt keine `sourceOwner`; der Erstrunden-Riegel und das Handinteraktions-Fenster (`checkHandInteractionReaction`) greifen nur bei fremder Quelle (Kommentar `_engine.js` ~14070). Boris-Verzicht davor wird mit `sourceOwner: pi` gerufen – der Abwurf selbst nicht. Weitere Aufrufer ohne `sourceOwner` nicht geprüft (Gruppe B-05/B-06).
+- **Nebenbeobachtung (kein Befund):** Kit legt das Creature bei Modus B/C per `ps.discardPile.push` in die Ablage (kein Hook, keine Instanz) – für die Messkarten folgenlos.
+
+### H02-heroes-30 · Koperniko: eine alte Deck-Add-Buchung (z. B. Hell Fox) löst beim nächsten Zauber ohne Suche die Zusatzsuche aus · Stufe B
+- **Karten:** Koperniko, the Stargazer (`koperniko-the-stargazer.js` `pruefeUndBiete`); Engine `noteDeckTutor` / `engine._deckAddTally` (`_engine.js` ~25289); Messkarten Hell Fox (Kreatur: sucht beim Tod 1 Karte), Fireball
+- **Voraussetzungen / Aufbau:** Koperniko als Held 0; Deck mit 6 Karten; Hell Fox auf dem Brett stirbt, Suche beantwortet (Hand +1); danach spielt Sitz 0 Fireball.
+- **Erwartet** (Kartentext: „when an Artifact or Spell **allows you** to add exactly 1 card from your deck to your hand"): Fireball fügt keine Karte hinzu → keine Zusatzsuche.
+- **Beobachtet:** Nach Fireball öffnet sich die Koperniko-Galerie (Prompt 2×), eine zweite Karte (Burning Finger) landet auf der Hand; Einmal-pro-Zug-Sperre verbraucht. Die Strichliste `_deckAddTally` {pi, source:'Hell Fox', names:[1]} blieb stehen und wird beim nächsten `afterSpellResolved` als „dieser Zauber hat 1 Karte geholt" gelesen.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/30-koperniko-veraltete-tutor-liste.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `koperniko-the-stargazer.js` prüft nur `tally.pi`, `tally.names.length === 1`, `tally.source !== CARD_NAME` und HOPT; die Strichliste wird nirgends zurückgesetzt (weder Zugwechsel noch Beginn einer Karte) – nur Koperniko selbst leert sie. Jede nicht-Spell/Artifact-Quelle (Kreaturen, Helden-Effekte, Ability-Effekte mit `actionAddCardFromDeckToHand`) hinterlässt so eine Altbuchung.
+
+### H02-heroes-31 · Hel: der Zugende-Zwang „by paying its Cost" ignoriert Kents Kreditrahmen (`goldOverdraft`) · Stufe B
+- **Karten:** Hel, the Bound Specter (`hel-the-bound-specter.js` `onTurnEnd`); Kent, the Indebted Apprentice (Vertrag `goldOverdraft`, `engine.canAffordGold`/`goldOverdraftLimit` `_engine.js` ~24227/24396); Messartefakt Cute Crown (Kosten 8)
+- **Voraussetzungen / Aufbau:** Sitz 0: Hel (Held 0) + Kent (Held 1), Gold 5, Hels Bezugsname Cute Crown in der Ablage, kein Artefakt an Hel; `t.endTurn()`.
+- **Erwartet** (Kartentext Hel: „immediately equip … by paying its Cost. If you can't, defeat this Hero"; Kent: „you may spend up to 20 Gold more than you own"): die Zahlung ist möglich → Hel rüstet aus (Gold 5 → −3). Kontrolle: dieselbe Karte aus der Hand mit Kent bei 5 Gold ist spielbar, Gold −3 ✓.
+- **Beobachtet:** Hel wird besiegt (`cant_pay`), Gold bleibt 5, Karte bleibt in der Ablage. Ohne Kent (Gold 5) stirbt Hel richtig, mit 20 Gold rüstet sie aus (Gold 12) ✓.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/31-hel-kent-kreditrahmen.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `hel-the-bound-specter.js:348` `if (cost > 0 && (ps.goldLocked || (ps.gold || 0) < cost)) return doDefeat('cant_pay')` statt `engine.canAffordGold(pi, cost, name)`. `engine.actionSpendGold(pi, cost)` verträgt den Kredit (Z. ~24440), nur die Vorprüfung nicht.
+- **Anmerkung:** Hel + Tsu-Ki/Idej (`equipCostReduction`) ist ohne Folge: der Vertrag wird für den Ziel-Helden (Hel) befragt, und Hel trägt ihn nicht; ihr Skript rechnet aber mit der Roh-`cd.cost` (kein `effectiveArtifactCost`) – nicht gemessen, weil Hel keinen Kostensenker besitzt.
+
+### H02-heroes-32 · Kit: Modus „Add the Creature to your hand" ignoriert Hand- und Such-Sperre · Stufe B
+- **Karten:** Kit, the Shark Researcher (`kit-the-shark-researcher.js`, Modus A); Sperren `ps.handLocked` (Rain of Spores, Jenny, Staff of the Teleporter …) und `ps.searchLocked` (Cats of the Pharaoh)
+- **Voraussetzungen / Aufbau:** Kit als Held 0, Hand [Fighting], Deck [ZZ Dummy, Fireball, Fireball]; `ps.handLocked = true` bzw. `ps.searchLocked = true`; Sitz 0 legt per echtem Spielweg Fighting an Kit an, wählt ZZ Dummy und Modus A.
+- **Erwartet** (Kartentext Kit: „reveal a Creature from your deck … Add the Creature to your hand"; Sperrentext Rain of Spores/Jenny: „You cannot draw or add cards to your hand for the rest of the turn", Cats: „cannot search or add cards to your hand"; CARD_API.md „Cats of the Pharaoh (v1068)"): das Creature kommt nicht auf die Hand. Kontrolle ohne Sperre: kommt auf die Hand ✓.
+- **Beobachtet:** unter beiden Sperren liegt das Creature auf der Hand, Deck −1 (kein Angebot ausgeblendet, keine Ablehnung).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/32-kit-modus-a-handsperre.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Vermutete Ursache:** Modus A nimmt die Karte mit `takeFromPile` und legt sie per `engine.handZugangSync(...)` auf die Hand (`kit-the-shark-researcher.js:277`); weder `ps.handLocked` noch `engine._isSearchBlocked` werden gefragt, und `modeAFree` blendet die Option unter Sperre nicht aus. Vorbild Brilliant Idea/`actionAddCardFromDeckToHand` (prüft die Sperren). Gleiche Klasse wie H01-11 (Alex).
+
+### H02-heroes-33 · Garius: „search your deck" läuft unter Such-/Handsperre durch · Stufe C
+- **Karten:** Garius, the Great Reformer (`garius-the-great-reformer.js` `_buildReplacementGallery`/`onHeroEffect`); Sperren `searchLocked`/`handLocked`
+- **Voraussetzungen / Aufbau:** Garius als Held 0; eigene Kreatur Bird (turnPlayed 1) auf dem Brett, Deck [Cheering Rabbit, …]; `ps.searchLocked = true` bzw. `ps.handLocked = true`; Heldeneffekt in Main Phase 2.
+- **Erwartet** (Kartentext: „… to **search your deck** for a Creature …"; Cats of the Pharaoh: „you cannot search …"; CARD_API.md: `searchLocked` sperrt „Deck-Suche und Adds"): Lesart A – die Suche ist gesperrt (Heldeneffekt nicht aktivierbar / keine Galerie). Lesart B – gesperrt ist nur Suchen-und-auf-die-Hand; dann ist das Verhalten richtig.
+- **Beobachtet:** Lesart B: Galerie erscheint, Bird wird geopfert, Cheering Rabbit kommt aufs Brett (Deck −1) – unter `searchLocked` wie `handLocked`. Gleiches Muster wie S01-27 (Create Illusion & Co.) und H01-11/-22.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/33-garius-suchsperre.js` (✗ = Lesart A wird nicht erfüllt)
+- **Frage an Al:** Soll „cannot search" auch Deck-Suchen sperren, die aufs Brett führen (Garius, Create Illusion …) – ja / nein (nur Suchen-auf-die-Hand)? (Dieselbe Frage wie S01-27.)
+- **Nebenbefunde (in Ordnung):** Opfer einer gestohlenen Kreatur (Bird des Gegners): Bird geht in die Ablage des Besitzers, der Ersatz (Rabbit) steht auf der Gegnerseite mit `controller` = Garius-Spieler und `originalOwner` = eigener Spieler, stirbt in die EIGENE Ablage ✓. Fiona (Vessel) unter `searchLocked`: Galerie, aber die Entnahme scheitert folgenlos (Einsatz bleibt erhalten) ✓.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

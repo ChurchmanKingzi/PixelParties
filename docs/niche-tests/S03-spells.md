@@ -190,6 +190,52 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S03-spells/20-surprise-party-deck-sperre-dupliziert-karten.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `surprise-party.js` Z. 106 prüft den Rückgabewert von `takeFromPileSync(ps, 'deck', 0, …)` nicht; `spellPlayCondition` (Z. 64–68) kennt `pileOutAllowed` nicht. Abhilfe: Rückgabewert prüfen (bei `null` abbrechen) bzw. Karte bei gesperrtem Deck nicht spielbar machen.
 
+### S03-21 · Phoenix Tackle: sind nach dem Zauber alle Helden beider Spieler besiegt, GEWINNT der Wirker (Text: „you lose the game") · Stufe A
+- **Karten:** Phoenix Tackle (`phoenix-tackle.js`); Engine-Spielende `_engine.js` ~48340–48415 (`_drawLoserIdx`, Bunny-Bombs-Vertrag).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 1/2 beider Seiten auf 0 HP; Gegner-Held 0 = 100 HP, Wirker-Held 0 = 50 HP, Destruction Magic 1 (100 Schaden / 50 Rückstoß); Wirker einmal Sitz 0, einmal Sitz 1.
+- **Schritte:** 1. Phoenix Tackle auf den letzten Gegner-Held. 2. `engine.over` lesen.
+- **Erwartet** (Kartentext „If all Heroes both players control are defeated after this Spell resolves, you lose the game."): beide Seiten sind nach dem Rückstoß ausgelöscht ⇒ der Wirker verliert.
+- **Beobachtet:** Beide Helden stehen am Ende auf 0 HP, `engine.over` = `{ winnerIdx: Wirker, reason: 'all_heroes_dead' }` – der Wirker **gewinnt** (bei beiden Sitzen). Der Gegner stirbt zuerst, die Engine prüft das Spielende in diesem Moment (Wirker lebt noch) und ruft `onGameOver` zugunsten des Wirkers; der Rückstoß kommt zu spät. Die Gleichstand-Auflösung (`draw_resolved`) wird nie erreicht.
+- **Repro:** `docs/niche-tests/repro/S03-spells/21-phoenix-tackle-beide-tot-wirker-gewinnt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `phoenix-tackle.js` Z. 105–121: keinerlei Spielende-Logik (kein `gs._drawLoserIdx = pi`, kein Aufschub der Spielende-Prüfung bis nach dem Rückstoß). Die Prüfung läuft schon im Treffer-Pfad von `dealDamage`.
+
+### S03-22 · Phoenix Bombardment wirkt gegen eine unversehrte Kreatur gar nicht (Rückfall `currentHp ?? 0`, Prüfauftrag C05-01) · Stufe A
+- **Karten:** Phoenix Bombardment (`phoenix-bombardment.js` Z. 104); gleiche Klasse wie C05-01 (Wire Hatchling).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 1 beschwört „ZZ Dummy" (200 HP, auch „ZZ Dummy Big" 1000 HP geprüft) über den echten Spielweg (`counters = {}`); Sitz 0 mit Destruction Magic 2.
+- **Schritte:** 1. Phoenix Bombardment auf die Kreatur. 2. `counters.currentHp`, HP des Wirkers, Zugende lesen.
+- **Erwartet** (Kartentext „Reduce a target's HP to 1. Then, the user takes damage equal to the amount of HP reduced by this effect. Immediately end your turn afterwards."): Kreatur auf 1 HP, Rückstoß 199 (999 bei 1000 HP), Zug endet.
+- **Beobachtet:** Nichts: `counters` bleibt `{}`, Wirker nimmt keinen Schaden, `_terrorForceEndTurn` wird nicht gesetzt (kein Zugende), keine Meldung; die Aktion ist verbraucht. Gegenprobe ✓: eine Kreatur, die schon 1 Schaden genommen hat (`currentHp` = 199), wird auf 1 gesenkt, Wirker nimmt 198. Das Ziel „unversehrte Kreatur" ist also der Normalfall der ersten Anwendung.
+- **Repro:** `docs/niche-tests/repro/S03-spells/22-phoenix-bombardment-unversehrte-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `phoenix-bombardment.js` Z. 104 `vorher = inst.counters?.currentHp ?? 0; if (vorher <= 0) return;` – Rückfall auf 0 statt auf die gedruckten HP (`inst.counters.currentHp ?? (cd.hp || 0)` wie `_engine.js` ~45522). Z. 125 (`inst.counters.currentHp = 1`) setzt dann nur den Zähler.
+
+### S03-23 · Rain of Spores: die gerade aufgelöste Karte ist als eigener Abwurf wählbar (R02-07) – kostenloser Zusatzabwurf beim Gegner · Stufe B
+- **Karten:** Rain of Spores (`rain-of-spores.js` Z. 40–55: `eligible = (ps.hand).map((_, i) => i)`); Wurzel R02-07 (aufgelöste Karte bleibt in `ps.hand`).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 Hand [Rain of Spores, Fireball, Fireball, Meteor Crash] (Decay Magic 3), Sitz 1 hat 6 Karten.
+- **Schritte:** 1. Rain of Spores spielen. 2. In der Abwurf-Abfrage die laufende Rain of Spores selbst wählen, danach „Done".
+- **Erwartet** (Kartentext „Discard any number of cards from your hand. Then … discard the same number of cards +1 from there."): die gerade gespielte Karte ist nicht mehr in der Hand und nicht wählbar; ohne Abwurf verliert der Gegner 1 Karte (6 → 5).
+- **Beobachtet:** `eligibleIndices = [0,1,2,3]` – Index 0 ist die laufende Rain of Spores. Wirft man sie „ab", gilt das als 1 Karte: der Gegner wirft 2 ab (6 → 4), die Karte landet ohnehin in der Ablage (Kartenbilanz ±0, `audit` leer). Der Spieler bekommt den Zusatzabwurf also gratis.
+- **Repro:** `docs/niche-tests/repro/S03-spells/23-rain-of-spores-laufende-karte-abwerfbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `rain-of-spores.js` Z. 40–41 liest `ps.hand` roh (enthält die laufende Karte); es müsste die laufende Instanz ausnehmen (vgl. `engine.handSizeWithoutResolving`, das Supply Chain benutzt).
+
+### S03-24 · Supply Chain (und Voice in your Head): reine Zieh-Karte ist unter Hand-/Zieh-Sperre und gegen Tuscan Artist spielbar und verpufft · Stufe B
+- **Karten:** Supply Chain (`supply-chain.js` – kein `blockedByHandLock`, keine `drawWouldBeBlocked`-Zeile im Gate); Voice in your Head (`voice-in-your-head.js`, Stufe C, siehe Frage); Referenz: Brilliant Idea (`blockedByHandLock: true`), die 13 Karten, die `drawWouldBeBlocked` fragen (`_draw-block-shared.js`). Gleiche Klasse wie C01-15 / A07-19 (Prüfauftrag).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. (a) `ps.handLocked = true` bzw. `drawLocked = true` (der Zustand nach Rain of Spores / Sacred Jewel), Hand [Supply Chain, Füllkarte]. (b) Tuscan Artist auf Sitz 1; Hand von Supply Chain so, dass 2 bzw. 3 Karten zu ziehen wären (5 bzw. 4 Füllkarten). Voice in your Head mit „Arthor, Inheritor of the Barbarian Sword" (Ascended).
+- **Schritte:** 1. Karte spielen. 2. Rückgabe, Hand, Ablage lesen.
+- **Erwartet** (CARD_API.md ~Z. 1944 „Draw-only unter Hand-Sperre ⇒ GAR NICHT spielbar"; `_draw-block-shared.js` Ruling 16.8. „Ist der Zug der einzige Nutzen … ist die Karte GESPERRT und wird ausgegraut … verbraucht auch sein Once-per-turn NICHT"): Supply Chain ist in allen vier Fällen nicht spielbar (`play` ⇒ false, Karte bleibt auf der Hand).
+- **Beobachtet:** `play` ⇒ `true`, Karte in der Ablage, nichts gezogen, Aktion verbraucht – in allen vier Fällen (Kontrolle: Brilliant Idea ist unter `handLocked` nicht spielbar). Voice in your Head verhält sich unter Hand-/Zieh-Sperre und Artist genauso (Karte weg, nichts gezogen), behält aber die Zusatzaktion („This counts as an additional Action") – dort ist offen, ob der Zusatzaktions-Effekt als „Nutzen" zählt.
+- **Repro:** `docs/niche-tests/repro/S03-spells/24-supply-chain-voice-ziehsperren.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `supply-chain.js` hat kein `blockedByHandLock: true` (der Loader taggt Spells bewusst nicht automatisch, `_loader.js` ~420–440, nur `resolve`-Module) und ruft `drawWouldBeBlocked(engine, pi, 7 - handSize)` in `spellPlayCondition` nicht auf; `voice-in-your-head.js` ebenso.
+- **Frage an Al:** Soll Voice in your Head unter Hand-/Zieh-Sperre bzw. gegen Tuscan Artist (Ziehen von 2/3) gesperrt sein, obwohl es noch eine Zusatzaktion gibt? (gesperrt / spielbar)
+
+### S03-25 · Weapon Unleashing als erste Karte der Action Phase: das Spielen verbraucht die reguläre Aktion – die „zweite Aktion" bringt nichts · Stufe A
+- **Karten:** Weapon Unleashing (`weapon-unleashing.js` `if ((ps._actionsPlayedThisPhase || 0) === 1) gs._preventPhaseAdvance = true;`, Server-Spielweg `server.js` ~8906–8923).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0: Fighting ×3 + Destruction Magic ×2; Hand [Weapon Unleashing, Fireball ×3]; Gegner 800 HP.
+- **Schritte:** A) Weapon Unleashing in Main 1, Action Phase betreten, Fireballs spielen (Kontrolle). B) Weapon Unleashing als erste Karte der Action Phase (`canActivate` erlaubt Phase 2 und 3), danach Fireballs.
+- **Erwartet** (Kartentext „You may perform a second Action with the user during your Action Phase this turn. This counts as an additional Action."; Ruling `CARD_API.md` ~Z. 7400 „inherente Zusatzaktion – das Spielen kostet keine Aktion, der Grant gibt die zweite"): in beiden Fällen 2 Fireballs (reguläre Aktion + zweite Aktion).
+- **Beobachtet:** A) 2 Fireballs ✓. B) nur **1** Fireball (Gegner 800 → 650), danach Phase 4; direkt nach dem Spielen steht `_actionsPlayedThisPhase = 1`, der erste Fireball verbraucht den Grant, die Phase springt auf Main 2. Drei Fighting-Kopien sind verloren, die Karte hat nichts gebracht. Hero-Bindung (Held 1 darf die zweite Aktion nicht nutzen) ✓.
+- **Repro:** `docs/niche-tests/repro/S03-spells/25-weapon-unleashing-action-phase-verliert-zweite-aktion.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Das Skript setzt `gs._preventPhaseAdvance = true`, wenn es die erste Aktion der Phase ist; dadurch läuft in `server.js` der `else if (… actionCounterIncrementedHere)`-Zweig (Z. ~8918–8923), der den Zähler der kostenlosen ersten Aktion zurücknimmt, nicht, und der Zähler bleibt auf 1.
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung

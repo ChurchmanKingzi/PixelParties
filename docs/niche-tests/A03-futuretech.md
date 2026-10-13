@@ -235,6 +235,53 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 - **Repro:** `docs/niche-tests/repro/A03-futuretech/25-kent-overdraft-stolen-hero.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` ~24227 `goldOverdraftLimit(playerIdx)` iteriert die Helden der physischen Seite (`ps.heroes`) und fragt `heroSideOf` nicht (vgl. `heroesControlledBy`); `kentAlive` in `kent-the-indebted-apprentice.js` ebenso.
 
+### A03-futuretech-26 · Debt-O-Tron Model Missing Parts und Scrap Plow: Ziellisten bauen IDs aus dem Besitzer – eine fremd beschworene Kreatur verdrängt die gewählte (gleiche Klasse wie F02-14) · Stufe B
+- **Karten:** Debt-O-Tron Model Missing Parts (`cards/effects/debt-o-tron-model-missing-parts.js`), Debt-O-Tron Model Scrap Plow (`debt-o-tron-model-scrap-plow.js`, gleiche Lage: IDs `support-0-0-0` doppelt, Wahl „ZZ Dummy“ schickt den Golem in die Ablage); Vergleich gemeinsamer Sammler `_targeting-shared.js:92` (nimmt `_brettSeite`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Plant Golem beschworen (landet bei Sitz 1, Held 0, Slot 0; owner 0, controller 1), eigene `ZZ Dummy` bei Sitz 0, Held 0, Slot 0; Missing Parts auf Held 1; Gold −30. Seed 1234.
+- **Schritte:** 1. Missing Parts aktivieren. 2. Den Eintrag „ZZ Dummy“ wählen.
+- **Erwartet** (Quelle: „choose a target and deal damage equal to 10 times the amount of negative Gold you have to it“): Die gewählte Kreatur (ZZ Dummy) erhält 300 Schaden; zwei verschiedene Kreaturen haben verschiedene Ziel-IDs.
+- **Beobachtet:** Beide Einträge tragen die ID `equip-0-0-0`; `ziele.find(t => t.id === id)` liefert den ersten Treffer, den Golem (−250 HP, 300 Schaden). Die ZZ Dummy bleibt unversehrt. (Die Animation läuft ebenfalls auf die Zone des Treffers.)
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/26-missing-parts-id-collision.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `debt-o-tron-model-missing-parts.js:47` die ID `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}` (Besitzer statt physischer Brettseite); Scrap Plow `:63` ebenso (`${inst.zone}-${inst.owner}-…`); die Sammler sind selbst gebaut statt `collectNonHeroBoardTargets`/`_brettSeite`. Verwandt mit F02-14 (dort `getCreatureTargets`), hier aber eine eigene Stelle.
+
+### A03-futuretech-27 · Laser Cannon + Slippery Fridge: der alte Held behält +100 ATK, der neue bekommt nochmals +100 · Stufe A
+- **Karten:** Future Tech Laser Cannon (`cards/effects/future-tech-laser-cannon.js`), Slippery Fridge (`slippery-fridge.js`, andere Gruppe; Gegenstück zu F03-07/-08, dort aber andere Ursache); Gegenprobe Gun/Doomsday Bomb/Gear/Jetpack/Weathercock/Fists/Bazooka/Potion Launcher
+- **Voraussetzungen / Aufbau:** Sitz 0, 200 Gold, Laser Cannon an Held 0 (ATK 40 → 140), Slippery Fridge auf der Hand. Seed 1234.
+- **Schritte:** 1. Fridge spielen, Laser Cannon wählen, Ziel Held 1. 2. Die Kanone danach zerstören (`actionDestroyCard`).
+- **Erwartet** (Quelle: Laser Cannon „That Hero's Attack stat is increased by 100“, Fridge „equip them to a different Hero“): Held 0 zurück auf 40, Held 1 80 → 180; nach der Zerstörung beide auf Basis.
+- **Beobachtet:** Held 0 bleibt bei 140, Held 1 steigt auf 180 – der Bonus gilt zweimal. Nach Zerstörung der Kanone wird nur einmal 100 abgezogen: Held 0 behält **dauerhaft** 140 (Held 1 80). Die Gun (rechnet neu) und alle übrigen Ausrüstungen der Gruppe zeigen das Problem nicht.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/27-fridge-laser-cannon-atk-doubled.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `slippery-fridge.js:360` ruft `onCardLeaveZone` ohne `leavingCard`; `future-tech-laser-cannon.js:90` bricht bei `ctx.leavingCard?.id !== inst.id` ab, der `revoke` entfällt. Danach setzt die Fridge (Z. 375) `atkGranted = 0`, das erneute `onPlay` gewährt am neuen Helden nochmals +100. (Die Engine-Pfade `_engine.js:13463/15729/26824` liefern `leavingCard`; nur die Fridge nicht. Prüfen: andere Ausrüstungen mit demselben `leavingCard`-Filter.)
+
+### A03-futuretech-28 · Steam Dwarf Miner: der den ganzen Zug gefrorene/betäubte Miner zieht am Zugende trotzdem (Klasse H04-14) · Stufe C
+- **Karten:** Steam Dwarf Miner (`cards/effects/steam-dwarf-miner.js:25` `onTurnEnd`); gleiche Klasse H04-14 (Heldeneffekte „Am Ende deines Zuges“), hier für eine Kreatur
+- **Voraussetzungen / Aufbau:** Miner (max 300 HP) bei Sitz 0; Sitz 1 friert bzw. betäubt ihn in seinem Zug; Sitz 0 ist wieder am Zug (`isCreatureEffectSuppressed` = true; Kontrolle: ein Abwurf steigert seine HP nicht – die Steam-Engine-Passive ruht). Seed 1234.
+- **Schritte:** `t.endTurn()` (echter Zugwechsel).
+- **Erwartet** (Quelle: „At the end of each of your turns, draw 1 card for every 100 max HP“; Engine-Konvention: Frost/Betäubung legen die Kreatur still): kein Ziehen.
+- **Beobachtet:** In beiden Fällen zieht der Miner 3 Karten. Negiert zieht er nicht (Negation läuft nicht vorher ab).
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/28-miner-zugende-trotz-frost.js` (✗ = Ist-Zustand)
+- **Vermutete Ursache:** Reihenfolge am Zugende wie in H04-14: `processStatusExpiry('END')` nimmt Frost/Betäubung der Kreaturen des aktiven Spielers (`_engine.js` ~45160, Schleife „multi-turn creature freeze durations“) vor `ON_TURN_END` (`switchTurn`, ~23479). Betrifft jede „At the end of your turn“-Kreatur.
+- **Frage an Al:** Dieselbe wie H04-14, hier für Kreaturen: Soll eine den ganzen Zug gefrorene/betäubte Kreatur ihren Zugende-Effekt noch auslösen („löst aus“) oder nicht („stumm“)?
+
+### A03-futuretech-29 · Cybug RHINOCEROS übersieht die Control Device, die der Gegner in die EIGENE Support Zone legt (Anleger = Gastgeberseite) · Stufe C
+- **Karten:** Cybug RHINOCEROS (`cards/effects/cybug-rhinoceros.js`), Future Tech Control Device (`placesOnOpponentBoard`); gleiche Klasse: Powder Keg (andere Gruppe, nicht gemessen)
+- **Voraussetzungen / Aufbau:** Sitz 1: Rhinoceros als Surprise (Held 0), Excavator Bucket auf der Hand; Sitz 0 spielt (a) Future Tech Gun an den eigenen Helden, (b) Control Device (landet bei Sitz 1, Held 0). Seed 1234.
+- **Schritte:** je Karte `t.play(0, …)`.
+- **Erwartet** (Quelle: „Activate this Surprise when your opponent places a card into an Area or Support Zone“): (a) löst aus (✓), (b) ebenfalls – der Gegner legt eine Karte in eine Support Zone; Rhinoceros schickt die Control Device in die Ablage von Sitz 0.
+- **Beobachtet:** (b) kein Prompt, die Control Device bleibt in der Zone von Sitz 1.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/29-rhinoceros-vs-control-device.js` (✗ = Variante (b))
+- **Vermutete Ursache:** `_engine.js` ~3621: `_checkSurpriseOnPlacement(effektiveSeiten(enteringCard).controller ?? enteringCard.owner, …)`; bei Cross-Side-Karten ist `inst.owner` die Gastgeberseite (siehe `future-tech-control-device.js` `besitzer()`), also gilt Sitz 1 als Anleger und `_scanSurprisesAgainst` prüft nur Surprises von Sitz 0 (`originalOwner` wäre der echte Anleger). Gleicher Mechanismus vermutlich für andere Platzierungs-Fenster (Equip-/Summon-Surprises) – nicht einzeln gemessen. Cybug LOCUST („a Hero **they control**“) ist hier korrekt stumm.
+- **Frage an Al:** Soll „your opponent places a card into a Support Zone“ auch das Anlegen einer Cross-Side-Ausrüstung (Control Device, Powder Keg) in die eigene Zone treffen – ja oder nein?
+
+### A03-futuretech-30 · Doomsday Bomb: „all targets on the board“ lässt eine eigene Kreatur aus, wenn ein Plant Golem an derselben (Held, Slot)-Stelle der Gegenseite steht (Prüfauftrag F02-14, Doomsday Bomb gemessen) · Stufe B
+- **Karten:** Future Tech Doomsday Bomb (`cards/effects/future-tech-doomsday-bomb.js:77`), Plant Golem; Wurzel F02-14 (`engine.getCreatureTargets`). Bazooka (`:70`) und Fists (`:45`) lesen denselben Sammler – nicht einzeln gemessen
+- **Voraussetzungen / Aufbau:** Sitz 0: Plant Golem beschworen (landet bei Sitz 1, Held 0, Slot 0), eigene `ZZ Dummy` bei Held 0, Slot 0, Doomsday Bomb an Held 0 (2 weitere in der Ablage → 100 Schaden), Heavy Hit auf Gegner-Held 0; Gegner-`ZZ Dummy` bei Sitz 1, Held 1. Seed 1234.
+- **Schritte:** Heavy Hit spielen (Doomsday negiert den Angriff und zündet).
+- **Erwartet** (Quelle: „all targets on the board take damage equal to 50 times …“): Golem, eigene ZZ Dummy und Gegner-ZZ-Dummy verlieren je 100 HP (Kontrolle ohne Golem: ✓, die eigene ZZ Dummy verliert 100).
+- **Beobachtet:** Golem (−100) und Gegner-Dummy werden getroffen, die eigene ZZ Dummy bleibt bei 200 HP – die Sammlung führt den Golem für beide Stellen (0,0).
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/30-doomsday-bomb-golem-collision.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** wie F02-14: `_engine.js` ~40263 `getCreatureTargets` sucht die Instanz ohne Brettseite (`(owner===pi || controller===pi) && heroIdx && zoneSlot`). Hier trifft es eine Flächenwirkung (stille Auslassung statt falsches Ziel).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

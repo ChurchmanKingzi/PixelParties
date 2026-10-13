@@ -145,6 +145,33 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/16-divine-zeal-statuswahl-nicht-abbrechbar.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `divine-zeal.js` Z. 169–176 `statusSelect … cancellable: false`, Z. ~178 `result?.selectedStatuses || []` (Abbruch = leere Wahl).
 
+### S02-17 · Einzelzielwahl (Magic Hammer, Icebolt, Heal u. a.): zwei gegenseitig gestohlene Kreaturen an derselben (Held, Slot)-Stelle lösen beide zur selben Instanz auf – die vom Wirker kontrollierte ist nicht wählbar · Stufe B
+- **Karten:** Magic Hammer (`magic-hammer.js`), Icebolt (`icebolt.js`), Heal (`heal.js`) – alle über `ctx.promptDamageTarget`; ebenso Fireball/Explosion (`promptMultiTarget`, dort nur „enemy"). Engine-Fehler; die Stelle ist die Schwester von F02-14 (dort `getCreatureTargets`), nicht dieselbe Funktion.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Magic Hammer] bzw. [Heal]; Sitz 0 besitzt X (Held 0, Slot 0), Sitz 1 besitzt Y (Held 0, Slot 0); `actionStealCreature(1, X)`, `actionStealCreature(0, Y)` (beide bleiben physisch in der Zone ihres Besitzers, also je eine Spalte, dieselbe Koordinate). Beide 500/1000 HP.
+- **Schritte:** 1. Zauber spielen, die Zielliste mitschneiden. 2. Die Kachel „Gegnerspalte, Held 0, Slot 0" wählen (id `equip-1-0-0`; dort liegt physisch Y, die ich kontrolliere).
+- **Erwartet** (Kartentext „Choose a target and deal 300 damage to it." / „Choose a target and heal it for 150/200/300 HP."; Konvention „Kontrolle statt Seite", CARD_API.md): zwei verschiedene Ziele X und Y; die Wahl der Kachel mit Y trifft Y.
+- **Beobachtet:** Beide Listeneinträge (`equip-1-0-0` und `equip-0-0-0`) tragen dieselbe `cardInstance` X; Y kommt in der Liste nie vor und ist damit unwählbar. Hammer: X −300 (500 → 200), Y unversehrt; Heal: X, die der **Gegner** kontrolliert, wird um 150 geheilt (650), die eigene Kreatur Y bleibt bei 500. Bei Fireball/Explosion („opponent controls") bekommt der Gegner-Eintrag ebenfalls die Instanz X (richtiges Ziel, aber die hervorgehobene Kachel ist Y).
+- **Repro:** `docs/niche-tests/repro/S02-spells/17-einzelzielwahl-gestohlene-kreaturen-gleiche-koordinate.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `promptDamageTarget` ~Z. 4917 und `promptMultiTarget` ~Z. 5507: `engine.cardInstances.find(c => (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si)` prüft nicht, in WELCHER Spalte die Instanz liegt (`physicalSide`); `find` liefert für beide Spalten den ersten Treffer. Tritt nur bei einem Überkreuz-Diebstahl an gleicher Koordinate auf (z. B. beide Seiten Slot 0 des ersten Helden), dort aber für jede Einzelzielwahl der Engine.
+
+### S02-18 · Xals Support-Zonen-Ability-Stapel zählen bei Haste, Heal, Healing Melody und Instant Cryo Stasis nicht (Prüfauftrag S01-20 auf diese Gruppe angewandt) · Stufe B
+- **Karten:** Haste (`haste.js` Z. 24/40), Heal (`heal.js` Z. 99), Healing Melody (`healing-melody.js` Z. 81), Instant Cryo Stasis (`instant-cryo-stasis.js` Z. 36 `inherentAction`); gleiche Zeile steht in Guard Change (`guard-change.js` Z. 45, SM ≥ 2 ⇒ Zusatzaktion) und Hymn of Rebirth (`reduceCardLevel`, Singing) – diese beiden nicht gemessen. Gleiche Klasse wie S01-20 (dort Divine Gift of Death, Create Illusion); hier die Karten dieser Gruppe.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Xal, the Animated Armor als Held 0 von Sitz 0, die Schule ×3 (Cryo: Decay Magic ×2) als Stapel in Xals erster Support Zone, Ability-Zonen leer. Vergleich: derselbe Stapel in der Ability-Zone.
+- **Schritte:** 1. Zauber mit Xal spielen (`noGrant`).
+- **Erwartet** (Kartentexte „Draw 2/3/4 cards." / „heal it for 150/200/300 HP." / „Heal all targets you control for 100/150/200 HP." / „If the user has at least Decay Magic 2, this counts as an additional Action."; Xal „You may place Abilities into the Support Zones of this Hero"; `effectiveSchoolLevelForCaster` zählt die Stapel ausdrücklich, `_engine.js` ~Z. 43290): Stufe 3 wie in der Ability-Zone: Haste 4 Karten, Heal +300, Healing Melody +200, Cryo als Zusatzaktion.
+- **Beobachtet:** Der Zauber wird gespielt (Level-Vertrag sieht den Stapel), wirkt aber auf Stufe 1: Haste zieht 2, Heal +150, Healing Melody +100, Cryo ohne Zusatzaktion. Gegenprobe Draw (nutzt `effectiveSchoolLevelForCaster`): Stapel zählt ✓ (ich 6, Gegner 3).
+- **Repro:** `docs/niche-tests/repro/S02-spells/18-xal-support-zonen-stapel-staffel-spells.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `engine.countAbilitiesForSchool(school, ps.abilityZones[heroIdx])` direkt; richtig wäre `effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner)` (Vorbild Draw `draw.js` Z. 35, Aurora Borealis). Zusätzlich blendet der direkte Aufruf „as if"-Effekte (`_castSchoolOverride`, z. B. Demon's Gate) aus – nicht gemessen.
+
+### S02-19 · Fire Bolts: beide Zielwahlen („opponent controls" / „you control") lesen die Brettspalte statt der Kontrolle (weiterer Betroffener der Wurzel von S03-06) · Stufe B
+- **Karten:** Fire Bolts (`fire-bolts.js` Z. 183 `side: 'enemy'`, Engine `promptDamageTarget`). Gleiche Engine-Wurzel wie S03-06 (Missing People); hier nur als gemessener weiterer Betroffener, keine neue Ursache. Gegenproben: Fireball/Explosion (`promptMultiTarget`) und Instant Cryo Stasis bieten X richtig an und Y nicht an (t10/t33).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Fire Bolts]; Sitz 0 besitzt X (vom Gegner gestohlen: Besitzer 0, Kontrolle 1) und M (eigene); Sitz 1 besitzt Y (von Sitz 0 gestohlen: Besitzer 1, Kontrolle 0) und Z (normale); jeweils 1000 HP.
+- **Schritte:** 1. Fire Bolts spielen, beide Zielwahlen mitschneiden.
+- **Erwartet** (Kartentext „Choose a target your opponent controls and deal 100 damage to it. Then, choose a target you control and deal 50 damage to it."; „Kontrolle statt Seite"): Liste 1: Gegnerhelden, Z, X – nicht Y; Liste 2: eigene Helden, M, Y – nicht X.
+- **Beobachtet:** Liste 1 = Gegnerhelden, Z, **Y** (meine eigene Kreatur wird als „Gegnerziel" angeboten, die vom Gegner kontrollierte X fehlt); Liste 2 = eigene Helden, X, M, Y (**X**, die der Gegner kontrolliert, steht als „eigenes Ziel" zur Wahl, Y steht in beiden Listen).
+- **Repro:** `docs/niche-tests/repro/S02-spells/19-fire-bolts-zielwahl-nach-brettspalte.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `promptDamageTarget` ~Z. 4880–4940: `addCreatures(opponentsOf(pi))` / `side: 'my'` laufen über die physische Spalte; vgl. S03-06.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

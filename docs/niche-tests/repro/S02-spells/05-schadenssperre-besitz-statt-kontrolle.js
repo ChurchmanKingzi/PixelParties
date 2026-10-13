@@ -17,8 +17,10 @@ const H = require('../../lib/h.js');
     const X = t.put(0, 0, 0, H.INERT.big);   // gehört mir, vom Gegner kontrolliert
     const Y = t.put(1, 0, 0, H.INERT.big);   // gehört dem Gegner, von mir kontrolliert
     const Z = t.put(1, 1, 0, H.INERT.big);   // normale Gegnerkreatur
-    t.engine.actionStealCreature(1, X);
-    t.engine.actionStealCreature(0, Y);
+    await t.engine.actionStealCreature(1, X);
+    await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
+    await t.engine.actionStealCreature(0, Y);
+    await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
     await t.play(0, 'Flame Avalanche', { hero: 0 });
     const [x0, y0, z0] = [X, Y, Z].map(i => i.counters.currentHp);
     await t.engine.actionDealCreatureDamage(src, Z, 100, 'destruction_spell', { sourceOwner: 0 });

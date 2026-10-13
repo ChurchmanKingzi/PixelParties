@@ -150,6 +150,25 @@ Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am End
 - **Repro:** `docs/niche-tests/repro/A09-idej/16-pet-snake-stinky-stables-gratis-beschwoerung.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `pet-snake.js:42` `inherentAction` prüft nur „irgendein Held vergiftet", nicht ob das Gift heilbar ist; `onPlay` (Z. 165/166) ruft `removeHeroStatus(…, 'poisoned')` (die Engine überspringt das Gift bei `poisonLocked`, `_engine.js:17247`) und stempelt `claimHOPT`, ohne den Rückgabewert zu prüfen. Die Kosten werden **nach** der Platzierung erhoben (kein `beforeSummon`); scheitert die Heilung, kann den Snake nichts mehr zurückhalten.
 
+### A09-17 · Idej Sword – Kogarasu: ein negierter Zauber verbraucht die „1 Spell pro Zug"-Grenze nicht · Stufe B
+- **Karten:** Idej Sword - Kogarasu (`idej-sword-kogarasu.js`); Auslöser der Negation hier Silence (Gegenprobe außerhalb der Gruppe)
+- **Voraussetzungen / Aufbau:** Seed 1234. Sitz 0: Idej Lord Daiyo (Fighting 2) mit Kogarasu, Hand [Fireball, Boiling Oil]. Sitz 1: Held 0 mit Decay Magic 2, Hand [Silence].
+- **Schritte:** 1. Fireball spielen; Sitz 1 negiert mit Silence. 2. Mit demselben Helden Boiling Oil spielen.
+- **Erwartet** (Kartentext: „… but the equipped Hero can only **use** 1 Spell per turn"; die Engine zählt einen negierten Zauber als gespielt: `ps.spellsPlayedThisTurn` wird im Negations-Zweig von `doPlaySpell` hochgezählt, Kommentar dort „the Attack WAS played (the Reaction just negated its effects)"): Der zweite Zauber ist gesperrt.
+- **Beobachtet:** Boiling Oil wird gespielt und wirkt (80 Schaden). Die Negation schenkt dem Träger einen zweiten Zauber im Zug; `canPlayCard` sieht den Stempel nicht.
+- **Repro:** `docs/niche-tests/repro/A09-idej/17-kogarasu-negierter-zauber-zaehlt-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `idej-sword-kogarasu.js` stempelt `hero._idejKogarasuSpellTurn` nur im Hook `afterSpellResolved`; der feuert bei Negation nicht. Ein Stempel beim Spielen (z. B. am Zielfenster-Zusagepunkt) wäre robuster, wobei ein Abbruch weiter nichts verbrauchen muss.
+
+### A09-18 · Bonded Companion Thuly: das Opfer eines HELDEN löst „when you sacrifice a target" nicht aus · Stufe C
+- **Karten:** Bonded Companion Thuly (`bonded-companion-thuly.js`); Auslöser Teocuilatl, the Embodiment of Gods (Held-Opfer-Weg; ebenso Divine Gift of Sacrifice, Rick – nur Teocuilatl gemessen)
+- **Voraussetzungen / Aufbau:** Seed 1234, Main 1. Sitz 0: Teocuilatl (Held 0), Rick (Held 1) mit Thuly, Zwei (Held 2); „ZZ Dummy" bei Held 0.
+- **Schritte:** 1. Heldeneffekt Teocuilatl: (A) Kreatur opfern, (B) Held 2 opfern. 2. Thuly-Schlag auf den Gegner-Helden wählen.
+- **Erwartet** (Kartentext Thuly: „Once per turn, when you sacrifice a **target**, you may choose a target and deal 150 damage to it"; Teocuilatl opfert ausdrücklich auch „a Hero you control"): In beiden Fällen bietet Thuly den Schlag an.
+- **Beobachtet:** (A) 150 Schaden – Kontrolle in Ordnung. (B) Held 2 fällt (HP 0), Thuly meldet sich nicht (0 Schaden, keine Abfrage).
+- **Repro:** `docs/niche-tests/repro/A09-idej/18-thuly-heldenopfer-loest-nicht-aus.js` (✗ = Lesart „target = auch Helden" nicht erfüllt)
+- **Vermutete Ursache:** Das Helden-Opfer läuft über `actionDefeatHero({ isSacrifice: true })` und feuert nur `onHeroKO`; `resolveSacrificeCost` kehrt bei `extraPicked` vor `onCreatureSacrificed`/`onSacrificeBatch` zurück (`_engine.js` ~27051). Thuly hört nur auf diese beiden Hooks.
+- **Frage an Al:** Soll Thulys „sacrifice a target" auch Helden-Opfer (Teocuilatl, Rick, Divine Gift of Sacrifice) erfassen, oder nur Kreaturen?
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

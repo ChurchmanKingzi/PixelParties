@@ -1,8 +1,27 @@
 # C03-creatures – Nischenfall-Bericht
-Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird am Ende gezählt) gezielt getestet · (wird am Ende gezählt) mit Befund.
+Stand/Autor: Agent C03-creatures, 12./13.10.2026 (Fortsetzung nach Abbruch durch API-Limit). Karten: 21 in der Liste · 21 gezielt getestet (L2) · 13 mit Befund. Befunde: 20 (Stufe A: 4 · B: 10 · C: 6).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+20 Befunde (A: 4 · B: 10 · C: 6), alle mit ausgeführtem Repro unter `docs/niche-tests/repro/C03-creatures/`.
+
+| ID | Titel | Stufe |
+|---|---|---|
+| C03-01 | Gravedigger (gestohlen) mahlt das EIGENE Deck des Aktivierenden | A |
+| C03-04 | Monster Nest (geliehen/gestohlen): Karte danach doppelt auf dem Brett, Bilanz +1 | A |
+| C03-05 | Golden Exploding Skull zählt unversehrte Kreaturen beim Gold nicht mit (`currentHp`-Rückfall, Prüfauftrag C05-01) | A |
+| C03-06 | Grave Worm: zweiter Wurm auf dem Brett verliert seine Instanz (Platzhalter-Name bleibt) | A |
+| C03-02/-03 | Lawn Gnome / Land Sharks (gestohlen): Wahl bzw. Stufe vom falschen Spieler/Helden | B |
+| C03-07 | Grave Worm erkennt „in die Ablage gesendet" nur am Namen | B |
+| C03-08/-09 | Golden Vermin: Zieh-/Handsperre vergisst, Rundeneinkommen wird abgefangen | B |
+| C03-11 | Monster Nest bietet Ifrit (nur von der Hand) an, Wahl scheitert still und mischt | B |
+| C03-12 | Ifrit gefroren/betäubt/negiert: Bonus und Immunität bleiben (Klasse B-01…B-03) | B/C |
+| C03-14 | Lovely Teddy: Koordinatenkollision im Zielsammler (Wurzel F02-14) | B |
+| C03-16 | Jiggles / Land Sharks mit Angler Angel: nur das erste Ziel +50 (Klasse C01-10) | B |
+| C03-19 | Monster Nest legt Land Sharks auch bei belegten Nachbarzonen (Hai mit einer Zone) | B |
+| C03-10/-13/-15/-17/-18/-20 | Regelfragen (Jiggles bietet sich selbst an; Gnom je Ort; Mausoleum-Limit; Demon geliehen/gefroren; Falter gestohlen) | C |
+
+Gesamteindruck: Die meisten Karten verhalten sich sauber; die Fehler konzentrieren sich auf (1) **Kontrolle statt Besitzer/Brettseite bei gestohlenen Kreaturen** (C03-01/-02/-03/-04/-10/-20, Klasse C01-05/-06), (2) **Zustand-Zonen-Abgleich bei Mehrfachkopien und Nest** (C03-04/-06/-19) und (3) **Rückfall `currentHp`** (C03-05). Alle stillgelegten Kreaturen (Frost/Betäubung/Negation) ruhen dynamisch korrekt – Ausnahmen Ifrit (C03-12) und die Reihenfolge Statusablauf vor Zugende-Hooks (C03-18). Die Prüfaufträge sind beantwortet: C05-01 → C03-05 (nur dieses Skript in meiner Gruppe); C01-05/-06 → C03-01/-02/-03/-10/-20; C01-10 → C03-16; F02-14 → C03-14; C01-12 („up to N" + negierte erste Aktivierung) – in dieser Gruppe nicht anwendbar (Golden Vermin ist ein Hook mit Verbrauchszähler, keine Aktivierung; alle aktiven Effekte sind „once per turn"); C05-02 (Zugende-Räumung `negated` ohne `sourceBound`) – keine Karte dieser Gruppe negiert Helden/Anhänge, Kreaturennegation (Ifrit/Demon) überlebt mehrere echte Zugwechsel ✓.
+Bewusst NICHT getestet: Skill-Test-Modus; Mehrspieler-Sitze (3/4); CPU-Antworten (`cpuResponse`); Animationen/Client; Karten-Reveals nur soweit sie Zustand ändern; `doActivateDiscardEffect` (Server-Gate, Harness-Host exportiert es nicht – Mountain Boars Ablage-Weg über `onDiscardEffect` direkt gemessen); Erst-Runden-Immunität (aktivierbare Kreaturen sind in Zug 1 nicht „alt", Klasse B-05/-06 nicht erreichbar).
 
 ## Befunde
 
@@ -143,8 +162,71 @@ Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/C03-creatures/16-jiggles-land-sharks-angler-angel-nur-erstes-ziel.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** wie C01-10 (Rundensperre `angler-boost:<id>` wird vom ersten Treffer gebucht); Jiggles/Sharks bauen für jeden Treffer eine neue Quelle `{ name, owner, heroIdx }` bzw. rufen `ctx.dealDamage` einzeln, ohne gemeinsame Schlag-Kennung. Nicht erneut gefragt: Frage an Al steht bei C01-10.
 
+### C03-17 · Horned Demon (von Lovely Teddy geliehen): der Leiher legt am Ende SEINES Zuges einen Demon Counter auf die Gegner-Kreatur · Stufe C
+- **Karten:** Horned Demon (`cards/effects/horned-demon.js`), Lovely Teddy (`lovely-teddy.js`); gilt für jeden passiven Hook einer per `actionStealCreature` geliehenen Kreatur (Aligning Goals, Deepsea Succubus …).
+- **Voraussetzungen / Aufbau:** Sitz 0: Lovely Teddy (alt); Sitz 1: Horned Demon (alt) mit 2 Demon Countern. Sitz 0 leiht den Demon (echter Aktivierungsweg), danach `t.endTurn()`.
+- **Erwartet** (Demon: „At the end of each of your turns, place a Demon Counter on this Creature."; Teddy: „You may use that Creature's active effects as if you controlled it for the rest of the turn."): Teddy leiht nur AKTIVE Effekte; „your turns" des Demons sind die Züge von Sitz 1 ⇒ Zähler bleibt 2.
+- **Beobachtet:** Zähler = 3. Der Leiher füttert am Ende seines eigenen Zuges den Demon des Gegners (der danach 150 statt 100 Schaden macht). Der Demon geht wie vorgesehen zurück an Sitz 1. Gegenproben in Ordnung: Golden Vermin ist nicht borgbar (kein aktiver Effekt), geliehener Giant Exploding Skull lässt sich sprengen (Ablage des Besitzers).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/17-horned-demon-geliehen-zaehler-fuer-den-leiher.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `horned-demon.js` `onTurnEnd`: `if (!ctx.isMyTurn) return;` – `isMyTurn` folgt dem (geliehenen) Kontrolleur (`_engine.js` ~3867); CARD_API „Lovely Teddy" (Z. 19392) regelt nur „Rundensperre je Kreatur", nichts zu Passiv-Hooks.
+- **Frage an Al:** Soll ein von Lovely Teddy/Aligning Goals geliehener Demon am Zugende des Leihers einen Counter bekommen (jetzt) oder nur am Ende der Züge seines Besitzers (nein)?
+
+### C03-18 · Horned Demon (gefroren/betäubt): bekommt am Ende des eigenen Zuges trotzdem den Counter (Eis fällt vor den Zugende-Hooks) · Stufe C
+- **Karten:** Horned Demon; gleiche Reihenfolge betrifft jede Kreatur mit `onTurnEnd`-Effekt („At the end of your turn …": Monster Nest-Räumung, Moonlight Butterfly …), hier nur der Demon belegt.
+- **Voraussetzungen / Aufbau:** Sitz 0: Horned Demon (alt, 1 Counter). Sitz 1 friert bzw. betäubt ihn in seinem Zug (`applyCreatureStatus`, **await**); der Status hält über den ganzen folgenden Zug von Sitz 0. Dort: Aktivierung (abgewiesen ✓), dann `t.endTurn()`.
+- **Erwartet** (Konvention B-01…B-03: gefrorene/betäubte Kreatur verliert ihre Effekte): Zähler unverändert.
+- **Beobachtet:** Zähler +1 – obwohl der Demon den ganzen Zug gefroren/betäubt war. Reihenfolge der End-Phase: `processStatusExpiry('END')` (`_engine.js` ~22923) entfernt Frost/Betäubung, DANACH läuft `ON_TURN_END` (~23479). Gegenprobe: ein gefrorener Mimic (Zugbeginn-Hook) klaut nicht; Giant/Golden Exploding Skull, Hell Fox, Golden Vermin, Golden Ladybug, Luna Kiai und die Aktivierungen aller Karten dieser Gruppe ruhen bei Frost/Betäubung/Negation korrekt (negiert: auch der Demon legt keinen Counter).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/18-horned-demon-gefroren-zaehler-am-zugende.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Engine-Reihenfolge in der End-Phase, nicht das Kartenskript.
+- **Frage an Al:** Soll ein im eigenen Zug gefrorener/betäubter Demon am Zugende noch seinen Counter bekommen (jetzt, weil der Status vorher abläuft) oder nicht?
+
+### C03-19 · Monster Nest legt Land Sharks auch bei belegten Nachbarzonen – ein Hai mit nur einer Zone · Stufe B
+- **Karten:** Monster Nest (`cards/effects/monster-nest.js`), Land Sharks (`land-sharks.js`, `multiZone: 3`, `canSummon` verlangt drei freie Plätze); gleiche Lücke zu erwarten bei Populated Island Turtle (nicht meine Gruppe, nicht geprüft).
+- **Voraussetzungen / Aufbau:** Sitz 0 / Held 0: Monster Nest (Slot 0, alt), ZZ Dummy in Slot 1 und 2; Deck: Land Sharks + Füller. Nest aktivieren, Land Sharks wählen.
+- **Erwartet** (Land Sharks: „This Creature occupies 3 Support Zones."): Land Sharks steht nicht in der Galerie bzw. lässt sich nicht legen, solange die Nachbarzonen von Kreaturen belegt sind – oder die Nachbarn werden vom Hai verdrängt. Jedenfalls kein Hai mit nur einer Zone neben zwei fremden Kreaturen.
+- **Beobachtet:** Land Sharks steht in der Galerie und wird auf das Nest gelegt (`["Land Sharks","Monster Nest"]` in Slot 0), die beiden Dummys bleiben in Slot 1/2. (Zugende räumt sauber auf: Hai gelöscht, Nest zurück.) Gegenprobe: bei leeren Nachbarzonen setzt die Engine korrekt zwei `_ZoneBlocked`-Platzhalter. Weitere Nest-Ziele ohne Befund: Nest legt Monster Nest, Mountain Boars (keine Area-Löschung, da kein normaler Einsatz), Golden Vermin, Mimic, Luna Kiai, Horned Demon, Hell Fox, beide Skulls, Grave Worm – Aufräumen zum Zugende und Bilanz sauber.
+- **Repro:** `docs/niche-tests/repro/C03-creatures/19-monster-nest-land-sharks-bei-belegten-nachbarzonen.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `monster-nest.js` ruft `summonCreatureWithHooks(…, { coverNested: true })`; die Nest-Galerie (`eligibleFromDeck`) und der Einsatz prüfen nicht `canSummon`/`multiZone`; `_multizone-shared.js` `claimZones` setzt nur in leere Zonen (`gesetzt === 0` ⇒ stilles `false`).
+
+### C03-20 · Moonlight Butterfly (dauerhaft gestohlen): Falter fliegt auf die Hand des Besitzers, der 150-Schaden trifft dessen Wirtsheld · Stufe C
+- **Karten:** Moonlight Butterfly (`cards/effects/moonlight-butterfly.js`); Weg: dauerhafter Kontrollwechsel (`actionStealCreature` ohne Rückgabe).
+- **Voraussetzungen / Aufbau:** Sitz 0: Falter in Held 1 / Slot 0 (alt); Sitz 1 stiehlt ihn; Zugende von Sitz 0 (= Zug des Gegners des Kontrolleurs), Sitz 1 sagt Ja.
+- **Erwartet** (Text „At the end of your opponent's turn, you may add this Creature you control back to your hand, and if you do, deal 150 damage to the opponent's Hero in the same position as the corresponding Hero."): „your hand" ist die Hand des Kontrolleurs; „the opponent's Hero in the same position" ist aus Sicht des Kontrolleurs (Sitz 1) ein Held von Sitz 0 – der Wirtsheld selbst steht aber schon auf Sitz 0, es gibt also keinen eindeutigen „gegenüberliegenden" Helden.
+- **Beobachtet:** Rückfrage an Sitz 1 (Kontrolleur) ✓; der Falter landet auf der Hand des BESITZERS (Sitz 0, +1 Karte für das Opfer des Diebstahls), und die 150 Schaden treffen Sitz 0 Held 1, also genau den Helden, in dessen Zone der Falter stand (650 HP).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/20-moonlight-butterfly-gestohlen-besitzer-haelt-karte-und-schaden.js` (✗ = Lesart A wird verletzt)
+- **Vermutete Ursache:** `moonlight-butterfly.js` `onTurnEnd`: `oi = opponentOf(ctx.cardOwner)` + `heroIdx = inst.heroIdx` (Spalte des Wirtes, der auf der Seite des Besitzers steht); `returnSupportCreatureToHand` (`_deepsea-shared.js`) legt in die Besitzerhand.
+- **Frage an Al:** Bei einem gestohlenen Falter: Karte auf die Hand des Diebes (A) oder des Besitzers (B = jetzt)? Und welcher Held ist „gegenüber" – der Held des Besitzers in derselben Spalte (jetzt) oder der gegenüberliegende des Diebes?
+
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Giant Exploding Skull | L2 gezielt | Selbstsprengung (Ja/Nein, HOPT) ✓, Wischer beide Seiten inkl. eigener ✓, zwei Skulls je Seite (Kette endet, Ablage korrekt) ✓, gestohlen ⇒ Ablage des Besitzers ✓, Hell Fox im Wischer (2 Füchse gelöscht, Suche je Fuchs) ✓, Nest-Räumung löst nicht aus ✓, Skull gefroren/betäubt/negiert stirbt an Kreatur-Schaden ⇒ kein Wischer ✓, Aktivierung gefroren/betäubt/negiert abgewiesen ✓, Tod durch Kreatur-Effekt (Haressassin) ⇒ Wischer ✓ |
+| Golden Exploding Skull | L2 gezielt | unversehrte Kreaturen zählen nicht ✗(→ C03-05); gestohlen ⇒ Gold an Kontrolleur, eigene Ziele des Kontrolleurs ✓; Held auf 30 HP/Kreatur stirbt ✓; stillgelegt ⇒ kein Effekt ✓; Nest-Räumung ✓ |
+| Golden Ladybug | L2 gezielt | Resource-Phase: Gold/Karte-Wahl, zwei Ladybugs (zwei Fragen), gestohlen (Bonus nur im Zug des Kontrolleurs), goldLocked/drawLocked/beide/leeres Deck (Leerlauf-Regel greift) ✓, Wirtsheld gefroren ✓, Kreatur gefroren/betäubt/negiert ✓; Hand-Reaktion auf Surprise (Bluff) inkl. Zonenwahl und Wirtsheld gefroren ✓ |
+| Golden Vermin | L2 gezielt | Zieh-/Handsperre ✗(→ C03-08), Rundeneinkommen ✗(→ C03-09), 5er-Grenze (6. Gewinn ohne Frage) ✓, zwei Vermins ⇒ nur eine Frage ✓, gestohlen ⇒ Frage an Kontrolleur ✓, stillgelegt ✓, Ja-Weg (Gold ±0, Karte +1) ✓; Nein-Weg nicht gemessen |
+| Grave Worm | L2 gezielt | zweiter Wurm verliert Instanz ✗(→ C03-06), Namenserkennung/Besitzer ✗(→ C03-07); Einsatz zieht 1 Karte ✓; Nest-Räumung löst nicht aus ✓ |
+| Gravedigger | L2 gezielt | gestohlen ⇒ falsches Deck ✗(→ C03-01); Einsatz: Ablage 7/8/9, Deck 2/leer, Wahl Mill/Löschen, Bilanz ✓ (7 Karten ⇒ erzwungener Mill); Aktivierung gegen leeres Deck wirkt nicht und verbraucht nichts (Beobachtung); stillgelegt ✓ |
+| Haressassin | L2 gezielt | 150 auf Held/Kreatur (200-HP-Kreatur unversehrt ⇒ 50 ✓), Selbstziel, HOPT ✓, gestohlen ⇒ Ablage des Besitzers ✓, `untargetable`/`invisible`-Helden nicht wählbar ✓, Frost/Betäubung/Negation ✓ |
+| Hell Fox | L2 gezielt | Such-Sperre (Prompt unterdrückt, kein Mischen) ✓, Handsperre ✓, negiert/gefroren/betäubt ⇒ Ablage statt Löschen, keine Suche ✓, gestohlen (Dieb sucht im eigenen Deck, Löschstapel des Besitzers) ✓, zwei Füchse gleichzeitig + alter Fuchs in der Ablage ✓, Nest-Räumung ✓ |
+| Horned Demon | L2 gezielt | Aktivierung ohne Zähler gesperrt ✓, 50 × n ✓, Zähler nur zum eigenen Zugende ✓, dauerhaft gestohlen ✓, negiert ⇒ kein Zähler ✓; geliehen ✗(→ C03-17), gefroren/betäubt ✗(→ C03-18) |
+| Ifrit | L2 gezielt | Armageddon gesund ✓; stillgelegt ✗(→ C03-12); in Nest-Galerie ✗(→ C03-11) |
+| Inconspicuous Lawn Gnome | L2 gezielt | gestohlen ✗(→ C03-02), Hand/Brett ✗(→ C03-13); zweite Brettaktivierung abgewiesen ✓, Lv-3-Gnom mit SM 1 nicht spielbar ✓, stillgelegt ✓ |
+| Informant | L2 gezielt | Gegnerdeck 1/3/5/8 Karten, Reorder-Antwort (2 oben umgekehrt, Rest unten), Kartenbilanz/Audit ✓, Deck 0 nicht aktivierbar ✓, Zug-1-Schutz im Skript, stillgelegt ✓; gestohlen nur gelesen (nutzt `ctx.cardOwner`) |
+| Land Sharks | L2 gezielt | gestohlen ✗(→ C03-03), Angler Angel ✗(→ C03-16), Nest ✗(→ C03-19); Zielzahl 1/2/3 nach Summoning Magic, Frost/Betäubung/Negation ✓ |
+| Lovely Teddy | L2 gezielt | Koordinatenkollision ✗(→ C03-14); Rückgabe zum Zugende, geliehene Kreatur stirbt ⇒ Ablage des Besitzers, geliehene Haressassin/Skull/Demon aktivierbar ✓; Passiv-Hooks des Geliehenen ✗(→ C03-17) |
+| Luna Kiai | L2 gezielt | Burn-Tick mit 0/1/2 Luna (+60/+120 Max-HP inkl. Heilen) ✓, Held stirbt am Tick bleibt tot ✓, Hand-Reveal (zweites Reveal im Zug abgewiesen) ✓, alle Helden verbrannt ⇒ Beschwörung als Zusatzaktion ✓, Nest-Einsatz ✓, stillgelegt ⇒ kein Bonus ✓ |
+| Mausoleum Worm | L2 gezielt | „1 pro Zug" nur für Ablage-Weg ✗/C(→ C03-15); zwei Würmer/zwei Helden ⇒ eine Platzierung ✓, alle Zonen belegt ⇒ kein Angebot ✓, Selbstschaden ⇒ kein Angebot ✓ |
+| Mimic | L2 gezielt | zwei Mimics gegen 15 Gold (Klau begrenzt auf Vorhandenes), Gegner 0/negativ ⇒ kein Klau, dauerhaft gestohlen ⇒ Dieb profitiert, eigene Mimics klauen nicht im Gegnerzug ✓, gefroren/betäubt (Status aus Gegnerzug) und negiert ⇒ kein Klau ✓ |
+| Monster Nest | L2 gezielt | gestohlen ✗(→ C03-04), Ifrit ✗(→ C03-11), Land Sharks ✗(→ C03-19); Nest legt Monster Nest, Mountain Boars, Golden Vermin, Mimic, Luna Kiai, Horned Demon, Hell Fox, beide Skulls, Grave Worm: Zugende-Räumung ohne Todes-Auslösung, Bilanz ✓ |
+| Moonlight Butterfly | L2 gezielt | normal (Hand +1, Held gegenüber −150) ✓, Held gegenüber tot ⇒ Hinweis, kein Schaden ✓, stillgelegt (Frost/Betäubung/Negation) ⇒ keine Frage ✓; gestohlen ✗(→ C03-20) |
+| Mountain Boars | L2 gezielt | Hand: freie Aktion + Area (Wahl special/normal), erzwungen ohne Aktionsplatz, Area dieses Zuges nicht löschbar (Karte bleibt auf Hand) ✓; Ablage-Weg (direkt über `onDiscardEffect`): Area gelöscht, Zusatzaktion bleibt frei, Zone gewählt ✓; als Nest-Einsatz keine Area-Löschung ✓ |
+| Mr. Jiggles | L2 gezielt | gestohlen bietet sich selbst an ✗/C(→ C03-10), Angler Angel ✗(→ C03-16); Held+Kreatur / zwei Kreaturen (je 100) ✓, `untargetable`/`invisible`-Helden nicht wählbar ✓, Frost/Betäubung/Negation ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+* **Stilllegung (Dauer- und Hook-Effekte)**: Giant/Golden Skull, Hell Fox, Golden Vermin, Golden Ladybug, Luna Kiai, Mimic, Moonlight Butterfly und alle aktiven Effekte (Haressassin, Jiggles, Informant, Gravedigger, Gnom, Giant Skull) ruhen bei Frost, Betäubung und Negation – dynamisch bestätigt. (Ausnahmen: Ifrit C03-12; Horned Demon C03-18.) Hell Fox (`deletesSelfOnDeath`) ruht ebenfalls: gefrorener Fuchs geht in die Ablage, keine Suche.
+* **Sperren**: Hell Fox unter Such-Sperre (Prompt unterdrückt, `_skipNextShuffle`) und Handsperre; Golden Ladybug unter Gold-/Zieh-Sperre/leerem Deck (kein Auftritt, wenn nichts wirken kann).
+* **Zielschutz**: `untargetable`/`invisible`-Helden erscheinen bei Haressassin, Jiggles, Land Sharks, Horned Demon nicht in der Zielliste (solange ein anderer Held wählbar ist).
+* **Tod und Ablage**: gestohlene Kreaturen (Haressassin, Giant Skull, Hell Fox) landen in Ablage/Löschstapel des Besitzers; Ketten-Wischer zweier Giant Skulls endet nach einem Durchlauf ohne Kopien.
+* **Zähl-/Staffelwerte**: Horned Demon 50 × Zähler über mehrere echte Zugwechsel; Informant bei 1/3/5/8 Gegnerkarten; Land Sharks 1/2/3 Ziele nach Summoning Magic; Gravedigger-Einsatz bei Ablage 7/8/9.
+* **Nest-Zugende**: neun verschiedene Nest-Ziele verschwinden ohne Todes-Auslösung (Hell Fox, Skulls, Grave Worm), Bilanz und Audit sauber.
+* **Harness-Hinweis für Nachfolger**: `t.policy.confirm = null` wird als „Ja" (Standard) behandelt – ein echtes „Nein" braucht ein `t.script`-Eintrag mit `answer: () => null`; `actionNegateCreature(inst, source)` erwartet für `source` einen **String** (ein Objekt wirft `toLowerCase`-Fehler).
