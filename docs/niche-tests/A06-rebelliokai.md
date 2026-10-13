@@ -189,6 +189,67 @@ Stand/Autor: Agent A06-rebelliokai, 12.10.2026. Karten: 67 in der Liste · (wird
 - **Repro:** `docs/niche-tests/repro/A06-rebelliokai/24-thebinxan-handsperre.js`
 - **Frage an Al:** Soll Thebinxan bei Handsperre gesperrt (nicht aktivierbar) sein – oder soll der Schaden bei falscher Ansage trotzdem fallen, weil die Karte aufgedeckt wurde? – „gesperrt" oder „Schaden trotzdem"?
 
+### A06-rebelliokai-25 · SnowItAll beschwört ohne Beschwörer-Eignung (Schule/Level, Frozen/Stunned, summonLocked, Aktionssperre) · Stufe A
+- **Karten:** Mischief Militia - SnowItAll (`mischief-militia-snowitall.js` `_findFreeOwnSupportSlots`/`onCreatureEffect`)
+- **Voraussetzungen / Aufbau:** Sitz 0: SnowItAll (nicht diesen Zug beschworen) auf Held 0, Loyal Beagle (Lv1) auf der Hand, ein gefrorenes Ziel auf dem Brett; nur Held 1 hat eine freie Zone. Varianten: Held 1 ohne Summoning Magic · Held 1 mit Summoning Magic Lv1 aber gefroren / betäubt / negiert · `summonLocked` · `_actionLockedTurn` am Host.
+- **Schritte:** 1. `t.activateCreature(0, 0, 0)` (SnowItAll in Main 1).
+- **Erwartet** (Kartentext „summon a level 1 or lower Creature from your hand as an additional Action"; spielweites Ruling 8.8. im Kopf von `_summon-eligibility.js` und CARD_API „BESCHWÖRUNGSSPERREN": „summon as an additional Action" ist eine ganz normale Beschwörung – tauglicher Beschwörer Pflicht, `summonLocked` sperrt JEDE echte Beschwörung, Aktionssperren sperren auch Zusatzaktionen): in allen Varianten wird nichts beschworen. Kontrolle (gesunder Host mit Summoning Magic Lv1) beschwört (✓).
+- **Beobachtet:** Der Beagle landet in jeder Variante bei Held 1 (und wird eingefroren): ohne Summoning Magic, bei gefrorenem/betäubtem/negiertem Host, unter `summonLocked`, bei Aktionssperre. Der Zustand bleibt sonst sauber.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/25-snowitall-beschwoerer-eignung.js` (✗ = Fehler tritt auf; 6 von 8 Prüfungen ✗)
+- **Vermutete Ursache:** `mischief-militia-snowitall.js` baut die Zonenliste selbst (`_findFreeOwnSupportSlots`, alle lebenden Helden, freie Zone) statt `eligibleSummonZones(engine, pi, name, { nachKontrolle: true })` aus `_summon-eligibility.js` zu benutzen; `canActivateCreatureEffect` kennt deshalb keine Sperre. (Die Level-≤1-Prüfung gilt nur der Handkarte, nicht dem Beschwörer.)
+
+### A06-rebelliokai-26 · Loyal Pinpom: Zweitbeschwörung über gefrorenen/betäubten/aktionsgesperrten Helden · Stufe B
+- **Karten:** Loyal Pinpom (`loyal-pinpom.js` ≈ Z. 82–135)
+- **Voraussetzungen / Aufbau:** Hand: Pinpom, Beagle; Held 0 und Held 1 haben Summoning Magic Lv1, Held 0 hat nur den Slot 0 frei, Held 2 ist voll; Held 1 ist gefroren / betäubt bzw. hat `_actionLockedTurn`.
+- **Schritte:** 1. Pinpom auf Held 0 / Slot 0 spielen, Pinpom-Frage bejahen.
+- **Erwartet** (Kartentext „immediately summon another "Loyal" Creature from your hand as an additional Action"; Ruling 8.8., siehe -25): ein gefrorener/betäubter Held kann nicht beschwören, ein aktionsgesperrter auch nicht als Zusatzaktion → der Beagle bleibt auf der Hand.
+- **Beobachtet:** Der Beagle wird bei Held 1 beschworen (gefroren ✗, betäubt ✗, Aktionssperre ✗). Ein negierter Held 1 wird korrekt abgelehnt (✓).
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/26-pinpom-beschwoerer-status.js`
+- **Vermutete Ursache:** Beide Wirtsschleifen in `loyal-pinpom.js` prüfen `hp > 0`, freie Zone und `heroMeetsLevelReq`, aber weder `statuses.frozen/stunned/webbed/bound` noch `heroActionLocked`; die Hilfen in `_summon-eligibility.js` (`eligibleSummonZones`) werden nicht benutzt. (Gleiche Lücke bei Orthos' Zweitbeschwörung ist nicht geprüft: Orthos beschwört immer in seine eigene Spalte, ein gefrorener Orthos ruht ohnehin.)
+
+### A06-rebelliokai-27 · Mischief Invasion beschwört trotz Beschwörungssperre und Host-Aktionssperre · Stufe B
+- **Karten:** Mischief Invasion (`mischief-invasion.js` `_heroCanHostCreature`, ≈ Z. 55–70)
+- **Voraussetzungen / Aufbau:** Hand: Mischief Invasion, Chilly Dog (Lv1); ein gefrorenes Ziel auf dem Brett; nur Held 1 (Summoning Magic Lv1) hat freie Zonen. Variante A: `ps.summonLocked`; Variante B: `_actionLockedTurn` an Held 1.
+- **Erwartet** (Kartentext „summon them as additional Actions"; Ruling 8.8./CARD_API „BESCHWÖRUNGSSPERREN": `summonLocked` sperrt jede Beschwörung, Aktionssperren auch Zusatzaktionen): nichts wird beschworen.
+- **Beobachtet:** Chilly Dog wird in beiden Varianten bei Held 1 beschworen (Kontrolle ohne Sperre ✓). Die Statusprüfung (frozen/stunned/negated/bound) ist vorhanden, `_heroCanHostCreature` kennt aber weder `summonLocked` noch `heroActionLocked`.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/27-invasion-summonlocked.js`
+- **Nebenbefund (Frage, Stufe C):** Der Skriptkopf nimmt Lv-0-Kreaturen von der Statusprüfung aus („not Frozen / Stunned / Negated / Bound for Lv > 0 Creatures"): ein gefrorener oder betäubter Held bekommt über Invasion z. B. Heli Troopers (Lv0) beschworen (gemessen, ✗ gegen die Regel). In `validateActionPlay` (`_engine.js` ≈ 20712) gilt das Frost-/Betäubungs-Tor dagegen für alle Stufen. **Frage an Al:** Darf ein gefrorener/betäubter Held eine Lv-0-Kreatur über Mischief Invasion beherbergen – Ja oder Nein?
+
+### A06-rebelliokai-28 · Gorinthian War Counselor: der Schadensschutz hängt am Merker, nicht an der tatsächlichen Betäubung · Stufe B
+- **Karten:** Gorinthian War Counselor (`gorinthian-war-counselor.js` `onCreatureEffect` ≈ Z. 150-160, `isShielded`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Gorinthian + Cykyran (zwei Ratgeber), Main 1; Ziel: Gegner-Held 0. (a) der Held trägt `buffs.negative_status_immune` (Betäubung wird abgewehrt); (b) die Betäubung wird gelungen angebracht und danach vorzeitig geheilt (`engine.cleanseHeroStatuses(…, ['stunned'])`, der Weg von Coffee/Cure/Elixir of Recovery).
+- **Schritte:** 1. Gorinthian aktivieren. 2. Probeschaden 10 (`actionDealDamage`, Typ creature) auf den Helden.
+- **Erwartet** (Kartentext „Any damage targets Stunned by this effect would take becomes 0"; Skriptkopf: „Laeuft der Stun aus, ist auch der Schutz vorbei – beides endet zusammen"): nur ein tatsächlich von diesem Effekt betäubter, noch betäubter Held ist geschützt. Kontrolle (normal betäubt → Schaden 0) ✓.
+- **Beobachtet:** (a) Betäubung abgewehrt (`stunned` = false), `hero._gorinthianStun` trotzdem gesetzt → Schaden 0 bis Zug+2. (b) Betäubung geheilt, Merker bleibt → Schaden 0 bis Zug+2. (Bei Kreaturen wird `applied` ausgewertet – dort kein Fall (a).)
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/28-gorinthian-schutz-ohne-stun.js`
+- **Vermutete Ursache:** Für Helden stempelt `onCreatureEffect` den Merker direkt nach `await engine.addHeroStatus(...)` ohne dessen Ergebnis zu prüfen; `isShielded` liest nur den Zug-Stempel, nie `statuses.stunned`. (Ergänzt -14, das die Dauer betrifft.)
+
+### A06-rebelliokai-29 · Negierter Pawn Sacrifice / negierte Mischief Invasion zählen nicht gegen „You can only play 1 … per turn" · Stufe C
+- **Karten:** Pawn Sacrifice (`pawn-sacrifice.js:136`), Mischief Invasion (`mischief-invasion.js:287`); gleiche Klasse wie S01-02, A01-pollution-04/-14, F01-19 (dort Prüfauftrag), M02. Pawn Chain (`pawn-chain.js:50`, ebenfalls „only play 1 per turn") stempelt im selben Muster, wurde nicht per Negierung gemessen.
+- **Voraussetzungen / Aufbau:** Sitz 0: zwei Kopien auf der Hand (Pawn Sacrifice mit Pawn of Kings [W] auf dem Brett bzw. Invasion mit Heli Troopers in der Hand und einem gefrorenen Ziel); Sitz 1: Silence (Decay Magic Lv2).
+- **Schritte:** 1. Erste Kopie spielen, Sitz 1 negiert sie (Karte in der Ablage). 2. Im selben Zug (Aktionsphase, `resetActions`) die zweite Kopie spielen.
+- **Erwartet** (Kartentext „You can only play 1 "…" per turn"; Ruling CARD_API.md ~Z. 11433 „Der Stempel sitzt dort, wo die Karte die Hand verlässt … unabhängig davon, ob ein Gegenzug sie später negiert"; Lesart A „gespielt = gezählt"): die zweite Kopie ist nicht spielbar.
+- **Beobachtet:** Lesart B (wie bei den Vorläufern): beide Zauber stempeln erst im `onPlay` (nach den Wahlen); ein negierter Zauber erreicht ihn nie. Die zweite Kopie wird gespielt und wirkt (Pawn Sacrifice zieht 3 Karten, die Invasion beschwört Heli Troopers).
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/29-einmal-pro-zug-negiert.js`
+- **Frage an Al:** Soll ein von Silence negierter „only play 1 per turn"-Zauber den Zug-Slot verbrauchen (Lesart A, wie die Divine Gifts) – Ja oder Nein? (Gilt dann für alle Karten dieser Klasse einheitlich.)
+
+### A06-rebelliokai-30 · Pawn Sacrifice und Timid Tanuki unter Tuscan Artist: nicht ausgegraut, Opfer und Einmal-Nutzung gehen verloren · Stufe B
+- **Karten:** Pawn Sacrifice (`pawn-sacrifice.js` `spellPlayCondition` Z. 52, `onPlay` Z. 139), Rebelliokai Timid Tanuki (`rebelliokai-timid-tanuki.js` `canActivateCreatureEffect` Z. 130); Tuscan Artist (Sperrkarte, `_draw-block-shared.js`)
+- **Voraussetzungen / Aufbau:** Sitz 1 hat Tuscan Artist auf dem Brett. Sitz 0: (a) Pawn Sacrifice auf der Hand, Pawn of Kings [W] (nicht neu) + Knight of Kings [W] auf dem Brett; (b) Timid Tanuki (alt) mit 3 verschieden benannten Rebelliokai in der Ablage (Ziehen von genau 3).
+- **Schritte:** (a) `t.play(0, 'Pawn Sacrifice')`; (b) `t.activateCreature(0, 0, 0)` in Main 1.
+- **Erwartet** (Kartentext Tuscan Artist „any effect that would allow your opponent to draw 2 or 3 cards is negated"; verbindliches Ruling 16.8. im Kopf von `_draw-block-shared.js`: „Ist der Zug der einzige Nutzen – auch wenn dafür Kosten anfallen – dann ist die Karte bzw. der aktive Effekt GESPERRT und wird ausgegraut. Ein Effekt, der so nicht feuern kann, verbraucht auch sein Once-per-turn NICHT."): Pawn Sacrifice (zieht immer 3 oder 2) ist nicht spielbar, der Tanuki (zieht 3) nicht aktivierbar.
+- **Beobachtet:** (a) Der Zauber wird gespielt, der Pawn geopfert, `drawWouldBeBlocked` überspringt das Ziehen erst im `onPlay` – Pawn und Karte weg, nichts gezogen, `hoptUsed['pawn-sacrifice:0']` gesetzt. (b) Der Tanuki wird aktiviert, zieht 0 Karten, die Einmal-Nutzung des Zuges ist verbraucht.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/30-tuscan-artist-ziehkarten-nicht-gesperrt.js`
+- **Vermutete Ursache:** Die beiden Gates rufen `drawWouldBeBlocked(engine, pi, n)` nicht auf (das Ruling nennt „rund zwölf betroffene Karten, mit EINER Zeile in ihrem eigenen Gate"). Verwandt mit -21 (Handsperre) und -24 (Thebinxan/Handsperre), dort ohne ausdrückliches Ruling als Frage; hier gilt das Ruling 16.8. direkt. Ice Sculpture Garden (zieht N = Anzahl Gefrorener, bei N = 2/3 negiert, behält aber die Zusatzaktion) wurde nicht als Fehler gewertet.
+
+### A06-rebelliokai-31 · Bear Rider: Handstufen-Senkung gilt nur für Sitz 0 und 1 (3-/4-Spieler-Partien) · Stufe B
+- **Karten:** Mischief Militia - Bear Rider (`mischief-militia-bear-rider.js` Hooks, `_mischief-militia-shared.js:325` `recomputeBearRiderHandLevelAllPlayers`)
+- **Voraussetzungen / Aufbau:** 3 Sitze; Sitz 0 spielt Snowstorm Mischief (Sitz 1 und 2 haben je eine Dummy-Kreatur → 2 gefrorene Ziele); je ein Bear Rider auf der Hand von Sitz 1 bzw. Sitz 2.
+- **Erwartet** (Kartentext „This card's level in your hand is reduced by 1 for every Frozen target on the board. While this Creature's level is 0, you may summon it as an additional Action"; CARD_API „Gegner-Index nie hart verdrahten"): in der Hand jedes Sitzes Stufe 0 bei 2 gefrorenen Zielen.
+- **Beobachtet:** Sitz 1: Stufe 0 ✓. Sitz 2: bleibt Stufe 2 (`_handLevelOffsetsTransient` leer); `t.play(2, Bear Rider, noGrant)` wird mit `validate-nein` abgelehnt, während derselbe Aufbau auf Sitz 1 gelingt.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/31-bear-rider-dritter-sitz.js` (✗ nur für Sitz 2)
+- **Vermutete Ursache:** `recomputeBearRiderHandLevelAllPlayers` ruft nur `recomputeBearRiderHandLevel(engine, 0)` und `(engine, 1)`; alle Frost-/Tod-/Zug-Hooks hängen daran. Nur `onCardEnterZone` (Karte kommt in die Hand) rechnet für den betroffenen Sitz, danach wird die Senkung nie nachgeführt – umgekehrt bleibt eine einmal gesetzte Senkung auf Sitz 2/3 auch nach dem Auftauen stehen.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

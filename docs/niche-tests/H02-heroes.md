@@ -199,6 +199,34 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Vermutete Ursache:** `kazena-the-storming-rebel.js` `canActivateHeroEffect` prüft `handLocked` und `hand < 7`, aber weder `drawLocked` noch `mainDeck.length > 0`; `onHeroEffect` gibt nach dem Ziehen von 0 Karten trotzdem `true` zurück (verbraucht den Einsatz).
 - **Frage an Al:** Soll Kazena unter Ziehsperre/leerem Deck gar nicht aktivierbar sein (Einsatz bleibt) – ja oder nein? (Der Spieler kann den Verbrauch selbst vermeiden, indem er die Rückfrage verneint.)
 
+### H02-heroes-23 · Junshi (gefroren/betäubt): die Stufensenkung der Magic-Arts-Zauber gilt weiter · Stufe B
+- **Karten:** Junshi, the Tactical Genius (`junshi-the-tactical-genius.js` `reduceCardLevel`/`heldWirkt`); Messkarte Detection (Magic Arts Lv 1)
+- **Voraussetzungen / Aufbau:** Junshi auf Held 0 mit 1 eigener Kreatur; Held 1 ohne Schulen; Detection auf der Hand, gegnerische Surprise auf dem Brett (sonst ist Detection unspielbar); Status gefroren / betäubt / negiert auf Junshi.
+- **Schritte:** Detection mit Held 1 über den echten Spielweg wirken.
+- **Erwartet** (Kartentext „Magic Arts Spells in your hand have their levels reduced by the number of Creatures you control."; Konvention `_isHeroEffectSilenced`, `_engine.js:6446`: gefroren/betäubt/negiert/tot ⇒ Heldeneffekt aus; Kontrolle ohne Junshi: unspielbar): Detection ist nur mit gesunder Junshi spielbar.
+- **Beobachtet:** ohne Status spielbar ✓; **gefroren ✗ und betäubt ✗: spielbar** (Lv 1 → 0); negiert und tot: gesperrt ✓. Weiter ✓: gegnerische Kreaturen zählen nicht, eine gestohlene eigene Kontrollkreatur zählt.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/23-junshi-gefroren-senkt-weiter.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Vermutete Ursache:** `junshi-the-tactical-genius.js` `heldWirkt` prüft nur `hero.statuses.negated` (Kommentar behauptet „jede Form der Negation"); die Engine liest `reduceCardLevel` ohne Status-Filter (wie B-01…B-03, nur für Helden). Gleiche Klasse bei jedem Helden-Stufensenker – dieselbe Prüfung für Layn/Fiedel sinngemäß ausgeführt (s. Abdeckung).
+- **Frage an Al:** (Konvention) Soll ein gefrorener/betäubter Held seine Handkarten-Stufensenkung verlieren – ja oder nein?
+
+### H02-heroes-24 · Krates (dauerhaft übernommen): die Such-Umleitung hängt an der Spalte, nicht am Kontrolleur · Stufe B
+- **Karten:** Krates, the Smartass (`krates-the-smartass.js`, Vertrag `interceptsOppDeckSearch`); Engine `_checkOppDeckSearchInterceptors`; Messkarte Brilliant Idea. Gehört zur Klasse H01-03/-04/-15/-16 („Spalte statt Kontrolleur").
+- **Voraussetzungen / Aufbau:** Krates als Held 0 von Sitz 0; Sitz 1 übernimmt ihn per `actionTakeHeroPermanently(1, 0, 0)`; beide Decks 5 Zauber + 5 Dummys; Antworten geskriptet.
+- **Schritte:** (b) Sitz 1 (Kontrolleur) wirkt Brilliant Idea; (c) Sitz 0 (Alt-Besitzer) wirkt Brilliant Idea.
+- **Erwartet** (Kartentext „Whenever an effect would allow **your opponent** to search their deck …"; Regel „Übernommene Helden gelten als Helden des Kontrolleurs", CARD_API.md Z. 6046): (b) die eigene Suche des Kontrolleurs wird nicht umgeleitet; (c) die Suche des Alt-Besitzers wird von Sitz 1 (Krates-Spieler) umgeleitet (3 Karten aufdecken, Sitz 1 wählt).
+- **Beobachtet:** genau umgekehrt – (b) Sitz 1 muss 3 Karten aufdecken, und SITZ 0 (der Alt-Besitzer, der Krates nicht mehr kontrolliert) wählt, welche Karte er selbst bekommt (hand0 [Fireball], hand1 [Burning Finger]); (c) die Suche von Sitz 0 läuft ungestört durch. Kontrolle (Krates beim Gegner, nicht übernommen): Umleitung ✓.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/24-krates-uebernommen-spalte-statt-kontrolleur.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Vermutete Ursache:** `_engine.js:25102-25116` `_checkOppDeckSearchInterceptors`: `holder = opponentOf(searcher)` und `gs.players[holder].heroes` – die Spalte, nicht `heroesControlledBy`; `krates-the-smartass.js` übergibt `holder` als „Krates-Spieler" (`k`), obwohl der Kontrolleur ein anderer sein kann.
+
+### H02-heroes-25 · Layn, Master of Deri's Relic: „Heroes you control" – die Zonenliste folgt der Spalte, nicht der Kontrolle · Stufe B
+- **Karten:** Layn, Master of Deri's Relic (`layn-master-of-deri-s-relic.js` `collectFreeZones`/`canActivateHeroEffect`); Klasse H01-03/-04/-15/-16
+- **Voraussetzungen / Aufbau:** Layn Master als Held 0 von Sitz 0; Ablage 3× Treasure Skeleton (Lv 1); (b) Sitz 1 übernimmt Held 2 von Sitz 0 dauerhaft; (c) Sitz 0 übernimmt Held 1 von Sitz 1 dauerhaft (`actionTakeHeroPermanently`).
+- **Schritte:** Heldeneffekt aktivieren, Skeleton wählen, die angebotenen Zonen mitschneiden.
+- **Erwartet** (Kartentext „place them into the free Support Zones of Heroes **you control**"; Regel „Übernommene Helden gelten als Helden des Kontrolleurs", CARD_API.md Z. 6046): (b) Held 2 (an Sitz 1 verloren) wird nicht angeboten; (c) die 3 Zonen des übernommenen Gegnerhelden werden zusätzlich angeboten.
+- **Beobachtet:** in beiden Fällen dieselben 9 Zonen der eigenen Spalte – (b) die Zonen von Held 2 stehen zur Wahl (bei Wahl landen die Skeletons bei einem Gegnerhelden), (c) der übernommene Gegnerheld fehlt.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/25-layn-master-uebernommene-helden-zonen.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Vermutete Ursache:** `collectFreeZones(ps)` und `canActivateHeroEffect` laufen über `ps.heroes`/`ps.supportZones` (Spalte); vorgesehen wäre `engine.heroesControlledBy(pi)` mit Brettseite (vgl. Jenny -09).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

@@ -161,6 +161,35 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S03-spells/17-overcharge-future-tech-control-device-eigener-held.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `istAusruestbar` prüft `neverPlayable` und `canEquipToHero`, aber weder `placesOnOpponentBoard` noch `isTargetingArtifact` (vgl. `_engine.js` ~12163).
 
+### S03-18 · Overcharge + Rain Viola: veralteter Deck-Index – die Aufwertung wird dupliziert, eine falsche Deckkarte verschwindet · Stufe A
+- **Karten:** Overcharge (`overcharge.js` Z. 265–277), Rain Viola (Ablege-Auslöser „search your deck for any Attack or Spell"); jeder Ablege-Auslöser, der das Deck verändert/mischt, gehört in dieselbe Klasse.
+- **Voraussetzungen / Aufbau:** Seeds 1234, 1, 7; Zug 5; Held 0 (Magic Arts 1) trägt „Rain Viola" (Kosten 4); Deck [Fireball, Blade of the Frostbringer (Kosten 5), ZZ Dummy, Meteor Crash]; Galerien: Overcharge → Blade of the Frostbringer, Rain Viola → Fireball.
+- **Schritte:** 1. Overcharge spielen, Blade wählen. 2. Kartenbilanz, Deck, Support Zone lesen.
+- **Erwartet** (Kartentext „… send it to the discard pile. Then, choose an equippable Artifact … from your deck and equip it to the same Hero."; Regel „Zone ↔ Instanz konsistent", Kartenbilanz ±0): Blade wandert aus dem Deck aufs Brett (genau eine Kopie), Fireball (Rain Viola) in die Hand, ZZ Dummy bleibt im Deck.
+- **Beobachtet:** In allen drei Seeds liegt Blade of the Frostbringer **zugleich auf dem Brett und noch im Deck** (Bilanz „Blade +1"), dafür ist **ZZ Dummy aus dem Deck verschwunden** (Bilanz „ZZ Dummy −1"). Ursache ist die Reihenfolge: der Index wird vor dem Ablegen gelesen, Rain Viola sucht beim Ablegen im Deck und mischt, danach nimmt `takeFromPile(ps, 'deck', deckIdx)` per Index die falsche Karte.
+- **Repro:** `docs/niche-tests/repro/S03-spells/18-overcharge-rain-viola-veralteter-deckindex.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `overcharge.js` Z. 265 `const deckIdx = (ps.mainDeck || []).indexOf(neuName);` vor `actionMoveCard(altInst, 'discard')` (Z. 273); `takeFromPile(ps, 'deck', deckIdx, …)` (Z. 277) müsste nach dem Ablegen den Namen statt des alten Index übergeben (`takeFromPile` nimmt auch Namen, s. `_engine.js` ~18947) oder den Index neu suchen.
+
+### S03-19 · Teleportal mischt das Deck nach der Suche nicht · Stufe B
+- **Karten:** Teleportal (`teleportal.js` Z. 170); Vergleich: Masterpiece, Pillar of Light, Ultimate Weapon Experiment, Overcharge mischen nach ihrer Suche.
+- **Voraussetzungen / Aufbau:** Seeds 1234, 5, 77; Zug 5; Deck aus 8 verschiedenen Karten in bekannter Reihenfolge, Teleportal sucht „Fireball" (mittendrin). Kontrolle: Masterpiece mit gleichem Aufbau.
+- **Schritte:** 1. Teleportal spielen, Fireball wählen. 2. Reihenfolge der restlichen 7 Karten lesen.
+- **Erwartet** (Kartentext „Search your deck for a card …"; Projektkonvention `CARD_API.md` ~Z. 14161 „Die Suchkarten mischen … („search implies a shuffle")" und Z. 19611 „mit Such-Sperre und anschließendem Mischen wie jede Suche"): Das Deck wird nach der Suche gemischt.
+- **Beobachtet:** In allen drei Seeds bleibt die Reihenfolge exakt die Ausgangsreihenfolge (ohne Fireball); die Kontrolle (Masterpiece) mischt. Folge: eine zuvor geordnete Deckoberseite (Umordnen/Mill-Reihenfolge) überlebt Teleportal. Lieferung am nächsten eigenen Zugbeginn ✓ (`teleportalUntil` = Zug+1, kommt in Zug 7 auf die Hand).
+- **Repro:** `docs/niche-tests/repro/S03-spells/19-teleportal-mischt-das-deck-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `teleportal.js` Z. 170 `engine.takeFromPile(pi, 'deck', name, { source: CARD_NAME })` ohne `shuffle: true` (vgl. `pillar-of-light.js` Z. 166) und ohne `shuffleDeck`; auch der Abbruchzweig mischt nicht.
+- **Frage an Al:** Soll Teleportal nach der Suche mischen wie alle anderen Suchkarten? (ja / nein)
+- **Nebenbeobachtung (nicht als Befund geführt, kein Repro):** `zustellenAlleFaelligen` (Z. 93 `ps.permanents.splice`, Z. 102 `actionAddCardToHand`) nimmt den Eintrag aus `ps.permanents`, bevor `actionAddCardToHand` (gibt immer `undefined` zurück, `ok === false` ist also nie wahr) prüft, ob die Hand gesperrt ist; ist `ps.handLocked` bei der Lieferung gesetzt, wäre die Karte verloren. Im Normalspiel räumt der Zugbeginn die Sperre vorher ab, ein natürlicher Auslöser wurde nicht gefunden.
+
+### S03-20 · Surprise Party unter Knight of Kings [B] (Deck-Sperre): Deckoberkarte wird 200-fach ins Deck zurückgelegt bzw. die Creature dupliziert · Stufe A
+- **Karten:** Surprise Party (`surprise-party.js` Z. 97–124 Aufdeck-Schleife, Z. 106 `takeFromPileSync`); Sperre: Knight of Kings [B] + Rook of Kings [B] + Board of Kings (`pileOutAllowed(pi, 'deck')` = false). Dieselbe Bauart (Schleife über `ps.mainDeck[0]` + `takeFromPileSync` ohne Prüfung des Ergebnisses) kann auch bei anderen Aufdeck-/Mill-Karten vorkommen (nicht getestet).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 Support Magic 2; Deck [Rockfall, Meteor Crash, ZZ Dummy (Creature), Slow] (Variante: [ZZ Dummy, Meteor Crash, Slow]); Sitz 1 kontrolliert Knight + Rook of Kings [B], Board of Kings liegt.
+- **Schritte:** 1. Surprise Party spielen. 2. Deckgröße, Support Zone, Kartenbilanz lesen.
+- **Erwartet** (Kartentext „Reveal the top card of your deck until …"; Knight of Kings [B] „your opponent cannot move cards from their deck … to anywhere else"; Regel Kartenbilanz ±0): Karte ist nicht spielbar bzw. wirkungslos, das Deck bleibt bei 4 Karten.
+- **Beobachtet:** `play` ⇒ `true`. Hauptfall: Das Deck wächst von 4 auf **204** Karten (Kartenbilanz „Rockfall +200"): `takeFromPileSync` verweigert die Entnahme, die Schleife liest aber immer wieder `ps.mainDeck[0]` (Rockfall), schiebt den Namen in `zurueck`, bis `wache < 200` abbricht, und `zurueckMischen` legt alle 200 Kopien ins Deck. Variante (Creature obenauf): die Creature wird auf das Brett gesetzt **und** bleibt im Deck (Bilanz „ZZ Dummy +1"). Ohne Sperre sauber (Bilanz ±0; ohne Creature im Deck und mit Level-4-Creature ebenfalls ±0 ✓).
+- **Repro:** `docs/niche-tests/repro/S03-spells/20-surprise-party-deck-sperre-dupliziert-karten.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `surprise-party.js` Z. 106 prüft den Rückgabewert von `takeFromPileSync(ps, 'deck', 0, …)` nicht; `spellPlayCondition` (Z. 64–68) kennt `pileOutAllowed` nicht. Abhilfe: Rückgabewert prüfen (bei `null` abbrechen) bzw. Karte bei gesperrtem Deck nicht spielbar machen.
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung

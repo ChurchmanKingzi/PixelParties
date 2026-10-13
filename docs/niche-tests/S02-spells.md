@@ -128,6 +128,23 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/14-holy-selection-ida-zielwahl-nicht-abbrechbar.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `holy-selection.js` Z. 175 `cancellable: false` im Ida-Zweig von `onPlay`.
 
+### S02-15 · Love Shot: Heldenwahl liest die Gegnerspalte statt „Held, den dein Gegner kontrolliert" · Stufe B
+- **Karten:** Love Shot (`love-shot.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Love Shot, Fireball]; Gegnerheld 0 per `actionTakeHeroPermanently(0, 1, 0)` dauerhaft von Sitz 0 kontrolliert, MEIN Held 2 per `actionTakeHeroPermanently(1, 0, 2)` vom Gegner kontrolliert.
+- **Schritte:** 1. Love Shot mit Held 0 spielen. 2. Die angebotene Heldenliste mitschneiden (Abbruch).
+- **Erwartet** (Kartentext „choose a Hero your opponent controls"; CARD_API.md „Kontrolle statt Seite"): angeboten werden Gegnerheld 1, 2 und mein vom Gegner kontrollierter Held 2; nicht der von mir kontrollierte Gegnerheld 0.
+- **Beobachtet:** Angeboten werden die drei physischen Helden der Gegnerspalte (1:0, 1:1, 1:2); der von mir kontrollierte Gegnerheld 0 steht zur Wahl (Love Shot würde dann mit meinem eigenen Helden als „Zusatzaktion" gewirkt), mein vom Gegner kontrollierter Held 2 fehlt. Sind die übrigen Gegnerhelden tot/gefroren, bleibt nur der eigene Held als „Gegnerheld" übrig.
+- **Repro:** `docs/niche-tests/repro/S02-spells/15-love-shot-heldenwahl-nach-besitz.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `love-shot.js` Z. 158 `for (hi …) ops.heroes[hi]` ohne `engine.heroesControlledBy(oi)` (gleiche Klasse wie S02-01/-02). Gegenprobe: gefrorene/betäubte/gebundene/negierte Gegnerhelden werden korrekt nicht angeboten ✓.
+
+### S02-16 · Divine Zeal: Statuswahl (2. Stufe) nicht abbrechbar – ein Abbruch verbrennt die Karte · Stufe B
+- **Karten:** Divine Zeal (`divine-zeal.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Divine Zeal]; Gegnerheld 0 brennt und ist vergiftet. Ziel wählen, die folgende `statusSelect`-Abfrage mit `null` abbrechen.
+- **Erwartet** (Ruling CARD_API.md Z. 367ff.: „… jede Stufe einer mehrstufigen Auswahl: `cancellable: true` … Abbruch heißt: nichts ist passiert"): die Statuswahl ist abbrechbar, nach Abbruch liegt die Karte auf der Hand, Status unverändert.
+- **Beobachtet:** `statusSelect` kommt mit `cancellable: false` (kein Begründungskommentar); die Abbruch-Antwort zählt als „0 Effekte gewählt": Karte in der Ablage, nichts entfernt. Ein Mensch kann nach der Zielwahl nicht mehr zurück (bei mehreren Zielen: n Folgefenster, alle ohne Abbrechen). Grundlauf ✓: 4 Effekte auf 3 Zielen (Helden und Kreatur) entfernt, 2 Karten gezogen.
+- **Repro:** `docs/niche-tests/repro/S02-spells/16-divine-zeal-statuswahl-nicht-abbrechbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `divine-zeal.js` Z. 169–176 `statusSelect … cancellable: false`, Z. ~178 `result?.selectedStatuses || []` (Abbruch = leere Wahl).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

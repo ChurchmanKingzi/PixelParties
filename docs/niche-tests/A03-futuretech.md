@@ -198,6 +198,43 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 - **Repro:** `docs/niche-tests/repro/A03-futuretech/21-barrage-cancel-burns-hopt.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `future-tech-barrage.js` `hooks.onPlay`: `engine.claimHOPT('future-tech-barrage', pi)` steht VOR `ctx.promptDamageTarget`; der Abbruchzweig (`gs._spellCancelled = true`) setzt die Sperre nicht zurück.
 
+### A03-futuretech-22 · The Core's Awakening: die Staffel „1/2/3" folgt dem ersten tauglichen Helden, nicht dem gewählten Wirker · Stufe B
+- **Karten:** The Core's Awakening (`cards/effects/the-core-s-awakening.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 0 und Held 1 mit unterschiedlicher Support Magic (a: 1 / 3, b: 3 / 1), Hand: Future Tech Gun + The Core's Awakening, Deck: 4× Gun. Seed 1234.
+- **Schritte:** 1. Gun auf Held 2 ausrüsten. 2. Reaktion bestätigen; im Auswahlfenster „Cast The Core's Awakening with …“ Held 1 wählen (`optionPicker`, Option `hero-1`).
+- **Erwartet** (Quelle: „Choose up to **1/2/3** copies …“; CARD_API-Hausnotation: Stufe der geforderten Schule des Wirkers): (a) Held 1 hat Support Magic 3 → 3 Kopien in die Ablage; (b) Held 1 hat Stufe 1 → 1 Kopie.
+- **Beobachtet:** (a) nur 1 Kopie, (b) 3 Kopien – die Stufe von Held 0 zählt, egal wen der Spieler wählt (Kettenglied trägt `casterHeroIdx: 1`, wird ignoriert). Bei zwei Helden mit verschiedener Stufe hängt das Ergebnis damit von der Aufstellung ab, nicht von der Wahl des Spielers. Nebenbei: es gibt keine Mengenwahl („up to"): es werden immer `min(Stufe, Kopien im Deck)` gesendet (gleiche Lage wie -11, dort als Frage an Al).
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/22-core-awakening-caster-level.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `the-core-s-awakening.js` `resolve`: `const heroIdx = wirkenderHeld(gs, pi, engine)` (erster Held, der Stufe/Status erfüllt) statt `chain[myIndex].casterHeroIdx`.
+
+### A03-futuretech-23 · Debt-O-Tron Model Backup Duplicator: unter Such-/Handsperre wird die Suche angeboten, nichts geholt – die Rundenladung ist trotzdem weg · Stufe B
+- **Karten:** Debt-O-Tron Model Backup Duplicator (`cards/effects/debt-o-tron-model-backup-duplicator.js`), Kent (Überziehung); verwandt B-04 (Spielbarkeit unter Such-Sperre), dort nicht diese Stelle
+- **Voraussetzungen / Aufbau:** Sitz 0: Kent auf Held 0, Duplicator auf dem Brett (Held 2, Slot 1, nicht im Legezug), Hand: Gun, Gold 0; Deck: 2× Damage Fees + Füller. (a) `ps.searchLocked = true`, (b) `ps.handLocked = true`. Seed 1234.
+- **Schritte:** Gun spielen (10 Gold bei 0 Gold → −10, Überziehung 10 → Duplicator-Auslöser); die Galerie „Add up to 1 Debt-O-Tron Artifact …“ bestätigen.
+- **Erwartet** (Quelle: „you may **search your deck** … and **add them to your hand**“; Konvention: Such-/Hand-Sperren verhindern Suchen und Adds, der Auslöser hat dann keinen Anlass): keine Abfrage, die einmal-pro-Zug-Ladung bleibt.
+- **Beobachtet:** Die Galerie (`cardGalleryMulti`) erscheint in beiden Fällen; die gewählte Karte landet nicht in der Hand; `remainingCharges` = 0/1 (Ladung verbraucht).
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/23-backup-duplicator-locks.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `debt-o-tron-model-backup-duplicator.js` `afterResourceSpend`: keine Prüfung von `ps.searchLocked`/`ps.handLocked`; `treffer.verbuche()` steht vor `takeFromPile`, dessen Fehlschlag (`return`) still bleibt.
+
+### A03-futuretech-24 · Future Tech Drone / Debt-O-Tron Model Money Printer unter Zieh-Sperre: Karte weg bzw. Ladung verbraucht, gezogen wird nichts · Stufe C
+- **Karten:** Future Tech Drone (`cards/effects/future-tech-drone.js`), Debt-O-Tron Model Money Printer (`debt-o-tron-model-money-printer.js`)
+- **Voraussetzungen / Aufbau:** (a) Drone auf dem Brett, 1× Drone in der Ablage, Hand 2× Fireball, `ps.drawLocked = true`. (b) Kent, Money Printer auf dem Brett, Gold 0, `ps.drawLocked = true`. Seed 1234.
+- **Schritte:** (a) Drone aktivieren, 1 Karte abwerfen. (b) Gun spielen (Überziehung 10 → Printer-Auslöser).
+- **Erwartet** (Quelle: Drone „discard … **and draw the same number**“, Printer „you may draw 1 card …“; Konvention CARD_API.md ~Z. 19118: Karten mit Ziehen als Kern sperren sich bei `handLocked`/`drawLocked`, „sonst würde man … löschen, ohne zu ziehen“; Gegenläufig: Leadership lässt den Menschenpfad bewusst offen): unklar, ob die Aktivierung gesperrt sein soll.
+- **Beobachtet:** (a) Aktivierung läuft, 1 Karte abgeworfen, nichts gezogen (Hand 2 → 1). (b) Printer fragt „Draw 1 card?", die Ladung geht auf 2/3, gezogen wird nichts.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/24-drone-printer-draw-lock.js` (✗ = Ist-Zustand)
+- **Vermutete Ursache:** Drone hat kein `canActivateCreatureEffect` mit Sperrprüfung; Printer prüft nur `mainDeck.length` (Golden Ladybug/Chuck prüfen `handLocked || drawLocked`).
+- **Frage an Al:** Soll die Drone (und der Money Printer) unter Zieh-Sperre gar nicht erst aktivierbar bzw. auslösbar sein – „sperren" oder „darf ins Leere laufen"?
+
+### A03-futuretech-25 · Kent: der Kreditrahmen bleibt beim Besitzer, wenn der Gegner Kent übernimmt · Stufe B
+- **Karten:** Kent, the Indebted Apprentice (`cards/effects/kent-the-indebted-apprentice.js`), Engine `goldOverdraftLimit`
+- **Voraussetzungen / Aufbau:** Sitz 0: Kent auf Held 0; beide 50 Gold. Seed 1234.
+- **Schritte:** 1. `goldOverdraftLimit(0)` / `(1)` lesen (20 / 0). 2. `actionStealHero(1, 0, 0)` (Sitz 1 übernimmt Kent). 3. Beide Werte erneut lesen.
+- **Erwartet** (Quelle: Kartentext „If **you** spend Gold …“; CARD_API.md ~Z. 18862 „Übernommene Helden gelten als Helden des Kontrolleurs … ‚you/your‘ = Kontrolleur (Hand, Deck, Ablage, Gold …)“): Sitz 1 hat den Kredit (20), Sitz 0 nicht mehr (0).
+- **Beobachtet:** Unverändert 20 / 0: der Besitzer überzieht weiter mit dem Helden, den der Gegner gerade kontrolliert; der Kontrolleur bekommt nichts. (Das Gleiche gilt vermutlich für Kents Aktionssperre `blocksActions`, die ebenfalls an `players[pi].heroes` hängt – nicht einzeln gemessen.)
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/25-kent-overdraft-stolen-hero.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` ~24227 `goldOverdraftLimit(playerIdx)` iteriert die Helden der physischen Seite (`ps.heroes`) und fragt `heroSideOf` nicht (vgl. `heroesControlledBy`); `kentAlive` in `kent-the-indebted-apprentice.js` ebenso.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

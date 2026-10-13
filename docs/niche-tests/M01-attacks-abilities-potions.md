@@ -154,6 +154,25 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/16-charme-lv2-gestohlene-karte-falsche-ablage.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `charme.js:520-530` legt die Karte mit `handZugangSync(…, {ohneInstanz: true})` und `_moveHandInstanceOwner` in die Hand, ruft aber nicht `_tagHandCardOrigin` (`_engine.js:~16190`) auf. Die Entnahme-Wege (`actionPromptForceDiscard` ~Z. 16650/16668, Spielen) lesen die Herkunft inzwischen über die Platz-Tabelle `_handOriginals` (`_handCardPileOwner`, Z. 24820) bzw. den Entfernungs-Merker; ohne `_tagHandCardOrigin` fehlt beides, die Instanz ist beim Splice schon weg. Gleiche Wirkung beim Rückmischen: Leadership mischt die von Charme gestohlene Fireball in das Deck des **Diebes** (Sitz 0), bei Infiltration korrekt in das Deck des Besitzers (Sitz 1) – gemessen (Scratch `c19-charme-shuffle.js`).
 
+### M01-17 · Hammer Throw: der Item Lock greift auch, wenn Escape die Attack (samt Schaden) negiert · Stufe C
+- **Karten:** Hammer Throw (`cards/effects/hammer-throw.js`), Escape (`cards/effects/escape.js`).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 1 Held 0 mit Fighting Lv2 und 30 HP, Hand [Escape, ZZ Filler]; Sitz 0 spielt Hammer Throw (ATK 40, tödlich) auf diesen Helden; Escape-Frage „Ja".
+- **Schritte:** 1. Hammer Throw auf Held 0 von Sitz 1. 2. Escape ausspielen lassen (Kosten ZZ Filler).
+- **Erwartet** (Kartentext Escape „negate all effects the Attack or Spell has on that Hero (including damage)"; Skriptkopf `hammer-throw.js`: „If the attack is not negated, the target's controller is Itemlocked …"; der Kartentext von Hammer Throw selbst nennt keine Negations-Klausel): Lesart A – bei negierter Attack entfällt auch der Item Lock; Lesart B – der Lock ist ein Effekt auf den Kontrolleur, nicht auf den Helden, und bleibt.
+- **Beobachtet:** Escape negiert Schaden (30 HP bleiben); Kontrolle Heavy Hit: die Betäubung wird mitnegiert ✓. Bei Hammer Throw ist Sitz 1 danach trotzdem `itemLocked`. Im Skript steht `let negated = false;` (~Z. 99), nie gesetzt oder gelesen; das Ergebnis von `actionDealDamage` wird nicht ausgewertet.
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/17-hammer-throw-escape-sperre-trotz-negierung.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `hammer-throw.js` ~Z. 99/129-160: tote Variable `negated`, Lock nur an `gs.turn > 1` gebunden.
+- **Frage an Al:** Soll ein von Escape (oder einem Schild) verhinderter Hammer Throw den Item Lock trotzdem setzen (ja = wie jetzt / nein = Lock entfällt)?
+
+### M01-18 · Elixir of Immortality übersieht Kreaturen, die in einem Mehrfachtreffer-Schlag (Fireball) sterben · Stufe A
+- **Karten:** Elixir of Immortality (`cards/effects/elixir-of-immortality.js`, Hook `afterCreatureDamageBatch`); auslösend getestet mit Fireball (Weg `engine.dealDamageToTargets`); Kontrollen Burning Finger und Attack (Einzeltreffer).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 spielt Elixir of Immortality (liegt als Permanent) und hat eine 10-HP-Kreatur; Sitz 1 tötet sie mit (a) Burning Finger, (b) Attack, (c) Fireball auf diese eine Kreatur.
+- **Schritte:** 1. Elixir spielen. 2. Kreatur töten. 3. `t.endTurn()`.
+- **Erwartet** (Kartentext „The next time a target you control is defeated, delete this card and revive and heal that target's HP for half their maximum instead (rounded up)."; Skriptkopf: Kreaturen werden wiederbelebt): in allen drei Fällen steht die Kreatur danach wieder mit halber Max-HP auf dem Brett, das Elixir ist verbraucht.
+- **Beobachtet:** (a) und (b) ✓ (100 von 200 bzw. 500 von 1000 HP, Elixir gelöscht). (c) Fireball: die Kreatur bleibt in der Ablage, das Elixir bleibt als Permanent liegen (`_pendingCreatures` leer), auch nach Zugwechseln – es löst bei der nächsten Einzeltreffer-Kreaturentötung erst dann aus. Helden-Tod im Mehrfachtreffer funktioniert (Fireball auf zwei Helden mit je 100 HP: einer wird mit 400 HP zurückgeholt).
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/18-elixir-of-immortality-kreatur-im-flaechenschlag.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `_kreaturTodMelden` (~Z. 47083): innerhalb einer Flächenklammer wird der Kreaturentod nur vorgemerkt („Erst Schaden, dann Tode", Vorgabe 26.9./v1400) und erst beim Schließen der Klammer abgewickelt; `AFTER_CREATURE_DAMAGE_BATCH` (Z. 47080) läuft davor. `elixir-of-immortality.js` ~Z. 195-225 sammelt nur Kreaturen, die zu diesem Zeitpunkt schon in `discardPile`/`deletedPile` stehen (`pile = null` ⇒ nichts vorgemerkt; Debug: Ablage zum Hookzeitpunkt `[]` beim Fireball, `["ZZ Dummy Frail"]` beim Burning Finger). Weitere Hörer von `afterCreatureDamageBatch` (z. B. `paraseed.js`, `null-the-mage-slayer.js`, `rool-the-troll-guard.js`) habe ich nicht auf dieselbe Annahme geprüft.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

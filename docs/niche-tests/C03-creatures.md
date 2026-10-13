@@ -126,6 +126,23 @@ Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/C03-creatures/14-lovely-teddy-zielsammler-koordinatenkollision.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` ~40263 `getCreatureTargets` (ohne Brettseite in der Instanzsuche), vgl. F02-14.
 
+### C03-15 · Mausoleum Worm: „You can only play 1 Mausoleum Worm per turn" begrenzt nur die Platzierung aus der Ablage, nicht das Spielen aus der Hand · Stufe C
+- **Karten:** Mausoleum Worm (`cards/effects/mausoleum-worm.js`).
+- **Voraussetzungen / Aufbau:** Sitz 0 am Zug; Worm in der Hand und in der Ablage; Held mit Summoning Magic 3. Fall A: Worm von der Hand spielen, danach fällt im selben Zug ein Held von Sitz 0 durch eine Gegnerquelle (`actionDealDamage` mit Quelle von Sitz 1). Fall B: umgekehrte Reihenfolge.
+- **Erwartet** (Text „You can only play 1 \"Mausoleum Worm\" per turn", kein „this way" wie bei Grave Worm): Lesart A: ein Worm je Zug über alle Wege; Lesart B: nur der Ablage-Weg ist gedeckelt (jetzt).
+- **Beobachtet:** In beiden Reihenfolgen stehen zwei Mausoleum Worms im selben Zug auf dem Brett (A: Rückfrage erscheint, zweite Platzierung + Nachziehen auf 8; B: das Handspiel gelingt nach dem Stempel). Der Stempel `hoptUsed['mausoleum-worm:<pi>']` wird nur im Ablage-Haken gesetzt und gelesen. (Gegenproben in Ordnung: zwei Worms in der Ablage, zwei Helden fallen im selben Zug ⇒ nur eine Platzierung; alle drei Zonen belegt ⇒ kein Angebot; Selbstschaden ⇒ kein Angebot.)
+- **Repro:** `docs/niche-tests/repro/C03-creatures/15-mausoleum-worm-eine-pro-zug-gilt-nur-fuer-ablage.js` (✗ = Lesart A wird verletzt)
+- **Vermutete Ursache:** Stempel/Gate nur in `discardHooks.onHeroDefeatFinal`; die Hand-Beschwörung kennt keine Sperre.
+- **Frage an Al:** Gilt „play 1 per turn" für jeden Weg aufs Brett (Hand und Ablage zusammen = A) oder nur für den Ablage-Weg (B = jetzt)?
+
+### C03-16 · Mr. Jiggles und Land Sharks mit Angler Angel: bei mehreren Zielen wird nur das erste um +50 erhöht (Bestätigung von C01-10) · Stufe B
+- **Karten:** Mr. Jiggles (`mr-jiggles.js`), Land Sharks (`land-sharks.js`); Angler Angel (`angler-angel.js`). Gleiche Klasse wie C01-10 (Cavalry, Yuki-Onna, Assault Eagle).
+- **Voraussetzungen / Aufbau:** Sitz 0: Angler Angel (Held 0) + Täter (Held 1, nicht frisch); Sitz 1: Helden und große Kreatur. Jiggles: Ziele Held 0 + Held 1 (auch Variante Held + Kreatur, zwei Kreaturen); Land Sharks (Summoning Magic 3): Held 0, Held 1, Kreatur.
+- **Erwartet** (Text „All damage your other Creatures inflict with their effects is increased by 50"; Ruling im Kopf von `angler-angel.js`/C01-10: ein Schlag auf mehrere Ziele ist EINE Schadensinstanz): alle Ziele 150.
+- **Beobachtet:** Jiggles: Ziel 1 = 150, Ziel 2 = 100 (bei allen Zielkombinationen: Held+Held, Held+Kreatur, Kreatur+Kreatur). Land Sharks: Ziel 1 = 150, Ziele 2 und 3 = 100.
+- **Repro:** `docs/niche-tests/repro/C03-creatures/16-jiggles-land-sharks-angler-angel-nur-erstes-ziel.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** wie C01-10 (Rundensperre `angler-boost:<id>` wird vom ersten Treffer gebucht); Jiggles/Sharks bauen für jeden Treffer eine neue Quelle `{ name, owner, heroIdx }` bzw. rufen `ctx.dealDamage` einzeln, ohne gemeinsame Schlag-Kennung. Nicht erneut gefragt: Frage an Al steht bei C01-10.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
