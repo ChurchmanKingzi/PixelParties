@@ -8335,7 +8335,7 @@ function ttQuoted(text) {
  * Vorlage (wird zum Leerzeichen), alle anderen Umbrueche sind echte Absaetze. „1) … 2) … 3) …“ (Faehigkeitsstufen) bekommen
  * eine Nummernmarke mit haengendem Einzug.
  */
-function TTText({ text }) {
+function TTText({ text, aktiv }) {
   const paras = String(text || '').replace(/ +\n/g, ' ').split('\n').map(t => t.trim()).filter(Boolean);
   if (paras.length === 0) return null;
   return (
@@ -8344,8 +8344,10 @@ function TTText({ text }) {
         const m = /^(\d+)\)\s*([\s\S]*)$/.exec(p);
         const abstand = i ? 8 : 0;
         if (!m) return <div key={i} style={{ marginTop: abstand }}>{ttQuoted(p)}</div>;
+        // Ability auf dem Brett (`aktiv` = aktuelle Stufe): die Zeile der Stufe ist hervorgehoben, die anderen sind grau.
+        const stufenKlasse = aktiv ? (parseInt(m[1], 10) === aktiv ? ' tt-stufe-aktiv' : ' tt-stufe-aus') : '';
         return (
-          <div key={i} style={{ marginTop: abstand, display: 'flex', gap: 9, alignItems: 'baseline' }}>
+          <div key={i} className={'tt-stufe' + stufenKlasse} style={{ marginTop: abstand, display: 'flex', gap: 9, alignItems: 'baseline' }}>
             <span className="tt-nummer">{m[1]}</span>
             <span>{ttQuoted(m[2])}</span>
           </div>
@@ -8356,9 +8358,9 @@ function TTText({ text }) {
 }
 
 /** Die Textbox des Effekttexts: Pixel-Box in der Kartenfarbe, darin die Absaetze (ohne Text: nichts). */
-function TTEffectBox({ card, text }) {
+function TTEffectBox({ card, text, aktiv }) {
   if (!String(text || '').trim()) return null;
-  return <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} /></TTBox>;
+  return <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>;
 }
 
 /** Der Effekttext, ohne den Satz, den der Ascension-Bonus-Hinweis schon sagt (Beato steht der Bonus auch im Effekt). */
@@ -8417,7 +8419,8 @@ function ascensionBonusText(card) {
 }
 
 // ── Karte mit aktueller max. HP (Als Vorgabe 12.10.) ────────────────
-// Weicht die aktuelle max. HP eines Helden/Wesens von der gedruckten ab
+// Weicht die aktuelle max. HP eines Helden/Wesens von der gedruckten ab (oder steht eine Ability auf dem Brett, deren aktuelle Stufe
+// hervorgehoben werden soll)
 // (Buffs, Ascension, Effekte), zeigt das Tooltip-Bild die AKTUELLE Zahl
 // auf der Karte. Der Renderer zeichnet die Karte dafuer mit `hp`-Override
 // neu; bis sie fertig ist (und wenn der Renderer fehlt) bleibt das normale
@@ -8425,9 +8428,10 @@ function ascensionBonusText(card) {
 // Hovern nicht neu zeichnet.
 const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
 const TT_HP_KARTEN_MAX = 24;
-function TooltipCardImage({ card, src, hp, style }) {
+function TooltipCardImage({ card, src, hp, stufe, style }) {
   const skin = skinOfUrl(src);
-  const key = hp != null ? `${card.name}|${skin || ''}|${hp}` : null;
+  // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
+  const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;
   const [alt, setAlt] = useState(() => (key && _ttHpKarten.get(key)) || null);
   useEffect(() => {
     if (key == null) { setAlt(null); return; }
@@ -8441,7 +8445,7 @@ function TooltipCardImage({ card, src, hp, style }) {
       try {
         // Kanonische Kartendaten wie beim normalen Bild — nur die HP weicht ab.
         const basis = window.CARDS_BY_NAME?.[card.name] || card;
-        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp });
+        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp: hp != null ? hp : undefined, stufe: stufe != null ? stufe : undefined });
         if (!cv || tot) return;
         const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
         if (!blob || tot) return;
@@ -8486,11 +8490,13 @@ function CardTooltipContent({ card, children, imageUrl }) {
   const bildHp = liveMaxHp != null && liveMaxHp !== card.hp ? liveMaxHp : null;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
+  // Ability auf dem Brett: aktuelle Stufe (1 = oberes, 2 = mittleres, 3 = unteres Feld) — im Bild und im Text hervorgehoben
+  const stufe = card.cardType === 'Ability' && card._abilityLevel >= 1 && card._abilityLevel <= 3 ? card._abilityLevel : null;
   return (
     <>
       {imgUrl && (
         <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} style={{
+          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
@@ -8511,7 +8517,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): sie liegen sichtbar in den Ability-Zonen, und bei
               Ascended Heroes beschreiben die startingAbility-Felder den Ascension Bonus — der steht hier als ganzer Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
-          <TTEffectBox card={card} text={effectText} />
+          <TTEffectBox card={card} text={effectText} aktiv={stufe} />
           {/* Handkarte mit aktuellen Werten: die Karte zeigt Stufe/Kosten wie sie jetzt sind (gruen = verringert, rot = erhoeht),
               dieser Tooltip die gedruckten — und sagt hier, woher die Abweichung kommt (`handNotes` aus BoardCard). */}
           {Array.isArray(card._handNotes) && card._handNotes.length > 0 && (

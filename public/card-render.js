@@ -463,6 +463,28 @@
     else sprite(lc, maskKey, 0, 0, dw, dh);
   }
 
+  // ═════════════ Stufe einer Ability hervorheben ═════════════
+  // Fähigkeitskarten (`skill3`) haben drei Textboxen, je eine pro Stufe. Steht die Karte auf dem Brett, hebt `stufe` (1–3) die
+  // Box ihrer aktuellen Stufe hervor (heller, goldene Pixelkante) und graut die beiden anderen aus (entsaettigt, abgedunkelt).
+  // Innenflaechen der Boxen im Rahmenraster (Kartenpixel): x 70–680, y 600–730 / 740–870 / 880–1000.
+  const STUFEN_BOXEN = [[600, 130], [740, 130], [880, 120]];
+  function markStufe(ctx, stufe) {
+    const X = 70, B = 610;
+    STUFEN_BOXEN.forEach(([y, h], i) => {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(X, y, B, h); ctx.clip();
+      if (i + 1 === stufe) {
+        ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(X, y, B, h);
+        ctx.fillStyle = 'rgb(255,226,110)';
+        ctx.fillRect(X, y, B, 10); ctx.fillRect(X, y + h - 10, B, 10); ctx.fillRect(X, y, 10, h); ctx.fillRect(X + B - 10, y, 10, h);
+      } else {
+        ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = 'rgb(128,128,128)'; ctx.fillRect(X, y, B, h);
+        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(14,12,26,.58)'; ctx.fillRect(X, y, B, h);
+      }
+      ctx.restore();
+    });
+  }
+
   // ═════════════ Karte zeichnen ═════════════
   // spec: { type, rarity, name, text, skillBox, skillBox2, hp, atk, level, school, kind }
   // art:  { src: CanvasImageSource, sx, sy, sw, sh } | null
@@ -570,6 +592,8 @@
         size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: 1, color: ruleColor(spec), main: true, soft: spec.soft,
       });
     }
+
+    if (t === 'skill3' && !textOnly && spec.stufe >= 1 && spec.stufe <= 3) markStufe(ctx, spec.stufe);
 
     // 9) Seltenheits-Stempel unten rechts
     const stamp = STAMP[spec.rarity];
@@ -692,6 +716,7 @@
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
    *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
    *                       { lv, kost: Zahl } — druckt diese aktuelle Stufe / Kosten (Hand): gruen = verringert, rot = erhoeht
+   *                       { stufe: 1–3 } — Fähigkeitskarte: hebt die Box dieser Stufe hervor, die anderen beiden grau (Brett, Tooltip)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
   async function renderCard(card, o) {
@@ -707,6 +732,7 @@
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
     if (o.hp != null) spec.hp = o.hp;
     if (o.noHp) spec.noHp = true;
+    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
     if (o.noAtk) spec.noAtk = true;
     // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
     if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }

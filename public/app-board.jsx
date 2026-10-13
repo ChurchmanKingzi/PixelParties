@@ -296,7 +296,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
@@ -311,6 +311,9 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   if (ohneGedruckt.length) bildParams.push('ohne=' + ohneGedruckt.join(','));
   if (handLevel != null) bildParams.push('lv=' + handLevel);
   if (handCost != null) bildParams.push('kost=' + handCost);
+  // Ability auf dem Brett (Als Vorgabe 13.10.): die Box der aktuellen Stufe (1–3) ist hervorgehoben, die anderen beiden sind grau.
+  // Der Renderer wendet das nur auf Faehigkeitskarten mit drei Stufen an; bei allen anderen Karten bleibt es ohne Wirkung.
+  if (abilityLevel != null) bildParams.push('stufe=' + abilityLevel);
   const boardImgUrl = imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
@@ -341,7 +344,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
     const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs && !(handNotes && handNotes.length)) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs && !(handNotes && handNotes.length) && abilityLevel == null) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -372,6 +375,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
       // Hand: Erklaerung, warum Stufe/Kosten auf der Karte vom Druck abweichen (s. `handLevel` / `handCost`).
       _handNotes: (handNotes && handNotes.length) ? handNotes : tooltipBase._handNotes,
+      // Ability auf dem Brett: aktuelle Stufe — der Tooltip hebt sie im Kartenbild und im Text hervor.
+      _abilityLevel: abilityLevel != null ? abilityLevel : tooltipBase._abilityLevel,
     };
   })();
 
@@ -29471,7 +29476,7 @@ function AbilityStack({ cards }) {
         }
         return (
           <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} />
+            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)} />
           </div>
         );
       })}
