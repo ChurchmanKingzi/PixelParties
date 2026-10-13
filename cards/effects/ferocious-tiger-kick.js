@@ -71,7 +71,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // animation + damage. Listeners may mutate the about-to-deal
       // damage.
-      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
+      const attackSource = { name: 'Ferocious Tiger Kick', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
       // Ram animation: hero charges to target and back

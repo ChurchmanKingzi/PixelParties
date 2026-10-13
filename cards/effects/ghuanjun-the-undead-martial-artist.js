@@ -190,26 +190,11 @@ module.exports = {
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
     },
 
-    // "Attacks deal damage equal to base Attack": die Differenz zwischen aktuellem und
-    // Grund-ATK wird im Angriffsfenster abgezogen (H02-heroes-16). Dort steht der Betrag
-    // noch roh, und es greift auch bei Schaden, den kein Hook mehr mindern kann
-    // (Surefire Shot). Nur Attacks, die ihren Betrag aus `hero.atk` bilden, setzen
-    // `usesHeroAtk`; steckt der ATK mehrfach in der Formel (Critical Strike: 2x), nennt
-    // `heroAtkFaktor` die Anzahl. Attacks mit Formel `baseAtk` (Strong Ox, Tiger Kick,
-    // Venom Snake) setzen das Flag nicht.
-    onAttackDeclare: (ctx) => {
-      if (!ctx.source?.usesHeroAtk) return;
-      if (ctx.source.heroIdx !== ctx.cardHeroIdx) return;
-      const sourceOwner = ctx.source.heroOwner ?? ctx.source.owner ?? ctx.source.controller ?? -1;
-      if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (!hero || hero.baseAtk === undefined) return;
-      const diff = ((hero.atk || 0) - (hero.baseAtk || 0)) * (ctx.source.heroAtkFaktor || 1);
-      if (diff > 0) ctx.modifyAmount(-Math.min(diff, ctx.amount));
-    },
-
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)
     // Uses setFlag so the cap applies AFTER all other modifiers (Sacred Hammer, etc.)
+    // Also enforces base ATK damage: only corrects Attacks that declare usesHeroAtk
+    // (i.e. attacks that deal hero.atk damage). Attacks that already use baseAtk
+    // (Strong Ox, Tiger Kick, Venom Snake) don't set the flag and are left alone.
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
@@ -217,6 +202,16 @@ module.exports = {
       const sourceOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
       if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       ctx.setFlag('capAtHPMinus1', true);
+
+      if (ctx.source?.usesHeroAtk) {
+        const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+        if (hero && hero.baseAtk !== undefined) {
+          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
+          if (diff !== 0) {
+            ctx.modifyAmount(-diff);
+          }
+        }
+      }
     },
 
     // After Attack damage to hero: apply Immortal buff with auto-expiry
@@ -244,15 +239,23 @@ module.exports = {
       engine.sync();
     },
 
-    // Flag creature damage from Ghuanjun Attacks for HP-1 cap
+    // Flag creature damage from Ghuanjun Attacks for HP-1 cap + base ATK enforcement
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
+      const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.heroOwner ?? e.source?.owner ?? -1) !== feld) continue;
         e.capAtHPMinus1 = true;
+        // Only correct attacks that use hero.atk for damage
+        if (e.source?.usesHeroAtk && hero) {
+          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
+          if (diff !== 0) {
+            e.modifyAmount(-Math.min(diff, e.amount));   // flat (Punkt vor Strich)
+          }
+        }
       }
     },
 

@@ -104,7 +104,7 @@ module.exports = {
       // Angriffs-Ansage VOR Animation und Schaden: Doqs Rateeffekt,
       // Darges Pfeil-Bonus und alles andere „wenn dieser Held
       // angreift" haengt hier dran und darf den Betrag noch aendern.
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, schaden);
 
       engine._broadcastEvent('play_zone_animation', {
