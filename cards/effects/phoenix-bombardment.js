@@ -101,7 +101,8 @@ module.exports = {
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,
         }).find(c => c.zoneSlot === ziel.slotIdx);
         if (!inst) return;
-        vorher = inst.counters?.currentHp ?? 0;
+        // Nie getroffene Kreatur: noch kein `currentHp` — Rueckfall auf die gedruckten HP (S03-22)
+        vorher = inst.counters?.currentHp ?? (engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name])?.hp ?? 0;
         if (vorher <= 0) return;
         opferName = inst.name;
       }

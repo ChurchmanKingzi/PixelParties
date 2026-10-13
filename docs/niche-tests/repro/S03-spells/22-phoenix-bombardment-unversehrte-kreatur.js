@@ -24,7 +24,7 @@ async function lauf(vorschaden) {
     const { t, inst } = await lauf(false);
     R.check('unversehrte Kreatur: HP auf 1 gesenkt', inst.counters.currentHp === 1, inst.counters);
     R.check('unversehrte Kreatur: Wirker nimmt 199 Rückstoß', t.hp(0, 0) === 800 - 199, t.hp(0, 0));
-    R.check('unversehrte Kreatur: Zugende ausgelöst', !!t.gs._terrorForceEndTurn || t.gs.activePlayer === 1, { force: t.gs._terrorForceEndTurn, aktiv: t.gs.activePlayer });
+    R.check('unversehrte Kreatur: Zugende ausgelöst', t.gs._terrorForceEndTurn != null || t.gs.activePlayer === 1, { force: t.gs._terrorForceEndTurn, aktiv: t.gs.activePlayer });
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   {
