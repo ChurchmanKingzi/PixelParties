@@ -13986,6 +13986,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ankerId = traeger.counters._identityAnchorInst;
       const anker = this.cardInstances.find(c => c.id === ankerId && c.zone === ZONES.SUPPORT);
       if (anker) continue;   // Traeger liegt noch, Identitaet haelt
+      await this.loseHeroEffect(traeger, 'identityAnchorLost');   // wie im Zugende-Sweep: erst das GELIEHENE Skript aufraeumen
       const eigenes = loadCardEffect(traeger.counters._identityCleanupCard || traeger.name);
       if (typeof eigenes?.onIdentityExpire === 'function') {
         try {
@@ -21928,6 +21929,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (fromZone !== 'deck') {
         const _brettIdx = pool.indexOf(cardName);
         if (_brettIdx >= 0) { pool.splice(_brettIdx, 1); this.sync(); }
+      } else if (opts.bereitsInAblage) {
+        // Chaos-Diamond: die vorab abgelegte Kopie verlaesst die Ablage,
+        // sonst existiert die Karte doppelt (Ablage UND Brett, H01-heroes-23).
+        const _ablIdx = ps.discardPile.lastIndexOf(cardName);
+        if (_ablIdx >= 0) { this._takeFromPileCore(playerIdx, ps, ps.discardPile, 'discard', _ablIdx, cardName, {}); this.sync(); }
       }
     } else if (fromZone === 'deck' && opts.bereitsInAblage) {
       // Die Karte liegt SCHON in der Ablage (Chaos-Diamond: Aufdecken vor
@@ -45660,7 +45666,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       const sideMap = { enemy: 'enemy', own: 'my', both: 'any' };
       const target = await this._createContext(cardInst, {}).promptDamageTarget({
         side: sideMap[config.side] || 'enemy',
-        types: types.includes('creature') ? ['hero', 'creature'] : ['hero'],
+        // Die Zieltypen des Zaubers bleiben erhalten: ein reiner Creature-Zauber
+        // (Hole in the Sky) bietet unter Ida keine Helden an (H02-heroes-04).
+        types: types.includes('creature') ? (types.includes('hero') ? ['hero', 'creature'] : ['creature']) : ['hero'],
         damageType,
         title: prompt.title || sourceName,
         description: prompt.description || `Deal ${damage} damage.`,

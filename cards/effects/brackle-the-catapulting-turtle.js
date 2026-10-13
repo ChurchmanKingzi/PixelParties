@@ -250,6 +250,9 @@ module.exports = {
         // Override the default "Cancel" label — cancelling here goes
         // BACK to the sacrifice picker, doesn't abort the effect.
         cancelLabel: '↩ Back',
+        // Das Opfer wird erst nach dem Schaden abgelegt, steht aber nicht
+        // mehr zur Wahl (sonst Selbstbeschuss + doppelte Ablage, H01-heroes-17).
+        condition: (t) => t.cardInstance?.id !== creatureInst.id,
       });
       if (target) break;     // Have both a sacrifice AND a target — proceed.
       // Target prompt cancelled → loop back to sacrifice picker.
