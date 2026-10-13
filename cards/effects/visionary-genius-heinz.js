@@ -38,6 +38,7 @@
 //     animation (same fix shape as Triceras).
 // ═══════════════════════════════════════════
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Visionary Genius Heinz';
 const MAX_DISCARDS = 4;
 
@@ -57,7 +58,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    if (drawBlockedFor(ctx._engine, pi)) return false;   // Z6 (H04-16): auch Zieh-Sperre (Jewel); Tuscan Artist: Heinz kann 1 oder 4 Kopien waehlen, bleibt also nutzbar
     return (ps.hand?.length || 0) >= 1;
   },
 

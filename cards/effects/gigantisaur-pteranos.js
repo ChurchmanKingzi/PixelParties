@@ -15,6 +15,7 @@ const {
   gigantisaursCanSummon, isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Gigantisaur Pteranos';
 
 /** Distinct Gigantisaur Creature names currently in the player's hand. */
@@ -36,8 +37,11 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false; // draw payout pointless
-    return distinctGigantisaurNamesInHand(ps, engine).length >= 1;
+    // Z6 (A07-19): Zieh-Sperre (Jewel) und Tuscan Artist zaehlen wie die Hand-Sperre - der Zug ist der
+    // einzige Nutzen. Mit nur einem waehlbaren Namen ist der Zug genau 2 (Artist negiert ihn).
+    const namen = distinctGigantisaurNamesInHand(ps, engine);
+    if (drawBlockedFor(engine, ctx.cardOwner, namen.length <= 1 ? 2 : null)) return false;
+    return namen.length >= 1;
   },
 
   async onCreatureEffect(ctx) {

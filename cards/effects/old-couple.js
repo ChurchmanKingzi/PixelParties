@@ -221,6 +221,7 @@ module.exports = {
     ps.summonLocked = true;
     const res = await engine.summonCreatureWithHooks(gewaehlt, pi, heroIdx, slot, {
       source: CARD_NAME, hookExtras: engine.deckHookExtras(),   // v1393
+      _ignoreSummonLock: true,   // Z6: der Riegel steht absichtlich schon VOR der eigenen Beschwoerung
     });
     if (!res?.inst) {
       ps.summonLocked = warGesperrt;

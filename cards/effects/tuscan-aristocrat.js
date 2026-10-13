@@ -53,6 +53,7 @@ module.exports = {
         && ctx.activePlayer === gewinner;
       if (inSeinerResourcePhase) return;
 
+      if (ctx._gainState) ctx._gainState.blocked = true;   // Z6 (A09-12): Diebstahl-Aufrufer erfaehrt vom Block
       ctx.cancel();
       ctx.log('tuscan_aristocrat_block', {
         card: CARD_NAME,

@@ -15058,6 +15058,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('summon_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
       return null;
     }
+    // ── BESCHWOERUNGSSPERRE AUCH FUER EFFEKT-BESCHWOERUNGEN (Z6, A01-27) ──
+    // `ps.summonLocked` sperrt laut CARD_API „Hand-, Effekt-Beschwoerungen UND Platzierungen" - die Platzierung
+    // (`actionPlaceCreature`) prueft es laengst, dieser Trichter (Living Illusion, Reincarnation, Thep, Soul
+    // Shards …) bisher nicht. Der Besitzer der Sperre ist der Beschwoerer (`controller`, sonst die Feldseite).
+    // Ausnahmen: Wiederbelebung (`skipBeforeSummon`, Rewrite History/Zombified Assault - keine Beschwoerung im
+    // Sinn der Sperre) und `_ignoreSummonLock` (Old Couple setzt den Riegel bewusst VOR der eigenen Beschwoerung).
+    if (!opts._ignoreSummonLock && !opts.skipBeforeSummon) {
+      const _sps = this.gs.players[opts.controller ?? playerIdx];
+      if (_sps?.summonLocked) {
+        this.log('summon_blocked', { card: cardName, reason: 'summonLocked', heroIdx });
+        return null;
+      }
+      if (_sps?.summonLockExceptGreatmaw) {
+        const { isGreatmawCreature } = require('./_greatmaw-shared');
+        if (!isGreatmawCreature(cardName, this)) {
+          this.log('summon_blocked', { card: cardName, reason: 'summonLockExceptGreatmaw', heroIdx });
+          return null;
+        }
+      }
+    }
     // ── Cross-Side-Sperre (Als Ruling) ────────────────────────────────
     // Creatures, die laut Text NUR in GEGNERISCHE Zonen gelegt werden
     // koennen (`placesOnOpponentBoard`, derzeit Powder Keg), duerfen auch
@@ -24119,7 +24139,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ausdruecklich aus — sonst wuerde der Monkee-Archetyp bei jedem
     // Zugbeginn von allein feuern (das Einkommen betraegt exakt 4 Gold).
     // Gleiches Muster wie `_isResourceDraw` beim Standard-Nachziehen.
-    const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain };
+    // Z6 (A09-12): `_gainState` ist die gemeinsame Referenz, ueber die eine SPERRENDE Karte (Tuscan Aristocrat)
+    // dem Aufrufer meldet "hier wurde geblockt" (Unterschied zum Ersatz-Effekt, z. B. Golden Vermin) -
+    // `actionStealGold` braucht das, damit das Opfer sein Gold behaelt.
+    const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain, _gainState: opts._gainState || {} };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
     this._settleAmount(hookCtx); // v840: modifyAmount-Boni (Semi, Wealth …) verrechnen
@@ -24807,6 +24830,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { stolen: 0, fizzled: true };
     }
 
+    // Z6 (A09-12): wer kein Gold gewinnen darf (Golden Arrow), kann auch nichts stehlen.
+    if (ps.goldLocked) {
+      this.log('gold_steal_fizzle', { by: source, reason: 'goldLocked' });
+      return { stolen: 0, fizzled: true };
+    }
+
     const clamped = Math.min(Math.max(0, requested | 0), ops.gold || 0);
     if (clamped <= 0) {
       this.log('gold_steal_fizzle', { by: source, reason: 'opponent at 0 Gold' });
@@ -24817,7 +24846,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
     this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
-    await this.actionGainGold(pi, clamped);
+    const _gainState = {};
+    await this.actionGainGold(pi, clamped, { _gainState });
+    // Z6 (A09-12): ein gesperrter Gewinn (Tuscan Aristocrat: ausserhalb der eigenen Resource Phase) macht den
+    // Diebstahl wirkungslos - das Opfer bekommt sein Gold zurueck, statt dass es aus dem Spiel faellt.
+    if (_gainState.blocked) {
+      ops.gold = (ops.gold || 0) + clamped;
+      this._checkGoldStateRules(oi);
+      this.log('gold_steal_fizzle', { by: source, reason: 'gain blocked' });
+      this.sync();
+      return { stolen: 0, fizzled: true };
+    }
 
     this.log('gold_steal', {
       by: source, player: ps.username, from: ops.username,

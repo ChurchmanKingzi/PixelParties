@@ -20,6 +20,7 @@ const {
   countGigantisaursInSupport,
 } = require('./_gigantisaurs-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Gigantisaur Raptoren';
 
 /**
@@ -293,9 +294,11 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    // Z6 (A07-19): auch Zieh-Sperre (Jewel) und Tuscan Artist (Zug von genau 2/3) - der Zug ist der einzige Nutzen.
+    const anzahl = countGigantisaursInSupport(ctx.cardOwner, engine);
+    if (drawBlockedFor(engine, ctx.cardOwner, anzahl)) return false;
     // Effect is meaningless when there are no Gigantisaurs to count.
-    return countGigantisaursInSupport(ctx.cardOwner, engine) > 0;
+    return anzahl > 0;
   },
 
   async onCreatureEffect(ctx) {

@@ -38,6 +38,7 @@ const MAX_USES_PER_TURN = 5;
 
 const { usesLeft, spendUse } = require('./_charges');
 const USE_KEY = 'goldenVermin';
+const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
@@ -71,6 +72,10 @@ module.exports = {
 
       const inst = ctx.card;
       const gs = ctx._engine?.gs;
+      // Z6 (C03-08): Leerlauf entfaellt (wie Golden Ladybug) - Zieh-/Handsperre oder leeres Deck: kein Angebot,
+      // sonst gehen Gold UND Karte verloren.
+      const _ps = gs?.players?.[ctx.cardOwner];
+      if (drawBlockedFor(ctx._engine, ctx.cardOwner, 1) || (_ps?.mainDeck || []).length < 1) return;
       const frei = usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
       if (frei <= 0) return;
       const used = MAX_USES_PER_TURN - frei;
