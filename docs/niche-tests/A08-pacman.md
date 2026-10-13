@@ -220,6 +220,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/25-noble-mummy-guards-loest-ohne-andere-faehigkeit-aus.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `surpriseTrigger` (~Z. 60-75) zählt den bereits bestehenden Stapel der neu angehängten Fähigkeit (`if (slot.length > 1) otherAbilityCount++`) als „andere Fähigkeit"; die Optionenliste in `onSurpriseActivate` (~Z. 150-160) überspringt denselben Slot richtig. Restunsicherheit (daher B): der gedruckte Auslöser nennt keine Mindestzahl anderer Fähigkeiten; nach wörtlicher Lesart löst die Surprise bei jedem Anhängen aus (das Skript schränkt bewusst ein, scheitert aber beim Stapeln).
 
+### A08-26 · Beer (nicht in der Gruppenliste; Nachtrag zu A08-02): zahlt trotz Rusting Crystal den Grundpreis · Stufe A
+- **Karten:** Beer (`beer.js`), Rusting Crystal
+- **Voraussetzungen / Aufbau:** Sitz 0 mit 24 Gold, Held 0 und 1 brennen, Beer mit zwei Zielen; einmal ohne, einmal mit Rusting Crystal auf der Hand.
+- **Erwartet** (Beer: „This Artifact's Cost is multiplied by the number of targets chosen"; Rusting: „the Costs of all your other Artifacts are doubled"): ohne Kristall 8 Gold, mit Kristall 16.
+- **Beobachtet:** Die Zielwahl zeigt mit Kristall 8 je Ziel, abgebucht werden in beiden Fällen 8. Bestätigt die in A08-02 vermutete Schwesterkarte.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/26-beer-ignoriert-rusting-crystal.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `beer.js:98` `baseCost = engine._getCardDB()['Beer']?.cost` statt `engine.artifactPlayCost(...)`, `manualGoldCost: true` (wie A08-02).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
