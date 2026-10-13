@@ -148,7 +148,8 @@ module.exports = {
       gs._spellKeepInstance = true;
       hero.buffs = hero.buffs || {};
       hero.buffs.second_action_grant = { appliedTurn: gs.turn };   // Badge-Schluessel aus _second-action-shared
-      if ((ps._actionsPlayedThisPhase || 0) === 1) gs._preventPhaseAdvance = true;
+      // KEIN `_preventPhaseAdvance` hier (S03-25): als ERSTE Karte der Action Phase ist das Spielen gratis — der Server
+      // nimmt den Zaehler nur OHNE dieses Flag zurueck (sonst verbraeuchte die Karte die regulaere Aktion).
       engine._broadcastEvent('play_zone_animation', {
         type: 'weapon_unleashing', owner: ctx.cardHeroOwner ?? pi, heroIdx, zoneSlot: -1,   // Als Befund 29.9.: Brettseite des Wirkers
       });
