@@ -17,8 +17,8 @@
 //  2. BORROW HERO EFFECT (`creatureEffect`):
 //     Once per turn, if the linked Hero has
 //     used its hero-effect THIS turn (engine's
-//     standard `hero-effect:${name}:${pi}:${hi}`
-//     HOPT key), invoke that hero's `onHeroEffect`
+//     standard HOPT key `engine.heroHoptKey(name, pi)`
+//     = `hero-effect:${name}:${pi}`, seit v1275 ohne Heldenindex), invoke that hero's `onHeroEffect`
 //     with the linked Hero's context. Sleeping
 //     Beauty's own creature HOPT is the once-
 //     per-turn lock; the linked Hero's HOPT is
@@ -158,7 +158,8 @@ module.exports = {
     // Linked hero's hero-effect HOPT must be stamped this turn — i.e.,
     // the hero ALREADY USED their effect, which is the trigger
     // condition for Sleeping Beauty to re-cast it.
-    const hoptKey = `hero-effect:${linkedHero.name}:${linkedOwner}:${linkedIdx}`;
+    // Schluessel ueber die Engine (v1275: Kartenname + Spieler, ohne Heldenindex).
+    const hoptKey = engine.heroHoptKey(linkedHero.name, linkedOwner);
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) return false;
 
     const { loadCardEffect } = require('./_loader');
