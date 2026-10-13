@@ -271,7 +271,8 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
-    const pi = engine.physicalSide(ctx.card) ?? ctx.cardOwner;
+    // Kontrolleur, nicht Brettseite: bei einer geliehenen Kreatur ist „your opponent" der Gegner des Aktivierenden (C03-01).
+    const pi = ctx.cardOwner;
     const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     if (!ops || (ops.mainDeck || []).length === 0) return false;

@@ -252,7 +252,10 @@ module.exports = {
       // SUMMON (not placement) at the dying creature's slot — v1389 über
       // die EINE Ablage-Stelle (`summonFromDiscard`: Signal, Lethe,
       // Rückgabe bei Fehlschlag). Der Listener-Klon wird danach abgeräumt.
-      const listenerId = ctx.card?.id;
+      // Abzuräumen ist der Ablage-Zuhörer — nicht zwingend der Haken-Ausführende: `activeIn` deckt auch einen
+      // zweiten Wurm auf Brett/Hand ab, dessen Instanz sonst getilgt würde (C03-06).
+      const listenerId = (ctx.card?.zone === 'discard' ? ctx.card
+        : engine.cardInstances.find(c => c.name === CARD_NAME && c.zone === 'discard' && (c.controller ?? c.owner) === pi))?.id;
       const placed = await engine.summonFromDiscard(pi, pi, dpIdx, death.heroIdx, death.zoneSlot, {
         source: CARD_NAME, flug: false,
         hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },

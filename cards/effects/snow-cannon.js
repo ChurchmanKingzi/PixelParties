@@ -60,6 +60,8 @@ module.exports = {
         if (inst.faceDown) continue;
         { const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name]; if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue; }   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (inst.counters?.frozen) continue;
+        // Harte Unwählbarkeit (Thicket): „cannot be chosen by cards and effects" — wie im Engine-Sammler (F03-04).
+        if (inst.counters?.untargetable_all) continue;
         if (typeof engine.canApplyCreatureStatus === 'function'
             && !engine.canApplyCreatureStatus(inst, 'frozen', { name: 'Snow Cannon' })) continue;
         targets.push({

@@ -6871,10 +6871,21 @@ class GameEngine {
   async anhaengselAbraeumen(inst, source) {
     if (!inst) return false;
     if (loadCardEffect(inst.name)?.deleteOnCleanse) {
-      await this.actionMoveCard(inst, 'deleted', -1, -1, {
-        source: typeof source === 'string' ? source : (source?.name || 'Cleanse'),
-        sourceOwner: inst.controller ?? inst.owner, unaufhaltsam: true,
-      });
+      // Zwei Aufräumer können denselben Status-Abgang bedienen (`cleanseNegativeAttachments` UND der
+      // `onStatusRemoved`-Haken) — der zweite sähe die Karte noch im Support und legte sie ein zweites Mal
+      // in den Gelöscht-Stapel (C05-04). Darum: nur wer die Karte noch auf dem Brett findet und nicht schon
+      // dabei ist, löscht.
+      if (inst.zone !== ZONES.SUPPORT || inst.counters?._anhaengselWirdGeloescht) return false;
+      inst.counters = inst.counters || {};
+      inst.counters._anhaengselWirdGeloescht = true;
+      try {
+        await this.actionMoveCard(inst, 'deleted', -1, -1, {
+          source: typeof source === 'string' ? source : (source?.name || 'Cleanse'),
+          sourceOwner: inst.controller ?? inst.owner, unaufhaltsam: true,
+        });
+      } finally {
+        if (inst.counters) delete inst.counters._anhaengselWirdGeloescht;
+      }
       return true;
     }
     return this.sendBoardCardToDiscard(inst, { source: typeof source === 'string' ? { name: source } : source });
@@ -14610,7 +14621,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const nurVerdeckt = drin.length > 0 && drin.every(n =>
         this.cardInstances.some(c => c.zone === ZONES.NESTED && c.name === n
           && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
-          && (c.controller ?? c.owner) === playerIdx));
+          && this.physicalSide(c) === playerIdx));   // Brettseite: ein geliehenes Nest liegt beim Besitzer (C03-04)
       if (nurVerdeckt) coverHere = true;
     }
 
@@ -47869,7 +47880,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Move to discard — use original owner's pile
         const inst = this.cardInstances.find(c => c.owner === playerIdx && c.zone === 'support' && c.heroIdx === heroIdx && c.name === cardName);
         const islandDiscardPs = this.gs.players[inst?.originalOwner ?? playerIdx];
-        if (islandDiscardPs) islandDiscardPs.discardPile.push(cardName);
+        // Tokens kommen nie in die Ablage, sondern in den Gelöscht-Stapel (F01-16).
+        const islandCd = (inst ? this.getEffectiveCardData(inst) : null) || this._getCardDB()[cardName];
+        if (islandDiscardPs) {
+          if (islandCd && hasCardType(islandCd, 'Token')) {
+            if (!islandDiscardPs.deletedPile) islandDiscardPs.deletedPile = [];
+            islandDiscardPs.deletedPile.push(cardName);
+          } else islandDiscardPs.discardPile.push(cardName);
+        }
         // Untrack card instance
         if (inst) {
           this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);

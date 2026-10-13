@@ -65,5 +65,23 @@ module.exports = {
         hero: hero.name, healed: healAmount, from: ctx.amount,
       });
     },
+
+    /** Kreaturenseite (F03-14): Schaden an einer Kreatur läuft über den Stapelpfad, nicht über `afterDamage`. */
+    afterCreatureDamageBatch: async (ctx) => {
+      const hero = ctx.attachedHero;
+      if (!hero?.name || hero.hp <= 0) return;
+      for (const e of (ctx.entries || [])) {
+        if (e.cancelled || e.isStatusDamage || e.type !== 'attack') continue;
+        if (e.source?.heroIdx !== ctx.cardHeroIdx) continue;
+        if (!ctx._engine.quelleIstHeld(e.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) continue;
+        if ((e.amount || 0) <= 0) continue;
+        if (hero.hp <= 0) return;
+        const healAmount = Math.ceil(e.amount / 2);
+        await ctx.healHero(hero, healAmount);
+        ctx._engine.log('vampiric_heal', {
+          hero: hero.name, healed: healAmount, from: e.amount,
+        });
+      }
+    },
   },
 };
