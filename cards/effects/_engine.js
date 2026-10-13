@@ -2916,6 +2916,9 @@ class GameEngine {
         istAktion: (info) => this._bleedTriggersForAction(info),
       });
     }
+    // ★ Z2 (A03-02): die Aktion ist aufgeloest → Effekt-Immunitaeten DIESER Aufloesung enden, noch vor Zuhoerern und Bleed
+    // (deren Schaden ist ein eigener Effekt).
+    if (hookName === 'onAnyActionResolved' && !((this.gs?._spellResolutionDepth || 0) > 0)) this.endeEffektImmunitaeten();
     const result = await this._runHooksImpl(hookName, hookCtx);
     // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
     // einziger zentraler Punkt fuer alle Action-Pfade (Spell/Attack,
@@ -8054,6 +8057,22 @@ class GameEngine {
     //   Zielfensters, der Schutz gilt also genau fuer die laufende
     //   Aufloesung — das war schon vorher der eigentliche Riegel.
     return liste.some(e => e.owner === playerIdx && e.heroIdx === heroIdx);
+  }
+
+  /**
+   * ★ Z2 (A03-02): Ende der Aufloesung — Effekt-Immunitaeten (Helden UND
+   * Kreaturen, gleiche Liste) gelten „fuer diese Aufloesung" und enden
+   * mit ihr, nicht erst am naechsten Zielfenster oder Zugbeginn
+   * (sonst schluckten sie fremden Schaden desselben Zuges: Bomb Mite,
+   * Passiv-Trigger, naechste Karte ohne Zielfenster). Gerufen vom
+   * Aktions-Ende (`onAnyActionResolved`, nur auf oberster Ebene — eine
+   * verschachtelte Sofort-Aktion beendet nicht die Aufloesung der
+   * aeusseren), vom Abbruch des Zaubers (server.js) und beim Betreten
+   * der End-Phase. Die bisherigen Leerungen (Zielfenster, Zugbeginn)
+   * bleiben als Sicherung.
+   */
+  endeEffektImmunitaeten() {
+    if (this.gs?._effectImmunities?.length) this.gs._effectImmunities.length = 0;
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -22963,6 +22982,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // path will clear the flags as the player responds.
         await this._waitForPromptsToClear();
         // Automatic phase — process status expiry, hooks, then switch turn
+        this.endeEffektImmunitaeten();   // Z2 (A03-02): keine Immunitaet einer frueheren Aufloesung in die Zugende-Effekte tragen
         await this.processStatusExpiry('END');
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._flushSurpriseDrawChecks();
@@ -45179,7 +45199,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // jede Runde ab und wurde erst zur naechsten Phase wieder
         // aufgelegt — mit falschem Tooltip und einem Fenster
         // dazwischen. Marke: `sourceBound` am Status.
-        if (hero.statuses.negated && !hero.statuses.negated.sourceBound) {
+        // ★ Z2 (C05-02/-03): ebenso ANHAENGSEL-Negierung (Decisive Defeat, Stowaway: `_fromAttachment` /
+        //   `permanent`) — sie lebt genau so lange wie die Karte (CARD_API: „Lasts as long as … remains
+        //   attached"); die Karte nimmt sie selbst zurueck (Austritt, Heilen).
+        if (hero.statuses.negated && !hero.statuses.negated.sourceBound
+            && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
           await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
         }
         // Bound: same default semantics as stunned/frozen — clears at

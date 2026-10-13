@@ -8454,6 +8454,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       delete gs._spellCancelled;
+      room.engine.endeEffektImmunitaeten?.();   // Z2 (A03-02): Abbruch beendet auch die Aufloesung
       // A09-01: Pfeile, die auf den abgebrochenen Angriff gekettet wurden, nicht scharf zuruecklassen
       // (sonst verstaerken sie den naechsten Angriff – „THAT Attack's damage").
       if (cardData.cardType === 'Attack') {
