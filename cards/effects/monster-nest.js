@@ -152,8 +152,11 @@ module.exports = {
       return false;
     }
 
-    const res = await engine.summonCreatureWithHooks(chosen, pi, heroIdx, zoneSlot, {
+    // Die Kreatur liegt auf der BRETTSEITE des Nests (bei einem geliehenen Nest die des Besitzers), gehört aber dem
+    // Aktivierenden (`controller`) — sie kam aus dessen Deck (C03-04).
+    const res = await engine.summonCreatureWithHooks(chosen, engine.physicalSide(inst), heroIdx, zoneSlot, {
       source: CARD_NAME,
+      controller: pi,
       // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
       coverNested: true,
       hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
