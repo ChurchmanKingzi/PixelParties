@@ -23749,6 +23749,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         this.sync();
         await this._delay(1700);
+        // ★ Z2 (A07-02): Fristen, die auf den ZUGBEGINN des uebersprungenen Spielers fallen („this turn" des Gegners:
+        // Niu, Cloudy …), sind mit dem Ueberspringen faellig — `startTurn()` laeuft fuer diesen Zug nie, und die Frist
+        // (`expiresAtTurn === gs.turn`) traefe spaeter keinen Zug mehr: der Buff stuende auf unbestimmte Zeit.
+        // Kein Statusschaden (Zhu: der Zug findet nicht statt), nur der Buff-Ablauf.
+        if (!this.gs.result) {
+          await this._processBuffExpiry({ beforeStatusDamage: true });
+          await this._processBuffExpiry({ beforeStatusDamage: false });
+        }
         // Advance straight to End Phase, then switchTurn back. The
         // standard switchTurn handles the start-of-turn ticks for
         // the OTHER player on the recursive call.
