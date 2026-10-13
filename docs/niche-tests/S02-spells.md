@@ -77,6 +77,14 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Vermutete Ursache:** `heat-wave.js` Z. ~204: `amount = (preBurned[i] && !damageLocked) ? DAMAGE : 0`; der Kopfkommentar (Z. 19–24) beschreibt das ausdrücklich als „damage branch suppressed". Die Engine (`_engine.js` ~8790) sperrt dagegen nur Gegnerziele; das Skript nullt vorab für alle.
 - **Frage an Al:** Soll Heat Wave unter der Flame-Avalanche-Sperre nur den Schaden an Gegnerzielen weglassen oder (wie jetzt) jeden Schaden? (nur Gegnerziele / alles)
 
+### S02-09 · Forbidden Zone negiert eine UNVERSEHRTE Gegnerkreatur nicht (Rückfall `currentHp ?? 0`) · Stufe A
+- **Karten:** Forbidden Zone (`forbidden-zone.js`); Muster-Verwandtschaft: C05-01 (Wire Hatchling). Die statische Suche über die 41 Karten dieser Gruppe fand `currentHp ?? 0` nur hier.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 1 beschwört per echtem Spielweg „ZZ Dummy" (200 HP, `counters = {}`); zweite Gegnerkreatur vorbeschädigt (currentHp 150). Sitz 0 spielt Forbidden Zone.
+- **Erwartet** (Kartentext „Inflict 50 damage to all targets your opponent controls. … Creatures have their effects negated until the end of your opponent's turn."): beide Kreaturen nehmen 50 Schaden und sind negiert.
+- **Beobachtet:** Die unversehrte Kreatur nimmt 50 Schaden (200 → 150), wird aber **nicht negiert**; die vorbeschädigte wird negiert. Helden: alle gebunden ✓ (`bound`, läuft Zug 7 aus). Im Normalfall (frisch beschworene Kreatur) negiert Forbidden Zone also keine Kreatur beim ersten Schlag.
+- **Repro:** `docs/niche-tests/repro/S02-spells/09-forbidden-zone-unversehrte-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `forbidden-zone.js` Z. 127 `hpVorher.set(…, counters?.currentHp ?? 0)` und Z. 143 `hpJetzt = counters?.currentHp ?? 0`: für nie getroffene Kreaturen ist „vorher" 0 und „nachher" 150 ⇒ `!(hpJetzt < hpVorher)` ⇒ „Schaden verpufft" ⇒ keine Negierung. Richtig wäre ein Rückfall auf die gedruckten HP (wie `_engine.js:45522`).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

@@ -155,6 +155,14 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/17-gobbo-negiert-spielt-weiter-gratis.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js:~43819` (`heroMeetsLevelReq`, Heldenzweig) und ~40004 (Spielbarkeitsliste) rufen `heroScript.canBypassLevelReqForCard(...)` ohne `_isHeroEffectSilenced(hero)`; im Gegensatz zum Zwilling `grantsInherentActionForCard` (nur lebender Held). Betrifft jeden Helden mit diesem Vertrag (Sorin, Luna …), Gobbo ist wegen der gekoppelten Kosten der sichtbarste Fall. Gehört zur Klasse B-01…B-09 (Dauereffekt/Vertrag ohne Status-Prüfung). Frozen/Stunned: der Held kann ohnehin nicht handeln; Tod: Dead-Hero-Zweig sperrt.
 
+### H02-heroes-18 · Crestina: Tokens stehen im „von außerhalb des Spiels"-Angebot und landen als tote Karte auf der Hand · Stufe B
+- **Karten:** Fairy Queen Crestina, the Creation Fairy (`fairy-queen-crestina-the-creation-fairy.js`, Kandidatenpool über `loadCardEffect(name)`); betroffene Namen: Biomancy Token, Invader Token, Mummy Token, Pollution Token
+- **Voraussetzungen / Aufbau:** Crestina als Held 0 von Sitz 0; Sitz 1 am Zug; `t.endTurn()` → Resource Phase von Sitz 0; Galerie-Antworten geskriptet (Mummy/Pollution/Biomancy Token als 3 Namen, Gegner wählt Mummy Token).
+- **Erwartet** (Konvention A05-02/A05-12, CARD_API „Tokens … überall verboten": Tokens sind keine Karten): kein Token im Angebot, keine Token-Karte auf der Hand.
+- **Beobachtet:** alle vier Token-Namen stehen in der Galerie; der gewählte „Mummy Token" liegt auf der Hand (Ziehen ausgefallen) und ist dort unspielbar (`doPlayCreature` → `false`) – eine tote Handkarte; die beiden anderen Namen sind „aus dem Spiel entfernt" und für Crestina gesperrt. Der Gegner kann so (absichtlich) die Wahl treffen, Crestina eine tote Karte zu geben (Karte statt Ziehen). Unspielbar bleiben auch die 170 Nicht-Ascended-Heldenkarten im Pool (Nebenbeobachtung, nicht gesondert gemeldet).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/18-crestina-token-im-angebot.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `fairy-queen-crestina-the-creation-fairy.js:~85-92`: Pool-Filter nur `loadCardEffect(name)`, kein `Token`-Ausschluss (Vorbild Garius' Galerie, `garius-the-great-reformer.js:122`).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

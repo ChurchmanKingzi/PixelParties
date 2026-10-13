@@ -60,13 +60,13 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Repro:** `docs/niche-tests/repro/F01-artifacts/06-charm-of-balance-handlimit-zaehlt-gespielte-karte.js`
 - **Vermutete Ursache:** (a) `charm-of-balance.js` Z. 58 `(ps.hand || []).length <= HAND_LIMIT` statt `engine.handSizeWithoutResolving(pi)`. (b) `birthday-present.js` Z. 215/220 schiebt per `handZugangSync` (ohne `onCardAddedToHand`/`onDraw`); der Charm-Kommentar („rare — the hand-grow primitives all funnel through them") unterstellt, dass alle Wege durch die Hooks laufen.
 
-### F01-07 · Cloud Pillow / Beer / Dark Gear: „you control" / „your opponent controls" folgt der Brettspalte, nicht der Kontrolle (gestohlene Kreaturen) · Stufe B
-- **Karten:** Cloud Pillow (`cards/effects/cloud-pillow.js` Z. 49), Beer (`beer.js` Z. 69), Dark Gear (`dark-gear.js` `getStealableCreatures` Z. ~87: „Choose a Creature your opponent controls" – eine mir vom Gegner gestohlene Kreatur in meiner Spalte ist nie wählbar, Zurückholen unmöglich); Quelle ist `engine.getCreatureTargets(pi)` – betrifft vermutlich jede Karte, die es für „you control" benutzt
+### F01-07 · Cloud Pillow / Beer / Dark Gear / Explosivo's Sword: „you control" / „your opponent controls" folgt der Brettspalte, nicht der Kontrolle (gestohlene Kreaturen) · Stufe B
+- **Karten:** Cloud Pillow (`cards/effects/cloud-pillow.js` Z. 49), Beer (`beer.js` Z. 69), Explosivo's Sword (`explosivo-s-sword.js` Z. 127: der 100-Schaden-Splash auf „all other targets your opponent controls" trifft die von MIR kontrollierte, gestohlene Kreatur in seiner Spalte und lässt die von IHM kontrollierte in meiner Spalte aus; gemessen 100 / 0 statt 0 / 100), Dark Gear (`dark-gear.js` `getStealableCreatures` Z. ~87: „Choose a Creature your opponent controls" – eine mir vom Gegner gestohlene Kreatur in meiner Spalte ist nie wählbar, Zurückholen unmöglich); Quelle ist `engine.getCreatureTargets(pi)` – betrifft vermutlich jede Karte, die es für „you control" benutzt
 - **Voraussetzungen / Aufbau:** Seed 1234, Sitz 0 am Zug mit Cloud Pillow bzw. Beer. (1) Sitz 0 hat die Kreatur von Sitz 1 gestohlen (`actionStealCreature(0, inst)`, wie Deepsea Succubus/Cute Conversion: Kreatur bleibt in der Spalte von Sitz 1, `controller` = 0). (2) Sitz 1 hat eine Kreatur von Sitz 0 gestohlen (steht weiter in Spalte 0, `controller` = 1).
 - **Schritte:** Karte spielen, angebotene Kreaturen-Ziele mitschneiden, Zielwahl abbrechen.
 - **Erwartet** (Kartentext „Choose a target you control" / „targets you control"; CARD_API.md Z. 18826 „Kontrolle statt Seite" – die Heldenzweige beider Karten halten sich bereits daran): (1) wird angeboten, (2) nicht.
 - **Beobachtet:** Genau umgekehrt. (1) Zielliste leer – die von mir kontrollierte Kreatur fehlt; (2) die mir gestohlene, vom Gegner kontrollierte Kreatur wird als „target you control" angeboten (bei Cloud Pillow bekäme sie dann sogar meinen Cloudy-Schutz, die Instanz-Suche in `resolve` Z. ~90 nimmt `c.owner === pi`).
-- **Repro:** `docs/niche-tests/repro/F01-artifacts/07-cloud-pillow-beer-ziel-you-control-gestohlene-kreaturen.js` (5 × ✗, davon 1 × Dark Gear)
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/07-cloud-pillow-beer-ziel-you-control-gestohlene-kreaturen.js` (7 × ✗, davon 1 × Dark Gear und 2 × Explosivo's Sword)
 - **Vermutete Ursache:** `_engine.js` Z. 40250 `getCreatureTargets(playerIdx)` durchläuft nur `gs.players[playerIdx].supportZones`; der Filter `(c.owner === playerIdx || c.controller === playerIdx)` greift nur innerhalb der eigenen Spalte. Ein Sammler „Kreaturen unter Kontrolle von pi" (analog `heroesControlledBy`) fehlt.
 
 ### F01-08 · Anti-Magnet spielbar ohne weitere eigene Ziele (Umleitung auf den Angreifer) · Stufe C
@@ -217,6 +217,16 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Beobachtet:** Das Schwert liegt beim Gegner (+10 ATK für dessen Helden); Swamp Witch wird korrekt abgelehnt.
 - **Repro:** `docs/niche-tests/repro/F01-artifacts/23-explosivos-sword-gegnerischer-held.js`
 - **Vermutete Ursache:** Das Skript exportiert kein `equipOwnSideOnly` – der Nachzug „49 nicht gebannte Equipment-Karten" (CARD_API.md) hat gebannte Karten ausgelassen. Wirkung bei Anlegen am Gegner: Der gegnerische Held hätte die 100-Schaden-Auslösung; wegen des Banns niedrige Dringlichkeit.
+
+### F01-24 · Item Lock: die Lösch-Kosten bleiben bei einem Abbruch der Boomerang-Galerie verloren · Stufe C
+- **Karten:** Boomerang (`cards/effects/boomerang.js`), Item Lock von Hammer Throw (`hammer-throw.js` Z. 137); betroffen jedes nicht-zielende Artefakt mit abbrechbarer Wahl in `resolve`
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 steht unter Item Lock (`ps.itemLocked`), Hand [Boomerang, Füller, Füller], Ablage [Beer].
+- **Schritte:** 1. Boomerang spielen. 2. Item-Lock-Frage: einen Füller löschen. 3. In der Boomerang-Galerie abbrechen.
+- **Erwartet** (Hammer Throw: „…must delete a card from their hand whenever they play an Artifact during their next turn."; Regel 23.9: Abbruch = nichts ist passiert): Entweder wird die Karte erst nach der Galerie verlangt oder bei Abbruch zurückgegeben; Gegenprobe: bei zielenden Artefakten (Burned Contract, Book of Doom) wird bei Abbruch nichts gelöscht (✓).
+- **Beobachtet:** Boomerang bleibt auf der Hand und kein Gold ist weg, aber der Füller ist im Gelöscht-Stapel (Kosten verloren; ein erneutes Spielen kostet wieder eine Karte).
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/24-boomerang-item-lock-kosten-bei-abbruch.js`
+- **Vermutete Ursache:** `server.js` `doUseArtifactEffect` Z. ~12226 verlangt die Item-Lock-Löschung vor Kette und `resolve`; der Abbruchzweig bucht nur Gold zurück. (Bei zielenden Artefakten läuft die Löschung in `doConfirmPotion` Z. 11323 nach der Zielwahl.)
+- **Frage an Al:** Soll ein abgebrochenes Artefakt-Spielen die Item-Lock-Löschung zurücknehmen bzw. gar nicht erst verlangen (wie bei zielenden Artefakten) – ja oder nein (heute: die Karte ist verloren)?
 
 ## Abdeckung
 (wird am Ende ergänzt)

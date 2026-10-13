@@ -245,6 +245,16 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S01-spells/25-mehrstufige-wahl-ohne-abbruch.js` (✗ = Stufe ist nicht abbrechbar)
 - **Vermutete Ursache:** `cancellable: false` an den genannten Stellen; keine Begründung im Kommentar. (Bei Sacrifice ist das Opfer laut Text eine Kosten-„Pflicht", aber vor der Auflösung ist noch nichts passiert.)
 
+### S01-26 · Divine Gift of Sacrifice: wird der Zauber negiert, entfällt das Opfer · Stufe C
+- **Karten:** Divine Gift of Sacrifice (`cards/effects/divine-gift-of-sacrifice.js`, `doSacrifice` im `onPlay`).
+- **Voraussetzungen / Aufbau:** Sitz 0 spielt Divine Gift of Sacrifice, Sitz 1 hat Silence (Reaktion, negiert einen Zauber).
+- **Schritte:** 1. Divine Gift of Sacrifice spielen, Sitz 1 antwortet mit Silence.
+- **Erwartet** (Kartentext: „Sacrifice a Hero originally controlled by you **to play this card**." – das Opfer ist als Kosten des Ausspielens formuliert): Lesart A – Kosten sind beim Verlassen der Hand bezahlt, auch bei Negierung (Vorbild: Ruling v1031 bei den Divine Gifts „unabhängig davon, ob ein Gegenzug sie später negiert"). Lesart B – das Opfer gehört zur Auflösung.
+- **Beobachtet:** Lesart B. Alle Helden unversehrt, keine Opferwahl geöffnet, Karte in der Ablage, Silence verbraucht. (Vergleich: Aligning Goals' „Spend 5 Gold" steht im Effektsatz, nicht als Kosten – dort ist „bei Negierung kein Gold weg" stimmig: 20 Gold bleiben.)
+- **Repro:** `docs/niche-tests/repro/S01-spells/26-divine-gift-of-sacrifice-negiert-kein-opfer.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `doSacrifice` läuft erst in `hooks.onPlay`, das ein negierter Zauber nie erreicht.
+- **Frage an Al:** Soll das Opfer von Divine Gift of Sacrifice als Kosten auch bei Negierung gezahlt sein (ja = Opfer beim Ausspielen / nein = erst bei Auflösung, wie jetzt)?
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
