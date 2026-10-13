@@ -63,6 +63,11 @@ function creatureHasActiveEffect(engine, inst) {
  */
 async function sleepCreature(engine, inst, ownerPi) {
   if (!inst || inst.counters?.negated) return;
+  // R02-05: „This counts as a negative status effect" — `actionNegateCreature`
+  // prueft Light Ball und die Immunitaet gegen negative Status (Lunatic Golem)
+  // nicht selbst (die sitzen in `canApplyCreatureStatus`), also hier.
+  if (engine._lightBallProtects(inst.controller ?? inst.owner, 'creature')) return;
+  if (engine._creatureNegStatusImmune(inst)) return;
   await engine.actionNegateCreature(inst, CARD_NAME, {
     // Current turn is the OPPONENT's; it ends when ownerPi's next
     // turn starts (gs.turn + 1 / expiresForPlayer = ownerPi). Same
