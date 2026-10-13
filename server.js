@@ -8387,7 +8387,17 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
     // post-resolution _firePendingCardReveal below then no-ops.
     room.engine.maybeFireCpuRevealEarly();
-    if (!_gefizzelt) await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+    // Z1 (R02-21): Wirker-Seite auch um den onPlay-Lauf stempeln (vorher nur um die Kette) - sonst liest
+    // `effectiveSchoolLevelForCaster` (ohne 4. Argument) die Zonen des gleich indizierten EIGENEN Helden.
+    if (!_gefizzelt) {
+      const _wirkerHook = gs._wirkerSeite;
+      gs._wirkerSeite = { pi, heroIdx, heroOwner };
+      try {
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+      } finally {
+        if (_wirkerHook === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerHook;
+      }
+    }
     delete gs._attachmentZoneSlot;
     delete gs._attachmentHeroIdx;
     delete gs._attachmentOwner;

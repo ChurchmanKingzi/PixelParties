@@ -38,7 +38,10 @@ function lvl(t, n, level) { const d = Object.assign({}, H.DB['ZZ Dummy'], { name
     const diff = t.censusDiff(c0, t.census()).filter(s2 => s2.startsWith('ZZ Dummy Big'));
     R.check('Missing People gespielt', r === true, r);
     R.check('Die gestohlene (= von mir kontrollierte) Kreatur ist KEIN legales Ziel („your opponent controls")', t.targets.every(q => !q.valid.some(v => v.cardName === 'ZZ Dummy Big')), t.targets.map(q => q.valid.map(v => v.cardName)));
-    R.check('Slot des Besitzers ist leer (keine Geisterkarte)', t.gs.players[1].supportZones[0][0].length === 0, t.gs.players[1].supportZones[0]);
+    // Repro-Korrektur (Z1): die gestohlene Kreatur ist KEIN legales Ziel (siehe oben, S03-06) - bleibt sie unangetastet, steht sie
+    // regulaer in ihrem Slot; eine „Geisterkarte" waere nur ein Slot-Name OHNE Instanz (das prueft `audit`).
+    const angeboten = t.targets.some(q => q.valid.some(v => v.cardName === 'ZZ Dummy Big'));
+    R.check('Slot des Besitzers ist leer (keine Geisterkarte) - oder die Kreatur blieb, weil sie kein Ziel war', angeboten ? t.gs.players[1].supportZones[0][0].length === 0 : t.gs.players[1].supportZones[0][0].length === 1, t.gs.players[1].supportZones[0]);
     R.check('Kartenbilanz „ZZ Dummy Big" ±0', diff.length === 0, diff);
     R.check('audit sauber', t.audit().length === 0, t.audit());
   }
