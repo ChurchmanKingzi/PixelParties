@@ -28374,23 +28374,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ Z3 (A06-33): ~190 Skripte rufen den Dispatcher OHNE `sourceCard`. Dann gilt – nur fuer die
     //   Fenster, nicht fuer die Zielliste – die echte Quelle `_redirectSource` (ctx.promptTarget) bzw. die
     //   gerade wirkende Karte (`_umgebungsQuelle`). Die Picker, die ihre Fenster selbst oeffnen
-    //   (`_callerHandlesSurprise`), bekommen keinen Ersatz (sonst doppelte Fenster). Der Ersatz gilt
-    //   ausserdem nur fuer Ziele, die NICHT der Seite der Quelle gehoeren („opponent's card or effect").
+    //   (`_callerHandlesSurprise`), bekommen keinen Ersatz (sonst doppelte Fenster). Keine eigene
+    //   Gegner-Beschraenkung (Al: steht im Text der Reaktionskarte „opponent's", gilt der Gegner-Lock –
+    //   den prueft die Karte selbst, z. B. Castling/Cloak `sourceOwner === pi`; sonst reagiert sie auch auf
+    //   eigene Effekte).
     const _ausdruecklich = config.sourceCard || config.source || null;
     const _umgebung = (!_ausdruecklich && !config._redirectSource && !config._callerHandlesSurprise)
       ? this._umgebungsQuelle(playerIdx, config) : null;
     const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
-    const _ersatzSeite = _ersatzQuelle ? (_ersatzQuelle.controller ?? _ersatzQuelle.owner) : null;
-    const _fremdZiel = (t) => !_ersatzQuelle || this.zielSeite(t) !== _ersatzSeite;
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
       const quelle = _ausdruecklich || _ersatzQuelle || null;
       const ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
-      const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id) && _fremdZiel(t));
+      const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id));
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
       // Reaktionen mit `postTargetKreaturWahl: true` (Hub-Option
       // `ausZielwahl`); alle anderen sehen weiter nur Helden.
       const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && ids.has(t.id)
-        && this._istKreaturenInstanz?.(t.cardInstance) && _fremdZiel(t));
+        && this._istKreaturenInstanz?.(t.cardInstance));
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
         // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
         // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
@@ -28475,9 +28475,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   oeffnet je gewaehltem Ziel EINZELN — die Schleife steht in
     //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
     //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
-    // Z3: ohne ausdrueckliche Quelle (nur Umgebungsquelle) zaehlen nur Ziele der Gegenseite.
     return await this.applyRedirectWindows(
-      _pickedIds, validTargets, _umgebung ? { ...config, _redirectNurFremde: true } : config,
+      _pickedIds, validTargets, config,
       this._redirectSourceFor(playerIdx, config) || _umgebung
     );
   }
@@ -29262,8 +29261,6 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Martyry, Anti-Magnet, Monia Bot) kennen nur diese beiden Arten.
         if (sel.type !== 'hero' && sel.type !== 'equip') continue;
         if (typeof sel.owner !== 'number' || sel.owner < 0) continue;
-        // Z3: Umgebungsquelle (kein `sourceCard` vom Skript) – eigene Ziele der Quelle nie umleiten.
-        if (config._redirectNurFremde && this.zielSeite(sel) === (sourceCard.controller ?? sourceCard.owner)) continue;
         const redirected = await this._checkTargetRedirect(
           sel.owner, sel, validTargets, config, sourceCard
         );
