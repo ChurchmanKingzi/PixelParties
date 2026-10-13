@@ -119,7 +119,11 @@ module.exports = {
       return;
     }
 
-    const baseCost = engine._getCardDB()[CARD_NAME]?.cost || 4;
+    // Preis je Karte wie im Zielwaehler angezeigt: Rusting Crystal,
+    // Rabatte & Co. stecken in `artifactPlayCost` (A08-02).
+    const baseCost = engine.artifactPlayCost(
+      pi, CARD_NAME, require('./_hand-resolve').getResolvingHandIndex(ps),
+    ).cost;
     const targets = selectedIds.map(id => (validTargets || []).find(t => t.id === id))
       .filter(t => t && t.type === 'hand' && t.owner === pi);
     if (targets.length === 0) {

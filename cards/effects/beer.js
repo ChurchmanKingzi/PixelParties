@@ -95,7 +95,11 @@ module.exports = {
   resolve: async (engine, pi, selectedIds, validTargets) => {
     if (!selectedIds || selectedIds.length === 0) return; // 0 targets — nothing happens
 
-    const baseCost = engine._getCardDB()['Beer']?.cost || 4;
+    // Preis je Ziel wie im Zielwaehler angezeigt: Rusting Crystal, Rabatte
+    // & Co. stecken in `artifactPlayCost` (A08-26).
+    const baseCost = engine.artifactPlayCost(
+      pi, CARD_NAME, require('./_hand-resolve').getResolvingHandIndex(engine.gs.players[pi]),
+    ).cost;
     const totalCost = baseCost * selectedIds.length;
     const ps = engine.gs.players[pi];
 
