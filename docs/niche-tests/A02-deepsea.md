@@ -1,8 +1,13 @@
 # A02-deepsea – Nischenfall-Bericht
-Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am Ende gefüllt) gezielt getestet · (wird am Ende gefüllt) mit Befund.
+Stand/Autor: Agent A02-deepsea, 13.10.2026 (Fortsetzung nach Abbruch des Vorgängers). Karten: 54 in der Liste · 50 gezielt getestet (L2) · 34 mit Befund. 37 Befunde: 8× A, 23× B, 6× C.
 
 ## Zusammenfassung
-(Entwurf – wird am Ende ausgefüllt. Bis dahin wächst der Bericht mit jedem bestätigten Befund.)
+- **37 Befunde** (8 Fehler A, 23 wahrscheinliche Fehler B, 6 Regelfragen C). Jeder Befund hat ein ausgeführtes Repro unter `docs/niche-tests/repro/A02-deepsea/` (alle 37 laufen und zeigen ihr ✗).
+- **Hauptklasse: geliehene Kreaturen und Koordinaten.** Die Archetypen Deepsea/Slippery/Cosmic arbeiten viel mit „Kreatur nach Held/Slot auflösen" und mit Kontrolle ≠ Brettseite (Succubus, Arrival, Styx). Wiederkehrende Muster: Instanzsuche nur über Held/Slot ohne Brettseite (-01 Siren, -06 Skates, -31 Whoolmoth, -32 Monstrosity), Ziel-ID aus der Kontrolle statt der Brettseite (-28 Pengu, -30 Spear), Kreatur der falschen Seite bezahlt oder zurückgenommen (-04 Life-Searcher, -07 Ice, -09/-14 Shapeshift/Castle/Encounter, -34 Opferkosten, -37 DDG-Tribut), Zählung nach Seite statt Kontrolle (-12).
+- **Schwerste Befunde:** -02 (Karte und Counter verschwinden beim zweiten Invader über Argos/Life-Searcher), -09 (Shapeshift/Castle: geliehene Gegnerkreatur landet dauerhaft auf meiner Hand), -30 (Aquatic Spear trifft meine eigene statt der gewählten geliehenen Kreatur), -32 (Monstrosity bounct bei gleichen Koordinaten die falsche Karte), -04 (Life-Searcher geliehen: Geister-Karte und doppelte Karte), -13 (Cosmic Malfunction schützt nur das erste Opfer).
+- **Prüfaufträge:** Zielsammler Brettspalte/„Besitzer ODER Kontrolleur" → gemessen, Befunde -28, -30, -32, -37 (Aquatic Arrows und Deepsea Reaper nutzen `physicalSide` bzw. Brettseite korrekt; Reaper-Animation kosmetisch falsch, Randnotiz in -30). `physicalSide()` = Besitzer für geliehene Kreaturen → bestätigt, Grundlage von -28/-30/-31. `counters.currentHp ?? 0` → Aquatic Arrows CPU-Entscheidung (-29); in Deepsea Siren unkritisch (die Schadens-Batch legt `currentHp` vorher an). `negatedDuration` ohne Leser → keine Karte meiner Gruppe nutzt es (grep), Negation durch The Cosmic Depths gemessen ✓ (Ende des Zuges). Zugende-Räumung `negated` (C05-02) → Datenpunkt: `addHeroStatus(…, 'negated', { duration: 5 })` auf Argos ist nach EINEM Zugwechsel weg (stattdessen `immune`), frozen/stunned bleiben mit Dauer; keine Karte meiner Gruppe wendet das an (nicht als eigener Befund). Kopierer (Monstrosity, A02-25/-26) → -25, -26, -32. Umhängen von Ausrüstung (F03-07/-08) → Fridge mit meinen Race Boats: -35 (zweites Boot am Helden); Snake-Boot und Skates gehören laut F02-22 zur Klasse „Ausrüstung am übernommenen Helden".
+- **Gesamteindruck:** Normalpfade (Einsatz-Effekte, HOPT, Kosten, Gold-Grenzen, Statusdauern, Race-Boat-Zähler, Kartenbilanz, `t.errors`/`t.audit()`) sind sauber; Absturz oder Hänger trat in keinem Test auf. Die Fehler sitzen fast alle an den Rändern Kontrolle/Seite/Koordinate sowie bei Typ/Sperren-Lücken.
+- **Bewusst nicht getestet:** CPU/MCTS-Wege (Slippery-Zugbeginn läuft im CPU-Weg durch MCTS-Rollouts und verbraucht Skript-Antworten, daher `moveSlipperyCreature` direkt aufgerufen); 3-/4-Spieler-Partien; Charme/Styx-Wege (geliehene HELDEN) außer als Auslöser; Client-Darstellung (Animationen nur über `t.events`); Flying Island in the Sky (Bonus-Zonen der Race Boats); Zufallsanteile nicht systematisch mit mehreren Seeds wiederholt (Harness-Seed 1234).
 
 ## Befunde
 
@@ -307,7 +312,7 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Voraussetzungen / Aufbau:** Seat 0: Siphem (Held 0) mit 2 Deepsea Counters, Frog Race Boat (Slot 0), 2 Kreaturen (Slot 1/2); Seat 1: Standardhelden (800 HP).
 - **Schritte:** Siphems Heldeneffekt aktivieren (2 Counter, Ziel Gegnerheld 0). Kontrolle: Fireball desselben Helden.
 - **Erwartet** (Quelle: Frog-Text „The first damage the equipped Hero deals **in any way** to a single target each turn is increased by 50 times the number of Creatures in its other Support Zones"; CARD_API „Schadenstyp 'hero' (v905)": Schaden aus aktivierbaren HELDEN-Effekten läuft als `'hero'`, Logan wurde deshalb von `'creature'` umgestellt): 100 + 2 × 50 = 200 Schaden, Gegnerheld 600.
-- **Beobachtet:** 700 (nur 100); der Fireball der Kontrolle bekommt den Bonus (550). Ursache bestätigt: ersetzt man `'creature'` durch `'hero'` (Wrapper um `actionDealDamage` im Scratch-Test), kommt der Bonus (600). Dasselbe gilt für Crocodile Race Boat (ein Siphem-Kill zählt nicht als „defeats") und jeden Leser, der `'creature'` vom Heldenschaden ausnimmt.
+- **Beobachtet:** 700 (nur 100); der Fireball der Kontrolle bekommt den Bonus (550). Ursache bestätigt: ersetzt man `'creature'` durch `'hero'` (Wrapper um `actionDealDamage` im Scratch-Test), kommt der Bonus (600). Dasselbe folgt aus dem Code für Crocodile Race Boat (`_waflav-shared.js` Z. 289 schließt `'creature'` aus: ein Siphem-Kill zählt nicht als „defeats"; an Crocodile nicht gemessen) und für jeden Leser, der `'creature'` vom Heldenschaden ausnimmt.
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/33-siphem-damage-type-frog.js` (ausgeführt: 1 ✗)
 - **Vermutete Ursache:** `siphem-the-deepsea-demon.js` `ctx.dealDamage(tHero, damage, 'creature')` und `actionDealCreatureDamage(ctx.card, …, 'creature', …)` im Heldeneffekt – Typ `'hero'` fehlt (CARD_API-Liste der Träger nennt Siphem nicht).
 
@@ -339,8 +344,79 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Vermutete Ursache:** `deepsea-primordium.js` Z. ~70: `registerAdditionalActionType(…)` ohne `freeInActionPhase: true`; Primordium ist die zentrale Eröffnungskarte der Linie (`playOrderPriority: 100`), die CPU spielt sie vor den finanzierten Karten.
 - **Frage an Al:** Soll die Primordium-Zusatzaktion in der Action Phase gratis sein wie bei der Cute Crown (Ja = `freeInActionPhase`, Hauptaktion bleibt), oder bleibt es dabei, dass sie die Phase beendet (Nein)?
 
+### A02-deepsea-37 · Dark Deepsea God: eine per Succubus geliehene Gegnerkreatur zählt als Tribut „von meiner Seite des Bretts" · Stufe B
+- **Karten:** Dark Deepsea God (`dark-deepsea-god.js` `_collectTributeCandidates`, Z. ~85), Engine `getSacrificableCreatures` (Kontrolle statt Seite, Styx 28.9.), Deepsea Succubus (Auslöser).
+- **Voraussetzungen / Aufbau:** Seat 0: DDG auf der Hand, eigene Deepsea Werewolf (Lv2) in Held 0 / Slot 0. Seat 1: Deepsea Poltergeister (Lv2) in Held 1 / Slot 0, von Seat 0 geliehen. Ohne die geliehene Karte reicht der Tribut (Summe 2) nicht.
+- **Schritte:** DDG spielen, in der Tributwahl beide Kreaturen markieren, Landezone wählen.
+- **Erwartet** (Quelle: Kartentext „returning 2 or more Creatures whose combined original levels are 4 or higher … **from your side of the board** to your hand"): Die geliehene Kreatur steht auf der Seite des Gegners und ist kein zulässiger Tribut; DDG ist hier nicht spielbar.
+- **Beobachtet:** Die Tributliste enthält Werewolf und Poltergeister; DDG wird gespielt (Summe 4), die Poltergeister gehen auf die HAND DES GEGNERS, DDG landet in der Werewolf-Zone. Der Preis ist damit teils mit der Karte des Gegners bezahlt, die er zurückerhält.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/37-ddg-tribute-borrowed-creature.js` (ausgeführt: 2 ✗)
+- **Vermutete Ursache:** `_collectTributeCandidates` nimmt `engine.getSacrificableCreatures(pi)` (Filter `controller ?? owner === pi`). Für Tribute auf einem GELIEHENEN HELDEN (Styx) ist die Kontrolle richtig, für eine per Succubus geliehene KREATUR auf einem Gegnerhelden nicht. Restunsicherheit: die Engine-Konvention „Kontrolle statt Seite" (Styx 28.9.) könnte hier gewollt sein; der Kartentext sagt aber ausdrücklich „side of the board", und die Landezone (`_landingAllowed`) prüft die Seite bereits.
+
 ## Abdeckung
-(wird am Ende gefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Analyzer from the Cosmic Depths | L2 gezielt | Token-Platzierung ✗(→ -11), Zählen von Brett→Hand ✗(→ -21), geliehene Karte mit Counters ✗(→ -12), Arrival-Besitz ✗(→ -03) |
+| Argos, the Eye of the Cosmos | L2 gezielt | zweiter Invader ✗(→ -02); Counter bei Gegner-Zugbeginn/eigenem Zugbeginn ✓, gefroren/betäubt (mit Dauer): keine Counter ✓, Cosmic-Manipulation-Fenster nach Platzierung ✓ |
+| Arrival from the Cosmic Depths | L2 gezielt | Besitz der platzierten Kreatur ✗(→ -03), Cosmic Manipulation auf Platzieren ?(→ -10); Aquatic Arrows-Fenster ✓ |
+| Blood Moon under the Sea | L2 gezielt | Bounce-Place über Skeleton am Wirtsheld (50 Schaden) ✓, anderer Held ohne Trigger ✓, Shapeshift ✓; Schadenstyp `'creature'` für ein Artefakt: kein Leser betroffen |
+| Cosmic Malfunction | L2 gezielt | mehrere Opfer ✗(→ -13) |
+| Cosmic Manipulation | L2 gezielt | Platzieren statt Beschwören ?(→ -10); `drawLocked` und Deck 1: spielbar, kein Fehler (Karte verbraucht, nichts gezogen: Engine-weit, nur Sacred Jewel/Mirror tragen `blockedByDrawLock`) |
+| Crocodile Race Boat | L2 gezielt | Schwelle 4/2/1 bei 0/2/3 Kreaturen ✓, Kill-Zähler je Zug, `actionLocked` danach ✓; Siphem-Kill zählt wegen Typ `'creature'` nicht (→ -33, aus dem Code abgeleitet, an Crocodile nicht gemessen) |
+| Dark Deepsea God | L2 gezielt | „once per game" fehlt ?(→ -15), Sammelrückgabe ✗(→ -16), geliehener Tribut ✗(→ -37) |
+| Deepsea Bats | L2 gezielt | Ablage-Galerie Lv≤1 (Squirrel nicht angeboten ✓), alle 8 Platzierten bleiben negiert und ohne Einsatz-Effekt (Pirate, Zombie, Jack, Skeleton, Mummy, Clown, Stein, Primordium; kein Gold, keine Abwürfe, keine Aufträge) ✓, Negation hält 2 Zugwechsel ✓ |
+| Deepsea Castle | L2 gezielt | geliehene Kreatur ✗(→ -09), Greatmaw-Teilsperre ✗(→ -24); beide Spieler je 1×/Zug ✓ (HOPT je Aktivierer) |
+| Deepsea Encounter | L2 gezielt | Token ✗(→ -14), Invader-Beschränkungen ✗(→ -19) |
+| Deepsea Horror Clown | L2 gezielt | Zwangsziel nur im nächsten Gegnerzug ✓ (auch bei gefrorenem/negiertem Clown, danach frei ✓), Kopie durch Monstrosity ✓ |
+| Deepsea Jack O' Lantern | L2 gezielt | Kopie ✗?(→ -26) |
+| Deepsea Monstrosity | L2 gezielt | Kopie Siren ✗(→ -25), Jack ?(→ -26), Auswahl bei gleichen Koordinaten ✗(→ -32); Kopien Werewolf/Pirate/Mummy/Reaper/Witch/Zombie/Stein/Skeleton/Bats/DDG ✓ |
+| Deepsea Mummy | L2 gezielt | Betäubung Kreatur 1 Zug ✓ (endet danach), Betäubung Held ✓ (Kreaturen des Helden bleiben aktivierbar), Abbruch laut Vorrunde einheitlich |
+| Deepsea Pirate | L2 gezielt | Gegnergold 0/3/6/100 ✓ (nie negativ, Summe stimmt) |
+| Deepsea Poltergeister | L2 gezielt | Ziele eigene und fremde Artefakte, Artefakt am übernommenen Helden ✓, Ablage des Besitzers ✓ |
+| Deepsea Primordium | L2 gezielt | Filter Nicht-Deepsea / Squirrel aus der Hand abgelehnt ✓, genau ein Zug mit Zusatzaktion ✓; Phase endet in der Action Phase ?(→ -36) |
+| Deepsea Reaper | L2 gezielt | Zielwahl ✓ (Reaper selbst wählbar: Text „any Creature on the board", kein Befund); Sense-Animation bei geliehener Kreatur auf falschem Brett (kosmetisch, Randnotiz in -30) |
+| Deepsea Siren | L2 gezielt | Link am Platz ✗(→ -01), Tod durch Zerstörung ✗(→ -27), `currentHp ?? 0` unkritisch, Kopie ✗(→ -25) |
+| Deepsea Skeleton | L2 gezielt | zwei gleichnamige Karten ✗(→ -08) |
+| Deepsea Spores | L2 gezielt | im eigenen Zug spielbar ?(→ -17) |
+| Deepsea Stein | L2 gezielt | 3/1/0 Karten, verschiedene Namen, Kartenbilanz ✓ |
+| Deepsea Succubus | L2 gezielt | Auslöser für -04, -07, -09, -12, -28, -31, -34, -37; Schaden/Zerstörung des Geliehenen blockiert ✓ (gemessen: 50 Schaden, Zerstörung durch beide Seiten) |
+| Deepsea Werewolf | L1 Standard | Kopie durch Monstrosity (80) ✓; Abbruch-Lead der Vorrunde (einheitlich, ohne Befund) |
+| Deepsea Witch | L1 Standard | Kopie durch Monstrosity ✓; als Gegenprobe zu -22 gelesen |
+| Deepsea Zombie | L1 Standard | Bounce-Place und Zusatzaktion mehrfach benutzt ✓, keine Besonderheit erkannt |
+| Frog Race Boat | L2 gezielt | erster Treffer +50×Kreaturen ✓, zweiter Treffer ohne Bonus ✓; Siphem-Treffer ohne Bonus ✗(→ -33); Fridge ✗(→ -35) |
+| Gatherer from the Cosmic Depths | L2 gezielt | Zieh-Sperre ✗(→ -20), Counter-Quelle ✗(→ -12), Brett→Hand ✗(→ -21), Malfunction ✗(→ -13) |
+| Greatmaw Remora | L2 gezielt | Gratis-Sperre auf Nicht-Greatmaw ✓, Shark nach Remora ✓, frisches Opfer + „delete" ✓, Teilsperre in Shapeshift/Castle ✗(→ -24) |
+| Greatmaw Shark | L2 gezielt | +100 ATK läuft zum Zugende aus ✓, 1×/Zug über alle Haie ✓, geliehener Shark aktivierbar ✓; Opfer einer geliehenen Kreatur ✗(→ -34) |
+| Infected Greatmaw | L2 gezielt | Schaden = aktueller ATK (inkl. Shark-Bonus) ✓; Opfer einer geliehenen Kreatur ✗(→ -34) |
+| Infected Squirrel | L0 gelesen | Text/Skript gelesen (Deklarationen für Deepsea-Fluss); Primordium lehnt ihn aus der Hand korrekt ab ✓; Sperre nach Same-Turn-Bounce nicht einzeln gemessen |
+| Invader from the Cosmic Depths | L2 gezielt | Limit ✗(→ -02), Token-Fenster ✗(→ -11), Encounter ✗(→ -19); Lv0-Zauber nicht als Abwurf wählbar (Skript, `lvl >= 1`): bei „level 4 or lower" läge 0 Schaden drin, aber ohne Wirkung → kein Befund |
+| Life-Searcher from the Cosmic Depths | L2 gezielt | Limit ✗(→ -02), geliehen ✗(→ -04), Suchsperre ✗(→ -22), Counter-Zählung ✗(→ -12); Argos zählt laut Kopfkommentar `_cosmic-shared.js` bewusst als „Cosmic" (bestätigt) |
+| Shapeshift | L2 gezielt | geliehene Kreatur ✗(→ -09), Token ✗(→ -14), Teilsperre ✗(→ -24), Brett→Hand ?(→ -21) |
+| Shu'Chaku, the Blood Moon Projection | L2 gezielt | 3 Artefakte = 1 Ereignis für Siphem/Teppes ✓, Kostenrabatt für das NÄCHSTE Artefakt (Frog gratis, Crocodile voll) ✓ |
+| Siphem, the Deepsea Demon | L2 gezielt | DDG-Sammelrückgabe ✗(→ -16), Schadenstyp ✗(→ -33); Counter bei Bounce-Place ✓ |
+| Slippery Ice | L2 gezielt | geliehene Kreatur ✗(→ -07) |
+| Slippery Narw | L2 gezielt | Quelle Ablage ✗(→ -18), Siren-Link ✗(→ -01) |
+| Slippery Pengu | L2 gezielt | Partner geliehen ✗(→ -28); Bewegungsfolgen mit Partner ✓ |
+| Slippery Polar | L2 gezielt | Zusatz-Beschwörung nach Zug in Nachbarzone ✓, zweite Verschiebung gleiche Runde ohne Angebot ✓ (HOPT) |
+| Slippery Skates | L2 gezielt | gleichnamige Gegnerkreatur ✗(→ -06); „once per turn je Kreatur" über alle Skates ✓ (Stempel `_slipperySkatesMovedTurn`) |
+| Slippery Snobbit | L2 gezielt | Bonus nur für Kreaturen ✗(→ -05) |
+| Slippery Snowman | L2 gezielt | Freeze nur ohne gefrorenen Gegnerheld ✓, Dauer 1 Zug ✓ (danach `immune`) |
+| Slippery Spikeblock | L2 gezielt | 80 Schaden ✓; bei gefrorener/betäubter/negierter Kreatur kein Schaden (Konvention Slippery-Gate) |
+| Slippery Whoolmoth | L2 gezielt | Stufen-Rabatt mit geliehener Kreatur ✗(→ -31) |
+| Snake Race Boat | L2 gezielt | exakt n verschiedene Namen ✓, Abbruch verbraucht nichts ✓, nicht aktivierbar bei <n Namen / 0 Kreaturen ✓, Kartenbilanz ✓ |
+| Teppes, the Deepsea Vampire | L2 gezielt | Sammelrückgabe ✗(→ -16); gefroren/betäubt/negiert: kein Zug (aus dem Code, nicht gemessen) |
+| The Cosmic Depths | L2 gezielt | zurückgemischte Karte ausgeschlossen ✗(→ -23); Negation bis Zugende ✓ |
+| Whale Race Boat | L2 gezielt | 40+30×n auf alle anderen Ziele ✓ (eigene/fremde); Einmal-je-Zug nicht gesondert gemessen; Fridge ✗(→ -35) |
+| Aquatic Arrows | L2 gezielt | Auslösefenster: gleiche Position normal/Bounce-Place/Slippery/Arrival ✓, andere Position ✓ (kein Trigger); CPU-Entscheidung ✗(→ -29) |
+| Aquatic Shield | L2 gezielt | Fireball/Burn-Tick/Flächenschaden/tödlicher Treffer ✓, Ablage-Zusatz mit Einmal-Schilden auf Helden + Kreaturen ✓ (verfällt zum eigenen Zugbeginn ✓), Nachschub aus dem Deck ✓ |
+| Aquatic Spear | L2 gezielt | Ablage-Zusatz mit geliehener Kreatur ✗(→ -30) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende gefüllt)
+- Alle Race Boats: Kartenbilanz, `t.errors`, `t.audit()` sauber; Frog +50×Kreaturen genau einmal je Zug; Whale trifft Helden und Kreaturen beider Seiten (eigene Kreaturen eingeschlossen), nicht den Träger; Crocodile zählt je Zug neu und sperrt danach Aktionen; Snake exakt n Namen, Abbruch kostenlos.
+- Shu'Chaku: 3 Artefakte in einem Zug = 1 Ereignis für Siphem und Teppes; Kostenrabatt trifft genau das nächste Artefakt.
+- Slippery-Reihe: Spikeblock/Snowman/Polar/Whoolmoth über den gemeinsamen Zug-Weg, Statusbremse (gefroren/betäubt/negiert) greift einheitlich; Polar-HOPT und Skates „je Kreatur einmal" über alle Kopien.
+- Greatmaw: Remora-Gratissperre, Shark-HOPT über alle Haie, ATK-Bonus endet mit dem Gegnerzug, Infected nutzt den aktuellen ATK.
+- Deepsea: Pirate (Gold 0/3/6/100), Stein (3/1/0 Karten, verschiedene Namen), Bats (Ablage-Galerie, Negation bleibt), Mummy (Betäubung 1 Zug), Clown (Zwang nur im nächsten Gegnerzug), Primordium (Filter und Ablauf), Poltergeister (Artefakte beider Seiten, Ablage des Besitzers).
+- Aquatic: Arrows-Fenster für Platz und Position, Shield (vier Schadensarten, Einmal-Schilde mit Ablauf), Ersatzkarte aus dem Deck.
+- Argos: Counter-Gewinn und -Verlust nach Handgröße des Gegners; gefrorener/betäubter Argos sammelt nichts.
+- Bestätigt durch Ruling/Kopfkommentar (kein Befund): Invader Token zählt in The Cosmic Depths als Level 0 (CARD_API ~Z. 6486); Argos zählt für Invader und Life-Searcher als „Cosmic" (`_cosmic-shared.js` Kopf); Race-Boat-Zählung schließt Bonus-Zonen ein (Vorgabe 10.10.).

@@ -1,8 +1,13 @@
 # A01-pollution – Nischenfall-Bericht
-Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird ergänzt) mit Befund.
+Stand/Autor: Agent A01-pollution (Fortsetzung nach Abbruch des Vorgängers), 13.10.2026. Karten: 49 in der Liste · 49 gezielt getestet (alle L2, davon einige nur mit einem Standardfall + Skriptlektüre) · 35 mit Befund · 38 Befunde (9 × A, 22 × B, 7 × C).
 
 ## Zusammenfassung
-(Entwurf – wird am Ende ausgefüllt. Arbeitsstand: Befunde werden nach jedem bestätigten Fall ergänzt.)
+* **38 Befunde:** 9 × A (Fehler), 22 × B (wahrscheinlicher Fehler), 7 × C (Regelfrage, je mit Frage an Al). Alle mit ausgeführtem Repro unter `docs/niche-tests/repro/A01-pollution/`.
+* **Wichtigste Fehler:** Spontaneous Reappearance beendet den Zug nicht (-01) · Doom Prophecy lässt die Zauberkarte beim Legen der Uhr in die Gegner-Area verschwinden (-07) · Reality Crack verdoppelt eine Area in der Ablage, wenn das Area-Limit währenddessen sinkt (-12) · The Fifth Circle verdoppelt bei Mehrziel-Treffern den ersten Helden (-21) · Rain of Death, Mass Multiplication (Abbruch), Pyroblast (zweite Kopie), Doom Clock (Mehrfachtod) und Null Zone (Dauer) weichen vom Kartentext ab (-02…-05, -18).
+* **Neu in der Fortsetzung (-29…-38):** Royal Corgi gibt dem Besitzer statt dem Kontrolleur das Handlimit (-29) · Pollution Spewer stempelt „1 pro Zug“ nach Position (-30) · Anti Magic Enchantment greift nur bei Schaden, nicht bei Cold Coffin/Medusa/Null Zone (-31) · Circle-Replays (Dante/Third Circle) umgehen Eraser-Beam- und Reality-Crack-Sperre (-32) · Pollution Piranha: Abgangseffekt bei Diebstahl stumm, beim Versetzen fälschlich (-33) · Sun Beam mit Ziel-ID nach Besitzer → falsche Kreatur (-34) · Mass Multiplication und Spontaneous Reappearance ignorieren Such-/Hand-Sperre (-35, -37), Deck-Suchen aufs Brett ebenfalls (-36, Regelfrage) · 20. Doom Counter vs. Archer-Schuss (-38, Regelfrage).
+* **Klassen, die sich durch die Gruppe ziehen:** (1) Negierung/Abbruch und „Kosten vor oder nach der Kette“ (-03, -14, -17, -23); (2) „Besitzer ODER Kontrolleur / Brettseite“ (-29, -30, -33, -34, dazu die bekannte Wurzel F02-14 mit The Seventh Circle bestätigt); (3) Sperren, die ein Kartenskript nicht liest (-25, -27, -32, -35, -36, -37); (4) Engine-Lücken im Schutz (-09 Warrior/Statusfenster, -31 AME). Details unten bei „Prüfaufträge“.
+* **Gesamteindruck:** Die Archetyp-Mechanik trägt (Doom-Counter-Kosten, Soul-Shard-Reihenfolgen, Hell-Circles-Kette, Dante, Thep, Victorica, Big Gwen, Ib/Ren/Shut/Khet ✓). Die Befunde konzentrieren sich auf Ränder: Abbruch/Negation, fremde Kontrolle und Sperren.
+* **Bewusst nicht getestet:** 3-/4-Spieler-Varianten, Skill-Test-Modus, Animationen/Protokoll-Verträge (Familie 11), `cpuResponse`-Zweige, Token-Platzierung auf geliehenen Helden-Zonen während der Gegner-Zug (Magic Mirror/Acid Rain mit entführtem Helden), Hero-AME bei übernommenem Helden (Angebot geht an den Verzauberer, nicht an den Kontrolleur – nur im Code gelesen), Siege/Cats als echte Sperrquellen (Flag `searchLocked` direkt gesetzt, wie Cats es tut).
 
 ## Befunde
 
@@ -318,8 +323,111 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Repro:** `docs/niche-tests/repro/A01-pollution/34-sun-beam-id-kollision-gestohlene-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `cards/effects/sun-beam.js` (Sammler: `id: equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, `owner: inst.owner`) – statt `collectNonHeroBoardTargets` oder `engine.physicalSide(inst)` zu nutzen. Nebenbeobachtung (nicht gewertet): Sun Beam setzt „die gleiche Zahl“ Tokens wie gewählte Karten, auch wenn ein Ziel durch Golden Wings/Warrior überlebt (07, 1 Token bei überlebender Kreatur) – Lesart „gewählt“ vs. „abgelegt“ offen, gleiche Frage wie A01-pollution-26.
 
+### A01-pollution-35 · Mass Multiplication ignoriert die Such-Sperre – holt unter „cannot search or add cards to your hand“ trotzdem 3 Kopien in die Hand · Stufe B
+- **Karten:** Mass Multiplication (`mass-multiplication.js`); Sperre aus Cats of the Pharaoh (`ps.searchLocked`, `cats-of-the-pharaoh.js` Z. 168); Lader-Auto-Erkennung `_loader.js` (`DECK_SEARCH_PATTERNS`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Mass Multiplication + Fireball auf der Hand, 3 Fireball im Deck, `ps.searchLocked = true` (genau wie Cats es setzt).
+- **Schritte:** 1. `t.play(0, 'Mass Multiplication')`, Fireball aus der Hand wählen. 2. Hand, Deck, Gelöscht-Stapel lesen.
+- **Erwartet** (Quelle: Cats „you cannot search or add cards to your hand for the rest of the turn“; Such-Template `_search-shared.js` Bauform ① „nur Suchen/Suche ist Schritt 1 und notwendig → `blockedBySearchLock`, gar nicht erst spielbar“; Mass Multiplication „… add up to 3 copies of it **from your deck to your hand**“): die Karte ist gesperrt, mindestens werden keine Karten aus dem Deck in die Hand gelegt und nichts gelöscht.
+- **Beobachtet:** `doPlaySpell` → `true`; die Hand-Fireball wird gelöscht, 3 Kopien kommen aus dem Deck in die Hand (Hand 3, Deck 0), Token bezahlt. Die Karte prüft nur `ps.handLocked` (Z. ~214), nicht `engine._isSearchBlocked`; ihr eigener Add-Weg (`deck.splice` + `handZugangSync`) läuft an den Primitiven vorbei, die die Sperre lesen (`actionAddCardFromDeckToHand` u. a.), und der Lader erkennt keines seiner Muster → kein `blockedBySearchLock`.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/35-mass-multiplication-ignoriert-such-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `mass-multiplication.js` ~Z. 209–225; Abhilfe `blockedBySearchLock: true` (Bauform ①) plus `searchBlocked`-Prüfung in der Add-Schleife (die Sperre kann mitten in der Auflösung fallen).
+
+### A01-pollution-36 · Deck-Suchen mit Ergebnis aufs Brett (Doom Prophecy, Living Illusion, Soul Shard Ka) laufen unter der Such-Sperre – Regelfrage · Stufe C
+- **Karten:** Doom Prophecy, Living Illusion, Soul Shard Ka (über Thep); Vergleich Masterpiece, Deepsea Witch, Snake Race Boat (prüfen die Sperre)
+- **Voraussetzungen / Aufbau:** je Karte `ps.searchLocked = true` (wie Cats); Doom Prophecy (Decay Magic 3, Uhr im Deck), Living Illusion (Summoning Magic 3, Royal Corgi im Deck), Thep → Ka (Royal Corgi im Deck).
+- **Schritte:** 1. Karte spielen bzw. `t.activateHero(0, 0)`. 2. Brett/Area lesen.
+- **Erwartet** (Quelle: Cats „you cannot **search** or add cards to your hand“; Engine-Kommentar `_engine.js` ~10637: `searchLocked` sperrt „Deck-Suche und Adds“; Such-Template: „alle Such-Effekte“): wörtlich darf auch eine Suche, deren Ergebnis aufs Brett geht, nicht stattfinden – Doom Prophecy und Living Illusion unspielbar (Bauform ①), Ka bietet seine Suche nicht an (Bauform ④: Suchschritt überspringen).
+- **Beobachtet:** Alle drei durchsuchen das Deck: Doom Clock liegt in der Area, die Corgi auf dem Brett (Living Illusion: samt Tokens), Ka beschwört die gewählte Kreatur. Der Lader markiert nur To-Hand-Wege als Suche, und die Skripte rufen `searchBlocked` nicht.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/36-deck-suche-aufs-brett-ignoriert-such-sperre.js` (✗ = Suche läuft unter der Sperre)
+- **Vermutete Ursache:** fehlende `blockedBySearchLock`/`searchBlocked`-Behandlung in `doom-prophecy.js`, `living-illusion.js`, `soul-shard-ka.js`; im Lader fehlt ein Muster für „Suche → Brett/Area“.
+- **Frage an Al:** Soll die Such-Sperre (Cats of the Pharaoh, Siege) auch Deck-Suchen sperren, deren Ergebnis **aufs Brett** statt in die Hand geht – ja / nur Suchen-in-die-Hand?
+
+### A01-pollution-37 · Spontaneous Reappearance ist unter der Hand-Sperre spielbar und verpufft · Stufe B
+- **Karten:** Spontaneous Reappearance (`spontaneous-reappearance.js`); Vergleich Mass Multiplication (`blockedByHandLock: true`); Klasse „Sperren-Auto-Erkennung“ (B-querschnitt)
+- **Voraussetzungen / Aufbau:** Sitz 0: Spontaneous Reappearance auf der Hand, Ablage [Fireball, Heal], `ps.handLocked = true`; „alle Karten wählen“.
+- **Schritte:** 1. `t.play(0, 'Spontaneous Reappearance')`. 2. Hand, Ablage, Tokens lesen.
+- **Erwartet** (Quelle: Hand-Sperre sperrt „ALLES: Draws UND Suchen/Tutoren/Adds“, `_engine.js` ~10626; Regel `_engine.js` ~20961: Karten mit `blockedByHandLock` sind unter der Sperre nicht spielbar; Kartentext „add them to your hand“ ist der ganze Inhalt der Karte): nicht spielbar, die Karte bleibt auf der Hand.
+- **Beobachtet:** `doPlaySpell` → `true`, die Galerie wird gezeigt, die gewählten Karten bleiben in der Ablage (Add gesperrt, 0 Tokens), die Karte liegt in der Ablage – Karte und Aktion verloren. Die Karte trägt nur `blockedBySearchLockDiscard`, und `searchLockLevel` leitet die Stufe nicht aus `handLocked` ab; ein `blockedByHandLock` (wie bei Mass Multiplication) fehlt, und der Lader tagt Spells nicht selbst (`_loader.js` ~420).
+- **Repro:** `docs/niche-tests/repro/A01-pollution/37-spontaneous-reappearance-unter-hand-sperre-spielbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `spontaneous-reappearance.js` ohne `blockedByHandLock: true`. Unter `drawLocked` (Sacred Jewel) und `searchLocked` funktioniert die Karte richtig (Add läuft, Tokens kommen).
+
+### A01-pollution-38 · 20. Doom Counter und tödlicher Archer-Schuss im selben Ereignis: der Schuss entscheidet, der Counter-Leger gewinnt · Stufe C
+- **Karten:** Doom Clock (`_doom-clock-shared.js` `placeCounter`), Archer of Teocuilatl (auch Swift Eagle Warrior als Counter-Leger)
+- **Voraussetzungen / Aufbau:** Sitz 0: Doom Clock mit 19 Countern, Archer auf dem Brett; Sitz 1: nur noch Held 0 (40 HP) am Leben. Zugende von Sitz 0 legt den 20. Counter (Zugspieler).
+- **Schritte:** 1. `t.endTurn()`. 2. Reihenfolge der `onGameOver`-Aufrufe mitschneiden.
+- **Erwartet** (Quelle: Doom Clock „The player that places the 20th Doom Counter onto this card **loses the game**“; Archer „**Whenever** a Doom Counter is placed …, you may choose a target and deal 50 damage“): unklar – plausibel ist, dass der Verlust mit dem Platzieren des 20. Counters sofort eintritt und kein Auslöser mehr dazu kommt (Sitz 0 verliert); die Gegenlesart: beides geschieht im selben Ereignis (Gleichstand – die README nennt für gleichzeitiges Spielende die Regel „draw → you win“).
+- **Beobachtet:** Reihenfolge der Aufrufe: `all_heroes_dead` (Sieger Sitz 0), danach `doom_clock` (Sieger Sitz 1). Der echte Server (`endGame`, `server.js` ~6295: `if (gs.result) return`) wertet nur den ersten – der Spieler, der den 20. Counter legt, **gewinnt** durch den Archer-Schuss. Ursache: `placeCounter` ruft zuerst `onDoomCounterPlaced` und prüft erst danach `DOOM_LIMIT`. (Die Harness hält in `engine.over` den letzten Aufruf – dort sähe es nach Niederlage aus.)
+- **Repro:** `docs/niche-tests/repro/A01-pollution/38-20-counter-und-archer-schuss-gleichzeitig.js` (✗ = Schuss kommt vor dem Doom-Clock-Verlust)
+- **Vermutete Ursache:** `cards/effects/_doom-clock-shared.js` `placeCounter` (Hook-Aufruf vor dem Test auf `DOOM_LIMIT`).
+- **Frage an Al:** Löst der Archer-Schuss auf den 20. Counter noch aus (dann gewinnt der Counter-Leger, wenn der Schuss den letzten Helden tötet) oder verliert er sofort – „Uhr verliert zuerst“ / „Schuss darf noch“?
+
 ## Abdeckung
-(wird ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Acid Rain | L2 gezielt | Auslöser nur für Zugspieler ✓, Wahl Löschen/Token ✓ (Code: nur eine Option legal → automatisch), Replay aus Gelöscht-Stapel zählt ✗(→ -24), Selbst-Wirken/Reality-Crack-Auslassung ✓ |
+| Anti Magic Enchantment | L2 gezielt | Angebot beim Ausrüsten + Token ✓, 1×/Zug-Ladung ✓, schützt vor Fireball/Pyroblast/Eraser Beam ✓; Status-Zauber ✗(→ -31) |
+| Archer of Teocuilatl | L2 gezielt | Opfer-Kosten (auch gestohlene Kreatur → Ablage des Besitzers ✓), +4 Gold ✓, Schuss je Counter nur im eigenen Zug ✓, 2 Archer × 3 Counter ✓, 20. Counter ✗(→ -38), Golden-Wings-Kreatur als Opfer ✗(→ -25) |
+| Basketskull | L2 gezielt | Mengenwahl 3/5 ✓, Zielwahl-Abbruch (Kosten bezahlt) ✓, Abbruch der Mengenwahl ✗(→ -23), Negation ✗(→ -17), Spiegel-Kopie (→ -15/-16) |
+| Cold Coffin | L2 gezielt | Kosten bei Negation ✓, Warrior-Schutz ✗(→ -09), Spiegel (→ -15/-16), AME ✗(→ -31) |
+| Dante, the Wanderer of Hell | L2 gezielt | Weg 1 (Level 3, Deck 1 Karte, Löschzahl Level−1) ✓, Weg 2 + Vorbedingung (Ruling) ✓, 1×/Zug ✓, gefroren gesperrt ✓, Circle-Replay (→ -24, -32) |
+| Doom Clock | L2 gezielt | Zugende-Counter beider Seiten ✓, 4-mal-Grenze ✗(→ -05), Held besiegt ✗(→ -06), 20. Counter ✗(→ -38), Basketskull/Archer/Eagle/Jaguar-Zusammenspiel ✓ |
+| Doom Prophecy | L2 gezielt | Uhr eigene Area ✓, Gegner-Area ✗(→ -07, -08), Area-Limit ✗(→ -13), Suchsperre (→ -36) |
+| Eraser Beam | L2 gezielt | Kosten vor der Kette ✓, Limit nach Negation ✗(→ -14), Spiegel (→ -16), AME schützt ✓, „einziger Zauber“ gegen früheren Zauber ✓ / gegen Circle-Replay ✗(→ -32) |
+| Ferocious Jaguar Warrior | L2 gezielt | Zusatzaktion nur mit Counter ✓ (Counter wird auch bei freier Aktion bezahlt – Design: Entfernen ist ein Vorteil), Schuss bei Opfer (eigene und gestohlene Opfer, gestohlener Jaguar) ✓ |
+| Golden Wings | L2 gezielt | Immunität quellenblind ✗(→ -25), Kosten bei Negation (→ -17), Sun Beam/Warrior-Zusammenspiel (→ -26) |
+| Goldify | L2 gezielt | Gold/Zusatzaktion Lv ≤ 1 ✓, Schutz ✗(→ -26), Negation ✗(→ -17) |
+| Guardian of Teocuilatl | L2 gezielt | Angebot für eigene Area ✓ (Hand und Brett), fremde Area ✗(→ -10, Regelfrage) |
+| Living Illusion | L2 gezielt | Zusatzaktion/Token ✓, Summon-Sperre ✗(→ -27), Suchsperre (→ -36) |
+| Magic Mirror | L2 gezielt | Negation + Kopie ✓, Kopie landet in Ablage ✗(→ -15), Kosten/Limit ✗(→ -16) |
+| Mana Beacon | L2 gezielt | Handwahl/Token-Wahl ✓, Abbruch ✓, Zusatzaktion für alle 16 Token-Zauber (`placesPollutionTokens` vollständig) ✓, Eraser Beam als Folgezauber nicht anbietbar ✓ |
+| Mass Multiplication | L2 gezielt | Abbruch ✗(→ -03), Circle-Löschung/Replay ✓, Hand-Sperre ✓ (Flag), Such-Sperre ✗(→ -35) |
+| Medusa's Curse | L2 gezielt | Betäubung nur unversehrter Ziele ✓, Kontrolle statt Seite (gestohlene Kreatur beider Seiten) ✓, Warrior ✗(→ -09), AME ✗(→ -31) |
+| Null Zone | L2 gezielt | Dauer ✗(→ -18), vorab negierte Kreatur ✗(→ -19), Kosten bei Negation (→ -17), Tokens bleiben unberührt ✓ |
+| Pollution Piranha | L2 gezielt | Voll belegtes Brett ✗(→ -20), Abgangseffekt gestohlen/versetzt ✗(→ -33), Biss/Spewer-Auslösung ✓ |
+| Pollution Spewer | L2 gezielt | Auslösung durch Piranha/Victorica/Beacon ✓, Ablehnen erhält Stempel ✓, gestohlener Spewer für den Kontrolleur ✓, Stempel nach Position ✗(→ -30) |
+| Pyroblast | L2 gezielt | Zugstempel nach dem Ausspielen ✗(→ -04), Mehrziel-Tokens ✓, Fifth-Circle-Verdopplung ✗(→ -21) |
+| Rain of Death | L2 gezielt | Token-Rechnung ✗(→ -02), Starthelden-Abilities bleiben ✓ |
+| Reality Crack | L2 gezielt | Alle Areas ablegen ✓, Limit-Fall ✗(→ -12), Circle-Zusammenspiel ✓, Area-Sperre durch Circle-Replay ✗(→ -32) |
+| Reincarnation | L2 gezielt | Held beleben/Kreatur platzieren ✓, Einmal-pro-Spiel ✗(→ -28, Regelfrage), Kosten bei Negation ✗(→ -17), Summon-Sperre ✗(→ -27) |
+| Royal Corgi | L2 gezielt | Handlimit +3 ✓ (eigene), gestohlen ✗(→ -29), Zähler `handLimitReduction` auch bei Onplay-Aufbau ✓ |
+| Soul Shard Ba | L2 gezielt | Zweite Aktion nach Thep/Necromancy ✓ (genau eine zusätzliche), Sperre 1/Zug ✓, Sah-Stempel ✗(→ -11), gestohlen/Schutz (→ -09/-26) |
+| Soul Shard Ib | L2 gezielt | Heilung 40 × verschiedene Kreaturen (3 → +120) ✓ |
+| Soul Shard Ka | L2 gezielt | Suche + Beschwörung ✓, Negation erst nach Einsatz-Effekt ✗(→ -22), Suchsperre (→ -36) |
+| Soul Shard Khet | L2 gezielt | Kette Khet → Sekhem/Ba ✓, Piranha mit/ohne Token ✓ |
+| Soul Shard Ren | L2 gezielt | Hand-/Ablage-Zweig ✓, Hand-Option fällt bei Sperre weg (Code) ✓, Deck-Rest ✓ |
+| Soul Shard Sah | L2 gezielt | Nachgespielte Effekte (2 verschiedene) ✓, Stempel fremder Shards ✗(→ -11) |
+| Soul Shard Sekhem | L2 gezielt | 50 × verschiedene Shards (beide Seiten gezählt, ≥ 1) ✓, Sperre 1/Zug (→ -11) |
+| Soul Shard Shut | L2 gezielt | 5 Karten Mill, Deck 2 / Deck 7 ✓ |
+| Spontaneous Reappearance | L2 gezielt | Zug-Ende ✗(→ -01), Hand-Sperre ✗(→ -37), Token-Hälfte aufgerundet ✓ |
+| Sun Beam | L2 gezielt | Ziel-Schutz/Warrior ✓ (Token trotzdem – Lesart), Erst-Runden-Schutz-Auswahl ✓, ID-Kollision ✗(→ -34) |
+| Swift Eagle Warrior | L2 gezielt | Zusatzbeschwörung 1/Zug (zweite abgelehnt) ✓, Zugende-Counter beider Seiten → Ziehen ✓, negiert → kein Ziehen ✓, Hand-/Zieh-Sperre ✓ |
+| The Eighth Circle of Hell | L2 gezielt | Löschen und Ziehen beider Richtungen ✓ (Besitzer/Gegner), Zieher mit zu kleinem Deck, einmalige Area ✓, Handlimit des Gegners ✓ |
+| The Fifth Circle of Hell | L2 gezielt | Verdopplung ✗(→ -21), Replay ✓, Replay nach Eraser Beam/Reality Crack ✗(→ -32) |
+| The First Circle of Hell | L2 gezielt | Ablage ungerade → löschen, Gelöscht gerade → zurück, 0 = Nichts, über 3 Zugwechsel ✓ |
+| The Fourth Circle of Hell | L2 gezielt | Gold = Gelöschte ✓, doppelt in Ablage ✗(→ -12), Replay-Kette (→ -24) |
+| The Great Clock Tower "Big Gwen" | L2 gezielt | Sofort-Löschung ausgesetzt, Zugende-Abwurf bleibt ✓ (Ruling), Wegfall prüft nach ✓ |
+| The Second Circle of Hell | L2 gezielt | Wahl aus Gelöscht-Stapel ✓, Reality-Crack-Kette ✓ |
+| The Seventh Circle of Hell | L2 gezielt | Zugende-Treffer für den Zugspieler ✓; Sammler `getCreatureTargets` (Brettspalte, Wurzel F02-14) bestätigt, kein neuer Befund; Abgangs-Treffer ✓ |
+| The Sixth Circle of Hell | L2 gezielt | Heldenübernahme bei Abgang ✓, „unaffected by your other cards“ (Fireball kann ihn nicht wählen) ✓, Rückgabe am Zugende ✓ |
+| The Third Circle of Hell | L2 gezielt | Deck zeigen, Area-Zauber spielen, Rest löschen, Zahlen ✓; Area-Sperre nach Reality Crack ✗(→ -32), Kartenbilanz ✓ |
+| Thep, the Court Scribe | L2 gezielt | Platzieren aus Ablage (Ba/Khet/Ka/Ib/Ren/Shut/Sekhem) ✓, „nicht diesen Zug abgelegt“ (Namensmenge, Doku-Näherung) ✓, Summon-Sperre ✗(→ -27) |
+| Victorica, the Eternal Empress | L2 gezielt | nur alte Tokens ✓, frischer Token nicht ✓, 1×/Zug ✓, gefroren gesperrt ✓, Spewer-Auslösung ✓ |
+| Warrior of Teocuilatl | L2 gezielt | Schutz vor Goldify/Eraser Beam/Sun Beam ✓ (Uhr −1), vor Status ✗(→ -09) |
+
+## Prüfaufträge
+* **Zielsammler Brettspalte / „Besitzer ODER Kontrolleur“ (F02-14, S01-09):** The Seventh Circle (Zugende-Zweig, `getHeroTargets(tp) + getCreatureTargets(tp)`) zeigt die Wurzel: die vom Zugspieler kontrollierte, gestohlene Kreatur fehlt in seiner Liste, dafür steht sie in der Liste des Besitzers (Messung A01_76: Zugende Sitz 0 bietet nur 000, Sitz 1 bietet 100 und die Beute 110) – gleiche Ursache wie F02-14, kein neuer Befund. Eigene, davon unabhängige Stellen: Sun Beam (-34, ID nach Besitzer), Royal Corgi (-29), Pollution Spewer (-30), Pollution Piranha (-33). Medusa's Curse, Golden Wings (Kontrolle) und die Shard-Sammler (`distinctSoulShardsOnBoard`) lesen den Kontrolleur richtig.
+* **`physicalSide()` für geliehene Kreaturen:** `removePollutionTokens`/Piranha-Zonenwahl verwenden `physicalSide(inst)` nur für Zonenanzeige von Tokens (Tokens werden nie gestohlen); Medusa nur für die Animation. Wirkung nicht berührt; kein Befund.
+* **`counters.currentHp ?? 0` (C05-01):** kein Skript der Gruppe liest `currentHp`; die 50er-Treffer von Piranha/Jaguar/Archer/Spewer auf unversehrte Kreaturen (ZZ Dummy) funktionieren (Messung 150/100 HP).
+* **`negatedDuration` (H03-15):** Null Zone und Ka setzen `expiresAtTurn` statt `negatedDuration`; Wirkung dort gemessen (-18, -19, -22).
+* **Zugende-Räumung `negated` (C05-02):** keine Karte der Gruppe legt `negated` auf einen Helden; die Kreaturen-Negation von Null Zone überlebt den ersten Zugwechsel (Zug 6 negiert), fällt aber wie in -18 zu früh.
+* **Zweite Kopie nach Negierung (F01-19, A01-04/-14):** Pyroblast (-04) und Eraser Beam (-14) zeigen die Klasse; Reality Crack (Area-Sperre) und Reincarnation (Heldenflag) stempeln erst bei Auflösung, ein negierter Zauber lässt sie frei – gleiche Lesart, nicht eigens gemeldet.
+* **Handlimit/Pollution-Token mit gestohlenen Kreaturen:** Royal Corgi (-29) trifft den Besitzer; Tokens werden nicht gestohlen; Medusa/Null Zone betreffen Tokens nicht (Messung: Token bleibt aktiv).
 
 ## Getestet & in Ordnung (Auswahl)
-(wird ergänzt)
+* Doom-Counter-Kosten der Archetyp-Kreaturen: Jaguar (Picker bei zwei Uhren, Abbruch lässt die Karte in der Hand), Eagle (1 Zusatzbeschwörung je Zug und Spieler, Counter-Platzieren je Instanz, Ziehen je Instanz und Zug, negiert = kein Ziehen).
+* Archer: Opfer-Kosten mit gestohlener Kreatur geht in die Ablage des Besitzers; Gold +4; Schuss je Counter nur im eigenen Zug; Doom Prophecy mit 2 Archer löst 6 Schüsse aus.
+* Soul Shards: Necromancy-Bypass, 1/Zug je Name, Thep-Platzierung mit „nicht heute abgelegt“, Ba-Zweitaktion (genau eine), Khet → Sekhem-Kette, Ib-Heilung 40 × verschiedene Kreaturen (+120), Ren Hand/Ablage, Shut Mill 5 (auch mit 2 Karten Deck).
+* Hell Circles: First Circle über 3 Zugwechsel (ungerade → löschen, gerade → zurück), Eighth Circle beide Richtungen und Zieher mit zu kleinem Deck, Sixth Circle (Übernahme, „unaffected by your other cards“, Rückgabe), Third Circle (Aufdecken, Area spielen, Rest löschen), Dante beide Wege, Big Gwen (Rundenende-Abwurf bleibt).
+* Medusa's Curse betäubt nach Kontrolle (beide gestohlenen Richtungen richtig); Pollution Tokens werden von Null Zone/Medusa nicht beeinflusst.
+* Warrior of Teocuilatl schützt vor Goldify, Eraser Beam, Sun Beam (Uhr −1); AME schützt vor Fireball/Pyroblast/Eraser Beam (1×/Zug).
+* Reality Crack danach Circle-Replay vor Eraser Beam: die Sperre „nur ein Zauber“ greift in dieser Reihenfolge richtig.
