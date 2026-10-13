@@ -2916,6 +2916,9 @@ class GameEngine {
         istAktion: (info) => this._bleedTriggersForAction(info),
       });
     }
+    // ★ Z2 (A03-02): die Aktion ist aufgeloest → Effekt-Immunitaeten DIESER Aufloesung enden, noch vor Zuhoerern und Bleed
+    // (deren Schaden ist ein eigener Effekt).
+    if (hookName === 'onAnyActionResolved' && !((this.gs?._spellResolutionDepth || 0) > 0)) this.endeEffektImmunitaeten();
     const result = await this._runHooksImpl(hookName, hookCtx);
     // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
     // einziger zentraler Punkt fuer alle Action-Pfade (Spell/Attack,
@@ -8054,6 +8057,22 @@ class GameEngine {
     //   Zielfensters, der Schutz gilt also genau fuer die laufende
     //   Aufloesung — das war schon vorher der eigentliche Riegel.
     return liste.some(e => e.owner === playerIdx && e.heroIdx === heroIdx);
+  }
+
+  /**
+   * ★ Z2 (A03-02): Ende der Aufloesung — Effekt-Immunitaeten (Helden UND
+   * Kreaturen, gleiche Liste) gelten „fuer diese Aufloesung" und enden
+   * mit ihr, nicht erst am naechsten Zielfenster oder Zugbeginn
+   * (sonst schluckten sie fremden Schaden desselben Zuges: Bomb Mite,
+   * Passiv-Trigger, naechste Karte ohne Zielfenster). Gerufen vom
+   * Aktions-Ende (`onAnyActionResolved`, nur auf oberster Ebene — eine
+   * verschachtelte Sofort-Aktion beendet nicht die Aufloesung der
+   * aeusseren), vom Abbruch des Zaubers (server.js) und beim Betreten
+   * der End-Phase. Die bisherigen Leerungen (Zielfenster, Zugbeginn)
+   * bleiben als Sicherung.
+   */
+  endeEffektImmunitaeten() {
+    if (this.gs?._effectImmunities?.length) this.gs._effectImmunities.length = 0;
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -17974,12 +17993,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
+    // ★ Z2 (A04-28, A09-21, M01-21): der Zaehler (`negated` …) gehoert allen Buffs, die ihn in `clearCountersOnExpire`
+    // fuehren — laeuft der KUERZERE ab, darf er den Zaehler nicht abraeumen, solange ein ANDERER Buff ihn noch haelt
+    // (z. B. Diplomacys „Rest des Zuges" gegen Forbidden Zones 6 Zuege). Der letzte Halter raeumt ab.
+    delete inst.counters.buffs[buffName];
     if (buffData.clearCountersOnExpire) {
+      const andereHalter = new Set();
+      for (const b of Object.values(inst.counters.buffs)) {
+        for (const k of (b?.clearCountersOnExpire || [])) andereHalter.add(k);
+      }
       for (const key of buffData.clearCountersOnExpire) {
+        if (andereHalter.has(key)) continue;
         delete inst.counters[key];
       }
     }
-    delete inst.counters.buffs[buffName];
     this.log('buff_remove', { creature: inst.name, buff: buffName });
     if (buffData.removeAnim || opts.removeAnim) {
       this._broadcastEvent('play_zone_animation', { type: opts.removeAnim || buffData.removeAnim, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
@@ -18083,7 +18110,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // buff clears `cc_immune` at the start of the bearer's
         // controller's next turn (parity with hero `immune`'s
         // start-of-turn cleanup).
-        if (grantsCcImmune && inst.zone === ZONES.SUPPORT) {
+        // ★ Z2: haelt ein anderer Negierungs-Buff den Zaehler noch, ist die Kreatur NICHT frei geworden → keine Immunitaet.
+        const negiertNoch = !!buffData.clearCountersOnExpire?.length && !!inst.counters?.[buffData.clearCountersOnExpire[0]];
+        if (grantsCcImmune && !negiertNoch && inst.zone === ZONES.SUPPORT) {
           inst.counters.cc_immune = 1;
           if (!inst.counters.buffs) inst.counters.buffs = {};
           const ctrl = inst.controller ?? inst.owner;
@@ -18112,6 +18141,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
           await this.removeHeroStatus(pi, hi, statusName);
+          if (statusName === 'negated') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: pi, onlyHero: hi });   // Z2 (A08-20), s. processStatusExpiry
           expired = true;
         }
       }
@@ -18830,6 +18860,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
     if (!this.isChoosableAsCreature(inst, cd)) return null;
+    // ★ Z2 (C05-03): „unaffected by all other cards and effects" (Stowaway, Cardinal Beasts, Golden Wings) — die
+    // Aura-Negation ist ein fremder Karteneffekt wie jede andere Negation (`actionNegateCreature` bricht hier
+    // ebenfalls ab); der Spezialtext gewinnt gegen den allgemeinen. Sonst bliebe z. B. Stowaways `onHeroKO` stumm.
+    if (inst.counters?._cardinalImmune) return null;
     const seite = inst.controller ?? inst.owner;
     const nach = gs._creatureEffectsNegated;
     if (nach && nach.turn === (gs.turn || 0)) {
@@ -22966,6 +23000,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // path will clear the flags as the player responds.
         await this._waitForPromptsToClear();
         // Automatic phase — process status expiry, hooks, then switch turn
+        this.endeEffektImmunitaeten();   // Z2 (A03-02): keine Immunitaet einer frueheren Aufloesung in die Zugende-Effekte tragen
         await this.processStatusExpiry('END');
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._flushSurpriseDrawChecks();
@@ -23722,6 +23757,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         this.sync();
         await this._delay(1700);
+        // ★ Z2 (A07-02): Fristen, die auf den ZUGBEGINN des uebersprungenen Spielers fallen („this turn" des Gegners:
+        // Niu, Cloudy …), sind mit dem Ueberspringen faellig — `startTurn()` laeuft fuer diesen Zug nie, und die Frist
+        // (`expiresAtTurn === gs.turn`) traefe spaeter keinen Zug mehr: der Buff stuende auf unbestimmte Zeit.
+        // Kein Statusschaden (Zhu: der Zug findet nicht statt), nur der Buff-Ablauf.
+        if (!this.gs.result) {
+          await this._processBuffExpiry({ beforeStatusDamage: true });
+          await this._processBuffExpiry({ beforeStatusDamage: false });
+        }
         // Advance straight to End Phase, then switchTurn back. The
         // standard switchTurn handles the start-of-turn ticks for
         // the OTHER player on the recursive call.
@@ -45231,8 +45274,16 @@ this._deathWatch = (this._deathWatchStack || []).length
         // jede Runde ab und wurde erst zur naechsten Phase wieder
         // aufgelegt — mit falschem Tooltip und einem Fenster
         // dazwischen. Marke: `sourceBound` am Status.
-        if (hero.statuses.negated && !hero.statuses.negated.sourceBound) {
+        // ★ Z2 (C05-02/-03): ebenso ANHAENGSEL-Negierung (Decisive Defeat, Stowaway: `_fromAttachment` /
+        //   `permanent`) — sie lebt genau so lange wie die Karte (CARD_API: „Lasts as long as … remains
+        //   attached"); die Karte nimmt sie selbst zurueck (Austritt, Heilen).
+        if (hero.statuses.negated && !hero.statuses.negated.sourceBound
+            && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
           await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
+          // ★ Z2 (A08-20): lag eine FREMDE Negation auf dem Helden, hielt die Kristall-Anlage still (sie
+          // ueberschreibt Fremdes nicht); laeuft die Fremde ab, gilt der Kristall in der Hand wieder SOFORT
+          // (nur dieser Held — eine Heilung bleibt bis zum naechsten Rundenbeginn, Ruling v1103).
+          this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: ap, onlyHero: hi });
         }
         // Bound: same default semantics as stunned/frozen — clears at
         // end of the active player's turn unless the source applied an

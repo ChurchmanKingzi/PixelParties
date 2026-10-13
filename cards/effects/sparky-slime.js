@@ -63,10 +63,15 @@ module.exports = {
           // Animation plays unconditionally so the player sees the
           // strike land even when the status fizzles on an immune target.
           engine._broadcastEvent('play_zone_animation', { type: 'electric_strike', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx });
-          await engine.applyCreatureStatus(inst, 'negated', {
-            sourceOwner: ctx.cardOwner,
-            source: 'Sparky Slime',
-          });
+          // ★ Z2 (H03-15): „… until your next turn" — `applyCreatureStatus('negated')` legt keine Frist an (der Zaehler
+          // `negatedDuration` hat keinen Leser), die Negierung blieb ewig. Wie Null/Locke ueber den Ablauf-Buff:
+          // endet zu Beginn des naechsten eigenen Zuges; „counts as a negative status effect" → heilbar.
+          if (engine.canApplyCreatureStatus(inst, 'negated', { name: 'Sparky Slime', owner: ctx.cardOwner })) {
+            await engine.actionNegateCreature(inst, 'Sparky Slime', {
+              expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner,
+              buffKey: 'sparky_slime_negated', cleansable: true,
+            });
+          }
         }
       }
       engine.log('negate', { target: target.cardName, by: 'Sparky Slime', type: target.type });
