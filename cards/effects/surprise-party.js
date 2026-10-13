@@ -103,7 +103,9 @@ module.exports = {
         // Erst aus dem Deck nehmen, dann zeigen: waehrend des Fluges
         // soll der Deckzaehler schon stimmen.
         // v1397: Entnahme über die Stapel-Schicht (Deckkopf-Sicht inklusive).
-        engine.takeFromPileSync(ps, 'deck', 0, { source: 'Surprise Party' });
+        // Gesperrtes Deck (Knight of Kings [B] …): nichts entnommen ⇒ abbrechen, sonst liest die Schleife
+        // immer wieder dieselbe Oberkarte und legt sie 200-fach zurueck bzw. dupliziert die Creature (S03-20).
+        if (!engine.takeFromPileSync(ps, 'deck', 0, { source: 'Surprise Party' })) break;
         engine.sync();
 
         if (!passt) {
