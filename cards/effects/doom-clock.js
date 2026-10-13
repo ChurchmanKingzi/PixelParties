@@ -67,9 +67,10 @@ module.exports = {
     },
 
     /**
-     * Besiegungen. `onTargetsDefeated` liefert die in EINEM Ereignis
-     * besiegten Ziele; die ersten vier solcher Ereignisse pro Zug
-     * legen je einen Counter auf jede Uhr.
+     * Besiegungen. `onCreaturesDefeated` (Sammel-Hook, CARD_API „One or
+     * more of your Creatures are defeated") liefert die in EINEM
+     * Vorgang besiegten Ziele EINMAL; die ersten vier solcher Ereignisse
+     * pro Zug legen je einen Counter auf jede Uhr.
      *
      * "their controller" = der Kontrolleur der besiegten Ziele. Fallen
      * Ziele BEIDER Spieler in einem Ereignis, ist es laut Ruling
@@ -77,29 +78,31 @@ module.exports = {
      * der die meisten Ziele verloren hat; bei Gleichstand der
      * Zugspieler.
      */
-    onCreatureDeath: async (ctx) => {
+    onCreaturesDefeated: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const uhren = D.getDoomClocks(engine);
       if (uhren[0]?.id !== ctx.card?.id) return;   // nur einmal je Ereignis
 
-      // EIN Ereignis = EINE Ausloesung, auch wenn mehrere Ziele
-      // gleichzeitig fallen (Als Ruling). `onCreatureDeath` feuert aber
-      // je Creature. Deshalb ein Riegel fuer den laufenden synchronen
-      // Block: alle Tode desselben Stapels zaehlen einmal, der Riegel
-      // faellt im naechsten Tick von selbst.
-      if (gs._doomDefeatTick) return;
-      gs._doomDefeatTick = true;
-      Promise.resolve().then(() => { delete gs._doomDefeatTick; });
+      const defeated = ctx.defeated || [];
+      if (defeated.length === 0) return;
 
       const bisher = gs._doomDefeatTriggers || 0;
       if (bisher >= D.DEFEAT_TRIGGERS_PER_TURN) return;
       gs._doomDefeatTriggers = bisher + 1;
 
-      // "their controller" = wer das besiegte Ziel kontrollierte.
-      const verlierer = ctx.creature?.controller
-        ?? ctx.creature?.owner
-        ?? gs.activePlayer;
+      // "their controller" = wer die besiegten Ziele kontrollierte; bei
+      // Verlusten beider Seiten die meisten, bei Gleichstand der Zugspieler.
+      const verluste = {};
+      for (const d of defeated) {
+        const k = d.controller ?? d.owner ?? gs.activePlayer;
+        verluste[k] = (verluste[k] || 0) + 1;
+      }
+      let verlierer = gs.activePlayer;
+      let meiste = verluste[verlierer] || 0;
+      for (const k of Object.keys(verluste)) {
+        if (verluste[k] > meiste) { verlierer = Number(k); meiste = verluste[k]; }
+      }
 
       for (const uhr of uhren) {
         const ende = await D.placeCounter(engine, uhr, verlierer, {

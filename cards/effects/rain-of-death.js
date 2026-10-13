@@ -6,11 +6,13 @@
 //  Deletes every non-Starting Ability on the board.
 //  Then places 1 Pollution Token into the caster's
 //  free Support Zones for every OPPONENT Ability
-//  that was removed.
+//  that was removed IN EXCESS OF the number of the
+//  caster's own removed Abilities
+//  (Tokens = max(0, gegnerisch - eigen entfernt)).
 //
-//  Spell is unplayable if the opponent has more
-//  Abilities that would be removed than the caster
-//  has free Support Zones to place the resulting
+//  Spell is unplayable if the excess of removed
+//  opponent Abilities is larger than the caster's
+//  free Support Zones to place the resulting
 //  Pollution Tokens into.
 //
 //  "Starting Ability" definition:
@@ -119,16 +121,18 @@ module.exports = {
 
   placesPollutionTokens: true,
 
-  // Block the cast if the opponent would lose more Abilities than the caster
-  // has free Support Zones to hold the resulting Pollution Tokens. Anything
+  // Block the cast if the EXCESS of the opponent's lost Abilities over the
+  // caster's own lost Abilities is larger than the caster's free Support
+  // Zones (Platz fuer die entstehenden Pollution Tokens). Anything
   // else is allowed (including "no removable abilities anywhere" — that just
   // fizzles at runtime, which is a valid outcome for a board-wipe effect).
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true; // Can't compute without engine; permissive fallback.
     const oppIdx = opponentOfGs(gs, pi);
     const oppRemovable = collectRemovableAbilities(engine, oppIdx);
-    if (oppRemovable.length === 0) return true;
-    return oppRemovable.length <= countFreeZones(gs, pi);
+    const excess = oppRemovable.length - collectRemovableAbilities(engine, pi).length;
+    if (excess <= 0) return true;
+    return excess <= countFreeZones(gs, pi);
   },
 
   hooks: {
@@ -207,11 +211,13 @@ module.exports = {
       engine.sync();
       await engine._delay(300);
 
-      // ── Pollution Tokens: 1 per OPPONENT ability removed ──
+      // ── Pollution Tokens: 1 per OPPONENT ability removed IN EXCESS OF
+      // the caster's own removed abilities ──
       // spellPlayCondition guarantees we have enough free zones.
+      const excess = oppRemovable.length - myRemovable.length;
       let placed = 0;
-      if (oppRemovable.length > 0) {
-        const result = await placePollutionTokens(engine, pi, oppRemovable.length, 'Rain of Death', {
+      if (excess > 0) {
+        const result = await placePollutionTokens(engine, pi, excess, 'Rain of Death', {
           promptCtx: ctx,
         });
         placed = result.placed;

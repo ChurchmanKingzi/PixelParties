@@ -60,10 +60,11 @@ module.exports = {
       await placePollutionTokens(engine, pi, 2, 'Null Zone', { promptCtx: ctx });
 
       // ── Apply effects ──
-      // Expiry: "end of your next turn" = START of the controller's turn
-      // AFTER their next one (turn T + 2).
-      const expiresAtTurn = gs.turn + 2;
-      const expiresForPlayer = pi;
+      // Expiry: "end of your next turn" = Beginn des ersten Zuges NACH dem
+      // naechsten eigenen Zug (T + 3, Zug des Gegners) — wie Disruption Ray;
+      // der naechste eigene Zug (T + 2) steht noch voll unter Null Zone.
+      const expiresAtTurn = gs.turn + 3;
+      const expiresForPlayer = engine.opponentOf(pi);
 
       // Apply the Nulled status to every Creature on the board. We use
       // actionNegateCreature with statusKey='nulled' so the counter

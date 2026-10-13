@@ -15,8 +15,11 @@
 //  as "main-phase-playable without an additional
 //  action provider" and as "skip the heroActed
 //  bookkeeping that would end the Action Phase."
-//  No auto-end-turn: the player continues their
-//  turn normally after Reappearance resolves.
+//  "Immediately end your turn afterwards": nach dem
+//  Aufloesen setzt das Skript `gs._spellEndsTurn`
+//  (server.js beendet den Zug hinter der Aufloesung;
+//  Tuscan Prisoner schuetzt davor, Ruling 16.8.).
+//  Bei Abbruch endet der Zug nicht.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens } = require('./_pollution-shared');
@@ -128,6 +131,11 @@ module.exports = {
         returned: movedNames.length,
         tokensPlaced: tokenCount,
       });
+
+      // "Immediately end your turn afterwards." — server.js liest die
+      // Flagge nach der Aufloesung (advanceToPhase ist waehrend onPlay
+      // gesperrt), wie bei Tanuki Escape / Great Offensive.
+      gs._spellEndsTurn = true;
 
       engine.sync();
     },

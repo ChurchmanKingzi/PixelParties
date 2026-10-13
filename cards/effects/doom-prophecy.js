@@ -65,7 +65,17 @@ module.exports = {
 
       if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       const inst = engine._trackCard(D.CLOCK_NAME, ziel, 'deck');
+      // Als Befund (A01-pollution-07): `placeArea` liest den aufloesenden Zauber
+      // vom BESITZER der Area-Zone. Liegt die Uhr beim Gegner, ist dort keiner
+      // → die Engine stempelt `_spellPlacedOnBoard` ("der Zauber liegt selbst
+      // auf dem Brett") und Doom Prophecy kaeme nie in die Ablage. Die Uhr ist
+      // aber nicht der Zauber: den Stempel wie vorher belassen.
+      const placedVorher = gs._spellPlacedOnBoard;
       await engine.placeArea(ziel, inst);
+      if (ziel !== pi) {
+        if (placedVorher) gs._spellPlacedOnBoard = placedVorher;
+        else delete gs._spellPlacedOnBoard;
+      }
       engine.log('doom_prophecy_place', {
         player: ps.username,
         into: gs.players[ziel]?.username,
