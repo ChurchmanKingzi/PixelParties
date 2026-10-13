@@ -249,6 +249,22 @@ module.exports = {
       if (gs._bsMarks) delete gs._bsMarks;
       if (gs._bsPromptedFor) delete gs._bsPromptedFor;
     },
+    // Der Angebots-Merker lebt NUR für eine Auflösung. `onChainResolve` feuert nur aus der alten
+    // `_resolveChain` — lief danach keine Reaktionskette, blieb er stehen und das Schild wurde für den
+    // Rest der Partie nie wieder angeboten (F01-03). Gleiche Aufräumer wie bei Spectral Armor (v1378).
+    onAnyActionResolved: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._bsPromptedFor) delete gs._bsPromptedFor;
+    },
+    afterSpellResolved: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._bsPromptedFor) delete gs._bsPromptedFor;
+    },
+    onTurnStart: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._bsPromptedFor) delete gs._bsPromptedFor;
+      if (gs._bsMarks) delete gs._bsMarks;
+    },
   },
 };
 
