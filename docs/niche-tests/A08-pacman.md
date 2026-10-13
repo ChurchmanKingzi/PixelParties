@@ -212,6 +212,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Vermutete Ursache:** `canActivateAreaEffect` (~Z. 195) prüft nur `ps.handLocked`; der Aktivierungsweg `_engine.js activateAreaEffect` (~Z. 42208) und `getActivatableAreas` lesen keine Sperr-Marken (`blockedBySearchLock`, `blockedByPileLock` gelten nur an Hand-/Fähigkeits-/Held-Wegen, z. B. `_engine.js:40890`); `pflanzen()` wertet das `null` von `deckEntnahme` als „Kosten sind bezahlt". Restunsicherheit (daher B): ob „search" bei Cats auch die Suche meint, deren Fund auf das Brett statt auf die Hand geht.
 - **Zusatzbeobachtung (d), gleiche Wurzel:** Crystal Well (Area, „…add a card … to your opponent's hand to draw a card") bleibt unter der Zieh-Sperre (`ps.drawLocked`, Sacred Jewel) aktivierbar: die Karte wandert zum Gegner, gezogen wird nicht (Hand 2 → 1, Gegner 0 → 1). Das Zieh-Sperren-Muster der Engine (`blockedByDrawLock`, CARD_API „Zieh-Sperre") gilt nur an Hand-/Fähigkeitswegen. Im Repro als Teil (d).
 
+### A08-25 · Noble Mummy Guards löst beim Stapeln derselben Fähigkeit aus, obwohl keine „different Ability" existiert · Stufe B
+- **Karten:** Noble Mummy Guards (`noble-mummy-guards.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Noble Mummy Guards als Surprise an Held 0. Sitz 1 Held 0 trägt „Fighting" (Stufe 1) und legt ein zweites „Fighting" darauf. Vergleich: „Training" neben „Fighting".
+- **Erwartet** („Activate this Surprise when your opponent attaches an Ability to a Hero. Choose a different Ability attached to the same Hero…"; Skriptkopf: „…a Hero that already has 1+ OTHER Abilities"): Beim Stapeln gibt es keine andere Fähigkeit ⇒ keine Auslösung (die Surprise bleibt verdeckt). Der Vergleich löst aus und schickt Fighting zurück.
+- **Beobachtet:** Fighting auf Fighting ⇒ Bestätigungsfrage, die Surprise wird aufgedeckt und in eine Support Zone gesetzt; die Optionenliste ist leer (`return null`), nichts geht zurück. Der Vergleich (Training neben Fighting) ✓.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/25-noble-mummy-guards-loest-ohne-andere-faehigkeit-aus.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `surpriseTrigger` (~Z. 60-75) zählt den bereits bestehenden Stapel der neu angehängten Fähigkeit (`if (slot.length > 1) otherAbilityCount++`) als „andere Fähigkeit"; die Optionenliste in `onSurpriseActivate` (~Z. 150-160) überspringt denselben Slot richtig. Restunsicherheit (daher B): der gedruckte Auslöser nennt keine Mindestzahl anderer Fähigkeiten; nach wörtlicher Lesart löst die Surprise bei jedem Anhängen aus (das Skript schränkt bewusst ein, scheitert aber beim Stapeln).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

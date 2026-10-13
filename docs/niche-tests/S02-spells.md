@@ -172,6 +172,16 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/19-fire-bolts-zielwahl-nach-brettspalte.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` `promptDamageTarget` ~Z. 4880–4940: `addCreatures(opponentsOf(pi))` / `side: 'my'` laufen über die physische Spalte; vgl. S03-06.
 
+### S02-20 · Draw: die gerade gespielte Draw-Karte zählt als „abgeworfene Handkarte" (Cute Bunny, Archibald-Nachwurf) – bei Boris dagegen nicht · Stufe C
+- **Karten:** Draw (`draw.js`), Cute Bunny (`cute-bunny.js`), Archibald, the Archmage (`archibald-the-archmage.js`). Prüfauftrag R02-07 („aufgelöste Karte bleibt in `ps.hand`") auf diese Gruppe angewandt: Draw ist die einzige Karte der Gruppe, die „deine ganze Hand" abwirft.
+- **Voraussetzungen / Aufbau:** (a) Seed 1234, Zug 5; Cute Bunny im Support, Hand [Draw, 1 weitere Karte], Gegner ohne Karten, Decay Magic 1. (b) Held 0 = Archibald mit Decay Magic 2, Hand [Draw, 2 weitere], Gegner 2 Karten.
+- **Schritte:** 1. Draw spielen.
+- **Erwartet** (Kartentext „Both players discard their entire hands."; Lesart „die gespielte Karte hat die Hand schon verlassen", Boris-Zählung im Skript selbst `hand.length - 1 // Draw selbst liegt noch drin`): (a) nur EINE Karte wird abgeworfen ⇒ Cute Bunny („2 or more cards") zieht nicht (Hand danach 4); (b) Archibald bietet die gerade gespielte Draw nicht an.
+- **Beobachtet:** (a) `onForcedDiscardBatchEnd.countByPlayer[0] = 2` (Draw zählt mit) ⇒ Bunny zieht 1 (Hand 5); (b) `onDiscard` feuert für die Draw-Karte selbst, Archibald fragt „Draw was just discarded — cast it as an additional Action?"; bei Ja wird Draw verschachtelt ein zweites Mal gewirkt (Hand 10 statt 5, Gegner 8 statt 4). Kein Zustandsfehler (Kartenbilanz ✓, Draw liegt genau einmal in der Ablage).
+- **Repro:** `docs/niche-tests/repro/S02-spells/20-draw-zaehlt-sich-selbst-als-abgeworfene-handkarte.js` (✗ = die Lesart „zählt nicht" wird nicht erfüllt)
+- **Vermutete Ursache:** `draw.js` Z. 18–26 (Kopfkommentar: Draw „as part of your entire hand … is safe") + `dumpHandsTogether` Z. 56–95 wirft `me.hand[0]` bis die Hand leer ist, inklusive der auflösenden Draw (`getResolvingHandIndex → -1`); die Boris-Frage Z. ~113 zählt dagegen `hand.length - 1`.
+- **Frage an Al:** Soll die gerade gespielte Draw als abgeworfene Handkarte gelten (Bunny-Schwelle, Archibald-Nachwurf, wie jetzt) oder nicht? (zählt / zählt nicht)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

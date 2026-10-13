@@ -188,6 +188,15 @@ Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am End
 - **Repro:** `docs/niche-tests/repro/A09-idej/20-primordium-beschwoert-elven-rider.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `tamed-primordium.js` `eligibleHand` filtert nur Kreaturentyp, Stufe ≤ 1 und freie Zone. Der Rider verlässt sich nach seinem Kopfkommentar darauf, dass `validateActionPlay` Reaction-Karten am proaktiven Spielen hindert; `engine.summonFromPile` hat diese Sperre nicht. Ein Sperr-Flag im Rider (z. B. `beforeSummon` mit Prüfung der Quelle) schließt auch andere Beschwörer aus der Hand (First Contact, Cats of the Pharaoh u. a., nicht gemessen).
 
+### A09-21 · Dirty Smuggler: der Ablauf der Selbstnegation löscht auch eine fremde, längere Negation · Stufe B
+- **Karten:** Dirty Smuggler (`dirty-smuggler.js`, einzige Karte der Gruppe mit befristeter Negation); Engine-Weg `actionNegateCreature` / `actionRemoveCreatureBuff` (Prüfauftrag C05-02: Zugende-Räumung ohne Quellenbindung)
+- **Voraussetzungen / Aufbau:** Seed 1234. Sitz 0: Dirty Smuggler. Sitz 1: 0 Gold.
+- **Schritte:** 1. Sitz 1 zieht per Effekt 2 Karten (`actionDrawCards(1, 2)`): Smuggler zieht 4 und ist bis Zugende negiert. 2. Danach negiert eine andere Karte den Smuggler dauerhaft bzw. bis Zug+6. 3. `t.endTurn()`.
+- **Erwartet** (Kartentext: „… negate this Creature's effect **for the rest of the turn**" – nur die eigene Negation endet; die zweite Quelle läuft weiter): Der Smuggler bleibt nach Zugende negiert.
+- **Beobachtet:** `counters.negated` ist gelöscht, obwohl der Buff-Eintrag der zweiten Quelle weiter in `counters.buffs` steht. Die fremde Negation (auch die dauerhafte) endet damit vorzeitig; die Gegenrichtung (fremd zuerst, Selbstnegation danach) endet ebenso am Zugende der Selbstnegation.
+- **Repro:** `docs/niche-tests/repro/A09-idej/21-dirty-smuggler-selbstnegation-loescht-fremde-negation.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `actionRemoveCreatureBuff` (~Z. 17938) löscht beim Ablauf eines Eintrags alle `clearCountersOnExpire`-Zähler (`delete inst.counters.negated`), ohne zu prüfen, ob ein anderer Buff-Eintrag denselben Zähler noch trägt. Betrifft jede Karte mit befristeter Negation; hier an Dirty Smuggler gemessen.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

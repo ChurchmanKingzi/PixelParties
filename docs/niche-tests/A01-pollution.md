@@ -273,6 +273,15 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Repro:** `docs/niche-tests/repro/A01-pollution/29-royal-corgi-gestohlen-bonus-geht-an-besitzer.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `cards/effects/_engine.js` ~16863 (`enforceHandLimit`) und ~16993 (`_checkReactiveHandLimits`): `inst.owner === playerIdx`; dieselbe Eigentümer-Lesart steht laut Quelltext auch in der Rückprüfung beim Tod/Wegzug (`handLimitAffectedOwners.add(e.inst.owner)`, ~13927 `cardInstance.owner`) – nur gelesen, nicht gemessen. Gilt für jede Karte mit `handLimitReduction`.
 
+### A01-pollution-30 · Pollution Spewer: das „einmal pro Zug“ hängt an (Besitzer, Held, Slot) statt an der Karte · Stufe B
+- **Karten:** Pollution Spewer (`pollution-spewer.js`); Klasse „Besitzer ODER Kontrolleur“ / positionsbezogene Stempel
+- **Voraussetzungen / Aufbau:** (a) Spewer auf Sitz 0 feuert (Token weg), wird zerstört, ein zweites Exemplar kommt in denselben Slot. (b) Zwei Spewer desselben Besitzers (Sitz 1): einer auf Sitz 1s Brett, der andere von Sitz 0 gestohlen und auf Sitz 0s Brett – beide an Held 0 / Slot 0.
+- **Schritte:** 1. `removePollutionTokens` für den Seitenbesitzer (a: zweimal nacheinander; b: erst Sitz 0, dann Sitz 1) im selben Zug. 2. Zielabfragen zählen.
+- **Erwartet** (Quelle: Kartentext „Once per turn, when a Pollution Token is removed from **your** side of the board …“; Skriptkopf „HOPT is tracked per-instance“): jede Karte feuert einmal pro Zug – (a) das neue Exemplar noch einmal, (b) beide Spewer je einmal (der eine für Sitz 0, der andere für Sitz 1).
+- **Beobachtet:** (a) und (b) je nur 1 Schuss: der Schlüssel ist `pollution_spewer:${cardOriginalOwner}:${cardHeroIdx}:${zoneSlot}` – bei (b) haben beide Karten Besitzer 1 und dieselbe Position (Brettseite fehlt im Schlüssel), bei (a) ist der Schlüssel nach dem Tod der ersten Karte noch gesetzt. Gegenprobe: der eigene Spewer allein feuert normal.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/30-pollution-spewer-hopt-schluessel-nach-position.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/pollution-spewer.js` `hoptKey` – müsste `ctx.card.id` (Instanz) nutzen. Nische (Diebstahl + gleiche Position / Ersatz im selben Slot desselben Zuges); (a) ist ohne Diebstahl erreichbar.
+
 ## Abdeckung
 (wird ergänzt)
 

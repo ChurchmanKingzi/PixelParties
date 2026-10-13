@@ -259,9 +259,60 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 
 <!--BEFUNDE-ENDE-->
 
+## Prüfaufträge (Wurzeln aus anderen Gruppen, an meinen Karten gemessen – keine neuen Befunde)
+| Auftrag | Betroffene Karte(n) meiner Liste | Messung |
+|---|---|---|
+| `getCreatureTargets` Brettspalte (F02-14) | keine – kein Skript meiner Liste ruft `getCreatureTargets` | nicht anwendbar |
+| `collectAoeCreatureTargets` „Besitzer ODER Kontrolleur" (S01-09) | Rain of Arrows (`aoeHit`) | **bestätigt:** eine vom Wirker gestohlene Gegnerkreatur (Kontrolleur = Wirker) nimmt den eigenen Flächenschaden (1000 → 940). Repro `repro/S03-spells/P2-pruefauftrag-rain-of-arrows-eigene-gestohlene-kreatur.js`. Gegenrichtung ✓: eine vom Gegner gestohlene eigene Kreatur wird getroffen. Poisoned Well und Toxic Fumes rechnen dagegen richtig nach Kontrolle (siehe Tabelle) |
+| `_castSpellImmediately` ohne `oncePerGame` (S01-11) | Victory Phoenix Cannon (Folgezauber) | **bestätigt:** bei verbrauchtem `divineGift` wird Divine Gift of Fire als Folgezauber angeboten und gewirkt. Repro `repro/S03-spells/P1-pruefauftrag-vpc-folgezauber-oncepergame.js` (Mission-Ladung ⇒ S03-15) |
+| `counters.currentHp ?? 0` (C05-01) | Phoenix Bombardment | **bestätigt, eigene Stufe-A-Wirkung ⇒ S03-22** (andere Skripte meiner Liste: kein weiteres Vorkommen) |
+| Tuscan-Artist-negiertes Ziehen + Once-per-turn (A07-19, C01-15) | Supply Chain, Voice in your Head, Salute to the Fallen | Supply Chain / Voice: Karte spielbar, Ziehen negiert, Karte verbraucht ⇒ S03-24. Salute: nur das Ziehen wird negiert, das Abwerfen bleibt (laut Ruling 16.8. richtig: Mill ist ein weiterer Nutzen) ✓. Kein Once-per-turn-Stempel in diesen Karten |
+| Aufgelöste Karte bleibt in `ps.hand` (R02-07) | Rain of Spores (Abwurf-Auswahl) | **bestätigt ⇒ S03-23.** Gegenproben ✓: Supply Chain (`handSizeWithoutResolving`), Voice in your Head (rechnet 8 − Handgröße) und Perilous Journey (Index-Stempel wandert beim Entfernen der Karte mit) liegen richtig |
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
+| Mass Routing | L2 gezielt | gestohlene Kreatur: Geisterkarte + Duplikat ✗ (→ S03-04); Staffel/Zieh-Zähler nicht eigens gemessen |
+| Masterpiece | L2 gezielt | Trapping 1 / Magic Arts 1 ⇒ Zusatzaktion ✓, weder noch ⇒ Aktion verbraucht ✓, Galerie-Abbruch ⇒ Karte zurück ✓, alle Surprise-Zonen voll ⇒ nicht spielbar ✓, Zone von Held 0 voll ⇒ Held 1 ✓, mischt ✓; Vergleichskarte für S03-19 |
+| Memory Blast | L2 gezielt | übernommener eigener Held nicht wählbar/rückholbar ✗ (→ S03-07); Kreatur-Rückholung ✓ |
+| Memory Wipe | L2 gezielt | 5 / 3 / 2 / 0 Abilities: exakt min(3, Anzahl) abgelegt ✓, Performance-Stapel ✓, Kartenbilanz ±0 ✓; Zielwahl nach Spalte (Wurzel wie S03-07) nicht eigens gemessen |
+| Meteor Crash | L2 gezielt | 300 beim ersten Schaden, danach 100 ✓; Statusschaden (Burn) an Helden zählt nicht für „already dealt damage" (laut Kopf von `_noteDamageDealt` nur bei zugeschriebenem Verursacher – nicht als Befund geführt) |
+| Missing People | L2 gezielt | Geisterkarte (→ S03-04), Token im Deck (→ S03-05), Kontrolle statt Brettseite (→ S03-06) |
+| Mission of the Light Brigade | L2 gezielt | VPC-Folgezauber umgeht „up to 2" ✗ (→ S03-15) |
+| Outbreak | L2 gezielt | alle 17 Negativstatus: negated/blinded nicht spielbar ✗ (→ S03-10) |
+| Overcharge | L2 gezielt | Deck-Sperre (→ S03-16), Future Tech Control Device (→ S03-17), Rain Viola (→ S03-18) |
+| Perilous Journey | L2 gezielt | Suche ✓, Index-Stempel wandert mit (Spell verlässt die Hand) ✓, Aufstieg in Zug +2 ✓, Dauerbrand auf alle Helden + eigene Kreaturen, unheilbar ✓, Gegner nicht betroffen ✓; 3/4-Spieler-Zugfolge im Harness nicht aussagekräftig (nicht getestet) |
+| Petrifier | L2 gezielt | Heilung der Betäubung lässt Kreatur unverwundbar ✗ (→ S03-08) |
+| Phoenix Bombardment | L2 gezielt | unversehrte Kreatur wirkungslos ✗ (→ S03-22); beschädigte Kreatur ✓ |
+| Phoenix Tackle | L2 gezielt | Staffel 100/200/300 + Rückstoß 50/100/150 ✓, Selbstziel ✓; beide Seiten ausgelöscht ⇒ Wirker gewinnt ✗ (→ S03-21) |
+| Piercer of Heavens | L1 Standard | 250 Schaden auf Held / Kreatur ✓, alle Helden als Ziel angeboten; Schutz-Attachments (Invisibility, Anti Magic …) wirken bei `t.put` nicht – Schutzprobe nicht aussagekräftig |
+| Pillar of Light | L2 gezielt | Gegner-Sperre gilt als „gefunden" ✗ (→ S03-11); negiert zählt nicht (→ S03-12, C) |
+| Poison Pollen | L2 gezielt | Momentaufnahme vs. der Reihe nach (→ S03-09, C) |
+| Poisoned Well | L2 gezielt | tote Gegnerhelden ✓, gestohlene/übernommene Kreaturen und Helden nach Kontrolle ✓ (beide Richtungen), verdeckte Kreatur übersprungen ✓, Token vergiftet ✓, Stapel +1 ✓ |
+| Pressure Projectile | L1 Standard | 150 unreduzierbar ✓; Fremd-Attachment (Overheal Shock) am Ziel wird angeboten und geht in die Ablage des Besitzers ✓; Area-Zweig nicht eigens gemessen |
+| Rain of Arrows | L2 gezielt | negiertes Exemplar zählt nicht (→ S03-12, C); eigene gestohlene Kreatur wird getroffen (Prüfauftrag S01-09, kein neuer Befund) |
+| Rain of Spores | L2 gezielt | Sperren getrennt (→ S03-02); laufende Karte abwerfbar ✗ (→ S03-23) |
+| Refreshing Night | L2 gezielt | negiertes Exemplar zählt nicht (→ S03-12, C) |
+| Rewrite History | L2 gezielt | Staffel 1/2/3 + Performance-Joker ✓, eigene Ursache/Gift ⇒ nicht gelistet ✓, besetzte Zone ✓, Ablage-Karte weg ✓; Zone eines toten Helden (→ S03-27, C) |
+| Rockfall | L1 Standard | 200 unreduzierbar auf Held/Kreatur ✓ |
+| Sacrifice to Divinity | L2 gezielt | Stapel-Sperren per Splice umgangen ✗ (→ S03-03) |
+| Salute to the Fallen | L2 gezielt | 5er-Mill, 0/2/5 Kreaturen, Deck exakt 5 bzw. 3 (Deck-out-Niederlage laut Regel ✓), Knight-Sperre (Mill gesperrt, nichts passiert) ✓, Tuscan Artist (nur Ziehen negiert) ✓ |
+| Shooting Star | L2 gezielt | Stab-/Hand-Sperre ⇒ spielbar, verpufft ✗ (→ S03-26); Ablage leer / Knight ⇒ nicht spielbar ✓ |
+| Slow | L2 gezielt | Sperr-Flaggen getrennt ✗ (→ S03-02) |
+| Soul Transmigration Ritual | L2 gezielt | Opfer 3 × Level 0 ✓, Magic Arts 1 ⇒ Zusatzaktion ✓, zweiter Tod: Held + Abilities + Ausrüstung/Artefakte gelöscht, Kreaturen bleiben ✓, Kartenbilanz ±0 ✓ |
+| Spreading Rumor | L2 gezielt | Sperre getrennt von Slow ✗ (→ S03-02) |
+| Supply Chain | L2 gezielt | Hand-/Zieh-Sperre und Tuscan Artist ✗ (→ S03-24); Nachziehen auf 7 mit 2–5 Handkarten ✓ |
+| Surprise Party | L2 gezielt | Deck-Sperre: 200-fach zurückgelegt ✗ (→ S03-20) |
+| Telekinesis | L2 gezielt | keine aktivierbare Surprise ⇒ Karte verpufft ✗ (→ S03-13) |
+| Teleportal | L2 gezielt | mischt nicht ✗ (→ S03-19, Lieferung am Zugbeginn ✓) |
+| The Warlord's Bite | L2 gezielt | Performance doppelt gezählt ✗ (→ S03-01) |
+| Torchure | L2 gezielt | 4 Gift dauerhaft + Zusatzaktion im nächsten Zug ✓ (2 Zauber in der Action Phase), Gift geheilt ⇒ kein Bonus ✓, Gift neu (fremd) ⇒ kein Bonus ✓, Torchure selbst kostet keine Aktion ✓ |
+| Toxic Fumes | L2 gezielt | Zusatzaktion nur mit eigener (kontrollierter) Kreatur: eigene/gestohlene/vorvergiftete/Token/gefrorene ✓, nur gegnerische / verdeckte / vom Gegner gestohlene eigene ⇒ Aktion verbraucht ✓ |
+| Ultimate Weapon Experiment | L2 gezielt | geliehener Held kein gültiger Wirt ✗ (→ S03-14) |
+| Venom Infusion | L2 gezielt | Decay 1 ⇒ heilbar, Decay 3 (auch 2 + Performance) ⇒ unheilbar ✓, Kreatur-Ziel ✓, vorvergifteter Held ⇒ Stapel +1 und unheilbar ✓ |
+| Victory Phoenix Cannon | L2 gezielt | Mission-Grenze umgangen ✗ (→ S03-15); Einmal-pro-Spiel des Folgezaubers (Prüfauftrag S01-11) bestätigt |
+| Voice in your Head | L2 gezielt | Nachziehen auf 7 ✓, nur Ascended-Held ✓, Zusatzaktion ✓; Hand-/Zieh-Sperre / Tuscan Artist ⇒ verpufft (→ S03-24, Frage) |
+| Weapon Unleashing | L2 gezielt | in Main 1 ✓ (2 Aktionen, Heldenbindung ✓), in der Action Phase ✗ (→ S03-25) |
 <!--ABDECKUNG-ENDE-->
 
 ## Getestet & in Ordnung (Auswahl)

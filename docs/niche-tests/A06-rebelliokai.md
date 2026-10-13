@@ -1,8 +1,16 @@
 # A06-rebelliokai – Nischenfall-Bericht
-Stand/Autor: Agent A06-rebelliokai, 12.10.2026. Karten: 67 in der Liste · (wird fortlaufend ergänzt) · (wird fortlaufend ergänzt).
+Stand/Autor: Agent A06-rebelliokai, 12.10.2026. Karten: 67 in der Liste · 62 gezielt getestet (L2), 5 L1 · 35 Befunde (7 × A, 19 × B, 9 × C).
 
 ## Zusammenfassung
-(Arbeitsstand – wird am Ende zusammengefasst. Bisher bestätigt: siehe Befunde.)
+35 Befunde (7 × A, 19 × B, 9 × C); Repros unter `docs/niche-tests/repro/A06-rebelliokai/` (01–35, plus 29b). Die wichtigsten:
+* **-33 (A):** Karten mit eigener Zielwahl ohne `sourceCard` (White Army, Thaw Blader, Bear Rider, Invasion, Windstorm …) öffnen das Post-Target-Fenster nicht – Castling/Invisibility Cloak greifen nicht.
+* **-05 (A):** „Cannot be chosen"-Schutz (Censpartan, Board of Kings) greift nicht bei Karten mit `promptEffectTarget`.
+* **-18/-19 (A):** Cykyran/Censpartan, die das Feld verlassen, hinterlassen ihre Wirkung (verdoppelte ATK, Zielschutz) dauerhaft; -11/-12/-13 (B): dasselbe bei Stummschaltung (Dauereffekte hängen an den eigenen Hooks).
+* **-06/-07/-08/-25 (A/B):** Tengu Windstorm umgeht Area-Schutz und „unaffected"; Rebelliokai-Kosten unter Knight-[B]-Sperre werden nicht gezahlt, die Karte wirkt trotzdem; SnowItAll beschwört ohne tauglichen Beschwörer.
+* **-32/-34 (B):** Wiederbelebung (Rewrite History) lässt SnowItAlls „cannot be Frozen" dauerhaft verloren gehen; Rider Warg/Corpse Cannibal/Terror Tengu ignorieren `summonLocked`/Aktionssperren.
+Gesamteindruck: Einzelkarten-Logik (Zähler, HOPT, Deckel, Kosten, Diebstahl-Ablage, Zugwechsel) ist sauber; Probleme entstehen an den Rändern zur Engine (Zielfenster, Sperren, Stummschaltung/Verlassen, Revive-Pfad, Stapelsperre). Keine verschluckten Engine-Fehler, keine Hänger, keine Zustandsfehler im Audit.
+Bewusst NICHT getestet: 3-/4-Spieler-Partien (außer -31), Skill-Test-Modus, Animationen/Reveal-Verträge, Courtly Kirin und Backup Bakus nur über Batterien, Potion-Auflösung durch Colored Snow, Minocrete-Verdopplung nur kurz, Spielende-Fälle.
+Die Prüfaufträge (Zielsammler, `currentHp ?? 0`, `negatedDuration`, Zugende-Räumung, Einmal-pro-Zug nach Negierung, `normalizeValidTargets`) stehen mit Messergebnis am Ende unter „Prüfaufträge".
 
 ## Befunde
 
@@ -300,12 +308,12 @@ Tiefen: L2 = gezielte Nischenfall-Tests (Messung oder Repro), L1 = nur Standardl
 | Chaorc Corpse Cannibal | L2 | Zug „beim Opfern" + Platzkonkurrenz mit Rottweiler ✓, Frost/Betäubung ✓, summonLocked/Aktionssperre ✗ (→ -34) |
 | Chaorc Friendly Fireballer | L2 | Deck/Ablage unter Knight-Sperre ✗ (→ -09), Zielwahl-Abbruch nach bezahltem Opfer: bewusst nicht abbrechbar (`_forcePerform`, Skriptkommentar) ✓ |
 | Chaorc Interception | L2 | Opfer ist nicht das Ziel ✓, Opfer darf den eigenen Chaorc nicht als Original-Ziel wählen ✓, gelöscht statt Ablage ✓ |
-| Chaorc Pyre Grill Master | L2 | +40 ATK bei Cykyran-Verdopplung ✓ (Folgefehler → -18), HP-Modus bei totem Helden ✓, Zusatzaktion bei Überopfer ✓ |
+| Chaorc Pyre Grill Master | L2 | +40 ATK bei Cykyran-Verdopplung ✓ (Folgefehler → -18), HP-Modus bei totem Helden ✓ |
 | Chaorc Rider Warg | L2 | Reaktion auf Gegner-Zerstörung ✓, Frost/Betäubung ✓, summonLocked/Aktionssperre ✗ (→ -34) |
 | Chaorc Ruin Mourner | L2 | 80 Schaden pro Opfer, Deckel „4 pro Zug" ✓ (5 Opfer: 4 Treffer), Brenn-Weg ✓ |
-| Cykyran War Counselor | L2 | stummgeschaltet ✗ (→ -13), Tod ✗ (→ -18), Revive-Verzögerung (→ -32), Schuss ≤ 300 ✓ |
+| Cykyran War Counselor | L2 | stummgeschaltet ✗ (→ -13), Tod ✗ (→ -18), Revive-Verzögerung (→ -32), Schuss unter Erst-Runden-Schutz nur als Batterie gemessen |
 | Gorinthian War Counselor | L2 | Schutzdauer ✗ (→ -14), Merker ohne Betäubung ✗ (→ -28), Aktivierung bei Aktionssperre ✓ |
-| Harpthenean War Counselor | L2 | Gold-Modus mit Gathering Place ✓, Schaden Deckel 300 ✓, Zielwahl-Abbruch unter Gathering Place (→ -35) |
+| Harpthenean War Counselor | L2 | Gold-Modus mit Gathering Place ✓ (−8 +10), Zielwahl-Abbruch unter Gathering Place (→ -35) |
 | Ice Sculpture Garden | L2 | Zählung gefrorener Ziele ✓, Zusatzaktion ab 2 ✓, Handsperre danach ✓, unter Tuscan Artist nicht als Fehler gewertet (Zusatzaktion bleibt) |
 | Kappa Sword Slash | L2 | Kosten unter Knight-Sperre ✗ (→ -08), Area-Wahl ohne Zielschutz (→ -05), Level-Reduktion ✓ |
 | Kasperov, the King of Kings [B] | L2 | Pawn-Opfer → Platzierung ✓, zählt nicht als Beschwörung ✓ |
@@ -329,7 +337,7 @@ Tiefen: L2 = gezielte Nischenfall-Tests (Messung oder Repro), L1 = nur Standardl
 | Mischief Militia - Chilly Dog | L1 | Frozen-Kreatur nutzt Effekt am Beschwörungstag (Rottweiler) ✓, Eligibility-Läufe, sonst Batterien |
 | Mischief Militia - Chilly Wizard | L2 | gespiegelter Status bleibt ✗ (→ -20), Wirt auf Gegnerseite ✓ |
 | Mischief Militia - Colored Snow | L2 | Auslöser nach Kontrolle statt Spalte ✓, Potion gesperrt (`potionLocked`) geprüft, ohne Potion/HOPT ✓ |
-| Mischief Militia - Heli Troopers | L1 | Tod → Freeze, Beschwörungs-Läufe (→ -27 Nebenbefund), Zielfenster ✗ (→ -33) |
+| Mischief Militia - Heli Troopers | L1 | Tod → Freeze, Beschwörungs-Läufe (→ -27 Nebenbefund), Zielwahl ohne `sourceCard` (→ -33, nicht einzeln gemessen) |
 | Mischief Militia - SnowItAll | L2 | Beschwörer-Eignung ✗ (→ -25), Immunität nach Revive ✗ (→ -32), Haste ✓ |
 | Mischief Militia - Thaw Blader | L2 | Zielschutz ✗ (→ -05), Castling ✗ (→ -33), Thicket ✓ |
 | Orthos, the Loyal Guard Dog | L2 | Platzierung (Rottweiler) löst Orthos aus (laut Skriptkommentar gewollt), Revive nicht ✓, summonLocked ✓ |
@@ -348,7 +356,7 @@ Tiefen: L2 = gezielte Nischenfall-Tests (Messung oder Repro), L1 = nur Standardl
 | Rebelliokai Timid Tanuki | L2 | Handsperre ✓, Tuscan Artist ✗ (→ -30) |
 | Rook of Kings [B] | L2 | Unaffected-Schutz bei Frost ✓, Windstorm ✗ (→ -07) |
 | Rook of Kings [W] | L2 | Windstorm ✗ (→ -07), Zusatzaktion ✓ |
-| Sculpture Guards | L2 | gefrorener Held ✓, Flächenschaden (Oni) ✓, Zielfenster nicht betroffen (reagiert auf Schaden) |
+| Sculpture Guards | L2 | gefrorener Held ✓, Flächenschaden (Oni) ✓ |
 | Sculpture Theft | L2 | alte Ziele ✗ (→ -01), Token ✗ (→ -23) |
 | Snowstorm Mischief | L2 | Auslöser für -11/-12/-13/-25, Freeze beider Seiten ✓ |
 | Tanuki Escape | L2 | eigene Karte wählbar ✗ (→ -15), Namensausschluss (→ -17) |
@@ -370,3 +378,10 @@ Tiefen: L2 = gezielte Nischenfall-Tests (Messung oder Repro), L1 = nur Standardl
 - Pawn of Kings [W] mit Board: erste Beschwörung gratis, zweite kostet die Aktion; ohne Board normale Aktion.
 - Kasperov [B] platziert Rook [W] aus der Hand auf den Platz des geopferten Pawn; Platzierung zählt nicht als Beschwörung (`_creaturesSummonedThisTurn`), wie bei Knight/Queen-Stempeln.
 - Bone Dog rettet bei tödlichem Schaden; Terrier trifft bei der Rettung weiter (50 Schaden).
+- Bishop [B]: Negation bleibt über vier Zugwechsel; Queen [B] schützt Nachbarn vor Frost/Negation; Rook [B] gibt bei Frost frei.
+- Hountriever: genau 3 Karten pro Zug; Beagle: Gold 2 × Loyals inkl. sich; Rottweiler-Selbstopfer löst Terrier aus; Labradoodle rechnet nach Kontrolle.
+- Ruin Mourner: bei 5 Opfern genau 4 Treffer à 80; Kind Kitsune holt eine Nicht-Kreatur und sperrt den Namen für den Zug.
+- Castling: negiert Fireball, beschwört nur tauglich (Wirt ohne Summoning Magic: nichts), geht in die Ablage; Immunität leckt nicht auf den nächsten Flächenschaden.
+- Banner Bearer: schützt je Schadensereignis ein Ziel, zwei Bearer zwei Ziele, gefrorener Host löst nicht aus.
+- Shepherd, Kasperov [W]: Frost/Betäubung/summonLocked/Aktionssperre werden korrekt abgewiesen; Corpse Cannibal und Rider Warg nur teilweise (→ -34).
+- Diebstahl-Batterie (alle Kreaturen der Gruppe gestohlen, aktiviert, getötet): Karte landet jeweils in der Ablage des Besitzers, keine Fehler.
