@@ -77,12 +77,7 @@ function _validVictims(engine, pi) {
     if (inst.counters?._damageDestroyImmune) continue; // Time Bomblebee armed
     if (inst.counters?.immovable) continue;
     if (inst.counters?._stealImmortal) continue;      // Stolen-and-immortal
-    out.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-      type: 'equip', owner: inst.owner,
-      heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-      cardName: inst.name, cardInstance: inst,
-    });
+    out.push(engine.kreaturZiel(inst));   // Z1: ID/owner = Brettseite
   }
   return out;
 }
@@ -152,7 +147,10 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const destHi = targetInst.heroIdx;
     const destSlot = targetInst.zoneSlot;
-    const ops = gs.players[oi];
+    // Z1 (C01-06): die Zone des Opfers liegt auf seiner BRETTSEITE (`vSeite`) — bei einer vom
+    // Gegner gestohlenen EIGENEN Kreatur ist das MEINE Seite, nicht die des Gegners.
+    const vSeite = engine.physicalSide(targetInst);
+    const ops = gs.players[vSeite];
     if (!ops) return false;
 
     // ── Step 2: defeat the chosen Creature ─────────────────────
@@ -194,8 +192,9 @@ module.exports = {
     // manually correct `originalOwner` back to us so destruction
     // routes the card to OUR discard pile (it WAS our card; opp
     // shouldn't get to recover it via their pile).
-    const placeRes = engine.summonCreature(FULL_NAME, oi, destHi, destSlot, {
+    const placeRes = engine.summonCreature(FULL_NAME, vSeite, destHi, destSlot, {
       source: FULL_NAME,
+      ...(vSeite !== oi ? { controller: oi } : {}),   // Z1: liegt in meiner Zone, wird vom Gegner kontrolliert
     });
     if (!placeRes) {
       engine.log('piranhas_fizzle', {
@@ -205,7 +204,7 @@ module.exports = {
     }
     const inst = placeRes.inst;
     inst.originalOwner = pi; // discard routes back to us, not opp
-    inst.controller = oi;    // explicit — already true via owner
+    inst.controller = oi;    // explicit — already true via owner (Z1: bei seitenfremder Zone gesetzt von `controller`)
 
     // Remove the card from our hand (the standard server flow
     // would do this for a normal summon, but we're bypassing it
@@ -221,7 +220,7 @@ module.exports = {
     // Visual: many bites on the host hero zone.
     engine._broadcastEvent('play_zone_animation', {
       type: 'piranha_bites',
-      owner: oi, heroIdx: destHi, zoneSlot: -1,
+      owner: vSeite, heroIdx: destHi, zoneSlot: -1,
     });
     await engine._delay(700);
 
@@ -263,7 +262,7 @@ module.exports = {
       // Animation: bites land on host hero.
       engine._broadcastEvent('play_zone_animation', {
         type: 'piranha_bites',
-        owner: controller, heroIdx: inst.heroIdx, zoneSlot: -1,
+        owner: ctx.cardHeroOwner ?? controller, heroIdx: inst.heroIdx, zoneSlot: -1,   // Z1: Brettseite
       });
       await engine._delay(450);
 

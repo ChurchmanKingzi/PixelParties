@@ -298,10 +298,7 @@ async function bonusDeal50x3(ctx, engine, pi) {
       await engine._delay(300);
       await engine.actionDealDamage(sourceMeta, hero, 50, 'destruction_spell');
     } else {
-      const inst = target.cardInstance || engine.cardInstances.find(c =>
-        (c.owner === target.owner || c.controller === target.owner)
-        && c.zone === 'support' && c.heroIdx === target.heroIdx
-        && c.zoneSlot === target.slotIdx);
+      const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
       if (!inst || inst.zone !== 'support') break;
       engine._broadcastEvent('play_zone_animation', {
         type: 'explosion', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
@@ -395,6 +392,9 @@ function buildDemonHooks(cardName) {
         const pi = death.controller ?? death.owner ?? ctx.cardOwner;
         const ps = gs.players[pi];
         if (!ps) return;
+        // Z1 (A09-15): „the Support Zone this Creature occupied" liegt auf der BRETTSEITE; ein
+        // gestohlener Demon stand beim Besitzer — nicht in die gleich indizierte Zone des Kontrolleurs.
+        if ((death.seite ?? death.owner) !== pi) return;
 
         const successor = def.successor;
 

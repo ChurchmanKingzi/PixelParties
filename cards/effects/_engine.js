@@ -4690,6 +4690,7 @@ class GameEngine {
        * @param {number}   [config.hitDelay]     - Delay between individual hero hits (default 150)
        * @param {Function} [config.heroFilter]   - (hero, heroIdx, playerIdx) => bool
        * @param {Function} [config.creatureFilter]- (inst, cardData) => bool
+       * @param {number}   [config.creatureBoardSide] - Z1: Kreaturen nach BRETTSEITE (Zone) statt nach Kontrolle sammeln
        * @param {number}   [config.heroMinHp]    - Only heroes with hp >= this
        * @param {number}   [config.heroMaxHp]    - Only heroes with hp <= this
        * @param {number}   [config.creatureMinHp]- Only creatures with currentHp >= this
@@ -13834,6 +13835,7 @@ class GameEngine {
         // Tode ueber Zerstoerung/Opfer kamen ohne sie an, und Karten mit
         // „during your turn" (Dragoneggs) muessten raten.
         controller: cardInstance.controller ?? cardInstance.owner,
+        seite: this.physicalSide(cardInstance),   // Z1: BRETTSEITE der Zone (gestohlen: Besitzer, nicht Kontrolleur)
         heroIdx: fromHeroIdx,
         zoneSlot: cardInstance.zoneSlot,
         instId: cardInstance.id,
@@ -28900,8 +28902,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._turnEndImmuneCardOnSide(targetPi)) return true;
 
     if (!isTerror && !isOppSource) return false;
-    for (const hero of (ps.heroes || [])) {
+    // Z1 (H01-03): „You" / „your turn" = KONTROLLEUR des Helden — uebernommene Helden zaehlen fuer den
+    // Uebernehmenden (`heroesControlledBy`), nicht fuer den Spieler, in dessen Spalte sie stehen.
+    for (const { physOwner, heroIdx: hIdx, hero } of this.heroesControlledBy(targetPi)) {
       if (!hero?.name || hero.hp <= 0) continue;
+      // Heldeneffekte eines gefrorenen/betaeubten/negierten Helden sind still (H01-03a).
+      if (this._isHeroEffectSilenced(physOwner, hIdx)) continue;
       const script = this.heroScript(hero);
       if (!script) continue;
       if (isTerror && script.immuneToTerror) return true;
@@ -28917,7 +28923,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _turnEndImmuneCardOnSide(pi) {
     const ps = this.gs.players[pi];
     if (!ps) return false;
-    for (const hero of (ps.heroes || [])) {
+    for (const { hero } of this.heroesControlledBy(pi)) {   // Z1 (H01-03): nach Kontrolle
       if (!hero?.name || hero.hp <= 0) continue;
       if (this.heroScript(hero)?.immuneToAllTurnEnd) return true;
     }
@@ -28948,12 +28954,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   _hasActiveNomu(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // Z1 (H03-20): „you draw" = KONTROLLEUR des Helden (uebernommener Nomu wirkt fuer den Uebernehmenden).
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(playerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
       // Mummy Token silences hero passives (see runHooks filter + bug 7).
-      if (this._isHeroMummified(playerIdx, hi)) continue;
+      if (this._isHeroMummified(physOwner, hi)) continue;
       const script = this.heroScript(hero);
       if (script?.isNomuHero) return true;
     }
@@ -29006,8 +29012,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Turn-based bypass (Willy, etc.)
     if (ps._noHandLimitUntilTurn != null && (this.gs.turn || 1) <= ps._noHandLimitUntilTurn) return true;
     // Hero-based bypass (alive + not incapacitated)
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    for (const { hero } of this.heroesControlledBy(playerIdx)) {   // Z1 (H03-20): „You have no hand size limit" = Kontrolleur
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
       if (hero.bypassHandLimit) return true;
@@ -45640,12 +45645,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   collectAoeCreatureTargets(targetPlayers, config = {}, types = ['hero', 'creature']) {
     const cardDB = this._getCardDB();
     const out = [];
-    for (const tpi of targetPlayers) {
+    // Z1 (C01-05): `config.creatureBoardSide` = „alle Kreaturen in den Zonen EINER Brettseite"
+    // (Cavalry: „… Creatures in its Support Zones") — dann zaehlt die BRETTSEITE, nicht die Kontrolle.
+    const nachBrett = Number.isInteger(config.creatureBoardSide);
+    for (const tpi of (nachBrett ? [config.creatureBoardSide] : targetPlayers)) {
       for (const inst of this.cardInstances) {
         // Z1 (S01-09): „Seite" = KONTROLLE (wie bei den Helden, v718) — nicht „Besitzer ODER
         // Kontrolleur": eine geliehene Kreatur zaehlte sonst zu BEIDEN Seiten (doppelt bei
         // `side: 'both'`, getroffen von „all targets your opponent controls" des Kontrolleurs).
-        if (this.kontrolleurVon(inst) !== tpi || inst.zone !== 'support') continue;
+        if ((nachBrett ? this.physicalSide(inst) : this.kontrolleurVon(inst)) !== tpi || inst.zone !== 'support') continue;
         if (inst.faceDown) continue; // Face-down surprises are immune to AOE
         const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !(hasCardType(cd, 'Creature')
@@ -47314,7 +47322,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // etc.) can attribute the death to the correct side — a cross-side
     // placed Chilly Wizard dying counts as the CONTROLLER's creature,
     // not the original owner's.
-    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
+    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, seite: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
     // If this creature contributed to hand-size math (e.g. Royal Corgi's
     // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
     // hand-limit recheck once the batch settles.

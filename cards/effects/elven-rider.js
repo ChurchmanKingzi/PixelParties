@@ -89,6 +89,9 @@ function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   // our Rider. Falls back to `owner` for any older payload that
   // pre-dates the controller field.
   if ((deathInfo.controller ?? deathInfo.owner) !== ownerIdx) return false;
+  // Z1 (A09-15): die Zone ist die der BRETTSEITE. Eine gestohlene Elven steht beim Besitzer —
+  // `supportZones[ownerIdx]` an gleicher Koordinate waere eine ANDERE Zone; kein Rider dorthin.
+  if ((deathInfo.seite ?? deathInfo.owner) !== ownerIdx) return false;
   const cardDB = engine._getCardDB();
   const cd = cardDB[deathInfo.name];
   if (!isElvenCreature(cd)) return false;
