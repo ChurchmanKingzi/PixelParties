@@ -12476,7 +12476,10 @@ class GameEngine {
         targetCard._redirectToDeleted = true;
         if (this._wurzelAktiv() && isBoardZone && fromZone === ZONES.SUPPORT) this._wurzelNebel(targetCard.owner, targetCard.heroIdx, targetCard.zoneSlot);
       }
-      const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend) ? 'deleted' : 'discard';
+      // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
+      const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
+      const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
+      const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -13499,6 +13502,17 @@ class GameEngine {
       toZone    = ZONES.DELETED;
       toHeroIdx = -1;
       toSlot    = -1;
+    }
+    // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
+    // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
+    // (`processCreatureDamageBatch`) und in `_addCardToState`, nie abgelegt.
+    if (toZone === ZONES.DISCARD && fromZone === 'support') {
+      const _tokenCd = this.getEffectiveCardData(cardInstance);
+      if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
+        toZone    = ZONES.DELETED;
+        toHeroIdx = -1;
+        toSlot    = -1;
+      }
     }
 
     // ── selfDeleteOnExternalDiscard redirect ──
