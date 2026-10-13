@@ -238,6 +238,14 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/25-erstrunden-gate-boulder-in-a-bottle.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `boulder-in-a-bottle.js` hat kein Spielgate (`canActivate`) für „kein wählbarer Gegnerheld"; in `flashbang.js` gibt es eines. Gleiche Klasse wie B-06.
 
+### M01-26 · Geliehener Held (Charme Lv3 u. a.): das Spielgate von Knife Throw, Breaking Strike und Forceful Revival liest den gleichindizierten EIGENEN Helden · Stufe B
+- **Karten:** Knife Throw (`knife-throw.js` `canPlayWithHero`/`ausruestungAm`), Breaking Strike (`breaking-strike.js` `equipsAm`), Forceful Revival (`forceful-revival.js` `canPlayWithHero`/`spellPlayCondition`); gleiche Klasse für jeden Wirker-Zugriff mit `pi` statt `engine.heldSeiteFuer(pi, heroIdx)`. Kontrolle: Capture (nutzt `heldSeiteFuer`) und Heavy Hit (ohne Gate) laufen mit dem geliehenen Helden.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Main Phase 1; Sitz 0 Held 0 hat Charme Lv3 und übernimmt Held 1 von Sitz 1 (`charmedBy = 0`); der geliehene Held hat Fighting Lv3 und (Knife Throw/Breaking Strike) einen „Club of Gobbo", bei Forceful Revival eine freie Zone und eine Kreatur in der Ablage von Sitz 0; Sitz 0 spielt die Karte mit `t.play(0, card, { hero: 1, charmedOwner: 1, noGrant: true })`.
+- **Erwartet** (Kartentexte „the user" = der Held, der die Attack nutzt; Engine-Vertrag `_engine.js:~43530` `heldSeiteFuer`: Skripte lesen „the user" in der Spalte des geliehenen Helden): die drei Attacks sind mit dem geliehenen Helden spielbar (sein Club bzw. sein Fighting und seine freie Zone zählen).
+- **Beobachtet:** `play` meldet `false`, die Karte bleibt auf der Hand; die Gates fragen Sitz 0 / Held 1 (eigener Held mit gleichem Index: kein Club, kein Fighting). Umgekehrt (Gegenprobe): trägt der EIGENE Held 1 den Club und der geliehene nicht, besteht das Gate, `onPlay` (liest `ctx.cardHeroOwner`) bricht danach ab und die Karte geht zurück auf die Hand. Die Unterscheidung zwischen beiden Spalten fehlt also nur im Gate.
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/26-geliehener-held-spielgate-knife-breaking-forceful.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `knife-throw.js` `canPlayWithHero` ruft `ausruestungAm(engine, pi, heroIdx)` und `ps = gs.players[pi]`; `breaking-strike.js` `canPlayWithHero` → `equipsAm(engine, pi, heroIdx)`; `forceful-revival.js` `canPlayWithHero`/`spellPlayCondition` lesen `gs.players[pi]` (`_userHasFreeSupportSlot`, `_fightingLevel`). Die `onPlay`-Zweige sind bereits auf `ctx.cardHeroOwner` umgestellt (Kommentare „Als Befund 29.9."); die Gates wurden dabei übersehen.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

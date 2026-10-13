@@ -1,8 +1,14 @@
 # S02-spells – Nischenfall-Bericht
-Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird ergänzt) mit Befund.
+Stand/Autor: Agent S02-spells (Fortsetzung nach Rate-Limit-Abbruch), 13.10.2026. Karten: 41 in der Liste · 39 gezielt getestet (L2) · 25 mit Befund (22 Befunde: 2 × A, 15 × B, 5 × C).
 
 ## Zusammenfassung
-(Entwurf – wird am Ende ausgefüllt. Arbeitsstand: Befunde werden nach jedem bestätigten Fall ergänzt.)
+22 Befunde (A: 2, B: 15, C: 5). Die Gruppe zerfällt in drei Muster:
+1. **Besitz/Brettspalte statt Kontrolle** (der größte Block): Healing Melody (-01), Howling in the Night (-02), Flame Avalanche/Last Resort-Sperre (-05), Love Shot (-15), Guard Change (-12), Fire Bolts (-19) und die Engine-Einzelzielwahl bei Überkreuz-Diebstahl (-17: zwei gegenseitig gestohlene Kreaturen an gleicher Koordinate lösen zur selben Instanz auf; Heal heilt dann die vom GEGNER kontrollierte Kreatur). Dazu Xals Support-Zonen-Stapel, den Haste/Heal/Healing Melody/Instant Cryo Stasis nicht mitzählen (-18).
+2. **Abbruch/Sperren-Verträge**: Hymn of Rebirth, Divine Zeal, Holy Selection (Ida) ohne Cancel-Knopf (-10, -14, -16); Haste unter Zieh-/Hand-Sperre spielbar und wirkungslos (-21); Gate to the Armory ignoriert Such-/Hand-Sperre (-22); Great Offensive lässt gefrorene/betäubte Kreaturen aktiv wirken (-13).
+3. **Zustands-/Zählfehler**: Forbidden Zone negiert eine unversehrte Kreatur nicht (`currentHp ?? 0`, -09, A); Divine Gift of The Light zählt heilende Zauber nicht als heilend (-03) und stempelt je Held statt je Zug (-04); Laser Volley kann gleichnamige Ziele nicht unterscheiden (-07); Draw zählt sich selbst als abgeworfene Handkarte (-20, C).
+Gesamteindruck: die Staffelwerte (Haste/Heal/Draw 2-3-4, Frost Breaker 100-200-300, Iceage 1/2 Züge, Icebolt/Icy Grave/Cryo-Dauern), Zusatzaktions-Buchhaltung (Gate, Gather Intel, Graveyard Gathering, Market Crash, Frost Breaker, Hole in the Sky, Looming Threat, Live Show, Inheritance Ceremony), Erstrunden-Gate und Abbrüche der Mehrstufen-Zauber sind ansonsten sauber; keine verschluckten Engine-Fehler, keine Hänger, Kartenbilanzen und `audit()` überall leer.
+Bewusst NICHT getestet: Mehrspieler (3/4 Sitze), Negation einzelner Zauber durch Reaktionen/Surprises (Drowned Remains reagiert in der Harness nicht ohne CPU-Entscheidung; die Once-Stempel-Frage bei Negation für Divine Gift/Hymn bleibt offen), Hymn/Guard Change mit Xal-Stapel, Frost Breaker mit „as if"-Effekten (Demon's Gate), gleichzeitiger Zugriff mehrerer Surprises auf Flächenzauber, und die doppelte Ziel-ID in `promptMultiTarget` (Explosion/Fireball treffen ein zweimal zurückgegebenes Ziel zweimal, Magic Hammer nicht – nur durch eine manipulierte Antwort erreichbar, daher nicht gemeldet).
+Harness-Hinweis für Folgetester: nach `await engine.actionStealCreature/Hero(...)` läuft eine Reaktionskette ~100 ms nach und setzt `gs._chainResolvingLock` – ein sofortiges `t.play` wird dann stillschweigend abgelehnt (`false`). Ohne `await` überlappen Diebstahl und Spielzug. Die Repros -01/-05/-12/-17/-19 warten deshalb 250 ms nach dem Diebstahl.
 
 ## Befunde
 ### S02-01 · Healing Melody heilt nach Besitz statt nach Kontrolle · Stufe A
@@ -201,7 +207,58 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Vermutete Ursache:** `gate-to-the-armory.js` trägt weder `blockedBySearchLock` noch fragt es `engine.searchLockLevel`/`pileOutAllowed`; die Loader-Erkennung (`_loader.js` ~Z. 462) sieht nur „reine" Such-Skripte, Gate hat zwei Zweige (Add oder Ausrüsten).
 
 ## Abdeckung
-(wird am Ende ausgefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Divine Gift of The Light | L2 gezielt | Heil-Flagge ✗(→ -03), je Held statt je Zug (→ -04), Fenster auch für Zauber des Gegners ✓ (Text „that Spell's controller"), zweite Kopie gesperrt ✓, über Call for Help ein zweites Gift gewirkt (= S01-11 bestätigt, kein neuer Befund), `getCreatureTargets`-Kollision (F02-14-Klasse) |
+| Divine Zeal | L2 gezielt | Abbruch Statuswahl ✗(→ -16), 3+ Effekte ⇒ 2 Karten ✓, Tuscan Artist: Status fällt, Zug wird negiert, Karte nicht gesperrt ✓ (Ruling), mit kollidierender gefrorener Kreatur unspielbar (= F02-14 bestätigt) |
+| Draw | L2 gezielt | Staffel 4/5/6 – 5/4/3 ✓, Deck 2, Tuscan Artist beim Wirker (Gegnerzug 3 negiert, 1/2 nicht) ✓, Selbst-Abwurf ✗(→ -20, C); Erstrunden-Schutz ✓ |
+| End of the Future | L2 gezielt | nur aufgedeckt spielbar ✓, Index-Verschiebung nach Abwurf ✓, Schaden 50 × (Hand − 1) ✓, Hand leer (0 Schaden, Zug endet) ✓, Abbruch bleibt aufgedeckt ✓, letzter Gegnerheld ⇒ Sieg ✓ |
+| Energy Drain | L2 gezielt | Heilmenge 0/1/10/25/99/100/300 fehlend ⇒ Schaden ⌈geheilt/2⌉ ✓ (Gegnerheld + Kreatur); Gift-Fenster ✗(→ -03) |
+| Explosion | L2 gezielt | Zielliste (gestohlene Kreaturen, toter Held) ✓, 0/leer/Abbruch ✓; doppelte Ziel-ID trifft zweimal (nur manipulierte Antwort, nicht gemeldet); Überkreuz-Diebstahl: richtige Instanz, falsche Kachel (→ -17) |
+| Fire Bolts | L2 gezielt | Enhanced-Angebot nur beim ersten DM-Zauber, 200 Rückstoß, Zusatzaktion ✓, abgebrochener Fireball zählt nicht ✓; Zielwahl nach Brettspalte ✗(→ -19) |
+| Fireball | L2 gezielt | Zielliste/0/Abbruch ✓, Ida (`maxTotal` 1) ✓, negierter Fall ✓; Überkreuz-Diebstahl wie Explosion (→ -17) |
+| Flame Avalanche | L2 gezielt | Sperre nach Besitz ✗(→ -05); trifft auch die von mir kontrollierte Leihkreatur (= S01-09 bestätigt); Erstrunden-Gate fehlt (= B-06) |
+| Forbidden Zone | L2 gezielt | unversehrte Kreatur nicht negiert ✗(→ -09); Helden gebunden ✓; Leihkreaturen: nur Gegner-kontrollierte betroffen ✓ |
+| Frost Breaker | L2 gezielt | Matrix Einfrierzeitpunkt (Zug 1/3/4/5) × Aktion schon verbraucht × Held/Kreatur: Zusatzaktion nur bei „vor meinem letzten Zug" ✓, jüngere Freezes bei verbrauchter Aktion nicht wählbar ✓, Schaden 100 bei Stufe 1 ✓, Auftauen ✓ |
+| Gate to the Armory | L2 gezielt | Aktionsbuchhaltung (Zusatz/normal, Zug endet, Abbruch) ✓, Direktausrüsten ohne Kosten ✓; Such-/Hand-Sperre ignoriert ✗(→ -22) |
+| Gather Intel | L2 gezielt | Zusatz/normal × geben/ziehen: Aktionssperre nur bei Zusatz und fällt am Zugende ✓, Hand-Sperre ⇒ nur Ziehen ✓, Tuscan Artist negiert den Zug ✓, Erstrunden-Gate ✓ |
+| Glimpse of the Future | L1 Standard | Starthand-Fenster (Reveal ⇒ 2 Karten) im gemeinsamen Lauf mit Grasp/End of the Future ✓, keine Besonderheit |
+| Grasp the Future | L1 Standard | Starthand-Fenster mit Kartenwahl und Deck-Suche ✓ (Mehrfachkopien), keine Besonderheit |
+| Graveyard Gathering | L2 gezielt | Galerie dedupliziert, Zusatzaktion ✓, kein Ascended im Deck ⇒ nicht spielbar ✓, Such-/Hand-Sperre ⇒ nicht spielbar ✓, Zieh-Sperre ⇒ spielt ✓ |
+| Great Offensive | L2 gezielt | gefroren/betäubt ✗(→ -13), Kontrolle statt Besitz ✓ (geklaute zählt, eigene beim Gegner nicht), HOPT-Geschenk ✓, Zug endet ✓ |
+| Guard Change | L2 gezielt | gestohlene Kreatur ✗(→ -12), Zusatzaktion ab Support Magic 2 ✓, 1 pro Zug ✓; Xal-Stapel nicht gemessen |
+| Hand of Death | L2 gezielt | Karte aus Ablage geholt ⇒ Effekt verfällt (→ -11, C), gefrorener Nutzer ⇒ Fizzle ✓, 1 pro Zug ✓, Zugsperre ✓ |
+| Haste | L2 gezielt | Staffel 2/3/4 ✓, Tuscan Artist (Zug 2/3 gesperrt, 4 frei) ✓, Xal-Stapel ✗(→ -18), Zieh-/Hand-Sperre ✗(→ -21) |
+| Heal | L2 gezielt | Staffel +150/+200/+300 ✓, Max-HP-Deckel (Kreatur) ✓, toter Held nicht wählbar ✓, Gegnerheld wählbar ✓, Abbruch ✓; Xal-Stapel ✗(→ -18), Überkreuz-Diebstahl ✗(→ -17) |
+| Healing Melody | L2 gezielt | Besitz statt Kontrolle ✗(→ -01), Xal-Stapel ✗(→ -18), Staffel 100/150/200 ✓ |
+| Heat Wave | L2 gezielt | Schadenssperre nach Flame Avalanche (→ -08, C); brennt auch die von mir kontrollierte Leihkreatur (= S01-09-Klasse bestätigt), „except the user" ✓ |
+| Hole in the Sky | L2 gezielt | Zusatzaktion nur wenn beide Seiten Kreaturen KONTROLLIEREN (gestohlene zählen nach Kontrolle) ✓, trifft Leih- und Überkreuz-Kreaturen genau einmal, Ablage des Besitzers ✓ |
+| Holy Selection | L2 gezielt | Grundlauf ✓ (Necromancy-Helden beider Seiten, gestohlene Nekro-Kreatur); Ida ohne Cancel-Knopf ✗(→ -14) |
+| Howling in the Night | L2 gezielt | Kontrolle statt Besitz ✗(→ -02), Standardablauf ✓, erste Runde gegated ✓ |
+| Hymn of Rebirth | L2 gezielt | Zielwahl nicht abbrechbar ✗(→ -10), Staffel Singing 0–3 ✓, zweite Kopie gesperrt ✓; Negation durch Reaktion nicht prüfbar (Harness) |
+| Iceage | L2 gezielt | Stufe-4-Frage nur mit genügend Schulen (DM2+MA1 nein, 3+1/2+2/1+3 ja) ✓, Dauer 1/2, kein Verkürzen vorhandenen Frosts ✓, Leihkreaturen nach Kontrolle ✓, keine Ziele ⇒ Karte bleibt ✓; Erstrunden-Gate fehlt (= B-06) |
+| Icebolt | L2 gezielt | 120 + 1 Zug Freeze (Held/Kreatur, Ablauf nach echten Zugwechseln) ✓, tödlich ⇒ kein Status ✓, Überkreuz-Diebstahl (→ -17) |
+| Icy Grave | L2 gezielt | 2 Züge (Held/Kreatur) ✓, vorhandener Frost wird nicht erneuert (Regel „Keine Erneuerung") ✓ |
+| Inheritance Ceremony | L2 gezielt | Ausrüstung umhängen + HP-Regler ✓ (Abzug/Heilung, Regler über Maximum wird geklemmt, Nutzer behält 1 HP), Ziel auf Max-HP ⇒ nicht spielbar ✓, HOPT erst nach Bestätigung ✓, Skip am Regler = 0; Gift-Fenster ✗(→ -03) |
+| Instant Cryo Stasis | L2 gezielt | Dauer „rest of the game" (9999, 8 Zugwechsel) ✓, Zusatzaktion ab Decay 2 ✓, bereits gefrorene Kreatur nicht wählbar (Karte grau), Xal-Stapel ✗(→ -18) |
+| Laser Volley | L2 gezielt | gleichnamige Ziele ✗(→ -07), Leih-/Überkreuz-Kreaturen nach Kontrolle ✓, 1 pro Zug ✓ |
+| Last Resort | L2 gezielt | Schadenssperre nur Gegnerziele (→ -06, C); Sperre misst Besitz (→ -05); Erstrunde: Gegnerhelden nicht wählbar, Karte zwingt zur eigenen Wahl |
+| Lesson in the Arts | L2 gezielt | Stapel ≤ 3 ✓, Zug endet ✓, Stapel voll ⇒ nicht spielbar ✓, Abbruch in der Galerie ⇒ Karte bleibt ✓, zweite Magic-Arts-Zone ✓ |
+| Liberation | L2 gezielt | Modus Bergen (0 / 3 Karten, Abbruch, Liberation gelöscht) ✓, Modus Rückholen (gestohlene eigene zurück, von mir gestohlene bleiben) ✓, Aktivierung danach ✓ |
+| Live Show | L2 gezielt | Geben/Nehmen-Grenzen (Zusatz: ≥ 2 mehr geben, höchstens gegeben − 2 nehmen) ✓, Hand-Sperre ⇒ kein Nehmen ✓, aufgelöste Karte nicht verschenkbar ✓ (kein R02-07), Kartenbilanz ✓ |
+| Looming Threat | L2 gezielt | Reveal/Countdown je Handindex (Index-Verschiebung) ✓, Stufe sinkt je Zugende bis 0 ✓, zweites Looming Threat bei aufgedeckter Karte gesperrt ✓, Zusatzaktion ✓ |
+| Love Shot | L2 gezielt | Heldenwahl nach Besitz ✗(→ -15); Ziehen vom Gegnerdeck, Nicht-Abbrechbarkeit der Heldenwahl mit Kommentar (bewusst), innerer Zauber als Zusatzaktion ✓; Vorrunden-Lead (Abbruch nach dem Ziehen): ist im Skript Z. 177–181 begründet (kein Befund) |
+| Magic Hammer | L2 gezielt | Zielliste/Abbruch/Doppelziel (dedupliziert) ✓, Überkreuz-Diebstahl ✗(→ -17) |
+| Market Crash | L2 gezielt | Gold 100/50, 100/100, 50/100, 0/0, mit verbrauchter Aktion: Zusatzaktion nur bei echtem Vorsprung ✓, beide 0 ✓; Erstrunde (= B-05) |
+
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+- **Staffeln** Haste (2/3/4), Heal (150/200/300), Draw (4-5-6 / 5-4-3), Frost Breaker (100/200/300 nach Summe beider Schulen), Iceage (1/2 Züge), Icy Grave (2), Icebolt (1), Cryo („rest of the game", 8 Zugwechsel) und Hymn (Singing 0–3) stimmen mit dem Text.
+- **Zusatzaktions-Buchhaltung** über echten Spielweg: Gate to the Armory (Zusatz ⇒ Zug endet, normal ⇒ Zug läuft, Abbruch ⇒ Karte zurück), Gather Intel (Sperre nur bei Zusatz, fällt am Zugende), Graveyard Gathering, Market Crash (nur bei echtem Goldvorsprung), Frost Breaker (nur bei vor meinem letzten Zug gesetztem Frost), Hole in the Sky (nur wenn beide Seiten Kreaturen kontrollieren), Looming Threat, Live Show, Inheritance Ceremony, Fire Bolts Enhanced, Guard Change (SM 2).
+- **Erstrunden-Schutz:** Howling in the Night, Gather Intel, Live Show, Instant Cryo Stasis, Frost Breaker, Great Offensive, Holy Selection, Guard Change sind in Zug 1 nicht spielbar bzw. gegated; Draw lässt den Gegner unberührt; Explosion/Fireball/Fire Bolts bleiben ohne Ziel auf der Hand. (Die gegateten Lücken Flame Avalanche, Forbidden Zone, Iceage, Laser Volley, Market Crash stehen schon in B-05/B-06.) Heat Wave, Energy Drain, Hole in the Sky, Last Resort, Hand of Death haben in Zug 1 eigene bzw. verzögerte Wirkung – kein Befund.
+- **Tuscan Artist** (Prüfauftrag A07-19/C01-15): Haste (2/3) gesperrt, bei 4 frei; Divine Zeal entfernt den Status, der 2er-Zug wird negiert; Draw-Staffel mit Artist beim Wirker: Gegnerzug 3 negiert, 1 und 2 nicht; Gather Intel „draw 2" wird negiert. Die einzige Lücke ist Haste unter `drawLocked`/`handLocked` (→ -21).
+- **Kontrolle statt Besitz bestätigt:** Fireball, Explosion (Listen), Iceage, Forbidden Zone, Laser Volley, Hole in the Sky (genau einmal getötet, Ablage des Besitzers), Great Offensive, Instant Cryo Stasis.
+- **Abbruch (null) mit Karte zurück auf der Hand:** Explosion, Fireball, Magic Hammer, Heal, Fire Bolts, Gate, Liberation, Lesson in the Arts, End of the Future. (Ausnahmen mit Befund: Hymn, Divine Zeal, Holy Selection/Ida.)
+- **Sperren:** Graveyard Gathering unter Such-/Hand-Sperre nicht spielbar ✓ (Gegenprobe zu -22); Gather Intel unter Hand-Sperre ⇒ nur „draw 2".
+- **Prüfaufträge ohne neuen Befund:** `currentHp ?? 0` kommt in der Gruppe nur in Forbidden Zone vor (-09); `_castSpellImmediately` ohne `oncePerGame`: Divine Gift of The Light wird über Call for Help als zweites Gift gewirkt (= S01-11, hier mit „Light" bestätigt); Live Show, End of the Future und Lesson in the Arts schließen die aufgelöste Karte korrekt aus der Hand aus (R02-07 trifft in der Gruppe nur Draw, -20).
+

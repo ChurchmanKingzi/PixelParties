@@ -252,6 +252,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/29-ushabti-beschwoerung-umgeht-beschwoerungssperren.js` (✗ = Handler ohne Sperrprüfung)
 - **Vermutete Ursache:** `server.js` ~15055-15150: nur Level-, Zonen- und `canSummon`-Prüfung, keine Sperren. Restunsicherheit (daher B): nur gelesen/statisch belegt, nicht über den Socket ausgeführt.
 
+### A08-30 · Waflav-Formen: die Zielliste „any target on the board" führt eine seitenfremde Kreatur unter dem Besitzer-Brett, IDs kollidieren · Stufe B
+- **Karten:** Flamebathed, Swampborne, Thunderstruck, Deep-Drowned Waflav (gemeinsam `_waflav-shared.js collectBoardTargets`); Prüfauftrag „Zielsammler Brettspalte / Besitzer ODER Kontrolleur"
+- **Voraussetzungen / Aufbau:** Sitz 0 hat „ZZ Dummy" (Held 0 / Slot 0) und spielt Plant Golem (Besitzer 0, Kontrolleur 1, steht auf Seite 1 / Held 0 / Slot 0). Waflav steigt zu Swampborne auf, die Zielwahl öffnet sich.
+- **Erwartet** (Text: „Choose any target on the board"; Bakhm liefert denselben Golem korrekt als `equip-1-0-0` mit Brettseite 1, gemessen): Der Golem erscheint mit der Brettseite 1, alle IDs sind eindeutig.
+- **Beobachtet:** Der Golem trägt `owner: 0` und die ID `equip-0-0-0` – identisch mit der Dummy von Seite 0. Die Oberfläche kann das Ziel nur an der falschen Stelle zeichnen (Seite 0 / Held 0 / Slot 0), und `targets.find(t => t.id === pick[0])` liefert stets den ersten Eintrag; der Golem lässt sich nicht gezielt wählen. Ohne gleichkoordinierte Kreatur liegt die Markierung auf einem leeren Platz der Besitzerseite.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/30-waflav-zielliste-seitenfremde-kreatur.js` (✗ = Fehler tritt auf; Oberfläche nicht geprüft – daher B)
+- **Vermutete Ursache:** `_waflav-shared.js` ~Z. 436-445: `id: equip-${inst.owner}-…`, `owner: inst.owner` statt der Brettseite (`engine.physicalSide(inst)`). Gleiche Klasse wie A08-16/-18.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

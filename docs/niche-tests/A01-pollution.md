@@ -291,6 +291,15 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Repro:** `docs/niche-tests/repro/A01-pollution/31-anti-magic-enchantment-ignoriert-status-zauber.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` ~8180 / ~35303: das Schild wird nur vor Schaden erfragt. Die Status-/Buff-/Heilungspfade lesen `_isAmeShieldedHero` (~17817, ~44747) zwar, aber ohne vorherigen Schaden wird nie gefragt. Abhilfe: das (tote) Ziel-Fenster `_checkAntiMagicEnchantmentNegation` an der Zielwahl bzw. beim Statussetzen durch einen Zauber aufrufen. Restunsicherheit: ob die Autoren die AME bewusst auf Schaden beschränkt haben (der Kartentext sagt „a Spell that hits it“).
 
+### A01-pollution-32 · Circle-of-Hell-Replay umgeht „nur ein Zauber pro Zug“ (Eraser Beam) und „keine weitere Area“ (Reality Crack) · Stufe B
+- **Karten:** The Fifth Circle of Hell (stellvertretend für alle Circles 2–8), Dante (Auslöser), Eraser Beam, Reality Crack; Engine `_castSpellImmediately` / `getHeroEligibleActionCards`
+- **Voraussetzungen / Aufbau:** Sitz 0: Dante (Destruction Magic 3 + Magic Arts 3), Fifth Circle of Hell und Heal auf der Hand, eine gelöschte Area im Stapel (Dantes Vorbedingung); „Ja“ auf alles. (a) Echtes `t.play(0, 'Eraser Beam')`, (b) echtes `t.play(0, 'Reality Crack')` (Area-Wahl abgebrochen).
+- **Schritte:** 1. Eraser Beam bzw. Reality Crack spielen. 2. `t.activateHero(0, 0)`: Dante Weg 1, die Fifth Circle aus der Hand löschen. 3. Nach-Ketten-Aktion (Replay-Angebot „Ja“).
+- **Erwartet** (Quelle: Eraser Beam „This must be the only Spell you play this turn“; Reality Crack „You cannot play another Area for the rest of the turn afterwards“; Circle „… **play** this deleted Spell as an additional Action“ – ein Area-Zauber, der gespielt wird): kein Replay; die Karte bleibt im Gelöscht-Stapel. (Kontrolle: Heal aus der Hand ist nach Eraser Beam gesperrt.)
+- **Beobachtet:** In beiden Fällen erscheint das Replay-Angebot und die Fifth Circle liegt danach als Area auf dem Brett – im selben Zug ein zweiter Zauber nach Eraser Beam bzw. eine zweite Area nach Reality Crack. Die Wirker-Probe (`moeglicheWirker` → `getHeroEligibleActionCards`) liest weder `ps._spellLockTurn` noch `ps._cantPlayAreaThisTurn`. (Umgekehrt ist es richtig: Circle-Replay zuerst, danach Eraser Beam wird abgelehnt.)
+- **Repro:** `docs/niche-tests/repro/A01-pollution/32-circle-replay-umgeht-zauber-und-area-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Die beiden Sperren stehen nur in `getHeroPlayableCards` (`_engine.js` ~20061) und `validateActionPlay` (~20866/~20870), nicht in `getHeroEligibleActionCards`/`_castSpellImmediately`; betroffen ist jeder Zusatzaktions-Pfad darüber (Circles, vermutlich auch andere „play as an additional Action“-Karten). Restunsicherheit: ob die Autoren das Replay bewusst als Ausnahme von den Sperren verstehen (`_hell-circles-shared.js` nennt Schulprüfung, Kette und Zusatzaktion, aber keine Sperren).
+
 ## Abdeckung
 (wird ergänzt)
 

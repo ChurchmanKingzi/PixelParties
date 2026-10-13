@@ -284,6 +284,24 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/30-spear-rider-stolen-id-collision.js` (ausgeführt: 3 ✗)
 - **Vermutete Ursache:** `aquatic-spear.js` Z. 48–50: `owner = inst.controller ?? inst.owner` (Kontrolle) in ID und `owner`, `pool.find(t => t.id === id)`; `aquatic-arrows.js` Z. 64 macht es richtig (`engine.physicalSide(inst)`). Gleiches Muster in `slippery-pengu.js` Z. 72 (-28). Randnotiz (kosmetisch): `deepsea-reaper.js` Z. 81 sendet `scythe_cut` mit `victim.controller ?? victim.owner`, die Sense erscheint bei einer geliehenen Kreatur auf dem falschen Brett (gemessen: owner 0 statt 1); `aquatic-shield.js` Z. 129 sendet `shield_block` mit `owner: pi` für geliehene Kreaturen.
 
+### A02-deepsea-31 · Slippery Whoolmoth: Level-Rabatt zählt eine geliehene Gegnerkreatur an denselben Koordinaten als „Kreatur bei meinem Helden" · Stufe B
+- **Karten:** Slippery Whoolmoth (`slippery-whoolmoth.js` `slotHoldsCreature`/`eachAliveHeroHasCreature`/`reduceCardLevel`), Deepsea Succubus (Auslöser, im Repro per `actionStealCreature`).
+- **Voraussetzungen / Aufbau:** Seat 0: Held 0 und Held 1 mit je einer Kreatur, Held 2 trägt NUR ein Artefakt in Slot 0; Whoolmoth auf der Hand. Seat 1: Kreatur in Held 2 / Slot 0 (in der Instanzliste vor meinem Artefakt), von Seat 0 geliehen.
+- **Schritte:** `reduceCardLevel` der Whoolmoth-Handkarte abfragen (so entscheidet der Server über die Spielbarkeit).
+- **Erwartet** (Quelle: Kartentext „If there is at least 1 Creature in a Support Zone of each of your Heroes, this Creature's level in your hand becomes 0"): Held 2 hat keine Kreatur in seinen Support Zones; die geliehene steht in der Zone des GEGNER-Helden. Rabatt = 0.
+- **Beobachtet:** Rabatt 5 (Level wird 0). Ohne Diebstahl 0 (Kontrolle ✓). Der Helfer sucht die Instanz zur Koordinate nur über `heroIdx`/`zoneSlot` und `owner === ownerIdx || controller === ownerIdx`, nicht über die Brettseite; er trifft die geliehene Kreatur und hält mein Artefakt-Feld für eine Kreatur. Das Ergebnis hängt von der Instanzreihenfolge ab.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/31-whoolmoth-level-stolen-coordinates.js` (ausgeführt: 1 ✗)
+- **Vermutete Ursache:** `slippery-whoolmoth.js` Z. 41–46 (`engine.cardInstances.find(c => … (c.owner === ownerIdx || c.controller === ownerIdx))` ohne `engine.physicalSide(c) === ownerIdx`). Gleiches Instanz-nach-Koordinate-Muster wie -01 (Siren) und -06 (Skates).
+
+### A02-deepsea-32 · Deepsea Monstrosity: gewählte Kreatur wird nur über Held/Slot aufgelöst – bei gleichen Koordinaten auf beiden Brettern wird die falsche zurückgenommen · Stufe A
+- **Karten:** Deepsea Monstrosity (`deepsea-monstrosity.js` Z. 71–103); gleiches Muster Shapeshift (Z. 157) und Deepsea Castle (Z. 151, nicht gesondert reproduziert; deren Zonenlisten tragen kein `owner`). Prüfauftrag „Zielsammler Brettspalte".
+- **Voraussetzungen / Aufbau:** Seat 0: Monstrosity auf der Hand (Held 0, Summoning Magic Lv2), eigene Deepsea Skeleton in Held 1 / Slot 0 (eine Runde alt). Seat 1: Deepsea Bats in Held 1 / Slot 0, von Seat 0 geliehen. Die Zonenwahl zeigt beide (`owner` 0 bzw. 1).
+- **Schritte:** Monstrosity normal beschwören, die Zone der geliehenen Bats (`owner` 1) wählen.
+- **Erwartet** (Quelle: Kartentext „choose one of your other "Deepsea" Creatures in play. Add it back to your hand"): Die gewählte Kreatur wird zurückgenommen, die nicht gewählte bleibt stehen.
+- **Beobachtet:** Liegt meine Skeleton in der Instanzliste vor den Bats, kommt die SKELETON auf meine Hand, die gewählten Bats bleiben stehen. Mit den Bats zuerst stimmt es (Kontrolle ✓: Bats auf der Hand des Besitzers, Seat 1).
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/32-monstrosity-pick-ignores-side.js` (ausgeführt: 2 ✗)
+- **Vermutete Ursache:** `candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx)` vergleicht `picked.owner` (die Brettseite, die die Zonenliste Z. 85–93 mitgibt) nicht.
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
