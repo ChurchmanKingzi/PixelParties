@@ -36492,7 +36492,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!plan || plan.casterIdx == null) return true;
     const pi = this._rxOwnerIdx(ps, '_rxCastWirkerWaehlen');
     if (pi < 0) return true;
-    const kandidaten = this._rxCastKandidaten(ps, cardName, script, opts) || [];
+    const kandidatenRoh = this._rxCastKandidaten(ps, cardName, script, opts);
+    // M01-03: `null` = die Karte braucht keinen Wirker (Potion) — nichts zu waehlen,
+    // der Plan bleibt wie er ist. Frueher wurde das zu `[]` und die Reaktion verworfen.
+    if (kandidatenRoh === null) return true;
+    const kandidaten = kandidatenRoh || [];
     if (kandidaten.length <= 1) {
       if (kandidaten.length === 1) Object.assign(plan, kandidaten[0]);
       return kandidaten.length === 1;
