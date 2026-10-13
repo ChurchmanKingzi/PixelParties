@@ -109,14 +109,17 @@ module.exports = {
         if (!inst || inst.zone !== 'support') continue;
         // Einmal je Schlag, nicht je Kreatur — `source` entprellt.
         await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: 'null-batch', windowMs: 1200 });
-        // ★ Gleiche Ueberlegung wie beim Helden: `applyCreatureStatus`
-        // mit `duration` ist der Weg, den Iceage fuer seinen
-        // Zwei-Runden-Frost geht — die Dauer landet in
-        // `counters.negatedDuration` und wird angezeigt UND
-        // heruntergezaehlt. `actionNegateCreature` legt sie stattdessen
-        // in einen Buff, den das Badge erst suchen muss.
-        await engine.applyCreatureStatus(inst, 'negated', {
-          duration: DAUER, appliedBy: pi, source: CARD_NAME,
+        // ★ Kreaturen: `applyCreatureStatus(…, 'negated', { duration })` legt
+        // `negatedDuration` an, aber der Zugende-Abbau zaehlt nur Frost und
+        // Betaeubung herunter — die Negation lief nie ab (H03-heroes-15).
+        // Deshalb der Weg mit Ablaufzug (Locke): „for 2 turns" = bis zum
+        // Beginn des eigenen uebernaechsten Zuges, wie beim Helden oben.
+        // Die Status-Sperren (Immunitaeten, Light Ball …) prueft vorab
+        // `canApplyCreatureStatus`; `cleansable`: „counts as a status effect".
+        if (!engine.canApplyCreatureStatus(inst, 'negated', { name: CARD_NAME, owner: pi })) continue;
+        await engine.actionNegateCreature(inst, CARD_NAME, {
+          expiresAtTurn: gs.turn + DAUER, expiresForPlayer: pi,
+          buffKey: 'null_negated', removeAnim: 'status_remove', cleansable: true,
         });
         engine.log('null_silence', {
           player: gs.players[pi]?.username, target: inst.name, turns: DAUER,

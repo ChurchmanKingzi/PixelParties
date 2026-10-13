@@ -163,6 +163,16 @@ module.exports = {
       applyAtkBonus(ctx, leavingInst?.id);
     },
 
+    // ── Wiederbelebung: die Ausruestung ging beim Tod verloren, ihr Bonus nicht ─
+    // (H04-03) Beim Heldentod wirft die Engine die Ausruestung ab, ohne Torasʼ
+    // eigenen `onCardLeaveZone` zu rufen — `hero.atk` behielt den Phantom-Bonus.
+    // Bei der Wiederbelebung neu rechnen: Zaehlung (0 ohne Ausruestung) gegen den
+    // gemerkten Bonus.
+    onHeroRevive: (ctx) => {
+      if (!ctx.attachedHero || ctx.hero !== ctx.attachedHero) return;
+      applyAtkBonus(ctx);
+    },
+
     // ── Clean up flag and stored bonus when Toras is KO'd ───────────────────
 
     onHeroKO: (ctx) => {
