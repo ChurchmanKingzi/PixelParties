@@ -362,6 +362,7 @@ module.exports = {
       const oldInst = ctx.card;
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: 650,
+        summonOpts: { alsZusatzaktion: true },   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       // Den Listener-Klon in der Ablage abräumen (sonst verwaist er).

@@ -193,21 +193,11 @@ module.exports = {
     // (Cute Cheese-style self-effects). Strategy: load the artifact's
     // own resolution path and invoke it for free.
     //
-    // Cost bypass — Swagdri's text says "without paying its Cost", and
-    // for `manualGoldCost` artifacts (Book of Doom's per-target scaling)
-    // the resolve does its own gold deduction. We can't intercept that
-    // cleanly, so we bump the player's gold by a generous headroom
-    // before resolving and restore the original value afterwards. Net
-    // effect: any deduction made by the resolve is undone, leaving the
-    // player at their pre-Swagdri gold total. Headroom is the artifact's
-    // base cost × the targeting maxTotal (capped at 99 per the
-    // `manualGoldCost` convention) so even an "all-in" Book of Doom on
-    // 99 targets fits.
+    // Cost bypass — Swagdri's text says "without paying its Cost":
+    // siehe Gratis-Scope weiter unten.
     const { loadCardEffect } = require('./_loader');
     const script = loadCardEffect(top);
     if (!script) return;
-
-    const baseCost = cd?.cost || 0;
 
     // Build validTargets + config for targeting artifacts.
     const isTargetingArtifact = !!(script.getValidTargets && script.targetingConfig);
@@ -252,26 +242,20 @@ module.exports = {
     if (!popped) return;
     engine.sync();
 
-    // Cost bypass via gold save/restore.
-    // `_goldFreeze` masks the inflated value in sendGameState so the
-    // client's diff-detector never sees the +headroom bump or the
-    // -headroom restore. Without this freeze the player would see
-    // a -999 (or larger) red floater above the gold counter.
-    const origGold = ps.gold || 0;
-    const headroom = Math.max(baseCost * 99, 999);
-    ps._goldFreeze = origGold;
-    ps.gold = origGold + headroom;
+    // Kosten umgehen ueber den Gratis-Scope (`engine.kostenlosSpielen`):
+    // fuer `pi` ist `canAffordGold` wahr und `_payCardCost` bucht nichts
+    // ab – auch Artifacts mit eigener Kostenrechnung (manualGoldCost)
+    // zahlen nichts. Frueher: Gold sichern/zuruecksetzen, das jeden
+    // Gold-GEWINN des Artifacts mit verwarf (A04-cute-03, Golden Bananas).
     try {
       if (script.resolve) {
-        await script.resolve(engine, pi, selectedIds, validTargets);
+        await engine.kostenlosSpielen(pi, async () => {
+          await script.resolve(engine, pi, selectedIds, validTargets);
+        });
       }
     } catch (err) {
       console.error('[Swagdri] artifact resolve error:', err?.message);
     }
-    // Restore gold and clear the freeze so subsequent gold changes
-    // (gains/losses outside the Swagdri play) animate normally.
-    ps.gold = origGold;
-    delete ps._goldFreeze;
 
     // Route the artifact to deletedPile (per Swagdri's text). The
     // synthetic flow never put it in hand, so there's no hand splice

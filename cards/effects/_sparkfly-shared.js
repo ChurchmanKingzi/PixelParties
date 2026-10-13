@@ -165,10 +165,13 @@ function grantInheritedAbility(queenInst, sourceName) {
  * after the aura strip to make sure the gift doesn't accidentally
  * lose its non-damage immunity.
  */
-function refreshAttendantAura(engine, playerIdx) {
+function refreshAttendantAura(engine, playerIdx, opts = {}) {
+  // `opts.ausserId`: ein Attendant, der gerade geht - sein Abgangs-Hook feuert,
+  // solange er noch in der Zone `support` gefuehrt wird; er zaehlt nicht mehr (A05-11).
   const hasAttendant = engine.cardInstances.some(inst =>
     inst.zone === 'support'
     && inst.name === 'Sparkfly Attendant'
+    && inst.id !== opts.ausserId
     && (inst.controller ?? inst.owner) === playerIdx,
   );
 

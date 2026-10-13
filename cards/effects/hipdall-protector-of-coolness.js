@@ -65,7 +65,10 @@ module.exports = {
       // counter; claim only after the player confirms.
       if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return;
 
-      const cardName = ctx.cardName;
+      // `ctx.cardName` ist der ZUHOERER (Hipdall); die gehende Karte reicht
+      // die Engine als `leavingCardName` mit (A04-cute-09).
+      const cardName = ctx.leavingCardName;
+      if (!cardName) return;
       const toZone = ctx.toZone;
       // Skip if the target is the board (Glorious Rebirth, Modnir,
       // Swellpnir, Hipdall self-summon, Swagdri self-summon) — those

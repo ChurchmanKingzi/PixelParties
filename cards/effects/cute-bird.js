@@ -70,6 +70,9 @@ module.exports = {
       if ((ps.hand || []).length < DISCARD_COST) return;
       // Payoff check: at least one Cute Phoenix in deck.
       if (!(ps.mainDeck || []).includes(TUTOR_TARGET)) return;
+      // "You can only control 1 Cute Phoenix": die Beschwoerung wuerde verweigert -
+      // gar nicht erst anbieten, damit keine Abwurfkosten fuer nichts anfallen (A04-cute-10).
+      if (engine.nurEinerSchonKontrolliert(pi, TUTOR_TARGET)) return;
 
       // Original slot — same Support Zone the Bird died in. Phoenix
       // tries this slot first; safePlaceInSupport falls back to any

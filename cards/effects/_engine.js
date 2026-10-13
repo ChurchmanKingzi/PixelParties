@@ -26712,6 +26712,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (origPs) {
         const dIdx = origPs.discardPile.lastIndexOf(reviveAfterDeath.name);
         if (dIdx >= 0) _ablage = await this.ablageEntnahme(reviveAfterDeath.owner, _pileOwner, dIdx, { source: reviveAfterDeath.by });
+        else {
+          // Hat Wildur den Kadaver auf den Coolness Stack umgeleitet, liegt er dort
+          // obenauf: er ist die Karte, die wiederbelebt wird, keine zweite Kopie (A04-cute-17).
+          const sInst = this.getCoolnessStackTopInst(_pileOwner);
+          if (sInst && sInst.name === reviveAfterDeath.name && sInst._wildurKadaver) {
+            await this.actionPopCoolnessStackTo(_pileOwner, 'board');
+          }
+        }
       }
       // Re-summon. Default (Bone Dog etc.) is hooks-suppressed: the
       // revived creature is the same one that just died, so on-summon
@@ -48051,6 +48059,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[playerIdx];
     if (!ps?.coolnessStack?.length) return null;
     const cardName = ps.coolnessStack.pop();
+    let gerettet = false;   // „deleted from anywhere"-Rettung (Cute Hydra) hat gegriffen
     // Match the rightmost (top) inst — there can be multiple stacked
     // copies of the same name on the Stack, and the inst we're popping
     // is the most recently pushed one.
@@ -48086,30 +48095,42 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (inst) inst.zone = ZONES.DISCARD;
       toZone = ZONES.DISCARD;
     } else if (dest === 'delete') {
-      ps.deletedPile.push(cardName);
-      if (inst) inst.zone = ZONES.DELETED;
-      toZone = ZONES.DELETED;
+      // „Deleted from anywhere"-Rettung (Cute Hydra, Ash Worms; A04-cute-06):
+      // zwischen Entnahme und Geloescht-Stapel, wie in jedem Loeschweg.
+      gerettet = await this._tryBeforeDelete(cardName, playerIdx, {
+        fromZone: ZONES.COOLNESS_STACK, fromInstance: inst, source: opts.source || null,
+      });
+      if (gerettet) {
+        // Der Retter hat die Karte neu beschworen und die Instanz abgeraeumt.
+        toZone = ZONES.SUPPORT;
+        this.log('delete_rescued', { player: ps.username, card: cardName, from: 'coolnessStack', source: opts.source || null });
+      } else {
+        ps.deletedPile.push(cardName);
+        if (inst) inst.zone = ZONES.DELETED;
+        toZone = ZONES.DELETED;
+      }
     }
 
     this.log('coolness_stack_pop', { player: ps.username, card: cardName, dest, source: opts.source || null });
     this.sync();
-    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'pop', card: cardName, dest });
+    // Gerettet: kein Flug in den Geloescht-Stapel, nur der Stapel zaehlt herunter.
+    this._broadcastEvent('coolness_stack_change', { owner: playerIdx, mode: 'pop', card: cardName, dest: gerettet ? 'board' : dest });
     await this._delay(450);
 
     await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
-      card: inst, cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx, toZone,
+      card: inst, cardName, leavingCardName: cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx, toZone,
     });
     if (dest === 'discard') {
       await this.runHooks(HOOKS.ON_DISCARD, {
         playerIdx, card: inst, cardName, discardedCardName: cardName,
         discardedInstId: inst?.id ?? null, _fromCoolnessStack: true, source: opts.source || null,
       });
-    } else if (dest === 'delete') {
+    } else if (dest === 'delete' && !gerettet) {
       await this.runHooks(HOOKS.ON_DELETE, {
         playerIdx, card: inst, cardName, _fromCoolnessStack: true, source: opts.source || null,
       });
     }
-    if (toZone) {
+    if (toZone && !gerettet) {
       await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, {
         enteringCard: inst, cardName, toZone, toOwner: playerIdx, fromZone: ZONES.COOLNESS_STACK,
       });
@@ -48304,9 +48325,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Der DELETED PILE waechst erst zur Landung; dort verdeckt der
       // Client ohnehin bis dahin.
       await this._delay(COOLNESS_LANDE_MS);
-      ps.deletedPile.push(cardName);
-      if (inst) inst.zone = ZONES.DELETED;
-      movedInsts.push({ inst, cardName });
+      // „Deleted from anywhere"-Rettung (Cute Hydra, Ash Worms; A04-cute-06).
+      const gerettet = await this._tryBeforeDelete(cardName, playerIdx, {
+        fromZone: ZONES.COOLNESS_STACK, fromInstance: inst, source: opts.source || null,
+      });
+      if (gerettet) {
+        this.log('delete_rescued', { player: ps.username, card: cardName, from: 'coolnessStack', source: opts.source || null });
+      } else {
+        ps.deletedPile.push(cardName);
+        if (inst) inst.zone = ZONES.DELETED;
+      }
+      movedInsts.push({ inst, cardName, gerettet });
       this.sync();
       // Kurze Luecke, bevor die naechste Karte startet: die Maske des
       // Clients wird knapp NACH der Landung freigegeben (Netzlaufzeit),
@@ -48315,10 +48344,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (i < stack.length - 1) await this._delay(COOLNESS_LUECKE_MS);
     }
     await this._delay(200);
-    for (const { inst, cardName } of movedInsts) {
+    for (const { inst, cardName, gerettet } of movedInsts) {
       await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
-        card: inst, cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx, toZone: ZONES.DELETED,
+        card: inst, cardName, leavingCardName: cardName, fromZone: ZONES.COOLNESS_STACK, fromOwner: playerIdx,
+        toZone: gerettet ? ZONES.SUPPORT : ZONES.DELETED,
       });
+      if (gerettet) continue;
       await this.runHooks(HOOKS.ON_DELETE, {
         playerIdx, card: inst, cardName, _fromCoolnessStack: true, source: opts.source || null,
       });

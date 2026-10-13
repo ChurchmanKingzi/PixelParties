@@ -117,6 +117,10 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
 
   const targetInst = target.cardInstance;
   const ops = gs.players[oi];
+  // Brettseite des Ziels: eine gestohlene Kreatur liegt weiter auf der Seite
+  // ihres Besitzers (`physicalSide`), obwohl `oi` sie kontrolliert (A05-03).
+  const feldSeite = engine.physicalSide(targetInst);
+  const fps = gs.players[feldSeite] || ops;
   const fromZone = targetInst.zone;
   const fromHeroIdx = targetInst.heroIdx;
   const fromZoneSlot = targetInst.zoneSlot;
@@ -158,7 +162,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // fizzles below).
   engine._broadcastEvent('play_zone_animation', {
     type: ANIM_TYPE,
-    owner: oi,
+    owner: feldSeite,
     heroIdx: fromHeroIdx,
     zoneSlot: fromZone === 'support' ? fromZoneSlot : -1,
     zoneType: fromZone,
@@ -188,7 +192,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // No-op for ability-zone targets (the watcher only tracks creatures).
   if (fromZone === 'support') {
     engine._broadcastEvent('creature_zone_move', {
-      owner: oi, heroIdx: fromHeroIdx, zoneSlot: fromZoneSlot,
+      owner: feldSeite, heroIdx: fromHeroIdx, zoneSlot: fromZoneSlot,
     });
   }
 
@@ -208,11 +212,11 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
 
   // Splice the name out of the proper zone array.
   if (fromZone === 'support') {
-    const slotArr = (ops.supportZones?.[fromHeroIdx] || [])[fromZoneSlot] || [];
+    const slotArr = (fps.supportZones?.[fromHeroIdx] || [])[fromZoneSlot] || [];
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
   } else if (fromZone === 'ability') {
-    const slotArr = (ops.abilityZones?.[fromHeroIdx] || [])[fromZoneSlot] || [];
+    const slotArr = (fps.abilityZones?.[fromHeroIdx] || [])[fromZoneSlot] || [];
     const idx = slotArr.indexOf(cardName);
     if (idx >= 0) slotArr.splice(idx, 1);
   }

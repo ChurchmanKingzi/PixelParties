@@ -49,7 +49,9 @@ module.exports = {
       if (myDp.length > 0) {
         const moved = myDp.length;
         ps.mainDeck.push(...myDp);
-        ps.discardPile = [];
+        // In place leeren, das Array nicht ersetzen: sonst geht ein
+        // `discardPile.push`-Override (Wildur, Forsaken) verloren (A04-cute-08).
+        myDp.length = 0;
         engine.shuffleDeck(pi, 'main');
         engine.log('guard_duty_shuffle_self', { player: ps.username, moved });
         // Hatusbals Bonus: diese Karte geht an `actionRecycleCards`
@@ -74,7 +76,7 @@ module.exports = {
         if (choice?.optionId === 'yes') {
           const moved = ops.discardPile.length;
           ops.mainDeck.push(...ops.discardPile);
-          ops.discardPile = [];
+          ops.discardPile.length = 0;   // in place (A04-cute-08)
           engine.shuffleDeck(oi, 'main');
           engine.log('guard_duty_shuffle_opp', { player: ops.username, moved });
         }

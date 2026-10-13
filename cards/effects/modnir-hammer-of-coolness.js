@@ -30,6 +30,10 @@ module.exports = {
     },
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'support') return;
+      // Nur der eigene Abgang nimmt den Bonus - nicht jede Karte, die irgendeine
+      // Support Zone verlaesst (A04-cute-19). Muster wie Cute Crown.
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card.id) return;
+      if (!ctx.leavingCard && (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot)) return;
       ctx.revokeAtk();
     },
   },

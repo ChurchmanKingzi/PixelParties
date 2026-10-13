@@ -47,9 +47,13 @@ module.exports = {
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
+      const sizeBefore = engine.getCoolnessStackSize(ctx.cardOwner);
       await engine.placeArea(ctx.cardOwner, ctx.card);
       // Seed the Stack from the top of the deck. requireStack is OFF
       // here — Wowhalla creates the Stack from nothing on entry.
+      // Hat der onCardEnterZone-Hook (unten) beim Platzieren schon
+      // geseedet, wird nicht ein zweites Mal gelegt (A04-cute-01).
+      if (engine.getCoolnessStackSize(ctx.cardOwner) > sizeBefore) return;
       await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
 
@@ -83,8 +87,8 @@ module.exports = {
      *
      * Der Kartentext sagt „When this card comes into play" — eine
      * Puzzle-Platzierung IST das. Doppelbefuellung ist ausgeschlossen:
-     * `onPlay` legt den Stack an, bevor dieser Hook laeuft, und wir
-     * fuellen nur einen LEEREN Stack.
+     * wir fuellen hier nur einen LEEREN Stack, und `onPlay` seedet
+     * nur, wenn dieser Hook beim Platzieren nichts gelegt hat.
      */
     onCardEnterZone: async (ctx) => {
       if (ctx.toZone !== 'area') return;
@@ -124,6 +128,9 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       if (ctx.fromZone !== 'area') return;
       if (ctx.fromOwner !== undefined && ctx.fromOwner !== ctx.cardOwner) return;
+      // Nur der eigene Abgang loescht den Stack – nicht jede andere
+      // eigene Area, die das Brett verlaesst (A04-cute-02).
+      if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card.id) return;
       await ctx.deleteCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
     },
   },
