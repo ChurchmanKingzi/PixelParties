@@ -19099,6 +19099,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
     pi = this._resolvePi(pi);
+    // A09-20: „You cannot summon this Creature, except with its own effect" (Elven Rider) – fremde Effekte duerfen sie aus keinem Stapel beschwoeren.
+    if (loadCardEffect(cardName)?.summonOnlyViaOwnEffect) return null;
     // v1393: Deck laeuft ueber die EINE Stelle (summonFromDeck).
     // Styx 28.9.: `opts.heldSeite` — physische Seite eines uebernommenen
     // Zielhelden; die Kreatur landet dort und gehoert `pi`.

@@ -177,6 +177,10 @@ module.exports = {
   // board. Hook bodies gate on `ctx.cardZone` to split behaviour.
   activeIn: ['hand', 'support'],
 
+  // „You cannot summon this Creature, except with its own effect." – `engine.summonFromPile` weist fremde
+  // Effekt-Beschwoerungen (Tamed Primordium & Co.) damit ab; der eigene Weg nutzt `summonCreatureWithHooks`.
+  summonOnlyViaOwnEffect: true,
+
   hooks: {
     // ── Reaction trigger: an Elven Creature we control dies ──
     onCreatureDeath: async (ctx) => {

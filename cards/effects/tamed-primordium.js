@@ -21,6 +21,7 @@
 //    faellt am Zugbeginn).
 // ═══════════════════════════════════════════
 const { eligibleSummonZones } = require('./_summon-eligibility');
+const { loadCardEffect } = require('./_loader');
 
 // Kontrolle statt Seite (Styx 28.9.): Beschwoerungsplaetze bei allen
 // Helden, die `pi` kontrolliert (Zonen tragen `owner` = physische Seite).
@@ -52,6 +53,7 @@ function eligibleHand(engine, pi) {
   for (const n of new Set(ps?.hand || [])) {
     const cd = cardDB[n];
     if (!cd || !(cd.cardType === 'Creature' || String(cd.cardType || '').split('/').includes('Creature'))) continue;
+    if (loadCardEffect(n)?.summonOnlyViaOwnEffect) continue;   // A09-20: Elven Rider („except with its own effect")
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
     if (summonZonesFor(engine, pi, cd).length === 0) continue;
     out.push(n);
