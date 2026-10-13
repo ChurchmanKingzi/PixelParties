@@ -4003,7 +4003,7 @@ function PuzzleCreator() {
                   style={{ ...zs('ability'), ...hl('ability', si, hi, slot) }}
                   data-ability-zone="1" data-ability-owner={isOpp ? 'opp' : 'me'}
                   {...zh('ability', si, hi, slot)}>
-                  {(p.abilityZones[hi]?.[slot]||[]).length > 0 ? <BoardCard cardName={p.abilityZones[hi][slot][0]} label={p.abilityZones[hi][slot].length > 1 ? String(p.abilityZones[hi][slot].length) : undefined} /> : <div className="board-zone-empty">Ability</div>}
+                  {(p.abilityZones[hi]?.[slot]||[]).length > 0 ? <BoardCard cardName={p.abilityZones[hi][slot][0]} abilityLevel={Math.min(3, p.abilityZones[hi][slot].length)} label={p.abilityZones[hi][slot].length > 1 ? String(p.abilityZones[hi][slot].length) : undefined} /> : <div className="board-zone-empty">Ability</div>}
                 </div>
               ))}
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
@@ -4054,7 +4054,7 @@ function PuzzleCreator() {
                           <div className="board-ability-stack">
                             {cards.map((cn, ci) => (
                               <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-                                <BoardCard cardName={cn} />
+                                <BoardCard cardName={cn} abilityLevel={Math.min(3, cards.length)} />
                               </div>
                             ))}
                             {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}

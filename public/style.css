@@ -26156,4 +26156,18 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
   background: rgba(255, 255, 255, .1);
   box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 0 0 1px var(--pp-kontur);
 }
-.tt-body { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+/* Die Boxen im Koerper sind so breit wie der Kopf (Als Befund 13.10.: „Warum ist die Effektbox schmaler als die Namensbox?"):
+   kein seitlicher Rand, damit Namensband, Wertekacheln, Hinweisfelder und Textbox buendig mit dem Kartenbild abschliessen.
+   Der Schlagschatten faellt dort nur nach unten (seitlich wuerde ihn der Tooltip abschneiden). */
+.tt-body { padding: 14px 0 18px; display: flex; flex-direction: column; gap: 14px; }
+.tt-body > .tt-box {
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .08), inset -2px -2px 0 rgba(0, 0, 0, .42), 0 3px 0 rgba(0, 0, 0, .45);
+}
+/* Stufenzeilen einer Ability auf dem Brett: aktuelle Stufe hervorgehoben (goldener Pixelbalken, getoente Zeile), die anderen grau. */
+.tt-stufe { padding: 2px 4px; margin-left: -4px; margin-right: -4px; }
+.tt-stufe-aktiv {
+  background: rgba(255, 226, 110, .13);
+  box-shadow: inset 3px 0 0 rgb(255, 226, 110);
+}
+.tt-stufe-aktiv .tt-nummer { background: rgb(255, 226, 110); color: #1a1408; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .3), 0 0 0 1px var(--pp-kontur); }
+.tt-stufe-aus { opacity: .38; filter: grayscale(1); }

@@ -60,6 +60,11 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
     (`{ lv, kost }`): grün, wenn niedriger als gedruckt, rot, wenn höher, jeweils mit dunkler Kontur (`drawLine` `outline`).
     Der Hover-Tooltip zeigt weiter die gedruckten Werte und erklärt die Abweichung (`handNotes` → „In your hand").
     Das ersetzt die früheren Abzeichen `.creature-level` / `.hand-cost-override` auf der Handkarte.
+  * `?stufe=2` — **Fähigkeitskarten auf dem Brett:** Die Box der aktuellen Stufe (1 = oben, 2 = Mitte, 3 = unten; Stufe =
+    Stapelhöhe, höchstens 3) ist hervorgehoben (heller, goldene Pixelkante), die beiden anderen sind entsättigt und
+    abgedunkelt (`{ stufe }`, `markStufe` in `card-render.js`). `AbilityStack` und die Ability-Zonen des Puzzle-Editors
+    reichen `abilityLevel` an `BoardCard` weiter; der Hover-Tooltip bekommt `_abilityLevel` und hebt die Stufe im Kartenbild
+    und im Text hervor (`TooltipCardImage`, `TTText` `aktiv`). Wirkt nur auf Karten mit drei Stufenfeldern (`skill3`).
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 
