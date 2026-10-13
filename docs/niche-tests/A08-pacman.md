@@ -244,6 +244,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/28-weakening-crystal-ignoriert-statusimmunitaet.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_crystals-shared.js` ~Z. 130 schreibt `hero.statuses.negated = { … }` direkt statt über `addHeroStatus`, wo die Immunitäten stehen (`status_immunity_attachment` `_engine.js` ~44835, Johanna, Submerged, Karian …). Restunsicherheit (daher B): Ob die Immunität einen *dauerhaften Zustand* der Handkarte verhindern soll, ist nicht ausdrücklich entschieden – der Zusatz „counts as a negative status effect" spricht dafür.
 
+### A08-29 · Ushabti: das spätere Beschwören der eingelagerten Kreatur umgeht Grinning Cat und die Beschwörungssperre · Stufe B
+- **Karten:** Ushabti of the Great Pharaoh, Grinning Cat (jede Karte mit `handSummonLockExceptSelf`), `ps.summonLocked`, Greatmaw-Sperre
+- **Voraussetzungen / Aufbau:** Sitz 0 lagert die eigene „ZZ Dummy" per Ushabti in die Surprise Zone (echter Spielweg), hält danach eine Grinning Cat auf der Hand.
+- **Erwartet** (Grinning Cat: „…you cannot summon any Creatures except Grinning Cat"; Ushabti: „A player may summon a Creature placed by this effect as an additional Action"): Das Beschwören aus der Surprise Zone unterliegt derselben Sperre wie das Ausspielen aus der Hand.
+- **Beobachtet:** `getSummonBlocked(0)` sperrt den Namen (mit gleichnamiger Handkopie gemessen – die Liste kennt nur Handkarten). Der Quelltext des Socket-Handlers `summon_ushabti` (server.js ~15055-15150) enthält weder `getSummonBlocked` noch `summonLocked` noch die Greatmaw-Sperre (statisch im Repro belegt, der Handler selbst ist headless nicht aufrufbar); `doPlayCreature` prüft alle drei (server.js ~9804-9806). Dasselbe gilt für die Anzeigeliste `ushabtiSummonable`.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/29-ushabti-beschwoerung-umgeht-beschwoerungssperren.js` (✗ = Handler ohne Sperrprüfung)
+- **Vermutete Ursache:** `server.js` ~15055-15150: nur Level-, Zonen- und `canSummon`-Prüfung, keine Sperren. Restunsicherheit (daher B): nur gelesen/statisch belegt, nicht über den Socket ausgeführt.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

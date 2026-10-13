@@ -1,8 +1,15 @@
 # H02-heroes – Nischenfall-Bericht
-Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird fortlaufend ergänzt) mit Befund.
+Stand/Autor: Agent H02-heroes (Fortsetzung nach Rate-Limit-Abbruch), 13.10.2026. Karten: 37 in der Liste · 36 gezielt getestet (L2) · 26 mit Befund · 35 Befunde (5× A, 23× B, 7× C).
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – Arbeitsstand: Bericht wächst mit jedem bestätigten Befund)
+Insgesamt **35 Befunde: 5× Stufe A, 23× B, 7× C** (jeder mit ausgeführtem Repro unter `docs/niche-tests/repro/H02-heroes/`; alle 35 Repros zeigen ✗ wie berichtet). Wichtigste Punkte:
+* **Ida (-04…-06) und Shapeshifter-Reste (-19), Gon (-03), Ghuanjun (-16)**: Ida hebt ihren Einzelziel-Deckel für fünf Flächenzauber und nach Wiederbelebung nicht (und trifft mit Hole in the Sky Helden); Gon verlängert den Freeze des *Gegners* auf den eigenen Helden statt den eigenen Effekt; Ghuanjuns Basis-ATK-Korrektur macht sieben Attacks falsch. Nach dem Abfallen des Shapeshifters bleiben Ida-Deckel, Fiedel-Rabatt und Friedhelm-Aktionsgrenze (Stufe A).
+* **Dauerverträge ohne Status-Prüfung** (Klasse B-01…B-09): Gobbo negiert (-17), Heragas negiert (-20), Junshi gefroren/betäubt (-23); dazu die Erstrunden-Immunität bei Kits Zufalls-Abwurf (-29).
+* **„Spalte statt Kontrolleur" bei dauerhaft übernommenen Helden**: Jenny (-09), Krates (-24), Layn Master (-25). Dynamisch **in Ordnung** (nach Kontrolle) gemessen: Güldefaber, Ingo, Kassaran, Layn Defender, Fiona (Princess); Johanna, Hel, Klaus, Kit, Kyli, Doq, Koperniko, Kohta (beide) tragen die Styx-28.9.-Anpassung im Skript, wurden aber nicht mit einem dauerhaft übernommenen Helden durchgespielt.
+* **Such-/Handsperren** (H01-11/-22): Kit Modus A legt trotz Hand-/Such-Sperre auf die Hand (-32); Garius' Deck-Suche aufs Brett ist nach dem Ruling „Such-Sperre: die vier Gruppen" (Gruppe C) in Ordnung und deshalb **kein** Befund.
+* **Zähler/Listen, die nie zurückgesetzt werden**: Koperniko liest eine veraltete Tutor-Strichliste (-30); Kohta Masters Super-Kill legt Tokens in die Ablage (-33, Engine-Weg `actionDestroyCard`, vgl. H02-15); Hel prüft das Gold roh statt über Kents Kreditrahmen (-31); Dajan umgeht Race-Boat-Limit und Artefakt-Sperre (-26/-27).
+* **Regelfragen (C)**: Karian (-11/-12), Ida/Cardinal (-07), Kazena (-22), Doq „random" (-28), Layn Defender bei übernommenen Kreaturen (-34), Lethe-Zeitfenster bei später gewonnenem Effekt (-35).
+* **Bewusst nicht getestet**: Kerthwack (Deckbau-Regel in `server.js`/`public/potion-deck-clauses.js`, Skript leer), das Spielstart-Fenster von Kassaran/Hel (Ansage der 3 Namen, Start-Ausrüstung), Hel/Garius/Kyli unter Frost/Betäubung im Detail (nur über den zentralen Hook-Filter gedeckt), Prüfaufträge zu Nutzern außerhalb dieser Liste (Cute Princess Mary, Luna, Sorin, Tsu-Ki, Maho, Idej, Kent/Logan als Nutzer – Kent nur als Kreditgeber für Hel).
 
 ## Befunde
 
@@ -312,7 +319,52 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Frage an Al:** Soll ein Held, der Lethes Effekt (Shapeshifter, Pseudonia, Throne Robber) erst nach dem Tod gewinnt, für den Rest des Zeitfensters gesperrt sein – ja / nein (nur wer beim Tod Lethe ist)?
 
 ## Abdeckung
-(wird am Ende ausgefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Fairy Queen Crestina | L2 gezielt | Galerie/Token-Angebot ✗ (→ -18); Wahl durch den Gegner, Auswahl mit 3 Namen ✓ |
+| Fiedel | L2 gezielt | Reaction-Rabatt ohne Status ✓, negiert/gefroren/betäubt ✓ (kein Rabatt bzw. kein Zug), nach Shapeshifter-Abfall ✗ (→ -19) |
+| Fiona (Empty Vessel) | L2 gezielt | Rabatt gilt für jede Kopie ✗ (→ -13); Heldeneffekt unter `searchLocked` ✓ (Entnahme scheitert folgenlos, Einsatz bleibt), unter `handLocked` gesperrt ✓ |
+| Fiona (Princess of Blackport) | L2 gezielt | 20 Gold je negativem Status (frozen/stunned/burned/poisoned/negated) ✓, Zweit-Freeze auf Gefrorenen 0 (Lesart „afflicted" – nicht als Befund), unter Negation ✓ (unnegierbar), dauerhaft übernommen: Gold an den Kontrolleur ✓ |
+| Friedhelm | L2 gezielt | Galerie bietet Unspielbares ✗ (→ -14); Aktionsgrenze nach Shapeshifter ✗ (→ -19) |
+| Garius | L2 gezielt | Opfer einer gestohlenen Kreatur (Ersatz steht beim Gegner, stirbt in die eigene Ablage) ✓; Such-/Handsperre: Gruppe C des Rulings 14.9. → in Ordnung; Heldeneffekt nur in Main-Phasen (kein Aktionskosten-Haken) |
+| Ghazma | L2 gezielt | Tokens ins Deck ✗ (→ -15); gefroren/betäubt siehe B-09 |
+| Ghuanjun | L2 gezielt | Basis-ATK-Korrektur ✗ (→ -16); Combo, HP-Deckel, Immortal-Buff ✓ |
+| Gobbo | L2 gezielt | negiert ✗ (→ -17); Kosten HP ✓ |
+| Gon | L2 gezielt | Freeze-Bonus am falschen Spieler ✗ (→ -03); Normalfall und Dauer über echte `endTurn()` ✓ |
+| Grand Inquisitor Karian | L2 gezielt | Gegnerzug ✗/C (→ -11), Soul Transmitted C (→ -12) |
+| Great Detective Doq | L2 gezielt | Handkarte wählbar statt zufällig C (→ -28); negiert ruht ✓, +150 und 2 Karten ✓ |
+| Grisgar | L2 gezielt | Zweitwurf zahlt Kosten doppelt ✗ (→ -08) |
+| Güldefaber | L2 gezielt | 20 Gold (Aktion), 10 Gold je Zug bei Attack/Spell, 2. Zauber im Zug 0 ✓; nach Ablauf des Status Trigger wieder frei ✓; dauerhaft übernommen: Kontrolleur +20 ✓, Alt-Besitzer abgelehnt ✓ |
+| Hel | L2 gezielt | Kents Kreditrahmen ✗ (→ -31); Re-Equip mit 20 Gold ✓, ohne Gold Tod ✓ |
+| Heragas | L2 gezielt | negiert zieht weiter ✗ (→ -20) |
+| Ida | L2 gezielt | -04, -05, -06, C -07; Shapeshifter-Rest -19 |
+| Ingo | L2 gezielt | +4 Gold eigene Beschwörung ✓, Plant Golem (fremd beschworen) nach Kontrolle ✓, dauerhaft übernommen: Kontrolleur ✓, Alt-Besitzer 0 ✓ |
+| Jean | L2 gezielt | -01, -02 |
+| Jenny | L2 gezielt | -09, -10 |
+| Johanna | L2 gezielt | Umleitung (Bestätigung, einmal pro Zug, Rundung) ✓; gefroren/betäubt/negiert/tot: keine Umleitung ✓, keine Immunität ✓; Geschwister-Status unter Eis-Johanna, Reinigung beim Auftauen ✓; Johanna selbst nicht geschützt ✓; als Shapeshifter-Gestalt schützt sie ✓ |
+| Junshi | L2 gezielt | gefroren/betäubt senkt weiter ✗ (→ -23) |
+| Kassaran | L2 gezielt | Ziehen mit deklariertem Namen (Mitte der Partie), einmal je Name und Zug ✓; negiert/gefroren/betäubt/tot ruhen ✓; unter `handLocked` kein Angebot ✓, unter `searchLocked` Angebot ohne Wirkung (folgenlos); übernommen: Kontrolleur ✓. Starthand-Fenster nicht getestet |
+| Kazena | L2 gezielt | -22 |
+| Kerthwack | L0 gelesen | Skript leer; Deckbauregel liegt in `server.js`/`public/potion-deck-clauses.js` (eigene Testsuite), nicht headless geprüft |
+| Key, the Cursed Thief | L2 gezielt | Artefakt aus der Gegnerhand: Key bezahlt, Gegner zahlt nichts ✓; gefroren/betäubt/negiert/tot/Gold 0: keine Reaktion ✓ |
+| Kit | L2 gezielt | Modus C Erstrunden-Immunität ✗ (→ -29), Modus A Sperren ✗ (→ -32); Modus B unter Schutz ✓, alle drei Modi sonst ✓ |
+| Klaus | L2 gezielt | Decay-Zauber → Kreatur aus der Hand ✓; negierter Zauber (Silence) löst nicht aus ✓ |
+| Kohta, Master of Super-Killing | L2 gezielt | Token landet in der Ablage ✗ (→ -33); Held-Kill, Einmal-pro-Zug, gefroren/betäubt/negiert gesperrt ✓ |
+| Kohta, the Silent Observer | L2 gezielt | Wiederholung mit Haressassin (Lv 2) ✓; Kohta negiert/gefroren: keine Wiederholung ✓ |
+| Koperniko | L2 gezielt | veraltete Tutor-Liste ✗ (→ -30); Zusatzsuche bei Brilliant Idea nicht gesondert wiederholt |
+| Krates | L2 gezielt | -24 |
+| Kyli | L2 gezielt | Occultism-Opfer → bis zu 3 gelöschte Potions als Biomancy-Tokens ✓ (Zonenbegrenzung, Löschstapel richtig); nicht-Potion-Klausel nur gelesen |
+| Layn, Defender of Deri | L2 gezielt | übernommene Kreaturen C (→ -34); Bonus auf eigene Beschwörung ✓, platziert (Klaus-Weg) ✓; dauerhaft übernommen: Kontrolleur ✓ |
+| Layn, Master of Deri's Relic | L2 gezielt | -25 |
+| Legendary Explorer Dajan | L2 gezielt | -26, -27 |
+| Lethe | L2 gezielt | -21, C -35; Tracker (Tod im Gegnerzug/eigenen Zug/anderer Held/gestohlene Kreatur/Token) ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+* **Wiederbelebung/Tod**: Fiedel-Override und Kassaran-Deklarationen bleiben am Heldenobjekt erhalten ✓; Ida (-06) und Friedhelm (-19) nicht.
+* **Status**: Johanna, Kassaran, Kohta Silent, Klaus, Key, Fiedel, Kohta Master, Doq, Güldefaber ruhen/arbeiten unter gefroren/betäubt/negiert/tot wie die Konvention verlangt (Ausnahmen siehe Befunde).
+* **Dauerhaft übernommene Helden (Kontrolle)**: Güldefaber (+20 Gold an Kontrolleur, Alt-Besitzer abgelehnt), Ingo (+4 an Kontrolleur, 0 für Zonen des Alt-Besitzers), Kassaran, Layn Defender, Fiona (Princess) zahlen an den Kontrolleur ✓; Garius' Opfer einer gestohlenen Kreatur landet korrekt in der Ablage des Besitzers.
+* **Such-Sperre**: Garius/Dajan (Deck → Brett) unberührt = Gruppe C des Rulings „Such-Sperre: die vier Gruppen" (14.9.); Fiona (Empty Vessel) unter `searchLocked`: Entnahme scheitert ohne Verlust.
+* **Erstrunden-Immunität**: Kit Modus B (50 Schaden) wird geblockt ✓, Modus C nicht (-29).
+* **Reaktionsfenster**: Silence negiert Klaus' Auslöser-Zauber ✓; Key bezahlt Gegner-Artefakt-Kosten und lässt den Gegner nicht zahlen ✓; Fiedel-Rabatt rechnet bei negiertem Fiedel nicht ✓.
+* **Token-Sperre**: Garius' Ersatzgalerie schließt Tokens aus ✓ (Vorbild für -15/-18).
+* **Hel**: Start-Ausrüstung nicht getestet; Zugende-Zwang mit 20 Gold ✓ (Gold 12 nach Kosten 8), ohne Gold → besiegt ✓ (abgesehen von Kents Kredit, -31).

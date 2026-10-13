@@ -275,6 +275,15 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/29-arrows-cpu-currenthp-unset.js` (ausgeführt: 1 ✗)
 - **Vermutete Ursache:** `aquatic-arrows.js` `(z.counters?.currentHp ?? 0) <= AOE_DAMAGE` statt `?? cardDB[z.name].hp`. Wirkt nur im CPU-Weg (Spielregeln nicht berührt).
 
+### A02-deepsea-30 · Aquatic Spear (Ablage-Zusatz): geliehene Gegnerkreatur trägt die ID MEINES Platzes – der Treffer geht auf meine eigene Kreatur · Stufe A
+- **Karten:** Aquatic Spear (`aquatic-spear.js` `allBoardTargets`/`onBoardSentToDiscard`), Deepsea Succubus (liefert die geliehene Kreatur; im Repro per `actionStealCreature`). Prüfauftrag „Zielsammler Brettspalte / Besitzer ODER Kontrolleur".
+- **Voraussetzungen / Aufbau:** Seat 0: Surprise Aquatic Spear (Held 0), eigene Kreatur (1000 HP) in Held 1 / Slot 0. Seat 1: Kreatur (1000 HP) in Held 1 / Slot 0, von Seat 0 geliehen. Der Gegner schickt die Spear per Effekt (`actionDestroyCard`) in die Ablage.
+- **Schritte:** Zusatzwirkung „deal 80 damage to any target on the board": die geliehene Kreatur als Ziel wählen.
+- **Erwartet** (Quelle: Kartentext „deal 80 damage to any target on the board"): Die gewählte Kreatur nimmt 80; die Zielliste hat eindeutige IDs.
+- **Beobachtet:** Die Zielliste enthält `equip-0-1-0` ZWEIMAL (beide Kreaturen). Gewählt wird die geliehene, getroffen wird die erste Fundstelle: MEINE eigene Kreatur (920/1000), die geliehene bleibt bei 1000.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/30-spear-rider-stolen-id-collision.js` (ausgeführt: 3 ✗)
+- **Vermutete Ursache:** `aquatic-spear.js` Z. 48–50: `owner = inst.controller ?? inst.owner` (Kontrolle) in ID und `owner`, `pool.find(t => t.id === id)`; `aquatic-arrows.js` Z. 64 macht es richtig (`engine.physicalSide(inst)`). Gleiches Muster in `slippery-pengu.js` Z. 72 (-28). Randnotiz (kosmetisch): `deepsea-reaper.js` Z. 81 sendet `scythe_cut` mit `victim.controller ?? victim.owner`, die Sense erscheint bei einer geliehenen Kreatur auf dem falschen Brett (gemessen: owner 0 statt 1); `aquatic-shield.js` Z. 129 sendet `shield_block` mit `owner: pi` für geliehene Kreaturen.
+
 ## Abdeckung
 (wird am Ende gefüllt)
 

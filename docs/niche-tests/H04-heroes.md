@@ -182,6 +182,15 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 - **Repro:** `docs/niche-tests/repro/H04-heroes/19-yukana-surprise-verpufft.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `yukana-the-scholar-on-the-run.js` `passenderSpell`: nur `cardType === 'Spell'` + Stufe, kein Ausschluss von `subtype === 'Surprise'` (Timeless King Zi filtert Surprise/Reaction in `uniqueDeckSpells`). `getHeroEligibleActionCards` filtert nur Reactions. Offen: ob andere Zusatzaktions-Wege (`performImmediateAction`, Coffee) dieselbe Lücke haben – im Test lieferte `performImmediateAction` Booby Trap ebenfalls in `eligibleCards`, die Wahl wurde aber nicht gewirkt (nicht weiter verfolgt).
 
+### H04-20 · Xal: Abilities in Support Zones verbrauchen die Zusatzplätze von Divine Gift of Skill nicht · Stufe B
+- **Karten:** Xal, the Animated Armor (`xal-the-animated-armor.js`, Flag `abilitiesInSupportZones`; gleicher Weg für Xalibur), Divine Gift of Skill (`divine-gift-of-skill.js`, `_bonusAbilityAttachments`); Server `doPlayAbility` (`server.js` ~Z. 7222–7262, 7278–7300)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Main Phase 1; Held 0 = Xal, nackt; Standardplatz `abilityGivenThisTurn[0] = true`, `_bonusAbilityAttachments = { 0: 1 }` (ein Zusatzplatz); Hand: Fighting, Leadership, Wisdom, Training.
+- **Schritte:** Nacheinander `doPlayAbility` mit `supportSlot` 0, 1, 2 für Fighting, Leadership, Wisdom. Gegenprobe: dieselbe Lage ohne `supportSlot` (normale Ability Zone).
+- **Erwartet** (Kartentext Divine Gift of Skill „You can attach up to 4 additional Abilities to that Hero this turn"; Xal „You may place Abilities into the Support Zones of this Hero"; Engine-Konvention `verbraucheAbilityAnlegen`: Standardplatz zuerst, dann je Anlegen ein Zusatzplatz): Mit einem Zusatzplatz kann Xal in diesem Zug genau eine weitere Ability anlegen, egal in welche Zone; der Zähler fällt auf 0.
+- **Beobachtet:** Gegenprobe (Ability Zone) korrekt: 1 Ability, Zähler 0. In die Support Zones werden alle drei Abilities angenommen, der Zähler bleibt 1 (und der sichtbare Blessed-Buff `blessed_skill` zählt nicht herunter). Mit Divine Gift of Skill (4 Zusatzplätze) kann Xal damit in einem Zug 1 + 4 + bis zu 3 Abilities bekommen (Support-Anlagen gehen kostenlos).
+- **Repro:** `docs/niche-tests/repro/H04-heroes/20-xal-support-ability-zusatzplaetze.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `server.js` `doPlayAbility`: die drei Support-Zweige (Stapel in Ability Zone mit `supportSlot`, neuer Support-Stapel, Rest-Zweig) setzen `ps.abilityGivenThisTurn[heroIdx] = true` von Hand, statt wie der Ability-Zone-Zweig `room.engine.verbraucheAbilityAnlegen(pi, heroIdx)` zu rufen (`_engine.js` ~Z. 42758: Zähler-Abzug + Blessed-Buff).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

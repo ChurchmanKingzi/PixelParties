@@ -229,6 +229,15 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/24-trank-server-ohne-sperrenpruefung.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `server.js:11849-11890` (`doUsePotion`) prüft nur `blockedByHandLock`, `blockedByPileLock`, `blockedBySummonLock`; `_cardBlockedBySearchLock` und `blockedByDrawLock` fehlen (im Artefaktweg ab Z. 12113 vorhanden, in `validateActionPlay` ebenso). Gleiches vermutlich in `doConfirmPotion` (Z. 11215, nicht gemessen).
 
+### M01-25 · Boulder in a Bottle: in Zug 1 spielbar und verbraucht, obwohl der Gegner geschützt ist (Ergänzung zu B-06) · Stufe B
+- **Karten:** Boulder in a Bottle (`cards/effects/boulder-in-a-bottle.js`); Randfall (Stufe C): Bottled Flame, Bottled Lightning.
+- **Voraussetzungen / Aufbau:** wie B-05 (echter Spielstart `engine.startGame()`, Sitz 0 spielt in Zug 1, Sitz 1 hat 5 Handkarten, 20 Gold und ist durch Erste-Runden-Schutz und `shielded` geschützt); Boulder in a Bottle auf der Hand von Sitz 0. Kontrolle: Flashbang.
+- **Schritte:** 1. `t.play(0, 'Boulder in a Bottle', { phase: <Main Phase 1>, keepActions: true })`.
+- **Erwartet** (CARD_API „Turn-1 Immunity": reine Gegner-Karten werden als Ganzes gegated; Kartentext „Place this card into the free Support Zone of a Hero your opponent controls": der einzige Wirkmodus ist der geschützte Gegner): die Karte bleibt auf der Hand, die Aktion ist nicht verbraucht.
+- **Beobachtet:** `play` meldet `true`, der Trank liegt im Gelöscht-Stapel, Sitz 1 ist unverändert (nichts wurde platziert). Flashbang wird dagegen korrekt gegated (`false`). Bottled Flame und Bottled Lightning werden in Zug 1 ebenfalls verbraucht, haben aber eine Eigenwirkung auf den Wirker (Abwerfen/„choose not to discard" betrifft auch ihn) – nur als Randfall notiert, kein Befund.
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/25-erstrunden-gate-boulder-in-a-bottle.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `boulder-in-a-bottle.js` hat kein Spielgate (`canActivate`) für „kein wählbarer Gegnerheld"; in `flashbang.js` gibt es eines. Gleiche Klasse wie B-06.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

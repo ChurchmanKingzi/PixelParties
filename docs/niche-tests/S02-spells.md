@@ -182,6 +182,24 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Vermutete Ursache:** `draw.js` Z. 18–26 (Kopfkommentar: Draw „as part of your entire hand … is safe") + `dumpHandsTogether` Z. 56–95 wirft `me.hand[0]` bis die Hand leer ist, inklusive der auflösenden Draw (`getResolvingHandIndex → -1`); die Boris-Frage Z. ~113 zählt dagegen `hand.length - 1`.
 - **Frage an Al:** Soll die gerade gespielte Draw als abgeworfene Handkarte gelten (Bunny-Schwelle, Archibald-Nachwurf, wie jetzt) oder nicht? (zählt / zählt nicht)
 
+### S02-21 · Haste (reine Zieh-Karte): unter Zieh-/Hand-Sperre spielbar und wirkungslos verbraucht – gegen Tuscan Artist korrekt gesperrt · Stufe B
+- **Karten:** Haste (`haste.js` `canPlayWithHero` Z. 20–26). Prüfauftrag A07-19/C01-15 (Zauber mit negiertem Ziehen) auf die Gruppe angewandt; Schwester von S03-24 (Supply Chain).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Haste, 2 Füllkarten], Deck 30. (a) `ps.drawLocked = true` (Zustand nach Sacred Jewel), (b) `ps.handLocked = true` (nach Rain of Spores), (c) Kontrolle: Tuscan Artist auf Sitz 1, Support Magic 1 (Zug von genau 2).
+- **Schritte:** 1. Haste spielen. 2. Rückgabe, Hand, Ablage, Aktion lesen.
+- **Erwartet** (Kartentext „Draw 2/3/4 cards."; CARD_API.md ~Z. 1944 „Draw-only unter Hand-Sperre ⇒ GAR NICHT spielbar"; `_draw-block-shared.js` Ruling 16.8.: Karten, deren Zug der einzige Nutzen ist, sind gesperrt): (a)/(b) Haste nicht spielbar, bleibt auf der Hand, Aktion frei.
+- **Beobachtet:** (a)/(b) `play` ⇒ true, Haste in der Ablage, nichts gezogen (Deck 30 → 30), Aktion verbraucht. (c) gesperrt ✓ (Haste fragt `drawWouldBeBlocked`, aber weder `drawLocked` noch `handLocked`). Unter `searchLocked` zieht Haste regulär ✓ (Draws bleiben frei).
+- **Repro:** `docs/niche-tests/repro/S02-spells/21-haste-ziehsperren.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** kein `blockedByHandLock` auf `haste.js`; der Loader markiert reine Zieh-Karten nur bei `resolve`-Modulen (`_loader.js` ~Z. 442) und lässt `hooks.onPlay`-Spells bewusst aus („eine Verhaltensänderung, die Al entscheiden sollte", `_loader.js` ~Z. 456). Wo die Ausnahme für Spells ausdrücklich offen ist, ist Haste das klarste Beispiel (Zug ist der gesamte Inhalt, und das Tuscan-Artist-Gate besteht schon).
+
+### S02-22 · Gate to the Armory ignoriert die Such-Sperre (Deck-Suche und Hand-Zugang) · Stufe B
+- **Karten:** Gate to the Armory (`gate-to-the-armory.js` `_getEligibleArtifacts` Z. 52–72, Entnahme Z. 267–270). Fällt unter die in CARD_API.md genannte „Altlast: Skripte splicen das Deck/die Ablage direkt, ohne das Gate" (`pileOutAllowed`); hier als gemessener Einzelfall.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Gate to the Armory, Füllkarte]; Deck [Glass Sword, Gravedigger's Shovel, Füllkarten]; Ablage [ZZ Trinket]. (a) `ps.searchLocked = true`, (b) zusätzlich `searchLockedIncludesDiscard = true`, (c) `ps.handLocked = true`.
+- **Schritte:** 1. Gate spielen (Antwort auf „Zusatzaktion?" = Nein), den ersten Eintrag der Galerie wählen.
+- **Erwartet** (Kartentext „Choose an Artifact from your deck or discard pile and add it to your hand."; `_engine.js` ~Z. 10618–10660: `searchLocked` sperrt Deck-Suche und Adds, `searchLockedIncludesDiscard` zusätzlich die Ablage, `handLocked` „sperrt ALLES: Draws UND Suchen/Tutoren/Adds"; Gegenprobe Graveyard Gathering ist unter `searchLocked`/`handLocked` korrekt nicht spielbar): (a) keine Deck-Einträge in der Galerie; (b)/(c) nichts wählbar.
+- **Beobachtet:** In (a), (b) und (c) bietet Gate die volle Galerie an (Glass Sword/deck, Gravedigger's Shovel/deck, ZZ Trinket/discard), nimmt Glass Sword aus dem Deck (Deck 4 → 3) und legt es auf die Hand.
+- **Repro:** `docs/niche-tests/repro/S02-spells/22-gate-to-the-armory-such-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `gate-to-the-armory.js` trägt weder `blockedBySearchLock` noch fragt es `engine.searchLockLevel`/`pileOutAllowed`; die Loader-Erkennung (`_loader.js` ~Z. 462) sieht nur „reine" Such-Skripte, Gate hat zwei Zweige (Add oder Ausrüsten).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 
