@@ -41,7 +41,8 @@ async function loeseAusstehende(ctx) {
   const permId = ctx.card.counters?.permId;
   const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
   if (!perm || perm._triggered) return;
-  if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
+  pileAufloesen(engine, ps, perm);
+  if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.some(c => c.pile))) return;
   await resolveElixirPending(engine, pi, perm);
 }
 
@@ -53,7 +54,13 @@ module.exports = {
   // permanent is on the owner's side, an all-heroes-dead state does
   // NOT end the game on that side — the permanent's own death-collect
   // path is responsible for handling the revive.
-  preventsAllHeroesDeadLoss: true,
+  // Nur solange das Elixir fuer mindestens einen toten Helden auch wirklich
+  // ausloesen kann (`onHeroKO` verwirft nicht wiederbelebbare Helden, z. B.
+  // Mirjam) — sonst bliebe die Partie ohne lebenden Helden ewig offen.
+  preventsAllHeroesDeadLoss: (engine, pi) => {
+    return engine.heroesControlledBy(pi, { permanentOnly: true })
+      .some(({ hero }) => hero.hp <= 0 && engine.canReviveHero(hero, { heilt: true }));
+  },
 
   // CPU evaluation hint — Elixir's value is a multi-turn safety net
   // (waits for a future death to revive). The immediate post-play
@@ -208,9 +215,15 @@ module.exports = {
           // Biomancy-Token wurde deshalb nie eingesammelt und das Elixir
           // loeste gar nicht aus. Der Stapel wird jetzt mitgefuehrt, damit
           // die Wiederbelebung ihn aus dem richtigen holt.
-          const pile = ps.discardPile.includes(e.inst.name) ? 'discard'
-                     : ps.deletedPile.includes(e.inst.name) ? 'deleted'
-                     : null;
+          let pile = ps.discardPile.includes(e.inst.name) ? 'discard'
+                   : ps.deletedPile.includes(e.inst.name) ? 'deleted'
+                   : null;
+          // M01-18: In einer Flächenklammer (Fireball & Co.) wird der Tod erst beim
+          // Schließen der Klammer abgewickelt (Vorgabe 26.9., `_kreaturTodMelden`) — dieser
+          // Hook läuft davor, die Kreatur liegt noch auf dem Brett. Dann ohne Stapel
+          // vormerken; `pileAufloesen` ergänzt ihn, sobald die Karte wirklich liegt.
+          const aufgeschoben = !pile && !!engine._todesAufschub && e.inst.zone === 'support';
+          if (aufgeschoben) pile = 'offen';
           // v1389: „cannot be revived by any effects" (Gigantisaur) —
           // dann löst das Elixir gar nicht erst aus und bleibt liegen.
           if (pile && engine.darfAusAblageAufsFeld(e.inst.name)) {
@@ -220,7 +233,7 @@ module.exports = {
                 name: e.inst.name,
                 heroIdx: e.inst.heroIdx,
                 zoneSlot: e.inst.zoneSlot,
-                pile,
+                pile: pile === 'offen' ? null : pile,
                 // Token-Identitaet mitnehmen (siehe TOKEN_STATE_KEYS):
                 // ohne sie kaeme die Potion als sie selbst zurueck, ohne
                 // Kreatur-Kartendaten, ohne Aktiveffekt und mit den
@@ -291,10 +304,26 @@ function captureTokenState(inst) {
   return out;
 }
 
+// M01-18: Stapel für Kreaturen nachtragen, die beim Einsammeln noch nicht lagen
+// (Tod in einer Flächenklammer). Landet die Karte nicht (Tod verhindert) und die
+// Klammer ist zu, fällt der Eintrag weg.
+function pileAufloesen(engine, ps, perm) {
+  if (!perm._pendingCreatures?.length) return;
+  const aufschub = !!engine._todesAufschub;
+  perm._pendingCreatures = perm._pendingCreatures.filter(pc => {
+    if (pc.pile) return true;
+    pc.pile = ps.discardPile.includes(pc.name) ? 'discard'
+            : ps.deletedPile.includes(pc.name) ? 'deleted'
+            : null;
+    return !!pc.pile || aufschub;
+  });
+}
+
 async function resolveElixirPending(engine, pi, perm) {
   const ps = engine.gs.players[pi];
+  pileAufloesen(engine, ps, perm);
   const pendingHeroes = perm._pendingHeroes || [];
-  const pendingCreatures = perm._pendingCreatures || [];
+  const pendingCreatures = (perm._pendingCreatures || []).filter(c => c.pile);
   const allDead = [
     ...pendingHeroes.map(h => ({ ...h, deathType: 'hero' })),
     ...pendingCreatures.map(c => ({ ...c, deathType: 'creature' })),

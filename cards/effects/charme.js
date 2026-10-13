@@ -525,7 +525,12 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
     // Instanz mitziehen (siehe _moveHandInstanceOwner): `owner` folgt
     // dem physischen Besitz, `originalOwner` bleibt — damit geht die
     // Karte beim Abwerfen/Löschen zurück in die richtige Ablage.
-    engine._moveHandInstanceOwner(oi, pi, cardName);
+    const _gestInst = engine._moveHandInstanceOwner(oi, pi, cardName);
+    // Herkunft markieren (Regel v692/v693, wie Infiltration): beim Abwerfen/Spielen/Rückmischen
+    // kehrt die Karte zum Besitzer zurück. `originalOwner` kurz auf den Halter, damit
+    // `_tagHandCardOrigin` DIESE Instanz markiert statt eine zweite anzulegen.
+    if (_gestInst) _gestInst.originalOwner = pi;
+    engine._tagHandCardOrigin(pi, cardName, oi, (gs.players[pi].hand.length || 1) - 1);
     const charmerSid = gs.players[pi]?.socketId;
     if (charmerSid && engine.io) {
       engine.io.to(charmerSid).emit('card_reveal', { cardName });

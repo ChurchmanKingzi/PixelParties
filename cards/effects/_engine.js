@@ -12490,7 +12490,10 @@ class GameEngine {
         targetCard._redirectToDeleted = true;
         if (this._wurzelAktiv() && isBoardZone && fromZone === ZONES.SUPPORT) this._wurzelNebel(targetCard.owner, targetCard.heroIdx, targetCard.zoneSlot);
       }
-      const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend) ? 'deleted' : 'discard';
+      // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
+      const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
+      const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
+      const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -13517,6 +13520,17 @@ class GameEngine {
       toZone    = ZONES.DELETED;
       toHeroIdx = -1;
       toSlot    = -1;
+    }
+    // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
+    // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
+    // (`processCreatureDamageBatch`) und in `_addCardToState`, nie abgelegt.
+    if (toZone === ZONES.DISCARD && fromZone === 'support') {
+      const _tokenCd = this.getEffectiveCardData(cardInstance);
+      if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
+        toZone    = ZONES.DELETED;
+        toHeroIdx = -1;
+        toSlot    = -1;
+      }
     }
 
     // ── selfDeleteOnExternalDiscard redirect ──
@@ -24107,7 +24121,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Wealth / Treasure Huntress' +N adjustments have already
     // settled — the surprise redirects the POST-hook amount, which
     // matches the card text "you gain that Gold instead."
-    const surpriseResult = await this._checkSurpriseOnResourceGain(playerIdx, hookCtx.amount);
+    // R01-01: Das automatische Rundeneinkommen ist KEIN „effect" (Ruling 24.9., s. o.) —
+    // Gold Trap („Activate this Surprise when your opponent would gain Gold through an effect")
+    // bleibt dafür verdeckt.
+    const surpriseResult = hookCtx._isResourceGain
+      ? null
+      : await this._checkSurpriseOnResourceGain(playerIdx, hookCtx.amount);
     if (surpriseResult?.redirected) return;
     const gained = Math.max(0, hookCtx.amount);
     ps.gold = (ps.gold || 0) + gained;
@@ -36542,7 +36561,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!plan || plan.casterIdx == null) return true;
     const pi = this._rxOwnerIdx(ps, '_rxCastWirkerWaehlen');
     if (pi < 0) return true;
-    const kandidaten = this._rxCastKandidaten(ps, cardName, script, opts) || [];
+    const kandidatenRoh = this._rxCastKandidaten(ps, cardName, script, opts);
+    // M01-03: `null` = die Karte braucht keinen Wirker (Potion) — nichts zu waehlen,
+    // der Plan bleibt wie er ist. Frueher wurde das zu `[]` und die Reaktion verworfen.
+    if (kandidatenRoh === null) return true;
+    const kandidaten = kandidatenRoh || [];
     if (kandidaten.length <= 1) {
       if (kandidaten.length === 1) Object.assign(plan, kandidaten[0]);
       return kandidaten.length === 1;
@@ -48445,9 +48468,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Any permanent opted into `preventsAllHeroesDeadLoss: true`
       // suspends the loss on this side (Elixir of Immortality and
       // any future "I'll handle the revive myself" effect).
+      // M01-02: Der Wert darf auch eine Funktion `(engine, pi, perm) => bool`
+      // sein — das Elixir haelt die Niederlage nur auf, wenn es fuer einen
+      // der toten Helden ueberhaupt ausloesen kann (nicht bei Mirjam o. ae.).
       const hasLossSuspender = (ps.permanents || []).some(p => {
         const script = loadCardEffect(p.name);
-        return script?.preventsAllHeroesDeadLoss;
+        const s = script?.preventsAllHeroesDeadLoss;
+        return typeof s === 'function' ? s(this, pi, p) : s;
       });
       // v867: Ein Held, der VORUEBERGEHEND aus dem Spiel entfernt ist
       // (Teleportation Powder), haelt seine Seite am Leben — „A player

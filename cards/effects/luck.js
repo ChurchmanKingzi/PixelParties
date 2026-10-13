@@ -158,6 +158,10 @@ module.exports = {
       // ebenso eine ueber Styx an einen uebernommenen Helden angelegte
       // Ability (owner = Brettseite, Kontrolle ueber den Charme).
       const spieler = ctx._engine.effektiveSeiten(entering).controller ?? entering.owner;
+      // M02-13: Ein Area-/Attachment-ZAUBER erzeugt beide Ereignisse (Eintritt in die Zone UND
+      // `afterSpellResolved`) — gezählt wird einmal, über `afterSpellResolved`. Tritt die Karte
+      // während der Auflösung GENAU dieses Zaubers ein, ist das derselbe Spielvorgang.
+      if (entering.name === ctx._engine._currentResolvingSpellName()) return;
       await module.exports.hooks._triggerLuck(ctx, entering.name, spieler);
     },
 

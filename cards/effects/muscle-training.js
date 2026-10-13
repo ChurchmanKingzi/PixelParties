@@ -28,7 +28,10 @@
  * Check if a specific hero can receive Fighting
  * (has a free ability zone OR an existing Fighting slot < Lv3).
  */
-function heroCanAcceptFighting(ps, heroIdx) {
+function heroCanAcceptFighting(ps, heroIdx, engine, side) {
+  // M02-02: dieselbe Zonenwahl wie beim Anhängen (`abilityZielZone`) — sonst wird die Karte
+  // bei vollem Fighting-Stapel (Lv3) plus freier Zone angeboten, aus dem Deck genommen und geht verloren.
+  if (engine && side != null) return engine.abilityZielZone(side, heroIdx, 'Fighting') >= 0;
   const abZones = ps.abilityZones[heroIdx] || [];
   for (let z = 0; z < 3; z++) {
     const slot = abZones[z] || [];
@@ -72,7 +75,7 @@ module.exports = {
    * - At least one alive hero can accept Fighting
    *   (free ability zone or existing Fighting < Lv3)
    */
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!(ps.mainDeck || []).includes('Fighting')) return false;
 
@@ -81,7 +84,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
-      if (heroCanAcceptFighting(ps, hi)) return true;
+      if (heroCanAcceptFighting(ps, hi, engine, pi)) return true;
     }
     return false;
   },
@@ -114,7 +117,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // ── Validate per-hero conditions ──
-      if (!heroCanAcceptFighting(hps, heroIdx)) {   // Als Befund 29.9.: Brettseite des Wirkers
+      if (!heroCanAcceptFighting(hps, heroIdx, engine, hs)) {   // Als Befund 29.9.: Brettseite des Wirkers
         gs._spellCancelled = true;
         return;
       }
