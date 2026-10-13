@@ -1,8 +1,16 @@
 # M01-attacks-abilities-potions – Nischenfall-Bericht
-Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der Liste · 48 gezielt getestet (L2), 5 mit Standardlauf (L1) · 25 Karten mit Befund (26 Befunde: 6 A, 17 B, 3 C). Fortsetzung nach Abbruch des ersten Laufs (Befunde 01-18 vom Vorgänger, 19-26 neu).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+26 Befunde: 6× A (alle vom Vorgänger: Elixir of Immortality ×2 [-02, -18], Cloud in a Bottle -03, Biomancy/Boulder -07 und -08, Charme Lv2 -16), 17× B, 3× C; neu in dieser Fortsetzung sind -19 bis -26 (alle B bzw. C).
+Wichtigste Befunde:
+* **Kontrolle statt Brettseite (Klasse F02-14/S01-09):** Experimental Potion bietet „target you control" nach Brettseite an (M01-20), Capture findet eine gestohlene Kreatur auf der eigenen Seite nicht, obwohl die Karte spielbar wirkt (M01-22, `promptDamageTarget` `side: 'enemy'` läuft ebenfalls über die Brettseite); Hammer Throw sperrt bei gestohlenen Kreaturen den Falschen (M01-14, Vorgänger).
+* **Geliehener Held:** die Spielgates von Knife Throw, Breaking Strike und Forceful Revival lesen den gleichindizierten eigenen Helden statt des geliehenen (M01-26).
+* **Sperren und Kosten ohne Gegenwert:** unter `drawLocked` zahlen Alchemy/Leadership/Inventing/Horn in a Bottle ohne zu ziehen (M01-23, Frage an Al); der Server-Trankweg `doUsePotion` kennt weder Such- noch Zieh-Sperre, Elixir of Mana wird still verbraucht (M01-24); Boulder in a Bottle ist in Zug 1 spielbar und wirkungslos (M01-25, Ergänzung zu B-06).
+* **Negation:** Diplomacys kurze Negierung räumt eine längere derselben Kreatur mit ab (M01-21, überlappende Negierungs-Buffs teilen sich den Statuszähler).
+* **Zahlen:** Tiger Kick heilt den Überhang mit (M01-19).
+Gesamteindruck: Die Standardlage der Karten ist sauber (keine Engine-Fehler, keine Hänger in über 300 Läufen); Treffer liegen fast ausschließlich bei Kontroll-/Seitenfragen, Sperren (Lock-Auto-Erkennung) und Zusammenspiel mit Negation/Biomancy. Die Prüfaufträge: `getCreatureTargets` bestätigt (M01-20, Kopie bei `promptDamageTarget` M01-22), `collectAoeCreatureTargets` nicht gemessen (keine Karte der Gruppe nutzt es), `currentHp ?? 0` und `negatedDuration` kommen in der Gruppe nicht vor, Zugende-Räumung `negated` nur als verwandter Fall bei Kreaturen (M01-21), R02-07 (aufgelöste Karte bleibt in der Hand) in dieser Gruppe nicht beobachtet, M02-18 (Ambush the Scout) nur mit Charme Lv2/Bottled Flame gemessen: kein Kartenverlust.
+Bewusst nicht getestet: Skill-Test-Modus, 3-/4-Spieler-Varianten, Animationen/Reveal-Verträge (Familie 11), CPU-Zweige, Kartenverhalten mit Truth-Seeing Eye (nur Gate gelesen), Charme Lv2/3 gegen Ambush the Scout im Detail, Challenge gegen Fireball (Mehrfachziel: im Test nicht umleitbar – vermutlich Design, nicht belegt), `doConfirmPotion` (Zielwahl-Tränke) bei den Sperren aus M01-24.
 
 ## Befunde
 ### M01-01 · Flashbang: Tränke und Normal-Artefakte des Betroffenen beenden seinen Zug sofort · Stufe B
@@ -249,5 +257,69 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
+| Acid Vial | L2 gezielt | HOPT „1 pro Zug" über Zugwechsel ✓, gestohlene Kreatur ✓, Zug-1-Schutz (Helden nicht wählbar) ✓, Submerged: wirkt trotz Jump in the River (Ruling CARD_API 2754: wahrer Schaden umgeht es) ✓, durch Local Idol negiert: kein HOPT-Stempel, Karte beim Gegner ✓; `getCreatureTargets`-Instanzbezug nur Randeffekt (→ -20) |
+| Adventurousness | L2 gezielt | gefroren/betäubt/gebunden aktivierbar ✗ (→ -11, Vorgänger); negiert/Charme ✓ |
+| Alchemy | L2 gezielt | Kosten 8/4/0 ✓, Gold genau 8 / 7 ✓, Potion Deck leer ✓, zwei Alchemy-Helden: 1× pro Zug ✓, Zieh-Sperre ✗ (→ -23), Hand-Sperre serverseitig ✗ (→ -23 Nebenbefund), gefroren/betäubt/tot ✓ |
+| Alliance | L2 gezielt | Wählbarkeit beide Richtungen ✓, „solange andere Ziele vorhanden" ✓, Verbündeter tot ✓, Zugende-Frage ✓, Knife Throw ignoriert ✓, Zielwahl des Verbündeten nicht abbrechbar (`cancellable: false`, Kopf: Design) — Notiz |
+| Amazing Finding | L2 gezielt | 7 Deckformen (A A X, Deckel 3, X zuerst, nur A, leer, Trank im Weg, Deckende) ✓, Zusatzaktion nur bei erster Attack ✓ (Vorgänger c28) |
+| Attack | L2 gezielt | aktueller ATK (Buff 100/Basis 40) ✓ |
+| Biomancy | L2 gezielt | -07, -08 (Vorgänger); durch Local Idol negierter 2. Trank: kein Token, Karte beim Gegner ✓ |
+| Blood Rock | L2 gezielt | Tick beider Zugenden ✓, Zug-1-Schutz ✓, dauerhaft übernommener Held (Besitzer-Seite korrekt) ✓, Charme-Held „unaffected" ✓ (Kartentext Charme), letzter Held stirbt am eigenen Zugende → Gegner gewinnt ✓ |
+| Blow of the Venom Snake | L2 gezielt | Basis-ATK ✓ (Buff ändert nichts), Gift 1/2/3 Stacks je Attack ✓, bereits vergifteter Held: kein Zusatz ✓, Kreatur ✓, Erste-Runden-Schutz ✓ |
+| Bluff | L2 gezielt | zieht 3 bei Attack/Spell/Whirlwind ✓, 4 beim Entfernen durch Breakthrough ✓, Host gefroren/betäubt/negiert: kein Auslösen ✓ |
+| Bottled Flame | L2 gezielt | Leere Hand/1 Karte/Wechsel ✓ (c02), Dauer „rest of the game" über 6 Zugwechsel ✓, Zug 1 verbraucht (Randfall, → -25 Notiz) |
+| Bottled Lightning | L2 gezielt | 3 Ziele 150/100/50 ✓, weniger Ziele ✓, Zug 1 (→ -25 Notiz) |
+| Boulder in a Bottle | L2 gezielt | -07, -08, -25; Besitzer der Brettinstanz = Zonenbesitzer (Seite des Opfers), Capture dadurch unmöglich (Notiz) |
+| Breaking Strike | L2 gezielt | ATK × Anzahl nach den Abwürfen ✓ (Skript beschreibt es: aktueller ATK nach Wegfall der Ausrüstung), geliehener Held ✗ (→ -26) |
+| Breakthrough | L2 gezielt | Surprise zerstören, Zusatzaktion ✓, keine Surprise → unspielbar ✓, Bluff-Rückzug 4 Karten ✓ |
+| Cannibalism | L2 gezielt | Lv 1-3 Heilwerte ✓, HOPT ✓, gestohlene Kreatur stirbt (Ablage des Besitzers) ✓, Gegner-Kreatur ✓, eigener Held ✓, Host gefroren/betäubt/negiert: keine Heilung ✓ |
+| Capture | L2 gezielt | Stufe ≤ Fighting ✓, keine freie Zone ✓, Token/Boulder, gestohlene Kreatur ✗ (→ -22) |
+| Challenge | L2 gezielt | Attack/Heavy Hit/Venom umgeleitet ✓ (Karte → Ablage), Acid Vial nicht (Potion) ✓, Fireball (Mehrfachziel) wird nicht angeboten — Notiz |
+| Charme | L2 gezielt | -15, -16 (Vorgänger); Lv3 + Blood Rock ✓, Lv3: Attack-Reihe mit geliehenem Helden ✓ (Tiger Kick heilt ihn, Hammer Throw sperrt den Zielspieler richtig) |
+| Cloud in a Bottle | L2 gezielt | -03, -04 (Vorgänger) |
+| Creativity | L2 gezielt | Lv1-3 (1/2/3 Karten) ✓, HOPT ✓, zweite Ability im Zug nicht möglich (Regel 1/Zug), Host gefroren/betäubt/negiert: keine Ziehung ✓, Deck leer → Deck-Out ✓ |
+| Critical Strike | L1 Standard | 2 × aktueller ATK ✓ (Buff 100 → 200), Hunting-Zielgespann ✓ |
+| Decapitating Strike | L2 gezielt | Schwelle 50/51 ✓, nur Seite des Ziels ✓, Token (Vorgänger b13) ✓ |
+| Diplomacy | L2 gezielt | Stufe/Gold 20/10/5 ✓ und eine zu wenig ✓, Besitzer wechselt, Tod → Ablage des Besitzers ✓, volle Zonen ✓, Negierung endet am Zugende ✓; kurze Negierung löscht lange ✗ (→ -21) |
+| Divine Gift of Coolness | L2 gezielt | Statusimmunität, Heilung, nicht entfernbar (Tod/Wiederbelebung) ✓, zweites Divine Gift im Spiel ✓ abgelehnt |
+| Divinity | L2 gezielt | Stufenstaffel (+1/+2/+3 über Fighting) ✓, aus der Hand nicht spielbar ✓ |
+| Duel | L2 gezielt | 3 Runden, Draw → Wirker gewinnt ✓, letzter Held beider Seiten ✓, eigener letzter Held fällt ✓; gefrorener Gegnerheld kämpft mit (Kartenkopf: gewollt) — Notiz |
+| Elixir of Cold | L2 gezielt | Attack/Whirlwind-Mehrfachziele/Kreatur frieren ✓, Spell des Trinkers ✓, nur der Trinker ✓, Dauer 1 Gegnerzug ✓, 0-Schaden-Attack friert nicht (Auslegung) |
+| Elixir of Immortality | L2 gezielt | -02, -18 (Vorgänger); Kreatur/Held ✓, Dauer/Verbrauch ✓ |
+| Elixir of Mana | L2 gezielt | 3 verschiedene Zauber ✓, schwache Such-Sperre ✓, starke ✗ (→ -24), Negation durch Local Idol ✓ |
+| Elixir of Quickness | L1 Standard | Draw 3 ✓, Zieh-Sperre: verbraucht sich nur (kein Befund) |
+| Elixir of Recovery | L2 gezielt | gestohlene Kreatur ✓ (Vorgänger p03), Ziehen nur für Heldenstatus (Text) ✓ |
+| Elixir of Strength | L2 gezielt | -12 (Vorgänger) |
+| Escape | L2 gezielt | -17 (Vorgänger); Kosten/Negation ✓ |
+| Experimental Potion | L2 gezielt | Gift heilt / Max-HP ✓ (c25), Kontrolle statt Seite ✗ (→ -20) |
+| Ferocious Tiger Kick | L2 gezielt | Basis-ATK ✓, Immunität nach Betäubung ✓ (echter Ablauf), 3. Attack umgeht ✓, Heilung Überhang ✗ (→ -19) |
+| Fighting | L1 Standard | ATK +10/+20/+40 bei Anlegen ✓, Wegfall (Fire Bomb) senkt ✓ |
+| Fire Bomb | L2 gezielt | Ability-Karte (Stapel oben) → Ablage des Besitzers ✓, mehrere Artefakte ✓, eigene/fremde ✓ |
+| Flashbang | L2 gezielt | -01 (Vorgänger); in Zug 1 korrekt gegated ✓ |
+| Forceful Revival | L2 gezielt | Stufe ≤ Fighting ✓, Token abgelehnt ✓, Selbstschaden = Max-HP ✓ (tödlich möglich), geliehener Held ✗ (→ -26) |
+| Friendship | L2 gezielt | -06 (Vorgänger) |
+| Golem Smash | L2 gezielt | Regler 0/4/10 ✓, Deck 0/3/12 ✓, Abbruch Ziel → Karte zurück, nichts gelöscht ✓ |
+| Gravedigger Slap | L2 gezielt | verschiedene Namen, Duplikate ✓, geliehener Held ✓ |
+| Hammer Throw | L2 gezielt | -13, -14, -17 (Vorgänger) |
+| Healing Potion | L1 Standard | Mirjam nicht wählbar ✓, Kreatur/gestohlene Kreatur ✓, Obergrenze ✓ |
+| Heavy Hit | L1 Standard | Betäubung auch bei Kreatur ✓, Challenge ✓, geliehener Held ✓ |
+| Horn in a Bottle | L2 gezielt | 0/1/n Karten, Tränke zurück ins Potion Deck ✓, Zieh-Sperre ✗ (→ -23), Local Idol ✓ |
+| Hunting | L2 gezielt | -05 (Vorgänger); gestohlene Kreaturen beider Richtungen ✓, Lv1-3 ✓ |
+| Infiltration | L2 gezielt | Lv1-3 ✓, Gegnerdeck 0/1/2/3/5 ✓ (Deck-Out am Gegner bei 1 Karte nach „draws 1"), Charme-Leihe ✗ (→ -15), Zug 1 gesperrt ✓ |
+| Inventing | L2 gezielt | -09, -10 (Vorgänger); Zieh-Sperre ✗ (→ -23) |
+| Jump in the River | L2 gezielt | Reaktion zu Beginn des Gegnerzuges ✓, Submerged gegen Fireball/Attack/Fläche ✓, wahrer Schaden/Heilung dringt durch (Ruling) ✓, Ablauf zum Besitzer-Zugbeginn ✓ |
+| Knife Throw | L2 gezielt | ATK-Bezug nach Opfer ✓, „only Attack" vor/nach ✓, Alliance wird ignoriert ✓, Zielwahl nicht abbrechbar (Kosten schon gezahlt), geliehener Held ✗ (→ -26) |
+| Leadership | L2 gezielt | Lv1/3 mit Tränken (gehen ins Potion Deck, Ziehen daraus) ✓, Zieh-Sperre ✗ (→ -23), Statusmatrix ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
+- Standardlage der Gruppe: über 300 Läufe (Kaltstart/Dauerfeuer der Vorrunde plus meine Matrizen) ohne verschluckte Engine-Fehler, ohne Hänger, `t.audit()` leer.
+- ATK-Bezug: Attack/Critical Strike/Heavy Hit/Hammer Throw/Knife Throw/Breaking Strike/Golem Smash lesen den aktuellen ATK (Buff 100 / Basis 40), Tiger Kick und Blow of the Venom Snake den Basis-ATK – wie im Text.
+- Alliance: Wählbarkeitssperre in beide Richtungen, Ausnahme „keine anderen Ziele", Zugende-Frage; Knife Throw ignoriert sie („can always target").
+- Blood Rock: Tick beider Zugenden, dauerhaft übernommener Held (Kontrolle statt Seite) korrekt, Charme-Held durch Charme-Text unberührt, Erste-Runden-Schutz.
+- Duel: 3 Runden, Draw gewinnt der Wirker (auch wenn beide Seiten ganz ausfallen), Wahlreihenfolge.
+- Passive Abilities (Cannibalism, Creativity, Fighting) respektieren Frost/Betäubung/Negation; freie Abilities sind bei gefroren/betäubt/webbed gesperrt (Ausnahme M01-11).
+- Verhalten bei Negation (Local Idol): zweiter Trank geht auf die Hand des Gegners, kein Biomancy-Token, kein HOPT-Stempel (Acid Vial).
+- Hunting/Cannibalism/Diplomacy mit gestohlenen Kreaturen in beide Richtungen: Besitzer-/Kontrolleurlogik, Ablage des Besitzers ✓.
+- Amazing Finding: Deckel 3, Artefakt-Reihen, leeres Deck. Golem Smash: Regler 0/4/10, Deck 0/3/12, Abbruch. Bluff: 3 Karten beim Auslösen, 4 beim Entfernen.
+- Echter Spielstart (Erste-Runden-Schutz) schützt Sitz 1 gegen Hammer Throw, Heavy Hit, Attack, Acid Vial, Critical Strike, Tiger Kick, Blow of the Venom Snake (Sitz 1 unverändert); Flashbang, Capture, Duel, Alliance, Breakthrough, Fire Bomb sind in Zug 1 korrekt gegated.
+- Jump in the River: Submerged lässt wahren Schaden (Acid Vial) durch – laut Ruling CARD_API ~Z. 2754 gewollt, kein Befund.

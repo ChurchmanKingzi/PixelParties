@@ -192,14 +192,14 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 - **Repro:** `docs/niche-tests/repro/H04-heroes/20-xal-support-ability-zusatzplaetze.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `server.js` `doPlayAbility`: die drei Support-Zweige (Stapel in Ability Zone mit `supportSlot`, neuer Support-Stapel, Rest-Zweig) setzen `ps.abilityGivenThisTurn[heroIdx] = true` von Hand, statt wie der Ability-Zone-Zweig `room.engine.verbraucheAbilityAnlegen(pi, heroIdx)` zu rufen (`_engine.js` ~Z. 42758: Zähler-Abzug + Blessed-Buff).
 
-### H04-21 · Tempeluna (und jeder Held mit gewonnenem Luna-Effekt): Firewall bekommt Lunas „+100 Schaden / alle Ziele brennen" nicht · Stufe A
-- **Karten:** Tempeluna, the Convergence Fairy (`tempeluna-the-convergence-fairy.js`, `grantHeroEffect` der Grundfeen), Luna, the Flame Fairy (`firewallModifiers`), Firewall (`firewall.js` Z. 45); gleiche Lücke bei „Dangerous Knowledge"-Erben (Luna gelernt)
-- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0: Luna (Held 0, Destruction Magic 3) + Tempeste (Held 1) + Tushu; Firewall verdeckt in Held 0; Sitz 1 greift Held 0 mit Fireball an. Variante: Tempeluna per `performAscension` aufgestiegen (Tempeste gelöscht, `gainedEffectNames` = Luna, Tempeste); Variante: Tushu mit `grantHeroEffect(Luna)`.
-- **Schritte:** Firewall auslösen (Ja), Schaden und Brandstatus des Angreifers und seiner anderen Ziele messen.
-- **Erwartet** (Kartentext Tempeluna „This Hero gains the effects of both 'Luna' and 'Tempeste'"; Luna „This Hero's 'Firewall' Spells deal 100 additional damage and Burns all targets your opponent controls, not just the attacker"; Ruling im Kopf von `tempeluna-…js` ②: „erbt den KOMPLETTEN Effekt", Lunas Wirkung stecke in `canBypassLevelReqForCard` und `firewallModifiers`, die `heroScriptOf` weitergibt): Mit Tempeluna schlägt Firewall mit 200 zurück und verbrennt alle Ziele des Gegners wie bei Luna.
-- **Beobachtet:** Luna selbst ✓ (200 Schaden, anderer Gegnerheld brennt). Tempeluna: nur 100 Schaden, nur der Angreifer brennt; ebenso der Tushu-mit-gewonnenem-Luna. Der Stufenbypass (`canBypassLevelReqForCard`) der geerbten Luna funktioniert dagegen (Firewall wird gesetzt/ausgelöst), nur der zweite Luna-Vertrag fehlt.
-- **Repro:** `docs/niche-tests/repro/H04-heroes/21-tempeluna-firewall-erbt-nicht.js` (✗ = Fehler tritt auf)
-- **Vermutete Ursache:** `cards/effects/firewall.js:45` `firewallMods`: `loadCardEffect(hero.name)` statt `engine.heroScript(pi, heroIdx)` – die 42 Umstellungen von v1186 haben diese Abfragestelle übersehen.
+### H04-21 · Tsu'Ki: der Lunatic-Cycle-Rabatt (`equipCostReduction`) gilt auch bei negierter und betäubter Tsu'Ki · Stufe B
+- **Karten:** Tsu'Ki, the Lunatic Princess (`tsu-ki-the-lunatic-princess.js`), Auslöser: Lunatic Cycle - New Moon (Kosten 12); Engine `artifactPlayCost` (`_engine.js` ~Z. 24369), Aufruf in `doPlayArtifact`
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Main Phase 1; Held 0 = Tsu'Ki (`onGameStart` gefeuert), Hand: New Moon, Gold 2 (= Kosten − 10); Tsu'Ki gesund / negiert / betäubt (`addHeroStatus`).
+- **Schritte:** `t.play(0, 'Lunatic Cycle - New Moon', { hero: 0 })`.
+- **Erwartet** (Kartentext „'Lunatic Cycle' cards that are equipped to this Hero have their Cost reduced by 10"; Engine-Regel: Negated/Stunned schalten Heldeneffekte stumm, `_isHeroEffectSilenced`): Gesund ✓ Rabatt. Negiert/betäubt: kein Rabatt, 2 Gold reichen für die 12 Gold teure Karte nicht.
+- **Beobachtet:** Gesund ✓ (Ausrüstung für 2). Negiert und betäubt: die Ausrüstung gelingt ebenfalls für 2 Gold (`heroEquipReduction` = 10). Gefroren und tot: die Ausrüstung wird abgelehnt (anderer Grund: Zielheld nicht ausrüstbar). Dieselbe Klasse wie H04-02/-09/-13 (Heldenvertrag ohne Statusprüfung), anderer Vertrag.
+- **Repro:** `docs/niche-tests/repro/H04-heroes/21-tsuki-ausruestungsrabatt-negiert.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `artifactPlayCost`: `loadCardEffect(eqHero.name)` + `hs.equipCostReduction(...)` ohne `_isHeroEffectSilenced(eqOwner, heroIdx)`; zudem nicht über `engine.heroScript` (ein Erbe des Effekts – „gains the effects of" – bekäme den Rabatt nie).
 
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |

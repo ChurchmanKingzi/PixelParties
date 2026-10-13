@@ -2,6 +2,7 @@
 // A01-pollution-32 · Circle-of-Hell-Replay umgeht die Sperren „nur ein Zauber pro Zug“ (Eraser Beam) und „keine weitere Area“ (Reality Crack)
 // Kartentexte: Eraser Beam „This must be the only Spell you play this turn.“ · Reality Crack „You cannot play another Area for the rest of the turn afterwards.“
 //   Circle of Hell „… you may immediately delete all Areas you control and **play this deleted Spell** as an additional Action.“ (Area-Zauber)
+// Fall (c): The Third Circle of Hell (Deck zeigen, einen Area-Zauber als Zusatzaktion spielen „if possible“) nach Reality Crack – derselbe Befund über `performImmediateActionAnyHero`.
 // Aufbau: Sitz 0: Dante (Destruction Magic 3 + Magic Arts 3), Fifth Circle of Hell auf der Hand, eine gelöschte Area (Dantes Vorbedingung).
 //   (a) echter Zug: Eraser Beam (Zauberspertre `_spellLockTurn`), dann Dante: Fifth Circle aus der Hand löschen (Weg 1) → Replay-Angebot „Ja“.
 //   (b) echter Zug: Reality Crack (Area-Gallery abgebrochen; setzt `_cantPlayAreaThisTurn`), danach dasselbe.
@@ -31,6 +32,20 @@ const tgt = (v) => [v.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx 
     const areas = t.gs.areaZones[0];
     R.check(`nach ${first}: Fifth Circle wird nicht als zweiter Zauber/Area gewirkt`, !areas.includes('The Fifth Circle of Hell'), { areas, gelöscht: t.pile(0, 'deletedPile') });
     R.check(`nach ${first}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
+  }
+  // (c) The Third Circle of Hell (Weg „aus dem Deck zeigen und spielen“) nach Reality Crack: ebenfalls eine zweite Area
+  {
+    const t = await H.fresh({ hand: [['Reality Crack', 'The Third Circle of Hell', 'Heal'], []],
+      deck: [[H.INERT.filler, 'The Fourth Circle of Hell', 'Heal', H.INERT.filler, H.INERT.filler, H.INERT.filler, H.INERT.filler, H.INERT.filler], []], heroes: [DANTE, undefined], abilities: DM });
+    t.gs.players[0].deletedPile.push('Acid Rain');
+    t.policy.confirm = true; t.targetFn = tgt;
+    t.script.push({ match: d => d && d.type === 'cardGallery' && d.title === 'Reality Crack', answer: () => ({ cancelled: true }) });
+    t.script.push({ match: d => d && d.type === 'forceDiscardCancellable', answer: () => ({ cardName: 'The Third Circle of Hell' }) });
+    await t.play(0, 'Reality Crack', { hero: 0 });
+    await t.activateHero(0, 0, {});
+    await t.run(() => t.engine._runPostChainActions());
+    R.check('(c) nach Reality Crack: Third Circle spielt keinen Area-Zauber aus dem Deck', !t.gs.areaZones[0].includes('The Fourth Circle of Hell'), t.gs.areaZones[0]);
+    R.check('(c) keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();
 })();

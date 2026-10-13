@@ -302,6 +302,15 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/32-monstrosity-pick-ignores-side.js` (ausgeführt: 2 ✗)
 - **Vermutete Ursache:** `candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx)` vergleicht `picked.owner` (die Brettseite, die die Zonenliste Z. 85–93 mitgibt) nicht.
 
+### A02-deepsea-33 · Siphem: Heldeneffekt-Schaden läuft als Typ 'creature' – Frog Race Boat (und Crocodile) erkennen ihn nicht als „Schaden des Helden" · Stufe B
+- **Karten:** Siphem, the Deepsea Demon (`siphem-the-deepsea-demon.js` Z. ~150–160), Frog Race Boat / Crocodile Race Boat (`_race-boat-shared.js` `schadenKommtVomTraeger`).
+- **Voraussetzungen / Aufbau:** Seat 0: Siphem (Held 0) mit 2 Deepsea Counters, Frog Race Boat (Slot 0), 2 Kreaturen (Slot 1/2); Seat 1: Standardhelden (800 HP).
+- **Schritte:** Siphems Heldeneffekt aktivieren (2 Counter, Ziel Gegnerheld 0). Kontrolle: Fireball desselben Helden.
+- **Erwartet** (Quelle: Frog-Text „The first damage the equipped Hero deals **in any way** to a single target each turn is increased by 50 times the number of Creatures in its other Support Zones"; CARD_API „Schadenstyp 'hero' (v905)": Schaden aus aktivierbaren HELDEN-Effekten läuft als `'hero'`, Logan wurde deshalb von `'creature'` umgestellt): 100 + 2 × 50 = 200 Schaden, Gegnerheld 600.
+- **Beobachtet:** 700 (nur 100); der Fireball der Kontrolle bekommt den Bonus (550). Ursache bestätigt: ersetzt man `'creature'` durch `'hero'` (Wrapper um `actionDealDamage` im Scratch-Test), kommt der Bonus (600). Dasselbe gilt für Crocodile Race Boat (ein Siphem-Kill zählt nicht als „defeats") und jeden Leser, der `'creature'` vom Heldenschaden ausnimmt.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/33-siphem-damage-type-frog.js` (ausgeführt: 1 ✗)
+- **Vermutete Ursache:** `siphem-the-deepsea-demon.js` `ctx.dealDamage(tHero, damage, 'creature')` und `actionDealCreatureDamage(ctx.card, …, 'creature', …)` im Heldeneffekt – Typ `'hero'` fehlt (CARD_API-Liste der Träger nennt Siphem nicht).
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
