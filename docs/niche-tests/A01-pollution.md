@@ -264,6 +264,15 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Vermutete Ursache:** `reincarnation.js` `getReviveTargets`: Sperre nur über das Heldenflag `reincarnationRevived`, kein Spieler-Zähler.
 - **Frage an Al:** Darf Reincarnation im Spiel **einmal je Held** (zwei Helden = zwei Wiederbelebungen) oder insgesamt **nur einmal** einen Helden wiederbeleben?
 
+### A01-pollution-29 · Royal Corgi: gestohlen wirkt das „+3 max. Handgröße“ für den Besitzer statt für den Kontrolleur · Stufe B
+- **Karten:** Royal Corgi (`royal-corgi.js`), Engine `enforceHandLimit` / `_checkReactiveHandLimits`; Klasse „Besitzer ODER Kontrolleur“ (Prüfauftrag)
+- **Voraussetzungen / Aufbau:** Sitz 1 beschwört Royal Corgi, Sitz 0 stiehlt sie (`actionStealCreature(0, inst)`: owner 1, controller 0, liegt auf Sitz 0s Brett); beide Seiten halten 9 Handkarten.
+- **Schritte:** 1. `engine.enforceHandLimit(0)`, dann `enforceHandLimit(1)`. 2. Handgrößen lesen.
+- **Erwartet** (Quelle: Kartentext „**Your** max hand size is increased by 3“; Konvention owner/controller, README §4 Familie 5): der Kontrolleur (Sitz 0) hat Limit 10 und wirft nicht ab; der Besitzer (Sitz 1) hat die Corgi nicht mehr unter Kontrolle und bleibt bei 7.
+- **Beobachtet:** Umgekehrt: Sitz 0 wirft auf 7 ab, Sitz 1 behält seine 9 Karten. Die Zählschleifen filtern mit `inst.owner === playerIdx`; der Bonus bleibt beim Besitzer, obwohl die Karte nicht mehr auf seinem Brett liegt. Der Dieb hat nichts davon, das Opfer behält den Vorteil.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/29-royal-corgi-gestohlen-bonus-geht-an-besitzer.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/_engine.js` ~16863 (`enforceHandLimit`) und ~16993 (`_checkReactiveHandLimits`): `inst.owner === playerIdx`; dieselbe Eigentümer-Lesart steht laut Quelltext auch in der Rückprüfung beim Tod/Wegzug (`handLimitAffectedOwners.add(e.inst.owner)`, ~13927 `cardInstance.owner`) – nur gelesen, nicht gemessen. Gilt für jede Karte mit `handLimitReduction`.
+
 ## Abdeckung
 (wird ergänzt)
 

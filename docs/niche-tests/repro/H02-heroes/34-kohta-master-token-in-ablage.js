@@ -1,7 +1,7 @@
 // H02-heroes-34 · Kohta, Master of Super-Killing: ein besiegter Token landet als Karte in der Ablage (statt gelöscht zu werden)
 //
 // Kartentext Kohta Master: „… choose any target on the board and defeat it."  Konvention (A05-02/A05-12/R01-02/M01-05, CARD_API „Tokens … überall verboten"): Tokens sind keine Karten – sie kommen nie in Hand/Deck/Ablage, ein besiegter Token liegt im Gelöscht-Stapel (so im Schadensweg: H02-15 Kontrolle).
-// Das Skript besiegt Kreaturen über `engine.actionDestroyCard(quelle, opfer, …)` (kohta-master-of-super-killing.js, Z. ~222). `_actionMoveCardKern` (`_engine.js` ~13731) schiebt den „Kadaver" unbedingt auf `discardPile`.
+// Das Skript besiegt Kreaturen über `engine.actionDestroyCard(quelle, opfer, …)` (kohta-master-of-super-killing.js, Z. 205). `_actionMoveCardKern` (`_engine.js` ~13731) schiebt den „Kadaver" unbedingt auf `discardPile`.
 // Aufbau: Kohta Master als Held 0 (Sitz 0), ein Mummy Token (bzw. Biomancy Token) auf Sitz 1; Heldeneffekt in der Action Phase, Zielwahl = der Token.
 // Erwartung: Ablage von Sitz 1 enthält keinen Token, der Token liegt im Gelöscht-Stapel. Beobachtung: der Token liegt in der Ablage von Sitz 1 (Gelöscht-Stapel leer).
 // Aufruf: node docs/niche-tests/repro/H02-heroes/34-kohta-master-token-in-ablage.js   (✗ = Fehler tritt auf)

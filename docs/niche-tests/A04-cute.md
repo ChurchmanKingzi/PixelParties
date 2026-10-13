@@ -1,8 +1,14 @@
 # A04-cute – Nischenfall-Bericht
-Stand/Autor: Agent A04-cute, 12.10.2026. Karten: 62 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird fortlaufend ergänzt) mit Befund.
-
+Stand/Autor: Agent A04-cute (Fortsetzung nach Abbruch durch das API-Rate-Limit), 13.10.2026. Karten: 62 in der Liste · 62 gezielt oder durch Batterie geprüft (61 × L2, 1 × L1) · ca. 32 Karten mit Befund (30 Befunde: 11 × A, 15 × B, 4 × C).
 ## Zusammenfassung
-(wird am Ende ausgefüllt – Arbeitsstand: Bericht wächst mit jedem bestätigten Befund)
+30 Befunde, alle mit ausgeführtem Repro unter `docs/niche-tests/repro/A04-cute/` (01–30): 11 × A, 15 × B, 4 × C. Beim Nachlauf aller 30 Repros zeigt jedes mindestens ein ✗.
+* **Coolness-Stack-Mechanik ist die Hauptbaustelle.** `actionPopCoolnessStackTo`/`actionDeleteCoolnessStack` umgehen die Standard-Wege (Löschrettung der Hydra -06, Cats Ablage-Mill -07, Hipdalls Rückholung -09, Elephant-Aufdecken -12), und Wowhalla selbst seedet doppelt (-01) und löscht den Stack, wenn irgendeine ANDERE eigene Area geht (-02).
+* **Wildur** hat die meisten Folgefehler: Ablage-Array-Austausch durch Guard Duty schaltet die Umleitung dauerhaft ab (-08), die Leiche des Phoenix liegt danach doppelt im Spiel (-17), Familiar kehrt nicht zurück (-18), Waisen-Instanz (-25), ignoriert Negation/Frost/Betäubung (-26).
+* **Eindeutigkeit („You can only control 1 …")** gilt nur beim Ausspielen aus der Hand; Army, Rebirth, Bird, Mini und Molinda umgehen sie (-10).
+* **Rangfolge A:** Doppelsaat Wowhalla (-01), Wowhalla-Stack wird von anderen Areas gelöscht (-02), Swagdri+Bananas verpufft (-03), Wildur nach Guard Duty (-08), Modnir-Bonus verschwindet (-19), Non-Fungible Monkee zahlt bei Schadens-Tod nichts (-23), Bunny/Dog/Familiar/Mini melden ihre Zusatzaktion nicht (-24, kein Bleed).
+* **Querschnittsklassen, die diese Gruppe berühren:** S01-20 (Xals Support-Stapel) trifft Army und Familiar (-29); die Ablauf-Räumung von `negated` löscht fremde Negierungen (-28, Pink Sky); `getCreatureTargets` zeigt die F02-14-Kollision auch mit Cute Conversion (kein neuer Befund). C05-01/H03-15/S01-11 betreffen keine Skripte dieser Gruppe (siehe „Prüfaufträge").
+* **Fragen an Al (Stufe C):** -11 (was ist „Cute"?), -15 (Schulstufe beim Stack-Summon), -22 (Hawk Stufe 3 auf sich selbst), -27 (abgelehntes Dog-Angebot).
+* **Nicht getestet:** Mehr-Sitz-Spiele, Animationen/Protokoll, „delete"-Gegenstück zu Bunny, Ash Worms, Conversion gegen gegnerischen Phoenix (Details am Ende).
 
 ## Befunde
 
@@ -252,8 +258,100 @@ Stand/Autor: Agent A04-cute, 12.10.2026. Karten: 62 in der Liste · (wird fortla
 - **Repro:** `docs/niche-tests/repro/A04-cute/29-xal-support-abilities-army-familiar.js`
 - **Vermutete Ursache:** `army-of-the-cute.js:51-54` (`levelBudget` → `countAbilitiesForSchool(…, abilityZones[heroIdx])`) und `cute-familiar.js:44-56` (`countCharme` liest nur `abilityZones`); richtig wäre `engine.effectiveSchoolLevelForCaster(...)` bzw. `heroSupportAbilityStacks`. Die Familiar-Rückkehr am Zugende (`onTurnEnd`, ebenfalls `countCharme`) habe ich nicht gesondert geprüft.
 
+### A04-cute-30 · Swagdri: eine über ihn ausgerüstete Ausrüstung wird beim späteren Weggang nicht gelöscht · Stufe B
+- **Karten:** Swagdri, Forger of Coolness; Cute Crown (Equipment)
+- **Voraussetzungen / Aufbau:** Wowhalla, Stack `[Cute Crown]`, Swagdri auf dem Brett; Crown über Swagdris Effekt an Held 0 ausgerüstet. Danach verlässt die Crown das Brett auf drei Wegen: `actionMoveCard(…,'discard')`, `actionDestroyCard`, Tod des Trägers.
+- **Erwartet** (Swagdri: „… delete the Artifact if it would be sent to the discard pile."; das Skript will es auch: `placed.inst._swagdriRouteToDelete = true`): Crown im Gelöscht-Stapel.
+- **Beobachtet:** in allen drei Wegen liegt die Crown in der Ablage, Gelöscht-Stapel leer. Gegenprobe Nicht-Equipment (Golden Bananas, siehe -03): gelöscht ✓.
+- **Repro:** `docs/niche-tests/repro/A04-cute/30-swagdri-ausruestung-nicht-geloescht.js`
+- **Vermutete Ursache:** `swagdri-forger-of-coolness.js:169` setzt die Marke `_swagdriRouteToDelete`; `grep -rn _swagdriRouteToDelete cards/effects` findet keinen Leser. Restunsicherheit (B): der Text lässt auch die Lesart zu, dass sich die Klausel nur auf das Ausspielen bezieht – dagegen spricht die gesetzte Marke.
+
 ## Abdeckung
-(wird am Ende ausgefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Army of the Cute | L2 gezielt | Budget 1/2/3 ✓, Überbudget-Antwort ✓, Ablage-Quelle ✓; zweites Phoenix ✗(→ -10), „Cute"-Begriff ✗(→ -11), Xal-Stapel ✗(→ -29) |
+| Bifab, Bridge to Coolness | L2 gezielt | nur vom Stack wirksam, HOPT hart ✓, Abbruch der Suche verbraucht nichts ✓, zweite Bifab bleibt liegen ✓; Hipdall-Rückholung ✗(→ -09), Hydra-Löschrettung ✗(→ -06) |
+| Cheeky Monkee | L2 gezielt | Invest-Kosten, Abbruch kostet nichts ✓, HOPT je Instanz ✓, Logan tot/bezaubert ✓, Gold-Trigger-Kette (Bananas) ✓; Status-Matrix ✓ |
+| Cool Rescue | L2 gezielt | Stack leer ✓, Zusatzaktion ✓; Elephant wird nicht aufgedeckt ✗(→ -12) |
+| Cooldin, King of Coolness | L2 gezielt | Wowhalla aus Hand/Deck ✓, Zug endet ✓, Abbruch der Galerie lässt HOPT frei ✓, gefroren/betäubt gesperrt ✓, Gegner-Area stört nicht ✓; Spatial Crevice ✗(→ -21) |
+| Coolness Overcharge | L2 gezielt | Stack < 6 gesperrt ✓, Zusatzaktion ✓, gestohlene Gegnerkreatur → Ablage des Besitzers ✓, eigene Wowhalla als Ziel ✓, Gegner-Wowhalla-Schutzabfrage ✓; Cat-Mill ✗(→ -07), hipdall ✗(→ -09) |
+| Cute Angel Molinda | L2 gezielt | Kreatur übernehmen/Rückgabe ✓, Schaden an Kreaturen 0 ✓; Eindeutigkeitsumgehung ✗(→ -10) |
+| Cute Annoyance Mini | L2 gezielt | Tutor + Rider, Eindeutigkeit des Familiar ✗(→ -10), Zusatzaktion nicht gemeldet ✗(→ -24), Bunny-Batch ✓ |
+| Cute Bird | L2 gezielt | Phoenix-Austausch im selben Slot ✓; zweiter Phoenix ✗(→ -10) |
+| Cute Bunny | L2 gezielt | Hand-Summon nach 2 Abwürfen ✓, Ziehen bei ≥ 2 Abwürfen ✓ (Phoenix/Bird/Mini-Wege); Hydra/Dog-Abwurf ✗(→ -16), Zusatzaktion ✗(→ -24) |
+| Cute Cat | L2 gezielt | Sofort-Ablage bei Beschwörung ✓, „erstes Mal pro Zug" ✓, Mill aus Deck (Magenta) ✓; Coolness-Stack-Ablage ✗(→ -07) |
+| Cute Conversion | L2 gezielt | Übernahme + Rückgabe ✓, Omni-Immunität gegen Schaden/Status ✓, Stufenreduktion ✓, Phatnir-Aktivierung der Leihkreatur (nicht aktivierbar, Lesart offen, nicht gemeldet); Applause-Counter ✗(→ -13); gegnerisch kontrollierte, eigene Kreatur wird nicht übernommen (`stolenBy`-Filter, nicht gemeldet) |
+| Cute Crown | L2 gezielt | 1 Summon/Zug ✓, nur „Cute" ✓; Swagdri-Ausrüstung bleibt in der Ablage ✗(→ -30); Namensbegriff ✗(→ -11) |
+| Cute Ditz Monami | L2 gezielt | Fireball auf Fremdheld ✓, zwei eigene Helden ✓, Monami selbst (nicht-tödlich ✓, tödlich ohne Reaktion ✓); Namensbegriff ✗(→ -11) |
+| Cute Dog | L2 gezielt | Abwurf-Summon ✓, Gegnerzug-Zwangsabwurf ✓, Tutor; Zusatzaktion ✗(→ -24), abgelehntes Angebot verbraucht Zug ✗(→ -27), Bunny-Batch ✗(→ -16) |
+| Cute Familiar | L2 gezielt | Abwurf-Summon, Heldenzusatzaktion, Rückkehr am Zugende (Gegenprobe ✓); Wildur-Fall ✗(→ -18), Xal ✗(→ -29), Eindeutigkeit ✗(→ -10), Zusatzaktion ✗(→ -24) |
+| Cute Hydra | L2 gezielt | Pflichtabwurf ≥ 2 (Hand mit 0/1 weiteren Karten nicht spielbar ✓), Head Counters, Ziele bis N; Löschrettung vom Stack ✗(→ -06), Abwurf-Batch ✗(→ -16); gefroren/betäubt wird weiter gelöscht (Klasse B-querschnitt, nicht neu gemeldet) |
+| Cute Meanie Melissa | L2 gezielt | Gegner zieht 3 → genau 1 ✓, nicht bei Ressourcenziehung ✓, Spiegel (beide Melissa) endet ✓ |
+| Cute Nerd Magenta | L2 gezielt | Kosten-Abwurf, Mill, Hand/Deck leer gesperrt ✓, Cat aus dem Deck löst Cats Mill aus ✓, letzte Deckkarte ✓ |
+| Cute Phoenix | L2 gezielt | Schaden × Namen in Ablage, Revive (2 Abwürfe) ✓; Wildur-Duplikat ✗(→ -17), Eindeutigkeit ✗(→ -10) |
+| Cute Princess Mary | L2 gezielt | Cute ohne Schulstufe ✓, Nicht-Cute gesperrt ✓, negiert; Namensbegriff ✗(→ -11) |
+| Cuteness Sensor | L1 Standard | Skript + Name-Regex gelesen; Cute-Archetyp ohne Wort im Namen (Pink Sky) nicht auffindbar (→ -11) |
+| Freshya, Beauty of Coolness | L2 gezielt | ohne Stack gesperrt ✓, Abbruch/HOPT ✓, Deck mit 2 Karten ✓ |
+| Glorious Rebirth | L2 gezielt | Level ≤ 3 an der Spitze ✓; Eindeutigkeit ✗(→ -10) |
+| Golden Bananas | L2 gezielt | 3 × 4 Gold ✓, Monkee-Kette ✓; über Swagdri verpufft das Gold ✗(→ -03) |
+| Hipdall, Protector of Coolness | L2 gezielt | Stack-Spitze-Beschwörung ✓; Rückholung ✗(→ -09), Schulprüfung fehlt (→ -15) |
+| Lolki, Trickstar of Coolness | L2 gezielt | Suche → Stack ✓, Betäubung eines eigenen Ziels ✓, Statusimmunität (Gibbous) ✓ |
+| Lunar Eclipse | L2 gezielt | Negation + Löschen (Fireball, Cute Bunny, Golden Bananas) ✓, Ersatzaktion (Queue + Heldenaktion) ✓; Kostenwahl ✗(→ -20) |
+| Lunatic Cycle - Crescent Moon | L2 gezielt | Mischen/Ziehen bei Aktion ✓; Swagdri ohne New Moon ✗(→ -04) |
+| Lunatic Cycle - Full Moon | L2 gezielt | ATK +100 ✓, Voraussetzungs-Kette (Gibbous) ✓ |
+| Lunatic Cycle - Gibbous Moon | L2 gezielt | Status-Immunität ✓ (Lolki-Stun abgewehrt) |
+| Lunatic Cycle - Half Moon | L2 gezielt | Schadensdeckel (halbe Max-HP, aufgerundet) ✓, mit Thorad ✓ |
+| Lunatic Cycle - New Moon | L2 gezielt | Tutor mit Abwurf ✓, Kosten 4 ✓, HOPT; als Eclipse-Kosten wird er immer zuerst gewählt (→ -20) |
+| Lunatic Golem | L2 gezielt | Stufen 1–5 (Schaden × Anzahl, Immunität, halber Schaden, Heldenschutz) ✓, Pink Sky bei Stufe ≥ 2 wirkungslos ✓ (Immunität), Status-Matrix ✓ |
+| Lunatic Hawk | L2 gezielt | Stufen 1 (Zusatzaktion), 2 (Ausrüsten zieht), 4 (Zusatz-Summon, Verfall), 5 (zweite Aktion, gefroren ✓) ✓; Stufe 3 beim eigenen Hawk ✗(→ -22, C) |
+| Maho, the Cute Magical Girl | L2 gezielt | Double Creature gratis 1×/Zug ✓, Double-Spell-Suche, Abbruch der Suche verbraucht die Gratis-Beschwörung (nach Wortlaut offen, nicht gemeldet) |
+| Mirjam, the Fallen Cute Angel | L2 gezielt | Schaden → ATK ✓, Heilsperre ✓, 1 Attack/Zug ✓, Wiederbelebung ✓; negiert: Heilung & Limit fallen weg (nach Konvention in Ordnung) |
+| Modnir, Hammer of Coolness | L2 gezielt | ATK +100 ✓, Träger stirbt/wird wiederbelebt ✓; Bonus geht bei fremdem Support-Abgang verloren ✗(→ -19) |
+| Molinda, the Cutest Being in the Sky | L2 gezielt | Kreatur/Held übernehmen und Rückgabe ✓, HOPT, kein Ziel gesperrt ✓ |
+| Nimble Monkee | L2 gezielt | Gold-Trigger-Summon (das Skript meldet die Zusatzaktion; nicht einzeln gemessen), 1/Zug, 8 Invest → 2 ziehen (Deck 1 → Deck-out wie vorgesehen) ✓; Tod durch Schaden ✗(→ -23, Non-Fungible Monkee) |
+| Phatnir, Prototype of Coolness | L2 gezielt | Levelreduktion durch Stack (Hand + Brett) ✓, 300 Schaden, Abbruch/HOPT ✓ |
+| Pink Sky | L2 gezielt | Negierung + Cute-Ausnahme ✓, Ablauf allein ✓; Fremd-Negierung ✗(→ -28), Namens-/Archetyp-Begriff ✗(→ -11) |
+| Prophecy of Coolness | L2 gezielt | ohne Stack gesperrt ✓, Abbruch ✓, HOPT hart ✓, leeres Deck ✓ |
+| Ragnarock | L2 gezielt | Kosten (Stack-Spitze löschen), Ability-Lv1/Lv2 negieren + Top-Kopie ablegen ✓, zweite Aktivierung im Zug gesperrt ✓ |
+| Resilient Monkee | L2 gezielt | Ablage-Summon per Gold, 10 Invest → Schadensschutz bis Beginn des eigenen Zuges (eigener & Gegnerzug) ✓ |
+| String of Fine | L2 gezielt | Stack-Weg, 1× pro Ziel pro Spiel ✓, Schutz bis Zugbeginn ✓; Hipdall ✗(→ -09) |
+| Swagdri, Forger of Coolness | L2 gezielt | Stack-Beschwörung, Artefakt-Spiel ohne Kosten, HOPT; Bananas ✗(→ -03), Crescent ✗(→ -04), Abbruch ✗(→ -05), Ausrüstungs-Löschung ✗(→ -30) |
+| Swellpnir, Mount of Coolness | L2 gezielt | zweite Aktion nur für Attack ✓, Stack-Ausrüstung ✓, Träger stirbt ✓ |
+| The Nornstellar, Foretellers of Coolness | L2 gezielt | Verbündeter/Held stirbt → Stack +1 ✓, Gegnerkreatur nicht ✓, Co-Fatal im Flächenschaden ✓, eigener Tod: Hand → Stack + 2 ziehen ✓ |
+| Thorad, Strength of Coolness | L2 gezielt | Einzelziel-Spell/Attack 40 × Stack ✓; Mehrziel-Konsistenz ✗(→ -14) |
+| Thrysh, Robber of Coolness | L2 gezielt | Levelreduktion ✓, Deck- und Stack-Weg ✓ (Modnir/Swellpnir) |
+| Wildur, the Shining Coolness | L2 gezielt | Redirect ✓; nach Guard Duty ✗(→ -08), Phoenix-Duplikat ✗(→ -17), Familiar ✗(→ -18), Waise ✗(→ -25), Status ✗(→ -26), ohne Schule vom Stack ✗(→ -15) |
+| Wowhalla, the Hall of the Cool | L2 gezielt | Saat/Zugende-Push/Gegner-Schutzabfrage ✓; Doppelsaat ✗(→ -01), fremde Area ✗(→ -02) |
+| Wowkyrie, Bringer of Coolness | L2 gezielt | Push 1/Zug ✓, kein Schaden ab Stack 3 ✓, Status-Matrix (gefroren/betäubt/negiert → stumm) ✓ |
+| Yolomungandr, Ender of Coolness | L2 gezielt | Beschwörung löscht Stack, 30 × N auf Helden/Kreaturen ✓, Zugende-Schlag ✓, geklaute Kreaturen unversehrt ✓, Frost/Betäubung (Dauer 3) stumm ✓ |
+| Criminal Monkee | L2 gezielt | Zusatz-Summon bei genau 4 Gold ✓, 4 Invest → Non-Fungible Monkee aus dem Deck ✓ |
+| Non-Fungible Monkee | L2 gezielt | Platzieren/Verschieben/Zerstören +4 ✓; Schadens-Tod ✗(→ -23) |
+| Logan, the Investment Monkee | L2 gezielt | Einzahlen 1×/Zug, Abbruch, 0-Gold-Regel über mehrere Wege, Zugende-Auszahlung (Gold/Schaden), gefrorener Logan zahlt aus (Lesart offen, nicht gemeldet) |
+| Fun-Fun Circus Strongman | L2 gezielt | HP bei Beschwörung 10 × Applause ✓, Flächenschlag zählt alle Besiegten ✓, Aktivierung 10 × Summe ✓ |
+| Fun-Fun Circus Elephant | L2 gezielt | Zählen in der Hand, Aufdecken beim Ziehen/Suchen ✓; Cool Rescue ✗(→ -12) |
+| Fun-Fun Circus Director | L2 gezielt | Resource Phase +1 pro 15 Applause (zwei Directors ✓, Gegner-Director ✓, gefroren/betäubt/negiert stumm ✓), Zähler-Übernahme + Handrückholung ✓ |
+| Fun-Fun Circus Clown | L2 gezielt | Zugende-Summon als Zusatzaktion gemeldet ✓, Counter auf eine/alle; geliehene Kreatur ✗(→ -13) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+- **Coolness-Stack-Karten:** Prophecy/Bifab/Freshya/Lolki: Abbruch verbraucht nichts, HOPT hart, leeres Deck, kein Stack = gesperrt. Phatnir/Thrysh: Levelreduktion durch Stack in Hand und auf dem Brett, Deck- und Stack-Weg. Swellpnir/Modnir nur vom Stack.
+- **Yolomungandr:** Stack-Löschung bei Beschwörung, 30 × N auf Helden oder Kreaturen, Zugende-Schlag; vom Gegner geliehene (eigene) Kreaturen bleiben unversehrt, vom Gegner kontrollierte werden getroffen (Beschwörung und Zugende). Frost/Betäubung mit Dauer 1 laufen vor dem Zugende-Hook ab; mit Dauer 3 bleibt er stumm.
+- **Wowkyrie / Nornstellar / Hawk / Golem:** Dauereffekte respektieren gefroren/betäubt/negiert (Status-Matrix); Golem ist ab 2 Cycles immun gegen Pink Sky. Lunatic Hawk Stufen 1, 2, 4, 5 inkl. verfallener Ladung und gefrorenem Hawk.
+- **Applause/Zirkus:** Strongman-HP und Flächenschlag-Zähler, Director-Resource-Phasen (zwei Directors, Gegner-Director, Status), Elephant zählt in der Hand mit.
+- **Monkees:** Invest-Kosten und Abbruch, Resilient-Schutz bis Beginn des nächsten eigenen Zuges, Criminal/Nimble/Resilient-Summons, Logan 0-Gold-Regel und Auszahlung.
+- **Lunar Eclipse:** Negation + Löschen bei Fireball, Cute Bunny, Golden Bananas; Ersatzaktion wird eingereiht und als Heldenaktion angeboten.
+- **Coolness Overcharge:** gestohlene Gegnerkreatur landet in der Ablage ihres Besitzers; Gegner-Wowhalla fragt den Schutz ab.
+- **Heldenkarten:** Mary (Cute ohne Schule, Nicht-Cute gesperrt, auch negiert), Monami (auch mehrere Helden, Selbsttreffer), Melissa (Spiegel ohne Endlosschleife), Mirjam (Heilsperre, 1 Attack), Maho (Gratis-Double-Creature 1×/Zug), Cooldin (Abbruch lässt HOPT frei), Molinda (Übernahme + Rückgabe).
+- **Cute Hydra:** mit 0 oder 1 weiteren Handkarten nicht spielbar, mit 2 Abwürfen 2 Head Counters.
+
+### Prüfaufträge des Auftraggebers (dynamisch gemessen)
+- **`getCreatureTargets` / Brettspalte / „Besitzer ODER Kontrolleur" (F02-14, S01-09):** meine Skripte rufen weder `getCreatureTargets` noch `collectAoeCreatureTargets` selbst auf. Mit Cute Conversion bestätigt (kein neuer Befund): liegt die geliehene Gegnerkreatur vor meiner eigenen an derselben (Held, Slot)-Stelle in `cardInstances`, liefert `getCreatureTargets(0)` für meinen Platz (0,0) die geliehene Instanz (Besitzer 1, Kontrolle 0); steht meine eigene zuerst, die richtige. Der eigene Flächenschlag Yolomungandr rechnet über die Kontrolle und trifft richtig.
+- **`counters.currentHp ?? 0` (C05-01):** in keinem Skript dieser Gruppe vorhanden; Molinda und Nornstellar nutzen `?? 1` (unversehrt = lebendig). Die engine-internen `?? 0`-Stellen (`_engine.js:12385, 47038, 47101`) habe ich hier nicht bis zu einer Karte dieser Gruppe verfolgt.
+- **`negatedDuration` ohne Leser (H03-15):** keine Karte der Gruppe setzt `negatedDuration`; Pink Sky und Eclipse arbeiten mit Buff-Ablauf (siehe -28 für die Ablauf-Schwäche).
+- **Zugende-Räumung entfernt `negated` ohne `sourceBound` (C05-02):** betrifft Helden-Status; für Kreaturen gilt der ähnliche Mechanismus im Buff-Ablauf, gemessen als -28.
+- **`_castSpellImmediately` ohne `oncePerGame` (S01-11):** kein Skript der Gruppe ruft `_castSpellImmediately` (grep); Swagdri/Thrysh spielen Artefakte über eigene Wege. Einmal-pro-Spiel-Karten der Gruppe: nur String of Fine (Ziel-Stempel), dort ✓.
+- **`countAbilitiesForSchool` ohne Support-Zonen-Stapel (S01-20):** trifft Army of the Cute und Cute Familiar → -29 (Stufe B, Repro ✗).
+
+### Nicht getestet / nur gelesen
+- Mehr-Sitz-Spiele (3/4 Spieler) für Yolomungandr, Pink Sky, Melissa; CPU-Pilot-Verhalten; Animationen/Protokoll-Verträge (Familie 11) nur dort, wo sie nebenbei auffielen.
+- Das „delete"-Gegenstück zu Bunny (≥ 2 Karten gelöscht); Ash Worms als Hydra-Vergleich; Cute-Conversion-Diebstahl des gegnerischen Phoenix; Cute Familiars Zugende-Rückkehr mit Xal-Charme.
+- Cuteness Sensor nur gelesen (L1), Molinda-Aufstieg-Voraussetzungen (Heart-Shaped Bow, 2 Love Shots) nur über den Aufstiegs-Effekt, nicht über den Spielweg der Verwandlung.

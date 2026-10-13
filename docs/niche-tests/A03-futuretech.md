@@ -1,8 +1,15 @@
 # A03-futuretech – Nischenfall-Bericht
-Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird am Ende gezählt) gezielt getestet · (wird am Ende gezählt) mit Befund.
+Stand/Autor: Agent A03-futuretech (Fortsetzung nach Abbruch des Vorgängers), 13.10.2026. Karten: 52 in der Liste · 52 gelesen/gemessen (davon 49 gezielt, L2) · 32 mit Befund. Befunde: 30 (4 × A, 19 × B, 7 × C).
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – der Bericht wächst fortlaufend, die Befunde stehen schon)
+Gesamteindruck: Der Archetyp ist durch die Vorrunden-Batterien crash-sicher (keine verschluckten Engine-Fehler, keine Hänger in über 150 Einzelläufen), die Befunde sind **semantisch**. Die fünf wichtigsten:
+1. **-02 (A)** Escape Device/Weathercock: die Effekt-Immunität bleibt bis zum nächsten Zielfenster stehen und verschluckt fremden Schaden im selben Zug (Erklärung der Vorrunden-„lead“: kein Spielende im Dauerfeuer).
+2. **-01 und -27 (A)** Laser Cannon/Gun-Boni werden nicht korrekt zurückgenommen: Copy Device als Laser Cannon/Gun lässt den Bonus dauerhaft stehen; Slippery Fridge verdoppelt den Laser-Cannon-Bonus (alter Held behält +100, neuer bekommt +100).
+3. **-05 (A)** Steam Dwarf Engineer bietet den Ifrit an, die Beschwörung scheitert, die Karte ist aus dem Spiel verschwunden.
+4. **-26, -30, -19 (B)** Selbstgebaute Ziel-/Flächensammler (Missing Parts, Scrap Plow, Doomsday Bomb, Bomb, Brewer) rechnen nach Besitzer/Brettseite statt nach Kontrolle bzw. kollidieren bei fremd beschworenen Kreaturen (Klasse F02-14).
+5. **-08, -09, -13, -07 (B)** Archetyp-Kombos laufen ins Leere: Gear mahlt schon beim Pflicht-Ziehen, Prototypes→Gun rechnet den ATK-Bonus nicht nach, Doomsday Bomb negiert nur den Schaden (Nebeneffekte laufen), Dragon Pilot löst je Karte statt je Vorgang aus.
+Prüfaufträge: H03-17 für Riffel bestätigt (-20); H03-15 (`negatedDuration`), C05-01 (`currentHp ?? 0`), C05-02 (Zugende-Räumung `negated`) betreffen keine Karte dieser Gruppe (Skripte enthalten weder die Muster noch setzen sie dauerhafte Negation; statisch per grep geprüft, dynamisch kein Ansatz); F02-14 an Missing Parts/Scrap Plow/Doomsday Bomb/Bomb/Brewer gemessen (-26, -30, -19), Bazooka/Fists lesen denselben Sammler (nicht einzeln gemessen); F03-04: die Ziel-Aufrufe dieser Gruppe (Mech, Exterminator, Dragon Pilot, Missing Parts, Scrap Plow, Barrage) filtern `untargetable_all` korrekt – nur der Potion Launcher feuert Poison Vial auf eine Thicket-Kreatur (wie der Handweg; Wurzel F03-04, kein eigener Befund); F03-07: Slippery Fridge verschiebt Gun, Doomsday Bomb, Gear, Jetpack, Weathercock, Fists, Bazooka und Potion Launcher ohne Folgen, die Laser Cannon bricht (-27).
+Bewusst NICHT getestet: Skill-Test-Modus, 3-/4-Spieler-Sitze, Animationen/Karten-Reveal (Protokoll-Verträge), Bazooka mit mehreren Zielen pro Angriff (kein Mehrziel-Angriff vorhanden), `cpuResponse`-Zweige der Cybug-Karten, Doping/Battery mit Copy-Device-Aliassen, Fists/Bazooka unter der F02-14-Kollision, Wiederholung mit anderen Seeds außer 1234 (Zufallsanteile: nur Mischen der Potion-Deck-/Deck-Karten, ohne Auffälligkeit).
 
 ## Befunde
 
@@ -283,7 +290,73 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 - **Vermutete Ursache:** wie F02-14: `_engine.js` ~40263 `getCreatureTargets` sucht die Instanz ohne Brettseite (`(owner===pi || controller===pi) && heroIdx && zoneSlot`). Hier trifft es eine Flächenwirkung (stille Auslassung statt falsches Ziel).
 
 ## Abdeckung
-(wird am Ende ausgefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Blueprints | L2 gezielt | Normalfall ✓, keine Kopie im Deck → unspielbar ✓, Abbruch ✓ (nichts verbraucht), Such-/Handsperre → unspielbar ✓, Artifact/Creature wählbar ✓, Cybug BEE klaut die Suche ✓ |
+| Cybug ANTS | L2 gezielt | Treibstoff Hand/Deck/keiner ✓, Träger stirbt ✓, Tod → Gun zurück ✓, „that same damage“ ✓, Statusticks lösen nicht aus ✓ |
+| Cybug BEE | L2 gezielt | gegen Database/Lamp/Magnetic Potion ✓, eigene Suche löst nicht aus ✓, Pflicht-Ziehen ✓ |
+| Cybug CENTIPEDE | L2 gezielt | Gegner zieht 3 per Effekt ✓, Pflicht-Ziehen löst nicht aus ✓, Host-Spalte voll ✓, Host gefroren/betäubt/negiert ✓, Gegner-Deck 1 Karte ✓, Tod → Wheels zurück ✓ |
+| Cybug LADYBUG | L2 gezielt | Action- und freie Ability negiert ✓, Zielliste ✓, negierte Aktions-Ability verbraucht die Aktion wie ohne Ladybug ✓, 2. Aktivierung desselben Zuges ✓ |
+| Cybug LOCUST | L2 gezielt | Laser Cannon/Gun/Gear/Fists/Jetpack umgeleitet ✓ (Boni am Träger ✓), nur 1 freie Zone ✓, Tod ✓, geklaute Ausrüstung zerstört → Ablage des Besitzers ✓, gegen Control Device stumm ✓ (Text „they control“) |
+| Cybug RHINOCEROS | L2 gezielt | Kreaturen (Frolake, Loyal Beagle, Slimes) ✓, Area ✓, Hook-Reihenfolge ✓; **Control Device in die eigene Zone ✗ (→ -29)** |
+| Cybug SCARAB | L2 gezielt | Held fällt ✓, mehrere fallen gleichzeitig ✓, maxHp 60 ✓, Tri Fecta ohne Tokens (sofort wieder besiegt, Text-konform) ✓ |
+| Debt-O-Tron Damage Fees | L2 gezielt | 2× pro Zug abgelehnt ✓, bei Gold < Kosten/negativ spielbar ✓, Misfire: Stempel erst bei Auflösung ✓ |
+| Debt-O-Tron Model Backup Duplicator | L2 gezielt | Auslöser ✓, Sperren ✗ (→ -23), Spielbarkeit unter Such-Sperre = B-04 (nicht erneut) |
+| Debt-O-Tron Model Loan Shredder | L2 gezielt | Gold −20/0/+50 ✓ (bei 0 nicht aktivierbar), Nein verbraucht HOPT nicht ✓, Spielbedingung (Gold < 0, Handkarte löschen) ✓, Misfire ✓ |
+| Debt-O-Tron Model Missing Parts | L2 gezielt | Schaden 10 × Schulden ✓, Zielliste ✓, Thicket-Schutz ✓; **ID-Kollision mit fremd beschworener Kreatur ✗ (→ -26)** |
+| Debt-O-Tron Model Money Printer | L2 gezielt | 3 Ladungen/Zug ✓, 1 pro Zug summonbar ✓; Zieh-Sperre ✗ (→ -24) |
+| Debt-O-Tron Model Scrap Plow | L2 gezielt | Zielliste ✗ Area fehlt (→ -16), ID-Kollision ✗ (→ -26), Thicket-Schutz ✓, Abbruch verbraucht Ladung nicht ✓ |
+| Future Tech Barrage | L2 gezielt | N = 0/1/3 ✓, Ziel stirbt mittendrin ✓, 1 pro Zug ✓; Abbruch verbrennt Sperre ✗ (→ -21) |
+| Future Tech Battery | L2 gezielt | Rabatt je Handplatz (verschiebt sich beim Abwurf mit ✓), 2 Batterien ✓, Zugende-Ablauf ✓, ohne Kopie unspielbar ✓, Abbruch ✓ |
+| Future Tech Bazooka | L2 gezielt | Attack tötet Kreatur/Held ✓, 0/2 Kopien ✓, Zauber-Tod löst nicht aus ✓, Angriff eines anderen Helden ✓; Sammler `getCreatureTargets` (F02-14) nicht einzeln gemessen |
+| Future Tech Bomb | L2 gezielt | 0/1/5/6 Namen (Deckel 100) ✓, 1 pro Zug ✓, Erst-Runden-Gate = B-06; gestohlene Kreaturen ✗ (→ -19) |
+| Future Tech Control Device | L2 gezielt | Übernahme/Rückgabe ✓, Unterhalt ✓, Instanz bleibt nach Verlassen mit `owner` = Gastgeberseite (Engine-Konvention, auch Powder Keg) ✓, Riffel ✗ (→ -20), Copy Device ✗ (→ -15), H03-17 bestätigt |
+| Future Tech Copy Device | L2 gezielt | ATK-Boni ✗ (→ -01), Riffel-Zählung ✗ (→ -12), Control Device ✗ (→ -15), Doomsday als Kopie ✓, Misfire ✓, Gear-Limit ✓, 10 Kopierziele ✓ (Zugende, Ablage, Kartenbilanz) |
+| Future Tech Database | L2 gezielt | N = 1/3 ✓, Such-/Handsperre → unspielbar ✓, Cybug BEE ✓; Abbruch ✗ (→ -17) |
+| Future Tech Doomsday Bomb | L2 gezielt | Zündung, Ablage-Zählung beider Seiten ✓, Alias ✓, Rest ✗ (→ -13), Flächen-Kollision ✗ (→ -30) |
+| Future Tech Doping | L2 gezielt | 3 Namen = +90 ✓, leere Ablage ✓, Abbruch ✓, tote Helden nicht angeboten ✓ |
+| Future Tech Drone | L2 gezielt | 2 Kopien ✓, Abbruch → HOPT bleibt ✓, Deck leer ✓; Zieh-Sperre ✗ (→ -24) |
+| Future Tech Escape Device | L2 gezielt | Immunität ✗ (→ -02), Token ✗ (→ -10), Stufe-0 ✗ (→ -14), Barrage-Mehrfachtreffer ✓, Organnon ✓, Statusticks ✓ |
+| Future Tech Fists | L2 gezielt | Basis-ATK/ATK ✓, Abbruch → erneut ✓, Thicket ✓; Einmal-pro-Zug ✗ (→ -18) |
+| Future Tech Gear | L2 gezielt | Limit 1 je Seite ✓, Copy Device als Gear ✓; Pflicht-Ziehen ✗ (→ -08) |
+| Future Tech Gun | L2 gezielt | ATK-Nachrechnung bei Abwurf/Mill/Zerstörung ✓ (40/80/160/40), Copy Device ✗ (→ -01), Prototypes ✗ (→ -09), Fridge ✓ |
+| Future Tech Gunslinger Riffel | L2 gezielt | Gun als Copy Device ✗ (→ -12), Control Device ✗ (→ -20) |
+| Future Tech Jetpack | L2 gezielt | Lv0/1, 0/1/2 Kopien ✓, Zauber nicht geschützt ✓, Träger gefroren/betäubt/negiert schützt weiter (Ausrüstung bleibt wirksam, kein Befund); 0 Kopien ✗ (→ -14) |
+| Future Tech Lamp | L2 gezielt | oben N+1 (Karte zählt sich nicht) ✓, Deck zu klein ✓, leeres Deck unspielbar ✓, Artifact/Creature ✓, Such-/Handsperre → unspielbar ✓ |
+| Future Tech Laser Cannon | L2 gezielt | Kosten −20 je Kopie ✓, ATK ✓, Copy Device ✗ (→ -01), Fridge ✗ (→ -27) |
+| Future Tech Magic Modifier | L2 gezielt | Aufdecken/Stufensenkung ✗ (→ -03) |
+| Future Tech Mech | L2 gezielt | 1+N Schüsse ✓, Zielliste ✓, Thicket ✓, Ruling „zählt sich nicht selbst“ ✓ |
+| Future Tech Organnon | L2 gezielt | Inventing 3 nötig ✓, 0/2 Kopien ✓, Sperre „kein anderer Schaden“ (Gegner-Schaden, Statustick, Bomb Mite) ✓, Folgezug ✓, gestohlene Kreaturen (S01-09 getrennt) |
+| Future Tech Potion Launcher | L2 gezielt | alle Tränke im Potion-Deck durchgespielt (keine Engine-Fehler) ✓, Elixir of Immortality bleibt liegen ✓, Boulder in a Bottle: `_ZoneBlocked`-Audit-Hinweis (Boulder-Eigenart, nicht untersucht), Thicket-Kreatur als Ziel von Poison Vial angeboten (Wurzel F03-04, nicht Launcher-spezifisch) |
+| Future Tech Prototypes | L2 gezielt | Alias auf Gun/Escape/Jetpack ✓, Alias-Ende ✓; ATK-Nachrechnung ✗ (→ -09) |
+| Future Tech Weathercock | L2 gezielt | Einzelziel-Spell ohne Angebot ✓, 2 Helden ✓, Held + Kreatur ✓, ohne Kopie in Ablage ✓; Immunität ✗ (→ -02) |
+| Iterative Testing | L2 gezielt | Namenswahl ✓, Magic Arts 2 ✓, Such-Sperre ✓; „up to 2“ ✗ (→ -11) |
+| Kent, the Indebted Apprentice | L2 gezielt | Kreditrahmen 20 je Zahlung (Ruling 16.8.) ✓, Aktionssperre ✓, Money-Printer-Kette ✓; Übernahme ✗ (→ -25) |
+| Misfire | L2 gezielt | Gun/Copy Device/Damage Fees/Loan Shredder negiert ✓, Folgekosten 0 ✓, Kopie aus dem Deck ✓ |
+| Mysterious Core | L2 gezielt | bis 3 verschiedene Artefakte ✓, Gold 100/20/0/−20 ✓, Such-/Handsperre (läuft weiter, Karten gehen nur in die Ablage) ✓ |
+| Steam Dwarf Brewer | L2 gezielt | Setzen auf 150/150 ✓, Abbruch ✓, Tokens; gestohlene Kreatur ✗ (→ -19) |
+| Steam Dwarf Diver | L2 gezielt | HP-Kosten ✗ (→ -06) |
+| Steam Dwarf Dragon Pilot | L2 gezielt | Opferregeln (2+, ≥ 300, frische Kreatur, Lv ≤ 1 = zusätzliche Aktion, Lv ≥ 2 = normale Aktion) ✓; Abwurf je Karte ✗ (→ -07) |
+| Steam Dwarf Engineer | L2 gezielt | Zielpool, Legezug, Frolake-Einsatz ✓; Ifrit ✗ (→ -05) |
+| Steam Dwarf Exterminator | L2 gezielt | Schaden = aktuelle HP, Deckel 200 ✓, einmal pro Zug +50 ✓, gefroren/betäubt/negiert → Passive ruht ✓, gestohlen (Abwurf des Besitzers/Diebs) ✓ |
+| Steam Dwarf Miner | L2 gezielt | 50/99/100/250/300 max HP → 0/0/1/2/3 Karten ✓, Deck 1 Karte (Niederlage) ✓, Gegner-Miner ✓, negiert ✓; gefroren/betäubt zieht trotzdem ✗ (→ -28, C) |
+| The Core's Awakening | L2 gezielt | Stufen 1/2/3, Held gefroren/betäubt/negiert, Deck zu klein ✓; Wirker-Wahl ✗ (→ -22) |
+| Tri Ad, the Puppet Mistress | L2 gezielt | Auflegen/Zurück + HOPT ✓, gemeinsamer HP-Topf ✓, Tokens; Escape ✗ (→ -10), Tokens gestohlen ✗ (→ -04) |
+| Tri Fecta, the Puppet Master | L2 gezielt | Tokens ✓, Zerstörung/Verlust aller Tokens ✓, Scarab-Wiederbelebung ✓; gestohlene Tokens ✗ (→ -04), Escape ✗ (→ -10) |
+| Troop Annihilation | L2 gezielt | 1/2/3 verteidigt → bis zu so viele verschiedene Surprises ✓ (Namensdopplung ✓), belegte Surprise-Zone ✓, Helden 1/2 tot ✓, gestohlene Kreatur (Ablage des Besitzers) ✓, Puppet-Tokens zählen nicht ✓, ohne Summoning Magic / Held gefroren/betäubt/negiert nicht spielbar ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+- Alle Cybug-Surprises: Treibstoff aus Hand/Deck/keiner, Träger stirbt, Tod holt den Treibstoff zurück, Host-Zone voll bzw. Host gefroren/betäubt/negiert, Kartenbilanz und Audit sauber.
+- Troop Annihilation mit 1/2/3 Verteidigten, teilweise belegten und toten Surprise-Zonen; Puppet-Tokens zählen nicht als Kreaturen; gestohlene Kreaturen gehen in die Ablage des Besitzers.
+- Loan Shredder: Gold −20/0/+50, „Nein“ verbraucht die Rundensperre nicht, Spielbedingung (Handkarte löschen, Gold < 0).
+- Kent-Kreditrahmen (20 je Zahlung, auch aus dem Minus – Ruling 16.8.): Fists/Laser Cannon/Money-Printer-Kette wie dokumentiert.
+- Steam Dwarfs: Miner-Ziehen nach max HP, Exterminator-Deckel 200, Steam-Engine-Passive ruht bei gefroren/betäubt/negiert, Dragon-Pilot-Opferregeln (Lv ≤ 1 = zusätzliche Aktion).
+- Potion Launcher mit **allen** Tränken des Spiels: keine Engine-Fehler, keine Hänger; Elixir of Immortality bleibt als Permanent liegen (kein Geisterkarten-Löschen).
+- Escape Device: Barrage-Mehrfachtreffer (Schwelle 3) und Organnon (Lv 0) korrekt negiert; Statusticks (burned/poisoned) wirken nach dem Zugwechsel.
+- Doomsday Bomb als Copy-Device-Kopie: „once per game“-Stempel greift, Alias zählt in beiden Ablagen bis zum Zugende.
+- Mech: 1+N Schüsse, zählt sich nicht selbst; Barrage: genau N, ein Ziel für alle Treffer, Ziel stirbt mittendrin.
+- Weathercock: nur bei Mehrziel-Zaubern/Angriffen (auch Held + Kreatur), nicht bei Einzelziel; Jetpack schützt nicht gegen Zauber.
+- Cross-Side-Ausrüstung (Control Device, wie Powder Keg): nach dem Abgang bleibt `inst.owner` die Gastgeberseite, der Stapel ist der des Besitzers (Engine-Konvention, kein Folgefehler gemessen).
+
+## Nicht untersucht / offene Randnotizen
+- Boulder in a Bottle über den Potion Launcher: der Zustandsprüfer meldet `seat1.support[0][2] "_ZoneBlocked": 0 Instanzen`; Eigenart des Tranks, nicht dieser Karte (nicht weiter untersucht).

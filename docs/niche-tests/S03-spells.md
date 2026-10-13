@@ -225,6 +225,7 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Beobachtet:** `play` ⇒ `true`, Karte in der Ablage, nichts gezogen, Aktion verbraucht – in allen vier Fällen (Kontrolle: Brilliant Idea ist unter `handLocked` nicht spielbar). Voice in your Head verhält sich unter Hand-/Zieh-Sperre und Artist genauso (Karte weg, nichts gezogen), behält aber die Zusatzaktion („This counts as an additional Action") – dort ist offen, ob der Zusatzaktions-Effekt als „Nutzen" zählt.
 - **Repro:** `docs/niche-tests/repro/S03-spells/24-supply-chain-voice-ziehsperren.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `supply-chain.js` hat kein `blockedByHandLock: true` (der Loader taggt Spells bewusst nicht automatisch, `_loader.js` ~420–440, nur `resolve`-Module) und ruft `drawWouldBeBlocked(engine, pi, 7 - handSize)` in `spellPlayCondition` nicht auf; `voice-in-your-head.js` ebenso.
+- **Hinweis:** Der Hand-Sperre-Teil gehört in dieselbe vom Loader bewusst offen gelassene Lücke (`_loader.js` ~Z. 456: „eine Verhaltensänderung, die Al entscheiden sollte"); der Tuscan-Artist-Teil (Ruling 16.8.) ist davon nicht gedeckt.
 - **Frage an Al:** Soll Voice in your Head unter Hand-/Zieh-Sperre bzw. gegen Tuscan Artist (Ziehen von 2/3) gesperrt sein, obwohl es noch eine Zusatzaktion gibt? (gesperrt / spielbar)
 
 ### S03-25 · Weapon Unleashing als erste Karte der Action Phase: das Spielen verbraucht die reguläre Aktion – die „zweite Aktion" bringt nichts · Stufe A
@@ -235,6 +236,16 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Beobachtet:** A) 2 Fireballs ✓. B) nur **1** Fireball (Gegner 800 → 650), danach Phase 4; direkt nach dem Spielen steht `_actionsPlayedThisPhase = 1`, der erste Fireball verbraucht den Grant, die Phase springt auf Main 2. Drei Fighting-Kopien sind verloren, die Karte hat nichts gebracht. Hero-Bindung (Held 1 darf die zweite Aktion nicht nutzen) ✓.
 - **Repro:** `docs/niche-tests/repro/S03-spells/25-weapon-unleashing-action-phase-verliert-zweite-aktion.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** Das Skript setzt `gs._preventPhaseAdvance = true`, wenn es die erste Aktion der Phase ist; dadurch läuft in `server.js` der `else if (… actionCounterIncrementedHere)`-Zweig (Z. ~8918–8923), der den Zähler der kostenlosen ersten Aktion zurücknimmt, nicht, und der Zähler bleibt auf 1.
+
+### S03-26 · Shooting Star unter Stab-Sperre oder Hand-Sperre: spielbar, Karte verbraucht, nichts geholt · Stufe B
+- **Karten:** Shooting Star (`shooting-star.js`, `blockedByPileLock: true`); Sperren: Staff of the Teleporter / of Uncontrollable Destruction (`ps._discardLockedTurn`), Rain of Spores (`handLocked`). Gleiche Klasse wie S03-24 (Supply Chain) und S03-03.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Ablage [Fireball, Meteor Crash], Hand [Shooting Star]; (a) Knight of Kings [B] + Rook + Board of Kings (Kontrolle), (b) `_discardLockedTurn = gs.turn`, (c) `handLocked = true`.
+- **Schritte:** 1. Shooting Star spielen (Galerie: erste Karte). 2. Rückgabe, Hand, Ablage lesen.
+- **Erwartet** (CARD_API.md ~Z. 1944 „Nur Stapel-Bewegung ⇒ GAR NICHT spielbar … Prüfung `engine.isPileLockedFor(pi)`"; Stab: „You cannot move cards out of your discard pile for the rest of the turn"): (b) und (c) nicht spielbar, Karte bleibt auf der Hand – wie in (a).
+- **Beobachtet:** (a) `play` ⇒ false ✓. (b) und (c): `play` ⇒ true, Shooting Star liegt in der Ablage, die Hand bleibt leer, die Aktion ist verbraucht, nichts geholt.
+- **Repro:** `docs/niche-tests/repro/S03-spells/26-shooting-star-stab-sperre-handsperre-verpufft.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `isPileLockedFor` (~Z. 2575) fragt nur `pileOutAllowed` (Brett-Sperre Knight of Kings [B]), nicht `_discardLockedTurn`/`_discardOutAllowed`; für (c) fehlt `blockedByHandLock` (der Loader taggt `hooks.onPlay`-Spells bewusst nicht, `_loader.js` ~Z. 456, dort als Entscheidung für Al vermerkt).
+- **Frage an Al:** Soll ein reiner Ablage→Hand-Zauber (Shooting Star) unter der Stab-Sperre bzw. Hand-Sperre ausgegraut sein wie unter Knight of Kings [B]? (ja / nein)
 
 <!--BEFUNDE-ENDE-->
 

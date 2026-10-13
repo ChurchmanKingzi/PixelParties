@@ -9,7 +9,7 @@
 // Beobachtet: `dark-gear.js` getFreeZones bietet jede freie Zone an, `actionTransferCreature` prüft weder `canSummon` noch
 //   `beforeSummon`/Einzigkeit. Ergebnis: Held 0 trägt Ankylos UND Pteranos; Sitz 0 kontrolliert zwei Brachion.
 //   (Gleiche Lücke für Diplomacy, Capture, Memory Blast, Liberation … – alle über `actionTransferCreature`; nicht einzeln gemessen.)
-//   Der Engine-Aufruf `actionTransferCreature` allein verhält sich ebenso (siehe Scratch-Test).
+//   Der Engine-Aufruf `actionTransferCreature` allein verhält sich ebenso (gemessen: erfolgreicher Transfer ohne jede Prüfung).
 const H = require('../../lib/h.js');
 
 (async () => {

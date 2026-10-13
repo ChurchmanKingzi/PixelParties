@@ -193,6 +193,25 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Vermutete Ursache:** `bloom-the-continent-corruptor.js` ~Z. 150-160 (`ctx.setAmount(0); ctx.cancel(); actionHealHero(…, betrag)` mit dem Betrag zum Zeitpunkt des eigenen Hooks, ohne spätere Auren abzuwarten); die Auren der anderen Blooms liegen ebenfalls in `beforeDamage`.
 - **Frage an Al:** Soll die Heilung den Grundschaden **plus alle Paraseed-Auren** enthalten (Maniacal +50 je Paraseed, Continent +100) – ja (Aura zählt als Teil des Poison-Schadens) oder nein (nur der Grundschaden)? Entscheidend ist, dass beide Reihenfolgen gleich rechnen.
 
+### A08-23 · Paraseed: bei gefrorener/betäubter/negierter Kreatur bleibt das Gift, aber Max-HP-Fraß und Einnisten fallen weg · Stufe C
+- **Karten:** Paraseed (`paraseed.js`, `_paraseed-shared.js syncParaseedPoison`); zur Klasse B-01…B-03 des Querschnittsberichts
+- **Voraussetzungen / Aufbau:** Sitz 1: Paraseed in der Support Zone von Held 0 (800 HP), Kreatur (a) normal, (b) gefroren, (c) betäubt, (d) negiert; echter Zugwechsel zum Gifttick. Zusatzprobe: Fireball tötet die Paraseed (normal/gefroren/negiert).
+- **Erwartet** (Text: „While this Creature is in a Hero's Support Zone, that Hero is Poisoned. Damage that Hero takes from Poison reduces its current and max HP … place it into one of the attacking … Hero's free Support Zones instead of sending it to the discard pile"; Konvention: stillgelegte Kreaturen verlieren ihre Effekte): entweder wirkt der ganze Text oder nichts davon.
+- **Beobachtet:** normal 800 → 770/770 ✓. Gefroren, betäubt und negiert: Held bleibt vergiftet und verliert 30 HP, die Max-HP bleiben 800 (Fraß fällt weg). Beim Tod nistet sich die stillgelegte Paraseed nicht ein (Ablage), und das Gift fällt dann mit ihr ab. Halb-gültige Lage: das Gift tickt weiter, nur der Zusatz wirkt nicht.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/23-paraseed-gift-bei-stillgelegter-kreatur.js` (✗ = Lesart „beides oder keins" verletzt)
+- **Vermutete Ursache:** Das Gift hängt am Zonen-Abgleich `syncParaseedPoison` (zählt `paraseedsOnHero` ohne Statusprüfung), Fraß (`afterDamage`) und Einnisten (`_deathClaim`) laufen über Hooks, die der Verteiler für stillgelegte Kreaturen sperrt.
+- **Frage an Al:** Soll eine gefrorene/betäubte/negierte Paraseed das Gift lösen (wie jeder andere Dauereffekt) – oder soll das Gift als Zonen-Zustand immer bleiben und nur Fraß/Einnisten ruhen?
+
+### A08-24 · Paraseed Greenhouse: Such-Sperre wird umgangen, unter Stapelsperre wird der Abwurf zum reinen Kostenverlust · Stufe B
+- **Karten:** Paraseed Greenhouse (`paraseed-greenhouse.js`), Cats of the Pharaoh (Such-Sperre), Knight of Kings [B] (Stapelsperre)
+- **Voraussetzungen / Aufbau:** Sitz 0: Area Greenhouse, zwei Handkarten, zwei Paraseeds im Deck. (a) ohne Sperre, (b) `ps.searchLocked = true` (so setzt Cats of the Pharaoh sie), (c) Sitz 1 hat Knight of Kings [B] + Rook of Kings [B] + Board of Kings (`pileOutAllowed(0,'deck') === false`).
+- **Schritte:** Area-Effekt über `engine.activateAreaEffect` (der Server-Weg `doActivateAreaEffect`), Abwurfwahl beantworten.
+- **Erwartet** (Greenhouse: „…discard a card from your hand to search your deck for a "Paraseed" and place it …"; Cats: „you cannot search or add cards to your hand"; Knight of Kings [B]: „your opponent cannot move cards from their deck or discard pile"): (b) Suche gesperrt – die Area ist nicht aktivierbar; (c) ebenso: kein Abwurf, kein verbrauchtes HOPT ohne Wirkung. (a) ✓.
+- **Beobachtet:** (b) Paraseed wird trotzdem aus dem Deck geholt und eingesetzt. (c) Die Handkarte wird abgeworfen und das HOPT verbraucht, die Paraseed bleibt im Deck (stilles `deckEntnahme` = null).
+- **Repro:** `docs/niche-tests/repro/A08-pacman/24-greenhouse-umgeht-such-und-stapelsperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `canActivateAreaEffect` (~Z. 195) prüft nur `ps.handLocked`; der Aktivierungsweg `_engine.js activateAreaEffect` (~Z. 42208) und `getActivatableAreas` lesen keine Sperr-Marken (`blockedBySearchLock`, `blockedByPileLock` gelten nur an Hand-/Fähigkeits-/Held-Wegen, z. B. `_engine.js:40890`); `pflanzen()` wertet das `null` von `deckEntnahme` als „Kosten sind bezahlt". Restunsicherheit (daher B): ob „search" bei Cats auch die Suche meint, deren Fund auf das Brett statt auf die Hand geht.
+- **Zusatzbeobachtung (d), gleiche Wurzel:** Crystal Well (Area, „…add a card … to your opponent's hand to draw a card") bleibt unter der Zieh-Sperre (`ps.drawLocked`, Sacred Jewel) aktivierbar: die Karte wandert zum Gegner, gezogen wird nicht (Hand 2 → 1, Gegner 0 → 1). Das Zieh-Sperren-Muster der Engine (`blockedByDrawLock`, CARD_API „Zieh-Sperre") gilt nur an Hand-/Fähigkeitswegen. Im Repro als Teil (d).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

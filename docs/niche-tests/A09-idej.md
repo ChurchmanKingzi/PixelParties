@@ -169,6 +169,25 @@ Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am End
 - **Vermutete Ursache:** Das Helden-Opfer läuft über `actionDefeatHero({ isSacrifice: true })` und feuert nur `onHeroKO`; `resolveSacrificeCost` kehrt bei `extraPicked` vor `onCreatureSacrificed`/`onSacrificeBatch` zurück (`_engine.js` ~27051). Thuly hört nur auf diese beiden Hooks.
 - **Frage an Al:** Soll Thulys „sacrifice a target" auch Helden-Opfer (Teocuilatl, Rick, Divine Gift of Sacrifice) erfassen, oder nur Kreaturen?
 
+### A09-19 · Priest of Luna / Tempeste: Gift-/Brand-Ticks lösen bei Helden den Priester aus, bei Kreaturen nie · Stufe C
+- **Karten:** Priest of Luna (`priest-of-luna.js`), Priest of Tempeste (`priest-of-tempeste.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234. Sitz 0: Priester auf dem Brett, Ablage mit 6 Kreaturen verschiedener Namen. (A) Held 1 von Sitz 0 verbrannt (Gift: gleich). (B) Eine Kreatur bei Held 1 verbrannt.
+- **Schritte:** 1. Zwei Zugwechsel (`t.endTurn()` ×2), bis der Brand-Tick des Besitzers läuft.
+- **Erwartet** (Kartentext Tempeste: „when a target you control … would take damage … negate that damage"; Luna: „… takes damage …"; „target" = Held oder Kreatur): Ein Status-Tick wird bei beiden Zieltypen gleich behandelt – entweder beide lösen aus oder keiner.
+- **Beobachtet:** (A) Der Held-Tick fragt nach (Bestätigung + Kostenwahl): Tempeste negiert ihn (Held-HP bleibt 800), Luna brennt nach dem Tick (Held-HP 770 nach Gift, 740 nach Brand). (B) Der Kreaturen-Tick (60) löst nie aus, weil beide Skripte im Kreaturen-Zweig `isStatusDamage` herausfiltern. Andere Karten tun das bewusst (Angler Angel, Monia, Rool), im Hero-Zweig derselben Priester fehlt der Filter.
+- **Repro:** `docs/niche-tests/repro/A09-idej/19-priester-statusschaden-held-ja-kreatur-nein.js` (✗ = Ungleichbehandlung)
+- **Vermutete Ursache:** `priest-of-tempeste.js:90` (`!e.isStatusDamage` im Kreaturen-Zweig; Held-Zweig `beforeDamage` ohne Entsprechung), `priest-of-luna.js:116` (ebenso `afterCreatureDamageBatch` vs. `afterDamage`).
+- **Frage an Al:** Zählen Gift-/Brand-Ticks als „takes damage" für die Priester – bei Helden UND Kreaturen (dann den Filter in den Kreaturen-Zweigen entfernen) oder nirgends (dann im Helden-Zweig `damageType`/Status herausfiltern)?
+
+### A09-20 · Tamed Primordium beschwört Elven Rider aus der Hand – obwohl dieser „nur mit seinem eigenen Effekt" beschworen werden darf · Stufe A
+- **Karten:** Tamed Primordium (`tamed-primordium.js`), Elven Rider (`elven-rider.js`); gleicher Weg für jeden Effekt, der über `summonFromPile('hand', …)` aus der Hand beschwört
+- **Voraussetzungen / Aufbau:** Seed 1234, Main 1. Sitz 0: Held 0 mit Summoning Magic 1, Hand [Elven Rider, Elven Archer], Deck mit Elven Leader. Primordium wird per Effekt beschworen (`summonCreatureWithHooks`).
+- **Schritte:** 1. Primordium: „Ja", in der Galerie Elven Rider wählen, Zone wählen.
+- **Erwartet** (Kartentext Rider: „You cannot summon this Creature, except with its own effect."; Elven Druid schließt den Rider in `EXCLUDE_SET` ausdrücklich aus): Der Rider wird nicht angeboten und nicht beschworen.
+- **Beobachtet:** Der Rider steht in der Galerie, landet auf dem Brett, und seine Beschwörungs-Suche läuft (Elven Leader kommt auf die Hand) – ohne dass je ein Elven-Kamerad abgegangen ist. Das ist ein Gratis-Tutor und umgeht die Zonenbindung der Reaktion.
+- **Repro:** `docs/niche-tests/repro/A09-idej/20-primordium-beschwoert-elven-rider.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `tamed-primordium.js` `eligibleHand` filtert nur Kreaturentyp, Stufe ≤ 1 und freie Zone. Der Rider verlässt sich nach seinem Kopfkommentar darauf, dass `validateActionPlay` Reaction-Karten am proaktiven Spielen hindert; `engine.summonFromPile` hat diese Sperre nicht. Ein Sperr-Flag im Rider (z. B. `beforeSummon` mit Prüfung der Quelle) schließt auch andere Beschwörer aus der Hand (First Contact, Cats of the Pharaoh u. a., nicht gemessen).
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
