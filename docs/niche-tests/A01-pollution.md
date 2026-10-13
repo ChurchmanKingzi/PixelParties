@@ -300,6 +300,24 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Repro:** `docs/niche-tests/repro/A01-pollution/32-circle-replay-umgeht-zauber-und-area-sperre.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** Die beiden Sperren stehen nur in `getHeroPlayableCards` (`_engine.js` ~20061) und `validateActionPlay` (~20866/~20870), nicht in `getHeroEligibleActionCards`/`_castSpellImmediately`; betroffen ist jeder Zusatzaktions-Pfad darüber (Circles, vermutlich auch andere „play as an additional Action“-Karten). Restunsicherheit: ob die Autoren das Replay bewusst als Ausnahme von den Sperren verstehen (`_hell-circles-shared.js` nennt Schulprüfung, Kette und Zusatzaktion, aber keine Sperren).
 
+### A01-pollution-33 · Pollution Piranha: „leaves the board“ – gestohlen stirbt sie folgenlos, beim Versetzen innerhalb der Seite löst sie fälschlich aus · Stufe B
+- **Karten:** Pollution Piranha (`pollution-piranha.js`); Auslöser: `actionStealCreature`, `actionTransferCreature` (Weg von Liberation, Diplomacy, Capture, Dark Gear)
+- **Voraussetzungen / Aufbau:** (a) Piranha von Sitz 0, von Sitz 1 gestohlen (owner 0, controller 1); sie stirbt. (b) Piranha wird von Held 0 in die Zone von Held 1 derselben Seite versetzt und bleibt auf dem Brett. Beide Seiten halten Handkarten.
+- **Schritte:** (a) `actionStealCreature(1, pir)`, `actionDestroyCard(…, pir)`. (b) `actionTransferCreature(pir, 0, 1, 0)`. Gelöscht-Stapel und Hände vergleichen.
+- **Erwartet** (Quelle: Kartentext „**When this Creature leaves the board**, delete 1 card from **your** hand“): (a) das Sterben ist ein Verlassen des Bretts → eine Handkarte wird gelöscht (beim Kontrolleur; die Lesart „Besitzer“ wäre die zweite, das Skript meint den Besitzer: `ownerIdx = self.owner`). (b) Ein Versetzen auf dem Brett ist kein Verlassen → keine Löschung.
+- **Beobachtet:** (a) Es wird nirgends etwas gelöscht (beide Hände unverändert, kein Prompt). (b) Es wird 1 Handkarte von Sitz 0 gelöscht (Prompt `forceDiscard`), obwohl die Piranha auf dem Brett bleibt. (Der Diebstahl selbst löst – richtig – nichts aus.)
+- **Repro:** `docs/niche-tests/repro/A01-pollution/33-piranha-abgangseffekt-gestohlen-und-versetzt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `pollution-piranha.js` `onCardLeaveZone`: der Guard `ctx.fromOwner !== ctx.cardOwner → return` vergleicht den Besitzer (`fromOwner`) mit dem Kontrolleur (`cardOwner`), sodass jede gestohlene Piranha stumm bleibt; außerdem wird `fromZone === 'support'` ohne Prüfung des Ziels als Abgang gelesen (kein Test auf `toZone`/Verbleib auf dem Brett), also feuert auch ein Versetzen.
+
+### A01-pollution-34 · Sun Beam: Ziel-IDs nach Besitzer statt Brettseite – eine gestohlene Kreatur kollidiert mit der eigenen an derselben Stelle · Stufe B
+- **Karten:** Sun Beam (`sun-beam.js`, eigener Sammler); Vergleich The Yeeting / Destructive Puppet Shishi (`_targeting-shared.js` `collectNonHeroBoardTargets`, `_brettSeite`); Klasse „Brettspalte / Besitzer ODER Kontrolleur“ (F02-14, S01-09)
+- **Voraussetzungen / Aufbau:** Sitz 1 besitzt eine Royal Corgi (Held 0 / Slot 0), Sitz 0 stiehlt sie: sie liegt auf Sitz 0s Brett an Held 0 / Slot 0 (owner 1, controller 0). Sitz 1 hat zusätzlich eine eigene ZZ Dummy an Held 0 / Slot 0 seines eigenen Bretts. Sitz 0 spielt Sun Beam und wählt die **Dummy**.
+- **Schritte:** 1. `t.play(0, 'Sun Beam')`, Zielwahl: ID der Dummy. 2. Prüfen, welche Karte zerstört wurde.
+- **Erwartet** (Quelle: Kartentext „Choose up to 3 cards on the board that aren't Heroes and send them to the discard pile“; Konvention aus `_targeting-shared.js` Z. ~60: „ID und `owner` nennen die Seite, auf der die Zone LIEGT“): die gewählte Dummy wird zerstört, die gestohlene Corgi bleibt.
+- **Beobachtet:** Beide Einträge tragen die ID `equip-1-0-0`; die Auflösung (`targets.find(t => t.id === id)`) nimmt den ersten Treffer – die **Corgi** wird zerstört (Ablage Sitz 1), die gewählte Dummy bleibt. Menschen können die gestohlene Corgi außerdem gar nicht anklicken (ihre Kachel trägt `owner: 1`, liegt aber auf Sitz 0s Brett). Bei jedem Treffer zahlt Sitz 0 den Token für die falsche Karte.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/34-sun-beam-id-kollision-gestohlene-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/sun-beam.js` (Sammler: `id: equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, `owner: inst.owner`) – statt `collectNonHeroBoardTargets` oder `engine.physicalSide(inst)` zu nutzen. Nebenbeobachtung (nicht gewertet): Sun Beam setzt „die gleiche Zahl“ Tokens wie gewählte Karten, auch wenn ein Ziel durch Golden Wings/Warrior überlebt (07, 1 Token bei überlebender Kreatur) – Lesart „gewählt“ vs. „abgelegt“ offen, gleiche Frage wie A01-pollution-26.
+
 ## Abdeckung
 (wird ergänzt)
 

@@ -267,6 +267,7 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Beobachtet:** Bei „Nein" wird der Gegner dreimal gefragt (je Karte). Bei „Ja" wird nur die erste Übergabe negiert, die Schleife bricht ab (`if (!ok) break`), die Kosten (3 × 4 Gold = 12) sind vorab für alle drei Karten bezahlt; nichts wurde verschenkt.
 - **Repro:** `docs/niche-tests/repro/A08-pacman/31-cool-presents-handfenster-je-karte.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `cool-presents.js` (~Z. 158, Schleife) ruft `actionTransferCardToOppHand(pi, t.handIndex, { source })` ohne `windowChecked: true`; das Fenster wird nicht einmal vor der Zahlung geöffnet (Live Show, `live-show.js:202`, macht es richtig). Gleiche Klasse bei jeder Mehrkarten-Übergabe.
+- **Zusatz (im Repro als zweiter Teil):** Hat der Gegner eine Such-Sperre (`ps.searchLocked`, über Siege auch über Zugwechsel hinweg erreichbar), lehnt `actionTransferCardToOppHand` jede Übergabe ab. Cool Presents prüft nur `ops.handLocked` (dann sauberer Abbruch ohne Kosten): gemessen wurden 12 Gold bezahlt, 0 Karten geliefert, die Karte liegt in der Ablage.
 
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |

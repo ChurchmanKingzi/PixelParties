@@ -1,8 +1,16 @@
 # H04-heroes – Nischenfall-Bericht
-Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt getestet (L2) · 1 mit Befund (Zwischenstand, wird fortlaufend ergänzt).
+Stand/Autor: Agent H04-heroes, 13.10.2026 (Fortsetzung der abgebrochenen Läufe). Karten: 35 in der Liste · 34 gezielt getestet (L2), 1 Standardlauf (L1: Timeless King Zi) · 22 Karten mit Befund · 21 Befunde (3 × A, 14 × B, 4 × C).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+21 Befunde: 3 × A, 14 × B, 4 × C (-16 und -17 enthalten je einen C-Teil). Wiederkehrende Klassen:
+* **Heldenverträge ohne Statusprüfung (Negiert/Betäubt)** – die Engine fragt `canBypassLevelReqForCard`, `levelOverrideCards`, `reduceCardLevel`, Hand-Offsets und `equipCostReduction` direkt am Helden, ohne `_isHeroEffectSilenced`: -02 (Sol Rym/Sorin/Tsu'Ki; Nachtrag Tempeluna mit geerbtem Luna-Bypass), -09 (Taio Sun Fencer), -13 (Sid), -21 (Tsu'Ki-Rabatt). Nur Hook-basierte Heldenpassive werden stumm. Gleiche Klasse wie B-01…B-03/B-09.
+* **Gestohlener Held / Besitzer ≠ Kontrolleur** – -10 (Ralzish: Besitzer statt Brettseite), -18 (Crestina: Vorrat bleibt beim Besitzer, der Dieb sucht, kann aber nie spielen). Stellan, Tryse, Tarleinn, Styx, Zhigao, Semi (dauerhaft übernommen), Heinz, Ralzish-Aktivierung sind in Ordnung.
+* **Tokens/Karten am falschen Ort** – -07 (Sas'Za holt Token auf die Hand), -15 (Kreatur-Tokens landen bei „zerstören/auf die Ablage" in der Ablage statt im Gelöscht-Stapel; Engine `actionMoveCard`), -12 (Sid: geraubte Karten gehen in Sids Ablage).
+* **Zustände, die nicht enden/beginnen** – -03 (Toras/Taio: ATK-Bonus der Ausrüstung überlebt Tod und Wiederbelebung), -14 (Zugende-Effekte laufen nach dem Statusablauf), -08 (Willys Handlimit-Bypass endet einen Zug zu früh).
+* **Aktionsökonomie / Sofort-Gussverträge** – -01 (Sol Rym: Zusatzaktionen zählen nicht), -17 (Zi: Sofort-Guss ignoriert „once per game" und Spielbedingung), -19 (Yukana: Surprise-Zauber werden angeboten und verpuffen), -20 (Xal: Abilities in Support Zones verbrauchen die Divine-Gift-of-Skill-Zusatzplätze nicht).
+* Rest: -04 (Xiong schließt gleichnamige Kopie aus), -05/-06/-11 (Regelfragen Saya, Mizune, Taio Absorber), -16 (Zieh-Sperre bei Heinz/Tharx).
+Einschätzung: Hook-basierte Helden sind robust (Frost/Betäubung/Negation/Tod/Wiederbelebung/Diebstahl größtenteils ✓); die Schwachstellen liegen in Engine-Verträgen ohne Statusfilter und in Sonderpfaden (Support-Ability-Zweig, Sofort-Guss, Token-Weiche).
+Bewusst NICHT getestet: Zhigaos Deckbau-Teil („nur 1 weiterer Startheld", `app-shared.jsx`, nicht headless); reine Anzeige (Ladungs-Abzeichen `chargesPerTurn` bei Sas'Za an gefrorenem/gestohlenem Helden); `goldOverdraft`, `waivesDiscardCosts`, `immuneToSourceNames` (kein Held der Gruppe benutzt sie); `equipCostReduction` bei Erben gewonnener Effekte (Tsu'Ki via Dangerous Knowledge; Quelltext: `artifactPlayCost` nutzt `loadCardEffect`, nicht gemessen); Zi nur L1 (227-Zauber-Batterie, Einzelfälle siehe -17). Doppelmeldung vermieden: Tempeluna/Luna-Firewall (+100/alle brennen) ist als H03-heroes-23 gemeldet.
 
 ## Befunde
 ### H04-01 · Sol Rym: Zusatzaktionen zählen nicht gegen „never more than 1 Action per turn" · Stufe A
@@ -206,7 +214,7 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 |---|---|---|
 | Sol Rym, the Thunder Djinn | L2 gezielt | Chain Lightning ohne Schule ✓, Quick-Attack-Reihenfolgen ✓, Coffee-Zusatzaktion ✗(→ -01), negiert ✗(→ -02) |
 | Sorin, the Warden of Blood Rock | L2 gezielt | Verpuffen gegen nicht blutende Helden/Kreaturen ✓, blutende Kreatur 150 ✓, negiert behält Stufenbypass ✗(→ -02) |
-| Tsu'Ki, the Lunatic Princess | L1 Standard | Stufenbypass negiert ✗(→ -02, geteilt); Lunatic-Cycle-Kostensenkung nicht gesondert getestet |
+| Tsu'Ki, the Lunatic Princess | L2 gezielt | Lunatic-Golem-Bypass negiert ✗(→ -02, geteilt); Lunatic-Cycle-Rabatt gesund ✓, negiert/betäubt ✗(→ -21), gefroren/tot: Ausrüstung abgelehnt ✓ |
 | Toras, Master of all Weapons | L2 gezielt | +40 je verschiedenem Artefakt ✓, gleichnamige zählen einmal ✓, Equipment zerstört ✓; Tod/Wiederbelebung ✗(→ -03) |
 | Taio, the Sun Fencer | L2 gezielt | Stufensenkung ✓ (normal), negiert ✗(→ -09), ATK +20 je Artefakt über Tod/Revive ✗(→ -03) |
 | Taio, Absorber of the Mountain's Heart | L2 gezielt | Nachguss Spell↔Attack ✓, Abbruch der Zielwahl ✗/C(→ -11) |
@@ -223,6 +231,11 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 | Teocuilatl, the Embodiment of Gods | L2 gezielt | Kreatur opfern (+10) ✓, Held opfern (+30, Zugende, 1×/Spiel) ✓, HOPT ✓, ohne Opfer nicht aktivierbar ✓ |
 | Tempeste Moana, the Rain Singer | L2 gezielt | genau 2 Ausrüstungen = Creature 50 HP ✓, 50×Anzahl-Schaden ✓, 0 HP ⇒ Ablage des Besitzers ✓, negiert/tot ✓ |
 | Vena, the Bounty Huntress | L2 gezielt | Markierung ✓, Kopfgeld ⇒ neuer Held ✓, Ziel tot/wiederbelebt ✓, Besitzer-Ablage (Hind) ✓; Token ✗(→ -15), Vena übernommen nicht aktivierbar (Marke bleibt beim Besitzer) |
+| Tempeluna, the Convergence Fairy | L2 gezielt | Aufstieg (andere Fee gelöscht, Luna+Tempeste gewonnen) ✓, Fee anlegen/zerstören (Effekt fällt ab) ✓, Tempeste-Reduktion −100 auf andere Helden: gesund ✓, negiert/gefroren/betäubt/tot stumm ✓, Wiederbelebung ✓; geerbter Luna-Bypass bei negiert ✗(→ -02 Nachtrag); Firewall-Bonus fehlt: bereits H03-heroes-23 |
+| True Fairy Crestina, the Primordial Goddess | L2 gezielt | Suche statt Ziehen ✓, Negieren (1× je Zug, gilt für alle Ascended) ✓, echtes „Nein" ✓, gefroren/betäubt/negiert/tot ⇒ Vorrat unbenutzbar ✓, leerer Vorrat ✓, Such-/Zieh-/Handsperre stört die Suche nicht (Karte geht nicht auf die Hand; Gruppe C der Such-Sperre); gestohlen ✗(→ -18) |
+| Xal, the Animated Armor | L2 gezielt | Ability-Stapel in Support Zones zählen für Stufen ✓, negiert ⇒ Stufen weg ✓, Tod/Wiederbelebung (Stapel bleiben, wie die Ability Zones) ✓, gestohlen ✓, Kreatur-Beschwörung weicht belegten Zonen aus ✓; Zusatzplätze Divine Gift of Skill ✗(→ -20) |
+| Yukana, the Scholar on the Run | L2 gezielt | Galerie Lv 1/2 ✓ (Lv 0/3/Reaction nicht angeboten), Zusatzaktion + reguläre Aktion ✓, HOPT/zweite Aktivierung gesperrt ✓, mit Zauberschule nicht aktivierbar ✓, gefroren/betäubt/negiert ✓, Abbruch der Zielwahl erstattet ✓, Area (Rioting Village) ✓, Einmal-/Spielbedingungs-Filter ✓; Surprise ✗(→ -19) |
+| Zhigao, the Heavenly Emperor | L2 gezielt | zweite Aktion nur mit Zhigao ✓ (auch nach Aktion eines anderen Helden), dritte gesperrt ✓, Zhigao-dann-anderer-Held gesperrt ✓, negiert/gefroren/betäubt nach dem Zuschlag ⇒ zweite Aktion weg ✓, negiert vor der Action Phase ⇒ kein Zuschlag ✓, tot ✓, dauerhaft übernommen: Dieb handelt zweimal ✓, Besitzer ohne Zuschlag ✓; Deckbau-Teil nicht getestet |
 | Zsos'Ssar, the Serpent Warlord | L2 gezielt | 2 Gift auf eigenen Held, +40×Vergiftete (Held und Kreatur), Abbruch ohne Gift ✓ |
 | Timeless King Zi | L1 Standard | 227-Zauber-Batterie (Wirkung/Bilanz; 6 Auffälligkeiten durch Zauber-Eigenheiten, nicht Zi); Vollständigkeit der Gegnerwahl siehe unten |
 | Styx, the Gate to the Spirit World | L2 gezielt | +100/+100 bei fremdem/eigenem Heldentod ✓, mehrfach ✓, gefroren/betäubt/negiert stumm ✓, toter Styx ✓, `maxHpCapped` ✓, unter Fremdkontrolle fragt der Kontrolleur ✓ |
@@ -237,3 +250,9 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 
 ## Getestet & in Ordnung (Auswahl)
 - Sol Rym: erste Aktion Chain Lightning, danach Quick Attack (Zusatzaktion) gesperrt; Quick Attack zuerst (zählt als Aktion), danach Chain Lightning gesperrt.
+- Crestina: Negieren eines Treffers auf Crestina und auf einen anderen Ascended Helden (einmal je Zug, auch der zweite Treffer wirkt), normale Helden ungeschützt, Nein/Ja-Abfrage, Vorrat bei Frost/Betäubung/Negation/Tod unbenutzbar.
+- Zhigao: zweite Aktion nur in der Action Phase und nur für Zhigao; verschwindet bei Negation/Frost/Betäubung/Tod nach dem Zuschlag; dauerhaft übernommen gehört sie dem Dieb.
+- Xal: negierter Xal verliert die Stufen seiner Support-Abilities; Abilities in Support Zones überleben Tod/Wiederbelebung wie die Ability Zones; Kreaturen weichen auf freie Zonen aus.
+- Tempeluna: geerbte Tempeste-Reduktion (−100 auf andere Helden) stumm bei Negation/Frost/Betäubung/Tod, wirkt nach Wiederbelebung wieder; angelegte Fee fällt beim Zerstören sauber ab; kein Zustandsfehler im Aufstieg (Audit-Meldungen sind die unsichtbaren Träger-Instanzen `zoneSlot -1`, Harness-Eigenheit).
+- Semi: dauerhaft übernommen erhält der Dieb den +6-Bonus, der Besitzer verliert ihn; zeitweise Übernahme endet vor dem Einkommen.
+- Heinz gestohlen: Kontrolleur wirft aus seiner Hand ab und zieht aus seinem Deck.

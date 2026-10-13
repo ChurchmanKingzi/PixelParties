@@ -320,6 +320,15 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/34-sacrifice-succubus-protected-free.js` (ausgeführt: 2 ✗, je Karte 1)
 - **Vermutete Ursache:** `getSacrificableCreatures` (`_engine.js` ~Z. 26471) filtert `_cardinalImmune`, nicht `_stealImmortal`; `resolveSacrificeCost` prüft nicht, ob die Kreatur nach dem Opfer noch auf dem Brett steht. Betrifft grundsätzlich jede Karte mit Opferkosten (nicht auf Greatmaw beschränkt; hier nur an Shark/Infected gemessen).
 
+### A02-deepsea-35 · Slippery Fridge legt ein zweites Race Boat an einen Helden (Prüfauftrag F03-07/-08, hier an den Race Boats gemessen) · Stufe B
+- **Karten:** Frog Race Boat / Whale Race Boat (`_race-boat-shared.js` `canEquipToHero`), Slippery Fridge (`slippery-fridge.js`, nicht in meiner Liste, nur Auslöser). Wurzel = F03-08 (`F03-artifacts.md`): dort steht „Race Boats … nicht einzeln durchprobiert". Nicht als neue Ursache gemeint, sondern als Messung für meine Karten.
+- **Voraussetzungen / Aufbau:** Held 0 trägt Frog Race Boat, Held 1 trägt Whale Race Boat (echter Ausrüst-Weg). Slippery Fridge verschiebt das Frog Race Boat an Held 1.
+- **Schritte:** Fridge spielen, Frog Race Boat als Ausrüstung wählen, Held 1 als Ziel.
+- **Erwartet** (Quelle: Boot-Text „A Hero can only have 1 "Race Boat" Artifact equipped to it"; Fridge „equip them to a different Hero"; CARD_API „Je-Held-Sperren … zählen"): Held 1 wird nicht angeboten bzw. das Boot bleibt bei Held 0.
+- **Beobachtet:** Held 1 trägt danach zwei Race Boats (Anzahl je Held `[0,2,0]`); Frog und Whale wirken dort beide.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/35-fridge-race-boat-limit.js` (ausgeführt: 1 ✗)
+- **Vermutete Ursache:** wie F03-08: `slippery-fridge.js` Schritt 3 (`destTargets`) fragt `canEquipToHero` des Boots nicht ab.
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
