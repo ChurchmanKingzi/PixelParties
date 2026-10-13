@@ -20,7 +20,6 @@ const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyf
 const CARD_NAME    = 'Techno Harpyformer';
 const ABILITY_NAME = 'Inventing';
 
-const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   inherentAction: harpyformerInherentAction,
 
@@ -52,7 +51,6 @@ module.exports = {
     // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
     // Once-per-turn nicht.
     if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
-    if (drawBlockedFor(ctx._engine, ctx.cardOwner)) return false;   // Z6 (A07-21): Hand-/Zieh-Sperre
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).includes(ABILITY_NAME);
   },

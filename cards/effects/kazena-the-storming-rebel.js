@@ -61,8 +61,7 @@ module.exports = {
    */
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
-    if (ps.handLocked || ps.drawLocked) return false;   // Z6 (H02-22): auch die Zieh-Sperre (Jewel)
-    if ((ps.mainDeck || []).length === 0) return false;   // Z6 (H02-22): leeres Deck - es koennte nichts gezogen werden
+    if (ps.handLocked) return false;
     return (ps.hand || []).length < 7;
   },
 

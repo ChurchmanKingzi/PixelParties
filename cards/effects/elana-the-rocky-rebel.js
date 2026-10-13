@@ -7,7 +7,6 @@
 //  Animation: big burst of music notes over Elana.
 // ═══════════════════════════════════════════
 
-const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   // CPU: confirm this Hero's activated-effect "you may" prompt — the default
   // brain declines cancellable confirms raised outside a card-cast (Hero
@@ -38,8 +37,6 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const pi = ctx.cardOwner;
     const ps = ctx.players[pi];
-    // Z6 (H01-18): "shuffle your hand back and draw the same number +1" - unter Hand-/Zieh-Sperre ginge die Hand verloren, ohne Nachzug.
-    if (drawBlockedFor(ctx._engine, pi)) return false;
     return (ps.hand || []).length >= 1;
   },
 

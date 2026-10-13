@@ -29,7 +29,6 @@
 // Die Auslegung steht in `_draw-block-shared.js`.
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
 
-const { drawBlockedFor } = require('./_draw-block-shared');
 const { gigantisaursCanSummon } = require('./_gigantisaurs-shared');
 
 const CARD_NAME = 'Gigantisaur Triceras';
@@ -52,7 +51,7 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (drawBlockedFor(engine, ctx.cardOwner)) return false;          // locked hand can't draw — wasteful (Z6, A07-21: auch Zieh-Sperre)
+    if (ps.handLocked) return false;          // locked hand can't draw — wasteful
     if ((ps.hand?.length || 0) < 1) return false; // need 1 card to pay the discard cost
     return true;
   },
