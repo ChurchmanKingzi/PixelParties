@@ -20,6 +20,7 @@ const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   /
 
 const CARD_NAME = 'Guardian Beast Tu';
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 module.exports = {
   activeIn: ['support'],
   creatureEffect: true,
@@ -31,6 +32,7 @@ module.exports = {
     // v1398 (Als Ruling 25.9.): Löschkosten aus der Ablage unter Knight-[B]-Lockdown → nicht aktivierbar.
     if (!ablageLoeschKostenMoeglich(ctx)) return false;
     const engine = ctx._engine;
+    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // Z6 (A07-21): das Ziehen ist der Ertrag - Hand-/Zieh-Sperre: Loeschkosten waeren umsonst
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
       + (engine.gs.players[1]?.discardPile?.length || 0);
     // Smallest valid cost is 3; below that the effect can't fire.

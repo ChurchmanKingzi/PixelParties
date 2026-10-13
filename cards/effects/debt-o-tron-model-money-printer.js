@@ -27,6 +27,7 @@
 
 const { modelBase, debtTriggerCheck, debtChargesLeft } = require('./_debt-o-tron-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Debt-O-Tron Model Money Printer';
 const MAX_PER_TURN = 3;
 
@@ -51,6 +52,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps || (ps.mainDeck || []).length === 0) return;
+      if (drawBlockedFor(engine, pi, treffer.steps)) return;   // Z6 (A03-24): Hand-/Zieh-Sperre, Tuscan Artist - nicht fragen, Ladung bleibt (verbuche() erst unten)
 
       // BOOLEAN, kein Objekt — siehe Loan Shredder. Derselbe Fehler
       // hat hier den Zug verschluckt (Als Report: „der Tooltip kam, aber

@@ -28,11 +28,17 @@
 
 const { zaehleInAblage } = require('./_future-tech-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Future Tech Drone';
 
 module.exports = {
   creatureEffect: true,
   requiresTarget: false,
+
+  // Z6 (A03-24): "discard ... and draw the same number" - unter Hand-/Zieh-Sperre blieben nur die Abwurfkosten.
+  canActivateCreatureEffect(ctx) {
+    return !drawBlockedFor(ctx._engine, ctx.cardOwner);
+  },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
@@ -40,6 +46,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (drawBlockedFor(engine, pi)) return false;   // Z6 (A03-24)
 
     const maximum = zaehleInAblage(gs, pi, CARD_NAME);
     if (maximum <= 0) {
