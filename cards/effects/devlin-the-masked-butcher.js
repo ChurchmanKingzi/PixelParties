@@ -68,7 +68,8 @@ module.exports = {
       if (t.hp > 0) await bleedHero(engine, owner, heroIdx, CARD_NAME, ctx.cardOwner);
       if (wasBleeding) {
         engine.log('devlin_bleeding_hit', { player: engine.gs.players[ctx.cardOwner]?.username, targets: 1 });
-        await forceDiscard(engine, owner, DISCARD_PER_TARGET, ctx.cardOwner);
+        // Z1 (H01-16): "those targets' controller" = Kontrolleur des Helden (heroSideOf), nicht die Spalte.
+        await forceDiscard(engine, engine.heroSideOf(owner, t), DISCARD_PER_TARGET, ctx.cardOwner);
       }
     },
     beforeCreatureDamageBatch: (ctx) => {
