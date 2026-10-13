@@ -109,7 +109,9 @@ module.exports = {
       // engine path between the two deaths without depending on the
       // batch-loop sequencing being identical to my reading of
       // `processCreatureDamageBatch`.
-      if (ctx.card.counters?._explodingSkullSuppressed) return;
+      // Die Marke traegt den ZUG, in dem sie gesetzt wurde (Befund C02-01): im
+      // naechsten Zug gilt das „einmal pro Zug" neu und sie ist wirkungslos.
+      if (ctx.card.counters?._explodingSkullSuppressed === ctx._engine.gs.turn) return;
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
@@ -135,7 +137,7 @@ module.exports = {
         if (inst.zone !== 'support' || inst.faceDown) continue;
         if ((inst.controller ?? inst.owner) !== pi) continue;
         if (!inst.counters) inst.counters = {};
-        inst.counters._explodingSkullSuppressed = true;
+        inst.counters._explodingSkullSuppressed = engine.gs.turn;
       }
 
       const gs = engine.gs;
