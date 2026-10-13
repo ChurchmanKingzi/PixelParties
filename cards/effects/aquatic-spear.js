@@ -45,7 +45,7 @@ function allBoardTargets(engine) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    const owner = inst.controller ?? inst.owner;
+    const owner = engine.physicalSide(inst);   // IDs = Brettseite, nicht Kontrolle (Styx 28.9.; geliehene Kreatur)
     out.push({
       id: `equip-${owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
       owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,

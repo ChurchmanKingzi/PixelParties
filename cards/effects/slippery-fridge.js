@@ -358,7 +358,7 @@ module.exports = {
     // hero). Pass the full canonical payload — same shape as
     // _engine.js's death/move paths and the runHooks call at line 14045.
     await engine.runHooks('onCardLeaveZone', {
-      _onlyCard: inst, card: inst,
+      _onlyCard: inst, card: inst, leavingCard: inst,   // leavingCard: wie die Engine-Pfade (Laser Cannon u.a. filtern darauf)
       fromZone: 'support',
       fromOwner: equipOwner,
       fromHeroIdx: srcHeroIdx,

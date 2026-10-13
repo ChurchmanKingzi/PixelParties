@@ -36,12 +36,14 @@ const H = require('../../lib/h.js');
   {
     const t = await H.fresh({ hand: [['Deepsea Siren'], []] });
     t.put(0, 0, 0, 'Slippery Narw');
-    const narw = t.find('Slippery Narw', 'support'); narw.turnPlayed = 1;
+    const narw0 = t.find('Slippery Narw', 'support'); narw0.turnPlayed = 1;
     t.targetFn = (valid) => [valid.find(v => v.type === 'equip' && v.owner === 0 && v.cardName === 'Slippery Narw').id];
     await t.play(0, 'Deepsea Siren', { hero: 0, slot: 1 });
     t.targetFn = () => null;                       // Narws Einsatz-Effekt: nichts besiegen
-    const siren = t.find('Deepsea Siren', 'support');
     await t.endTurn(); await t.endTurn();          // Sitz 0 ist wieder dran: Slippery rutscht
+    // Der Zugwechsel baut die Instanzen neu auf (Snapshot-Restore) – alte Variablen sind danach veraltet.
+    const siren = t.find('Deepsea Siren', 'support');
+    const narw = t.find('Slippery Narw', 'support');
     const moved = narw.heroIdx !== 0;
     R.check('Vorbedingung: Narw ist gerutscht', moved, [narw.heroIdx, narw.zoneSlot]);
     const hp0 = narw.counters.currentHp ?? 80;

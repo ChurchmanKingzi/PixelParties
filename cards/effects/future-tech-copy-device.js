@@ -548,13 +548,11 @@ module.exports = {
 
     // ── Als Vorgabe: „War es ein Equip, fällt es sofort ab und geht
     //    zum Discard (visuell sichtbar!)" ──
-    // Die Identität zuerst abnehmen, DANN ablegen: sonst liefe der
-    // Abgang noch über die Hooks der kopierten Karte.
-    delete inst.counters._effectOverride;
-    delete inst.counters._cardDataOverride;
-    delete inst.counters._ftCopyOf;
-    delete inst.counters.treatAsEquip;
-
+    // ★ A03-futuretech-01: erst ABLEGEN, dann die Identität abnehmen. Der Abgang
+    // muss noch über die Hooks der kopierten Karte laufen — ihr `onCardLeaveZone`
+    // nimmt den Attack-Zuschlag zurück (Laser Cannon +100, Gun +40 je Gun in der
+    // Ablage). Wie bei einer Zerstörung mitten im Zug. Zuvor wurde das Override
+    // vor dem Ablegen gelöscht, der Held behielt den Bonus dauerhaft.
     engine.log('ft_copy_device_expire', {
       player: gs.players[besitzer]?.username, copied: kopiertVon, wasEquipped: true,
     });
@@ -562,5 +560,9 @@ module.exports = {
       { name: CARD_NAME, owner: besitzer, heroIdx: inst.heroIdx }, inst,
       { toOwnerDiscard: true },
     );
+    delete inst.counters._effectOverride;
+    delete inst.counters._cardDataOverride;
+    delete inst.counters._ftCopyOf;
+    delete inst.counters.treatAsEquip;
   },
 };

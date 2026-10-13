@@ -28,7 +28,7 @@ const { hasCardType } = require('./_hooks');
 const {
   COSMIC_DEPTHS_CREATURES, COSMIC_DEPTHS_ANY,
   changeCounterCardsOnSide, getChangeCounters,
-  isCosmicCard, canSummonInvaderViaSource,
+  isCosmicCard, canSummonInvaderViaSource, invaderLimitAllows,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Life-Searcher from the Cosmic Depths';
@@ -160,6 +160,10 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
+    // Geliehen / über einen geliehenen Helden gelegt: die Kreatur liegt auf der Gegenseite,
+    // „back into your deck" und der Platz wären nicht dieselbe Seite — nicht ausführbar.
+    if (engine.physicalSide(inst) !== pi) return false;
+
     // Gate: ≥3 Change Counters across cards we control.
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
 
@@ -175,7 +179,8 @@ module.exports = {
       if (!COSMIC_DEPTHS_CREATURES.has(n)) return false;
       const cd = cardDB[n];
       if (!cd || (cd.level ?? 0) !== targetLvl) return false;
-      return canSummonInvaderViaSource(n, CARD_NAME);
+      // 1-Invader-Limit schon bei der Auswahl, sonst geht die Karte beim Platzieren verloren.
+      return canSummonInvaderViaSource(n, CARD_NAME) && invaderLimitAllows(engine, pi, n);
     });
     if (upgrades.length === 0) return false;
     return true;
@@ -189,6 +194,9 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
+    // Siehe canActivateCreatureEffect: nur eine Kreatur auf der eigenen Seite kann sich mischen.
+    if (engine.physicalSide(inst) !== pi) return false;
+
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
 
     const cardDB = engine._getCardDB();
@@ -198,7 +206,8 @@ module.exports = {
       if (!COSMIC_DEPTHS_CREATURES.has(n)) return false;
       const cd = cardDB[n];
       if (!cd || (cd.level ?? 0) !== targetLvl) return false;
-      return canSummonInvaderViaSource(n, CARD_NAME);
+      // 1-Invader-Limit schon bei der Auswahl, sonst geht die Karte beim Platzieren verloren.
+      return canSummonInvaderViaSource(n, CARD_NAME) && invaderLimitAllows(engine, pi, n);
     });
     if (upgrades.length === 0) return false;
 

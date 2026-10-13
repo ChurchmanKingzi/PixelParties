@@ -13,7 +13,8 @@
 //  Implementation notes:
 //    • The link is stored on the Siren's
 //      counters (_sirenLinkType / _sirenLinkOwner
-//      / _sirenLinkHeroIdx / _sirenLinkSlotIdx).
+//      / _sirenLinkHeroIdx für Helden, _sirenLinkInstId
+//      für Kreaturen — die Karte, nicht der Platz).
 //      Both Siren and linked target also get
 //      `sirenLinked = 1` + a partner-name counter
 //      so the "Linked" StatusBadge renders on
@@ -59,12 +60,13 @@ function _resolveLinkedTarget(engine, inst) {
     return null;
   }
   if (c._sirenLinkType === 'creature') {
+    // Verknüpfung hängt an der gewählten KARTE (Instanz-ID), nicht am Platz:
+    // ein verschobenes Ziel bleibt verbunden, eine Nachfolgerin im alten Platz nicht.
     const linkedInst = engine.cardInstances.find(x =>
-      x.owner === c._sirenLinkOwner && x.zone === 'support' &&
-      x.heroIdx === c._sirenLinkHeroIdx && x.zoneSlot === c._sirenLinkSlotIdx
+      x.id === c._sirenLinkInstId && x.zone === 'support'
     );
     if (linkedInst && linkedInst.id !== inst.id) {
-      return { type: 'creature', inst: linkedInst, owner: c._sirenLinkOwner };
+      return { type: 'creature', inst: linkedInst, owner: linkedInst.owner };
     }
     return null;
   }
@@ -155,9 +157,7 @@ module.exports = {
         }
       } else if (target.cardInstance) {
         c._sirenLinkType = 'creature';
-        c._sirenLinkOwner = target.cardInstance.owner;
-        c._sirenLinkHeroIdx = target.cardInstance.heroIdx;
-        c._sirenLinkSlotIdx = target.cardInstance.zoneSlot;
+        c._sirenLinkInstId = target.cardInstance.id;
         target.cardInstance.counters = target.cardInstance.counters || {};
         target.cardInstance.counters.sirenLinked = 1;
         target.cardInstance.counters._sirenLinkedToName = CARD_NAME;

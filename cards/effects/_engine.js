@@ -34659,6 +34659,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     if (this.gs.firstTurnProtectedPlayer === victimOwner) return false;
 
+    // Cosmic Malfunction hat in DIESEM Zug schon gewirkt („Negate all effects that card or
+    // effect would have on "Cosmic Depths" Creatures you control this turn"): jede weitere
+    // CD-Kreatur, die dieselbe Karte erwischt, ist ebenfalls geschützt — ohne neue Frage.
+    {
+      const schild = ps._cdMalfunctionSchild;
+      if (schild && schild.turn === this.gs.turn && source?.name
+          && schild.namen.includes(baseCardName(source.name))) {
+        this.log('cd_malfunction_shield', { victim: victim.name, source: source.name, effectType });
+        return true;
+      }
+    }
+
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];

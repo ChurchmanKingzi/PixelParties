@@ -888,7 +888,10 @@ async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
 /** All own Creatures in support zones (any archetype, any turn-played).
  *  `opts.needsLevel`: der Aufrufer rechnet mit der STUFE der Creature (Deepsea
  *  Castle, Shapeshift: „level <= that Creature's") — Artifact Creatures haben
- *  keine (Als Ruling 9.10.) und bleiben dann draussen. */
+ *  keine (Als Ruling 9.10.) und bleiben dann draussen.
+ *  `opts.ohneLeihgabe`: per Succubus & Co. GELIEHENE Kreaturen (`stolenBy`) bleiben draussen —
+ *  sie stehen in der Zone eines GEGNERISCHEN Helden, Castle/Shapeshift sprechen aber von
+ *  „Kreatur in einer Zone deiner/ihrer Helden" und schicken die Karte auf die Hand. */
 function ownSupportCreatures(engine, pi, opts = {}) {
   const { hasCardType, isArtifactCreature } = require('./_hooks');
   const cardDB = engine._getCardDB();
@@ -897,6 +900,7 @@ function ownSupportCreatures(engine, pi, opts = {}) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
+    if (opts.ohneLeihgabe && inst.stolenBy != null) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (opts.needsLevel && isArtifactCreature(cd)) continue;

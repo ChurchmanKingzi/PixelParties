@@ -82,6 +82,18 @@ module.exports = {
       oppPs._creationLockedNames.add(baseCardName(source.name));   // v876
     }
 
+    // Schutz für den Rest des Zuges: weitere CD-Kreaturen, die dieselbe Karte im selben
+    // Durchlauf trifft (Trial of Dominance & Co.), prüft `_checkCdMovementHandReactions`
+    // gegen diesen Zugstempel und bricht auch deren Entfernung ab (A02-deepsea-13).
+    const meinPs = gs.players[victimOwnerPi];
+    if (meinPs && source?.name) {
+      const turn = gs.turn;
+      if (!meinPs._cdMalfunctionSchild || meinPs._cdMalfunctionSchild.turn !== turn) {
+        meinPs._cdMalfunctionSchild = { turn, namen: [] };
+      }
+      meinPs._cdMalfunctionSchild.namen.push(baseCardName(source.name));
+    }
+
     // Animation: dramatic cosmic-portal flash on the saved CD Creature.
     engine._broadcastEvent('play_zone_animation', {
       type: 'cosmic_summon',
@@ -100,17 +112,10 @@ module.exports = {
     engine.sync();
 
     // The card text says "Negate all effects that card or effect would
-    // have on 'Cosmic Depths' Creatures you control this turn." Beyond
-    // negating the in-flight removal (the cancellation we return below),
-    // the name lock prevents the opponent from re-activating the same
-    // card to retry. For a card that affects MULTIPLE CD Creatures in
-    // one resolve (rare — most removal effects target one), the lock
-    // would still be in place by the time the source's resolve loop
-    // continues — but the source's resolve typically already committed
-    // to its targets before we got here. We rely on the source-name
-    // lock to be the load-bearing mechanism for the turn-long
-    // protection clause; the in-flight cancellation handles the
-    // immediate save.
+    // have on 'Cosmic Depths' Creatures you control this turn." Das
+    // abgebrochene Entfernen gilt für dieses Opfer; der Namens-Riegel
+    // verhindert den Neuversuch, und der Zugstempel `_cdMalfunctionSchild`
+    // (oben) schützt die weiteren CD-Kreaturen desselben Effekts.
     return true; // Cancel the operation
   },
 };
