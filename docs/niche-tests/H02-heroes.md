@@ -180,6 +180,25 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/20-heragas-negiert-zieht-weiter.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `heragas-the-monster-slayer.js:70` `bypassStatusFilter: true` hebt den zentralen Statusfilter für ALLE Hooks des Skripts auf (gedacht für `onTurnEnd`→`stampTurnEnd`, damit die Zeitmarke auch unter Status läuft); die Reaktion `onCreatureDeath` prüft `_isHeroEffectSilenced` nicht selbst.
 
+### H02-heroes-21 · Lethe: die Aktionssperre hält Necromancy („as an additional Action") nicht auf · Stufe B
+- **Karten:** Lethe, the Forgetful Fixer (`lethe-the-forgetful-fixer.js` `lockLethe`/`_actionLockedTurn`), Necromancy (`necromancy.js`); Engine-Weg `doActivateFreeAbility` (`server.js:9501`)
+- **Voraussetzungen / Aufbau:** Lethe auf Held 0 mit Necromancy ×3 (Held 0, Zone 0), Hand [Fireball], Ablage mit 2 Dummys; eigene Kreatur auf Held 1 stirbt im Gegnerzug (`t.endTurn()`, Schaden, `t.endTurn()`).
+- **Schritte:** 1. In Lethes Zug Fireball (Aktion) versuchen. 2. Necromancy per `doActivateFreeAbility` aktivieren (Galerie: erste Karte, Zone: erste freie).
+- **Erwartet** (Kartentext Lethe: „This Hero cannot perform Actions if a target you control was defeated since the end of your last turn."; Necromancy: „summon it with this Hero as an additional Action"; Skriptkopf Lethe: die Sperre „covers … AND the alt-summon below, which is itself an Action"): Lethe kann weder zaubern noch per Necromancy beschwören.
+- **Beobachtet:** Fireball ist gesperrt ✓, die Necromancy-Beschwörung läuft aber durch (Dummy auf dem Brett). Kontrolle ohne Tod: beschwört (richtig). Der Tracker selbst ist sauber gemessen: Tod im Gegnerzug / im eigenen Zug / eines anderen eigenen Helden / einer gestohlenen Kreatur / eines Tokens sperrt, ein Tod vor zwei Runden nicht (bestanden).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/21-lethe-gesperrt-necromancy-laeuft.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `doActivateFreeAbility` (`server.js:9501-9570`) prüft `hero._actionLockedTurn` und `areActionsBlocked` nicht (nur Stunned/Webbed/Frozen, Thing in the Ship, Boris, HOPT); `necromancy.js` `canFreeActivate` auch nicht. Dieselbe Lücke gilt damit für jede andere Aktionssperre (Treasure Hunter's Backpack, Chalice, Kent) bei Necromancy – nicht gesondert gemessen.
+- **Nebenbefund (in Ordnung):** Lethes Stempel-Welle: 5 Lv-1-Dummys in der Ablage, Necromancy 3× → Stempel 1/2/3, vierte Nutzung abgelehnt; die beschworenen Kreaturen tragen `_letheLevelBonus` (1 und 2).
+
+### H02-heroes-22 · Kazena: unter Ziehsperre oder bei leerem Deck wird der Effekt angeboten und der Einsatz ohne Wirkung verbraucht · Stufe C
+- **Karten:** Kazena, the Storming Rebel (`kazena-the-storming-rebel.js` `canActivateHeroEffect`/`onHeroEffect`)
+- **Voraussetzungen / Aufbau:** Kazena auf Held 0, Hand 2 Karten; (a) `ps.drawLocked = true` (Sacred Jewel); (b) Deck 0.
+- **Erwartet** (Kartentext „draw until you have 7 cards … If you do, you cannot draw …"; das Skript sperrt die Aktivierung bei `handLocked`/≥ 7 Handkarten): bei unmöglichem Ziehen nicht aktivierbar bzw. Einsatz nicht verbraucht.
+- **Beobachtet:** Rückfrage „Draw 5 cards (to 7)?" erscheint, nach „Ja" werden 0 Karten gezogen (Hand 2), die Sperre „kein Ziehen" greift korrekt nicht (kein Zug von Karten), der Heldeneffekt ist für den Zug verbraucht (`hero-effect:Kazena…`). Normalfall ✓ (Hand → 7, Sperre, zweite Nutzung abgelehnt, Sperre fällt am Zugwechsel; Deck 3 → zieht 3).
+- **Repro:** `docs/niche-tests/repro/H02-heroes/22-kazena-ziehsperre-verbrennt-einsatz.js` (✗ = Einsatz verbraucht)
+- **Vermutete Ursache:** `kazena-the-storming-rebel.js` `canActivateHeroEffect` prüft `handLocked` und `hand < 7`, aber weder `drawLocked` noch `mainDeck.length > 0`; `onHeroEffect` gibt nach dem Ziehen von 0 Karten trotzdem `true` zurück (verbraucht den Einsatz).
+- **Frage an Al:** Soll Kazena unter Ziehsperre/leerem Deck gar nicht aktivierbar sein (Einsatz bleibt) – ja oder nein? (Der Spieler kann den Verbrauch selbst vermeiden, indem er die Rückfrage verneint.)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

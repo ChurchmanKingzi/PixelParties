@@ -237,7 +237,59 @@ Zählung: A = 12 (R02-01, -02, -03, -04, -05, -07, -09, -10, -12, -13, -19, -20)
 - **Frage an Al:** Soll der 100-Deckel (statische Regel) auch bei gefrorenem/betäubtem/negiertem Wirt gelten – Ja – und nur die Umleitung („you may") unter CC ruhen, oder soll der ganze Anhang unter CC ruhen (Nein, wie jetzt)?
 
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Light Ball | L2 gezielt | Abwehr von Held-/Kreaturenstatus ✓, Reinigung beim Anlegen ✓ (unheilbare Negation bleibt), Wirt nicht geschützt ✓, geliehene Kreatur ✓ (Kontrolle-Logik `heroesControlledBy` nur gelesen, Frost/Übernahme des Wirts nicht dynamisch getestet); Unwanted Audience umgeht den Schutz ✗(→ -05); `healReversed` (Overheal Shock) wird nicht als Status gereinigt ✓ |
+| Loot the Leftovers | L2 gezielt | Besitzer = Opfer / Killer ✓, Handgrößen 0–3, blinde Wahl ✓, Gifttod löst nicht aus (konsistent mit Ruling 1.9. „Status-Ticks haben keinen Verursacher"), Erst-Runden-Gate ✓; laufender Zauber wird mitgeklaut ✗(→ -07) |
+| Looting | L2 gezielt | Auswahl beider Ablagen ✓, Equip landet beim Wirker, Tod des Trägers → Ablage des Ursprungsdecks ✓, Cutlass (nur Cecilia) wird gefiltert ✓, Race Boat/Flying Island wählbar; Control Device am eigenen Helden ✗/C(→ -08) |
+| Martyry | L2 gezielt | Held/Kreatur gewählt ✓, User selbst gewählt ✓ (nicht angeboten), User gefroren/tot ✓, Kreatur des Users ✓; Mehrfachziel-Picker ✗(→ -02) |
+| MOE Shield | L2 gezielt | Einzelziel-Sperre bis Ende des eigenen nächsten Zuges inkl. Resource Phase ✓ (echter Zugwechsel), Flächenzauber gratis ✓, Kreaturenziel ✓, kein Befund |
+| Mountain Tear River | L2 gezielt | Heldenwahl ✓, DM3-Zusatzziele (0/1/2) ✓, DM2 kein Bonus ✓, Host gefroren ✓; Kreatur gewählt ✗(→ -01), Zusatz-Abbruch ✗(→ -09) |
+| No Retreat! | L2 gezielt | Flaggenkarten (Guard Duty, Renewable Energy) ✓; ungeflaggte Mischkarten ✗(→ -10) |
+| Off Duty | L1 Standard | Standardfall: Karte zurück ins Deck (+1), Ersatzaktion über `heroAction`-Fenster ✓, Kartenbilanz ✓; Zusatzaktions-Fall nicht sauber aufgebaut (nicht getestet) |
+| Old Couple | L2 gezielt | Partner-Suche (anderer Name, gleiche Stufe), Sperre „no more summons" bis Zugende ✓ und danach aufgehoben ✓, kein Partner im Deck → nicht angeboten ✓ |
+| Overheal Shock | L2 gezielt | Zusatzaktion bei Support 1 / Support 2 / Decay 1 ✓, tödliche Umkehrung (HP 50 + Heilung 100) ✓, Erst-Runden-Gate ✓, Karte → Ablage des Wirkers beim Heldentod ✓; Status nach Abgang der Karte ✗(→ -03) |
+| Petrification Break | L2 gezielt | nur betäubt spielbar ✓, Halbierung aufgerundet (1→1, 5→3, 101→51) ✓, True Damage ungehalbiert, Status-Immunität ✓, volle Support Zones → nicht spielbar ✓, zwei Kopien → Viertel, Träger stirbt → Ablage ✓; Tempeste-Zusammenspiel ✗(→ -04) |
+| Point-Blank Annihilation | L2 gezielt | zusätzlich zum alten Test: gestohlene Kreatur des Gegners wird besiegt und landet in der Ablage ihres Besitzers ✓ |
+| Prayer | L2 gezielt | Abwurf = Zug, Extra-Karte + Ziehsperre ✓, einmal pro Zug ✓, Sperre fällt am Zugende ✓; Ziehsperre vorher ✗/C(→ -11) |
+| Prophecy of Tempeste | L2 gezielt | 100-Deckel, Umleitung nur einmal pro Zug, Kreaturenschaden-Umleitung, Limit „1 in play" (je Spieler) ✓; Reduktion trotz „cannot be reduced" ✗(→ -04), Deckel unter CC C(→ -23) |
+| Quest of the Chosen One | L2 gezielt | Ziehen max. 3 je Zug und Kopie ✓, Ability an anderem Helden zählt nicht ✓, neuer Zug setzt zurück ✓, Zusatzaktion gegen alle Abilities ✓; unter Ziehsperre wird trotzdem gefragt (kosmetisch, nicht gemeldet) |
+| Rioting Village | L2 gezielt | ATK-Verdopplung beider Seiten ✓, Rückstoß ceil(Schaden/2) ✓, Attack-Limit 1/Zug ✓; Kreaturenziel ✗(→ -12), geliehener Angreifer ✗(→ -13) |
+| Rolling Boulder | L2 gezielt | Kreatur gewählt/eigenes Brettziel ✓, gestohlene Kreatur → Ablage ihres Besitzers ✓, Host gefroren → keine Auslösung ✓; Mehrfachziel-Picker ✗(→ -02) |
+| Royal Treasury | L2 gezielt | 4/6/8 nach Magic-Arts-Stufe, 3 Mal pro Zug, Reset im neuen Zug, Steal-Gold zählt, Gain 0 nicht, Wirt tot → kein Bonus, Level 0 zählt wie 1, übernommener Wirt → Kontrolleur bekommt den Bonus ✓ |
+| Rusty Touch | L2 gezielt | Equip (Jetpack 4) und Artifact Creature (Powder Keg 4) ✓, Gold wird mit der WIRKSAMEN Kostenreduktion gezahlt (Laser Cannon 20) ✓, Kartenbilanz ✓; Normal-Artifact ohne Kosten (Renewable Energy) war im Aufbau nicht spielbar |
+| Shamanic Curse | L2 gezielt | Stufe +1: DM1-Held bei Lv1-Spell negiert, DM2 bei Lv1 überlebt ✓, Zusatzaktion-Fenster ✓; Wisdom-Pfad ✗/B(→ -15), geliehener Wirker ✗(→ -22) |
+| Shared Blood Tanks | L2 gezielt | Kettenschaden an andere blutende Ziele (Helden + Kreatur) ✓, Area beider Seiten (doppelte Kette, kein Kreisel) ✓, toter Held übersprungen ✓, Gegner-Bleed trifft Gegnerseite ✓ |
+| Siege | L2 gezielt | Sperre nach Kontrolle (übernommener Träger) ✓, Resource-Phase-Ausnahme, Kartenbilanz unter Sperre ✓; Crevice-Frage ✗(→ -14) |
+| Silence | L2 gezielt | Negation, genau ein Zusatz-Spell, danach gesperrt ✓, nächster Zug frei, einmal pro Spiel ✓; Attack danach nicht sauber aufgebaut (nicht getestet) |
+| Skull Carpet Bombing | L2 gezielt | (Vorgänger-Messung) Gegnerseite / selbst gelegt (beide) / nach Schaden keine Auslösung / zwei Exemplare nur eins / Unentschieden → Nutzer gewinnt ✓; echter Frost/Betäubung am Host verhindert Auslösung ✓ |
+| Spatial Crevice | L2 gezielt | Limit 3 / 4. Area abgelehnt ✓, Crevice weg → Wahl bis Limit 1 ✓, Gegner-Area-Limit 1 ✓, Suche für den Spieler am Zug (auch Gegner) ✓; Frage unter Such-Sperre ✗/B(→ -14) |
+| Spectral Armor | L2 gezielt | Held 100 → 50 ✓; Kreatur ✗(→ -16) |
+| Spike Trap | L2 gezielt | Gegenzug „2 Karten abwerfen" (nur bei ≥ 2 Handkarten angeboten; Fizzle statt Negation ✓), 200 Schaden an Angreifer ✓, geliehener Angreifer trifft den richtigen Helden ✓, Reihenfolge zweier Surprises ✓; laufende Spielkarte als Abwurfkarte ✗(→ -07) |
+| Stealthy Pursuit | L2 gezielt | Karte wird gelöscht ✓, T+2-Frist, Anti-Lock (anderer wählbarer Held; die Wahl bietet den geschützten Helden nicht an) ✓; echter Flächenschaden und der Fall „alle anderen Helden tot" nicht getestet |
+| Stinky Stables | L2 gezielt | vergifteter Held/Kreatur nicht heilbar, nicht vergiftete heilen ✓, Giftentfernung blockiert ✓ |
+| Surprising Opportunity | L1 Standard | nur alte Tests (Besitzer-Reihenfolge, Token, fremde Kreaturen, Frostschutz); keine neue Nische |
+| Tarleinn's Floating Island | L2 gezielt | Held-Heilung löst Frage und Ziehen aus ✓ (einmal-pro-Zug-Slot und Slot-Rückgabe bei Ablehnung nur im Skript gelesen); Kreaturenheilung ✗(→ -17) |
+| Temple of Sacrifice | L2 gezielt | Action Phase / Main 1 / Main 2 × Opfer ja/nein, Karte zurück bei Ablehnung in Main Phase ✓, Zug-Beschwörung nicht opferbar ✓, Sacrifice to Divinity / Divine Gift of Sacrifice lösen Ziehen aus (beide Seiten) ✓ |
+| Test Flight | L2 gezielt | Fenster bei 1 gewähltem Held ✓, 2 Ziele (nur der Geschützte wird negiert) ✓, Held ohne Magic Arts ✓; zweite Kopie wird nach erfolgreicher Negation noch einmal angeboten (kosmetisch, nicht gemeldet) |
+| Tharxian Horse | L2 gezielt | Zielzahl-Schaden, toter Held zählt nicht, Wiederbeleben als Zusatzaktion ✓, einmal pro Spiel ✓, geliehener Angreifer ✓ (Vorgänger + eigene Messung) |
+| The Master's Plan | L2 gezielt | Matrix Ability / Equip / Area / Creature / Artifact / Potion / Attack: Karte → Ablage, Aktion nur wo sie gekostet hat ✓; Surprise-Platzierung bleibt verdeckt (Bauart) |
+| The Melting | L1 Standard | nur alte Tests (Front-Soldier-Zusammenspiel, Zug beenden); keine neue Nische |
+| Toxic Trap | L2 gezielt | Host gefroren/betäubt/negiert/tot ✓, gewählt + Flächenschlag (Flame Avalanche) ✓, Angreifer geliehen ✓, Reihenfolge zweier Surprises ✓; Flächen-Statuszauber ✗/C(→ -18) |
+| Trample Sounds in the Forest | L1 Standard | Aufstieg Dajan → Reaktion, zweite Kopie derselben Runde gesperrt ✓ |
+| Triumphant Return | L1 Standard | nur alte Tests |
+| Unwanted Audience | L2 gezielt | spät beschworene Kreatur ✓, übernommene Kreatur ✓, Ablauf am Ende des Gegnerzugs ✓; Light Ball ✗(→ -05), Bomb Mite ✗(→ -06) |
+| Very Special Prisoner | L2 gezielt | Quelle Hand/Deck, Auswahl, Anhängen ohne Zusatz-Budget ✓; Deck-Sperre ✗(→ -19) |
+| Weapon Absorption | L2 gezielt | Mehrfachabwurf + Heilkappung ✓, Kartenbilanz ✓ (der Dauerfeuer-Lead „+2 Destruction Magic" ist die Gratis-Schule des Angreifers im Testaufbau, kein Verlust) |
+| Zombified Assault | L2 gezielt | Flächenschlag tötet drei Kreaturen → Wahl einer ✓, Rückschlag 50 × Stufe ✓, Zone belegt → Ausweichzone; geliehener Angreifer ✗(→ -20) |
+
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+- **Normalfälle sauber:** Alle Karten der Liste laufen im Standardaufbau ohne Engine-Fehler (`t.errors` leer) und mit sauberem `t.audit()`; Kartenbilanzen (`t.census()`) stimmen – auch bei Raub (Loot), Wiederbelebung (Zombified Assault), Negation (Master's Plan, Rusty Touch, Silence).
+- **Sperren und Kontrolle:** Siege und Royal Treasury folgen dem Kontrolleur eines dauerhaft übernommenen Wirts (gemessen: Siege-Sperre wechselt die Seite, Royal-Treasury-Bonus geht an den neuen Kontrolleur); bei Light Ball nur der Code gelesen (`_lightBallProtects` zählt `heroesControlledBy`). Rückschlag-Surprises (Spike Trap, Toxic Trap, Mountain Tear River, Tharxian Horse) treffen bei einem geliehenen Angreifer den richtigen Helden.
+- **Gestohlene Kreaturen sterben in die richtige Ablage:** Rolling Boulder und Point-Blank Annihilation legen eine übernommene Kreatur in die Ablage ihres Besitzers.
+- **Einmal-pro-Zug/-Spiel:** Silence (einmal pro Spiel, genau ein Zusatz-Spell), Old Couple (Sperre bis Zugende, danach frei), MOE Shield (Ziehsperre bis zum Ende des eigenen nächsten Zuges, danach normal), Quest (3 Karten je Zug und Kopie), Royal Treasury (3 Auslösungen, Reset im neuen Zug), Tharxian Horse (einmal pro Spiel).
+- **Areas:** Spatial Crevice (3 verschiedene Areas, 4. abgelehnt, Wegfall → Wahl bis Limit 1, Gegner behält Limit 1), Shared Blood Tanks (Area beider Seiten ohne Kettenkreisel), Stinky Stables (Heilung/Giftentfernung vergifteter Ziele blockiert, andere nicht).
+- **Zeitfenster:** Surprise-Host gefroren/betäubt/negiert/tot löst Toxic Trap nicht aus; zwei Surprises auf verschiedenen Helden feuern in Heldenreihenfolge; negiert Spike Trap den Zauber, fällt der zweite Host aus dem Fenster.
+- **Gewollt laut Ruling/Skript (kein Befund):** Gifttod löst Loot the Leftovers nicht aus (Status-Ticks haben keinen Verursacher, Ruling 1.9. bei Skull Carpet Bombing); Prophecy of Tempeste leitet bei CC des Wirts nicht um (Skriptentscheidung, nur die Deckel-Folge ist als -23 gemeldet); Royal Treasury zählt Magic Arts 0 wie 1.
+

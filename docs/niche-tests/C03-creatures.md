@@ -100,6 +100,32 @@ Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/C03-creatures/11-monster-nest-bietet-ifrit-an.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `monster-nest.js` `eligibleFromDeck()` (Filter: `isPileCreature`, kein Artifact-Creature, Level ≤ 3) ohne `loadCardEffect(cn)?.summonOnlyFromHand` (und ohne `cannotBeRevived`-/Bedingungs-Prüfung); `canActivateCreatureEffect` hängt an derselben Liste.
 
+### C03-12 · Ifrit: gefroren/betäubt/negiert gibt er Armageddon weiter +100 Schaden und bleibt unverwundbar (Klasse B-01…B-03) · Stufe B/C
+- **Karten:** Ifrit (`cards/effects/ifrit.js`: `armageddonBonus`, `immuneToSourceNames`), Armageddon (`armageddon.js`, `_apocalypse-shared.js`).
+- **Voraussetzungen / Aufbau:** Sitz 1: Ifrit (nicht frisch) + ZZ Dummy Big; Ifrit gesund / negiert (`actionNegateCreature`) / gefroren / betäubt (`applyCreatureStatus`, **await**); Sitz 0 wirkt Armageddon (Destruction 3 gewährt) über den echten Weg.
+- **Erwartet** (Text „The damage of all Armageddon Spells … is increased by 100. This Creature is unaffected by Armageddon."; Engine-Konvention `isCreatureEffectSuppressed`, B-01…B-03): gesund 150 Schaden, Ifrit unverwundbar; stillgelegt nur 50 Schaden und Ifrit nimmt 50.
+- **Beobachtet:** gesund ✓. Negiert, gefroren, betäubt: weiter 150 Schaden auf den Helden und Ifrit bleibt bei 80 HP. Die Prüfliste in B-querschnitt nennt `immuneToSourceNames (Ifrit)` als „ohne Prüfung" (statisch); hier dynamisch bestätigt, und der Aufschlag (`armageddonBonus`) gehört ebenfalls dazu.
+- **Repro:** `docs/niche-tests/repro/C03-creatures/12-ifrit-stillgelegt-bonus-und-immunitaet-bleiben.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_apocalypse-shared.js` `ifritsOf()` (Z. 38–47: Zone/Kontrolleur, kein `isCreatureEffectSuppressed`), gelesen in `armageddon.js` `schaden()`; Immunität in `_engine.js` ~46122/46140.
+- **Frage an Al:** Wie B-01: Soll ein gefrorener/betäubter/negierter Ifrit Aufschlag und Immunität verlieren (ja) oder gelten beide als statische Eigenschaft der Karte (nein)?
+
+### C03-13 · Inconspicuous Lawn Gnome: „once per turn" gilt getrennt für Hand und Brett – im selben Zug zweimal umstellbar · Stufe C
+- **Karten:** Inconspicuous Lawn Gnome (`cards/effects/inconspicuous-lawn-gnome.js`, Hand-Weg `doHandActivate` in `_engine.js` ~40678).
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 0 mit Summoning Magic 3, Gnom auf der Hand. (1) in der Hand auf Stufe 2 stellen, (2) Gnom spielen, (3) auf dem Brett auf Stufe 3 stellen – alles im selben Zug.
+- **Erwartet** (Text „You may once per turn change this card's level in your hand or on your side of the board"): Lesart A: ein Kontingent je Zug und Karte, Schritt (3) gesperrt; Lesart B: je Ort.
+- **Beobachtet:** Alle drei Schritte gelingen (Hand-Stempel `_revealedThisTurn` und Brett-Stempel `creature-effect:<id>` sind getrennt); die gesetzte Hand-Stufe 2 wirkt nach dem Spielen nicht weiter (Brettstufe wieder Basis), die zweite Änderung setzt dann 3. (Gegenprobe: zwei Aktivierungen auf dem Brett im selben Zug – die zweite wird abgewiesen; Lv-3-Gnom aus der Hand ist mit Summoning Magic 1 nicht spielbar – beides in Ordnung.)
+- **Repro:** `docs/niche-tests/repro/C03-creatures/13-lawn-gnome-stufe-erst-hand-dann-brett.js` (✗ = Lesart A wird verletzt)
+- **Vermutete Ursache:** zwei getrennte Einmal-Stempel (`_revealedThisTurn` an der Hand-Instanz, `creature-effect:<instId>` am Brett).
+- **Frage an Al:** Eine Stufenänderung je Zug und Karte insgesamt (Lesart A) oder je Ort, also einmal in der Hand und einmal auf dem Brett (Lesart B = jetzt)?
+
+### C03-14 · Lovely Teddy: eine geklaute Kreatur an derselben (Held, Slot)-Stelle der anderen Seite macht die gegnerische Kreatur unborgbar (Wurzel F02-14) · Stufe B
+- **Karten:** Lovely Teddy (`cards/effects/lovely-teddy.js`, nutzt `engine.getCreatureTargets`). Gleiche Wurzel wie F02-14 (Poisoned Meat u. a.); hier nur der Teddy-Weg belegt.
+- **Voraussetzungen / Aufbau:** Sitz 0: Teddy (Held 0 / Slot 0) und Haressassin Y (Held 1 / Slot 0); Sitz 1 stiehlt Y (`actionStealCreature`: Besitzer 0, Kontrolle 1, Brettseite 0). Sitz 1: Mr. Jiggles X (Held 1 / Slot 0), nach Y angelegt. Sitz 0 aktiviert Teddy.
+- **Erwartet** (Text „choose a Creature your opponent controls … use that Creature's active effects as if you controlled it"): X ist borgbar.
+- **Beobachtet:** Teddy ist nicht aktivierbar (keine Ziele). Die Instanzsuche in `getCreatureTargets(1)` liefert für die Stelle (Held 1 / Slot 0) die geklaute Y (hat `stolenBy` ⇒ von Teddys Filter ausgeschlossen); X fällt mit heraus. Mit vertauschter Anlegereihenfolge (X vor Y) funktioniert es. (Gegenproben in Ordnung: geborgte Kreatur stirbt ⇒ Ablage des Besitzers; Rückgabe zum Zugende; geborgte Haressassin trifft per Teddy-Weg.)
+- **Repro:** `docs/niche-tests/repro/C03-creatures/14-lovely-teddy-zielsammler-koordinatenkollision.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` ~40263 `getCreatureTargets` (ohne Brettseite in der Instanzsuche), vgl. F02-14.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

@@ -180,6 +180,24 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 - **Repro:** `docs/niche-tests/repro/A03-futuretech/19-bomb-brewer-side-not-control.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `future-tech-bomb.js:65` `getHeroTargets(oi)` + `getCreatureTargets(oi)` und `steam-dwarf-brewer.js:30` `getCreatureTargets(pi)`; `_engine.js:40250` `getCreatureTargets` iteriert die physischen Support Zones der Seite. (Helden-Teil der Bomb nicht gemessen.)
 
+### A03-futuretech-20 · Gunslinger Riffel rüstet die Future Tech Control Device an sich selbst aus – der Gegner übernimmt Riffel (Prüfauftrag H03-17, für Riffel bestätigt) · Stufe B
+- **Karten:** Future Tech Gunslinger Riffel (`cards/effects/future-tech-gunslinger-riffel.js`), Future Tech Control Device (`future-tech-control-device.js`, `placesOnOpponentBoard`); gleiche Klasse wie H03-17 (Lolek, dort erneut gelaufen: ✗ unverändert)
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 0 = Riffel; Ablage 1× Control Device, Deck 1× Control Device + Füller; Sitz 1 hat 1× Control Device in der Ablage. Seed 1234.
+- **Schritte:** 1. Riffels Heldeneffekt, Galerie → Control Device. 2. `t.endTurn()` (Sitz 1 am Zug). 3. Sitz 1 aktiviert die Ausrüstung (`doActivateEquipEffect(room, 1, {heroIdx: 0, zoneSlot: 0, charmedOwner: 0})`).
+- **Erwartet** (Quelle: Riffel „equip it to **this Hero**“, Control Device „Equip this card to a Hero **your opponent** controls“ – nicht gleichzeitig erfüllbar; Spielweg legt sie ausschließlich auf die Gegenseite): die Control Device wird Riffel nicht angeboten; jedenfalls hängt sie nicht an Riffels eigenem Helden.
+- **Beobachtet:** Sie wird angeboten und liegt an Riffel (Sitz 0, Held 0, Slot 0); Sitz 1 darf sie im eigenen Zug aktivieren und Riffel übernehmen (`charmedBy` 1, Heldseite 1) – der Gegner bekommt Riffels Held für den Zug.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/20-riffel-control-device-on-self.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `future-tech-gunslinger-riffel.js` `kandidaten()` (Z. ~63-80) lässt jede Equipment-Karte mit Deck-Kopie zu und prüft das Cross-Side-Flag `placesOnOpponentBoard` nicht (`istAusruestTraeger` in `_equip-shared.js` kennt es offenbar ebenfalls nicht).
+
+### A03-futuretech-21 · Future Tech Barrage: Abbruch der Zielwahl verbraucht die Rundensperre „1 pro Zug" · Stufe B
+- **Karten:** Future Tech Barrage (`cards/effects/future-tech-barrage.js`); Gegenprobe Iterative Testing (beansprucht erst nach der Zusage)
+- **Voraussetzungen / Aufbau:** Sitz 0: Hand 2× Barrage, Ablage 2× Barrage, Held 0 mit Destruction 3 (`grantFor`); Gegner 800 HP. Seed 1234.
+- **Schritte:** 1. Barrage spielen, Zielwahl abbrechen (`t.policy.cancelTargets`). 2. Im selben Zug die zweite Barrage spielen (Ziel Gegner-Held 0).
+- **Erwartet** (Quelle: CARD_API.md Z. 367-390 „Abbruch heißt: nichts ist passiert"; Skriptkonvention von Iterative Testing Z. 90-100 „erst nach der Zusage beansprucht – ein Abbruch soll den Zug nicht verbrennen"): nach dem Abbruch ist die Karte auf der Hand und im selben Zug erneut spielbar (360 Schaden).
+- **Beobachtet:** Der Abbruch gibt die Karte zurück, aber `gs.hoptUsed['future-tech-barrage:0']` steht auf dem Zug; das zweite Spielen wird abgelehnt (`play` = false, Held 800). Der Spieler kann sich so (z. B. nach einem versehentlichen Klick) den Barrage-Einsatz des ganzen Zuges nehmen.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/21-barrage-cancel-burns-hopt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `future-tech-barrage.js` `hooks.onPlay`: `engine.claimHOPT('future-tech-barrage', pi)` steht VOR `ctx.promptDamageTarget`; der Abbruchzweig (`gs._spellCancelled = true`) setzt die Sperre nicht zurück.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

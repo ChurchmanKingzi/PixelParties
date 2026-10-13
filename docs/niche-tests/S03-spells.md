@@ -134,6 +134,33 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S03-spells/14-ultimate-weapon-experiment-geliehener-held.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `ultimate-weapon-experiment.js` Z. 36–63 (Z. 60 `(ps.heroes || []).map`) und Zielwahl Z. 105: `kandidaten` iteriert `ps.heroes`; der geliehene Held liegt in der Spalte des Besitzers (`engine.heroesControlledBy(pi)` liefert `{ physOwner, heroIdx }`), und `performAscension` bekäme `opts.heroOwner` mit.
 
+### S03-15 · Mission of the Light Brigade + Victory Phoenix Cannon: der VPC-Folgezauber umgeht die Grenze „up to 2 additional Actions" · Stufe B
+- **Karten:** Victory Phoenix Cannon (`victory-phoenix-cannon.js` Z. 187–191, `_castSpellImmediately(… alsZusatzaktion: true)`), Mission of the Light Brigade (`mission-of-the-light-brigade.js`, Engine `missionLockActive` / `onConsume`); gleiche Wurzel möglich bei anderen Karten, die einen Zauber innerhalb ihres Effekts als Zusatzaktion wirken (nicht getestet).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 mit Destruction Magic 3 + Support Magic 4; Hand [Mission, Victory Phoenix Cannon, Meteor Crash, Rockfall, Rockfall]; Gegner 800 HP.
+- **Schritte:** 1. Mission als erste Aktion der Action Phase (2 Ladungen). 2. VPC als Zusatzaktion 1 (Ladung 2→1), Ziel Gegner-Held 0, Ja auf „Cast another Spell?", Folgezauber Meteor Crash. 3. Rockfall spielen.
+- **Erwartet** (Kartentext Mission: „You may perform **up to 2** additional Actions this turn. You cannot perform any other additional Actions this turn."; VPC: „… use a level 1 or lower Destruction Magic Spell from your hand with the user **as an additional Action**."): VPC (1) + Folgezauber (2) füllen das Kontingent; danach ist Rockfall nicht spielbar. (Alternativ: der Folgezauber wird als „andere" Zusatzaktion gar nicht angeboten.)
+- **Beobachtet:** Folgezauber läuft ohne Mission-Ladung (Ladungen danach: 1), Rockfall wird als dritte Zusatzaktion gespielt (Ladung 0, 200 Schaden). Insgesamt Mission + VPC + Folgezauber + Rockfall = 3 Zusatzaktionen statt höchstens 2. Ein Vierter scheitert („braucht eine Zusatz-Aktion, aber kein Geber passt zur Karte").
+- **Repro:** `docs/niche-tests/repro/S03-spells/15-mission-victory-phoenix-cannon-dritte-zusatzaktion.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_castSpellImmediately` verbraucht keine Mission-Ladung (nur der Zuschlag-Sucher und der inhärente Weg `onAnyActionResolved` mit `isInherent`, `_engine.js` ~2938–2949, tun es), und VPC bietet den Folgezauber an, ohne `missionLockActive` zu befragen (die Prüfung steht nur in `kannSofortWirken`, `_engine.js` ~21694).
+
+### S03-16 · Overcharge: unter einer Deck-Sperre (Knight of Kings [B]) geht die alte Ausrüstung verloren, die neue bleibt im Deck · Stufe B
+- **Karten:** Overcharge (`overcharge.js`); Sperre: Knight of Kings [B] + Rook of Kings [B] + Board of Kings (`pileOutAllowed(pi, 'deck')` = false).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 (Magic Arts 1) trägt „Glass Sword" (Kosten 2); Deck [ZZ Dummy, Club of Gobbo (Kosten 4), ZZ Dummy]; Sitz 1 kontrolliert Knight + Rook, Board of Kings liegt; Galerie-Antwort „Club of Gobbo".
+- **Schritte:** 1. Overcharge spielen, Club of Gobbo wählen. 2. Support Zone, Ablage, Deck lesen.
+- **Erwartet** (Skript-Kopf, Vorgabe 5.9.: „Ein Equip ohne Nachfolger steht gar nicht erst zur Wahl – sonst wirft man seine Ausrüstung weg und bekommt nichts zurück."; Kartentext „… equip it to the same Hero"; Stapel-Sperre nach CARD_API): Die Karte ist nicht spielbar bzw. nichts wird abgelegt, solange die neue Ausrüstung nicht aus dem Deck geholt werden darf.
+- **Beobachtet:** `play` ⇒ `true`, Overcharge in der Ablage, **Glass Sword in der Ablage**, Club of Gobbo bleibt im Deck, Held ohne Ausrüstung. Gegenprobe: ohne Sperre Tausch ✓; mit Stab-Sperre (`_discardLockedTurn`, betrifft nur die Ablage) Tausch ✓.
+- **Repro:** `docs/niche-tests/repro/S03-spells/16-overcharge-deck-sperre-ausruestung-verloren.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `overcharge.js` Z. 190–193 `spellPlayCondition`/`zulaessigeZiele`/`aufwertungenImDeck` (Z. 112–127) prüfen `pileOutAllowed(pi, 'deck')` nicht; Z. 273 legt die alte Ausrüstung ab, bevor Z. 277 `takeFromPile` die Sperre feststellt und `onPlay` ohne Abbruch/Rückgabe verlässt.
+
+### S03-17 · Overcharge rüstet „Future Tech Control Device" (nur an Gegner-Helden) an den eigenen Helden aus · Stufe B
+- **Karten:** Overcharge (`overcharge.js` `istAusruestbar` Z. 91–106), Future Tech Control Device (`placesOnOpponentBoard: true`); dieselbe Definition steht laut Skript-Kopf auch bei Gate to the Armory (nicht getestet, andere Gruppe).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 (Magic Arts 1) trägt „Glass Sword" (Kosten 2); Deck [ZZ Dummy, Future Tech Control Device (Kosten 4), ZZ Dummy]; Galerie-Antwort „Future Tech Control Device".
+- **Schritte:** 1. Overcharge spielen. 2. Galerie-Inhalt und Support Zones beider Seiten lesen.
+- **Erwartet** (Kartentext FTCD: „Equip this card to a Hero **your opponent controls**."; Overcharge: „choose an **equippable** Artifact"; sonstige Pool-Filter beachten `placesOnOpponentBoard`, z. B. `_hooks.js` `isOwnSideSummonableCreature`, `_engine.js` ~12163): FTCD ist nicht „equippable" an den eigenen Helden und wird nicht angeboten (oder landet beim Gegner).
+- **Beobachtet:** FTCD steht in der Galerie und liegt danach in der Support Zone des **eigenen** Helden (Gegnerseite leer); der Übernahme-Effekt kann dort nie greifen (`canActivateEquipEffect` liest `heroSideOf(inst.owner, held) !== pi` – der Gastgeber ist man selbst). Die Aufwertung ist verschwendet und die Karte widerspricht ihrem Text.
+- **Repro:** `docs/niche-tests/repro/S03-spells/17-overcharge-future-tech-control-device-eigener-held.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `istAusruestbar` prüft `neverPlayable` und `canEquipToHero`, aber weder `placesOnOpponentBoard` noch `isTargetingArtifact` (vgl. `_engine.js` ~12163).
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung
