@@ -398,10 +398,10 @@ module.exports = {
     onCardLeaveZone: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
-      const card = ctx.card;
+      const card = ctx.leavingCard || ctx.card;
       if (!card || card.name !== 'Overheal Shock') return;
       const fromHeroIdx = ctx.fromHeroIdx;
-      const ownerIdx = card.owner;
+      const ownerIdx = ctx.fromOwner ?? card.owner;
       if (ownerIdx == null || fromHeroIdx == null) return;
 
       const ps = gs.players[ownerIdx];
@@ -409,10 +409,12 @@ module.exports = {
       const hero = ps.heroes?.[fromHeroIdx];
       if (!hero) return;
 
-      // Check if any other Overheal Shock remains in this hero's support zones
-      const supportZones = ps.supportZones[fromHeroIdx] || [];
-      const stillHasShock = supportZones.some(slot =>
-        (slot || []).includes('Overheal Shock')
+      // Check if any OTHER Overheal Shock remains on this hero. Der Hook
+      // feuert VOR dem Zonenwechsel: die gehende Karte selbst steht noch
+      // in der Support Zone und darf nicht mitzaehlen (R02-03).
+      const stillHasShock = (engine.cardInstances || []).some(c =>
+        c !== card && c.name === 'Overheal Shock' && c.zone === 'support'
+        && c.owner === ownerIdx && c.heroIdx === fromHeroIdx && !c.faceDown
       );
 
       if (!stillHasShock && hero.statuses?.healReversed) {
