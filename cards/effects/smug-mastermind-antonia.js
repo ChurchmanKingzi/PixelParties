@@ -198,6 +198,8 @@ async function runAntoniaEffect(ctx) {
 
 const { usesLeft, spendUse, refundUse, charges } = require('./_charges');
 const USE_KEY = 'antonia';
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.). SONDERFALL: den
   // Effekt gibt es ueberhaupt erst, wenn „Cool Rescuer Monia" unter
@@ -238,6 +240,9 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+
     // Ruecksetzung entfaellt (v417) — der gemeinsame Zaehler stempelt
     // die Runde mit. Der alte Hook loeschte bei JEDEM Rundenbeginn und
     // traf damit zufaellig schon die richtige Regel; jetzt steht sie

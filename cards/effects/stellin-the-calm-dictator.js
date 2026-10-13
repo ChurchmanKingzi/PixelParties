@@ -99,6 +99,9 @@ function isHostable(engine, pi, heroIdx, cardData, physOwner = pi) {
   if (s.frozen || s.stunned || s.negated || s.bound) return false;
   if (firstFreeSlot(ps, heroIdx) < 0) return false;
   if (!engine.heroMeetsLevelReq(physOwner, heroIdx, cardData)) return false;
+  // „summon": die kartenseitigen Beschwoerungstore (`canSummon`: Gigantisaurier,
+  // Guardian Beasts …) gelten auch hier (A07-04).
+  if (cardData.name && !engine.isCreatureSummonable(cardData.name, physOwner, heroIdx, { beschwoerer: pi })) return false;
   return true;
 }
 
@@ -270,6 +273,12 @@ async function runStellinEffect(ctx) {
       // close and action — re-verify before committing.
       const supZones = gs.players[seite].supportZones?.[heroIdx] || [];
       if ((supZones[slot] || []).length !== 0) continue;
+      // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
+      // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
+      if (!(await engine._runBeforeSummon(cardName, pi, heroIdx,
+        seite !== pi ? { heldSeite: seite } : {}, slot))) continue;
+      if ((ps.hand || []).indexOf(cardName) < 0) continue;
+      if ((gs.players[seite].supportZones?.[heroIdx]?.[slot] || []).length !== 0) continue;   // Kosten koennen den Platz belegt haben
       const res = await engine.actionPlaceCreature(cardName, pi, heroIdx, slot, {
         heldSeite: seite,   // Kontrolle statt Seite (Styx 28.9.)
         source: 'hand',
@@ -348,6 +357,8 @@ async function runStellinEffect(ctx) {
   return true;
 }
 
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   activeIn: ['support'],
 
@@ -385,6 +396,9 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+
     onTurnStart: (ctx) => {
       refundTrigger(ctx.card);
     },

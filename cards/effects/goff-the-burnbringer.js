@@ -28,6 +28,8 @@
 
 const ATTACHABLE = 'Gon, the Frostbringer';
 
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   activeIn: ['support'],
 
@@ -75,6 +77,9 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+
     /**
      * Hero-target Burn damage doubler. Fires before the engine
      * applies the damage so the doubled amount flows through every
