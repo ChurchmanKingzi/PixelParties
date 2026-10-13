@@ -127,7 +127,9 @@ function _installRedirect(engine, pi) {
       // engine's downstream cleanup may untrack the source inst (creature
       // death does) or re-zone it to discard (hand discard); either way
       // we have a separate tracker on the new resting place.
-      engine._trackCard(first, pi, 'coolnessStack');
+      const stackInst = engine._trackCard(first, pi, 'coolnessStack');
+      // Marke fuer die Wiederbelebung (Cute Phoenix & Co.): diese Kopie IST der Kadaver (A04-cute-17).
+      if (stackInst) stackInst._wildurKadaver = true;
 
       engine._broadcastEvent('coolness_stack_change', {
         owner: pi, mode: 'push', from: fromZone, card: first,
