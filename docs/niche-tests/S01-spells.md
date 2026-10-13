@@ -63,6 +63,131 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S01-spells/06-dance-of-the-flame-pillars-ausruestung-zaehlt-als-ziel.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `countAllValidTargets` zählt jede belegte Support Zone (`slot.length > 0`), nicht nur Kreaturen (Kartentyp prüfen wie in der Wahl).
 
+### S01-07 · Anti Magic Zone: nach dem Wirken beschworene Kreaturen (und wiederbelebte Helden) sind nicht stillgelegt · Stufe B
+- **Karten:** Anti Magic Zone (`cards/effects/anti-magic-zone.js`), Status `magic_silenced` (`_hooks.js` ~Z. 338-350).
+- **Voraussetzungen / Aufbau:** Sitz 1 hat Kreatur (ZZ Dummy) und einen toten Held 2; Sitz 0 spielt Anti Magic Zone (Zug 5).
+- **Schritte:** 1. Anti Magic Zone wirken. 2. `endTurn()`, Sitz 1 beschwört im Fenster eine weitere Kreatur. 3. Zusatz: Held 2 von Sitz 1 wird im Fenster wiederbelebt.
+- **Erwartet** (Kartentext: „No target can use any Spells and the effects of **all** Creatures are negated until the end of your opponent's next turn."; Absicht im Code, `_hooks.js:349`: „New Creatures summoned during the AMZ window auto-receive the status (handled engine-side in `actionPlaceCreature`)"): Die im Fenster beschworene Kreatur ist ebenfalls negiert; ein wiederbelebter Held (neues „Ziel") darf keine Zauber wirken.
+- **Beobachtet:** Die beim Wirken vorhandene Kreatur ist negiert (`isCreatureEffectSuppressed` = true), die neu beschworene **nicht**; der wiederbelebte Held hat keinen `magic_silenced`. Die Engine-Seite `actionPlaceCreature` kennt den Status nicht (kein Treffer für `magic_silenced` dort), und der Ablage-Haken `onCardEnterZone` des Skripts (`ctx.cardZone === 'discard'`, liest `ctx.card.counters._amzExpiresAtTurn`) ist tot: die Instanz des gespielten Zaubers wird nach der Auflösung entsorgt (`server.js` doPlaySpell ~Z. 8697 `_untrackCard`, ausgenommen `gs._spellKeepInstance`), die Zähler gehen damit verloren, und für Ablage-Karten ohne `discardEffect` legt `_ensureDiscardInstances` keine Instanz an.
+- **Repro:** `docs/niche-tests/repro/S01-spells/07-anti-magic-zone-spaetere-kreatur.js` (✗ = Fehler tritt auf; der Held-Teil (C) ist die zweite Prüfung)
+- **Vermutete Ursache:** `anti-magic-zone.js` (`onCardEnterZone`, Z. 228-250) – es fehlt `gs._spellKeepInstance = true` im `onPlay` (Vorbild: Weapon Unleashing) bzw. ein Fenster-Zustand auf dem Spieler/`gs` (`gs._amzWindow = {expiresAtTurn, expiresForPlayer}`), den `actionPlaceCreature`/`actionReviveHero` lesen.
+- **Restunsicherheit (daher B, Held-Teil C):** Ob „all Creatures" auch später beschworene meint, ist vom Code selbst bejaht (Kommentar), nur nicht umgesetzt; beim wiederbelebten Helden nennt der Text kein Verhalten.
+
+### S01-08 · Aurora Borealis: Abbruch der Zielwahl des ausgeführten Zaubers – die zwei anderen Zauber sind schon gelöscht · Stufe C
+- **Karten:** Aurora Borealis (`cards/effects/aurora-borealis.js`).
+- **Voraussetzungen / Aufbau:** Held 0 mit Magic Arts 3 + Destruction Magic 3; Deck: Fireball, Burning Finger, Boiling Oil u. a.
+- **Schritte:** 1. Aurora Borealis, drei Zauber wählen (Fireball, Burning Finger, Boiling Oil). 2. „Delete 2 … to perform the third?" = ja, auszuführen: Fireball. 3. Die Zielwahl von Fireball mit „Abbrechen" beenden.
+- **Erwartet** (Kartentext: „you may delete 2 of your chosen Spells to immediately perform the third one"; Regel 23.9 „Abbruch heißt: nichts ist passiert"): Wer die Ausführung abbricht, soll die beiden Zauber behalten (Lesart A) – oder die Kosten sind mit der Zusage bezahlt (Lesart B).
+- **Beobachtet:** Lesart B. Das Skript löscht die zwei anderen Zauber **vor** `_castSpellImmediately`; nach dem Abbruch liegt nur noch Fireball auf der Hand, Burning Finger und Boiling Oil sind gelöscht, kein Schaden. (Wird die Ausführung nicht abgebrochen, ist alles in Ordnung: 2 gelöscht, der dritte wirkt als Zusatzaktion; Staffel 1/2/3 und die Ja/Nein-Frage ab Magic Arts 3 mit 3 gewählten Zaubern ✓.)
+- **Repro:** `docs/niche-tests/repro/S01-spells/08-aurora-borealis-abbruch-nach-loeschen.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `aurora-borealis.js` (Schleife `loescheAusHand`, danach `_castSpellImmediately`).
+- **Frage an Al:** Soll das Löschen der zwei Zauber ausbleiben, wenn der Spieler die Ausführung des dritten Zaubers (Zielwahl) abbricht (ja = Löschen erst nach erfolgreicher Zielwahl / nein = wie jetzt, Kosten bezahlt)?
+
+### S01-09 · Flächenschlag „all targets your opponent controls" trifft eine vom Wirker kontrollierte (geliehene) Kreatur · Stufe B
+- **Karten:** Boiling Oil (`cards/effects/boiling-oil.js`, `aoeHit({ side: 'enemy' })`); gleicher Weg für jede Karte mit `side: 'enemy'` (u. a. Butterfly Cloud, Flame Avalanche), Engine `collectAoeCreatureTargets` (`_engine.js` ~Z. 45511); Quelle der Leihkreatur z. B. Aligning Goals (`actionStealCreature`).
+- **Voraussetzungen / Aufbau:** Sitz 1 besitzt eine Kreatur, die Sitz 0 sich geliehen hat (`actionStealCreature(0, inst)`, Besitzer 1 / Kontrolleur 0); Sitz 0 besitzt eine Kreatur, die Sitz 1 sich geliehen hat.
+- **Schritte:** 1. Sitz 0 spielt Boiling Oil.
+- **Erwartet** (Kartentext: „Deal 80 damage to all targets your **opponent controls**."; Ruling `CARD_API.md` ~Z. 6046-6090 (v718): Wer nach Seiten rechnet, fragt nie die Spalte; `collectAoeHeroTargets` lässt einen vom Wirker kontrollierten Helden aus dem Gegnerflächenschlag heraus): Die vom Wirker kontrollierte Kreatur bleibt unverletzt; die vom Gegner kontrollierte (dem Wirker gehörende) wird getroffen.
+- **Beobachtet:** Beide verlieren 80. Die Kreatur, die Sitz 0 selbst kontrolliert, wird vom eigenen „Gegner"-Flächenschlag getroffen (und danach in die Ablage ihres Besitzers gelegt). Die Heldenvariante ist umgestellt, die Kreaturenvariante nicht.
+- **Repro:** `docs/niche-tests/repro/S01-spells/09-boiling-oil-trifft-geliehene-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `collectAoeCreatureTargets` (~Z. 45511-45528): `if ((inst.owner !== tpi && inst.controller !== tpi) …) continue;` – Besitzer **oder** Kontrolleur reichen. Folgefehler bei `side: 'both'` (Hole in the Sky, MOE Bomb, Divine Gift of Fire): eine Kreatur mit Besitzer ≠ Kontrolleur steht dort **doppelt** in der Zielliste (gemessen: `collectAoeCreatureTargets([0,1])` liefert sie zweimal; Hole in the Sky tötet sie trotzdem nur einmal, daher dort ohne sichtbare Folge). Richtig wäre das Kriterium `(inst.controller ?? inst.owner) === Seite`.
+- **Verwandt (gleiche Zeile, nicht gesondert mit einer Karte getestet):** `side: 'own'` erfasst umgekehrt eine eigene, vom Gegner kontrollierte Kreatur (Besitzer reicht).
+
+### S01-10 · Calm Diatribe: die zweite Aktion des gewählten Helden wird im nächsten Zug nie eingerichtet · Stufe A
+- **Karten:** Calm Diatribe (`cards/effects/calm-diatribe.js`).
+- **Voraussetzungen / Aufbau:** Sitz 0, Held 0 wirkt Calm Diatribe auf Held 1 (Zug 5); danach zwei echte Zugwechsel (`t.endTurn()` ×2: Gegnerzug, dann wieder Sitz 0, Zug 7).
+- **Schritte:** 1. Calm Diatribe wirken (Zusatzaktion ✓). 2. Zwei Zugwechsel. 3. In der Action Phase spielt Held 1 zwei Fireballs.
+- **Erwartet** (Kartentext: „You may perform a second Action with that Hero during your Action Phase next turn."): Beide Fireballs sind spielbar; Held 1 trägt in diesem Zug `calm_ready`, danach verfällt es.
+- **Beobachtet:** Nur der erste Fireball; der zweite wird abgelehnt. Held 1 behält dauerhaft den angekündigten Status `calm` (nie `calm_ready`), die Zusage (`registerAdditionalActionType`/`grantAdditionalAction`) wird nie angelegt. Mit einer im Test simulierten Korrektur (`ctx.playerIdx = ctx.activePlayer`) klappt es wie beschrieben: zweite Aktion ✓, dritte abgelehnt ✓, Status danach weg – die Diagnose ist damit gesichert.
+- **Repro:** `docs/niche-tests/repro/S01-spells/10-calm-diatribe-zweite-aktion-nie-gewaehrt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `calm-diatribe.js` `hooks.onTurnStart`: `if (ctx.playerIdx !== ctx.cardOwner || …) return;` – der Hook-Kontext von `onTurnStart` hat laut `CARD_API.md` Z. 2636 und `_engine.js:22753` (`runHooks(ON_TURN_START, { turn, activePlayer })`) kein `playerIdx` (= `undefined`); richtig wäre `ctx.activePlayer` bzw. `ctx.isMyTurn`. Weitere Skripte mit `ctx.playerIdx` stehen in anderen Hooks (nicht in `onTurnStart`) und sind nicht betroffen (Stichprobe: Forbidden Grimoire, Gældefaber, Karian, Idej Sword, Resistance).
+
+### S01-11 · Call for Help und Aurora Borealis führen ein zweites „Divine Gift" aus (Einmal-pro-Spiel-Grenze umgangen) · Stufe A
+- **Karten:** Call for Help (`cards/effects/call-for-help.js`), Aurora Borealis (`aurora-borealis.js`, Magic-Arts-3-Zweig), alle „Divine Gift of …" (hier: Fire), Engine `_castSpellImmediately` (`_engine.js` ~Z. 21713).
+- **Voraussetzungen / Aufbau:** Sitz 0 hat `divineGift` schon gestempelt (Divine Gift of Skill normal gespielt, `_oncePerGameUsed = {divineGift}`); (a) Call for Help (eigene Kreatur diesen Zug besiegt), Deck enthält Divine Gift of Fire; (b) Aurora Borealis mit Magic Arts 3, drei gewählte Zauber inkl. Divine Gift of Fire.
+- **Schritte:** (a) Call for Help spielen, im Angebot „Divine Gift of Fire" wählen. (b) Aurora Borealis spielen, Divine Gift of Fire + zwei weitere wählen, „delete 2 …" = ja, Divine Gift of Fire als auszuführenden Zauber wählen.
+- **Erwartet** (Kartentext: „You can only activate 1 "Divine Gift" card per game."; derselbe Zauber wird im normalen Immediate-Pick `_resolveImmediateActionPick`, `_engine.js` ~Z. 19735 / 13184, wegen `oncePerGame` gar nicht angeboten): Das zweite Divine Gift wird nicht angeboten bzw. nicht gewirkt.
+- **Beobachtet:** In beiden Fällen wird es angeboten und gewirkt: alle Gegner-Helden brennen („für den Rest des Spiels"). Der Stempel selbst wird vom Guss korrekt gesetzt (Gegenprobe: Call for Help → Divine Gift of Skill, danach lässt sich ein normales Divine Gift nicht mehr spielen) – es fehlt nur die **Prüfung** vor dem Guss.
+- **Repro:** `docs/niche-tests/repro/S01-spells/11-zweites-divine-gift-ueber-call-for-help-und-aurora.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Ruling `CARD_API.md` ~Z. 4553-4575: „Der Kern [`_castSpellImmediately`] prüft KEINE Level-/Schulanforderung … Sperren … prüft der Aufrufer selbst". `call-for-help.js` (`eligible`, Z. ~48; Prüfungen nach der Wahl) und `aurora-borealis.js` (`wirkbar`) prüfen `oncePerGame` nicht. Betrifft auch die anderen Einmal-pro-Spiel-Zauber der Stufe ≤ 2 (z. B. Eraser Beam, sofern Stufe ≤ 2 – nicht einzeln getestet) und `spellPlayCondition`/`canPlayWithHero` (siehe S01-12). Besser zentral: `oncePerGame`-Prüfung in `_castSpellImmediately` (Abbruch wie ein ablehnender `spellPlayCondition`).
+
+### S01-12 · Call for Help bietet Zauber an, die nicht spielbar sind; die Wahl ist nicht abbrechbar, Call for Help verpufft · Stufe B
+- **Karten:** Call for Help (`cards/effects/call-for-help.js`).
+- **Voraussetzungen / Aufbau:** Eine eigene Kreatur wurde in diesem Zug besiegt; Deck: Detection („You can only play this card while your opponent controls 1+ Surprises."); der Gegner hat keine Surprise.
+- **Schritte:** 1. Call for Help spielen. 2. Im Angebot Detection wählen.
+- **Erwartet** (Kartentext: „Choose a level 2 or lower Spell … and play it immediately as an additional Action"; Vorbild: der Standard-Immediate-Pick filtert `spellPlayCondition`/`canPlayWithHero`/`oncePerGame`, `_engine.js` ~Z. 19700-19740): Unspielbare Zauber werden gar nicht erst angeboten (oder Call for Help bleibt erhalten).
+- **Beobachtet:** Detection steht im Angebot; die Galerie ist `cancellable: false`; nach der Wahl bricht das Skript still ab (`spellPlayCondition` wird erst nach der Wahl geprüft), Call for Help liegt in der Ablage, Detection im Deck, kein Hinweis. Gleiche Folge, wenn der Spieler die Zielwahl des gewählten Zaubers abbricht (Burning Finger: Call for Help verbraucht, Zauber zurück ins Deck) – dieselbe Frage wie S01-08.
+- **Repro:** `docs/niche-tests/repro/S01-spells/12-call-for-help-bietet-unspielbare-zauber.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `call-for-help.js` `eligible` (nur Level/Subtyp/HOPT) vs. Prüfungen nach der Wahl (`spellPlayCondition`, `canHeroPerformAction`, `supportSpellLocked`); `canPlayWithHero` und `oncePerGame` fehlen ganz.
+
+### S01-13 · Chain Lightning: die Kettenwahl des Opfers wird serverseitig nicht geprüft (Heldenpflicht, Anzahl, Duplikate) · Stufe C
+- **Karten:** Chain Lightning (`cards/effects/chain-lightning.js`, Wahl über `engine.promptChainTargets`, `_engine.js` ~Z. 10562).
+- **Voraussetzungen / Aufbau:** Der Gegner (= Opfer, wählt selbst) hat 3 lebende Helden und 3 Kreaturen. Antworten per Skript wie ein veränderter Client: (b) nur die drei Kreaturen, (c) dasselbe Ziel dreimal, (e) nur ein Ziel.
+- **Schritte:** 1. Chain Lightning spielen. 2. Opfer antwortet auf `chainTargetPick` mit der jeweiligen Auswahl.
+- **Erwartet** (Kartentext: „Your opponent has to choose 3 targets they control consecutively (or as many targets as possible). … Your opponent always has to choose their undefeated Heroes first."): Die drei Helden werden getroffen (200/150/100), egal was der Client schickt.
+- **Beobachtet:** Kontrolle (a) mit drei Helden korrekt (600/650/700), und auch die CPU-Standardantwort wählt regelkonform (3 Helden; bei einem lebenden Helden: Held + 2 Kreaturen). Aber: (b) nur Kreaturen gewählt → die Helden bleiben bei 800, die Kreaturen nehmen den Schaden; (c) dasselbe Ziel dreimal → ein Held verliert 450; (e) nur 1 Ziel → nur 200 Schaden. `promptChainTargets` gibt `result.selectedTargets` ungeprüft zurück, `heroesFirst` ist nur ein Hinweis an die Oberfläche (der Standard-Client erzwingt es in `public/dist/app-board.js`). Das Opfer hat damit mit einem veränderten Client einen Vorteil.
+- **Repro:** `docs/niche-tests/repro/S01-spells/13-chain-lightning-wahl-ungeprueft.js` (✗ = Regel wird nicht erzwungen)
+- **Vermutete Ursache:** `promptChainTargets` (kein Abgleich: Anzahl = min(3, Ziele), Heldenpflicht, Ids paarweise verschieden).
+- **Frage an Al:** Soll der Server die Kettenwahl nachprüfen bzw. korrigieren (ja = Regel auch gegen veränderte Clients erzwingen / nein = Client wird vertraut)?
+
+### S01-14 · Chaos Magic, die zu einem „Divine Gift" wird: kein Einmal-pro-Spiel-Stempel; die Zusatzaktion des Gifts entfällt · Stufe B (Zusatzaktion-Teil: C)
+- **Karten:** Chaos Magic (`cards/effects/chaos-magic.js`), Divine Gift of Biseria (gefundener Zauber).
+- **Voraussetzungen / Aufbau:** Sitz 0: Chaos Magic, Divine Gift of Skill, Fireball auf der Hand; Deck besteht nur aus Divine Gift of Biseria.
+- **Schritte:** 1. Chaos Magic spielen (enthüllt Divine Gift of Biseria, friert den gewählten Helden ein). 2. Im selben Zug Divine Gift of Skill spielen. 3. (zweiter Lauf) statt 2.: Fireball als weitere Aktion.
+- **Erwartet** (Kartentext Chaos Magic: „This Spell's name, level and effect become the revealed Spell's name, level and effect"; Divine Gift: „You can only activate 1 "Divine Gift" card per game. … This counts as an additional Action."): (a) Chaos Magic ist jetzt ein Divine Gift ⇒ `divineGift` gestempelt, ein weiteres Divine Gift ist nicht spielbar. (b) (Lesart, Stufe C) Auch „This counts as an additional Action" gehört zum übernommenen Effekt ⇒ der Fireball ist danach spielbar.
+- **Beobachtet:** (a) `_oncePerGameUsed` bleibt leer, Divine Gift of Skill wirkt danach voll (4 Bonus-Anhänge) – zwei Gifts in einem Spiel. (b) Der Fireball wird abgelehnt (Chaos Magic verbraucht die Aktion; zur Kontrolle: Biseria normal gespielt ⇒ Fireball danach spielbar). Gegenprobe: Ist `divineGift` schon gestempelt, fizzelt Chaos Magic (Zauber wird gelöscht, kein Effekt) ✓. Ebenfalls ✓: 5 Nicht-Zauber ⇒ Hand abgeworfen, bereits gewirkte Zauber werden übersprungen (und mitgezählt), Wirken ohne Schule.
+- **Repro:** `docs/niche-tests/repro/S01-spells/14-chaos-magic-wird-divine-gift.js` (✗ = Fehler tritt auf; zweite ✗-Zeile = Zusatzaktion-Teil)
+- **Vermutete Ursache:** `chaos-magic.js` ruft `onPlay` des gefundenen Zaubers selbst auf (Z. ~120-135) statt `_castSpellImmediately` (der setzt den `oncePerGame`-Stempel, `_engine.js` ~Z. 21895) und wertet `inherentAction` des gefundenen Zaubers nicht aus.
+- **Frage an Al (Teil b):** Soll bei Chaos Magic, die zu einem Zauber mit „This counts as an additional Action" wird, auch die Zusatzaktion gelten (ja / nein, nur die Wirkung)?
+
+### S01-15 · Create Illusion: die Kreatur kommt in eine freie Zone eines beliebigen eigenen Helden, nicht des Nutzers · Stufe B
+- **Karten:** Create Illusion (`cards/effects/create-illusion.js`).
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 0 (Nutzer, Magic Arts 1) hat alle 3 Support Zones belegt, Held 1 hat freie Zonen; Deck: Elven Archer (Lv 1).
+- **Schritte:** 1. Create Illusion mit Held 0 wirken, Elven Archer wählen; in der Zonenwahl wird (auch) Held 1 angeboten.
+- **Erwartet** (Kartentext: „…place it into a free Support Zone of **the user**."; „the user" = der wirkende Held, so auch Create Secret Room: „the user's Surprise Zone"): Nur freie Zonen des Nutzers; hat er keine, ist der Zauber nicht spielbar bzw. wird abgebrochen.
+- **Beobachtet:** Der Zauber ist spielbar und die Illusion liegt bei Held 1. `spellPlayCondition` prüft „irgendein lebender Held hat eine freie Zone", `onPlay` sammelt `freeZones` über alle Helden der Seite (`for (let hi …)`) und bietet sie an.
+- **Repro:** `docs/niche-tests/repro/S01-spells/15-create-illusion-zone-des-nutzers.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `create-illusion.js` `spellPlayCondition` und die Schleife über `ps.heroes` in `onPlay` (Z. ~85-95) müssten sich auf `ctx.cardHeroIdx` bzw. `heroIdx` des Nutzers beschränken.
+- **Restunsicherheit (daher B):** Falls „the user" bewusst weit gelesen wird (jede eigene Zone), wäre der Kartentext zu ändern.
+
+### S01-16 · Create Illusion: „your opponent may draw …" wird als Pflicht ausgeführt (Deck-Out-Niederlage) · Stufe C
+- **Karten:** Create Illusion (`create-illusion.js`), Engine `_illusionenZurueck` (`_engine.js` ~Z. 26800-26845; gleicher Weg für Staff of Illusions).
+- **Voraussetzungen / Aufbau:** Sitz 0 legt eine Level-1-Illusion (Elven Archer); Sitz 1 zieht zu Zugbeginn eine Karte, sein Deck wird dann geleert.
+- **Schritte:** 1. Create Illusion. 2. Zwei Zugwechsel (Ende des Gegnerzugs: die Illusion geht ins Deck zurück).
+- **Erwartet** (Kartentext: „…and if you do, your opponent **may** draw as many cards as the Creature's level."): Der Gegner darf ziehen, muss aber nicht – bei leerem Deck kann er verzichten.
+- **Beobachtet:** `actionDrawCards(entry.opponent, entry.oppDrawCount)` läuft ohne Frage; der Gegner verliert sofort durch Deck-Out (Sieger Sitz 0, `deck_out`). Im Normalfall (Deck gefüllt) zieht er brav `level` Karten (gemessen: 1 bei Lv 1).
+- **Repro:** `docs/niche-tests/repro/S01-spells/16-create-illusion-draw-pflicht.js` (✗ = Spiel endet durch Deck-Out)
+- **Vermutete Ursache:** `_engine.js` `_illusionenZurueck` (`if (entry.oppDrawCount > 0 …) actionDrawCards`) kennt keine „may"-Frage (Ja/Nein an `entry.opponent`).
+- **Frage an Al:** Soll der Gegner das Ziehen ablehnen dürfen (ja = Ja/Nein-Frage, wie „may" im Text / nein = Ziehen ist immer Vorteil und läuft automatisch)?
+
+### S01-17 · Dangerous Knowledge: genau ein Kandidat wird ohne Zielschutz-Prüfung automatisch gewählt (Erstrunden-Immunität umgangen) · Stufe B
+- **Karten:** Dangerous Knowledge (`cards/effects/dangerous-knowledge.js`, `onPlay`: `let ziel = ziele[0]; if (ziele.length > 1) { promptEffectTarget … }`).
+- **Voraussetzungen / Aufbau:** Zug 1-Lage (`gs.firstTurnProtectedPlayer = 1`); Sitz 1 hat Barker, seine anderen Helden tragen Namen, die Sitz 0 schon führt (keine Kandidaten).
+- **Schritte:** 1. Sitz 0 spielt Dangerous Knowledge mit Held 0.
+- **Erwartet** (Regel `CARD_API.md` „Turn-1 Immunity": „every card belonging to the non-turn player is completely immune to anything the turn player can do"; Kartentext: „Choose a Hero your opponent controls …"): Der geschützte Held ist nicht wählbar, nichts wird gelernt, die Karte bleibt auf der Hand.
+- **Beobachtet:** Kontrolle mit **zwei** Kandidaten: es öffnet sich keine Zielwahl (nichts wählbar), die Karte geht auf die Hand zurück ✓. Mit **genau einem** Kandidaten wird er ohne die zentrale Schutzprüfung gewählt: Sitz 0 lernt Barkers Heldeneffekte, die Karte ist verbraucht. (Gemessen auch: mit dem Butterfly-Cloud-Status auf dem einzigen Kandidaten ist das Ergebnis dasselbe wie über die Zielwahl, weil dessen Schutz nur „solange andere wählbare Helden da sind" gilt. Anderer Wahlschutz (Stealth …) und „is chosen"-Surprises sind auf diesem Weg **nicht getestet**, vermutlich ebenfalls umgangen, sofern sie erst in `promptEffectTarget` greifen.)
+- **Repro:** `docs/niche-tests/repro/S01-spells/17-dangerous-knowledge-ein-kandidat-ohne-schutz.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `dangerous-knowledge.js` – die Einzelkandidaten-Abkürzung überspringt `promptEffectTarget` (und damit das Erstrunden-Gate). Zusätzlich fehlt in `kandidaten()` die Erstrunden-Prüfung für die Spielbarkeit (Vorbild: `compulsory-body-swap.js` `heldWaehlbar`: `gs.firstTurnProtectedPlayer === h.owner → false`).
+
+### S01-18 · Detection zählt eine per Create Secret Room gelegte Nicht-Surprise-Karte als „Surprise" · Stufe C
+- **Karten:** Detection (`cards/effects/detection.js`, `_getOppSurprises`), Create Secret Room (`_secret-room-shared.js`).
+- **Voraussetzungen / Aufbau:** Sitz 1 legt per Create Secret Room einen **Fireball** (kein Surprise) verdeckt in die Surprise Zone seines Helden 0; keine echte Surprise. Sitz 0 spielt Detection.
+- **Schritte:** 1. Create Secret Room (Sitz 1). 2. Detection (Sitz 0).
+- **Erwartet** (Kartentext Detection: „Remove all **Surprises** your opponent controls … draw 2 cards for every Surprise removed … You can only play this card while your opponent controls 1+ Surprises."; Create Secret Room erlaubt jede Karte): Lesart A – ein Fireball ist keine Surprise; Detection ist nicht spielbar bzw. entfernt/zieht nichts. Lesart B – alles in der Surprise Zone zählt.
+- **Beobachtet:** Lesart B. Detection ist spielbar, legt den Fireball in die Ablage von Sitz 1 und Sitz 0 zieht 2 Karten. Die erste Schleife von `_getOppSurprises` nimmt jeden Eintrag von `_getAllSurpriseEntries` ohne Subtyp-Prüfung (die zweite Schleife über die Support Zones prüft `subtype === 'surprise'`).
+- **Repro:** `docs/niche-tests/repro/S01-spells/18-detection-secret-room-karte.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `detection.js:_getOppSurprises` (Zeilen der ersten `for … _getAllSurpriseEntries`-Schleife, ohne `cardDB[cardName].subtype`-Prüfung).
+- **Frage an Al:** Soll eine per Create Secret Room verdeckt in die Surprise Zone gelegte Nicht-Surprise-Karte für Detection als „Surprise" gelten (ja = entfernen + 2 Karten ziehen / nein = nur echte Surprises)?
+
+### S01-19 · Divine Gift of Creation: die Sperre „cannot use those cards" gilt nicht für Equipment, Surprises und Abilities · Stufe B
+- **Karten:** Divine Gift of Creation (`cards/effects/divine-gift-of-creation.js`, Sperre `ps._creationLockedNames`); Verbraucher in `_engine.js` ~Z. 20698 (`validateActionPlay`: Zauber/Attacks/Kreaturen), `server.js` ~Z. 11863 (`doUsePotion`) und ~Z. 12058 (`doUseArtifactEffect`).
+- **Voraussetzungen / Aufbau:** Sitz 0 hat das Gift und je eine Kopie der Testkarte auf der Hand; das Gift holt (Testkarte, Zweitkarte) aus dem Deck – beide Namen stehen in `_creationLockedNames`. Getestet: Burning Finger (Zauber), Elven Archer (Kreatur), Club of Gobbo (Equipment), Magic Mirror (Surprise), Toughness (Ability).
+- **Schritte:** 1. Divine Gift of Creation, zwei Karten wählen. 2. Im selben Zug eine Kopie einer der gewählten Karten spielen.
+- **Erwartet** (Kartentext: „If you choose 2 cards, you cannot use those cards or cards with the same names for the rest of the turn."): Keine Kopie ist in diesem Zug spielbar, gleich welcher Kartentyp.
+- **Beobachtet:** Zauber und Kreatur werden abgelehnt ✓ (Kontrolle), Trank und Artefakt-Effekt prüfen die Sperre laut Quelltext (nicht getestet); aber **Club of Gobbo (Equipment), Magic Mirror (Surprise) und Toughness (Ability) lassen sich trotz Sperre spielen** (`doPlay…` liefert `true`, Karte liegt auf dem Brett). Damit entfällt der Preis des Gifts („zwei Karten holen, aber nicht benutzen") für Ausrüstung, Surprises und Abilities.
+- **Repro:** `docs/niche-tests/repro/S01-spells/19-divine-gift-of-creation-sperre-luecken.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `doPlayArtifact` (server.js ~Z. 7448, Equipment), `doPlaySurprise` und `doPlayAbility` prüfen `_creationLockedNames` nicht (keine Prüfung über Basisnamen in diesen Pfaden; `grep _creationLockedNames` findet nur die drei oben genannten Stellen).
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

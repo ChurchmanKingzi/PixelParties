@@ -22,5 +22,16 @@ const H = require('../../lib/h.js');
   R.check('Hatchling gespielt', r === true, r);
   R.check('Ziel (200 HP) verliert die Hälfte -> 100 HP', hp === 100, { currentHp: ziel.counters.currentHp, hp });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+
+  // Gegenprobe mit ECHTEN Kreaturen (nicht nur dem Dummy): Mr. Jiggles (90 HP), Populated Island Turtle (400 HP)
+  for (const [name, hp] of [['Mr. Jiggles', 90], ['Populated Island Turtle', 400]]) {
+    const t2 = await H.fresh({ hand: [['Wire Hatchling'], [name]] });
+    await t2.play(1, name, { hero: 0 });
+    const z = t2.find(name, 'support');
+    t2.targetFn = (valid) => [valid.find(v => v.type === 'equip' && v.cardName === name).id];
+    await t2.play(0, 'Wire Hatchling', { hero: 0 });
+    const rest = z.counters.currentHp ?? hp;
+    R.check(name + ' (' + hp + ' HP) verliert die Hälfte -> ' + (hp - Math.ceil(hp / 2)) + ' HP', rest === hp - Math.ceil(hp / 2), { currentHp: z.counters.currentHp, rest });
+  }
   R.finish();
 })();
