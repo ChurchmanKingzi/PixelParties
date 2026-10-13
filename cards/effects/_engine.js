@@ -12560,13 +12560,17 @@ class GameEngine {
    * (`gs._naechsterEinzelschadenX2 = { turn, owner }`) an einem Schadensereignis: `target` ist
    * der Hook-Kontext des Heldenpfads oder ein Kreaturen-Eintrag (beide tragen `amount`, der
    * Kreaturen-Eintrag zusaetzlich die Sammler-Helfer). Gilt nur im selben Zug, nur fuer Schaden
-   * > 0, und nicht mitten in einem Flaechenschlag (`_deferGameOverCheck`).
+   * > 0, und nicht mitten in einem Flaechenschlag (`_deferGameOverCheck`, Mehrziel-Klammer
+   * `_multiHitScope` mit 2+ Zielen).
    */
   _naechsterEinzelschadenVerdoppeln(ziel) {
     const st = this.gs._naechsterEinzelschadenX2;
     if (!st || !ziel) return;
     if (st.turn !== this.gs.turn) { delete this.gs._naechsterEinzelschadenX2; return; }
     if ((this.gs._deferGameOverCheck || 0) > 0) return;
+    // Mehrziel-Treffer ueber die Flaechenklammer (`beginMultiHit`, 2+ Ziele): kein
+    // „exactly 1 target" — der Stempel bleibt stehen (A01-pollution-21).
+    if ((this._multiHitScope?.total || 0) >= 2) return;
     if (!((ziel.amount || 0) > 0)) return;
     if (typeof ziel.multiplyAmount === 'function') ziel.multiplyAmount(2);
     else ziel._mul = (ziel._mul ?? 1) * 2;
@@ -27557,6 +27561,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     let removed = 0;
     for (const inst of areaInsts) {
       if (inst.owner === excludePlayerIdx) continue;
+      // Momentaufnahme: eine Area, die waehrend der Schleife schon weg ist
+      // (z. B. von `enforceAreaLimit` nach dem Entfernen von Spatial Crevice
+      // abgelegt), darf nicht ein zweites Mal in die Ablage (A01-pollution-12).
+      if (inst.zone !== 'area') continue;
       await this.removeArea(inst, sourceName);
       removed++;
     }
