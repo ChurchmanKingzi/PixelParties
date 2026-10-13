@@ -24095,7 +24095,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Wealth / Treasure Huntress' +N adjustments have already
     // settled — the surprise redirects the POST-hook amount, which
     // matches the card text "you gain that Gold instead."
-    const surpriseResult = await this._checkSurpriseOnResourceGain(playerIdx, hookCtx.amount);
+    // R01-01: Das automatische Rundeneinkommen ist KEIN „effect" (Ruling 24.9., s. o.) —
+    // Gold Trap („Activate this Surprise when your opponent would gain Gold through an effect")
+    // bleibt dafür verdeckt.
+    const surpriseResult = hookCtx._isResourceGain
+      ? null
+      : await this._checkSurpriseOnResourceGain(playerIdx, hookCtx.amount);
     if (surpriseResult?.redirected) return;
     const gained = Math.max(0, hookCtx.amount);
     ps.gold = (ps.gold || 0) + gained;
