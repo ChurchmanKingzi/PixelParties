@@ -5546,6 +5546,21 @@ says so in a comment. If you write such a check, say why.
 `server.js`. Need only the counters (no placement)? Use
 `biomancyTokenCounters(potionData, level)`.
 
+**Tokens sind keine Karten (Z5, Welle 2):** ein Token (Typ `Token` bzw. `Creature/Token` —
+Mummy/Invader/Leprochaun/Pollution Token, Puppets, Biomancy-/Boulder-Token) gehört nie in Hand,
+Deck oder Ablage; verlässt er das Brett, geht er in den **Gelöscht-Stapel**. Die Engine sichert das
+an drei Stellen: `actionDestroyCard`/Schadens-Batch/`actionMoveCard` (Brett → Ablage **und** → Hand),
+`removeIslandZones` und das Namens-Netz in `handZugangSync`/`actionAddCardToHand`
+(`_tokenStattKarte`). Wer eine Brettkarte selbst in Hand/Deck/Ablage schreibt oder einen
+Todes-Anspruch auf die Hand stempelt, fragt vorher `engine.isTokenCard(inst)` (wirksame
+Kartendaten, erkennt auch Override-Tokens) und löscht stattdessen. Beschwören/Übernehmen **auf das
+Brett** (Hunting Lv2/3, Paraseed) bleibt mit Tokens erlaubt.
+
+**Aktuelle HP einer Kreatur:** `counters.currentHp` legt erst der erste Schaden (oder
+`increaseMaxHp`/Heilung) an; eine frische Kreatur hat `counters = {}`. Nie `currentHp ?? 0` /
+`|| 0` lesen (unversehrt ≠ HP 0), sondern `engine.creatureCurrentHp(inst)` (Zähler → `maxHp` →
+wirksame Kartendaten-HP).
+
 ---
 
 ### Borrowed identity — a card that *is* another card for one turn (v573)

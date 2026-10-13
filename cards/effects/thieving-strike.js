@@ -49,12 +49,12 @@ function _targetControllerIdx(gs, target) {
   return target.owner;
 }
 
-function _snapshotHp(gs, target) {
+function _snapshotHp(gs, target, engine) {
   if (target.type === 'hero') {
     return gs.players[target.owner]?.heroes?.[target.heroIdx]?.hp ?? 0;
   }
   if (target.cardInstance) {
-    return target.cardInstance.counters?.currentHp ?? 0;
+    return engine.creatureCurrentHp(target.cardInstance);   // Z5: unversehrt = gedruckte HP (sonst Vorher 0, kein Klau)
   }
   return 0;
 }
@@ -136,7 +136,7 @@ module.exports = {
       await engine._delay(100);
 
       // Snapshot HP pre-damage so we can decide whether the steal fires.
-      const prevHp = _snapshotHp(gs, target);
+      const prevHp = _snapshotHp(gs, target, engine);
       const wasOppControlled = _targetControllerIdx(gs, target) !== pi;
 
       if (target.type === 'hero') {
@@ -160,7 +160,7 @@ module.exports = {
 
       // Did damage actually land? Hero's `.hp` drops; creature's
       // `.counters.currentHp` drops (or zeroes out on death).
-      const postHp = _snapshotHp(gs, target);
+      const postHp = _snapshotHp(gs, target, engine);
       const damageDealt = Math.max(0, prevHp - postHp);
 
       engine.log('thieving_strike', {

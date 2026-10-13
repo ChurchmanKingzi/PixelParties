@@ -197,6 +197,7 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   const fromZone = inst.zone;
   const fromHeroIdx = inst.heroIdx;
   const fromZoneSlot = inst.zoneSlot;
+  const istToken = engine.isTokenCard(inst);   // Z5 (A06-23)
 
   // Visual flight from the source zone to the deck. Uses the standard
   // play_pile_transfer envelope (now with `to: 'deck'` mapping to the
@@ -223,7 +224,7 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
     toOwner:     owner,
     cardName:    inst.name,
     from:        fromZone,
-    to:          'deck',
+    to:          istToken ? 'deleted' : 'deck',
     flightStyle: 'windstorm',
   };
   if (fromZone === 'support' || fromZone === 'ability') {
@@ -268,11 +269,17 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   engine._removeCardFromState(inst);
   engine._untrackCard(inst.id);
 
-  if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
-  if (position === 'top') {
-    ownerPs.mainDeck.unshift(inst.name);
+  if (istToken) {
+    // Z5 (A06-23): ein Token ist keine Karte — er geht nie ins Deck, sondern in den Gelöscht-Stapel.
+    if (!ownerPs.deletedPile) ownerPs.deletedPile = [];
+    ownerPs.deletedPile.push(inst.name);
   } else {
-    ownerPs.mainDeck.push(inst.name);
+    if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
+    if (position === 'top') {
+      ownerPs.mainDeck.unshift(inst.name);
+    } else {
+      ownerPs.mainDeck.push(inst.name);
+    }
   }
 
   engine.log('tengu_windstorm_bounce', {

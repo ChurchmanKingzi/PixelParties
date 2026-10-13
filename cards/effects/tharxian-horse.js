@@ -221,7 +221,7 @@ module.exports = {
       if (isCreatureSource(engine, sourceInfo)) {
         const srcInst = resolveSourceCreature(engine, sourceInfo);
         if (srcInst) {
-          const beforeHp = srcInst.counters?.currentHp ?? 0;
+          const beforeHp = engine.creatureCurrentHp(srcInst);   // Z5: unversehrter Angreifer = gedruckte HP
           engine._broadcastEvent('play_zone_animation', {
             type: 'explosion', owner: srcInst.owner,
             heroIdx: srcInst.heroIdx, zoneSlot: srcInst.zoneSlot,
@@ -232,7 +232,7 @@ module.exports = {
             srcInst, damage, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
-          const afterHp = srcInst.counters?.currentHp ?? 0;
+          const afterHp = engine.creatureCurrentHp(srcInst);   // Z5: Schaden verpufft (Immunitaet) -> unversehrt, nicht "besiegt"
           if (beforeHp > 0 && afterHp <= 0) attackerDefeated = true;
         }
       } else {

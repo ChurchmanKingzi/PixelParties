@@ -121,7 +121,7 @@ module.exports = {
         wert = 1000 + (h?.hp || 0) + (h?.atk || 0);
       } else {
         const inst = t.cardInstance;
-        wert = (inst?.counters?.currentHp || 0) + (inst?.counters?.maxHp || 0) / 2;
+        wert = engine.creatureCurrentHp(inst) + (inst?.counters?.maxHp || 0) / 2;   // Z5: unversehrt = gedruckte HP
       }
       if (wert > bestwert) { bestwert = wert; bestes = t; }
     }

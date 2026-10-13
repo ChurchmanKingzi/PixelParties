@@ -172,7 +172,7 @@ module.exports = {
           hp = h?.hp ?? Infinity; wert = 500 + (h?.atk || 0);
         } else {
           const inst = t.cardInstance;
-          hp = inst?.counters?.currentHp ?? Infinity; wert = inst?.counters?.maxHp || 0;
+          hp = inst ? engine.creatureCurrentHp(inst) : Infinity; wert = inst?.counters?.maxHp || 0;   // Z5: unversehrt = gedruckte HP
         }
         if (hp <= SCHADEN) wert += 10000 - hp;
         if (wert > bestwert) { bestwert = wert; bestes = t; }

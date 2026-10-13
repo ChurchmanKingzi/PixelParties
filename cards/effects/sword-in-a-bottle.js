@@ -209,7 +209,7 @@ module.exports = {
         wert = 500 + (h?.atk || 0);
       } else {
         const inst = t.cardInstance;
-        hp = inst?.counters?.currentHp ?? Infinity;
+        hp = inst ? engine.creatureCurrentHp(inst) : Infinity;   // Z5: unversehrt = gedruckte HP
         wert = inst?.counters?.maxHp || 0;
       }
       // Ein toedlicher Schlag schlaegt jeden Wert.

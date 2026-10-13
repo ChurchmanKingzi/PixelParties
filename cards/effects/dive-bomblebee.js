@@ -125,6 +125,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   const fromHeroIdx = targetInst.heroIdx;
   const fromZoneSlot = targetInst.zoneSlot;
   const cardName = targetInst.name;
+  const istToken = engine.isTokenCard(targetInst);   // Z5 (A05-02)
 
   // Defending the Gate: support-zone targets only (ability-zone displacement
   // is outside the gate's scope, which protects Support Zone cards).
@@ -225,9 +226,15 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // only, no instance tracking.
   engine._untrackCard(targetInst.id);
 
-  // Bottom-of-deck.
-  if (!ops.mainDeck) ops.mainDeck = [];
-  ops.mainDeck.push(cardName);
+  // Bottom-of-deck. Z5 (A05-02): Tokens gehören nie ins Deck — sie gehen in den Gelöscht-Stapel.
+  if (istToken) {
+    const tps = gs.players[targetInst.originalOwner ?? targetInst.owner] || ops;
+    if (!tps.deletedPile) tps.deletedPile = [];
+    tps.deletedPile.push(cardName);
+  } else {
+    if (!ops.mainDeck) ops.mainDeck = [];
+    ops.mainDeck.push(cardName);
+  }
 
   engine.log('dive_bomblebee_strike', {
     player: gs.players[pi]?.username,

@@ -22,7 +22,8 @@ const H = require('../../lib/h.js');
     t.targetFn = (valid) => [valid.find(v => v.type === 'equip' && v.owner === 1).id];
     const r = await t.play(0, 'Critical Strike', { hero: 0 });
     R.check('Critical Strike gespielt', r === true, r);
-    R.check('Hunting hat gefragt (Vorbedingung)', t.prompts.some(p => p.d.type === 'confirm' && p.d.title === 'Hunting'), t.prompts.map(p => p.d.title));
+    R.check('Hunting fragt NICHT nach einem Token (Z5: Token ist keine Karte)', !t.prompts.some(p => p.d.type === 'confirm' && p.d.title === 'Hunting'), t.prompts.map(p => p.d.title));
+    R.check('Token im Gelöscht-Stapel des Besitzers', t.pile(1, 'deletedPile').includes('Mummy Token'), t.pile(1, 'deletedPile'));
     R.check('Token liegt NICHT als Karte auf der Hand', !t.pile(0, 'hand').includes('Mummy Token'), t.pile(0, 'hand'));
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }

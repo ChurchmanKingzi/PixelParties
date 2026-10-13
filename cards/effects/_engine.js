@@ -11676,6 +11676,7 @@ class GameEngine {
     pi = this._resolvePi(pi);
     const ps = this.gs.players[pi];
     if (!ps || !cardName) return false;
+    if (this._tokenStattKarte(ps, cardName)) return false;   // Z5: Token nie auf die Hand
     if (!ps.hand) ps.hand = [];
     const idx = (opts.idx != null && opts.idx >= 0 && opts.idx <= ps.hand.length) ? opts.idx : ps.hand.length;
     ps.hand.splice(idx, 0, cardName);
@@ -11709,6 +11710,7 @@ class GameEngine {
     // (`searchDeckForNamedCard`, `actionAddCardFromDeckToHand`), der
     // Ablage-Weg ebenfalls (`addCardFromDiscardToHand`).
     if (ps.handLocked) return;
+    if (this._tokenStattKarte(ps, cardName)) return;   // Z5: Token nie auf die Hand
     ps.hand.push(cardName);
     this.log('card_added_to_hand', { player: ps.username, card: cardName, by: source || null });
     this.sync();
@@ -12396,7 +12398,7 @@ class GameEngine {
     if (isCreatureTarget && !_u && !opts._keinRettungsfenster
         && !(opts.isSacrifice && (this._beschwoerungsOpferTiefe || 0) > 0)) {
       const gerettet = await this._checkCreaturePreDefeatHandReactions(
-        targetCard, source, targetCard.counters?.currentHp ?? 0, 'destroy',
+        targetCard, source, this.creatureCurrentHp(targetCard), 'destroy',   // Z5: unversehrt = gedruckte HP (A08)
         { isSacrifice: !!opts.isSacrifice, istZerstoerung: true });
       if (gerettet) {
         if (opts.isSacrifice) this.gs._opferFizzle = true;
@@ -13524,7 +13526,8 @@ class GameEngine {
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
     // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
     // (`processCreatureDamageBatch`) und in `_addCardToState`, nie abgelegt.
-    if (toZone === ZONES.DISCARD && fromZone === 'support') {
+    // Z5: gleiche Konvention fuer „zurueck auf die Hand" (Chasing the Legend, Surprising Opportunity …): ein Token ist keine Karte.
+    if ((toZone === ZONES.DISCARD || toZone === ZONES.HAND) && fromZone === 'support') {
       const _tokenCd = this.getEffectiveCardData(cardInstance);
       if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
         toZone    = ZONES.DELETED;
@@ -40280,6 +40283,55 @@ this._deathWatch = (this._deathWatchStack || []).length
   getEffectiveCardData(inst) {
     if (inst?.counters?._cardDataOverride) return inst.counters._cardDataOverride;
     return this._getCardDB()[inst?.name] || null;
+  }
+
+  /**
+   * ★ Aktuelle HP einer Kreatur (Z5, Welle 2 – Befundklasse C05-01).
+   * `counters.currentHp` legt der Schadens-Batch erst beim ERSTEN Schaden an
+   * (bzw. `increaseMaxHp`/Heilung); eine frisch beschworene, unversehrte
+   * Kreatur hat `counters = {}`. Wer `currentHp ?? 0` / `|| 0` liest, hielte
+   * sie für tot. Rückfall-Reihenfolge: Zähler → `counters.maxHp` (gesenkte/
+   * erhöhte Obergrenze ohne Schaden) → wirksame Kartendaten-HP (Override/
+   * Token) → 0. Ohne Instanz bzw. Zähler-Objekt: 0.
+   * @param {object} inst - Kartenobjekt (CardInstance)
+   * @returns {number}
+   */
+  creatureCurrentHp(inst) {
+    const c = inst?.counters;
+    if (!c) return 0;
+    if (c.currentHp != null) return c.currentHp;
+    return c.maxHp ?? this.getEffectiveCardData(inst)?.hp ?? 0;
+  }
+
+  /**
+   * ★ Ist die Karte ein Token (Z5, Welle 2 – Token-Konvention)? Wirksame Kartendaten, damit auch
+   * Biomancy-/Boulder-Tokens (Potion mit `_cardDataOverride` `Creature/Token`) erkannt werden.
+   * Konvention: Tokens verlassen das Brett nie in Hand, Deck oder Ablage — sie gehen in den
+   * Gelöscht-Stapel (siehe `actionDestroyCard`, `removeIslandZones`). Wer eine Brettkarte
+   * „auf die Hand/ins Deck/in die Ablage" legt, fragt vorher hiernach.
+   * @param {object} inst - Kartenobjekt (CardInstance)
+   * @returns {boolean}
+   */
+  isTokenCard(inst) {
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst?.name];
+    return !!(cd && hasCardType(cd, 'Token'));
+  }
+
+  /**
+   * Namens-Netz fuer die Hand-Zugaenge (`handZugangSync`, `actionAddCardToHand`): Heisst die Karte
+   * laut Kartendaten „Token" (Mummy/Invader/Leprochaun/Pollution Token, Puppets), landet sie nicht in
+   * der Hand, sondern im Gelöscht-Stapel des Empfaengers (Besitzer der Brettkarte ist hier nicht
+   * mehr bekannt). Instanz-bezogene Token (Biomancy/Boulder) fangen `actionMoveCard` und
+   * `isTokenCard` an der Quelle ab. Liefert true, wenn die Karte verworfen wurde.
+   */
+  _tokenStattKarte(ps, cardName) {
+    const cd = this._getCardDB()[cardName];
+    if (!cd || !hasCardType(cd, 'Token')) return false;
+    if (!ps.deletedPile) ps.deletedPile = [];
+    ps.deletedPile.push(cardName);
+    this.log('token_not_a_card', { player: ps.username, card: cardName, to: 'deleted' });
+    this.sync();
+    return true;
   }
 
   /**

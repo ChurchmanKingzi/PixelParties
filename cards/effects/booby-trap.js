@@ -130,7 +130,7 @@ module.exports = {
       await engine._delay(400);
 
       // If the creature was killed, negate the entire effect
-      if ((srcInst.counters?.currentHp ?? 0) <= 0) {
+      if (engine.creatureCurrentHp(srcInst) <= 0) {   // Z5: Schaden verpufft/negiert = unversehrt, nicht getoetet
         engine.log('surprise_negate', {
           card: 'Booby Trap', killed: srcInst.name,
           player: gs.players[ctx.cardOwner]?.username,

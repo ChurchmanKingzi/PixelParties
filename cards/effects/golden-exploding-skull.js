@@ -121,7 +121,9 @@ module.exports = {
       for (const c of (engine.cardInstances || [])) {
         if ((c.controller ?? c.owner) !== pi || c.zone !== 'support' || c.id === inst.id) continue;
         ziele++;
-        if ((c.counters?.currentHp ?? 999) <= SCHADEN) knapp++;
+        // Z5: unversehrte Kreatur = gedruckte HP; Nicht-Kreaturen (ohne HP) zaehlen nie als knapp.
+        const hpC = (c.counters?.currentHp != null || engine.getEffectiveCardData(c)?.hp != null) ? engine.creatureCurrentHp(c) : 999;
+        if (hpC <= SCHADEN) knapp++;
       }
       // 5 Gold je Treffer sind etwa ein halber Support-Slot wert (30);
       // jedes Ziel, das daran stirbt, frisst den Gewinn wieder auf.

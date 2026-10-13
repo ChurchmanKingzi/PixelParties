@@ -214,7 +214,7 @@ module.exports = {
       // landed — a Spectral-Armor-style full cancellation also
       // negates the Burn rider.
       if (!creatureDmgResult?.cancelled
-          && (srcInst.counters?.currentHp ?? 0) > 0) {
+          && engine.creatureCurrentHp(srcInst) > 0) {   // Z5
         const applied = await engine.applyCreatureStatus(srcInst, 'burned', {
           sourceOwner: ctx.cardOwner,
           source: CARD_NAME,
