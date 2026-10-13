@@ -67,7 +67,9 @@ function zieleAufnehmen(engine, pi, ausnahmeId) {
   for (const inst of engine.cardInstances) {
     if (inst.id === ausnahmeId) continue;
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support' || inst.faceDown) continue;
-    const hp = inst.counters?.currentHp;
+    // Unversehrte Kreaturen haben noch kein `currentHp` (erst beim ersten Schaden
+    // gesetzt) — dann gilt die Basis-HP aus der Kartendatenbank (C03-05).
+    const hp = inst.counters?.currentHp ?? engine._getCardDB()[inst.name]?.hp;
     if (!Number.isFinite(hp)) continue;
     out.push({ art: 'creature', inst, hp });
   }
