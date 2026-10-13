@@ -360,12 +360,13 @@ function _kontrolleur(ctx) {
 function _getCreaturesOnHero(ps, heroIdx, engine, kontrolleur = null) {
   const result = [];
   const cardDB = engine._getCardDB();
+  const seite = engine.gs.players.indexOf(ps);   // Brettseite: gleiche Koordinaten gibt es auf beiden Seiten
   for (let zi = 0; zi < (ps.supportZones[heroIdx] || []).length; zi++) {
     const slot = (ps.supportZones[heroIdx] || [])[zi] || [];
     if (slot.length === 0) continue;
     const name = slot[0];
     const inst = engine.cardInstances.find(c =>
-      c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === name
+      c.zone === 'support' && c.owner === seite && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === name
     );
     if (!inst || inst.faceDown) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[name];   // wirksame Daten (Als Sweep 9.10.)
