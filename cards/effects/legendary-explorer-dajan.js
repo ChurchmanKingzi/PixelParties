@@ -84,6 +84,9 @@ function _countCopies(arr, cardName) {
 function _buildEligibleGallery(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Z6 (H02-27): dieselben Sperren wie der Handweg - Boomerangs Artefakt-Sperre und die Stapel-Sperre (Knight of Kings [B]).
+  if (ps._artifactLockTurn === engine.gs.turn) return [];
+  if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return [];
   const cardDB = engine._getCardDB();
   const gold = ps.gold || 0;
   const seen = new Set();
@@ -93,6 +96,13 @@ function _buildEligibleGallery(engine, pi) {
     const cd = cardDB[cardName];
     const script = loadCardEffect(cardName);
     if (!_isPlayableArtifact(cd, script)) continue;
+    // Z6: die Sperr-Marken der Karte selbst (Zieh-/Hand-/Such-/Stapel-/Beschwoerungssperre), wie `_free-artifact-shared.spielweg`.
+    if (script?.blockedByDrawLock && ps.drawLocked) continue;
+    if (script?.blockedByHandLock && ps.handLocked) continue;
+    if (engine._cardBlockedBySearchLock?.(script, cd, ps, pi)) continue;
+    if (script?.blockedByPileLock && engine.isPileLockedFor(pi)) continue;
+    if (script?.blockedBySummonLock && ps.summonLocked) continue;
+    if (cd.subtype && cd.subtype.toLowerCase() === 'equipment' && !engine.hasLegalEquipHero(cardName, pi)) continue;
     const reducedCost = Math.max(0, (cd.cost || 0) - COST_REDUCTION);
     if (gold < reducedCost) continue;
     seen.add(cardName);
@@ -123,7 +133,8 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   // Uebernahme `ausruesten` erlaubt (Styx, Golden Apple …; Charme nicht)
   // — Ziel-ID und `owner` tragen die Brettseite.
   const kandidaten = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) kandidaten.push({ seite: pi, hi });
+  // Z6 (H02-26): auch die EIGENEN Helden fragen die Ausruest-Regel der Karte (`canEquipToHero`, z. B. "A Hero can only have 1 Race Boat").
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) if (engine.canEquipCardToHero(cardName, pi, hi)) kandidaten.push({ seite: pi, hi });
   for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
     if (engine.canEquipCardToHero(cardName, physOwner, heroIdx)) kandidaten.push({ seite: physOwner, hi: heroIdx });
   }

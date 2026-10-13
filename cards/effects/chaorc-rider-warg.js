@@ -45,6 +45,8 @@ function summonableZones(engine, pi) {
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (physOwner === pi) {
       if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) continue;
+      // Z6 (A06-34): "as an additional Action" - Beschwoerungs- und Aktionssperre gelten auch fuer die eigene Spalte.
+      if (!canHeroSummon(engine, pi, hi, engine._getCardDB()[CARD_NAME], { alsAktion: true, physOwner })) continue;
     } else {
       // Das Surprise-Gate kennt nur die eigene Spalte — fuer den
       // uebernommenen Helden die geteilte Beschwoerungspruefung.

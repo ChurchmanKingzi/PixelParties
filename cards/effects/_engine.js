@@ -23820,6 +23820,28 @@ this._deathWatch = (this._deathWatchStack || []).length
    * conditions that currently prevent summoning.
    * Returns array of card names that are blocked.
    */
+  /**
+   * Z6 (A08-29): Ist DIESE Kreatur fuer `playerIdx` gerade von den Beschwoerungssperren gesperrt? Namens-Gegenstueck zu
+   * `getSummonBlocked` (das nur Handkarten listet) fuer Wege, die eine Kreatur NICHT aus der Hand beschwoeren (Ushabti aus der
+   * Surprise Zone): `summonLocked`, Teil-Sperre Greatmaw Remora, Handkarten-Sperre (Grinning Cat) und das kartenseitige `canSummon`.
+   */
+  getSummonBlockedFor(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return false;
+    if (ps.summonLocked) return true;
+    if (ps.summonLockExceptGreatmaw) {
+      const { isGreatmawCreature } = require('./_greatmaw-shared');
+      if (!isGreatmawCreature(cardName, this)) return true;
+    }
+    const { selfRevealEffectsSuppressed } = require('./_crystals-shared');
+    if (!selfRevealEffectsSuppressed(this, playerIdx)) {
+      for (const cn of (ps.hand || [])) {
+        if (cn !== cardName && loadCardEffect(cn)?.handSummonLockExceptSelf) return true;
+      }
+    }
+    return false;
+  }
+
   getSummonBlocked(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];

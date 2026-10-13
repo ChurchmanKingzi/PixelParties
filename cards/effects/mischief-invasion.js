@@ -38,6 +38,7 @@ const {
   applyFreezeToTarget,
 } = require('./_mischief-militia-shared');
 
+const { heroActionLocked } = require('./_summon-eligibility');
 const CARD_NAME = 'Mischief Invasion';
 
 // ─── Helpers ─────────────────────────────────
@@ -55,10 +56,14 @@ function _isMmCreature(cd) {
  *     Performance, Mana Mining, Crystal multipliers, etc.).
  * Slot-level free-ness is checked separately when building slot list.
  */
-function _heroCanHostCreature(engine, pi, heroIdx, cd) {
+function _heroCanHostCreature(engine, pi, heroIdx, cd, ctrl = pi) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  // Z6 (A06-27): "summon ... as additional Actions" ist eine echte Beschwoerung - Beschwoerungssperre des Kontrolleurs `ctrl`
+  // und die Aktionssperren des Hosts gelten (Ruling 8.8./28.8., `_summon-eligibility`).
+  if (engine.gs.players[ctrl]?.summonLocked) return false;
+  if (heroActionLocked(engine, ctrl, heroIdx, pi)) return false;
   if ((cd.level || 0) > 0) {
     const s = hero.statuses || {};
     if (s.frozen || s.stunned || s.negated || s.bound) return false;
@@ -94,7 +99,7 @@ function _enumerateFreeOwnSlots(engine, pi) {
  */
 function _enumerateHostSlotsForCreature(engine, pi, cd) {
   const slots = _enumerateFreeOwnSlots(engine, pi);
-  return slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd));
+  return slots.filter(s => _heroCanHostCreature(engine, s.owner, s.heroIdx, cd, pi));
 }
 
 /**
@@ -114,7 +119,7 @@ function _buildHandCopies(engine, pi, slots) {
     if (!_isMmCreature(cd)) continue;
     const eligibleSlotIdxs = [];
     for (let s = 0; s < slots.length; s++) {
-      if (_heroCanHostCreature(engine, slots[s].owner, slots[s].heroIdx, cd)) {
+      if (_heroCanHostCreature(engine, slots[s].owner, slots[s].heroIdx, cd, pi)) {
         eligibleSlotIdxs.push(s);
       }
     }

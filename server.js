@@ -5831,6 +5831,7 @@ function sendGameState(room, playerIdx, extra) {
         const hero = ps2?.heroes?.[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) continue;
+        if (ps2.summonLocked || room.engine.getSummonBlockedFor(playerIdx, inst.name)) continue;   // Z6 (A08-29)
         // Check abilities
         const cardData = getCardDB()[inst.name];
         if (!cardData) continue;
@@ -15106,6 +15107,8 @@ io.on('connection', (socket) => {
     const hero = ps.heroes[heroIdx];
     if (!hero?.name || hero.hp <= 0) return;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) return;
+    // Z6 (A08-29): Beschwoerungssperren wie beim Ausspielen aus der Hand (`doPlayCreature`): summonLocked, Teil-Sperre, Grinning Cat.
+    if (ps.summonLocked || room.engine.getSummonBlockedFor(pi, cardName)) return;
 
     // Check abilities
     const cardData = getCardDB()[cardName];
