@@ -58,7 +58,7 @@ const { loadCardEffect } = require('./cards/effects/_loader');
 // ★ v1186: „This Hero gains the effects of X" — dieselbe Aufloesung wie
 // in der Engine, ohne Engine-Referenz (siehe _gained-effects-shared).
 const { heroScriptOf, eigenesHeldenSkript } = require('./cards/effects/_gained-effects-shared');   // v1286
-const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool } = require('./cards/effects/_hooks');
+const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool, baseCardName } = require('./cards/effects/_hooks');
 const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 // Potion-Deck-Klauseln der Helden (Chaos-Diamond, Pinta, …) — dieselbe Tabelle liest der Deckbau im Client.
@@ -7176,6 +7176,8 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Ability') return false;
+  // Z6 (M01-10, S01-19): Namenssperre (Inventing Lv3, Divine Gift of Creation …) auch fuer Abilities.
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
 
   // ★ Styx, the Opened Gate (28.9.): Ability an einen FREMDEN Helden,
   // den dieser Spieler gerade kontrolliert — eigener Weg, weil hier
@@ -7473,6 +7475,8 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
+  // Z6 (M01-10, S01-19): Namenssperre (Inventing Lv3, Divine Gift of Creation …) auch fuer Ausruestung.
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
 
   // ── KARTENEIGENES SPIELBARKEITS-GATE (16.8.) ───────────────────────
   // `canPlayWithHero` ist der Vertrag, mit dem eine KARTE sagt „ich darf
@@ -11620,6 +11624,8 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
   const cardData = getCardDB()[cardName];
   if (!cardData || (cardData.subtype || '').toLowerCase() !== 'surprise') return false;
+  // Z6 (M01-10, S01-19): Namenssperre (Inventing Lv3, Divine Gift of Creation …) auch fuer Surprises.
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
 
   // Once-per-game Surprises (Tharxian Horse, etc.) can only be played
   // ONCE per game. The client grays the card out via
@@ -11866,7 +11872,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   // Sperre kann auch von einer gegnerischen Karte kommen (Tuscan
   // Mystic) — `arePotionsLockedFor` fasst beide Quellen zusammen.
   if (room.engine.arePotionsLockedFor(pi)) return false;
-  if (ps._creationLockedNames?.has(cardName)) return false;
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
   // ★ 28.8.: Quelle kann die Hand ODER Crestinas Vorrat sein.
   const _quelle = room.engine.handSourceList(pi, fromCreation);
   if (!_quelle) return false;
@@ -11890,6 +11896,9 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   }
   if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
+  // Z6 (M01-24, M02-17): Zieh- und Such-Sperre auch auf dem Server-Trankweg (wie validateActionPlay / doUseArtifactEffect); vorher hing der Schutz allein am Client-Ausgrauen.
+  if (script.blockedByDrawLock && ps.drawLocked) return false;
+  if (room.engine._cardBlockedBySearchLock?.(script, cardData, ps, pi)) return false;
   if (script.blockedByPileLock && room.engine.isPileLockedFor(pi)) return false;   // v826: „nur Stapel-Bewegung" unter Knight of Kings [B]
   if (script.blockedBySummonLock && ps.summonLocked) return false;   // v834: „nur Beschwoerung" unter Summon-Lock
   // A08-08: Distracting Crystal sperrt auch Traenke ohne Zielwahl (Horn in a Bottle) – dieses Tor steht sonst nur in `doConfirmPotion`.
@@ -12063,7 +12072,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   // covers Normal / Reaction-with-proactivePlay Artifacts that route
   // through this handler.
   if (ps._artifactLockTurn === gs.turn) return false;
-  if (ps._creationLockedNames?.has(cardName)) return false;
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
   // ★ 28.8.: Quelle kann die Hand ODER Crestinas Vorrat sein.
   const _quelle = room.engine.handSourceList(pi, fromCreation);
   if (!_quelle) return false;
