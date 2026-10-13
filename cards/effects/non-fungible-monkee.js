@@ -81,5 +81,22 @@ module.exports = {
       if (!isMonkeeCreature(engine, inst)) return;
       await zahleAus(engine, ctx.cardOwner, 'left_board', inst.name);
     },
+
+    /**
+     * Ein Monkee stirbt DURCH SCHADEN. Dieser Tod feuert `onCardLeaveZone`
+     * nur fuer die sterbende Karte selbst (`_onlyCard`) - diese Karte hoert
+     * dort nichts (A04-cute-23). Zerstoeren/Verschieben melden den Abgang
+     * weiter ueber `onCardLeaveZone`; ihr `onCreatureDeath` (ohne
+     * `todStapel` im Todes-Info) darf hier nicht ein zweites Mal zahlen.
+     */
+    onCreatureDeath: async (ctx) => {
+      const engine = ctx._engine;
+      const tod = ctx.creature;
+      if (!tod || !('todStapel' in tod)) return;   // nur der Schadens-Tod
+      const inst = (engine.cardInstances || []).find(c => c.id === tod.instId);
+      if (!inst) return;
+      if (!isMonkeeCreature(engine, inst)) return;
+      await zahleAus(engine, ctx.cardOwner, 'left_board', inst.name);
+    },
   },
 };
