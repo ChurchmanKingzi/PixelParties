@@ -136,6 +136,8 @@ module.exports = {
 
       // ── Stufe 1: in die Hand statt in die Ablage ─────────────────
       if (stufe === 1) {
+        // Z5 (M01-05): ein Token ist keine Karte — er geht nie auf die Hand, sondern in den Gelöscht-Stapel.
+        if (engine.isTokenCard(inst)) return;
         const ja = await engine.promptGeneric(pi, {
           type: 'confirm', title: CARD_NAME,
           message: `Add ${tot.name} to your hand instead of sending it to the discard pile?`,

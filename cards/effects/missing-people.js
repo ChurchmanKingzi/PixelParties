@@ -129,9 +129,10 @@ module.exports = {
       const bPs = gs.players[besitzer];
       const sPs = gs.players[seite];
 
+      const istToken = engine.isTokenCard(inst);   // Z5 (S03-05): ein Token ist keine Karte -> Gelöscht-Stapel statt Deck
       engine._broadcastEvent('play_pile_transfer', {
         owner: seite, toOwner: besitzer, cardName: inst.name,
-        from: 'support', to: 'deck',
+        from: 'support', to: istToken ? 'deleted' : 'deck',
         fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
       });
 
@@ -150,7 +151,12 @@ module.exports = {
         if (idx >= 0) slot.splice(idx, 1);
       }
       // ANS ENDE — „at the bottom of their deck".
-      bPs.mainDeck.push(inst.name);
+      if (istToken) {
+        if (!bPs.deletedPile) bPs.deletedPile = [];
+        bPs.deletedPile.push(inst.name);
+      } else {
+        bPs.mainDeck.push(inst.name);
+      }
       engine._untrackCard(inst.id);
 
       engine.log('missing_people', {
