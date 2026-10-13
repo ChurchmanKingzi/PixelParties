@@ -103,6 +103,23 @@ function canSummonInvaderViaSource(targetName, sourceCardName) {
 }
 
 /**
+ * Das Ein-Invader-Limit („You can only control 1 Invader … at a time")
+ * VOR der Auswahl: Placer wie Argos / Life-Searcher bieten einen zweiten
+ * Invader gar nicht erst an — `Invader.beforeSummon` würde ihn erst NACH
+ * dem Herausnehmen aus Hand/Deck ablehnen (Karte und Kosten wären weg).
+ * Gleiche Zählweise wie `countOwnInvaders` im Invader-Skript.
+ */
+function invaderLimitAllows(engine, pi, targetName) {
+  if (targetName !== INVADER_NAME) return true;
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (inst.name === INVADER_NAME) return false;
+  }
+  return true;
+}
+
+/**
  * Live, non-face-down Cosmic Depths Creature instances controlled by pi.
  */
 function ownCosmicCreatures(engine, pi) {
@@ -347,6 +364,7 @@ module.exports = {
   INVADER_TOKEN_NAME,
   isCosmicCard,
   canSummonInvaderViaSource,
+  invaderLimitAllows,
   ownCosmicCreatures,
   getChangeCounters,
   setChangeCounters,

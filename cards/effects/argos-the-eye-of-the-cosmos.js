@@ -35,7 +35,7 @@ const { hasCardType } = require('./_hooks');
 const {
   COSMIC_DEPTHS_CREATURES,
   getChangeCounters, addChangeCounters, removeChangeCounters,
-  canSummonInvaderViaSource,
+  canSummonInvaderViaSource, invaderLimitAllows,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Argos, the Eye of the Cosmos';
@@ -66,6 +66,8 @@ function cdCreaturesAtLevelInHandOrDeck(engine, pi, lvl) {
       // to specific Cosmic sources) lands here cleanly without
       // touching every CD card's picker.
       if (!canSummonInvaderViaSource(cn, CARD_NAME)) continue;
+      // 1-Invader-Limit schon bei der Auswahl, sonst geht die Karte beim Platzieren verloren.
+      if (!invaderLimitAllows(engine, pi, cn)) continue;
       seen.add(cn);
       out.push({ name: cn, source });
     }
