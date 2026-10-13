@@ -1,8 +1,12 @@
 # A07-guardianbeasts – Nischenfall-Bericht
-Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (wird am Ende gezählt) gezielt getestet · (wird am Ende gezählt) mit Befund.
+Stand/Autor: Agent A07-guardianbeasts (Fortsetzung nach Abbruch des Vorgängers), 13.10.2026. Karten: 59 in der Liste · 53 gezielt getestet (L2), 6 Standard (L1) · 39 mit Befund. Befunde: 31 (7 × A, 19 × B, 5 × C).
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – Bericht wächst fortlaufend)
+31 Befunde, alle mit ausgeführtem Repro unter `docs/niche-tests/repro/A07-guardianbeasts/` (Stufe A: 02, 03, 04, 05, 08, 11, 28 · Stufe B: 01, 06, 09, 10, 12, 14, 15, 16, 19, 20, 22–27, 29, 30, 31 · Stufe C: 07, 13, 17, 18, 21). Alle 31 Repros zeigen den Fehler weiterhin (✗).
+Wichtigste Klassen: (1) **Beschwörungsbedingungen werden von Platzierungs- und Übernahme-Wegen umgangen** (-04 Vullary/Stellin, -06 Xuanwu, -31 Dark Gear & Co.), (2) **Dauer-/Zeitfenster-Rechnung mit `gs.turn + 1`** (-02 Niu, -28 Mao: die Negation endet nie), (3) **Kreaturen-Dauereffekte ignorieren Stilllegung** (-14, -20, -25, -26, -29, -30) oder werden von ihr beendet, obwohl der Text es nicht sagt, (4) **Kosten vor Wirkung bei Sperren** (-19, -21, -22, -23), (5) **Dream Lander verlassen das Brett, der angelegte Held verschwindet** (-05).
+Gesamteindruck: die Standardwege (Aktivierung, Abbruch/HOPT, Kontrolle bei gestohlenen Kreaturen, Zielwahl nach Kontrolle/Brettseite) sind sauber; Fehler liegen an den Rändern zwischen Karten (Mao × Beast, Vullary × Beschwörungstor, Pangaia × Platzierung, Clown × Cardinal Beast).
+Bewusst nicht getestet: Skill-Test-Modus und mehr als zwei Sitze (die Guardian Beasts zählen die Ablagen hart über `players[0]`/`players[1]`, also nur für 3+ Sitze relevant – nur Nebenbeobachtung, kein Befund, da dort außerhalb des Auftrags), Client-Klickpfade (nur statisch, siehe -24), Zufalls-Seeds außerhalb des Standardsamens, zwei gleichzeitige Pangaia, Dream-Lander-Abgang über jede weitere Zerstörungsvariante außer den in -05 genannten.
+Prüfaufträge aus dem Auftrag: Zielsammler Brettspalte/Besitzer-ODER-Kontrolleur – Guardian-Beast-Sammler (`buildAllBoardTargets`), Antonia (`_brettSeite`), Baihu/Zhuque/Ankylos geprüft, **korrekt** (Transfer, Diebstahl, seitenfremd); `counters.currentHp ?? 0` – echte Beschwörungen setzen `currentHp` gar nicht (nur nach Schaden/`increaseMaxHp`); die Wächter in Antonia/Stellin (`|| 0`) sind wegen `increaseMaxHp` beim Anlegen gedeckt, Cardinal-Skripte nutzen `?? cd.hp`, **kein Befund**; `negatedDuration`: in dieser Gruppe nirgends benutzt; Zugende-Räumung `negated` ohne `sourceBound`: betrifft Helden-Status (nicht Kreaturen) – nur Randbeobachtung bei -30 (ein `negated`-Status des Gegnerhelden erreicht Lizbeths Zug nie); Kontrolle statt Seite bei gestohlenen Kreaturen: 14 aktive Kreaturen gestohlen aktiviert (Red Dragoneer/Yang mangels Bedingung nicht aktivierbar, Ma/Tu ohne sichtbare Wirkung im Test); die zehn mit Wirkung nehmen **alle** Hand/Deck/Ablage des Kontrolleurs ✓; aufgelöste Karte bleibt in `ps.hand`: bestätigt für Guard Duty, Stomp, Portal, Guardian's Appearance (Engine-Muster, hier folgenlos).
 
 ## Befunde
 
@@ -290,3 +294,81 @@ Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (w
 - **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/31-uebernahme-umgeht-gigantisaurier-einzigkeit.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** Einzigkeitsregeln stehen nur in `canSummon`/`beforeSummon` (Beschwörungstor); die Übernahme-Karten bauen die Zonenliste selbst (`getFreeZones`) und rufen `actionTransferCreature`, das `isCreatureSummonable` nicht kennt. Gleiche Klasse wie A07-04 (Platzierung statt Beschwörung).
 - **Restunsicherheit (daher B):** Ob Übernahmen die Beschwörungsregeln der übernommenen Karte beachten sollen, ist nirgends ausdrücklich entschieden (der Kommentar in `dark-gear.js`: „Creatures are independent of their Hero"). Der Brachion-Text („control") spricht klarer dafür als der Gigantisaurier-Text („have in its Support Zones").
+
+## Abdeckung
+Tiefe: L2 = gezielte Nischenfall-Tests (Repro oder ausgeführte Messskripte), L1 = Standardlauf/Gegenprobe. Der Vorgänger hat die Scratchpad-Messungen t01–t37/n01–n22 geschrieben; ich habe die für die Tabelle genutzten erneut ausgeführt und ergänzt.
+
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Ballad Harpyformer | L2 gezielt | Einsatz-Suche läuft vor der Vullary-Negation ✗(→ -27), „erste Kreatur“-Zähler uneinheitlich (→ -07), gestohlen aktiviert: Kosten aus Hand des Kontrolleurs ✓, Abbruch ✓ |
+| Blue-Ice Dragon | L2 gezielt | Opfer nur aus nicht-frischen Kreaturen ✓, Gratisweg/bezahlter Weg: Haste nur beim bezahlten ✓, HOPT ✓, 300 Schaden auf Gefrorenes / sonst Frost ✓, Abbruch ✓; Umgehung der Opfer per Vullary/Stellin ✗(→ -04) |
+| Clausss, the No-Nonsense Cultist | L2 gezielt | Zweite Aktion/Opfer (✗ C → -17); Abgang vom Brett lässt Klaus verschwinden ✗(→ -05) |
+| Classical Harpyformer | L2 gezielt | Goldsperre ✗(→ -22), gestohlen ✓, Abbruch ✓ |
+| Country Harpyformer | L1 Standard | nur Gegenprobe zu -22 (Goldsperre gesperrt ✓); sonst nur Batterie |
+| Dragolfin | L2 gezielt | gestohlen: Deck/Schaden des Kontrolleurs ✓ (12 Karten ⇒ 60), Abbruch ⇒ zweiter Versuch im selben Zug klappt ✓, Dream Dust negiert die Wahl ✓; Deck 0 nicht gemessen |
+| Dream Dust | L2 gezielt | negiert Fireball, Dragolfin, Spinor, Green Dragoneer auf Träger-Kreatur ✓; Zusatzaktion nur bei echter Hand-Aktion ✓; Karte danach in der Ablage ✓; Sorbereus (nur Helden) trifft Träger nie |
+| Dream World Portal | L2 gezielt | Abbruch ⇒ Karte bleibt auf der Hand ✓, Zusatzaktion ✓, Hand+Deck-Wahl ✓, zweites Portal ohne Kandidat nicht spielbar ✓, Karte während der Auflösung noch in `ps.hand` (Engine-Muster, hier folgenlos) |
+| Dream World Switcheroo | L2 gezielt | Umleitung Held ⇒ Träger-Kreatur ✓ (mit und ohne zusätzliche Dream Dust), Karte in Ablage ✓, keine Engine-Fehler |
+| Gigantisaur Ankylos | L2 gezielt | Ziele nach Kontrolle (gestohlene Kreatur angeboten, eigene gestohlene nicht) ✓; Kostenabwurf vor der nicht abbrechbaren Zielwahl (Absicht: Text „discard … to choose“); Übernahme umgeht Einzigkeit ✗(→ -31) |
+| Gigantisaur Brachion | L2 gezielt | Umleitung bei allen acht Schadenstypen ✓, Überschuss geht verloren ✓, vom Choir-Schild unverändert ✓, nicht wiederbelebbar (Xuanwu) ✓; zweites Brachion durch Übernahme ✗(→ -31) |
+| Gigantisaur Chimera | L2 gezielt | Kette über Raptoren ✓, Zugende ✓, nur 2 andere Namen nicht spielbar ✓, Blast 100×Namen + HOPT ✓; Umgehung der Kosten per Vullary ✗(→ -04) |
+| Gigantisaur King Trex | L2 gezielt | Stufe-0-Stempel bleibt nach Kontrollwechsel ✗(→ -11) und bei Stilllegung ✗(→ -20) |
+| Gigantisaur Pteranos | L2 gezielt | Ziehsperre ✗(→ -19, -21); Platzierung zählt „Eintritt“ (→ -06) |
+| Gigantisaur Raptoren | L2 gezielt | Ziehsperre ✗(→ -19, -21); Beschwörungskette (inkl. Trex, Chimera) ✓ |
+| Gigantisaur Spinor | L2 gezielt | 50×Handkarten ✓, Abbruch erstattet die Hand ✓, gestohlen: Hand des Kontrolleurs ✓, Dream Dust ✓ |
+| Gigantisaur Stegon | L2 gezielt | Rückstoß auf Held, Kreatur und bei Treffer auf sich selbst ✓, HOPT je Spieler (im Skript bewusst dokumentiert), zweiter Treffer im selben Zug ohne Rückstoß ✓ |
+| Gigantisaur Stomp | L2 gezielt | max HP 399/400 ✓, HOPT je Held ✓, Abbruch ✓, vom Gegner kontrollierte Große zählt nicht ✓, Zusatzaktion ✓ |
+| Gigantisaur Triceras | L1 Standard | Gegenprobe zu -19 (Ziehsperre ✓), Zieh-Sperren uneinheitlich ✗(→ -21) |
+| Goff, the Burnbringer | L2 gezielt | Abgang ohne Schadens-Tod: Gon verschwindet ✗(→ -05); Auslöser für Dream Dust/Switcheroo ✓ |
+| Grunge Harpyformer | L2 gezielt | Brand dauerhaft über 4 Runden ✓ (Held und Kreatur), gestohlen ✓, Abbruch ✓ |
+| Guard Duty | L2 gezielt | Limit nach Negation ✗(→ -12); Karte während der Auflösung noch in `ps.hand` (Engine-Muster, folgenlos) |
+| Guardian Beast Gou | L2 gezielt | Schutz endet bei Negation/Frost ✗(→ -14), Ziele inkl. Ausrüstung ✗(→ -10), Abbruch ✓ |
+| Guardian Beast Hou | L2 gezielt | Ziele inkl. Ausrüstung ✗(→ -10), Zielliste mit Besitzer/Brettseite korrekt (Transfer, Diebstahl) ✓, gestohlen ✓, Abbruch ✓ |
+| Guardian Beast Hu | L2 gezielt | Kosten ohne Zusatzaktion ✗ C(→ -13) |
+| Guardian Beast Ji | L2 gezielt | Ziele inkl. Ausrüstung ✗(→ -10), Abbruch ✓ |
+| Guardian Beast Long | L2 gezielt | Brandobergrenze zählt Ausrüstung ✗(→ -10), Abbruch ✓ |
+| Guardian Beast Ma | L2 gezielt | Decks 0/1/2/5 Karten ✓, Erst-Runden-Schutz des Gegners schützt dessen Deck ✓, gestohlen aktivierbar ✓ |
+| Guardian Beast Niu | L2 gezielt | Bonus überlebt Zhus Zugsprung ✗(→ -02), Abbruch ⇒ zweiter Versuch klappt ✓ |
+| Guardian Beast She | L2 gezielt | Ziele inkl. Ausrüstung ✗(→ -10), Abbruch ✓ |
+| Guardian Beast Shu | L2 gezielt | Ausrüstung als Ziel ✗(→ -08), Kopien nur aus dem Deck ✗(→ -09), Suchsperre ✗(→ -23) |
+| Guardian Beast Tu | L2 gezielt | Beschwörungsbedingung per Vullary/Stellin umgangen ✗(→ -04), Ziehsperre ✗ C(→ -21), gestohlen aktivierbar ✓ |
+| Guardian Beast Yang | L2 gezielt | 3 zurück ⇒ 2 Karten ✓, nur mit gegnerischen gelöschten Karten aktivierbar ✓ |
+| Guardian Beast Zhu | L2 gezielt | von Mao im Beschwörungszug gefeuert ✗(→ -01), Zugsprung ✗(→ -02) |
+| Guardian's Appearance | L2 gezielt | zählt als Beschwörung für „erste Kreatur“ (→ -07), Hand-Fakt (Karte noch in der Hand während der Auflösung, folgenlos), Mill-Wahl ✓ |
+| Harpyformer Choir | L2 gezielt | Schutz endet bei Stilllegung/Tod des Choir ✗(→ -29); ein Schild (150 ⇒ 50), zwei Schilde auf einen Treffer (⇒ 0), Ablauf zum eigenen Zugbeginn ✓, Abbruch ✓ |
+| Lizbeth, the Reaper of the Light | L2 gezielt | geliehenes Fighting von gefrorenen Gegnern ✗(→ -30); Stufen-Leihe in sechs Zuständen (Gegnerzug, Frost, tot …) ✓, Spinor über Lizbeth spielbar ✓ |
+| Mao, the Vengeful Guardian | L2 gezielt | Zhu/Sperren ✗(→ -01), Kosten bei unmöglicher Aktivierung ✗ C(→ -18), Negation endet nie ✗(→ -28), Mao → Gou ✗(→ -14) |
+| Metal Harpyformer | L1 Standard | 50 Schaden ✓, gestohlen ✓, Abbruch ✓; sonst nur Batterie |
+| Pangaia, the Dino Domain | L2 gezielt | Xuanwu-Platzierung 201/201 ✗(→ -06), Cardinal Beast +200 ✗(→ -16); Buff bleibt nach Area-Verlust (Text „increased“ – Absicht), zwei Pangaia nicht geprüft |
+| Rap Harpyformer | L1 Standard | Gift ✓, gestohlen ✓, Abbruch ✓; sonst nur Batterie |
+| Shanty Harpyformer | L2 gezielt | Suchsperre ✗(→ -23) |
+| Ska Harpyformer | L2 gezielt | Suchsperre ✗(→ -23) |
+| Smug Mastermind Antonia | L2 gezielt | Surprise-Ziel-ID ✗(→ -24); Support-Ziele mit Brettseite (`_brettSeite`) ✓; `currentHp`-Wächter: nach `increaseMaxHp` gesetzt ✓; Dream-Lander-Abgang ✗(→ -05) |
+| Smugbeth, the Rebel of no Rules | L2 gezielt | Leihe trotz Aura-Stilllegung ✗(→ -25); Dream-Lander-Abgang (→ -05) |
+| Sorbereus, the Adapting Dragon | L1 Standard | Schaden = aktuelles `hero.atk` ✓, gestohlen ✓ (Kontrolleur), Abbruch ✓; nur Helden als Ziel (Text „Hero“) |
+| Stellin, the Calm Dictator | L2 gezielt | Hand-/Deck-Weg umgeht Beschwörungsbedingungen ✗(→ -04); Dream-Lander-Abgang (→ -05) |
+| Techno Harpyformer | L2 gezielt | Zieh-Sperre ✗ C(→ -21) |
+| Unsettling Opportunist Vullary | L2 gezielt | Platzierung umgeht Bedingungen ✗(→ -04), Einsatz-Effekt vor Negation ✗(→ -27); Negation endet zu Zug 7 ✓ |
+| Wolflesia, the Canine Flower | L2 gezielt | Zusatzaktion trotz Stilllegung ✗(→ -26) |
+| Cardinal Beast Baihu | L2 gezielt | versteinerte Kreatur nicht betäubt ✗(→ -03), HP +200 durch Pangaia ✗(→ -16), Clown-Aura ✗(→ -15); Zielliste nach Kontrolle ✓ |
+| Cardinal Beast Qinglong | L2 gezielt | 1/2/4 gegnerische Ziele ✓ (120/80/40), Abbruch des Gegners ist kein Ausweg ✓; Clown-Aura ✗(→ -15) |
+| Cardinal Beast Xuanwu | L2 gezielt | HP 201 mit Pangaia ✗(→ -06), zählt als „Beschwörung“ (→ -07); Brachion in der Ablage nicht wiederbelebbar ✓ |
+| Cardinal Beast Zhuque | L2 gezielt | Brand dauerhaft über 4 Runden (Held und Kreatur) ✓, Kreaturen unter dem Helden mit verbrannt ✓, Zielliste nach Kontrolle ✓; Clown-Aura ✗(→ -15) |
+| Red Dragoneer | L1 Standard | gestohlen: nur mit anderer Drago aktivierbar ✓, Abbruch ✓; sonst nur Batterie |
+| Green Dragoneer | L2 gezielt | Reaktion aus der Hand (Zone/zwei Dragos/Hand-Kopie) ✓, Ziel = geopferte Kreatur ohne Fehler ✓, Abbruch ✓ |
+| Rubin, the Dragoneer Champion | L2 gezielt | Zusatz-Zauber nur bei lebendem, nicht gefrorenem/betäubtem/negiertem Rubin mit Zerstörungsstufe ✓, in beiden Zügen ✓ |
+| Icy Dragonegg | L2 gezielt | Gratisaktion nur ohne Kreaturen ✓, Tod in eigener Runde ⇒ Freeze, in Gegnerrunde nichts ✓, als Opfer ✓ |
+| Flaming Dragonegg | L2 gezielt | wie Icy (Brand) ✓ |
+
+## Getestet & in Ordnung (Auswahl)
+- **Gestohlene Kreaturen (Kontrolleur ≠ Besitzer)**: Dragolfin, Spinor, Sorbereus, Metal/Rap/Grunge/Classical/Choir, Triceras und Hou werden vom Kontrolleur über `charmedOwner` aktiviert und benutzen **dessen** Hand, Deck und Ablage, nicht die des Besitzers (Schaden trifft den Gegner).
+- **Zielwahl nach Kontrolle und Brettseite**: Baihu, Zhuque, Ankylos bieten eine vom Gegner gestohlene eigene Kreatur an und nicht die von mir gestohlene gegnerische; `buildAllBoardTargets` (Hou & Co.) nennt für übertragene, gestohlene und seitenfremd beschworene Kreaturen die physische Brettseite.
+- **Abbruch**: 17 aktive Kreaturen (Dragolfin, Sorbereus, Spinor, Metal, Rap, Grunge, Choir, Hou, She, Ji, Long, Gou, Hu, Niu, Zhuque, Green/Red Dragoneer): nach Abbruch bleiben Karten, Decks, Ablagen und Lebenspunkte unverändert, ein zweiter Versuch im selben Zug klappt (HOPT nicht verbraucht). Ausnahmen mit Absicht: Ankylos und Rap zahlen die Kosten vor einer nicht abbrechbaren Zielwahl (Text „discard … to choose“).
+- **Brachion**: Umleitung bei allen acht Schadenstypen, Überschuss verfällt, Choir-Schild reduziert den Schaden an Brachion nicht („cannot be reduced“), Xuanwu belebt Brachion nicht wieder.
+- **Zhuque/Grunge**: Brand wirkt über vier Runden weiter (Kreatur −60/Runde, Held tickt zu Zugbeginn des Gegners); Zhuque brennt bei einem Helden auch die Kreaturen unter ihm.
+- **Dream Dust**: negiert Fireball, Dragolfin, Spinor, Green Dragoneer auf Träger-Kreatur; Zusatzaktion nur nach echter Hand-Aktion; die Dust-Karte liegt danach in der Ablage.
+- **Rubin**: Zusatz-Zauber nur mit lebendem, nicht gefrorenem/betäubtem/negiertem Rubin, der die Zerstörungsstufe hat; feuert in beiden Zügen.
+- **Blue-Ice Dragon**: Haste nur beim bezahlten Weg, Gratisweg nicht im Beschwörungszug, 300 Schaden auf Gefrorenes, sonst Frost, HOPT.
+- **Vullary**: die Negation der beschworenen Kreatur endet korrekt zu Beginn von Zug 7 (zum Vergleich mit -28).
+- **Zhuque/Qinglong/Ankylos-Ziele und Ma**: Qinglong 1/2/4 Ziele (120/80/40), Gegner kann sich der Wahl nicht entziehen; Ma bei Decks 0/1/2/5 und mit Erst-Runden-Schutz sauber.
+- **Spiel-/Zustandsprüfer** (`t.errors`, `t.audit()`) blieben in allen Messungen ohne Meldung (Ausnahme: Dream-Lander-Verlust -05 zeigt sich als Kartenbilanz −1).

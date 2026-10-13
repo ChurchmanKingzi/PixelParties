@@ -164,6 +164,15 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 - **Vermutete Ursache:** `timeless-king-zi.js` ~Z. 340–392: Sofort-Guss per direktem `runHooks('onPlay')` (Muster Chaos Magic); `canPerform` prüft nur Held lebt/nicht gefroren/betäubt/negiert, weder `script.oncePerGame` (Stempel + Filter) noch `script.spellPlayCondition`. `uniqueDeckSpells` filtert nur Surprise/Reaction.
 - **Frage an Al (Teil Spielbedingung):** Soll Zi einen Zauber, dessen Spielbedingung nicht erfüllt ist (Call for Help, Reunion, Guard Duty …), nicht ausführen („if possible") oder ist „regardless of its level" die einzige Ausnahme? Ein Wort: „entfällt" oder „wirkt trotzdem". (Das Einmal-Limit halte ich wegen der Engine-Konvention für B.)
 
+### H04-18 · True Fairy Crestina: bei gestohlenem Held bleibt der Vorrat beim Besitzer – der Dieb sucht, kann aber nie spielen · Stufe B
+- **Karten:** True Fairy Crestina, the Primordial Goddess (`true-fairy-crestina-the-primordial-goddess.js`); Engine `isCreationZoneUsable` (`_engine.js` ~Z. 19817)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0: Held 0 = Crestina (500 HP), Held 1 mit Destruction-Schule, Vorrat (`creationZone`) = [Fireball]; Crestina per `actionStealHero(1, 0, 0)` von Sitz 1 gestohlen (`controller` = 1).
+- **Schritte:** (a) Besitzer (Sitz 0) spielt Fireball aus dem Vorrat (`doPlaySpell … fromCreation:true`). (b) Der Dieb (Sitz 1) durchläuft seine Resource Phase (`onPhaseStart`), bestätigt „Skip your draw … search", wählt Fireball aus seinem Deck, danach spielt er ihn aus seinem Vorrat.
+- **Erwartet** (Kartentext „While you control this Hero, you may play cards placed by this effect as if they were part of your hand"; „During your Resource Phase, you may skip drawing …"): Der Kontrolleur darf spielen, wer Crestina nicht kontrolliert, nicht. Der Dieb, der den Ziehverzicht bezahlt hat, kann seine Karte nutzen.
+- **Beobachtet:** (a) Der Besitzer spielt den Fireball aus dem Vorrat (150 Schaden), obwohl Crestina dem Gegner gehört. (b) Der Dieb verzichtet aufs Ziehen und legt Fireball in seinen Vorrat (`creationZone` Sitz 1), `isCreationZoneUsable(1)` = false, `doPlaySpell` liefert `false` – die Karte ist für ihn unbenutzbar (kein Rückweg, bis die Heldin zurück ist). Der Hook `onPhaseStart` nimmt `ctx.cardOwner` (Kontrolleur) und die Brettseite für den Statuscheck, `isCreationZoneUsable(pi)` aber sucht Crestina nur in `ps.heroes` des Spielers `pi` (Besitzerseite).
+- **Repro:** `docs/niche-tests/repro/H04-heroes/18-crestina-gestohlen-vorrat.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `isCreationZoneUsable`: Schleife über `ps.heroes` des Anfragenden statt über die von ihm kontrollierten Helden (`heroSideOf`/Controller); der Rest des Skripts (`beforeDamage`) ist bereits kontrollbewusst (Styx 28.9.).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

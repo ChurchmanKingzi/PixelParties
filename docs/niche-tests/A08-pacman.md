@@ -228,6 +228,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/26-beer-ignoriert-rusting-crystal.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `beer.js:98` `baseCost = engine._getCardDB()['Beer']?.cost` statt `engine.artifactPlayCost(...)`, `manualGoldCost: true` (wie A08-02).
 
+### A08-27 · Rusting Crystal: die zweite Kopie auf der Hand verdoppelt die Kosten der ersten nicht · Stufe C
+- **Karten:** Rusting Crystal (`rusting-crystal.js`, `_crystals-shared.js applyRustingCrystalCostMultiplier`)
+- **Aufbau / Schritte:** Sitz 0 hält zwei Rusting Crystal (Kosten 15) und 15 Gold, spielt eine Kopie.
+- **Erwartet** („…the Costs of all your other Artifacts are doubled. This effect does not stack with itself."): Wörtlich ist die zweite Kopie ein „anderes Artefakt" ⇒ Kosten 30, nicht 60 (nicht gestapelt) – die erste Kopie wäre mit 15 Gold nicht spielbar.
+- **Beobachtet:** Die Kopie wird mit 15 Gold gespielt (Gold 0); mit 30 Gold bleiben 15. Der Kristall rechnet sich selbst nie doppelt. Ein einzelner Kristall verdoppelt Equipment, Mana Absorbing Crystal und andere Kristalle korrekt (Club of Gobbo 4 → 8, Mana Absorbing Crystal 15 → 30 ✓; Beer/Cool Presents siehe A08-26/-02).
+- **Repro:** `docs/niche-tests/repro/A08-pacman/27-rusting-crystal-zweite-kopie.js` (✗ = Lesart „Kopie ist ein anderes Artefakt" verletzt)
+- **Frage an Al:** Soll bei zwei Rusting Crystal auf der Hand jede Kopie als „anderes Artefakt" der anderen gelten (Kosten 30) – ja oder nein (Kosten bleiben 15)?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

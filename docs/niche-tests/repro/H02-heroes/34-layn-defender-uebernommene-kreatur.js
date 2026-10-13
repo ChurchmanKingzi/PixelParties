@@ -1,11 +1,11 @@
-// H02-heroes-35 · Layn, Defender of Deri: eine per Capture übernommene Gegnerkreatur bekommt +100 HP, obwohl sie nicht „beschworen" wird
+// H02-heroes-34 · Layn, Defender of Deri: eine per Capture übernommene Gegnerkreatur bekommt +100 HP, obwohl sie nicht „beschworen" wird
 //
 // Kartentext Layn: „Increase the current and max HP of any Creature you **summon** by 100."  Capture: „… take permanent control of it. Place it in one of the user's free Support Zones."
 // Das Skript hängt am Hook `onCardEnterZone` (layn-defender-of-deri.js `onCardEnterZone`): jede Kreatur, die in eine Zone des Kontrolleurs „eintritt", bekommt den Bonus – auch Übernahmen (`actionTransferCreature`: Capture, Diplomacy, Dark Gear, Liberation …) und Umsetzungen zwischen eigenen Zonen (der Zähler `_laynBonus` fängt nur Doppelvergabe ab).
 // Aufbau: Layn Defender als Held 0 (Sitz 0), gegnerische ZZ-Dummy-Kreatur (200 HP) auf Sitz 1; Sitz 0 spielt Capture (echter Spielweg), Zielwahl = der Dummy, Zone = erste freie bei Layn.
 // Erwartung: die übernommene Kreatur behält 200/200 (nicht beschworen). Kontrolle: eine beschworene Kreatur hat 300/300 ✓.
 // Beobachtung: die übernommene Kreatur hat 300/300 (`counters._laynBonus = 100`).
-// Aufruf: node docs/niche-tests/repro/H02-heroes/35-layn-defender-uebernommene-kreatur.js   (✗ = Fehler tritt auf)
+// Aufruf: node docs/niche-tests/repro/H02-heroes/34-layn-defender-uebernommene-kreatur.js   (✗ = Fehler tritt auf)
 const H = require('../../lib/h.js');
 const LD = 'Layn, Defender of Deri';
 (async () => {

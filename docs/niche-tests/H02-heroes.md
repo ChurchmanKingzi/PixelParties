@@ -281,34 +281,25 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 ### H02-heroes-32 · Kit: Modus „Add the Creature to your hand" ignoriert Hand- und Such-Sperre · Stufe B
 - **Karten:** Kit, the Shark Researcher (`kit-the-shark-researcher.js`, Modus A); Sperren `ps.handLocked` (Rain of Spores, Jenny, Staff of the Teleporter …) und `ps.searchLocked` (Cats of the Pharaoh)
 - **Voraussetzungen / Aufbau:** Kit als Held 0, Hand [Fighting], Deck [ZZ Dummy, Fireball, Fireball]; `ps.handLocked = true` bzw. `ps.searchLocked = true`; Sitz 0 legt per echtem Spielweg Fighting an Kit an, wählt ZZ Dummy und Modus A.
-- **Erwartet** (Kartentext Kit: „reveal a Creature from your deck … Add the Creature to your hand"; Sperrentext Rain of Spores/Jenny: „You cannot draw or add cards to your hand for the rest of the turn", Cats: „cannot search or add cards to your hand"; CARD_API.md „Cats of the Pharaoh (v1068)"): das Creature kommt nicht auf die Hand. Kontrolle ohne Sperre: kommt auf die Hand ✓.
+- **Erwartet** (Kartentext Kit: „reveal a Creature from your deck … Add the Creature to your hand"; Sperrentext Rain of Spores/Jenny: „You cannot draw or add cards to your hand for the rest of the turn", Cats: „cannot search or add cards to your hand"; CARD_API.md „Cats of the Pharaoh (v1068)" und „Such-Sperre: die vier Gruppen" 14.9.: Gruppe A – Deck-Suche mit Ertrag „auf die Hand" ist unter der Sperre nicht möglich): das Creature kommt nicht auf die Hand. Kontrolle ohne Sperre: kommt auf die Hand ✓.
 - **Beobachtet:** unter beiden Sperren liegt das Creature auf der Hand, Deck −1 (kein Angebot ausgeblendet, keine Ablehnung).
 - **Repro:** `docs/niche-tests/repro/H02-heroes/32-kit-modus-a-handsperre.js` (✗ = Fehler tritt auf; 2 ✗)
 - **Vermutete Ursache:** Modus A nimmt die Karte mit `takeFromPile` und legt sie per `engine.handZugangSync(...)` auf die Hand (`kit-the-shark-researcher.js:277`); weder `ps.handLocked` noch `engine._isSearchBlocked` werden gefragt, und `modeAFree` blendet die Option unter Sperre nicht aus. Vorbild Brilliant Idea/`actionAddCardFromDeckToHand` (prüft die Sperren). Gleiche Klasse wie H01-11 (Alex).
 
-### H02-heroes-33 · Garius: „search your deck" läuft unter Such-/Handsperre durch · Stufe C
-- **Karten:** Garius, the Great Reformer (`garius-the-great-reformer.js` `_buildReplacementGallery`/`onHeroEffect`); Sperren `searchLocked`/`handLocked`
-- **Voraussetzungen / Aufbau:** Garius als Held 0; eigene Kreatur Bird (turnPlayed 1) auf dem Brett, Deck [Cheering Rabbit, …]; `ps.searchLocked = true` bzw. `ps.handLocked = true`; Heldeneffekt in Main Phase 2.
-- **Erwartet** (Kartentext: „… to **search your deck** for a Creature …"; Cats of the Pharaoh: „you cannot search …"; CARD_API.md: `searchLocked` sperrt „Deck-Suche und Adds"): Lesart A – die Suche ist gesperrt (Heldeneffekt nicht aktivierbar / keine Galerie). Lesart B – gesperrt ist nur Suchen-und-auf-die-Hand; dann ist das Verhalten richtig.
-- **Beobachtet:** Lesart B: Galerie erscheint, Bird wird geopfert, Cheering Rabbit kommt aufs Brett (Deck −1) – unter `searchLocked` wie `handLocked`. Gleiches Muster wie S01-27 (Create Illusion & Co.) und H01-11/-22.
-- **Repro:** `docs/niche-tests/repro/H02-heroes/33-garius-suchsperre.js` (✗ = Lesart A wird nicht erfüllt)
-- **Frage an Al:** Soll „cannot search" auch Deck-Suchen sperren, die aufs Brett führen (Garius, Create Illusion …) – ja / nein (nur Suchen-auf-die-Hand)? (Dieselbe Frage wie S01-27.)
-- **Nebenbefunde (in Ordnung):** Opfer einer gestohlenen Kreatur (Bird des Gegners): Bird geht in die Ablage des Besitzers, der Ersatz (Rabbit) steht auf der Gegnerseite mit `controller` = Garius-Spieler und `originalOwner` = eigener Spieler, stirbt in die EIGENE Ablage ✓. Fiona (Vessel) unter `searchLocked`: Galerie, aber die Entnahme scheitert folgenlos (Einsatz bleibt erhalten) ✓.
-
-### H02-heroes-34 · Kohta Master: ein besiegter Token landet als Karte in der Ablage · Stufe B
+### H02-heroes-33 · Kohta Master: ein besiegter Token landet als Karte in der Ablage · Stufe B
 - **Karten:** Kohta, Master of Super-Killing (`kohta-master-of-super-killing.js:205` `engine.actionDestroyCard`); Tokens Mummy Token, Biomancy Token (gleiches Bild mit jeder Kreatur-Token)
 - **Voraussetzungen / Aufbau:** Kohta Master als Held 0 (Sitz 0); Mummy Token bzw. Biomancy Token auf Sitz 1; Heldeneffekt (Action Phase), Zielwahl = Token.
 - **Erwartet** (Kartentext: „choose any target on the board and defeat it"; Konvention A05-02/A05-12/R01-02/M01-05: Tokens sind keine Karten und kommen nie in Hand/Deck/Ablage; im Schadensweg liegt ein besiegter Token im Gelöscht-Stapel, vgl. H02-15 Kontrolle): Token im Gelöscht-Stapel, Ablage ohne Token.
 - **Beobachtet:** der Token liegt in der ABLAGE von Sitz 1 (Gelöscht-Stapel leer); `t.audit()` meldet nichts. Folge: ein Token in der Ablage ist als Karte weiterverwendbar (Ablage-Rückholer, Necromancy-artige Effekte) bzw. verändert Ablage-Zähler (Graveyard of Limited Power, Jean/Wheels & Co.).
-- **Repro:** `docs/niche-tests/repro/H02-heroes/34-kohta-master-token-in-ablage.js` (✗ = Fehler tritt auf; 2 ✗)
+- **Repro:** `docs/niche-tests/repro/H02-heroes/33-kohta-master-token-in-ablage.js` (✗ = Fehler tritt auf; 2 ✗)
 - **Vermutete Ursache:** wie in H02-15 (Nebenbefund) beschrieben: `_engine.js:13731` `_actionMoveCardKern` schiebt den „Kadaver" vor den Todes-Hooks unbedingt auf `discardPile`, ohne die Token-Umleitung von `_addCardToState` (~48530). Jetzt mit einer echten Karte belegt: Kohta Master (der Nebenbefund in -15 nannte ihn nur). Betroffen wären alle Karten, die Tokens über `actionDestroyCard` besiegen (nicht gesondert durchgezählt).
 
-### H02-heroes-35 · Layn Defender: übernommene oder umgesetzte Kreaturen bekommen +100 HP, obwohl sie nicht „beschworen" werden · Stufe C
+### H02-heroes-34 · Layn Defender: übernommene oder umgesetzte Kreaturen bekommen +100 HP, obwohl sie nicht „beschworen" werden · Stufe C
 - **Karten:** Layn, Defender of Deri (`layn-defender-of-deri.js` Hook `onCardEnterZone`); Messkarte Capture (Attack: „take permanent control of it. Place it in one of the user's free Support Zones"); gleicher Weg: Diplomacy, Dark Gear, Liberation u. a. (`actionTransferCreature`)
 - **Voraussetzungen / Aufbau:** Layn Defender als Held 0 (Sitz 0); gegnerische ZZ-Dummy-Kreatur (200 HP) auf Sitz 1; Sitz 0 spielt Capture (echter Spielweg), Zielwahl = Dummy, Zone = die erste freie bei Layn.
 - **Erwartet** (Kartentext: „Increase the current and max HP of any Creature you **summon** by 100."): die übernommene Kreatur bleibt 200/200. Kontrolle: beschworene Kreatur 300/300 ✓. (Platzieren aus Hand/Deck/Ablage durch einen Effekt „zählt als Effekt-Beschwörung", CARD_API.md Z. 11187 → bekommt den Bonus zu Recht: Klaus-Platzierung 300/300 geprüft.)
 - **Beobachtet:** die per Capture übernommene Kreatur ist 300/300 (`counters._laynBonus = 100`); ebenso eine eigene Kreatur, die per `actionTransferCreature` in eine andere eigene Zone wandert (300/300, falls vorher ohne Bonus).
-- **Repro:** `docs/niche-tests/repro/H02-heroes/35-layn-defender-uebernommene-kreatur.js` (✗ = Fehler tritt auf)
+- **Repro:** `docs/niche-tests/repro/H02-heroes/34-layn-defender-uebernommene-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `layn-defender-of-deri.js` `onCardEnterZone` unterscheidet nicht zwischen Beschwörung/Platzierung und Übernahme/Umsetzung (jede Kreatur, die in eine Zone des Kontrolleurs „eintritt"); `_laynBonus` fängt nur die Doppelvergabe ab.
 - **Frage an Al:** Soll Layns Bonus auch Kreaturen treffen, die per Capture/Diplomacy/Dark Gear übernommen oder zwischen Zonen verschoben werden (jetziges Verhalten), oder nur beschworene/platzierte – ja / nur beschworene?
 

@@ -197,6 +197,15 @@ Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am End
 - **Repro:** `docs/niche-tests/repro/A09-idej/21-dirty-smuggler-selbstnegation-loescht-fremde-negation.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` `actionRemoveCreatureBuff` (~Z. 17938) löscht beim Ablauf eines Eintrags alle `clearCountersOnExpire`-Zähler (`delete inst.counters.negated`), ohne zu prüfen, ob ein anderer Buff-Eintrag denselben Zähler noch trägt. Betrifft jede Karte mit befristeter Negation; hier an Dirty Smuggler gemessen.
 
+### A09-22 · Hydra Blood Arrow: gegen eine Kreatur gibt es nie Giftmarken · Stufe A
+- **Karten:** Hydra Blood Arrow (`hydra-blood-arrow.js`, `_arrows-shared.js`); Gegenprobe Poisoned Arrow (vergiftet dieselbe Kreatur korrekt)
+- **Voraussetzungen / Aufbau:** Seed 1234. Sitz 0: Tushu (Fighting 1, ATK 40), Hand [Angelfeather Arrow, Hydra Blood Arrow, Attack]. Sitz 1: „ZZ Dummy Big" (1000 HP) bzw. Held 0. Beide Pfeile werden gekettet (Antwort auf „Chain a Reaction?" skripten).
+- **Schritte:** 1. Attack auf das Ziel; Angelfeather und Hydra Blood ketten.
+- **Erwartet** (Kartentext: „Reduce that Attack's damage to 0 and apply 1 Poison Stack to **the target** for every 30 full damage the Attack would have dealt instead"; „1 or more targets" schließt Kreaturen ein): Schaden 0 und floor(100/30) = 3 Giftmarken – beim Helden wie bei der Kreatur.
+- **Beobachtet:** Held: 3 Marken, korrekt. Kreatur: Schaden 0, aber **0 Marken** (auch ohne Angelfeather: ATK 40 → erwartet 1 Marke, beobachtet 0).
+- **Repro:** `docs/niche-tests/repro/A09-idej/22-hydra-blood-arrow-vergiftet-kreatur-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Der Kreaturen-Schadensstapel (`_engine.js` ~Z. 46892) springt bei `actualAmount === 0` mit `continue` heraus, bevor `applyArrowsAfterDamage` (~Z. 47019) die Reiter (Gift/Brand) anwendet. Der Heldenweg (`_engine.js` ~9022) wendet sie auch bei Schaden 0 an. Hydra Blood setzt den Schaden immer auf 0, daher nie ein Reiter an Kreaturen. Vermutlich trifft dieselbe Lücke auch Brand-/Gift-Pfeile, deren Schaden anderweitig auf 0 sinkt (nicht gemessen).
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
