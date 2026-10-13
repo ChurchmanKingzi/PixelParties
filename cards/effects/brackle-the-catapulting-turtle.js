@@ -163,8 +163,8 @@ module.exports = {
     const own = validTargets.filter(t => t.type === 'equip' && t.cardInstance);
     if (own.length === 0) return undefined;
     const sorted = own.slice().sort((a, b) => {
-      const aHp = Math.min(a.cardInstance.counters?.currentHp || 0, MAX_DAMAGE);
-      const bHp = Math.min(b.cardInstance.counters?.currentHp || 0, MAX_DAMAGE);
+      const aHp = Math.min(engine.creatureCurrentHp(a.cardInstance), MAX_DAMAGE);   // Z5: unversehrt = gedruckte HP
+      const bHp = Math.min(engine.creatureCurrentHp(b.cardInstance), MAX_DAMAGE);
       return bHp - aHp;
     });
     return [sorted[0].id];
@@ -234,7 +234,8 @@ module.exports = {
       // doesn't read a stale value (defensive — nothing should mutate
       // currentHp between here and the actionDealDamage call, but the
       // snapshot is the contract value per the card text).
-      baseDamage = Math.min(creatureInst.counters?.currentHp || 0, MAX_DAMAGE);
+      // Z5: unversehrte Kreatur hat noch kein `currentHp` -> gedruckte HP (sonst 0 Schaden).
+      baseDamage = Math.min(engine.creatureCurrentHp(creatureInst), MAX_DAMAGE);
 
       // ── Target picker — Cancel reads as "Back" (return to sac picker) ──
       target = await ctx.promptDamageTarget({

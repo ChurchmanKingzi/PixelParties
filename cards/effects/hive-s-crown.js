@@ -78,7 +78,7 @@ module.exports = {
       let bestScore = -Infinity;
       for (const t of validTargets) {
         const score = (PRIORITY[t.cardName] || 0) * 1000
-          + (1000 - ((t._cardInstance?.counters?.currentHp) || 0));
+          + (1000 - engine.creatureCurrentHp(t._cardInstance));   // Z5: unversehrt = gedruckte HP
         if (score > bestScore) { bestScore = score; best = t; }
       }
       return best ? [best.id] : undefined;

@@ -12396,7 +12396,7 @@ class GameEngine {
     if (isCreatureTarget && !_u && !opts._keinRettungsfenster
         && !(opts.isSacrifice && (this._beschwoerungsOpferTiefe || 0) > 0)) {
       const gerettet = await this._checkCreaturePreDefeatHandReactions(
-        targetCard, source, targetCard.counters?.currentHp ?? 0, 'destroy',
+        targetCard, source, this.creatureCurrentHp(targetCard), 'destroy',   // Z5: unversehrt = gedruckte HP (A08)
         { isSacrifice: !!opts.isSacrifice, istZerstoerung: true });
       if (gerettet) {
         if (opts.isSacrifice) this.gs._opferFizzle = true;
@@ -40280,6 +40280,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   getEffectiveCardData(inst) {
     if (inst?.counters?._cardDataOverride) return inst.counters._cardDataOverride;
     return this._getCardDB()[inst?.name] || null;
+  }
+
+  /**
+   * ★ Aktuelle HP einer Kreatur (Z5, Welle 2 – Befundklasse C05-01).
+   * `counters.currentHp` legt der Schadens-Batch erst beim ERSTEN Schaden an
+   * (bzw. `increaseMaxHp`/Heilung); eine frisch beschworene, unversehrte
+   * Kreatur hat `counters = {}`. Wer `currentHp ?? 0` / `|| 0` liest, hielte
+   * sie für tot. Rückfall-Reihenfolge: Zähler → `counters.maxHp` (gesenkte/
+   * erhöhte Obergrenze ohne Schaden) → wirksame Kartendaten-HP (Override/
+   * Token) → 0. Ohne Instanz bzw. Zähler-Objekt: 0.
+   * @param {object} inst - Kartenobjekt (CardInstance)
+   * @returns {number}
+   */
+  creatureCurrentHp(inst) {
+    const c = inst?.counters;
+    if (!c) return 0;
+    if (c.currentHp != null) return c.currentHp;
+    return c.maxHp ?? this.getEffectiveCardData(inst)?.hp ?? 0;
   }
 
   /**

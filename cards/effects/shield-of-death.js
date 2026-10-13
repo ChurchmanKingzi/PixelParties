@@ -42,7 +42,7 @@ module.exports = {
         const inst = t.cardInstance || engine.cardInstances?.find(c =>
           c.owner === t.owner && c.zone === 'support'
           && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
-        hp = inst?.counters?.currentHp;
+        hp = inst ? engine.creatureCurrentHp(inst) : null;   // Z5: unversehrt = gedruckte HP
         if (typeof hp !== 'number' || hp <= 0) continue;
       }
       const kills = dmg >= hp;
