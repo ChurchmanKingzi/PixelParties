@@ -363,6 +363,8 @@ module.exports = {
       fromOwner: equipOwner,
       fromHeroIdx: srcHeroIdx,
       fromZoneSlot: srcSlot,
+      // Reiner Zonenwechsel auf dem Brett — ohne `toZone` deuten Ablage-Zuhörer (Thunder Trumpet, Storm Piano) es als Ablage (F03-07).
+      toZone: 'support',
       _skipReactionCheck: true,
     });
 
