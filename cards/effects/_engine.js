@@ -2423,6 +2423,9 @@ class GameEngine {
     if (!ps) return;
     if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
     ps._permanentlyRevealedHandIndices[handIdx] = true;
+    // ★ A08-01: Weakening Crystal negiert die Helden schon beim EINTRITT in die Hand
+    // (Ruling v1103: angelegt wird beim Eintritt, zu Rundenbeginn, beim Laden) – nicht erst ab dem naechsten eigenen Zugbeginn.
+    if (cardName === 'Weakening Crystal') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: playerIdx });
   }
 
   /**
