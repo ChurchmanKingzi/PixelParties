@@ -345,7 +345,8 @@ module.exports = {
       const discHas = !!name && (ps.discardPile || []).includes(name);
       if (!name || !cd) return doDefeat('no_reference');
       if (!handHas && !discHas) return doDefeat('no_copy');
-      if (cost > 0 && (ps.goldLocked || (ps.gold || 0) < cost)) return doDefeat('cant_pay');
+      // Z6 (H02-31): Kents Kreditrahmen zaehlt (`canAffordGold` statt rohem Goldvergleich) - "by paying its Cost" wie beim Handspiel.
+      if (cost > 0 && (ps.goldLocked || !engine.canAffordGold(pi, cost, name))) return doDefeat('cant_pay');
       if (_firstFreeSupportSlot(gs.players[feld], helHeroIdx) < 0) return doDefeat('no_slot');
       if (!_helCanUseEquip(engine, feld, helHeroIdx, name)) return doDefeat('cant_equip');
       // Als Vorgabe 29.9.: uebernommene Hel nur ausruestbar, wenn die
@@ -384,7 +385,7 @@ module.exports = {
 
       // Pay the Cost. Only now — failure here still means "can't".
       if (cost > 0) {
-        const paid = await engine.actionSpendGold(pi, cost);
+        const paid = await engine.actionSpendGold(pi, cost, { cardName: name });
         if (!paid) return doDefeat('cant_pay');
       }
 

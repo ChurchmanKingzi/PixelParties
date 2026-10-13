@@ -23,8 +23,10 @@ module.exports = {
   // detection.
   shufflesFromHandOrDiscardIntoDeck: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
+    // Z6 (A09-06): Hatusbal sperrt das Zurueckmischen aus ALLEN Quellen - der Mischvorgang ist der einzige Nutzen.
+    if (engine?.shuffleBackIntoOwnDeckBlocked?.(pi, { fromHandOrDiscard: true })) return false;
     return (ps?.discardPile || []).length > 0;
   },
 
@@ -32,6 +34,7 @@ module.exports = {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps || (ps.discardPile || []).length === 0) return { cancelled: true };
+    if (engine.shuffleBackIntoOwnDeckBlocked?.(pi, { fromHandOrDiscard: true })) return { cancelled: true };   // Z6 (A09-06)
 
     // Build gallery from discard pile — unique names only (1 entry per card name)
     const seen = new Set();
