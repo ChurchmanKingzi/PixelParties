@@ -155,6 +155,7 @@ module.exports = {
 
     const gs = engine.gs;
     const oi = ziel.owner;
+    delete gs._boulderSelbstPlatziert;                    // Marke dieses Spielvorgangs frisch setzen
     if (!hatFreieZone(gs, oi, ziel.heroIdx)) return;      // Brett hat sich geaendert
 
     // ── Felsen auf ALLE freien Zonen (Als Vorgabe 12.9.) ───────────
@@ -175,6 +176,9 @@ module.exports = {
     const platz = engine.safePlaceInSupport(CARD_NAME, oi, ziel.heroIdx, landeplatz(gs, oi, ziel.heroIdx));
     if (!platz?.inst) return;
     const inst = platz.inst;
+    // M01-07: Biomancy (älteres `afterPotionUsed` als der Fels) darf die Potion nicht
+    // ein zweites Mal auf das Brett legen — sie liegt schon, als Fels.
+    gs._boulderSelbstPlatziert = inst.id;
 
     // Kartendaten-Override: ab jetzt ist die Potion auf dem Brett eine
     // Kreatur mit 150 HP und Stufe 3.

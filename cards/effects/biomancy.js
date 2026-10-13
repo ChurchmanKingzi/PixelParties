@@ -51,6 +51,11 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
 
+      // Die Potion hat sich selbst aufs Brett gelegt (Boulder in a Bottle) — dessen eigenes
+      // `afterPotionUsed` setzt `placed` erst NACH uns; die Marke sagt es schon vorher.
+      if (ctx.potionName === 'Boulder in a Bottle' && gs._boulderSelbstPlatziert != null
+          && engine.cardInstances.some(c => c.id === gs._boulderSelbstPlatziert && c.zone === 'support')) return;
+
       // Only trigger for the potion owner's Biomancy
       if (ctx.potionOwner !== pi) return;
 
