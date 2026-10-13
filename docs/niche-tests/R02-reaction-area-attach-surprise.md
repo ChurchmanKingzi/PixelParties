@@ -1,8 +1,42 @@
 # R02-reaction-area-attach-surprise – Nischenfall-Bericht
-Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent R02-reaction-area-attach-surprise (Fortsetzung des Vorgängers ab R02-03), 13.10.2026. Karten: 43 in der Liste · 38 gezielt getestet (L2) · 21 mit Befund (23 Befunde: 22 aus der Liste + 1 Nebenbefund außerhalb).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+Gesamteindruck: Die Reaktions-/Area-/Attachment-/Surprise-Karten sind im Normalfall solide (Auslösefenster für Helden, Einmal-pro-Zug-Buchhaltung, Area-Limit mit Crevice, Kontrolle statt Seite bei Siege/Light Ball/Royal Treasury, Surprise-Reihenfolge). Die Befunde bündeln sich in fünf Klassen:
+1. **Kreaturen als Ziel/Quelle fehlen in Fenstern, die „target" sagen**: Mountain Tear River (R02-01), Umleiter bei Mehrfachziel-Pickern (R02-02), Spectral Armor (R02-16), Tarleinn's Floating Island (R02-17), Rioting Village ohne Rückstoß gegen Kreaturen (R02-12).
+2. **Die gerade aufgelöste Spielkarte steht noch in der Hand** und zählt für Gegenzugriffe mit: Loot the Leftovers klaut sie, Spike Trap und Shamanic Curse zählen sie als bezahlbare Handkarte (R02-07, R02-15).
+3. **Geliehene Helden (Charme/Übernahme) werden an der falschen Heldenreihe gelesen**: Rioting Village (R02-13), Zombified Assault (R02-20), Shamanic Curse (R02-22) und als Nebenbefund Burning Finger (R02-21). Die Rückschlag-Surprises Spike Trap, Toxic Trap, Mountain Tear River und Tharxian Horse sind dagegen korrekt (gemessen).
+4. **Zustands-/Flaggenverträge**: Overheal Shock räumt `healReversed` nie auf (R02-03, Leave-Hook feuert vor dem Zonenwechsel), Prophecy of Tempeste wird von Cloudy/Petrification Break reduziert (R02-04), Unwanted Audience umgeht Light Ball (R02-05) und negiert die rein passive Bomb Mite (R02-06), No Retreat!/Distracting Crystal erkennen nur geflaggte Karten (R02-10), Very Special Prisoner spliced am Deck-Sperrvertrag vorbei (R02-19).
+5. **Abbruchmarke**: Der optionale Zusatzziel-Prompt von Mountain Tear River setzt `_spellCancelled` und gibt dem GEGNER den Zauber samt Aktion zurück (R02-09) – der gefährlichste Befund.
+Bewusst nicht (oder nur oberflächlich) getestet: Test Flight, The Melting, Surprising Opportunity, Triumphant Return, Trample Sounds (alte Kartentests existieren, nur Stichproben bzw. L1), Off Duty nur Standardfall, Weapon Absorption nur Stichprobe (Dauerfeuer-Lead „+2 Destruction Magic" ist ein Harness-Artefakt der Angriffskarte, kein Kartenverlust), Surprise-Hosts in der Zone gestohlener Helden nur grob, Mehrspieler (3/4 Sitze), Spielende-Gleichstand der Skull Carpet Bombing (durch B-08/Hauptlauf gedeckt). Harness-Falle (für Folgetester): `policy.confirm = false` liefert `{confirmed:false}`, ein wahrheitsfähiges Objekt – Fenster mit `if (!ja)` lesen das als Ja (Test Flight, Spatial Crevice); ein echtes „Nein" ist `null`.
+
+| ID | Titel | Stufe |
+|---|---|---|
+| R02-01 | Mountain Tear River feuert nie auf Kreaturenwahl | A |
+| R02-02 | Umleiter/Negierer sehen Mehrfachziel-Picker nie | A |
+| R02-03 | Overheal Shock: `healReversed` bleibt nach Abgang der Karte | A |
+| R02-04 | Prophecy of Tempeste: Cloudy/Petrification Break reduzieren trotz „cannot be reduced" | A |
+| R02-05 | Unwanted Audience umgeht Light Ball | A |
+| R02-06 | Unwanted Audience negiert Bomb Mite (passiv) | B |
+| R02-07 | Aufgelöste Spielkarte zählt als Handkarte (Loot, Spike Trap) | A |
+| R02-08 | Looting rüstet Control Device am eigenen Helden aus | C |
+| R02-09 | Mountain Tear River: Zusatzziel-Abbruch gibt den Gegner-Zauber zurück | A |
+| R02-10 | No Retreat!/Distracting Crystal erkennen Mischkarten nur per Flagge | A |
+| R02-11 | Prayer unter Ziehsperre wirft ab, zieht nichts | C |
+| R02-12 | Rioting Village: kein Rückstoß gegen Kreaturen | A |
+| R02-13 | Rioting Village: Rückstoß trifft bei geliehenem Helden die falsche Reihe | A |
+| R02-14 | Spatial Crevice bietet unter Siege die Suche an | B |
+| R02-15 | Shamanic Curse + Wisdom (Spielkarte als Handkarte, Kosten nie gezahlt) | B |
+| R02-16 | Spectral Armor schützt keine Kreaturen | B |
+| R02-17 | Tarleinn's Floating Island: Kreaturenheilung löst nie aus | B |
+| R02-18 | Toxic Trap öffnet nicht bei Flächen-Statuszauber | C |
+| R02-19 | Very Special Prisoner umgeht die Deck-Sperre (Knight of Kings [B]) | A |
+| R02-20 | Zombified Assault: Rückschlag trifft bei geliehenem Angreifer die falsche Reihe | A |
+| R02-21 | Nebenbefund Burning Finger: Stufe eines geliehenen Wirkers falsch | B |
+| R02-22 | Shamanic Curse: geliehener Wirker an falscher Reihe geprüft | B |
+| R02-23 | Prophecy of Tempeste: Deckel entfällt unter CC des Wirts | C |
+
+Zählung: A = 12 (R02-01, -02, -03, -04, -05, -07, -09, -10, -12, -13, -19, -20), B = 7 (R02-06, -14, -15, -16, -17, -21, -22), C = 4 (R02-08, -11, -18, -23).
 
 ## Befunde
 ### R02-01 · Mountain Tear River: „… or a Creature in one of its Support Zones is chosen" löst nie aus · Stufe A
@@ -89,7 +123,7 @@ Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in 
 - **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 0 spielt die Karte (Aktionsphase), Sitz 1 hat No Retreat! auf der Hand (Held 0 mit Decay Magic 1) und sagt zu allem Ja. Brainstorming mit 4× Fireball in der Ablage von Sitz 0; Staff of the Teleporter mit 3 weiteren Handkarten.
 - **Schritte:** 1. Sitz 0 spielt Guard Duty (Kontrolle), danach in frischen Spielen Brainstorming bzw. Staff of the Teleporter. 2. Beobachten, ob No Retreat! angeboten wird. 3. Nebenprobe: Brainstorming mit Distracting Crystal auf der Hand.
 - **Erwartet** (No Retreat!: „Play this card immediately when your opponent activates a card or effect that would include shuffling cards from their hand, discard pile or side of the board back into the deck. Negate that card or effect."; Brainstorming: „shuffle 4 cards with the same name from your discard pile back into your deck"; Staff of the Teleporter: „Shuffle any number of cards from your hand into your deck"): No Retreat! wird in allen Fällen angeboten und negiert die Karte.
-- **Beobachtet:** Guard Duty (Kontrolle) und Renewable Energy: Angebot ✓. Brainstorming (Deck 20 → 23), Staff of the Teleporter, Meditation, Expedition, Mass Routing: **kein** Angebot, die Karte wirkt. Dieselbe Lücke macht Distracting Crystal wirkungslos („While this card is in your hand, you cannot activate effects that include adding cards from your hand or discard pile to your deck"): Guard Duty wird abgelehnt (✓), Brainstorming und Staff of the Teleporter laufen mit Distracting Crystal auf der Hand ungehindert (Deck 20 → 23).
+- **Beobachtet:** Guard Duty (Kontrolle) und Renewable Energy: Angebot ✓. Brainstorming (**kein** Angebot, Effekt läuft: Deck 20 → 23) und Staff of the Teleporter (**kein** Angebot, die Handkarten-Auswahl öffnet sich): nachgewiesen. Meditation, Expedition, Mass Routing: **kein** Angebot gemessen, die Wirkung selbst wurde nicht durchgespielt. Dieselbe Lücke macht Distracting Crystal wirkungslos („While this card is in your hand, you cannot activate effects that include adding cards from your hand or discard pile to your deck"): Guard Duty wird abgelehnt (✓), Brainstorming und Staff of the Teleporter laufen mit Distracting Crystal auf der Hand ungehindert (Deck 20 → 23).
 - **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/10-no-retreat-erkennung-flag.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `no-retreat.js` Z. 33–40 (und die Sperren in `_engine.js` ~28682/40898/41505, `_crystals-shared.js`) lesen nur `script.shufflesFromHandOrDiscardIntoDeck`. Das Skript-Flag tragen 15 Karten (Black Marketeer, Cosmic Manipulation, Deepsea Stein, Elana, Copy Device, Weathercock, Guard Duty, Horn in a Bottle, Kitsune Transformation, Leadership, Lunatic Cycle – Crescent Moon, Renewable Energy, Tanuki Escape, The Cosmic Depths, The Stormblade); im Kartentext-Scan (`shuffle … back into … deck`) bleiben 29 Karten ohne Flagge, darunter eindeutig passende: Brainstorming, Staff of the Teleporter, Meditation (Ablage → Deck), Expedition und Mass Routing (Brett → Deck), Motharch Squire, Priest of Luna/Tempeste (Kosten aus der Ablage), Anti Intruder System. Nicht jeder davon gehört dazu (Deck-intern gemischte Karten wie Amazing Finding, Time Distortion, Ghazma/Hatusbal-Lage, spätere Trigger wie Create Illusion), ihre Zuordnung ist ein Prüfauftrag. `Last Second Escape`/`Homecoming` (Reaktionen, mischen Kreaturen aus Support Zones ins Deck) sind ebenfalls ohne Flagge.
 
@@ -177,6 +211,30 @@ Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in 
 - **Beobachtet:** Der Archer kommt zurück; der Schaden trifft Held 1 von **Sitz 0** (`S0 [800, 750, 800]`), der Angreifer (Sitz 1, Held 1) bleibt bei 800 HP. Normalfall (eigener Held greift an) ✓ (Kontrolle: S0 `[750, 800, 800]`).
 - **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/20-zombified-assault-geliehener-angreifer.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `zombified-assault.js` `schlageZurueck`: `seite = quellSeite(quelle)` (= `src.controller ?? src.owner`, also der Kontrolleur) und `players[seite].heroes[quelle.heroIdx]`; `heroIdx` gehört aber zur Heldenreihe von `source.heroOwner`. Richtig wäre `quelle.heroOwner ?? seite`.
+
+### R02-21 · Nebenbefund (nicht aus der Kartenliste): Burning Finger liest die Stufe eines geliehenen Wirkers an der falschen Heldenreihe · Stufe B
+- **Karten:** Burning Finger (`burning-finger.js`, Gruppe S0x); aufgefallen beim Test der Rückschlag-Karten (R02-13/-20) mit gecharmten Angreifern
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Held 1 von Sitz 1 ist von Sitz 0 gecharmt (`charmedBy = 0`, Destruction Magic 1). Der gleichindizierte eigene Held 1 von Sitz 0 hat Destruction Magic 3. Sitz 0 spielt Burning Finger („deal 100/160/240 damage") mit dem geliehenen Helden (`charmedOwner: 1`) auf Held 0 von Sitz 1.
+- **Erwartet** (Engine-Vorgabe `_engine.js` ~43281, Styx 28.9.: Stufenabfragen lesen die Zonen des geliehenen Helden): Stufe 1 ⇒ 100 Schaden.
+- **Beobachtet:** 240 Schaden (Stufe 3 des gleichindizierten eigenen Helden). Kontrolle Heal (Support Magic 1 geliehen / 3 eigen) liefert korrekt 150.
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/21-burning-finger-geliehener-wirker-stufe.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `server.js` `doPlaySpell` stempelt `gs._wirkerSeite` nur um `executeCardWithChain` (finally ~Z. 8313); `runHooks('onPlay')` (~Z. 8397) läuft danach ohne Stempel. `burning-finger.js` Z. 27 ruft `effectiveSchoolLevelForCaster('Destruction Magic', pi, heroIdx)` ohne `heroOwner`, der Rückgriff auf `_wirkerSeite` greift nicht mehr. Dieselbe Aufrufform steht in ~24 weiteren Skripten (Liste im Repro-Kopf); ob sie das 4. Argument anders übergeben, wurde nicht einzeln geprüft. In meiner Gruppe nutzen Old Couple, Test Flight und The Melting diese Abfrage (für geliehene Reaktions-Wirker nicht getestet).
+
+### R02-22 · Shamanic Curse prüft bei einem geliehenen Wirker die Stufe am gleichindizierten Helden des Kontrolleurs · Stufe B
+- **Karten:** Shamanic Curse (`shamanic-curse.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Held 1 von Sitz 1 ist von Sitz 0 gecharmt (`charmedBy = 0`, Destruction Magic 1). Der gleichindizierte eigene Held 1 von Sitz 0 hat Destruction Magic 3 (Falle). Sitz 0 spielt mit dem geliehenen Helden (`charmedOwner: 1`) Burning Finger (Lv1) auf Held 0 von Sitz 1. Sitz 1 hält Shamanic Curse (Decay Magic 3) und sagt Ja.
+- **Erwartet** (Kartentext „If the Spell's level is now too high for that Hero to use it, it is negated"): Der Wirker (Destruction Magic 1) kann einen Lv-2-Spell nicht wirken ⇒ Burning Finger wird negiert, Held 0 von Sitz 1 bleibt bei 800 HP.
+- **Beobachtet:** Der Spell „überlebt" und trifft (560 HP; Höhe der Wirkung siehe R02-21).
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/22-shamanic-curse-geliehener-wirker.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `shamanic-curse.js` `resolve`: `oppIdx = targetLink.owner` (= Kontrolleur), `castingHero = oppPs.heroes[targetLink.heroIdx]` und `getWisdomDiscardCost(oppIdx, castingHi, …)` lesen die Heldenreihe des Kontrolleurs; das Kettenglied trägt `casterOwner` (Brettseite des Wirkers, gesetzt in `doPlaySpell`), das hier nicht verwendet wird.
+
+### R02-23 · Prophecy of Tempeste: der 100-Deckel entfällt bei gefrorenem/betäubtem/negiertem Wirt · Stufe C
+- **Karten:** Prophecy of Tempeste (`prophecy-of-tempeste.js` Z. 210 und Z. 324)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 0 legt Prophecy of Tempeste an Held 0; (a) Wirt ohne Status, (b) gefroren, (c) betäubt, (d) negiert. Sitz 1 trifft Held 0 direkt mit 300.
+- **Erwartet** (Kartentext „Damage this Hero would take cannot exceed 100" – statische Regel; Konvention aus dem Light-Ball-Kopf: „Support-Zone Attachments aren't silenced by hero CC", Light Ball/Siege/Royal Treasury/Petrification Break wirken unter CC weiter): jeweils 100 Schaden.
+- **Beobachtet:** (a) 100; (b)(c)(d) 300. Unter CC sind Deckel UND Umleitung ausgeschaltet (`if (host.statuses?.frozen || stunned || negated) return;` in beiden Hooks, Kommentar „Host must still be alive + functional"). Die Anweisung von Al vom 22.9. (v1280) nennt CC nicht.
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/23-prophecy-of-tempeste-deckel-bei-status.js` (✗ = Abweichung von meiner Erwartung)
+- **Frage an Al:** Soll der 100-Deckel (statische Regel) auch bei gefrorenem/betäubtem/negiertem Wirt gelten – Ja – und nur die Umleitung („you may") unter CC ruhen, oder soll der ganze Anhang unter CC ruhen (Nein, wie jetzt)?
 
 ## Abdeckung
 (wird am Ende ergänzt)

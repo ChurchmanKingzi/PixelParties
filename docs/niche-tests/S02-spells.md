@@ -111,6 +111,23 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/12-guard-change-gestohlene-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `guard-change.js` Z. 52–61 wählt Kreaturen nach `controller ?? owner`, `moveCreature` (Z. 105–109) und `swapCreatures` arbeiten aber in `players[Kontrolleur].supportZones` – dort liegt die gestohlene Kreatur nicht (`sArr.indexOf(inst.name) < 0` ⇒ `false`), und der Aufrufer wertet das nicht als Fehler.
 
+### S02-13 · Great Offensive lässt gefrorene/betäubte Kreaturen ihren aktiven Effekt benutzen · Stufe B
+- **Karten:** Great Offensive (`great-offensive.js`); Engine-Weg `reactivateCreatureEffect` (`_engine.js` ~25180) wird auch von Kohta und Spirit of the Forbidden Grimoire benutzt (nicht gemessen).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Great Offensive]; „Skeleton Mage" (Lv1, „You may once per turn draw 2 cards and discard 1 card afterwards") auf dem Brett seit Zug 1 (`turnPlayed = 1`), gefroren bzw. betäubt (3 Züge).
+- **Schritte:** 1. Kontrolle: reguläre Aktivierung der gefrorenen/betäubten Mage (`t.activateCreature`) – abgelehnt ✓ (server.js ~9042 `isCreatureEffectSuppressed`). 2. Great Offensive spielen.
+- **Erwartet** (Kartentext „All level 2 and lower Creatures you control use their active effects an additional time (even if they were summoned this turn)"): die Parenthese hebt nur den Beschwörungs-Schlaf auf; eine gefrorene/betäubte Kreatur kann ihren Effekt auch hier nicht benutzen.
+- **Beobachtet:** Die gefrorene und die betäubte Mage ziehen/werfen ab (Netto +2 Handkarten); eine negierte Mage tut nichts ✓. Der Zug endet danach wie vorgesehen ✓; schon per Hand benutzter Effekt (HOPT verbraucht) wird erneut gefeuert ✓.
+- **Repro:** `docs/niche-tests/repro/S02-spells/13-great-offensive-gefrorene-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` `reactivateCreatureEffect` Z. 25184 prüft nur `counters.negated/nulled` (`_creatureNegationProof`), nicht das zentrale Prädikat `isCreatureEffectSuppressed` (frozen/stunned/magic_silenced …); `great-offensive.js` `eigeneAktivKreaturen` (Z. ~11–28) filtert nicht nach Status. Gleiche Klasse wie B-01…B-03 (Status-Prüfung fehlt beim Verbraucher).
+
+### S02-14 · Holy Selection mit Ida: erzwungene Einzelzielwahl ohne Abbruch-Knopf (Regel 23.9) · Stufe B (geringe Auswirkung)
+- **Karten:** Holy Selection (`holy-selection.js`), Ida, the Adept of Destruction (Flagge `forcesSingleTarget`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Ida als Held 0 von Sitz 0 (Flagge per Zugbeginn-Hook), zwei Helden mit Necromancy (eigener Held 1, Gegnerheld 0) ⇒ mehr als ein Ziel. Holy Selection mit Ida spielen, Zielwahl mit `null` beantworten.
+- **Erwartet** (Ruling CARD_API.md Z. 367ff.: „Jede Zielwahl hat einen Cancel-Button … Ausnahme: Pflichtwahl, die der Kartentext erzwingt – dann steht der Grund als Kommentar daneben"): Ida-Zielwahl `cancellable: true`.
+- **Beobachtet:** `cancellable: false`, kein Begründungskommentar; die Abbruch-Antwort selbst wird sauber behandelt (Karte bleibt auf der Hand, kein Schaden ✓), nur ein Mensch hat keinen Knopf dafür. Grundlauf ohne Ida ✓ (alle Necromancy-Helden beider Seiten und alle `_summonedByNecromancy`-Kreaturen inkl. gestohlener −200, andere unversehrt).
+- **Repro:** `docs/niche-tests/repro/S02-spells/14-holy-selection-ida-zielwahl-nicht-abbrechbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `holy-selection.js` Z. 175 `cancellable: false` im Ida-Zweig von `onPlay`.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

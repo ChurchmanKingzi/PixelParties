@@ -126,6 +126,25 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Vermutete Ursache:** `server.js:12226-12232` (`doUseArtifactEffect`) und `server.js:11323-11329` rufen `actionPromptForceDiscard` ohne `eligibleIndices`; der Zweig bei `server.js:7815` (Ausrüstung) tut es mit `eligibleIndicesWithoutResolving(ps)`.
 - **Hinweis:** Ob der Client die in Auflösung befindliche Karte als wählbar anzeigt, habe ich nicht geprüft (headless); der Server nimmt sie an.
 
+### M01-14 · Hammer Throw auf eine gestohlene Kreatur sperrt den Angreifer selbst statt des Kontrolleurs · Stufe B
+- **Karten:** Hammer Throw (`cards/effects/hammer-throw.js`); gleiche Klasse für jedes Ziel, dessen Kontrolleur nicht der Besitzer der Brettseite ist (gestohlene Kreatur, übernommener Held).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 1 hat eine Kreatur von Sitz 0 gestohlen (`actionStealCreature(1, inst)`: Besitzer 0, Kontrolleur 1, physisch weiter bei Sitz 0 / Held 1); Sitz 0 spielt Hammer Throw auf diese Kreatur.
+- **Erwartet** (Kartentext „The target's **controller** must delete a card from their hand whenever they play an Artifact during their next turn."): Sitz 1 (Kontrolleur) ist `itemLocked`, Sitz 0 nicht.
+- **Beobachtet:** Sitz 0, der Angreifer selbst, ist `itemLocked` (er muss in seinem nächsten Zug bei jedem Artefakt eine Karte löschen), Sitz 1 nicht. Normalfall (Held des Gegners als Ziel) korrekt, ebenso das Intervall „every other turn" (Würfe in Zug 5 / 7 / 9: gesperrt / frei / gesperrt).
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/14-hammer-throw-gestohlene-kreatur-sperrt-falschen.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `hammer-throw.js` (~Z. 140): `const oppIdx = tgtOwner;` – `target.owner` ist die physische Brettseite; der Kontrolleur wäre `inst.controller ?? inst.owner` bzw. `engine.heroSideOf` für Helden (Muster „Kontrolle statt Seite", Styx 28.9.).
+- **Hinweis zum Harness:** `actionStealCreature` von außen aufgerufen hinterlässt `gs._chainResolvingLock = true`; ohne `delete t.gs._chainResolvingLock` lehnt der Server danach jede Karte ab (reiner Harness-Effekt, kein Befund).
+
+### M01-15 · Charme Lv1 kann „Infiltration" (und Necromancy) des Gegners nie ausleihen · Stufe B
+- **Karten:** Charme (`cards/effects/charme.js`, `_getOpponentActivatableAbilities`), Infiltration (`cards/effects/infiltration.js`); gleiche Klasse: Necromancy (nicht in der Gruppe, gemessen: direkt aktivierbar, über Charme nicht).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Main Phase 1; Sitz 0 Held 0: Charme Lv1; Sitz 1 Held 0: Infiltration Lv1, Gegner-Deck 10 Karten. Kontrollen im selben Aufbau: Leadership, Inventing, Alchemy.
+- **Schritte:** 1. `doActivateFreeAbility` auf die Charme-Zone von Sitz 0.
+- **Erwartet** (Kartentext „choose an Ability attached to an opponent's Hero and use it as if it was attached to this Hero"; Infiltration ist freie Aktivierung wie Leadership/Inventing): Infiltration steht im Picker; die oberste Gegner-Deckkarte kommt auf Sitz 0, der Gegner zieht 1.
+- **Beobachtet:** Charme Lv1 wird abgelehnt (`false`), kein Picker. Mit Leadership / Inventing / Alchemy als Gegner-Ability aktiviert Charme normal. Direkt aktiviert funktioniert Infiltration (`true`).
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/15-charme-lv1-infiltration-nie-ausleihbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `charme.js` (~Z. 255-275) prüft die geliehene Ability über `script.canFreeActivate.call(script, ctx, level)` mit einem Kontext **ohne `cardHeroIdx`** (Kommentar: „bleibt bewusst offen"); nur ein explizites `false` schließt aus. `infiltration.js:34-38` liest `heroes[ctx.cardHeroIdx]`, findet keinen Helden und gibt `false` zurück. Die Prüfung `Nur ein explizites false` fängt das nicht ab, weil „kein Held" selbst als `false` zurückkommt. Weitere `canFreeActivate`, die `cardHeroIdx` lesen: `necromancy.js` (bestätigt), `occultism.js`, `singing.js`, `training.js`, `trapping.js` (Direkt-Aktivierung im Testaufbau schon `false`, daher nicht gemessen).
+- **Nebenbeobachtung (ohne Befund):** Charme Lv1 leiht Adventurousness in der Aktionsphase aus (+10/+30 Gold, verbraucht die Aktion, Phase 3 → 4). Bei gefrorenem Charme-Helden wird das – anders als die Direktaktivierung (M01-11) – abgelehnt.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

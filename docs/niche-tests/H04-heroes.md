@@ -144,10 +144,49 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 - **Repro:** `docs/niche-tests/repro/H04-heroes/15-token-landet-in-ablage.js` (✗ = Fehler tritt auf; Mummy Token bei Sett ausgenommen, der mumifiziert seinen Wirt Sett selbst)
 - **Vermutete Ursache:** `_engine.js` `actionMoveCard` (~Z. 13715–13730): für `toZone === DISCARD` schiebt der „Kadaver landet VOR den Hooks"-Block `cardInstance.name` unbesehen in `discardPile`; die Token-Weiche (`hasCardType(cd, 'Token')` → `deletedPile`) gibt es nur in `_kreaturTodAbwickeln`/Schadens-Batch (~Z. 47235) und in `handleHeroDeathCleanup`. Eine Weiche im Zielstapel-Block von `actionMoveCard` würde alle Aufrufer (u. a. `actionDestroyCard`) abdecken.
 
+### H04-16 · Visionary Genius Heinz (und Tharx): unter Zieh-Sperre wird bezahlt, aber nichts gezogen · Stufe B (Heinz) / C (Tharx)
+- **Karten:** Visionary Genius Heinz (`visionary-genius-heinz.js`), Tharx, the Never-Losing General (`tharx-the-never-losing-general.js`); Sperre: `ps.drawLocked` (The Sacred Jewel, Prayer) bzw. `ps.handLocked`
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Heinz auf Held 0, Hand: 3× Fireball + Icebolt, Deck 20; `drawLocked = true`. Tharx: eine alte Kreatur in Support 0, `handLocked = true`.
+- **Schritte:** 1. Heinz aktivieren, drei Fireball markieren. 2. Tharx aktivieren, Bestätigung „Draw 1 card?" mit Ja.
+- **Erwartet** (Kartentext Heinz „discard up to 4 copies of the same card to draw that many cards"; das Skript sperrt `handLocked` in `canActivateHeroEffect` – erkennbare Absicht „kein Abwurf ohne Nachziehen"; Engine `actionDrawCards`: `handLocked || drawLocked` ⇒ `[]`): Heinz ist unter `drawLocked` nicht aktivierbar (wie unter `handLocked`). Tharx verbrennt unter Sperre nicht die Einmal-Sperre.
+- **Beobachtet:** Heinz wirft die drei Fireball ab, `actionDrawCards` liefert `[]`, Hand = 1 (Icebolt), die Einmal-pro-Zug-Sperre ist verbraucht. Tharx unter `handLocked`: Bestätigung wird angeboten, 0 Karten gezogen, Einmal-Sperre verbraucht (nur HOPT, keine Karten verloren – daher nur C). Gegenprobe: Heinz unter `handLocked` korrekt gesperrt ✓; gefroren/betäubt/negiert ✓; leeres Deck: wirft ab und zieht nichts (Text-konform: „to draw that many").
+- **Repro:** `docs/niche-tests/repro/H04-heroes/16-heinz-tharx-zieh-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `visionary-genius-heinz.js` `canActivateHeroEffect`: nur `ps.handLocked`; `drawLocked` (reiner Zieh-Lock, `_engine.js` ~10876) fehlt. `tharx-the-never-losing-general.js` `canActivateHeroEffect` zählt nur Kreaturen. Vergleich: `prayer.js:97`, `golden-ladybug.js:129`, `chuck-the-storyteller.js:357` prüfen beide Sperren. Leadership (`leadership.js` ~Z. 15–25) nennt dieselbe Lücke ausdrücklich als „nur CPU-Regel, der Menschenpfad bleibt unangetastet".
+- **Frage an Al:** Soll Heinz (und Tharx) unter `drawLocked` nicht aktivierbar sein wie unter `handLocked`? Ein Wort: „gesperrt" oder „erlaubt".
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
-| Sol Rym, the Thunder Djinn | L2 gezielt | Chain Lightning ohne Schule ✓, Quick-Attack-Reihenfolgen ✓, Coffee-Zusatzaktion ✗(→ -01), negiert/gefroren siehe unten |
+| Sol Rym, the Thunder Djinn | L2 gezielt | Chain Lightning ohne Schule ✓, Quick-Attack-Reihenfolgen ✓, Coffee-Zusatzaktion ✗(→ -01), negiert ✗(→ -02) |
+| Sorin, the Warden of Blood Rock | L2 gezielt | Verpuffen gegen nicht blutende Helden/Kreaturen ✓, blutende Kreatur 150 ✓, negiert behält Stufenbypass ✗(→ -02) |
+| Tsu'Ki, the Lunatic Princess | L1 Standard | Stufenbypass negiert ✗(→ -02, geteilt); Lunatic-Cycle-Kostensenkung nicht gesondert getestet |
+| Toras, Master of all Weapons | L2 gezielt | +40 je verschiedenem Artefakt ✓, gleichnamige zählen einmal ✓, Equipment zerstört ✓; Tod/Wiederbelebung ✗(→ -03) |
+| Taio, the Sun Fencer | L2 gezielt | Stufensenkung ✓ (normal), negiert ✗(→ -09), ATK +20 je Artefakt über Tod/Revive ✗(→ -03) |
+| Taio, Absorber of the Mountain's Heart | L2 gezielt | Nachguss Spell↔Attack ✓, Abbruch der Zielwahl ✗/C(→ -11) |
+| Xiong, the Bamboo Guardian | L2 gezielt | Galerie beider Ablagen ✓, gleichnamige Kopie ausgeschlossen ✗(→ -04) |
+| Saya, the Plant Princess | L2 gezielt | Zweitguss bei Stufe < Support-Stufe ✓, Einmal-Klauseln ✗/C(→ -05) |
+| Silent Water Mizune | L2 gezielt | Basis ✓, Träger-Zustände C(→ -06) |
+| Sas'Za, the Snaka Adventurer | L2 gezielt | Ziehen = Stufe ✓, Dreimal-Grenze ✓, Rückholung ✓; Token ✗(→ -07) |
+| Sett, the Adept of Necromancy | L2 gezielt | Zugende-Abräumen alte/neue/fremde Kreatur ✓ (fremde in der Ablage des Besitzers), toter Sett ✓; Zustände C(→ -14), Token ✗(→ -15) |
+| Sid, the King of Thieves | L2 gezielt | Raub 2 Karten ✓, Stufe-0-Freigabe ✓ (nach Spielen verschobener Index ✓); Ablage ✗(→ -12), negiert ✗(→ -13) |
+| Wall Breaker General Ralzish | L2 gezielt | genau 2 Kreaturen ✓, Verbot „seit Zugende beschworen" ✓; Fremdkreatur ✗(→ -10), Token ✗(→ -15) |
+| Willy, the Valiant Leprechaun | L2 gezielt | 5 Karten / 30 Gold am Ende des ersten Zuges ✓; Handlimit-Ende ✗(→ -08), Zugende-Zustand C(→ -14) |
+| Stellan, the Calm Cat | L2 gezielt | bis 3 verschiedene Lv-0-Kreaturen ✓, nur einmal je Zug ✓ (zweiter Treffer im Zug ohne Auslösung), Gift-Tick/Vena-Treffer/Frost+Schaden löst genau einmal aus ✓, tödlicher Treffer, volle Zonen, Deck-Weg, negiert ✓ |
+| Tryse, the Shadow Slayer | L2 gezielt | 2 Zufallskarten ✓, höchstens 2× pro Zug ✓, gestohlene Kreatur ✓, 1-Karten-Hand ✓, negiert stumm ✓, Heldentod ✓ |
+| Teocuilatl, the Embodiment of Gods | L2 gezielt | Kreatur opfern (+10) ✓, Held opfern (+30, Zugende, 1×/Spiel) ✓, HOPT ✓, ohne Opfer nicht aktivierbar ✓ |
+| Tempeste Moana, the Rain Singer | L2 gezielt | genau 2 Ausrüstungen = Creature 50 HP ✓, 50×Anzahl-Schaden ✓, 0 HP ⇒ Ablage des Besitzers ✓, negiert/tot ✓ |
+| Vena, the Bounty Huntress | L2 gezielt | Markierung ✓, Kopfgeld ⇒ neuer Held ✓, Ziel tot/wiederbelebt ✓, Besitzer-Ablage (Hind) ✓; Token ✗(→ -15), Vena übernommen nicht aktivierbar (Marke bleibt beim Besitzer) |
+| Zsos'Ssar, the Serpent Warlord | L2 gezielt | 2 Gift auf eigenen Held, +40×Vergiftete (Held und Kreatur), Abbruch ohne Gift ✓ |
+| Timeless King Zi | L1 Standard | 227-Zauber-Batterie (Wirkung/Bilanz; 6 Auffälligkeiten durch Zauber-Eigenheiten, nicht Zi); Vollständigkeit der Gegnerwahl siehe unten |
+| Styx, the Gate to the Spirit World | L2 gezielt | +100/+100 bei fremdem/eigenem Heldentod ✓, mehrfach ✓, gefroren/betäubt/negiert stumm ✓, toter Styx ✓, `maxHpCapped` ✓, unter Fremdkontrolle fragt der Kontrolleur ✓ |
+| Styx, the Opened Gate | L2 gezielt | Wiederbelebung eigener/gegnerischer Helden mit 100 HP ✓, Kontrolle bis Zugende, Zwangstod ✓, Zähler ✓, HOPT ✓, gefroren/betäubt/negiert ✓ |
+| Tarleinn the Traveler | L2 gezielt | 40/80/150 nach Zauberstufe (0/1/2/3) ✓, eine Schule/Fighting ⇒ nein ✓, HOPT ✓, Abbruch erstattet ✓, Zustände/tot ✓, Attack ⇒ nein ✓, geliehener Wirker ✓ |
+| Tazune, the Angry Hot-Blood | L2 gezielt | zwei Ladungen je Zug, Gegner-/Statusschaden unberührt, Reset beim Zugwechsel ✓, Phoenix Tackle Rückstoß ✓, Zustände ✓, eigene/gegnerische Kreatur ✓ |
+| Tempeste, the Weather Fairy | L2 gezielt | −100 andere Helden, min. 0 ✓, selbst unreduzierbar ✓, Zustände/tot ✓, zwei Tempeste stapeln, Gift auf anderem Helden ⇒ 0, Erstrunden-Immunität schlägt „unstoppable" ✓ |
+| Thalia, the Fun Fairy | L2 gezielt | Stufensenkung Support-Zauber (nackter Held ab Lv 0) ✓, Friendship 1/2 ✓, Zustände/tot ✓, Gegner-Thalia ✓, Nicht-Support ✓ |
+| Tharx, the Never-Losing General | L2 gezielt | zählt nur ältere Kreaturen ✓, HOPT ✓, Zustände ✓, geklaute Kreatur zählt, Token zählt; Zieh-Sperre ✗/C(→ -16) |
+| Treasure Huntress Semi | L2 gezielt | +6 Gold nur Rundeneinkommen ✓, gefroren/betäubt/tot ⇒ kein Bonus ✓ (negiert endet vor dem eigenen Zugbeginn) |
+| Visionary Genius Heinz | L2 gezielt | bis 4 gleiche Karten ✓, Zustände ✓, `handLocked` ✓; `drawLocked` ✗(→ -16) |
 
 ## Getestet & in Ordnung (Auswahl)
 - Sol Rym: erste Aktion Chain Lightning, danach Quick Attack (Zusatzaktion) gesperrt; Quick Attack zuerst (zählt als Aktion), danach Chain Lightning gesperrt.

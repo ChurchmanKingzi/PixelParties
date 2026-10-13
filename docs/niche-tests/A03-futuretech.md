@@ -153,6 +153,33 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 - **Repro:** `docs/niche-tests/repro/A03-futuretech/16-scrap-plow-board-cards.js` (✗ = Area fehlt)
 - **Vermutete Ursache:** `debt-o-tron-model-scrap-plow.js:60` baut die Liste selbst und lässt alles außer `support`/`ability` weg; statt `collectNonHeroBoardTargets` zu nutzen.
 
+### A03-futuretech-17 · Future Tech Database: Abbruch der ersten Wahl verbraucht Karte und 10 Gold · Stufe B
+- **Karten:** Future Tech Database (`cards/effects/future-tech-database.js`); Gegenprobe Mysterious Core, Blueprints (beide korrekt)
+- **Voraussetzungen / Aufbau:** Sitz 0: Hand Database, Ablage 2× Database, Deck mit Gun/Jetpack/Lamp; 100 Gold. Seed 1234.
+- **Schritte:** Database spielen, die erste Galerie („Add a Future Tech card …“, 1/3) mit dem Abbruch-Knopf (`{cancelled:true}`) schließen.
+- **Erwartet** (Quelle: CARD_API.md Z. 367-390 „Zielende Karten sind immer abbrechbar … Galerie … Abbruch heißt: nichts ist passiert. Die Karte bleibt auf der Hand“; Blueprints und Mysterious Core halten sich daran): Database wieder auf der Hand, Gold 100.
+- **Beobachtet:** `t.play` meldet „behandelt“, die Database liegt in der Ablage (3 Stück), 10 Gold sind bezahlt, nichts wurde geholt. Ein Abbruch erst in der zweiten Galerie (nach einer gewählten Karte) ist dagegen unkritisch (die erste Karte bleibt).
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/17-database-cancel-consumed.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `future-tech-database.js` `resolve`: `if (!name) break;` und am Ende immer `return { ok: true }`; beim Abbruch ohne bisherige Wahl müsste `{ cancelled: true }` zurückgehen.
+
+### A03-futuretech-18 · Future Tech Fists: „once per turn" gilt je Kopie statt je Kartenname · Stufe B
+- **Karten:** Future Tech Fists (`cards/effects/future-tech-fists.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Fists auf Held 0 und auf Held 1 ausgerüstet, 2× Fists in der Ablage; Gegner 800 HP je Held. Seed 1234.
+- **Schritte:** `t.activateEquip(0, 0, 0)` (Ziel: Gegner-Held 0), danach im selben Zug `t.activateEquip(0, 1, 0)` (gleiches Ziel).
+- **Erwartet** (Quelle: „… once per turn … **You can only activate the effect of "Future Tech Fists" once per turn.**“ – der zweite Satz nennt den Kartennamen und wäre sonst überflüssig): zweite Aktivierung abgelehnt.
+- **Beobachtet:** Beide Aktivierungen laufen; Gegner-Held 0 verliert 40 (Basis-ATK Held 0) + 80 (Held 1) = 120.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/18-fists-name-level-once.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Die Engine stempelt das Einmal-pro-Zug je Instanz (`_engine.js` ~42332 `hoptUsed['equip-effect:' + inst.id]`); das Skript hat keine Namenssperre (vgl. die Debt-O-Tron-Modelle, `_debt-o-tron-shared.js` `modelBase`, die ihre Namens-Sperren über `gs.hoptUsed` mit dem Kartennamen im Schlüssel führen).
+
+### A03-futuretech-19 · Future Tech Bomb und Steam Dwarf Brewer: Kreaturen-Sammler nach Brettseite statt nach Kontrolle (gestohlene Kreaturen) · Stufe B
+- **Karten:** Future Tech Bomb (`cards/effects/future-tech-bomb.js`), Steam Dwarf Brewer (`steam-dwarf-brewer.js`); Klasse wie M02-22 (Ricochet), S02-01 (Healing Melody); der Engine-Sammler `collectAoeCreatureTargets` (S01-09) ist davon getrennt (hier nicht erneut gemeldet)
+- **Voraussetzungen / Aufbau:** Seed 1234. Kreatur A gehört Sitz 1, steht auf Seite 1, von Sitz 0 gestohlen (`actionStealCreature(0, A)`); Kreatur B gehört Sitz 0, steht auf Seite 0, von Sitz 1 gestohlen; Kreatur C normal beim Gegner. Bomb: 2 verschiedene Future-Tech-Karten in Ablage (40 Schaden). Brewer: Sitz 0, Held 0 Slot 0, 150/150 HP.
+- **Schritte:** (Bomb) Future Tech Bomb aus dem Trank-Deck spielen. (Brewer) Brewer-Effekt aktivieren und die Zielliste ansehen.
+- **Erwartet** (Quelle: Bomb „all targets **your opponent controls**“, Brewer „another Creature **you control**“; CARD_API.md „Kontrolle statt Seite", Kreaturen = `controller ?? owner`): Bomb trifft B und C, nicht A. Brewer bietet A an, B nicht.
+- **Beobachtet:** Bomb trifft A (200 → 160, die Kreatur, die ich kontrolliere) und verfehlt B (200; die Kreatur, die der Gegner kontrolliert); C 160. Brewer bietet nur B an (die Kreatur des Gegners würde auf 150/150 gesetzt, ein Geschenk) und nicht A.
+- **Repro:** `docs/niche-tests/repro/A03-futuretech/19-bomb-brewer-side-not-control.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `future-tech-bomb.js:65` `getHeroTargets(oi)` + `getCreatureTargets(oi)` und `steam-dwarf-brewer.js:30` `getCreatureTargets(pi)`; `_engine.js:40250` `getCreatureTargets` iteriert die physischen Support Zones der Seite. (Helden-Teil der Bomb nicht gemessen.)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

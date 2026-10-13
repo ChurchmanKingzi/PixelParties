@@ -83,6 +83,23 @@ Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird a
 - **Vermutete Ursache:** `golden-vermin.js` `onResourceGain` prüft `ctx._isResourceGain` nicht (vgl. `wealth.js:32`, `royal-treasury.js:71`).
 - **Frage an Al:** Soll Golden Vermin das automatische Rundeneinkommen ersetzen dürfen (ja = jetziges Verhalten) oder nur Effekt-Gold wie die Monkees (nein)?
 
+### C03-10 · Mr. Jiggles (gestohlen): die geliehene Kreatur selbst wird als „Ziel, das dein Gegner kontrolliert" angeboten · Stufe C
+- **Karten:** Mr. Jiggles (`cards/effects/mr-jiggles.js`); Weg: jeder Kontrollwechsel (Lovely Teddy …).
+- **Voraussetzungen / Aufbau:** Sitz 0: Mr. Jiggles (Held 0 / Slot 0) + ZZ Dummy; Sitz 1 stiehlt Jiggles (`actionStealCreature`) und aktiviert ihn (`charmedOwner = 0`).
+- **Erwartet** (Text „up to 2 targets your opponent controls"): Jiggles wird jetzt von Sitz 1 kontrolliert; er ist kein Ziel „des Gegners". Angeboten werden nur Held und Kreaturen von Sitz 0 ohne Jiggles.
+- **Beobachtet:** Zielliste: alle Helden von Sitz 0, `Mr. Jiggles` selbst und ZZ Dummy. Der Dieb kann seine geliehene Kreatur (90 HP) mit 100 Schaden selbst zerstören (und sie kommt in die Ablage des Besitzers) – die Zielseite `'enemy'` wird nach Brettseite aufgelöst, nicht nach Kontrolle. (Die übrigen Karten dieser Gruppe mit `side: 'any'`/Zielwahl ohne Kontroll-Text sind davon nicht betroffen.)
+- **Repro:** `docs/niche-tests/repro/C03-creatures/10-mr-jiggles-gestohlen-bietet-sich-selbst-als-gegnerziel.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `mr-jiggles.js` `ctx.promptMultiTarget({ side: 'enemy', … })` – kein Filter auf `inst.controller`; verwandt mit C01-05/-07 (Brettseite statt Kontrolle).
+- **Frage an Al:** Darf eine geliehene Kreatur ihren eigenen Wirtsplatz als Gegnerziel wählen (ja = Brettseite zählt) oder soll sie herausgefiltert werden (nein = Kontrolle zählt)?
+
+### C03-11 · Monster Nest bietet Ifrit aus dem Deck an (nur von der Hand beschwörbar); die Wahl scheitert still und mischt das Deck · Stufe B
+- **Karten:** Monster Nest (`cards/effects/monster-nest.js`), Ifrit (`ifrit.js`, `summonOnlyFromHand`).
+- **Voraussetzungen / Aufbau:** Sitz 0: Monster Nest (nicht frisch); Deck = [Ifrit, Fireball, Slow]; Nest aktivieren, in der Galerie Ifrit wählen.
+- **Erwartet** (Ifrit: „This Creature cannot be summoned from anywhere, except your hand."; Nest-Kommentar: „die Galerie soll gar nicht erst lügen"; Pinta/Slave Trader filtern `summonOnlyFromHand`): Ifrit steht nicht in der Galerie; ist er die einzige taugliche Karte, ist das Nest nicht aktivierbar.
+- **Beobachtet:** Ifrit steht in der Galerie (auch als einzige Karte ist das Nest „aktivierbar"). Die Wahl wird vom Engine-Riegel abgewiesen (Log `summon_blocked`/`hand_only`), das Nest hebt sich wieder, die Karte kehrt ins Deck zurück und das Deck wird dabei neu gemischt (Ifrit, Fireball, Slow → Fireball, Slow, Ifrit): ein wirkungsloser Zug, der ein freies Mischen erlaubt. Bilanz/Zustand sauber, keine Fehler.
+- **Repro:** `docs/niche-tests/repro/C03-creatures/11-monster-nest-bietet-ifrit-an.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `monster-nest.js` `eligibleFromDeck()` (Filter: `isPileCreature`, kein Artifact-Creature, Level ≤ 3) ohne `loadCardEffect(cn)?.summonOnlyFromHand` (und ohne `cannotBeRevived`-/Bedingungs-Prüfung); `canActivateCreatureEffect` hängt an derselben Liste.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

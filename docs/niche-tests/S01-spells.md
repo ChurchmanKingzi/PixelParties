@@ -1,8 +1,16 @@
 # S01-spells – Nischenfall-Bericht
-Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent S01-spells (Vorgänger 12.10.2026, Fortsetzung 13.10.2026). Karten: 41 in der Liste · 39 gezielt getestet (L2), 2 Standardlauf (L1) · 25 Karten mit Befund (28 Befunde: 3 × A, 16 × B, 9 × C).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+28 Befunde (3 × A, 16 × B, 9 × C) aus 41 Karten; alle mit ausgeführtem Repro unter `docs/niche-tests/repro/S01-spells/` (01–28). Stufe A: **Calm Diatribe richtet die zweite Aktion nie ein** (`ctx.playerIdx` im `onTurnStart`, S01-10), **Dance of the Flame Pillars trifft im Vollflächen-Zweig nur die Gegnerseite** (`side: 'any'`, S01-05) und **Call for Help / Aurora Borealis führen ein zweites „Divine Gift" aus** (der Guss prüft `oncePerGame` nicht, S01-11).
+Querschnitts-Muster dieser Gruppe (jeweils mehrere Karten):
+* **Einmal-pro-Spiel/Pro-Zug-Stempel und Negierung/Sofortguss:** negiertes Divine Gift stempelt nicht (S01-01, alle 11 Gifts), Chaos Magic als Divine Gift stempelt nicht (S01-14), Sofortgüsse umgehen den Stempel (S01-11), Big Oopsie / Butterfly Cloud zählen negiert nicht (S01-02, C), Opfer-Kosten bei Negierung (S01-26, C).
+* **Besitzer/Kontrolle statt Spalte:** der Flächen-Sammler `collectAoeCreatureTargets` nimmt „Besitzer ODER Kontrolleur" (Boiling Oil, Divine Gift of Fire, jede `aoeHit`-Karte, S01-09), Divine Gift of Forgetting rechnet nach Spalte (S01-23).
+* **Stufen-Zählung:** Death und Create Illusion zählen Xals Support-Zonen-Abilities nicht (S01-20; vermutlich ~40 weitere Skripte mit `countAbilitiesForSchool(… abilityZones …)`), Death gewährt die Zusatzaktion nach Absicht statt nach Ergebnis (S01-21).
+* **Sperren-Lücken:** Divine Gift of Creation sperrt Equipment/Surprises/Abilities nicht (S01-19), Aurora Borealis fehlt die Hand-Sperre (S01-28), Such-Sperre gilt nicht für Deck → Brett (S01-27, C), Anti Magic Zone erfasst später Beschworene/Wiederbelebte nicht (S01-07).
+* **Abbruch/Regel 23.9:** mehrstufige Wahlen ohne Abbruch-Knopf (S01-25), Kosten vor Zielwahl-Abbruch (Aurora S01-08, Call for Help S01-12); Zielwahl-Antworten werden serverseitig nicht auf Anzahl/Regel geprüft (Chain Lightning S01-13, allgemein S01-22, beides C).
+Gesamteindruck: die Zauber-Effektkerne sind solide (Staffelwerte 1/2/3 bei Burning Finger, Big Oopsie, Aurora, Death, Create Illusion stimmen; Armageddon in allen Siegvarianten, Cataclysm, Disruption Ray, Disarm, Forgetting, Body Swap-Statübertrag, Equality-Rundung ✓). Die Fehler sitzen an den Rändern: Stempel/Negierung, Besitz/Kontrolle, Spezialzonen (Xal), Sperren-Marken und Aktionsbuchhaltung.
+Bewusst NICHT getestet: Skill-Test-Modus und 3–4-Sitz-Tische (z. B. Cataclysms Stufenregel kennt nur die Area-Zonen von Sitz 0/1 – im Normalspiel irrelevant); reale Client-Oberfläche (Knöpfe, Animationen); Divine Gift of Balance wurde über die Skript-Funktionen `canActivatePermanent`/`onActivatePermanent` statt über `doActivatePermanent` geprüft (der Server-Handler ist in der Harness nicht exportiert); Controlled Attack, Brilliant Idea nur L1; Erste-Runden-Immunität nur mit künstlichem Brett (siehe unten); Zufallsanteile (Chaos Magic nur mit festem Deck, Forgetting mit festem Samen).
 
 ## Befunde
 ### S01-01 · Negiertes Divine Gift verbraucht die gemeinsame Einmal-pro-Spiel-Grenze nicht · Stufe B
@@ -195,7 +203,7 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Erwartet** (Kartentext: „Choose up to 1/2/3 defeated Heroes …" / „Choose a level 1/2/3 or lower Creature …"; Xal: „You may place Abilities into the Support Zones of this Hero." – diese Stapel zählen für den Level-Vertrag `heroMeetsLevelReq` und `effectiveSchoolLevelForCaster` (3), `_engine.js` ~Z. 43140/43290): Death erweckt beide Helden, Create Illusion bietet Level-3-Kreaturen an.
 - **Beobachtet:** In der Ability-Zone ✓ (2 Helden erweckt; Level-3-Angebot). In Xals Support Zone: `heroMeetsLevelReq` und `effectiveSchoolLevelForCaster` sehen Stufe 3 und lassen den Zauber zu, aber Death rechnet `maxPicks = 0` und bricht ab (Karte zurück auf die Hand, kein Held erweckt); Create Illusion bietet nur Level-1-Kreaturen an.
 - **Repro:** `docs/niche-tests/repro/S01-spells/20-xal-support-zonen-abilities-staffel.js` (✗ = Fehler tritt auf)
-- **Vermutete Ursache:** Beide Skripte zählen direkt `engine.countAbilitiesForSchool(school, ps.abilityZones[heroIdx])`; richtig wäre `engine.effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner)` (Vorbild: `aurora-borealis.js`), das Xals Stapel (`heroSupportAbilityStacks`) und `_castSchoolOverride` einrechnet. Dasselbe Muster steht laut `grep` in ca. 40 weiteren Skripten (nicht geprüft); aus meiner Gruppe zusätzlich `divine-gift-of-sacrifice.js` (s. dort).
+- **Vermutete Ursache:** Beide Skripte zählen direkt `engine.countAbilitiesForSchool(school, ps.abilityZones[heroIdx])`; richtig wäre `engine.effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner)` (Vorbild: `aurora-borealis.js`), das Xals Stapel (`heroSupportAbilityStacks`) und `_castSchoolOverride` einrechnet. Dasselbe Muster steht laut `grep` in ca. 40 weiteren Skripten (nicht geprüft); in `divine-gift-of-sacrifice.js` steht der Aufruf nur in der CPU-Bewertung (`cpuHeroValue`), nicht in der Regel.
 
 ### S01-21 · Divine Gift of Death: die Zusatzaktion wird auch gewährt, wenn nur EIN Held erweckt wird · Stufe B
 - **Karten:** Divine Gift of Death (`cards/effects/divine-gift-of-death.js`, `inherentAction`-Funktion).
@@ -274,7 +282,56 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** Es fehlt `blockedByHandLock: true` in `aurora-borealis.js` (bzw. die Auto-Erkennung des Laders markiert nur `blockedBySearchLock`; vgl. B-Querschnitt „Sperren-Auto-Erkennung"); alternativ ein Abbruch (`gs._spellCancelled`), wenn alle Hinzufügungen scheitern, wie bei Brainstorming.
 
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Accusation | L2 gezielt | 3 Kopien ziehen 3 ✓, 0 Treffer ✓, Abbruch ✓, [B]/[W]-Basisname ✓, Deck zu klein ⇒ Deck-Out ✓ (Text: „draw 1 for every card"); Erstrunde: nichts abgeworfen ✓, Karte aber verbraucht (B-06-Klasse, kein eigener Befund) |
+| Aligning Goals | L2 gezielt | Gold 4/5 ✓, Aktivierung der geliehenen Kreatur (Main 2) ✓, HOPT ✓, Tod in Leihe ⇒ Ablage des Besitzers ✓, Rückgabe beim Zugwechsel ✓, Zusatzaktion ✓, bei Negierung kein Gold weg ✓ |
+| Alluring Light | L2 gezielt | ATK 70/0 ✓, eigene Kreatur als Opfer ✓, gefrorener/negierter Angreifer (zieht trotzdem; Text offen), Abbruch ✓, toter Held ✓ |
+| Anti Magic Zone | L2 gezielt | Dauer (T+1 aktiv, T+2 weg) ✓, eigene Helden mitgesilenced ✓, Kreaturen negiert ✓; später beschworene Kreatur / wiederbelebter Held ✗ (→ S01-07) |
+| Armageddon | L2 gezielt | 50 auf alle ✓, Kreaturen sterben vor Zählung ✓, Gleichstand ⇒ Wirker verliert ✓, mehr Kreaturen ⇒ Sieg ✓, geliehene Kreaturen zählen für den Kontrolleur ✓, nur eigene Helden tot ⇒ Gegner gewinnt ✓, Fireball danach wirkungslos (`damageLocked`) ✓, negiert ⇒ kein Zugende ✓ |
+| Audience with a hostile King | L2 gezielt | Abstieg (HP-Differenz, Ruling) ✓, Ablage des Besitzers ✓, unspielbar ohne Ascended ✓, Zusatzaktion ✓ |
+| Aurora Borealis | L2 gezielt | Staffel 1/2/3 ✓, Magic Arts 3 + 3 Zauber ⇒ „delete 2" ✓; Abbruch der Ausführung verliert 2 Zauber (→ S01-08), zweites Divine Gift (→ S01-11), Hand-Sperre (→ S01-28) |
+| Big Oopsie | L2 gezielt | Staffel 150/300/450 ✓, Gegner wählt ✓, Ascended ⇒ Zusatzaktion ✓ (Basis: keine) ✓; Negierung zählt nicht (→ S01-02, Vorgänger) |
+| Blind Destruction | L2 gezielt | Nutzer ausgenommen ✓, 50 × Artefakte je Held ✓, Ausrüstung toter Helden wird mitgeräumt, Ablage des Besitzers ✓, nur Wirker-Ausrüstung ⇒ unspielbar ✓; geschützter („charmed") Held bekommt keinen Schaden (Charme-Regel) ✓ |
+| Boiling Oil | L2 gezielt | 80 auf Gegnerseite ✓, tote/gefrorene Hosts ✓; Leihkreatur wird getroffen (→ S01-09) |
+| Brainstorming | L2 gezielt | 4/6 Kopien ✓, zwei Gruppen (Wahl) ✓, Deck leer ⇒ zurück auf Hand ✓, Suche = Gruppenname ✓, Zusatzaktion ✓, Such-/Hand-Sperre ✓ |
+| Brilliant Idea | L1 Standard | Standardlauf und Sperren (Hand/Such) ✓; sonst nichts erkannt |
+| Burning Finger | L2 gezielt | Staffel 100/160/240 ✓, tote/gefrorene Hosts ✓ |
+| Butterfly Cloud | L2 gezielt | (Vorgänger) Negierung ⇒ Sperrzug nicht gezählt (→ S01-02), Dark Ocean (→ S01-03) |
+| Call for Help | L2 gezielt | Bedingung (Kontrolleur-Stempel, nur eigener Zug) ✓, „regardless of level" (kein Schul-Zwang) ✓, HOPT je Name ✓; zweites Divine Gift (→ S01-11), unspielbare Angebote/Abbruch (→ S01-12) |
+| Calm Diatribe | L2 gezielt | Zusage nie eingerichtet (→ S01-10, mit simulierter Korrektur gegengeprüft) |
+| Cataclysm | L2 gezielt | Stufe 0 bei Area ✓ (2 Sitze), Schaden auf alle inkl. Kreaturen ✓, Areas in die Ablage der Besitzer ✓, negiert ⇒ Areas bleiben ✓; tote/gefrorene Hosts ✓ |
+| Chain Lightning | L2 gezielt | 200/150/100 ✓, bei einem Helden: Held + 2 Kreaturen ✓; serverseitig ungeprüfte Wahl (→ S01-13) |
+| Chaos Magic | L2 gezielt | 5 Nicht-Zauber ⇒ Hand abgeworfen ✓, bereits gewirkte Zauber übersprungen ✓, Divine Gift bei gesetztem Stempel fizzelt ✓; Stempel/Zusatzaktion (→ S01-14) |
+| Cleansing of the Land | L2 gezielt | Zusatzaktion nur mit Area ✓, Areas in die Ablage der Besitzer ✓, Area-Wahl/„Use it?" (Ja/Nein) ✓, eigene Area vorher ✓; Hand-Sperre ⇒ halbe Wirkung (Anm. in S01-28) |
+| Compulsory Body Swap | L2 gezielt | Ability-Zonen und Instanzen getauscht ✓, Toughness-/Fighting-Zähler (max-HP/ATK) wandern ✓, Audit sauber ✓; Dedizierter Test der Zusatzaktion des Nutzers nicht ausgeführt |
+| Controlled Attack | L1 Standard | Marke `controlledBy` gesetzt und zum Zugwechsel gelöscht ✓; ein Zauberwurf mit dem kontrollierten Helden wird abgelehnt (`validateActionPlay` = null; beim Charme erlaubt) – passt zum Text („Abilities and active effect"), nicht weiter verfolgt |
+| Create Illusion | L2 gezielt | Staffel ✓, Vollzyklus (zurück ins Deck, Gegner zieht Level) ✓, Tod in der Zwischenzeit ✓, `summonLocked` ✓; Zone des Nutzers (→ S01-15), „may" (→ S01-16), Xal (→ S01-20), Abbruch-Knopf (→ S01-25), Such-Sperre (→ S01-27) |
+| Create Secret Room | L2 gezielt | Platzieren ✓, Auslösen durch Einzelziel („add to hand") ✓, Flächenschaden löst nicht aus ✓; Such-Sperre (→ S01-27), Detection-Interaktion (→ S01-18) |
+| Dance of the Flame Pillars | L2 gezielt | (Vorgänger) → S01-05, S01-06; zusätzlich N=0 ⇒ unspielbar ✓, Kopien zählen einmal ✓, Wahl-Grenzen ✓ |
+| Dangerous Knowledge | L2 gezielt | Einmal-je-Held ✓, Namens-Filter ✓; Einzelkandidat ohne Schutzprüfung (→ S01-17) |
+| Deepsea Treasure | L2 gezielt | Deck < 3 ✓, 1/2 Equipment, beide spielen ✓, Ablehnen ⇒ bleibt in der Hand ✓, Nicht-Equipment ⇒ Gratis-Marke bis Zugende ✓ |
+| Detection | L2 gezielt | Surprises der Gegnerseite, Ablage des Besitzers, 2 Karten je Surprise ✓; Nicht-Surprise-Karte aus Create Secret Room (→ S01-18); Sperren: Zieh-Sperre ⇒ nur Entfernen |
+| Disarm | L2 gezielt | Held-Wahl dann Artefakte (mind. 1) ✓, Löschen in den Stapel des Besitzers ✓, Charme-Held und toter Held ✓, Zusatzaktion ✓ |
+| Disruption Ray | L2 gezielt | Verdopplung im Zug, im Gegnerzug, im eigenen nächsten Zug ✓, danach abgelaufen ✓, kein Stapeln (zweiter Ray) |
+| Divine Gift of Balance | L2 gezielt | Platzieren/Stempel ✓, Aktivierung beider Spieler im eigenen Zug ✓, einmal je Zug ✓; Zieh-Sperre verbraucht die Aktivierung (kleiner Randfall, nicht gemeldet); Negierung (→ S01-01) |
+| Divine Gift of Biseria | L2 gezielt | Dauer 3 Züge (Held des Gegners, eigener Held, Kreatur) konsistent ✓ |
+| Divine Gift of Creation | L2 gezielt | Sperre nach 2 Karten für Zauber/Kreatur ✓, 1 Karte ⇒ keine Sperre ✓; Equipment/Surprise/Ability nicht gesperrt (→ S01-19) |
+| Divine Gift of Death | L2 gezielt | Staffel ✓, Max-HP-Deckel 50 (Heilung/`increaseMaxHp`) ✓; Zusatzaktion nach Absicht (→ S01-21), Xal-Zählung (→ S01-20), Anzahl-Prüfung (→ S01-22) |
+| Divine Gift of Equality | L2 gezielt | Halbierung aufgerundet (125 ⇒ 63, 1 ⇒ 1) ✓, Kreatur/Held/eigener Held als Ziel ✓, Held mit Schule nicht wählbar ✓; Abbruch-Knopf (→ S01-25) |
+| Divine Gift of Fire | L2 gezielt | Spielerwahl, Helden und Kreaturen brennen ✓; Leih-/Verlustkreaturen in beiden Richtungen (→ S01-09 „Verwandt") |
+| Divine Gift of Forgetting | L2 gezielt | Starting Abilities bleiben ✓, Toughness-Abgang ✓; Kontrolle statt Spalte (→ S01-23) |
+| Divine Gift of Magic | L2 gezielt | Senkung −3 ✓, Verfall am Zugwechsel ✓; alle Kopien (→ S01-24) |
+| Divine Gift of Sacrifice | L2 gezielt | +Max-HP und aktuelle HP ✓, Max-HP des Opfers ✓, Stempel ✓; Abbruch-Knopf (→ S01-25), Negierung (→ S01-26) |
+| Divine Gift of Skill | L2 gezielt | (Vorgänger) → S01-04; 1 + 4 Anhängungen ✓, Verfall zum Zugwechsel ✓ |
+| Divine Gift of the Deepsea | L2 gezielt | Bounce + Ersatz aus Deck/Hand ✓, `_hasHaste` ⇒ Aktivierung im selben Zug ✓, Leihkreatur nicht wählbar ✓; Such-Sperre (→ S01-27) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+* **Staffelwerte:** Burning Finger 100/160/240 und Big Oopsie 150/300/450 je Destruction-Magic-Stufe 1/2/3; Aurora Borealis (1/2/3 Zauber), Create Illusion (Level 1/2/3) und Death (1/2/3 Helden) bei Schulen in der Ability-Zone.
+* **Armageddon** in allen Siegvarianten (mehr Kreaturen / Gleichstand / Gegner mehr / eigene Helden tot / nur eigene Seite tot), geliehene Kreaturen zählen für den Kontrolleur, `damageLocked` blockiert Folge-Schaden, negiert ⇒ kein Zugende.
+* **Dauer-Effekte mit echtem `endTurn()`:** Disruption Ray (bis Ende des eigenen nächsten Zuges), Anti Magic Zone (Ende des gegnerischen nächsten Zuges), Divine Gift of Biseria (3 Züge der Besitzerseite), Create Illusion (Rückkehr am Ende des Gegnerzuges + Ziehen), Divine Gift of Creation (Sperre nur bis Zugende), Divine Gift of Skill (4 Zusatz-Anhängungen, Aufhebung).
+* **Zonen/Besitz:** Disarm, Blind Destruction, Detection und Aligning Goals legen Karten in den Stapel des **Besitzers** ab (auch bei Charme/Leihe/totem Host); Cataclysm legt Areas in die Ablage ihrer Besitzer; Divine Gift of Forgetting lässt Starting Abilities liegen und gibt Toughness-Boni zurück; Compulsory Body Swap überträgt `hpGranted`/`atkGranted`.
+* **Konventionen:** Brainstorming (Suche, Gruppenwahl, Zusatzaktion), Cleansing of the Land (Ja/Nein „Use it?", Zusatzaktion nur mit Area), Deepsea Treasure (Deck < 3, Ablehnen, Gratis-Marke bis Zugende), Divine Gift of the Deepsea (Hast, Ersatzauswahl), Divine Gift of Equality (Aufrunden).
+* **Ziele auf toten/gefrorenen Heldenseiten:** Burning Finger, Boiling Oil, Chain Lightning, Cataclysm, Disruption Ray, Blind Destruction treffen Kreaturen unter totem und gefrorenem Host korrekt.
+* **Harness-Hinweise (für Nachtests):** Antworten `{ cancelled: true }` auf `promptGeneric` laufen in der Harness roh durch, der echte Weg (`resolveGenericPrompt`) macht daraus `null`; für Abbruch-Tests `null` verwenden. Decks von Sitz 1 nicht leer lassen (`deck: [x, []]` lässt Sitz 1 beim ersten Zug durch Deck-Out verlieren). `t.put` setzt `turnPlayed` auf den aktuellen Zug (Beschwörungsschlaf) – für Kreaturen-Aktivierungen `inst.turnPlayed = 1` setzen.
+* **Erste-Runden-Immunität (nur mit künstlichem Brett gemessen, daher kein Befund):** Anti Magic Zone, Armageddon, Boiling Oil, Butterfly Cloud, Cataclysm, Divine Gift of Fire verletzen/negieren/verbrennen Kreaturen des geschützten Spielers, Detection entfernt dessen Surprise, Divine Gift of Forgetting entfernt dessen Nicht-Starting-Abilities. Im echten Zug 1 hat der geschützte Spieler dort noch nichts, also keine Folge (B-05/B-06 decken die realistische Lage ab); Accusation verbraucht in Zug 1 Karte und Aktion ohne Wirkung (B-06-Klasse).

@@ -125,6 +125,15 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/S03-spells/13-telekinesis-keine-aktivierbare-surprise-verbraucht.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `telekinesis.js` Z. 43–77 `spellPlayCondition` benutzt `_regulaereZonen` (nur lebend/nicht gefroren/nicht betäubt) und nicht die Prüfung `_canHeroActivateSurprise`, die erst die Zielliste in `_getEligibleTelekinesisTargets` filtert; `onPlay` Z. 87 `if (targets.length === 0) return;` bricht ohne `gs._spellCancelled = true` ab.
 
+### S03-14 · Ultimate Weapon Experiment: ein übernommener (geliehener) Held ist kein gültiger Wirt · Stufe B
+- **Karten:** Ultimate Weapon Experiment (`ultimate-weapon-experiment.js` `kandidaten`/`bedingungErfuellt`); Gegenprobe: `performAscension` aus der Hand (`_engine.js` ~49013, Vorgabe 29.9.).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 1 hat „Legendary Explorer Dajan" in Held 0, Sitz 0 übernimmt ihn (`actionStealHero(0, 1, 0)`), Gold 100 (Bedingung: 60+ Gold); Sitz 0 hat „Dajan, Conqueror of the Treasure Cave" im Deck (UWE-Lauf) bzw. auf der Hand (Kontrolle).
+- **Schritte:** 1. Held übernehmen (80 ms warten). 2a. Ultimate Weapon Experiment spielen. 2b. Kontrolle: `performAscension(0, 0, 'Dajan, Conqueror …', 0, { heroOwner: 1 })`.
+- **Erwartet** (Kartentext „Search your deck for an Ascended Hero whose Ascension Conditions are fulfilled by a Hero **you control** and play it on top of that Hero."; Vorgabe 29.9. im Engine-Kommentar: „auch aus der HAND auf einen geliehenen Helden – bei JEDER echten Übernahme (Charme, Golden Apple, Styx …)"): der übernommene Held ist ein gültiger Wirt.
+- **Beobachtet:** 2b klappt (Held wird Dajan, Conqueror). 2a: `play` ⇒ `false` („spellPlayCondition"), die Karte bleibt auf der Hand – `kandidaten()` kennt nur die Helden der eigenen Spalte (`ps.heroes`) und ruft `ascensionCondition(gs, pi, hi, engine, pi)` mit der eigenen Brettseite. Dieselbe Aufstellung mit eigenem Helden: Aufstieg, volle Heilung (600/600), Poison + Frozen entfernt ✓.
+- **Repro:** `docs/niche-tests/repro/S03-spells/14-ultimate-weapon-experiment-geliehener-held.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `ultimate-weapon-experiment.js` Z. 36–63 (Z. 60 `(ps.heroes || []).map`) und Zielwahl Z. 105: `kandidaten` iteriert `ps.heroes`; der geliehene Held liegt in der Spalte des Besitzers (`engine.heroesControlledBy(pi)` liefert `{ physOwner, heroIdx }`), und `performAscension` bekäme `opts.heroOwner` mit.
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung

@@ -171,6 +171,15 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/19-shapeshifter-reste-ida-fiedel-friedhelm.js` (✗ = Fehler tritt auf; 3 ✗)
 - **Vermutete Ursache:** wie H01-14: `initGainedHeroEffect` führt die Anfangsroutine der Gestalt aus, `loseHeroEffect` → `onIdentityLost` fehlt bei Ida (`heroFlags` geschlüsselt nach Seite/Slot), Fiedel (`levelOverrideCards` am Heldenobjekt) und Friedhelm (`_maxActionsPerTurn`).
 
+### H02-heroes-20 · Heragas (negiert) zieht weiter 1 Karte je besiegter Kreatur · Stufe B
+- **Karten:** Heragas, the Monster Slayer (`heragas-the-monster-slayer.js`, `bypassStatusFilter: true`)
+- **Voraussetzungen / Aufbau:** Heragas als Held 0 (Status `negated`), Hand [Attack], eine 10-HP-Kreatur auf Sitz 1; Kontrolle ohne Status.
+- **Schritte:** 1. „Attack" (Lv 0, ohne Fähigkeiten spielbar) auf die Kreatur. 2. Deck-Länge vor/nach.
+- **Erwartet** (Kartentext „Whenever this Hero defeats a Creature, draw 1 card."; Konvention B-09: negierte Helden verlieren ihren Heldeneffekt, der Heldeneffekt-Knopf ist unter Negation korrekt gesperrt): negiert keine Karte ziehen.
+- **Beobachtet:** Kreatur besiegt, Deck 20 → 19 (Hand: gespielte Karte ersetzt). Kontrolle ohne Status zieht ebenfalls 1 (richtig). Unter Frost/Betäubung kann Heragas nicht angreifen, dort ohne Folge.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/20-heragas-negiert-zieht-weiter.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `heragas-the-monster-slayer.js:70` `bypassStatusFilter: true` hebt den zentralen Statusfilter für ALLE Hooks des Skripts auf (gedacht für `onTurnEnd`→`stampTurnEnd`, damit die Zeitmarke auch unter Status läuft); die Reaktion `onCreatureDeath` prüft `_isHeroEffectSilenced` nicht selbst.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 
