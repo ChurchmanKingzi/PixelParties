@@ -1,8 +1,16 @@
 # A08-pacman – Nischenfall-Bericht
-Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am Ende gezählt) gezielt getestet · (wird am Ende gezählt) mit Befund.
+Stand/Autor: Agent A08-pacman, 13.10.2026 (Fortsetzung des am Rate-Limit gestorbenen Vorgängers; IDs -01…-15 unverändert übernommen). Karten: 38 in der Liste · 37 gezielt getestet (36 × L2, 1 × L1), 1 nur gelesen (Treacherous Crystal) · 28 mit Befund. 32 Befunde: 10 × A, 17 × B, 5 × C.
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – der Bericht wächst fortlaufend)
+32 Befunde in 38 Karten (A: -01, -02, -03, -07, -08, -11, -15, -16, -18, -26 · B: -04, -05, -06, -09, -12, -13, -14, -17, -20, -21, -22, -24, -25, -28, -29, -30, -31 · C: -10, -19, -23, -27, -32). Alle mit ausgeführtem Repro unter `docs/niche-tests/repro/A08-pacman/` (Ausnahmen mit statischem Anteil: -17, -29).
+Die wichtigsten Muster:
+- **Zielsammler / Instanzsuche nach „Besitzer ODER Kontrolleur" oder Besitzer-Spalte** (Prüfauftrag F02-14/S01-09): Ushabti greift bei gleichnamigen Kreaturen die falsche Instanz und hinterlässt eine Geister-Instanz (-16), Trial of Coolness legt das Extraleben auf die Kreatur des Gegners (-18), die Waflav-Formen listen seitenfremde Kreaturen unter dem falschen Brett mit kollidierenden IDs (-30); Ushabti-Einlagerung seitenfremder Kreaturen ist nicht beschwörbar (-17) und der Beschwörungsweg umgeht Sperren (-29). Bakhm macht es richtig.
+- **Kristalle (Crystals):** Weakening Crystal wirkt erst ab dem nächsten eigenen Zugbeginn (-01), hat eine Lücke nach fremder Negation (-20) und ignoriert Status-Immunität (-28); Distracting Crystal fehlt an Tränken und drei Karten (-08, -09, C -10); Rusting Crystal wird von Cool Presents und Beer ignoriert (-02, -26).
+- **Sperren-Lücken:** Waflav-Tutoren (-14), Paraseed Greenhouse und Crystal Well auf dem Area-Weg (-24), Cool Presents (-31).
+- **Paraseed/Waflav-Familie:** Max-HP-Deckel und Aufstieg (-05), Deep-Drowned-Schlag trifft Kreaturen nicht (-15), Dominance gegen Paraseed (-12), Bloom-Reihenfolge (-22), Paraseed bei Stilllegung (C -23), Zombie wertet den Besitzer der Quelle aus (-21).
+- Weitere Einzelfälle: Letter mischt die Hand an Ort und Stelle (-03), Afflicted Pests legt Tokens in die Ablage (-11), Extraleben nur gegen Schaden (-07), Cactus reagiert nicht auf Kreaturenstatus (-13), Noble Mummy Guards (-25).
+Gesamteindruck: Die Einzelkarten laufen im Standardfall sauber (Absturz-/Hänger-Klassen: keine Befunde, `audit()` bei den Repros sauber, außer den Zustandsfehlern -16/-17); Fehler liegen in den Randzonen Kontrolle ≠ Besitz ≠ Brettseite, Sperren und Mehrkarten-Effekten.
+**Bewusst nicht getestet:** Treacherous Crystal (Server-Handler nicht exportiert, headless nicht aufrufbar), Oberflächen-/Client-Darstellung (Zielmarkierungen, Animationen), 3/4-Spieler-Partien, CPU-/MCTS-Wege, Skill-Test-Modus, Trial of Loyalty über die Standardfälle hinaus, Stun-Variante von -19 (nur Burn/Poison gemessen). Das Vorgänger-Skript `t14-mary.js` war lautlos abgebrochen; Mary Crestmas wurde in dieser Fortsetzung neu gemessen. Nicht gemeldete Konstruktionen: Camel-Ziehen in der gegnerischen Resource Phase, Mary mit 0-Schaden-Ereignis.
 
 ## Befunde
 
@@ -149,7 +157,7 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/17-ushabti-seitenfremde-kreatur-nicht-beschwoerbar.js` (✗ = Fehler tritt auf; der Socket-Handler ist headless nicht aufrufbar, daher sind seine Prädikate nachgebildet – Restunsicherheit, daher B)
 - **Vermutete Ursache:** `server.js` ~15067-15075 (`summon_ushabti`) und ~5826-5830 (`ushabtiSummonable`) filtern nach `inst.owner === pi` statt nach der Spielerzone, in der die Karte liegt. (Gestohlene Kreaturen sind unauffällig: Besitzer = Brettseite, Rückgabe zu Zugende ✓.)
 
-### A08-18 · Trial of Coolness: ein gewählter seitenfremder Kreatur-Besitz bekommt das Extraleben nicht – die gleichkoordinierte Kreatur des Gegners schon · Stufe A
+### A08-18 · Trial of Coolness: wird eine seitenfremd beschworene Kreatur gewählt, bekommt die gleichkoordinierte Kreatur des Gegners das Extraleben · Stufe A
 - **Karten:** Trial of Coolness (`trial-of-coolness.js`); Prüfauftrag „Zielsammler Besitzer ODER Kontrolleur"
 - **Voraussetzungen / Aufbau:** Sitz 0 hat „ZZ Dummy" (Held 0 / Slot 0) und spielt Plant Golem (Besitzer 0, Kontrolleur 1, steht auf Seite 1 / Held 0 / Slot 0). Echter Zugwechsel zu Sitz 1; Sitz 1 spielt Trial of Coolness mit Held 1 (Held 0 trägt den Golem und ist gesperrt).
 - **Schritte:** 1. Zielwahl zeigt u. a. „Plant Golem" (Id `equip-0-0-0`, weil `inst.owner` als Brettspalte benutzt wird). 2. Sitz 1 wählt den Golem.
@@ -269,10 +277,66 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Vermutete Ursache:** `cool-presents.js` (~Z. 158, Schleife) ruft `actionTransferCardToOppHand(pi, t.handIndex, { source })` ohne `windowChecked: true`; das Fenster wird nicht einmal vor der Zahlung geöffnet (Live Show, `live-show.js:202`, macht es richtig). Gleiche Klasse bei jeder Mehrkarten-Übergabe.
 - **Zusatz (im Repro als zweiter Teil):** Hat der Gegner eine Such-Sperre (`ps.searchLocked`, über Siege auch über Zugwechsel hinweg erreichbar), lehnt `actionTransferCardToOppHand` jede Übergabe ab. Cool Presents prüft nur `ops.handLocked` (dann sauberer Abbruch ohne Kosten): gemessen wurden 12 Gold bezahlt, 0 Karten geliefert, die Karte liegt in der Ablage.
 
+### A08-32 · Afflicted Pests reagiert nicht, wenn der Gegner eine Ability anlegt (Text „equips or attaches a card to a Hero") · Stufe C
+- **Karten:** Afflicted Pests (`afflicted-pests.js`, Auslöser `surpriseEquipTrigger`), Vergleich Noble Mummy Guards („attaches an Ability to a Hero")
+- **Aufbau / Schritte:** Sitz 0: Pests als Surprise an Held 0; Sitz 1 legt „Fighting" bzw. „Resistance" an Held 0 an. Vergleich: Club of Gobbo wird ausgerüstet.
+- **Erwartet:** offen. Wörtlich ist eine Ability „a card", die an den Helden „attached" wird (so formuliert es das Spiel bei Waflav und Noble Mummy Guards). Das Skript meint nur Karten, die in eine Support Zone treten (Ausrüstung/Attachments).
+- **Beobachtet:** Club of Gobbo löst aus ✓; Fighting und Resistance lösen nicht aus, Pests bleibt verdeckt. Der Skriptkopf nennt „Choose a non-Creature card in any Hero's Support Zone" (älterer Textstand).
+- **Repro:** `docs/niche-tests/repro/A08-pacman/32-afflicted-pests-loest-bei-ability-nicht-aus.js` (✗ = Lesart „Abilities zählen" verletzt)
+- **Vermutete Ursache:** `_engine.js` ~3567: `_checkSurpriseOnEquip` wird nur beim Eintritt in eine Support Zone gerufen; das Ability-Anlegen nutzt `surpriseAbilityTrigger`.
+- **Frage an Al:** Soll Afflicted Pests auch auslösen, wenn der Gegner eine Ability an einen Helden anlegt – ja oder nein?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
-| (wird fortlaufend ergänzt) | | |
+| "Bloom", the Continent Corruptor | L2 gezielt | erzwungener Aufstieg aus dem Tod (mit/ohne Paraseed Control/Extraleben) ✓, Gift → Heilung ✓, Deckel-Löschen bewusst ✓; Heilbetrag hängt von der Heldenreihenfolge ab ✗(→ -22) |
+| Afflicted Pests | L2 gezielt | Auslöser Ausrüsten ✓, Ability-Anlegen löst nicht aus (C → -32), Token als Ziel ✗(→ -11), Zielwahl Eigen-/Gegnerseite ✓ |
+| Afflicted Vermin | L2 gezielt | Platzkonkurrenz mit eingenisteter Paraseed (Text „user's free Support Zones" = Zonen des Helden, Regel CARD_API Z. 2514) ✓, keine freie Zone ⇒ keine Aktivierung (Ruling) ✓, Extraleben-Ziel ✗(→ -07) |
+| Bakhm, the Desert Digger | L2 gezielt | Surprise-Kreaturen in Support Zones ✓, Nicht-Surprise abgelehnt ✓, 100 Schaden auf Held und Kreatur inkl. seitenfremden Golem (Id `equip-1-0-0`) ✓, gestohlener Bakhm ✓, Quelle mit `heroOwner` ✓, gefroren/negiert/tot ruht (gelesen) |
+| Big Gwen Guard | L2 gezielt | Kosten Weakening Crystal ✓, Kosten Grinning Cat ✗(→ -06) |
+| Bloom, the Maniacal Botanist | L2 gezielt | Aura je Paraseed 0/1/2 ✓, auf Gegner- und eigene Helden ✓, Reihenfolge mit Continent ✗(→ -22) |
+| Cactus Creature | L2 gezielt | Umleitung Frost/Betäubung/Brand/Gift/Negierung auf Held und Kreatur ✓, Fenster bei Kreaturenstatus ✗(→ -13) |
+| Chatty Town Guard | L2 gezielt | HOPT ✓, Hand-Sperre eigen/Gegner ⇒ keine Aktivierung ✓, Gegner-Such-Sperre ⇒ Abbruch ohne HOPT ✓, gleichnamige Instanz ✗(→ -04), Crystal-Geschenk ⇒ Empfänger ungebunden ✗(→ -01) |
+| Cool Presents | L2 gezielt | 0 Karten ✓, gleichnamige Karten (ein Eintrag) ✓, Gegner-Hand-Sperre ⇒ Rückerstattung ✓, Rusting ✗(→ -02), Fenster je Karte/Such-Sperre ✗(→ -31) |
+| Crystal Well | L2 gezielt | HOPT je Spieler ✓, Gegner-Hand-Sperre ⇒ nicht aktivierbar ✓, leeres Deck (Karte weg, nichts gezogen) ✓ erwartbar, gleichnamige Instanz ✗(→ -04), Zieh-Sperre ⇒ Karte verschenkt ✗(→ -24 Zusatz) |
+| Deep-Drowned Waflav | L2 gezielt | Überladung auf Held ✓, auf Kreatur ✗(→ -15), Tutor aus gesperrter Ablage ✗(→ -14), Descend-Kette ✓ |
+| Distracting Crystal | L2 gezielt | Horn in a Bottle ✗(→ -08), nicht markierte Karten ✗(→ -09), Einsatz-/Auslöser-Effekte (C → -10), Sperre bei Zauber/Artefakt/Ability ✓ |
+| Flamebathed Waflav | L2 gezielt | Aufstieg + Verbrennen (Held, Kreatur, eigener Held) ✓, Counter bei Burn ✓, gefroren/betäubt/negiert ⇒ keine Counter ✓, Ziele/Wiederholung (C → -19), Aufstieg über Paraseed-Control-Deckel ✗(→ -05) |
+| Grinning Cat | L2 gezielt | sperrt Handkreaturen ✓, Surprise-Kreatur legen erlaubt ✓, zwei Katzen ✓, Wechselwirkung Big Gwen ✗(→ -06), Ushabti-Beschwörung ✗(→ -29) |
+| Letter of Misinformations | L2 gezielt | Mischen der Gegnerhand und Aufdeck-Marken (5 Seeds) ✗(→ -03), kein Effekt beim Ausspielen ✓, Letter selbst ausgenommen ✓ |
+| Mana Absorbing Crystal | L2 gezielt | +1 Level für Spells (nicht Attacks) ✓, mehrere Kopien nicht gestapelt (Skriptkopf-Ruling) ✓, mit Trial of Knowledge ✓ (Level bleibt 0), Hand-Aktivierung 200 Schaden/Löschen (Held tot, letzter Held, Extraleben, zwei Kopien) ✓ |
+| Mary Crestmas | L2 gezielt | Ziehen je übergebener Karte (3 Karten, drei Kristalle gezogen, Bilanz/Audit sauber) ✓, Schadensnegierung mit Abwurf ✓, HOPT-Reset zu Beginn des eigenen Zuges ✓, zweiter Treffer im selben Zug ✓, Brenn-Tick ✓; Konstruktion: Schaden 0 löst Abfrage/Kosten aus (nicht gemeldet); gleichnamige Instanz ✗(→ -04) |
+| Mummy Maker Machine | L2 gezielt | Token auf aktivierenden Held (Effekt ersetzt) und anderen Helden ✓, alle Helden vermummt ⇒ bleibt verdeckt ✓, eigene Zonen voll ⇒ bleibt verdeckt ✓, Host gefroren/betäubt/negiert ⇒ keine Auslösung ✓, Token zählt ohne `currentHp`-Feld sauber (50 − 30 = 20) ✓ |
+| Noble Mummy Guards | L2 gezielt | Rückgabe der obersten Fähigkeit eines Stapels ✓, Wahl bei mehreren ✓, Rückgabe an Karten-Besitzer ✓, Audit sauber ✓, Auslösen ohne andere Fähigkeit ✗(→ -25) |
+| Paraseed | L2 gezielt | Einnisten beim Töter ✓, Gift unheilbar/Abgang ✓, Max-HP-Fraß ✓, Dominance-Löschen ✗(→ -12), gefroren/negiert (C → -23) |
+| Paraseed Control | L2 gezielt | Übernahme + 100/100 ✓, Gift neu aufgelegt ✓, Karte vor Auflösung aus `ps.hand` ✓, Heilung/`increaseMaxHp` über 100 abgewiesen ✓, Aufstieg ✗(→ -05) |
+| Paraseed Greenhouse | L2 gezielt | Pflanzen (1 Ziel/mehrere) ✓, Umziehen mehrerer Paraseeds, HOPT-je-Paraseed ✓, Such-/Stapelsperre ✗(→ -24) |
+| Paraseed Zombie | L2 gezielt | Paraseed aus Hand/Deck ✓, ohne Paraseed/ohne freie Zone ⇒ nicht spielbar ✓, nicht tödlicher Treffer ✓, Löschen der Karte ✓, Folgetick ✓, Quelle = gestohlene Kreatur ✗(→ -21) |
+| Pure Advantage Camel | L2 gezielt | Zugbeginn-Ziehen löst nicht aus ✓, 3 Karten gezogen ⇒ ein Auslösen ✓, zwei Camels ✓, Camel gegen Camel ✓; Konstruktion (nicht gemeldet): Ziehen des Gegners in der Resource Phase des Camel-Besitzers löst nicht aus (`drawInfo.phase === 1`), keine reale Karte bekannt |
+| Rusting Crystal | L2 gezielt | Equipment ✓, Mana Absorbing Crystal ✓, Nicht-Stapeln ✓, Cool Presents/Beer ✗(→ -02/-26), zweite Kopie (C → -27) |
+| Stormkissed Waflav | L2 gezielt | Aufstieg, Abwurf-Counter, Tutor aus Deck ✓, Tutor unter Stapelsperre ✗(→ -14) |
+| Swampborne Waflav | L2 gezielt | Gift auf Held/Kreatur, Stapel ✓, Counter je Giftanwendung ✓, Ziele/Wiederholung (C → -19), Zielliste seitenfremd ✗(→ -30) |
+| The Final Trial | L2 gezielt | zu früh ⇒ nicht spielbar ✓, im Zug einer Trial ⇒ nicht spielbar ✓, als erste Aktion nach fünf Trials ⇒ Sieg ✓ (Audit/Fehler sauber) |
+| Thunderstruck Waflav | L2 gezielt | Aufstieg-Stun ✓, Defeat-Trigger (Held, Kreatur) ✓, Stun auf Gegnerheld ✓, übernommener Held (Quelle/Brettseite) ✓, Zielliste seitenfremd ✗(→ -30) |
+| Treacherous Crystal | L0 gelesen | Handler `doTriggerTreacherousCrystal` (server.js:9435) ist nicht exportiert, headless nicht aufrufbar; gelesen: filtert `inst.owner !== oi` (Besitzer), „all Creatures you control" gilt dem Kontrolleur – nicht ausgeführt, daher nicht gemeldet |
+| Trial of Annoyance | L2 gezielt | Gegnerhand ≤ 2 ⇒ nichts abzuwerfen ✓, Abwurf bis 2 Karten (Kristalle in der Hand) ✓, Riegel/Once-Stempel ✓ |
+| Trial of Coolness | L2 gezielt | Abbruch ⇒ Karte zurück ✓, kein Ziel ⇒ unspielbar ✓, Nutzer ausgenommen ✓, Extraleben-Stapel ✓, Schaden-Todesweg ✓; „defeat" ✗(→ -07), Zielsammler seitenfremd ✗(→ -18) |
+| Trial of Dominance | L2 gezielt | leeres Gegnerbrett ✓, Löschen statt Ablage ✓, Quelle mit `controller`/`heroOwner` ✓, Paraseed-Nisten ✗(→ -12), Extraleben ✗(→ -07), Erst-Runden-Gate (B-06) |
+| Trial of Knowledge | L2 gezielt | Level 0 für alle „Trial of"-Spells, bleibt mit Mana Absorbing Crystal 0 ✓, nach Zugwechseln ✓, Gegner unberührt ✓ |
+| Trial of Loyalty | L1 Standard | Abbruch der Galerie ⇒ Karte zurück ✓, leeres Ergebnis ⇒ Riegel ✓, 7 Treffer/max. 5 ✓ (Skripte gelesen; Suchsperre-Marke per Ruling); nicht tiefer |
+| Ushabti of the Great Pharaoh | L2 gezielt | eigene/gegnerische/gestohlene Kreatur ✓ (Rückgabe zum Zugende ✓), beschädigt/gefroren bleibt erhalten, Zielsammler ✗(→ -16), seitenfremde Kreatur ✗(→ -17), Beschwörungssperre ✗(→ -29) |
+| Waflav, the Metamorphing Monstrosity | L2 gezielt | Draw 3 + HOPT je Effekt ✓, Fähigkeit aus Deck/Hand anhängen ✓, Zähler beim Kill ✓ (gefroren/betäubt/negiert ⇒ keine), Aufstiegs-/Descend-Kette über alle Formen ✓ |
+| Weakening Crystal | L2 gezielt | Anlage beim Eintritt/Zug ✗(→ -01), fremde Negation ✗(→ -20), Status-Immunität ✗(→ -28), `sourceBound` übersteht die Zugende-Räumung ✓, heilbar (Ruling) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird fortlaufend ergänzt)
+- Prüfaufträge: **`counters.currentHp ?? 0` (C05-01):** `_engine.js:12385` reicht bei jeder unversehrten Kreatur (`counters` leer; HP-Feld entsteht erst beim ersten Schaden) den Betrag 0 an das Rettungsfenster (`_checkCreaturePreDefeatHandReactions`); die drei Leser (`barrier-of-undying`, `loyal-bone-dog`, `troop-annihilation`) werten den Betrag nicht aus ⇒ folgenlos (gemessen mit Dummy/Mummy Token). Ein von Mummy Maker Machine gesetzter Token mit leerem `counters` rechnet beim ersten Schaden korrekt (50 − 30 = 20).
+- **`negatedDuration` ohne Leser (H03-15):** in den Skripten der Gruppe kein Verbraucher; die einzige Fundstelle ist ein Kommentar in `null-the-mage-slayer.js`. Cactus Creature reicht `duration` bei der Umleitung an `addHeroStatus`/`applyCreatureStatus` weiter ✓.
+- **Zugende-Räumung `negated` ohne `sourceBound` (C05-02):** Weakening-Crystal-Negation (`sourceBound`) überlebt vier echte Zugwechsel ✓; die Lücke entsteht nur bei vorheriger fremder Negation (→ A08-20).
+- **Aufgelöste Karte bleibt in `ps.hand` (R02-07):** gemessen — Trial of Coolness, Loyalty und Annoyance liegen während ihrer Zielwahl/Galerie/Abwurfwahl noch in `ps.hand`; Paraseed Zombie und Paraseed Control sind beim Platzieren/Wiederbeleben schon aus der Hand (die Instanz trägt noch `zone: hand`). In dieser Gruppe ohne beobachtbare Folge; Cool Presents schließt den eigenen Slot ausdrücklich aus.
+- **`source.controller` mit `heroIdx` bei geliehenem Angreifer (R02-13/-20):** Bakhm (`heroOwner`), Trial of Dominance (`controller`, `heroOwner`), Thunderstruck/Flamebathed (`quelleIstHeld`) ✓, auch mit dauerhaft übernommenem Waflav (Zähler auf der richtigen Brettseite, Stun landet). Abweichler nur Paraseed Zombie (→ -21).
+- **Zielsammler Brettspalte / Besitzer ODER Kontrolleur (F02-14, S01-09):** sauber: Bakhm (liefert seitenfremden Golem mit Brettseite + Instanz), Ushabti mit gestohlener Kreatur einzeln (Rückgabe zum Zugende ✓); fehlerhaft: Ushabti (-16/-17), Trial of Coolness (-18), Waflav-Formen (-30). Das Muster `c.owner === target.owner` steht in 65 Skripten (`grep`) – Hinweis für die Querschnittsprüfung.
+- Dauereffekte und Statusfilter (Klasse B-01…B-03): Waflav-Passive (Flamebathed/Swampborne/Thunderstruck/Basis) ruhen bei gefroren/betäubt/negiert ✓; Pests/Vermin/Camel/MMM/NMG/Cactus lösen bei Host gefroren/betäubt/negiert nicht aus (Surprise-Regel) ✓; Paraseed teilweise (→ -23).
+- Rusting Crystal: Kosten von Equipment (4 → 8) und Mana Absorbing Crystal (15 → 30) verdoppelt, Nicht-Stapeln bei zwei Kopien (nach Skriptkopf-Auslegung) ✓.
+- Trial-Familie: Riegel „keine anderen Attacks/Spells" vorwärts und rückwärts, Once-Stempel nach Abbruch frei (Loyalty, Coolness), Final Trial gewinnt nur als erste Aktion nach allen fünf Trials ✓.
+- Paraseed Control: Heilung über 100 und `increaseMaxHp` werden vom Deckel abgewiesen ✓ (nur der Aufstieg umgeht ihn, → -05).
+- Mary Crestmas: Ziehen je Übergabe, Schadensnegierung nur mit „originally owned"-Karte, HOPT pro Seite, Reset zu Beginn des eigenen Zuges, Brenn-Tick ✓. Hinweis: das Vorgänger-Skript `t14-mary.js` (Scratchpad) endete wegen eines Fehlers beim Auflösen eines Sets lautlos – Mary wurde erst jetzt tatsächlich gemessen.

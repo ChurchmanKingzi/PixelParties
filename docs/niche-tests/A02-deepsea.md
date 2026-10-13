@@ -329,6 +329,16 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/35-fridge-race-boat-limit.js` (ausgeführt: 1 ✗)
 - **Vermutete Ursache:** wie F03-08: `slippery-fridge.js` Schritt 3 (`destTargets`) fragt `canEquipToHero` des Boots nicht ab.
 
+### A02-deepsea-36 · Deepsea Primordium: die Zusatzaktion beendet die Action Phase, obwohl die Hauptaktion unverbraucht ist · Stufe C
+- **Karten:** Deepsea Primordium (`deepsea-primordium.js` `registerAdditionalActionType`), Deepsea Werewolf (Beispiel der finanzierten Karte); Engine: `server.js` doPlayCreature (~Z. 10290). Vergleich: Cute Crown (`freeInActionPhase`, CARD_API ~Z. 19700).
+- **Voraussetzungen / Aufbau:** Held 0 (Summoning Magic Lv2, Destruction Magic) mit Deepsea Bats (eine Runde alt) in Slot 0; Hand: Primordium, Werewolf, Fireball. Action Phase, Hauptaktion frei.
+- **Schritte:** 1. Primordium per Bounce-Place über die Bats (gratis: `inherentAction`; Phase bleibt 3, Hauptaktion frei). 2. Werewolf mit der Primordium-Zusatzaktion.
+- **Erwartet** (Quelle: Kartentext „… as an additional Action this turn"; „zusätzlich" zur Hauptaktion): Offen. Lesart A: Die Zusatzaktion kostet die Hauptaktion nicht, die Phase bleibt offen (Fireball danach spielbar).
+- **Beobachtet:** Nach dem Werewolf steht die Phase auf 4 (Main 2), `heroesActedThisTurn` ist leer: die Hauptaktion ist verloren, ohne gespielt worden zu sein. Das entspricht dem allgemeinen Engine-Verhalten für Zusatzaktionen in der Action Phase („sonst beendet jede Zusatzaktion in der Action Phase sie", CARD_API ~Z. 19700); nur die Cute Crown trägt dafür `freeInActionPhase`. Der Weg über die Hauptaktion zuerst (Primordium als normale Beschwörung → Main 2) ist unproblematisch.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/36-primordium-grant-ends-action-phase.js` (prüft Lesart A; ✗ = Phase wechselt)
+- **Vermutete Ursache:** `deepsea-primordium.js` Z. ~70: `registerAdditionalActionType(…)` ohne `freeInActionPhase: true`; Primordium ist die zentrale Eröffnungskarte der Linie (`playOrderPriority: 100`), die CPU spielt sie vor den finanzierten Karten.
+- **Frage an Al:** Soll die Primordium-Zusatzaktion in der Action Phase gratis sein wie bei der Cute Crown (Ja = `freeInActionPhase`, Hauptaktion bleibt), oder bleibt es dabei, dass sie die Phase beendet (Nein)?
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
