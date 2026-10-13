@@ -1,5 +1,5 @@
 'use strict';
-// F03-artifacts-19 · Item Lock („Hammer Throw"): die Kosten „delete a card from your hand" dürfen die gerade gespielte Artefakt-Karte selbst treffen
+// F03-artifacts-19 · Item Lock ("Hammer Throw"): bei Nicht-Equipment-Artefakten dürfen die Kosten „delete a card from your hand" die gerade gespielte Artefakt-Karte selbst treffen
 // Kartentext Hammer Throw: „The target's controller must delete a card from their hand whenever they play an Artifact during their next turn."
 // Regel (server.js `validateActionPlay` ~7464/12053: Item Lock verlangt ≥ 2 Handkarten): die gespielte Karte ist KEINE Handkarte mehr, die Kosten brauchen eine ANDERE Karte.
 // Aufbau: Sitz 0 trägt `itemLocked` (so setzt es Hammer Throw), Hand [Treasure Chest, Fireball]; Sitz 0 spielt Treasure Chest; als Kostenkarte wird die gespielte Treasure Chest gewählt (Mensch) – im
@@ -7,8 +7,8 @@
 // Erwartung: Der Picker bietet die gespielte Treasure Chest nicht an; die Kosten zahlt eine andere Karte (Fireball); Treasure Chest landet in der Ablage.
 // Beobachtet (✗): Der Picker listet auch die gespielte Karte (kein `eligibleIndices`); wird sie gewählt (CPU-Standard = erster Platz), wird das Artefakt selbst gelöscht – die Kosten sind frei, Fireball bleibt,
 //   und die Karte fehlt in der Ablage (Gold +10 wirkt trotzdem).
-// Ursache: `server.js` ~11323 (doUsePotion), ~7654 (doPlayArtifact), ~12226 (doUseArtifactEffect): `actionPromptForceDiscard(pi, 1, { title: 'Item Lock Cost', deleteMode: true, … })` ohne `eligibleIndices`-Ausschluss
-//   der auflösenden Karte (`engine._istAufloesendeHandkarte`, _engine.js ~19630); Wheels/Staffs/Live Show schließen sie selbst aus.
+// Ursache: `server.js` ~12226 (doUseArtifactEffect, auch Potion-Weg ~11323): `actionPromptForceDiscard(pi, 1, { title: 'Item Lock Cost', deleteMode: true, … })` ohne `eligibleIndices`-Ausschluss der auflösenden
+//   Karte (`engine._istAufloesendeHandkarte`, _engine.js ~19630); Wheels/Live Show schließen sie selbst aus. Der Equipment-Weg (doPlayArtifact ~7654) ist nicht betroffen (Warhorse/Smug Coin/Circle löschen einen Bird).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();

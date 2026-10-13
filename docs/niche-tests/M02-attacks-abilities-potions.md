@@ -1,8 +1,15 @@
 # M02-attacks-abilities-potions – Nischenfall-Bericht
-Stand/Autor: Agent M02-attacks-abilities-potions, 13.10.2026. Karten: 53 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent M02-attacks-abilities-potions (Fortsetzung eines Vorgängers, der bei Befund 10 abbrach), 13.10.2026. Karten: 53 in der Liste · 53 gezielt getestet (L2) · 33 mit Befund · 25 Befunde (A 5 · B 14 · B/C 2 · C 4).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+Die Gruppe (53 Karten: 16 Attacks, 18 Abilities, 19 Potions) hat 25 Befunde ergeben (A 5 · B 14 · B/C 2 · C 4); die Befunde 01–10 stammen vom Vorgänger (jetzt alle erneut ausgeführt und im Bericht ausgeschrieben), 11–25 sind neu.
+Die wichtigsten Muster:
+* **Kartenverlust / kaputter Zustand (A):** Muscle Training (voller Fighting-Stapel, -02), Magic Lamp (Negierung durch Ambush the Scout, -18), Singing auf Surprise-Kreaturen (Geister-Instanz, -24), Luck zieht bei Areas/Attachments doppelt (-13), Toughness gegen „cannot be negated" (-08).
+* **Dauer-Verträge ohne Status-Prüfung (Klasse B-01…B-09):** Stealth (-05), Terror (-12), Thieving Strike (-03), Toughness/Fighting (-08), freie Ability-Aktivierung negierter Helden (-09).
+* **„Held/Ziel, das du kontrollierst" nach physischer Seite statt Kontrolle:** Tears of Creation (-16), Overflowing Chalice / Pressed Skill (-20), Ricochet (-22); Gegenprobe: Smoke Vial, Sword in a Bottle, Punch in the Box, Shattering Strike machen es richtig.
+* **Sperren:** Such-Sperre wird von Magic Lamp (-19), Navigation/Trapping/Premonition/Training (-23) und serverseitig von Magnetic Potion (-17) nicht beachtet; Blinded-Sperre fehlt bei Rocket Fist/Whirlwind (-04); Wisdom-Material wird serverseitig nicht geprüft (-25).
+* **Einmal-Stempel bei Negierung** fehlt bei Tränken (-10, gleiche Klasse wie S01-01); Resistance lässt Life Serum und Teleportation Powder durch (-11); Planet in a Bottle kennt Spatial Crevice nicht (-21); Punch in the Box übersieht Kreaturenschaden (-15).
+Gesamteindruck: Die Attacks (Schaden/ATK-Rechnung, Zusatzaktions-Buchhaltung, Stufensenkung, Ketten) sind sauber; die Befunde liegen fast ausschließlich in den Randverträgen (Sperren, Kontrolle, Negierung, Status). Bewusst NICHT getestet: CPU-/MCTS-Pfade, Client-/UI-Ausgrauung (nur Server-Seite), Elixir-/Heldengruppen-Karten außer als Gegenprobe, Petrifying-Potion-Klick-Heilung, Singing/Megu-Eigenpfad, Mehrspieler >2 Sitze, Wisdom × Learning-Zweitguss, Reaktionsketten mit mehreren gleichzeitigen Reaktoren auf Punch in the Box.
 
 ## Befunde
 ### M02-01 · Stranglehold zählt nur 5 von 17 negativen Status · Stufe B
@@ -69,7 +76,7 @@ Stand/Autor: Agent M02-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M02-attacks-abilities-potions/07-monster-in-a-bottle-zaehlt-nicht-als-beschwoerung.js`
 - **Vermutete Ursache:** `monster-in-a-bottle.js:252` `engine._trackCard(…)` stellt die Kreatur direkt aufs Brett, ohne `_creaturesSummonedThisTurn` zu erhöhen.
 
-### M02-08 · Toughness: HP-Bonus wird bei negiertem / gefrorenem / betäubtem Helden weder vergeben noch zurückgenommen · Stufe B
+### M02-08 · Toughness: HP-Bonus wird bei negiertem / gefrorenem / betäubtem Helden weder vergeben noch zurückgenommen · Stufe A (negiert: Textwiderspruch „cannot be negated“; gefroren/betäubt: Konventionsklasse B-01…B-09)
 - **Karten:** Toughness (`toughness.js`); gleiche Wirkung bei Fighting (ATK-Bonus; Fighting gehört nicht zu dieser Liste, nur als Gegenprobe).
 - **Voraussetzungen / Aufbau:** (a) Held 0 mit 800 HP bekommt Toughness (Hand → Zone 0) im Zustand negated/frozen/stunned. (b) Held mit Toughness ×2 (bzw. Fighting ×2), Zustand setzen, `engine.discardAbilityTopCopy`.
 - **Erwartet** (Kartentext „The Hero's current and max HP are increased by 100/200/400. This Ability cannot be negated."): (a) Bonus auch bei negiertem Helden; (b) beim Verlassen der Kopie wird der Bonus in **jedem** Heldenzustand wieder abgezogen.
@@ -223,5 +230,67 @@ Stand/Autor: Agent M02-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
+| Learning | L2 gezielt | Lv3: Zweitzauber (Meteor Crash, Boiling Oil, Fire Bolts) ✓; Lv1 ohne Magic-Arts-Auslöser: kein Trigger ✓; gleichnamige Zauber ausgeschlossen ✓; Zweitzauber zählt als Zusatzaktion (Phase 4 danach) ✓; Abbruch der Auswahl/Zielwahl verbraucht HOPT (laut Skriptkommentar gewollt) ✓ |
+| Life Serum | L2 gezielt | Resistance lässt es durch ✗(→ -11); Max-HP-Deckel (Resuscitation-Held) ✓; Negierung ohne Bilanz-Abweichung ✓ |
+| Luck | L2 gezielt | Area/Attachment doppelt ✗(→ -13); Normal-Artefakte ✗(→ -14); Zauber/Attacke/Trank/Ausrüstung/Ability Lv1–3 ✓; Reaction-/Surprise-Namen fehlen im Wähler (Beobachtung) |
+| Magic Lamp | L2 gezielt | Ambush-Negierung verliert 3 Karten ✗(→ -18); Such-Sperre ✗(→ -19); <3 Namen nicht spielbar ✓; Zug 1 gesperrt ✓; eigene Hand-Sperre ✓ |
+| Magnetic Potion | L2 gezielt | Negierung ohne Stempel ✗(→ -10); Such-Sperre serverseitig ✗(→ -17); HOPT nach Erfolg ✓; Galerie nicht abbrechbar (Absicht) |
+| Mana Mining | L1 Standard | Flag `placesPollutionTokens` gegen alle 19 Kartentexte mit „Pollution Token“ geprüft: konsistent (Mana Beacon/Big Gwen bewusst ohne); die Pollution-Wirkung selbst gehört zu A01 |
+| Massacre | L2 gezielt | 0 / 2 offene + 1 verdeckte Kreatur, Token, Cursed-Angreifer ✓ |
+| Midnight Assault | L2 gezielt | Held mit 150/151/1 HP ✓; Stufensenkung durch eigene Kreatur ✓, gestohlene zählt nicht ✓, gefrorene zählt ✓; ignoriert immune/shielded/damage_proof ✓ |
+| Monster in a Bottle | L2 gezielt | Zähler „diesen Zug beschworen“ ✗(→ -07); Galerie-/Zonenabbruch, Hand und Ablage, Negierung ✓; Summon-Sperre ✓ |
+| Muscle Training | L2 gezielt | voller Fighting-Stapel verschluckt Karte ✗(→ -02); Equip-Zusatzaktion nur beim 1. Angriff des Helden ✓; ohne Fighting im Deck nicht spielbar ✓ |
+| Navigation | L2 gezielt | Such-Sperre zahlt Kosten ✗(→ -23); Lv1/2 Hand-Sperre danach, Lv3 keine ✓; Hand-Sperre sperrt ✓ |
+| Necromancy | L2 gezielt | Batterie: 406 Kreaturen Lv ≤ 3 aus der Ablage beschworen (377 landen), keine Fehler/Audit/Bilanz-Abweichung; Negierung endet zu Beginn des eigenen nächsten Zugs (echter `endTurn`) ✓; Phase bleibt 2 (Zusatzaktion) ✓ |
+| Occultism | L2 gezielt | frisch gespielte Kreatur nicht opferbar ✓; gestohlenes Opfer → Ablage des Besitzers ✓; Kosten erst nach beiden Wahlen ✓; Beobachtung: das Opfer steht in der Schadens-Zielwahl noch als Ziel (Nutzerfehler, kein Befund) |
+| Overflowing Chalice | L2 gezielt | Heldenkontrolle (Charme) ✗(→ -20); Nachteil immer ✓; Negierung ohne Kartenverlust ✓ |
+| Performance | L2 gezielt | auf Toughness/Fighting/Wealth: Stufe +1, 50 Schaden, Bonus-Rücknahme beim Abwurf ✓; Held mit 50 HP stirbt (textgemäß) |
+| Petrifying Potion | L1 Standard | Dauer 3 Besitzer-Runden (Verlauf über Zugwechsel) ✓; Negierung ✓; Heil-Klick nicht getestet |
+| Pillage | L2 gezielt | negierter Held aktiviert ✗(→ -09); Lv1/2/3 = 1/3/5 Karten in die Ablage des Gegners ✓ |
+| Planet in a Bottle | L2 gezielt | Spatial Crevice (Limit 3) ✗(→ -21); Limit 1 gesperrt ✓; Hand-Sperre egal ✓ |
+| Poison Vial | L2 gezielt | Held und Kreatur, 2 Stapel, 2. Vial → 4 Stapel, Tick 30 je Stapel ✓; Resistance blockt ✓ |
+| Potion of Greed | L1 Standard | Potion Deck 5/1/0, volle Hand ✓; nur in Main 1 ✓; Beobachtung: bei leerem Potion Deck bleibt reiner Nachteil spielbar (Ruling „Tuscan Artist“ nennt nur Zieh-Sperren) |
+| Premonition | L2 gezielt | Lv1–3, 0 Karten bei Lv2/3 (Zugende trotzdem), Reihenfolge-Dialog, Mehrfach-Namen ✓; unter Such-Sperre läuft es durch ✗(→ -23); Beobachtung: Server prüft die Galerie-Antwort nicht gegen die Auswahl (nur manipulierter Client) |
+| Pressed Skill | L2 gezielt | Heldenkontrolle ✗(→ -20); Negierung ✓; Hand-Sperre ✓ |
+| Punch in the Box | L2 gezielt | Kreaturenschaden öffnet kein Fenster ✗(→ -15); Heldenschaden: Rückschlag ceil(Schaden/2) ✓; tödlicher Schaden ohne Fenster (laut Kommentar gewollt) |
+| Pusher | L2 gezielt | alle Kopien aus Hand und Deck in die Ablage ✓; gestohlene Kreatur ✓; Stealth-Gate ✓ |
+| Quick Attack | L2 gezielt | Basis-ATK trotz Buffs/Cursed ✓; 1. Angriff Zusatzaktion, 2. kostet Aktion, 3. nicht spielbar ✓ (3 Helden, gleicher Held) |
+| Resistance | L2 gezielt | Life Serum / Teleportation Powder gehen durch ✗(→ -11); Budget-Reset zu Zugbeginn auch im Gegnerzug ✓; Status (Poison/Stun/Blind) wird abgewehrt ✓ |
+| Resuscitation Potion | L2 gezielt | Negierung ohne Stempel ✗(→ -10); Max-HP 50 gegen Life Serum/Toughness/Heilung gedeckelt ✓; zweite Kopie gesperrt ✓ |
+| Ricochet | L2 gezielt | Ziele nach physischer Seite ✗(→ -22); Kette 100/50/25/13/7/4 ✓; Stealth/Zielschutz ✓ |
+| Rocket Fist | L2 gezielt | Blinded-Gate fehlt ✗(→ -04); Rückkehr auf die Hand bei Tötung (Held/Kreatur) ✓, sonst Ablage ✓ |
+| Shattering Strike | L2 gezielt | Kettenkill (2 Frail + Big) ✓; vom Spieler kontrollierte Kreatur nicht Ziel ✓ |
+| Singing | L2 gezielt | Geister-Instanz bei 6 Surprise-Kreaturen ✗(→ -24); Batterie über 149 Kreaturen Lv ≤ 3 mit aktivem Effekt: sonst keine Fehler/Audit-Abweichung |
+| Smoke Vial | L1 Standard | Dauer bis Ende des nächsten Zugs des Wirkers ✓; nutzt `heroesControlledBy` ✓; Erste-Runden-Gate fehlt (B-06 bekannt) |
+| Smugness | L2 gezielt | Lv1–3 = 75/150/300 Rückschlag auf 150 Schaden ✓; nur an Aufgestiegene anhängbar ✓ |
+| Stealth | L2 gezielt | gefroren/betäubt/negiert ✗(→ -05); Lv1/2/3-Schwellen ✓; Zirkelfälle (alle Helden mit Stealth, Mitstreiter tot/unwählbar) ✓ |
+| Stranglehold | L2 gezielt | zählt nur 5 Status ✗(→ -01); Fighting-3-Bonus (+Basis-ATK, auch bei 0 Status) ✓ |
+| Strong Ox Headbutt | L2 gezielt | 1./2./3. Angriff = 1 / 2 / 1 Karte (+ Ability beim 3.) ✓ |
+| Surefire Shot | L2 gezielt | Stealth, untargetable, damage_proof, Silence in der Gegnerhand ✓ |
+| Sword in a Bottle | L2 gezielt | Negierung ohne Zug-Stempel ✗(→ -10); Abbruch stempelt nicht ✓; 2. Kopie im Zug gesperrt ✓; Angreifer in jedem Status wählbar (Beobachtung) |
+| Tears of Creation | L2 gezielt | gecharmter eigener Held zählt mit ✗(→ -16); Kreaturen/Charme-Gegnerheld ✓ |
+| Teleportation Powder | L2 gezielt | Negierung ohne Stempel ✗(→ -10); Resistance ✗(→ -11); Rückkehr zu Beginn des nächsten Zuges mit Statuses/Equip/Abilities/Bilanz ✓; Platzieren in den entfernten Slot gesperrt ✓ |
+| Terror | L2 gezielt | gefroren/betäubt ✗(→ -12); Schwelle 5/6/7 nach verschiedenen Namen ✓; Gegner-Terror zählt für beide ✓ |
+| Thieving | L2 gezielt | negierter Held ✗(→ -09); 4/8/12, Deckel bei 5 Gold ✓ |
+| Thieving Strike | L2 gezielt | negierter Held spielt Lv2 als Lv0 ✗(→ -03); Zufallskarte/Treffer ✓ |
+| Toughness | L2 gezielt | negiert/gefroren/betäubt ✗(→ -08); Max-HP-Deckel (Resuscitation) ✓; Performance-Rücknahme ✓ |
+| Trade | L2 gezielt | negierter Held ✗(→ -09); 5/10/20, Löschen statt Ablage, <5 Karten Deck gesperrt ✓ |
+| Training | L2 gezielt | Lv1–3 Hand-Option (verbraucht den Heldenanhang nicht) ✓, Deck-Option ✓; Deck-Option unter Such-Sperre ✗(→ -23) |
+| Transdimensional Stab | L2 gezielt | Negierung bei leerer Hand (Hand 2/ATK 120), 2 Discards bei Hand 3 ✓; Entwurf nach nominalem ATK (Skriptkommentar), nicht nach tatsächlichem Schaden gegen 10-HP-Kreatur (Beobachtung) |
+| Trapping | L2 gezielt | legt Surprise trotz Such-Sperre ✗(→ -23); Stufe/Zonenwahl ✓ |
+| Trunk Sand | L2 gezielt | Blinded_hit endet bei Schaden/Burn-/Poison-Tick ✓, nicht bei Heilung/Zugende ✓; Kreatur ✓; damage_proof-Ziel wird nicht geblendet (Beobachtung) |
+| Wealth | L2 gezielt | Lv1–3, zwei Helden summieren, toter Held ✓ |
+| Weapon Storm | L2 gezielt | kein Abbruch vor der ersten Karte ✗(→ -06); 40/50/60 nach Fighting-Stufe nach dem Senden ✓ |
+| Whirlwind Strike | L2 gezielt | Blinded-Gate fehlt ✗(→ -04); 1/2 Helden, gestohlene Kreaturen in den Zonen treffen ✓; Abbruch (null / []) ✓ |
+| Wisdom | L2 gezielt | Server-Tor ohne Abwurfmaterial ✗(→ -25); Abbruch der Zielwahl: kein Abwurf ✓; negierter Held: nicht spielbar ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
+* **Rechenwege der Attacks:** Quick Attack nutzt Basis-ATK (auch bei Buffs/Cursed), Surefire/Massacre/Stranglehold den laufenden ATK; Massacre zählt offene + verdeckte Kreaturen und Token; Ricochet-Kette 100/50/25/13/7/4 (je Seite); Strong Ox Headbutt 1/2/1 Discards und Ability-Abwurf beim 3. Angriff; Trunk Sand-Blind endet bei jedem Schaden (auch Brand/Gift-Tick), nicht bei Heilung oder Zugende.
+* **Zusatzaktions-Buchhaltung:** Quick Attack / Muscle Training nur als erster Angriff (des Helden bzw. des Spielers) Zusatzaktion, danach nicht spielbar; Learning-Zweitguss und Necromancy zählen als Zusatzaktion.
+* **Stealth-Zirkel:** alle Helden mit Stealth, Mitstreiter tot oder unwählbar: Engine löst auf (kein leeres Ziel-Fenster).
+* **Teleportation Powder:** Rückkehr zu Beginn des eigenen nächsten Zuges inkl. Status, Equip, Ability-Stapel; Kartenbilanz ±0; Platzieren in den entfernten Heldenslot gesperrt.
+* **Negierung (The Master's Plan) von 14 Tränken:** keine Kartenverluste, keine Fehler (Ausnahme Magic Lamp mit Ambush -18, Einmal-Stempel -10).
+* **Premonition / Navigation / Trade / Thieving / Pillage / Wealth:** Zahlenwerte Lv1–3 stimmen mit dem Text überein.
+* **Resuscitation Potion:** Max-HP 50 bleibt gegen Life Serum, Toughness und Heilung bestehen.
+* **Resistance:** Budget (1/2/∞) wird zu jedem Zugbeginn zurückgesetzt, auch nach einer Wirkung im eigenen Zug.
+* **Necromancy-Batterie (406 Kreaturen) und Singing-Batterie (149 Kreaturen):** keine verschluckten Fehler; einzige Auffälligkeit sind die sechs Surprise-Kreaturen (-24).

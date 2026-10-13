@@ -226,6 +226,16 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** `collectRemovableAbilities` iteriert `ps.heroes` der Gegnerspalte (`inst.owner === playerIdx`); richtig wäre `engine.heroesControlledBy(oi)` (Held-Seite `heroSideOf`).
 - **Gemessen und in Ordnung:** Starting Abilities bleiben, der Rest (auch Stapel) geht ins Deck und wird gemischt; Toughness-Abgang reduziert die Max-HP über `onCardLeaveZone`.
 
+### S01-24 · Divine Gift of Magic: die Stufensenkung gilt für alle Kopien des Namens, nicht nur für den offenbarten Zauber · Stufe C
+- **Karten:** Divine Gift of Magic (`cards/effects/divine-gift-of-magic.js`, Speicher `ps._magicLevelReductions` nach Name; Verbraucher `_applyCardLevelReductions`, `_engine.js` ~Z. 43962-43972).
+- **Voraussetzungen / Aufbau:** Held 0 mit Magic Arts 1, ohne Destruction Magic; Hand: Divine Gift of Magic, Fireball (Lv 2) ×2.
+- **Schritte:** 1. Das Gift offenbart die erste Fireball-Kopie. 2. Beide Fireballs werden nacheinander gespielt (zweiter mit frischer Aktion, damit nur die Stufe entscheidet).
+- **Erwartet** (Kartentext: „Reveal **a Spell** from your hand. Until the end of this turn, **that Spell's** level in your hand is reduced by 3."): Lesart A – nur die offenbarte Kopie ist gesenkt, die zweite bleibt Stufe 2 (mangels Destruction Magic nicht spielbar). Lesart B – die Senkung hängt am Namen.
+- **Beobachtet:** Lesart B. Beide Kopien sind auf Stufe 0 und spielbar; die Senkung gilt nach Namen auch für später gezogene Kopien und für Ablage-/Deck-Auswertungen (`effectiveCardLevel(…, { pileSide: true })` = 0). Die Engine kennt einen Kopie-genauen Weg (`ps._handLevelOffsets[handIdx]`, registriert `_engine.js` ~Z. 790).
+- **Repro:** `docs/niche-tests/repro/S01-spells/24-divine-gift-of-magic-alle-kopien.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `divine-gift-of-magic.js` schreibt `{ cardName, amount }` statt eines Handpositions-Eintrags.
+- **Frage an Al:** Soll die Senkung nur die eine offenbarte Kopie betreffen (ja = Kopie-genau / nein = alle Kopien des Namens in der Hand wie bisher)?
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

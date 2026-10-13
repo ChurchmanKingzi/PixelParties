@@ -1,8 +1,27 @@
 # H01-heroes – Nischenfall-Bericht
-Stand/Autor: Agent H01-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird fortlaufend ergänzt) mit Befund.
+Stand/Autor: Agent H01-heroes, 12.–13.10.2026 (Vorgänger bis -07, Fortsetzung ab -08). Karten: 37 in der Liste · 37 gezielt getestet (L2; Bartas und Chuck Crazy nur L1) · 20 mit Befund (24 Befunde: 6 A, 13 B, 5 C).
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – Arbeitsstand: Bericht wächst mit jedem bestätigten Befund)
+
+24 Befunde in 37 Heldenkarten (6 × A, 13 × B, 5 × C; jeder mit ausgeführtem Repro unter `docs/niche-tests/repro/H01-heroes/`, alle ✗ beim aktuellen Stand).
+
+| Stufe | Befunde |
+|---|---|
+| **A** | -02 / -14 (Shapeshifter behält Zustände der Gestalten: Broghan, Beato, Karian, Taio, Nao, Alice), -12 (Shapeshifter unter fremder Kontrolle: Gestalt fällt nie ab), -13 (Throne Robber unter fremder Kontrolle: Abstieg bleibt aus), -17 (Brackle: Opfer als eigenes Ziel wählbar → Karte doppelt in der Ablage), -23 (Chaos-Diamond: 22 Attachment-/Area-Spells liegen nach dem Wirken doppelt vor) |
+| **B** | -01 Archibald im Gegnerzug, -03 Blackstache, -04 Boris, -15 Alice Transfer Student und -16 Devlin (Spalte statt Kontrolleur), -05 Alice Puppeteer (selbst gestohlene Kreatur), -08 / -24 Monia (Schildmarke bleibt stehen; nur Schaden, keine Status-/Kontrolleffekte), -09 Baaliel und -21 Beato (Stufenumgehung/Gratisbeschwörung bei Negation), -10 Damus (Armageddon-Immunität bei Negation), -11 Alex (Deck-Suche trotz Such-/Handsperre), -20 Inya (negiert → Buddy) |
+| **C** | -06 Alice Puppeteer vs. Anti Magic, -07 Shapeshifter→Chaos-Diamond (Potion-Zieh-Sperre bleibt), -18 Elana/Champion unter Zieh-/Handsperre, -19 Dajan (Gratiskauf bleibt nach Ausfall), -22 Shapeshifter/Robber vs. Such-Sperre |
+
+Die fünf wichtigsten Befunde:
+1. **-23** Chaos-Diamond: Attachment-/Area-Spells (22 von 213 Normal/Attachment-Spells, darunter Curse, Siege, Prayer, Royal Treasury) bleiben nach dem Wirken zusätzlich in der Ablage – Kartenduplikat (`_engine.js` ~21925, Zweig `_aufsBrett` + `fromZone: 'deck'`).
+2. **-17** Brackle: das zu opfernde Wesen steht in der Schadenswahl als Ziel; gewählt wird die Karte doppelt abgelegt.
+3. **-12 / -13** Shapeshifter und Throne Robber unter fremder Kontrolle (Paraseed/Charme): die geliehene Gestalt bzw. der Aufstieg endet nie, der angelegte Held bleibt für immer im Support.
+4. **-02 / -14** Shapeshifter-Rückverwandlung räumt `onGameStart`-Reste fremder Helden nicht ab (nur Pseudonia, Sol Rym tun es): Broghans Frostimmunität, Karians 10 Status-Immunitäten, Taio +20 ATK, Nao-Überheilung, Beatos Stufenumgehung bleiben für immer.
+5. **-09 / -10 / -21 / -20** Engine-gelesene Heldenverträge ignorieren Negation: Baaliel (Gratis-Beschwörung unbegrenzt oft pro Zug), Beato (Stufen-/Schulumgehung), Damus (Armageddon-Immunität), Inya (Buddy-Beschwörung).
+
+Querschnittsklassen aus der Messung: (a) *Spalte statt Kontrolleur* bei übernommenen Helden (-03, -04, -15, -16; Gegenseite, gemessen korrekt: Don Quisto, Carris, Codumbus, Damus, Bubbles, Chuck Storyteller, Andras und Champion/Broghan/Enigma/Elana/Brackle/Arthor I; Chuck Crazy nur gelesen – das Skript nutzt `heroesControlledBy`); (b) *Engine-gelesener Heldenvertrag ohne Statusprüfung* (-09, -10, -21 sowie -19); (c) *Deck-/Ablage-Zugriff ohne `_isSearchBlocked`* (-11, -22).
+Gesamteindruck: die Aktivierungs-Heldeneffekte (Alice P, Broghan, Brackle, Champion, Elana, Enigma, Arthor I) verhalten sich bei Frost/Betäubung/Negation, Erst-Runden-Immunität, HOPT, Abbruch und Übernahme sauber – ihre Befunde sind andere (-05/-06 Zählregel/Anti Magic, -17 Opfer als Ziel, -18 Zieh-/Handsperre). Die meisten Befunde liegen bei Passiv-/Vertragshelden (Engine-gelesene Verträge ohne Statusprüfung) und beim Zusammenspiel Shapeshifter/Throne Robber × fremde Skripte bzw. fremde Kontrolle.
+
+Bewusst NICHT getestet: Alex unter fremder Kontrolle (Harness reicht `charmedOwner` für Abilities nicht durch), Aufstiegsweg Diamond Keeper → Bulwark (`_diamondSelfLoss`), Arthor-Aufstiegsbereitschaft über die Ausrüstungskette, echte Beato-Ascension über 5 Schulen, Barker im echten Spielstart (Harness startet in Zug 5; geprüft über Zugwechsel), Chaos-Diamond als übernommener/Nicht-Starthelden, 3-/4-Spieler-Kontrollfälle, die Nutzer derselben Verträge in anderen Gruppen (Cute Princess Mary, Gobbo, Luna, Sorin, Tsu-Ki, Maho, Idej ×4, Kent, Logan) – für -09/-21 nur als Prüfauftrag genannt –, Monia gegen Bounce/Zerstören/Kontrolle (Kidnapping ließ sich nicht aufbauen), Diamond Keepers Zählung bei doppeltem Batch-Eintrag derselben Kreatur (kein echter Auslöser gefunden), Chuck Crazys Schild gegen Carris/Inya-Mitspieler (Skript zählt nur „volle Schutzmarken“ als immun – laut Kopfkommentar bewusst konservativ). Nicht gemeldet, weil durch Skript-Kopfkommentare als Entscheidung dokumentiert: Enigma „zwei Picks“, Inyas/Karians/Broghans Statusimmunität bei Negation (bewusstes `bypassStatusFilter`/Statusmarke), Champion „draw that many“ bei kleiner Gegnerhand, Boris-Auto-Verzicht bei unbezahlbaren Kosten.
 
 ## Befunde
 
@@ -220,7 +239,58 @@ Stand/Autor: Agent H01-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Vermutete Ursache:** `cool-rescuer-monia.js` Kopfkommentar „Hooks into beforeCreatureDamageBatch … Future: also intercept status, healing, control changes." – die Karte ist nur für den Schadensweg verdrahtet (siehe auch -08, wo die dort gesetzte Marke fremde Status später blockt, obwohl der Status-Weg selbst keinen Auslöser hat).
 
 ## Abdeckung
-(wird am Ende ausgefüllt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| ???, the Shapeshifter | L2 gezielt | Zustände nach Abfallen ✗ (→ -02, -14), Chaos-Diamond-Gestalt ✗ (→ -07), übernommen ✗ (→ -12), Such-/Handsperre (→ -22); Gestalt-Effekt im selben Zug ✓, HOPT ✓, Träger zerstört/Held stirbt+Revive ✓, Hel-Gestalt stirbt am Zugende (regelkonform) |
+| ???, the Throne Robber | L2 gezielt | Abstieg unter Kontrolle ✗ (→ -13), Suchsperre (→ -22); Abstieg bei Tod/Negation/Frost/Revive ✓, Aufstieg „unskippable"-Ziele ✓, HP-Bilanz ✓ |
+| Alex, Trainer of Heroes | L2 gezielt | Suchsperre/Handsperre ✗ (→ -11); max. 2× pro Zug ✓, Abbruch der Galerie ✓, negiert ✓, tote Zielhelden ✓, Folgezug ✓. Übernommener Alex nicht getestet (Harness) |
+| Alice, the Puppeteer Girl | L2 gezielt | selbst gestohlene Kreatur ✗ (→ -05), Anti Magic (→ -06); Matrix Frost/Betäubung/Negation/Erstrunde/HOPT ✓, übernommen ✓ |
+| Alice, the Transfer Student | L2 gezielt | Kontrolle statt Spalte ✗ (→ -15), Rest nach Shapeshifter (→ -14); tot/negiert teilen weiter ✓ |
+| Andras, the Human Weapon | L2 gezielt | zweites Ziel bei Fighting-Stufe 1/2 ✓, negiert ✓, nur 1 Gegnerheld ✓, Kreatur als Ziel ✓, übernommen ✓ |
+| Archibald, the Archmage | L2 gezielt | Gegnerzug ✗ (→ -01); Pro-Zug-Liste bei Negation/Zugwechsel ✓ |
+| Arthor, Inheritor of the Barbarian Sword | L2 gezielt | Matrix Status/Sperren/Erstrunde/HOPT/Abbruch ✓, übernommen ✓ (Aufstiegsweg nicht getestet) |
+| Arthor, the King of Blackport | L2 gezielt | Handgrößen 1/2/3 ✓, The White Eye ✓, negiert ✓, anderer Held ✓, Slow-Sperre ✓, Erstrunde ✓ |
+| Baaliel, the Demon General | L2 gezielt | negiert: Stufenumgehung + Gratis-Beschwörung ✗ (→ -09); gesund 1× gratis ✓, Dämonenzähler (Kreatur/Held, beide Seiten, eigener Tod) ✓ |
+| Barker, the Monster Tamer | L2 gezielt | Lv1 aus Hand/Deck ✓, Lv2 ausgeschlossen ✓, alle Zonen belegt ✓, negiert/gefroren/tot ✓ (Zugwechsel statt echtem Spielstart) |
+| Beato, the Butterfly Witch | L2 gezielt | negiert: Stufenumgehung ✗ (→ -21), Reste nach Shapeshifter (→ -02); Orb-Zähler-Wächter gelesen ✓ |
+| Beato, the Eternal Butterfly | L2 gezielt | negiert ✗ (→ -21); Bonus bei `handLocked` fizzelt ✓ (gelesen) |
+| Bill, the Angry Auctioneer | L2 gezielt | 1/2 Ausrüstungen, Kostendeckel 20, Doppelname, tote Helden, kein Artefakt im Deck ✓ |
+| Blackstache, Scourge of the Pixel Seas | L2 gezielt | Status und Kontrolle ✗ (→ -03) |
+| Bomb Berserker Bartas | L1 Standard | zweites Ziel bei Destruction Magic 2 ✓ (nur Standardfall) |
+| Boris, the Guardian of Blackport | L2 gezielt | Kontrolle ✗ (→ -04); Status-Prüfung vorhanden ✓, Skip-Abfrage bei Champion ✓ |
+| Bow Sniper Darge | L2 gezielt | +50 je Pfeil ✓, ohne Pfeil ✓, negiert ✓, Kreaturenziel ✓ (Pfeil-Stau nach Abbruch = bekannter Befund A09-01) |
+| Brackle, the Catapulting Turtle | L2 gezielt | Opfer als Ziel ✗ (→ -17); Abbruch Ziel→Opfer ✓, HOPT ✓, gestohlene Kreatur → Ablage des Besitzers ✓, 300-Deckel ✓, frische Kreatur nicht wählbar ✓, Erstrunde ✓ |
+| Broghan, the Frozen Guardian of the North | L2 gezielt | Matrix ✓, Schadensformel (Deckgröße des Kontrolleurs) ✓, Revive hält Immunität ✓; Leck als Gestalt → -02 |
+| Bubbles, the Bouncy Bunny | L2 gezielt | Umleitung, tödliche Umleitung (7 Karten), frozen/stunned/negated, Batch mit 2 Kreaturen, übernommen (Frage an Kontrolleur) ✓ |
+| Card Game Player Inya | L2 gezielt | negiert ✗ (→ -20); Buddy-Tod → Karte in „deleted" ✓, Schadensschild ✓, Flooding negiert ✓, Lead „kein Spielende" erklärt (kein Buddy → Inya stirbt normal) |
+| Carris, the Time Keeper | L2 gezielt | Uhr unter Kontrolle ✓ (Kontrolleur verliert nach 3 eigenen Zugenden), Lead „kein Spielende" ✓ (Schadensmauer) |
+| Champion, the Stormbringer | L2 gezielt | Zieh-/Handsperre ✗ (→ -18); Gegner-`drawLocked` wird ignoriert wie vorgesehen ✓, Boris-Gegner ✓, Erstrunde ✓, leere Gegnerhand gesperrt ✓ |
+| Chaos-Diamond, the Cracked Keeper | L2 gezielt | Attachment-Duplikat ✗ (→ -23), Potion-Sperre als Gestalt (→ -07); 213-Spell-Reihenuntersuchung, Deck mit 0/1 Karte ✓, negiert/gefroren gesperrt ✓ |
+| Chuck, the Crazy Veteran | L1 Standard | Flächenschlag (alle 80 HP) und Lead ✓ (Skript liest `heroesControlledBy`), Ida-Zauber durchbricht Schild (Ida: „cannot be reduced") |
+| Chuck, the Storyteller | L2 gezielt | Aufstieg (Schaden ja / `actionDefeatHero` nein / letzter Held nein) ✓, Ziehen 2 bei Zauber/Beschwörung ✓, negiert ✓, übernommen (Kontrolleur zieht) ✓ |
+| Codumbus, the Clueless Voyager | L2 gezielt | Treffer/Fehlschlag/Deck=1/HOPT/Hand-/Zieh-Sperre/negiert/Erstrunde/übernommen ✓, normales Zugziehen löst nicht aus ✓ |
+| Cool Rescuer Monia | L2 gezielt | Marke bleibt ✗ (→ -08), nur Schaden ✗ (→ -24) |
+| Dajan, Conqueror of the Treasure Cave | L2 gezielt | Scharfstellen bleibt nach Ausfall (→ -19); Gratis ✓, HOPT erst beim Spielen ✓ |
+| Damus, the Prophet of Apocalypse | L2 gezielt | Armageddon-Immunität bei Negation ✗ (→ -10); Ifrit-Schutz ruht korrekt ✓, übernommen: Platzierung/Level-Senkung ✓ |
+| Devlin, the Masked Butcher | L2 gezielt | übernommenes Helden-Ziel ✗ (→ -16); Blutung ✓ |
+| Diamond, the Bulwark of Peace | L2 gezielt | Ersetzen + HOPT ✓, gestohlene Kreatur (Löschen beim Besitzer) ✓, gefroren/Gegnerkreatur ✓ (Aufstieg nicht getestet) |
+| Diamond, the Keeper of Peace | L2 gezielt | Schutz per Kreatur, HOPT, 2-Kreaturen-Batch, gefroren/betäubt/negiert, Lv2-Kreatur, Gift-Tick, True Damage, Diamond stirbt am Selbstschaden ✓; doppelter Batch-Eintrag derselben Kreatur zählt 2× (kein echter Auslöser gefunden, nicht gemeldet) |
+| Don Quisto, the Gold Seeker | L2 gezielt | 19/20/100 Gold ✓, negiert ✓, Kopfgeld bei Held/Kreatur ✓, Bonus abgelehnt ✓, übernommen (Gold des Kontrolleurs) ✓ |
+| Elana, the Rocky Rebel | L2 gezielt | Zieh-/Handsperre (→ -18); Matrix sonst ✓, übernommen ✓ |
+| Enigma, the Seller of Secrets | L2 gezielt | Matrix Status/Sperren/Erstrunde/HOPT ✓, übernommen ✓ (Entscheidungen im Kopf dokumentiert, nicht gemeldet) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+* **Aktivierungs-Helden unter Zuständen** (Alice P, Arthor I, Brackle, Broghan, Champion, Elana, Enigma): frozen/stunned/negated gesperrt, Erstrunden-Schutz (Gegner geschützt) sperrt die rein schädlichen Effekte, HOPT hält (zweite Aktivierung abgelehnt), Zieh-/Hand-/Such-/Aktionssperre ändert nichts außer Elana/Champion (→ -18).
+* **Übernommene Helden** (dauerhaft per `actionTakeHeroPermanently`): Alice P, Arthor I, Brackle, Broghan (Deck des Kontrolleurs), Champion, Elana, Enigma, Codumbus (Rückfrage an Gegner des Kontrolleurs), Don Quisto (Gold/Kopfgeld), Chuck Storyteller (Kontrolleur zieht), Andras, Damus (Ifrit aus der Hand des Kontrolleurs), Carris (Uhr tickt für den Kontrolleur), Bubbles, Diamond Bulwark ✓ – nur Boris, Blackstache, Alice TS, Devlin, Shapeshifter/Robber fallen aus (→ -03, -04, -15, -16, -12, -13).
+* **Brackle**: Opferwahl zurück/abbrechen lässt Kreatur und HOPT unberührt; gestohlene Kreatur → Ablage des Besitzers; 1000 HP → 300 Schaden.
+* **Chaos-Diamond**: negiert/gefroren nicht aktivierbar, Potion Deck 0 → nicht aktivierbar, 1 Karte ✓; alle 213 Normal-/Attachment-Spells als oberste Karte ohne Fehler/Hänger (nur das Duplikat -23).
+* **Chuck Storyteller**: Aufstieg nur bei Schaden-Tod mit lebendem Mitspieler; `actionDefeatHero` (kein Schaden) und letzter Held lösen nicht aus; „draw 2" bei Zauber und Beschwörung, nicht bei Negation.
+* **Diamond Bulwark**: Ersetzen im selben Platz, nur 1× pro Zug, gestohlene Kreatur wird beim Besitzer gelöscht (Ablage), kein Angebot bei gefrorenem Held oder gegnerischer Kreatur.
+* **Don Quisto**: 19 Gold → kein Angebot, 20 → Bonus = aktueller ATK, abgelehnt → kein Gold weg, Kopfgeld je besiegtem Ziel (Held und Kreatur) auch ohne Bonus.
+* **Codumbus**: Zugziehen löst nicht aus, „Gegner zieht 1" nicht, „2 Karten" nicht, HOPT, Erstrunden-Schutz (kein Deck-Verlust beim Geschützten).
+* **Bubbles**: Umleitung auch aus Zauberschaden, tödliche Umleitung → Nachziehen bis 7, bei Frost/Betäubung/Negation keine Umleitung.
+* **Barker**: Lv2 nicht wählbar, Deck-Lv0 wählbar, alle Zonen belegt → keine Frage, negiert/gefroren/tot → keine Wirkung.
+* **Arthor, the King of Blackport**: 1/2 Handkarten, White Eye (2 Karten), Slow-Sperre, Erstrunde, Fremdheld, negiert.
+* **Throne Robber**: Abstieg auch bei totem/negiertem/gefrorenem/wiederbelebtem Gestalt-Held; HP-Bilanz über Auf- und Abstieg stimmig.
+* **Darge**: +50 je Pfeil, auch gegen Kreaturenziel; negiert → kein Bonus. (Hinweis außerhalb dieser Gruppe: ein Angriff eines NEGIERTEN Helden fizzelt in einer Reaktionskette — mit Pfeil —, wird aber ohne Kette ausgeführt; `_kettenWirkerFizzelt` ist dokumentiert „Als Befund 24.9.", aber die Asymmetrie ketten/nicht ketten fiel auf; nicht weiter verfolgt.)
+

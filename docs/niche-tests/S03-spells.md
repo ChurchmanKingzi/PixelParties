@@ -98,6 +98,24 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** `outbreak.js` `canPlayDespiteStatuses` wird nur an den Lähmungs-/Nulled-/Silence-/Berserk-Toren abgefragt; Blinded-Tor (~20052 und ~20843) und der `negated`-Pfad kennen den Hook nicht.
 - **Frage an Al:** Soll Outbreak auch mit einem **negierten** bzw. **geblendeten** Nutzer spielbar sein (Text „any negative status effects" wörtlich)? (ja / nein)
 
+### S03-11 · Pillar of Light: Gegner KANN nicht suchen (Siege), das Skript wertet es trotzdem als „gefunden" · Stufe B
+- **Karten:** Pillar of Light (`pillar-of-light.js`); Sperren, die dieselbe Lücke öffnen: Siege (`blocksSearchFor`), Knight of Kings [B] (`blocksOpponentPileOut`), Cats of the Pharaoh-Sperren, die `takeFromPile` verweigern lässt.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; mein Held 0 trägt Siege; Gegner-Deck enthält 2 × Fireball; ich spiele in Main 1 Pillar of Light (Fireball angesagt).
+- **Schritte:** 1. Pillar of Light als Zusatzaktion spielen, Fireball nennen. 2. Gegnerhand, Zieh-Frage, Phase lesen.
+- **Erwartet** (Kartentext „Your opponent must search their deck for a card with that name and add it to their hand, **if possible**. If they find a card with the declared name, this counts as an additional Action and you may draw a card."; Siege: „your opponent cannot add cards from their deck or discard pile to their hand outside their Resource Phase"): Der Gegner kann nicht suchen ⇒ nichts gefunden ⇒ keine Zieh-Frage, die Aktion wird wie bei „nicht gefunden" verbraucht.
+- **Beobachtet:** `takeFromPile` verweigert (Fireball bleibt im Deck, Gegnerhand leer), das Skript hat den Treffer aber schon als `gefunden` verbucht ⇒ Zieh-Frage („Draw a card?") erscheint, ich ziehe 1 Karte, die Zusatzaktion bleibt erhalten (Phase bleibt Main 1). Der Gegner wird ausgebremst, ich bekomme aber den vollen Nutzen.
+- **Repro:** `docs/niche-tests/repro/S03-spells/11-pillar-of-light-gegner-sperre-gilt-als-gefunden.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `pillar-of-light.js` Z. 161–166: `const gefunden = idx >= 0;` wird vor `takeFromPile(...)` gesetzt; der Rückgabewert der Zeile 166 wird nur für die Animation benutzt, `gefunden` müsste auf `false` fallen, wenn `takeFromPile` `false` liefert (Z. 179 `if (gefunden)` / Fehlschlag-Zweig Z. 199).
+
+### S03-12 · „You can only play 1 X per turn": ein NEGIERTES Exemplar zählt nicht gegen die Sperre (Pillar of Light, Rain of Arrows, Refreshing Night) · Stufe C
+- **Karten:** Pillar of Light (`pillar-of-light.js` Z. 155), Rain of Arrows (`rain-of-arrows.js` Z. 86–89), Refreshing Night (`refreshing-night.js`); dieselbe Klasse wie S01-02 (Big Oopsie / Butterfly Cloud).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0: zwei Kopien der Karte; Sitz 1: Silence auf der Hand (Held 0 mit Magic Arts). Erste Kopie wird von Silence negiert, danach die zweite Kopie im selben Zug.
+- **Erwartet** (Kartentext „You can only play 1 "…" per turn."): Lesart A „gespielt = gezählt" – die zweite Kopie ist nicht spielbar. Lesart B (Skript): gestempelt wird erst im `onPlay`, ein negierter Zauber führt `onPlay` nie aus ⇒ die zweite Kopie wirkt.
+- **Beobachtet:** In allen drei Fällen wird die erste Kopie negiert (Silence verbraucht, Karte in der Ablage), die zweite Kopie ist spielbar und wirkt (Rain of Arrows: 800 → 770 HP). Der Kopfkommentar von Rain of Arrows nennt Lesart B ausdrücklich als Konvention („A negated cast … prevents `onPlay` from firing entirely, so the slot stays free — matching the codebase's existing convention for spell HOPT (Acid Vial does the same)"). Fehler tritt also nur gegen Lesart A auf.
+- **Repro:** `docs/niche-tests/repro/S03-spells/12-einmal-pro-zug-negiert-pillar-rain-refreshing.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** Stempel im `onPlay` statt im Spielweg (`spellPlayCondition` liest `gs.hoptUsed`, gesetzt erst in `onPlay`).
+- **Frage an Al:** Soll ein von Silence negiertes „1 pro Zug"-Exemplar die Sperre verbrauchen (wie bei S01-02 gefragt)? (ja / nein – bei „nein" ist die Konvention bestätigt und S03-12 erledigt)
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung

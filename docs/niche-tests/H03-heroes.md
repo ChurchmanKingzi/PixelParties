@@ -1,8 +1,46 @@
 # H03-heroes – Nischenfall-Bericht
-Stand/Autor: Agent H03-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fortlaufend ergänzt) gezielt getestet · (wird fortlaufend ergänzt) mit Befund.
+Stand/Autor: Agent H03-heroes (Fortsetzung nach dem Rate-Limit-Abbruch des Vorgängers; dessen Befunde 01–11 unverändert übernommen und neu ausgeführt), 13.10.2026. Karten: 37 in der Liste · 37 gezielt getestet (L2) · 22 mit Befund (23 Befunde: 1× A, 18× B, 4× C).
 
 ## Zusammenfassung
-(wird am Ende ausgefüllt – Arbeitsstand: Bericht wächst mit jedem bestätigten Befund)
+**23 Befunde mit ausgeführtem Repro** (alle unter `docs/niche-tests/repro/H03-heroes/`, `node <datei>`; ✗ = Fehler tritt auf): 1× **A**, 18× **B**, 4× **C**.
+
+| ID | Titel (Kurzform) | Stufe |
+|---|---|---|
+| 01 | Nao: Überheilung hängt am Heldenplatz-Flag (Kreaturen der Spalte, toter/negierter Nao) | B |
+| 02 | Pseudonia: gewonnene Effekte von Pete, Rha'Bi, Monia Bot, Rafflesia, Lilly (namensgebundene Skripte); Damsel-Teil C | B |
+| 03 | Madaga unter Such-Sperre: Nachteil ohne Ertrag, HOPT verbrannt | B |
+| 04 | Nomu + Mummy Token: Extra-Zug aus, Handlimit-Freiheit bleibt | B |
+| 05 | Omikrons Illusion löst keine „Creature placed"-Trigger aus (Nero, Maya, Pes'zet, Madame Guillotine) | C |
+| 06 | Quetzahuitl: „gelöschte" Heldenkarten landen nirgends (Kartenbilanz −3) | B |
+| 07 | Mithuru (übernommen) senkt die Stufe für den fremden Helden mit gleichem Index | B |
+| 08 | Luna Pele: vergiftete Kreatur brennt nicht | B |
+| 09 | Sabrina: unopferbare Kreaturen (Cardinal Beast, „cannot be sacrificed") stehen zur Wahl – Surprise gratis | B |
+| 10 | Monia Bot: True-Damage-Stempel bleibt nach schadenloser Umleitung liegen | B |
+| 11 | Rafflesia: Kettenzauber-Anspruch/HOPT auch für eine Reaktion im Gegnerzug | B |
+| 12 | **Santa Klaus: der soeben gewirkte Zauber wird als Geschenkkarte angeboten (und dem Gegner gegeben)** | B |
+| 13 | Santa Klaus: negierter Santa bleibt durch die Hand-Sperre blockiert (Saint Nicolas macht es richtig) | B |
+| 14 | Saint Nicolas / Santa Klaus: bei Gegner-Handsperre wird die Pflicht-Abgabe nie fällig (Aktion gratis) | C |
+| 15 | **Null: von Null getroffene Kreatur bleibt für immer negiert („for 2 turns" läuft nie ab)** (Sparky Slime: gleiche Engine-Ursache) | **A** |
+| 16 | Nicolas: Trank-Sperre gilt auch bei gefrorenem/betäubtem Nicolas; Randfall „tot" = C | B |
+| 17 | Lolek (Shard Knight/Mender): Future Tech Control Device wählbar, landet auf eigenem Helden, Gegner übernimmt Lolek | B |
+| 18 | Lolek: „half its Cost" vom Grundpreis statt vom wirksamen Preis (Laser Cannon 30 statt 0–10) | C |
+| 19 | Damsel: Extra-Leben wirkt auch bei negierter/gefrorener/betäubter Damsel | C |
+| 20 | Nomu (übernommen): Extra-Zug/Handlimit-Freiheit bleiben beim ALTEN Besitzer | B |
+| 21 | Nicolas (übernommen): Trank-Sperre trifft auch den ALTEN Besitzer | B |
+| 22 | Santa Klaus (übernommen): Spielbarkeits-Sperre zählt die Hand des ALTEN Besitzers | B |
+| 23 | Gewonnener Luna-Effekt (Pseudonia, Tempeluna): Firewall-Bonus fehlt (`firewall.js:45` nutzt `loadCardEffect(hero.name)`) | B |
+
+**Gesamteindruck.** Die Heldenpassive der Gruppe sind im Normalfall solide (Stilllegung durch Frost/Betäubung/Negation/Tod, HOPT nach Abbruch, Erstrunden-Schutz, Kappen „up to N times", Dauer in echten Zugwechseln – siehe „Getestet & in Ordnung"). Die Fehler sitzen an den **Rändern**, in vier wiederkehrenden Klassen:
+1. **Engine-gelesene Heldenverträge ohne vollständigen Stilllegungsfilter** (Klasse B-09 aus dem Querschnittsbericht): Nicolas/`potionLockAfterN` (nur negated, 16), Santa/`canPlayCard` (kein Status, 13), Nomu/`bypassHandLimit` (Mummy, 04), Damsel/`_extraLife` (19).
+2. **Gestohlene Helden (`permaControlBy`/`charmedBy`): Direktleser über die Brettseite statt über den Kontrolleur** – Nomu (20), Nicolas (21), Santa (22), Mithuru (07). Der alte Besitzer behält die Wirkung, der Dieb bekommt sie nicht (bzw. wird mit der falschen Hand gerechnet).
+3. **Pseudonia/Tempeluna – „gains the effects"**: Skripte, die ihren Kartennamen vergleichen (02: fünf Helden + Damsel), und eine Abfragestelle, die bei der Umstellung auf `heroScriptOf` ausgelassen wurde (23, Luna/Firewall). Der 24-Helden-Sweep der Gruppe (Pseudonia mit jedem gewonnenen Effekt gegen den echten Helden, gleiches Szenario) ergab sonst Gleichstand.
+4. **Zonen- und Karten-Buchhaltung**: der noch in der Hand liegende, gerade gewirkte Zauber (12), `deletedPile` bei „delete all Heroes" (06), Cross-Side-Artefakt über den Lolek-Weg (17), Statuszähler ohne Leser (15, Engine-Ursache: `negatedDuration`).
+
+**Wichtigster Einzelfund:** 15 (Stufe A) – Null und Sparky Slime machen eine Kreatur dauerhaft statt zeitweilig negiert.
+
+**Bewusst NICHT getestet:** 3–4-Spieler-Partien (nur 2 Sitze); CPU-Pfade (`cpuResponse`/`cpuShouldUseHeroEffect`) und Client-/UI-Darstellung; Deckbau-Klauseln (Nicolas, Pinta, Peter Röll – `public/potion-deck-clauses.js`, Editor); Aufstiegswege selbst (Lolek, Quetzahuitl-Abstieg nur über Heldentod, Damsel-Aufstieg); Initiation Ritual / Styx / Tempeluna-Fee-Anlegen als Quelle gewonnener Effekte; Fälle ab 5 gleichzeitigen Spezialeffekten. Wo Karten für einen Befund mehrere Lesarten zulassen, steht die Frage an Al direkt im Eintrag (05, 14, 16-tot, 18, 19, 02-Damsel).
+
+Messhinweis: Zustände (`frozen`/`stunned`/`negated`) wurden mit `{ appliedTurn, duration: 3 }` gesetzt und **innerhalb desselben Zuges** geprüft oder erst im Gegnerzug aufgelegt – ein in den eigenen Zug gelegter Status ohne Dauer verfällt beim Zugwechsel und täuscht „Effekt trotz Status" vor (so ein Fehlalarm bei Locke wurde verworfen).
 
 Harness-Hinweis für alle Heldenkarten: `H.fresh()` ruft `startGame()` nicht auf, also feuert **`onGameStart` nicht**. Heldenskripte, die dort etwas einrichten
 (Nao, Rescued Damsel Cecilia, Pinta, Lolek-Bereitschaft), brauchen in den Tests ein `t.run(() => t.engine.runHooks('onGameStart', {}))`.
@@ -213,7 +251,56 @@ Harness-Hinweis für alle Heldenkarten: `H.fresh()` ruft `startGame()` nicht auf
 - **Vermutete Ursache:** `firewall.js:45` `const script = loadCardEffect(hero.name);` statt `engine.heroScript(hero)` (= `heroScriptOf`, `_engine.js:29824`) – eine der Abfragestellen, die bei der Umstellung auf `heroScriptOf` ausgelassen wurde. Die Gegenprobe über die anderen Heldenverträge (24-Helden-Sweep in der Gruppe) ergab sonst nur Gleichstand mit dem echten Helden.
 
 ## Abdeckung
-(wird am Ende ausgefüllt)
+Alle 37 Karten sind **L2** (gezielt); „✓" = geprüft und in Ordnung, „✗(→NN)" = Befund NN. Explorative Läufe (nicht committet) liegen im Scratchpad unter `tests/H03-heroes/`; die Befund-Repros unter `docs/niche-tests/repro/H03-heroes/`.
+
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Lilly, the Charming Infiltrator | L2 | Infiltration Lv1 und Lv3 (+2 Karten) ✓, gefroren/betäubt/negiert/tot: nur die gestohlene Karte ✓, Thieving Strike/Loot the Leftovers ✓, gestohlene Lilly: Kontrolleur zieht ✓; als gewonnener Effekt (Pseudonia) ✗(→02) |
+| Locke, the Unseen Saboteur | L2 | Ablauf „bis zu deinem nächsten Zug" über echte Zugwechsel ✓, Held/Kreatur als Ziel ✓ (Kreatur danach CC-immun ✓), Ziel zweimal hintereinander ✓, gefroren/betäubt/negiert/tot ✓, Erst-Runden-Schutz ✓, Abbruch (HOPT frei, nichts geändert) ✓, übernommen ✓, Pseudonia ✓ |
+| Lolek, Mender of the Shattered Trident | L2 | Deck+Ablage gratis auf jeden eigenen Helden ✓, HOPT ✓, gefroren/betäubt/negiert ✓, Abbruch ✓, Discard-out-Sperre ✓; Control Device ✗(→17) |
+| Lolek, the Shard Knight | L2 | halber Preis aufgerundet (2→1, 15→8, 0→0, 4→2) ✓, Gold 7/8 (Schwelle) ✓, Discard&Draw aus Deck/Hand ✓, Zustände ✓, Abbruch ✓, Race-Boat-Limit/voller/gefrorener Held als Ziel ✓, Pseudonia ✓; Control Device ✗(→17), Laser Cannon ✗(→18) |
+| Lord Mithuru, the Rotten Mastermind | L2 | nur Mithuru selbst (Iceage Lv3 bei Decay1/MA1 ✓), negiert/gefroren/tot ✓, anderer Held neben Mithuru ✓, Reaction-Doppelzauber ohne Schule ✓, Pseudonia ✓; übernommen ✗(→07) |
+| Luna Pele, the Flame Dancer | L2 | Kappe 4/Zug + Reset im Folgezug ✓, zwei Lunas je Seite ✓, gefroren/betäubt/negiert/tot ✓, eigener Held vergiftet ✓, gestohlen: Kontrolleur zieht ✓; Kreatur vergiftet ✗(→08) |
+| Luna, the Flame Fairy | L2 | Firewall-Bypass (kein Destruction Magic nötig) ✓, +100 Schaden / alle Gegnerziele brennen ✓, Surprise-Träger gefroren/betäubt/negiert/tot ruht ✓; als gewonnener Effekt ✗(→23) |
+| Madaga, the Forsaken Seafarer | L2 | Suche + „rest of the turn": Mill, Handabwurf, Kreaturentod, Artefakt → Gelöscht ✓, Gegnerzug-Tod → Ablage ✓, gestohlen ✓, Abbruch ✓, Pseudonia ✓; Such-Sperre ✗(→03) |
+| Madame Guillotine, the Great Equalizer | L2 | Löschen und Rückkehr zum Zugende real ✓, Madame fällt/negiert nach dem Löschen: Rückkehr bleibt ✓, Wirtsheld tot/übernommen ✓ (Kartenbilanz sauber), vorher gefroren/betäubt/negiert/tot: kein Trigger ✓, Pseudonia ✓; Omikron-Platzierung ✗(→05) |
+| Maya, the Nature Fairy | L2 | +50 max/aktuell auf Held/Kreatur ✓, nur eigene Ziele ✓, fremde Kreatur in meiner Zone ✓, gefroren/betäubt/negiert/tot ✓, übernommen ✓; Omikron-Platzierung ✗(→05) |
+| Medea, the Swamp Witch | L2 | Gift ×2 auf Held und Kreatur ✓, gefroren/betäubt/negiert/tot ✓, zwei Medeas ×4 (Skriptkopf: multiplikativ), übernommen ✓ |
+| Monia Bot, the Foretold Rescuer of Coolness | L2 | Umleitung inkl. True Damage ✓, gefroren/betäubt/negiert/tot ✓; Stempel nach schadenlosem Effekt ✗(→10); Pseudonia ✗(→02) |
+| Monsieur Pete, the Booty Raider | L2 | Trigger bei Fireball/Kreatur ✓, anderer Held / Eigengift / Eigenschaden: kein Trigger ✓, Gegnergift (Tick) ✓, gefroren/betäubt/negiert/tot ✓, Such-Sperre (Galerie, nichts geholt); Pseudonia ✗(→02) |
+| Nao, the Barrier Priestess | L2 | Heal über Max (Held, Kreatur), Max bleibt ✓, Pseudonia ✓; Slot-Flag ✗(→01) |
+| Natas, the Master of Hell | L2 | Resource-Phase-Plan statt Ziehen ✓, gesperrt bei gefroren/betäubt/negiert ✓, Negation + 2 Gift ✓, gefrorener Natas: kein Gift ✓, übernommen ✓, Pseudonia ✓ |
+| Nero Zira, the Mastermind | L2 | Kappe 5/Zug + Folgezug ✓, gefroren/betäubt/negiert/tot ✓, fremde Kreatur in meiner Zone ✓, übernommen ✓, Pseudonia ✓; Omikron-Platzierung ✗(→05) |
+| Nicolas, the Hidden Alchemist | L2 | Sperre nach dem 2. Trank, Reset im nächsten eigenen Zug ✓, negiert ✓, Pseudonia ✓; gefroren/betäubt ✗(→16), tot (C, →16), übernommen ✗(→21) |
+| Nieht, the Blitz Blade | L2 | Ziehen bei genau 1 Ziel, Bonus-Attack (Hand, Lv ≤ 1) auf dasselbe Ziel, HOPT ✓, Ziel fällt: kein Bonus ✓, negiert ✓ |
+| Nomu, Wanderer of Worlds | L2 | Resource-Draw + Extra, 3×/Zug, 2 Karten: kein Extra, Gegnerzug Zähler frisch, Deck 1, gefroren/betäubt ✓, Pseudonia ✓; Mummy Token ✗(→04), übernommen ✗(→20) |
+| Null, the Mage Slayer | L2 | Held 2 Züge negiert ✓, 0-Schaden-Treffer (Schild) negiert ✓, negierter Null ohne Wirkung ✓, übernommen ✓, Pseudonia ✓; getroffene Kreatur ✗(→15) |
+| Omikron, the Faceless Illusionist | L2 | Platzierung, HP 1, negiert bis zum nächsten eigenen Zug, Name 1×/Spiel ✓, Abbruch ✓, Illusion → Ablage (Konvention „von außerhalb des Spiels", wie Beer), Pseudonia ✓; Platzier-Trigger ✗(→05, C) |
+| Pes'zet, the Plague Bringer | L2 | Gift auf Held/Kreatur, immun, Erstrunden-Schutz ✓, gefroren/betäubt/negiert/tot ✓, übernommen ✓, Pseudonia ✓; Omikron-Platzierung ✗(→05) |
+| Peter Röll, the Protagonist | L2 | ein/zwei Peters, Held fällt, Peter selbst fällt/anderer Peter lebt, alle Zonen voll ✓, gefroren/betäubt/negiert ✓, Pseudonia ✓ |
+| Pharaoh, the Lone Living Being | L2 | Burning Finger Lv1 (kein Divinity) ohne Counter, Fireball Lv2 mit Counter ✓, Zugende bei gefrorenem Pharaoh (Opfer + 2 Karten, nicht negierbar) ✓, Pharaoh tot: kein Payoff ✓, letzter Held opfert sich → Niederlage |
+| Pinta, the Singing Ship | L2 | Aufdecken + Beschwören (Lv0) als Zusatzaktion, Mischen, HOPT, Aktion bleibt ✓, alle Zonen belegt: nur aufdecken/mischen ✓, gefroren/betäubt/negiert ✓, Potion-Deck-Zug gesperrt ✓; Pseudonia mit Pinta: Zieh-Sperre überträgt sich (Folge der „starting hero"-Regel, kein Befund) |
+| Pseudonia, the Skill Devourer | L2 | 24-Szenarien-Sweep gegen die echten Helden (nur Luna ✗→23; Nieht/Peter unterscheiden sich nur durch ATK bzw. Pseudonias eigenen Prompt), Nao/Mithuru/Pinta ✓; namensgebundene Skripte ✗(→02) |
+| Quetzahuitl, Receiver of Sacrifices | L2 | Abstieg im Gegnerzug (Hand/Deck), im eigenen Zug Niederlage, Flächenschaden tötet alle drei, zwei fallen/dritter lebt: kein Abstieg, Quetzahuitl fällt → Niederlage (auch gefroren) ✓; Heldenkarten ✗(→06) |
+| Rafflesia, the Poison Princess | L2 | Anspruch auf Zusatzaktion nach Decay/Support, negiert ✓, HOPT ✓; Gegnerzug-Reaktion ✗(→11), Pseudonia ✗(→02) |
+| Rakah, the Loan Shark | L2 | ≤ 150 HP-Grenze, aktuelle HP zählen, Opfer durch Gegner: nichts, gestohlene Kreatur, Ladder to the Sky, gefroren/betäubt/negiert/tot ✓ |
+| Reiza, the Chief Tormentor | L2 | Stun + Gift bei genau 1 Ziel, zweite Aktion nur mit Reiza und nur wenn alle lebenden Ziele (Helden + offene Kreaturen) vergiftet, nicht bei Teilvergiftung ✓, übernommen ✓, Pseudonia ✓ (Hinweis: „Quick Attack" gibt selbst eine Zusatzaktion – als Sonde ungeeignet) |
+| Rescued Damsel Cecilia | L2 | Revive 600/600, zweiter Tod endgültig, Gift-Tick, letzter Held hält das Spiel am Leben, Wiederbelebung danach verbraucht ✓; negiert/gefroren/betäubt ✗(→19, C); Pseudonia ✗(→02, C) |
+| Rha'Bi, the Living Skeleton | L2 | 3 Ziele, kein 4. auf denselben Helden, Einsammeln auch gefroren/betäubt/negiert (Ruling), Zielheld fällt, Rha'Bi fällt (Karten gelöscht), Erst-Runden-Schutz, Deck leer, HP 100 ✓; Pseudonia ✗(→02) |
+| Riffel, Master of the Ultimate Gun | L2 | Suche + Rest in Ablage, Forsaken-Umleitung, handLocked/drawLocked, gefroren/betäubt/negiert/tot, HOPT, Deck 1/leer, übernommen ✓, Pseudonia ✓; unter `searchLocked` öffnet sich die Galerie, es passiert nichts, HOPT bleibt frei (Beobachtung, kein Befund) |
+| Rool, the Troll Guard | L2 | disrupted → doppelter Schaden bis Ende des nächsten Rool-Zuges (echte Zugwechsel) ✓, gefroren/betäubt/negiert/tot ✓, Flächenschaden einmal, Kreatur trifft ✓, Eigenschaden nein ✓, übernommen ✓, Pseudonia ✓ |
+| Sabrina, the Psychic Witch | L2 | Standard (Lv ≥ Surprise), Lv0-Kreatur reicht nicht, Abbruch nach dem Opfer, Abbruch aller Prompts ✓, Pseudonia ✓; unopferbare Kreaturen ✗(→09) |
+| Saint Nicolas | L2 | Steuer wird bezahlt, Abbruch/Negation geben den Trank zurück, Aura (eigener Trank → Gegnerhand, Gegnertrank → meine Hand), negiert: Trank gelöscht und keine Steuer, negiert spielbar ✓; Gegner-Handsperre ✗(→14, C) |
+| Santa Klaus | L2 | Preis von 2 Karten, Sperre unter 3 Handkarten (Zauber von der Hand) ✓, Pseudonia ✓; gespielter Zauber als Geschenk ✗(→12), negiert ✗(→13), Handsperre ✗(→14, C), übernommen ✗(→22). Dauerfeuer-Lead (Test Dummy +1) erklärt: die Batterie legt Karten nach, die Santa vorher weggegeben hat (Harness, kein Befund) |
+
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ausgefüllt)
+* **Stilllegung der Heldenpassive** (Frost/Betäubung/Negation/Tod, Status mit Dauer 3 gesetzt): Luna Pele, Nero Zira, Maya, Medea, Rool, Natas, Locke, Lilly, Pes'zet, Peter Röll, Null, Pete, Monia Bot, Riffel, Rakah, Reiza, Nomu (frozen/stunned), Madame Guillotine, Pinta, Lolek ×2, Mithuru: bleiben stumm. Hero-Effekt-Aktivierungen (Madaga, Sabrina, Omikron, Riffel, Lolek, Mender, Pinta) sind unter Betäubung/Negation/Frost nicht auslösbar.
+* **Engine-Verträge der Gruppe**: `chargesPerTurn` (Luna Pele 4, Nero 5, Nomu 3: Kappen, Reset im Folgezug, Status), `reduceCardLevel` (Mithuru: nur er selbst, auch als Reaction-Doppelzauber), `canBypassLevelReqForCard` + `firewallModifiers` (echte Luna), `bypassStatusFilter` (Pharaoh, Rha'Bi: wirken weiter, wenn gefroren), `potionLockAfterN` (Nicolas: negiert hebt auf, Reset im eigenen Zug).
+* **Abbruch = nichts ist passiert**: Madaga, Sabrina, Omikron, Riffel, Lolek, Mender, Locke: alle Prompts abgebrochen ⇒ Hand/Deck/Ablage/Gold/Brett unverändert, kein HOPT, keine Engine-Fehler.
+* **Dauern über echte Zugwechsel**: Locke (bis zum nächsten eigenen Zug), Rool (bis Ende des nächsten eigenen Zuges), Omikron-Illusion (negiert bis zum eigenen nächsten Zug), Null auf Helden (2 Züge), Rha'Bi (Einsammeln im eigenen nächsten Zug), Nicolas-Sperre.
+* **Erst-Runden-Immunität**: Locke, Pes'zet und Rha'Bi treffen/legen nichts auf den geschützten Gegner; Null/Reiza/Nieht schlagen nicht durch.
+* **Stehlen** (`actionTakeHeroPermanently`): Luna Pele, Lilly, Nero, Maya, Pes'zet, Medea, Rool, Locke, Natas, Null, Reiza, Riffel (Deck des Kontrolleurs), Madaga (Deck des Kontrolleurs): wirken für den Kontrolleur. (Fehlerhaft: Nomu 20, Nicolas 21, Santa 22, Mithuru 07.)
+* **Wiederbelebung/Spielende**: Damsel (zweiter Tod endgültig, Revive verbraucht), Quetzahuitl (Abstieg statt Niederlage; fällt danach: sofortige Niederlage, auch gefroren), Pharaoh (letzter Held opfert sich ⇒ Niederlage, Spielende sauber).
+* **Kartenbilanz/Audit** nach den Läufen sauber (außer 06); keine verschluckten Engine-Fehler außer den im Bericht genannten Szenarien.
+* **Bewusst nicht gemeldet** (Konvention/Ruling oder Messartefakt): Omikron-Illusion landet beim Tod in der Ablage (+1 Karte – wie „Beer from outside the game"); Medea ×4 bei zwei Medeas (Skriptkopf: multiplikativ); Santa/Saint-Nicolas-Preise sind bei fehlenden Karten korrekt gesperrt; Nieht-Kartenzahlen (jeder Treffer auf genau ein Ziel zieht); Reiza-„Quick Attack"-Fehlalarm (Karte gibt eine Zusatzaktion); Locke-Fehlalarm (ein ohne Dauer aufgelegter Status verfiel beim Zugwechsel); Sparky Slime siehe 15.

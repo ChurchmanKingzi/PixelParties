@@ -209,6 +209,15 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Repro:** `docs/niche-tests/repro/F01-artifacts/22-cloak-of-edge-the-thing-in-the-ship.js`
 - **Vermutete Ursache:** Die Sperre sitzt nur in den Ability-Sammlern (`_engine.js` Z. 40871 ff.); die Cloak läuft über den Equip-Weg (`getActivatableEquips` / `doActivateEquipEffect`, `equipEffect`), der `abilityActivationBlocked` nicht abfragt. Das Skript des Things (Kopf) beschreibt als Maßstab „aktive Effekte = anklickbar (`onFreeActivate`/`onActivate`)" – die Cloak fiel dabei durchs Netz. (Nicht B-01: dort geht es um die Sperre bei gefrorenem Thing.)
 
+### F01-23 · Explosivo's Sword lässt sich an einen gegnerischen Helden anlegen · Stufe B
+- **Karten:** Explosivo's Sword (`cards/effects/explosivo-s-sword.js`, gebannt)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 spielt das Schwert auf Held 0 von Sitz 1 (`targetOwner: 1`). Gegenprobe: Blade of the Swamp Witch (gleiche Klausel, Fahne gesetzt).
+- **Schritte:** `t.play(0, "Explosivo's Sword", { hero: 0, targetOwner: 1 })`.
+- **Erwartet** (Kartentext: „Equip this card to a Hero you control."; Regel CARD_API.md Z. 7118 ff. [5.9.]: bei dieser Klausel gehört `equipOwnSideOnly: true` gesetzt): Anlegen am gegnerischen Helden wird abgelehnt, Karte bleibt auf der Hand.
+- **Beobachtet:** Das Schwert liegt beim Gegner (+10 ATK für dessen Helden); Swamp Witch wird korrekt abgelehnt.
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/23-explosivos-sword-gegnerischer-held.js`
+- **Vermutete Ursache:** Das Skript exportiert kein `equipOwnSideOnly` – der Nachzug „49 nicht gebannte Equipment-Karten" (CARD_API.md) hat gebannte Karten ausgelassen. Wirkung bei Anlegen am Gegner: Der gegnerische Held hätte die 100-Schaden-Auslösung; wegen des Banns niedrige Dringlichkeit.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

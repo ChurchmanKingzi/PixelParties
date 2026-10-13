@@ -1,14 +1,14 @@
 # F03-artifacts – Nischenfall-Bericht
-Stand/Autor: Agent F03-artifacts (Vorgänger + Fortsetzung), 13.10.2026. Karten: 48 in der Liste · 43 gezielt getestet (L2) · 26 mit Befund. Befunde: 20 (Stufe A: 4 · B: 10 · C: 6).
+Stand/Autor: Agent F03-artifacts (Vorgänger + Fortsetzung), 13.10.2026. Karten: 48 in der Liste · 46 gezielt getestet (L2), 1 × L1, 1 × L0 · 26 mit Befund. Befunde: 21 (Stufe A: 4 · B: 11 · C: 6).
 
 ## Zusammenfassung
-20 Befunde (A 4 · B 10 · C 6), alle mit ausgeführtem Repro unter `docs/niche-tests/repro/F03-artifacts/` (Exit 1 = Fehler tritt auf). Die fünf wichtigsten:
+21 Befunde (A 4 · B 11 · C 6), alle mit ausgeführtem Repro unter `docs/niche-tests/repro/F03-artifacts/` (Exit 1 = Fehler tritt auf). Die fünf wichtigsten:
 1. **F03-03 (A)** Weird Doll: eine Ability in einer Support Zone (Xalibur) kollidiert in der Wahl-ID mit der Ability-Zone gleicher Nummer – gelöscht wird die *falsche* Ability bzw. nichts.
 2. **F03-14 (A)** Warhorse, The Master's Sword, Vampiric Sword: ihre Angriffs-Boni (+50 / doppelter Schaden / Heilung) greifen nur gegen Helden, nie gegen Kreaturen als Ziel.
 3. **F03-07 (A)** Slippery Fridge: das bloße Umhängen von Thunder Trumpet / Storm Piano löst deren „sent to the discard pile"-Trigger aus (80 Schaden, `damage_proof`); dazu F03-08/-09: die Fridge umgeht Je-Held-Limits und gefrorene Zielhelden und verschiebt nur *eine* statt „any number" Ausrüstung.
 4. **F03-04 (A)** Snow Cannon ignoriert Thickets „cannot be chosen" (`normalizeValidTargets` filtert `untargetable_all` nicht – betrifft jedes Ziel-Artefakt mit eigener Liste).
 5. **F03-16 / F03-19 (B)** Zieh-Sperre (Sacred Jewel): Wheels und beide Stäbe verlieren dabei Karten/Gold ohne zu ziehen (Teleporter/Uncontrollable leeren die ganze Hand); Item Lock („delete a card") darf die gerade gespielte Artefakt-Karte selbst als Kosten löschen.
-Weiter: Heldentod gibt The White Eye nicht zurück (F03-01), Sun Sword stempelt Frost-Immunität nur einmal (F03-02), Backpack ignoriert „1 Smug Coin per game" (F03-06), Eye of Ren kauft die harte Stab-Sperre frei (F03-10), Stormblade mischt die auflösende Gegnerkarte mit (F03-11), Treasure Chest unter eigener Gold-Sperre wirkungslos spielbar (F03-20); sechs Regelfragen (C) an Al.
+Weiter: Heldentod gibt The White Eye nicht zurück (F03-01), Sun Sword stempelt Frost-Immunität nur einmal (F03-02), Backpack ignoriert „1 Smug Coin per game" (F03-06) und fragt bei Summoning Instructions X ab (F03-21), Eye of Ren kauft die harte Stab-Sperre frei (F03-10), Stormblade mischt die auflösende Gegnerkarte mit (F03-11), Treasure Chest unter eigener Gold-Sperre wirkungslos spielbar (F03-20); sechs Regelfragen (C) an Al.
 Gesamteindruck: Die Kartenskripte selbst sind sorgfältig (Reaktions-Artefakte, Great Wall, Smug Coin, Schilde, Tea, Instruments-HOPT, Brewer's Blade ohne Befund); die Befunde liegen fast alle an **Nahtstellen** – Engine-Verträge, die ein Skript nicht kennt (`toZone`, `ineligible`/`untargetable_all`, `drawLocked` vs. `handLocked`, auflösende Handkarte, `canEquipCardToHero`/`heroCanBeEquipped` bei Verschiebungen).
 Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger`), Elana/Weitere „shuffle your entire hand"-Karten, andere Ziel-Artefakte mit eigener Zielliste (F03-04 nur an Snow Cannon belegt), Geschwister der Cheese-Familie, Golden Bananas/War Chest (F03-20), Surprise-Fenster-Ketten mit mehreren Reaktionen gleichzeitig, UI/Client (greyed-out-Anzeige), Mehrspieler-Sitze 3/4. Karte „The Master's Sword" ist **gebannt** und trägt (anders als der Text „Equip this card to a Hero you control") keine `equipOwnSideOnly`-Fahne (landet auf Gegnerhelden); gemäß CARD_API.md Z. ~7140 wurden gebannte Karten beim Nachziehen nicht angefasst – nur als Hinweis, kein Befund.
 
@@ -168,13 +168,13 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 - **Vermutete Ursache:** Beide Stäbe benutzen den älteren Voll-Lock `ps.handLocked`; die schmalere Sperre `ps.drawLocked` kam später mit dem Sacred Jewel.
 - **Frage an Al:** Sollen die Stäbe nur das Ziehen sperren (wie das Jewel; Suchen bleibt erlaubt) oder weiterhin auch Suchen/Hinzufügen – nur Ziehen oder auch Suchen?
 
-### F03-19 · Item Lock (Hammer Throw): die Kosten „delete a card from your hand" können die gerade gespielte Artefakt-Karte selbst treffen · Stufe B
-- **Karten:** alle Artefakte unter `ps.itemLocked` (getestet mit Treasure Chest, Snow Cannon, Wheels, Warhorse, Smug Coin, Summoning Circle, The Eye of Ren, Skull Necklace, Staff of Uncontrollable Destruction, Treasure Hunter's Backpack, Weird Doll, Spice Mortar); Quelle Hammer Throw (`itemLocked = true`); Code in `server.js` ~11323 / ~7654 / ~12226
-- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 mit `itemLocked`, Hand [Treasure Chest, Fireball]; Treasure Chest wird gespielt. Variante „Mensch": das Skript wählt im Kosten-Picker `forceDiscard` / „Item Lock Cost" die Treasure Chest. Variante „CPU" (Harness-Standard): die Engine wählt selbst.
+### F03-19 · Item Lock (Hammer Throw): bei Nicht-Equipment-Artefakten dürfen die Kosten „delete a card from your hand" die gerade gespielte Artefakt-Karte selbst treffen · Stufe B
+- **Karten:** alle Nicht-Equipment-Artefakte unter `ps.itemLocked` – getestet mit Treasure Chest, Snow Cannon, Wheels, The Eye of Ren, Skull Necklace, Staff of Uncontrollable Destruction, Treasure Hunter's Backpack, Weird Doll, Spice Mortar (alle neun löschen sich selbst); Quelle Hammer Throw (`itemLocked = true`); Code `server.js` `doUseArtifactEffect` ~12226 (Equipment-Weg ~7654 ist **nicht** betroffen: Warhorse, Smug Coin, Summoning Circle löschen korrekt einen Bird)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 mit `itemLocked`, Hand [Treasure Chest, Fireball]; Treasure Chest wird gespielt. Variante „Mensch": das Skript wählt im Kosten-Picker `forceDiscard` / „Item Lock Cost" die Treasure Chest. Variante „CPU" (Harness-Standard): die Engine wählt selbst und nimmt Platz 0 = die gespielte Karte.
 - **Erwartet** (Hammer Throw: „The target's controller must delete a card from their hand whenever they play an Artifact"; Gate in server.js ~7464/12053 verlangt ≥ 2 Handkarten, also eine ANDERE Karte): die gespielte Karte ist keine Kostenkarte; der Picker bietet sie nicht an, gelöscht wird eine andere Handkarte, das Artefakt landet in der Ablage.
-- **Beobachtet:** Der Picker (`eligibleIndices` undefiniert) listet die gespielte Karte mit (Roh-Hand [Treasure Chest, Fireball], `_resolvingCard` = Treasure Chest). Wird sie gewählt – bzw. wählt die CPU den ersten Platz –, wird das Artefakt selbst gelöscht: Fireball bleibt, die Chest fehlt in der Ablage, +10 Gold wirken trotzdem. In der Reihe oben löschen alle zwölf Artefakte so sich selbst (Handgröße 3 → 2, Deleted +1). Die Kosten sind damit praktisch gratis.
+- **Beobachtet:** Der Picker (`eligibleIndices` undefiniert) listet die gespielte Karte mit (Roh-Hand [Treasure Chest, Fireball], `_resolvingCard` = Treasure Chest). Wird sie gewählt – bzw. wählt die CPU den ersten Platz –, wird das Artefakt selbst gelöscht: Fireball bleibt, die Chest fehlt in der Ablage, +10 Gold wirken trotzdem. Die Kosten sind damit praktisch gratis (das Artefakt geht nur statt in die Ablage in den Deleted Pile).
 - **Repro:** `docs/niche-tests/repro/F03-artifacts/19-item-lock-kosten-loescht-gespielte-karte.js` (✗ = Fehler tritt auf)
-- **Vermutete Ursache:** `actionPromptForceDiscard(pi, 1, { title: 'Item Lock Cost', deleteMode: true, … })` wird in den drei Server-Pfaden ohne `eligibleIndices`-Ausschluss der auflösenden Karte aufgerufen (`engine._istAufloesendeHandkarte`, `_engine.js` ~19630; Wheels und Live Show schließen sie selbst aus, s. `wheels.js` `buildEligibleIndices`).
+- **Vermutete Ursache:** `actionPromptForceDiscard(pi, 1, { title: 'Item Lock Cost', deleteMode: true, … })` im Nicht-Equipment-Weg ohne `eligibleIndices`-Ausschluss der auflösenden Karte (`engine._istAufloesendeHandkarte`, `_engine.js` ~19630; Wheels und Live Show schließen sie selbst aus, s. `wheels.js` `buildEligibleIndices`). Im Equipment-Weg ist die Handkarte zum Zeitpunkt der Kostenzahlung bereits ausgerüstet.
 
 ### F03-20 · Treasure Chest unter der eigenen Gold-Sperre (Golden Arrow): spielbar, Karte wird wirkungslos verbrannt · Stufe B
 - **Karten:** Treasure Chest (`treasure-chest.js`), Sperrquelle Golden Arrow (`_arrows-shared.js` ~302, `ps.goldLocked`); gleiche Lücke bei Karten, die denselben Helfer nutzen (Golden Bananas, War Chest …, nicht getestet)
@@ -184,6 +184,14 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 - **Repro:** `docs/niche-tests/repro/F03-artifacts/20-treasure-chest-gold-sperre.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `goldGainWouldBeBlocked` (`_gold-block-shared.js` ~Z. 84) prüft nur den gegnerischen Tuscan Aristocrat (`blockerAufDemBrett`), nicht die eigene Spielersperre `ps.goldLocked`, die `actionGainGold` (`_engine.js` ~24065) durchsetzt.
 
+### F03-21 · Treasure Hunter's Backpack: Summoning Instructions fragt beim Effekt-Anlegen X ab (Vorgabe: X = 1 ohne Wahl) · Stufe B
+- **Karten:** Treasure Hunter's Backpack (`treasure-hunter-s-backpack.js` ~Z. 187), Summoning Instructions (`summoning-instructions.js` `onCardEnterZone`/`frageX`); gleicher Helfer `_equip-shared.ruesteAusStapelAus` bei Weapon Collecting Wight / Riffel (nicht getestet)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, 100 Gold; Summoning Instructions im Deck; Backpack gespielt, die Instructions gewählt.
+- **Erwartet** (Skript-Kopf „Als Vorgabe 21.9. v1263": „wird die Karte durch einen EFFEKT angelegt (Bill, Treasure Hunter's Backpack — Placement/Verschiebung statt Ausspielen), gibt es keine Wahl: X = 1"): keine X-Abfrage, `levelGapCoverage` = 1.
+- **Beobachtet:** Der Prompt „Summoning Instructions" (X = 1/2/3) erscheint; die Antwort (hier 3, CPU-Standard = höchstes X) setzt `levelGapCoverage = 3` – der Held darf Level-3-Kreaturen ohne Summoning Magic beschwören.
+- **Repro:** `docs/niche-tests/repro/F03-artifacts/21-backpack-summoning-instructions-x.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `onCardEnterZone` erkennt Effekt-Anlegen nur an `ctx._isPlacement || ctx._isMove`; der Backpack feuert den Hook (`treasure-hunter-s-backpack.js` ~187, ebenso `_equip-shared.js` ~192) ohne dieses Kennzeichen. (Die Fridge-Verschiebung ist durch „Zähler schon gesetzt ⇒ nicht erneut fragen" gedeckt.)
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
@@ -191,12 +199,12 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 | Shield of Life | L2 gezielt | wie Shield of Death ✓ (Heilung auf eigenes Ziel, Abbruch erstattet) |
 | Shield of Wisdom | L2 gezielt | Umleitung eines Kreatur-Effekts (Cannon Tower): Wirt/Kreatur im Support gewählt ✓, Angreifer-Kreatur nicht als Umleitziel ✓, Wirtsheld gefroren ⇒ kein Auslöser (Konvention) ✓, kein Umleitziel ⇒ Effekt läuft ✓ |
 | Sickly Cheese | L2 gezielt | Stapel +1 ✓, Such-Sperre ⇒ unspielbar ✓, giftimmuner Held ✗(→ -12) |
-| Skull Necklace | L2 gezielt | eigener/gegnerischer Zwangsabwurf und Delete: 50 bzw. 200 ✓, gestohlene Kreatur als Ziel ✓, Item-Lock-Kosten ✗(→ -19, Kostenwahl) |
+| Skull Necklace | L2 gezielt | eigener/gegnerischer Zwangsabwurf und Delete: 50 bzw. 200 ✓, gestohlene Kreatur als Ziel ✓; als gespielte Karte unter Item Lock ✗(→ -19) |
 | Skullmael's Greatsword | L2 gezielt | Galerie/Beschwörung ✓, Ablage-Sperre ✓, HOPT je Instanz ✓, Knife-Kill ✗(→ -05, C) |
 | Slippery Fridge | L2 gezielt | Instrumente feuern ✗(→ -07), Je-Held-Limits/gefrorenes Ziel ✗(→ -08), „any number" ✗(→ -09); ATK-Waffen wandern korrekt ✓, Xalibur-Abilities fallen ✓ |
 | Smug Coin | L2 gezielt | 799 / 800 / 5000 Fremdschaden ✓, Eigenschaden nicht gerettet ✓, Brand-Tick ✓, zweiter Treffer tödlich ✓, Löschung ✓, von Tool Freezer negiert ⇒ kein Stempel ✓; Backpack-Weg ✗(→ -06) |
 | Snow Cannon | L2 gezielt | Thicket ✗(→ -04); Frost-Dauer Held/Kreatur (bis Ende der nächsten Runde des Opfers) ✓, immuner/gefrorener Held nicht angeboten ✓, von Tool Freezer negiert ✓ |
-| Spice Mortar | L2 gezielt | Hand-/Zieh-/Such-Sperre, <10 Karten, Erstzug-Schutz ✓; Such-Sperre ✗(→ -17, C) |
+| Spice Mortar | L2 gezielt | Hand-Sperre ⇒ unspielbar ✓, Zieh-Sperre ⇒ spielbar ✓, Potion-Wahl ✓; Such-Sperre ✗(→ -17, C) |
 | Spiky Armor | L2 gezielt | Held / Kreatur als Ziel ✓, tödlicher Treffer: Rückstoß = tatsächlich verlorene HP (30) ✓, Spell kein Auslöser ✓, zu wenig Gold ✓, Angreifer stirbt am Rückstoß ohne Spielende ✓, proaktiv nicht spielbar ✓ |
 | Staff of Illusions | L2 gezielt | Rückkehr nach Gegnerzug ✓, gestohlene Illusion kehrt ins richtige Deck ✓, Summon-Sperre danach ✓; Level 0 / < 10 Gold ✗(→ -13, C) |
 | Staff of the Teleporter | L2 gezielt | 0/n/alle gewählt (+1 bei ganzer Hand) ✓; ✗(→ -10, -16, -18) |
@@ -206,7 +214,7 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 | Storm Ring | L2 gezielt | 3 Helden ⇒ negiert (Karte Ablage, 4 Gold) ✓, 1 Ziel / Held+Kreatur ✓, HOPT von Rain of Arrows nach Negierung bleibt ✓, zu wenig Gold ✓ |
 | Strong Shield | L2 gezielt | 299 / 300 / 301 ✓, Kreatur ✓, Eigenschaden ✓ (quellenunabhängig), 7 Gold (Kosten 8) ✓, zwei Treffer / eine Karte ✓ |
 | Summoning Circle | L2 gezielt | HP-Verdopplung bei Beschwörung ✓, anderer Held nicht ✓, 1 Kreis je Held ✓, Tod/Wiederbelebung ✓ |
-| Summoning Instructions | L2 gezielt | X = 1/2/3 × Summoning Magic 0/1 gegen Lv 1–3 ✓ (Text ↔ Skript), Backpack-Weg fragt X ✓ |
+| Summoning Instructions | L2 gezielt | X = 1/2/3 × Summoning Magic 0/1 gegen Lv 1–3 ✓ (Text ↔ Skript); Backpack-Weg ✗(→ -21) |
 | Super-Killing Knife, the Tool of Liquidation | L2 gezielt | +10 ATK / Abgang ✓, Kreaturentreffer fällt ✓, Held-Treffer nicht ✓; Poster/Skullmael ✗(→ -05, C) |
 | Tea | L2 gezielt | Stati + Gift-Stapel wandern ✓, Zielliste ohne immunen Helden (Frost) ✓ |
 | Teal Fishing Rod | L2 gezielt | Basis ✓ (Level 0, Zonenwahl), Snapshot-Namensprüfung ✗(→ -15, C) |
@@ -227,7 +235,7 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 | Thunder Trumpet | L2 gezielt | 80 Schaden, HOPT ✓, Heldentod-Abbau ✓; Fridge ✗(→ -07) |
 | Tool Freezer | L2 gezielt | Kosten = 2× (Snow Cannon 10, Warhorse 16), unbezahlbar ⇒ keine Reaktion ✓, Kosten-0-Artefakt ✓, Equipment ⇒ Ablage ohne Stempel ✓ |
 | Treasure Chest | L2 gezielt | +10 ✓, Item-Lock ✓; ✗(→ -20) |
-| Treasure Hunter's Backpack | L2 gezielt | Je-Held-Limits (Poster, Sword, Circle, Piano, Stormblade) ✓, Träger-Aktionssperre ✓, Kostenschranke 50 ✓; ✗(→ -06) |
+| Treasure Hunter's Backpack | L2 gezielt | Je-Held-Limits (Poster, Sword, Circle, Piano, Stormblade) ✓, Träger-Aktionssperre ✓, Kostenschranke 50 ✓; ✗(→ -06, -21) |
 | Truth-Seeing Eye | L2 gezielt | wählt Thicket-Kreatur trotz Schutz ✓; Eye an anderem Held ohne Wirkung ✓ |
 | Vampiric Sword | L2 gezielt | ⌈x/2⌉-Heilung (45 ⇒ 23) ✓, Deckel bei Max-HP ✓, 2. Schwert am Held abgelehnt ✓; gegen Kreatur ✗(→ -14) |
 | Wanted Poster | L2 gezielt | 2 bei Kill, mehrere Kills, Kill eigener Kreatur ✓, 2. Poster abgelehnt ✓; Knife ✗(→ -05, C), Fridge ✗(→ -08) |
@@ -236,7 +244,7 @@ Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger
 | Wheels | L2 gezielt | beide Modi, HOPT, Deck 2 ✓; Zieh-Sperre ✗(→ -16) |
 | Xalibur | L2 gezielt | Abilities in Support Zonen, Abgang/Heldentod legt sie ab ✓, 2. Xalibur am Held ✓, Fridge ✓; Weird-Doll-Wahl ✗(→ -03) |
 
-Querschnitt über alle 21 Ausrüstungen (Batterie `u25`): Ausrüsten auf toten Helden abgelehnt ✓, Heldentod legt in die Ablage des Besitzers (nicht des Kontrolleurs, auch bei dauerhaft übernommenem Helden) ✓, ATK-Boni werden zurückgenommen ✓, Wiederbelebung bringt keine Ausrüstung zurück ✓ (Ausnahme The White Eye ⇒ -01), voller Held lehnt Ausrüstung ab ✓; Item Lock/`_artifactLockTurn` ✗(→ -19), `_artifactLockTurn` verweigert alle zwölf getesteten Artefakte ✓.
+Querschnitt über alle 21 Ausrüstungen (Batterie `u25`): Ausrüsten auf toten Helden abgelehnt ✓, Heldentod legt in die Ablage des Besitzers (nicht des Kontrolleurs, auch bei dauerhaft übernommenem Helden) ✓, ATK-Boni werden zurückgenommen ✓, Wiederbelebung bringt keine Ausrüstung zurück ✓ (Ausnahme The White Eye ⇒ -01), voller Held lehnt Ausrüstung ab ✓; Item Lock bei Nicht-Equipment ✗(→ -19; Equipment-Weg ✓), `_artifactLockTurn` verweigert alle zwölf getesteten Artefakte ✓.
 
 ## Getestet & in Ordnung (Auswahl)
 - **Reaktions-Artefakte** (Strong Shield, Spiky Armor, Storm Ring, Tool Freezer, Shield of Wisdom): Schwellen (299/300), Mehrfachtreffer, Kreatur als Ziel, zu wenig Gold, proaktiv nicht spielbar, Rückstoß = tatsächlich verlorene HP, Ring zählt tatsächliche Ziele (1 Ziel / 2+), Tool-Freezer-Kosten 2× und Negierung ohne Stempel.
@@ -247,4 +255,4 @@ Querschnitt über alle 21 Ausrüstungen (Batterie `u25`): Ausrüsten auf toten H
 - **Gold/Zieh-Sperren**: Staffs' Locks laufen mit dem Zugwechsel aus; Sacred Jewel sperrt nur den Wirker; Sacred Mirror Schwelle 60/61.
 - **Ausrüstungs-Lebenszyklus** aller 21 Ausrüstungen (Tod, Wiederbelebung, dauerhafte Übernahme des Trägers, volle Zonen, toter Zielheld) ohne Engine-Fehler, ohne Audit-Meldung, Kartenbilanz bleibt.
 - **Truth-Seeing Eye / Thicket**: Eye ignoriert den harten Zielschutz, aber nur für den eigenen Träger.
-- **Zwei Blindgänger der Vorrunde** (Test-Artefakte, kein Befund): „Instructions X=2/3 kein Platz" (Brettgeometrie im Aufbau) und „Sickly Cheese: Karte in `deletedPile` bei Item Lock" (Harness-CPU wählt Platz 0; Ursache = -19).
+- **Aussortierte Verdachtsfälle des Vorgängers** (Test-Artefakte, kein Befund): „Instructions X=2/3: kein Platz" (Brettgeometrie im Aufbau), „Skullmael: unbekannte Karte Goblin" (ungültiger Kartenname im Aufbau), „Knife-Kill: Instanz bleibt in `cardInstances`" (Normalzustand jeder Nicht-Schadens-Zerstörung, auch bei `actionDestroyCard` ohne Knife), „Thicket: Skull Necklace/Yeeting bieten die Kreatur an" (Test las `ineligible` nicht; die Engine graut sie aus und filtert die Antwort – nur Snow Cannon ist real betroffen, F03-04), „Stormblade A1/B1: Hand 3 statt 4" (war bereits F03-11).

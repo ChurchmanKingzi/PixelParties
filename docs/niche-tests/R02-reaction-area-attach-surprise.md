@@ -162,6 +162,14 @@ Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in 
 - **Vermutete Ursache:** Statusflächenzauber ohne Schaden laufen an den AoE-Surprise-Fenstern vorbei (`poisoned-well.js` Z. 77–90).
 - **Frage an Al:** Zählt „hit by a Spell" auch einen Spell, der nur einen Status verteilt (Poisoned Well) – Ja (Toxic Trap/Booby Trap sollen dann auslösen) oder nein (nur Schaden)?
 
+### R02-19 · Very Special Prisoner holt „Divinity" per direktem Splice aus dem Deck – an der Stapel-Sperre von Knight of Kings [B] vorbei · Stufe A
+- **Karten:** Very Special Prisoner (`very-special-prisoner.js`), Knight of Kings [B] (`knight-of-kings-b.js`, Vertrag `blocksOpponentPileOut`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 1: Knight of Kings [B] + Rook of Kings [B] auf dem Brett, Board of Kings in der Area Zone (⇒ `engine.pileOutAllowed(0,'deck')` = `false`). Sitz 0 (Held 0 mit Magic Arts 1) hat Very Special Prisoner auf der Hand, ein Divinity im Deck (Variante A) bzw. auf der Hand (Variante B, Kontrolle) und übernimmt eine Kreatur von Sitz 1 (`actionStealCreature`).
+- **Erwartet** (Knight of Kings [B]: „your opponent cannot move cards from their deck or discard pile to anywhere else (but they can still draw)"; CARD_API „Kein direktes Splicen an Deck und Ablage"): A: Das Deck ist als Quelle gesperrt – Divinity wird nicht aus dem Deck geholt (Karte nicht angeboten bzw. wirkungslos); B: Divinity von der Hand wird angehängt.
+- **Beobachtet:** A: Very Special Prisoner wird angeboten, Divinity wird aus dem Deck gezogen (Deck 3 → 2) und an Held 0 gehängt, obwohl die Sperre gilt. B ✓.
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/19-very-special-prisoner-deckklau-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `very-special-prisoner.js` `_availableDivinitySources` (reactionCondition) zählt das Deck ungeprüft, und `resolve` splict `ps.mainDeck` direkt (`removeFromPile`), statt über die Stapel-Schicht (`takeFromPile`/`pileOutAllowed`) zu gehen. Hinweis: gleiche Bauform steht laut Kommentar bei `sacrifice-to-divinity.js` (nicht geprüft).
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
