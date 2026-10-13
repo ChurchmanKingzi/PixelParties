@@ -11804,6 +11804,24 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     t.owner = physSide;
     t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
   }
+  // ★ Z3 (F03-04, A06-05): Kreatur-Zielschutz am selben Tor wie die Filter darunter. Ziel-Artefakte/-Traenke
+  // bauen ihre Liste selbst und laufen nicht durch die Engine-Picker – „cannot be chosen by cards and
+  // effects" (Thicket, `untargetable_all`, fuer jeden Waehler), „… by your opponent" (Censpartan, Golden
+  // Wings: `untargetable_by_opponent` + `_pi`) und die Board-of-Kings-Deckung (`guardsCreatureChoice`)
+  // fielen hier durch. Gleiche Regeln und Opt-out (`ignoreUntargetable`) wie in `promptEffectTarget`.
+  if (engine && !config?.ignoreUntargetable) {
+    for (let i = validTargets.length - 1; i >= 0; i--) {
+      const inst = validTargets[i]?.cardInstance;
+      if (!inst?.counters) continue;
+      if (inst.counters.untargetable_all) { validTargets.splice(i, 1); continue; }
+      if (typeof casterPi !== 'number' || validTargets[i].type !== 'equip') continue;
+      if (typeof engine._istKreaturenInstanz === 'function' && !engine._istKreaturenInstanz(inst)) continue;
+      if ((inst.counters.untargetable_by_opponent && inst.counters.untargetable_by_opponent_pi === casterPi)
+          || (typeof engine._boardGuardsCreatureChoice === 'function' && engine._boardGuardsCreatureChoice(inst, casterPi))) {
+        validTargets.splice(i, 1);
+      }
+    }
+  }
   // Non-damage opponent shield filter (The Great Wall of Deri, any
   // future "your Creatures can't be chosen by opp's non-damage
   // cards/effects" card). Targeting Artifacts build their own
