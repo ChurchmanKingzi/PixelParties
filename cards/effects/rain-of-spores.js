@@ -53,8 +53,10 @@ module.exports = {
       const oppHandSizeAtStart = ops.hand?.length || 0;
       const maxOwnDiscard = Math.max(0, oppHandSizeAtStart - 1);
       let ownDiscarded = 0;
-      while ((ps.hand?.length || 0) > 0 && ownDiscarded < maxOwnDiscard) {
-        const eligible = (ps.hand || []).map((_, i) => i);
+      // ★ Z4 (S03-23): die gerade aufloesende Rain of Spores liegt noch in `ps.hand`, ist aber keine Handkarte
+      // mehr — nicht als eigener Abwurf waehlbar (sonst gaebe es den „+1"-Abwurf des Gegners gratis dazu).
+      while (engine._handIndizesOhneAufloesende(ps).length > 0 && ownDiscarded < maxOwnDiscard) {
+        const eligible = engine._handIndizesOhneAufloesende(ps);
         const remaining = maxOwnDiscard - ownDiscarded;
         const result = await engine.promptGeneric(pi, {
           type: 'forceDiscardCancellable',
@@ -66,6 +68,7 @@ module.exports = {
           cancelLabel: 'Done',
         });
         if (!result || result.cancelled || result.cardName == null) break;
+        if (!eligible.includes(result.handIndex)) break;   // Z4: Antwort ausserhalb der Auswahl (aufloesende Karte) zaehlt nicht
         const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
           source: CARD_NAME,
         });

@@ -212,6 +212,40 @@ function handSizeWithoutResolving(ps) {
 }
 
 /**
+ * ★ Wave 2 / Z4 — die ECHTEN Handplaetze OHNE die gerade aufloesende(n) Karte(n).
+ *
+ * Zentraler Zugriff „Hand ohne die gerade auflösende Karte" fuer alle Handzugriffe
+ * (Abwurf-/Geschenk-/Raub-/Misch-Auswahl, Bezahlbarkeits- und Mengenpruefungen):
+ * die Karte liegt bis zum Ende ihrer Aufloesung noch in `ps.hand`, ist aber
+ * keine Handkarte mehr. Gleiche Regel wie `handSizeWithoutResolving` (Primaerkarte
+ * + Zusatz-Guesse), nur als Indexliste — `liste.length === handSizeWithoutResolving(ps)`.
+ *
+ * Die Indizes sind die PHYSISCHEN Plaetze in `ps.hand` (die Client-Anzeige zeigt die
+ * aufloesende Karte ausgegraut mit, Anzeige-Index == Handplatz). Wer nur die Karten
+ * braucht: `handCardsWithoutResolving`.
+ * @returns {number[]} aufsteigende Handindizes
+ */
+function handIndicesWithoutResolving(ps) {
+  const hand = ps?.hand || [];
+  const raus = new Set();
+  const rc = ps?._resolvingCard;
+  if (rc && !rc.fromCreation) { const i = getResolvingHandIndex(ps); if (i >= 0) raus.add(i); }
+  for (const name of (ps?._zusatzAufloesend || [])) {
+    const j = hand.findIndex((c, k) => c === name && !raus.has(k));
+    if (j >= 0) raus.add(j);
+  }
+  const out = [];
+  for (let i = 0; i < hand.length; i++) if (!raus.has(i)) out.push(i);
+  return out;
+}
+
+/** ★ Z4: die Handkarten (Namen) ohne die aufloesende(n) Karte(n) — `handIndicesWithoutResolving` als Namensliste. */
+function handCardsWithoutResolving(ps) {
+  const hand = ps?.hand || [];
+  return handIndicesWithoutResolving(ps).map(i => hand[i]);
+}
+
+/**
  * v1323 — ein Zusatz-Guss aus der Hand laeuft: seine Karte zaehlt fuer
  * `handSizeWithoutResolving` nicht mit, bis `fn` fertig ist. Verschachtelt
  * ist erlaubt (Stapel).
@@ -231,6 +265,8 @@ async function mitZusatzAufloesung(ps, name, fn) {
 module.exports = {
   mitZusatzAufloesung,
   handSizeWithoutResolving,
+  handIndicesWithoutResolving,
+  handCardsWithoutResolving,
   eligibleCreationIndices,
   beginHandResolve,
   getResolvingHandIndex,

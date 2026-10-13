@@ -39,6 +39,7 @@ const HOOKS = {
   BEFORE_DRAW:      'beforeDraw',
   ON_DRAW:          'onDraw',
   ON_CARD_ADDED_TO_HAND: 'onCardAddedToHand', // Fires when a card is added to a hand from the deck (tutor effects — Mass Multiplication, etc.). Complements ON_DRAW, which only fires for top-of-deck draws.
+  ON_HAND_GREW: 'onHandGrew', // Z4: die Hand von { playerIdx } ist durch einen Zugang OHNE Zieh-/Such-Hook gewachsen (Birthday Present, Rueckgaben ueber handZugang) — Zuhoerer: Handlimit-Waechter (Charm of Balance).
   ON_CARD_ADDED_FROM_DISCARD_TO_HAND: 'onCardAddedFromDiscardToHand', // Fires when a card is moved from a discard pile (either player's) into a hand. Distinct from ON_CARD_ADDED_TO_HAND so listeners (Bamboo Staff, Bamboo Shield reveal, …) can react specifically to "recovered from graveyard" without firing on deck-tutors.
   // Fires whenever a card is taken from the OPPONENT's deck or
   // hand and added to the taker's hand (Infiltration, Charme Lv2,

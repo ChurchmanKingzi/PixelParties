@@ -226,6 +226,11 @@ module.exports = {
 
     engine.sync();
 
+    // ★ Z4 (F01-06 b): Geschenk und eigene Karten kommen ohne Zieh-/Such-Hook auf die Hand — Handlimit-Waechter
+    // (Charm of Balance) werden ueber `onHandGrew` benachrichtigt (beide Haende).
+    await engine.runHooks('onHandGrew', { playerIdx: oppIdx });
+    await engine.runHooks('onHandGrew', { playerIdx: pi });
+
     // ── Step 8: wait for client highlight + fly-out animation ────────────
     // The `bounceReturnHidden` keys the client set when receiving
     // `pick_resolved` keep the new hand slots invisible during this

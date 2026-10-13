@@ -39,7 +39,8 @@ module.exports = {
     // Opponent must have 2+ cards in hand
     const oppIdx = opponentOfGs(gs, pi);
     const oppPs = gs.players[oppIdx];
-    if (!oppPs || (oppPs.hand || []).length < 2) return false;
+    // ★ Z4 (R02-07): die Karte, die der Gegner gerade spielt, ist keine Handkarte mehr.
+    if (!oppPs || (engine ? engine._handIndizesOhneAufloesende(oppPs).length : (oppPs.hand || []).length) < 2) return false;
 
     // At least 1 hero must be able to cast this (Decay Magic Lv1)
     if (engine) {
@@ -66,7 +67,7 @@ module.exports = {
     const gs = engine.gs;
     const oppIdx = engine.opponentOf(pi);
     const oppPs = gs.players[oppIdx];
-    if (!oppPs || (oppPs.hand || []).length < 2) return;
+    if (!oppPs || engine._handIndizesOhneAufloesende(oppPs).length < 2) return;
 
     // Show card to both players
     engine._broadcastEvent('card_reveal', {

@@ -167,12 +167,13 @@ module.exports = {
       let shuffledNames = [];
       let shuffledPlaetze;
       if (budget > 0 && (ps.hand || []).length > 0) {
-        const cap = Math.min(budget, ps.hand.length);
-        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));
+        const waehlbar = new Set(engine.shuffleBackEligibleHandSlots(pi));   // ohne die aufloesende Tanuki Escape (Z4, A06-15)
         const eligibleIndices = ps.hand
           .map((_, i) => i)
           .filter(i => waehlbar.has(i));
-        const handPick = await engine.promptGeneric(pi, {
+        const cap = Math.min(budget, eligibleIndices.length);
+        // Nur die aufloesende Karte in der Hand: nichts zu mischen (kein Prompt mit leerer Auswahl).
+        const handPick = eligibleIndices.length === 0 ? null : await engine.promptGeneric(pi, {
           type:           'handPick',
           title:          CARD_NAME,
           description:    `Click 1 to ${cap} card${cap === 1 ? '' : 's'} in your hand to shuffle back into your deck.`,
@@ -187,7 +188,8 @@ module.exports = {
           // descending handIndex so any name-based splices in the
           // mulligan helper still resolve to the right slot if duplicate
           // names exist (peel right-to-left).
-          const sortiert = [...handPick.selectedCards].sort((a, b) => b.handIndex - a.handIndex);
+          // Z4 (A06-15): nur Plaetze aus der Auswahl (die aufloesende Tanuki Escape ist keine Handkarte).
+          const sortiert = handPick.selectedCards.filter(s => eligibleIndices.includes(s.handIndex)).sort((a, b) => b.handIndex - a.handIndex);
           shuffledNames = sortiert.map(s => s.cardName);
           shuffledPlaetze = sortiert.map(s => s.handIndex);
         }
