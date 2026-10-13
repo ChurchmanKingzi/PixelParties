@@ -204,6 +204,14 @@ Harness-Hinweis für alle Heldenkarten: `H.fresh()` ruft `startGame()` nicht auf
 - **Repro:** `docs/niche-tests/repro/H03-heroes/22-santa-klaus-uebernommen-zaehlt-falsche-hand.js` (2 ✗)
 - **Vermutete Ursache:** `santa-klaus.js:57-67` nutzt `gs.players[pi].hand` ohne den Kontrolleur aufzulösen (`hero.permaControlBy ?? hero.charmedBy ?? pi`, wie `heldUndHand` in `saint-nicolas.js`). Der Preis selbst (`afterSpellResolved`) gibt aus der Hand von `ctx.cardOwner` – im Test Sitz 0, also der Kontrolleur ✓ (nur 1 Karte, kein Prompt).
 
+### H03-heroes-23 · Gewonnener Luna-Effekt (Pseudonia / Tempeluna): der „Firewall"-Bonus (+100 Schaden, alle Gegnerziele brennen) fehlt · Stufe B
+- **Karten:** Luna, the Flame Fairy (`cards/effects/luna-the-flame-fairy.js`: `firewallModifiers`), Pseudonia, the Skill Devourer, Tempeluna, the Convergence Fairy; Verbraucher `cards/effects/firewall.js:42-50` (`firewallMods`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 0 = echte Luna (Kontrolle) bzw. Pseudonia bzw. Tempeluna mit `grantHeroEffect(0, 0, 'Luna, the Flame Fairy')` + `finishGainedHeroEffects`; keine Destruction Magic (der Bypass muss den Level ersetzen); „Firewall" in Held 0s Surprise Zone; Gegner (Sitz 1) greift Held 0 mit Fireball an.
+- **Erwartet** (Kartentext Luna: „This Hero's „Firewall" Spells deal 100 additional damage and Burn all targets your opponent controls, not just the attacker."; Tempeluna: „This Hero gains the effects of both „Luna …" and „Tempeste …""; `_gained-effects-shared.js`-Kopf: „Lunas ganze Wirkung steckt in `canBypassLevelReqForCard` und `firewallModifiers` … die 42 Abfragestellen laufen seit v1186 über `heroScriptOf`"): wie bei Luna 200 Schaden auf den Angreifer und alle drei Gegnerhelden brennen.
+- **Beobachtet:** Kontrolle (echte Luna) ✓ (`[400,600,600]`, alle brennen). Pseudonia und Tempeluna: Firewall löst aus (der Level-Bypass kommt an), aber nur **100** Schaden (`[500,600,600]`) und nur der Angreifer brennt (`[true,false,false]`).
+- **Repro:** `docs/niche-tests/repro/H03-heroes/23-pseudonia-luna-firewall-bonus-fehlt.js` (4 ✗)
+- **Vermutete Ursache:** `firewall.js:45` `const script = loadCardEffect(hero.name);` statt `engine.heroScript(hero)` (= `heroScriptOf`, `_engine.js:29824`) – eine der Abfragestellen, die bei der Umstellung auf `heroScriptOf` ausgelassen wurde. Die Gegenprobe über die anderen Heldenverträge (24-Helden-Sweep in der Gruppe) ergab sonst nur Gleichstand mit dem echten Helden.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

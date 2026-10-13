@@ -173,6 +173,15 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Vermutete Ursache:** (a) `the-seventh-circle-of-hell.js` Z. 58–62: `ziele = [...getHeroTargets(tp), ...getCreatureTargets(tp)]` ohne `heroHasDiverHelmet`/`isAreaImmuneInst`; dasselbe gilt für den Abgangs-Zweig (150 Schaden). (b) `_engine.js` Z. 46292 ff. (Dark-Ocean-Block der Kreaturen-Schadenssammlung) ruft `_isDiverHelmetProtectedTarget` nicht auf (Z. 27290 stellt es bereit).
 - **Hinweis zur Einordnung:** Das Skript hält fest, dass der Zugspieler „seine eigenen Ziele selbst" wählt und Submerged/Stealth dann nicht schützen (Ruling 9.10., `festesZiel`). Der Helm ist aber keine Zielwahl-Sperre, sondern „unaffected by Areas" – das Ruling deckt ihn nicht ab.
 
+### F01-19 · „Once per turn"-Artefakte: ein negiertes Spielen verbraucht das Zug-Limit nicht (Book of Doom, Burned Contract, Capture Net, Cute Cheese) · Stufe B
+- **Karten:** Book of Doom (`book-of-doom.js` Z. 83), Burned Contract (`burned-contract.js` Z. 112), Capture Net (`capture-net.js` Z. 162), Cute Cheese (`cute-cheese.js` Z. 55); Negierer: Rusty Touch (Sitz 1)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 hat zwei Kopien der Karte, 100 Gold; Sitz 1 hält Rusty Touch („Negate that Artifact (but your opponent still has to pay its Cost)").
+- **Schritte:** 1. Erste Kopie spielen – Rusty Touch negiert, Kosten werden bezahlt. 2. Zweite Kopie im selben Zug spielen (`keepActions`).
+- **Erwartet** (Kartentexte „You can only play 1 "…" per turn" bzw. „activate 1"; Präzedenz A01-pollution-14/-04 [Eraser Beam, Pyroblast: Stufe B] und CARD_API.md Z. 19709 „wird der Stich selbst negiert, ist er verbraucht"): Das negierte Spielen zählt als gespielt; die zweite Kopie ist im selben Zug nicht spielbar.
+- **Beobachtet:** Die zweite Kopie wird gespielt und wirkt (Book of Doom 50 Schaden, Burned Contract besiegt die Kreatur, Capture Net holt sie, Cute Cheese holt eine Kreatur); `gs.hoptUsed` bleibt nach dem negierten Spielen leer. Nebenbeobachtung (nicht eigens gewertet): Rusty Touch lässt bei Book of Doom mit 2 gewählten Zielen nur die Grundkosten (4) zahlen, nicht 4 × Ziele.
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/19-einmal-pro-zug-artefakte-negiert-zweite-kopie.js` (4 × ✗)
+- **Vermutete Ursache:** Der Einmal-pro-Zug-Stempel (`engine.claimHOPT`) steht in allen vier Skripten erst in `resolve`, das bei einer Negation in der Kette nie läuft; zum Muster der Karten, die es richtig machen, gehört der Stempel in `payActivationCost`/`canActivate`-Seite vor der Kette. Restunsicherheit: ob ein in der Kette negiertes Artefakt als „gespielt" gilt (wie bei A01-pollution-04/-14).
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

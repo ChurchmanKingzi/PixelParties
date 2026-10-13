@@ -211,6 +211,15 @@ Stand/Autor: Agent F02-artifacts, 13.10.2026. Karten: 50 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/F02-artifacts/22-aktive-ausruestung-am-uebernommenen-helden.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `server.js doActivateEquipEffect` (~Z. 11074–11117): `ps = _crossInst ? gs.players[oi] : gs.players[pi]` – gegenüber adressiert wird nur bei Karten mit `placesOnOpponentBoard` (FTCD); der Socket-Handler `activate_equip_effect` reicht nur `heroIdx`/`zoneSlot` durch, keine Brettseite; die Instanzsuche `c.owner === pi || c.controller === pi` trifft für die Instanz an Seite 1 (owner/controller 1) nur den Brettseiten-Besitzer.
 
+### F02-23 · Item Lock (Hammer Throw): Reaktions-Artefakte im eigenen Zug kosten keine Handkarte · Stufe B
+- **Karten:** Idol of Crestina (`cards/effects/idol-of-crestina.js`, Fenster `_checkResourcePhaseReactions`), Magic Topaz (`magic-topaz.js`, Pfeil-Fenster); gleiche Klasse: alle Hand-Reaktionsartefakte, die der Gesperrte in seinem eigenen Zug spielt (Rocket Sneeze, Philosopher's Stone, Juice-Reaktionsweg); Auslöser: Hammer Throw (`hammer-throw.js`, setzt `itemLocked`)
+- **Voraussetzungen / Aufbau:** (a) Sitz 1 mit `itemLocked = true`, Hand [Idol of Crestina, ZZ Filler ×2]; Zugwechsel auf Sitz 1, Idol wird im eigenen Resource Phase angeboten und angenommen. (b) Sitz 0 mit `itemLocked = true`, Hand [Attack, Magic Topaz, ZZ Filler ×2]; Sitz 0 greift an, Topaz wird als Reaktion gespielt.
+- **Schritte:** (a) `t.endTurn()`, Idol bestätigen. (b) „Attack" spielen, Topaz bestätigen.
+- **Erwartet** (Kartentext Hammer Throw: „The target's controller must delete a card from their hand whenever they play an Artifact during their next turn."; Server-Prompt „Item Lock Cost: You must delete 1 card from your hand to use an Artifact."; Reaction ist ein Artifact-Untertyp): beide Spielzüge lösen den Löschkosten-Prompt aus.
+- **Beobachtet:** Idol (+1 Karte per Suche) und Topaz (+60 Schaden) wirken ohne Item-Lock-Prompt, es wird nichts gelöscht. Kontrolle: ein normal gespieltes Artefakt (Heart of the Mountain) löst den Prompt aus ✓.
+- **Repro:** `docs/niche-tests/repro/F02-artifacts/23-item-lock-reaktionsartefakte-im-eigenen-zug.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** die Hand-Reaktionsfenster der Engine prüfen `_artifactLockTurn` (z. B. `_engine.js` Z. 32150/32419/32585/32737/37807), aber nirgends `ps.itemLocked`; der Kostenprompt steht nur in `server.js` (`doPlayArtifact` ~Z. 12226, `doUseArtifactEffect`/Tränke ~Z. 11323). Zu klären wäre zusätzlich, ob Reaktionen im Zug des Hammer-Werfers (nicht „their next turn") frei bleiben sollen – so ist es heute.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

@@ -5,7 +5,7 @@
 // Aufbau: Sitz 0 hat zwei Kopien in der Hand und 100 Gold; Sitz 1 hält Rusty Touch (negiert die erste Kopie, Kosten werden bezahlt). Danach spielt Sitz 0 die zweite Kopie (`keepActions`).
 // Erwartung: Die erste Kopie war „gespielt" (Präzedenz: A01-pollution-14/-04 Eraser Beam/Pyroblast, B-Stufe); die zweite ist im selben Zug nicht spielbar.
 // Beobachtet: Die zweite Kopie wird gespielt und wirkt (Book of Doom 50 Schaden, Burned Contract besiegt die Kreatur, Capture Net holt sie, Cute Cheese holt eine Kreatur).
-// Ursache: Der Einmal-pro-Zug-Stempel steht jeweils erst in `resolve` (`book-of-doom.js` Z. 70 `engine.claimHOPT('book-of-doom', pi)`; `burned-contract.js`, `capture-net.js`, `cute-cheese.js` analog) –
+// Ursache: Der Einmal-pro-Zug-Stempel steht jeweils erst in `resolve` (`book-of-doom.js` Z. 83, `burned-contract.js` Z. 112, `capture-net.js` Z. 162, `cute-cheese.js` Z. 55: jeweils `engine.claimHOPT(…)`) –
 //   `resolve` läuft bei einer Negation in der Kette nie. (Gegenbeispiel mit richtiger Auslegung: Speerkämpfer-Regel CARD_API.md Z. 19709 „Gestempelt wird beim Aktivieren … wird der Stich selbst negiert, ist er verbraucht".)
 const H = require('../../lib/h.js');
 const FAELLE = {
