@@ -90,8 +90,9 @@ module.exports = {
       // weniger auf der Hand (ein Effekt hat sie waehrend der
       // Aufloesung geleert), wird gegeben, was da ist.
       for (let n = 0; n < PREIS; n++) {
-        const eligibleIndices = [];
-        for (let i = 0; i < (ps.hand || []).length; i++) eligibleIndices.push(i);
+        // ★ Z4 (H03-12): der soeben gewirkte Zauber liegt noch in der Hand, ist aber keine Geschenkkarte
+        // (`canPlayCard` rechnet ihn ebenfalls nicht als Reserve).
+        const eligibleIndices = engine._handIndizesOhneAufloesende(ps);
         if (eligibleIndices.length === 0) break;
 
         let handIndex = eligibleIndices[0];

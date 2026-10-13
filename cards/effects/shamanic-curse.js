@@ -80,7 +80,8 @@ module.exports = {
     // AND has enough hand cards to pay. The original cast already paid
     // its own Wisdom cost before this reaction — we don't charge more.
     const coverable = newCost >= 0;
-    const affordable = coverable && (oppPs.hand?.length || 0) >= newCost;
+    // ★ Z4 (R02-15): der gerade gewirkte Zauber liegt noch in `oppPs.hand`, ist aber keine bezahlbare Handkarte.
+    const affordable = coverable && engine._handIndizesOhneAufloesende(oppPs).length >= newCost;
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'plague_smoke', owner: oppIdx,

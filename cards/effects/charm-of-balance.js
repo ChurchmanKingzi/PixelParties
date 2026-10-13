@@ -55,7 +55,9 @@ async function _maybeSelfDiscard(ctx) {
   const pi = ctx.cardOwner;
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  if ((ps.hand || []).length <= HAND_LIMIT) return;
+  // ★ Z4 (F01-06): die gerade aufloesende Karte (Boomerang, Capture Net, Cool/Cute Cheese …) liegt noch in `ps.hand`,
+  // ist aber keine Handkarte mehr — „more than 7 cards in your hand" zaehlt sie nicht.
+  if (engine.handSizeWithoutResolving(pi) <= HAND_LIMIT) return;
 
   // actionMoveCard with `fireCreatureDeath: false` is the right
   // primitive — Charm isn't a Creature, so no death hooks should run,
@@ -169,6 +171,12 @@ module.exports = {
       await _maybeSelfDiscard(ctx);
     },
     onCardAddedFromDiscardToHand: async (ctx) => {
+      if (ctx.playerIdx !== ctx.cardOwner) return;
+      await _maybeSelfDiscard(ctx);
+    },
+    // ★ Z4 (F01-06 b): Handzugaenge OHNE Such-/Zieh-Hook (Geschenk-Karten wie Birthday Present, Rueckgaben/Bounces ueber
+    // `handZugang`) melden sich ueber den allgemeinen Hook `onHandGrew` (Kontext: { playerIdx }).
+    onHandGrew: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       await _maybeSelfDiscard(ctx);
     },

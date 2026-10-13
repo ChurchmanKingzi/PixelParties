@@ -13,7 +13,7 @@ const AUSLOESER_HOOKS = new Set([
   HOOKS.BEFORE_DRAW_BATCH, HOOKS.ON_CARD_ADDED_TO_HAND,
   HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
 ]);
-const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
+const { handSizeWithoutResolving, handIndicesWithoutResolving } = require('./_hand-resolve');   // v1288 (+ Z4: Handindizes ohne aufloesende Karte)
 const { loadCardEffect } = require('./_loader');
 const { isSeat, opponentOfGs, opponentsOfGs, playerCountGs } = require('./_opp');   // N-Spieler-Umbau
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
@@ -11696,6 +11696,10 @@ class GameEngine {
         addedCard: inst, addedCardName: cardName,
         source: opts.source || null, _skipReactionCheck: true,
       });
+    } else {
+      // ★ Z4 (F01-06): Rueckgabe/Bounce/Erzeugung/fremdes Deck feuern keinen Such-Hook — Handlimit-Waechter
+      // (Charm of Balance) erfahren vom Zuwachs ueber `onHandGrew`. Kein Such-Hook, also keine Tutor-Zuhoerer.
+      await this.runHooks('onHandGrew', { playerIdx: pi, cardName });
     }
     return inst;
   }
@@ -16170,7 +16174,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   shuffleBackEligibleHandSlots(pi) {
     const ps = this.gs.players[pi];
     if (!ps) return [];
-    const alle = (ps.hand || []).map((_, i) => i);
+    // ★ Z4 (A06-15, F03-11): die gerade aufloesende Karte liegt noch in `ps.hand`, ist aber keine Handkarte mehr — sie wird
+    // nicht ins Deck gemischt (sonst fehlt sie in der Ablage und der Mischer zaehlt sie als „Karte aus der Hand").
+    const alle = this._handIndizesOhneAufloesende(ps);
     if (!this._opponentBlocksShuffleBack(pi)) return alle;
     return alle.filter(i => this._handSlotDeckOwner(pi, i) !== pi);
   }
@@ -16541,6 +16547,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.hand || []).length === 0) return;
+    // ★ Z4 (A06-16, F03-19, M01-13): Ohne eigene `opts.eligibleIndices` ist die Auswahl die Hand OHNE die gerade aufloesende
+    // Karte — sie liegt bis zum Ende ihrer Aufloesung noch in `ps.hand`, ist aber keine Handkarte mehr (kein Abwurf der eigenen
+    // Zauber-/Artefaktkarte als „Kosten"). `undefined` = alle Plaetze, solange keine Karte aufloest (Verhalten wie bisher).
+    const ohneAufl = () => {
+      const l = this._handIndizesOhneAufloesende(ps);
+      return l.length === (ps.hand || []).length ? undefined : l;
+    };
+    const effektiveHand = () => (opts.eligibleIndices === undefined ? this.handSizeWithoutResolving(playerIdx) : (ps.hand || []).length);
+    if (effektiveHand() === 0) return;
 
     // Reaktionsfenster (Ambush the Scout). Hier ist der richtige
     // Moment: alle Wahlmöglichkeiten der auslösenden Karte sind
@@ -16625,11 +16640,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Cute Nerd Magenta brauchen sie fuer den naechsten Schritt.
     const abgeworfen = [];
     try {
-      const toDiscard = Math.min(count, ps.hand.length);
+      const toDiscard = Math.min(count, effektiveHand());
       for (let i = 0; i < toDiscard; i++) {
-        if ((ps.hand || []).length === 0) break;
+        if (effektiveHand() === 0) break;
 
-        const result = await this.promptGeneric(playerIdx, {
+        const standardListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: Auswahl, die die Engine selbst festlegt
+        let result = await this.promptGeneric(playerIdx, {
           type: 'forceDiscard',
           // ★ v1041: Kosten-Marken durchreichen — so bedient auch
           // dieser Weg den Lernkanal, ohne dass die Karte ihren Prompt
@@ -16649,7 +16665,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Static arrays keep their existing one-shot semantics.
           eligibleIndices: typeof opts.eligibleIndices === 'function'
             ? opts.eligibleIndices()
-            : opts.eligibleIndices,
+            : (opts.eligibleIndices === undefined ? ohneAufl() : opts.eligibleIndices),
           // `cancellable` ist opt-in: ein ERZWUNGENER Abwurf darf nicht
           // abgebrochen werden, ein freiwilliger als Kosten sehr wohl
           // („You MAY discard a card…" — Cute Nerd Magenta).
@@ -16666,6 +16682,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Antwort ohne Namen, nicht nur bei gesetztem `cancelled`.
         if (opts.cancellable && (!result || result.cancelled || result.cardName == null)) break;
 
+        // ★ Z4: eine Antwort AUSSERHALB der von der Engine festgelegten Auswahl (die aufloesende Karte) gilt nicht — sie wird wie
+        // eine Antwort ohne Karte behandelt (Notbremse unten: letzte waehlbare Karte). Falscher/fehlender Platz: erste waehlbare Kopie desselben Namens.
+        if (standardListe && result && result.cardName != null) {
+          const platz = (Number.isInteger(result.handIndex) && standardListe.includes(result.handIndex) && ps.hand[result.handIndex] === result.cardName)
+            ? result.handIndex
+            : standardListe.find(i => ps.hand[i] === result.cardName);
+          result = platz === undefined ? null : { ...result, handIndex: platz };
+        }
+
         let actuallyDiscarded = false;
         let rescuedFromDelete = false;
         let resolvedCardName = null;
@@ -16681,8 +16706,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Safety fallback: auto-pop the LAST hand slot. Index of the
           // popped slot (pre-pop) = post-pop length, captured BEFORE
           // the pop mutation.
-          resolvedHandIdx = ps.hand.length - 1;
-          const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
+          const notfallListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: nie die aufloesende Karte
+          resolvedHandIdx = notfallListe && notfallListe.length > 0 ? notfallListe[notfallListe.length - 1] : ps.hand.length - 1;
+          const cardName = ps.hand.splice(resolvedHandIdx, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
           if (cardName) {
             resolvedCardName = cardName;
             // Snapshot the instance BEFORE delete-rescue runs (rescue
@@ -24959,7 +24985,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { stolen: [], cancelled: false, fizzled: true };
     }
 
-    const oppHandLen = (oppPs.hand || []).length;
+    // ★ Z4 (R02-07): Eine Karte, die der Gegner GERADE SPIELT (Reaktionsfenster mitten in seiner Aufloesung), liegt bis zum
+    // Ende der Aufloesung noch in `oppPs.hand`, ist aber keine Handkarte mehr — sie ist nicht stehlbar und zaehlt nicht mit.
+    // Die Indizes bleiben die physischen Handplaetze (die Anzeige zeigt die Karte ausgegraut mit; `oppHandCount`/`indices`
+    // bleiben deshalb unveraendert), nur `blockedIndices` nennt dem Client den gesperrten Platz.
+    const oppStehlbar = this._handIndizesOhneAufloesende(oppPs);
+    const oppGesperrt = (oppPs.hand || []).map((_, i) => i).filter(i => !oppStehlbar.includes(i));
+    const oppHandLen = oppStehlbar.length;
     if (oppHandLen === 0) return { stolen: [], cancelled: false, fizzled: true };
 
     // Reaktionsfenster (Ambush the Scout): Zugriff auf die fremde
@@ -24986,7 +25018,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         description: opts.description || defaultDesc,
         maxSelect: effectiveCount,
         confirmLabel: opts.confirmLabel || '🫳 Steal!',
-        oppHandCount: oppHandLen,
+        oppHandCount: (oppPs.hand || []).length,
+        blockedIndices: oppGesperrt,
         cancellable,
         autoConfirm: effectiveCount === 1,
       });
@@ -24996,8 +25029,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     const raw = Array.isArray(prompt.selectedIndices) ? prompt.selectedIndices : [];
-    const validated = raw
-      .filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length)
+    const gueltig = raw.filter(i => Number.isInteger(i) && i >= 0 && i < oppPs.hand.length);
+    // ★ Z4: die aufloesende Karte ist nicht stehlbar. Hat der Spieler blind genau sie erwischt, wird mit zufaelligen anderen
+    // Handkarten aufgefuellt („choose random cards", Loot the Leftovers) — nicht mit einer Niete bestraft. Vorab festgelegte
+    // Karten (`preselectedIndices`) werden nur gestrichen.
+    let aus = gueltig.filter(i => oppStehlbar.includes(i));
+    if (!Array.isArray(opts.preselectedIndices) && aus.length < Math.min(effectiveCount, gueltig.length)) {
+      const rest = oppStehlbar.filter(i => !aus.includes(i));
+      while (aus.length < effectiveCount && rest.length > 0) aus.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+    }
+    const validated = [...new Set(aus)]
       .slice(0, effectiveCount)
       .sort((a, b) => a - b);
     if (validated.length === 0) return { stolen: [], cancelled: true, fizzled: false };
@@ -44752,6 +44793,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** v1288: Handgroesse ohne die gerade aufloesende Karte (siehe _hand-resolve.js). */
   handSizeWithoutResolving(playerIdx) {
     return handSizeWithoutResolving(this.gs.players[playerIdx]);
+  }
+
+  /**
+   * ★ Z4: die echten Handplaetze von `ps` OHNE die gerade aufloesende Karte (zentraler Zugriff, siehe
+   * `handIndicesWithoutResolving`). Fuer Abwurf-/Geschenk-/Raub-/Misch-Auswahlen und Bezahlbarkeitspruefungen;
+   * `ps` darf auch die Hand des GEGNERS sein (Reaktionsfenster mitten in der Aufloesung des aktiven Spielers).
+   */
+  _handIndizesOhneAufloesende(ps) {
+    return handIndicesWithoutResolving(ps);
   }
 
   getWisdomDiscardCost(playerIdx, heroIdx, cardData) {
