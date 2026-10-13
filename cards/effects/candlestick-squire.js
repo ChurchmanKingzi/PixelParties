@@ -89,6 +89,7 @@ function buildBurnedTargets(engine) {
 }
 
 // ─── CARD MODULE ─────────────────────────
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -293,6 +294,9 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Z6 (C01-15): der Zug ist der einzige Nutzen - Hand-/Zieh-Sperre und Tuscan Artist (genau 2/3) sperren ihn (Ruling 16.8.).
+    const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(ctx._engine));
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, n)) return false;
     return countBurnedTargets(ctx._engine) > 0;
   },
 

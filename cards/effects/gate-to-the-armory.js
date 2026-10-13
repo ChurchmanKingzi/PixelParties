@@ -53,8 +53,13 @@ function _getEligibleArtifacts(engine, pi) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
+  // Z6 (S02-22): die Karte kommt AUF DIE HAND - Hand-/Such-Sperre und Stapel-Sperren (Knight of Kings [B], Stab-Sperre) schliessen
+  // die jeweilige Quelle aus; ist keine mehr frei, ist die Karte nicht spielbar (`spellPlayCondition`).
+  const deckFrei = !engine._isSearchBlocked(pi, {}, 'deck') && engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi });
+  const ablageFrei = !engine._isSearchBlocked(pi, {}, 'discard') && engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })
+    && !engine.isDiscardOutHardLocked(pi);
   // Deck first — entries the picker shows as `source: 'deck'`.
-  for (const cardName of (ps.mainDeck || [])) {
+  for (const cardName of (deckFrei ? (ps.mainDeck || []) : [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
@@ -62,7 +67,7 @@ function _getEligibleArtifacts(engine, pi) {
     out.push({ name: cardName, source: 'deck' });
   }
   // Discard
-  for (const cardName of (ps.discardPile || [])) {
+  for (const cardName of (ablageFrei ? (ps.discardPile || []) : [])) {
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
@@ -264,10 +269,8 @@ module.exports = {
 
       if (!kratesUmgebaut) {
       // Remove the chosen copy from its source pile.
-      const sourcePile = pickedEntry.source === 'deck' ? ps.mainDeck : ps.discardPile;
-      const idx = sourcePile.indexOf(pickedName);
-      if (idx < 0) { gs._spellCancelled = true; return; }
-      sourcePile.splice(idx, 1);
+      // Z6 (S02-22): ueber die Stapel-Schicht (Stapel-/Stab-/Eye-/Such-Sperre) statt eigenem Splice.
+      if (!(await engine.takeFromPile(ps, pickedEntry.source === 'deck' ? 'deck' : 'discard', pickedName, { source: CARD_NAME, toHand: true }))) { gs._spellCancelled = true; return; }
 
       // Reshuffle the deck after a deck-tutor (standard convention so
       // the opponent doesn't gain free knowledge of the deck order).

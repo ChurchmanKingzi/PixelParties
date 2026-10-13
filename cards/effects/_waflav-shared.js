@@ -539,6 +539,7 @@ async function tutorAscendedHeroes(engine, pi, cardName, { from, max = 1 } = {})
         : `Add an Ascended Hero from your ${label} to your hand.`,
       cards: names.map(n => ({ name: n, source: from })),
       cancellable: max > 1,          // "up to N" darf abgebrochen werden
+      searchToHand: true, searchPile: from === 'discard' ? 'discard' : 'deck',   // Z6 (A08-14): Suche AUF DIE HAND kennzeichnen (Such-Template)
     });
     const picked = choice?.cardName;
     if (!picked) break;

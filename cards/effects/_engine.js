@@ -10782,7 +10782,9 @@ class GameEngine {
 
   _cardBlockedBySearchLock(script, cardData, ps, playerIdx) {
     if (!script || !ps) return false;
-    if (cardData?.cardType === 'Creature') return false;
+    // Z6 (B-04): auch Artifact-Creatures (cardType 'Artifact', Subtyp Creature, z. B. Debt-O-Tron Backup Duplicator) haben einen
+    // Koerper und sind ausgenommen - `hasCardType` kennt beide Formen.
+    if (cardData && (cardData.cardType === 'Creature' || hasCardType(cardData, 'Creature'))) return false;
     // v1090: die Stufe kann von der Flagge ODER vom Brett kommen.
     // `playerIdx` ist optional, damit alte Aufrufer weiterlaufen; ohne
     // ihn zaehlen nur die Flaggen.
@@ -18943,6 +18945,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hermes, Philosopher's Stone …) - EIN Prädikat statt je Fenster (F01-13, F02-24).
       if (ps._artifactLockTurn === this.gs?.turn
           && this._getCardDB()[cardName]?.cardType === 'Artifact') return true;
+      // Z6 (F02-23): Item Lock verlangt eine ANDERE Handkarte als Kosten (wie `validateActionPlay`: mindestens 2 Handkarten).
+      if (ps.itemLocked && (ps.hand || []).length < 2
+          && this._getCardDB()[cardName]?.cardType === 'Artifact') return true;
       const sc = loadCardEffect(cardName);
       if (sc?.blockedBySummonLock && ps.summonLocked) return true;
       if (sc?.blockedByPileLock) {
@@ -19776,6 +19781,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         const reactScript = loadCardEffect(cardName);
         if (!reactScript?.proactivePlay) continue;
       }
+      // Z6 (H04-19): Surprises kommen NUR verdeckt in den Main Phases ins Spiel (`doPlaySurprise`) - ein Sofort-Guss
+      // (`_castSpellImmediately`: Yukana, Coffee, performImmediateAction) fuehrt nur `onPlay` aus und liesse sie wirkungslos
+      // in der Ablage verpuffen (Karte, Wisdom-Abwurf und Einmal-Stempel weg).
+      if ((cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'surprise')) continue;
       // Check spell school / level requirements (centralized).
       // v664: derselbe Caster-Bypass wie in validateActionPlay — ein
       // Zusatzaktions-Token mit `bypassesCasterRequirement` (Wolflesia,
@@ -24439,7 +24448,22 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Kosten einer Reaktionskarte beim Spieler `ps` verbuchen. */
   async _rxPay(ps, cost, opts = {}) {
-    return this._payCardCost(this._rxOwnerIdx(ps, '_rxPay'), cost, opts);
+    const pi = this._rxOwnerIdx(ps, '_rxPay');
+    const gezahlt = await this._payCardCost(pi, cost, opts);
+    // Z6 (F02-23): Item Lock (Hammer Throw) - "must delete a card from their hand whenever they play an Artifact": gilt auch fuer
+    // Hand-REAKTIONSartefakte (Idol of Crestina, Magic Topaz …), die an den Server-Spielwegen vorbeilaufen. Die Reaktionskarte selbst
+    // ist zu diesem Zeitpunkt schon aus der Hand genommen; `_handPlayLockedFor` stellt sicher, dass noch eine Karte uebrig ist.
+    if (opts.cardName && ps.itemLocked && (ps.hand || []).length > 0
+        && this._getCardDB()[opts.cardName]?.cardType === 'Artifact') {
+      await this.actionPromptForceDiscard(pi, 1, {
+        title: 'Item Lock Cost',
+        description: 'You must delete 1 card from your hand to use an Artifact.',
+        source: 'Item Lock', deleteMode: true, selfInflicted: true,
+        // die gerade aufloesende EIGENE Karte (z. B. der Angriff, auf den reagiert wird) steht noch in der Hand, ist aber keine Kostenkarte
+        eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => i !== opts.inHandIdx && !this._istAufloesendeHandkarte(ps, i, false)),
+      });
+    }
+    return gezahlt;
   }
 
   /**
@@ -32455,7 +32479,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(targetOwner);
 
@@ -32635,7 +32659,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(pi);
 
@@ -32794,7 +32818,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
 
@@ -32945,7 +32969,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(pi);
 
@@ -33089,7 +33113,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
 
@@ -33412,7 +33436,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     ps.hand.splice(actualIdx, 1);
     if (inDieLoeschung) ps.deletedPile.push(cardName);
     else ps.discardPile.push(cardName);
-    await this._rxPay(ps, cost);
+    await this._rxPay(ps, cost, { cardName });
     await this._rxPayWisdom(ps, rxCast);
     this.notePlayedFromHand(ownerIdx);
     if (script?.oncePerGame || script?.oncePerGameKey) {
@@ -33915,7 +33939,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else {
           ps.discardPile.push(cardName);
         }
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);   // v1155: wie in den uebrigen Hand-Reaktionen
         this.notePlayedFromHand(reactorIdx);
 
@@ -34117,7 +34141,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ps.hand.splice(actualIdx, 1);
         if (destPile === 'deleted') ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(ownerIdx);
 
@@ -34300,7 +34324,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(playerIdx);
 
@@ -34391,7 +34415,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         ps.hand.splice(idx, 1);
         (zumLoeschen ? ps.deletedPile : ps.discardPile).push(cardName);
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(playerIdx);
         this.sync();
@@ -34497,7 +34521,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(summoningPi);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: summoningPi });
@@ -34726,7 +34750,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         this.sync();
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
 
         this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
@@ -34861,7 +34885,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(victimOwner);
 
       // Play-Signal + Handkarten-Flug. Dieses Fenster spliced die Karte
@@ -35012,7 +35036,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(reactorIdx);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: reactorIdx });
@@ -36167,7 +36191,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else {
           ps.discardPile.push(cardName);
         }
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
 
         // Push state to the client NOW so the hand re-renders without
@@ -36412,7 +36436,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Consume from hand + pay gold
       ps.hand.splice(hi, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
 
       // Reveal the card to the opponent + spectators
@@ -38426,7 +38450,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         wisdomCost = this.getWisdomDiscardCost(reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdx });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den

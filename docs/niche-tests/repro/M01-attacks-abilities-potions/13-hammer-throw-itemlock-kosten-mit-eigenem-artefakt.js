@@ -14,7 +14,8 @@ const H = require('../../lib/h.js');
   t.gs.players[1].itemLocked = true; t.gs.activePlayer = 1;
   const gold0 = t.gs.players[1].gold;
   let eligible = 'n/a', handAtPrompt = null;
-  t.script.push({ match: d => d.type === 'forceDiscard', answer: (d) => { eligible = d.eligibleIndices; handAtPrompt = t.pile(1, 'hand').slice(); return { cardName: 'Treasure Chest', handIndex: 0 }; } });
+  t.script.push({ match: d => d.type === 'forceDiscard', answer: (d) => { eligible = d.eligibleIndices; handAtPrompt = t.pile(1, 'hand').slice(); // Z6: ein Mensch kann nur aus `eligibleIndices` waehlen - das Skript tut dasselbe (ohne Liste: die Artefaktkarte selbst, wie zuvor).
+    const i = Array.isArray(d.eligibleIndices) ? d.eligibleIndices[0] : 0; const hand = t.pile(1, 'hand'); return { cardName: hand[i], handIndex: i }; } });
   const r = await t.play(1, 'Treasure Chest');
   R.note(`r=${r}; Hand beim Prompt=${JSON.stringify(handAtPrompt)} eligibleIndices=${JSON.stringify(eligible)}; Hand danach=${JSON.stringify(t.pile(1, 'hand'))}; gelöscht=${JSON.stringify(t.pile(1, 'deletedPile'))}; Ablage=${JSON.stringify(t.pile(1, 'discardPile'))}; Gold ${gold0} -> ${t.gs.players[1].gold}`);
   R.check('die gerade gespielte Artefaktkarte steht nicht als Item-Lock-Kosten zur Wahl (eligibleIndices schließt Index 0 aus)', Array.isArray(eligible) && !eligible.includes(0), eligible);
