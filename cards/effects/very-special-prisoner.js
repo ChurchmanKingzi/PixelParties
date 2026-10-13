@@ -40,11 +40,14 @@ const CARD_NAME = 'Very Special Prisoner';
  * `reactionCondition` to grey the card out when the attach would
  * fizzle for lack of a Divinity to fetch.
  */
-function _availableDivinitySources(ps) {
+function _availableDivinitySources(ps, engine, pi) {
   if (!ps) return [];
   const out = [];
   const handCount = (ps.hand || []).filter(n => n === DIVINITY).length;
-  const deckCount = (ps.mainDeck || []).filter(n => n === DIVINITY).length;
+  // R02-19: das Deck ist nur Quelle, solange der Stapel-Abgang nicht gesperrt ist
+  // (Knight of Kings [B]) — der Splice unten geht an der Stapel-Schicht vorbei.
+  const deckGesperrt = !!engine && !engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi, source: CARD_NAME });
+  const deckCount = deckGesperrt ? 0 : (ps.mainDeck || []).filter(n => n === DIVINITY).length;
   if (handCount > 0) out.push({ source: 'hand', count: handCount });
   if (deckCount > 0) out.push({ source: 'deck', count: deckCount });
   return out;
@@ -96,7 +99,7 @@ module.exports = {
     if (hctx.controllerPi !== pi) return false;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (_availableDivinitySources(ps).length === 0) return false;
+    if (_availableDivinitySources(ps, engine, pi).length === 0) return false;
     if (_eligibleHeroIdxs(engine, pi).length === 0) return false;
     return true;
   },
@@ -113,7 +116,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return;
 
-    const sources = _availableDivinitySources(ps);
+    const sources = _availableDivinitySources(ps, engine, pi);
     if (sources.length === 0) return; // Defensive — reactionCondition gated this.
 
     // Source pick — only prompt when both hand and deck have copies.
