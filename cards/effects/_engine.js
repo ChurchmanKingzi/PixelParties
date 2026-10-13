@@ -17382,6 +17382,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       delete inst.counters[key + 'AppliedTurn'];
       delete inst.counters[key + 'Duration'];
       delete inst.counters[key + 'Cleansable'];
+      // Petrifier (S03-08): der Versteinerungs-Marker haengt AM Stun und faellt mit ihm
+      // (wie beim Dauerablauf in der Zugende-Raeumung); Baihus eigener Stun (`_baihuStunned`) behaelt ihn.
+      if (key === 'stunned' && !inst.counters._baihuStunned) delete inst.counters._petrified;
       this.log('status_remove', { target: inst.name, status: key, by: source });
       removed.push(key);
     }
