@@ -55,6 +55,13 @@ module.exports = {
       gs.heroFlags[key] = { ...(gs.heroFlags[key] || {}), forcesSingleTarget: true };
     },
 
+    // Geliehen (??? the Shapeshifter): der Einzelziel-Deckel geht mit der
+    // Gestalt (H02-heroes-19).
+    onIdentityLost: (ctx) => {
+      const flags = ctx.gameState.heroFlags?.[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`];
+      if (flags) delete flags.forcesSingleTarget;
+    },
+
     onTurnStart: (ctx) => {
       // Ida is alive + active (hooks filter dead / frozen / stunned /
       // negated heroes). Re-assert the flag so revives don't leave her

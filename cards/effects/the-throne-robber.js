@@ -123,8 +123,12 @@ function aufstiegsziele(engine, pi, heroIdx) {
 
 /** Die Heldeninstanz dieses Slots (`seite` = Brettseite). */
 function heldeninstanz(engine, seite, heroIdx) {
-  return engine.cardInstances.find(c =>
-    c.owner === seite && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
+  // Waehrend der Aktivierung eines UEBERNOMMENEN Helden traegt die Instanz den
+  // Kontrolleur als `owner` und die Brettseite als `heroOwner`
+  // (`resolveHeroEffectActivation`) — H01-heroes-13.
+  const slot = engine.cardInstances.filter(c => c.zone === 'hero' && c.heroIdx === heroIdx);
+  return slot.find(c => c.heroOwner === seite)
+    || slot.find(c => c.owner === seite && c.heroOwner == null) || null;
 }
 
 // ─── MODULE EXPORTS ──────────────────────

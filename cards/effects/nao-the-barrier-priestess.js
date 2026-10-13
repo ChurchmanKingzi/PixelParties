@@ -44,5 +44,12 @@ module.exports = {
       if (!gs.heroFlags[key]) gs.heroFlags[key] = {};
       gs.heroFlags[key].overhealPassive = true;
     },
+
+    // Geliehen (??? the Shapeshifter): die Ueberheilung geht mit der Gestalt
+    // (H01-heroes-14).
+    onIdentityLost: (ctx) => {
+      const flags = ctx.gameState.heroFlags?.[`${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`];
+      if (flags) delete flags.overhealPassive;
+    },
   },
 };

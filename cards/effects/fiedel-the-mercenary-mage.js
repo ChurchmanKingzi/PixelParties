@@ -74,6 +74,20 @@ module.exports = {
   hooks: {
     onGameStart: (ctx) => _applyOverrides(ctx),
     onPlay: (ctx) => _applyOverrides(ctx),
+    // Geliehen (??? the Shapeshifter): der Reaction-Rabatt geht mit der
+    // Gestalt (H02-heroes-19). Entfernt nur Eintraege mit genau Fiedels Wert.
+    onIdentityLost: (ctx) => {
+      const hero = ctx._engine.gs.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.levelOverrideCards) return;
+      const cardDB = ctx._engine._getCardDB();
+      for (const name of Object.keys(hero.levelOverrideCards)) {
+        const cd = cardDB[name];
+        if (_isReactionSpell(cd) && hero.levelOverrideCards[name] === (cd.level || 0) - 1) {
+          delete hero.levelOverrideCards[name];
+        }
+      }
+      if (Object.keys(hero.levelOverrideCards).length === 0) delete hero.levelOverrideCards;
+    },
     onTurnStart: (ctx) => {
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
