@@ -173,6 +173,15 @@ Stand/Autor: Agent H04-heroes, 12.10.2026. Karten: 35 in der Liste · 0 gezielt 
 - **Repro:** `docs/niche-tests/repro/H04-heroes/18-crestina-gestohlen-vorrat.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` `isCreationZoneUsable`: Schleife über `ps.heroes` des Anfragenden statt über die von ihm kontrollierten Helden (`heroSideOf`/Controller); der Rest des Skripts (`beforeDamage`) ist bereits kontrollbewusst (Styx 28.9.).
 
+### H04-19 · Yukana: Surprise-Zauber werden angeboten und verpuffen als Zusatzaktion (Karte, Wisdom-Abwurf und Einmal-Sperre weg) · Stufe B
+- **Karten:** Yukana, the Scholar on the Run (`yukana-the-scholar-on-the-run.js`, `wirkbar`), Auslöser im Test: Booby Trap (Lv 1, Spell/Surprise); Engine `_castSpellImmediately` (`_engine.js` ~Z. 21713)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Action Phase; Yukana mit Wisdom ×2 (keine Zauberschule), Hand: Booby Trap, Heal, Heal.
+- **Schritte:** Yukanas Heldeneffekt aktivieren, in der Galerie „Booby Trap" wählen.
+- **Erwartet** (Kartentext „perform a level 1 or 2 Spell with it as an additional Action"; Regel server.js ~Z. 8116, Skull Carpet Bombing v1308: „Surprises kommen NUR in den Main Phases ins Spiel (verdeckt gesetzt)", `doPlaySpell` lehnt sie in der Action Phase ab): Eine Surprise ist in der Action Phase kein ausführbarer Zauber – sie wird nicht angeboten (oder wenigstens nicht verbraucht).
+- **Beobachtet:** Die Galerie zeigt [Booby Trap, Heal]. Nach der Wahl: Booby Trap liegt wirkungslos in der Ablage (nirgends als Surprise gesetzt), ein Heal ist als Wisdom-Abwurf bezahlt, `hoptUsed['yukana_spell:0']` ist gesetzt – eine ganze Aktivierung und zwei Karten für nichts. Rioting Village (Area) wird dagegen korrekt gelegt; Cure (Reaction) wird korrekt nicht angeboten; Lv 3 nicht angeboten ✓.
+- **Repro:** `docs/niche-tests/repro/H04-heroes/19-yukana-surprise-verpufft.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `yukana-the-scholar-on-the-run.js` `passenderSpell`: nur `cardType === 'Spell'` + Stufe, kein Ausschluss von `subtype === 'Surprise'` (Timeless King Zi filtert Surprise/Reaction in `uniqueDeckSpells`). `getHeroEligibleActionCards` filtert nur Reactions. Offen: ob andere Zusatzaktions-Wege (`performImmediateAction`, Coffee) dieselbe Lücke haben – im Test lieferte `performImmediateAction` Booby Trap ebenfalls in `eligibleCards`, die Wahl wurde aber nicht gewirkt (nicht weiter verfolgt).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

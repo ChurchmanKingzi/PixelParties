@@ -282,6 +282,15 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Repro:** `docs/niche-tests/repro/A01-pollution/30-pollution-spewer-hopt-schluessel-nach-position.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `cards/effects/pollution-spewer.js` `hoptKey` – müsste `ctx.card.id` (Instanz) nutzen. Nische (Diebstahl + gleiche Position / Ersatz im selben Slot desselben Zuges); (a) ist ohne Diebstahl erreichbar.
 
+### A01-pollution-31 · Anti Magic Enchantment greift nur bei Schaden – Status-Zauber (Cold Coffin, Medusa's Curse, Null Zone) treffen den Helden ungehindert · Stufe B
+- **Karten:** Anti Magic Enchantment (`anti-magic-enchantment.js`, Engine-Teil `_maybePromptAntiMagicEnchantment`); betroffen: Cold Coffin, Medusa's Curse, Null Zone (alle drei selbst Pollution-Karten – das natürliche Gegenstück zur AME)
+- **Voraussetzungen / Aufbau:** Sitz 1: Blade of the Frostbringer an Held 0 mit verzaubertem Zähler (`antiMagicEnchanted {ownerPi:1, charges:1}`, genau so wie ihn das Skript setzt); Sitz 1 antwortet überall „Ja“. Sitz 0 wirkt den Zauber auf Held 0.
+- **Schritte:** 1. `t.play(0, <Zauber>, {hero: 0})`. 2. AME-Angebote, Ladung und Heldenstatus lesen. Gegenprobe Pyroblast.
+- **Erwartet** (Quelle: Kartentext „… that Hero's controller may once per turn make the Hero **unaffected by a Spell that hits it**“; Skriptkopf: „negate the effects of a Spell that hits this Artifact's equipped Hero“): bei jedem Zauber, der den Helden trifft, erscheint das Angebot; bei „Ja“ bleibt der Held frei von Frost, Betäubung bzw. Null-Status.
+- **Beobachtet:** Pyroblast/Eraser Beam: Angebot, Ladung 1 → 0, kein Schaden ✓. Cold Coffin, Medusa's Curse, Null Zone: **kein** Angebot, Ladung bleibt 1, Held 0 ist gefroren (Cold Coffin: für den Rest des Spiels), betäubt bzw. „nulled“. Das Angebot hängt allein an `actionDealDamage` (`_engine.js` ~8180); der gezielte Weg `_checkAntiMagicEnchantmentNegation` (~35303) hat keinen einzigen Aufrufer.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/31-anti-magic-enchantment-ignoriert-status-zauber.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` ~8180 / ~35303: das Schild wird nur vor Schaden erfragt. Die Status-/Buff-/Heilungspfade lesen `_isAmeShieldedHero` (~17817, ~44747) zwar, aber ohne vorherigen Schaden wird nie gefragt. Abhilfe: das (tote) Ziel-Fenster `_checkAntiMagicEnchantmentNegation` an der Zielwahl bzw. beim Statussetzen durch einen Zauber aufrufen. Restunsicherheit: ob die Autoren die AME bewusst auf Schaden beschränkt haben (der Kartentext sagt „a Spell that hits it“).
+
 ## Abdeckung
 (wird ergänzt)
 

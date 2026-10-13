@@ -1,8 +1,14 @@
 # A09-idej – Nischenfall-Bericht
-Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent A09-idej, 13.10.2026 (Fortsetzung nach Rate-Limit-Abbruch des Vorgängers; IDs 01–16 unverändert übernommen, 17–22 neu). Karten: 51 in der Liste · 46 gezielt getestet (L2) · 31 mit Befund.
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+**22 Befunde: 4 × A, 15 × B, 3 × C.** Alle mit ausgeführtem Repro unter `docs/niche-tests/repro/A09-idej/`.
+- **Stufe A:** A09-01 (Pfeile bleiben nach abgebrochenem Angriff scharf), A09-02 (Bonded Companion zurück auf die Hand → Karte in Hand UND Ablage), A09-20 (Tamed Primordium beschwört den Elven Rider, der „nur mit eigenem Effekt" beschworen werden darf, samt Gratis-Suche), A09-22 (Hydra Blood Arrow vergiftet Kreaturen nie, weil der Kreaturenstapel bei Schaden 0 vor den Pfeil-Reitern abbricht).
+- **Schwerpunkte der B-Befunde:** (1) **Gold-/Zieh-/Hand-/Such-Sperren werden nicht gelesen**: Golden Arrow ↔ Cecilia/Pier (04), Cecilia unter Hand-/Suchsperre (05), Pier zahlt unter Zieh-Sperre/Artist (13), Pier setzt mit `handLocked` mehr als „draw" (07), Dirty Smuggler vernichtet Gold bei gesperrtem Gewinn (12), Hatusbal-Sperre fehlt bei Priestern (06). (2) **Kontrolle/Seite**: Rider/Demons setzen den Nachfolger bei gestohlener Kreatur in die falsche Zone (15). (3) **Schadens-/Negations-Buchhaltung**: Bomb Arrow/Infernous mit falschem Schadenstyp (08), Arrow Slit wiederholt einen negierten Pfeil (09), Kogarasu zählt einen negierten Zauber nicht (17), Selbstnegation des Dirty Smuggler löscht eine fremde Negation (21; Engine-Klasse C05-02). (4) Companion-Schutz „unaffected by effects that can't affect Heroes" fehlt in Bomb-/Racket-Arrow-Zielliste (03).
+- **C (Fragen an Al):** A09-11 (Golden Arrow: Sperre auch für Kartenkosten?), A09-18 (Thuly: Helden-Opfer = „sacrifice a target"?), A09-19 (Priester: Status-Ticks bei Helden ja, bei Kreaturen nein).
+- **Prüfaufträge der Fortsetzung (dynamisch gemessen):** Heldenverträge der 4 Idej Lords (`equipCostReduction`) → **kein Befund**: der Rabatt steht im Text der Schwerter („If you equip this Artifact to …"), nicht im Heldeneffekt, ist also von Negation/Frost des Helden unabhängig (tot: Ausrüsten ohnehin verweigert). Hatusbal/Cecilia über `heroScriptOf` (Initiation Ritual: gewonnener Effekt) → wirken korrekt; Hatusbal respektiert negiert/gefroren/betäubt/tot. Zielsammler Brettspalte (Bomb/Racket Arrow, Priester, Thuly, Dämonen) → Kontrolle-statt-Seite stimmt, Rücknahme eigener, gestohlener Kreatur geht in die Hand des Besitzers; nur A09-03/-15 als Lücken. `currentHp ?? 0`: in der Gruppe nur `?? 1` (Kunagi), harmlos. `negatedDuration`: von keiner Karte der Gruppe benutzt. Zugende-Räumung (C05-02): bestätigt an Dirty Smuggler (A09-21).
+- **Gesamteindruck:** Die Kernmechaniken (Arrows-Hooks, Companion-Austritt, Cycling-Demons, Idej-Equipment) laufen sauber ohne Engine-Fehler/Hänger/`audit`-Meldungen; die Fehler liegen fast alle an den **Schnittstellen zu Sperren, Kontrollwechsel und Negation**.
+- **Bewusst nicht getestet:** Mehrspielerbretter (3–4 Sitze), `Test Dummy`/Redirect-Wechselwirkungen, Racket/Bomb-Pfeile mit Alice-geteilten Zonen (gleichnamige Kreaturen, Auswahl unscharf), Rider-Zeitfenster gegen Counter-Ketten, Arrow-Rider bei Schaden 0 durch andere Effekte als Hydra, Massentests der Priester-Kosten mit 3+ gleichzeitigen Treffern, Rescued-Damsel-Aufstieg von Cecilia, Shapeshifter-Namensübernahme der Lords.
 
 ## Befunde
 ### A09-01 · Pfeile bleiben nach abgebrochenem Angriff „scharf“ und verstärken den nächsten Angriff · Stufe A
@@ -207,7 +213,69 @@ Stand/Autor: Agent A09-idej, 12.10.2026. Karten: 51 in der Liste · (wird am End
 - **Vermutete Ursache:** Der Kreaturen-Schadensstapel (`_engine.js` ~Z. 46892) springt bei `actualAmount === 0` mit `continue` heraus, bevor `applyArrowsAfterDamage` (~Z. 47019) die Reiter (Gift/Brand) anwendet. Der Heldenweg (`_engine.js` ~9022) wendet sie auch bei Schaden 0 an. Hydra Blood setzt den Schaden immer auf 0, daher nie ein Reiter an Kreaturen. Vermutlich trifft dieselbe Lücke auch Brand-/Gift-Pfeile, deren Schaden anderweitig auf 0 sinkt (nicht gemessen).
 
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Angelfeather Arrow | L2 gezielt | Abbruch ✗(→ -01), Misfire+Slit ✗(→ -09), Mehrfach-Ketten (4 Pfeile mit Archer) ✓, Kunagi-Wiederholung ✓ |
+| Archer | L2 gezielt | 4 Pfeile → genau 3 Schüsse ✓, gefroren/betäubt/negiert ✓, Gegner-Archer feuert nicht ✓, gestohlener Archer feuert für den Kontrolleur ✓, Alt-Beschwörung-Abbruch ✓ |
+| Arrow Slit | L2 gezielt | Negierter Pfeil wird wiederholt ✗(→ -09), Pfeil+Slit = 160 ✓ |
+| Bomb Arrow | L2 gezielt | Abbruch ✗(→ -01), Companion als Ziel ✗(→ -03), Dark Ocean ✗(→ -08); Zielsammler gleich gebaut wie Racket Arrow (dort Kontrolle-statt-Seite gemessen ✓) |
+| Bonded Companion Humby | L2 gezielt | Austritt/Rückgabe ✗(→ -02), Gold-Bonus: Aristocrat/goldLocked/gefroren/negiert ✓, Diebstahl-Gold löst Bonus aus ✓, Rundeneinkommen zählt nicht ✓ |
+| Bonded Companion Mellvy | L2 gezielt | Rückgabe ✗(→ -02), Potion-Zug unter Handsperre (→ -07 Randeffekt), Locks im Shared-Baustein ✓ |
+| Bonded Companion Orphy | L2 gezielt | Rückgabe ✗(→ -02), Ability-Anlage eigener/anderer Held ✓, Deck 2 ✓, gefroren ✓; unter Zieh-Sperre/Artist wird Einmal-Ladung verbraucht (bewusst nicht gemeldet: Pflicht-Trigger) |
+| Bonded Companion Thuly | L2 gezielt | Rückgabe ✗(→ -02), Helden-Opfer löst nicht aus (→ -18, C), Kreatur-Opfer 150 ✓ |
+| Bouldor Demon | L2 gezielt | Zyklus ✓, gestohlen ✗(→ -15), Infernous-Schadenstyp ✗(→ -08) |
+| Cecilia, the Harrowing Crusader | L2 gezielt | Gold-/Hand-/Suchsperre ✗(→ -04, -05), gefroren/betäubt/negiert/tot nicht aktivierbar ✓, HOPT ✓, gewonnener Effekt via Initiation Ritual ✓ |
+| Dirty Smuggler | L2 gezielt | Diebstahl bei Sperre ✗(→ -12), Selbstnegation löscht fremde ✗(→ -21), Zwei Smuggler ✓, Opfer 3 Gold ✓, Ressourcenphase zählt nicht ✓ |
+| Doctor Fester | L2 gezielt | Stufenverzicht Fighting 2, Bluten-Kosten, Nein-Antwort, HOPT, Kreaturenziel ✓ (Scratch t47/t48) |
+| Elven Archer | L1 Standard | nur als Opfer-/Gegenprobe-Kreatur in Rider-/Archer-Tests; `inherentAction` nicht gesondert getestet |
+| Elven Druid | L2 gezielt | unter Hand-/Zieh-/Suchsperre beschwört er weiter ✓ (kein Hinzufügen zur Hand, Text sagt nur „summon") |
+| Elven Forager | L1 Standard | Frost/Betäubung/Negation bekannt (B-03) |
+| Elven Leader | L2 gezielt | Trefferzahl: allein 1, +2 eigene 3, gestohlene +1, vom Gegner gestohlene −1, verdeckte zählt mit, Gegnerkreatur zählt nicht ✓ |
+| Elven Rider | L2 gezielt | Massentod 3 Elven mit 1–3 Ridern ✓, gestohlen ✗(→ -15), Handsperre ✗(→ -07), Primordium beschwört ihn ✗(→ -20) |
+| Flame Arrow | L2 gezielt | Held/Kreatur brennt ✓, Abbruch ✗(→ -01), gegen letalen Treffer ✓ |
+| Golden Arrow | L2 gezielt | Sperre vs. Cecilia/Pier ✗(→ -04), Mehrzielangriff ✗(→ -10), Kartenkosten (→ -11, C) |
+| Hatusbal, the Leader of Tusca | L2 gezielt | Sperre fehlt bei Priestern/Renewable Energy ✗(→ -06); Sperre respektiert negiert/gefroren/betäubt/tot ✓; gewonnener Effekt (Initiation Ritual) ✓ |
+| Herbithorn Demon | L2 gezielt | Zyklus/Locks ✓, gestohlen ✗(→ -15), Handsperre ✗(→ -07) |
+| Hydra Blood Arrow | L2 gezielt | Abbruch ✗(→ -01), Kreatur ohne Gift ✗(→ -22), Held 3 Marken ✓, Kombination mit Angelfeather ✓ |
+| Hydrogen Demon | L2 gezielt | Zyklus ✓, gestohlen ✗(→ -15) |
+| Idej Blade - Gensui | L1 Standard | wie Hakai (gleicher Code), Kaltstart/Dauerfeuer |
+| Idej Blade - Hakai | L2 gezielt | Stufenabzug, Ausrüsten an Nicht-Idej verweigert, zwei Kopien stapeln (−2) ✓ |
+| Idej Blade - Manabi | L1 Standard | wie Hakai |
+| Idej Blade - Naosu | L1 Standard | wie Hakai |
+| Idej Lord Daiyo | L2 gezielt | Spielbeginn-Suche (1–4 Projections, Abbruch), Kogarasu-Rabatt normal/negiert/betäubt ✓, gefroren/tot: Ausrüsten verweigert ✓ |
+| Idej Lord Nobunakin | L2 gezielt | Spielbeginn (2 Proj + 1 Blade) ✓; Rabatt steht im Schwerttext (Prüfauftrag: kein Befund) |
+| Idej Lord Shoguwana | L2 gezielt | Spielbeginn-Abbruch ✓; Rabatt wie Nobunakin |
+| Idej Lord Todugawin | L2 gezielt | 3 gleiche Blades ✓; Rabatt wie Nobunakin |
+| Idej Projector | L2 gezielt | Quelle Hand/Deck/Ablage, Schildwirkung mit Projection-Rückfrage ✓, Kartenbilanz ✓ |
+| Idej Sword - Kogarasu | L2 gezielt | Negierter Zauber zählt nicht ✗(→ -17), 2. Schwert/2. Zauber verweigert ✓, Zugwechsel ✓ |
+| Idej Sword - Kunagi | L2 gezielt | 4 Kreaturen, Abbruch bei Wiederholung, Frost nach 1. Kill, Spell tötet 2 ✓ |
+| Idej Sword - Muras | L2 gezielt | Zusatzaktion, 2. Angriff gesperrt, anderer Held normale Aktion, Abbruch gibt Token zurück, Zugwechsel ✓ |
+| Idej Sword - Onima | L2 gezielt | 3/1/0 Abilities, Held stirbt, Kreaturentreffer ✓ |
+| Infernous Demon | L2 gezielt | Bonus-Schadenstyp ✗(→ -08), gestohlen ✗(→ -15) |
+| Pet Snake | L2 gezielt | Stinky Stables ✗(→ -16), Kontrolle ✓ |
+| Poisoned Arrow | L2 gezielt | Held/Kreatur vergiftet ✓, Abbruch ✗(→ -01), letaler Treffer ✓ |
+| Priest of Luna | L2 gezielt | Hatusbal ✗(→ -06), Status-Tick ✗(→ -19, C) |
+| Priest of Tempeste | L2 gezielt | Hatusbal ✗(→ -06), Status-Tick ✗(→ -19, C) |
+| Racket Arrow | L2 gezielt | Companion ✗(→ -02, -03), Abbruch ✗(→ -01), gestohlene/eigene Kreaturen: Besitzer-Hand ✓ |
+| Rainbow's Arrow | L2 gezielt | Zieht 2 sofort ✓, bleibt nach Abbruch gezahlt (Klasse -01) |
+| Serpentous Demon | L2 gezielt | Zyklus ✓, gestohlen ✗(→ -15) |
+| Smuggler's Pier | L2 gezielt | Goldsperre ✗(→ -04), Handsperre ✗(→ -07), Zieh-Sperre/Artist ✗(→ -13) |
+| Tamed Hell Fox | L2 gezielt | 2 Karten → Löschung + Namenssperre bis Zugwechsel ✓; unter Suchsperre erst „Ja" + 2 Galerien, dann nichts (Fuchs bleibt, keine Kosten, bewusst nicht gemeldet); Handsperre bricht vorher ab ✓ |
+| Tamed Primordium | L2 gezielt | Rider angeboten ✗(→ -20), 2 Beschwörungen → gelöscht + Sperre fällt zum Zugwechsel ✓, volles Brett ✓, zweites Primordium aus der Hand ✓ |
+| Tuscan Aristocrat | L2 gezielt | Diebstahl-Gewinn ✗(→ -12), Ressourcenphase frei ✓, Set-Gold nur 0 (kein Gewinn) ✓ |
+| Tuscan Artist | L2 gezielt | Pier ✗(→ -13), Orphy-3er-Zug blockiert ✓ (Ruling) |
+| Tuscan Mystic | L2 gezielt | Mehrfachzug ✗(→ -14) |
+| Tuscan Prisoner | L2 gezielt | Schutz bei normal/gestohlen/seitenfremd ✓, entfällt bei gefroren/betäubt/negiert/verdeckt ✓; alle Zugende-Wege nur teilweise headless messbar (Terror-Weg liegt in `sendGameState`) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+- **Idej-Helden-Verträge** (Prüfauftrag H01-09/-10/-20/-21): Rabatt „Cost becomes 0" gilt unabhängig vom Zustand des Helden (steht im Schwerttext); tote Lords lassen sich gar nicht ausrüsten.
+- **Gewonnene Heldeneffekte** (Initiation Ritual): Cecilia-Effekt auf Tushu aktivierbar, Hatusbal-Sperre wirkt über `heroScriptOf`.
+- **Archer**: 3 Schüsse je Zug und Archer, stilllegt bei Frost/Betäubung/Negation, Gegner-Archer feuert nicht, gestohlener Archer feuert für den Kontrolleur.
+- **Elven Leader**: Trefferzahl folgt Kontrolle (nicht Seite); **Elven Rider**: Massentod bedient bis zu 3 Rider in je eigener Zone, Kartenbilanz sauber.
+- **Muras/Kunagi/Onima/Projector**: Abbruch gibt Zusatzaktion bzw. Karte zurück, Bilanzen sauber, `audit()` still.
+- **Bonded Humby**: Bonus nach Aristocrat/goldLocked/Frost/Negation korrekt aus; **Orphy**: nur der eigene Held.
+- **Tuscan Prisoner**: Schutz fällt bei Stilllegung, folgt dem Kontrolleur; **Tamed Hell Fox / Primordium**: Löschung, Namens-/Beschwörungssperre fallen zum Zugwechsel.
+- **Cecilia**: gefroren/betäubt/negiert/tot nicht aktivierbar, HOPT hält, Abbruch kostet nichts.
+- **Dirty Smuggler**: Mehrfachziehen = eine Antwort je Smuggler, Selbstnegation lässt sich im selben Zug nicht erneut auslösen und endet zum Zugwechsel (außer bei zweiter Quelle, A09-21).
+- **Racket Arrow**: eine meiner Kreaturen, die der Gegner gestohlen hat (liegt bei mir, Kontrolle Gegner), wird als Ziel angeboten und landet in MEINER Hand; eine von mir gestohlene Kreatur (liegt beim Gegner, Kontrolle ich) wird nicht angeboten.
+- Keine Engine-Fehler (`t.errors`), keine `audit()`-Meldungen und keine Hänger in allen oben genannten Läufen.

@@ -303,6 +303,14 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Vermutete Ursache:** `layn-defender-of-deri.js` `onCardEnterZone` unterscheidet nicht zwischen Beschwörung/Platzierung und Übernahme/Umsetzung (jede Kreatur, die in eine Zone des Kontrolleurs „eintritt"); `_laynBonus` fängt nur die Doppelvergabe ab.
 - **Frage an Al:** Soll Layns Bonus auch Kreaturen treffen, die per Capture/Diplomacy/Dark Gear übernommen oder zwischen Zonen verschoben werden (jetziges Verhalten), oder nur beschworene/platzierte – ja / nur beschworene?
 
+### H02-heroes-35 · Lethe: ein Held, der Lethes Effekt erst nach dem Tod gewinnt (Shapeshifter), ist nicht gesperrt · Stufe C
+- **Karten:** Lethe, the Forgetful Fixer (`lethe-the-forgetful-fixer.js` `lockLethe`), ???, the Shapeshifter (`the-shapeshifter.js`)
+- **Voraussetzungen / Aufbau:** (a) echte Lethe als Held 0; (b) Shapeshifter als Held 0, Lethe auf der Hand. Eine eigene Kreatur (Held 1) stirbt im Gegnerzug (`t.endTurn()`, Schaden, `t.endTurn()`); in (b) wird der Shapeshifter im eigenen Zug per echtem Heldeneffekt zu Lethe (Held heißt dann „Lethe, the Forgetful Fixer"); danach Fireball.
+- **Erwartet** (Kartentext Lethe: „cannot perform Actions if a target you control was defeated **since the end of your last turn**" – Lesart A: ein Zustand, der auch für einen später gewonnenen Effekt gilt): (a) und (b) gesperrt. Lesart B: der Stempel wird im Moment des Todes gesetzt, wer dann nicht Lethe ist, ist nicht betroffen – dann ist (b) richtig.
+- **Beobachtet:** (a) gesperrt ✓; (b) Fireball läuft durch (Lesart B). Der Tracker `lockLethe` stempelt `hero._actionLockedTurn` nur bei Helden, die im Moment des Todes „Lethe" heißen.
+- **Repro:** `docs/niche-tests/repro/H02-heroes/35-lethe-spaet-gewonnen-ohne-sperre.js` (✗ = Lesart A wird nicht erfüllt)
+- **Frage an Al:** Soll ein Held, der Lethes Effekt (Shapeshifter, Pseudonia, Throne Robber) erst nach dem Tod gewinnt, für den Rest des Zeitfensters gesperrt sein – ja / nein (nur wer beim Tod Lethe ist)?
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 
