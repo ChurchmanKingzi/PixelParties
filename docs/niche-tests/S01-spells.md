@@ -91,7 +91,7 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Beobachtet:** Beide verlieren 80. Die Kreatur, die Sitz 0 selbst kontrolliert, wird vom eigenen „Gegner"-Flächenschlag getroffen (und danach in die Ablage ihres Besitzers gelegt). Die Heldenvariante ist umgestellt, die Kreaturenvariante nicht.
 - **Repro:** `docs/niche-tests/repro/S01-spells/09-boiling-oil-trifft-geliehene-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js` `collectAoeCreatureTargets` (~Z. 45511-45528): `if ((inst.owner !== tpi && inst.controller !== tpi) …) continue;` – Besitzer **oder** Kontrolleur reichen. Folgefehler bei `side: 'both'` (Hole in the Sky, MOE Bomb, Divine Gift of Fire): eine Kreatur mit Besitzer ≠ Kontrolleur steht dort **doppelt** in der Zielliste (gemessen: `collectAoeCreatureTargets([0,1])` liefert sie zweimal; Hole in the Sky tötet sie trotzdem nur einmal, daher dort ohne sichtbare Folge). Richtig wäre das Kriterium `(inst.controller ?? inst.owner) === Seite`.
-- **Verwandt (gleiche Zeile, nicht gesondert mit einer Karte getestet):** `side: 'own'` erfasst umgekehrt eine eigene, vom Gegner kontrollierte Kreatur (Besitzer reicht).
+- **Verwandt (gemessen mit Divine Gift of Fire, „Choose a player. All targets that player controls are Burned"):** Gewählt Sitz 1 (`side: 'enemy'`): verbrannt wird auch die vom Wirker kontrollierte Leihkreatur (Besitzer 1) – falsch –; gewählt Sitz 0 (`side: 'own'`): verbrannt wird auch die dem Wirker gehörende, aber vom Gegner kontrollierte Kreatur – falsch. Eine Kreatur mit Besitzer ≠ Kontrolleur wird also in **beiden** Richtungen getroffen (Besitzer **oder** Kontrolleur reicht). Betrifft jede Karte mit `aoeHit` auf `enemy`/`own`/`both`.
 
 ### S01-10 · Calm Diatribe: die zweite Aktion des gewählten Helden wird im nächsten Zug nie eingerichtet · Stufe A
 - **Karten:** Calm Diatribe (`cards/effects/calm-diatribe.js`).
@@ -187,6 +187,44 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Beobachtet:** Zauber und Kreatur werden abgelehnt ✓ (Kontrolle), Trank und Artefakt-Effekt prüfen die Sperre laut Quelltext (nicht getestet); aber **Club of Gobbo (Equipment), Magic Mirror (Surprise) und Toughness (Ability) lassen sich trotz Sperre spielen** (`doPlay…` liefert `true`, Karte liegt auf dem Brett). Damit entfällt der Preis des Gifts („zwei Karten holen, aber nicht benutzen") für Ausrüstung, Surprises und Abilities.
 - **Repro:** `docs/niche-tests/repro/S01-spells/19-divine-gift-of-creation-sperre-luecken.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `doPlayArtifact` (server.js ~Z. 7448, Equipment), `doPlaySurprise` und `doPlayAbility` prüfen `_creationLockedNames` nicht (keine Prüfung über Basisnamen in diesen Pfaden; `grep _creationLockedNames` findet nur die drei oben genannten Stellen).
+
+### S01-20 · Stufen-Zauber zählen Xals Ability-Stapel in den Support Zones nicht (Divine Gift of Death, Create Illusion) · Stufe B
+- **Karten:** Divine Gift of Death (`cards/effects/divine-gift-of-death.js`, `supportMagicLevelOfHero`), Create Illusion (`create-illusion.js`, `countAbilitiesForSchool(… abilityZones[heroIdx])`), Hero Xal, the Animated Armor (Support-Zonen-Abilities, `engine.heroSupportAbilityStacks`).
+- **Voraussetzungen / Aufbau:** Xal als Held 0 von Sitz 0; Support Magic ×3 (bzw. Magic Arts ×3) liegen als Stapel in Xals erster Support Zone, die Ability-Zonen sind leer. Vergleich: dieselben Karten in der Ability-Zone. Death: zwei gefallene eigene Helden; Create Illusion: Deck mit Elven Archer (Lv 1) und Field Cannon (Lv 3).
+- **Schritte:** 1. Divine Gift of Death bzw. Create Illusion mit Xal wirken (`noGrant`).
+- **Erwartet** (Kartentext: „Choose up to 1/2/3 defeated Heroes …" / „Choose a level 1/2/3 or lower Creature …"; Xal: „You may place Abilities into the Support Zones of this Hero." – diese Stapel zählen für den Level-Vertrag `heroMeetsLevelReq` und `effectiveSchoolLevelForCaster` (3), `_engine.js` ~Z. 43140/43290): Death erweckt beide Helden, Create Illusion bietet Level-3-Kreaturen an.
+- **Beobachtet:** In der Ability-Zone ✓ (2 Helden erweckt; Level-3-Angebot). In Xals Support Zone: `heroMeetsLevelReq` und `effectiveSchoolLevelForCaster` sehen Stufe 3 und lassen den Zauber zu, aber Death rechnet `maxPicks = 0` und bricht ab (Karte zurück auf die Hand, kein Held erweckt); Create Illusion bietet nur Level-1-Kreaturen an.
+- **Repro:** `docs/niche-tests/repro/S01-spells/20-xal-support-zonen-abilities-staffel.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Beide Skripte zählen direkt `engine.countAbilitiesForSchool(school, ps.abilityZones[heroIdx])`; richtig wäre `engine.effectiveSchoolLevelForCaster(school, pi, heroIdx, heroOwner)` (Vorbild: `aurora-borealis.js`), das Xals Stapel (`heroSupportAbilityStacks`) und `_castSchoolOverride` einrechnet. Dasselbe Muster steht laut `grep` in ca. 40 weiteren Skripten (nicht geprüft); aus meiner Gruppe zusätzlich `divine-gift-of-sacrifice.js` (s. dort).
+
+### S01-21 · Divine Gift of Death: die Zusatzaktion wird auch gewährt, wenn nur EIN Held erweckt wird · Stufe B
+- **Karten:** Divine Gift of Death (`cards/effects/divine-gift-of-death.js`, `inherentAction`-Funktion).
+- **Voraussetzungen / Aufbau:** Held 0 mit Support Magic 2 (+ Destruction Magic 1), zwei gefallene eigene Helden, Action Phase. Der Spieler wählt nur **einen** Helden.
+- **Schritte:** 1. Divine Gift of Death wirken, einen Helden wählen. 2. Im selben Zug Burning Finger spielen (`keepActions`).
+- **Erwartet** (Kartentext: „If at least 2 Heroes are revived by this effect, this counts as an additional Action."): Nur 1 erweckt ⇒ der Zauber verbraucht die Aktion, der zweite Zauber ist nicht spielbar.
+- **Beobachtet:** Der Burning Finger ist spielbar. `inherentAction(gs, pi, heroIdx, engine)` wertet **vor** der Wahl aus („≥ 2 gefallene Helden gibt es und Support Magic ≥ 2") – nicht die tatsächliche Zahl der Erweckten. Kontrolle: 2 erweckt ⇒ zweite Aktion ✓; Support Magic 1 ⇒ keine Zusatzaktion ✓. Ruling `CARD_API.md` Z. 8267 bestätigt nur, dass die Zusatzaktion eine Bedingung ist („dort hängt die Zusatzaktion an einer Bedingung"), nicht dass sie an die Absicht statt an das Ergebnis geknüpft sein soll.
+- **Repro:** `docs/niche-tests/repro/S01-spells/21-divine-gift-of-death-zusatzaktion-bei-einem-held.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `inherentAction` kann die Wahl nicht kennen; nötig wäre eine nachträgliche Aktionsgutschrift/-belastung nach dem Erwecken (Vorbild für nachträgliche Zusatzaktionen: `gs._spellFreeAction`/`afterSpellResolved`-Gutschrift anderer Karten – nicht geprüft) oder die Mindestwahl 2 in der Action Phase wie im Main-Phase-Zweig des Skripts (`minRequired`).
+
+### S01-22 · Die Antwort einer Zielwahl wird serverseitig nicht auf `maxTotal` geprüft (Beispiel Divine Gift of Death) · Stufe C
+- **Karten:** Divine Gift of Death (`divine-gift-of-death.js`: `for (const id of picked)` ohne Kappung); die Lücke liegt im Weg `doConfirmPotion` → `engine.resolveEffectPrompt` (`server.js` ~Z. 11210-11240, `_engine.js` ~Z. 28931) und betrifft jede Karte, die der Zielwahl-Antwort traut (gleiche Wurzel wie S01-13).
+- **Voraussetzungen / Aufbau:** Held 0 mit Support Magic 1 (⇒ `maxTotal: 1`), zwei gefallene eigene Helden; die Antwort (wie von einem veränderten Client) enthält beide Ids.
+- **Schritte:** 1. Divine Gift of Death wirken, beide Ids übermitteln.
+- **Erwartet** (Kartentext: „Choose up to 1/2/3 defeated Heroes"): höchstens 1 Held (Stufe 1).
+- **Beobachtet:** Beide Helden werden erweckt. Serverseitig wird nur `ineligible` geprüft (Kommentar „autoritativer Flaschenhals", v915), nicht `maxTotal`/`minRequired`.
+- **Repro:** `docs/niche-tests/repro/S01-spells/22-zielwahl-maxtotal-ungeprueft.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** siehe oben; Abhilfe zentral (Anzahl gegen `config.maxTotal`/`minRequired` prüfen) oder je Karte `picked.slice(0, maxPicks)`.
+- **Frage an Al:** Soll der Server die Anzahl der Zielwahl-Antworten nachprüfen (ja = `maxTotal`/`minRequired` zentral erzwingen / nein = der Client wird vertraut, wie bisher)?
+
+### S01-23 · Divine Gift of Forgetting wertet „Heroes they control" nach Spalte statt nach Kontrolle aus · Stufe B
+- **Karten:** Divine Gift of Forgetting (`cards/effects/divine-gift-of-forgetting.js`, `collectRemovableAbilities`).
+- **Voraussetzungen / Aufbau:** Sitz 1 hat Abilities an Held 0 und Held 1; Sitz 0 kontrolliert Held 1 von Sitz 1 (Charme, `actionStealHero(0, 1, 1)`); Sitz 1 kontrolliert Held 2 von Sitz 0 (`actionStealHero(1, 0, 2)`), der ebenfalls Abilities trägt.
+- **Schritte:** 1. Sitz 0 spielt Divine Gift of Forgetting.
+- **Erwartet** (Kartentext: „Your opponent shuffles all Abilities attached to Heroes **they control** back into their deck, except Starting Abilities."; Ruling `CARD_API.md` ~Z. 6046-6090, v718: „Wer nach Seiten rechnet, fragt nie die Spalte"): Betroffen sind Held (1,0) und der vom Gegner kontrollierte Held (0,2); Held (1,1), den der Wirker kontrolliert, behält seine Abilities.
+- **Beobachtet:** Held (1,0) ✓, aber Held (1,1) verliert seine Abilities (Spalte des Gegners), Held (0,2) behält sie (Spalte des Wirkers). Offen (daher nicht in der Prüfung): in welches Deck die Abilities eines kontrollierten fremden Helden gehören (Besitzer oder Kontrolleur) – „back into their deck" sagt dazu nichts.
+- **Repro:** `docs/niche-tests/repro/S01-spells/23-divine-gift-of-forgetting-kontrolle-statt-spalte.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `collectRemovableAbilities` iteriert `ps.heroes` der Gegnerspalte (`inst.owner === playerIdx`); richtig wäre `engine.heroesControlledBy(oi)` (Held-Seite `heroSideOf`).
+- **Gemessen und in Ordnung:** Starting Abilities bleiben, der Rest (auch Stapel) geht ins Deck und wird gemischt; Toughness-Abgang reduziert die Max-HP über `onCardLeaveZone`.
 
 ## Abdeckung
 (wird am Ende ergänzt)

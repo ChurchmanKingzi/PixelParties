@@ -96,6 +96,16 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/10-inventing-namenssperre-ausruestung-ability-surprise.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** Die Prüfung `ps._creationLockedNames?.has(cardName)` steht in `doUsePotion` (`server.js:11863`) und `doUseArtifactEffect` (Z. 12058) sowie in `validateActionPlay`, aber nicht in `doPlayArtifact`, `doPlayAbility` (ab Z. 7162) und `doPlaySurprise`.
 
+### M01-11 · Adventurousness (Action-Ability) ist trotz gefrorenem/betäubtem/verstricktem Wirtsheld aktivierbar · Stufe B
+- **Karten:** Adventurousness (`cards/effects/adventurousness.js`, einzige `actionCost`-Ability der Gruppe); gleiche Klasse für jede künftige `actionCost`-Ability.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Aktionsphase; Held 0 mit Adventurousness Lv1, 50 Gold; Held 0 gefroren / betäubt / `webbed`.
+- **Schritte:** 1. `t.activateAbility(0, 0, 0, {phase: 3})`. Kontrolle: derselbe Held mit Fighting + Attack in der Hand versucht anzugreifen.
+- **Erwartet** (Client-Tooltips `app-shared.jsx:7705/7731`: „Frozen/Stunned: Cannot act and has its effects and Abilities negated."; Kartentext „use your Action"; Engine-Konvention: freie Ability-Aktivierung dieser Helden wird abgelehnt, `server.js:9535-9537`): Aktivierung abgelehnt, Gold unverändert.
+- **Beobachtet:** Attack und Fireball des gefrorenen/betäubten/webbed Helden werden abgelehnt (`false`) und die freien Abilities (Leadership, Alchemy, Inventing, Infiltration) ebenfalls – **Adventurousness liefert `true` und +10 Gold** in allen drei Zuständen (Lv1; auch negiert und gebunden erlaubt, das ist bei Negation/Bound laut Kommentar `server.js:9531` gewollt).
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/11-adventurousness-gefroren-betaeubt-aktiv.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `server.js` `doActivateAbility` (Z. 10332 ff.) prüft – anders als `doActivateFreeAbility` (Z. 9535-9537) und die Held-Effekt-Aktivierung (Z. 10733) – weder `statuses.stunned/webbed` noch `statuses.frozen` (Chilly-Dog-Ausnahme); `canHeroPerformAction` (Engine) kennt nur Plant Golem und Heldenskripte.
+- **Frage an Al:** Darf ein gefrorener/betäubter Held seine Action-Ability (Adventurousness) nutzen (ja = wie jetzt / nein = wie bei Spells und freien Abilities)?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

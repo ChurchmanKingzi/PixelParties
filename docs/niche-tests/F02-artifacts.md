@@ -1,8 +1,15 @@
 # F02-artifacts – Nischenfall-Bericht
-Stand/Autor: Agent F02-artifacts, 13.10.2026. Karten: 50 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent F02-artifacts (Vorgänger-Lauf bis F02-08 + Fortsetzung F02-09…F02-24), 13.10.2026. Karten: 50 in der Liste · 44 gezielt getestet (L2), 6 mit Standardlauf/Anschauung (L1), 0 nur gelesen · 30 Karten mit Befund (24 Befunde: 2 × A, 16 × B, 6 × C).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+24 Befunde (A 2 · B 16 · C 6); alle mit ausgeführtem Repro unter `docs/niche-tests/repro/F02-artifacts/`. Gesamteindruck: Die Skripte der Kartenliste laufen ohne verschluckte Engine-Fehler und ohne Hänger; die Befunde sind semantisch (Text ↔ Verhalten) und liegen in vier Klassen:
+* **Skript ist älter als der Kartentext oder ein leerer Stub** (alle Skripte kamen mit Commit 4db2f97): Mana-Consuming Blade und Secret Lab Entrance tun nichts (A, F02-01/-02); Sacred Hammer addiert Basis- statt aktueller ATK (F02-03); Initiation Ritual legt Fähigkeiten in die Ablage statt zu löschen (F02-17); Shard of Chaos führt Kreaturen als Attack/Spell (C, F02-21).
+* **„Kontrolle statt Seite" / Brettseite** (Klasse B-01…B-03 für Zielsammler): Hat of Madness am geliehenen Helden (F02-04), Magic Cobalt/Ruby/Amethyst/Golden Apple (F02-08), aktive Ausrüstung am übernommenen Helden: der Kontrolleur kann sie nicht aktivieren, der Brettseiten-Besitzer schon (F02-22), und `getCreatureTargets` löst bei gleicher (Held, Slot)-Stelle die falsche Kreatur auf, wenn eine fremd beschworene Kreatur (Plant Golem, gestohlene Kreatur) daneben liegt – Poisoned Meat trifft dann den Golem statt der gewählten Kreatur (F02-14, betrifft 39 Skripte).
+* **Stempel / Sperren bei Abbruch und Negierung** (Regel 23.9, Ruling v1031): negierte „1 pro Zug/Partie"-Artefakte stempeln nicht (F02-10, F02-11); Eye-of-Ren-Ablehnung lässt bei Shard of Chaos Handkarten verloren gehen (F02-13) und bei Relic in the Sky / Magic Sapphire den Stempel stehen (F02-20); Rocket Sneeze lässt sein Dedup-Flag ohne Kette stehen (F02-16); Item Lock und Artefakt-Sperre werden von einzelnen Hand-Reaktionsfenstern nicht gelesen (Idol of Crestina, Magic Topaz, Philosopher's Stone; F02-23, F02-24).
+* **Einzelfälle**: Heart of Ice überschreibt Broghans angeborene Frost-Immunität (F02-05); Renewable Energy bietet [B]/[W]-Varianten als „different names" (F02-12); Heart of Cards löscht eine Mystery Box ohne deren Trigger (F02-09); Juice proaktiv nur für Heldenstatus (F02-15).
+Offene Regelfragen (C): Heart-Shaped Bow einmal je Zug (F02-06), Rain Viola am Gegnerhelden (F02-07), „1 pro Zug" bei Negierung (F02-11), Dagger bei Heldenopfer (F02-18), Heart-of-Ice-Rache bei tödlichem Treffer (F02-19), Shard und Kreaturen (F02-21).
+**Bewusst nicht getestet:** 3-/4-Sitz-Spiel und Skill-Test-Modus (Poisoned Meat u. a. nehmen `[pi, opponentOf(pi)]`), CPU-/MCTS-Verhalten (`cpuMeta`, `cpuResponse`), Client/Anzeige, Secret Spell Book jenseits zweier Stichproben (alte Tests + umfangreiche Vorgaben im Kopf), Open Invitation Waflav-Sonderweg (von Al als „Plan" bestätigt), die Pfeil-/Bluff-Kopplung von Javelin Throw („treated as an Attack" gegen Surprises, die „Attack or Spell *card*" verlangen), Tränke-/Hero-Zusammenspiel von Local Idol über zwei negierte Tränke (Skriptkopf: „negierte Tränke zählen nicht mit" – dokumentiert).
+**Hinweis zur Arbeitsumgebung:** Das Scratchpad wird von mehreren Agenten geteilt; ein fremdes Skript gleichen Namens hat kurzzeitig zwei meiner Befundblöcke in `S01-spells.md` eingefügt. Ich habe nur diese beiden Blöcke wieder entfernt (S01 enthält danach wieder ausschließlich die eigenen Einträge S01-07…S01-09 des anderen Agenten).
 
 ## Befunde
 ### F02-01 · Mana-Consuming Blade: kein +10 ATK (Karte ist ein leerer Stub) · Stufe A
@@ -220,8 +227,75 @@ Stand/Autor: Agent F02-artifacts, 13.10.2026. Karten: 50 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/F02-artifacts/23-item-lock-reaktionsartefakte-im-eigenen-zug.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** die Hand-Reaktionsfenster der Engine prüfen `_artifactLockTurn` (z. B. `_engine.js` Z. 32150/32419/32585/32737/37807), aber nirgends `ps.itemLocked`; der Kostenprompt steht nur in `server.js` (`doPlayArtifact` ~Z. 12226, `doUseArtifactEffect`/Tränke ~Z. 11323). Zu klären wäre zusätzlich, ob Reaktionen im Zug des Hammer-Werfers (nicht „their next turn") frei bleiben sollen – so ist es heute.
 
+### F02-24 · Philosopher's Stone wird trotz Artefakt-Sperre (Boomerang) angeboten und gespielt · Stufe B
+- **Karten:** Philosopher's Stone (`cards/effects/philosopher-s-stone.js`, Fenster `_checkPotionDrawHandReactions`), Boomerang / Blood-Soaked Coin (setzen `_artifactLockTurn`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Hand [Boomerang, Potion of Greed, Philosopher's Stone], Ablage [Juice], Potion Deck [Healing Potion, Poison Vial, Acid Vial, Healing Potion].
+- **Schritte:** 1. Boomerang spielen (Juice holen). 2. Potion of Greed spielen („Draw 2 cards from your Potion Deck").
+- **Erwartet** (Kartentext Boomerang „You cannot play any Artifacts for the rest of this turn."; Philosopher's Stone ist ein Reaction-**Artifact**; die Geschwisterfenster für Topaz, Rocket Sneeze, Homerun! lassen unter der Sperre nichts zu ✓): kein Stone-Fenster, die Tränke werden normal gezogen.
+- **Beobachtet:** Die Stone wird angeboten, bezahlt (4 Gold) und ersetzt einen Zug (Hand danach: Juice, Acid Vial, Healing Potion; Stone in der Ablage).
+- **Repro:** `docs/niche-tests/repro/F02-artifacts/24-philosophers-stone-artefakt-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js _checkPotionDrawHandReactions` (~Z. 34202–34240) prüft `_handPlayLockedFor`, Such-Sperre, Heldenplan, Gold – aber nicht `ps._artifactLockTurn === this.gs.turn` (und nicht `itemLocked`, vgl. F02-23); die Geschwisterfenster haben `if (cardData?.cardType === 'Artifact' && ps._artifactLockTurn === this.gs.turn) continue;` (Z. 32150/32419/32585/32737/37807).
+
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Golden Ankh | L2 gezielt | Revive-HP min(100,maxHP) ✓, Re-Defeat am Zugende ✓, mit Homerun!/Negation (unnegierbar) ✓, Held anderweitig neu besiegt und wiederbelebt ✓, letzter Held/Spielende ✓ (Vorgänger-Messung t19, erneut ausgeführt) |
+| Golden Apple | L2 gezielt | Übernahme/Rückgabe am Zugende ✓, „unaffected by your other cards" (Besitzer-Effekte kommen durch) ✓, gefrorener Held ✓, Ausrüsten am geliehenen Helden ✓; Zielwahl nach Brettseite ✗ (→ F02-08) |
+| Gravedigger's Shovel | L2 gezielt | Kreatur/Held besiegt ✓, HOPT je Shovel ✓, eigene Kreatur ✗ (korrekt kein Auslöser), Deck 3 ✓, seitenfremde Kreatur ✓, zwei Shovel am Helden ✓ (Vorgänger t10) |
+| Hat of Madness | L2 gezielt | eigener Held ✓, geliehener Held ✗ (→ F02-04), Held stirbt/Ablage des Besitzers ✓, Hut an Gegnerheld ✓ |
+| Heart of Cards | L2 gezielt | Treffer ✓, Fehlschlag (löschen) ✓, zweite Kopie im Zug ✓, Abbruch der Ansage ✓, Deck nur diese Karte (→ Deck-Out) ✓; Mystery-Box-Trigger ✗ (→ F02-09); negierter Spielzug zählt nicht ✗ (→ F02-11) |
+| Heart of Ice | L2 gezielt | Immunität/Gegenschlag auf Angreifer ✓, Kreatur-Treffer ✓, zweites Heart ✓; Broghan-Immunität überschrieben ✗ (→ F02-05), tödlicher Treffer ✗ (→ F02-19) |
+| Heart of the Mountain | L2 gezielt | 0/2/5 Burned-Ziele (Helden + Kreaturen, Deckel 4) ✓, HOPT ✓; negierter Spielzug zählt nicht ✗ (→ F02-11) |
+| Heart-Shaped Bow, the Final Proof of Cuteness | L2 gezielt | +10 ATK ✓, kein Surprise-Auslöser ✓, Love-Shot-Angebot nur 1×/Zug ✗/C (→ F02-06), Tod/Wiederbelebung ✓ |
+| Holy Cheese | L2 gezielt | Suche + Gegnerheilung auf Held ✓, Gegner-Zielliste (Helden + Kreaturen) ✓, Reveal an Gegner ✓, keine Support-Magic-Karte im Deck → nicht spielbar (v1119, gewollt) ✓ |
+| Homerun! | L2 gezielt | Schwelle ≥ max HP (Spell/Attack/Status/Kreatur) ✓, Insta-Kill über `actionDefeatHero` ✓, Ablehnen ✓, Gold 3 (Kosten 4) ✓, `cannotBeNegated` ✓, Ankh-Re-Defeat unnegierbar ✓ (Vorgänger t26/t27, Ruling v1278) |
+| Idol of Crestina | L2 gezielt | Resource Phase: Suche statt Ziehen, Gold netto 0 ✓, Gold 2 → nicht angeboten ✓, leeres Deck → nicht angeboten ✓; Item Lock ✗ (→ F02-23) |
+| Initiation Ritual | L2 gezielt | toter Held am Vortag ✓, Ausrüsten an lebenden Helden ✓, Fähigkeiten → Ablage statt Löschen ✗ (→ F02-17) |
+| Invisibility Cloak | L2 gezielt | 1 Ziel von 3 Helden ✓, letzter Held (nicht angeboten) ✓, Held + Kreatur ✓, Spell auf Kreatur ✓, Zusatz-Aktion des Gegners ohne das Ziel ✓ |
+| Javelin Throw | L2 gezielt | Base Attack ✓, Wurf von Rain Viola/Hat/Pike ✓, gefrorener/betäubter/negierter Träger → nicht spielbar ✓ (Vorgänger t15/t16, eigene Stichprobe Pike werfen) |
+| Juice | L2 gezielt | Reaktionsweg ✓, Held-Status proaktiv ✓; nur Kreaturenstatus proaktiv ✗ (→ F02-15) |
+| Ladder to the Sky | L2 gezielt | Opfer (nicht diesen Zug beschworen) ✓, Suche zu Beginn des nächsten eigenen Zuges, nicht im Gegnerzug ✓, Haste ✓, Gold ✓ |
+| Legendary Sword of a Barbarian King | L2 gezielt | +10 ATK ✓, kostenlose Beschwörung 1×/Zug ✓, Abbruch → HOPT frei ✓, Zonen voll ✓, Tod/Wiederbelebung ✓ (Vorgänger t12) |
+| Lifeforce Howitzer | L2 gezielt | Heilung 120/500 (Deckel 200) ✓, nur tatsächlich geheilte HP ✓, HOPT ✓, zweite Kopie am selben Helden ✓ abgelehnt, am anderen ✓, Abbruch ✓, geliehener Held ✓ (Vorgänger t14) |
+| Local Idol | L2 gezielt | 2. Trank → negiert und auf die Hand des Idol-Spielers ✓; Skriptkopf-Auslegung „negierte Tränke zählen nicht mit" (3. Trank wäre wieder „zweiter") – dokumentiert, nicht beanstandet |
+| Lone Survivor | L2 gezielt | nur ohne eigene Kreaturen ✓ (gegnerische Kreatur in meiner Zone zählt nicht ✓, gestohlene zählt ✓), Platzwahl ✓, Beschwörungssperre bis Zugende, fällt im Gegnerzug ✓ |
+| Magic Amber | L1 Standard | Gegnerhand 0/1/2 ✓, Behalten-Abwurf ✓, keine Fehler |
+| Magic Amethyst | L1 Standard | Zielwahl nach Brettseite ✗ (→ F02-08); Skript gelesen (oberste Ability je Stapel, Performance-Anzeige) |
+| Magic Cobalt | L2 gezielt | Heilung 50 ✓; Ziel nach Brettseite statt Kontrolle ✗ (→ F02-08); negierter Spielzug zählt nicht ✗ (→ F02-11) |
+| Magic Emerald | L1 Standard | 3 Karten mill ✓ (Mystery-Box-Gegenprobe ✓); negierter Spielzug zählt nicht ✗ (→ F02-11) |
+| Magic Ruby | L2 gezielt | Betäubung 1 Zug, Ablauf ✓; Zielwahl: eigene Kontrolle korrekt gefiltert, kontrollierter Held in meiner Spalte fehlt ✗ (→ F02-08) |
+| Magic Sapphire | L2 gezielt | Such-Sperre schwach ✓ / stark → unspielbar ✓; Eye-of-Ren-Ablehnung: Stempel bleibt ✗ (→ F02-20) |
+| Magic Topaz | L2 gezielt | +60 Schaden ✓, HOPT ✓, Pfeil nach negiertem Angriff aufgeräumt ✓, Behalten-Abwurf ✓; Item Lock ✗ (→ F02-23) |
+| Magnetic Glove | L1 Standard | leeres Deck → nicht spielbar ✓; negierter Spielzug zählt nicht ✗ (→ F02-11) |
+| Mana-Consuming Blade | L2 gezielt | ATK-Bonus fehlt ✗ (→ F02-01) |
+| MOE Bomb | L1 Standard | 999 Schaden an allen Kreaturen beider Seiten ✓ (1000-HP-Kreatur überlebt ✓), ohne Kreaturen spielbar ✓, Gold 19 → abgelehnt ✓ |
+| Mystery Box | L2 gezielt | Mill-Trigger ✓ (Emerald-Gegenprobe); „deleted from deck" durch Heart of Cards ✗ (→ F02-09) |
+| Nerdy Cheese | L2 gezielt | 2 Kopien → eine gelöscht, eine auf die Hand + Reveal ✓; 1 Kopie → nur gelöscht ✓ |
+| Open Invitation | L2 gezielt | Diamond-Ascension: Platzieren, Zugende, Rückmischen nach dem nächsten eigenen Zug ✓, Träger tot → Rückweg läuft trotzdem ✓ (laut Ruling); unskippable Helden nicht wählbar (Liste geprüft) |
+| Perfect Disguise | L2 gezielt | Held getarnt nur im Gegnerzug ✓, danach frei ✓, einziges legales Ziel ✓; negierter Spielzug stempelt nicht ✗ (→ F02-10) |
+| Phalanx Pike | L2 gezielt | +30 ATK ✓, Attacks lösen keine Surprises aus, Spells schon ✓, Equip auf geliehenen Helden ✓ (Vorgänger t15/t08) |
+| Philosopher's Stone | L2 gezielt | Ersetzt 1 Zug (zweite Kopie ersetzt den zweiten) ✓, Gold ✓; unter Artefakt-Sperre ✗ (→ F02-24) |
+| Play Money | L2 gezielt | Rabatt −20 (Boden 0) auf Equipment/Normal-Artefakt ✓, folgt der Handkarte nach Verschiebung ✓, zwei Play Money stapeln ✓, Wipe zum Zugwechsel ✓, Gold 4 → nächstes Artefakt gratis ✓ |
+| Pocket Catapult | L2 gezielt | 40 Schaden 1×/Zug ✓, gefrorener/betäubter Träger gesperrt ✓, negierter Träger wirkt ✓ (Skriptvorgabe), Abbruch → HOPT frei ✓, zwei Katapulte ✓; am übernommenen Helden nicht aktivierbar durch den Kontrolleur ✗ (→ F02-22) |
+| Poisoned Meat | L2 gezielt | 20 Schaden + 1 Gift ✓, tötet Frail ohne Gift ✓; falsche Instanz bei Fremd-Kreatur ✗ (→ F02-14) |
+| Rain Viola | L2 gezielt | Suche bei Tod/Zerstörung/Wurf ✓, HOPT je Name, leeres Deck ✓; am Gegnerhelden nützt sie dem Gegner (→ F02-07, C) |
+| Relic in the Sky | L2 gezielt | unterste Karte ✓; negierter Spielzug (→ F02-11), Eye-of-Ren-Ablehnung (→ F02-20) |
+| Remote Detonator | L2 gezielt | ohne Golem unspielbar ✓, 2 eigene Golems → alle gelöscht, 400 Schaden ✓, gegnerischer Golem als Ziel ✓ |
+| Renewable Energy | L2 gezielt | bis 3 Karten ✓, Löschen ✓, Eye-of-Ren-Ablehnung sauber ✓; [B]/[W] als verschiedene Namen ✗ (→ F02-12) |
+| Rocket Sneeze | L2 gezielt | Hero-/Kreaturenweg, Schwelle 50, Weiterleitung an alle Ziele ✓; Dedup-Flag bleibt ✗ (→ F02-16) |
+| Sacred Hammer of the Volcano | L2 gezielt | Basis- statt aktuelle ATK ✗ (→ F02-03) |
+| Sacrificial Dagger | L2 gezielt | Kreaturenopfer → Schlag (HOPT je Dagger, Abbruch gibt HOPT frei, Gegner-Opfer löst nicht aus) ✓; Heldenopfer löst nicht aus ✗/C (→ F02-18) |
+| Secret Lab Entrance | L2 gezielt | Equip nur an Inventing-Held / Zusatz-Aktivierung fehlen ✗ (→ F02-02) |
+| Secret Spell Book | L1 Standard | nichts zu holen → 1 Karte ziehen ✓, gestohlene Kreatur dauerhaft zurück ✓ (alte Tests + Kopf-Vorgaben); keine tiefe Messung |
+| Shard of Chaos | L2 gezielt | Löschen/Holen gleicher Typen ✓; Ablage-Sperre ✗ (→ F02-13), Kreatur als Attack/Spell ✗/C (→ F02-21) |
+| Shattered Trident, Treasure of the Deepsea | L2 gezielt | +10 ATK, Angebot nur bei einem Ziel, Verbrauch nach dem Angriff ✓, Abbruch ✓, Attack negiert → Trident bleibt ✓ (Vorgänger t17) |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+* **Equip-Regeln einheitlich:** alle 13 Ausrüstungen der Liste werden auf gefrorene und tote eigene Helden abgelehnt, auf betäubte/negierte angenommen; Ausrüstung geht beim Tod des Trägers in die Ablage des Ausrüsters (auch bei Gegner-Helden), nach Wiederbelebung bleibt nichts hängen; Flags von Pike/Bow werden mit der Ausrüstung entfernt.
+* **Perfect Disguise:** Tarnung nur im Gegnerzug, danach weg; „only legal target"-Ausnahme gilt.
+* **Open Invitation / Ladder to the Sky:** verzögerte Effekte feuern am richtigen Zugende bzw. Zugbeginn (nicht im Gegnerzug), auch wenn der Träger tot ist.
+* **Idol of Crestina / Philosopher's Stone / Local Idol / Rocket Sneeze (Einzelfenster):** Fensterlogik, Gold, Ersetzen des Ziehens, Weiterleitung auf alle Ziele korrekt; Magic Topaz räumt den Pfeil nach negiertem Angriff auf.
+* **Homerun!:** Schwellen- und Insta-Kill-Logik laut Ruling v1278; Golden Ankh-Re-Defeat ist unnegierbar.
+* **Play Money:** Rabatt bleibt an der Handkarte, auch bei Handverschiebung; Boden 0.
+* **MOE Bomb / Remote Detonator / Poisoned Meat (ohne Fremd-Kreatur):** Schaden, Löschen, Gift korrekt.
+* **Kartenbilanz:** in allen eigenen Läufen `t.audit()` leer und keine verschluckten Engine-Fehler.

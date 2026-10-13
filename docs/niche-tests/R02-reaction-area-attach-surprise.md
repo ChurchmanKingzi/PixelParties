@@ -145,6 +145,23 @@ Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in 
 - **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/16-spectral-armor-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `spectral-armor.js` sammelt nur Heldenziele (`_collectOwnedHeroTargets`, `postTargetResolve`, `isPreDamageReaction` für `heroIdx`); für Kreaturenschaden fehlt ein Zweig.
 
+### R02-17 · Tarleinn's Floating Island: Heilung einer KREATUR löst „may draw 1 card" nie aus · Stufe B
+- **Karten:** Tarleinn's Floating Island (`tarleinn-s-floating-island.js`); Engine `actionHealCreature`
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Die Area liegt bei Sitz 0; Sitz 0 hat einen verletzten Helden (500/800) und eine verletzte Kreatur (100/200 HP). Ja auf alle Fragen. (a) `actionHealHero` 100 auf den Helden (Kontrolle), (b) in frischer Szene `actionHealCreature` 100 auf die Kreatur.
+- **Erwartet** (Kartentext „Once per turn, when a TARGET a player controls has its HP healed, that player may draw 1 card"; Kreaturen sind Ziele): in (a) und (b) kommt die Frage „Draw 1 card …?" und der Spieler zieht 1 Karte.
+- **Beobachtet:** (a) ✓. (b) Die Kreatur wird geheilt (200 HP), aber keine Frage, keine Karte. Das Skript sagt es selbst im Kopf: „Creature heals don't fire afterHeal in the engine, so this card effectively triggers off hero heals" – Kreaturenheiler (Skeleton Healer, Lamenting Knight …) lösen die Area also nie aus.
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/17-tarleinn-island-kreaturenheilung.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `actionHealCreature` (`_engine.js` ~10109) feuert `afterHeal` nicht (nur `actionHealHero` ~10093). Die Lücke betrifft jeden Heal-Beobachter, der „target" liest (nicht geprüft, welche außer dieser Area).
+
+### R02-18 · Toxic Trap („is hit by …") öffnet bei einem reinen Flächen-Statuszauber (Poisoned Well) nicht · Stufe C
+- **Karten:** Toxic Trap (`toxic-trap.js`); Poisoned Well (`poisoned-well.js`, nicht in der Gruppe)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 1: Toxic Trap in der Surprise Zone von Held 0 (Decay Magic 1). Sitz 0 (Destruction + Decay Magic 3) spielt (a) Flame Avalanche (150 Schaden an alle Ziele des Gegners; Kontrolle) bzw. (b) Poisoned Well („Inflict 1 Stack of Poison to all targets your opponent controls").
+- **Erwartet** (Toxic Trap: „Activate this Surprise when the user is hit by an Attack, Spell or Creature effect"; CARD_API (Flächenschlag): „„hit by"-Surprises (Booby Trap) [öffnen bei Flächenschlägen] schon"): in beiden Fällen kommt die Frage „Toxic Trap" und der Angreifer wird vergiftet.
+- **Beobachtet:** (a) ✓ (Frage, Held 0 von Sitz 0 vergiftet). (b) keine Frage; Toxic Trap bleibt verdeckt liegen, obwohl alle Helden von Sitz 1 vergiftet werden. Poisoned Well vergibt den Status direkt über `addHeroStatus` (Z. 77) und nicht über `dealDamageToTargets`, das die „hit by"-Fenster öffnet.
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/18-toxic-trap-flaechen-status.js` (✗ = Abweichung von meiner Erwartung)
+- **Vermutete Ursache:** Statusflächenzauber ohne Schaden laufen an den AoE-Surprise-Fenstern vorbei (`poisoned-well.js` Z. 77–90).
+- **Frage an Al:** Zählt „hit by a Spell" auch einen Spell, der nur einen Status verteilt (Poisoned Well) – Ja (Toxic Trap/Booby Trap sollen dann auslösen) oder nein (nur Schaden)?
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

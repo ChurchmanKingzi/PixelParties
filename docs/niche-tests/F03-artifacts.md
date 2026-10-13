@@ -1,8 +1,16 @@
 # F03-artifacts – Nischenfall-Bericht
-Stand/Autor: Agent F03-artifacts, 13.10.2026. Karten: 48 in der Liste · (wird am Ende gezählt) gezielt getestet · (wird am Ende gezählt) mit Befund.
+Stand/Autor: Agent F03-artifacts (Vorgänger + Fortsetzung), 13.10.2026. Karten: 48 in der Liste · 43 gezielt getestet (L2) · 26 mit Befund. Befunde: 20 (Stufe A: 4 · B: 10 · C: 6).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+20 Befunde (A 4 · B 10 · C 6), alle mit ausgeführtem Repro unter `docs/niche-tests/repro/F03-artifacts/` (Exit 1 = Fehler tritt auf). Die fünf wichtigsten:
+1. **F03-03 (A)** Weird Doll: eine Ability in einer Support Zone (Xalibur) kollidiert in der Wahl-ID mit der Ability-Zone gleicher Nummer – gelöscht wird die *falsche* Ability bzw. nichts.
+2. **F03-14 (A)** Warhorse, The Master's Sword, Vampiric Sword: ihre Angriffs-Boni (+50 / doppelter Schaden / Heilung) greifen nur gegen Helden, nie gegen Kreaturen als Ziel.
+3. **F03-07 (A)** Slippery Fridge: das bloße Umhängen von Thunder Trumpet / Storm Piano löst deren „sent to the discard pile"-Trigger aus (80 Schaden, `damage_proof`); dazu F03-08/-09: die Fridge umgeht Je-Held-Limits und gefrorene Zielhelden und verschiebt nur *eine* statt „any number" Ausrüstung.
+4. **F03-04 (A)** Snow Cannon ignoriert Thickets „cannot be chosen" (`normalizeValidTargets` filtert `untargetable_all` nicht – betrifft jedes Ziel-Artefakt mit eigener Liste).
+5. **F03-16 / F03-19 (B)** Zieh-Sperre (Sacred Jewel): Wheels und beide Stäbe verlieren dabei Karten/Gold ohne zu ziehen (Teleporter/Uncontrollable leeren die ganze Hand); Item Lock („delete a card") darf die gerade gespielte Artefakt-Karte selbst als Kosten löschen.
+Weiter: Heldentod gibt The White Eye nicht zurück (F03-01), Sun Sword stempelt Frost-Immunität nur einmal (F03-02), Backpack ignoriert „1 Smug Coin per game" (F03-06), Eye of Ren kauft die harte Stab-Sperre frei (F03-10), Stormblade mischt die auflösende Gegnerkarte mit (F03-11), Treasure Chest unter eigener Gold-Sperre wirkungslos spielbar (F03-20); sechs Regelfragen (C) an Al.
+Gesamteindruck: Die Kartenskripte selbst sind sorgfältig (Reaktions-Artefakte, Great Wall, Smug Coin, Schilde, Tea, Instruments-HOPT, Brewer's Blade ohne Befund); die Befunde liegen fast alle an **Nahtstellen** – Engine-Verträge, die ein Skript nicht kennt (`toZone`, `ineligible`/`untargetable_all`, `drawLocked` vs. `handLocked`, auflösende Handkarte, `canEquipCardToHero`/`heroCanBeEquipped` bei Verschiebungen).
+Bewusst NICHT getestet: Rain Viola (dritter Nutzer von `instrumentDiscardTrigger`), Elana/Weitere „shuffle your entire hand"-Karten, andere Ziel-Artefakte mit eigener Zielliste (F03-04 nur an Snow Cannon belegt), Geschwister der Cheese-Familie, Golden Bananas/War Chest (F03-20), Surprise-Fenster-Ketten mit mehreren Reaktionen gleichzeitig, UI/Client (greyed-out-Anzeige), Mehrspieler-Sitze 3/4. Karte „The Master's Sword" ist **gebannt** und trägt (anders als der Text „Equip this card to a Hero you control") keine `equipOwnSideOnly`-Fahne (landet auf Gegnerhelden); gemäß CARD_API.md Z. ~7140 wurden gebannte Karten beim Nachziehen nicht angefasst – nur als Hinweis, kein Befund.
 
 ## Befunde
 ### F03-01 · The White Eye kehrt beim Heldentod nicht auf die Hand zurück · Stufe B
@@ -168,10 +176,75 @@ Stand/Autor: Agent F03-artifacts, 13.10.2026. Karten: 48 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/F03-artifacts/19-item-lock-kosten-loescht-gespielte-karte.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `actionPromptForceDiscard(pi, 1, { title: 'Item Lock Cost', deleteMode: true, … })` wird in den drei Server-Pfaden ohne `eligibleIndices`-Ausschluss der auflösenden Karte aufgerufen (`engine._istAufloesendeHandkarte`, `_engine.js` ~19630; Wheels und Live Show schließen sie selbst aus, s. `wheels.js` `buildEligibleIndices`).
 
+### F03-20 · Treasure Chest unter der eigenen Gold-Sperre (Golden Arrow): spielbar, Karte wird wirkungslos verbrannt · Stufe B
+- **Karten:** Treasure Chest (`treasure-chest.js`), Sperrquelle Golden Arrow (`_arrows-shared.js` ~302, `ps.goldLocked`); gleiche Lücke bei Karten, die denselben Helfer nutzen (Golden Bananas, War Chest …, nicht getestet)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, 100 Gold, `ps.goldLocked = true` (so setzt es Golden Arrow „You cannot gain or spend Gold for the rest of the turn afterwards"); Treasure Chest auf der Hand.
+- **Erwartet** (Ruling Al 17.8., `_gold-block-shared.js` Kopf: „eine Karte, deren einziger Nutzen ein Gold-Gewinn ist, wird gesperrt statt wirkungslos zu feuern – Treasure Chest, Golden Bananas, War Chest …"; Chest-Skript: „Der Gewinn (10 Gold) IST die ganze Karte"): nicht spielbar, bleibt auf der Hand.
+- **Beobachtet:** Chest wird gespielt (`r === true`), landet in der Ablage, Gold bleibt 100 (`gold_gain_blocked`).
+- **Repro:** `docs/niche-tests/repro/F03-artifacts/20-treasure-chest-gold-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `goldGainWouldBeBlocked` (`_gold-block-shared.js` ~Z. 84) prüft nur den gegnerischen Tuscan Aristocrat (`blockerAufDemBrett`), nicht die eigene Spielersperre `ps.goldLocked`, die `actionGainGold` (`_engine.js` ~24065) durchsetzt.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
-| (wird ergänzt) | | |
+| Shield of Death | L2 gezielt | einmal je Zug (Reset über 4 Zugwechsel, beide Seiten am Zug) ✓, tödlicher Treffer / 0 Schaden / Eigenschaden / Gift-Tick kein Auslöser ✓, Träger gefroren/betäubt/negiert feuert ✓, Kreatur als Quelle ✓; durch Fridge verschoben unauffällig |
+| Shield of Life | L2 gezielt | wie Shield of Death ✓ (Heilung auf eigenes Ziel, Abbruch erstattet) |
+| Shield of Wisdom | L2 gezielt | Umleitung eines Kreatur-Effekts (Cannon Tower): Wirt/Kreatur im Support gewählt ✓, Angreifer-Kreatur nicht als Umleitziel ✓, Wirtsheld gefroren ⇒ kein Auslöser (Konvention) ✓, kein Umleitziel ⇒ Effekt läuft ✓ |
+| Sickly Cheese | L2 gezielt | Stapel +1 ✓, Such-Sperre ⇒ unspielbar ✓, giftimmuner Held ✗(→ -12) |
+| Skull Necklace | L2 gezielt | eigener/gegnerischer Zwangsabwurf und Delete: 50 bzw. 200 ✓, gestohlene Kreatur als Ziel ✓, Item-Lock-Kosten ✗(→ -19, Kostenwahl) |
+| Skullmael's Greatsword | L2 gezielt | Galerie/Beschwörung ✓, Ablage-Sperre ✓, HOPT je Instanz ✓, Knife-Kill ✗(→ -05, C) |
+| Slippery Fridge | L2 gezielt | Instrumente feuern ✗(→ -07), Je-Held-Limits/gefrorenes Ziel ✗(→ -08), „any number" ✗(→ -09); ATK-Waffen wandern korrekt ✓, Xalibur-Abilities fallen ✓ |
+| Smug Coin | L2 gezielt | 799 / 800 / 5000 Fremdschaden ✓, Eigenschaden nicht gerettet ✓, Brand-Tick ✓, zweiter Treffer tödlich ✓, Löschung ✓, von Tool Freezer negiert ⇒ kein Stempel ✓; Backpack-Weg ✗(→ -06) |
+| Snow Cannon | L2 gezielt | Thicket ✗(→ -04); Frost-Dauer Held/Kreatur (bis Ende der nächsten Runde des Opfers) ✓, immuner/gefrorener Held nicht angeboten ✓, von Tool Freezer negiert ✓ |
+| Spice Mortar | L2 gezielt | Hand-/Zieh-/Such-Sperre, <10 Karten, Erstzug-Schutz ✓; Such-Sperre ✗(→ -17, C) |
+| Spiky Armor | L2 gezielt | Held / Kreatur als Ziel ✓, tödlicher Treffer: Rückstoß = tatsächlich verlorene HP (30) ✓, Spell kein Auslöser ✓, zu wenig Gold ✓, Angreifer stirbt am Rückstoß ohne Spielende ✓, proaktiv nicht spielbar ✓ |
+| Staff of Illusions | L2 gezielt | Rückkehr nach Gegnerzug ✓, gestohlene Illusion kehrt ins richtige Deck ✓, Summon-Sperre danach ✓; Level 0 / < 10 Gold ✗(→ -13, C) |
+| Staff of the Teleporter | L2 gezielt | 0/n/alle gewählt (+1 bei ganzer Hand) ✓; ✗(→ -10, -16, -18) |
+| Staff of Uncontrollable Destruction | L2 gezielt | Hand 0 / n ✓; ✗(→ -10, -16, -18) |
+| Sticky Wand | L2 gezielt | Zusatzaktion ✓, zweite Wand im Zug abgelehnt ✓, Abbruch der Heldenwahl verbrennt HOPT nicht ✓, weitere Aktion danach möglich ✓ |
+| Storm Piano | L2 gezielt | zweites Piano am Held / Held mit Merker abgelehnt ✓, HOPT ✓, `damage_proof` bis Ende der nächsten Runde ✓, Heldentod-Abbau ✓; Fridge ✗(→ -07) |
+| Storm Ring | L2 gezielt | 3 Helden ⇒ negiert (Karte Ablage, 4 Gold) ✓, 1 Ziel / Held+Kreatur ✓, HOPT von Rain of Arrows nach Negierung bleibt ✓, zu wenig Gold ✓ |
+| Strong Shield | L2 gezielt | 299 / 300 / 301 ✓, Kreatur ✓, Eigenschaden ✓ (quellenunabhängig), 7 Gold (Kosten 8) ✓, zwei Treffer / eine Karte ✓ |
+| Summoning Circle | L2 gezielt | HP-Verdopplung bei Beschwörung ✓, anderer Held nicht ✓, 1 Kreis je Held ✓, Tod/Wiederbelebung ✓ |
+| Summoning Instructions | L2 gezielt | X = 1/2/3 × Summoning Magic 0/1 gegen Lv 1–3 ✓ (Text ↔ Skript), Backpack-Weg fragt X ✓ |
+| Super-Killing Knife, the Tool of Liquidation | L2 gezielt | +10 ATK / Abgang ✓, Kreaturentreffer fällt ✓, Held-Treffer nicht ✓; Poster/Skullmael ✗(→ -05, C) |
+| Tea | L2 gezielt | Stati + Gift-Stapel wandern ✓, Zielliste ohne immunen Helden (Frost) ✓ |
+| Teal Fishing Rod | L2 gezielt | Basis ✓ (Level 0, Zonenwahl), Snapshot-Namensprüfung ✗(→ -15, C) |
+| The Brewer's Blade | L2 gezielt | 1× je Zug ✓, nur Attack (Spell nicht) ✓, anderer Held nicht ✓, leeres Potion Deck ✓ |
+| The Eye of Ren | L2 gezielt | Freikauf ✓ (Gold, Ablehnung = Abbruch); ✗(→ -10) |
+| The Great Wall of Deri | L2 gezielt | Eingang 5/10/11/15/25/100 ⇒ 5/10/10/10/15/90 ✓, zwei Mauern ✓, gestohlene Kreatur geschützt ✓ |
+| The Hands of Big Gwen | L2 gezielt | Galerie ohne Attack ✓, 1× je Zug ✓, Ablehnung ⇒ erneut angeboten ✓, Ablage-Sperre ✓, Treffer auf Kreatur ✓ |
+| The Master's Key | L2 gezielt | Aktionssperre/Negation bis Zugende ✓, zweiter Key abgelehnt ✓, nach gespielter Attack abgelehnt ✓, Rabatt 3 Decay-Level / Mindestkosten 0 ✓ |
+| The Master's Sword | L2 gezielt | ✗(→ -14); gebannt, Seitenbindung fehlt (Hinweis, s. Zusammenfassung) |
+| The Sacred Blade | L0 gelesen | `neverPlayable`, reine Deckbau-Klausel |
+| The Sacred Jewel | L2 gezielt | Ja ⇒ beide ziehen, nur Wirker `drawLocked` ✓; Nein ⇒ Karte bleibt ✓; leeres Gegnerdeck ⇒ Sieg ✓; Erstrunden-Lücke = B-05 |
+| The Sacred Mirror | L1 Standard | Deck 59/60 ⇒ unspielbar (Skriptentscheid), 61 ⇒ zieht 2 ✓, `drawLocked` ⇒ unspielbar ✓ |
+| The Stormblade | L2 gezielt | Gegner-Treffer / eigene Aktion (1× je Zug), Ziehsperre umgangen ✓, leere Hand ✓; ✗(→ -11) |
+| The Sun Sword | L2 gezielt | ✗(→ -02); Anlegen taut auf ✓, neue Kreaturen immun ✓, Brand überlebt Schwertverlust ✓ |
+| The White Eye | L2 gezielt | ✗(→ -01); gestohlene Kreatur / übernommener Held: Controller verwirft ✓ |
+| The Yeeting | L2 gezielt | Held 100 HP stirbt am Schaden, Wahl läuft weiter ✓, gestohlene Kreatur / Ausrüstung in die Ablage des Besitzers ✓, Thicket-Kreatur nicht wählbar ✓, Abbruch im zweiten Schritt = nichts passiert ✓ |
+| Thicket | L2 gezielt | Zielschutz gegen Yeeting/Skull Necklace/Tea ✓, 2-Züge-Sperre ✓; Snow Cannon ✗(→ -04) |
+| Thunder Trumpet | L2 gezielt | 80 Schaden, HOPT ✓, Heldentod-Abbau ✓; Fridge ✗(→ -07) |
+| Tool Freezer | L2 gezielt | Kosten = 2× (Snow Cannon 10, Warhorse 16), unbezahlbar ⇒ keine Reaktion ✓, Kosten-0-Artefakt ✓, Equipment ⇒ Ablage ohne Stempel ✓ |
+| Treasure Chest | L2 gezielt | +10 ✓, Item-Lock ✓; ✗(→ -20) |
+| Treasure Hunter's Backpack | L2 gezielt | Je-Held-Limits (Poster, Sword, Circle, Piano, Stormblade) ✓, Träger-Aktionssperre ✓, Kostenschranke 50 ✓; ✗(→ -06) |
+| Truth-Seeing Eye | L2 gezielt | wählt Thicket-Kreatur trotz Schutz ✓; Eye an anderem Held ohne Wirkung ✓ |
+| Vampiric Sword | L2 gezielt | ⌈x/2⌉-Heilung (45 ⇒ 23) ✓, Deckel bei Max-HP ✓, 2. Schwert am Held abgelehnt ✓; gegen Kreatur ✗(→ -14) |
+| Wanted Poster | L2 gezielt | 2 bei Kill, mehrere Kills, Kill eigener Kreatur ✓, 2. Poster abgelehnt ✓; Knife ✗(→ -05, C), Fridge ✗(→ -08) |
+| Warhorse | L2 gezielt | +50 gegen Helden ✓; gegen Kreatur ✗(→ -14) |
+| Weird Doll | L2 gezielt | ✗(→ -03) |
+| Wheels | L2 gezielt | beide Modi, HOPT, Deck 2 ✓; Zieh-Sperre ✗(→ -16) |
+| Xalibur | L2 gezielt | Abilities in Support Zonen, Abgang/Heldentod legt sie ab ✓, 2. Xalibur am Held ✓, Fridge ✓; Weird-Doll-Wahl ✗(→ -03) |
+
+Querschnitt über alle 21 Ausrüstungen (Batterie `u25`): Ausrüsten auf toten Helden abgelehnt ✓, Heldentod legt in die Ablage des Besitzers (nicht des Kontrolleurs, auch bei dauerhaft übernommenem Helden) ✓, ATK-Boni werden zurückgenommen ✓, Wiederbelebung bringt keine Ausrüstung zurück ✓ (Ausnahme The White Eye ⇒ -01), voller Held lehnt Ausrüstung ab ✓; Item Lock/`_artifactLockTurn` ✗(→ -19), `_artifactLockTurn` verweigert alle zwölf getesteten Artefakte ✓.
 
 ## Getestet & in Ordnung (Auswahl)
-(wird ergänzt)
+- **Reaktions-Artefakte** (Strong Shield, Spiky Armor, Storm Ring, Tool Freezer, Shield of Wisdom): Schwellen (299/300), Mehrfachtreffer, Kreatur als Ziel, zu wenig Gold, proaktiv nicht spielbar, Rückstoß = tatsächlich verlorene HP, Ring zählt tatsächliche Ziele (1 Ziel / 2+), Tool-Freezer-Kosten 2× und Negierung ohne Stempel.
+- **The Great Wall of Deri**: Reduktion −10 mit Boden 10 (kein Anheben kleiner Schläge), Stapelung zweier Mauern, gestohlene Kreaturen bleiben geschützt.
+- **Smug Coin**: 799 vs. 800 vs. 5000, Eigenschaden nicht gerettet, Brandtick gerettet, Münze gelöscht (Deleted Pile), zweiter tödlicher Treffer tötet.
+- **Schilde** (Death/Life): „first time every turn" über vier Zugwechsel auf beiden Seiten, kein Auslöser bei tödlichem Treffer, 0 Schaden, Eigenschaden, Gift-Tick.
+- **Instrumente**: Piano/Trompete HOPT, Heldentod-Abbau, `damage_proof`-Laufzeit; Vampiric Sword Rundung/Deckel; Brewer's Blade nur bei Attack, einmal je Zug, anderer Held ohne Wirkung.
+- **Gold/Zieh-Sperren**: Staffs' Locks laufen mit dem Zugwechsel aus; Sacred Jewel sperrt nur den Wirker; Sacred Mirror Schwelle 60/61.
+- **Ausrüstungs-Lebenszyklus** aller 21 Ausrüstungen (Tod, Wiederbelebung, dauerhafte Übernahme des Trägers, volle Zonen, toter Zielheld) ohne Engine-Fehler, ohne Audit-Meldung, Kartenbilanz bleibt.
+- **Truth-Seeing Eye / Thicket**: Eye ignoriert den harten Zielschutz, aber nur für den eigenen Träger.
+- **Zwei Blindgänger der Vorrunde** (Test-Artefakte, kein Befund): „Instructions X=2/3 kein Platz" (Brettgeometrie im Aufbau) und „Sickly Cheese: Karte in `deletedPile` bei Item Lock" (Harness-CPU wählt Platz 0; Ursache = -19).

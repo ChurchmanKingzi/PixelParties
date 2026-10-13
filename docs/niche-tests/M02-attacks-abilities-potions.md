@@ -211,6 +211,15 @@ Stand/Autor: Agent M02-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Repro:** `docs/niche-tests/repro/M02-attacks-abilities-potions/24-singing-geisterinstanz-surprise-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `singing.js:71–108` `_makeBorrowInst` übergibt dem Effekt eine Schatten-Instanz („Mutations on the shim never reach the original creature"); `engine.surpriseCreatureReset` (`_engine.js:36789`) schreibt die Zonen-Arrays der realen Seite (`ps.supportZones`/`ps.surpriseZones`), setzt `zone/heroIdx/faceDown` aber nur auf `ctx.card` (= Schatten). Rückfrage: Soll Singing diese sechs Kreaturen ausschließen (Effekt verschiebt die Kreatur des Gegners; Nutznießer ist der Gegner) – oder die echte Instanz mitführen?
 
+### M02-25 · Wisdom: der Server lässt einen Zauber über der eigenen Stufe ohne Abwurfmaterial zu (Zauber wirkt gratis) · Stufe C
+- **Karten:** Wisdom (`wisdom.js`), Fireball (Lv2) als Probekarte
+- **Voraussetzungen / Aufbau:** Sitz 0 Held 0 mit Destruction Magic 1 und Wisdom 1; Hand nur Fireball (bzw. Fireball + Füllkarte als Kontrolle); `t.play(0, 'Fireball', {noGrant: true})`.
+- **Erwartet** (Kartentext „discard as many cards as the Spell's level is too high"; CARD_API.md ~Z. 17916/18115: Wisdom-Abwurf braucht Material, `handFodderFor`): ohne Füllkarte ist der Fireball nicht spielbar.
+- **Beobachtet:** Kontrolle ✓ (wirkt, Füllkarte abgeworfen). Ohne Füllkarte: `true`, Fireball wirkt (150 Schaden), die Kosten entfallen stillschweigend (kein Abwurf möglich).
+- **Repro:** `docs/niche-tests/repro/M02-attacks-abilities-potions/25-wisdom-kosten-ohne-abwurfmaterial.js`
+- **Vermutete Ursache:** `_engine.js` `validateActionPlay` (Z. 20598 ff.) enthält keine Wisdom-Prüfung; die Material-Prüfung `handFodderFor` steht nur in `getHeroPlayableCards` (Z. 19713/20083/20274, UI-Liste). Der Client graut die Karte aus, ein manipulierter Client oder die CPU-Wege ohne Liste umgehen das. Gleiche Klasse wie M02-17 (Server-Tor fehlt, nur UI sperrt).
+- **Frage an Al:** Soll `validateActionPlay` die Wisdom-Kosten selbst prüfen (authoritativer Server) – ja oder nein?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

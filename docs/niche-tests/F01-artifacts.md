@@ -182,6 +182,33 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Repro:** `docs/niche-tests/repro/F01-artifacts/19-einmal-pro-zug-artefakte-negiert-zweite-kopie.js` (4 × ✗)
 - **Vermutete Ursache:** Der Einmal-pro-Zug-Stempel (`engine.claimHOPT`) steht in allen vier Skripten erst in `resolve`, das bei einer Negation in der Kette nie läuft; zum Muster der Karten, die es richtig machen, gehört der Stempel in `payActivationCost`/`canActivate`-Seite vor der Kette. Restunsicherheit: ob ein in der Kette negiertes Artefakt als „gespielt" gilt (wie bei A01-pollution-04/-14).
 
+### F01-20 · Arcane Lamp: ein Held mit dem Auftau-Puffer „immune" ist kein Brand-Ziel · Stufe B
+- **Karten:** Arcane Lamp (`cards/effects/arcane-lamp.js` Z. 42; gleiches Muster in `heat-wave.js` Z. 75, nicht Teil dieser Gruppe)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 1: Held 0 trägt `statuses.immune` (entsteht nach jedem Auftauen/Ende einer Betäubung), Helden 1 und 2 besiegt, keine Kreaturen; Sitz 0 hat Arcane Lamp.
+- **Schritte:** Arcane Lamp spielen.
+- **Erwartet** (Kartentext: „Choose a target your opponent controls and Burn it."; `immune` schützt laut Engine nur vor `frozen/stunned/negated/bound`, `_engine.js` Z. 44861 – Gegenprobe im Repro: `addHeroStatus(…, 'burned')` wirkt auch bei „immune"): Held 0 ist ein gültiges Ziel, die Lampe spielbar, er brennt.
+- **Beobachtet:** Die Lampe ist nicht spielbar (`r = false`, Karte bleibt auf der Hand), der Held wird nicht angeboten; sind mehrere Ziele da, fehlt der „immune"-Held in der Liste.
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/20-arcane-lamp-immune-held-kein-ziel.js` (2 × ✗)
+- **Vermutete Ursache:** `arcane-lamp.js` Z. 42 `if (hero.statuses?.immune) return false;` in `heroCanBeBurned` – verwechselt die CC-Karenz mit einer Brand-Immunität (die heißt `burn_immune`, Z. 44 geprüft).
+
+### F01-21 · Capture Net holt die Kreatur trotz Hand-Sperre auf die Hand · Stufe B
+- **Karten:** Capture Net (`cards/effects/capture-net.js` Z. 185 → `_sparkfly-shared.js` `stealBoardCardToHand` Z. 289; derselbe Helfer steckt in Sparkfly Queen/Worker und Winged Skeleton)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 steht unter Hand-Sperre (`ps.handLocked`, so setzt sie z. B. Ice Sculpture Garden: „You cannot draw or add cards to your hand for the rest of the turn afterwards."), Hand [Capture Net], 100 Gold; Sitz 1 hat Albrecht auf dem Brett.
+- **Schritte:** Capture Net spielen, Albrecht wählen.
+- **Erwartet** (Kartentext Capture Net „…add it to your hand"; Hand-Sperre; Präzedenz: Cute Cheese, Cool Cheese, Boomerang, Angry Cheese, Birthday Present sind unter der Sperre unspielbar – gemessen, bleiben auf der Hand, kein Gold weg): Capture Net holt nichts auf die Hand bzw. ist nicht spielbar.
+- **Beobachtet:** Capture Net wird gespielt (4 Gold), Albrecht liegt auf der Hand von Sitz 0.
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/21-capture-net-unter-handsperre.js`
+- **Vermutete Ursache:** Weder `capture-net.js` (`blockedByHandLock`/`canActivate`) noch der Helfer `stealBoardCardToHand` prüfen `engine.handZugangGesperrt(pi)`; `handZugang` überlässt die Sperre ausdrücklich dem Aufrufer (`_engine.js` Z. 11626–11634). Die Loader-Automatik (`detectDrawOnly`) deckt nur reine Zieh-Karten ab.
+
+### F01-22 · The Thing in the Ship hält die Cloak of Edge („treated as an Ability") nicht auf · Stufe B
+- **Karten:** Cloak of Edge (`cards/effects/cloak-of-edge.js`), The Thing in the Ship (`the-thing-in-the-ship.js` + Engine `abilityActivationBlocked`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 trägt die Cloak an Held 0; Sitz 1 hat The Thing in the Ship auf dem Brett.
+- **Schritte:** 1. `t.activateEquip(0, 0, 0)` (Cloak aktivieren). Gegenprobe: Adventurousness (echte Ability) aktivieren.
+- **Erwartet** (Thing: „neither player can activate the active effects of their Abilities."; Cloak: „it is treated as an Ability with the following effect: 'You may once per turn …'", Skriptkopf: „Innerhalb der Support-Zone zählt sie als ABILITY"): Die Cloak ist unter The Thing nicht aktivierbar.
+- **Beobachtet:** Adventurousness ist gesperrt (✓), die Cloak lässt sich dagegen aktivieren: ATK +20 permanent, `abilityActivationBlocked()` ist dabei `true`.
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/22-cloak-of-edge-the-thing-in-the-ship.js`
+- **Vermutete Ursache:** Die Sperre sitzt nur in den Ability-Sammlern (`_engine.js` Z. 40871 ff.); die Cloak läuft über den Equip-Weg (`getActivatableEquips` / `doActivateEquipEffect`, `equipEffect`), der `abilityActivationBlocked` nicht abfragt. Das Skript des Things (Kopf) beschreibt als Maßstab „aktive Effekte = anklickbar (`onFreeActivate`/`onActivate`)" – die Cloak fiel dabei durchs Netz. (Nicht B-01: dort geht es um die Sperre bei gefrorenem Thing.)
+
 ## Abdeckung
 (wird am Ende ergänzt)
 
