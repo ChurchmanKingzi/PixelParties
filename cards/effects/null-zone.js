@@ -77,7 +77,10 @@ module.exports = {
         if (inst.faceDown) continue;
         const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (isCreatureNegated(inst)) continue; // Already negated/nulled — skip
+        // ★ Z2 (A01-19): nur bei bereits vorhandenem `nulled` ueberspringen. Eine anderweitig (kurz) negierte Kreatur
+        // bekommt zusaetzlich `nulled` mit eigenem Buff (eigener Zaehler) — sonst liefe ihre kurze Negation zum Zugende
+        // ab und Null Zone („all Creatures", bis Ende des naechsten eigenen Zuges) haette sie nicht erfasst.
+        if (inst.counters?.nulled) continue;
         engine._broadcastEvent('play_zone_animation', {
           type: 'null_zone_spiral',
           owner: inst.controller ?? inst.owner,
