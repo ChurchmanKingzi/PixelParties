@@ -5350,7 +5350,9 @@ class GameEngine {
         // Der Vorab-Stempel `_surpriseCheckedHeroes` bleibt Heldenzielen
         // vorbehalten: Kreaturenschaden oeffnet in actionDealDamage kein
         // Helden-Fenster, es gibt also nichts zu deduplizieren.
-        if (selected && (selected.type === 'hero' || selected.type === 'creature') && !config._skipSurpriseCheck) {
+        if (selected && (selected.type === 'hero' || selected.type === 'creature'
+            || (selected.type === 'equip' && selected.cardInstance && engine._istKreaturenInstanz(selected.cardInstance)))
+            && !config._skipSurpriseCheck) {
           // Mark this hero as surprise-checked so actionDealDamage doesn't re-check
           if (selected.type === 'hero') {
             if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
@@ -5851,8 +5853,19 @@ class GameEngine {
           return [];
         }
 
+        // ── Umleitungs-/Negierungsfenster (Martyry, Challenge, Rolling Boulder …) ──
+        // Z3 (R02-02): wie `promptDamageTarget` – der Dispatcher darueber kennt hier keine Quelle
+        // (`_callerHandlesSurprise`), also oeffnet der Picker das Fenster selbst; `applyRedirectWindows`
+        // fragt je gewaehltem Ziel EINZELN (Ruling 31.8.) und kennt die Pick-Anzahl (Rolling Boulder:
+        // „exactly 1 target"). Leere Rueckgabe = der Effekt ist negiert (kein Abbruch: keine Zaubermarke).
+        let _gewaehlt = selectedIds;
+        if (!config._skipRedirectCheck) {
+          _gewaehlt = await engine.applyRedirectWindows(selectedIds, targets, config, cardInstance);
+          if (!Array.isArray(_gewaehlt) || _gewaehlt.length === 0) return [];
+        }
+
         // Map IDs to target objects and record for spell tracking
-        const result = selectedIds.map(id => targets.find(t => t.id === id)).filter(Boolean);
+        const result = _gewaehlt.map(id => targets.find(t => t.id === id)).filter(Boolean);
         if (gs._spellDamageLog) {
           for (const t of result) gs._spellDamageLog.push({ ...t });
         }
@@ -5860,7 +5873,8 @@ class GameEngine {
         // ── Surprise window check ──
         if (!config._skipSurpriseCheck) {
           // v703: Kreaturenziele laufen mit (Opt-in-Filter im Fenster).
-          const heroTargets = result.filter(t => t.type === 'hero' || t.type === 'creature');
+          const heroTargets = result.filter(t => t.type === 'hero' || t.type === 'creature'
+            || (t.type === 'equip' && t.cardInstance && engine._istKreaturenInstanz(t.cardInstance)));   // Z3 (R02-01)
           if (heroTargets.length > 0) {
             const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance, { damageType: config.damageType });
             if (surpriseResult?.effectNegated) {
@@ -28120,6 +28134,18 @@ this._deathWatch = (this._deathWatchStack || []).length
         const inst = t?.cardInstance || t?._cardInstance;
         if (inst?.counters?.untargetable_all) t.ineligible = true;
       }
+      // ★ Z3 (A06-05): die zwei uebrigen Kreatur-Schutzarten, die `promptDamageTarget`/`promptMultiTarget`
+      // schon kennen, gelten auch fuer selbstgebaute Listen: „cannot be chosen by your opponent"
+      // (Censpartan, Golden Wings: `untargetable_by_opponent` + `_pi` = der geschuetzte Gegner) und die
+      // Deckung durch Board of Kings (`guardsCreatureChoice`). Nur Kreaturen, nie der eigene Waehler.
+      for (const t of validTargets) {
+        if (!t || t.ineligible || t.type !== 'equip') continue;
+        const inst = t.cardInstance || t._cardInstance;
+        if (!inst || !this._istKreaturenInstanz(inst)) continue;
+        if (inst.counters?.untargetable_by_opponent
+            && inst.counters.untargetable_by_opponent_pi === playerIdx) t.ineligible = true;
+        else if (this._boardGuardsCreatureChoice(inst, playerIdx)) t.ineligible = true;
+      }
     }
     // ★ KARTEN-VERTRAG `blocksTargeting` AM FLASCHENHALS (v919, Als
     //   Befund 12.9. an Stealth vs Overheal Shock) ────────────────────
@@ -28391,8 +28417,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   • Rekursionssperre: die Reaktionen selbst zielen ueber denselben
     //     Dispatcher (Escape Device laesst waehlen, welcher Held
     //     entkommt) — ohne den Riegel riefe sich das Fenster selbst auf.
+    // ★ Z3 (A06-33): ~190 Skripte rufen den Dispatcher OHNE `sourceCard`. Dann gilt – nur fuer die
+    //   Fenster, nicht fuer die Zielliste – die echte Quelle `_redirectSource` (ctx.promptTarget) bzw. die
+    //   gerade wirkende Karte (`_umgebungsQuelle`). Die Picker, die ihre Fenster selbst oeffnen
+    //   (`_callerHandlesSurprise`), bekommen keinen Ersatz (sonst doppelte Fenster). Keine eigene
+    //   Gegner-Beschraenkung (Al: steht im Text der Reaktionskarte „opponent's", gilt der Gegner-Lock –
+    //   den prueft die Karte selbst, z. B. Castling/Cloak `sourceOwner === pi`; sonst reagiert sie auch auf
+    //   eigene Effekte).
+    const _ausdruecklich = config.sourceCard || config.source || null;
+    const _umgebung = (!_ausdruecklich && !config._redirectSource && !config._callerHandlesSurprise)
+      ? this._umgebungsQuelle(playerIdx, config) : null;
+    const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
-      const quelle = config.sourceCard || config.source || null;
+      const quelle = _ausdruecklich || _ersatzQuelle || null;
       const ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const helden = (validTargets || []).filter(t => t?.type === 'hero' && ids.has(t.id));
       // ★ v1368 (Dream Dust): gewaehlte KREATUREN gehen mit — aber nur an
@@ -28401,6 +28438,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       const kreaturen = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && ids.has(t.id)
         && this._istKreaturenInstanz?.(t.cardInstance));
       if (quelle && (helden.length > 0 || kreaturen.length > 0)) {
+        // Z3: Merker fuer `preDamageMultiTargetWindow` – ein Skript, das dasselbe Fenster danach selbst
+        // oeffnet (Guardian Beast Hou), soll es nicht ein zweites Mal ausloesen.
+        if (_ersatzQuelle) this._zielFensterGeoeffnet = { ref: this._currentEffectSource || this._activationSource || null, ids: new Set(helden.concat(kreaturen).map(t => `${t.type === 'hero' ? 'hero' : 'creature'}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`)) };
         this._inPostTargetWindow = true;
         try {
           const pt = await this._checkPostTargetHandReactions(helden.concat(kreaturen), quelle, {
@@ -28482,8 +28522,31 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
     //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
     return await this.applyRedirectWindows(
-      _pickedIds, validTargets, config, this._redirectSourceFor(playerIdx, config)
+      _pickedIds, validTargets, config,
+      this._redirectSourceFor(playerIdx, config) || _umgebung
     );
+  }
+
+  /**
+   * ★ Z3 (A06-33) — Quelle fuer Zielwahlen OHNE `config.sourceCard`: die Karte, die gerade wirkt
+   * (`_currentEffectSource`: Zauber in `executeCardWithChain`, Hook-Listener, Kreatureneffekt;
+   * sonst `_activationSource`: Helden-/Ability-/Area-/Equip-Effekt). Nur wenn der WAEHLENDE ihr
+   * Kontrolleur ist – Reaktionen und Entscheidungen des Gegners im selben Fenster bleiben aussen vor.
+   * Liefert die echte Instanz, wenn die Quelle eine kennt (`instId`), sonst ein Ersatzobjekt wie das
+   * des Surprise-Fensters darunter.
+   */
+  _umgebungsQuelle(playerIdx, config = {}) {
+    const cur = this._currentEffectSource || null;
+    const act = this._activationSource || null;
+    let name = null, owner = null, heroIdx = -1, instId = null;
+    if (cur?.cardName) { name = cur.cardName; owner = cur.owner; heroIdx = cur.heroIdx ?? -1; instId = cur.instId ?? null; }
+    else if (act?.cardName && (act.turn == null || act.turn === this.gs?.turn)) { name = act.cardName; owner = act.owner; }
+    if (!name || !isSeat(this, owner) || owner !== playerIdx) return null;
+    if (instId != null) {
+      const inst = this.cardInstances.find(c => c.id === instId);
+      if (inst && inst.name === name) return inst;
+    }
+    return { name, owner, controller: owner, heroIdx: heroIdx >= 0 ? heroIdx : (config.chooserHeroIdx ?? -1), zone: 'hand' };
   }
 
   /**
@@ -35088,7 +35151,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `surpriseFiresOnSupportCreature: true` ausdruecklich anbieten
       // alle Bestands-Surprises bleiben reine Helden-Fenster. Das
       // Skript sieht die gewaehlte Kreatur als `sourceInfo.chosenCreature`.
-      const viaCreature = target.type === 'creature';
+      // Z3 (R02-01): die Zielwahl-Eingaenge liefern gewaehlte Kreaturen als `type: 'equip'` (mit Instanz) –
+      // sie zaehlen wie `'creature'` (nur `surpriseFiresOnSupportCreature`-Skripte reagieren darauf).
+      const viaCreature = target.type === 'creature'
+        || (target.type === 'equip' && !!target.cardInstance && this._istKreaturenInstanz(target.cardInstance));
       if (target.type !== 'hero' && !viaCreature) continue;
       const tOwner = target.owner;
       const tHeroIdx = target.heroIdx;
@@ -35739,6 +35805,15 @@ this._deathWatch = (this._deathWatchStack || []).length
         cardName: t.cardName,
       };
     });
+    // ★ Z3: hat der Zielwahl-Dispatcher dieses Fenster fuer genau diese Ziele und diese wirkende Karte schon
+    // geoeffnet (Umgebungsquelle, A06-33), nicht noch einmal fragen.
+    const _gz = this._zielFensterGeoeffnet;
+    if (_gz) {
+      this._zielFensterGeoeffnet = null;
+      const ref = this._currentEffectSource || this._activationSource || null;
+      if (ref && _gz.ref === ref
+          && normalized.every(t => _gz.ids.has(`${t.type}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`))) return;
+    }
     const ptResult = await this._checkPostTargetHandReactions(normalized, source, {});
     // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
     // actionAoeHit (which set `_spellNegatedByEffect` and return an
@@ -37631,7 +37706,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieser Merker schliesst die Luecke; Vorgaenger gesichert, damit
     // verschachtelte Aufloesungen sich nicht ueberschreiben.
     const prevEffectSource = this._currentEffectSource;
-    this._currentEffectSource = { cardName, owner, cardType };
+    this._currentEffectSource = { cardName, owner, cardType, heroIdx: heroIdx ?? -1 };   // Z3: heroIdx fuer `_umgebungsQuelle`
     this._inReactionCheck = true;
     try {
       const eventDesc = `${cardName} was activated`;

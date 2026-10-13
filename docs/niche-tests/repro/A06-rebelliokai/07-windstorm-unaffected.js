@@ -24,7 +24,7 @@ const H = require('../../lib/h.js');
   t.putArea(0, 'Board of Kings');
   t.put(1, 0, 0, 'Rook of Kings [W]'); t.put(1, 0, 1, 'Pawn of Kings [W]');
   t.script.push({ match: d => d.type === 'optionPicker', answer: () => ({ optionId: 'top' }) });
-  t.targetFn = (valid) => [valid.find(v => v.cardName === 'Rook of Kings [W]').id];
+  t.targetFn = (valid) => { const x = valid.find(v => v.cardName === 'Rook of Kings [W]'); return x ? [x.id] : null; };   // Z3: ist der Rook (richtig) nicht waehlbar, bricht die Wahl ab statt im Repro zu werfen
   const r = await t.play(0, 'Tengu Windstorm', { hero: 0 });
   R.check('Tengu Windstorm ausgeführt', r === true, r);
   R.check('gedeckter Rook bleibt auf dem Brett (unaffected)', t.zone(1, 0, 0) === 'Rook of Kings [W]', { slot: t.zone(1, 0, 0), deck1Top: t.pile(1, 'mainDeck')[0] });
