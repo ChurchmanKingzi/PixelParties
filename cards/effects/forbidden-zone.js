@@ -121,10 +121,12 @@ module.exports = {
       }
       // „…and all associated effects": wo der Schaden vollständig verpufft (Spectral Armor,
       // Anti Magic …), entfällt auch der Zusatz — erkannt am unveränderten HP-Stand.
+      // Nie getroffene Kreaturen haben noch kein `currentHp` — Rueckfall auf die gedruckten HP (S02-09)
+      const kreaturHp = (inst) => inst.counters?.currentHp ?? (engine.getEffectiveCardData(inst) || cardDB[inst.name])?.hp ?? 0;
       const hpVorher = new Map();
       for (const z of ziele) {
         if (z.type === 'hero') hpVorher.set(`h${z.owner}-${z.heroIdx}`, gs.players[z.owner]?.heroes?.[z.heroIdx]?.hp);
-        else hpVorher.set(`c${z.inst.id}`, z.inst.counters?.currentHp ?? 0);
+        else hpVorher.set(`c${z.inst.id}`, kreaturHp(z.inst));
       }
       const res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
         damage: DAMAGE, damageType: 'decay_spell', sourceName: CARD_NAME,
@@ -140,7 +142,7 @@ module.exports = {
               });
             } else {
               const stillOn = engine.cardInstances.find(c => c.id === z.inst.id);
-              const hpJetzt = stillOn?.counters?.currentHp ?? 0;
+              const hpJetzt = stillOn ? kreaturHp(stillOn) : 0;
               if (!stillOn || stillOn.zone !== 'support' || hpJetzt <= 0) continue;
               if (!(hpJetzt < hpVorher.get(`c${z.inst.id}`))) continue;           // Schaden verpufft
               if (!engine.canApplyCreatureStatus(stillOn, 'negated')) continue;

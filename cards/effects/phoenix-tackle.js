@@ -14,6 +14,8 @@
 //    Lv 3+ → 300
 // ═══════════════════════════════════════════
 
+const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -88,37 +90,56 @@ module.exports = {
       }
       await engine._delay(200);
 
-      // Deal damage to target
-      if (target.type === 'hero') {
-        const tgtHero = ctx.players[tgtOwner].heroes?.[tgtHeroIdx];
-        if (tgtHero && tgtHero.hp > 0) {
-          await ctx.dealDamage(tgtHero, damage, 'destruction_spell');
-        }
-      } else if (target.type === 'equip') {
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === tgtOwner && c.zone === 'support' &&
-          c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
-        );
-        if (inst) {
-          await engine.actionDealCreatureDamage(
-            { name: 'Phoenix Tackle', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
-            inst, damage, 'destruction_spell',
-            { sourceOwner: pi, canBeNegated: true }
+      // „If all Heroes both players control are defeated after this Spell resolves, you lose the game."
+      // Spielende-Pruefung bis NACH dem Rueckstoss anhalten (Bauform Last Resort / Bunny Bombs) und den
+      // Verlierer eines Gleichstands benennen: der Wirker (S03-21 / B-08).
+      const gs = engine.gs;
+      gs._deferGameOverCheck = (gs._deferGameOverCheck || 0) + 1;
+      const vorherigerVerlierer = gs._drawLoserIdx;
+      gs._drawLoserIdx = pi;
+      try {
+        // Deal damage to target
+        if (target.type === 'hero') {
+          const tgtHero = ctx.players[tgtOwner].heroes?.[tgtHeroIdx];
+          if (tgtHero && tgtHero.hp > 0) {
+            await ctx.dealDamage(tgtHero, damage, 'destruction_spell');
+          }
+        } else if (target.type === 'equip') {
+          const inst = target.cardInstance || engine.cardInstances.find(c =>
+            c.owner === tgtOwner && c.zone === 'support' &&
+            c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
           );
+          if (inst) {
+            await engine.actionDealCreatureDamage(
+              { name: 'Phoenix Tackle', owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi },   // Als Befund 29.9.: Brettseite des Wirkers
+              inst, damage, 'destruction_spell',
+              { sourceOwner: pi, canBeNegated: true }
+            );
+          }
         }
+
+        engine.sync();
+        await engine._delay(300);
+
+        // Recoil damage to caster
+        if (hero.hp > 0) {
+          engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
+          await engine._delay(200);
+          // `festesZiel`: Rueckstoss trifft immer den Wirker — kein Schutz der Bauart
+          // „solange es andere Ziele gibt" (Submerged, Dive Down, …) greift.
+          await ctx.dealDamage(hero, recoil, 'other', { festesZiel: true });
+          engine.sync();
+        }
+      } finally {
+        gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }
 
-      engine.sync();
-      await engine._delay(300);
-
-      // Recoil damage to caster
-      if (hero.hp > 0) {
-        engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
-        await engine._delay(200);
-        // `festesZiel`: Rueckstoss trifft immer den Wirker — kein Schutz der Bauart
-        // „solange es andere Ziele gibt" (Submerged, Dive Down, …) greift.
-        await ctx.dealDamage(hero, recoil, 'other', { festesZiel: true });
-        engine.sync();
+      // Jetzt EINMAL auswerten, Hinweis noch gesetzt
+      try {
+        await engine.checkAllHeroesDead();
+      } finally {
+        if (isSeat(gs, vorherigerVerlierer)) gs._drawLoserIdx = vorherigerVerlierer;
+        else delete gs._drawLoserIdx;
       }
     },
   },

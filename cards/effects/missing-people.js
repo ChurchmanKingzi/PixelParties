@@ -125,7 +125,7 @@ module.exports = {
 
       // ── Ans Deckende — ins Deck des BESITZERS ─────────────────────
       const besitzer = inst.owner;                 // „their deck"
-      const seite = inst.controller ?? inst.owner;  // wo die Karte liegt
+      const seite = engine.physicalSide(inst);      // wo die Karte liegt: Brettseite (eine gestohlene Kreatur bleibt in der Zone des Besitzers, S03-04)
       const bPs = gs.players[besitzer];
       const sPs = gs.players[seite];
 

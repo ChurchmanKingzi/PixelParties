@@ -35,6 +35,8 @@
 //    Aktionskosten, genau das meint „as an additional Action".
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+
 const CARD_NAME = 'Aurora Borealis';
 const SCHULE = 'Magic Arts';
 
@@ -163,6 +165,9 @@ module.exports = {
       const wirkbar = geholt.filter(n => {
         const cd = engine._getCardDB()[n];
         if (!cd) return false;
+        // „Only 1 per game" (Divine Gift …): der Sofort-Guss prueft das nicht selbst (S01-11)
+        const sc = loadCardEffect(n);
+        if ((sc?.oncePerGame || sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(sc.oncePerGameKey || n)) return false;
         try { return engine.heroMeetsLevelReq(pi, heroIdx, cd); } catch { return false; }
       });
       if (wirkbar.length === 0) return;
@@ -191,7 +196,7 @@ module.exports = {
       });
       if (!pick || pick.cancelled || !pick.cardName) return;   // „you may" — nichts passiert
       const gewirkt = pick.cardName;
-      if (!geholt.includes(gewirkt)) return;
+      if (!wirkbar.includes(gewirkt)) return;   // nur ein angebotener (wirkbarer) Zauber
 
       // Die anderen zwei loeschen …
       for (const name of geholt) {

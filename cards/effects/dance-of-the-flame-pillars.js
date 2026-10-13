@@ -115,7 +115,7 @@ module.exports = {
         await ctx.aoeHit({
           damage: FULL_BOARD_DAMAGE,
           damageType: 'destruction_spell',
-          side: 'any',
+          side: 'both',   // `aoeTargetPlayers` kennt 'own'/'both'/'enemy' — 'any' fiel auf die Gegnerseite zurueck (S01-05)
           types: ['hero', 'creature'],
           animationType: 'flame_pillars',
           sourceName: CARD_NAME,

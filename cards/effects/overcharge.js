@@ -274,7 +274,7 @@ module.exports = {
         engine.sync();
 
         // ── 3b) Neue Ausruestung aus dem Deck in denselben Platz ───
-        if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
+        if (!(await engine.takeFromPile(ps, 'deck', neuName, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht; per NAME, nicht per Index — Ablege-Ausloeser (Rain Viola) koennen das Deck davor umbauen (S03-18)
         engine._broadcastEvent('play_card_transfer', {
           cardName: neuName,
           sourceOwner: pi, sourceZoneKind: 'deck', sourceHeroIdx: heroIdx, sourceZoneSlot: -1,

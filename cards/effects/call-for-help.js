@@ -60,6 +60,9 @@ module.exports = {
         if (!cd || !hasCardType(cd, 'Spell') || name === CARD_NAME) return false;
         if ((cd.subtype || 'Normal').toLowerCase() !== 'normal') return false;
         if ((cd.level || 0) > MAX_LEVEL) return false;
+        // „Only 1 per game" (Divine Gift …): der Sofort-Guss prueft das nicht selbst (S01-11)
+        const sc = loadCardEffect(name);
+        if ((sc?.oncePerGame || sc?.oncePerGameKey) && ps._oncePerGameUsed?.has(sc.oncePerGameKey || name)) return false;
         return gs.hoptUsed?.[usedKey(pi, name)] !== gs.turn;
       };
       const cards = [];
