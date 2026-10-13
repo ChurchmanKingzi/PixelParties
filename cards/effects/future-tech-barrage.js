@@ -54,6 +54,9 @@ const BOLT_ABSTAND_MS = 90;
 const TREFFER_ABSTAND_MS = 420;
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('future-tech-barrage', pi); },
+
   requiresTarget: true,
   // ^ Blinded-Gate (siehe `_hooks.js`).
 
@@ -71,7 +74,9 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
-      if (!engine.claimHOPT('future-tech-barrage', pi)) {
+      // ★ Z7 (A03-21): Rundensperre erst NACH der Zusage stempeln (Muster Iterative Testing) — ein
+      // Abbruch der Zielwahl darf den Zug nicht verbrennen (Regel 23.9). Vorab nur prüfen.
+      if (gs.hoptUsed?.[`future-tech-barrage:${pi}`] === gs.turn) {
         gs._spellCancelled = true;
         return;
       }
@@ -87,6 +92,7 @@ module.exports = {
       if (treffer === 0) {
         // Kein Abbruch! Der Zauber ist gespielt, verpufft und landet in
         // der Ablage — genau dort wird er gebraucht.
+        engine.claimHOPT('future-tech-barrage', pi);
         engine.sync();
         return;
       }
@@ -106,6 +112,7 @@ module.exports = {
         cancellable: true,
       });
       if (!ziel) { gs._spellCancelled = true; engine.sync(); return; }
+      engine.claimHOPT('future-tech-barrage', pi);   // ★ Z7: Zusage steht
 
       for (let i = 0; i < treffer; i++) {
         // Ziel schon tot? Dann verpuffen die restlichen Treffer.

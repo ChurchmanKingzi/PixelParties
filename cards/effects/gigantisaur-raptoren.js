@@ -20,6 +20,8 @@ const {
   countGigantisaursInSupport,
 } = require('./_gigantisaurs-shared');
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Gigantisaur Raptoren';
 
 /**
@@ -295,7 +297,9 @@ module.exports = {
     if (!ps) return false;
     if (ps.handLocked) return false;
     // Effect is meaningless when there are no Gigantisaurs to count.
-    return countGigantisaursInSupport(ctx.cardOwner, engine) > 0;
+    const n = countGigantisaursInSupport(ctx.cardOwner, engine);
+    // ★ Z7 (A07-19): Zug von genau 2/3 unter Tuscan Artist ist negiert → gesperrt (Ruling 16.8.).
+    return n > 0 && !drawWouldBeBlocked(engine, ctx.cardOwner, n);
   },
 
   async onCreatureEffect(ctx) {

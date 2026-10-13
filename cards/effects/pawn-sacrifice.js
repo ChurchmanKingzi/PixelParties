@@ -43,6 +43,9 @@ function prognoseFree(engine, pi) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('pawn-sacrifice', pi); },
+
   activeIn: ['hand'],
 
   // CPU: auch als NORMALE Aktion in der Action Phase spielbar, wenn die Prognose „frei"

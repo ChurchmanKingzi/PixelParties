@@ -10,6 +10,10 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  // (-1 = für die Partie verbraucht, wie im `resolve`)
+  onNegatedPlay: ({ gs, pi }) => { if (!gs.hoptUsed) gs.hoptUsed = {}; gs.hoptUsed[`resuscitation-potion:${pi}`] = -1; },
+
   isPotion: true,
   // `reviveCard`: Ohne besiegten eigenen Helden ist die Karte als
   // Suchziel/Handkarte wertlos — _cpu.js (reviveCardSituation) deckelt

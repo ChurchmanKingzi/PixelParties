@@ -10,6 +10,9 @@
 const { baseCardName } = require('./_hooks');
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('alchemic-journal', pi); },
+
   isTargetingArtifact: true,
   deferBroadcast: true,
   // Both modes (draw + search) move a Potion from deck to hand —

@@ -16,6 +16,9 @@ const CARD_NAME = 'Laser Volley';
 const VOLLEY_DAMAGE = 200;
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(`spell-played:${CARD_NAME}`, pi); },
+
   // Once-per-turn-by-name gate. The play is rejected upstream by
   // doPlaySpell when this returns false; the same `gs.hoptUsed` map
   // every other HOPT keys into.

@@ -16,6 +16,9 @@ const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
 const CARD_NAME = 'Magic Amber';
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(CARD_NAME, pi); },
+
   // CPU: alwaysCommit — Sofort-Handdisruption (Gegner discardet) — der Immediate-Score gewichtet Gegner-Handverlust nicht, das Gate lehnte 100% ab.
   // planArtifactPlay filtert Bezahlbarkeit bereits; entspricht der
   // dokumentierten Artifact-Politik "played as soon as affordable".

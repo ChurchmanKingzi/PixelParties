@@ -33,6 +33,9 @@ const CARD_NAME = 'Debt-O-Tron Damage Fees';
 const HOPT_KEY = 'debt-o-tron-damage-fees';
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   /**
    * Kreditrahmen NUR fuer diese Karte. `true` heisst der Engine
    * gegenueber „unbegrenzt" — der Kartentext nennt keine Grenze und

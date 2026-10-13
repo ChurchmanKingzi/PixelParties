@@ -40,6 +40,7 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Candlestick Squire';
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
 const HOPT_DRAW_CAP = 4;
 const ANIM_HOLD_MS  = 500;
 
@@ -293,13 +294,18 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
-    return countBurnedTargets(ctx._engine) > 0;
+    // ★ Z7 (C01-15): Ruling 16.8. (`_draw-block-shared.js`) — ist das Ziehen der einzige Nutzen und
+    // Tuscan Artist negiert es (genau 2 oder 3 Karten), ist der Effekt gesperrt und verbraucht
+    // sein Once-per-turn nicht.
+    const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(ctx._engine));
+    return n > 0 && !drawWouldBeBlocked(ctx._engine, ctx.cardOwner, n);
   },
 
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(engine));
     if (n <= 0) return false;
+    if (drawWouldBeBlocked(engine, ctx.cardOwner, n)) return false;   // ★ Z7: negiertes Ziehen stempelt nicht
     await ctx.drawCards(ctx.cardOwner, n);
     engine.log('candlestick_squire_draw', {
       player: engine.gs.players[ctx.cardOwner]?.username,

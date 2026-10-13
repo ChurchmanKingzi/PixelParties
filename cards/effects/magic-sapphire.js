@@ -36,6 +36,9 @@ function _buildSpellGallery(gs, pi, cardDB) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(CARD_NAME, pi); },
+
   activeIn: ['hand'],
 
   canActivate(gs, pi) {

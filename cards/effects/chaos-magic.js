@@ -157,6 +157,15 @@ module.exports = {
             cardName: found, zone: 'hand', heroIdx,
             _skipReactionCheck: true,
           });
+          // ★ Z7 (S01-14): Chaos Magic IST jetzt der gefundene Zauber — „Einmal pro Spiel" (Divine Gift …)
+          // wird verbraucht, wie bei jedem Sofort-Guss (`_castSpellImmediately`).
+          {
+            const _fs = loadCardEffect(found);
+            if (_fs?.oncePerGame || _fs?.oncePerGameKey) {
+              if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+              ps._oncePerGameUsed.add(_fs.oncePerGameKey || found);
+            }
+          }
 
           const uniqueTargets = [];
           const seenIds = new Set();

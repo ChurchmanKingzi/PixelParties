@@ -30,6 +30,9 @@ function maxTargets(engine, pi) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { gs.players[pi]._whiteArmyUsedTurn = gs.turn; },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.
 

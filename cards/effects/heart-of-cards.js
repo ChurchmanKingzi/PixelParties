@@ -40,6 +40,9 @@ function schonGespielt(gs, pi) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
+
   canActivate(gs, pi, engine) {
     if (gs.activePlayer !== pi) return false;   // nur in der eigenen Runde
     if (schonGespielt(gs, pi)) return false;

@@ -59,6 +59,9 @@ function magicArts(gs, pi, heroIdx, engine) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('iterative-testing', pi); },
+
   // Ohne Handkarte mit Deck-Kopie bewirkt der Zauber nichts.
   spellPlayCondition(gs, pi) {
     return brauchbareHandkarten(gs, pi).length > 0;

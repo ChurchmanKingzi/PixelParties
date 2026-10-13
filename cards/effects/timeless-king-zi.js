@@ -51,6 +51,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, baseCardName } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Timeless King Zi';
 const PICK_COUNT = 3;
@@ -333,11 +334,17 @@ module.exports = {
     // indizierte eigene Held); der Guss laeuft ueber ihn (`heroOwner`).
     const feld = ctx.cardHeroOwner ?? pi;
     const hero = ctx.attachedHero ?? gs.players[feld]?.heroes?.[heroIdx];
+    // ★ Z7 (H04-17): „if possible" — ein bereits verbrauchtes „Einmal pro Spiel" (Divine Gift …)
+    // lässt sich nicht noch einmal wirken; ein gewirktes stempelt (der Weg hier umgeht server.js).
+    const _opgSk = loadCardEffect(oppChoice);
+    const _opgKey = (_opgSk?.oncePerGame || _opgSk?.oncePerGameKey) ? (_opgSk.oncePerGameKey || oppChoice) : null;
     const canPerform = hero?.name && hero.hp > 0
-      && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated;
+      && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated
+      && !(_opgKey && ps._oncePerGameUsed?.has(_opgKey));
 
     if (canPerform) {
       engine.log('timeless_king_zi_perform', { player: ps.username, spell: oppChoice });
+      if (_opgKey) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
       // Direct runHooks('onPlay') sub-cast bypasses validateActionPlay,
       // so the Spell's level / spell-school requirements are ignored —
       // exactly "regardless of its level". Mirrors Chaos Magic /

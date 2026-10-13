@@ -26,6 +26,15 @@ function stampSelf(ctx) {
   }
 }
 
+function stampSpellUsed(ctx) {
+  if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
+  if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+  // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
+  if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
+  const hero = ctx.attachedHero;
+  if (hero) hero._idejKogarasuSpellTurn = ctx._engine.gs.turn;
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -62,13 +71,10 @@ module.exports = {
 
     // Record that the equipped Hero has cast a Spell this turn so
     // canPlayCard blocks the next one.
-    afterSpellResolved: (ctx) => {
-      if (!ctx.spellCardData || ctx.spellCardData.cardType !== 'Spell') return;
-      if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
-      // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
-      if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      const hero = ctx.attachedHero;
-      if (hero) hero._idejKogarasuSpellTurn = ctx._engine.gs.turn;
-    },
+    afterSpellResolved: (ctx) => stampSpellUsed(ctx),
+    // ★ Z7 (A09-17): ein NEGIERTER Zauber ist trotzdem „benutzt" — der Träger bekam
+    // sonst durch die Negation einen Zusatzzauber. Die Engine ruft den Hook aus
+    // `_noteNegatedPlay`, weil `afterSpellResolved` bei Negation nie feuert.
+    afterSpellNegatedPlay: (ctx) => stampSpellUsed(ctx),
   },
 };

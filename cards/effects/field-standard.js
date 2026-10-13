@@ -142,6 +142,9 @@ function _isEligible(engine, inst, pi) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { _stampHopt(gs, pi); },
+
   /**
    * Suppress the default `potion_resolved` explosion that
    * `doConfirmPotion` would otherwise fire on each picked Creature.
