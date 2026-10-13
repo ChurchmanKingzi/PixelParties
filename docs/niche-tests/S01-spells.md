@@ -255,6 +255,24 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** `doSacrifice` läuft erst in `hooks.onPlay`, das ein negierter Zauber nie erreicht.
 - **Frage an Al:** Soll das Opfer von Divine Gift of Sacrifice als Kosten auch bei Negierung gezahlt sein (ja = Opfer beim Ausspielen / nein = erst bei Auflösung, wie jetzt)?
 
+### S01-27 · Such-Sperre („cannot search …") greift nicht bei Deck-Suchen, die auf das Brett führen · Stufe C
+- **Karten:** Create Illusion (`create-illusion.js`), Create Secret Room (`create-secret-room.js`), Divine Gift of the Deepsea (`divine-gift-of-the-deepsea.js`, Ersatzkreatur aus dem Deck); Sperre `ps.searchLocked` (Cats of the Pharaoh), Loader-Marke `blockedBySearchLock` (`_engine.js` `_cardBlockedBySearchLock` ~Z. 10766).
+- **Voraussetzungen / Aufbau:** `ps.searchLocked = true`; Sitz 0 spielt je eine der drei Karten mit passendem Deck.
+- **Schritte:** 1. Karte spielen; im Angebot eine Deckkarte wählen.
+- **Erwartet** (Kartentext Cats of the Pharaoh: „you cannot **search** or add cards to your hand for the rest of the turn"; CARD_API.md ~Z. 15805: `searchLocked` sperrt „Deck-Suche und Adds"): Lesart A – jedes Suchen im Deck ist gesperrt, auch wenn die Karte aufs Brett statt auf die Hand geht. Lesart B – gesperrt ist nur Suchen-und-auf-die-Hand.
+- **Beobachtet:** Lesart B. Alle drei laufen durch (Deck −1, Kreatur auf dem Brett bzw. Karte in der Surprise Zone); Kontrolle: Brainstorming (Deck → Hand) wird abgelehnt ✓, ebenso sind Aurora Borealis, Brilliant Idea, Divine Gift of Creation und Cleansing of the Land markiert. Die drei Karten tragen kein `blockedBySearchLock`, ihre Deckentnahmen laufen über `deckEntnahme`/`takeFromPile`, nicht über `_isSearchBlocked`.
+- **Repro:** `docs/niche-tests/repro/S01-spells/27-such-sperre-deck-zu-brett.js` (✗ = Lesart A wird nicht erfüllt)
+- **Frage an Al:** Soll „cannot search" auch Deck-Suchen sperren, die auf das Brett führen (Create Illusion, Create Secret Room, Divine Gift of the Deepsea; ggf. Call for Help) (ja / nein, nur Hand-Suchen)?
+
+### S01-28 · Aurora Borealis ist unter der Hand-Sperre spielbar und verpufft · Stufe B
+- **Karten:** Aurora Borealis (`cards/effects/aurora-borealis.js`; Marke nur `blockedBySearchLock`). Kontrolle: Brilliant Idea und Divine Gift of Creation tragen zusätzlich `blockedByHandLock`.
+- **Voraussetzungen / Aufbau:** Sitz 0 mit `ps.handLocked = true` (sperrt Draws UND Suchen/Adds, CARD_API ~Z. 15805-15820), Aurora Borealis auf der Hand, Spells im Deck.
+- **Schritte:** 1. Aurora Borealis spielen, in der Galerie einen Zauber wählen.
+- **Erwartet** (Kartentext: „…reveal them and add them to your hand"; Vorbild: Brilliant Idea bleibt unter `handLocked` auf der Hand): Die Karte ist nicht spielbar, nichts wird verbraucht.
+- **Beobachtet:** Der Server spielt sie, die Galerie öffnet sich, aber `takeFromPile(… toHand)` schlägt still fehl: Aurora liegt in der Ablage, nichts wurde geholt, Deck unverändert, die Aktion ist weg. Ebenso verbraucht Cleansing of the Land unter `handLocked` die Karte mit nur halber Wirkung (Areas weg, kein Area geholt – hier ist der erste Teil legitim, keine Fehlermeldung nötig). Brainstorming ist unter `handLocked` korrekt, weil sein Skript bei fehlgeschlagener Suche abbricht (Karte zurück).
+- **Repro:** `docs/niche-tests/repro/S01-spells/28-aurora-borealis-hand-sperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Es fehlt `blockedByHandLock: true` in `aurora-borealis.js` (bzw. die Auto-Erkennung des Laders markiert nur `blockedBySearchLock`; vgl. B-Querschnitt „Sperren-Auto-Erkennung"); alternativ ein Abbruch (`gs._spellCancelled`), wenn alle Hinzufügungen scheitern, wie bei Brainstorming.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

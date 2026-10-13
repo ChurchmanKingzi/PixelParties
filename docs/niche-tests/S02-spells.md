@@ -85,6 +85,32 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/09-forbidden-zone-unversehrte-kreatur.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `forbidden-zone.js` Z. 127 `hpVorher.set(…, counters?.currentHp ?? 0)` und Z. 143 `hpJetzt = counters?.currentHp ?? 0`: für nie getroffene Kreaturen ist „vorher" 0 und „nachher" 150 ⇒ `!(hpJetzt < hpVorher)` ⇒ „Schaden verpufft" ⇒ keine Negierung. Richtig wäre ein Rückfall auf die gedruckten HP (wie `_engine.js:45522`).
 
+### S02-10 · Hymn of Rebirth: Zielwahl nicht abbrechbar (Regel 23.9) – abgebrochen wird die Einmal-Karte in die Ablage verbrannt · Stufe B
+- **Karten:** Hymn of Rebirth (`hymn-of-rebirth.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Hymn of Rebirth]; Held 1 von Sitz 0 besiegt; Held 0 mit Magic Arts 3 + Singing 1 (Stufe 4 − 1). Zielwahl wird per `targetFn` mit `null` (Abbruch-Knopf) beantwortet.
+- **Erwartet** (Ruling CARD_API.md Z. 367–390 „Zielende Karten sind immer abbrechbar … Jede Zielwahl hat einen Cancel-Button … Ausnahme: Pflichtwahl, die der Kartentext erzwingt – dann steht der Grund als Kommentar daneben"; „Abbruch heißt: nichts ist passiert. Die Karte bleibt auf der Hand"): Zielwahl `cancellable: true`; nach Abbruch liegt die Karte auf der Hand, Held bleibt tot, kein Once-Stempel.
+- **Beobachtet:** Die Zielwahl wird mit `cancellable: false` angeboten (kein Begründungskommentar im Skript); kommt trotzdem eine Abbruch-Antwort an, geht die Karte in die Ablage (Hand leer, Ablage [Hymn of Rebirth]), der Held bleibt tot. Ein Mensch hat ohne Cancel-Knopf keinen Rückweg: wer die Stufe-4-Einmal-Karte ausspielt, muss einen Helden wiederbeleben. (Once-Stempel wird bei Nicht-Wirkung nicht gesetzt ✓; Stufenstaffel Singing 0–3, volle Max-HP beim Wiederbeleben, Gegnerhelden als Ziel, zweite Kopie gesperrt ✓.)
+- **Repro:** `docs/niche-tests/repro/S02-spells/10-hymn-of-rebirth-zielwahl-nicht-abbrechbar.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `hymn-of-rebirth.js` Z. 66–71: `promptEffectTarget(… cancellable: false …)` und `if (!chosen || chosen.length === 0) return;` ohne `gs._spellCancelled = true` (Regel: „wer `promptEffectTarget` roh benutzt, setzt es von Hand – auf JEDEM Abbruchweg").
+
+### S02-11 · Hand of Death: der verzögerte Effekt verfällt, wenn die Karte vor Zugende aus der Ablage geholt wird · Stufe C
+- **Karten:** Hand of Death (`hand-of-death.js`); Auslöser der Lage: Magic Sapphire (auch Meditation, Klaus' Mom für Decay Magic).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Hand of Death, Magic Sapphire]; Hand of Death spielen (liegt in der Ablage, `ps._handOfDeathArmed` gesetzt), dann Magic Sapphire spielen und Hand of Death aus der Ablage zurück auf die Hand holen; zwei Zugwechsel (Ende des Gegnerzugs 6).
+- **Erwartet** (Kartentext „… at the end of your opponent's next turn, you may choose any target and defeat it."): der Zauber hat einen Effekt für das Ende des nächsten Gegnerzugs gestartet; wörtlich feuert er auch dann.
+- **Beobachtet:** Kein Zielprompt, Gegnerheld bleibt bei 800 HP; `_handOfDeathArmed` bleibt als Leiche stehen. (Gegenprobe: bleibt die Karte in der Ablage, besiegt der Zauber am Ende des Gegnerzugs den Gegnerheld 0 ✓ und überspringt den nächsten eigenen Zug ✓; gefrorener Nutzer ⇒ Fizzle ohne Zugsperre ✓; zweite Kopie im selben Zug gesperrt ✓.)
+- **Repro:** `docs/niche-tests/repro/S02-spells/11-hand-of-death-karte-aus-ablage-geholt.js` (✗ = Effekt feuert nicht)
+- **Vermutete Ursache:** `hand-of-death.js` Z. 143 `if (ctx.card.zone !== 'discard') return;` – der Auslöser ist der Zugende-Listener einer Instanz IN DER ABLAGE (Kopfkommentar: „ANY Hand of Death instance … in either player's discard pile fires"); ohne Karte dort gibt es keinen Listener.
+- **Frage an Al:** Soll der Todeshand-Effekt auch kommen, wenn die Karte zwischenzeitlich aus der Ablage genommen wurde (Magic Sapphire/Meditation), oder verfällt er (wie jetzt)? (kommt trotzdem / verfällt)
+
+### S02-12 · Guard Change bietet gestohlene Kreaturen an, kann sie aber nicht bewegen (stille Fehlzüge, Abfrage wiederholt sich bis zu 64-mal) · Stufe B
+- **Karten:** Guard Change (`guard-change.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Guard Change]; eine Kreatur von Sitz 1 per `actionStealCreature(0, …)` von Sitz 0 gestohlen (controller 0, owner 1 – sie bleibt physisch in der Zone von Sitz 1). Mensch-Pfad (`engine.isCpuPlayer = () => false`; mit der Harness-Standardeinstellung „beide Sitze CPU" nimmt das Skript den CPU-Kurzweg, der denselben Fehlzug macht und die Karte zurückgibt).
+- **Schritte:** 1. Guard Change spielen. 2. In der `guardChangeMove`-Abfrage die gestohlene Kreatur mit dem angebotenen Ziel wählen.
+- **Erwartet** (Kartentext „Choose any number of Creatures you control … place them into free Support Zones of other Heroes you control"; Konvention „Kontrolle statt Seite"): entweder wird die gestohlene Kreatur nicht angeboten oder sie lässt sich bewegen.
+- **Beobachtet:** Sie wird mit 6 Zielzonen angeboten; der Zug scheitert still, die Abfrage öffnet sich erneut (hier 64 Abfragen bis zur Schleifenbremse), Position unverändert; am Ende „guard_change_fizzle", Karte bleibt auf der Hand. Die Karte ist mit nur einer gestohlenen Kreatur auf dem Brett als spielbar markiert (`spellPlayCondition` zählt sie mit).
+- **Repro:** `docs/niche-tests/repro/S02-spells/12-guard-change-gestohlene-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `guard-change.js` Z. 52–61 wählt Kreaturen nach `controller ?? owner`, `moveCreature` (Z. 105–109) und `swapCreatures` arbeiten aber in `players[Kontrolleur].supportZones` – dort liegt die gestohlene Kreatur nicht (`sArr.indexOf(inst.name) < 0` ⇒ `false`), und der Aufrufer wertet das nicht als Fehler.
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

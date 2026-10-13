@@ -116,6 +116,16 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Vermutete Ursache:** `_engine.js:35515-35540` (`_applyEmpoweredStrikeIfApplicable`) prüft nur `hookCtx.type === 'attack'` und die Quelle, nicht die Zielzahl der Attack; der Kommentar (Z. 35528-35531) nennt das ausdrücklich „first match gets the boost" für Mehrfachtreffer. Ein Ruling dazu steht nicht in `CARD_API.md`.
 - **Frage an Al:** Soll der Elixir nur bei Attacks mit genau einem Ziel feuern (Text, Buff bleibt sonst) oder am ersten Treffer jeder Attack (wie jetzt)?
 
+### M01-13 · Hammer Throw (Item Lock): ein Normal-Artefakt kann sich selbst als „Item Lock Cost" löschen · Stufe B
+- **Karten:** Hammer Throw (`cards/effects/hammer-throw.js`, setzt `ps.itemLocked`); betroffen ist der Server-Weg `doUseArtifactEffect` (alle Normal-Artefakte: Treasure Chest, Cloud Pillow getestet), vermutlich auch `doConfirmPotion`/Artifact (`server.js:11323`).
+- **Voraussetzungen / Aufbau:** Seed 1234; Sitz 1 `itemLocked` (Folge eines Hammer Throws, direkt gesetzt), Hand [Treasure Chest, ZZ Filler, ZZ Filler], 100 Gold. Die „Item Lock Cost"-Abfrage wird mit der Artefaktkarte selbst beantwortet.
+- **Schritte:** 1. Treasure Chest spielen (`doUseArtifactEffect`). 2. Auf die Abfrage „You must delete 1 card from your hand to use an Artifact." die Chest selbst wählen.
+- **Erwartet** (Kartentext „The target's controller must delete a card from their hand whenever they play an Artifact during their next turn."; Muster im Ausrüstungs-Zweig, `server.js:7811-7823`: „… koennte der Spieler ausgerechnet sie selbst loeschen" ⇒ `eligibleIndicesWithoutResolving`): die gerade gespielte Karte ist nicht wählbar; die Sperre kostet eine zusätzliche Karte (Hand danach 1, Chest in der Ablage, +10 Gold).
+- **Beobachtet:** Die Abfrage hat `eligibleIndices === undefined`, die Chest liegt dabei noch in der Hand (`beginHandResolve`), und die Antwort „Chest" wird angenommen: Chest geht in den **Gelöscht-Stapel** (statt Ablage), die Hand verliert nur 1 Karte, die 10 Gold werden trotzdem gutgeschrieben. Der Item Lock kostet in diesem Fall nichts. Der CPU-Pilot schließt die Karte defensiv aus (`_cpu.js` ~Z. 8463, Kommentar: „Scripts should still pass eligibleIndices explicitly for correctness against the human player too"), ein Mensch nicht. Der Ausrüstungs-Zweig ist unauffällig (Karte ist bei der Abfrage schon aus der Hand).
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/13-hammer-throw-itemlock-kosten-mit-eigenem-artefakt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `server.js:12226-12232` (`doUseArtifactEffect`) und `server.js:11323-11329` rufen `actionPromptForceDiscard` ohne `eligibleIndices`; der Zweig bei `server.js:7815` (Ausrüstung) tut es mit `eligibleIndicesWithoutResolving(ps)`.
+- **Hinweis:** Ob der Client die in Auflösung befindliche Karte als wählbar anzeigt, habe ich nicht geprüft (headless); der Server nimmt sie an.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

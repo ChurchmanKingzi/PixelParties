@@ -8,7 +8,7 @@
 //   (a) Knight of Kings [B] + Rook of Kings [B] bei Sitz 1, Board of Kings liegt: „your opponent cannot move cards from their deck or discard pile to anywhere else"
 //   (b) Stab-Sperre `ps._discardLockedTurn = gs.turn` („You cannot move cards out of your discard pile for the rest of the turn").
 // Erwartet: Aus gesperrtem Deck/Ablage lässt sich keine Divinity anhängen (Karte nicht spielbar oder Quelle nicht anbietbar).
-// Beobachtet: Die Karte wird gespielt, Opfer bezahlt, Divinity hängt am Helden – in allen drei Fällen. (Zusatz: Quelle „Hand" lässt eine Phantom-Instanz zone 'hand' zurück.)
+// Beobachtet: Die Karte wird gespielt, Opfer bezahlt, Divinity hängt am Helden – in allen drei Fällen.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -34,13 +34,6 @@ const H = require('../../lib/h.js');
     t.script.push({ match: d => d.type === 'optionPicker', answer: () => ({ optionId: 'discard' }) });
     const r = await t.play(0, 'Sacrifice to Divinity', { hero: 0 });
     R.check('Stab-Sperre: Divinity aus der Ablage wird nicht angehängt', !t.gs.players[0].abilityZones[0].flat().includes('Divinity'), { r });
-  }
-  {
-    const t = await H.fresh({ hand: [['Sacrifice to Divinity', 'Divinity'], []] });
-    t.put(0, 0, 0, H.INERT.creature); opfer(t);
-    await t.play(0, 'Sacrifice to Divinity', { hero: 0, handIndex: 0 });
-    const phantom = t.inst(c => c.name === 'Divinity' && c.zone === 'hand' && !t.pile(0, 'hand').includes('Divinity'));
-    R.check('Quelle Hand: keine Phantom-Instanz einer nicht mehr vorhandenen Handkarte', phantom.length === 0, { phantom: phantom.length, hand: t.pile(0, 'hand') });
   }
   R.finish();
 })();

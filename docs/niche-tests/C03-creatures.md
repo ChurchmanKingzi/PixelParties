@@ -50,6 +50,39 @@ Stand/Autor: Agent C03-creatures, 12.10.2026. Karten: 21 in der Liste · (wird a
 - **Repro:** `docs/niche-tests/repro/C03-creatures/05-golden-exploding-skull-zaehlt-unversehrte-kreaturen-nicht.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `golden-exploding-skull.js` `zieleAufnehmen()`: `const hp = inst.counters?.currentHp; if (!Number.isFinite(hp)) continue;` – `counters.currentHp` ist bei einer Kreatur ohne bisherigen Treffer nicht gesetzt (die Engine initialisiert es erst beim ersten Schaden, `_engine.js` ~46382; sonst gilt `currentHp ?? baseHp`, vgl. Z. 10142/45522). Unversehrte Kreaturen fallen aus der Zählliste, nur bereits beschädigte werden gezählt.
 
+### C03-06 · Grave Worm: ein zweiter Grave Worm auf dem Brett verliert seine Instanz, wenn der Ablage-Wurm wiederbelebt wird · Stufe A
+- **Karten:** Grave Worm (`cards/effects/grave-worm.js`).
+- **Voraussetzungen / Aufbau:** Sitz 0: Grave Worm in der Ablage, ein zweiter Grave Worm auf dem Brett (Held 1 / Slot 0), eine eigene Kreatur (Held 0 / Slot 1) stirbt (`actionDestroyCard`); Rückfrage „Crawl out!" mit Ja. Seed 1234.
+- **Erwartet** (Text „you may summon this Creature into the same Support Zone from your discard pile"): Der Ablage-Wurm kommt in den Platz der gestorbenen Kreatur; der Brett-Wurm bleibt unberührt (Zone ↔ Instanz konsistent).
+- **Beobachtet:** Der Ablage-Wurm wird korrekt eingesetzt, aber der Brett-Wurm verliert seine Instanz: `audit`: „seat0.support[1][0] \"Grave Worm\": 0 Instanzen". Der Name bleibt als unzerstörbarer Platzhalter im Platz (wird als Ziel angeboten, Schaden wirkt nicht). Liegt der zweite Wurm stattdessen auf der Hand, verliert auch er seine Instanz (Folge dort harmlos: Spielen aus der Hand legt eine neue Instanz an, `audit` sauber).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/06-grave-worm-zweiter-wurm-verliert-instanz.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `grave-worm.js` Z. 259–260: `const listenerId = ctx.card?.id; … engine._untrackCard(listenerId);` – `activeIn` enthält neben der Ablage auch Brett/Hand; die Instanz, die den Haken zuerst ausführt, räumt sich ab. Das ist bei zwei Würmern nicht zwingend der Ablage-Wurm.
+
+### C03-07 · Grave Worm: „sent to the discard pile" wird nur am Namen in der eigenen Ablage erkannt · Stufe B
+- **Karten:** Grave Worm (`cards/effects/grave-worm.js`); Gegenkarten Hell Fox, Lovely Teddy/jede geliehene Kreatur.
+- **Voraussetzungen / Aufbau:** Fall A: Ablage Sitz 0 = Grave Worm + Hell Fox, Hell Fox steht auf dem Brett und wird zerstört. Fall B: Ablage Sitz 0 = Grave Worm + ZZ Dummy Frail; Sitz 0 stiehlt eine ZZ Dummy Frail von Sitz 1 (`actionStealCreature`), diese wird zerstört.
+- **Erwartet** (Text „is defeated and sent to the discard pile while this Creature is in your discard pile"): Kreatur wurde gelöscht (Hell Fox: „delete it") bzw. ging in die Ablage des Besitzers (Gegner) ⇒ keine Rückfrage des Wurms.
+- **Beobachtet:** Fall A: Hell Fox landet im Gelöscht-Stapel, der Wurm fragt trotzdem „Hell Fox just hit your discard pile" und wird in den Platz gesetzt (der alte Hell Fox in der Ablage genügt). Fall B: der Wurm fragt ebenfalls und setzt sich in Held/Slot-Nummer der Gegnerseite auf die EIGENE Seite (Held 2 / Slot 2 von Sitz 0).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/07-grave-worm-ablage-nur-am-namen-erkannt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `grave-worm.js` Z. 182: `if (!(ps.discardPile || []).includes(death.name)) return;` prüft nur, ob IRGENDEIN Exemplar des Namens in der Ablage liegt, nicht ob DIESE Karte dort ankam; zusätzlich `dyingController`-Prüfung (Kontrolleur) gegen Ablage des Besitzers.
+
+### C03-08 · Golden Vermin: „1 Karte statt Gold" wird auch bei Zieh-/Handsperre angeboten – Gold UND Karte gehen verloren · Stufe B
+- **Karten:** Golden Vermin (`cards/effects/golden-vermin.js`); Sperren: `ps.drawLocked` (The Sacred Jewel), `ps.handLocked`.
+- **Voraussetzungen / Aufbau:** Sitz 0: Golden Vermin; Zieh- bzw. Handsperre gesetzt; Sitz 0 gewinnt per Effekt 10 Gold (`actionGainGold`); Rückfrage mit Ja. Deck 30. Seed 1234.
+- **Erwartet** (Text „you may draw 1 card instead"; Vorbild-Ruling in `golden-ladybug.js`: „Leerlauf – eine Option, die nichts bewirken kann, entfällt (Zieh-/Handsperre …)"): Tausch wird nicht angeboten (Gold +10) oder die Karte kommt wirklich.
+- **Beobachtet:** Rückfrage „Draw 1 card instead of gaining 10 Gold? (1/5 uses this turn)" erscheint; mit Ja entfällt das Gold, das Ziehen wird von der Sperre verschluckt: Gold ±0, Hand ±0 (und der Verbrauch 1/5 ist gebucht). (Bei leerem Deck verliert der Spieler mit Ja per Deck-out – das ist seine Entscheidung, aber auch dort wird es nicht gewarnt.)
+- **Repro:** `docs/niche-tests/repro/C03-creatures/08-golden-vermin-zieh-sperre-gold-weg.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `golden-vermin.js` `onResourceGain`: vor dem Angebot keine Prüfung auf `drawLocked`/`handLocked`/leeres Deck (so wie `kannZiehen()` in `golden-ladybug.js`); `ctx.cancel()` läuft vor dem Zug.
+
+### C03-09 · Golden Vermin fängt das automatische Rundeneinkommen (4 Gold) ab, obwohl der Text „through an effect" sagt · Stufe B
+- **Karten:** Golden Vermin (`cards/effects/golden-vermin.js`).
+- **Voraussetzungen / Aufbau:** Sitz 0: Golden Vermin; zwei `t.endTurn()` bis zum Zugbeginn von Sitz 0; Rückfrage mit Ja.
+- **Erwartet** (Text „when you would gain Gold through an effect"; Ruling Als 8.8. in `_engine.js` `actionGainGold`: „through an effect schließt das Rundeneinkommen (`_isResourceGain`) ausdrücklich aus" – Monkees, Humby, Royal Treasury, Golden Ladybug prüfen das): keine Vermin-Rückfrage beim Einkommen, 4 Gold kommen an.
+- **Beobachtet:** Rückfrage „Draw 1 card instead of gaining 4 Gold? (1/5 uses this turn)" zu Beginn jedes eigenen Zuges (mit Ja: Karte statt 4 Gold Einkommen; Gold ±0).
+- **Repro:** `docs/niche-tests/repro/C03-creatures/09-golden-vermin-faengt-rundeneinkommen.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `golden-vermin.js` `onResourceGain` prüft `ctx._isResourceGain` nicht (vgl. `wealth.js:32`, `royal-treasury.js:71`).
+- **Frage an Al:** Soll Golden Vermin das automatische Rundeneinkommen ersetzen dürfen (ja = jetziges Verhalten) oder nur Effekt-Gold wie die Monkees (nein)?
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

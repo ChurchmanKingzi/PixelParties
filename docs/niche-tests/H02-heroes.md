@@ -163,6 +163,14 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/H02-heroes/18-crestina-token-im-angebot.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `fairy-queen-crestina-the-creation-fairy.js:~85-92`: Pool-Filter nur `loadCardEffect(name)`, kein `Token`-Ausschluss (Vorbild Garius' Galerie, `garius-the-great-reformer.js:122`).
 
+### H02-heroes-19 · Shapeshifter nach dem Abfallen: Ida-Deckel, Fiedel-Rabatt und Friedhelm-Aktionsgrenze bleiben (Erweiterung von H01-02/-14) · Stufe A
+- **Karten:** ???, the Shapeshifter (`the-shapeshifter.js`); verursachend: Ida (`ida-the-adept-of-destruction.js`), Fiedel (`fiedel-the-mercenary-mage.js`), Friedhelm (`friedhelm-the-misled-avenger.js`) – H01-14 nennt diese drei als „nicht gemessen"
+- **Voraussetzungen / Aufbau:** Shapeshifter auf Held 0 (`onGameStart` gefeuert), Gestalt aus der Hand per echtem Heldeneffekt, `t.endTurn()` ×2 (Gestalt fällt am Ende des Gegnerzuges ab; Held heißt wieder Shapeshifter). Kontrolle: nie verwandelter Shapeshifter.
+- **Schritte / Erwartet** (Kartentext Shapeshifter, Skript-Ruling ② „nach dem Abfallen gilt wieder nur der eigene Effekt"): (a) Ida: Explosion trifft alle 3 Gegnerhelden; (b) Fiedel: Reaction Spectral Armor (Lv 1) ohne Schule nicht spielbar; (c) Friedhelm: mit einer Zusatzaktion (`ps.bonusActions`) darf der Held ein zweites Mal handeln.
+- **Beobachtet:** (a) 1 Treffer statt 3 (`gs.heroFlags['0-0'] = {forcesSingleTarget: true}` bleibt); (b) Spectral Armor wird gespielt (150 → 75; `hero.levelOverrideCards` mit allen Reaction-Zaubern −1 bleibt); (c) zweite Aktion abgelehnt (`hero._maxActionsPerTurn = 1` bleibt). Alle Kontrollen grün. Weitere Reste dieser Klasse bei meinen Helden **nicht** gefunden: ein Zustands-Diff des Heldenobjekts, der `gs.heroFlags` und der Spielerflags vor/nach (alle 37 Gestalten) zeigt außer diesen drei nur harmlose Marken (`ghuanjunAttacksUsed`, `_ghazmaZugende`, `_lastTurnEndTick` bei Heragas) und die Karian-Immunitäten (= H01-14). (Hel: ein in Hel verwandelter Shapeshifter wird am Zugende besiegt, weil er „sein" Artefakt nicht hat – laut Text zulässig, kein Befund.)
+- **Repro:** `docs/niche-tests/repro/H02-heroes/19-shapeshifter-reste-ida-fiedel-friedhelm.js` (✗ = Fehler tritt auf; 3 ✗)
+- **Vermutete Ursache:** wie H01-14: `initGainedHeroEffect` führt die Anfangsroutine der Gestalt aus, `loseHeroEffect` → `onIdentityLost` fehlt bei Ida (`heroFlags` geschlüsselt nach Seite/Slot), Fiedel (`levelOverrideCards` am Heldenobjekt) und Friedhelm (`_maxActionsPerTurn`).
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

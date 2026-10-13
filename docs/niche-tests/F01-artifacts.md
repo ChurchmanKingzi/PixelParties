@@ -1,8 +1,12 @@
 # F01-artifacts – Nischenfall-Bericht
-Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezielt getestet (wird fortlaufend ergänzt) · 0 mit Befund.
+Stand/Autor: Agent F01-artifacts (Fortsetzung nach Abbruch des Vorgängers), 13.10.2026. Karten: 50 in der Liste · 48 gezielt getestet (L2), 1 Standardlauf (L1), 1 gelesen (L0) · 29 Karten mit eigenem Befund · 26 Befunde (A: 5, B: 15, C: 6).
 
 ## Zusammenfassung
-(wird am Ende ergänzt)
+26 Befunde, alle mit ausgeführtem Repro (`repro/F01-artifacts/01…26-*.js`, alle Exit 1): **A 5 · B 15 · C 6**. Die fünf A-Befunde: Cool Repair umgeht alle Ausrüstregeln (-01), Birthday Present lässt bei negierter Gabe 3 Karten verschwinden (-02), Bamboo Shield ist nach dem ersten Angebot für den Rest der Partie tot (-03), Flying Island legt Token beim Abbau in die Ablage (-16) und der Bow of the Hunt Goddess hat keinerlei Wirkung (-17).
+Zwei Klassen ziehen sich durch die Gruppe: (1) **„Kontrolle statt Seite" bei Kreaturen und Helden** – `getCreatureTargets(pi)` und Heldenschleifen über `gs.players[pi].heroes` bedienen die Brettspalte statt des Kontrolleurs (Cloud Pillow, Beer, Dark Gear, Explosivo's Sword -07; Deepsea Idol -10; Coffee, Angry Cheese -11; Blood-Soaked Coin -09); (2) **Sperren, Zug-Limits und Trigger-Fenster, die nur in `resolve`/Teilpfaden hängen**: Artefakt-Sperre ignoriert von Bamboo Shield/Boots (-13), Jetpack gegen Flächenzauber (-26), Einmal-pro-Zug nach Negierung nicht verbraucht (-19), Item-Lock-Kosten bei Abbruch (-24), Hand-Sperre bei Capture Net (-21), The Thing in the Ship gegen Cloak (-22), Diver Helmet gegen Seventh Circle/Dark Ocean (-18).
+Gesamteindruck: Die Equipment-/Statuskerne (Cloak, Club, Glass Sword, Crusader's, Grimoire, Cheat Chair, Giga Steroids, Difficulty Lever, Cloud Pillow-Zahlen, Beer-Kosten) halten Nischenfälle sehr gut; Auffälligkeiten entstehen fast nur an den Rändern (Kontrolle, Sperren, Negierung, Mehrfachkopien).
+**Bewusst nicht getestet:** Mehrspieler-/Skill-Test-Modus (3–8 Sitze; `Burned Contract` verdrahtet nur Sitz 0/1, außerhalb des Auftrags), Client-/Animationsverträge (README Familie 11), CPU-Entscheidungen, Gigalopolis (kein Skript), die Zählung „poisoned: alter + neuer Stack" bei Coffee (Regelfrage, nicht bewertet), Rioting Village/Tearing Mountain/Tree of Golden Apples/Gloomy Village gegen den Diver Helmet (im Harness per `putArea` nicht auslösbar, nur Zugwechsel-Differenzprobe), Strom von Mehrfach-Surprises gegen Boots of Hermes.
+Hinweis an die Auswertung: -16 (Token → Ablage) ist die zweite Spielart der schon in M01-08/H04 beschriebenen Token-Klasse (hier eigener Codepfad in `removeIslandZones`); -19 folgt der Präzedenz A01-pollution-04/-14.
 
 ## Befunde
 
@@ -228,8 +232,90 @@ Stand/Autor: Agent F01-artifacts, 13.10.2026. Karten: 50 in der Liste · 0 gezie
 - **Vermutete Ursache:** `server.js` `doUseArtifactEffect` Z. ~12226 verlangt die Item-Lock-Löschung vor Kette und `resolve`; der Abbruchzweig bucht nur Gold zurück. (Bei zielenden Artefakten läuft die Löschung in `doConfirmPotion` Z. 11323 nach der Zielwahl.)
 - **Frage an Al:** Soll ein abgebrochenes Artefakt-Spielen die Item-Lock-Löschung zurücknehmen bzw. gar nicht erst verlangen (wie bei zielenden Artefakten) – ja oder nein (heute: die Karte ist verloren)?
 
+### F01-25 · Glass of Marbles zieht 2, wenn es als Handlimit-Abwurf am Zugende abgelegt wird · Stufe C
+- **Karten:** Glass of Marbles (`cards/effects/glass-of-marbles.js`); Auslöser Engine `_engine.js` Z. 16944 (Handlimit-Abwurf)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 beendet den Zug mit 9 Handkarten (Glass of Marbles + 8 Füller); die Handlimit-Abfrage (max. 7) wird mit Glass of Marbles beantwortet.
+- **Schritte:** `t.endTurn()`.
+- **Erwartet** (Kartentext: „When this card is discarded or deleted from your hand **by an effect**, draw 2 cards."): der Handlimit-Abwurf ist wörtlich eine Spielregel, kein Karteneffekt – kein Ziehen.
+- **Beobachtet:** Der Abwurf zählt als „von der Hand durch Effekt" (`_fromHand: true`); Glass of Marbles zieht 2 (Log `glass_of_marbles`), danach müssen wegen der gezogenen Karten weitere abgeworfen werden (4 Abfragen). Das Skript selbst unterscheidet Regel und Effekt nicht („set by the engine on all effect-forced discards from hand").
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/25-glass-of-marbles-handlimit-abwurf.js`
+- **Vermutete Ursache:** `_engine.js` Z. 16944 ruft `ON_DISCARD`/`ON_DELETE` mit `_fromHand: true` für den regulären Handlimit-Abwurf; das Kartenskript kann ihn nicht von Effekt-Abwürfen trennen.
+- **Frage an Al:** Soll das Handlimit am Zugende Glass of Marbles auslösen (heute: ja, 2 Karten ziehen), oder zählt nur ein Karteneffekt als „by an effect" – eins von beiden?
+
+### F01-26 · Cool Tech Jetpack wird gegen einen Flächenzauber angeboten und negiert ihn für alle Ziele · Stufe B
+- **Karten:** Cool Tech Jetpack (`cards/effects/cool-tech-jetpack.js` Z. 36–45), Gegenprobe Anti-Magnetic Armor
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Sitz 0 trägt das Jetpack an Held 0, hat eine Kreatur und 2 Handkarten; Sitz 1 wirkt Flame Avalanche („Deal 150 damage to all targets your opponent controls").
+- **Schritte:** Flame Avalanche spielen, Jetpack-Angebot bejahen.
+- **Erwartet** (Kartentext: „…when the equipped Hero is **chosen** by a card or effect…"; Ruling CARD_API.md Z. 16680: „Ein Flächenschlag WÄHLT niemanden: „is chosen by / targeted by"-Surprises … öffnen dabei nie"; Anti-Magnetic Armor, „is chosen by an opponent's card or effect", verhält sich so): kein Angebot, alle Ziele nehmen 150.
+- **Beobachtet:** Das Jetpack wird angeboten; nach dem Abwurf einer Karte ist der GANZE Flächenzauber negiert (Held 0, Held 1, Held 2 und die Kreatur: 0 Schaden). Die Armor bietet nichts an (✓).
+- **Repro:** `docs/niche-tests/repro/F01-artifacts/26-cool-tech-jetpack-flaechenzauber.js`
+- **Vermutete Ursache:** `cool-tech-jetpack.js` `postTargetCondition` zählt jede Quelle, die den Träger unter `targetedHeroes` führt; die Engine-Schleife für ausgerüstete Reaktionen (`_engine.js` Z. ~36130 ff.) wertet `sourceCard._isAoeCheck` nicht aus (die Surprise-Schleife tut es, Z. 35090).
+
 ## Abdeckung
-(wird am Ende ergänzt)
+| Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
+|---|---|---|
+| Alchemic Journal | L2 gezielt | Ziehen/Suchen (ab 13 Gold), Namenssperre für Tränke ✓, 2. Journal im Zug gesperrt ✓, leeres Potion Deck ✓, `potionLocked` ✓, Hand-Sperre ✓ (unspielbar) |
+| Ancient Tech Infinite Energy Core | L2 gezielt | Bonus folgt Boomerang/Mill/Cool Repair/Abgang ✓, nach Tod/Wiederbelebung Basis-ATK ✓; direkter Ablage→Hand-Zug ohne Aktion bleibt bis zum nächsten Hook veraltet (nur Notiz) |
+| Angry Cheese | L2 gezielt | Held mit 100 HP stirbt am Preis, Suche trotzdem ✓, Abbruch ✓, eigenes Bamboo Shield ✓, Hand-Sperre ✓; Heldenliste nach Spalte ✗(→ -11) |
+| Anti-Magnet | L2 gezielt | Gold 1 ✓, Kreatur als Ziel ✓, nicht proaktiv ✓; ohne eigene weitere Ziele spielbar (→ -08, C) |
+| Anti-Magnetic Armor | L2 gezielt | 1×/Zug ✓, Träger gefroren/betäubt/negiert ✓, Kreatur als Ersatzziel ✓, ohne Ersatzziel nicht angeboten ✓ |
+| Arcane Lamp | L2 gezielt | Kontrolle statt Seite ✓; Held mit „immune" kein Ziel ✗(→ -20) |
+| Bamboo Shield | L2 gezielt | Merker bleibt stehen ✗(→ -03), Artefakt-Sperre ✗(→ -13), Reveal-Kosten 8 ✓, zwei Kopien/Zug ✓, Fireball auf 2 Helden ✓ |
+| Bamboo Staff | L2 gezielt | 1×/Zug ✓, Träger gefroren/betäubt/negiert (schlägt weiter zu), tot ✓ (kein Schlag), Abbruch ✓, Gegner-Rückholung löst nicht aus ✓, Basis-ATK 0 ✓ |
+| Beer | L2 gezielt | Kosten × Ziele ✓, Gold-Deckel ✓, Status-Auswahl/teilweise Heilung ✓, Abbruch ✓; Kreaturenziele nach Spalte ✗(→ -07) |
+| Birthday Present | L2 gezielt | Negierte Gabe ✗(→ -02), zu kleines Deck ✓, Hand-Sperre ✓; Handzugang ohne Hooks (→ -06 b) |
+| Blade of the Frostbringer | L2 gezielt | Held ✓ (Immunität), Kreatur ✗(→ -04), bereits gefrorenes Ziel ✓ |
+| Blade of the Swamp Witch | L2 gezielt | Gift auf Held/Kreatur ✓; Gift trotz durch Bamboo Shield negiertem Schaden (Text „hit by an Attack", als Lesart notiert) |
+| Blood-Soaked Coin | L2 gezielt | 300 Schaden/Gold ✓, Tod → 0 Gold ✓, 2. Münze + andere Artefakte gesperrt ✓, Bamboo Shield ✓, goldLocked ✓; dauerhaft übernommene Ziele (→ -09, C) |
+| Book of Doom | L2 gezielt | Kosten × Ziele, Gold-Deckel ✓; Einmal-pro-Zug nach Negierung ✗(→ -19) |
+| Boomerang | L2 gezielt | Galerie nur Artefakte (Token nicht) ✓, Sperre für den Zug ✓, Abbruch ohne Sperre ✓; Item-Lock-Kosten bei Abbruch (→ -24, C) |
+| Boots of Hermes | L2 gezielt | Negation + Ziehen ✓, nicht proaktiv ✓; Artefakt-Sperre ✗(→ -13) |
+| Bow of the Hunt Goddess | L2 gezielt | Effekt fehlt ganz ✗(→ -17) |
+| Burned Contract | L2 gezielt | Ziele beider Seiten ✓, Abbruch ✓; Einmal-pro-Zug nach Negierung ✗(→ -19); Token → Ablage (Engine, bereits M01-08) |
+| Capture Net | L2 gezielt | Kosten Stufe × 4 ✓, Token nicht wählbar ✓, gestohlene Kreatur ✓; Hand-Sperre ✗(→ -21), Einmal-pro-Zug nach Negierung ✗(→ -19) |
+| Charm of Balance | L2 gezielt | Zähler (Schaden/Status/Gift/gefrorener Träger) ✓, Zieh-Aktivierung 1×/Zug ✓, > 7 Karten ✓ (Ziehen, Suche, Ablage); gespielte Karte zählt mit / Handzugang ohne Hook ✗(→ -06) |
+| Cheat Chair | L2 gezielt | letzter Held ✓, Flächenschaden tötet alle 3 ✓, Selbstschaden löst nicht aus ✓, nach dem 3. eigenen Zug nicht mehr ✓ (Zug 7), Schutz „Schaden 0" bis Zugende ✓ |
+| Cloak of Edge | L2 gezielt | +20 permanent ✓ (bleibt nach Abgang), HOPT je Instanz ✓, gefroren/betäubt gesperrt ✓, Tod/Wiederbelebung ✓; The Thing in the Ship ✗(→ -22) |
+| Cloud Pillow | L2 gezielt | Halbierung gerundet nach oben (Held/Kreatur, alle Schadensarten) ✓, Dauer bis Zugbeginn ✓, nicht stapelbar am Helden ✓; Kreaturenziele nach Spalte ✗(→ -07) |
+| Club of Gobbo | L2 gezielt | Schaden = ATK trotz Bamboo Shield/Cloudy (Held und Kreatur) ✓, Tod/Wiederbelebung ✓ |
+| Coffee | L2 gezielt | Nur alte Status ✓, Zusatzaktion bei betäubtem Helden angeboten (Notiz), Status-Dialog ✓; Heldenliste nach Spalte ✗(→ -11); „alter + neuer Gift-Stack" nicht bewertet |
+| Communication Device | L2 gezielt | Quelle lebendig ✓, Quelle tot ✓ (kein Zugriff), Quelle ohne Gerät ✓; Quelle gefroren/negiert liefert weiter (Auslegung laut Skriptkopf) |
+| Cool Cheese | L2 gezielt | Namenssperre ✓, Wiederfreigabe im nächsten Zug ✓, Hand-/Such-Sperre ✓; Doppelkosten-Angebot ✗(→ -05) |
+| Cool Repair | L2 gezielt | Ausrüstregeln ✗(→ -01), halbe Kosten (aufgerundet) ✓ für Jetpack/Insel/Core/Charm/Bucket/Device, Jetpack bleibt über Cool Repair ✓ |
+| Cool Tech Jetpack | L2 gezielt | Negation gegen Zielwahl ✓ (Karte abwerfen), HOPT nach Erfolg ✓, Jetpack über Cool Repair bleibt ✓; Angebot nach Ablehnen erneut (→ -12, C), Flächenzauber wird angeboten/negiert ✗(→ -26) |
+| Crusader's Arm-Cannon | L2 gezielt | Ziel mit 3 Fähigkeiten Stufe 1 → alle abgeworfen ✓, Zugende-Kreislauf ✓; Ausrüstregeln via Cool Repair ✗(→ -01) |
+| Crusader's Cutlass | L2 gezielt | Held besiegt → alle Kreaturen des Gegners besiegt, nach Kontrolle (stehend bei mir/ihm) ✓ |
+| Crusader's Flintlock | L2 gezielt | Schaden an Held → alle Artefakte des Helden abgeworfen ✓; Bamboo Shield (Schaden 0) → nichts ✓ |
+| Crusader's Hookshot | L2 gezielt | Negation 1 Zug (bis Ende des Gegnerzugs) ✓, Zugende-Kreislauf aus Deck/Hand mit Galerie ✓ |
+| Cute Camera | L1 Standard | Gold-Staffel 3/4/6/7/10 ✓ (Aufpreis nur ab 7), respektiert Artefakt-Sperre ✓ |
+| Cute Cheese | L2 gezielt | 1 pro Zug ✓, Hand-Sperre ✓; nach Negierung zweite Kopie wirkt ✗(→ -19) |
+| Cute Wings | L0 gelesen | rein passive Markierung (`_cute-shared.js`), keine Nische gemessen |
+| Dark Gear | L2 gezielt | Zweites Dark Gear gesperrt ✓, Tod → Ablage des Besitzers ✓, Zonenwahl bei heldenlosen Spalten (Skriptauslegung), Zurückholen einer gestohlenen Kreatur unmöglich ✗(→ -07) |
+| Deepsea Idol | L2 gezielt | Gold 3 ✓, 1 Kreatur + 1 Held ✓, Artefakt-Sperre ✓; Zählung nach Seite statt Kontrolle ✗(→ -10) |
+| Difficulty Lever | L2 gezielt | Galerie/Held/Ziel ✓, einzige Aktion ✓, Schule vorhanden / toter Held mit Schule ✓ (nicht anbietbar), Once-per-game nach Erfolg ✓ |
+| Diver Helmet | L2 gezielt | Differenzmessreihe über 44 Areas: bis auf Seventh Circle und Dark Ocean unauffällig ✗(→ -18) |
+| Earth-Shattering Hammer, Relic of Deri | L2 gezielt | Auswahl in den Zonen des getroffenen Helden ✓, Abbruch ✓, Ziel stirbt am Angriff ✓; Token → Ablage (Engine, M01-08-Klasse) |
+| Excavator Bucket | L2 gezielt | Area in der Ablage des Besitzers ✓, unbenutzt am Zugende abgeworfen ✓, ohne Area nicht aktivierbar ✓, zwei Eimer ✓, gefrorener Träger ✓ |
+| Explosivo's Sword | L2 gezielt | Splash ✓ (nur 1×/Zug), Kreaturentod ✓; Splash nach Spalte ✗(→ -07), gegnerischer Träger ✗(→ -23) |
+| Field Standard | L2 gezielt | HOPT vor dem Kauf ✓, 100 Schaden gesamt (2. Einsatz) ✓, 3. Einsatz gesperrt ✓, Kreatur auf totem Helden ✓ |
+| Flying Island in the Sky | L2 gezielt | Zusatz-Zonen ✓, zwei Inseln an einem Helden ✓, gestohlene Kreatur → Ablage des Besitzers ✓; Todes-Hooks/Phantom-Held ✗(→ -15), Token ✗(→ -16) |
+| Forbidden Grimoire of a Forgotten Sorceress | L2 gezielt | Stufe 0/1/2/3-Helden mit Level-2/3-Zaubern ✓ (Abwurf nur bei Krücke), Zweitkopie via Cool Repair ✗(→ -01) |
+| Giga Steroids | L2 gezielt | zweite Aktion nur als Aktivierung ✓ (Adventurousness), Zauber verboten ✓, dritte Aktion verboten ✓ |
+| Gigantisaur Skull | L2 gezielt | Reaktivform: Effekt negiert + Frost ✓, HOPT; proaktiv spielbar (→ -14, C) |
+| Glass of Marbles | L2 gezielt | Force-Discard ✓ (zieht 2), 2 Kopien → einmal ✓, nicht spielbar ✓; Handlimit-Abwurf löst aus (→ -25, C) |
+| Glass Sword | L2 gezielt | +50 Held/Kreatur ✓, zwei Schwerter ✓ (+100), Angriff eines anderen Helden ✓, eigener Held als Ziel ✓ |
 
 ## Getestet & in Ordnung (Auswahl)
-(wird am Ende ergänzt)
+* **Crusader's-Familie:** Cutlass besiegt auch die vom Gegner kontrollierten Kreaturen in MEINER Spalte (nach Kontrolle), verschont gestohlene; Flintlock wirft alle Artefakte des getroffenen Helden ab, aber nur bei echtem Schaden (Bamboo Shield → nichts); Hookshot-Negation hält bis Ende des Gegnerzugs; Arm-Cannon wirft bei 3 Stufe-1-Fähigkeiten alle ab; der Zugende-Kreislauf zieht ein anderes Crusader's aus Deck oder Hand (Galerie) und mischt das Deck.
+* **Cheat Chair:** letzter Held durch Fireball / Flächenschaden (alle 3 sterben) wiederbelebt; Selbstschaden löst nicht aus; nach dem dritten eigenen Zug (Zug 7) kein Angebot (Spielende); „Schaden 0 bis Zugende" gilt für den zweiten Fireball im Zug.
+* **Forbidden Grimoire:** Level-2-Zauber ohne Schule gewirkt (Grimoire fällt weg), Stufe-3-Zauber bei Schule 1/2 → Grimoire fällt weg, bei Schule 3 bleibt es.
+* **Giga Steroids:** zweite Aktion nur für Aktivierungen; Zauber als 2. und jede 3. Aktion verweigert.
+* **Cloud Pillow:** Halbierung (1→1, 25→13, 51→26, 150→75) für alle Schadensarten bei Held und Kreatur, Ablauf zum Beginn des eigenen nächsten Zugs, bis dahin im Gegnerzug aktiv.
+* **Beer / Book of Doom:** Kosten × Ziele, Gold-Deckel gegen zu viele Ziele, teilweise Heilung (nur gewählte Status), Abbruch ohne Kosten.
+* **Cool Repair:** halbe Kosten (aufgerundet) für Jetpack, Insel, Core, Charm, Bucket, Device; Jetpack bleibt über Cool Repair auf dem Brett.
+* **Reaktions-Artefakte** (Anti-Magnet, Bamboo Shield, Boots, Cheat Chair, Cute Camera, Deepsea Idol) sind nicht proaktiv spielbar; Deepsea Idol und Cute Camera respektieren die Artefakt-Sperre.
+* **Hand-Sperre:** Cute Cheese, Cool Cheese, Boomerang, Angry Cheese, Birthday Present, Alchemic Journal, Glass of Marbles sind darunter unspielbar/wirkungslos (Ausnahme Capture Net → -21).
+* **Item Lock** (Hammer Throw): bei zielenden Artefakten wird die Lösch-Kosten-Frage erst nach der Zielwahl gestellt – Abbruch kostet nichts.
+* **Equip-Matrix** (19 Ausrüstungen × toter / voller / gegnerischer / gefrorener Held): tote, volle und gefrorene Helden werden überall abgelehnt (Karte bleibt auf der Hand, kein Gold); gegnerische nur bei den Karten ohne „Equip this card to a Hero you control" (Club, Helm, Armor, Device) – Ausnahme Explosivo's Sword (→ -23).
+* **Tod des Trägers:** Ausrüstung wandert in die Ablage ihres Besitzers, ATK-Boni werden zurückgenommen (Club, Blade, Hammer, Core), Cloak-Bonus bleibt (permanent).
+
