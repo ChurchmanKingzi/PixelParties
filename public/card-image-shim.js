@@ -87,28 +87,41 @@
     if (/^https?:/i.test(url)) {
       try { const u = new URL(url); if (u.origin !== location.origin) return null; path = u.pathname; } catch (e) { return null; }
     }
-    // Variante `?ohne=hp,atk`: die Karte ohne gedruckte HP bzw. ATK (Brett — dort liegen die Live-Werte darueber).
-    const qm = /(?:^|&)ohne=([a-z,]*)/.exec(url.split('#')[0].split('?').slice(1).join('?'));
+    // Varianten per Query: `?ohne=hp,atk` (Karte ohne gedruckte HP/ATK — Brett, dort liegen die Live-Werte darueber) und
+    // `?lv=2&kost=3` (aktuelle Stufe / Kosten auf die Karte gedruckt — Hand: gruen = verringert, rot = erhoeht).
+    const query = url.split('#')[0].split('?').slice(1).join('?');
+    const qm = /(?:^|&)ohne=([a-z,]*)/.exec(query);
     const ohne = qm ? ['atk', 'hp'].filter(k => qm[1].split(',').includes(k)).join(',') : '';
+    const zahl = name => { const m = new RegExp('(?:^|&)' + name + '=(\\d{1,3})(?:&|$)').exec(query); return m ? parseInt(m[1], 10) : null; };
+    const lv = zahl('lv'), kost = zahl('kost');
     path = path.split(/[?#]/)[0];
     if (!path.startsWith('/cards/') || path.startsWith('/cards/effects/')) return null;
     let rel;
     try { rel = decodeURIComponent(path.slice(7)); } catch (e) { return null; }
     if (!/\.(png|webp|jpe?g)$/i.test(rel)) return null;
     const stem = rel.replace(/\.[a-z]+$/i, '');
-    const sfx = ohne ? '|' + ohne : '';
+    const sfx = variantKey({ ohne, lv, kost });
     if (stem.startsWith('skins/')) {
       const file = stem.replace(/^skins\/(?:unlockable\/)?/, '');
-      return { kind: 'skin', stem: file, ohne, id: 'skin:' + file + sfx };
+      return { kind: 'skin', stem: file, ohne, lv, kost, id: 'skin:' + file + sfx };
     }
     if (stem.includes('/')) return null;
-    return { kind: 'card', stem, ohne, id: 'card:' + stem + sfx };
+    return { kind: 'card', stem, ohne, lv, kost, id: 'card:' + stem + sfx };
   }
-  /** Karten-ID (`card:Stem` / `skin:Stem`, optional `|hp,atk`) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
+  /** Die Variante als Anhang der Karten-ID: `|o=hp,atk|l=2|k=3` (leer ohne Variante). */
+  function variantKey(v) {
+    return (v.ohne ? '|o=' + v.ohne : '') + (v.lv != null ? '|l=' + v.lv : '') + (v.kost != null ? '|k=' + v.kost : '');
+  }
+  /** Karten-ID (`card:Stem` / `skin:Stem`, optional mit Variante) -> wie `parse`; fuer das Vorwaermen aus der gemerkten Liste. */
   function fromId(id) {
-    const i = id.lastIndexOf('|');
-    const ohne = i > 4 ? id.slice(i + 1) : '';
-    return { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: id.slice(5, i > 4 ? i : undefined), ohne, id };
+    const teile = id.split('|');
+    const m = { kind: id.startsWith('skin:') ? 'skin' : 'card', stem: teile[0].slice(5), ohne: '', lv: null, kost: null, id };
+    for (const t of teile.slice(1)) {
+      if (t.startsWith('o=')) m.ohne = t.slice(2);
+      else if (t.startsWith('l=')) m.lv = parseInt(t.slice(2), 10);
+      else if (t.startsWith('k=')) m.kost = parseInt(t.slice(2), 10);
+    }
+    return m;
   }
 
   function resolve(m) {
@@ -151,7 +164,9 @@
       const opts = {};
       if (r.skin) opts.skin = r.skin;
       if (m.ohne) { if (m.ohne.includes('hp')) opts.noHp = true; if (m.ohne.includes('atk')) opts.noAtk = true; }
-      const cv = await CardRender.renderCard(r.card, r.skin || m.ohne ? opts : null);
+      if (m.lv != null) opts.lv = m.lv;
+      if (m.kost != null) opts.kost = m.kost;
+      const cv = await CardRender.renderCard(r.card, Object.keys(opts).length ? opts : null);
       if (!cv) return null;
       const blob = await CardRender.toBlob(cv);
       if (!blob) return null;

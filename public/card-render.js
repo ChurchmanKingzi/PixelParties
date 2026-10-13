@@ -28,6 +28,7 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
+  const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
   const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
@@ -318,8 +319,18 @@
       if (o.align === 'center') x = o.left + (o.width - w) / 2;
       else if (o.align === 'right') x = o.left + o.width - w;
       const y = top + li * pitch + em * ASC / UPM + OPT.dy;
-      let cx = x + OPT.dx;
-      for (const ch of line) { putGlyph(ctx, ch, cx, y, k, sx); cx += adv(ch) * k * sx; }
+      const paint = (ox, oy) => {
+        let cx = x + OPT.dx + ox;
+        for (const ch of line) { putGlyph(ctx, ch, cx, y + oy, k, sx); cx += adv(ch) * k * sx; }
+      };
+      // `outline`: dunkle Kontur um die Zahl (8 Richtungen, 0,7 Schrift-Pixel) — hebt farbige Werte (gruen/rot) auf jedem Rahmen ab
+      if (o.outline && !TEXT_MASK) {
+        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7));
+        ctx.fillStyle = o.outline;
+        for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) paint(ox, oy);
+        ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
+      }
+      paint(0, 0);
     });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -503,8 +514,10 @@
     // 5) Zauberschule (links) und Stufe (rechts) — Zauber und Kreaturen
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
-      if (spec.level != null) drawLine(ctx, String(spec.level), {
-        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle', color: levelColor(spec),
+      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur
+      if (spec.level != null || spec.lvOver != null) drawLine(ctx, String(spec.lvOver != null ? spec.lvOver : spec.level), {
+        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle',
+        color: spec.lvOver != null ? spec.lvColor : levelColor(spec), outline: spec.lvOver != null ? OVER_OUTLINE : null,
       });
     }
     // Kartenart-Symbol unten links (Falle, Reaktion, Flaeche, Anhang)
@@ -531,9 +544,12 @@
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
       const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (!spec.noAtk && (spec.atk != null || isHero3(t) || sup)) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
+      // `costOver`: aktuelle Kosten eines Artifacts (sitzen im Wertefeld der Mitte), gruen/rot mit dunkler Kontur
+      const kostet = isArti2(t) && spec.costOver != null;
+      if (!spec.noAtk && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
-        height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
+        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : stat, ink: heroBox,
+        outline: kostet ? OVER_OUTLINE : null,
       });
     }
 
@@ -675,6 +691,7 @@
    * @param {object} [o]   { skin: Skin-Name } — Skins zeigen dieselbe Karte mit eigener Kunst und eigenem Namen
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
    *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
+   *                       { lv, kost: Zahl } — druckt diese aktuelle Stufe / Kosten (Hand): gruen = verringert, rot = erhoeht
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
   async function renderCard(card, o) {
@@ -691,6 +708,9 @@
     if (o.hp != null) spec.hp = o.hp;
     if (o.noHp) spec.noHp = true;
     if (o.noAtk) spec.noAtk = true;
+    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
+    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
+    if (o.kost != null && card.cost != null && o.kost !== card.cost) { spec.costOver = o.kost; spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED; }
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;

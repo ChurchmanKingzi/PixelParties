@@ -50,11 +50,16 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
 * **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
   Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
   gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
-* **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt (Helden: HP und ATK, Wesen: HP),
-  fordert es das Bild mit `?ohne=hp,atk` bzw. `?ohne=hp` an. `card-image-shim.js` liest die Variante aus der URL,
-  hängt sie an die Cache-ID (`card:Name|atk,hp`) und ruft `renderCard(karte, { noHp, noAtk })` auf — die Karte
-  entsteht ohne die gedruckte Zahl, die Box bleibt leer. Tooltip, Foil und alle Karten ohne Live-Werte (Hand,
-  Ablage, Menüs) nehmen weiter die normale URL und zeigen die gedruckten Werte.
+* **Bild-Varianten per URL:** `BoardCard` fordert das Kartenbild mit einem Query an; `card-image-shim.js` liest ihn,
+  hängt ihn an die Cache-ID (`card:Name|o=atk,hp|l=2|k=3`, auch beim Vorwärmen) und ruft `renderCard` mit den Optionen auf.
+  Tooltip, Foil und alle Karten ohne Variante nehmen die normale URL.
+  * `?ohne=hp,atk` bzw. `?ohne=hp` — **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt
+    (Helden: HP und ATK, Wesen: HP), entsteht die Karte ohne die gedruckte Zahl (`{ noHp, noAtk }`), die Box bleibt leer.
+  * `?lv=2` / `?kost=3` — **Handkarten mit aktueller Stufe und aktuellen Kosten:** Weicht die Stufe (Spells, Wesen) oder
+    der Preis (Artifacts, sitzt im Wertefeld der Mitte) in der Hand vom Druck ab, steht die AKTUELLE Zahl auf der Karte
+    (`{ lv, kost }`): grün, wenn niedriger als gedruckt, rot, wenn höher, jeweils mit dunkler Kontur (`drawLine` `outline`).
+    Der Hover-Tooltip zeigt weiter die gedruckten Werte und erklärt die Abweichung (`handNotes` → „In your hand").
+    Das ersetzt die früheren Abzeichen `.creature-level` / `.hand-cost-override` auf der Handkarte.
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 
