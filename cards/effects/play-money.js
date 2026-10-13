@@ -25,7 +25,7 @@
 //  Display: the client renders an effective-cost
 //  badge on each tagged hand card (see
 //  app-board.jsx — `handEffectiveCost` /
-//  `.hand-cost-override`).
+//  `.hand-cost-override`; seit 13.10. steht der Preis auf der Karte selbst).
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');

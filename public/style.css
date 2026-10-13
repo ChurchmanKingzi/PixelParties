@@ -7661,29 +7661,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 
-/* Per-instance Artifact cost-override badge (Play Money). Top-left of
-   the card, blue-tinted to match the gold-cost diamond used in
-   tooltips. Auto-pointer so the hover-tooltip explains the discount. */
-.hand-cost-override {
-  position: absolute;
-  /* Als Vorgabe 2.10.: rechts auf Hoehe des Level-Abzeichens (`.creature-level`), wo bei anderen Karten das verringerte Level steht */
-  right: 2px;
-  top: 45%;
-  padding: 2px 5px;
-  background: rgba(20, 30, 60, 0.92);
-  border: 1px solid #44aaff;
-  border-radius: 4px;
-  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
-  font-size: calc(10px * var(--board-scale));
-  font-weight: bold;
-  color: #88ddff;
-  text-shadow: 0 0 4px #000, 1px 1px 0 #000;
-  box-shadow: 0 0 6px rgba(68, 170, 255, 0.55);
-  z-index: 5;
-  pointer-events: auto;
-  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
-  line-height: 1;
-}
+/* (Das Kosten-Abzeichen der Handkarten `.hand-cost-override` ist entfallen: die aktuellen Kosten stehen seit 13.10. auf der
+   Karte selbst, s. `CardRender.renderCard` { kost } und `BoardCard` `handCost`.) */
 
 /* Additional Action provider icon */
 .additional-action-icon {
@@ -15937,8 +15916,7 @@ body:has(.textbox-overlay) .tooltip {
    der Highlight-Klon mit (TextBox, `data-tb-hover`). Per `opacity`, nicht
    `visibility`: das Element muss den Zeiger weiter annehmen, sonst
    ginge der Hover sofort wieder verloren und die Karte flackerte. */
-[data-tb-hover],
-[data-tb-hover] + .hand-badge-layer {
+[data-tb-hover] {
   opacity: 0 !important;
 }
 /* Handkarten (Als Befund 26.9.): Umrandung wie beim Hover in der Hand —
@@ -25468,28 +25446,6 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   opacity: .92;
 }
 
-/* ── Handkarten-Abzeichen ÜBER allen Karten (Als Vorgabe 2.10.) ─────
-   Level-/Kosten-Abzeichen sitzen in einer eigenen Ebene NEBEN der Karte (nicht darin: die Karte trägt ein z-index und
-   sperrte sie unter ihren Nachbarn ein). Die Ebene deckt die Karte exakt ab, dreht sich mit dem Fächerwinkel und
-   zoomt beim Hover mit — z-index 100 liegt über der gehoverten Karte (60). `.hand-slot` ist kein Stapelkontext. */
-.game-hand-me .hand-slot > .hand-badge-layer {
-  position: absolute;
-  left: 0; top: 0;
-  width: var(--hand-card-w);
-  height: var(--hand-card-h);
-  rotate: var(--fan-rot, 0deg);
-  transform-origin: 50% 50%;
-  transition: transform .16s ease-out, rotate .16s ease-out;
-  z-index: 100;
-  pointer-events: none;
-}
-.game-hand-me .hand-slot > .hand-badge-layer > * { pointer-events: none; }
-.game-hand-me .game-hand-cards:not([data-pp-dragging]) .hand-slot > .board-card:hover + .hand-badge-layer {
-  transform: translateY(calc(-1 * var(--hand-hover-lift)))
-             scale(var(--hand-hover-scale))
-             rotate(var(--hand-tilt, 0deg));
-}
-
 /* Als Vorgabe 2.10.: die Handkarten (samt Hover-Zoom) liegen über den Trennlinien und Clustern der Handzeile. */
 .game-hand-me .game-hand-cards { z-index: 5; }
 
@@ -26107,3 +26063,97 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 .pz-zahl::-webkit-outer-spin-button,
 .pz-zahl::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .pz-zahl-einzeln { margin-top: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   KARTEN-TOOLTIP IM PIXEL-STIL (Als Vorgabe 13.10.)
+
+   „Der eigentliche Effekttext sollte auch noch eine Textbox bekommen, und
+   die vorhandenen Boxelemente passen stilistisch noch nicht richtig — das
+   sollte alles pixelartig aussehen, nicht so ‚modern'."
+
+   Bis hier trugen Plaketten, Wertekacheln und Hinweisfelder abgerundete
+   Ecken, duenne Linien und weiche Verlaeufe. Jetzt dieselbe Sprache wie die
+   Karten und die Menuefenster (`.pp-fenster`):
+     • Rahmen als 9-Slice-Pixelbild (`border-image`, SVG mit crispEdges,
+       in JS je Farbe gebaut: `ttFrame` in app-shared.jsx): abgeschnittene
+       Ecken, aussen die dunkle Kontur `--pp-kontur`, darin ein Farbring —
+       oben/links hell, unten/rechts dunkel, wie die abgeschraegten Raender
+       der Menuefenster;
+     • Flaeche mit 2x2-Raster (Dither) wie die Textfenster der Karten,
+       innen eine Pixel-Kante (Licht oben/links, Schatten unten/rechts),
+       aussen ein harter Schlagschatten;
+     • keine weichen Verlaeufe: der Kopf ist in harten Stufen getoent,
+       Schatten am Text sind Pixelversatz ohne Weichzeichnung.
+   Eine Einheit des Rahmens (`--u`) ist 2 px (Plaketten: 1 px), er ist also
+   4 px (Plaketten: 2 px) breit.
+   ═══════════════════════════════════════════════════════════════════ */
+.tt-kopf {
+  --zier: #aa44ff;
+  padding: 10px 14px 12px;
+  border-top: 4px solid color-mix(in srgb, var(--zier) 70%, #fff);
+  border-bottom: 4px solid color-mix(in srgb, var(--zier) 55%, #000);
+  box-shadow: 0 -2px 0 var(--pp-kontur), 0 2px 0 var(--pp-kontur);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--zier) 30%, #0b0a14) 0 25%,
+      color-mix(in srgb, var(--zier) 23%, #0b0a14) 25% 50%,
+      color-mix(in srgb, var(--zier) 16%, #0b0a14) 50% 75%,
+      color-mix(in srgb, var(--zier) 10%, #0b0a14) 75% 100%);
+}
+.tt-name {
+  font-size: 19px; font-weight: 700; line-height: 1.25;
+  text-shadow: 2px 2px 0 #000;
+}
+.tt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+
+/* Basis aller Pixel-Boxen: Rahmen kommt als `border-image-source` aus JS (Farbe), Rest ist hier. */
+.tt-box {
+  --zier: #8888aa;
+  --u: 2px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: calc(var(--u) * 2);
+  border-image-slice: 2;
+  border-image-width: calc(var(--u) * 2);
+  border-image-repeat: stretch;
+  border-radius: 0;
+  image-rendering: pixelated;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.045'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.045'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    color-mix(in srgb, var(--zier) 13%, #0b0a14);
+  /* die Ecken des Rahmens sind ausgeschnitten: der Hintergrund darf nicht darunter durchscheinen */
+  background-clip: padding-box;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, .08),
+    inset -2px -2px 0 rgba(0, 0, 0, .42),
+    3px 3px 0 rgba(0, 0, 0, .45);
+}
+/* Plakette (Typ, Untertyp, Archetyp, Stufe, Schule): schmaler Rahmen, kein Schlagschatten. */
+.tt-chip {
+  --u: 1px;
+  display: inline-block;
+  padding: 1px 7px 2px;
+  font-size: 12px; font-weight: 700; letter-spacing: .3px; line-height: 1.45;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .1), inset -1px -1px 0 rgba(0, 0, 0, .4);
+}
+/* Wertekachel (HP / ATK / Cost) */
+.tt-stat { flex: 1 1 0; min-width: 0; padding: 4px 6px 5px; text-align: center; }
+.tt-stat-label {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 10px; letter-spacing: .8px; text-transform: uppercase; line-height: 1;
+}
+.tt-stat-wert { font-size: 18px; font-weight: 700; line-height: 1.3; text-shadow: 2px 2px 0 rgba(0, 0, 0, .75); }
+.tt-icon { display: inline-block; flex: 0 0 auto; shape-rendering: crispEdges; image-rendering: pixelated; }
+/* Hinweisfeld (Ascension Bonus, Orbs, geerbte Effekte) und die Textbox des Effekttexts */
+.tt-callout { padding: 6px 10px 7px; font-size: 14px; line-height: 1.5; }
+.tt-callout-titel { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
+.tt-textbox { padding: 9px 11px 10px; }
+/* Nummernmarke der Faehigkeitsstufen */
+.tt-nummer {
+  flex-shrink: 0; min-width: 22px; padding: 0 4px; text-align: center;
+  font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.5;
+  background: rgba(255, 255, 255, .1);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 0 0 1px var(--pp-kontur);
+}
+.tt-body { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }

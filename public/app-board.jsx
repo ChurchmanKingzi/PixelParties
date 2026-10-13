@@ -296,7 +296,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
@@ -304,7 +304,14 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // neben und unter den Live-Zahlen durch, sobald die Stellenzahl abweicht.
   // Nur fuers Bild; Tooltip und Foil behalten die normale `imgUrl`.
   const ohneGedruckt = [hp != null && hpPosition ? 'hp' : null, hpPosition === 'hero' && atk != null ? 'atk' : null].filter(Boolean);
-  const boardImgUrl = imgUrl && ohneGedruckt.length ? imgUrl + '?ohne=' + ohneGedruckt.join(',') : imgUrl;
+  // Handkarten (Als Vorgabe 13.10.): AKTUELLE Stufe und Kosten stehen auf der Karte selbst — gruen, wenn verringert, rot, wenn
+  // erhoeht (der Renderer vergleicht mit dem gedruckten Wert). `handLevel` / `handCost` kommen nur, wenn sie vom Druck abweichen.
+  // Der Hover-Tooltip zeigt weiter die gedruckten Werte; `handNotes` erklaert dort, woher die Abweichung kommt.
+  const bildParams = [];
+  if (ohneGedruckt.length) bildParams.push('ohne=' + ohneGedruckt.join(','));
+  if (handLevel != null) bildParams.push('lv=' + handLevel);
+  if (handCost != null) bildParams.push('kost=' + handCost);
+  const boardImgUrl = imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
@@ -334,7 +341,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
     const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs && !(handNotes && handNotes.length)) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -363,6 +370,8 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
       // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
       _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
+      // Hand: Erklaerung, warum Stufe/Kosten auf der Karte vom Druck abweichen (s. `handLevel` / `handCost`).
+      _handNotes: (handNotes && handNotes.length) ? handNotes : tooltipBase._handNotes,
     };
   })();
 
@@ -52623,9 +52632,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && (handCostReduction > 0 || handBaseCostAfterCrystal !== handCardData.cost)
                   ? Math.max(0, handBaseCostAfterCrystal - handCostReduction)
                   : null;
-                const handCostIsBoosted = handEffectiveCost != null
-                  && handCardData?.cost != null
-                  && handEffectiveCost > handCardData.cost;
+                // Erklaerungen fuer den Hover-Tooltip (frueher Tooltips der beiden Abzeichen auf der Karte): Die Karte selbst
+                // zeigt die aktuellen Werte, der Tooltip die gedruckten — und sagt, woher die Abweichung kommt.
+                const handNotes = [];
+                if (handEffectiveLevel != null) {
+                  const lvFarbe = handEffectiveLevel > (handCardData?.level ?? 0) ? '#ff5555' : '#4ade80';
+                  handNotes.push({ color: lvFarbe, text: `Level ${handEffectiveLevel} in your hand (printed ${handCardData?.level}).` });
+                  if (handLevelIsHeroFiltered) handNotes.push({ color: lvFarbe, text: `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.` });
+                  if (manaCrystalBoost) handNotes.push({ color: '#ff5555', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
+                }
+                if (handEffectiveCost != null) {
+                  const kFarbe = handEffectiveCost > handCardData.cost ? '#ff5555' : '#4ade80';
+                  const teile = [];
+                  if (handBaseCostAfterCrystal !== handCardData.cost) teile.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
+                  if (handCostReduction > 0) teile.push(`Reduced by ${handCostReduction} this turn`);
+                  handNotes.push({ color: kFarbe, text: `Cost ${handEffectiveCost} in your hand (printed ${handCardData.cost})` + (teile.length ? ': ' + teile.join('. ') : '') + '.' });
+                }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
@@ -52649,54 +52671,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
-                    {(handEffectiveLevel != null || handEffectiveCost != null) && <div className="hand-badge-layer">
-                    {handEffectiveLevel != null && (() => {
-                      // "Boosted" = effective level is HIGHER than the
-                      // printed base (Mana Absorbing Crystal's +1).
-                      // Render the badge in red so the player visually
-                      // distinguishes a punishing increase from a
-                      // friendly reduction.
-                      const baseLevel = handCardData?.level ?? 0;
-                      const isBoosted = handEffectiveLevel > baseLevel;
-                      return (
-                        <div
-                          className={'creature-level' + (handLevelIsHeroFiltered ? ' creature-level-hero-filtered' : '')}
-                          onMouseEnter={handLevelIsHeroFiltered
-                            ? (e) => showGameTooltip(e, `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.`)
-                            : undefined}
-                          onMouseLeave={handLevelIsHeroFiltered ? hideGameTooltip : undefined}
-                          style={isBoosted ? {
-                            color: '#ff5555',
-                            textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                          } : undefined}>
-                          Lv{handEffectiveLevel}
-                        </div>
-                      );
-                    })()}
-                    {handEffectiveCost != null && (
-                      <div className="hand-cost-override"
-                        onMouseEnter={e => {
-                          const parts = [];
-                          if (handBaseCostAfterCrystal !== handCardData.cost) {
-                            parts.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
-                          }
-                          if (handCostReduction > 0) {
-                            parts.push(`Reduced by ${handCostReduction} this turn`);
-                          }
-                          showGameTooltip(e, parts.length
-                            ? parts.join('. ') + '.'
-                            : `Effective cost ${handEffectiveCost} (printed ${handCardData.cost}).`);
-                        }}
-                        onMouseLeave={hideGameTooltip}
-                        style={handCostIsBoosted ? {
-                          color: '#ff5555',
-                          textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                        } : undefined}>
-                        ◆{handEffectiveCost}
-                      </div>
-                    )}
-                    </div>}
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}
+                      handLevel={handEffectiveLevel} handCost={handEffectiveCost} handNotes={handNotes} />
                     {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
