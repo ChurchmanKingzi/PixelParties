@@ -45,6 +45,10 @@
 const CARD_NAME = 'Staff of the Teleporter';
 
 module.exports = {
+  // R02-10: mischt Handkarten ins Deck — Erkennung fuer „No Retreat!" und
+  // Distracting Crystal.
+  shufflesFromHandOrDiscardIntoDeck: true,
+
   // Hand-lock greys-out: when the controller is hand-locked, the staff's
   // own draws would silently fizzle and the player would be 4 gold poorer
   // for nothing. Tagging this opts into the standard 🚫-and-dim treatment

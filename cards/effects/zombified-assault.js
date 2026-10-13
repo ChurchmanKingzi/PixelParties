@@ -166,9 +166,12 @@ async function schlageZurueck(engine, pi, casterIdx, d, level) {
     return { betrag, ziel: rc.name };
   }
   const hi = quelle?.heroIdx ?? -1;
-  const held = engine.gs.players[seite]?.heroes?.[hi];
+  // R02-20: `heroIdx` gilt fuer die Heldenreihe von `heroOwner` (geliehener Held:
+  // Kontrolleur != Brettseite).
+  const heldSeite = quelle?.heroOwner ?? seite;
+  const held = engine.gs.players[heldSeite]?.heroes?.[hi];
   if (!held?.name || held.hp <= 0) return { betrag: 0, ziel: null };
-  engine._broadcastEvent('play_zone_animation', { type: 'claw_maul', owner: seite, heroIdx: hi, zoneSlot: -1 });
+  engine._broadcastEvent('play_zone_animation', { type: 'claw_maul', owner: heldSeite, heroIdx: hi, zoneSlot: -1 });
   await engine._delay(260);
   // Vergeltung: der Angreifer ist das einzige Ziel — Submerged/Stealth & Co. schuetzen nicht (Als Ruling 9.10.).
   await engine.actionDealDamage(spellQuelle, held, betrag, 'decay_spell', { festesZiel: true });

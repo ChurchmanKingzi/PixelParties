@@ -57,9 +57,10 @@ module.exports = {
     // Opp counter-window: discard 2 to negate Spike Trap. Only offered
     // when opp actually has 2 cards in hand — otherwise skip the
     // prompt entirely (no point asking for an impossible cost).
-    if (opp && (opp.hand?.length || 0) >= COUNTER_DISCARD_COST) {
-      const eligibleIndices = [];
-      for (let i = 0; i < opp.hand.length; i++) eligibleIndices.push(i);
+    // R02-07: die Karte, die der Gegner GERADE spielt (bleibt waehrend der
+    // Aufloesung in `ps.hand`, `_resolvingCard`), ist keine Handkarte mehr
+    // und taugt nicht als Abwurfkosten (Konvention v1405).
+    if (opp && engine._handOhneAufloesendeKarte(opp).length >= COUNTER_DISCARD_COST) {
 
       // Use a confirm prompt first ("pay 2 discard to negate?"); only
       // open the discard picker if they accept. forceDiscard prompts
@@ -84,7 +85,9 @@ module.exports = {
           let n = 0;
           for (let step = 0; step < COUNTER_DISCARD_COST; step++) {
             const eligible = [];
-            for (let i = 0; i < (opp.hand?.length || 0); i++) eligible.push(i);
+            for (let i = 0; i < (opp.hand?.length || 0); i++) {
+              if (!engine._istAufloesendeHandkarte(opp, i)) eligible.push(i);
+            }
             if (eligible.length === 0) break;
             const result = await engine.promptGeneric(oppPi, {
               type: 'forceDiscard',

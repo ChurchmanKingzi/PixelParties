@@ -212,6 +212,7 @@ module.exports = {
         confirmLabel: '🔥 Burn!',
         confirmClass: 'btn-danger',
         cancellable: true,
+        noSpellCancel: true,   // R02-09: kein Abbruch des Zaubers des GEGNERS ("up to 2" erlaubt 0)
         condition: (t, eng) => !isAlreadyBurned(t, eng),
       });
       if (Array.isArray(extra) && extra.length > 0) {
