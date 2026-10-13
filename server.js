@@ -11886,6 +11886,8 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   if (script.blockedByHandLock && ps.handLocked) return false;
   if (script.blockedByPileLock && room.engine.isPileLockedFor(pi)) return false;   // v826: „nur Stapel-Bewegung" unter Knight of Kings [B]
   if (script.blockedBySummonLock && ps.summonLocked) return false;   // v834: „nur Beschwoerung" unter Summon-Lock
+  // A08-08: Distracting Crystal sperrt auch Traenke ohne Zielwahl (Horn in a Bottle) – dieses Tor steht sonst nur in `doConfirmPotion`.
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
 
   // Targeted Potions enter targeting mode; the CPU defers them until 2i (the
   // targeting brain). Callers should pre-filter those — this branch still
