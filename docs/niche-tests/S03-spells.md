@@ -247,6 +247,16 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** `_engine.js` `isPileLockedFor` (~Z. 2575) fragt nur `pileOutAllowed` (Brett-Sperre Knight of Kings [B]), nicht `_discardLockedTurn`/`_discardOutAllowed`; für (c) fehlt `blockedByHandLock` (der Loader taggt `hooks.onPlay`-Spells bewusst nicht, `_loader.js` ~Z. 456, dort als Entscheidung für Al vermerkt).
 - **Frage an Al:** Soll ein reiner Ablage→Hand-Zauber (Shooting Star) unter der Stab-Sperre bzw. Hand-Sperre ausgegraut sein wie unter Knight of Kings [B]? (ja / nein)
 
+### S03-27 · Rewrite History stellt die Kreatur in die Zone eines inzwischen besiegten Helden zurück (normales Beschwören dorthin ist verboten) · Stufe C
+- **Karten:** Rewrite History (`rewrite-history.js` `zoneFrei` Z. 15–20).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 und 1 mit Magic Arts 3; „Lamenting Knight" in Held 0 Slot 0 wird von einer Gegnerquelle besiegt (protokolliert), danach fällt Held 0 (0 HP); Held 1 wirkt Rewrite History.
+- **Schritte:** 1. Rewrite History spielen, Lamenting Knight wählen. 2. Support Zone von Held 0 lesen. Kontrolle: `doPlayCreature` in dieselbe Zone.
+- **Erwartet** (Kartentext „place it into the same Support Zone it was in when it was defeated"; Engine-Konvention: eine Kreatur kann nicht in die Zone eines besiegten Helden gesetzt werden): offen. Lesart A: Zone des toten Helden ist kein gültiger Platz ⇒ Kandidat entfällt. Lesart B (Skript): „same Support Zone" gilt wörtlich.
+- **Beobachtet:** Lesart B: Der Knight steht danach in der Zone des toten Helden (0 HP). Kontrolle: normales Beschwören dorthin ⇒ `false`. (Staffelung 1/2/3 mit Magic Arts 1/2/3, Performance als Joker, eigener Tod/Gift als Ursache ⇒ nicht gelistet, besetzte Zone ⇒ nicht gelistet, gefrorener Heldenplatz ⇒ gelistet: alle ✓.)
+- **Repro:** `docs/niche-tests/repro/S03-spells/27-rewrite-history-tote-heldenzone.js` (✗ = Lesart A wird nicht erfüllt)
+- **Vermutete Ursache:** `rewrite-history.js` Z. 15–20 `zoneFrei` prüft `hero?.name` und die leere Zone, nicht `hero.hp > 0` (Gegenstück: die Aquatic-Nachbestückung nimmt tote Zonen laut Ruling CARD_API.md ~Z. 3730 ausdrücklich mit).
+- **Frage an Al:** Darf Rewrite History eine Kreatur in die Zone eines besiegten Helden zurückstellen? (ja / nein)
+
 <!--BEFUNDE-ENDE-->
 
 ## Abdeckung

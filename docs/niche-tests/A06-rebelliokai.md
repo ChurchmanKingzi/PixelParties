@@ -276,10 +276,95 @@ Stand/Autor: Agent A06-rebelliokai, 12.10.2026. Karten: 67 in der Liste · (wird
 - **Repro:** `docs/niche-tests/repro/A06-rebelliokai/34-reaktions-beschwoerung-sperren.js` (5 × ✗)
 - **Vermutete Ursache:** Warg und Cannibal prüfen die EIGENE Spalte nur mit `engine._canHeroActivateSurprise` (`_engine.js` ≈ 36636: Frost/Betäubung/Negation, Schulen – keine `summonLocked`-/Aktionssperre); nur die Fremdspalte läuft über `canHeroSummon(…, { alsAktion: true })`. Tengu baut seine Zielliste selbst. Restunsicherheit: Reaktions-Kreaturen laufen sonst über das Surprise-Tor; gewollt ist das für die Sperren laut Ruling 8.8. wohl nicht.
 
+### A06-rebelliokai-35 · War Council Gathering Place: die 8 Gold sind weg, wenn die Zielwahl des Ratgebers danach abgebrochen wird · Stufe C
+- **Karten:** War Council Gathering Place (`war-council-gathering-place.js`, Zahlung nach dem „Ja", dann `onCreatureEffect`), Harpthenean War Counselor (Schadensmodus mit abbrechbarer Zielwahl)
+- **Voraussetzungen / Aufbau:** Seed 1234. Sitz 0 hat die Area, Harpthenean auf der Hand, 100 Gold; `t.policy.cancelTargets = true`, Optionswahl „damage".
+- **Schritte:** 1. Harpthenean beschwören. 2. Gathering Place bejahen (8 Gold). 3. Zielwahl der Schadensoption abbrechen.
+- **Erwartet** (Kartentext „they may spend 8 Gold to immediately have it use its active effect"; Konvention Regel 23.9 „Abbruch heißt: nichts ist passiert"): Lesart A – bricht der Spieler die Wahl ab, ist nichts passiert, die Gold bleiben. Lesart B – das Gold ist die Gebühr für den Versuch.
+- **Beobachtet:** Gold −8, kein Schaden, die Kreatur hat ihren normalen Einsatz weiterhin (Gathering Place stempelt bewusst kein HOPT). Kein Fehler im Zustand.
+- **Repro:** `docs/niche-tests/repro/A06-rebelliokai/35-gathering-place-abbruch-gold.js` (✗ = Lesart A nicht erfüllt)
+- **Frage an Al:** Soll das Gold zurückerstattet werden, wenn der ausgelöste Ratgeber-Effekt mangels Zielwahl abgebrochen wird – „zurück" oder „verloren"?
+
 ## Abdeckung
+Tiefen: L2 = gezielte Nischenfall-Tests (Messung oder Repro), L1 = nur Standardlauf/Batterien (Kaltstart, Dauerfeuer, Diebstahl-Batterie `n12`) plus Teilproben, L0 = gelesen. „→ -NN" verweist auf einen Befund; ✓ = geprüft und in Ordnung.
+
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
-| (wird am Ende vollständig gefüllt) | | |
+| Bishop of Kings [B] | L2 | stummgeschaltet ✗ (→ -11), Leave-Reihenfolge ✗ (→ -22), Revive-Verzögerung (→ -32), `sourceBound` hält über 4 Zugwechsel ✓ (kein C05-02), Cure-Weg ✓ bleibt |
+| Bishop of Kings [W] | L2 | HOPT über zwei Bishops ✓, Platzierung mit/ohne Board ✓, volles Brett ✓ (Pawn bleibt auf der Hand) |
+| Board of Kings | L2 | Opfer → Zusatzaktion ✓, ohne Kandidat ✓, Area-Schutz/Unaffected gegen Windstorm ✗ (→ -06/-07), „can't be chosen" ✗ (→ -05) |
+| Calamitusk, the Chaorc War Chief | L2 | Level-Senkung ✗ bei White Army (→ -04), Tribut/Deck unter Stapelsperre ✗ (→ -09), Diebstahl-Batterie ✓ |
+| Castling | L2 | Fireball auf Wirt ✓ (negiert, Pawn beschworen, Karte → Ablage), Wirt ohne Summoning Magic ✓ (Knight bleibt in der Hand), Wirt stirbt ✓ (Ablage), AoE im selben Zug ✓ (Immunität leckt nicht), White Army/Thaw Blader/Bear Rider ✗ (→ -33), negierte Kopie stempelt „1 per game" nicht (= Wurzel S01-01, hier nicht neu) |
+| Censpartan War Counselor | L2 | Zielschutz ✗ (→ -05), stummgeschaltet ✗ (→ -12), Tod/Bounce ✗ (→ -19), Revive-Verzögerung (→ -32) |
+| Chaorc Cannon Fodder | L2 | Level-Delta ✗ (→ -04), Opfer-Ausnahme „im selben Zug" ✓ (Pyre/Interception-Läufe) |
+| Chaorc Corpse Cannibal | L2 | Zug „beim Opfern" + Platzkonkurrenz mit Rottweiler ✓, Frost/Betäubung ✓, summonLocked/Aktionssperre ✗ (→ -34) |
+| Chaorc Friendly Fireballer | L2 | Deck/Ablage unter Knight-Sperre ✗ (→ -09), Zielwahl-Abbruch nach bezahltem Opfer: bewusst nicht abbrechbar (`_forcePerform`, Skriptkommentar) ✓ |
+| Chaorc Interception | L2 | Opfer ist nicht das Ziel ✓, Opfer darf den eigenen Chaorc nicht als Original-Ziel wählen ✓, gelöscht statt Ablage ✓ |
+| Chaorc Pyre Grill Master | L2 | +40 ATK bei Cykyran-Verdopplung ✓ (Folgefehler → -18), HP-Modus bei totem Helden ✓, Zusatzaktion bei Überopfer ✓ |
+| Chaorc Rider Warg | L2 | Reaktion auf Gegner-Zerstörung ✓, Frost/Betäubung ✓, summonLocked/Aktionssperre ✗ (→ -34) |
+| Chaorc Ruin Mourner | L2 | 80 Schaden pro Opfer, Deckel „4 pro Zug" ✓ (5 Opfer: 4 Treffer), Brenn-Weg ✓ |
+| Cykyran War Counselor | L2 | stummgeschaltet ✗ (→ -13), Tod ✗ (→ -18), Revive-Verzögerung (→ -32), Schuss ≤ 300 ✓ |
+| Gorinthian War Counselor | L2 | Schutzdauer ✗ (→ -14), Merker ohne Betäubung ✗ (→ -28), Aktivierung bei Aktionssperre ✓ |
+| Harpthenean War Counselor | L2 | Gold-Modus mit Gathering Place ✓, Schaden Deckel 300 ✓, Zielwahl-Abbruch unter Gathering Place (→ -35) |
+| Ice Sculpture Garden | L2 | Zählung gefrorener Ziele ✓, Zusatzaktion ab 2 ✓, Handsperre danach ✓, unter Tuscan Artist nicht als Fehler gewertet (Zusatzaktion bleibt) |
+| Kappa Sword Slash | L2 | Kosten unter Knight-Sperre ✗ (→ -08), Area-Wahl ohne Zielschutz (→ -05), Level-Reduktion ✓ |
+| Kasperov, the King of Kings [B] | L2 | Pawn-Opfer → Platzierung ✓, zählt nicht als Beschwörung ✓ |
+| Kasperov, the King of Kings [W] | L2 | Tod eines „of Kings" → Pawn aus Hand ✓; Frost/Betäubung/summonLocked/Aktionssperre ✓ (alle abgewiesen) |
+| Kirin Firebreath | L2 | Kosten unter Knight-Sperre ✗ (→ -08), Schadensanzahl ✓ |
+| Kitsune Transformation | L2 | eigene Karte als Abwurf ✗ (→ -16), Handsperre ✓ |
+| Knight of Kings [W] | L2 | Zusatzaktion einmal pro Zug ✓, Handsperre mit/ohne Board ✓ |
+| Knight of Kings [B] | L2 | Sperre aufgehoben bei Frost ✓, Stapelsperre umgangen ✗ (→ -08, -09, -10) |
+| Loyal Beagle | L2 | Gold 2 × Loyals inkl. sich ✓, Revive-/Platzierungswege ✓ |
+| Loyal Bone Dog | L2 | Zerstören/Opfer ✗ (→ -02), Shepherd-Slot ✗ (→ -03), Schaden ✓ |
+| Loyal Hountriever | L2 | Deckel 3 Karten pro Zug ✓, nicht für sich selbst ✓ |
+| Loyal Labradoodle | L2 | Minderung 20 × Loyals, nicht kumulierend ✓, Kontrolle statt Spalte (Leih-/Verlustkreatur) ✓ |
+| Loyal Pinpom | L2 | Zweitbeschwörung über Frost/Betäubung/Aktionssperre ✗ (→ -26), negierter Held ✓ |
+| Loyal Rottweiler | L2 | Opfer → Deckplatzierung ✓, Terrier-Treffer beim Selbstopfer ✓ (Ruling 6.9), Fizzle bei Deckelsperre ✓ (bewusst) |
+| Loyal Shepherd | L2 | Slot-Konflikt ✗ (→ -03), Negierung bis nächsten Zugbeginn ✓, Frost/Betäubung/summonLocked/Aktionssperre ✓ (alle abgewiesen) |
+| Loyal Terrier | L2 | Treffer bei Tod anderer Loyals ✓, Opfer zählt ✓, Bone-Dog-Rettung ✓ |
+| Minocrete War Counselor | L1 | Batterien, Diebstahl ✓, Verdopplung/„schon erlittener Schaden" nur kurz gemessen, keine Auffälligkeit |
+| Mischief Invasion | L2 | summonLocked/Aktionssperre ✗ (→ -27), „1 pro Zug" negiert ✗ (→ -29), Lv0-Statusfrage (-27 Nebenbefund) |
+| Mischief Militia - Banner Bearer | L2 | Reduktion 150 + Frost ✓, Kreaturenziel ✓, 400 → 250 ✓, Host gefroren → kein Trigger ✓, AoE (Oni): ein Ziel geschützt, zwei Bearer zwei Ziele ✓ |
+| Mischief Militia - Bear Rider | L2 | Hand-Stufe ✗ Sitz 2/3 (→ -31), Treffer auf gefrorenen Castling-Wirt ✗ (→ -33) |
+| Mischief Militia - Chilly Dog | L1 | Frozen-Kreatur nutzt Effekt am Beschwörungstag (Rottweiler) ✓, Eligibility-Läufe, sonst Batterien |
+| Mischief Militia - Chilly Wizard | L2 | gespiegelter Status bleibt ✗ (→ -20), Wirt auf Gegnerseite ✓ |
+| Mischief Militia - Colored Snow | L2 | Auslöser nach Kontrolle statt Spalte ✓, Potion gesperrt (`potionLocked`) geprüft, ohne Potion/HOPT ✓ |
+| Mischief Militia - Heli Troopers | L1 | Tod → Freeze, Beschwörungs-Läufe (→ -27 Nebenbefund), Zielfenster ✗ (→ -33) |
+| Mischief Militia - SnowItAll | L2 | Beschwörer-Eignung ✗ (→ -25), Immunität nach Revive ✗ (→ -32), Haste ✓ |
+| Mischief Militia - Thaw Blader | L2 | Zielschutz ✗ (→ -05), Castling ✗ (→ -33), Thicket ✓ |
+| Orthos, the Loyal Guard Dog | L2 | Platzierung (Rottweiler) löst Orthos aus (laut Skriptkommentar gewollt), Revive nicht ✓, summonLocked ✓ |
+| Pawn Chain | L2 | Pawn in den Slot ✓, zweite im Zug nicht angeboten ✓, Opfer (Ruling 6.9) ✓ |
+| Pawn of Kings [B] | L2 | Area-Schutz: Windstorm umgeht ✗ (→ -06) |
+| Pawn of Kings [W] | L2 | erste Beschwörung gratis, zweite kostet ✓ |
+| Pawn Sacrifice | L2 | Handsperre ✗ (→ -21), „1 pro Zug" negiert ✗ (→ -29), Tuscan Artist ✗ (→ -30) |
+| Queen of Kings [B] | L2 | „nicht negierbar" für Nachbarn gegen Frost/Negation ✓ (Labradoodle-Minderung bleibt), zählt als Rook ✓ |
+| Queen of Kings [W] | L2 | eine pro Zug (auch gemischt [B]/[W]) ✓, Level-Senkung ✓ |
+| Rebelliokai Backup Bakus | L1 | Rückkehr bei Abwurf (Diebstahl-/Batterie-Läufe), kein gezielter Mehrfachtest |
+| Rebelliokai Camouflaged Kappa | L2 | Opfer unter Knight-Sperre ✗ (→ -10), Suche + Kitsune-Kette ✓ |
+| Rebelliokai Courtly Kirin | L1 | Kosten-/Cost-Weg unter Sperre (→ -08), Reaktion nicht gezielt gemessen |
+| Rebelliokai Kind Kitsune | L2 | Abwurf per Kappa → Nicht-Kreatur holen ✓, Namenssperre ✓ (Fireball gesperrt) |
+| Rebelliokai Oblivious Oni | L2 | AoE trifft Leihkreatur des Wirkers (Wurzel S01-09, dort gemeldet), Banner-Bearer ✓, Tengu-Reihenfolge/5er-Regel ✓ |
+| Rebelliokai Terror Tengu | L2 | Folge-Beschwörung über aktionsgesperrten Held ✗ (→ -34), Reihenfolge ✓, Token (→ -23) |
+| Rebelliokai Timid Tanuki | L2 | Handsperre ✓, Tuscan Artist ✗ (→ -30) |
+| Rook of Kings [B] | L2 | Unaffected-Schutz bei Frost ✓, Windstorm ✗ (→ -07) |
+| Rook of Kings [W] | L2 | Windstorm ✗ (→ -07), Zusatzaktion ✓ |
+| Sculpture Guards | L2 | gefrorener Held ✓, Flächenschaden (Oni) ✓, Zielfenster nicht betroffen (reagiert auf Schaden) |
+| Sculpture Theft | L2 | alte Ziele ✗ (→ -01), Token ✗ (→ -23) |
+| Snowstorm Mischief | L2 | Auslöser für -11/-12/-13/-25, Freeze beider Seiten ✓ |
+| Tanuki Escape | L2 | eigene Karte wählbar ✗ (→ -15), Namensausschluss (→ -17) |
+| Tengu Windstorm | L2 | → -06, -07, -22, -23, -08; Thicket ✓ |
+| The White Army | L2 | → -04, -29 (Ergänzung 29b), -33; Kappe nach Kontrolle ✓, Thicket ✓ |
+| Thebinxan War Counselor | L2 | Handsperre ✗ (→ -24), Gathering Place ✓ |
+| War Chest | L2 | 0 Ratgeber ✓, gefroren/negiert zählen ✓, gestohlener Ratgeber ✓, Goldsperre ✓ |
+| War Council Gathering Place | L2 | beide Seiten ✓, 7 Gold kein Angebot ✓, zwei Areas ✓, Abbruch-Gold (→ -35) |
+
+## Prüfaufträge (dynamisch gemessen)
+* **Zielsammler Brettspalte (F02-14, F01-07/-10/-11, S01-09):** Oblivious Oni (`aoeHit`, „all targets your opponent controls") trifft eine vom Wirker kontrollierte Leihkreatur in der Gegnerspalte (Messung: 850 statt 1000 HP) – das ist die in S01-09 beschriebene Wurzel, nicht neu gemeldet. Nach Kontrolle statt Spalte rechnen korrekt: White Army (Kappe), Colored Snow (Auslöser), Loyal Labradoodle (Minderung), War Chest, Bishop [B]. `getCreatureTargets` wird von keiner Karte der Gruppe benutzt (F02-14 betrifft sie nicht).
+* **`counters.currentHp ?? 0` (C05-01):** kein Skript der Gruppe enthält das Muster (grep leer).
+* **`negatedDuration` (H03-15):** kein Skript der Gruppe liest oder setzt es.
+* **Zugende-Räumung entfernt `negated` ohne `sourceBound` (C05-02):** Bishop [B] setzt `sourceBound` – die Negation hält über 4 Zugwechsel ✓. Loyal Shepherds Negierung (Kreatur) läuft laut Text bis zum nächsten eigenen Zugbeginn ✓.
+* **Zweite Kopie nach Negierung (F01-19):** mit Silence (statt Rusty Touch) an The White Army ✗ (Ergänzung zu -29), Castling (`oncePerGame`, Wurzel S01-01), Pawn Sacrifice/Invasion (-29). War Chest hat kein Zug-Limit.
+* **`normalizeValidTargets` / „cannot be chosen" (F03-04):** keine Karte der Gruppe nutzt `potionTargeting`; die Zielwege der Gruppe (`promptEffectTarget`, `promptDamageTarget`) filtern `untargetable_all` (Thicket-Marke) bei White Army, Tengu Windstorm, Thaw Blader und Kirin Firebreath ✓. Anderer Schutz (`untargetable_by_opponent`, Board of Kings) fehlt in `promptEffectTarget` → -05.
 
 ## Getestet & in Ordnung (Auswahl)
 - Pawn of Kings [W] mit Board: erste Beschwörung gratis, zweite kostet die Aktion; ohne Board normale Aktion.
