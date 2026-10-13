@@ -105,14 +105,28 @@ module.exports = {
       // Surprises wie Frost Rune bleiben zu — ein Flaechenschlag waehlt niemanden), trifft dann ALLE Ziele und wertet
       // erst danach die Tode aus (Helden-KOs aufgeschoben, Kreaturen in EINEM Stapel). Negiert eine
       // Reaktion den Zauber, faellt der Schaden an ALLEN Zielen weg — und die Areas bleiben liegen.
-      const ziele = [
+      let ziele = [
         ...heroTargets.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
         ...creatureTargets.map(inst => ({ type: 'creature', inst })),
       ];
+      // Ida („never hit more than 1 target with a Destruction Spell"): aus dem Flaechenschlag
+      // wird ein Einzelschlag auf EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die
+      // Reaktionsfenster selbst (wie `actionAoeHit` im Einzelmodus).
+      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`]?.forcesSingleTarget;
+      if (idaEinzel) {
+        const t = await ctx.promptDamageTarget({
+          side: 'any', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: DAMAGE,
+          title: CARD_NAME, description: `Deal ${DAMAGE} damage to a single target.`,
+          confirmLabel: `💥 ${DAMAGE} Damage!`, confirmClass: 'btn-danger', cancellable: false,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht, wie in `actionAoeHit`
+        });
+        if (!t) return;
+        ziele = [t.type === 'hero' ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx } : { type: 'creature', inst: t.cardInstance }];
+      }
       await kometAnimation();   // Komet VOR dem Reaktionsfenster
       const res = await engine.dealDamageToTargets(ctx.card, ziele, {
         damage: DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
-        istFlaeche: true, hitDelay: 0,
+        istFlaeche: !idaEinzel, hitDelay: 0,
+        ...(idaEinzel ? { surpriseCheck: false, postTargetCheck: false } : {}),
         bilderGespielt: true,   // der Komet ist schon gefallen — bei Negation kein zweiter
       });
       if (res?.cancelled) return;

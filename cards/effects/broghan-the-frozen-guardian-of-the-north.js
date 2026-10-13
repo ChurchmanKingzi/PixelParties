@@ -129,5 +129,11 @@ module.exports = {
       if (!hero || hero.hp <= 0) return;
       if (!hero.statuses?.freeze_immune) applyFreezeImmunity(hero);
     },
+    // Geliehen (??? the Shapeshifter): mit der Gestalt faellt auch die
+    // Unfreezable-Marke ab (H01-heroes-02).
+    onIdentityLost: (ctx) => {
+      const hero = ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (hero?.statuses?.freeze_immune?.source === CARD_NAME) delete hero.statuses.freeze_immune;
+    },
   },
 };

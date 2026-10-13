@@ -7,6 +7,20 @@
 
 module.exports = {
   hooks: {
+    // „1 Action per turn" schliesst ZUSATZAKTIONEN ein (H04-01): jede aufgeloeste Aktion
+    // DIESES Helden — auch eine zusaetzliche/inhaerente — verbraucht die eine Aktion.
+    // Danach sperrt der `_maxActionsPerTurn`-Vertrag ihn fuer alles Weitere (wie Friedhelm).
+    onAnyActionResolved: (ctx) => {
+      const engine = ctx._engine;
+      const pi = ctx.cardOwner;
+      const feld = ctx.cardHeroOwner ?? pi;
+      const hero = engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.name || !hero._maxActionsPerTurn) return;
+      const handelnd = ctx.heroOwner ?? ctx.playerIdx;
+      if (ctx.heroIdx !== ctx.cardHeroIdx || (handelnd !== pi && handelnd !== feld)) return;
+      hero._actionsThisTurn = Math.max(hero._actionsThisTurn || 0, 1);
+    },
+
     onGameStart: (ctx) => {
       const ps = ctx.gameState.players[ctx.cardOriginalOwner];
       const hero = ps?.heroes?.[ctx.cardHeroIdx];

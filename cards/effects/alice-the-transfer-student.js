@@ -52,7 +52,19 @@ module.exports = {
   bypassStatusFilter: true,
 
   hooks: {
-    onGameStart: (ctx) => { armSharing(ctx.gameState, ctx.cardOwner); },
+    onGameStart: (ctx) => {
+      // Geliehen (??? the Shapeshifter): Schalter merken, damit nur DIESER
+      // beim Abfallen der Gestalt zurueckgenommen wird (H01-heroes-14).
+      const ps = ctx.gameState.players[ctx.cardOwner];
+      if (ctx.gainedEffect && ps && !ps._aliceShareActive) ps._aliceShareBorrowed = true;
+      armSharing(ctx.gameState, ctx.cardOwner);
+    },
+    onIdentityLost: (ctx) => {
+      const ps = ctx.gameState.players[ctx.cardOwner];
+      if (!ps?._aliceShareBorrowed) return;
+      delete ps._aliceShareBorrowed;
+      delete ps._aliceShareActive;
+    },
     onPlay: (ctx) => { armSharing(ctx.gameState, ctx.cardOwner); },
   },
 };

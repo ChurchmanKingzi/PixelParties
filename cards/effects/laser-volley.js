@@ -76,6 +76,24 @@ module.exports = {
         return;
       }
 
+      // Ida („never hit more than 1 target with a Destruction Spell"): aus „alle Ziele" wird
+      // EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die Reaktionsfenster selbst
+      // (wie `actionAoeHit` im Einzelmodus) — die Sammelfenster unten entfallen dann.
+      // Die Verschonen-Runde des Gegners laeuft danach unveraendert ueber dieses eine Ziel.
+      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      if (idaEinzel) {
+        const t = await ctx.promptDamageTarget({
+          side: 'enemy', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: VOLLEY_DAMAGE,
+          title: CARD_NAME, description: `Deal ${VOLLEY_DAMAGE} damage to a single target.`,
+          confirmLabel: `💥 ${VOLLEY_DAMAGE} Damage!`, confirmClass: 'btn-danger', cancellable: false,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht, wie in `actionAoeHit`
+        });
+        const gewaehlt = t && targets.find(x => t.type === 'hero'
+          ? (x.kind === 'hero' && x.physOwner === t.owner && x.heroIdx === t.heroIdx)
+          : (x.kind === 'creature' && x.instId === t.cardInstance?.id));
+        if (!gewaehlt) return;
+        targets.splice(0, targets.length, gewaehlt);
+      }
+
       // Opp counter-window: each spare costs 1 hand card. Iterate
       // discard → spare-pick until opp opts out (cancel) or runs out
       // of either hand cards or targets to spare. Cap at
@@ -152,7 +170,7 @@ module.exports = {
         .map(t => ({
           type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName,
         }));
-      if (unsparedHeroTargets.length > 0) {
+      if (unsparedHeroTargets.length > 0 && !idaEinzel) {
         if (ctx.card) ctx.card._isAoeCheck = true;
         const surpriseResult = await engine._checkSurpriseWindow(
           unsparedHeroTargets, ctx.card, { damageType: 'destruction_spell' }
@@ -213,7 +231,7 @@ module.exports = {
           .map(t => t.kind === 'hero'
             ? { type: 'hero', owner: t.physOwner, heroIdx: t.heroIdx, cardName: t.cardName }
             : { type: 'creature', owner: oi, heroIdx: t.heroIdx, slotIdx: t.slotIdx, cardName: t.cardName });
-        const _negR = await engine.preDamageMultiTargetWindow(source, allUnspared);
+        const _negR = idaEinzel ? null : await engine.preDamageMultiTargetWindow(source, allUnspared);
         // Full-negate reaction (Storm Ring / Invisibility Cloak): bail
         // before any damage so the whole Spell is negated.
         if (_negR?.effectNegated) return;

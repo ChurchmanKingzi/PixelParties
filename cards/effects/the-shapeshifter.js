@@ -170,10 +170,17 @@ function waehlbareGestalten(engine, pi, hero) {
   return raus;
 }
 
-/** Die Heldeninstanz dieses Slots (Traeger der Identitaet). */
+/**
+ * Die Heldeninstanz dieses Slots (Traeger der Identitaet). `pi` = Brettseite.
+ * Waehrend der Aktivierung eines UEBERNOMMENEN Helden traegt die Instanz den
+ * Kontrolleur als `owner` und die Brettseite als `heroOwner`
+ * (`resolveHeroEffectActivation`) — sonst fand die Suche sie nicht, der
+ * Ablaufstempel (H01-heroes-12) blieb aus.
+ */
 function heldeninstanz(engine, pi, heroIdx) {
-  return engine.cardInstances.find(c =>
-    c.owner === pi && c.zone === 'hero' && c.heroIdx === heroIdx) || null;
+  const slot = engine.cardInstances.filter(c => c.zone === 'hero' && c.heroIdx === heroIdx);
+  return slot.find(c => c.heroOwner === pi)
+    || slot.find(c => c.owner === pi && c.heroOwner == null) || null;
 }
 
 /**

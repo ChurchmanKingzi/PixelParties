@@ -172,6 +172,19 @@ module.exports = {
       _applyImmunities(_karianHero(ctx));
     },
 
+    // Geliehen (??? the Shapeshifter): die Immunitaeten (Bucket 3) und ein
+    // gerade ausgesetzter Frozen/Stunned-Vorrat gehen mit der Gestalt
+    // (H01-heroes-14). Nur die von uns gestempelten Marken (Wert 1).
+    onIdentityLost: (ctx) => {
+      const hero = _karianHero(ctx);
+      if (!hero) return;
+      _restoreParalysis(hero);
+      for (const name of getNegativeStatuses()) {
+        const key = STATUS_EFFECTS[name]?.immuneKey;
+        if (key && hero.statuses?.[key] === 1) delete hero.statuses[key];
+      }
+    },
+
     // ─── Bucket 2 — paralysisLike: act despite + bonus Action ───
     // v339 (Als Befund): die Aussetzung lief NUR in der Action Phase —
     // Abilities und Helden-Effekte aktiviert man aber in den MAIN-Phasen.

@@ -133,12 +133,16 @@ module.exports = {
       // Ziele auf dem Brett als Zahlen in der Ablage" ist oben schon
       // abgefangen — dort schlaegt die Karte flaechendeckend zu; hier
       // unten stehen also immer mindestens N Ziele zur Verfuegung.
+      // Unter Ida (Einzelziel-Deckel, H02-heroes-05) kappt die Engine auf 1 Ziel —
+      // dann kann `min` nicht N sein.
+      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`]?.forcesSingleTarget;
       const selected = await ctx.promptMultiTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        min: N,
+        min: idaEinzel ? 1 : N,
         max: N,
         baseDamage: PER_TARGET_DAMAGE,
+        damageType: 'destruction_spell',
         title: CARD_NAME,
         description: `Choose ${N} different target${N > 1 ? 's' : ''}. Deal ${PER_TARGET_DAMAGE} damage to each.`,
         confirmLabel: `🔥 Strike! (${PER_TARGET_DAMAGE} ×N)`,

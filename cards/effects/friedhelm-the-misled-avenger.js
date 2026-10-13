@@ -164,6 +164,12 @@ module.exports = {
       const hero = ctx._engine?.gs?.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
       if (hero) hero._maxActionsPerTurn = 1;
     },
+    // Geliehen (??? the Shapeshifter): die Aktionsgrenze geht mit der Gestalt
+    // (H02-heroes-19).
+    onIdentityLost: (ctx) => {
+      const hero = ctx._engine?.gs?.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (hero?._maxActionsPerTurn === 1) delete hero._maxActionsPerTurn;
+    },
   },
 
   async onHeroEffect(ctx) {
