@@ -96,8 +96,23 @@ function makeSingletonCanSummon(cardName) {
   };
 }
 
+/**
+ * Feuert dieser `onCardLeaveZone` fuer den ABGANG DER EIGENEN KARTE SELBST
+ * (statt fuer eine fremde)? Der Todes-/Zerstoerungs-/Bounce-Pfad nennt sie als
+ * `leavingCard`; `actionTransferCreature` (Kontrollwechsel) nur ueber
+ * `_onlyCard`. Zu diesem Zeitpunkt steht die Instanz noch im Support und
+ * zaehlt sich bei jeder Feldzaehlung selbst mit (A06-18/19).
+ */
+function istEigenerAbgang(ctx) {
+  const inst = ctx.card;
+  if (!inst || ctx.fromZone !== 'support') return false;
+  if (ctx.leavingCard) return ctx.leavingCard.id === inst.id;
+  return !!ctx._onlyCard && ctx._onlyCard.id === inst.id;
+}
+
 module.exports = {
   WC,
+  istEigenerAbgang,
   isWarCounselorName,
   isWarCounselorCreatureName,
   controlledWarCounselors,

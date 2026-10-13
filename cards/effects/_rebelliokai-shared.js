@@ -166,7 +166,8 @@ async function payRebelliokaiCost(engine, playerIdx, cardName, opts = {}) {
   if (orphan) engine._untrackCard(orphan.id);
 
   // Phase 1 — vanish from discard pile.
-  if (!engine.takeFromPileSync(ps, 'discard', idx, { source: opts.source || 'Rebelliokai' })) return;   // v820: Stapel-Schicht
+  // Gesperrte Entnahme (Knight of Kings [B]): Kosten NICHT bezahlt → false (A06-08).
+  if (!engine.takeFromPileSync(ps, 'discard', idx, { source: opts.source || 'Rebelliokai' })) return false;   // v820: Stapel-Schicht
   engine.sync();
 
   // Phase 2 — broadcast the chained flight animation. The client pre-

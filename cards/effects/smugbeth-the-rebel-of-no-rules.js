@@ -30,6 +30,8 @@
 
 const ATTACHABLE = 'Lizbeth, the Reaper of the Light';
 
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   activeIn: ['support'],
 
@@ -71,8 +73,12 @@ module.exports = {
 
   cpuMeta: { alwaysCommit: true },
 
-  // No `hooks` block. The active-ability borrowing for Smugbeth's host
+  // Sonst keine Hooks: the active-ability borrowing for Smugbeth's host
   // is dispatched entirely by the engine (`_getAbilityBorrowSources`
   // returns opponent sources for any hero that has a Smugbeth+Lizbeth
   // attached, gated on `mode === 'active'`).
+  hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+  },
 };

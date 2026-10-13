@@ -376,8 +376,10 @@ module.exports = {
     return true;
   },
 
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 
@@ -463,7 +465,22 @@ module.exports = {
         gs._spellCancelled = true;
         return;
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
+      if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+        gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+        return;
+      }
+
+      // ── Area-Schutzfenster (Pawn of Kings [B], Guardian of Teocuilatl, Wowhalla) ──
+      // Eine Area verlaesst das Brett hier ueber `_bounceToDeck` am Engine-Tor
+      // vorbei; die Kosten sind gezahlt, der Effekt verpufft (A06-06).
+      if (targetInst.zone === 'area') {
+        const negated = await engine.tryAreaProtection(targetInst, { name: CARD_NAME, owner: pi }, pi);
+        if (negated) {
+          engine.log('tengu_windstorm_area_protected', { player: ps.username, area: targetInst.name });
+          engine.sync();
+          return;
+        }
+      }
 
       // ── Step 3: top or bottom of original owner's deck ──
       // `inst.originalOwner` survives charm/steal flips; `inst.owner`

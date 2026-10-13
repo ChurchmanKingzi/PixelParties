@@ -86,6 +86,8 @@ function setupWolflesiaSpellAction(ctx) {
   engine.grantAdditionalAction(inst, typeId(inst));
 }
 
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   activeIn: ['support'],
 
@@ -125,6 +127,9 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+
     onTurnStart: (ctx) => {
       // Re-grant each turn so the Lv3-Decay/Support cast is available
       // exactly once per turn. The grant is idempotent —

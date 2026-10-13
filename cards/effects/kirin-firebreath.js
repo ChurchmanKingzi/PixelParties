@@ -66,8 +66,10 @@ module.exports = {
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 
@@ -106,7 +108,10 @@ module.exports = {
         gs._spellCancelled = true;
         return;
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
+      if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+        gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+        return;
+      }
 
       // ── Step 3: snap N AFTER cost (deleted Kirin doesn't count) ──
       const N = countDifferentRebelliokaiInDiscard(ps, engine);

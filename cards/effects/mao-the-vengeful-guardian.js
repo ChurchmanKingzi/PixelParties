@@ -168,8 +168,9 @@ module.exports = {
     // The buffKey is `mao_negated` so the status badge / hover-tooltip
     // surfaces as "Mao-Negated" (matches the BUFF_ICONS entry in
     // app-shared.jsx).
+    // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2 (A07-28).
     await engine.actionNegateCreature(inst, CARD_NAME, {
-      expiresAtTurn: gs.turn + 1,
+      expiresAtTurn: gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
       buffKey: 'mao_negated',
       removeAnim: 'negate_release',

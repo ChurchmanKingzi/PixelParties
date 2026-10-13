@@ -103,7 +103,7 @@ async function insDeck(engine, inst, maxLevel) {
   hps.mainDeck.push(cardName);
 
   await engine.runHooks('onCardLeaveZone', {
-    card: inst, fromZone: 'support',
+    card: inst, leavingCard: inst, fromZone: 'support',   // leavingCard: Vertrag fuer Selbst-Aufraeumer (A07-05, Dream Lander)
     fromOwner: kontrolleur, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
     toZone: 'deck', toOwner: heim,
     _skipReactionCheck: true,

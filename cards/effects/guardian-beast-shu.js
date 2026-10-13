@@ -65,7 +65,8 @@ module.exports = {
     const deckSet = new Set(deck);
     return engine.cardInstances.some(c =>
       c.controller === pi && c.zone === 'support' && !c.faceDown
-      && deckSet.has(c.name));
+      && deckSet.has(c.name)
+      && engine.isChoosableAsCreature(c, engine.getEffectiveCardData(c)));   // A07-08: nur Kreaturen
   },
 
   async onCreatureEffect(ctx) {
@@ -84,8 +85,10 @@ module.exports = {
     // copies remain (also drives the per-target delete-cost cap below).
     const deckCounts = new Map();
     for (const n of (ps.mainDeck || [])) deckCounts.set(n, (deckCounts.get(n) || 0) + 1);
+    // „Creature": Ausrüstung/Anhängsel in der Support-Zone zählen nicht (A07-08).
     const ownCreatures = engine.cardInstances.filter(c =>
-      c.controller === pi && c.zone === 'support' && !c.faceDown);
+      c.controller === pi && c.zone === 'support' && !c.faceDown
+      && engine.isChoosableAsCreature(c, engine.getEffectiveCardData(c)));
     if (ownCreatures.length === 0) return false;
     // Need at least one Creature WITH deck copies — otherwise everything
     // would be grayed out and the prompt has no valid pick.

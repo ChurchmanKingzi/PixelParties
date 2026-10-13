@@ -61,6 +61,8 @@ function freshSacrificableCount(engine, pi) {
   return n;
 }
 
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
+
 module.exports = {
   activeIn: ['support'],
 
@@ -152,4 +154,9 @@ module.exports = {
   },
 
   cpuMeta: { alwaysCommit: true },
+
+  hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+  },
 };

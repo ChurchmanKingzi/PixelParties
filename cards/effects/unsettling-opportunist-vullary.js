@@ -54,7 +54,7 @@ function freeHostSlot(ps, heroIdx) {
   return -1;
 }
 
-function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
+function levelMaxNCreatureNames(engine, pi, hand, maxLevel, heroIdx = -1) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   const out = [];
@@ -67,10 +67,15 @@ function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
     // Effective level (handIdx forwarded so per-slot offsets count).
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
     if (lvl > maxLevel) continue;
+    // „regardless of its level" — nur das LEVEL entfaellt; die kartenseitigen
+    // Beschwoerungstore (`canSummon`: Gigantisaurier, Guardian Beasts …) gelten (A07-04).
+    if (heroIdx >= 0 && !engine.isCreatureSummonable(cn, pi, heroIdx)) continue;
     out.push(cn);
   }
   return out;
 }
+
+const { heldFolgtAbgang } = require('./_dream-lander-shared');   // A07-05
 
 module.exports = {
   activeIn: ['support'],
@@ -92,7 +97,7 @@ module.exports = {
     // Mode B: Mary attached — summon Lv≤3 Creature with bypass.
     if (ps.summonLocked) return false;
     if (freeHostSlot(ps, ctx.cardHeroIdx) < 0) return false;
-    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3).length > 0;
+    return levelMaxNCreatureNames(engine, ctx.cardOwner, ps.hand, 3, ctx.cardHeroIdx).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -116,7 +121,7 @@ module.exports = {
     // Mode B: bypass-summon a Lv≤3 Creature with negate-until-next-turn.
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
-    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3);
+    const eligible = levelMaxNCreatureNames(engine, pi, ps.hand, 3, heroIdx);
     if (eligible.length === 0) return false;
 
     const slot = freeHostSlot(ps, heroIdx);
@@ -136,6 +141,12 @@ module.exports = {
     // Re-verify free slot — async prompt could have shifted state.
     const slotNow = freeHostSlot(ps, heroIdx);
     if (slotNow < 0) return false;
+
+    // Beschwoerungskosten der Kreatur (`beforeSummon`: Opfer, Tribut …) zahlen —
+    // `actionPlaceCreature` fuehrt sie nicht aus (A07-04).
+    if (!(await engine._runBeforeSummon(chosenName, pi, heroIdx, {}, slotNow))) return false;
+    if ((ps.hand || []).indexOf(chosenName) < 0) return false;
+    if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0) return false;   // Kosten koennen den Platz belegt haben
 
     // Place — `actionPlaceCreature` bypasses level/school via the
     // placement code path. `countAsSummon: false` keeps the per-turn
@@ -187,4 +198,9 @@ module.exports = {
   },
 
   cpuMeta: { alwaysCommit: true },
+
+  hooks: {
+    // A07-05: der angelegte Held folgt der Kreatur in die Ablage, wenn sie ohne Schadens-Tod geht.
+    onCardLeaveZone: heldFolgtAbgang,
+  },
 };

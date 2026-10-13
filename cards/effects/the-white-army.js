@@ -76,6 +76,7 @@ module.exports = {
       const upper = Math.min(cap, candidates.length);
       const picked = await engine.promptEffectTarget(pi, candidates, {
         title: CARD_NAME,
+        sourceCard: ctx.card,   // Quelle -> Post-Target-Fenster (Castling, Invisibility Cloak) oeffnet (A06-33)
         description: `Freeze up to ${upper} target(s) for 1 turn.`,
         confirmLabel: '❄️ Freeze!',
         confirmClass: 'btn-info',

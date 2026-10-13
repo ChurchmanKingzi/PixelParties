@@ -463,6 +463,7 @@ module.exports = {
       // got summoned, or as many as possible").
       const freezePick = await engine.promptEffectTarget(pi, freezeCandidates, {
         title: CARD_NAME,
+        sourceCard: ctx.card,   // Quelle -> Post-Target-Fenster (Castling, Invisibility Cloak) oeffnet (A06-33)
         description: `Choose ${freezeMax} target(s) to Freeze for 1 turn.`,
         confirmLabel: '❄️ Freeze!',
         confirmClass: 'btn-info',

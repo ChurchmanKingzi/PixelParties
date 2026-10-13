@@ -113,6 +113,7 @@ module.exports = {
 
     const picked = await engine.promptEffectTarget(pi, candidates, {
       title: CARD_NAME,
+      sourceCard: ctx.card,   // Quelle -> Post-Target-Fenster (Castling, Invisibility Cloak) oeffnet (A06-33)
       description: `Choose a Frozen target. Deal ${DAMAGE} damage to it and free it from Freeze.`,
       confirmLabel: `🗡️ ${DAMAGE} Damage!`,
       confirmClass: 'btn-danger',

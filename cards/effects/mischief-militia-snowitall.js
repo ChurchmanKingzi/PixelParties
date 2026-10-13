@@ -33,6 +33,7 @@ const { hasCardType, isSummonablePileCreature } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { CARDINAL_NAMES } = require('./_cardinal-shared');
 const { countFrozenTargets } = require('./_mischief-militia-shared');
+const { eligibleSummonZones } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Mischief Militia - SnowItAll';
 const FREEZE_DURATION = 2;
@@ -77,27 +78,23 @@ function _getSummonableHandIndices(engine, pi) {
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
     if (lvl > 1) continue;
     if (!_isFreezableOnSummon(cn)) continue;
+    // „summon … as an additional Action" ist eine normale Beschwoerung (Ruling 8.8.):
+    // ohne tauglichen Beschwoerer mit freier Zone (Schule/Level, Status,
+    // summonLocked, Aktionssperre) ist die Karte nicht waehlbar (A06-25).
+    if (_findFreeOwnSupportSlots(engine, pi, cn).length === 0) continue;
     out.push(i);
   }
   return out;
 }
 
-function _findFreeOwnSupportSlots(engine, pi) {
+function _findFreeOwnSupportSlots(engine, pi, cardName) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  const slots = [];
   // Kontrolle statt Seite (Styx 28.9.): alle Helden, die `pi` kontrolliert
   // (auch uebernommene der Gegenspalte); `owner` = physische Seite.
-  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
-    if (!hero?.name || hero.hp <= 0) continue;
-    const zones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
-    for (let zi = 0; zi < 3; zi++) {
-      if ((zones[zi] || []).length === 0) {
-        slots.push({ owner: physOwner, heroIdx: hi, slotIdx: zi, label: `${hero.name} — Slot ${zi + 1}` });
-      }
-    }
-  }
-  return slots;
+  // Nur Zonen tauglicher Beschwoerer fuer GENAU diese Karte (A06-25).
+  return eligibleSummonZones(engine, pi, cardName, { nachKontrolle: true })
+    .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx, label: z.label }));
 }
 
 module.exports = {
@@ -142,8 +139,7 @@ module.exports = {
 
     // Must have at least one Lv≤1 freezable Creature in hand.
     if (_getSummonableHandIndices(engine, pi).length === 0) return false;
-    // Must have at least one free own Support Zone to land into.
-    if (_findFreeOwnSupportSlots(engine, pi).length === 0) return false;
+    // (Freie Zone eines tauglichen Beschwoerers ist schon Teil der Handauswahl.)
 
     // Summon-turn gate: a Frozen target must already exist for the
     // haste to apply. Off-summon-turn, the standard sickness gate
@@ -236,7 +232,7 @@ module.exports = {
       // exactly 1 eligible Creature, both steps auto-pick — no way
       // to cancel back, which matches the "single legal choice"
       // expectation.
-      const freeSlots = _findFreeOwnSupportSlots(engine, pi);
+      const freeSlots = _findFreeOwnSupportSlots(engine, pi, chosenName);
       if (freeSlots.length === 0) return false;
       if (freeSlots.length === 1) {
         dest = freeSlots[0];

@@ -98,8 +98,10 @@ module.exports = {
     return countDifferentRebelliokaiInDiscard(ps, engine);
   },
 
-  spellPlayCondition(gs, pi /*, engine */) {
+  spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 
@@ -135,7 +137,10 @@ module.exports = {
       // reaction during the prompt could have shifted the pile). If
       // missing, the Attack still resolves but no cost was paid.
       if ((ps.discardPile || []).indexOf(COST_NAME) >= 0) {
-        await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
 
       // Pre-resolution hook (Doq's guess, future "when this Hero

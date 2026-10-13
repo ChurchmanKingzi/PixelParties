@@ -364,7 +364,10 @@ module.exports = {
     onCardLeaveZone: (ctx) => {
       const engine = ctx._engine;
       const inst = ctx.card;
-      const leaving = ctx.leavingCard;
+      // `actionTransferCreature` (dauerhafte Uebernahme) feuert den Hook ohne
+      // `leavingCard`, nur mit `_onlyCard: inst` — auch das ist ein Abgang
+      // aus der Kontrolle des bisherigen Kontrolleurs (A07-11).
+      const leaving = ctx.leavingCard || (ctx._onlyCard && ctx._onlyCard.id === ctx.card?.id ? ctx.card : null);
       if (!inst || !leaving) return;
       if (leaving.id !== inst.id) return;
       if (ctx.fromZone !== 'support') return;

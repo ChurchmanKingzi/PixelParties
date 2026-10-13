@@ -65,4 +65,27 @@ function istAttackOderSpell(engine, quelle, hasCardType) {
   return !!cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'));
 }
 
-module.exports = { traeger, zielVon, istTraegerZiel, portalKandidaten, istAttackOderSpell };
+/**
+ * `onCardLeaveZone` eines Dream Landers: verlaesst er das Brett OHNE Schadens-Tod
+ * (Zerstoerung per Effekt, Opfer, Zurueckmischen, auf die Hand), folgt der
+ * angelegte Held in die Ablage des urspruenglichen Besitzers (Engine-Vertrag
+ * `actionAttachHeroToCreature`). Sonst verschwaende er aus dem Spiel (A07-05).
+ * Der Schadens-Tod feuert den Hook ohne `toZone` und raeumt in der Engine
+ * selbst auf — dort tut dieser Helfer nichts (kein Doppeleintrag).
+ */
+function heldFolgtAbgang(ctx) {
+  const inst = ctx.card;
+  if (!inst || ctx.leavingCard?.id !== inst.id) return;
+  if (ctx.fromZone !== 'support' || ctx.toZone == null || ctx.toZone === 'support') return;
+  const held = inst.counters?.attachedHero;
+  if (!held) return;
+  const engine = ctx._engine;
+  const ps = engine.gs.players[inst.originalOwner ?? inst.owner];
+  if (!ps) return;
+  if (!ps.discardPile) ps.discardPile = [];
+  ps.discardPile.push(held);
+  delete inst.counters.attachedHero;
+  engine.log('attached_hero_discarded', { hero: held, creature: inst.name, player: ps.username });
+}
+
+module.exports = { traeger, zielVon, istTraegerZiel, portalKandidaten, istAttackOderSpell, heldFolgtAbgang };

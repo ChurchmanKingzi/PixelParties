@@ -104,6 +104,8 @@ module.exports = {
     // whole effect — the deck-search step is core, mulligan-style
     // shuffle-back also implies hand contents). Grey out in hand.
     if (ps.handLocked) return false;
+    // „Delete … from your discard pile": unter Knight of Kings [B] nicht zahlbar (A06-08).
+    if (engine && !engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi })) return false;
 
     const ds = ps.discardPile || [];
     // Cost: at least 1 Tanuki must be in discard to delete.
@@ -140,7 +142,10 @@ module.exports = {
         gs._spellCancelled = true;
         return;
       }
-      await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME });
+      if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+        gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+        return;
+      }
 
       // Snap budget AFTER cost was paid — the deleted Tanuki doesn't
       // count toward its own bounce total.
