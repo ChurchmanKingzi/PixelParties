@@ -422,6 +422,26 @@ module.exports = {
         console.error(`[Singing] borrowed onCreatureEffect threw for ${realInst.name}:`, err.message);
         result = false;
       }
+      // M02-24: Verschiebt der Effekt die Kreatur selbst in die Surprise Zone
+      // („move this Creature … into the Hero's Surprise Zone", Pure Advantage Camel & Co.),
+      // landet die Zonenänderung auf der Schatten-Instanz; die Zonen-Arrays der Brettseite
+      // sind aber schon umgeschrieben. Die echte Instanz folgt, sonst bleibt eine
+      // Geister-Instanz „im Support" zurück (zählt z. B. bei Massacre mit).
+      const echt = engine.cardInstances.find(c => c.id === realInst.id);
+      if (echt && echt.zone === 'support') {
+        if (fakeInst.zone === 'surprise') {
+          echt.zone = 'surprise';
+          echt.heroIdx = fakeInst.heroIdx;
+          echt.zoneSlot = fakeInst.zoneSlot;
+          echt.faceDown = true;
+          echt.knownToOpponent = true;
+          engine._resetCreatureForSurpriseZone(echt);
+        } else if (fakeInst.faceDown) {   // Bakhm-Platz: verdeckt an Ort und Stelle
+          echt.faceDown = true;
+          echt.knownToOpponent = true;
+          engine._resetCreatureForSurpriseZone(echt);
+        }
+      }
     }
 
     engine.sync();
