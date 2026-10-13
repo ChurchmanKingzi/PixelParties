@@ -28,6 +28,13 @@ module.exports = {
 
   placesPollutionTokens: true,
 
+  // "You can only play 1 Pyroblast per turn": die zweite Karte ist gar nicht
+  // erst spielbar (sonst verpufft sie in der Ablage). Gleicher Stempel wie
+  // `ctx.hardOncePerTurn('pyroblast')` unten.
+  spellPlayCondition(gs, pi) {
+    return gs.hoptUsed?.[`pyroblast:${pi}`] !== gs.turn;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
