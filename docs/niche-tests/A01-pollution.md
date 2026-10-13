@@ -161,6 +161,7 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Beobachtet:** Cold Coffin 2 und Eraser Beam 3 Tokens (bezahlt); Medusa's Curse, Null Zone, Goldify, Reincarnation: **0** Tokens – ein negierter Zauber kostet nichts, obwohl der Spieler die „Place … to use“-Kosten laut Text und Rulings bezahlt haben müsste.
 - **Repro:** `docs/niche-tests/repro/A01-pollution/17-token-kosten-bei-negation-uneinheitlich.js` (✗ = Kosten nicht bezahlt)
 - **Vermutete Ursache:** nur `cold-coffin.js` und `eraser-beam.js` haben `payActivationCost`; die anderen setzen die Tokens in `onPlay` (nach der Kette; bei Goldify/Reincarnation/Golden Wings sogar erst nach der Zielwahl). Restunsicherheit: ob die Autoren die Token-Kosten dieser Karten bewusst als Teil der Wirkung ansehen.
+- **Nachtrag (Fortsetzung):** Dieselbe Klasse bei **Basketskull** („Remove any number of Doom Counters … to play this card“): in der Kette von Silence negiert, behält die Uhr alle 5 Counter, die Karte liegt in der Ablage (Repro `docs/niche-tests/repro/A01-pollution/17b-basketskull-negiert-zahlt-keine-counter.js`, ✗ = Kosten nicht bezahlt). Einordnung eher C als B, weil die Menge der Counter („any number“) erst in `onPlay` gewählt wird – es gibt vor der Kette keine bezahlbare Menge; eine Lösung bräuchte die Mengenwahl in `payActivationCost`.
 
 ### A01-pollution-18 · Null Zone endet am Anfang statt am Ende des nächsten eigenen Zuges · Stufe A
 - **Karten:** Null Zone (`null-zone.js`)
@@ -179,6 +180,89 @@ Stand/Autor: Agent A01-pollution, 12.10.2026. Karten: 49 in der Liste · (wird f
 - **Beobachtet:** Die frisch genullte Kreatur ist negiert, die vorab kurz negierte nicht mehr (ihre Negation lief zum Zugende ab, Null Zone hat sie wegen `if (isCreatureNegated(inst)) continue;` übersprungen und nichts verlängert).
 - **Repro:** `docs/niche-tests/repro/A01-pollution/19-null-zone-verlaengert-vorab-negierte-nicht.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `null-zone.js`: Überspringen per `isCreatureNegated` statt nur bei bereits vorhandenem `nulled`-Status; die Schleife sollte die Dauer verlängern (oder `nulled` zusätzlich stapeln).
+
+### A01-pollution-20 · Pollution Piranha ist bei komplett belegtem Brett nicht spielbar, obwohl der Token den Platz freimachen würde · Stufe B
+- **Karten:** Pollution Piranha (`pollution-piranha.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: alle 9 Support Zonen belegt (nur Pollution Tokens), Piranha auf der Hand; Kontrolle: 1 freie Zone.
+- **Schritte:** 1. `t.play(0, 'Pollution Piranha', {hero: 0, slot: 0})`. 2. Hand/Brett prüfen.
+- **Erwartet** (Quelle: Kartentext „You must remove a Pollution Token from your side of the board to summon this Creature"; Skript-Dialog `beforeSummon`: „Choose a Pollution Token to consume and summon Pollution Piranha **in its place**"): bei vollem Brett kann die Piranha beschworen werden; der Token wird als Kosten entfernt, die Piranha landet in der frei gewordenen Zone (Muster `canBypassFreeZoneRequirement` / Drop auf belegten Slot wie bei den Teocuilatl-Kreaturen).
+- **Beobachtet:** Kontrolle (1 freie Zone) funktioniert (Piranha beschworen, 1 Token entfernt). Bei 0 freien Zonen lehnt `doPlayCreature` ab (`false`), die Karte bleibt auf der Hand, 9 Tokens bleiben – noch bevor `beforeSummon` den Token entfernen könnte. Ein mit Tokens zugelegtes Brett ist aber gerade der Normalfall, in dem die Piranha helfen soll.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/20-piranha-nicht-spielbar-bei-vollem-brett.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/pollution-piranha.js` – weder `canBypassFreeZoneRequirement` noch `canPlaceOnOccupiedSlot` (beide Hooks gibt es z. B. in `archer-of-teocuilatl.js`). Restunsicherheit: der Text sagt nichts ausdrücklich zu „kein freier Platz"; die Skript-Formulierung „in its place" spricht aber für den Ersetzen-Weg.
+
+### A01-pollution-21 · The Fifth Circle of Hell verdoppelt den ersten Helden eines Mehrziel-Treffers (Text: „exactly 1 target“) · Stufe A
+- **Karten:** The Fifth Circle of Hell (`the-fifth-circle-of-hell.js`), Engine `_naechsterEinzelschadenVerdoppeln`; getestet mit Pyroblast, Flame Avalanche, Forbidden Zone, Chain Lightning
+- **Voraussetzungen / Aufbau:** Fifth Circle in der Area-Zone von Sitz 0, Reality Crack schickt sie in die Ablage (Stempel `gs._naechsterEinzelschadenX2` gesetzt); danach Mehrziel-Zauber auf die Gegner-Helden.
+- **Schritte:** 1. Reality Crack (Area-Wahl abbrechen). 2. Pyroblast auf Gegner-Held 0 + 1 (bzw. Flame Avalanche). 3. HP und Stempel lesen.
+- **Erwartet** (Quelle: Kartentext „the next damage that **exactly 1 target** takes this turn is doubled“; Skriptkopf: „nicht mitten in einem Flächenschlag … bleibt der Stempel stehen“): ein Treffer auf 2+ Ziele zählt nicht – jeder Held verliert den normalen Schaden, der Stempel bleibt für einen späteren Einzelschaden.
+- **Beobachtet:** Pyroblast auf 2 Helden: Held 0 verliert 200 (doppelt), Held 1 100, Stempel verbraucht. Flame Avalanche: [500, 650, 650] (150 Grundschaden → erster Held 300); Forbidden Zone [700, 750, 750]; Chain Lightning ebenso (der erste Held doppelt). Held + Kreatur im selben Pyroblast: der Held wird verdoppelt. Richtig dagegen: zwei Kreaturen-Ziele (ein Stapel mit 2 Einträgen) – der Stempel bleibt stehen.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/21-fifth-circle-verdoppelt-mehrziel-treffer.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/_engine.js` `_naechsterEinzelschadenVerdoppeln` (~12565) schützt nur gegen `gs._deferGameOverCheck > 0`; Mehrfachtreffer über `dealDamageToTargets` laufen aber in der Klammer `_multiHitScope` (`beginMultiHit`, `total >= 2`), und der Heldenpfad (`actionDealDamage` ~8458) fragt die nicht ab. Abhilfe: `this._multiHitScope?.total >= 2` mit auswerten.
+
+### A01-pollution-22 · Soul Shard Ka: die per Suche beschworene Kreatur ist negiert, ihr Einsatz-Effekt läuft trotzdem · Stufe B
+- **Karten:** Soul Shard Ka (`soul-shard-ka.js`), Thep (löst Ka aus), Archer of Teocuilatl, Sleeping Beauty (Beispiele); Vergleich Necromancy
+- **Voraussetzungen / Aufbau:** Thep als Held 0 mit Summoning Magic 3, Ka in der Ablage (nicht diesen Zug dorthin gekommen), im Deck Archer bzw. Sleeping Beauty. Thep setzt Ka (Held-Effekt), Ka sucht die Kreatur.
+- **Schritte:** 1. `t.activateHero(0, 0)` → Ka → im Ka-Dialog Archer (bzw. Sleeping Beauty). 2. Gold / Verknüpfung / Negations-Flag prüfen. Gegenprobe: dieselbe Kreatur per Necromancy aus der Ablage.
+- **Erwartet** (Quelle: Kartentext „… immediately summon it as an additional Action, but **negate its effects** until the end of the turn“; Skriptkopf: „Necromancy-style negated“): wie bei Necromancy kommt die Kreatur negiert ins Spiel, ihr Einsatz-Effekt unterbleibt (Archer: keine 4 Gold; Sleeping Beauty: keine Verknüpfung).
+- **Beobachtet:** Ka → Archer: Gold 100 → 104, Archer danach „negiert“; Ka → Sleeping Beauty: `_linkedHeroOwner` gesetzt (Verknüpfung steht), Kreatur danach „negiert“. Gegenprobe Necromancy: beide Einsatz-Effekte unterbleiben. Die Negation von Ka wirkt also nur auf die späteren (laufenden/aktiven) Effekte, nicht auf den Einsatz-Effekt der gesuchten Kreatur – Ka ist faktisch „suche eine Kreatur Lv ≤ 2 und löse ihren Einsatz-Effekt aus“.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/22-soul-shard-ka-negiert-erst-nach-dem-einsatz-effekt.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/soul-shard-ka.js` – `engine.summonCreatureWithHooks(…)` (Hooks `onPlay`/`onCardEnterZone` laufen sofort) und erst danach `engine.actionNegateCreature(placeRes.inst, …)`; Necromancy negiert vor dem Einsatz-Effekt. Restunsicherheit: ob die Autoren „negate its effects" bewusst nur auf laufende Effekte beziehen.
+
+### A01-pollution-23 · Basketskull: Abbruch der Counter-Mengenwahl verbraucht die Karte statt sie zurückzugeben · Stufe B
+- **Karten:** Basketskull (`basketskull.js`)
+- **Voraussetzungen / Aufbau:** Doom Clock mit 5 Countern in der Area von Sitz 0, Basketskull auf der Hand; im Dialog „Remove how many?“ (Dropdown, `cancellable: true`) wird der Abbrechen-Knopf gedrückt (`{cancelled: true}`).
+- **Schritte:** 1. `t.play(0, 'Basketskull')`. 2. Mengenwahl abbrechen. 3. Hand, Ablage, Uhr prüfen.
+- **Erwartet** (Quelle: Regel 23.9 / CARD_API.md Z. 3104 „`gs._spellCancelled = true` – Spell returns to hand (player cancelled …)“: „Abbruch heißt: nichts ist passiert. Die Karte bleibt auf der Hand, die Aktion wird erstattet“): Basketskull bleibt auf der Hand, Uhr 5 Counter, Aktion erstattet.
+- **Beobachtet:** Die Uhr behält 5 Counter (nichts bezahlt), aber `doPlaySpell` gibt `true` zurück und Basketskull liegt in der **Ablage**: Karte und Aktion sind verbraucht, ohne dass etwas passiert ist. (Dieselbe Folge, wenn auf eine Uhr-Wahl bei zwei Uhren abgebrochen würde: `pickClock` ist dort aber nicht abbrechbar.)
+- **Repro:** `docs/niche-tests/repro/A01-pollution/23-basketskull-abbruch-verbraucht-karte.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/basketskull.js` `onPlay`: `if (!wahl || wahl.cancelled || !wahl.optionId) return false;` (und `if (!uhr) return false;`) – der Rückgabewert `false` wird nicht als Abbruch gelesen; es fehlt `gs._spellCancelled = true` (so wie in `goldify.js`, `reincarnation.js`, `sun-beam.js`, `mana-beacon.js`). Hinweis: die Zielwahl danach ist bewusst nicht abbrechbar (`cancellable: false`), aber die bereits entfernten Counter sind dann bezahlt (Kosten-vor-Wahl-Muster wie Cold Coffin).
+
+### A01-pollution-24 · Acid Rain: ein aus dem Gelöscht-Stapel gewirkter Spell (Circle-Replay) verbraucht das „first time … from their hand“ · Stufe B
+- **Karten:** Acid Rain (`acid-rain.js`), The Fourth Circle of Hell (und die übrigen Circles: Replay aus dem Gelöscht-Stapel), Dante (Auslöser im Test)
+- **Voraussetzungen / Aufbau:** Sitz 1 kontrolliert Acid Rain; Sitz 0 (Zugspieler; Dante als Held 0, Destruction Magic 3 + Magic Arts 3) hat Fourth Circle, Fireball, 2× Heal auf der Hand und eine gelöschte Area im Gelöscht-Stapel (Dantes Vorbedingung). Dante löscht (Weg 1) die Fourth Circle aus der Hand, Antwort „Ja“ zum Circle-Replay; danach spielt Sitz 0 Fireball aus der Hand.
+- **Schritte:** 1. `t.activateHero(0, 0)` (Dante Weg 1, Fourth Circle löschen). 2. Nach-Ketten-Aktion abarbeiten (Replay). 3. `t.play(0, 'Fireball')`. 4. Tokens/Hand zählen.
+- **Erwartet** (Quelle: Kartentext „The first time every turn the turn player plays a Spell **from their hand** …“; Fourth Circle: „play this **deleted** Spell as an additional Action“ – also nicht aus der Hand): der Replay löst Acid Rain nicht aus; der erste Zauber aus der Hand (Fireball) löst die Strafe aus.
+- **Beobachtet:** Acid Rain wird schon beim Replay ausgelöst (Optionswahl, Pollution Token für Sitz 0, Wächter `triggeredOnTurn` gesetzt); der Fireball aus der Hand löst danach nichts mehr aus (Tokens 1 → 1, Hand 4 → 3). Betroffen ist jeder gewirkte Spell, der nicht aus der Hand kommt, sofern er über `_castSpellImmediately` läuft (Circle-Replays 2.–8. Kreis, vermutlich auch der Area-Zauber der Third Circle).
+- **Repro:** `docs/niche-tests/repro/A01-pollution/24-acid-rain-zaehlt-spell-aus-geloescht-stapel.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cards/effects/acid-rain.js` `afterSpellResolved` prüft nur „Zugspieler“ und „Kartentyp Spell“; der Hook trägt keine Herkunft (`_engine.js` ~21848, `_castSpellImmediately`). Restunsicherheit: die Circle-Autoren behandeln den Replay als „Spell spielen“ (Wegwerf-Pool statt Hand); der Acid-Rain-Text sagt aber ausdrücklich „from their hand“.
+
+### A01-pollution-25 · Golden Wings: die Immunität ist quellenblind – sie sperrt auch die eigenen Karten und Opfer-Kosten · Stufe B
+- **Karten:** Golden Wings (`golden-wings.js`); betroffen im Test: Archer of Teocuilatl (Opfer-Kosten), Goldify, Sun Beam, Pyroblast, Cold Coffin (eigene Zauber)
+- **Voraussetzungen / Aufbau:** Sitz 0: eine ältere Kreatur (nicht in diesem Zug beschworen) + Golden Wings und ein zweiter Eigenzauber bzw. Archer auf der Hand. Golden Wings (proaktiv, ohne Aktionskosten) auf die eigene Kreatur.
+- **Schritte:** 1. Golden Wings auf die Kreatur. 2. (a) Archer (Zusatzaktion durch Opfer; die geschützte Kreatur ist die einzige Opfergabe). (b) eigener Goldify / Sun Beam / Cold Coffin / Pyroblast auf dieselbe Kreatur.
+- **Erwartet** (Quelle: Kartentext „That Creature is unaffected by your **opponent's** cards and effects until the end of this turn“; Buff-Tooltip in `_hooks.js`: „Fully immune to all opponent effects“): eigene Zauber und eigene Kosten wirken weiter – nur der Gegner ist ausgesperrt.
+- **Beobachtet:** (a) Archer wird abgelehnt (`doPlayCreature` → `false`, die geschützte Kreatur gilt nicht als Opfer-Kandidat). (b) Eigener Goldify/Sun Beam/Cold Coffin/Pyroblast zahlt seine Kosten, die Kreatur bleibt unberührt; ein eigener Buff (`actionAddCreatureBuff`) wird ebenfalls abgewiesen. Golden Wings setzt `_cardinalImmune`, und die Engine liest diese Marke quellenblind („source-blind by design“, `_engine.js` 12281, 13343, 17877, 17931, 18622, 40387).
+- **Repro:** `docs/niche-tests/repro/A01-pollution/25-golden-wings-blockt-eigene-effekte.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `golden-wings.js` `applyBuff` (`inst.counters._cardinalImmune = true`); für „nur gegnerische Karten“ braucht es eine quellenabhängige Marke (so wie das bereits gesetzte `untargetable_by_opponent` + `_pi`). Restunsicherheit: ob die Autoren die Folgen für eigene Opfer-/Buff-Effekte einkalkuliert haben.
+
+### A01-pollution-26 · Goldify: Gold und Zusatzaktion fließen auch, wenn die Kreatur durch Schutz überlebt · Stufe C
+- **Karten:** Goldify (`goldify.js`); Schutzquellen: Golden Wings (Gegner-Reaktion), Warrior of Teocuilatl, `_cardinalImmune`
+- **Voraussetzungen / Aufbau:** Sitz 0: Goldify + Fireball auf der Hand; Sitz 1: Soul Shard Ba (Lv1) auf dem Brett, (a) Golden Wings auf der Hand (sagt „Ja"), (b) Warrior of Teocuilatl daneben und Doom Clock mit 5 Countern.
+- **Schritte:** 1. `t.play(0, 'Goldify')` auf Ba. 2. Gold, Kreatur, Phase prüfen.
+- **Erwartet** (Quelle: Kartentext „Choose a Creature and defeat it. Gain Gold equal to 5 times its level. If you chose a level 1 or lower Creature, this counts as an additional Action“): unklar – wörtlich sind „defeat“ und „gain Gold“ getrennte Sätze (kein „if you do“), und der Warrior negiert „alle Effekte auf die Kreatur“, nicht den Goldgewinn des Spielers; spielerisch zahlt der Gegner für den Schutz und der Goldify-Spieler bekommt trotzdem das Gold und seine Aktion zurück.
+- **Beobachtet:** In (a) und (b) überlebt Ba; Sitz 0 erhält trotzdem +5 Gold, die Zusatzaktion (Lv ≤ 1) bleibt (Phase 3), die Token-Kosten sind bezahlt.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/26-goldify-gold-trotz-ueberlebender-kreatur.js` (✗ = Gold fließt trotz überlebender Kreatur)
+- **Vermutete Ursache:** `goldify.js` (~Z. 163–185): `await engine.actionDestroyCard(ctx.card, inst)` – das Ergebnis wird nicht ausgewertet, Gold und `_spellFreeAction` folgen unbedingt.
+- **Frage an Al:** Soll Goldify Gold (und die Zusatzaktion) auch dann liefern, wenn die gewählte Kreatur **nicht besiegt** wurde (Schutz) – ja oder nein?
+
+### A01-pollution-27 · Living Illusion: „You cannot summon Creatures for the rest of the turn“ sperrt Effekt-Beschwörungen nicht · Stufe B
+- **Karten:** Living Illusion (`living-illusion.js`), Reincarnation (Kreaturen-Weg), Thep (Held-Effekt), Soul Shard Ka/Khet (über `summonFromDiscard`/`summonCreatureWithHooks`); die Sperre selbst: `ps.summonLocked`
+- **Voraussetzungen / Aufbau:** Sitz 0: 2× Living Illusion, Reincarnation, Dummy-Kreatur auf der Hand; 2× Royal Corgi im Deck, Royal Corgi in der Ablage. Zweiter Aufbau: Thep als Held 0 mit Summoning Magic 3, Soul Shard Ba in der Ablage (schon zu Zugbeginn dort).
+- **Schritte:** 1. Erste Living Illusion (setzt `summonLocked`). 2. Kontrolle: Kreatur aus der Hand. 3. Zweite Living Illusion. 4. Reincarnation (Kreatur aus der Ablage). 5. Thep platziert Soul Shard Ba.
+- **Erwartet** (Quelle: Kartentext „You cannot summon Creatures for the rest of the turn afterwards“; CARD_API.md Z. 1972: die Beschwörungssperre „sperrt in der Engine Hand-, Effekt-Beschwörungen UND Platzierungen“; Z. 18167: „`ps.summonLocked` — immer (jede echte Beschwörung)“; Z. 1968: „PLATZIEREN durch einen Effekt zählt als Effekt-Beschwörung“): unter der Sperre wird keine weitere Kreatur beschworen oder platziert.
+- **Beobachtet:** Hand-Beschwörung wird abgelehnt (Kontrolle ✓) und Necromancy ist gesperrt (`doActivateFreeAbility` → `false`). Aber: die zweite Living Illusion setzt eine zweite Kreatur (2 Corgis), Reincarnation (Ablage → Brett) eine dritte (3 Corgis), und Thep platziert Soul Shard Ba (die Shard-Effekte würden danach ebenfalls feuern). Die Sperre wird nur an der Hand-Prüfung, in `actionPlaceCreature` (`_engine.js` ~25989) und bei per Lader markierten Summon-only-Karten (`blockedBySummonLock`) gelesen.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/27-living-illusion-summonsperre-greift-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `summonCreatureWithHooks` (`_engine.js` ~14899) und `summonFromDiscard` prüfen `ps.summonLocked` nicht; Living Illusion, Reincarnation, Thep, Ka und Khet gehen darüber. Abhilfe: Wächter in `summonCreatureWithHooks` bei `isPlacement`/Effekt-Beschwörung (der Hand-Weg ist schon geprüft). Querschnittsnahe Lücke: dieselbe Sperre setzt auch Create Illusion (`create-illusion.js:186`) – nicht geprüft, ob dort dasselbe zu beobachten ist.
+
+### A01-pollution-28 · Reincarnation: „once per game“ gilt je Held, nicht je Spieler – Regelfrage · Stufe C
+- **Karten:** Reincarnation (`reincarnation.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Held 1 und Held 2 gefallen, 2× Reincarnation auf der Hand, genug freie Zonen (2 je Karte); Modus „Revive Hero".
+- **Schritte:** 1. Reincarnation → Held 1. 2. Zweite Reincarnation (dasselbe Spiel) → Held 2.
+- **Erwartet** (Quelle: Kartentext „You can only revive a Hero with „Reincarnation“ **once per game**“): unklar – wörtlich ist „a Hero … once per game“ ein Spielerlimit (vgl. „You can only play 1 „Eraser Beam“ per game“); das Skript liest es als „jeder Held höchstens einmal“ (`hero.reincarnationRevived`, Kopfkommentar „Each Hero can be revived by Reincarnation AT MOST ONCE per game“).
+- **Beobachtet:** Beide Wiederbelebungen laufen durch (Helden [800, 800, 800] nach der zweiten Karte, 4 Tokens). Im Skript steht keine Rulings-Quelle für die je-Held-Lesart; `CARD_API.md` erwähnt die Karte nicht.
+- **Repro:** `docs/niche-tests/repro/A01-pollution/28-reincarnation-einmal-pro-spiel-je-held-oder-je-spieler.js` (✗ = zweite Wiederbelebung geht durch; unter der Lesart „je Spieler“ ein Fehler)
+- **Vermutete Ursache:** `reincarnation.js` `getReviveTargets`: Sperre nur über das Heldenflag `reincarnationRevived`, kein Spieler-Zähler.
+- **Frage an Al:** Darf Reincarnation im Spiel **einmal je Held** (zwei Helden = zwei Wiederbelebungen) oder insgesamt **nur einmal** einen Helden wiederbeleben?
 
 ## Abdeckung
 (wird ergänzt)

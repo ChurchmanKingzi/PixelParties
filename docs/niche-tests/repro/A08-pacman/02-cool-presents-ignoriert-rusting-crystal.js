@@ -18,7 +18,7 @@ const H = require('../../lib/h.js');
     t.engine.handZugangSync(0, 'Cool Presents');
     if (mitRusting) t.engine.handZugangSync(0, 'Rusting Crystal');
     for (const n of [F, A, D]) t.engine.handZugangSync(0, n);
-    await t.play(0, 'Cool Presents');                      // öffnet die Zielwahl (Potion-Targeting)
+    await t.play(0, 'Cool Presents', { noAutoConfirm: true });   // öffnet die Zielwahl (Potion-Targeting); Auswahl von Hand
     const pt = t.gs.potionTargeting;
     const ids = pt.validTargets.filter(v => [F, A, D].includes(v.cardName)).map(v => v.id);
     const g0 = t.gs.players[0].gold;

@@ -61,5 +61,22 @@ async function vullary(hand, discard, vorher) {
   const gb = t.inst(c => c.zone === 'support' && c.owner === 0 && /^Guardian Beast /.test(c.name)).map(c => c.name);
   R.check('Guardian Beasts werden bei gefüllter Ablage NICHT über Stellin beschworen', gb.length === 0, gb);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+
+  // Ergänzung (Fortsetzungsagent): auch der Deck-Weg von Stellin („1 level 0 Creature from your deck") läuft über
+  // `summonCreatureWithHooks` und prüft `canSummon` nicht – Guardian Beast Tu landet trotz gefüllter Ablage auf dem Brett.
+  R.section('Stellin, Deck-Weg + Guardian Beast Tu bei nicht leerer Ablage');
+  {
+    const t2 = await H.fresh({ hand: [['Stellan, the Calm Cat'], []], discard: [[F, F], []], deck: [['Guardian Beast Tu', ...Array(9).fill(F)], []] });
+    const st2 = t2.put(0, 0, 0, 'Stellin, the Calm Dictator'); st2.turnPlayed = 1;
+    t2.gs.activePlayer = 0; t2.phase(2);
+    await t2.activateCreature(0, 0, 0);
+    t2.script.push({ match: d => d && d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx, owner: d.zones[0].owner }) });
+    t2.script.push({ match: d => d && d.type === 'cardGallery', answer: (d) => ({ cardName: d.cards[0].name, source: 'deck' }) });
+    t2.script.push({ match: d => d && d.type === 'optionPicker', answer: () => ({ optionId: 'deck' }) });
+    await t2.engine.actionDealCreatureDamage({ name: 'Test', owner: 1, heroIdx: 0 }, st2, 10, 'creature');
+    await t2.engine._flushSurpriseDrawChecks();
+    R.check('Guardian Beast Tu wird bei gefüllter Ablage NICHT über Stellins Deck-Weg beschworen', !t2.find('Guardian Beast Tu', 'support'), t2.inst(c => c.zone === 'support' && c.owner === 0).map(c => c.name));
+    R.check('keine Engine-Fehler (Deck-Weg)', t2.errors.length === 0, t2.errors);
+  }
   R.finish();
 })();

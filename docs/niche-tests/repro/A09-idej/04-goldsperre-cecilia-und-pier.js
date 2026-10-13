@@ -33,7 +33,7 @@ const H = require('../../lib/h.js');
   R.section("Smuggler's Pier");
   {
     const t = await mk();
-    t.setGold(0, 100);   // Spielkosten der Pier sind eine eigene Frage (siehe A09-10); hier geht es um das Ausgeben per Effekt
+    t.setGold(0, 100);   // Spielkosten der Pier sind eine eigene Frage (siehe A09-11); hier geht es um das Ausgeben per Effekt
     await t.play(0, "Smuggler's Pier", {});
     t.setGold(0, 100);
     const h = t.pile(0, 'hand').length;

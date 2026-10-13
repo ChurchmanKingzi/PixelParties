@@ -59,6 +59,79 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/06-big-gwen-guard-vs-grinning-cat.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `_engine.js:23751-23775` (Sperre der Hand-Kreaturen) kennt keine Ausnahme für Karten, deren Beschwörung die Katze selbst als Kosten abwirft; `big-gwen-guard.js` `canSummon`/`beforeSummon` laufen erst nach dem Sperrcheck. Restunsicherheit (daher B): „Kosten zuerst" ist die natürliche, aber nicht ausdrücklich entschiedene Lesart.
 
+### A08-07 · Extra Life (Trial of Coolness) rettet eine Kreatur nur vor Schaden, nicht vor einem „defeat"-Effekt · Stufe A
+- **Karten:** Trial of Coolness (`trial-of-coolness.js`), Afflicted Vermin (`afflicted-vermin.js`), Trial of Dominance (`trial-of-dominance.js`), Engine `_actionDestroyCardKern`
+- **Voraussetzungen / Aufbau:** Sitz 1 hat eine „ZZ Dummy"-Kreatur mit der Extra-Life-Marke von Trial of Coolness (`engine.addExtraLife`); Sitz 0 spielt (a) Afflicted Vermin (Gegner beschwört → Vermin besiegt die markierte Kreatur) bzw. (b) Trial of Dominance.
+- **Schritte:** 1. Marke setzen. 2. Vermin auslösen bzw. Dominance spielen. 3. Brett/Ablage/gelöscht und Marke prüfen. (Kontrolle: tödlicher Fireball-Schaden auf dieselbe Kreatur.)
+- **Erwartet** (Trial of Coolness: „The next time that target is defeated, immediately revive it and fully heal its HP."; Vermin: „Choose a different Creature and defeat it"; Dominance: „Defeat all Creatures your opponent controls and delete them."): Jedes „defeat" löst das Extraleben aus – so macht es die Engine bei Helden auf allen Todeswegen, und bei Kreaturen durch Schaden (Kontrolle ✓).
+- **Beobachtet:** Vermin: die Kreatur liegt in der Ablage, die Marke ist **unverbraucht** (`_extraLifeStack` noch 1). Dominance: die Kreatur wird gelöscht, die Marke bleibt an der gelöschten Instanz. Nur der Schadensweg verbraucht die Marke.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/07-extraleben-kreatur-nur-bei-schaden.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js:46964` (Schadens-Stapel: `counters._extraLife` → `_reviveAfterDeath`) ist die einzige Stelle, die die Kreatur-Marke liest; `_actionDestroyCardKern` (Vermin, Dominance, jedes „defeat"/„destroy") kennt sie nicht. Folge außerdem: Trial of Coolness auf eine Kreatur schützt nicht vor Dominance des Gegners.
+
+### A08-08 · Distracting Crystal sperrt Horn in a Bottle nicht (Trank ohne Zielwahl) · Stufe A
+- **Karten:** Distracting Crystal (`distracting-crystal.js`, `_crystals-shared.js: shuffleIntoDeckBlocked`), Horn in a Bottle (`horn-in-a-bottle.js`, trägt `shufflesFromHandOrDiscardIntoDeck: true`), `server.js: doUsePotion`
+- **Voraussetzungen / Aufbau:** Sitz 0: Hand Distracting Crystal + 3 Füller; Horn in a Bottle wird über den echten Weg (`doUsePotion`) gespielt; Handauswahl wählt 1 Füller.
+- **Erwartet** (Distracting Crystal: „…you cannot activate effects that include adding cards from your hand or discard pile to your deck."; Horn: „Shuffle any number of cards from your hand back into your deck…"; Skriptkopf Horn: „Von Distracting Crystal gesperrt"): Ausspielen wird abgelehnt (`false`), Horn bleibt in der Hand, das Deck bleibt unverändert.
+- **Beobachtet:** `play = true`: eine Handkarte geht ins Deck, 2 Karten werden gezogen, Horn landet in der Ablage – mit Kristall auf der Hand exakt wie ohne.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/08-distracting-crystal-sperrt-horn-in-a-bottle-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Das Tor `isShuffleIntoDeckBlockedByDistractingCrystal` steht in `doPlaySpell` (`server.js:8056`), `doUseArtifactEffect` (`:12140`), `doConfirmPotion` (`:11253`) und den Aktivierungs-Handlern – aber nicht in `doUsePotion` (`:11849`). Horn in a Bottle hat keine Zielwahl und läuft deshalb nie durch `doConfirmPotion`. (Es ist der einzige Trank mit der Marke.)
+
+### A08-09 · Distracting Crystal erfasst drei Karten mit genau dem gesperrten Effekt nicht (Staff of the Teleporter, Brainstorming, Priest of Luna/Tempeste) · Stufe B
+- **Karten:** Distracting Crystal, Staff of the Teleporter (`staff-of-the-teleporter.js`), Brainstorming (`brainstorming.js`), Priest of Luna (`priest-of-luna.js`) und Priest of Tempeste (nur gelesen, nicht getestet; gleiche Kosten über `_priest-shared.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0 hält Distracting Crystal; (a) Staff + 3 Füller, (b) Brainstorming mit 4 gleichen Karten in der Ablage, (c) Priest of Luna mit 5 verschiedenen Kreaturen in der Ablage (Zusatzbeschwörung in Main Phase 1).
+- **Erwartet** (Distracting Crystal wie A08-08; Staff: „Shuffle any number of cards from your hand into your deck…"; Brainstorming: „…shuffle 4 cards with the same name from your discard pile back into your deck"; Priest: „You may shuffle 5 Creatures … from your discard pile back into your deck to summon this Creature"): alle drei sind mit dem Kristall auf der Hand nicht aktivierbar – wie Horn in a Bottle, Leadership, Renewable Energy, Guard Duty, die die Marke tragen.
+- **Beobachtet:** Alle drei laufen unverändert durch (Staff mischt 1 Karte, Brainstorming mischt 4 zurück, Priest wird beschworen, die 5 Kreaturen gehen ins Deck).
+- **Repro:** `docs/niche-tests/repro/A08-pacman/09-distracting-crystal-ungekennzeichnete-karten.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Das Tor liest ausschließlich die Skript-Marke `shufflesFromHandOrDiscardIntoDeck` (`server.js:8018`, `_engine.js:40898/41505/42530`); die drei Skripte tragen sie nicht (Meditation und Motharch Squire haben noch kein Skript). Restunsicherheit (daher B): kein Ruling, dass der Kristall wirklich *jeden* solchen Effekt meint – aber der Kartentext sagt es.
+
+### A08-10 · Distracting Crystal und Einsatz-/Auslöser-Effekte, die ins Deck mischen (Black Marketeer, Deepsea Stein, The Stormblade, Lunatic Cycle - Crescent Moon) · Stufe C
+- **Karten:** Distracting Crystal; Black Marketeer (`black-marketeer.js`), Deepsea Stein (`deepsea-stein.js`), The Stormblade (`the-stormblade.js`), Lunatic Cycle - Crescent Moon (`lunatic-cycle-crescent-moon.js`) – alle tragen die Marke, deren Kommentar „Distracting Crystal sperrt genau das" lautet.
+- **Aufbau:** Sitz 0 hält den Kristall; (a) Black Marketeer bzw. Deepsea Stein wird beschworen, Ablage hat Karten; (b) Stormblade/Crescent Moon am Helden, der Held spielt Fireball.
+- **Erwartet / Beobachtet:** Die Marke wirkt nur an den Aktivierungs-Handlern. Der Einsatz-Effekt der Kreaturen (`hooks.onPlay`) und die Auslöser der Ausrüstungen (`onAnyActionResolved`) laufen am Tor vorbei: Galerie bzw. Handauswahl öffnen sich, es wird gemischt (Marketeer sogar mit Goldgewinn +4/Karte). Ob das Beschwören einer Kreatur / ein Pflicht-Auslöser „ein Effekt, den man aktiviert" ist, sagt der Kartentext nicht.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/10-distracting-crystal-einsatz-und-ausloeser-effekte.js` (✗ = Lesart „Sperre gilt auch hier" verletzt)
+- **Vermutete Ursache:** Einsatz-/Auslöser-Effekte fragen `shuffleIntoDeckBlocked` nirgends ab (nur `future-tech-weathercock.js:103` tut es selbst); `actionRecycleCards` prüft nur Hatusbal (`_engine.js:26809`).
+- **Frage an Al:** Soll Distracting Crystal auch den Einsatz-Effekt (Marketeer/Stein beim Beschwören) und die Auslöser von Stormblade/Crescent Moon unterdrücken – ja oder nein?
+
+### A08-11 · Afflicted Pests legt ein gewähltes Token in die Ablage statt es zu löschen · Stufe A
+- **Karten:** Afflicted Pests (`afflicted-pests.js`); betrifft jedes Token auf dem Brett (Mummy Token, Pollution Token, Puppets …)
+- **Voraussetzungen / Aufbau:** Sitz 0: Pests als Surprise am Helden 0; ein Mummy Token bzw. Pollution Token liegt in einer Support Zone (eigene Seite, im Vergleich auch Gegnerseite); Sitz 1 rüstet „Club of Gobbo" aus → Pests löst aus, das Token wird gewählt.
+- **Erwartet** (Pests: „Choose a card in any Hero's Support Zone and send it to the discard pile"; Engine-Konvention: Tokens kommen nie in die Ablage, `_engine.js:47686-47706` „Tokens go to deleted pile", `_enforceSupportZoneLock` „Token → Deleted"): das Token verschwindet, in der Ablage liegt kein Token (Gelöscht-Stapel bzw. gar nichts).
+- **Beobachtet:** „Mummy Token"/„Pollution Token" liegt danach als Karte in der Ablage des Besitzers (Gelöscht-Stapel leer). Ein Token in der Ablage ist ein unzulässiger Zustand (Wiederbeleber/Mischeffekte können es von dort holen). `audit()` meldet nichts.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/11-afflicted-pests-token-in-ablage.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `afflicted-pests.js` (~Z. 112-125) entfernt die Karte selbst und schreibt `discardPs.discardPile.push(tCardName)`, ohne die Token-Weiche der Engine. Die Zielliste (`~Z. 44-72`) lässt Tokens ausdrücklich zu (nur Unbewegliche und Verdeckte fallen weg). Zusätzlich splict Pests direkt am Brett statt `actionMoveCard`/`actionDestroyCard` – Zähler, Unter-Karten und Sterbe-Hooks laufen deshalb nicht.
+
+### A08-12 · Trial of Dominance löscht gegnerische Paraseeds nicht – sie nisten sich beim Wirker ein und vergiften ihn · Stufe B
+- **Karten:** Trial of Dominance (`trial-of-dominance.js`), Paraseed (`paraseed.js` `onCreatureDeathClaim`)
+- **Voraussetzungen / Aufbau:** Sitz 1 hat zwei Paraseeds (Held 0, Slot 0/1) und eine weitere Kreatur; Sitz 0 spielt Trial of Dominance.
+- **Erwartet** (Dominance: „Defeat all Creatures your opponent controls and delete them."; Paraseed: „…place it into one of the attacking or corresponding Hero's free Support Zones **instead of sending it to the discard pile**"): Dominance löscht – es schickt nichts auf den Ablagestapel, die Ersetzung der Paraseed greift also nicht; beide Paraseeds liegen im Gelöscht-Stapel von Sitz 1, der Wirker bleibt ungiftig.
+- **Beobachtet:** Beide Paraseeds ziehen in die freien Support Zones von Held 0 des Wirkers; er ist vergiftet. Gelöscht wurde nur die dritte Kreatur.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/12-dominance-loescht-paraseed-nicht.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `actionDestroyCard` löst den Todes-Anspruch (`_deathClaim`, `_engine.js` ~12422-12440, `CARD_API.md` „Kadaver beanspruchen") vor der Löschumleitung `_redirectToDeleted` ein; für „löschen statt ablegen" (Dominance, auch Ghazma) gibt es keinen Vorrang. Restunsicherheit (daher B): kein ausdrückliches Ruling zum Zusammentreffen von Löschen und Kadaver-Anspruch.
+
+### A08-13 · Cactus Creature reagiert nur auf Heldenstatus, nicht auf Status an eigenen Kreaturen · Stufe B
+- **Karten:** Cactus Creature (`cactus-creature.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Cactus Creature als Surprise, eine eigene Kreatur und ein zweiter Held; der Gegner friert (a) Held 0, (b) die Kreatur ein.
+- **Erwartet** (Text: „Activate this Surprise when **a target you control** would be affected by a status effect. Afflict any other target you control with that status effect instead"; das Skript führt Kreaturen selbst als Umleitungsziel und in `canTelekinesisActivate` mit): Auch ein Status an einer eigenen Kreatur öffnet das Fenster.
+- **Beobachtet:** (a) ✓ – Fenster, Frost landet bei Held 1. (b) Kein Fenster, die Kreatur ist eingefroren, die Surprise bleibt verdeckt liegen.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/13-cactus-creature-reagiert-nicht-auf-kreaturenstatus.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_checkSurpriseOnStatus` wird nur in `addHeroStatus` gerufen (`_engine.js:44755`); `applyCreatureStatus` (`_engine.js:17564`) kennt das Fenster nicht. Restunsicherheit (daher B): möglich, dass „target" hier bewusst auf Helden eingeschränkt wurde – das Skript sagt es aber nicht. (Die Umleitung auf Kreaturen funktioniert: Frost/Betäubung/Brand/Gift/Negierung geprüft ✓.)
+
+### A08-14 · Die Waflav-Tutoren (Stormkissed: Deck, Deep-Drowned: Ablage) umgehen Ablage- und Stapelsperren · Stufe B
+- **Karten:** Stormkissed Waflav (`stormkissed-waflav.js`), Deep-Drowned Waflav (`deep-drowned-waflav.js`), gemeinsam `_waflav-shared.js tutorAscendedHeroes`; Sperren: The Eye of Ren, Knight of Kings [B] (auch Staff of Uncontrollable Destruction)
+- **Voraussetzungen / Aufbau:** (a) Sitz 0 spielt The Eye of Ren (Gold danach 0, Freikauf nicht zahlbar), steigt danach zu Deep-Drowned auf; Ablage enthält zwei Ascended Heroes. (b) Sitz 1 hat Knight of Kings [B] + Rook of Kings [B] + Board of Kings; Sitz 0 steigt zu Stormkissed auf, im Deck liegt ein Ascended Hero.
+- **Erwartet** (The Eye of Ren: „You cannot move cards out of your discard pile for the rest of the turn unless you spend an additional 6 Gold."; Knight of Kings [B]: „your opponent cannot move cards from their deck or discard pile to anywhere else"; CARD_API.md „Die Stapel-Schicht (v820)": Sperren hängen in der Schicht, Kartenskripte splicen nie selbst): Beide Tutoren holen nichts.
+- **Beobachtet:** (a) Beide Karten wandern aus der gesperrten Ablage auf die Hand. (b) Der Ascended Hero wandert aus dem gesperrten Deck auf die Hand. Nur die Handsperre (`ps.handLocked`) wird beachtet.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/14-waflav-tutor-umgeht-ablage-und-stapelsperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_waflav-shared.js` ~Z. 540-545: `pile.splice(idx, 1)` + `engine.handZugangSync(ps, picked, {})` statt `engine.takeFromPile`/`addFromPileToHand`. Der Wächter `scripts/check-no-splice.js` sucht nur nach `(mainDeck|discardPile|deletedPile|hand).splice(` und übersieht den Alias `pile`. Gemessen ist nur der Sperren-Effekt; weitere Folgen des Splice (Lethe-Stempel, Deckkopf-Sichtbarkeit) wurden nicht geprüft.
+
+### A08-15 · Deep-Drowned Waflav: der Überladungs-Schlag trifft gewählte Kreaturen nicht, bezahlt aber die Zähler · Stufe A
+- **Karten:** Deep-Drowned Waflav (`deep-drowned-waflav.js`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Deep-Drowned mit 3 Evolution Counters; Sitz 1: eine Kreatur („ZZ Dummy Frail", 10 HP; Vergleich „ZZ Dummy", 200 HP). Held-Effekt → „Surge" → 3 Counter → die Kreatur als Ziel.
+- **Erwartet** (Text: „remove up to 3 Evolution Counters from this Hero to deal 100 damage to a target that many times"; `collectBoardTargets` bietet Kreaturen ausdrücklich an): 3 × 100 Schaden – beide Kreaturen sind besiegt.
+- **Beobachtet:** Die 3 Counter sind weg und der Once-per-turn ist gestempelt, die Kreatur steht unversehrt auf dem Brett (`counters.currentHp` unverändert). Gegen einen Helden als Ziel funktioniert der Schlag (800 → 500 ✓).
+- **Repro:** `docs/niche-tests/repro/A08-pacman/15-deepdrowned-surge-trifft-keine-kreatur.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `deep-drowned-waflav.js` ~Z. 103-106 ruft für Kreaturen `engine.actionDealDamage(source, inst, 100, 'hero')`. `actionDealDamage` ist der Heldenpfad – mit einer Kreatur-Instanz liefert er `{ dealt: 100 }` und ändert nichts (im Test gegengeprüft: `actionDealCreatureDamage` mit denselben Argumenten setzt `currentHp` korrekt).
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

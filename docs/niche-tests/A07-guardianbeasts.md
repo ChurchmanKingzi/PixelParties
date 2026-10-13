@@ -42,6 +42,7 @@ Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (w
 - **Beobachtet:** Alle vier Fälle gehen durch: Held 0 hat danach Triceras UND Pteranos; Tu liegt trotz 2 Ablagekarten auf dem Brett (ebenso Tu+Gou über Stellin); Blue-Ice Dragon liegt ohne Opfer auf dem Brett. Die Galerien bieten die Karten sogar an (`isSummonablePileCreature` prüft nur die Kartenart).
 - **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/04-vullary-stellin-umgehen-beschwoerungsbedingungen.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `actionPlaceCreature` (_engine.js ~25949) ruft weder `isCreatureSummonable` noch `_runBeforeSummon`; die beiden Skripte filtern vorher nur nach Stufe/Kartenart. Xuanwu prüft `isCreatureSummonable` dagegen selbst.
+- **Ergänzung (Fortsetzungsagent, gleiche Ursache, Repro erweitert):** Auch Stellins **Deck-Weg** („1 level 0 Creature from your deck") umgeht `canSummon`: er läuft zwar über `summonCreatureWithHooks` (anders als der Hand-Weg über `actionPlaceCreature`), das Skript fragt aber vor der Galerie nie `isCreatureSummonable` – Guardian Beast Tu landet bei 2 Ablagekarten auf dem Brett. `summonCreatureWithHooks` selbst prüft `canSummon` nicht (Vertrag laut Kommentar an `isCreatureSummonable`: „usable from any summoning effect … that wants to filter its gallery").
 - **Folgefrage (nicht eigens als Befund):** beide Karten stempeln `countAsSummon: false`, d. h. diese „Beschwörungen" zählen nicht für „erste Kreatur, die du in deinem Zug beschwörst" (Harpyformer-Gratisaktion). Vullary: erst Vullary-Kreatur, dann Harpyformer → Harpyformer bleibt gratis. Siehe C-Befund unten.
 
 ### A07-05 · Dream Lander verlässt das Brett ohne Schadens-Tod → der angelegte Held verschwindet aus dem Spiel · Stufe A
@@ -162,4 +163,92 @@ Stand/Autor: Agent A07-guardianbeasts, 12.10.2026. Karten: 59 in der Liste · (w
 - **Warum unsicher:** Der Text sagt „to immediately activate that Creature's active effect"; ob eine Aktivierung, die gar nicht möglich ist, die Kosten verbrauchen darf, entscheidet die Konvention „unmöglich → nicht aktivierbar" (Ruling „Tuscan Artist" 16.8.) – für Mao ausdrücklich nicht entschieden.
 - **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/18-mao-zahlt-trotz-unmoeglicher-aktivierung.js` (✗ = Beobachtung tritt auf)
 - **Frage an Al:** „Soll Mao nur Bestien wählbar machen, deren Effekt gerade aktivierbar ist (wie ‚ineligible' bei den Bestien selbst) – ja oder nein?"
+
+### A07-19 · Pteranos und Raptoren prüfen die Ziehsperre (Tuscan Artist) nicht – Kosten und Once-per-turn verbrannt, nichts gezogen · Stufe B
+- **Karten:** Gigantisaur Pteranos (`gigantisaur-pteranos.js`), Gigantisaur Raptoren (`gigantisaur-raptoren.js`); Gegenprobe Gigantisaur Triceras (`gigantisaur-triceras.js:19`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Pteranos (bzw. Raptoren + ein zweiter Gigantisaurier) ohne Beschwörungsschlaf, Pteranos mit genau einem Gigantisaurier-Namen (Spinor) auf der Hand; Sitz 1: Tuscan Artist; Main Phase 1.
+- **Schritte:** 1. Triceras aktivieren (Gegenprobe). 2. Pteranos aktivieren, Spinor abwerfen. 3. Raptoren mit genau 2 Gigantisauriern auf dem Brett aktivieren.
+- **Erwartet** (Tuscan Artist: „any effect that would allow your opponent to draw 2 or 3 cards is negated"; Ruling `_draw-block-shared.js`/CARD_API.md 16.8.: „Ist der Zug der einzige Nutzen — auch wenn dafür Kosten anfallen — dann ist der aktive Effekt GESPERRT … Ein Effekt, der so nicht feuern kann, verbraucht auch sein Once-per-turn NICHT"): Pteranos (ein Name ⇒ Zug von genau 2) und Raptoren (2 Gigantisaurier ⇒ Zug von genau 2) sind gesperrt wie Triceras.
+- **Beobachtet:** Triceras ist gesperrt ✓. Pteranos wirft Spinor ab, Artist negiert den Zug (Hand 0, Deck unverändert), Once-per-turn gestempelt; Raptoren verbraucht den Zug, nichts wird gezogen.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/19-pteranos-raptoren-ziehsperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `canActivateCreatureEffect` von Pteranos/Raptoren ruft `drawWouldBeBlocked` (`_draw-block-shared.js`) nicht auf; die Liste der Nutzer dort (13 Dateien) enthält beide nicht. Bei Pteranos ist der Effekt nur im Ein-Namen-Fall (Zug = 2) ganz nutzlos – mit 2+ Namen (Zug 4/6) läuft er normal; bei Raptoren nur bei genau 2 oder 3 Gigantisauriern.
+- **Restunsicherheit (daher B):** Das Ruling spricht von Karten, deren Zug „der einzige Nutzen" ist; bei Pteranos kann der Spieler durch weitere Namen ausweichen, die Sperre träfe nur den Ein-Namen-Fall.
+
+### A07-20 · King Trex: die Stufensenkung gilt weiter, wenn Trex negiert/eingefroren/betäubt/von der Clown-Aura stillgelegt ist · Stufe B
+- **Karten:** Gigantisaur King Trex (`gigantisaur-king-trex.js` `_applyOverrides`/`onPlay`/`onTurnStart`/`onCardLeaveZone`); Probe-Karte Gigantisaur Spinor (Lv 3)
+- **Voraussetzungen / Aufbau:** Sitz 0: Trex auf dem Brett (onPlay gefeuert), Helden ohne Schulen, Spinor auf der Hand; Trex dann negiert (`actionNegateCreature`) / gefroren / betäubt (`applyCreatureStatus`) bzw. The Creepy Clown of Heaven auf Sitz 1.
+- **Schritte:** `isCreatureEffectSuppressed(trex)` prüfen, dann `heroMeetsLevelReq(0, 1, Spinor)` bzw. Spinor über den echten Spielweg (`doPlayCreature`) mit Held 1 spielen.
+- **Erwartet** (Trex: „**While you control this Creature**, the levels of all "Gigantisaur" Creatures in your hand are reduced to 0"; Konvention aus B-querschnitt B-01…B-03: eine stillgelegte Kreatur verliert ihre Dauereffekte): mit stillgelegtem Trex ist Spinor ohne Summoning Magic nicht spielbar.
+- **Beobachtet:** In allen vier Zuständen meldet die Engine die Kreatur als stillgelegt (`isCreatureEffectSuppressed === true`), Spinor wird trotzdem ohne Stufe auf Held 1 gespielt (Brett: Trex + Spinor). Die Senkung ist ein einmaliger Stempel in `hero.levelOverrideCards`; nur das Verlassen des Bretts räumt ihn weg.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/20-king-trex-stillgelegt-senkt-weiter.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** Stempel statt Abfrage (`_applyOverrides` bei onPlay/onTurnStart; `onTurnStart` überspringt negierte Trex nur beim Neu-Stempeln, räumt aber nichts ab). Gleiche Klasse wie B-03 (Elven Forager); anders als dort ist das Muster hier ein Stempel, nicht der `reduceCardLevel`-Weg.
+- **Restunsicherheit (daher B):** Ob die Autoren Dauerstempel nach Negation bewusst stehen lassen, ist nicht entschieden; die Frage an Al steht bei B-03 (dieselbe Antwort gilt hier).
+
+### A07-21 · Zieh-Kreaturen ignorieren die Zieh-Sperren uneinheitlich: Kosten verbrannt, nichts gezogen · Stufe C
+- **Karten:** Gigantisaur Triceras, Pteranos, Raptoren, Guardian Beast Tu, Techno Harpyformer (Sperren: `handLocked` z. B. Ice Sculpture Garden/Smuggler's Pier, `drawLocked` The Sacred Jewel/Prayer)
+- **Voraussetzungen / Aufbau:** Sitz 0: die Kreatur ohne Beschwörungsschlaf, passende Kostenkarten (Hand/Ablagen), `ps.handLocked = true` bzw. `ps.drawLocked = true`; Main Phase 1.
+- **Schritte:** Kreatur über `t.activateCreature` aktivieren, Kosten bezahlen.
+- **Erwartet** (Lesart „ein Effekt, der so nicht feuern kann, ist nicht aktivierbar", Ruling Tuscan Artist 16.8. in `_draw-block-shared.js`; Triceras kommentiert `handLocked` im Gate als „locked hand can't draw — wasteful"; Prayer fragt `!ps.drawLocked && !ps.handLocked`): unter der Sperre ist die Aktivierung nicht möglich, es entstehen keine Kosten.
+- **Beobachtet:** Triceras, Pteranos und Raptoren prüfen nur `handLocked`, nicht `drawLocked`: unter `drawLocked` wirft Triceras eine Karte ab (Pteranos 1–2, Raptoren verbraucht den Zug), gezogen wird nichts. Guardian Beast Tu prüft keine von beiden: 3 Karten werden gelöscht, nichts gezogen. Techno Harpyformer wirft unter `handLocked` und `drawLocked` die Inventing-Ability ab, ohne zu ziehen.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/21-zieh-kreaturen-zieh-sperre.js` (✗ = Beobachtung tritt auf)
+- **Warum unsicher:** A06-Bericht (Pawn Sacrifice) und `_loader.js` ≈ Z. 410 halten fest, dass Karten, die „nur ziehen", nicht automatisch gesperrt werden – „eine Verhaltensänderung, die Al entscheiden sollte"; die Triceras-Gruppe ist aber innerhalb sich uneinheitlich (Triceras sperrt bei `handLocked`, Tu und Techno nicht).
+- **Frage an Al:** „Soll eine Karte, deren Wirkung nur aus Kosten und Ziehen besteht (Triceras, Pteranos, Raptoren, Tu, Techno), bei gesetzter Zieh-Sperre (`drawLocked`/`handLocked`) nicht aktivierbar sein – ja oder nein?"
+
+### A07-22 · Classical Harpyformer prüft die Gold-Sperre (Tuscan Aristocrat) nicht – Wealth abgeworfen, kein Gold, Once-per-turn verbraucht · Stufe B
+- **Karten:** Classical Harpyformer (`classical-harpyformer.js`); Gegenprobe Country Harpyformer (`country-harpyformer.js`, `goldGainWouldBeBlocked`)
+- **Voraussetzungen / Aufbau:** Sitz 0: Harpyformer ohne Beschwörungsschlaf, „Wealth" (bzw. „Adventurousness") auf der Hand, 50 Gold; Sitz 1: Tuscan Aristocrat; Main Phase 1.
+- **Schritte:** Harpyformer aktivieren, die Ability als Kosten abwerfen.
+- **Erwartet** (Classical: „discard a Wealth Ability from your hand to gain 5 Gold"; Aristocrat: „your opponent cannot gain any Gold outside their Resource Phase"; Ruling `_gold-block-shared.js` (Al 17.8.): „eine Karte, deren einziger Nutzen ein Gold-Gewinn ist, wird gesperrt statt wirkungslos zu feuern … verbraucht dann auch sein Once-per-turn NICHT"): Classical ist gesperrt wie Country.
+- **Beobachtet:** Country ist gesperrt ✓. Classical lässt sich aktivieren, Wealth landet in der Ablage, Gold bleibt 50, Once-per-turn gestempelt.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/22-classical-harpyformer-goldsperre.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `classical-harpyformer.js canActivateCreatureEffect` fragt nur „Wealth auf der Hand", nicht `goldGainWouldBeBlocked(engine, pi)` (Country tut es in der ersten Zeile).
+
+### A07-23 · Such-Kreaturen (Shu, Shanty, Ska) zahlen ihre Kosten unter Such-/Hand-Sperre und bekommen nichts · Stufe B
+- **Karten:** Guardian Beast Shu (`guardian-beast-shu.js`), Shanty Harpyformer (`shanty-harpyformer.js`), Ska Harpyformer (`ska-harpyformer.js`); Auslöser: Cats of the Pharaoh (`ps.searchLocked`), Ice Sculpture Garden/Smuggler's Pier u. Ä. (`ps.handLocked`)
+- **Voraussetzungen / Aufbau:** Sitz 0: die Kreatur ohne Beschwörungsschlaf; Shu: 4 Füller in der Ablage, Kopie der Brettkreatur im Deck; Shanty: Navigation + Fireball auf der Hand, Fireball im Deck; Ska: Performance auf der Hand, Fighting im Deck; Sperre gesetzt; Main Phase 1.
+- **Schritte:** Kreatur aktivieren, Kosten bezahlen (Kontrolle ohne Sperre: jeweils Wirkung wie erwartet).
+- **Erwartet** (Shu: „… and add them to your hand"; Shanty: „… search your deck for a copy …, and add it to your hand"; Ska: „attach an Ability from your deck"; Cats: „you cannot search or add cards to your hand"; Vergleich A09-05 (Cecilia, „genau die im Skript beschriebene Falle") und die Ruling-Reihe „ein Effekt, der so nicht feuern kann, ist nicht aktivierbar" aus `_draw-block-shared.js`/`_gold-block-shared.js`): unter der Sperre nicht aktivierbar bzw. Abbruch vor der Zahlung.
+- **Beobachtet:** Shu löscht 4 Karten, nichts kommt auf die Hand; Shanty wirft Navigation ab, die Suche scheitert still; Ska wirft Performance ab, es wird nichts angelegt. In allen Fällen Once-per-turn gestempelt.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/23-suchkosten-unter-such-sperre.js` (✗ = Fehler tritt auf; Kontrolle ohne Sperre ✓)
+- **Restunsicherheit:** Ska „attach … from your deck" ist kein Hinzufügen zur Hand im Wortsinn (das Skript führt es aber über `actionAddCardFromDeckToHand` + `attachAbilityFromHand`), daher für Ska unsicherer; für Shu/Shanty („add … to your hand") klar. Nebenfall (C, im Repro): Shanty ist mit **nur** der Navigation auf der Hand aktivierbar, obwohl nach dem Abwurf keine Karte mehr zum „reveal 1 card" bleibt – die Navigation ist dann verloren (`shanty_no_hand`). Frage an Al: „Soll Shanty nur aktivierbar sein, wenn außer der Navigation noch eine Handkarte da ist – ja oder nein?"
+
+### A07-24 · Smug Mastermind Antonia: gegnerische Surprises werden mit einer ID angeboten, die der Client nicht anklicken kann · Stufe B
+- **Karten:** Smug Mastermind Antonia (`smug-mastermind-antonia.js`, lokale `collectNonHeroBoardTargets`, Zweig `inst.zone === 'surprise'`); gleiches Muster (nicht geprüft) in `coolness-overcharge.js:192`, `tengu-windstorm.js:163`, `wall-breaker-general-ralzish.js:126`, `_sparkfly-shared.js:268`
+- **Voraussetzungen / Aufbau:** Sitz 0: Antonia mit angelegter Cool Rescuer Monia (echter Weg: aktivieren), eigene Zweitkreatur, Handkarten; Sitz 1: eine verdeckte Surprise (Booby Trap); Antonia-Auslöser durch 50 Kreaturenschaden auf die eigene Kreatur.
+- **Schritte:** Antonias Zielwahl mitschneiden (`t.targetFn`), die Surprise wählen.
+- **Erwartet** (Antonia: „choose any card on the board that is not a Hero"; Client-Vertrag `app-board.jsx:49785/49817`: eine Surprise-Zone ist nur unter `surprise-<Seite>-<Held>` anklickbar; `_targeting-shared.js:132-141` (v706): „Die alte `equip-…-surprise`-ID war für den Client unsichtbar" – dort mit ID `surprise-<owner>-<heroIdx>`/Typ `surprise` behoben): Surprise-Ziel mit der Client-ID.
+- **Beobachtet:** Antonia bietet `equip-1-0-surprise` mit Typ `equip` (ohne `slotIdx`) an. Die Engine nimmt die Wahl entgegen (Surprise landet in der Ablage ✓), aber im echten Client passt weder die Surprise-Zone (`surprise-1-0`) noch eine Support-Zelle (`type 'equip'` + `slotIdx`) – die Surprise ist für Antonia faktisch nie wählbar. Headless ist die Wahl nur per ID möglich.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/24-antonia-surprise-ziel-id.js` (✗ = Fehler tritt auf; belegt die ID-Abweichung, nicht den Klick selbst)
+- **Vermutete Ursache:** lokale Kopie der Zielsammlung mit der alten ID statt `require('./_targeting-shared')`; Antonias Area-Zweig ist schon auf `areaTargetId` umgestellt, der Surprise-Zweig nicht.
+- **Restunsicherheit (daher B):** Der Klickpfad wurde nur statisch gegen den Client-Code geprüft (kein Browser).
+
+### A07-25 · Smugbeth: der Träger leiht gegnerische Ability-Effekte weiter, wenn Smugbeth von der Clown-Aura / `magic_silenced` stillgelegt ist · Stufe B
+- **Karten:** Smugbeth, the Rebel of no Rules (`smugbeth-the-rebel-of-no-rules.js` `grantsActiveAbilityBorrowToHost`), Engine `_heroHasSmugbethBoost` (`_engine.js` ~42964); Stilllegung durch The Creepy Clown of Heaven (Querschnitt)
+- **Voraussetzungen / Aufbau:** Sitz 0: Smugbeth mit angelegter Lizbeth (echter Weg), Sitz 1: Held 0 mit Wealth-Ability, dazu Clown (Aura) bzw. `counters.magic_silenced`; Zug von Sitz 0.
+- **Schritte:** `engine._getAbilityBorrowerForOppSlot(0, 1, 0, 0)` (der Prüfweg von `doActivateFreeAbility`) in sechs Zuständen.
+- **Erwartet** (Smugbeth: „While this Creature has Lizbeth attached … you may use the active effects of your opponent's Heroes' Abilities"; Konvention aus B-01…B-03: eine stillgelegte Kreatur verliert ihre Dauereffekte, `isCreatureEffectSuppressed`): keine Leihe, solange Smugbeth stillgelegt ist.
+- **Beobachtet:** negiert/gefroren/betäubt ⇒ keine Leihe ✓ (die Engine prüft `negated/nulled/frozen/stunned` einzeln); Clown-Aura und `magic_silenced` ⇒ Leihe bleibt möglich, obwohl `isCreatureEffectSuppressed` true meldet.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/25-smugbeth-leiht-trotz-stilllegung.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_heroHasSmugbethBoost` fragt vier Zähler einzeln ab statt `isCreatureEffectSuppressed(inst)` (das auch abgeleitete Aura-Negation und `magic_silenced` kennt).
+- **Restunsicherheit (daher B):** Nischenfall (Clown/`magic_silenced`); gleiche Klasse wie B-03, deshalb hier mit eigener Ursache statt als weiterer Fall dort.
+
+### A07-26 · Wolflesia: die Zusatz-Zauberaktion bleibt verfügbar, wenn die Kreatur negiert/gefroren/betäubt/aura-negiert ist · Stufe B
+- **Karten:** Wolflesia, the Canine Flower (`wolflesia-the-canine-flower.js` `setupWolflesiaSpellAction`); Engine `findAdditionalActionForCard`/`getAdditionalActions` (`_engine.js` ~39831/39880)
+- **Voraussetzungen / Aufbau:** Sitz 0: Wolflesia mit angelegter Rafflesia (echter Weg), 3× Brilliant Idea (Support Magic Lv 1, keine Inherent-Action) auf der Hand; Wolflesia dann negiert / gefroren / betäubt / Clown-Aura auf Sitz 1; Action Phase.
+- **Schritte:** 1. Brilliant Idea über den Helden spielen (verbraucht die Hauptaktion). 2. Zweite Brilliant Idea mit `viaCreatureInstId` (Wolflesia) spielen. Kontrollen: ohne Wolflesia ⇒ abgelehnt; mit arbeitender Wolflesia ⇒ erlaubt.
+- **Erwartet** (Wolflesia: „… this effect: You may once per turn use a level 3 or lower Decay or Support Spell with this Creature as an additional Action"; Konvention B-01…B-03: stillgelegte Kreatur verliert ihre Effekte): mit stillgelegter Wolflesia gibt es keinen zweiten Zauber.
+- **Beobachtet:** In allen vier Zuständen (`isCreatureEffectSuppressed === true`) wird der zweite Zauber als Zusatzaktion gespielt. Wolflesia legt den Grant (`counters.aaGrants`) per `onAttachHero`/`onTurnStart` ab; der Grant hat kein `expiresAtTurnEnd` und bleibt stehen, und die Engine liest die Grants aller Instanzen des Spielers, ohne die Stilllegung des Anbieters zu prüfen (nur die Hook-Wege der Karte sind stumm).
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/26-wolflesia-zusatzaktion-trotz-stilllegung.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js getAdditionalActions`/`findAdditionalActionForCard` (und der Verbrauchsweg ~39877-39906) fragen `_zusatzAnbieterVon` (Kontrolle), aber nicht `isCreatureEffectSuppressed(inst)`. Gilt vermutlich für jeden Kreaturen-Anbieter mit persistentem Grant (Lunatic Hawk, Psychic Scout, Slippery Polar, Reiza … – nicht gemessen).
+- **Restunsicherheit (daher B):** gleiche Klasse wie B-01…B-03 (Entscheidung steht aus); Wolflesia ist hier das gemessene Beispiel.
+
+### A07-27 · Vullary: der Einsatz-Effekt der beschworenen Kreatur feuert, bevor die Negation greift · Stufe B
+- **Karten:** Unsettling Opportunist Vullary (`unsettling-opportunist-vullary.js` ~140-165); Beispiel Ballad Harpyformer (Einsatz-Suche); Vorbilder: The Master's Key (`negateEffects: true`), Necromancy
+- **Voraussetzungen / Aufbau:** Sitz 0: Vullary mit angelegter Cute Princess Mary (echter Weg), Ballad Harpyformer auf der Hand, „Support Magic" im Deck; Main Phase 1.
+- **Schritte:** 1. Vullary Modus B: Ballad wählen. 2. Prompts/Hand/Deck prüfen.
+- **Erwartet** (Vullary: „… summon a level 3 or lower Creature … but **negate its effects** until the beginning of your next turn"; gleiche Klasse wie A01-pollution-22 (Soul Shard Ka) und die Vorbilder Necromancy/The Master's Key, bei denen die Negation vor dem Einsatz-Effekt steht): Ballad kommt negiert aufs Brett, ihr Einsatz-Effekt („search your deck for a Support Magic Ability") bleibt aus.
+- **Beobachtet:** Ballad liegt danach negiert (✓), aber das Such-Fenster („Search your deck for a "Support Magic" Ability …?") wurde angeboten und „Support Magic" liegt auf der Hand. Vullary ruft `actionPlaceCreature` ohne `negateEffects` und negiert erst danach (`applyCreatureStatus … 'negated'`); der Kommentar im Skript verweist selbst auf `negateEffects: true`.
+- **Repro:** `docs/niche-tests/repro/A07-guardianbeasts/27-vullary-einsatzeffekt-vor-negation.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `unsettling-opportunist-vullary.js` übergibt `negateEffects: true` nicht an `actionPlaceCreature` (Master's Key tut es: `the-master-s-key.js:154`); `negated_placement` wird nachträglich von Hand gesetzt.
+- **Restunsicherheit (daher B):** wie bei A01-pollution-22 – die Autoren könnten „negate its effects" bewusst nur auf laufende/aktive Effekte beziehen.
 

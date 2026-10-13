@@ -19,12 +19,13 @@ const H = require('../../lib/h.js');
   const t = await H.fresh({ heroes: [[SOL, 'Tushu, the Knowledge Keeper', 'Rick, the Trigger Happy Undertaker']], hand: [['Coffee', 'Chain Lightning', 'Chain Lightning'], []] });
   await t.run(() => t.engine.runHooks('onGameStart', {}));
   t.heroStatus(0, 0, 'poisoned'); t.hero(0, 0).statuses.poisoned.stacks = 1;   // alter Negativstatus (appliedTurn 0 < Zug 5)
-  t.targetFn = (valid) => { const v = valid.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx === 0); return v ? [v.id] : null; };
+  // Coffee zielt auf den EIGENEN Helden (Sitz 0, Held 0); die Zielwahl lösen t.play/t.resolveTargeting automatisch auf
+  t.targetFn = (valid) => { const v = valid.find(x => x.type === 'hero' && x.owner === 0 && x.heroIdx === 0) || valid.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx === 0); return v ? [v.id] : null; };
   t.script.push({ match: d => d.type === 'statusSelect', answer: () => ({ selectedStatuses: ['poisoned'] }), once: true });
   t.script.push({ match: d => d.type === 'heroAction', answer: () => ({ cardName: 'Chain Lightning', handIndex: t.gs.players[0].hand.indexOf('Chain Lightning') }), once: true });
-  // Coffee ist ein zielendes Artefakt: play() öffnet den Zielmodus, doConfirmPotion bestätigt ihn
+  // Coffee ist ein zielendes Artefakt: play() öffnet den Zielmodus und bestätigt ihn über t.targetFn (Korrektur gegenüber der ersten Fassung:
+  // dort wählte targetFn einen Gegner-Helden, Coffee hatte kein Ziel, die Vorbereitung lief ins Leere)
   await t.play(0, 'Coffee', { hero: 0 });
-  await t.run(() => t.host.doConfirmPotion(t.room, 0, { selectedIds: ['hero-0-0'] }));
   const nach1 = t.pile(0, 'discardPile').filter(n => n === 'Chain Lightning').length;
   R.check('Vorbereitung: Zusatzaktion hat Chain Lightning gewirkt', nach1 === 1, t.pile(0, 'discardPile'));
   t.targetFn = (valid) => { const v = valid.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx === 1); return v ? [v.id] : null; };

@@ -172,6 +172,91 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/18-narw-ignores-source.js`
 - **Vermutete Ursache:** `slippery-narw.js` ~Z. 126–146: `takeFromPile(ps, 'deck', chosenName, …)` zuerst, `picked.source` wird nicht gelesen.
 
+### A02-deepsea-19 · Deepsea Encounter: die Ersatz-Kreatur umgeht die Beschwörungsbeschränkungen des Invaders (nur durch Cosmic-Karte, höchstens 1) · Stufe B
+- **Karten:** Deepsea Encounter (`deepsea-encounter.js`), Invader from the Cosmic Depths (`invader-from-the-cosmic-depths.js`); Vergleich: Shapeshift / Deepsea Castle (`_deepsea-shared.js` `eligibleSwapReplacements`).
+- **Voraussetzungen / Aufbau:** Seat 0: Life-Searcher (Lv3, eine Runde alt) in Held 0 / Slot 0, Hand Encounter + Invader (Lv4), Held 0 mit Summoning Magic Lv3 + Decay Magic Lv2. Seat 1 hat Deepsea Werewolf auf der Hand. Variante (b): Seat 0 kontrolliert schon einen Invader in Held 2.
+- **Schritte:** Seat 1 spielt Werewolf (80 Schaden) und wählt den Life-Searcher; Seat 0 antwortet mit Encounter und nimmt den Invader als Ersatz.
+- **Erwartet** (Quelle: Invader-Text „This card can only be summoned by the effect of a "Cosmic" card or "Argos …" … You can only control 1 "Invader from the Cosmic Depths" at a time"; Skriptkopf des Invaders: „each placing card pre-filters its picker via `canSummonInvaderViaSource`"; Ruling CARD_API „Platzieren durch einen Effekt zählt als Effekt-Beschwörung" (8.9.); Shapeshift und Castle bieten den Invader nicht an): Encounter bietet den Invader nicht an; erst recht nicht, wenn schon einer auf dem Brett liegt.
+- **Beobachtet:** Die Galerie von Encounter enthält den Invader, er wird platziert (sein Token-Fenster öffnet sich). Mit schon kontrolliertem Invader stehen danach **zwei** auf dem Brett. Die Gegenprobe über `eligibleSwapReplacements` lässt den Invader korrekt weg.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/19-encounter-invader-restrictions.js`
+- **Vermutete Ursache:** `deepsea-encounter.js` `postTargetCondition` (~Z. 77–90) und `postTargetResolve` (~Z. 130–142) bauen die Ersatzliste selbst (`isSummonablePileCreature` + Stufe), ohne `engine.isCreatureSummonable(n, pi)` / `canSummon` zu fragen; `actionPlaceCreature` prüft das Limit/die Quelle ebenfalls nicht.
+
+### A02-deepsea-20 · Gatherer: Zieh-Effekt unter Zieh-Sperre (The Sacred Jewel) zahlt die Counter und zieht nichts · Stufe B
+- **Karten:** Gatherer from the Cosmic Depths (`gatherer-from-the-cosmic-depths.js`), The Sacred Jewel (setzt `ps.drawLocked`); Vorbild: Golden Ladybug prüft `handLocked || drawLocked`.
+- **Voraussetzungen / Aufbau:** Seat 0: Gatherer mit 3 Change Counters (eine Runde alt), The Sacred Jewel auf der Hand; Main 1.
+- **Schritte:** 1. Jewel spielen (beide ziehen 1; Seat 0 ist danach bis Zugende gesperrt; der Gegner-Zug lässt zudem +1 Counter auf den Gatherer fallen). 2. Gatherer aktivieren, „Draw", die maximale Zahl wählen.
+- **Erwartet** (Quelle: Gatherer „remove up to 3 Change Counters from this Creature to draw that many cards"; Jewel „you cannot draw any cards for the rest of the turn afterwards"; Engine-Kommentar `_engine.js` ~Z. 20955: bei Kreaturen sperrt die Zieh-Sperre den Zieh-Effekt „per Karte über `canActivateCreatureEffect`"): Der Zieh-Teil ist nicht aktivierbar; jedenfalls werden keine Counter für 0 Karten bezahlt.
+- **Beobachtet:** Aktivierbar; 3 Counter werden entfernt, `actionDrawCards` liefert nichts (0 Karten), der Einmal-pro-Zug-Stempel `gatherer-draw` ist gesetzt. Nur `handLocked` ist abgefragt.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/20-gatherer-draw-lock-cost.js`
+- **Vermutete Ursache:** `gatherer-from-the-cosmic-depths.js` `canActivateCreatureEffect` (Z. 186), `onCreatureEffect` (Z. 203) und `runDraw` (Z. 124) prüfen nur `ps.handLocked`, nicht `ps.drawLocked`.
+
+### A02-deepsea-21 · Analyzer / Gatherer zählen „adds cards to their hand via an effect" nicht für Karten vom Brett (Deepsea-Bounce, Shapeshift, Castle) · Stufe C
+- **Karten:** Analyzer / Gatherer from the Cosmic Depths (Hooks `onCardAddedToHand`, `onCardAddedFromDiscardToHand`, `beforeDrawBatch`); Auslöser: alle Deepsea-Kreaturen (Bounce-Place), Shapeshift, Deepsea Castle, Deepsea Encounter, Deepsea Monstrosity.
+- **Voraussetzungen / Aufbau:** Seat 0: Analyzer + Gatherer. Seat 1: Skeleton (eine Runde alt), Zombie auf der Hand (bzw. Poltergeister + Shapeshift).
+- **Schritte:** Seat 1 bounce-placet den Zombie über das Skeleton (bzw. spielt Shapeshift).
+- **Erwartet** (Quelle: Text „Whenever your opponent draws or adds cards to their hand via an effect, place 1 Change Counter"; die Deepsea-Texte und Teppes sagen selbst „**add** … to your hand" bzw. „cards are **added** from your Heroes' Support Zones to your hand"): Lesart A (Wortlaut): auch Brett→Hand zählt, +1 je Effekt.
+- **Beobachtet:** Kein Counter (0/0). Kontrolle: Suche aus dem Deck (`actionAddCardFromDeckToHand`) zählt +1. Brett→Hand läuft nur über `onCardsReturnedToHand`, das die Cosmic-Karten nicht abonnieren. Das Engine-Vokabular `onCardAddedToHand` ist laut `_hooks.js` ausdrücklich „tutor effects", Lesart B (Brett→Hand ist ein „return") ist also die Konvention der Engine.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/21-analyzer-ignores-board-to-hand.js` (prüft Lesart A; ✗ = Counter bleibt aus)
+- **Vermutete Ursache:** `analyzer-from-the-cosmic-depths.js` / `gatherer-from-the-cosmic-depths.js` Hooks (Z. 334–349 bzw. Z. 240–255): kein Hook auf `onCardsReturnedToHand`.
+- **Frage an Al:** Soll Rückgabe vom Brett (Deepsea-Bounce, Shapeshift, Castle) beim Gegner Analyzer/Gatherer einen Counter geben (Ja = Wortlaut „adds cards to their hand", Nein = nur Suchen/Ziehen)?
+
+### A02-deepsea-22 · Life-Searcher: unter Such-/Hand-Sperre wird „Discard & Search" angeboten, die Karte abgeworfen, die Suche entfällt · Stufe B
+- **Karten:** Life-Searcher from the Cosmic Depths (`life-searcher-from-the-cosmic-depths.js`, Einsatz-Effekt), Auslöser hier Argos; Sperre: Cats of the Pharaoh (`searchLocked`) bzw. `handLocked`; Vorbild: Deepsea Witch (`promptOptionalOnSummon(…, { searchToHand: true, searchPile: 'deck' })`).
+- **Voraussetzungen / Aufbau:** Seat 0: Held Argos mit 3 Change Counters und Summoning Magic Lv3, Hand Fireball + ZZ Filler, Deck mit Cosmic Manipulation / Arrival / Life-Searcher; Spielerflag `searchLocked` (bzw. `handLocked`).
+- **Schritte:** Argos' Heldeneffekt: Lv3, Life-Searcher aus dem Deck platzieren; im Einsatz-Fenster „Discard & Search" mit Ja beantworten.
+- **Erwartet** (Quelle: Text „you may discard a card from your hand to search your deck for a "Cosmic Depths" card, reveal it and add it to your hand"; Ruling CARD_API.md ~Z. 13987, Al 15.9.: „Karten wie Deepsea Witch sollten nicht mal ihren optionalen Effekt ANBIETEN" – ein `confirm`, das nur fragt „möchtest du suchen?", trägt dieselbe Kennzeichnung wie die Galerie dahinter): Unter der Sperre wird das Angebot nicht gemacht, Fireball bleibt auf der Hand.
+- **Beobachtet:** Das `confirm` von Life-Searcher hat kein `searchToHand`; es erscheint, Fireball wird als Kosten abgeworfen (`actionPromptForceDiscard`), danach entfällt die Suche (Galerie unterdrückt): Kosten bezahlt, nichts gesucht. Ohne Sperre läuft alles (Kontrolle ✓). Nicht betroffen: die aktivierte Aufwertung (Karte wird aus dem Deck auf das Brett gelegt, nicht auf die Hand).
+- **Hinweis zur Harness:** Die Harness beantwortet Prompts selbst und führt die Sperren-Unterdrückung des echten `promptGeneric` nicht aus; die Aussage „Angebot wird gemacht" folgt aus dem fehlenden Flag im Skript (Z. 71–79), die Folge „Fireball weg, keine Karte gesucht" ist am Zustand gemessen.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/22-life-searcher-search-lock-cost.js`
+- **Vermutete Ursache:** `life-searcher-from-the-cosmic-depths.js` `onPlay`, `engine.promptGeneric({ type: 'confirm', … })` ohne `searchToHand: true, searchPile: 'deck'` (Z. 71–79).
+
+### A02-deepsea-23 · The Cosmic Depths: die zurückgemischte Karte (alle Exemplare des Namens) wird aus der Suche ausgeschlossen – Aktivierung angeboten, Effekt entfällt, Karte verloren/gemischt · Stufe B
+- **Karten:** The Cosmic Depths (`the-cosmic-depths.js`), Beispielkreatur Gatherer.
+- **Voraussetzungen / Aufbau:** Seat 0: Area The Cosmic Depths, Held 0 mit Summoning Magic Lv2, Hand Gatherer, Brett Deepsea Skeleton (Lv1), Deck 2× Gatherer + Füllkarten.
+- **Schritte:** Area aktivieren (Main 1), Gatherer aus der Hand zurückmischen.
+- **Erwartet** (Quelle: Text „shuffle a card from their hand back into their deck to search their deck for a Creature with a different level from all Creatures they currently control and summon it …" – der Text schließt die zurückgemischte Karte nicht aus; Gatherer Lv2 ≠ Lv1): Der Gatherer ist suchbar und wird beschworen (negiert).
+- **Beobachtet:** Keine Galerie, Log `cosmic_depths_no_target`: die Karte ist ins Deck gemischt, die Einmal-pro-Zug-Aktivierung verbraucht, kein Wesen beschworen. `canActivateAreaEffect` (ohne Ausschluss) bot die Aktivierung an, `onAreaEffect` schließt den Namen `shuffledName` aus (Kommentar: „none of them are searchable this activation").
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/23-cosmic-depths-shuffled-name-excluded.js`
+- **Vermutete Ursache:** `the-cosmic-depths.js` `getEligibleDeckCreatures(…, excludeName)` (Z. 106–111) und der Aufruf in `onAreaEffect` (Z. 222) – erfundene Zusatzregel, nicht im Text; Aktivierbarkeits- und Auflösungsprüfung sind uneinheitlich.
+- **Nachprüfung:** Negation „bis zum Ende des Zuges" gemessen: Das Wesen ist nach der Aktivierung negiert und im Gegnerzug nicht mehr (✓).
+
+### A02-deepsea-24 · Greatmaw Remora: die Teil-Sperre „keine Kreaturen außer Greatmaw" greift bei Shapeshift / Deepsea Castle nicht · Stufe B
+- **Karten:** Greatmaw Remora (`greatmaw-remora.js`, `ps.summonLockExceptGreatmaw`), Shapeshift (`shapeshift.js`), Deepsea Castle (`deepsea-castle.js`), `atomicSwap` in `_deepsea-shared.js`.
+- **Voraussetzungen / Aufbau:** Seat 0: Greatmaw Shark (Held 0), Deepsea Skeleton (Held 1, eine Runde alt); Hand: Remora, Shapeshift bzw. Castle, Deepsea Zombie.
+- **Schritte:** 1. Remora als Gratis-Zusatzaktion spielen („Free (lock non-Greatmaw)"). 2. Shapeshift spielen bzw. Castle aktivieren, Skeleton gegen den Zombie tauschen.
+- **Erwartet** (Quelle: Remora-Text „you cannot summon Creatures for the rest of the turn afterwards, except "Greatmaw" Creatures"; `_engine.js` `actionPlaceCreature` ~Z. 25999: die Teil-Sperre gilt ausdrücklich „including effect placements"; `atomicSwap` sperrt die Voll-Sperre als „ANY path that adds a new Creature to the board, including atomic swaps"): Der Zombie darf nicht eingetauscht werden.
+- **Beobachtet:** Der Tausch läuft, der Zombie steht auf dem Brett (sein Einsatz-Effekt feuert).
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/24-remora-lock-swap-gap.js`
+- **Vermutete Ursache:** `_deepsea-shared.js` `atomicSwap` (~Z. 961) sowie `shapeshift.js` (`inherentAction`/`spellPlayCondition`/`onPlay`) und `deepsea-castle.js` (`canActivateAreaEffect`/`onAreaEffect`) prüfen nur `ps.summonLocked`, nicht `ps.summonLockExceptGreatmaw` (Ausnahme Greatmaw-Name).
+
+### A02-deepsea-25 · Deepsea Monstrosity kopiert Siren: Verknüpfung wird gesetzt, wirkt aber nie · Stufe B
+- **Karten:** Deepsea Monstrosity (`deepsea-monstrosity.js`), Deepsea Siren (`deepsea-siren.js`).
+- **Voraussetzungen / Aufbau:** Seat 0: Siren (Held 1, eine Runde alt), Monstrosity auf der Hand; Seat 1: Dummy Big als Ziel.
+- **Schritte:** Monstrosity normal beschwören, Siren zum Zurücknehmen und Kopieren wählen, Dummy Big als Ziel der Verknüpfung; danach 30 und 500 Schaden auf die Monstrosity.
+- **Erwartet** (Quelle: Monstrosity „this Creature activates that Creature's on-summon effect as if it was its own"; Siren: die Folgesätze „Any damage this Creature takes is also applied to that target … also defeat the chosen target" erklären die Wirkung der Wahl): Die Monstrosity ist mit dem Ziel verknüpft – Schaden und Tod werden weitergegeben.
+- **Beobachtet:** Die Monstrosity trägt die Link-Marken (`sirenLinked`, `_sirenLink*`), nimmt 30 Schaden (50 → 20), der Dummy bleibt bei 1000; stirbt sie durch den Gegner, lebt der Dummy. Die Spielerin trifft also eine Wahl, die nichts bewirkt. (Andere Kopien funktionieren, soweit gemessen: Werewolf 80, Pirate 6 Gold, Mummy/Reaper/Witch/Zombie/Stein/Skeleton/Bats-Fenster erscheinen, DDG-Flächenschaden 150, Clown-Zwang auf der Monstrosity.)
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/25-monstrosity-copies-siren-link.js`
+- **Vermutete Ursache:** `deepsea-monstrosity.js` ruft nur `hooks.onPlay` der Kopie auf; die Dauerwirkung der Siren (`beforeCreatureDamageBatch`, Tod-Teil) liegt im Hook-Satz der Siren und ist an deren Skript gebunden, nicht an die Instanz-Marken.
+
+### A02-deepsea-26 · Deepsea Monstrosity kopiert Jack O' Lantern: die Kartenzahl hängt vom Einzugsweg der Monstrosity ab · Stufe C
+- **Karten:** Deepsea Monstrosity, Deepsea Jack O' Lantern (`deepsea-jack-o-lantern.js`).
+- **Voraussetzungen / Aufbau:** Seat 0: Jack (Held 1, eine Runde alt), Monstrosity auf der Hand, 6 Füllkarten im Deck; (a) Monstrosity normal in freie Zone, (b) per Bounce-Place über Deepsea Witch (Lv2).
+- **Schritte:** Monstrosity-Einsatz: Jack zurücknehmen und kopieren.
+- **Erwartet** (Quelle: Jack „Then, draw cards equal to the returned Creature's level"; Monstrosity „… as if it was its own"): Offen. Lesart A (hier geprüft): die „returned Creature" ist die für die Kopie zurückgenommene Jack (Lv1) → in beiden Fällen 1 Karte.
+- **Beobachtet:** (a) 0 Karten, (b) 2 Karten (die Stufe der Witch, die beim Platzieren der Monstrosity zurückgenommen wurde). Jacks Skript liest `ctx.card.counters._bouncedFromLevel` der Instanz, auf der der Effekt läuft – bei der Kopie ist das die Monstrosity mit ihrem eigenen Platzierungsstand.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/26-monstrosity-copies-jack-level.js` (prüft Lesart A)
+- **Vermutete Ursache:** `deepsea-jack-o-lantern.js` `onPlay` (Z. 43) liest die Marke an `ctx.card` ohne Bezug auf die Kopie (`ctx._monstrosityCopy`).
+- **Frage an Al:** Welche Stufe zählt bei Monstrosity→Jack: die von der Monstrosity zurückgenommene Jack (Lv1, in beiden Fällen 1 Karte), die beim Platzieren zurückgenommene Kreatur (wie jetzt, aber nur bei Bounce-Place) oder gar keine?
+
+### A02-deepsea-27 · Deepsea Siren: „defeated by an opponent's card or effect" löst nur bei tödlichem Schaden aus, nicht bei Besiegen-/Zerstören-Effekten · Stufe B
+- **Karten:** Deepsea Siren (`deepsea-siren.js`), Auslöser: Deepsea Reaper (Gegner), `actionDestroyCard` (z. B. Trial of Dominance, Poltergeister-ähnliche Effekte).
+- **Voraussetzungen / Aufbau:** Seat 0: Siren mit Dummy Big (Held 1) als verknüpftem Ziel. Seat 1: Deepsea Reaper.
+- **Schritte:** Seat 1 spielt Reaper und besiegt die Siren (bzw. `actionDestroyCard`; Kontrolle: 500 Schaden).
+- **Erwartet** (Quelle: Text „When this Creature is defeated by an opponent's card or effect, also defeat the chosen target"; Reaper: „defeat it"): Das verknüpfte Ziel wird mit besiegt.
+- **Beobachtet:** Siren in der Ablage, das Ziel bleibt unverletzt auf dem Brett. Nur der Schadenspfad (`beforeCreatureDamageBatch`, tödlicher Treffer eines Gegners) besiegt das Ziel (Kontrolle ✓). Der `onCardLeaveZone`-Hook räumt nur die Verknüpfungs-Abzeichen auf.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/27-siren-destroy-effect-kills-link.js`
+- **Vermutete Ursache:** `deepsea-siren.js` `onCardLeaveZone` (~Z. 254): „cleans up the linked-target flags" – keine Tod-Weitergabe; der Hook kennt weder Quelle noch Gegner-Eigenschaft (`ctx` trägt die Quelle des Zerstörens nicht).
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
