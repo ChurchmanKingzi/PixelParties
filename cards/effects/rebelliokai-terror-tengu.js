@@ -59,6 +59,7 @@ function _heroCanSummon(hero) {
   return true;
 }
 
+const { canHeroSummon } = require('./_summon-eligibility');   // Z6 (A06-34)
 /**
  * Build the list of (heroIdx, slotIdx) destinations on `pi`'s side
  * where `cardName` can be NORMALLY summoned right now. A destination
@@ -82,6 +83,8 @@ function _eligibleDestinations(engine, pi, cardName) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!_heroCanSummon(h)) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+    // Z6 (A06-34): "as additional Actions" - Beschwoerungssperre und Aktionssperre des Helden gelten (`_summon-eligibility`).
+    if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;
     const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];
     for (let zi = 0; zi < 3; zi++) {
       if ((zones[zi] || []).length === 0) {
@@ -120,7 +123,8 @@ function _totalUsableSummonZones(engine, pi, eligibleNames) {
     if (!_heroCanSummon(h)) continue;
     const heroCanHostSomething = eligibleNames.some(name => {
       const cd = cardDB[name];
-      return cd && engine.heroMeetsLevelReq(physOwner, hi, cd);
+      return cd && engine.heroMeetsLevelReq(physOwner, hi, cd)
+        && canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner });   // Z6 (A06-34)
     });
     if (!heroCanHostSomething) continue;
     const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];

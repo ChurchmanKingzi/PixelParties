@@ -39,11 +39,12 @@ module.exports = {
   // their entire hand for nothing. Tagging opts into the standard 🚫
   // overlay (see Staff of the Teleporter for the full rationale).
   blockedByHandLock: true,
+  blockedByDrawLock: true,   // Z6 (F03-16): auch die reine Zieh-Sperre (Sacred Jewel)
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (ps.handLocked) return false; // Lock prevents the +1 draw — fizzles silently.
+    if (ps.handLocked || ps.drawLocked) return false; // Z6 (F03-16: auch Zieh-Sperre) Lock prevents the +1 draw — fizzles silently.
     return true;
   },
 
@@ -100,6 +101,7 @@ module.exports = {
     // reflects the lock state.
     ps.handLocked = true;
     ps._discardLockedTurn = gs.turn;
+    ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
 
     engine.log('staff_of_uncontrollable_destruction', {
       player: ps.username, discarded: count, drawn: drawCount,

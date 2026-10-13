@@ -10,6 +10,9 @@ const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite gel
 
 module.exports = {
   cpuMeta: { scalesWithSchool: 'Support Magic' },
+  // Z6 (S02-21): der Zug ist der einzige Nutzen - unter Hand-/Zieh-Sperre gar nicht spielbar (Praezedenz Brilliant Idea).
+  blockedByHandLock: true,
+  blockedByDrawLock: true,
 
   // ── Tuscan Artist (Als Ruling 16.8.) ──
   // Haste zieht 2/3/4 je nach Support-Magic-Level des CASTERS. Der Zug

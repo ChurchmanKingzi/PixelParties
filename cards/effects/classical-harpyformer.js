@@ -32,6 +32,7 @@
 
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
 const CARD_NAME    = 'Classical Harpyformer';
 const ABILITY_NAME = 'Wealth';
 const GOLD         = 5;
@@ -77,6 +78,8 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Z6 (A07-22): der Gold-Gewinn ist der einzige Nutzen - bei Tuscan Aristocrat/Gold-Sperre gesperrt (wie Country Harpyformer).
+    if (goldGainWouldBeBlocked(ctx._engine, ctx.cardOwner)) return false;
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).includes(ABILITY_NAME);
   },

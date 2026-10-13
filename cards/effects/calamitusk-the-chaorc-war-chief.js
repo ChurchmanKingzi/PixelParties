@@ -60,7 +60,9 @@ function replacements(engine, pi, calaHi, excludeName, feld = pi) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
   }
-  for (const cn of (ps?.mainDeck || [])) {
+  // Z6 (A06-09): Stapel-Sperre (Knight of Kings [B]) - aus einem gesperrten Deck gibt es keine Ersatzkreatur.
+  const deckFrei = engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi });
+  for (const cn of (deckFrei ? (ps?.mainDeck || []) : [])) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'deck' });
   }
@@ -136,8 +138,16 @@ module.exports = {
         const pile = chosen.source === 'deck' ? ps.mainDeck : ps.hand;
         const idx = pile.indexOf(chosen.name);
         if (idx < 0) { engine.sync(); return; }
-        pile.splice(idx, 1);
-        if (chosen.source === 'deck') engine.shuffleDeck(pi);
+        // Z6 (A06-09): Stapel-Schicht statt Splice - Deck ueber die Deck-Bausteine (`deckEntnahme`: Stapel-Sperre, `deckHookExtras`),
+        // Hand wie bisher.
+        let _deckAb = null;
+        if (chosen.source === 'deck') {
+          _deckAb = await engine.deckEntnahme(pi, chosen.name, { source: CARD_NAME });
+          if (!_deckAb) { engine.sync(); return; }
+          engine.shuffleDeck(pi);
+        } else {
+          pile.splice(idx, 1);
+        }
 
         // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling
         // 8.8.) — `hookExtras._tributePaid` meldet das an Trigger wie
@@ -146,12 +156,11 @@ module.exports = {
         // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
         const summon = await engine.summonCreatureWithHooks(
           chosen.name, feld, calaHi, slot,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
-          { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}), hookExtras: { _tributePaid: true } },
+          { source: CARD_NAME, ...(feld !== pi ? { controller: pi } : {}), hookExtras: chosen.source === 'deck' ? engine.deckHookExtras({ _tributePaid: true }) : { _tributePaid: true } },
         );
         if (!summon?.inst) {
           // Placement fizzled — refund the fetched card.
-          pile.push(chosen.name);
-          if (chosen.source === 'deck') engine.shuffleDeck(pi);
+          if (_deckAb) engine.deckRueckgabe(_deckAb); else pile.push(chosen.name);
           engine.sync();
           return;
         }

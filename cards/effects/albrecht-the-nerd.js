@@ -44,6 +44,7 @@ async function ausDerHand(ctx, gezogen) {
   if (ok) engine.log('double_class', { player: ps.username, card: CARD_NAME, text: `summoned by revealing ${gezogen}` });
   engine.sync();
 }
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 async function aufDemBrett(ctx, name) {
   const engine = ctx._engine;
@@ -57,9 +58,8 @@ async function aufDemBrett(ctx, name) {
   if (gs.hoptUsed?.[sperre] === gs.turn) return;
   const ps = gs.players[pi];
   if (!(ps.hand || []).includes(name) || (ps.mainDeck || []).length === 0) return;
-  // ★ Z7 (C01-15): Tuscan Artist negiert ein Ziehen von genau 2/3 Karten — der Effekt ist dann
-  // reiner Verlust (Aufdecken + Sperre), also gar nicht erst anbieten (Ruling 16.8.).
-  if (drawWouldBeBlocked(engine, pi, stufe)) return;
+  // Z6 (C01-15): ein negierter/gesperrter Zug (Tuscan Artist 2/3, Zieh-/Hand-Sperre) wird nicht angeboten und verbraucht die Sperre nicht.
+  if (drawBlockedFor(engine, pi, stufe)) return;
   const ja = await engine.promptGeneric(pi, {
     type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
     message: `Reveal "${name}" to draw ${stufe} card${stufe === 1 ? '' : 's'}?`,

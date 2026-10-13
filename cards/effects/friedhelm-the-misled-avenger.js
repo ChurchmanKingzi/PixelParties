@@ -70,6 +70,14 @@ function spielbareDeckkarten(engine, pi, heroIdx, feld = pi) {
     // Karten, die aus der Hand nichts bewirken (`neverPlayable`: Reaction-/Coolness-Karten, Startblatt-Zauber wie
     // Grasp the Future) lassen sich auch aus dem Deck nicht „spielen".
     if (skript?.neverPlayable) continue;
+    // Z6 (H02-14): "as if you played it from your hand" in der Action Phase - Surprises (nur Main Phase) und Reaction-Spells ohne
+    // `proactivePlay` sind aus der Hand dort nicht spielbar, und das Helden-Tor der Karte (`canPlayWithHero`, z. B. Waffe noetig) gilt auch.
+    const unterarten = (cd.subtype || '').toLowerCase().split('/').map(t => t.trim());
+    if (unterarten.includes('surprise')) continue;
+    if (unterarten.includes('reaction') && !skript?.proactivePlay) continue;
+    if (typeof skript?.canPlayWithHero === 'function') {
+      try { if (!skript.canPlayWithHero(gs, pi, heroIdx, cd, engine)) continue; } catch { /* kaputtes Tor sperrt nicht */ }
+    }
     // Schul- und Stufenpruefung wie beim Handspiel. Ohne sie bietet die
     // Karte Zuege an, die `validateActionPlay` danach ablehnt — und die
     // Karte waere aus dem Deck heraus und die Aktion weg.

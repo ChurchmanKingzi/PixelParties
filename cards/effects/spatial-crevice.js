@@ -86,7 +86,7 @@ module.exports = {
       const pi = engine.gs.activePlayer;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) return;
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return;   // Z6 (R02-14): Hand-, Such-Sperre und Siege - gar nicht erst fragen
 
       const cardDB = engine._getCardDB();
       const anzahl = {};
@@ -110,6 +110,7 @@ module.exports = {
         message: 'Search your deck for an Area and add it to your hand?',
         confirmLabel: '🔍 Search', cancelLabel: 'No thanks',
         cancellable: true,
+        searchToHand: true, searchPile: 'deck',   // Z6 (R02-14): wie die Galerie dahinter gekennzeichnet
       });
       if (!ja) return;
 

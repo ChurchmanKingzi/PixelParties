@@ -59,6 +59,9 @@ module.exports = {
     if (typ !== 'Attack' && typ !== 'Spell') return true;
     const ps = gs.players[pi];
     if (!ps) return true;
+    // Z6 (H03-13): ein NEGIERTER Santa wirkt nicht - sein "must"-Preis entfaellt (der Hook ist stillgelegt), also darf auch die
+    // Spielbarkeits-Sperre nicht greifen (Saint Nicolas macht es ebenso).
+    if (ps.heroes?.[heroIdx]?.statuses?.negated) return true;
     // Kommt die Karte von der Hand, liegt sie zum Pruefzeitpunkt noch
     // dort und zaehlt nicht als Reserve. Ohne Herkunftsangabe (alte
     // Aufrufer) wird der Hand-Fall angenommen — das ist die sichere

@@ -16,7 +16,6 @@ const {
 } = require('./_gigantisaurs-shared');
 
 const { drawWouldBeBlocked } = require('./_draw-block-shared');
-
 const CARD_NAME = 'Gigantisaur Pteranos';
 
 /** Distinct Gigantisaur Creature names currently in the player's hand. */
@@ -39,11 +38,11 @@ module.exports = {
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     if (ps.handLocked) return false; // draw payout pointless
-    const k = distinctGigantisaurNamesInHand(ps, engine).length;
-    // ★ Z7 (A07-19): bei genau EINEM Namen ist der Zug zwingend 2 → unter Tuscan Artist negiert,
-    // nur die Abwurfkosten blieben (Ruling 16.8.: gesperrt, kein Once-per-turn verbrauchen).
-    if (k === 1 && drawWouldBeBlocked(engine, ctx.cardOwner, 2)) return false;
-    return k >= 1;
+    // Z6 (A07-19): Tuscan Artist - der Zug ist der einzige Nutzen (Ruling 16.8.). Mit nur einem waehlbaren Namen ist der Zug genau 2.
+    // (Die Zieh-Sperre `drawLocked` bleibt wie vorher ungeprueft: Regelfrage A07-21 an Al.)
+    const namen = distinctGigantisaurNamesInHand(ps, engine);
+    if (namen.length <= 1 && drawWouldBeBlocked(engine, ctx.cardOwner, 2)) return false;
+    return namen.length >= 1;
   },
 
   async onCreatureEffect(ctx) {

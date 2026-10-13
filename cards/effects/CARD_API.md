@@ -15842,6 +15842,28 @@ Server-Validierungen, die Ausgrau-Liste `searchLockBlockedCards` im
 Sync und die Handkarten-Optik im Client.
 
 
+## ★ Sperren auf Nebenwegen — die zentralen Fragen (Welle 2, Klasse Z6)
+
+Eine Sperre gilt nur, wenn JEDER Weg sie fragt. Die Pruefer stehen an EINER Stelle; Kartenskripte rufen sie, statt Flaggen
+selbst zu lesen:
+
+| Frage | Pruefer |
+|---|---|
+| Faellt ein Zug von N Karten ganz aus (Hand-/Zieh-Sperre, Tuscan Artist 2/3)? | `drawBlockedFor(engine, pi, N)` in `_draw-block-shared.js` (`N` weglassen = nur die beiden Spielerflaggen) |
+| Kann eine Karte AUF DIE HAND (Hand-/Such-Sperre, Siege)? | `engine._isSearchBlocked(pi, {}, 'deck' \| 'discard')`, Brett->Hand: `engine.handZugangGesperrt(pi)` (Gruppe D: Such-Sperre gilt dort nicht) |
+| Darf die Karte Deck/Ablage verlassen (Knight of Kings [B], Stab, Eye of Ren)? | `engine.pileOutAllowed(pi, pile, { sourceOwner: pi })`, Ablage-Ausgang zusaetzlich `engine.isDiscardOutHardLocked(pi)` (harte Stab-Sperre, die auch der 6-Gold-Freikauf des Eye nicht hebt: `ps._discardLockHard`) |
+| Gold-Gewinn unmoeglich (Golden Arrow, Tuscan Aristocrat)? | `goldGainWouldBeBlocked(engine, pi)` in `_gold-block-shared.js` (kennt jetzt auch `goldLocked`) |
+| Darf `pi` DIESE Kreatur beschwoeren (`summonLocked`, Remora-Teil-Sperre, Grinning Cat, Aktionssperre)? | Held: `canHeroSummon(engine, pi, hi, cd, { alsAktion })` in `_summon-eligibility.js`; Kreatur ohne Hand: `engine.getSummonBlockedFor(pi, name)` |
+
+Zusicherungen: `summonCreatureWithHooks` verweigert unter `summonLocked`/Remora-Teil-Sperre (Ausnahmen: `skipBeforeSummon` =
+Wiederbelebung, `_ignoreSummonLock` = Old Couple setzt den Riegel bewusst VORHER); der Server-Weg freier Abilities prueft die
+Sperr-Marken hart (`doActivateFreeAbility`); `_cardBlockedBySearchLock` kennt Hand-Sperre, harte Stab-Sperre und nimmt auch
+Artifact-Creatures aus; Hand-Reaktionsartefakte zahlen den Item-Lock (`_rxPay` mit `cardName`) und beachten die Artefakt-Sperre
+(`_handPlayLockedFor`). Wer Karten aus Deck/Ablage holt, geht durch `takeFromPile`/`deckEntnahme` (kein eigener Splice).
+**Nicht betroffen bleibt (Als Ruling 14.9., Gruppe C/D):** Deck-Suchen, die auf Brett/Ablage/Held fuehren (Garius, Alex, Ska,
+Greenhouse) — die Such-Sperre meint nur "AUF DIE HAND".
+
+
 ## Neue Karte: „Cats of the Pharaoh" (v1068) — NEUE SPIELER-SPERRE
 
 ```

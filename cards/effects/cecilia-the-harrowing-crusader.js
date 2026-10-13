@@ -93,6 +93,18 @@ function waehlbareArtefakte(engine, pi) {
   return treffer;
 }
 
+/**
+ * Z6 (A09-04, A09-05): Zahlung und Kopie muessen beide moeglich sein, sonst gehen alle Gold und die
+ * geloeschte Karte ohne Gegenwert verloren. Gold-Sperre (Golden Arrow: "cannot ... spend Gold") sperrt die
+ * Zahlung, Hand-/Such-Sperre (und Siege) die Kopie aus dem Deck.
+ */
+function gesperrt(engine, pi) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps) return true;
+  if (ps.goldLocked) return true;
+  return !!engine._isSearchBlocked?.(pi, {}, 'deck');
+}
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -103,6 +115,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     // "spend all your Gold (at least 1)" — ohne Gold kein Effekt.
     if ((engine?.gs?.players?.[pi]?.gold || 0) < 1) return false;
+    if (gesperrt(engine, pi)) return false;   // Z6 (A09-04, A09-05)
     return waehlbareArtefakte(engine, pi).size > 0;
   },
 
@@ -114,6 +127,7 @@ module.exports = {
     const ps = engine?.gs?.players?.[pi];
     if (!ps) return false;
     if ((ps.gold || 0) < 1) return false;
+    if (gesperrt(engine, pi)) return false;   // Z6
     return waehlbareArtefakte(engine, pi).size > 0;
   },
 
@@ -131,6 +145,7 @@ module.exports = {
 
     const gold = ps.gold || 0;
     if (gold < 1) return false;
+    if (gesperrt(engine, pi)) return false;   // Z6: Zahlung ODER Kopie unmoeglich - nichts bezahlen/loeschen
 
     const treffer = waehlbareArtefakte(engine, pi);
     if (treffer.size === 0) return false;

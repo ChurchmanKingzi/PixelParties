@@ -259,6 +259,9 @@ module.exports = {
     if (!ps) return false;
     if ((ps.hand || []).length === 0) return false;        // Abwurf ist Pflichtkosten
     if (ps.handLocked) return false;
+    // Z6 (A08-24): Stapel-Sperre (Knight of Kings [B]) - das Deck darf nicht verlassen werden, dann waere der Abwurf reine Kosten.
+    // (Die Such-Sperre meint nur Karten AUF DIE HAND - Paraseed kommt ins Spiel, Gruppe Garius, Al 14.9.: nicht betroffen.)
+    if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return false;
     return kannPflanzen(engine, pi) || kannUmziehen(engine);
   },
 

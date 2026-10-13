@@ -53,6 +53,8 @@ module.exports = {
     if (!ablageLoeschKostenMoeglich(ctx)) return false;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    // Z6 (A07-23): die Kopien kommen aus dem DECK auf die Hand - Hand-/Such-Sperre: sonst waeren nur die Kosten weg.
+    if (engine._isSearchBlocked(pi, {}, 'deck')) return false;
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
       + (engine.gs.players[1]?.discardPile?.length || 0);
     if (total < 4) return false;
@@ -74,6 +76,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
     if (!ps) return false;
+    if (engine._isSearchBlocked(pi, {}, 'deck')) return false;   // Z6 (A07-23)
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
       + (engine.gs.players[1]?.discardPile?.length || 0);
     if (total < 4) return false;

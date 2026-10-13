@@ -8,6 +8,7 @@
 
 module.exports = {
   blockedByHandLock: true,
+  blockedBySearchLock: true,   // Z6 (M02-19): Deck-Suche ist der ganze Ertrag (Gruppe A, Al 14.9.) - unter der Such-Sperre unspielbar
   isPotion: true,
   deferBroadcast: true, // Broadcast after selections, not before
 

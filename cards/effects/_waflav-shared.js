@@ -539,13 +539,16 @@ async function tutorAscendedHeroes(engine, pi, cardName, { from, max = 1 } = {})
         : `Add an Ascended Hero from your ${label} to your hand.`,
       cards: names.map(n => ({ name: n, source: from })),
       cancellable: max > 1,          // "up to N" darf abgebrochen werden
+      searchToHand: true, searchPile: from === 'discard' ? 'discard' : 'deck',   // Z6 (A08-14): Suche AUF DIE HAND kennzeichnen (Such-Template)
     });
     const picked = choice?.cardName;
     if (!picked) break;
     const pile = pileOf();
     const idx = pile.indexOf(picked);
     if (idx < 0) break;
-    pile.splice(idx, 1);
+    // Z6 (A08-14): ueber die Stapel-Schicht statt eigenem Splice - sie fragt Knight of Kings [B] (`pileOutAllowed`), die
+    // Stab-/Eye-Sperre (`_discardOutAllowed`) und die Such-Sperre (`toHand`); gesperrt = null = nichts geholt.
+    if (!(await engine.takeFromPile(ps, from === 'discard' ? 'discard' : 'deck', picked, { source: cardName, toHand: true }))) break;
     engine.handZugangSync(ps, picked, {  });
     taken++;
     engine.log('waflav_tutor', { player: ps.username, hero: cardName, card: picked, from });

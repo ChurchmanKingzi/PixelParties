@@ -50,6 +50,10 @@ module.exports = {
   // validateActionPlay rejects the cast entirely when this is set and the
   // caster's hand is locked, matching the gray-out state.
   blockedByHandLock: true,
+  // Z6 (A01-35): die Kopien kommen aus dem DECK auf die Hand - das ist der ganze Ertrag (Gruppe A, Al 14.9.):
+  // unter der Such-Sperre und unter der Stapel-Sperre (Knight of Kings [B]) nicht spielbar.
+  blockedBySearchLock: true,
+  blockedByPileLock: true,
 
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
@@ -211,7 +215,7 @@ module.exports = {
       const targetCount = Math.min(MAX_COPIES, deckCounts[chosenName] || 0);
       let added = 0;
       for (let k = 0; k < targetCount; k++) {
-        if (ps.handLocked) {
+        if (ps.handLocked || engine._isSearchBlocked(pi, {}, 'deck') || !engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) {   // Z6 (A01-35): Such-/Stapel-Sperre
           engine.log('mass_multiplication_handlock', { player: ps.username, remaining: targetCount - k });
           break;
         }

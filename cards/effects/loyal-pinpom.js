@@ -27,6 +27,7 @@
 // ═══════════════════════════════════════════
 
 const { isLoyalCreature, getLoyalsInHand } = require('./_loyal-shared');
+const { canHeroSummon } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Loyal Pinpom';
 const HOPT_KEY  = 'loyal_pinpom_chain';
@@ -89,7 +90,9 @@ module.exports = {
         // heroMeetsLevelReq covers Wisdom / Divinity coverage too.
         const sample = cardDB[handLoyals[0].name];
         if (!sample) continue;
-        if (!engine.heroMeetsLevelReq(physOwner, hi, sample)) continue;
+        // Z6 (A06-26): tauglicher Beschwoerer Pflicht (Ruling 8.8., `_summon-eligibility`): nicht Frozen/Stunned/Webbed/Bound/Negated,
+        // keine Aktions-/Beschwoerungssperre - plus die Level-Pruefung.
+        if (!canHeroSummon(engine, pi, hi, sample, { alsAktion: true, physOwner })) continue;
         eligibleHeroes.push({ owner: physOwner, heroIdx: hi, slot: freeSlot, name: hero.name });
       }
       if (eligibleHeroes.length === 0) { refundHopt(); return; }
@@ -140,7 +143,7 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): `owner` = physische Seite.
       for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
-        if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;
+        if (!canHeroSummon(engine, pi, hi, cd, { alsAktion: true, physOwner })) continue;   // Z6 (A06-26)
         const zones = gs.players[physOwner]?.supportZones?.[hi] || [];
         for (let z = 0; z < 3; z++) {
           if ((zones[z] || []).length === 0) {

@@ -90,6 +90,7 @@ function buildBurnedTargets(engine) {
 }
 
 // ─── CARD MODULE ─────────────────────────
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -294,11 +295,10 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
-    // ★ Z7 (C01-15): Ruling 16.8. (`_draw-block-shared.js`) — ist das Ziehen der einzige Nutzen und
-    // Tuscan Artist negiert es (genau 2 oder 3 Karten), ist der Effekt gesperrt und verbraucht
-    // sein Once-per-turn nicht.
+    // Z6 (C01-15): der Zug ist der einzige Nutzen - Hand-/Zieh-Sperre und Tuscan Artist (genau 2/3) sperren ihn (Ruling 16.8.).
     const n = Math.min(HOPT_DRAW_CAP, countBurnedTargets(ctx._engine));
-    return n > 0 && !drawWouldBeBlocked(ctx._engine, ctx.cardOwner, n);
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, n)) return false;
+    return countBurnedTargets(ctx._engine) > 0;
   },
 
   async onCreatureEffect(ctx) {

@@ -30,6 +30,8 @@ const {
   targetToPromptEntry,
 } = require('./_cosmic-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Gatherer from the Cosmic Depths';
 const HOPT_MOVE = 'gatherer-move';
 const HOPT_DRAW = 'gatherer-draw';
@@ -121,7 +123,7 @@ async function runDraw(engine, inst, ctx) {
   const ps = gs.players[pi];
   const have = getChangeCounters(inst);
   if (have <= 0) return false;
-  if (ps?.handLocked) return false; // Defensive — handLocked blocks draw
+  if (drawBlockedFor(engine, pi)) return false; // Defensive — Hand-/Zieh-Sperre (Z6, A02-20: Jewel zaehlte nicht)
 
   const max = Math.min(have, MAX_DRAW);
   const opts = [];
@@ -183,7 +185,7 @@ module.exports = {
     const ps = gs.players[pi];
     const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
       && getChangeCounters(inst) > 0
-      && !ps?.handLocked;
+      && !drawBlockedFor(engine, pi);
 
     return moveAvail || drawAvail;
   },
@@ -200,7 +202,7 @@ module.exports = {
       && ownCosmicCreatures(engine, pi).length > 0;
     const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
       && getChangeCounters(inst) > 0
-      && !ps?.handLocked;
+      && !drawBlockedFor(engine, pi);
 
     if (!moveAvail && !drawAvail) return false;
 

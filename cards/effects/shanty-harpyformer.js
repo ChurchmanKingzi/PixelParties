@@ -65,6 +65,8 @@ module.exports = {
   /** Gray out the button while no Navigation Ability is in hand. */
   canActivateCreatureEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
+    // Z6 (A07-23): die Kopie kommt aus dem DECK auf die Hand - unter Hand-/Such-Sperre bliebe nur der Abwurf.
+    if (ctx._engine._isSearchBlocked(ctx.cardOwner, {}, 'deck')) return false;
     return (ps?.hand || []).includes(ABILITY_NAME);
   },
 

@@ -938,6 +938,10 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
     // defines canSummon, so plain Creatures pass through untouched.
     if (typeof engine.isCreatureSummonable === 'function'
         && !engine.isCreatureSummonable(n, pi)) continue;
+    // Z6 (A02-24): Teil-Beschwoerungssperren (Greatmaw Remora „except Greatmaw", Grinning Cat)
+    // sperren auch den Tausch - dasselbe Handkarten-Gate wie beim Ausspielen.
+    if (typeof engine.getSummonBlocked === 'function'
+        && engine.getSummonBlocked(pi).includes(n)) continue;
     seen.add(n);
     out.push({ name: n, source: 'hand', cost: lvl });
   }
@@ -965,6 +969,13 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   if (ps.summonLocked) {
     engine.log('swap_blocked', {
       card: newCardName, by: sourceName || 'Swap', reason: 'summonLocked',
+    });
+    return null;
+  }
+  // Z6 (A02-24): Teil-Sperre (Remora „except Greatmaw", Grinning Cat) ebenso.
+  if (engine.getSummonBlocked?.(pi).includes(newCardName)) {
+    engine.log('swap_blocked', {
+      card: newCardName, by: sourceName || 'Swap', reason: 'summonBlocked',
     });
     return null;
   }

@@ -19,7 +19,8 @@ const H = require('../../lib/h.js');
   t.script.push({ match: d => d.type === 'forceDiscard' && d.title === 'Item Lock Cost', answer: (d) => {
     const hand = t.gs.players[0].hand.slice();   // Roh-Hand: die gespielte Karte steht bis zur Auflösung noch darin
     angebot = { eligible: d.eligibleIndices ?? 'alle', hand };
-    const idx = hand.indexOf('Treasure Chest');
+    // Z6: ein Mensch kann nur aus `eligibleIndices` waehlen (sobald die Engine sie liefert) - das Skript tut dasselbe.
+    const idx = Array.isArray(d.eligibleIndices) ? d.eligibleIndices[0] : hand.indexOf('Treasure Chest');
     return { cardName: hand[idx], handIndex: idx };
   }, once: false });
   const r = await t.play(0, 'Treasure Chest');

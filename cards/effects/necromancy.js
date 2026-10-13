@@ -113,6 +113,8 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel, feld = pi) {
 
 // ─── CARD MODULE ─────────────────────────
 
+const { heroActionLocked } = require('./_summon-eligibility');   // Z6 (H02-21)
+
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
@@ -222,6 +224,9 @@ module.exports = {
       if (hostName && lock.heroName && hostName !== lock.heroName) return false;
     }
     if (getFreeZones(hps, heroIdx, feld).length === 0) return false;
+    // Z6 (H02-21): die Beschwoerung ist eine Zusatz-AKTION - Aktionssperren des Helden (Lethe `_actionLockedTurn`, Skill-/Aktionslimit,
+    // Kent/Chalice) gelten (Ruling 28.8., `_summon-eligibility.heroActionLocked`).
+    if (heroActionLocked(engine, pi, heroIdx, feld)) return false;
     return getEligibleCreatures(engine, pi, heroIdx, level, feld).length > 0;
   },
 

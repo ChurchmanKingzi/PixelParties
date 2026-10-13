@@ -58,6 +58,9 @@ module.exports = {
 
       const fehlen = ZIEL_HANDGROESSE - (ps.hand || []).length;
       if (fehlen <= 0) return;                           // Hand ist schon voll genug
+      // Z6 (C01-01): "add ... to your hand" - Hand-Sperre und Such-Sperre ("cannot search or add cards to your hand")
+      // verbieten das Hinzufuegen; gar nicht erst anbieten.
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return;
 
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm',

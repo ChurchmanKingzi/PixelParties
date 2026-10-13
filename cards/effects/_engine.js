@@ -2567,6 +2567,9 @@ class GameEngine {
       return false;
     }
     if (ps._discardLockedTurn !== this.gs.turn) return true;
+    // Z6 (F03-10): die HARTE Stab-Sperre (`_discardLockHard`, Staebe) hebt auch der 6-Gold-Freikauf des Eye of Ren
+    // nicht auf - gelten beide im selben Zug, gilt die strengere (der Stab hat keine Ausnahme), in beiden Reihenfolgen.
+    if (ps._discardLockHard === this.gs.turn) return false;
     const buy = ps._discardLockBuyout;
     if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
     if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
@@ -10829,7 +10832,9 @@ class GameEngine {
 
   _cardBlockedBySearchLock(script, cardData, ps, playerIdx) {
     if (!script || !ps) return false;
-    if (cardData?.cardType === 'Creature') return false;
+    // Z6 (B-04): auch Artifact-Creatures (cardType 'Artifact', Subtyp Creature, z. B. Debt-O-Tron Backup Duplicator) haben einen
+    // Koerper und sind ausgenommen - `hasCardType` kennt beide Formen.
+    if (cardData && (cardData.cardType === 'Creature' || hasCardType(cardData, 'Creature'))) return false;
     // v1090: die Stufe kann von der Flagge ODER vom Brett kommen.
     // `playerIdx` ist optional, damit alte Aufrufer weiterlaufen; ohne
     // ihn zaehlen nur die Flaggen.
@@ -10839,6 +10844,11 @@ class GameEngine {
       deck: !!ps.searchLocked,
       discard: !!(ps.searchLocked && ps.searchLockedIncludesDiscard),
     };
+    // Z6 (S03-26, A01-37): die Hand-Sperre ist die STAERKSTE Stufe ("cannot draw or add cards") und sperrt jede
+    // Suche (`_isSearchBlocked` tut es laengst) - eine reine Such-Karte ist darunter ebenso wirkungslos; und die harte
+    // Stab-Sperre (Ablage-Ausgang) macht reine ABLAGE-Sucher wirkungslos.
+    if ((script.blockedBySearchLock || script.blockedBySearchLockDiscard) && ps.handLocked) return true;
+    if (script.blockedBySearchLockDiscard && this.isDiscardOutHardLocked?.(pi)) return true;
     if (script.blockedBySearchLock && stufe.deck) return true;
     if (script.blockedBySearchLockDiscard && stufe.discard) return true;
     return false;
@@ -15115,6 +15125,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('summon_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
       return null;
     }
+    // ── BESCHWOERUNGSSPERRE AUCH FUER EFFEKT-BESCHWOERUNGEN (Z6, A01-27) ──
+    // `ps.summonLocked` sperrt laut CARD_API „Hand-, Effekt-Beschwoerungen UND Platzierungen" - die Platzierung
+    // (`actionPlaceCreature`) prueft es laengst, dieser Trichter (Living Illusion, Reincarnation, Thep, Soul
+    // Shards …) bisher nicht. Der Besitzer der Sperre ist der Beschwoerer (`controller`, sonst die Feldseite).
+    // Ausnahmen: Wiederbelebung (`skipBeforeSummon`, Rewrite History/Zombified Assault - keine Beschwoerung im
+    // Sinn der Sperre) und `_ignoreSummonLock` (Old Couple setzt den Riegel bewusst VOR der eigenen Beschwoerung).
+    if (!opts._ignoreSummonLock && !opts.skipBeforeSummon) {
+      const _sps = this.gs.players[opts.controller ?? playerIdx];
+      if (_sps?.summonLocked) {
+        this.log('summon_blocked', { card: cardName, reason: 'summonLocked', heroIdx });
+        return null;
+      }
+      if (_sps?.summonLockExceptGreatmaw) {
+        const { isGreatmawCreature } = require('./_greatmaw-shared');
+        if (!isGreatmawCreature(cardName, this)) {
+          this.log('summon_blocked', { card: cardName, reason: 'summonLockExceptGreatmaw', heroIdx });
+          return null;
+        }
+      }
+    }
     // ── Cross-Side-Sperre (Als Ruling) ────────────────────────────────
     // Creatures, die laut Text NUR in GEGNERISCHE Zonen gelegt werden
     // koennen (`placesOnOpponentBoard`, derzeit Powder Keg), duerfen auch
@@ -19004,6 +19034,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // der Stapel-Sperre — gilt in JEDEM Fenster, in dem dieses Praedikat
     // haengt (validateActionPlay, Spielbarkeitsliste, 22 Reaktionsfenster).
     if (ps && cardName) {
+      // Z6: Artefakt-Sperre (Boomerang, Blood-Soaked Coin: `_artifactLockTurn`)
+      // gilt auch fuer Hand-REAKTIONSartefakte (Bamboo Shield, Boots of
+      // Hermes, Philosopher's Stone …) - EIN Prädikat statt je Fenster (F01-13, F02-24).
+      if (ps._artifactLockTurn === this.gs?.turn
+          && this._getCardDB()[cardName]?.cardType === 'Artifact') return true;
+      // Z6 (F02-23): Item Lock verlangt eine ANDERE Handkarte als Kosten (wie `validateActionPlay`: mindestens 2 Handkarten).
+      if (ps.itemLocked && (ps.hand || []).length < 2
+          && this._getCardDB()[cardName]?.cardType === 'Artifact') return true;
       const sc = loadCardEffect(cardName);
       if (sc?.blockedBySummonLock && ps.summonLocked) return true;
       if (sc?.blockedByPileLock) {
@@ -19168,7 +19206,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
       const buy = ps._discardLockBuyout;
-      if (!(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
+      if (ps._discardLockHard === this.gs.turn || !(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
         this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
         return null;
       }
@@ -19477,6 +19515,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     const pi = (this.gs?.players || []).indexOf(ps);
     if (pi < 0) return true;
     return this.pileOutAllowed(pi, pile, opts);
+  }
+
+  /**
+   * Z6 (S03-26): Ist der Ablage-AUSGANG fuer `pi` in diesem Zug gerade hart gesperrt - Stab-Sperre ohne Freikauf
+   * (Staff of the Teleporter/Uncontrollable Destruction) bzw. Stab + Eye of Ren? Synchrones Gegenstueck zu
+   * `_discardOutAllowed` fuer Spielbarkeits-Gates (die Eye-Sperre allein ist freikaufbar und zaehlt NICHT).
+   */
+  isDiscardOutHardLocked(pi) {
+    const ps = this.gs?.players?.[pi];
+    if (!ps || ps._discardLockedTurn !== this.gs.turn) return false;
+    if (ps._discardLockHard === this.gs.turn) return true;
+    const buy = ps._discardLockBuyout;
+    return !buy || buy.turn !== this.gs.turn;
   }
 
   /**
@@ -19824,6 +19875,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         const reactScript = loadCardEffect(cardName);
         if (!reactScript?.proactivePlay) continue;
       }
+      // Z6 (H04-19): Surprises kommen NUR verdeckt in den Main Phases ins Spiel (`doPlaySurprise`) - ein Sofort-Guss
+      // (`_castSpellImmediately`: Yukana, Coffee, performImmediateAction) fuehrt nur `onPlay` aus und liesse sie wirkungslos
+      // in der Ablage verpuffen (Karte, Wisdom-Abwurf und Einmal-Stempel weg).
+      if ((cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'surprise')) continue;
       // Check spell school / level requirements (centralized).
       // v664: derselbe Caster-Bypass wie in validateActionPlay — ein
       // Zusatzaktions-Token mit `bypassesCasterRequirement` (Wolflesia,
@@ -23895,6 +23950,28 @@ this._deathWatch = (this._deathWatchStack || []).length
    * conditions that currently prevent summoning.
    * Returns array of card names that are blocked.
    */
+  /**
+   * Z6 (A08-29): Ist DIESE Kreatur fuer `playerIdx` gerade von den Beschwoerungssperren gesperrt? Namens-Gegenstueck zu
+   * `getSummonBlocked` (das nur Handkarten listet) fuer Wege, die eine Kreatur NICHT aus der Hand beschwoeren (Ushabti aus der
+   * Surprise Zone): `summonLocked`, Teil-Sperre Greatmaw Remora und die Handkarten-Sperre (Grinning Cat). Das kartenseitige `canSummon` prueft der Aufrufer selbst.
+   */
+  getSummonBlockedFor(playerIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !cardName) return false;
+    if (ps.summonLocked) return true;
+    if (ps.summonLockExceptGreatmaw) {
+      const { isGreatmawCreature } = require('./_greatmaw-shared');
+      if (!isGreatmawCreature(cardName, this)) return true;
+    }
+    const { selfRevealEffectsSuppressed } = require('./_crystals-shared');
+    if (!selfRevealEffectsSuppressed(this, playerIdx)) {
+      for (const cn of (ps.hand || [])) {
+        if (cn !== cardName && loadCardEffect(cn)?.handSummonLockExceptSelf) return true;
+      }
+    }
+    return false;
+  }
+
   getSummonBlocked(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -24235,7 +24312,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ausdruecklich aus — sonst wuerde der Monkee-Archetyp bei jedem
     // Zugbeginn von allein feuern (das Einkommen betraegt exakt 4 Gold).
     // Gleiches Muster wie `_isResourceDraw` beim Standard-Nachziehen.
-    const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain };
+    // Z6 (A09-12): `_gainState` ist die gemeinsame Referenz, ueber die eine SPERRENDE Karte (Tuscan Aristocrat)
+    // dem Aufrufer meldet "hier wurde geblockt" (Unterschied zum Ersatz-Effekt, z. B. Golden Vermin) -
+    // `actionStealGold` braucht das, damit das Opfer sein Gold behaelt.
+    const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain, _gainState: opts._gainState || {} };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
     this._settleAmount(hookCtx); // v840: modifyAmount-Boni (Semi, Wealth …) verrechnen
@@ -24489,7 +24569,22 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Kosten einer Reaktionskarte beim Spieler `ps` verbuchen. */
   async _rxPay(ps, cost, opts = {}) {
-    return this._payCardCost(this._rxOwnerIdx(ps, '_rxPay'), cost, opts);
+    const pi = this._rxOwnerIdx(ps, '_rxPay');
+    const gezahlt = await this._payCardCost(pi, cost, opts);
+    // Z6 (F02-23): Item Lock (Hammer Throw) - "must delete a card from their hand whenever they play an Artifact": gilt auch fuer
+    // Hand-REAKTIONSartefakte (Idol of Crestina, Magic Topaz …), die an den Server-Spielwegen vorbeilaufen. Die Reaktionskarte selbst
+    // ist zu diesem Zeitpunkt schon aus der Hand genommen; `_handPlayLockedFor` stellt sicher, dass noch eine Karte uebrig ist.
+    if (opts.cardName && ps.itemLocked && (ps.hand || []).length > 0
+        && this._getCardDB()[opts.cardName]?.cardType === 'Artifact') {
+      await this.actionPromptForceDiscard(pi, 1, {
+        title: 'Item Lock Cost',
+        description: 'You must delete 1 card from your hand to use an Artifact.',
+        source: 'Item Lock', deleteMode: true, selfInflicted: true,
+        // die gerade aufloesende EIGENE Karte (z. B. der Angriff, auf den reagiert wird) steht noch in der Hand, ist aber keine Kostenkarte
+        eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => i !== opts.inHandIdx && !this._istAufloesendeHandkarte(ps, i, false)),
+      });
+    }
+    return gezahlt;
   }
 
   /**
@@ -24923,6 +25018,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       return { stolen: 0, fizzled: true };
     }
 
+    // Z6 (A09-12): wer kein Gold gewinnen darf (Golden Arrow), kann auch nichts stehlen.
+    if (ps.goldLocked) {
+      this.log('gold_steal_fizzle', { by: source, reason: 'goldLocked' });
+      return { stolen: 0, fizzled: true };
+    }
+
     const clamped = Math.min(Math.max(0, requested | 0), ops.gold || 0);
     if (clamped <= 0) {
       this.log('gold_steal_fizzle', { by: source, reason: 'opponent at 0 Gold' });
@@ -24933,7 +25034,17 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
     this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
-    await this.actionGainGold(pi, clamped);
+    const _gainState = {};
+    await this.actionGainGold(pi, clamped, { _gainState });
+    // Z6 (A09-12): ein gesperrter Gewinn (Tuscan Aristocrat: ausserhalb der eigenen Resource Phase) macht den
+    // Diebstahl wirkungslos - das Opfer bekommt sein Gold zurueck, statt dass es aus dem Spiel faellt.
+    if (_gainState.blocked) {
+      ops.gold = (ops.gold || 0) + clamped;
+      this._checkGoldStateRules(oi);
+      this.log('gold_steal_fizzle', { by: source, reason: 'gain blocked' });
+      this.sync();
+      return { stolen: 0, fizzled: true };
+    }
 
     this.log('gold_steal', {
       by: source, player: ps.username, from: ops.username,
@@ -32553,7 +32664,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(targetOwner);
 
@@ -32733,7 +32844,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(pi);
 
@@ -32892,7 +33003,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
 
@@ -33043,7 +33154,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(pi);
 
@@ -33187,7 +33298,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(ownerIdx);
 
@@ -33510,7 +33621,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     ps.hand.splice(actualIdx, 1);
     if (inDieLoeschung) ps.deletedPile.push(cardName);
     else ps.discardPile.push(cardName);
-    await this._rxPay(ps, cost);
+    await this._rxPay(ps, cost, { cardName });
     await this._rxPayWisdom(ps, rxCast);
     this.notePlayedFromHand(ownerIdx);
     if (script?.oncePerGame || script?.oncePerGameKey) {
@@ -34013,7 +34124,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else {
           ps.discardPile.push(cardName);
         }
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);   // v1155: wie in den uebrigen Hand-Reaktionen
         this.notePlayedFromHand(reactorIdx);
 
@@ -34215,7 +34326,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ps.hand.splice(actualIdx, 1);
         if (destPile === 'deleted') ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(ownerIdx);
 
@@ -34398,7 +34509,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       } else {
         ps.discardPile.push(cardName);
       }
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       await this._rxPayWisdom(ps, rxCast);
       this.notePlayedFromHand(playerIdx);
 
@@ -34489,7 +34600,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         ps.hand.splice(idx, 1);
         (zumLoeschen ? ps.deletedPile : ps.discardPile).push(cardName);
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         await this._rxPayWisdom(ps, rxCast);
         this.notePlayedFromHand(playerIdx);
         this.sync();
@@ -34595,7 +34706,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(summoningPi);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: summoningPi });
@@ -34824,7 +34935,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         this.sync();
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
 
         this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
@@ -34959,7 +35070,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(victimOwner);
 
       // Play-Signal + Handkarten-Flug. Dieses Fenster spliced die Karte
@@ -35110,7 +35221,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(reactorIdx);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: reactorIdx });
@@ -36277,7 +36388,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } else {
           ps.discardPile.push(cardName);
         }
-        await this._rxPay(ps, cost);
+        await this._rxPay(ps, cost, { cardName });
         this.notePlayedFromHand(pi);
 
         // Push state to the client NOW so the hand re-renders without
@@ -36522,7 +36633,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Consume from hand + pay gold
       ps.hand.splice(hi, 1);
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName });
       this.notePlayedFromHand(pi);
 
       // Reveal the card to the opponent + spectators
@@ -38545,7 +38656,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         wisdomCost = this.getWisdomDiscardCost(reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
-      await this._rxPay(ps, cost);
+      await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdx });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -42901,6 +43012,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           canActivate = false;
           handLockBlocked = true;
         }
+        if (canActivate && this._cardBlockedBySearchLock(script, null, ps, playerIdx)) {   // Z6 (M02-23): Such-Sperre auch fuer freie Abilities (Navigation)
+          canActivate = false;
+          handLockBlocked = true;
+        }
 
         // Distracting Crystal in hand blocks shuffle-into-deck plays —
         // grey out abilities like Leadership while a copy is held.
@@ -43072,6 +43187,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             handLockBlocked = true;
           }
           if (canActivate && script.blockedBySummonLock && ps.summonLocked) {   // v834
+            canActivate = false;
+            handLockBlocked = true;
+          }
+          if (canActivate && this._cardBlockedBySearchLock(script, null, ps, playerIdx)) {   // Z6 (M02-23)
             canActivate = false;
             handLockBlocked = true;
           }

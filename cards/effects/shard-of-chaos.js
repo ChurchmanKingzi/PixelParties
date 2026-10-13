@@ -23,8 +23,15 @@ module.exports = {
   deferBroadcast: true,
   deleteOnUse: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
+    // Z6 (F02-13): der Ertrag kommt aus der ABLAGE - harte Stab-Sperre, Stapel-Sperre (Knight of Kings [B]) und Hand-/starke
+    // Such-Sperre machen die Karte wirkungslos (die geloeschten Handkarten waeren die reinen Kosten).
+    if (engine) {
+      if (engine.isDiscardOutHardLocked?.(pi)) return false;
+      if (!engine.pileOutAllowed?.(pi, 'discard', { sourceOwner: pi })) return false;
+      if (engine._isSearchBlocked?.(pi, {}, 'discard')) return false;
+    }
     // Need 2+ cards in hand (Shard + at least 1 other)
     if ((ps.hand || []).length < 2) return false;
     // At least 1 hand card (not Shard) whose normalized type exists in discard
@@ -81,6 +88,10 @@ module.exports = {
     }
 
     if (eligibleIndices.length === 0) return { cancelled: true };
+
+    // Z6 (F02-13): Ablage-Ausgang VOR dem Loeschen klaeren (Eye of Ren: 6-Gold-Freikauf anbieten; abgelehnt/hart gesperrt = sauberer
+    // Abbruch, Karte bleibt in der Hand) - sonst waeren die Handkarten schon geloescht, wenn die Ablage zubleibt.
+    if (!(await engine._discardOutAllowed(pi, { source: 'Shard of Chaos' }))) return { cancelled: true };
 
     // ── Step 1: Hand Pick prompt ──
     const maxSelect = Math.min(3, eligibleIndices.length);
