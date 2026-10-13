@@ -175,7 +175,8 @@ module.exports = {
 
       await engine.summonCreatureWithHooks(
         CARD_NAME, chosen.owner, chosen.heroIdx, chosen.slotIdx,
-        { source: CARD_NAME, ...(chosen.owner !== pi ? { controller: pi } : {}) }   // Kontrolle statt Seite (Styx 28.9.)
+        { source: CARD_NAME, alsZusatzaktion: true,   // "as an additional Action" ist eine Aktion (A04-cute-24)
+          ...(chosen.owner !== pi ? { controller: pi } : {}) }   // Kontrolle statt Seite (Styx 28.9.)
       );
 
       engine.log('cute_bunny_hand_summon', {

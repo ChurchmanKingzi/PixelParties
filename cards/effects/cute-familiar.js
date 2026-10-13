@@ -33,6 +33,8 @@
 //     stamp, and acting on `onTurnEnd` once.
 // ═══════════════════════════════════════════
 
+const { kontrolliert } = require('./_double-shared');
+
 const CARD_NAME = 'Cute Familiar';
 const REQUIRED_CHARME = 2;
 
@@ -135,6 +137,13 @@ module.exports = {
   activeIn: ['support', 'discard'],
 
   // ── 1. UNIQUENESS ──────────────────────────────────────────────
+  // „You can only control 1" gilt auch fuer jede Beschwoerung, die nicht
+  // ueber die Hand laeuft (Cute Bird, Annoyance Mini, ...): `beforeSummon`
+  // laeuft vor JEDER Beschwoerung dieser Karte (A04-cute-10).
+  async beforeSummon(ctx) {
+    return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME);
+  },
+
   canSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -284,6 +293,7 @@ module.exports = {
       const oldInst = ctx.card;
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: false,
+        summonOpts: { alsZusatzaktion: true },   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(chosen.owner !== pi ? { heldSeite: chosen.owner } : {}),   // Kontrolle statt Seite (Styx 28.9.)
       });
       if (oldInst && oldInst.zone === 'discard') {

@@ -31,6 +31,8 @@
 
 const { hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_hooks');
 
+const { kontrolliert } = require('./_double-shared');
+
 const CARD_NAME = 'Cute Phoenix';
 
 /**
@@ -138,6 +140,13 @@ module.exports = {
    * on this player's side. The `ctx.card.id` self-exclusion prevents
    * the just-being-summoned dummy from blocking itself.
    */
+  // „You can only control 1" gilt auch fuer jede Beschwoerung, die nicht
+  // ueber die Hand laeuft (Cute Bird, Annoyance Mini, ...): `beforeSummon`
+  // laeuft vor JEDER Beschwoerung dieser Karte (A04-cute-10).
+  async beforeSummon(ctx) {
+    return !kontrolliert(ctx._engine, ctx.cardOwner, CARD_NAME);
+  },
+
   canSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;

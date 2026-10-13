@@ -207,7 +207,9 @@ module.exports = {
       if (i === tutoredHandIdx) return acc;
       return acc + 1;
     }, 0);
-    if (spendable < 1 || hostSlots.length === 0) {
+    // "You can only control 1 ..." (Phoenix, Familiar): die Beschwoerung wuerde
+    // verweigert - den Zusatz nicht anbieten, sonst Abwurfkosten fuer nichts (A04-cute-10).
+    if (spendable < 1 || hostSlots.length === 0 || engine.nurEinerSchonKontrolliert(pi, chosenName)) {
       engine.sync();
       return true;
     }
@@ -289,6 +291,7 @@ module.exports = {
       chosenName, feld, slot.heroIdx, slot.slotIdx,   // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
       {
         source: CARD_NAME,
+        alsZusatzaktion: true,   // "as an additional Action" ist eine Aktion (A04-cute-24)
         ...(feld !== pi ? { controller: pi } : {}),
         hookExtras: {
           _summonedBy: CARD_NAME,
