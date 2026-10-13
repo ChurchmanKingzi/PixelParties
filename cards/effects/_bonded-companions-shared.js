@@ -105,11 +105,18 @@ async function companionAbgang(ctx) {
   engine._broadcastEvent('play_zone_animation', {
     type: 'bloody_cut', owner: pi, heroIdx, zoneSlot: -1,
   });
-  await engine.actionDefeatHero(
-    { name: ctx.cardName, owner: pi, controller: pi, heroIdx },
-    held,
-    { sourceName: ctx.cardName },
-  );
+  // A09-02: Die Karte verlaesst das Brett bereits (z. B. Rueckgabe auf die Hand – `inst.zone` ist hier noch 'support').
+  // Ohne Marke schob `companionHeldGefallen` sie im Heldentod zusaetzlich in die Ablage (Karte doppelt: Hand + Ablage).
+  ich._verlaesstBrett = true;
+  try {
+    await engine.actionDefeatHero(
+      { name: ctx.cardName, owner: pi, controller: pi, heroIdx },
+      held,
+      { sourceName: ctx.cardName },
+    );
+  } finally {
+    delete ich._verlaesstBrett;
+  }
   engine.log('bonded_companion_bond_broken', {
     player: engine.gs.players[pi]?.username,
     companion: ctx.cardName,
@@ -153,6 +160,7 @@ async function companionHeldGefallen(ctx) {
   const engine = ctx._engine;
   const ich = ctx.card;
   if (!ich || ich.zone !== 'support') return;
+  if (ich._verlaesstBrett) return;   // A09-02: geht schon (Abgang loest den Heldentod aus) – nicht noch einmal ablegen
   const pi = ich.controller ?? ich.owner;
   const gefallen = ctx.hero;
   if (!gefallen?.name) return;
