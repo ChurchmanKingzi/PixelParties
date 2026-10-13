@@ -38,8 +38,13 @@ const FIREBALL = 'Fireball';
 function fireballSources(engine, pi) {
   const ps = engine.gs.players[pi];
   const out = [];
-  if ((ps?.mainDeck || []).includes(FIREBALL)) out.push('deck');
-  if ((ps?.discardPile || []).includes(FIREBALL)) out.push('discard');
+  // Z6 (A06-09): nur Stapel, aus denen die Karte AUF DIE HAND darf - Stapel-Sperre (Knight of Kings [B]), Stab-Sperre
+  // und Such-/Hand-Sperre schliessen ihn aus (sonst bote das Angebot eine Karte an, die nicht kommt).
+  const frei = (pile) => engine.pileOutAllowed(pi, pile, { sourceOwner: pi })
+    && !engine._isSearchBlocked(pi, {}, pile)
+    && !(pile === 'discard' && engine.isDiscardOutHardLocked(pi));
+  if ((ps?.mainDeck || []).includes(FIREBALL) && frei('deck')) out.push('deck');
+  if ((ps?.discardPile || []).includes(FIREBALL) && frei('discard')) out.push('discard');
   return out;
 }
 
@@ -263,7 +268,7 @@ module.exports = {
           return;
         }
         // Deck search reveal — the card flies in from the deck pile.
-        pile.splice(idx, 1);
+        if (!(await engine.takeFromPile(ps, 'deck', FIREBALL, { source: CARD_NAME, toHand: true }))) return;   // Z6 (A06-09): Stapel-Schicht statt Splice
         engine.handZugangSync(ps, FIREBALL, { source: CARD_NAME, ohneInstanz: true });
         engine.shuffleDeck(pi);
         engine._broadcastEvent('deck_search_add', { cardName: FIREBALL, playerIdx: pi });
@@ -278,7 +283,7 @@ module.exports = {
           from: 'discard', to: 'hand',
           toHandIdx, finalHandSize: toHandIdx + 1,
         });
-        pile.splice(idx, 1);
+        if (!(await engine.takeFromPile(ps, 'discard', FIREBALL, { source: CARD_NAME, toHand: true }))) return;   // Z6 (A06-09): Stab-/Eye-/Stapel-Sperre
         engine.handZugangSync(ps, FIREBALL, { source: CARD_NAME, ohneInstanz: true });
       }
       engine.log('friendly_fireballer_tutor', { player: ps.username, from });

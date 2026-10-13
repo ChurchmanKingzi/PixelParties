@@ -113,6 +113,8 @@ function istAusruestbar(engine, pi, heroIdx, cardName) {
 function aufwertungenImDeck(engine, pi, heroIdx, altKosten) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // Z6 (S03-16): Stapel-Sperre (Knight of Kings [B]) - ohne Deck-Ausgang gibt es keinen Nachfolger, das Equip waere kein Ziel.
+  if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return [];
   const cardDB = engine._getCardDB();
   const min = altKosten + MIN_AUFSCHLAG;
   const max = altKosten + MAX_AUFSCHLAG;

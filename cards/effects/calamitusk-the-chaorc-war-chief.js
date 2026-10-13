@@ -60,7 +60,9 @@ function replacements(engine, pi, calaHi, excludeName, feld = pi) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'hand' });
   }
-  for (const cn of (ps?.mainDeck || [])) {
+  // Z6 (A06-09): Stapel-Sperre (Knight of Kings [B]) - aus einem gesperrten Deck gibt es keine Ersatzkreatur.
+  const deckFrei = engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi });
+  for (const cn of (deckFrei ? (ps?.mainDeck || []) : [])) {
     if (cn === excludeName || byName.has(cn)) continue;
     if (canSummonReduced(engine, feld, calaHi, cn)) byName.set(cn, { name: cn, source: 'deck' });
   }
@@ -136,7 +138,8 @@ module.exports = {
         const pile = chosen.source === 'deck' ? ps.mainDeck : ps.hand;
         const idx = pile.indexOf(chosen.name);
         if (idx < 0) { engine.sync(); return; }
-        pile.splice(idx, 1);
+        // Z6 (A06-09): Stapel-Schicht statt Splice (fragt die Stapel-Sperre; Hand: unveraendert)
+        if (!(await engine.takeFromPile(ps, chosen.source === 'deck' ? 'deck' : 'hand', chosen.name, { source: CARD_NAME }))) { engine.sync(); return; }
         if (chosen.source === 'deck') engine.shuffleDeck(pi);
 
         // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling

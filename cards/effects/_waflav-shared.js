@@ -545,7 +545,9 @@ async function tutorAscendedHeroes(engine, pi, cardName, { from, max = 1 } = {})
     const pile = pileOf();
     const idx = pile.indexOf(picked);
     if (idx < 0) break;
-    pile.splice(idx, 1);
+    // Z6 (A08-14): ueber die Stapel-Schicht statt eigenem Splice - sie fragt Knight of Kings [B] (`pileOutAllowed`), die
+    // Stab-/Eye-Sperre (`_discardOutAllowed`) und die Such-Sperre (`toHand`); gesperrt = null = nichts geholt.
+    if (!(await engine.takeFromPile(ps, from === 'discard' ? 'discard' : 'deck', picked, { source: cardName, toHand: true }))) break;
     engine.handZugangSync(ps, picked, {  });
     taken++;
     engine.log('waflav_tutor', { player: ps.username, hero: cardName, card: picked, from });

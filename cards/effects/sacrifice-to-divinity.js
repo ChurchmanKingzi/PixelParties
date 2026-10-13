@@ -71,8 +71,9 @@ module.exports = {
       const deckCount    = (ps.mainDeck    || []).filter(n => n === DIVINITY).length;
       const discardCount = (ps.discardPile || []).filter(n => n === DIVINITY).length;
       if (handCount    > 0) sources.push({ name: DIVINITY, source: 'hand',    count: handCount });
-      if (deckCount    > 0) sources.push({ name: DIVINITY, source: 'deck',    count: deckCount });
-      if (discardCount > 0) sources.push({ name: DIVINITY, source: 'discard', count: discardCount });
+      // Z6 (S03-03): Deck/Ablage nur, wenn die Karte sie verlassen darf (Knight of Kings [B], Stab-/Eye-Sperre).
+      if (deckCount    > 0 && engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) sources.push({ name: DIVINITY, source: 'deck',    count: deckCount });
+      if (discardCount > 0 && engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi }) && !engine.isDiscardOutHardLocked(pi)) sources.push({ name: DIVINITY, source: 'discard', count: discardCount });
 
       if (sources.length === 0) {
         // Sacrifice is paid (matches Wisdom contract — costs always
@@ -159,6 +160,7 @@ module.exports = {
       }
 
       // ── Step 4: pull the Divinity from its source pile and attach ──
+      // Z6 (S03-03): Deck/Ablage ueber die Stapel-Schicht (Stapel-, Stab- und Eye-Sperre), Hand wie bisher.
       const removeFromPile = (pile) => {
         const idx = pile.indexOf(DIVINITY);
         if (idx >= 0) { pile.splice(idx, 1); return true; }
@@ -166,8 +168,8 @@ module.exports = {
       };
       let pulled = false;
       if (pickedSource === 'hand')    pulled = removeFromPile(ps.hand);
-      if (pickedSource === 'deck')    pulled = removeFromPile(ps.mainDeck);
-      if (pickedSource === 'discard') pulled = removeFromPile(ps.discardPile);
+      if (pickedSource === 'deck')    pulled = !!(await engine.takeFromPile(ps, 'deck', DIVINITY, { source: CARD_NAME }));
+      if (pickedSource === 'discard') pulled = !!(await engine.takeFromPile(ps, 'discard', DIVINITY, { source: CARD_NAME }));
       if (!pulled) {
         engine.log('sacrifice_to_divinity_attach_failed', { player: ps.username, reason: 'pile_empty' });
         engine.sync();
