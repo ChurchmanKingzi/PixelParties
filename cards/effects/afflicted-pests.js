@@ -14,6 +14,8 @@
 //  Surprise Zone (re-set).
 // ═══════════════════════════════════════════
 
+const { hasCardType } = require('./_hooks');
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -128,9 +130,12 @@ module.exports = {
       if (idx >= 0) supSlot.splice(idx, 1);
     }
 
-    // Send to discard (original owner's pile)
+    // Send to discard (original owner's pile) – Tokens kommen nie in die Ablage, sondern in den Geloescht-Stapel (A08-11)
     const discardPs = gs.players[tInst?.originalOwner ?? tOwner];
-    if (discardPs) discardPs.discardPile.push(tCardName);
+    if (discardPs) {
+      if (hasCardType(cardDB[tCardName], 'Token')) discardPs.deletedPile.push(tCardName);
+      else discardPs.discardPile.push(tCardName);
+    }
 
     // Untrack instance
     if (tInst) engine._untrackCard(tInst.id);
