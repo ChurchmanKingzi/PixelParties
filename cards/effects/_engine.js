@@ -42665,6 +42665,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           canActivate = false;
           handLockBlocked = true;
         }
+        if (canActivate && this._cardBlockedBySearchLock(script, null, ps, playerIdx)) {   // Z6 (M02-23): Such-Sperre auch fuer freie Abilities (Navigation)
+          canActivate = false;
+          handLockBlocked = true;
+        }
 
         // Distracting Crystal in hand blocks shuffle-into-deck plays —
         // grey out abilities like Leadership while a copy is held.
@@ -42836,6 +42840,10 @@ this._deathWatch = (this._deathWatchStack || []).length
             handLockBlocked = true;
           }
           if (canActivate && script.blockedBySummonLock && ps.summonLocked) {   // v834
+            canActivate = false;
+            handLockBlocked = true;
+          }
+          if (canActivate && this._cardBlockedBySearchLock(script, null, ps, playerIdx)) {   // Z6 (M02-23)
             canActivate = false;
             handLockBlocked = true;
           }

@@ -294,6 +294,12 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (!ps) return false;
+  // Z6 (F01-21): Hand-Sperre ("cannot draw or add cards to your hand") gilt auch fuer diesen Brett->Hand-Weg
+  // (Capture Net, Sparkfly Queen/Worker). Die Such-Sperre nicht - Add aus dem BRETT ist Gruppe D (Al 14.9.).
+  if (engine.handZugangGesperrt?.(pi)) {
+    engine.log('steal_to_hand_blocked', { card: targetInst.name, by: sourceName, reason: 'handLocked' });
+    return false;
+  }
 
   const owner    = targetInst.owner;
   const heroIdx  = targetInst.heroIdx;

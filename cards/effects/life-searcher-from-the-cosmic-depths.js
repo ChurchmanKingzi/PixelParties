@@ -77,6 +77,7 @@ module.exports = {
         confirmLabel: '🌌 Discard & Search',
         cancelLabel: 'No',
         cancellable: true,
+        searchToHand: true, searchPile: 'deck',   // Z6 (A02-22): Angebot unter Hand-/Such-Sperre unterdruecken (wie Deepsea Witch)
       });
       if (!confirmed) return;
 

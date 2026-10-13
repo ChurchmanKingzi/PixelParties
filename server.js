@@ -9572,6 +9572,16 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // NICHT ueber validateActionPlay — Charme (Lv2 stiehlt eine Handkarte)
   // brauchte den Riegel deshalb eigens (Als Befund 5.8.).
   if (room.engine.isBorisBlocked(script, pi)) return false;
+  // Z6 (M02-23): die Sperr-Marken der Ability (Hand-/Zieh-/Such-/Stapel-/Beschwoerungssperre) gelten auch hier hart -
+  // bisher standen sie nur in der Engine-Liste (Ausgrauen), der Socket-Weg kannte sie nicht.
+  {
+    const _me = gs.players[pi];
+    if (script.blockedByHandLock && _me?.handLocked) return false;
+    if (script.blockedByDrawLock && _me?.drawLocked) return false;
+    if (room.engine._cardBlockedBySearchLock?.(script, null, _me, pi)) return false;
+    if (script.blockedByPileLock && room.engine.isPileLockedFor(pi)) return false;
+    if (script.blockedBySummonLock && _me?.summonLocked) return false;
+  }
 
   const hoptKey = `free-ability:${abilityName}:${pi}`;
   if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;

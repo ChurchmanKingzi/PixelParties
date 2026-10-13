@@ -39,6 +39,8 @@ module.exports = {
     const ps = ctx.players[ctx.cardOwner];
     if (!ps) return false;
     if (ps.handLocked) return false;
+    // Z6 (H03-03): Such-Sperre (Gruppe A, Al 14.9.: auch mit Nachteil daneben) - sonst gaebe es den Nachteil ohne Ertrag.
+    if (ctx._engine._isSearchBlocked(ctx.cardOwner, {}, 'deck')) return false;
     return getEligibleCardNames(ps).size > 0;
   },
 
@@ -51,6 +53,7 @@ module.exports = {
 
     const eligibleNames = getEligibleCardNames(ps);
     if (eligibleNames.size === 0) return false;
+    if (engine._isSearchBlocked(pi, {}, 'deck')) return false;   // Z6 (H03-03)
 
     // ── Step 1: Player picks a card from hand to reveal ──
 

@@ -23,6 +23,9 @@ const ARGOS = 'Argos, the Eye of the Cosmos';
     t.setAbilities(0, 0, [['Summoning Magic', 'Summoning Magic', 'Summoning Magic']]);
     t.hero(0, 0)._changeCounters = 3;
     if (sperre !== 'none') t.gs.players[0][sperre] = true;
+    // Z6: der Harness beantwortet Ja/Nein-Fragen, BEVOR die Engine ihre Such-Unterdrueckung (`promptGeneric`, v1117) sieht - diese Regel
+    // wendet dieselbe Engine-Pruefung an (`_suchQuelleDerAbfrage` + `_isSearchBlocked`), damit das echte Spielverhalten gemessen wird.
+    t.script.unshift({ match: d => { const sp = t.engine._suchQuelleDerAbfrage(d); return !!sp && t.engine._isSearchBlocked(0, {}, sp); }, answer: () => null, once: false });
     t.script.push({ match: d => d.type === 'optionPicker' && /Argos/.test(d.title || ''), answer: (d) => ({ optionId: d.options[d.options.length - 1].id }) });
     t.script.push({ match: d => d.type === 'cardGallery' && /Argos/.test(d.title || ''), answer: () => ({ cardName: 'Life-Searcher from the Cosmic Depths' }) });
     const r = await t.activateHero(0, 0, {});
@@ -31,7 +34,7 @@ const ARGOS = 'Argos, the Eye of the Cosmos';
     if (sperre === 'none') {
       R.check('Kontrolle ohne Sperre: Fireball abgeworfen, Karte gesucht', !hand.includes('Fireball') && hand.length === 2, hand);
     } else {
-      const angeboten = t.prompts.some(p => p.d.type === 'confirm' && p.d.title === 'Life-Searcher from the Cosmic Depths');
+      const angeboten = t.prompts.some(p => p.d.type === 'forceDiscard' && /Life-Searcher/.test(p.d.title || ''));   // Z6: das Kosten-Prompt (nach dem unterdrueckten Angebot) darf nie erscheinen
       R.check('Das Abwurf-&-Suche-Angebot wird unter ' + sperre + ' nicht gemacht', !angeboten, t.prompts.map(p => p.d.type + ':' + (p.d.title || '')));
       R.check('Die Handkarte (Fireball) bleibt auf der Hand – keine Kosten ohne Wirkung', hand.includes('Fireball'), { hand, ablage: t.pile(0, 'discardPile') });
     }

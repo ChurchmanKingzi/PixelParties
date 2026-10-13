@@ -308,7 +308,10 @@ module.exports = {
     // ToHand`) gate on `if (ps.handLocked) return [...]` and silently
     // no-op. Matches the user's spec exactly: "You cannot draw or add
     // cards from your deck to your hand for the rest of the turn".
-    ps.handLocked = true;
+    // Z6 (H02-10): der Text sperrt nur "draw or add cards FROM YOUR DECK" - also Zieh-Sperre + (schwache) Such-Sperre,
+    // die den Ablagestapel offen laesst; die volle Hand-Sperre (`handLocked`, Kazena) waere breiter als der Text.
+    ps.drawLocked = true;
+    ps.searchLocked = true;
     engine.log('hand_locked', { player: ps.username, by: CARD_NAME });
     engine.sync();
     return true;

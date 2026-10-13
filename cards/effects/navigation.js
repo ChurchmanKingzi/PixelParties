@@ -18,6 +18,7 @@ module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
   blockedByHandLock: true,
+  blockedBySearchLock: true,   // Z6 (M02-23): sucht nur im Deck - unter der Such-Sperre nicht aktivierbar (Kosten waeren umsonst)
 
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];

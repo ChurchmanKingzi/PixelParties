@@ -90,6 +90,7 @@ module.exports = {
   stealsFromEitherSide: true,
 
   isTargetingArtifact: true,
+  blockedByHandLock: true,   // Z6 (F01-21): Ausgrau-Liste/Server-Tor; nur die HAND-Sperre (Such-Sperre: Gruppe D, nicht betroffen)
   // cards.json cost (4) is the BASE — real cost is level × 4, so the
   // engine must not auto-deduct; resolve() deducts manually.
   manualGoldCost: true,
@@ -100,6 +101,7 @@ module.exports = {
     const eng = engine || gs._engineRef;
     if (!eng) return false;
     if (hoptUsed(eng, pi)) return false;
+    if (eng.handZugangGesperrt?.(pi)) return false;   // Z6 (F01-21): einziger Nutzen = Karte auf die Hand
     return getCapturableCreatures(eng, pi).length > 0;
   },
 
@@ -132,6 +134,7 @@ module.exports = {
 
     // Defensive HOPT recheck.
     if (hoptUsed(engine, pi)) return { aborted: true };
+    if (engine.handZugangGesperrt?.(pi)) return { aborted: true };   // Z6 (F01-21): vor der Zahlung
 
     // Re-resolve the live Creature instance.
     const inst = (target.cardInstance && engine.cardInstances.find(c => c.id === target.cardInstance.id))

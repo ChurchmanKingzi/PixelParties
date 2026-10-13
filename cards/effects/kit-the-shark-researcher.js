@@ -151,7 +151,8 @@ module.exports = {
       // now (Mode B needs ≥2 opp targets; Mode C needs ≥1 opp hand
       // card). If no modes are available, skip the trigger entirely —
       // no creature reveal, no log line, just a silent no-op.
-      const modeAFree = !_hoptUsed(gs, pi, HOPT_A);
+      // Z6 (H02-32): Modus A legt die Karte aus dem Deck auf die Hand - unter Hand-/Such-Sperre nicht waehlbar.
+      const modeAFree = !_hoptUsed(gs, pi, HOPT_A) && !engine._isSearchBlocked(pi, {}, 'deck');
       const oppTgts = _collectOppTargets(engine, oppPi);
       const modeBFree = !_hoptUsed(gs, pi, HOPT_B) && oppTgts.length >= MODE_B_TARGET_COUNT;
       const modeCFree = !_hoptUsed(gs, pi, HOPT_C) && (ops.hand?.length || 0) > 0;
@@ -269,6 +270,7 @@ module.exports = {
       //     Per the user's spec: discarding only happens with the
       //     damage and discard modes; a pure cancel does NOT dump
       //     the Creature.
+      if (chosenMode === 'A' && !modeAFree) chosenMode = null;   // Z6 (H02-32): nicht angebotener Modus (gesperrt) zaehlt als Abbruch
       if (chosenMode === 'A') {
         // Add the revealed Creature to hand. Routes through the
         // engine's canonical "card enters hand" path so fire-on-add
