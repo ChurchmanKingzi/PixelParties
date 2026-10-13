@@ -175,6 +175,9 @@ function _pickSelectedCopies(selectedEntries, allCopies) {
 // ─── Card module ─────────────────────────────
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { gs.players[pi]._mischiefInvasionUsedTurn = gs.turn; },
+
   /**
    * Eligibility gate: need at least 1 Frozen target (cap > 0), at least
    * one MM Creature in hand whose level/school can be hosted by SOME own

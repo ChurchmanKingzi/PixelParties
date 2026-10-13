@@ -37639,6 +37639,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // the play lock is released. Draining from arbitrary hook/chain
     // points (esp. End-Phase turn-end chains) caused a frozen-turn
     // CPU-deadline trip.
+    // ★ Z7: negierte / fizzelnde Karte war GESPIELT → Einmal-Stempel jetzt (siehe `_noteNegatedPlay`).
+    // Nur Zauber/Attacken/Artefakte/Tränke aus der Hand: Beschwörungen stempeln
+    // `oncePerGame` bewusst erst bei der Landung (v1030, Off Duty), Fähigkeiten/Helden-
+    // und Kreatureneffekte haben eigene Stempel.
+    if ((result.negated || result.fizzled) && !fromBoard && !cardInfo.isPlacement
+        && (cardType === 'Spell' || cardType === 'Attack' || cardType === 'Artifact' || cardType === 'Potion')) {
+      await this._noteNegatedPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
+    }
     return result;
   }
 
@@ -38884,6 +38892,51 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('placement_negated', { card: cardName, player: ps.username, to: pile });
     }
     this.sync();
+  }
+
+  /**
+   * ★ Z7 — „1 pro Zug / 1 pro Spiel" bei NEGIERUNG (eine Regel, eine Stelle).
+   *
+   * Wann gilt eine Karte als GESPIELT? Sobald sie die Hand verlassen hat und ein
+   * Gegenzug sie später negiert, ändert daran nichts (Ruling v1031 „Divine-Gift-
+   * Grenze"; Rusty Touch „… but your opponent still has to pay its Cost"; die
+   * Engine zählt eine negierte Attack/einen negierten Spell ohnehin als gespielt
+   * — `spellsPlayedThisTurn`, `attacksPlayedThisTurn`). Wer erst im `onPlay`/
+   * `resolve` stempelt, stempelt bei einer Negation nie — die zweite Kopie wirkte
+   * im selben Zug. Deshalb stempelt die Engine hier für jede negierte (oder
+   * fizzelnde, v1328) Initialkarte, die aus der Hand kam:
+   *   • `oncePerGame` / `oncePerGameKey` am Skript: automatisch (`ps._oncePerGameUsed`);
+   *   • Rundensperren: das Skript meldet sie selbst über den optionalen Haken
+   *     `onNegatedPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (Rückgabe
+   *     egal) — dieselbe Marke, die es sonst im `onPlay`/`resolve` setzt.
+   * Abbruch durch den SPIELER ist etwas anderes (Karte kehrt zurück, nichts gilt als
+   * gespielt) und läuft nie hierher.
+   */
+  async _noteNegatedPlay(owner, cardName, heroIdx, cardType, casterOwner) {
+    const ps = this.gs.players?.[owner];
+    if (!ps || !cardName) return;
+    const script = loadCardEffect(cardName);
+    if (!script) return;
+    if (script.oncePerGame || script.oncePerGameKey) {
+      if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+      ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+    }
+    if (typeof script.onNegatedPlay === 'function') {
+      try { await script.onNegatedPlay({ engine: this, gs: this.gs, pi: owner, heroIdx, cardName, cardType }); }
+      catch (err) { console.error(`[Engine] onNegatedPlay for ${cardName} failed:`, err.message); }
+    }
+    // „Der Held hat einen Zauber BENUTZT" (Kogarasu: „can only use 1 Spell per turn") —
+    // auch wenn er negiert wurde. `afterSpellResolved` feuert dort nie; Hörer dieses
+    // Gegenstücks (nur Heldenzähler, keine Wirkung) lauschen auf `afterSpellNegatedPlay`.
+    if (cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
+      try {
+        await this.runHooks('afterSpellNegatedPlay', {
+          heroOwner: Number.isInteger(casterOwner) ? casterOwner : owner,
+          spellName: cardName, spellCardData: this._getCardDB()[cardName], heroIdx, casterIdx: owner,
+          _skipReactionCheck: true,
+        });
+      } catch (err) { console.error(`[Engine] afterSpellNegatedPlay for ${cardName} failed:`, err.message); }
+    }
   }
 
   /**

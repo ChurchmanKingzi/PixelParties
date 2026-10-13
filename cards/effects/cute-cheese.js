@@ -11,6 +11,9 @@ const { isPileCreature, hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('cute-cheese', pi); },
+
   // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
   // einzigen Effekt und muessten entsprechend komplett geblockt und gar
   // nicht erst aktivierbar sein").

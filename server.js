@@ -9252,8 +9252,21 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       if (consumedAdditionalCreatureInst) {
         room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
-      if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[hoptKey] = gs.turn;
+      // ★ Z7 (C01-12): Die negierte Aktivierung ist VERBRAUCHT — aber nur EINE der N Nutzungen
+      // bei „up to N times per turn" (3-Headed Giant: `chargesPerTurn` + `chargeKey` über
+      // `_charges`). Die Rundensperre fällt erst, wenn keine Nutzung mehr frei ist; vorher
+      // sperrte schon die erste negierte Aktivierung alle drei.
+      let _negSperre = true;
+      if (script.chargesPerTurn > 1 && script.chargeKey) {
+        const _ch = require('./cards/effects/_charges');
+        const _chOpt = { key: script.chargeKey, max: script.chargesPerTurn };
+        _ch.spendUse(inst, gs, _chOpt);
+        if (_ch.usesLeft(inst, gs, _chOpt) > 0) _negSperre = false;
+      }
+      if (_negSperre) {
+        if (!gs.hoptUsed) gs.hoptUsed = {};
+        gs.hoptUsed[hoptKey] = gs.turn;
+      }
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -11446,6 +11459,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     return true;
   }
 
+  // ★ Z7 (F02-10): „You can only play 1 … per game" auch für ZIELENDE ARTEFAKTE (Perfect
+  // Disguise & Co.). Der Stempel stand bisher nur im Trank-Zweig unten — ein zielendes
+  // Artefakt blieb beliebig oft spielbar. Hier ist die Karte gespielt (nicht abgebrochen,
+  // nicht aborted); eine Negation hat die Engine schon in `_noteNegatedPlay` gestempelt.
+  _markOncePerGamePotion(ps, script, potionName);
+
   // v657: Gratis-Preise auch auf dem ZIEL-Pfad einloesen — der
   // namensweite Nullpreis (Misfire) und der scharfgestellte Gratis-Kauf
   // (Dajan) wurden bisher nur im Nicht-Ziel-Zweig von
@@ -12145,6 +12164,12 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
 
   const script = loadCardEffect(cardName);
   if (!script) return false;
+  // ★ Z7 (F02-10): EINMAL PRO SPIEL auch auf dem Normal-Artefakt-Weg prüfen — hier fehlte das
+  // Tor (nur Equip-, Zauber-, Trank-, Kreatur- und Surprise-Weg kannten es); ein Perfect
+  // Disguise ließ sich trotz Stempel erneut spielen.
+  if (script.oncePerGame || script.oncePerGameKey) {
+    if (ps._oncePerGameUsed?.has(script.oncePerGameKey || cardName)) return false;
+  }
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
   // `manualGoldCost` Artifacts (Dark Gear's level-scaled cost, Cool
   // Repair / Beer's per-target multiplier, etc.) compute their own
@@ -12271,6 +12296,9 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
 
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     else room.engine._firePendingPlayLog();
+
+    // ★ Z7: Partie-Stempel der gespielten Karte (Negation: schon in `_noteNegatedPlay`).
+    _markOncePerGamePotion(ps, script, cardName);
 
     if (ps._freeArtifactNames && ps._freeArtifactNames[cardName] && !chainResult.negated) {
       delete ps._freeArtifactNames[cardName];

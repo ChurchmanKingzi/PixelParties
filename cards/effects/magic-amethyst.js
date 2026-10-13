@@ -64,6 +64,9 @@ function _buildAbilityGallery(ps, hi) {
 }
 
 module.exports = {
+  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
+  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(CARD_NAME, pi); },
+
   // Gelockertes Commit (Al-Design-Update): Auch schwache Abilities
   // (Toughness) sind es wert, entfernt zu werden — Amethyst kann
   // GELOOPT werden: Eine schwache Removal jetzt heißt nächste Runde
