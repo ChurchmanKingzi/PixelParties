@@ -48379,6 +48379,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Any permanent opted into `preventsAllHeroesDeadLoss: true`
       // suspends the loss on this side (Elixir of Immortality and
       // any future "I'll handle the revive myself" effect).
+      // M01-02: Der Wert darf auch eine Funktion `(engine, pi, perm) => bool`
+      // sein — das Elixir haelt die Niederlage nur auf, wenn es fuer einen
+      // der toten Helden ueberhaupt ausloesen kann (nicht bei Mirjam o. ae.).
       const hasLossSuspender = (ps.permanents || []).some(p => {
         const script = loadCardEffect(p.name);
         const s = script?.preventsAllHeroesDeadLoss;
@@ -48403,9 +48406,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hint = this.gs._drawLoserIdx;
       const loserIdx = (isSeat(this, hint)) ? hint : 0;
       const winnerIdx = loserIdx === 0 ? 1 : 0;
-      // M01-02: Der Wert darf auch eine Funktion `(engine, pi, perm) => bool`
-      // sein — das Elixir haelt die Niederlage nur auf, wenn es fuer einen
-      // der toten Helden ueberhaupt ausloesen kann (nicht bei Mirjam o. ae.).
       this.log('draw_resolved', {
         loser: this.gs.players[loserIdx]?.username,
         winner: this.gs.players[winnerIdx]?.username,
