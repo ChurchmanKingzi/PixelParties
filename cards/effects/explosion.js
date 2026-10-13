@@ -78,9 +78,7 @@ module.exports = {
           });
         } else {
           const inst = t.cardInstance
-            || engine.cardInstances.find(c =>
-              (c.owner === t.owner || c.controller === t.owner)
-              && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+            || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
           if (inst) {
             engine._broadcastEvent('play_zone_animation', {
               type: 'explosion', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
@@ -101,9 +99,7 @@ module.exports = {
       // wird die Instanzliste hier einmal aufgeloest und danach
       // wiederverwendet.
       const aufloesen = (t) => t.cardInstance
-        || engine.cardInstances.find(c =>
-          (c.owner === t.owner || c.controller === t.owner)
-          && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+        || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
       await engine.beginAoeStrike(targets.length, {
         creatures: targets.filter(t => t.type !== 'hero').map(aufloesen).filter(Boolean),
         source, amount: EXPLOSION_DAMAGE, type: 'destruction_spell', sourceOwner: pi,

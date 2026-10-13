@@ -115,9 +115,7 @@ module.exports = {
           heldenZiele.push({ t, hero });
         } else {
           const inst = t.cardInstance
-            || engine.cardInstances.find(c =>
-              (c.owner === t.owner || c.controller === t.owner)
-              && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+            || engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
           if (!inst) continue;
           kreaturZiele.push(inst);
         }

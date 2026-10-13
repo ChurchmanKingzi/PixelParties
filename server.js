@@ -9015,8 +9015,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // ohne die Angabe traefe das `find(...)` immer nur die unterste Kopie.
   // Die ID wird gegen den Platz geprueft, damit ein manipulierter Aufruf
   // nicht irgendeine fremde Instanz aktiviert.
+  // Z1: `heroOwner` ist die BRETTSEITE des Platzes - nicht "Besitzer ODER Kontrolleur" (sonst trifft eine von
+  // `heroOwner` gestohlene Fremdkreatur gleicher (Held, Slot)-Koordinate).
   const slotInsts = room.engine.cardInstances.filter(c =>
-    (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    room.engine.physicalSide(c) === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   const inst = instId != null
     ? slotInsts.find(c => c.id === instId)
@@ -11121,7 +11123,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   // Zweig fand der Server die Karte nicht und der Klick verpuffte
   // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
   const inst = _crossInst || room.engine.cardInstances.find(c =>
-    (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    room.engine.physicalSide(c) === pi && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
   );
   if (!inst) return false;
 

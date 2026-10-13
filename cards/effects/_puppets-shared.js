@@ -380,9 +380,7 @@ function instForTarget(engine, t) {
   if (t.cardInstance) return t.cardInstance;
   if (t._cardInstance) return t._cardInstance;
   if (t.type !== 'equip') return null;
-  return engine.cardInstances.find(c =>
-    (c.owner === t.owner || c.controller === t.owner) && c.zone === ZONES.SUPPORT
-    && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx) || null;
+  return engine.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
 }
 
 // ── Luck / Preserve: Einloesung an den HELDEN (Als Ruling 3.9.) ───────
