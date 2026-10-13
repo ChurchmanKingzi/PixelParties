@@ -18910,6 +18910,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // der Stapel-Sperre — gilt in JEDEM Fenster, in dem dieses Praedikat
     // haengt (validateActionPlay, Spielbarkeitsliste, 22 Reaktionsfenster).
     if (ps && cardName) {
+      // Z6: Artefakt-Sperre (Boomerang, Blood-Soaked Coin: `_artifactLockTurn`)
+      // gilt auch fuer Hand-REAKTIONSartefakte (Bamboo Shield, Boots of
+      // Hermes, Philosopher's Stone …) - EIN Prädikat statt je Fenster (F01-13, F02-24).
+      if (ps._artifactLockTurn === this.gs?.turn
+          && this._getCardDB()[cardName]?.cardType === 'Artifact') return true;
       const sc = loadCardEffect(cardName);
       if (sc?.blockedBySummonLock && ps.summonLocked) return true;
       if (sc?.blockedByPileLock) {

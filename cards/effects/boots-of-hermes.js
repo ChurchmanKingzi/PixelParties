@@ -74,6 +74,9 @@ module.exports = {
       if (!bootsInst || bootsInst.zone !== 'hand') return;
       const ps = gs.players[bootsOwner];
       if (!ps || ps.hand.indexOf(CARD_NAME) < 0) return;
+      // Z6 (F01-13): Boots geht an den Engine-Fenstern vorbei - das gemeinsame
+      // Hand-Spielsperren-Prädikat (inkl. Artefakt-Sperre Boomerang) selbst fragen.
+      if (engine._handPlayLockedFor(ps, CARD_NAME)) return;
 
       const surpriseName = ctx.surpriseCardName || 'that Surprise';
 
