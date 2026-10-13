@@ -106,6 +106,16 @@ Stand/Autor: Agent M01-attacks-abilities-potions, 13.10.2026. Karten: 53 in der 
 - **Vermutete Ursache:** `server.js` `doActivateAbility` (Z. 10332 ff.) prüft – anders als `doActivateFreeAbility` (Z. 9535-9537) und die Held-Effekt-Aktivierung (Z. 10733) – weder `statuses.stunned/webbed` noch `statuses.frozen` (Chilly-Dog-Ausnahme); `canHeroPerformAction` (Engine) kennt nur Plant Golem und Heldenskripte.
 - **Frage an Al:** Darf ein gefrorener/betäubter Held seine Action-Ability (Adventurousness) nutzen (ja = wie jetzt / nein = wie bei Spells und freien Abilities)?
 
+### M01-12 · Elixir of Strength feuert auch bei Attacks mit mehreren Zielen und wird dabei verbraucht · Stufe B
+- **Karten:** Elixir of Strength (`cards/effects/elixir-of-strength.js`, Engine `_applyEmpoweredStrikeIfApplicable`); getestet mit Whirlwind Strike und Ricochet als Auslöser (nicht Teil der Gruppe).
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5; Held 0 (ATK 40) trinkt Elixir of Strength; Gegner hat 3 Helden à 800 HP und zwei Kreaturen; Held 0 spielt Whirlwind Strike auf 2 Helden (trifft damit 2 Helden + 2 Kreaturen).
+- **Schritte:** 1. Elixir auf Held 0. 2. Whirlwind Strike auf zwei Helden.
+- **Erwartet** (Kartentext „The next time that Hero hits **exactly 1 target** with an Attack, that Attack's damage is increased by 100 …"; Buff-Tooltip `_hooks.js:472` gleichlautend): bei einer Attack mit mehreren Zielen keine +100, der Buff bleibt für die nächste Ein-Ziel-Attack stehen.
+- **Beobachtet:** Der erste Treffer macht 140 (40 + 100, unreduzierbar), die übrigen 40; der Buff ist weg. Mit Ricochet identisch (140 / 10 / 3, Buff weg). Kontrollen: normale Attack auf 1 Ziel = 140 ✓ Buff verbraucht ✓; ein Spell (Fireball) verbraucht den Buff nicht ✓.
+- **Repro:** `docs/niche-tests/repro/M01-attacks-abilities-potions/12-elixir-of-strength-mehrfachziel.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js:35515-35540` (`_applyEmpoweredStrikeIfApplicable`) prüft nur `hookCtx.type === 'attack'` und die Quelle, nicht die Zielzahl der Attack; der Kommentar (Z. 35528-35531) nennt das ausdrücklich „first match gets the boost" für Mehrfachtreffer. Ein Ruling dazu steht nicht in `CARD_API.md`.
+- **Frage an Al:** Soll der Elixir nur bei Attacks mit genau einem Ziel feuern (Text, Buff bleibt sonst) oder am ersten Treffer jeder Attack (wie jetzt)?
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|

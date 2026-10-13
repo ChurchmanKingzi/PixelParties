@@ -236,6 +236,15 @@ Stand/Autor: Agent S01-spells, 12.10.2026. Karten: 41 in der Liste · (wird am E
 - **Vermutete Ursache:** `divine-gift-of-magic.js` schreibt `{ cardName, amount }` statt eines Handpositions-Eintrags.
 - **Frage an Al:** Soll die Senkung nur die eine offenbarte Kopie betreffen (ja = Kopie-genau / nein = alle Kopien des Namens in der Hand wie bisher)?
 
+### S01-25 · Mehrstufige Zielwahlen ohne Abbruch-Knopf, bevor etwas verbraucht ist · Stufe B
+- **Karten:** Divine Gift of Sacrifice (`divine-gift-of-sacrifice.js`: Opfer- und Buff-Wahl, beide `cancellable: false`), Divine Gift of Equality (`divine-gift-of-equality.js`: Wahl des Zweitziels `cancellable: false`, die Wahl des gefallenen Helden davor ist abbrechbar), Create Illusion (`create-illusion.js`: Zonenwahl `cancellable: false`, die Kreaturenwahl davor ist abbrechbar). (Call for Help: siehe S01-12; Divine Gift of the Deepsea: die Ersatzwahl liegt nach der Rückgabe – nicht geprüft.)
+- **Voraussetzungen / Aufbau:** Jeweils eine Standardlage, in der die Karte regulär wirkt.
+- **Schritte:** 1. Karte spielen. 2. Die Konfigurationen der Wahl-Abfragen (`t.targets[].config.cancellable`, `t.prompts[].d.cancellable`) auslesen.
+- **Erwartet** (Regel `CARD_API.md` Z. 367-395, MANDATORY: „Jede Zielwahl hat einen Cancel-Button – … jede Stufe einer mehrstufigen Auswahl: `cancellable: true`. Ausnahme ist nur, was nach dem Zusagepunkt kommt … oder eine Pflichtwahl, die der Kartentext erzwingt – dann steht der Grund als Kommentar daneben."): Alle Stufen vor dem Verbrauch (Opfer/Revive/Deck-Entnahme) sind abbrechbar.
+- **Beobachtet:** Sacrifice: beide Stufen `false` (geopfert wird erst nach beiden Wahlen, `actionDefeatHero` danach); Equality: Stufe 2 `false` (halbiert/wiederbelebt wird erst danach); Create Illusion: Zonenwahl `false` (die Karte kommt erst danach aus dem Deck). Der Spieler kann in diesen Stufen nicht zurück; bei einem Abbruch mit `null` (wie ihn die Harness sendet) räumen die Skripte sauber auf – es fehlt nur der Knopf (und der Kommentar mit dem Grund).
+- **Repro:** `docs/niche-tests/repro/S01-spells/25-mehrstufige-wahl-ohne-abbruch.js` (✗ = Stufe ist nicht abbrechbar)
+- **Vermutete Ursache:** `cancellable: false` an den genannten Stellen; keine Begründung im Kommentar. (Bei Sacrifice ist das Opfer laut Text eine Kosten-„Pflicht", aber vor der Auflösung ist noch nichts passiert.)
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

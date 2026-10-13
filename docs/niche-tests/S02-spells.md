@@ -58,6 +58,25 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/06-last-resort-schadenssperre-eigene-ziele.js` (✗ = wörtliche Lesart nicht erfüllt)
 - **Frage an Al:** Soll Last Resort wie Flame Avalanche nur Schaden an Gegnerzielen sperren (wie jetzt) oder wörtlich ALLEN weiteren Schaden, auch an eigenen Zielen? (nur Gegner / alles)
 
+### S02-07 · Laser Volley: gleichnamige Ziele sind nicht unterscheidbar wählbar – es wird immer das erste verschont · Stufe B
+- **Karten:** Laser Volley (`laser-volley.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand Sitz 0 [Laser Volley], Sitz 1 [Füllkarte]; Gegner kontrolliert zwei gleichnamige Kreaturen („ZZ Dummy Big", je 1000 HP) auf Held 0 und Held 1.
+- **Schritte:** 1. Laser Volley spielen. 2. Gegner wirft die Füllkarte ab. 3. In der Spar-Galerie klickt er den ZWEITEN Eintrag (Kreatur auf Held 1) an – Antwort in der Form, die der Client schickt (`{cardName, source}`, `public/dist/app-board.js` ~62130).
+- **Erwartet** (Kartentext „… they choose that many of their targets. The chosen targets take no damage from this Spell."): die angeklickte Kreatur bleibt bei 1000, die andere nimmt 200.
+- **Beobachtet:** Die ERSTE gleichnamige Kreatur (Held 0) wird verschont, die angeklickte (Held 1) nimmt die 200 (1000/800).
+- **Repro:** `docs/niche-tests/repro/S02-spells/07-laser-volley-gleichnamige-ziele.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `laser-volley.js` Z. 126–131: `remaining.find(t => t.cardName === sparePick.cardName)` – der Kommentar darüber verspricht „Match by name AND slot", verglichen wird nur der Name. Die Client-Antwort enthält keine Slotangabe (Galerie-Eintrag trägt `heroIdx`, die Antwort nicht), die Galerie ist also für gleichnamige Ziele grundsätzlich nicht eindeutig. Relevant, sobald der Gegner zwei Kopien derselben Kreatur auf verschiedenen Helden hat (z. B. Tokens/Skelette) und eine davon geschont werden soll.
+
+### S02-08 · Heat Wave nach Flame Avalanche: Schadenssperre gilt auch für EIGENE vorverbrannte Ziele · Stufe C
+- **Karten:** Heat Wave (`heat-wave.js`), Flame Avalanche (`flame-avalanche.js`)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Flame Avalanche, Heat Wave] (zwei Aktionen über das Zurücksetzen des Harness); vorverbrannt: eine eigene Kreatur (Held 1), eigener Held 2, eine Gegnerkreatur, Gegnerheld 2.
+- **Schritte:** 1. Flame Avalanche spielen (`ps.damageLocked`). 2. Heat Wave mit Held 0 spielen.
+- **Erwartet** (Flame Avalanche „You cannot deal any other damage to targets your opponent controls this turn."; Heat Wave „Targets that are already Burned take 150 damage instead."): Gegnerziele 0 Schaden; eigene vorverbrannte Ziele nehmen 150 (die Sperre betrifft nur Gegnerziele).
+- **Beobachtet:** Gegnerziele ✓ gesperrt, aber auch die eigenen vorverbrannten Ziele (Kreatur 1000 → 1000, Held 2 800 → 800) bleiben ohne Schaden.
+- **Repro:** `docs/niche-tests/repro/S02-spells/08-heat-wave-schadenssperre-eigene-ziele.js` (✗ = die Lesart „nur Gegnerziele gesperrt" wird nicht erfüllt)
+- **Vermutete Ursache:** `heat-wave.js` Z. ~204: `amount = (preBurned[i] && !damageLocked) ? DAMAGE : 0`; der Kopfkommentar (Z. 19–24) beschreibt das ausdrücklich als „damage branch suppressed". Die Engine (`_engine.js` ~8790) sperrt dagegen nur Gegnerziele; das Skript nullt vorab für alle.
+- **Frage an Al:** Soll Heat Wave unter der Flame-Avalanche-Sperre nur den Schaden an Gegnerzielen weglassen oder (wie jetzt) jeden Schaden? (nur Gegnerziele / alles)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 

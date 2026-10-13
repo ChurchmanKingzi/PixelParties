@@ -170,6 +170,14 @@ Stand/Autor: Agent R02-reaction-area-attach-surprise, 13.10.2026. Karten: 43 in 
 - **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/19-very-special-prisoner-deckklau-sperre.js` (✗ = Fehler tritt auf)
 - **Vermutete Ursache:** `very-special-prisoner.js` `_availableDivinitySources` (reactionCondition) zählt das Deck ungeprüft, und `resolve` splict `ps.mainDeck` direkt (`removeFromPile`), statt über die Stapel-Schicht (`takeFromPile`/`pileOutAllowed`) zu gehen. Hinweis: gleiche Bauform steht laut Kommentar bei `sacrifice-to-divinity.js` (nicht geprüft).
 
+### R02-20 · Zombified Assault: der Rückschlag trifft bei einem geliehenen Angreifer den falschen Helden · Stufe A
+- **Karten:** Zombified Assault (`zombified-assault.js`); gleiches Muster wie R02-13
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5. Sitz 1: Zombified Assault auf der Hand (Held 0, Decay Magic 2), Elven Archer (Lv1, 50 HP) in Support Zone 0 von Held 0. Held 1 von Sitz 1 ist von Sitz 0 gecharmt (`charmedBy = 0`, Destruction Magic 2). Sitz 0 spielt mit diesem geliehenen Helden (`charmedOwner: 1`) Burning Finger auf den Archer (besiegt); Zombified Assault wird gespielt (Ja).
+- **Erwartet** (Kartentext „… deal damage equal to 50 times the revived Creature's level to the attacking Hero"): Der Archer lebt wieder; der ANGREIFENDE Held (Sitz 1, Held 1) erleidet 50 Schaden (750 HP), alle anderen Helden bleiben unversehrt.
+- **Beobachtet:** Der Archer kommt zurück; der Schaden trifft Held 1 von **Sitz 0** (`S0 [800, 750, 800]`), der Angreifer (Sitz 1, Held 1) bleibt bei 800 HP. Normalfall (eigener Held greift an) ✓ (Kontrolle: S0 `[750, 800, 800]`).
+- **Repro:** `docs/niche-tests/repro/R02-reaction-area-attach-surprise/20-zombified-assault-geliehener-angreifer.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `zombified-assault.js` `schlageZurueck`: `seite = quellSeite(quelle)` (= `src.controller ?? src.owner`, also der Kontrolleur) und `players[seite].heroes[quelle.heroIdx]`; `heroIdx` gehört aber zur Heldenreihe von `source.heroOwner`. Richtig wäre `quelle.heroOwner ?? seite`.
+
 ## Abdeckung
 (wird am Ende ergänzt)
 

@@ -2,7 +2,7 @@
 Stand/Autor: Agent M02-attacks-abilities-potions (Fortsetzung eines Vorgängers, der bei Befund 10 abbrach), 13.10.2026. Karten: 53 in der Liste · 53 gezielt getestet (L2) · 33 mit Befund · 25 Befunde (A 5 · B 14 · B/C 2 · C 4).
 
 ## Zusammenfassung
-Die Gruppe (53 Karten: 16 Attacks, 18 Abilities, 19 Potions) hat 25 Befunde ergeben (A 5 · B 14 · B/C 2 · C 4); die Befunde 01–10 stammen vom Vorgänger (jetzt alle erneut ausgeführt und im Bericht ausgeschrieben), 11–25 sind neu.
+Die Gruppe (53 Karten: 16 Attacks, 21 Abilities, 16 Potions) hat 25 Befunde ergeben (A 5 · B 14 · B/C 2 · C 4); die Befunde 01–10 stammen vom Vorgänger (jetzt alle erneut ausgeführt und im Bericht ausgeschrieben), 11–25 sind neu.
 Die wichtigsten Muster:
 * **Kartenverlust / kaputter Zustand (A):** Muscle Training (voller Fighting-Stapel, -02), Magic Lamp (Negierung durch Ambush the Scout, -18), Singing auf Surprise-Kreaturen (Geister-Instanz, -24), Luck zieht bei Areas/Attachments doppelt (-13), Toughness gegen „cannot be negated" (-08).
 * **Dauer-Verträge ohne Status-Prüfung (Klasse B-01…B-09):** Stealth (-05), Terror (-12), Thieving Strike (-03), Toughness/Fighting (-08), freie Ability-Aktivierung negierter Helden (-09).
