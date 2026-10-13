@@ -1,8 +1,12 @@
 # S03-spells – Nischenfall-Bericht
-Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am Ende ergänzt) gezielt getestet · (wird am Ende ergänzt) mit Befund.
+Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · 38 gezielt getestet (L2), 3 Standardlauf (L1) · 28 mit Befund (27 Befunde: 7 × A, 17 × B, 3 × C; dazu 2 bestätigte Prüfaufträge).
 
 ## Zusammenfassung
-(Entwurf – wird am Ende ausgefüllt. Arbeitsstand: Befunde werden nach jedem bestätigten Fall ergänzt.)
+27 Befunde aus 41 Karten (7 × A, 17 × B, 3 × C), alle mit ausgeführtem Repro unter `docs/niche-tests/repro/S03-spells/` (01–27; dazu `P1`/`P2` für zwei Prüfaufträge). Gesamteindruck: die Zahlen/Staffeln der Zauber (Phoenix Tackle 100/200/300, Rewrite History 1/2/3, Venom Infusion Decay 3, Torchure, Toxic Fumes, Poisoned Well, Soul Transmigration Ritual) stimmen; die Fehler sitzen fast durchweg an **Rändern zu Sperren und fremder Kontrolle**.
+* **Stufe A:** Phoenix Tackle: sind danach alle Helden beider Seiten besiegt, GEWINNT der Wirker statt zu verlieren (S03-21); Phoenix Bombardment wirkt gegen eine unversehrte Kreatur gar nicht (`currentHp ?? 0`, S03-22); Weapon Unleashing in der Action Phase verbraucht die erste Aktion (S03-25); Surprise Party unter Knight of Kings [B] legt die Deckoberkarte 200-fach zurück (S03-20); Mass Routing / Missing People hinterlassen bei gestohlenen Kreaturen eine Geisterkarte plus Duplikat (S03-04); Overcharge + Rain Viola dupliziert eine Aufwertung (S03-18); Petrifier-Betäubung geheilt ⇒ dauerhaft unverwundbar (S03-08).
+* **Klassen:** Stapel-/Hand-Sperren werden von Zauber-Gates nicht gelesen (S03-03, -16, -20, -24, -26); reine Zieh-/Hol-Zauber sind unter Tuscan Artist bzw. Hand-/Stab-Sperre spielbar und verpuffen (S03-24, -26); Zielwahl nach Brettspalte statt Kontrolle (S03-04/06/07); die aufgelöste Karte in der Hand zählt mit (Rain of Spores, S03-23); Einmal-pro-Zug-Stempel nach Negierung (S03-12, C).
+* **Prüfaufträge:** `collectAoeCreatureTargets` (Rain of Arrows trifft die eigene gestohlene Kreatur), `_castSpellImmediately` ohne `oncePerGame` (VPC bietet das verbrauchte Divine Gift an) und `currentHp ?? 0` (⇒ S03-22) an meinen Karten bestätigt; `getCreatureTargets` kommt in meiner Liste nicht vor.
+* **Bewusst nicht getestet:** 3-/4-Spieler-Zugfolgen (Perilous-Journey-Fenster `turn + 2`; die Harness-Zugfolge ist dort nicht aussagekräftig), Zielschutz-Attachments gegen Piercer/Rockfall (per `t.put` unwirksam), Area-Zweig von Pressure Projectile, Memory Wipe gegen übernommene Helden (Wurzel S03-07), Animationen/Reveal-Protokoll, Zufallskarten über mehrere Seeds außer Overcharge/Teleportal.
 
 ## Befunde
 ### S03-01 · The Warlord's Bite zählt Performance doppelt (Staffel 1/2/4 zu hoch) · Stufe B
@@ -316,4 +320,17 @@ Stand/Autor: Agent S03-spells, 13.10.2026. Karten: 41 in der Liste · (wird am E
 <!--ABDECKUNG-ENDE-->
 
 ## Getestet & in Ordnung (Auswahl)
+* Phoenix Tackle: Staffel 100/200/300 mit Rückstoß 50/100/150, Selbstziel (Rückstoß auf denselben Helden), Gegner-Held stirbt allein ⇒ Wirker gewinnt zu Recht.
+* Meteor Crash: erster Schaden 300, danach 100; Statusschaden (Burn) am Gegner zählt nicht als „verursachter Schaden" (Engine-Kopf: nur bei zugeschriebenem Verursacher).
+* Rewrite History: Magic Arts 1/2/3 ⇒ Level 1/2/3, Performance als Joker, Ablage-Karte weg / Zone besetzt / eigene Ursache / Gift als Ursache ⇒ nicht gelistet, Kartenbilanz ±0.
+* Soul Transmigration Ritual: Revive mit voller HP, Zusatzaktion mit Magic Arts 1, zweiter Tod löscht Held + Abilities + Ausrüstung/Artefakte, Kreaturen bleiben, Bilanz ±0.
+* Poisoned Well / Toxic Fumes: Kontrolle statt Besitz in beiden Richtungen (gestohlene Kreatur, übernommener Held), verdeckte Kreaturen übersprungen, Tokens vergiftet, Toxic Fumes Zusatzaktion nur mit eigener (kontrollierter) Kreatur.
+* Torchure: Zusatzaktion im nächsten Zug nur, solange DASSELBE Gift (ungeheilt, nicht neu aufgetragen) liegt.
+* Perilous Journey: Index-Stempel überlebt das Entfernen der gespielten Karte, Aufstieg in Zug +2, Dauerbrand auf alle eigenen Helden und Kreaturen (unheilbar), Gegner unberührt.
+* Memory Wipe: exakt min(3, Anzahl) Abilities abgelegt, 0 Abilities ohne Fehler, Performance-Stapel.
+* Venom Infusion: Decay 3 (auch 2 + Performance) macht das Gift unheilbar, Kreatur-Ziel, vorvergifteter Held.
+* Masterpiece: inherente Aktion je Held (Magic Arts oder Trapping), Abbruch der Galerie, volle Surprise Zonen.
+* Salute to the Fallen: Deck-out-Niederlage bei zu kleinem Deck, Knight-Sperre stoppt das Abwerfen, Tuscan Artist negiert nur das Ziehen.
+* Weapon Unleashing in Main 1: zwei Aktionen, zweite Aktion gebunden an den Nutzer.
+* Pressure Projectile: Fremd-Attachment am Ziel wird angeboten und geht in die Ablage seines Besitzers.
 <!--OK-ENDE-->
