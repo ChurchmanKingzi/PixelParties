@@ -311,6 +311,15 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/33-siphem-damage-type-frog.js` (ausgeführt: 1 ✗)
 - **Vermutete Ursache:** `siphem-the-deepsea-demon.js` `ctx.dealDamage(tHero, damage, 'creature')` und `actionDealCreatureDamage(ctx.card, …, 'creature', …)` im Heldeneffekt – Typ `'hero'` fehlt (CARD_API-Liste der Träger nennt Siphem nicht).
 
+### A02-deepsea-34 · Greatmaw Shark / Infected Greatmaw: Opfer einer per Succubus geliehenen Kreatur – Kosten werden nicht bezahlt, der Nutzen kommt trotzdem · Stufe B
+- **Karten:** Greatmaw Shark (`greatmaw-shark.js`), Infected Greatmaw (`infected-greatmaw.js`), Deepsea Succubus (setzt `_stealImmortal`), Engine `getSacrificableCreatures` / `resolveSacrificeCost`.
+- **Voraussetzungen / Aufbau:** Seat 0: Shark (bzw. Infected Greatmaw), Held 0 mit ATK 100. Seat 1: Kreatur (10 HP, eine Runde alt) in Held 1 / Slot 0, per `actionStealCreature(…, { damageImmune: true })` wie im Succubus-Skript geliehen. Main 1.
+- **Schritte:** Aktiven Effekt benutzen und als Opfer die geliehene Kreatur wählen.
+- **Erwartet** (Quelle: Shark „sacrifice a Creature you control … to increase the Attack stat … by 100"; Succubus „cannot take any damage and cannot be defeated while you control it"): Entweder wird die geschützte Kreatur nicht als Opfer angeboten, oder sie wird wirklich geopfert. Nie „Opfer gilt als gebracht, Kreatur bleibt stehen, Nutzen wird gewährt".
+- **Beobachtet:** Die geliehene Kreatur wird angeboten (Kontrolle liegt bei mir), bleibt aber auf dem Brett (`actionDestroyCard` bricht bei `_stealImmortal` still ab: Log `destroy_blocked`, Grund `steal-immortal`). Der Effekt gilt als bezahlt: Shark +100 ATK (200) und Einmal-pro-Zug-Stempel gesetzt, Infected Greatmaw trifft den Gegnerhelden mit 100. Der Opfer-Preis ist damit umsonst.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/34-sacrifice-succubus-protected-free.js` (ausgeführt: 2 ✗, je Karte 1)
+- **Vermutete Ursache:** `getSacrificableCreatures` (`_engine.js` ~Z. 26471) filtert `_cardinalImmune`, nicht `_stealImmortal`; `resolveSacrificeCost` prüft nicht, ob die Kreatur nach dem Opfer noch auf dem Brett steht. Betrifft grundsätzlich jede Karte mit Opferkosten (nicht auf Greatmaw beschränkt; hier nur an Shark/Infected gemessen).
+
 ## Abdeckung
 (wird am Ende gefüllt)
 

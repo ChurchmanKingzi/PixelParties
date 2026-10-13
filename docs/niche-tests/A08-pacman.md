@@ -260,6 +260,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/30-waflav-zielliste-seitenfremde-kreatur.js` (✗ = Fehler tritt auf; Oberfläche nicht geprüft – daher B)
 - **Vermutete Ursache:** `_waflav-shared.js` ~Z. 436-445: `id: equip-${inst.owner}-…`, `owner: inst.owner` statt der Brettseite (`engine.physicalSide(inst)`). Gleiche Klasse wie A08-16/-18.
 
+### A08-31 · Cool Presents: das Hand-Fenster (Ambush the Scout) öffnet sich für jede verschenkte Karte einzeln · Stufe B
+- **Karten:** Cool Presents (`cool-presents.js`), Ambush the Scout (Gegner); Engine `actionTransferCardToOppHand`
+- **Voraussetzungen / Aufbau:** Sitz 0: 24 Gold, Cool Presents + drei verschiedene Handkarten, verschenkt alle drei. Sitz 1 hält Ambush the Scout (Heldenstufe vorhanden) und antwortet mit echtem „Nein" (`null`) bzw. „Ja".
+- **Erwartet** (Engine-Vorbild Live Show, `_engine.js` ~Z. 25325: „der Aufrufer verschenkt MEHRERE Karten in einem Zug und hat das Fenster einmal für das ganze Geben geöffnet — ein Fenster je Karte würde den Gegner mit derselben Frage mehrfach unterbrechen"; Ambush: „Negate that effect"): ein Effekt, ein Fenster.
+- **Beobachtet:** Bei „Nein" wird der Gegner dreimal gefragt (je Karte). Bei „Ja" wird nur die erste Übergabe negiert, die Schleife bricht ab (`if (!ok) break`), die Kosten (3 × 4 Gold = 12) sind vorab für alle drei Karten bezahlt; nichts wurde verschenkt.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/31-cool-presents-handfenster-je-karte.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `cool-presents.js` (~Z. 158, Schleife) ruft `actionTransferCardToOppHand(pi, t.handIndex, { source })` ohne `windowChecked: true`; das Fenster wird nicht einmal vor der Zahlung geöffnet (Live Show, `live-show.js:202`, macht es richtig). Gleiche Klasse bei jeder Mehrkarten-Übergabe.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
