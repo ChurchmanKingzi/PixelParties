@@ -107,7 +107,8 @@ async function runSurge(ctx) {
     } else {
       const inst = sel.cardInstance;
       if (!inst || inst.zone !== 'support') break;
-      await engine.actionDealDamage(source, inst, SURGE_DAMAGE, 'hero');
+      // A08-15: Kreaturen laufen ueber den Kreaturen-Schadenspfad (`actionDealDamage` ist der Heldenpfad und laesst sie unberuehrt).
+      await engine.actionDealCreatureDamage(source, inst, SURGE_DAMAGE, 'other', { sourceOwner: pi, canBeNegated: true });
     }
     engine.sync();
     await engine._delay(220);

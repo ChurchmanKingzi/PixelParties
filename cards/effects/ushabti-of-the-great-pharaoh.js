@@ -46,7 +46,7 @@ module.exports = {
     // Boardzustand mit Folgefehler-Flut) und crashte dann bei
     // `inst.zone = …` ("Cannot set properties of undefined").
     const inst = target.cardInstance || engine.cardInstances.find(c =>
-      c.zone === 'support' && (c.controller ?? c.owner) === target.owner
+      c.zone === 'support' && engine.physicalSide(c) === target.owner   // A08-16: Brettseite, nicht Besitzer/Kontrolleur
       && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       && c.name === cardName);
     if (!inst || inst.zone !== 'support') return false; // sauber abbrechen — VOR jeder Mutation
@@ -129,7 +129,7 @@ function _getEligibleCreatures(gs, engine) {
 
         if (engine) {
           const inst = engine.cardInstances.find(c =>
-            (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si && c.name === cardName
+            c.zone === 'support' && engine.physicalSide(c) === pi && c.heroIdx === hi && c.zoneSlot === si && c.name === cardName
           );
           if (inst?.faceDown) continue;
           targets.push({

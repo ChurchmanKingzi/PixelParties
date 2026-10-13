@@ -182,10 +182,9 @@ module.exports = {
         stampedHeroIdx = target.heroIdx;
         stampedZoneSlot = -1;
       } else { // 'equip' (creature)
-        const inst = engine.cardInstances.find(c =>
-          c.zone === 'support' && c.owner === target.owner
-          && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
-        );
+        // A08-18: die Zielliste liefert die Instanz mit. Eine Suche ueber `c.owner` als Brettseite traf bei seitenfremd
+        // beschworenen Kreaturen (Besitzer ≠ Brettseite) die gleichkoordinierte Kreatur des Gegners.
+        const inst = (target.cardInstance && target.cardInstance.zone === 'support') ? target.cardInstance : null;
         if (!inst) { gs._spellCancelled = true; return; }
         if (!inst.counters) inst.counters = {};
         // Kreaturen tragen ihre Marke in den Countern; derselbe Stapel,

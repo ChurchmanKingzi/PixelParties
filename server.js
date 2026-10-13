@@ -8454,6 +8454,12 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       delete gs._spellCancelled;
+      // A09-01: Pfeile, die auf den abgebrochenen Angriff gekettet wurden, nicht scharf zuruecklassen
+      // (sonst verstaerken sie den naechsten Angriff – „THAT Attack's damage").
+      if (cardData.cardType === 'Attack') {
+        const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
+        clearArmedArrows(room.engine, pi);
+      }
       // Roll back ALL action-economy bookkeeping — the Spell never
       // resolved, so the Action resource wasn't actually spent. Without
       // this, a cancelled action-2 attempt leaves _actionsPlayedThisPhase
@@ -11886,6 +11892,8 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   if (script.blockedByHandLock && ps.handLocked) return false;
   if (script.blockedByPileLock && room.engine.isPileLockedFor(pi)) return false;   // v826: „nur Stapel-Bewegung" unter Knight of Kings [B]
   if (script.blockedBySummonLock && ps.summonLocked) return false;   // v834: „nur Beschwoerung" unter Summon-Lock
+  // A08-08: Distracting Crystal sperrt auch Traenke ohne Zielwahl (Horn in a Bottle) – dieses Tor steht sonst nur in `doConfirmPotion`.
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
 
   // Targeted Potions enter targeting mode; the CPU defers them until 2i (the
   // targeting brain). Callers should pre-filter those — this branch still

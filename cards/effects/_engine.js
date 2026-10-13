@@ -2423,6 +2423,9 @@ class GameEngine {
     if (!ps) return;
     if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
     ps._permanentlyRevealedHandIndices[handIdx] = true;
+    // ★ A08-01: Weakening Crystal negiert die Helden schon beim EINTRITT in die Hand
+    // (Ruling v1103: angelegt wird beim Eintritt, zu Rundenbeginn, beim Laden) – nicht erst ab dem naechsten eigenen Zugbeginn.
+    if (cardName === 'Weakening Crystal') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: playerIdx });
   }
 
   /**
@@ -19100,6 +19103,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
     pi = this._resolvePi(pi);
+    // A09-20: „You cannot summon this Creature, except with its own effect" (Elven Rider) – fremde Effekte duerfen sie aus keinem Stapel beschwoeren.
+    if (loadCardEffect(cardName)?.summonOnlyViaOwnEffect) return null;
     // v1393: Deck laeuft ueber die EINE Stelle (summonFromDeck).
     // Styx 28.9.: `opts.heldSeite` — physische Seite eines uebernommenen
     // Zielhelden; die Kreatur landet dort und gehoert `pi`.
@@ -46935,6 +46940,13 @@ this._deathWatch = (this._deathWatchStack || []).length
             amount: 0,
           });
           e._nullGezeigt = true;
+        }
+        // A09-22: Pfeil-Reiter (Gift/Brand) gelten wie im Heldenpfad auch bei Schaden 0 (Hydra Blood setzt ihn immer auf 0).
+        // Der Treffer ist erfolgt; `applyArrowsAfterDamage` filtert selbst auf Angriffsschaden.
+        e.realDealt = 0;
+        {
+          const { applyArrowsAfterDamage } = require('./_arrows-shared');
+          await applyArrowsAfterDamage(this, e.source, e.inst, 0, e.amount, e.type);
         }
         continue;
       }
