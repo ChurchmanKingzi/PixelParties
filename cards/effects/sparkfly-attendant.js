@@ -35,7 +35,13 @@ module.exports = {
       refreshAttendantAura(ctx._engine, ctx.cardOwner);
     },
     onCardLeaveZone: (ctx) => {
-      refreshAttendantAura(ctx._engine, ctx.cardOwner);
+      // Geht DIESER Attendant vom Brett (Tod, Zerstoerung, Verschieben weg
+      // von der Support Zone), zaehlt er nicht mehr mit - sonst bliebe die
+      // Aura dauerhaft auf der Queen (A05-11).
+      const geht = ctx.leavingCard || ctx._onlyCard;
+      const selbst = geht && geht.id === ctx.card.id
+        && ctx.fromZone === 'support' && ctx.toZone !== 'support';
+      refreshAttendantAura(ctx._engine, ctx.cardOwner, selbst ? { ausserId: ctx.card.id } : {});
     },
     onPlay: (ctx) => {
       // Initial sync the moment Attendant is placed.
