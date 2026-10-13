@@ -96,7 +96,7 @@ Stand/Autor: Agent H02-heroes, 12.10.2026. Karten: 37 in der Liste · (wird fort
 ### H02-heroes-11 · Karian: gefroren/betäubt im Gegnerzug – Reaktions-Spell nicht spielbar · Stufe C
 - **Karten:** Grand Inquisitor Karian (`grand-inquisitor-karian.js`); Spectral Armor (Reaction, Support Magic) als Messkarte
 - **Voraussetzungen / Aufbau:** Karian (Support Magic 2 + Magic Arts 2) auf Sitz 0, `onGameStart` ausgeführt, Spectral Armor auf der Hand; Sitz 1 am Zug wirkt Fireball auf Karian; Variante: Karian mit Status frozen bzw. stunned (Dauer 2).
-- **Beobachtet:** ohne Status wird Spectral Armor gespielt (150 → 75 Schaden); gefroren und betäubt: keine Reaktion, Karian nimmt 150 (gleiches Verhalten wie ein beliebiger gefrorener Held). Das Skript hebt die Starre nur in den eigenen Handlungsphasen (MAIN1/ACTION/MAIN2) auf (`onPhaseStart`, Z. 197-215).
+- **Beobachtet:** ohne Status wird Spectral Armor gespielt (150 → 75 Schaden); gefroren und betäubt: keine Reaktion, Karian nimmt 150 (gleiches Verhalten wie ein beliebiger gefrorener Held). Das Skript hebt die Starre nur in den eigenen Handlungsphasen (MAIN1/ACTION/MAIN2) auf (`onPhaseStart`, `grand-inquisitor-karian.js:194`).
 - **Kartentext:** „While this Hero is Stunned or Frozen, you may perform a second Action with it during your Action Phase and it is **otherwise not affected** by those effects."
 - **Frage an Al:** Soll eine gefrorene/betäubte Karian auch im Gegnerzug (und in Start-/Resource-/End-Phase) Reaktionen und Fähigkeiten nutzen können („otherwise not affected") – ja oder nein?
 - **Repro:** `docs/niche-tests/repro/H02-heroes/11-karian-gefroren-keine-reaktion-im-gegnerzug.js` (✗ = Reaktion gesperrt)

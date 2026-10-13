@@ -7,7 +7,7 @@
 // Erwartung: Eine Area auf dem Brett (Rioting Village) ist als Ziel wählbar (Area-Karten verlassen das Brett in die Ablage).
 // Beobachtet: Die Liste enthält nur Karten aus Support Zones und Ability Zones (Ausrüstung, Kreaturen, Abilities, eigene Modelle); Areas fehlen, verdeckte
 //   Surprises ebenfalls (letzteres: Regelfrage, siehe Bericht), auch Permanents/Coolness Stack.
-// Ursache: cards/effects/debt-o-tron-model-scrap-plow.js:60 (`if (inst.zone !== 'support' && inst.zone !== 'ability') continue;`) baut die Liste selbst (`inst.zone !== 'support' && inst.zone !== 'ability'`).
+// Ursache: cards/effects/debt-o-tron-model-scrap-plow.js:60 baut die Liste selbst und lässt alles außer `support`/`ability` weg.
 const H = require('../../lib/h.js');
 const KENT = 'Kent, the Indebted Apprentice', SP = 'Debt-O-Tron Model Scrap Plow';
 (async () => {

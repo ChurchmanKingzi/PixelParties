@@ -163,6 +163,15 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/17-spores-proactive-own-turn.js`
 - **Frage an Al:** Soll Deepsea Spores auch im eigenen Zug aktivierbar sein (Ja = so lassen, Nein = nur Reaktion zu Beginn des Gegnerzugs)?
 
+### A02-deepsea-18 · Slippery Narw: gewählte Quelle (Ablage) wird ignoriert, wenn dieselbe Kreatur auch im Deck liegt · Stufe B
+- **Karten:** Slippery Narw (`slippery-narw.js`).
+- **Voraussetzungen / Aufbau:** Seat 0: Narw in Held 0, eigene Kreatur in Held 1; Deck: Deepsea Bats + 2 Füllkreaturen; Ablage: Deepsea Bats, Fireball. Narw verschiebt sich nach Held 2 (gemeinsamer Weg `moveSlipperyCreature`).
+- **Schritte:** Narw besiegt die eigene Kreatur in Held 1; in der Galerie die Kachel „Deepsea Bats / discard" wählen (Antwort `{ cardName, source: 'discard' }` wie vom Client).
+- **Erwartet** (Quelle: Kartentext „you may choose any Creature from your **deck or discard pile**"; Galerie bietet getrennte Kacheln je Quelle): Die Karte kommt aus der Ablage; das Deck bleibt unberührt.
+- **Beobachtet:** Das Skript liest nur `picked.cardName` und nimmt zuerst aus dem Deck: die Deck-Kopie von Bats geht auf die Hand, die Ablage-Kopie bleibt liegen, das Deck wird gemischt.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/18-narw-ignores-source.js`
+- **Vermutete Ursache:** `slippery-narw.js` ~Z. 126–146: `takeFromPile(ps, 'deck', chosenName, …)` zuerst, `picked.source` wird nicht gelesen.
+
 ## Abdeckung
 (wird am Ende gefüllt)
 

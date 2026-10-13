@@ -146,10 +146,10 @@ Stand/Autor: Agent A03-futuretech, 12.10.2026. Karten: 52 in der Liste · (wird 
 
 ### A03-futuretech-16 · Scrap Plow: „any card on the board that is not a Hero“ – Areas (und verdeckte Surprises) fehlen in der Zielliste · Stufe B
 - **Karten:** Debt-O-Tron Model Scrap Plow (`cards/effects/debt-o-tron-model-scrap-plow.js`); Vergleich Destructive Puppet Shishi / The Yeeting (`_targeting-shared.js:61` `collectNonHeroBoardTargets`)
-- **Voraussetzungen / Aufbau:** Sitz 0: Kent (Held 0), Scrap Plow auf Held 2 Slot 2, Gold 0, Hand: Fists (20); Sitz 1: Area „Rioting Village“, ein Dummy, Surprise Cybug ANTS (verdeckt). Seed 1234.
+- **Voraussetzungen / Aufbau:** Sitz 0: Kent (Held 0), Scrap Plow auf Held 2 Slot 2, Gold 0, Hand: Fists (20); Sitz 1: Area „Rioting Village“, ein Dummy. (Im explorativen Lauf zusätzlich: verdeckte Surprise Cybug ANTS und Ability Fighting.) Seed 1234.
 - **Schritte:** Fists mit Kent bezahlen (0 → −20, Überziehung 20 → Scrap Plow löst aus); die Zielliste des Scrap Plow ansehen.
 - **Erwartet** (Quelle: „choose **any card on the board** that is not a Hero and send it to the discard pile“; derselbe Satz wird bei Shishi/Yeeting über den gemeinsamen Sammler gelesen): Die Area ist wählbar. (Verdeckte Surprises: Regelfrage – die gemeinsame Hilfsfunktion bietet sie an.)
-- **Beobachtet:** Liste = `Scrap Plow`, `ZZ Dummy`; die Area „Rioting Village“ fehlt, ebenso die verdeckte Surprise, Permanents und die Coolness-Stack-Spitze. Außerdem erscheint ein Ability-Stapel Lv2 doppelt mit identischer ID (`ability-1-1-0` ×2, harmlos – die Wahl funktioniert).
+- **Beobachtet:** Liste = `Scrap Plow`, `ZZ Dummy`; die Area „Rioting Village“ fehlt (Repro); im explorativen Lauf fehlte ebenso die verdeckte Surprise; Permanents und Coolness-Stack-Spitze fehlen laut Code ebenfalls (nicht getestet). Außerdem erscheint ein Ability-Stapel Lv2 doppelt mit identischer ID (`ability-1-1-0` ×2, harmlos – die Wahl funktioniert).
 - **Repro:** `docs/niche-tests/repro/A03-futuretech/16-scrap-plow-board-cards.js` (✗ = Area fehlt)
 - **Vermutete Ursache:** `debt-o-tron-model-scrap-plow.js:60` baut die Liste selbst und lässt alles außer `support`/`ability` weg; statt `collectNonHeroBoardTargets` zu nutzen.
 

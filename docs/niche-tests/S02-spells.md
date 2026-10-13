@@ -40,6 +40,24 @@ Stand/Autor: Agent S02-spells, 12.10.2026. Karten: 41 in der Liste · (wird fort
 - **Repro:** `docs/niche-tests/repro/S02-spells/04-divine-gift-light-je-held-statt-je-zug.js` (✗ = die Lesart „einmal je Zug" wird nicht erfüllt)
 - **Frage an Al:** Soll das Heilfenster einmal je Zug (egal welcher Held) oder einmal je Held und Zug aufgehen? (je Zug / je Held)
 
+### S02-05 · Flame Avalanche / Last Resort: Schadenssperre misst Besitz/Spalte statt Kontrolle · Stufe B
+- **Karten:** Flame Avalanche (`flame-avalanche.js`, setzt `ps.damageLocked`), Last Resort (`last-resort.js`, gleicher Mechanismus); Fehler sitzt in der Engine.
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Flame Avalanche], Held 0 bekommt per `grantFor` Destruction Magic 3. Kreatur X (Besitzer 0) per `actionStealCreature(1, X)` vom Gegner kontrolliert, Kreatur Y (Besitzer 1) per `actionStealCreature(0, Y)` von mir kontrolliert, normale Gegnerkreatur Z (je 1000 HP). Zweiter Aufbau mit Helden: mein Held 2 und Gegnerheld 2 per `actionTakeHeroPermanently` (dauerhafte Kontrolle, damit der Charme-Schadensschutz nicht stört) vertauscht.
+- **Schritte:** 1. Flame Avalanche spielen (trifft alles, was der Gegner kontrolliert, also auch X: 850). 2. Danach mit Sitz 0 als Quelle je 100 `destruction_spell`-Schaden direkt (`actionDealCreatureDamage` / `actionDealDamage`) auf Z, X, Y bzw. die Helden.
+- **Erwartet** (Kartentext „You cannot deal any other damage to targets your opponent controls this turn."; CARD_API.md „Kontrolle statt Seite"): Z und X (vom Gegner kontrolliert) gesperrt (0 Schaden), Y (von mir kontrolliert) NICHT gesperrt.
+- **Beobachtet:** Z ✓ gesperrt; X ✗ nimmt 100 (850 → 750); Y ✗ wird gesperrt (850 → 850). Bei Helden dasselbe: mein vom Gegner kontrollierter Held 2 ✗ nimmt 100, der von mir kontrollierte Gegnerheld 2 ✗ ist gesperrt.
+- **Repro:** `docs/niche-tests/repro/S02-spells/05-schadenssperre-besitz-statt-kontrolle.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_engine.js` ~8790–8800 (Heldenpfad: `targetOwner` = Spalte per `players[pi].heroes.includes(target)`) und ~46709 (Kreaturenpfad: `e.inst.owner !== e.sourceOwner`). Beide müssten `controller ?? owner` bzw. `heroSideOf` lesen. Folge in der Praxis: Der Sperrriegel der beiden Zauber hat ein Loch (Zusatzschaden an übernommenen Zielen) und sperrt zu viel (Schaden an eigenen übernommenen Zielen).
+
+### S02-06 · Last Resort: gilt „any other damage" auch für eigene Ziele und für Vorab-Schaden? · Stufe C
+- **Karten:** Last Resort (`last-resort.js` Z. 83–87, 190)
+- **Voraussetzungen / Aufbau:** Seed 1234, Zug 5, Hand [Last Resort]; eigene Kreatur (1000 HP) auf Held 1, Gegnerkreatur (1000 HP), Zielwahl Gegnerheld 0.
+- **Schritte:** 1. Last Resort spielen (Ziel 1600 Schaden, Nutzer fällt ✓). 2. Danach 100 Schaden auf Gegnerkreatur, eigene Kreatur und eigenen Held 1. 3. Zweiter Aufbau: vor dem Zauber nur 50 Schaden an einem EIGENEN Helden, dann Last Resort.
+- **Erwartet** (Kartentext „You cannot deal any other damage the turn you activate this card." – anders als Flame Avalanche steht dort nicht „to targets your opponent controls"): Zusatzschaden an eigenen Zielen ebenfalls gesperrt; ob Vorab-Schaden die Karte unspielbar macht, ist Lesart.
+- **Beobachtet:** Gegnerkreatur gesperrt ✓; eigene Kreatur −100 und eigener Held −100 gehen durch (✗ nach wörtlicher Lesart); Last Resort bleibt nach reinem Eigenschaden spielbar (Gate liest `dealtDamageToOpponent`, nicht `dealtDamageAnyTarget`).
+- **Repro:** `docs/niche-tests/repro/S02-spells/06-last-resort-schadenssperre-eigene-ziele.js` (✗ = wörtliche Lesart nicht erfüllt)
+- **Frage an Al:** Soll Last Resort wie Flame Avalanche nur Schaden an Gegnerzielen sperren (wie jetzt) oder wörtlich ALLEN weiteren Schaden, auch an eigenen Zielen? (nur Gegner / alles)
+
 ## Abdeckung
 (wird am Ende ausgefüllt)
 
