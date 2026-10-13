@@ -71,7 +71,9 @@ module.exports = {
         inst = ziel.cardInstance || engine.findCards({
           controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx,
         }).find(c => c.zoneSlot === ziel.slotIdx);
-        const hp = inst?.counters?.currentHp ?? 0;
+        // Unversehrte Kreaturen haben noch kein `currentHp` (erst beim ersten Schaden gesetzt) — dann gelten die gedruckten HP (C05-01).
+        const hp = inst?.counters?.currentHp
+          ?? (inst ? (inst.counters?._cardDataOverride || engine._getCardDB()[inst.name])?.hp : 0) ?? 0;
         if (!inst || hp <= 0) return;
         betrag = Math.ceil(hp / 2);
       }
