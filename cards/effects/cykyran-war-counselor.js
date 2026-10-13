@@ -52,7 +52,8 @@
 
 const {
   WC,
-  countDistinctWarCounselors,
+  controlledWarCounselors,
+  istEigenerAbgang,
   makeSingletonCanSummon,
 } = require('./_war-counselor-shared');
 
@@ -61,10 +62,13 @@ const NEEDED_DISTINCT = 3;
 const DAMAGE_CAP = 300;
 
 /** Verdopplung an- oder abgleichen. */
-function resync(engine, pi) {
+function resync(engine, pi, ausserId = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  const active = countDistinctWarCounselors(engine, pi) >= NEEDED_DISTINCT;
+  // `ausserId`: die Kopie, die gerade abgeht — sie steht im Leave-Hook noch im
+  // Support und darf sich nicht mehr mitzaehlen (A06-18).
+  const active = new Set(controlledWarCounselors(engine, pi)
+    .filter((i) => i.id !== ausserId).map((i) => i.name)).size >= NEEDED_DISTINCT;
 
   // Kontrolle statt Seite (Styx 28.9.) — „your Heroes": alle Helden, die
   // `pi` kontrolliert, plus die, auf denen noch SEIN Zuschlag liegt
@@ -219,8 +223,16 @@ module.exports = {
     // Beschwoerungen und Tode veraendern ja die Ratgeberzahl.
     onPlay: (ctx) => resyncFromCtx(ctx),
     onCardEnterZone: (ctx) => resyncFromCtx(ctx),
-    onCardLeaveZone: (ctx) => resyncFromCtx(ctx),
-    onCreatureDeath: (ctx) => resyncFromCtx(ctx),
+    onCardLeaveZone: (ctx) => {
+      if (istEigenerAbgang(ctx)) { resync(ctx._engine, ctx.cardOwner, ctx.card.id); return; }
+      resyncFromCtx(ctx);
+    },
+    // Der eigene Tod ist schon im Leave-Hook abgeglichen; hier steht die Instanz
+    // noch im Support und wuerde sich sonst wieder mitzaehlen (A06-18/19).
+    onCreatureDeath: (ctx) => {
+      if (ctx.creature?.instId === ctx.card?.id) return;
+      resyncFromCtx(ctx);
+    },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
     afterDamage: (ctx) => resyncFromCtx(ctx),
   },

@@ -45,6 +45,7 @@ const { hasCardType } = require('./_hooks');
 const {
   WC,
   controlledWarCounselors,
+  istEigenerAbgang,
   makeSingletonCanSummon,
 } = require('./_war-counselor-shared');
 
@@ -65,9 +66,11 @@ function controlledCreatures(engine, pi) {
  * bekommen ihn, alles andere verliert ihn wieder — aber nur, wenn er von
  * hier kam.
  */
-function resyncShield(engine, pi, selfId) {
+function resyncShield(engine, pi, selfId, selfLeaving = false) {
   const oppIdx = engine.opponentOf(pi);
-  const shouldHave = new Set(
+  // Geht Censpartan selbst ab (A06-19), schirmt er niemanden mehr: er steht im
+  // Leave-Hook noch im Support, die anderen Ratgeber bleiben aber auf dem Feld.
+  const shouldHave = new Set(selfLeaving ? [] :
     controlledWarCounselors(engine, pi)
       .filter((inst) => inst.id !== selfId)
       .map((inst) => inst.id),
@@ -189,8 +192,16 @@ module.exports = {
     // falsch: gerade FREMDE Beschwoerungen muessen den Schirm auslösen.
     onPlay: (ctx) => resyncFromCtx(ctx),
     onCardEnterZone: (ctx) => resyncFromCtx(ctx),
-    onCardLeaveZone: (ctx) => resyncFromCtx(ctx),
-    onCreatureDeath: (ctx) => resyncFromCtx(ctx),
+    onCardLeaveZone: (ctx) => {
+      if (istEigenerAbgang(ctx)) { resyncShield(ctx._engine, ctx.cardOwner, ctx.card.id, true); return; }
+      resyncFromCtx(ctx);
+    },
+    // Der eigene Tod ist schon im Leave-Hook abgeglichen; hier steht die Instanz
+    // noch im Support und wuerde sich sonst wieder mitzaehlen (A06-18/19).
+    onCreatureDeath: (ctx) => {
+      if (ctx.creature?.instId === ctx.card?.id) return;
+      resyncFromCtx(ctx);
+    },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
   },
 };
