@@ -17990,12 +17990,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const buffData = inst.counters.buffs[buffName];
     // Clear associated counters on expiry (e.g. dark_gear_negated clears negated)
+    // ★ Z2 (A04-28, A09-21, M01-21): der Zaehler (`negated` …) gehoert allen Buffs, die ihn in `clearCountersOnExpire`
+    // fuehren — laeuft der KUERZERE ab, darf er den Zaehler nicht abraeumen, solange ein ANDERER Buff ihn noch haelt
+    // (z. B. Diplomacys „Rest des Zuges" gegen Forbidden Zones 6 Zuege). Der letzte Halter raeumt ab.
+    delete inst.counters.buffs[buffName];
     if (buffData.clearCountersOnExpire) {
+      const andereHalter = new Set();
+      for (const b of Object.values(inst.counters.buffs)) {
+        for (const k of (b?.clearCountersOnExpire || [])) andereHalter.add(k);
+      }
       for (const key of buffData.clearCountersOnExpire) {
+        if (andereHalter.has(key)) continue;
         delete inst.counters[key];
       }
     }
-    delete inst.counters.buffs[buffName];
     this.log('buff_remove', { creature: inst.name, buff: buffName });
     if (buffData.removeAnim || opts.removeAnim) {
       this._broadcastEvent('play_zone_animation', { type: opts.removeAnim || buffData.removeAnim, owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
@@ -18099,7 +18107,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // buff clears `cc_immune` at the start of the bearer's
         // controller's next turn (parity with hero `immune`'s
         // start-of-turn cleanup).
-        if (grantsCcImmune && inst.zone === ZONES.SUPPORT) {
+        // ★ Z2: haelt ein anderer Negierungs-Buff den Zaehler noch, ist die Kreatur NICHT frei geworden → keine Immunitaet.
+        const negiertNoch = !!buffData.clearCountersOnExpire?.length && !!inst.counters?.[buffData.clearCountersOnExpire[0]];
+        if (grantsCcImmune && !negiertNoch && inst.zone === ZONES.SUPPORT) {
           inst.counters.cc_immune = 1;
           if (!inst.counters.buffs) inst.counters.buffs = {};
           const ctrl = inst.controller ?? inst.owner;
