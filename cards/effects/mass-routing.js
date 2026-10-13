@@ -69,7 +69,7 @@ function betroffene(engine, maxLevel) {
 async function insDeck(engine, inst, maxLevel) {
   if (!inst || inst.zone !== 'support') return null;
   const gs = engine.gs;
-  const kontrolleur = inst.controller ?? inst.owner;
+  const kontrolleur = engine.physicalSide(inst);       // Brettseite (nicht der Kontrolleur): eine gestohlene Kreatur liegt weiter beim Besitzer (S03-04)
   const heim = inst.originalOwner ?? inst.owner;      // ★ „original owners"
   const hps = gs.players[heim];
   const kps = gs.players[kontrolleur];
