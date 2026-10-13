@@ -4535,21 +4535,14 @@ playerProfile.registerPlayerProfileRoutes(app, {
  */
 function checkPotionLock(ps, gs, pi) {
   ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
-  // Check own heroes
-  for (const hero of (ps.heroes || [])) {
-    if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
-    const heroScript = heroScriptOf(hero);
-    if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
-      ps.potionLocked = true;
-      return;
-    }
-  }
-  // Check charmed opponent heroes controlled by this player
-  if (gs && pi != null) {
-    const oi = opponentOfGs(gs, pi);
-    for (const hero of (gs.players[oi]?.heroes || [])) {
+  // Z1 (H03-21): „After YOU have played …" = KONTROLLEUR des Helden (wie `heroSideOf`/`heroesControlledBy`):
+  // alle Helden, die `pi` fuehrt — eigene Spalte ohne die abgegebenen plus uebernommene der Gegenspalte.
+  const spieler = (gs && gs.players) || [ps];
+  for (let seite = 0; seite < spieler.length; seite++) {
+    for (const hero of (spieler[seite]?.heroes || [])) {
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
-      if (hero.charmedBy !== pi) continue;
+      const kontrolleur = hero.charmedBy ?? hero.permaControlBy ?? seite;
+      if (gs && pi != null ? kontrolleur !== pi : seite !== 0) continue;
       const heroScript = heroScriptOf(hero);
       if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
         ps.potionLocked = true;
@@ -4693,7 +4686,7 @@ function sendGameState(room, playerIdx, extra) {
       // die ganze Drop-/Klick-Logik lief ins Leere.
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
-      sharesSupportZones: !!ps._aliceShareActive,
+      sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, pi),   // Z1: nach Kontrolle (H01-15)
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, pi),
@@ -5945,7 +5938,7 @@ function sendSpectatorGameState(room) {
       // die ganze Drop-/Klick-Logik lief ins Leere.
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
-      sharesSupportZones: !!ps._aliceShareActive,
+      sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, spi),   // Z1: nach Kontrolle (H01-15)
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),

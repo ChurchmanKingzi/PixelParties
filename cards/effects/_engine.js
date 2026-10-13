@@ -30813,8 +30813,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (this.borisBlockIdx(nm, playerIdx) >= 0) abilities.push(nm);
       }
     }
+    const _opp = this.opponentOf(playerIdx);
     return {
-      cards, abilities, heroIdx, owner: this.opponentOf(playerIdx),
+      cards, abilities, heroIdx,
+      owner: loadCardEffect('Boris, the Guardian of Blackport')?.borisHeroSeite?.(this, _opp) ?? _opp,   // Z1: Brettseite des Boris (uebernommen: evtl. meine Spalte)
       active: this.borisHidesOpponentSide(playerIdx),
     };
   }
@@ -43901,7 +43903,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // damit pro-Held-Rabatte weiter am richtigen Helden greifen.
     const lvrPi = (typeof evalOpts.levelSourcePi === 'number')
       ? evalOpts.levelSourcePi : playerIdx;
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, lvrPi, heroIdx, evalOpts);
+    // Z1 (H03-07): `playerIdx` ist hier die BRETTSEITE des wirkenden Helden (`lvrPi` nur die Seite der
+    // Ermaessigungen). Die Seite geht mit, damit Je-Held-Senker den Wirker nicht allein ueber den Index
+    // `heroIdx` erkennen (ein uebernommener Held der Gegenspalte hat denselben Index wie der eigene).
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, lvrPi, heroIdx,
+      evalOpts.castHeroSide == null ? { ...evalOpts, castHeroSide: playerIdx } : evalOpts);
 
     const schools = [];
     if (cardData.spellSchool1) schools.push(cardData.spellSchool1);
@@ -44089,7 +44095,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // backwards-compatible. `evalOpts.pileSide` lets "in your hand"
         // reducers (Chaorc Ruin Mourner) skip deck / discard / deleted
         // evaluations so the reduction doesn't leak to a card in a pile.
-        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, heroIdx, evalOpts)) || 0;
+        // Z1 (H03-07): ein an einen Helden GEBUNDENER Senker (Held/Ausruestung/Ability) auf einer ANDEREN
+        // Brettseite als der des Wirkers gilt nie fuer „diesen Helden" — Index `-1` = kein Wirker-Treffer.
+        let _hIdx = heroIdx;
+        if (evalOpts.castHeroSide != null && inst.heroIdx >= 0
+            && (inst.zone === 'hero' || inst.zone === 'support' || inst.zone === 'ability')
+            && (inst.zone === 'support' ? this.physicalSide(inst) : inst.owner) !== evalOpts.castHeroSide) _hIdx = -1;
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, _hIdx, evalOpts)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
     }
