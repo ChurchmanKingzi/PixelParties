@@ -48358,7 +48358,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // any future "I'll handle the revive myself" effect).
       const hasLossSuspender = (ps.permanents || []).some(p => {
         const script = loadCardEffect(p.name);
-        return script?.preventsAllHeroesDeadLoss;
+        const s = script?.preventsAllHeroesDeadLoss;
+        return typeof s === 'function' ? s(this, pi, p) : s;
       });
       // v867: Ein Held, der VORUEBERGEHEND aus dem Spiel entfernt ist
       // (Teleportation Powder), haelt seine Seite am Leben — „A player
@@ -48379,6 +48380,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hint = this.gs._drawLoserIdx;
       const loserIdx = (isSeat(this, hint)) ? hint : 0;
       const winnerIdx = loserIdx === 0 ? 1 : 0;
+      // M01-02: Der Wert darf auch eine Funktion `(engine, pi, perm) => bool`
+      // sein — das Elixir haelt die Niederlage nur auf, wenn es fuer einen
+      // der toten Helden ueberhaupt ausloesen kann (nicht bei Mirjam o. ae.).
       this.log('draw_resolved', {
         loser: this.gs.players[loserIdx]?.username,
         winner: this.gs.players[winnerIdx]?.username,
