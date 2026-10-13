@@ -206,15 +206,17 @@ module.exports = {
     // Opp's gifted card carries `originalOwner = pi` so its eventual
     // discard / deleted disposition routes back to the activator.
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
+    // Negiert wird NUR die Gabe an den Gegner (Teileffekt): die eigenen 2 Karten kommen trotzdem auf die Hand,
+    // die entfallene Gabe geht zurück OBEN aufs Deck — keine Karte darf verschwinden (F01-02).
     if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
           { byPi: pi, count: 1, sourceName: 'Birthday Present' })) {
       engine.log('birthday_present_negated', { player: gs.players[pi]?.username });
-      engine.sync();
-      return;
+      engine.returnToPile(pi, 'deck', oppChoice, 0);
+    } else {
+      const oppInst = engine.handZugangSync(oppPs, oppChoice, { source: CARD_NAME });
+      oppInst.originalOwner = pi;
+      engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: CARD_NAME });
     }
-    const oppInst = engine.handZugangSync(oppPs, oppChoice, { source: CARD_NAME });
-    oppInst.originalOwner = pi;
-    engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: CARD_NAME });
 
     for (const name of playerCards) {
       engine.handZugangSync(ps, name, { source: CARD_NAME });
