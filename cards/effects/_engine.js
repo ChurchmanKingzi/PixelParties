@@ -18857,6 +18857,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gs = this.gs;
     const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
     if (!this.isChoosableAsCreature(inst, cd)) return null;
+    // ★ Z2 (C05-03): „unaffected by all other cards and effects" (Stowaway, Cardinal Beasts, Golden Wings) — die
+    // Aura-Negation ist ein fremder Karteneffekt wie jede andere Negation (`actionNegateCreature` bricht hier
+    // ebenfalls ab); der Spezialtext gewinnt gegen den allgemeinen. Sonst bliebe z. B. Stowaways `onHeroKO` stumm.
+    if (inst.counters?._cardinalImmune) return null;
     const seite = inst.controller ?? inst.owner;
     const nach = gs._creatureEffectsNegated;
     if (nach && nach.turn === (gs.turn || 0)) {
