@@ -185,7 +185,7 @@ module.exports = {
       const inst = ctx.card;
       const c = inst?.counters;
       if (!c?._calmLive || c._calmGranted) return;
-      if (ctx.playerIdx !== ctx.cardOwner || ctx._engine.gs.turn === c._calmTurn) return;
+      if (ctx.activePlayer !== ctx.cardOwner || ctx._engine.gs.turn === c._calmTurn) return;   // onTurnStart-Kontext hat `activePlayer`, kein `playerIdx`
       richteZusageEin(ctx._engine, inst);
     },
 
