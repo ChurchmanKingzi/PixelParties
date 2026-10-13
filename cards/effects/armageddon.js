@@ -422,7 +422,25 @@ module.exports = {
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
 
       // ── ① Alles einsammeln, BEVOR etwas faellt ───────────────────
-      const { helden, kreaturen, ziele } = sammleZiele(engine);
+      let { helden, kreaturen, ziele } = sammleZiele(engine);
+
+      // Ida („never hit more than 1 target with a Destruction Spell"): aus dem Flaechenschlag
+      // wird ein Einzelschlag auf EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die
+      // Reaktionsfenster selbst (wie `actionAoeHit` im Einzelmodus); Damus hinter seiner Ifrit
+      // bleibt nicht waehlbar. Der Rest (Siegregel, Schadenssperre, Zugende) bleibt unveraendert.
+      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      if (idaEinzel) {
+        const t = await ctx.promptDamageTarget({
+          side: 'any', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: dmg,
+          title: CARD_NAME, description: `Deal ${dmg} damage to a single target.`,
+          confirmLabel: `💥 ${dmg} Damage!`, confirmClass: 'btn-danger', cancellable: false,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht, wie in `actionAoeHit`
+          condition: (x) => !(x.type === 'hero' && heldGefeit(engine, x.owner, x.heroIdx)),
+        });
+        if (!t) return;
+        helden = t.type === 'hero' ? [{ hero: gs.players[t.owner]?.heroes?.[t.heroIdx], p: t.owner, hi: t.heroIdx }] : [];
+        kreaturen = t.type === 'hero' ? [] : [t.cardInstance];
+        ziele = [t.type === 'hero' ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx } : { type: 'creature', inst: t.cardInstance }];
+      }
 
       // ★★ v1146 (Al 17.9.): eigene Animation — Feuerball vom Wirker,
       // der das ganze Brett einhuellt, Flammen und Feuerregen. Staerke
@@ -482,7 +500,8 @@ module.exports = {
         await feuerwelle();   // Feuerwelle VOR dem Reaktionsfenster, genau einmal
         res = await engine.dealDamageToTargets({ ...quelle, cardInstance: ctx.card }, ziele, {
           damage: dmg, damageType: 'destruction_spell', sourceName: CARD_NAME,
-          istFlaeche: true, hitDelay: 0,
+          istFlaeche: !idaEinzel, hitDelay: 0,
+          ...(idaEinzel ? { surpriseCheck: false, postTargetCheck: false } : {}),
           bilderGespielt: true,
         });
       } finally {

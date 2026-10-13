@@ -17,7 +17,7 @@ const H = require('../../lib/h.js');
   t.put(1, 0, 0, H.INERT.big);
   t.put(0, 1, 0, H.INERT.big);
   let offered = null;
-  t.targetFn = (valid) => { offered = valid.map(v => v.type); return [valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0).id]; };
+  t.targetFn = (valid) => { offered = valid.map(v => v.type); return [(valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0) || valid[0]).id]; };   // Fallback: ohne Heldenangebot (behoben) die erste Creature
   const r = await t.play(0, 'Hole in the Sky', { hero: 0 });
   R.check('Hole in the Sky behandelt', r === true, r);
   R.note('angebotene Zieltypen', offered);

@@ -58,12 +58,15 @@ module.exports = {
       if (applied !== 'frozen') return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      // "Your effects" — fire only when the side whose turn is
-      // currently active is Gon's controller. The vast majority of
-      // freezes are applied during the caster's own turn (their
-      // effect resolution); reactive surprise-applied freezes also
-      // fire while their owner is the active player.
-      if (gs.activePlayer !== ctx.cardOwner) return;
+      // "Your effects" — massgeblich ist der VERURSACHER des Freeze (Spieler
+      // des wirkenden Effekts), nicht wessen Zug laeuft: Surprises und
+      // Reaktionen feuern im Zug des Gegners (H02-heroes-03). Nur ohne
+      // Zuordnung (-1) gilt wie bisher der aktive Spieler.
+      const wirker = ctx.cardController ?? ctx.cardOwner;
+      const v = engine.statusVerursacher(ctx.target, 'frozen');
+      if (v && v.spieler >= 0) {
+        if (v.spieler !== wirker) return;
+      } else if (gs.activePlayer !== wirker) return;
 
       const target = ctx.target;
       if (!target) return;

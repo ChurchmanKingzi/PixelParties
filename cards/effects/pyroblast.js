@@ -54,6 +54,7 @@ module.exports = {
         max: maxTargets,
         min: 1,
         baseDamage: 100,
+        damageType: 'destruction_spell',   // Idas Einzelziel-Deckel greift nur mit diesem Typ (H02-heroes-05)
         title: 'Pyroblast',
         description: `Select up to ${maxTargets} target${maxTargets > 1 ? 's' : ''} to deal 100 damage each.`,
         confirmLabel: '🔥 Pyroblast!',
