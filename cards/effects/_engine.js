@@ -23832,7 +23832,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Z6 (A08-29): Ist DIESE Kreatur fuer `playerIdx` gerade von den Beschwoerungssperren gesperrt? Namens-Gegenstueck zu
    * `getSummonBlocked` (das nur Handkarten listet) fuer Wege, die eine Kreatur NICHT aus der Hand beschwoeren (Ushabti aus der
-   * Surprise Zone): `summonLocked`, Teil-Sperre Greatmaw Remora, Handkarten-Sperre (Grinning Cat) und das kartenseitige `canSummon`.
+   * Surprise Zone): `summonLocked`, Teil-Sperre Greatmaw Remora und die Handkarten-Sperre (Grinning Cat). Das kartenseitige `canSummon` prueft der Aufrufer selbst.
    */
   getSummonBlockedFor(playerIdx, cardName) {
     const ps = this.gs.players[playerIdx];
