@@ -257,6 +257,24 @@ Stand/Autor: Agent A02-deepsea, 12.10.2026. Karten: 54 in der Liste · (wird am 
 - **Repro:** `docs/niche-tests/repro/A02-deepsea/27-siren-destroy-effect-kills-link.js`
 - **Vermutete Ursache:** `deepsea-siren.js` `onCardLeaveZone` (~Z. 254): „cleans up the linked-target flags" – keine Tod-Weitergabe; der Hook kennt weder Quelle noch Gegner-Eigenschaft (`ctx` trägt die Quelle des Zerstörens nicht).
 
+### A02-deepsea-28 · Slippery Pengu: geliehene Gegnerkreatur wird als Partner angeboten und auf dem FALSCHEN Brett verschoben · Stufe B
+- **Karten:** Slippery Pengu (`slippery-pengu.js`, `eligiblePartnerCreatures`; Verschiebung über `_slippery-shared.js` `moveSlipperyCreature`), Deepsea Succubus (liefert die geliehene Kreatur; im Repro per `stolenBy`/`controller` nachgestellt).
+- **Voraussetzungen / Aufbau:** Seat 0: Pengu in Held 0, eigene Kreatur in Held 2; Seat 1: Deepsea Siren in Held 1 / Slot 0, von Seat 0 geliehen (Kontrolle bei Seat 0, Brett beim Gegner).
+- **Schritte:** Pengu wird per Slippery-Weg nach Held 1 bewegt; als Partner die geliehene Siren wählen; der Gegner wählt die Zone.
+- **Erwartet** (Quelle: Kartentext „you may choose another Creature **you control** … Your opponent chooses a free Support Zone of one of **your** adjacent undefeated Heroes … Immediately move that Creature into that Support Zone"): Die Kreatur wird in die gewählte Zone MEINER Seite bewegt – oder (weil die benachbarten Helden der geliehenen Kreatur Gegnerhelden sind) gar nicht erst angeboten.
+- **Beobachtet:** Die Siren wird angeboten (neben der eigenen Dummy-Kreatur). Die Zonenwahl listet nur freie Zonen meines Bretts; die Verschiebung läuft aber auf dem physischen Brett der Siren (dem des Gegners): sie landet dort an denselben Koordinaten (Held 0 / Slot 0 des Gegners), das gewählte Ziel auf meiner Seite wird nie erreicht.
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/28-pengu-borrowed-partner.js` (ausgeführt: 1 ✗)
+- **Vermutete Ursache:** `slippery-pengu.js` `eligiblePartnerCreatures` filtert nach Kontrolle, trägt die Koordinaten aber mit `owner: pi` ein; `adjacentFreeUndefeatedZones` prüft das eigene Brett, `moveSlipperyCreature` verschiebt auf `physicalSide(inst)`. Gleiche Familie wie -07 (Slippery Ice).
+
+### A02-deepsea-29 · Aquatic Arrows (CPU-Entscheidung): frische Kreaturen zählen wegen `currentHp ?? 0` als „sterben am Flächenschaden" · Stufe B
+- **Karten:** Aquatic Arrows (`aquatic-arrows.js` `cpuResponse`, ~Z. 115). Gleiches Muster bei Deepsea Siren (`deepsea-siren.js` Z. 199, dort unkritisch, weil die Schadens-Batch `currentHp` vorher anlegt).
+- **Voraussetzungen / Aufbau:** Seat 1 hat genau eine unversehrte Kreatur (1000 HP) unter dem Host-Helden; Seat 0 = CPU entscheidet über die Aktivierung (`cpuResponse` direkt aufgerufen).
+- **Schritte:** `AA.cpuResponse(engine, 'generic', { type:'confirm', title:'Aquatic Arrows', _hostHeroIdx:0 })`.
+- **Erwartet** (Quelle: Kartentext „Deal 100 damage to all Creatures in that Hero's Support Zones"; eigener Kommentar „Aktivierung lohnt, wenn mindestens eine gegnerische Creature am AoE stirbt oder mindestens zwei getroffen werden"): 1000-HP-Kreatur stirbt nicht, nur 1 Ziel → nicht aktivieren.
+- **Beobachtet:** `{ confirmed: true }`. `summonCreature` legt `counters.currentHp` nicht an (erst beim ersten Schaden, `_engine.js` ~Z. 46382); `?? 0` macht jede unversehrte Kreatur zum „Kill".
+- **Repro:** `docs/niche-tests/repro/A02-deepsea/29-arrows-cpu-currenthp-unset.js` (ausgeführt: 1 ✗)
+- **Vermutete Ursache:** `aquatic-arrows.js` `(z.counters?.currentHp ?? 0) <= AOE_DAMAGE` statt `?? cardDB[z.name].hp`. Wirkt nur im CPU-Weg (Spielregeln nicht berührt).
+
 ## Abdeckung
 (wird am Ende gefüllt)
 
