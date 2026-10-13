@@ -61,22 +61,32 @@ function verzichtVerbraucht(engine, pi) {
  * auseinanderlaufen koennen.
  */
 function borisActive(engine, pi) {
-  const heroes = engine?.gs?.players?.[pi]?.heroes || [];
-  return heroes.some(h =>
+  return wirksamerBoris(engine, pi) != null;
+}
+
+/**
+ * Z1 (H01-04): „Your opponent …" / „you" = KONTROLLEUR. Gesucht wird unter den Helden, die `pi`
+ * KONTROLLIERT (eigene Spalte ohne abgegebene + uebernommene), nicht in der Spalte von `pi`.
+ * @returns {{physOwner:number, heroIdx:number}|null}
+ */
+function wirksamerBoris(engine, pi) {
+  const liste = engine?.heroesControlledBy ? engine.heroesControlledBy(pi) : null;
+  if (!liste) return null;
+  const f = liste.find(({ hero: h }) =>
     h && h.name === CARD_NAME && h.hp > 0
     && !h.statuses?.frozen && !h.statuses?.stunned
-    && !h.statuses?.webbed && !h.statuses?.negated,
-  );
+    && !h.statuses?.webbed && !h.statuses?.negated);
+  return f ? { physOwner: f.physOwner, heroIdx: f.heroIdx } : null;
 }
 
 /** Index des wirksamen Boris (fuer das Hervorheben im Client), sonst -1. */
 function borisHeroIdx(engine, pi) {
-  const heroes = engine?.gs?.players?.[pi]?.heroes || [];
-  return heroes.findIndex(h =>
-    h && h.name === CARD_NAME && h.hp > 0
-    && !h.statuses?.frozen && !h.statuses?.stunned
-    && !h.statuses?.webbed && !h.statuses?.negated,
-  );
+  return wirksamerBoris(engine, pi)?.heroIdx ?? -1;
+}
+
+/** Brettseite des wirksamen Boris (Spalte kann beim Gegner liegen), sonst `pi`. */
+function borisHeroSeite(engine, pi) {
+  return wirksamerBoris(engine, pi)?.physOwner ?? pi;
 }
 
 module.exports = {
@@ -175,6 +185,7 @@ module.exports = {
   // Hervorheben beim Hovern).
   borisActive,
   borisHeroIdx,
+  borisHeroSeite,
   verzichtVerbraucht,
   CARD_NAME,
 };

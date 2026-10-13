@@ -4713,6 +4713,7 @@ class GameEngine {
        * @param {number}   [config.hitDelay]     - Delay between individual hero hits (default 150)
        * @param {Function} [config.heroFilter]   - (hero, heroIdx, playerIdx) => bool
        * @param {Function} [config.creatureFilter]- (inst, cardData) => bool
+       * @param {number}   [config.creatureBoardSide] - Z1: Kreaturen nach BRETTSEITE (Zone) statt nach Kontrolle sammeln
        * @param {number}   [config.heroMinHp]    - Only heroes with hp >= this
        * @param {number}   [config.heroMaxHp]    - Only heroes with hp <= this
        * @param {number}   [config.creatureMinHp]- Only creatures with currentHp >= this
@@ -4805,10 +4806,7 @@ class GameEngine {
               const hr = gs.players[forced.owner]?.heroes?.[forced.heroIdx];
               valid = !!(hr && hr.name && hr.hp > 0);
             } else {
-              const inst = forced.cardInstance || engine.cardInstances.find(c =>
-                c.owner === forced.owner && c.zone === 'support'
-                && c.heroIdx === forced.heroIdx && c.zoneSlot === forced.slotIdx
-              );
+              const inst = forced.cardInstance || engine.kreaturAnBrett(forced.owner, forced.heroIdx, forced.slotIdx);   // Z1: Brettseite
               valid = !!(inst && inst.zone === 'support' && (inst.counters?.currentHp ?? 1) > 0);
               if (valid && !forced.cardInstance) forced.cardInstance = inst;
             }
@@ -4941,9 +4939,10 @@ class GameEngine {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
               const creatureName = slot[0];
-              const inst = engine.cardInstances.find(c =>
-                (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-              );
+              // Z1: Instanz ueber die BRETTSEITE (S02-17); „my"/„enemy" gilt fuer Kreaturen nach
+              // KONTROLLE (S02-19, S03-06, M01-20, M01-22, C03-10) — nur `side: 'any'` ist seitenlos.
+              const inst = engine.kreaturAnBrett(playerIdx, hi, si);
+              if (inst && !engine.kreaturPasstZurSeite(inst, side, pi)) continue;
               // Only actual Creatures are targetable — not Equipment, Heroes, etc.
               // v704 (Puppets): Tokens mit `choosableAsCreature` („can still
               // be chosen like one") laufen mit — siehe isChoosableAsCreature.
@@ -4979,8 +4978,11 @@ class GameEngine {
           }
         }
         if (types.includes('creature')) {
-          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addCreatures(_o);
-          if (side === 'my' || side === 'any') addCreatures(pi);
+          // Z1: BEIDE Bretter durchsuchen (eine gestohlene Kreatur liegt auf der Brettseite des
+          // Besitzers, gehoert aber dem Kontrolleur); `addCreatures` filtert nach Kontrolle.
+          // Reihenfolge wie bisher: „my" zuerst die eigene Seite, sonst zuerst die Gegner.
+          if (side === 'my') { addCreatures(pi); for (const _o of engine.opponentsOf(pi)) addCreatures(_o); }
+          else { for (const _o of engine.opponentsOf(pi)) addCreatures(_o); addCreatures(pi); }
         }
 
         if (targets.length === 0) return null;
@@ -5532,9 +5534,9 @@ class GameEngine {
               const slot = (ps2.supportZones[hi] || [])[si] || [];
               if (slot.length === 0) continue;
               const creatureName = slot[0];
-              const inst2 = engine.cardInstances.find(c =>
-                (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-              );
+              // Z1: Brettseite fuer die Instanz, Kontrolle fuer „my"/„enemy" (s. promptDamageTarget).
+              const inst2 = engine.kreaturAnBrett(playerIdx, hi, si);
+              if (inst2 && !engine.kreaturPasstZurSeite(inst2, side, pi)) continue;
               // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
               // v704 (Puppets): Ausnahme Tokens mit `choosableAsCreature`.
               const cd = (inst2 ? engine.getEffectiveCardData(inst2) : null) || cardDB[creatureName];
@@ -5568,8 +5570,11 @@ class GameEngine {
           }
         }
         if (types.includes('creature')) {
-          if (side === 'enemy' || side === 'any') for (const _o of engine.opponentsOf(pi)) addCreatures(_o);
-          if (side === 'my' || side === 'any') addCreatures(pi);
+          // Z1: BEIDE Bretter durchsuchen (eine gestohlene Kreatur liegt auf der Brettseite des
+          // Besitzers, gehoert aber dem Kontrolleur); `addCreatures` filtert nach Kontrolle.
+          // Reihenfolge wie bisher: „my" zuerst die eigene Seite, sonst zuerst die Gegner.
+          if (side === 'my') { addCreatures(pi); for (const _o of engine.opponentsOf(pi)) addCreatures(_o); }
+          else { for (const _o of engine.opponentsOf(pi)) addCreatures(_o); addCreatures(pi); }
         }
 
         if (targets.length === 0) return [];
@@ -13897,6 +13902,7 @@ class GameEngine {
         // Tode ueber Zerstoerung/Opfer kamen ohne sie an, und Karten mit
         // „during your turn" (Dragoneggs) muessten raten.
         controller: cardInstance.controller ?? cardInstance.owner,
+        seite: this.physicalSide(cardInstance),   // Z1: BRETTSEITE der Zone (gestohlen: Besitzer, nicht Kontrolleur)
         heroIdx: fromHeroIdx,
         zoneSlot: cardInstance.zoneSlot,
         instId: cardInstance.id,
@@ -16032,17 +16038,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     const targets = [];
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // Z1 (S02-19): „a target you control" = nach KONTROLLE; IDs/`owner` bleiben die Brettseite.
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(ownerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
-      targets.push({ id: `hero-${ownerIdx}-${hi}`, type: 'hero', owner: ownerIdx, heroIdx: hi, cardName: hero.name });
+      targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
     const cardDB = this._getCardDB();
     for (const inst of this.cardInstances) {
-      if ((inst.owner !== ownerIdx && inst.controller !== ownerIdx) || inst.zone !== 'support' || inst.faceDown) continue;
+      if (this.kontrolleurVon(inst) !== ownerIdx || inst.zone !== 'support' || inst.faceDown) continue;
       const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Kartendaten: Tokens liegen unter dem Namen einer Potion (Als Sweep 9.10.)
       if (!cd || !this.isChoosableAsCreature(inst, cd)) continue;   // Tokens/Artifact Creatures auf dem Brett sind Creatures
-      targets.push({ id: `equip-${ownerIdx}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: ownerIdx, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst });
+      targets.push(this.kreaturZiel(inst));
     }
     if (targets.length === 0) return;
 
@@ -17001,7 +17007,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (maxSize === undefined) {
       maxSize = 7;
       for (const inst of this.cardInstances) {
-        if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
+        // Z1 (A01-29): „Your max hand size" = KONTROLLEUR (Royal Corgi / Pollution Token), nicht Besitzer.
+        if (this.kontrolleurVon(inst) === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
           maxSize -= inst.counters.handLimitReduction || 0;
         }
       }
@@ -17131,7 +17138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._shouldBypassHandLimit(playerIdx)) return;
     let reduction = 0;
     for (const inst of this.cardInstances) {
-      if (inst.owner === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {
+      if (this.kontrolleurVon(inst) === playerIdx && inst.zone === ZONES.SUPPORT && this.isCardEffectActive(inst)) {   // Z1 (A01-29): Kontrolle
         reduction += inst.counters.handLimitReduction || 0;
       }
     }
@@ -19657,6 +19664,51 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Seite des Helden (`owner`), kontrolliert vom Beschwoerer.
     if (inst.counters?.crossSideControlled != null) return inst.owner;
     return inst.controller ?? inst.owner;
+  }
+
+  /**
+   * ★ Z1 (Welle 2) — DREI Begriffe, die nicht verwechselt werden duerfen:
+   *   • BRETTSEITE  `physicalSide(inst)`: in wessen `supportZones`-Array die Karte liegt.
+   *     Gehoert in Ziel-IDs (`equip-<Seite>-<Held>-<Slot>`), `target.owner`, Zonenzugriffe,
+   *     Animationen. Ziel-IDs sind NUR ueber (Brettseite, Held, Slot) eindeutig.
+   *   • KONTROLLEUR `kontrolleurVon(inst)` (= `controller ?? owner`): wer die Karte fuehrt —
+   *     „you control", „your opponent controls", Aktivierung, Gold/Karten/Prompts.
+   *   • BESITZER    `kartenBesitzerVon(inst)` (= `originalOwner ?? owner`): wessen Karte es ist —
+   *     Ablage, Deck, Hand-Rueckkehr.
+   * Eine gestohlene/seitenfremd beschworene Kreatur hat Brettseite ≠ Kontrolleur; `inst.owner` ist
+   * dort NICHT immer die Brettseite (Plant-Golem-Weg: nur `controller` zeigt auf die Brettseite).
+   * Wer eine Instanz aus Koordinaten aufloest, nimmt `kreaturAnBrett`, wer ein Ziel baut,
+   * `kreaturZiel` — nie `c.owner === x || c.controller === x` ohne Brettseiten-Test.
+   */
+  kontrolleurVon(inst) {
+    return inst ? (inst.controller ?? inst.owner) : -1;
+  }
+
+  kartenBesitzerVon(inst) {
+    return inst ? (inst.originalOwner ?? inst.owner) : -1;
+  }
+
+  /** Instanz in der Support Zone (`heroIdx`, `zoneSlot`) auf der BRETTSEITE `seite` — unabhaengig von Besitzer/Kontrolleur. */
+  kreaturAnBrett(seite, heroIdx, zoneSlot, name = null) {
+    return this.cardInstances.find(c =>
+      c.zone === ZONES.SUPPORT && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+      && this.physicalSide(c) === seite && (name == null || c.name === name)) || null;
+  }
+
+  /** „Seite" einer Zielwahl (`my` / `enemy` / `any`) fuer eine Kreatur: nach KONTROLLE, nicht nach Brettseite (Z1). */
+  kreaturPasstZurSeite(inst, side, pi) {
+    if (!inst || !side || side === 'any') return true;
+    const k = this.kontrolleurVon(inst);
+    return side === 'my' ? k === pi : k !== pi;
+  }
+
+  /** Standard-Zielobjekt einer Support-Karte: ID und `owner` nennen die BRETTSEITE (nie den Kontrolleur). */
+  kreaturZiel(inst) {
+    const seite = this.physicalSide(inst);
+    return {
+      id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: seite,
+      heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
+    };
   }
 
   /**
@@ -28246,6 +28298,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._aborted) return null;
     if (!validTargets || validTargets.length === 0) return [];
 
+    // Z1 (A03-26, A08-30, A01-34, H04-10 …): Ziel-IDs/`owner` der Support-Kreaturen auf die
+    // BRETTSEITE normieren — fuer MENSCH UND CPU. Karten, die ihre Liste selbst bauen, schreiben
+    // oft `equip-${inst.owner}-…`; bei einer seitenfremd beschworenen Kreatur (Plant Golem:
+    // owner = Beschwoerer, Brett = Gegenseite) kollidierte die ID mit der Kreatur der Gegenseite
+    // an gleicher (Held, Slot)-Stelle. Vorher lief diese Umschreibung erst NACH dem CPU-Zweig,
+    // sodass nur der Client sie sah (Rest der Begruendung: `normalizeValidTargets`, server.js).
+    for (const t of validTargets) {
+      if (t?.type !== 'equip') continue;
+      const inst = t.cardInstance;
+      if (!inst || inst.zone !== ZONES.SUPPORT) continue;
+      const physSide = this.physicalSide(inst);   // Styx 28.9.: inkl. seitenfremd beschworener
+      if (physSide === t.owner) continue;
+      t.owner = physSide;
+      t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
+    }
+
     // ★ v1375: Karten in den Ability Zones eines TEMPORAER gesteuerten
     // Helden sind von allen Effekten unberuehrt (Love-Shot-Errata, Charme 3
     // & Co.) — als Ziel ausgegraut.
@@ -28359,9 +28427,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_nurKreaturen) {
         for (const t of validTargets) {
           if (!t || t.type === 'hero' || t.ineligible) continue;
-          const inst = t.cardInstance || this.cardInstances.find(c =>
-            c.zone === 'support' && (c.controller ?? c.owner) === t.owner
-            && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+          const inst = t.cardInstance || this.kreaturAnBrett(t.owner, t.heroIdx, t.slotIdx);   // Z1: Brettseite
           if (this.isUnaffectedByCreatureOnly(inst, config.types)) t.ineligible = true;
         }
       }
@@ -28460,22 +28526,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ★ v1332: derselbe Abschluss wie beim Menschen (siehe
       // `_zielwahlAbschliessen`) — vorher kehrte dieser Zweig hier zurueck.
       return await this._zielwahlAbschliessen(playerIdx, validTargets, config, cpuPicked);
-    }
-    // Rewrite equip-target IDs to use the creature's PHYSICAL side
-    // before handing them to the client — see `normalizeValidTargets`
-    // (server.js) for the full rationale. Without this, a cross-side-
-    // placed Chilly Wizard renders on opp's slot but the prompt's
-    // target IDs still point at the caster's side, so the client's
-    // `t.owner === pi` highlight match silently fails. No-op for the
-    // common case where controller equals owner.
-    for (const t of validTargets) {
-      if (t?.type !== 'equip') continue;
-      const inst = t.cardInstance;
-      if (!inst) continue;
-      const physSide = this.physicalSide(inst);   // Styx 28.9.: inkl. seitenfremd beschworener
-      if (physSide === t.owner) continue;
-      t.owner = physSide;
-      t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
     }
     this.beginHumanWait();   // v848: Uhren der CPU anhalten
     const picked = await new Promise((resolve) => {
@@ -29148,8 +29198,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._turnEndImmuneCardOnSide(targetPi)) return true;
 
     if (!isTerror && !isOppSource) return false;
-    for (const hero of (ps.heroes || [])) {
+    // Z1 (H01-03): „You" / „your turn" = KONTROLLEUR des Helden — uebernommene Helden zaehlen fuer den
+    // Uebernehmenden (`heroesControlledBy`), nicht fuer den Spieler, in dessen Spalte sie stehen.
+    for (const { physOwner, heroIdx: hIdx, hero } of this.heroesControlledBy(targetPi)) {
       if (!hero?.name || hero.hp <= 0) continue;
+      // Heldeneffekte eines gefrorenen/betaeubten/negierten Helden sind still (H01-03a).
+      if (this._isHeroEffectSilenced(physOwner, hIdx)) continue;
       const script = this.heroScript(hero);
       if (!script) continue;
       if (isTerror && script.immuneToTerror) return true;
@@ -29165,7 +29219,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _turnEndImmuneCardOnSide(pi) {
     const ps = this.gs.players[pi];
     if (!ps) return false;
-    for (const hero of (ps.heroes || [])) {
+    for (const { hero } of this.heroesControlledBy(pi)) {   // Z1 (H01-03): nach Kontrolle
       if (!hero?.name || hero.hp <= 0) continue;
       if (this.heroScript(hero)?.immuneToAllTurnEnd) return true;
     }
@@ -29196,12 +29250,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   _hasActiveNomu(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // Z1 (H03-20): „you draw" = KONTROLLEUR des Helden (uebernommener Nomu wirkt fuer den Uebernehmenden).
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(playerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
       // Mummy Token silences hero passives (see runHooks filter + bug 7).
-      if (this._isHeroMummified(playerIdx, hi)) continue;
+      if (this._isHeroMummified(physOwner, hi)) continue;
       const script = this.heroScript(hero);
       if (script?.isNomuHero) return true;
     }
@@ -29254,8 +29308,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Turn-based bypass (Willy, etc.)
     if (ps._noHandLimitUntilTurn != null && (this.gs.turn || 1) <= ps._noHandLimitUntilTurn) return true;
     // Hero-based bypass (alive + not incapacitated)
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    for (const { hero } of this.heroesControlledBy(playerIdx)) {   // Z1 (H03-20): „You have no hand size limit" = Kontrolleur
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
       if (hero.bypassHandLimit) return true;
@@ -31056,8 +31109,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (this.borisBlockIdx(nm, playerIdx) >= 0) abilities.push(nm);
       }
     }
+    const _opp = this.opponentOf(playerIdx);
     return {
-      cards, abilities, heroIdx, owner: this.opponentOf(playerIdx),
+      cards, abilities, heroIdx,
+      owner: loadCardEffect('Boris, the Guardian of Blackport')?.borisHeroSeite?.(this, _opp) ?? _opp,   // Z1: Brettseite des Boris (uebernommen: evtl. meine Spalte)
       active: this.borisHidesOpponentSide(playerIdx),
     };
   }
@@ -40730,38 +40785,47 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * Get standardised target objects for all Creatures (by card type) in a player's support zones.
+   * Get standardised target objects for all Creatures (by card type) that `playerIdx` CONTROLS
+   * (Z1: nach Kontrolle, nicht nach Brettseite; ID/`owner` = Brettseite der Zone).
    * Excludes Equipment Artifacts, Tokens, attached Spells/Attacks, etc.
    * Returns [{ id, type:'equip', owner, heroIdx, slotIdx, cardName, cardInstance }]
    * @param {number} playerIdx
    */
   getCreatureTargets(playerIdx) {
-    const ps = this.gs.players[playerIdx];
     const cardDB = this._getCardDB();
     const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      // Iterate support zones regardless of host-Hero state.
-      // Creatures persist past their host Hero's death AND remain
-      // targetable while the slot's Hero is empty (e.g. left over
-      // by Quetzahuitl's mass-delete) — creatures are independent
-      // of their Hero.
-      for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
-        const slot = (ps.supportZones[hi] || [])[si] || [];
-        if (slot.length === 0) continue;
-        const inst = this.cardInstances.find(c =>
-          (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
-        );
-        const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
-        if (!cd || !this.isChoosableAsCreature(inst, cd)) continue; // v704: + choosableAsCreature
-        // Harte Unwaehlbarkeit (Thicket, v724): gar nicht erst in die
-        // Liste. Dieser Sammler speist die Targeting-Artefakte
-        // (Book of Doom, Dark Gear, Capture Net …), die sonst an den
-        // Filtern der Prompt-Sammler vorbeilaufen.
-        if (inst?.counters?.untargetable_all) continue;
-        targets.push({
-          id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
-          heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
-        });
+    // Z1 (F02-14, M01-20): „Kreaturen von `playerIdx`" = die er KONTROLLIERT (wie „you control" /
+    // „your opponent controls" im Kartentext), wo auch immer sie liegen. Ziel-ID und `owner` nennen
+    // die BRETTSEITE (eigene Zone zuerst, dann die uebrigen Bretter). Ohne diese Trennung loeste die
+    // (Held, Slot)-Suche „Besitzer ODER Kontrolleur" eine fremde Kreatur an gleicher Stelle auf.
+    const bretter = [playerIdx, ...this.gs.players.map((_, i) => i).filter(i => i !== playerIdx)];
+    for (const seite of bretter) {
+      const ps = this.gs.players[seite];
+      if (!ps) continue;
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        // Iterate support zones regardless of host-Hero state.
+        // Creatures persist past their host Hero's death AND remain
+        // targetable while the slot's Hero is empty (e.g. left over
+        // by Quetzahuitl's mass-delete) — creatures are independent
+        // of their Hero.
+        for (let si = 0; si < (ps.supportZones[hi] || []).length; si++) {
+          const slot = (ps.supportZones[hi] || [])[si] || [];
+          if (slot.length === 0) continue;
+          const inst = this.kreaturAnBrett(seite, hi, si);
+          // Eine Karte ohne Instanz gilt wie bisher als Kreatur der Zonenseite.
+          if (inst ? this.kontrolleurVon(inst) !== playerIdx : seite !== playerIdx) continue;
+          const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
+          if (!cd || !this.isChoosableAsCreature(inst, cd)) continue; // v704: + choosableAsCreature
+          // Harte Unwaehlbarkeit (Thicket, v724): gar nicht erst in die
+          // Liste. Dieser Sammler speist die Targeting-Artefakte
+          // (Book of Doom, Dark Gear, Capture Net …), die sonst an den
+          // Filtern der Prompt-Sammler vorbeilaufen.
+          if (inst?.counters?.untargetable_all) continue;
+          targets.push({
+            id: `equip-${seite}-${hi}-${si}`, type: 'equip', owner: seite,
+            heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
+          });
+        }
       }
     }
     return targets;
@@ -40977,9 +41041,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let si = 0; si < zonen.length; si++) {
         const slot = zonen[si] || [];
         if (slot.length === 0) continue;
-        const inst = this.cardInstances.find(c =>
-          (c.owner === playerIdx || c.controller === playerIdx)
-          && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si);
+        const inst = this.kreaturAnBrett(playerIdx, hi, si);   // Z1: Brettseite
         // Zaehlt hier als Ability -> KEIN Artifact-Ziel.
         if (this.countsAsAbilityInZone(slot[0], inst || { zone: 'support' })) continue;
         const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
@@ -42387,7 +42449,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Fuer einen gewoehnlichen Platz mit genau einer Kreatur ist
           // die Schleife wortgleich zum alten Verhalten.
           const slotInsts = this.cardInstances.filter(c =>
-            (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
+            this.physicalSide(c) === pi && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi   // Z1: Brettseite
           );
           if (slotInsts.length === 0) continue;
           for (const inst of slotInsts) {
@@ -42849,9 +42911,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const slot = (ps.supportZones[hi] || [])[zi] || [];
         if (slot.length === 0) continue;
         const cardName = slot[0];
-        const inst = this.cardInstances.find(c =>
-          (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
-        );
+        const inst = this.kreaturAnBrett(playerIdx, hi, zi);   // Z1: Brettseite
         if (!inst || inst.faceDown) continue;
 
         // ★ Geliehene Identitaet: eine Karte kann Ausruestung SEIN,
@@ -44263,7 +44323,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // damit pro-Held-Rabatte weiter am richtigen Helden greifen.
     const lvrPi = (typeof evalOpts.levelSourcePi === 'number')
       ? evalOpts.levelSourcePi : playerIdx;
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, lvrPi, heroIdx, evalOpts);
+    // Z1 (H03-07): `playerIdx` ist hier die BRETTSEITE des wirkenden Helden (`lvrPi` nur die Seite der
+    // Ermaessigungen). Die Seite geht mit, damit Je-Held-Senker den Wirker nicht allein ueber den Index
+    // `heroIdx` erkennen (ein uebernommener Held der Gegenspalte hat denselben Index wie der eigene).
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, lvrPi, heroIdx,
+      evalOpts.castHeroSide == null ? { ...evalOpts, castHeroSide: playerIdx } : evalOpts);
 
     const schools = [];
     if (cardData.spellSchool1) schools.push(cardData.spellSchool1);
@@ -44451,7 +44515,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // backwards-compatible. `evalOpts.pileSide` lets "in your hand"
         // reducers (Chaorc Ruin Mourner) skip deck / discard / deleted
         // evaluations so the reduction doesn't leak to a card in a pile.
-        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, heroIdx, evalOpts)) || 0;
+        // Z1 (H03-07): ein an einen Helden GEBUNDENER Senker (Held/Ausruestung/Ability) auf einer ANDEREN
+        // Brettseite als der des Wirkers gilt nie fuer „diesen Helden" — Index `-1` = kein Wirker-Treffer.
+        let _hIdx = heroIdx;
+        if (evalOpts.castHeroSide != null && inst.heroIdx >= 0
+            && (inst.zone === 'hero' || inst.zone === 'support' || inst.zone === 'ability')
+            && (inst.zone === 'support' ? this.physicalSide(inst) : inst.owner) !== evalOpts.castHeroSide) _hIdx = -1;
+        const r = Number(script.reduceCardLevel(cardData, this, playerIdx, inst, _hIdx, evalOpts)) || 0;
         if (r > 0) total += r;
       } catch { /* card threw — ignore, no reduction */ }
     }
@@ -46024,9 +46094,15 @@ this._deathWatch = (this._deathWatchStack || []).length
   collectAoeCreatureTargets(targetPlayers, config = {}, types = ['hero', 'creature']) {
     const cardDB = this._getCardDB();
     const out = [];
-    for (const tpi of targetPlayers) {
+    // Z1 (C01-05): `config.creatureBoardSide` = „alle Kreaturen in den Zonen EINER Brettseite"
+    // (Cavalry: „… Creatures in its Support Zones") — dann zaehlt die BRETTSEITE, nicht die Kontrolle.
+    const nachBrett = Number.isInteger(config.creatureBoardSide);
+    for (const tpi of (nachBrett ? [config.creatureBoardSide] : targetPlayers)) {
       for (const inst of this.cardInstances) {
-        if ((inst.owner !== tpi && inst.controller !== tpi) || inst.zone !== 'support') continue;
+        // Z1 (S01-09): „Seite" = KONTROLLE (wie bei den Helden, v718) — nicht „Besitzer ODER
+        // Kontrolleur": eine geliehene Kreatur zaehlte sonst zu BEIDEN Seiten (doppelt bei
+        // `side: 'both'`, getroffen von „all targets your opponent controls" des Kontrolleurs).
+        if ((nachBrett ? this.physicalSide(inst) : this.kontrolleurVon(inst)) !== tpi || inst.zone !== 'support') continue;
         if (inst.faceDown) continue; // Face-down surprises are immune to AOE
         const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
         if (!cd || !(hasCardType(cd, 'Creature')
@@ -47695,7 +47771,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // etc.) can attribute the death to the correct side — a cross-side
     // placed Chilly Wizard dying counts as the CONTROLLER's creature,
     // not the original owner's.
-    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
+    const deathInfo = { name: e.inst.name, owner: e.inst.owner, originalOwner: e.inst.originalOwner, controller: e.inst.controller ?? e.inst.owner, seite: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot, instId: e.inst.id, level: this.kreaturLevelJetzt(e.inst), todStapel: (typeof e.inst.counters?._dyingThisBatch === 'number') ? e.inst.counters._dyingThisBatch : null };   // v1334: level; todStapel: Schadens-Stapel, in dem sie stirbt
     // If this creature contributed to hand-size math (e.g. Royal Corgi's
     // -3 bonus, or a hypothetical reducer-creature), flag the owner for a
     // hand-limit recheck once the batch settles.

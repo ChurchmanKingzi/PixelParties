@@ -67,7 +67,7 @@ module.exports = {
     // „by an opponent's card or effect\" — die Quelle muss der
     // Gegenseite gehoeren. Eigener Rueckstoss und eigenes Gift
     // zaehlen nicht.
-    const quellSeite = source?.owner ?? source?.controller;
+    const quellSeite = source?.controller ?? source?.owner;   // Z1 (A08-21): Kontrolle, nicht Besitzer/Brettseite (gestohlene Kreatur)
     if (!Number.isInteger(quellSeite) || quellSeite === ownerIdx) return false;
 
     // „a Hero you control\" — nach Kontrolle, nicht nach Spalte.

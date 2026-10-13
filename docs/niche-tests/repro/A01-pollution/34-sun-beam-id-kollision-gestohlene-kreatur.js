@@ -12,10 +12,14 @@ const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
   const t = await H.fresh({ hand: [['Sun Beam'], []] });
-  const stolen = t.put(1, 0, 0, 'Royal Corgi');
-  await t.run(() => t.engine.actionStealCreature(0, stolen));
-  const own = t.put(1, stolen.heroIdx, stolen.zoneSlot, H.INERT.creature);
-  R.check('Aufbau: Corgi gestohlen, gleiche (Held, Slot)-Stelle wie die eigene Dummy', stolen.controller === 0 && stolen.heroIdx === own.heroIdx && stolen.zoneSlot === own.zoneSlot,
+  // Repro-Korrektur (Z1): `actionStealCreature` bewegt die Karte NICHT (Brettseite = Besitzer, owner 1) - die „gleiche (Held, Slot)-Stelle" war dort dieselbe
+  // physische Zone. Eine echte Kollision entsteht bei seitenfremd gelegten Karten, deren `owner` NICHT die Brettseite ist (Plant-Golem-Weg: owner = Beschwoerer 0,
+  // controller = Brettseite 1). Sitz 0 hat zudem eine eigene Dummy an derselben (Held, Slot)-Stelle SEINES Bretts.
+  const stolen = t.put(1, 0, 1, 'Royal Corgi');
+  stolen.owner = 0; stolen.controller = 0; stolen.originalOwner = 0;
+  stolen.controller = 1;
+  const own = t.put(0, stolen.heroIdx, stolen.zoneSlot, H.INERT.creature);
+  R.check('Aufbau: Corgi liegt auf Sitz 1s Brett (owner 0 / controller 1), eigene Dummy an gleicher (Held, Slot)-Stelle auf Sitz 0s Brett', t.engine.physicalSide(stolen) === 1 && stolen.owner === 0 && stolen.heroIdx === own.heroIdx && stolen.zoneSlot === own.zoneSlot,
     { stolen: [stolen.owner, stolen.controller, stolen.heroIdx, stolen.zoneSlot], own: [own.owner, own.heroIdx, own.zoneSlot] });
   let angebote = [];
   t.targetFn = (v) => { angebote = v.filter(y => y.type === 'equip').map(y => y.id + '=' + y.cardName); return [v.find(y => y.cardName === H.INERT.creature).id]; };
@@ -23,7 +27,7 @@ const H = require('../../lib/h.js');
   const ids = angebote.map(s => s.split('=')[0]);
   R.check('die beiden Karten haben verschiedene Ziel-IDs', new Set(ids).size === ids.length, angebote);
   R.check('die gewählte Dummy wurde zerstört', !t.find(H.INERT.creature, 'support'), { dummyDa: !!t.find(H.INERT.creature, 'support') });
-  R.check('die gestohlene Corgi blieb unberührt', !!t.find('Royal Corgi', 'support'), { corgiDa: !!t.find('Royal Corgi', 'support') });
+  R.check('die seitenfremde Corgi blieb unberührt', !!t.find('Royal Corgi', 'support'), { corgiDa: !!t.find('Royal Corgi', 'support') });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

@@ -114,7 +114,8 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ich = ctx.card;
-    const pi = engine.physicalSide(ich) ?? ctx.cardOwner;
+    const pi = ctx.cardOwner;                    // Z1 (C03-02): fragen/entscheiden darf der KONTROLLEUR (bei Diebstahl nicht der Besitzer)
+    const seite = engine.physicalSide(ich) ?? pi;   // Bild auf die BRETTSEITE
     const cd = engine.getEffectiveCardData(ich) || engine._getCardDB()[CARD_NAME];
     const aktuell = cd?.level || 0;
 
@@ -140,7 +141,7 @@ module.exports = {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'board',
     });
     engine._broadcastEvent('play_zone_animation', {
-      type: 'modifier_sparkle', owner: pi, heroIdx: ich.heroIdx, zoneSlot: ich.zoneSlot,
+      type: 'modifier_sparkle', owner: seite, heroIdx: ich.heroIdx, zoneSlot: ich.zoneSlot,
     });
     engine.sync();
     return true;

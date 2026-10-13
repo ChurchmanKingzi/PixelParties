@@ -66,10 +66,24 @@ const ALICE_NAME = 'Alice, the Transfer Student';
 function sharingActive(gs, pi) {
   const ps = gs?.players?.[pi];
   if (!ps) return false;
-  if (ps._aliceShareActive) return true;
-  const imTeam = (ps.heroes || []).some(h => h?.name === ALICE_NAME);
-  if (imTeam) { ps._aliceShareActive = true; return true; }
-  return false;
+  // Z1 (H01-15): „a Hero YOU control" = KONTROLLE (wie `heroSideOf`: charmedBy ?? permaControlBy ?? Spalte),
+  // nicht die Spalte. Ein Spieler, der Alice kontrolliert, teilt (ohne den dauerhaften Schalter zu setzen —
+  // die Kontrolle kann zurueckfallen); steht Alice noch auf dem Brett, wird aber von einem ANDEREN gefuehrt,
+  // teilt der alte Besitzer nicht mehr. Ist sie ganz vom Brett, entscheidet wie bisher der Schalter.
+  let aliceBeiAnderen = false;
+  for (let seite = 0; seite < (gs.players || []).length; seite++) {
+    for (const h of (gs.players[seite]?.heroes || [])) {
+      if (h?.name !== ALICE_NAME) continue;
+      const kontrolleur = h.charmedBy ?? h.permaControlBy ?? seite;
+      if (kontrolleur === pi) {
+        if (seite === pi) ps._aliceShareActive = true;   // eigene Spalte: Schalter wie bisher
+        return true;
+      }
+      aliceBeiAnderen = true;
+    }
+  }
+  if (aliceBeiAnderen) return false;
+  return !!ps._aliceShareActive;
 }
 
 /**

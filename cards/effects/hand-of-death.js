@@ -275,11 +275,7 @@ module.exports = {
         }
       } else {
         // 'equip' / 'creature' — a Creature in a Support Zone.
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          (c.owner === target.owner || c.controller === target.owner)
-          && c.zone === 'support' && c.heroIdx === target.heroIdx
-          && c.zoneSlot === target.slotIdx,
-        );
+        const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
         if (inst && inst.zone === 'support') {
           // ── Strike animation on the Creature's slot ──
           engine._broadcastEvent('play_zone_animation', {

@@ -57,7 +57,15 @@ module.exports = {
   canPlayCard(gs, pi, heroIdx, cardData, engine, herkunft) {
     const typ = cardData?.cardType;
     if (typ !== 'Attack' && typ !== 'Spell') return true;
-    const ps = gs.players[pi];
+    // Z1 (H03-22): „the player" = KONTROLLEUR. Die Engine ruft mit der BRETTSEITE (`pi`) oder dem
+    // Kontrolleur; die Hand gehoert immer dem Kontrolleur des Helden (Muster Saint Nicolas `heldUndHand`).
+    let hero = gs.players[pi]?.heroes?.[heroIdx];
+    if (hero?.name !== CARD_NAME) {
+      const fremd = (gs.players || []).map(p => p?.heroes?.[heroIdx])
+        .find(h => h?.name === CARD_NAME && h.charmedBy === pi);
+      if (fremd) hero = fremd;
+    }
+    const ps = gs.players[hero?.charmedBy ?? hero?.permaControlBy ?? pi];
     if (!ps) return true;
     // Z6 (H03-13): ein NEGIERTER Santa wirkt nicht - sein "must"-Preis entfaellt (der Hook ist stillgelegt), also darf auch die
     // Spielbarkeits-Sperre nicht greifen (Saint Nicolas macht es ebenso).

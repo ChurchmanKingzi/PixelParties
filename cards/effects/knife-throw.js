@@ -77,7 +77,8 @@ module.exports = {
     if (!ps) return false;
     if ((ps.attacksPlayedThisTurn || 0) > 0) return false;   // „the only Attack\"
     if (ps._soleAttackTurn === gs.turn) return false;
-    return ausruestungAm(engine, pi, heroIdx).length > 0;
+    // Z1 (M01-26): "equipped to the user" - Brettseite des Nutzers (geliehener Held), nicht der gleich indizierte eigene.
+    return ausruestungAm(engine, engine.heldSeiteFuer(pi, heroIdx), heroIdx).length > 0;
   },
 
   cpuMeta: {

@@ -58,7 +58,7 @@ module.exports = {
   // „Artifacts equipped to the user" — ohne eins geht die Karte nicht.
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return equipsAm(engine, pi, heroIdx).length > 0;
+    return equipsAm(engine, engine.heldSeiteFuer(pi, heroIdx), heroIdx).length > 0;   // Z1 (M01-26): Brettseite des Nutzers
   },
 
   hooks: {

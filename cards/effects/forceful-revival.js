@@ -81,11 +81,12 @@ module.exports = {
     if (!ps) return false;
     // Need at least one alive own hero with a free support slot AND a
     // candidate creature in discard at that hero's Fighting level.
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    // Z1 (M01-26): auch geliehene Helden (Charme, Love Shot ...) sind "Nutzer" - Zonen/Fighting auf ihrer Brettseite.
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
-      if (!_userHasFreeSupportSlot(ps, hi)) continue;
-      const lvl = _fightingLevel(engine, ps, hi);
+      const hps = gs.players[physOwner] || ps;
+      if (!_userHasFreeSupportSlot(hps, hi)) continue;
+      const lvl = _fightingLevel(engine, hps, hi);
       if (_eligibleCreatureNames(engine, ps, lvl, pi).length > 0) return true;
     }
     return false;
@@ -96,8 +97,10 @@ module.exports = {
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (!_userHasFreeSupportSlot(ps, heroIdx)) return false;
-    const lvl = _fightingLevel(engine, ps, heroIdx);
+    // Z1 (M01-26): Zonen und Fighting-Stufe des NUTZERS = Brettseite (geliehener Held); Ablage bleibt beim Kontrolleur.
+    const hps = gs.players[engine.heldSeiteFuer(pi, heroIdx)] || ps;
+    if (!_userHasFreeSupportSlot(hps, heroIdx)) return false;
+    const lvl = _fightingLevel(engine, hps, heroIdx);
     return _eligibleCreatureNames(engine, ps, lvl, pi).length > 0;
   },
 

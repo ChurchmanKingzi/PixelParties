@@ -85,9 +85,18 @@ function destinationsFor(engine, pi, inst) {
   return out;
 }
 
+/**
+ * Z1 (A02-07): „Creatures they control" UND „adjacent Heroes they also control" — eine geliehene
+ * Kreatur (Succubus & Co.) steht in der Zone eines GEGNERISCHEN Helden; ihre Nachbarn gehoeren
+ * nicht dem Aktivierenden. Es zaehlen nur Kreaturen auf der eigenen BRETTSEITE.
+ */
+function beweglicheKreaturen(engine, pi) {
+  return ownSupportCreatures(engine, pi).filter(inst => engine.physicalSide(inst) === pi);
+}
+
 /** True when at least one own Creature has at least one legal destination. */
 function hasAnyLegalMove(engine, pi) {
-  for (const inst of ownSupportCreatures(engine, pi)) {
+  for (const inst of beweglicheKreaturen(engine, pi)) {
     // Diver Helmet: Creatures in the equipped Hero's Support Zones are
     // unaffected by Areas — Slippery Ice can't move them.
     if (isAreaImmuneInst(engine, inst)) continue;
@@ -208,7 +217,7 @@ module.exports = {
     if (engine.isCpuPlayer(activator)) {
       const collectIce = () => {
         const out = [];
-        for (const inst of ownSupportCreatures(engine, activator)) {
+        for (const inst of beweglicheKreaturen(engine, activator)) {
           if (movedInstIds.has(inst.id)) continue;
           if (isAreaImmuneInst(engine, inst)) continue;
           const dests = destinationsFor(engine, activator, inst);
@@ -232,7 +241,7 @@ module.exports = {
 
     while (true) {
       // Re-collect each iteration — previous moves change the board.
-      const candidates = ownSupportCreatures(engine, activator).filter(inst => {
+      const candidates = beweglicheKreaturen(engine, activator).filter(inst => {
         if (movedInstIds.has(inst.id)) return false;
         // Diver Helmet: protected Creatures are unaffected by Areas.
         if (isAreaImmuneInst(engine, inst)) return false;

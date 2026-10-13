@@ -4535,21 +4535,14 @@ playerProfile.registerPlayerProfileRoutes(app, {
  */
 function checkPotionLock(ps, gs, pi) {
   ps.potionsUsedThisTurn = (ps.potionsUsedThisTurn || 0) + 1;
-  // Check own heroes
-  for (const hero of (ps.heroes || [])) {
-    if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
-    const heroScript = heroScriptOf(hero);
-    if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
-      ps.potionLocked = true;
-      return;
-    }
-  }
-  // Check charmed opponent heroes controlled by this player
-  if (gs && pi != null) {
-    const oi = opponentOfGs(gs, pi);
-    for (const hero of (gs.players[oi]?.heroes || [])) {
+  // Z1 (H03-21): „After YOU have played …" = KONTROLLEUR des Helden (wie `heroSideOf`/`heroesControlledBy`):
+  // alle Helden, die `pi` fuehrt — eigene Spalte ohne die abgegebenen plus uebernommene der Gegenspalte.
+  const spieler = (gs && gs.players) || [ps];
+  for (let seite = 0; seite < spieler.length; seite++) {
+    for (const hero of (spieler[seite]?.heroes || [])) {
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
-      if (hero.charmedBy !== pi) continue;
+      const kontrolleur = hero.charmedBy ?? hero.permaControlBy ?? seite;
+      if (gs && pi != null ? kontrolleur !== pi : seite !== 0) continue;
       const heroScript = heroScriptOf(hero);
       if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
         ps.potionLocked = true;
@@ -4693,7 +4686,7 @@ function sendGameState(room, playerIdx, extra) {
       // die ganze Drop-/Klick-Logik lief ins Leere.
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
-      sharesSupportZones: !!ps._aliceShareActive,
+      sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, pi),   // Z1: nach Kontrolle (H01-15)
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, pi),
@@ -5946,7 +5939,7 @@ function sendSpectatorGameState(room) {
       // die ganze Drop-/Klick-Logik lief ins Leere.
       // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
       // Alices Tod.
-      sharesSupportZones: !!ps._aliceShareActive,
+      sharesSupportZones: require('./cards/effects/_alice-shared').sharingActive(gs, spi),   // Z1: nach Kontrolle (H01-15)
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
       verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
@@ -8399,7 +8392,17 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
     // post-resolution _firePendingCardReveal below then no-ops.
     room.engine.maybeFireCpuRevealEarly();
-    if (!_gefizzelt) await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+    // Z1 (R02-21): Wirker-Seite auch um den onPlay-Lauf stempeln (vorher nur um die Kette) - sonst liest
+    // `effectiveSchoolLevelForCaster` (ohne 4. Argument) die Zonen des gleich indizierten EIGENEN Helden.
+    if (!_gefizzelt) {
+      const _wirkerHook = gs._wirkerSeite;
+      gs._wirkerSeite = { pi, heroIdx, heroOwner };
+      try {
+        await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+      } finally {
+        if (_wirkerHook === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerHook;
+      }
+    }
     delete gs._attachmentZoneSlot;
     delete gs._attachmentHeroIdx;
     delete gs._attachmentOwner;
@@ -9018,8 +9021,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // ohne die Angabe traefe das `find(...)` immer nur die unterste Kopie.
   // Die ID wird gegen den Platz geprueft, damit ein manipulierter Aufruf
   // nicht irgendeine fremde Instanz aktiviert.
+  // Z1: `heroOwner` ist die BRETTSEITE des Platzes - nicht "Besitzer ODER Kontrolleur" (sonst trifft eine von
+  // `heroOwner` gestohlene Fremdkreatur gleicher (Held, Slot)-Koordinate).
   const slotInsts = room.engine.cardInstances.filter(c =>
-    (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    room.engine.physicalSide(c) === heroOwner && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   const inst = instId != null
     ? slotInsts.find(c => c.id === instId)
@@ -11147,7 +11152,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   // Zweig fand der Server die Karte nicht und der Klick verpuffte
   // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
   const inst = _crossInst || room.engine.cardInstances.find(c =>
-    (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    room.engine.physicalSide(c) === pi && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
   );
   if (!inst) return false;
 
