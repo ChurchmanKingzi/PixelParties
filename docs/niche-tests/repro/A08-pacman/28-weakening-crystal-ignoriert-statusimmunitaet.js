@@ -5,7 +5,7 @@
 // Aufbau: Sitz 0 hält Weakening Crystal; Held 0 trägt Petrification Break (Engine erkennt den Schutz: `heroHasStatusImmunityAttachment(0,0)` = true; Frost wird abgewehrt).
 //   Die Kristall-Anlage läuft wie beim Eintritt in die Hand (`_refreshWeakeningCrystalNegation({ reapply: true })`).
 // Erwartung: Held 0 bleibt unbeeinflusst (die Negation zählt als negativer Status, Petrification Break schützt), Held 1 und 2 sind negiert.
-// Beobachtet: Alle drei Helden tragen `negated`, auch der Träger von Petrification Break. Ursache: `_crystals-shared.js` ~Z. 132 schreibt `hero.statuses.negated = {…}` direkt, statt über `addHeroStatus`
+// Beobachtet: Alle drei Helden tragen `negated`, auch der Träger von Petrification Break. Ursache: `_crystals-shared.js` ~Z. 130 schreibt `hero.statuses.negated = {…}` direkt, statt über `addHeroStatus`
 //   (dort stehen die Immunitäten: `status_immunity_attachment` `_engine.js` ~44835, Johanna, Submerged, Karian …).
 // Aufruf: node docs/niche-tests/repro/A08-pacman/28-weakening-crystal-ignoriert-statusimmunitaet.js   (✗ = Fehler tritt auf)
 const H = require('../../lib/h.js');

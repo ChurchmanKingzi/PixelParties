@@ -236,6 +236,14 @@ Stand/Autor: Agent A08-pacman, 12.10.2026. Karten: 38 in der Liste · (wird am E
 - **Repro:** `docs/niche-tests/repro/A08-pacman/27-rusting-crystal-zweite-kopie.js` (✗ = Lesart „Kopie ist ein anderes Artefakt" verletzt)
 - **Frage an Al:** Soll bei zwei Rusting Crystal auf der Hand jede Kopie als „anderes Artefakt" der anderen gelten (Kosten 30) – ja oder nein (Kosten bleiben 15)?
 
+### A08-28 · Weakening Crystal: „counts as a negative status effect", wird aber an Petrification Break vorbei angelegt · Stufe B
+- **Karten:** Weakening Crystal (`_crystals-shared.js refreshWeakeningCrystalNegation`), Petrification Break (Anhängsel, Flag `immuneToNegativeStatuses`)
+- **Voraussetzungen / Aufbau:** Sitz 0 hält den Kristall; Held 0 trägt Petrification Break (`heroHasStatusImmunityAttachment` = true, Frost wird abgewehrt ✓). Kristall-Anlage wie beim Eintritt in die Hand (`reapply: true`).
+- **Erwartet** (Kristall: „…the effects of all your Heroes are negated. This counts as a negative status effect."; Petrification Break: „…it cannot be affected by negative status effects"): Held 0 bleibt unnegiert, Held 1/2 sind negiert.
+- **Beobachtet:** Alle drei Helden tragen die Negation, auch der Träger von Petrification Break.
+- **Repro:** `docs/niche-tests/repro/A08-pacman/28-weakening-crystal-ignoriert-statusimmunitaet.js` (✗ = Fehler tritt auf)
+- **Vermutete Ursache:** `_crystals-shared.js` ~Z. 130 schreibt `hero.statuses.negated = { … }` direkt statt über `addHeroStatus`, wo die Immunitäten stehen (`status_immunity_attachment` `_engine.js` ~44835, Johanna, Submerged, Karian …). Restunsicherheit (daher B): Ob die Immunität einen *dauerhaften Zustand* der Handkarte verhindern soll, ist nicht ausdrücklich entschieden – der Zusatz „counts as a negative status effect" spricht dafür.
+
 ## Abdeckung
 | Karte | Tiefe | Geprüfte Nischenfälle / Anmerkung |
 |---|---|---|
