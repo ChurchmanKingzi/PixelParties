@@ -11569,10 +11569,20 @@ Einmal-Slot unverbraucht, aber **bereits gezahlte Kosten bleiben bezahlt**; Kost
 Kappa Sword Slash; Tanuki Escape hat keine Zielwahl) entfällt; die Reihenfolge der Ziele in `onPlay` bleibt, aber die erste Zielwahl ist
 nach der Zahlung nicht mehr abbrechbar. Tengu Windstorm zahlt nichts, wenn kein legales Brettziel existiert.
 
-*Bewusst NICHT umgestellt (Frage an Al):* Karten mit **freiwilligem** Alternativ-Preis („You may sacrifice … to summon this Creature as an
-additional Action": Archer/Guardian/Warrior of Teocuilatl, Suspicious Monster; Deepsea-Tausch „add a Deepsea Creature … to place this
-Creature") — dort ist Opfer und Platzierung ein untrennbarer Tausch (`sacrificeSummonIntoSlot`); außerdem Angry Cheese / Sickly Cheese
-(Schaden/Gift als Kosten), Temple of Sacrifice, Basketskull (Doom Counter).
+*Tausch-Kreaturen (Al, Nachtrag Welle 4: „auch wenn zB ein Deep-sea negiert wird, soll das ursprüngliche auf der Hand landen und das neue
+negiert sein"):* der Bewohner des Tausches ist der Kostenpunkt. Deepsea-Kreaturen (`tryBouncePlace`, Haken `tryBouncePlace.paySummonCost =
+payBouncePlace` — die Engine sucht `paySummonCost` auch an der `beforeSummon`-Funktion), Archer/Guardian/Warrior of Teocuilatl
+(`T.paySacrificeSwap` / `T.placeAfterSacrificeSwap` in `_teocuilatl-shared.js`) und Suspicious Monster geben den Bewohner VOR dem Fenster
+zurück auf die Hand bzw. opfern ihn (Ablage, Todes-Signale) und HALTEN den frei gewordenen Platz (`engine.haltePlatzFuerTausch` /
+`isSwapSlotHeld`; `isSlotReservedForSummon` kennt ihn, Chaorc Corpse Cannibal prüft ihn — der frühere atomare Tausch schützte den Platz
+sonst). `beforeSummon` landet die neue Kreatur erst nach dem Fenster (ist der Platz trotzdem belegt: anderer freier Platz desselben Helden,
+sonst Abbruch — Karte bleibt auf der Hand, Kosten bezahlt). Wird die Beschwörung negiert: Bewohner geopfert bzw. auf der Hand, neue
+Kreatur nicht im Spiel. Der alte atomare Tausch (`sacrificeSummonIntoSlot`, `sacrificeSwapAtomar`, `tryBouncePlace` ohne `_summonKosten`)
+bleibt für Wege ohne `paySummonCost` bestehen. Archer/Guardian/Warrior zahlen außerdem den freien Opfer-Weg („Zusatzaktion", Opferwahl)
+vorab.
+*Artefakte Angry Cheese / Sickly Cheese (Al, Nachtrag):* 100 Schaden bzw. 1 Gift am eigenen Helden sind Kosten (`payArtifactCost`), bei
+Ganz-Negierung bleiben sie bezahlt, die Suche entfällt.
+*Bewusst NICHT umgestellt:* Temple of Sacrifice (optionales Opfer), Basketskull (Doom Counter).
 
 *Tharxian Horse (Antwort i):* ist so, wie von Al gewollt — beliebig viele Kopien dürfen gesetzt werden (auch nach der ersten Aktivierung),
 keine löst nach der ersten nicht negierten Aktivierung noch einmal aus. Repro `W4-kosten/I1`.
