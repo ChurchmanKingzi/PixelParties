@@ -34862,7 +34862,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Lv0 creatures without a school requirement can still land on them.
     // v1114: die LEICHTE Negation blendet die Abilities NICHT aus.
     const nStat = hero.statuses?.negated;
-    const hartNegiert = !!nStat && !(nStat._byWeakeningCrystal || nStat._fromAttachment);
+    const hartNegiert = !!nStat && (!(nStat._byWeakeningCrystal || nStat._fromAttachment) || !!nStat.abilitiesNegated);   // S1: Stowaway = harte Form
     const abZones = hartNegiert ? [] : (playerData.abilityZones?.[heroIdx] || []);
     // Spiegel von `countAbilitiesForSchool` in _engine.js — INKLUSIVE
     // der Joker-Regel: eine Ability mit `isWildcardAbility` (Performance)
@@ -49950,7 +49950,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const _abZoneSide = isOpp ? oppIdx : myIdx;
           const _chillyDogLiftsAbZone = !!(gameState.chillyDogActiveSides || [])[_abZoneSide];
           const isFrozenOrStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed)
-            || (hero?.statuses?.frozen && !_chillyDogLiftsAbZone);
+            || (hero?.statuses?.frozen && !_chillyDogLiftsAbZone)
+            || !!hero?.statuses?.negated?.abilitiesNegated;   // S1: Stowaway negiert die Abilities des Wirts -> Zonen ausgegraut
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {

@@ -7800,7 +7800,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         badges.push({
           key: 'negated', icon: '🚫',
           tooltip: `Negated (${kartenQuelle}): Has its effect negated. `
-            + `Abilities still work. Lasts as long as ${kartenQuelle} remains ${wo}.`,
+            + (s.negated?.abilitiesNegated ? 'Its Abilities are negated as well. ' : 'Abilities still work. ')
+            + `Lasts as long as ${kartenQuelle} remains ${wo}.`,
         });
       } else {
       const quelle = s.negated?.sourceBound ? s.negated.source : c.negatedSourceBound;

@@ -3278,9 +3278,14 @@ class GameEngine {
         const _istHeldenTraeger = c.zone === 'support'
           && (c.counters?.treatAsEquip || c.counters?._gainedEffectOnly)
           && this._getCardDB()[c.name]?.cardType === 'Hero';
-        if ((c.zone === 'hero' || c.zone === 'ability' || _istHeldenTraeger)
+        // ★ S1 (Al, zwei getrennte Zustaende): Heldeneffekt-Hooks stumm bei „effect negated" (jedes `negated`),
+        // Passiv-Hooks der ABILITY-Karten nur bei „abilities negated" (`_isHeroAbilityPassiveSilenced`).
+        if ((c.zone === 'hero' || _istHeldenTraeger)
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
+        if (c.zone === 'ability'
+            && !loadCardEffect(c.name)?.bypassStatusFilter
+            && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
       // `bypassStatusFilter` on the card's script lets the listener fire
@@ -6709,12 +6714,48 @@ class GameEngine {
   }
 
   /**
+   * ★ S1 — Passiv-Hooks der Ability-Karten eines Helden stumm? Wie `_isHeroEffectSilenced` (Stun/Frost/Mumie),
+   * nur `negated` zaehlt hier erst als „abilities negated": die HARTE Form (Standard, v1114) oder die
+   * Anhaengsel-Marke `abilitiesNegated` (Stowaway). Die LEICHTE Form (Decisive Defeat, Weakening Crystal:
+   * nur der Heldeneffekt) laesst die Abilities laufen.
+   */
+  _isHeroAbilityPassiveSilenced(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    if (hero.statuses?.stunned || hero.statuses?.webbed) return true;
+    if (hero.statuses?.frozen && !this._isChillyDogActiveFor(pi)) return true;
+    const ng = hero.statuses?.negated;
+    if (ng && (!(ng._byWeakeningCrystal || ng._fromAttachment) || this.heroAbilitiesNegated(pi, heroIdx))) return true;
+    if (this._isHeroMummified(pi, heroIdx)) return true;
+    return false;
+  }
+
+  /**
+   * ★ S1 (C05-10) — HARTE Anhaengsel-Negierung: „The corresponding Hero's effect AND Abilities are negated"
+   * (Stowaway). Die Abilities des Helden zaehlen nicht mehr: keine Schulstufen (Level-Pruefung,
+   * Weisheitskosten, Skalierung), keine Aktivierung. Der Held bleibt sonst handlungsfaehig
+   * (`isHeroIncapacitated` kennt nur die LEICHTE Form, Lv-0-Karten ohne Schule bleiben spielbar).
+   * Der Status ist der normale heilbare `negated` mit `_fromAttachment`; die Marke `abilitiesNegated`
+   * (oder der Kartenvertrag `negatesAllHostAbilities` der Quelle) macht ihn hart. Decisive Defeat
+   * traegt beides nicht und bleibt bei der leichten Form „nur Heldeneffekt".
+   */
+  heroAbilitiesNegated(pi, heroIdx) {
+    const st = this.gs.players[pi]?.heroes?.[heroIdx]?.statuses?.negated;
+    if (!st) return false;
+    if (st.abilitiesNegated) return true;
+    const quelle = st._fromAttachment;
+    return !!quelle && !!loadCardEffect(quelle)?.negatesAllHostAbilities;
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
    */
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
+    // S1 (C05-10): Stowaway negiert ALLE Abilities des Wirts (`heroAbilitiesNegated`).
+    if (this.heroAbilitiesNegated(pi, heroIdx)) return true;
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT) continue;
       if (inst.heroIdx !== heroIdx || inst.owner !== pi) continue;
@@ -43725,6 +43766,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
+    // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
+    if (this.heroAbilitiesNegated(playerIdx, heroIdx)) return [[]];
     // v767: Support-Zonen-Abilities (Xal) zaehlen wie echte
     // Ability-Zonen. Sie hier anzuhaengen genuegt fuer den GANZEN
     // Level-Vertrag — `heroMeetsLevelReq` prueft ausschliesslich ueber
@@ -43879,6 +43922,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       seite = (w && w.pi === pi && w.heroIdx === heroIdx) ? w.heroOwner : pi;
     }
     const ps = this.gs.players[seite];
+    if (this.heroAbilitiesNegated(seite, heroIdx)) return 0;   // S1 (C05-10): Abilities negiert (Stowaway)
     const abZones = [
       ...(ps?.abilityZones?.[heroIdx] || []),
       ...this.heroSupportAbilityStacks(seite, heroIdx),   // v767 (Xal)

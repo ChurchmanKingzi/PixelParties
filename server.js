@@ -9592,6 +9592,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  if (room.engine.heroAbilitiesNegated?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -10438,6 +10439,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
+  if (room.engine.heroAbilitiesNegated?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
   // NICHT ueber validateActionPlay — Charme (Lv2 stiehlt eine Handkarte)
@@ -16422,7 +16424,8 @@ io.on('connection', (socket) => {
       if (!hero?.name || hero.hp <= 0) continue;
       if (statusName && !hero.statuses?.[statusName]) {
         if (!hero.statuses) hero.statuses = {};
-        hero.statuses[statusName] = { appliedTurn: 0, permanent: true, _fromAttachment: inst.name };
+        hero.statuses[statusName] = { appliedTurn: 0, permanent: true, _fromAttachment: inst.name,
+          ...(scr?.negatesAllHostAbilities ? { abilitiesNegated: true } : {}) };   // S1: Stowaway = harte Form
         room.engine.log('puzzle_attachment_status', {
           hero: hero.name, status: statusName, by: inst.name,
         });

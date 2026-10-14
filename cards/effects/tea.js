@@ -363,7 +363,10 @@ module.exports = {
       } else if (ok) {
         // Der Status am neuen Traeger gehoert jetzt dieser Karte.
         const neuHero = engine.gs.players[secondTarget.owner]?.heroes?.[secondTarget.heroIdx];
-        if (neuHero?.statuses?.[key]) neuHero.statuses[key]._fromAttachment = inst.name;
+        if (neuHero?.statuses?.[key]) {
+          neuHero.statuses[key]._fromAttachment = inst.name;
+          if (require('./_loader').loadCardEffect(inst.name)?.negatesAllHostAbilities) neuHero.statuses[key].abilitiesNegated = true;   // S1: Stowaway bleibt hart
+        }
       }
     }
 
