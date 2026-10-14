@@ -64,7 +64,8 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
     // D1 (H02-22): der Zug ist der einzige Nutzen (die Folgesperre ist nur sein Nachteil) - unter Hand-/Zieh-Sperre nicht aktivierbar.
-    if (drawBlockedFor(ctx._engine, ctx.cardOwner)) return false;
+    // W5b-Z4 (Al, Welle 5): gegen Tuscan Artist nur gesperrt, wenn genau 2 oder 3 Karten zu ziehen wären.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, 7 - (ps.hand || []).length)) return false;
     return (ps.hand || []).length < 7;
   },
 

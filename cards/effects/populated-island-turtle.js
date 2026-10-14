@@ -76,7 +76,7 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
+    if (drawBlockedFor(engine, ctx.cardOwner, HAND_TARGET - (ps.hand?.length || 0))) return false;   // W5b-Z4: Tuscan Artist nur bei genau 2/3; D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
     return (ps.hand?.length || 0) < HAND_TARGET;
   },
 

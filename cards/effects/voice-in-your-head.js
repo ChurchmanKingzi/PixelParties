@@ -84,7 +84,8 @@ module.exports = {
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (drawBlockedFor(engine, pi)) return false;   // D1 (S03-24): reiner Zug - Hand-/Zieh-Sperre
+    // W5b-Z4 (Al, Welle 5): auch gegen Tuscan Artist nur dann nicht spielbar, wenn die Zugmenge genau 2 oder 3 betrüge.
+    if (drawBlockedFor(engine, pi, HAND_TARGET_PLUS_SELF - (ps.hand || []).length)) return false;   // D1 (S03-24): reiner Zug - Hand-/Zieh-Sperre
     if ((ps.hand || []).length >= HAND_TARGET_PLUS_SELF) return false;
     return _heroIsAscended(gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx], engine._getCardDB());
   },

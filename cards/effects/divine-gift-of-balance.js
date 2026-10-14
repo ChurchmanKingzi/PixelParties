@@ -107,7 +107,7 @@ module.exports = {
     if ((actPs.mainDeck || []).length === 0) return false;
 
     // D1 (Regel von Al): der Zug ist der einzige Nutzen - der ZIEHENDE (Aktivierer) darf unter Hand-/Zieh-Sperre nicht aktivieren.
-    if (drawBlockedFor(engine, activatorIdx)) return false;
+    if (drawBlockedFor(engine, activatorIdx, (oppPs.hand || []).length - (actPs.hand || []).length)) return false;   // W5b-Z4: Tuscan Artist nur bei genau 2/3
 
     return true;
   },
