@@ -6708,12 +6708,31 @@ class GameEngine {
   }
 
   /**
+   * ★ S1 (C05-10) — HARTE Anhaengsel-Negierung: „The corresponding Hero's effect AND Abilities are negated"
+   * (Stowaway). Die Abilities des Helden zaehlen nicht mehr: keine Schulstufen (Level-Pruefung,
+   * Weisheitskosten, Skalierung), keine Aktivierung. Der Held bleibt sonst handlungsfaehig
+   * (`isHeroIncapacitated` kennt nur die LEICHTE Form, Lv-0-Karten ohne Schule bleiben spielbar).
+   * Der Status ist der normale heilbare `negated` mit `_fromAttachment`; die Marke `abilitiesNegated`
+   * (oder der Kartenvertrag `negatesAllHostAbilities` der Quelle) macht ihn hart. Decisive Defeat
+   * traegt beides nicht und bleibt bei der leichten Form „nur Heldeneffekt".
+   */
+  heroAbilitiesNegated(pi, heroIdx) {
+    const st = this.gs.players[pi]?.heroes?.[heroIdx]?.statuses?.negated;
+    if (!st) return false;
+    if (st.abilitiesNegated) return true;
+    const quelle = st._fromAttachment;
+    return !!quelle && !!loadCardEffect(quelle)?.negatesAllHostAbilities;
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
    */
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
+    // S1 (C05-10): Stowaway negiert ALLE Abilities des Wirts (`heroAbilitiesNegated`).
+    if (this.heroAbilitiesNegated(pi, heroIdx)) return true;
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT) continue;
       if (inst.heroIdx !== heroIdx || inst.owner !== pi) continue;
@@ -43687,6 +43706,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
+    // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
+    if (this.heroAbilitiesNegated(playerIdx, heroIdx)) return [[]];
     // v767: Support-Zonen-Abilities (Xal) zaehlen wie echte
     // Ability-Zonen. Sie hier anzuhaengen genuegt fuer den GANZEN
     // Level-Vertrag — `heroMeetsLevelReq` prueft ausschliesslich ueber
@@ -43841,6 +43862,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       seite = (w && w.pi === pi && w.heroIdx === heroIdx) ? w.heroOwner : pi;
     }
     const ps = this.gs.players[seite];
+    if (this.heroAbilitiesNegated(seite, heroIdx)) return 0;   // S1 (C05-10): Abilities negiert (Stowaway)
     const abZones = [
       ...(ps?.abilityZones?.[heroIdx] || []),
       ...this.heroSupportAbilityStacks(seite, heroIdx),   // v767 (Xal)

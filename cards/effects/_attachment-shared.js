@@ -346,7 +346,7 @@ async function attachToHero(ctx, CARD_NAME, opts = {}) {
 //        nicht mehr (`engine._attachmentStatusHaelt`).
 // ═══════════════════════════════════════════
 
-function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME) {
+function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, extras) {
   const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!wirt?.name || wirt.hp <= 0) return false;
   if (!wirt.statuses) wirt.statuses = {};
@@ -354,6 +354,7 @@ function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME) {
     permanent: true,
     appliedTurn: engine.gs.turn || 0,
     _fromAttachment: CARD_NAME,
+    ...(extras || {}),   // S1: z. B. `abilitiesNegated` (Stowaway: harte Form „effect and Abilities")
   };
   engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME });   // v1399
   return true;
@@ -376,7 +377,7 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       const engine = ctx._engine;
       const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
       if (!wirt?.name || wirt.statuses?.[STATUS_NAME]) return;
-      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME);
+      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME, optionen.statusExtras);
       engine.sync();
     },
 
