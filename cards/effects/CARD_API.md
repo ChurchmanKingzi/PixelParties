@@ -11962,10 +11962,12 @@ engine.interferenceLevel(ownerIdx, heroIdx)   // 0, wenn er nicht schützen kann
 ```
 
 Er verlangt einen LEBENDEN und nicht stummgeschalteten Träger und fragt
-dafür `_isHeroEffectSilenced` — **dasselbe Prädikat, das den globalen
+dafür `_isHeroEffectSilenced` (seit W4a: `_isHeroAbilityPassiveSilenced`) — **dasselbe Prädikat, das den globalen
 Hook-Filter speist** (Stunned / Webbed, Frozen mit Chilly-Dog-Ausnahme,
 Negated in jeder Form, Mummy). Tempeste benutzt es für die wortgleiche
-Formulierung. Eine zweite Statusliste an dieser Stelle wäre genau die
+Formulierung. **(Überholt, Welle 4 / W4a, Al 14.10.2026: Interference prüft
+jetzt `_isHeroAbilityPassiveSilenced` — die LEICHTE Negierung stoppt sie
+nicht mehr, siehe Dateiende.)** Eine zweite Statusliste an dieser Stelle wäre genau die
 Dublette, die bei der nächsten Status-Änderung still ausschert.
 
 **② Xals Support-Zonen-Abilities zählen mit** (Als Ruling 14.9.). Der
@@ -14365,6 +14367,8 @@ vom Aufrufer, der weiss, wessen Reihe er zeichnet.
 
 
 ## ★ v1114 — EIGENER BADGE, und die LEICHTE Negation
+
+> **Änderung Welle 4 (W4a, Entscheidung Al, 14.10.2026):** v1114 gilt weiter als Standard für Karten, deren Text „negated" **ohne Einschränkung** sagt (HARTE Form: Heldeneffekt UND Ability-Zonen). Karten, die nur „effect(s) negated" sagen, geben ab jetzt die **LEICHTE** Form über die Statusmarke `effectOnly` — siehe „★ Welle 4 / W4a" am Dateiende (Locke, Null, Crusader's Hookshot, Bishop of Kings [B], Water Golem).
 
 Al 15.9.: „Der Negated-Status-Badge, den Defeat anlegt, behauptet
 faelschlicherweise, der Effekt wuerde auch Abilities negieren und am
@@ -20056,3 +20060,34 @@ Gemeinsam: Kartenbilder aus den Bildern 43–47 (nativ **96×65**, Live Show **7
 „Search your deck for a Surprise and place it face-down into the Surprise Zone of any Hero you control without showing it to your opponent. If the user has at least Magic Arts 1 or Trapping 1, this counts as an additional Action."
 - Private Galerie der verschiedenen Surprises des Hauptdecks (`_privat: true`), Held mit freier ECHTER Surprise Zone (lebend, kontrolliert; auch ein geliehener), kein Reveal an den Gegner (verdeckte Flüge, Log ohne Kartennamen), Deck wird danach gemischt; `blockedBySearchLock`. `inherentAction` als Funktion (Magic Arts ODER Trapping ≥ 1 des Wirkers). Leere Suche: gespielt, nichts gelegt, Deck gemischt (`masterpiece_none`).
 - **Bild und Klang:** `masterpiece_paint` (Goldrahmen, Pinsel malt bunte Striche, Glanz). Logs `masterpiece_set`, `masterpiece_none`.
+
+
+## ★ Welle 4 / W4a — Negation: nur „Effekt negiert" vs. „Abilities negiert", Stufe 0 bei Skalierung, Interference, Staff of Illusions (Entscheidung Al, 14.10.2026)
+
+Vier verbindliche Antworten von Al; Repros unter `docs/niche-tests/repro/W4-neg/`.
+
+**① Nur-Effekt-Karten geben die LEICHTE Form (`effectOnly`).** Locke, Null, Crusader's Hookshot, Bishop of Kings [B] und Water Golem sagen im Kartentext nur „effect(s) negated" — Al: die Abilities sollen dann **nicht** negiert sein. Diese Karten legen den Status `negated` jetzt mit der Marke `effectOnly: true` an (`addHeroStatus(…, 'negated', { …, effectOnly: true })`). **Was jetzt gilt (präzise):**
+
+| Quelle | Zustand | Abilities |
+|---|---|---|
+| `negated` mit `_byWeakeningCrystal`, `_fromAttachment` (Decisive Defeat) **oder `effectOnly`** | „Effekt negiert" (leicht) | laufen: Schulstufen zählen, Aktivierung, Passiv-Hooks, Held handlungsfähig |
+| `negated` mit Marke `abilitiesNegated` (Stowaway) | „Effekt UND Abilities negiert" | negiert (`heroAbilitiesNegated`) |
+| `negated` **ohne** alle diese Marken (v1114-Standard: Text sagt „negated" ohne Einschränkung, z. B. Sparky Slime) | „Effekt UND Abilities negiert" (hart) | Ability-Zonen aus, Held `isHeroIncapacitated`, Passiv-Hooks stumm |
+
+Die Unterscheidung steckt an fünf Stellen in der Engine (`_isHeroAbilityPassiveSilenced`, `isHeroIncapacitated`, `heroMeetsLevelReq`, `getWisdomDiscardCost` (Weisheitskosten), `heroAbilityLevelsBlanked`) und an zwei im Client (`app-board.jsx` Level-Spiegel, `app-shared.jsx` Badge-Text). **Neue Karten, deren Text nur „effect negated" sagt, setzen `effectOnly: true`**; sagt der Text „negated" ohne Einschränkung, bleibt es bei der Standardform ohne Marke. Heilbarkeit, Dauer und `sourceBound` ändern sich dadurch nicht. Kreaturen sind nicht betroffen (sie haben nur „effects negated").
+
+**② Skalierung liest unter harter Negierung Stufe 0 („generell für alle Scaling-Karten").** Royal Treasury (Bonus 4/6/8 nach Magic Arts des Wirts) war der Anlass; Al: das gilt für alle Karten, deren Wirkung mit der Stufe einer Ability/Spell School des Helden skaliert. Ist der Held **hart** negiert (Standard-`negated` ohne leichte Marke ODER `abilitiesNegated`), liest die Karte Stufe 0; die leichte Form lässt die Stufen stehen.
+
+```js
+engine.heroAbilityLevelsBlanked(seite, heroIdx)      // harte Form? (nur Lesen, kein Nebeneffekt)
+engine.heroSchoolLevel(school, seite, heroIdx)       // eigene Ability-Zonen des Helden, 0 bei harter Form
+```
+
+* **Zentral** ändert das den Rest ohne Skriptänderung: `_getCandidateAbilityZoneSets` und `effectiveSchoolLevelForCaster` (damit auch `heroAbilityLevel`/`heroFightingLevel` in `_hooks.js` und alle Karten, die schon über sie lesen: Phoenix Tackle, Draw, Slow, Venom Infusion, Frost Breaker, Burning Finger, Land Sharks, Gobbo, Doctor Fester, Overcharge …). Die Stufenprüfung der Handkarten (`heroMeetsLevelReq`) war schon hart-bewusst (S1) und bleibt unverändert.
+* **Neue Karten mit Stufen-Skalierung** lesen ausschließlich über `effectiveSchoolLevelForCaster` (Wirker eines Zaubers, mit „as if"-Overrides) oder `heroSchoolLevel` (eigene Zonen eines Helden), **nie** über `countAbilitiesForSchool(…, abilityZones[…])`.
+* **Auf den Helfer umgestellt (Rohzugriffe):** Royal Treasury (Stufe 0 = Bonus entfällt, keine Ladung verbraucht), Army of the Cute, Capture, Create Illusion, Divine Gift of Death, Doom Prophecy, Forceful Revival, Future Tech Organnon, Guard Change, Haste, Heal, Healing Melody, Hymn of Rebirth, Idej Sword Kogarasu (Stufensenkung), Instant Cryo Stasis, Iterative Testing, Overheal Shock, Reality Crack, Rewrite History, Soul Shard Ka, Spirit of the Relic Hammer, Stealth (Stufe der Ability für `blocksTargeting`), The Core's Awakening, The Master's Key, The Warlord's Bite (Performance), The Weather Orchestra, Undurdle, Stranglehold, Mountain Tear River, Fireshield, Cute Familiar (Charme ≥ 2), Telekinesis und Cosmic Skeleton (Schwelle/Voraussetzung „Stufe ≥ 1"), Biomancy-Stufe (`_biomancy-shared`), `isHeroSkillLocked` (Magic Arts ≥ 1).
+* **Bewusst nicht umgestellt:** Hero-eigene Effekte (Andras, Bartas, Grisgar, Taio, Saya, Klaus, Thalia, Tarleinn …: der Heldeneffekt ist bei jeder Negierung ohnehin stumm); Ability-eigene Skripte (Resistance, Smugness, Creativity, Friendship, Toughness: Passiv-Hooks filtert `_isHeroAbilityPassiveSilenced`); reine Struktur-/Anwesenheitsfragen (Anlegen, Stapelgröße, `Charme`-Umgehung in Love Shot, Difficulty Lever, Forbidden Curse of Aging …); CPU-Heuristiken (`_cpu.js`, `cpuMeta`); Stowaway/Chilly Wizard (Geschwister mit `negated` sind dort ohnehin ausgeschlossen).
+
+**③ Interference (Ability) wirkt, solange nicht Abilities negiert sind.** `interferenceLevel` fragt `_isHeroAbilityPassiveSilenced` statt `_isHeroEffectSilenced`: die LEICHTE Negierung (Decisive Defeat, Weakening Crystal, `effectOnly` wie Locke) stoppt Interference **nicht** mehr; stumm bleibt sie bei der harten Form, `abilitiesNegated` (Stowaway), Stunned/Webbed, Frozen (Chilly-Dog-Ausnahme) und Mumie — wie bisher. Das Ruling „in welcher Form auch immer" (v1049) ist damit für die Negierung aufgehoben (Stunned/Frozen/Mumie unverändert).
+
+**④ Staff of Illusions: Kosten 0 bei Stufe 0.** „Wenn die Kosten für lv 0 0 sind, ja." — `canActivate` sperrt unter 10 Gold nur noch, wenn keine wählbare Kreatur effektiv Stufe 0 hat (Gesamtkosten 0 erlaubt, auch ohne Goldsperre); Kosten > 0 bleiben an Gold gebunden (`resolve` bricht ab, wenn das Gold fehlt).
