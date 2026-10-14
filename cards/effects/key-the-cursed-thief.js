@@ -92,6 +92,11 @@ module.exports = {
     return true;
   },
 
+  /** Z7b: wird Keys Reaktion selbst GANZ negiert, hat sie nie aufgelöst — die Rundengrenze bleibt frei (das Gold ist bezahlt). */
+  refundOnNegation(engine, link) {
+    if (engine.gs.hoptUsed) delete engine.gs.hoptUsed[hoptKey(link.owner, link.heroIdx)];
+  },
+
   async heroReactionResolve(engine, pi, chain, myIndex, heroIdx) {
     const ziel = zielArtefakt(chain, pi);
     if (!ziel) return;

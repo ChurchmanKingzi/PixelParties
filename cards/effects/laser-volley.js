@@ -16,8 +16,9 @@ const CARD_NAME = 'Laser Volley';
 const VOLLEY_DAMAGE = 200;
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(`spell-played:${CARD_NAME}`, pi); },
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(`spell-played:${CARD_NAME}`, pi); },
 
   // Once-per-turn-by-name gate. The play is rejected upstream by
   // doPlaySpell when this returns false; the same `gs.hoptUsed` map

@@ -83,9 +83,6 @@ function getCapturableCreatures(engine, pi) {
 }
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
-
   // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt eine BELIEBIGE Creature vom Brett auf die eigene Hand.
   // Trifft beliebige Creature auf dem GESAMTEN Brett — deshalb NICHT sperren, sondern bei
   // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange

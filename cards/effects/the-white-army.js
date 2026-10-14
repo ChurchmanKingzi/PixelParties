@@ -30,8 +30,9 @@ function maxTargets(engine, pi) {
 }
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { gs.players[pi]._whiteArmyUsedTurn = gs.turn; },
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ engine, gs, pi }) => { gs.players[pi]._whiteArmyUsedTurn = gs.turn; },
 
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.

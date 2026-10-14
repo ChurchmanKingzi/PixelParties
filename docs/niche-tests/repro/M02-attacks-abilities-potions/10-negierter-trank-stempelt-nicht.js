@@ -1,12 +1,10 @@
 'use strict';
-// M02-10 · Ein NEGIERTER Trank verbraucht seine Einmal-Grenze nicht (Teleportation Powder, Resuscitation Potion, Magnetic Potion, Sword in a Bottle)
+// M02-10 · Ein GANZ negierter Trank verbraucht seine Einmal-Grenze NICHT (Teleportation Powder, Resuscitation Potion: pro Spiel; Magnetic Potion, Sword in a Bottle: pro Zug) (Als Entscheidung, Welle 3)
 // Kartentexte: Teleportation Powder „You can only play 1 'Teleportation Powder' per game." · Resuscitation Potion „… only play 1 … per game." ·
 //   Magnetic Potion „You can only play 1 'Magnetic Potion' per turn." · Sword in a Bottle „You can only play 1 'Sword in a Bottle' per turn."
-// Ruling (CARD_API.md „Die geteilte Divine-Gift-Grenze", v1031): „Der Stempel sitzt dort, wo die Karte die Hand verlässt – ab da IST sie aktiviert …,
-//   unabhängig davon, ob ein Gegenzug sie später negiert." (gleiche Klasse wie S01-01).
-// Erwartung: wird der Trank von der Reaktion „The Master's Plan" negiert, gilt er als gespielt: eine zweite Kopie im selben Zug / späteren Zug der Partie ist nicht spielbar.
-// Beobachtet: `server.js` doUsePotion/doConfirmPotion stempeln (`_markOncePerGamePotion`, HOPT im `resolve`) nur im Nicht-Negations-Zweig; der Trank geht in die Ablage,
-//   `_oncePerGameUsed` bleibt leer, die zweite Kopie wird ohne Weiteres gespielt.
+// REGEL (CARD_API.md „★ Z7b", ersetzt Ruling v1031 / Z7): wird der Trank von The Master's Plan komplett negiert, hat er nie aufgelöst → Einmal-Slot unverbraucht (auch „per game");
+//   eine zweite Kopie im selben Zug ist spielbar.
+// Exit 1 (Fehler tritt auf) = die negierte erste Kopie hat den Slot verbraucht (zweite Kopie nicht spielbar).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -30,7 +28,7 @@ const H = require('../../lib/h.js');
     await t.play(0, name, { handIndex: idx });
     const zweiteGespielt = !t.pile(0, 'hand').includes(name);
     R.check(`${name}: erste Kopie wurde negiert (Voraussetzung)`, negiert, { hand1: t.pile(1, 'hand') });
-    R.check(`${name}: zweite Kopie ist NICHT mehr spielbar`, !zweiteGespielt, { hand0: t.pile(0, 'hand'), stempel: [...(t.gs.players[0]._oncePerGameUsed || [])], hopt: t.gs.hoptUsed });
+    R.check(`${name}: zweite Kopie ist spielbar (der Slot ist unverbraucht)`, zweiteGespielt, { hand0: t.pile(0, 'hand'), stempel: [...(t.gs.players[0]._oncePerGameUsed || [])], hopt: t.gs.hoptUsed });
   }
   R.finish();
 })();

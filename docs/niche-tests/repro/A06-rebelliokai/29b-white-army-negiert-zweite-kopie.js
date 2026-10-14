@@ -1,9 +1,8 @@
 'use strict';
-// A06-rebelliokai-29 (Ergänzung) · Negierte The White Army zählt nicht gegen „You can only activate 1 "The White Army" per turn"
+// A06-rebelliokai-29b · Ganz negierte The White Army zählt NICHT gegen „You can only activate 1 "The White Army" per turn" (Als Entscheidung, Welle 3)
 // Kartentext: „You can only activate 1 "The White Army" per turn." Gleiche Klasse wie Pawn Sacrifice/Mischief Invasion (Befund -29).
-// Beobachtung: `the-white-army.js` stempelt `ps._whiteArmyUsedTurn` erst NACH der Zielwahl im onPlay (Z. ~92); wird der Zauber von Silence negiert,
-//   läuft der onPlay nie. Die zweite Kopie im selben Zug ist spielbar und friert Ziele ein.
-// Erwartung (Lesart A „gespielt = gezählt", wie -29): die zweite Kopie ist nach der Negierung nicht spielbar.
+// REGEL (CARD_API.md „★ Z7b"): eine komplett negierte Karte (Silence) hat nie aufgelöst → der Einmal-Slot ist unverbraucht; die zweite Kopie im selben Zug ist spielbar und friert ein Ziel ein.
+// Exit 1 (Fehler tritt auf) = die negierte erste Kopie hat den Zug-Slot verbraucht.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -18,7 +17,7 @@ const H = require('../../lib/h.js');
   t.reset(); t.gs.activePlayer = 0; t.gs.currentPhase = 3; t.resetActions(0);
   const r2 = await t.play(0, 'The White Army', { hero: 0 });
   const frozen = t.inst(c => c.owner === 1 && c.zone === 'support' && c.counters.frozen).length;
-  R.check('zweite Kopie im selben Zug nicht spielbar / ohne Wirkung', r2 === false || frozen === 0, { r2, frozen });
+  R.check('zweite Kopie im selben Zug ist spielbar und wirkt (friert ein Ziel ein)', r2 === true && frozen > 0, { r2, frozen });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

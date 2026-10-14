@@ -10,9 +10,6 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('acid-vial', pi); },
-
   isPotion: true,
 
   // Der Kartentext sagt "This damage cannot be reduced, REDIRECTED or

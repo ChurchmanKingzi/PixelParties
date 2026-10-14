@@ -12,9 +12,6 @@ const CARD_NAME = 'Book of Doom';
 const DAMAGE_PER_TARGET = 50;
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT('book-of-doom', pi); },
-
   isTargetingArtifact: true,
   manualGoldCost: true,
   goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Ziel - unter der Goldsperre nicht aktivierbar (server.js doUseArtifactEffect)

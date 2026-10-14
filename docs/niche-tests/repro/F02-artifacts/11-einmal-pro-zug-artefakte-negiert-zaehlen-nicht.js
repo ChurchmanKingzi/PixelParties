@@ -1,11 +1,10 @@
 'use strict';
-// F02-11 · „You can only play 1 X per turn"-Artefakte: ein negierter Spielzug verbraucht die Grenze nicht
+// F02-11 · „You can only play 1 X per turn"-Artefakte: ein GANZ negierter Spielzug verbraucht die Grenze NICHT (Als Entscheidung, Welle 3)
 // Karten (Kartentext jeweils „You can only play 1 "<Name>" per turn."): Magic Emerald, Magic Cobalt (beide Magic Gems), Magnetic Glove, Relic in the Sky, Heart of the Mountain, Heart of Cards.
-// Parallelfall: S01-02 (Big Oopsie / Butterfly Cloud, Stufe C); für „per game" gilt das Ruling v1031 (siehe F02-10).
+// REGEL (CARD_API.md „★ Z7b"): eine komplett negierte Karte (Rusty Touch: Kosten bezahlt) hat nie aufgelöst → der Zug-Slot ist unverbraucht. (Entscheidung gilt auch bei bezahlten Kosten.)
 // Aufbau: Sitz 0: 2 Kopien der Karte auf der Hand, 100 Gold; Sitz 1: Rusty Touch (negiert einen Artifact-Spielzug).
 // Schritte: 1. Karte spielen, Sitz 1 negiert. 2. Zweite Kopie im selben Zug spielen (ohne weitere Reaktion).
-// Erwartet (Lesart „gespielt = gezählt", analog Ruling v1031): die zweite Kopie ist nicht spielbar.
-// Beobachtet: `gs.hoptUsed` bleibt nach der Negierung leer; die zweite Kopie wird gespielt und wirkt (bei den Gems: Stempel steht in `maybeKeepGemInHand` am Ende von `resolve`; sonst `claimHOPT` im `resolve`).
+// Exit 1 (Fehler tritt auf) = die zweite Kopie ist nach der Negierung nicht spielbar (der Slot wurde verbraucht).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -35,7 +34,7 @@ const H = require('../../lib/h.js');
     const zweitesAngenommen = t.pile(0, 'hand').filter(n => n === c.name).length < 1 || !!t.gs.potionTargeting || t.pile(0, 'discardPile').filter(n => n === c.name).length >= 2;
     t.gs.potionTargeting = null;
     R.check(`${c.name}: 1. Spielzug negiert`, negiert, null);
-    R.check(`${c.name}: 2. Kopie im selben Zug NICHT spielbar`, !zweitesAngenommen, { hand: t.pile(0, 'hand'), disc: t.pile(0, 'discardPile'), hopt: t.gs.hoptUsed });
+    R.check(`${c.name}: 2. Kopie im selben Zug ist spielbar`, zweitesAngenommen, { hand: t.pile(0, 'hand'), disc: t.pile(0, 'discardPile'), hopt: t.gs.hoptUsed });
   }
   R.finish();
 })();

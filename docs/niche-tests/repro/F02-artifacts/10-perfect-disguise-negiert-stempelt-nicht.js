@@ -1,12 +1,10 @@
 'use strict';
-// F02-10 · Negierter Perfect Disguise verbraucht die Einmal-pro-Spiel-Grenze nicht
-// Kartentext: „You can only play 1 "Perfect Disguise" per game." – Ruling CARD_API.md ~Z. 11418-11440 (v1031, Divine Gifts): „Der Stempel sitzt dort, wo die Karte die Hand verlässt – ab da IST sie
-//   aktiviert …, unabhängig davon, ob ein Gegenzug sie später negiert." (Parallelbefund S01-01 für Spells.)
+// F02-10 · Ganz negierter Perfect Disguise verbraucht die Einmal-pro-Spiel-Grenze NICHT (Als Entscheidung, Welle 3)
+// Kartentext: „You can only play 1 "Perfect Disguise" per game." – REGEL (CARD_API.md „★ Z7b", ersetzt Ruling v1031 / Z7): eine komplett negierte Karte (Rusty Touch) hat nie aufgelöst →
+//   Einmal-Slot unverbraucht, auch „per game"; die Kosten (12 Gold) bleiben bezahlt. Das zweite Exemplar ist spielbar; erst ein aufgelöstes stempelt.
 // Aufbau: Sitz 0: 2× Perfect Disguise auf der Hand, 100 Gold; Sitz 1: Rusty Touch (Spell-Reaktion, negiert einen Artifact-Spielzug; der Spieler zahlt trotzdem).
 // Schritte: 1. Perfect Disguise spielen (Held 0 als Ziel), Sitz 1 negiert mit Rusty Touch. 2. Das zweite Perfect Disguise spielen.
-// Erwartet: Nach dem ersten (negierten) Spielzug ist `perfectDisguise` gestempelt; das zweite ist nicht spielbar.
-// Beobachtet: `_oncePerGameUsed` bleibt leer (12 Gold wurden aber bezahlt), das zweite Perfect Disguise wird gespielt und wirkt.
-// Vermutete Ursache: der Stempel für Ziel-Artefakte steht erst im Normalzweig von `doConfirmPotion` (nicht im Negierungs-Zweig).
+// Exit 1 (Fehler tritt auf) = der negierte Spielzug hat „perfectDisguise" gestempelt bzw. das zweite ist nicht spielbar.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -26,10 +24,11 @@ const H = require('../../lib/h.js');
   const a = await spiele();
   R.check('1. Perfect Disguise wurde negiert (Rusty Touch in der Ablage, Karte in der Ablage, Gold bezahlt)',
     t.pile(1, 'discardPile').includes('Rusty Touch') && t.pile(0, 'discardPile').includes('Perfect Disguise') && g0 - t.gs.players[0].gold === 12, { a, d0: t.pile(0, 'discardPile'), gold: t.gs.players[0].gold });
-  R.check('negierter Spielzug stempelt „perfectDisguise"', [...(t.gs.players[0]._oncePerGameUsed || [])].includes('perfectDisguise'), [...(t.gs.players[0]._oncePerGameUsed || [])]);
+  R.check('der ganz negierte Spielzug stempelt „perfectDisguise" NICHT', ![...(t.gs.players[0]._oncePerGameUsed || [])].includes('perfectDisguise'), [...(t.gs.players[0]._oncePerGameUsed || [])]);
   t.policy.confirm = false; t.reset();
   const b = await spiele();
-  R.check('2. Perfect Disguise ist NICHT mehr spielbar', b.geoeffnet === false, { b, hand: t.pile(0, 'hand'), untargetable: t.hero(0, 0).statuses.untargetable });
+  R.check('2. Perfect Disguise ist spielbar (Zielwahl öffnet sich, Karte wirkt)', b.geoeffnet === true && b.c === true, { b, hand: t.pile(0, 'hand'), untargetable: t.hero(0, 0).statuses.untargetable });
+  R.check('Kontrolle: das aufgelöste zweite stempelt „perfectDisguise"', [...(t.gs.players[0]._oncePerGameUsed || [])].includes('perfectDisguise'), [...(t.gs.players[0]._oncePerGameUsed || [])]);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

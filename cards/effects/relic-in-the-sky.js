@@ -32,9 +32,6 @@ const CARD_NAME = 'Relic in the Sky';
 const HOPT_KEY = 'relic-in-the-sky';
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
-
   blockedByPileLock: true,
 
   canActivate(gs, pi) {

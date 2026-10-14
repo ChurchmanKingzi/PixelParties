@@ -1,14 +1,10 @@
 'use strict';
-// A07-12 · Guard Duty: eine NEGIERTE Guard Duty verbraucht das „once per game"-Limit nicht
+// A07-12 · Guard Duty: eine GANZ negierte Guard Duty verbraucht das „once per game"-Limit NICHT (Als Entscheidung, Welle 3)
 //
 // Kartentext Guard Duty: „… You can only play 1 "Guard Duty" per game."
-// Ruling CARD_API.md ~Z. 11410-11416 (Divine Gifts, gilt für „You can only activate 1 … per game"): „Der Stempel sitzt dort, wo
-//   die Karte die Hand verlässt – ab da IST sie aktiviert, unabhängig davon, ob ein Gegenzug sie später negiert."
-//   Dafür gibt es den Vertrag `oncePerGame: true` (CARD_API.md Z. 2118); Guard Duty benutzt stattdessen einen eigenen
-//   Schlüssel `gs._guardDutyUsed`, der erst in `onPlay` gestempelt wird (guard-duty.js:45).
-// Erwartung: Wird die erste Guard Duty negiert (No Retreat!, The Master's Plan …), ist das Limit trotzdem verbraucht; eine
-//   zweite Guard Duty ist nicht spielbar.
-// Beobachtet: `onPlay` läuft bei Negierung nie → kein Stempel → die zweite Guard Duty wird gespielt und mischt die Ablage zurück.
+// REGEL (CARD_API.md „★ Z7b", ersetzt Ruling v1031 / Z7): eine komplett negierte Karte (No Retreat!, The Master's Plan …) hat nie aufgelöst → ihr Einmal-Slot ist
+//   unverbraucht, auch „per game". Guard Duty stempelt `gs._guardDutyUsed` erst im `onPlay` — der bei Negation nie läuft, das ist jetzt genau richtig.
+// Exit 1 (Fehler tritt auf) = die negierte Guard Duty hat das Limit verbraucht (zweite wird abgelehnt) bzw. die zweite wirkt nicht.
 const H = require('../../lib/h.js');
 const F = H.INERT.filler;
 
@@ -21,7 +17,8 @@ const F = H.INERT.filler;
   R.check('Vorbedingung: erste Guard Duty wurde negiert (Ablage unverändert, Karte in der Ablage)',
     t.pile(0, 'discardPile').length === 4 && t.pile(0, 'mainDeck').length === 10, { discard: t.pile(0, 'discardPile'), deck: t.pile(0, 'mainDeck').length });
   r = await t.play(0, 'Guard Duty', { hero: 0 });
-  R.check('zweite Guard Duty wird abgelehnt (Limit durch die negierte verbraucht)', r === false, { r, deck: t.pile(0, 'mainDeck').length, discard: t.pile(0, 'discardPile') });
+  R.check('zweite Guard Duty ist spielbar und wirkt (mischt die Ablage zurück ins Deck)', r === true && t.pile(0, 'mainDeck').length > 10, { r, deck: t.pile(0, 'mainDeck').length, discard: t.pile(0, 'discardPile') });
+  R.check('Kontrolle: die aufgelöste zweite Guard Duty verbraucht das Limit', !!(t.gs._guardDutyUsed && t.gs._guardDutyUsed[0]), t.gs._guardDutyUsed);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

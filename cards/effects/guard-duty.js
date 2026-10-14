@@ -19,8 +19,9 @@ const ONCE_PER_GAME_KEY = '_guardDutyUsed';
 const CARD_NAME = 'Guard Duty';
 
 module.exports = {
-  // ★ Z7 (A07-12): negiert/fizzelt = die Karte war trotzdem GESPIELT → Partie-Grenze jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ gs, pi }) => { if (!gs[ONCE_PER_GAME_KEY]) gs[ONCE_PER_GAME_KEY] = {}; gs[ONCE_PER_GAME_KEY][pi] = true; },
+  // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
+  // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
+  onFizzledPlay: ({ gs, pi }) => { if (!gs[ONCE_PER_GAME_KEY]) gs[ONCE_PER_GAME_KEY] = {}; gs[ONCE_PER_GAME_KEY][pi] = true; },
 
   inherentAction: true, // Free additional Action — no main-action cost.
   // Shuffles discard pile back into deck — flagged for "No Retreat!"
