@@ -142,18 +142,19 @@ module.exports = {
     engine._broadcastEvent('card_reveal', { cardName: oppChoice });
     engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: oppIdx });
     // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
-    if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
-          { byPi: pi, count: 1, sourceName: 'Magic Lamp' })) {
-      engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
-      engine.sync();
-      return;
-    }
+    // W5b-B2 (Al, Welle 5; wie Birthday Present): Negiert wird NUR die Gabe an den Gegner (Teileffekt) –
+    // die eigenen 2 Karten kommen trotzdem auf die Hand, die entfallene Gabe bleibt im Deck; die Lampe
+    // gilt als aufgelöst (nicht ganz negiert).
+    const gabeNegiert = await engine.checkHandInteractionReaction(oppIdx, 'insert',
+          { byPi: pi, count: 1, sourceName: 'Magic Lamp' });
+    if (gabeNegiert) engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
     // Remove chosen cards from deck — erst NACH dem Reaktionsfenster (M02-18): wird das
-    // Einfügen negiert, bleiben alle drei im Deck, nichts geht verloren.
-    for (const name of chosenNames) {
+    // Einfügen negiert, bleibt die Gabe im Deck, nichts geht verloren.
+    for (const name of (gabeNegiert ? playerCards : chosenNames)) {
       await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
     }
     engine.sync();
+    if (!gabeNegiert) {
     const oppInst = engine.handZugangSync(oppPs, oppChoice, {  });
     // Track the gifted card with a foreign-origin tag so when the
     // opponent plays it, the discard / deleted pile routes back to
@@ -169,6 +170,7 @@ module.exports = {
     engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: 'Magic Lamp' });
     engine.sync();
     await engine._delay(600);
+    }
 
     // Add remaining 2 to player's hand one at a time (face-up to both players)
     for (const name of playerCards) {
