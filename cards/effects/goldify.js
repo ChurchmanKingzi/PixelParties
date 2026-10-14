@@ -32,7 +32,7 @@
 //    currently hold?".
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
+const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 // Walk the board for any Creature whose level is ≤ 1. Used both by
@@ -65,8 +65,18 @@ module.exports = {
 
   // Cannot be cast without at least one free Support Zone for the token,
   // and at least one Creature on the board to target.
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     if (!hasFreeZone(gs, pi)) return false;
+    // W4b: der Token wird jetzt VOR dem Reaktionsfenster bezahlt — also nur spielbar, wenn eine echte Kreatur mit Level
+    // (kein Pollution Token, keine Artifact Creature) als Ziel da ist, sonst wäre der Preis ohne Wirkung gezahlt.
+    if (engine) {
+      const cardDB = engine._getCardDB();
+      return engine.cardInstances.some(inst => {
+        if (inst.zone !== 'support' || inst.faceDown) return false;
+        const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
+        return !!cd && hasCardType(cd, 'Creature') && hasNumericCreatureLevel(cd);
+      });
+    }
     // Pre-check: any Creature on the board? If there isn't, the effect
     // can't resolve even after paying the token cost.
     for (const ps of gs.players) {
@@ -90,12 +100,19 @@ module.exports = {
     return hasLowLevelCreatureTarget(gs, engine);
   },
 
+  // ★ W4b (Al, Welle 4): der Token ist Kostenpunkt („… to use this Spell") und wird VOR dem Reaktionsfenster bezahlt;
+  // bei Ganz-Negierung bleibt er liegen. Danach ist die Zielwahl nicht mehr abbrechbar (die Kosten sind gezahlt).
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 1, 'Goldify');
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const cardDB = engine._getCardDB();
+      const _vorab = kostenSchonBezahlt(ctx);   // W4b: Token schon vor dem Fenster gelegt?
 
       // When the cast is inherent (Main Phase + low-level Creature on board),
       // restrict targeting to level-1-or-lower Creatures. This is ONLY the
@@ -114,7 +131,7 @@ module.exports = {
           : 'Place 1 Pollution Token, then defeat a Creature to gain gold equal to 5 × its level. Level 1 or lower → additional Action.',
         confirmLabel: '🪙 Goldify!',
         confirmClass: 'btn-success',
-        cancellable: true,
+        cancellable: !_vorab,
         condition: (t) => {
           // Only Creatures count (not equips/abilities)
           if (t.type !== 'equip' && t.type !== 'creature') return false;
@@ -129,7 +146,7 @@ module.exports = {
       });
 
       if (!target) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;   // Kosten bezahlt: Karte ist verbraucht (negiert / kein Ziel)
         return;
       }
 
@@ -138,7 +155,7 @@ module.exports = {
         c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
       );
       if (!inst) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;
         return;
       }
 
@@ -147,7 +164,7 @@ module.exports = {
       const goldGain = 5 * creatureLevel;
 
       // ── Pay cost: place 1 Pollution Token FIRST (per card text ordering) ──
-      await placePollutionTokens(engine, pi, 1, 'Goldify', { promptCtx: ctx });
+      if (!_vorab) await placePollutionTokens(engine, pi, 1, 'Goldify', { promptCtx: ctx });
 
       // ── Transmutation animation on the target ──
       engine._broadcastEvent('play_zone_animation', {

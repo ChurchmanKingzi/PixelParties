@@ -28,7 +28,7 @@
 //      each arrival is individually visible.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
+const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { HOOKS } = require('./_hooks');
 
 const MAX_COPIES = 3;
@@ -77,16 +77,23 @@ module.exports = {
     return false;
   },
 
+  // ★ W4b (Al, Welle 4): der Token ist Kostenpunkt („… to play this card") und wird VOR dem Reaktionsfenster bezahlt;
+  // bei Ganz-Negierung bleibt er liegen. Danach ist die Kartenwahl nicht mehr abbrechbar (die Kosten sind gezahlt).
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 1, 'Mass Multiplication');
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
+      const _vorab = kostenSchonBezahlt(ctx);   // W4b: Token schon vor dem Fenster gelegt?
       if (!ps) return;
 
-      // ── Pay cost: 1 Pollution Token FIRST ──
-      await placePollutionTokens(engine, pi, 1, 'Mass Multiplication', { promptCtx: ctx });
+      // ── Pay cost: 1 Pollution Token FIRST ── (Normalweg: schon in `payActivationCost` bezahlt; sonst Fallback)
+      if (!_vorab) await placePollutionTokens(engine, pi, 1, 'Mass Multiplication', { promptCtx: ctx });
 
       // ── Build the gallery ──
       // Include a hand/discard card only if it has at least one copy still
@@ -127,10 +134,10 @@ module.exports = {
         cards: gallery,
         title: 'Mass Multiplication',
         description: 'Delete a card from your hand or discard pile. Up to 3 copies will be pulled from your deck.',
-        cancellable: true,
+        cancellable: !_vorab,
       });
       if (!picked || picked.cancelled) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;   // Kosten bezahlt: Karte ist verbraucht
         return;
       }
 

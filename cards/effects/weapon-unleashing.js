@@ -24,6 +24,15 @@
 //    (`activeIn: ['hand','discard']`); `inst.heroIdx` wird auf den
 //    Nutzer gepinnt, damit `heroRestricted` greift. „counts as an
 //    additional Action" ist genau die Grant-Semantik.
+//
+//  ★ W4b (Al, Welle 4): DER ABWURF IST EIN KOSTENPUNKT („… to use this
+//  Spell"). Stapelwahl und Ablegen der 3 Kopien laufen in
+//  `payActivationCost` VOR dem Reaktionsfenster; wird die Karte komplett
+//  negiert (Silence, The Master's Plan …), bleiben die Abilities in der
+//  Ablage und der Grant entsteht nicht. `onPlay` setzt nur noch den
+//  Second-Action-Grant. Abbruch der Stapelwahl (`false`) nimmt den Zug
+//  zurück. Fallback ohne `payActivationCost` (anderer Spielweg): `onPlay`
+//  zahlt wie früher selbst.
 // ═══════════════════════════════════════════
 
 const { secondActionHooks, isSecondActionGrant } = require('./_second-action-shared');
@@ -43,6 +52,62 @@ function stacksOf(engine, pi, heroIdx) {
   // Karten, die nur als Ability GELTEN (Cloak of Edge), haben keinen Stapel.
   return engine.getAbilityTargets(pi, { heroIdx })
     .filter(a => (a.level || 0) >= STACK && (a.zoneKind === 'ability' || a.istEchteAbility));
+}
+
+/**
+ * KOSTEN: Stapel (3 Kopien) wählen und alle drei ablegen. Rückgabe: Name der Ability = bezahlt, `null` = nicht bezahlt
+ * (Abbruch / nichts abgelegt). Eine Stelle für `payActivationCost` und den Fallback in `onPlay`.
+ */
+async function zahleKosten(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const ps = gs.players[pi];
+  const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
+  if (!hero?.name || hero.hp <= 0) return null;
+  const stacks = stacksOf(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Abilities des Nutzers auf seiner Brettseite
+  if (stacks.length === 0) return null;
+  // Kartenbild ZURUECKHALTEN, bis die Ability gewaehlt ist (Als Vorgabe
+  // 6.9.) — vorher kann der Spieler noch abbrechen. Danach an BEIDE
+  // Spieler streamen (der Reveal geht sonst nur an den Gegner).
+  gs._holdCardReveal = true;
+
+  // Kosten: welcher Level-3-Stapel? IMMER fragen — auch bei nur
+  // einem Stapel —, denn bis zur Wahl darf der Spieler abbrechen
+  // (Als Vorgabe 6.9.); danach ist die Karte gespielt.
+  const ziele = stacks.map(a => ({ id: a.id, type: a.type, owner: a.owner, heroIdx: a.heroIdx, slotIdx: a.slotIdx, cardName: a.cardName, cardInstance: a.cardInstance || undefined }));
+  const wahl = await engine.promptEffectTarget(pi, ziele, {
+    title: CARD_NAME,
+    description: `Choose a level 3 Ability of ${hero.name} — all 3 copies go to the discard pile. ${hero.name} may then perform a second Action this turn.`,
+    confirmLabel: '💥 Unleash',
+    confirmClass: 'btn-danger',
+    cancelLabel: 'Cancel',
+    cancellable: true, maxTotal: 1, minRequired: 1,
+    _abilityCost: { cardName: CARD_NAME, heroIdx, sent: 0, abilitiesSent: 0, amount: 0, needMore: true, wisdomPending: false },
+  });
+  delete gs._holdCardReveal;
+  if (!wahl || wahl.length === 0) return null;
+  const gewaehlt = stacks.find(a => a.id === wahl[0]);
+  if (!gewaehlt) return null;
+  engine._firePendingCardReveal();
+  try {
+    const ownSid = ps.socketId;
+    if (ownSid && engine.io) engine.io.to(ownSid).emit('card_reveal', { cardName: CARD_NAME });
+  } catch { /* Anzeige ist Beiwerk */ }
+  const abilityName = gewaehlt.cardName;
+  let abgelegt = 0;
+  for (let k = 0; k < STACK; k++) {
+    const entry = engine.getAbilityTargets(ctx.cardHeroOwner ?? pi, { heroIdx, cardName: abilityName })   // Als Befund 29.9.: Brettseite des Wirkers
+      .find(a => a.zoneKind === gewaehlt.zoneKind && a.slotIdx === gewaehlt.slotIdx);
+    if (!entry || !(await engine.discardAbilityTopCopy(entry, { source: CARD_NAME, sourceOwner: pi }))) break;
+    abgelegt++;
+    engine.sync();
+    await engine._delay(250);
+  }
+  // Als Befund 29.9.: ohne vollstaendig bezahlte Kosten keine Wirkung.
+  if (abgelegt === 0) return null;
+  return abilityName;
 }
 
 module.exports = {
@@ -71,6 +136,13 @@ module.exports = {
     try { return stacksOf(engine, heldSeite(gs, pi, heroIdx), heroIdx).length > 0; } catch { return true; }   // Als Befund 29.9.: Brettseite
   },
 
+  /** ★ W4b: Kosten („to use this Spell") vor dem Reaktionsfenster; `false` = Stapelwahl abgebrochen → Zug zurück. */
+  async payActivationCost(ctx) {
+    const abilityName = await zahleKosten(ctx);
+    if (!abilityName) return false;
+    if (ctx.card) ctx.card._kostenAbility = abilityName;
+  },
+
   hooks: {
     ...secondActionHooks,
 
@@ -82,48 +154,15 @@ module.exports = {
       const ps = gs.players[pi];
       const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       const inst = ctx.card;
-      if (!hero?.name || hero.hp <= 0 || !inst) { gs._spellCancelled = true; return; }
-      const stacks = stacksOf(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Abilities des Nutzers auf seiner Brettseite
-      if (stacks.length === 0) { gs._spellCancelled = true; return; }
-      // Kartenbild ZURUECKHALTEN, bis die Ability gewaehlt ist (Als Vorgabe
-      // 6.9.) — vorher kann der Spieler noch abbrechen. Danach an BEIDE
-      // Spieler streamen (der Reveal geht sonst nur an den Gegner).
-      gs._holdCardReveal = true;
-
-      // Kosten: welcher Level-3-Stapel? IMMER fragen — auch bei nur
-      // einem Stapel —, denn bis zur Wahl darf der Spieler abbrechen
-      // (Als Vorgabe 6.9.); danach ist die Karte gespielt.
-      const ziele = stacks.map(a => ({ id: a.id, type: a.type, owner: a.owner, heroIdx: a.heroIdx, slotIdx: a.slotIdx, cardName: a.cardName, cardInstance: a.cardInstance || undefined }));
-      const wahl = await engine.promptEffectTarget(pi, ziele, {
-        title: CARD_NAME,
-        description: `Choose a level 3 Ability of ${hero.name} — all 3 copies go to the discard pile. ${hero.name} may then perform a second Action this turn.`,
-        confirmLabel: '💥 Unleash',
-        confirmClass: 'btn-danger',
-        cancelLabel: 'Cancel',
-        cancellable: true, maxTotal: 1, minRequired: 1,
-        _abilityCost: { cardName: CARD_NAME, heroIdx, sent: 0, abilitiesSent: 0, amount: 0, needMore: true, wisdomPending: false },
-      });
-      delete gs._holdCardReveal;
-      if (!wahl || wahl.length === 0) { gs._spellCancelled = true; return; }
-      const gewaehlt = stacks.find(a => a.id === wahl[0]);
-      if (!gewaehlt) { gs._spellCancelled = true; return; }
-      engine._firePendingCardReveal();
-      try {
-        const ownSid = ps.socketId;
-        if (ownSid && engine.io) engine.io.to(ownSid).emit('card_reveal', { cardName: CARD_NAME });
-      } catch { /* Anzeige ist Beiwerk */ }
-      const abilityName = gewaehlt.cardName;
-      let abgelegt = 0;
-      for (let k = 0; k < STACK; k++) {
-        const entry = engine.getAbilityTargets(ctx.cardHeroOwner ?? pi, { heroIdx, cardName: abilityName })   // Als Befund 29.9.: Brettseite des Wirkers
-          .find(a => a.zoneKind === gewaehlt.zoneKind && a.slotIdx === gewaehlt.slotIdx);
-        if (!entry || !(await engine.discardAbilityTopCopy(entry, { source: CARD_NAME, sourceOwner: pi }))) break;
-        abgelegt++;
-        engine.sync();
-        await engine._delay(250);
+      // W4b: Normalweg — die Kosten hat `payActivationCost` vor der Kette bezahlt (Marke an der Instanz).
+      let abilityName = inst?._kostenAbility || null;
+      if (inst) delete inst._kostenAbility;
+      const vorab = !!abilityName;
+      if (!hero?.name || hero.hp <= 0 || !inst) { if (!vorab) gs._spellCancelled = true; return; }   // Kosten bezahlt: Karte verbraucht
+      if (!vorab) {
+        abilityName = await zahleKosten(ctx);
+        if (!abilityName) { gs._spellCancelled = true; return; }
       }
-      // Als Befund 29.9.: ohne vollstaendig bezahlte Kosten keine Wirkung.
-      if (abgelegt === 0) { gs._spellCancelled = true; return; }
 
       // Effekt: Second-Action-Grant, an den Nutzer gebunden.
       inst.heroIdx = heroIdx;
