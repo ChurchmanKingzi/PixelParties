@@ -41151,7 +41151,59 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     this.log('token_not_a_card', { card: inst.name, to: unter ? 'underlying_deleted' : 'gone' });
+    this._tokenZerfallSenden(inst, !!unter);
     return true;
+  }
+
+  /**
+   * ★ W6 (Al 14.10.2026: „Das optische Token-Fliegen muss weg, stattdessen sollen sie (außer sie haben Träger-Karten
+   * wie bei Biomancy) desintegrieren."): ein Token, das das Brett verlässt, fliegt NICHT mehr zu einem Stapel (er
+   * kommt in keinen — siehe `tokenAbgang`), sondern zerfällt an seinem Platz. Das Ereignis `token_disintegrate`
+   * (`{ owner: BRETTSEITE, heroIdx, slotIdx, cardName, unterkarte }`) sendet `tokenAbgang` — der EINE Pfad, über den
+   * jeder Token-Abgang läuft (Tod, Zerstören, Rückgabe auf Hand/Deck/Ablage, Opfer, Insel-Aufräumen; Heldentod lässt Tokens liegen).
+   * Die Stapel-Flüge (`play_pile_transfer`) für Tokens unterdrückt `_tokenStapelFlug` zentral in `_broadcastEvent`.
+   * Liegt eine echte Karte darunter (`unterkarte`), fliegt SIE weiter in den Gelöscht-Stapel (Flug bleibt), der Token
+   * zerfällt zusätzlich. Genau einmal je Instanz; nur aus einem Support-Platz (nicht aus dem Sog des Lochs, `_sogUrsprung`).
+   */
+  _tokenZerfallSenden(inst, unterkarte) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst._sogUrsprung) return;
+    if (!Number.isInteger(inst.heroIdx) || !Number.isInteger(inst.zoneSlot) || inst.zoneSlot < 0) return;
+    if (!this._tokenZerfallGesendet) this._tokenZerfallGesendet = new WeakSet();
+    if (this._tokenZerfallGesendet.has(inst)) return;
+    this._tokenZerfallGesendet.add(inst);
+    this._broadcastEvent('token_disintegrate', {
+      owner: this.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      cardName: inst.name, unterkarte: !!unterkarte,
+    });
+  }
+
+  /**
+   * ★ W6: Bereinigt einen Brett→Stapel/Hand/Deck-Flug (`play_pile_transfer`), der einen TOKEN zeigen würde: ein Token ohne
+   * Karte darunter gehört nirgends hin und zerfällt stattdessen (`_tokenZerfallSenden`) → `null` (Flug entfällt).
+   * Biomancy-/Boulder-Token (echte Karte darunter) behalten ihren Flug, aber die Karte darunter wandert in den
+   * GELÖSCHT-Stapel ihres Besitzers (nie in Hand/Deck/Ablage) → Ziel wird dorthin korrigiert. Erkennung: die Instanz am
+   * Quellplatz (Biomancy-Token tragen den Namen einer Potion) bzw. ein reiner Token-Name; ein Flug in eine Brettzone
+   * (Umsetzen) bleibt unberührt. Liefert `d` selbst, wenn nichts zu tun ist.
+   */
+  _tokenStapelFlug(d) {
+    if (!d || !d.cardName || (d.from !== 'support' && d.from !== 'boardCenter')) return d;
+    if (d.to !== 'hand' && d.to !== 'deck' && d.to !== 'discard' && d.to !== 'deleted' && d.to !== 'potionDeck') return d;
+    let inst = null;
+    if (Number.isInteger(d.fromHeroIdx) && Number.isInteger(d.fromSlotIdx)) {
+      const seite = d.fromOwner ?? d.owner;
+      inst = this.cardInstances.find(c => c.zone === ZONES.SUPPORT && c.heroIdx === d.fromHeroIdx && c.zoneSlot === d.fromSlotIdx
+        && c.name === d.cardName && (c.owner === seite || this.physicalSide(c) === seite)) || null;
+    }
+    if (inst) {
+      if (!this.isTokenCard(inst)) return d;
+      if (!this.tokenUnterkarte(inst)) return null;
+    } else {
+      const cd = this._getCardDB()[d.cardName];
+      return (cd && hasCardType(cd, 'Token')) ? null : d;
+    }
+    if (d.to === 'deleted') return d;
+    const { toHandIdx, finalHandSize, ...rest } = d;
+    return { ...rest, to: 'deleted', toOwner: this.kartenBesitzerVon(inst) };
   }
 
   /**
@@ -49809,6 +49861,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
+    // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
+    if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
     // Animation broadcasts count as progress for the runHooks timeout
     // watcher — a hook that's spacing itself with delay+broadcast (Chain
     // Lightning's per-bolt animation, Wheels' staggered draw, Cosmic

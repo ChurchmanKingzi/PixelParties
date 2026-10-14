@@ -5572,6 +5572,15 @@ Besitzers; liefert `true` bei einem Token → dann die Karte NICHT zusätzlich i
 Schadens-Batch/`removeIslandZones`, Namens-Netz `_tokenStattKarte` in `handZugangSync`/`actionAddCardToHand` → verwirft
 ohne Stapel) rufen sie. Wer eine Brettkarte selbst in Hand/Deck/Ablage schreibt, fragt vorher `isTokenCard` und ruft
 `tokenAbgang`. Beschwören/Übernehmen **auf das Brett** (Hunting Lv2/3, Paraseed) bleibt mit Tokens erlaubt.
+**Optik (W6, Al 14.10.2026: „Das optische Token-Fliegen muss weg, stattdessen sollen sie (außer sie haben Träger-Karten wie bei Biomancy) desintegrieren."):**
+ein Token fliegt nie zu einem Stapel oder zur Hand — er **zerfällt an seinem Platz** (Pixel-Zerfall im Client, `tokenZerfallSpielen` in `app-board.jsx`).
+`tokenAbgang` sendet dafür EIN Ereignis `token_disintegrate` `{ owner (Brettseite), heroIdx, slotIdx, cardName, unterkarte }` (genau einmal je Instanz);
+`play_pile_transfer` mit einem Token als Quelle (`from: 'support'`) filtert `_broadcastEvent` zentral heraus (`_tokenStapelFlug`) — auch Flüge, die eine Karte
+selbst vor dem Abgang sendet (Deepsea-Rückgabe, Zerstören, Schadenstod …); ein Umsetzen auf dem Brett (`to: 'support'`) bleibt unberührt.
+Liegt eine echte Karte darunter (Biomancy-/Boulder-Token), zerfällt der Token zusätzlich und die Karte fliegt weiter — immer in den **Gelöscht-Stapel**
+(ein Flug mit Ziel Hand/Ablage/Deck wird dorthin umgeschrieben). Wer künftig eine Brettkarte selbst ablegt/zurückgibt, ruft `tokenAbgang` (dann kommt der
+Zerfall automatisch); einen eigenen Flug für einen Token braucht es nicht. Pollution Tokens haben ihre eigene Verdunstung (`pollution_evaporate`) und laufen nicht
+über `tokenAbgang`.
 
 **★ Besitzer-Regel (W3, Entscheidung Welle 5, Al 14.10.2026 — gilt vor allen älteren Rulings):** „Karten landen *immer* im
 Deck/Discard/Deleted Pile ihres **permanenten Besitzers**, durch alles." und „Karten werden immer ins Deck ihres originalen
