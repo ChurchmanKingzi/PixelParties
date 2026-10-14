@@ -152,6 +152,8 @@ module.exports = {
       const quelle = ctx.source;
       // Styx 28.9.: Quelle = dieser Held (Brettseite `heroOwner` + Index).
       if (!quelle || (quelle.heroOwner ?? quelle.owner) !== (ctx.cardHeroOwner ?? pi) || quelle.heroIdx !== hi) return;
+      // W7a (H02-20, Al): `bypassStatusFilter` gilt nur der Zeitmarke im onTurnEnd — das Ziehen ist ein Heldeneffekt und ruht bei Frost/Betäubung/Negation.
+      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? pi, hi)) return;
       await engine.showTriggeredEffect(CARD_NAME);   // Regel: aktivierter Effekt zeigt seine Karte
       await engine.actionDrawCards(pi, 1, { source: CARD_NAME });
       engine.log('heragas_draw', {

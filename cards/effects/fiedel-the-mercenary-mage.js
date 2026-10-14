@@ -70,6 +70,8 @@ function _applyOverrides(ctx) {
 
 module.exports = {
   activeIn: ['hero'],
+  // W7a (Al): der Reaction-Rabatt (`levelOverrideCards`) ist ein laufender Heldenpassiv — ruht bei Frost/Betäubung/Negation (Engine `_heroLevelOverride`)
+  levelOverridesArePassive: true,
 
   hooks: {
     onGameStart: (ctx) => _applyOverrides(ctx),

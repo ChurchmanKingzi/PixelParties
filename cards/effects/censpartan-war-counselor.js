@@ -70,7 +70,10 @@ function resyncShield(engine, pi, selfId, selfLeaving = false) {
   const oppIdx = engine.opponentOf(pi);
   // Geht Censpartan selbst ab (A06-19), schirmt er niemanden mehr: er steht im
   // Leave-Hook noch im Support, die anderen Ratgeber bleiben aber auf dem Feld.
-  const shouldHave = new Set(selfLeaving ? [] :
+  // ★ W7a (A06-12, Al): der Schirm ist ein laufender Passiv Censpartans — ruht, solange er gefroren/betäubt/negiert ist.
+  const quelle = engine.cardInstances.find(i => i.id === selfId);
+  const quelleRuht = !!quelle && engine.isCreatureEffectSuppressed(quelle, { honorNegStatusImmune: false });
+  const shouldHave = new Set((selfLeaving || quelleRuht) ? [] :
     controlledWarCounselors(engine, pi)
       .filter((inst) => inst.id !== selfId)
       .map((inst) => inst.id),
@@ -117,6 +120,8 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // W7a: der Schirm-Abgleich muss Zustandswechsel auch im stillgelegten Zustand mitbekommen (Hooks laufen immer, fragen selbst).
+  bypassStatusFilter: true,
 
   canSummon: makeSingletonCanSummon(CARD_NAME),
 
@@ -203,5 +208,9 @@ module.exports = {
       resyncFromCtx(ctx);
     },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
+    // W7a: Frost/Betäubung/Negation kommen und gehen
+    onPhaseStart: (ctx) => resyncFromCtx(ctx),
+    onStatusApplied: (ctx) => resyncFromCtx(ctx),
+    onStatusRemoved: (ctx) => resyncFromCtx(ctx),
   },
 };

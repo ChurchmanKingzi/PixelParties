@@ -99,6 +99,16 @@ function _findSourceInst(engine, pi, cardName) {
   return null;
 }
 
+/**
+ * ★ W7a (A04-cute-26, Al 14.10.2026): die Umleitung ist ein laufender Ersatzeffekt und ruht, solange KEIN Wildur der Seite
+ * wirksam ist (gefroren/betäubt/negiert/Clown-Aura: `isCreatureEffectSuppressed`). Der Override bleibt installiert; er fragt je Push.
+ */
+function _wildurWirkt(engine, pi) {
+  return engine.cardInstances.some(c =>
+    c.name === CARD_NAME && c.zone === 'support' && (c.controller ?? c.owner) === pi
+    && !engine.isCreatureEffectSuppressed(c, { honorNegStatusImmune: false }));
+}
+
 function _installRedirect(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps || ps[INSTALLED_FLAG]) return;
@@ -109,7 +119,7 @@ function _installRedirect(engine, pi) {
     if (cards.length === 0) return this.length;
     // Only redirect when (a) the per-turn slot is open, AND (b) the
     // Stack visualisation actually exists for this controller.
-    if (!ps[TURN_FLAG] && _stackExists(engine, pi)) {
+    if (!ps[TURN_FLAG] && _wildurWirkt(engine, pi) && _stackExists(engine, pi)) {
       const first = cards[0];
       ps[TURN_FLAG] = true;
 

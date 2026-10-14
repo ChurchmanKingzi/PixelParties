@@ -317,6 +317,8 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
     if (inst.zone !== 'support') return false;
     const c = inst.counters;
     if (!c || !(c.forcesTargeting || c.buffs?.forcesTargeting)) return false;
+    // ★ W7a (C02-02, Al): der Schutzschirm/Spott einer Kreatur ist ein laufender Passiv und ruht bei Frost/Betäubung/Negation.
+    if (engine.isCardPassiveDormant(inst)) return false;
     const side = inst.controller ?? inst.owner;
     if (side === casterPi) return false;
     return tauntDirectedAtCaster(c.forcesTargeting_pi, c.forcesTargeting_untilTurn);
@@ -12449,7 +12451,8 @@ class GameEngine {
     // Sparkfly Attendant gift: blocks destroys from the opponent only.
     // Own-side sacrifices etc. still resolve.
     if (!_u && this.isOppEffectImmuneFrom(targetCard, source)) return;
-    if (!_u && targetCard.counters?._damageDestroyImmune) {
+    // ★ W7a (A05-04, Al): die Immunität einer geladenen Time Bomblebee ist ein laufender Passiv — ruht bei Frost/Betäubung/Negation.
+    if (!_u && targetCard.counters?._damageDestroyImmune && !this.isCardPassiveDormant(targetCard)) {
       // Generic "fully damage- and destroy-immune" flag (Time Bomblebee
       // while charged with Bomb Counters). Mirror of the same check in
       // processCreatureDamageBatch.
@@ -24974,7 +24977,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const eqHero = gs.players[eqOwner]?.heroes?.[opts.heroIdx];
       let hs = null;
       try { hs = eqHero?.name ? loadCardEffect(eqHero.name) : null; } catch { hs = null; }
-      if (typeof hs?.equipCostReduction === 'function') {
+      // ★ W7a (H04-21, Al): der Rabatt ist ein laufender Heldenpassiv und ruht bei Frost/Betäubung/Negation des Zielhelden.
+      if (typeof hs?.equipCostReduction === 'function' && !this._isHeroEffectSilenced(eqOwner, opts.heroIdx)) {
         heroEquipReduction = hs.equipCostReduction(gs, playerIdx, opts.heroIdx, cardData, this) || 0;
       }
     }
@@ -29560,9 +29564,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Z1 (H03-20): „you draw" = KONTROLLEUR des Helden (uebernommener Nomu wirkt fuer den Uebernehmenden).
     for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(playerIdx)) {
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
-      // Mummy Token silences hero passives (see runHooks filter + bug 7).
-      if (this._isHeroMummified(physOwner, hi)) continue;
+      // Mummy Token, Frost, Betäubung, Negation: ein Prüfer (W7a, `_isHeroEffectSilenced`).
+      if (this._isHeroEffectSilenced(physOwner, hi)) continue;
       const script = this.heroScript(hero);
       if (script?.isNomuHero) return true;
     }
@@ -29615,9 +29618,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Turn-based bypass (Willy, etc.)
     if (ps._noHandLimitUntilTurn != null && (this.gs.turn || 1) <= ps._noHandLimitUntilTurn) return true;
     // Hero-based bypass (alive + not incapacitated)
-    for (const { hero } of this.heroesControlledBy(playerIdx)) {   // Z1 (H03-20): „You have no hand size limit" = Kontrolleur
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(playerIdx)) {   // Z1 (H03-20): „You have no hand size limit" = Kontrolleur
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
+      if (this._isHeroEffectSilenced(physOwner, hi)) continue;   // W7a (H03-heroes-04): ein EINZIGER Prüfer (kennt auch Mummy Token)
       if (hero.bypassHandLimit) return true;
       const script = this.heroScript(hero);
       if (script?.bypassHandLimit) return true;
@@ -39959,7 +39962,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     if (inst.counters?._controlLocked) return true;
     const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
-    return script?.controlCannotChange === true;
+    // ★ W7a (C01-16, Al): „Control of this Creature cannot change" ist ein laufender Passiv und ruht bei Frost/Betäubung/Negation.
+    return script?.controlCannotChange === true && !this.isCardPassiveDormant(inst);
   }
 
   /**
@@ -40901,7 +40905,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[hi];
       if (!hero?.name) continue;
       const heroScript = this.heroScript(hero);
-      const heroSide = typeof heroScript?.canBypassLevelReqForCard === 'function';
+      const heroSide = typeof heroScript?.canBypassLevelReqForCard === 'function'
+        && !this._isHeroEffectSilenced(playerIdx, hi);   // W7a: ruhender Held leuchtet nicht
       const bypassed = [];
       const seen = new Set();
       for (const cn of (ps.hand || [])) {
@@ -41041,6 +41046,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Kontrolleur, seitenfremd beschworene Kreaturen ihrem Beschwoerer.
    */
   _zusatzAnbieterVon(inst, playerIdx) {
+    // ★ W7a (A07-26, Al): ein gefrorener/betäubter/negierter Anbieter (Wolflesia …) stellt keine Zusatzaktion mehr zur Verfügung.
+    if (this.isCardPassiveDormant(inst)) return false;
     if (inst.owner === playerIdx && (inst.controller ?? inst.owner) === playerIdx
         && inst.counters?.crossSideControlled == null) {
       // Schnellweg fuer den Normalfall — nur der Held kann fremd sein.
@@ -44040,8 +44047,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const script = loadCardEffect(inst.name);
       const spec = script?.grantsActiveAbilityBorrowToHost;
       if (!spec) continue;
-      if (inst.counters?.negated || inst.counters?.nulled
-          || inst.counters?.frozen || inst.counters?.stunned) continue;
+      // ★ W7a (A07-25, Al): EIN Prädikat statt eigener Statusliste (kennt auch Clown-Aura und Magic Silence).
+      if (this.isCardPassiveDormant(inst)) continue;
       if (inst.faceDown) continue;
       if ((inst.counters?.currentHp ?? 1) <= 0) continue;
       try {
@@ -44647,6 +44654,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.name || hero.hp <= 0) return false;
     const heroScript = this.heroScript(hero);
     if (typeof heroScript?.grantsInherentActionForCard !== 'function') return false;
+    if (this._isHeroEffectSilenced(hs, heroIdx)) return false;   // ★ W7a (H01-heroes-09, Al): Heldenpassiv ruht bei Frost/Betäubung/Negation
     try {
       // Heldenvertrag: liest seine eigene Spalte (wie bisher im Uebernahme-Zweig).
       return !!heroScript.grantsInherentActionForCard(gs, hs, heroIdx, cardData, this);
@@ -44858,7 +44866,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (schools.length === 0 || combined >= level) return true;
 
     // Failed primary count — try bypass paths against this same zone set.
-    const blr = hero.bypassLevelReq;
+    // ★ W7a (H01-heroes-21, H02-17, H04-02, Al): Stufen-/Schul-Umgehungen sind laufende Heldenpassive (Beato, Gobbo, Sol Rym,
+    // Sorin, Tsu'Ki, Baaliel, Mary, Luna …) und ruhen bei Frost/Betäubung/Negation des Helden.
+    const _bypassRuht = this._isHeroEffectSilenced(playerIdx, heroIdx);
+    const blr = _bypassRuht ? null : hero.bypassLevelReq;
     if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return true;
 
     if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack' || cardData.cardType === 'Creature') {
@@ -44897,7 +44908,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // bypasses level reqs for Cute Creatures, etc.). Mirror to the
     // card-script branch above — same arg shape, hero-script keyed.
     const heroScript = this.heroScript(hero);
-    if (typeof heroScript?.canBypassLevelReqForCard === 'function') {
+    if (typeof heroScript?.canBypassLevelReqForCard === 'function' && !_bypassRuht) {
       try {
         if (heroScript.canBypassLevelReqForCard(this.gs, playerIdx, heroIdx, cardData, this)) return true;
       } catch (err) {
@@ -44939,18 +44950,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W7a (A07-20, Al): Stufen-Stempel eines HELDEN-Eintrags (`hero.levelOverrideCards[name]`) — der EINE Lesezugriff der drei
+   * ★ W7a (A07-20, H04-02, Al): Stufen-Stempel eines HELDEN-Eintrags (`hero.levelOverrideCards[name]`) — der EINE Lesezugriff der drei
    * Stufenrechnungen (`heroMeetsLevelReq`, `effectiveCardLevel`, `getWisdomDiscardCost`). Ein Stempel von „Gigantisaur King Trex"
    * ist ein laufender Passiv und gilt nur, solange ein Trex der Seite wirksam ist (`stempelWirkt`: nicht gefroren/betäubt/negiert);
-   * sonst zählt der frühere Wert (`prevValue`) bzw. keiner. Alle anderen Einträge (Sol Rym, Fiedel, Archibald …) unverändert.
+   * sonst zählt der frühere Wert (`prevValue`) bzw. keiner. Stempel des Helden selbst (Skript-Flag `levelOverridesArePassive`: Sol Rym, Fiedel)
+   * ruhen, solange der Held stillgelegt ist; alle anderen Einträge (Archibald, Shamanic Curse: Wirk-Zeitfenster) unverändert.
    * @returns {number|null} die gesetzte Stufe oder `null` (kein Eintrag)
    */
   _heroLevelOverride(playerIdx, heroIdx, cardName) {
     const ps = this.gs.players[playerIdx];
-    const v = ps?.heroes?.[heroIdx]?.levelOverrideCards?.[cardName];
+    const hero = ps?.heroes?.[heroIdx];
+    let v = hero?.levelOverrideCards?.[cardName];
     if (v == null) return null;
     const e = v === 0 ? ps._kingTrexOverrideRegistry?.[heroIdx]?.find(x => x.name === cardName) : null;
-    if (e && !loadCardEffect('Gigantisaur King Trex')?.stempelWirkt?.(this, playerIdx)) return e.prevValue ?? null;
+    let vomTrex = false;
+    if (e) {
+      if (loadCardEffect('Gigantisaur King Trex')?.stempelWirkt?.(this, playerIdx)) vomTrex = true;
+      else v = e.prevValue ?? null;
+    }
+    // Stempel, die der HELD selbst als laufenden Passiv schreibt (`levelOverridesArePassive`: Sol Rym, Fiedel), ruhen mit ihm.
+    if (v != null && !vomTrex && this.heroScript(hero)?.levelOverridesArePassive && this._isHeroEffectSilenced(playerIdx, heroIdx)) return null;
     return v;
   }
 
@@ -45689,7 +45708,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;
 
-    const blr = hero.bypassLevelReq;
+    const blr = this._isHeroEffectSilenced(playerIdx, heroIdx) ? null : hero.bypassLevelReq;   // W7a: ruht wie in `_testLevelReqForZones`
     if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return 0;
 
     const cov = this._findLevelGapCoverage(cardData, gap, abZones, playerIdx, heroIdx);
@@ -47321,7 +47340,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           || inst?.counters?._baihuPetrify
           || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
-      } else if (inst?.counters?._damageDestroyImmune) {
+      } else if (inst?.counters?._damageDestroyImmune && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee
         // stamps this while it has Bomb Counters; cleared when counters
         // are removed. Distinct from `_cardinalImmune` so the Cardinal

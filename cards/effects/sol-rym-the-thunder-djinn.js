@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // W7a (H04-02, Al): der Stempel `levelOverrideCards` ist ein laufender Heldenpassiv — ruht bei Frost/Betäubung/Negation (Engine `_heroLevelOverride`)
+  levelOverridesArePassive: true,
   hooks: {
     // „1 Action per turn" schliesst ZUSATZAKTIONEN ein (H04-01): jede aufgeloeste Aktion
     // DIESES Helden — auch eine zusaetzliche/inhaerente — verbraucht die eine Aktion.

@@ -42,10 +42,12 @@
 //    Hooked via beforeDamage: target=Inya AND
 //    any live Buddy → setAmount(0).
 //
-//  bypassStatusFilter is set so Inya's damage
-//  shield keeps protecting her while she's
-//  frozen / stunned / negated — passive
-//  protection isn't an "effect she activates."
+//  ★ W7a (H01-heroes-20, Al 14.10.2026: „Freeze, Stun
+//  und Negated unterbrechen alle laufenden passiven
+//  Effekte"): KEIN `bypassStatusFilter` mehr — der
+//  Schadensschild ist ein laufender Schutz und ruht
+//  wie der Buddy-Effekt bei Frost, Betäubung und
+//  Negation. (Vorher hielt das Flag den Schild.)
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Card Game Player Inya';
@@ -95,9 +97,6 @@ module.exports = {
   },
 
   activeIn: ['hero'],
-  // Damage shield is a passive — keep it active even when Inya is
-  // frozen / stunned / negated.
-  bypassStatusFilter: true,
 
   hooks: {
     /**

@@ -42,11 +42,15 @@ module.exports = {
   },
 
   activeIn: ['support'],
+  // ★ W7a (A07-29, Al 14.10.2026): der gewirkte Schutz ist eine VERGEBENE Wirkung (kein laufender Passiv) und bleibt, auch wenn der
+  // Choir danach gefroren/betäubt/negiert wird. Die Hooks laufen deshalb immer; der Suchtrigger bei der Beschwörung fragt selbst.
+  bypassStatusFilter: true,
 
   // ── On summon: search deck for Summoning Magic + shield hook ──────────────
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
+      if (engine.isCreatureEffectSuppressed(ctx.card, { honorNegStatusImmune: false })) return;   // W7a: stillgelegt -> kein Suchtrigger
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;

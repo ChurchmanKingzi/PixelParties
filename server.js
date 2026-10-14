@@ -4540,7 +4540,8 @@ function checkPotionLock(ps, gs, pi) {
   const spieler = (gs && gs.players) || [ps];
   for (let seite = 0; seite < spieler.length; seite++) {
     for (const hero of (spieler[seite]?.heroes || [])) {
-      if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
+      // ★ W7a (H03-heroes-16, Al): die Sperre ist ein laufender Heldenpassiv — ruht bei Negation, Frost, Betäubung (wie `_isHeroEffectSilenced`).
+      if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed) continue;
       const kontrolleur = hero.charmedBy ?? hero.permaControlBy ?? seite;
       if (gs && pi != null ? kontrolleur !== pi : seite !== 0) continue;
       const heroScript = heroScriptOf(hero);

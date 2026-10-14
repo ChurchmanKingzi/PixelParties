@@ -157,6 +157,8 @@ function recomputeFighting(ctx) {
     // Kontrolle statt Seite (Styx 28.9.): Fighting der Helden, die der
     // Gegner KONTROLLIERT (Instanzen physisch beim Besitzer).
     for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(oi)) {
+      // W7a (A07-30, Al): das Fighting eines gefrorenen/betäubten Gegnerhelden (bzw. mit negierten Abilities) ruht — es wird nicht geliehen.
+      if (engine._isHeroAbilityPassiveSilenced(physOwner, hi)) continue;
       const t = fightingTotalForHero(engine, physOwner, hi);
       if (t > oppHighest) oppHighest = t;
     }
@@ -572,7 +574,11 @@ module.exports = {
       }
     },
 
+    // W7a (A07-30, Al): die Fighting-Leihe folgt dem Zustand des Gegnerhelden auch MITTEN im Zug (Frost/Betäubung kommt und geht).
+    onStatusRemoved: (ctx) => { recomputeFighting(ctx); },
+
     onStatusApplied: (ctx) => {
+      recomputeFighting(ctx);
       if (!lizbethActiveBorrower(ctx)) return;
       const hero = ctx.attachedHero;
       // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden

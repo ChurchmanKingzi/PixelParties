@@ -159,6 +159,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // ★ W7a (A07-14, Al 14.10.2026): der erteilte Schutz ist eine an ANDERE Karten VERGEBENE Wirkung, kein laufender Passiv Gous —
+  // er bleibt, auch wenn Gou danach gefroren/betäubt/negiert wird (nur der Abgang vom Brett beendet ihn vorzeitig). Alle Hooks der
+  // Karte betreffen nur diesen Schutz (Schild + Aufräumen) und laufen deshalb immer.
+  bypassStatusFilter: true,
 
   canSummon: canSummonGuardianBeast,
   inherentAction: (gs, pi) => inherentActionForFirstSummon(gs, pi),

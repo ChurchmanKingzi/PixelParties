@@ -56,8 +56,15 @@ async function syncBishopNegation(engine, ignoreInstId) {
 module.exports = {
   cpuResponse(engine, kind, payload) { return ofKingsCpuAnswer(engine, kind, payload); },
   activeIn: ['support'],
+  // ★ W7a (A06-11, Al): die Negation ist ein laufender Passiv des Bishops und ruht, solange er gefroren/betäubt/negiert ist
+  // (`conditionHolds` fragt `isCreatureEffectSuppressed`). Damit der Abgleich den Zustandswechsel mitbekommt, laufen die
+  // Hooks auch im stillgelegten Zustand — sie rufen nur den Abgleich, der die Stilllegung selbst prüft.
+  bypassStatusFilter: true,
 
   hooks: {
+    onStatusApplied: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
+    onStatusRemoved: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
+    onPhaseStart: async (ctx) => { await syncBishopNegation(ctx._engine); },
     onCardEnterZone: async (ctx) => { await syncBishopNegation(ctx._engine); },
     onCardLeaveZone: async (ctx) => {
       const self = ctx.leavingCard?.id === ctx.card.id;

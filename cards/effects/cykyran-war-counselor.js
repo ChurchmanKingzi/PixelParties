@@ -67,8 +67,13 @@ function resync(engine, pi, ausserId = null) {
   if (!ps) return;
   // `ausserId`: die Kopie, die gerade abgeht — sie steht im Leave-Hook noch im
   // Support und darf sich nicht mehr mitzaehlen (A06-18).
+  // ★ W7a (A06-13, Al): die Verdopplung ist ein laufender Passiv Cykyrans — sie gilt nur, solange eine Cykyran WIRKT (nicht
+  // gefroren/betäubt/negiert/Aura-negiert); mitgezählt werden die Ratgeber unabhängig von ihrem Zustand („you control").
   const active = new Set(controlledWarCounselors(engine, pi)
-    .filter((i) => i.id !== ausserId).map((i) => i.name)).size >= NEEDED_DISTINCT;
+    .filter((i) => i.id !== ausserId).map((i) => i.name)).size >= NEEDED_DISTINCT
+    && engine.cardInstances.some((i) => i.name === CARD_NAME && i.zone === 'support' && !i.faceDown
+      && i.id !== ausserId && (i.controller ?? i.owner) === pi
+      && !engine.isCreatureEffectSuppressed(i, { honorNegStatusImmune: false }));
 
   // Kontrolle statt Seite (Styx 28.9.) — „your Heroes": alle Helden, die
   // `pi` kontrolliert, plus die, auf denen noch SEIN Zuschlag liegt
@@ -123,6 +128,8 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
   creatureEffect: true,
+  // W7a: der Abgleich muss Zustandswechsel auch im stillgelegten Zustand mitbekommen (Hooks laufen immer, fragen selbst).
+  bypassStatusFilter: true,
 
   canSummon: makeSingletonCanSummon(CARD_NAME),
 
@@ -235,5 +242,9 @@ module.exports = {
     },
     onTurnStart: (ctx) => resyncFromCtx(ctx),
     afterDamage: (ctx) => resyncFromCtx(ctx),
+    // W7a: Frost/Betäubung/Negation kommen und gehen
+    onPhaseStart: (ctx) => resyncFromCtx(ctx),
+    onStatusApplied: (ctx) => resyncFromCtx(ctx),
+    onStatusRemoved: (ctx) => resyncFromCtx(ctx),
   },
 };
