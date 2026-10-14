@@ -13,6 +13,9 @@ const { areaTargetId } = require('./_targeting-shared');
 //    this turn, this counts as an additional
 //    Action.
 //
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt; die Zielwahl danach ist nicht mehr abbrechbar. Der Rest dieses Absatzes beschreibt den alten Ablauf.
+//
 //  House clarifications (per user spec):
 //    • Cost (delete Terror Tengu) is paid AFTER
 //      the player picks the bounce target, BEFORE
@@ -390,6 +393,26 @@ module.exports = {
     return (ps?.discardPile || []).indexOf(COST_NAME) >= 0;
   },
 
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar oder kein legales Ziel → nichts bezahlt,
+  // Karte bleibt auf der Hand. Fallback: lief `payActivationCost` nicht (anderer Spielweg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    // Ohne legales Ziel wird nichts bezahlt (wie bisher: „no legal targets → no cost paid").
+    if (_collectBoardTargets(engine.gs, engine).length === 0) {
+      engine.log('tengu_windstorm_fizzle', { player: ps.username, reason: 'no_targets' });
+      return false;
+    }
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -397,6 +420,9 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
+      const abbruch = () => { if (!vorab) gs._spellCancelled = true; };   // Kosten bezahlt: Karte ist verbraucht
 
       // Snap "first Action this turn" BEFORE any prompt fires (otherwise
       // the pending-play-log for this Spell flushes on the first prompt
@@ -415,7 +441,8 @@ module.exports = {
         // Nothing to bounce. The Spell has not committed yet (no target
         // selected, so the cost path was never reached) — refund the
         // Action via _spellCancelled so the cost ALSO stays unpaid.
-        gs._spellCancelled = true;
+        // (W4b: nach dem Fenster verschwundene Ziele — Kosten bezahlt, Karte verbraucht.)
+        abbruch();
         engine.log('tengu_windstorm_fizzle', {
           player: ps.username, reason: 'no_targets',
         });
@@ -428,7 +455,7 @@ module.exports = {
         description:  'Choose any card on the board that is not a Hero.',
         confirmLabel: '🌪️ Banish to deck!',
         confirmClass: 'btn-info',
-        cancellable:  true,
+        cancellable:  !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
         exclusiveTypes: true,
         maxPerType:   { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
       });
@@ -436,14 +463,14 @@ module.exports = {
       if (!cardPick || cardPick.length === 0) {
         // Cancelled BEFORE cost is paid — refund the Action and leave
         // Terror Tengu in the discard pile.
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
 
       const sel = boardTargets.find(t => t.id === cardPick[0]);
       const targetInst = sel?._cardInstance;
       if (!targetInst) {
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
 
@@ -452,12 +479,12 @@ module.exports = {
       if (targetInst.zone === 'hand' || targetInst.zone === 'discard'
           || targetInst.zone === 'deleted' || targetInst.zone === 'hero'
           || targetInst.zone === 'deck') {
-        gs._spellCancelled = true;
+        abbruch();
         return;
       }
       if (targetInst.counters?.immovable) {
         // Immovable target — refund (no cost paid yet).
-        gs._spellCancelled = true;
+        abbruch();
         engine.log('tengu_windstorm_blocked', {
           card: targetInst.name, reason: 'immovable',
         });
@@ -468,13 +495,15 @@ module.exports = {
       // Now that a valid target is locked in, delete Terror Tengu from
       // discard. Defensive re-check guards against a parallel reaction
       // having moved Tengu during the target prompt.
-      if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-      if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
-        gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
-        return;
+      if (!vorab) {
+        if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
+          gs._spellCancelled = true;
+          return;
+        }
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
 
       // ── Area-Schutzfenster (Pawn of Kings [B], Guardian of Teocuilatl, Wowhalla) ──
