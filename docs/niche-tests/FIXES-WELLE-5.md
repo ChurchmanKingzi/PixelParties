@@ -52,3 +52,15 @@ Al hat die liegengebliebenen Fragen aus [FIXES-WELLE-1.md](FIXES-WELLE-1.md) und
 * Client: Flug-Animationen (`play_pile_transfer`) zeigen Token noch zum Stapel fliegen, obwohl nichts ankommt.
 * Teil „Fenster je Karte" von A08-31 (Cool Presents) bleibt rot; von Al nicht angesprochen.
 * Ghuanjun: Critical Strike (2× Grund-ATK = 160) und Massacre (+50 je Kreatur = 130) rechnen ihre eigene Formel mit der aktuellen Grund-ATK; Alternative wäre „jede Attack genau Grund-ATK". Bitte bestätigen.
+
+## Nachträge nach dem ersten Abschluss (14.10.2026)
+
+| Thema | Entscheidung / Umsetzung |
+|---|---|
+| Cool Tech Jetpack (F01-12) | Al: „Wenn ein Effekt spezifisch nur bei der ersten Instanz von etwas triggern kann, wird sie auch beim Ablehnen aufgebraucht." → Skript-Hook `consumeOnDecline` (Engine ruft ihn bei „Nein"); Jetpack verbraucht das „erste Mal" auch bei Ablehnen. Divine Gift of The Light und Gerrymander taten das schon |
+| No Retreat! und die Priests | Al: „No Retreat soll die Priests erkennen!" → Priest of Luna/Tempeste (Zusatzbeschwörung, Kosten = 5 Kreaturen mischen) werden erkannt; das Fenster liegt vor den Kosten, bei Negierung bleibt der Priest auf der Hand, nichts wird gemischt/bezahlt (`isInherentAction` im Kettenkopf, `shufflesIntoDeckIf` in `_priest-shared`). Weitere Karten mit demselben Muster gibt es unter den Skripten nicht |
+| Token-Optik | Al: „Das optische Token-Fliegen muss weg, stattdessen sollen sie (außer sie haben Träger-Karten wie bei Biomancy) desintegrieren." → Neues Ereignis `token_disintegrate` (aus `tokenAbgang`), `play_pile_transfer` für reine Tokens zentral unterdrückt; Client `tokenZerfallSpielen` (Pixelzerfall ~1,25 s, `prefers-reduced-motion`: 350 ms Ausblenden). Biomancy-/Boulder-Token zerfällt, die Karte darunter fliegt zum Gelöscht-Stapel |
+
+Endstand nach den Nachträgen: **346 Repros grün von 743**, 0 Rückschritte, 0 Abstürze; `check-*.js` wie im Ausgangszustand; E2E rot nur battle, lobby, prep, seats, target; Dauerfeuer ohne neu auffällige Läufe. Der Client-Zerfall ist in echtem Chromium an einer Attrappen-Zone getestet (`scripts/skilltest-e2e/ui-token-zerfall.js`, 15 Prüfungen), nicht in einem vollständigen Spiel.
+
+Offen aus den Nachträgen (Ja/Nein an Al): Sollen Pollution Tokens beim Entfernen ebenfalls im selben Pixelzerfall verschwinden statt in ihrer eigenen Verdunstung? Soll der Zerfall einen Klang bekommen?
