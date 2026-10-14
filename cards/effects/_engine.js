@@ -39851,7 +39851,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return 0;
-    if (this._isHeroEffectSilenced(ownerIdx, heroIdx)) return 0;
+    // W4a (Al, Welle 4 / C): „Interference als Ability wirkt, solange nicht Abilities negiert sind." Die LEICHTE Negierung
+    // (nur Heldeneffekt: Decisive Defeat, Weakening Crystal, Locke …) laesst sie wirken; stumm ist sie bei Stunned/Webbed/Frozen/
+    // Mumie (wie bisher) und bei der HARTEN Form bzw. `abilitiesNegated` (Stowaway) - genau das Praedikat der Ability-Passiv-Hooks.
+    if (this._isHeroAbilityPassiveSilenced(ownerIdx, heroIdx)) return 0;
     const abZones = [
       ...(ps.abilityZones?.[heroIdx] || []),
       ...this.heroSupportAbilityStacks(ownerIdx, heroIdx),
