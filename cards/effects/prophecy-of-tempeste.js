@@ -228,7 +228,9 @@ module.exports = {
         });
         ctx.setAmount(DAMAGE_CAP);
       }
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;   // W7a: nur die Umleitung ruht
+      // ★ W8 (Al, 14.10.2026, Frage 2): die Umleitung läuft bei Freeze/Stun NICHT weiter - sie ruht bei Frost/Betäubung/Negation
+      // des Wirts (EIN Prüfer `_isHeroEffectSilenced`: mit Chilly-Dog-Ausnahme, Webbed, Mumie); nur der Deckel (statische Regel) gilt weiter.
+      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? ownerIdx, ctx.cardHeroIdx)) return;
 
       // Target must be a hero on the SAME side, NOT the host itself.
       const target = ctx.target;
@@ -324,7 +326,7 @@ module.exports = {
 
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
+      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? ownerIdx, ctx.cardHeroIdx)) return;   // W8: die Umleitung ruht (s. beforeDamage)
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
