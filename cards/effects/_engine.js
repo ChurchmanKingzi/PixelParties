@@ -38974,6 +38974,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return null;
     const hi = link.isInitialCard ? link.heroIdx : link.casterHeroIdx;
     if (!Number.isInteger(hi) || hi < 0) return null;
+    // Z7c: opfert der Wirker sich selbst als KOSTEN („Sacrifice … to play this card", Divine Gift of Sacrifice,
+    // `payActivationCost` vor der Kette), fällt er nicht als Wirker aus — die Karte soll trotzdem auflösen dürfen.
+    const _kow = this.gs._kostenOpferWirker;
+    if (_kow && link.isInitialCard && _kow.cardName === link.cardName && _kow.pi === (link.casterOwner ?? link.owner) && _kow.heroIdx === hi) return null;
     return this.wirkerHandlungsunfaehig(link.casterOwner ?? link.owner, hi);
   }
 

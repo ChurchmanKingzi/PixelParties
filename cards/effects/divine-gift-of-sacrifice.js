@@ -11,6 +11,16 @@
 //  user's own turn as an inherent additional
 //  Action. No reaction / chain behavior.
 //
+//  ★ Z7c (Als Entscheidung, Welle 3): DAS OPFER IST EIN KOSTENPUNKT
+//  („Sacrifice a Hero … TO PLAY THIS CARD"). Es wird deshalb in
+//  `payActivationCost` VOR dem Reaktionsfenster bezahlt (Wahl des
+//  Opfers, Tod). Wird die Karte danach komplett negiert (Silence, The
+//  Master's Plan …), bleibt der Held geopfert, die Karte wirkt nicht,
+//  und der Einmal-Slot `divineGift` bleibt frei (Z7b). Erst `onPlay`
+//  (Wirkung) wählt den Empfänger und erhöht die HP.
+//  Fallback: lief `payActivationCost` nicht (anderer Spielweg), zahlt
+//  `onPlay` die Kosten wie früher selbst.
+//
 //  Animation: snake devour on sacrifice, golden
 //  sparkles on buffed hero.
 // ═══════════════════════════════════════════
@@ -36,14 +46,17 @@ function getSacrificeTargets(gs, pi) {
 }
 
 /**
- * Core sacrifice logic: pick a hero to sacrifice, kill it, buff another.
+ * KOSTEN (Z7c): Opfer wählen und besiegen. Läuft vor dem Reaktionsfenster
+ * (`payActivationCost`) bzw. als Fallback am Anfang von `onPlay`.
+ * Rückgabe: `{ heroIdx, name, maxHp }` des Opfers oder `null` (nicht zahlbar,
+ * nichts passiert). Die Wahl ist nicht abbrechbar (wie bisher).
  */
-async function doSacrifice(engine, pi) {
+async function payOpferKosten(engine, pi, inst) {
   const gs = engine.gs;
   const ps = gs.players[pi];
 
   const sacrificeTargets = getSacrificeTargets(gs, pi);
-  if (sacrificeTargets.length < 2) return false; // Need 2+ to sacrifice one and buff another
+  if (sacrificeTargets.length < 2) return null; // Need 2+ to sacrifice one and buff another
 
   // Step 1: Pick hero to sacrifice
   const sacrificePick = await engine.promptEffectTarget(pi, sacrificeTargets, {
@@ -57,41 +70,20 @@ async function doSacrifice(engine, pi) {
     maxTotal: 1,
   });
 
-  if (!sacrificePick || sacrificePick.length === 0) return false;
+  if (!sacrificePick || sacrificePick.length === 0) return null;
   const sacTarget = sacrificeTargets.find(t => t.id === sacrificePick[0]);
-  if (!sacTarget) return false;
+  if (!sacTarget) return null;
 
   const sacHero = ps.heroes[sacTarget.heroIdx];
-  if (!sacHero?.name || sacHero.hp <= 0) return false;
+  if (!sacHero?.name || sacHero.hp <= 0) return null;
   const sacMaxHp = sacHero.maxHp || sacHero.hp;
 
-  // Step 2: Pick hero to receive the buff (exclude sacrificed hero)
-  const buffTargets = sacrificeTargets.filter(t => t.id !== sacTarget.id);
-  if (buffTargets.length === 0) return false;
-
-  let buffTarget;
-  if (buffTargets.length === 1) {
-    buffTarget = buffTargets[0]; // Auto-select if only 1 option
-  } else {
-    const buffPick = await engine.promptEffectTarget(pi, buffTargets, {
-      title: 'Divine Gift of Sacrifice',
-      description: `Choose a Hero to receive +${sacMaxHp} max HP from ${sacHero.name}.`,
-      confirmLabel: '✨ Empower!',
-      confirmClass: 'btn-success',
-      cancellable: false,
-      greenSelect: true,
-      exclusiveTypes: true,
-      maxPerType: { hero: 1 },
-      maxTotal: 1,
-    });
-
-    if (!buffPick || buffPick.length === 0) return false;
-    buffTarget = buffTargets.find(t => t.id === buffPick[0]);
-    if (!buffTarget) return false;
+  // Z7c: opfert sich der WIRKER selbst, darf der Zauber deshalb nicht fizzeln
+  // (Engine `_kettenWirkerFizzelt` liest die Marke) — das Opfer ist Kosten, nicht Ausfall des Wirkers.
+  delete gs._kostenOpferWirker;
+  if ((inst?.heroOwner ?? pi) === pi && inst?.heroIdx === sacTarget.heroIdx) {
+    gs._kostenOpferWirker = { pi, heroIdx: sacTarget.heroIdx, cardName: 'Divine Gift of Sacrifice' };
   }
-
-  const buffHero = ps.heroes[buffTarget.heroIdx];
-  if (!buffHero?.name || buffHero.hp <= 0) return false;
 
   // Step 3: Snake devour animation on sacrificed hero
   engine._broadcastEvent('play_zone_animation', {
@@ -122,8 +114,53 @@ async function doSacrifice(engine, pi) {
     { reason: 'Divine Gift of Sacrifice', respectFirstTurnProtection: false, isSacrifice: true }
   );
 
+  return { heroIdx: sacTarget.heroIdx, name: sacHero.name, maxHp: sacMaxHp };
+}
+
+/**
+ * WIRKUNG: Empfänger wählen und Max-/Aktuelle HP um die Max-HP des Opfers erhöhen.
+ * `opfer` = Ergebnis von `payOpferKosten` (Kosten bereits bezahlt). Rückgabe `true`,
+ * wenn der Zauber (auch als Verpuffer) aufgelöst hat, `false` = Abbruch (nur ohne bezahlte Kosten).
+ */
+async function doSacrifice(engine, pi, opfer) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+
   // If game ended from all heroes dead, stop
   if (gs.result) return true;
+
+  // Step 2: Pick hero to receive the buff (exclude sacrificed hero)
+  const sacrificeTargets = getSacrificeTargets(gs, pi);
+  const buffTargets = sacrificeTargets.filter(t => t.heroIdx !== opfer.heroIdx);
+  if (buffTargets.length === 0) {
+    // Kosten sind bezahlt (Z7c), aber es gibt keinen Empfänger mehr (in der Kette gefallen): verpufft.
+    engine.log('divine_gift_sacrifice_no_target', { player: ps.username, sacrificed: opfer.name });
+    return true;
+  }
+
+  let buffTarget;
+  if (buffTargets.length === 1) {
+    buffTarget = buffTargets[0]; // Auto-select if only 1 option
+  } else {
+    const buffPick = await engine.promptEffectTarget(pi, buffTargets, {
+      title: 'Divine Gift of Sacrifice',
+      description: `Choose a Hero to receive +${opfer.maxHp} max HP from ${opfer.name}.`,
+      confirmLabel: '✨ Empower!',
+      confirmClass: 'btn-success',
+      cancellable: false,
+      greenSelect: true,
+      exclusiveTypes: true,
+      maxPerType: { hero: 1 },
+      maxTotal: 1,
+    });
+
+    if (!buffPick || buffPick.length === 0) return true;   // Kosten bezahlt: kein Abbruch mehr
+    buffTarget = buffTargets.find(t => t.id === buffPick[0]);
+    if (!buffTarget) return true;
+  }
+
+  const buffHero = ps.heroes[buffTarget.heroIdx];
+  if (!buffHero?.name || buffHero.hp <= 0) return true;
 
   // Step 5: Golden sparkles on buffed hero
   engine._broadcastEvent('play_zone_animation', {
@@ -133,11 +170,11 @@ async function doSacrifice(engine, pi) {
   await engine._delay(400);
 
   // Step 6: Increase current and max HP
-  engine.increaseMaxHp(buffHero, sacMaxHp);
+  engine.increaseMaxHp(buffHero, opfer.maxHp);
 
   engine.log('divine_gift_sacrifice', {
     player: ps.username,
-    sacrificed: sacHero.name, sacMaxHp,
+    sacrificed: opfer.name, sacMaxHp: opfer.maxHp,
     buffed: buffHero.name, newMaxHp: buffHero.maxHp,
   });
 
@@ -295,13 +332,30 @@ module.exports = {
     return getSacrificeTargets(gs, pi).length >= 2;
   },
 
+  /**
+   * ★ Z7c: das Opfer („to play this card") wird VOR dem Reaktionsfenster bezahlt — eine
+   * Negation der Karte (Silence, The Master's Plan …) macht es nicht ungeschehen.
+   * Die Instanz merkt sich das Opfer für `onPlay`.
+   */
+  async payActivationCost(ctx) {
+    const opfer = await payOpferKosten(ctx._engine, ctx.cardOwner, ctx.card);
+    if (opfer && ctx.card) ctx.card._opfer = opfer;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
 
-      const success = await doSacrifice(engine, pi);
+      // Kosten schon bezahlt? Sonst (anderer Spielweg ohne `payActivationCost`) jetzt zahlen.
+      let opfer = ctx.card?._opfer;
+      if (!opfer) opfer = await payOpferKosten(engine, pi, ctx.card);
+      delete gs._kostenOpferWirker;   // nur für die Dauer der Kette nötig
+      if (!opfer) { gs._spellCancelled = true; return; }
+      if (ctx.card) delete ctx.card._opfer;
+
+      const success = await doSacrifice(engine, pi, opfer);
       if (!success) {
         gs._spellCancelled = true;
       }

@@ -34,6 +34,13 @@
 //  Der Wurf hat seit v727 eine eigene Animation `knife_throw_fly`:
 //  das Messer kommt flach und schnell aus dem Bildrand geflogen,
 //  schlaegt ein und spritzt Blut entgegen der Flugrichtung.
+//
+//  ★ Z7c (Als Entscheidung, Welle 3): die KOSTEN („… to play this card")
+//  werden in `payActivationCost` VOR dem Reaktionsfenster bezahlt — wird
+//  der Angriff danach komplett negiert, bleibt das Artefakt in der
+//  Ablage. Fehlt beim Zahlen die Ausruestung, gilt das wie ein Abbruch
+//  (`false`: Karte bleibt auf der Hand). Fallback: lief `payActivationCost`
+//  nicht (Sofort-Guss, anderer Weg), zahlt `onPlay` wie frueher selbst.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -54,6 +61,38 @@ function ausruestungAm(engine, pi, heroIdx) {
     out.push(inst);
   }
   return out;
+}
+
+/**
+ * KOSTEN: ein ausgeruestetes Artefakt des Nutzers in die Ablage. Rueckgabe `true` = bezahlt,
+ * `false` = nicht zahlbar (nichts passiert). Eine Stelle fuer `payActivationCost` und den Fallback in `onPlay`.
+ */
+async function zahleKosten(ctx) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const ps = engine.gs.players[pi];
+  const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
+  if (!hero?.name || hero.hp <= 0) return false;
+  const ausruestung = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Ausruestung des Nutzers auf seiner Brettseite
+  if (ausruestung.length === 0) return false;
+
+  let opfer = ausruestung[0];
+  if (ausruestung.length > 1) {
+    const wahl = await engine.promptGeneric(pi, {
+      type: 'cardGallery', title: CARD_NAME,
+      description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`,
+      cards: ausruestung.map(i => ({ name: i.name, source: 'board' })),
+      cancellable: false,
+    });
+    opfer = ausruestung.find(i => i.name === wahl?.cardName) || ausruestung[0];
+  }
+  await engine.actionMoveCard(opfer, 'discard', -1, -1, {
+    source: ctx.card, sourceName: CARD_NAME,
+  });
+  engine.sync();
+  await engine._delay(200);
+  return true;
 }
 
 module.exports = {
@@ -88,6 +127,12 @@ module.exports = {
     endsAttackSequence: true,
   },
 
+  /** ★ Z7c: Kosten („to play this card") vor dem Reaktionsfenster; `false` = nicht zahlbar → Abbruch ohne Verlust. */
+  async payActivationCost(ctx) {
+    if (!(await zahleKosten(ctx))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -99,24 +144,9 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
       // ── ① Kosten: ein ausgeruestetes Artefakt in die Ablage ──────
-      const ausruestung = ausruestungAm(engine, ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Ausruestung des Nutzers auf seiner Brettseite
-      if (ausruestung.length === 0) { gs._spellCancelled = true; return; }
-
-      let opfer = ausruestung[0];
-      if (ausruestung.length > 1) {
-        const wahl = await engine.promptGeneric(pi, {
-          type: 'cardGallery', title: CARD_NAME,
-          description: `Send one of ${hero.name}'s Artifacts to the discard pile to throw it.`,
-          cards: ausruestung.map(i => ({ name: i.name, source: 'board' })),
-          cancellable: false,
-        });
-        opfer = ausruestung.find(i => i.name === wahl?.cardName) || ausruestung[0];
-      }
-      await engine.actionMoveCard(opfer, 'discard', -1, -1, {
-        source: ctx.card, sourceName: CARD_NAME,
-      });
-      engine.sync();
-      await engine._delay(200);
+      // Z7c: Normalweg — `payActivationCost` hat sie vor der Kette bezahlt; sonst (Fallback) jetzt.
+      if (ctx.card?._kostenBezahlt) delete ctx.card._kostenBezahlt;
+      else if (!(await zahleKosten(ctx))) { gs._spellCancelled = true; return; }
 
       // ── ② Ziel und Schaden ───────────────────────────────────────
       const damage = (hero.atk || 0) * ATK_MULT;

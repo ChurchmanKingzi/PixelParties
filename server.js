@@ -8288,10 +8288,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     room.engine._setPendingPlayLog('spell_played', { card: cardName, player: ps.username, hero: hero.name, cardType: cardData.cardType });
 
+    // Z7c: ein striktes `false` aus `payActivationCost` = der Spieler hat die Kostenwahl abgebrochen
+    // (nichts bezahlt) → Abbruch wie in der Zielwahl: weder Kette noch `onPlay`, Karte zurück auf die Hand.
+    let _kostenAbbruch = false;
     if (script?.payActivationCost) {
       try {
         const costCtx = room.engine._createContext(inst, {});
-        await script.payActivationCost(costCtx);
+        if ((await script.payActivationCost(costCtx)) === false) _kostenAbbruch = true;
       } catch (err) {
         console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message);
       }
@@ -8304,7 +8307,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._wirkerSeite = { pi, heroIdx, heroOwner };
     let chainResult;
     try {
-    chainResult = await room.engine.executeCardWithChain({
+    chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
       resolve: null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
@@ -8380,7 +8383,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     gs._spellDamageLog = [];
     gs._spellExcludeTargets = [];
-    gs._spellCancelled = false;
+    gs._spellCancelled = _kostenAbbruch;   // Z7c
 
     if (!chainResult.chainFormed) {
       gs._pendingCardReveal = { cardName, ownerIdx: pi };
@@ -8403,7 +8406,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
     // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
     const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
-    if (!_gefizzelt) {
+    if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
       gs._wirkerSeite = { pi, heroIdx, heroOwner };
       try {
