@@ -2581,9 +2581,10 @@ class GameEngine {
     };
     if (opts.mandatory) {
       const pay = Math.min(buy.cost, gold);
-      if (pay > 0) await spend(pay); // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
+      let paid = 0;   // G1: TATSAECHLICH gezahlt (goldLocked → 0), nicht der Wunschbetrag
+      if (pay > 0 && await spend(pay)) paid = pay; // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
       buy.paidTurn = this.gs.turn;
-      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: pay, mandatory: true });
+      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid, mandatory: true });
       this.sync();
       return true;
     }

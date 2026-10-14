@@ -56,13 +56,18 @@ module.exports = {
   deferBroadcast: true,
   activeIn: ['support', 'ability', 'hero', 'hand', 'discard'],
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     const cardDB = {}; // placeholder — real check below
+    // G1 (A09-11, Als Antwort): unter der Goldsperre ("cannot spend Gold") sind nur Gesamtkosten 0 erlaubt, also nur Stufe-0-Kreaturen
+    // (Kartentext: Kosten = 10 x Stufe). Die "mindestens 10 Gold"-Regel unten ist KEINE Kartentext-Bedingung, nur die Vorpruefung
+    // fuer Stufe >= 1 - sie sperrt die Karte unter der Goldsperre daher nicht mehr ganz, sondern laesst nur noch Stufe 0 zu.
+    if (ps.goldLocked) {
+      if (!engine || !buildCreatureGallery(ps, engine._getCardDB(), engine, pi).some(e => e.level === 0)) return false;
+    } else
     // Player needs at least 10 gold (level 1 minimum cost) and a free support zone
     if ((ps.gold || 0) < COST_PER_LEVEL) return false;
-    if (ps.goldLocked) return false;   // G1 (A09-11): Goldsperre - wie Gold 0 (Mindestgold 10 gilt unveraendert)
     const hasFreeZone = (ps.heroes || []).some((h, hi) =>
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
@@ -83,7 +88,9 @@ module.exports = {
 
     // ── Step 1: pick a Creature from deck or hand ────────────────────────
 
-    const gallery = buildCreatureGallery(ps, cardDB, engine, pi);
+    let gallery = buildCreatureGallery(ps, cardDB, engine, pi);
+    // G1 (A09-11): Goldsperre - nur Auswahlen mit Gesamtkosten 0 (Stufe 0) sind waehlbar
+    if (ps.goldLocked) gallery = gallery.filter(e => e.level === 0);
     if (gallery.length === 0) return { aborted: true };
 
     const creaturePick = await engine.promptGeneric(pi, {

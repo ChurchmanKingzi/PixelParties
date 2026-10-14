@@ -282,11 +282,11 @@ function equipHeldErlaubt(gameState, myIdx, cardName, ownerIdx, heroIdx) {
  *  `heroIdx` der Seite `ownerIdx` bezahlbar? Zielheld-Rabatte gibt es
  *  nur fuer eigene Helden — so rechnet auch der Server. */
 function equipBezahlbarAuf(me, myIdx, cardName, card, handIdx, ownerIdx, heroIdx) {
-  if (!card || goldSelfFinanced(me, cardName)) return true;
+  if (!card) return true;
   const preis = applyCrystalCostMods(me, cardName, card.cost || 0)
     - ((me.handCostReductions || {})[handIdx] || 0)
     - (ownerIdx === myIdx ? equipHeldRabatt(me, handIdx, heroIdx) : 0);
-  return (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, preis);
+  return goldKannZahlen(me, cardName, preis);
 }
 
 function applyCrystalCostMods(me, cardName, baseCost) {
@@ -737,6 +737,15 @@ function goldIsNegative(v) { return (Number(v) || 0) < 0; }
 /** Finanziert sich diese Karte selbst? Namensliste kommt vom Server. */
 function goldSelfFinanced(ps, cardName) {
   return !!cardName && (ps?.goldSelfOverdraftCards || []).includes(cardName);
+}
+/** G1 (A09-11): Kann der Spieler `preis` Gold zahlen? Goldsperre (`goldLocked`, Golden Arrow: "cannot spend Gold"): Kosten > 0 nie,
+ *  Kosten 0 immer - sonst wie bisher (Kontostand + Kreditrahmen, Selbstfinanzierer). Spiegelt `engine.canAffordGold`. */
+function goldKannZahlen(ps, cardName, preis) {
+  const p = Math.max(0, Number(preis) || 0);
+  if (p <= 0) return true;
+  if (ps?.goldLocked) return false;
+  if (goldSelfFinanced(ps, cardName)) return true;
+  return (Math.max(0, ps?.gold || 0) + (ps?.goldOverdraft || 0)) >= p;
 }
 function formatGold(v) {
   const n = Number(v) || 0;
@@ -34062,8 +34071,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // (mirrors `applyRustingCrystalCostMultiplier` server-side).
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
           const effCost = Math.max(0, baseAfterCrystal - handReduction);
-          if (!goldSelfFinanced(me, card.name)
-              && (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) < effCost) return true;
+          // G1: inkl. Goldsperre; Karten mit Stufen-Preis (`goldLockSelfChecked`) prüfen ihre Kosten selbst - dort entscheidet `unactivatableArtifacts`.
+          if (!(me.goldLocked && (me.goldLockSelfChecked || []).includes(card.name)) && !goldKannZahlen(me, card.name, effCost)) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -35329,8 +35338,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //    Kartenskripte, deshalb schickt der Server die Namen.
       // Ohne beides graut die Oberflaeche Karten aus, die der Server
       // laengst erlaubt.
-      && (goldSelfFinanced(me, card.name)
-          || (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0) - besterEquipHeldRabatt(me, idx)));
+      && goldKannZahlen(me, card.name, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0) - besterEquipHeldRabatt(me, idx));
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility

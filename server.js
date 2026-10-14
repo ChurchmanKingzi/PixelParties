@@ -4962,6 +4962,10 @@ function sendGameState(room, playerIdx, extra) {
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
       goldLocked: ps.goldLocked || false,   // G1 (A09-11): Goldsperre (Golden Arrow) - fuer die Client-Ausgrauung bereitgestellt
+      // G1 (A09-11): Handartefakte mit Stufen-Preis (`manualGoldCost` ohne `goldPerTarget`: Capture Net, Dark Gear, Staff of Illusions …)
+      // pruefen Gold-Kosten selbst (Kosten 0 moeglich) - der Client darf sie unter der Sperre nicht pauschal ausgrauen (Grau-Liste: `unactivatableArtifacts`).
+      goldLockSelfChecked: (ps.goldLocked && pi === playerIdx)
+        ? [...new Set((ps.hand || []).filter(n => { const sc = loadCardEffect(n); return !!sc?.manualGoldCost && !sc.goldPerTarget; }))] : [],
       drawLocked: ps.drawLocked || false,
       // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
       // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der

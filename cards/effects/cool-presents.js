@@ -42,6 +42,7 @@ const CARD_NAME = 'Cool Presents';
 module.exports = {
   isTargetingArtifact: true,
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Uebergabe - unter der Goldsperre nur bei Preis 0 aktivierbar (server.js doUseArtifactEffect)
 
   /**
    * Optimistic gate — need ≥1 hand card (besides the resolving copy),
@@ -52,7 +53,7 @@ module.exports = {
     const ps = gs.players?.[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;
-    if ((ps.gold || 0) < 4 || ps.goldLocked) return false;   // G1 (A09-11): Goldsperre - jede Uebergabe kostet Gold
+    if ((ps.gold || 0) < 4) return false;
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
     // 2 cards is the floor either way.
