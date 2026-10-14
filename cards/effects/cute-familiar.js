@@ -213,6 +213,7 @@ module.exports = {
     // plays AND ability activations for the rest of this turn,
     // cleared automatically at turn-start.
     targetHero._actionLockedTurn = engine.gs.turn;
+    targetHero._actionLockedFremd = engine.gs.turn;   // W8: Fremdsperre (Lethes Selbstabgleich löst nur die eigene)
 
     engine.log('cute_familiar_extra_action', {
       player: ps.username,

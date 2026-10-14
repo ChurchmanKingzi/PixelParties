@@ -209,6 +209,7 @@ module.exports = {
     const destHero = zps.heroes[destHeroIdx];
     if (destHero) {
       destHero._actionLockedTurn = gs.turn;
+      destHero._actionLockedFremd = gs.turn;   // W8: Fremdsperre (Lethes Selbstabgleich löst nur die eigene)
     }
 
     // ── Step 7: shuffle deck + reveal to opponent ──
