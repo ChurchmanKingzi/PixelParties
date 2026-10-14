@@ -1,5 +1,7 @@
 # Fragen an Al – gesammelt aus allen Berichten
 
+> **Stand 14.10.2026:** Die bereinigte Liste steht in [FRAGEN-OFFEN.md](FRAGEN-OFFEN.md). Diese Datei bleibt als Archiv der ursprünglichen 179 Fragen unverändert.
+
 **179 Fragen.** Jede Frage steht mit Befund-ID und Titel; die Details (Karten, Aufbau, Repro) stehen im verlinkten Bericht. Antwort „ja/nein" genügt meist.
 
 ## A01-pollution
