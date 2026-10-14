@@ -29,7 +29,7 @@ const H = require('../../lib/h.js');
     t.script.push({ match: d => /Archibald/.test((d.title || '') + (d.message || '') + (d.description || '')), answer: (d) => { angebote.push((d.message || d.description || '').slice(0, 90)); return { confirmed: true }; } });
     await t.play(0, 'Draw', { hero: 0, noGrant: true });
     R.note('Archibald', `Angebote ${JSON.stringify(angebote)}; Hand ${t.pile(0, 'hand').length}, Gegner ${t.pile(1, 'hand').length}`);
-    R.check('(b) Archibald bietet die gerade gespielte Draw nicht zum Nachwurf an', angebote.length === 0, angebote);
+    R.check('(b) Archibald bietet die gerade gespielte Draw nicht zum Nachwurf an (W5b-B10: Filler als echte Abwurfkarte darf angeboten werden)', !angebote.some(a => /^Draw/.test(a)), angebote);
   }
   R.finish();
 })();

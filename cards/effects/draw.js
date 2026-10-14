@@ -58,9 +58,14 @@ async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberu
   await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () =>
     engine.withDiscardBatch(oppIdx, { source: CARD_NAME }, async () => {
       let guard = 0;
-      while (((me?.hand?.length || 0) > 0 || (op?.hand?.length || 0) > 0)
+      // W5b-B10 (Al, Welle 5: „eine gespielte Karte ist nie abgeworfen"): die gerade auflösende Draw gehört nicht zur
+      // abzuwerfenden Hand – weder Zähler (Cute Bunny, Glass of Marbles) noch Archibald sehen sie als abgeworfen;
+      // sie geht wie jede gespielte Karte erst nach der Auflösung in die Ablage (`doPlaySpell`).
+      const meineIdx = () => (me ? engine._handIndizesOhneAufloesende(me) : []);
+      while ((meineIdx().length > 0 || (op?.hand?.length || 0) > 0)
              && guard++ < 200) {
-        const myCard  = (me?.hand?.length || 0) > 0 ? me.hand[0] : null;
+        const myI = meineIdx()[0];
+        const myCard  = myI != null ? me.hand[myI] : null;
         const oppCard = (op?.hand?.length || 0) > 0 ? op.hand[0] : null;
 
         // Launch BOTH hand→discard flights on the same beat (before
@@ -70,7 +75,7 @@ async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberu
         // onDiscard hooks for each.
         if (myCard != null) {
           engine._broadcastEvent('play_pile_transfer', {
-            owner: pi, cardName: myCard, from: 'hand', to: 'discard', fromHandIdx: 0,
+            owner: pi, cardName: myCard, from: 'hand', to: 'discard', fromHandIdx: myI,
           });
         }
         if (oppCard != null) {
@@ -83,7 +88,7 @@ async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberu
         // der Gleichschritt (BEAT_MS) die Zeitführung ist.
         const lockstep = { source: CARD_NAME, _noFlight: true, _noPace: true };
         if (myCard != null
-            && await engine.actionDiscardHandCard(pi, myCard, 0, lockstep)) my++;
+            && await engine.actionDiscardHandCard(pi, myCard, myI, lockstep)) my++;
         // Gegnerseite MIT Quellenangabe: das ist ein fremder Zwangs-
         // abwurf, kein Eigenabwurf. Damit oeffnet er das Ambush-Fenster
         // und faellt unter den Erstrunden-Riegel (v860).
@@ -92,7 +97,7 @@ async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberu
                  { ...lockstep, sourceOwner: pi })) opp++;
 
         engine.sync();
-        const more = (me?.hand?.length || 0) > 0 || (op?.hand?.length || 0) > 0;
+        const more = meineIdx().length > 0 || (op?.hand?.length || 0) > 0;
         if (more) await engine._delay(BEAT_MS);
       }
     }),
@@ -132,10 +137,8 @@ module.exports = {
       const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx || gegnerBoris;
 
       // ── Both players discard their entire hands, card by card, in
-      //    lockstep (one card each per beat). The caster's hand
-      //    includes the resolving Draw itself — the engine's
-      //    self-discard path (getResolvingHandIndex → -1) handles
-      //    that without a double-discard.
+      //    lockstep (one card each per beat). The resolving Draw itself
+      //    is NOT part of the dumped hand (W5b-B10).
       const { my: myDiscarded, opp: oppDiscarded } =
         await dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichBoris);
       engine.sync();
