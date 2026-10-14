@@ -172,6 +172,7 @@ function refreshAttendantAura(engine, playerIdx, opts = {}) {
     inst.zone === 'support'
     && inst.name === 'Sparkfly Attendant'
     && inst.id !== opts.ausserId
+    && !inst.counters?.negated && !inst.counters?.nulled   // W5b-Z3 (Al): ein negierter Attendant gibt keinen Schutz mehr
     && (inst.controller ?? inst.owner) === playerIdx,
   );
 

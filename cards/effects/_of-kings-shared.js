@@ -165,6 +165,7 @@ function sourceOwnerOf(source, engine) {
 function protectorAffectable(engine, inst, source) {
   if (engine.isOmniImmune?.(inst)) return false;
   const so = sourceOwnerOf(source, engine);
+  if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(engine, inst.controller ?? inst.owner);   // W5b-Z3
   if (inst.counters?._oppEffectImmune && so != null && so !== (inst.controller ?? inst.owner)) return false;
   if (inst.counters?.untargetable_by_opponent && so != null
       && inst.counters.untargetable_by_opponent_pi === so) return false;

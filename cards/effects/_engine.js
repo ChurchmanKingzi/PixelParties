@@ -19003,6 +19003,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     const sourceOwner = source?.owner ?? source?.controller;
     const targetController = inst.controller ?? inst.owner;
+    // W5b-Z3: die Attendant-Aura gilt nur, solange ein NICHT negierter Attendant steht – beim Lesen frisch rechnen.
+    if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(this, targetController);
     if (inst.counters?._oppEffectImmune && sourceOwner != null && sourceOwner !== targetController) return true;
     // v818: Fenster-Immunitaet (Rook of Kings [B], Castling) und
     // dynamische Brett-Waechter (Board of Kings).
@@ -19021,6 +19023,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   isOppDamageImmuneFrom(inst, sourceOwner, source = null) {
     if (!inst) return false;
     const targetController = inst.controller ?? inst.owner;
+    if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(this, targetController);   // W5b-Z3
     if (inst.counters?._oppDamageImmune && sourceOwner != null && sourceOwner !== targetController) return true;
     // v818: Fenster-Immunitaet einer Kreatur (Rook of Kings [B],
     // Castling) und dynamische Brett-Waechter (Board of Kings).
