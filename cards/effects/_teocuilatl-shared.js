@@ -216,6 +216,128 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   return true; // placement consumed
 }
 
+/**
+ * ★ W4b (Al, Welle 4): DIE KOSTEN DES TAUSCHES VOR DEM REAKTIONSFENSTER. Das Opfer des Bewohners ist der Kostenpunkt
+ * („You may sacrifice a Creature … to summon this Creature"). `paySacrificeSwap` (aus `paySummonCost`) opfert den Bewohner
+ * — Messer, `onCreatureSacrificed`, Ablage, `onCardLeaveZone`/`onCreatureDeath` — und HAELT den frei gewordenen Platz
+ * (`engine.haltePlatzFuerTausch`: Corpse Cannibal und Green Dragoneer lassen ihn in Ruhe). Wird die Beschwoerung danach
+ * negiert, bleibt das Opfer bezahlt und die neue Kreatur kommt nicht ins Spiel. `placeAfterSacrificeSwap` (aus
+ * `beforeSummon`, nach dem Fenster) setzt die neue Kreatur in den frei gewordenen Platz (ist er trotzdem belegt, in einen
+ * anderen freien Platz desselben Helden, sonst `false` = Karte bleibt auf der Hand). Der alte atomare Tausch
+ * `sacrificeSummonIntoSlot` bleibt fuer Wege ohne `paySummonCost` bestehen.
+ * Rueckgabe von `paySacrificeSwap`: Daten `{ heroIdx, slotIdx, heroOwner, occName }` oder `false` (Bewohner nicht mehr opferbar).
+ */
+async function paySacrificeSwap(engine, pi, req, CARD_NAME_ARG) {
+  const gs = engine.gs;
+  const heroOwner = (isSeat(gs, req.heroOwner)) ? req.heroOwner : pi;
+  const fps = gs.players[heroOwner];
+  const occ = findOccupant(engine, pi, req.heroIdx, req.slotIdx, CARD_NAME_ARG, heroOwner);
+  if (!occ) return false;
+  const { heroIdx, slotIdx } = req;
+  const occName = occ.name;
+  engine.haltePlatzFuerTausch(heroOwner, heroIdx, slotIdx);
+
+  // (1) Messer + ON_CREATURE_SACRIFICED, solange der Bewohner noch im Platz steht.
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'knife_sacrifice', owner: heroOwner, heroIdx, zoneSlot: slotIdx,
+  });
+  await engine._delay(450);
+  await engine.runHooks('onCreatureSacrificed', {
+    creature: occ, cardName: occName, owner: occ.owner,
+    heroIdx, zoneSlot: slotIdx,
+    source: { name: CARD_NAME_ARG, owner: pi, heroIdx },
+    _skipReactionCheck: true,
+  });
+
+  // (2) Bewohner aus dem Platz in die Ablage, Todes-Signale.
+  const slotArr = fps.supportZones?.[heroIdx]?.[slotIdx];
+  if (Array.isArray(slotArr)) {
+    const idx = slotArr.indexOf(occName);
+    if (idx >= 0) slotArr.splice(idx, 1);
+  }
+  occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
+  if (!fps.discardPile) fps.discardPile = [];
+  fps.discardPile.push(occName);
+  engine.sync();
+  await engine.runHooks('onCardLeaveZone', {
+    card: occ, leavingCard: occ, fromZone: 'support',
+    fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+    toZone: 'discard', _skipReactionCheck: true,
+  });
+  await engine.runHooks('onCreatureDeath', {
+    creature: {
+      name: occName, owner: occ.owner, originalOwner: occ.originalOwner,
+      heroIdx, zoneSlot: slotIdx, instId: occ.id,
+    },
+    source: { name: CARD_NAME_ARG, owner: pi, heroIdx },
+    _skipReactionCheck: true,
+  });
+  engine._untrackCard(occ.id);
+  return { heroIdx, slotIdx, heroOwner, occName };
+}
+
+/** Landung nach dem Fenster (siehe `paySacrificeSwap`). `true` = Platzierung erledigt (Server ueberspringt seine eigene), `false` = Abbruch. */
+async function placeAfterSacrificeSwap(engine, pi, data, CARD_NAME_ARG) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const { heroOwner, occName } = data;
+  const fps = gs.players[heroOwner];
+  const heroIdx = data.heroIdx;
+  let slotIdx = data.slotIdx;
+  if (((fps.supportZones?.[heroIdx] || [])[slotIdx] || []).length > 0) {
+    // Im Fenster belegt worden: anderer freier Platz desselben Helden, sonst Abbruch (Opfer bleibt bezahlt).
+    const frei = [0, 1, 2].find(z => ((fps.supportZones?.[heroIdx] || [])[z] || []).length === 0);
+    if (frei == null) return false;
+    slotIdx = frei;
+  }
+
+  // Hand→Brett-Flug (vor der Entnahme, siehe `sacrificeSummonIntoSlot`).
+  const fromHandIdx = ps.hand.indexOf(CARD_NAME_ARG);
+  engine._broadcastEvent('hand_to_board_fly', {
+    ownerIdx: pi, cardName: CARD_NAME_ARG,
+    handIndex: fromHandIdx >= 0 ? fromHandIdx : 0,
+    zoneType: 'support', heroIdx, slotIdx, _forceOwnerAnim: true,
+    ...(heroOwner !== pi ? { destOwner: heroOwner } : {}),
+  });
+
+  if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+  fps.supportZones[heroIdx][slotIdx] = [CARD_NAME_ARG];
+  const newInst = engine._trackCard(CARD_NAME_ARG, heroOwner, 'support', heroIdx, slotIdx);
+  newInst.counters = newInst.counters || {};
+  if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
+  newInst.counters.isPlacement = 1;
+  newInst.turnPlayed = gs.turn || 0;
+
+  if (fromHandIdx >= 0) {
+    engine.takeFromPileSync(ps, 'hand', fromHandIdx);
+    engine.notePlayedFromHand(pi);
+  }
+  ps._resolvingCard = null;
+  ps._placementConsumedByCard = CARD_NAME_ARG;
+
+  engine._broadcastEvent('summon_effect', {
+    owner: heroOwner, heroIdx, zoneSlot: slotIdx, cardName: CARD_NAME_ARG,
+  });
+  engine.log('teocuilatl_sacrifice_summon', {
+    player: ps.username, sacrificed: occName, heroIdx, slotIdx,
+  });
+  engine.sync();
+
+  const hostHero = fps?.heroes?.[heroIdx];
+  const onDeadHero = !hostHero?.name || hostHero.hp <= 0;
+  await engine.runHooks('onPlay', {
+    _onlyCard: newInst, playedCard: newInst, cardName: CARD_NAME_ARG,
+    zone: 'support', heroIdx, zoneSlot: slotIdx,
+    _skipReactionCheck: true, _bypassDeadHeroFilter: onDeadHero,
+  });
+  await engine.runHooks('onCardEnterZone', {
+    enteringCard: newInst, toZone: 'support', toHeroIdx: heroIdx,
+    _skipReactionCheck: true, _bypassDeadHeroFilter: onDeadHero,
+  });
+  engine.sync();
+  return true; // placement consumed
+}
+
 /** Sacrifice a specific Guardian instance (hand or board): fire the
  *  sacrifice signal + per-turn tally/stamp, then route it to discard. */
 async function sacrificeSelf(engine, inst, pi) {
@@ -258,6 +380,8 @@ module.exports = {
   sacrificeableSlots,
   bounceTargets,
   sacrificeSummonIntoSlot,
+  paySacrificeSwap,
+  placeAfterSacrificeSwap,
   // War NIE exportiert — Guardian of Teocuilatl rief sie als freien
   // Bezeichner auf und lief dort in einen ReferenceError.
   sacrificeSelf,

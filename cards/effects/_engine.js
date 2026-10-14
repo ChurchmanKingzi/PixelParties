@@ -15430,6 +15430,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * freien und hat nichts zu verlieren.
    */
   isSlotReservedForSummon(playerIdx, heroIdx, zoneSlot) {
+    if (this.isSwapSlotHeld(playerIdx, heroIdx, zoneSlot)) return true;   // W4b: Tauschplatz bleibt bis zur Landung gehalten
     const r = this._reservedSummonSlot;
     if (!r) return false;
     if (r.playerIdx !== playerIdx || r.heroIdx !== heroIdx || r.zoneSlot !== zoneSlot) return false;
@@ -15483,7 +15484,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async _payCreatureSummonCost(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
     const script = loadCardEffect(cardName);
-    if (typeof script?.paySummonCost !== 'function') return true;
+    // Haken am Skript oder an der `beforeSummon`-Funktion selbst (gemeinsame Funktion `tryBouncePlace` der Deepsea-Kreaturen).
+    const _pay = typeof script?.paySummonCost === 'function' ? script.paySummonCost
+      : (typeof script?.beforeSummon?.paySummonCost === 'function' ? script.beforeSummon.paySummonCost : null);
+    if (!_pay) return true;
     const _alt = this._summonKostenBezahlt;
     if (_alt && _alt.cardName === cardName && _alt.playerIdx === playerIdx) this._verwerfeSummonKosten();   // Rest derselben Karte
     this._beschwoerungsOpferTiefe = (this._beschwoerungsOpferTiefe || 0) + 1;
@@ -15497,8 +15501,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
         if (heldSeite !== playerIdx) dummy.heroOwner = heldSeite;
         const ctx = this._createContext(dummy, { ...hookExtras });
-        const res = await script.paySummonCost(ctx);
+        const res = await _pay.call(script, ctx);
         if (res === false) {
+          delete this._tauschPlatz;
           if (this._pendingTributeSummon && this._pendingTributeSummon.cardName === cardName
               && this._pendingTributeSummon.playerIdx === playerIdx) delete this._pendingTributeSummon;
           return false;
@@ -15507,6 +15512,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return true;
       } catch (err) {
         console.error(`[paySummonCost] ${cardName} threw:`, err.message);
+        delete this._tauschPlatz;
         return false;
       } finally {
         this._reservedSummonSlot = _prevReservation;
@@ -15557,12 +15563,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** W4b: Rest der vorab bezahlten Artefakt-Kosten vergessen (Artefakt negiert/abgebrochen); die Kosten selbst bleiben bezahlt. */
   _verwerfeArtefaktKosten() { delete this._artefaktKostenBezahlt; }
 
+  /**
+   * W4b: Tausch-Kreaturen (Opfer/Rueckgabe EINES Bewohners, Deepsea-Tausch, Teocuilatl-Trio, Suspicious Monster) zahlen den
+   * Bewohner VOR dem Kettenfenster und landen erst danach im frei gewordenen Platz. Bis dahin ist der Platz gehalten — kein
+   * Todes-Trigger (Corpse Cannibal, Green Dragoneer) darf ihn wegschnappen (frueher: atomarer Tausch). `side` = physische Seite.
+   */
+  haltePlatzFuerTausch(side, heroIdx, zoneSlot) { this._tauschPlatz = { side, heroIdx, zoneSlot, turn: this.gs?.turn }; }
+  isSwapSlotHeld(side, heroIdx, zoneSlot) {
+    const t = this._tauschPlatz;
+    return !!t && t.turn === this.gs?.turn && t.side === side && t.heroIdx === heroIdx && t.zoneSlot === zoneSlot;
+  }
+
   /** W4b: vorab bezahlte Beschwörungskosten dieser Karte abholen (genau einmal), sonst `null`. */
   _takePaidSummonCost(cardName, playerIdx) {
     const k = this._summonKostenBezahlt;
     if (!k) return null;
     if (k.cardName !== cardName || k.playerIdx !== playerIdx || k.turn !== this.gs?.turn) return null;
     delete this._summonKostenBezahlt;
+    delete this._tauschPlatz;   // die Landung kommt jetzt (Tausch-Kreaturen), der Platz ist nicht mehr gehalten
     return k;
   }
 
@@ -15571,6 +15589,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const k = this._summonKostenBezahlt;
     if (!k) return;
     delete this._summonKostenBezahlt;
+    delete this._tauschPlatz;
     const p = this._pendingTributeSummon;
     if (p && p.cardName === k.cardName && p.playerIdx === k.playerIdx) delete this._pendingTributeSummon;
   }
