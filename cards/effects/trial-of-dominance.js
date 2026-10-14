@@ -108,7 +108,7 @@ module.exports = {
           title: CARD_NAME,
           description: 'Choose 1 Creature your opponent controls: defeat it and delete it.',
           confirmLabel: '💀 Defeat!', confirmClass: 'btn-danger',
-          cancellable: false, maxTotal: 1, minRequired: 1,
+          cancellable: false, maxTotal: 1, minRequired: 1,   // pflichtwahl: Idas Einzelziel-Wahl ist Pflicht (wie Cataclysm/Armageddon)
         });
         const gewaehlt = creatures.find(i => engine.kreaturZiel(i).id === (ids && ids[0]));
         creatures = [gewaehlt || creatures[0]];

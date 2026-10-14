@@ -55,8 +55,7 @@ module.exports = {
     if (ps.handLocked) return false;
     // W5b-B6 (Al, Welle 5): Geben ist der EINZIGE Effekt – ist die Gegnerhand gesperrt (Hand-/Such-Sperre:
     // „cannot search or add cards to the hand"), würde er versagen, also ist die Karte gar nicht aktivierbar.
-    const oi = engine?.opponentOf ? engine.opponentOf(pi) : (pi === 0 ? 1 : 0);
-    if (engine?._isSearchBlocked ? engine._isSearchBlocked(oi, {}, 'deck') : gs.players?.[oi]?.handLocked) return false;
+    if (engine && engine._isSearchBlocked(engine.opponentOf(pi), {}, 'deck')) return false;
     if ((ps.gold || 0) < 4) return false;
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
