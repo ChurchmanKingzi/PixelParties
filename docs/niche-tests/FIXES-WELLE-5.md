@@ -63,4 +63,4 @@ Al hat die liegengebliebenen Fragen aus [FIXES-WELLE-1.md](FIXES-WELLE-1.md) und
 
 Endstand nach den Nachträgen: **346 Repros grün von 743**, 0 Rückschritte, 0 Abstürze; `check-*.js` wie im Ausgangszustand; E2E rot nur battle, lobby, prep, seats, target; Dauerfeuer ohne neu auffällige Läufe. Der Client-Zerfall ist in echtem Chromium an einer Attrappen-Zone getestet (`scripts/skilltest-e2e/ui-token-zerfall.js`, 15 Prüfungen), nicht in einem vollständigen Spiel.
 
-Offen aus den Nachträgen (Ja/Nein an Al): Sollen Pollution Tokens beim Entfernen ebenfalls im selben Pixelzerfall verschwinden statt in ihrer eigenen Verdunstung? Soll der Zerfall einen Klang bekommen?
+Entschieden (Al): Pollution Tokens behalten ihre eigene Verdunstung; der Token-Zerfall bekommt einen Klang (vorhandener Klang `status_remove`, Rate 0.8, in `onTokenDisintegrate`).

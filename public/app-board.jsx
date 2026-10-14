@@ -43919,6 +43919,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const zoneEl = document.querySelector(`[data-support-zone][data-support-owner="${label}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
       const ms = tokenZerfallSpielen(zoneEl, cardName);
       if (!ms) return;
+      // Al 14.10.2026: der Zerfall bekommt einen Klang (vorhandener Klang, tiefer abgespielt).
+      if (window.playSFX) window.playSFX('status_remove', { rate: 0.8, volume: 0.6, dedupe: 120 });
       // Der Token steht bis zum nächsten Sync noch im Zustand: sein Platz wird verdeckt, solange die Kopie zerfällt.
       const hideKey = `${owner}-${heroIdx}-${slotIdx}::${cardName || ''}`;
       setBounceOutgoingHidden(prev => { const next = new Set(prev); next.add(hideKey); return next; });
