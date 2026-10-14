@@ -11325,6 +11325,27 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         return false;   // Abfrage bleibt offen, die Antwort zaehlt nicht
       }
     }
+    // ★ W7b (S01-22, Al 14.10.: der Server prueft Antworten nach): dieselben Grenzen, die der Client beim
+    // Anklicken erzwingt – doppelte Ids, mehr Ziele als `maxTotal`, weniger als `minRequired` (nur wenn
+    // ueberhaupt genug waehlbare Ziele da sind) – gelten auch gegen einen veraenderten Client. Wie bei
+    // `ineligible`: Abfrage bleibt offen (Neu-Abfrage), die Antwort zaehlt nicht; der Abbruch-Knopf
+    // (`cancelled`) laeuft ueber einen anderen Weg und ist nie betroffen.
+    if (_pt && _pt.isEffectPrompt && Array.isArray(selectedIds) && selectedIds.length > 0) {
+      const _c = _pt.config || {};
+      const _n = selectedIds.length;
+      const _frei = (_pt.validTargets || []).filter(t => !t?.ineligible).length;
+      const _min = _c.minRequired || 0;
+      if (new Set(selectedIds).size !== _n
+          || (typeof _c.maxTotal === 'number' && _n > _c.maxTotal)
+          || (_min > 0 && _n < _min && _min <= _frei)) {
+        room.engine.log?.('targeting_blocked', {
+          reason: 'selection_count_invalid',
+          source: _pt.potionName || null,
+          count: _n, maxTotal: _c.maxTotal ?? null, minRequired: _min,
+        });
+        return false;
+      }
+    }
   }
   const gs = room.gameState;
   if (!gs.potionTargeting) return false;
