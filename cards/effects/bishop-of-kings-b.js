@@ -43,6 +43,7 @@ async function syncBishopNegation(engine, ignoreInstId) {
         if (st) { st._bishopOfKings = true; st.sourceBound = true; st.noAbsorb = true; engine.sync(); continue; }
         await engine.addHeroStatus(physOwner, heroIdx, 'negated', {
           _bishopOfKings: true, sourceBound: true, noAbsorb: true, permanent: true,
+          effectOnly: true,   // W4a (Al): Text sagt nur "effects ... negated" -> leichte Form, Abilities laufen weiter
           appliedBy: pi, source: { name: CARD_NAME, owner: pi }, _skipReactionCheck: true,
         });
       } else if (st?._bishopOfKings) {

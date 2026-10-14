@@ -34862,7 +34862,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Lv0 creatures without a school requirement can still land on them.
     // v1114: die LEICHTE Negation blendet die Abilities NICHT aus.
     const nStat = hero.statuses?.negated;
-    const hartNegiert = !!nStat && (!(nStat._byWeakeningCrystal || nStat._fromAttachment) || !!nStat.abilitiesNegated);   // S1: Stowaway = harte Form
+    const hartNegiert = !!nStat && (!(nStat._byWeakeningCrystal || nStat._fromAttachment || nStat.effectOnly) || !!nStat.abilitiesNegated);   // S1: Stowaway = harte Form
     const abZones = hartNegiert ? [] : (playerData.abilityZones?.[heroIdx] || []);
     // Spiegel von `countAbilitiesForSchool` in _engine.js — INKLUSIVE
     // der Joker-Regel: eine Ability mit `isWildcardAbility` (Performance)

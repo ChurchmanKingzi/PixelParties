@@ -66,6 +66,7 @@ async function negationAuffrischen(engine, golem) {
       // heraus — sie endet mit dem Golem, nicht mit der Runde. Der
       // Badge liest dieselbe Marke fuer seinen Tooltip.
       sourceBound: true,
+      effectOnly: true,   // W4a (Al): Text sagt nur "effects are negated" -> leichte Form, Abilities laufen weiter
     });
   } else {
     if (ziel.inst.counters?.negated) return;

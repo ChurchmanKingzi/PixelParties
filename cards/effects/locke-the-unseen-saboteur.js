@@ -65,6 +65,7 @@ module.exports = {
         await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
           appliedBy: pi, source: CARD_NAME,
           expiresAtTurn: gs.turn + 2, expiresForPlayer: pi,
+          effectOnly: true,   // W4a (Al): Text sagt nur "effects are negated" -> leichte Form, Abilities laufen weiter
         });
       } else if (target.cardInstance) {
         await engine.actionNegateCreature(target.cardInstance, CARD_NAME, {

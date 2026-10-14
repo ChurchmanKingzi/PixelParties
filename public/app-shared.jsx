@@ -7808,7 +7808,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       if (quelle) {
         badges.push({
           key: 'negated', icon: '🚫',
-          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+          tooltip: (isHero ? (s.negated?.effectOnly ? 'Negated: Has its effect negated. Abilities still work.' : 'Negated: Has its effects and Abilities negated.') : 'Negated: Has its effects negated.')   // W4a: effectOnly = leichte Form
             + ` Lasts while ${quelle} remains on the board.`,
         });
       } else {
@@ -7817,7 +7817,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         const ng = s.negated || c.negated;
         badges.push({
           key: 'negated', icon: '🚫',
-          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+          tooltip: (isHero ? (ng?.effectOnly ? 'Negated: Has its effect negated. Abilities still work.' : 'Negated: Has its effects and Abilities negated.') : 'Negated: Has its effects negated.')   // W4a: effectOnly = leichte Form
             + dur(ng, 'negated'),
           duration: restrundenFuer('negated', ng),
         });

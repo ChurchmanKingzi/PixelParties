@@ -6725,7 +6725,7 @@ class GameEngine {
     if (hero.statuses?.stunned || hero.statuses?.webbed) return true;
     if (hero.statuses?.frozen && !this._isChillyDogActiveFor(pi)) return true;
     const ng = hero.statuses?.negated;
-    if (ng && (!(ng._byWeakeningCrystal || ng._fromAttachment) || this.heroAbilitiesNegated(pi, heroIdx))) return true;
+    if (ng && (!(ng._byWeakeningCrystal || ng._fromAttachment || ng.effectOnly) || this.heroAbilitiesNegated(pi, heroIdx))) return true;
     if (this._isHeroMummified(pi, heroIdx)) return true;
     return false;
   }
@@ -43688,7 +43688,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Abilities). Vorher war sie an den Crystal allein gebunden, und
     // Decisive Defeat lief faelschlich in der HARTEN Form: sie blendete
     // die Ability-Zonen aus und machte den Helden handlungsunfaehig.
-    if (s.negated && !(s.negated._byWeakeningCrystal || s.negated._fromAttachment)) return true;
+    if (s.negated && !(s.negated._byWeakeningCrystal || s.negated._fromAttachment || s.negated.effectOnly)) return true;
     return false;
   }
 
@@ -44439,7 +44439,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it ONLY suppresses the Hero's effect, leaving Abilities (and
     // therefore plays > Lv 0) functional.
     const negStatus_lvr = hero.statuses?.negated;
-    const candidates = (negStatus_lvr && !(negStatus_lvr._byWeakeningCrystal || negStatus_lvr._fromAttachment))
+    const candidates = (negStatus_lvr && !(negStatus_lvr._byWeakeningCrystal || negStatus_lvr._fromAttachment || negStatus_lvr.effectOnly))
       ? [[]]
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     for (const abZones of candidates) {
@@ -45313,7 +45313,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // blank ability zones (matches the parallel branch in
     // `heroMeetsLevelReq`).
     const negStatus_w = hero.statuses?.negated;
-    const candidates = (negStatus_w && !(negStatus_w._byWeakeningCrystal || negStatus_w._fromAttachment))
+    const candidates = (negStatus_w && !(negStatus_w._byWeakeningCrystal || negStatus_w._fromAttachment || negStatus_w.effectOnly))
       ? [[]]
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     let bestCost = -1; // -1 = not playable

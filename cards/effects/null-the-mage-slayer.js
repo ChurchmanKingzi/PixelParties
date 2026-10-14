@@ -87,6 +87,7 @@ module.exports = {
       // Rundenzahl.
       await engine.addHeroStatus(zielBesitzer, zielIdx, 'negated', {
         duration: DAUER, appliedBy: pi, source: CARD_NAME,
+        effectOnly: true,   // W4a (Al): Text sagt nur "Negate the effects" -> leichte Form, Abilities laufen weiter
       });
       engine.log('null_silence', {
         player: gs.players[pi]?.username, target: ziel.name, turns: DAUER,
