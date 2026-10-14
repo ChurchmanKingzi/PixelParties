@@ -67,7 +67,9 @@ module.exports = {
     const ps = ctx.players[ctx.cardOwner];
     // Z6 (A07-23): die Kopie kommt aus dem DECK auf die Hand - unter Hand-/Such-Sperre bliebe nur der Abwurf.
     if (ctx._engine._isSearchBlocked(ctx.cardOwner, {}, 'deck')) return false;
-    return (ps?.hand || []).includes(ABILITY_NAME);
+    // W5b-Z6 (Al, Welle 5: "Shanty braucht die zweite Karte unbedingt"): nach dem Abwurf der Navigation muss noch mindestens
+    // eine Handkarte zum Aufdecken da sein - sonst nicht aktivierbar, nichts verbraucht.
+    return (ps?.hand || []).includes(ABILITY_NAME) && (ps.hand || []).length >= 2;
   },
 
   async onCreatureEffect(ctx) {

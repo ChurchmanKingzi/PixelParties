@@ -20139,3 +20139,18 @@ engine.heroSchoolLevel(school, seite, heroIdx)       // eigene Ability-Zonen des
 * **Ability-Zugriff/Zählung:** Difficulty Lever („Spell School, die keiner deiner Helden hat": ein Held mit negierten Abilities zählt nicht), Weapon Unleashing („Held mit Ability auf Stufe 3": kein Stapel bei negierten Abilities), Sarcophagus of Sealed Magic (verschiedene Schul-Abilities der Helden: negierte Helden zählen nicht), Communication Device (der Geber mit negierten Abilities liefert nichts).
 * **Lizbeth** war schon richtig: der Leih-Effekt ist ihr Heldeneffekt, `_heroCanAct` schließt jede Negierung von Borger und Quelle aus.
 * **Bewusst nicht geändert** (Attached-Zustand, kein Zugriff auf die Ability): Forbidden Curse of Aging („hat Charme angelegt"), Holy Selection (Necromancy), Yukana, Divine Gift of Equality, Crusader's Arm-Cannon, Weird Doll, Magic Amethyst, Noble Mummy Guards, Weapon Absorption (Abilities als Abwurf-Kosten).
+
+### ★ W5b — Entscheidungen von Al, Welle 5 (14.10.2026)
+
+* **Reincarnation „once per game"** = je **Held** (Al), kein Spielerlimit. Skript unverändert (`hero.reincarnationRevived`).
+* **Saya** (Zweitguss): vollständiges erneutes Wirken — Einmal-Klauseln gelten, siehe v1277 oben.
+* **Abgelehnte Angebote verbrauchen nie** eine Once-per-turn-/-game-Aktivierung (Al): Stempel erst nach Bestätigung/Ausführung (Cute Dog: vor der tatsächlichen Beschwörung).
+* **„You can only control 1 …" gilt auch beim Platzieren** (Army of the Cute, Glorious Rebirth, Cute Angel Molinda): `engine.nurEinerSchonKontrolliert(pi, name)` vor jeder Platzierung/Übernahme prüfen.
+* **Such-Sperre** gilt bewusst **nicht** für Deck-Suchen ohne Hand-Ziel (Alex, Ska, Paraseed Greenhouse); Ska umgeht sie beim Durchgang über die Hand mit `_bypassHandLock`.
+* **Ghuanjun**: Attacks rechnen ihre eigene Formel mit der AKTUELLEN Grund-ATK (`baseAtk`, unter Curse 0). Quellen-Flags: `usesHeroAtk` (+ `heroAtkFaktor`) = Formel enthält `hero.atk`; `usesBaseAtk` = Formel enthält schon `hero.baseAtk`. Neue ATK-Attacks setzen das passende Flag.
+* **No Retreat!** erkennt zusätzlich `shufflesFromBoardIntoDeck: true` (Brettseite des Aktivierenden) und `shufflesIntoDeckIf(gs, pi, engine, link) => bool` (dynamisch zum Zeitpunkt des Fensters; Mass Routing). Distracting Crystal liest weiter nur `shufflesFromHandOrDiscardIntoDeck`. Neue Skripte (Meditation, Expedition, Motharch Squire, Priests, Homecoming, Last Second Escape …) tragen das passende Merkmal.
+* **„Draw until …"-Karten** (Voice in your Head, Supply Chain, Kazena, Populated Island Turtle, Divine Gift of Balance): `drawBlockedFor(engine, pi, menge)` — Hand-/Zieh-Sperre immer, Tuscan Artist nur bei Ziehmenge genau 2 oder 3.
+* **Cool Presents** ist bei gesperrter Gegnerhand (Hand-/Such-Sperre) nicht aktivierbar. **Shanty Harpyformer** braucht nach dem Abwurf noch eine Handkarte. **Thebinxan War Counselor** ist unter Handsperre nicht aktivierbar. **Pawn Sacrifice** bleibt unter Handsperre spielbar.
+* **Sparkfly Attendant**: ein negierter Attendant gibt keinen Queen-Schutz (Aura wird beim Lesen von `isOppEffectImmuneFrom`/`isOppDamageImmuneFrom` neu berechnet).
+* **Unwanted Audience** öffnet das Monia-Fenster (`beforeCreatureAffected`) und lässt statusimmune Kreaturen aus.
+* **Draw** wirft die auflösende Draw nicht mit ab (gespielte Karte ist nie abgeworfen); **Shamanic Curse** kostet bei Wisdom-Helden den Zusatz-Abwurf (Differenz); **Magic Lamp** unter Ambush the Scout: nur die Gabe bleibt im Deck, die eigenen 2 Karten kommen auf die Hand (wie Birthday Present). **Idas** Einzelziel-Deckel gilt auch für Sun Beam (höchstens 1 Karte/Token) und Trial of Dominance (1 gewählte Kreatur).

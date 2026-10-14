@@ -5,6 +5,7 @@
 // Wörtlich lässt sich „a Hero … once per game“ auch als Spielerlimit lesen (vgl. Eraser Beam: „You can only play 1 … per game“): ein Held-Wiederbeleben mit Reincarnation je Spiel.
 // Aufbau: Sitz 0 hat zwei gefallene Helden (Held 1, Held 2) und zwei Reincarnation auf der Hand.
 // Beobachtet: die erste Reincarnation belebt Held 1 wieder, die zweite (im selben Spiel, anderer Held) belebt Held 2 wieder – beide laufen durch (Flags je Held).
+// ★ W5b-Z7 (Al, Welle 5: „Das Revival ist per Hero."): Repro auf die Lesart „je HELD" umgestellt – die zweite Reincarnation darf einen ANDEREN Helden beleben.
 // Aufruf: node docs/niche-tests/repro/A01-pollution/28-reincarnation-einmal-pro-spiel-je-held-oder-je-spieler.js   (✗ = zweite Wiederbelebung geht durch; Lesart „je Spieler“ erwartet ✗)
 const H = require('../../lib/h.js');
 (async () => {
@@ -16,7 +17,7 @@ const H = require('../../lib/h.js');
   await t.play(0, 'Reincarnation', { hero: 0 });
   R.check('erste Reincarnation belebt einen Helden wieder', t.gs.players[0].heroes.filter(h => h.hp > 0).length === 2, t.gs.players[0].heroes.map(h => h.hp));
   await t.play(0, 'Reincarnation', { hero: 0 });
-  R.check('zweite Reincarnation (anderer Held) belebt keinen weiteren Helden wieder – Lesart „je Spieler“', t.gs.players[0].heroes.filter(h => h.hp > 0).length === 2, t.gs.players[0].heroes.map(h => h.hp));
+  R.check('zweite Reincarnation (anderer Held) belebt auch wieder – Lesart „je Held" (Al, Welle 5)', t.gs.players[0].heroes.filter(h => h.hp > 0).length === 3, t.gs.players[0].heroes.map(h => h.hp));
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
