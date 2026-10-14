@@ -22,9 +22,8 @@
 //      `ctx.card.zone === 'discard'` so only the
 //      just-discarded copy prompts — copies in
 //      support don't double-fire. Per-turn cap
-//      is taken on prompt-SHOW (matches "may"
-//      semantics: declining still spends the
-//      offer). Visual flow (Als Ruling): the Dog
+//      is taken only once the summon is actually going to happen (W5b-B12: a declined offer never spends it; "may"
+//      semantics). Visual flow (Als Ruling): the Dog
 //      first lands VISIBLY in the discard pile
 //      (sync + settle before the prompt), then
 //      flies discard → chosen Support Zone via
@@ -321,9 +320,8 @@ module.exports = {
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — opt-in summon.
       });
-      // Stamp regardless of accept/decline — the offer counts as the
-      // turn's use of this effect.
-      ps._cuteDogDiscardSummonUsed = true;
+      // W5b-B12 (Al, Welle 5): „abgelehnte Angebote verbrauchen NIE eine Once-per-Turn-Aktivierung" – gezählt wird
+      // nach Wortlaut das Beschwören; der Stempel sitzt erst vor der tatsächlichen Beschwörung (unten).
       if (!confirmed) return;
 
       // ── Pick destination zone ──
@@ -360,6 +358,7 @@ module.exports = {
       // (`engine.summonFromDiscard`: Sperre, Signal, Flug mit 650 ms
       // Landezeit wie zuvor, Rückgabe bei Fehlschlag.)
       const oldInst = ctx.card;
+      ps._cuteDogDiscardSummonUsed = true;   // W5b-B12: vor der Beschwörung (Nachfolge-Listener derselben Charge), bei Fehlschlag zurück
       const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
         source: CARD_NAME, flug: 650,
         summonOpts: { alsZusatzaktion: true },   // "as an additional Action" ist eine Aktion (A04-cute-24)
@@ -367,7 +366,7 @@ module.exports = {
       });
       // Den Listener-Klon in der Ablage abräumen (sonst verwaist er).
       if (oldInst && oldInst.zone === 'discard') engine._untrackCard(oldInst.id);
-      if (!res) return;
+      if (!res) { ps._cuteDogDiscardSummonUsed = false; return; }
 
       engine.log('cute_dog_discard_summon', {
         player: ps.username,
