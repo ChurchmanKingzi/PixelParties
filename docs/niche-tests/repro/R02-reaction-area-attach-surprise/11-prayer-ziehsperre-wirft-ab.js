@@ -7,6 +7,9 @@
 //   oder – falls es erlaubt sein soll – die Frage an Al s. u.
 // Beobachtet: B: Prayer lässt sich aktivieren, die 3 Abilities wandern in die Ablage, die Hand schrumpft von 3 auf 0, es wird nichts gezogen.
 // Ursache: `prayer.js` (onEquipEffect) prüft `ps.drawLocked` nur für die Extra-Karte („Ist der Zieh-Lock schon gesetzt, entfällt die Nachfrage"), nicht vor dem Abwurf.
+// ★ ENTSCHIEDEN (Regel von Al, Welle 3 / D1): unter einer Zieh-Sperre bleibt eine Aktivierung spielbar, solange NICHT der komplette Effekt nur Ziehen ist
+//   (Abwerfen, Zurückmischen, Löschen aus der Ablage … sind eigenständig – „es gibt Decks, die abwerfen wollen“); gesperrt sind nur reine Zieher.
+//   Prayer („discard Abilities to draw the same number“) = Mischeffekt: unter drawLocked bleibt der Abwurf möglich (gezogen wird nichts).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -22,7 +25,7 @@ const H = require('../../lib/h.js');
     const abgeworfen = t.pile(0, 'discardPile').filter(c => c === 'Fighting' || c === 'Toughness').length;
     const hand1 = t.pile(0, 'hand').length;
     if (!gesperrt) R.check('A (ohne Sperre): 3 Abilities abgeworfen, 3 Karten gezogen', abgeworfen === 3 && hand1 === hand0 - 3 + 3, { r, abgeworfen, hand: [hand0, hand1] });
-    else R.check('B (Ziehsperre): es werden keine Abilities abgeworfen, wenn nichts gezogen werden kann', abgeworfen === 0, { r, abgeworfen, hand: [hand0, hand1] });
+    else R.check('B (Ziehsperre): Mischeffekt bleibt aktivierbar – die 3 Abilities werden abgeworfen, nichts gezogen', abgeworfen === 3 && hand1 === hand0 - 3, { r, abgeworfen, hand: [hand0, hand1] });
     R.check(`${gesperrt ? 'B' : 'A'}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
   }
   R.finish();

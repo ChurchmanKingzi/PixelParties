@@ -42,6 +42,8 @@ module.exports = {
   canSummon: gigantisaursCanSummon,
 
   creatureEffect: true,
+  // D1: nur die KI - unter Hand-/Zieh-Sperre wirft sie nicht fuer nichts ab (Menschen duerfen, Regel von Al; Engine-Pfad unberuehrt).
+  cpuMeta: { shouldActivateNow: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivateCreatureEffect(ctx) {
     // Ohne den 3er-Zug blieben nur die Abwurf-Kosten uebrig — Als Ruling:
@@ -51,7 +53,8 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;          // locked hand can't draw — wasteful
+    // D1 (A07-21, Regel von Al): "discard a card to draw 3" ist ein Mischeffekt (der Abwurf ist eigenstaendig - es gibt Decks, die
+    // abwerfen wollen): unter Hand-/Zieh-Sperre bleibt die Aktivierung moeglich, man wirft dann nur ab (frueher: handLocked sperrte).
     if ((ps.hand?.length || 0) < 1) return false; // need 1 card to pay the discard cost
     return true;
   },

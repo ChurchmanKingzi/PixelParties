@@ -9,6 +9,9 @@
 // Erwartet (Lesart A – gesperrt wie Enigma): Aktivierung nicht möglich, Hand bleibt. (Lesart B – erlaubt): dann zumindest kein stiller Totalverlust.
 // Beobachtet: Elana ist aktivierbar, die ganze Hand wandert ins Deck (4 → 0 Handkarten, Deck 12 → 16), gezogen wird nichts. Champion: wirft 3 Karten ab, zieht keine.
 // Ursache: `elana-the-rocky-rebel.js` / `champion-the-stormbringer.js` `canActivateHeroEffect` prüfen `drawLocked`/`handLocked` nicht.
+// ★ ENTSCHIEDEN (Regel von Al, Welle 3 / D1): unter einer Zieh-Sperre bleibt eine Aktivierung spielbar, solange NICHT der komplette Effekt nur Ziehen ist
+//   (Abwerfen, Zurückmischen, Löschen aus der Ablage … sind eigenständig – „es gibt Decks, die abwerfen wollen“); gesperrt sind nur reine Zieher.
+//   Elana (Hand zurückmischen) und Champion (Karten abwerfen) sind Mischeffekte: sie bleiben unter drawLocked/handLocked aktivierbar (Hand-Verlust ist dann ERWARTET).
 const H = require('../../lib/h.js');
 const D = H.INERT.creature;
 (async () => {
@@ -21,7 +24,7 @@ const D = H.INERT.creature;
   }
   for (const s of ['drawLocked', 'handLocked']) {
     const x = await elana(s);
-    R.check(`Elana unter ${s}: Hand bleibt erhalten (nicht aktivierbar oder wenigstens keine Hand ins Deck)`, x.hand >= 4, { aktiviert: x.r, hand: x.hand, deck: x.deck });
+    R.check(`Elana unter ${s}: Mischeffekt bleibt aktivierbar (Hand wird zurückgemischt)`, x.hand < 4, { aktiviert: x.r, hand: x.hand, deck: x.deck });
     R.check(`Elana unter ${s}: keine Engine-Fehler`, x.t.errors.length === 0, x.t.errors);
   }
   async function champion() {
@@ -33,6 +36,6 @@ const D = H.INERT.creature;
     return { r, hand: t.pile(0, 'hand').length };
   }
   const c = await champion();
-  R.check('Champion unter drawLocked: kein Nettoverlust von Handkarten (nicht aktivierbar oder gleich viele Karten)', c.hand >= 4, { aktiviert: c.r, hand: c.hand });
+  R.check('Champion unter drawLocked: Mischeffekt bleibt aktivierbar (Karten werden abgeworfen)', c.hand < 4, { aktiviert: c.r, hand: c.hand });
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });
