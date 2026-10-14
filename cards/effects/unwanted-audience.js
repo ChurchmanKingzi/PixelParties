@@ -68,6 +68,15 @@ async function sleepCreature(engine, inst, ownerPi) {
   // nicht selbst (die sitzen in `canApplyCreatureStatus`), also hier.
   if (engine._lightBallProtects(inst.controller ?? inst.owner, 'creature')) return;
   if (engine._creatureNegStatusImmune(inst)) return;
+  // W5b-Z2 (Al, Welle 5: „Monia kann darauf reagieren"): Cool Rescuer Monia schützt „Creatures either player controls, die von
+  // einer Karte/einem Effekt betroffen würden" – das Setzen der Negierung hat das Fenster `beforeCreatureAffected` bisher
+  // nie geöffnet (wie bei Gift: `actionApplyCreaturePoison`). Bricht Monia ab, schläft die Kreatur nicht ein.
+  // Monias Schild („… all Creatures") steht für diesen Effekt schon: seine Sperre „1 pro Zug" liegt nach dem ersten Treffer vor
+  // dem Schild-Zweig in Monias Hook, also hier selbst prüfen.
+  if (engine.gs._moniaShieldActive != null && (inst.controller ?? inst.owner) === engine.gs._moniaShieldActive) return;
+  const fensterCtx = { creature: inst, effectType: 'status', source: { name: CARD_NAME, owner: ownerPi }, cancelled: false, _skipReactionCheck: true };
+  await engine.runHooks('beforeCreatureAffected', fensterCtx);
+  if (fensterCtx.cancelled) return;
   await engine.actionNegateCreature(inst, CARD_NAME, {
     // Current turn is the OPPONENT's; it ends when ownerPi's next
     // turn starts (gs.turn + 1 / expiresForPlayer = ownerPi). Same
@@ -208,6 +217,7 @@ module.exports = {
             if (!creatureHasActiveEffect(engine, cInst)) continue;
             await sleepCreature(engine, cInst, pi);
           }
+          delete gs._moniaShieldActive;   // Z2: Monias Schild gilt für DIESEN Effekt (alle Kreaturen), nicht darüber hinaus
           engine.log('unwanted_audience', {
             player: ps.username, target: gs.players[oppIdx]?.username,
           });
@@ -249,6 +259,7 @@ module.exports = {
       if (inst.counters?.negated) return;            // already asleep (idempotent vs. dup copies)
       if (!creatureHasActiveEffect(engine, inst)) return;
       await sleepCreature(engine, inst, ua.owner);
+      delete gs._moniaShieldActive;   // Z2: Schild nur für diese Auslösung
       engine.sync();
     },
 
