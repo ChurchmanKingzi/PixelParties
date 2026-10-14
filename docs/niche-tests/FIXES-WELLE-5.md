@@ -19,7 +19,7 @@ Al hat die liegengebliebenen Fragen aus [FIXES-WELLE-1.md](FIXES-WELLE-1.md) und
 | „You can only control 1" | Wird von platzierenden Karten (Army of the Cute, Glorious Rebirth, Molinda) **nicht** umgangen |
 | Sun Beam / Trial of Dominance unter Ida | Wie die anderen Flächenzauber gedeckelt |
 | Cool Presents | Bei Hand-/Such-Sperre der Gegnerhand **nicht aktivierbar** |
-| Ghuanjun | Schaden = **aktuelle** Grund-ATK (unter Curse 0) |
+| Ghuanjun | **Jede** Attack verursacht genau die **aktuelle Grund-ATK** (Base Attack ist ein eigener Stat; unter Curse 0). Critical Strike, Massacre & Co. ändern den Schaden nicht; Flächenattacken: jedes Ziel die Grund-ATK |
 | Shamanic Curse | Der erhöhte Level kostet bei Wisdom-Helden tatsächlich den Zusatz-Abwurf |
 | Gespielte Karte | Ist **nie** abgeworfen (Draw zählt nicht für Cute-Bunny-Schwelle/Archibald) |
 | Abgelehnte Angebote | Verbrauchen **nie** once per turn/game |
@@ -51,7 +51,6 @@ Al hat die liegengebliebenen Fragen aus [FIXES-WELLE-1.md](FIXES-WELLE-1.md) und
 * Meditation, Expedition, Motharch Squire, Anti Intruder System, Last Second Escape, Homecoming haben noch kein Skript; sie bekommen das No-Retreat!-Merkmal, sobald sie geschrieben werden (`CARD_API.md`, Kopf von `no-retreat.js`).
 * Client: Flug-Animationen (`play_pile_transfer`) zeigen Token noch zum Stapel fliegen, obwohl nichts ankommt.
 * Teil „Fenster je Karte" von A08-31 (Cool Presents) bleibt rot; von Al nicht angesprochen.
-* Ghuanjun: Critical Strike (2× Grund-ATK = 160) und Massacre (+50 je Kreatur = 130) rechnen ihre eigene Formel mit der aktuellen Grund-ATK; Alternative wäre „jede Attack genau Grund-ATK". Bitte bestätigen.
 
 ## Nachträge nach dem ersten Abschluss (14.10.2026)
 
