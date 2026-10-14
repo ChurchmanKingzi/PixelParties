@@ -18085,6 +18085,11 @@ naechste Zauber verbrauchte es.
 - Bartas klammert den Zweitguss: `_spellFreeAction` und
   `_spellForcesActionConsume` stehen danach wieder auf dem Stand davor.
   Ein Zweitguss ist kein neues Ausspielen.
+  **★ Für Saya überholt (Al, 14.10.2026, Entscheidung Welle 5):** Sayas Zweitguss ist ein
+  *vollständiges erneutes Wirken der Karte* — „You can only play 1 … per turn / per game"-Klauseln
+  (`spellPlayCondition`) und Einmal-pro-Spiel-Stempel (`oncePerGame`/`oncePerGameKey`) gelten auch für
+  ihn; ist die Karte nach dem Erstguss gestempelt/gesperrt, gibt es kein Angebot. (Das Flag-Verhalten
+  oben — kein neues Ausspielen für `_spellFreeAction` — bleibt.)
 - Sicherheitsnetz: `doPlaySpell` loescht `_spellFreeAction` zu Beginn
   der Aufloesung und beide Flags im Aufraeumblock am Ende; der
   Direktguss-Weg der Engine loescht es vor dem Guss.
