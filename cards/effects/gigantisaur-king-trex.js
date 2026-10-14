@@ -259,7 +259,10 @@ module.exports = {
    *   • Otherwise, run the standard pick-from-anywhere prompt.
    *   • Cancel or no valid candidate → refuse the summon.
    */
-  beforeSummon: async (ctx) => {
+  // ★ W4b (Al, Welle 4): das Opfer des Gigantisaurs ist ein KOSTENPUNKT der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt er bezahlt.
+  // `beforeSummon` zahlt nur noch, wenn `paySummonCost` nicht lief (Effekt-Beschwörungen u. ä.; `ctx._summonKosten` fehlt).
+  paySummonCost: async (ctx) => {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
@@ -332,6 +335,8 @@ module.exports = {
     });
     return !!sacrificed;
   },
+
+  beforeSummon: async (ctx) => (ctx._summonKosten ? true : (await module.exports.paySummonCost(ctx)) !== false),
 
   hooks: {
     /**

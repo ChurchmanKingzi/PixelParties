@@ -181,6 +181,97 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
   });
 }
 
+/**
+ * ★ W4b (Al, Welle 4): der TRIBUT (Wahl der Kreaturen, Landeplatz, Rückkehr auf die Hand) ist der Kostenpunkt
+ * („You can only play this Creature by returning 2 or more Creatures …") und läuft VOR dem Reaktionsfenster der
+ * Beschwörung (`paySummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleiben die Kreaturen auf
+ * der Hand. Rückgabe: `false` = abgebrochen / nicht zahlbar (nichts bezahlt), sonst
+ * `{ heroIdx, slotIdx, landSeite, tributed }` für die Landung. Eine Stelle für `paySummonCost` und den Fallback.
+ */
+async function _zahleTribut(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  if (!ps) return false;
+  const candidates = _collectTributeCandidates(engine, pi, ctx.card?.id);
+  if (!engine.hasValidSacrificeSet(candidates, SACRIFICE_SPEC.minCount, 0, SACRIFICE_SPEC.minSumLevel)) {
+    engine.log('ddg_fizzle', { reason: 'no_valid_tribute' });
+    return false;
+  }
+
+  // ── Step 1: pick the tribute set ─────────
+  const targets = candidates.map(c => ({
+    id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
+    type: 'equip', owner: c.inst.owner,
+    heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+    cardName: c.cardName, cardInstance: c.inst,
+    _meta: { level: c.level, maxHp: c.maxHp },
+  }));
+
+  const picked = await engine.promptEffectTarget(pi, targets, {
+    title: `${CARD_NAME} — Tribute`,
+    description: 'Select 2+ of your Creatures (not summoned this turn) whose combined original levels are 4 or higher. They will be returned to your hand.',
+    confirmLabel: '🌊 Confirm Tribute',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    maxTotal: targets.length,
+    minRequired: SACRIFICE_SPEC.minCount,
+    minSumLevel: SACRIFICE_SPEC.minSumLevel,
+  });
+  if (!picked || picked.length < SACRIFICE_SPEC.minCount) return false;
+
+  const chosenTargets = picked.map(id => targets.find(t => t.id === id)).filter(Boolean);
+  if (chosenTargets.length < SACRIFICE_SPEC.minCount) return false;
+  const sumLvl = chosenTargets.reduce((s, t) => s + (t._meta.level || 0), 0);
+  if (sumLvl < SACRIFICE_SPEC.minSumLevel) return false;
+
+  // ── Step 2: pick DDG's placement slot (one of the tribute slots) ──
+  // Styx 28.9.: geliehene Helden der Gegenspalte — Landeplatz auf der
+  // Gegenspalte nur ueber einen Helden, den `pi` kontrolliert.
+  const zones = chosenTargets.filter(t => _landingAllowed(engine, pi, t.cardInstance)).map(t => {
+    const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+    return {
+      heroIdx: t.heroIdx, slotIdx: t.slotIdx,
+      ...(t.owner !== pi ? { owner: t.owner } : {}),
+      label: `${hero?.name || 'Hero'} — ${t.cardName} (Slot ${t.slotIdx + 1})`,
+    };
+  });
+  if (zones.length === 0) return false;
+  const zonePick = await ctx.promptZonePick(zones, {
+    title: `${CARD_NAME} — Rise From`,
+    description: `Pick which tributed Support Zone ${CARD_NAME} rises into.`,
+    cancellable: true,
+  });
+  if (!zonePick) return false;
+  const landSeite = zonePick.owner ?? pi;   // Styx 28.9.: physische Seite
+  const _istLandung = (t) => t.heroIdx === zonePick.heroIdx && t.slotIdx === zonePick.slotIdx
+    && t.owner === landSeite;
+  if (!zones.some(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx
+    && (z.owner ?? pi) === landSeite)) return false;
+
+  // ── Step 3: bounce every chosen Creature back to hand ────────────
+  // Non-landing tributes first, landing tribute last so the destination
+  // slot stays "occupied by a departing sacrifice" right up to the
+  // moment DDG takes its place.
+  const landingInst = chosenTargets.find(_istLandung)?.cardInstance;
+  const others = chosenTargets
+    .filter(t => !_istLandung(t))
+    .map(t => t.cardInstance);
+  for (const inst of others) {
+    if (!inst) continue;
+    await returnSupportCreatureToHand(engine, inst, CARD_NAME);
+  }
+  if (landingInst) {
+    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME);
+  }
+
+  return {
+    heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx, landSeite,
+    tributed: chosenTargets.map(t => t.cardName),
+  };
+}
+
 module.exports = {
 
   // ★ v1021: Der AoE-Helfer wird jetzt AUCH von „Creepy Villager"
@@ -263,6 +354,8 @@ module.exports = {
       .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
         ...(c.inst.owner !== pi ? { owner: c.inst.owner } : {}) })),
 
+  paySummonCost: async (ctx) => (ctx._monstrosityCopy ? {} : _zahleTribut(ctx)),   // W4b: Tribut vor dem Reaktionsfenster
+
   beforeSummon: async (ctx) => {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -296,77 +389,12 @@ module.exports = {
     }
 
     // ── Normal summon from here ──────────────────────────────────────
-    const candidates = _collectTributeCandidates(engine, pi, ctx.card?.id);
-    if (!engine.hasValidSacrificeSet(candidates, SACRIFICE_SPEC.minCount, 0, SACRIFICE_SPEC.minSumLevel)) {
-      engine.log('ddg_fizzle', { reason: 'no_valid_tribute' });
-      return false;
-    }
-
-    // ── Step 1: pick the tribute set ─────────
-    const targets = candidates.map(c => ({
-      id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
-      type: 'equip', owner: c.inst.owner,
-      heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
-      cardName: c.cardName, cardInstance: c.inst,
-      _meta: { level: c.level, maxHp: c.maxHp },
-    }));
-
-    const picked = await engine.promptEffectTarget(pi, targets, {
-      title: `${CARD_NAME} — Tribute`,
-      description: 'Select 2+ of your Creatures (not summoned this turn) whose combined original levels are 4 or higher. They will be returned to your hand.',
-      confirmLabel: '🌊 Confirm Tribute',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      maxTotal: targets.length,
-      minRequired: SACRIFICE_SPEC.minCount,
-      minSumLevel: SACRIFICE_SPEC.minSumLevel,
-    });
-    if (!picked || picked.length < SACRIFICE_SPEC.minCount) return false;
-
-    const chosenTargets = picked.map(id => targets.find(t => t.id === id)).filter(Boolean);
-    if (chosenTargets.length < SACRIFICE_SPEC.minCount) return false;
-    const sumLvl = chosenTargets.reduce((s, t) => s + (t._meta.level || 0), 0);
-    if (sumLvl < SACRIFICE_SPEC.minSumLevel) return false;
-
-    // ── Step 2: pick DDG's placement slot (one of the tribute slots) ──
-    // Styx 28.9.: geliehene Helden der Gegenspalte — Landeplatz auf der
-    // Gegenspalte nur ueber einen Helden, den `pi` kontrolliert.
-    const zones = chosenTargets.filter(t => _landingAllowed(engine, pi, t.cardInstance)).map(t => {
-      const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-      return {
-        heroIdx: t.heroIdx, slotIdx: t.slotIdx,
-        ...(t.owner !== pi ? { owner: t.owner } : {}),
-        label: `${hero?.name || 'Hero'} — ${t.cardName} (Slot ${t.slotIdx + 1})`,
-      };
-    });
-    if (zones.length === 0) return false;
-    const zonePick = await ctx.promptZonePick(zones, {
-      title: `${CARD_NAME} — Rise From`,
-      description: `Pick which tributed Support Zone ${CARD_NAME} rises into.`,
-      cancellable: true,
-    });
-    if (!zonePick) return false;
-    const landSeite = zonePick.owner ?? pi;   // Styx 28.9.: physische Seite
-    const _istLandung = (t) => t.heroIdx === zonePick.heroIdx && t.slotIdx === zonePick.slotIdx
-      && t.owner === landSeite;
-    if (!zones.some(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx
-      && (z.owner ?? pi) === landSeite)) return false;
-
-    // ── Step 3: bounce every chosen Creature back to hand ────────────
-    // Non-landing tributes first, landing tribute last so the destination
-    // slot stays "occupied by a departing sacrifice" right up to the
-    // moment DDG takes its place.
-    const landingInst = chosenTargets.find(_istLandung)?.cardInstance;
-    const others = chosenTargets
-      .filter(t => !_istLandung(t))
-      .map(t => t.cardInstance);
-    for (const inst of others) {
-      if (!inst) continue;
-      await returnSupportCreatureToHand(engine, inst, CARD_NAME);
-    }
-    if (landingInst) {
-      await returnSupportCreatureToHand(engine, landingInst, CARD_NAME);
-    }
+    // W4b: Normalweg — der Tribut ist schon vor dem Reaktionsfenster bezahlt (`paySummonCost`); sonst jetzt.
+    const kosten = ctx._summonKosten || await _zahleTribut(ctx);
+    if (!kosten) return false;
+    const zonePick = { heroIdx: kosten.heroIdx, slotIdx: kosten.slotIdx };
+    const landSeite = kosten.landSeite;
+    const chosenTargetsNamen = kosten.tributed;
 
     // ── Step 4: start the manifest, then wait to the midpoint ───────
     engine._broadcastEvent('dark_deepsea_god_manifest', { owner: pi });
@@ -393,7 +421,7 @@ module.exports = {
     ps._placementConsumedByCard = CARD_NAME;
     engine.log('ddg_summon', {
       player: ps.username,
-      tributed: chosenTargets.map(t => t.cardName),
+      tributed: chosenTargetsNamen,
       landedAt: { heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx,
         ...(landSeite !== pi ? { owner: landSeite } : {}) },
     });

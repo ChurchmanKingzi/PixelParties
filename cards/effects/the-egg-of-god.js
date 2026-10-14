@@ -122,6 +122,24 @@ function glaenzen(engine, inst) {
   });
 }
 
+/**
+ * KOSTEN: das Opfer (bei einem Wurf auf einen belegten Platz eines vom Beschwörer-Helden). `false` = abgebrochen.
+ * Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
+ */
+async function zahleOpfer(ctx, allFullDrop) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const heroOwner = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+  const base = makeSacrificeSpec(engine);
+  const spec = allFullDrop
+    ? { ...fullDropSpec(base, heroIdx, pi, heroOwner),
+        description: `${base.description} It must come from the summoning Hero's Support Zones.` }
+    : base;
+  const ok = await engine.resolveSacrificeCost(ctx, spec);
+  return !!ok && !ok.extraPicked;
+}
+
 module.exports = {
   activeIn: ['support'],
   inherentAction: true,
@@ -144,6 +162,16 @@ module.exports = {
     occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx
       && (sl.owner ?? pi) === heroOwner),
 
+  // ★ W4b (Al, Welle 4): das Opfer ist KOSTEN der Beschwörung und wird VOR dem Reaktionsfenster bezahlt
+  // (`paySummonCost`, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …),
+  // bleibt es geopfert. `beforeSummon` platziert danach nur noch (`ctx._summonKosten`); ohne `paySummonCost`
+  // (Effekt-Beschwörungen u. ä.) zahlt es wie früher selbst.
+  async paySummonCost(ctx) {
+    const ps = ctx._engine.gs.players[ctx.cardOwner];
+    const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
+    return (await zahleOpfer(ctx, allFullDrop)) ? { allFullDrop } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
@@ -152,15 +180,10 @@ module.exports = {
     // Styx 28.9.: geliehene Helden der Gegenspalte — physische Seite des
     // Zielhelden (fehlt → pi). Opfer zahlt `pi`.
     const heroOwner = (isSeat(engine, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
-    const allFullDrop = !!ps?._requestedBouncePlaceSlot;
+    const pre = ctx._summonKosten;   // W4b: Opfer schon vor dem Reaktionsfenster bezahlt
+    const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
-    const base = makeSacrificeSpec(engine);
-    const spec = allFullDrop
-      ? { ...fullDropSpec(base, heroIdx, pi, heroOwner),
-          description: `${base.description} It must come from the summoning Hero's Support Zones.` }
-      : base;
-    const ok = await engine.resolveSacrificeCost(ctx, spec);
-    if (!ok || ok.extraPicked) return false;
+    if (!pre && !(await zahleOpfer(ctx, allFullDrop))) return false;
     if (allFullDrop) {
       const frei = [0, 1, 2].find(z => !engine.supportSlotBelegt(heroOwner, heroIdx, z));
       if (frei == null) return false;

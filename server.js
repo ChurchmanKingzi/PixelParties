@@ -10061,11 +10061,30 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   let _heroCostFinalized = false;
 
   try {
+    // ★ W4b (Al, Welle 4): Tribut-/Opferkosten der Beschwörung („… to play this card") werden VOR dem Reaktionsfenster
+    // bezahlt (`paySummonCost` der Kreatur, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett
+    // negiert (Off Duty …), bleiben die Opfer tot. Bricht der Spieler die Kostenwahl ab (`false`), ist nichts bezahlt:
+    // Rückabwicklung wie bei einem abgelehnten `beforeSummon` unten (Karte bleibt auf der Hand).
+    const _kostenOk = await room.engine._payCreatureSummonCost(cardName, pi, heroIdx,
+      { isInherentAction, viaDragDrop: !!viaDragDrop, _isNormalSummon: true, ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}) }, zoneSlot);
+    if (!_kostenOk) {
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
+      ps._resolvingCard = null;
+      if (additionalConsumed && consumedInst) room.engine.restoreAdditionalAction(consumedInst);
+      if (actionCounterIncrementedHere) ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) ps._bonusMainActions = 1;
+      room.engine.log('creature_fizzle', { card: cardName, reason: 'summon_cost_cancelled' });
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
+
     const chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0,
     });
 
     if (chainResult.negated) {
+      room.engine._verwerfeSummonKosten();   // W4b: die Kosten bleiben bezahlt, der Merker für die Landung entfällt
       // Negated by a Reaction — the creature never actually summoned,
       // refund the Hero pre-action cost (Saint Nicolas keeps the
       // marked Potion in hand).
