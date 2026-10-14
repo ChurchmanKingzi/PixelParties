@@ -44,7 +44,7 @@ module.exports = {
     if (!ps) return;
 
     // Check if player can afford the 3G chain-close cost
-    if ((ps.gold || 0) >= 3) {
+    if ((ps.gold || 0) >= 3 && !engine.goldSpendBlocked(pi)) {   // G1 (A09-11): Goldsperre
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: 'Cute Camera',

@@ -100,7 +100,7 @@ module.exports = {
       if (counters._cheekyMonkeeTurn === gs.turn) return;
 
       // "pay that Gold" — ohne Deckung gar nicht erst fragen.
-      if ((ps.gold || 0) < betrag) return;
+      if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       const bestaetigt = await engine.promptGeneric(pi, {
         type: 'confirm',

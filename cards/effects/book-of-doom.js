@@ -17,6 +17,7 @@ module.exports = {
 
   isTargetingArtifact: true,
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Ziel - unter der Goldsperre nicht aktivierbar (server.js doUseArtifactEffect)
 
   canActivate(gs, pi) {
     // HOPT check

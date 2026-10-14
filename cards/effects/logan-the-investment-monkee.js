@@ -176,6 +176,7 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    if (engine?.goldSpendBlocked?.(pi)) return false;   // G1 (A09-11): Goldsperre - Einzahlen = Gold ausgeben
     return (engine?.gs?.players?.[pi]?.gold || 0) > 0;
   },
 
@@ -192,7 +193,7 @@ module.exports = {
     if (!hero || hero.name !== CARD_NAME) return false;
 
     const gold = ps.gold || 0;
-    if (gold <= 0) return false;
+    if (gold <= 0 || engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11)
 
     // Betrag frei waehlbar von 1 bis Gold. `renderAs: 'slider'` gibt dem
     // Client einen Schieberegler mit Zahlenfeld (Als Vorgabe) — die

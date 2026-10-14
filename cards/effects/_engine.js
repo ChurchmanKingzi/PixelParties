@@ -2581,9 +2581,10 @@ class GameEngine {
     };
     if (opts.mandatory) {
       const pay = Math.min(buy.cost, gold);
-      if (pay > 0) await spend(pay); // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
+      let paid = 0;   // G1: TATSAECHLICH gezahlt (goldLocked → 0), nicht der Wunschbetrag
+      if (pay > 0 && await spend(pay)) paid = pay; // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
       buy.paidTurn = this.gs.turn;
-      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: pay, mandatory: true });
+      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid, mandatory: true });
       this.sync();
       return true;
     }
@@ -24345,6 +24346,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       // Boris beim GEGNER sperrt Steal-/Kontroll-Karten komplett.
       if (this.isBorisBlocked(script, playerIdx)) blocked.push(cardName);
+      // G1 (A09-11): Goldsperre - Handartefakte mit Gold-Kosten > 0 sind nicht zahlbar (Kosten 0 bleiben moeglich). Preis je
+      // Kopie wie im Server (`artifactPlayCost`); Ausruestungen mit dem besten Zielheld-Rabatt (Tsu'Ki). Karten mit
+      // Stufen-Preis (`manualGoldCost` ohne `goldPerTarget`) filtern ihre Ziele selbst und fehlen hier.
+      if (this.goldSpendBlocked(playerIdx) && !blocked.includes(cardName)
+          && this._getCardDB()[cardName]?.cardType === 'Artifact'
+          && (!script?.manualGoldCost || script.goldPerTarget)) {
+        const equip = (this._getCardDB()[cardName].subtype || '').toLowerCase() === 'equipment';
+        let frei = false;
+        try {
+          (ps.hand || []).forEach((n, i) => {
+            if (frei || n !== cardName) return;
+            if (equip) {
+              for (let hi = 0; hi < (ps.heroes || []).length && !frei; hi++) {
+                if (this.artifactPlayCost(playerIdx, cardName, i, { heroIdx: hi, heroOwner: playerIdx }).cost <= 0) frei = true;
+              }
+            } else if (this.artifactPlayCost(playerIdx, cardName, i).cost <= 0) frei = true;
+          });
+        } catch (err) { frei = false; }
+        if (!frei) blocked.push(cardName);
+      }
     }
     return blocked;
   }
@@ -24420,7 +24441,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     // Gold-lock (Golden Arrow): cannot spend gold either — the card text
     // says "You cannot gain or spend Gold for the rest of the turn."
-    if (ps.goldLocked) {
+    if (this.goldSpendBlocked(playerIdx)) {
       this.log('gold_spend_blocked', { player: ps.username, amount, reason: 'goldLocked' });
       return false;
     }
@@ -24709,12 +24730,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     finally { this._kostenlosScope = vorher; }
   }
 
+  /**
+   * G1: darf `playerIdx` gerade KEIN Gold ausgeben? Golden Arrow: "You cannot gain or spend Gold for the rest of the turn
+   * afterwards." (`ps.goldLocked`, faellt zum Zugwechsel). Als Regel: unter dieser Sperre ist auch alles mit Gold-KOSTEN > 0
+   * (Handkarten, Reaktions-Artefakte, Faehigkeiten/Effekte mit "spend N Gold", Freikauf) nicht spielbar/aktivierbar; Kosten 0
+   * bleiben moeglich. Gegenstueck zu `goldGainWouldBeBlocked` (_gold-block-shared.js, Gewinn-Seite) - hier die Ausgabe-Seite.
+   * `actionSpendGold`, `canAffordGold` und `goldBudget` fragen HIER.
+   * @param {number} playerIdx
+   * @returns {boolean} true = Ausgeben gesperrt
+   */
+  goldSpendBlocked(playerIdx) {
+    return !!this.gs?.players?.[playerIdx]?.goldLocked;
+  }
+
   canAffordGold(playerIdx, cost, cardName) {
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return false;
     const betrag = Number(cost) || 0;
     if (betrag <= 0) return true;
     if (this._kostenlosScope && this._kostenlosScope.pi === playerIdx) return true;   // Gratis-Scope (kostenlosSpielen)
+    // G1 (A09-11): Goldsperre (Golden Arrow: "cannot gain or SPEND Gold") - Kosten > 0 sind nicht zahlbar (Als Regel), Kosten 0
+    // und der Gratis-Scope (oben) bleiben moeglich. DIE eine Stelle fuer Hand-/Aktivierungs-/Reaktions-/Potion-Kosten.
+    if (this.goldSpendBlocked(playerIdx)) return false;
     const gold = ps.gold || 0;
     if (gold >= betrag) return true;
     // BASIS ist `max(0, gold)`, nicht `gold` (Als Korrektur 16.8.).
@@ -24753,6 +24790,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return 0;
     if (this._kostenlosScope && this._kostenlosScope.pi === playerIdx) return Infinity;   // Gratis-Scope (kostenlosSpielen)
+    if (this.goldSpendBlocked(playerIdx)) return 0;   // G1 (A09-11): Goldsperre - nichts ausgebbar
     const limit = this.goldOverdraftLimit(playerIdx, cardName);
     if (limit === Infinity) return Infinity;
     return Math.max(0, ps.gold || 0) + limit;

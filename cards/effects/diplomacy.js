@@ -130,6 +130,7 @@ module.exports = {
 
     const cost = getCost(level);
     if ((ps.gold || 0) < cost) return false;
+    if (cost > 0 && engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre - "Spend N Gold"
 
     if (getFreeZones(ps).length === 0) return false;
 
@@ -196,7 +197,7 @@ module.exports = {
     // ── Effect resolves ──
 
     // Final gold check
-    if ((ps.gold || 0) < cost) return false;
+    if ((ps.gold || 0) < cost || (cost > 0 && engine.goldSpendBlocked(pi))) return false;
 
     // Flash the Diplomacy ability zone
     engine._broadcastEvent('ability_activated', {

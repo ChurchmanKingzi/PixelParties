@@ -47,7 +47,7 @@ function getCapturableCreatures(engine, pi) {
   const oppIdx = engine.opponentOf(pi);
   const ps = engine.gs.players[pi];
   if (!ps) return [];
-  const gold = ps.gold || 0;
+  const gold = engine.goldSpendBlocked(pi) ? 0 : (ps.gold || 0);   // G1 (A09-11): Goldsperre - nur Kosten 0 (Level 0) zahlbar
   const cardDB = engine._getCardDB();
   const oppShielded = engine._isSideNondamageShielded(oppIdx);
   const out = [];

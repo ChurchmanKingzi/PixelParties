@@ -4961,6 +4961,11 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: room.engine ? room.engine.arePotionsLockedFor(pi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
+      goldLocked: ps.goldLocked || false,   // G1 (A09-11): Goldsperre (Golden Arrow) - fuer die Client-Ausgrauung bereitgestellt
+      // G1 (A09-11): Handartefakte mit Stufen-Preis (`manualGoldCost` ohne `goldPerTarget`: Capture Net, Dark Gear, Staff of Illusions …)
+      // pruefen Gold-Kosten selbst (Kosten 0 moeglich) - der Client darf sie unter der Sperre nicht pauschal ausgrauen (Grau-Liste: `unactivatableArtifacts`).
+      goldLockSelfChecked: (ps.goldLocked && pi === playerIdx)
+        ? [...new Set((ps.hand || []).filter(n => { const sc = loadCardEffect(n); return !!sc?.manualGoldCost && !sc.goldPerTarget; }))] : [],
       drawLocked: ps.drawLocked || false,
       // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
       // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
@@ -6013,6 +6018,7 @@ function sendSpectatorGameState(room) {
       potionLocked: room.engine ? room.engine.arePotionsLockedFor(spi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
+      goldLocked: ps.goldLocked || false,   // G1 (A09-11): Goldsperre (Golden Arrow) - fuer die Client-Ausgrauung bereitgestellt
       drawLocked: ps.drawLocked || false,
       // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
       // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
@@ -12226,6 +12232,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   // and `getValidTargets` filter targets by what they can actually
   // afford. Standard Artifacts still gate on the base cost.
   if (!script.manualGoldCost && !room.engine.canAffordGold(pi, cost, cardName)) return false;
+  // G1 (A09-11): Goldsperre bei "Kosten je Ziel" (Beer, Book of Doom): der Grundpreis ist der Preis JEDES Ziels - ist er > 0, ist
+  // unter der Sperre kein Ziel zahlbar (Preis 0 durch Rabatt bleibt moeglich). Karten mit Stufen-Preis (Capture Net, Dark Gear …)
+  // filtern ihre Ziele selbst (Stufe 0 kostet 0).
+  if (script.manualGoldCost && script.goldPerTarget && cost > 0 && room.engine.goldSpendBlocked(pi)) return false;
   // v657: „an Artifact with a SET Cost" — Artefakte, die ihre Kosten
   // selbst rechnen (manualGoldCost), sind vom Gratis-Kauf ausgenommen
   // und waehrend der Scharfstellung nicht spielbar.

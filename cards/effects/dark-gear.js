@@ -92,7 +92,7 @@ function getStealableCreatures(engine, playerIdx) {
   // `getUnactivatableArtifacts` instead of opening an empty picker.
   if (engine._isSideNondamageShielded(oppIdx)) return [];
   const ps = engine.gs.players[playerIdx];
-  const gold = ps.gold || 0;
+  const gold = engine.goldSpendBlocked(playerIdx) ? 0 : (ps.gold || 0);   // G1 (A09-11): Goldsperre - nur Kosten 0 (Level 0) zahlbar
   const cardDB = engine._getCardDB();
   return engine.getCreatureTargets(oppIdx).filter(t => {
     const inst = t.cardInstance;

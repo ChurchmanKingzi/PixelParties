@@ -42,6 +42,7 @@ const CARD_NAME = 'Cool Presents';
 module.exports = {
   isTargetingArtifact: true,
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Uebergabe - unter der Goldsperre nur bei Preis 0 aktivierbar (server.js doUseArtifactEffect)
 
   /**
    * Optimistic gate — need ≥1 hand card (besides the resolving copy),

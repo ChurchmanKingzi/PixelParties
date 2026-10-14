@@ -71,6 +71,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if ((ps.gold || 0) < GOLD_COST) return false;
+    if (engine.goldSpendBlocked(pi)) return false;   // G1 (A09-11): Goldsperre - "Spend 5 Gold"
     return _getEligibleTargets(engine, pi).length > 0;
   },
 
@@ -85,7 +86,7 @@ module.exports = {
       // Re-validate gold + targets — state may have shifted between
       // the play gate and resolution (chained discard cost, reactive
       // gold loss, target died inside a chain, etc.).
-      if ((ps.gold || 0) < GOLD_COST) {
+      if ((ps.gold || 0) < GOLD_COST || engine.goldSpendBlocked(pi)) {
         gs._spellCancelled = true;
         return;
       }
