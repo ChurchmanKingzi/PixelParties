@@ -183,8 +183,9 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   // (6) Route the sacrificed occupant to discard + fire ON_CREATURE_DEATH
   //     (sacrifice is a sub-type of dying). Slot already taken by Guardian.
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-  if (!fps.discardPile) fps.discardPile = [];
-  fps.discardPile.push(occName);
+  // W3/W5a (Al 14.10.2026): in die Ablage des PERMANENTEN Besitzers (nicht der Brettseite/des Kontrolleurs); ein Token verschwindet.
+  { const opfPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;
+    if (!engine.tokenAbgang(occ)) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
     fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
@@ -256,8 +257,9 @@ async function paySacrificeSwap(engine, pi, req, CARD_NAME_ARG) {
     if (idx >= 0) slotArr.splice(idx, 1);
   }
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-  if (!fps.discardPile) fps.discardPile = [];
-  fps.discardPile.push(occName);
+  // W3/W5a (Al 14.10.2026): in die Ablage des PERMANENTEN Besitzers (nicht der Brettseite/des Kontrolleurs); ein Token verschwindet.
+  { const opfPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;
+    if (!engine.tokenAbgang(occ)) { if (!opfPs.discardPile) opfPs.discardPile = []; opfPs.discardPile.push(occName); } }
   engine.sync();
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
@@ -357,7 +359,7 @@ async function sacrificeSelf(engine, inst, pi) {
       from: 'hand', to: 'discard', fromHandIdx: hi >= 0 ? hi : 0,
     });
     if (hi >= 0) engine.takeFromPileSync(ps, 'hand', hi);
-    ps.discardPile.push(inst.name);
+    (engine.gs.players[engine.kartenBesitzerVon(inst)] || ps).discardPile.push(inst.name);   // W3/W5a: Ablage des permanenten Besitzers
     inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
     engine._untrackCard(inst.id);
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den

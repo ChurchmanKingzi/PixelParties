@@ -13899,7 +13899,8 @@ class GameEngine {
         if (_zielPs) {
           const _stapel = (toZone === ZONES.DELETED) ? _zielPs.deletedPile : _zielPs.discardPile;
           if (Array.isArray(_stapel)) {
-            _stapel.push(cardInstance.name);
+            // W5a: ein Token landet in keinem Stapel; nur eine echte Karte darunter wird gelöscht (`tokenAbgang`).
+            if (!this.tokenAbgang(cardInstance)) _stapel.push(cardInstance.name);
             cardInstance._ppSchonGelandet = toZone;
             this.sync();          // damit der Stapel SOFORT sichtbar waechst
           }
@@ -14071,6 +14072,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die Zeile wird hier nur nicht mehr erzeugt, damit aeltere
     // Spielstaende und Mitschnitte lesbar bleiben.
     await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, { card: cardInstance, toZone, toHeroIdx });
+    // W5a: ein Token ohne Karte darunter ist nach dem Abgang nirgends mehr — keine Geister-Instanz im Gelöscht-Stapel.
+    if (fromZone === ZONES.SUPPORT && toZone === ZONES.DELETED && this.isTokenCard(cardInstance) && !this.tokenUnterkarte(cardInstance)) {
+      this._untrackCard(cardInstance.id);
+    }
 
     // ── „Vom Brett per Effekt in die Ablage" (v697) ─────────────────
     // Jede Bewegung durch actionMoveCard IST effektgetrieben (Destroys,
@@ -27790,7 +27795,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             fromHandIdx: hi >= 0 ? hi : 0,
           });
           if (hi >= 0) subPs.hand.splice(hi, 1);
-          if (subPs) subPs.discardPile.push(inst.name);
+          { const pileOwnerPs = this.gs.players[this.kartenBesitzerVon(inst)] || subPs;   // W3/W5a: Ablage des permanenten Besitzers
+            if (pileOwnerPs) pileOwnerPs.discardPile.push(inst.name); }
           inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
           this._untrackCard(inst.id);
           this.sync();
@@ -37960,7 +37966,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
           const bz = ps.supportZones?.[heroIdx];
           if (bz && bz[bakhmZoneSlot]) bz[bakhmZoneSlot] = [];
-          ps.discardPile.push(cardName);
+          (this.gs.players[this.kartenBesitzerVon(inst)] || ps).discardPile.push(cardName);   // W3/W5a: Ablage des permanenten Besitzers
           this._untrackCard(inst.id);
         }
       } else if (inst && await this._bakhmAufdeckenNegiert(inst, cardName, playerIdx, steuerer, heroIdx, bakhmZoneSlot)) {
@@ -41087,10 +41093,58 @@ this._deathWatch = (this._deathWatchStack || []).length
   _tokenStattKarte(ps, cardName) {
     const cd = this._getCardDB()[cardName];
     if (!cd || !hasCardType(cd, 'Token')) return false;
-    if (!ps.deletedPile) ps.deletedPile = [];
-    ps.deletedPile.push(cardName);
-    this.log('token_not_a_card', { player: ps.username, card: cardName, to: 'deleted' });
+    // W5a (Entscheidung Welle 5, Al 14.10.2026): ein Token, der das Brett verlaesst, verschwindet VOLLSTAENDIG
+    // (kein Eintrag in Hand/Deck/Ablage/Gelöscht-Stapel). Nur eine ECHTE Karte darunter wird gelöscht
+    // (siehe `tokenAbgang`) — hier kommt nur der Name an, ein Token-Name hat keine Karte darunter.
+    this.log('token_not_a_card', { player: ps.username, card: cardName, to: 'gone' });
     this.sync();
+    return true;
+  }
+
+  /**
+   * ★ W5a (Entscheidung Welle 5, Al 14.10.2026: „Sterbende Tokens sollten komplett verschwinden, außer wenn
+   * 'darunter' noch echte Karten liegen, etwa bei Biomancy Tokens; die werden dann gelöscht."):
+   * Name der ECHTEN Karte, die unter einem Token liegt (Biomancy-/Boulder-Token = Potion mit
+   * `_cardDataOverride` `Creature/Token`), sonst null (Mummy/Invader/Leprochaun/Pollution Token, Puppets,
+   * kein Token). Wer eine Brettkarte „auf die Hand/ins Deck/in die Ablage" schickt, fragt `isTokenCard`
+   * und ruft bei einem Token `tokenAbgang` statt die Karte zu bewegen.
+   */
+  tokenUnterkarte(inst) {
+    if (!inst || !this.isTokenCard(inst)) return null;
+    const roh = this._getCardDB()[inst.name];
+    return (roh && !hasCardType(roh, 'Token')) ? inst.name : null;
+  }
+
+  /**
+   * ★ W3/W5a (Al 14.10.2026: „Karten landen *immer* im Deck/Discard/Deleted Pile ihres permanenten Besitzers, durch alles."):
+   * Spielerzustand, in dessen Stapel (Ablage/Gelöscht/Deck) eine GERADE aus der Hand von `holder` (Index oder Spielerzustand)
+   * entnommene Karte gehoert — bei gestohlener/geliehener Handkarte ihr permanenter Besitzer, sonst der Halter. Aufruf NACH
+   * `takeFromPileSync(…, 'hand', …)` (die Herkunft wird dabei festgehalten); verbraucht die Herkunftsmarke.
+   */
+  handKartenBesitzerPs(holder, cardName, handIdx) {
+    const pi = this._resolvePi(holder);
+    const o = this._consumeHandCardOrigin(pi, cardName, handIdx);
+    return this.gs.players[o] || this.gs.players[pi];
+  }
+
+  /**
+   * ★ W5a: Ein Token verlaesst das Brett (Tod, Zerstoerung, Rueckgabe auf Hand/Deck/Ablage …) und verschwindet
+   * aus dem Spiel; liegt eine echte Karte darunter (Biomancy-/Boulder-Token), wird SIE in den Gelöscht-Stapel
+   * ihres permanenten Besitzers (`originalOwner`) gelegt. Raeumt NICHT die Zone/Instanz ab — das tut der
+   * Aufrufer wie bei jeder anderen Karte. Liefert true, wenn `inst` ein Token ist (dann NICHT zusaetzlich in
+   * Hand/Deck/Ablage schreiben), sonst false.
+   */
+  tokenAbgang(inst) {
+    if (!this.isTokenCard(inst)) return false;
+    const unter = this.tokenUnterkarte(inst);
+    if (unter) {
+      const ps = this.gs.players[this.kartenBesitzerVon(inst)];
+      if (ps) {
+        if (!ps.deletedPile) ps.deletedPile = [];
+        ps.deletedPile.push(unter);
+      }
+    }
+    this.log('token_not_a_card', { card: inst.name, to: unter ? 'underlying_deleted' : 'gone' });
     return true;
   }
 
@@ -48179,7 +48233,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_gerettet) {
         _creatureDest = 'rescued';
       } else if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
-        creatureDiscardPs.deletedPile.push(e.inst.name);
+        // W5a: ein Token verschwindet vollstaendig; nur eine echte Karte darunter (Biomancy/Boulder) wird gelöscht.
+        if (!this.tokenAbgang(e.inst)) creatureDiscardPs.deletedPile.push(e.inst.name);
         _creatureDest = 'deleted';
       } else {
         creatureDiscardPs.discardPile.push(e.inst.name);
@@ -48649,7 +48704,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const discardPs = this.gs.players[inst.originalOwner];
         if (discardPs) {
-          if (isToken) discardPs.deletedPile.push(inst.name);
+          if (isToken) this.tokenAbgang(inst);   // W5a: Token verschwindet, nur eine echte Karte darunter wird gelöscht
           else discardPs.discardPile.push(inst.name);
         }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
@@ -48780,7 +48835,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (islandDiscardPs) {
           if (islandCd && hasCardType(islandCd, 'Token')) {
             if (!islandDiscardPs.deletedPile) islandDiscardPs.deletedPile = [];
-            islandDiscardPs.deletedPile.push(cardName);
+            // W5a: Token verschwindet vollstaendig; nur eine echte Karte darunter (Biomancy/Boulder) wird gelöscht.
+            if (inst) this.tokenAbgang(inst);
           } else islandDiscardPs.discardPile.push(cardName);
         }
         // Untrack card instance
@@ -49503,20 +49559,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   _addCardToState(inst) {
     switch (inst.zone) {
       case ZONES.DISCARD: {
-        // Cards always return to their ORIGINAL owner's discard pile (Tokens → deleted pile)
+        // Cards always return to their ORIGINAL owner's discard pile
+        // W5a: Tokens verschwinden vollstaendig; nur eine echte Karte darunter wird gelöscht (`tokenAbgang`).
+        if (this.tokenAbgang(inst)) return;
         const discardPs = this.gs.players[inst.originalOwner];
-        if (discardPs) {
-          const effectiveCd = this.getEffectiveCardData(inst);
-          if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
-            discardPs.deletedPile.push(inst.name);
-          } else {
-            discardPs.discardPile.push(inst.name);
-          }
-        }
+        if (discardPs) discardPs.discardPile.push(inst.name);
         return;
       }
       case ZONES.DELETED: {
         // Cards always return to their ORIGINAL owner's deleted pile
+        if (this.tokenAbgang(inst)) return;   // W5a
         const deletePs = this.gs.players[inst.originalOwner];
         if (deletePs) deletePs.deletedPile.push(inst.name);
         return;

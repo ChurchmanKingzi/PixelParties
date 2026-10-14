@@ -183,7 +183,7 @@ module.exports = {
       if (selfIdx >= 0) {
         engine.takeFromPileSync(ps, 'hand', selfIdx);
         engine.notePlayedFromHand(pi);
-        ps.discardPile.push(ctx.cardName);
+        engine.handKartenBesitzerPs(ps, ctx.cardName).discardPile.push(ctx.cardName);   // W3/W5a: Stapel des permanenten Besitzers
         engine._untrackCard(ctx.card.id);
       }
       ps._resolvingCard = null;
@@ -195,6 +195,7 @@ module.exports = {
       // auto-animation picks this up (hand shrank, deleted grew).
       // Discard-sourced: fire the custom pile-to-pile animation first
       // since the client can't infer discard→deleted from state diff.
+      let delPs = ps;
       if (actualSource === 'discard') {
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: chosenName, from: 'discard', to: 'deleted',
@@ -202,10 +203,10 @@ module.exports = {
         await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
       } else {
         const idx = ps.hand.indexOf(chosenName);
-        if (idx >= 0) engine.takeFromPileSync(ps, 'hand', idx);
+        if (idx >= 0) { engine.takeFromPileSync(ps, 'hand', idx); delPs = engine.handKartenBesitzerPs(ps, chosenName); }   // W3/W5a: Stapel des permanenten Besitzers (gestohlene Handkarte)
       }
-      if (!ps.deletedPile) ps.deletedPile = [];
-      ps.deletedPile.push(chosenName);
+      if (!delPs.deletedPile) delPs.deletedPile = [];
+      delPs.deletedPile.push(chosenName);
 
       engine.log('mass_multiplication_delete', {
         player: ps.username, card: chosenName, from: actualSource,

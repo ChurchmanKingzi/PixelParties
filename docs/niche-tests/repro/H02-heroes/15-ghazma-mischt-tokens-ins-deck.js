@@ -16,7 +16,7 @@ const GH = 'Ghazma, the Worm Feeder';
       const t = await H.fresh({ heroes: [[withGhazma ? GH : H.BLANK_HEROES[0], H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], active: 1, deckSize: 5 });
       const c = t.put(1, 0, 0, tok);
       await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Test', owner: 0, heroIdx: 0 }, c, 999, 'spell'));
-      R.check(`${tok}: nach dem Tod im Gelöscht-Stapel des Besitzers`, t.pile(1, 'deletedPile').includes(tok), t.pile(1, 'deletedPile'));
+      R.check(`${tok}: nach dem Tod weder im Gelöscht-Stapel noch sonstwo (W5a, Al 14.10.2026: Tokens verschwinden vollständig)`, !t.pile(1, 'deletedPile').includes(tok), t.pile(1, 'deletedPile'));
       await t.endTurn(); await t.endTurn(); await t.endTurn();   // Zugende Sitz 1 (gleicher Zug), Sitz 0, Sitz 1 (spätere Runde)
       const deck = t.pile(1, 'mainDeck'), hand = t.pile(1, 'hand'), disc = t.pile(1, 'deletedPile');
       const imDeck = deck.filter(n => n === tok).length + hand.filter(n => n === tok).length;

@@ -18,6 +18,7 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionGainGold(1, 30));
   R.check('Gold Trap hat ausgelöst (Gold umgeleitet: Sitz 0 hat 130)', t.gs.players[0].gold === 130, t.gs.players[0].gold);
   R.check('Mummy Token wird nicht als Karte in die Hand gelegt', !t.pile(0, 'hand').includes('Mummy Token'), t.pile(0, 'hand'));
+  R.check('W5a (Al 14.10.2026): Token verschwindet vollständig – auch nicht im Gelöscht-Stapel', [0, 1].every(s => ['hand', 'mainDeck', 'discardPile', 'deletedPile'].every(k => !t.pile(s, k).includes('Mummy Token'))), [0, 1].map(s => t.pile(s, 'deletedPile')));
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

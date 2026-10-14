@@ -104,9 +104,7 @@ module.exports = {
       });
       if (!ziel || ziel.type !== 'equip') return;
 
-      const inst = ziel.cardInstance || engine.cardInstances.find(c =>
-        c.zone === 'support' && c.heroIdx === ziel.heroIdx && c.zoneSlot === ziel.slotIdx
-        && (c.controller ?? c.owner) === ziel.owner);
+      const inst = ziel.cardInstance || engine.kreaturAnBrett(ziel.owner, ziel.heroIdx, ziel.slotIdx);   // Z1/W5a: Ziel-IDs nennen die BRETTSEITE
       if (!inst) return;
 
       // „Defending the Gate" schuetzt die Support Zones des Gegners.
@@ -124,12 +122,12 @@ module.exports = {
       await engine._delay(BLENDE_MS);
 
       // ── Ans Deckende — ins Deck des BESITZERS ─────────────────────
-      const besitzer = inst.owner;                 // „their deck"
+      const besitzer = engine.kartenBesitzerVon(inst);   // „their deck" — permanenter Besitzer (W3, Al 14.10.2026), nie der Kontrolleur
       const seite = engine.physicalSide(inst);      // wo die Karte liegt: Brettseite (eine gestohlene Kreatur bleibt in der Zone des Besitzers, S03-04)
       const bPs = gs.players[besitzer];
       const sPs = gs.players[seite];
 
-      const istToken = engine.isTokenCard(inst);   // Z5 (S03-05): ein Token ist keine Karte -> Gelöscht-Stapel statt Deck
+      const istToken = engine.isTokenCard(inst);   // W5a (S03-05, Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (echte Karte darunter wird gelöscht)
       engine._broadcastEvent('play_pile_transfer', {
         owner: seite, toOwner: besitzer, cardName: inst.name,
         from: 'support', to: istToken ? 'deleted' : 'deck',
@@ -152,8 +150,7 @@ module.exports = {
       }
       // ANS ENDE — „at the bottom of their deck".
       if (istToken) {
-        if (!bPs.deletedPile) bPs.deletedPile = [];
-        bPs.deletedPile.push(inst.name);
+        engine.tokenAbgang(inst);
       } else {
         bPs.mainDeck.push(inst.name);
       }

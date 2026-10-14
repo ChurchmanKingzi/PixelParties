@@ -109,7 +109,7 @@ module.exports = {
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         engine.sync();
         engine.notePlayedFromHand(pi);
-        ps.discardPile.push('Divine Gift of the Guardian');
+        engine.handKartenBesitzerPs(ps, 'Divine Gift of the Guardian').discardPile.push('Divine Gift of the Guardian');   // W3/W5a: Stapel des permanenten Besitzers
       }
 
       // Untrack hand instance

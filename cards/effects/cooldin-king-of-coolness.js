@@ -117,7 +117,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
     engine.takeFromPileSync(ps, 'hand', handIndex);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
   }

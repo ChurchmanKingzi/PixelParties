@@ -128,7 +128,7 @@ module.exports = {
     if (ps.hand[idx] !== CARD_NAME) idx = ps.hand.indexOf(CARD_NAME);
     if (idx >= 0) {
       engine.takeFromPileSync(ps, 'hand', idx);
-      ps.deletedPile.push(CARD_NAME);
+      engine.handKartenBesitzerPs(ps, CARD_NAME).deletedPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
       // Untrack the hand inst so the engine state stays clean.
       const inst = engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME,

@@ -184,7 +184,7 @@ async function tryTimeRescue(engine, pi, ps, names) {
       fromHandIdx: ti, asPlay: 'sole',
     });
     engine.takeFromPileSync(ps, 'hand', ti);
-    ps.discardPile.push(CARD_NAME);
+    engine.handKartenBesitzerPs(ps, CARD_NAME).discardPile.push(CARD_NAME);   // W3/W5a: Stapel des permanenten Besitzers
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
     // Startplatz der abfliegenden Karte nur, solange die Hand noch so
     // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie

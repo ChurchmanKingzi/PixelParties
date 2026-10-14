@@ -16,5 +16,6 @@ const H = require('../../lib/h.js');
   R.check('kein Token im Deck des Gegners', !t.pile(1, 'mainDeck').includes('Mummy Token'), t.pile(1, 'mainDeck'));
   await t.engine.actionDrawCards(1, 4);
   R.check('Gegner hat keinen Token auf der Hand', !t.pile(1, 'hand').includes('Mummy Token'), t.pile(1, 'hand'));
+  R.check('W5a (Al 14.10.2026): Token verschwindet vollständig – auch nicht im Gelöscht-Stapel', [0, 1].every(s => ['hand', 'mainDeck', 'discardPile', 'deletedPile'].every(k => !t.pile(s, k).includes('Mummy Token'))), [0, 1].map(s => t.pile(s, 'deletedPile')));
   R.finish();
 })();

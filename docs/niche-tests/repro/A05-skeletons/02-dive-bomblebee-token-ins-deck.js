@@ -18,5 +18,6 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionDestroyCard({ name: 'x', owner: 0 }, opfer));
   R.check('Token wurde als Ziel gewählt/entfernt (Kontrolle: Effekt lief)', !t.gs.players[1].supportZones[0][0].length, t.gs.players[1].supportZones[0]);
   R.check('kein Token im Deck des Gegners', !t.pile(1, 'mainDeck').some(n => /Token/.test(n)), t.pile(1, 'mainDeck').slice(-2));
+  R.check('W5a (Al 14.10.2026): Token verschwindet vollständig – auch nicht im Gelöscht-Stapel', [0, 1].every(s => ['hand', 'mainDeck', 'discardPile', 'deletedPile'].every(k => !t.pile(s, k).includes('Mummy Token'))), [0, 1].map(s => t.pile(s, 'deletedPile')));
   R.finish();
 })();
