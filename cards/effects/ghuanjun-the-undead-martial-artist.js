@@ -7,6 +7,12 @@ const { hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Ghuanjun, the Undead Martial Artist';
 
+/** Aktuelle Grund-ATK des Helden (W5b-B7): `baseAtk`; unter Curse („Attack stat is always 0") ist sie 0. */
+function grundAtkJetzt(engine, hero) {
+  if (engine?._isHeroAtkSuppressed?.(hero)) return 0;
+  return hero.baseAtk || 0;
+}
+
 /**
  * Styx 28.9.: Brettseite von `(sideOrCtrl, heroIdx)`. Die Engine ruft
  * `canPlayCard` teils mit der Seite (Aktionsliste), teils mit dem
@@ -190,11 +196,28 @@ module.exports = {
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
     },
 
+    // W5b-B7 (Al, Welle 5; Hero-Text: „This Hero's Attacks deal damage equal to this Hero's base Attack stat"):
+    // Maßgeblich ist die AKTUELLE Grund-ATK (`grundAtkJetzt`: baseAtk, unter Curse 0 – „Attack stat is always 0"),
+    // nicht fest 80. Die Attack rechnet mit ihrer eigenen Formel, nur mit Grund-ATK statt ATK-Wert (Critical Strike
+    // 2x, Massacre +50 je Kreatur …). Korrigiert wird im Angriffsfenster (`onAttackDeclare`, vor Animation/Schaden;
+    // greift auch bei „cannot be reduced" wie Surefire Shot): Quellen mit `usesHeroAtk` haben `hero.atk` in der Formel
+    // (`heroAtkFaktor` = wie oft, Standard 1), Quellen mit `usesBaseAtk` haben schon `hero.baseAtk` darin
+    // (Strong Ox, Tiger Kick, Venom Snake, Quick Attack) – die ändern sich nur, wenn die Grund-ATK ≠ baseAtk ist (Curse).
+    onAttackDeclare: (ctx) => {
+      const q = ctx.source;
+      if (!q || (!q.usesHeroAtk && !q.usesBaseAtk)) return;
+      if (q.heroIdx !== ctx.cardHeroIdx) return;
+      const sourceOwner = q.heroOwner ?? q.owner ?? q.controller ?? -1;
+      if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
+      const hero = ctx.attachedHero ?? ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero || hero.baseAtk === undefined) return;
+      const verwendet = q.usesBaseAtk ? (hero.baseAtk || 0) : (hero.atk || 0);
+      const diff = (grundAtkJetzt(ctx._engine, hero) - verwendet) * (q.heroAtkFaktor || 1);
+      if (diff) ctx.modifyAmount(Math.max(diff, -ctx.amount));
+    },
+
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)
     // Uses setFlag so the cap applies AFTER all other modifiers (Sacred Hammer, etc.)
-    // Also enforces base ATK damage: only corrects Attacks that declare usesHeroAtk
-    // (i.e. attacks that deal hero.atk damage). Attacks that already use baseAtk
-    // (Strong Ox, Tiger Kick, Venom Snake) don't set the flag and are left alone.
     beforeDamage: (ctx) => {
       if (ctx.type !== 'attack') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
@@ -202,16 +225,6 @@ module.exports = {
       const sourceOwner = ctx.source?.heroOwner ?? ctx.source?.owner ?? ctx.source?.controller ?? -1;
       if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       ctx.setFlag('capAtHPMinus1', true);
-
-      if (ctx.source?.usesHeroAtk) {
-        const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
-        if (hero && hero.baseAtk !== undefined) {
-          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
-          if (diff !== 0) {
-            ctx.modifyAmount(-diff);
-          }
-        }
-      }
     },
 
     // After Attack damage to hero: apply Immortal buff with auto-expiry
@@ -239,23 +252,15 @@ module.exports = {
       engine.sync();
     },
 
-    // Flag creature damage from Ghuanjun Attacks for HP-1 cap + base ATK enforcement
+    // Flag creature damage from Ghuanjun Attacks for HP-1 cap
     beforeCreatureDamageBatch: (ctx) => {
       if (!ctx.entries) return;
       const heroIdx = ctx.cardHeroIdx;
       const feld = ctx.cardHeroOwner ?? ctx.cardOwner;   // Styx 28.9.: Brettseite
-      const hero = ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[heroIdx];
       for (const e of ctx.entries) {
         if (e.type !== 'attack' || e.cancelled) continue;
         if ((e.source?.heroIdx ?? -1) !== heroIdx || (e.source?.heroOwner ?? e.source?.owner ?? -1) !== feld) continue;
         e.capAtHPMinus1 = true;
-        // Only correct attacks that use hero.atk for damage
-        if (e.source?.usesHeroAtk && hero) {
-          const diff = (hero.atk || 0) - (hero.baseAtk || 0);
-          if (diff !== 0) {
-            e.modifyAmount(-Math.min(diff, e.amount));   // flat (Punkt vor Strich)
-          }
-        }
       }
     },
 

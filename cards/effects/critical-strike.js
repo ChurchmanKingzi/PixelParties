@@ -58,7 +58,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // animation + damage. Listeners may mutate the about-to-deal
       // damage.
-      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
+      const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true, heroAtkFaktor: ATK_MULT };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, damage);
 
       // Very fast ram — the cut is the hero-moment, not the approach.

@@ -116,7 +116,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // animation + damage. Listeners may mutate the about-to-deal
       // damage.
-      const attackSource = { name: 'Stranglehold', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
+      const attackSource = { name: 'Stranglehold', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, ...(atkBonus > 0 ? { usesBaseAtk: true } : {}) };   // W5b-B7: nur der Fighting-3-Zuschlag ist Grund-ATK   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, totalDamage);
 
       // Play squeeze animation on target

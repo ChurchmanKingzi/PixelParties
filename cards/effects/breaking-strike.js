@@ -109,7 +109,7 @@ module.exports = {
       });
       if (!target) return;
 
-      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
+      const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true, heroAtkFaktor: res.sent };   // Als Befund 29.9.: Brettseite des Angreifers
       const endgueltig = await engine._fireAttackDeclare(quelle, target, dmg);
       const slot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {
