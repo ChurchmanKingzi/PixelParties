@@ -47,6 +47,84 @@ function queenSourcesFor(gs, ps, candidateInst) {
   };
 }
 
+/**
+ * KOSTEN: den gewählten Sparkfly opfern. `false` = nichts bezahlt (Auswahl ungültig / keine Queen-Quelle).
+ * Sonst `{ sacHeroIdx, sacZoneSlot, sacName, turnPlayed, fizzle }` für `resolve`; `fizzle: true` = das Opfer wurde gerettet
+ * oder der Platz ist belegt (Karte gespielt, ohne Wirkung). Eine Stelle für `payArtifactCost` und den Fallback in `resolve`.
+ */
+async function zahleOpfer(engine, pi, selectedIds, validTargets) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  if (!ps) return false;
+
+  const sel = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
+  let sacInst = sel?._cardInstance;
+  // The targeting flow sometimes hands back targets without
+  // _cardInstance attached if the artifact reopens after a cancel —
+  // re-resolve from coordinates as a safety net.
+  if (!sacInst && sel) {
+    sacInst = engine.cardInstances.find(c =>
+      c.zone === 'support'
+      && c.owner === sel.owner
+      && c.heroIdx === sel.heroIdx
+      && c.zoneSlot === sel.slotIdx,
+    );
+  }
+  if (!sacInst) return false;
+
+  // Re-validate Queen sources against live state — the player could
+  // have lost their hand Queen between targeting and resolve via a
+  // chained reaction.
+  const sources = queenSourcesFor(gs, ps, sacInst);
+  if (!sources.hand && !sources.deck) {
+    engine.log('hives_crown_fizzle', {
+      player: ps.username,
+      reason: 'no_queen_source',
+    });
+    return false;
+  }
+
+  // Reveal Hive's Crown to both sides now that the player has committed.
+  engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
+  delete engine.gs._pendingCardReveal;
+  await engine._delay(300);
+
+  // ── Sacrifice the chosen Sparkfly creature. ──
+  const sacHeroIdx  = sacInst.heroIdx;
+  const sacZoneSlot = sacInst.zoneSlot;
+  const sacName     = sacInst.name;
+  const turnPlayed  = sacInst.turnPlayed;
+
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'knife_sacrifice',
+    owner: sacInst.owner,
+    heroIdx: sacInst.heroIdx,
+    zoneSlot: sacInst.zoneSlot,
+  });
+  await engine._delay(500);
+
+  await engine.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
+    creature: sacInst,
+    cardName: sacInst.name,
+    owner: sacInst.owner,
+    heroIdx: sacInst.heroIdx,
+    zoneSlot: sacInst.zoneSlot,
+    source: { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
+    _skipReactionCheck: true,
+  });
+  await engine.actionDestroyCard(
+    { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
+    sacInst,
+  );
+
+  // ★ v1360 (Audit „same Support Zone"): ab hier ist das Opfer BEZAHLT.
+  // Geht danach etwas schief, bleibt Hive's Crown gespielt (keine
+  // Rueckgabe per `cancelled`) und fizzelt sichtbar. Zuerst: blieb das
+  // Opfer liegen (gerettet) oder hat ein Todes-Listener den Platz gefuellt?
+  const fizzle = sacInst.zone === 'support' || engine.supportSlotBelegt(pi, sacHeroIdx, sacZoneSlot);
+  return { sacHeroIdx, sacZoneSlot, sacName, turnPlayed, fizzle };
+}
+
 module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
@@ -182,37 +260,31 @@ module.exports = {
 
   animationType: 'none',
 
-  resolve: async (engine, pi, selectedIds, validTargets) => {
+  // ★ W4b (Al, Welle 4): das OPFER ist der KOSTENPUNKT („Sacrifice a Sparkfly … to play this card") und läuft VOR dem
+  // Reaktionsfenster (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert (Rusty
+  // Touch, Silence …), bleibt der Sparkfly geopfert und es kommt keine Queen. `resolve` holt danach nur noch die Queen
+  // (Quellenwahl, Ziehen, Platzieren). `false` = nichts bezahlt (Karte bleibt auf der Hand).
+  payArtifactCost: async (engine, pi, selectedIds, validTargets) => zahleOpfer(engine, pi, selectedIds, validTargets),
+
+  resolve: async (engine, pi, selectedIds, validTargets, kosten) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
 
-    const sel = (validTargets || []).find(t => t.id === selectedIds[0]);
-    let sacInst = sel?._cardInstance;
-    // The targeting flow sometimes hands back targets without
-    // _cardInstance attached if the artifact reopens after a cancel —
-    // re-resolve from coordinates as a safety net.
-    if (!sacInst && sel) {
-      sacInst = engine.cardInstances.find(c =>
-        c.zone === 'support'
-        && c.owner === sel.owner
-        && c.heroIdx === sel.heroIdx
-        && c.zoneSlot === sel.slotIdx,
-      );
-    }
-    if (!sacInst) return { cancelled: true };
+    // Normalweg: das Opfer ist schon vor dem Fenster erbracht (`kosten`); sonst (Fallback) jetzt.
+    const k = kosten || await zahleOpfer(engine, pi, selectedIds, validTargets);
+    if (!k) return { cancelled: true };
+    const { sacHeroIdx, sacZoneSlot, sacName } = k;
 
-    // Re-validate Queen sources against live state — the player could
-    // have lost their hand Queen between targeting and resolve via a
-    // chained reaction.
-    const sources = queenSourcesFor(gs, ps, sacInst);
-    if (!sources.hand && !sources.deck) {
-      engine.log('hives_crown_fizzle', {
-        player: ps.username,
-        reason: 'no_queen_source',
-      });
-      return { cancelled: true };
+    // Ab hier ist das Opfer BEZAHLT. Gerettet (Barrier of Undying) oder Platz belegt → Hive's Crown bleibt gespielt und fizzelt sichtbar.
+    if (k.fizzle) {
+      engine.log('hives_crown_fizzle', { player: ps.username, reason: 'zone_taken' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+      return true;
     }
+
+    // Quellen frisch gegen den Live-Stand pruefen (die Queen kann im Fenster die Hand verlassen haben).
+    const sources = queenSourcesFor(gs, ps, { turnPlayed: k.turnPlayed });
 
     // ── Step 1: pick the Queen source (hand vs deck). ──
     let queenSource;
@@ -228,49 +300,11 @@ module.exports = {
         cancellable: false,
       });
       queenSource = choice?.optionId === 'deck' ? 'deck' : 'hand';
-    } else {
+    } else if (sources.hand || sources.deck) {
       queenSource = sources.hand ? 'hand' : 'deck';
-    }
-
-    // Reveal Hive's Crown to both sides now that the player has committed.
-    engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
-    delete engine.gs._pendingCardReveal;
-    await engine._delay(300);
-
-    // ── Step 2: sacrifice the chosen Sparkfly creature. ──
-    const sacHeroIdx  = sacInst.heroIdx;
-    const sacZoneSlot = sacInst.zoneSlot;
-    const sacName     = sacInst.name;
-
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'knife_sacrifice',
-      owner: sacInst.owner,
-      heroIdx: sacInst.heroIdx,
-      zoneSlot: sacInst.zoneSlot,
-    });
-    await engine._delay(500);
-
-    await engine.runHooks(HOOKS.ON_CREATURE_SACRIFICED, {
-      creature: sacInst,
-      cardName: sacInst.name,
-      owner: sacInst.owner,
-      heroIdx: sacInst.heroIdx,
-      zoneSlot: sacInst.zoneSlot,
-      source: { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
-      _skipReactionCheck: true,
-    });
-    await engine.actionDestroyCard(
-      { name: CARD_NAME, owner: pi, heroIdx: sacInst.heroIdx },
-      sacInst,
-    );
-
-    // ★ v1360 (Audit „same Support Zone"): ab hier ist das Opfer BEZAHLT.
-    // Geht danach etwas schief, bleibt Hive's Crown gespielt (keine
-    // Rueckgabe per `cancelled`) und fizzelt sichtbar. Zuerst: blieb das
-    // Opfer liegen (gerettet) oder hat ein Todes-Listener den Platz gefuellt?
-    if (sacInst.zone === 'support' || engine.supportSlotBelegt(pi, sacHeroIdx, sacZoneSlot)) {
-      engine.log('hives_crown_fizzle', { player: ps.username, reason: 'zone_taken' });
-      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+    } else {
+      engine.log('hives_crown_fizzle', { player: ps.username, reason: 'no_queen_source' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_hand' });
       return true;
     }
 

@@ -14,6 +14,9 @@
 //    reveal them and add them to your hand.
 //    Immediately end your turn afterwards.
 //
+//  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)
+//  und bleiben bei Ganz-Negierung bezahlt. Der Rest dieses Absatzes beschreibt den alten Ablauf.
+//
 //  House clarifications (per user spec):
 //    • Cost (delete Timid Tanuki) is paid AT THE
 //      START of onPlay, BEFORE any selection
@@ -124,6 +127,21 @@ module.exports = {
     return ds.some(n => n !== COST_NAME && isRebelliokaiCreature(n, engine));
   },
 
+  // ★ W4b (Al, Welle 4): die Kosten („Delete 1 … from your discard pile to play this card") werden VOR dem Reaktionsfenster
+  // bezahlt (`payActivationCost`) und bleiben bei Ganz-Negierung bezahlt (Silence, The Master's Plan …). Das ersetzt die
+  // frühere Hausregel „Kosten nach der ersten Zielwahl": die Zielwahl läuft unverändert in `onPlay` (gleiche Reihenfolge der
+  // Ziele), ist aber NICHT mehr abbrechbar, weil die Karte schon verbraucht ist (CARD_API.md, „Zielende Karten sind immer
+  // abbrechbar": Ausnahme nach dem Zusagepunkt). `false` = Kosten nicht zahlbar (Stapel-Sperre, Karte fehlt) → Karte bleibt auf der Hand.
+  // Fallback: lief `payActivationCost` nicht (Sofort-Guss von Attacks, anderer Weg), zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (!ps || (ps.discardPile || []).indexOf(COST_NAME) < 0) return false;
+    if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -131,6 +149,8 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
+      const vorab = !!ctx.card?._kostenBezahlt;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt?
+      if (ctx.card) delete ctx.card._kostenBezahlt;
 
       // ── Step 0: pay the cost upfront ──
       // No target step exists for Tanuki Escape, so the chain-reaction
@@ -138,13 +158,15 @@ module.exports = {
       // Spell is committed — pay the cost before any further prompts.
       // Defensive re-check: a parallel reaction during chain resolution
       // could have shifted the discard pile.
-      if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-      if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
-        gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
-        return;
+      if (!vorab) {
+        if ((ps.discardPile || []).indexOf(COST_NAME) < 0) {
+          gs._spellCancelled = true;
+          return;
+        }
+        if (!(await payRebelliokaiCost(engine, pi, COST_NAME, { source: CARD_NAME }))) {
+          gs._spellCancelled = true;   // Kosten nicht zahlbar (Stapel-Sperre) → nichts passiert (A06-08)
+          return;
+        }
       }
 
       // Snap budget AFTER cost was paid — the deleted Tanuki doesn't

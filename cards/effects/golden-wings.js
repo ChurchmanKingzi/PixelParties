@@ -51,7 +51,7 @@
 //  the protection would be self-perpetuating.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, hasFreeZone } = require('./_pollution-shared');
+const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
 /** Shared precondition: caster has a Creature, a free zone, and a castable hero. */
@@ -104,12 +104,12 @@ function getOwnCreatureTargets(engine, pi) {
 }
 
 /** Apply the Golden Wings buff + immunity flags to a specific creature instance. */
-async function applyBuff(engine, pi, inst, promptCtxShim) {
+async function applyBuff(engine, pi, inst, promptCtxShim, vorab) {
   const gs = engine.gs;
   const ps = gs.players[pi];
 
-  // Cost: 1 Pollution Token.
-  await placePollutionTokens(engine, pi, 1, 'Golden Wings', { promptCtx: promptCtxShim });
+  // Cost: 1 Pollution Token. (W4b: im proaktiven Spielweg schon vor dem Reaktionsfenster bezahlt, `payActivationCost`.)
+  if (!vorab) await placePollutionTokens(engine, pi, 1, 'Golden Wings', { promptCtx: promptCtxShim });
 
   // Shield animation on the protected creature.
   engine._broadcastEvent('play_zone_animation', {
@@ -142,7 +142,7 @@ async function applyBuff(engine, pi, inst, promptCtxShim) {
  * Prompt the caster to click one of their Creatures, then apply the buff.
  * Used for the proactive play path (all own creatures eligible).
  */
-async function promptAndApply(engine, pi, promptCtxShim) {
+async function promptAndApply(engine, pi, promptCtxShim, vorab) {
   const gs = engine.gs;
   const targets = getOwnCreatureTargets(engine, pi);
   if (targets.length === 0) {
@@ -155,7 +155,7 @@ async function promptAndApply(engine, pi, promptCtxShim) {
     description: 'Click one of your Creatures to grant it Golden Wings — full immunity to opponent effects for the rest of this turn.',
     confirmLabel: '🪽 Shield!',
     confirmClass: 'btn-success',
-    cancellable: true,
+    cancellable: !vorab,
     maxTotal: 1,
   });
   if (!selectedIds || selectedIds.length === 0) return false;
@@ -163,7 +163,7 @@ async function promptAndApply(engine, pi, promptCtxShim) {
   const chosen = targets.find(t => t.id === selectedIds[0]);
   if (!chosen?.cardInstance) return false;
 
-  await applyBuff(engine, pi, chosen.cardInstance, promptCtxShim);
+  await applyBuff(engine, pi, chosen.cardInstance, promptCtxShim, vorab);
   return true;
 }
 
@@ -273,13 +273,21 @@ module.exports = {
     return null;
   },
 
+  // ★ W4b (Al, Welle 4): im proaktiven Spielweg ist der Token Kostenpunkt und wird VOR dem Reaktionsfenster bezahlt (bleibt
+  // bei Ganz-Negierung liegen); danach ist die Kreaturwahl nicht mehr abbrechbar. Die Post-Target-Reaktion (`postTargetResolve`)
+  // kennt kein Negationsfenster und zahlt weiter beim Auflösen.
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 1, 'Golden Wings');
+  },
+
   hooks: {
     // Proactive play path — no Action cost (inherentAction above). Any own
     // Creature is a valid pick; the ctx already wires promptZonePick for
     // placePollutionTokens.
     onPlay: async (ctx) => {
-      const ok = await promptAndApply(ctx._engine, ctx.cardOwner, ctx);
-      if (!ok) ctx.gameState._spellCancelled = true;
+      const vorab = kostenSchonBezahlt(ctx);
+      const ok = await promptAndApply(ctx._engine, ctx.cardOwner, ctx, vorab);
+      if (!ok && !vorab) ctx.gameState._spellCancelled = true;
     },
   },
 };

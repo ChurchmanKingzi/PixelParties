@@ -164,6 +164,27 @@ async function doLadderSearch(engine, pi, sacLevel) {
   engine.sync();
 }
 
+/**
+ * KOSTEN: genau eine Kreatur opfern (nicht in diesem Zug beschworen, mit passendem Deck-Ersatz).
+ * Rückgabe: Level des Opfers, `null` = abgebrochen / gerettet (nichts bezahlt).
+ */
+async function zahleOpfer(engine, pi) {
+  let sacLevel = 0;
+  const shimCtx = { cardOwner: pi, card: { id: null }, cardName: CARD_NAME, cardHeroIdx: -1 };
+  const paid = await engine.resolveSacrificeCost(shimCtx, {
+    minCount: 1,
+    maxCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures (not summoned this turn, with an eligible deck replacement) to play Ladder to the Sky.',
+    confirmLabel: '🗡️ Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    filter: ladderSacrificeFilter(engine, pi),
+    onResolved: (_ctx, picked) => { sacLevel = picked?.[0]?._meta?.level ?? 0; },
+  });
+  return paid ? sacLevel : null;
+}
+
 module.exports = {
   // Tracked in the discard pile so the delayed onTurnStart fires.
   activeIn: ['discard'],
@@ -175,28 +196,26 @@ module.exports = {
     return engine.getSacrificableCreatures(pi).some(c => filt(c));
   },
 
-  async resolve(engine, pi /*, selectedIds, validTargets */) {
+  // ★ W4b (Al, Welle 4): das Opfer ist der KOSTENPUNKT („… to play this card") und läuft VOR dem Reaktionsfenster
+  // (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert (Rusty Touch, Silence …),
+  // bleibt die Kreatur geopfert und es wird nichts scharfgestellt. `false` = Opferwahl abgebrochen (nichts bezahlt):
+  // die Karte bleibt auf der Hand, kein Gold.
+  async payArtifactCost(engine, pi) {
+    const sacLevel = await zahleOpfer(engine, pi);
+    return sacLevel == null ? false : { sacLevel };
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     const gs = engine.gs;
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
 
     // ── Pay the sacrifice cost; record the tribute's level. Only
     //    Creatures that have an eligible deck replacement are offered. ──
-    let sacLevel = 0;
-    const shimCtx = { cardOwner: pi, card: { id: null }, cardName: CARD_NAME, cardHeroIdx: -1 };
-    const paid = await engine.resolveSacrificeCost(shimCtx, {
-      minCount: 1,
-      maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn, with an eligible deck replacement) to play Ladder to the Sky.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: ladderSacrificeFilter(engine, pi),
-      onResolved: (_ctx, picked) => { sacLevel = picked?.[0]?._meta?.level ?? 0; },
-    });
+    // (Normalweg: schon vor dem Fenster bezahlt, `kosten`; sonst — z. B. Gratis-Spiel durch Sky Archeologist — jetzt.)
+    const sacLevel = kosten ? kosten.sacLevel : await zahleOpfer(engine, pi);
     // Cancel → card stays in hand, no Gold spent.
-    if (!paid) return { cancelled: true };
+    if (sacLevel == null) return { cancelled: true };
 
     engine.log('ladder_to_sky_played', { player: ps.username, sacrificedLevel: sacLevel });
 

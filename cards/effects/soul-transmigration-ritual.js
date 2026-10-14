@@ -43,6 +43,18 @@
 //  (Als Regel 24.9., zentral in der Engine: `_isHeroSpellProtected`
 //  und das Todes-Aufraeumen).
 //
+//  ── ★ W4b (Al, Welle 4): DAS OPFER IST EIN KOSTENPUNKT ───────────────
+//  „Sacrifice 3 level 0 Creatures you control TO USE THIS SPELL": die
+//  Opferwahl und der Tod der 3 Kreaturen laufen in `payActivationCost`
+//  VOR dem Reaktionsfenster; wird die Karte komplett negiert (Silence,
+//  The Master's Plan …), bleiben sie geopfert (Z7b/Z7c: der Einmal-
+//  Stempel bleibt frei). Danach wählt `onPlay` den Helden — nicht mehr
+//  abbrechbar. Abbruch der Opferwahl (`false`) nimmt den Zug zurück
+//  (Karte bleibt auf der Hand); ein von Barrier of Undying gerettetes
+//  Opfer lässt die Karte wie zuvor fizzeln (gespielt, ohne Wirkung).
+//  Fallback ohne `payActivationCost` (anderer Spielweg): alter Ablauf
+//  (Ziel zuerst, dann Opfer im `onPlay`).
+//
 //  ── ZUSATZAKTION ──────────────────────────────────────────────────
 //  „If the user has at least Magic Arts 1" — `inherentAction` als
 //  Funktion ueber `effectiveSchoolLevelForCaster` (Performance, Xal &
@@ -140,6 +152,23 @@ module.exports = {
     return engine.canSatisfySacrifice(pi, opferSpec(), null);
   },
 
+  /**
+   * ★ W4b: der Preis (3 Kreaturen mit Level 0) VOR dem Reaktionsfenster. `false` = Opferwahl abgebrochen (nichts
+   * bezahlt) → der Server nimmt den Zug zurück. Gibt es genau einen wählbaren Helden, laufen die Fäden zu ihm,
+   * sonst das Standardbild (der Held wird erst nach dem Fenster gewählt).
+   */
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const inst = ctx.card;
+    if (!inst) return;
+    const kand = waehlbareHelden(engine, ctx.cardOwner);
+    const bezahlt = await engine.resolveSacrificeCost(ctx, opferSpec(kand.length === 1 ? kand[0] : null));
+    if (bezahlt) { inst._opferVorab = true; return; }
+    // Gerettetes Opfer (Barrier of Undying): gespielt, fizzelt (v1313) — `onPlay` setzt das nach.
+    if (engine.nimmOpferFizzle()) { inst._opferGerettet = true; return; }
+    return false;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
@@ -148,11 +177,17 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
-      if (!ps) { gs._spellCancelled = true; return; }
+      // W4b: Normalweg — der Preis ist schon vor der Kette bezahlt (`payActivationCost`).
+      const _inst = ctx.card;
+      if (_inst?._opferGerettet) { delete _inst._opferGerettet; gs._opferFizzle = true; gs._spellCancelled = true; return; }
+      const vorab = !!_inst?._opferVorab;
+      if (_inst) delete _inst._opferVorab;
+      const abbruch = () => { if (!vorab) gs._spellCancelled = true; };   // Kosten bezahlt: Karte ist verbraucht
+      if (!ps) { abbruch(); return; }
 
       // ── 1. Ziel ──────────────────────────────────────────────────
       const kandidaten = waehlbareHelden(engine, pi);
-      if (kandidaten.length === 0) { gs._spellCancelled = true; return; }
+      if (kandidaten.length === 0) { abbruch(); return; }
       const ziele = kandidaten.map(hi => ({
         id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi,
         cardName: ps.heroes[hi].name,
@@ -162,18 +197,20 @@ module.exports = {
         description: 'Choose a defeated Hero you control to revive with full HP.',
         confirmLabel: '🕯️ Revive!',
         confirmClass: 'btn-success',
-        cancellable: true,
+        cancellable: !vorab,
         greenSelect: true,
         exclusiveTypes: true,
         maxPerType: { hero: 1 },
         maxTotal: 1,
       });
       const ziel = ziele.find(z => z.id === wahl?.[0]);
-      if (!ziel) { gs._spellCancelled = true; return; }
+      if (!ziel) { abbruch(); return; }
 
       // ── 2. Preis ─────────────────────────────────────────────────
-      const bezahlt = await engine.resolveSacrificeCost(ctx, opferSpec(ziel.heroIdx));
-      if (!bezahlt) { gs._spellCancelled = true; return; }   // Abbruch — oder Rettung (Server: fizzelt)
+      if (!vorab) {
+        const bezahlt = await engine.resolveSacrificeCost(ctx, opferSpec(ziel.heroIdx));
+        if (!bezahlt) { gs._spellCancelled = true; return; }   // Abbruch — oder Rettung (Server: fizzelt)
+      }
 
       // ── 3. Wiederbeleben ─────────────────────────────────────────
       const held = ps.heroes[ziel.heroIdx];

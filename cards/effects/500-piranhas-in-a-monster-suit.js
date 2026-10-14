@@ -82,6 +82,80 @@ function _validVictims(engine, pi) {
   return out;
 }
 
+/**
+ * KOSTEN: gegnerische Kreatur wählen und besiegen. `false` = abgebrochen / nicht möglich (nichts bezahlt bzw. Rettung),
+ * sonst `{ victimName, destHi, destSlot, vSeite }` für die Platzierung. Eine Stelle für `paySummonCost` und den Fallback.
+ */
+async function _zahleKosten(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  if (!ps) return false;
+  if (_hoptUsed(gs, pi)) return false;
+
+  const victims = _validVictims(engine, pi);
+  if (victims.length === 0) return false;
+
+  // ── Step 1: pick the opp Creature to defeat ────────────────
+  const picked = await engine.promptEffectTarget(pi, victims, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
+    title: FULL_NAME,
+    description: 'Choose an opponent Creature to defeat. The Piranhas takes its slot.',
+    confirmLabel: '🐟 Devour!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    exclusiveTypes: true,
+    maxPerType: { equip: 1 },
+  });
+  if (!picked || picked.length === 0) return false;
+  const victim = victims.find(t => t.id === picked[0]);
+  if (!victim?.cardInstance) return false;
+
+  const targetInst = victim.cardInstance;
+  const destHi = targetInst.heroIdx;
+  const destSlot = targetInst.zoneSlot;
+  // Z1 (C01-06): die Zone des Opfers liegt auf seiner BRETTSEITE (`vSeite`) — bei einer vom
+  // Gegner gestohlenen EIGENEN Kreatur ist das MEINE Seite, nicht die des Gegners.
+  const vSeite = engine.physicalSide(targetInst);
+  const ops = gs.players[vSeite];
+  if (!ops) return false;
+
+  // ── Step 2: defeat the chosen Creature ─────────────────────
+  // Use actionDestroyCard so on-death hooks fire (Phoenix revive,
+  // Loyal Terrier chain, etc.). Source is the Piranhas (owned by
+  // us) so reactions correctly attribute the kill.
+  const dummySource = { name: FULL_NAME, owner: pi, heroIdx: -1 };
+  await engine.actionDestroyCard(dummySource, targetInst, {
+    fireCreatureDeath: true,
+  });
+
+  // If the target was rescued (Cool Rescuer Monia, Cosmic
+  // Malfunction, …) the destroy fizzled — bail and DON'T claim the
+  // HOPT (the play didn't go through).
+  if (targetInst.zone === 'support') {
+    engine.log('piranhas_fizzle', {
+      player: ps.username, reason: 'destroy_blocked',
+      target: targetInst.name,
+    });
+    return false;
+  }
+
+  // The destroy may have triggered an on-death effect that re-
+  // occupies the slot (revives, cluster summons, etc.). If so,
+  // there's no opening for the Piranhas — fizzle without claiming
+  // the HOPT.
+  const slotAfter = ((ops.supportZones?.[destHi] || [])[destSlot] || []);
+  if (slotAfter.length > 0) {
+    engine.log('piranhas_fizzle', {
+      player: ps.username, reason: 'slot_reoccupied',
+      target: victim.cardName,
+    });
+    return false;
+  }
+  return { victimName: victim.cardName, destHi, destSlot, vSeite };
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -117,72 +191,31 @@ module.exports = {
     return _validVictims(engine, pi).length > 0;
   },
 
+  // ★ W4b (Al, Welle 4): das Besiegen der gegnerischen Kreatur ist der KOSTENPUNKT („… and defeat it to play this card").
+  // Wahl + Tod laufen VOR dem Reaktionsfenster der Beschwörung (`paySummonCost`); wird die Beschwörung danach komplett
+  // negiert (Off Duty …), bleibt die Kreatur besiegt, die Piranhas gehen in die Ablage und die Rundengrenze bleibt frei.
+  // `beforeSummon` platziert danach nur noch in den frei gewordenen Platz (ohne `paySummonCost`, z. B. bei
+  // Effekt-Beschwörungen, zahlt es wie früher selbst).
+  paySummonCost: async (ctx) => _zahleKosten(ctx),
+
   beforeSummon: async (ctx) => {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (_hoptUsed(gs, pi)) return false;
 
-    const victims = _validVictims(engine, pi);
-    if (victims.length === 0) return false;
-
-    // ── Step 1: pick the opp Creature to defeat ────────────────
-    const picked = await engine.promptEffectTarget(pi, victims, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
-      title: FULL_NAME,
-      description: 'Choose an opponent Creature to defeat. The Piranhas takes its slot.',
-      confirmLabel: '🐟 Devour!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      exclusiveTypes: true,
-      maxPerType: { equip: 1 },
-    });
-    if (!picked || picked.length === 0) return false;
-    const victim = victims.find(t => t.id === picked[0]);
-    if (!victim?.cardInstance) return false;
-
-    const targetInst = victim.cardInstance;
-    const oi = engine.opponentOf(pi);
-    const destHi = targetInst.heroIdx;
-    const destSlot = targetInst.zoneSlot;
-    // Z1 (C01-06): die Zone des Opfers liegt auf seiner BRETTSEITE (`vSeite`) — bei einer vom
-    // Gegner gestohlenen EIGENEN Kreatur ist das MEINE Seite, nicht die des Gegners.
-    const vSeite = engine.physicalSide(targetInst);
+    const kosten = ctx._summonKosten || await _zahleKosten(ctx);
+    if (!kosten) return false;
+    const { victimName, destHi, destSlot, vSeite } = kosten;
     const ops = gs.players[vSeite];
     if (!ops) return false;
+    const oi = engine.opponentOf(pi);
 
-    // ── Step 2: defeat the chosen Creature ─────────────────────
-    // Use actionDestroyCard so on-death hooks fire (Phoenix revive,
-    // Loyal Terrier chain, etc.). Source is the Piranhas (owned by
-    // us) so reactions correctly attribute the kill.
-    const dummySource = { name: FULL_NAME, owner: pi, heroIdx: -1 };
-    await engine.actionDestroyCard(dummySource, targetInst, {
-      fireCreatureDeath: true,
-    });
-
-    // If the target was rescued (Cool Rescuer Monia, Cosmic
-    // Malfunction, …) the destroy fizzled — bail and DON'T claim the
-    // HOPT (the play didn't go through).
-    if (targetInst.zone === 'support') {
-      engine.log('piranhas_fizzle', {
-        player: ps.username, reason: 'destroy_blocked',
-        target: targetInst.name,
-      });
-      return false;
-    }
-
-    // The destroy may have triggered an on-death effect that re-
-    // occupies the slot (revives, cluster summons, etc.). If so,
-    // there's no opening for the Piranhas — fizzle without claiming
-    // the HOPT.
+    // Der Platz kann im Reaktionsfenster belegt worden sein.
     const slotAfter = ((ops.supportZones?.[destHi] || [])[destSlot] || []);
     if (slotAfter.length > 0) {
-      engine.log('piranhas_fizzle', {
-        player: ps.username, reason: 'slot_reoccupied',
-        target: victim.cardName,
-      });
+      engine.log('piranhas_fizzle', { player: ps.username, reason: 'slot_reoccupied', target: victimName });
       return false;
     }
 
@@ -229,7 +262,7 @@ module.exports = {
 
     engine.log('piranhas_summon', {
       player: ps.username,
-      victim: victim.cardName,
+      victim: victimName,
       hostHero: ops.heroes?.[destHi]?.name,
     });
     engine.sync();

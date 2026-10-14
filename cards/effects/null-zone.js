@@ -23,7 +23,7 @@
 //  same pattern as Spontaneous Reappearance.
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
+const { placePollutionTokens, countFreeZones, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType, isCreatureNegated } = require('./_hooks');
 
 module.exports = {
@@ -49,6 +49,12 @@ module.exports = {
     return countFreeZones(gs, pi) >= 2;
   },
 
+  // ★ W4b (Al, Welle 4): die Token-Kosten („… to use this Spell") werden VOR dem Reaktionsfenster bezahlt und
+  // bleiben bei Ganz-Negierung bezahlt (Helfer in `_pollution-shared.js`).
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 2, 'Null Zone');
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -56,8 +62,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const cardDB = engine._getCardDB();
 
-      // ── Pay cost ──
-      await placePollutionTokens(engine, pi, 2, 'Null Zone', { promptCtx: ctx });
+      // ── Pay cost ── (Normalweg: schon in `payActivationCost` bezahlt; sonst Fallback)
+      if (!kostenSchonBezahlt(ctx)) await placePollutionTokens(engine, pi, 2, 'Null Zone', { promptCtx: ctx });
 
       // ── Apply effects ──
       // Expiry: "end of your next turn" = Beginn des ersten Zuges NACH dem

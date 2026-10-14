@@ -15492,9 +15492,119 @@ this._deathWatch = (this._deathWatchStack || []).length
     return false;
   }
 
+  /**
+   * ★ W4b (Al, Welle 4): Tribut-/Opferkosten einer Kreatur-Beschwörung werden VOR dem Reaktionsfenster bezahlt
+   * (Gegenstück zu `payActivationCost` der Zauber; eigener Name `paySummonCost`, weil `payActivationCost` bei Kreaturen
+   * schon die Reaktions-Aktivierung meint). Wird die Beschwörung danach komplett negiert (Off Duty …), bleiben die Kosten
+   * bezahlt: die Opfer sind tot, die Karte wandert in die Ablage.
+   *
+   * Skript-Vertrag (Kreatur, optional): `paySummonCost(ctx) → false | Daten`. `false` = Kostenwahl abgebrochen oder
+   * nicht zahlbar (nichts bezahlt → der Server nimmt den Zug zurück wie bei einem abgelehnten `beforeSummon`). Sonst
+   * die Daten (beliebiges Objekt, auch `{}`), die das spätere `beforeSummon` als `ctx._summonKosten` bekommt — dann
+   * überspringt es die Kostenzahlung und erledigt nur den Rest (Platzieren, Beschwörungsart, Effekt). Läuft
+   * `paySummonCost` nicht (Effekt-Beschwörung, andere Wege), bezahlt `beforeSummon` wie früher selbst.
+   * Der Ablauf spiegelt `_runBeforeSummon` (Reservierung des Zielplatzes, Tribut-Stempel `_tributePaid`).
+   */
+  async _payCreatureSummonCost(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
+    const script = loadCardEffect(cardName);
+    if (typeof script?.paySummonCost !== 'function') return true;
+    const _alt = this._summonKostenBezahlt;
+    if (_alt && _alt.cardName === cardName && _alt.playerIdx === playerIdx) this._verwerfeSummonKosten();   // Rest derselben Karte
+    this._beschwoerungsOpferTiefe = (this._beschwoerungsOpferTiefe || 0) + 1;
+    try {
+      const _prevReservation = this._reservedSummonSlot;
+      const heldSeite = (hookExtras && (isSeat(this, hookExtras.heldSeite))) ? hookExtras.heldSeite : playerIdx;
+      if (reservedSlot >= 0) this._reservedSummonSlot = { playerIdx: heldSeite, heroIdx, zoneSlot: reservedSlot };
+      const _prevBeforeSummon = this._beforeSummonInFlight;
+      this._beforeSummonInFlight = { cardName, playerIdx, turn: this.gs?.turn };
+      try {
+        const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
+        if (heldSeite !== playerIdx) dummy.heroOwner = heldSeite;
+        const ctx = this._createContext(dummy, { ...hookExtras });
+        const res = await script.paySummonCost(ctx);
+        if (res === false) {
+          if (this._pendingTributeSummon && this._pendingTributeSummon.cardName === cardName
+              && this._pendingTributeSummon.playerIdx === playerIdx) delete this._pendingTributeSummon;
+          return false;
+        }
+        this._summonKostenBezahlt = { cardName, playerIdx, turn: this.gs?.turn, data: (res && typeof res === 'object') ? res : {} };
+        return true;
+      } catch (err) {
+        console.error(`[paySummonCost] ${cardName} threw:`, err.message);
+        return false;
+      } finally {
+        this._reservedSummonSlot = _prevReservation;
+        this._beforeSummonInFlight = _prevBeforeSummon;
+      }
+    } finally {
+      this._beschwoerungsOpferTiefe = Math.max(0, (this._beschwoerungsOpferTiefe || 1) - 1);
+    }
+  }
+
+  /**
+   * ★ W4b (Al, Welle 4): Opfer-/Abwurf-Kosten eines ARTEFAKTS („Sacrifice … to play this card": Hive's Crown, Ladder to
+   * the Sky, Remote Detonator) werden VOR dem Reaktionsfenster bezahlt (Gegenstück zu `payActivationCost` der Zauber und
+   * `paySummonCost` der Kreaturen). Wird das Artefakt danach komplett negiert, bleiben die Kosten bezahlt.
+   *
+   * Skript-Vertrag (Artefakt, optional): `payArtifactCost(engine, pi, selectedIds, validTargets) → false | Daten`.
+   * `false` = nichts bezahlt (Kostenwahl abgebrochen / nicht zahlbar → der Server legt die Karte zurück auf die Hand wie bei
+   * `{ cancelled: true }`). Sonst die Daten (Objekt, auch `{}`), die `resolve(engine, pi, selectedIds, validTargets, kosten)`
+   * als 5. Argument bekommt und dann nicht noch einmal bezahlt. Ohne diesen Haken bzw. auf anderen Wegen, die `resolve`
+   * direkt rufen (Gratis-Spiel durch Sky Archeologist u. ä.), zahlt `resolve` wie früher selbst (`kosten` fehlt).
+   * Aufgerufen von `doConfirmPotion` (zielende) und `doUseArtifactEffect` (nicht zielende Artefakte).
+   * Rückgabe: `{ ok: false }` oder `{ ok: true }`.
+   */
+  async _payArtifactCost(cardName, pi, selectedIds, validTargets) {
+    const script = loadCardEffect(cardName);
+    if (typeof script?.payArtifactCost !== 'function') return { ok: true };
+    delete this._artefaktKostenBezahlt;
+    let res;
+    try {
+      res = await script.payArtifactCost(this, pi, selectedIds || [], validTargets || []);
+    } catch (err) {
+      console.error(`[payArtifactCost] ${cardName} threw:`, err.message);
+      return { ok: false };
+    }
+    if (res === false) return { ok: false };
+    this._artefaktKostenBezahlt = { cardName, pi, turn: this.gs?.turn, data: (res && typeof res === 'object') ? res : {} };
+    return { ok: true };
+  }
+
+  /** W4b: vorab bezahlte Artefakt-Kosten abholen (genau einmal), sonst `undefined`. */
+  _takePaidArtifactCost(cardName, pi) {
+    const k = this._artefaktKostenBezahlt;
+    if (!k || k.cardName !== cardName || k.pi !== pi || k.turn !== this.gs?.turn) return undefined;
+    delete this._artefaktKostenBezahlt;
+    return k.data;
+  }
+
+  /** W4b: Rest der vorab bezahlten Artefakt-Kosten vergessen (Artefakt negiert/abgebrochen); die Kosten selbst bleiben bezahlt. */
+  _verwerfeArtefaktKosten() { delete this._artefaktKostenBezahlt; }
+
+  /** W4b: vorab bezahlte Beschwörungskosten dieser Karte abholen (genau einmal), sonst `null`. */
+  _takePaidSummonCost(cardName, playerIdx) {
+    const k = this._summonKostenBezahlt;
+    if (!k) return null;
+    if (k.cardName !== cardName || k.playerIdx !== playerIdx || k.turn !== this.gs?.turn) return null;
+    delete this._summonKostenBezahlt;
+    return k;
+  }
+
+  /** W4b: Rest der vorab bezahlten Beschwörungskosten vergessen (Beschwörung negiert/abgebrochen); die Kosten selbst bleiben bezahlt. */
+  _verwerfeSummonKosten() {
+    const k = this._summonKostenBezahlt;
+    if (!k) return;
+    delete this._summonKostenBezahlt;
+    const p = this._pendingTributeSummon;
+    if (p && p.cardName === k.cardName && p.playerIdx === k.playerIdx) delete this._pendingTributeSummon;
+  }
+
   async _runBeforeSummon(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
     const script = loadCardEffect(cardName);
     if (!script?.beforeSummon) return true;
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt (`payActivationCost` der Kreatur) → `ctx._summonKosten`.
+    const _bezahlt = this._takePaidSummonCost(cardName, playerIdx);
+    if (_bezahlt) hookExtras = { ...(hookExtras || {}), _summonKosten: _bezahlt.data };
     // v1313: Opfer, die eine BESCHWOERUNG kostet, oeffnen kein Rettungs-
     // fenster (Als Vorgabe 23.9.) — Zaehler statt Flag, falls verschachtelt.
     this._beschwoerungsOpferTiefe = (this._beschwoerungsOpferTiefe || 0) + 1;

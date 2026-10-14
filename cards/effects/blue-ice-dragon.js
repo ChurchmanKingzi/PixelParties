@@ -192,6 +192,26 @@ function targetIsFrozen(engine, target) {
   return !!inst?.counters?.frozen;
 }
 
+/**
+ * KOSTEN: die Opfer (bei einem Wurf auf einen belegten Platz mindestens eines vom Beschwörer-Helden). `false` = abgebrochen.
+ * Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
+ */
+async function zahleOpfer(ctx, allFullDrop) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+  const base = makeSacrificeSpec(engine);
+  const spec = allFullDrop
+    ? {
+        ...fullDropSpec(engine, pi, heroIdx, heroOwner),
+        description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
+      }
+    : base;
+  return !!(await engine.resolveSacrificeCost(ctx, spec));
+}
+
 module.exports = {
   // Vertrag fuer Effekte, die eine Creature mit Opferkosten in einen BELEGTEN Platz beschwoeren (Pinta): die
   // Kostenbeschreibung, wie `resolveSacrificeCost` sie versteht. Mit `requiredInstIds` fragt der Effekt per
@@ -247,6 +267,16 @@ module.exports = {
    * Opferwahl ab, ist die Beschwörung ganz vom Tisch und es kann kein
    * Umschaltmerker zurückbleiben.
    */
+  // ★ W4b (Al, Welle 4): die Opfer sind KOSTEN der Beschwörung und werden VOR dem Reaktionsfenster bezahlt
+  // (`paySummonCost`, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …),
+  // bleiben sie geopfert. `beforeSummon` klärt danach nur noch Beschwörungsart und Platzierung (`ctx._summonKosten`);
+  // ohne `paySummonCost` (Effekt-Beschwörungen u. ä.) zahlt es wie früher selbst.
+  async paySummonCost(ctx) {
+    const ps = ctx._engine.gs.players[ctx.cardOwner];
+    const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
+    return (await zahleOpfer(ctx, allFullDrop)) ? { allFullDrop } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -259,19 +289,11 @@ module.exports = {
 
     // Wurf auf einen belegten Platz -> mind. ein Opfer muss von diesem
     // Helden kommen, sonst wird dort kein Platz frei.
-    const allFullDrop = !!ps?._requestedBouncePlaceSlot;
+    const pre = ctx._summonKosten;   // W4b: Opfer schon vor dem Reaktionsfenster bezahlt
+    const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    const base = makeSacrificeSpec(engine);
-    const spec = allFullDrop
-      ? {
-          ...fullDropSpec(engine, pi, heroIdx, heroOwner),
-          description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
-        }
-      : base;
-
-    const ok = await engine.resolveSacrificeCost(ctx, spec);
-    if (!ok) return false;
+    if (!pre && !(await zahleOpfer(ctx, allFullDrop))) return false;
 
     // ── Beschwörungsart ──
     // `ctx.isInherentAction` ist bereits true, wenn der Gratisweg

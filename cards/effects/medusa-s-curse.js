@@ -11,7 +11,7 @@
 //  buff — damageMultiplier: 0).
 // ═══════════════════════════════════════════
 
-const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
+const { placePollutionTokens, countFreeZones, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
@@ -36,6 +36,11 @@ module.exports = {
     return countFreeZones(gs, pi) >= 2;
   },
 
+  // ★ W4b (Al, Welle 4): die Token-Kosten werden VOR dem Reaktionsfenster bezahlt und bleiben bei Ganz-Negierung bezahlt.
+  async payActivationCost(ctx) {
+    await payTokenCost(ctx, 2, "Medusa's Curse");
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -45,8 +50,9 @@ module.exports = {
       const opp = gs.players[oppIdx];
       const cardDB = engine._getCardDB();
 
+      const _vorab = kostenSchonBezahlt(ctx);   // W4b: Kosten schon vor dem Fenster bezahlt?
       if (!opp) {
-        gs._spellCancelled = true;
+        if (!_vorab) gs._spellCancelled = true;
         return;
       }
 
@@ -91,7 +97,7 @@ module.exports = {
       // The spell is always consumed — Pollution placement is a cost per the
       // card text ("Place 2 Pollution Tokens... to use this Spell"), so we
       // pay it even if the filter produced 0 eligible targets.
-      await placePollutionTokens(engine, pi, 2, "Medusa's Curse", { promptCtx: ctx });
+      if (!_vorab) await placePollutionTokens(engine, pi, 2, "Medusa's Curse", { promptCtx: ctx });
 
       if (totalTargets === 0) return;
 

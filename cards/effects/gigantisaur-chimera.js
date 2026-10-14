@@ -119,7 +119,10 @@ module.exports = {
    * Cancellable` prompts — same pattern as Pteranos's distinct-name
    * draw, but mandatory (3 picks; cancel any of them = refuse summon).
    */
-  beforeSummon: async (ctx) => {
+  // ★ W4b (Al, Welle 4): der Abwurf der drei Gigantisaurs ist ein KOSTENPUNKT der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt er bezahlt.
+  // `beforeSummon` zahlt nur noch, wenn `paySummonCost` nicht lief (Effekt-Beschwörungen u. ä.; `ctx._summonKosten` fehlt).
+  paySummonCost: async (ctx) => {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
@@ -217,6 +220,8 @@ module.exports = {
       return true;
     });
   },
+
+  beforeSummon: async (ctx) => (ctx._summonKosten ? true : (await module.exports.paySummonCost(ctx)) !== false),
 
   hooks: {
     /**

@@ -10061,11 +10061,30 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   let _heroCostFinalized = false;
 
   try {
+    // ★ W4b (Al, Welle 4): Tribut-/Opferkosten der Beschwörung („… to play this card") werden VOR dem Reaktionsfenster
+    // bezahlt (`paySummonCost` der Kreatur, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett
+    // negiert (Off Duty …), bleiben die Opfer tot. Bricht der Spieler die Kostenwahl ab (`false`), ist nichts bezahlt:
+    // Rückabwicklung wie bei einem abgelehnten `beforeSummon` unten (Karte bleibt auf der Hand).
+    const _kostenOk = await room.engine._payCreatureSummonCost(cardName, pi, heroIdx,
+      { isInherentAction, viaDragDrop: !!viaDragDrop, _isNormalSummon: true, ...(heroOwner !== pi ? { heldSeite: heroOwner } : {}) }, zoneSlot);
+    if (!_kostenOk) {
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
+      ps._resolvingCard = null;
+      if (additionalConsumed && consumedInst) room.engine.restoreAdditionalAction(consumedInst);
+      if (actionCounterIncrementedHere) ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) ps._bonusMainActions = 1;
+      room.engine.log('creature_fizzle', { card: cardName, reason: 'summon_cost_cancelled' });
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
+
     const chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0,
     });
 
     if (chainResult.negated) {
+      room.engine._verwerfeSummonKosten();   // W4b: die Kosten bleiben bezahlt, der Merker für die Landung entfällt
       // Negated by a Reaction — the creature never actually summoned,
       // refund the Hero pre-action cost (Saint Nicolas keeps the
       // marked Potion in hand).
@@ -11411,6 +11430,16 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // resolves (no-op for humans / PvP / MCTS sim and for the immediate-
   // broadcast else-branch above which set no pending reveal).
   room.engine.maybeFireCpuRevealEarly();
+  // ★ W4b (Al, Welle 4): Opfer-/Abwurf-Kosten („… to play this card") VOR dem Reaktionsfenster bezahlen
+  // (`payArtifactCost` des Skripts, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert, bleiben sie
+  // bezahlt. `false` = nichts bezahlt → wie `{ cancelled: true }`: Karte bleibt auf der Hand.
+  if (!(await room.engine._payArtifactCost(potionName, pi, selectedIds, validTargets)).ok) {
+    ps._resolvingCard = null;
+    delete gs._pendingCardReveal;
+    delete gs._pendingPlayLog;
+    for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+    return true;
+  }
   let chainResult;
   try {
     chainResult = await room.engine.executeCardWithChain({
@@ -11423,13 +11452,14 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         // v1444: Defending the Gate, sobald ein Ziel in einer gegnerischen
         // Support Zone liegt (Dark Gear & alle anderen zielenden Karten).
         await room.engine.gateVorZielen(pi, potionName, selectedIds, validTargets);
-        return await script.resolve(room.engine, pi, selectedIds, validTargets);
+        return await script.resolve(room.engine, pi, selectedIds, validTargets, room.engine._takePaidArtifactCost(potionName, pi));
       } : null,
     });
   } catch (err) {
     console.error('[Engine] doConfirmPotion chain error:', err.message);
     chainResult = { negated: false, chainFormed: false, resolveResult: null };
   }
+  room.engine._verwerfeArtefaktKosten();   // W4b: bei Negation bleibt nur der bezahlte Preis, der Merker entfällt
 
   if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost && !chainResult.negated) {
     // `cardName` mit — siehe oben (selfGoldOverdraft).
@@ -12315,6 +12345,16 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       });
     }
 
+    // ★ W4b (Al, Welle 4): Opfer-/Abwurf-Kosten („… to play this card") VOR dem Reaktionsfenster bezahlen
+    // (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert, bleiben sie bezahlt.
+    // `false` = nichts bezahlt → wie `{ cancelled: true }` unten: Karte bleibt auf der Hand.
+    if (!(await room.engine._payArtifactCost(cardName, pi, [], [])).ok) {
+      delete gs._pendingCardReveal;
+      delete gs._pendingPlayLog;
+      ps._resolvingCard = null;
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
     let chainResult;
     try {
       chainResult = await room.engine.executeCardWithChain({
@@ -12322,7 +12362,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
         resolve: async () => {
           room.engine.armEffectAnnounce(cardName, pi, 'hand');   // v349
           try {
-            const r = await script.resolve(room.engine, pi, [], []);
+            const r = await script.resolve(room.engine, pi, [], [], room.engine._takePaidArtifactCost(cardName, pi));
             if (r !== false) room.engine.announceActiveEffect();
             return r;
           } finally {
@@ -12334,6 +12374,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
       console.error('[Engine] Artifact resolve error:', err.stack || err.message); // Stack statt nur Message — ohne ihn war der Täter (Ushabti) nicht auffindbar
       chainResult = { negated: false, chainFormed: false };
     }
+    room.engine._verwerfeArtefaktKosten();   // W4b: bei Negation bleibt nur der bezahlte Preis, der Merker entfällt
     await room.engine._delay(100);
 
     if (chainResult.resolveResult?.cancelled) {

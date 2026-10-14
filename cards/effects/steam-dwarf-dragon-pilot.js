@@ -162,6 +162,26 @@ function occupiedDropSlots(gs, pi, engine) {
 
 const { usesLeft, spendUse } = require('./_charges');
 const USE_KEY = 'dragonPilot';
+/**
+ * KOSTEN: die Opfer (inhärent nur Level ≤ 1; bei einem Wurf auf einen belegten Platz mindestens eines vom Beschwörer-Helden).
+ * `false` = abgebrochen. Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
+ */
+async function zahleOpfer(ctx, allFullDrop) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const heroIdx = ctx.cardHeroIdx;
+  const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
+  const baseSpec = ctx.isInherentAction ? makeLv1SacrificeSpec(engine) : makeSacrificeSpec(engine);
+  const spec = allFullDrop
+    ? {
+        ...fullDropSpec(baseSpec, heroIdx, pi, heroOwner),
+        description: `${baseSpec.description} At least one sacrifice must come from the summoning Hero's Support Zones.`,
+      }
+    : baseSpec;
+  return !!(await engine.resolveSacrificeCost(ctx, spec));
+}
+
 module.exports = attachSteamEngine({
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
@@ -257,6 +277,16 @@ module.exports = attachSteamEngine({
   //     the sacrifice frees a slot, Dragon Pilot is placed manually
   //     into the first freed slot and we signal the server to skip its
   //     default placement by setting _placementConsumedByCard.
+  // ★ W4b (Al, Welle 4): die Opfer sind KOSTEN der Beschwörung und werden VOR dem Reaktionsfenster bezahlt
+  // (`paySummonCost`, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …),
+  // bleiben sie geopfert. `beforeSummon` platziert danach nur noch (`ctx._summonKosten`); ohne `paySummonCost`
+  // (Effekt-Beschwörungen u. ä.) zahlt es wie früher selbst.
+  async paySummonCost(ctx) {
+    const ps = ctx._engine.gs.players[ctx.cardOwner];
+    const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
+    return (await zahleOpfer(ctx, allFullDrop)) ? { allFullDrop } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -270,19 +300,11 @@ module.exports = attachSteamEngine({
     // `_requestedBouncePlaceSlot` is only set when the player dropped
     // on an occupied slot — which for Dragon Pilot means the summoning
     // Hero had no free slots (canPlaceOnOccupiedSlot gates on that).
-    const allFullDrop = !!ps?._requestedBouncePlaceSlot;
+    const pre = ctx._summonKosten;   // W4b: Opfer schon vor dem Reaktionsfenster bezahlt
+    const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    const baseSpec = ctx.isInherentAction ? makeLv1SacrificeSpec(engine) : makeSacrificeSpec(engine);
-    const spec = allFullDrop
-      ? {
-          ...fullDropSpec(baseSpec, heroIdx, pi, heroOwner),
-          description: `${baseSpec.description} At least one sacrifice must come from the summoning Hero's Support Zones.`,
-        }
-      : baseSpec;
-
-    const ok = await engine.resolveSacrificeCost(ctx, spec);
-    if (!ok) return false;
+    if (!pre && !(await zahleOpfer(ctx, allFullDrop))) return false;
 
     // All-full path: manually place into a freed slot on the summoning
     // Hero, then tell the server to skip its default summonCreature.

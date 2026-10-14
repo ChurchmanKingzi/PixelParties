@@ -409,8 +409,27 @@ async function _removeTokenInstance(engine, inst, sourceName) {
   await engine._delay(200);
 }
 
+/**
+ * ★ W4b (Al, Welle 4): Token-Kosten „Place N Pollution Tokens … to use this Spell / to play this card" sind Kosten und
+ * werden VOR dem Reaktionsfenster bezahlt (`payActivationCost`) — wird der Zauber danach komplett negiert, bleiben die
+ * Token liegen. Der Zauber merkt sich das an der Instanz (`ctx.card._kostenBezahlt`, dieselbe Instanz wie im `onPlay`);
+ * lief `payActivationCost` nicht (Sofort-Guss, Spiegelkopie, anderer Weg), zahlt `onPlay` wie früher selbst.
+ * `payTokenCost(ctx, n, name)` = der Haken; `kostenSchonBezahlt(ctx)` = im `onPlay` abfragen (verbraucht die Marke).
+ */
+async function payTokenCost(ctx, count, sourceName) {
+  await placePollutionTokens(ctx._engine, ctx.cardOwner, count, sourceName, { promptCtx: ctx });
+  if (ctx.card) ctx.card._kostenBezahlt = true;
+}
+function kostenSchonBezahlt(ctx) {
+  const v = !!ctx.card?._kostenBezahlt;
+  if (ctx.card) delete ctx.card._kostenBezahlt;
+  return v;
+}
+
 module.exports = {
   POLLUTION_TOKEN,
+  payTokenCost,
+  kostenSchonBezahlt,
   countFreeZones,
   hasFreeZone,
   getFreeZones,
