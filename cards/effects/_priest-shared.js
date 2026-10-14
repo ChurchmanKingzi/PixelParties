@@ -80,6 +80,10 @@ function zusatzWegGilt(gs, pi) {
  */
 function zusatzBeschwoerung(CARD_NAME) {
   return {
+    // W5b-Z1b (Al, Welle 5): No Retreat! erkennt die Zusatzbeschwörung (Kosten = Zurückmischen), BEVOR `beforeSummon` zahlt.
+    shufflesIntoDeckIf(gs, pi, engine, link) {
+      return !!(link && link.isInherentAction && link.cardType === 'Creature');
+    },
     inherentAction(gs, pi, heroIdx, engine) {
       if (!engine) return false;
       if (!zusatzWegGilt(gs, pi)) return false;

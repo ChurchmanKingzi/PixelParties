@@ -10080,8 +10080,24 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     }
 
     const chainResult = await room.engine.executeCardWithChain({
-      cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0,
+      cardName, owner: pi, heroIdx, cardType: 'Creature', goldCost: 0, isInherentAction,
     });
+
+    // ★ W5b-Z1b (Al, Welle 5: „No Retreat soll die Priests erkennen"): Negiert No Retreat! die Zusatzbeschwörung, deren Kosten
+    // das Zurückmischen sind (Priest of Luna/Tempeste), ist NUR dieser Weg negiert: nichts gemischt, nichts bezahlt, die Karte
+    // bleibt auf der Hand und keine Aktion ist verbraucht (Rückabwicklung wie bei einem abgelehnten `beforeSummon`).
+    if (chainResult.negated && chainResult.negatedKeepInHand) {
+      room.engine._verwerfeSummonKosten();
+      await room.engine.refundHeroActionCost(pi, heroIdx);
+      _heroCostFinalized = true;
+      ps._resolvingCard = null;
+      if (additionalConsumed && consumedInst) room.engine.restoreAdditionalAction(consumedInst);
+      if (actionCounterIncrementedHere) ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
+      if (bonusMainActionsConsumedHere) ps._bonusMainActions = 1;
+      room.engine.log('creature_fizzle', { card: cardName, reason: 'summon_effect_negated_keep_in_hand' });
+      for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
+      return true;
+    }
 
     if (chainResult.negated) {
       room.engine._verwerfeSummonKosten();   // W4b: die Kosten bleiben bezahlt, der Merker für die Landung entfällt

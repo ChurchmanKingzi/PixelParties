@@ -38262,6 +38262,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // der Hand, keine Aktion — nur Reaktionen mit `reactsToPlacement`
       // (Off Duty) greifen ein.
       isPlacement: !!cardInfo.isPlacement,
+      // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
+      isInherentAction: !!cardInfo.isInherentAction,
       goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
@@ -38307,6 +38309,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           negatedToDeleted: !!initialLink._negatedToDeleted,
           negatedToHandOf: Number.isInteger(initialLink._negatedToHandOf) ? initialLink._negatedToHandOf : null,
           negatedToDeck: !!initialLink._negatedToDeck,                    // v1017
+          negatedKeepInHand: !!initialLink._negatedKeepInHand,            // W5b-Z1b: No Retreat! auf die Priest-Zusatzbeschwörung
         };
       }
     } finally {
