@@ -111,6 +111,7 @@ function pruefePleite(engine, pi) {
   if ((ps.gold || 0) !== 0) return;
   let etwasVerfallen = false;
   for (const { hero, heroIdx, physOwner } of ownLogans(engine, pi)) {
+    if (engine.isHeroPassiveDormant?.(physOwner, heroIdx)) continue;   // W8: ein gefrorener/betäubter/negierter Logan verliert seine Counter nicht
     const hatte = getInvest(hero);
     if (hatte <= 0) continue;
     setInvest(hero, 0);

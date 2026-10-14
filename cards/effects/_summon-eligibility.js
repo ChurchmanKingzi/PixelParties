@@ -43,7 +43,7 @@ function heroActionLocked(engine, pi, heroIdx, physOwner = pi) {
   const hero = engine?.gs?.players?.[physOwner]?.heroes?.[heroIdx];
   if (!hero) return true;
   if (engine.isHeroSkillLocked?.(physOwner, heroIdx)) return true;
-  if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return true;
+  if (engine.heroActionCapReached?.(physOwner, heroIdx)) return true;   // W8: ruht bei Frost/Betäubung/Negation
   if (hero._actionLockedTurn === engine.gs.turn) return true;
   if (engine.areActionsBlocked?.(pi)) return true;
   return false;

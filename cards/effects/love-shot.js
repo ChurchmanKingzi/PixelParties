@@ -163,7 +163,7 @@ module.exports = {
         if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
             || h.statuses?.bound || h.statuses?.negated) continue;
         if (engine.isHeroSkillLocked(oi, hi)) continue;
-        if (h._maxActionsPerTurn && (h._actionsThisTurn || 0) >= h._maxActionsPerTurn) continue;
+        if (engine.heroActionCapReached(oi, hi)) continue;   // W8: ruht bei Frost/Betäubung/Negation
         if (h._actionLockedTurn === gs.turn) continue;
         heroTargets.push({
           id: `hero-${oi}-${hi}`, type: 'hero',

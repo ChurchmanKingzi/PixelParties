@@ -84,7 +84,7 @@ module.exports = {
       // EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die Reaktionsfenster selbst
       // (wie `actionAoeHit` im Einzelmodus) — die Sammelfenster unten entfallen dann.
       // Die Verschonen-Runde des Gegners laeuft danach unveraendert ueber dieses eine Ziel.
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
       if (idaEinzel) {
         const t = await ctx.promptDamageTarget({
           side: 'enemy', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: VOLLEY_DAMAGE,

@@ -112,7 +112,7 @@ module.exports = {
       // Ida („never hit more than 1 target with a Destruction Spell"): aus dem Flaechenschlag
       // wird ein Einzelschlag auf EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die
       // Reaktionsfenster selbst (wie `actionAoeHit` im Einzelmodus).
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.forcesSingleTarget;
       if (idaEinzel) {
         const t = await ctx.promptDamageTarget({
           side: 'any', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: DAMAGE,

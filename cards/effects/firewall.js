@@ -42,6 +42,7 @@ const DAMAGE    = 100;
 function firewallMods(engine, pi, heroIdx) {
   const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return { extraDamage: 0, burnAllOpponentTargets: false };
+  if (engine.isHeroPassiveDormant(pi, heroIdx)) return { extraDamage: 0, burnAllOpponentTargets: false };   // W8: Lunas Zuschlag ruht bei Frost/Betäubung/Negation
   const script = loadCardEffect(hero.name);
   const m = (typeof script?.firewallModifiers === 'function')
     ? script.firewallModifiers(engine.gs, pi, heroIdx, engine)

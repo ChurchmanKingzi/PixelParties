@@ -168,6 +168,7 @@ function isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicAr
   // Hero-level play restriction (e.g. Archibald's per-name dupe ban,
   // Bartas' attack restriction, …).
   if (heroScript?.canPlayCard
+      && !engine.isHeroPassiveDormant(hs, heroIdx)   // W8: Heldenbeschränkung ruht bei Frost/Betäubung/Negation
       && !heroScript.canPlayCard(engine.gs, hs, heroIdx, cd, engine)) return false;
 
   // Spell-side custom play condition (Flame Avalanche needs targets,

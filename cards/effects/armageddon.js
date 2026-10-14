@@ -430,7 +430,7 @@ module.exports = {
       // wird ein Einzelschlag auf EIN gewaehltes Ziel (H02-heroes-05). Die Wahl oeffnet die
       // Reaktionsfenster selbst (wie `actionAoeHit` im Einzelmodus); Damus hinter seiner Ifrit
       // bleibt nicht waehlbar. Der Rest (Siegregel, Schadenssperre, Zugende) bleibt unveraendert.
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
       if (idaEinzel) {
         const t = await ctx.promptDamageTarget({
           side: 'any', types: ['hero', 'creature'], damageType: 'destruction_spell', baseDamage: dmg,

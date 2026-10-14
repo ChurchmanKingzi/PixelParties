@@ -5476,7 +5476,7 @@ function sendGameState(room, playerIdx, extra) {
         // Vorrat (0 HP in der Datenbank). Der Client zeigt stattdessen
         // die HP des Helden derselben Spalte — dafuer muss er wissen,
         // dass der Pool geteilt ist.
-        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero && !room.engine.isCardPassiveDormant(inst);   // W8: bei Frost/Betäubung/Negation ruht der Pool
         // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
         // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
         const _zoneAura = zoneAuraFuer(room, physicalSide, inst);
@@ -6208,7 +6208,7 @@ function sendSpectatorGameState(room) {
         // Vorrat (0 HP in der Datenbank). Der Client zeigt stattdessen
         // die HP des Helden derselben Spalte — dafuer muss er wissen,
         // dass der Pool geteilt ist.
-        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero && !room.engine.isCardPassiveDormant(inst);   // W8: bei Frost/Betäubung/Negation ruht der Pool
         // Dauer-Aura des Helden ueber seinen Support Zones (Sett: lila
         // Todes-Flackern). Live abgeleitet: Held lebt und ist nicht negiert.
         const _zoneAura = zoneAuraFuer(room, physicalSide, inst);

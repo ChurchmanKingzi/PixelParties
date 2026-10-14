@@ -93,6 +93,7 @@ function eligibleHandIndices(engine, pi, heroIdx, feld = pi) {
           if (wisdomCost > 0 && wisdomPool < wisdomCost) ok = false;
         }
         if (ok && heroScript?.canPlayCard
+            && !engine.isHeroPassiveDormant(feld, heroIdx)   // W8: Heldenbeschränkung ruht bei Frost/Betäubung/Negation
             && !heroScript.canPlayCard(gs, feld, heroIdx, cd, engine)) ok = false;
         if (ok && typeof script?.spellPlayCondition === 'function') {
           try { if (!script.spellPlayCondition(gs, pi)) ok = false; }

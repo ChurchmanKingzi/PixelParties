@@ -5822,7 +5822,7 @@ class GameEngine {
           : (effectiveController ?? cardInstance.owner ?? -1);
         const casterHeroIdx = cardInstance.heroIdx ?? -1;
         const casterHeroFlag = (flagOwner >= 0 && casterHeroIdx >= 0)
-          ? gs.heroFlags?.[`${flagOwner}-${casterHeroIdx}`]
+          ? engine.heroFlagsLive(flagOwner, casterHeroIdx)
           : null;
         const forceSingleByIda = !!(casterHeroFlag?.forcesSingleTarget
           && config.damageType === 'destruction_spell');
@@ -10209,7 +10209,7 @@ class GameEngine {
     if (source && source.owner != null && source.heroIdx >= 0) {
       const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
       const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
-      if (this.gs.heroFlags?.[flagKey]?.overhealPassive && target.hp <= maxHp) allowOverheal = true;
+      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && target.hp <= maxHp) allowOverheal = true;
     }
     const hpBefore = target.hp;
     // Allow Resistance to cancel healing
@@ -10264,7 +10264,7 @@ class GameEngine {
     if (target.faceDown) return; // Face-down surprises cannot be healed
     // v704 (Puppets): Shared HP pool — Heilung eines Puppet-Tokens heilt
     // den Helden der Spalte.
-    if (loadCardEffect(target.counters?._effectOverride || target.name)?.sharesHpWithHero) {
+    if (loadCardEffect(target.counters?._effectOverride || target.name)?.sharesHpWithHero && !this.isCardPassiveDormant(target)) {   // W8: der Pool ruht bei Frost/Betäubung/Negation
       const pooledOwner = target.controller ?? target.owner;
       const pooledHero = this.gs.players[pooledOwner]?.heroes?.[target.heroIdx];
       if (pooledHero?.name && pooledHero.hp > 0) {
@@ -10298,7 +10298,7 @@ class GameEngine {
     if (source && source.owner != null && source.heroIdx >= 0) {
       const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
       const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
-      if (this.gs.heroFlags?.[flagKey]?.overhealPassive && currentHp <= baseHp) allowOverheal = true;
+      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && currentHp <= baseHp) allowOverheal = true;
     }
     if (allowOverheal) {
       target.counters.currentHp = currentHp + amount;
@@ -12670,7 +12670,7 @@ class GameEngine {
       // Diff-Animator schickt sie gleich darauf noch einmal weiter.
       // Genau das stand in Als Protokoll: zwei „Start"-Zeilen fuer
       // dieselbe Karte, 26 ms auseinander.
-      const _selbstLoeschend = !!loadCardEffect(targetCard.name)?.deletesSelfOnDeath;
+      const _selbstLoeschend = !!loadCardEffect(targetCard.name)?.deletesSelfOnDeath && !this.isCardPassiveDormant(targetCard);   // W8: das Selbstlöschen ruht bei Frost/Betäubung/Negation (Hell Fox, Cute Hydra)
       // Ghazma: besiegte Kreaturen werden geloescht (Umleitung ueber `_redirectToDeleted`).
       if (isCreatureTarget && !_selbstLoeschend && this._gefalleneKreaturenGeloescht()) {
         targetCard._redirectToDeleted = true;
@@ -13539,7 +13539,8 @@ class GameEngine {
     if (cardInstance.zone === ZONES.SUPPORT && toZone === ZONES.SUPPORT
         && (toHeroIdx !== cardInstance.heroIdx || toSlot !== cardInstance.zoneSlot
             || (opts.newOwner != null && opts.newOwner !== (cardInstance.controller ?? cardInstance.owner)))
-        && loadCardEffect(cardInstance.name)?.cannotChangeSupportZone) {
+        && loadCardEffect(cardInstance.name)?.cannotChangeSupportZone
+        && !this.isCardPassiveDormant(cardInstance)) {   // W8 (Bonded Companion): ruht bei Frost/Betäubung/Negation (Puppets: bypassStatusFilter)
       this.log('move_blocked', { card: cardInstance.name, reason: 'cannot_change_support_zone' });
       return;
     }
@@ -15769,6 +15770,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _tryBeforeDelete(cardName, originalOwner, opts = {}) {
     const script = loadCardEffect(cardName);
     if (!script?.beforeDelete) return false;
+    // W8 (Cute Hydra, Ash Worms): die Rettung ist ein Ersatzeffekt der Karte - eine gefrorene/betäubte/negierte Kreatur auf
+    // dem Brett rettet sich nicht (aus Hand/Deck/Ablage kommt keine Instanz, dort gibt es nichts stillzulegen).
+    if (opts.fromZone === 'support' && opts.fromInstance && !script.bypassStatusFilter
+        && this.isCreatureEffectSuppressed(opts.fromInstance, { honorNegStatusImmune: false })) return false;
     const rescueCtx = {
       _engine: this,
       opponentOf: (p) => this.opponentOf(p),
@@ -18195,6 +18200,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!inst.isActiveIn(inst.zone)) continue;
       const script = loadCardEffect(inst.name);
       if (script?.estimateDamageBonus) {
+        if (this.isCardPassiveDormant(inst)) continue;   // W8 (Zsos'Ssar, Warhorse): die vorhergesagte Wirkung ruht wie die echte (Hook-Verteiler)
         damage = script.estimateDamageBonus(this, playerIdx, heroIdx, damage, damageType, opts);
       }
     }
@@ -19298,6 +19304,47 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W8 (Entscheidung Al, Welle 8, 14.10.2026): „Sofern ein Effekt/eine Beschränkung nicht explizit nicht negiert/abgestellt
+   * werden kann, ja - dann ist er während Freeze/Stun/Negation deaktiviert." Erweitert die W7a-Regel auf Beschränkungen,
+   * Pflichten, Selbstlöschungen und geteilte Pools: Heldenskript-Verträge, die die Engine DIREKT liest (`canPlayCard`,
+   * `_maxActionsPerTurn`, `goldOverdraft`/`blocksActions`/`goldStateRule` …), ruhen mit dem Heldeneffekt.
+   * Heldenvariante von `isCardPassiveDormant` für Aufrufer, die (Brettseite, Index) statt einer Instanz haben. Ein Skript mit
+   * `bypassStatusFilter` („cannot be negated") ruht nie; tot/lebend prüft der Aufrufer selbst.
+   */
+  isHeroPassiveDormant(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (loadCardEffect(hero.name)?.bypassStatusFilter) return false;
+    return this._isHeroEffectSilenced(pi, heroIdx);
+  }
+
+  /**
+   * ★ W8: Aktionsgrenze je Held (Stempel `_maxActionsPerTurn`: Sol Rym, Friedhelm — „can never perform more than 1 Action
+   * per turn") erreicht? Ruht bei Frost/Betäubung/Negation des Helden (der Stempel bleibt, der Leser fragt den Zustand).
+   */
+  heroActionCapReached(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?._maxActionsPerTurn || (hero._actionsThisTurn || 0) < hero._maxActionsPerTurn) return false;
+    return !this.isHeroPassiveDormant(pi, heroIdx);
+  }
+
+  /**
+   * ★ W8: Hero-Stempel in `gs.heroFlags` lesen. Die PASSIVEN Stempel (Idas/Toras' „can never hit more than 1 target",
+   * Naos Überheilung) setzt das Heldenskript beim Spielstart; sie ruhen aber bei Frost/Betäubung/Negation des Helden — der Leser
+   * fragt den Zustand (Stempel statt Abfrage, W7a). Gibt bei ruhendem Helden eine Kopie OHNE die passiven Flaggen zurück;
+   * aktivierungsgebundene Flaggen (Friedhelms `forcesSingleTargetAny`, Monias Schutz) bleiben unberührt.
+   */
+  heroFlagsLive(pi, heroIdx) {
+    const f = this.gs.heroFlags?.[`${pi}-${heroIdx}`];
+    if (!f) return f;
+    if (!f.forcesSingleTarget && !f.singleTargetAttack && !f.overhealPassive) return f;
+    if (!this.isHeroPassiveDormant(pi, heroIdx)) return f;
+    const out = { ...f };
+    delete out.forcesSingleTarget; delete out.singleTargetAttack; delete out.overhealPassive;
+    return out;
+  }
+
+  /**
    * HAND-SPIELSPERRE (v818, Knight of Kings [W]): „you can't play any
    * more cards from your hand for the rest of the turn". Rundenstempel
    * `ps._handPlayLock = { turn, allow }` — `allow: 'of-kings'` laesst
@@ -20184,7 +20231,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // der regulaere Spielweg und ein paar Einzelstellen die Sperre.
     if (this.isHeroSkillLocked(hs, heroIdx)) return [];
     // Per-hero action limit (Sol Rym, etc.)
-    if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return [];
+    if (this.heroActionCapReached(hs, heroIdx)) return [];
     // One-turn action lock (Treasure Hunter's Backpack, etc.) — stamp matches the
     // current turn while live, becomes stale on turn rollover.
     if (hero._actionLockedTurn === this.gs.turn) return [];
@@ -20444,7 +20491,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!hero?.name) { own[hi] = playable; continue; }
       const heroParalyzed = !!(hero.hp <= 0 || hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound);
       if (!this.comboSperreErlaubt(playerIdx, hi)) { own[hi] = playable; continue; }
-      if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
+      if (this.heroActionCapReached(playerIdx, hi)) { own[hi] = playable; continue; }
       if (hero._actionLockedTurn === this.gs.turn) { own[hi] = playable; continue; }
       // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
       // Geltungsbereich wie der Rundenstempel darueber.
@@ -20620,7 +20667,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (wisdomCost > 0 && this.handFodderFor(playerIdx, cd.name) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;   // v1279/v1288
         }
         // Hero script card restriction (e.g. Ghuanjun duplicate attack ban)
-        if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, playerIdx, hi, cd, this)) continue;
+        if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(playerIdx, hi) && !heroScript.canPlayCard(gs, playerIdx, hi, cd, this)) continue;   // W8: Beschränkung ruht bei Frost/Betäubung/Negation
         // Equipped card restrictions (treatAsEquip cards in support zones)
         let equipBlocked = false;
         for (const es of equipScripts) {
@@ -20748,7 +20795,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (hero.charmedBy !== playerIdx) continue;
         if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.bound) continue;
         // Combo lock does NOT apply to charmed heroes
-        if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) continue;
+        if (this.heroActionCapReached(oppIdx, hi)) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
         // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
         // Geltungsbereich wie der Rundenstempel darueber.
@@ -20810,7 +20857,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // v1279 fragte hier faelschlich den Gegner.
             if (wisdomCost > 0 && this.handFodderFor(playerIdx, cd.name) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;
           }
-          if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, oppIdx, hi, cd, this)) continue;
+          if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(oppIdx, hi) && !heroScript.canPlayCard(gs, oppIdx, hi, cd, this)) continue;   // W8
           // Als Befund 29.9.: Kartenvertrag je Held auch fuer geliehene Helden.
           {
             const _cs = loadCardEffect(cd.name);
@@ -21429,7 +21476,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.comboSperreErlaubt(pi, heroIdx, opts.charmedOwner ?? pi)) return null;
 
     // Per-hero action limit (Sol Rym, etc.)
-    if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return null;
+    if (this.heroActionCapReached(heroOwner, heroIdx)) return null;
     // One-turn action lock (Treasure Hunter's Backpack, etc.)
     if (hero._actionLockedTurn === this.gs.turn) return null;
     // (Die spielerweite Sperre steht weiter oben, vor der Fall-
@@ -21550,7 +21597,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx 28.9.: wie `getHeroPlayableCards` — Heldenskript und
     // Ausruestung bekommen die BRETTSEITE des Helden (`heroOwner`).
     const heroScript = this.heroScript(hero);
-    if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, heroOwner, heroIdx, cardData, this, herkunft)) return null;
+    if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(heroOwner, heroIdx) && !heroScript.canPlayCard(gs, heroOwner, heroIdx, cardData, this, herkunft)) return null;   // W8
 
     // Equipped hero card restrictions (treatAsEquip cards in support zones)
     for (const inst of this.cardInstances) {
@@ -24883,11 +24930,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return 0;
     let limit = 0;
-    for (const hero of (ps.heroes || [])) {
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.goldOverdraft !== 'function') continue;
+      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): der Kredit ruht bei Frost/Betäubung/Negation
       try { limit = Math.max(limit, script.goldOverdraft(this, playerIdx) || 0); }
       catch { /* eine kaputte Karte darf keinen Kredit erzwingen */ }
     }
@@ -25215,11 +25264,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // eine Aktion erlaubt ist, fragt `areActionsBlocked` — sonst
     // niemanden.
     if (ps.actionLocked) return true;
-    for (const hero of (ps.heroes || [])) {
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.blocksActions !== 'function') continue;
+      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): „While your Gold is negative …" ruht
       try { if (script.blocksActions(this, playerIdx)) return true; }
       catch { /* defensiv: eine kaputte Karte sperrt nichts */ }
     }
@@ -25270,6 +25321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         let script = null;
         try { script = this.heroScript(hero); } catch { continue; }
         if (typeof script?.goldStateRule !== 'function') continue;
+        if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent, Logan): Zustandsregel ruht bei Frost/Betäubung/Negation
         try { script.goldStateRule(this, playerIdx); }
         catch (err) {
           console.error(`[Engine] goldStateRule "${hero.name}" warf:`, err?.message || err);
@@ -27028,6 +27080,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((inst.controller ?? inst.owner) !== playerIdx) continue;
       const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
       if (typeof sc?.supportZonesLocked !== 'function') continue;
+      if (this.isCardPassiveDormant(inst)) continue;   // W8 (Bonded Companion): die Zonensperre der Karte ruht bei Frost/Betäubung/Negation
       try { if (sc.supportZonesLocked(this, playerIdx, heroIdx, { ...opts, lockingInstance: inst })) return true; }
       catch { /* kaputtes Kartenskript darf die Zone nicht sperren */ }
     }
@@ -27064,6 +27117,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   isUnaffectedByCreatureOnly(inst, typen) {
     if (!inst?.name) return false;
     if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.unaffectedByCreatureOnly) return false;
+    if (this.isCardPassiveDormant(inst)) return false;   // W8 (Bonded Companion): ruht bei Frost/Betäubung/Negation
     // Keine Typangabe = die Abfrage grenzt nicht ein; dann greift die
     // Klausel nicht (sie schuetzt nur vor KREATUR-ONLY).
     if (!Array.isArray(typen) || typen.length === 0) return false;
@@ -27091,7 +27145,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const e of entries) {
       const inst = e.inst;
       const script = inst?.name ? loadCardEffect(inst.counters?._effectOverride || inst.name) : null;
-      if (!script?.sharesHpWithHero) { keep.push(e); continue; }
+      if (!script?.sharesHpWithHero || this.isCardPassiveDormant(inst)) { keep.push(e); continue; }   // W8: der Pool ruht bei Frost/Betäubung/Negation
       const owner = inst.controller ?? inst.owner;
       const hero = this.gs.players[owner]?.heroes?.[inst.heroIdx];
       e._pooledToHero = true;
@@ -37576,7 +37630,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const herkunft = { fromHand: !!opts.spellInHand };
       const heroScript = this.heroScript(hero);
       try {
-        if (heroScript?.canPlayCard && !heroScript.canPlayCard(this.gs, playerIdx, heroIdx, cardData, this, herkunft)) return false;
+        if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(playerIdx, heroIdx) && !heroScript.canPlayCard(this.gs, playerIdx, heroIdx, cardData, this, herkunft)) return false;   // W8
       } catch (err) { console.error(`[canPlayCard] ${hero.name}:`, err.message); }
       for (const inst of this.cardInstances) {
         if (inst.owner !== playerIdx || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
@@ -44584,6 +44638,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     const script = this.heroScript(hero);
     if (typeof script?.canPerformAction !== 'function') return true;
+    if (this.isHeroPassiveDormant(playerIdx, heroIdx)) return true;   // W8: Beschränkung ruht
     try {
       return !!script.canPerformAction(this.gs, playerIdx, heroIdx, this);
     } catch (err) {
@@ -46903,7 +46958,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── Ida single-target override check ──
     const flagOwner = cardInst.heroOwner != null ? cardInst.heroOwner : pi;
-    const heroFlags = gs.heroFlags?.[`${flagOwner}-${heroIdx}`];
+    const heroFlags = this.heroFlagsLive(flagOwner, heroIdx);
     // Auto-generate singleTargetPrompt for Destruction Spells when Ida's
     // forcesSingleTarget is active and no explicit prompt was provided.
     let singleTargetPrompt = config.singleTargetPrompt || null;
@@ -48499,7 +48554,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Absicherung an EINER Stelle ist keine Absicherung.
       const _ghazmaLoescht = this._gefalleneKreaturenGeloescht();
       if (_ghazmaLoescht && this._wurzelAktiv()) this._wurzelNebel(e.inst.owner, e.inst.heroIdx, e.inst.zoneSlot);   // Root: schwarzer Nebel
-      const _selbstLoeschend = !!loadCardEffect(e.inst.name)?.deletesSelfOnDeath || _ghazmaLoescht;
+      const _selbstLoeschend = (!!loadCardEffect(e.inst.name)?.deletesSelfOnDeath && !this.isCardPassiveDormant(e.inst)) || _ghazmaLoescht;   // W8
       // Loesch-Rettung („deleted from anywhere", Ash Worms) greift auch hier, wenn Ghazma
       // die Niederlage zu einem Loeschen macht (die Instanz ist schon aus dem Platz).
       let _gerettet = false;

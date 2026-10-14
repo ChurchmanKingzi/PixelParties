@@ -114,7 +114,7 @@ module.exports = {
       const freeZones = countFreeZones(gs, pi);
       // W5b-B5 (Al, Welle 5; wie die übrigen Destruction-Zauber unter Ida): Idas Held „can never hit more than 1 target
       // with a Destruction Spell" – höchstens EIN Ziel (und damit höchstens 1 Pollution Token).
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
       const maxTotal = Math.min(idaEinzel ? 1 : SUN_BEAM_MAX, freeZones + ownSupportAvailable);
 
       if (targets.length === 0 || maxTotal === 0) {

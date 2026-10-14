@@ -58,7 +58,7 @@ module.exports = {
       // we must read the opp-side flag, not the caster's same-slot
       // Hero. cardHeroOwner falls back to cardOwner for normal
       // casts, so this stays correct outside Love Shot too.
-      const heroFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
+      const heroFlags = ctx._engine.heroFlagsLive(ctx.cardHeroOwner, heroIdx);
       if (heroFlags?.forcesSingleTarget) {
         // Opponent picks only 1 target, only the first hit (200) applies
         const selected = await engine.promptEffectTarget(oppIdx, targets, {

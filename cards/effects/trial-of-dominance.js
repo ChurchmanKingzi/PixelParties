@@ -102,7 +102,7 @@ module.exports = {
       // W5b-B5 (Al, Welle 5; wie die übrigen Destruction-Flächenzauber unter Ida): Idas Held
       // „can never hit more than 1 target with a Destruction Spell" – aus dem Flächenschlag wird
       // ein Einzelschlag auf EINE gewählte gegnerische Kreatur (Pflichtwahl wie bei Cataclysm/Armageddon).
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${ctx.cardHeroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx)?.forcesSingleTarget;
       if (idaEinzel && creatures.length > 1) {
         const ids = await engine.promptEffectTarget(pi, creatures.map(i => engine.kreaturZiel(i)), {
           title: CARD_NAME,

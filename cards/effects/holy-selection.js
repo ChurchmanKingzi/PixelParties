@@ -151,7 +151,7 @@ module.exports = {
       // use cardHeroOwner (board side), not cardOwner (caster).
       // Diverges only under Love Shot, where the caster casts
       // through an opp-side Hero.
-      const casterFlags = gs.heroFlags?.[`${ctx.cardHeroOwner}-${heroIdx}`];
+      const casterFlags = ctx._engine.heroFlagsLive(ctx.cardHeroOwner, heroIdx);
       const idaForcesSingle = !!casterFlags?.forcesSingleTarget;
       const totalTargets = heroTargets.length + creatureTargets.length;
 

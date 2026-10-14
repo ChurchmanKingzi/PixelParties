@@ -135,7 +135,7 @@ module.exports = {
       // unten stehen also immer mindestens N Ziele zur Verfuegung.
       // Unter Ida (Einzelziel-Deckel, H02-heroes-05) kappt die Engine auf 1 Ziel —
       // dann kann `min` nicht N sein.
-      const idaEinzel = !!gs.heroFlags?.[`${ctx.cardHeroOwner ?? pi}-${heroIdx}`]?.forcesSingleTarget;
+      const idaEinzel = !!ctx._engine.heroFlagsLive(ctx.cardHeroOwner ?? pi, heroIdx)?.forcesSingleTarget;
       const selected = await ctx.promptMultiTarget({
         side: 'any',
         types: ['hero', 'creature'],
