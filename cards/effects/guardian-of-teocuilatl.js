@@ -54,6 +54,23 @@ const findOccupant        = (engine, pi, hi, si, heroOwner = pi) => T.findOccupa
 const sacrificeableSlots  = (engine, pi) => T.sacrificeableSlots(engine, pi, CARD_NAME);
 const sacrificeSummonIntoSlot = (engine, pi, req) => T.sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME);
 
+/** KOSTEN (inhärent, freier Platz): ein Opfer, nicht in diesem Zug beschworen. `true` = bezahlt. */
+async function zahleOpfer(ctx) {
+  const engine = ctx._engine;
+  const turn = engine.gs.turn;
+  const paid = await engine.resolveSacrificeCost(ctx, {
+    minCount: 1,
+    maxCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Guardian of Teocuilatl as an additional Action.',
+    confirmLabel: '🗡️ Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    filter: (c) => c.inst.turnPlayed !== turn,
+  });
+  return !!paid;
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
 
@@ -87,10 +104,34 @@ module.exports = {
     return T.bounceTargets(engine, pi, CARD_NAME);
   },
 
+  // ★ W4b (Al, Welle 4): das Opfer ist KOSTE der Beschwörung und wird VOR dem Reaktionsfenster bezahlt (`paySummonCost`,
+  // Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleibt es bezahlt.
+  // Tausch (Wurf auf einen belegten Platz): `T.paySacrificeSwap` opfert den Bewohner und hält den Platz, `beforeSummon`
+  // setzt die neue Kreatur danach hinein (`T.placeAfterSacrificeSwap`). Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.)
+  // zahlt `beforeSummon` wie früher selbst (`ctx._summonKosten` fehlt).
+  async paySummonCost(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    if (ps?._requestedBouncePlaceSlot) {   // Marke bleibt gesetzt: `beforeSummon` räumt sie ab
+      const d = await T.paySacrificeSwap(engine, pi, ps._requestedBouncePlaceSlot, CARD_NAME);
+      return d ? { kind: 'swap', ...d } : false;
+    }
+    if (!ctx.isInherentAction) return { kind: 'none' };
+    return (await zahleOpfer(ctx)) ? { kind: 'sac' } : false;
+  },
+
   async beforeSummon(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt → nur noch landen.
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      return pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+    }
 
     // Drop onto an occupied slot → full-board sacrifice-summon: sacrifice
     // that slot's Creature and install Guardian into the freed slot. This
@@ -113,19 +154,7 @@ module.exports = {
     // Free-slot additional-Action summon: pick any tribute (a board
     // Creature not summoned this turn, OR a hand substitute like Chosen
     // Sacrifice); the engine then places Guardian into the chosen slot.
-    const turn = engine.gs.turn;
-    const paid = await engine.resolveSacrificeCost(ctx, {
-      minCount: 1,
-      maxCount: 1,
-      title: `${CARD_NAME} — Sacrifice`,
-      description: 'Sacrifice 1 of your Creatures (not summoned this turn) to summon Guardian of Teocuilatl as an additional Action.',
-      confirmLabel: '🗡️ Sacrifice!',
-      confirmClass: 'btn-danger',
-      cancellable: true,
-      filter: (c) => c.inst.turnPlayed !== turn,
-    });
-    // Cancel → abort the alt summon: card returns to hand, Action kept.
-    return !!paid;
+    return await zahleOpfer(ctx);
   },
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────

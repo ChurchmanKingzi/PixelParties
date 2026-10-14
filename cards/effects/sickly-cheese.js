@@ -14,6 +14,23 @@
 const { hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
+/** KOSTEN: 1 Stack Poison auf den gewählten eigenen Helden. `false` = ungültige Wahl (nichts bezahlt). */
+async function zahleKosten(engine, pi, selectedIds, validTargets) {
+  const target = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
+  if (!target || target.type !== 'hero') return false;
+  const hero = engine.gs.players[pi]?.heroes?.[target.heroIdx];
+  if (!hero?.name || hero.hp <= 0) return false;
+  await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
+    addStacks: 1, appliedBy: pi,
+  });
+  engine.log('poison_applied', {
+    target: hero.name, stacks: 1, by: 'Sickly Cheese',
+  });
+  engine.sync();
+  await engine._delay(400);
+  return true;
+}
+
 module.exports = {
   // ★ v1070 (Als Befund 14.9.: „Wieso drei Cheese-Karten? Davon gibt es
   // sechs!"). Die Autoerkennung liess diese Karte als spielbar durch,
@@ -81,24 +98,19 @@ module.exports = {
 
   animationType: 'poison_vial',
 
-  async resolve(engine, pi, selectedIds, validTargets) {
+  // ★ W4b (Al, Welle 4): der Giftstapel am eigenen Helden („… to play this card“) ist der KOSTENPUNKT und läuft VOR dem Reaktionsfenster (`payArtifactCost`,
+  // Engine `_payArtifactCost`); wird die Karte danach komplett negiert (Rusty Touch, Silence …), bleibt der Preis bezahlt
+  // und es wird nichts gesucht. `false` = ungültige Wahl → nichts bezahlt. Normalweg: `resolve` bekommt `kosten`.
+  async payArtifactCost(engine, pi, selectedIds, validTargets) {
+    return (await zahleKosten(engine, pi, selectedIds, validTargets)) ? {} : false;
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     if (!selectedIds || selectedIds.length === 0) return;
-    const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target || target.type !== 'hero') return;
+    // Step 1: 1 Stack Poison auf den gewählten eigenen Helden (cost) — Normalweg schon vor dem Fenster bezahlt (`kosten`).
+    if (!kosten && !(await zahleKosten(engine, pi, selectedIds, validTargets))) return;
 
     const ps = engine.gs.players[pi];
-    const hero = ps.heroes?.[target.heroIdx];
-    if (!hero?.name || hero.hp <= 0) return;
-
-    // Step 1: Inflict 1 stack of Poison to the chosen hero
-    await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
-      addStacks: 1, appliedBy: pi,
-    });
-    engine.log('poison_applied', {
-      target: hero.name, stacks: 1, by: 'Sickly Cheese',
-    });
-    engine.sync();
-    await engine._delay(400);
 
     // Step 2: Deck search for Decay Magic Spells
     const cardDB = engine._getCardDB();

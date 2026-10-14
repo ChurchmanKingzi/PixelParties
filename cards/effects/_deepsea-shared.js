@@ -440,6 +440,14 @@ async function tryBouncePlace(ctx) {
   // swap's atomicSwap proceed to place this Creature directly.
   if (ctx._isSwap) return true;
 
+  // ★ W4b: die Rueckgabe des Bewohners ist schon VOR dem Kettenfenster erfolgt (`payBouncePlace` als `paySummonCost`) —
+  // jetzt nur noch landen (oder, ohne Tausch, normal beschwoeren).
+  if (ctx._summonKosten) {
+    delete ps._requestedBouncePlaceSlot;
+    delete ps._requestedNormalSummonSlot;
+    return ctx._summonKosten.kind === 'swap' ? await landeNachBounce(ctx, ctx._summonKosten) : true;
+  }
+
   // Capture & clear any explicit occupied-slot bounce request UP-FRONT
   // (the server sets ps._requestedBouncePlaceSlot when the player drops /
   // clicks the hand card directly onto an occupied bounceable slot). When
@@ -736,6 +744,204 @@ async function tryBouncePlace(ctx) {
 
   engine.sync();
   return false;
+}
+
+// ─── W4b: Tausch-Kosten vor dem Reaktionsfenster ─────────
+
+/**
+ * ★ W4b (Al, Welle 4): DIE RUECKGABE DES BEWOHNERS IST DER KOSTENPUNKT des Deepsea-Tausches („You may add a Deepsea Creature …
+ * to your hand to place this Creature into the same Support Zone"). Als `paySummonCost` (`tryBouncePlace.paySummonCost`, die
+ * Engine findet den Haken an der `beforeSummon`-Funktion) laeuft sie VOR dem Kettenfenster: Wahl des Bewohners, Rueckgabe auf
+ * die Hand, `onCardLeaveZone`/`onCardsReturnedToHand`; der frei gewordene Platz bleibt gehalten (`haltePlatzFuerTausch`).
+ * Wird die Beschwoerung danach komplett negiert (Off Duty …), landet der urspruengliche Bewohner auf der Hand und die neue
+ * Kreatur ist negiert (Al: „das urspruengliche auf der Hand landen und das neue negiert"). `tryBouncePlace` (nach dem Fenster)
+ * ruft dann `landeNachBounce`. Rueckgabe: `{ kind: 'none' }` (normale Beschwoerung, kein Tausch), `{ kind: 'swap', … }` oder
+ * `false` (abgebrochen / Tausch angefordert, aber unmoeglich: nichts bezahlt, Karte bleibt auf der Hand).
+ */
+async function payBouncePlace(ctx) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  const cardName = ctx.cardName;
+  if (ctx._monstrosityCopy || ctx._isSwap) return { kind: 'none' };
+
+  // Marken bleiben stehen: `tryBouncePlace` raeumt sie nach dem Fenster ab.
+  const bounceReq = ps._requestedBouncePlaceSlot || null;
+  if (ps._requestedNormalSummonSlot && !bounceReq) return { kind: 'none' };
+
+  const bounceable = getBounceableDeepseaCreatures(engine, pi);
+  if (bounceable.length === 0) return bounceReq ? false : { kind: 'none' };
+
+  let chosen = null;
+  if (bounceReq) {
+    const reqSeite = bounceReq.heroOwner ?? pi;
+    chosen = bounceable.find(b => b.heroIdx === bounceReq.heroIdx && b.slotIdx === bounceReq.slotIdx
+      && b.heroOwner === reqSeite) || null;
+  }
+  if (!chosen) {
+    const zones = bounceable.map(b => {
+      const hero = gs.players[b.heroOwner]?.heroes?.[b.heroIdx];
+      return {
+        heroIdx: b.heroIdx,
+        slotIdx: b.slotIdx,
+        ...(b.heroOwner !== pi ? { owner: b.heroOwner } : {}),
+        label: `${hero?.name || 'Hero'} — ${b.cardName} (Slot ${b.slotIdx + 1})`,
+      };
+    });
+    const picked = await ctx.promptZonePick(zones, {
+      title: cardName,
+      description: `Bounce a Deepsea Creature to place ${cardName} into its Support Zone?`,
+      confirmLabel: '🌊 Bounce & Place',
+      cancellable: true,
+      heroShortcut: false,
+    });
+    if (!picked) return false;
+    chosen = bounceable.find(b => b.heroIdx === picked.heroIdx && b.slotIdx === picked.slotIdx
+      && b.heroOwner === (picked.owner ?? pi));
+    if (!chosen) return false;
+  }
+
+  const bouncedName = chosen.cardName;
+  const bouncedInst = chosen.inst;
+  const heroIdx = chosen.heroIdx;
+  const slotIdx = chosen.slotIdx;
+  const seite = chosen.heroOwner ?? pi;
+  const fps = gs.players[seite];
+  const bouncedLevel = engine._getCardDB()[bouncedName]?.level || 0;
+  const lockSummonsAfter =
+    !!loadCardEffect(bouncedName)?.locksSummonsWhenBouncedSameTurn &&
+    (bouncedInst.turnPlayed || 0) >= (gs.turn || 0);
+  engine.haltePlatzFuerTausch(seite, heroIdx, slotIdx);
+
+  // (A) Bewohner aus dem Platz, (D) seinen Namen auf die Hand.
+  const slotArr = fps.supportZones?.[heroIdx]?.[slotIdx];
+  if (Array.isArray(slotArr)) {
+    const idx = slotArr.indexOf(bouncedName);
+    if (idx >= 0) slotArr.splice(idx, 1);
+  }
+  if (!ps.hand) ps.hand = [];
+  const toHandIdx = ps.hand.length;
+  engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
+    ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),
+    fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
+    toHandIdx,
+  });
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'deep_sea_bubbles', owner: seite, heroIdx, zoneSlot: slotIdx,
+  });
+  engine.log('deepsea_return_to_hand', {
+    player: ps.username, card: bouncedName, by: `${cardName} (Bounce-Place)`,
+    heroIdx, slotIdx,
+  });
+  engine.sync();
+
+  bouncedInst.zone = 'hand';
+  bouncedInst.heroIdx = -1;
+  bouncedInst.zoneSlot = -1;
+  await engine.runHooks('onCardLeaveZone', {
+    card: bouncedInst, fromZone: 'support',
+    fromOwner: seite, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
+    toZone: 'hand', toOwner: pi,
+    _skipReactionCheck: true,
+  });
+  await engine.runHooks('onCardsReturnedToHand', {
+    ownerIdx: pi, returnedCards: [bouncedName], returnedInsts: [bouncedInst],
+    fromHeroIdxs: [heroIdx], fromZoneSlots: [slotIdx],
+    ...(seite !== pi ? { fromOwners: [seite] } : {}),
+    by: `${cardName} (Bounce-Place)`, _skipReactionCheck: true,
+  });
+  engine._untrackCard(bouncedInst.id);
+  return { kind: 'swap', heroIdx, slotIdx, seite, bouncedName, bouncedLevel, lockSummonsAfter };
+}
+
+/** W4b: Landung der neuen Deepsea-Kreatur nach dem Kettenfenster in den (gehaltenen) Platz des zurueckgegebenen Bewohners. `false` = Abbruch (die Rueckgabe bleibt bezahlt, die Karte bleibt auf der Hand). */
+async function landeNachBounce(ctx, data) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const ps = gs.players[pi];
+  const cardName = ctx.cardName;
+  const { heroIdx, seite, bouncedName, bouncedLevel, lockSummonsAfter } = data;
+  const fps = gs.players[seite];
+  let slotIdx = data.slotIdx;
+  if (((fps.supportZones?.[heroIdx] || [])[slotIdx] || []).length > 0) {
+    // Im Fenster belegt worden: anderer freier Platz desselben Helden, sonst Abbruch.
+    const frei = [0, 1, 2].find(z => ((fps.supportZones?.[heroIdx] || [])[z] || []).length === 0);
+    if (frei == null) return false;
+    slotIdx = frei;
+  }
+
+  // (B) neue Kreatur in den Platz, frische Instanz.
+  if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+  fps.supportZones[heroIdx][slotIdx] = [cardName];
+  const newInst = engine._trackCard(cardName, seite, 'support', heroIdx, slotIdx);
+  newInst.counters = newInst.counters || {};
+  if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
+  newInst.counters.isPlacement = 1;
+  newInst.turnPlayed = gs.turn || 0;
+  newInst.counters._bouncedFromName = bouncedName;
+  newInst.counters._bouncedFromLevel = bouncedLevel;
+  clearSwapInheritedStatus(newInst);
+
+  // (C) Entnahme der gespielten Kopie aus der Hand (`_resolvingCard`, nth-Treffer; die zurueckgegebene Karte liegt am Ende).
+  let newCardFromHandIdx = -1;
+  if (ps._resolvingCard) {
+    const { name, nth } = ps._resolvingCard;
+    let seen = 0, handRemoveIdx = -1;
+    for (let i = 0; i < ps.hand.length; i++) {
+      if (ps.hand[i] === name) { seen++; if (seen === nth) { handRemoveIdx = i; break; } }
+    }
+    if (handRemoveIdx >= 0) {
+      newCardFromHandIdx = handRemoveIdx;
+      engine.takeFromPileSync(ps, 'hand', handRemoveIdx);
+      engine.notePlayedFromHand(pi);
+    }
+    ps._resolvingCard = null;
+  }
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName, from: 'hand', to: 'support',
+    fromHandIdx: newCardFromHandIdx,
+    toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+    ...(seite !== pi ? { fromOwner: pi, toOwner: seite } : {}),
+  });
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'deep_sea_bubbles', owner: seite, heroIdx, zoneSlot: slotIdx,
+  });
+  engine._broadcastEvent('summon_effect', {
+    owner: seite, heroIdx, zoneSlot: slotIdx, cardName,
+  });
+  ps._placementConsumedByCard = cardName;
+  engine.log('placement', {
+    card: cardName, by: `${cardName} (Bounce-Place)`, from: 'external',
+    heroIdx, zoneSlot: slotIdx,
+  });
+  engine.sync();
+
+  const bouncedHero = gs.players[seite]?.heroes?.[heroIdx];
+  const landedOnDeadHero = !bouncedHero?.name || bouncedHero.hp <= 0;
+  await engine.runHooks('onPlay', {
+    _onlyCard: newInst, playedCard: newInst, cardName,
+    zone: 'support', heroIdx, zoneSlot: slotIdx,
+    _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
+    _viaBouncePlace: true,
+  });
+  await engine.runHooks('onCardEnterZone', {
+    enteringCard: newInst, toZone: 'support', toHeroIdx: heroIdx,
+    _skipReactionCheck: true,
+    _bypassDeadHeroFilter: landedOnDeadHero,
+  });
+  if (lockSummonsAfter) {
+    ps.summonLocked = true;
+    engine.log('infected_squirrel_lock', {
+      player: ps.username, by: cardName, bouncedFrom: bouncedName,
+    });
+  }
+  engine.sync();
+  return false;   // wie der alte Tausch: Platzierung ist erledigt (`_placementConsumedByCard`), der Server platziert nicht selbst
 }
 
 // ─── Deepsea Counters (Siphem) ──────────────
@@ -1188,6 +1394,9 @@ function deepseaAbilityPriorFloor(abilityName, targetLevel) {
   if (targetLevel <= 2) return 80;
   return null;
 }
+
+// W4b: die Engine sucht `paySummonCost` auch an der `beforeSummon`-Funktion (alle Deepsea-Kreaturen teilen `tryBouncePlace`).
+tryBouncePlace.paySummonCost = payBouncePlace;
 
 module.exports = {
   deepseaIgnitionMulliganAdvice,
