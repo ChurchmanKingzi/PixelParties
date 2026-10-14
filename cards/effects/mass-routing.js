@@ -130,6 +130,16 @@ module.exports = {
 
   requiresTarget: false,
 
+  // W5b-Z1 (Al, Welle 5): No Retreat! erkennt Mass Routing nur, wenn ≥ 1 Kreatur der Brettseite des Aktivierenden
+  // betroffen wäre (Zielprüfung zum Zeitpunkt des Fensters; Level wie in `onPlay`). Distracting Crystal betrifft
+  // nur Hand/Ablage und bleibt unberührt.
+  shufflesIntoDeckIf(gs, pi, engine, link) {
+    const hi = Number.isInteger(link?.heroIdx) ? link.heroIdx : -1;
+    const dm = hi >= 0 ? engine.effectiveSchoolLevelForCaster(SCHULE, pi, hi) : 3;
+    const maxLevel = Math.max(1, Math.min(3, dm));
+    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !isCardinalBeastByName(i.name));
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

@@ -16,6 +16,16 @@
 //  its script's flag. A new "shuffles back"
 //  effect added to the codebase just needs the
 //  flag for No Retreat! to start countering it.
+//
+//  ★ W5b-Z1 (Al, Welle 5: „generell sollen alle Effekte betroffen sein, die Karten auf der entsprechenden
+//  Seite / von entsprechenden Händen shufflen würden"): zwei weitere Wege, alle nur für No Retreat!
+//  (Distracting Crystal bleibt bei Hand/Ablage, `shufflesFromHandOrDiscardIntoDeck`):
+//    • `shufflesFromBoardIntoDeck: true`  — mischt Karten der eigenen Brettseite ins Deck (statisch).
+//    • `shufflesIntoDeckIf(gs, pi, engine, link) => bool` — dynamisch, zum Zeitpunkt des Fensters
+//      (`pi` = Aktivierender): z. B. Mass Routing nur, wenn ≥ 1 Kreatur seiner Brettseite betroffen wäre.
+//  Nicht dazu gehören rein deck-interne Mischungen und spätere Trigger (Amazing Finding, Time Distortion,
+//  Create Illusion, Ghazma/Hatusbal-Lage …). Neue Skripte (Meditation, Expedition, Motharch Squire,
+//  Priests …) tragen das passende Merkmal, sobald sie geschrieben werden.
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -34,7 +44,13 @@ module.exports = {
     // "When your opponent activates ..." — only opp-initiated effects.
     if (initial.owner === pi) return false;
     const script = loadCardEffect(initial.cardName);
-    return !!script?.shufflesFromHandOrDiscardIntoDeck;
+    if (!script) return false;
+    if (script.shufflesFromHandOrDiscardIntoDeck || script.shufflesFromBoardIntoDeck) return true;
+    if (typeof script.shufflesIntoDeckIf === 'function') {
+      try { return !!script.shufflesIntoDeckIf(gs, initial.casterOwner ?? initial.owner, engine, initial); }
+      catch (err) { console.error('[No Retreat!] shufflesIntoDeckIf', initial.cardName, err.message); }
+    }
+    return false;
   },
 
   resolve: async (engine, pi, _selectedIds, _validTargets, chain) => {
