@@ -89,9 +89,8 @@ const SACRIFICE_SPEC = {
 function _collectTributeCandidates(engine, playerIdx, selfId) {
   let cs = engine.getSacrificableCreatures(playerIdx);
   if (selfId != null) cs = cs.filter(c => c.inst.id !== selfId);
-  // Z1 (A02-37): „from your side of the board" — eine GELIEHENE Kreatur (Succubus & Co.) steht auf
-  // der Brettseite des Gegners und waere sonst Tribut mit Rueckkehr auf DESSEN Hand.
-  cs = cs.filter(c => c.inst.stolenBy == null);
+  // W5a (A02-37, Al 14.10.2026: „Auch geliehene Creatures sollen sogar möglich sein!"): eine GELIEHENE Kreatur (Succubus & Co.)
+  // darf als Tribut dienen; sie geht auf die Hand des Spielers („returning … to your hand"), bleibt aber Eigentum ihres Besitzers.
   // DDG's text: "not summoned this turn." The generic
   // `getSacrificableCreatures` deliberately skips this filter (cards
   // like Sacrifice to Divinity sacrifice anything you control), so
@@ -260,10 +259,10 @@ async function _zahleTribut(ctx) {
     .map(t => t.cardInstance);
   for (const inst of others) {
     if (!inst) continue;
-    await returnSupportCreatureToHand(engine, inst, CARD_NAME);
+    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi });
   }
   if (landingInst) {
-    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME);
+    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi });
   }
 
   return {

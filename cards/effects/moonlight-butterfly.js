@@ -102,6 +102,7 @@ module.exports = {
       // ── Zurueck auf die Hand ────────────────────────────────────
       const zurueck = await returnSupportCreatureToHand(engine, inst, CARD_NAME, {
         animationType: 'moonlight_beam',
+        toPlayer: pi,   // W6 (Al 14.10.2026): „add this Creature YOU CONTROL back to YOUR hand" — ein gestohlener Falter kommt auf die Hand des Kontrolleurs
       });
       if (!zurueck?.returned) return;                 // z.B. Cardinal-Immunitaet
 

@@ -161,9 +161,9 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Geliehen / über einen geliehenen Helden gelegt: die Kreatur liegt auf der Gegenseite,
-    // „back into your deck" und der Platz wären nicht dieselbe Seite — nicht ausführbar.
-    if (engine.physicalSide(inst) !== pi) return false;
+    // W3/W5a (Al 14.10.2026): auch eine GELIEHENE Life-Searcher (liegt auf der Gegenseite) darf — sie wird ins Deck ihres
+    // BESITZERS gemischt („Karten werden immer ins Deck ihres originalen Besitzers gemischt"), die Suche läuft im Deck des
+    // Kontrolleurs, der Nachfolger kommt in dieselbe Zone (Brettseite des Besitzers), kontrolliert vom Kontrolleur.
 
     // Gate: ≥3 Change Counters across cards we control.
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
@@ -195,8 +195,11 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
 
-    // Siehe canActivateCreatureEffect: nur eine Kreatur auf der eigenen Seite kann sich mischen.
-    if (engine.physicalSide(inst) !== pi) return false;
+    // Siehe canActivateCreatureEffect: geliehen erlaubt (W3/W5a).
+    const seite = engine.physicalSide(inst);              // Brettseite der Zone
+    const besitzerIdx = engine.kartenBesitzerVon(inst);   // Deck, in das sie gemischt wird
+    const sps = gs.players[seite];                        // Spielerzustand der Brettseite (Zonen-Arrays)
+    if (!sps) return false;
 
     if (totalChangeCountersOnSide(engine, pi) < 3) return false;
 
@@ -236,13 +239,13 @@ module.exports = {
 
     // ── Phase 1: Remove Life-Searcher from board, fire onCardLeaveZone,
     //             shuffle into deck ─────────────────────────────────
-    const slotArr = (ps.supportZones?.[sameHero] || [])[sameSlot] || [];
+    const slotArr = (sps.supportZones?.[sameHero] || [])[sameSlot] || [];
     const lsIdx = slotArr.indexOf(CARD_NAME);
     if (lsIdx >= 0) slotArr.splice(lsIdx, 1);
 
     // Suppress damage-number for the disappearing creature.
     engine._broadcastEvent('creature_zone_move', {
-      owner: inst.owner, heroIdx: sameHero, zoneSlot: sameSlot,
+      owner: seite, heroIdx: sameHero, zoneSlot: sameSlot,
     });
 
     await engine.runHooks('onCardLeaveZone', {
@@ -253,8 +256,8 @@ module.exports = {
     });
 
     engine._untrackCard(inst.id);
-    engine.returnToPile(ps, 'deck', CARD_NAME);
-    engine.shuffleDeck(pi);
+    engine.returnToPile(gs.players[besitzerIdx] || ps, 'deck', CARD_NAME);   // W3: ins Deck des BESITZERS
+    engine.shuffleDeck(besitzerIdx);
 
     engine.log('life_searcher_shuffle', { player: ps.username });
     engine.sync();
@@ -262,7 +265,7 @@ module.exports = {
 
     // ── Phase 2: Place upgrade in the same slot (may have been filled
     //             by another effect mid-resolve) ──────────────────────
-    const occupied = ((ps.supportZones?.[sameHero] || [])[sameSlot] || []).length > 0;
+    const occupied = ((sps.supportZones?.[sameHero] || [])[sameSlot] || []).length > 0;
     if (occupied) {
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'slot_occupied' });
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
@@ -283,7 +286,7 @@ module.exports = {
 
     engine._broadcastEvent('deck_search_add', { cardName: chosen, playerIdx: pi });
     engine._broadcastEvent('play_zone_animation', {
-      type: ANIM_PORTAL, owner: pi, heroIdx: sameHero, zoneSlot: sameSlot,
+      type: ANIM_PORTAL, owner: seite, heroIdx: sameHero, zoneSlot: sameSlot,
     });
     await engine._delay(500);
 
@@ -294,9 +297,10 @@ module.exports = {
     // IS a Cosmic card by name, so the cosmic flag is set both for
     // Invader's by-Cosmic gate (the Lv4 upgrade pool includes Invader)
     // and for Cosmic Manipulation's deck-summon reaction window.
-    await engine.summonCreatureWithHooks(chosen, pi, sameHero, sameSlot, {
+    await engine.summonCreatureWithHooks(chosen, seite, sameHero, sameSlot, {
       source: CARD_NAME,
       isPlacement: true,
+      ...(seite !== pi ? { controller: pi } : {}),   // geliehen: Nachfolger seitenfremd auf der Brettseite des Besitzers, kontrolliert vom Kontrolleur
       hookExtras: {
         _summonedBy: CARD_NAME,
         _summonedByCosmic: true,

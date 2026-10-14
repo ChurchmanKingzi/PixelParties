@@ -75,6 +75,11 @@ const EXCLUDE_NAME = 'Elven Rider';
 // Scoped per-player (`_elvenRiderResolving[pi]`) and cleared in finally.
 const RESOLVING_KEY = '_elvenRiderResolving';
 
+/** Brettseite der Zone, in die der Rider muss (= die Zone der gestorbenen Karte); sonst der Kontrolleur. */
+function riderSeite(deathInfo, ownerIdx) {
+  return deathInfo?.seite ?? deathInfo?.owner ?? ownerIdx;
+}
+
 /**
  * Narrow check: is this `onCreatureDeath` event a valid trigger for a
  * Rider in our hand? Requires the deceased to be an Elven Creature we
@@ -89,13 +94,13 @@ function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   // our Rider. Falls back to `owner` for any older payload that
   // pre-dates the controller field.
   if ((deathInfo.controller ?? deathInfo.owner) !== ownerIdx) return false;
-  // Z1 (A09-15): die Zone ist die der BRETTSEITE. Eine gestohlene Elven steht beim Besitzer —
-  // `supportZones[ownerIdx]` an gleicher Koordinate waere eine ANDERE Zone; kein Rider dorthin.
-  if ((deathInfo.seite ?? deathInfo.owner) !== ownerIdx) return false;
+  // Z1 (A09-15) / W4 (Al 14.10.2026: „Falls der temporary owner ein geeignetes Ziel zum Beschwoeren hat, darf er es
+  // seitenfremd beschwoeren."): die Zone ist die der BRETTSEITE. Eine gestohlene Elven steht beim Besitzer — der Rider
+  // des Kontrolleurs darf trotzdem in DIESE Zone (seitenfremd, `controller`), siehe `riderSeite`.
   const cardDB = engine._getCardDB();
   const cd = cardDB[deathInfo.name];
   if (!isElvenCreature(cd)) return false;
-  const ps = engine.gs.players[ownerIdx];
+  const ps = engine.gs.players[riderSeite(deathInfo, ownerIdx)];
   if (!ps) return false;
   // Slot must be empty RIGHT NOW. The engine clears the slot just
   // before firing this hook, so this normally passes — but another
@@ -239,7 +244,8 @@ module.exports = {
       if (handIdx < 0) return;
 
       // Re-verify the slot is empty (belt-and-suspenders)
-      const slot = ps.supportZones?.[death.heroIdx]?.[death.zoneSlot];
+      const seite = riderSeite(death, pi);   // W4: Brettseite der Zone (bei gestohlener Elven die des Besitzers)
+      const slot = gs.players[seite]?.supportZones?.[death.heroIdx]?.[death.zoneSlot];
       if (slot && slot.length > 0) {
         engine.log('elven_rider_fizzle', { player: ps.username, reason: 'slot_occupied' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
@@ -262,12 +268,13 @@ module.exports = {
         // on occupied — we've already verified empty, so it lands
         // where requested.
         const res = await engine.summonCreatureWithHooks(
-          CARD_NAME, pi, death.heroIdx, death.zoneSlot,
+          CARD_NAME, seite, death.heroIdx, death.zoneSlot,
           // `fromHandIdx`: Flug von der Hand in die Zone (v934). Ohne
           // das erscheint die Kreatur ohne Bewegung im Slot — der
           // HOOK-Weg sendet den Flug nicht von selbst, anders als der
           // regulaere Spielweg im Server.
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true }
+          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx, summonWindow: true,
+            ...(seite !== pi ? { controller: pi } : {}) }   // W4: seitenfremd, vom Kontrolleur gefuehrt
         );
         if (res?.negated) return;   // Off Duty & co.: Karte ist schon geroutet
         if (!res) {
