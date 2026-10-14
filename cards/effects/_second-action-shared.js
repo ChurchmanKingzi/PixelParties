@@ -188,7 +188,13 @@ async function secondActionGrant(ctx, opts = {}) {
   // (unconsumed), don't re-register / re-animate / re-log. Lets
   // callers re-invoke freely (e.g. Lunatic Hawk's onTurnStart) without
   // a mirror-based guard, and without clobbering a co-resident grant.
-  if (inst.counters?.aaGrants?.[typeId] > 0) return true;
+  if (inst.counters?.aaGrants?.[typeId] > 0) {
+    // W5a (Al 14.10.2026, Slippery Fridge: Boni wandern mit der Ausruestung): wurde die Karte auf einen anderen Helden
+    // verschoben (`onPlay` wird dort erneut gefeuert), muss das Abzeichen am NEUEN Wirt stehen — der alte hat es beim Austritt verloren.
+    hostHero.buffs = hostHero.buffs || {};
+    if (!hostHero.buffs[SECOND_ACTION_BUFF_KEY]) hostHero.buffs[SECOND_ACTION_BUFF_KEY] = { appliedTurn: gs.turn };
+    return true;
+  }
   engine.registerAdditionalActionType(typeId, {
     label: hostHero.name,
     allowedCategories: allowedCategories
