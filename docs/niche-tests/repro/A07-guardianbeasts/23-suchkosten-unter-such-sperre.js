@@ -47,7 +47,7 @@ const gal1 = (t) => t.script.push({ match: d => d && d.type === 'cardGallery', a
       disc(t); gal1(t); t.script.push({ match: d => d && d.type === 'optionPicker', answer: () => ({ optionId: '0' }) });
       const r = await act(t);
       if (frei) R.check('Kontrolle Ska: Fighting am Helden angelegt', JSON.stringify(t.gs.players[0].abilityZones).includes('Fighting'), { r, ab: t.gs.players[0].abilityZones });
-      else R.check('Ska: Performance bleibt auf der Hand (nicht abgeworfen)', t.pile(0, 'hand').includes('Performance'), { r, hand: t.pile(0, 'hand'), ablage: t.pile(0, 'discardPile') });
+      else R.check('Ska: Suche läuft bewusst trotz Sperre (W5b-B11, Al: kein Hand-Ziel) – Fighting am Helden angelegt', JSON.stringify(t.gs.players[0].abilityZones).includes('Fighting'), { r, ab: t.gs.players[0].abilityZones });
     }
   }
   R.section('Nebenfall (C): Shanty, nur „Navigation" auf der Hand – das „reveal 1 card" ist nach dem Abwurf nicht mehr möglich');

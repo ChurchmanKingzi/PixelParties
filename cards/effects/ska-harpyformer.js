@@ -328,9 +328,12 @@ module.exports = {
     // Ska's tutor-then-attach flow). Helper covers deck-search anim,
     // tracking, log, hook, and opponent reveal.
     if (ps.mainDeck.indexOf(chosenAbility) < 0) return true;
+    // W5b-B11 (Al, Welle 5): die Such-/Hand-Sperre gilt bewusst NICHT für diese Deck-Suche ohne Hand-Ziel (die Ability geht
+    // sofort an den Helden, die Hand ist nur Durchgang) – `_bypassHandLock`, sonst zahlt Ska die Kosten und erhält nichts.
     await engine.actionAddCardFromDeckToHand(pi, chosenAbility, {
       source: CARD_NAME,
       reveal: true,
+      _bypassHandLock: true,
     });
 
     // v1356: KEIN `skipAbilityGivenCheck` — verbraucht das Anlegen des Helden.

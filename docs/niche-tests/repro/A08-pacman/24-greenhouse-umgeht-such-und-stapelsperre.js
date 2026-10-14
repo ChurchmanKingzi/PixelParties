@@ -4,7 +4,8 @@
 // Cats of the Pharaoh: „you cannot search or add cards to your hand …" (Skript: `ps.searchLocked = true`, „Draws bleiben frei"); Knight of Kings [B]: „your opponent cannot move cards from their deck or discard pile …"
 // Aufbau: Sitz 0 hat die Area Paraseed Greenhouse, zwei Handkarten, zwei Paraseeds im Deck. (a) ohne Sperre; (b) `ps.searchLocked = true` (wie Cats of the Pharaoh sie setzt);
 //   (c) Sitz 1 hat Knight of Kings [B] + Rook of Kings [B] + Board of Kings (Stapelsperre gegen Sitz 0, `pileOutAllowed(0,'deck') === false`).
-// Erwartung: (b) die Suche ist gesperrt – Area nicht aktivierbar / kein Abwurf / keine Paraseed; (c) dasselbe: weder Abwurf-Kosten noch HOPT-Verbrauch ohne Wirkung (`canActivateAreaEffect` müsste es erkennen).
+// ★ W5b-B11 (Al, Welle 5): die Such-Sperre gilt bewusst NICHT für Deck-Suchen ohne Hand-Ziel – (b) erwartet jetzt: Paraseed wird gepflanzt. (c) bleibt.
+// Erwartung (alt): (b) die Suche ist gesperrt – Area nicht aktivierbar / kein Abwurf / keine Paraseed; (c) dasselbe: weder Abwurf-Kosten noch HOPT-Verbrauch ohne Wirkung (`canActivateAreaEffect` müsste es erkennen).
 // Beobachtet: (b) Die Paraseed wird aus dem Deck geholt und eingesetzt. (c) `activateAreaEffect` liefert true, die Handkarte wird abgeworfen (Kosten), die Paraseed bleibt im Deck, das HOPT ist verbraucht.
 // Ursache: `canActivateAreaEffect` (paraseed-greenhouse.js ~Z. 195) prüft nur `ps.handLocked`; der Aktivierungsweg `_engine.js activateAreaEffect` (~Z. 42208) liest keine Sperr-Marken (`blockedBySearchLock` /
 //   `blockedByPileLock` werden nur an Hand-/Fähigkeits-/Held-Wegen ausgewertet); `pflanzen()` ignoriert das `null` von `deckEntnahme` (return true = „Kosten sind bezahlt").
@@ -35,7 +36,7 @@ const H = require('../../lib/h.js');
   R.check('(a) ohne Sperre: 1 abgeworfen, 1 Paraseed gepflanzt', a.abgeworfen === 1 && a.gepflanzt === 1, a);
   const b = await lauf('searchLocked');
   R.note('(b) Such-Sperre', JSON.stringify(b));
-  R.check('(b) Such-Sperre: nichts gepflanzt', b.gepflanzt === 0, b);
+  R.check('(b) Such-Sperre: Paraseed wird trotzdem gepflanzt (W5b-B11: bewusst, kein Hand-Ziel)', b.gepflanzt === 1 && b.abgeworfen === 1, b);
   const c = await lauf('Knight of Kings');
   R.note('(c) Stapelsperre', JSON.stringify(c));
   R.check('(c) Stapelsperre: nichts abgeworfen und kein HOPT verbraucht', c.abgeworfen === 0 && !c.hopt, c);

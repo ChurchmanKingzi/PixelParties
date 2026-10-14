@@ -5,7 +5,8 @@
 //   of your other Heroes as an additional attachment."
 // Regel (CARD_API.md „Cats of the Pharaoh" v1068): `searchLocked` sperrt „Deck-Suche und Adds"; der Riegel sitzt in `engine._isSearchBlocked`
 //   („gemeinsam mit jedem anderen Draw/Search/Tutor-Weg").
-// Erwartet: unter `searchLocked` / `handLocked` bietet Alex keine Deck-Suche an (keine Galerie, kein Deckverlust, keine Ability am anderen Helden).
+// ★ W5b-B11 (Al, Welle 5: „Ja – die Such-Sperre gilt bewusst NICHT für Deck-Suchen ohne Hand-Ziel (Alex, Ska, Greenhouse)"): Repro auf die NEUE Regel umgestellt.
+// Erwartet (neu): auch unter `searchLocked` / `handLocked` läuft Alex' Deck-Suche (die Ability geht an einen Helden, nicht auf die Hand).
 // Beobachtet: die Galerie erscheint, die Ability wird aus dem Deck gezogen und angehängt – in beiden Sperr-Zuständen.
 // Ursache: `alex-trainer-of-heroes.js` (~Z. 252/281/346) liest `ps.mainDeck` direkt und ruft `engine._isSearchBlocked` / `searchDeckForNamedCard` nie auf.
 const H = require('../../lib/h.js');
@@ -28,8 +29,8 @@ const ALEX = 'Alex, Trainer of Heroes';
   R.check('Kontrolle ohne Sperre: Luck gespielt, Tutor läuft (Galerie, 1 Ability am anderen Helden)', g.r === true && g.galerie === 1 && g.angehaengt === 1 && g.deck === 19, [g.r, g.galerie, g.angehaengt, g.deck]);
   for (const s of ['searchLocked', 'handLocked']) {
     const x = await lauf(s);
-    R.check(`${s}: keine Deck-Suche (keine Galerie)`, x.galerie === 0, [x.r, x.galerie]);
-    R.check(`${s}: Deck unverändert (20) und keine Ability am anderen Helden`, x.deck === 20 && x.angehaengt === 0, [x.deck, x.angehaengt]);
+    R.check(`${s}: Suche läuft trotz Sperre (Galerie, bewusst – kein Hand-Ziel)`, x.galerie === 1, [x.r, x.galerie]);
+    R.check(`${s}: Ability aus dem Deck am anderen Helden angelegt (Deck 19)`, x.deck === 19 && x.angehaengt === 1, [x.deck, x.angehaengt]);
     R.check(`${s}: keine Engine-Fehler`, x.t.errors.length === 0, x.t.errors);
   }
   R.finish();
