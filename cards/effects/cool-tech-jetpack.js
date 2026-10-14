@@ -51,6 +51,15 @@ module.exports = {
     return (targetedHeroes || []).some(t => t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx);
   },
 
+  // ★ Al 14.10.2026 (F01-12): „The FIRST time every turn …, you may …" — schon das Angebot ist das
+  // „erste Mal"; auch ein abgelehntes Angebot verbraucht es (Engine ruft das bei „Nein").
+  consumeOnDecline(gs, pi, engine, opts) {
+    const inst = opts?.inst;
+    const heroIdx = opts?.heroIdx ?? inst?.heroIdx;
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;
+  },
+
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard, opts) {
     const gs = engine.gs;
     const ps = gs.players[pi];
@@ -58,6 +67,8 @@ module.exports = {
     const heroIdx = opts?.heroIdx ?? inst?.heroIdx;
     const seite = opts?.heroOwner ?? pi;   // Brettseite des Traegers (Styx 28.9.)
     if (!ps || (ps.hand || []).length < 1) return {};
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    gs.hoptUsed[`cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`] = gs.turn;   // Angebot angenommen = „erstes Mal" verbraucht
     const vorher = ps.hand.length;
     await engine.actionPromptForceDiscard(pi, 1, {
       title: CARD_NAME, source: CARD_NAME, selfInflicted: true,

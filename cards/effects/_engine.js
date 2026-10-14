@@ -36880,7 +36880,13 @@ this._deathWatch = (this._deathWatchStack || []).length
               _handReactionWindow: true,
               reactionCardName: cardName,
             });
-            if (!confirmed) continue;
+            if (!confirmed) {
+              // ★ Al 14.10.2026: „The first time every turn …, you may …" — ein abgelehntes
+              // Angebot verbraucht das „erste Mal" (nur bei Effekten, die ausdrücklich nur die
+              // erste Instanz treffen; Skript meldet das über `consumeOnDecline`).
+              if (script.consumeOnDecline) script.consumeOnDecline(this.gs, pi, this, rxOpts);
+              continue;
+            }
 
             // Auftritt links am Feld — dieselbe Zeile wie im
             // Handfenster oben, damit JEDE ausgeruestete Reaktion ihn
