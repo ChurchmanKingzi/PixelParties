@@ -3277,9 +3277,14 @@ class GameEngine {
         const _istHeldenTraeger = c.zone === 'support'
           && (c.counters?.treatAsEquip || c.counters?._gainedEffectOnly)
           && this._getCardDB()[c.name]?.cardType === 'Hero';
-        if ((c.zone === 'hero' || c.zone === 'ability' || _istHeldenTraeger)
+        // ★ S1 (Al, zwei getrennte Zustaende): Heldeneffekt-Hooks stumm bei „effect negated" (jedes `negated`),
+        // Passiv-Hooks der ABILITY-Karten nur bei „abilities negated" (`_isHeroAbilityPassiveSilenced`).
+        if ((c.zone === 'hero' || _istHeldenTraeger)
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
+        if (c.zone === 'ability'
+            && !loadCardEffect(c.name)?.bypassStatusFilter
+            && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
       // `bypassStatusFilter` on the card's script lets the listener fire
@@ -6705,6 +6710,23 @@ class GameEngine {
       if (script?.blocksHostStatusRemoval && script.attachmentStatus) out.add(script.attachmentStatus);
     }
     return out;
+  }
+
+  /**
+   * ★ S1 — Passiv-Hooks der Ability-Karten eines Helden stumm? Wie `_isHeroEffectSilenced` (Stun/Frost/Mumie),
+   * nur `negated` zaehlt hier erst als „abilities negated": die HARTE Form (Standard, v1114) oder die
+   * Anhaengsel-Marke `abilitiesNegated` (Stowaway). Die LEICHTE Form (Decisive Defeat, Weakening Crystal:
+   * nur der Heldeneffekt) laesst die Abilities laufen.
+   */
+  _isHeroAbilityPassiveSilenced(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    if (hero.statuses?.stunned || hero.statuses?.webbed) return true;
+    if (hero.statuses?.frozen && !this._isChillyDogActiveFor(pi)) return true;
+    const ng = hero.statuses?.negated;
+    if (ng && (!(ng._byWeakeningCrystal || ng._fromAttachment) || this.heroAbilitiesNegated(pi, heroIdx))) return true;
+    if (this._isHeroMummified(pi, heroIdx)) return true;
+    return false;
   }
 
   /**
