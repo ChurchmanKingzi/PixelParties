@@ -49,10 +49,14 @@ module.exports = {
    * ≥4 gold (one transfer minimum), and a hand that isn't locked.
    * The opponent's hand-lock is re-checked at resolve time.
    */
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players?.[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;
+    // W5b-B6 (Al, Welle 5): Geben ist der EINZIGE Effekt – ist die Gegnerhand gesperrt (Hand-/Such-Sperre:
+    // „cannot search or add cards to the hand"), würde er versagen, also ist die Karte gar nicht aktivierbar.
+    const oi = engine?.opponentOf ? engine.opponentOf(pi) : (pi === 0 ? 1 : 0);
+    if (engine?._isSearchBlocked ? engine._isSearchBlocked(oi, {}, 'deck') : gs.players?.[oi]?.handLocked) return false;
     if ((ps.gold || 0) < 4) return false;
     // At least 2 cards in hand (Cool Presents + one to give) — though
     // sibling-copy plays can technically count the OTHER copy too, so
@@ -109,7 +113,7 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const ops = gs.players[oi];
     if (!ps || !ops) return { cancelled: true };
-    if (ops.handLocked) return { cancelled: true };
+    if (engine._isSearchBlocked(oi, {}, 'deck')) return { cancelled: true };   // W5b-B6: auch Such-Sperre (kein Verbrauch)
 
     // 0-selection branch — legal, Artifact still resolves and discards
     // for free, no transfers, no gold spent. Matches "any number" → 0.
