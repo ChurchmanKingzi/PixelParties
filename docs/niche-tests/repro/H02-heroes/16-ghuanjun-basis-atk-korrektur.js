@@ -7,13 +7,15 @@
 // Beobachtung (Ghuanjun mit Fighting 1, ATK 90): Venom Snake/Tiger Kick/Ox Headbutt 70 (die drei Karten setzen `usesHeroAtk` trotz Formel „base ATK" → die Differenz wird doppelt abgezogen; mit ATK-Bonus ≥ 80 sogar 0),
 //   Critical Strike 170 (nur 1× Differenz abgezogen, Formel verdoppelt sie), Surefire Shot 90 („cannot be reduced" lässt den Abzug leerlaufen), Massacre 140 (kein `usesHeroAtk`), Shattering Strike auf Kreatur 90.
 // Aufruf: node docs/niche-tests/repro/H02-heroes/16-ghuanjun-basis-atk-korrektur.js   (✗ = Fehler tritt auf)
+// ★ W5b-B7 (Al, Welle 5): "Base Attack ist ein eigener Stat. Critical Strike und Co aendern *nicht* die base atk, also kein hoeherer Schaden." => PAUSCHAL: jede Attack genau die aktuelle Grund-ATK
+//   (Critical Strike 80 statt 160, Massacre 80 statt 130) - Erwartungswerte unten entsprechend umgestellt.
 const H = require('../../lib/h.js');
 const GU = 'Ghuanjun, the Undead Martial Artist';
 (async () => {
   const R = H.runner();
   // [Karte, erwarteter Schaden mit ATK := baseAtk (80), Ziel: 'hero' | 'creature']
   const CASES = [['Attack', 80, 'hero'], ['Blow of the Venom Snake', 80, 'hero'], ['Ferocious Tiger Kick', 80, 'hero'], ['Strong Ox Headbutt', 80, 'hero'],
-    ['Critical Strike', 160, 'hero'], ['Surefire Shot', 80, 'hero'], ['Massacre', 130, 'hero'], ['Shattering Strike', 80, 'creature']];
+    ['Critical Strike', 80, 'hero'], ['Surefire Shot', 80, 'hero'], ['Massacre', 80, 'hero'], ['Shattering Strike', 80, 'creature']];
   for (const [card, erwartet, ziel] of CASES) {
     const t = await H.fresh({ heroes: [[GU, H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], hand: [['Fighting'], []], hp: 1000 });
     await t.run(() => t.engine.runHooks('onGameStart', {}));

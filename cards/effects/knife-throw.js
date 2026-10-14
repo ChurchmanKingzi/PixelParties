@@ -175,7 +175,7 @@ module.exports = {
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
 
       const attackSource = {
-        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true, heroAtkFaktor: ATK_MULT,   // Als Befund 29.9.: Brettseite des Angreifers
+        name: CARD_NAME, owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesHeroAtk: true,   // Als Befund 29.9.: Brettseite des Angreifers
       };
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, damage);
 

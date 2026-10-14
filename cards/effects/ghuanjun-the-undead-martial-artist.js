@@ -196,24 +196,24 @@ module.exports = {
       if (!hero.ghuanjunAttacksUsed.includes(ctx.playedCardName)) hero.ghuanjunAttacksUsed.push(ctx.playedCardName);
     },
 
-    // W5b-B7 (Al, Welle 5; Hero-Text: „This Hero's Attacks deal damage equal to this Hero's base Attack stat"):
-    // Maßgeblich ist die AKTUELLE Grund-ATK (`grundAtkJetzt`: baseAtk, unter Curse 0 – „Attack stat is always 0"),
-    // nicht fest 80. Die Attack rechnet mit ihrer eigenen Formel, nur mit Grund-ATK statt ATK-Wert (Critical Strike
-    // 2x, Massacre +50 je Kreatur …). Korrigiert wird im Angriffsfenster (`onAttackDeclare`, vor Animation/Schaden;
-    // greift auch bei „cannot be reduced" wie Surefire Shot): Quellen mit `usesHeroAtk` haben `hero.atk` in der Formel
-    // (`heroAtkFaktor` = wie oft, Standard 1), Quellen mit `usesBaseAtk` haben schon `hero.baseAtk` darin
-    // (Strong Ox, Tiger Kick, Venom Snake, Quick Attack) – die ändern sich nur, wenn die Grund-ATK ≠ baseAtk ist (Curse).
+    // W5b-B7 (Al, Welle 5; Hero-Text: "This Hero's Attacks deal damage equal to this Hero's base Attack stat"):
+    // Al: "Base Attack ist ein eigener Stat. Critical Strike und Co aendern *nicht* die base atk, also kein hoeherer
+    // Schaden." => PAUSCHAL: jede Attack dieses Helden verursacht GENAU seine AKTUELLE Grund-ATK (`grundAtkJetzt`:
+    // `baseAtk` mit allen Effekten, die die Basis aendern; unter Curse 0). Die eigene Formel der Attack entfaellt
+    // (Critical Strike 2x, Massacre +50 je Kreatur, Quick Attack ...); Effekte, die nur die normale ATK aendern, aendern
+    // den Schaden nicht. Nebenwirkungen der Karte (Status, Zusatzaktion, Zielmuster) und Flaechenattacken (jedes Ziel
+    // erhaelt die Grund-ATK) bleiben unberuehrt. Gesetzt wird im Angriffsfenster (`onAttackDeclare`, vor Animation und
+    // Schaden; greift auch bei "cannot be reduced" wie Surefire Shot) - nur bei Betrag > 0 (Attacks ohne Schaden bleiben ohne).
     onAttackDeclare: (ctx) => {
       const q = ctx.source;
-      if (!q || (!q.usesHeroAtk && !q.usesBaseAtk)) return;
-      if (q.heroIdx !== ctx.cardHeroIdx) return;
+      if (!q || q.heroIdx !== ctx.cardHeroIdx) return;
       const sourceOwner = q.heroOwner ?? q.owner ?? q.controller ?? -1;
       if (sourceOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       const hero = ctx.attachedHero ?? ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
       if (!hero || hero.baseAtk === undefined) return;
-      const verwendet = q.usesBaseAtk ? (hero.baseAtk || 0) : (hero.atk || 0);
-      const diff = (grundAtkJetzt(ctx._engine, hero) - verwendet) * (q.heroAtkFaktor || 1);
-      if (diff) ctx.modifyAmount(Math.max(diff, -ctx.amount));
+      if (!(ctx.amount > 0)) return;
+      const diff = grundAtkJetzt(ctx._engine, hero) - ctx.amount;
+      if (diff) ctx.modifyAmount(diff);
     },
 
     // Flag Ghuanjun's Attacks to cap damage at target HP - 1 (prevents kills)

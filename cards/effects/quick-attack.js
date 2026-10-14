@@ -61,7 +61,7 @@ module.exports = {
       // attacks" effects) fires AFTER target pick but BEFORE the
       // animation + damage. Listeners may mutate the about-to-deal
       // damage.
-      const attackSource = { name: 'Quick Attack', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi, usesBaseAtk: true };   // Als Befund 29.9.: Brettseite des Angreifers
+      const attackSource = { name: 'Quick Attack', owner: pi, heroIdx, controller: pi, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Angreifers
       const finalDmg = await engine._fireAttackDeclare(attackSource, target, baseAtk);
 
       // Fast ram animation
