@@ -90,6 +90,7 @@ module.exports = {
 
   // Resolve handles gold deduction manually
   manualGoldCost: true,
+  goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Ziel - unter der Goldsperre nicht aktivierbar (server.js doUseArtifactEffect)
   animationType: 'beer_bubbles',
 
   resolve: async (engine, pi, selectedIds, validTargets) => {

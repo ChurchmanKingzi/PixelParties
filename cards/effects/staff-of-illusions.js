@@ -62,6 +62,7 @@ module.exports = {
     const cardDB = {}; // placeholder — real check below
     // Player needs at least 10 gold (level 1 minimum cost) and a free support zone
     if ((ps.gold || 0) < COST_PER_LEVEL) return false;
+    if (ps.goldLocked) return false;   // G1 (A09-11): Goldsperre - wie Gold 0 (Mindestgold 10 gilt unveraendert)
     const hasFreeZone = (ps.heroes || []).some((h, hi) =>
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
@@ -104,7 +105,7 @@ module.exports = {
     const goldCost   = level * COST_PER_LEVEL;
 
     // Verify the player can afford it
-    if ((ps.gold || 0) < goldCost) return { aborted: true };
+    if ((ps.gold || 0) < goldCost || (goldCost > 0 && ps.goldLocked)) return { aborted: true };   // G1 (A09-11): Goldsperre
 
     // ── Step 2: pick a free support zone ────────────────────────────────
     // Place can target ANY of the player's Heroes' Support Zones —

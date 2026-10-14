@@ -83,7 +83,7 @@ module.exports = {
       // Beschwoerung erlaubt ist.
       if (gs[RESOLVING]?.[pi]) return;
       if (!(ps.discardPile || []).includes(CARD_NAME)) return;
-      if ((ps.gold || 0) < betrag) return;
+      if ((ps.gold || 0) < betrag || engine.goldSpendBlocked(pi)) return;   // G1 (A09-11): Goldsperre - "pay N Gold"
 
       if (eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true }).length === 0) return;   // Kontrolle statt Seite (Styx 28.9.)
 

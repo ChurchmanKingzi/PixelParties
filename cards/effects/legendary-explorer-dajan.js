@@ -104,7 +104,7 @@ function _buildEligibleGallery(engine, pi) {
     if (script?.blockedBySummonLock && ps.summonLocked) continue;
     if (cd.subtype && cd.subtype.toLowerCase() === 'equipment' && !engine.hasLegalEquipHero(cardName, pi)) continue;
     const reducedCost = Math.max(0, (cd.cost || 0) - COST_REDUCTION);
-    if (gold < reducedCost) continue;
+    if (gold < reducedCost || (reducedCost > 0 && engine.goldSpendBlocked(pi))) continue;   // G1 (A09-11): Goldsperre
     seen.add(cardName);
     out.push({
       name: cardName, source: 'deck', cost: reducedCost,
@@ -369,7 +369,7 @@ module.exports = {
 
     const rawCost = cd.cost || 0;
     const cost = Math.max(0, rawCost - COST_REDUCTION);
-    if ((ps.gold || 0) < cost) return false;
+    if ((ps.gold || 0) < cost || (cost > 0 && engine.goldSpendBlocked(pi))) return false;   // G1 (A09-11): Goldsperre
 
     // Re-verify deck membership; a mid-prompt mill could have removed it.
     if (!ps.mainDeck.includes(chosenName)) return false;

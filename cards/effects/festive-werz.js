@@ -68,7 +68,8 @@ module.exports = {
       const hoptKey = `festive-werz:${pi}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
-      const gold = ps.gold || 0;
+      // G1 (A09-11): Goldsperre des ZAHLERS (Golden Arrow: "cannot spend Gold") - nichts zahlbar, Effekt entfaellt ohne Abfrage.
+      const gold = engine.goldSpendBlocked(pi) ? 0 : (ps.gold || 0);
       const deck = (ps.mainDeck || []).length;
       const maxStufen = Math.min(
         MAX_KARTEN,
@@ -127,7 +128,7 @@ module.exports = {
 
       // Nach der Abfrage neu pruefen — waehrend des Ueberlegens kann
       // ein Effekt das Gold oder das Deck veraendert haben.
-      if ((ps.gold || 0) < kosten) return;
+      if ((ps.gold || 0) < kosten || engine.goldSpendBlocked(pi)) return;
       const karten = Math.floor(kosten / GOLD_PRO_KARTE);
       if ((ps.mainDeck || []).length < karten) return;
 

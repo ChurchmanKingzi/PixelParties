@@ -69,6 +69,7 @@ module.exports = {
     const ps = ctx.players[ctx.cardOwner];
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
     if ((ps.gold || 0) < goldCost) return false;
+    if (goldCost > 0 && ctx._engine.goldSpendBlocked(ctx.cardOwner)) return false;   // G1 (A09-11): Goldsperre - "spend N Gold"
     if (ctx._engine.deckLeer(ctx.cardOwner, 'potion')) return false;
     return true;
   },
@@ -94,7 +95,7 @@ module.exports = {
 
     // Pay gold
     if (goldCost > 0) {
-      if ((ps.gold || 0) < goldCost) return false; // Safety
+      if ((ps.gold || 0) < goldCost || engine.goldSpendBlocked(pi)) return false; // Safety (G1: auch Goldsperre)
       await engine._payCardCost(pi, goldCost);
       engine.log('gold_spent', { player: ps.username, amount: goldCost, reason: 'Alchemy' });
       engine._broadcastEvent('gold_change', { owner: pi, amount: -goldCost });
