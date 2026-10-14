@@ -152,6 +152,9 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const ps = ctx._engine.gs.players[ctx.cardOwner];
+    // W5b-Z5 (Al, Welle 5): „Thebinxan unter Handsperre ist gesperrt!" – die aufgedeckte Karte käme nicht auf die Hand;
+    // nicht aktivierbar, nichts verbraucht (Vorbild Camouflaged Kappa / Timid Tanuki).
+    if (ps?.handLocked) return false;
     return (ps?.mainDeck || []).length > 0;
   },
 
