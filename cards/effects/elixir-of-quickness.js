@@ -13,6 +13,9 @@ const CARD_NAME = 'Elixir of Quickness';
 
 module.exports = {
   isPotion: true,
+  // D1 (Regel von Al): der Zug IST die ganze Karte - unter der Zieh-Sperre (drawLocked) nicht spielbar; unter handLocked
+  // markiert sie der Loader schon selbst (blockedByHandLock).
+  blockedByDrawLock: true,
 
   // Der Zug IST die ganze Karte — ohne ihn bleibt nichts uebrig.
   canActivate(gs, pi, engine) {

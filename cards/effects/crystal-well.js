@@ -137,7 +137,8 @@ module.exports = {
     const oi = engine.opponentOf(pi);
     const ops = engine.gs.players[oi];
     if (!ops || ops.handLocked) return false;
-    if (ps.handLocked || ps.drawLocked) return false;   // Z6 (A08-24 d): das Ziehen ist die Gegenleistung - unter der Zieh-Sperre wuerde die Karte nur verschenkt
+    // D1 (Antwort von Al): Karte-geben ist eigenstaendig - unter Zieh-/Hand-Sperre bleibt die Aktivierung moeglich, nur das Ziehen verpufft
+    // (Z6 A08-24 d hatte sie gesperrt).
     return _hasOriginallyOwnedHandCard(engine, pi);
   },
 

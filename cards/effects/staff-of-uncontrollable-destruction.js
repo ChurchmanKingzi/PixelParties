@@ -38,13 +38,15 @@ module.exports = {
   // Hand-lock greys-out: with no +1 draw landing, the player has paid
   // their entire hand for nothing. Tagging opts into the standard 🚫
   // overlay (see Staff of the Teleporter for the full rationale).
-  blockedByHandLock: true,
-  blockedByDrawLock: true,   // Z6 (F03-16): auch die reine Zieh-Sperre (Sacred Jewel)
+  // D1 (Antwort von Al): Mischeffekt (Abwerfen ist eigenstaendig) - unter Zieh-/Hand-Sperre BLEIBT der Stab aktivierbar, nur der
+  // Nachzug entfaellt. `blockedByHandLock: false` schlaegt den Auto-Tagger des Loaders.
+  blockedByHandLock: false,
+  // KI: wie bisher "immer spielen" (frueher ueber das Flag), aber nicht unter der Sperre, wo der Nachzug entfaellt.
+  cpuMeta: { alwaysCommit: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    if (ps.handLocked || ps.drawLocked) return false; // Z6 (F03-16: auch Zieh-Sperre) Lock prevents the +1 draw — fizzles silently.
     return true;
   },
 

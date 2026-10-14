@@ -15864,6 +15864,34 @@ Artifact-Creatures aus; Hand-Reaktionsartefakte zahlen den Item-Lock (`_rxPay` m
 Greenhouse) — die Such-Sperre meint nur "AUF DIE HAND".
 
 
+### ★ Zieh-Sperre und Aktivierungen: nur REINE Zieher sind gesperrt (Welle 3, D1 — Regel von Al)
+
+Unter Zieh-Sperre (`drawLocked`: Jenny, MOE Shield, Prayer, Smuggler's Pier, The Sacred Jewel) und Hand-Sperre (`handLocked`) darf eine
+Aktivierung/Karte weiterhin gespielt werden, solange **nicht der KOMPLETTE Effekt nur Ziehen ist**.
+
+* **Gesperrt** (ausgegraut, ohne Kosten und ohne Einmal-Stempel): der ganze Nutzen ist das Ziehen, und die Kosten sind nur der Preis
+  dafuers — keine Kosten (Tharx, Raptoren, Populated Island Turtle, Timid Tanuki, Charm of Balance, Kazena), Gold/Zaehler als Preis
+  (Alchemy aller Stufen, Smuggler's Pier, Gatherer, Nimble Monkee, Waflav-"Draw 3", Sparkfly-Architect), ein Nachteil des Zuges
+  ("danach abwerfen": Skeleton Mage, Clever Puppet Saras, Wheels; "danach nicht mehr ziehen": Kazena, Ice Sculpture Garden;
+  "Aktionsphase ueberspringen": Potion of Greed), Spells/Traenke/Artefakte, die nur ziehen (Haste, Supply Chain, Voice in your Head —
+  die Zusatzaktion erstattet nur die eigene Aktion —, Elixir of Quickness, Heart of the Mountain), Reaktionen wie der Money Printer
+  (kein Angebot, keine Ladung). Pruefer: `drawBlockedFor(engine, pi[, N])` im `canActivate*`-/`canFreeActivate`-/`canPlayWithHero`-Gate
+  bzw. die Flaggen `blockedByDrawLock`/`blockedByHandLock` bei Handkarten.
+* **Aktivierbar bleibt** jede Mischung mit etwas Eigenstaendigem — Abwerfen (Triceras, Pteranos, Techno Harpyformer, Future Tech Drone,
+  Heinz, Champion, Inventing Lv1/2, Prayer), Zurueckmischen (Elana, Leadership, Horn in a Bottle, die Staebe), Loeschen aus den Ablagen
+  (Guardian Beast Tu), Suchen, Auf-die-Hand-Nehmen, Opfern ... "Es gibt Decks, die abwerfen wollen": man wirft dann nur ab, gezogen wird
+  nichts. Diese Skripte pruefen die Zieh-/Hand-Sperre **nicht** (Z6 hatte Heinz gesperrt und Triceras/Pteranos/Heinz hingen an
+  `handLocked` — D1 hat das zurueckgenommen). Die KI schont sich (`cpuMeta.shouldActivateNow` bei Triceras/Pteranos); der Engine-Pfad der Menschen ist frei.
+* **Tuscan Artist** (genau 2/3, Ruling 16.8.) bleibt unveraendert: `drawWouldBeBlocked` sitzt weiter in den Gates, auch bei Mischeffekten
+  (Triceras, Pteranos, Techno, Freshya ...).
+* **Auch Mischeffekte (Antwort von Al):** Staff of the Teleporter / Staff of Uncontrollable Destruction (Mischen bzw. Abwerfen der Hand) und
+  Crystal Well (Karte dem Gegner geben) bleiben unter Zieh-/Hand-Sperre aktivierbar - nur das Nachziehen entfaellt ("nur das Ziehen
+  sperren"). Die Staebe tragen dafuer ausdruecklich `blockedByHandLock: false` (schlaegt den Auto-Tagger) und kein `blockedByDrawLock`;
+  die KI spielt sie unter der Sperre nicht blind (`cpuMeta.alwaysCommit` als Funktion).
+* Bleibt gesperrt (Antwort von Al): "danach abwerfen" / "danach nicht mehr ziehen" als Nachteil des Zuges (Skeleton Mage, Clever Puppet
+  Saras, Wheels, Kazena, Ice Sculpture Garden); Alchemy Lv1-3; Heinz ist offen.
+
+
 ## Neue Karte: „Cats of the Pharaoh" (v1068) — NEUE SPIELER-SPERRE
 
 ```

@@ -26,6 +26,7 @@
 'use strict';
 
 const { modelBase, debtTriggerCheck, debtChargesLeft } = require('./_debt-o-tron-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 
 const CARD_NAME = 'Debt-O-Tron Model Money Printer';
 const MAX_PER_TURN = 3;
@@ -51,6 +52,8 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps || (ps.mainDeck || []).length === 0) return;
+      // D1 (A03-24, Regel von Al): reiner Zug - unter Hand-/Zieh-Sperre wird er gar nicht erst angeboten (keine Ladung verbraucht).
+      if (drawBlockedFor(engine, pi)) return;
 
       // BOOLEAN, kein Objekt — siehe Loan Shredder. Derselbe Fehler
       // hat hier den Zug verschluckt (Als Report: „der Tooltip kam, aber

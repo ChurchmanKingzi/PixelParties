@@ -12,6 +12,8 @@
 //  - Engine clears handLocked automatically on turn start
 // ═══════════════════════════════════════════
 
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
+
 module.exports = {
   // CPU: confirm this Hero's activated-effect "you may" prompt — the default
   // brain declines cancellable confirms raised outside a card-cast (Hero
@@ -61,7 +63,8 @@ module.exports = {
    */
   canActivateHeroEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
-    if (ps.handLocked) return false;
+    // D1 (H02-22): der Zug ist der einzige Nutzen (die Folgesperre ist nur sein Nachteil) - unter Hand-/Zieh-Sperre nicht aktivierbar.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner)) return false;
     return (ps.hand || []).length < 7;
   },
 

@@ -55,15 +55,15 @@ module.exports = {
   // (server.js builds `handLockBlockedCards`, app-board.jsx renders the
   // overlay). The loader's auto-tagger missed it because the header
   // comment mentions `actionPlaceCreature` — a NON_DRAW substring match.
-  blockedByHandLock: true,
-  blockedByDrawLock: true,   // Z6 (F03-16): auch die reine Zieh-Sperre (Sacred Jewel) laesst den Nachzug ausfallen
+  // D1 (Antwort von Al): Mischeffekt (Mischen ist eigenstaendig) - unter Zieh-/Hand-Sperre BLEIBT der Stab aktivierbar, nur der Nachzug
+  // entfaellt. Das fruehere `blockedByHandLock` ist deshalb ausdruecklich AUS (`false` schlaegt den Auto-Tagger des Loaders).
+  blockedByHandLock: false,
+  // KI: wie bisher "immer spielen" (frueher ueber das Flag), aber nicht unter der Sperre, wo der Nachzug entfaellt.
+  cpuMeta: { alwaysCommit: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;
-    // Hand-locked → the staff's own draws would silently fizzle, so
-    // there's no value in activating. Mirrors Leadership / similar.
-    if (ps.handLocked || ps.drawLocked) return false;   // Z6 (F03-16)
     return true;
   },
 

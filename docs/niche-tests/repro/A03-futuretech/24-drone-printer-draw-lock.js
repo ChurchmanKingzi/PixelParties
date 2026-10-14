@@ -7,6 +7,9 @@
 //   Golden Ladybug `kannZiehen`, Chuck, `_potion-draw-trigger-shared`: Zieh-Effekte prüfen `handLocked || drawLocked`; gegenläufig: Leadership lässt den Menschenpfad „bewusst unangetastet").
 // Beobachtet: Mit `ps.drawLocked` darf man die Drone aktivieren, wirft 1 Karte ab und zieht nichts (Handverlust ohne Gegenwert); der Money Printer fragt „Draw 1 card?", verbraucht die Ladung und zieht nichts.
 // Ursache: future-tech-drone.js (`onCreatureEffect`, kein `canActivateCreatureEffect`, keine Sperrprüfung) und debt-o-tron-model-money-printer.js (`afterResourceSpend`: Prüfung nur `mainDeck.length`).
+// ★ ENTSCHIEDEN (Regel von Al, Welle 3 / D1): unter einer Zieh-Sperre bleibt eine Aktivierung spielbar, solange NICHT der komplette Effekt nur Ziehen ist
+//   (Abwerfen, Zurückmischen, Löschen aus der Ablage … sind eigenständig – „es gibt Decks, die abwerfen wollen“); gesperrt sind nur reine Zieher.
+//   Drone („discard … and draw the same number“) = Mischeffekt: bleibt aktivierbar (man wirft nur ab). Money Printer („draw 1 card …“) = reiner Zieher: gesperrt.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -20,7 +23,7 @@ const H = require('../../lib/h.js');
     const hand0 = t.pile(0, 'hand').length;
     const r = await t.activateCreature(0, 0, 0);
     const abgeworfen = hand0 - t.pile(0, 'hand').length;
-    R.check('Drone unter Zieh-Sperre: nicht aktivierbar oder kein Kartenverlust ohne Nachziehen', !(r === true && abgeworfen > 0), { r, abgeworfen, hand: t.pile(0, 'hand') });
+    R.check('Drone unter Zieh-Sperre: Mischeffekt bleibt aktivierbar (die Karte wird abgeworfen)', r === true && abgeworfen > 0, { r, abgeworfen, hand: t.pile(0, 'hand') });
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   // ── Money Printer ──

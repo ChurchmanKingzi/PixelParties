@@ -12,6 +12,8 @@
 //  highlighted but also NOT grayed out.
 // ═══════════════════════════════════════════
 
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
+
 module.exports = {
   blockedByHandLock: true,
   activeIn: ['ability'],
@@ -61,12 +63,14 @@ module.exports = {
   // Harte CPU-Restriktion (Als Ruling): Alchemy niemals unter Hand-
   // oder Draw-Lock aktivieren — der Potion-Draw fizzlet dann
   // (actionDrawFromPotionDeck liefert []), das Gold wäre verschwendet.
-  // CPU-only: Menschen dürfen weiterhin (der Engine-Pfad prüft dieses
-  // Flag bewusst nicht).
+  // (Frueher "CPU-only: Menschen duerfen weiterhin" - D1 hat das mit der Regel von Al abgeloest, s. canFreeActivate.)
   cpuSkipActivationWhenDrawLocked: true,
 
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];
+    // D1 (M01-23, Regel von Al): "spend N Gold in order to draw" / "draw" - der Zug ist der ganze Nutzen, das Gold nur sein Preis
+    // (Smuggler's-Pier-artig). Unter Hand-/Zieh-Sperre nicht aktivierbar: weder Gold noch Einmal-Stempel gehen fuer nichts weg.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner)) return false;
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;
     if ((ps.gold || 0) < goldCost) return false;
     if (goldCost > 0 && ctx._engine.goldSpendBlocked(ctx.cardOwner)) return false;   // G1 (A09-11): Goldsperre - "spend N Gold"

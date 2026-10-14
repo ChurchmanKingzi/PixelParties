@@ -32,7 +32,9 @@ const H = require('../../lib/h.js');
     const vor = t.pile(0, 'hand').length;
     const r = await t.play(0, staff);
     const nach = t.pile(0, 'hand').length;
-    R.check(`Jewel dann ${staff}: unspielbar bzw. Hand bleibt (nicht ${vor - 1} Karten weg ohne Nachziehen)`, r === false || nach >= vor - 1, { r, handVorher: vor, handNachher: nach, drawLocked: t.gs.players[0].drawLocked });
+    // ★ ENTSCHIEDEN (Al, Welle 3 / D1): die Stäbe sind Mischeffekte (Mischen bzw. Abwerfen ist eigenständig) – unter der Zieh-Sperre bleiben sie
+    // spielbar, nur der Nachzug entfällt (die Hand geht dann ins Deck bzw. in die Ablage). Wheels (reiner Zieher + Nachteil) bleibt gesperrt.
+    R.check(`Jewel dann ${staff}: bleibt spielbar (Mischeffekt, nur der Nachzug entfällt)`, r === true && nach < vor - 1, { r, handVorher: vor, handNachher: nach, drawLocked: t.gs.players[0].drawLocked });
   }
   R.finish();
 })();

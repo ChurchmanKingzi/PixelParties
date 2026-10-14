@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════
 
 const { opponentOfGs } = require('./_opp');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -104,6 +105,9 @@ module.exports = {
 
     // Must have cards in deck to draw
     if ((actPs.mainDeck || []).length === 0) return false;
+
+    // D1 (Regel von Al): der Zug ist der einzige Nutzen - der ZIEHENDE (Aktivierer) darf unter Hand-/Zieh-Sperre nicht aktivieren.
+    if (drawBlockedFor(engine, activatorIdx)) return false;
 
     return true;
   },

@@ -58,6 +58,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isArtifactCreature } = require('./_hooks');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 const {
   QUEEN_NAME,
   SPARKFLY_NAMES,
@@ -237,7 +238,8 @@ module.exports = {
     // MAIN mode is always available (subject to per-mode HOPT). Gifts
     // require their respective tags. Any unused mode → activatable.
     if (!isModeUsed(inst, 'main', turn)) return true;
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn)) return true;
+    // D1 (Regel von Al): der Architect-Modus ist ein reiner Zug - unter Hand-/Zieh-Sperre kein Grund zur Aktivierung.
+    if (gifts.architect && !isModeUsed(inst, 'architect', turn) && !drawBlockedFor(ctx._engine, ctx.cardOwner)) return true;
     if (gifts.worker    && !isModeUsed(inst, 'worker',    turn)) return true;
     return false;
   },
@@ -256,7 +258,7 @@ module.exports = {
     if (!isModeUsed(inst, 'main', turn)) {
       modeOptions.push({ id: 'main', label: '👑  Declare a card type' });
     }
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn)) {
+    if (gifts.architect && !isModeUsed(inst, 'architect', turn) && !drawBlockedFor(engine, pi)) {
       modeOptions.push({ id: 'architect', label: '✏️  Architect gift: draw to opponent\'s hand size' });
     }
     if (gifts.worker && !isModeUsed(inst, 'worker', turn)) {

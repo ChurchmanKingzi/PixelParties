@@ -33,7 +33,7 @@ const H = require('../../lib/h.js');
     t.setHero(0, 0, 'Arthor, Inheritor of the Barbarian Sword', 600);
     t.gs.players[0][lock] = true;
     const r = await t.play(0, 'Voice in your Head', { hero: 0 });
-    R.check(`Voice in your Head unter ${lock}: nicht spielbar (Frage an Al: zählt die Zusatzaktion als „Nutzen"?)`, r === false, { r, ablage: t.pile(0, 'discardPile') });
+    R.check(`Voice in your Head unter ${lock}: nicht spielbar (Regel von Al: Zug + Zusatzaktion = reiner Zieher)`, r === false, { r, ablage: t.pile(0, 'discardPile') });
   }
   R.finish();
 })();

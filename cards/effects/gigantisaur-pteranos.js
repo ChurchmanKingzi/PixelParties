@@ -32,14 +32,16 @@ module.exports = {
   canSummon: gigantisaursCanSummon,
 
   creatureEffect: true,
+  // D1: nur die KI - unter Hand-/Zieh-Sperre wirft sie nicht fuer nichts ab (Menschen duerfen, Regel von Al; Engine-Pfad unberuehrt).
+  cpuMeta: { shouldActivateNow: (engine, pi) => !(engine.gs.players[pi]?.handLocked || engine.gs.players[pi]?.drawLocked) },
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false; // draw payout pointless
+    // D1 (A07-21, Regel von Al): Abwurf + Zug ist ein Mischeffekt (der Abwurf ist eigenstaendig): unter Hand-/Zieh-Sperre bleibt die
+    // Aktivierung moeglich, man wirft dann nur ab (frueher: handLocked sperrte).
     // Z6 (A07-19): Tuscan Artist - der Zug ist der einzige Nutzen (Ruling 16.8.). Mit nur einem waehlbaren Namen ist der Zug genau 2.
-    // (Die Zieh-Sperre `drawLocked` bleibt wie vorher ungeprueft: Regelfrage A07-21 an Al.)
     const namen = distinctGigantisaurNamesInHand(ps, engine);
     if (namen.length <= 1 && drawWouldBeBlocked(engine, ctx.cardOwner, 2)) return false;
     return namen.length >= 1;

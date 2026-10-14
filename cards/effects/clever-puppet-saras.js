@@ -20,6 +20,7 @@
 const {
   PUPPET_TOKEN_BASE, PUPPET_TOKEN_HOOKS, puppetGlow, SARAS, canUsePuppetActive, lockPuppetActives,
 } = require('./_puppets-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 
 const CARD_NAME = SARAS;
 
@@ -37,6 +38,9 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     if (!canUsePuppetActive(ctx)) return false;
+    // D1 (Regel von Al): "draw 4, then discard 1" - der Zug ist der Nutzen, der Abwurf nur sein Nachteil; unter Hand-/Zieh-Sperre
+    // nicht aktivierbar (sonst wuerden die Puppen-Aktivierungen des Zuges fuer nichts gesperrt).
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, 4)) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     return (ps?.mainDeck || []).length > 0;
   },
