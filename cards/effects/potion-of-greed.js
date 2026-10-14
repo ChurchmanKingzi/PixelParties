@@ -21,6 +21,9 @@ const CARD_NAME = 'Potion of Greed';
 
 module.exports = {
   isPotion: true,
+  // D1 (Regel von Al): Zug + Nachteil (Aktionsphase ueberspringen) - der Zug ist der ganze Nutzen; unter der Zieh-Sperre
+  // (drawLocked) nicht spielbar (unter handLocked prueft `canActivate` unten schon).
+  blockedByDrawLock: true,
 
   // No targeting — Potion of Greed always resolves on activation.
   // Main Phase 1 ONLY (PHASES.MAIN1 === 2): the Action-Phase skip is

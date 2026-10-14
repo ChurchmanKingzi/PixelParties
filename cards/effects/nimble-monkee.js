@@ -25,7 +25,7 @@
 // Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
 // Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
 // Die Auslegung steht in `_draw-block-shared.js`.
-const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');
 
 const { monkeeGoldTrigger, eligibleSummonZones, goldSourceVerbraucht, verbraucheGoldSource,
   investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
@@ -157,7 +157,7 @@ module.exports = {
     // Ohne den 2er-Zug blieben nur der Verlust von 8 Invest Countern uebrig — Als Ruling:
     // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
     // Once-per-turn nicht.
-    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner, 2)) return false;   // D1: auch Hand-/Zieh-Sperre (Regel von Al)
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
     if (investHoptUsed(engine.gs, ctx.card)) return false;

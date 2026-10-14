@@ -51,7 +51,12 @@ function _playerHasAscendedHero(gs, pi, engine) {
 }
 
 const { heldSeite } = require('./_hooks');   // Als Befund 29.9.: Brettseite geliehener Helden
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 module.exports = {
+  // D1 (S03-24, Regel von Al): Zug + Zusatzaktion - der Zug ist der ganze Nutzen (die Zusatzaktion erstattet nur die eigene Aktion):
+  // unter Hand-/Zieh-Sperre nicht spielbar (Praezedenz Haste/Supply Chain; Gate unten in `canPlayWithHero`, bewusst OHNE die
+  // Loader-Flaggen `blockedBy*Lock`, die die KI auf "immer spielen" stellen wuerden). Tuscan Artist bleibt unveraendert (nicht geprueft).
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -79,6 +84,7 @@ module.exports = {
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
+    if (drawBlockedFor(engine, pi)) return false;   // D1 (S03-24): reiner Zug - Hand-/Zieh-Sperre
     if ((ps.hand || []).length >= HAND_TARGET_PLUS_SELF) return false;
     return _heroIsAscended(gs.players[heldSeite(gs, pi, heroIdx)]?.heroes?.[heroIdx], engine._getCardDB());
   },

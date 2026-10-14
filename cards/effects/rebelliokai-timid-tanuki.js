@@ -41,6 +41,7 @@ const {
   countDifferentRebelliokaiInDiscard,
 } = require('./_rebelliokai-shared');
 
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 const CARD_NAME = 'Rebelliokai Timid Tanuki';
 
 module.exports = {
@@ -132,7 +133,7 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur.
     const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
     return countDifferentRebelliokaiInDiscard(ps, engine, 3) > 0;
   },
 

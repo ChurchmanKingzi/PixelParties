@@ -20,7 +20,7 @@ const {
   countGigantisaursInSupport,
 } = require('./_gigantisaurs-shared');
 
-const { drawWouldBeBlocked } = require('./_draw-block-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');
 const CARD_NAME = 'Gigantisaur Raptoren';
 
 /**
@@ -294,10 +294,10 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
-    // Z6 (A07-19): Tuscan Artist (Zug von genau 2/3) - der Zug ist der einzige Nutzen.
+    // D1 (A07-21, Regel von Al): der Zug ist der EINZIGE Nutzen - Hand-/Zieh-Sperre (handLocked/drawLocked) und Tuscan Artist
+    // (Z6, A07-19: Zug von genau 2/3) sperren die Aktivierung; kein Once-Stempel fuer nichts.
     const anzahl = countGigantisaursInSupport(ctx.cardOwner, engine);
-    if (drawWouldBeBlocked(engine, ctx.cardOwner, anzahl)) return false;   // (drawLocked: Regelfrage A07-21)
+    if (drawBlockedFor(engine, ctx.cardOwner, anzahl)) return false;
     // Effect is meaningless when there are no Gigantisaurs to count.
     return anzahl > 0;
   },

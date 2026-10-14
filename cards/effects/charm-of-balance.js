@@ -20,6 +20,7 @@
 
 const { ZONES } = require('./_hooks');
 const { trefferHooks } = require('./_affected-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 
 const CARD_NAME = 'Charm of Balance';
 const HAND_LIMIT = 7;
@@ -101,6 +102,8 @@ module.exports = {
   // No-op when the counter is zero — keeps the equip from being clicked
   // in error before it has accumulated anything.
   canActivateEquipEffect(ctx) {
+    // D1 (Regel von Al): der Zug ist der einzige Nutzen - unter Hand-/Zieh-Sperre nicht aktivierbar.
+    if (drawBlockedFor(ctx._engine, ctx.cardOwner ?? (ctx.card.controller ?? ctx.card.owner), ctx.card.counters?.balance || 0)) return false;
     return (ctx.card.counters?.balance || 0) > 0;
   },
 

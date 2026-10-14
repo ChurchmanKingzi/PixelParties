@@ -56,6 +56,9 @@ function countBurnedTargets(engine) {
 }
 
 module.exports = {
+  // D1 (Regel von Al): der Zug IST die ganze Karte - unter der Zieh-Sperre (drawLocked) nicht spielbar; unter handLocked
+  // markiert der Loader sie schon selbst (blockedByHandLock).
+  blockedByDrawLock: true,
   // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
   onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
 

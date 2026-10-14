@@ -33,6 +33,7 @@
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const W = require('./_waflav-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al
 
 const CARD_NAME = 'Waflav, the Metamorphing Monstrosity';
 const DRAW_COUNT = 3;
@@ -60,7 +61,7 @@ function effectAvailable(engine, id, pi, heroIdx, hs = pi) {
   if (!ps) return false;
   if (id === 'deck') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.mainDeck, hs).length > 0;
   if (id === 'hand') return W.attachableAbilitiesIn(engine, pi, heroIdx, ps.hand, hs).length > 0;
-  return true;   // 'draw'
+  return !drawBlockedFor(engine, pi);   // 'draw' - D1 (Regel von Al): reiner Zug, unter Hand-/Zieh-Sperre keine Wahl (Counter nicht fuer nichts)
 }
 
 function stampEffect(engine, id, pi, heroIdx) {

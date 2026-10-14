@@ -47,6 +47,7 @@
 // ═══════════════════════════════════════════
 
 const multizone = require('./_multizone-shared');
+const { drawBlockedFor } = require('./_draw-block-shared');   // D1: Regel von Al - reine Zieh-Aktivierungen unter Zieh-/Hand-Sperre gesperrt
 
 const CARD_NAME = 'Populated Island Turtle';
 const HAND_TARGET = 10;
@@ -75,7 +76,7 @@ module.exports = {
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
-    if (ps.handLocked) return false;
+    if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
     return (ps.hand?.length || 0) < HAND_TARGET;
   },
 
