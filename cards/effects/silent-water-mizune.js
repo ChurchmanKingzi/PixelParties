@@ -165,7 +165,11 @@ module.exports = {
 
     // Bonus: was the surprise on a hero with the right abilities to activate it?
     const hero = ps.heroes?.[heroIdx];
-    if (hero && cardData) {
+    // ★ W7a (H04-06, Al): „a Hero that could activate it" — ein toter, gefrorener, betäubter oder negierter Träger kann
+    // die Surprise jetzt nicht auslösen (dieselben Zustände wie `_canHeroActivateSurprise`): kein Bonus.
+    const _st = hero?.statuses || {};
+    const _traegerKannAusloesen = !!hero && hero.hp > 0 && !(_st.frozen || _st.stunned || _st.webbed || _st.negated);
+    if (hero && cardData && _traegerKannAusloesen) {
       const level = cardData.level || 0;
       if (level === 0 && !cardData.spellSchool1) {
         // No requirement — always qualifies

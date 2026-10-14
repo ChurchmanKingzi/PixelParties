@@ -78,6 +78,7 @@ function schaden(engine) {
   let summe = GRUNDSCHADEN;
   for (let pi = 0; pi < engine.playerCount(); pi++) {
     for (const inst of ifritsOf(engine, pi)) {
+      if (engine.isCardPassiveDormant?.(inst)) continue;   // ★ W7a (C03-12, Al): gefroren/betäubt/negiert -> kein Aufschlag
       summe += loadCardEffect(inst.name)?.armageddonBonus || 0;
     }
   }
@@ -201,7 +202,8 @@ function kreaturenNachSchlag(engine, p, dmg) {
       if (((inst ? (inst.controller ?? inst.owner) : seite)) !== p) return;
       // Verdeckte Karten trifft Armageddon nicht (siehe onPlay).
       const gefeit = !!inst?.faceDown
-        || (loadCardEffect(name)?.immuneToSourceNames || []).some(x => ARMAGEDDON.includes(x) || x.includes(ARMAGEDDON));
+        || (!(inst && engine.isCardPassiveDormant?.(inst))   // ★ W7a: stillgelegte Ifrit ist nicht mehr gefeit
+          && (loadCardEffect(name)?.immuneToSourceNames || []).some(x => ARMAGEDDON.includes(x) || x.includes(ARMAGEDDON)));
       const hp = (inst ? engine.getEffectiveCardData(inst)?.hp : null) ?? basis.hp ?? Infinity;
       const rest = hp - (inst?.counters?.damageTaken || 0);
       if (gefeit || rest > dmg) n++;

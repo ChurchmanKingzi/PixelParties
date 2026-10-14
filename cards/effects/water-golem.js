@@ -31,6 +31,13 @@
 //  gleicht ab: zu Zug- und Phasenbeginn wird die Negation aufgefrischt
 //  (Helden-Negation verfaellt sonst zum Zugende), beim Abgang faellt
 //  sie. Bauform wie beim Paraseed-Gift.
+//
+//  ★ W7a (C05-11, Al 14.10.2026: „Freeze, Stun und Negated unterbrechen alle laufenden
+//  passiven Effekte"): „While this Creature remains on the board, that target's effects are
+//  negated" ist ein laufender Passiv. Ist der Golem gefroren, betäubt oder negiert (oder unter
+//  der Clown-Aura), ruht die Negierung seines Ziels (`negationRuhen`) und kommt zurück, sobald
+//  er wieder wirksam ist. Das Ziel bleibt gemerkt (`_golemTarget`). Damit die Karte jeden
+//  Zustandswechsel mitbekommt, trägt sie `bypassStatusFilter` und fragt die Stilllegung selbst.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -49,8 +56,31 @@ function zielVon(engine, inst) {
   return t ? { type: 'creature', inst: t } : null;
 }
 
+/** W7a: ruht der Golem gerade (gefroren/betäubt/negiert/genullt/Aura)? Wie der Hook-Verteiler (Lunatic-Immunität zählt nicht). */
+function golemRuht(engine, golem) {
+  return engine.isCreatureEffectSuppressed(golem, { honorNegStatusImmune: false });
+}
+
+/** W7a: Negierung des Ziels ruhen lassen (Golem stillgelegt) — nur DIE EIGENE Negierung, `_golemTarget` bleibt stehen. */
+async function negationRuhen(engine, golem) {
+  const ziel = zielVon(engine, golem);
+  if (!ziel) return;
+  if (ziel.type === 'hero') {
+    const ng = ziel.hero.statuses?.negated;
+    if (ng && ng.sourceBound && ng.source === CARD_NAME) {
+      await engine.removeHeroStatus(ziel.owner, ziel.heroIdx, 'negated', { bypassUnhealable: true });
+    }
+  } else if (ziel.inst.counters?.negated && ziel.inst.counters.negatedSourceBound === CARD_NAME) {
+    delete ziel.inst.counters.negated;
+    delete ziel.inst.counters.negatedSourceBound;
+    engine.log('status_remove', { target: ziel.inst.name, status: 'negated', by: CARD_NAME });
+  }
+  engine.sync();
+}
+
 /** Negation auflegen bzw. auffrischen. */
 async function negationAuffrischen(engine, golem) {
+  if (golemRuht(engine, golem)) { await negationRuhen(engine, golem); return; }   // W7a
   const ziel = zielVon(engine, golem);
   if (!ziel) return;
   if (ziel.type === 'hero') {
@@ -114,6 +144,8 @@ module.exports = {
 
   isSurprise: true,
   activeIn: ['surprise', 'support'],
+  // W7a: die Zustands-Hooks (Statuswechsel des Golems, Abgang, Zugbeginn) müssen auch im stillgelegten Zustand laufen.
+  bypassStatusFilter: true,
 
   cpuMeta: {
     // Der Wert liegt in der Negation, nicht im Koerper.
@@ -219,6 +251,10 @@ module.exports = {
     // ── Zustand halten: Helden-Negation verfaellt sonst zum Zugende ─
     onTurnStart: async (ctx) => { await alleGolemsAbgleichen(ctx._engine); },
     onPhaseStart: async (ctx) => { await alleGolemsAbgleichen(ctx._engine); },
+    // W7a: Frost/Betäubung/Negation des Golems kommen und gehen -> Negierung des Ziels ruhen lassen bzw. zurückholen
+    onStatusApplied: async (ctx) => { if (ctx.card?.zone === 'support') await alleGolemsAbgleichen(ctx._engine); },
+    onStatusRemoved: async (ctx) => { if (ctx.card?.zone === 'support') await alleGolemsAbgleichen(ctx._engine); },
+    onCardEnterZone: async (ctx) => { if (ctx.card?.zone === 'support') await alleGolemsAbgleichen(ctx._engine); },
 
     // ── Abgang: die Negation faellt mit dem Golem ─────────────────
     onCardLeaveZone: async (ctx) => {

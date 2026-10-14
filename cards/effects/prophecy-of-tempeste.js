@@ -207,7 +207,9 @@ module.exports = {
       // Host must still be alive + functional.
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
+      // ★ W7a (R02-23, Al): „Damage this Hero would take cannot exceed 100" ist ein Dauerdeckel des ANHANGS — Anhänge sind
+      // eigene Karten und ruhen nicht, nur weil der Träger gefroren/betäubt/negiert ist. Der Deckel gilt deshalb immer;
+      // die Umleitung („you may redirect") bleibt wie bisher an einen handlungsfähigen Wirt gebunden (Skriptentscheidung).
 
       // ★ v1280 (Als Befund 22.9.: „Prophecy of Tempeste cappt eingehenden
       // Schaden gegen den Hero noch nicht bei 100 — sollte ALLER Schaden an
@@ -226,6 +228,7 @@ module.exports = {
         });
         ctx.setAmount(DAMAGE_CAP);
       }
+      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;   // W7a: nur die Umleitung ruht
 
       // Target must be a hero on the SAME side, NOT the host itself.
       const target = ctx.target;

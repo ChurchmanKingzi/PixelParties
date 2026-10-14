@@ -8884,7 +8884,9 @@ class GameEngine {
       const script = (hi >= 0) ? this.heroScript(target) : null;
       const liste = script?.immuneToSourceNames;
       const qName = (typeof source === 'string') ? source : source?.name;
+      // ★ W7a (H01-heroes-10, Al): ein gefrorener/betäubter/negierter Held ist nicht mehr „unaffected" (Damus).
       if (Array.isArray(liste) && typeof qName === 'string'
+          && !(owner >= 0 && this._isHeroEffectSilenced(owner, hi))
           && liste.some(n => qName.includes(n))) {
         const bed = script.immuneToSourceCondition;
         let gilt = true;
@@ -9706,6 +9708,11 @@ class GameEngine {
       _ersterDurchlauf = true;
       // Wer hat den Tod verursacht? Vor dem Aufraeumen berechnen — es leert `statuses`.
       _toeterBesitzer = this._todesVerursacher(target, source);
+      // ★ W7a (H03-heroes-19, Al): ruht die Heldenkarte beim Tod (Frost/Betäubung/Negation), gilt ihr eigenes Extra-Leben nicht.
+      if (target._extraLife?.passiv) {
+        const _hi0 = (this.gs.players[ownerIdx]?.heroes || []).indexOf(target);
+        target._extraLifeRuht = _hi0 >= 0 && this._isHeroEffectSilenced(ownerIdx, _hi0);
+      } else delete target._extraLifeRuht;
       target._koProcessed = true;
       // Ausruestungen abwerfen, Inselzonen raeumen — der „when dying"-Teil.
       await this.handleHeroDeathCleanup(target);
@@ -9856,6 +9863,11 @@ class GameEngine {
 
   _consumeExtraLife(target, knownOwnerIdx) {
     if (!target || target.hp > 0 || !target._extraLife) return false;
+    // ★ W7a (H03-heroes-19, Al): ein Extra-Leben, das die Heldenkarte SELBST als laufenden Passiv trägt (`passiv: true`,
+    // Rescued Damsel Cecilia), ruht bei Frost/Betäubung/Negation des Helden — es bleibt liegen, wird nicht verbraucht.
+    // Von anderen Karten VERGEBENE Extra-Leben (Trial of Coolness, Divine Gift of Sacrifice) sind keine Passive und gelten immer.
+    // Der Zustand wird beim Tod VOR dem Aufräumen gelesen (`_runHeroDefeatSequence`: `handleHeroDeathCleanup` leert `statuses`).
+    if (target._extraLife.passiv && target._extraLifeRuht) return false;
     const lifeMark = this._popExtraLife(target);
     // ★ v1467: „revive it and fully heal its HP" (Trial of Coolness) —
     // bei einem nicht heilbaren Helden (Mirjam) oder 0 max HP (v1466)
@@ -10869,7 +10881,10 @@ class GameEngine {
     for (const inst of (this.cardInstances || [])) {
       if (inst.zone !== ZONES.SUPPORT) continue;
       if (inst.faceDown) continue;
-      if (loadCardEffect(inst.name)?.blocksAbilityActivation) return true;
+      if (loadCardEffect(inst.name)?.blocksAbilityActivation) {
+        if (this.isCardPassiveDormant(inst)) continue;   // ★ W7a (B-01): gefroren/betäubt/negiert -> keine Sperre
+        return true;
+      }
     }
     return false;
   }
@@ -12844,15 +12859,18 @@ class GameEngine {
 
   /**
    * ★ „Creatures that are defeated are deleted" (Ghazma, the Worm Feeder): gilt, solange ein
-   * LEBENDER, nicht negierter Held beider Seiten das Skript-Flag `defeatedCreaturesAreDeleted`
+   * LEBENDER, nicht gefrorener/betäubter/negierter Held beider Seiten das Skript-Flag `defeatedCreaturesAreDeleted`
    * traegt. Besiegte Kreaturen (Schaden UND Zerstoerung) gehen dann in den Geloescht-Stapel
    * ihres Besitzers statt in die Ablage.
    */
   _gefalleneKreaturenGeloescht() {
     if (this._wurzelAktiv()) return true;   // The Root of all Evil: Creatures, die in eine Ablage kaemen, werden geloescht
-    for (const ps of this.gs.players || []) {
-      for (const h of ps?.heroes || []) {
-        if (!h?.name || !(h.hp > 0) || h.statuses?.negated) continue;
+    for (let p = 0; p < (this.gs.players || []).length; p++) {
+      const heroes = this.gs.players[p]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const h = heroes[hi];
+        // ★ W7a (B-09, Al): auch ein gefrorener/betäubter Ghazma ruht (`_isHeroEffectSilenced`, wie jede Negation).
+        if (!h?.name || !(h.hp > 0) || this._isHeroEffectSilenced(p, hi)) continue;
         if (this.heroScript(h)?.defeatedCreaturesAreDeleted) return true;
       }
     }
@@ -19209,6 +19227,41 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
     if (this._creatureNegationProof(inst)) return false;
     return true;
+  }
+
+  /**
+   * ★ W7a (Entscheidung Al, Welle 7, 14.10.2026): „Freeze, Stun und Negated unterbrechen *alle* laufenden passiven Effekte!"
+   *
+   * EIN Prüfer für die Frage „ruht alles, was diese Karte als LAUFENDE Wirkung tut?" (fortlaufende Boni, Sperren,
+   * Stufensenkungen, Schutzwirkungen, Zähler-/Deckel-Regeln, Ersatzeffekte). Jede Passiv-Auswertung, die NICHT über den
+   * Hook-Verteiler (`runHooks` filtert dieselben Zustände) läuft, fragt hier statt eine eigene Statusliste zu führen:
+   *   • Kreatur (Support Zone): `isCreatureEffectSuppressed` (Frost [Chilly Dog beachtet], Betäubung, Negation, Null,
+   *     Magic Silence, Clown-Aura); wie im Verteiler zählt Lunatics Immunität hier NICHT (`honorNegStatusImmune: false`).
+   *   • Held und angelegte Heldenkarte: `_isHeroEffectSilenced` (Frost, Betäubung, Webbed, JEDE Negation, Mumie).
+   *   • Ability-Karte: `_isHeroAbilityPassiveSilenced` — die leichte Negation („nur Effekt") lässt Ability-Passive laufen
+   *     (Zwei-Zustände-Modell, Welle 3/4).
+   * Nicht erfasst (laufen weiter): Anhänge/Ausrüstung am Träger — sie sind eigene Karten und ruhen nicht, nur weil der Träger
+   * gefroren ist, sofern ihr eigener Text sich nicht an den Zustand bindet. Wirkungen, die die Karte schon AN ANDERE vergeben
+   * hat (gewährte Status, bezahlte Kosten), sind keine laufenden Passive und bleiben. Tot/Lebend prüft der Aufrufer selbst.
+   * `bypassStatusFilter` am Skript gewinnt wie im Verteiler. Zugende-/Zugbeginn-Trigger NACH Abklingen des Zustands sind
+   * davon unberührt (Welle 3: gewollt).
+   */
+  isCardPassiveDormant(inst) {
+    if (!inst) return false;
+    if (loadCardEffect(inst.counters?._effectOverride || inst.name)?.bypassStatusFilter) return false;
+    const seite = inst.controller ?? inst.owner;
+    if (inst.zone === ZONES.HERO) return this._isHeroEffectSilenced(seite, inst.heroIdx);
+    if (inst.zone === ZONES.ABILITY) return this._isHeroAbilityPassiveSilenced(seite, inst.heroIdx);
+    if (inst.zone !== ZONES.SUPPORT) return false;
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) {
+      return this.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false });
+    }
+    // Heldenkarte als Ausrüstung (Tempelunas Feen …): ihr Heldeneffekt ruht mit dem Wirt.
+    if ((inst.counters?.treatAsEquip || inst.counters?._gainedEffectOnly) && cd?.cardType === 'Hero') {
+      return this._isHeroEffectSilenced(seite, inst.heroIdx);
+    }
+    return false;
   }
 
   /**
@@ -29212,7 +29265,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        if (hero.statuses?.negated) continue;
+        // ★ W7a (M02-12, Al): Terror ist ein Ability-Passiv — es ruht bei Frost/Betäubung und bei „Abilities negiert"
+        // (harte Form); die leichte Negation („nur Effekt") lässt Ability-Passive laufen.
+        if (this._isHeroAbilityPassiveSilenced(pi, hi)) continue;
         const abZones = ps.abilityZones[hi] || [];
         const copyByName = new Map();
         for (const zone of abZones) {
@@ -44433,7 +44488,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if ((inst.controller ?? inst.owner) !== playerIdx) continue;
       if (inst.counters?.negated) continue;
       const sc = this.supportCardScript(playerIdx, heroIdx, inst.name);
-      if (sc?.blocksHostHeroActions) return false;
+      if (sc?.blocksHostHeroActions) {
+        if (this.isCardPassiveDormant(inst)) continue;   // ★ W7a (B-02): auch gefroren/betäubt gibt der Golem den Helden frei
+        return false;
+      }
     }
     const script = this.heroScript(hero);
     if (typeof script?.canPerformAction !== 'function') return true;
@@ -44640,8 +44698,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     let rawLevel = cardData.level || 0;
     // Per-card level override (e.g. Sol Rym treats Chain Lightning as level 0)
-    if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
-      rawLevel = hero.levelOverrideCards[cardData.name];
+    if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
+      rawLevel = this._heroLevelOverride(playerIdx, heroIdx, cardData.name);
     }
     // ★ ABSOLUTE STUFEN-SETZUNG JE HANDKOPIE (v988, Inconspicuous Lawn
     // Gnome). Anders als die Offsets darunter SETZT sie die Stufe statt
@@ -44881,6 +44939,22 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W7a (A07-20, Al): Stufen-Stempel eines HELDEN-Eintrags (`hero.levelOverrideCards[name]`) — der EINE Lesezugriff der drei
+   * Stufenrechnungen (`heroMeetsLevelReq`, `effectiveCardLevel`, `getWisdomDiscardCost`). Ein Stempel von „Gigantisaur King Trex"
+   * ist ein laufender Passiv und gilt nur, solange ein Trex der Seite wirksam ist (`stempelWirkt`: nicht gefroren/betäubt/negiert);
+   * sonst zählt der frühere Wert (`prevValue`) bzw. keiner. Alle anderen Einträge (Sol Rym, Fiedel, Archibald …) unverändert.
+   * @returns {number|null} die gesetzte Stufe oder `null` (kein Eintrag)
+   */
+  _heroLevelOverride(playerIdx, heroIdx, cardName) {
+    const ps = this.gs.players[playerIdx];
+    const v = ps?.heroes?.[heroIdx]?.levelOverrideCards?.[cardName];
+    if (v == null) return null;
+    const e = v === 0 ? ps._kingTrexOverrideRegistry?.[heroIdx]?.find(x => x.name === cardName) : null;
+    if (e && !loadCardEffect('Gigantisaur King Trex')?.stempelWirkt?.(this, playerIdx)) return e.prevValue ?? null;
+    return v;
+  }
+
+  /**
    * Walk every tracked card instance owned by `playerIdx` and apply any
    * `reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) → number`
    * hook the card's script exports. Reductions are summed and subtracted
@@ -44957,6 +45031,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!inst.isActiveIn()) continue;
       const script = loadCardEffect(inst.name);
       if (typeof script?.reduceCardLevel !== 'function') continue;
+      // ★ W7a (Al): eine gefrorene/betäubte/negierte Kreatur bzw. ein so stillgelegter Held/eine Ability senkt nichts
+      // (B-03 Elven Forager & Co., H02-heroes-23 Junshi) — EIN Prüfer, `isCardPassiveDormant`.
+      if (this.isCardPassiveDormant(inst)) continue;
       // Controller filter: by default only the spell-resolving player's
       // own instances contribute reductions (Cataclysm's self-rebate,
       // Elven Forager, etc.). A script can opt-in to GLOBAL reductions
@@ -45073,8 +45150,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps?.heroes?.[heroIdx];
       if (hero?.levelOverrideCards
           && cardData.name
-          && hero.levelOverrideCards[cardData.name] != null) {
-        raw = hero.levelOverrideCards[cardData.name];
+          && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
+        raw = this._heroLevelOverride(playerIdx, heroIdx, cardData.name);
       }
     }
 
@@ -45553,8 +45630,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.name || hero.hp <= 0) return 0;
 
     let rawLevel = cardData.level || 0;
-    if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
-      rawLevel = hero.levelOverrideCards[cardData.name];
+    if (hero.levelOverrideCards && cardData.name && this._heroLevelOverride(playerIdx, heroIdx, cardData.name) != null) {
+      rawLevel = this._heroLevelOverride(playerIdx, heroIdx, cardData.name);
     }
     // Mirror of heroMeetsLevelReq's per-index hand offset (Rocky Slime
     // + Sparkfly Queen's transient rebate). Reduced spells need less
@@ -47201,7 +47278,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       {
         const liste = loadCardEffect(inst?.name)?.immuneToSourceNames;
         const qName = (typeof e.source === 'string') ? e.source : e.source?.name;
+        // ★ W7a (C03-12, Al): eine gefrorene/betäubte/negierte Kreatur ist nicht mehr „unaffected" (laufender Schutz ruht).
         if (Array.isArray(liste) && typeof qName === 'string'
+            && !this.isCardPassiveDormant(inst)
             && liste.some(n => qName.includes(n))) {
           e._immuneCreature = true;
           this.log('damage_blocked', { target: inst.name, reason: 'source_immune', source: qName });

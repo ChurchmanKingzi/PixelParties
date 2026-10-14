@@ -53,7 +53,7 @@ function sicherstellenExtraLeben(hero) {
   if (!hero || hero.name !== CARD_NAME) return;
   if (hero._damselLifeGranted) return;      // schon vergeben (oder verbraucht)
   hero._damselLifeGranted = true;
-  hero._extraLife = { by: CARD_NAME };
+  hero._extraLife = { by: CARD_NAME, passiv: true };   // W7a: laufender Passiv der Karte -> ruht bei Frost/Betäubung/Negation (Engine `_consumeExtraLife`)
 }
 
 module.exports = {

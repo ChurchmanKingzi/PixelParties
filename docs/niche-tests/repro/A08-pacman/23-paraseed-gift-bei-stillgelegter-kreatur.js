@@ -27,6 +27,8 @@ const { syncAllParaseedPoison } = require('../../../../cards/effects/_paraseed-s
     R.note(mode, JSON.stringify({ hp: h.hp, maxHp: h.maxHp, vergiftet }));
     if (mode === 'normal') R.check('normal: Gift 30 und Max-HP-Fraß 30', gift === 30 && fraß === 30, { gift, fraß });
     else R.check(`${mode}: Gift und Max-HP-Fraß gehören zusammen (beide aus oder beide an)`, (gift > 0) === (fraß > 0), { gift, fraß });
+    // Welle 7 (Al 14.10.2026, „Freeze, Stun und Negated unterbrechen alle laufenden passiven Effekte"): stillgelegte Paraseed = KEIN Gift, kein Fraß.
+    if (mode !== 'normal') R.check(`${mode}: stillgelegte Paraseed vergiftet nicht (Regel Welle 7)`, !vergiftet && gift === 0 && fraß === 0, { vergiftet, gift, fraß });
     R.check(`${mode}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
   }
   R.finish();

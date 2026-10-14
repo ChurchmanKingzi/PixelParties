@@ -28,7 +28,7 @@
 // ═══════════════════════════════════════════
 
 const {
-  isParaseedCreature, paraseedsOnHero, syncParaseedPoison, syncAllParaseedPoison,
+  isParaseedCreature, paraseedsOnHero, paraseedWirkt, syncParaseedPoison, syncAllParaseedPoison,
   killerHeroOf, freeSlotOnHero,
 } = require('./_paraseed-shared');
 
@@ -36,6 +36,9 @@ const CARD_NAME = 'Paraseed';
 
 module.exports = {
   activeIn: ['support'],
+  // ★ W7a (A08-23, Al): alle laufenden Wirkungen (Gift, Max-HP-Fraß, Einnisten) ruhen bei Frost/Betäubung/Negation. Damit
+  // die Karte den Zustandswechsel mitbekommt (Gift abräumen/zurückholen), laufen ihre Hooks immer und fragen selbst.
+  bypassStatusFilter: true,
 
   cpuMeta: {
     // Die Paraseed IST der Schaden — sie stirbt gern, weil sie beim
@@ -50,10 +53,19 @@ module.exports = {
     onCardEnterZone: async (ctx) => {
       const engine = ctx._engine;
       const eintritt = ctx.enteringCard;
-      if (!eintritt || eintritt.id !== ctx.card.id) return;
+      if (!eintritt) return;
+      if (eintritt.id !== ctx.card.id) {
+        // W7a: eine fremde Karte kann die Paraseed stilllegen (Clown-Aura) — Gift abgleichen
+        if (ctx.toZone === 'support' && ctx.card.zone === 'support') await syncAllParaseedPoison(engine);
+        return;
+      }
       if (ctx.toZone !== 'support') return;
       await syncParaseedPoison(engine, eintritt.owner, eintritt.heroIdx);
     },
+
+    // W7a: Frost/Betäubung/Negation kommen und gehen — das Gift folgt dem Zustand
+    onStatusApplied: async (ctx) => { if (ctx.card.zone === 'support') await syncAllParaseedPoison(ctx._engine); },
+    onStatusRemoved: async (ctx) => { if (ctx.card.zone === 'support') await syncAllParaseedPoison(ctx._engine); },
 
     // ── Abzug: das Gift faellt mit der letzten Paraseed ──────────
     onCardLeaveZone: async (ctx) => {
@@ -71,6 +83,7 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.type !== 'poison') return;
       const engine = ctx._engine;
+      if (!paraseedWirkt(engine, ctx.card)) return;          // W7a: stillgelegt -> kein Fraß
       const ziel = ctx.target;
       if (!ziel || ziel.hp === undefined) return;          // nur Helden
       const wirt = engine.gs.players[ctx.card.owner]?.heroes?.[ctx.card.heroIdx];
@@ -81,7 +94,7 @@ module.exports = {
       // (Bauform aus hunting.js). Sonst zog jede Kopie denselben
       // Betrag noch einmal von der Obergrenze ab.
       const geschwister = paraseedsOnHero(engine, ctx.card.owner, ctx.card.heroIdx)
-        .map(i => i.id).sort();
+        .filter(i => paraseedWirkt(engine, i)).map(i => i.id).sort();
       if (geschwister.length > 0 && geschwister[0] !== ctx.card.id) return;
 
       const abzug = ctx.realDealt ?? ctx.amount ?? 0;
@@ -101,13 +114,14 @@ module.exports = {
     // Max HP um den Betrag zu senken, steigen sie um ihn.
     onPoisonHealedInstead: async (ctx) => {
       const engine = ctx._engine;
+      if (!paraseedWirkt(engine, ctx.card)) return;          // W7a: stillgelegt
       const ziel = ctx.target;
       if (!ziel || ziel.hp === undefined) return;          // nur Helden
       const wirt = engine.gs.players[ctx.card.owner]?.heroes?.[ctx.card.heroIdx];
       if (!wirt || wirt !== ziel) return;                  // nur der eigene Wirt
       // EINMAL je Tick (kleinste Instanz-ID rechnet ab), wie in afterDamage.
       const geschwister = paraseedsOnHero(engine, ctx.card.owner, ctx.card.heroIdx)
-        .map(i => i.id).sort();
+        .filter(i => paraseedWirkt(engine, i)).map(i => i.id).sort();
       if (geschwister.length > 0 && geschwister[0] !== ctx.card.id) return;
       const betrag = ctx.amount ?? 0;
       if (!(betrag > 0)) return;
@@ -136,6 +150,7 @@ module.exports = {
       const tot = ctx.creature;
       if (!tot || tot.instId !== ctx.card.id) return;      // nur ich selbst
       if (!isParaseedCreature(tot.name, engine)) return;
+      if (!paraseedWirkt(engine, ctx.card)) return;        // W7a: Ersatzeffekt „einnisten" ruht -> Ablage
 
       const toeter = killerHeroOf(engine, ctx.source);
       if (!toeter) return;                                  // Artifact/Potion/Status

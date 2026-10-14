@@ -63,6 +63,11 @@ function paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId) {
   return out;
 }
 
+/** W7a: wirkt diese Paraseed gerade (nicht gefroren/betäubt/negiert/genullt/Aura)? Wie der Hook-Verteiler. */
+function paraseedWirkt(engine, inst) {
+  return !engine.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false });
+}
+
 /** Zaehlung fuer die beiden Bloom-Auren. */
 function countParaseedsOnHero(engine, physOwner, heroIdx) {
   return paraseedsOnHero(engine, physOwner, heroIdx).length;
@@ -89,7 +94,10 @@ async function syncParaseedPoison(engine, physOwner, heroIdx, ignoreInstId) {
   // `ignoreInstId`: der Verlass-Hook feuert, BEVOR die Karte aus der
   // Zone ausgebucht ist — die abgehende Instanz wird deshalb beim
   // Zaehlen uebergangen.
-  const liegende = paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId);
+  // ★ W7a (A08-23, Al 14.10.2026: „Freeze, Stun und Negated unterbrechen alle laufenden passiven Effekte"): „While this
+  // Creature is in a Hero's Support Zone, that Hero is Poisoned" ist ein laufender Passiv — eine gefrorene, betäubte oder
+  // negierte Paraseed (oder eine unter der Clown-Aura) vergiftet nicht; das Gift fällt, bis sie wieder wirksam ist.
+  const liegende = paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId).filter(i => paraseedWirkt(engine, i));
   const traegt = liegende.length > 0;
   const gift = hero.statuses?.poisoned;
 
@@ -185,7 +193,7 @@ function freeSlotOnHero(engine, physOwner, heroIdx) {
 
 module.exports = {
   PARASEED_TOKEN, BLOOM, BLOOM_ASCENDED,
-  isParaseedCreature, paraseedsOnHero, countParaseedsOnHero, heroHasParaseed,
+  isParaseedCreature, paraseedsOnHero, countParaseedsOnHero, heroHasParaseed, paraseedWirkt,
   syncParaseedPoison, syncAllParaseedPoison,
   killerHeroOf, freeSlotOnHero,
 };

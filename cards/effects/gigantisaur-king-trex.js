@@ -40,11 +40,17 @@
 //    tear down the entries WE wrote (no clobbering
 //    Sol Rym / Fiedel-style overrides).
 //
-//  Negation note: if a King Trex is negated while
-//  in play, its hooks stop firing — the override
-//  CAN go stale until the negated copy leaves play
-//  (death / bounce will fire onCardLeaveZone and
-//  trigger cleanup). Accepted edge case.
+//  ★ W7a (A07-20, Al 14.10.2026: „Freeze, Stun und
+//  Negated unterbrechen alle laufenden passiven
+//  Effekte"): der Stempel ist ein laufender Passiv.
+//  Er bleibt als Eintrag stehen, GILT aber nur,
+//  solange mindestens ein Trex der Seite wirksam ist
+//  (nicht gefroren/betäubt/negiert/Aura-negiert):
+//  die Engine liest die Stufen-Stempel über
+//  `_heroLevelOverride` und fragt dafür `stempelWirkt`
+//  (unten). Eine Abfrage statt Auf-/Abräumen bei jedem
+//  Zustandswechsel — gilt damit sofort und für
+//  jeden Weg (auch Clown-Aura, die kein Status ist).
 // ═══════════════════════════════════════════
 
 const {
@@ -72,14 +78,17 @@ function _trexSacrificeCandidates(engine, pi, selfId) {
  * controls. Used to know whether the "I just left, clean up" cleanup
  * should fire (only the LAST King Trex leaving triggers a sweep).
  */
-function _activeKingTrexCount(engine, pi, excludeInstId = null) {
+function _activeKingTrexCount(engine, pi, excludeInstId = null, nurWirksame = false) {
   let n = 0;
   for (const c of engine.cardInstances) {
     if (c.zone !== 'support') continue;
     if ((c.controller ?? c.owner) !== pi) continue;
     if (c.name !== CARD_NAME) continue;
     if (excludeInstId && c.id === excludeInstId) continue;
-    if (c.counters?.negated || c.counters?.nulled) continue;
+    // W7a: `nurWirksame` — wirksam = nicht gefroren/betäubt/negiert/genullt/Aura-negiert (`isCreatureEffectSuppressed`, wie der
+    // Hook-Verteiler). Ohne das Flag (Aufräumen beim Abgang) zählt wie bisher jede nicht negierte/genullte Kopie.
+    if (nurWirksame && engine.isCreatureEffectSuppressed(c, { honorNegStatusImmune: false })) continue;
+    if (!nurWirksame && (c.counters?.negated || c.counters?.nulled)) continue;
     n++;
   }
   return n;
@@ -174,6 +183,10 @@ module.exports = {
   },
 
   activeIn: ['support'],
+  /**
+   * W7a: gelten die Stufen-Stempel dieser Seite gerade? (Engine `_heroLevelOverride`) — ja, solange ein Trex wirksam ist.
+   */
+  stempelWirkt: (engine, pi) => _activeKingTrexCount(engine, pi, null, true) > 0,
   // Free additional Action — the play itself doesn't consume the
   // host Hero's action slot. Same pattern as 500 Piranhas.
   inherentAction: true,
@@ -357,7 +370,6 @@ module.exports = {
       const engine = ctx._engine;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated || inst.counters?.nulled) return;
       _applyOverrides(engine, ctx.cardOwner);
     },
 

@@ -33,6 +33,8 @@ const { hasCardType } = require('./_hooks');
 const ABILITY = 'Stealth';
 
 function stealthLevel(engine, pi, heroIdx) {
+  // W7a (M02-05, Al): Stealth ist ein Ability-Passiv und ruht bei Frost/Betäubung/„Abilities negiert" (leichte Negation nicht).
+  if (engine._isHeroAbilityPassiveSilenced(pi, heroIdx)) return 0;
   return engine.heroSchoolLevel(ABILITY, pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
