@@ -20,7 +20,7 @@ Al hat die Folgefragen aus [FIXES-WELLE-7.md](FIXES-WELLE-7.md) beantwortet; ein
 ## Ergebnis in Zahlen (zusammengeführter Stand)
 
 * Repros: **408 grün** von 755 (Welle 7: 403 von 750); **0 Rückschritte**, keine Abstürze/Timeouts; 5 neue Repros (`W8/01–05`).
-* Alle 44 `scripts/check-*.js` wie im Ausgangszustand (nur `check-scope.js` rot). Skilltest-E2E: rot nur battle, lobby, prep, seats, target; `cards.test.js` unter Last einmal rot, in drei Wiederholungen grün; `artifacts.test.js` Zufalls-Flake (zufällige Helden/Hände, auch auf der Basis). Dauerfeuer über alle Karten: keine neu auffälligen Läufe; zusätzlich 168 Läufe (28 Karten × beide Seiten × normal/gefroren/negiert) ohne Unterschied.
+* Alle 44 `scripts/check-*.js` wie im Ausgangszustand (nur `check-scope.js` rot). Skilltest-E2E: rot nur battle, lobby, prep, seats, target; `cards.test.js` ist ein bekannter Zufalls-Flake (im Lauf rot, in drei Wiederholungen einmal rot und zweimal grün, auch auf der Basis zeitweise rot); `artifacts.test.js` Zufalls-Flake (zufällige Helden/Hände, auch auf der Basis). Dauerfeuer über alle Karten: keine neu auffälligen Läufe; zusätzlich 168 Läufe (28 Karten × beide Seiten × normal/gefroren/negiert) ohne Unterschied.
 
 ## Offene Fragen an Al (ja/nein)
 
