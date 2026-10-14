@@ -74,11 +74,13 @@ module.exports = {
     // Restore override exactly as it was
     if (!hadOverride) delete castingHero.levelOverrideCards[spellName];
     else castingHero.levelOverrideCards[spellName] = prevOverride;
+    // W5b-B9 (Al, Welle 5): der erhöhte Level kostet bei Wisdom-Helden den Zusatz-Abwurf TATSÄCHLICH. Die ursprünglichen
+    // Wisdom-Kosten zahlt `doPlaySpell` erst nach der Auflösung (Kosten vorab berechnet, `oldCost`); hier kommt nur die Differenz dazu.
+    const oldCost = Math.max(0, engine.getWisdomDiscardCost(oppIdx, castingHi, spellCd));
 
     // newCost: -1 means uncoverable (no Wisdom path exists), otherwise the
     // required extra discards. Spell survives iff the caster CAN cover it
-    // AND has enough hand cards to pay. The original cast already paid
-    // its own Wisdom cost before this reaction — we don't charge more.
+    // AND has enough hand cards to pay (Gesamtkosten; B9: die Differenz zum Ursprungsgebot wird unten wirklich abgeworfen).
     const coverable = newCost >= 0;
     // ★ Z4 (R02-15): der gerade gewirkte Zauber liegt noch in `oppPs.hand`, ist aber keine bezahlbare Handkarte.
     const affordable = coverable && engine._handIndizesOhneAufloesende(oppPs).length >= newCost;
@@ -90,10 +92,17 @@ module.exports = {
     await engine._delay(500);
 
     if (affordable) {
-      // Still legal — the +1 is flavor only; spell resolves normally.
+      // Still legal – aber der Zusatz-Level kostet bei Wisdom-Helden die Differenz an Handkarten (Abwurf wie die Wisdom-Kosten;
+      // die auflösende Karte ist ausgenommen). Gesamtkosten (alt + Zusatz) sind oben als bezahlbar geprüft.
+      const extra = Math.max(0, newCost - oldCost);
+      if (extra > 0) {
+        await engine.actionPromptForceDiscard(oppIdx, extra, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
       engine.log('shamanic_curse_survived', {
         player: gs.players[pi]?.username,
-        spell: spellName, newCost,
+        spell: spellName, newCost, extraDiscarded: extra,
       });
       engine.sync();
       return;
