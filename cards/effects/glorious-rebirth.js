@@ -21,6 +21,8 @@ module.exports = {
       ? engine.effectiveCardLevel(cd, pi)
       : (cd.level || 0);
     if (lvl > MAX_LEVEL) return false;
+    // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch beim Platzieren – nicht spielbar, wenn die Kreatur nicht platziert werden darf.
+    if (engine?.nurEinerSchonKontrolliert?.(pi, topName)) return false;
     return true;
   },
 
@@ -33,7 +35,8 @@ module.exports = {
       const topName = engine.getCoolnessStackTop(pi);
       const cardDB = engine._getCardDB();
       const cd = topName ? cardDB[topName] : null;
-      if (!cd || cd.cardType !== 'Creature' || engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) {
+      if (!cd || cd.cardType !== 'Creature' || engine.effectiveCardLevel(cd, pi) > MAX_LEVEL
+          || engine.nurEinerSchonKontrolliert(pi, topName)) {   // W5b-B3: „You can only control 1" auch beim Platzieren
         engine.gs._spellCancelled = true;
         return;
       }

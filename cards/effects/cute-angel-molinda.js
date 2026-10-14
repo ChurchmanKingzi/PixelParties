@@ -240,6 +240,8 @@ module.exports = {
         if (!inst || (inst.counters?.currentHp ?? 1) <= 0) continue;
         const tgtCtrl = inst.controller ?? inst.owner;
         if (tgtCtrl === ctx.cardOwner) continue;
+        // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch bei der Übernahme – nicht anbieten.
+        if (engine.nurEinerSchonKontrolliert?.(ctx.cardOwner, inst.name)) continue;
         // Per-side non-damage shield (The Great Wall of Deri). Molinda's
         // steal is a non-damage effect — opp's protected Creatures are
         // unreachable even though the preceding damage hit them legally

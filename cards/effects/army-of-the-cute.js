@@ -43,6 +43,8 @@ const CARD_NAME = 'Army of the Cute';
 function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
   // Platziert wird direkt (Splice/_trackCard) — die zentralen Riegel greifen nicht, also hier filtern.
   if (!cd || !isSummonablePileCreature(cd, cd.name)) return false;
+  // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch beim Platzieren – schon kontrolliert = nicht wählbar.
+  if (engine?.nurEinerSchonKontrolliert?.(pi, cd.name)) return false;
   if (cd.archetype === 'Cute') return true;
   return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, hs, heroIdx);
 }
@@ -223,6 +225,9 @@ module.exports = {
         const slots = freeSlots(hps, heroIdx);
         if (slots.length === 0) break; // ran out of zones (defensive)
         const slot = slots[0];
+        // W5b-B3: zwei Kopien derselben „only control 1"-Kreatur in einer Wahl – die zweite wird nicht platziert
+        // (bleibt in Hand/Ablage; der Riegel steht VOR der Entnahme).
+        if (engine.nurEinerSchonKontrolliert?.(pi, name)) continue;
 
         const wunsch = gewollteQuellen[ci];
         let src = wunsch === 'discard' ? 'discard' : 'hand';
