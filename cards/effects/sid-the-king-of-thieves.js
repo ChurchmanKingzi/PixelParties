@@ -50,6 +50,8 @@ const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Sid, the King of Thieves';
 
 module.exports = {
+  // W7a (H04-13, Al): der Stufenrabatt der geraubten Karten ist ein laufender Heldenpassiv — ruht bei Frost/Betäubung/Negation (Engine `_heldHandOffsetsRuhen`)
+  handLevelOffsetsArePassive: true,
   // BORIS-SPERRE (Klausel 1): nimmt Karten aus dem GEGNERDECK auf die eigene Hand.
   // Bei wirksamem Boris beim Gegner nicht aktivierbar.
   stealsOpponentCards: true,

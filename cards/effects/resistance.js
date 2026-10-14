@@ -55,6 +55,8 @@ module.exports = {
 
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // ★ W7a (Al 14.10.2026): ein laufender Ability-Schutz — ruht bei Frost/Betäubung/„Abilities negiert" des Helden.
+      if (engine._isHeroAbilityPassiveSilenced(pi, heroIdx)) return;
 
       // Compute level + slot
       const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];
@@ -132,6 +134,18 @@ module.exports = {
 
       // If another Resistance instance already removed this status, skip
       if (!hero.statuses?.[statusName]) return;
+
+      // ★ W7a (Al 14.10.2026): Resistance ist ein laufender Ability-Passiv und ruht, solange der Held gefroren/betäubt/„Abilities
+      // negiert" ist. Das `bypassStatusFilter` bleibt nötig (der Status, der gerade auflag, würde den Hook sonst selbst stummschalten);
+      // deshalb zählt für die Frage nur der Zustand OHNE den eingehenden Status.
+      {
+        const eingehend = hero.statuses[statusName];
+        delete hero.statuses[statusName];
+        let ruht = false;
+        try { ruht = engine._isHeroAbilityPassiveSilenced(pi, heroIdx); }
+        finally { hero.statuses[statusName] = eingehend; }
+        if (ruht) return;
+      }
 
       // Compute level from the ability zone slot
       const abZones = gs.players[pi]?.abilityZones?.[heroIdx] || [];

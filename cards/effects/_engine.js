@@ -44744,6 +44744,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const idx = +k;
           if (handArr_lvr[idx] !== cardData.name) continue;
           if (filterMap_lvr && filterMap_lvr[k] != null && filterMap_lvr[k] !== heroIdx) continue;
+          if (filterMap_lvr && filterMap_lvr[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
           const v = map[k] || 0;
           if (v < bestOffset) bestOffset = v;
         }
@@ -44947,6 +44948,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch { /* ability threw — ignore, no reduction */ }
     }
     return Math.max(0, rawLevel - total);
+  }
+
+  /**
+   * ★ W7a (H04-13, Al): Hand-Stufenrabatte, die an einen HELDEN gebunden sind (`_handLevelOffsetHeroFilter`) und von dessen
+   * Heldeneffekt stammen (Skript-Flag `handLevelOffsetsArePassive`: Sid), ruhen bei Frost/Betäubung/Negation des Helden.
+   * (Grenze: liegt auf demselben Helden zusätzlich ein Sparkfly-Queen-Rabatt mit gleichem Filter, ruht er hier mit.)
+   */
+  _heldHandOffsetsRuhen(playerIdx, heroIdx) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    return !!hero && !!this.heroScript(hero)?.handLevelOffsetsArePassive && this._isHeroEffectSilenced(playerIdx, heroIdx);
   }
 
   /**
@@ -45670,6 +45681,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const idx = +k;
           if (handArr_w[idx] !== cardData.name) continue;
           if (filterMap_w && filterMap_w[k] != null && filterMap_w[k] !== heroIdx) continue;
+          if (filterMap_w && filterMap_w[k] != null && this._heldHandOffsetsRuhen(playerIdx, heroIdx)) continue;   // W7a (H04-13)
           const v = map[k] || 0;
           if (v < bestOffset) bestOffset = v;
         }
