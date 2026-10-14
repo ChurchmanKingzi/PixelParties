@@ -15517,6 +15517,46 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
   }
 
+  /**
+   * ★ W4b (Al, Welle 4): Opfer-/Abwurf-Kosten eines ARTEFAKTS („Sacrifice … to play this card": Hive's Crown, Ladder to
+   * the Sky, Remote Detonator) werden VOR dem Reaktionsfenster bezahlt (Gegenstück zu `payActivationCost` der Zauber und
+   * `paySummonCost` der Kreaturen). Wird das Artefakt danach komplett negiert, bleiben die Kosten bezahlt.
+   *
+   * Skript-Vertrag (Artefakt, optional): `payArtifactCost(engine, pi, selectedIds, validTargets) → false | Daten`.
+   * `false` = nichts bezahlt (Kostenwahl abgebrochen / nicht zahlbar → der Server legt die Karte zurück auf die Hand wie bei
+   * `{ cancelled: true }`). Sonst die Daten (Objekt, auch `{}`), die `resolve(engine, pi, selectedIds, validTargets, kosten)`
+   * als 5. Argument bekommt und dann nicht noch einmal bezahlt. Ohne diesen Haken bzw. auf anderen Wegen, die `resolve`
+   * direkt rufen (Gratis-Spiel durch Sky Archeologist u. ä.), zahlt `resolve` wie früher selbst (`kosten` fehlt).
+   * Aufgerufen von `doConfirmPotion` (zielende) und `doUseArtifactEffect` (nicht zielende Artefakte).
+   * Rückgabe: `{ ok: false }` oder `{ ok: true }`.
+   */
+  async _payArtifactCost(cardName, pi, selectedIds, validTargets) {
+    const script = loadCardEffect(cardName);
+    if (typeof script?.payArtifactCost !== 'function') return { ok: true };
+    delete this._artefaktKostenBezahlt;
+    let res;
+    try {
+      res = await script.payArtifactCost(this, pi, selectedIds || [], validTargets || []);
+    } catch (err) {
+      console.error(`[payArtifactCost] ${cardName} threw:`, err.message);
+      return { ok: false };
+    }
+    if (res === false) return { ok: false };
+    this._artefaktKostenBezahlt = { cardName, pi, turn: this.gs?.turn, data: (res && typeof res === 'object') ? res : {} };
+    return { ok: true };
+  }
+
+  /** W4b: vorab bezahlte Artefakt-Kosten abholen (genau einmal), sonst `undefined`. */
+  _takePaidArtifactCost(cardName, pi) {
+    const k = this._artefaktKostenBezahlt;
+    if (!k || k.cardName !== cardName || k.pi !== pi || k.turn !== this.gs?.turn) return undefined;
+    delete this._artefaktKostenBezahlt;
+    return k.data;
+  }
+
+  /** W4b: Rest der vorab bezahlten Artefakt-Kosten vergessen (Artefakt negiert/abgebrochen); die Kosten selbst bleiben bezahlt. */
+  _verwerfeArtefaktKosten() { delete this._artefaktKostenBezahlt; }
+
   /** W4b: vorab bezahlte Beschwörungskosten dieser Karte abholen (genau einmal), sonst `null`. */
   _takePaidSummonCost(cardName, playerIdx) {
     const k = this._summonKostenBezahlt;

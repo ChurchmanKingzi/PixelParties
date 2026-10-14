@@ -15,7 +15,10 @@
 //    Golem — mit null Kopien waere der Schaden 0.
 //  • Reihenfolge: Zielwahl (abbrechbar) → bei Bestaetigung loescht
 //    `resolve` ALLE Golems (Kosten) → Schaden = 200 × Anzahl. Ein Abbruch
-//    der Zielwahl loescht also nichts. Die eigenen Golems sind keine Ziele.
+//    der Zielwahl loescht also nichts.
+//    ★ W4b (Al, Welle 4): das Loeschen (Kosten) laeuft jetzt VOR dem
+//    Reaktionsfenster (`payArtifactCost`) und bleibt bei Ganz-Negierung
+//    bezahlt; `resolve` verursacht nur noch den Schaden. Die eigenen Golems sind keine Ziele.
 //  • „deleted" = in den GELOESCHT-Stapel (`actionMoveCard`), nicht besiegt.
 //  • Spielstart-Schutz: ein Held, der noch die Erstrunden-Schonung traegt,
 //    ist wie bei Acid Vial kein Ziel.
@@ -30,6 +33,23 @@ function meineGolems(engine, pi) {
   return engine.cardInstances.filter(c =>
     c.zone === 'support' && c.name === GOLEM && !c.faceDown
     && (c.controller ?? c.owner) === pi);
+}
+
+/** KOSTEN: ALLE meine offenen Golems löschen (frisch gezählt). Rückgabe: Anzahl der gelöschten Kopien (0 = keine). */
+async function loescheGolems(engine, pi) {
+  const golems = meineGolems(engine, pi);
+  if (golems.length === 0) return 0;
+  for (const g of golems) {
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'explosion', owner: engine.physicalSide(g), heroIdx: g.heroIdx, zoneSlot: g.zoneSlot,
+    });
+  }
+  await engine._delay(450);
+  for (const g of golems) {
+    await engine.actionMoveCard(g, 'deleted', -1, -1, { source: CARD_NAME, sourceOwner: pi });
+  }
+  engine.sync();
+  return golems.length;
 }
 
 module.exports = {
@@ -71,29 +91,27 @@ module.exports = {
     return !!selectedIds && selectedIds.length === 1;
   },
 
-  async resolve(engine, pi, selectedIds, validTargets) {
+  // ★ W4b (Al, Welle 4): das Löschen der Golems ist der KOSTENPUNKT („… to play this card") und läuft VOR dem
+  // Reaktionsfenster (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert (Rusty
+  // Touch, Silence …), sind die Golems gelöscht und der Schaden entfällt. `false` = nichts bezahlt (Karte bleibt auf der Hand).
+  async payArtifactCost(engine, pi, selectedIds, validTargets) {
+    if (!selectedIds || selectedIds.length === 0) return false;
+    if (!(validTargets || []).find(t => t.id === selectedIds[0])) return false;
+    const anzahl = await loescheGolems(engine, pi);
+    return anzahl > 0 ? { anzahl } : false;
+  },
+
+  async resolve(engine, pi, selectedIds, validTargets, kosten) {
     if (!selectedIds || selectedIds.length === 0) return { cancelled: true };
     const target = validTargets.find(t => t.id === selectedIds[0]);
-    if (!target) return { cancelled: true };
+    if (!target) return kosten ? true : { cancelled: true };
     const gs = engine.gs;
 
-    // Kosten: ALLE meine Golems loeschen (frisch gezaehlt).
-    const golems = meineGolems(engine, pi);
-    if (golems.length === 0) return { cancelled: true };
-    const anzahl = golems.length;
+    // Kosten: ALLE meine Golems loeschen (frisch gezaehlt). Normalweg: schon vor dem Fenster bezahlt (`kosten`).
+    const anzahl = kosten ? kosten.anzahl : await loescheGolems(engine, pi);
+    if (!(anzahl > 0)) return { cancelled: true };
     const schaden = PRO_GOLEM * anzahl;
     const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: -1 };
-
-    for (const g of golems) {
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: engine.physicalSide(g), heroIdx: g.heroIdx, zoneSlot: g.zoneSlot,
-      });
-    }
-    await engine._delay(450);
-    for (const g of golems) {
-      await engine.actionMoveCard(g, 'deleted', -1, -1, { source: CARD_NAME, sourceOwner: pi });
-    }
-    engine.sync();
 
     // Wirkung: 200 × Anzahl auf das gewaehlte Ziel.
     const zoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
