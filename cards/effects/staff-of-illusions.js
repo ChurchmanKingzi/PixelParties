@@ -63,11 +63,14 @@ module.exports = {
     // G1 (A09-11, Als Antwort): unter der Goldsperre ("cannot spend Gold") sind nur Gesamtkosten 0 erlaubt, also nur Stufe-0-Kreaturen
     // (Kartentext: Kosten = 10 x Stufe). Die "mindestens 10 Gold"-Regel unten ist KEINE Kartentext-Bedingung, nur die Vorpruefung
     // fuer Stufe >= 1 - sie sperrt die Karte unter der Goldsperre daher nicht mehr ganz, sondern laesst nur noch Stufe 0 zu.
+    // W4a (F03-13, Al: "Wenn die Kosten fuer lv 0 0 sind, ja."): Auch OHNE Goldsperre ist die Karte unter 10 Gold spielbar,
+    // sobald eine waehlbare Kreatur effektiv Stufe 0 hat (Gesamtkosten 0). Kosten > 0 bleiben an Gold gebunden.
+    const hatStufe0 = !!engine && buildCreatureGallery(ps, engine._getCardDB(), engine, pi).some(e => e.level === 0);
     if (ps.goldLocked) {
-      if (!engine || !buildCreatureGallery(ps, engine._getCardDB(), engine, pi).some(e => e.level === 0)) return false;
+      if (!hatStufe0) return false;
     } else
-    // Player needs at least 10 gold (level 1 minimum cost) and a free support zone
-    if ((ps.gold || 0) < COST_PER_LEVEL) return false;
+    // Player needs at least 10 gold (level 1 minimum cost) - es sei denn, eine Stufe-0-Kreatur kostet nichts - and a free support zone
+    if ((ps.gold || 0) < COST_PER_LEVEL && !hatStufe0) return false;
     const hasFreeZone = (ps.heroes || []).some((h, hi) =>
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
