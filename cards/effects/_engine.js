@@ -37544,9 +37544,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // deliberate `doActivateCreatureEffect` call (free-activate or
     // creature-effect loop); re-asking the CPU to confirm it is
     // redundant and self-contradictory.
-    const confirmed = this.isCpuPlayer(heroOwner)
+    // W5b-B1 (Al, Welle 5): Wirkt der Effekt über Singing, fragt der AKTIVIERENDE
+    // (ctx.cardController = Singing-Nutzer), nicht der Besitzer des Helden;
+    // die Surprise liegt danach beim Heldenbesitzer (`surpriseKontrolleur`).
+    const frager = ctx.cardController ?? heroOwner;
+    const confirmed = this.isCpuPlayer(frager)
       ? true
-      : await this.promptGeneric(heroOwner, {
+      : await this.promptGeneric(frager, {
           type: 'confirm',
           title: cardName,
           message: isBakhmHero
