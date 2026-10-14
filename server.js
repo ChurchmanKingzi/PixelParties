@@ -8244,7 +8244,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Stale-flag safety net — mirror of the engine-side resolution starts:
   // clear a leaked `_spellNegatedByEffect` when an OUTERMOST spell
   // resolution begins (see preDamageMultiTargetWindow's depth-0 notes).
-  if ((gs._spellResolutionDepth || 0) === 0) { delete gs._spellNegatedByEffect; room.engine._visLog = []; }
+  if ((gs._spellResolutionDepth || 0) === 0) { delete gs._spellNegatedByEffect; delete gs._negationWhole; room.engine._visLog = []; }
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   // Resolving-Spell name stack: paired with the depth counter so
   // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
@@ -8394,6 +8394,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     room.engine.maybeFireCpuRevealEarly();
     // Z1 (R02-21): Wirker-Seite auch um den onPlay-Lauf stempeln (vorher nur um die Kette) - sonst liest
     // `effectiveSchoolLevelForCaster` (ohne 4. Argument) die Zonen des gleich indizierten EIGENEN Helden.
+    // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
+    // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
+    const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
     if (!_gefizzelt) {
       const _wirkerHook = gs._wirkerSeite;
       gs._wirkerSeite = { pi, heroIdx, heroOwner };
@@ -8592,6 +8595,17 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
       _wisdomBezahlt = true;
     }
+    // ★ Z7b (Als Entscheidung, Welle 3): ob der Slot verbraucht ist, hängt daran, ob die Karte AUFLÖSEN
+    // durfte. GANZ negiert nach der Zielwahl („Negate that Spell": MOE Shield, Storm Ring, Invisibility
+    // Cloak, Frost Rune, Flooding …) → Stempel zurück (bezahlte Kosten bleiben bezahlt), kein
+    // `afterSpellResolved`. Nur Ergebnis verhindert (Schadens-/Teil-Negierung wie Test Flight,
+    // Fizzle v1328) → verbraucht; Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
+    const _ganzNegiert = !!(gs._spellNegatedByEffect && gs._negationWhole);
+    if (_ganzNegiert) room.engine._stempelZurueck(_stempelVorher);
+    else if (gs._spellNegatedByEffect && !_gefizzelt && Number.isInteger(heroIdx) && heroIdx >= 0
+             && cardData.cardType === 'Spell') {
+      await room.engine._meldeZauberVerhindert(pi, cardName, heroIdx, heroOwner);
+    }
     if (!gs._spellNegatedByEffect) {
       // Per-player, whole-game record of Spell names whose effect has
       // successfully resolved (negated Spells are excluded — we're
@@ -8646,6 +8660,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellExcludeTargets;
     delete gs._bartasSecondCast;
     delete gs._spellNegatedByEffect;
+    delete gs._negationWhole;
     // v1277: beide Aktions-Flags sind oben ausgewertet — was danach noch
     // steht (gesetzt in `afterSpellResolved`, Zweitguesse …), ist ein Rest.
     delete gs._spellFreeAction;
@@ -8960,7 +8975,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
     delete gs._preventPhaseAdvance;
 
-    if (script?.oncePerGame) {
+    if (script?.oncePerGame && !_ganzNegiert) {   // Z7b: ganz negiert = nie aufgeloest
       const opgKey = script.oncePerGameKey || cardName;
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add(opgKey);
@@ -9244,11 +9259,9 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       delete gs._creatureEffectActivationContext;
     }
 
-    // Negation path — Skull doesn't negate today, but future reactions
-    // composing on CreatureEffect could. Mirrors the ability-negation
-    // policy at line 4184: stamp HOPT (the activation fired and was
-    // countered), refund any consumed additional-action provider, and
-    // bail without running the script's onCreatureEffect.
+    // Negation path — Spearman / Skull negate the activation. Refund any
+    // consumed additional-action provider and bail without running the
+    // script's onCreatureEffect. Z7b: no HOPT stamp (the effect never resolved).
     if (creatureEffectChainResult?.negated) {
       room.engine.beendeDarkDeal(inst);
       if (charmedHeroCreature) {
@@ -9263,21 +9276,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       if (consumedAdditionalCreatureInst) {
         room.engine.restoreAdditionalAction(consumedAdditionalCreatureInst);
       }
-      // ★ Z7 (C01-12): Die negierte Aktivierung ist VERBRAUCHT — aber nur EINE der N Nutzungen
-      // bei „up to N times per turn" (3-Headed Giant: `chargesPerTurn` + `chargeKey` über
-      // `_charges`). Die Rundensperre fällt erst, wenn keine Nutzung mehr frei ist; vorher
-      // sperrte schon die erste negierte Aktivierung alle drei.
-      let _negSperre = true;
-      if (script.chargesPerTurn > 1 && script.chargeKey) {
-        const _ch = require('./cards/effects/_charges');
-        const _chOpt = { key: script.chargeKey, max: script.chargesPerTurn };
-        _ch.spendUse(inst, gs, _chOpt);
-        if (_ch.usesLeft(inst, gs, _chOpt) > 0) _negSperre = false;
-      }
-      if (_negSperre) {
-        if (!gs.hoptUsed) gs.hoptUsed = {};
-        gs.hoptUsed[hoptKey] = gs.turn;
-      }
+      // ★ Z7b (C01-12, Als Entscheidung, Welle 3): die GANZ negierte Aktivierung (Spearman …) hat nie
+      // aufgelöst — weder die Rundensperre (HOPT) noch eine Nutzung bei „up to N times per turn"
+      // (3-Headed Giant, `chargesPerTurn`) ist verbraucht; bezahlte Kosten bleiben bezahlt.
+      // (Früher: Z7 stempelte, vorher die Rundensperre ganz.)
       await room.engine._flushSurpriseDrawChecks();
       await room.engine._executeDeferredSurprises();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -9667,8 +9669,9 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
       // sonst sieht der Gegner nie, WAS seine Negation getroffen hat.
       room.engine.announceActiveEffect();
       room.engine.clearEffectAnnounce();
-      // Negation keeps HOPT consumed — the ability fired (and was countered).
-      hoptReserved = false;
+      // ★ Z7b (Als Entscheidung, Welle 3): GANZ negiert (Master's Plan, Cybug LADYBUG …) = die
+      // Aktivierung hat nie aufgelöst → die Rundensperre wird freigegeben (Auftritt/Kosten bleiben).
+      releaseHopt();
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
       return true;
     }
@@ -10569,6 +10572,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     if (chainResult.negated || abilitySurprise?.negateEffect) {
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
+      // ★ Z7b: ganz negiert = nie aufgelöst → die Rundensperre (oben vorab gestempelt) wird frei.
+      if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
       // Negated — refund the Hero pre-action cost (Saint Nicolas
       // keeps the marked Potion).
       await room.engine.refundHeroActionCost(heroOwner, heroIdx);
@@ -11485,8 +11490,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // ★ Z7 (F02-10): „You can only play 1 … per game" auch für ZIELENDE ARTEFAKTE (Perfect
   // Disguise & Co.). Der Stempel stand bisher nur im Trank-Zweig unten — ein zielendes
   // Artefakt blieb beliebig oft spielbar. Hier ist die Karte gespielt (nicht abgebrochen,
-  // nicht aborted); eine Negation hat die Engine schon in `_noteNegatedPlay` gestempelt.
-  _markOncePerGamePotion(ps, script, potionName);
+  // nicht aborted). ★ Z7b: eine GANZ negierte Karte (Rusty Touch, Silence …) hat nie aufgelöst
+  // und stempelt nicht (Als Entscheidung, Welle 3).
+  if (!chainResult.negated) _markOncePerGamePotion(ps, script, potionName);
 
   // v657: Gratis-Preise auch auf dem ZIEL-Pfad einloesen — der
   // namensweite Nullpreis (Misfire) und der scharfgestellte Gratis-Kauf
@@ -12345,8 +12351,8 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     else room.engine._firePendingPlayLog();
 
-    // ★ Z7: Partie-Stempel der gespielten Karte (Negation: schon in `_noteNegatedPlay`).
-    _markOncePerGamePotion(ps, script, cardName);
+    // ★ Z7: Partie-Stempel der gespielten Karte. Z7b: eine ganz negierte Karte stempelt nicht.
+    if (!chainResult.negated) _markOncePerGamePotion(ps, script, cardName);
 
     if (ps._freeArtifactNames && ps._freeArtifactNames[cardName] && !chainResult.negated) {
       delete ps._freeArtifactNames[cardName];

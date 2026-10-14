@@ -61,9 +61,6 @@ function heldenZiele(gs, pi, engine) {
 }
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { if (!gs.hoptUsed) gs.hoptUsed = {}; gs.hoptUsed[SPERRE(pi)] = gs.turn; },
-
   isTargetingArtifact: true,
   deferReveal: true,                 // Bild erst beim Zusagepunkt
   animationType: 'none',             // eigenes Bild im Zusagepunkt

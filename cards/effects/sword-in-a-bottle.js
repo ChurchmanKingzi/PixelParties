@@ -81,9 +81,6 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },
-
   // ★ PFLICHTFLAGGE (Als Befund 12.9.): `doUsePotion` steigt ohne sie
   //   STILL aus (`if (!script?.isPotion) return false;`). Die Karte war
   //   im Client als nutzbar hervorgehoben, der Klick lief ins Leere —

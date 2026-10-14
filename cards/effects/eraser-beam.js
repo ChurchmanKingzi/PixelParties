@@ -109,8 +109,9 @@ module.exports = {
       if (!ps) return;
 
       // Cost has already been paid via payActivationCost. Mark the
-      // once-per-game key now so even a same-turn negation still
-      // consumes the game-long charge.
+      // once-per-game key now (Teil-Negierung/Fizzle verbrauchen die Ladung). Z7b: wird der
+      // Zauber GANZ negiert (Silence in der Kette: onPlay läuft nie; MOE Shield & Co. nach der
+      // Zielwahl: `_stempelZurueck`), bleibt die Ladung frei — nur die Token-Kosten sind bezahlt.
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add('eraserBeam');
 

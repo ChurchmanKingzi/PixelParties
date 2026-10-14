@@ -11439,6 +11439,13 @@ für alles Künftige da.
 
 ## ★ Die geteilte „Divine Gift"-Grenze — geprüft und eine Lücke geschlossen (v1031, Als Frage 12.9.)
 
+> **Z7b (Als Entscheidung, Welle 3, 14.10.2026): das Ruling vom 12.9. zur NEGIERUNG ist aufgehoben.**
+> Der Satz „ab dem Verlassen der Hand IST sie aktiviert, unabhängig davon, ob ein Gegenzug sie später
+> negiert" gilt nicht mehr: eine **komplett negierte** Divine-Gift-Karte hat nie aufgelöst und
+> **verbraucht die Grenze `divineGift` nicht** (Al: „Ja, das gilt auch für once per game, inklusive
+> Divine Gifts"). Maßgeblich ist der Abschnitt „★ Z7b" weiter unten. Tor, geteilte Grenze, Set und
+> Ausgrauung (siehe unten) bleiben unverändert.
+
 Alle **17** „Divine Gift"-Karten melden korrekt
 `oncePerGame: true` + `oncePerGameKey: 'divineGift'`, teilen sich also
 eine Partie-Grenze. Das ist die richtige Bauform — aber sie greift nur
@@ -11452,9 +11459,9 @@ Geschenk wäre dort wieder angeboten worden. Die
 Schadens-Fenster (`_checkPreDamageHandReactions` & Co.) hatten beides
 seit jeher; nur dieses eine Fenster fiel durch.
 
-Jetzt hat es beides. **Der Stempel sitzt dort, wo die Karte die Hand
-verlässt** — ab da IST sie aktiviert („You can only ACTIVATE 1 … per
-game"), unabhängig davon, ob ein Gegenzug sie später negiert.
+Jetzt hat es beides. Der Stempel sitzt dort, wo die Karte die Hand
+verlässt (*Z7b: wird die Reaktion später GANZ negiert, z. B. von Cute Camera, nimmt
+`_resolveReactionChain` ihn zurück — `link._opgNeu`*).
 
 Mitgeprüft und in Ordnung:
 * Die 12 Normal-Spells und die eine Attack laufen über `doPlaySpell` —
@@ -11465,31 +11472,59 @@ Mitgeprüft und in Ordnung:
 * Ausgrauung im Client: `getBlockedSpells`,
   `getHeroEligibleActionCards` und die Projektion `oncePerGameUsed`.
 
-### ★ Z7 — Einmal-Stempel („1 pro Zug / 1 pro Spiel") bei Negation, Abbruch, Sofort-Guss (Welle 2)
+### ★ Z7b — Einmal-Stempel („1 pro Zug / 1 pro Spiel") bei Negation, Fizzle, Abbruch, Sofort-Guss (Welle 3, Als Entscheidung)
 
-**Regel (eine Stelle):** Eine Spell/Attack/Artifact/Potion-Karte, die die Hand verlassen hat und
-dann **negiert** wird (oder beim Auflösen **fizzelt**, v1328), war **GESPIELT** (Ruling v1031,
-Rusty Touch „der Gegner zahlt trotzdem") — ihr „You can only play/activate 1 … per turn/game"
-ist verbraucht. Ein **Abbruch durch den Spieler** (auch die Ablehnung des Eye-of-Ren-Freikaufs)
-ist das Gegenteil: nichts ist passiert, nichts ist gestempelt.
+**Leitfrage: „Durfte die Karte resolven oder nicht?"** (Al, Welle 3 — kehrt die Z7-Regel aus Welle 2
+„jede negierte Karte gilt als gespielt" und das Ruling v1031 vom 12.9. um.)
 
-* `executeCardWithChain` ruft bei negierter/fizzelnder Initialkarte (nicht `fromBoard`, nicht
-  Platzierung, nicht Creature/Ability) `engine._noteNegatedPlay(...)`:
-  * `oncePerGame` / `oncePerGameKey` stempelt die Engine **automatisch** (`ps._oncePerGameUsed`);
-  * Rundensperren melden **Karten selbst** über den optionalen Haken
-    `onNegatedPlay({ engine, gs, pi, heroIdx, cardName, cardType })` — dieselbe Marke, die das
-    Skript sonst im `resolve`/`onPlay` setzt (meist `engine.claimHOPT(KEY, pi)`). **Wer eine neue
-    „only play 1 per turn"-Karte schreibt, ergänzt den Haken.**
-  * Hörer-Hook `afterSpellNegatedPlay` (Gegenstück zu `afterSpellResolved`, nur für Zähler wie
-    Kogarasu „1 Spell pro Zug" — nie für Wirkungen).
-* Creature-Beschwörungen stempeln `oncePerGame` weiter erst bei der **Landung** (v1030).
-* Zielende Artefakte (`doConfirmPotion`) und Normal-Artefakte (`doUseArtifactEffect`) haben jetzt
-  Tor **und** Stempel für `oncePerGame` (Perfect Disguise).
-* Sofort-Güsse: `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit `opts.pruefen`).
-* Abgelehnter Ablage-Freikauf (`_applyDiscardOutDecline`) gibt die im `resolve` gestempelten
-  Rundensperren (`gs.hoptUsed`) zurück.
-* „Up to N times per turn" (`chargesPerTurn` + `chargeKey`, z. B. 3-Headed Giant): eine negierte
-  Aktivierung verbraucht **eine** Nutzung; die Rundensperre fällt erst bei der letzten.
+| Fall | Einmal-Stempel („per turn" UND „per game", auch Divine Gifts) |
+|---|---|
+| Komplette Karte / kompletter Effekt **negiert**, bevor er auflöst — „Negate that card/Spell/Artifact/Ability/effect" (Silence, The Master's Plan, Rusty Touch, Ambush the Scout, MOE Shield, Storm Ring, Invisibility Cloak, Frost Rune, Flooding, Spearman, Cybug LADYBUG, Creepy Clown, Cute Camera gegen eine Reaktion …) | **NICHT verbraucht.** Bezahlte Kosten bleiben bezahlt (Rusty Touch: „your opponent still has to pay its Cost" — Gold/Tokens/Aktion weg, der Einmal-Slot nicht). |
+| Karte **feuert durch**, nur ein **Teil/Ergebnis** wird verhindert — Schadens-/Effekt-Negierung („Negate any effects … on that Hero", „Negate that damage": Rain, Test Flight, Escape, Bamboo Shield, Sculpture Guards …), Immunität/„unaffected", Zielschutz, kein legales Ziel mehr, **Fizzle** (Wirker beim Auflösen handlungsunfähig, v1328), Effekt wirkt ins Leere | **verbraucht**, auch wenn de facto nichts erreicht wurde. |
+| **Abbruch durch den Spieler** (Zielwahl, Wahlfenster, Ablehnung des Eye-of-Ren-Freikaufs) | **nie** gestempelt (Regel 23.9; abgelehnter Ablage-Freikauf `_applyDiscardOutDecline` gibt gestempelte Rundensperren `gs.hoptUsed` zurück). |
+
+**Wie die Engine das umsetzt (eine Regel, wenige Stellen):**
+
+* *Kettennegation einer Initialkarte* (Silence & Co.): das Skript-`resolve`/`onPlay` läuft nie, also stempelt
+  nichts. Die Z7-Stempelung in `executeCardWithChain` (`_noteNegatedPlay`) und der Haken `onNegatedPlay` in
+  ~44 Skripten sind **entfernt**. Server-Gates: `doUseArtifactEffect`/`doConfirmPotion` stempeln `oncePerGame`
+  nur noch ohne `chainResult.negated`.
+* *Negation nach der Zielwahl* (Surprises/Hand-Reaktionen im Ziel-Fenster, `gs._spellNegatedByEffect`): die
+  Zauber-Wege (`doPlaySpell`, `_castSpellImmediately`) merken sich vor dem `onPlay` den Stempelstand des
+  Wirkers (`engine._stempelAbzug(pi)`: `gs.hoptUsed`-Schlüssel `…:<pi>` + `ps._oncePerGameUsed`) und geben ihn
+  zurück (`_stempelZurueck`), wenn die **ganze Karte** negiert wurde. Ob ganz oder nur teil-negiert,
+  entscheidet die negierende Reaktion: **`negatesWholeCard: true`** am Skript (derzeit Anti Magic Shield,
+  Booby Trap, Chaorc Interception, Cool Tech Jetpack, Crimson Web, Dream Dust, Flooding, Frost Rune, Glass
+  Wall, Invisibility Cloak, Magic Mirror, MOE Shield, Spike Trap, Storm Ring, Tharxian Horse) — gesetzt wird
+  `gs._negationWhole` in `_merkeGanzeNegation` (aus `_activateSurprise` und den Post-Target-Fenstern).
+  **Wer eine neue Reaktion „Negate that Spell/Attack" schreibt, ergänzt das Flag**; Teil-Negierungen tragen es nicht.
+  Annahme: ganz negierende Reaktionen gehören dem Gegner des Wirkers (eigene Stempel bleiben unberührt).
+  Bekannte Grenze: Spell-eigene Sonderflags ohne `hoptUsed`/`_oncePerGameUsed` (z. B. `_whiteArmyUsedTurn`)
+  stempeln erst NACH der Zielwahl und sind davon nicht betroffen.
+* *Hand-Reaktion ganz negiert* (Cute Camera gegen Divine Gift of Edge): `link._opgNeu` — `_resolveReactionChain`
+  nimmt den beim Verlassen der Hand gesetzten Partie-Stempel zurück. *Held-/Board-Creature-Reaktionen* (Key,
+  Spearman) stempeln ihre Rundengrenze beim Aktivieren (`payActivationCost`); ein optionales
+  `refundOnNegation(engine, link)` am Skript gibt sie bei ganzer Negierung zurück (Kosten bleiben bezahlt).
+* *Aktivierungen* (Kreatureneffekt `doActivateCreatureEffect`, Heldeneffekt `resolveHeroEffectActivation`,
+  Ability `doActivateFreeAbility`/`doActivateAbility`): eine ganz negierte Aktivierung (Spearman, Master's
+  Plan, Cybug LADYBUG, No Retreat! …) stempelt die Rundensperre **nicht** und verbraucht bei „up to N times per turn"
+  (`chargesPerTurn`/`chargeKey`, 3-Headed Giant) **keine** Nutzung. Zusatzaktions-Geber und Aktion folgen der
+  bisherigen Kostenregel (Geber wird erstattet, Aktion bleibt verbraucht).
+* *Fizzle* (Wirker beim Auflösen eingefroren/besiegt/betäubt/negiert, v1328): die Karte war gespielt →
+  `_noteFizzledPlay` (aus `executeCardWithChain`, nur Spell/Attack, nur wenn nicht negiert): stempelt
+  `oncePerGame`/`oncePerGameKey` automatisch, Rundensperren meldet die Karte über den optionalen Haken
+  `onFizzledPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (in 18 Zauber-Skripten; Artefakte/Tränke
+  fizzeln nie am Wirker und haben ihn nicht). **Wer eine neue „only play 1 per turn"-Karte (Spell/Attack) schreibt,
+  ergänzt den Haken nur, wenn sie ihre Marke erst im `onPlay` setzt.**
+* *Zähler-Lauscher* („Held hat einen Zauber BENUTZT": Kogarasu „1 Spell pro Zug"): `afterSpellResolved` plus der
+  neue Hook **`afterSpellPrevented`** (Zauber durfte auflösen, Ergebnis verhindert: Teil-Negierung/Fizzle;
+  `_meldeZauberVerhindert`). Ein ganz negierter Zauber meldet nichts.
+* Unverändert aus Z7: Creature-Beschwörungen stempeln `oncePerGame` erst bei der **Landung** (v1030); zielende
+  Artefakte (`doConfirmPotion`) und Normal-Artefakte (`doUseArtifactEffect`) haben Tor **und** Stempel für
+  `oncePerGame` (Perfect Disguise); `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit
+  `opts.pruefen`); Item-/Zieh-Sperren aus Z6 (`drawWouldBeBlocked` in Squire/Albrecht/Pteranos/Raptoren).
+* Nicht betroffen: Surprises stempeln `oncePerGame` beim **Setzen** (verdeckt gespielt); die spätere Negierung
+  ihrer Aktivierung (Boots of Hermes, See through the Ruse …) macht das Setzen nicht ungeschehen.
 
 
 ## ★ Puzzle-Editor: Tooltip lag unter der Hand (v1032, Als Befund 12.9.)
@@ -19770,7 +19805,7 @@ Kunst aller fünf: nativ im Index (`kind: 'a'`) — Spearman im Quellraster 96×
 
 ### ★ Neuer Vertrag `isCreatureReaction` — Board-Creature-Reaktion im Kettenfenster (Spearman)
 
-Eine Creature AUF DEM BRETT darf in ein Kettenfenster einsteigen, ohne Handkarte zu sein (Gegenstück zu `isHeroReaction`): `isCreatureReaction: true` + `creatureReactionCondition(gs, pi, engine, chainCtx, inst) → bool` + optional `payActivationCost(engine, pi, chainCtx, inst) → bool` (Kosten, auch bei Negation des Gliedes verbraucht) + `creatureReactionResolve(engine, pi, chain, myIndex, inst) → bool|false`. `_promptReactionsForChain` bietet sie als Kachel `BOARD` an (nur der Reagierende sieht „Activate <Creature>?" mit dem Auslöser daneben), das Kettenglied trägt `fromCreature: true`, `creatureInstId`; die Auflösung läuft LIFO in `_resolveReactionChain` (wie `fromHero`). Stumme Creatures (`isCreatureEffectSuppressed`: Frozen/Stunned/Negated/Aura, Dark Ocean, Erstzug-Sperre) bieten sich nie an. Die Kette um den AKTIVEN Effekt einer Creature öffnet `doActivateCreatureEffect` (`cardType: 'CreatureEffect'`, `gs._creatureEffectActivationContext = { activatingInst, activator, creatureName, heroIdx }`); wird sie negiert (`negateChainLink`), überspringt der Server `onCreatureEffect`, stempelt die Rundengrenze der Creature und erstattet eine verbrauchte Zusatzaktion.
+Eine Creature AUF DEM BRETT darf in ein Kettenfenster einsteigen, ohne Handkarte zu sein (Gegenstück zu `isHeroReaction`): `isCreatureReaction: true` + `creatureReactionCondition(gs, pi, engine, chainCtx, inst) → bool` + optional `payActivationCost(engine, pi, chainCtx, inst) → bool` (Kosten, auch bei Negation des Gliedes verbraucht; die stempelnde Rundengrenze gibt ein optionales `refundOnNegation(engine, link)` bei ganzer Negierung zurück) + `creatureReactionResolve(engine, pi, chain, myIndex, inst) → bool|false`. `_promptReactionsForChain` bietet sie als Kachel `BOARD` an (nur der Reagierende sieht „Activate <Creature>?" mit dem Auslöser daneben), das Kettenglied trägt `fromCreature: true`, `creatureInstId`; die Auflösung läuft LIFO in `_resolveReactionChain` (wie `fromHero`). Stumme Creatures (`isCreatureEffectSuppressed`: Frozen/Stunned/Negated/Aura, Dark Ocean, Erstzug-Sperre) bieten sich nie an. Die Kette um den AKTIVEN Effekt einer Creature öffnet `doActivateCreatureEffect` (`cardType: 'CreatureEffect'`, `gs._creatureEffectActivationContext = { activatingInst, activator, creatureName, heroIdx }`); wird sie negiert (`negateChainLink`), überspringt der Server `onCreatureEffect` und erstattet eine verbrauchte Zusatzaktion; die Rundengrenze der negierten Creature bleibt **unverbraucht** (Z7b: ganz negiert = nie aufgelöst).
 
 ### ★ Neue Verträge für den Clown: Aura, Nachwirkung, „either player may spend an Action"
 
@@ -19790,7 +19825,7 @@ Eine Creature AUF DEM BRETT darf in ein Kettenfenster einsteigen, ohne Handkarte
 Creature (Normal, **Lv0** — vorher Lv1 —, 50 HP, Summoning Magic): „Once per turn, when your opponent activates one of their Creatures' active effects, you may negate that effect and deal 50 damage to that Creature instead." — **Text geändert** („active effects" statt „once per turn effects": JEDER aktive Effekt einer Gegner-Creature).
 
 - **Fenster:** `isCreatureReaction` (siehe oben). Bedingung: Initialglied = Aktivierung einer GEGNERISCHEN Creature (`initial.owner !== pi`), Ziel steht noch auf dem Brett und gehört dem Gegner, dieser Speerkämpfer hat in diesem Zug noch nicht gestochen (`counters._spearTurn`), in der Kette steht noch kein anderer Speerkämpfer (ein Effekt wird nur EINMAL negiert).
-- **„Once per turn" je EXEMPLAR:** zwei Speerkämpfer stechen zweimal. Gestempelt wird beim Aktivieren (`payActivationCost`): wird der Stich selbst negiert, ist er verbraucht.
+- **„Once per turn" je EXEMPLAR:** zwei Speerkämpfer stechen zweimal. Gestempelt wird beim Aktivieren (`payActivationCost`); wird der Stich selbst ganz negiert (Cute Camera …), gibt `refundOnNegation` die Rundengrenze zurück (Z7b), ein Fizzle behält sie.
 - **Wirkung:** `negateChainLink` auf das Initialglied (der Effekt läuft nie), dann `actionDealCreatureDamage(…, 50, 'creature', { sourceOwner, canBeNegated: true })`; Log `spearman_negate`, bei geändertem Zustand `spearman_fizzle`.
 - **Bild und Klang:** `spearman_thrust` (Brett-Animation, Ursprung = Speerkämpfer, Ziel = angreifende Creature, `ppSalve` mit `extra: 40`): der Speer wird zurückgezogen, schießt aufs Ziel, Kreuzblitz und Funken, bleibt zitternd stecken, ein rotes Verbotszeichen pulsiert. CPU: `cpuMeta.reactionHeuristic` immer, `cpuResponse` bejaht „Activate Spearman?".
 

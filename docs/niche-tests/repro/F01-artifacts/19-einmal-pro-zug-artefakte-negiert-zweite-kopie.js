@@ -1,12 +1,11 @@
 'use strict';
-// F01-artifacts-19 · „You can only play 1 X per turn": ein per Rusty Touch negiertes Artefakt verbraucht das Zug-Limit nicht – die zweite Kopie wirkt im selben Zug
+// F01-artifacts-19 · „You can only play 1 X per turn": ein per Rusty Touch GANZ negiertes Artefakt verbraucht das Zug-Limit NICHT – die zweite Kopie wirkt im selben Zug (Als Entscheidung, Welle 3)
 // Kartentexte: Book of Doom „You can only play 1 "Book of Doom" per turn."; Burned Contract „…play 1 "Burned Contract" per turn."; Capture Net „…play 1 "Capture Net" per turn.";
 //   Cute Cheese „You can only activate 1 "Cute Cheese" per turn."; Rusty Touch „Negate that Artifact (but your opponent still has to pay its Cost)."
+// REGEL (CARD_API.md „★ Z7b"): die Kosten bleiben bezahlt (Rusty Touch), aber die Karte hat nie aufgelöst → der Einmal-Slot ist unverbraucht. (Gilt auch für Aktivierungen:
+//   ein negierter Speerkämpfer-Stich ändert daran nichts.)
 // Aufbau: Sitz 0 hat zwei Kopien in der Hand und 100 Gold; Sitz 1 hält Rusty Touch (negiert die erste Kopie, Kosten werden bezahlt). Danach spielt Sitz 0 die zweite Kopie (`keepActions`).
-// Erwartung: Die erste Kopie war „gespielt" (Präzedenz: A01-pollution-14/-04 Eraser Beam/Pyroblast, B-Stufe); die zweite ist im selben Zug nicht spielbar.
-// Beobachtet: Die zweite Kopie wird gespielt und wirkt (Book of Doom 50 Schaden, Burned Contract besiegt die Kreatur, Capture Net holt sie, Cute Cheese holt eine Kreatur).
-// Ursache: Der Einmal-pro-Zug-Stempel steht jeweils erst in `resolve` (`book-of-doom.js` Z. 83, `burned-contract.js` Z. 112, `capture-net.js` Z. 162, `cute-cheese.js` Z. 55: jeweils `engine.claimHOPT(…)`) –
-//   `resolve` läuft bei einer Negation in der Kette nie. (Gegenbeispiel mit richtiger Auslegung: Speerkämpfer-Regel CARD_API.md Z. 19709 „Gestempelt wird beim Aktivieren … wird der Stich selbst negiert, ist er verbraucht".)
+// Exit 1 (Fehler tritt auf) = die negierte erste Kopie hat den Zug-Slot verbraucht (die zweite wirkt nicht).
 const H = require('../../lib/h.js');
 const FAELLE = {
   'Book of Doom': { setup: () => {}, ziele: (v) => v.filter(x => x.type === 'hero' && x.owner === 1).slice(0, 1).map(x => x.id), wirkung: (t) => 800 - t.hp(1, 0) === 50 },
@@ -28,7 +27,7 @@ const FAELLE = {
     const r2 = await t.play(0, karte, { hero: 0, keepActions: true });
     const wirkt = f.wirkung(t);
     R.check(karte + ': erste Kopie negiert (Voraussetzung)', negiert, { rusty: t.pile(1, 'discardPile') });
-    R.check(karte + ': zweite Kopie im selben Zug wirkungslos / nicht spielbar', !wirkt, { r2, wirkt });
+    R.check(karte + ': zweite Kopie im selben Zug ist spielbar und wirkt', wirkt, { r2, wirkt });
     R.check(karte + ': keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

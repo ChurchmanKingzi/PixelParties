@@ -18,9 +18,6 @@ const CARD_NAME = 'Magic Emerald';
 const MILL_AMOUNT = 3;
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { engine.claimHOPT(CARD_NAME, pi); },
-
   // v826: NICHT "nur Stapel-Bewegung" (Gegner-Deck: eigene Bewegung des Wirkenden, nicht gesperrt); die Auto-Erkennung
   // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
   blockedByPileLock: false,

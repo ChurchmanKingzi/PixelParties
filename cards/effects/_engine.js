@@ -22035,7 +22035,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _aeussererLog = this.gs._spellDamageLog;
     this.gs._spellDamageLog = [];
     if (opts.excludeTargets) this.gs._spellExcludeTargets = opts.excludeTargets;
-    if ((this.gs._spellResolutionDepth || 0) === 0) { delete this.gs._spellNegatedByEffect; this._visLog = []; }
+    if ((this.gs._spellResolutionDepth || 0) === 0) { delete this.gs._spellNegatedByEffect; delete this.gs._negationWhole; this._visLog = []; }
     this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
     if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
     // ★ v1303 (Als Vorgabe 23.9.): der Auftritt der schenkenden Karte
@@ -22054,6 +22054,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Abbruch in der Zielwahl verraet nichts), bei der CPU sofort (sie
     // hat nichts zu verbergen, und der Auftritt soll der Wirkung vorangehen).
     let _placedVorher = false, _aufsBrett = false;   // v1364
+    let _ganzNegiert = false;   // Z7b
     const _auftritt = this.gussAuftrittBeginnen(cardName, playerIdx);   // v1339: gemeinsamer Helfer
     // Als Vorgabe 29.9.: Wirker-Seite fuer Stufenabfragen (wie doPlaySpell).
     const _wirkerVorher = this.gs._wirkerSeite;
@@ -22077,6 +22078,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           catch (err) { console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message); }
         }
       }
+      const _stempelVorher = this._stempelAbzug(playerIdx);   // Z7b
       const _onPlay = () => this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
       // ★★ v1364 (Als Befund Sticky Wand + Call of the Deepsea): legt sich
       // der Sofort-Guss selbst aufs Brett (Attachment → `placeAttachment`
@@ -22114,7 +22116,15 @@ this._deathWatch = (this._deathWatchStack || []).length
           _skipReactionCheck: true,
         });
       }
+      // Z7b: ganz negiert (MOE Shield, Frost Rune …) = nie aufgeloest → kein „1 pro Spiel"-Stempel unten;
+      // nur das Ergebnis verhindert (Teil-Negierung) = verbraucht, Zaehler-Lauscher hoeren `afterSpellPrevented`.
+      _ganzNegiert = !!(this.gs._spellNegatedByEffect && this.gs._negationWhole);
+      if (_ganzNegiert) this._stempelZurueck(_stempelVorher);
+      else if (this.gs._spellNegatedByEffect && cardData.cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
+        await this._meldeZauberVerhindert(playerIdx, cardName, heroIdx, opts.heroOwner ?? playerIdx);
+      }
       delete this.gs._spellNegatedByEffect;
+      delete this.gs._negationWhole;
     } finally {
       if (_wirkerVorher === undefined) delete this.gs._wirkerSeite; else this.gs._wirkerSeite = _wirkerVorher;
       if (_ablageVorher === undefined) delete this.gs._inAblageGewirkt; else this.gs._inAblageGewirkt = _ablageVorher;
@@ -22146,7 +22156,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.gs._spellCancelled = _cancelVorher;
     // „Only 1 per game" (Hymn of Rebirth, Divine Gift …): auch der Sofort-Guss
     // verbraucht das Einmal-Limit — der regulaere Weg stempelt in server.js.
-    if (!abgebrochen && cardData.cardType === 'Spell') {
+    if (!abgebrochen && !_ganzNegiert && cardData.cardType === 'Spell') {
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -31296,6 +31306,47 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._autoAnnounce = { card: quelle.cardName, src: quelle };
   }
 
+  /**
+   * ★ Z7b — GANZE Karte negiert ODER nur ein Teil des Ergebnisses? (Als Entscheidung, Welle 3.)
+   * Reaktionen, deren Text „Negate that card/Spell/Attack/effect" sagt, tragen `negatesWholeCard: true`;
+   * liefern sie `effectNegated`, merkt sich der Zauber-Weg (`doPlaySpell`, `_castSpellImmediately`)
+   * `gs._negationWhole` und gibt die Einmal-Stempel der gewirkten Karte zurück — sie hat nie aufgelöst.
+   * „Negate any effects … on that Hero" / „Negate that damage" (Rain, Test Flight, Bamboo Shield …)
+   * lassen die Karte auflösen (Ergebnis verhindert) und tragen das Flag nicht → Stempel bleibt.
+   */
+  _merkeGanzeNegation(script, result) {
+    if (result?.effectNegated && script?.negatesWholeCard) this.gs._negationWhole = true;
+  }
+
+  /**
+   * ★ Z7b — Abzug der Einmal-Stempel des WIRKENDEN Spielers (`gs.hoptUsed`-Schlüssel `…:<pi>` und
+   * `ps._oncePerGameUsed`), vor dem `onPlay`. Annahme: ganz negierende Reaktionen gehören dem
+   * GEGNER (andere Sitzhälfte `…:<pi>` / anderes `ps`), ihre eigenen Stempel bleiben also unberührt.
+   */
+  _stempelAbzug(pi) {
+    const h = this.gs.hoptUsed || {};
+    const suffix = `:${pi}`;
+    const hopt = {};
+    for (const k of Object.keys(h)) if (k.endsWith(suffix)) hopt[k] = h[k];
+    return { pi, hopt, opg: new Set(this.gs.players?.[pi]?._oncePerGameUsed || []) };
+  }
+
+  /** ★ Z7b — Gegenstück: setzt die Stempel des Wirkers auf den Abzug zurück (ganze Karte negiert). */
+  _stempelZurueck(abzug) {
+    if (!abzug) return;
+    const h = this.gs.hoptUsed;
+    const suffix = `:${abzug.pi}`;
+    if (h) {
+      for (const k of Object.keys(h)) {
+        if (!k.endsWith(suffix)) continue;
+        if (!(k in abzug.hopt)) delete h[k];
+        else if (h[k] !== abzug.hopt[k]) h[k] = abzug.hopt[k];
+      }
+    }
+    const ps = this.gs.players?.[abzug.pi];
+    if (ps?._oncePerGameUsed) for (const k of [...ps._oncePerGameUsed]) if (!abzug.opg.has(k)) ps._oncePerGameUsed.delete(k);
+  }
+
   claimHOPT(key, playerIdx) {
     if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
     const hoptKey = `${key}:${playerIdx}`;
@@ -36481,6 +36532,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             resolveResult = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard,
               { damageType, dealsDamage, casterIdx: isArtifact ? null : castingHeroIdx, casterSeite: castingSeite });
           }
+          this._merkeGanzeNegation(script, resolveResult);   // Z7b
         } finally {
           this._inPostTargetReaction = false;
         }
@@ -36604,6 +36656,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               if (script.postTargetResolve) {
                 r2 = await script.postTargetResolve(this, pi, targetedHeroes, sourceCard, rxOpts);
               }
+              this._merkeGanzeNegation(script, r2);   // Z7b
             } finally {
               this._inPostTargetReaction = false;
             }
@@ -37549,6 +37602,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!surpriseNegated && script.onSurpriseActivate && inst) {
       const ctx = this._createContext(inst, { sourceInfo });
       result = await script.onSurpriseActivate(ctx, sourceInfo);
+      this._merkeGanzeNegation(script, result);   // Z7b
     }
 
     if (surpriseNegated) {
@@ -38003,13 +38057,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // the play lock is released. Draining from arbitrary hook/chain
     // points (esp. End-Phase turn-end chains) caused a frozen-turn
     // CPU-deadline trip.
-    // ★ Z7: negierte / fizzelnde Karte war GESPIELT → Einmal-Stempel jetzt (siehe `_noteNegatedPlay`).
-    // Nur Zauber/Attacken/Artefakte/Tränke aus der Hand: Beschwörungen stempeln
-    // `oncePerGame` bewusst erst bei der Landung (v1030, Off Duty), Fähigkeiten/Helden-
-    // und Kreatureneffekte haben eigene Stempel.
-    if ((result.negated || result.fizzled) && !fromBoard && !cardInfo.isPlacement
-        && (cardType === 'Spell' || cardType === 'Attack' || cardType === 'Artifact' || cardType === 'Potion')) {
-      await this._noteNegatedPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
+    // ★ Z7b (Als Entscheidung, Welle 3): eine NEGIERTE Karte (ganz negiert, bevor sie auflöst) war nicht
+    // gespielt — kein Einmal-Stempel. Nur wer FIZZELT (Wirker handlungsunfähig, v1328), durfte auflösen:
+    // das Ergebnis ist verhindert, der Slot verbraucht (siehe `_noteFizzledPlay`). Beschwörungen
+    // stempeln `oncePerGame` weiter erst bei der Landung (v1030), Fähigkeiten/Helden-/Kreatureneffekte
+    // haben eigene Stempel.
+    if (result.fizzled && !result.negated && !fromBoard && !cardInfo.isPlacement
+        && (cardType === 'Spell' || cardType === 'Attack')) {
+      await this._noteFizzledPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
     }
     return result;
   }
@@ -38724,14 +38779,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       ps.hand.splice(actualHandIdx, 1);
 
       // ★ v1031: … und die Partie-Grenze verbrauchen. Der Stempel sitzt
-      // hier, wo die Karte die Hand verlaesst — ab jetzt IST sie
-      // aktiviert („You can only ACTIVATE 1 … per game"), unabhaengig
-      // davon, ob ein Gegenzug sie spaeter negiert.
+      // hier, wo die Karte die Hand verlaesst. ★ Z7b (Als Entscheidung,
+      // Welle 3): wird die Reaktion spaeter GANZ negiert (Cute Camera …),
+      // hat sie nie aufgeloest — `_resolveReactionChain` nimmt den hier
+      // gesetzten Stempel (`link._opgNeu`) dann zurueck. Fizzle behaelt ihn.
+      let _opgNeu = null;
       {
         const _opgScript = loadCardEffect(chosenName);
         if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
           if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-          ps._oncePerGameUsed.add(_opgScript.oncePerGameKey || chosenName);
+          const _opgKey = _opgScript.oncePerGameKey || chosenName;
+          if (!ps._oncePerGameUsed.has(_opgKey)) _opgNeu = _opgKey;
+          ps._oncePerGameUsed.add(_opgKey);
         }
       }
 
@@ -38753,6 +38812,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Master's Plan": die Karte flog aus der Handmitte statt von
         // ihrem Platz.
         fromHandIdx: actualHandIdx,
+        _opgNeu,   // Z7b: Partie-Stempel dieser Aktivierung (Rueckgabe bei ganzer Negation)
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
         // Als Vorgabe 29.9.: Reihe, in die `casterHeroIdx` zeigt (geliehener Wirker).
@@ -38878,6 +38938,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         if (link.negated) {
           this.log('card_negated', { card: link.cardName, owner: link.owner });
+          // Z7b: ganz negierte Reaktion = nie aufgeloest → „1 pro Spiel" (Divine Gift …) nicht verbraucht.
+          if (link._opgNeu) this.gs.players[link.owner]?._oncePerGameUsed?.delete(link._opgNeu);
+          // Z7b: Held-/Board-Creature-Reaktionen (Key, Spearman) stempeln ihre Rundengrenze beim Aktivieren
+          // (`payActivationCost`); die Kosten bleiben bezahlt, die Rundengrenze nicht (optionaler Haken).
+          if (!link.isInitialCard && typeof link.script?.refundOnNegation === 'function') {
+            try { link.script.refundOnNegation(this, link); }
+            catch (err) { console.error(`[Engine] refundOnNegation for ${link.cardName} failed:`, err.message); }
+          }
         } else {
           const _wo = link.casterOwner ?? link.owner;
           const _whi = link.isInitialCard ? link.heroIdx : link.casterHeroIdx;
@@ -39260,24 +39328,22 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ Z7 — „1 pro Zug / 1 pro Spiel" bei NEGIERUNG (eine Regel, eine Stelle).
+   * ★ Z7b — Einmal-Stempel („1 pro Zug / 1 pro Spiel") bei FIZZLE (eine Regel, eine Stelle).
    *
-   * Wann gilt eine Karte als GESPIELT? Sobald sie die Hand verlassen hat und ein
-   * Gegenzug sie später negiert, ändert daran nichts (Ruling v1031 „Divine-Gift-
-   * Grenze"; Rusty Touch „… but your opponent still has to pay its Cost"; die
-   * Engine zählt eine negierte Attack/einen negierten Spell ohnehin als gespielt
-   * — `spellsPlayedThisTurn`, `attacksPlayedThisTurn`). Wer erst im `onPlay`/
-   * `resolve` stempelt, stempelt bei einer Negation nie — die zweite Kopie wirkte
-   * im selben Zug. Deshalb stempelt die Engine hier für jede negierte (oder
-   * fizzelnde, v1328) Initialkarte, die aus der Hand kam:
-   *   • `oncePerGame` / `oncePerGameKey` am Skript: automatisch (`ps._oncePerGameUsed`);
-   *   • Rundensperren: das Skript meldet sie selbst über den optionalen Haken
-   *     `onNegatedPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (Rückgabe
-   *     egal) — dieselbe Marke, die es sonst im `onPlay`/`resolve` setzt.
-   * Abbruch durch den SPIELER ist etwas anderes (Karte kehrt zurück, nichts gilt als
-   * gespielt) und läuft nie hierher.
+   * Leitfrage (Als Entscheidung, Welle 3): „Durfte die Karte resolven?"
+   *   • Ganz negiert („Negate that card/Spell/Artifact/effect": Silence, Master's Plan, Rusty Touch,
+   *     MOE Shield …) → nie aufgelöst → KEIN Stempel (auch nicht bei Divine Gifts); bezahlte Kosten
+   *     bleiben bezahlt. Läuft nie hierher.
+   *   • Aufgelöst, aber das Ergebnis verhindert (Schadens-/Teil-Negierung, Immunität, Zielschutz,
+   *     kein legales Ziel, Fizzle) → die Karte WAR gespielt → Slot verbraucht.
+   * Hierher kommt nur das Fizzle einer Initialkarte, deren Skript-`onPlay` deshalb gar nicht läuft
+   * (Wirker beim Auflösen eingefroren/besiegt/betäubt/negiert, v1328): `oncePerGame`/`oncePerGameKey`
+   * stempelt die Engine, Rundensperren meldet die Karte über den optionalen Haken
+   * `onFizzledPlay({ engine, gs, pi, heroIdx, cardName, cardType })` (dieselbe Marke, die sie sonst
+   * im `onPlay` setzt), und Zähler-Lauscher (Kogarasu) hören auf `afterSpellPrevented`.
+   * Abbruch durch den SPIELER ist wieder etwas anderes (nichts gespielt) und läuft nie hierher.
    */
-  async _noteNegatedPlay(owner, cardName, heroIdx, cardType, casterOwner) {
+  async _noteFizzledPlay(owner, cardName, heroIdx, cardType, casterOwner) {
     const ps = this.gs.players?.[owner];
     if (!ps || !cardName) return;
     const script = loadCardEffect(cardName);
@@ -39286,22 +39352,29 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
     }
-    if (typeof script.onNegatedPlay === 'function') {
-      try { await script.onNegatedPlay({ engine: this, gs: this.gs, pi: owner, heroIdx, cardName, cardType }); }
-      catch (err) { console.error(`[Engine] onNegatedPlay for ${cardName} failed:`, err.message); }
+    if (typeof script.onFizzledPlay === 'function') {
+      try { await script.onFizzledPlay({ engine: this, gs: this.gs, pi: owner, heroIdx, cardName, cardType }); }
+      catch (err) { console.error(`[Engine] onFizzledPlay for ${cardName} failed:`, err.message); }
     }
-    // „Der Held hat einen Zauber BENUTZT" (Kogarasu: „can only use 1 Spell per turn") —
-    // auch wenn er negiert wurde. `afterSpellResolved` feuert dort nie; Hörer dieses
-    // Gegenstücks (nur Heldenzähler, keine Wirkung) lauschen auf `afterSpellNegatedPlay`.
     if (cardType === 'Spell' && Number.isInteger(heroIdx) && heroIdx >= 0) {
-      try {
-        await this.runHooks('afterSpellNegatedPlay', {
-          heroOwner: Number.isInteger(casterOwner) ? casterOwner : owner,
-          spellName: cardName, spellCardData: this._getCardDB()[cardName], heroIdx, casterIdx: owner,
-          _skipReactionCheck: true,
-        });
-      } catch (err) { console.error(`[Engine] afterSpellNegatedPlay for ${cardName} failed:`, err.message); }
+      await this._meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner);
     }
+  }
+
+  /**
+   * ★ Z7b — „Der Zauber durfte auflösen, sein Ergebnis wurde verhindert" (Fizzle oder Teil-Negierung
+   * wie Accidental Dodge/Test Flight). `afterSpellResolved` feuert dort nie; Hörer dieses
+   * Gegenstücks (nur Zähler, z. B. Kogarasu „1 Spell pro Zug" — der Zauber wurde BENUTZT) lauschen auf
+   * `afterSpellPrevented`. Ein ganz negierter Zauber meldet nichts (er hat nie aufgelöst).
+   */
+  async _meldeZauberVerhindert(owner, cardName, heroIdx, casterOwner) {
+    try {
+      await this.runHooks('afterSpellPrevented', {
+        heroOwner: Number.isInteger(casterOwner) ? casterOwner : owner,
+        spellName: cardName, spellCardData: this._getCardDB()[cardName], heroIdx, casterIdx: owner,
+        _skipReactionCheck: true,
+      });
+    } catch (err) { console.error(`[Engine] afterSpellPrevented for ${cardName} failed:`, err.message); }
   }
 
   /**
@@ -41780,8 +41853,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     });
 
     if (chainResult.negated) {
-      if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
-      this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
+      // ★ Z7b (Als Entscheidung, Welle 3): die ganz negierte Aktivierung hat nie aufgeloest — die
+      // Rundensperre (HOPT) bleibt frei; bezahlte Kosten (Aktion) bleiben bezahlt. Frueher: Stempel.
       return true;
     }
 

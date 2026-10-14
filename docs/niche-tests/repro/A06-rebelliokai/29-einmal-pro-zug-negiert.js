@@ -1,11 +1,9 @@
 'use strict';
-// A06-rebelliokai-29 · Negierter Pawn Sacrifice / negierte Mischief Invasion zählen nicht gegen „You can only play 1 … per turn"
+// A06-rebelliokai-29 · Ganz negierter Pawn Sacrifice / negierte Mischief Invasion zählen NICHT gegen „You can only play 1 … per turn" (Als Entscheidung, Welle 3)
 // Kartentexte: Pawn Sacrifice „You can only play 1 "Pawn Sacrifice" per turn." · Mischief Invasion „You can only play 1 "Mischief Invasion" per turn."
-// Präzedenz (gleiche Klasse): S01-02 (Big Oopsie/Butterfly Cloud), A01-pollution-04/-14, F01-19, F02, M02; Ruling CARD_API.md ~Z. 11433
-//   „Der Stempel sitzt dort, wo die Karte die Hand verlässt – ab da IST sie aktiviert, unabhängig davon, ob ein Gegenzug sie später negiert."
-// Beobachtung: pawn-sacrifice.js:136 (`gs.hoptUsed`) und mischief-invasion.js:287 (`ps._mischiefInvasionUsedTurn`) stempeln erst im `onPlay`;
-//   wird der Zauber von Silence negiert, läuft `onPlay` nie. Die zweite Kopie im selben Zug ist spielbar und wirkt.
-// Erwartung (Lesart A „gespielt = gezählt"): die zweite Kopie ist nach der Negierung nicht spielbar.
+// REGEL (CARD_API.md „★ Z7b", ersetzt die Z7-Lesart „gespielt = gezählt" und Ruling v1031): eine komplett negierte Karte (Silence) hat nie aufgelöst → der Einmal-Slot ist
+//   unverbraucht; die zweite Kopie im selben Zug ist spielbar und wirkt. Löst eine Karte auf und nur das Ergebnis wird verhindert, ist der Slot verbraucht.
+// Exit 1 (Fehler tritt auf) = die negierte erste Kopie hat den Zug-Slot verbraucht (zweite Kopie nicht spielbar / ohne Wirkung).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -37,7 +35,7 @@ const H = require('../../lib/h.js');
     const r2 = await t.play(0, name, { hero: 0 });
     const wirkt = name === 'Pawn Sacrifice' ? t.pile(0, 'hand').length > handBefore - 1 + 1   // Karte raus, ≥2 gezogen
                                             : t.zone(0, 0, 1) === 'Mischief Militia - Heli Troopers' || [0, 1, 2].some(hi => [0, 1, 2].some(z => t.zone(0, hi, z) === 'Mischief Militia - Heli Troopers'));
-    R.check(name + ': zweite Kopie im selben Zug NICHT spielbar / ohne Wirkung (Lesart A)', r2 === false || !wirkt, { r2, wirkt, hand: t.pile(0, 'hand').length - handBefore, prompts: t.prompts.map(p => p.d.type + ':' + (p.d.title || '')) });
+    R.check(name + ': zweite Kopie im selben Zug ist spielbar und wirkt (der Slot ist unverbraucht)', r2 === true && wirkt, { r2, wirkt, hand: t.pile(0, 'hand').length - handBefore, prompts: t.prompts.map(p => p.d.type + ':' + (p.d.title || '')) });
     R.check(name + ': keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

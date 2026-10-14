@@ -72,9 +72,9 @@ module.exports = {
     // Record that the equipped Hero has cast a Spell this turn so
     // canPlayCard blocks the next one.
     afterSpellResolved: (ctx) => stampSpellUsed(ctx),
-    // ★ Z7 (A09-17): ein NEGIERTER Zauber ist trotzdem „benutzt" — der Träger bekam
-    // sonst durch die Negation einen Zusatzzauber. Die Engine ruft den Hook aus
-    // `_noteNegatedPlay`, weil `afterSpellResolved` bei Negation nie feuert.
-    afterSpellNegatedPlay: (ctx) => stampSpellUsed(ctx),
+    // ★ Z7b (A09-17, Als Entscheidung, Welle 3): „1 Spell pro Zug" zählt, wenn der Zauber AUFLÖSEN
+    // durfte — auch mit verhindertem Ergebnis (Teil-Negierung, Fizzle): `afterSpellPrevented`.
+    // Ein GANZ negierter Zauber (Silence …) hat nie aufgelöst und verbraucht den Zug-Zauber nicht.
+    afterSpellPrevented: (ctx) => stampSpellUsed(ctx),
   },
 };

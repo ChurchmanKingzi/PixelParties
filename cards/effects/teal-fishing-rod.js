@@ -61,9 +61,6 @@ function zonenFuer(engine, pi, cardName) {
 }
 
 module.exports = {
-  // ★ Z7: negiert/fizzelt = die Karte war trotzdem GESPIELT → Stempel jetzt (Engine: `_noteNegatedPlay`).
-  onNegatedPlay: ({ engine, gs, pi }) => { if (!gs.hoptUsed) gs.hoptUsed = {}; gs.hoptUsed[HOPT(pi)] = gs.turn; },
-
   blockedByPileLock: true,
   blockedBySummonLock: true,
 
