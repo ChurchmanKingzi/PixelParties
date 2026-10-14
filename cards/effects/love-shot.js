@@ -111,8 +111,10 @@ module.exports = {
    * gar keine Magic Arts hat, kommt weiter ueber Wisdom/Divinity —
    * dieselbe Trennung wie bei „Last Resort" (v1104).
    */
-  canBypassLevelReq(gs, pi, heroIdx, cardData) {
+  canBypassLevelReq(gs, pi, heroIdx, cardData, engine) {
     if (cardData?.name !== CARD_NAME) return false;
+    // W4a (Al, Welle 4): unter Ability-Negation (harte Form / Stowaway) hat der Held keinen Zugriff auf Charme.
+    if ((engine || gs._engineRef)?.heroAbilityLevelsBlanked?.(pi, heroIdx)) return false;
     const zonen = gs.players[pi]?.abilityZones?.[heroIdx] || [];
     return zonen.some(slot => Array.isArray(slot) && slot[0] === 'Charme');
   },

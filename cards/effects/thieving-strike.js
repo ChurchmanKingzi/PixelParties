@@ -79,7 +79,9 @@ module.exports = {
    * the Thieving Ability qualifies (the ability itself scales in
    * strength per level, but the bypass clause doesn't).
    */
-  canBypassLevelReq: (gs, pi, heroIdx) => {
+  canBypassLevelReq: (gs, pi, heroIdx, cardData, engine) => {
+    // W4a (Al, Welle 4): unter Ability-Negation (harte Form / Stowaway) hat der Held keinen Zugriff auf Thieving.
+    if ((engine || gs._engineRef)?.heroAbilityLevelsBlanked?.(pi, heroIdx)) return false;
     return _heroHasThieving(gs.players[pi], heroIdx);
   },
 

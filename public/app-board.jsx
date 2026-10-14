@@ -49951,7 +49951,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const _chillyDogLiftsAbZone = !!(gameState.chillyDogActiveSides || [])[_abZoneSide];
           const isFrozenOrStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed)
             || (hero?.statuses?.frozen && !_chillyDogLiftsAbZone)
-            || !!hero?.statuses?.negated?.abilitiesNegated;   // S1: Stowaway negiert die Abilities des Wirts -> Zonen ausgegraut
+            || (!!hero?.statuses?.negated && (!(hero.statuses.negated._byWeakeningCrystal || hero.statuses.negated._fromAttachment || hero.statuses.negated.effectOnly) || !!hero.statuses.negated.abilitiesNegated));   // S1: Stowaway negiert die Abilities des Wirts -> Zonen ausgegraut; W4a: auch harte Standardform
           const abilityAttachActive2 = !isOpp && gameState.effectPrompt?.type === 'abilityAttach' && gameState.effectPrompt?.ownerIdx === myIdx;
           const heroIneligible = !isOpp && abilityDrag && (() => {
             if (abilityAttachActive2) {

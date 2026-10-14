@@ -9597,7 +9597,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
-  if (room.engine.heroAbilitiesNegated?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe
+  if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -10445,7 +10445,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
   // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
   // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
   if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
-  if (room.engine.heroAbilitiesNegated?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe
+  if (room.engine.heroAbilityLevelsBlanked?.(heroOwner, heroIdx)) return false;   // S1 (C05-10): Stowaway, auch bei Charme/Leihe; W4a: auch harte Standardform
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
   // NICHT ueber validateActionPlay — Charme (Lv2 stiehlt eine Handkarte)
