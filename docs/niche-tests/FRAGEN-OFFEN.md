@@ -2,7 +2,9 @@
 
 Aus den ursprünglichen **179 Fragen** ([FRAGEN-AN-AL.md](FRAGEN-AN-AL.md), unverändert als Archiv) bleiben nach den Entscheidungen der Wellen 3–5: **33 beantwortet**, **10 mit Vorschlag aus deinen Entscheidungen** (nur bestätigen), **14 in einer Grundsatzfrage zusammengefasst**, **4 in einer technischen Frage zusammengefasst**, **118 einzeln offen**. Jede Frage nennt die Befund-ID; Details im verlinkten Bericht.
 
-## 1. Grundsatzfrage: stillgelegte Passive (gefroren / betäubt / negiert)
+## 1. Grundsatzfrage: stillgelegte Passive (gefroren / betäubt / negiert) – ENTSCHIEDEN am 14.10.2026
+
+> Al: „Freeze, Stun und Negated unterbrechen *alle* laufende passive Effekte!" Umgesetzt in Welle 7 (siehe [FIXES-WELLE-7.md](FIXES-WELLE-7.md)); neue Folgefragen dort.
 
 Betrifft: A07-20, A08-23, B-01, B-02, B-03, B-09, C03-12, C05-11, H02-heroes-23, H03-heroes-19, H04-06, M02-05, M02-12, R02-23.
 
@@ -10,13 +12,13 @@ Beispiele: The Thing in the Ship, Plant Golem, Elven Forager, King Trex, Ghazma,
 
 **Frage:** Verlieren fortlaufende (passive) Effekte von Karten ihre Wirkung, solange die Karte gefroren, betäubt oder (Effekt-)negiert ist – Konvention "stillgelegt = stumm" – oder gilt "liegt auf dem Brett" wörtlich? Bei Abilities-Negation (Stowaway usw.) gilt nach Welle 4 bereits: Skalierung 0, Ability-Passive stumm. Bitte je Zustand antworten: gefroren / betäubt / Effekt negiert.
 
-## 2. Technische Frage: Server prüft Client-Antworten nach
+## 2. Technische Frage: Server prüft Client-Antworten nach – ENTSCHIEDEN (ja), umgesetzt in Welle 7
 
 Betrifft: B-07, M02-25, S01-13, S01-22 (Chain Lightning Kettenwahl, Zielwahl maxTotal, Wisdom-Kosten in validateActionPlay, CPU-Abbruch bei sacrifice).
 
 **Frage:** Soll der Server Antworten des Clients generell nachprüfen und erzwingen (maxTotal/minRequired, Kettenwahl, Wisdom-Kosten), statt dem Client zu vertrauen? Empfehlung: ja (nur Absicherung, keine Regeländerung).
 
-## 3. Vorschläge aus deinen Entscheidungen (nur bestätigen: ja / nein)
+## 3. Vorschläge aus deinen Entscheidungen – BESTÄTIGT (Sickly Cheese präzisiert), umgesetzt in Welle 7
 
 - **39. [A06-rebelliokai-10](A06-rebelliokai.md)** Camouflaged Kappa opfert sich unter der Knight-[B]-Sperre für nichts → Vorschlag: gesperrt (wie Cool Presents: der einzige Effekt würde scheitern → nicht aktivierbar)
 - **48. [A07-13](A07-guardianbeasts.md)** Hu: 5 Karten und Zugsperre gehen verloren, wenn keine Zusatzaktion möglich ist oder abgebrochen wird → Vorschlag: Hu nur aktivierbar, wenn eine Handkarte spielbar ist (wie Shanty/Cool Presents)
