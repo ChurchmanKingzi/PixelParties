@@ -5,8 +5,9 @@
 //   Hero … from your hand or deck." Regel (CARD_API.md Cats of the Pharaoh v1068): `searchLocked` sperrt „Deck-Suche und Adds", `searchLockedIncludesDiscard` zusätzlich
 //   die Ablage; `handLocked` sperrt Suchen und Adds ebenfalls.
 // Aufbau: Sitz 0 mit Shapeshifter (bzw. Throne Robber), die Wunschgestalt liegt NUR im Deck (bzw. nur in der Ablage); `ps.searchLocked` / `ps.handLocked` gesetzt.
-// Erwartet (Lesart „Suche"): die Gestalt aus dem gesperrten Stapel wird nicht angeboten bzw. nicht entnommen.
-// Beobachtet: Galerie bietet sie an, Verwandlung/Aufstieg gelingt, Karte verlässt Deck bzw. Ablage.
+// ENTSCHEIDUNG AL (Welle 7, 14.10.2026): Shapeshifter/Throne Robber sind NICHT von der Such-Sperre erfasst (wie Alex/Ska/Greenhouse: ein Held aus Deck/Ablage anlegen
+//   ist kein „Karte auf die Hand"). Dieses Skript hält das fest (Exit 0 = die Sperren hindern Verwandlung/Aufstieg nicht). Bis Welle 6 prüfte es die Gegenlesart („gesperrt").
+// Beobachtet (gewollt): Galerie bietet die Gestalt an, Verwandlung/Aufstieg gelingt, Karte verlässt Deck bzw. Ablage.
 // Ursache: `the-shapeshifter.js` `waehlbareGestalten` (~Z. 135 ff.) / `the-throne-robber.js` (~Z. 120 `sammle(ps.mainDeck, 'deck')`) fragen `engine._isSearchBlocked` nicht;
 //   `takeFromPile` prüft nur die Stapel-Ausgangssperre (Knight of Kings [B]), nicht `searchLocked`.
 const H = require('../../lib/h.js');
@@ -26,10 +27,10 @@ const SHAPE = '???, the Shapeshifter', ROBBER = '???, the Throne Robber', F = 'A
   R.check('Kontrolle ohne Sperre: Shapeshifter nimmt Archibald aus dem Deck', k.name === F, k.name);
   for (const [lbl, fn] of [['searchLocked', p => { p.searchLocked = true; }], ['handLocked', p => { p.handLocked = true; }]]) {
     const x = await shape(fn, true);
-    R.check(`Shapeshifter, Archibald nur im Deck, ${lbl}: nicht anlegbar`, x.name !== F, { angeboten: x.angeboten, name: x.name });
+    R.check(`Shapeshifter, Archibald nur im Deck, ${lbl}: trotzdem anlegbar (Sperre erfasst Held anlegen nicht)`, x.name === F, { angeboten: x.angeboten, name: x.name });
   }
   const d = await shape(p => { p.searchLocked = true; p.searchLockedIncludesDiscard = true; }, false);
-  R.check('Shapeshifter, Archibald nur in der Ablage, searchLocked+Ablage: nicht anlegbar', d.name !== F, { angeboten: d.angeboten, name: d.name });
+  R.check('Shapeshifter, Archibald nur in der Ablage, searchLocked+Ablage: trotzdem anlegbar', d.name === F, { angeboten: d.angeboten, name: d.name });
 
   async function robber(sperre) {
     const t = await H.fresh({ heroes: [[SHAPE, H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], hand: [[ROBBER], []], deck: [[DAJAN, ...Array(19).fill(H.INERT.creature)], Array(20).fill(H.INERT.creature)] });
@@ -43,6 +44,7 @@ const SHAPE = '???, the Shapeshifter', ROBBER = '???, the Throne Robber', F = 'A
     return t.hero(0, 0).name;
   }
   R.check('Kontrolle: Throne Robber steigt zu Dajan aus dem Deck auf', (await robber(null)) === DAJAN);
-  R.check('Throne Robber, Dajan nur im Deck, searchLocked: kein Aufstieg', (await robber('searchLocked')) !== DAJAN);
+  R.check('Throne Robber, Dajan nur im Deck, searchLocked: Aufstieg gelingt trotzdem', (await robber('searchLocked')) === DAJAN);
+  R.check('Throne Robber, Dajan nur im Deck, handLocked: Aufstieg gelingt trotzdem', (await robber('handLocked')) === DAJAN);
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });

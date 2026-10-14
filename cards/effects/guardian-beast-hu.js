@@ -45,6 +45,7 @@ const {
   canSummonGuardianBeast,
   inherentActionForFirstSummon,
   promptAndDeleteFromBothDiscards,
+  ruecklegenGeloeschteAblagekarten,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
 
@@ -70,7 +71,20 @@ module.exports = {
     if (total < DELETE_COST) return false;
     // At least one alive Hero must exist on this side — otherwise the
     // bonus action has no possible recipient.
-    return (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    if (!(ps.heroes || []).some(h => h?.name && h.hp > 0)) return false;
+    // ★ W7b (A07-13, Al 14.10.): Hu ist nur aktivierbar, wenn die geschenkte Aktion auch stattfinden kann (eine Handkarte
+    // spielbar, eine Ability-/Helden-Aktion moeglich) - sonst waeren die 5 Karten umsonst geloescht. Die Pruefung laeuft
+    // vor der Zahlung; ein Guardian Beast auf der Hand ist erst spielbar, wenn die EIGENE Ablage leer ist (`canSummon`).
+    // Reichen die Loeschkosten dafuer (hoechstens 5 Karten in der eigenen Ablage), gilt die leere Ablage als erreichbar.
+    const aktion = { title: CARD_NAME };
+    if (engine.canPerformImmediateActionAnyHero(pi, aktion)) return true;
+    const eigene = ps.discardPile || [];
+    if (eigene.length > 0 && eigene.length <= DELETE_COST) {
+      ps.discardPile = [];
+      try { return engine.canPerformImmediateActionAnyHero(pi, aktion); }
+      finally { ps.discardPile = eigene; }
+    }
+    return false;
   },
 
   async onCreatureEffect(ctx) {
@@ -105,6 +119,14 @@ module.exports = {
       description: 'Use an additional Action with any of your Heroes!',
       cancellable: true,
     });
+    // ★ W7b (A07-13, Al 14.10.): findet die Aktion nicht statt (Aktionswahl abgebrochen oder nichts spielbar), gehen die
+    // 5 Karten in ihre Ablagen zurueck und der Effekt gilt als nicht benutzt (`false` gibt die Einmal-Sperre frei).
+    if (!result?.played) {
+      ruecklegenGeloeschteAblagekarten(engine, deleted);
+      engine.log('guardian_beast_hu_refund', { player: ps.username });
+      engine.sync();
+      return false;
+    }
 
     engine.log('guardian_beast_hu_grant_action', {
       player: ps.username,

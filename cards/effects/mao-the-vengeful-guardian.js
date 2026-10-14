@@ -29,6 +29,7 @@
 const {
   promptAndDeleteFromBothDiscards,
   isGuardianBeastCreature,
+  ruecklegenGeloeschteAblagekarten,
 } = require('./_guardian-beasts-shared');
 const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
 
@@ -49,6 +50,9 @@ function isRefirable(engine, pi, inst) {
   if (inst.counters?.negated || inst.counters?.nulled) return false;
   const script = inst.loadScript ? inst.loadScript() : null;
   if (!script?.creatureEffect || typeof script.onCreatureEffect !== 'function') return false;
+  // W7b (A07-18, Al 14.10.): nur Bestien, deren Effekt gerade aktivierbar ist (dasselbe Karten-Gate wie bei der normalen
+  // Aktivierung, `canActivateCreatureEffect`) - sonst zahlte Mao 5 Karten und negierte eine Bestie, die gar nicht feuern kann.
+  if (!engine.creatureEffectScriptAllows(inst)) return false;
   return true;
 }
 
@@ -148,6 +152,15 @@ module.exports = {
         player: ps.username, reason: 'partial_delete_or_cancel',
         deleted: deleted ? deleted.length : 0,
       });
+      return false;
+    }
+
+    // W7b (A07-18): die Zahlung selbst kann das Karten-Gate der Bestie kippen (z. B. weniger Karten in den Ablagen als
+    // ihre eigenen Kosten verlangen) - dann kann sie nicht feuern: die 5 Karten gehen zurueck, nichts wird negiert.
+    if (!engine.creatureEffectScriptAllows(inst)) {
+      ruecklegenGeloeschteAblagekarten(engine, deleted);
+      engine.log('mao_fizzle', { player: ps.username, reason: 'refire_impossible_after_cost' });
+      engine.sync();
       return false;
     }
 

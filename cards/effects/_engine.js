@@ -22534,6 +22534,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     await this._delay(Math.round(dauer * anteil) + 30);
   }
   /**
+   * ★ W7b (A07-13, Al 14.10.): Bietet `performImmediateActionAnyHero` dem Spieler ueberhaupt etwas an? Dieselbe Sammlung
+   * wie dort (spielbare Handkarten je lebendem Helden, Ability-Aktionen, Helden-Effekte mit Aktionskosten), ohne Abfrage.
+   * Fuer Karten, deren Kosten sich nur lohnen, wenn die geschenkte Aktion auch stattfinden kann (Guardian Beast Hu):
+   * ein Effekt, der so nicht feuern kann, ist nicht aktivierbar. Gleiche Filter-Optionen wie die Aktion (`config`).
+   */
+  canPerformImmediateActionAnyHero(playerIdx, config = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    const cardDB = this._getCardDB();
+    const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      let karten = this.getHeroEligibleActionCards(playerIdx, hi);
+      if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
+      if (typeof config.cardNameFilter === 'function') {
+        try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
+      }
+      if (karten.length > 0) return true;
+      if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
+      if (!eingeschraenkt && !config.skipHeroEffects
+          && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
+    }
+    return false;
+  }
+  /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
    * without restricting to a single hero — the player drags a card onto
    * whichever hero they want, just like during the normal Action Phase.
@@ -45801,6 +45827,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (statusName !== 'stunned' && statusName !== 'frozen') return false;
     if (opts.renew === true) return false;
     return !!(target && target.statuses && target.statuses[statusName]);
+  }
+
+  /**
+   * ★ W7b (F03-12, Al 14.10.: „Giftimmun macht ein Ziel ineligible"): Wuerde `addHeroStatus` diesen Status auf diesem Helden
+   * gerade abweisen? Nur die ZUSTANDS-Immunitaeten, die schon vor dem Effekt feststehen (gleiche Reihenfolge/Quellen wie in
+   * `addHeroStatus`: Charme, Shielded, Johanna, Light Ball, Immunitaets-Anhaengsel, Submerged, `negative_status_immune`,
+   * Einzel-Immunitaet wie `poison_immune`, CC-`immune`) - keine Quellen-/Aufloesungs-Schutze (Effekt-Immunitaet, Anti Magic).
+   * Fuer Kosten-Karten, die einen Status auf den eigenen Helden legen MUESSEN (Sickly Cheese): ein solcher Held ist kein
+   * waehlbares Ziel. `opts.appliedBy` = Seite der Quelle (Charme-Schutz), `opts.bypassImmune` wie dort.
+   */
+  heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    const statusDef = STATUS_EFFECTS[statusName];
+    if (statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
+    if (hero.statuses?.shielded && statusName !== 'shielded') return true;
+    if (statusDef?.negative) {
+      if (this._johannaSchuetzt(hero)) return true;
+      if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
+      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx)) return true;
+    }
+    if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
+    if (statusDef?.negative && hero.buffs?.negative_status_immune) return true;
+    if (!opts.bypassImmune && hero.statuses?.immune && ['frozen', 'stunned', 'negated', 'bound'].includes(statusName)) return true;
+    if (statusDef?.immuneKey && hero.statuses?.[statusDef.immuneKey]) return true;
+    return false;
   }
 
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {

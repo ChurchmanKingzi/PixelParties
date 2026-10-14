@@ -70,6 +70,9 @@ module.exports = {
     // Z6 (H03-13): ein NEGIERTER Santa wirkt nicht - sein "must"-Preis entfaellt (der Hook ist stillgelegt), also darf auch die
     // Spielbarkeits-Sperre nicht greifen (Saint Nicolas macht es ebenso).
     if (ps.heroes?.[heroIdx]?.statuses?.negated) return true;
+    // W7b (H03-14, Al 14.10.): kann die Gegenseite die Pflicht-Karten nicht annehmen (Hand-/Such-Sperre), wuerde der „must"-Preis
+    // nie faellig - die Aktion waere gratis. Dann gesperrt (wie Saint Nicolas, Cool Presents).
+    if (engine?._isSearchBlocked && engine._isSearchBlocked(engine.opponentOf(gs.players.indexOf(ps)), {}, 'deck')) return false;
     // Kommt die Karte von der Hand, liegt sie zum Pruefzeitpunkt noch
     // dort und zaehlt nicht als Reserve. Ohne Herkunftsangabe (alte
     // Aufrufer) wird der Hand-Fall angenommen — das ist die sichere

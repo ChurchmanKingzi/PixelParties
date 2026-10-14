@@ -78,6 +78,11 @@ module.exports = {
     // Hand-lock gate — see actionAddCardFromDeckToHand. The deck pull
     // would silently fizzle and we'd waste the sacrifice.
     if (ps.handLocked) return false;
+    // ★ W7b (A06-rebelliokai-10, Al 14.10.): ein Opfer-Effekt, dessen Hauptwirkung (die Suche) durch eine Sperre unmoeglich
+    // ist, ist gar nicht aktivierbar - das Opfer bleibt erspart. Gesperrt ist die Suche durch die Stapel-Ausgangssperre
+    // (Knight of Kings [B], `pileOutAllowed`) und durch die Such-Sperre (Cats of the Pharaoh, Siege).
+    if (!engine.pileOutAllowed(ctx.cardOwner, 'deck', { sourceOwner: ctx.cardOwner })) return false;
+    if (engine._isSearchBlocked(ctx.cardOwner, {}, 'deck')) return false;
     return true;
   },
 
