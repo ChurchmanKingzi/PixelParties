@@ -11682,14 +11682,10 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   // Z6 (M01-10, S01-19): Namenssperre (Inventing Lv3, Divine Gift of Creation …) auch fuer Surprises.
   if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
 
-  // Once-per-game Surprises (Tharxian Horse, etc.) can only be played
-  // ONCE per game. The client grays the card out via
-  // `getBlockedSpells`, but the server must also enforce it so a
-  // hand-jiggle / replay attempt can't bypass the lock.
-  if (script.oncePerGame) {
-    const opgKey = script.oncePerGameKey || cardName;
-    if (ps._oncePerGameUsed?.has(opgKey)) return false;
-  }
+  // Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) gilt für die
+  // AKTIVIERUNG, nicht fürs verdeckte Setzen — kein Tor, kein Stempel hier; beliebig viele Kopien dürfen
+  // (auch an mehreren Helden) liegen. Verbraucht wird die Grenze in `_activateSurprise`
+  // (nicht negierte Aktivierung), gesperrt wird sie in `_canHeroActivateSurprise`.
 
   // Als Vorgabe 29.9.: Surprise an einen geliehenen Gegnerhelden setzen.
   if (heroOwner != null && heroOwner !== pi) {
@@ -11720,11 +11716,6 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
     const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, bakhmSlot);
     inst.faceDown = true;
 
-    if (script.oncePerGame) {
-      if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-      ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-    }
-
     room.engine.log('surprise_set', { player: ps.username, hero: hero.name, bakhmSlot: true });
     broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: bakhmSlot, faceDown: true });
 
@@ -11747,11 +11738,6 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
   const inst = room.engine._trackCard(cardName, pi, 'surprise', heroIdx, 0);
   inst.faceDown = true;
-
-  if (script.oncePerGame) {
-    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-  }
 
   room.engine.log('surprise_set', { player: ps.username, hero: hero.name });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true });
@@ -11790,11 +11776,6 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
   const inst = engine._trackCard(cardName, heroOwner, 'surprise', heroIdx, 0);
   inst.originalOwner = pi;
   inst.faceDown = true;
-
-  if (script?.oncePerGame) {
-    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-  }
 
   engine.log('surprise_set', { player: ps.username, hero: hero.name, foreignHero: true });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true, destOwner: heroOwner });

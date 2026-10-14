@@ -30,9 +30,14 @@
 //     dependent costs are ALL respected. Necromancy deliberately
 //     bypasses beforeSummon; Tharxian Horse does the opposite.
 //   • Once-per-game: `oncePerGame: true` + `oncePerGameKey: 'Tharxian Horse'`.
-//     The engine's `getBlockedSpells` grays the hand copy out after
-//     the first play; `server.js doPlaySurprise` also enforces it and
-//     marks `_oncePerGameUsed` when set.
+//     ★ Z7c (Als Entscheidung, Welle 3): die Grenze gilt für die
+//     AKTIVIERUNG, nicht fürs verdeckte Setzen. Beliebig viele Kopien
+//     dürfen (auch an mehreren Helden) verdeckt liegen; erst die nicht
+//     negierte Aktivierung (`_activateSurprise`) stempelt
+//     `_oncePerGameUsed`, danach lösen weitere Kopien nicht mehr aus
+//     (`_canHeroActivateSurprise`) und bleiben verdeckt liegen. Eine
+//     komplett negierte Aktivierung (Boots of Hermes) lässt die Grenze
+//     unverbraucht (Z7b).
 //   • Telekinesis disallowed (no real triggering effect to negate, no
 //     attacker to damage). Same gate Frost Rune / Magic Mirror use.
 // ═══════════════════════════════════════════
