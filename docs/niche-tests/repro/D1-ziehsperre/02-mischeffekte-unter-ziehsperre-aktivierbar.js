@@ -77,6 +77,28 @@ const FAELLE = [
     const picker = t.prompts.find(p => p.d.type === 'optionPicker');
     R.check('Sparkfly Queen unter drawLocked: Architect-Modus (reiner Zug) wird nicht angeboten', !picker || !(picker.d.options || []).some(o => o.id === 'architect'), { optionen: picker?.d.options });
   }
+  // Staff of the Teleporter / Staff of Uncontrollable Destruction (Antwort von Al): Mischen bzw. Abwerfen ist eigenständig, nur der Nachzug entfällt
+  for (const sperre of ['drawLocked', 'handLocked']) {
+    for (const staff of ['Staff of the Teleporter', 'Staff of Uncontrollable Destruction']) {
+      const t = await H.fresh({ hand: [[staff, 'Bird', 'Bird', 'Bird'], []], deckSize: 20, gold: 100 });
+      t.script.push({ match: d => d.type === 'handPick', answer: (d) => ({ selectedCards: (d.eligibleIndices || []).map(i => ({ handIndex: i, cardName: t.pile(0, 'hand')[i] })) }) });
+      t.gs.players[0][sperre] = true;
+      const r = await t.play(0, staff);
+      R.check(`${staff} unter ${sperre}: bleibt spielbar (Hand wird gemischt/abgeworfen, nichts nachgezogen)`, r === true && !t.pile(0, 'hand').includes(staff) && t.pile(0, 'hand').length === 0, { r, hand: t.pile(0, 'hand') });
+      R.check(`${staff} unter ${sperre}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
+    }
+  }
+  // Crystal Well (Antwort von Al): Karte-geben ist eigenständig, nur das Ziehen verpufft
+  for (const sperre of ['drawLocked', 'handLocked']) {
+    const t = await H.fresh({ hand: [[F, F], []], deck: [Array(4).fill(F), Array(3).fill(F)] });
+    t.putArea(0, 'Crystal Well');
+    t.gs.players[0][sperre] = true;
+    t.gs.activePlayer = 0; t.phase(2); t.reset();
+    t.script.push({ match: d => d && d.type === 'pickHandCard', answer: (d) => ({ handIndex: d.eligibleIndices[0], cardName: t.pile(0, 'hand')[d.eligibleIndices[0]] }) });
+    await t.run(() => t.engine.activateAreaEffect(0, 0, 'Crystal Well'));
+    R.check(`Crystal Well unter ${sperre}: bleibt aktivierbar (Karte gegeben, nichts gezogen)`, t.pile(0, 'hand').length === 1 && t.pile(1, 'hand').length === 1, { hand0: t.pile(0, 'hand').length, hand1: t.pile(1, 'hand').length });
+    R.check(`Crystal Well unter ${sperre}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
+  }
   // Horn in a Bottle (Trank: zurückmischen -> zieh +1): unter drawLocked spielbar (unter handLocked sperrt der Loader-Auto-Tagger sie seit jeher)
   {
     const t = await H.fresh({ hand: [['Horn in a Bottle', 'Fireball', 'Heal'], []], deckSize: 20 });

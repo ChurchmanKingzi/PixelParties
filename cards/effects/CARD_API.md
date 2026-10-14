@@ -15878,14 +15878,18 @@ Aktivierung/Karte weiterhin gespielt werden, solange **nicht der KOMPLETTE Effek
   (kein Angebot, keine Ladung). Pruefer: `drawBlockedFor(engine, pi[, N])` im `canActivate*`-/`canFreeActivate`-/`canPlayWithHero`-Gate
   bzw. die Flaggen `blockedByDrawLock`/`blockedByHandLock` bei Handkarten.
 * **Aktivierbar bleibt** jede Mischung mit etwas Eigenstaendigem — Abwerfen (Triceras, Pteranos, Techno Harpyformer, Future Tech Drone,
-  Heinz, Champion, Inventing Lv1/2, Prayer), Zurueckmischen (Elana, Leadership, Horn in a Bottle), Loeschen aus den Ablagen
+  Heinz, Champion, Inventing Lv1/2, Prayer), Zurueckmischen (Elana, Leadership, Horn in a Bottle, die Staebe), Loeschen aus den Ablagen
   (Guardian Beast Tu), Suchen, Auf-die-Hand-Nehmen, Opfern ... "Es gibt Decks, die abwerfen wollen": man wirft dann nur ab, gezogen wird
   nichts. Diese Skripte pruefen die Zieh-/Hand-Sperre **nicht** (Z6 hatte Heinz gesperrt und Triceras/Pteranos/Heinz hingen an
   `handLocked` — D1 hat das zurueckgenommen). Die KI schont sich (`cpuMeta.shouldActivateNow` bei Triceras/Pteranos); der Engine-Pfad der Menschen ist frei.
 * **Tuscan Artist** (genau 2/3, Ruling 16.8.) bleibt unveraendert: `drawWouldBeBlocked` sitzt weiter in den Gates, auch bei Mischeffekten
   (Triceras, Pteranos, Techno, Freshya ...).
-* Offen/Frage an Al: Crystal Well und die Staebe (Teleporter, Uncontrollable Destruction) — der Preis ist hier eine Hand-/Gegner-Verschiebung;
-  sie bleiben wie sie waren (gesperrt).
+* **Auch Mischeffekte (Antwort von Al):** Staff of the Teleporter / Staff of Uncontrollable Destruction (Mischen bzw. Abwerfen der Hand) und
+  Crystal Well (Karte dem Gegner geben) bleiben unter Zieh-/Hand-Sperre aktivierbar - nur das Nachziehen entfaellt ("nur das Ziehen
+  sperren"). Die Staebe tragen dafuer ausdruecklich `blockedByHandLock: false` (schlaegt den Auto-Tagger) und kein `blockedByDrawLock`;
+  die KI spielt sie unter der Sperre nicht blind (`cpuMeta.alwaysCommit` als Funktion).
+* Bleibt gesperrt (Antwort von Al): "danach abwerfen" / "danach nicht mehr ziehen" als Nachteil des Zuges (Skeleton Mage, Clever Puppet
+  Saras, Wheels, Kazena, Ice Sculpture Garden); Alchemy Lv1-3; Heinz ist offen.
 
 
 ## Neue Karte: „Cats of the Pharaoh" (v1068) — NEUE SPIELER-SPERRE

@@ -49,7 +49,8 @@ const H = require('../../lib/h.js');
     await t.run(() => t.engine.activateAreaEffect(0, 0, 'Crystal Well'));
     const verschenkt = 2 - t.pile(0, 'hand').length;   // Hand 2 -> 1 und nichts gezogen
     R.note('(d) Crystal Well unter Zieh-Sperre', JSON.stringify({ hand0: t.pile(0, 'hand').length, hand1: t.pile(1, 'hand').length }));
-    R.check('(d) Crystal Well unter Zieh-Sperre: Karte wird nicht ohne Gegenleistung verschenkt', verschenkt === 0, { hand0: t.pile(0, 'hand').length, hand1: t.pile(1, 'hand').length });
+    // ★ ENTSCHIEDEN (Al, Welle 3 / D1): Karte-geben ist eigenständig – die Aktivierung bleibt unter der Zieh-Sperre möglich, nur das Ziehen verpufft.
+    R.check('(d) Crystal Well unter Zieh-Sperre: Mischeffekt bleibt aktivierbar (Karte wird gegeben, nichts gezogen)', verschenkt === 1 && t.pile(1, 'hand').length === 1, { hand0: t.pile(0, 'hand').length, hand1: t.pile(1, 'hand').length });
   }
   R.check('keine Engine-Fehler', a.err + b.err + c.err === 0);
   R.finish();
