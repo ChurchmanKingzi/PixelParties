@@ -48,6 +48,7 @@ function stacksOf(engine, pi, heroIdx) {
   // unberuehrbar (v1375) — die Kosten waeren nicht bezahlbar, also kein Stapel.
   const _held = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (engine.istTemporaerGesteuert?.(_held)) return [];
+  if (engine.heroAbilityLevelsBlanked(pi, heroIdx)) return [];   // W4a (Al, Welle 4): unter Ability-Negation kein Zugriff auf einen Level-3-Stapel
   // Ability-Zonen UND echte Stapel in Support Zones (Xal, Xalibur, v805);
   // Karten, die nur als Ability GELTEN (Cloak of Edge), haben keinen Stapel.
   return engine.getAbilityTargets(pi, { heroIdx })

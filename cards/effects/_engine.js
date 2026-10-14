@@ -6779,7 +6779,8 @@ class GameEngine {
   _abilityNegatedOnHero(pi, heroIdx, abilityName) {
     if (!abilityName) return false;
     // S1 (C05-10): Stowaway negiert ALLE Abilities des Wirts (`heroAbilitiesNegated`).
-    if (this.heroAbilitiesNegated(pi, heroIdx)) return true;
+    // W4a (Al, Welle 4): "Jede Negierung von Abilities" - auch die harte Standardform sperrt die Aktivierung (`heroAbilityLevelsBlanked`).
+    if (this.heroAbilityLevelsBlanked(pi, heroIdx)) return true;
     for (const inst of this.cardInstances) {
       if (inst.zone !== ZONES.SUPPORT) continue;
       if (inst.heroIdx !== heroIdx || inst.owner !== pi) continue;
@@ -44060,6 +44061,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (q.physOwner === playerIdx && q.heroIdx === heroIdx) continue;
       if (!(q.hero.hp > 0)) continue;
       if (!this.heldTraegtKommunikationsGeraet(q.physOwner, q.heroIdx)) continue;
+      if (this.heroAbilityLevelsBlanked(q.physOwner, q.heroIdx)) continue;   // W4a: Abilities des Gebers negiert -> kein Zugriff
       out.push([
         ...(this.gs.players[q.physOwner]?.abilityZones?.[q.heroIdx] || [[], [], []]),
         ...this.heroSupportAbilityStacks(q.physOwner, q.heroIdx),

@@ -62,6 +62,7 @@ function schulenZaehlen(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;               // „undefeated"
+    if (engine.heroAbilityLevelsBlanked(pi, hi)) continue;    // W4a (Al): Abilities negiert -> zaehlen nicht (Skalierung 0)
     for (const s of spellSchoolAbilitiesOn(ps.abilityZones?.[hi], SPELL_SCHOOL_ABILITIES)) {
       namen.add(s);
     }

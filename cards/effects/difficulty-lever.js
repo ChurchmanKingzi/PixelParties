@@ -74,6 +74,7 @@ function schulenDerPartei(engine, pi) {
   // kontrollierten Helden; ihre Ability-Zonen liegen in der physischen Spalte.
   const raus = new Set();
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
+    if (engine.heroAbilityLevelsBlanked(physOwner, hi)) continue;   // W4a (Al): negierte Abilities zaehlen nicht als "hat die Schule"
     const zonen = engine.gs.players[physOwner]?.abilityZones?.[hi];
     for (const s of spellSchoolAbilitiesOn(zonen, SPELL_SCHOOL_ABILITIES)) raus.add(s);
   }
