@@ -1635,6 +1635,150 @@ function makeFlightTiltLayer(card, opts, doc) {
 }
 
 // ═══════════════════════════════════════════
+//  TOKEN-ZERFALL (W6, Al 14.10.2026)
+// ═══════════════════════════════════════════
+// „Das optische Token-Fliegen muss weg, stattdessen sollen sie (außer sie haben Träger-Karten wie bei Biomancy)
+// desintegrieren." Ein Token, der das Brett verlässt, kommt in keinen Stapel (Engine: `tokenAbgang`) — die Engine
+// sendet für ihn daher keinen Stapel-Flug mehr (`_tokenStapelFlug`), sondern `token_disintegrate`
+// { owner, heroIdx, slotIdx, cardName, unterkarte }. Der Client lässt das Kartenbild an seinem Platz in Pixel
+// zerfallen: die Karte wird zu einem groben Pixelraster (Zellen = ein Farbwert des Kartenbilds), die Zellen lösen sich
+// schräg von links unten nach rechts oben, steigen auf, verfärben sich zu violetter Asche und verblassen gedithert
+// (Bayer wie die übrigen Pixelart-Animationen; Vorbild: Disarm, `disarm_snap`). Liegt eine echte Karte darunter
+// (Biomancy-/Boulder-Token), fliegt SIE weiter in den Gelöscht-Stapel (Flug-Handler), der Token zerfällt zusätzlich.
+// `window._playAnimations === false`: kein Effekt (die Karte ist einfach weg). `prefers-reduced-motion`: nur ein kurzes
+// Ausblenden des Kartenbilds, keine Partikel. Rückgabe: Dauer in ms (0 = nichts gespielt).
+const TOKEN_ZERFALL_MS = 1250;
+const TOKEN_ZERFALL_REDUZIERT_MS = 350;
+function tokenZerfallSpielen(srcEl, cardName) {
+  if (!srcEl || typeof srcEl.getBoundingClientRect !== 'function' || typeof document === 'undefined') return 0;
+  if (window._playAnimations === false) return 0;
+  const m = kartenMassAmBildschirm(srcEl, 'brett');
+  const zr = srcEl.getBoundingClientRect();
+  if (!(m.b > 4) || !(zr.width > 4)) return 0;
+  // Weltverankerung wie der Flug-Handler (v1262): liegt die Zone im Feld, hängt der Effekt in der Welt-Schicht.
+  const anker = window.ppFxWeltAnker ? window.ppFxWeltAnker(srcEl) : { welt: false, dx: 0, dy: 0 };
+  const mx = zr.left + zr.width / 2 + anker.dx, my = zr.top + zr.height / 2 + anker.dy;
+  const url = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  let reduziert = false;
+  try { reduziert = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch {}
+  const card = document.createElement('div');
+  card.className = 'card-flight token-zerfall';
+  card.setAttribute('aria-hidden', 'true');
+  card.setAttribute('data-pp-px', 'aus');
+  card.style.cssText = [
+    'position:fixed', `left:${Math.round(mx - m.b / 2)}px`, `top:${Math.round(my - m.h / 2)}px`,
+    `width:${m.b}px`, `height:${m.h}px`, 'z-index:10200', 'pointer-events:none',
+  ].join(';');
+  // Die Karte stand auf der geneigten Brettebene: gleiche Neigung, damit sie nicht im ersten Bild flach umklappt
+  // (die Keyframes der Flugkarte gibt es erst nach dem ersten Flug, deshalb statisch statt per Animation).
+  const neigung = readBoardTiltDeg(document);
+  const inhalt = makeFlightTiltLayer(card, { startDeg: neigung, endDeg: neigung }, document);
+  if (inhalt !== card) { inhalt.style.animation = 'none'; inhalt.style.transform = `rotateX(${neigung}deg)`; inhalt.style.overflow = 'visible'; }
+  const bild = document.createElement('img');
+  bild.draggable = false;
+  bild.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;border-radius:4px;opacity:1;transition:opacity 320ms linear;';
+  if (url) bild.src = url; else bild.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+  inhalt.appendChild(bild);
+  (anker.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
+  if (reduziert) {
+    void bild.offsetWidth;
+    bild.style.opacity = '0';
+    setTimeout(() => card.remove(), TOKEN_ZERFALL_REDUZIERT_MS + 80);
+    return TOKEN_ZERFALL_REDUZIERT_MS;
+  }
+  let raf = 0, fertig = false;
+  const aufraeumen = () => { if (fertig) return; fertig = true; cancelAnimationFrame(raf); card.remove(); };
+  setTimeout(aufraeumen, TOKEN_ZERFALL_MS + 250);
+  let gestartet = false;
+  const los = (im) => {
+    if (fertig || gestartet) return;
+    gestartet = true;
+    // Raster: ca. 22 Zellen breit, mindestens 2 Bildschirmpixel je Zelle; 14 Zellen Rand für die aufsteigende Asche.
+    const P = Math.max(2, Math.round(m.b / 22));
+    const gw = Math.max(8, Math.round(m.b / P)), gh = Math.max(10, Math.round(m.h / P));
+    const PAD = 14, cw = gw + PAD * 2, ch = gh + PAD * 2;
+    const cv = document.createElement('canvas');
+    cv.width = cw; cv.height = ch;
+    cv.style.cssText = [
+      'position:absolute', `left:${Math.round((m.b - gw * P) / 2 - PAD * P)}px`, `top:${Math.round((m.h - gh * P) / 2 - PAD * P)}px`,
+      `width:${cw * P}px`, `height:${ch * P}px`, 'image-rendering:pixelated', 'pointer-events:none',
+    ].join(';');
+    let daten = null;
+    if (im) {
+      try {
+        const o = document.createElement('canvas');
+        o.width = gw; o.height = gh;
+        const oc = o.getContext('2d');
+        oc.drawImage(im, 0, 0, gw, gh);
+        daten = oc.getImageData(0, 0, gw, gh).data;
+      } catch { daten = null; }   // z. B. fremde Herkunft des Bildes: Farbpalette statt Kartenfarben
+    }
+    const PAL = [[200, 150, 255], [150, 90, 220], [240, 220, 255], [110, 60, 170]];
+    const ASCHE = [74, 52, 92], BLITZ = [244, 232, 255];
+    const zellen = [];
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+      let c;
+      if (daten) { const i = (y * gw + x) * 4; if (daten[i + 3] < 100) continue; c = [daten[i], daten[i + 1], daten[i + 2]]; }
+      else c = PAL[(x * 7 + y * 3) & 3];
+      zellen.push({
+        x, y, c,
+        ab: ((x / gw) * 0.55 + (1 - y / gh) * 0.45) * 420 + Math.random() * 200,   // Welle von links unten nach rechts oben
+        leben: 320 + Math.random() * 240,
+        vx: (Math.random() - 0.4) * 16, vy: -(4 + Math.random() * 18),             // Zellen je Sekunde
+      });
+    }
+    let ende = 0;
+    for (const z of zellen) ende = Math.max(ende, z.ab + z.leben);
+    ende = Math.min(ende, TOKEN_ZERFALL_MS);
+    const ctx = cv.getContext('2d');
+    const buf = ctx.createImageData(cw, ch), px = buf.data;
+    const put = (fx, fy, c, a) => {
+      const X = Math.round(fx) + PAD, Y = Math.round(fy) + PAD;
+      if (X < 0 || Y < 0 || X >= cw || Y >= ch || a <= 0) return;
+      if (a < 1 && ppBayer(X, Y) >= a) return;
+      const i = (Y * cw + X) * 4;
+      px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255;
+    };
+    const mische = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+    const t0 = performance.now();
+    let letzte = -1;
+    const schritt = (jetzt) => {
+      if (fertig) return;
+      const t = jetzt - t0;
+      const fr = Math.floor(t / 33);                       // ~30 Bilder/s wie die übrigen Pixelart-Animationen
+      if (fr !== letzte) {
+        letzte = fr;
+        px.fill(0);
+        for (const z of zellen) {
+          const al = t - z.ab;
+          if (al < 0) { put(z.x, z.y, z.c, 1); continue; }
+          if (al >= z.leben) continue;
+          const k = al / z.leben, sek = al / 1000;
+          let col = mische(z.c, ASCHE, Math.min(1, k * 1.3) * 0.65);
+          if (al < 90) col = mische(col, BLITZ, 0.55 * (1 - al / 90));   // kurzes Aufblitzen beim Lösen
+          put(z.x + z.vx * sek, z.y + z.vy * sek, col, 1 - k);
+        }
+        ctx.putImageData(buf, 0, 0);
+      }
+      if (t < ende + 40) raf = requestAnimationFrame(schritt); else aufraeumen();
+    };
+    inhalt.appendChild(cv);
+    bild.style.opacity = '0';                               // das scharfe Bild blendet weg, das Raster zerfällt
+    schritt(t0);                                            // erstes Bild sofort (grobes Raster unter dem scharfen Bild), danach per rAF
+  };
+  if (!url) los(null);
+  else {
+    const im = new Image();
+    im.onload = () => los(im);
+    im.onerror = () => los(null);
+    im.src = url;
+    if (im.complete && im.naturalWidth) los(im);
+  }
+  return TOKEN_ZERFALL_MS;
+}
+if (typeof window !== 'undefined') window.tokenZerfallSpielen = tokenZerfallSpielen;
+
+// ═══════════════════════════════════════════
 //  MODULAR GAME ANIMATION SYSTEM
 //  Add new animation types by adding to ANIM_REGISTRY.
 //  Usage: playAnimation('explosion', '#target-selector', { duration: 800 })
@@ -43768,6 +43912,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else spawnFlight();
     };
     socket.on('play_pile_transfer', onPileTransfer);
+    // ★ W6: Token verlässt das Brett → zerfällt an seinem Platz (kein Stapel-Flug; siehe `tokenZerfallSpielen`).
+    const onTokenDisintegrate = ({ owner, heroIdx, slotIdx, cardName }) => {
+      if (owner == null || heroIdx == null || slotIdx == null) return;
+      const label = owner === myIdx ? 'me' : 'opp';
+      const zoneEl = document.querySelector(`[data-support-zone][data-support-owner="${label}"][data-support-hero="${heroIdx}"][data-support-slot="${slotIdx}"]`);
+      const ms = tokenZerfallSpielen(zoneEl, cardName);
+      if (!ms) return;
+      // Der Token steht bis zum nächsten Sync noch im Zustand: sein Platz wird verdeckt, solange die Kopie zerfällt.
+      const hideKey = `${owner}-${heroIdx}-${slotIdx}::${cardName || ''}`;
+      setBounceOutgoingHidden(prev => { const next = new Set(prev); next.add(hideKey); return next; });
+      setTimeout(() => {
+        setBounceOutgoingHidden(prev => {
+          if (!prev.has(hideKey)) return prev;
+          const next = new Set(prev); next.delete(hideKey); return next;
+        });
+      }, ms + 100);
+    };
+    socket.on('token_disintegrate', onTokenDisintegrate);
 
     // Kassaran reveal flip — server emits this event BEFORE mutating
     // state, so we can suppress the auto-draw / deckTopVisible diff
@@ -46114,6 +46276,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('divine_time_rewind', onDivineTimeRewind);
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
+      socket.off('token_disintegrate', onTokenDisintegrate);
       socket.off('hand_card_present', onHandCardPresent);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('chaos_magic_reveal', onChaosMagicReveal);
