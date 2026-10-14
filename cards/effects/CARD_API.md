@@ -11553,6 +11553,31 @@ aus (`_canHeroActivateSurprise`) und **bleiben verdeckt liegen**. Eine komplett 
 nicht (Z7b). `engine._surpriseStempel` schützt den Eintrag vor dem Z7b-Rückgabe-Abzug (`_stempelZurueck`).
 
 
+### ★ W4b — Kosten „to play/use this …" werden VOR dem Reaktionsfenster bezahlt (Welle 4, Als Antworten e–i)
+
+Fortsetzung von Z7c. Regel (Al): wird eine Karte GANZ negiert (Master's Plan, Silence, Rusty Touch, Off Duty …), bleibt ihr
+Einmal-Slot unverbraucht, aber **bereits gezahlte Kosten bleiben bezahlt**; Kosten, die der Kartentext vom Effekt trennt
+(„… to play this card" / „… to use this Spell"), werden deshalb VOR dem Fenster gezahlt. Ein Haken je Kartenart:
+
+| Kartenart | Haken | Vertrag |
+|---|---|---|
+| Zauber / Attack | `payActivationCost(ctx)` (Z7c) | `false` = nichts bezahlt → Zug zurück. Neu: **Soul Transmigration Ritual** und **Weapon Unleashing** (Opfer/Abwurf), **Medusa's Curse, Null Zone, Goldify, Reincarnation, Mass Multiplication, Golden Wings** (Token; Hilfsfunktionen `payTokenCost`/`kostenSchonBezahlt` in `_pollution-shared.js`), **Kirin Firebreath, Tanuki Escape, Tengu Windstorm, Kappa Sword Slash** (Ablage-Kosten, `payRebelliokaiCost`). Das Skript merkt sich das Gezahlte an `ctx.card` (`_kostenBezahlt` o. ä.); `onPlay` überspringt dann die Zahlung und macht die Wahlen **nicht mehr abbrechbar** (Ausnahme nach dem Zusagepunkt, wie Cold Coffin) — ist die Wahl dann leer/negiert, ist die Karte verbraucht (kein `_spellCancelled`). Ohne `payActivationCost`-Lauf (Sofort-Guss, Spiegelkopie, anderer Weg) zahlt `onPlay` wie früher selbst. |
+| Kreatur (Beschwörung) | `paySummonCost(ctx) → false \| Daten` | NEU. Aufgerufen von `doPlayCreature` (server.js) VOR `executeCardWithChain` über `engine._payCreatureSummonCost` (spiegelt `_runBeforeSummon`: Zielplatz-Reservierung, Tribut-Stempel `_tributePaid`). `false` = Kostenwahl abgebrochen → Rückabwicklung wie ein abgelehntes `beforeSummon` (Karte bleibt auf der Hand, keine Kette). Die Daten bekommt das spätere `beforeSummon` als `ctx._summonKosten` (es zahlt dann nicht noch einmal und erledigt nur Beschwörungsart/Platzierung); ohne `_summonKosten` (Effekt-Beschwörung, `summonCreatureWithHooks`) zahlt es selbst. Negierte Beschwörung: `_verwerfeSummonKosten()`, die Kosten (tote Opfer, abgeworfene Karten) bleiben bezahlt, die Karte geht wie bisher in Ablage/Deck. Eigener Name, weil `payActivationCost` bei Kreaturen schon die Reaktions-Aktivierung (`isCreatureReaction`) meint. Umgestellt: 500 Piranhas in a Monster Suit, Dark Deepsea God, Blue-Ice Dragon, Foresta the Guard, The Egg of God, Steam Dwarf Dragon Pilot, Gigantisaur King Trex, Gigantisaur Chimera, Pollution Piranha. |
+| Artefakt | `payArtifactCost(engine, pi, selectedIds, validTargets) → false \| Daten` | NEU. Aufgerufen von `doConfirmPotion` (zielende Artefakte, NACH der Zielwahl) und `doUseArtifactEffect` (nicht zielende) über `engine._payArtifactCost` VOR dem Kettenfenster. `false` = nichts bezahlt → Karte bleibt auf der Hand (wie `{ cancelled: true }`). Die Daten bekommt `resolve(engine, pi, selectedIds, validTargets, kosten)` als 5. Argument (dann nicht noch einmal zahlen); ohne `kosten` (Gratis-Spiel durch Sky Archeologist u. ä.) zahlt `resolve` selbst. Umgestellt: Hive's Crown (Sparkfly-Opfer; die Queen-Wahl bleibt im `resolve`), Ladder to the Sky, Remote Detonator. |
+
+*Kosten vor der Zielwahl (Rebelliokai):* die frühere Hausregel „Kosten nach der ersten Zielwahl" (Kirin Firebreath, Tengu Windstorm,
+Kappa Sword Slash; Tanuki Escape hat keine Zielwahl) entfällt; die Reihenfolge der Ziele in `onPlay` bleibt, aber die erste Zielwahl ist
+nach der Zahlung nicht mehr abbrechbar. Tengu Windstorm zahlt nichts, wenn kein legales Brettziel existiert.
+
+*Bewusst NICHT umgestellt (Frage an Al):* Karten mit **freiwilligem** Alternativ-Preis („You may sacrifice … to summon this Creature as an
+additional Action": Archer/Guardian/Warrior of Teocuilatl, Suspicious Monster; Deepsea-Tausch „add a Deepsea Creature … to place this
+Creature") — dort ist Opfer und Platzierung ein untrennbarer Tausch (`sacrificeSummonIntoSlot`); außerdem Angry Cheese / Sickly Cheese
+(Schaden/Gift als Kosten), Temple of Sacrifice, Basketskull (Doom Counter).
+
+*Tharxian Horse (Antwort i):* ist so, wie von Al gewollt — beliebig viele Kopien dürfen gesetzt werden (auch nach der ersten Aktivierung),
+keine löst nach der ersten nicht negierten Aktivierung noch einmal aus. Repro `W4-kosten/I1`.
+
+
 ## ★ Puzzle-Editor: Tooltip lag unter der Hand (v1032, Als Befund 12.9.)
 
 `.board-tooltip` liegt im gemeinsamen CSS auf **z-index 9999**, die
