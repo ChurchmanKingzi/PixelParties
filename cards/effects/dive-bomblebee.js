@@ -8,6 +8,9 @@
 //  Hero and place it at the bottom of your
 //  opponent's deck.
 //
+//  W5a (Al 14.10.2026): wählbar sind Nicht-Helden-Karten, die der GEGNER kontrolliert ("opponent's side" = Nomenklatur
+//  für "vom Gegner kontrolliert"); sie kommen unter das Deck ihres PERMANENTEN Besitzers. Tokens verschwinden vollständig.
+//
 //  Targets every face-up non-Hero card in any
 //  opponent support / ability / area zone. The
 //  selected card fires `onCardLeaveZone` (full
@@ -48,19 +51,19 @@ function pickableOppCards(engine, listenerOwner) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    // Filter to instances OPP CURRENTLY CONTROLS — controller is the
-    // gameplay-truth side (a creature stolen by us is no longer in opp's
-    // target pool; a Chilly Wizard cross-side-summoned onto opp's board
-    // IS). `controller ?? owner` collapses to plain owner for everything
-    // that has never had its controller flipped.
-    if ((inst.controller ?? inst.owner) !== oi) continue;
+    // W5a (Al 14.10.2026, A05-03; Praezisierung: „'Opponent's side of the board' ist einfach Nomenklatur fuer 'Creature, die der
+    // Opponent kontrolliert'"): waehlbar sind Karten, die der GEGNER kontrolliert (nach KONTROLLE, nicht nach Brettseite) —
+    // nie eine, die der Wirker selbst kontrolliert. Ziel-IDs/Zonenzugriffe nennen die BRETTSEITE (`physicalSide`, Z1); die Karte
+    // kommt unter das Deck ihres PERMANENTEN Besitzers (W3, siehe unten).
+    if (engine.kontrolleurVon(inst) !== oi) continue;
+    const seite = engine.physicalSide(inst);
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd) continue;
     if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero')) continue;
     out.push({
-      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+      id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',
-      owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
       _zone: 'support',
     });
@@ -69,11 +72,11 @@ function pickableOppCards(engine, listenerOwner) {
   // Ability zone instances.
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'ability') continue;
-    if ((inst.controller ?? inst.owner) !== oi) continue;
+    if (engine.kontrolleurVon(inst) !== oi) continue;   // W5a (A05-03), s. o.
     out.push({
-      id: `ability-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
+      id: `ability-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'ability',
-      owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
       cardName: inst.name, cardInstance: inst,
       _zone: 'ability',
     });
@@ -226,14 +229,14 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // only, no instance tracking.
   engine._untrackCard(targetInst.id);
 
-  // Bottom-of-deck. Z5 (A05-02): Tokens gehören nie ins Deck — sie gehen in den Gelöscht-Stapel.
+  // Bottom-of-deck. W5a (Al 14.10.2026): Tokens verschwinden vollstaendig (eine echte Karte darunter wird gelöscht);
+  // jede andere Karte kommt unter das Deck ihres PERMANENTEN Besitzers (W3), nicht des Kontrolleurs/Brettbesitzers.
   if (istToken) {
-    const tps = gs.players[targetInst.originalOwner ?? targetInst.owner] || ops;
-    if (!tps.deletedPile) tps.deletedPile = [];
-    tps.deletedPile.push(cardName);
+    engine.tokenAbgang(targetInst);
   } else {
-    if (!ops.mainDeck) ops.mainDeck = [];
-    ops.mainDeck.push(cardName);
+    const dps = gs.players[engine.kartenBesitzerVon(targetInst)] || ops;
+    if (!dps.mainDeck) dps.mainDeck = [];
+    dps.mainDeck.push(cardName);
   }
 
   engine.log('dive_bomblebee_strike', {

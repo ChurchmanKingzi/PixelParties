@@ -26,6 +26,7 @@ const H = require('../../lib/h.js');
   t.targetFn = (valid) => { const a = valid.find(v => v.cardName === 'Mummy Token'); return [a ? a.id : valid[0].id]; };
   await t.play(0, 'The White Army', { hero: 0 });
   R.check('Sculpture Theft: „Mummy Token" liegt NICHT auf der Hand', !t.pile(1, 'hand').includes('Mummy Token'), { hand1: t.pile(1, 'hand') });
+  R.check('W5a (Al 14.10.2026): Token verschwindet vollständig – auch nicht im Gelöscht-Stapel', [0, 1].every(s => ['hand', 'mainDeck', 'discardPile', 'deletedPile'].every(k => !t.pile(s, k).includes('Mummy Token'))), [0, 1].map(s => t.pile(s, 'deletedPile')));
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

@@ -1323,6 +1323,8 @@ Creatures."
 
 ## ★ GESTOHLENE KARTEN GEHEN IN DIE ABLAGE IHRES BESITZERS (v1224)
 
+> **Welle 5 (W3, Al 14.10.2026):** gilt jetzt für ALLE Stapel (Deck, Ablage, Gelöscht) und ALLE Wege — siehe Besitzer-Regel (W3) bei der Token-Konvention.
+
 Als Befund (18.9.): „Eine durch Herbithorn Demon gestohlene und dann
 gespielte Karte landet im Discard Pile (oder Deleted Pile) des Diebs
 statt dem des ursprünglichen Besitzers."
@@ -5553,15 +5555,41 @@ says so in a comment. If you write such a check, say why.
 `server.js`. Need only the counters (no placement)? Use
 `biomancyTokenCounters(potionData, level)`.
 
-**Tokens sind keine Karten (Z5, Welle 2):** ein Token (Typ `Token` bzw. `Creature/Token` —
-Mummy/Invader/Leprochaun/Pollution Token, Puppets, Biomancy-/Boulder-Token) gehört nie in Hand,
-Deck oder Ablage; verlässt er das Brett, geht er in den **Gelöscht-Stapel**. Die Engine sichert das
-an drei Stellen: `actionDestroyCard`/Schadens-Batch/`actionMoveCard` (Brett → Ablage **und** → Hand),
-`removeIslandZones` und das Namens-Netz in `handZugangSync`/`actionAddCardToHand`
-(`_tokenStattKarte`). Wer eine Brettkarte selbst in Hand/Deck/Ablage schreibt oder einen
-Todes-Anspruch auf die Hand stempelt, fragt vorher `engine.isTokenCard(inst)` (wirksame
-Kartendaten, erkennt auch Override-Tokens) und löscht stattdessen. Beschwören/Übernehmen **auf das
-Brett** (Hunting Lv2/3, Paraseed) bleibt mit Tokens erlaubt.
+**Tokens sind keine Karten (Z5, Welle 2; ÜBERHOLT durch Entscheidung Welle 5, Al 14.10.2026):** ein Token
+(Typ `Token` bzw. `Creature/Token` — Mummy/Invader/Leprochaun/Pollution Token, Puppets, Biomancy-/Boulder-Token)
+gehört nie in Hand, Deck, Ablage — und seit Welle 5 auch **nicht mehr in den Gelöscht-Stapel**. Al: „Sterbende Tokens
+sollten komplett verschwinden, außer wenn 'darunter' noch echte Karten liegen, etwa bei Biomancy Tokens; die werden dann
+gelöscht." Ein Token, der das Brett verlässt (Tod, Zerstören, „zurück auf die Hand/ins Deck/in die Ablage", Inselabbau …),
+verschwindet **vollständig aus dem Spiel**: kein Eintrag in irgendeinem Stapel, keine Geister-Instanz, die Kartenbilanz
+bleibt sauber. Liegt eine **echte Karte** darunter (Biomancy-/Boulder-Token = Potion mit `_cardDataOverride`), wird DIESE
+Karte gelöscht (Gelöscht-Stapel des permanenten Besitzers, genau einmal). Tokens bleiben **legale Ziele** von „auf die
+Hand/ins Deck"-Effekten (Gold Trap, Chasing the Legend, Shapeshift, Dive Bomblebee, Missing People, Tengu Windstorm,
+Sparkfly …): der Effekt gilt als ausgeführt, der Token verschwindet.
+Engine-Helfer (eine Stelle): `engine.isTokenCard(inst)` (wirksame Kartendaten), `engine.tokenUnterkarte(inst)` (Name der
+echten Karte darunter oder `null`), **`engine.tokenAbgang(inst)`** (legt die Karte darunter in den Gelöscht-Stapel ihres
+Besitzers; liefert `true` bei einem Token → dann die Karte NICHT zusätzlich in Hand/Deck/Ablage schreiben). Die Netze
+(`_addCardToState` für Ablage/Gelöscht, `actionMoveCard` Brett → Hand/Ablage/Gelöscht inkl. Untracken der Instanz,
+Schadens-Batch/`removeIslandZones`, Namens-Netz `_tokenStattKarte` in `handZugangSync`/`actionAddCardToHand` → verwirft
+ohne Stapel) rufen sie. Wer eine Brettkarte selbst in Hand/Deck/Ablage schreibt, fragt vorher `isTokenCard` und ruft
+`tokenAbgang`. Beschwören/Übernehmen **auf das Brett** (Hunting Lv2/3, Paraseed) bleibt mit Tokens erlaubt.
+
+**★ Besitzer-Regel (W3, Entscheidung Welle 5, Al 14.10.2026 — gilt vor allen älteren Rulings):** „Karten landen *immer* im
+Deck/Discard/Deleted Pile ihres **permanenten Besitzers**, durch alles." und „Karten werden immer ins Deck ihres originalen
+Besitzers gemischt." Egal wer eine Karte kontrolliert oder wie sie dorthin kommt (Opfer, Zerstören, Mischen, unter/auf das
+Deck, Löschen), sie wandert in den Stapel von `engine.kartenBesitzerVon(inst)` (= `originalOwner ?? owner`), nie in den des
+Kontrolleurs/der Brettseite. **Hand-Rückgaben** gehen in die Hand des Besitzers, es sei denn der Kartentext sagt „YOUR hand"
+(Gold Trap, Sculpture Theft, Dark Deepsea God Tribut, Moonlight Butterfly „you control back to your hand",
+Surprising Opportunity): dann in die Hand des Spielers/Kontrolleurs, die Karte bleibt aber Eigentum ihres Besitzers
+(`engine._tagHandCardOrigin(holder, name, besitzer)` → Ablage/Deck später dort). Skripte, die eine Karte aus der HAND
+direkt in einen Stapel schreiben, nehmen `engine.handKartenBesitzerPs(ps, cardName)` (NACH `takeFromPileSync(…,'hand',…)`)
+statt `ps`. Einzelfälle: Life-Searcher (geliehen: ins Deck des Besitzers gemischt, Suche im Deck des Kontrolleurs, Nachfolger
+seitenfremd), Dive Bomblebee („opponent's side of the board" = Nomenklatur für „vom Gegner kontrolliert", nie eine selbst
+kontrollierte Karte; unter das Deck des Besitzers), Missing People („Creature your opponent controls"; Zielliste leer →
+nicht spielbar), Elven Rider / Cycling Demons (stirbt eine gestohlene Karte, darf der Kontrolleur den Nachfolger **seitenfremd**
+in die Zone der gestorbenen Karte beschwören — `summonCreatureWithHooks(…, brettSeite, …, { controller })`), Dark Deepsea
+God (geliehene Kreaturen sind als Tribut möglich; `returnSupportCreatureToHand(…, { toPlayer })`), Slippery Fridge (bei
+JEDER Ausrüstung wandern die Boni vom alten auf den neuen Träger — Batterie-Repro `W5-a/04`; `_second-action-shared`
+setzt das Abzeichen am neuen Wirt neu).
 
 **Aktuelle HP einer Kreatur:** `counters.currentHp` legt erst der erste Schaden (oder
 `increaseMaxHp`/Heilung) an; eine frische Kreatur hat `counters = {}`. Nie `currentHp ?? 0` /
@@ -10010,6 +10038,10 @@ Steht dort kein lebender Held, fällt nur der Schaden aus — die
 Rücknahme ist trotzdem geschehen („you MAY add … and IF YOU DO": die
 Rücknahme ist die Bedingung, nicht der Schaden). Der Prompt sagt vorher,
 ob gegenüber jemand steht.
+
+**Gestohlener Falter (W6, Al 14.10.2026 „Korrekt"):** die Rückfrage geht an den Kontrolleur, der Falter kommt auf die Hand des
+KONTROLLEURS (`returnSupportCreatureToHand(…, { toPlayer })`, bleibt aber Eigentum seines Besitzers → Ablage später dort), die 150
+Schaden gehen auf den Helden des Gegners des Kontrolleurs in der Position des Wirts.
 
 **Rücknahme** über `returnSupportCreatureToHand` — die eine Stelle, die
 die Zone räumt, den Flug sendet, `onCardLeaveZone` feuert und die

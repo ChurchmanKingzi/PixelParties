@@ -76,7 +76,7 @@ async function loescheAusHand(engine, pi, name) {
   if (inst) engine._untrackCard(inst.id);
   await engine._delay(650);
   if (!ps.deletedPile) ps.deletedPile = [];
-  ps.deletedPile.push(name);
+  engine.handKartenBesitzerPs(ps, name).deletedPile.push(name);   // W3/W5a: Stapel des permanenten Besitzers
   engine.sync();
   return true;
 }

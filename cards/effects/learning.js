@@ -367,7 +367,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   if (chainResult.negated || chainResult.fizzled) {
     const i = findChosenInHand();
     if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
     if (chainResult.negated) {
@@ -445,7 +445,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     // onPlay handler.
     if (handInst) engine._untrackCard(handInst.id);
   } else if (!cancelled) {
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   } else {
     // Cancelled mid-prompt — Archibald-style: HOPT was already claimed

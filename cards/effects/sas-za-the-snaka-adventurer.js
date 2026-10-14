@@ -110,7 +110,7 @@ module.exports = {
       // stempelt, bekommt den Kadaver.
       const inst = engine.cardInstances.find(c => c.id === tot.instId);
       if (!inst || inst._deathClaim) return;
-      // Z5 (H04-07): ein Token ist keine Karte — er geht nie auf die Hand, sondern in den Gelöscht-Stapel.
+      // Z5 (H04-07) / W5a: ein Token ist keine Karte — er geht nie auf die Hand, sondern verschwindet vollständig (Al 14.10.2026).
       if (engine.isTokenCard(inst)) return;
 
       const ja = await engine.promptGeneric(pi, {

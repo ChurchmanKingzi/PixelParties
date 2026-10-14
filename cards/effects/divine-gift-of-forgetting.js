@@ -206,7 +206,7 @@ module.exports = {
           const idx = slotArr.indexOf(inst.name);
           if (idx >= 0) slotArr.splice(idx, 1);
         }
-        oppPs.mainDeck.push(inst.name);
+        (engine.gs.players[engine.kartenBesitzerVon(inst)] || oppPs).mainDeck.push(inst.name);   // W3 (Al 14.10.2026): Deck des permanenten Besitzers
         engine._untrackCard(inst.id);
         engine.log('ability_returned_to_deck', {
           player: oppPs.username, ability: inst.name,

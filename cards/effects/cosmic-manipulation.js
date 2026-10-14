@@ -141,7 +141,7 @@ module.exports = {
         if (i < 0 || i >= ps.hand.length) continue;
         const name = ps.hand[i];
         engine.takeFromPileSync(ps, 'hand', i);
-        ps.mainDeck.push(name);
+        engine.handKartenBesitzerPs(ps, name).mainDeck.push(name);   // W3/W5a: Stapel des permanenten Besitzers
         shuffled++;
       }
       if (shuffled > 0) {

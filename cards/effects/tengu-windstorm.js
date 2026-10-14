@@ -273,9 +273,9 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   engine._untrackCard(inst.id);
 
   if (istToken) {
-    // Z5 (A06-23): ein Token ist keine Karte — er geht nie ins Deck, sondern in den Gelöscht-Stapel.
-    if (!ownerPs.deletedPile) ownerPs.deletedPile = [];
-    ownerPs.deletedPile.push(inst.name);
+    // W5a (A06-23, Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie ins Deck);
+    // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht.
+    engine.tokenAbgang(inst);
   } else {
     if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
     if (position === 'top') {

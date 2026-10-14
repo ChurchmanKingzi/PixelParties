@@ -13,14 +13,14 @@ const H = require('../../lib/h.js');
     const t = await H.fresh({ hand: [[FI], []], hp: 800 });
     const tk = t.put(0, 0, 0, 'Mummy Token');
     await t.engine.actionDealCreatureDamage({ name: 'test', owner: 1 }, tk, 9999, 'other');   // Schadenstod = korrekter Weg (nicht actionDestroyCard: das ist M01-08)
-    R.check('Gegenprobe: durch Schaden gestorbener Token liegt nicht in der Ablage, sondern im Gelöscht-Stapel', !t.pile(0, 'discardPile').includes('Mummy Token') && t.pile(0, 'deletedPile').includes('Mummy Token'), { ablage: t.pile(0, 'discardPile'), geloescht: t.pile(0, 'deletedPile') });
+    R.check('Gegenprobe: durch Schaden gestorbener Token verschwindet vollständig (W5a: weder Ablage noch Gelöscht-Stapel)', !t.pile(0, 'discardPile').includes('Mummy Token') && !t.pile(0, 'deletedPile').includes('Mummy Token'), { ablage: t.pile(0, 'discardPile'), geloescht: t.pile(0, 'deletedPile') });
   }
   {
     const t = await H.fresh({ hand: [[FI], []], hp: 800 });
     await t.play(0, FI, { hero: 0 });
     t.put(0, 0, 3, 'Mummy Token');
     await t.engine.actionMoveCard(t.find(FI, 'support'), 'discard');
-    R.check('Inselabbau: Token kommt nicht in die Ablage', !t.pile(0, 'discardPile').includes('Mummy Token'), t.pile(0, 'discardPile'));
+    R.check('Inselabbau: Token kommt nicht in die Ablage und verschwindet vollständig (W5a)', !t.pile(0, 'discardPile').includes('Mummy Token') && !t.pile(0, 'deletedPile').includes('Mummy Token'), { ablage: t.pile(0, 'discardPile'), geloescht: t.pile(0, 'deletedPile') });
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

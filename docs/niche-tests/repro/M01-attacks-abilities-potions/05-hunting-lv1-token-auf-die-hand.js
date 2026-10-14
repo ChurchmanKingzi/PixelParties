@@ -23,7 +23,7 @@ const H = require('../../lib/h.js');
     const r = await t.play(0, 'Critical Strike', { hero: 0 });
     R.check('Critical Strike gespielt', r === true, r);
     R.check('Hunting fragt NICHT nach einem Token (Z5: Token ist keine Karte)', !t.prompts.some(p => p.d.type === 'confirm' && p.d.title === 'Hunting'), t.prompts.map(p => p.d.title));
-    R.check('Token im Gelöscht-Stapel des Besitzers', t.pile(1, 'deletedPile').includes('Mummy Token'), t.pile(1, 'deletedPile'));
+    R.check('Token verschwindet vollständig (W5a, Al 14.10.2026): in keinem Stapel', ![0, 1].some(s => ['hand', 'mainDeck', 'discardPile', 'deletedPile'].some(k => t.pile(s, k).includes('Mummy Token'))), [0, 1].map(s => t.pile(s, 'deletedPile')));
     R.check('Token liegt NICHT als Karte auf der Hand', !t.pile(0, 'hand').includes('Mummy Token'), t.pile(0, 'hand'));
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }

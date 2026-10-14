@@ -65,8 +65,9 @@ async function handkarteLoeschen(engine, pi, name) {
   const gerettet = await engine._tryBeforeDelete(name, pi, { fromZone: 'hand', fromInstance: inst, source: CARD_NAME });
   if (gerettet) { engine.log('delete_rescued', { player: ps.username, card: name, source: CARD_NAME }); engine.sync(); return false; }
   engine._pileFlight(pi, name, 'hand', 'deleted', { fromHandIdx: idx });
-  engine._geloeschtVerfolgen(pi);
-  ps.deletedPile.push(name);
+  const dPs = engine.handKartenBesitzerPs(pi, name);   // W3/W5a: Gelöscht-Stapel des permanenten Besitzers
+  engine._geloeschtVerfolgen(engine._resolvePi(dPs));
+  dPs.deletedPile.push(name);
   if (inst) engine._untrackCard(inst.id);
   engine.log('forced_delete', { player: ps.username, card: name, source: CARD_NAME });
   engine.sync();

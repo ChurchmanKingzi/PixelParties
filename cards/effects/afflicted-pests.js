@@ -133,7 +133,8 @@ module.exports = {
     // Send to discard (original owner's pile) – Tokens kommen nie in die Ablage, sondern in den Geloescht-Stapel (A08-11)
     const discardPs = gs.players[tInst?.originalOwner ?? tOwner];
     if (discardPs) {
-      if (hasCardType(cardDB[tCardName], 'Token')) discardPs.deletedPile.push(tCardName);
+      // W5a (Al 14.10.2026): ein Token verschwindet vollstaendig (nur eine echte Karte darunter wird gelöscht).
+      if (tInst ? engine.isTokenCard(tInst) : hasCardType(cardDB[tCardName], 'Token')) { if (tInst) engine.tokenAbgang(tInst); }
       else discardPs.discardPile.push(tCardName);
     }
 

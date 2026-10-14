@@ -278,7 +278,7 @@ module.exports = {
         asPlay: 'sole',
       });
       engine.takeFromPileSync(ps, 'hand', finalIdx);
-      ps.discardPile.push(spellName);
+      engine.handKartenBesitzerPs(ps, spellName).discardPile.push(spellName);   // W3/W5a: Stapel des permanenten Besitzers
     }
 
     engine.log('skeleton_wizard_cast', { player: ps.username, spell: spellName });

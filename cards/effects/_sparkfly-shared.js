@@ -386,8 +386,16 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Untrack the original board instance, then re-track in hand under pi
   // with originalOwner pinned to the source side.
   engine._untrackCard(targetInst.id);
+  // W5a (Al 14.10.2026): ein Token ist ein legales Ziel, verschwindet aber vollstaendig (kommt nie auf die Hand);
+  // eine echte Karte darunter (Biomancy-/Boulder-Token) wird gelöscht. Der Effekt gilt als ausgefuehrt.
+  if (engine.tokenAbgang(targetInst)) {
+    engine.log('sparkfly_steal', { by: sourceName, player: ps.username, card: cardName, fromZone: zone, fromOwner: gs.players[owner]?.username, token: true });
+    engine.sync();
+    return true;
+  }
   const newInst = engine.handZugangSync(ps, cardName, { von: 'brett' });
-  newInst.originalOwner = owner;
+  // W3 (Al 14.10.2026): die Karte bleibt Eigentum ihres PERMANENTEN Besitzers (nicht der Brettseite, auf der sie gerade liegt).
+  newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
 
   // Authoritative flight animation — start at the EXACT board slot the
   // card was sitting in (not the receiver's deck/hand). The

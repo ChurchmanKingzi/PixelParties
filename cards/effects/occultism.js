@@ -215,6 +215,7 @@ module.exports = {
       // resolved the card's own on-sacrifice reward (Chosen Sacrifice's
       // draw / gold choice), so exactly one flight plays.
       const subPs = gs.players[sacInst.owner];
+      const subPileOwner = gs.players[engine.kartenBesitzerVon(sacInst)] || subPs;   // W3/W5a: Ablage des permanenten Besitzers
       const hi = (subPs?.hand || []).indexOf(sacName);
       engine._broadcastEvent('play_pile_transfer', {
         owner: sacInst.owner, cardName: sacName,
@@ -222,7 +223,7 @@ module.exports = {
         fromHandIdx: hi >= 0 ? hi : 0,
       });
       if (hi >= 0) engine.takeFromPileSync(subPs, 'hand', hi);
-      if (subPs) subPs.discardPile.push(sacName);
+      if (subPileOwner) subPileOwner.discardPile.push(sacName);
       sacInst.zone = 'discard'; sacInst.heroIdx = -1; sacInst.zoneSlot = -1;
       engine._untrackCard(sacInst.id);
       engine.sync();

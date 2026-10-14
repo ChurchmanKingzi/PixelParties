@@ -110,7 +110,7 @@ module.exports = {
     const weg = await engine.takeFromPile(pi, 'hand', handIdx, { source: CARD_NAME });
     if (!weg) { engine.returnToPile(pi, 'discard', spell); engine._trackCard(spell, pi, 'discard'); engine.sync(); return false; }
     if (!ps.discardPile) ps.discardPile = [];
-    ps.discardPile.push(weg.name);
+    engine.handKartenBesitzerPs(ps, weg.name).discardPile.push(weg.name);   // W3/W5a: Stapel des permanenten Besitzers
     engine._trackCard(weg.name, pi, 'discard');
     engine.sync();
     await engine._delay(650);

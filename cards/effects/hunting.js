@@ -136,7 +136,7 @@ module.exports = {
 
       // ── Stufe 1: in die Hand statt in die Ablage ─────────────────
       if (stufe === 1) {
-        // Z5 (M01-05): ein Token ist keine Karte — er geht nie auf die Hand, sondern in den Gelöscht-Stapel.
+        // Z5 (M01-05) / W5a: ein Token ist keine Karte — er geht nie auf die Hand, sondern verschwindet vollständig (Al 14.10.2026).
         if (engine.isTokenCard(inst)) return;
         const ja = await engine.promptGeneric(pi, {
           type: 'confirm', title: CARD_NAME,

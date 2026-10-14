@@ -161,7 +161,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   if (chainResult.negated || chainResult.fizzled) {
     const i = findInHand();
     if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
     if (chainResult.negated) engine.log('rubin_spell_negated', { player: ps.username, spell: cardName });
@@ -220,7 +220,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   const i = findInHand();
   if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
   if (!placedOnBoard) {
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W3/W5a: Stapel des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   }
   await payWisdom();

@@ -127,7 +127,7 @@ module.exports = {
       typeNeeds[nt] = (typeNeeds[nt] || 0) + 1;
       deletedNames.push(cn);
       engine.takeFromPileSync(ps, 'hand', idx);
-      ps.deletedPile.push(cn);
+      engine.handKartenBesitzerPs(ps, cn).deletedPile.push(cn);   // W3/W5a: Stapel des permanenten Besitzers
     }
 
     engine.log('shard_delete', { player: ps.username, deleted: deletedNames });
