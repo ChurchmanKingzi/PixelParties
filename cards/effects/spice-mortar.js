@@ -51,6 +51,10 @@ module.exports = {
   // das haette die Loader-Erkennung die ganze Karte unter der Sperre
   // blockiert (v826).
   blockedByPileLock: false,
+  // ★ W7b (F03-17, Al 14.10.): „cannot search or add cards to your hand" (Cats of the Pharaoh, Siege) gilt auch fuer eine Karte
+  // aus dem GEGNERDECK auf die eigene Hand - der Effekt kann so nicht feuern, also ist die Karte nicht spielbar
+  // (`_cardBlockedBySearchLock`: Server-Weg, Ausgrau-Liste, Sofort-Wege; die Hand-Sperre prueft `canActivate`).
+  blockedBySearchLock: true,
   stealsOpponentCards: true,
   activeIn: ['hand'],
 

@@ -31,6 +31,29 @@ async function zahleKosten(engine, pi, selectedIds, validTargets) {
   return true;
 }
 
+/**
+ * Eigene lebende Helden als Kostenziel. W7b (F03-12): ein Held, der den Giftstapel nicht annehmen wuerde (giftimmun,
+ * `negative_status_immune`, Johanna/Light-Ball-Schutz, Shielded …), ist `ineligible` (ausgegraut, serverseitig nicht waehlbar).
+ */
+function getValidTargets(gs, pi, engine) {
+  const ps = gs.players[pi];
+  const targets = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    const t = {
+      id: `hero-${pi}-${hi}`,
+      type: 'hero',
+      owner: pi,
+      heroIdx: hi,
+      cardName: hero.name,
+    };
+    if (engine && engine.heroBlocksStatusNow(pi, hi, 'poisoned', { appliedBy: pi })) t.ineligible = true;
+    targets.push(t);
+  }
+  return targets;
+}
+
 module.exports = {
   // ★ v1070 (Als Befund 14.9.: „Wieso drei Cheese-Karten? Davon gibt es
   // sechs!"). Die Autoerkennung liess diese Karte als spielbar durch,
@@ -44,11 +67,14 @@ module.exports = {
   // Tutors a Decay Magic Spell into hand — blocked while hand-locked.
   blockedByHandLock: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     // Must have at least 1 living hero under control
     const ps = gs.players[pi];
     const hasHero = (ps.heroes || []).some(h => h?.name && h.hp > 0);
     if (!hasHero) return false;
+    // ★ W7b (F03-12, Al 14.10.): „Giftimmun macht ein Ziel ineligible" - die Karte ist nur gesperrt, wenn es GAR KEIN
+    // waehlbares Ziel gibt, d. h. kein lebender Held, der den Giftstapel (die Kosten) annehmen wuerde.
+    if (engine && !getValidTargets(gs, pi, engine).some(t => !t.ineligible)) return false;
 
     // Must have at least 1 Decay Magic Spell in deck
     const cardDB = _getCardDB();
@@ -59,21 +85,8 @@ module.exports = {
     });
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
-    const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: hero.name,
-      });
-    }
-    return targets;
+  getValidTargets(gs, pi, engine) {
+    return getValidTargets(gs, pi, engine);
   },
 
   targetingConfig: {

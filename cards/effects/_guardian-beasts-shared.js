@@ -203,6 +203,9 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
     if (p?.owner != null && p?.idx != null) byOwner[p.owner].push(p);
   }
   const deletedNames = [];
+  // W7b (A07-13/A07-18): woher die geloeschten Karten kamen (Besitzer + Platz), damit eine Kostenzahlung, deren Wirkung
+  // nicht stattfindet, zurueckgegeben werden kann (`ruecklegenGeloeschteAblagekarten`). Haengt als Eigenschaft am Ergebnis-Array.
+  const herkunft = [];
   // Per-pile name buckets so we can fire one batch animation per
   // owner after the splices. Animation order matches splice order.
   const animByOwner = [[], []];
@@ -231,6 +234,7 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
         card: cardName, player: ps.username, source: sourceName || ARCHETYPE,
       });
       deletedNames.push(cardName);
+      herkunft.push({ owner: pi, idx: p.idx, cardName });
       animByOwner[pi].push(cardName);
     }
   }
@@ -247,7 +251,33 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
     });
   }
   if (deletedNames.length > 0) engine.sync();
+  deletedNames.herkunft = herkunft;
   return deletedNames;
+}
+
+/**
+ * W7b (A07-13 Hu, A07-18 Mao; Al 14.10.): gibt Karten zurueck, die als Kosten aus den Ablagen geloescht wurden (Ergebnis von
+ * `promptAndDeleteFromBothDiscards`), wenn die bezahlte Wirkung nicht stattfindet (Aktionswahl abgebrochen, Effekt kann nicht
+ * feuern). Jede Karte verlaesst den Geloescht-Stapel ihres Besitzers wieder und kehrt an ihren alten Platz in der Ablage zurueck
+ * (aufsteigend einsortiert, damit die Reihenfolge stimmt). Rettungen (`_tryBeforeDelete`) fehlen in `herkunft` und bleiben, wo sie sind.
+ */
+function ruecklegenGeloeschteAblagekarten(engine, geloescht) {
+  const herkunft = geloescht && geloescht.herkunft;
+  if (!engine || !Array.isArray(herkunft) || herkunft.length === 0) return 0;
+  let n = 0;
+  const sortiert = herkunft.slice().sort((a, b) => a.idx - b.idx);
+  for (const h of sortiert) {
+    if (!engine.gs?.players?.[h.owner]) continue;
+    // Stapel-Schicht statt eigener Splice: die Karte verlaesst den Geloescht-Stapel (Rueckabwicklung, keine Verwahrungs-Sperre)
+    // und kehrt mit `returnToPile` an ihren alten Platz zurueck.
+    const k = engine.takeFromPileSync(h.owner, 'deleted', h.cardName, { last: true, _verwahrungFreigabe: true, source: 'cost_refund' });
+    if (!k) continue;
+    engine.returnToPile(h.owner, 'discard', h.cardName, Math.min(h.idx, (engine.gs.players[h.owner].discardPile || []).length));
+    engine.log('card_restored_to_discard', { card: h.cardName, player: engine.gs.players[h.owner].username, reason: 'cost_refunded' });
+    n++;
+  }
+  if (n > 0) engine.sync();
+  return n;
 }
 
 /**
@@ -509,6 +539,7 @@ module.exports = {
   buildDiscardGallery,
   deleteSelectedDiscardCards,
   promptAndDeleteFromBothDiscards,
+  ruecklegenGeloeschteAblagekarten,
   rangeValidCounts,
   multiplesOfK,
   deleteTopOfOwnDiscard,

@@ -10730,9 +10730,39 @@ class GameEngine {
       cancellable: false,
     });
 
-    if (!result || !result.selectedTargets || result.selectedTargets.length === 0) return [];
+    if (!result) return [];
+    // ★ W7b (S01-13, Al 14.10.: der Server prueft nach): die Kettenwahl des Clients wird gegen die Regel geprueft –
+    // genau min(Schritte, Ziele) Ziele, paarweise verschieden, aus der Liste, und mit `heroesFirst` zuerst alle
+    // lebenden Helden. Gueltig bleibt der Anfang der Antwort; was verletzt oder fehlt, fuellt der Server in
+    // Listenreihenfolge auf (die Wahl ist nicht abbrechbar, eine Neu-Abfrage koennte haengen). Eine gueltige
+    // Antwort (Standard-Client, CPU) bleibt unveraendert.
+    const wunsch = Array.isArray(result.selectedTargets) ? result.selectedTargets : [];
+    const soll = Math.min(Array.isArray(damages) ? damages.length : 0, targets.length);
+    const gewaehlt = [];
+    const nimm = (t) => { gewaehlt.push(t); };
+    const verfuegbar = () => targets.filter(t => !gewaehlt.includes(t));
+    const erlaubt = (t) => {
+      if (gewaehlt.includes(t)) return false;
+      if (opts.heroesFirst && t.type !== 'hero' && verfuegbar().some(x => x.type === 'hero')) return false;
+      return true;
+    };
+    let praefixGilt = true;
+    for (const sel of wunsch) {
+      if (gewaehlt.length >= soll) break;
+      const t = targets.find(x => x.id === sel?.id);
+      if (!t || !erlaubt(t)) { praefixGilt = false; break; }
+      nimm(t);
+    }
+    while (gewaehlt.length < soll) {
+      const t = verfuegbar().find(x => erlaubt(x));
+      if (!t) break;
+      nimm(t);
+    }
+    if (!praefixGilt || gewaehlt.length !== wunsch.length) {
+      this.log?.('chain_pick_corrected', { title: opts.title || 'Chain Lightning', requested: wunsch.length, applied: gewaehlt.length });
+    }
     // Re-match targets by id to get full data (cardInstance etc.)
-    return result.selectedTargets.map(sel => targets.find(t => t.id === sel.id)).filter(Boolean);
+    return gewaehlt;
   }
 
   async revealSearchedCards(playerIdx, cardNames, title) {
@@ -21411,6 +21441,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // type is flagged `bypassesCasterRequirement: true`.
     const _bypassesCasterReq = this.canBypassCasterRequirementForSpell(heroOwner, heroIdx, cardData, cardName);
     if (!opts.sofortGuss && !_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData)) return null;
+    // ★ W7b (M02-25, Al 14.10.: der Server prueft nach): Wisdom-Abwurf braucht Material. Dieselbe Pruefung wie die
+    // Spielbarkeitslisten (`getHeroPlayableCards`, v1279/v1288) – hier als autoritatives Tor, damit ein Zauber ueber
+    // der eigenen Stufe nicht gratis wirkt, wenn ein veraenderter Client/die CPU an der UI-Liste vorbeispielt.
+    // Boris & Co. (`discardCostWaived`) erlassen die Kosten; Sofort-Guss und Kreatur-Wirker zahlen hier nichts.
+    if (!opts.sofortGuss && !_bypassesCasterReq && cardData.cardType === 'Spell') {
+      const _wisdomCost = this.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
+      if (_wisdomCost > 0 && this.handFodderFor(pi, cardName) < _wisdomCost && !this.discardCostWaived(pi)) return null;
+    }
 
     // Load card script
     const script = loadCardEffect(cardName);
@@ -22550,6 +22588,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._broadcastEvent('play_ram_animation', { ...ev, duration: dauer });
     const anteil = ev.trailType === 'fire' ? 0.45 : 0.12;
     await this._delay(Math.round(dauer * anteil) + 30);
+  }
+  /**
+   * ★ W7b (A07-13, Al 14.10.): Bietet `performImmediateActionAnyHero` dem Spieler ueberhaupt etwas an? Dieselbe Sammlung
+   * wie dort (spielbare Handkarten je lebendem Helden, Ability-Aktionen, Helden-Effekte mit Aktionskosten), ohne Abfrage.
+   * Fuer Karten, deren Kosten sich nur lohnen, wenn die geschenkte Aktion auch stattfinden kann (Guardian Beast Hu):
+   * ein Effekt, der so nicht feuern kann, ist nicht aktivierbar. Gleiche Filter-Optionen wie die Aktion (`config`).
+   */
+  canPerformImmediateActionAnyHero(playerIdx, config = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    const cardDB = this._getCardDB();
+    const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      let karten = this.getHeroEligibleActionCards(playerIdx, hi);
+      if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
+      if (typeof config.cardNameFilter === 'function') {
+        try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
+      }
+      if (karten.length > 0) return true;
+      if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
+      if (!eingeschraenkt && !config.skipHeroEffects
+          && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
+    }
+    return false;
   }
   /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
@@ -27662,8 +27726,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       && forced.some(t => t.cardInstance && this._vomPflichtHelden(t.cardInstance, spec));
     // CPU/Schnellmodus: Eine deterministische Auswahl, die die Bedingung verfehlt, wiederholt sich endlos (Skill Test: Steam Dwarf Dragon Pilot,
     // Nachttraining) — nach drei Fehlversuchen zählt es als Abbruch (nur im Skill Test; Menschen werden unbegrenzt neu gefragt).
+    // ★ W7b (B-07, Al 14.10.): Der CPU-Standard beantwortet eine ABBRECHBARE Zielwahl mit `[]` („nichts gewaehlt" =
+    // Abbruch, `_getCpuTargetResponse`); ein Mensch kann nicht leer bestaetigen. Eine leere Antwort, die die Bedingungen
+    // verfehlt, gilt darum bei `cancellable` sofort als Abbruch statt als „zu wenig gewaehlt" ohne Ende (gilt auch
+    // ausserhalb des Skill Tests). Erfuellt `[]` die Bedingungen (minCount 0 …), bleibt es bei der Zahlung ohne Opfer.
     let _cpuFehl = 0;
-    const _cpuGibtAuf = () => cancellable && this.gs.isSkillTest && (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) && ++_cpuFehl >= 3;
+    let _leereAntwort = false;
+    const _cpuGibtAuf = () => cancellable && (_leereAntwort || (this.gs.isSkillTest && (this.isCpuPlayer(pi) || this._inMctsSim || this._fastMode) && ++_cpuFehl >= 3));
     while (true) {
       // Reichen die Pflicht-Tribute schon (genau so viele wie gefordert), gibt es nichts mehr zu waehlen.
       const nichtsMehrZuWaehlen = nForced > 0 && nForced >= spec.minCount && restMinHp === 0 && restMinLvl === 0
@@ -27713,6 +27782,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           .find(t => t && extraIds.has(t.id));
         if (extra) return { extraPicked: extra };
       }
+      _leereAntwort = !nichtsMehrZuWaehlen && Array.isArray(ids) && ids.length === 0;
       if (!ids || ids.length + nForced < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
       const chosen = [...forced, ...ids.map(id => pickable.find(t => t.id === id)).filter(Boolean)];
       if (chosen.length < spec.minCount) { if (_cpuGibtAuf()) { this.log('sacrifice_cancelled', { card: ctx.cardName, player: this.gs.players[pi]?.username, cpuGaveUp: true }); return false; } continue; }
@@ -28943,6 +29013,18 @@ this._deathWatch = (this._deathWatchStack || []).length
    * dieses Surprise-Fenster.
    */
   async _zielwahlAbschliessen(playerIdx, validTargets, config, picked) {
+    // ★ W7b (S01-22, Al 14.10.: der Server prueft Antworten nach): doppelte Ids und mehr Ziele als
+    // `maxTotal` sind nie eine gueltige Antwort (der Client erzwingt beides schon beim Anklicken; ein
+    // veraenderter Client, ein `targetFn`/Skript-CPU ohne Kappung nicht). Korrigiert wird hier, am
+    // gemeinsamen Abschluss fuer Mensch und CPU: Duplikate fallen weg, ueberzaehlige Ziele werden
+    // abgeschnitten (die zuerst genannten gelten). Abbruch (`null`) und `[]` bleiben unberuehrt.
+    // Der Mensch-Weg weist solche Antworten zusaetzlich schon in `doConfirmPotion` ab (Abfrage bleibt offen).
+    if (Array.isArray(picked) && picked.length > 0) {
+      let _ids = [...new Set(picked)];
+      const _max = config?.maxTotal ?? config?.selectCount ?? null;
+      if (typeof _max === 'number' && _max >= 0 && _ids.length > _max) _ids = _ids.slice(0, _max);
+      if (_ids.length !== picked.length) picked = _ids;
+    }
     const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
     const _gesperrt = new Set(validTargets.filter(t => t.ineligible).map(t => t.id));
     let _pickedIds = Array.isArray(_pickedRoh)
@@ -45853,6 +45935,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (statusName !== 'stunned' && statusName !== 'frozen') return false;
     if (opts.renew === true) return false;
     return !!(target && target.statuses && target.statuses[statusName]);
+  }
+
+  /**
+   * ★ W7b (F03-12, Al 14.10.: „Giftimmun macht ein Ziel ineligible"): Wuerde `addHeroStatus` diesen Status auf diesem Helden
+   * gerade abweisen? Nur die ZUSTANDS-Immunitaeten, die schon vor dem Effekt feststehen (gleiche Reihenfolge/Quellen wie in
+   * `addHeroStatus`: Charme, Shielded, Johanna, Light Ball, Immunitaets-Anhaengsel, Submerged, `negative_status_immune`,
+   * Einzel-Immunitaet wie `poison_immune`, CC-`immune`) - keine Quellen-/Aufloesungs-Schutze (Effekt-Immunitaet, Anti Magic).
+   * Fuer Kosten-Karten, die einen Status auf den eigenen Helden legen MUESSEN (Sickly Cheese): ein solcher Held ist kein
+   * waehlbares Ziel. `opts.appliedBy` = Seite der Quelle (Charme-Schutz), `opts.bypassImmune` wie dort.
+   */
+  heroBlocksStatusNow(playerIdx, heroIdx, statusName, opts = {}) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    const statusDef = STATUS_EFFECTS[statusName];
+    if (statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
+    if (hero.statuses?.shielded && statusName !== 'shielded') return true;
+    if (statusDef?.negative) {
+      if (this._johannaSchuetzt(hero)) return true;
+      if (this._lightBallProtects(playerIdx, 'hero', heroIdx)) return true;
+      if (this.heroHasStatusImmunityAttachment(playerIdx, heroIdx)) return true;
+    }
+    if (hero.buffs?.submerged && this.isSubmergedProtected(playerIdx, hero, { festesZiel: opts.festesZiel })) return true;
+    if (statusDef?.negative && hero.buffs?.negative_status_immune) return true;
+    if (!opts.bypassImmune && hero.statuses?.immune && ['frozen', 'stunned', 'negated', 'bound'].includes(statusName)) return true;
+    if (statusDef?.immuneKey && hero.statuses?.[statusDef.immuneKey]) return true;
+    return false;
   }
 
   async addHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
