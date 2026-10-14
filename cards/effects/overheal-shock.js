@@ -167,11 +167,10 @@ module.exports = {
     return candidateHosts(gs, pi, engine, { sides: [oi], heroFilter }).length > 0;
   },
   inherentAction(gs, pi, heroIdx, engine) {
-    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
-    const abZones = ps.abilityZones[heroIdx] || [[], [], []];
-    const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+    const seite = heldSeite(gs, pi, heroIdx);
+    const smLevel = engine.heroSchoolLevel('Support Magic', seite, heroIdx);   // W4a: harte Negierung -> Stufe 0
     if (smLevel >= 2) return true;
-    const dmLevel = engine.countAbilitiesForSchool('Decay Magic', abZones);
+    const dmLevel = engine.heroSchoolLevel('Decay Magic', seite, heroIdx);
     if (dmLevel >= 1) return true;
     return false;
   },

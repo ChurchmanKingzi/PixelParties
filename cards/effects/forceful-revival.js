@@ -34,8 +34,7 @@ const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 const CARD_NAME = 'Forceful Revival';
 
 function _fightingLevel(engine, ps, heroIdx) {
-  const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
-  return engine.countAbilitiesForSchool('Fighting', abZones);
+  return engine.heroSchoolLevel('Fighting', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 function _eligibleCreatureNames(engine, ps, maxLevel, pi) {

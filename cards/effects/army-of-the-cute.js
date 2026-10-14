@@ -49,8 +49,7 @@ function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
 
 /** Casting Hero's Summoning Magic level, clamped to [1, 3]. */
 function levelBudget(engine, pi, heroIdx) {
-  const abZones = engine.gs.players[pi]?.abilityZones?.[heroIdx] || [];
-  const sm = engine.countAbilitiesForSchool('Summoning Magic', abZones);
+  const sm = engine.heroSchoolLevel('Summoning Magic', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(1, Math.min(3, sm));
 }
 

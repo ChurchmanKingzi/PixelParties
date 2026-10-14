@@ -58,8 +58,7 @@ function getDeadHeroes(gs) {
 
 /** Casting Hero's Support Magic count from their own ability zones. */
 function supportMagicLevelOfHero(engine, ps, heroIdx) {
-  const abZones = ps?.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Support Magic', abZones);
+  return engine.heroSchoolLevel('Support Magic', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 module.exports = {

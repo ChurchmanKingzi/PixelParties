@@ -60,8 +60,7 @@ const INVENTING_NOETIG = 3;
 
 /** Inventing-Stufe des Helden — Performance-Joker inklusive. */
 function inventingStufe(engine, pi, heroIdx) {
-  const abZones = engine.gs.players[pi]?.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Inventing', abZones);
+  return engine.heroSchoolLevel('Inventing', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 /** Darf DIESER Held Organnon wirken? */

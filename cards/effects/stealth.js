@@ -33,8 +33,7 @@ const { hasCardType } = require('./_hooks');
 const ABILITY = 'Stealth';
 
 function stealthLevel(engine, pi, heroIdx) {
-  const ps = engine.gs.players[pi];
-  return engine.countAbilitiesForSchool(ABILITY, ps?.abilityZones?.[heroIdx] || []);
+  return engine.heroSchoolLevel(ABILITY, pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 /**

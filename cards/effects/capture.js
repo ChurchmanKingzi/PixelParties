@@ -53,8 +53,7 @@ const LASSO_MS = 1000;       // Länge der Animation (deckt sich mit `capture_la
 
 /** Fighting-Stufe des Nutzers auf seiner Brettseite, 1–3. */
 function maxLevelFuer(engine, hs, heroIdx) {
-  const zonen = engine.gs.players[hs]?.abilityZones?.[heroIdx] || [];
-  const stufe = engine.countAbilitiesForSchool(SCHOOL, zonen);
+  const stufe = engine.heroSchoolLevel(SCHOOL, hs, heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(1, Math.min(stufe, MAX_STUFE));
 }
 

@@ -6748,6 +6748,30 @@ class GameEngine {
   }
 
   /**
+   * ★ W4a (Al, Welle 4 / B) — „Das gilt generell für alle Scaling-Karten": Ist der Held in der HARTEN Form negiert
+   * (Standard-`negated` ohne leichte Marke, v1114: Heldeneffekt UND Ability-Zonen aus, oder `abilitiesNegated` wie beim
+   * Stowaway), liest jede Wirkung, die mit der STUFE einer Ability/Spell School des Helden skaliert, Stufe 0.
+   * Die LEICHTE Form (nur Effekt: Decisive Defeat, Weakening Crystal, `effectOnly`) laesst die Stufen stehen.
+   * Gleiche Regel wie die Stufenpruefung der Handkarten (`heroMeetsLevelReq`: harte Form -> leere Zonenmenge).
+   */
+  heroAbilityLevelsBlanked(pi, heroIdx) {
+    const ng = this.gs.players[pi]?.heroes?.[heroIdx]?.statuses?.negated;
+    if (!ng) return false;
+    if (!(ng._byWeakeningCrystal || ng._fromAttachment || ng.effectOnly)) return true;
+    return this.heroAbilitiesNegated(pi, heroIdx);
+  }
+
+  /**
+   * ★ W4a — Stufe einer Ability/Spell School an den EIGENEN Ability-Zonen des Helden (Brettseite `seite`), 0 bei
+   * `heroAbilityLevelsBlanked`. Ersatz fuer den Rohzugriff `countAbilitiesForSchool(s, abilityZones[heroIdx])` in
+   * Skripten, deren Wirkung mit der Stufe skaliert (Support-Zonen-/„as if"-Stufen: dafuer `effectiveSchoolLevelForCaster`).
+   */
+  heroSchoolLevel(school, seite, heroIdx) {
+    if (this.heroAbilityLevelsBlanked(seite, heroIdx)) return 0;
+    return this.countAbilitiesForSchool(school, this.gs.players[seite]?.abilityZones?.[heroIdx] || []);
+  }
+
+  /**
    * „… negate the effects of all «Charme» Abilities attached to it."
    *
    * Vertrag: `negatesHostAbilities: ['Charme', …]` am Anhaengsel.
@@ -43872,7 +43896,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
     // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
-    if (this.heroAbilitiesNegated(playerIdx, heroIdx)) return [[]];
+    if (this.heroAbilityLevelsBlanked(playerIdx, heroIdx)) return [[]];   // W4a: harte Form wie Stowaway
     // v767: Support-Zonen-Abilities (Xal) zaehlen wie echte
     // Ability-Zonen. Sie hier anzuhaengen genuegt fuer den GANZEN
     // Level-Vertrag — `heroMeetsLevelReq` prueft ausschliesslich ueber
@@ -44027,7 +44051,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       seite = (w && w.pi === pi && w.heroIdx === heroIdx) ? w.heroOwner : pi;
     }
     const ps = this.gs.players[seite];
-    if (this.heroAbilitiesNegated(seite, heroIdx)) return 0;   // S1 (C05-10): Abilities negiert (Stowaway)
+    if (this.heroAbilityLevelsBlanked(seite, heroIdx)) return 0;   // S1 (C05-10): Abilities negiert (Stowaway); W4a: auch harte Standardform
     const abZones = [
       ...(ps?.abilityZones?.[heroIdx] || []),
       ...this.heroSupportAbilityStacks(seite, heroIdx),   // v767 (Xal)
@@ -44126,8 +44150,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[heroIdx];
     if (!hero) return false;
     if (hero._skillLockTurn !== this.gs.turn) return false;
-    const abZones = ps.abilityZones?.[heroIdx] || [];
-    if (this.countAbilitiesForSchool('Magic Arts', abZones) >= 1) return false;
+    if (this.heroSchoolLevel('Magic Arts', playerIdx, heroIdx) >= 1) return false;   // W4a: harte Negierung -> Stufe 0
     return true;
   }
 

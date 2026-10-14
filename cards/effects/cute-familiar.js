@@ -73,7 +73,7 @@ function eligibleCharmeHeroes(engine, pi) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
     if (h._actionLockedTurn === gs.turn) continue;
-    if (countCharme(ps, hi) < REQUIRED_CHARME) continue;
+    if (engine.heroSchoolLevel('Charme', pi, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
     out.push(hi);
   }
   return out;
@@ -92,7 +92,7 @@ function eligibleReviveHosts(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     const hps = engine.gs.players[physOwner];
-    if (countCharme(hps, hi) < REQUIRED_CHARME) continue;
+    if (engine.heroSchoolLevel('Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
     const sup = hps.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
@@ -181,7 +181,7 @@ module.exports = {
     } else {
       const zones = heroes.map(hi => ({
         heroIdx: hi, slotIdx: -1,
-        label: `${ps.heroes[hi].name} (Charme ${countCharme(ps, hi)})`,
+        label: `${ps.heroes[hi].name} (Charme ${engine.heroSchoolLevel('Charme', pi, hi)})`,
       }));
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',

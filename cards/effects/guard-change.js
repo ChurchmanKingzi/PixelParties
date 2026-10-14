@@ -41,8 +41,7 @@ const HOPT_KEY  = 'guard-change';
 /** Casting Hero's Support Magic level (base + Performance wildcard). */
 function supportMagicLevel(engine, pi, heroIdx) {
   if (!engine || heroIdx == null || heroIdx < 0) return 0;
-  const abZones = engine.gs.players[pi]?.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Support Magic', abZones);
+  return engine.heroSchoolLevel('Support Magic', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 /** Own support-zone CREATURE instances (NOT Equip Artifacts, which

@@ -47,8 +47,7 @@ module.exports = {
     if (!inst || inst.zone !== 'hand') return 0;
     if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     if (typeof heroIdx !== 'number' || heroIdx < 0) return 0;
-    const ps = engine.gs.players[ownerIdx];
-    return engine.countAbilitiesForSchool('Singing', ps?.abilityZones?.[heroIdx] || []);
+    return engine.heroSchoolLevel('Singing', ownerIdx, heroIdx);   // W4a: harte Negierung -> Stufe 0
   },
 
   spellPlayCondition(gs, pi, engine) {

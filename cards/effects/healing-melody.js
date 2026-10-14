@@ -77,8 +77,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level on the caster hero's ability zones
-      const abZones = heroPs.abilityZones[heroIdx] || [[], [], []];
-      const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+      const smLevel = engine.heroSchoolLevel('Support Magic', heroOwner, heroIdx);   // W4a: harte Negierung -> Stufe 0
       const healAmount = smLevel >= 3 ? 200 : smLevel >= 2 ? 150 : 100;
 
       // Confirm prompt (no targeting, just confirm/cancel)

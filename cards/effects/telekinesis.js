@@ -29,6 +29,7 @@ module.exports = {
     const hs = heldSeite(gs, pi, heroIdx);
     if (engine?.isHeroIncapacitated?.(hs, heroIdx)) return false;
     const abZones = gs.players[hs]?.abilityZones?.[heroIdx] || [];
+    if (engine?.heroAbilityLevelsBlanked?.(hs, heroIdx)) return false;   // W4a: harte Negierung -> Stufe 0 (Stowaway)
     let magicArtsCount = 0;
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;

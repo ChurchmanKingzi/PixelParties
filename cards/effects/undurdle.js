@@ -35,8 +35,7 @@ const CARD_NAME = 'Undurdle';
 
 /** Level-Deckel: Summoning-Magic-Level des Helden an dem Platz. */
 function levelDeckel(engine, feld, heroIdx) {
-  const ab = engine.gs.players[feld]?.abilityZones?.[heroIdx] || [];
-  return engine.countAbilitiesForSchool('Summoning Magic', ab);
+  return engine.heroSchoolLevel('Summoning Magic', feld, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 /** Wiederbelebbare Kreaturen aus der eigenen Ablage. */

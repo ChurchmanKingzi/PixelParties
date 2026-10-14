@@ -47,8 +47,7 @@ const CARD_NAME = 'Soul Shard Ka';
  * keeps the gate well-defined regardless).
  */
 function levelCapForHost(engine, ps, heroIdx) {
-  const abZones = ps.abilityZones?.[heroIdx] || [];
-  const summoningLevel = engine.countAbilitiesForSchool('Summoning Magic', abZones);
+  const summoningLevel = engine.heroSchoolLevel('Summoning Magic', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(0, summoningLevel - 1);
 }
 

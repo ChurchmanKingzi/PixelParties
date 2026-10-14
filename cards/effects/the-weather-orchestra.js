@@ -45,10 +45,11 @@ const MAX_PIECES = 3;
 
 function singingOnBoard(engine) {
   let n = 0;
-  for (const ps of engine.gs.players || []) {
+  for (let seite = 0; seite < (engine.gs.players || []).length; seite++) {
+    const ps = engine.gs.players[seite];
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       if (!ps.heroes[hi]?.name) continue;
-      n += engine.countAbilitiesForSchool('Singing', ps.abilityZones?.[hi] || []);
+      n += engine.heroSchoolLevel('Singing', seite, hi);   // W4a: harte Negierung -> Stufe 0
     }
   }
   return n;

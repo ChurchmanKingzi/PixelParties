@@ -196,7 +196,7 @@ module.exports = {
     engine.sync();
 
     // ── DM-3 bonus: up to 2 additional Burns ──
-    const dmLevel = countDestructionMagic(gs.players[ctx.cardHeroOwner ?? pi] || ps, ctx.cardHeroIdx);   // 29.9.: Traeger-Seite
+    const dmLevel = engine.heroSchoolLevel('Destruction Magic', ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx);   // 29.9.: Traeger-Seite; W4a: harte Negierung -> Stufe 0
     if (dmLevel >= REQUIRED_DM_LEVEL) {
       const extra = await ctx.promptMultiTarget({
         side: 'any',

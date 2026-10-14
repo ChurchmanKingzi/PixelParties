@@ -70,8 +70,7 @@ module.exports = {
   /** ③ „If the user has Summoning Magic 3, … additional Action.\" */
   inherentAction(gs, pi, heroIdx, engine) {
     if (!engine) return false;
-    const abZones = gs.players[heldSeite(gs, pi, heroIdx)]?.abilityZones?.[heroIdx] || [];
-    return engine.countAbilitiesForSchool('Summoning Magic', abZones) >= SM_SCHWELLE;
+    return engine.heroSchoolLevel('Summoning Magic', heldSeite(gs, pi, heroIdx), heroIdx) >= SM_SCHWELLE;   // W4a: harte Negierung -> Stufe 0
   },
 
   hooks: {

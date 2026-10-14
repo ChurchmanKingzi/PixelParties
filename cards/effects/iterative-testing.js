@@ -55,7 +55,7 @@ function magicArts(gs, pi, heroIdx, engine) {
   const ps = gs.players[pi];
   const zonen = ps?.abilityZones?.[heroIdx];
   if (!zonen) return 0;
-  return engine.countAbilitiesForSchool('Magic Arts', zonen);
+  return engine.heroSchoolLevel('Magic Arts', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
 }
 
 module.exports = {

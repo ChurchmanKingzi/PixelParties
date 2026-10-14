@@ -162,8 +162,7 @@ module.exports = {
       }
 
       // ── Step 6: calculate excess level and place Pollution Tokens ──
-      const abZones = ps.abilityZones?.[userHeroIdx] || [];
-      const magicArtsLevel = engine.countAbilitiesForSchool('Magic Arts', abZones);
+      const magicArtsLevel = engine.heroSchoolLevel('Magic Arts', pi, userHeroIdx);   // W4a: harte Negierung -> Stufe 0
       const excess = Math.max(0, chosenLevel - magicArtsLevel);
       let tokensPlaced = 0;
       if (excess > 0) {

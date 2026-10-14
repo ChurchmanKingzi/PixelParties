@@ -58,6 +58,7 @@ module.exports = {
     const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
+    if (engine.heroAbilityLevelsBlanked(heroOwner, heroIdx)) return false;   // W4a: harte Negierung -> Stufe 0 (keine Schul-Ability zaehlt)
     const abZones = gs.players[heroOwner].abilityZones[heroIdx] || [];
     return spellSchoolAbilitiesOn(abZones, VALID_SCHOOLS).length > 0;
   },

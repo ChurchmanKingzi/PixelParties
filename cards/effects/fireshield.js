@@ -54,16 +54,7 @@ module.exports = {
     const ps = gs.players[pi];
 
     // Count Destruction Magic level on the damaged hero (with Performance)
-    const abZones = ps.abilityZones[targetHeroIdx] || [];
-    let dmLevel = 0;
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      const base = slot[0];
-      for (const ab of slot) {
-        if (ab === 'Destruction Magic') dmLevel++;
-        else if (ab === 'Performance' && base === 'Destruction Magic') dmLevel++;
-      }
-    }
+    const dmLevel = engine.heroSchoolLevel('Destruction Magic', pi, targetHeroIdx);   // W4a: harte Negierung -> Stufe 0
 
     const recoil = dmLevel >= 3 ? amount : Math.ceil(amount / 2);
 

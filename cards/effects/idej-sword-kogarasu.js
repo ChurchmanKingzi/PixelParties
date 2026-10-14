@@ -50,8 +50,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!cardData || cardData.cardType !== 'Spell') return 0;
     if (heroIdx == null || !inst || heroIdx !== inst.heroIdx) return 0;
-    const abZones = engine.gs.players?.[ownerIdx]?.abilityZones?.[heroIdx] || [];
-    return engine.countAbilitiesForSchool('Fighting', abZones) || 0;
+    return engine.heroSchoolLevel('Fighting', ownerIdx, heroIdx) || 0;   // W4a: harte Negierung -> Stufe 0
   },
 
   // "the equipped Hero can only use 1 Spell per turn." Consulted by the

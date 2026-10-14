@@ -67,8 +67,7 @@ module.exports = {
       // override) — Performance is read from the actual host hero's
       // ability zones, never overridden.
       const decayLevel = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
-      const abZones = (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [];   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
-      const perfLevel = engine.countAbilitiesForSchool('Performance', abZones);
+      const perfLevel = engine.heroSchoolLevel('Performance', ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       const combinedLevel = decayLevel + perfLevel;
       const stacks = combinedLevel >= 3 ? 4 : combinedLevel >= 2 ? 2 : 1;
 

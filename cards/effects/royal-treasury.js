@@ -74,7 +74,10 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[feld]?.heroes?.[inst.heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
       if (usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return;
-      const ma = engine.countAbilitiesForSchool('Magic Arts', gs.players[feld]?.abilityZones?.[inst.heroIdx] || []);
+      // W4a (Al, Welle 4 / B): harte Negierung des Wirts (Stowaway, Standard-negated) -> Magic Arts liest Stufe 0, der Bonus
+      // entfaellt (kein Aufschlag, keine Ladung verbraucht). Ohne Negierung bleibt "Level 0 zaehlt wie 1" (siehe Kopf).
+      if (engine.heroAbilityLevelsBlanked(feld, inst.heroIdx)) return;
+      const ma = engine.heroSchoolLevel('Magic Arts', feld, inst.heroIdx);
       const bonus = BONUS[Math.min(3, Math.max(1, ma))];
       spendUse(inst, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
       await engine.announceHookActivation(CARD_NAME, pi, { source: ctx._goldSource });

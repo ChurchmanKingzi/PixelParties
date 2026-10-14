@@ -40,7 +40,7 @@ function maximum(gs, pi, engine, heroIdx) {
   const ps = gs.players[pi];
   const zonen = ps?.abilityZones?.[heroIdx];
   if (!zonen) return 1;
-  const stufe = engine.countAbilitiesForSchool(SCHULE, zonen);
+  const stufe = engine.heroSchoolLevel(SCHULE, pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
   return Math.max(1, Math.min(stufe, 3));
 }
 

@@ -70,8 +70,7 @@ function zonenFuer(engine, pi, cardName) {
 function decayLevel(engine, pi) {
   let summe = 0;
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
-    const zonen = engine.gs.players[physOwner]?.abilityZones?.[hi] || [];
-    summe += engine.countAbilitiesForSchool('Decay Magic', zonen) || 0;
+    summe += engine.heroSchoolLevel('Decay Magic', physOwner, hi) || 0;   // W4a: harte Negierung -> Stufe 0
   }
   return summe;
 }

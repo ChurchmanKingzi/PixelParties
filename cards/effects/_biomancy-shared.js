@@ -83,8 +83,7 @@ function biomancyTokenCounters(potionData, level) {
 
 /** Biomancy-Stufe eines Helden (0 = keine Biomancy). */
 function biomancyLevelOf(engine, pi, heroIdx) {
-  const zones = engine?.gs?.players?.[pi]?.abilityZones?.[heroIdx] || [];
-  try { return engine.countAbilitiesForSchool('Biomancy', zones) || 0; }
+  try { return engine.heroSchoolLevel('Biomancy', pi, heroIdx) || 0; }   // W4a: harte Negierung -> Stufe 0
   catch { return 0; }
 }
 

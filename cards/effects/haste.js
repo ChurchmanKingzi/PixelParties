@@ -22,9 +22,7 @@ module.exports = {
   // graut ueber `cardGateBlockedCards` erst aus, wenn KEIN eigener Held
   // sie mehr spielen kann.
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
-    const ps = gs.players[heldSeite(gs, pi, heroIdx)];
-    const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
-    const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+    const smLevel = engine.heroSchoolLevel('Support Magic', heldSeite(gs, pi, heroIdx), heroIdx);   // W4a: harte Negierung -> Stufe 0
     const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
     return !drawWouldBeBlocked(engine, pi, drawCount);
   },
@@ -39,8 +37,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level
-      const abZones = (gs.players[ctx.cardHeroOwner ?? pi] || ps).abilityZones[heroIdx] || [[], [], []];   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite
-      const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+      const smLevel = engine.heroSchoolLevel('Support Magic', ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
 
       // Confirm
