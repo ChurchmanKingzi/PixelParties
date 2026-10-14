@@ -32,7 +32,8 @@ Nach Welle 2 hat Al eine Reihe von Regelfragen beantwortet. Fünf Agenten haben 
 * Repros: **286 grün** von 703 (Welle 2: 265 von 691); **0 Rückschritte**, keine Abstürze. Die 13 von Z7b umgekehrten Repros sind keine Fehler mehr: S01-01, S01-02, S03-12, F02-10, F02-11, M02-10, A01-14, A06-29, A06-29b, A07-12, A09-17, C01-12, F01-19 (gelten jetzt als „kein Fehler / gewollt" – der Index zeigt sie noch als `✔ behoben`, weil das Repro die neue Regel prüft).
 * Alle 44 `scripts/check-*.js` wie im Ausgangszustand (nur `check-scope.js` rot). `check-bundles.js` baut `public/dist` neu und vergleicht; nach einem Merge mit Client-Änderungen ist es einmal rot, dann grün.
 * Skilltest-E2E: wie im Ausgangsstand (rot: battle, lobby, prep, seats, target); `cards.test.js` ist ein bekannter Zufalls-Flake (im Ausgangsstand ebenfalls ~1 von 4 rot, „Abomination wählt Gegner"); `mcts.test.js` braucht allein ~6 Min und läuft unter Last in den Timeout.
-* Dauerfeuer über alle Karten: siehe Abschnitt „Endstand" unten.
+* Skilltest-E2E auf dem Endstand (60d50bb): 25 grün, 5 rot (battle, lobby, prep, seats, target) – identisch zum Ausgangszustand; `cards.test.js` und `mcts.test.js` diesmal grün.
+* Dauerfeuer über alle Karten (~2 440 Läufe) auf dem Endstand: 14 auffällige Läufe, **alle bereits im Ausgangsstand auffällig, keine neu**; einige frühere Auffälligkeiten sind verschwunden.
 
 ## Offene Fragen an Al (ja/nein)
 
