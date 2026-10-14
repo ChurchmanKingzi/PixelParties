@@ -20011,7 +20011,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       // Once-per-game cards (Divine Gift, etc.)
       const script = loadCardEffect(cardName);
-      if (script?.oncePerGame) {
+      if (script?.oncePerGame && !script.isSurprise) {   // Z7c: bei Surprises begrenzt die AKTIVIERUNG, nicht das Setzen
         const opgKey = script.oncePerGameKey || cardName;
         if (ps._oncePerGameUsed?.has(opgKey)) continue;
       }
@@ -21200,8 +21200,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Reaction subtype: not proactively playable unless script opts in
     if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script?.proactivePlay) return null;
 
-    // Once-per-game check
-    if (script?.oncePerGame) {
+    // Once-per-game check (Z7c: bei Surprises begrenzt die AKTIVIERUNG, nicht das Setzen)
+    if (script?.oncePerGame && !script.isSurprise) {
       const opgKey = script.oncePerGameKey || cardName;
       if (ps._oncePerGameUsed?.has(opgKey)) return null;
     }
@@ -24278,8 +24278,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (seen.has(cardName)) continue;
       seen.add(cardName);
       const script = loadCardEffect(cardName);
-      // Once-per-game cards
-      if (script?.oncePerGame) {
+      // Once-per-game cards (Z7c: bei Surprises begrenzt die AKTIVIERUNG, nicht das Setzen)
+      if (script?.oncePerGame && !script.isSurprise) {
         const opgKey = script.oncePerGameKey || cardName;
         if (ps._oncePerGameUsed?.has(opgKey)) {
           blocked.push(cardName);
@@ -31423,7 +31423,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     const ps = this.gs.players?.[abzug.pi];
-    if (ps?._oncePerGameUsed) for (const k of [...ps._oncePerGameUsed]) if (!abzug.opg.has(k)) ps._oncePerGameUsed.delete(k);
+    if (ps?._oncePerGameUsed) for (const k of [...ps._oncePerGameUsed]) if (!abzug.opg.has(k) && !this._surpriseStempel?.has(`${abzug.pi}|${k}`)) ps._oncePerGameUsed.delete(k);
   }
 
   claimHOPT(key, playerIdx) {
@@ -37225,6 +37225,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
+    // ★ Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) begrenzt die
+    // AKTIVIERUNG — gesetzt werden darf beliebig oft. Ist die Grenze verbraucht (`_activateSurprise`
+    // stempelt bei der nicht negierten Aktivierung), kann keine weitere verdeckt liegende Kopie mehr
+    // auslösen; sie bleibt unberührt liegen. Die Grenze gehört dem Auslöser (`reaktor`).
+    {
+      const _opgScript = loadCardEffect(cardName);
+      if (_opgScript?.isSurprise && (_opgScript.oncePerGame || _opgScript.oncePerGameKey)
+          && this.gs.players[reaktor]?._oncePerGameUsed?.has(_opgScript.oncePerGameKey || cardName)) return false;
+    }
+
     // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
     // „cannot use Spells" heisst JEDER Spell, nicht nur der normale
     // Spielweg aus der Hand. Surprises und Hand-Reaktionen sind Spells
@@ -37675,6 +37685,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     };
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);
     const surpriseNegated = !!surpriseHookCtx._surpriseNegated;
+
+    // ★ Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) verbraucht erst die
+    // AKTIVIERUNG — ab dem Moment, in dem sie auflösen darf (nicht von Boots of Hermes & Co. negiert).
+    // Eine ganz negierte Aktivierung lässt die Grenze unverbraucht (Z7b). Beim Auslöser gestempelt
+    // (`steuerer`); `_surpriseStempel` schützt den Eintrag vor dem Z7b-Rückgabe-Abzug (`_stempelZurueck`),
+    // falls der Auslöser zugleich der Wirker der negierten Karte ist.
+    if (!surpriseNegated && (script.oncePerGame || script.oncePerGameKey)) {
+      const _sps = this.gs.players[steuerer];
+      if (_sps) {
+        const _opgKey = script.oncePerGameKey || cardName;
+        if (!_sps._oncePerGameUsed) _sps._oncePerGameUsed = new Set();
+        _sps._oncePerGameUsed.add(_opgKey);
+        (this._surpriseStempel || (this._surpriseStempel = new Set())).add(`${steuerer}|${_opgKey}`);
+      }
+    }
 
     // Execute the surprise's effect (unless negated)
     let result = null;
@@ -38974,6 +38999,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return null;
     const hi = link.isInitialCard ? link.heroIdx : link.casterHeroIdx;
     if (!Number.isInteger(hi) || hi < 0) return null;
+    // Z7c: opfert der Wirker sich selbst als KOSTEN („Sacrifice … to play this card", Divine Gift of Sacrifice,
+    // `payActivationCost` vor der Kette), fällt er nicht als Wirker aus — die Karte soll trotzdem auflösen dürfen.
+    const _kow = this.gs._kostenOpferWirker;
+    if (_kow && link.isInitialCard && _kow.cardName === link.cardName && _kow.pi === (link.casterOwner ?? link.owner) && _kow.heroIdx === hi) return null;
     return this.wirkerHandlungsunfaehig(link.casterOwner ?? link.owner, hi);
   }
 

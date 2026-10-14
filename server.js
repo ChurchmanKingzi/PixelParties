@@ -8288,10 +8288,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     room.engine._setPendingPlayLog('spell_played', { card: cardName, player: ps.username, hero: hero.name, cardType: cardData.cardType });
 
+    // Z7c: ein striktes `false` aus `payActivationCost` = der Spieler hat die Kostenwahl abgebrochen
+    // (nichts bezahlt) → Abbruch wie in der Zielwahl: weder Kette noch `onPlay`, Karte zurück auf die Hand.
+    let _kostenAbbruch = false;
     if (script?.payActivationCost) {
       try {
         const costCtx = room.engine._createContext(inst, {});
-        await script.payActivationCost(costCtx);
+        if ((await script.payActivationCost(costCtx)) === false) _kostenAbbruch = true;
       } catch (err) {
         console.error(`[Engine] payActivationCost for ${cardName} failed:`, err.message);
       }
@@ -8304,7 +8307,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     gs._wirkerSeite = { pi, heroIdx, heroOwner };
     let chainResult;
     try {
-    chainResult = await room.engine.executeCardWithChain({
+    chainResult = _kostenAbbruch ? { negated: false, chainFormed: true, fizzled: false } : await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
       resolve: null,
       // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
@@ -8380,7 +8383,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     gs._spellDamageLog = [];
     gs._spellExcludeTargets = [];
-    gs._spellCancelled = false;
+    gs._spellCancelled = _kostenAbbruch;   // Z7c
 
     if (!chainResult.chainFormed) {
       gs._pendingCardReveal = { cardName, ownerIdx: pi };
@@ -8403,7 +8406,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Z7b: Abzug der Einmal-Stempel VOR dem `onPlay` — wird der Zauber nach der Zielwahl GANZ negiert
     // (MOE Shield, Storm Ring, Frost Rune …), hat er nie aufgeloest und gibt sie unten zurück.
     const _stempelVorher = _gefizzelt ? null : room.engine._stempelAbzug(pi);
-    if (!_gefizzelt) {
+    if (!_gefizzelt && !_kostenAbbruch) {
       const _wirkerHook = gs._wirkerSeite;
       gs._wirkerSeite = { pi, heroIdx, heroOwner };
       try {
@@ -11679,14 +11682,10 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   // Z6 (M01-10, S01-19): Namenssperre (Inventing Lv3, Divine Gift of Creation …) auch fuer Surprises.
   if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;
 
-  // Once-per-game Surprises (Tharxian Horse, etc.) can only be played
-  // ONCE per game. The client grays the card out via
-  // `getBlockedSpells`, but the server must also enforce it so a
-  // hand-jiggle / replay attempt can't bypass the lock.
-  if (script.oncePerGame) {
-    const opgKey = script.oncePerGameKey || cardName;
-    if (ps._oncePerGameUsed?.has(opgKey)) return false;
-  }
+  // Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) gilt für die
+  // AKTIVIERUNG, nicht fürs verdeckte Setzen — kein Tor, kein Stempel hier; beliebig viele Kopien dürfen
+  // (auch an mehreren Helden) liegen. Verbraucht wird die Grenze in `_activateSurprise`
+  // (nicht negierte Aktivierung), gesperrt wird sie in `_canHeroActivateSurprise`.
 
   // Als Vorgabe 29.9.: Surprise an einen geliehenen Gegnerhelden setzen.
   if (heroOwner != null && heroOwner !== pi) {
@@ -11717,11 +11716,6 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
     const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, bakhmSlot);
     inst.faceDown = true;
 
-    if (script.oncePerGame) {
-      if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-      ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-    }
-
     room.engine.log('surprise_set', { player: ps.username, hero: hero.name, bakhmSlot: true });
     broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: bakhmSlot, faceDown: true });
 
@@ -11744,11 +11738,6 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
   const inst = room.engine._trackCard(cardName, pi, 'surprise', heroIdx, 0);
   inst.faceDown = true;
-
-  if (script.oncePerGame) {
-    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-  }
 
   room.engine.log('surprise_set', { player: ps.username, hero: hero.name });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true });
@@ -11787,11 +11776,6 @@ async function doPlaySurpriseFremd(room, pi, { cardName, handIndex, heroIdx, fro
   const inst = engine._trackCard(cardName, heroOwner, 'surprise', heroIdx, 0);
   inst.originalOwner = pi;
   inst.faceDown = true;
-
-  if (script?.oncePerGame) {
-    if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
-    ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
-  }
 
   engine.log('surprise_set', { player: ps.username, hero: hero.name, foreignHero: true });
   broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'surprise', heroIdx, slotIdx: 0, faceDown: true, destOwner: heroOwner });

@@ -19,10 +19,32 @@
 //  Card text marks the cast as an additional Action — that's
 //  handled by the `inherentAction: true` flag below; the engine's
 //  spell-play flow will not consume the hero's main action slot.
+//
+//  ★ Z7c (Als Entscheidung, Welle 3): DAS OPFER IST EIN KOSTENPUNKT
+//  („Sacrifice a Creature you control TO PLAY THIS CARD"). Es wird in
+//  `payActivationCost` VOR dem Reaktionsfenster bezahlt; wird die Karte
+//  danach komplett negiert, bleibt die Kreatur geopfert. Abbruch der
+//  Opferwahl (`false`) nimmt den Zug zurück (Karte bleibt auf der Hand);
+//  ein von Barrier of Undying gerettetes Opfer fizzelt die Karte wie
+//  zuvor (gespielt, verbraucht, ohne Wirkung — `_opferGerettet`).
+//  Fallback: lief `payActivationCost` nicht (anderer Spielweg), zahlt
+//  `onPlay` die Kosten wie früher selbst.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Sacrifice to Divinity';
 const DIVINITY  = 'Divinity';
+
+/** Opferwahl (Kosten) — eine Stelle für `payActivationCost` und den Fallback in `onPlay`. */
+function opferSpec() {
+  return {
+    minCount: 1,
+    title: `${CARD_NAME} — Sacrifice`,
+    description: 'Sacrifice 1 of your Creatures to play Sacrifice to Divinity.',
+    confirmLabel: '🗡️ Sacrifice & Cast!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+  };
+}
 
 module.exports = {
   inherentAction: true,
@@ -36,6 +58,22 @@ module.exports = {
     if (!engine) return true; // Optimistic if engine missing.
     const candidates = engine.getSacrificableCreatures(playerIdx);
     return candidates.length > 0;
+  },
+
+  /**
+   * ★ Z7c: das Opfer („to play this card") wird VOR dem Reaktionsfenster bezahlt.
+   * `false` = Opferwahl abgebrochen (nichts bezahlt) → der Server nimmt den Zug zurück.
+   */
+  async payActivationCost(ctx) {
+    const engine = ctx._engine;
+    const inst = ctx.card;
+    if (!inst) return;
+    const sacrificed = await engine.resolveSacrificeCost(ctx, opferSpec());
+    if (sacrificed) { inst._opfer = sacrificed; return; }
+    // Gerettetes Opfer (Barrier of Undying): die Karte ist gespielt und fizzelt (v1313) — `onPlay` setzt das nach.
+    if (engine.nimmOpferFizzle()) { inst._opferGerettet = true; return; }
+    inst._opferAbbruch = true;
+    return false;
   },
 
   hooks: {
@@ -53,14 +91,13 @@ module.exports = {
       // `cancellable` lets the player back out before the cost is
       // paid — gs._spellCancelled tells the spell-play handler to
       // return the card to hand without discarding.
-      const sacrificed = await engine.resolveSacrificeCost(ctx, {
-        minCount: 1,
-        title: `${CARD_NAME} — Sacrifice`,
-        description: 'Sacrifice 1 of your Creatures to play Sacrifice to Divinity.',
-        confirmLabel: '🗡️ Sacrifice & Cast!',
-        confirmClass: 'btn-danger',
-        cancellable: true,
-      });
+      // Z7c: Normalweg — die Kosten hat `payActivationCost` schon vor der Kette bezahlt.
+      const _inst = ctx.card;
+      if (_inst?._opferGerettet) { delete _inst._opferGerettet; gs._opferFizzle = true; gs._spellCancelled = true; return; }
+      if (_inst?._opferAbbruch) { delete _inst._opferAbbruch; gs._spellCancelled = true; return; }
+      let sacrificed = _inst?._opfer;
+      if (_inst) delete _inst._opfer;
+      if (!sacrificed) sacrificed = await engine.resolveSacrificeCost(ctx, opferSpec());
       if (!sacrificed) { gs._spellCancelled = true; return; }
 
       // ── Step 2: pick a Divinity from hand / deck / discard ──

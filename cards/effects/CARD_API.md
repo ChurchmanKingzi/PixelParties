@@ -2365,7 +2365,7 @@ Any prompt whose `title` carries a dash, colon or interpolation needs an explici
 |--------|-----------|-------------|
 | `spellPlayCondition` | `(gs, playerIdx) → bool` | Extra condition beyond spell school/level. Return `false` to block play. |
 | `canPlayCard` | `(gs, pi, heroIdx, cardData, engine) → bool` | Hero-level play restriction (e.g. duplicate attack bans). Exported by hero scripts. |
-| `payActivationCost` | `async (ctx) → void` | **Runs BEFORE the reaction chain window.** Use for costs that must be paid at activation and are NOT refunded by negation (e.g. Cold Coffin's Pollution placement). `ctx` is a standard card ctx built from the hand-zone instance — includes `promptZonePick`, `promptGeneric`, etc. If the spell is later negated by Anti Magic Shield / The Master's Plan / any counter-spell, the cost stays paid. Make `onPlay`'s target prompt `cancellable: false` since the cost is committed. |
+| `payActivationCost` | `async (ctx) → void \| false` | **Runs BEFORE the reaction chain window.** Use for costs that must be paid at activation and are NOT refunded by negation (e.g. Cold Coffin's Pollution placement). `ctx` is a standard card ctx built from the hand-zone instance — includes `promptZonePick`, `promptGeneric`, etc. If the spell is later negated by Anti Magic Shield / The Master's Plan / any counter-spell, the cost stays paid. Make `onPlay`'s target prompt `cancellable: false` since the cost is committed. **Z7c:** ein striktes `false` (nichts bezahlt: der Spieler hat die Kostenwahl abgebrochen oder sie ist nicht zahlbar) nimmt den Zug zurück wie einen Abbruch in der Zielwahl — weder Kette noch `onPlay`, Karte bleibt auf der Hand (`doPlaySpell`). Ein Skript merkt sich das Gezahlte an `ctx.card` (die Instanz ist dieselbe wie im `onPlay`) und fällt im `onPlay` auf „jetzt zahlen" zurück, wenn der Weg `payActivationCost` nicht aufruft (Sofort-Guss von Attacks, Chaos Magic). |
 
 ### Heroes
 
@@ -11394,7 +11394,7 @@ Versuch am Server — Doppelklick, CPU, Wiederholung) und einen
 |---|---|---|
 | Zauber (`doPlaySpell`) | nur Stempel — **Tor fehlte** | beides |
 | Artefakt | beides | beides |
-| Überraschung | beides | beides |
+| Überraschung | beides | beides — *Z7c: Tor und Stempel sitzen bei der AKTIVIERUNG, nicht beim Setzen* |
 | Trank | **keins von beidem** (v1028) | beides |
 | Kreatur-Beschwörung | **keins von beidem** | beides |
 
@@ -11523,8 +11523,34 @@ Mitgeprüft und in Ordnung:
   Artefakte (`doConfirmPotion`) und Normal-Artefakte (`doUseArtifactEffect`) haben Tor **und** Stempel für
   `oncePerGame` (Perfect Disguise); `_castSpellImmediately` prüft `oncePerGame` immer (nicht nur mit
   `opts.pruefen`); Item-/Zieh-Sperren aus Z6 (`drawWouldBeBlocked` in Squire/Albrecht/Pteranos/Raptoren).
-* Nicht betroffen: Surprises stempeln `oncePerGame` beim **Setzen** (verdeckt gespielt); die spätere Negierung
-  ihrer Aktivierung (Boots of Hermes, See through the Ruse …) macht das Setzen nicht ungeschehen.
+* ~~Nicht betroffen: Surprises stempeln `oncePerGame` beim Setzen~~ — **überholt durch Z7c** (siehe unten):
+  Surprises stempeln erst bei der nicht negierten AKTIVIERUNG.
+
+
+### ★ Z7c — Opfer-Kosten bleiben bezahlt; „once per game" bei Surprises erst bei der Aktivierung (Welle 3, Als Entscheidung)
+
+**(A) Kosten „to play this card" werden VOR dem Reaktionsfenster bezahlt.** Divine Gift of Sacrifice: „Sacrifice a Hero
+originally controlled by you to play this card" — das Opfer ist ein Kostenpunkt. Wird die Karte komplett negiert
+(Silence, The Master's Plan …), bleibt der Held geopfert, die Karte wirkt nicht, `divineGift` bleibt frei (Z7b).
+Umsetzung: `payActivationCost` (Opferwahl + Tod; Empfängerwahl und HP-Gewinn bleiben im `onPlay`); der Wirker darf sich
+selbst opfern — `gs._kostenOpferWirker` nimmt ihn vom Fizzle-Test „Wirker handlungsunfähig" (`_kettenWirkerFizzelt`) aus.
+Gleich behandelt, weil Kartentext eindeutig „to play this card" und derselbe Mechanismus (Kosten erst im `onPlay`):
+**Sacrifice to Divinity** (Kreatur-Opfer; abbrechbar ⇒ `payActivationCost` liefert `false`; Barrier-of-Undying-Rettung
+fizzelt weiter als „gespielt") und **Knife Throw** (ausgerüstetes Artefakt → Ablage). Neuer Vertrag: `payActivationCost`
+darf strikt `false` liefern (nichts bezahlt ⇒ Zug zurück, Karte bleibt auf der Hand; `doPlaySpell`).
+*Nicht geändert (Rest):* Rebelliokai-Kosten (Kirin Firebreath, Tanuki Escape, Tengu Windstorm, Kappa Sword Slash —
+Hausregel „Kosten nach der ersten Zielwahl", Skriptkopf), Temple of Sacrifice (optionales Opfer), Artefakte mit
+Kosten im `resolve` (Hive's Crown, Ladder to the Sky, Remote Detonator: anderer Spielweg), Basketskull (Doom Counters),
+Token-Kosten (Medusa's Curse, Null Zone, Goldify, Reincarnation, Mass Multiplication, Golden Wings — Frage A01-17),
+Soul Transmigration Ritual / Weapon Unleashing („to use this Spell"), Tribut-Kreaturen (`beforeSummon` nach der Kette).
+
+**(B) „Once per game" bei Surprises (Tharxian Horse) begrenzt die AKTIVIERUNG, nicht das Setzen.** `doPlaySurprise` /
+`doPlaySurpriseFremd` prüfen und stempeln nichts mehr; `getBlockedSpells`, `validateActionPlay` und
+`getHeroEligibleActionCards` graue Surprises nicht mehr nach der Grenze aus (Skript `isSurprise`). Beliebig viele Kopien
+dürfen (auch an mehreren Helden) verdeckt liegen. `_activateSurprise` stempelt `ps._oncePerGameUsed` des Auslösers, sobald
+die Aktivierung auflösen darf (nicht von Boots of Hermes / Front Soldier negiert); danach lösen weitere Kopien nicht mehr
+aus (`_canHeroActivateSurprise`) und **bleiben verdeckt liegen**. Eine komplett negierte Aktivierung verbraucht die Grenze
+nicht (Z7b). `engine._surpriseStempel` schützt den Eintrag vor dem Z7b-Rückgabe-Abzug (`_stempelZurueck`).
 
 
 ## ★ Puzzle-Editor: Tooltip lag unter der Hand (v1032, Als Befund 12.9.)
