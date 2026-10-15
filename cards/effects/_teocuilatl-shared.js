@@ -157,6 +157,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   newInst.counters = newInst.counters || {};
   if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
 
   // (4) Remove Guardian from hand BY NAME (path-independent — all copies
@@ -308,6 +309,7 @@ async function placeAfterSacrificeSwap(engine, pi, data, CARD_NAME_ARG) {
   newInst.counters = newInst.counters || {};
   if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
 
   if (fromHandIdx >= 0) {

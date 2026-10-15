@@ -32,10 +32,9 @@
 //  any prompt or picks nothing. Reset on
 //  onTurnStart.
 //
-//  Placements bypass `countAsSummon` — the card
-//  text frames them as a passive reaction, not a
-//  summon play, so they don't consume the
-//  creatures-summoned-this-turn counter.
+//  Welle 10 (Q47): Platzierungen zaehlen als Beschwoerung
+//  (`actionPlaceCreature` zaehlt immer, `countAsSummon` wird
+//  nicht mehr gelesen) — auch Stellans.
 // ═══════════════════════════════════════════
 
 const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)

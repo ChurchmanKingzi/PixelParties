@@ -153,6 +153,7 @@ module.exports = {
         // Track card instance with placement flag
         const inst = engine._trackCard(cardName, pi, 'support', hi, si);
         inst.counters.isPlacement = 1;
+        engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
 
         engine.log('placement', { card: cardName, by: 'Cloudy Slime', from: 'hand', heroIdx: hi, zoneSlot: si });
 

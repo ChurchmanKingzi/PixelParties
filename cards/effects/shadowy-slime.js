@@ -144,6 +144,7 @@ module.exports = {
         const inst = engine._trackCard(cardName, feld, 'support', heroIdx, si);
         if (feld !== pi) engine.markiereSeitenfremd(inst, pi);
         inst.counters.isPlacement = 1;
+        engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
         const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
         engine.log('placement', { card: cardName, by: 'Shadowy Slime', from: 'discard', heroIdx, zoneSlot: si });

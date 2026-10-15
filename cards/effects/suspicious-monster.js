@@ -133,6 +133,7 @@ async function landeNachTausch(engine, pi, data) {
   newInst.counters = newInst.counters || {};
   if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
 
   // Hand-Entnahme (der Server hat die Kopie ueber `_resolvingCard` gemerkt), Flug + Glanz.
@@ -261,6 +262,7 @@ async function sacrificeSwapAtomar(ctx) {
   newInst.counters = newInst.counters || {};
   if (heroOwner !== pi) engine.markiereSeitenfremd(newInst, pi);   // wie `safePlaceInSupport(…, { controller: pi })`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
 
   // (3) Splice Suspicious Monster from hand (server pinned the copy via

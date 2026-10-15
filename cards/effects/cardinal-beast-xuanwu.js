@@ -143,7 +143,7 @@ module.exports = {
     const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
     // Track creature summon
-    ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+    engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): zentraler Zaehler, jede Platzierung zaehlt
 
     engine._broadcastEvent('summon_effect', { owner: pi, heroIdx: destHeroIdx, zoneSlot: destSlot, cardName: chosenName });
     engine.log('xuanwu_revive', { player: ps.username, card: chosenName, hp: 1 });

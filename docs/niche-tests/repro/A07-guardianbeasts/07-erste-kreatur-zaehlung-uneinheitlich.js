@@ -13,6 +13,8 @@
 //   • Xuanwu  (Text: „place")    → zählt (cardinal-beast-xuanwu.js:146 erhöht den Zähler)  ← Harpyformer nicht mehr gratis
 // Das ist das Gegenteil dessen, was die Textverben nahelegen. Dieses Skript hält die Beobachtung fest und prüft die
 // Lesart „Text-Verb entscheidet" (✗ = Beobachtung tritt auf). Frage an Al steht im Bericht (Stufe C).
+// ★ W10b (Al, Welle 10, Q47: Alles sollte zählen, inklusive Xuanwu): JEDE Platzierung/Beschwörung zählt als erste Kreatur, die du beschwörst. Repro umgestellt:
+//   Xuanwu zählt – Harpyformer danach nicht mehr gratis (siehe W10/b-q47).
 const H = require('../../lib/h.js');
 const { harpyformerInherentAction } = require('../../../../cards/effects/_harpyformer-shared.js');
 const D = H.INERT.creature;
@@ -27,7 +29,7 @@ const D = H.INERT.creature;
   t.script.push({ match: d => d && d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx, owner: d.zones[0].owner }) });
   t.gs.activePlayer = 0; t.phase(2);
   await t.activateCreature(0, 0, 0);
-  R.check('Xuanwu legt eine Kreatur („place"): Harpyformer bleibt als erste Beschwörung gratis', frei(t), { zaehler: t.gs.players[0]._creaturesSummonedThisTurn });
+  R.check('Xuanwu legt eine Kreatur („place"): zählt als Beschwörung, Harpyformer ist danach NICHT mehr gratis', !frei(t), { zaehler: t.gs.players[0]._creaturesSummonedThisTurn });
 
   t = await H.fresh({ hand: [['Cute Princess Mary', D], []], deckSize: 10 });
   const v = t.put(0, 0, 0, 'Unsettling Opportunist Vullary'); v.turnPlayed = 1;
