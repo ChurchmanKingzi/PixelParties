@@ -305,9 +305,12 @@ function allChangeCounterTargets(engine) {
   return out;
 }
 
-/** All cards on `pi`'s side that currently hold any Change Counters. */
+/** All cards `pi` CONTROLS that currently hold any Change Counters.
+ *  ★ Welle 9 (Al, 15.10.2026, A02-deepsea-12): „cards you control" zählt nach KONTROLLE, nicht nach Brettseite — eine per Succubus
+ *  geliehene Kreatur zählt für ihren Kontrolleur (Invader-Token-Strafe entfällt, Life-Searcher/Gatherer sehen ihre Counter);
+ *  eine verliehene eigene Kreatur zählt nicht mehr. Helden: unverändert nach Spalte. */
 function changeCounterCardsOnSide(engine, pi) {
-  return allChangeCounterTargets(engine).filter(t => t.owner === pi);
+  return allChangeCounterTargets(engine).filter(t => (t.kind === 'creature' ? (t.ref.controller ?? t.ref.owner) : t.owner) === pi);
 }
 
 /**
