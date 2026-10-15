@@ -27,6 +27,96 @@
 
 const CARD_NAME = 'Sacrificial Dagger';
 
+/**
+ * Der Schlag selbst (Kreaturen- UND Helden-Opfer). `pi` = Kontrolleur des Daggers (= Opferer), Träger muss leben.
+ */
+async function dolchSchlag(ctx, pi) {
+  const engine = ctx._engine;
+  const gs = engine.gs;
+  const hero = ctx.attachedHero;
+  const heroIdx = ctx.cardHeroIdx;
+
+  // Once per turn, per Dagger. Peek now; claim only on commit so a
+  // declined "may" stays usable on a later sacrifice this turn.
+  // (claimHOPT stores under `${key}:${pi}` — peek the suffixed key.)
+  const hoptKey = `sacrificial_dagger:${ctx.card.id}`;
+  if (gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;
+
+  const atk = Math.max(0, hero.atk || 0);
+
+  // "you may choose a target" — optional; cancel = decline.
+  const target = await ctx.promptDamageTarget({
+    side: 'any',
+    types: ['hero', 'creature'],
+    damageType: 'attack',
+    baseDamage: atk,
+    title: CARD_NAME,
+    description: `You may deal ${hero.name}'s Attack (${atk}) to a target — counts as ${hero.name}'s Attack.`,
+    confirmLabel: `🗡️ Sacrificial Strike! (${atk})`,
+    confirmClass: 'btn-danger',
+    cancellable: true,
+    // "Counts as the equipped Hero hitting with an Attack" — the
+    // reaction windows attribute the hit to the equipped Hero.
+    attackerSourceOverride: {
+      name: hero.name, owner: pi, controller: pi,
+      heroIdx, zone: 'hand', _heroAttackSource: true,
+    },
+  });
+  if (!target) return; // declined — HOPT untouched
+
+  // Auftritt links am Feld (Als Regel 21.8.: beim Opfern). Erst
+  // hier, nach der verbindlichen Zusage — ein abgelehntes „may"
+  // soll nichts anzeigen.
+  await engine.announceHookActivation('Sacrificial Dagger', pi);
+
+  // Committed — claim the once-per-turn.
+  engine.claimHOPT(hoptKey, pi);
+
+  // Re-resolve the live target (a reaction could have moved/killed it).
+  let tHero = null, tInst = null;
+  if (target.type === 'hero') {
+    tHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
+    if (!tHero || tHero.hp <= 0) { engine.sync(); return; }
+  } else if (target.cardInstance) {
+    tInst = engine.cardInstances.find(c => c.id === target.cardInstance.id);
+    if (!tInst || tInst.zone !== 'support') { engine.sync(); return; }
+  } else {
+    engine.sync();
+    return;
+  }
+  const tgtHeroIdx = tInst ? tInst.heroIdx : target.heroIdx;
+
+  // ── Dagger animation ── the same knife-plunge a sacrificed
+  // Creature shows, on the struck target.
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'knife_sacrifice', owner: target.owner,
+    heroIdx: tgtHeroIdx, zoneSlot: tInst ? tInst.zoneSlot : -1,
+  });
+  await engine._delay(550);
+
+  // ── Damage, as the equipped Hero's Attack ──
+  // Re-read the Hero — a reaction window could have changed its ATK.
+  const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
+  const liveHero = gs.players[feld]?.heroes?.[heroIdx];
+  const damage = Math.max(0, liveHero?.atk || 0);
+  const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
+
+  if (tHero) {
+    await engine.actionDealDamage(source, tHero, damage, 'attack');
+  } else if (tInst) {
+    await engine.actionDealCreatureDamage(
+      source, tInst, damage, 'attack',
+      { sourceOwner: pi, canBeNegated: true },
+    );
+  }
+
+  engine.log('sacrificial_dagger', {
+    player: gs.players[pi]?.username, hero: hero.name,
+    damage, target: target.cardName || target.type,
+  });
+  engine.sync();
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -42,13 +132,10 @@ module.exports = {
 
   hooks: {
     onCreatureSacrificed: async (ctx) => {
-      const engine = ctx._engine;
-      const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
 
       // Equipped Hero must be a living Hero — it's the ATK source.
       const hero = ctx.attachedHero;
-      const heroIdx = ctx.cardHeroIdx;
       if (!hero || !hero.name || hero.hp <= 0) return;
 
       // "when YOU sacrifice a target you control" — the sacrificed
@@ -59,85 +146,23 @@ module.exports = {
       const srcOwner = ctx.source?.owner ?? ctx.source?.controller;
       if (srcOwner != null && srcOwner !== pi) return;
 
-      // Once per turn, per Dagger. Peek now; claim only on commit so a
-      // declined "may" stays usable on a later sacrifice this turn.
-      // (claimHOPT stores under `${key}:${pi}` — peek the suffixed key.)
-      const hoptKey = `sacrificial_dagger:${ctx.card.id}`;
-      if (gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;
+      await dolchSchlag(ctx, pi);
+    },
 
-      const atk = Math.max(0, hero.atk || 0);
-
-      // "you may choose a target" — optional; cancel = decline.
-      const target = await ctx.promptDamageTarget({
-        side: 'any',
-        types: ['hero', 'creature'],
-        damageType: 'attack',
-        baseDamage: atk,
-        title: CARD_NAME,
-        description: `You may deal ${hero.name}'s Attack (${atk}) to a target — counts as ${hero.name}'s Attack.`,
-        confirmLabel: `🗡️ Sacrificial Strike! (${atk})`,
-        confirmClass: 'btn-danger',
-        cancellable: true,
-        // "Counts as the equipped Hero hitting with an Attack" — the
-        // reaction windows attribute the hit to the equipped Hero.
-        attackerSourceOverride: {
-          name: hero.name, owner: pi, controller: pi,
-          heroIdx, zone: 'hand', _heroAttackSource: true,
-        },
-      });
-      if (!target) return; // declined — HOPT untouched
-
-      // Auftritt links am Feld (Als Regel 21.8.: beim Opfern). Erst
-      // hier, nach der verbindlichen Zusage — ein abgelehntes „may"
-      // soll nichts anzeigen.
-      await engine.announceHookActivation('Sacrificial Dagger', pi);
-
-      // Committed — claim the once-per-turn.
-      engine.claimHOPT(hoptKey, pi);
-
-      // Re-resolve the live target (a reaction could have moved/killed it).
-      let tHero = null, tInst = null;
-      if (target.type === 'hero') {
-        tHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (!tHero || tHero.hp <= 0) { engine.sync(); return; }
-      } else if (target.cardInstance) {
-        tInst = engine.cardInstances.find(c => c.id === target.cardInstance.id);
-        if (!tInst || tInst.zone !== 'support') { engine.sync(); return; }
-      } else {
-        engine.sync();
-        return;
-      }
-      const tgtHeroIdx = tInst ? tInst.heroIdx : target.heroIdx;
-
-      // ── Dagger animation ── the same knife-plunge a sacrificed
-      // Creature shows, on the struck target.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'knife_sacrifice', owner: target.owner,
-        heroIdx: tgtHeroIdx, zoneSlot: tInst ? tInst.zoneSlot : -1,
-      });
-      await engine._delay(550);
-
-      // ── Damage, as the equipped Hero's Attack ──
-      // Re-read the Hero — a reaction window could have changed its ATK.
-      const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
-      const liveHero = gs.players[feld]?.heroes?.[heroIdx];
-      const damage = Math.max(0, liveHero?.atk || 0);
-      const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
-
-      if (tHero) {
-        await engine.actionDealDamage(source, tHero, damage, 'attack');
-      } else if (tInst) {
-        await engine.actionDealCreatureDamage(
-          source, tInst, damage, 'attack',
-          { sourceOwner: pi, canBeNegated: true },
-        );
-      }
-
-      engine.log('sacrificial_dagger', {
-        player: gs.players[pi]?.username, hero: hero.name,
-        damage, target: target.cardName || target.type,
-      });
-      engine.sync();
+    // Welle 12 (Q98, Al: „Auch Heroes"): auch ein geopferter HELD (Divine Gift of Sacrifice, Teocuilatl, Pharaoh …) ist „a target you
+    // sacrifice" — Hook `onHeroSacrificed` (`actionDefeatHero` mit `isSacrifice`, nach dem Todesablauf). Ein Held, der durch HP-Verlust stirbt,
+    // wird NICHT geopfert (Al, Welle 12) und löst nicht aus. Opferer = `source.owner`; war der Träger selbst das Opfer, ging der Dagger mit.
+    onHeroSacrificed: async (ctx) => {
+      const engine = ctx._engine;
+      const pi = ctx.cardController ?? ctx.cardOwner;
+      const hero = ctx.attachedHero;
+      if (!hero || !hero.name || hero.hp <= 0) return;
+      const srcOwner = ctx.source?.owner ?? ctx.source?.controller;
+      if (srcOwner != null && srcOwner !== pi) return;
+      const kontrolle = ctx.hero ? engine.heroSideOf?.(ctx.heroOwner, ctx.hero) : null;
+      if (kontrolle != null && kontrolle !== pi) return;
+      if (srcOwner == null && kontrolle == null) return;
+      await dolchSchlag(ctx, pi);
     },
   },
 };

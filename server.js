@@ -11443,15 +11443,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     await room.engine._delay(100);
   }
 
-  if (cardType === 'Artifact' && ps.itemLocked && (ps.hand || []).length > 0) {
-    await room.engine.actionPromptForceDiscard(pi, 1, {
-      title: 'Item Lock Cost',
-      description: 'You must delete 1 card from your hand to use an Artifact.',
-      source: 'Item Lock', deleteMode: true, selfInflicted: true,
-      // Z6 (F03-19): die gerade aufloesende Artefakt-Karte steht noch in der Hand, ist aber keine Kostenkarte.
-      eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => !room.engine._istAufloesendeHandkarte(ps, i, false)),
-    });
-  }
+  // ★ Welle 12 (Q92, F01-24, Al): Item-Lock-Kosten erst NACH dem Commit (Abbruch/„aborted" kostet nichts), bei Zieh-Artefakten VOR dem Ziehen —
+  // hier nur vormerken; `engine.itemLockFordern` (Hand-Primitive / nach dem Auflösen / nach Negation) fordert sie ein.
+  if (cardType === 'Artifact') room.engine.itemLockVormerken(pi);   // (setzt/löscht je nach `ps.itemLocked`)
 
   // Pre-broadcast the script's top-level animationType from INSIDE
   // the wrapped resolve so it lands at the same instant as the
@@ -11482,6 +11476,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // (`payArtifactCost` des Skripts, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert, bleiben sie
   // bezahlt. `false` = nichts bezahlt → wie `{ cancelled: true }`: Karte bleibt auf der Hand.
   if (!(await room.engine._payArtifactCost(potionName, pi, selectedIds, validTargets)).ok) {
+    room.engine.itemLockVerwerfen();   // Welle 12 (Q92): Abbruch kostet nichts
     ps._resolvingCard = null;
     delete gs._pendingCardReveal;
     delete gs._pendingPlayLog;
@@ -11518,6 +11513,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   if (room.engine.nimmOpferFizzle() && chainResult.resolveResult) {
     delete chainResult.resolveResult.aborted; delete chainResult.resolveResult.cancelled;
   }
+  // Welle 12 (Q92): abgebrochen/„aborted" → Vormerkung verfällt (nichts gezahlt); sonst (aufgelöst oder negiert) jetzt einfordern, falls noch offen.
+  if (chainResult.resolveResult?.cancelled || chainResult.resolveResult?.aborted) room.engine.itemLockVerwerfen();
+  else await room.engine.itemLockFordern(pi);
+
   if (chainResult.resolveResult?.aborted) {
     // Gold zurück. `aborted` öffnet die Targeting-Session gleich WIEDER,
     // und beim nächsten Confirm zieht der Block oben die Kosten erneut
@@ -12382,21 +12381,15 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
 
-    if (ps.itemLocked && (ps.hand || []).length > 0) {
-      if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
-      await room.engine.actionPromptForceDiscard(pi, 1, {
-        title: 'Item Lock Cost',
-        description: 'You must delete 1 card from your hand to use an Artifact.',
-        source: 'Item Lock', deleteMode: true, selfInflicted: true,
-        // Z6 (F03-19): die gerade aufloesende Artefakt-Karte steht noch in der Hand, ist aber keine Kostenkarte.
-        eligibleIndices: () => (ps.hand || []).map((_, i) => i).filter(i => !room.engine._istAufloesendeHandkarte(ps, i, false)),
-      });
-    }
+    // ★ Welle 12 (Q92, F01-24, Al): Item-Lock-Kosten erst NACH dem Commit (Abbruch kostet nichts), bei Zieh-Artefakten VOR dem Ziehen —
+    // hier nur vormerken; `engine.itemLockFordern` (Hand-Primitive / nach dem Auflösen / nach Negation) fordert sie ein.
+    room.engine.itemLockVormerken(pi, { vorab: () => { if (gs._pendingCardReveal) room.engine._firePendingCardReveal(); } });   // (setzt/löscht je nach `ps.itemLocked`)
 
     // ★ W4b (Al, Welle 4): Opfer-/Abwurf-Kosten („… to play this card") VOR dem Reaktionsfenster bezahlen
     // (`payArtifactCost`, Engine `_payArtifactCost`); wird das Artefakt danach komplett negiert, bleiben sie bezahlt.
     // `false` = nichts bezahlt → wie `{ cancelled: true }` unten: Karte bleibt auf der Hand.
     if (!(await room.engine._payArtifactCost(cardName, pi, [], [])).ok) {
+      room.engine.itemLockVerwerfen();   // Welle 12 (Q92): Abbruch kostet nichts
       delete gs._pendingCardReveal;
       delete gs._pendingPlayLog;
       ps._resolvingCard = null;
@@ -12424,6 +12417,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
     }
     room.engine._verwerfeArtefaktKosten();   // W4b: bei Negation bleibt nur der bezahlte Preis, der Merker entfällt
     await room.engine._delay(100);
+
+    // Welle 12 (Q92): abgebrochen → Vormerkung verfällt (nichts gezahlt); sonst (aufgelöst oder negiert) jetzt einfordern, falls noch offen.
+    if (chainResult.resolveResult?.cancelled) room.engine.itemLockVerwerfen();
+    else await room.engine.itemLockFordern(pi);
 
     if (chainResult.resolveResult?.cancelled) {
       delete gs._pendingCardReveal;

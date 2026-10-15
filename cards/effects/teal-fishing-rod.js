@@ -9,8 +9,9 @@
 //  ── AUSLEGUNG (Schwester von Lone Survivor) ───────────────────────
 //  · „level 0": EFFEKTIVES Level in der Ablage genau 0 (`pileSide: 'discard'`); Creatures ohne Level
 //    (null) zaehlen nicht. Eligibilitaet wie Lone Survivor (`isPileCreature`, `darfAusAblageAufsFeld`).
-//  · „not sent there this turn": Namensschnappschuss `ps._discardNamesAtTurnStart` (wie Thep): ein Name ist
-//    waehlbar, wenn er schon zu Zugbeginn in der Ablage lag UND jetzt dort liegt.
+//  · „not sent there this turn": Welle 12 (Q105, Al): EXAKTE Instanzverfolgung — `engine.ablageAlteEintraege(pi)` (Zeitstempel je
+//    Ablage-Eintrag): waehlbar ist nur ein Eintrag, der zu Zugbeginn schon in der Ablage lag und seither nicht herausgenommen und
+//    neu hineingelegt wurde (auch nicht gleichnamig). (Vorher: Namensschnappschuss wie Thep.)
 //  · „place": Platzieren ist keine Beschwoerung und kostet keine Aktion, zaehlt aber als Effekt-Beschwoerung
 //    (On-Summon feuert); eine bestehende Beschwoerungssperre sperrt es (`blockedBySummonLock`).
 //  · „free Support Zone of any Hero you control": lebender, kontrollierter Held (auch uebernommene), freie,
@@ -29,10 +30,13 @@ const ANGEL_MS = 2600;   // Dauer der Angel-Animation (`fishing_catch`, muss zur
 function kandidaten(engine, pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
-  const start = ps?._discardNamesAtTurnStart || new Set();
+  // Welle 12 (Q105, Al: „Es darf nur eine Instanz geangelt werden, die zu Rundenbeginn bereits im Discard lag."): EXAKT je Ablage-Eintrag
+  // (`engine.ablageAlteEintraege`, Zeitstempel je Eintrag) statt Namensnäherung — eine in diesem Zug (erneut) abgelegte Karte, auch gleichnamig,
+  // ist nicht wählbar.
+  const alt = engine.ablageAlteEintraege(pi);
   const zaehler = new Map();
-  for (const n of (ps?.discardPile || [])) {
-    if (!start.has(n)) continue;                                  // in diesem Zug abgelegt → nicht waehlbar
+  for (const [i, n] of (ps?.discardPile || []).entries()) {
+    if (!alt[i]) continue;                                        // in diesem Zug abgelegt → nicht waehlbar
     if (!engine.darfAusAblageAufsFeld(n)) continue;               // Gigantisaur, Ifrit …
     const cd = db[n];
     if (!cd || !isSummonablePileCreature(cd)) continue;

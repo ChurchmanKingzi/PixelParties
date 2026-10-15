@@ -55,6 +55,10 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return { cancelled: true };
 
+    // Welle 12 (Q92, Al): Item-Lock-Kosten (falls vorgemerkt) VOR dem Abwurf der Hand — dieses Skript hat keinen Abbruchpunkt, die Kosten
+    // kommen also hier, bevor die Handindizes unten gebildet werden.
+    await engine.itemLockFordern(pi);
+
     // Find the resolving copy of the staff so we don't include it in the
     // "rest of hand" we discard. _resolvingCard.nth is the 1-based index
     // of which copy is currently mid-resolution (mirrors the same

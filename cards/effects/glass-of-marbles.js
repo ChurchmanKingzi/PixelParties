@@ -11,6 +11,8 @@
 //  Guard: ctx._fromHand must be true (set by
 //  the engine on all effect-forced discards
 //  from hand — not on voluntary plays).
+//  Welle 12 (Q93, Al): NUR Karteneffekte — der Regel-Abwurf
+//  des Handlimits am Zugende (`ctx._handLimitRegel`) löst nicht aus.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Glass of Marbles';
@@ -32,6 +34,8 @@ module.exports = {
     onDiscard: async (ctx) => {
       // Must have been discarded from hand by an effect
       if (!ctx._fromHand) return;
+      // Welle 12 (Q93, Al: „NUR Karteneffekte, nicht das Hand-Size-Limit."): der Handlimit-Abwurf am Zugende ist kein Karteneffekt.
+      if (ctx._handLimitRegel) return;
       if (ctx.discardedCardName !== CARD_NAME) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
 
@@ -55,6 +59,7 @@ module.exports = {
 
     onDelete: async (ctx) => {
       if (!ctx._fromHand) return;
+      if (ctx._handLimitRegel) return;   // Welle 12 (Q93)
       if (ctx.discardedCardName !== CARD_NAME) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
 

@@ -2668,6 +2668,7 @@ class GameEngine {
     const fromPs = this.gs.players[fromOwnerIdx];
     const toPs   = this.gs.players[toPlayerIdx];
     if (!fromPs || !toPs || !cardName) return null;
+    if (this.gs._itemLockOffen?.pi === toPlayerIdx) await this.itemLockFordern(toPlayerIdx);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
 
     // Discard-out lock: only fires when the discard's OWNER is recovering
     // from their OWN pile. Opponent reach-ins (Xiong, Boomerang) are
@@ -11138,6 +11139,7 @@ class GameEngine {
     const batchId = this._drawBatchSeq;
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (this.gs._itemLockOffen?.pi === playerIdx) await this.itemLockFordern(playerIdx);   // Welle 12 (Q92): Item-Lock-Kosten VOR dem Ziehen
     // `opts._unpreventable: true` lets a card-effect draw bypass both
     // the hand-locked debuff and the BEFORE_DRAW_BATCH cancellation
     // hook. Used by Champion, the Stormbringer's "this draw cannot be
@@ -12795,6 +12797,7 @@ class GameEngine {
     await this.actionMoveCard(targetCard, ZONES.DISCARD, undefined, undefined, {
       fireCreatureDeath: isCreatureTarget,
       deathSource: source,
+      deathHeldQuelle: opts.heldQuelle || null,   // Welle 12 (Q101): „zählt als: der Held besiegt das Ziel" (Super-Killing Knife)
       unaufhaltsam: _u,   // v1293
       // Das CD-Bewegungsfenster hat actionDestroyCard oben bereits
       // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
@@ -12937,6 +12940,62 @@ class GameEngine {
         this._loeschAbholungAngemeldet = false;
       }
     });
+  }
+
+  /**
+   * ★ Welle 12 (Q105, Al: „Es darf nur eine Instanz geangelt werden, die zu Rundenbeginn bereits im Discard lag."): ZEITSTEMPEL JE EINTRAG
+   * DER ABLAGE (Muster `_geloeschtVerfolgen`). Der Ablagestapel besteht nur aus Namen; „was not sent there this turn" läßt sich am Namen
+   * nicht entscheiden, wenn dieselbe Karte den Stapel verläßt und im selben Zug wieder hineinfällt. `ps._ablageStamps` führt parallel zu
+   * `ps.discardPile` den Zug, in dem jeder Eintrag hineinkam (-1 = vor der Verfolgung). Die Instanzmethoden `push`, `unshift`, `pop`, `shift`,
+   * `splice` des Stapels werden dazu (nicht aufzählbar) überlagert — `push`/`unshift` UM die Umleitung der Root of all Evil herum (nur wirklich
+   * Hineingelegtes wird gestempelt); andere Schreibwege (`length = 0`, neues Array) gleicht `ablageAlteEintraege` beim Lesen auf die Länge ab
+   * (Unbekanntes am Ende zählt als „in diesem Zug"). Verfolgt wird ab dem Zugbeginn des Spielers (startTurn) und beim ersten Lesen.
+   */
+  _ablageVerfolgen(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    this._ablageUmleitungVerfolgen(pi);   // legt auch `ps.discardPile` an; seine push/unshift werden unten umhüllt
+    const arr = ps.discardPile;
+    if (!Array.isArray(ps._ablageStamps)) ps._ablageStamps = arr.map(() => -1);
+    const st = ps._ablageStamps;
+    if (st.length > arr.length) st.length = arr.length;
+    while (st.length < arr.length) st.push(this.gs.turn);   // unverfolgt hineingelegt → zählt als „in diesem Zug"
+    const engine = this;
+    const jetzt = () => engine.gs.turn;
+    const stamps = () => ps._ablageStamps;
+    const def = (name, fn) => Object.defineProperty(arr, name, { value: fn, enumerable: false, configurable: true, writable: true });
+    const umhuellen = (name, nachher) => {
+      const marke = '_ablage_' + name;
+      if (arr[marke] && arr[marke] === arr[name]) return;       // unser Wrapper steckt noch (enableDiscardToDelete & Co. können ihn ersetzen)
+      const vor = arr[name];
+      const w = function (...args) { const n0 = this.length; const r = vor.apply(this, args); nachher.call(this, n0, args); return r; };
+      def(name, w); def(marke, w);
+    };
+    // Vor dem Stempeln die Länge angleichen (z. B. nach `length = 0` in place, Guard Duty): Länge VOR dem Einfügen = n0.
+    const angleichen = (n0) => { const st2 = stamps(); if (st2.length > n0) st2.length = n0; while (st2.length < n0) st2.push(-1); };
+    umhuellen('push', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().push(...Array(d).fill(jetzt())); } });
+    umhuellen('unshift', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().unshift(...Array(d).fill(jetzt())); } });
+    if (!arr._ablage_pop) {
+      def('_ablage_pop', true);
+      def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
+      def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+      def('splice', function (...args) {
+        Array.prototype.splice.apply(stamps(), args.length > 2 ? [args[0], args[1], ...Array(args.length - 2).fill(jetzt())] : args);
+        return Array.prototype.splice.apply(this, args);
+      });
+    }
+  }
+
+  /**
+   * ★ Welle 12 (Q105): je Eintrag von `ps.discardPile` — lag diese KARTE schon zu Beginn des laufenden Zuges in der Ablage (und ist seither
+   * nicht herausgenommen und neu hineingelegt worden)? Exakt je Eintrag, nicht je Name. Zusätzlich muß der Name im Zugbeginn-Schnappschuss
+   * (`_discardNamesAtTurnStart`) stehen (Untergrenze für unverfolgte Eingänge; ohne Schnappschuss ist nichts „alt", wie bisher).
+   */
+  ablageAlteEintraege(pi) {
+    this._ablageVerfolgen(pi);
+    const ps = this.gs.players[pi];
+    const start = ps._discardNamesAtTurnStart || new Set();   // ohne Zugbeginn-Schnappschuss (nie ein startTurn gelaufen) gilt wie bisher: nichts ist „alt"
+    return (ps.discardPile || []).map((n, i) => ps._ablageStamps[i] !== this.gs.turn && start.has(n));
   }
 
   /** Die Zug-Stempel des Geloescht-Stapels von `pi`, abgeglichen auf die Stapellaenge. */
@@ -14153,6 +14212,9 @@ class GameEngine {
       await this.runHooks(HOOKS.ON_CREATURE_DEATH, {
         creature: deathInfo,
         source: opts.deathSource || null,
+        // Welle 12 (Q101, Al): eine Zerstörung, die als „der Held besiegt das Ziel (mit einem Angriff)" zählt, nennt die Angriffs-Quelle des Helden hier
+        // (Schutz-/Immunitätsprüfungen laufen weiter gegen `source`); Wanted Poster / Skullmael's Greatsword lesen sie.
+        ...(opts.deathHeldQuelle ? { heldQuelle: opts.deathHeldQuelle } : {}),
         _skipReactionCheck: true,
       });
       if (this._deathWatch?.id === cardInstance.id) {
@@ -17469,7 +17531,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
         }
         this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
-        await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
+        // Welle 12 (Q93, Al: „NUR Karteneffekte, nicht das Hand-Size-Limit."): der Regel-Abwurf (kein `deleteMode`) ist kein „by an effect" —
+        // `_handLimitRegel` lässt Glass of Marbles stumm; das Pollution-Löschen (`deleteMode`) bleibt ein Karteneffekt.
+        await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _handLimitRegel: !deleteMode, _skipReactionCheck: true });
         this.sync();
         return true;
       };
@@ -19638,6 +19702,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async takeFromPile(pi, pile, what, opts = {}) {
     pi = this._resolvePi(pi);
+    if (opts.toHand && this.gs._itemLockOffen?.pi === pi) await this.itemLockFordern(pi);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
@@ -20374,6 +20439,59 @@ this._deathWatch = (this._deathWatchStack || []).length
   _handOhneAufloesendeKarte(ps, ausVorrat = false) {
     const liste = (ausVorrat ? ps?.creationZone : ps?.hand) || [];
     return liste.filter((_, i) => !this._istAufloesendeHandkarte(ps, i, ausVorrat));
+  }
+
+  /**
+   * ★ Welle 12 (Q92, F01-24, Al: „Soll die Kosten gar nicht erst verlangen. Die Kosten dürfen erst eingefordert werden, NACHDEM die Karte committed
+   * ist und nicht mehr abgebrochen werden kann, im Fall von Zieh-Artifacts wie Wheels aber VOR dem eigentlichen Ziehen."): die Item-Lock-Löschung
+   * („must delete a card from their hand whenever they play an Artifact") wird beim Artefakt-Spielen nur VORGEMERKT (`itemLockVormerken`, Server:
+   * `doUseArtifactEffect`/`doConfirmPotion`). Eingefordert wird sie (`itemLockFordern`, genau einmal) an der ersten dieser Stellen:
+   *   (a) VOR der ersten Hand-Vergrößerung der Karte (Ziehen, Deck→Hand, Ablage→Hand, `takeFromPile(…, { toHand })` — diese Primitive rufen
+   *       `itemLockFordern`), damit frisch gezogene Karten nie die Kosten bezahlen (zusätzlich dürfen nur Karten zahlen, die schon beim Spielen in der
+   *       Hand lagen: `handVorher`); Skripte mit indexabhängiger Hand-Mechanik rufen es selbst an ihrem Commit-Punkt und ordnen ihre Indizes danach
+   *       neu zu (Shard of Chaos, Staff of the Teleporter, Staff of Uncontrollable Destruction);
+   *   (b) nach dem Auflösen, wenn das Skript nicht abgebrochen hat; (c) nach einer Negation (die Kosten bleiben dann bezahlt).
+   * Bricht das Skript vorher ab (`cancelled`/`aborted`), wird die Vormerkung verworfen (`itemLockVerwerfen`): ein Abbruch kostet nichts.
+   */
+  itemLockVormerken(pi, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps?.itemLocked) { delete this.gs._itemLockOffen; return false; }
+    // `handVorher`: die Hand beim Spielen — NUR diese Karten dürfen die Kosten tragen (frisch gezogene/geholte Kopien nie), auch wenn eine
+    // Hand-Mechanik des Skripts nicht über die gehakten Primitive läuft.
+    this.gs._itemLockOffen = { pi, vorab: opts.vorab || null, handVorher: (ps.hand || []).slice(), turn: this.gs.turn };
+    return true;
+  }
+
+  itemLockVerwerfen() { delete this.gs._itemLockOffen; }
+
+  async itemLockFordern(pi) {
+    const o = this.gs._itemLockOffen;
+    if (!o || o.pi !== pi) return false;
+    delete this.gs._itemLockOffen;
+    const ps = this.gs.players[pi];
+    // Sicherung gegen eine verwaiste Vormerkung: nur im selben Zug, für den aktiven Spieler, solange das Spiel läuft.
+    if (!ps?.itemLocked || o.turn !== this.gs.turn || this.gs.activePlayer !== pi || this.gs.result || !(ps.hand || []).length) return false;
+    if (o.vorab) await o.vorab();
+    // Wählbar: Handkarten, die schon beim Spielen in der Hand lagen (Namenszähler), ohne die gerade auflösende Karte.
+    const frei = new Map();
+    for (const n of o.handVorher) frei.set(n, (frei.get(n) || 0) + 1);
+    const eligibleIndices = () => {
+      const rest = new Map(frei);
+      const out = [];
+      (ps.hand || []).forEach((n, i) => {
+        if (this._istAufloesendeHandkarte(ps, i, false)) return;   // Z6 (F03-19): die gerade auflösende Artefakt-Karte ist keine Kostenkarte
+        if ((rest.get(n) || 0) > 0) { rest.set(n, rest.get(n) - 1); out.push(i); }
+      });
+      return out;
+    };
+    if (eligibleIndices().length === 0) return false;
+    await this.actionPromptForceDiscard(pi, 1, {
+      title: 'Item Lock Cost',
+      description: 'You must delete 1 card from your hand to use an Artifact.',
+      source: 'Item Lock', deleteMode: true, selfInflicted: true,
+      eligibleIndices,
+    });
+    return true;
   }
 
   getHeroEligibleActionCards(playerIdx, heroIdx, heroOwner = null) {
@@ -23404,6 +23522,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // snapshot is also rebuilt there from the puzzle's preset
         // discard pile.
         ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
+        this._ablageVerfolgen(this.gs.activePlayer);   // Welle 12 (Q105): Zeitstempel je Ablage-Eintrag ab Zugbeginn
+        delete this.gs._itemLockOffen;   // Welle 12 (Q92): keine verwaiste Vormerkung über den Zug hinaus
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
@@ -25911,6 +26031,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionAddCardFromDeckToHand(pi, cardName, opts = {}) {
     const ps = this.gs.players[pi];
     if (!ps) return false;
+    if (this.gs._itemLockOffen?.pi === pi) await this.itemLockFordern(pi);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
     // Hand lock gates every mechanism that adds cards to the caster's
     // hand — draws (actionDrawCards), tutors (this function), and any
     // future hand-augmenting action. Fizzles silently here so card

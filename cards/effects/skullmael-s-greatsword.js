@@ -263,6 +263,21 @@ module.exports = {
       await bieteBeschwoerungAn(ctx, ctx.source);
     },
 
+    // ── Welle 12 (Q101, Al: „Doch, das soll zählen."): ein Knife-Kill ist „der Held besiegt das Ziel mit einem Angriff" ──
+    // `heldQuelle` (Zerstörung mit Heldenanrechnung, Super-Killing Knife) ist die Angriffs-Quelle des Helden — Marke und Strichliste hängen
+    // an ihr, ein Angriff bleibt EIN Angebot.
+    onCreatureDeath: async (ctx) => {
+      const quelle = ctx.heldQuelle;
+      if (!ctx.card || !quelle || !vomWirt(ctx, quelle, 'attack')) return;
+      const tot = ctx.creature;
+      const pi = ctx.cardController ?? ctx.cardOwner;
+      if (tot && (tot.originalOwner ?? tot.owner) === pi) {
+        if (!quelle._skullmaelFresh) quelle._skullmaelFresh = new Map();
+        quelle._skullmaelFresh.set(tot.name, (quelle._skullmaelFresh.get(tot.name) || 0) + 1);
+      }
+      await bieteBeschwoerungAn(ctx, quelle);
+    },
+
     // ── Der Wirt besiegt eine CREATURE mit einem Angriff ─────────────
     afterCreatureDamageBatch: async (ctx) => {
       if (!ctx.card || !ctx.entries) return;

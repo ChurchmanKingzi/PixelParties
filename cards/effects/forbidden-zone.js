@@ -52,6 +52,9 @@ const CARD_NAME = 'Forbidden Zone';
 const DAMAGE    = 50;
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   activeIn: ['hand'],
   // Engine routes hand-reaction windows by this flag, but the standard
   // doPlaySpell path doesn't honour it — see the manual deletedPile
