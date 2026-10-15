@@ -11304,37 +11304,6 @@ function _markOncePerGamePotion(ps, script, cardName) {
   ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
 }
 
-/**
- * ★ W7b (Welle 7, Nachtrag Al 15.10.): die End-Zustands-Regeln des Zielwahl-Pickers, die der Client (`togglePotionTarget`/`canConfirmPotion`
- * in app-board.jsx) beim Anklicken erzwingt, auch serverseitig - gleiche Felder, gleiche Auslegung, nur Ablehnen (nie Kappen, nie der Abbruch).
- * Der Client baut die Auswahl Klick fuer Klick auf (Typwechsel ersetzt, volle Gruppen tauschen), jede bestaetigbare Auswahl erfuellt also diese
- * Invarianten; ein Verstoss kommt nur von einem veraenderten Client. Liefert den Namen der verletzten Regel oder null.
- * Mit der Maximalzahl/Mindestzahl (`maxTotal`/`minRequired`) prueft `doConfirmPotion` davor.
- */
-function zielAuswahlRegelverstoss(validTargets, config, selectedIds) {
-  const c = config || {};
-  const sel = (selectedIds || []).map(id => (validTargets || []).find(t => t && t.id === id)).filter(Boolean);
-  if (sel.length === 0) return null;
-  if (c.exclusiveTypes && new Set(sel.map(t => t.type)).size > 1) return 'exclusive_types';
-  if (c.maxPerType) {
-    for (const [typ, max] of Object.entries(c.maxPerType)) {
-      if (typeof max === 'number' && sel.filter(t => t.type === typ).length > max) return 'max_per_type';
-    }
-  }
-  if (c.uniqueBy) {
-    const werte = sel.map(t => t[c.uniqueBy]);
-    if (new Set(werte).size !== werte.length) return 'unique_by';
-  }
-  if (c.maxBudget != null && sel.reduce((n, t) => n + (t.budgetCost ?? 0), 0) > c.maxBudget) return 'max_budget';
-  if (c.maxNonOwnSupport !== undefined && sel.filter(t => !t.ownSupport).length > c.maxNonOwnSupport) return 'max_non_own_support';
-  if (c.minSumMaxHp != null && c.minSumMaxHp > 0 && sel.reduce((n, t) => n + (t._meta?.maxHp || 0), 0) < c.minSumMaxHp) return 'min_sum_max_hp';
-  if (c.minSumLevel != null && c.minSumLevel > 0 && sel.reduce((n, t) => n + (t._meta?.level || 0), 0) < c.minSumLevel) return 'min_sum_level';
-  if (c.mustIncludeFromHeroIdx != null
-      && !sel.some(t => t.type === 'equip' && t.heroIdx === c.mustIncludeFromHeroIdx
-        && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner))) return 'must_include_from_hero';
-  return null;
-}
-
 async function doConfirmPotion(room, pi, { selectedIds }) {
   if (!room?.engine || !room.gameState) return false;
   // ★ UNWAEHLBARE ZIELE ABWEISEN (v915, Als Befund 12.9.) ────────────
@@ -11362,15 +11331,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // ueberhaupt genug waehlbare Ziele da sind) – gelten auch gegen einen veraenderten Client. Wie bei
     // `ineligible`: Abfrage bleibt offen (Neu-Abfrage), die Antwort zaehlt nicht; der Abbruch-Knopf
     // (`cancelled`) laeuft ueber einen anderen Weg und ist nie betroffen.
-    if (_pt && _pt.isEffectPrompt && Array.isArray(selectedIds) && selectedIds.length > 0) {
+    if (_pt && Array.isArray(selectedIds) && selectedIds.length > 0) {
       const _c = _pt.config || {};
       const _n = selectedIds.length;
-      const _frei = (_pt.validTargets || []).filter(t => !t?.ineligible).length;
       const _min = _c.minRequired || 0;
-      const _grund = new Set(selectedIds).size !== _n ? 'duplicate_ids'
-        : (typeof _c.maxTotal === 'number' && _n > _c.maxTotal) ? 'max_total'
-        : (_min > 0 && _n < _min && _min <= _frei) ? 'min_required'
-        : zielAuswahlRegelverstoss(_pt.validTargets, _c, selectedIds);
+      // Regelfunktion der Engine (`zielAuswahlRegelverstoss`): dieselbe fuer Mensch, CPU und Skripte; Client-Spiegel: app-board.jsx
+      const _grund = room.engine.zielAuswahlRegelverstoss(_pt.validTargets, room.engine.pickerRegelKonfig(_pt), selectedIds);
       if (_grund) {
         room.engine.log?.('targeting_blocked', {
           reason: 'selection_invalid:' + _grund,

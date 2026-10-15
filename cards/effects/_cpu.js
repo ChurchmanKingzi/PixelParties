@@ -3345,7 +3345,10 @@ async function resolveTargetingPrompt(engine, helpers) {
     // (`_waehlbar`); dieser zweite Eingang tat es nicht.
     const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible);
     const picks = engine._getCpuTargetResponse(waehlbar, cfg);
-    const selectedIds = Array.isArray(picks) ? picks : [];
+    // W7b (Nachtrag 2, Al 15.10.): die CPU unterliegt denselben Picker-Regeln wie ein Spieler - eine regelwidrige Wahl wird auf eine gueltige
+    // reduziert/aufgefuellt (`korrigiereZielAuswahl`), statt am Server-Tor abzuprallen (sonst 4 Fehlversuche, dann Abbruch).
+    const korrigiert = engine.korrigiereZielAuswahl(tgt.validTargets, { ...engine.pickerRegelKonfig(tgt), cancellable: false }, Array.isArray(picks) ? picks : []);
+    const selectedIds = Array.isArray(korrigiert) ? korrigiert : [];
     cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
     await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });
     // If doConfirmPotion re-opened targeting (aborted pick), loop to try again

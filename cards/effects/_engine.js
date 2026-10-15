@@ -2184,7 +2184,8 @@ class GameEngine {
     const minNeeded   = Math.max(1, config.minRequired || 1);
     const maxAllowed  = config.maxTotal ?? validTargets.length;
     const pickCount   = Math.min(minNeeded, maxAllowed, validTargets.length);
-    return validTargets.slice(0, pickCount).map(t => t.id);
+    // W7b (Nachtrag 2, Al 15.10.): die CPU waehlt nur regelkonform (maxPerType, uniqueBy, Summen, Pflichttribut …), nicht erst nach Ablehnung.
+    return this.baueZielAuswahl(validTargets, config, pickCount);
   }
 
 
@@ -29132,6 +29133,120 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W7b (Welle 7, Nachtrag 2): EINE Regelfunktion fuer die Zielwahl-Auswahl - fuer Mensch (`doConfirmPotion`), CPU und Skripte.
+   * Spiegelt die End-Zustands-Regeln des Client-Pickers (`togglePotionTarget`/`canConfirmPotion`, app-board.jsx): neue Picker-Regeln
+   * muessen HIER und im Client stehen. `sel` = die bekannten Ziele (Objekte) der Auswahl, `ids` = alle Ids (auch unbekannte zaehlen fuer `maxTotal`).
+   */
+  _zielObergrenzenVerstoss(sel, ids, c) {
+    const max = c.maxTotal ?? c.selectCount;
+    if (typeof max === 'number' && ids.length > max) return 'max_total';
+    if (c.exclusiveTypes && new Set(sel.map(t => t.type)).size > 1) return 'exclusive_types';
+    if (c.maxPerType) {
+      for (const [typ, m] of Object.entries(c.maxPerType)) {
+        if (typeof m === 'number' && sel.filter(t => t.type === typ).length > m) return 'max_per_type';
+      }
+    }
+    if (c.uniqueBy) {
+      const werte = sel.map(t => t[c.uniqueBy]);
+      if (new Set(werte).size !== werte.length) return 'unique_by';
+    }
+    if (c.maxBudget != null && sel.reduce((n, t) => n + (t.budgetCost ?? 0), 0) > c.maxBudget) return 'max_budget';
+    if (c.maxNonOwnSupport !== undefined && sel.filter(t => !t.ownSupport).length > c.maxNonOwnSupport) return 'max_non_own_support';
+    return null;
+  }
+
+  _zielUntergrenzenVerstoss(sel, ids, c, frei) {
+    const min = c.minRequired ?? c.minSelect ?? 0;
+    if (min > 0 && ids.length < min && min <= frei) return 'min_required';
+    if (c.minSumMaxHp != null && c.minSumMaxHp > 0 && sel.reduce((n, t) => n + (t._meta?.maxHp || 0), 0) < c.minSumMaxHp) return 'min_sum_max_hp';
+    if (c.minSumLevel != null && c.minSumLevel > 0 && sel.reduce((n, t) => n + (t._meta?.level || 0), 0) < c.minSumLevel) return 'min_sum_level';
+    if (c.mustIncludeFromHeroIdx != null
+        && !sel.some(t => t.type === 'equip' && t.heroIdx === c.mustIncludeFromHeroIdx
+          && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner))) return 'must_include_from_hero';
+    return null;
+  }
+
+  /**
+   * Konfiguration, gegen die der Client eine Auswahl der offenen Session `pt` (`gs.potionTargeting`) prueft. Effekt-Abfragen tragen `minSelect` schon
+   * als `minRequired`; Trank-/Artefakt-Sessions kennt der Client nur mit `minRequired`, und `alwaysConfirmable` (Weakening Crystal …) hebt dort alle
+   * Untergrenzen auf (`canConfirmPotion`).
+   */
+  pickerRegelKonfig(pt) {
+    const c = pt?.config || {};
+    if (pt?.isEffectPrompt) return c;
+    return { ...c, minSelect: undefined, ...(c.alwaysConfirmable ? { minRequired: 0, minSumMaxHp: undefined, minSumLevel: undefined, mustIncludeFromHeroIdx: undefined } : {}) };
+  }
+
+  /** Name der verletzten Picker-Regel (oder null) fuer die Auswahl `ids` aus `validTargets`; leere Auswahl ist nie ein Verstoss. */
+  zielAuswahlRegelverstoss(validTargets, config, ids) {
+    const c = config || {};
+    if (!Array.isArray(ids) || ids.length === 0) return null;
+    if (new Set(ids).size !== ids.length) return 'duplicate_ids';
+    const sel = ids.map(id => (validTargets || []).find(t => t && t.id === id)).filter(Boolean);
+    const frei = (validTargets || []).filter(t => t && !t.ineligible).length;
+    return this._zielObergrenzenVerstoss(sel, ids, c) || this._zielUntergrenzenVerstoss(sel, ids, c, frei);
+  }
+
+  /** Fuellt eine Auswahl aus `waehlbar` in Listenreihenfolge auf, bis die Untergrenzen erfuellt sind (Obergrenzen bleiben gewahrt). */
+  _zielAuswahlAuffuellen(waehlbar, c, res, byId) {
+    const frei = waehlbar.length;
+    const sel = () => res.map(byId).filter(Boolean);
+    const untergrenze = () => this._zielUntergrenzenVerstoss(sel(), res, c, frei);
+    if (!untergrenze()) return true;
+    const rest = waehlbar.filter(t => !res.includes(t.id));
+    const musterfuellt = (t) => c.mustIncludeFromHeroIdx != null && t.type === 'equip' && t.heroIdx === c.mustIncludeFromHeroIdx
+      && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner);
+    const wert = (t) => (c.minSumMaxHp > 0 ? (t._meta?.maxHp || 0) : 0) + (c.minSumLevel > 0 ? (t._meta?.level || 0) : 0);
+    rest.sort((a, b) => (Number(musterfuellt(b)) - Number(musterfuellt(a))) || (wert(b) - wert(a)));   // stabil: sonst Listenreihenfolge
+    for (const t of rest) {
+      const test = res.concat(t.id);
+      if (this._zielObergrenzenVerstoss(test.map(byId).filter(Boolean), test, c)) continue;
+      res.push(t.id);
+      if (!untergrenze()) return true;
+    }
+    return !untergrenze();
+  }
+
+  /**
+   * Bringt eine Auswahl auf eine regelkonforme: Duplikate und unwaehlbare Ziele raus, Obergrenzen kappen (die zuerst genannten gelten),
+   * Untergrenzen auffuellen. Unmoeglich + abbrechbar → `null` (Abbruch); sonst bestmoegliche Auswahl. Nicht-Arrays, `[]`: unveraendert.
+   */
+  korrigiereZielAuswahl(validTargets, config, ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return ids;
+    const c = config || {};
+    const byId = (id) => (validTargets || []).find(t => t && t.id === id);
+    const waehlbar = (validTargets || []).filter(t => t && !t.ineligible);
+    const grund = this.zielAuswahlRegelverstoss(validTargets, c, ids) || (ids.some(id => byId(id)?.ineligible) ? 'ineligible' : null);
+    if (!grund) return ids;   // gueltig: unveraendert
+    const res = [];
+    for (const id of new Set(ids)) {
+      if (byId(id)?.ineligible) continue;
+      const test = res.concat(id);
+      if (this._zielObergrenzenVerstoss(test.map(byId).filter(Boolean), test, c)) continue;
+      res.push(id);
+    }
+    const ok = this._zielAuswahlAuffuellen(waehlbar, c, res, byId);
+    this.log?.('target_selection_corrected', { rule: grund, requested: ids.length, applied: res.length, valid: ok });
+    if (!ok && c.cancellable !== false) return null;
+    return res;
+  }
+
+  /** Regelkonforme Standard-Auswahl fuer die CPU: die ersten `anzahl` waehlbaren Ziele, die alle Picker-Regeln einhalten. */
+  baueZielAuswahl(waehlbar, config, anzahl) {
+    const c = config || {};
+    const byId = (id) => (waehlbar || []).find(t => t && t.id === id);
+    const res = [];
+    for (const t of waehlbar || []) {
+      if (res.length >= anzahl) break;
+      const test = res.concat(t.id);
+      if (this._zielObergrenzenVerstoss(test.map(byId).filter(Boolean), test, c)) continue;
+      res.push(t.id);
+    }
+    this._zielAuswahlAuffuellen(waehlbar || [], c, res, byId);
+    return res;
+  }
+
+  /**
    * ★ v1332 — ABSCHLUSS JEDER ZIELWAHL ueber `promptEffectTarget`, fuer
    * Mensch UND CPU (vorher nur Mensch). Stapel-Eindeutigkeit, Sperren
    * (`ineligible`), Post-Target-Reaktionen, Surprise-Fenster und
@@ -29142,18 +29257,14 @@ this._deathWatch = (this._deathWatchStack || []).length
    * dieses Surprise-Fenster.
    */
   async _zielwahlAbschliessen(playerIdx, validTargets, config, picked) {
-    // ★ W7b (S01-22, Al 14.10.: der Server prueft Antworten nach): doppelte Ids und mehr Ziele als
-    // `maxTotal` sind nie eine gueltige Antwort (der Client erzwingt beides schon beim Anklicken; ein
-    // veraenderter Client, ein `targetFn`/Skript-CPU ohne Kappung nicht). Korrigiert wird hier, am
-    // gemeinsamen Abschluss fuer Mensch und CPU: Duplikate fallen weg, ueberzaehlige Ziele werden
-    // abgeschnitten (die zuerst genannten gelten). Abbruch (`null`) und `[]` bleiben unberuehrt.
-    // Der Mensch-Weg weist solche Antworten zusaetzlich schon in `doConfirmPotion` ab (Abfrage bleibt offen).
-    if (Array.isArray(picked) && picked.length > 0) {
-      let _ids = [...new Set(picked)];
-      const _max = config?.maxTotal ?? config?.selectCount ?? null;
-      if (typeof _max === 'number' && _max >= 0 && _ids.length > _max) _ids = _ids.slice(0, _max);
-      if (_ids.length !== picked.length) picked = _ids;
-    }
+    // ★ W7b (S01-22, Al 14.10./15.10.: der Server prueft Antworten nach; „die CPU-Regeln sollen denen fuer Spieler entsprechen“):
+    // Jede Antwort - Mensch, CPU, Skript-`cpuResponse`, `targetFn` - unterliegt denselben Picker-Regeln wie ein Klick im Client
+    // (`korrigiereZielAuswahl`): Duplikate, unwaehlbare Ziele, `maxTotal`, `exclusiveTypes`, `maxPerType`, `uniqueBy`, `maxBudget`,
+    // `maxNonOwnSupport` (Obergrenzen: gekappt, die zuerst genannten gelten) sowie `minRequired`, `minSumMaxHp`, `minSumLevel`,
+    // Pflichttribut (Untergrenzen: aus den waehlbaren Zielen in Listenreihenfolge aufgefuellt; geht das nicht auf, gilt eine
+    // abbrechbare Wahl als Abbruch). Gueltige Antworten bleiben unveraendert; Abbruch (`null`) und `[]` auch. Der Mensch-Weg
+    // weist Verstoesse schon in `doConfirmPotion` ab (Abfrage bleibt offen).
+    picked = this.korrigiereZielAuswahl(validTargets, config, picked);
     const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
     const _gesperrt = new Set(validTargets.filter(t => t.ineligible).map(t => t.id));
     let _pickedIds = Array.isArray(_pickedRoh)
