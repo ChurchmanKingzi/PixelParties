@@ -7,6 +7,7 @@
 // Die Skripte lauschen auf `onCardAddedToHand` / `onCardAddedFromDiscardToHand` / `beforeDrawBatch`, nicht auf
 // `onCardsReturnedToHand` (so feuern Deepsea-Bounce, Shapeshift, Castle, Encounter, Monstrosity – nicht).
 //
+// WELLE 9 (Al, 15.10.2026, Q13): „Ja, das soll zählen“ – Lesart A ist entschieden und umgesetzt (Hook `onCardsReturnedToHand` in Analyzer/Gatherer; neues Repro W9/a-13).
 // Lesart A (Wortlaut): jede Karte, die der Gegner per Effekt auf die Hand nimmt, zählt – auch vom Brett (+1 je Effekt).
 // Lesart B (Engine-Vokabular): „add" = Suchen/Einsammeln aus Deck/Ablage; Brett→Hand ist ein „return" und zählt nicht.
 // Das Repro prüft Lesart A (✗ = Counter bleibt aus); die Kontrolle (Deck→Hand) zählt wie erwartet.
@@ -43,6 +44,9 @@ const H = require('../../lib/h.js');
     const a = t.put(0, 0, 0, 'Analyzer from the Cosmic Depths'); a.turnPlayed = 1;
     const p = t.put(1, 0, 0, 'Deepsea Poltergeister'); p.turnPlayed = 1;
     t.setHand(1, ['Shapeshift', H.INERT.creature]);
+    // Harness-Korrektur Welle 9: Zonen- und Handwahl von Shapeshift beantworten (vorher blieb der Zauber in der Zonenwahl hängen)
+    t.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx, owner: d.zones[0].owner }) });
+    t.script.push({ match: d => d.type === 'pickHandCard', answer: () => { const i = t.pile(1, 'hand').indexOf(H.INERT.creature); return { cardName: H.INERT.creature, handIndex: i, selectedCards: [{ cardName: H.INERT.creature, handIndex: i }] }; } });
     await t.play(1, 'Shapeshift', { hero: 0 });
     R.check('Analyzer erhält 1 Counter (Shapeshift: „add it to your hand")', (a.counters.changeCounter || 0) === 1, a.counters.changeCounter || 0);
   }

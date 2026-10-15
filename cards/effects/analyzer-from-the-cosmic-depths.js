@@ -345,5 +345,16 @@ module.exports = {
       if (ctx.playerIdx === ctx.cardOwner) return;
       addChangeCounters(ctx._engine, ctx.card, 1);
     },
+    // ★ Welle 9 (Al, 15.10.2026, A02-deepsea-21): „Ja, das soll zählen" — auch die Rückgabe vom Brett auf die Hand des Gegners per Effekt
+    // (Deepsea-Bounce, Shapeshift, Castle, Encounter, Monstrosity …) ist „adds cards to their hand". Ein Counter je Rückgabe-Ereignis
+    // (`onCardsReturnedToHand`), nicht je Karte. Tokens verschwinden beim Verlassen und landen nie auf der Hand → zählen nicht.
+    // Gezählt wird, wenn die Hand des GEGNERS (`ownerIdx`) Karten erhält; die eigene Rückgabe zählt nicht.
+    onCardsReturnedToHand: (ctx) => {
+      if (ctx.ownerIdx === ctx.cardOwner) return;
+      const insts = ctx.returnedInsts || [];
+      if ((ctx.returnedCards || []).length === 0) return;
+      if (insts.length > 0 && insts.every(i => ctx._engine.isTokenCard(i))) return;
+      addChangeCounters(ctx._engine, ctx.card, 1);
+    },
   },
 };
