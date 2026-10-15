@@ -39,6 +39,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { hasCardType } = require('./_hooks');
 
 const BASE_FORM = 'Waflav, the Metamorphing Monstrosity';
 const ARCHETYPE = 'Waflav';
@@ -439,6 +440,11 @@ function collectBoardTargets(engine) {
   }
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
+    // Al, Welle 10 (Q55): „any target on the board" = nur Helden und Creatures
+    // (inkl. Artifact Creatures) — Ausruestung und Nicht-Creature-Tokens
+    // (Pollution/Puppet) sind keine Ziele. Token mit Untertyp Creature zaehlen mit.
+    const _cd = engine.getEffectiveCardData?.(inst) || engine._getCardDB()[inst.name];
+    if (!hasCardType(_cd, 'Creature')) continue;
     targets.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip', owner: inst.owner,
@@ -488,15 +494,20 @@ async function applyStatusOnAscension(engine, pi, cardName, statusName, opts = {
     appliedBy: pi,
     source: cardName,
     ...(opts.duration ? { duration: opts.duration } : {}),
-    ...(opts.stacks ? { stacks: opts.stacks } : {}),
+    ...(opts.stacks && !opts.addStacks ? { stacks: opts.stacks } : {}),
     ...(opts.animationType ? { animationType: opts.animationType } : {}),
   };
 
+  // Al, Welle 10 (Q55): „apply 1 Stack of Poison" ADDIERT einen Stapel (auch auf ein
+  // schon vergiftetes Ziel); ohne `addStacks` setzte der Held-Pfad den Stapel auf 1
+  // zurueck und der Kreaturen-Pfad lehnte ein schon vergiftetes Ziel ab.
   if (sel.type === 'hero') {
-    await engine.addHeroStatus(sel.owner, sel.heroIdx, statusName, statusOpts);
+    await engine.addHeroStatus(sel.owner, sel.heroIdx, statusName,
+      opts.addStacks ? { ...statusOpts, addStacks: opts.stacks || 1 } : statusOpts);
   } else if (sel.cardInstance) {
     await engine.applyCreatureStatus(sel.cardInstance, statusName, {
       ...statusOpts, sourceOwner: pi,
+      ...(opts.addStacks ? { addStacks: true, stacks: opts.stacks || 1 } : {}),
     });
   }
   engine.log('waflav_on_ascension_status', {
