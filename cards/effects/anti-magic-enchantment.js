@@ -70,9 +70,9 @@ module.exports = {
   hooks: {
     /**
      * Fires for every zone entry event. We only care when an Equipment
-     * Artifact lands in a Support Zone on the AME holder's own side
-     * (card text benefits the "controlling player" — for that to mean
-     * anything, AME's holder must be the Artifact's controller).
+     * Artifact lands in a Support Zone — auf JEDER Seite, von jedem angelegt
+     * (Welle 11, Al R6). Die Negier-Fähigkeit gehört dem Kontrolleur des
+     * Artefakts („controlling player").
      *
      * Uses a hookCtx flag so if the player holds multiple copies of AME,
      * only one prompts per event. Self-dedupes via engine.sync after the
@@ -98,8 +98,9 @@ module.exports = {
       if (!cd || cd.cardType !== 'Artifact') return;
       if ((cd.subtype || '').toLowerCase() !== 'equipment') return;
 
-      // AME enchants YOUR own artifacts — opponent's artifacts do nothing for you.
-      if (entering.owner !== pi) return;
+      // Welle 11 (Al, R6: „Jedes Equip zählt, egal wer es anlegt."): jedes angelegte Artefakt – auch auf der Gegenseite
+      // und auch vom Gegner angelegt – darf verzaubert werden (vorher nur Artefakte der eigenen Brettseite). Die Negier-Fähigkeit
+      // gehört laut Text dem „controlling player" des Artefakts (siehe `ownerPi` unten).
 
       // Dedupe: if multiple AME instances are in this player's hand, only
       // the first that reaches this point prompts. Scoped per-player so the
@@ -188,7 +189,7 @@ module.exports = {
       });
 
       entering.counters.antiMagicEnchanted = {
-        ownerPi: pi,
+        ownerPi: entering.controller ?? entering.owner,   // „the controlling player may negate" (eigenes Artefakt: = pi)
         charges: 1,
       };
       if (!entering.counters.buffs) entering.counters.buffs = {};
