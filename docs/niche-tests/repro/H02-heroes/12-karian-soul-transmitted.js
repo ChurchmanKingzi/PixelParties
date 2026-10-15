@@ -5,7 +5,9 @@
 //   (Engine-Status `soul_transmitted`, `negative: true`, direkt gesetzt – ohne `immuneKey`, `_hooks.js:398`)
 // Beobachtung: Karian wird mit dem Ritual wiederbelebt (Status haftet), beim nächsten Besiegen wird sie samt Fähigkeit gelöscht – identisch zu jedem anderen Helden.
 // Frage an Al: Soll Karians Immunität auch gegen Soul Transmitted gelten (sie wird dann beim zweiten Tod nicht gelöscht) – ja oder nein?
-// Aufruf: node docs/niche-tests/repro/H02-heroes/12-karian-soul-transmitted.js   (✗ = Karian wird gelöscht)
+// ★ Welle 13 (Q115, Al: „Nein, DAGEGEN ist Karian nicht immun."): UMGESTELLT auf die neue Regel – Soul Transmitted wirkt auf Karian wie auf jeden anderen Helden, sie wird beim zweiten Besiegen
+//   GELÖSCHT (Ist-Zustand). Vorher erwartete dieses Repro die Gegenlesart (Karian bleibt unversehrt).
+// Aufruf: node docs/niche-tests/repro/H02-heroes/12-karian-soul-transmitted.js   (Exit 0 = korrekt: Karian wird gelöscht)
 const H = require('../../lib/h.js');
 const KA = 'Grand Inquisitor Karian';
 (async () => {
@@ -20,7 +22,7 @@ const KA = 'Grand Inquisitor Karian';
   R.check('Ritual gespielt, Karian lebt (800 HP)', r === true && t.hp(0, 0) === 800, { r, hp: t.hp(0, 0) });
   R.note('Status an Karian', Object.keys(t.hero(0, 0).statuses).filter(k => !/immune/.test(k)));
   await t.run(() => t.engine.actionDefeatHero({ name: 'test', owner: 1 }, t.hero(0, 0), { reason: 'test' }));
-  R.check('Karian wird beim zweiten Besiegen NICHT gelöscht (negativer Status wirkt nicht auf sie)', t.hero(0, 0).name === KA, { name: t.hero(0, 0).name, deleted: t.pile(0, 'deletedPile') });
+  R.check('Karian wird beim zweiten Besiegen GELÖSCHT (Soul Transmitted wirkt trotz ihrer Immunität, Q115)', t.hero(0, 0).name !== KA, { name: t.hero(0, 0).name, deleted: t.pile(0, 'deletedPile') });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
