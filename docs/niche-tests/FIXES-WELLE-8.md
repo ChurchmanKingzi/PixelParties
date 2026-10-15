@@ -22,7 +22,18 @@ Al hat die Folgefragen aus [FIXES-WELLE-7.md](FIXES-WELLE-7.md) beantwortet; ein
 * Repros: **408 grün** von 755 (Welle 7: 403 von 750); **0 Rückschritte**, keine Abstürze/Timeouts; 5 neue Repros (`W8/01–05`).
 * Alle 44 `scripts/check-*.js` wie im Ausgangszustand (nur `check-scope.js` rot). Skilltest-E2E: rot nur battle, lobby, prep, seats, target; `cards.test.js` ist ein bekannter Zufalls-Flake (im Lauf rot, in drei Wiederholungen einmal rot und zweimal grün, auch auf der Basis zeitweise rot); `artifacts.test.js` Zufalls-Flake (zufällige Helden/Hände, auch auf der Basis). Dauerfeuer über alle Karten: keine neu auffälligen Läufe; zusätzlich 168 Läufe (28 Karten × beide Seiten × normal/gefroren/negiert) ohne Unterschied.
 
-## Offene Fragen an Al (ja/nein)
+## Nachtrag (15.10.2026): Al hat Fragen 1, Chaos-Diamond/Pinta, Broghan und Xal beantwortet
+
+| Thema | Entscheidung / Umsetzung (`wave8/W8`, c6b6d59) |
+|---|---|
+| Bonded Companion ohne Pool fällt bei jedem Treffer, Abgang besiegt den Helden nicht | „Ja, gewollt." – keine Änderung |
+| Chaos-Diamond / Pinta „never draw from your Potion Deck" | „Nein, das Verbot bleibt bestehen." – Verbot ist der Spieler-Stempel `ps.potionDrawBanned`, Frost/Betäubung/Negation berühren ihn nicht; Repro `W8/06` |
+| Broghan „cannot be Frozen" | „Broghan ja" – die Immunität entfällt, solange Broghans Heldeneffekt ruht (Frost/Betäubung/Negation), danach ist sie wieder da; nur Broghans eigener Stempel (`source === Broghan`), fremde Quellen (Heart of Ice, The Sun Sword, Embodiment of Biseria, SnowItAll) bleiben; Selbstabgleich über `bypassStatusFilter` wie bei Lethe. Grenze: eine leise abklingende Negation wird erst beim nächsten Phasen-/Zugbeginn nachgezogen |
+| Xals Erlaubnis für Abilities in Support Zones | „Xal nein" – bleibt bei Negation/Frost/Betäubung bestehen, bereits liegende Abilities bleiben, neue dürfen sogar angelegt werden (war schon so, per Repro `W8/06` abgesichert) |
+
+Stand danach: **409 Repros grün von 756**, 0 Rückschritte; `check-*.js` wie zuvor; E2E rot nur battle, lobby, prep, seats, target; Dauerfeuer 66 Läufe ohne Unterschied.
+
+## Offene Fragen an Al (ja/nein) – Stand 15.10.2026: offen sind nur noch 2, 6 und 7 (die Fragen 1, 3, 4, 5 sind beantwortet)
 
 1. Ein gefrorener/betäubter/negierter Bonded Companion hat ohne Pool seine gedruckten 0 HP und fällt bei jedem Treffer; sein Abgang besiegt den Helden dann nicht mehr, weil der Trigger ebenfalls ruht – so gewollt?
 2. Bonded Companion „cannot be moved … in any way": soll auch diese Zonensperre ruhen (jetzt ja)?
