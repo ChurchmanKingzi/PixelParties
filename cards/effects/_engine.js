@@ -3971,6 +3971,9 @@ class GameEngine {
         // Zaehler) fuer einen Bonus, der nie ankommt.
         if (hookCtx.cannotBeIncreased && delta > 0) return;
         hookCtx._flat = (hookCtx._flat || 0) + delta;
+        // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
+        // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
+        if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
       },
       multiplyAmount(factor) {
         if (hookCtx.amount === undefined) return;
@@ -24879,6 +24882,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
     this._settleAmount(hookCtx); // v840: modifyAmount-Boni (Semi, Wealth …) verrechnen
+    // Welle 11 (Al, Q76: „das normale Einkommen sollte unberührt sein. Aber andere Einkommensquellen in der Resource Phase, etwa Wealth oder
+    // Semi, dürfen ihn triggern!"): die Zuschläge zum Rundeneinkommen sind Effekt-Gold — je Quelle bietet der Hook `onIncomeBonusGain`
+    // (Golden Vermin) an, sie durch eine Karte zu ersetzen. Das Grund-Einkommen (4) bleibt immer.
+    if (hookCtx._isResourceGain && hookCtx._einkommensBoni?.length) {
+      for (const bonus of hookCtx._einkommensBoni) {
+        const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
+        await this.runHooks('onIncomeBonusGain', bonusCtx);
+        if (bonusCtx.cancelled) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
+      }
+    }
     // Opponent's Surprise window — Gold Trap (and any future
     // surpriseResourceGainTrigger surprise) intercepts the gain.
     // Fires AFTER own-side hooks so Golden Vermin's swap and

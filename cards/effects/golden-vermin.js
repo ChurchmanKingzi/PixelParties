@@ -65,8 +65,14 @@ module.exports = {
     // der Gegnerrunde. Vermin lief damit auf halbem Kontingent.
     // Der gemeinsame Zaehler stempelt die Runde mit.
 
+    // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Ability Wealth, Treasure Huntress Semi …) sind Effekt-Gold und dürfen
+    // ersetzt werden — je Quelle ein Angebot über `onIncomeBonusGain` (engine.actionGainGold, gleicher Rumpf wie `onResourceGain`);
+    // das Grund-Einkommen (4) selbst bleibt unberührt.
+    onIncomeBonusGain: (ctx) => module.exports.hooks.onResourceGain(ctx),
+
     onResourceGain: async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
+      if (ctx._isResourceGain) return;   // das automatische Einkommen ist kein „effect" (Al, Q76)
       const pending = ctx.amount || 0;
       if (pending <= 0) return;
 
