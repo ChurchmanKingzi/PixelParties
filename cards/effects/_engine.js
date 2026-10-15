@@ -2843,6 +2843,13 @@ class GameEngine {
       const sp = this.gs.players[hookCtx.casterIdx];
       if (sp) sp._spellResolvedTurn = this.gs.turn;
     }
+    // ★ W8 (Al, 15.10.2026): Bonded-Companion-Pool beim Ende des Ruhens neu verknüpfen (Statuswechsel, Phasen-/Zugbeginn).
+    if (hookName === 'onStatusApplied' || hookName === 'onStatusRemoved' || hookName === 'onPhaseStart' || hookName === 'onTurnStart') {
+      // (synchron prüfen, nur bei Arbeit `await`en - ein unbedingtes `await` verschöbe die Hook-Zeitpunkte, auf die sich z. B. der
+      // nicht abgewartete Statuswechsel-Hook beim Negieren verlässt)
+      const _tote = this._begleiterPoolAbgleich();
+      if (_tote) await this._begleiterPoolToeten(_tote);
+    }
     // v1365: vorgemerkte Arbeit „nach dem Abgang" (eigene Entfern-Wege).
     if (this._nachAbgang && this._nachAbgang.length > 0 && !this._nachAbgangLaeuft) {
       await this._nachAbgangAbarbeiten();
@@ -19352,6 +19359,48 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?._maxActionsPerTurn || (hero._actionsThisTurn || 0) < hero._maxActionsPerTurn) return false;
     return !this.isHeroPassiveDormant(pi, heroIdx);
+  }
+
+  /**
+   * ★ W8 (Al, 15.10.2026, Bonded Companion): „Die Zonensperre darf ruhen. Aber sobald der Freeze/Stun/Negate endet, muss der
+   * Companion mit exakt dem Hero gelinkt werden, in dessen Zone er ist! Ist dort kein oder ein toter Hero, bleibt er bei 0 HP und
+   * stirbt sofort." Der Pool hängt nie an einem gespeicherten Partner, sondern immer an der Spalte, in der die Kreatur JETZT steht
+   * (`_reroutePooledCreatureDamage`, `actionHealCreature`) - die Neuverknüpfung beim Wirksamwerden ergibt sich also von selbst. Dieser
+   * Abgleich merkt sich das Ruhen (`counters._poolRuht`, gesetzt beim ersten Abgleich, der die Kreatur ruhend sieht) und lässt die
+   * Kreatur beim Übergang ruhend -> wirksam regulär sterben (`actionDestroyCard`: Todes-/Abgangs-Trigger), wenn in ihrer Spalte
+   * kein lebender Held steht (der Held-besiegt-Trigger greift dann nicht: kein lebender Held verknüpft). Aufgerufen aus `runHooks`
+   * vor `onStatusApplied/Removed`, `onPhaseStart`, `onTurnStart` (leises Abklingen holt der Zug-/Phasenbeginn nach). Die Karte selbst
+   * kann das nicht tun: ihre Hooks schweigen, solange sie ruht (und `bypassStatusFilter` würde den Ruhe-Prüfer blind machen).
+   * Puppet-Tokens (`bypassStatusFilter`) sind ausgenommen: ihr Pool ruht nie.
+   */
+  _begleiterPoolAbgleich() {
+    if (this._begleiterAbgleichLaeuft) return null;
+    let tote = null;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+      const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (!sc?.sharesHpWithHero || sc.bypassStatusFilter) continue;
+      const c = inst.counters || (inst.counters = {});
+      if (this.isCardPassiveDormant(inst)) { c._poolRuht = 1; continue; }
+      if (!c._poolRuht) continue;
+      delete c._poolRuht;
+      const seite = inst.controller ?? inst.owner;
+      const held = this.gs.players[seite]?.heroes?.[inst.heroIdx];
+      if (!held?.name || held.hp <= 0) (tote || (tote = [])).push(inst);
+      else this.log('bonded_companion_relinked', { card: inst.name, hero: held.name, heroIdx: inst.heroIdx });
+    }
+    return tote;
+  }
+
+  /** Zweiter Teil von `_begleiterPoolAbgleich`: die Kreaturen ohne lebenden Spaltenhelden sterben regulär. */
+  async _begleiterPoolToeten(tote) {
+    this._begleiterAbgleichLaeuft = true;
+    try {
+      for (const inst of tote) {
+        this.log('bonded_companion_no_hero', { card: inst.name, heroIdx: inst.heroIdx });
+        await this.actionDestroyCard({ name: inst.name, owner: inst.controller ?? inst.owner, controller: inst.controller ?? inst.owner, heroIdx: inst.heroIdx }, inst);
+      }
+    } finally { this._begleiterAbgleichLaeuft = false; }
   }
 
   /**
