@@ -37,9 +37,9 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { isCuteCreatureCard } = require('./_cute-shared');
 
 const CARD_NAME = 'Cute Annoyance Mini';
-const CUTE_ARCHETYPE = 'Cute';
 
 /**
  * Enumerate unique Cute Creature names still in the player's main
@@ -55,7 +55,7 @@ function getCuteCreaturesInDeck(engine, ps) {
   for (const [name, count] of Object.entries(counts)) {
     const cd = cardDB[name];
     if (!cd) continue;
-    if (cd.archetype !== CUTE_ARCHETYPE) continue;
+    if (!isCuteCreatureCard(cd)) continue;   // Name zaehlt (Al, Welle 9, Q24)
     if (!isOwnSideSummonableCreature(cd, name)) continue;
     out.push({ name, count });
   }

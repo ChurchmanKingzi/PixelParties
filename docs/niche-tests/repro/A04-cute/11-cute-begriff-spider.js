@@ -7,7 +7,9 @@
 //   · Archetyp (`archetype === 'Cute'`): Army of the Cute, Pink Sky (`isCuteCreatureInst`), Cute Conversion, Cute Annoyance Mini
 //   · Namens-Präfix: Cuteness Sensor
 // Erwartung: ein und derselbe Begriff „Cute" Creature (CARD_API: die Anführungszeichen bedeuten „zählt als") für alle Karten.
-// Beobachtet: Cute Spider wird von Princess Mary als Cute behandelt (summonbar, Stufenbypass), von Pink Sky NICHT verschont und von
+// ENTSCHIEDEN (Al, Welle 9, Q24): „Der Name zählt, Substring 'Cute' als ein Wort“ → Cute Spider zählt ÜBERALL als Cute (Check unten: alle drei Karten = ja;
+//   zusätzlich Cute Conversion und Cute Annoyance Mini in b-q24-cute-name-ueberall.js).
+// Beobachtet (vor Welle 9): Cute Spider wird von Princess Mary als Cute behandelt (summonbar, Stufenbypass), von Pink Sky NICHT verschont und von
 //   Army of the Cute nicht angeboten.
 const H = require('../../lib/h.js');
 (async () => {
@@ -37,6 +39,6 @@ const H = require('../../lib/h.js');
   const maryDarf = !!t.find('Cute Spider', 'support');
   R.note('Cute Princess Mary beschwört Cute Spider ohne Schule', maryDarf);
 
-  R.check('Alle drei Karten behandeln Cute Spider gleich (alle „Cute" oder alle „nicht Cute")', verschont === armyBietet && armyBietet === maryDarf, { pinkSky: verschont, army: armyBietet, mary: maryDarf });
+  R.check('Alle drei Karten behandeln Cute Spider als "Cute" (Name zählt, Al Q24)', verschont && armyBietet && maryDarf, { pinkSky: verschont, army: armyBietet, mary: maryDarf });
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });

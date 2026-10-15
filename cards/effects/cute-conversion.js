@@ -38,6 +38,7 @@
 
 const { opponentOfGs } = require('./_opp');
 const { hasCardType } = require('./_hooks');
+const { isCuteCreatureCard } = require('./_cute-shared');
 const CARD_NAME = 'Cute Conversion';
 
 /** Kreaturen des Gegners, die man sich holen kann. */
@@ -64,7 +65,7 @@ function cuteKreaturen(engine, pi) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = engine.getEffectiveCardData(inst);
     if (!cd || cd.cardType !== 'Creature') continue;
-    if (cd.archetype === 'Cute') n++;
+    if (isCuteCreatureCard(cd)) n++;   // Name zaehlt (Al, Welle 9, Q24)
   }
   return n;
 }
