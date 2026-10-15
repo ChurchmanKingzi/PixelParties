@@ -15,9 +15,17 @@
 //    bleibt gueltiges Ziel. Kein `livingHeroesOnly`, kein
 //    `isCreatureSummonable`, keine Level-/Schulpruefung des Helden.
 //  · „the corresponding Hero" = der Held, unter dem der Sergeant
-//    liegt (`ctx.cardHeroIdx`). Zielzonen sind seine freien Support
-//    Zones — Basisplaetze UND Inselzonen (Flying Island in the Sky;
-//    `getFreeSupportZones` zaehlt die seit v607 mit).
+//    liegt (`ctx.cardHeroIdx`, auf der BRETTSEITE `physicalSide`). Zielzonen
+//    sind seine freien Support Zones — Basisplaetze UND Inselzonen
+//    (Flying Island in the Sky; `getFreeSupportZones` zaehlt die seit
+//    v607 mit).
+//  · ★ Welle 11 (Al, 15.10.2026, Q74 „a"): GESTOHLENER Sergeant (Lovely
+//    Teddy, Dark Gear …) legt beim Helden, UNTER DEM ER LIEGT — auf der
+//    Gegnerseite. Die Kreatur kommt aus der Hand des KONTROLLEURS und
+//    gehoert ihm (seitenfremd: `heldSeite`, `controller` +
+//    `crossSideControlled` wie beim Beschwoeren ueber einen geliehenen
+//    Helden). Vorher wurde der Index auf die EIGENE Spalte des Diebes
+//    abgebildet.
 //  · „level 1 or lower" liest den gedruckten Level der Handkarte;
 //    nur echte Kreaturen (`isSummonablePileCreature`: keine Artifact
 //    Creatures, keine Tokens).
@@ -49,9 +57,9 @@ function eligibleHandCards(engine, pi) {
   return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count }));
 }
 
-/** Freie Support Zones (inkl. Insel) des Helden, unter dem der Sergeant liegt. */
-function targetZones(engine, pi, heroIdx) {
-  return engine.getFreeSupportZones(pi).filter(z => z.heroIdx === heroIdx);
+/** Freie Support Zones (inkl. Insel) des Helden, unter dem der Sergeant liegt (Brettseite `seite`, Q74). */
+function targetZones(engine, seite, heroIdx) {
+  return engine.getFreeSupportZones(seite).filter(z => z.heroIdx === heroIdx);
 }
 
 module.exports = {
@@ -61,9 +69,10 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    const seite = engine.physicalSide(ctx.card) ?? pi;   // Q74: Brettseite des Helden, unter dem der Sergeant liegt
     if (engine.gs.players[pi]?.summonLocked) return false;
     if (eligibleHandCards(engine, pi).length === 0) return false;
-    return targetZones(engine, pi, ctx.cardHeroIdx).length > 0;
+    return targetZones(engine, seite, ctx.cardHeroIdx).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -72,10 +81,11 @@ module.exports = {
     const pi      = ctx.cardOwner;
     const heroIdx = ctx.cardHeroIdx;
     const ps      = gs.players[pi];
+    const seite   = engine.physicalSide(ctx.card) ?? pi;   // Q74: Brettseite des Helden, unter dem der Sergeant liegt
 
     const cards = eligibleHandCards(engine, pi);
     if (cards.length === 0) return false;
-    const zones = targetZones(engine, pi, heroIdx);
+    const zones = targetZones(engine, seite, heroIdx);
     if (zones.length === 0) return false;
 
     const picked = await ctx.promptCardGallery(cards, {
@@ -92,7 +102,7 @@ module.exports = {
     let dest = zones[0];
     if (zones.length > 1) {
       const zonePick = await ctx.promptZonePick(
-        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: pi })),
+        zones.map(z => ({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, ownerIdx: seite, owner: seite })),
         {
           title: CARD_NAME,
           description: `Choose a free Support Zone for ${cardName}.`,
@@ -110,6 +120,7 @@ module.exports = {
     const placed = await engine.actionPlaceCreature(cardName, pi, dest.heroIdx, dest.slotIdx, {
       source: 'hand',
       sourceName: CARD_NAME,
+      ...(seite !== pi ? { heldSeite: seite } : {}),   // Q74: gestohlener Sergeant -> Zone auf der Gegnerseite, Kontrolle beim Dieb
     });
     if (!placed?.inst) return false;
 
