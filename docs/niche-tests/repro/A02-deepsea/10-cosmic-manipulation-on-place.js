@@ -4,6 +4,7 @@
 // Kartentext (Cosmic Manipulation): „Play this card immediately when you SUMMON a Creature directly from your deck. Draw cards equal to the Creature's level …"
 // Kartentext (Arrival): „Choose a "Cosmic Depths" Creature from your deck and PLACE it into the free Support Zone of a Hero your opponent controls. Then, choose a
 //   "Cosmic Depths" Creature 1 level higher … and SUMMON it …" (beide aus dem Deck)
+// WELLE 9 (Al, Q9): „place ist auch eine Subform von summon“ – das Fensterverhalten bleibt; die Erwartung unten prüft den Fall, dass man das 1. Fenster ABLEHNT (Absicherung: W9/a-10).
 // Beobachtet: Das Reaktionsfenster von Cosmic Manipulation öffnet schon beim Platzieren der ersten Kreatur (Analyzer, Lv1 → zieht 1, mischt 0 zurück, kein Zähler).
 //   Zieht die Reaktion dabei die Aufwertungs-Karte (hier: Gatherer ist die oberste Karte), findet Arrival für den 2. Schritt nichts mehr: `arrival_fizzle`
 //   (Grund `no_upgrade`), die Arrival ist verbraucht (HOPT gestempelt), die 2. Kreatur kommt nicht. Lehnt man die Reaktion beim 1. Fenster ab, läuft alles
@@ -17,8 +18,9 @@ const H = require('../../lib/h.js');
   const t = await H.fresh({ hand: [['Arrival from the Cosmic Depths', 'Cosmic Manipulation', H.INERT.filler], []], deck: [deck] });
   t.setAbilities(0, 0, [['Summoning Magic', 'Summoning Magic', 'Summoning Magic']]);
   t.script.push({ match: d => d.type === 'pickHandCard', answer: () => { const i = t.pile(0, 'hand').indexOf(H.INERT.filler); return { cardName: H.INERT.filler, handIndex: i, selectedCards: [{ cardName: H.INERT.filler, handIndex: i }] }; } });
+  t.script.push({ match: d => d.type === 'confirm' && d.title === 'Cosmic Manipulation', answer: () => null, once: true });   // Welle 9: 1. Fenster (Platzieren) bewusst ablehnen – nimmt man es an und zieht den Gatherer, fizzelt Arrival (Spielerwahl)
   t.targetFn = (valid) => [valid[0].id];
-  await t.play(0, 'Arrival from the Cosmic Depths', { hero: 0 });   // Reaktionsfenster: Standardantwort „Ja"
+  await t.play(0, 'Arrival from the Cosmic Depths', { hero: 0 });
   const fizzle = t.logs.some(l => l.type === 'arrival_fizzle');
   R.note('Log', t.logs.map(l => l.type).filter(x => /cosmic|arrival/.test(x)));
   R.check('Arrival führt den 2. Schritt aus (Gatherer steht auf meinem Brett)', t.gs.players[0].supportZones[0].some(z => z[0] === GA), { board0: t.gs.players[0].supportZones[0], hand: t.pile(0, 'hand'), fizzle });
