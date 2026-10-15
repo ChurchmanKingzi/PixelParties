@@ -392,10 +392,7 @@ module.exports = {
     const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: „this Hero" = Brettseite
 
     const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx, feld).length > 0;
-    // W7b (M02-23, Al 14.10.): die Deck-Option ist ein reiner Deck-Zugriff - unter der Such-Sperre gibt es sie nicht
-    // (die Hand-Option bleibt; Lv2: auch keine Abwurfkosten ohne Wirkung).
-    const hasDeckAbilities = !engine._isSearchBlocked(pi, {}, 'deck')
-      && getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
+    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
     const ps = ctx.players[pi];
     const hasCardsInHand = (ps.hand || []).length > 0;
     const anlegenVerbraucht = feld === pi
@@ -445,8 +442,7 @@ module.exports = {
     // ── Levels 2 & 3 ──
     const maxHandAttach = level === 2 ? 2 : 3;
     const hasHandAbilities = getEligibleHandAbilities(engine, pi, heroIdx, feld).length > 0;
-    const hasDeckAbilities = !engine._isSearchBlocked(pi, {}, 'deck')   // W7b (M02-23): s. canFreeActivate
-      && getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
+    const hasDeckAbilities = getEligibleDeckAbilities(engine, pi, heroIdx, feld).length > 0;
     const hasCardsInHand = (ps.hand || []).length > 0;
     const abilityGivenBlocked = feld === pi
       ? (ps.abilityGivenThisTurn || [])[heroIdx]

@@ -79,18 +79,39 @@ async function hu(opts) {
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   {
-    // Die Zahlung selbst kippt das Gate der Bestie: Hu (Fireball spielbar, 6 Karten in den Ablagen) ist VOR der Zahlung aktivierbar, danach nicht mehr (6 − 5 < 5)
-    // → Mao gibt die 5 Karten zurück und negiert nichts
-    const t = await H.fresh({ heroes: [['Mao, the Vengeful Guardian', H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], hand: [['Fireball'], []], discard: [Array(6).fill(F), []] });
-    const hu2 = t.put(0, 0, 1, 'Guardian Beast Hu');
-    t.grantFor(0, 0, 'Fireball');
-    t.gs.activePlayer = 0; t.phase(2);
-    t.script.push({ match: d => d && d.type === 'cardGalleryMulti', once: true, answer: fuenf });
-    t.targetFn = (v) => { const m = v.find(x => x.cardName === 'Guardian Beast Hu'); return m ? [m.id] : null; };
-    await t.activateHero(0, 0, {});
-    R.check('Zahlung macht Hu unfeuerbar: 5 Karten zurück in der Ablage, nichts gelöscht, Hu nicht negiert', t.pile(0, 'deletedPile').length === 0 && t.pile(0, 'discardPile').length === 6 && !hu2.counters.negated, { geloescht: t.pile(0, 'deletedPile').length, ablage: t.pile(0, 'discardPile').length, negiert: !!hu2.counters.negated });
-    R.check('Der Rückgabeweg wurde wirklich durchlaufen (Log mao_fizzle: refire_impossible_after_cost)', t.lg('mao_fizzle').some(l => (l.reason || l.data?.reason) === 'refire_impossible_after_cost'), t.lg('mao_fizzle'));
-    R.check('Bilanz sauber, keine Engine-Fehler', t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
+    // Al 15.10.: wählbar sind nur Bestien, die AUCH NACH Maos bezahlten Kosten (5 Karten weniger in den Ablagen) noch aktivierbar wären.
+    // Hu braucht ≥ 5 Karten in den Ablagen (und eine spielbare Aktion): bei 9 Karten bleiben nach der Zahlung 4 → nicht wählbar; bei 10 bleiben 5 → wählbar.
+    for (const [gesamt, soll] of [[9, false], [10, true]]) {
+      const t = await H.fresh({ heroes: [['Mao, the Vengeful Guardian', H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], hand: [['Fireball'], []], discard: [Array(gesamt).fill(F), []] });
+      const hu2 = t.put(0, 0, 1, 'Guardian Beast Hu');
+      t.grantFor(0, 0, 'Fireball');
+      t.gs.activePlayer = 0; t.phase(2);
+      let angeboten = null;
+      t.script.push({ match: d => d && d.type === 'cardGalleryMulti', answer: fuenf });
+      t.targetFn = (v) => { angeboten = v.map(x => x.cardName); const m = v.find(x => x.cardName === 'Guardian Beast Hu'); return m ? [m.id] : null; };
+      const erzwungen = [];   // `_forceNonCancellable` (Zähler der Pflichtwahl) in dem Moment, in dem Hus Aktionswahl und Kostenwahl gestellt werden
+      t.script.push({ match: d => d && d.type === 'heroAction', answer: () => { erzwungen.push(t.engine._forceNonCancellable || 0); return null; } });
+      const vorher = t.pile(0, 'discardPile').length;
+      await t.activateHero(0, 0, {});
+      const gewaehlbar = !!angeboten && angeboten.includes('Guardian Beast Hu');
+      R.check(`Hu mit ${gesamt} Karten in den Ablagen: ${soll ? 'wählbar' : 'nicht wählbar, nichts gezahlt/negiert'}`, soll ? gewaehlbar : (!gewaehlbar && t.pile(0, 'discardPile').length === vorher && !hu2.counters.negated && t.pile(0, 'deletedPile').length === 0), { angeboten, ablage: t.pile(0, 'discardPile').length });
+      if (soll) {
+        R.check('Mao feuert Hu: Hus Aktionswahl läuft unter erzwungener Auflösung (unabbrechbar), Mao negiert Hu danach, Maos 5 Karten bleiben gelöscht', erzwungen.length > 0 && erzwungen.every(n => n > 0) && !!hu2.counters.negated && t.pile(0, 'deletedPile').length >= 5, { erzwungen, negiert: !!hu2.counters.negated, geloescht: t.pile(0, 'deletedPile').length });
+        R.check('… und der Zähler ist danach wieder 0', (t.engine._forceNonCancellable || 0) === 0, t.engine._forceNonCancellable);
+      }
+      R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+    }
+  }
+  {
+    // Mechanik: `validatePicks` weist eine ungültige Zahlung ab (Neu-Abfrage) und löscht erst die gültige
+    const t = await H.fresh({ heroes: [['Mao, the Vengeful Guardian', H.BLANK_HEROES[1], H.BLANK_HEROES[2]], null], discard: [Array(8).fill(F), []] });
+    const { promptAndDeleteFromBothDiscards } = require('../../../../cards/effects/_guardian-beasts-shared.js');
+    let versuche = 0;
+    t.script.push({ match: d => d && d.type === 'cardGalleryMulti', answer: (d) => { versuche++; const idx = versuche === 1 ? [0, 1, 2, 3, 4] : [3, 4, 5, 6, 7]; return { selectedIndices: idx, selectedCards: idx.map(i => d.cards[i].name) }; } });
+    const ctx = t.engine._createContext(t.put(0, 0, 0, F), {});
+    const del = await t.run(() => promptAndDeleteFromBothDiscards(ctx, { validCounts: [5], title: 'Test', sourceName: 'Test', cancellable: true,
+      validatePicks: (picks) => !picks.some(p => p.idx === 0) }));
+    R.check('ungültige Zahlung (enthält Platz 0) wird abgewiesen, die zweite Wahl gelöscht', versuche === 2 && Array.isArray(del) && del.length === 5 && t.pile(0, 'deletedPile').length === 5, { versuche, del });
   }
   R.finish();
 })().catch(e => { process.stderr.write(String(e && e.stack || e) + "\n"); process.exit(2); });
