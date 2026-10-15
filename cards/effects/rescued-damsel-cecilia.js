@@ -44,13 +44,17 @@
 //  aus „the first time" ein Dauerschutz geworden.
 // ═══════════════════════════════════════════
 
+const { hatEffekt } = require('./_gained-effects-shared');
+
 const CARD_NAME = 'Rescued Damsel Cecilia';
 const BASIS = 'Cecilia, the Harrowing Crusader';
 const BONUS_ABILITY = 'Charme';
 
 /** Einmalig den Wiederbelebungs-Marker setzen — und nur einmal. */
 function sicherstellenExtraLeben(hero) {
-  if (!hero || hero.name !== CARD_NAME) return;
+  // ★ Welle 13 (Al, Q121): „Pseudonia bekommt mit Damsels Effekt das Extra-Leben, obwohl sie kein Ascended Hero ist." — `hatEffekt` erkennt
+  // auch den GEWONNENEN Effekt (Pseudonia, Tempeluna …); nach der Verbrauchsmarke `_damselLifeGranted` wächst das Leben nicht nach.
+  if (!hero || !hatEffekt(hero, CARD_NAME)) return;
   if (hero._damselLifeGranted) return;      // schon vergeben (oder verbraucht)
   hero._damselLifeGranted = true;
   hero._extraLife = { by: CARD_NAME, passiv: true };   // W7a: laufender Passiv der Karte -> ruht bei Frost/Betäubung/Negation (Engine `_consumeExtraLife`)
