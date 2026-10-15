@@ -102,6 +102,32 @@ function _consumeCrossSideHint(engine, casterPi, inst) {
   return hint;
 }
 
+/**
+ * ★ Welle 10 (Al, Q41 / A06-rebelliokai-20: „Sollte an den Wizard gebunden sein!"): der gespiegelte Status ist an den Wizard gebunden. Er trägt
+ * `_chillyWizardId` (Instanz des Wizards); endet er beim Wizard (Heilung, Ablauf, Tod, Abgang vom Brett), endet er auch beim Wirtshelden.
+ * `weg` = der Wizard verlässt gerade das Brett. Läuft auch, wenn der Wizard selbst Frost/Betäubung/Negation trägt (`bypassStatusFilter`,
+ * „This effect cannot be negated").
+ */
+async function _spiegelAbgleichen(engine, inst, weg = false) {
+  if (!inst) return;
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
+    const heroes = engine.gs.players[pi]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const st = heroes[hi]?.statuses;
+      if (!st) continue;
+      for (const key of Object.keys(st)) {
+        const eintrag = st[key];
+        if (!eintrag || typeof eintrag !== 'object' || eintrag._chillyWizardId !== inst.id) continue;
+        const traegtNoch = !weg && inst.zone === 'support' && !!inst.counters?.[key];
+        if (!traegtNoch) {
+          await engine.removeHeroStatus(pi, hi, key, { bypassUnhealable: true });
+          engine.log('chilly_wizard_mirror_end', { target: heroes[hi].name, status: key });
+        }
+      }
+    }
+  }
+}
+
 module.exports = {
   inherentAction: true,
   bypassStatusFilter: true,
@@ -232,6 +258,19 @@ module.exports = {
       engine.sync();
     },
 
+    // Welle 10 (Q41): gebundener Spiegel endet mit dem Status des Wizards bzw. seinem Abgang.
+    onCardLeaveZone: async (ctx) => {
+      if (!ctx.leavingCard || ctx.leavingCard.id !== ctx.card.id) return;
+      await _spiegelAbgleichen(ctx._engine, ctx.card, true);
+    },
+    onStatusRemoved: async (ctx) => {
+      if (!ctx._onCreature || !ctx.target || ctx.target.id !== ctx.card.id) return;
+      await _spiegelAbgleichen(ctx._engine, ctx.card, false);
+    },
+    // Auffangnetz für Wege, die einen Kreaturenstatus ohne Hook entfernen (direktes Löschen des Zählers).
+    onTurnStart: async (ctx) => { await _spiegelAbgleichen(ctx._engine, ctx.card, false); },
+    onTurnEnd: async (ctx) => { await _spiegelAbgleichen(ctx._engine, ctx.card, false); },
+
     // ── Status mirror ──
     // Fires when ANY status is applied to this Creature. Bypass-status-
     // filter keeps the hook firing even when Chilly Wizard is CC'd —
@@ -271,6 +310,9 @@ module.exports = {
         _viaChillyWizard: true,
         festesZiel: true,   // „the corresponding Hero": die Zone legt es fest (Als Ruling 9.10.)
       });
+      // Welle 10 (Q41): Spiegel an diesen Wizard binden (siehe `_spiegelAbgleichen`).
+      const gespiegelt = hostHero.statuses?.[statusName];
+      if (gespiegelt && typeof gespiegelt === 'object') gespiegelt._chillyWizardId = inst.id;
       engine.log('chilly_wizard_mirror', {
         target: hostHero.name, status: statusName,
       });
