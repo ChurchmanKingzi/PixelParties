@@ -390,6 +390,19 @@ async function promptAndDeleteFromBothDiscards(ctx, opts = {}) {
   // anything.
   if (!achievable.includes(picks.length)) return null;
 
+  // W7b (A07-18, Al 15.10.): optionale Pruefung der gewaehlten Karten VOR dem Loeschen (`opts.validatePicks(picks)`, Mao: die Bestie muss
+  // nach der Zahlung noch feuern koennen). Ungueltige Wahl → Neu-Abfrage (abbrechbar), nach 3 Fehlversuchen gilt es als Abbruch.
+  if (typeof opts.validatePicks === 'function') {
+    let ok = false;
+    try { ok = !!opts.validatePicks(picks); } catch { ok = false; }
+    if (!ok) {
+      const versuch = (opts._versuch || 0) + 1;
+      if (versuch >= 3) return null;
+      return promptAndDeleteFromBothDiscards(ctx, { ...opts, _versuch: versuch,
+        description: (opts.description || '') + ' (That selection would leave the Creature unable to activate - choose again.)' });
+    }
+  }
+
   return deleteSelectedDiscardCards(engine, picks, opts.sourceName || ARCHETYPE);
 }
 

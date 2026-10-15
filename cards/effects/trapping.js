@@ -12,9 +12,6 @@ const { loadCardEffect } = require('./_loader');
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
-  // W7b (M02-23, Al 14.10.): reiner Deck-Zugriff - unter der Such-Sperre (Cats of the Pharaoh, Siege, Hand-Sperre) nicht aktivierbar
-  // (`_cardBlockedBySearchLock`: Server-Weg und Ausgrau-Liste der freien Abilities, wie Navigation).
-  blockedBySearchLock: true,
 
   canFreeActivate(ctx, level) {
     const engine = ctx._engine;

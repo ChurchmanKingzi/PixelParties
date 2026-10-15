@@ -8,9 +8,9 @@ const H = require('../../lib/h.js');
   const R = H.runner();
 
   // ── (1) doConfirmPotion, Mensch-Weg: offene Effekt-Abfrage mit maxTotal 1 / minRequired 2 ──
-  async function offeneAbfrage(config, ids) {
+  async function offeneAbfrage(config, ids, ziele) {
     const t = await H.fresh({});
-    const validTargets = [0, 1, 2].map(i => ({ id: `hero-0-${i}`, type: 'hero', owner: 0, heroIdx: i, cardName: t.gs.players[0].heroes[i].name }));
+    const validTargets = ziele || [0, 1, 2].map(i => ({ id: `hero-0-${i}`, type: 'hero', owner: 0, heroIdx: i, cardName: t.gs.players[0].heroes[i].name }));
     let aufgeloest = null;
     t.engine._pendingPrompt = { resolve: (v) => { aufgeloest = v; } };
     t.gs.potionTargeting = { potionName: 'Test', ownerIdx: 0, isEffectPrompt: true, validTargets, config };
@@ -29,6 +29,32 @@ const H = require('../../lib/h.js');
   R.check('minRequired 2, zwei Ids: angenommen', o.r === true && o.aufgeloest.length === 2, o);
   o = await offeneAbfrage({ maxTotal: 3, minRequired: 5 }, ['hero-0-0']);
   R.check('minRequired 5 bei nur drei wählbaren Zielen (unerfüllbar): blockiert nicht', o.r === true, o);
+
+  // ── (1b) Regeln des Pickers (Nachtrag Al 15.10.): dieselben Invarianten, die der Client beim Anklicken erzwingt ──
+  const kr = (id, extra) => ({ id, type: 'equip', owner: 0, heroIdx: 0, slotIdx: 0, cardName: id, ...extra });
+  const hz = (id, extra) => ({ id, type: 'hero', owner: 0, heroIdx: 0, cardName: id, ...extra });
+  const regeln = [
+    ['exclusiveTypes: Held + Kreatur gemischt', { exclusiveTypes: true, maxTotal: 3 }, ['h', 'k'], [hz('h'), kr('k')], false],
+    ['exclusiveTypes: zwei Helden', { exclusiveTypes: true, maxTotal: 3 }, ['h', 'h2'], [hz('h'), hz('h2')], true],
+    ['maxPerType hero 1: zwei Helden', { maxPerType: { hero: 1 }, maxTotal: 3 }, ['h', 'h2'], [hz('h'), hz('h2')], false],
+    ['maxPerType hero 1 / equip 1: Held + Kreatur', { maxPerType: { hero: 1, equip: 1 }, maxTotal: 3 }, ['h', 'k'], [hz('h'), kr('k')], true],
+    ['uniqueBy cardName: zwei gleiche Namen', { uniqueBy: 'cardName', maxTotal: 3 }, ['a', 'b'], [kr('a', { cardName: 'X' }), kr('b', { cardName: 'X' })], false],
+    ['uniqueBy cardName: verschiedene Namen', { uniqueBy: 'cardName', maxTotal: 3 }, ['a', 'b'], [kr('a', { cardName: 'X' }), kr('b', { cardName: 'Y' })], true],
+    ['maxBudget 4: Summe 5', { maxBudget: 4, maxTotal: 3 }, ['a', 'b'], [kr('a', { budgetCost: 2 }), kr('b', { budgetCost: 3 })], false],
+    ['maxBudget 4: Summe 4', { maxBudget: 4, maxTotal: 3 }, ['a', 'b'], [kr('a', { budgetCost: 2 }), kr('b', { budgetCost: 2 })], true],
+    ['maxNonOwnSupport 1: zwei fremde', { maxNonOwnSupport: 1, maxTotal: 3 }, ['a', 'b'], [kr('a'), kr('b')], false],
+    ['maxNonOwnSupport 1: eine fremde + eine eigene', { maxNonOwnSupport: 1, maxTotal: 3 }, ['a', 'b'], [kr('a'), kr('b', { ownSupport: true })], true],
+    ['minSumMaxHp 100: Summe 80', { minSumMaxHp: 100, maxTotal: 3 }, ['a', 'b'], [kr('a', { _meta: { maxHp: 30 } }), kr('b', { _meta: { maxHp: 50 } })], false],
+    ['minSumMaxHp 100: Summe 100', { minSumMaxHp: 100, maxTotal: 3 }, ['a', 'b'], [kr('a', { _meta: { maxHp: 50 } }), kr('b', { _meta: { maxHp: 50 } })], true],
+    ['minSumLevel 4: Summe 3', { minSumLevel: 4, maxTotal: 3 }, ['a', 'b'], [kr('a', { _meta: { level: 1 } }), kr('b', { _meta: { level: 2 } })], false],
+    ['minSumLevel 4: Summe 4', { minSumLevel: 4, maxTotal: 3 }, ['a', 'b'], [kr('a', { _meta: { level: 2 } }), kr('b', { _meta: { level: 2 } })], true],
+    ['Pflichttribut von Held 1: keiner von dort', { mustIncludeFromHeroIdx: 1, maxTotal: 3 }, ['a'], [kr('a', { heroIdx: 0 }), kr('b', { heroIdx: 1 })], false],
+    ['Pflichttribut von Held 1: einer von dort', { mustIncludeFromHeroIdx: 1, maxTotal: 3 }, ['a', 'b'], [kr('a', { heroIdx: 0 }), kr('b', { heroIdx: 1 })], true],
+  ];
+  for (const [name, cfg, ids, ziele, gueltig] of regeln) {
+    const o2 = await offeneAbfrage(cfg, ids, ziele);
+    R.check(`Picker-Regel ${name}: ${gueltig ? 'angenommen' : 'abgewiesen, Abfrage bleibt offen'}`, gueltig ? (o2.r === true && Array.isArray(o2.aufgeloest)) : (o2.r === false && o2.aufgeloest === null && o2.offen), o2);
+  }
 
   // ── (2) Abschluss für CPU/Skript: überzählige Ziele abgeschnitten, Duplikate entfernt (S01-22, Divine Gift of Death) ──
   {

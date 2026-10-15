@@ -4,7 +4,8 @@
 //   e) F03-17  Spice Mortar unter der Such-Sperre gesperrt (Karte aus dem Gegnerdeck auf die eigene Hand)
 //   f) H01-heroes-22  Shapeshifter/Throne Robber sind von der Such-Sperre NICHT erfasst (siehe auch H01-heroes/22)
 //   h) M02-17  Magnetic Potion / Elixir of Mana: serverseitig gesperrt
-//   i) M02-23  Navigation, Trapping, Premonition, Training (Deck-Option): reine Deck-Zugriffe unter der Such-Sperre nicht aktivierbar; Mischeffekte (Training: Hand-Option) bleiben aktivierbar
+//   i) M02-23  Navigation (legt eine Karte auf die Hand) unter der Such-/Hand-Sperre nicht aktivierbar. Al (15.10.): Trapping, Premonition und Training (Deck-Option) legen NICHTS auf die Hand
+//      und werden von der Such-/Hand-Sperre NICHT erfasst – sie bleiben aktivierbar
 //   j) S03-26  Shooting Star unter Hand-/Stab-Sperre nicht spielbar
 const H = require('../../lib/h.js');
 const D = H.INERT.creature;
@@ -60,7 +61,7 @@ const sperren = {
   }
 
   // ── i) Navigation, Trapping, Premonition (freie Abilities), Training (Deck-Option) ──
-  R.section('i) Navigation, Trapping, Premonition, Training');
+  R.section('i) Navigation gesperrt; Trapping, Premonition, Training unberührt');
   async function frei(ability, lv, setup, hand) {
     const zones = [Array(lv).fill(ability), [], []];
     const t = await H.fresh({ hand: [[], []], hp: 800, deck: [['Booby Trap', 'Fighting', 'Wealth', 'ZZ Dummy', 'ZZ Dummy'], ['ZZ Dummy']] });
@@ -73,19 +74,25 @@ const sperren = {
     const r = await t.run(() => t.host.doActivateFreeAbility(t.room, 0, { heroIdx: 0, zoneIdx: 0 }));
     return { t, r };
   }
-  for (const [ab, lv, hand] of [['Navigation', 2, ['Fireball', 'Fireball', 'ZZ Filler']], ['Trapping', 1, []], ['Premonition', 1, []]]) {
-    let x = await frei(ab, lv, null, hand);
-    R.check(`${ab}: Kontrolle ohne Sperre läuft`, x.r === true || x.r === undefined ? (x.t.pile(0, 'discardPile').length > 0 || x.t.pile(0, 'hand').length > 0 || x.t.gs.players[0].surpriseZones[0].length > 0 || (x.t.gs.players[0].deckTopVisible || []).length > 0) : false, { r: x.r });
+  {
+    const x = await frei('Navigation', 2, null, ['Fireball', 'Fireball', 'ZZ Filler']);
+    R.check('Navigation: Kontrolle ohne Sperre läuft', x.t.pile(0, 'discardPile').length > 0 || x.t.pile(0, 'hand').length > 0, { r: x.r });
     for (const [lbl, fn] of Object.entries(sperren)) {
-      x = await frei(ab, lv, fn, hand);
-      const surprise = x.t.gs.players[0].surpriseZones[0].length;
-      R.check(`${ab} unter ${lbl}: nicht aktivierbar, nichts abgeworfen, nichts gelegt, Einmal-Sperre frei`,
-        !x.r && x.t.pile(0, 'discardPile').length === 0 && surprise === 0 && !(x.t.gs.players[0].deckTopVisible || []).length && !x.t.gs.hoptUsed?.[`free-ability:${ab}:0`] && !x.t.gs._spellEndsTurn,
-        { r: x.r, ablage: x.t.pile(0, 'discardPile'), surprise, hopt: x.t.gs.hoptUsed });
+      const y = await frei('Navigation', 2, fn, ['Fireball', 'Fireball', 'ZZ Filler']);
+      R.check(`Navigation unter ${lbl}: nicht aktivierbar, nichts abgeworfen, Einmal-Sperre frei`, !y.r && y.t.pile(0, 'discardPile').length === 0 && !y.t.gs.hoptUsed?.['free-ability:Navigation:0'], { r: y.r, ablage: y.t.pile(0, 'discardPile') });
+      R.check('keine Engine-Fehler', y.t.errors.length === 0, y.t.errors);
+    }
+  }
+  // Trapping / Premonition legen nichts auf die Hand: auch unter Such- und Hand-Sperre aktivierbar (Al 15.10.)
+  for (const ab of ['Trapping', 'Premonition']) {
+    for (const [lbl, fn] of Object.entries(sperren)) {
+      const x = await frei(ab, 1, fn, []);
+      const gelegt = x.t.gs.players[0].surpriseZones[0].length > 0 || (x.t.gs.players[0].deckTopVisible || []).length > 0;
+      R.check(`${ab} unter ${lbl}: weiter aktivierbar (legt nichts auf die Hand)`, gelegt, { r: x.r });
       R.check('keine Engine-Fehler', x.t.errors.length === 0, x.t.errors);
     }
   }
-  // Training: Deck-Option (Lv3: Ability aus dem Deck anlegen) – Mischeffekt (Hand-Option) bleibt aktivierbar
+  // Training: Deck-Option bleibt unter der Such-Sperre aktivierbar
   {
     async function trainingKann(lv, hand, lock) {
       const t = await H.fresh({ hand: [[], []], hp: 800, deck: [['Fighting', 'Wealth', 'ZZ Dummy', 'ZZ Dummy'], ['ZZ Dummy']] });
@@ -94,20 +101,10 @@ const sperren = {
       if (lock) lock(t.gs.players[0]);
       t.gs.activePlayer = 0; t.phase(2);
       const liste = t.engine.getFreeActivatableAbilities(0).filter(e => (e.abilityName || e.cardName || e.name) === 'Training');
-      return { kann: liste.some(e => e.canActivate !== false), t };
+      return liste.some(e => e.canActivate !== false);
     }
-    let x = await trainingKann(3, [], null);
-    R.check('Training Lv3, nur Deck-Option möglich, ohne Sperre: aktivierbar', x.kann === true, x.kann);
-    x = await trainingKann(3, [], sperren['Such-Sperre (Cats)']);
-    R.check('Training Lv3, nur Deck-Option möglich, Such-Sperre: nicht aktivierbar', x.kann === false, x.kann);
-    x = await trainingKann(3, ['Fighting'], sperren['Such-Sperre (Cats)']);
-    R.check('Training Lv3, Hand-Option möglich (Ability auf der Hand), Such-Sperre: weiter aktivierbar (Mischeffekt)', x.kann === true, x.kann);
-    x = await trainingKann(2, ['ZZ Filler'], null);
-    R.check('Training Lv2, nur Deck-Option (Abwurf + Deck), ohne Sperre: aktivierbar', x.kann === true, x.kann);
-    x = await trainingKann(2, ['ZZ Filler'], sperren['Such-Sperre (Cats)']);
-    R.check('Training Lv2, Deck-Option unter Such-Sperre: nicht aktivierbar (kein Abwurf ohne Wirkung)', x.kann === false, x.kann);
-    x = await trainingKann(1, ['Fighting'], sperren['Such-Sperre (Cats)']);
-    R.check('Training Lv1 (nur Hand) unter Such-Sperre: unverändert aktivierbar', x.kann === true, x.kann);
+    R.check('Training Lv3, nur Deck-Option möglich, Such-Sperre: weiter aktivierbar', (await trainingKann(3, [], sperren['Such-Sperre (Cats)'])) === true);
+    R.check('Training Lv2, Deck-Option (Abwurf + Deck), Such-Sperre: weiter aktivierbar', (await trainingKann(2, ['ZZ Filler'], sperren['Such-Sperre (Cats)'])) === true);
   }
 
   // ── j) Shooting Star ──
