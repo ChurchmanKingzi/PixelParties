@@ -12,9 +12,13 @@
 //    your next turn, the next damage ANY Creature
 //    you control would take is reduced by 100.
 //
-//  Shield is stored as _choirShield on this
-//  creature instance and cleared on the
-//  owner's next turn start or when consumed.
+//  ★ W7a (A07-29, Al 14.10.2026): der Schutz ist eine
+//  VERGEBENE Wirkung — er hängt am Spieler
+//  (`ps._kreaturenSchild`, Engine
+//  `_kreaturenSchadenSchilde`) und überlebt Tod,
+//  Frost, Betäubung und Negation des Choir. Er endet
+//  beim nächsten Zugbeginn des Besitzers oder mit
+//  dem ersten geschützten Treffer.
 // ═══════════════════════════════════════════
 
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
@@ -42,15 +46,10 @@ module.exports = {
   },
 
   activeIn: ['support'],
-  // ★ W7a (A07-29, Al 14.10.2026): der gewirkte Schutz ist eine VERGEBENE Wirkung (kein laufender Passiv) und bleibt, auch wenn der
-  // Choir danach gefroren/betäubt/negiert wird. Die Hooks laufen deshalb immer; der Suchtrigger bei der Beschwörung fragt selbst.
-  bypassStatusFilter: true,
-
   // ── On summon: search deck for Summoning Magic + shield hook ──────────────
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
-      if (engine.isCreatureEffectSuppressed(ctx.card, { honorNegStatusImmune: false })) return;   // W7a: stillgelegt -> kein Suchtrigger
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;
@@ -64,47 +63,6 @@ module.exports = {
       if (!confirm) return;
 
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
-    },
-
-    /**
-     * Expire the shield at the start of its owner's turn (if unused).
-     */
-    onTurnStart: async (ctx) => {
-      if (ctx.activePlayer !== ctx.cardOwner) return;
-      if (ctx.card?.counters?._choirShield) {
-        ctx.card.counters._choirShield = false;
-        ctx._engine.sync();
-      }
-    },
-
-    /**
-     * Intercept creature damage batches: if the shield is active, reduce
-     * the first non-cancelled damage entry against a friendly creature by 100.
-     */
-    beforeCreatureDamageBatch: async (ctx) => {
-      const inst = ctx.card;
-      if (!inst?.counters?._choirShield) return;
-
-      const pi = ctx.cardOwner;
-      const entries = ctx.entries;
-      if (!entries || entries.length === 0) return;
-
-      // Find the first non-cancelled entry targeting a creature this player controls
-      for (const entry of entries) {
-        if (entry.cancelled) continue;
-        const entryOwner = entry.inst?.controller ?? entry.inst?.owner;
-        if (entryOwner !== pi) continue;
-
-        // Reduce by 100, minimum 0
-        entry.modifyAmount(-Math.min(100, entry.amount));   // flat (Punkt vor Strich)
-        inst.counters._choirShield = false;
-        ctx._engine.log('choir_shield', {
-          player: ctx.players[pi]?.username,
-          protected: entry.inst.name,
-          reduced: 100,
-        });
-        break;
-      }
     },
   },
 
@@ -146,8 +104,8 @@ module.exports = {
     });
     if (!ok) return false;
 
-    // Activate the shield on this creature instance
-    ctx.card.counters._choirShield = true;
+    // Schutz am SPIELER vergeben (überlebt den Choir; Engine `_kreaturenSchadenSchilde`)
+    (ps._kreaturenSchild = ps._kreaturenSchild || []).push({ by: CARD_NAME, reduce: 100, turn: gs.turn });
     engine.log('choir_shield_active', { player: ps.username });
 
     engine.sync();

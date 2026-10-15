@@ -12759,6 +12759,32 @@ class GameEngine {
   }
 
   /**
+   * ★ W7a (A07-29, Al 14.10.2026: der von Choir erteilte Schutz überlebt den Tod des Choir): VERGEBENE Kreaturen-Schilde
+   * „der nächste Schaden, den eine Kreatur des Spielers nähme, sinkt um X bis zu seinem nächsten Zugbeginn".
+   * Zustand am SPIELER: `ps._kreaturenSchild = [{ by, reduce, turn }]` (`turn` = Zug der Erteilung). Der Schild endet, sobald der
+   * Besitzer seinen nächsten Zug beginnt (`gs.turn > turn` und er ist am Zug) oder beim ersten Treffer auf eine seiner Kreaturen
+   * (erster nicht abgebrochener Eintrag, `modifyAmount` — Punkt vor Strich). Er hängt an keiner Karte und läuft damit auch,
+   * wenn die erteilende Karte gestorben, gefroren, betäubt oder negiert ist. Ablauf lazy beim Lesen.
+   */
+  _kreaturenSchadenSchilde(entries) {
+    for (let p = 0; p < (this.gs.players || []).length; p++) {
+      const ps = this.gs.players[p];
+      const liste = ps?._kreaturenSchild;
+      if (!Array.isArray(liste) || liste.length === 0) continue;
+      const live = liste.filter(s => !(this.gs.turn > s.turn && this.gs.activePlayer === p));
+      if (live.length !== liste.length) { if (live.length) ps._kreaturenSchild = live; else delete ps._kreaturenSchild; }
+      for (const s of live.slice()) {
+        const e = (entries || []).find(x => x && !x.cancelled && x.inst && (x.inst.controller ?? x.inst.owner) === p);
+        if (!e) break;
+        e.modifyAmount(-Math.min(s.reduce, e.amount));   // flat (Punkt vor Strich)
+        ps._kreaturenSchild = ps._kreaturenSchild.filter(x => x !== s);
+        if (!ps._kreaturenSchild.length) delete ps._kreaturenSchild;
+        this.log('creature_shield_used', { player: ps.username, by: s.by, protected: e.inst.name, reduced: s.reduce });
+      }
+    }
+  }
+
+  /**
    * ★ The Fifth Circle of Hell — verbraucht den Stempel „naechster Einzelschaden verdoppelt"
    * (`gs._naechsterEinzelschadenX2 = { turn, owner }`) an einem Schadensereignis: `target` ist
    * der Hook-Kontext des Heldenpfads oder ein Kreaturen-Eintrag (beide tragen `amount`, der
@@ -47892,6 +47918,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       entries,
       _skipReactionCheck: true,
     });
+    this._kreaturenSchadenSchilde(entries);   // W7a (A07-29): vergebene Schilde (Harpyformer Choir) hängen am Spieler, nicht an der Karte
 
     // ── `cannotBeIncreased`, Kreaturenseite (v579) ───────────────────
     // Gegenstueck zur Klammer im Heldenpfad. Ohne sie waere die Regel
