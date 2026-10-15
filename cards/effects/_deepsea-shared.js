@@ -629,6 +629,7 @@ async function tryBouncePlace(ctx) {
   // mit `heldSeite`).
   if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
   newInst.counters._bouncedFromLevel = bouncedLevel;
@@ -918,6 +919,7 @@ async function landeNachBounce(ctx, data) {
   newInst.counters = newInst.counters || {};
   if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
   newInst.counters._bouncedFromName = bouncedName;
   newInst.counters._bouncedFromLevel = bouncedLevel;
@@ -1268,6 +1270,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   newInst.counters = newInst.counters || {};
   if (seite !== pi) engine.markiereSeitenfremd(newInst, pi);   // Styx 28.9.: steht beim Gegner, gehoert `pi`
   newInst.counters.isPlacement = 1;
+  engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
   newInst.turnPlayed = gs.turn || 0;
   // See clearSwapInheritedStatus's docstring — the swapped-in Creature
   // does not inherit negation/freeze/stun/null from its predecessor.

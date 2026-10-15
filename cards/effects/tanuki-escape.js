@@ -10,8 +10,11 @@
 //    have "Rebelliokai" Creatures with different
 //    names in your discard pile back into your
 //    deck (max 3). Then, search your deck for up
-//    to that many cards with different names,
-//    reveal them and add them to your hand.
+//    to that many cards with different names from
+//    each other and from the cards shuffled back
+//    this way (Al, Welle 10, Q40: Text praezisiert,
+//    Ausschliessung der zurueckgemischten Namen
+//    bleibt), reveal them and add them to your hand.
 //    Immediately end your turn afterwards.
 //
 //  ★ W4b (Al, Welle 4): ÜBERHOLT — die Kosten werden jetzt VOR dem Reaktionsfenster bezahlt (`payActivationCost`, siehe unten)

@@ -251,6 +251,7 @@ module.exports = {
       // Track card instance
       const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
       inst.counters.isPlacement = 1;
+      engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
       const ablageExtras = ab ? engine.ablageLandung(inst, ab, 'summon') : {};   // Lethe, SC, Signal
 
       engine.log('placement', { card: creatureName, by: 'Monster in a Bottle', from: creatureSource, heroIdx: hi, zoneSlot: si });

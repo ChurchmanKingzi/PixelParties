@@ -28,8 +28,8 @@
 //      effect.
 //
 //  The summon bypasses school/level requirements
-//  via `actionPlaceCreature` (`countAsSummon:
-//  false` — same Klaus pattern), so a Lv0 host
+//  via `actionPlaceCreature` (Welle 10, Q47: die
+//  Platzierung zaehlt als Beschwoerung), so a Lv0 host
 //  Hero with no Summoning Magic can still drop
 //  a Lv3 Creature here. The negation is applied
 //  on-place and tied to a buff with
@@ -149,8 +149,8 @@ module.exports = {
     if ((ps.supportZones?.[heroIdx]?.[slotNow] || []).length > 0) return false;   // Kosten koennen den Platz belegt haben
 
     // Place — `actionPlaceCreature` bypasses level/school via the
-    // placement code path. `countAsSummon: false` keeps the per-turn
-    // summon tally clean (matches Klaus's place-on-Decay pattern).
+    // placement code path. Welle 10 (Q47): die Platzierung zaehlt als
+    // Beschwoerung dieses Zuges (zentral in `actionPlaceCreature`).
     const res = await engine.actionPlaceCreature(chosenName, pi, heroIdx, slotNow, {
       source: 'hand',
       sourceName: CARD_NAME,

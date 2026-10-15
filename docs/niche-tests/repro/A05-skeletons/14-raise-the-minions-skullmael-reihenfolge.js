@@ -7,6 +7,8 @@
 // Lesart A (Skript): die Karten werden nacheinander gelegt; ein Skelett, das VOR Skullmael landet, bekommt den Bonus nicht.
 // Lesart B: „place them" ist eine gleichzeitige Platzierung → Skullmael ist „kontrolliert", wenn die anderen ankommen; Reihenfolge darf keine Rolle spielen.
 // Beobachtet: Archer>Skullmael → Archer ohne Eile; Skullmael>Archer → Archer mit Eile.
+// ★ W10b (Al, Welle 10, Q31): Lesart A ist gewollt – ein Skelett bekommt den Bonus genau dann, wenn Skullmael beim Platzieren schon auf dem Feld ist.
+//   Repro auf diese Regel umgestellt (Archer zuerst: keine Eile; Skullmael zuerst: Eile). Siehe W10/b-q31.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -19,6 +21,6 @@ const H = require('../../lib/h.js');
     ergebnis[order[0]] = !!(arch && arch.counters._hasHaste);
   }
   R.note('Eile des Archers je Wahlreihenfolge', ergebnis);
-  R.check('Lesart B: Archer bekommt den Skullmael-Bonus unabhängig von der Reihenfolge', ergebnis['Skeleton Archer'] === ergebnis['Skeleton King Skullmael'] && ergebnis['Skeleton Archer'] === true, ergebnis);
+  R.check('Al (Q31): Archer bekommt den Bonus nur, wenn Skullmael schon auf dem Feld ist', ergebnis['Skeleton Archer'] === false && ergebnis['Skeleton King Skullmael'] === true, ergebnis);
   R.finish();
 })();

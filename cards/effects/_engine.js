@@ -14974,7 +14974,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const cd = cardDB[cardName];
     if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) {
-      ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+      this.zaehleBeschwoerung(playerIdx);
       // Guardian Beasts archetype: stamp the per-turn flag so subsequent
       // Guardian Beast summons in the same turn don't claim the
       // first-of-turn additional Action. Centralized here so every
@@ -17625,7 +17625,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die halbe Engine blind (Luna Pele und die Mischief-Militia-Karten
     // lesen deshalb seit jeher beide). Rein additiv: kein bestehender
     // Leser ändert sein Verhalten, wer eines liest, sieht jetzt alles.
-    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target, status: statusName, statusName, opts });
+    await this.runHooks(HOOKS.ON_STATUS_APPLIED, { target, status: statusName, statusName, opts, wasAlreadyActive: !!_vorher });
     return true;
   }
 
@@ -18144,6 +18144,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           target: inst, statusName, status: statusName,
           _onCreature: true,
           opts,
+          wasAlreadyActive: !!already,   // Welle 10 (Q55): Flamebathed zaehlt nur den initialen Burn
           _skipReactionCheck: !!opts?._skipReactionCheck || !!stapel,
         });
       } catch (err) {
@@ -26802,6 +26803,21 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * Der EINE Zaehler „Kreaturen in diesem Zug beschworen/platziert"
+   * (`ps._creaturesSummonedThisTurn`; Reset zu Zugbeginn). Al, Welle 10 (Q47):
+   * „place" ist eine Subform von „summon" — jede Beschwoerung UND Platzierung
+   * zaehlt (Xuanwu, Vullary, Stellin, Klaus, Slimes, Monster in a Bottle,
+   * Selbst-Platzierungen …). Leser: Harpyformer, Aggressive Town Guard, Pawn/Rook
+   * of Kings (`=== 0`), Chaorc Pyre Grill Master (Opfer > beschworen).
+   * Neue Wege, die eine Kreatur aufs Feld bringen und weder `_placeCard` noch
+   * `actionPlaceCreature` benutzen, rufen diesen Helfer.
+   */
+  zaehleBeschwoerung(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (ps) ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
+  }
+
+  /**
    * Generic creature placement primitive. Used by Monster in a Bottle,
    * Barker, Alice, Elixir of Immortality, every Deepsea bounce-place,
    * Dark Deepsea God, etc. Blocks on `ps.summonLocked`. Tracks a fresh
@@ -27028,9 +27044,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
       }
     }
-    if (opts.countAsSummon) {
-      ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
-    }
+    // Al, Welle 10 (Q47, „place ist eine Subform von summon"): JEDE Platzierung
+    // zaehlt als beschworene Kreatur dieses Zuges („erste Kreatur, die du
+    // beschwoerst", Harpyformer/Aggressive Town Guard, Chaorc). `opts.countAsSummon`
+    // wird nicht mehr gelesen (frueher zaehlte nur `true`: Vullary/Stellin/Stellan/
+    // Klaus/Master's Key blieben aussen vor, Xuanwu zaehlte von Hand).
+    this.zaehleBeschwoerung(playerIdx);
 
     // Landung des Hand-Flugs abwarten (v700), bevor Poof und Hooks
     // laufen — sonst feuert z.B. Monamis Draw, waehrend die Karte noch
@@ -46486,6 +46505,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
       delete statusOpts.addStacks; // Clean up
     }
+    const _warAktiv = !!hero.statuses[statusName];   // Welle 10 (Q55): Erneuerung, kein initiales Hinzufuegen
     hero.statuses[statusName] = statusOpts;
     this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx });
     // Surface `animationType` (and the original opts) so absorb-style
@@ -46500,6 +46520,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       target: hero, heroOwner: playerIdx, heroIdx, statusName, status: statusName,
       animationType: opts.animationType || _DEFAULT_STATUS_ANIM_HERO[statusName] || null,
       opts,
+      wasAlreadyActive: _warAktiv,
       _skipReactionCheck: opts._skipReactionCheck || !!stapel,
     });
     this.sync();

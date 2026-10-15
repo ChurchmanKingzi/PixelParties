@@ -50,6 +50,9 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps || (ps.discardPile || []).length === 0) return;
+      // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt den
+      // Einsatz-Effekt (Ablage ins Deck) — nicht angeboten.
+      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, pi)) return;
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Shuffle up to 3 different-named cards from discard back into your deck?'

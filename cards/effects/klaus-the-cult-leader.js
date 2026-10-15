@@ -17,13 +17,12 @@
 //  Creature off the back of any Decay Spell.
 //
 //  The placement is also marked as a placement
-//  (`isPlacement: 1`, `countAsSummon: false`), so
-//  it doesn't tick `_creaturesSummonedThisTurn`
-//  and can therefore be sacrificed by Clausss
-//  (or any other "not summoned this turn" gate)
-//  on a later turn — but NOT this turn, since
-//  `inst.turnPlayed = gs.turn` is still set by
-//  the placement helper.
+//  (`isPlacement: 1`). Welle 10 (Q47): jede Platzierung
+//  zaehlt als Beschwoerung (`_creaturesSummonedThisTurn`),
+//  auch diese. Die Kreatur kann von Clausss (oder jedem
+//  "not summoned this turn"-Gate) erst in einem spaeteren
+//  Zug geopfert werden, da `inst.turnPlayed = gs.turn`
+//  vom Platzierungs-Helfer gesetzt wird.
 // ═══════════════════════════════════════════
 
 const { isSummonablePileCreature, hasCardType } = require('./_hooks');

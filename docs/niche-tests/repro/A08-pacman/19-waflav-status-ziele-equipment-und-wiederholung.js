@@ -10,6 +10,8 @@
 // (b) Aufbau: Waflav-Form direkt aufgestellt, Gegner-Held 0 und Gegner-Kreatur „ZZ Dummy"; derselbe Status zweimal nacheinander.
 //     Beobachtet: Held: beide Male +1 Counter (Gift stapelt auf 2). Kreatur: nur beim ersten Mal +1, beim zweiten +0 (Gift bleibt bei 1 Stapel). Brennen analog.
 // Aufruf: node docs/niche-tests/repro/A08-pacman/19-waflav-status-ziele-equipment-und-wiederholung.js   (✗ = Lesart „Equipment ist kein Ziel" bzw. „Wiederholung zählt gleich" verletzt)
+// ★ W10b (Al, Welle 10, Q55): (a) nur Helden und Creatures sind Ziele (Ausrüstung/Tokens nicht); (b) Gift zählt jeden neuen Stapel, Burn nur das initiale Hinzufügen
+//   (Helden und Kreaturen gleich). Repro umgestellt/ergänzt (siehe W10/b-q55).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -41,9 +43,11 @@ const H = require('../../lib/h.js');
     const c = t.put(1, 0, 0, D); c.turnPlayed = 1;
     const dH = [], dC = [];
     for (let i = 0; i < 2; i++) { const e0 = evo(); await t.run(() => t.engine.addHeroStatus(1, 0, st, { appliedBy: 0, duration: 1 })); dH.push(evo() - e0); }
-    for (let i = 0; i < 2; i++) { const e0 = evo(); await t.run(() => t.engine.applyCreatureStatus(c, st, { sourceOwner: 0 })); dC.push(evo() - e0); }
+    // W10b: ein NEUER Gift-Stapel läuft in der Engine immer mit addStacks (ohne addStacks lehnt der Kreaturen-Pfad ab: Harness-Fehler)
+    for (let i = 0; i < 2; i++) { const e0 = evo(); await t.run(() => t.engine.applyCreatureStatus(c, st, { sourceOwner: 0, ...(st === 'poisoned' ? { addStacks: true, stacks: 1 } : {}) })); dC.push(evo() - e0); }
     R.note(`${form}: Held ${dH}, Kreatur ${dC}`);
     R.check(`${form}: zweite Anwendung zählt bei Held und Kreatur gleich`, (dH[1] > 0) === (dC[1] > 0), { dH, dC });
+    R.check(`${form}: Al (Q55): Gift zählt jeden neuen Stapel, Burn nur das initiale Hinzufügen`, st === 'poisoned' ? (dH[1] === 1 && dC[1] === 1) : (dH[1] === 0 && dC[1] === 0), { dH, dC });
   }
   R.finish();
 })();

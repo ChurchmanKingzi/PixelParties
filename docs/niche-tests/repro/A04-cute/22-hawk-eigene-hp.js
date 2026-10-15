@@ -6,6 +6,7 @@
 // Beobachtet (3 verschiedene Cycles auf dem Brett): der erste Hawk bleibt bei 100 HP (`onCardEnterZone` ignoriert den eigenen Eintritt: "ignore our own entry"),
 //   ein später beschworener zweiter Hawk wird vom ersten auf 200 verdoppelt; eine Cute Bunny (20) → 40 ✓.
 // Frage an Al: Soll Hawk bei der eigenen Beschwörung (Stufe 3 liegt schon) selbst verdoppelt werden – ja oder nein?
+// ★ W10b (Al, Welle 10, Q26: Nein, das sollte nicht direkt ihn selbst zählen): der erste Hawk bleibt bei 100, der zweite wird vom ersten verdoppelt (200). Repro umgestellt (siehe W10/b-q26).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -18,6 +19,6 @@ const H = require('../../lib/h.js');
   const hawks = t.inst(c => c.name === 'Lunatic Hawk' && c.zone === 'support').sort((a, b) => a.zoneSlot - b.zoneSlot);
   const maxHp = hawks.map(h => h.counters.maxHp ?? 100);
   R.note('maxHp der beiden Hawks (erster, zweiter)', maxHp);
-  R.check('beide Hawks haben gleich viele HP', maxHp[0] === maxHp[1], maxHp);
+  R.check('Al (Q26): erster Hawk 100 (nicht selbst verdoppelt), zweiter vom ersten verdoppelt (200)', maxHp[0] === 100 && maxHp[1] === 200, maxHp);
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });

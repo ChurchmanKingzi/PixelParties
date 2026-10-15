@@ -50,18 +50,13 @@ const ANIM_TYPE = 'bomblebee_fuse';
 // still re-fired by Fuse. We pass `bypassHopt: true` through to the
 // per-Bomblebee payload below to honor that.
 //
-// Time Bomblebee is EXCLUDED here. Unlike the other three Bomblebees,
-// its trigger has no immediate payoff (it just stacks a Bomb Counter
-// that detonates at the start of the opponent's turn) — re-firing it
-// through Fuse, then immediately destroying it as part of Fuse's
-// "defeat all affected" clause, would erase the counter and produce
-// zero effect. Fuse only makes sense for Bomblebees with an immediate
-// damage payload. If Time is the player's only (or only living)
-// Bomblebee, Fuse is grayed out by `spellPlayCondition` returning
-// false from this same set.
+// Time Bomblebee is INCLUDED (Al, Welle 10, Q29b): sie bekommt ueber das simulierte
+// Gegner-Tod-Ereignis einen Bomb Counter und wird beim abschliessenden "Defeat all
+// affected" wegen ihres eigenen "cannot take damage or be defeated" (solange sie
+// Counter traegt) NICHT zerstoert. (Frueher ausgeschlossen: Zaehler waere mit dem
+// Besiegen verloren gegangen.)
 function eligibleBomblebees(engine, pi) {
-  const all = findOwnBomblebees(engine, pi);
-  return all.filter(inst => inst.name !== 'Time Bomblebee');
+  return findOwnBomblebees(engine, pi);
 }
 
 async function runEffect(engine, pi) {
@@ -98,20 +93,15 @@ async function runEffect(engine, pi) {
   }
 
   // "Defeat all affected 'Bomblebee' Creatures afterwards." Time
-  // Bomblebee with active Bomb Counters carries _damageDestroyImmune,
-  // which would normally block actionDestroyCard. The card text says
-  // ALL affected Bomblebees die, so we clear the flag immediately
-  // before destruction. Counters die with the inst — leftover
-  // bombCounters don't matter post-destroy.
+  // Bomblebee mit Bomb Counters traegt _damageDestroyImmune ("cannot take
+  // damage or be defeated"): actionDestroyCard laesst sie stehen — Al, Welle 10
+  // (Q29b): gewollt, sie ueberlebt und behaelt den frisch erhaltenen Counter.
   const source = { name: CARD_NAME, owner: pi };
   // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
   engine.beginDestroyScope(targets.length);
   try {
     for (const inst of targets) {
       if (inst.zone !== 'support') continue;
-      if (inst.counters?._damageDestroyImmune) {
-        delete inst.counters._damageDestroyImmune;
-      }
       await engine.actionDestroyCard(source, inst, { fireCreatureDeath: true });
     }
   } finally { engine.endDestroyScope(); }
