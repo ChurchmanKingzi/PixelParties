@@ -36993,6 +36993,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    *     Cloudy / shields / Anti Magic / etc.
    *   • Strip the buff so it only fires once.
    *
+   * Welle 13 (Q138): nur bei EXAKT einem Ziel — nicht in einer Mehrziel-Klammer
+   * mit 2+ Zielen (ausser Ketten, die mit einem Ziel beginnen: Ricochet).
+   *
    * Mutates the passed hookCtx-shape object directly (works for both
    * the hero-damage hookCtx and the creature-damage proxy).
    */
@@ -37005,6 +37008,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typeof srcOwner !== 'number' || typeof srcHi !== 'number' || srcHi < 0) return;
     const srcHero = this.gs.players[srcOwner]?.heroes?.[srcHi];
     if (!srcHero?.buffs?.empowered_strike) return;
+
+    // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
+    // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
+    // es!"): Ein Flaechenschlag mit 2+ Zielen in der Mehrziel-Klammer
+    // (`_multiHitScope`, Whirlwind Strike & Co.) loest den Buff weder aus noch
+    // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
+    // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
+    const _mh = this._multiHitScope;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
 
     hookCtx.amount = (hookCtx.amount || 0) + 100;
     hookCtx.cannotBeReduced = true;
@@ -37036,9 +37048,6 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ░░░ CONTRACT: AoE / multi-target damage MUST batch its targets ░░░
    *
    * Any card that delivers damage to 2+ targets in a single resolution
-   * Welle 13 (Q138): nur bei EXAKT einem Ziel — nicht in einer Mehrziel-Klammer
-   * mit 2+ Zielen (ausser Ketten, die mit einem Ziel beginnen: Ricochet).
-   *
    * — whether selected by the caster (Chain Lightning, Bottled
    * Lightning), declared by the script (Cataclysm, Carpet Bomblebee,
    * The Spawn Mother), or composed across heroes + creatures
@@ -37052,15 +37061,6 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Spectral Armor, Bamboo Shield, Homerun!, Cloud in a Bottle,
    * Invisibility Cloak, and any future shield/reaction card following
    * the same pattern. Per-target damage paths (`actionDealDamage`,
-    // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
-    // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
-    // es!"): Ein Flaechenschlag mit 2+ Zielen in der Mehrziel-Klammer
-    // (`_multiHitScope`, Whirlwind Strike & Co.) loest den Buff weder aus noch
-    // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
-    // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
-    const _mh = this._multiHitScope;
-    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
-
    * `actionDealCreatureDamage`) DO NOT invoke this hub — they only
    * fire the per-target windows (`isPreDamageReaction`,
    * `isAfterDamageReaction`, `isCreaturePreDamageReaction`). Without
@@ -41006,6 +41006,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async beginAoeStrike(zielzahl, opts = {}) {
     const scope = this.beginMultiHit(zielzahl);
+    if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
     // `creatures` nimmt rohe Instanzen ODER `{inst, amount, type}` —
     // Karten mit abgestuftem Schaden (Chain Lightning) sollen nicht
     // einen erfundenen Einheitsbetrag melden muessen.
@@ -41049,7 +41050,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     return !!ps && ps._missionLockTurn === this.gs.turn;
   }
 
-    if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
   /**
    * Wie viele Mission-Ladungen sind noch offen?
    * Fuehrend ist der SPIELERZAEHLER (`_missionCharges`) — er ueberlebt
