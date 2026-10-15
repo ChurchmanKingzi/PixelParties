@@ -4695,7 +4695,7 @@ function sendGameState(room, playerIdx, extra) {
       // Skript jede Aktion verbietet — der Client zeigt dafuer ein
       // Abzeichen. Abgeleitet, nie gespeichert (kein Puzzle-Editor-Feld).
       actionBlockedHeroes: room.engine
-        ? (ps.heroes || []).map((h, hi) => !!(h?.name && h.hp > 0 && !room.engine.canHeroPerformAction(pi, hi)))
+        ? (ps.heroes || []).map((h, hi) => !!(h?.name && h.hp > 0 && !room.engine.canHeroPerformAction(pi, hi, { ohneStatus: true })))   // W13 (Q137): Abzeichen nur für Plant Golem & Co., nicht für Frost/Betäubung
         : [],
       // Als Vorgabe 29.9.: eine verdeckte Surprise sieht ihr KARTENBESITZER
       // (`originalOwner`) — auch auf der Gegenseite (gesetzt am geliehenen
@@ -10967,6 +10967,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     // flag take the standard free Main-Phase activation path (no
     // bookkeeping below).
     const isActionCost = !!chosen.script.heroEffectActionCost;
+    // ★ Welle 13 (Al, Q137): ein gefrorener/betäubter Held (außer Karian) kann keine Aktion durch irgendetwas verbrauchen – auch nicht unter Chilly Dog.
+    if (isActionCost && !room.engine.canHeroPerformAction(heroOwner, heroIdx)) return false;
     // Action-locking effects (Treasure Hunter's Backpack et al.) block
     // Action plays. Free hero-effect activations skip this check (they
     // aren't "Actions"); action-cost activations DO consume an Action,

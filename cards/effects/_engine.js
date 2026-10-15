@@ -20817,7 +20817,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // keine Handkarten an — sie werden im Client wie Frozen/Stunned
       // ausgegraut, und Karten, die nur solche Helden als Nutzer
       // haetten, sind in der Hand komplett grau.
-      if (!this.canHeroPerformAction(playerIdx, hi)) { own[hi] = playable; continue; }
+      if (!this.canHeroPerformAction(playerIdx, hi, { ohneStatus: true })) { own[hi] = playable; continue; }   // W13 (Q137): Frost/Betäubung steht oben (`heroParalyzed`)
 
       // Pre-load hero script and equip scripts for per-card checks
       const heroScript = this.heroScript(hero);
@@ -21748,7 +21748,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Action" rule). Generic — any Hero script may export
     // `canPerformAction(gs, pi, hi, engine)` and the engine honors it
     // here at the Spell/Attack/Creature server-side validation point.
-    if (!this.canHeroPerformAction(heroOwner, heroIdx)) return null;
+    if (!this.canHeroPerformAction(heroOwner, heroIdx, { ohneStatus: true })) return null;   // W13 (Q137): Frost/Betäubung behandelt diese Prüfung oben selbst
 
     // Generic per-player Spell lock — set by cards that declare themselves
     // "the only Spell you play this turn" (Eraser Beam). Cleared at turn
@@ -45161,10 +45161,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Returns true when the Hero is allowed to act. Defaults to true
    * for Heroes without the hook.
    */
-  canHeroPerformAction(playerIdx, heroIdx) {
+  canHeroPerformAction(playerIdx, heroIdx, opts = {}) {
     const ps = this.gs?.players?.[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return true;
+    // ★ Welle 13 (Al, Q137): „andere Heroes können gar keine Actions durch *irgendwas* konsumieren, wenn sie Frozen/Stunned sind!" (Karian ist
+    // wegen seines Effekts die Ausnahme: `ignoresHaltStatuses`). Zentral an der Stelle, die jeder Action-Verbrauch befragt: Ability-Aktionen
+    // (Adventurousness), Heldeneffekte mit Action-Kosten (Zi, Champion …), Zusatzaktions-Güsse. Auch ein Chilly Dog ändert das nicht
+    // („but Frozen Heroes still can't perform Actions"). `opts.ohneStatus`: die Aufrufer, die Frost/Betäubung schon selbst (mit ihren
+    // Ausnahmen für Platzieren und `canPlayDespiteStatuses`) behandeln – `validateActionPlay` und die Spielbarkeitslisten.
+    if (!opts.ohneStatus) {
+      const st = hero.statuses;
+      if ((st?.frozen || st?.stunned || st?.webbed) && hero.hp > 0 && !this.heroIgnoresHaltStatuses(playerIdx, heroIdx)) return false;
+    }
     // v640: Support-Karten in den Zonen dieses Helden koennen seine
     // Aktionen sperren (`blocksHostHeroActions: true` — Plant Golem:
     // „The corresponding Hero cannot perform Actions"). Negierte und
