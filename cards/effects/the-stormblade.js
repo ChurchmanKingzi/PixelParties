@@ -117,6 +117,10 @@ async function sturmzyklus(engine, pi, anlass, klingenSeite) {
   if (!ps) return false;
   // ★ Leere Hand → gar kein Ausloesen (Als Ruling).
   if ((ps.hand || []).length === 0) return false;
+  // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt den eigenen
+  // Zyklus („action"); der erzwungene Zyklus des Treffers („hit", „must shuffle")
+  // ist keine Aktivierung des Crystal-Halters und bleibt.
+  if (anlass === 'action' && require('./_crystals-shared').shuffleIntoDeckBlocked(engine, pi)) return false;
 
   // Re-Entranz-Riegel: der Zyklus zieht Karten, und Ziehen kann
   // seinerseits Effekte ausloesen, die den Helden treffen. Ohne den

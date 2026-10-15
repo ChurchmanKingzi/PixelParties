@@ -55,6 +55,9 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps || (ps.hand || []).length === 0) return;
       if (ps.handLocked) return; // can't draw → effect would be pointless
+      // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt den Ausloeser
+      // (Hand ins Deck mischen) — nicht angeboten, kein Auftritt.
+      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, pi)) return;
 
       inst.counters._crescentBusy = true;
       try {
