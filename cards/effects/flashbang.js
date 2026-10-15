@@ -165,6 +165,10 @@ module.exports = {
       if (armedTurn !== gs.turn) return;
       // Only the target's own actions count.
       if (ctx.playerIdx !== targetIdx) return;
+      // ★ Welle 13 (Al, Q133): „Nein, absolut nicht. Nur Attacks, Spells, Creatures (inklusive 'place') sowie Effekte wie Adventurousness oder
+      // Zi, die explizit eine Action kosten (also auch nicht JEDER aktive Hero-Effekt!)." — `onAnyActionResolved` ist Sammelpunkt auch für Tränke
+      // ('potion') und Normal-Artefakte ('artifact'), die keine Aktion sind; Heldeneffekte melden den Haken nur, wenn sie eine Aktion kosten.
+      if (!['attack', 'spell', 'creature', 'ability_activation', 'hero_effect'].includes(ctx.actionType)) return;
 
       // Disarm immediately so a chain of recursive onActionUsed events
       // (e.g. additional actions, follow-up plays in the same handler)
