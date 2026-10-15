@@ -3,8 +3,10 @@
 // Kartentext Demon: „At the end of each of your turns, place a Demon Counter on this Creature."
 // Kartentext Teddy: „You may use that Creature's active effects as if you controlled it for the rest of the turn."
 // Aufbau: Sitz 0: Lovely Teddy (alt); Sitz 1: Horned Demon (alt) mit 2 Demon Countern. Sitz 0 leiht den Demon (Teddy), dann endet der Zug von Sitz 0.
-// Erwartung: Teddy leiht nur AKTIVE Effekte; „each of YOUR turns" des Demons sind die Züge von Sitz 1 → Zähler bleibt 2.
+// Alte Erwartung: Teddy leiht nur AKTIVE Effekte; „each of YOUR turns" des Demons sind die Züge von Sitz 1 → Zähler bleibt 2.
 // Beobachtet: Zähler = 3 – der Leiher füttert am Ende seines eigenen Zuges den Demon des Gegners.
+// ENTSCHIEDEN (Al, Welle 11, Q82): „Ja, er bekommt Counter am Ende der Runde seines aktuellen Beherrschers" -> Ist-Zustand (Zähler 3) ist KORREKT.
+//   Repro in Welle 11 auf die neue Regel umgestellt (Erwartung 3 statt 2); die Absicherung steht in W11/c-q82-*.
 // Ursache: Teddy benutzt actionStealCreature (voller Kontrollwechsel bis Zugende, CARD_API „Lovely Teddy"); der Hook horned-demon.js onTurnEnd
 //   prüft `ctx.isMyTurn` gegen den (geliehenen) Kontrolleur → feuert für den Leiher. Gilt für jeden passiven Hook geliehener Kreaturen.
 const H = require('../../lib/h.js');
@@ -19,7 +21,7 @@ const H = require('../../lib/h.js');
   R.check('Teddy hat den Demon geliehen (Kontrolle Sitz 0)', r === true && demon.controller === 0, [r, demon.controller]);
   await t.endTurn();
   R.check('Demon ist wieder bei Sitz 1', (demon.controller ?? demon.owner) === 1, demon.controller);
-  R.check('Zugende des LEIHERS legt keinen Zähler auf die Gegner-Kreatur (erwartet 2)', demon.counters.demonCounter === 2, demon.counters.demonCounter);
+  R.check('Zugende des Leihers (aktueller Beherrscher) legt einen Zähler: 2 -> 3 (Q82)', demon.counters.demonCounter === 3, demon.counters.demonCounter);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
