@@ -174,4 +174,15 @@ function heroAgiert(hero) {
   return !(st.frozen || st.stunned || st.webbed || st.bound || st.negated);
 }
 
-module.exports = { canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert };
+/**
+ * ★ Welle 12 (Al, Rueckfrage 1 / Sandy Blob): „Nein, nur explizit On-Summon-Effekte triggern Blob." Hat der KARTENTEXT einer Kreatur einen
+ * On-Summon-Effekt? Wortlaut: „When you summon/play this Creature …", „When this Creature is summoned/played …" (auch „… from your discard pile",
+ * „… via an effect", „… with the effect of X"). Ein technischer `onPlay`-/`beforeSummon`-Haken im Skript ohne solchen Text (Kosten, Zusatzaktion,
+ * Aktiv-Effekt, Surprise-Aktivierung) ist KEIN On-Summon-Effekt. Der Text ist die Quelle: `engine._getCardDB()[name].effect`.
+ */
+const ON_SUMMON_TEXT = /\b(?:when|whenever)\b[^.:]*\b(?:you (?:summon|play) this (?:creature|card)|this (?:creature|card) (?:is|gets|was) (?:summoned|played))/i;
+function hatOnSummonText(cd) {
+  return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
+}
+
+module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert };
