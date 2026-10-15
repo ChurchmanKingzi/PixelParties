@@ -377,7 +377,7 @@ function _hasCaster(gs, pi, engine) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     if (engine?._canHeroActivateSurprise?.(pi, hi, CARD_NAME)) return true;
     if (engine?.heroMeetsLevelReq?.(pi, hi, cardData)) return true;
   }

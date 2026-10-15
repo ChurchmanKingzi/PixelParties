@@ -50,7 +50,7 @@ module.exports = {
       const hi = tgt.heroIdx;
       const hero = ps.heroes?.[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
 
       // Must meet Shield's own level req (Magic Arts Lv1)
       if (!engine.heroMeetsLevelReq(pi, hi, amsData)) continue;

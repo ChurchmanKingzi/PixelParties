@@ -52,7 +52,7 @@ function wirkenderHeld(gs, pi, engine) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const h = ps.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+    if (h.statuses?.frozen || h.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     if (engine.heroMeetsLevelReq(pi, hi, cd)) return hi;
   }
   return -1;

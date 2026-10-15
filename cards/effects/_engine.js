@@ -38018,7 +38018,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ★ HAND-REAKTION: WER CASTET? — EINE Auslegung (v619, Als Regel 29.8.)
    *
    * Reaction-ATTACKS, -SPELLS und -CREATURES aus der Hand brauchen einen
-   * castenden Helden: lebend, nicht Frozen/Stunned/Negated, der Schule
+   * castenden Helden: lebend, nicht Frozen/Stunned (Welle 13: Negated sperrt nicht mehr, die harte Form begrenzt auf Stufe 0), der Schule
    * UND Level der Karte erfuellt (Wisdom zaehlt; `spellInHand`, weil
    * die Karte beim Cast die Hand verlaesst). Reaction-Creatures brauchen
    * zusaetzlich eine freie Support Zone (im Helfer enthalten).
@@ -38111,10 +38111,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.surpriseKontrolleur(playerIdx, heroIdx) !== reaktor) return false;
     } else if (this.heroSideOf(playerIdx, hero) !== playerIdx) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) return false;
-    // v619 (Als Regel 29.8.): ein NEGIERTER Held castet keine Reaktion —
-    // jede Form der Negation, auch die Effekt-Only-Variante des
-    // Weakening Crystal. Gilt fuer Surprises UND Hand-Reaktionen.
-    if (hero.statuses?.negated) return false;
+    // v619 (Als Regel 29.8.): ein NEGIERTER Held castete keine Reaktion — ★ Welle 13 (Al, A2) aufgehoben: „Ein Held, der *nur* seinen
+    // Effekt negiert hat, darf ganz normal beschwören. Sind seine *Abilities* negiert, ist er auf Lv 0 beschränkt, genau wie bei anderen
+    // Beschwörungen auch." Die leichte Form (`effectOnly`) aktiviert Surprises/Hand-Reaktionen also normal; bei der harten Form
+    // (Abilities negiert) bleibt nur Stufe 0 ohne Schule — das erledigt `heroMeetsLevelReq` unten. Frozen/Stunned/Webbed sperren wie bisher.
 
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
@@ -39882,7 +39882,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const st = hero.statuses || {};
     if (st.frozen) return 'frozen';
     if (st.stunned || st.webbed) return 'stunned';
-    if (st.negated) return 'negated';
+    // ★ Welle 13 (Al, A2): nur die HARTE Negierung (Abilities weg) hindert den Wirker; ein bloss effekt-negierter Held handelt normal.
+    if (st.negated && this.heroAbilityLevelsBlanked(owner, heroIdx)) return 'negated';
     return null;
   }
 

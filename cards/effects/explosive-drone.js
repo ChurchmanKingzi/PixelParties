@@ -53,12 +53,13 @@ function beschwoerbareZonen(engine, pi) {
 // `_canHeroActivateSurprise` kennt nur die eigene Spalte — fuer den
 // uebernommenen Helden dieselben Kernpruefungen an der physischen Adresse.
 function darfUeberHeld(engine, pi, feld, hi) {
-  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME);
+  // W13 (Al, A2): dieselbe Prüfung wie jede Beschwörung (`canHeroSummon`): Frozen/Stunned/Webbed/Bound sperren, `negated` nicht.
+  if (feld === pi) return engine._canHeroActivateSurprise(pi, hi, CARD_NAME) && !engine.gs.players[pi]?.heroes?.[hi]?.statuses?.bound;
   if (engine._reaktionGesperrt(pi)) return false;
   const hero = engine.gs.players[feld]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return false;
   const st = hero.statuses || {};
-  if (st.frozen || st.stunned || st.webbed || st.negated) return false;
+  if (st.frozen || st.stunned || st.webbed || st.bound) return false;   // W13 (Al, A2): `negated` sperrt nicht mehr (harte Form: Stufe über `heroMeetsLevelReq`)
   return engine.heroMeetsLevelReq(feld, hi, engine._getCardDB()[CARD_NAME], { levelSourcePi: pi });
 }
 

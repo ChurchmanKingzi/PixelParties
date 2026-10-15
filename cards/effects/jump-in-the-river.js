@@ -50,7 +50,7 @@
 function heroCanUseJump(gs, ps, heroIdx, engine, reaktor = null) {
   const hero = ps.heroes[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
+  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
 
   // Per-hero cooldown: can't use if used on the previous opponent turn.
   // Opponent turns are 2 game-turns apart (A→B→A→B…).

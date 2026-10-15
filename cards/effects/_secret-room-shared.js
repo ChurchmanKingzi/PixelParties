@@ -121,12 +121,12 @@ async function place(engine, o) {
   return inst;
 }
 
-/** Darf der Held jetzt „reagieren" wie bei einer Surprise? (lebend, nicht Frozen/Stunned/Webbed/Negated, keine Reaktionssperre) */
+/** Darf der Held jetzt „reagieren" wie bei einer Surprise? (lebend, nicht Frozen/Stunned/Webbed — Welle 13: Negated sperrt nicht mehr —, keine Reaktionssperre) */
 function heldDarfReagieren(engine, seite, heroIdx, reaktor) {
   if (engine._reaktionGesperrt && engine._reaktionGesperrt(reaktor)) return false;
   const hero = engine.gs.players[seite]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed || hero.statuses?.negated) return false;
+  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed) return false;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
   return true;
 }
 

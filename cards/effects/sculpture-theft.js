@@ -65,8 +65,7 @@ module.exports = {
       if (engine.heroMeetsLevelReq(pi, hi, cardData)
           && (ps.heroes[hi]?.hp > 0)
           && !ps.heroes[hi].statuses?.frozen
-          && !ps.heroes[hi].statuses?.stunned
-          && !ps.heroes[hi].statuses?.negated) return true;
+          && !ps.heroes[hi].statuses?.stunned) return true;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     }
     return false;
   },
