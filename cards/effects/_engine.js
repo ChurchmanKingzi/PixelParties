@@ -8694,6 +8694,20 @@ class GameEngine {
       }
       return { dealt: 0, cancelled: true };
     }
+    // ── Continent Corruptor: Giftschaden heilt stattdessen (Welle 11, Q56) ──
+    // Al: „Die Giftheilung heilt den vollen Wert, inklusive Paraseed-Boni." Die Karte
+    // storniert nicht mehr im eigenen Hook (dort kannte sie die Auren der Held-Nachbarn
+    // je nach Heldenreihenfolge noch nicht), sondern markiert `_poisonHealsInstead`;
+    // geheilt wird hier mit dem ENDBETRAG aller beforeDamage-Hooks (reihenfolgefrei).
+    // Bewusst ohne `onPoisonHealedInstead` (Paraseed-Max-HP-Zuwachs ist Sache des Tranks).
+    if (type === 'poison' && !hookCtx.cancelled && target?.hp !== undefined
+        && hookCtx._poisonHealsInstead && target.hp > 0) {
+      const proj = this._projectedAmount(hookCtx);
+      const betrag = Math.max(0, (proj !== undefined ? proj : hookCtx.amount) || 0);
+      this.log('poison_heal_instead', { target: this._heroLabel(target), amount: betrag, by: hookCtx._poisonHealsInstead?.name });
+      if (betrag > 0) await this.actionHealHero(hookCtx._poisonHealsInstead, target, betrag);
+      return { dealt: 0, cancelled: true };
+    }
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
     // ── Anti Magic immunity ──

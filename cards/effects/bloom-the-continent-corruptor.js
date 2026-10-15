@@ -148,14 +148,14 @@ module.exports = {
 
       // (a) Trifft es mich selbst? Dann wird geheilt statt geschadet.
       // Nie bei 0 HP: Heilung wuerde einen gefallenen Helden zurueckholen.
+      // Welle 11 (Q56, Al): die Heilung enthaelt den VOLLEN Wert inklusive aller Paraseed-
+      // Auren (Maniacal +50 je Paraseed, Continent +100 — auch meine eigene). Deshalb
+      // wird hier nicht mehr storniert, sondern markiert; die Engine heilt nach allen
+      // beforeDamage-Hooks mit dem Endbetrag (Heldenreihenfolge ohne Einfluss).
       if (ziel === selbst) {
         if (selbst.hp <= 0) return;
-        const betrag = ctx.amount;
-        ctx.setAmount(0);
-        ctx.cancel();
-        if (betrag > 0) {
-          await engine.actionHealHero(ctx.card, selbst, betrag);
-        }
+        if (countParaseedsOnHero(engine, ctx.cardHeroOwner, ctx.cardHeroIdx) > 0) ctx.modifyAmount(AURA_BONUS);
+        ctx.setFlag('_poisonHealsInstead', ctx.card);
         return;
       }
 
