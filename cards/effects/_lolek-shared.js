@@ -24,9 +24,37 @@ const ASCEND_TARGET = 'Lolek, Mender of the Shattered Trident';
 const TRIDENT_NAME  = 'Shattered Trident, Treasure of the Deepsea';
 const HELMET_NAME   = 'Diver Helmet';
 
-/** Halber Preis, aufgerundet — wie „Spirit of the Shattered Trident" es ausschreibt. */
-function halfCost(cd) {
-  return Math.ceil((cd?.cost || 0) / 2);
+/**
+ * Aktuell WIRKSAMER Preis einer Ablage-Karte (Welle 13, Q125, Al: „Den aktuellen").
+ * Wie `kopierKosten` (Future Tech Copy Device): Grundpreis mit Rusting-Crystal-
+ * Verdopplung minus `selfCostReduction` der Karte (Laser Cannon: −20 je Kopie in
+ * der Ablage); die gewaehlte Kopie selbst verlaesst die Ablage und zaehlt nicht mit
+ * (Ruling 21.8.). BEWUSST nicht dabei: handindizierte Rabatte und einmalige
+ * Gutscheine fuers SPIELEN einer Handkarte (Shu'Chaku, Misfire, Dajan).
+ */
+function wirksamerPreis(engine, pi, name, cd) {
+  const { applyRustingCrystalCostMultiplier } = require('./_crystals-shared');
+  const { loadCardEffect } = require('./_loader');
+  cd = cd || engine._getCardDB()[name];
+  let kosten = applyRustingCrystalCostMultiplier(engine.gs, pi, name, cd?.cost || 0, engine);
+  let sk = null;
+  try { sk = loadCardEffect(name); } catch { sk = null; }
+  if (typeof sk?.selfCostReduction !== 'function') return Math.max(0, kosten);
+  const ps = engine.gs.players[pi];
+  const idx = (ps?.discardPile || []).lastIndexOf(name);
+  const probe = idx >= 0 ? engine.takeFromPileSync(ps, 'discard', idx, { source: 'Lolek' }) : null;
+  try {
+    kosten -= (sk.selfCostReduction(engine.gs, pi, cd, engine) || 0);
+  } catch { /* eine defekte Rabattrechnung darf die Karte nicht sperren */ } finally {
+    if (probe) engine.returnToPile(ps, 'discard', name, idx);
+  }
+  return Math.max(0, kosten);
+}
+
+/** Halber Preis, aufgerundet — wie „Spirit of the Shattered Trident" es ausschreibt. Mit `engine`/`pi`: vom wirksamen Preis (Q125), sonst vom gedruckten. */
+function halfCost(cd, engine, pi) {
+  const preis = (engine && cd?.name) ? wirksamerPreis(engine, pi, cd.name, cd) : (cd?.cost || 0);
+  return Math.ceil(preis / 2);
 }
 
 /**
