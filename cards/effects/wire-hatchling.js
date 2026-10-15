@@ -21,6 +21,10 @@
 //    Randfall aus der Aufrundung: ein Ziel mit 1 HP nimmt 1 und stirbt.
 //    Alles darueber ueberlebt rechnerisch — halbieren toetet nicht.
 //
+//  • ★ W12 (Al, Q86): die Zielwahl ist PFLICHT (`cancellable: false`) — „Sobald er in einer Zone liegt, MUSS man ein
+//    Ziel waehlen, man kommt da nicht raus." Es gibt keinen Abbruch und damit auch keine Rücknahme der Beschwörung;
+//    gibt es kein legales Ziel, fizzelt der Effekt sichtbar (`summonEffektFizzelt`, nicht stumm).
+//
 //  • Schadenstyp `creature`: der Schaden kommt vom Effekt einer
 //    Kreatur, nicht von einem Zauber oder Angriff.
 //
@@ -56,9 +60,10 @@ module.exports = {
         description: "Deal damage equal to half the target's current HP (rounded up).",
         confirmLabel: '⚡ Half it!',
         confirmClass: 'btn-danger',
-        cancellable: true,
+        cancellable: false,   // W12 (Al, Q86/C05-09): Pflichtwahl - liegt der Hatchling in einer Zone, MUSS man ein Ziel waehlen
       });
-      if (!ziel) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // W12 (Q86): gibt es gar kein legales Ziel, FIZZELT der Effekt sichtbar; die Beschwoerung wird nie zurueckgenommen.
+      if (!ziel) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { playerIdx: ctx.cardOwner });
 
       // Der Wert wird ERST JETZT genommen.
       let betrag = 0;
