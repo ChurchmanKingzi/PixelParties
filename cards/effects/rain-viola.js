@@ -7,6 +7,10 @@
 //   and add it to your hand. You can only activate this effect of
 //   "Rain Viola" once per turn."
 //
+//  Welle 12 (Q95, Al): Die Suche gehoert IMMER dem Spieler, dessen Held
+//  mit der Viola ausgeruestet war (Kontrolleur des Helden) — egal, wem
+//  die Viola selbst gehoert (am Gegner-Helden sucht der Gegner).
+//
 //  Ausloeser wie bei den Geschwistern (`_orchestra-shared`). Suche per
 //  Galerie ueber alle Attacks/Spells im Deck, dann
 //  `actionAddCardFromDeckToHand` mit `reveal: true` (Flug, Reveal fuer
