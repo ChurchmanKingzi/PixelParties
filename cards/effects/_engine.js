@@ -3660,8 +3660,21 @@ class GameEngine {
         // die beiden Fenster darueber behalten damit ihre bisherige
         // Reihenfolge, und eine Karte, die hier zerstoert, tut das erst,
         // nachdem alle anderen den Neuzugang gesehen haben.
-        await this._checkSurpriseOnPlacement(
-          this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner, enteringCard, 'support');   // Styx 28.9.: nach Kontrolle
+        // Al, Welle 9 (Q23): entscheidend ist, WER die Karte anlegt, nicht in
+        // wessen Zone. Eine Cross-Side-Ausruestung (Control Device, Powder Keg:
+        // `placesOnOpponentBoard`) liegt auf der Gastgeberseite (`controller`/
+        // `owner` = Gastgeber), angelegt hat sie ihr urspruenglicher Besitzer.
+        let _platzierer = this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner;   // Styx 28.9.: nach Kontrolle
+        if (loadCardEffect(enteringCard.counters?._effectOverride || enteringCard.name)?.placesOnOpponentBoard) {
+          // `originalOwner` steht beim Powder Keg erst NACH den Hooks (server.js/powder-keg.js
+          // stempeln nach dem Setzen) — davor gilt der Gastgeber; dann ist der Anleger sein Gegner.
+          _platzierer = (enteringCard.originalOwner != null && enteringCard.originalOwner !== enteringCard.owner)
+            ? enteringCard.originalOwner : this.opponentOf(enteringCard.owner);
+          // Fruehzeitig stempeln (die Aufrufer setzen denselben Wert danach noch einmal):
+          // die Surprise schickt die Karte sonst in die Ablage des Gastgebers.
+          enteringCard.originalOwner = _platzierer;
+        }
+        await this._checkSurpriseOnPlacement(_platzierer, enteringCard, 'support');
       }
       if (enteringCard && toZone === 'ability') {
         // Styx 28.9.: Anleger = Kontrolleur des Helden (uebernommen: der

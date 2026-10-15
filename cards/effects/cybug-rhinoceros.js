@@ -12,6 +12,9 @@
 //
 //  Mechanics
 //  ─────────
+//   • Al, Welle 9 (Q23): zählt, WER die Karte anlegt — auch eine
+//     Cross-Side-Ausrüstung des Gegners (Control Device, Powder Keg) in
+//     die eigene Support Zone des Besitzers löst aus.
 //   • Auslöser: `surprisePlacementTrigger`, das NEUE Fenster
 //     `_checkSurpriseOnPlacement`. Es ist das breiteste der
 //     Platzierungs-Fenster und musste eigens gebaut werden:
@@ -95,7 +98,9 @@ module.exports = {
     const inst = sourceInfo?.cardInstance;
     if (!inst) return null;
     if (inst.zone !== 'support' && inst.zone !== 'area') return null;
-    if ((inst.controller ?? inst.owner) === pi) return null;   // nur Gegnerkarten
+    // Nur Gegnerkarten: entscheidend ist, wer die Karte anlegt (Al, Welle 9, Q23) —
+    // eine Cross-Side-Ausruestung des Gegners (Control Device) liegt in MEINER Zone.
+    if ((sourceInfo.placerIdx ?? inst.controller ?? inst.owner) === pi) return null;
 
     // Kosten ZUERST. Ist die Kopie zwischenzeitlich weg, scheitert die
     // Aktivierung sauber und die Karte bleibt liegen.
