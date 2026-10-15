@@ -10710,6 +10710,47 @@ class GameEngine {
   }
 
   /**
+   * ★ W13 (Q144, Al: „Es soll *jeden* Nicht-Schaden-Effekt blocken!") — EIN Prüfer für
+   * „dieser Nicht-Schaden-Effekt würde den Helden betreffen — wirkt er?".
+   *
+   * Resistance („The first card or effect every turn that would affect this Hero, except
+   * damage, doesn't affect it" / Lv3: alle) sitzt als Listener am Hook `beforeHeroEffect`.
+   * Statuswege (`onStatusApplied`), Heilung, Buff setzen/entfernen und Charme feuern ihn
+   * schon; DIESER Helfer ist die Form für alle übrigen Wege, die einen Helden ohne Status
+   * ändern (Max-HP-Gewinn: Life Serum, Future Tech Doping, Divine Gift of Sacrifice;
+   * Entfernen aus dem Spiel: Teleportation Powder; Ability-Abwurf durch fremde Effekte;
+   * dauerhafte Kontrolle: Paraseed Control). Jeder neue „Karte/Effekt verändert einen
+   * Helden, kein Schaden"-Weg fragt ihn vor der Zustandsänderung und lässt es bei `true` sein:
+   *
+   *   if (await engine.heroNonDamageEffectBlocked(owner, heroIdx, 'max_hp', { sourceOwner: pi })) return;
+   *
+   * Der Helfer fragt NUR; die Animation des Effekts läuft vorher (Regel „Immunitäten
+   * blocken Effekte, nie Animationen"). Kosten, die der Kontrolleur des Helden selbst
+   * zahlt (Ability-Abwurf als Kosten, Opfer), sind KEIN Effekt auf den Helden und fragen
+   * nicht. Ruht Resistance (Frost/Betäubung/Abilities negiert), blockt sie nichts.
+   * @param {number} heroOwner  Brettseite des Helden
+   * @param {number} heroIdx
+   * @param {string} effectType 'max_hp' | 'remove_from_game' | 'ability_discard' | 'control' | …
+   * @param {object} [opts]     { sourceOwner, source, amount }
+   * @returns {Promise<boolean>} true = der Effekt wirkt NICHT
+   */
+  async heroNonDamageEffectBlocked(heroOwner, heroIdx, effectType, opts = {}) {
+    const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    const ctx = {
+      playerIdx: heroOwner, heroIdx, hero, effectType, cancelled: false, _skipReactionCheck: true,
+      ...(opts.sourceOwner != null ? { sourceOwner: opts.sourceOwner } : {}),
+      ...(opts.source ? { source: opts.source } : {}),
+      ...(opts.amount != null ? { amount: opts.amount } : {}),
+    };
+    await this.runHooks(HOOKS.BEFORE_HERO_EFFECT, ctx);
+    if (ctx.cancelled) {
+      this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || null });
+    }
+    return !!ctx.cancelled;
+  }
+
+  /**
    * Increase a hero's max HP (and optionally current HP) by the given amount.
    * Respects hero.maxHpCapped — if set, max HP cannot exceed that value.
    * @param {object} hero - The hero object
@@ -26849,6 +26890,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!hero?.name) return false;
     if (hero.permaControlBy === newControllerPi) return false;
     if (newControllerPi === this.heroSideOf(heroOwnerPi, hero)) return false;
+    // W13 (Q144): dauerhafte Kontrolle ist ein Nicht-Schaden-Effekt auf den Helden (Resistance).
+    if (await this.heroNonDamageEffectBlocked(heroOwnerPi, heroIdx, 'control', { sourceOwner: newControllerPi, source: opts.sourceName })) return false;
 
     hero.permaControlBy = newControllerPi;
     hero.permaControlFrom = heroOwnerPi;
@@ -42194,6 +42237,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ownerIdx = eintrag.owner;
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
+
+    // ── W13 (Q144): ein EFFEKT wirft eine Ability eines Helden ab (`opts.effectOnHero`, z. B. Cybug LADYBUG) →
+    // Resistance & Co. fragen. Kosten (Weapon Storm, Quest …) sind kein Effekt auf den Helden und setzen es nicht;
+    // Mehrfach-Abwuerfe EINES Effekts (Memory Wipe) fragen einmal auf Kartenebene, nicht je Ability.
+    if (opts.effectOnHero === true && eintrag.zoneKind !== 'support' && ps.heroes?.[eintrag.heroIdx]?.name
+        && await this.heroNonDamageEffectBlocked(ownerIdx, eintrag.heroIdx, 'ability_discard', { sourceOwner: opts.sourceOwner, source: opts.source })) {
+      return false;
+    }
 
     // ── Support-Zone: die Karte wandert als Ganzes ──
     if (eintrag.zoneKind === 'support') {

@@ -7,8 +7,16 @@
 //  Lv2: Block the first 2 statuses/effects per turn.
 //  Lv3: Block ALL statuses/effects (permanent).
 //
-//  "Except damage" — only status application is
-//  intercepted, not HP/ATK changes from damage.
+//  "Except damage" — Welle 13 (Q144, Al: „Es soll *jeden*
+//  Nicht-Schaden-Effekt blocken!"): Resistance fängt JEDEN
+//  Nicht-Schaden-Effekt auf den Träger ab — Status, Heilung,
+//  Buffs, Max-HP-Gewinn (Life Serum), Entfernen aus dem Spiel
+//  (Teleportation Powder), fremden Ability-Abwurf, dauerhafte
+//  Kontrolle. Alle Wege fragen den Hook `beforeHeroEffect`
+//  (Status: `onStatusApplied`); neue Wege über den zentralen
+//  Prüfer `engine.heroNonDamageEffectBlocked(...)`.
+//  Schaden bleibt unberührt. Welle 7 gilt weiter: Resistance
+//  ruht bei Frost/Betäubung/„Abilities negiert".
 //
 //  Block counter tracked on gs._resistanceBlocks
 //  (keyed by "playerIdx:heroIdx") and reset each

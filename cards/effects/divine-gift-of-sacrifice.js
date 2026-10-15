@@ -170,6 +170,11 @@ async function doSacrifice(engine, pi, opfer) {
   await engine._delay(400);
 
   // Step 6: Increase current and max HP
+  // W13 (Q144): Resistance blockt den Max-HP-Gewinn (zentraler Pruefer; Opfer und Animation sind schon passiert).
+  if (await engine.heroNonDamageEffectBlocked(pi, buffTarget.heroIdx, 'max_hp', { sourceOwner: pi, source: 'Divine Gift of Sacrifice', amount: opfer.maxHp })) {
+    engine.sync();
+    return true;
+  }
   engine.increaseMaxHp(buffHero, opfer.maxHp);
 
   engine.log('divine_gift_sacrifice', {
