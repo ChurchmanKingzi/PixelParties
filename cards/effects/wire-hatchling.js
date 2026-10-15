@@ -60,7 +60,7 @@ module.exports = {
         description: "Deal damage equal to half the target's current HP (rounded up).",
         confirmLabel: '⚡ Half it!',
         confirmClass: 'btn-danger',
-        cancellable: false,   // W12 (Al, Q86/C05-09): Pflichtwahl - liegt der Hatchling in einer Zone, MUSS man ein Ziel waehlen
+        cancellable: false,   // pflichtwahl: Al (Q86/C05-09) - liegt der Hatchling in einer Zone, MUSS man ein Ziel waehlen, man kommt da nicht raus
       });
       // W12 (Q86): gibt es gar kein legales Ziel, FIZZELT der Effekt sichtbar; die Beschwoerung wird nie zurueckgenommen.
       if (!ziel) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { playerIdx: ctx.cardOwner });
