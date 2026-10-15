@@ -6,6 +6,7 @@
 // Erwartung (Lesart: zwei getrennte Schadensinstanzen derselben Kreatur): Salve 1 = 150, Antwort = 50 (kein zweiter Bonus).
 // Beobachtet: Salve 1 = 150, Antwort = 100 – beide Salven teilen EIN Quell-Literal (`const source` in `onCreatureEffect`), Angler erkennt die zweite Salve als „weiteren Treffer derselben gleichzeitigen Instanz".
 // Ursache: cards/effects/assault-eagle.js `const source = { name, owner: pi, heroIdx }` (Z. ~122) wird in `schlagen()` für BEIDE Salven benutzt; angler-angel.js `darfErhoehen` (`quelle._anglerInstanz === turn`).
+// ★ Welle 11 (Q71, Al: „Angler Angel verstärkt explizit alle Treffer eines Effekts, der mehrere Ziele gleichzeitig trifft, inklusive beider Salven von Assault Eagle"): die Antwort-Salve bekommt den Bonus ebenfalls – Erwartung hier umgestellt auf 100 (50 + 50).
 // Stufe C: ob die Antwort-Salve (vom Gegner gewählt, nach Pause) noch zur „gleichen" Schadensinstanz zählt, ist Auslegungssache.
 const H = require('../../lib/h.js');
 (async () => {
@@ -22,7 +23,7 @@ const H = require('../../lib/h.js');
   const salve1 = 1000 - feind.counters.currentHp, antwort = 1000 - meine.counters.currentHp;
   R.note('Schaden', { salve1, antwort });
   R.check('Salve 1 = 150 (100 + Angler 50)', salve1 === 150, salve1);
-  R.check('Antwort-Salve = 50 (nur die erste Schadensinstanz wird erhöht)', antwort === 50, antwort);
+  R.check('Antwort-Salve = 100 (50 + Angler 50, beide Salven zählen als ein Effekt)', antwort === 100, antwort);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

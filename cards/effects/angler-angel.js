@@ -44,6 +44,14 @@
 //     gleichzeitig. Dort werden Eintraege mit derselben Quelle
 //     zusammengefasst, egal welcher Art das Quellobjekt ist.
 //
+//  ── WELLE 11 (Q71/Q81, Al) — JEDER Treffer eines Mehrfachziel-Effekts ─
+//  „Angler Angel verstaerkt explizit alle Treffer eines Effekts, der mehrere Ziele *gleichzeitig* trifft, inklusive beider
+//   Salven von Assault Eagle, da diese technisch gesehen alle gleichzeitig durch denselben Effekt ausloesen."
+//  Die Quellen-Identitaet reicht dafuer nicht (Helden werden mit der CardInstance getroffen, Kreaturen mit je einem neuen
+//  Literal): die Treffer einer Mehrfachtreffer-Klammer (`engine._multiHitScope`) bzw. einer Effekt-Gruppe (`engine._anglerGruppe`,
+//  Assault Eagle: beide Salven) teilen sich die Entscheidung. Sequenzielle Einzeltreffer (Elven Leader, 3-Headed Giant) bleiben
+//  beim Ruling 20.8.: nur der erste Schlag.
+//
 //  ── Zwei Hooks, weil es zwei Schadenswege gibt ────────────────────
 //  Helden laufen ueber `beforeDamage`, Kreaturen ueber
 //  `beforeCreatureDamageBatch` — dasselbe Paar wie bei Minocrete War
@@ -162,13 +170,23 @@ function darfErhoehen(engine, traeger, quelle, pi) {
 
   const turn = engine.gs.turn;
   let erlaubt;
+  // ★ Welle 11 (Q71/Q81, Al: „Angler Angel verstärkt explizit alle Treffer eines Effekts, der mehrere Ziele *gleichzeitig* trifft,
+  // inklusive beider Salven von Assault Eagle"): gleichzeitig = innerhalb derselben Mehrfachtreffer-Klammer (`beginAoeStrike` /
+  // `beginMultiHit`: aoeHit, dealDamageToTargets, Jiggles, Land Sharks, Eagle …) oder derselben Effekt-Gruppe (`engine._anglerGruppe`,
+  // Eagle: beide Salven). Der erste Treffer bucht die Rundensperre und merkt den Schluessel an der Klammer; jeder weitere Treffer
+  // derselben Kreatur in dieser Klammer — auch mit CardInstance als Quelle (`ctx.dealDamage`) — ist ebenfalls erhoeht.
+  const schluessel = budgetSchluessel(engine, quelle);
+  const klammern = [engine._multiHitScope, engine._anglerGruppe].filter(Boolean);
   if (!istInstanzObjekt(quelle) && quelle._anglerInstanz === turn) {
     // Weiterer Treffer DERSELBEN gleichzeitigen Instanz.
     erlaubt = true;
-  } else if (engine.claimHOPT(budgetSchluessel(engine, quelle), pi)) {
+  } else if (klammern.some(k => k._anglerGebucht?.has(schluessel))) {
+    erlaubt = true;
+  } else if (engine.claimHOPT(schluessel, pi)) {
     erlaubt = true;
     // Nur Literale markieren — siehe `istInstanzObjekt`.
     if (!istInstanzObjekt(quelle)) quelle._anglerInstanz = turn;
+    for (const k of klammern) (k._anglerGebucht || (k._anglerGebucht = new Set())).add(schluessel);
   } else {
     erlaubt = false;
   }
