@@ -178,6 +178,20 @@ module.exports = {
       engine.sync();
       await engine._delay(300);
 
+      // ★ Welle 9 (Al, 15.10.2026, A01-pollution-26): Gold und Zusatzaktion NUR, wenn die Kreatur tatsächlich besiegt wurde.
+      // Überlebt sie (Golden Wings, Warrior of Teocuilatl, Cardinal-Immunität …), gibt es weder Gold noch Zusatzaktion;
+      // der Token ist bezahlt und die Karte verbraucht. „Besiegt" = die Instanz steht nicht mehr im Support.
+      const besiegt = !engine.cardInstances.includes(inst) || inst.zone !== 'support';
+      if (!besiegt) {
+        engine.log('goldify', {
+          player: gs.players[pi].username,
+          creature: inst.name, level: creatureLevel,
+          gold: 0, additionalAction: false, survived: true,
+        });
+        engine.sync();
+        return;
+      }
+
       // ── Gold gain ──
       if (goldGain > 0) {
         await engine.actionGainGold(pi, goldGain);
