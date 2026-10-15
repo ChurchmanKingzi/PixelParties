@@ -5,6 +5,7 @@
 // Lesart A (wörtlich): die zweite Kopie ist ein „anderes Artefakt" der ersten ⇒ Kosten 30 (nicht gestapelt: nicht 60).
 // Lesart B (Engine heute): der Kristall zählt nie auf sich selbst/Kopien ⇒ 15.
 // Beobachtet: 2 Kopien, 15 Gold ⇒ die Kopie wird gespielt (Gold 0). Lesart A würde sie ablehnen.
+// ★ Welle 11 (Q58, Al: „2 Kopien machen einander teurer“): Lesart A ist verbindlich; Repro prüft jetzt 15 Gold = abgelehnt, 30 Gold = gespielt (Kosten 30).
 // Aufruf: node docs/niche-tests/repro/A08-pacman/27-rusting-crystal-zweite-kopie.js   (✗ = Lesart A verletzt)
 const H = require('../../lib/h.js');
 (async () => {
@@ -14,5 +15,9 @@ const H = require('../../lib/h.js');
   const r = await t.play(0, 'Rusting Crystal', {});
   R.note('zwei Kopien, 15 Gold', JSON.stringify({ play: r, gold: t.gs.players[0].gold, hand: t.pile(0, 'hand') }));
   R.check('zwei Kopien: die zweite verdoppelt die Kosten der ersten (15 Gold reichen nicht)', r === false, { play: r, gold: t.gs.players[0].gold });
+  const t2 = await H.fresh({ hand: [[], []], gold: [30, 100] });
+  t2.engine.handZugangSync(0, 'Rusting Crystal'); t2.engine.handZugangSync(0, 'Rusting Crystal');
+  const r2 = await t2.play(0, 'Rusting Crystal', {});
+  R.check('zwei Kopien, 30 Gold: gespielt, Kosten 30', r2 === true && t2.gs.players[0].gold === 0, { play: r2, gold: t2.gs.players[0].gold });
   R.finish();
 })();

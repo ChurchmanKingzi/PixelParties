@@ -16,8 +16,10 @@
 //     `applyRustingCrystalCostMultiplier(gs, pi,
 //     cardName, baseCost, engine)` in server.js.
 //     The helper short-circuits when:
-//       (a) `cardName === 'Rusting Crystal'` — the
-//           Crystal's own cost is never doubled;
+//       (a) `cardName === 'Rusting Crystal'` and it is the
+//           only copy in hand — Welle 11 (Q58, Al: „2 Kopien
+//           machen einander teurer"): with two copies each
+//           counts as the other's "other Artifact" (cost 30);
 //       (b) no Rusting Crystal in the hand;
 //       (c) Big Gwen Guard suppression is active.
 //     Idempotent — multiple Rusting Crystals still

@@ -193,11 +193,18 @@ function shuffleIntoDeckBlocked(engine, pi) {
  * @param {object} [engine]  Für die Big-Gwen-Guard-Unterdrückung
  * @returns {number}
  */
-function applyRustingCrystalCostMultiplier(gs, pi, cardName, baseCost, engine) {
-  if (!cardName || cardName === RUSTING_CRYSTAL) return baseCost;
+function applyRustingCrystalCostMultiplier(gs, pi, cardName, baseCost, engine, opts) {
+  if (!cardName) return baseCost;
   const ps = gs?.players?.[pi];
   if (!ps) return baseCost;
-  if (!(ps.hand || []).includes(RUSTING_CRYSTAL)) return baseCost;
+  // Welle 11 (Q58, Al: „2 Kopien machen einander teurer"): ein Rusting Crystal ist fuer
+  // jede ANDERE Kopie auf der Hand ein „anderes Artefakt" — bei zwei Kopien kosten beide
+  // das Doppelte (30). Die Karte selbst zaehlt nie auf sich (Kopie in der Hand = Anzahl >= 2);
+  // `opts.fremdeKarte` (Copy Device nimmt die Identitaet an, liegt aber nicht als Kristall in der Hand)
+  // zaehlt jede Kopie auf der Hand. „Does not stack with itself" bleibt: immer nur ×2.
+  const kopien = (ps.hand || []).filter(n => n === RUSTING_CRYSTAL).length;
+  const noetig = (cardName === RUSTING_CRYSTAL && !opts?.fremdeKarte) ? 2 : 1;
+  if (kopien < noetig) return baseCost;
   if (engine && selfRevealEffectsSuppressed(engine, pi)) return baseCost;
   return baseCost * 2;
 }
