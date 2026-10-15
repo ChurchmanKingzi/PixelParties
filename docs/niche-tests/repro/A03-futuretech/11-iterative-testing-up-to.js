@@ -5,6 +5,8 @@
 // Beobachtet: Nach der Wahl der Handkarte werden automatisch `min(2, Kopien im Deck)` Karten gesendet (cards/effects/iterative-testing.js:103
 //   `wieViele = Math.min(MAX_SENDS, …)`); es gibt keine Abfrage 0/1/2. Zum Vergleich: Mysterious Core („up to 3“) lässt den Spieler abbrechen.
 // Frage an Al: Soll bei „up to 2“ gewählt werden dürfen, wie viele Kopien (1 oder 2) gesendet werden – ja oder nein?
+// ENTSCHIEDEN (Al, Welle 9, Q17): Der Spieler wählt 1 oder 2 (nur eine Kopie im Deck: Default 1 ohne Rückfrage; CPU: Höchstzahl). Dieses Repro prüft, dass eine Anzahl-Abfrage kommt;
+//   die Einzelfälle stehen in W9/b-q17-up-to-anzahlwahl.js.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();

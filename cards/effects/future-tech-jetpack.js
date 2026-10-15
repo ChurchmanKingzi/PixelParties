@@ -7,8 +7,9 @@
 //   number of \"Future Tech Jetpack\" cards in your discard pile."
 //
 //  ── Der Ausweicher ──
-//  Mit leerer Ablage schützt sie gegen NICHTS (Stufe ≤ 0 trifft nur
-//  stufenlose Angriffe), mit drei Kopien gegen fast jeden Angriff. Nur
+//  Mit leerer Ablage schützt sie gegen Stufe-0-Attacken (0 ≤ 0; Al,
+//  Welle 9, Q18: gleiche Zählweise wie Escape Device), mit drei Kopien
+//  gegen fast jeden Angriff. Nur
 //  gegen ATTACKEN — Zauber und Karteneffekte kommen weiter durch, das
 //  ist der Preis gegenüber Escape Device.
 //
@@ -58,6 +59,7 @@ module.exports = {
     // Der Schutz gehoert dem Besitzer der Jetpack — das ist der Held,
     // an dem sie haengt.
     const kopien = zaehleInAblage(gs, info.heroOwner, CARD_NAME);
-    return (src.level || 0) <= kopien && kopien > 0;
+    // Al, Welle 9 (Q18): auch bei 0 Kopien gilt „Stufe ≤ Anzahl“ (0 ≤ 0).
+    return (src.level || 0) <= kopien;
   },
 };

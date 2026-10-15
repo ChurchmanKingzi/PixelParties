@@ -31,7 +31,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
-const { heroHasCuteWings } = require('./_cute-shared');
+const { heroHasCuteWings, isCuteCreatureCard } = require('./_cute-shared');
 
 const CARD_NAME = 'Army of the Cute';
 
@@ -45,7 +45,7 @@ function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
   if (!cd || !isSummonablePileCreature(cd, cd.name)) return false;
   // W5b-B3 (Al, Welle 5): „You can only control 1 …" gilt auch beim Platzieren – schon kontrolliert = nicht wählbar.
   if (engine?.nurEinerSchonKontrolliert?.(pi, cd.name)) return false;
-  if (cd.archetype === 'Cute') return true;
+  if (isCuteCreatureCard(cd)) return true;   // Name zaehlt (Al, Welle 9, Q24)
   return heroIdx != null && heroIdx >= 0 && heroHasCuteWings(engine, hs, heroIdx);
 }
 

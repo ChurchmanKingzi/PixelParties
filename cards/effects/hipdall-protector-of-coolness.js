@@ -133,6 +133,7 @@ module.exports = {
 //   • Negated Heroes can summon ONLY Lv-0 Creatures (matches the
 //     general rule for Negated — only Lv-0 cards bypass).
 //   • Hero must have at least one free Support Zone.
+//   • Hero must meet the Creature's level requirement ("summon", Q25).
 async function summonFromStack(engine, pi, cardName) {
   const ps = engine.gs.players[pi];
   if (!ps) return { aborted: true, reason: 'no_player' };
@@ -147,6 +148,11 @@ async function summonFromStack(engine, pi, cardName) {
     if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
     if (hero.statuses?.negated && !isLv0) continue;
     if (engine._isHeroMummified?.(pi, hi)) continue;
+    // ★ Al, Welle 9 (Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei
+    // 'place' nicht." Hipdall/Swagdri/Wildur werden vom Coolness Stack
+    // BESCHWOREN — der Held braucht die Stufe (Wildur Lv1: Summoning Magic 1).
+    // (Glorious Rebirth „Place that Creature" bleibt ohne Stufe.)
+    if (cd && !engine.heroMeetsLevelReq(pi, hi, cd)) continue;
     const slots = ps.supportZones?.[hi] || [];
     let leftmostFree = -1;
     for (let si = 0; si < slots.length; si++) {
