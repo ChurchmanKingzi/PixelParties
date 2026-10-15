@@ -109,6 +109,14 @@ module.exports = {
           if (!script.canActivateCreatureEffect(probe)) return;
         } catch { return; }
       }
+      // Welle 10 (Al, Q46 / A06-rebelliokai-35: „Der Effekt sollte gar nicht erst angeboten werden, wenn er kein legales Ziel hat!"):
+      // hat der Ratgeber-Effekt kein legales Ziel (`hasLegalTargetForOffer`), gibt es kein Angebot und keine Zahlung.
+      if (typeof script.hasLegalTargetForOffer === 'function') {
+        try {
+          const probe2 = engine._createContext(summoned, {});
+          if (!script.hasLegalTargetForOffer(probe2)) return;
+        } catch { return; }
+      }
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',

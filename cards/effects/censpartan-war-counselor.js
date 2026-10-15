@@ -47,6 +47,7 @@ const {
   controlledWarCounselors,
   istEigenerAbgang,
   makeSingletonCanSummon,
+  waehlbareKreaturen,
 } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Censpartan War Counselor';
@@ -132,6 +133,12 @@ module.exports = {
     const mine = controlledCreatures(engine, pi).length;
     const theirs = controlledCreatures(engine, oppIdx).length;
     return theirs > mine;
+  },
+
+  // Welle 10 (Al, Q46): Angebote ausserhalb der normalen Aktivierung (War Council Gathering Place) nur mit mindestens einer wählbaren gegnerischen Kreatur.
+  hasLegalTargetForOffer(ctx) {
+    const engine = ctx._engine;
+    return waehlbareKreaturen(engine, ctx.cardOwner, engine.opponentOf(ctx.cardOwner)).length > 0;
   },
 
   async onCreatureEffect(ctx) {

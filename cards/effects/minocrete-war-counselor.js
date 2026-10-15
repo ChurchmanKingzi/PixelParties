@@ -42,6 +42,7 @@ const {
   WC,
   isWarCounselorCreatureName,
   makeSingletonCanSummon,
+  waehlbareKreaturen,
 } = require('./_war-counselor-shared');
 
 const { loadCardEffect } = require('./_loader');
@@ -96,6 +97,24 @@ module.exports = {
     }
     for (const inst of (engine.cardInstances || [])) {
       if (inst?.zone === 'support' && engine.damageTakenThisTurn(inst.counters) > 0) return true;
+    }
+    return false;
+  },
+
+  // Welle 10 (Al, Q46): Angebote ausserhalb der normalen Aktivierung (War Council Gathering Place) nur mit einem WÄHLBAREN Ziel, das diesen Zug schon
+  // Schaden genommen hat (Helden sind immer wählbar; Kreaturen unter den harten Wahl-Schutzfiltern nicht).
+  hasLegalTargetForOffer(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    for (const p of engine.gs.players) {
+      for (const hero of (p.heroes || [])) {
+        if (hero?.name && hero.hp > 0 && engine.damageTakenThisTurn(hero) > 0) return true;
+      }
+    }
+    for (let o = 0; o < engine.playerCount(); o++) {
+      for (const t of waehlbareKreaturen(engine, pi, o)) {
+        if (engine.damageTakenThisTurn(t.cardInstance.counters) > 0) return true;
+      }
     }
     return false;
   },

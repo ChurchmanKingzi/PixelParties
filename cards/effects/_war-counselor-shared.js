@@ -110,7 +110,24 @@ function istEigenerAbgang(ctx) {
   return !!ctx._onlyCard && ctx._onlyCard.id === inst.id;
 }
 
+/**
+ * ★ Welle 10 (Al, Q46 / A06-rebelliokai-35): vom Spieler `chooserPi` WÄHLBARE Kreaturen, die `ownerIdx` kontrolliert — dieselben harten
+ * Wahl-Schutzfilter wie im Zielfenster (`untargetable_all`, `untargetable_by_opponent`, Board-of-Kings-Deckung/`guardsCreatureChoice`).
+ * Für „wird der Effekt überhaupt angeboten?" (War Council Gathering Place); die weichen Schutz-Formen (Perfect Disguise: „ausser einziges Ziel") bleiben außen vor.
+ */
+function waehlbareKreaturen(engine, chooserPi, ownerIdx) {
+  return engine.getCreatureTargets(ownerIdx).filter((t) => {
+    const inst = t.cardInstance;
+    if (!inst || inst.faceDown) return false;
+    if (inst.counters?.untargetable_all) return false;
+    if (inst.counters?.untargetable_by_opponent && inst.counters.untargetable_by_opponent_pi === chooserPi) return false;
+    if (typeof engine._boardGuardsCreatureChoice === 'function' && engine._boardGuardsCreatureChoice(inst, chooserPi)) return false;
+    return true;
+  });
+}
+
 module.exports = {
+  waehlbareKreaturen,
   WC,
   istEigenerAbgang,
   isWarCounselorName,
