@@ -199,6 +199,7 @@ module.exports = {
             && c.heroIdx === z.heroIdx && c.zoneSlot === z.slotIdx))
           .filter(Boolean),
         source: attackSource, amount: atk, type: 'attack', sourceOwner: pi,
+        ersterTrefferEinzel: true,   // Welle 13 (Q138): Elixir of Strength feuert am ersten Treffer (initial genau ein Ziel)
       });
       try {
         for (const ziel of kette) {

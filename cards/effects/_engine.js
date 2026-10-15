@@ -8816,12 +8816,9 @@ class GameEngine {
     }
 
     // Elixir of Strength rider — primed +100 unstoppable damage on the
-    // buffed Hero's next single-target Attack hit. Fires on the first
-    // 'attack' damage instance from the source hero, then consumes the
-    // buff. The buff stays on multi-target attacks long enough to
-    // boost only the first hit; the user accepted this approximation
-    // since strictly "only fire if the attack hits exactly 1 target"
-    // would require deferring the boost past AFTER_SPELL_RESOLVED.
+    // buffed Hero's next single-target Attack hit (Welle 13, Q138: Mehrziel-
+    // Flaechenschlaege mit 2+ Zielen in der Klammer feuern nicht, siehe
+    // `_applyEmpoweredStrikeIfApplicable`).
     this._applyEmpoweredStrikeIfApplicable(hookCtx);
 
     // ── Carris, the Time Keeper (v1444, neuer Text Al 26.9.) ─────────
@@ -36996,6 +36993,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ░░░ CONTRACT: AoE / multi-target damage MUST batch its targets ░░░
    *
    * Any card that delivers damage to 2+ targets in a single resolution
+   * Welle 13 (Q138): nur bei EXAKT einem Ziel — nicht in einer Mehrziel-Klammer
+   * mit 2+ Zielen (ausser Ketten, die mit einem Ziel beginnen: Ricochet).
+   *
    * — whether selected by the caster (Chain Lightning, Bottled
    * Lightning), declared by the script (Cataclysm, Carpet Bomblebee,
    * The Spawn Mother), or composed across heroes + creatures
@@ -37009,6 +37009,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Spectral Armor, Bamboo Shield, Homerun!, Cloud in a Bottle,
    * Invisibility Cloak, and any future shield/reaction card following
    * the same pattern. Per-target damage paths (`actionDealDamage`,
+    // Welle 13 (Q138, Al: „Nur bei exakt einem Ziel. Aber: Ricochet z.B. trifft
+    // initial *exakt ein Ziel*, bevor die Attacke sich fortsetzt, *da* funktioniert
+    // es!"): Ein Flaechenschlag mit 2+ Zielen in der Mehrziel-Klammer
+    // (`_multiHitScope`, Whirlwind Strike & Co.) loest den Buff weder aus noch
+    // verbraucht er ihn. Ketten, die mit EINEM Ziel beginnen (Ricochet:
+    // `ersterTrefferEinzel`), feuern am ersten Treffer; danach ist der Buff weg.
+    const _mh = this._multiHitScope;
+    if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
+
    * `actionDealCreatureDamage`) DO NOT invoke this hub — they only
    * fire the per-target windows (`isPreDamageReaction`,
    * `isAfterDamageReaction`, `isCreaturePreDamageReaction`). Without
@@ -40997,6 +41006,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return !!ps && ps._missionLockTurn === this.gs.turn;
   }
 
+    if (opts.ersterTrefferEinzel) scope.ersterTrefferEinzel = true;   // Welle 13 (Q138): Kette beginnt mit genau einem Ziel (Ricochet)
   /**
    * Wie viele Mission-Ladungen sind noch offen?
    * Fuehrend ist der SPIELERZAEHLER (`_missionCharges`) — er ueberlebt
