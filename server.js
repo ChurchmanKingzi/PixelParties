@@ -8164,6 +8164,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
     additionalConsumed = true;
   }
+  // ★ Welle 9 (Al, 15.10.2026, A02-deepsea-36): Zusatzaktion in der Action Phase bei NOCH FREIER Hauptaktion (Idej Muras, Wolflesia …) ist gratis —
+  // sie zählt nicht als Aktion der Phase und beendet sie nicht (Gegenstück zu `additionalIsFree` in `doPlayCreature`). Die ZWEITE Aktion
+  // (`isSecondActionGrant`) bleibt die Aktion selbst.
+  const _spellAddlFree = additionalConsumed && isActionPhase && !actionAlreadyUsed
+    && !!room.engine._additionalActionTypes?.[matchedAddlType] && !room.engine._additionalActionTypes[matchedAddlType].isSecondActionGrant;
 
   // Stash the final inherent/non-inherent disposition of this play so
   // card scripts can read it from inside their onPlay handler. True iff
@@ -8188,7 +8193,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // the counter and the bonus-action slot.
   let actionCounterIncrementedHere = false;
   let bonusMainActionsConsumedHere = false;
-  if (isActionPhase && !isReactionSubtype) {
+  if (isActionPhase && !isReactionSubtype && !_spellAddlFree) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
     actionCounterIncrementedHere = true;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
@@ -8961,7 +8966,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // den oben fuer DIESES Spiel gesetzten Zaehler wieder zuruecknehmen.
       ps._actionsPlayedThisPhase = Math.max(0, (ps._actionsPlayedThisPhase || 0) - 1);
     }
-    if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance) {
+    if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance && !_spellAddlFree) {
       // Only `isSecondActionGrant` providers gate the post-action-2
       // advance. Generic additional-action providers (Friendship,
       // Wolflesia, Lizbeth, etc.) are designed for Main Phase use and
@@ -9878,7 +9883,12 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const usingAdditional = !!additionalTypeId;
   // ★ Zusatzaktions-Typ mit `freeInActionPhase` (Cute Crown: „… ohne dabei die Action zu verbrauchen“): in der Action Phase ist so ein Zug GRATIS wie eine inhaerente
   // Aktion — er zaehlt nicht als Aktion der Phase und schaltet sie nicht weiter. Die Ladung wird trotzdem verbraucht (`consumeAdditionalAction`).
-  const additionalIsFree = usingAdditional && !!room.engine._additionalActionTypes?.[additionalTypeId]?.freeInActionPhase;
+  // ★ Welle 9 (Al, 15.10.2026, A02-deepsea-36): „Das gilt generell für verfügbare Zusatzaktionen während der Action Phase" — JEDE Zusatzaktion
+  // (Primordium, Mission, Lunatic Hawk, Legendary Sword …) ist in der Action Phase gratis: sie verbraucht die Hauptaktion nicht und beendet die
+  // Phase nicht. Ausnahme: die ZWEITE Aktion der Action Phase (`isSecondActionGrant`: Zhigao, Giga Steroids, Calm Diatribe …) IST die Aktion
+  // und beendet die Phase wie bisher; `freeInActionPhase` (Cute Crown) bleibt als ausdrückliche Markierung bestehen.
+  const _aaCfg = usingAdditional ? room.engine._additionalActionTypes?.[additionalTypeId] : null;
+  const additionalIsFree = usingAdditional && !!_aaCfg && (!!_aaCfg.freeInActionPhase || !_aaCfg.isSecondActionGrant);
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
     room.engine.bonusAktionFuer(pi, heroIdx, charmedOwner ?? pi)
