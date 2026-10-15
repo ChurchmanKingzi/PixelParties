@@ -3,7 +3,9 @@
 //   „Ja, soll es. Reaction-Creatures können, sofern sie nichts anderes spezifizieren (der Term 'place' beinhaltet z.B., dass kein aktionsfähiger Hero notwendig ist)
 //   NUR von Heroes beschworen werden, die aktionsfähig sind, dasselbe für Effekte, die spezifisch 'summon' sagen."
 // Erwartet: Wo der Kartentext „summon" sagt (Elven Rider: Reaction; Orthos: „summon a second Loyal"; Hipdall/Swagdri/Wildur: „summon it … from there"; Old Couple;
-//   Bomblebee Cluster), beschwört kein Frozen / Stunned / Webbed / Bound / Negated Held – auch keine Lv-0-Kreatur (die frühere Hipdall-Ausnahme „Negated + Lv0" entfällt).
+//   Bomblebee Cluster), beschwört kein Frozen / Stunned / Webbed / Bound Held – auch keine Lv-0-Kreatur.
+//   (Welle 12, Al Rückfrage 2: Negated gehört NICHT mehr dazu - effekt-negiert beschwört normal, abilities-negiert nur Lv0; die Hipdall-Ausnahme „Negated + Lv0" gilt wieder.
+//    Die Negated-Fälle dieser Datei bleiben, soweit sie hier stehen, gültig: Rider ist Lv1 (harte Form → nein), Orthos' Heldeneffekt selbst ist negiert; Hipdall unten umgestellt.)
 //   Wo der Text „place" sagt (Monster Nest), braucht es keinen aktionsfähigen Helden (Gegenprobe: das Nest wirkt auch bei gefrorenem Gastgeber).
 //   Regression: ein gesunder Held beschwört weiterhin.
 const H = require('../../lib/h.js');
@@ -49,6 +51,9 @@ const gefragt = (t, n) => t.prompts.some(p => p.d && p.d.type === 'confirm' && n
     const r = await t.run(() => t.engine.actionPlayTopOfCoolnessStack(0));
     const da = !!t.find('Hipdall, Protector of Coolness', 'support');
     if (!st) R.check('Hipdall vom Stack: gesunde Helden → beschworen (Regression)', da && r?.played === true, r);
+    // Umgestellt in Welle 12 (Al, Rückfrage 2): ein NEGIERTER Held beschwört wieder - bei negierten Abilities (harte Form, Standard-`negated`) nur Stufe 0;
+    // Hipdall ist Lv0, die Ausnahme „Negated + Lv0" gilt also wieder (Details und alle Formen: W12/a-2).
+    else if (st === 'negated') R.check('Hipdall (Lv0) vom Stack: alle Helden negiert (Abilities, hart) → Lv0 wird beschworen (Welle 12)', da && r?.played === true, r);
     else R.check('Hipdall (Lv0) vom Stack: alle Helden ' + st + ' → abgelehnt', !da && r?.aborted === true, r);
     R.check('Hipdall/' + (st || 'ok') + ': keine Engine-Fehler', t.errors.length === 0, t.errors);
   }

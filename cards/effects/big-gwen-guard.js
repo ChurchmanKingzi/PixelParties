@@ -114,9 +114,9 @@ function _heroCanNormalSummonBgg(engine, pi, heroIdx) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
-  const abZones = ps.abilityZones?.[heroIdx] || [];
-  const smLevel = engine.countAbilitiesForSchool('Summoning Magic', abZones);
+  // Welle 12 (Al, Rueckfrage 2): nur Effekt-negiert beschwoert normal; Abilities negiert (harte Form) -> Summoning Magic weg (`heroSchoolLevel` = 0).
+  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  const smLevel = engine.heroSchoolLevel('Summoning Magic', pi, heroIdx);
   return smLevel >= 1;
 }
 

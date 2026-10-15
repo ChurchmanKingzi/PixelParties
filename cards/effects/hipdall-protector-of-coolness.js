@@ -130,8 +130,8 @@ module.exports = {
 // Eligibility:
 //   • Hero must be alive (hp > 0).
 //   • Frozen / Stunned / Mummified Heroes cannot summon.
-//   • Negated Heroes can summon ONLY Lv-0 Creatures (matches the
-//     general rule for Negated — only Lv-0 cards bypass).
+//   • Negated Heroes: effect-only negation summons normally; with the
+//     ABILITIES negated (hard form) only Lv-0 Creatures (Welle 12, Al).
 //   • Hero must have at least one free Support Zone.
 //   • Hero must meet the Creature's level requirement ("summon", Q25).
 async function summonFromStack(engine, pi, cardName) {
@@ -144,8 +144,9 @@ async function summonFromStack(engine, pi, cardName) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer — auch Lv-0-Kreaturen (die frühere Ausnahme „Negated + Lv0" entfällt);
-    // zusätzlich Webbed/Bound (gleiche Menge wie `canHeroSummon`).
+    // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (Frozen/Stunned/Webbed/Bound; gleiche Menge wie `canHeroSummon`).
+    // Welle 12 (Al, Rückfrage 2): ein Negierter beschwört wieder — Effekt-negiert normal, Abilities-negiert (harte Form) nur Lv-0 (die Ausnahme
+    // „Negated + Lv0" gilt wieder): das erledigt die Stufenprüfung `heroMeetsLevelReq` unten (harte Form -> leere Zonenmenge).
     if (!require('./_summon-eligibility').heroAgiert(hero)) continue;
     if (engine._isHeroMummified?.(pi, hi)) continue;
     // ★ Al, Welle 9 (Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei

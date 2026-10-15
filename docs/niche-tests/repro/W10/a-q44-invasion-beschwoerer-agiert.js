@@ -1,6 +1,6 @@
 'use strict';
 // W10a · Q44 (A06-rebelliokai-27) · Al, 15.10.2026: „'summon' erfordert grundsätzlich, dass der Beschwörer agieren kann, also nicht Frozen/Stunned ist. Also nein.“
-//   Mischief Invasion: „… summon them as additional Actions.“ Ein gefrorener/betäubter/negierter Held darf KEINE Kreatur beherbergen – auch keine Lv-0-Kreatur
+//   Mischief Invasion: „… summon them as additional Actions.“ Ein gefrorener/betäubter Held darf KEINE Kreatur beherbergen (Welle 12: ein negierter beschwört wieder, siehe unten) – auch keine Lv-0-Kreatur
 //   (der alte Skriptkopf-Sonderfall „nicht Frozen/Stunned/Negated/Bound nur für Lv > 0“ entfällt). Beschwörungssperre und Host-Aktionssperre gelten (Hauptbefund -27).
 // Erwartet: Heli Troopers (Lv0) landet nur bei einem agierfähigen Helden; ist der einzige Wirt gefroren/betäubt/negiert, wird nichts beschworen.
 const H = require('../../lib/h.js');
@@ -23,11 +23,17 @@ const H = require('../../lib/h.js');
   t = await mk(null);
   r = await t.play(0, 'Mischief Invasion', { hero: 0, noGrant: true });
   R.check('Kontrolle: agierfähiger Held beherbergt Heli Troopers (Lv0)', heli(t), r);
-  for (const st of ['frozen', 'stunned', 'negated']) {
+  for (const st of ['frozen', 'stunned']) {
     t = await mk(st);
     r = await t.play(0, 'Mischief Invasion', { hero: 0, noGrant: true });
     R.check(st + ': Lv-0-Kreatur wird NICHT beherbergt', !heli(t), { r, z: [0, 1, 2].map(z => t.zone(0, 1, z)) });
     R.check(st + ': keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
+  // Umgestellt in Welle 12 (Al, Rückfrage 2): ein NEGIERTER Held beschwört wieder - effekt-negiert normal, Abilities negiert (harte Form, Standard-`negated`) nur noch Lv-0:
+  // Heli Troopers ist Lv0 und wird beherbergt (vorher: negiert sperrte auch Lv0). Alle Formen: W12/a-2.
+  t = await mk('negated');
+  r = await t.play(0, 'Mischief Invasion', { hero: 0, noGrant: true });
+  R.check('negated (Abilities, hart): die Lv-0-Kreatur wird beherbergt (Welle 12)', heli(t), { r, z: [0, 1, 2].map(z => t.zone(0, 1, z)) });
+  R.check('negated: keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

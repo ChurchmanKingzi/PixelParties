@@ -55,7 +55,8 @@ const MAX_SUMMONS = 3;
 function _heroCanSummon(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
   const s = hero.statuses || {};
-  if (s.frozen || s.stunned || s.negated || s.bound) return false;
+  // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
+  if (s.frozen || s.stunned || s.bound) return false;
   return true;
 }
 

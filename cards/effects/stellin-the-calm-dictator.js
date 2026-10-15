@@ -96,7 +96,8 @@ function isHostable(engine, pi, heroIdx, cardData, physOwner = pi) {
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
   const s = hero.statuses || {};
-  if (s.frozen || s.stunned || s.negated || s.bound) return false;
+  // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
+  if (s.frozen || s.stunned || s.bound) return false;
   if (firstFreeSlot(ps, heroIdx) < 0) return false;
   if (!engine.heroMeetsLevelReq(physOwner, heroIdx, cardData)) return false;
   // „summon": die kartenseitigen Beschwoerungstore (`canSummon`: Gigantisaurier,

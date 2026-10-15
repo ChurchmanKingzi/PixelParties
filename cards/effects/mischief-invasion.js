@@ -68,7 +68,8 @@ function _heroCanHostCreature(engine, pi, heroIdx, cd, ctrl = pi) {
   // das Status-Tor gilt für ALLE Stufen (der frühere Lv-0-Sonderfall entfällt).
   {
     const s = hero.statuses || {};
-    if (s.frozen || s.stunned || s.negated || s.bound || s.webbed) return false;
+    // Welle 12 (Al): Negated sperrt nicht (nur Frozen/Stunned/Bound/Webbed); die harte Form begrenzt ueber `heroMeetsLevelReq` auf Stufe 0.
+    if (s.frozen || s.stunned || s.bound || s.webbed) return false;
   }
   if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return false;
   return true;

@@ -93,7 +93,8 @@ module.exports = {
     const feld = (isSeat(gs, triggerInst.owner)) ? triggerInst.owner : pi;
     const fps = gs.players[feld];
     const host = fps?.heroes?.[hostHeroIdx];
-    // Welle 11 (Al, R5): „Summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound/Negated).
+    // Welle 11 (Al, R5): „Summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound; Welle 12: Negated nur
+    // noch als Stufe-0-Grenze bei negierten Abilities, siehe `blanked` unten).
     if (!host?.name || host.hp <= 0 || !require('./_summon-eligibility').heroAgiert(host)) {
       // Host hero died between the summon firing and this reaction
       // resolving — nothing to do, but still apply the summon-lock
@@ -116,7 +117,10 @@ module.exports = {
 
     let summoned = 0;
     for (let i = 0; i < MAX_RESUMMONS; i++) {
-      const candidates = bomblebeeNamesInHand(ps, usedNames);
+      // Welle 12 (Al): bei negierten ABILITIES des Wirts (harte Form) nur Stufe-0-Bomblebees („Summoning Magic weg").
+      const blanked = engine.heroAbilityLevelsBlanked(feld, hostHeroIdx);
+      const candidates = bomblebeeNamesInHand(ps, usedNames)
+        .filter(n => !blanked || require('./_summon-eligibility').beschwoerStufeOk(engine, feld, hostHeroIdx, engine._getCardDB()[n]));
       if (candidates.length === 0) break;
 
       const slot = findFreeSupportSlot(fps, hostHeroIdx);

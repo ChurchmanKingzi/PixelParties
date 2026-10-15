@@ -5,8 +5,10 @@
 //  eine ganz normale Beschwoerung** — sie kostet nur keine Aktion und
 //  laeuft reaktiv. Ein tauglicher Caster ist also weiterhin Pflicht.
 //
-//  Geprueft wird: lebendig, nicht Frozen / Stunned / Webbed / Bound /
-//  Negated, und die Level- bzw. Schulanforderung der Karte.
+//  Geprueft wird: lebendig, nicht Frozen / Stunned / Webbed / Bound, und
+//  die Level- bzw. Schulanforderung der Karte. Welle 12 (Al): ein bloss
+//  „Effekt negierter" Held beschwoert normal; sind seine Abilities
+//  negiert (harte Form), bleiben nur Stufe-0-Kreaturen (Summoning Magic weg).
 //  `heroMeetsLevelReq` deckt Abilities, Ascension-Bypaesse und Wisdom
 //  bereits mit ab.
 //
@@ -69,7 +71,9 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   if (engine.kontrollRechte && !engine.kontrollRechte(physOwner, heroIdx).beschwoeren) return false;
   if (ps?.summonLocked) return false;
   const st = hero.statuses || {};
-  if (st.frozen || st.stunned || st.webbed || st.bound || st.negated) return false;
+  // Welle 12 (Al, Rueckfrage 2): ein NEGIERTER Held kann „ganz normal Aktionen ausfuehren und also beschwoeren" — `negated` sperrt hier nicht mehr.
+  // Sind seine ABILITIES negiert (harte Form), faellt die Summoning Magic weg: `heroMeetsLevelReq` laesst dann nur noch Stufe-0-Kreaturen zu.
+  if (st.frozen || st.stunned || st.webbed || st.bound) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
@@ -165,13 +169,27 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
 /**
  * ★ Welle 11 (Al, R5): „… Reaction-Creatures können, sofern sie nichts anderes spezifizieren (der Term 'place' beinhaltet z.B., dass kein
  * aktionsfähiger Hero notwendig ist) NUR von Heroes beschworen werden, die aktionsfähig sind, dasselbe für Effekte, die spezifisch 'summon' sagen."
- * EINE Statusfrage für jedes „summon" eines Helden-Beschwörers: nicht Frozen / Stunned / Webbed / Bound / Negated — gleiche Menge wie
+ * EINE Statusfrage für jedes „summon" eines Helden-Beschwörers: nicht Frozen / Stunned / Webbed / Bound (seit Welle 12 ohne Negated) — gleiche Menge wie
  * `canHeroSummon`, für Skripte mit eigener Zonen-/Helden-Auswahl. Bei „place" (Monster Nest, Garius, Steam Dwarf Engineer …) NICHT benutzen.
  */
 function heroAgiert(hero) {
   if (!hero?.name || hero.hp <= 0) return false;
   const st = hero.statuses || {};
-  return !(st.frozen || st.stunned || st.webbed || st.bound || st.negated);
+  // Welle 12 (Al, Rueckfrage 2): „Nein, ein effekt-negierter Held kann ganz normal Aktionen ausführen und also beschwören." — `negated` gehoert nicht
+  // mehr zu den sperrenden Status (Frozen / Stunned / Webbed / Bound bleiben). Die harte Form („Abilities negiert") begrenzt nur die STUFE
+  // (`beschwoerStufeOk` bzw. `heroMeetsLevelReq`).
+  return !(st.frozen || st.stunned || st.webbed || st.bound);
+}
+
+/**
+ * ★ Welle 12 (Al, Rueckfrage 2): „Anders sieht es aus, wenn seine *Abilities* negiert sind - dann kann er nur noch Lv-0-Creatures beschwören, weil ja
+ * seine Summoning Magic weg ist." Fuer Skripte mit eigener Held-/Zonenwahl, die KEIN `heroMeetsLevelReq` rufen (Elven Rider, Bomblebee Cluster):
+ * ist der Held in der harten Form negiert (`heroAbilityLevelsBlanked`: Standard-`negated`, Stowaway), geht nur Stufe 0.
+ * @param {number} physOwner Brettseite des Helden · @param {object} cd Kartendaten der Kreatur
+ */
+function beschwoerStufeOk(engine, physOwner, heroIdx, cd) {
+  if (!cd || (cd.level || 0) <= 0) return true;
+  return !engine.heroAbilityLevelsBlanked(physOwner, heroIdx);
 }
 
 /**
@@ -185,4 +203,4 @@ function hatOnSummonText(cd) {
   return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
 }
 
-module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert };
+module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, beschwoerStufeOk };

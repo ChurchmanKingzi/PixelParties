@@ -88,7 +88,8 @@ function heldKannBeschwoeren(engine, pi, heroIdx) {
   const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   const s = hero.statuses || {};
-  if (s.frozen || s.stunned || s.webbed || s.negated) return false;
+  // Welle 12 (Al): ein bloss Effekt-negierter Held beschwoert normal; harte Form (Abilities negiert) -> nur Stufe 0 ueber `heroMeetsLevelReq`.
+  if (s.frozen || s.stunned || s.webbed) return false;
   return true;
 }
 

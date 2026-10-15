@@ -103,8 +103,10 @@ function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   const ps = engine.gs.players[riderSeite(deathInfo, ownerIdx)];
   if (!ps) return false;
   // Welle 11 (Al, R5): „Reaction-Creatures können … NUR von Heroes beschworen werden, die aktionsfähig sind" — der Held der Zone beschwört den
-  // Rider: nicht Frozen / Stunned / Webbed / Bound / Negated.
+  // Rider: nicht Frozen / Stunned / Webbed / Bound (Welle 12: Negated sperrt nicht mehr, nur die Stufe, s. u.).
   if (!require('./_summon-eligibility').heroAgiert(ps.heroes?.[deathInfo.heroIdx])) return false;
+  // Welle 12 (Al): ein nur Effekt-negierter Held beschwoert normal; sind seine ABILITIES negiert (harte Form), geht nur Stufe 0 - der Rider ist Stufe 1.
+  if (!require('./_summon-eligibility').beschwoerStufeOk(engine, riderSeite(deathInfo, ownerIdx), deathInfo.heroIdx, cardDB[CARD_NAME])) return false;
   // Slot must be empty RIGHT NOW. The engine clears the slot just
   // before firing this hook, so this normally passes — but another
   // reaction in the batch could conceivably have filled it.

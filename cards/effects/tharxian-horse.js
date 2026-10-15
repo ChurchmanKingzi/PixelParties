@@ -97,8 +97,7 @@ function eligibleDestinations(engine, pi, creatureName) {
     if (hero.statuses?.frozen
         || hero.statuses?.stunned
         || hero.statuses?.webbed
-        || hero.statuses?.bound
-        || hero.statuses?.negated) continue;
+        || hero.statuses?.bound) continue;   // Welle 12 (Al): Negated sperrt „summon" nicht; die harte Form (Abilities negiert) begrenzt ueber `heroMeetsLevelReq` auf Stufe 0
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd, { pileSide: 'discard' })) continue;
     if (!engine.isCreatureSummonable(creatureName, physOwner, hi)) continue;
     const sup = engine.gs.players[physOwner].supportZones?.[hi] || [];
