@@ -18,7 +18,7 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     // Soft once-per-turn (per Wowkyrie instance).
-    if (ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (!engine.hasCoolnessStack(pi)) return false;
@@ -29,7 +29,7 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     if (!engine.hasCoolnessStack(pi)) return false;
     if (!ctx.card.counters) ctx.card.counters = {};
     ctx.card.counters[HOPT_KEY] = engine.gs.turn;

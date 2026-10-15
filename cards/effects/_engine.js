@@ -6536,6 +6536,17 @@ class GameEngine {
     return BLIND_STATUSES.some(n => !!c[n]);
   }
 
+  /**
+   * ★ W12 (Al, Q114/H02-heroes-11): „Karian wird NIEMALS durch Freeze/Stun/Negation daran gehindert, irgendetwas zu tun." Skriptmarke
+   * `ignoresHaltStatuses` am Heldenskript (Karian; ein Shapeshifter in Karian-Gestalt traegt sie mit dem Namen). Frost und Betaeubung legt
+   * das Skript selbst still (Stash, `_karianSuspendedParalysis`); an den Stellen, die eine NEGIERUNG ohne `addHeroStatus` direkt auf den
+   * Helden schreiben (Anhaengsel, Weakening Crystal), fragt man diesen Helfer und legt sie dort nicht an.
+   */
+  heroIgnoresHaltStatuses(pi, heroIdx) {
+    const hero = this.gs?.players?.[pi]?.heroes?.[heroIdx];
+    return !!(hero?.name && hero.hp > 0 && this.heroScript(hero)?.ignoresHaltStatuses === true);
+  }
+
   _isHeroEffectSilenced(pi, heroIdx) {
     const hero = this.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?.name) return true;
@@ -7275,6 +7286,23 @@ class GameEngine {
   }
 
   /**
+   * ★ W12 (Al, Q108/H01-heroes-06): Stufe, mit der eine Schadens-/Effektquelle fuer STUFEN-Spell-Immunitaeten (Anti Magic) zaehlt —
+   * oder `null`, wenn sie dort nicht als Spell gilt. Eine echte Spell-KARTE zaehlt mit ihrer gedruckten Stufe; ein Skript, das
+   * `treatedAsSpell: { level }` deklariert (Alice, the Puppeteer Girl: „treated as … a Destruction Magic Spell", Al: „soll blockbar sein und
+   * als lv 0 gelten"), zaehlt mit dieser Stufe. EINE Stelle fuer alle drei Anti-Magic-Sperrpunkte (Schaden, Voraussage, Nicht-Schaden).
+   */
+  _spellLevelAlsQuelle(sourceName, damageType) {
+    if (!sourceName) return null;
+    const card = this._getCardDB()[sourceName];
+    if (card?.cardType === 'Spell') return card.level || 0;
+    // `treatedAsSpell` gilt nur fuer den Spell-Schaden der Karte selbst (nicht fuer ihre sonstigen Treffer unter demselben Namen).
+    if (damageType != null && damageType !== 'destruction_spell' && damageType !== 'spell') return null;
+    const ts = loadCardEffect(sourceName)?.treatedAsSpell;
+    if (ts && typeof ts === 'object') return Number.isFinite(ts.level) ? ts.level : 0;
+    return null;
+  }
+
+  /**
    * Would the damage `source → target` be fully voided by an
    * already-active protection on the target side, ignoring any
    * piercing flag (`hookCtx.cannotBeNegated`) that may apply?
@@ -7305,17 +7333,16 @@ class GameEngine {
    * helper, because piercing OVERRIDES the void (Ida's Destruction
    * Spell pierces Anti Magic too).
    */
-  _wouldHeroDamageBeVoided(target, source) {
+  _wouldHeroDamageBeVoided(target, source, damageType) {   // W12 (Q108): optional `damageType` (ctx.type) fuer `treatedAsSpell`
     if (!target || target.hp === undefined) return false;
     if (!source?.name) return false;
 
     // Anti Magic (`magic_immune` buff) — Spell-source-only, level
     // ≤ buff.level, with `bypassesMagicImmune` opt-out honored.
     if (target.buffs?.magic_immune) {
-      const srcCard = this._getCardDB()[source.name];
-      if (srcCard?.cardType === 'Spell') {
+      const srcLevel = this._spellLevelAlsQuelle(source.name, damageType);   // W12 (Q108): auch Alice („treated as a Spell")
+      if (srcLevel != null) {
         const buffLevel = target.buffs.magic_immune.level;
-        const srcLevel = srcCard.level || 0;
         if (typeof buffLevel === 'number' && srcLevel <= buffLevel) {
           const srcScript = loadCardEffect(source.name);
           if (!srcScript?.bypassesMagicImmune) return true;
@@ -7363,11 +7390,11 @@ class GameEngine {
     // ★ v1330 (Als Regel 24.9.): ein BESIEGTER Held ist nie magieimmun.
     if (!(target.hp > 0)) return false;
     if (!sourceCardName) return false;
-    const srcCard = this._getCardDB()[sourceCardName];
-    if (srcCard?.cardType !== 'Spell') return false;
+    const srcLevel = this._spellLevelAlsQuelle(sourceCardName);   // W12 (Q108): Spell-Karte ODER `treatedAsSpell`
+    if (srcLevel == null) return false;
     const buffLevel = target.buffs.magic_immune.level;
     if (typeof buffLevel !== 'number') return false;
-    if ((srcCard.level || 0) > buffLevel) return false;
+    if (srcLevel > buffLevel) return false;
     const srcScript = loadCardEffect(sourceCardName);
     if (srcScript?.bypassesMagicImmune) return false;
     return true;
@@ -8755,10 +8782,9 @@ class GameEngine {
         && hookCtx.amount > 0
         && !hookCtx.cannotBeNegated
         && source?.name) {
-      const srcCard = this._getCardDB()[source.name];
-      if (srcCard?.cardType === 'Spell') {
+      const srcLevel = this._spellLevelAlsQuelle(source.name, type);   // W12 (Q108): auch Alice („treated as a Spell", Stufe 0)
+      if (srcLevel != null) {
         const buffLevel = target.buffs.magic_immune.level;
-        const srcLevel = srcCard.level || 0;
         if (typeof buffLevel === 'number' && srcLevel <= buffLevel) {
           const srcScript = loadCardEffect(source.name);
           if (!srcScript?.bypassesMagicImmune) {
@@ -26263,9 +26289,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // nicht erfuellt war). `canActivateCreatureEffect` ist der Ort, an
     // dem eine Karte ihre Voraussetzungen fuehrt — wer ihren Effekt
     // ausloest, fragt sie.
+    // ★ W12 (Al, Q5): `opts.borrowed` (Spirit of the Forbidden Grimoire, Kohta) = eine GELIEHENE/WIEDERHOLTE Verwendung: das EIGENE Limit der Karte
+    // (3-Headed Giant 3/3, Analyzer beide Optionen benutzt, eigene Einmal-Stempel) steht ihr nicht im Weg — die Karte liest `ctx._borrowedUse`
+    // in `canActivateCreatureEffect`/`onCreatureEffect`. Echte Voraussetzungen (Ziel da, Vorrat da) bleiben; Great Offensive setzt es NICHT.
     if (!opts.ignoreOwnCondition && typeof script.canActivateCreatureEffect === 'function') {
       try {
-        const pruefCtx = this._createContext(inst, {});
+        const pruefCtx = this._createContext(inst, opts.borrowed ? { _borrowedUse: true } : {});
         if (!script.canActivateCreatureEffect(pruefCtx)) return false;
       } catch (err) {
         console.error('[canActivateCreatureEffect]', inst.name, err.message);
@@ -26273,7 +26302,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    const ctx = this._createContext(inst, {});
+    const ctx = this._createContext(inst, opts.borrowed ? { _borrowedUse: true } : {});
     ctx._isRetrigger = true;                 // Skripte koennen das lesen
     // v749: vorgezogener Plan aus `prepareCreatureEffectFor`. Liegt er
     // an, ueberspringt das Skript seine Zielwahl und wirkt nur noch.
@@ -46788,6 +46817,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async removeHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    // ★ W12 (Q114): ein VON KARIAN stillgelegter Status (Stash) wird beim Entfernen/Heilen mit entfernt, sonst kaeme er spaeter zurueck.
+    const _karianStash = hero?._karianSuspendedParalysis;
+    if (_karianStash?.[statusName] && !hero.statuses?.[statusName] && (opts.bypassUnhealable || !_karianStash[statusName].unhealable)) {
+      delete _karianStash[statusName];
+      if (Object.keys(_karianStash).length === 0) delete hero._karianSuspendedParalysis;
+      this.log('status_remove', { target: hero.name, status: statusName, owner: playerIdx });
+      return;
+    }
     if (!hero || !hero.name || !hero.statuses?.[statusName]) return;
     // `unhealable` (Venom Infusion Lv3) blocks removal by healing /
     // cleansing AFTER the status has stuck — but NOT removal by

@@ -32,6 +32,9 @@ function _qualifies(inst, pi, currentTurn, cardDB) {
 }
 
 module.exports = {
+  // ★ W12 (Al, Q108/H01-heroes-06): „Ja, Alices Effekt soll blockbar sein und als lv 0 gelten!" — der Effekt zaehlt fuer Stufen-Spell-
+  // Immunitaeten (Anti Magic: `magic_immune` Stufe >= 0) als Destruction Magic Spell der Stufe 0 (Engine: `_spellLevelAlsQuelle`).
+  treatedAsSpell: { level: 0, school: 'Destruction Magic' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],

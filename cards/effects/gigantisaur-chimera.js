@@ -263,7 +263,7 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const hoptKey = `${HOPT_KEY}:${ctx.card?.id ?? 'inst'}`;
-    if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[hoptKey] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
     const ps = gs.players[pi];
     if (!ps) return false;
     // Effect is meaningless with 0 distinct Gigantisaurs in discard.

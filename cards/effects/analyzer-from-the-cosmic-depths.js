@@ -262,16 +262,18 @@ module.exports = {
   // Engine HOPT is bypassed inside each ability's resolve via
   // _skipCreatureEffectHopt. We expose creatureEffect=true so the engine
   // surfaces the activate-button, but the actual gating below.
+  // ★ W12 (Al, Q5): eine GELIEHENE/WIEDERHOLTE Verwendung (Spirit of the Forbidden Grimoire, Kohta: `ctx._borrowedUse`) ignoriert das
+  // eigene Einmal-Limit je Option — auch mit beiden Optionen schon benutzt darf sie noch einmal laufen (Counter-/Platz-Voraussetzungen bleiben).
   canActivateCreatureEffect(ctx) {
     const inst = ctx.card;
     const engine = ctx._engine;
     const gs = engine.gs;
     const have = getChangeCounters(inst);
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
 
-    const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
+    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
       && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     return moveAvail || spawnAvail;
@@ -284,9 +286,9 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     const have = getChangeCounters(inst);
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id) && have > 0
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id)) && have > 0
       && allBoardTargets(engine).some(t => !(t.kind === 'creature' && t.ref?.id === inst.id));
-    const spawnAvail = !hoptUsed(gs, HOPT_SPAWN, inst.id)
+    const spawnAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_SPAWN, inst.id))
       && have >= 2 && allFreeSupportSlotsBothSides(engine).length > 0;
 
     if (!moveAvail && !spawnAvail) return false;

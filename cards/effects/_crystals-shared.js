@@ -123,6 +123,7 @@ function refreshWeakeningCrystalNegation(engine, opts = {}) {
       if (typeof opts.onlyHero === 'number' && ps.heroes.indexOf(hero) !== opts.onlyHero) continue;   // Z2: nur dieser Held
       if (hasCrystal) {
         if (!opts.reapply) continue;               // nur aufraeumen
+        if (engine.heroIgnoresHaltStatuses?.(pi, ps.heroes.indexOf(hero))) continue;   // W12 (Al, Q114): Karian wird nie durch Negation gehindert
         const cur = hero.statuses?.negated;
         // Ein FREMDES `negated` nicht ueberschreiben.
         if (cur && cur._byWeakeningCrystal !== true) continue;
