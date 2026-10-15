@@ -198,7 +198,9 @@ function beschwoerStufeOk(engine, physOwner, heroIdx, cd) {
  * „… via an effect", „… with the effect of X"). Ein technischer `onPlay`-/`beforeSummon`-Haken im Skript ohne solchen Text (Kosten, Zusatzaktion,
  * Aktiv-Effekt, Surprise-Aktivierung) ist KEIN On-Summon-Effekt. Der Text ist die Quelle: `engine._getCardDB()[name].effect`.
  */
-const ON_SUMMON_TEXT = /\b(?:when|whenever)\b[^.:]*\b(?:you (?:summon|play) this (?:creature|card)|this (?:creature|card) (?:is|gets|was) (?:summoned|played))/i;
+// ★ Welle 13 (Al, A1): Kreatur-Surprises („Activate this Surprise …") lösen den Blob nicht aus, AUSSER ihr Kartentext enthält
+// ausdrücklich einen On-Summon-/On-Place-Satz („When this Creature is summoned/placed, …"). Darum zählt auch „place/placed".
+const ON_SUMMON_TEXT = /\b(?:when|whenever)\b[^.:]*\b(?:you (?:summon|play|place) this (?:creature|card)|this (?:creature|card) (?:is|gets|was) (?:summoned|played|placed))/i;
 function hatOnSummonText(cd) {
   return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
 }

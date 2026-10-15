@@ -110,7 +110,8 @@ module.exports = {
       // ★ Welle 12 (Al, Rueckfrage 1: „Nein, nur explizit On-Summon-Effekte triggern Blob."): maßgeblich ist der KARTENTEXT
       // („When you summon this Creature …", `hatOnSummonText`). Ein technischer `onPlay`-/`beforeSummon`-Haken ohne On-Summon-Text im
       // Kartentext (Archer, Spinnen, Albrecht, Priest of Luna, Censpartan, Land Sharks, Kosten/Zusatzaktion/Aktiv-Effekt, ~45 Kreaturen) löst
-      // den Blob nie aus; ebenso keine Kreatur-SURPRISE (ihr Text heißt „Activate this Surprise …", nicht On-Summon).
+      // den Blob nie aus; ebenso keine Kreatur-SURPRISE (ihr Text heißt „Activate this Surprise …", nicht On-Summon) — es sei denn (Welle 13,
+      // Al A1), ihr Kartentext enthält AUSDRÜCKLICH einen Satz „When this Creature is summoned/placed, …" (`hatOnSummonText`).
       // Zusätzlich muss das Skript den Effekt wirklich tragen (onPlay oder die Beschwörungsklammer `beforeSummon`, DDG).
       if (!hatOnSummonText(cd)) return;
       const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
