@@ -6,7 +6,9 @@
 // Beobachtet: Ein Held ohne jede Fähigkeit beschwört Wildur von der Stack-Spitze; aus der Hand wird derselbe Versuch abgelehnt
 //   (Gegenprobe). `summonFromStack` (hipdall-protector-of-coolness.js) prüft nur lebt / nicht gefroren / nicht betäubt / Negated nur Lv0 /
 //   nicht mumifiziert / freie Zone – nicht `heroMeetsLevelReq` und nicht `canSummon`/`canPlayCard` des Helden (Cute Crown, Princess Mary).
-// Frage an Al: Soll die Stack-Beschwörung die Stufe des Helden (Summoning Magic 1 für Wildur) verlangen – ja oder nein?
+// ENTSCHIEDEN (Al, Welle 9, Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei 'place' nicht.“ → Wildur braucht Summoning Magic 1 auch vom Stack.
+//   Das Repro prüft seitdem: Held ohne Schule kann Wildur weder vom Stack noch aus der Hand beschwören (Stack-Ergebnis: no_legal_target).
+// Frage an Al (beantwortet): Soll die Stack-Beschwörung die Stufe des Helden (Summoning Magic 1 für Wildur) verlangen – ja oder nein?
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -21,6 +23,6 @@ const H = require('../../lib/h.js');
   t = await H.fresh({ hand: [['Wildur, the Shining Coolness'], []], deck: [[H.INERT.creature], []] });
   await t.play(0, 'Wildur, the Shining Coolness', { hero: 0, noGrant: true });
   const ausHand = !!t.find('Wildur, the Shining Coolness', 'support');
-  R.check('Beschwörung ohne Schule ist vom Stack und aus der Hand gleich erlaubt/verboten', vomStack === ausHand, { vomStack, ausHand });
+  R.check('Ohne Summoning Magic 1 ist die Beschwörung vom Stack wie aus der Hand verboten', vomStack === false && ausHand === false, { vomStack, ausHand });
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });
