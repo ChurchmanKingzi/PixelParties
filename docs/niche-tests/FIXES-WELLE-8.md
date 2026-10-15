@@ -44,3 +44,15 @@ Stand danach: **409 Repros grün von 756**, 0 Rückschritte; `check-*.js` wie zu
 7. Lethe: ihre 3 Necromancy-Einsätze und die Stufen-Welle ruhen jetzt ebenfalls – richtig?
 
 Außerdem weiterhin offen aus Welle 7: Choir-Schutz über den Tod (Frage 6), W7b-Fragen 7–10.
+
+## Nachtrag 2 (15.10.2026): Bonded Companion, Paraseed-Gift, Lethe
+
+| Frage | Entscheidung / Umsetzung (`wave8/W8`, 371ae36) |
+|---|---|
+| Bonded Companion, Zonensperre | „Ja, die darf ruhen. Aber sobald der Freeze/Stun/Negate endet, muss der Companion mit exakt dem Hero gelinkt werden, in dessen Zone er ist! Ist dort kein oder ein toter Hero, bleibt er bei 0 HP *und stirbt sofort*." – der Pool hing schon an der aktuellen Spalte; neu: `engine._begleiterPoolAbgleich()` lässt die Kreatur beim Übergang ruhend → wirksam sofort sterben (regulär über `actionDestroyCard`, mit Todes-/Abgangs-Triggern), wenn in ihrer Spalte kein lebender Held steht; Puppet-Tokens ausgenommen; leises Abklingen holt der Zug-/Phasenbeginn nach. Repro `W8/08` (122 Prüfungen) |
+| Paraseed, übernommenes Gift | „Das Paraseed-Gift sollte ruhen, aber bei reaktiviertem Paraseed sofort zurückkehren." – war schon so (Repro `W8/07`): das Gift fällt bei Frost/Negation der Paraseed und liegt bei Reaktivierung sofort wieder auf dem Wirt als unheilbares Paraseed-Gift; ein von Anfang an fremdes Gift bleibt |
+| Lethe | „Ja" – Necromancy-Einsätze und Stufen-Welle ruhen, wenn Lethe ruht (war schon so, Repro `W8/07`) |
+
+Hinweis zur Paraseed: Das Gift verschwindet während des Ruhens ganz. Soll es stattdessen als normales, heilbares Gift mit Restdauer weiterlaufen, wäre das eine Änderung in `syncParaseedPoison` (nicht gefragt, Ist-Zustand = verschwindet).
+
+**Endstand nach den Nachträgen von Welle 7 und 8 (zusammengeführt):** 413 Repros grün von 759, 0 Rückschritte, 0 Abstürze; alle 44 `scripts/check-*.js` wie im Ausgangszustand (nur `check-scope.js` rot); Skilltest-E2E rot nur battle, lobby, prep, seats, target; Dauerfeuer über alle Karten ohne neu auffällige Läufe.

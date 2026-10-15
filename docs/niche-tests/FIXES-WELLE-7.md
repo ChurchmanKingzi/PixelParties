@@ -46,3 +46,15 @@ Al hat die Grundsatzfrage und die Vorschläge aus [FRAGEN-OFFEN.md](FRAGEN-OFFEN
 8. Sollen Navigation, Premonition und Trapping auch unter der reinen Hand-Sperre (Smuggler's Pier) gesperrt sein? Heute ja, weil die Hand-Sperre per Engine-Regel jede Suche sperrt.
 9. Soll ein von Mao ausgelöster Effekt, den der Spieler in der Bestie selbst abbricht, die 5 Karten zurückgeben und die Bestie nicht negieren?
 10. Soll der Server auch `maxPerType`, `exclusiveTypes` und die Summenregeln bei Zielwahl-Antworten erzwingen?
+
+## Nachtrag (15.10.2026): Al hat die offenen Fragen beantwortet
+
+| Frage | Entscheidung / Umsetzung |
+|---|---|
+| Choir-Schutz über den Tod des Choir | „Ja" – der erteilte Schutz ist eine vergebene Wirkung am Spieler (`ps._kreaturenSchild`, `_kreaturenSchadenSchilde` im Kreaturen-Schadens-Batch); wirkt einmal, endet zum nächsten Zugbeginn des Besitzers; Frost/Betäubung/Negation lassen ihn bestehen (W7a, d550c59; A07-29 grün, Repro `W7-a/04`) |
+| Trapping, Training (Deck-Option) unter Such-Sperre | „Nein, nicht sperren" – entsperrt |
+| Navigation, Premonition, Trapping unter Hand-Sperre | „Von denen gibt nur Navigation eine Karte auf die Hand, also nur das sperren." – Kartentexte geprüft: nur Navigation gesperrt; Premonition (legt verdeckt aufs Deck) und Trapping (bringt die Surprise ins Spiel) sind entsperrt |
+| Mao | „Nein, stattdessen soll der Effekt unabbrechbar sein!" – der von Mao ausgelöste Bestien-Effekt läuft unter `_forceNonCancellable` (Pflichtwahl), die 5 Karten werden nie zurückgegeben; Mao erlaubt nur Bestien, die auch **nach** Abzug der bezahlten Kosten noch aktivierbar sind (Prüfung über alle Aufteilungen der 5 Karten auf die Ablagen, `validatePicks` bei der tatsächlichen Zahlung) |
+| Server prüft Picker-Regeln (`maxPerType`, `exclusiveTypes`, `uniqueBy`, `maxBudget`, `maxNonOwnSupport`, `minSumMaxHp`, `minSumLevel`, Pflichttribute) | „Architecture kannst du besser beurteilen, dein Call." – Entscheidung: ja, serverseitig in `zielAuswahlRegelverstoss` (`server.js`, aufgerufen in `doConfirmPotion`), gleiche Auslegung wie der Client (Spiegelung, da das JSX-Bundle nicht auf dem Server läuft; Hinweis „neue Picker-Regeln in beide Stellen" in `CARD_API.md`); nur ablehnen, nie kappen, Abbruch nie betroffen; gilt im Mensch-Weg |
+
+Offene Frage aus dem Nachtrag (ja/nein): Sollen die Picker-Regeln auch im Engine-Abschluss für CPU und Skripte erzwungen werden (dort bisher nur Duplikate und `maxTotal`)?
