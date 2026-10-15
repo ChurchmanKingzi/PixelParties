@@ -165,7 +165,8 @@ module.exports = {
   // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
-    if (promptData?.type === 'confirm') return { confirmed: true };
+    // Welle 9: nur für die EIGENE Area pauschal opfern; eine gegnerische Area schützt die CPU nicht (kein Plan dafür).
+    if (promptData?.type === 'confirm') return { confirmed: promptData.cpuEigeneArea !== false };
     return undefined;
   },
 
@@ -184,6 +185,7 @@ module.exports = {
         title: CARD_NAME,
         message: `${ctx.source || 'An effect'} would affect ${eigene ? 'your' : "your opponent's"} "${ctx.areaName}" Area. Sacrifice ${CARD_NAME} to negate it?`,
         showCard: CARD_NAME,
+        cpuEigeneArea: eigene,
         confirmLabel: '🛡️ Sacrifice & Protect!',
         cancelLabel: 'No',
         cancellable: true,
