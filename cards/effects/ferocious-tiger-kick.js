@@ -5,7 +5,8 @@
 //  Stuns the target for 1 turn.
 //
 //  2nd Attack this turn: heal attacker for
-//    the full damage dealt.
+//    the damage dealt = the ACTUAL HP loss of the target (Welle 13,
+//    Q140: Overkill zaehlt nicht, wie bei Golden Arrow & Co.).
 //  3rd Attack this turn: Stun bypasses the
 //    Immune status (post-CC immunity).
 //
@@ -100,8 +101,10 @@ module.exports = {
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
+          const _hpVor = targetHero.hp;
           const result = await engine.actionDealDamage(attackSource, targetHero, finalDmg, 'attack');
-          dealt = result?.dealt || 0;
+          // Welle 13 (Q140, Al: „Den tatsächlichen Verlust"): Overkill zählt nicht
+          dealt = Math.min(result?.dealt || 0, Math.max(0, _hpVor - Math.max(0, targetHero.hp)));
           damageCancelled = !!result?.cancelled;
         }
       } else if (target.type === 'equip') {
@@ -110,11 +113,14 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
+          const _hpVor = engine.creatureCurrentHp(inst);   // Z5: unversehrte Kreatur hat noch kein currentHp
           const result = await engine.actionDealCreatureDamage(
             attackSource, inst, finalDmg, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
-          dealt = result?.dealt || 0;
+          // Q140: tatsächlicher Verlust, kein Overkill (gefallene Kreatur: auf die Vor-Treffer-HP gedeckelt)
+          const _lebt = inst.zone === 'support' && engine.creatureCurrentHp(inst) > 0;
+          dealt = Math.min(result?.dealt || 0, _hpVor, _lebt ? Math.max(0, _hpVor - engine.creatureCurrentHp(inst)) : Infinity);
           damageCancelled = !!result?.cancelled;
         }
       }
