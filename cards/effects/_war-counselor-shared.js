@@ -126,7 +126,28 @@ function waehlbareKreaturen(engine, chooserPi, ownerIdx) {
   });
 }
 
+/**
+ * ★ Welle 11 (Al, R3): die 8 Gold des War Council Gathering Place werden NICHT beim Annehmen des Angebots abgezogen, sondern erst, wenn der
+ * ausgelöste Ratgeber-Effekt sein Ziel bestätigt hat — und zwar VOR der Auflösung (goldskalierende Effekte wie Harpthenean sehen den reduzierten
+ * Stand). Ratgeber-Effekte ohne Zielwahl zahlen direkt vor der Auflösung. Bricht der Spieler die Zielwahl ab, wird nie Gold abgezogen.
+ * Das Gathering Place hinterlegt die offene Gebühr in `engine._gatheringGebuehr` (`{ instId, betrag, bezahlt, bezahle() }`); der Ratgeber-Effekt
+ * ruft `zahleGatheringGebuehr` am Zusagepunkt auf und bricht ab (`return false`), wenn die Zahlung nicht mehr möglich ist.
+ * Ohne offene Gebühr (normale Aktivierung) tut beides nichts.
+ */
+function offeneGatheringGebuehr(engine, inst) {
+  const g = engine?._gatheringGebuehr;
+  return (g && inst && g.instId === inst.id && !g.bezahlt) ? g.betrag : 0;
+}
+
+async function zahleGatheringGebuehr(engine, inst) {
+  const g = engine?._gatheringGebuehr;
+  if (!g || !inst || g.instId !== inst.id || g.bezahlt) return true;
+  return await g.bezahle();
+}
+
 module.exports = {
+  offeneGatheringGebuehr,
+  zahleGatheringGebuehr,
   waehlbareKreaturen,
   WC,
   istEigenerAbgang,

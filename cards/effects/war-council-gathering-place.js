@@ -14,6 +14,15 @@
 //  wird von dem, der beschworen hat, und der Effekt
 //  loest auch fuer ihn aus.
 //
+//  ── Gold erst bei bestaetigtem Ziel (Welle 11, Al R3) ──
+//  Die 8 Gold werden NICHT beim Annehmen abgezogen, sondern erst,
+//  wenn der Ratgeber-Effekt sein Ziel bestaetigt hat (Zielwahl
+//  abgeschlossen) und VOR seiner Aufloesung — goldskalierende
+//  Effekte (Harpthenean: 5 x aktuelles Gold) sehen den reduzierten
+//  Stand. Ohne Zielwahl: direkt vor der Aufloesung. Abbruch der
+//  Zielwahl: nie Gold abgezogen. Der Ratgeber ruft dazu
+//  `zahleGatheringGebuehr` (_war-counselor-shared.js) am Zusagepunkt.
+//
 //  ── Zusaetzliche Nutzung, keine ersetzte ──
 //  Die 8 Gold kaufen einen EXTRA-Einsatz: die
 //  Einmal-pro-Zug-Sperre der Kreatur wird bewusst NICHT
@@ -130,25 +139,40 @@ module.exports = {
       });
       if (!confirmed || confirmed.cancelled) return;
 
-      // Gold erst jetzt abbuchen — und nur, wenn es noch da ist.
-      const paid = await engine.actionSpendGold(pi, GOLD_COST);
-      if (!paid) {
-        engine.log('gathering_place_unpaid', { player: ps.username, card: summoned.name });
-        return;
-      }
-
-      engine.log('gathering_place_trigger', {
-        player: ps.username, card: summoned.name, gold: GOLD_COST,
-      });
+      // ★ Welle 11 (Al, R3): das Gold wird NICHT beim Annehmen abgezogen, sondern erst, wenn der Ratgeber-Effekt sein Ziel bestätigt hat
+      // (und VOR der Auflösung: Harpthenean sieht den reduzierten Goldstand). Ohne Zielwahl: direkt vor der Auflösung. Bricht der Spieler die
+      // Zielwahl ab, wird nie Gold abgezogen (keine Rückerstattung nötig). Der Ratgeber zahlt über `zahleGatheringGebuehr` (_war-counselor-shared).
+      const gebuehr = {
+        instId: summoned.id, betrag: GOLD_COST, bezahlt: false,
+        bezahle: async () => {
+          if (gebuehr.bezahlt) return true;
+          // Gold nur abbuchen, wenn es noch da ist (zwischen Angebot und Zusage kann sich der Stand ändern).
+          const paid = !engine.goldSpendBlocked(pi) && await engine.actionSpendGold(pi, GOLD_COST);
+          if (!paid) {
+            engine.log('gathering_place_unpaid', { player: ps.username, card: summoned.name });
+            return false;
+          }
+          gebuehr.bezahlt = true;
+          engine.log('gathering_place_trigger', {
+            player: ps.username, card: summoned.name, gold: GOLD_COST,
+          });
+          return true;
+        },
+      };
 
       const effCtx = engine._createContext(summoned, {});
       engine._promptCardStack.push(summoned.name);
+      const vorherigeGebuehr = engine._gatheringGebuehr;
+      engine._gatheringGebuehr = gebuehr;
       try {
-        await script.onCreatureEffect(effCtx);
+        const ergebnis = await script.onCreatureEffect(effCtx);
+        // Sicherheitsnetz für Ratgeber, die den Zahlungspunkt nicht selbst melden: hat der Effekt gewirkt, wird nachträglich bezahlt.
+        if (ergebnis && !gebuehr.bezahlt) await gebuehr.bezahle();
       } catch (err) {
         console.error(`[${CARD_NAME}] ${summoned.name} onCreatureEffect threw:`, err.message);
       } finally {
         engine._promptCardStack.pop();
+        if (vorherigeGebuehr) engine._gatheringGebuehr = vorherigeGebuehr; else delete engine._gatheringGebuehr;
       }
       engine.sync();
     },

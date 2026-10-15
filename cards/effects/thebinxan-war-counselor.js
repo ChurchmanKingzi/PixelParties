@@ -43,7 +43,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
-const { makeSingletonCanSummon } = require('./_war-counselor-shared');
+const { makeSingletonCanSummon, zahleGatheringGebuehr } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Thebinxan War Counselor';
 const DAMAGE = 50;
@@ -170,6 +170,8 @@ module.exports = {
 
     const topCard = (ps.mainDeck || [])[0];
     if (!topCard) return false;
+    // Welle 11 (Al, R3): keine Zielwahl — die 8 Gold des War Council Gathering Place werden direkt vor der Auflösung abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     // ── Der Gegner sagt an (keine Abbruchmoeglichkeit) ──
     const declared = await engine.promptGeneric(oppIdx, {

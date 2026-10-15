@@ -55,6 +55,7 @@ const {
   controlledWarCounselors,
   istEigenerAbgang,
   makeSingletonCanSummon,
+  zahleGatheringGebuehr,
 } = require('./_war-counselor-shared');
 
 const CARD_NAME = 'Cykyran War Counselor';
@@ -196,6 +197,8 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    // Welle 11 (Al, R3): War Council Gathering Place — die 8 Gold werden erst jetzt (Ziel bestätigt, vor der Auflösung) abgezogen.
+    if (!(await zahleGatheringGebuehr(engine, inst))) return false;
 
     const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
     engine._broadcastEvent('play_zone_animation', {
