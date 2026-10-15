@@ -103,6 +103,12 @@ async function placeCounter(engine, clock, byPi, opts = {}) {
 
   // Der 20. Counter AUF DIESER UHR beendet das Spiel.
   if (clock.counters.doom >= DOOM_LIMIT) {
+    // ★ Welle 9 (Al, 15.10.2026, A01-pollution-38): „Generell gewinnt zuerst ‚alle Gegner getötet', ehe man durch Doom Clock
+    // verliert." Sind im selben Ereignis (z. B. ein Archer-Schuss auf den 20. Counter) die letzten Helden aller Gegner gefallen,
+    // entscheidet das Heldensterben: erst die Auswertung „alle Helden besiegt" (nachholen, falls ausstehend), danach — nur wenn das
+    // Spiel noch läuft — die Niederlage durch die Uhr. Ein bereits entschiedenes Spiel (gs.result / _endGameLaeuft) bleibt unberührt.
+    try { await engine.checkAllHeroesDead(); } catch (err) { console.error('[Doom Clock] checkAllHeroesDead:', err.message); }
+    if (engine.gs.result || engine.gs._endGameLaeuft) return true;
     const winnerIdx = byPi === 0 ? 1 : 0;
     engine.log('doom_clock_loss', {
       loser: engine.gs.players[byPi]?.username,
