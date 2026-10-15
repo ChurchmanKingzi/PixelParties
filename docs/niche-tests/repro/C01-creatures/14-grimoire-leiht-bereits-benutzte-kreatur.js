@@ -10,6 +10,7 @@
 // Ursache: grimoire (`spirit-of-the-forbidden-grimoire.js` `sammleKandidaten`) prüft nur `_effectLockedTurn` und die Karten-eigene `canActivateCreatureEffect`; die Engine-Sperre `hoptUsed['creature-effect:<id>']`
 //   (`creatureEffectStillAvailable`, _engine.js ~30956) wird nicht gefragt, und `reactivateCreatureEffect` verzichtet bewusst auf den HOPT (_engine.js ~25126 „geschenkte Wiederholung"). Karten, deren
 //   `canActivateCreatureEffect` konstant `true` liefert (Cannon Tower, Aggressive Town Guard, Coreling, Assault Eagle, …), sind deshalb mehrfach pro Zug leihbar; Karten mit eigenem Zähler (Giant) nicht.
+// ★ Welle 11 (Q73, Al: „Beide dürfen explizit Effekte ein weiteres Mal verwenden … Also ja, sie dürfen sie wiederholen."): Teil A prüft jetzt, dass der Tower geliehen werden DARF (150); Teil B (Giant mit erschöpftem eigenem 3/3-Zähler) bleibt unverändert (Ist-Zustand, Frage an Al offen).
 // Stufe C: Ob die Wiederholung eines schon benutzten Einmal-pro-Zug-Effekts gewollt ist (Kohta/Grimoire als „geschenkte Wiederholung"), ist eine Regelfrage.
 const H = require('../../lib/h.js');
 (async () => {
@@ -31,7 +32,7 @@ const H = require('../../lib/h.js');
     await t.activateCreature(0, 2, 0);
     const geliehen = h0 - t.hp(1, 0);
     R.note('A) Tower', { normal, geliehen });
-    R.check('A) der im Zug schon benutzte Tower feuert über das Grimoire nicht noch einmal', geliehen === 0, { normal, geliehen });
+    R.check('A) der im Zug schon benutzte Tower darf über das Grimoire noch einmal feuern (Al: Wiederholung erlaubt)', geliehen === 150, { normal, geliehen });
     R.check('A) keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   {
