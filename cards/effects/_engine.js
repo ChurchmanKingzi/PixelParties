@@ -10057,7 +10057,7 @@ class GameEngine {
       hero: target, source, heroOwner: targetOwner,
       killerOwner: source?.owner ?? source?.controller ?? -1,
     };
-    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, isSacrifice: !!opts.isSacrifice, _bypassDeadHeroFilter: true });
+    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, isSacrifice: !!opts.isSacrifice, hpKosten: !!opts.hpKosten, _bypassDeadHeroFilter: true });
     delete this.gs._heroKOContext;
 
     // Ein Hook (Guardian Angel) hat den Tod verhindert — dann gilt der
@@ -10080,7 +10080,9 @@ class GameEngine {
     await this._runHeroDefeatSequence(target, source, targetOwner);
     // Welle 11 (Al, Q61: „Auch Heroes"): ein Helden-OPFER ist ein „sacrifice a target" — Hook NACH dem Todesablauf (Bonded Companion Thuly:
     // „when you sacrifice a target"). Opferer = `source.owner`; nicht mehr nach Spielende.
-    if (opts.isSacrifice && !this.gs.result) {
+    // Welle 12 (Al, Rueckfrage 4, Foresta): „Der Hero stirbt ja nicht, weil er durch einen Effekt 'sacrificed' wird, sondern durch HP-Verlust!" —
+    // ein Tod durch HP-KOSTEN (`opts.hpKosten`, Foresta bei 1 HP) ist KEIN Opfer: weder dieser Hook (Thuly) noch Temple of Sacrifice feuern.
+    if (opts.isSacrifice && !opts.hpKosten && !this.gs.result) {
       await this.runHooks('onHeroSacrificed', { hero: target, source, heroOwner: targetOwner, _skipReactionCheck: true });
     }
     return { defeated: true };

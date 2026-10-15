@@ -194,7 +194,9 @@ async function zahleHpKosten(engine, pi, heroIdx, heroOwner = pi) {
     await engine.actionDefeatHero(
       { name: CARD_NAME, owner: pi, heroIdx },
       hero,
-      { reason: CARD_NAME, isSacrifice: true, respectFirstTurnProtection: false },
+      // Welle 12 (Al): der Held stirbt am HP-VERLUST, nicht an einem Opfer-Effekt — `hpKosten` haelt Thuly / Temple of Sacrifice heraus
+      // (`isSacrifice` bleibt fuer „kein Reaktionsfenster, kein Schadenstod" - Kosten des eigenen Zuges).
+      { reason: CARD_NAME, isSacrifice: true, hpKosten: true, respectFirstTurnProtection: false },
     );
   } else {
     hero.hp = nachher;

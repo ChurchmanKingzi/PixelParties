@@ -138,6 +138,7 @@ module.exports = {
     onHeroKO: async (ctx) => {
       if (ctx.cardZone !== 'area') return;
       if (!ctx.isSacrifice) return;
+      if (ctx.hpKosten) return;   // Welle 12 (Al): Tod durch HP-Kosten (Foresta) ist kein Opfer
       const drawPlayer = ctx.source?.owner ?? ctx.source?.controller;
       await offerDraw(ctx._engine, drawPlayer, 3);
     },
