@@ -36,10 +36,11 @@ module.exports = {
       // Check HOPT manually — only mark used AFTER successful summon
       if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
       const hoptKey = `shadowy-slime-summon:${pi}`;
-      if (engine.gs.hoptUsed[hoptKey] === engine.gs.turn) return;
+      // Welle 10 (Al, Q30): ohne Kandidat/Platz FIZZELT der Effekt (Sandy Blob feuert dann nicht); Einmal-pro-Zug verbraucht / Sperre = gar nicht verfügbar.
+      if (engine.gs.hoptUsed[hoptKey] === engine.gs.turn) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }
 
       // Check summon lock
-      if (ctx.isSummonLocked()) return;
+      if (ctx.isSummonLocked()) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }
 
       // Load card database
       // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
@@ -65,7 +66,7 @@ module.exports = {
       }
 
       // Fizzle if no eligible creatures in discard
-      if (eligibleCards.length === 0) return;
+      if (eligibleCards.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'no_target' }); return; }
 
       // Find free support zones on the SAME hero only
       const getFreeZones = () => {
@@ -87,7 +88,7 @@ module.exports = {
       };
 
       // Fizzle if no free zones on this hero
-      if (getFreeZones().length === 0) return;
+      if (getFreeZones().length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { playerIdx: pi, grund: 'zone_taken' }); return; }
 
       // Step 1: Confirm
       const confirmed = await ctx.promptConfirmEffect({

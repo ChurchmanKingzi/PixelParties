@@ -148,6 +148,9 @@ module.exports = {
       // don't burn one of the 3 uses on a creature whose effect was
       // suppressed before it could run.
       if (entering.counters?.negated || entering.counters?.nulled) return;
+      // Welle 10 (Al, Q30): „nur, wenn der On-Summon-Effekt wirklich feuert und nicht fizzelt“ — ein Effekt ohne legales Ziel/Kandidat
+      // (Cloudy/Shadowy Slime) meldet sich über `engine.summonEffektFizzelt` und löst den Blob nicht aus.
+      if (entering.counters?._summonFizzledTurn === gs.turn) return;
 
       // Sandy Blob must be live on the board — by ITS OWN state only.
       // Als Bugreport (Demo 22-43-23, T7-T11): der Blob feuerte nie,

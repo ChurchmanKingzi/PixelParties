@@ -10,8 +10,8 @@
 //     summoned by a Hero capable of summoning it
 //     normally (alive, sufficient ability levels
 //     for the Creature's level / schools, not
-//     Frozen / Stunned / Negated / Bound for
-//     Lv > 0 Creatures, with a free Support
+//     Frozen / Stunned / Negated / Bound (all
+//     levels, Welle 10), with a free Support
 //     Zone). Per user spec, the total number of
 //     Creatures selectable is the MAX BIPARTITE
 //     MATCHING between MM Creatures in hand and
@@ -51,7 +51,7 @@ function _isMmCreature(cd) {
  * Can hero `heroIdx` legally host this card right now?
  * Mirrors the standard summoning gate:
  *   • Hero alive.
- *   • For Lv > 0 Creatures: hero not Frozen / Stunned / Negated / Bound.
+ *   • Hero not Frozen / Stunned / Negated / Bound / Webbed (alle Stufen, Welle 10 / Q44).
  *   • Spell-school requirement met via `heroMeetsLevelReq` (handles
  *     Performance, Mana Mining, Crystal multipliers, etc.).
  * Slot-level free-ness is checked separately when building slot list.
@@ -64,9 +64,11 @@ function _heroCanHostCreature(engine, pi, heroIdx, cd, ctrl = pi) {
   // und die Aktionssperren des Hosts gelten (Ruling 8.8./28.8., `_summon-eligibility`).
   if (engine.gs.players[ctrl]?.summonLocked) return false;
   if (heroActionLocked(engine, ctrl, heroIdx, pi)) return false;
-  if ((cd.level || 0) > 0) {
+  // Welle 10 (Al, Q44 / A06-rebelliokai-27): „'summon' erfordert grundsätzlich, dass der Beschwörer agieren kann, also nicht Frozen/Stunned ist" —
+  // das Status-Tor gilt für ALLE Stufen (der frühere Lv-0-Sonderfall entfällt).
+  {
     const s = hero.statuses || {};
-    if (s.frozen || s.stunned || s.negated || s.bound) return false;
+    if (s.frozen || s.stunned || s.negated || s.bound || s.webbed) return false;
   }
   if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) return false;
   return true;

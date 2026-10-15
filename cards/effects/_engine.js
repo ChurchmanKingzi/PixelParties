@@ -27649,6 +27649,20 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Welle 10 (Al, Q30 / A05-10): ein On-Summon-Effekt, der mangels legalem Ziel/Kandidat nichts tun kann, FIZZELT und „aktiviert" nicht
+   * (Sandy Blob: „when the on-summon effect … activates" feuert dann nicht). Der Effekt ruft das statt eines stillen `return`:
+   * stempelt die Kreatur (`counters._summonFizzledTurn`, von Sandy Blob gelesen) und zeigt - auf Wunsch - das sichtbare Fizzeln.
+   * `opts.stumm: true` = nur stempeln (Effekt war gar nicht verfuegbar: Einmal-pro-Zug verbraucht, Beschwoerungssperre).
+   */
+  async summonEffektFizzelt(inst, cardName, opts = {}) {
+    if (inst) {
+      if (!inst.counters) inst.counters = {};
+      inst.counters._summonFizzledTurn = this.gs.turn;
+    }
+    if (!opts.stumm) await this.zeigeFizzle(cardName, { playerIdx: opts.playerIdx, grund: opts.grund || 'no_target' });
+  }
+
+  /**
    * ★★ v1364 — „At the end of your opponent's next turn, shuffle the
    * Creature back into your deck" (Create Illusion, Staff of Illusions).
    * Laeuft am Ende JEDES Zuges (switchTurn, nach ON_TURN_END); faellig ist

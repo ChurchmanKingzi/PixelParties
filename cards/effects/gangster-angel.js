@@ -47,6 +47,7 @@
 
 const CARD_NAME = 'Gangster Angel';
 const PARTNER = 'Angler Angel';
+const { eligibleSummonZones } = require('./_summon-eligibility');
 const DAMAGE = 10;
 
 /**
@@ -55,7 +56,9 @@ const DAMAGE = 10;
  * Gegenspalte; jede Zone traegt `owner` (physische Seite).
  */
 function freieSlots(engine, pi) {
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
+  // Welle 10 (Al, Q44-Regel: jedes „summon" erfordert einen agierfähigen Beschwörer): „summon an Angler Angel … as an additional Action" ist eine
+  // echte Beschwörung — nur Plätze von Helden, die sie wirklich ausführen dürfen (nicht Frozen/Stunned/Negated, Stufe/Schule, keine Beschwörungs-/Aktionssperre).
+  return eligibleSummonZones(engine, pi, PARTNER, { nachKontrolle: true, alsAktion: true });
 }
 
 /**
