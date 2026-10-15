@@ -70,7 +70,7 @@ function eligibleHostSlots(engine, pi, creatureCardData) {
   // Pruefungen und Zonen ueber die physische Adresse, `owner` = Seite.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
     if (!engine.heroMeetsLevelReq(physOwner, hi, creatureCardData)) continue;
     if (!engine.isCreatureSummonable(creatureCardData.name, physOwner, hi, { _bypassBeforeSummon: true })) continue;
     const zones = engine.gs.players[physOwner].supportZones?.[hi] || [[], [], []];

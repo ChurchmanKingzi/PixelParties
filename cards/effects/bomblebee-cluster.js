@@ -93,7 +93,8 @@ module.exports = {
     const feld = (isSeat(gs, triggerInst.owner)) ? triggerInst.owner : pi;
     const fps = gs.players[feld];
     const host = fps?.heroes?.[hostHeroIdx];
-    if (!host?.name || host.hp <= 0) {
+    // Welle 11 (Al, R5): „Summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound/Negated).
+    if (!host?.name || host.hp <= 0 || !require('./_summon-eligibility').heroAgiert(host)) {
       // Host hero died between the summon firing and this reaction
       // resolving — nothing to do, but still apply the summon-lock
       // because text says "afterwards" unconditionally.

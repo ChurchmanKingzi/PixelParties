@@ -102,6 +102,9 @@ function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   if (!isElvenCreature(cd)) return false;
   const ps = engine.gs.players[riderSeite(deathInfo, ownerIdx)];
   if (!ps) return false;
+  // Welle 11 (Al, R5): „Reaction-Creatures können … NUR von Heroes beschworen werden, die aktionsfähig sind" — der Held der Zone beschwört den
+  // Rider: nicht Frozen / Stunned / Webbed / Bound / Negated.
+  if (!require('./_summon-eligibility').heroAgiert(ps.heroes?.[deathInfo.heroIdx])) return false;
   // Slot must be empty RIGHT NOW. The engine clears the slot just
   // before firing this hook, so this normally passes — but another
   // reaction in the batch could conceivably have filled it.

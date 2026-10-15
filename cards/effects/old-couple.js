@@ -77,6 +77,8 @@ function beschwoerbar(engine, pi, heroIdx, name, cd) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (ps?.summonLocked) return false;
+  // Welle 11 (Al, R5): „summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound/Negated).
+  if (!require('./_summon-eligibility').heroAgiert(ps?.heroes?.[heroIdx])) return false;
   try {
     if (engine.getSummonBlocked(pi).includes(name)) return false;
   } catch { /* eine defekte Sperre darf die Karte nicht sprengen */ }

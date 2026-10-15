@@ -72,6 +72,9 @@ module.exports = {
       const ps     = gs.players[pi];
       const orthos = gs.players[feld]?.heroes?.[ctx.cardHeroIdx];   // Kontrolle statt Seite (Styx 28.9.)
       if (!ps || !orthos?.name || orthos.hp <= 0) return;
+      // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer — Orthos selbst beschwört den zweiten Loyal
+      // (nicht Frozen / Stunned / Webbed / Bound / Negated).
+      if (!require('./_summon-eligibility').heroAgiert(orthos)) return;
 
       // Once per turn, scoped per Orthos instance.
       const hoptKey = heldenSperreKey('orthos_chain', pi);

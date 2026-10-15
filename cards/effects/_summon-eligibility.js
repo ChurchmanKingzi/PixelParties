@@ -162,4 +162,16 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
   return !!inst;
 }
 
-module.exports = { canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren };
+/**
+ * ★ Welle 11 (Al, R5): „… Reaction-Creatures können, sofern sie nichts anderes spezifizieren (der Term 'place' beinhaltet z.B., dass kein
+ * aktionsfähiger Hero notwendig ist) NUR von Heroes beschworen werden, die aktionsfähig sind, dasselbe für Effekte, die spezifisch 'summon' sagen."
+ * EINE Statusfrage für jedes „summon" eines Helden-Beschwörers: nicht Frozen / Stunned / Webbed / Bound / Negated — gleiche Menge wie
+ * `canHeroSummon`, für Skripte mit eigener Zonen-/Helden-Auswahl. Bei „place" (Monster Nest, Garius, Steam Dwarf Engineer …) NICHT benutzen.
+ */
+function heroAgiert(hero) {
+  if (!hero?.name || hero.hp <= 0) return false;
+  const st = hero.statuses || {};
+  return !(st.frozen || st.stunned || st.webbed || st.bound || st.negated);
+}
+
+module.exports = { canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert };

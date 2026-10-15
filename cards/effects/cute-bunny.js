@@ -64,7 +64,7 @@ function getHostHeroes(engine, pi) {
   // — auch uebernommene der Gegenspalte. Eintrag: { owner, heroIdx }.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
     const supZones = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!supZones.some(slot => (slot || []).length === 0)) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;

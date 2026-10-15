@@ -118,7 +118,7 @@ function getDiscardSummonHosts(engine, pi) {
   // — auch uebernommene der Gegenspalte. Eintrag: { owner, heroIdx }.
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated)
     const sup = engine.gs.players[physOwner]?.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
     if (!engine.heroMeetsLevelReq(physOwner, hi, cd)) continue;

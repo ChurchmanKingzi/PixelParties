@@ -51,7 +51,7 @@ function eligibleHostSlots(engine, pi, cardData) {
     // nachgezogenen Gigantisaurier — Chimera-Abwurf, Trex-Opfer — liefe
     // dort mit der Feldseite als `cardOwner`.)
     if (engine.heroSideOf(pi, h) !== pi) continue;
-    if (h.statuses?.frozen || h.statuses?.stunned) continue;
+    if (!require('./_summon-eligibility').heroAgiert(h)) continue;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
     if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
     // Per-creature canSummon check — handles the archetype's "1 per
     // Hero" rule for most Gigantisaurs (via gigantisaursCanSummon)

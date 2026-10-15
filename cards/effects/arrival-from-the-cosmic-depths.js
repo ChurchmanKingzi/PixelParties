@@ -103,7 +103,7 @@ function canHeroSummonCd(engine, pi, heroIdx, cd) {
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.bound) return false;
+  if (!require('./_summon-eligibility').heroAgiert(hero)) return false;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
   return engine.heroMeetsLevelReq(pi, heroIdx, cd);
 }
 

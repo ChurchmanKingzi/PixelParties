@@ -139,14 +139,14 @@ async function summonFromStack(engine, pi, cardName) {
   if (!ps) return { aborted: true, reason: 'no_player' };
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
-  const isLv0 = (cd?.level || 0) === 0;
 
   const targets = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    if (hero.statuses?.negated && !isLv0) continue;
+    // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer — auch Lv-0-Kreaturen (die frühere Ausnahme „Negated + Lv0" entfällt);
+    // zusätzlich Webbed/Bound (gleiche Menge wie `canHeroSummon`).
+    if (!require('./_summon-eligibility').heroAgiert(hero)) continue;
     if (engine._isHeroMummified?.(pi, hi)) continue;
     // ★ Al, Welle 9 (Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei
     // 'place' nicht." Hipdall/Swagdri/Wildur werden vom Coolness Stack

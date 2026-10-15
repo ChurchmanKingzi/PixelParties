@@ -36,7 +36,7 @@ function heroCanHost(engine, pi, heroIdx, cd, name, feld = pi, handIdx = null) {
   const ps = engine.gs.players[pi];
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+  if (!require('./_summon-eligibility').heroAgiert(hero)) return false;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
   if (ps?.summonLocked) return false;
   try { if (engine.getSummonBlocked(pi).includes(name)) return false; } catch { /* defekte Sperre sprengt die Karte nicht */ }
   if (!(feld === pi

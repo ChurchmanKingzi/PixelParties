@@ -207,9 +207,9 @@ module.exports = {
       // summons.
       const hostHero = ps.heroes?.[death.heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
-      if (hostHero.statuses?.frozen
-          || hostHero.statuses?.stunned
-          || hostHero.statuses?.bound) return;
+      // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`
+      // (auch die leichte Negation sperrt jetzt; vorher ließ nur die harte Form über `heroMeetsLevelReq` die Beschwörung scheitern).
+      if (!require('./_summon-eligibility').heroAgiert(hostHero)) return;
       if (ps.summonLocked) return;
       const ourCardData = cardDB[CARD_NAME];
       if (!ourCardData) return;
