@@ -136,7 +136,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) return;                           // wie jeder andere Suchpfad
+      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Galerie der passenden Deckkarten, Kopien zusammengefasst.
       const counts = {};
@@ -147,7 +147,7 @@ module.exports = {
       const gallery = Object.entries(counts)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([name, count]) => ({ name, source: 'deck', count }));
-      if (gallery.length === 0) return;
+      if (gallery.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const pick = await engine.promptGeneric(pi, {
         type: 'cardGallery',
@@ -157,7 +157,7 @@ module.exports = {
         cancellable: true,          // "you may"
         gerrymanderEligible: true,
       });
-      if (!pick || pick.cancelled || !pick.cardName) return;
+      if (!pick || pick.cancelled || !pick.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       if (!isDragoCreatureName(engine, pick.cardName)) return;
 
       // Nimmt die Karte aus dem Deck, legt sie auf die Hand, zeigt sie

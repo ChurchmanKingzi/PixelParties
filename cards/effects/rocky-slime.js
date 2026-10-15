@@ -109,7 +109,7 @@ module.exports = {
         });
       }
 
-      if (validTargets.length === 0) return; // No legal targets, fizzle silently.
+      if (validTargets.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await engine.promptEffectTarget(pi, validTargets, {
         title: 'Rocky Slime',
@@ -120,10 +120,10 @@ module.exports = {
         maxTotal: 1,
         autoConfirm: true,
       });
-      if (!picked || picked.length === 0) return;
+      if (!picked || picked.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const target = validTargets.find(t => t.id === picked[0]);
-      if (!target) return;
+      if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (target.type === 'hand') {
         // Validate the hand index still holds the expected card name —

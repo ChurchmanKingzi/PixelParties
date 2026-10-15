@@ -80,21 +80,21 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!isEffectSummon(ctx)) return;
+      if (!isEffectSummon(ctx)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
       const ps = gs.players[pi];
       const inst = ctx.card;
-      if (!ps || ps.summonLocked) return;
-      if (eligibleHand(engine, pi).length === 0) return;
+      if (!ps || ps.summonLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      if (eligibleHand(engine, pi).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const yes = await engine.promptGeneric(pi, {
         type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
         message: 'Tamed Primordium was summoned by an effect. Summon up to 2 level 1 or lower Creatures from your hand as additional Actions? (2 Creatures: Tamed Primordium is deleted and you can\'t summon any more Creatures this turn.)',
         confirmLabel: '🐾 Summon!', cancelLabel: 'No', cancellable: true,
       });
-      if (!yes) return;
+      if (!yes) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
       let summoned = 0;
@@ -126,6 +126,7 @@ module.exports = {
         });
       }
       engine.log('tamed_primordium', { player: ps.username, summoned });
+      if (summoned === 0) await engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: nichts beschworen → wirkt nicht → Blob stumm
       if (summoned >= 2) {
         // Sperre VOR der Loeschung (Al 8.9.): `ps.summonLocked` sperrt auch
         // Platzierungen, und eine Summon-only-Karte (Pawn Chain) darf im

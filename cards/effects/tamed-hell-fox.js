@@ -64,23 +64,23 @@ module.exports = {
 
   hooks: {
     onPlay: async (ctx) => {
-      if (!isEffectSummon(ctx)) return;
+      if (!isEffectSummon(ctx)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardController ?? ctx.cardOwner;
       const ps = gs.players[pi];
       const inst = ctx.card;
       if (!ps) return;
-      if (ps.handLocked) return;
-      if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return;
-      if ((ps.mainDeck || []).length === 0) return;
+      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      if (!engine.pileOutAllowed(pi, 'deck', { sourceOwner: pi })) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      if ((ps.mainDeck || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const yes = await engine.promptGeneric(pi, {
         type: 'confirm', title: CARD_NAME, showCard: CARD_NAME,
         message: 'Tamed Hell Fox was summoned by an effect. Search your deck for up to 2 cards with different names? (2 cards: Tamed Hell Fox is deleted and you can\'t play those names this turn.)',
         confirmLabel: '🦊 Search!', cancelLabel: 'No', cancellable: true,
       });
-      if (!yes) return;
+      if (!yes) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
       const first = await pickOne(engine, pi, ps.mainDeck || [], null);

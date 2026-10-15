@@ -156,9 +156,9 @@ module.exports = {
       // Angebot nur, wenn es auch ausfuehrbar ist: Angler in der Hand
       // UND ein freier Platz. Sonst waere die Abfrage eine Falle —
       // „ja" haette den Zug beendet, ohne den Angler zu bringen.
-      if (!(ps.hand || []).includes(PARTNER)) return;
+      if (!(ps.hand || []).includes(PARTNER)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const slots = freieSlots(engine, pi);
-      if (slots.length === 0) return;
+      if (slots.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const antwort = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -169,7 +169,7 @@ module.exports = {
         cancelLabel: 'No, keep my turn',
         cancellable: true,
       });
-      if (!antwort || antwort.cancelled) return;
+      if (!antwort || antwort.cancelled) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Platz waehlen (bei genau einem freien Platz ohne Rueckfrage).
       let ziel = slots[0];

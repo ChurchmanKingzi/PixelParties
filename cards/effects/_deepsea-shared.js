@@ -1118,7 +1118,11 @@ function resetPerTurnSummons(ps) {
  *   es dann gar nicht erst gestellt.
  */
 async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
-  return !!(await ctx.promptConfirmEffect({ title, message, ...opts }));
+  const ja = !!(await ctx.promptConfirmEffect({ title, message, ...opts }));
+  // Welle 11 (Al, R4: „Nur ein wirklich feuernder Effekt löst Sandy Blob aus!"): ein abgelehntes „you may" ist kein feuernder Effekt.
+  // (Nicht bei der Monstrosity-Kopie: ihr Bounce hat schon gewirkt.)
+  if (!ja && !ctx._monstrosityCopy) await ctx._engine.summonEffektFizzelt(ctx.card, title, { stumm: true });
+  return ja;
 }
 
 // ─── Generic creature atomic swap ────────────

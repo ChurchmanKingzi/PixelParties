@@ -152,13 +152,13 @@ module.exports = {
       for (const n of (ps.discardPile || [])) add(n, 'discard');
       for (const n of (ps.mainDeck || [])) add(n, 'deck');
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
-      if (cards.length === 0) return;
+      if (cards.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Obergrenze (Als Regel 29.8.): min(3, freie Support Zones der EIGENEN
       // Helden). Nur eine freie Zone → nur ein einzelnes Equip mit Kosten
       // genau 12 moeglich.
       const cap = Math.min(MAX_PIECES, ownFreeBaseZones(engine, pi));
-      if (cap <= 0) { engine.log('weather_orchestra_no_zone', { player: ps.username }); return; }
+      if (cap <= 0) { engine.log('weather_orchestra_no_zone', { player: ps.username }); return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true }); }   // W11/R4: wirkt nicht → Blob stumm
 
       // Machbarkeit: gibt es ueberhaupt eine Kombination aus 1..cap
       // VERSCHIEDENEN Namen mit Summe genau 12? Sonst feuert der Effekt
@@ -166,7 +166,7 @@ module.exports = {
       const distinctCosts = [...new Map(cards.map(c => [c.name, c.cost])).values()];
       if (!hasExactSubset(distinctCosts, EXACT_COST, cap)) {
         engine.log('weather_orchestra_no_combo', { player: ps.username, cap });
-        return;
+        return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       }
 
       const result = await engine.promptGeneric(pi, {
@@ -176,7 +176,7 @@ module.exports = {
         description: `Choose up to ${cap} different Artifacts with a combined Cost of EXACTLY ${EXACT_COST} — from your hand, deck or discard pile — and equip them to Heroes on the board for free.`,
         confirmLabel: '🎼 Equip!', confirmClass: 'btn-success', cancellable: true,
       });
-      if (!result || result.cancelled) return;
+      if (!result || result.cancelled) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // Eintraege ueber die Indizes aufloesen (Quelle!); Fallback ueber Namen.
       const idxs = Array.isArray(result.selectedIndices) ? result.selectedIndices
         : (result.selectedCards || []).map(n => cards.findIndex(c => c.name === n));

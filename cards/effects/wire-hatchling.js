@@ -58,7 +58,7 @@ module.exports = {
         confirmClass: 'btn-danger',
         cancellable: true,
       });
-      if (!ziel) return;
+      if (!ziel) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Der Wert wird ERST JETZT genommen.
       let betrag = 0;
@@ -77,7 +77,7 @@ module.exports = {
         if (!inst || hp <= 0) return;
         betrag = Math.ceil(hp / 2);
       }
-      if (betrag <= 0) return;
+      if (betrag <= 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'paralyzing_bolts', owner: ziel.owner, heroIdx: ziel.heroIdx,

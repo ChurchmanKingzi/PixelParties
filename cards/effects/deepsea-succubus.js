@@ -71,7 +71,7 @@ module.exports = {
         confirmClass: 'btn-success',
         cancellable: true,
       });
-      if (!target) return;
+      if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (target.type === 'hero') {
         const ok = engine.actionStealHero(pi, target.owner, target.heroIdx, { sourceName: CARD_NAME });

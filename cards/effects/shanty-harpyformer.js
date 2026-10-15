@@ -46,14 +46,14 @@ module.exports = {
 
       // Check if any Navigation Ability exists in deck
       const hasCopy = (ps.mainDeck || []).includes(ABILITY_NAME);
-      if (!hasCopy) return;
+      if (!hasCopy) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al)
 
       // Ask if the player wants to search
       const confirm = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Search your deck for a "${ABILITY_NAME}" Ability and add it to your hand?`,
       });
-      if (!confirm) return;
+      if (!confirm) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): abgelehntes „you may" → Blob stumm
 
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
     },

@@ -76,7 +76,7 @@ module.exports = {
       if (!ps) return;
 
       const eligible = _eligibleLinkHeroes(gs, pi);
-      if (eligible.length === 0) return; // No legal pick → effect stays dormant.
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const targets = eligible.map(hi => ({
         id: `hero-${pi}-${hi}`,

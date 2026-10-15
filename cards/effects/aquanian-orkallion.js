@@ -116,7 +116,7 @@ module.exports = {
 
       // Eine Area je Spieler — dasselbe Tor wie beim Ausspielen aus der
       // Hand. Wer schon eine kontrolliert, bekommt keine Suche.
-      if ((gs.areaZones?.[pi] || []).length > 0) return;
+      if ((gs.areaZones?.[pi] || []).length > 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const cardDB = engine._getCardDB();
       const gezaehlt = {};
@@ -127,7 +127,7 @@ module.exports = {
       const galerie = Object.entries(gezaehlt)
         .map(([name, count]) => ({ name, source: 'deck', count, level: cardDB[name]?.level || 0 }))
         .sort((a, b) => (a.level - b.level) || a.name.localeCompare(b.name));
-      if (galerie.length === 0) return;
+      if (galerie.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery',
@@ -136,10 +136,10 @@ module.exports = {
         description: 'You may bring an Area from your deck into play, regardless of its level.',
         cancellable: true,
       });
-      if (!wahl || wahl.cancelled || !wahl.cardName) return;   // „you may" — abgelehnt
+      if (!wahl || wahl.cancelled || !wahl.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const name = wahl.cardName;
-      if (!(await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME }))) return;
+      if (!(await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME }))) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       engine.shuffleDeck?.(pi, 'main');
 
       // ★ Auftritt erst NACH der bindenden Wahl (CARD_API): die Galerie

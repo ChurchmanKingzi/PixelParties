@@ -55,18 +55,18 @@ module.exports = {
       // hookExtras; we read either as a fallback.
       const byCosmic = ctx._summonedByCosmic
         || (typeof ctx._summonedBy === 'string' && isCosmicCard(ctx._summonedBy));
-      if (!byCosmic) return;
+      if (!byCosmic) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       if (!ps) return;
-      if ((ps.hand || []).length === 0) return;
+      if ((ps.hand || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Search-target check: any Cosmic Depths card present in the deck.
       const eligible = (ps.mainDeck || []).filter(n => COSMIC_DEPTHS_ANY.has(n));
-      if (eligible.length === 0) return;
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Optional ("you may") — discard cost requires a confirm.
       const confirmed = await engine.promptGeneric(pi, {
@@ -79,7 +79,7 @@ module.exports = {
         cancellable: true,
         searchToHand: true, searchPile: 'deck',   // Z6 (A02-22): Angebot unter Hand-/Such-Sperre unterdruecken (wie Deepsea Witch)
       });
-      if (!confirmed) return;
+      if (!confirmed) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Pay the discard cost (player picks the card to discard).
       await engine.actionPromptForceDiscard(pi, 1, {
@@ -95,7 +95,7 @@ module.exports = {
       const stillEligible = (ps.mainDeck || []).filter(n => COSMIC_DEPTHS_ANY.has(n));
       if (stillEligible.length === 0) {
         engine.log('life_searcher_fizzle', { player: ps.username, reason: 'no_target_post_discard' });
-        return;
+        return;   // (Abwurf ist schon bezahlt → der Effekt hat gewirkt; kein Stempel)
       }
 
       // Build deduped gallery of CD cards in deck.
@@ -113,7 +113,7 @@ module.exports = {
         description: 'Choose a "Cosmic Depths" card to add to your hand.',
         cancellable: false,
       });
-      if (!pick?.cardName) return;
+      if (!pick?.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const chosen = pick.cardName;
       // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt.
       const kratesNamen = new Set(stillEligible);

@@ -49,10 +49,10 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
-      if (!ps || (ps.discardPile || []).length === 0) return;
+      if (!ps || (ps.discardPile || []).length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt den
       // Einsatz-Effekt (Ablage ins Deck) — nicht angeboten.
-      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, pi)) return;
+      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, pi)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Shuffle up to 3 different-named cards from discard back into your deck?'
@@ -66,7 +66,7 @@ module.exports = {
         seen.add(baseCardName(n));
         gallery.push({ name: n, source: 'discard' });
       }
-      if (gallery.length === 0) return;
+      if (gallery.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await ctx.promptCardGalleryMulti(gallery, {
         title: CARD_NAME,
@@ -76,7 +76,7 @@ module.exports = {
         cancellable: true,
       });
       const chosen = picked?.selectedCards || [];
-      if (chosen.length === 0) return;
+      if (chosen.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const recycled = await engine.actionRecycleCards(pi, chosen, {
         source: CARD_NAME,

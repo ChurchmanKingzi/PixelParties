@@ -27691,6 +27691,9 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (Sandy Blob: „when the on-summon effect … activates" feuert dann nicht). Der Effekt ruft das statt eines stillen `return`:
    * stempelt die Kreatur (`counters._summonFizzledTurn`, von Sandy Blob gelesen) und zeigt - auf Wunsch - das sichtbare Fizzeln.
    * `opts.stumm: true` = nur stempeln (Effekt war gar nicht verfuegbar: Einmal-pro-Zug verbraucht, Beschwoerungssperre).
+   * Welle 11 (Al, R4: „Nur ein wirklich feuernder Effekt löst Sandy Blob aus!"): gilt ebenso für ein abgelehntes „you may" und ein leeres
+   * Suchen/Wählen (Harpyformers, Sparkfly Architect, Deepsea-Familie über `promptOptionalOnSummon`, Black Marketeer, Slimes …) — die Skripte
+   * rufen es mit `{ stumm: true }` an jedem solchen Ausstieg (Kennung `// W11/R4`). NEUE On-Summon-Effekte mit „you may"/Suche/Wahl tun dasselbe.
    */
   async summonEffektFizzelt(inst, cardName, opts = {}) {
     if (inst) {

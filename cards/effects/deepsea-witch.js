@@ -44,7 +44,7 @@ module.exports = {
       // Hand lock blocks any card-adding effect — skip the prompt
       // entirely rather than walking the player through a tutor that
       // can't add the chosen card.
-      if (ps.handLocked) return;
+      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // ★★ v1121 (Als Vorgabe 15.9.): „Karten wie Deepsea Witch sollten
       // nicht mal ihren optionalen Effekt ANBIETEN, das sollte alles
       // geskipped werden!"
@@ -67,7 +67,7 @@ module.exports = {
         seen.add(name);
         eligible.push({ name, source: 'deck' });
       }
-      if (eligible.length === 0) return;
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Search your deck for a Deepsea Creature and add it to your hand?',
@@ -80,7 +80,7 @@ module.exports = {
         description: 'Choose a Deepsea Creature to add to your hand.',
         cancellable: true,
       });
-      if (!picked?.cardName) return;
+      if (!picked?.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await engine.actionAddCardFromDeckToHand(pi, picked.cardName, {
         source: CARD_NAME,

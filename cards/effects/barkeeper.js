@@ -57,10 +57,10 @@ module.exports = {
       if (!ps) return;
 
       const fehlen = ZIEL_HANDGROESSE - (ps.hand || []).length;
-      if (fehlen <= 0) return;                           // Hand ist schon voll genug
+      if (fehlen <= 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // Z6 (C01-01): "add ... to your hand" - Hand-Sperre und Such-Sperre ("cannot search or add cards to your hand")
       // verbieten das Hinzufuegen; gar nicht erst anbieten.
-      if (engine._isSearchBlocked(pi, {}, 'deck')) return;
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const ja = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -74,7 +74,7 @@ module.exports = {
       const bestaetigt = typeof engine._confirmSaidYes === 'function'
         ? engine._confirmSaidYes(ja)
         : !!(ja && !ja.cancelled);
-      if (!bestaetigt) return;
+      if (!bestaetigt) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 

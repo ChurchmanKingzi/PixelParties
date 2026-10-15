@@ -74,7 +74,7 @@ module.exports = {
         if (!isDeepseaCreature(inst.name, engine, inst)) continue;
         candidates.push(inst);
       }
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Bounce one of your other Deepsea Creatures and copy its on-summon effect?'
@@ -98,12 +98,12 @@ module.exports = {
         // darf nicht stillschweigend dessen linkeste waehlen (s. promptZonePick).
         heroShortcut: false,
       });
-      if (!picked) return;
+      if (!picked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Held/Slot gibt es auf BEIDEN Brettern — die Brettseite (`picked.owner`) gehört zur Wahl.
       const chosenInst = candidates.find(i => i.heroIdx === picked.heroIdx && i.zoneSlot === picked.slotIdx
         && (picked.owner ?? engine.physicalSide(i)) === engine.physicalSide(i));
-      if (!chosenInst) return;
+      if (!chosenInst) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const copiedName = chosenInst.name;
 
       // Step 1: bounce the chosen creature back to hand.

@@ -60,14 +60,14 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return;
+      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): kein Treffer → wirkt nicht → Blob stumm
 
       // „you may" — die Suche deckt die Karte auf, also wird gefragt.
       const ja = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Search your deck for a "${ABILITY_NAME}" Ability, reveal it and add it to your hand?`,
       });
-      if (!ja) return;
+      if (!ja) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al)
 
       await engine.searchDeckForNamedCard(pi, ABILITY_NAME, CARD_NAME);
       engine.sync();

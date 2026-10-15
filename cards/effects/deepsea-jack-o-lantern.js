@@ -41,12 +41,12 @@ module.exports = {
       markSummonedPerTurnLimit(ctx, CARD_NAME);
 
       const bouncedLevel = ctx.card?.counters?._bouncedFromLevel;
-      if (bouncedLevel == null || bouncedLevel <= 0) return;
+      if (bouncedLevel == null || bouncedLevel <= 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const engine = ctx._engine;
       // Hand lock blocks any card-adding effect — skip the draw entirely
       // rather than calling into a fizzling actionDrawCards.
-      if (engine.gs.players[ctx.cardOwner]?.handLocked) return;
+      if (engine.gs.players[ctx.cardOwner]?.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await ctx.drawCards(ctx.cardOwner, bouncedLevel);
       engine.log('deepsea_jack_lantern_draw', {

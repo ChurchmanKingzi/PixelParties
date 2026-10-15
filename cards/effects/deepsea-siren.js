@@ -133,7 +133,7 @@ module.exports = {
         cancellable: true,
         excludeSelf: true,
       });
-      if (!target) return;
+      if (!target) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const engine = ctx._engine;
       const selfInst = ctx.card;

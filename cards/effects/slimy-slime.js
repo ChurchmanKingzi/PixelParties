@@ -45,7 +45,7 @@ module.exports = {
         },
       });
 
-      if (selected.length === 0) return;
+      if (selected.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const target = selected[0];
 
       if (target.type === 'hero') {

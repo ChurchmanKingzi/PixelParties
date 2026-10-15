@@ -47,7 +47,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const oi = engine.opponentOf(pi);
       const hearts = eigeneHearts(engine, pi);
-      if (hearts.length === 0) return;
+      if (hearts.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const ziele = hearts.map(h => ({
         id: `equip-${engine.physicalSide(h)}-${h.heroIdx}-${h.zoneSlot}`, type: 'equip',
@@ -61,7 +61,7 @@ module.exports = {
         _skipRedirectCheck: true, _skipPostTargetReactions: true,
       });
       const gewaehlt = (ids || []).map(id => ziele.find(z => z.id === id)).filter(Boolean);
-      if (gewaehlt.length === 0) return;
+      if (gewaehlt.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       let n = 0;
       for (const z of gewaehlt) {

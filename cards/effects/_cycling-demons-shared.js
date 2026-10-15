@@ -374,7 +374,7 @@ function buildDemonHooks(cardName) {
 
         markDemonSummoned(engine.gs, pi, cardName);
 
-        if (ctx._summonedByDemon !== def.predecessor) return;
+        if (ctx._summonedByDemon !== def.predecessor) return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): „when you summon … with the effect of <Vorgänger>" trifft nicht zu → Blob stumm
         const bonus = BONUS[cardName];
         if (bonus) await bonus(ctx, engine, pi);
       },

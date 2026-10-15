@@ -69,7 +69,7 @@ module.exports = {
           cardName: inst.name, cardInstance: inst,
         });
       }
-      if (targets.length === 0) return;
+      if (targets.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Destroy an Artifact on the board?'
@@ -83,9 +83,9 @@ module.exports = {
         cancellable: true,
         maxTotal: 1,
       });
-      if (!selectedIds || selectedIds.length === 0) return;
+      if (!selectedIds || selectedIds.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       const chosen = targets.find(t => t.id === selectedIds[0]);
-      if (!chosen?.cardInstance) return;
+      if (!chosen?.cardInstance) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Spooky ghost haunts the Artifact slot BEFORE it's destroyed so
       // the player sees the cause-and-effect.

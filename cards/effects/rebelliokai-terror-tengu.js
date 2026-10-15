@@ -181,7 +181,7 @@ module.exports = {
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_eligible_discard_summons',
         });
-        return;
+        return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       }
 
       // Cap the multi-pick at min(3, eligible-creature-count, total
@@ -198,7 +198,7 @@ module.exports = {
         engine.log('rebelliokai_terror_tengu_fizzle', {
           player: ps.username, reason: 'no_free_summon_zones',
         });
-        return;
+        return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       }
 
       const cardDB = engine._getCardDB();
@@ -302,6 +302,8 @@ module.exports = {
       // filled up, etc.), the turn proceeds normally.
       if (summonsLanded > 0) {
         await engine.advanceToPhase(pi, PHASES.END);
+      } else {
+        await engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: nichts gewählt/gelandet → Blob stumm
       }
     },
   },

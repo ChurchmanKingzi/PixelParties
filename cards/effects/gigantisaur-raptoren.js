@@ -107,7 +107,7 @@ module.exports = {
       };
 
       let initialEligible = buildEligibleHandIndices();
-      if (initialEligible.length === 0) return;
+      if (initialEligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // No upfront Yes/No confirm — the player goes straight into the
       // picker. Cancelling the picker is the opt-out.

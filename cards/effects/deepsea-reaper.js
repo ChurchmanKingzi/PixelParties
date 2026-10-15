@@ -57,7 +57,7 @@ module.exports = {
         if (inst.faceDown) continue;
         creatures.push(inst);
       }
-      if (creatures.length === 0) return;
+      if (creatures.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Defeat any Creature on the board?'
@@ -72,7 +72,7 @@ module.exports = {
         cancellable: true,
         excludeSelf: true,
       });
-      if (!target || !target.cardInstance) return;
+      if (!target || !target.cardInstance) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Scythe cut animation on the victim BEFORE destruction so the
       // player sees the blade that killed the creature.

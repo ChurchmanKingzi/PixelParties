@@ -66,30 +66,30 @@ module.exports = {
         seen.add(name);
         eligible.push({ name, source: 'discard', cost: lvl });
       }
-      if (eligible.length === 0) return;
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Any free support zone on any hero we control (living OR dead).
       // Kontrolle statt Seite (Styx 28.9.) — Zonen tragen `owner`.
       const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true });
-      if (freeZones.length === 0) return;
+      if (freeZones.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Revive a Lv1-or-lower Deepsea Creature from your discard pile (its effects will be negated)?'
-      ))) return;
+      ))) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await ctx.promptCardGallery(eligible, {
         title: CARD_NAME,
         description: 'Pick a Lv1-or-lower Deepsea Creature to place (effects negated).',
         cancellable: true,
       });
-      if (!picked?.cardName) return;
+      if (!picked?.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const zone = await ctx.promptZonePick(freeZones, {
         title: CARD_NAME,
         description: `Place ${picked.cardName} into which free Support Zone?`,
         cancellable: true,
       });
-      if (!zone) return;
+      if (!zone) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       await engine.actionPlaceCreature(picked.cardName, pi, zone.heroIdx, zone.slotIdx, {
         heldSeite: zone.owner ?? pi,

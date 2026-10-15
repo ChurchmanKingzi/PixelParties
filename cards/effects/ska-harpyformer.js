@@ -189,14 +189,14 @@ module.exports = {
       const hero = gs.players[ctx.cardHeroOwner ?? pi]?.heroes?.[heroIdx];   // Styx 28.9.: Brettseite
       if (!ps || !hero?.name || hero.hp <= 0) return;
 
-      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return;
+      if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): kein Treffer → wirkt nicht → Blob stumm
 
       // Offer the 50-damage trade
       const confirm = await ctx.promptConfirmEffect({
         title: CARD_NAME,
         message: `Deal 50 damage to ${hero.name} to search your deck for a "${ABILITY_NAME}" Ability?`,
       });
-      if (!confirm) return;
+      if (!confirm) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): abgelehntes „you may" → Blob stumm
 
       // Deal 50 to the hosting hero
       engine._broadcastEvent('play_zone_animation', {

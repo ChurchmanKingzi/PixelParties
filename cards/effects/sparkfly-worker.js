@@ -45,17 +45,17 @@ module.exports = {
       const pi     = ctx.cardOwner;
       const ps     = gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) return;
+      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // Gate: only fires while a Queen is controlled.
-      if (!findControlledQueen(engine, pi)) return;
+      if (!findControlledQueen(engine, pi)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       // HARD once-per-turn (player-level) — only one Worker steal per
       // turn total, even with multiple Workers in play. Pre-check
       // without claiming so cancelling the picker doesn't burn the
       // slot. Stored at `gs.hoptUsed[key:pi]` per the engine's
       // canonical HOPT registry.
-      if (engine.gs.hoptUsed?.[`sparkfly-worker-steal:${pi}`] === engine.gs.turn) return;
+      if (engine.gs.hoptUsed?.[`sparkfly-worker-steal:${pi}`] === engine.gs.turn) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const targets = collectNonHeroBoardTargets(gs, engine);
       // Don't offer the just-summoned Worker as a steal target — it would
@@ -68,7 +68,7 @@ module.exports = {
       const filteredTargets = targets
         .filter(t => t._cardInstance?.id !== ctx.card?.id)
         .filter(t => !nurEigene || (t.owner ?? t._cardInstance?.owner) === pi);
-      if (filteredTargets.length === 0) return;
+      if (filteredTargets.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const picked = await engine.promptEffectTarget(pi, filteredTargets, {
         maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
@@ -80,7 +80,7 @@ module.exports = {
         exclusiveTypes: true,
         maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
       });
-      if (!picked || picked.length === 0) return;
+      if (!picked || picked.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       const sel = filteredTargets.find(t => t.id === picked[0]);
       if (!sel?._cardInstance) return;

@@ -149,14 +149,15 @@ module.exports = {
 
       const engine = ctx._engine;
       const ps = engine.gs.players[ctx.cardOwner];
-      if (!ps || !(ps.discardPile || []).length) return;
+      if (!ps || !(ps.discardPile || []).length) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
       // Al, Welle 10 (Q54): Distracting Crystal auf der Hand sperrt auch den
       // Einsatz-Effekt (Ablage ins Deck) — nicht angeboten, die Beschwoerung gilt.
-      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, ctx.cardOwner)) return;
+      if (require('./_crystals-shared').shuffleIntoDeckBlocked(engine, ctx.cardOwner)) return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4
 
-      await recycleUndGold(ctx, MAX_PICKS,
+      const _recycelt = await recycleUndGold(ctx, MAX_PICKS,
         `Shuffle up to ${MAX_PICKS} cards from your discard pile back into your deck `
         + `and gain ${GOLD_JE} Gold each.`);
+      if (!_recycelt) await engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: nichts gewählt/recycelt → Blob stumm
     },
   },
 
