@@ -89,7 +89,7 @@ module.exports = {
       // beforeDamage hook, so we look ahead via the generic helper.
       // Saves the Projection for a future damage event that actually
       // needs it.
-      if (ctx._engine._wouldHeroDamageBeVoided(ctx.target, ctx.source)) return;
+      if (ctx._engine._wouldHeroDamageBeVoided(ctx.target, ctx.source, ctx.type)) return;
 
       // One prompt per damage event, even if the Hero holds several
       // Idej Projections. The flag survives across every beforeDamage
