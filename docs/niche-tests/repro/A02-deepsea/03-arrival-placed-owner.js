@@ -5,7 +5,7 @@
 // your opponent controls. Then, choose a "Cosmic Depths" Creature 1 level higher … and summon it with a Hero you control …"
 // Vorbild/Konvention: Powder Keg (`powder-keg.js` Z. 30–45, 301–304): Kreatur steht auf der Gegenseite, aber `originalOwner` = Wirker,
 //   damit der Leichnam in die Ablage des Wirkers geht („Gestohlene/fremd platzierte Karten gehen in die Ablage ihres Besitzers").
-// Erwartung: Die Karte stammt aus MEINEM Deck; stirbt sie, landet sie in MEINER Ablage.
+// WELLE 9: Al hat den Ist-Stand bestätigt („funktioniert wie gewollt“) – die Prüfungen unten sind umgestellt. Alte Erwartung (überholt): Die Karte stammt aus MEINEM Deck; stirbt sie, landet sie in MEINER Ablage.
 // Beobachtet: `inst.owner = inst.controller = inst.originalOwner = Gegner` → die Karte aus meinem Deck landet in der ABLAGE DES GEGNERS
 //   (und könnte per Deepsea Castle/Shapeshift des Gegners sogar auf SEINE Hand zurückgeholt werden, weil er sie kontrolliert).
 //   Außerdem zählt der Analyzer dort „your opponent draws" aus Sicht des Gegners, also MEINE Züge.
@@ -24,8 +24,9 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionDrawCards(0, 1));
   R.note('Analyzer-Counter nach EIGENEM Ziehen des Spielers (Gegner-Analyzer zählt „your opponent draws")', an.counters.changeCounter || 0);
   await t.run(() => t.engine.actionDestroyCard({ name: 'Src', owner: 0 }, an));
-  R.check('Die Karte aus meinem Deck liegt in MEINER Ablage', t.pile(0, 'discardPile').includes(AN), { meine: t.pile(0, 'discardPile'), gegner: t.pile(1, 'discardPile') });
-  R.check('Sie liegt nicht in der Ablage des Gegners', !t.pile(1, 'discardPile').includes(AN), t.pile(1, 'discardPile'));
+  // Welle 9 (Al, 15.10.2026, Q8): „Das funktioniert wie gewollt.“ – Platz + Kontrolle + Ablage beim Gegner sind Absicht; das Repro prüft jetzt diesen Ist-Stand (früher: Ablage beim Wirker).
+  R.check('Welle 9: Die platzierte Karte endet in der Ablage des Gegners (gewollt)', t.pile(1, 'discardPile').includes(AN), { meine: t.pile(0, 'discardPile'), gegner: t.pile(1, 'discardPile') });
+  R.check('Welle 9: Sie liegt nicht in meiner Ablage', !t.pile(0, 'discardPile').includes(AN), t.pile(0, 'discardPile'));
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
 
   // Folge: weil der Gegner die Kreatur kontrolliert, kann er sie mit Shapeshift auf SEINE Hand nehmen (Zugabe einer Karte aus meinem Deck)
@@ -37,6 +38,6 @@ const H = require('../../lib/h.js');
   t2.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx, owner: d.zones[0].owner }) });
   t2.script.push({ match: d => d.type === 'pickHandCard', answer: () => { const i = t2.pile(1, 'hand').indexOf(H.INERT.creature); return { cardName: H.INERT.creature, handIndex: i, selectedCards: [{ cardName: H.INERT.creature, handIndex: i }] }; } });
   await t2.play(1, 'Shapeshift', { hero: 0 });
-  R.check('Der Gegner kann meine Deck-Karte NICHT per Shapeshift auf seine Hand holen', !t2.pile(1, 'hand').includes(AN), t2.pile(1, 'hand'));
+  R.check('Welle 9: Der Gegner kontrolliert die Kreatur und kann sie per Shapeshift auf seine Hand holen (gewollt)', t2.pile(1, 'hand').includes(AN), t2.pile(1, 'hand'));
   R.finish();
 })();
