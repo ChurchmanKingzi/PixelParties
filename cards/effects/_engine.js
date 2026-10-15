@@ -49938,6 +49938,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Welle 11 (Q85): Wer ist gerade der „Karten-Wirker"? Der Spieler, dessen Karte/Effekt gerade aufloest — gleiche
+   * Rangfolge wie bei den uebrigen Quellenfragen (`pileOutAllowed`, `_gateQuelleIstGegner`), nur mit dem Kettenglied
+   * davor: 1. Hook/Aktivierung einer Karte auf dem Brett (`_currentEffectSource` MIT `instId` — der innerste Verursacher),
+   * 2. das Kettenglied, das gerade aufloest (`_rxResolvingOwner` — auch eine Reaktion des Gegners), 3. die laufende
+   * Effektquelle ohne Instanz (gespielte Karte, Kreatur-Effekt), 4. die aktivierende Karte (`_activationSource`).
+   * Ohne jede Quelle (Spielablauf, Statusticks) `null` — der Zugspieler ist KEIN Wirker.
+   */
+  _kartenWirker() {
+    const q = this._currentEffectSource;
+    if (q && q.instId != null && isSeat(this, q.owner)) return q.owner;
+    if (isSeat(this, this._rxResolvingOwner)) return this._rxResolvingOwner;
+    if (q && isSeat(this, q.owner)) return q.owner;
+    const a = this._activationSource;
+    if (a && isSeat(this, a.owner) && (a.turn == null || a.turn === this.gs?.turn)) return a.owner;
+    return null;
+  }
+
+  /**
    * Check if all heroes of either player are dead.
    * If so, the other player wins.
    */
@@ -50008,16 +50026,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Beide Seiten ausgeloescht. Bisher entschied stillschweigend die
     // Schleifenreihenfolge (Spieler 0 verlor). Eine Karte kann den
     // Verlierer jetzt ausdruecklich bestimmen — Bunny Bombs: "When this
-    // would result in a draw, you lose the game." Ohne Angabe bleibt es
-    // beim alten Verhalten.
+    // would result in a draw, you lose the game." Ohne Angabe gewinnt seit
+    // Welle 11 der Karten-Wirker (s. u.).
     if (wiped[0] && wiped[1]) {
       const hint = this.gs._drawLoserIdx;
-      const loserIdx = (isSeat(this, hint)) ? hint : 0;
-      const winnerIdx = loserIdx === 0 ? 1 : 0;
+      // ★ Welle 11 (Al, 15.10.2026, Q85): „Wenn nichts anderes angegeben ist, gewinnt der Karten-Wirker." Rangfolge:
+      // 1. ausdrückliche Karten-Klausel (`_drawLoserIdx`: Bunny Bombs, Armageddon …), 2. der Wirker der laufenden
+      // Karte/des Effekts (`_kartenWirker`), 3. ohne jede Karte (reiner Spielablauf) der alte Standard (Sitz 0 verliert).
+      const wirker = (isSeat(this, hint)) ? null : this._kartenWirker();
+      let loserIdx = (isSeat(this, hint)) ? hint : 0;
+      let winnerIdx = loserIdx === 0 ? 1 : 0;
+      if (wirker != null) { winnerIdx = wirker; loserIdx = this.opponentOf(wirker); }
       this.log('draw_resolved', {
         loser: this.gs.players[loserIdx]?.username,
         winner: this.gs.players[winnerIdx]?.username,
-        decidedBy: (isSeat(this, hint)) ? 'card_effect' : 'default',
+        decidedBy: (isSeat(this, hint)) ? 'card_effect' : (wirker != null ? 'caster' : 'default'),
       });
       if (this._inMctsSim) {
         if (!this.gs.result) this.gs.result = { winnerIdx, reason: 'draw_resolved' };
