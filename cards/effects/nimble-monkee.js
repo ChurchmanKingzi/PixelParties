@@ -171,7 +171,7 @@ module.exports = {
     if (ctx.card?.zone !== 'support') return false;
     if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (!await payInvestCounters(engine, pi, 8, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
     engine.log('nimble_monkee_invest_draw', {
       player: engine.gs.players[pi]?.username, cards: 2,

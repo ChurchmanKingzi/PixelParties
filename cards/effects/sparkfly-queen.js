@@ -288,13 +288,13 @@ module.exports = {
     let resolvedSomething = false;
     if (chosenMode === 'main') {
       resolvedSomething = await runMainEffect(ctx, engine, gs, pi, oi, inst);
-      if (resolvedSomething) markModeUsed(inst, 'main', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'main', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     } else if (chosenMode === 'architect') {
       resolvedSomething = await runArchitectGift(ctx, engine, gs, pi, oi);
-      if (resolvedSomething) markModeUsed(inst, 'architect', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'architect', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     } else if (chosenMode === 'worker') {
       resolvedSomething = await runWorkerGift(ctx, engine, gs, pi, oi);
-      if (resolvedSomething) markModeUsed(inst, 'worker', turn);
+      if (resolvedSomething && !ctx._borrowedUse) markModeUsed(inst, 'worker', turn);   // W13 (Al, Rueckfrage 9): geliehen = Zaehler bleibt
     }
 
     if (!resolvedSomething) {

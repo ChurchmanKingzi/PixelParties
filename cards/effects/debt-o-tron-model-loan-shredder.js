@@ -68,8 +68,10 @@ module.exports = {
     });
     if (!bestaetigt) return false;
 
-    if (!gs.hoptUsed) gs.hoptUsed = {};
-    gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    if (!ctx._borrowedUse) {   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    }
 
     // Zaehl-Animation wie bei Market Crash, aber GRUEN und von −X auf 0
     // (Als Vorgabe 16.8.). `to` haelt den Gegner auf seinem Wert fest —

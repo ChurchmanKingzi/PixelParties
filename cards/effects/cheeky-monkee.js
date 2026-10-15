@@ -200,7 +200,7 @@ module.exports = {
     if (!ziel) return false;
 
     if (!await payInvestCounters(engine, pi, 4, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
     // v349 (Als Vorgabe, Muster Book of Doom): der Karten-Auftritt kommt
     // ERST jetzt — Ziel steht, Kosten sind bezahlt. Der Server hat ihn
     // nur angemeldet; wir loesen ihn aus, bevor die Bananen fallen.

@@ -57,7 +57,7 @@ module.exports = {
     // Soft HOPT — stamp the inst, not the player. Each Phatnir gets
     // its own per-turn slot.
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt
 
     // Giant red laser from Phatnir's support slot to the target.
     // Uses the existing beam infrastructure with a thickness multiplier

@@ -103,11 +103,11 @@ module.exports = {
     const cd = cardDB[top];
     if (cd?.cardType !== 'Artifact') return false;
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt (und Abbruch loescht keinen fremden Stempel)
     // ★ Z7 (A04-05): Abbruch/Fehlschlag VOR der Zusage verbraucht die Einmal-Nutzung NICHT (Regel 23.9) —
     // der Zählerstempel geht zurück, und `false` hält auch die Engine-Rundensperre offen (ein blankes
     // `return;` gilt dort als Erfolg).
-    const abbruch = () => { delete ctx.card.counters[HOPT_KEY]; return false; };
+    const abbruch = () => { if (!ctx._borrowedUse) delete ctx.card.counters[HOPT_KEY]; return false; };
 
     const ps = engine.gs.players[pi];
 

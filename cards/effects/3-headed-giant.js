@@ -113,7 +113,7 @@ module.exports = {
     // zu stempeln.
     if (!target) return false;
 
-    const spent = spendUse(gs, inst);
+    const spent = ctx._borrowedUse ? usesThisTurn(gs, inst) : spendUse(gs, inst);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Zaehler NICHT
     // Solange noch Nutzungen offen sind, die Engine-Sperre offen lassen.
     // Mit der letzten NICHT mehr — dann greift die reguläre Sperre und
     // die Karte graut aus.
