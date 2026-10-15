@@ -38,6 +38,7 @@
 
 const CARD_NAME = 'Sleeping Beauty';
 const ON_DEFEAT_DAMAGE = 300;
+const HARD_KEY = 'sleeping-beauty-hard';   // W13 (Rueckfrage 8)
 
 function _eligibleLinkHeroes(gs, pi) {
   const ps = gs.players[pi];
@@ -146,6 +147,8 @@ module.exports = {
     const linkedOwner = inst.counters?._linkedHeroOwner;
     const linkedIdx   = inst.counters?._linkedHeroIdx;
     if (linkedOwner == null || linkedIdx == null) return false;
+    // W13 (Al, Rueckfrage 8): „You can only activate the effect of "Sleeping Beauty" once per turn" = hard once per turn, ein Stempel je Spieler fuer alle Kopien.
+    if (gs.hoptUsed?.[`${HARD_KEY}:${ctx.cardOwner}`] === gs.turn) return false;
 
     const linkedHero = gs.players[linkedOwner]?.heroes?.[linkedIdx];
     if (!linkedHero?.name || linkedHero.hp <= 0) return false;
@@ -206,6 +209,7 @@ module.exports = {
     // place. Sleeping Beauty's own creature HOPT is stamped by the
     // engine after this returns (standard behavior).
     const heroCtx = engine._createContext(heroInst, {});
+    if (!engine.claimHOPT(HARD_KEY, ctx.cardOwner)) return false;   // W13 (Rueckfrage 8): vor dem Lauf stempeln (verschachtelte Ketten sehen die Sperre)
     let result;
     try {
       result = await heroScript.onHeroEffect(heroCtx);
@@ -214,6 +218,7 @@ module.exports = {
       result = false;
     }
 
+    if (result === false && gs.hoptUsed) delete gs.hoptUsed[`${HARD_KEY}:${ctx.cardOwner}`];   // W13: Fehlschlag verbraucht nichts
     engine.log('sleeping_beauty_borrow', {
       owner: linkedOwner, hero: linkedHero.name,
     });

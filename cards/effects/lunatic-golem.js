@@ -31,6 +31,7 @@ const { countDistinctLunaticCycle, hostHeroOf } = require('./_lunatic-shared');
 const { getNegativeStatuses } = require('./_hooks');
 
 const CARD_NAME = 'Lunatic Golem';
+const HARD_KEY = 'lunatic-golem-hard';   // W13 (Rueckfrage 8)
 const DMG_PER_CYCLE = 100;
 
 /** Keep the tier-2+ `negative_status_immune` buff in sync with the
@@ -82,6 +83,8 @@ module.exports = {
     const inst = ctx.card;
     if (!inst || inst.zone !== 'support') return false;
     if (ctx._engine.istHartNegiert(inst)) return false;   // v1444
+    // W13 (Al, Rueckfrage 8): „You can only activate this effect once per turn" = hard once per turn: ein Stempel je Spieler fuer alle Golems (auch geliehene Verwendung).
+    if (ctx._engine.gs.hoptUsed?.[`${HARD_KEY}:${ctx.cardOwner}`] === ctx._engine.gs.turn) return false;
     return countDistinctLunaticCycle(ctx._engine) >= 1;
   },
 
@@ -119,6 +122,7 @@ module.exports = {
       cancellable: true,
     });
     if (!target) return false;
+    if (!engine.claimHOPT(HARD_KEY, pi)) return false;   // W13 (Rueckfrage 8): Hard-Stempel erst nach der Zielwahl
 
     // Moon beam: a pale moonlight ray from the Golem to the target —
     // light-yellow, almost white. `color` drives the core line + the
