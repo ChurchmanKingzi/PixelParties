@@ -195,15 +195,9 @@ module.exports = {
         await engine._delay(200);
       }
 
-      // Card text: this Spell ends the caster's turn after resolving.
-      // Setting `_spellEndsTurn` here is checked by server.js's
-      // doPlaySpell right after `_releaseSpellDepth()` and triggers
-      // `advanceToPhase(pi, END)` from there — calling advanceToPhase
-      // directly from inside onPlay would short-circuit on the
-      // `_spellResolutionDepth > 0` guard (which is what stops
-      // premature turn-ends mid-resolve). Same pattern Tanuki Escape
-      // uses for its "immediately end your turn afterwards" clause.
-      gs._spellEndsTurn = true;
+      // Al, Welle 10 (Q33): der Kartentext nennt KEIN Zugende („Immediately end
+      // your turn" steht nicht auf der Karte) — Raise the Minions! beendet den
+      // Zug nicht mehr (frueher: `gs._spellEndsTurn = true`).
     },
   },
 };

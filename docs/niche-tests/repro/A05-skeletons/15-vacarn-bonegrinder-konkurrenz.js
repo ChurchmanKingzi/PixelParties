@@ -6,6 +6,7 @@
 // Beobachtet: Das Skelett in Vacarns Zone wird gelöscht, OHNE dass die Bonegrinder fragt/zieht (Vacarns Hook setzt `_redirectToDeleted`, Bonegrinder bricht dann ab);
 //   das Skelett in der anderen Zone wird gefragt und zieht.
 // Lesart A (Skript): Vacarn ersetzt zuerst, Bonegrinder hat nichts mehr zu tun. Lesart B: der Spieler darf Bonegrinder wählen (Löschen UND Ziehen), die Löschung ist dasselbe Ergebnis.
+// ★ W10b (Al, Welle 10, Q32, Antwort Nein): Lesart A ist gewollt – Bonegrinder zieht NICHT, wenn Vacarn das Skelett ohnehin löscht. Repro umgestellt (siehe W10/b-q32).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -17,6 +18,6 @@ const H = require('../../lib/h.js');
   const h0 = t.pile(0, 'hand').length;
   await t.run(() => t.engine.actionDestroyCard({ name: 'x', owner: 1 }, a));
   R.check('Kontrolle: Skelett in Vacarns Zone gelöscht', t.pile(0, 'deletedPile').includes('Skeleton Archer'), t.pile(0, 'deletedPile'));
-  R.check('Lesart B: Bonegrinder darf trotzdem fragen/ziehen', fragen === 1 && t.pile(0, 'hand').length === h0 + 1, { fragen, hand: t.pile(0, 'hand').length - h0 });
+  R.check('Al (Q32): Bonegrinder fragt nicht und zieht nicht', fragen === 0 && t.pile(0, 'hand').length === h0, { fragen, hand: t.pile(0, 'hand').length - h0 });
   R.finish();
 })();
