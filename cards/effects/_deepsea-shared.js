@@ -344,7 +344,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // Add to hand.
   if (!ps.hand) ps.hand = [];
   if (!engine.tokenAbgang(inst)) {   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
-    engine.handZugangSync(ps, cardName, { ohneInstanz: true });
+    engine.handZugangSync(ps, cardName, { ohneInstanz: true, vonInst: inst });   // Welle 12: Handindex-Sperren (Lawn Gnome) wandern mit
     const _besitzer = engine.kartenBesitzerVon(inst);
     if (Number.isInteger(opts.toPlayer) && _besitzer !== ownerIdx) engine._tagHandCardOrigin(ownerIdx, cardName, _besitzer);   // W3: bleibt Eigentum des Besitzers
   }
@@ -669,7 +669,7 @@ async function tryBouncePlace(ctx) {
   // (D) Push the bounced Creature's NAME onto the hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfer animations BEFORE the first sync
   //     so the client sees the "flying cards" events and the new state
@@ -860,7 +860,7 @@ async function payBouncePlace(ctx) {
   }
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
     ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),
@@ -1289,7 +1289,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // (D) Push the bounced creature to hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfers so the two creatures visually
   //     cross mid-flight — bounced support→hand, new hand→support.

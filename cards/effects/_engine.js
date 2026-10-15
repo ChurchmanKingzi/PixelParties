@@ -11946,6 +11946,12 @@ class GameEngine {
     const inst = opts.ohneInstanz ? null : this._trackCard(cardName, pi, ZONES.HAND);
     if (opts.originalOwner != null && opts.originalOwner !== pi) this._tagHandCardOrigin(pi, cardName, opts.originalOwner, idx);
     this._autoRevealOnEnterHand(pi, idx, cardName);
+    // ★ Welle 12 (Al, Rueckfrage 14, Lawn Gnome): „die Sperre wandert mit der Karte" — kommt die Karte vom BRETT (`opts.vonInst`: die verlassende Instanz),
+    // darf das Skript (`beimRueckgangInHand(engine, ps, handIdx, inst)`) Handindex-Felder fuer die neue Handkopie setzen.
+    if (opts.vonInst) {
+      try { loadCardEffect(cardName)?.beimRueckgangInHand?.(this, ps, idx, opts.vonInst); }
+      catch (err) { console.error(`[beimRueckgangInHand] ${cardName} threw:`, err.message); }
+    }
     // `opts.geheim` (Create Secret Room, „an keiner Stelle revealed"): die Logzeile geht an BEIDE Spieler — ohne Kartennamen.
     this.log('card_added_to_hand', { player: ps.username, ...(opts.geheim ? {} : { card: cardName }), by: opts.source || null, from: opts.von || null });
     this.sync();
@@ -42238,6 +42244,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (!ok) continue;
       }
+      // Welle 12: Sperre je KOPIE (Lawn Gnome: Stufenaenderung dieses Zuges schon verbraucht, auch ueber Brett und Rueckkehr).
+      if (typeof script.canHandActivateAt === 'function') {
+        let okAt;
+        try { okAt = !!script.canHandActivateAt(this.gs, playerIdx, handIndex, this); } catch { okAt = false; }
+        if (!okAt) continue;
+      }
       result.push({
         cardName, handIndex,
         fromCreation: ausVorrat || undefined,
@@ -42290,6 +42302,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!script?.handActivatedEffect || typeof script.onHandActivate !== 'function') return false;
     if (typeof script.canHandActivate === 'function') {
       try { if (!script.canHandActivate(this.gs, playerIdx, this)) return false; }
+      catch { return false; }
+    }
+    if (typeof script.canHandActivateAt === 'function') {
+      try { if (!script.canHandActivateAt(this.gs, playerIdx, handIndex, this)) return false; }
       catch { return false; }
     }
     try {

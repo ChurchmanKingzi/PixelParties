@@ -14,8 +14,9 @@
 //     `_handStufenWechsel` (Wert = Zug) und wandert beim Beschwoeren als
 //     `counters._stufeGeaendertZug` aufs Brett; `canActivateCreatureEffect`
 //     sperrt dort im selben Zug. Umgekehrt sperrt die Hand-Nutzung sich selbst
-//     (`_revealedThisTurn`). NICHT abgedeckt: Brettaenderung, dann Rueckkehr auf
-//     die Hand im selben Zug (die neue Handinstanz kennt die alte nicht).
+//     (`_revealedThisTurn`). Welle 12 (Al, Rueckfrage 14: "Ja"): auch
+//     Brettaenderung und Rueckkehr auf die Hand im selben Zug bleibt EINE Aenderung (`beimRueckgangInHand`,
+//     Engine `handZugangSync(..., { vonInst })`; abgedeckt: die Deepsea-/Bounce-Wege in `_deepsea-shared`).
 //
 //  BAUART
 //  ──────
@@ -89,12 +90,30 @@ module.exports = {
     return !!gs.players[pi];
   },
 
+  /** Welle 12 (Al, Rueckfrage 14): diese Kopie hat ihre Stufe in DIESEM Zug schon geaendert (Hand -> Brett -> Hand mitgerechnet). */
+  canHandActivateAt(gs, pi, handIndex) {
+    return gs.players[pi]?._handStufenWechsel?.[handIndex] !== (gs.turn || 1);
+  },
+
+  /**
+   * Welle 12 (Al, Rueckfrage 14: „Ja"): die Einmal-Grenze gilt auch, wenn der Gnom im selben Zug vom Brett zurueck auf die Hand geht - die Sperre
+   * wandert mit der Karte. Hat die Kopie auf dem Brett ihre Stufe in diesem Zug geaendert (`counters._stufeGeaendertZug`), traegt die neue
+   * Handkopie dieselbe Sperre (Handindex-Feld `_handStufenWechsel`). Gerufen von `handZugangSync` mit `opts.vonInst`.
+   */
+  beimRueckgangInHand(engine, ps, handIdx, inst) {
+    const zug = inst?.counters?._stufeGeaendertZug;
+    if (!zug || zug !== (engine.gs.turn || 1)) return;
+    if (!ps._handStufenWechsel) ps._handStufenWechsel = {};
+    ps._handStufenWechsel[handIdx] = zug;
+  },
+
   async onHandActivate(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const handIndex = ctx.handIndex;
     const inst = engine._findHandInstanceAt?.(pi, handIndex);
     if (!inst) return false;
+    if (engine.gs.players[pi]?._handStufenWechsel?.[handIndex] === (engine.gs.turn || 1)) return false;   // Welle 12: schon geaendert (Brett -> Hand)
 
     const cd = engine._getCardDB()[CARD_NAME];
     const aktuell = typeof inst.counters?.levelSet === 'number'
@@ -161,6 +180,7 @@ module.exports = {
       ...(ich.counters._cardDataOverride || basis || {}),
       level: stufe,
     };
+    ich.counters._stufeGeaendertZug = engine.gs.turn || 1;   // Welle 12: die Sperre wandert bei der Rueckkehr auf die Hand mit (`beimRueckgangInHand`)
     engine.log('gnome_level', {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'board',
     });
