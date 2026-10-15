@@ -113,8 +113,24 @@ module.exports = {
     // that don't reference an eligible slot (a desynced client could
     // send phantom indices).
     const eligibleSet = new Set(eligibleIndices);
-    const selected = (result.selectedCards || [])
+    let selected = (result.selectedCards || [])
       .filter(s => Number.isInteger(s?.handIndex) && eligibleSet.has(s.handIndex));
+
+    // Welle 12 (Q92, Al): Item-Lock-Kosten (falls vorgemerkt) NACH dem Commit (bestätigte Handwahl), VOR dem Zurückmischen. Die Kostenlöschung
+    // verschiebt die Handindizes: die gewählten Karten werden per Name neu zugeordnet (traf die Kostenwahl eine gewählte Karte, fällt sie weg),
+    // die wählbaren Plätze neu gebildet.
+    if (engine.gs._itemLockOffen?.pi === pi) {
+      const gemerkt = selected.map(s => ps.hand[s.handIndex]);
+      await engine.itemLockFordern(pi);
+      eligibleIndices.length = 0;
+      for (let i = 0; i < ps.hand.length; i++) if (!engine._istAufloesendeHandkarte(ps, i, false)) eligibleIndices.push(i);
+      const benutzt = new Set();
+      selected = gemerkt.map(n => {
+        const i = ps.hand.findIndex((c, j) => c === n && !benutzt.has(j) && !engine._istAufloesendeHandkarte(ps, j, false));
+        if (i >= 0) benutzt.add(i);
+        return i >= 0 ? { handIndex: i, cardName: n } : null;
+      }).filter(Boolean);
+    }
 
     const count = selected.length;
     const isAllHand = eligibleIndices.length > 0 && count === eligibleIndices.length;

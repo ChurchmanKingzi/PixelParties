@@ -2668,6 +2668,7 @@ class GameEngine {
     const fromPs = this.gs.players[fromOwnerIdx];
     const toPs   = this.gs.players[toPlayerIdx];
     if (!fromPs || !toPs || !cardName) return null;
+    if (this.gs._itemLockOffen?.pi === toPlayerIdx) await this.itemLockFordern(toPlayerIdx);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
 
     // Discard-out lock: only fires when the discard's OWNER is recovering
     // from their OWN pile. Opponent reach-ins (Xiong, Boomerang) are
@@ -11136,6 +11137,7 @@ class GameEngine {
     const batchId = this._drawBatchSeq;
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    if (this.gs._itemLockOffen?.pi === playerIdx) await this.itemLockFordern(playerIdx);   // Welle 12 (Q92): Item-Lock-Kosten VOR dem Ziehen
     // `opts._unpreventable: true` lets a card-effect draw bypass both
     // the hand-locked debuff and the BEFORE_DRAW_BATCH cancellation
     // hook. Used by Champion, the Stormbringer's "this draw cannot be
@@ -19685,6 +19687,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async takeFromPile(pi, pile, what, opts = {}) {
     pi = this._resolvePi(pi);
+    if (opts.toHand && this.gs._itemLockOffen?.pi === pi) await this.itemLockFordern(pi);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
@@ -20421,6 +20424,59 @@ this._deathWatch = (this._deathWatchStack || []).length
   _handOhneAufloesendeKarte(ps, ausVorrat = false) {
     const liste = (ausVorrat ? ps?.creationZone : ps?.hand) || [];
     return liste.filter((_, i) => !this._istAufloesendeHandkarte(ps, i, ausVorrat));
+  }
+
+  /**
+   * ★ Welle 12 (Q92, F01-24, Al: „Soll die Kosten gar nicht erst verlangen. Die Kosten dürfen erst eingefordert werden, NACHDEM die Karte committed
+   * ist und nicht mehr abgebrochen werden kann, im Fall von Zieh-Artifacts wie Wheels aber VOR dem eigentlichen Ziehen."): die Item-Lock-Löschung
+   * („must delete a card from their hand whenever they play an Artifact") wird beim Artefakt-Spielen nur VORGEMERKT (`itemLockVormerken`, Server:
+   * `doUseArtifactEffect`/`doConfirmPotion`). Eingefordert wird sie (`itemLockFordern`, genau einmal) an der ersten dieser Stellen:
+   *   (a) VOR der ersten Hand-Vergrößerung der Karte (Ziehen, Deck→Hand, Ablage→Hand, `takeFromPile(…, { toHand })` — diese Primitive rufen
+   *       `itemLockFordern`), damit frisch gezogene Karten nie die Kosten bezahlen (zusätzlich dürfen nur Karten zahlen, die schon beim Spielen in der
+   *       Hand lagen: `handVorher`); Skripte mit indexabhängiger Hand-Mechanik rufen es selbst an ihrem Commit-Punkt und ordnen ihre Indizes danach
+   *       neu zu (Shard of Chaos, Staff of the Teleporter, Staff of Uncontrollable Destruction);
+   *   (b) nach dem Auflösen, wenn das Skript nicht abgebrochen hat; (c) nach einer Negation (die Kosten bleiben dann bezahlt).
+   * Bricht das Skript vorher ab (`cancelled`/`aborted`), wird die Vormerkung verworfen (`itemLockVerwerfen`): ein Abbruch kostet nichts.
+   */
+  itemLockVormerken(pi, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps?.itemLocked) { delete this.gs._itemLockOffen; return false; }
+    // `handVorher`: die Hand beim Spielen — NUR diese Karten dürfen die Kosten tragen (frisch gezogene/geholte Kopien nie), auch wenn eine
+    // Hand-Mechanik des Skripts nicht über die gehakten Primitive läuft.
+    this.gs._itemLockOffen = { pi, vorab: opts.vorab || null, handVorher: (ps.hand || []).slice(), turn: this.gs.turn };
+    return true;
+  }
+
+  itemLockVerwerfen() { delete this.gs._itemLockOffen; }
+
+  async itemLockFordern(pi) {
+    const o = this.gs._itemLockOffen;
+    if (!o || o.pi !== pi) return false;
+    delete this.gs._itemLockOffen;
+    const ps = this.gs.players[pi];
+    // Sicherung gegen eine verwaiste Vormerkung: nur im selben Zug, für den aktiven Spieler, solange das Spiel läuft.
+    if (!ps?.itemLocked || o.turn !== this.gs.turn || this.gs.activePlayer !== pi || this.gs.result || !(ps.hand || []).length) return false;
+    if (o.vorab) await o.vorab();
+    // Wählbar: Handkarten, die schon beim Spielen in der Hand lagen (Namenszähler), ohne die gerade auflösende Karte.
+    const frei = new Map();
+    for (const n of o.handVorher) frei.set(n, (frei.get(n) || 0) + 1);
+    const eligibleIndices = () => {
+      const rest = new Map(frei);
+      const out = [];
+      (ps.hand || []).forEach((n, i) => {
+        if (this._istAufloesendeHandkarte(ps, i, false)) return;   // Z6 (F03-19): die gerade auflösende Artefakt-Karte ist keine Kostenkarte
+        if ((rest.get(n) || 0) > 0) { rest.set(n, rest.get(n) - 1); out.push(i); }
+      });
+      return out;
+    };
+    if (eligibleIndices().length === 0) return false;
+    await this.actionPromptForceDiscard(pi, 1, {
+      title: 'Item Lock Cost',
+      description: 'You must delete 1 card from your hand to use an Artifact.',
+      source: 'Item Lock', deleteMode: true, selfInflicted: true,
+      eligibleIndices,
+    });
+    return true;
   }
 
   getHeroEligibleActionCards(playerIdx, heroIdx, heroOwner = null) {
@@ -25960,6 +26016,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionAddCardFromDeckToHand(pi, cardName, opts = {}) {
     const ps = this.gs.players[pi];
     if (!ps) return false;
+    if (this.gs._itemLockOffen?.pi === pi) await this.itemLockFordern(pi);   // Welle 12 (Q92): Item-Lock-Kosten VOR der Hand-Bewegung
     // Hand lock gates every mechanism that adds cards to the caster's
     // hand — draws (actionDrawCards), tutors (this function), and any
     // future hand-augmenting action. Fizzles silently here so card

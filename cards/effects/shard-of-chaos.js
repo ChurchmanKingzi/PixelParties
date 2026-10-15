@@ -9,6 +9,11 @@
 //  Attack/Spell/Creature count as one type
 //  ("Action"). Ability, Artifact, Potion, Hero
 //  are separate types.
+//  Welle 12 (Q100, Al: „Ergänze Attack/Spell/Creature im Text. Ein
+//  Topf."): Kreaturen bleiben im selben Topf wie Attack/Spell; der
+//  Kartentext in `data/cards.json` nennt jetzt „Attack/Spell/Creature".
+//  Welle 12 (Q97, Al: „Nicht spielbar."): unter der harten Ablage-
+//  Ausgangssperre (Stäbe) ist die Karte nicht spielbar (`canActivate`).
 // ═══════════════════════════════════════════
 
 const { getCardDB } = require('./_card-db');
@@ -113,11 +118,24 @@ module.exports = {
 
     // ── Delete selected hand cards ──
     const selectedCards = pickResult.selectedCards;
+
+    // Welle 12 (Q92, Al): Item-Lock-Kosten NACH dem Commit (Handwahl bestätigt, nicht mehr abbrechbar), aber VOR dem Löschen. Die Kostenlöschung
+    // verschiebt die Handindizes — die gewählten Karten werden deshalb vorher als Namen gemerkt und danach neu zugeordnet (traf die Kostenwahl
+    // eine gewählte Karte, ist sie schon gelöscht und fällt weg).
+    if (engine.gs._itemLockOffen?.pi === pi) {
+      const gewaehlteNamen = selectedCards.map(s => ps.hand[s.handIndex]);
+      await engine.itemLockFordern(pi);
+      const frei = new Set();
+      selectedCards.forEach((sel, k) => {
+        const i = ps.hand.findIndex((c, j) => c === gewaehlteNamen[k] && !frei.has(j) && !engine._istAufloesendeHandkarte(ps, j, false));
+        if (i >= 0) { frei.add(i); sel.handIndex = i; } else sel.handIndex = -1;
+      });
+    }
     const typeNeeds = {}; // normalized type → count needed
     const deletedNames = [];
 
     // Sort indices descending to splice safely
-    const sortedIndices = selectedCards.map(s => s.handIndex).sort((a, b) => b - a);
+    const sortedIndices = selectedCards.map(s => s.handIndex).filter(i => i >= 0).sort((a, b) => b - a);
     for (const idx of sortedIndices) {
       const cn = ps.hand[idx];
       if (!cn) continue;
