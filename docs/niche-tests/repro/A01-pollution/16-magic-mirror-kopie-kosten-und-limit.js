@@ -11,6 +11,7 @@
 //     seine eigene Eraser Beam ist damit für den Rest des Spiels weg, obwohl er sie nie gespielt hat.
 // Frage an Al: (1) Muss die Kopie die „… to use this Spell“-Kosten bezahlen (nur das Level wird ignoriert), oder ist der Mirror-Preis alles? (2) Soll die Kopie eines
 //   „nur 1 pro Spiel/Zug“-Zaubers das eigene Limit des Spiegel-Besitzers verbrauchen?
+// Welle 9 (Al, 15.10.2026): „3a: Ja. B: sollte das eigene Limit verbrauchen und bei schon verbrauchtem Limit nicht nutzbar sein!“ – umgesetzt (siehe W9/a-03).
 // Aufruf: node docs/niche-tests/repro/A01-pollution/16-magic-mirror-kopie-kosten-und-limit.js   (✗ = Verhalten weicht von der wörtlichen Lesart ab)
 const H = require('../../lib/h.js');
 const tokens = (t, seat) => t.inst(c => c.name === 'Pollution Token' && c.owner === seat).length;
@@ -30,6 +31,8 @@ async function lauf(spell) {
   R.check('Cold Coffin-Kopie zahlt ihre 2 Tokens zusätzlich zum Mirror-Preis (Sitz 1 hat 1 + 2 = 3 Tokens)', tokens(t, 1) === 3, tokens(t, 1));
   t = await lauf('Eraser Beam');              // Stufe 2: Mirror-Preis 2 Token; Kopie wörtlich + 3 Tokens
   R.check('Eraser Beam-Kopie zahlt ihre 3 Tokens zusätzlich zum Mirror-Preis (Sitz 1 hat 2 + 3 = 5 Tokens)', tokens(t, 1) === 5, tokens(t, 1));
-  R.check('Eraser Beam-Kopie verbraucht NICHT das Limit „1 pro Spiel“ von Sitz 1', !(t.gs.players[1]._oncePerGameUsed && t.gs.players[1]._oncePerGameUsed.has('eraserBeam')), t.gs.players[1]._oncePerGameUsed && [...t.gs.players[1]._oncePerGameUsed]);
+  // Welle 9 (Al, 15.10.2026, Q3): ja, die Kopie zahlt ihre Kosten (a); sie verbraucht das EIGENE Limit des Spiegel-Besitzers (b) – das alte Repro prüfte das Gegenteil und ist umgestellt.
+  R.check('Eraser Beam-Kopie verbraucht das eigene Limit „1 pro Spiel“ von Sitz 1 (Welle 9)', !!(t.gs.players[1]._oncePerGameUsed && t.gs.players[1]._oncePerGameUsed.has('eraserBeam')), t.gs.players[1]._oncePerGameUsed && [...t.gs.players[1]._oncePerGameUsed]);
+  R.check('Das Limit des Original-Wirkers (Sitz 0) bleibt unverbraucht (Original ganz negiert)', !(t.gs.players[0]._oncePerGameUsed && t.gs.players[0]._oncePerGameUsed.has('eraserBeam')), t.gs.players[0]._oncePerGameUsed && [...t.gs.players[0]._oncePerGameUsed]);
   R.finish();
 })();
