@@ -104,6 +104,9 @@ function boulderCounters(potionData) {
 }
 
 module.exports = {
+  // ★ Welle 12 (B-06/M01-25, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): platziert NUR beim Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   isPotion: true,
   // Hooks feuern vom Brett aus (Zonen halten, Zonen freigeben) UND aus
   // der Hand heraus braucht die Karte nichts — `afterPotionUsed` laeuft

@@ -26,6 +26,9 @@ const CARD_NAME = 'Slow';
 const DISCARD_BY_LEVEL = { 1: 2, 2: 3, 3: 4 };
 
 module.exports = {
+  // ★ Welle 12 (B-06, Al: „Eine Karte, deren Effekt komplett nutzlos wäre, ist nicht spielbar."): trifft NUR den Gegner — gegen den durch die
+  // Erste-Runden-Immunität geschützten Spieler unspielbar (Karte bleibt auf der Hand, keine Aktion/Kosten; `engine.ersterZugGeschuetzt`).
+  blockedByFirstTurnProtection: true,
   cpuMeta: { scalesWithSchool: 'Decay Magic' },
   /** Block play if the caster's opp-hand interaction is already locked. */
   spellPlayCondition(gs, playerIdx) {
