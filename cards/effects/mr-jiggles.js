@@ -4,6 +4,13 @@
 //
 //  Once per turn: choose up to 2 targets the
 //  opponent controls and deal 100 damage to each.
+//
+//  ★ Welle 11 (Al, 15.10.2026, Q77 „Ja"): Eine GELIEHENE/gestohlene
+//  Jiggles darf ihren eigenen Wirtsplatz als Gegnerziel waehlen (sie
+//  liegt auf der Gegnerseite des Leihers - die Brettseite zaehlt fuer
+//  sie selbst). Sonst bleibt Z1: andere Kreaturen nach Kontrolle, Helden
+//  des Gegners. Umsetzung: side 'any' + Bedingung (gleiche Menge wie
+//  'enemy' plus die geliehene Jiggles selbst).
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Mr. Jiggles';
@@ -25,9 +32,22 @@ module.exports = {
     // differ; for any normal creature they're equal.
     const sourceOwner = ctx.cardHeroOwner;
 
+    const ich = ctx.card;
+    const ichAufGegnerseite = engine.physicalSide(ich) !== pi;   // geliehen: liegt auf der Seite des Gegners
     const targets = await ctx.promptMultiTarget({
       types: ['hero', 'creature'],
-      side: 'enemy',
+      side: 'any',
+      // Q77: wie side 'enemy' (Helden der Gegner, Kreaturen nach KONTROLLE), plus die geliehene Jiggles selbst.
+      condition: (t) => {
+        if (t.type === 'hero') {
+          const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+          return t.owner !== pi && h?.charmedBy !== pi;
+        }
+        const inst = t.cardInstance;
+        if (!inst) return false;
+        if (inst === ich) return ichAufGegnerseite;
+        return engine.kontrolleurVon(inst) !== pi;
+      },
       max: 2,
       min: 1,
       baseDamage: DAMAGE,
