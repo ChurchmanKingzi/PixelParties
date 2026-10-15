@@ -32,6 +32,9 @@
 //  decline paths) and in `afterDamageCondition`.
 //  All flags + marks are cleared at chain-resolve.
 //
+//  Kreaturen (Welle 13, Q134): eigenes Fenster
+//  `isAfterCreatureDamageReaction` (Haelfte zurueck + Cloudy).
+//
 //  Stacking guard: targets that already have the
 //  Cloudy buff are excluded from the candidate
 //  list (no point doubling-up halving).
@@ -152,6 +155,55 @@ module.exports = {
     engine.sync();
   },
 
+  // ── Kreaturen (Welle 13, Q134, Al: „Sollte auch für Creatures einsetzbar sein") ──
+  // „a target you control" schliesst Kreaturen ein. Eigenes Nach-Schadens-Fenster
+  // der Kreatur-Seite (`isAfterCreatureDamageReaction`, wie Spiky Armor): die
+  // Haelfte des gerade erlittenen Schadens kommt zurueck, danach traegt die
+  // Kreatur „Cloudy" bis Zugende (halbiert allen weiteren Schaden). Dedup und
+  // Grenzen wie beim Helden-Fallback (ein Angebot je Kette; kein Angebot bei
+  // bereits Cloudy; ein toedlicher Treffer wird nicht mehr abgefangen).
+  isAfterCreatureDamageReaction: true,
+
+  afterCreatureDamageCondition(gs, pi, _engine, inst, _source, amount /*, type */) {
+    if (_alreadyPrompted(gs, pi)) return false;
+    if (!(amount > 0)) return false;
+    if (!inst || (inst.controller ?? inst.owner) !== pi) return false;
+    if (inst.zone !== 'support') return false;
+    if ((inst.counters?.currentHp ?? 0) <= 0) return false;
+    if (inst.counters?.buffs?.cloudy) return false;
+    _markPrompted(gs, pi);
+    return true;
+  },
+
+  async afterCreatureDamageResolve(engine, pi, inst, _source, amount /*, type */) {
+    _markPrompted(engine.gs, pi);
+    const gs = engine.gs;
+    const restoreAmount = amount - Math.ceil(amount / 2);   // = floor(amount / 2)
+    if (restoreAmount > 0 && (inst.counters.currentHp ?? 0) > 0) {
+      const maxHp = inst.counters.maxHp ?? Infinity;
+      inst.counters.currentHp = Math.min(inst.counters.currentHp + restoreAmount, maxHp);
+      engine.log('cloud_bottle_restore', {
+        player: gs.players[pi]?.username, creature: inst.name,
+        originalDamage: amount, effectiveDamage: amount - restoreAmount, restored: restoreAmount,
+      });
+    }
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'cloud_gather', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+    });
+    await engine._delay(600);
+    const nextPlayer = engine.opponentOf(gs.activePlayer);
+    await engine.actionAddCreatureBuff(inst, 'cloudy', {
+      sourceOwner: pi,
+      expiresAtTurn: gs.turn + 1,
+      expiresForPlayer: nextPlayer,
+      source: CARD_NAME,
+      addAnim: 'cloud_gather',
+      removeAnim: 'cloud_disperse',
+    });
+    engine.log('cloud_bottle', { player: gs.players[pi]?.username, creature: inst.name });
+    engine.sync();
+  },
+
   hooks: {
     /**
      * Consume the per-target halve-after-damage mark. Restores
@@ -243,10 +295,8 @@ function _keyForHero(ownerIdx, heroIdx) {
 
 /**
  * Filter the source's target list to alive Heroes controlled by `pi`
- * that don't already have the Cloudy buff. CIB's text "any target you
- * control" technically includes Creatures, but the current
- * implementation is hero-only (mirroring the existing after-damage
- * scope).
+ * that don't already have the Cloudy buff. Kreaturen laufen ueber das
+ * eigene Nach-Schadens-Fenster (`afterCreatureDamageResolve`, Welle 13).
  */
 function _collectOwnedHeroTargets(gs, pi, targetedTargets, engine) {
   const out = [];

@@ -146,6 +146,17 @@ module.exports = {
     const hero = ops?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0) return;
 
+    // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): „remove it … from the game" ist
+    // ein Nicht-Schaden-Effekt auf den Helden. Animation zuerst, dann der zentrale Pruefer; bei
+    // Block ist die Potion verbraucht (Einmal-Stempel gesetzt), der Held bleibt unberuehrt.
+    if (await engine.heroNonDamageEffectBlocked(oi, hi, 'remove_from_game', { sourceOwner: pi, source: CARD_NAME })) {
+      engine._broadcastEvent('play_zone_animation', {   // Animation trotzdem (Regel: Immunitaeten blocken Effekte, nie Animationen)
+        type: 'gold_sparkle', owner: oi, heroIdx: hi, zoneSlot: -1,
+      });
+      engine.sync();
+      return;
+    }
+
     // ── Alles einsammeln, was mitgeht ───────────────────────────────
     const auftrag = {
       besitzer: oi,

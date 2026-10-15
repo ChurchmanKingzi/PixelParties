@@ -40,16 +40,22 @@ function pileArr(ps, source) {
   return [];
 }
 
-/** Living own Heroes that can receive `abilityName` as an attachment. */
-function eligibleHeroIdxs(engine, pi, abilityName) {
-  const ps = engine.gs.players[pi];
+/**
+ * Living Heroes `pi` CONTROLS that can receive `abilityName` as an attachment.
+ * Welle 13 (Q147, Al: „Ja, nach aktueller Kontrolle"): „a Hero you control" =
+ * `heroesControlledBy` — ein vom Gegner gecharmter eigener Held steht NICHT zur
+ * Wahl, ein von mir gecharmter Gegnerheld schon (wenn die Uebernahme Abilities
+ * erlaubt, `kontrollRechte`; die Karte landet auf seiner Brettseite `phys`).
+ * @returns {Array<{phys:number, heroIdx:number}>}
+ */
+function eligibleHeroes(engine, pi, abilityName) {
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
-    if (!h?.name || h.hp <= 0) continue;
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
+    if (!hero?.name || hero.hp <= 0) continue;
     // No `allowRestricted` — restricted Abilities (Divinity) are
     // refused here, which naturally drops them from the gallery.
-    if (engine.canAttachAbilityToHero(pi, abilityName, hi)) out.push(hi);
+    const opts = physOwner !== pi ? { heroOwner: physOwner } : undefined;
+    if (engine.canAttachAbilityToHero(pi, abilityName, heroIdx, opts)) out.push({ phys: physOwner, heroIdx });
   }
   return out;
 }
@@ -72,7 +78,7 @@ function buildGallery(engine, pi) {
       counts[name] = (counts[name] || 0) + 1;
     }
     for (const name of Object.keys(counts)) {
-      if (eligibleHeroIdxs(engine, pi, name).length === 0) continue;
+      if (eligibleHeroes(engine, pi, name).length === 0) continue;
       entries.push({ name, source, count: counts[name] });
     }
   }
@@ -127,18 +133,18 @@ module.exports = {
     if (!source) return { cancelled: true };
 
     // ── Step 2: pick the Hero ──
-    const heroIdxs = eligibleHeroIdxs(engine, pi, abilityName);
-    if (heroIdxs.length === 0) return { cancelled: true };
+    const helden = eligibleHeroes(engine, pi, abilityName);
+    if (helden.length === 0) return { cancelled: true };
 
-    let targetHeroIdx = -1;
+    let ziel = null;           // { phys, heroIdx }
     let explicitZone = -1;
-    if (heroIdxs.length === 1) {
-      targetHeroIdx = heroIdxs[0];
-    } else {
+    if (helden.length === 1) {
+      ziel = helden[0];
+    } else if (helden.every(h => h.phys === pi)) {
       const pickRes = await engine.promptGeneric(pi, {
         type: 'abilityAttachTarget',
         cardName: abilityName,
-        eligibleHeroIdxs: heroIdxs,
+        eligibleHeroIdxs: helden.map(h => h.heroIdx),
         // Additional attachment — bypass the client's once-per-turn
         // ability-attach highlight gate (mirrors Sacrifice to Divinity).
         skipAbilityGiven: true,
@@ -147,12 +153,32 @@ module.exports = {
         cancellable: true,
       });
       if (!pickRes || pickRes.cancelled) return { cancelled: true };
-      targetHeroIdx = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : heroIdxs[0];
+      const hi = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : helden[0].heroIdx;
+      ziel = helden.find(h => h.heroIdx === hi) || helden[0];
       explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
+    } else {
+      // Mit geliehenem Helden unter den Zielen: Heldenwahl ueber Brett-Klick (die
+      // Anlege-Maske `abilityAttachTarget` kennt nur die eigene Heldenreihe).
+      const ids = await engine.promptEffectTarget(pi, helden.map(h => ({
+        id: `hero-${h.phys}-${h.heroIdx}`, type: 'hero', owner: h.phys, heroIdx: h.heroIdx,
+        cardName: engine.gs.players[h.phys]?.heroes?.[h.heroIdx]?.name || '',
+      })), {
+        title: CARD_NAME, source: CARD_NAME,
+        description: `Attach "${abilityName}" to one of your Heroes as an additional attachment.`,
+        confirmLabel: '🔧 Attach', confirmClass: 'btn-info',
+        maxTotal: 1, cancellable: true, greenSelect: true,
+        previewCardName: abilityName,
+      });
+      if (!Array.isArray(ids) || ids.length === 0) return { cancelled: true };
+      ziel = helden.find(h => `hero-${h.phys}-${h.heroIdx}` === ids[0]);
+      if (!ziel) return { cancelled: true };
     }
+    const targetHeroIdx = ziel.heroIdx;
+    const zielSeite = ziel.phys;
+    const seitenOpt = zielSeite !== pi ? { heroOwner: zielSeite } : undefined;
 
     // Re-verify (state may have shifted across the async prompts).
-    if (!engine.canAttachAbilityToHero(pi, abilityName, targetHeroIdx)) {
+    if (!engine.canAttachAbilityToHero(pi, abilityName, targetHeroIdx, seitenOpt)) {
       return { cancelled: true };
     }
 
@@ -180,6 +206,7 @@ module.exports = {
     const res = await engine.attachAbilityFromHand(pi, abilityName, targetHeroIdx, {
       skipAbilityGivenCheck: true,
       targetZoneSlot: explicitZone >= 0 ? explicitZone : undefined,
+      ...(zielSeite !== pi ? { heroOwner: zielSeite } : {}),
     });
 
     if (!res?.success) {
@@ -201,7 +228,7 @@ module.exports = {
     // no zoneType routes onZoneAnim to the hero-zone selector.
     engine._broadcastEvent('play_zone_animation', {
       type: 'pressed_skill_rain',
-      owner: pi, heroIdx: targetHeroIdx, zoneSlot: -1,
+      owner: zielSeite, heroIdx: targetHeroIdx, zoneSlot: -1,
       duration: 1700,
     });
 
@@ -221,7 +248,7 @@ module.exports = {
     // Placement sparkle on the new ability slot (parity with the
     // standard ability-attach visual).
     engine._broadcastEvent('ability_activated', {
-      owner: pi, heroIdx: targetHeroIdx, zoneIdx: res.zoneSlot,
+      owner: zielSeite, heroIdx: targetHeroIdx, zoneIdx: res.zoneSlot,
       abilityName,
     });
 
@@ -229,7 +256,7 @@ module.exports = {
       player: ps.username,
       ability: abilityName,
       from: source,
-      to: ps.heroes[targetHeroIdx]?.name,
+      to: engine.gs.players[zielSeite]?.heroes?.[targetHeroIdx]?.name,
       zone: res.zoneSlot,
     });
     engine.sync();

@@ -129,7 +129,7 @@ module.exports = {
       // arbeitet auf Slot-Indizes.
       const eintrag = id ? alleAbilities(engine).find(z => z.id === id) : null;
       if (eintrag) {
-        const abgeworfen = await engine.discardAbilityTopCopy(eintrag);
+        const abgeworfen = await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi, effectOnHero: true });   // W13 (Q144): Effekt auf den Helden → Resistance fragt
         if (abgeworfen) {
           engine.log('cybug_ladybug_discard', {
             player: ps.username,

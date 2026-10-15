@@ -12,9 +12,10 @@
 //    • Is negated until the start of your next
 //      turn (actionNegateCreature with timed buff,
 //      expiresAtTurn = gs.turn + 2 — turn counter ticks per player)
-//    • Its on-summon hooks (onPlay / onCardEnterZone)
-//      are suppressed (skipHooks: true) because
-//      negation is applied BEFORE placement
+//    • Its OWN on-summon effects are silent (negation is
+//      applied BEFORE placement); fremde „Creature placed"-
+//      Trigger (Nero Zira, Maya, Pes'zet, …) feuern aber
+//      ueber `onCardEnterZone` (Welle 13, Q122, Al: „Ja!")
 //
 //  Per-name once-per-game gate: each Omikron
 //  Hero tracks the names it has already summoned
@@ -152,10 +153,17 @@ module.exports = {
       hero: hero.name,
     });
 
-    // Hooks are intentionally SKIPPED — the creature is negated before placement,
-    // so none of its on-summon effects (nor external triggers like Ingo/Maya/Layn)
-    // should fire. This matches the "effects negated" wording.
-    // (No runHooks('onCardEnterZone') call here.)
+    // Welle 13 (Q122, Al: „Ja, sollen sie!"): Das Platzieren ist ein Ereignis fuer
+    // FREMDE Beobachter (Nero Zira, Maya, Pes'zet, Madame Guillotine, Layn …) —
+    // wie bei Create Illusion / Staff of Illusions. Negiert sind nur die EIGENEN
+    // Effekte der Illusion (sie ist oben schon negiert, ihre eigenen Hooks bleiben
+    // deshalb ueber den zentralen Filter stumm). Platzier-Form wie Staff of Illusions.
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+      _skipReactionCheck: true,
+      _bypassDeadHeroFilter: true,
+      _isPlacement: true,
+    });
 
     engine.sync();
     return true;

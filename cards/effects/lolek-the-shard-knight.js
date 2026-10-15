@@ -38,7 +38,7 @@ function discardEntries(engine, pi) {
 
 function equipEntries(engine, pi) {
   return equippableEntries(engine, pi, ['discard'], (name, cd) =>
-    engine.canAffordGold(pi, halfCost(cd), name) && hasDestination(engine, pi, name));
+    engine.canAffordGold(pi, halfCost(cd, engine, pi), name) && hasDestination(engine, pi, name));
 }
 
 module.exports = {
@@ -136,7 +136,7 @@ module.exports = {
       title: CARD_NAME,
       source: `${CARD_NAME}:equip`,
       description: 'Equip an equippable Artifact from your discard pile to a Hero you control. You pay half its Cost.',
-      costOf: (_name, cd) => halfCost(cd),
+      costOf: (_name, cd) => halfCost(cd, engine, pi),
     });
     if (ok) engine.sync();
     return ok;

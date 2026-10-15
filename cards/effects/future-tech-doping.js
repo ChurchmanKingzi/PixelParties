@@ -107,6 +107,11 @@ module.exports = {
     // keine Karteninstanz, also gibt es hier auch keinen Kontext
     // (`_createContext(null)` wirft). Der Engine-Aufruf ist der
     // richtige Weg, nicht der Umweg ueber einen gebauten Kontext.
+    // W13 (Q144): Resistance blockt auch den Max-HP-Gewinn (zentraler Pruefer; Animation lief schon).
+    if (await engine.heroNonDamageEffectBlocked(ziel.owner, ziel.heroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: bonus })) {
+      engine.sync();
+      return;
+    }
     engine.increaseMaxHp(held, bonus);
     engine.sync();
   },
