@@ -65,12 +65,15 @@ module.exports = {
       // 1) Senden — mindestens eine Karte, beliebig viele.
       const res = await sendCardsLoop(engine, pi, heroIdx, {
         cardName: CARD_NAME, kinds: ['ability', 'equip'], min: 1, amount: 0, heroOwner: ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Brettseite des Wirkers
+        // Welle 13 (Q143, Al: „Ja, sollte abbrechbar sein"): wie Breaking Strike abbrechbar,
+        // SOLANGE nichts abgelegt ist — die Karte loest dann nicht auf und bleibt auf der Hand.
+        cancelAtZero: true,
         confirmLabel: '🌪️ Send',
         describe: (sent) => sent === 0
           ? `Click an Artifact equipped or an Ability attached to ${hero.name} to send it to the discard pile — each card adds ${rateFor(engine, pi, heroIdx)} damage.`
           : `Sent ${sent} — currently ${sent * rateFor(engine, pi, heroIdx)} damage (${rateFor(engine, pi, heroIdx)} per card at Fighting ${fightingLevel(engine, pi, heroIdx)}). Click the next card, or stop here.`,
       });
-      if (res.aborted || res.sent === 0) return;
+      if (res.aborted || res.sent === 0) { gs._spellCancelled = true; return; }   // Q143: Abbruch = nichts verbraucht
 
       // 2) Schaden nach dem Level NACH dem Senden.
       const rate = rateFor(engine, pi, heroIdx);
