@@ -5,6 +5,7 @@
 // Skript: HOPT-Stempel `hoptUsed['mausoleum-worm:<pi>'] = gs.turn` nur im Ablage-Weg (`discardHooks.onHeroDefeatFinal`); die Hand-Beschwörung kennt weder Stempel noch Sperre.
 // Aufbau: Sitz 0 am Zug; Worm in Hand UND in der Ablage; Fall A: erst Worm von der Hand spielen, dann fällt im selben Zug ein Held von Sitz 0 durch eine Gegnerquelle
 //   (z. B. Surprise des Gegners im eigenen Zug) ⇒ zweiter Worm aus der Ablage. Fall B: umgekehrte Reihenfolge (Heldentod ⇒ Worm aus der Ablage, danach zweiter Worm von der Hand).
+// ENTSCHIEDEN (Al, Welle 11, Q80): „Für alle Wege kombiniert." - Lesart A gilt (Repro prüft sie; ✓ seit W11c).
 // Erwartung (Lesart „play" = jede Beschwörung): höchstens ein Mausoleum Worm je Zug kommt aufs Brett (Fall A: zweite Platzierung bleibt aus; Fall B: Handspiel abgelehnt).
 // Beobachtet: In beiden Reihenfolgen kommen zwei Mausoleum Worms im selben Zug aufs Brett (Fall A: Rückfrage erscheint; Fall B: `t.play` gelingt).
 // Ursache: cards/effects/mausoleum-worm.js: Stempel nur im Ablage-Haken; kein Spielgate für die Hand (vgl. Grave Worm: „…this way").

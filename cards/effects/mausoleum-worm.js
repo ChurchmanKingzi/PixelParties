@@ -24,6 +24,13 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  • „1 per turn": je Spieler und Zug ein Mal (`gs.hoptUsed`, gestempelt bei
 //    gelungener Platzierung). Mehrere Kopien in der Ablage fragen je Held-KO nur
 //    ein Mal.
+//  • ★ Welle 11 (Al, 15.10.2026, Q80: „Für alle Wege kombiniert."): „play 1 per
+//    turn" gilt fuer ALLE Wege aufs Brett zusammen - Handspiel UND Platzierung
+//    aus der Ablage. Der Stempel (`mausoleum-worm:<Kontrolleur>`) wird beim
+//    EINTRITT jeder Kopie gesetzt (`hooks.onPlay`, auch Platzierungen); gesperrt
+//    sind danach das Handspiel (`canSummon`) und das Ablage-Angebot (Haken unten).
+//    Nicht gesperrt (kein „play"): andere Effekte, die einen Wurm platzieren
+//    (The Master's Key, Pinta …) - sie setzen aber den Stempel.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Mausoleum Worm';
@@ -38,7 +45,22 @@ module.exports = {
     return undefined;
   },
 
-  hooks: {},   // der Lader ignoriert Skripte ohne `hooks`
+  /** Q80: ein zweiter Mausoleum Worm ist im selben Zug nicht spielbar (Hand), wenn schon einer eingetreten ist. */
+  canSummon(ctx) {
+    const gs = ctx._engine.gs;
+    return gs.hoptUsed?.[`${HOPT_KEY}:${ctx.cardOwner}`] !== gs.turn;
+  },
+
+  hooks: {
+    /** Q80: jeder Eintritt aufs Brett (Hand, Ablage, Effekt) verbraucht das „1 per turn" des Kontrolleurs. */
+    onPlay: async (ctx) => {
+      if (ctx.playedCard?.id !== ctx.card.id) return;
+      if (ctx.cardZone !== 'support') return;
+      const gs = ctx._engine.gs;
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[`${HOPT_KEY}:${ctx.cardOwner}`] = gs.turn;
+    },
+  },
 
   // Ablage-Lauscher OHNE Instanz (`engine._runDiscardHooks`): Puzzle-Vorgaben, Mills & Co.
   // legen Karten ohne verfolgte Instanz in die Ablage — ein instanzgebundener Haken sah sie nie.
