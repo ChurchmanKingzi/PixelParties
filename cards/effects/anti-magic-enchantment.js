@@ -100,7 +100,7 @@ module.exports = {
 
       // Welle 11 (Al, R6: „Jedes Equip zählt, egal wer es anlegt."): jedes angelegte Artefakt – auch auf der Gegenseite
       // und auch vom Gegner angelegt – darf verzaubert werden (vorher nur Artefakte der eigenen Brettseite). Die Negier-Fähigkeit
-      // gehört laut Text dem „controlling player" des Artefakts (siehe `ownerPi` unten).
+      // gehört dem Kontrolleur des Träger-Helden (Welle 12, siehe `ownerPi` unten).
 
       // Dedupe: if multiple AME instances are in this player's hand, only
       // the first that reaches this point prompts. Scoped per-player so the
@@ -188,8 +188,10 @@ module.exports = {
         promptCtx: promptCtxShim,
       });
 
+      // Welle 12 (Al, Rueckfrage 3: „Der Halter des Equips …"): die Faehigkeit gehoert dem Kontrolleur des TRAEGER-Helden (Brettseite des Artefakts,
+      // `heroSideOf`); die Engine liest ihn beim Negieren neu (`_ameHalter`), `ownerPi` hier ist nur der Stand beim Verzaubern.
       entering.counters.antiMagicEnchanted = {
-        ownerPi: entering.controller ?? entering.owner,   // „the controlling player may negate" (eigenes Artefakt: = pi)
+        ownerPi: engine.heroSideOf(entering.owner, gs.players[entering.owner]?.heroes?.[entering.heroIdx]),
         charges: 1,
       };
       if (!entering.counters.buffs) entering.counters.buffs = {};

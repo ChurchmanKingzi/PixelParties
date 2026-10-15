@@ -36568,9 +36568,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       );
       if (!armedArtifact) continue;
 
-      const enchOwner = armedArtifact.counters.antiMagicEnchanted.ownerPi;
       const targetHero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
       if (!targetHero?.name) continue;
+      const enchOwner = this._ameHalter(armedArtifact, heroOwner, targetHero);
 
       this._inAntiMagicEnchantmentCheck = true;
       try {
@@ -36600,6 +36600,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
     return shieldedHeroes.length > 0 ? { shieldedHeroes } : null;
+  }
+
+  /**
+   * ★ Welle 12 (Al, Rueckfrage 3): „Der Halter des Equips; dieses wird 'enchanted' und trägt dann den Effekt." Die Negier-Faehigkeit der
+   * Anti Magic Enchantment gehoert dem KONTROLLEUR DES TRAEGER-HELDEN (`heroSideOf`: Charme / dauerhafte Uebernahme zaehlen), nicht dem
+   * Kontrolleur des Artefakts und nicht dem AME-Spieler. Dynamisch gelesen: wechselt der Held den Kontrolleur, wechselt die Faehigkeit mit.
+   */
+  _ameHalter(armedArtifact, heroOwner, hero) {
+    const halter = this.heroSideOf(heroOwner, hero);
+    return Number.isInteger(halter) ? halter : (armedArtifact?.counters?.antiMagicEnchanted?.ownerPi ?? heroOwner);
   }
 
   /** Register AME-shielded heroes for the in-progress spell. */
@@ -36648,7 +36658,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const srcData = srcName ? cardDB[srcName] : null;
     if (!srcData || srcData.cardType !== 'Spell') return false;
 
-    const enchOwner = armedArtifact.counters.antiMagicEnchanted.ownerPi;
+    const enchOwner = this._ameHalter(armedArtifact, owner, hero);
     this._inAntiMagicEnchantmentCheck = true;
     try {
       const confirmed = await this.promptGeneric(enchOwner, {
