@@ -45,7 +45,7 @@
 //  Zug.
 // ═══════════════════════════════════════════
 
-const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
+const { heldenSperreFrei, heldenSperreSetzen, heldenSperreFreigeben } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
@@ -172,6 +172,8 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
 
   gs._immediateActionContext = true;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
+  const _cancelVorher = gs._spellCancelled;
+  gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Zusatz-Guss
   // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
   // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
   // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
@@ -190,7 +192,7 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
       _skipReactionCheck: true,
     }));
 
-    if (!gs._spellNegatedByEffect) {
+    if (!gs._spellNegatedByEffect && !gs._spellCancelled) {   // W13 (Q129): ein abgebrochener Guss löst nichts aus
       const uniqueTargets = [];
       const seenIds = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -217,6 +219,17 @@ async function performSpell(engine, pi, heroIdx, cardName, feld = pi) {
   // Instanz dort und darf nicht zusätzlich abgelegt werden.
   const placedOnBoard = !!gs._spellPlacedOnBoard;
   delete gs._spellPlacedOnBoard;
+
+  // ★ Welle 13 (Al, Q129 – allgemeine Regel für „automatische" Zusatzaktionen): Abbruch in der Zielwahl des Zaubers → die Karte wird gar nicht erst
+  // konsumiert (bleibt auf der Hand), der Einmal-pro-Zug-Stempel wird frei, keine Wisdom-Kosten.
+  const abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+  gs._spellCancelled = _cancelVorher;
+  if (abgebrochen && !placedOnBoard) {
+    heldenSperreFreigeben(gs, 'rubin-dragoneer', pi);
+    engine.log('rubin_perform_cancelled', { player: ps.username, spell: cardName });
+    engine.sync();
+    return true;
+  }
 
   const i = findInHand();
   if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);

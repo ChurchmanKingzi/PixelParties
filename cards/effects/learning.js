@@ -289,6 +289,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // Done AFTER the hand-locate succeeds: same commit timing as the
   // server (post-hero-cost, pre-chain) — once we've claimed the card
   // the cast is committed and counts even if the reaction chain negates.
+  const _zaehlerVorher = { n: ps._actionsPlayedThisPhase, bonus: ps._bonusMainActions };   // W13 (Q129): bei Abbruch zurückgeben
   if (gs.currentPhase === 3) {
     ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
     if (ps._actionsPlayedThisPhase === 2 && (ps._bonusMainActions || 0) > 0) {
@@ -384,6 +385,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // instance located above is the synth instance the hooks operate on. ──
   gs._immediateActionContext = true;
   gs._learningCasting = pi;
+  gs._spellCancelled = false;   // W13 (Q129): eigener Abbruchmerker für diesen Zusatz-Guss
   // Als Befund 29.9.: Wirker-Seite fuer Stufen-/Seitenabfragen des Nachgusses.
   const _wirkerVorher = gs._wirkerSeite;
   if (hs !== pi) gs._wirkerSeite = { pi, heroIdx, heroOwner: hs };
@@ -403,7 +405,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
       _skipReactionCheck: true,
     }));
 
-    if (!gs._spellNegatedByEffect) {
+    if (!gs._spellNegatedByEffect && !gs._spellCancelled) {   // W13 (Q129): ein abgebrochener Guss löst nichts aus
       const uniqueTargets = [];
       const seenIds = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -435,6 +437,18 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   const placed = !!gs._spellPlacedOnBoard;
   delete gs._spellCancelled;
   delete gs._spellPlacedOnBoard;
+
+  // ★ Welle 13 (Al, Q129 – allgemeine Regel für „automatische" Zusatzaktionen): „Bricht man die Zielwahl ab, soll die Karte gar nicht erst
+  // konsumiert werden … Und once per turn/game wird natürlich auch erst dann konsumiert." Abbruch in der Zielwahl des Nachgusses: die Karte
+  // bleibt auf der Hand, der Einmal-pro-Zug-Stempel dieses Slots wird frei, keine Wisdom-Kosten (bisher: „gilt als verpufft", Karte in die Ablage).
+  // Ein Abbruch schon im Auswahlfenster (vor der Karte) lässt den Stempel bewusst stehen (siehe Hook: ein Abbruch ist dort endgültig).
+  if (cancelled && !placed) {
+    if (gs.hoptUsed) delete gs.hoptUsed[`learning:${pi}:${heroIdx}:${abilityZoneSlot}`];
+    ps._actionsPlayedThisPhase = _zaehlerVorher.n; ps._bonusMainActions = _zaehlerVorher.bonus;   // die Aktion wurde nicht verbraucht
+    engine.log('learning_cast_cancelled', { player: ps.username, spell: cardName, hero: hero.name, heroIdx });
+    engine.sync();
+    return true;
+  }
 
   const ix = findChosenInHand();
   if (ix >= 0) engine.takeFromPileSync(ps, 'hand', ix);

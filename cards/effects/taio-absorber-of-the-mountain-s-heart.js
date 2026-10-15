@@ -33,8 +33,9 @@
 //      for. Dedup BY NAME in the gallery (hand first; deck adds
 //      uniques). The cast pulls the chosen name from hand if
 //      available, else from deck (and shuffles).
-//    • Prompt is cancellable — HOPT is claimed only on accept so a
-//      decline doesn't burn the turn's slot.
+//    • Prompt is cancellable — HOPT is claimed only at the COMMIT of the
+//      follow-up (Welle 13, Al Q129: confirmed target choice), so neither
+//      a declined gallery nor a cancelled target pick burns the slot.
 //    • Resolution: synthesize a hand-zone CardInstance and fire
 //      `onPlay` + `afterSpellResolved` exactly like
 //      `engine.performImmediateAction`'s Spell/Attack branch.
@@ -65,6 +66,7 @@ module.exports = {
   hooks: {
     afterSpellResolved: async (ctx) => {
       if (ctx.isSecondCast) return;          // defense against trigger recursion
+      if (ctx._engine.gs._taioNachguss) return;   // W13 (Q129): HOPT wird erst beim Commit gestempelt – bis dahin sperrt dieser Merker die Verschachtelung
       if (!ctx.isMyTurn) return;
       if (ctx.casterIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
@@ -123,9 +125,8 @@ module.exports = {
                   || candidates.find(c => c.name === pickedName);
       if (!picked) return;
 
-      // Claim HOPT NOW (the prompt was accepted).
-      engine.claimHOPT(HOPT_KEY, pi);
-
+      // ★ Welle 13 (Al, Q129): die Galerie-Wahl ist NICHT der Zusagepunkt. Die Karte bleibt in Hand/Deck und der Einmal-pro-Zug-Stempel bleibt
+      // frei, bis die Zielwahl des Nachgusses bestätigt ist; erst dann wird bewegt und gestempelt (`_castAsAdditionalAction`). Abbruch kostet nichts.
       await _castAsAdditionalAction(engine, pi, heroIdx, picked, feld);
     },
   },
@@ -224,16 +225,17 @@ function _collectCandidates(engine, pi, heroIdx, kind, feld = pi) {
 }
 
 /**
- * Pull the chosen card from its source pile and resolve it as an
- * additional Action with Taio. Mirrors `performImmediateAction`'s
- * Spell/Attack branch — the only deviation is the optional `deck`
- * source (splice from `mainDeck` + shuffle reveal).
+ * Resolve the chosen card as an additional Action with Taio.
+ * Mirrors `performImmediateAction`'s Spell/Attack branch.
  *
- * Wisdom (level-gap) cost is paid BEFORE `onPlay` runs so a
- * mid-cast turn-end can't skip it. The card is NOT pushed back to
- * hand on cancel — Mountain's Heart's prompt is the commitment
- * point. The synth-inst is untracked + the card pushed to discard
- * regardless of how onPlay terminates.
+ * ★ Welle 13 (Al, Q129) — ALLGEMEINE REGEL für „automatische" Zusatzaktionen: „Bricht man die Zielwahl ab, soll die Karte gar nicht erst
+ * konsumiert werden. Bis man die committed hat, verbleibt sie einfach in Hand/Deck, erst danach wird sie bewegt. Und once per turn/game wird
+ * natürlich auch erst dann konsumiert." Hier:
+ *   • HAND: die Karte bleibt in der Hand (`mitZusatzAufloesung`: zählt dabei nicht zur Hand), bis der Guss aufgelöst ist.
+ *   • DECK: die Karte bleibt im Deck, bis der COMMIT feuert (erste bestätigte Abfrage des Gusses bzw. sein Ende ohne Abfrage – derselbe
+ *     Zusagepunkt wie der Kartenauftritt, `_zusageAuftrittVormerken`); dann Entnahme, Mischen, Auftritt für den Gegner.
+ *   • Der Einmal-pro-Zug-Stempel wird im selben Commit gesetzt. Abbruch (`gs._spellCancelled`) lässt alles unberührt: Karte in Hand/Deck,
+ *     Stempel frei, keine Wisdom-Kosten. Ein Abbruch NACH dem Commit (mehrstufige Wahl) gibt Karte und Stempel zurück.
  */
 async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   const gs = engine.gs;
@@ -243,28 +245,31 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   const cardData = cardDB[cardName];
   if (!cardData) return;
 
-  // Pull from source pile.
-  if (picked.source === 'hand') {
-    const idx = ps.hand.indexOf(cardName);
-    if (idx < 0) return;                   // raced — bail
-    engine.takeFromPileSync(ps, 'hand', idx);
+  const fromDeck = picked.source !== 'hand';
+  // Quelle prüfen, ohne etwas zu bewegen.
+  if (!fromDeck) {
+    if (ps.hand.indexOf(cardName) < 0) return;                   // raced — bail
   } else {
-    const _taken_idx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
-    if (!_taken_idx) return;
-    engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
-    engine.shuffleDeck(pi, 'main');
-    // Reveal to opp — standard etiquette for deck-search casts.
-    const oi = engine.opponentOf(pi);
-    try {
-      await engine.promptGeneric(oi, {
-        type: 'deckSearchReveal',
-        cardName,
-        searcherName: ps.username,
-        title: CARD_NAME,
-        cancellable: false,
-      });
-    } catch { /* opp side may not be promptable in puzzle/CPU — best-effort */ }
+    if (ps.mainDeck.indexOf(cardName) < 0) return;               // raced — bail
+    if (!engine.pileOutAllowed(pi, 'deck', { source: CARD_NAME })) return;   // Stapel-Sperre (Knight of Kings [B] …)
   }
+
+  // COMMIT: Stempel + (Deck) Entnahme, Mischen, Auftritt. Synchron und idempotent – feuert am Zusagepunkt.
+  let committed = false, deckGenommen = false, deckIdx = -1;
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    engine.claimHOPT(HOPT_KEY, pi);
+    if (fromDeck) {
+      // Entnahme jetzt, gemischt wird erst nach einem aufgelösten Guss (ein späterer Abbruch stellt das Deck exakt wieder her).
+      const g = engine.takeFromPileSync(pi, 'deck', cardName, { source: CARD_NAME });
+      if (g) {
+        deckGenommen = true; deckIdx = g.idx;
+        engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi, castOnly: true });
+      }
+    }
+  };
+  const zusage = engine._zusageAuftrittVormerken(commit, pi);
 
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
   if (feld !== pi) inst.heroOwner = feld;   // Als Vorgabe 29.9.: Wirker auf der Brettseite
@@ -272,26 +277,31 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
   const _wirkerVorher = gs._wirkerSeite;
   gs._wirkerSeite = { pi, heroIdx, heroOwner: feld };
 
-
+  gs._taioNachguss = true;
   gs._immediateActionContext = true;
+  const _cancelVorher = gs._spellCancelled;
+  gs._spellCancelled = false;
   // ★ v1476: eigenes Schadensprotokoll fuer den Nachguss (wie v1469 in
   // `_castSpellImmediately`) — sonst saehe `afterSpellResolved` auch die
   // Ziele des aeusseren Zaubers (Bartas' „exactly 1 target“) und umgekehrt.
   const _aeussererLog = gs._spellDamageLog;
   gs._spellDamageLog = [];
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
-  // v1339: aus der HAND gewirkt → dem Gegner zeigen wie beim normalen
-  // Spielen. Der Deck-Weg hat die Karte schon per `deckSearchReveal` gezeigt.
-  const _auftritt = picked.source === 'hand' ? engine.gussAuftrittBeginnen(cardName, pi) : null;
+  // v1339: dem Gegner zeigen wie beim normalen Spielen – beim Menschen erst am Zusagepunkt (ein Abbruch verrät nichts).
+  const _auftritt = engine.gussAuftrittBeginnen(cardName, pi);
+  let abgebrochen = false;
 
   try {
-    await engine.runHooks('onPlay', {
+    const _onPlay = () => engine.runHooks('onPlay', {
       _onlyCard: inst, playedCard: inst, cardName,
       zone: 'hand', heroIdx, _skipReactionCheck: true,
     });
+    if (!fromDeck) await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, _onPlay);
+    else await _onPlay();
     delete gs._immediateActionContext;
 
-    if (!gs._spellNegatedByEffect) {
+    abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+    if (!abgebrochen && !gs._spellNegatedByEffect) {
       const uniqueTargets = [];
       const seenIds = new Set();
       for (const t of (gs._spellDamageLog || [])) {
@@ -308,7 +318,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
       });
     }
     // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-    if (!(gs._spellCancelled && !gs._spellNegatedByEffect)) await engine.meldeGussAlsAktion(pi, heroIdx, cardName, feld !== pi ? { heroOwner: feld } : {});
+    if (!abgebrochen) { commit(); await engine.meldeGussAlsAktion(pi, heroIdx, cardName, feld !== pi ? { heroOwner: feld } : {}); }
     delete gs._spellNegatedByEffect;
   } finally {
     if (_wirkerVorher === undefined) delete gs._wirkerSeite; else gs._wirkerSeite = _wirkerVorher;
@@ -316,14 +326,39 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
     if (_aeussererLog === undefined) delete gs._spellDamageLog;
     else gs._spellDamageLog = _aeussererLog;
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
-    engine.gussAuftrittBeenden(_auftritt, { abgebrochen: !!gs._spellCancelled && !gs._spellNegatedByEffect });
+    delete gs._taioNachguss;
+    delete gs._immediateActionContext;
+    gs._spellCancelled = _cancelVorher;
+    if (abgebrochen) engine._zusageAuftrittVerwerfen(zusage); else engine._feuereZusageAuftritte(zusage);
+    engine.gussAuftrittBeenden(_auftritt, { abgebrochen });
   }
 
+  if (abgebrochen) {
+    // Abbruch: nichts ist passiert. Vor dem Commit liegt die Karte unberührt in Hand/Deck; nach dem Commit (mehrstufige Wahl) zurück + Stempel frei.
+    if (committed) {
+      if (gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`];
+      if (deckGenommen) engine.returnToPile(pi, 'deck', cardName, deckIdx);
+    }
+    engine._untrackCard(inst.id);
+    engine.log('taio_mountains_heart_cancelled', { player: ps.username, card: cardName, source: picked.source });
+    engine.sync();
+    return;
+  }
+
+  // Aufgeloest (oder ganz negiert): die Karte wandert jetzt in die Ablage.
+  if (fromDeck && deckGenommen) engine.shuffleDeck(pi, 'main');   // Suche aus dem Deck: nach dem Guss mischen
+  if (!fromDeck) {
+    const idx = ps.hand.indexOf(cardName);
+    if (idx >= 0) {
+      engine._pileFlight?.(pi, cardName, 'hand', 'discard', { fromHandIdx: idx });
+      engine.takeFromPileSync(ps, 'hand', idx);
+    }
+  }
   ps.discardPile.push(cardName);
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — der Zauber
   // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
   // kostet nichts.
-  if (cardData.cardType === 'Spell' && !gs.result && !gs._spellCancelled) {
+  if (cardData.cardType === 'Spell' && !gs.result) {
     const wisdomCost = engine.getWisdomDiscardCost(feld, heroIdx, cardData);
     if (wisdomCost > 0) {
       await engine.actionPromptForceDiscard(pi, wisdomCost, {
