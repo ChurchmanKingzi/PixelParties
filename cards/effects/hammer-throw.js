@@ -3,7 +3,9 @@
 //  Attack (Fighting Lv1, Normal)
 //
 //  Deal damage equal to attacker's ATK stat.
-//  If the attack is not negated, the target's
+//  If the card is not negated AS A WHOLE (Welle 13, Q139:
+//  Escape/Schild/Immunitaet, die nur den Schaden verhindern,
+//  halten den Lock NICHT auf), the target's
 //  controller is Itemlocked for their next
 //  turn: whenever they play an Artifact, they
 //  must delete a card from their hand
@@ -92,7 +94,8 @@ module.exports = {
       if (target.type === 'hero') {
         const targetHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
         if (targetHero && targetHero.hp > 0) {
-          await engine.actionDealDamage(attackSource, targetHero, finalAtk, 'attack');
+          const _r = await engine.actionDealDamage(attackSource, targetHero, finalAtk, 'attack');
+          if (_r?.surpriseNegated || _r?.effectNegated) negated = true;
         }
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -100,15 +103,24 @@ module.exports = {
           c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
         );
         if (inst) {
-          await engine.actionDealCreatureDamage(
+          const _r = await engine.actionDealCreatureDamage(
             attackSource, inst, finalAtk, 'attack',
             { sourceOwner: pi, canBeNegated: true },
           );
+          if (_r?.surpriseNegated || _r?.effectNegated) negated = true;
         }
       }
 
+      // Welle 13 (Q139, Al: „Wenn NUR der Schaden verhindert wird, ja. Wenn die Karte
+      // insgesamt negiert wird, nein."): Escape, Schilde, Immunitaet verhindern nur den
+      // Schaden — der Item Lock kommt trotzdem. Eine GANZ negierte Karte (Z7b:
+      // `negatesWholeCard`, `gs._negationWhole`) loest nie auf: dann kein Lock. Die
+      // ueblichen Ganz-Negierungen (Post-Target-Fenster, Surprise vor dem Schaden)
+      // brechen den Wurf schon vorher ab; dies ist der Guertel fuer Negierungen am Treffer.
+      if (gs._spellNegatedByEffect && gs._negationWhole) negated = true;
+
       // Apply Itemlock to target's controller (not on turn 1)
-      if ((gs.turn || 1) > 1) {
+      if ((gs.turn || 1) > 1 && !negated) {
         const oppIdx = tgtOwner;
         const oppPs = gs.players[oppIdx];
         if (oppPs) {
