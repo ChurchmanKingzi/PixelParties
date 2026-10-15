@@ -17518,7 +17518,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           });
         }
         this.log('hand_limit_' + pile, { player: ps.username, card: cardName });
-        await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _skipReactionCheck: true });
+        // Welle 12 (Q93, Al: „NUR Karteneffekte, nicht das Hand-Size-Limit."): der Regel-Abwurf (kein `deleteMode`) ist kein „by an effect" —
+        // `_handLimitRegel` lässt Glass of Marbles stumm; das Pollution-Löschen (`deleteMode`) bleibt ein Karteneffekt.
+        await this.runHooks(hookName, { playerIdx, cardName, discardedCardName: cardName, _fromHand: true, _handLimitRegel: !deleteMode, _skipReactionCheck: true });
         this.sync();
         return true;
       };
