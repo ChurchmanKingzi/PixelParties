@@ -8,7 +8,7 @@
 // bei der Kopie also der MONSTROSITY: gesetzt nur, wenn die Monstrosity selbst per Bounce-Place kam (dann: Stufe des dabei zurückgenommenen
 // Wesens), sonst fehlt sie (dann zieht die Kopie nichts).
 //
-// Lesart (offen): Die „returned Creature" der kopierten Wirkung ist die von der Monstrosity für die Kopie zurückgenommene Jack (Stufe 1).
+// WELLE 9: Al hat entschieden (siehe Prüfung unten): zählt die beim Platzieren der Monstrosity gebouncte Kreatur; ohne Bounce kein Level. Alte Lesart (überholt): Die „returned Creature" der kopierten Wirkung ist die von der Monstrosity für die Kopie zurückgenommene Jack (Stufe 1).
 //   Es gibt dann in beiden Fällen 1 Karte. Das Repro prüft diese Lesart (✗ = Abweichung); die Frage steht im Bericht.
 // Beobachtet: normal beschworen → 0 Karten; per Bounce-Place über Deepsea Witch (Lv2) → 2 Karten.
 const H = require('../../lib/h.js');
@@ -26,7 +26,9 @@ const H = require('../../lib/h.js');
     await t.play(0, 'Deepsea Monstrosity', { hero: 0, slot: 0 });
     const gezogen = t.pile(0, 'hand').filter(n => n === 'ZZ Dummy').length;
     R.note('Hand danach', t.pile(0, 'hand'));
-    R.check('Die kopierte Jack-Wirkung zieht 1 Karte (Stufe der zurückgenommenen Jack), unabhängig vom Weg der Monstrosity', gezogen === 1, { gezogen, hand0 });
+    // Welle 9 (Al, 15.10.2026, Q14): „Die beim Platzieren von Monstrosity gebouncte Creature/deren Level zählt“ – kein Bounce beim Platzieren = kein Level = 0 Karten.
+    const erwartet = via === 'normal' ? 0 : 2;
+    R.check('Welle 9: Die kopierte Jack-Wirkung zieht so viele Karten wie die Stufe der beim PLATZIEREN der Monstrosity gebouncten Kreatur (normal: 0, Witch Lv2: 2)', gezogen === erwartet, { gezogen, erwartet, hand0 });
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();
