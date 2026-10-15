@@ -17,6 +17,7 @@ const DS = require('../../../../cards/effects/_deepsea-shared.js');
   t.setHand(0, ['Deepsea Zombie']);
   const r2 = await t.play(0, 'Deepsea Zombie', { hero: 0, slot: 0, noGrant: true });
   R.note('Zombie per Bounce-Place über die eigene Fremd-Kreatur (kein Summoning Magic nötig)', { r2, hand: t.pile(0, 'hand'), board: t.gs.players[0].supportZones[0].map(z => z[0] || null) });
-  R.check('Im eigenen Zug nicht spielbar (Text: nur zu Beginn des Gegnerzugs)', r === false, { r, aktiv: t.gs._deepseaSporesActiveTurn, eigeneKreaturIstDeepsea: DS.isDeepseaCreature(eigene.name, t.engine, eigene) });
+  // Welle 9 (Al, 15.10.2026, Q12): im eigenen Zug normal spielbar (kein „only“ im Text); Subtyp Reaction (schon gesetzt) – das Repro prüft jetzt dieses Verhalten (früher: „nicht spielbar“).
+  R.check('Welle 9: Im eigenen Zug spielbar (Reaction, proactivePlay)', r === true, { r, aktiv: t.gs._deepseaSporesActiveTurn, eigeneKreaturIstDeepsea: DS.isDeepseaCreature(eigene.name, t.engine, eigene) });
   R.finish();
 })();
