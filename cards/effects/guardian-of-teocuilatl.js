@@ -175,13 +175,14 @@ module.exports = {
       if (ctx.cancelled) return; // already negated by another Guardian
       const engine = ctx._engine;
       const pi = ctx.cardController ?? ctx.cardOwner;
-      // Only protect YOUR OWN Areas.
-      if (ctx.affectedOwner !== pi) return;
+      // ★ Welle 9 (Al, 15.10.2026, A01-pollution-10): Der Text sagt „an Area“, nicht „your Area“ — der Guardian darf JEDE
+      // Area schützen, auch eine gegnerische. Der Besitzer des Guardians (Kontrolleur) entscheidet, `pi` ist er.
+      const eigene = ctx.affectedOwner === pi;
 
       const ok = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `${ctx.source || 'An effect'} would affect your "${ctx.areaName}" Area. Sacrifice ${CARD_NAME} to negate it?`,
+        message: `${ctx.source || 'An effect'} would affect ${eigene ? 'your' : "your opponent's"} "${ctx.areaName}" Area. Sacrifice ${CARD_NAME} to negate it?`,
         showCard: CARD_NAME,
         confirmLabel: '🛡️ Sacrifice & Protect!',
         cancelLabel: 'No',
