@@ -19,6 +19,14 @@
 //     Quelle eine Creature auf dem Brett ist (`afterDamage`) — diese
 //     Creature friert ein. Attacks laufen ueber ②, nicht doppelt.
 //  Einfrieren ueber `_frost-shared` (Immunitaeten greifen), 1 Zug.
+//  ④ Welle 12 (Q99, Al: „Auch tödliche Gegentreffer sollten einfrieren"):
+//     auch wenn der Treffer den Träger TÖTET, friert der Angreifer
+//     (Held per Attack, Kreatur per Effekt) ein. Das Heart liegt nach dem
+//     Tod des Trägers schon in der Ablage (`afterSpellResolved` käme zu
+//     spät) — deshalb `bypassDeadHeroFilter` und die tödliche Attack
+//     wird schon in `afterDamage` (Heart liegt noch am Träger) vergolten;
+//     `_hoiTod` verhindert die Doppelung, falls der Träger doch überlebt
+//     (Guardian Angel & Co.).
 // ═══════════════════════════════════════════
 const { hasCardType } = require('./_hooks');
 const { einfrieren, eisblockAnimation } = require('./_frost-shared');
@@ -64,6 +72,7 @@ module.exports = {
   isEquip: true,
   equipOwnSideOnly: true,
   activeIn: ['support'],
+  bypassDeadHeroFilter: true,   // Welle 12 (Q99): `afterDamage` muss auch beim tödlichen Treffer auf den Träger laufen
 
   hooks: {
     onPlay: async (ctx) => {
@@ -87,6 +96,7 @@ module.exports = {
       const engine = ctx._engine;
       const t = traeger(engine, ctx.card);
       if (!t) return;
+      if (ctx.card._hoiTod === engine.gs.turn) { delete ctx.card._hoiTod; return; }   // Welle 12 (Q99): in `afterDamage` schon vergolten (tödlicher Treffer, Träger hat überlebt)
       const getroffen = (ctx.damageTargets || []).some(d => d.type === 'hero' && d.owner === t.pi && d.heroIdx === t.hi);
       if (!getroffen) return;
       const aPi = ctx.heroOwner ?? ctx.casterIdx;
@@ -101,6 +111,18 @@ module.exports = {
       const engine = ctx._engine;
       const t = traeger(engine, ctx.card);
       if (!t || ctx.target !== t.hero) return;
+      // Welle 12 (Q99): tödliche Attack eines Helden → jetzt vergelten (nach dem Tod liegt das Heart in der Ablage); nicht tödliche laufen über ②.
+      if (ctx.amount > 0 && ctx.type === 'attack' && t.hero.hp <= 0) {
+        const aq = ctx.source;
+        const acd = aq?.name ? engine._getCardDB()[aq.name] : null;
+        if (!acd || !hasCardType(acd, 'Attack')) return;
+        const aPi = aq.heroOwner ?? aq.owner;
+        const angreifer = engine.gs.players[aPi]?.heroes?.[aq.heroIdx];
+        if (!angreifer?.name || angreifer.hp <= 0 || angreifer === t.hero) return;
+        ctx.card._hoiTod = engine.gs.turn;
+        await vergelten(engine, ctx.card, { type: 'hero', owner: aPi, heroIdx: aq.heroIdx, name: angreifer.name });
+        return;
+      }
       if (!(ctx.amount > 0) || ctx.type === 'attack') return;
       const q = ctx.source;
       if (!q) return;
