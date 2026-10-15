@@ -21,6 +21,25 @@ function applyFreezeImmunity(hero) {
   hero.statuses.freeze_immune = { source: CARD_NAME, innate: true };
 }
 
+/**
+ * W8 (Al, 14.10.2026: "Broghan ja"): "This Hero cannot be Frozen" ist ein laufender Passiv - solange Broghans Heldeneffekt ruht
+ * (Frost/Betäubung/Negation, `_isHeroEffectSilenced`), entfällt die Immunität; nach dem Ende ist sie wieder da. Bereits
+ * angewandter Frost bleibt. Der Stempel `freeze_immune` wird von mehreren Karten direkt gelesen, darum Stempel-Abgleich statt
+ * Leser-Abfrage (W7a-Muster): `bypassStatusFilter` hält die Abgleich-Hooks am Laufen, der Zustand wird direkt gefragt. Nur der
+ * eigene Stempel (source === Broghan) ruht; fremde Quellen (Heart of Ice, The Sun Sword …) bleiben unberührt.
+ */
+function abgleichen(ctx) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOriginalOwner, hi = ctx.cardHeroIdx;
+  const hero = engine?.gs?.players?.[pi]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0) return;
+  if (engine._isHeroEffectSilenced(pi, hi)) {
+    if (hero.statuses?.freeze_immune?.source === CARD_NAME) { delete hero.statuses.freeze_immune; engine.sync?.(); }
+  } else if (!hero.statuses?.freeze_immune) {
+    applyFreezeImmunity(hero);
+  }
+}
+
 function computeDamage(deckSize) {
   return Math.max(10, 500 - 10 * deckSize);
 }
@@ -29,6 +48,9 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
+  // W8: nur für den Stempel-Abgleich (alle Hooks dieser Karte betreffen ausschließlich `freeze_immune`; die Aktivierung des
+  // Heldeneffekts läuft nicht über den Verteiler). Die Immunität ruht trotzdem - `abgleichen` fragt den Zustand selbst.
+  bypassStatusFilter: true,
   heroEffect: true,
   // Rein schaedlich: 500 Schaden (deckabhaengig reduziert) auf ein Ziel.
   // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
@@ -116,19 +138,18 @@ module.exports = {
     // Innate freeze immunity. `hero.statuses` gets wiped by revive
     // (engine.actionReviveHero) and death cleanup, so re-apply on
     // game start, on revive, and as a turn-start safety net.
-    onGameStart: (ctx) => {
-      applyFreezeImmunity(ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx]);
-    },
+    onGameStart: (ctx) => { abgleichen(ctx); },
     onHeroRevive: (ctx) => {
       if (ctx.playerIdx !== ctx.cardOriginalOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       applyFreezeImmunity(ctx.hero);
+      abgleichen(ctx);   // W8: wiederbelebt, aber negiert -> Immunität ruht
     },
-    onTurnStart: (ctx) => {
-      const hero = ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
-      if (!hero || hero.hp <= 0) return;
-      if (!hero.statuses?.freeze_immune) applyFreezeImmunity(hero);
-    },
+    onTurnStart: (ctx) => { abgleichen(ctx); },
+    // W8: Selbstabgleich bei Statuswechseln und je Phasenbeginn (leises Abklingen der Negation)
+    onStatusApplied: (ctx) => { abgleichen(ctx); },
+    onStatusRemoved: (ctx) => { abgleichen(ctx); },
+    onPhaseStart: (ctx) => { abgleichen(ctx); },
     // Geliehen (??? the Shapeshifter): mit der Gestalt faellt auch die
     // Unfreezable-Marke ab (H01-heroes-02).
     onIdentityLost: (ctx) => {
