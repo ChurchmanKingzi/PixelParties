@@ -15041,6 +15041,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cd = cardDB[cardName];
     if (cd && (cd.cardType === 'Creature' || cd.cardType === 'Token')) {
       this.zaehleBeschwoerung(playerIdx);
+      this._stempelEintrittsLimit(cardName, opts.controller ?? playerIdx);   // Welle 12: „1 pro Zug" zaehlt jeden Eintritt
       // Guardian Beasts archetype: stamp the per-turn flag so subsequent
       // Guardian Beast summons in the same turn don't claim the
       // first-of-turn additional Action. Centralized here so every
@@ -26894,6 +26895,30 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ Welle 12 (Al, Rueckfrage 12, Mausoleum Worm): „You can only play 1 'X' per turn" gilt fuer ALLE Wege aufs Brett — Hand, Ablage UND jeden
+   * Effekt, der die Karte PLATZIERT (The Master's Key …): „auch Place-Effekte sind davon limitiert/zählen ins Limit". Skript-Vertrag
+   * `playLimitKey: '<schluessel>'` an der Kreatur (je Spieler und Zug ein Eintritt). Zwei Helfer:
+   *  - `_stempelEintrittsLimit(name, pi)`: wird vom Eintritt aufs Brett gerufen (`safePlaceInSupport`, `actionPlaceCreature`) und stempelt
+   *    `gs.hoptUsed['<schluessel>:<pi>'] = Zug`;
+   *  - `_eintrittsLimitErreicht(name, pi)`: Stempel ODER eine in diesem Zug eingetretene eigene Kopie auf dem Brett (Wege, die `_trackCard` selbst
+   *    rufen, z. B. Necromancy). Die Platzierung (`actionPlaceCreature`) und das Handspiel (`canSummon` der Karte) fragen es.
+   */
+  _stempelEintrittsLimit(cardName, playerIdx) {
+    const key = loadCardEffect(cardName)?.playLimitKey;
+    if (!key || !this.gs.players[playerIdx]) return;
+    if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+    this.gs.hoptUsed[`${key}:${playerIdx}`] = this.gs.turn;
+  }
+
+  _eintrittsLimitErreicht(cardName, playerIdx) {
+    const key = loadCardEffect(cardName)?.playLimitKey;
+    if (!key) return false;
+    if (this.gs.hoptUsed?.[`${key}:${playerIdx}`] === this.gs.turn) return true;
+    return this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SUPPORT
+      && c.turnPlayed === this.gs.turn && (c.controller ?? c.owner) === playerIdx);
+  }
+
+  /**
    * Generic creature placement primitive. Used by Monster in a Bottle,
    * Barker, Alice, Elixir of Immortality, every Deepsea bounce-place,
    * Dark Deepsea God, etc. Blocks on `ps.summonLocked`. Tracks a fresh
@@ -26944,6 +26969,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('placement_blocked', {
         card: cardName, by: opts.sourceName || 'Placement', reason: 'summonLocked',
       });
+      return null;
+    }
+    // Welle 12 (Al, Rueckfrage 12): „You can only play 1 'X' per turn" sperrt auch das Platzieren (Mausoleum Worm), bevor etwas entnommen wird.
+    if (this._eintrittsLimitErreicht(cardName, playerIdx)) {
+      this.log('placement_blocked', { card: cardName, by: opts.sourceName || 'Placement', reason: 'play_limit' });
       return null;
     }
 
@@ -27126,6 +27156,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // wird nicht mehr gelesen (frueher zaehlte nur `true`: Vullary/Stellin/Stellan/
     // Klaus/Master's Key blieben aussen vor, Xuanwu zaehlte von Hand).
     this.zaehleBeschwoerung(playerIdx);
+    this._stempelEintrittsLimit(cardName, playerIdx);   // Welle 12: „1 pro Zug" zaehlt auch die Platzierung
 
     // Landung des Hand-Flugs abwarten (v700), bevor Poof und Hooks
     // laufen — sonst feuert z.B. Monamis Draw, waehrend die Karte noch
@@ -40920,6 +40951,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   nurEinerSchonKontrolliert(pi, cardName) {
     const cd = this._getCardDB()[cardName];
     if (!cd || cd.cardType !== 'Creature') return false;
+    // Welle 12 (Al, Rueckfrage 12): „You can only play 1 'X' per turn" (Mausoleum Worm) sperrt dieselben Wege wie „You can only control 1": Platzier-Effekte
+    // (Glorious Rebirth …) und das Ausgrauen der Handkopien - der erste Eintritt dieses Zuges zaehlt (`playLimitKey`, `_eintrittsLimitErreicht`).
+    if (this._eintrittsLimitErreicht(cardName, pi)) return true;
     if (!(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
     return this.cardInstances.some(c => c.name === cardName && c.zone === 'support' && !c.faceDown
       && (c.controller ?? c.owner) === pi);

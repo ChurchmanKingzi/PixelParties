@@ -45,10 +45,13 @@ module.exports = {
     return undefined;
   },
 
-  /** Q80: ein zweiter Mausoleum Worm ist im selben Zug nicht spielbar (Hand), wenn schon einer eingetreten ist. */
+  // Welle 12 (Al, Rueckfrage 12): „auch Place-Effekte sind davon limitiert/zählen ins Limit" — Engine-Vertrag `playLimitKey`: jeder Eintritt aufs
+  // Brett (Hand, Ablage, Platzieren durch The Master's Key & Co.) stempelt (`_stempelEintrittsLimit`), `actionPlaceCreature` verweigert danach.
+  playLimitKey: HOPT_KEY,
+
+  /** Q80/Welle 12: ein zweiter Mausoleum Worm ist im selben Zug weder spielbar (Hand) noch platzierbar/waehlbar, wenn schon einer eingetreten ist. */
   canSummon(ctx) {
-    const gs = ctx._engine.gs;
-    return gs.hoptUsed?.[`${HOPT_KEY}:${ctx.cardOwner}`] !== gs.turn;
+    return !ctx._engine._eintrittsLimitErreicht(CARD_NAME, ctx.cardOwner);
   },
 
   hooks: {
@@ -75,7 +78,7 @@ module.exports = {
       const gefallen = ctx.hero;
       if (!gefallen?.name || gefallen.hp > 0) return;   // gerettet? dann feuert dieser Haken gar nicht
       if ((ps.discardPile || []).indexOf(CARD_NAME) < 0) return;      // nur aus MEINER Ablage
-      if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return;
+      if (engine._eintrittsLimitErreicht(CARD_NAME, pi)) return;
 
       // Physische Position des gefallenen Helden + Kontrolle.
       let seite = -1, heroIdx = -1;
