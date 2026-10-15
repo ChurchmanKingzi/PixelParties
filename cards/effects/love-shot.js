@@ -91,6 +91,9 @@ module.exports = {
     impact: { type: 'love_burst' }, impactMs: 260,
   },
 
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Deck-Zug, Heldenübernahme) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   requiresTarget: true,
 
   /**

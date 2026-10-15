@@ -81,6 +81,9 @@ const FLIGHT_DURATION = 700;
 const RESOLVE_ANIM_MS = 200 + USER_BOUND_INTER_DELAY + FLIGHT_DURATION + 200;
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Karte schenken) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   blockedByHandLock: true,
   deferBroadcast: true,
 
