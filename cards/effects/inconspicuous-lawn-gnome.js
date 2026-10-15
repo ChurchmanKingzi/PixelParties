@@ -3,7 +3,19 @@
 //  Creature (Summoning Magic Lv 0, 50 HP, PP MBS1)
 //
 //  „You may once per turn change this card's level in your hand or on
-//   your side of the board to any level from 0 to 3."
+//   the board while you control it to any level from 0 to 3."
+//   (Kartentext seit Welle 11; vorher „… on your side of the board".)
+//
+//  ★ Welle 11 (Al, 15.10.2026, Q75/Q79):
+//   • Q75: Der Kontrolleur (Dieb/Leiher) aktiviert den Effekt ganz normal und
+//     waehlt die Stufe SELBST (Prompt an ihn, `ctx.cardOwner` = Kontrolleur).
+//   • Q79: „Nur einmal pro Runde insgesamt!" - Hand UND Brett teilen sich EINE
+//     Nutzung je Zug und Karte. Die Handaenderung steht im Handindex-Feld
+//     `_handStufenWechsel` (Wert = Zug) und wandert beim Beschwoeren als
+//     `counters._stufeGeaendertZug` aufs Brett; `canActivateCreatureEffect`
+//     sperrt dort im selben Zug. Umgekehrt sperrt die Hand-Nutzung sich selbst
+//     (`_revealedThisTurn`). NICHT abgedeckt: Brettaenderung, dann Rueckkehr auf
+//     die Hand im selben Zug (die neue Handinstanz kennt die alte nicht).
 //
 //  BAUART
 //  ──────
@@ -101,6 +113,12 @@ module.exports = {
 
     inst.counters = inst.counters || {};
     inst.counters.levelSet = stufe;
+    // Q79: die Nutzung dieses Zuges folgt der Kopie aufs Brett (Handindex-Feld, s. Kopf).
+    const ps = engine.gs.players[pi];
+    if (ps && handIndex >= 0 && inst.zone === 'hand') {   // nicht fuer Crestinas Vorrat (anderer Index-Raum)
+      if (!ps._handStufenWechsel) ps._handStufenWechsel = {};
+      ps._handStufenWechsel[handIndex] = engine.gs.turn || 1;
+    }
     engine.log('gnome_level', {
       player: engine.gs.players[pi]?.username, level: stufe, where: 'hand',
     });
@@ -109,6 +127,12 @@ module.exports = {
     });
     engine.sync();
     return true;
+  },
+
+  /** Q79: im selben Zug schon in der Hand umgestellt -> keine zweite Aenderung auf dem Brett. */
+  canActivateCreatureEffect(ctx) {
+    const gs = ctx._engine.gs;
+    return ctx.card?.counters?._stufeGeaendertZug !== (gs.turn || 1);
   },
 
   async onCreatureEffect(ctx) {

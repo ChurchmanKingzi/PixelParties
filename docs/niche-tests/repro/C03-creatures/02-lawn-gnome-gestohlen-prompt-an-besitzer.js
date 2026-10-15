@@ -1,6 +1,7 @@
 'use strict';
 // C03-creatures-02 · Inconspicuous Lawn Gnome (gestohlen): die Stufenwahl geht an den BESITZER statt an den Aktivierenden
 // Kartentext: „You may once per turn change this card's level in your hand or on your side of the board to any level from 0 to 3."
+// ENTSCHIEDEN (Al, Welle 11, Q75): Der Borger/Dieb darf den Effekt ganz normal aktivieren und die Stufe selbst wählen (Repro prüft das; Kartentext angepasst).
 // Aufbau: Sitz 0 besitzt den Gnom (Held 0 / Slot 0, „alt"); Sitz 1 stiehlt ihn (actionStealCreature) und aktiviert ihn (charmedOwner = 0).
 // Erwartung: Wer den Effekt aktiviert (Sitz 1, Kontrolleur), bekommt die Optionswahl und entscheidet. (Ob ein gestohlener Gnom überhaupt
 //   „auf deiner Seite des Bretts" liegt, ist eine eigene Regelfrage – siehe Bericht C03-02; in keiner Lesart darf der Gegner die Wahl treffen.)

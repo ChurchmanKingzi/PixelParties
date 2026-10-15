@@ -3,6 +3,7 @@
 // Kartentext: „You may once per turn change this card's level in your hand or on your side of the board to any level from 0 to 3."
 // Aufbau: Sitz 0: Held 0 mit Summoning Magic 3, Gnom auf der Hand. Zug: (1) in der Hand auf Stufe 2 stellen (`doHandActivate`), (2) Gnom spielen, (3) auf dem Brett
 //   auf Stufe 3 stellen (`doActivateCreatureEffect`).
+// ENTSCHIEDEN (Al, Welle 11, Q79): „Nur einmal pro Runde insgesamt!" = Lesart A (Repro prüft sie; ✓ seit W11c). Kartentext in `data/cards.json` angepasst.
 // Lesart A (eine Nutzung je Zug und Karte): Schritt (3) ist gesperrt. Lesart B (je Zone): zulässig. Der Text sagt „once per turn … in your hand OR on your side" – ein Ein-Zug-Kontingent.
 // Beobachtet: Schritt (3) wird angenommen (zwei Stufenänderungen im selben Zug); die Hand-Stufe (2) geht beim Spielen verloren (Brettstufe zurück auf Basis 0).
 // Ursache: Hand-Sperre `_revealedThisTurn` (`_engine.js` `doHandActivate`) und Brett-Sperre `creature-effect:<instId>` sind getrennte Stempel.

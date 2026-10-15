@@ -2,6 +2,7 @@
 // C03-creatures-10 · Mr. Jiggles (gestohlen/geliehen): die geliehene Kreatur selbst wird als „Ziel, das dein Gegner kontrolliert" angeboten
 // Kartentext: „You may once per turn choose up to 2 targets your opponent controls and inflict 100 damage to them."
 // Aufbau: Sitz 0 besitzt Mr. Jiggles (Held 0 / Slot 0) und eine ZZ Dummy; Sitz 1 stiehlt Jiggles (`actionStealCreature`, wie Lovely Teddy) und aktiviert ihn.
+// ENTSCHIEDEN (Al, Welle 11, Q77, nach Klarstellung): „Jiggles sollte sich niemals *selbst* wählen können!" - die Erwartung unten gilt (Repro unverändert, ✓).
 // Erwartung: Der Kontrolleur (Sitz 1) kontrolliert Jiggles selbst – er ist KEIN Ziel „das dein Gegner kontrolliert"; angeboten werden nur die Ziele des Besitzers (Sitz 0).
 // Beobachtet: `side: 'enemy'` wird nach der Brettseite aufgelöst; Jiggles (Kontrolleur Sitz 1) steht auf Brettseite 0 und wird mit angeboten; der Dieb kann sich damit
 //   selbst (90 HP, 100 Schaden) zerstören bzw. eine Fremd-Kreatur-Auswahl „verbrauchen" (Ziel 1 von 2).

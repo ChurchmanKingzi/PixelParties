@@ -7,6 +7,7 @@
 // Beobachtet: Der Dummy landet auf Seite 1, Held 1 (EIGENER Held des Diebes mit gleichem Index) – weder beim Wirtsheld des Sergeants (Seite 0 / Held 1)
 //   noch bei einer Wahl des Diebes. Grund: `drill-sergeant.js` `targetZones` = `engine.getFreeSupportZones(pi)` (Kontrolleur-Seite) gefiltert auf `ctx.cardHeroIdx`.
 // Strenge Lesart (Wirtsheld = Held unter dem der Sergeant liegt): ✗ (hier geprüft). Lockere Lesart („ein Held des Kontrolleurs"): ✓.
+// ENTSCHIEDEN (Al, Welle 11, Q74 „a"): strenge Lesart gilt - der gestohlene Sergeant legt beim Helden, unter dem er liegt (Gegnerseite). Repro prüft das (✓ seit W11c).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();

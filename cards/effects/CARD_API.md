@@ -10505,8 +10505,9 @@ Profil Regeln hat. Beim Löschen wählt die CPU die BILLIGSTEN acht
 ## Neue Karte: „Inconspicuous Lawn Gnome" (v988)
 
 Creature, Summoning Magic Lv 0, 50 HP. „You may once per turn change
-this card's level in your hand or on your side of the board to any level
-from 0 to 3."
+this card's level in your hand or on the board while you control it to any
+level from 0 to 3." (Text seit Welle 11, Q75/Q79 — vorher „… on your side
+of the board"; Hand und Brett teilen sich EINE Nutzung je Zug.)
 
 **★ ZWEI ORTE, ZWEI VERTRÄGE.** Die Karte ist in der HAND und auf dem
 BRETT aktivierbar:
@@ -20417,3 +20418,19 @@ Alle Antworten sind von Al; Repros unter `docs/niche-tests/repro/W11/b-*.js` (Ex
 | Q73 (C01-14) Spirit of the Forbidden Grimoire, Kohta | „Beide dürfen explizit Effekte ein weiteres Mal verwenden; bei Kohta ist das sogar der einzige Anwendungsfall. Also ja, sie dürfen sie wiederholen." | Ist-Zustand bestätigt: eine Kreatur mit „once per turn", die ihren Effekt schon benutzt hat, ist über das Grimoire leihbar und von Kohta wiederholbar (kein Eingriff am HOPT); danach ist der Effekt für den Zug gesperrt (`_effectLockedTurn`, Grimoire-Text). Karten mit EIGENEM Zähler im `canActivateCreatureEffect` (3-Headed Giant 3/3, Analyzer from the Cosmic Depths) bleiben ausgeschlossen (ihre Aktivierungsbedingung gilt auch für geliehene Verwendungen, Befund 5.9.) — offene Rückfrage. `C01-creatures/14` Teil A umgestellt; Repro `b-73`. |
 
 Repros: `docs/niche-tests/repro/W11/b-56`, `b-58`, `b-66`, `b-69`, `b-70`, `b-71-81`, `b-72`, `b-73` (Exit 0 = korrekt).
+
+## ★ Welle 11 / W11c — Entscheidungen von Al zu Q74, Q75, Q77, Q79, Q80, Q82, Q85 (15.10.2026)
+
+Alle Antworten sind von Al; Repros unter `docs/niche-tests/repro/W11/c-*.js` (Exit 0 = korrekt), umgestellte alte Repros sind in der Tabelle genannt.
+
+| Frage | Entscheidung (Al) | Umsetzung |
+|---|---|---|
+| Q74 (C02-05) Drill Sergeant, gestohlen | „a" — der gestohlene Sergeant legt die Kreatur beim Helden, **unter dem er liegt** (Gegnerseite; die Karte gehört dem Dieb, die Kreatur kommt aus der Hand des Kontrolleurs) | `drill-sergeant.js`: `targetZones(engine, seite, heroIdx)` mit der Brettseite (`engine.physicalSide(ctx.card)`), Zonenwahl mit `owner`/`ownerIdx` = Brettseite, `actionPlaceCreature(…, { heldSeite: seite })` -> `controller` = Dieb + `crossSideControlled` (Tod: Ablage des Diebes). Ungestohlen unverändert. Repro `W11/c-q74`; `C02-creatures/05` gilt jetzt (✓). |
+| Q75 (C03-02) Lawn Gnome, gestohlen | „Der Borger/Dieb darf den Effekt ganz normal aktivieren und die Stufe selbst wählen. Der Kartentext sollte … zu ‚from your hand or that you control' geändert werden." | Ist-Verhalten (Prompt an den Kontrolleur, Z1) bestätigt. Kartentext in `data/cards.json` (nur dieser Teilsatz): „… change this card's level in your hand or on the board while you control it to any level from 0 to 3." Repro `W11/c-q75-q79`; `C03-creatures/02` ✓. |
+| Q77 (C03-10) Mr. Jiggles, geliehen | Erst „Ja", dann klargestellt: „Jiggles sollte sich niemals *selbst* wählen können!" | **Keine Codeänderung.** Auch die geliehene/gestohlene Jiggles bietet sich nie selbst als Ziel an (Z1: Kreaturen nach KONTROLLE, `kreaturPasstZurSeite`); alle anderen Gegnerziele wie bisher. Repro `W11/c-q77` sichert das ab, `C03-creatures/10` prüft dasselbe. |
+| Q79 (C03-13) Lawn Gnome „once per turn" | „Nur einmal pro Runde insgesamt!" | Hand UND Brett teilen sich EINE Stufenänderung je Zug und Karte. Neues Handindex-Feld `ps._handStufenWechsel[handIdx] = Zug` (`_engine.js` `_registerBuiltinHandIndexedFields`, `onCardSummonedFromHand` -> `inst.counters._stufeGeaendertZug`); `inconspicuous-lawn-gnome.js` `canActivateCreatureEffect` sperrt das Brett im selben Zug (die Hand sperrt sich über `_revealedThisTurn`). Die Sperre gehört der geänderten KOPIE. Nicht abgedeckt: Brettänderung, dann Rückkehr auf die Hand im selben Zug. Repro `W11/c-q75-q79`; `C03-creatures/13` ✓. |
+| Q80 (C03-15) Mausoleum Worm | „Für alle Wege kombiniert." | „Play 1 per turn" gilt für Handspiel und Platzierung aus der Ablage zusammen (je Spieler und Zug, Stempel `hoptUsed['mausoleum-worm:<Kontrolleur>']`). `mausoleum-worm.js`: `hooks.onPlay` stempelt bei JEDEM Eintritt aufs Brett (auch Platzierungen anderer Effekte), `canSummon` sperrt das Handspiel danach, das Ablage-Angebot prüft denselben Stempel. Andere Effekte, die einen Wurm platzieren (The Master's Key …), sind kein „play" und werden nicht gesperrt, zählen aber für den Stempel. Repro `W11/c-q80`; `C03-creatures/15` ✓. |
+| Q82 (C03-17) Horned Demon, geliehen | „Ja, er bekommt Counter am Ende der Runde seines aktuellen Beherrschers" | Ist-Zustand bestätigt (`onTurnEnd` mit `ctx.isMyTurn` = aktueller Kontrolleur): Der Leiher (Lovely Teddy, Aligning Goals) füttert den Demon am Ende SEINES Zuges; am Ende des Besitzer-Zuges (nach der Rückgabe) zählt der Besitzer. Repro `W11/c-q82`; `C03-creatures/17` auf die neue Regel umgestellt (Erwartung 3 statt 2). |
+| Q85 (C05-08) Gleichstand | „Wenn nichts anderes angegeben ist, gewinnt der Karten-Wirker." | **Allgemeine Regel:** Löscht ein Effekt beide Seiten gleichzeitig aus (alle Helden beider Seiten besiegt — The Spawn Mother „alles", Cataclysm, jede Flächenkarte ohne eigene Klausel), gewinnt der Spieler, dessen Karte/Effekt gerade aufgelöst wird. Zentral in `_engine.js` `checkAllHeroesDead` (Zweig `wiped[0] && wiped[1]`, Log `draw_resolved`, `decidedBy: 'caster'`). Rangfolge: 1. Karten-Klausel (`gs._drawLoserIdx`: Bunny Bombs „you lose", Armageddon „most Creatures wins"), 2. Karten-Wirker `engine._kartenWirker()` (Hook einer Brettkarte mit `_currentEffectSource.instId`, dann das auflösende Kettenglied `_rxResolvingOwner`, dann `_currentEffectSource.owner`, dann `_activationSource.owner`), 3. ohne jede Karte (reiner Spielablauf, z. B. Statusticks beider Seiten) der alte Standard (Sitz 0 verliert). Die Reihenfolgeregel aus Welle 9 („alle Gegner getötet" vor der Doom-Clock-Niederlage) bleibt unberührt. Repro `W11/c-q85`; `C05-creatures/08` auf „Wirker gewinnt" umgestellt. |
+
+Repros: `docs/niche-tests/repro/W11/c-q74-…`, `c-q75-q79-…`, `c-q77-…`, `c-q80-…`, `c-q82-…`, `c-q85-…` (Exit 0 = korrekt).
