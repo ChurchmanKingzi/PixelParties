@@ -216,7 +216,7 @@
     "hp": 40,
     "atk": null,
     "cost": null,
-    "effect": "Activate this Surprise when your opponent equips or attaches a card to a Hero. Choose a card in any Hero's Support Zone and send it to the discard pile, then place this Creature into one of the user's free Support Zones. You may once per turn move this Creature you control into the corresponding Hero's Surprise Zone face-down.",
+    "effect": "Activate this Surprise when your opponent equips or attaches a card into a Hero's Support Zone. Choose a card in any Hero's Support Zone and send it to the discard pile, then place this Creature into one of the user's free Support Zones. You may once per turn move this Creature you control into the corresponding Hero's Surprise Zone face-down.",
     "archetype": "PACMAN",
     "setID": "PP MSEG",
     "banned": "",

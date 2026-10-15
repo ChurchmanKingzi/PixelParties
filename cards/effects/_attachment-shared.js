@@ -307,7 +307,7 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
   }
   engine.log('attachment_placed', { card: CARD_NAME, player: gs.players[pi]?.username, hero: hero.name, side: host.owner, heroIdx: host.heroIdx, zoneSlot: slot });
   if (!opts.skipEnterHook) {
-    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: host.heroIdx, _skipReactionCheck: true });
+    await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: host.heroIdx, _skipReactionCheck: true, _anhaengselAnleger: pi });
   }
   engine.sync();
   return inst;

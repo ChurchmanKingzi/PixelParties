@@ -3,7 +3,10 @@
 //  Creature (Surprise) — Summoning Magic Lv1
 //
 //  Activate when the opponent equips or
-//  attaches a card to a Hero.
+//  attaches a card into a Hero's Support Zone.
+//  (Welle 11, Al Q59/R1: Text so präzisiert — Spell-/Attack-
+//  Anhängsel zählen, ABILITIES nicht: sie liegen in Ability-
+//  Zonen, nicht in Support Zones.)
 //  Choose a non-Creature card in any Hero's
 //  Support Zone and destroy it, then summon
 //  this Creature.

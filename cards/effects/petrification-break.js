@@ -129,7 +129,7 @@ module.exports = {
 
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: res.host.heroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
       engine.log('petrification_break', { player: ps.username, hero: user.name });
       engine.sync();

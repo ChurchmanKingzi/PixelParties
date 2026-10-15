@@ -83,7 +83,7 @@ module.exports = {
       // Fire zone enter hook
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: targetHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.log('guardian_angel_placed', {

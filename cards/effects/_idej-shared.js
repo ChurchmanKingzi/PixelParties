@@ -94,6 +94,7 @@ async function attachIdejCardToHero(engine, pi, heroIdx, cardName, opts = {}) {
   await engine.runHooks('onCardEnterZone', {
     enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
     _skipReactionCheck: true,
+    _anhaengselAnleger: pi,   // Welle 11 (Al, R1): „attach an Idej Projection / equip an Idej Blade" öffnet das Equip-Fenster (Afflicted Pests, LOCUST)
   });
   return inst;
 }

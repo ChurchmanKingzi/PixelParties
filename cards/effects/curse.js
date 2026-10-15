@@ -290,7 +290,7 @@ module.exports = {
       // Fire enter-zone hook so listeners observe the new support card.
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: targetHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, _anhaengselAnleger: pi,
       });
 
       engine.log('curse_attached', {

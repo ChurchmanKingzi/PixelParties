@@ -3679,6 +3679,16 @@ class GameEngine {
       }
     }
 
+    // Welle 11 (Al, R1: „Ja, soll es"): Spell-/Attack-ANHÄNGSEL (Curse, Stoneskin …) sind „equips or attaches a card" und öffnen das
+    // Equip-Fenster (Afflicted Pests, Cybug LOCUST). Sie feuern `onCardEnterZone` mit `_skipReactionCheck` (die Hand-Reaktionskette des
+    // Zaubers lief schon) — deshalb öffnet NUR das Equip-Fenster hier, nicht Beschwörungs-/Platzierungs-Fenster. Der ANLEGER ist der Wirker
+    // (`_anhaengselAnleger`), nicht die Seite des Wirts (Curse auf einen Gegner-Helden liegt auf dessen Seite).
+    if (hookName === 'onCardEnterZone' && hookCtx._skipReactionCheck && hookCtx._anhaengselAnleger != null
+        && hookCtx.toZone === 'support' && hookCtx.enteringCard && !this._surpriseNestingBlocked()) {
+      const _anh = hookCtx.enteringCard;
+      if (_anh.zone === 'support') await this._checkSurpriseOnEquip(hookCtx._anhaengselAnleger, _anh.heroIdx, _anh);
+    }
+
     // ── Eintritts-Fenster „Creature betritt eine Support Zone" (v699).
     // EIGENER Block, absichtlich OHNE `_skipReactionCheck`-Gate (siehe
     // _checkSurpriseOnCreatureEnterSupport): das Flag meint die
