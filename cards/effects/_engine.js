@@ -50082,7 +50082,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * davor: 1. Hook/Aktivierung einer Karte auf dem Brett (`_currentEffectSource` MIT `instId` — der innerste Verursacher),
    * 2. das Kettenglied, das gerade aufloest (`_rxResolvingOwner` — auch eine Reaktion des Gegners), 3. die laufende
    * Effektquelle ohne Instanz (gespielte Karte, Kreatur-Effekt), 4. die aktivierende Karte (`_activationSource`).
-   * Ohne jede Quelle (Spielablauf, Statusticks) `null` — der Zugspieler ist KEIN Wirker.
+   * Ohne jede Quelle (Spielablauf, Statusticks) `null` — der Zugspieler ist KEIN Wirker (er gewinnt dann trotzdem, Welle 12: `checkAllHeroesDead`).
    */
   _kartenWirker() {
     const q = this._currentEffectSource;
@@ -50171,15 +50171,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hint = this.gs._drawLoserIdx;
       // ★ Welle 11 (Al, 15.10.2026, Q85): „Wenn nichts anderes angegeben ist, gewinnt der Karten-Wirker." Rangfolge:
       // 1. ausdrückliche Karten-Klausel (`_drawLoserIdx`: Bunny Bombs, Armageddon …), 2. der Wirker der laufenden
-      // Karte/des Effekts (`_kartenWirker`), 3. ohne jede Karte (reiner Spielablauf) der alte Standard (Sitz 0 verliert).
+      // Karte/des Effekts (`_kartenWirker`), 3. ohne jede Karte (reiner Spielablauf) der Zugspieler (Welle 12; vorher Sitz 0 verliert).
       const wirker = (isSeat(this, hint)) ? null : this._kartenWirker();
       let loserIdx = (isSeat(this, hint)) ? hint : 0;
       let winnerIdx = loserIdx === 0 ? 1 : 0;
       if (wirker != null) { winnerIdx = wirker; loserIdx = this.opponentOf(wirker); }
+      // ★ Welle 12 (Al, 15.10.2026, Q85-Rueckfrage 13): „Der Zugspieler gewinnt." Ohne Klausel und ohne Karten-Wirker (reiner Spielablauf,
+      // z. B. Statusticks beider Seiten am Zugende) gewinnt der Spieler am Zug statt des alten Sitz-Standards „Sitz 0 verliert".
+      const zugspielerEntscheidet = !isSeat(this, hint) && wirker == null && isSeat(this, this.gs.activePlayer);
+      if (zugspielerEntscheidet) { winnerIdx = this.gs.activePlayer; loserIdx = this.opponentOf(winnerIdx); }
       this.log('draw_resolved', {
         loser: this.gs.players[loserIdx]?.username,
         winner: this.gs.players[winnerIdx]?.username,
-        decidedBy: (isSeat(this, hint)) ? 'card_effect' : (wirker != null ? 'caster' : 'default'),
+        decidedBy: (isSeat(this, hint)) ? 'card_effect' : (wirker != null ? 'caster' : (zugspielerEntscheidet ? 'turn_player' : 'default')),
       });
       if (this._inMctsSim) {
         if (!this.gs.result) this.gs.result = { winnerIdx, reason: 'draw_resolved' };

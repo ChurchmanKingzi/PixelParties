@@ -4,7 +4,7 @@
 // ENTSCHIEDEN (Al, Welle 11, Q85): „Wenn nichts anderes angegeben ist, gewinnt der Karten-Wirker." Gilt für jeden Effekt ohne eigene
 //   Klausel, der beide Seiten gleichzeitig auslöscht (The Spawn Mother „alles", Cataclysm, Flächenkarten). Karteneigene Klauseln
 //   (`gs._drawLoserIdx`: Bunny Bombs „you lose", Armageddon „most Creatures wins") haben Vorrang. Zentral: `_engine.js` `checkAllHeroesDead`
-//   (`draw_resolved`) mit `_kartenWirker()`. Ohne jede Karte (reiner Spielablauf) bleibt der alte Standard (Sitz 0 verliert).
+//   (`draw_resolved`) mit `_kartenWirker()`. Ohne jede Karte (reiner Spielablauf) gewinnt seit Welle 12 (Al, Rückfrage 13) der Zugspieler (vorher: Sitz 0 verliert) - Repro W12/a-13.
 // Geprüft (je beide Sitze): (a) The Spawn Mother „alles"-Modus, (b) Cataclysm (Spell, 100 auf alles), (c) gestohlene Spawn Mother
 //   (Wirker = Kontrolleur/Dieb), (d) Armageddon mit Klausel: wer die meisten Kreaturen führt, gewinnt - auch gegen den Wirker.
 //   Die Reihenfolgeregel aus Welle 9 („alle Gegner getötet" vor der Doom-Clock-Niederlage) bleibt unberührt (Repro W9).
@@ -67,7 +67,7 @@ const H = require('../../lib/h.js');
     const t = await H.fresh({});
     const e = t.engine;
     e._currentEffectSource = null; e._rxResolvingOwner = undefined; e._activationSource = null;
-    R.check('ohne Quelle: kein Wirker (Spielablauf; alter Standard)', e._kartenWirker() === null, e._kartenWirker());
+    R.check('ohne Quelle: kein Wirker (Spielablauf; es entscheidet der Zugspieler, W12/a-13)', e._kartenWirker() === null, e._kartenWirker());
     e._currentEffectSource = { cardName: 'X', owner: 0, cardType: 'Spell' };
     R.check('Spell-Quelle ohne Kette: deren Besitzer', e._kartenWirker() === 0, e._kartenWirker());
     e._rxResolvingOwner = 1;
