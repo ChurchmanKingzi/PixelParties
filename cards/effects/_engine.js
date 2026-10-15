@@ -2926,6 +2926,27 @@ class GameEngine {
         && !(hookCtx.hero.hp > 0)) {
       this.kontrolleBeimTodZurueckgeben(hookCtx.hero);
     }
+    // ★ Welle 13 (Al, Q120/Q124): zwei Ereignis-Merker, die UNABHAENGIG davon gelten muessen, ob die Karte zum Zeitpunkt auf dem Brett lag
+    // (ihre eigenen Hooks liefen sonst nicht): (a) Lethe — „a target you control was defeated since the end of your last turn": ein Held, der Lethes
+    // Effekt erst spaeter annimmt (Shapeshifter, Pseudonia …), ist ab Annahme gesperrt; der Merker lebt hier, bis zum Ende des Zuges des Betroffenen.
+    // (b) Nicolas — „(even if this Hero gets defeated before then)": ein Held mit `potionLockAfterN`, dessen Effekt beim Fall wirkte, merkt sich den Zug.
+    if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
+      let seite = hookCtx.creature ? (hookCtx.creature.controller ?? hookCtx.creature.owner) : -1;
+      if (!isSeat(this, seite) && hookCtx.hero) {
+        seite = -1;
+        for (let p = 0; p < (this.gs.players || []).length && seite < 0; p++) {
+          if ((this.gs.players[p]?.heroes || []).includes(hookCtx.hero)) seite = this.heroSideOf(p, hookCtx.hero);
+        }
+      }
+      if (isSeat(this, seite) && this.gs.players[seite]) this.gs.players[seite]._letheTargetDefeated = true;
+      const _kh = hookCtx.hero;
+      if (_kh?.name && !(_kh.statuses?.negated || _kh.statuses?.frozen || _kh.statuses?.stunned || _kh.statuses?.webbed)
+          && this.heroScript(_kh)?.potionLockAfterN) _kh._potionLockDiedTurn = this.gs.turn;
+    }
+    if (hookName === HOOKS.ON_TURN_END) {
+      const _tps = this.gs.players?.[hookCtx.activePlayer ?? this.gs.activePlayer];
+      if (_tps) delete _tps._letheTargetDefeated;
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
       const opfer = hookCtx.creature || hookCtx.hero;
       const quelle = hookCtx.source;

@@ -4541,7 +4541,10 @@ function checkPotionLock(ps, gs, pi) {
   for (let seite = 0; seite < spieler.length; seite++) {
     for (const hero of (spieler[seite]?.heroes || [])) {
       // ★ W7a (H03-heroes-16, Al): die Sperre ist ein laufender Heldenpassiv — ruht bei Negation, Frost, Betäubung (wie `_isHeroEffectSilenced`).
-      if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed) continue;
+      // ★ Welle 13 (Al, Q124): „(even if this Hero gets defeated before then)" — ein in DIESEM Zug gefallener Held (Stempel `_potionLockDiedTurn`
+      // aus dem Heldentod, nur wenn sein Effekt beim Fall wirkte) sperrt trotzdem; ein lebender prüft wie bisher.
+      if (!hero?.name || hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed) continue;
+      if (hero.hp <= 0 && !(gs && hero._potionLockDiedTurn === gs.turn)) continue;
       const kontrolleur = hero.charmedBy ?? hero.permaControlBy ?? seite;
       if (gs && pi != null ? kontrolleur !== pi : seite !== 0) continue;
       const heroScript = heroScriptOf(hero);

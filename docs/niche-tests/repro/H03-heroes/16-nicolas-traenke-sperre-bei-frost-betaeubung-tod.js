@@ -37,8 +37,10 @@ const H = require('../../lib/h.js');
     R.note(`Nicolas ${s} ab dem 2. Trank`, x.res);
     R.check(`Nicolas ${s}: keine Trank-Sperre (alle 4 Tränke spielbar)`, x.res.every(r => r === true), x.res);
   }
-  x = await lauf((t) => { t.hero(0, 0).hp = 0; });
+  // ★ Welle 13 (Al, Q124: „Ja, soll sie"): Fall E – Nicolas fällt (echter Tod) zwischen dem 1. und 2. Trank → die Sperre entsteht trotzdem.
+  x = await lauf((t) => t.run(() => t.engine.actionDealDamage({ name: 'ZZ', owner: 1, heroIdx: 0 }, t.hero(0, 0), 9999, 'spell')));
   R.note('Frage E: Nicolas tot nach dem 1. Trank', x.res);
+  R.check('Fall E (Al: ja): Nicolas fällt nach dem 1. Trank – 3. und 4. Trank dennoch gesperrt', x.res.join() === 'true,true,false,false', x.res);
   R.check('keine Engine-Fehler', x.t.errors.length === 0, x.t.errors);
   R.finish();
 })();

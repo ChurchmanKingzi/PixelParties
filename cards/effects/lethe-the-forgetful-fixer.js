@@ -46,6 +46,7 @@
 // ═══════════════════════════════════════════
 
 const { usesLeft, spendUse, charges } = require('./_charges');
+const { hatEffekt } = require('./_gained-effects-shared');   // W13 (Q120): auch gewonnene Effekte (Pseudonia) tragen die Sperre
 
 const CARD_NAME = 'Lethe, the Forgetful Fixer';
 const MAX_NECROMANCY_USES = 3;
@@ -93,8 +94,11 @@ function lockLethe(engine, controller) {
   const gs = engine.gs;
   const ps = gs.players[controller];
   const soll = !!ps?._letheTargetDefeated && gs.activePlayer === controller;
+  // ★ Welle 13 (Al, Q120): „Lethe/ihr Kopierer wird gesperrt, selbst wenn der Effekt erst im laufenden Zug angenommen wird, sofern die
+  // Sperr-Condition erfüllt ist." — jeder Held, der Lethes Effekt TRÄGT: Lethe selbst, ein Shapeshifter in ihrer Gestalt (Name) oder ein Erbe
+  // (Pseudonia & Co.: gewonnener Effekt, `hatEffekt`). Der Verlust-Merker `_letheTargetDefeated` führt die Engine unabhängig von Lethes Anwesenheit.
   for (const { hero: h, heroIdx, physOwner } of engine.heroesControlledBy(controller)) {
-    if (h?.name !== CARD_NAME || h.hp <= 0) continue;
+    if (!hatEffekt(h, CARD_NAME) || h.hp <= 0) continue;
     if (soll && !engine._isHeroEffectSilenced(physOwner, heroIdx)) {
       if (h._actionLockedTurn === gs.turn && h._letheActionLocked !== gs.turn) h._actionLockedFremd = gs.turn;
       h._actionLockedTurn = gs.turn;
@@ -165,6 +169,8 @@ module.exports = {
      * too via the controller filter).
      */
     // ★ W8: Selbstabgleich der Sperre bei Statuswechseln (Frost/Betäubung/Negation an/aus) und je Phasenbeginn (leises Abklingen).
+    // ★ Welle 13 (Q120): Lethes Effekt wird ANGENOMMEN (Shapeshifter-Gestalt, Pseudonia-Erbe: `initGainedHeroEffect`) – die Sperre gilt ab sofort.
+    onIdentityGained: async (ctx) => { sperreAbgleichen(ctx._engine); },
     onStatusApplied: async (ctx) => { sperreAbgleichen(ctx._engine); },
     onStatusRemoved: async (ctx) => { sperreAbgleichen(ctx._engine); },
     onPhaseStart: async (ctx) => { sperreAbgleichen(ctx._engine); },
