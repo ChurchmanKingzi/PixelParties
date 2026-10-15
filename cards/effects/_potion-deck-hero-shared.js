@@ -19,6 +19,9 @@
 //     Stempel nicht: kein Effekt, KEINE Zieh-Sperre. Der Stempel nennt den
 //     BESITZER, damit ein uebernommener Held („one of YOUR starting
 //     Heroes") dem Uebernehmer nicht gehoert.
+//     W12 (Al, Q109): eine nur GELIEHENE Gestalt (Shapeshifter) sperrt nur, solange
+//     sie steht; faellt sie ab, faellt auch die Sperre — ausser ein permanenter
+//     Chaos-Diamond/Pinta steht noch auf der Seite (Quellenzaehlung, s. unten).
 //   • „you can never draw cards from your Potion Deck": dieselbe Stelle
 //     setzt `ps.potionDrawBanned`, das `engine.actionDrawFromPotionDeck`
 //     liest. Die Sperre haengt am SPIELER, nicht am Helden — sie bleibt,
@@ -44,15 +47,62 @@ const PotionDeckClauses = require('../../public/potion-deck-clauses.js');
 
 const STARTHELD_VON = '_startingHeroOf';
 
+/**
+ * ★ W12 (Al, Q109/H01-heroes-07): „Nein, nach einer temporären Verwandlung in Pinta/Chaos-Diamond wird die Ziehsperre wieder aufgehoben,
+ * sofern es nicht noch einen permanenten Chaos-Diamond/Pinta gibt." — die Sperre `ps.potionDrawBanned` ist jetzt aus QUELLEN abgeleitet:
+ *   • `ps._potionBanPerm` — ein echter Starthero (Spielstart) ist im Spiel; bleibt für immer („never", auch bei Tod/Frost/Betäubung/Negation, Welle 8);
+ *   • `ps._potionBanTemp[<Held>]` — eine GELIEHENE Gestalt (Shapeshifter, Throne Robber, Initiation Ritual … ueber `onIdentityGained`/`gainedEffect`);
+ *     faellt weg, wenn die Gestalt abfaellt (`onIdentityLost`).
+ * Gesperrt ist, wer mindestens eine Quelle hat. `ps.potionDrawBanned` bleibt der abgeleitete Wert, den alle Leser (Engine, Potion Juggler) lesen.
+ */
+function sperreNeuBerechnen(ps) {
+  if (!ps) return;
+  ps.potionDrawBanned = !!ps._potionBanPerm || Object.keys(ps._potionBanTemp || {}).length > 0;
+}
+
 /** `onGameStart`-Hook: Held als Starthelden seines Besitzers stempeln, Potion-Deck-Ziehen sperren. */
 function onGameStart(ctx) {
   const engine = ctx._engine;
   const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
   const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
   if (!hero) return;
-  hero[STARTHELD_VON] = ctx.cardOwner;
   const ps = engine.gs.players[ctx.cardOwner];
-  if (ps) ps.potionDrawBanned = true;
+  if (ctx.gainedEffect) {
+    // GELIEHENE Gestalt (Shapeshifter & Co.): vorübergehende Quelle, haengt am Helden und faellt mit der Gestalt ab (`onIdentityLost`).
+    if (hero[STARTHELD_VON] == null) hero._startingStampTemp = true;   // Stempel nur fuer die Dauer der Gestalt
+    hero[STARTHELD_VON] = ctx.cardOwner;
+    if (!ps) return;
+    // Alt-Zustand (Sperre ohne Quelle, z. B. aufgesetzter Puzzle-Stand): als permanent behandeln, nicht als Leihgabe verlieren.
+    if (ps.potionDrawBanned && !ps._potionBanPerm && Object.keys(ps._potionBanTemp || {}).length === 0) ps._potionBanPerm = true;
+    if (!ps._potionBanTemp) ps._potionBanTemp = {};
+    ps._potionBanTemp[`${feld}:${ctx.cardHeroIdx}`] = true;
+    hero._potionBanOwner = ctx.cardOwner;
+    sperreNeuBerechnen(ps);
+    return;
+  }
+  hero[STARTHELD_VON] = ctx.cardOwner;
+  if (ps) { ps._potionBanPerm = true; sperreNeuBerechnen(ps); }
+}
+
+/**
+ * `onIdentityLost`-Hook: die geliehene Chaos-Diamond-/Pinta-Gestalt faellt ab → ihre Sperr-Quelle (und der geliehene Starthelden-Stempel) gehen weg.
+ * Ein permanenter Chaos-Diamond/Pinta (`_potionBanPerm`) haelt die Sperre weiter.
+ */
+function onIdentityLost(ctx) {
+  const engine = ctx._engine;
+  const feld = ctx.cardHeroOwner ?? ctx.cardOwner;
+  const hero = ctx.attachedHero ?? engine?.gs?.players?.[feld]?.heroes?.[ctx.cardHeroIdx];
+  const pi = hero?._potionBanOwner ?? ctx.cardOwner;
+  const ps = engine?.gs?.players?.[pi];
+  if (ps?._potionBanTemp) {
+    delete ps._potionBanTemp[`${feld}:${ctx.cardHeroIdx}`];
+    if (Object.keys(ps._potionBanTemp).length === 0) delete ps._potionBanTemp;
+    sperreNeuBerechnen(ps);
+  }
+  if (hero) {
+    delete hero._potionBanOwner;
+    if (hero._startingStampTemp) { delete hero[STARTHELD_VON]; delete hero._startingStampTemp; }
+  }
 }
 
 /**
@@ -103,6 +153,6 @@ function darfAktivieren(engine, hero, pi, feld, heroName) {
   return uebernommen && potionDeckZugeschnitten(engine, pi, heroName);
 }
 
-const starthelden = { onGameStart, istStartheldVon, obersteKarten, darfAktivieren, potionDeckZugeschnitten, kontrolleur };
+const starthelden = { onGameStart, onIdentityLost, istStartheldVon, obersteKarten, darfAktivieren, potionDeckZugeschnitten, kontrolleur };
 
-module.exports = { starthelden, onGameStart, istStartheldVon, obersteKarten, darfAktivieren, potionDeckZugeschnitten, kontrolleur };
+module.exports = { starthelden, onGameStart, onIdentityLost, istStartheldVon, obersteKarten, darfAktivieren, potionDeckZugeschnitten, kontrolleur };

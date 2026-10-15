@@ -246,6 +246,7 @@ module.exports = {
   hooks: {
     // „starting Heroes" + „you can never draw cards from your Potion Deck".
     onGameStart: starthelden.onGameStart,
+    onIdentityLost: starthelden.onIdentityLost,   // W12 (Q109): geliehene Gestalt faellt ab → Sperre faellt mit
   },
 
   _test: { moeglicheZonen, opferZonen },
