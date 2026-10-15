@@ -293,9 +293,11 @@ module.exports = {
     });
     if (!target) return false;
 
-    if (!gs.hoptUsed) gs.hoptUsed = {};
-    const hoptKey = `${HOPT_KEY}:${ctx.card?.id ?? 'inst'}`;
-    gs.hoptUsed[hoptKey] = gs.turn;
+    if (!ctx._borrowedUse) {   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      const hoptKey = `${HOPT_KEY}:${ctx.card?.id ?? 'inst'}`;
+      gs.hoptUsed[hoptKey] = gs.turn;
+    }
 
     const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
     // Chimera's signature chomp — `dino_bite` in gore mode (deeper

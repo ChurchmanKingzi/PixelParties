@@ -35,6 +35,7 @@
 const { zaehleInAblage } = require('./_future-tech-shared');
 
 const CARD_NAME = 'Future Tech Fists';
+const HARD_KEY = 'future-tech-fists-hard';   // W13 (Rueckfrage 8)
 /** Flugzeit der Faust, bevor der Schaden faellt. */
 const FAUST_MS = 400;
 
@@ -66,6 +67,8 @@ module.exports = {
     // Styx 28.9.: Ablage = Kontrolleur (`cardOwner`), Held = Brettseite.
     const pi = ctx.cardOwner ?? (inst.controller ?? inst.owner);
     if (zaehleInAblage(gs, pi, CARD_NAME) <= 0) return false;
+    // W13 (Al, Rueckfrage 8): „You can only activate the effect of "Future Tech Fists" once per turn" = hard once per turn, ein Stempel je Spieler fuer alle Kopien.
+    if (gs.hoptUsed?.[`${HARD_KEY}:${pi}`] === gs.turn) return false;
     const hero = gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
     return !!hero?.name && hero.hp > 0 && (hero.baseAtk || 0) > 0;
   },
@@ -101,6 +104,7 @@ module.exports = {
     });
     const ids = Array.isArray(wahl) ? wahl : (wahl ? [wahl] : []);
     if (ids.length === 0) return false;            // Abbruch gibt die Sperre frei
+    if (!engine.claimHOPT(HARD_KEY, pi)) return false;   // W13 (Rueckfrage 8): Hard-Stempel erst nach der Zusage
 
     // EIN Quellobjekt fuer alle Treffer — Reaktionen und die
     // Effekt-Immunitaet sehen den Streuschlag als EINEN Vorgang.

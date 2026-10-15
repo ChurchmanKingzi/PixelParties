@@ -16,13 +16,15 @@
 //    mimic, Sekhem strikes, Shut self-mills, Ba
 //    grants a second Action, Ib heals).
 //  • The "not sent there this turn" rule is gated
-//    via `ps._discardNamesAtTurnStart` (set in
-//    _engine.js startTurn). A Shard's name is
-//    eligible iff it was already in the snapshot
-//    AND a copy is currently in the discard. Set-
-//    based — multi-copy nuance is approximated by
-//    name presence; the rare revive-then-redie
-//    case rounds in the player's favour.
+//    EXACTLY per discard entry (Welle 13, Al Rueckfrage 6:
+//    „Ja, unbedingt auf Instanz umstellen" — wie die
+//    Teal Fishing Rod): `engine.ablageAlteEintraege(pi)`
+//    liefert je Ablage-Eintrag, ob er zu Zugbeginn schon
+//    dort lag und seither nicht herausgenommen und neu
+//    hineingelegt wurde. Nur solche Eintraege sind
+//    waehlbar; gleichnamige, in diesem Zug abgelegte
+//    Kopien zaehlen nicht. Gelegt wird genau ein alter
+//    Eintrag (Index), nicht "die erste Kopie".
 //  • The Shard's per-name 1/turn cap (shared
 //    `canSummonSoulShard`) STILL applies — Thep's
 //    placement is still a summon, so Necromancy /
@@ -68,10 +70,10 @@ module.exports = {
 
     // Need at least one Soul Shard in own discard whose name was
     // already there at turn start (i.e. not sent there THIS turn).
-    const startSet = ps._discardNamesAtTurnStart || new Set();
-    for (const name of (ps.discardPile || [])) {
+    const alt = engine.ablageAlteEintraege(pi);   // W13 (Al, Rueckfrage 6): exakt je Ablage-Instanz
+    for (const [i, name] of (ps.discardPile || []).entries()) {
       if (!isSoulShard(name)) continue;
-      if (!startSet.has(name)) continue;
+      if (!alt[i]) continue;
       // Per-name 1/turn cap — Thep's placement still goes through
       // canSummonSoulShard, so re-summoning a Shard already played
       // this turn would fizzle. Filter here so the picker never
@@ -104,12 +106,12 @@ module.exports = {
     // Build a deduped gallery of eligible Soul Shard names from the
     // own discard pile. "Eligible" = was already in the discard at
     // turn start AND not blocked by the per-name 1/turn cap.
-    const startSet = ps._discardNamesAtTurnStart || new Set();
+    const alt = engine.ablageAlteEintraege(pi);   // W13 (Al, Rueckfrage 6): exakt je Ablage-Instanz
     const summonedThisTurn = ps._soulShardSummonedThisTurn || {};
     const counts = {};
-    for (const name of ps.discardPile) {
+    for (const [i, name] of ps.discardPile.entries()) {
       if (!isSoulShard(name)) continue;
-      if (!startSet.has(name)) continue;
+      if (!alt[i]) continue;
       if (summonedThisTurn[name]) continue;
       counts[name] = (counts[name] || 0) + 1;
     }
@@ -131,9 +133,10 @@ module.exports = {
     // Re-validate against the live state (the prompt could have
     // resolved after another effect changed the discard contents).
     if (!isSoulShard(chosenName)) return false;
-    if (!startSet.has(chosenName)) return false;
     if (summonedThisTurn[chosenName]) return false;
-    if (ps.discardPile.indexOf(chosenName) < 0) return false;
+    const altJetzt = engine.ablageAlteEintraege(pi);
+    const ablageIdx = ps.discardPile.findIndex((n, i) => n === chosenName && altJetzt[i]);
+    if (ablageIdx < 0) return false;
 
     // Pick a free slot on Thep. Auto-resolves if only one is open.
     let chosenSlot;
@@ -161,13 +164,17 @@ module.exports = {
     // Shard reads in its onPlay gate.
     // v1389: über die EINE Ablage-Stelle — Platzieren gilt als
     // „summoned from discard" (Als Ruling 25.9.), die Soul Shards lösen aus.
-    const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, heroIdx, chosenSlot, {
+    const placeRes = await engine.summonFromDiscard(pi, pi, ablageIdx, heroIdx, chosenSlot, {   // W13: genau dieser alte Eintrag
       source: CARD_NAME, flug: false,
       summonOpts: { isPlacement: true },
       hookExtras: { _isNormalSummon: false },
       ...(feld !== pi ? { heldSeite: feld } : {}),   // Kontrolle statt Seite (Styx 28.9.)
     });
-    if (!placeRes) return false;
+    if (!placeRes) {
+      // W13: scheiterte das Legen, geht die Karte an ihren Platz zurueck — dann bleibt sie ein ALTER Eintrag (sonst stempelt der Rueckweg „in diesem Zug").
+      if (ps.discardPile[ablageIdx] === chosenName && Array.isArray(ps._ablageStamps) && ps._ablageStamps.length === ps.discardPile.length) ps._ablageStamps[ablageIdx] = -1;
+      return false;
+    }
 
     // Standard summon glow on the placement zone.
     engine._broadcastEvent('summon_effect', {

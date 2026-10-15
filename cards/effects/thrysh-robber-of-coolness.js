@@ -177,7 +177,7 @@ module.exports = {
     // Cancelling either prompt above bails out before this line, so
     // a cancel never burns Thrysh's once-per-turn slot.
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt
 
     // ── Stage 3: remove from source + animate from source ──
     // Both paths feed into the same placement+hooks block below; the

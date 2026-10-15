@@ -135,7 +135,7 @@ async function runMove(engine, inst, ctx) {
   if (!tgt) return false;
 
   moveChangeCounters(engine, inst, tgt.ref, n);
-  stampHopt(gs, HOPT_MOVE, inst.id);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_MOVE, inst.id);   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
   ctx._skipCreatureEffectHopt = true; // engine HOPT bypassed; script-level wins
   return true;
 }
@@ -223,7 +223,7 @@ async function runSpawn(engine, inst, ctx) {
   engine.log('analyzer_spawn', {
     player: gs.players[pi]?.username, tokens, cost,
   });
-  stampHopt(gs, HOPT_SPAWN, inst.id);
+  if (!ctx._borrowedUse) stampHopt(gs, HOPT_SPAWN, inst.id);   // W13 (Al, Rueckfrage 9)
   ctx._skipCreatureEffectHopt = true;
   return true;
 }

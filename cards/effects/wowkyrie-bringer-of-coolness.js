@@ -32,7 +32,7 @@ module.exports = {
     if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     if (!engine.hasCoolnessStack(pi)) return false;
     if (!ctx.card.counters) ctx.card.counters = {};
-    ctx.card.counters[HOPT_KEY] = engine.gs.turn;
+    if (!ctx._borrowedUse) ctx.card.counters[HOPT_KEY] = engine.gs.turn;   // W13 (Al, Rueckfrage 9): geliehen = Stempel bleibt
     await ctx.pushDeckTopToCoolnessStack(pi, { source: CARD_NAME, requireStack: true });
     return true;
   },

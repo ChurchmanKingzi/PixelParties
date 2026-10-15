@@ -140,7 +140,7 @@ module.exports = {
     if (!bestaetigt || bestaetigt.cancelled) return false;
 
     const bezahlt = await payInvestCounters(engine, pi, INVEST_COST, CARD_NAME);
-    if (bezahlt) markInvestHopt(gs, ctx.card);
+    if (bezahlt && !ctx._borrowedUse) markInvestHopt(gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     if (!bezahlt) return false;
 
     // Zustand nach der Zahlung neu pruefen — `afterResourceSpend` kann

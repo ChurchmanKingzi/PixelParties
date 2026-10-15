@@ -218,7 +218,7 @@ module.exports = {
     if (!ziel) return false;
 
     if (!await payInvestCounters(engine, pi, 10, CARD_NAME)) return false;
-    markInvestHopt(engine.gs, ctx.card);
+    if (!ctx._borrowedUse) markInvestHopt(engine.gs, ctx.card);   // W13 (Al, Rueckfrage 9)
     // v349: Auftritt erst nach bestaetigter Zielwahl (Muster Book of Doom).
     engine.announceActiveEffect();
     if (!ziel.counters) ziel.counters = {};

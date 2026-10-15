@@ -107,8 +107,10 @@ module.exports = {
     const ziel = ziele.find(t => t.id === id);
     if (!ziel) return false;
 
-    if (!gs.hoptUsed) gs.hoptUsed = {};
-    gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    if (!ctx._borrowedUse) {   // W13 (Al, Rueckfrage 9): geliehene Verwendung verbraucht den Stempel NICHT
+      if (!gs.hoptUsed) gs.hoptUsed = {};
+      gs.hoptUsed[HOPT_KEY(pi)] = gs.turn;
+    }
 
     // Auftritt erst NACH bestaetigtem Ziel (Muster Book of Doom / Logan).
     engine.announceActiveEffect();
