@@ -6,7 +6,9 @@
 //  Kartentext: "Increase the current and max HP
 //  of any Creature you summon by 100."
 //
-//  EINMALIGER Bonus im Moment des Beschwoerens.
+//  EINMALIGER Bonus im Moment des Beschwoerens/Platzierens
+//  (Welle 13, Q119: nur NEU aufs Board kommende Kreaturen —
+//  uebernommene/umgesetzte (`_isMove`) bekommen ihn nicht).
 //  Er wird NIE zurueckgenommen — weder bei Layns
 //  Tod noch bei Frozen / Stunned / Negated.
 //
@@ -120,6 +122,12 @@ module.exports = {
 
       const entering = ctx.enteringCard;
       if (!entering) return;
+
+      // Welle 13 (Q119, Al: „Nein, nur solche, die neu aufs Board kommen."):
+      // Uebernahme (Capture/Diplomacy/Dark Gear → actionTransferCreature) und
+      // Umsetzen zwischen Zonen feuern `onCardEnterZone` mit `_isMove` — das
+      // ist kein Beschwoeren/Platzieren, also kein Bonus.
+      if (ctx._isMove) return;
 
       const pi = ctx.cardOwner;
       // Kontrolle statt Seite (Styx 28.9.): „you summon" = Kontrolleur, nicht
