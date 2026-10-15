@@ -870,6 +870,17 @@ class GameEngine {
         inst.counters.applause = (inst.counters.applause || 0) + value;
       },
     });
+    // ★ Welle 11 (Al, 15.10.2026, Q79): Inconspicuous Lawn Gnome - „once per turn" gilt fuer Hand UND Brett zusammen. Wert = Zug der
+    // Stufenaenderung in der Hand; folgt der physischen Kopie und wandert beim Beschwoeren als `inst.counters._stufeGeaendertZug`
+    // aufs Brett (dort sperrt `canActivateCreatureEffect` im selben Zug die zweite Aenderung).
+    this.registerHandIndexedField('_handStufenWechsel', {
+      kind: 'value',
+      onCardSummonedFromHand: ({ inst, value }) => {
+        if (!inst || !value) return;
+        if (!inst.counters) inst.counters = {};
+        inst.counters._stufeGeaendertZug = value;
+      },
+    });
   }
 
   // ═══════════════════════════════════════════

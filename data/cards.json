@@ -12305,7 +12305,7 @@
     "hp": 50,
     "atk": null,
     "cost": null,
-    "effect": "You may once per turn change this card's level in your hand or on your side of the board to any level from 0 to 3.",
+    "effect": "You may once per turn change this card's level in your hand or on the board while you control it to any level from 0 to 3.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
