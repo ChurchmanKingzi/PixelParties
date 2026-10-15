@@ -7,6 +7,7 @@
 // Beobachtet: Beide Clausss lassen sich im selben Zug aktivieren; `ps._bonusMainActions = 1` wird nur GESETZT (nicht erhöht),
 //   die zweite Aktivierung opfert also eine Kreatur ohne zusätzlichen Gewinn (`canActivateCreatureEffect` prüft den
 //   Stand nicht). Hier festgehalten; die Frage (gesperrt wie Triceras beim gesperrten Ziehen, oder dritte Aktion?) steht im Bericht.
+// ★ W10b (Al, Welle 10, Q49: Erlaubt und bringt nichts ist fine): das zweite Opfer ist ERLAUBT (bringt nichts). Repro umgestellt (siehe W10/b-q49).
 const H = require('../../lib/h.js');
 const D = H.INERT.creature;
 
@@ -24,7 +25,7 @@ const D = H.INERT.creature;
   const vor = t.inst(c => c.zone === 'support' && c.owner === 0).length;
   t.phase(2); const r2 = await t.activateCreature(0, 0, 1);
   const nach = t.inst(c => c.zone === 'support' && c.owner === 0).length;
-  R.check('zweite Clausss darf KEINE Kreatur opfern, wenn sie nichts zusätzlich bringt', !(r2 === true && nach === vor - 1 && t.gs.players[0]._bonusMainActions === nach1), { r2, bonus: t.gs.players[0]._bonusMainActions, kreaturen: [vor, nach] });
+  R.check('Al (Q49): zweite Clausss darf opfern (bringt nichts: Zusatzaktion bleibt 1)', r2 === true && nach === vor - 1 && t.gs.players[0]._bonusMainActions === nach1, { r2, bonus: t.gs.players[0]._bonusMainActions, kreaturen: [vor, nach] });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
