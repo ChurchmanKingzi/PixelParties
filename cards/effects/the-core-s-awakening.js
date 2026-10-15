@@ -16,7 +16,8 @@
 //  ── „1/2/3" ist die Schulstufe des Wirkers ──
 //  Hausnotation (Create Illusion, Army of the Cute, Betrayal): die drei
 //  Zahlen stehen fuer Stufe 1, 2 und 3 der geforderten Schule — hier
-//  Support Magic. Gedeckelt auf 1..3.
+//  Support Magic. Gedeckelt auf 1..3. Massgeblich ist der vom Spieler
+//  gewaehlte Wirker (Al, Welle 9, Q20), nicht der erste taugliche Held.
 //
 //  ── Reaktion auf die EIGENE Karte ──
 //  Anders als Rusty Touch (`lastLink.owner === pi` → false) verlangt
@@ -30,7 +31,7 @@
 //  einzeln.
 // ═══════════════════════════════════════════
 
-const { schickeVonDeckInAblage } = require('./_future-tech-shared');
+const { schickeVonDeckInAblage, waehleAnzahl, cpuAnzahlHoechstzahl } = require('./_future-tech-shared');
 
 const CARD_NAME = "The Core's Awakening";
 const SCHULE = 'Support Magic';
@@ -62,6 +63,8 @@ module.exports = {
   // v834: NUR Stapel-Bewegung (Deck zur Ablage ueber `schickeVonDeckInAblage`);
   // der Helfer ist fuer die Auto-Erkennung des Loaders unsichtbar.
   blockedByPileLock: true,
+  // CPU: bei „up to 1/2/3“ die Höchstzahl (Q17).
+  cpuResponse: (engine, promptType, promptData) => cpuAnzahlHoechstzahl(promptData),
   isReaction: true,
   canActivate: () => false,
 
@@ -87,13 +90,28 @@ module.exports = {
     if (!ziel || ziel.cardType !== 'Artifact') return;
     const name = ziel.cardName;
 
-    const heroIdx = wirkenderHeld(gs, pi, engine);
-    if (heroIdx < 0) return;
-    const grenze = maximum(gs, pi, engine, heroIdx);
+    // ★ Al, Welle 9 (Q20): „Unbedingt mit dem Wirker skalieren" — die
+    // Staffel 1/2/3 folgt dem Helden, den der Spieler als Wirker gewaehlt
+    // hat (Kettenglied `casterHeroIdx`, bei geliehenem Wirker auf seiner
+    // Brettseite `heroOwner`), nicht dem ersten tauglichen Helden.
+    const mein = chain[myIndex];
+    let heroIdx = mein?.casterHeroIdx ?? -1;
+    const seite = mein?.heroOwner ?? pi;
+    if (!(heroIdx >= 0 && gs.players[seite]?.heroes?.[heroIdx]?.name)) {
+      heroIdx = wirkenderHeld(gs, pi, engine);   // Rueckfall: kein Wirker im Glied
+      if (heroIdx < 0) return;
+    }
+    const grenze = maximum(gs, seite, engine, heroIdx);
 
-    // „up to": so viele wie im Deck liegen, hoechstens die Schulstufe.
+    // „up to": der Spieler waehlt 1..Staffel, begrenzt durch die Kopien im Deck
+    // (Al, Welle 9, Q17); nur eine moegliche Zahl: ohne Rueckfrage. CPU: Hoechstzahl.
     const vorhanden = (ps.mainDeck || []).filter(n => n === name).length;
-    const wieViele = Math.min(grenze, vorhanden);
+    const hoechstens = Math.min(grenze, vorhanden);
+    if (hoechstens <= 0) return;
+    const wieViele = await waehleAnzahl(engine, pi, hoechstens, {
+      title: CARD_NAME, showCard: name,
+      description: `How many copies of ${name} go from your deck to the discard pile (up to ${hoechstens})?`,
+    });
     if (wieViele <= 0) return;
 
     // ── Blitze aus der Kettenanzeige (Als Vorgabe 21.8.) ──

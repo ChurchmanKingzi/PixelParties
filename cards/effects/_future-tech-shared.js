@@ -273,6 +273,41 @@ async function schickeVonDeckInAblage(engine, pi, namen, quelle) {
 }
 
 /**
+ * ★ Al, Welle 9 (Q17): „up to N“ — der Spieler WAEHLT die Anzahl 1..max
+ * (Iterative Testing, The Core's Awakening). Gibt es nur eine Moeglichkeit
+ * (`max` <= 1), wird ohne Rueckfrage `max` genommen. Nicht abbrechbar (die Karte
+ * ist bereits zugesagt). Die CPU waehlt die Hoechstzahl: die Karten liefern dafuer
+ * `cpuResponse` (Markierung `_anzahlWahl`); ungueltige Antworten gelten ebenfalls als `max`.
+ *
+ * @returns {Promise<number>} gewaehlte Anzahl (0, wenn `max` <= 0)
+ */
+async function waehleAnzahl(engine, pi, max, config = {}) {
+  if (!(max >= 1)) return 0;
+  if (max === 1) return 1;
+  const options = [];
+  for (let n = 1; n <= max; n++) {
+    options.push({ id: `count-${n}`, label: `${n}`, description: `Send ${n} cop${n === 1 ? 'y' : 'ies'}.`, color: '#66ccff' });
+  }
+  const antwort = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    title: config.title || FT_PRAEFIX,
+    description: config.description || `How many copies (1-${max})?`,
+    showCard: config.showCard,
+    options,
+    cancellable: false,
+    _anzahlWahl: true,
+  });
+  const n = Number(String(antwort?.optionId || '').replace('count-', ''));
+  return (Number.isInteger(n) && n >= 1 && n <= max) ? n : max;
+}
+
+/** `cpuResponse`-Teil fuer `waehleAnzahl`: die CPU nimmt die Hoechstzahl. */
+function cpuAnzahlHoechstzahl(promptData) {
+  if (!promptData?._anzahlWahl || !Array.isArray(promptData.options) || promptData.options.length === 0) return undefined;
+  return { optionId: promptData.options[promptData.options.length - 1].id };
+}
+
+/**
  * Galerie-Auswahl aus einer Namensliste (Deck oder Ablage).
  * Fasst gleiche Namen zusammen und zeigt die Stückzahl — dieselbe
  * Bauform wie Brilliant Idea.
@@ -309,4 +344,6 @@ module.exports = {
   verschiedeneFutureTechInAblage,
   schickeVonDeckInAblage,
   waehleAusNamen,
+  waehleAnzahl,
+  cpuAnzahlHoechstzahl,
 };

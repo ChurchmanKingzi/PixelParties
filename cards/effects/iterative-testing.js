@@ -18,8 +18,8 @@
 //  ① „a card from your hand" — die Handkarte wird nur ALS VORLAGE
 //    gewählt und bleibt liegen. Sie wird nicht abgeworfen; der Text
 //    sagt „choose", nicht „discard".
-//  ② „up to 2 … from your deck" — es werden so viele Kopien
-//    verschoben, wie da sind, höchstens zwei. Liegt keine im Deck,
+//  ② „up to 2 … from your deck" — der Spieler wählt 1 oder 2 (Al,
+//    Welle 9, Q17; nur eine Kopie im Deck: ohne Rückfrage 1). Liegt keine im Deck,
 //    fizzelt die Wahl; deshalb stehen solche Handkarten gar nicht erst
 //    zur Auswahl.
 //  ③ „If the user has at least Magic Arts 2, this counts as an
@@ -32,7 +32,7 @@
 //  Kreatureffekte gilt sie je SPIELER, nicht je Instanz.
 // ═══════════════════════════════════════════
 
-const { schickeVonDeckInAblage, waehleAusNamen } = require('./_future-tech-shared');
+const { schickeVonDeckInAblage, waehleAusNamen, waehleAnzahl, cpuAnzahlHoechstzahl } = require('./_future-tech-shared');
 
 // v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
 // Kosmetik (siehe CARD_API, „Namen vergleichen").
@@ -62,6 +62,9 @@ module.exports = {
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT('iterative-testing', pi); },
+
+  // CPU: bei „up to 2“ die Höchstzahl (Q17).
+  cpuResponse: (engine, promptType, promptData) => cpuAnzahlHoechstzahl(promptData),
 
   // Ohne Handkarte mit Deck-Kopie bewirkt der Zauber nichts.
   spellPlayCondition(gs, pi) {
@@ -103,8 +106,13 @@ module.exports = {
       // `iterative-testing:0:0` und die Vorpruefung oben greift nie.
       engine.claimHOPT('iterative-testing', pi);
 
-      // ② so viele Kopien wie vorhanden, höchstens zwei
-      const wieViele = Math.min(MAX_SENDS, (ps.mainDeck || []).filter(k => baseCardName(k) === baseCardName(name)).length);
+      // ② „up to 2“: der Spieler wählt 1 oder 2 (Al, Welle 9, Q17); gibt es nur
+      // eine Kopie im Deck, ohne Rückfrage 1. CPU: die Höchstzahl.
+      const vorhanden = (ps.mainDeck || []).filter(k => baseCardName(k) === baseCardName(name)).length;
+      const wieViele = await waehleAnzahl(engine, pi, Math.min(MAX_SENDS, vorhanden), {
+        title: CARD_NAME, showCard: name,
+        description: `How many copies of ${name} go from your deck to the discard pile?`,
+      });
       const bewegt = await schickeVonDeckInAblage(engine, pi, Array(wieViele).fill(name), CARD_NAME);
 
       engine.log('iterative_testing', {
