@@ -10050,6 +10050,11 @@ class GameEngine {
     // restlichen HP — ein eigenes Opfer ist „50%+ damage" (Als Ruling 24.9.).
     this._scNoteHeroHpLoss(target, _scHpVorher);
     await this._runHeroDefeatSequence(target, source, targetOwner);
+    // Welle 11 (Al, Q61: „Auch Heroes"): ein Helden-OPFER ist ein „sacrifice a target" — Hook NACH dem Todesablauf (Bonded Companion Thuly:
+    // „when you sacrifice a target"). Opferer = `source.owner`; nicht mehr nach Spielende.
+    if (opts.isSacrifice && !this.gs.result) {
+      await this.runHooks('onHeroSacrificed', { hero: target, source, heroOwner: targetOwner, _skipReactionCheck: true });
+    }
     return { defeated: true };
   }
 
