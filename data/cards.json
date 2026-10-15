@@ -22625,7 +22625,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Delete 1 \"Rebelliokai Timid Tanuki\" from your discard pile to play this card. Shuffle up to as many cards from your hand as you have \"Rebelliokai\" Creatures with different names in your discard pile back into your deck (max 3). Then, search your deck for up to that many cards with different names, reveal them and add them to your hand. Immediately end your turn afterwards.",
+    "effect": "Delete 1 \"Rebelliokai Timid Tanuki\" from your discard pile to play this card. Shuffle up to as many cards from your hand as you have \"Rebelliokai\" Creatures with different names in your discard pile back into your deck (max 3). Then, search your deck for up to that many cards with different names from each other and from the cards shuffled back this way, reveal them and add them to your hand. Immediately end your turn afterwards.",
     "archetype": "Rebelliokai",
     "setID": "PP MSJP",
     "banned": "",
