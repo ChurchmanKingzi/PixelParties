@@ -6,6 +6,7 @@
 //   (_engine.js:32905, CARD_API.md „v1313"); Bone Dog trägt das Flag nicht (loyal-bone-dog.js) → bei einem Zerstören-Effekt
 //   des Gegners (Censpartan, Ralzish, The Yeeting …) oder einem Opfer kommt KEIN Angebot, die Kreatur bleibt tot.
 //   Bei tödlichem SCHADEN funktioniert die Karte (Gegenprobe unten ✓).
+// ENTSCHIEDEN (Al, Welle 10, Q37: „Zerstören ja, opfern nein“): Zerstören-Effekte bieten den Bone Dog an, ein Opfer (isSacrifice) nicht.
 // Erwartung laut Text: „defeated" ist nicht auf Schaden beschränkt (vgl. Chess-Ruling 6.9: Opfer = defeated).
 const H = require('../../lib/h.js');
 (async () => {
@@ -26,5 +27,13 @@ const H = require('../../lib/h.js');
   R.check('Zerstören durch den Gegner: Bone Dog wird angeboten und belebt die Beagle wieder', t.zone(0, 0, 0) === 'Loyal Beagle',
     { zone: t.zone(0, 0, 0), hand: t.pile(0, 'hand'), prompts: t.prompts.map(p => p.d.type + ':' + (p.d.title || '')) });
   R.check('keine Engine-Fehler / Zustand sauber', t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
+  // Opfer: kein Angebot, Beagle bleibt tot, Bone Dog bleibt auf der Hand
+  t = await H.fresh({ hand: [[dog], []] });
+  t.grantFor(0, 0, dog);
+  b = t.put(0, 0, 0, 'Loyal Beagle');
+  await t.run(() => t.engine.actionDestroyCard({ name: 'Eigenes Opfer', owner: 0, heroIdx: 0 }, b, { isSacrifice: true }));
+  R.check('Opfer: Bone Dog wird NICHT angeboten (Beagle bleibt tot, Bone Dog bleibt auf der Hand)', t.zone(0, 0, 0) !== 'Loyal Beagle' && t.pile(0, 'hand').includes(dog),
+    { zone: t.zone(0, 0, 0), hand: t.pile(0, 'hand'), prompts: t.prompts.map(p => p.d.type + ':' + (p.d.title || '')) });
+  R.check('Opfer: keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

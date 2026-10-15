@@ -13957,6 +13957,7 @@ class GameEngine {
     // miss any future "delete this Creature to the deleted pile"
     // path. `actionDestroyCard` already passes the flag, so this is
     // additive: a defense for paths that don't.
+    let _sofortWiederbelebt = false;   // Welle 10 (Q38): Bone Dog hat schon VOR den Todes-Triggern wiederbelebt
     let shouldFireDeath = !!opts.fireCreatureDeath;
     if (!shouldFireDeath
         && fromZone === ZONES.SUPPORT
@@ -14070,6 +14071,13 @@ class GameEngine {
         // dem Tod ist die Instanz weg („30 times its level", Core Explosion).
         level: this.kreaturLevelJetzt(cardInstance),
       };
+      // ★ Welle 10 (Al, Q38 / A06-rebelliokai-03: „Ja, Bone Dog feuert zuerst“): eine „immediately"-Wiederbelebung (`_reviveAfterDeath.sofort`,
+      // Loyal Bone Dog) wird VOR den Todes-Triggern anderer Karten (Loyal Shepherd, Terrier …) aufgelöst; sie sehen den Platz dann belegt.
+      if (cardInstance._reviveAfterDeath?.sofort && toZone === ZONES.DISCARD) {
+        const _sofortRev = cardInstance._reviveAfterDeath;
+        delete cardInstance._reviveAfterDeath;
+        _sofortWiederbelebt = !!(await this._wiederbelebungNachTod(_sofortRev));
+      }
       await this.runHooks(HOOKS.ON_CREATURE_DEATH, {
         creature: deathInfo,
         source: opts.deathSource || null,
@@ -14157,6 +14165,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Wiederbelebt → die Ablage-Instanz dieser Karte ist verbraucht.
       if (await this._wiederbelebungNachTod(_rev)) this._untrackCard(cardInstance.id);
     }
+    if (_sofortWiederbelebt) this._untrackCard(cardInstance.id);   // Welle 10 (Q38): die Ablage-Instanz ist verbraucht
 
     // Kein Aktionslog-Eintrag fuer reine Zonenwechsel (Al 19.8.:
     // „X was moved!" ist fuer Spieler unnoetig, wenn ohnehin dasteht,
@@ -48863,6 +48872,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // losfliegen — Als „kurzes Aufblitzen in der Zone".
     this.sync();
     await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
+    // ★ Welle 10 (Al, Q38 / A06-rebelliokai-03: „Ja, Bone Dog feuert zuerst“): eine „immediately"-Wiederbelebung (`_reviveAfterDeath.sofort`,
+    // Loyal Bone Dog) wird VOR den Todes-Triggern anderer Karten (Loyal Shepherd, Terrier …) aufgelöst; sie sehen den Platz dann belegt.
+    if (e.inst._reviveAfterDeath?.sofort) {
+      const _sofortRev = e.inst._reviveAfterDeath;
+      e.inst._reviveAfterDeath = null;
+      await this._wiederbelebungNachTod(_sofortRev);
+    }
     if (!this._fastMode && todesWacheAn()) {
       const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
       const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
