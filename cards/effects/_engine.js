@@ -12789,6 +12789,7 @@ class GameEngine {
     await this.actionMoveCard(targetCard, ZONES.DISCARD, undefined, undefined, {
       fireCreatureDeath: isCreatureTarget,
       deathSource: source,
+      deathHeldQuelle: opts.heldQuelle || null,   // Welle 12 (Q101): „zählt als: der Held besiegt das Ziel" (Super-Killing Knife)
       unaufhaltsam: _u,   // v1293
       // Das CD-Bewegungsfenster hat actionDestroyCard oben bereits
       // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
@@ -14203,6 +14204,9 @@ class GameEngine {
       await this.runHooks(HOOKS.ON_CREATURE_DEATH, {
         creature: deathInfo,
         source: opts.deathSource || null,
+        // Welle 12 (Q101, Al): eine Zerstörung, die als „der Held besiegt das Ziel (mit einem Angriff)" zählt, nennt die Angriffs-Quelle des Helden hier
+        // (Schutz-/Immunitätsprüfungen laufen weiter gegen `source`); Wanted Poster / Skullmael's Greatsword lesen sie.
+        ...(opts.deathHeldQuelle ? { heldQuelle: opts.deathHeldQuelle } : {}),
         _skipReactionCheck: true,
       });
       if (this._deathWatch?.id === cardInstance.id) {
