@@ -38,6 +38,14 @@
 //  STATUS_EFFECTS entry. No edits to this file
 //  required — both helpers are queried at runtime.
 //
+//  ★ W12 (Al, Q114/H02-heroes-11): „Karian wird NIEMALS durch Freeze/Stun/Negation daran gehindert, irgendetwas zu tun." Frost und
+//  Betaeubung liegen bei ihr nicht mehr nur in den eigenen Handlungsphasen still, sondern DAUERND (Stash): sobald der Status angelegt wird
+//  (`onStatusApplied`, jede Phase, jeder Zug) und an jedem Phasenbeginn als Netz. Sichtbar ist er nur im Zeitfenster des Statusablaufs
+//  (Beginn der END-Phase ihrer Seite bis nach der Zugende-Zaehlung), damit die Dauer wie gehabt herunterzaehlt. So sehen ALLE Pruefer
+//  (Reaktionen im Gegnerzug, Start-/Resource-/End-Phase, Fähigkeiten, Aktionen, Client) eine handlungsfaehige Karian. NEGIERUNG wird an den
+//  Direkt-Schreibern (Anhaengsel, Weakening Crystal) gar nicht erst angelegt (`engine.heroIgnoresHaltStatuses`, Marke `ignoresHaltStatuses`).
+//  Die Welle-7/8-Ruhe-Regeln gelten fuer sie damit nicht. Webbed (auch `paralysisLike`) bleibt bei der alten Phasen-Aussetzung.
+//
 //  Hooks fire while Karian is paralysed thanks to
 //  `bypassStatusFilter: true` (Beato's pattern,
 //  engine.js:1764). Without it her own onPhaseStart
@@ -52,6 +60,9 @@ const {
 
 const CARD_NAME = 'Grand Inquisitor Karian';
 const SUSPENDED_KEY = '_karianSuspendedParalysis';
+
+/** W12 (Q114): die zwei im Text genannten Zustaende, die Karian DAUERND nicht am Handeln hindern („Stunned or Frozen"). */
+const IMMER_AUSGESETZT = new Set(['frozen', 'stunned']);
 
 /**
  * Phasen, in denen der Spieler mit dem Helden handelt: beide MAIN-Phasen
@@ -103,11 +114,12 @@ function _applyImmunities(hero) {
  * Stash format mirrors the original `hero.statuses[name]` value verbatim
  * so duration / appliedBy / icon-render data round-trips on restore.
  */
-function _suspendParalysis(hero) {
+function _suspendParalysis(hero, nurImmer = false) {
   if (!hero?.statuses) return false;
   const stash = hero[SUSPENDED_KEY] || {};
   let touched = false;
   for (const name of getParalysisStatuses()) {
+    if (nurImmer && !IMMER_AUSGESETZT.has(name)) continue;
     const cur = hero.statuses[name];
     if (cur == null) continue;
     stash[name] = cur;
@@ -124,14 +136,23 @@ function _suspendParalysis(hero) {
  * (a late freeze landing while Karian is acting): the live entry wins
  * over the stale stash, so the new duration is what ticks at END.
  */
-function _restoreParalysis(hero) {
+function _restoreParalysis(hero, nurVorlaeufige = false) {
   const stash = hero?.[SUSPENDED_KEY];
   if (!stash) return;
   if (!hero.statuses) hero.statuses = {};
   for (const [name, val] of Object.entries(stash)) {
+    // W12 (Q114): Frost/Betaeubung bleiben ueber das Phasenende hinaus still — sie kommen nur im Ablauf-Fenster (END ihrer Seite) zurueck.
+    if (nurVorlaeufige && IMMER_AUSGESETZT.has(name)) continue;
     if (hero.statuses[name] == null) hero.statuses[name] = val;
+    delete stash[name];
   }
-  delete hero[SUSPENDED_KEY];
+  if (Object.keys(stash).length === 0) delete hero[SUSPENDED_KEY];
+}
+
+/** Liegt Frost/Betaeubung im Stash (= Karian ist „afflicted", Anspruch auf die Bonus-Aktion)? */
+function _hatImmerStash(hero) {
+  const stash = hero?.[SUSPENDED_KEY];
+  return !!stash && Object.keys(stash).some(n => IMMER_AUSGESETZT.has(n));
 }
 
 /**
@@ -153,6 +174,8 @@ function _grantBonusAction(engine, pi, heroIdx, heroOwner = pi) {
 
 module.exports = {
   activeIn: ['hero'],
+  // W12 (Al, Q114): Frost/Betaeubung/Negation hindern Karian nie am Handeln — Marke fuer `engine.heroIgnoresHaltStatuses` (Direkt-Schreiber der Negation).
+  ignoresHaltStatuses: true,
   // Beato pattern — let Karian's own hooks fire while she's frozen /
   // stunned / negated, otherwise the very phase hook that's supposed
   // to lift her paralysis would itself be silenced.
@@ -205,14 +228,23 @@ module.exports = {
     // koennen. Waeren die Status dann weggeraeumt, liefe das Einfrieren
     // nie ab.
     onPhaseStart: async (ctx) => {
-      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
+      const hero = _karianHero(ctx);
+      if (!hero?.name || hero.hp <= 0) return;
+      // ★ W12 (Al, Q114): Frost/Betaeubung liegen DAUERND still (jede Phase, auch im Gegnerzug) — hier das Netz fuer Status, die ohne
+      // `onStatusApplied` auf den Helden kamen. AUSNAHME: Beginn der END-Phase IHRER Seite — dort zaehlt `processStatusExpiry('END')` die
+      // Dauer herunter, der Status muss dafuer sichtbar sein (Wiederaufnahme in `onPhaseEnd`).
+      if (ctx.phaseIndex === PHASES.END && engine.gs.activePlayer === ctx.cardOriginalOwner) {
+        _restoreParalysis(hero);
+        return;
+      }
+      const dauerhaft = _suspendParalysis(hero, true);
+      if (dauerhaft) engine.sync();
+      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       // Nur der aktive Spieler — der Held handelt im Zug seines
       // KONTROLLEURS („your Action Phase", Styx 28.9.).
       if (engine.gs.activePlayer !== ctx.cardController) return;
-      const hero = _karianHero(ctx);
-      if (!hero?.name || hero.hp <= 0) return;
-      const wasAfflicted = _suspendParalysis(hero);
+      const wasAfflicted = _suspendParalysis(hero) || dauerhaft || _hatImmerStash(hero);
       if (!wasAfflicted) return;
       // Die zweite Aktion bleibt der Action Phase vorbehalten.
       if (ctx.phaseIndex === PHASES.ACTION) {
@@ -223,15 +255,21 @@ module.exports = {
     },
 
     onPhaseEnd: async (ctx) => {
-      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
       const hero = _karianHero(ctx);
       if (!hero) return;
+      // ★ W12 (Q114): Ende der END-Phase ihrer Seite — die Zugende-Zaehlung ist durch, uebrig gebliebener Frost/Betaeubung wieder stilllegen.
+      if (ctx.phaseIndex === PHASES.END) {
+        if (hero.name && hero.hp > 0 && _suspendParalysis(hero, true)) engine.sync();
+        return;
+      }
+      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       // Styx 28.9.: auch einsetzen, wenn der Kontrolleur mitten in der Phase
       // wechselte (Uebernahme endet) — ein liegengebliebener Vorrat liefe
       // sonst nie ab. Ohne Vorrat ist `_restoreParalysis` wirkungslos.
       if (engine.gs.activePlayer !== ctx.cardController && !hero[SUSPENDED_KEY]) return;
-      _restoreParalysis(hero);
+      // W12 (Q114): nur die vorlaeufig ausgesetzten (Webbed …); Frost/Betaeubung kommen erst im Ablauf-Fenster zurueck.
+      _restoreParalysis(hero, true);
       engine.sync();
     },
 
@@ -289,22 +327,23 @@ module.exports = {
       }
     },
 
-    // Late-applied paralysis during Karian's own Action Phase (e.g. a
-    // Snow Cannon Surprise reacting to her first action). Re-suspend
-    // immediately so the rest of the phase stays usable, and refresh
-    // the bonus Action — the rule grants it "while" afflicted, so
-    // becoming afflicted mid-phase still qualifies.
+    // Late-applied paralysis (e.g. a Snow Cannon Surprise reacting to her first action, or a Fireball-Frost in the OPPONENT's turn).
+    // ★ W12 (Al, Q114): Frost/Betaeubung werden SOFORT stillgelegt, in jeder Phase und jedem Zug - sie hindern Karian nie. Die Bonus-Aktion
+    // ("while ... Stunned or Frozen ... during your Action Phase") wird weiterhin nur in der Action Phase ihres Kontrolleurs gewaehrt;
+    // Webbed (kein Text-Zustand) bleibt bei der alten Aussetzung nur in dieser Phase.
     onStatusApplied: async (ctx) => {
       const def = STATUS_EFFECTS[ctx.statusName];
       if (!def?.paralysisLike) return;
       const engine = ctx._engine;
-      if (engine.gs.currentPhase !== PHASES.ACTION) return;
-      if (engine.gs.activePlayer !== ctx.cardController) return;
       const hero = _karianHero(ctx);
       if (!hero || hero !== ctx.target) return;
-      const touched = _suspendParalysis(hero);
+      const eigeneActionPhase = engine.gs.currentPhase === PHASES.ACTION && engine.gs.activePlayer === ctx.cardController;
+      if (!IMMER_AUSGESETZT.has(ctx.statusName) && !eigeneActionPhase) return;
+      const touched = _suspendParalysis(hero, !eigeneActionPhase);
       if (!touched) return;
-      _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardController);
+      if (eigeneActionPhase) {
+        _grantBonusAction(engine, ctx.cardController, ctx.cardHeroIdx, ctx.cardHeroOwner ?? ctx.cardController);
+      }
       engine.log('karian_shake_off', { hero: hero.name, from: ctx.statusName });
       engine.sync();
     },

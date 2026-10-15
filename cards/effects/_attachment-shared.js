@@ -349,6 +349,8 @@ async function attachToHero(ctx, CARD_NAME, opts = {}) {
 function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, extras) {
   const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
   if (!wirt?.name || wirt.hp <= 0) return false;
+  // W12 (Al, Q114): Karian wird NIE durch Negation (oder Frost/Betaeubung) am Handeln gehindert — der Anhaengsel-Status wird bei ihr nicht angelegt.
+  if (STATUS_NAME === 'negated' && engine.heroIgnoresHaltStatuses?.(owner, heroIdx)) return false;
   if (!wirt.statuses) wirt.statuses = {};
   wirt.statuses[STATUS_NAME] = {
     permanent: true,

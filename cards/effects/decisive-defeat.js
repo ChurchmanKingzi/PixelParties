@@ -115,7 +115,8 @@ module.exports = {
 
       // ★ Den Status anlegen — das ist die eigentliche Wirkung.
       const wirt = gs.players[res.host.owner]?.heroes?.[res.host.heroIdx];
-      if (wirt?.name) {
+      // W12 (Al, Q114): Karian wird NIE durch Negation am Handeln gehindert — bei ihr wird der Status nicht angelegt.
+      if (wirt?.name && !engine.heroIgnoresHaltStatuses?.(res.host.owner, res.host.heroIdx)) {
         if (!wirt.statuses) wirt.statuses = {};
         wirt.statuses.negated = {
           permanent: true,

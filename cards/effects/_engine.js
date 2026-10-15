@@ -6535,6 +6535,17 @@ class GameEngine {
     return BLIND_STATUSES.some(n => !!c[n]);
   }
 
+  /**
+   * ★ W12 (Al, Q114/H02-heroes-11): „Karian wird NIEMALS durch Freeze/Stun/Negation daran gehindert, irgendetwas zu tun." Skriptmarke
+   * `ignoresHaltStatuses` am Heldenskript (Karian; ein Shapeshifter in Karian-Gestalt traegt sie mit dem Namen). Frost und Betaeubung legt
+   * das Skript selbst still (Stash, `_karianSuspendedParalysis`); an den Stellen, die eine NEGIERUNG ohne `addHeroStatus` direkt auf den
+   * Helden schreiben (Anhaengsel, Weakening Crystal), fragt man diesen Helfer und legt sie dort nicht an.
+   */
+  heroIgnoresHaltStatuses(pi, heroIdx) {
+    const hero = this.gs?.players?.[pi]?.heroes?.[heroIdx];
+    return !!(hero?.name && hero.hp > 0 && this.heroScript(hero)?.ignoresHaltStatuses === true);
+  }
+
   _isHeroEffectSilenced(pi, heroIdx) {
     const hero = this.gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?.name) return true;
@@ -46623,6 +46634,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async removeHeroStatus(playerIdx, heroIdx, statusName, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    // ★ W12 (Q114): ein VON KARIAN stillgelegter Status (Stash) wird beim Entfernen/Heilen mit entfernt, sonst kaeme er spaeter zurueck.
+    const _karianStash = hero?._karianSuspendedParalysis;
+    if (_karianStash?.[statusName] && !hero.statuses?.[statusName] && (opts.bypassUnhealable || !_karianStash[statusName].unhealable)) {
+      delete _karianStash[statusName];
+      if (Object.keys(_karianStash).length === 0) delete hero._karianSuspendedParalysis;
+      this.log('status_remove', { target: hero.name, status: statusName, owner: playerIdx });
+      return;
+    }
     if (!hero || !hero.name || !hero.statuses?.[statusName]) return;
     // `unhealable` (Venom Infusion Lv3) blocks removal by healing /
     // cleansing AFTER the status has stuck — but NOT removal by
