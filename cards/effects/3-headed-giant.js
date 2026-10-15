@@ -80,7 +80,8 @@ module.exports = {
    * Damit kann die CPU nie mehr Nutzungen bekommen als ein Mensch.
    */
   canActivateCreatureEffect(ctx) {
-    return usesThisTurn(ctx._engine?.gs, ctx.card) < MAX_USES;
+    // W12 (Al, Q5): eine geliehene/wiederholte Verwendung (Grimoire, Kohta: `ctx._borrowedUse`) ignoriert die 3/3-Grenze.
+    return !!ctx._borrowedUse || usesThisTurn(ctx._engine?.gs, ctx.card) < MAX_USES;
   },
 
   async onCreatureEffect(ctx) {
@@ -94,7 +95,7 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;
 
     const used = usesThisTurn(gs, inst);
-    if (used >= MAX_USES) return false;
+    if (used >= MAX_USES && !ctx._borrowedUse) return false;   // W12 (Q5): geliehene Verwendung darf trotz 3/3
 
     const target = await ctx.promptDamageTarget({
       side: 'any',
@@ -102,7 +103,7 @@ module.exports = {
       damageType: 'creature',
       baseDamage: DAMAGE,
       title: CARD_NAME,
-      description: `Choose a target and deal ${DAMAGE} damage to it. (${used + 1}/${MAX_USES} this turn)`,
+      description: `Choose a target and deal ${DAMAGE} damage to it. (${used >= MAX_USES ? 'extra use' : `${used + 1}/${MAX_USES} this turn`})`,
       confirmLabel: `🪵 ${DAMAGE} Damage!`,
       confirmClass: 'btn-danger',
       cancellable: true,

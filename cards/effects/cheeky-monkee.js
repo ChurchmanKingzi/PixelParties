@@ -171,7 +171,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 4).length === 0) return false;
     return true;
   },
@@ -180,7 +180,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     // v346: Zielwahl VOR der Zahlung und abbrechbar — wie bei Resilient
     // Monkee. Wer abbricht, hat nichts ausgegeben und seine
     // Einmal-pro-Zug-Nutzung noch.

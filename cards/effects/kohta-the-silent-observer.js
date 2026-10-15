@@ -182,7 +182,7 @@ module.exports = {
       // Kohta wiederholte endlos (im Test bis zum Hook-Deckel bei
       // 10 000). Also erst sperren, dann laufen lassen.
       engine.claimHOPT(HOPT_KEY, pi);
-      const gefeuert = await engine.reactivateCreatureEffect(inst, pi);
+      const gefeuert = await engine.reactivateCreatureEffect(inst, pi, { borrowed: true });   // W12 (Al, Q5): auch bei erschoepftem EIGENEM Limit
       // Steigt das Skript aus eigenem Antrieb aus (`return false`),
       // etwa weil das Brett kein legales Ziel mehr hergibt, wird die
       // Sperre zurueckgegeben — dann hat Kohta nichts verbraucht.

@@ -48,7 +48,8 @@ const H = require('../../lib/h.js');
     for (let i = 0; i < 3; i++) await t.activateCreature(0, 1, 0);
     const rg = await t.activateCreature(0, 2, 0);
     R.note('B) Giant 3/3 – Grimoire aktivierbar? / angebotene Kreaturen', { rg, angeboten });
-    R.check('B) erschöpfter Giant wird nicht angeboten (das Grimoire hat dann gar kein Ziel und ist nicht aktivierbar)', rg === false && !(angeboten || []).includes('3-Headed Giant'), { rg, angeboten });
+    // ★ Welle 12 (Q5, Al: „Ja, dürfen sie."): UMGESTELLT – der Giant mit erschöpftem eigenem 3/3-Zähler ist über das Grimoire leihbar.
+    R.check('B) erschöpfter Giant wird dem Grimoire angeboten (Q5: eigenes Limit steht nicht im Weg)', rg === true && (angeboten || []).includes('3-Headed Giant'), { rg, angeboten });
   }
   R.finish();
 })();

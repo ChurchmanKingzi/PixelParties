@@ -100,7 +100,7 @@ module.exports = {
     if (!wirtKannAusgeruestetWerden(hps, ctx.cardHeroIdx)) return false;
     // v343 (Als Auftrag): die zweite Faehigkeit kostet 4 INVEST COUNTER
     // statt 4 Gold. Der Beschwoerungs-Trigger unten bleibt bei Gold.
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
     return freeSlotOn(hps, ctx.cardHeroIdx) >= 0;
@@ -121,7 +121,7 @@ module.exports = {
     // nur das Angebot, ein manipulierter Client koennte die Aktivierung
     // trotzdem schicken.
     if (!wirtKannAusgeruestetWerden(hps, heroIdx)) return false;
-    if (investHoptUsed(gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(gs, ctx.card)) return false;
     if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
     if (freeSlotOn(hps, heroIdx) < 0) return false;

@@ -160,7 +160,7 @@ module.exports = {
     if (drawBlockedFor(ctx._engine, ctx.cardOwner, 2)) return false;   // D1: auch Hand-/Zieh-Sperre (Regel von Al)
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 8).length === 0) return false;
     return true;
   },
@@ -169,7 +169,7 @@ module.exports = {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (ctx.card?.zone !== 'support') return false;
-    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!ctx._borrowedUse && investHoptUsed(engine.gs, ctx.card)) return false;   // W12 (Q5): geliehene Verwendung ignoriert das eigene Einmal-Limit
     if (!await payInvestCounters(engine, pi, 8, CARD_NAME)) return false;
     markInvestHopt(engine.gs, ctx.card);
     await engine.actionDrawCards(pi, 2, { source: CARD_NAME });

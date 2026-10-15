@@ -30,6 +30,12 @@
 //    (`prepareCreatureEffect` → Ziele, dann `onCreatureEffect` mit
 //    diesen Zielen) in JEDEM Kreaturenskript.
 //
+//  ★ W12 (Al, Q5): „Ja, dürfen sie." — das Grimoire (und Kohta) darf auch einen
+//  Effekt nutzen, dessen EIGENES Limit erschöpft ist (3-Headed Giant bei 3/3,
+//  Analyzer mit beiden Optionen benutzt …): `reactivateCreatureEffect(…, { borrowed: true })`
+//  → `ctx._borrowedUse` in der Karte. Es bleiben: negiert, hart gesperrt
+//  (`_effectLockedTurn`), echte Voraussetzungen (Ziel/Vorrat), Levelgrenze.
+//
 //  Sperre danach
 //  ─────────────
 //  „cannot be used another time for the rest of the turn IN ANY WAY\" —
@@ -92,7 +98,7 @@ function sammleKandidaten(engine) {
     else if (levelVon(engine, inst) > MAX_SUMME) grund = `level ${levelVon(engine, inst)}`;
     else if (typeof script.canActivateCreatureEffect === 'function') {
       try {
-        if (!script.canActivateCreatureEffect(engine._createContext(inst, {}))) {
+        if (!script.canActivateCreatureEffect(engine._createContext(inst, { _borrowedUse: true }))) {   // W12 (Q5): eigenes Limit steht nicht im Weg
           grund = 'requirements not met';
         }
       } catch { grund = 'requirements not met'; }
@@ -212,6 +218,7 @@ module.exports = {
       if (inst.zone !== 'support') continue;        // zwischendurch gefallen
       await engine.reactivateCreatureEffect(inst, pi, {
         ignoreEffectLock: true,
+        borrowed: true,   // W12 (Q5): auch ein Effekt mit erschoepftem EIGENEM Limit darf geliehen werden
         plan: plaene.has(inst.id) ? plaene.get(inst.id) : undefined,
       });
     }

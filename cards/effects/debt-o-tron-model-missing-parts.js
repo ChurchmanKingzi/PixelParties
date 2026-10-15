@@ -68,7 +68,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
     return debt(gs.players[pi]) > 0;
   },
 
@@ -78,7 +78,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps) return;
-    if (gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;
+    if (!ctx._borrowedUse && gs.hoptUsed?.[HOPT_KEY(pi)] === gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert das Einmal-Limit
 
     const schaden = debt(ps) * PER_GOLD;
     if (schaden <= 0) return false;

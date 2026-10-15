@@ -178,12 +178,12 @@ module.exports = {
     const gs = engine.gs;
     const pi = inst.controller ?? inst.owner;
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id)
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
       && changeCounterCardsOnSide(engine, pi).length > 0
       && ownCosmicCreatures(engine, pi).length > 0;
 
     const ps = gs.players[pi];
-    const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
+    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
       && getChangeCounters(inst) > 0
       && !drawBlockedFor(engine, pi);
 
@@ -197,10 +197,10 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     const ps = gs.players[pi];
 
-    const moveAvail = !hoptUsed(gs, HOPT_MOVE, inst.id)
+    const moveAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_MOVE, inst.id))
       && changeCounterCardsOnSide(engine, pi).length > 0
       && ownCosmicCreatures(engine, pi).length > 0;
-    const drawAvail = !hoptUsed(gs, HOPT_DRAW, inst.id)
+    const drawAvail = (ctx._borrowedUse || !hoptUsed(gs, HOPT_DRAW, inst.id))
       && getChangeCounters(inst) > 0
       && !drawBlockedFor(engine, pi);
 

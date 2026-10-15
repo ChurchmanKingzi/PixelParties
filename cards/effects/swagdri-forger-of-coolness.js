@@ -38,7 +38,7 @@ module.exports = {
    */
   canActivateCreatureEffect(ctx) {
     // Soft once-per-turn (per Swagdri instance).
-    if (ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -96,7 +96,7 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     const top = engine.getCoolnessStackTop(pi);
     if (!top) return false;
     const cardDB = engine._getCardDB();

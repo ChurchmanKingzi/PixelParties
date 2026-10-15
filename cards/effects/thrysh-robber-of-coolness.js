@@ -114,7 +114,7 @@ module.exports = {
   },
 
   canActivateCreatureEffect(ctx) {
-    if (ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === ctx._engine.gs.turn) return false;   // W12 (Q5): geliehene Verwendung ignoriert den Stempel
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     if (_collectCandidates(engine, pi).length === 0) return false;
@@ -128,7 +128,7 @@ module.exports = {
   async onCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    if (ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
+    if (!ctx._borrowedUse && ctx.card?.counters?.[HOPT_KEY] === engine.gs.turn) return false;
     const ps = engine.gs.players[pi];
 
     const candidates = _collectCandidates(engine, pi);

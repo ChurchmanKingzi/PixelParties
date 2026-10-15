@@ -231,16 +231,17 @@ module.exports = {
   // ── Activated multi-mode effect ───────────────────────────────────
   creatureEffect: true,
 
+  // ★ W12 (Al, Q5): eine geliehene/wiederholte Verwendung (Grimoire, Kohta: `ctx._borrowedUse`) ignoriert die Einmal-Stempel je Modus.
   canActivateCreatureEffect(ctx) {
     const turn = ctx._engine.gs.turn || 0;
     const inst = ctx.card;
     const gifts = inst?.counters?._sparkflyGifts || {};
     // MAIN mode is always available (subject to per-mode HOPT). Gifts
     // require their respective tags. Any unused mode → activatable.
-    if (!isModeUsed(inst, 'main', turn)) return true;
+    if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) return true;
     // D1 (Regel von Al): der Architect-Modus ist ein reiner Zug - unter Hand-/Zieh-Sperre kein Grund zur Aktivierung.
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn) && !drawBlockedFor(ctx._engine, ctx.cardOwner)) return true;
-    if (gifts.worker    && !isModeUsed(inst, 'worker',    turn)) return true;
+    if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(ctx._engine, ctx.cardOwner)) return true;
+    if (gifts.worker    && (ctx._borrowedUse || !isModeUsed(inst, 'worker',    turn))) return true;
     return false;
   },
 
@@ -255,13 +256,13 @@ module.exports = {
 
     // Build the mode picker — only show modes still unused this turn.
     const modeOptions = [];
-    if (!isModeUsed(inst, 'main', turn)) {
+    if ((ctx._borrowedUse || !isModeUsed(inst, 'main', turn))) {
       modeOptions.push({ id: 'main', label: '👑  Declare a card type' });
     }
-    if (gifts.architect && !isModeUsed(inst, 'architect', turn) && !drawBlockedFor(engine, pi)) {
+    if (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)) && !drawBlockedFor(engine, pi)) {
       modeOptions.push({ id: 'architect', label: '✏️  Architect gift: draw to opponent\'s hand size' });
     }
-    if (gifts.worker && !isModeUsed(inst, 'worker', turn)) {
+    if (gifts.worker && (ctx._borrowedUse || !isModeUsed(inst, 'worker', turn))) {
       modeOptions.push({ id: 'worker', label: '🪲  Worker gift: opponent picks a non-Hero card → your hand' });
     }
     if (modeOptions.length === 0) return false;
@@ -307,9 +308,9 @@ module.exports = {
     // the global creature-effect HOPT so the player can fire another
     // mode this turn.
     const stillAnyUnused =
-      !isModeUsed(inst, 'main', turn)
-      || (gifts.architect && !isModeUsed(inst, 'architect', turn))
-      || (gifts.worker    && !isModeUsed(inst, 'worker',    turn));
+      (ctx._borrowedUse || !isModeUsed(inst, 'main', turn))
+      || (gifts.architect && (ctx._borrowedUse || !isModeUsed(inst, 'architect', turn)))
+      || (gifts.worker    && (ctx._borrowedUse || !isModeUsed(inst, 'worker',    turn)));
     if (stillAnyUnused) ctx._skipCreatureEffectHopt = true;
 
     return true;

@@ -26133,9 +26133,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // nicht erfuellt war). `canActivateCreatureEffect` ist der Ort, an
     // dem eine Karte ihre Voraussetzungen fuehrt — wer ihren Effekt
     // ausloest, fragt sie.
+    // ★ W12 (Al, Q5): `opts.borrowed` (Spirit of the Forbidden Grimoire, Kohta) = eine GELIEHENE/WIEDERHOLTE Verwendung: das EIGENE Limit der Karte
+    // (3-Headed Giant 3/3, Analyzer beide Optionen benutzt, eigene Einmal-Stempel) steht ihr nicht im Weg — die Karte liest `ctx._borrowedUse`
+    // in `canActivateCreatureEffect`/`onCreatureEffect`. Echte Voraussetzungen (Ziel da, Vorrat da) bleiben; Great Offensive setzt es NICHT.
     if (!opts.ignoreOwnCondition && typeof script.canActivateCreatureEffect === 'function') {
       try {
-        const pruefCtx = this._createContext(inst, {});
+        const pruefCtx = this._createContext(inst, opts.borrowed ? { _borrowedUse: true } : {});
         if (!script.canActivateCreatureEffect(pruefCtx)) return false;
       } catch (err) {
         console.error('[canActivateCreatureEffect]', inst.name, err.message);
@@ -26143,7 +26146,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    const ctx = this._createContext(inst, {});
+    const ctx = this._createContext(inst, opts.borrowed ? { _borrowedUse: true } : {});
     ctx._isRetrigger = true;                 // Skripte koennen das lesen
     // v749: vorgezogener Plan aus `prepareCreatureEffectFor`. Liegt er
     // an, ueberspringt das Skript seine Zielwahl und wirkt nur noch.
