@@ -3611,7 +3611,9 @@ class GameEngine {
         if (cd && !hasCardType(cd, 'Creature')) {
           // Styx 28.9.: Ausruestender nach Kontrolle (an einem uebernommenen
           // Helden handelt die Ausruestung fuer den Uebernehmer).
-          await this._checkSurpriseOnEquip(this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner, enteringCard.heroIdx, enteringCard);
+          // Welle 10 (Al, R6): „opponent equips …“ wertet den ANLEGER (Spielende), nicht die Zone — bei einer Cross-Side-Ausruestung
+          // (Control Device, Powder Keg) ist das der urspruengliche Besitzer, nicht der Gastgeber (gleiche Regel wie das Platzierungs-Fenster unten).
+          await this._checkSurpriseOnEquip(this._anlegerEinerSupportKarte(enteringCard), enteringCard.heroIdx, enteringCard);
         }
         if (cd && hasCardType(cd, 'Creature')) {
           await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
@@ -3664,16 +3666,7 @@ class GameEngine {
         // wessen Zone. Eine Cross-Side-Ausruestung (Control Device, Powder Keg:
         // `placesOnOpponentBoard`) liegt auf der Gastgeberseite (`controller`/
         // `owner` = Gastgeber), angelegt hat sie ihr urspruenglicher Besitzer.
-        let _platzierer = this.effektiveSeiten(enteringCard).controller ?? enteringCard.owner;   // Styx 28.9.: nach Kontrolle
-        if (loadCardEffect(enteringCard.counters?._effectOverride || enteringCard.name)?.placesOnOpponentBoard) {
-          // `originalOwner` steht beim Powder Keg erst NACH den Hooks (server.js/powder-keg.js
-          // stempeln nach dem Setzen) — davor gilt der Gastgeber; dann ist der Anleger sein Gegner.
-          _platzierer = (enteringCard.originalOwner != null && enteringCard.originalOwner !== enteringCard.owner)
-            ? enteringCard.originalOwner : this.opponentOf(enteringCard.owner);
-          // Fruehzeitig stempeln (die Aufrufer setzen denselben Wert danach noch einmal):
-          // die Surprise schickt die Karte sonst in die Ablage des Gastgebers.
-          enteringCard.originalOwner = _platzierer;
-        }
+        const _platzierer = this._anlegerEinerSupportKarte(enteringCard);
         await this._checkSurpriseOnPlacement(_platzierer, enteringCard, 'support');
       }
       if (enteringCard && toZone === 'ability') {
@@ -32248,10 +32241,31 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer);   // v1377
   }
 
+  /**
+   * Welle 10 (Al, R6; Q23 aus Welle 9): WER legt die Support-Karte an? Eine Karte mit `placesOnOpponentBoard` (Control Device, Powder Keg)
+   * liegt auf der Gastgeberseite (`controller`/`owner` = Gastgeber), angelegt hat sie ihr urspruenglicher Besitzer. Sonst der Kontrolleur
+   * (Styx 28.9.: nach Kontrolle). Stempelt bei Cross-Side-Karten `originalOwner` frueh (Surprises schicken die Karte sonst in die Ablage des Gastgebers).
+   */
+  _anlegerEinerSupportKarte(karte) {
+    let anleger = this.effektiveSeiten(karte).controller ?? karte.owner;
+    if (loadCardEffect(karte.counters?._effectOverride || karte.name)?.placesOnOpponentBoard) {
+      // `originalOwner` steht beim Powder Keg erst NACH den Hooks (server.js/powder-keg.js
+      // stempeln nach dem Setzen) — davor gilt der Gastgeber; dann ist der Anleger sein Gegner.
+      anleger = (karte.originalOwner != null && karte.originalOwner !== karte.owner)
+        ? karte.originalOwner : this.opponentOf(karte.owner);
+      // Fruehzeitig stempeln (die Aufrufer setzen denselben Wert danach noch einmal).
+      karte.originalOwner = anleger;
+    }
+    return anleger;
+  }
+
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
     if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = this.opponentOf(equipOwnerIdx);
-    const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, cardName: equipCard?.name, cardInstance: equipCard };
+    // `heroController` = Kontrolleur des Helden, an den angelegt wird (Cybug LOCUST: „a Hero they control“).
+    const heroController = (equipCard && equipCard.heroIdx >= 0)
+      ? this.surpriseKontrolleur(this.physicalSide(equipCard), equipCard.heroIdx) : equipOwnerIdx;
+    const equipInfo = { equipOwner: equipOwnerIdx, equipHeroIdx, heroController, cardName: equipCard?.name, cardInstance: equipCard };
     const equipPlayerName = this.gs.players[equipOwnerIdx]?.username || 'Opponent';
     return this._scanSurprisesAgainst(equipOwnerIdx, 'surpriseEquipTrigger', equipInfo, {
       message: () => `${equipPlayerName} equipped ${equipCard?.name || 'a card'}!`,

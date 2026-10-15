@@ -93,6 +93,9 @@ module.exports = {
   surpriseEquipTrigger(gs, ownerIdx, heroIdx, info, engine, seite = ownerIdx) {
     if (!info) return false;
     if (info.equipOwner == null || info.equipOwner === ownerIdx) return false;
+    // Welle 10 (Al, R6): „… to a Hero **they control**“ — der Anleger (Gegner) UND der Held gehört ihm. Eine Cross-Side-Ausruestung
+    // (Control Device, Powder Keg) an einen Helden des Surprise-Besitzers loest LOCUST nicht aus.
+    if (info.heroController != null && info.heroController !== info.equipOwner) return false;
     const inst = info.cardInstance;
     if (!inst || inst.zone !== 'support') return false;
     const cd = engine?._getCardDB?.()[info.cardName];

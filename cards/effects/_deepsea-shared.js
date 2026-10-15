@@ -363,6 +363,15 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
     _skipReactionCheck: true,
   });
 
+  // ★ Welle 10 (Al, R3 / A02-deepsea-16): „1 or more cards" ist EIN Ereignis. Gibt ein Effekt mehrere Kreaturen auf einmal zurück
+  // (Dark Deepsea God), sammelt der Aufrufer sie über `opts.batch` und feuert den Hook EINMAL mit `fireReturnedBatch`.
+  if (Array.isArray(opts.batch)) {
+    opts.batch.push({ ownerIdx, cardName, inst, heroIdx, slotIdx, seite });
+    engine.sync();
+    await engine._delay(250);
+    return { returned: true };
+  }
+
   // Custom hook fired specifically for "cards returned to hand from board"
   // events. Teppes draws a card per firing (up to 5/turn); Siphem adds a
   // Deepsea Counter. The hook is ANY string — engine accepts whatever we
@@ -386,6 +395,26 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   engine.sync();
   await engine._delay(250);
   return { returned: true };
+}
+
+/**
+ * ★ Welle 10 (R3): feuert `onCardsReturnedToHand` EINMAL je Hand-Besitzer für die über `returnSupportCreatureToHand(…, { batch })`
+ * gesammelten Rückgaben (parallele Herkunfts-Arrays wie im Einzelweg) und entfernt die Instanzen aus der Verfolgung.
+ */
+async function fireReturnedBatch(engine, batch, sourceName) {
+  if (!Array.isArray(batch) || batch.length === 0) return;
+  const owners = [...new Set(batch.map(e => e.ownerIdx))];
+  for (const ownerIdx of owners) {
+    const es = batch.filter(e => e.ownerIdx === ownerIdx);
+    const fromOwners = es.map(e => e.seite);
+    await engine.runHooks('onCardsReturnedToHand', {
+      ownerIdx, returnedCards: es.map(e => e.cardName), returnedInsts: es.map(e => e.inst),
+      fromHeroIdxs: es.map(e => e.heroIdx), fromZoneSlots: es.map(e => e.slotIdx),
+      ...(fromOwners.some(o => o !== ownerIdx) ? { fromOwners } : {}),
+      by: sourceName, _skipReactionCheck: true,
+    });
+  }
+  for (const e of batch) engine._untrackCard(e.inst.id);
 }
 
 /**
@@ -1416,6 +1445,7 @@ module.exports = {
   hasBounceableDeepsea,
   returnSupportCreatureToHand,
   fireReturnBatchHook,
+  fireReturnedBatch,
   tryBouncePlace,
   addDeepseaCounters,
   clearDeepseaCounters,

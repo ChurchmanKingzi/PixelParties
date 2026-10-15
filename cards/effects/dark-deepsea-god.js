@@ -66,7 +66,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
-const { returnSupportCreatureToHand } = require('./_deepsea-shared');
+const { returnSupportCreatureToHand, fireReturnedBatch } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Dark Deepsea God';
 // Als Ruling: DDG macht 150 — die Konstante hier war IMMER richtig.
@@ -257,13 +257,17 @@ async function _zahleTribut(ctx) {
   const others = chosenTargets
     .filter(t => !_istLandung(t))
     .map(t => t.cardInstance);
+  // ★ Welle 10 (Al, R3 / A02-deepsea-16): „returning 2 or more Creatures" ist EIN Rückgabe-Ereignis — Siphem/Teppes/Analyzer/Gatherer
+  // reagieren einmal (nicht je Kreatur); Blood Moon zählt weiter je Kreatur (liest `returnedInsts`).
+  const batch = [];
   for (const inst of others) {
     if (!inst) continue;
-    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi });
+    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch });
   }
   if (landingInst) {
-    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi });
+    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch });
   }
+  await fireReturnedBatch(engine, batch, CARD_NAME);
 
   return {
     heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx, landSeite,
