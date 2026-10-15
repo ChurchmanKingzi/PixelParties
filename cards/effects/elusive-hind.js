@@ -63,6 +63,9 @@ async function bezahlen(engine, inst, ctrl, was) {
 }
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Platzieren in seine Zone) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   inherentAction: true,
   playOnAnyHeroSide: true,
   playOnOppSideOnly: true,   // eigene Zonen sind beim Ziehen kein Ziel

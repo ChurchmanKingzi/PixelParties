@@ -8,6 +8,7 @@
 // Beobachtet: `inherentAction` ist wahr, sobald irgendwo ein Brand liegt; `beforeSummon` verlangt dann die Heilung; Abbruch = die Karte bleibt auf der Hand.
 //   Der gewöhnliche Weg (Aktion statt Heilung) wird nie angeboten – solange der gegnerische Brand liegt, ist Squire nur mit Heilung beschwörbar.
 // Ursache: cards/effects/candlestick-squire.js `inherentAction()` Z. ~108 (wahr bei jedem Brand) + `beforeSummon` Z. ~149 (Heilung ist Pflicht auf dem inhärenten Weg).
+// ★ Welle 11 (Q70, Al: „Normale Beschwörung sollte möglich sein!"): in der Action Phase mit freier Aktion wird bei vorhandenem Brand gefragt „Special (heilen, Zusatzaktion)" oder „Normal (Aktion, ohne Heilung)"; das Repro wählt „Normal" (echtes Nein = answer: () => null).
 // Stufe C (Skript-Kopf: „With no Burned targets in play, the card falls back to the standard summon path" – offenbar bewusst).
 const H = require('../../lib/h.js');
 (async () => {
@@ -18,7 +19,8 @@ const H = require('../../lib/h.js');
   await t.engine.addHeroStatus(1, 0, 'burned', { duration: 5, appliedBy: 0 });
   t.grantFor(0, 0, S);
   t.script.push({ match: d => d.type === 'zonePick', answer: (d) => { const z = d.zones[0]; return { owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx }; } });
-  t.targetFn = () => null;                       // „ich will NICHT heilen"
+  t.script.push({ match: d => d.type === 'confirm' && /Choose how to summon/.test(d.message || ''), answer: () => null });   // „Normal": keine Heilung
+  t.targetFn = () => null;                       // (nie gefragt)
   const r = await t.play(0, S);
   const onBoard = !!t.find(S, 'support');
   R.note('Ergebnis', { r, onBoard, hand: ps.hand, brandBleibt: !!gs.players[1].heroes[0].statuses.burned, aktionVerbraucht: ps.heroesActedThisTurn });

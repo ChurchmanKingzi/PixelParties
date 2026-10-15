@@ -106,7 +106,7 @@ function rustingVerdopplung(engine, pi, name, grundpreis) {
   try {
     const helfer = require('./_crystals-shared').applyRustingCrystalCostMultiplier;
     if (typeof helfer !== 'function') throw new Error('Helfer fehlt');
-    return helfer(engine.gs, pi, name, grundpreis, engine);
+    return helfer(engine.gs, pi, name, grundpreis, engine, { fremdeKarte: true });
   } catch (err) {
     if (!_rustingGewarnt) {
       _rustingGewarnt = true;

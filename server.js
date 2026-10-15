@@ -5021,7 +5021,8 @@ function sendGameState(room, playerIdx, extra) {
       // schwachen Sperre tot, Ablage-Sucher erst bei der starken.
       searchLockBlockedCards: (((room.engine?.searchLockLevel?.(pi)?.deck
         || room.engine?.searchLockLevel?.(pi)?.discard
-        || ps.searchLocked || ps.handLocked || room.engine?.isDiscardOutHardLocked?.(pi))) && pi === playerIdx) ? (() => {
+        || ps.searchLocked || ps.handLocked || room.engine?.isDiscardOutHardLocked?.(pi)
+        || room.engine?.ersterZugGeschuetzt?.(room.engine.opponentOf(pi), pi))) && pi === playerIdx) ? (() => {   // Welle 11 (Q66): Erste-Runden-Sperre
         const blocked = new Set();
         const slDB = getCardDB();
         for (const cn of ps.hand) {

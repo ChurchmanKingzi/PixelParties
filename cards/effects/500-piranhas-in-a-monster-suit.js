@@ -141,18 +141,9 @@ async function _zahleKosten(ctx) {
     return false;
   }
 
-  // The destroy may have triggered an on-death effect that re-
-  // occupies the slot (revives, cluster summons, etc.). If so,
-  // there's no opening for the Piranhas — fizzle without claiming
-  // the HOPT.
-  const slotAfter = ((ops.supportZones?.[destHi] || [])[destSlot] || []);
-  if (slotAfter.length > 0) {
-    engine.log('piranhas_fizzle', {
-      player: ps.username, reason: 'slot_reoccupied',
-      target: victim.cardName,
-    });
-    return false;
-  }
+  // ★ Welle 11 (Q72, Al: „b falls möglich, aber es muss eine Zone desselben Heroes sein, wähle automatisch die erstbeste,
+  // sonst c."): belegt ein Todes-Effekt (Cute Bird → Cute Phoenix, Wiederbelebung …) die Zone sofort wieder, ist das KEIN
+  // Fizzle mehr — die Ersatzzone (erste freie Zone desselben Helden) bzw. die Ablage entscheidet `beforeSummon` (`_ersatzzone`).
   return { victimName: victim.cardName, destHi, destSlot, vSeite };
 }
 
@@ -207,16 +198,34 @@ module.exports = {
 
     const kosten = ctx._summonKosten || await _zahleKosten(ctx);
     if (!kosten) return false;
-    const { victimName, destHi, destSlot, vSeite } = kosten;
+    const { victimName, destHi, vSeite } = kosten;
+    let destSlot = kosten.destSlot;
     const ops = gs.players[vSeite];
     if (!ops) return false;
     const oi = engine.opponentOf(pi);
 
-    // Der Platz kann im Reaktionsfenster belegt worden sein.
-    const slotAfter = ((ops.supportZones?.[destHi] || [])[destSlot] || []);
-    if (slotAfter.length > 0) {
-      engine.log('piranhas_fizzle', { player: ps.username, reason: 'slot_reoccupied', target: victimName });
-      return false;
+    // Der Platz kann sofort nach dem Besiegen (Cute Phoenix …) oder im Reaktionsfenster belegt worden sein.
+    // Q72 (Al): (b) automatisch die erste freie Zone DESSELBEN Helden, sonst (c) die Piranhas geht in die Ablage
+    // (Opfer ist gefallen, Kosten bezahlt, Karte gespielt und verloren; die Rundengrenze ist verbraucht).
+    if (((ops.supportZones?.[destHi] || [])[destSlot] || []).length > 0) {
+      const ersatz = engine.getFreeSupportZones(vSeite).find(z => z.heroIdx === destHi);
+      if (ersatz) {
+        engine.log('piranhas_ersatzzone', { player: ps.username, target: victimName, slot: ersatz.slotIdx });
+        destSlot = ersatz.slotIdx;
+      } else {
+        const handIdx0 = (ps.hand || []).indexOf(FULL_NAME);
+        if (handIdx0 >= 0) {
+          engine.takeFromPileSync(ps, 'hand', handIdx0);
+          engine.notePlayedFromHand(pi);
+        }
+        const ablageSeite = engine._consumeHandCardOrigin(pi, FULL_NAME);
+        (gs.players[ablageSeite]?.discardPile || ps.discardPile).push(FULL_NAME);
+        _stampHopt(gs, pi);
+        ps._placementConsumedByCard = FULL_NAME;
+        engine.log('piranhas_verworfen', { player: ps.username, reason: 'no_free_zone_on_hero', target: victimName });
+        engine.sync();
+        return false;
+      }
     }
 
     // ── Step 3: place the Piranhas on OPP'S side ──────────────
@@ -282,15 +291,18 @@ module.exports = {
       // under the opp's ownership in beforeSummon, so cardOwner is opp
       // and isMyTurn is true exactly at the end of opp's turn — which
       // is the spec ("end of each of its controller's turns").
-      if (!ctx.isMyTurn) return;
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
       const engine = ctx._engine;
       const gs = engine.gs;
-      const controller = ctx.cardOwner;
 
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
+      // ★ Welle 11 (Q69, Al): „Der Schaden wird am Ende der Runde des Spielers applied, der aktuell die
+      // permanente Kontrolle über den Hero in question hält." — nicht der Kontrolleur der Piranhas, sondern
+      // der des Wirtshelden (Brettseite, bei dauerhafter Übernahme `permaControlBy`; Charme zählt nicht).
+      const controller = host.permaControlBy ?? engine.physicalSide(inst);
+      if (gs.activePlayer !== controller) return;
 
       // Animation: bites land on host hero.
       engine._broadcastEvent('play_zone_animation', {

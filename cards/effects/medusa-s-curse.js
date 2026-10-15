@@ -29,6 +29,9 @@ module.exports = {
     impact: { type: 'petrify' }, impactMs: 260,
   },
 
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Stun auf alle seine Ziele) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   placesPollutionTokens: true,
 
   // Cost gate: need 2 free Support Zones.

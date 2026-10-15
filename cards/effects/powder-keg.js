@@ -126,6 +126,8 @@ module.exports = {
   // valid targets are all on opp's side, the engine publishes
   // `crossSidePlayableArtifacts` for client highlighting.
   placesOnOpponentBoard: true,
+  // ★ Welle 11 (Q66, Al): Platzieren in die Zone des durch die Erste-Runden-Immunität geschützten Spielers — gesperrt statt „spielbar und leer“.
+  blockedByFirstTurnProtection: true,
   activeIn: ['support'],
 
   canActivate(gs, pi) {

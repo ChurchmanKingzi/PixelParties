@@ -1,4 +1,5 @@
 const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
+const { erzwungen } = require('./_extra-summon-shared');   // W11b (Q70): Main Phase / keine freie Aktion
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Candlestick Squire"
 //  Creature (Summoning Magic Lv 1, 30 HP, Banned)
@@ -107,8 +108,19 @@ module.exports = {
   // Inherent additional Action whenever a Burned target is on the
   // board — engine stamps `ctx.isInherentAction = true` on the summon
   // path and `beforeSummon` charges the cleanse cost.
+  // ★ Welle 11 (Q70, Al: „Normale Beschwörung sollte möglich sein!"): wie bei den anderen „may … as an additional Action"-Kreaturen
+  // (Regel 10.10., `_extra-summon-shared.js`) ist die Heilung nur dort ZWANG, wo die Zusatzaktion der einzige Weg ist (Main Phase /
+  // Action Phase ohne freie Aktion). In der Action Phase MIT freier Aktion und einem Brand auf dem Brett fragt `beforeSummon`
+  // „Special (heilen, Aktion zurück)" oder „Normal (Aktion des Helden, keine Heilung)".
   inherentAction(gs, pi, heroIdx, engine) {
-    return countBurnedTargets(engine) > 0;
+    return countBurnedTargets(engine) > 0 && erzwungen(gs, pi, heroIdx);
+  },
+
+  /** CPU: „Special" (Brand heilen, Aktion sparen) wie bisher auf dem inhärenten Weg. */
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'generic' || !payload) return undefined;
+    if (payload.type === 'confirm' && payload.title === CARD_NAME && /Choose how to summon/.test(payload.message || '')) return { confirmed: true };
+    return undefined;
   },
 
   // Custom host pick — same flag Waitress uses. The client reads this
@@ -148,10 +160,27 @@ module.exports = {
    * placement is skipped — same path Waitress uses.
    */
   async beforeSummon(ctx) {
-    if (!ctx.isInherentAction) return true; // standard summon path
     const engine = ctx._engine;
     const pi     = ctx.cardOwner;
     const ps     = engine.gs.players[pi];
+    // Q70: freie Aktion UND ein Brand auf dem Brett → beide Wege; „Normal" (oder Effekt-Beschwörung, kein Brand) = Standardweg.
+    let alsSpecial = false;
+    if (!ctx.isInherentAction) {
+      if (ctx._isNormalSummon !== true || !ps || countBurnedTargets(engine) === 0) return true;   // standard summon path
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'confirm',
+        title: CARD_NAME,
+        message: `Choose how to summon ${CARD_NAME}:`,
+        showCard: CARD_NAME,
+        confirmLabel: '🔥 Special (heal a Burn, free Action)',
+        cancelLabel: '⚔️ Normal (use the Hero\'s Action)',
+        cancellable: true,
+        equalButtons: true,
+        gerrymanderEligible: false,
+      });
+      if (!wahl) return true;          // Normal: die Engine hat die Aktion schon eingezogen, keine Heilung
+      alsSpecial = true;
+    }
     if (!ps) return false;
 
     // ── Step 1: pick the HOST Hero + slot ───────────────────────
@@ -287,6 +316,7 @@ module.exports = {
       host: engine.gs.players[hostSeite]?.heroes?.[hostHeroIdx]?.name,
       target: target.cardName,
     });
+    if (alsSpecial) engine.gs._summonModeUpgradedToInherent = pi;   // Q70: server.js erstattet die Aktion (Zusatzaktion)
     engine.sync();
     return true;
   },

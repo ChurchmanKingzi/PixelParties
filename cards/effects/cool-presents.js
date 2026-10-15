@@ -40,6 +40,8 @@ const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Cool Presents';
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al: „Karte schenken“ gegen den Erste-Runden-geschützten Spieler uneinsetzbar): Geben ist der einzige Effekt.
+  blockedByFirstTurnProtection: true,
   isTargetingArtifact: true,
   manualGoldCost: true,
   goldPerTarget: true,   // G1 (A09-11): Grundpreis gilt je Uebergabe - unter der Goldsperre nur bei Preis 0 aktivierbar (server.js doUseArtifactEffect)

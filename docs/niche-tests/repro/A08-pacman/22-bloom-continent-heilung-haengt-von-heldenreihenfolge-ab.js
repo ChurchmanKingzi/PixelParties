@@ -7,6 +7,7 @@
 // Erwartung: Dieselbe Heilung in beiden Reihenfolgen (Hook-Reihenfolge darf das Ergebnis nicht bestimmen, vgl. Kommentar in `_engine.js` ~3970 „Reihenfolge der Listener darf das Ergebnis nicht bestimmen").
 // Beobachtet: [Continent, Bloom]: +30 (nur der Grundschaden – Continent storniert den Schaden, bevor Maniacals Aura greift). [Bloom, Continent]: +80 (30 + 50). Mit 2 Paraseeds +30 gegen +130.
 //   Zusätzlich greift die eigene +100-Aura des Continent nie auf ihn selbst (der Heil-Zweig kehrt vor der Aura zurück) – ob die Heilung die Auren enthalten soll, sagt der Text nicht (Frage unten).
+// ★ Welle 11 (Q56, Al: „Die Giftheilung heilt den vollen Wert, inklusive Paraseed-Boni.“): Heilung = Grundschaden + alle Auren (Maniacal +50 je Paraseed, Continent +100) in beiden Reihenfolgen; exakte Werte prüft W11/b-56.
 // Aufruf: node docs/niche-tests/repro/A08-pacman/22-bloom-continent-heilung-haengt-von-heldenreihenfolge-ab.js   (✗ = Fehler tritt auf)
 const H = require('../../lib/h.js');
 const { syncAllParaseedPoison } = require('../../../../cards/effects/_paraseed-shared.js');

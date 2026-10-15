@@ -8707,6 +8707,20 @@ class GameEngine {
       }
       return { dealt: 0, cancelled: true };
     }
+    // ── Continent Corruptor: Giftschaden heilt stattdessen (Welle 11, Q56) ──
+    // Al: „Die Giftheilung heilt den vollen Wert, inklusive Paraseed-Boni." Die Karte
+    // storniert nicht mehr im eigenen Hook (dort kannte sie die Auren der Held-Nachbarn
+    // je nach Heldenreihenfolge noch nicht), sondern markiert `_poisonHealsInstead`;
+    // geheilt wird hier mit dem ENDBETRAG aller beforeDamage-Hooks (reihenfolgefrei).
+    // Bewusst ohne `onPoisonHealedInstead` (Paraseed-Max-HP-Zuwachs ist Sache des Tranks).
+    if (type === 'poison' && !hookCtx.cancelled && target?.hp !== undefined
+        && hookCtx._poisonHealsInstead && target.hp > 0) {
+      const proj = this._projectedAmount(hookCtx);
+      const betrag = Math.max(0, (proj !== undefined ? proj : hookCtx.amount) || 0);
+      this.log('poison_heal_instead', { target: this._heroLabel(target), amount: betrag, by: hookCtx._poisonHealsInstead?.name });
+      if (betrag > 0) await this.actionHealHero(hookCtx._poisonHealsInstead, target, betrag);
+      return { dealt: 0, cancelled: true };
+    }
     if (hookCtx.cancelled) return { dealt: 0, cancelled: true };
 
     // ── Anti Magic immunity ──
@@ -10981,8 +10995,29 @@ class GameEngine {
         || !!script.actionCost;
   }
 
+  /**
+   * ★ Welle 11 (Q66, B-05, Al: „Ja, sollte auch davor ‚schützen‘ und entsprechende Effekte uneinsetzbar machen"): EIN Prüfer für die
+   * Erste-Runden-Immunität gegen Nicht-Schadens-Effekte (Karte schenken, Gold zurücksetzen, Karte hinlegen/platzieren, Deck-Zug, Zwangssuche …).
+   * Ist `seite` der geschützte Spieler (`gs.firstTurnProtectedPlayer`) und `wirker` ein anderer Spieler (Standard: der Zugspieler), gilt die
+   * Seite als unantastbar. Karten, die den Gegner ausschließlich so treffen, tragen `blockedByFirstTurnProtection: true` und sind dann
+   * unspielbar (kein Kostenverbrauch ohne Wirkung); Effekt-Teile mit zwei Seiten fragen diese Methode direkt und überspringen die Seite.
+   */
+  ersterZugGeschuetzt(seite, wirker = this.gs.activePlayer) {
+    const prot = this.gs.firstTurnProtectedPlayer;
+    return prot != null && seite === prot && wirker !== prot;
+  }
+
+  /** `blockedByFirstTurnProtection`: unspielbar, solange der Gegner des Spielers `pi` durch die Erste-Runden-Immunität geschützt ist. */
+  _cardBlockedByFirstTurn(script, playerIdx) {
+    if (!script?.blockedByFirstTurnProtection || !Number.isInteger(playerIdx) || playerIdx < 0) return false;
+    return this.ersterZugGeschuetzt(this.opponentOf(playerIdx), playerIdx);
+  }
+
   _cardBlockedBySearchLock(script, cardData, ps, playerIdx) {
     if (!script || !ps) return false;
+    // Welle 11 (Q66): derselbe Sperr-Stutzen (Server-Wege, Ausgrau-Liste, Sofort-Wege) trägt die Erste-Runden-Sperre — vor der Kreaturen-Ausnahme.
+    if (script.blockedByFirstTurnProtection
+        && this._cardBlockedByFirstTurn(script, (typeof playerIdx === 'number') ? playerIdx : this.gs.players.indexOf(ps))) return true;
     // Z6 (B-04): auch Artifact-Creatures (cardType 'Artifact', Subtyp Creature, z. B. Debt-O-Tron Backup Duplicator) haben einen
     // Koerper und sind ausgenommen - `hasCardType` kennt beide Formen.
     if (cardData && (cardData.cardType === 'Creature' || hasCardType(cardData, 'Creature'))) return false;

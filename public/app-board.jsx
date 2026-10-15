@@ -290,8 +290,9 @@ function equipBezahlbarAuf(me, myIdx, cardName, card, handIdx, ownerIdx, heroIdx
 }
 
 function applyCrystalCostMods(me, cardName, baseCost) {
-  if (!me || cardName === 'Rusting Crystal') return baseCost;
-  if (!(me.hand || []).includes('Rusting Crystal')) return baseCost;
+  if (!me) return baseCost;
+  // Welle 11 (Q58): zwei Rusting Crystals auf der Hand verteuern einander (je Kopie zaehlt die andere als „anderes Artefakt").
+  if ((me.hand || []).filter(n => n === 'Rusting Crystal').length < (cardName === 'Rusting Crystal' ? 2 : 1)) return baseCost;
   if (_meControlsBigGwenGuard(me)) return baseCost;
   return baseCost * 2;
 }

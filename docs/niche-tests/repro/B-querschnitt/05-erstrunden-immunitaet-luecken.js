@@ -4,6 +4,8 @@
 // Aufbau wie im echten Spielstart (`engine.startGame()`), Sitz 0 spielt in seinem ersten Zug eine Karte gegen den (noch leeren) Sitz 1.
 // Geprüft wird: Sitz 1 hat danach noch dieselben Hände/Decks/Gold/Brett wie vorher.
 //   ✗ = Karte wirkt trotz Immunität auf den geschützten Spieler.
+// ★ Welle 11 (Q66, Al: „Ja, sollte auch davor ‚schützen‘ und entsprechende Effekte uneinsetzbar machen“): die Karten sind gegen den geschützten Spieler UNSPIELBAR (bleiben auf der Hand,
+//   nichts bezahlt, Sitz 1 unverändert); das Repro wertet „nicht spielbar“ jetzt als richtig (früher: übersprungen). Positivprobe siehe W11/b-66.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -35,7 +37,7 @@ const H = require('../../lib/h.js');
     const r = await t.play(0, card, { hero: 0, noGrant: true, phase: t.gs.currentPhase, keepActions: true });
     const after = snap1(t);
     const gespielt = r === true && !t.pile(0, 'hand').includes(card);
-    if (!gespielt) { R.note(`${card}: im Test nicht ausspielbar (r=${JSON.stringify(r)}) – übersprungen`, { phase: t.gs.currentPhase, hand: t.pile(0, 'hand') }); continue; }
+    if (!gespielt) { R.check(`${card}: gegen den geschützten Spieler unspielbar (bleibt auf der Hand, Sitz 1 unverändert)`, t.pile(0, 'hand').includes(card) && before === after, { r, hand: t.pile(0, 'hand') }); continue; }
     R.check(`${card}: Sitz 1 bleibt unverändert – ${what}`, before === after, { vorher: JSON.parse(before), nachher: JSON.parse(after) });
   }
   R.finish();

@@ -53,6 +53,9 @@ function oppFreeZones(engine, pi) {
 }
 
 module.exports = {
+  // ★ Welle 11 (Q66, Al): trifft den Gegner nur mit Nicht-Schadens-Effekten (Platzieren in seine Zone) — gegen den durch die Erste-Runden-Immunität
+  // geschützten Spieler unspielbar (`engine.ersterZugGeschuetzt`, Sperr-Stutzen `_cardBlockedBySearchLock`).
+  blockedByFirstTurnProtection: true,
   playOnAnyHeroSide: true,
   playOnOppSideOnly: true,   // v641: eigene Zonen sind beim Ziehen kein Ziel
   blocksHostHeroActions: true,
