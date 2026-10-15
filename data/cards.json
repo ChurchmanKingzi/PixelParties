@@ -5521,7 +5521,7 @@
     "hp": 150,
     "atk": null,
     "cost": null,
-    "effect": "You can only play this Creature by returning 2 or more Creatures whose combined original levels are 4 or higher and that were not summoned this turn from your side of the board to your hand and placing it into one of their Support Zones. This counts as an Action. \nYou do not need Summoning Magic to play this Creature. When this Creature is played, deal 150 damage to all targets your opponent controls. \nYou can only resolve this effect of \"Dark Deepsea God\" once per game.\nThis effect can only occur once per turn.",
+    "effect": "You can only play this Creature by returning 2 or more Creatures whose combined original levels are 4 or higher and that were not summoned this turn from your side of the board to your hand and placing it into one of their Support Zones. This counts as an Action. \nYou do not need Summoning Magic to play this Creature. When this Creature is played, deal 150 damage to all targets your opponent controls. \nThis effect can only occur once per turn.",
     "archetype": "Deepsea",
     "setID": "PP DD",
     "banned": "",

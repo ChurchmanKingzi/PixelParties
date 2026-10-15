@@ -3,7 +3,7 @@
 //
 // Kartentext (Dark Deepsea God, data/cards.json): „… When this Creature is played, deal 150 damage to all targets your opponent controls.
 // You can only resolve this effect of "Dark Deepsea God" once per game. This effect can only occur once per turn."
-// Erwartung: Der 150-Schaden wird in der ganzen Partie nur ein einziges Mal aufgelöst (die Engine kennt dafür `oncePerGame` / `oncePerGameEffect`).
+// WELLE 9: Regel geändert (siehe Prüfung unten). Alte Erwartung (überholt): Der 150-Schaden wird in der ganzen Partie nur ein einziges Mal aufgelöst (die Engine kennt dafür `oncePerGame` / `oncePerGameEffect`).
 // Beobachtet: Das Skript sperrt nur „einmal pro Zug" (`claimHOPT('ddg_aoe', pi)`, Z. ~127). In einem späteren Zug (DDG wieder auf der Hand, z. B. per Shapeshift/Castle/Monstrosity
 //   zurückgeholt, wieder zwei Opfer) richtet er den Schaden erneut an. Es gibt weder `oncePerGame` noch `oncePerGameEffect` im Skript, kein Ruling in CARD_API.
 // Hinweis: Skript-Kommentare nennen DDG „EXTREM stark … Balancing-Mechanismus = Breite des eigenen Bretts"; ob „once per game" in der aktuellen Textfassung gewollt ist, ist die Frage.
@@ -31,7 +31,9 @@ const H = require('../../lib/h.js');
   await t.play(0, 'Dark Deepsea God', { hero: 0, slot: 0, noGrant: true });
   const nach2 = hpOpp();
   R.note('Gegner-HP nach DDG #2 (späterer Zug)', nach2);
-  R.check('DDG #2: der Flächenschaden wird in der Partie kein zweites Mal aufgelöst ("once per game")', nach2.every(h => h === 650), nach2);
+  // Welle 9 (Al, 15.10.2026, Q11): „Ja, die once per game Klausel kann einfach weg“ / „Es sollte einmal pro Runde sein“ – der Satz ist aus data/cards.json gestrichen,
+  // der Schaden löst einmal pro ZUG auf (in einem späteren Zug erneut). Das Repro prüft jetzt die Pro-Zug-Regel (früher: einmal pro Spiel).
+  R.check('DDG #2 (späterer Zug): der Flächenschaden löst erneut aus (einmal pro Zug, nicht pro Spiel)', nach2.every(h => h === 500), nach2);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
