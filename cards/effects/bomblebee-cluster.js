@@ -24,10 +24,11 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //  so this dedicated post-summon window is the
 //  only path that catches all summon types.
 //
-//  "Different names" — the two re-summons must each
-//  have a name that differs both from the trigger
-//  Bomblebee AND from the other re-summon. The
-//  picker omits names already used.
+//  "Different names" — Al, Welle 10 (Q28): bezieht sich NUR auf
+//  die bis zu 2 gewaehlten Re-Summons untereinander. Ein Name
+//  gleich dem der ausloesenden Bomblebee ist erlaubt (der Text
+//  verlangt keine Abweichung zur ausloesenden Karte). Der Picker
+//  laesst nur Namen weg, die der erste Re-Summon schon belegt.
 //
 //  "Same Hero" — the two re-summons land on the
 //  trigger Bomblebee's host hero. If that hero has
@@ -102,8 +103,9 @@ module.exports = {
       return;
     }
 
-    // "Different names" tracker — start by excluding the trigger's name.
-    const usedNames = new Set([triggerInst.name]);
+    // "Different names" tracker — Welle 10 (Q28): nur die gewaehlten Re-Summons
+    // untereinander; der Name der ausloesenden Bomblebee ist NICHT gesperrt.
+    const usedNames = new Set();
 
     // Cluster animation on the host hero's row — three cascading bursts.
     engine._broadcastEvent('play_zone_animation', {
