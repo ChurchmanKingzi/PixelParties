@@ -338,13 +338,21 @@ module.exports = {
     // lässt sich nicht noch einmal wirken; ein gewirktes stempelt (der Weg hier umgeht server.js).
     const _opgSk = loadCardEffect(oppChoice);
     const _opgKey = (_opgSk?.oncePerGame || _opgSk?.oncePerGameKey) ? (_opgSk.oncePerGameKey || oppChoice) : null;
-    const canPerform = hero?.name && hero.hp > 0
-      && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated
-      && !(_opgKey && ps._oncePerGameUsed?.has(_opgKey));
+    // ★ Welle 13 (Al, Q132): „Das Level wird ignoriert, alle anderen Bedingungen, etwa schon verbrauchte once-per-games oder notwendige und
+    // unbezahlbare Ressourcen, führen dazu, dass der Zauber einfach fizzelt." — `kannSofortWirken` ist die EINE Prüfung des Sofort-Gusses
+    // (`validateActionPlay` mit `sofortGuss`: ohne Hand und ohne Stufe, aber mit Spielbedingung `spellPlayCondition`, Einmal-Grenzen,
+    // Pflichtziel, Heldensperren, Spell-Sperren, Pile-/Hand-/Such-/Ziehsperren). Fällt sie durch, zeigt Zi das Fizzeln (kein Effekt, keine
+    // Kosten ohne Wirkung); der Zauber geht wie ein verpuffter Guss in die Ablage.
+    const heldOk = hero?.name && hero.hp > 0
+      && !hero.statuses?.frozen && !hero.statuses?.stunned && !hero.statuses?.negated;
+    const canPerform = !!heldOk && engine.kannSofortWirken(pi, heroIdx, oppChoice, feld);
+    if (heldOk && !canPerform) {
+      engine.log('timeless_king_zi_fizzle', { player: ps.username, spell: oppChoice });
+      await engine.zeigeFizzle(oppChoice, { playerIdx: pi, grund: 'cannot_cast_now' });
+    }
 
     if (canPerform) {
       engine.log('timeless_king_zi_perform', { player: ps.username, spell: oppChoice });
-      if (_opgKey) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
       // Direct runHooks('onPlay') sub-cast bypasses validateActionPlay,
       // so the Spell's level / spell-school requirements are ignored —
       // exactly "regardless of its level". Mirrors Chaos Magic /
@@ -352,6 +360,7 @@ module.exports = {
       // globals so Bartas-style second-casts compose).
       gs._spellDamageLog = [];
       gs._spellExcludeTargets = [];
+      gs._spellCancelled = false;   // W13 (Q132/Q129): eigener Abbruchmerker für diesen Guss
       // Zi has NO subtype restriction (unlike Chaos Magic) — the chosen
       // Spell may be an Area / Attachment that PLACES ITSELF on the
       // board. `_spellPlacedOnBoard` is the engine's canonical "this
@@ -381,6 +390,11 @@ module.exports = {
         console.error('[Timeless King Zi] sub-spell error:', err?.message || err);
       }
       placedOnBoard = !!gs._spellPlacedOnBoard;
+      // „Einmal pro Spiel" erst NACH dem Guss und nur, wenn er nicht abgebrochen wurde (allgemeine Regel Q129: Stempel erst nach dem Commit).
+      const _abgebrochen = !!gs._spellCancelled && !gs._spellNegatedByEffect;
+      if (_opgKey && !_abgebrochen) { if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set(); ps._oncePerGameUsed.add(_opgKey); }
+      delete gs._spellCancelled;
+      delete gs._spellNegatedByEffect;
       delete gs._spellDamageLog;
       delete gs._spellExcludeTargets;
       delete gs._bartasSecondCast;

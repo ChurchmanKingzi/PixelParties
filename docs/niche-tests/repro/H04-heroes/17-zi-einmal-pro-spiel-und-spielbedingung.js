@@ -27,6 +27,9 @@ const H = require('../../lib/h.js');
 
   // (a) Stempel
   let t = await mk('Divine Gift of Creation');
+  // Welle 13 (Q129/Q132, Al): der Einmal-pro-Spiel-Stempel wird erst nach dem Commit gesetzt – die Suchgalerie wird deshalb bestätigt
+  // (ein Abbruch ließe den Stempel frei, siehe W13/a-q132-zi-nur-stufe-ignoriert.js).
+  t.script.push({ match: d => d.type === 'cardGalleryMulti' && d.title === 'Divine Gift of Creation', answer: d => ({ selectedCards: [(d.cards[0].name || d.cards[0])] }), once: true });
   await go(t);
   R.check('Divine Gift per Zi gewirkt (Suchgalerie erschien)', gallerien(t) >= 2, gallerien(t));
   R.check('(a) Zi stempelt das Einmal-pro-Spiel-Limit von Divine Gift', t.gs.players[0]._oncePerGameUsed?.has('divineGift'), [...(t.gs.players[0]._oncePerGameUsed || [])]);
