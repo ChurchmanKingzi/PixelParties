@@ -12931,6 +12931,62 @@ class GameEngine {
     });
   }
 
+  /**
+   * ★ Welle 12 (Q105, Al: „Es darf nur eine Instanz geangelt werden, die zu Rundenbeginn bereits im Discard lag."): ZEITSTEMPEL JE EINTRAG
+   * DER ABLAGE (Muster `_geloeschtVerfolgen`). Der Ablagestapel besteht nur aus Namen; „was not sent there this turn" läßt sich am Namen
+   * nicht entscheiden, wenn dieselbe Karte den Stapel verläßt und im selben Zug wieder hineinfällt. `ps._ablageStamps` führt parallel zu
+   * `ps.discardPile` den Zug, in dem jeder Eintrag hineinkam (-1 = vor der Verfolgung). Die Instanzmethoden `push`, `unshift`, `pop`, `shift`,
+   * `splice` des Stapels werden dazu (nicht aufzählbar) überlagert — `push`/`unshift` UM die Umleitung der Root of all Evil herum (nur wirklich
+   * Hineingelegtes wird gestempelt); andere Schreibwege (`length = 0`, neues Array) gleicht `ablageAlteEintraege` beim Lesen auf die Länge ab
+   * (Unbekanntes am Ende zählt als „in diesem Zug"). Verfolgt wird ab dem Zugbeginn des Spielers (startTurn) und beim ersten Lesen.
+   */
+  _ablageVerfolgen(pi) {
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    this._ablageUmleitungVerfolgen(pi);   // legt auch `ps.discardPile` an; seine push/unshift werden unten umhüllt
+    const arr = ps.discardPile;
+    if (!Array.isArray(ps._ablageStamps)) ps._ablageStamps = arr.map(() => -1);
+    const st = ps._ablageStamps;
+    if (st.length > arr.length) st.length = arr.length;
+    while (st.length < arr.length) st.push(this.gs.turn);   // unverfolgt hineingelegt → zählt als „in diesem Zug"
+    const engine = this;
+    const jetzt = () => engine.gs.turn;
+    const stamps = () => ps._ablageStamps;
+    const def = (name, fn) => Object.defineProperty(arr, name, { value: fn, enumerable: false, configurable: true, writable: true });
+    const umhuellen = (name, nachher) => {
+      const marke = '_ablage_' + name;
+      if (arr[marke] && arr[marke] === arr[name]) return;       // unser Wrapper steckt noch (enableDiscardToDelete & Co. können ihn ersetzen)
+      const vor = arr[name];
+      const w = function (...args) { const n0 = this.length; const r = vor.apply(this, args); nachher.call(this, n0, args); return r; };
+      def(name, w); def(marke, w);
+    };
+    // Vor dem Stempeln die Länge angleichen (z. B. nach `length = 0` in place, Guard Duty): Länge VOR dem Einfügen = n0.
+    const angleichen = (n0) => { const st2 = stamps(); if (st2.length > n0) st2.length = n0; while (st2.length < n0) st2.push(-1); };
+    umhuellen('push', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().push(...Array(d).fill(jetzt())); } });
+    umhuellen('unshift', function (n0) { const d = this.length - n0; if (d > 0) { angleichen(n0); stamps().unshift(...Array(d).fill(jetzt())); } });
+    if (!arr._ablage_pop) {
+      def('_ablage_pop', true);
+      def('pop', function () { stamps().pop(); return Array.prototype.pop.call(this); });
+      def('shift', function () { stamps().shift(); return Array.prototype.shift.call(this); });
+      def('splice', function (...args) {
+        Array.prototype.splice.apply(stamps(), args.length > 2 ? [args[0], args[1], ...Array(args.length - 2).fill(jetzt())] : args);
+        return Array.prototype.splice.apply(this, args);
+      });
+    }
+  }
+
+  /**
+   * ★ Welle 12 (Q105): je Eintrag von `ps.discardPile` — lag diese KARTE schon zu Beginn des laufenden Zuges in der Ablage (und ist seither
+   * nicht herausgenommen und neu hineingelegt worden)? Exakt je Eintrag, nicht je Name. Zusätzlich muß der Name im Zugbeginn-Schnappschuss
+   * (`_discardNamesAtTurnStart`) stehen (Untergrenze für unverfolgte Eingänge; ohne Schnappschuss ist nichts „alt", wie bisher).
+   */
+  ablageAlteEintraege(pi) {
+    this._ablageVerfolgen(pi);
+    const ps = this.gs.players[pi];
+    const start = ps._discardNamesAtTurnStart || new Set();   // ohne Zugbeginn-Schnappschuss (nie ein startTurn gelaufen) gilt wie bisher: nichts ist „alt"
+    return (ps.discardPile || []).map((n, i) => ps._ablageStamps[i] !== this.gs.turn && start.has(n));
+  }
+
   /** Die Zug-Stempel des Geloescht-Stapels von `pi`, abgeglichen auf die Stapellaenge. */
   _geloeschtZuege(pi) {
     this._geloeschtVerfolgen(pi);
@@ -23395,6 +23451,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // snapshot is also rebuilt there from the puzzle's preset
         // discard pile.
         ps._discardNamesAtTurnStart = new Set(ps.discardPile || []);
+        this._ablageVerfolgen(this.gs.activePlayer);   // Welle 12 (Q105): Zeitstempel je Ablage-Eintrag ab Zugbeginn
+        delete this.gs._itemLockOffen;   // Welle 12 (Q92): keine verwaiste Vormerkung über den Zug hinaus
         delete ps._creationLockedNames;
         delete ps._revealedCardCounts;
         delete ps._revealedHandIndices;
