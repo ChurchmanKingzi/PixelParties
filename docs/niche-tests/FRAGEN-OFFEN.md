@@ -1,5 +1,7 @@
 # Offene Fragen an Al – bereinigt (Stand 14.10.2026)
 
+> **Stand 16.10.2026:** Alle Einzelfragen 1–179 sind beantwortet und umgesetzt (Wellen 9–14, siehe [FIXES-WELLE-9.md](FIXES-WELLE-9.md) bis [FIXES-WELLE-14.md](FIXES-WELLE-14.md)). Offen sind nur die neuen Ja/Nein-Rückfragen am Ende von FIXES-WELLE-14.md.
+
 Aus den ursprünglichen **179 Fragen** ([FRAGEN-AN-AL.md](FRAGEN-AN-AL.md), unverändert als Archiv) bleiben nach den Entscheidungen der Wellen 3–5: **33 beantwortet**, **10 mit Vorschlag aus deinen Entscheidungen** (nur bestätigen), **14 in einer Grundsatzfrage zusammengefasst**, **4 in einer technischen Frage zusammengefasst**, **118 einzeln offen**. Jede Frage nennt die Befund-ID; Details im verlinkten Bericht.
 
 ## 1. Grundsatzfrage: stillgelegte Passive (gefroren / betäubt / negiert) – ENTSCHIEDEN am 14.10.2026
