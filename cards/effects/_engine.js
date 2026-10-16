@@ -24491,6 +24491,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
       try {
         await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+        // Welle 14 (Q171): Hand of Death loest auch ohne Karte in der Ablage aus (haengt am Zauber, nicht an der Karte).
+        await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);
         await this._runPostChainActions();
       } catch (err) {
         console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
