@@ -21,6 +21,17 @@
 //  so the only thing this card hand-rolls is moving the chosen
 //  Ability into hand from deck / discard first.
 //
+//  ── Welle 13/14: wer ist „a Hero you control"? ──────────────────
+//  Nach aktueller Kontrolle (Q147): `heroesControlledBy`. Welle 14 (Al, Q9):
+//  „Die Regel lautet, dass nur ein permanent kontrollierter Held normal von der
+//  Hand als Standard-Spielaktion eine Ability bekommen kann - aber Attachments
+//  per Effekt können alle eigenen Heroes betreffen." → Pressed Skill ist ein
+//  EFFEKT: auch ein nur gecharmter Held steht zur Wahl (`byEffect: true` an
+//  `canAttachAbilityToHero`, das Recht `abilities` entfällt); ausgenommen bleibt
+//  ein Held ganz ohne Rechte (Charme Lv3: „unaffected"). Resistance blockt das
+//  Anlegen PER EFFEKT (Q5, auch beim eigenen Helden): die Potion ist dann
+//  verbraucht, die Ability bleibt, wo sie war.
+//
 //  Restricted Abilities (Divinity — `restrictedAttachment`) are NOT
 //  selectable: this is a generic attach effect and passes no
 //  `allowRestricted`, so `canAttachAbilityToHero` /
@@ -54,7 +65,7 @@ function eligibleHeroes(engine, pi, abilityName) {
     if (!hero?.name || hero.hp <= 0) continue;
     // No `allowRestricted` — restricted Abilities (Divinity) are
     // refused here, which naturally drops them from the gallery.
-    const opts = physOwner !== pi ? { heroOwner: physOwner } : undefined;
+    const opts = physOwner !== pi ? { heroOwner: physOwner, byEffect: true } : undefined;   // W14 (Q9): Anlegen per Effekt – Kontrolle genügt
     if (engine.canAttachAbilityToHero(pi, abilityName, heroIdx, opts)) out.push({ phys: physOwner, heroIdx });
   }
   return out;
@@ -175,11 +186,22 @@ module.exports = {
     }
     const targetHeroIdx = ziel.heroIdx;
     const zielSeite = ziel.phys;
-    const seitenOpt = zielSeite !== pi ? { heroOwner: zielSeite } : undefined;
+    const seitenOpt = zielSeite !== pi ? { heroOwner: zielSeite, byEffect: true } : undefined;
 
     // Re-verify (state may have shifted across the async prompts).
     if (!engine.canAttachAbilityToHero(pi, abilityName, targetHeroIdx, seitenOpt)) {
       return { cancelled: true };
+    }
+
+    // ★ Welle 14 (Al, Q5): Resistance fängt das Anlegen per Effekt ab — VOR jeder Kartenbewegung (die Ability bleibt in Deck/Hand/Ablage).
+    // Die Potion ist gespielt und verbraucht; die Animation läuft wie immer („Immunitäten blocken Effekte, nie Animationen").
+    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, zielSeite, targetHeroIdx, CARD_NAME)) {
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'pressed_skill_rain', owner: zielSeite, heroIdx: targetHeroIdx, zoneSlot: -1, duration: 1700,
+      });
+      engine.log('pressed_skill_blocked', { player: ps.username, ability: abilityName, hero: engine.gs.players[zielSeite]?.heroes?.[targetHeroIdx]?.name });
+      engine.sync();
+      return true;
     }
 
     // ── Step 3: route the chosen Ability into hand so the canonical
@@ -205,6 +227,7 @@ module.exports = {
     // the Hero's once-per-turn attach slot is not consumed.
     const res = await engine.attachAbilityFromHand(pi, abilityName, targetHeroIdx, {
       skipAbilityGivenCheck: true,
+      resistanzGeprueft: true,   // W14: oben schon gefragt
       targetZoneSlot: explicitZone >= 0 ? explicitZone : undefined,
       ...(zielSeite !== pi ? { heroOwner: zielSeite } : {}),
     });

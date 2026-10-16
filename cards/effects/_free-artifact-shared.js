@@ -130,8 +130,10 @@ async function legeAn(engine, pi, name, key, source) {
   }
   if ((ps.mainDeck || [])[0] !== name) return false;
   const seite = platz.side ?? pi;
+  // ★ Welle 14 (Al, Q5): Resistance blockt „Ausrüsten per Effekt" — vor dem Flug (die Karte bleibt im Deck).
+  if (await engine.heroNonDamageEffectBlocked(seite, platz.heroIdx, 'equip', { sourceOwner: pi, source })) return false;
   await gibFrei(engine, pi, key, name, { dest: 'support', destHeroIdx: platz.heroIdx, destSlotIdx: platz.slotIdx, destSide: seite });
-  const inst = await equipArtifactToHero(engine, pi, name, seite, platz.heroIdx, platz.slotIdx, { from: 'deck', source, animDelay: 120 });
+  const inst = await equipArtifactToHero(engine, pi, name, seite, platz.heroIdx, platz.slotIdx, { from: 'deck', source, animDelay: 120, resistanzGeprueft: true });
   if (!inst) return false;
   engine.log('free_artifact_played', { player: ps.username, card: name, as: 'equipment', by: source });
   return 'equip';

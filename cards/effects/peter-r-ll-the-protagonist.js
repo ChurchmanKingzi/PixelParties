@@ -141,6 +141,8 @@ async function offerAttach(ctx) {
       ...seitenOpt,
     });
   } else {
+    // ★ Welle 14 (Al, Q5): Resistance blockt das Anlegen per Effekt — vor der Kartenbewegung (die Ability bleibt im Deck).
+    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, feld, heroIdx, CARD_NAME)) return;
     const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return;
 

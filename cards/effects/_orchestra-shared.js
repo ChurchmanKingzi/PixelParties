@@ -76,6 +76,10 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   const idx = (pool || []).indexOf(cardName);
   if (idx < 0) return null;
   if (((hps.supportZones[heroIdx] || [])[slotIdx] || []).length > 0) return null;
+  // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „Ausrüsten per Effekt" (dieser Helfer: Orchester, Lolek, Deepsea Treasure,
+  // Free-Artifact-Karten) ist ein Nicht-Schaden-Effekt auf den Helden. Das normale Ausspielen einer Ausrüstung von der Hand (Standard-Spielaktion) läuft nicht hier.
+  // Vor jeder Kartenbewegung gefragt: bei `true` bleibt die Karte, wo sie war (Aufrufer lesen `null` als "nicht ausgerüstet").
+  if (!opts.resistanzGeprueft && await engine.heroNonDamageEffectBlocked(ownerOfHero, heroIdx, 'equip', { sourceOwner: pi, source: opts.source })) return null;
   if (from === 'discard' && !(await engine._discardOutAllowed(pi, opts))) return null;
   pool.splice(idx, 1);
   if (from === 'deck') engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });

@@ -44,7 +44,9 @@ const H = require('../../lib/h.js');
   R.check('Pressed Skill: eigener, vom Gegner gecharmter Held 1 ist kein Ziel', p.el && !p.el.includes(1) && p.el.includes(0), p.el);
   const perma = (t) => { charm(t, 1, 0, 0); const h = t.gs.players[1].heroes[0]; h.permaControlBy = 0; h.permaControlFrom = 1; h.permaControlHeroIdx = 0; delete h.statuses.charmed; };
   p = await ps(t => charm(t, 1, 0, 0));
-  R.check('Pressed Skill: nur temporär gecharmter Gegnerheld (Rechte ohne Abilities) ist kein Ziel', p.el && p.el.length === 3 && !p.ziele, { el: p.el, ziele: p.ziele });   // nur die drei eigenen (Abilities-Rechte fehlen bei Charme)
+  // ★ UMGESTELLT in Welle 14 (Al, Q9: „… nur ein permanent kontrollierter Held kann normal von der Hand als Standard-Spielaktion eine Ability bekommen - aber Attachments
+  //   per Effekt können alle eigenen Heroes betreffen."): Pressed Skill ist ein EFFEKT – auch ein nur gecharmter Gegnerheld steht zur Wahl (ALTE Regel: kein Ziel). Siehe W14/a-q9.
+  R.check('Pressed Skill: auch nur temporär gecharmter Gegnerheld (1:0) steht zur Wahl (Anlegen per Effekt, Welle 14)', p.ziele && p.ziele.includes('1:0') && p.ziele.includes('0:0'), { el: p.el, ziele: p.ziele });
   p = await ps(perma);
   R.check('Pressed Skill: dauerhaft übernommener Gegnerheld (1:0) steht zur Wahl', p.ziele && p.ziele.includes('1:0') && p.ziele.includes('0:0'), p.ziele);
   { const t = await H.fresh({ hand: [['Pressed Skill'], []], hp: 800, deck: [['Wealth', 'ZZ Dummy'], []] });

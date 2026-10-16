@@ -10789,6 +10789,14 @@ class GameEngine {
   }
 
   /**
+   * ★ Welle 14 (Al, Q5): fängt Resistance ein Anlegen einer Ability PER EFFEKT (nicht die normale Ability per turn) auf dem Helden `feld`/`heroIdx` ab?
+   * Dünne Hülle um `heroNonDamageEffectBlocked` (Effekttyp `ability_attach`) für Effekte, die die Karte zuerst aus Deck/Ablage holen: erst fragen, dann bewegen.
+   */
+  async abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, source) {
+    return this.heroNonDamageEffectBlocked(feld, heroIdx, 'ability_attach', { sourceOwner: playerIdx, source });
+  }
+
+  /**
    * Increase a hero's max HP (and optionally current HP) by the given amount.
    * Respects hero.maxHpCapped — if set, max HP cannot exceed that value.
    * @param {object} hero - The hero object
@@ -44657,6 +44665,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (handIdx < 0) return { success: false };
     // v1356: ohne „additional" muss der Held sein Anlegen noch frei haben.
     if (!opts.skipAbilityGivenCheck && !this.kannAbilityAnlegen(playerIdx, heroIdx)) return { success: false };
+    // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „allerdings z.B. beim Anlegen von Abilities NICHT die normale
+    // Ability per turn, sondern nur eine per Effekt angelegte". `skipAbilityGivenCheck` = „additional attachment" = Anlegen PER EFFEKT (Pressed Skill, Training,
+    // Peter Röll, Lesson in the Arts, Super Fan, Waflav); das normale Anlegen (ohne das Flag, Standard-Spielaktion/Ska) fragt nicht. Aufrufer, die die Karte
+    // schon aus Deck/Ablage geholt haben, fragen VORHER selbst (`abilityAnlegenDurchResistanceBlockiert`) und setzen `resistanzGeprueft`.
+    if (opts.skipAbilityGivenCheck && !opts.resistanzGeprueft
+        && await this.abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, opts.source)) return { success: false, blocked: true };
 
     const abZones = hps.abilityZones[heroIdx] || [[], [], []];
     hps.abilityZones[heroIdx] = abZones;
@@ -46536,8 +46550,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    if (hs !== playerIdx && (this.heroSideOf(hs, hero) !== playerIdx
-        || !this.kontrollRechte(hs, heroIdx).abilities)) return false;
+    // ★ Welle 14 (Al, Q9): „nur ein permanent kontrollierter Held kann normal von der Hand als Standard-Spielaktion eine Ability bekommen - aber
+    // Attachments per Effekt können alle eigenen Heroes betreffen." → `opts.byEffect` (Pressed Skill & Co.): das Recht `abilities` entfällt, es genügt
+    // die Kontrolle (`heroSideOf`); ein Held ganz ohne Rechte (Charme Lv3, Love Shot: „unaffected") bleibt ausgenommen.
+    if (hs !== playerIdx) {
+      const _kr = this.kontrollRechte(hs, heroIdx);
+      const _darf = _kr.abilities || (opts.byEffect && (_kr.beschwoeren || _kr.ausruesten));
+      if (this.heroSideOf(hs, hero) !== playerIdx || !_darf) return false;
+    }
 
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     const script = loadCardEffect(cardName);
