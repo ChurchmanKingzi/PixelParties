@@ -19,10 +19,15 @@
 //  Damage-lock edge case: if the caster's own
 //  state carries `damageLocked` (Flame Avalanche's
 //  rest-of-turn debuff), the damage branch is
-//  suppressed. Burns still apply to the non-
+//  suppressed — Welle 14 (Q170, Al: „Nur Schaden
+//  an Gegnerzielen, eigene kann man noch normal
+//  treffen"): NUR fuer Ziele, die der GEGNER
+//  kontrolliert; eigene vorverbrannte Ziele nehmen
+//  weiter 150. Burns still apply to the non-
 //  already-burned, non-immune targets. The card
 //  is still CAST (spell-school cost paid, HOPT
-//  consumed) — it just skips the damage leg.
+//  consumed) — it just skips the damage leg an
+//  Gegnerzielen.
 //
 //  Play-time usability:
 //    • Normal: usable if at least one non-caster
@@ -30,7 +35,9 @@
 //      OR take damage because it's already Burned).
 //    • Damage-locked: usable only if at least one
 //      non-caster target can still be Burned
-//      (i.e. not already Burned AND not immune).
+//      (i.e. not already Burned AND not immune) OR
+//      an own already-Burned target would still
+//      take damage (Q170).
 //      Matches the user spec: "Heat Wave is still
 //      usable unless ALL possible targets are
 //      already Burned or immune to being Burned".
@@ -122,6 +129,16 @@ function collectTargets(engine, pi, casterHeroIdx) {
   return targets;
 }
 
+/**
+ * Welle 14 (Q170): Kontrolliert der GEGNER dieses Ziel? Nur dort greift die Schadenssperre
+ * (`ps.damageLocked`, Flame Avalanche / Last Resort: „… to targets your opponent controls").
+ * Kreatur: Kontrolleur; Held: Kontrolleur der Spalte (`kontrolleurVonHeld`, Uebernahme).
+ */
+function gegnerKontrolliert(engine, t, pi) {
+  if (t.type === 'hero') return engine.kontrolleurVonHeld(t.owner, t.heroIdx) !== pi;
+  return (t.inst?.controller ?? t.inst?.owner) !== pi;
+}
+
 /** Brettweite Heat-Wave-Animation (Client: `heat_wave`); wartet, bis die Schwaden das Brett erfasst haben. */
 async function heissWindBild(engine, owner) {
   engine._broadcastEvent('play_zone_animation', {
@@ -159,8 +176,9 @@ module.exports = {
       const burned = targetIsBurned(engine, t);
       const canBurn = targetCanBeBurned(engine, t, playerIdx);
       if (damageLocked) {
-        // Only the burn leg is live. Need a non-burned, non-immune target.
+        // Burn leg live (non-burned, non-immune target) — oder (Q170) ein EIGENES vorverbranntes Ziel nimmt noch Schaden.
         if (canBurn) return true;
+        if (burned && !gegnerKontrolliert(engine, t, playerIdx)) return true;
       } else {
         // Either a new burn or a damage-the-already-burned hit counts.
         if (canBurn || burned) return true;
@@ -201,7 +219,7 @@ module.exports = {
       // Schaden, die anderen bekommen Burned — das läuft in `wirkung`, VOR den Toden.
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi };   // Als Befund 29.9.: Brettseite des Wirkers
       const ziele = targets.map((t, i) => {
-        const amount = (preBurned[i] && !damageLocked) ? DAMAGE : 0;
+        const amount = (preBurned[i] && !(damageLocked && gegnerKontrolliert(engine, t, pi))) ? DAMAGE : 0;   // Q170: Sperre nur fuer Gegnerziele
         return t.type === 'hero'
           ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, amount }
           : { type: 'creature', inst: engine.cardInstances.find(c => c.id === t.inst.id), amount };

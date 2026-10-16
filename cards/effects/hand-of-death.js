@@ -41,6 +41,16 @@
 //    • Turn 6 end (P1): turn=6, activePlayer=1,
 //      ownerIdx=0 → fires.
 //
+//  ── Welle 14 (Q171, Al 16.10.2026: „Ja!") ──
+//  Der verzoegerte Effekt haengt am ZAUBER, nicht an der Karte in der
+//  Ablage: wird die Karte vor dem Fenster aus der Ablage geholt (Magic
+//  Sapphire, Meditation) oder liegt sie sonst nirgends mit Listener,
+//  loest er trotzdem aus. Die Engine ruft dafuer am Zugende (direkt
+//  nach `ON_TURN_END`) `nachholenOhneKarte` auf: steht noch ein
+//  `_handOfDeathArmed` im Fenster (die Ablage-Instanz hat ihn nicht
+//  verbraucht), laeuft derselbe `onTurnEnd`-Rumpf ueber eine kurzlebige
+//  Hilfsinstanz.
+//
 //  ── Immunities respected at trigger time ──
 //  Hero targets:
 //    • Anti Magic — `engine._isHeroSpellProtected`
@@ -62,7 +72,29 @@
 const CARD_NAME = 'Hand of Death';
 const HOPT_KEY = 'hand-of-death';
 
+/**
+ * Welle 14 (Q171): Ausloesung ohne Karte in der Ablage (s. Kopf). Von der Engine nach
+ * `ON_TURN_END` gerufen. Laeuft nur, wenn der Ablage-Listener den Eintrag nicht schon
+ * verbraucht hat (er loescht `_handOfDeathArmed` im Fenster sofort).
+ */
+async function nachholenOhneKarte(engine) {
+  const gs = engine.gs;
+  for (let pi = 0; pi < engine.playerCount(); pi++) {
+    const armed = gs.players[pi]?._handOfDeathArmed;
+    if (!armed || typeof armed.armedOnTurn !== 'number') continue;
+    if (gs.turn !== armed.armedOnTurn + 1 || gs.activePlayer === pi) continue;
+    const tmp = engine._trackCard(CARD_NAME, pi, 'discard');
+    try {
+      await module.exports.hooks.onTurnEnd(
+        engine._createContext(tmp, { turn: gs.turn, activePlayer: gs.activePlayer }));
+    } finally {
+      engine._untrackCard(tmp.id);
+    }
+  }
+}
+
 module.exports = {
+  nachholenOhneKarte,
   // ★ Z7b: FIZZELT die Karte (Wirker beim Auflösen handlungsunfähig, v1328), war sie GESPIELT → Stempel (Engine: `_noteFizzledPlay`).
   // Eine ganz NEGIERTE Karte stempelt nicht (Als Entscheidung, Welle 3).
   onFizzledPlay: ({ engine, gs, pi }) => { engine.claimHOPT(HOPT_KEY, pi); },

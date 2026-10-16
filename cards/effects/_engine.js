@@ -6550,6 +6550,18 @@ class GameEngine {
     return BLIND_STATUSES.some(n => !!st[n]);
   }
 
+  /**
+   * Welle 14 (Q174, Al: „Ja"): „can be used in spite of any negative status effects" (Outbreak) —
+   * spielt die Karte TROTZ Negierung und Blendung. Eine Stelle fuer die Skriptmarke `canPlayDespiteStatuses`
+   * (Frost/Betaeubung/Nulled/Silenced/Berserked fragen sie an ihren Toren selbst). `pi` = Brettseite des Helden
+   * (bzw. Kontrolleur mit `_wirkerSeite` fuer geliehene Helden, s. `_mitWirker`).
+   */
+  _spielTrotzStatus(pi, heroIdx, cardData) {
+    const s = cardData?.name ? loadCardEffect(cardData.name) : null;
+    if (typeof s?.canPlayDespiteStatuses !== 'function') return false;
+    try { return !!s.canPlayDespiteStatuses(this.gs, pi, heroIdx, cardData, this); } catch { return false; }
+  }
+
   /** Dasselbe fuer eine Kreatur (Status liegen in `counters`). */
   _isCreatureBlinded(inst) {
     const c = inst?.counters;
@@ -21081,7 +21093,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // preview matches what the server will accept.
         if (this._isHeroBlinded(playerIdx, hi) && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
           const s = loadCardEffect(cd.name);
-          if (s?.requiresTarget === true) continue;
+          if (s?.requiresTarget === true && !this._spielTrotzStatus(playerIdx, hi, cd)) continue;   // W14 (Q174): Outbreak trotz Blendung
         }
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
         // this turn" card). Blocks further Spell plays once the lock is set
@@ -21872,7 +21884,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // server-side gate.
     if (this._isHeroBlinded(heroOwner, heroIdx) && (cardData.cardType === 'Spell' || cardData.cardType === 'Attack')) {
       const cardScript = loadCardEffect(cardData.name);
-      if (cardScript?.requiresTarget === true) return null;
+      if (cardScript?.requiresTarget === true
+          && !this._mitWirker(pi, heroIdx, opts.charmedOwner, () => this._spielTrotzStatus(pi, heroIdx, cardData))) return null;   // W14 (Q174): Outbreak trotz Blendung
     }
 
     // Divine Gift of Skill lock — the chosen hero can't perform Actions
@@ -24569,6 +24582,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
       try {
         await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+        // Welle 14 (Q171): Hand of Death loest auch ohne Karte in der Ablage aus (haengt am Zauber, nicht an der Karte).
+        await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);
         await this._runPostChainActions();
       } catch (err) {
         console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
@@ -45099,10 +45114,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     return out;
   }
 
-  _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
+  _getCandidateAbilityZoneSets(playerIdx, heroIdx, trotzNegierung = false) {
     const ps = this.gs.players[playerIdx];
     // S1 (C05-10): Abilities negiert (Stowaway) — weder eigene noch geliehene noch Geraete-Zonen zaehlen.
-    if (this.heroAbilityLevelsBlanked(playerIdx, heroIdx)) return [[]];   // W4a: harte Form wie Stowaway
+    // W14 (Q174): `trotzNegierung` — Karte, die „in spite of any negative status effects" spielbar ist (Outbreak).
+    if (!trotzNegierung && this.heroAbilityLevelsBlanked(playerIdx, heroIdx)) return [[]];   // W4a: harte Form wie Stowaway
     // v767: Support-Zonen-Abilities (Xal) zaehlen wie echte
     // Ability-Zonen. Sie hier anzuhaengen genuegt fuer den GANZEN
     // Level-Vertrag — `heroMeetsLevelReq` prueft ausschliesslich ueber
@@ -45521,6 +45537,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return pi;
   }
 
+  /**
+   * Welle 14 (Q165, Al: „Nur die eine Kopie"): Die Stufenpruefung beim Ausspielen ist namensweit („spielbar, wenn IRGENDEINE
+   * Kopie es ist"), der Klick kann aber eine ANDERE Kopie als die gesenkte treffen (Client hebt je Name hervor, CPU nimmt die
+   * erste). Traegt die geklickte Kopie keinen befristeten Rabatt (`_handLevelOffsetsExpireTurn`, Divine Gift of Magic, Fiona),
+   * eine gleichnamige andere aber schon, wandert der Rabatt auf die gespielte Kopie — er wird damit genau einmal verbraucht
+   * und bleibt nicht auf einer uebrig gebliebenen Kopie stehen. Nach dem Gate, vor dem Hand-Splice aufrufen.
+   */
+  kopienRabattAufGespielteKopie(pi, cardName, handIndex) {
+    const ps = this.gs?.players?.[pi];
+    const ex = ps?._handLevelOffsetsExpireTurn, tm = ps?._handLevelOffsetsTransient;
+    if (!ex || !tm || !Number.isInteger(handIndex) || ps.hand?.[handIndex] !== cardName) return;
+    if (ex[handIndex] != null || (tm[handIndex] || 0) < 0) return;
+    const hf = ps._handLevelOffsetHeroFilter;
+    const j = Object.keys(ex).find(k => ps.hand[+k] === cardName && (tm[k] || 0) < 0 && !(hf && hf[k] != null));
+    if (j === undefined) return;
+    tm[handIndex] = tm[j]; ex[handIndex] = ex[j];
+    delete tm[j]; delete ex[j];
+  }
+
   /** `fn()` mit `gs._wirkerSeite` fuer einen geliehenen Helden (synchron). */
   _mitWirker(pi, heroIdx, heroOwner, fn) {
     if (heroOwner == null || heroOwner === pi) return fn();
@@ -45687,9 +45722,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it ONLY suppresses the Hero's effect, leaving Abilities (and
     // therefore plays > Lv 0) functional.
     const negStatus_lvr = hero.statuses?.negated;
-    const candidates = (negStatus_lvr && !(negStatus_lvr._byWeakeningCrystal || negStatus_lvr._fromAttachment || negStatus_lvr.effectOnly))
+    // W14 (Q174, Al): „in spite of any negative status effects" (Outbreak) — auch die harte Negierung blankt die
+    // Ability-Zonen fuer diese Karte nicht; es zaehlen die echten Schulstufen des Helden.
+    const _trotzNeg_lvr = !!negStatus_lvr && this._spielTrotzStatus(playerIdx, heroIdx, cardData);
+    const candidates = (negStatus_lvr && !(negStatus_lvr._byWeakeningCrystal || negStatus_lvr._fromAttachment || negStatus_lvr.effectOnly)
+        && !_trotzNeg_lvr)
       ? [[]]
-      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
+      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx, _trotzNeg_lvr);
     for (const abZones of candidates) {
       if (this._testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones, opts)) return true;
     }
@@ -46602,9 +46641,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // blank ability zones (matches the parallel branch in
     // `heroMeetsLevelReq`).
     const negStatus_w = hero.statuses?.negated;
-    const candidates = (negStatus_w && !(negStatus_w._byWeakeningCrystal || negStatus_w._fromAttachment || negStatus_w.effectOnly))
+    const _trotzNeg_w = !!negStatus_w && this._spielTrotzStatus(playerIdx, heroIdx, cardData);   // W14 (Q174): wie `heroMeetsLevelReq`
+    const candidates = (negStatus_w && !(negStatus_w._byWeakeningCrystal || negStatus_w._fromAttachment || negStatus_w.effectOnly)
+        && !_trotzNeg_w)
       ? [[]]
-      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
+      : this._getCandidateAbilityZoneSets(playerIdx, heroIdx, _trotzNeg_w);
     let bestCost = -1; // -1 = not playable
     for (const abZones of candidates) {
       const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx);

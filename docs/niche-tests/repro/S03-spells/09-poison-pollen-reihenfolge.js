@@ -5,7 +5,8 @@
 // Aufbau: Gegner-Held 0 ist vergiftet (2 Stacks), nicht betäubt. Sitz 0 spielt Poison Pollen.
 // Lesart A (Skript, Momentaufnahme): Held 0 wird betäubt, bleibt bei 2 Stacks (er war beim Wirken nicht betäubt).
 // Lesart B (der Reihe nach, wörtlich „and"): erst werden alle Vergifteten betäubt, DANN bekommen alle Betäubten – also auch Held 0 – 1 Stack ⇒ 3 Stacks.
-// Das Repro prüft Lesart B (✗ = Skript folgt Lesart A).
+// ★ Welle 14 (Q173, Al 16.10.2026): „Das gilt zum Zeitpunkt des Ausspielens … erhält NICHT noch einen extra Gift-Stack" – verbindlich ist Lesart A (Momentaufnahme).
+//   Dieses Repro prüft jetzt Lesart A (vorher B).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -16,6 +17,6 @@ const H = require('../../lib/h.js');
   R.check('Poison Pollen gespielt', r === true, r);
   R.check('Held 0 ist betäubt', !!h.statuses.stunned, h.statuses);
   R.note('Gift-Stacks von Held 0 nach dem Zauber (Lesart A = 2, Lesart B = 3)', h.statuses.poisoned && h.statuses.poisoned.stacks);
-  R.check('Lesart B: das eben betäubte Ziel bekommt im selben Zauber +1 Gift (3 Stacks)', h.statuses.poisoned && h.statuses.poisoned.stacks === 3, h.statuses.poisoned);
+  R.check('Lesart A (Momentaufnahme, Welle 14): das eben betäubte, schon vergiftete Ziel bekommt KEINEN zusätzlichen Gift-Stack (bleibt bei 2)', h.statuses.poisoned && h.statuses.poisoned.stacks === 2, h.statuses.poisoned);
   R.finish();
 })();

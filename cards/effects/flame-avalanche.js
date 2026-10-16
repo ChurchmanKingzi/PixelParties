@@ -5,6 +5,10 @@
 //  After resolving, the player cannot deal any
 //  more damage to opponent's targets this turn
 //  (absolute lock — overrides everything).
+//  Kartentext seit Welle 14 (Al 16.10.2026): „You cannot
+//  deal any other damage to targets your opponent controls
+//  the turn you activate this card." Eigene Ziele bleiben
+//  normal treffbar.
 //
 //  Cannot be played if the player already dealt
 //  damage to opponent's targets this turn.
