@@ -104,6 +104,11 @@ module.exports = {
 
       if (totalTargets === 0) return;
 
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier
+      // (nach der Kostenzahlung, wie jede andere Abwehr der gewirkten Karte).
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, heroTargets, 'decay_spell');
+      if (sr?.effectNegated) return;
+
       // ── Animation: petrify on every affected target ──
       for (const ht of heroTargets) {
         engine._broadcastEvent('play_zone_animation', {

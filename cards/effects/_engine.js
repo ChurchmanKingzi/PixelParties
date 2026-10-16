@@ -37320,6 +37320,30 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen wie Poisoned Well."): das „is hit by an Attack, Spell or Creature
+   * effect"-Fenster (Booby Trap, Toxic Trap …) für Zauber, die Helden NUR mit einem Status treffen (Poisoned Well, Iceage, Medusa's Curse):
+   * kein Schaden, also nie `dealDamageToTargets`. Öffnet dieselben Helden-Surprise-Fenster wie ein Flächenschlag (nichts wird „gewählt":
+   * „chosen by"-Surprises bleiben zu) VOR dem Status. Liefert das Ergebnis; `effectNegated` ⇒ der Aufrufer bricht ab (die Negierung ist
+   * bereits an Zauber/Quelle vermerkt). Die Vormerkungen werden hier wieder geräumt: es folgt kein Schadenstreffer, der sie verbraucht.
+   * @param {object} cardInst  die wirkende Zauberinstanz (`ctx.card`)
+   * @param {Array}  heroes    [{ owner (Brettseite), heroIdx }]
+   * @param {string} damageType Schulen-Tag des Zaubers ('decay_spell' …)
+   */
+  async statusHitSurpriseWindow(cardInst, heroes, damageType = 'decay_spell') {
+    if (!cardInst || !heroes?.length) return null;
+    const targets = heroes.map(h => ({
+      type: 'hero', owner: h.owner, heroIdx: h.heroIdx,
+      cardName: this.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name,
+    }));
+    try {
+      return await this.aoeSurpriseVorab(cardInst, targets, { damageType });
+    } finally {
+      for (const k of (this._aoeSurpriseKeys || [])) this.gs._surpriseCheckedHeroes?.delete(k);
+      this._aoeSurpriseKeys = null;
+    }
+  }
+
+  /**
    * Stable identity key for a damage source, used by the source-bound
    * effect-negation registry (`gs._negatedEffectSources`). Prefers the
    * tracked instance id; plain-object sources (Qinglong's
