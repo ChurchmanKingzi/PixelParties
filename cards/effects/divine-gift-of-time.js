@@ -7,7 +7,17 @@
 //  the controller's discard pile from anywhere.
 //  Adds those cards to hand instead.
 //
-//  Triggering paths covered:
+//  ★ W14b (Q150, Al: „Gift of Time soll auf **alles** reagieren
+//  können, was den Discard erreicht, inklusive zerstörter
+//  Equips/Attachments oder genutzter Surprises!"): die ENGINE meldet
+//  jede Karte, die in die Ablage des Spielers gelangt (`push`/`unshift`
+//  des Ablagestapels → `engine._ablageMeldung` → `onCardsSentToDiscard`
+//  unten), also auch gewirkte Zauber, zerstörte Ausrüstung/Attachments,
+//  ausgelöste Surprises, Tränke, Artefakte. Die drei Hooks unten bleiben
+//  als Netz (Stapel ersetzt, Hook-Kontext); doppelt Gemeldetes zählt
+//  einmal (`dedupeBatch`).
+//
+//  Triggering paths covered (historisch, jetzt Teilmenge):
 //    • Mill (deck → discard) — `onMill` hook,
 //      delivered as a batch from `actionMillCards`
 //      so multi-card mills coalesce naturally.
@@ -45,7 +55,7 @@ const CARD_NAME = 'Divine Gift of Time';
  * multiple cards into the discard pile (mill batch, multi-discard,
  * mass kill) gets one consolidated prompt at task end.
  */
-function queueTimeRescue(engine, ps, pi, names) {
+function queueTimeRescue(engine, ps, pi, names, viaPush) {
   if (!ps) return;
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   // Time must still be in hand to spend.
@@ -54,8 +64,9 @@ function queueTimeRescue(engine, ps, pi, names) {
   const cleaned = (names || []).filter(n => n && n !== CARD_NAME);
   if (cleaned.length === 0) return;
 
-  if (!ps._timeRescueQueue) ps._timeRescueQueue = [];
-  for (const n of cleaned) ps._timeRescueQueue.push(n);
+  const qKey = viaPush ? '_timeRescuePushQueue' : '_timeRescueQueue';
+  if (!ps[qKey]) ps[qKey] = [];
+  for (const n of cleaned) ps[qKey].push(n);
 
   if (ps._timeRescueScheduled) return;
   // Don't queue from inside MCTS rollouts — the macrotask fires AFTER
@@ -68,8 +79,9 @@ function queueTimeRescue(engine, ps, pi, names) {
   // task — the discard-loop / mill batch / death cleanup completes
   // first, then the queued names are processed as one batch.
   setTimeout(async () => {
-    const batch = ps._timeRescueQueue || [];
+    const batch = dedupeBatch(ps._timeRescuePushQueue || [], ps._timeRescueQueue || []);
     ps._timeRescueQueue = [];
+    ps._timeRescuePushQueue = [];
     ps._timeRescueScheduled = false;
     if (batch.length === 0) return;
     try {
@@ -78,6 +90,21 @@ function queueTimeRescue(engine, ps, pi, names) {
       engine.log('divine_gift_time_error', { err: err?.message });
     }
   }, 0);
+}
+
+/**
+ * Zentrale Meldung (push) plus Hook-Meldungen: was beide melden, zählt einmal. Je Name zählt die Hook-Menge nur über die
+ * Push-Menge hinaus (Hook ohne Push = Stapel wurde ersetzt / Weg ohne push).
+ */
+function dedupeBatch(pushed, hooked) {
+  const out = pushed.slice();
+  const cnt = new Map();
+  for (const n of pushed) cnt.set(n, (cnt.get(n) || 0) + 1);
+  for (const n of hooked) {
+    if ((cnt.get(n) || 0) > 0) cnt.set(n, cnt.get(n) - 1);
+    else out.push(n);
+  }
+  return out;
 }
 
 async function tryTimeRescue(engine, pi, ps, names) {
@@ -220,6 +247,10 @@ module.exports = {
     // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
     if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
+  },
+  // ★ W14b (Q150): Meldung der Engine für JEDE Karte, die in die Ablage von `pi` gelangt (`engine._ablageMeldung`).
+  onCardsSentToDiscard(engine, pi, names) {
+    queueTimeRescue(engine, engine.gs.players[pi], pi, names, true);
   },
   oncePerGame: true,
   oncePerGameKey: 'divineGift',

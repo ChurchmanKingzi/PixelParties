@@ -13142,8 +13142,29 @@ class GameEngine {
       }
       return rest;
     };
-    def('push', function (...items) { return Array.prototype.push.apply(this, filtern(items)); });
-    def('unshift', function (...items) { return Array.prototype.unshift.apply(this, filtern(items)); });
+    // ★ W14b (Q150): jede Karte, die WIRKLICH in die Ablage gelangt (nach der Root-Umleitung), wird gemeldet (`_ablageMeldung`).
+    def('push', function (...items) { const rest = filtern(items); const r = Array.prototype.push.apply(this, rest); engine._ablageMeldung(pi, rest); return r; });
+    def('unshift', function (...items) { const rest = filtern(items); const r = Array.prototype.unshift.apply(this, rest); engine._ablageMeldung(pi, rest); return r; });
+  }
+
+  /**
+   * ★ W14b (Q150, Al: Divine Gift of Time „soll auf alles reagieren können, was den Discard erreicht"): „WENN KARTEN IN DIE ABLAGE GESCHICKT
+   * WERDEN" — EINE Stelle (Gegenstück zu `_geloeschtMeldung` des Geloescht-Stapels). Alle Wege in die Ablage von `pi` laufen über `push`/`unshift`
+   * ihres Stapels (Mill, Abwurf, Kreaturentod, zerstörte Ausrüstung/Attachments, ausgelöste Surprises, gewirkte Zauber, Tränke, Artefakte …);
+   * Rückgaben (`returnToPile`, `splice`) zählen nicht. Hält der Spieler auf der Hand eine Karte, deren Skript `onCardsSentToDiscard(engine, pi, names)`
+   * trägt (Divine Gift of Time), wird sie benachrichtigt. Nicht in Bewertungsproben (`_fastMode`/`_inMctsSim`).
+   */
+  _ablageMeldung(pi, items) {
+    if (!items?.length || this._fastMode || this._inMctsSim) return;
+    const hand = this.gs.players[pi]?.hand;
+    if (!hand?.length) return;
+    for (const n of new Set(hand)) {
+      let script = null;
+      try { script = loadCardEffect(n); } catch { script = null; }
+      if (typeof script?.onCardsSentToDiscard !== 'function') continue;
+      try { script.onCardsSentToDiscard(this, pi, items.slice()); }
+      catch (err) { console.error(`[onCardsSentToDiscard] ${n}:`, err.message); }
+    }
   }
 
   /**
