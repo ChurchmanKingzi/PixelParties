@@ -9091,6 +9091,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // getActivatableCreatures gate so a valid click isn't rejected here.
   void chillyDogLiftsForCreature;
   if (room.engine.isCreatureEffectSuppressed(inst)) return false;   // v818: EIN Praedikat
+  if (room.engine.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): Unwanted Audience — nur der AKTIVE Effekt ist gesperrt
 
   if (charmedOwner != null && !anyPlayer
       && hero.charmedBy !== pi && hero.controlledBy !== pi

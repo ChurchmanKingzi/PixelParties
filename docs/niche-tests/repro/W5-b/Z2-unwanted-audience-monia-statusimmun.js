@@ -5,6 +5,7 @@
 //   you may discard 1 card to negate any effects that card or effect has on all Creatures."
 // Erwartung: (a) Light Ball: Kreatur nicht negiert; (b) Monia (Sitz 0) wird gefragt, schützt (Ja): Kreatur nicht negiert, 1 Karte abgeworfen; Monia lehnt ab (Nein = null): negiert, nichts abgeworfen;
 //   (c) ohne Monia/Light Ball: negiert (Kontrolle).
+// ★ W14b (Q152): Unwanted Audience legt seit Welle 14 den Status `active_locked` (nur aktive Effekte) statt `negated` an; die Messung liest ihn.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -25,14 +26,14 @@ const H = require('../../lib/h.js');
     return { t, turm, dummy2, moniaFrage, abgeworfen: hand0 + 1 - t.pile(0, 'hand').length };   // +1: Zugkarte
   }
   let x = await lauf({});
-  R.check('Kontrolle ohne Monia/Light Ball: beide Kreaturen negiert', !!x.turm.counters.negated && !!x.dummy2.counters.negated);
+  R.check('Kontrolle ohne Monia/Light Ball: beide Kreaturen negiert', !!x.turm.counters.active_locked && !!x.dummy2.counters.active_locked);
   x = await lauf({ lightBall: true });
-  R.check('Light Ball (statusimmun): nicht negiert', !x.turm.counters.negated && !x.dummy2.counters.negated, [x.turm.counters.negated, x.dummy2.counters.negated]);
+  R.check('Light Ball (statusimmun): nicht negiert', !x.turm.counters.active_locked && !x.dummy2.counters.active_locked, [x.turm.counters.active_locked, x.dummy2.counters.active_locked]);
   x = await lauf({ monia: true, antwort: 'ja' });
-  R.check('Monia wird gefragt (genau einmal) und schützt alle Kreaturen', x.moniaFrage === 1 && !x.turm.counters.negated && !x.dummy2.counters.negated, { fragen: x.moniaFrage, n: [x.turm.counters.negated, x.dummy2.counters.negated] });
+  R.check('Monia wird gefragt (genau einmal) und schützt alle Kreaturen', x.moniaFrage === 1 && !x.turm.counters.active_locked && !x.dummy2.counters.active_locked, { fragen: x.moniaFrage, n: [x.turm.counters.active_locked, x.dummy2.counters.active_locked] });
   R.check('Monia: 1 Handkarte abgeworfen', x.abgeworfen === 1, x.abgeworfen);
   x = await lauf({ monia: true, antwort: 'nein' });
-  R.check('Monia lehnt ab: Kreaturen negiert, nichts abgeworfen', !!x.turm.counters.negated && x.abgeworfen === 0, { n: x.turm.counters.negated, abgeworfen: x.abgeworfen });
+  R.check('Monia lehnt ab: Kreaturen negiert, nichts abgeworfen', !!x.turm.counters.active_locked && x.abgeworfen === 0, { n: x.turm.counters.active_locked, abgeworfen: x.abgeworfen });
   R.check('keine Engine-Fehler', x.t.errors.length === 0, x.t.errors);
   R.finish();
 })();

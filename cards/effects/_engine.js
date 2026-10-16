@@ -19562,6 +19562,17 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W14b (Q152, Unwanted Audience; Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): ist der AKTIVE Effekt dieser Kreatur
+   * gesperrt (Status `active_locked`)? Gilt NUR für das Aktivieren (Aktivierungs-Tor in server.js, Angebotsliste/CPU über
+   * `creatureEffectScriptAllows`, Wiederholung durch Grimoire/Kohta); Passive laufen weiter. Der Status ist ein negativer Status:
+   * Lunatic-Immunität (`negative_status_immune`) hebt ihn auf, wie bei jedem anderen.
+   */
+  isCreatureActiveEffectLocked(inst) {
+    if (!inst?.counters?.active_locked) return false;
+    return !this._creatureNegStatusImmune(inst);
+  }
+
+  /**
    * ★ W7a (Entscheidung Al, Welle 7, 14.10.2026): „Freeze, Stun und Negated unterbrechen *alle* laufenden passiven Effekte!"
    *
    * EIN Prüfer für die Frage „ruht alles, was diese Karte als LAUFENDE Wirkung tut?" (fortlaufende Boni, Sperren,
@@ -26325,6 +26336,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.prepareCreatureEffect) return { ok: false, plan: null };
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return { ok: false, plan: null };
+    if (this.isCreatureActiveEffectLocked(inst)) return { ok: false, plan: null };   // W14b (Q152)
 
     const ctx = this._createContext(inst, {});
     ctx._isRetrigger = true;
@@ -26355,6 +26367,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
+    if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): auch geliehene Wiederholungen (Grimoire, Kohta) sind „aktivieren"
     // v748: „cannot be used another time for the rest of the turn in
     // ANY way" (Spirit of the Forbidden Grimoire). Die Marke sperrt
     // auch geschenkte Wiederholungen — Kohta kann einen so verbrauchten
@@ -32415,6 +32428,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
     if (!script?.creatureEffect) return false;
+    if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): Unwanted Audience sperrt NUR den aktiven Effekt
     if (!script.canActivateCreatureEffect) return true;
     try {
       const ctx = this._createContext(inst, { event: 'canCreatureEffectCheck' });
