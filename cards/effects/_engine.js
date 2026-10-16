@@ -9283,8 +9283,9 @@ class GameEngine {
     // never overkill; it equals `actualAmount` whenever the target
     // survived, so existing cards see identical numbers.
     if (realDealt > 0 && target && target.hp !== undefined) {
+      // ★ Welle 14 (Al, Q10): `fullAmount`/`hpBefore` für Karten, die den vollen (ungedeckelten) Treffer brauchen (Cloud in a Bottle halbiert auch einen tödlichen).
       await this._checkAfterDamageHandReactions(
-        target, source, realDealt, type, { defeated: target.hp <= 0 },
+        target, source, realDealt, type, { defeated: target.hp <= 0, fullAmount: actualAmount, hpBefore },
       );
       // ── Nach-Schaden-Surprise-Fenster (Cybug ANTS) ──
       // Zwilling der Zeile darueber, gleicher `realDealt`. Der
@@ -35190,7 +35191,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         // Check condition
         if (script.afterDamageCondition &&
-            !script.afterDamageCondition(this.gs, reactorIdx, this, target, targetHeroIdx, source, amount, type)) continue;
+            !script.afterDamageCondition(this.gs, reactorIdx, this, target, targetHeroIdx, source, amount, type, opts)) continue;
 
         // Hero-can-cast gate. Normally the (surviving) damaged Hero
         // must itself be able to cast. But on a LETHAL hit that Hero
@@ -35265,7 +35266,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inAfterDamageReaction = true;
         try {
           if (script.afterDamageResolve) {
-            await script.afterDamageResolve(this, reactorIdx, target, targetHeroIdx, source, amount, type);
+            await script.afterDamageResolve(this, reactorIdx, target, targetHeroIdx, source, amount, type, opts);
           }
         } finally {
           this._inAfterDamageReaction = false;
@@ -48961,7 +48962,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Fall through to death branch — death proceeds, then revive
           // handler downstream re-summons with on-summon hooks.
         } else {
-          const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type);
+          // ★ Welle 14 (Al, Q10, Cloud in a Bottle): eine Reaktion kann den TÖDLICHEN Betrag herabsetzen, ohne die Kreatur zu retten
+          // (`info.amountOverride`, die Reaktion setzt ihn in `creaturePreDefeatResolve`): reicht der neue Betrag weiter, stirbt sie trotzdem.
+          const _pdInfo = {};
+          const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type, _pdInfo);
+          if (!saved && Number.isFinite(_pdInfo.amountOverride) && _pdInfo.amountOverride >= 0 && _pdInfo.amountOverride < actualAmount) {
+            this.log('creature_pre_defeat_amount_override', { creature: e.inst.name, original: actualAmount, override: _pdInfo.amountOverride });
+            actualAmount = _pdInfo.amountOverride;
+          }
           if (saved) {
             // Saved by Bone Dog (or similar) — creature is back to full
             // HP and will not die this batch. Clear the dying flag so

@@ -35,6 +35,14 @@
 //  Kreaturen (Welle 13, Q134): eigenes Fenster
 //  `isAfterCreatureDamageReaction` (Haelfte zurueck + Cloudy).
 //
+//  ★ Welle 14 (Al, Q10): „Sowohl bei Heroes als auch Creatures soll Cloud auch für Schaden angeboten werden, der
+//  tödlich wäre, und diesen halbieren. Natürlich könnte der Schaden, wenn er genug Overkill gehabt hätte, trotzdem
+//  noch tödlich sein." → Der Treffer wird mit seinem VOLLEN Betrag (inkl. Overkill) halbiert (aufgerundet):
+//   • Held: `firesOnLethalDamage` (Nach-Schaden-Fenster) und der Marken-Hook rechnen mit `hpBefore − ceil(voll/2)`;
+//     ist das ≤ 0, bleibt der Held besiegt (kein Cloudy für einen Gefallenen).
+//   • Kreatur: `isCreaturePreDefeatReaction` setzt den tödlichen Betrag herab (`info.amountOverride`, die Engine wendet
+//     den neuen Betrag an; reicht er weiter, stirbt die Kreatur trotzdem). Nur Schaden, kein Zerstören/Opfer.
+//
 //  Stacking guard: targets that already have the
 //  Cloudy buff are excluded from the candidate
 //  list (no point doubling-up halving).
@@ -102,8 +110,9 @@ module.exports = {
 
   // ── Per-hero fallback (direct hero damage paths) ─────────────────
   isAfterDamageReaction: true,
+  firesOnLethalDamage: true,   // Welle 14 (Q10): auch ein sonst tödlicher Treffer wird angeboten und halbiert
 
-  afterDamageCondition(gs, pi, _engine, target, _targetHeroIdx, _source, amount /*, type */) {
+  afterDamageCondition(gs, pi, _engine, target, _targetHeroIdx, _source, amount, _type, _info) {
     if (_alreadyPrompted(gs, pi)) return false;
     if (!(amount > 0)) return false;
     // Kontrolle statt Seite (Styx 28.9.) — der Reaktor ist hier die
@@ -115,18 +124,29 @@ module.exports = {
     return true;
   },
 
-  async afterDamageResolve(engine, pi, target, targetHeroIdx, _source, amount, _type) {
+  async afterDamageResolve(engine, pi, target, targetHeroIdx, _source, amount, _type, info) {
     _markPrompted(engine.gs, pi);
     const gs = engine.gs;
     const ps = gs.players[pi];
 
-    const halfDmg = Math.ceil(amount / 2);
-    const restoreAmount = amount - halfDmg; // = floor(amount / 2)
-    if (restoreAmount > 0 && target.hp > 0) {
-      target.hp = Math.min(target.hp + restoreAmount, target.maxHp);
+    // Welle 14 (Q10): voller Treffer (inkl. Overkill) und HP davor — `amount` ist der auf die Vor-Treffer-HP gedeckelte Verlust.
+    const voll = Number.isFinite(info?.fullAmount) ? info.fullAmount : amount;
+    const hpVor = Number.isFinite(info?.hpBefore) ? info.hpBefore : (target.hp + amount);
+    const halfDmg = Math.ceil(voll / 2);
+    const neuHp = hpVor - halfDmg;
+    if (neuHp <= 0) {
+      // Auch halbiert noch tödlich: der Held bleibt besiegt (die Karte war trotzdem gespielt).
+      target.hp = 0;
+      engine.log('cloud_bottle_still_lethal', { player: ps.username, hero: target.name, originalDamage: voll, effectiveDamage: halfDmg });
+      engine.sync();
+      return;
+    }
+    if (neuHp > target.hp) {
+      const restoreAmount = neuHp - target.hp;
+      target.hp = Math.min(neuHp, target.maxHp);
       engine.log('cloud_bottle_restore', {
         player: ps.username, hero: target.name,
-        originalDamage: amount, effectiveDamage: halfDmg, restored: restoreAmount,
+        originalDamage: voll, effectiveDamage: halfDmg, restored: restoreAmount,
       });
     }
 
@@ -204,6 +224,48 @@ module.exports = {
     engine.sync();
   },
 
+  // ── Kreaturen, TÖDLICHER Treffer (Welle 14, Q10) ─────────────────────
+  // Vor dem Tod fragt die Engine die Hand (`_checkCreaturePreDefeatHandReactions`, nach allen anderen Modifikatoren, mit dem
+  // endgültigen Betrag). Cloud rettet nicht, sondern halbiert (aufgerundet) den Betrag (`info.amountOverride`) und legt danach
+  // „Cloudy" auf — beides nur, wenn die Kreatur den halbierten Treffer überlebt. Nur Schaden: Zerstören/Opfer sind kein Schaden.
+  isCreaturePreDefeatReaction: true,
+
+  creaturePreDefeatCondition(gs, pi, _engine, inst, _source, amount, type, info) {
+    if (_alreadyPrompted(gs, pi)) return false;
+    if (!(amount > 0)) return false;
+    if (type === 'destroy' || info?.isSacrifice || info?.istZerstoerung) return false;
+    if (!inst || (inst.controller ?? inst.owner) !== pi) return false;
+    if (inst.zone !== 'support') return false;
+    if (inst.counters?.buffs?.cloudy) return false;   // schon Cloudy: der Treffer ist bereits halbiert
+    _markPrompted(gs, pi);
+    return true;
+  },
+
+  async creaturePreDefeatResolve(engine, pi, inst, _source, amount, _type, info) {
+    _markPrompted(engine.gs, pi);
+    const gs = engine.gs;
+    const halb = Math.ceil(amount / 2);
+    if (info && typeof info === 'object') info.amountOverride = halb;
+    const hp = inst.counters?.currentHp ?? 0;
+    engine.log('cloud_bottle', { player: gs.players[pi]?.username, creature: inst.name, originalDamage: amount, effectiveDamage: halb, lethal: halb >= hp });
+    if (halb >= hp) return { saved: false };   // auch halbiert tödlich: die Kreatur stirbt trotzdem
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'cloud_gather', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+    });
+    await engine._delay(600);
+    const nextPlayer = engine.opponentOf(gs.activePlayer);
+    await engine.actionAddCreatureBuff(inst, 'cloudy', {
+      sourceOwner: pi,
+      expiresAtTurn: gs.turn + 1,
+      expiresForPlayer: nextPlayer,
+      source: CARD_NAME,
+      addAnim: 'cloud_gather',
+      removeAnim: 'cloud_disperse',
+    });
+    engine.sync();
+    return { saved: false };   // der (halbierte) Treffer wird von der Engine normal angewendet
+  },
+
   hooks: {
     /**
      * Consume the per-target halve-after-damage mark. Restores
@@ -217,7 +279,6 @@ module.exports = {
     afterDamage: async (ctx) => {
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
-      if (target.hp <= 0) return;
       const actualAmount = ctx.amount;
       if (!(actualAmount > 0)) return;
       const engine = ctx._engine;
@@ -227,10 +288,18 @@ module.exports = {
       if (tgtHi < 0) return;
       if (!_consumeMark(engine.gs, _keyForHero(tgtOwner, tgtHi))) return;
 
+      // Welle 14 (Q10): auch ein tödlicher Treffer wird halbiert (voller Betrag inkl. Overkill; `realDealt` ist auf die Vor-Treffer-HP gedeckelt).
       const halfDmg = Math.ceil(actualAmount / 2);
-      const restoreAmount = actualAmount - halfDmg; // = floor(actualAmount/2)
-      if (restoreAmount > 0 && target.hp > 0) {
-        target.hp = Math.min(target.hp + restoreAmount, target.maxHp);
+      const hpVor = target.hp + (Number.isFinite(ctx.realDealt) ? ctx.realDealt : actualAmount);
+      const neuHp = hpVor - halfDmg;
+      if (neuHp <= 0) {
+        // Halbiert immer noch tödlich: der Held bleibt besiegt, kein Cloudy für einen Gefallenen.
+        engine.log('cloud_bottle_still_lethal', { target: engine._heroLabel(target), originalDamage: actualAmount, effectiveDamage: halfDmg });
+        return;
+      }
+      const restoreAmount = neuHp - target.hp;
+      if (restoreAmount > 0) {
+        target.hp = Math.min(neuHp, target.maxHp);
       }
       engine._broadcastEvent('play_zone_animation', {
         type: 'cloud_gather', owner: tgtOwner, heroIdx: tgtHi, zoneSlot: -1,
