@@ -10016,6 +10016,22 @@ class GameEngine {
       return { defeated: false };
     }
 
+    // ★ Welle 14 (Al, Q6 aus W13b): „Ja, die prallen ab!" — Insta-Kill-„Defeat"-Effekte ohne Schaden (Midnight Assault, Decapitating Strike, Kohta,
+    // Lunatic Golem, Hand of Death …) sind Nicht-Schaden-Effekte auf den Helden: Resistance fängt sie ab (auch das unaufhaltsame Midnight Assault).
+    // KEIN Effekt gegen den Helden sind das freiwillige Opfer (`isSacrifice`, `respectFirstTurnProtection: false`: Divine Gift of Sacrifice, Pharaoh,
+    // Teocuilatl, Last Resort, Hel), HP-Kosten (Foresta) und die Buchführung/Eigenfolge am eigenen Helden (`eigenerAbgang`: Gobbo, Companion-Bruch,
+    // Puppet ohne Token, Waflav-Abstieg) — dort fragt nichts. Hand of Death fragt den Prüfer schon vorher; ein zweiter Aufruf zählt nichts
+    // (Resistance zählt nur ein TATSÄCHLICHES Blocken, danach ist die Lage unverändert).
+    if (!opts.isSacrifice && !opts.eigenerAbgang && opts.respectFirstTurnProtection !== false && targetOwner >= 0) {
+      const _rsHi = (this.gs.players[targetOwner]?.heroes || []).indexOf(target);
+      if (_rsHi >= 0 && await this.heroNonDamageEffectBlocked(targetOwner, _rsHi, 'defeat', {
+        sourceOwner: source?.owner ?? source?.controller, source: source?.name || opts.reason || opts.sourceName,
+      })) {
+        this.log('defeat_negated', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat', reason: 'hero_effect_blocked' });
+        return { defeated: false, blocked: true };
+      }
+    }
+
     // ★ EFFEKT-IMMUNITAET GEGEN GENAU DIESE QUELLE (v911, Als Befund
     //   12.9. an Kohta + Castling) ─────────────────────────────────────
     // Brett-Reaktionen wie Castling und Rook of Kings [B] melden KEINE

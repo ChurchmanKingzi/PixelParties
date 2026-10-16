@@ -132,7 +132,7 @@ module.exports = {
       // ueberhaupt anzulaufen — deshalb steht Gobbo eine Zeile weiter
       // oben vorlaeufig auf 1, ohne dass ein Versand dazwischen liegt.
       if (zielHp <= 0) {
-        await engine.actionDefeatHero(ctx.card, hero, { reason: CARD_NAME });
+        await engine.actionDefeatHero(ctx.card, hero, { reason: CARD_NAME, eigenerAbgang: true });   // Welle 14: HP-Verlust des eigenen Helden, kein Effekt gegen ihn (Resistance fragt nicht)
       }
     },
   },

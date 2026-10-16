@@ -112,7 +112,7 @@ async function companionAbgang(ctx) {
     await engine.actionDefeatHero(
       { name: ctx.cardName, owner: pi, controller: pi, heroIdx },
       held,
-      { sourceName: ctx.cardName },
+      { sourceName: ctx.cardName, eigenerAbgang: true },   // Welle 14: Folge der eigenen Bindung, kein Effekt gegen den Helden (Resistance fragt nicht)
     );
   } finally {
     delete ich._verlaesstBrett;
