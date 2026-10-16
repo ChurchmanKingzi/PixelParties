@@ -167,7 +167,8 @@ module.exports = {
       if (!name) { gs._spellCancelled = true; return; }
 
       // Stapel-Schicht (v820): nie per splice.
-      const genommen = await engine.takeFromPile(pi, 'deck', name, { source: CARD_NAME });
+      // Welle 14 (Q176, Al: „Ja"): „Search" heisst, wie bei allen Suchkarten, danach das Deck mischen.
+      const genommen = await engine.takeFromPile(pi, 'deck', name, { source: CARD_NAME, shuffle: true });
       if (!genommen) { gs._spellCancelled = true; return; }
 
       // Offen ablegen — Bauform von „Elixir of Immortality".
