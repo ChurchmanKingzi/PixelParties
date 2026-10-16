@@ -9,7 +9,8 @@
 //  While active: the first time every turn a Hero
 //  uses a non-healing Support Magic Spell, that
 //  Spell's controller chooses a target to heal
-//  for 100 HP. Per-hero HOPT.
+//  for 100 HP. Einmal pro ZUG und Karte, NICHT je Held
+//  (Al 16.10.2026, Welle 14, Q168).
 //
 //  Healing is attributed to the casting Hero
 //  (matters for Nao's overheal passive).
@@ -197,7 +198,7 @@ module.exports = {
 
     /**
      * After any spell resolves: check if it was a non-healing Support Spell,
-     * and trigger the healing prompt for the caster (per-hero HOPT).
+     * and trigger the healing prompt for the caster (einmal pro Zug, Q168).
      */
     afterSpellResolved: async (ctx) => {
       // Only triggers while on the board as a permanent, not from hand
@@ -227,9 +228,10 @@ module.exports = {
       const hero = ps.heroes?.[spellHeroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 
-      // Per-hero HOPT: each hero triggers at most once per turn
-      const hoptKey = `gift-of-light:${spellCasterIdx}:${spellHeroIdx}`;
-      if (!engine.claimHOPT(hoptKey, spellCasterIdx)) return;
+      // Welle 14 (Q168, Al): „the first time every turn" = EINMAL PRO ZUG (egal welcher Held),
+      // nicht einmal je Held und Zug. Der Stempel haengt an der Karte (Instanz), nicht am Helden.
+      const hoptKey = `gift-of-light:${ctx.card.id}`;
+      if (!engine.claimHOPT(hoptKey, ctx.cardOwner)) return;
 
       // Flash the permanent card itself
       const permInst = ctx.card;
