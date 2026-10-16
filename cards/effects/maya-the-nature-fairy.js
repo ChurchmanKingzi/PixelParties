@@ -84,7 +84,9 @@ module.exports = {
 
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (tgtHero && tgtHero.hp > 0) {
+        // ★ Welle 14 (Al, Q7 aus W13b): „Ja, die prallen auch ab." — der HP-Gewinn auf einen Helden (auch Maya selbst) ist ein Nicht-Schaden-Effekt: Resistance blockt ihn.
+        if (tgtHero && tgtHero.hp > 0
+            && !(await engine.heroNonDamageEffectBlocked(target.owner, target.heroIdx, 'max_hp', { sourceOwner: pi, source: 'Maya, the Nature Fairy', amount: HP_BOOST }))) {
           ctx.increaseMaxHp(tgtHero, HP_BOOST);
           engine.log('maya_boost_hero', {
             player: gs.players[pi].username, target: tgtHero.name, amount: HP_BOOST,

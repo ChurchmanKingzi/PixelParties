@@ -74,6 +74,15 @@ module.exports = {
       const hero = ctx.attachedHero || gs.players[hs]?.heroes?.[heroIdx];
       if (!ps || !hero?.name || hero.hp <= 0) { gs._spellCancelled = true; return; }
 
+      // ★ Welle 14 (Al, Q5): Resistance blockt das Anlegen per Effekt (auch auf den eigenen Helden) — EINMAL je Effekt gefragt, vor jeder Kartenbewegung.
+      // Der Zauber ist gespielt, der Held bleibt unberührt; „Immediately end your turn" ist nicht Teil der Wirkung auf den Helden und gilt weiter.
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, hs, heroIdx, CARD_NAME)) {
+        engine.log('lesson_in_the_arts_blocked', { player: ps.username, hero: hero.name });
+        gs._spellEndsTurn = true;
+        engine.sync();
+        return;
+      }
+
       let angelegt = 0;
       let ausDeck = false;
       for (let n = 0; n < MAX; n++) {
@@ -101,7 +110,7 @@ module.exports = {
           engine.handZugangSync(ps, ABILITY, { von: 'transit', source: CARD_NAME });
         }
         const res = await engine.attachAbilityFromHand(pi, ABILITY, heroIdx, {
-          skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
+          skipAbilityGivenCheck: true, resistanzGeprueft: true, ...(hs !== pi ? { heroOwner: hs } : {}),
         });
         if (!res?.success) break;
         angelegt++;

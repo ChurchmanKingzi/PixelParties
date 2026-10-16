@@ -164,10 +164,10 @@ module.exports = {
             cancellable: true,
           });
           if (!platz) continue;
-          await equipArtifactToHero(engine, pi, name, platz.owner ?? pi, platz.heroIdx, platz.slotIdx, {
+          const _ausgeruestet = await equipArtifactToHero(engine, pi, name, platz.owner ?? pi, platz.heroIdx, platz.slotIdx, {
             from: 'hand', source: CARD_NAME,
           });
-          engine.log('deepsea_treasure_played', { player: ps.username, card: name, as: 'equipment' });
+          if (_ausgeruestet) engine.log('deepsea_treasure_played', { player: ps.username, card: name, as: 'equipment' });   // W14: Resistance kann das Ausrüsten blocken (Karte bleibt auf der Hand)
           engine.sync();
           continue;
         }

@@ -9283,8 +9283,9 @@ class GameEngine {
     // never overkill; it equals `actualAmount` whenever the target
     // survived, so existing cards see identical numbers.
     if (realDealt > 0 && target && target.hp !== undefined) {
+      // ★ Welle 14 (Al, Q10): `fullAmount`/`hpBefore` für Karten, die den vollen (ungedeckelten) Treffer brauchen (Cloud in a Bottle halbiert auch einen tödlichen).
       await this._checkAfterDamageHandReactions(
-        target, source, realDealt, type, { defeated: target.hp <= 0 },
+        target, source, realDealt, type, { defeated: target.hp <= 0, fullAmount: actualAmount, hpBefore },
       );
       // ── Nach-Schaden-Surprise-Fenster (Cybug ANTS) ──
       // Zwilling der Zeile darueber, gleicher `realDealt`. Der
@@ -10013,6 +10014,22 @@ class GameEngine {
         && targetOwner >= 0 && this.gs.firstTurnProtectedPlayer === targetOwner) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'shielded' });
       return { defeated: false };
+    }
+
+    // ★ Welle 14 (Al, Q6 aus W13b): „Ja, die prallen ab!" — Insta-Kill-„Defeat"-Effekte ohne Schaden (Midnight Assault, Decapitating Strike, Kohta,
+    // Lunatic Golem, Hand of Death …) sind Nicht-Schaden-Effekte auf den Helden: Resistance fängt sie ab (auch das unaufhaltsame Midnight Assault).
+    // KEIN Effekt gegen den Helden sind das freiwillige Opfer (`isSacrifice`, `respectFirstTurnProtection: false`: Divine Gift of Sacrifice, Pharaoh,
+    // Teocuilatl, Last Resort, Hel), HP-Kosten (Foresta) und die Buchführung/Eigenfolge am eigenen Helden (`eigenerAbgang`: Gobbo, Companion-Bruch,
+    // Puppet ohne Token, Waflav-Abstieg) — dort fragt nichts. Hand of Death fragt den Prüfer schon vorher; ein zweiter Aufruf zählt nichts
+    // (Resistance zählt nur ein TATSÄCHLICHES Blocken, danach ist die Lage unverändert).
+    if (!opts.isSacrifice && !opts.eigenerAbgang && opts.respectFirstTurnProtection !== false && targetOwner >= 0) {
+      const _rsHi = (this.gs.players[targetOwner]?.heroes || []).indexOf(target);
+      if (_rsHi >= 0 && await this.heroNonDamageEffectBlocked(targetOwner, _rsHi, 'defeat', {
+        sourceOwner: source?.owner ?? source?.controller, source: source?.name || opts.reason || opts.sourceName,
+      })) {
+        this.log('defeat_negated', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat', reason: 'hero_effect_blocked' });
+        return { defeated: false, blocked: true };
+      }
     }
 
     // ★ EFFEKT-IMMUNITAET GEGEN GENAU DIESE QUELLE (v911, Als Befund
@@ -10769,6 +10786,14 @@ class GameEngine {
       this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || null });
     }
     return !!ctx.cancelled;
+  }
+
+  /**
+   * ★ Welle 14 (Al, Q5): fängt Resistance ein Anlegen einer Ability PER EFFEKT (nicht die normale Ability per turn) auf dem Helden `feld`/`heroIdx` ab?
+   * Dünne Hülle um `heroNonDamageEffectBlocked` (Effekttyp `ability_attach`) für Effekte, die die Karte zuerst aus Deck/Ablage holen: erst fragen, dann bewegen.
+   */
+  async abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, source) {
+    return this.heroNonDamageEffectBlocked(feld, heroIdx, 'ability_attach', { sourceOwner: playerIdx, source });
   }
 
   /**
@@ -35190,7 +35215,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         // Check condition
         if (script.afterDamageCondition &&
-            !script.afterDamageCondition(this.gs, reactorIdx, this, target, targetHeroIdx, source, amount, type)) continue;
+            !script.afterDamageCondition(this.gs, reactorIdx, this, target, targetHeroIdx, source, amount, type, opts)) continue;
 
         // Hero-can-cast gate. Normally the (surviving) damaged Hero
         // must itself be able to cast. But on a LETHAL hit that Hero
@@ -35265,7 +35290,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inAfterDamageReaction = true;
         try {
           if (script.afterDamageResolve) {
-            await script.afterDamageResolve(this, reactorIdx, target, targetHeroIdx, source, amount, type);
+            await script.afterDamageResolve(this, reactorIdx, target, targetHeroIdx, source, amount, type, opts);
           }
         } finally {
           this._inAfterDamageReaction = false;
@@ -44640,6 +44665,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (handIdx < 0) return { success: false };
     // v1356: ohne „additional" muss der Held sein Anlegen noch frei haben.
     if (!opts.skipAbilityGivenCheck && !this.kannAbilityAnlegen(playerIdx, heroIdx)) return { success: false };
+    // ★ Welle 14 (Al, Q5 aus W13b): Resistance blockt auch EIGENE Effekte auf den Träger — „allerdings z.B. beim Anlegen von Abilities NICHT die normale
+    // Ability per turn, sondern nur eine per Effekt angelegte". `skipAbilityGivenCheck` = „additional attachment" = Anlegen PER EFFEKT (Pressed Skill, Training,
+    // Peter Röll, Lesson in the Arts, Super Fan, Waflav); das normale Anlegen (ohne das Flag, Standard-Spielaktion/Ska) fragt nicht. Aufrufer, die die Karte
+    // schon aus Deck/Ablage geholt haben, fragen VORHER selbst (`abilityAnlegenDurchResistanceBlockiert`) und setzen `resistanzGeprueft`.
+    if (opts.skipAbilityGivenCheck && !opts.resistanzGeprueft
+        && await this.abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, opts.source)) return { success: false, blocked: true };
 
     const abZones = hps.abilityZones[heroIdx] || [[], [], []];
     hps.abilityZones[heroIdx] = abZones;
@@ -46519,8 +46550,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     const hero = ps.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    if (hs !== playerIdx && (this.heroSideOf(hs, hero) !== playerIdx
-        || !this.kontrollRechte(hs, heroIdx).abilities)) return false;
+    // ★ Welle 14 (Al, Q9): „nur ein permanent kontrollierter Held kann normal von der Hand als Standard-Spielaktion eine Ability bekommen - aber
+    // Attachments per Effekt können alle eigenen Heroes betreffen." → `opts.byEffect` (Pressed Skill & Co.): das Recht `abilities` entfällt, es genügt
+    // die Kontrolle (`heroSideOf`); ein Held ganz ohne Rechte (Charme Lv3, Love Shot: „unaffected") bleibt ausgenommen.
+    if (hs !== playerIdx) {
+      const _kr = this.kontrollRechte(hs, heroIdx);
+      const _darf = _kr.abilities || (opts.byEffect && (_kr.beschwoeren || _kr.ausruesten));
+      if (this.heroSideOf(hs, hero) !== playerIdx || !_darf) return false;
+    }
 
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     const script = loadCardEffect(cardName);
@@ -48961,7 +48998,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Fall through to death branch — death proceeds, then revive
           // handler downstream re-summons with on-summon hooks.
         } else {
-          const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type);
+          // ★ Welle 14 (Al, Q10, Cloud in a Bottle): eine Reaktion kann den TÖDLICHEN Betrag herabsetzen, ohne die Kreatur zu retten
+          // (`info.amountOverride`, die Reaktion setzt ihn in `creaturePreDefeatResolve`): reicht der neue Betrag weiter, stirbt sie trotzdem.
+          const _pdInfo = {};
+          const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type, _pdInfo);
+          if (!saved && Number.isFinite(_pdInfo.amountOverride) && _pdInfo.amountOverride >= 0 && _pdInfo.amountOverride < actualAmount) {
+            this.log('creature_pre_defeat_amount_override', { creature: e.inst.name, original: actualAmount, override: _pdInfo.amountOverride });
+            actualAmount = _pdInfo.amountOverride;
+          }
           if (saved) {
             // Saved by Bone Dog (or similar) — creature is back to full
             // HP and will not die this batch. Clear the dying flag so

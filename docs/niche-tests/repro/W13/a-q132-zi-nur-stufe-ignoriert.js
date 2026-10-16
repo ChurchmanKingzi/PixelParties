@@ -42,7 +42,7 @@ const H = require('../../lib/h.js');
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
 
-  R.section('(c) „Einmal pro Spiel" frei (Divine Gift): wirkt und stempelt — erst nach dem Commit, ein Abbruch lässt den Stempel frei (Q129)');
+  R.section('(c) „Einmal pro Spiel" frei (Divine Gift): wirkt und stempelt (Welle 14: der Guss ist unabbrechbar, daher kein Abbruch-Zweig mehr)');
   {
     const t = await mk('Divine Gift of Creation');
     t.script.push({ match: d => d.type === 'cardGalleryMulti' && d.title === 'Divine Gift of Creation', answer: d => ({ selectedCards: [(d.cards[0].name || d.cards[0])] }), once: true });
@@ -53,10 +53,13 @@ const H = require('../../lib/h.js');
   }
   {
     const t = await mk('Divine Gift of Creation');
-    t.script.push({ match: d => d.type === 'cardGalleryMulti' && d.title === 'Divine Gift of Creation', answer: () => null, once: true });
+    // ★ Welle 14 (Al, 16.10.2026: „Zis Spell soll unabbrechbar sein!"): umgestellt — die Galerie hat KEINEN Abbruch-Knopf mehr (Zi-Spieler unter Zwang);
+    //   gemeldet wird er nur dem, der die Wahl trifft. Der Stempel folgt dem Guss (kein Abbruch = Stempel gesetzt). Siehe W14/a-q4-zi-spell-unabbrechbar.js.
+    let zwang = null;
+    t.script.push({ match: d => d.type === 'cardGalleryMulti' && d.title === 'Divine Gift of Creation', answer: (d, pi, tt) => { zwang = tt.engine._promptsForceCommit(pi); return { selectedCards: [(d.cards[0].name || d.cards[0])] }; }, once: true });
     await go(t);
-    R.check('Abbruch der Divine-Gift-Galerie: Stempel bleibt FREI', !t.gs.players[0]._oncePerGameUsed?.has('divineGift'), [...(t.gs.players[0]._oncePerGameUsed || [])]);
-    R.check('Abbruch: keine Engine-Fehler', t.errors.length === 0, t.errors);
+    R.check('Suchgalerie unter Zwang (kein Abbruch möglich), Stempel gesetzt', zwang === true && t.gs.players[0]._oncePerGameUsed?.has('divineGift'), { zwang, st: [...(t.gs.players[0]._oncePerGameUsed || [])] });
+    R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
 
   R.section('(d) Spielbedingung nicht erfüllt: Call for Help (keine eigene Kreatur besiegt) und Guard Duty (Partie-Limit verbraucht) fizzeln');

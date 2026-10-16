@@ -366,7 +366,11 @@ module.exports = {
 
         // ── ④ Rha'Bi bekommt SOFORT seine 100 ────────────────────────
         const jetzt = rhabiVon(ctx);
-        if (jetzt?.name && jetzt.hp > 0) engine.increaseMaxHp(jetzt, ZUWACHS);
+        // ★ Welle 14 (Al, Q7 aus W13b): „Ja, die prallen auch ab." — der Zuwachs des eigenen Helden ist ein Nicht-Schaden-Effekt: Resistance blockt ihn.
+        if (jetzt?.name && jetzt.hp > 0
+            && !(await engine.heroNonDamageEffectBlocked(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: ZUWACHS }))) {
+          engine.increaseMaxHp(jetzt, ZUWACHS);
+        }
 
         zurueck++;
         engine.log('rhabi_return', {

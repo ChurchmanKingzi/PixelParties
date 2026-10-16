@@ -118,6 +118,8 @@ module.exports = {
         }
         const zone = engine.abilityZielZone(pi, heroIdx, top, { wunschZone: wunsch });
         if (zone >= 0 && oberste(engine, pi) === top) ziel = { heroIdx, zone };
+        // ★ Welle 14 (Al, Q5): Resistance blockt das Anlegen per Effekt — vor jeder Kartenbewegung; die Karte geht dann den „Otherwise"-Weg (oben/unten).
+        if (ziel && await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, ziel.heroIdx, CARD_NAME)) ziel = null;
       }
       if (ziel) {
         // Die Karte fliegt aus der Mitte in ihre Ability Zone; gebucht wird mit der Landung.
@@ -127,7 +129,7 @@ module.exports = {
         if (entnommen) {
           engine.handZugangSync(pi, top, { von: 'transit', source: CARD_NAME });   // Durchgang zur Anlage, keine Suche
           const res = await engine.attachAbilityFromHand(pi, top, ziel.heroIdx, {
-            skipAbilityGivenCheck: true, targetZoneSlot: ziel.zone, keinFlug: true,
+            skipAbilityGivenCheck: true, resistanzGeprueft: true, targetZoneSlot: ziel.zone, keinFlug: true,
           });
           if (res?.success) angelegtAn = ps.heroes[ziel.heroIdx]?.name || true;
           else engine.log('super_fan_fizzle', { player: ps.username, card: top });
