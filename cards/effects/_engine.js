@@ -45392,6 +45392,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return pi;
   }
 
+  /**
+   * Welle 14 (Q165, Al: „Nur die eine Kopie"): Die Stufenpruefung beim Ausspielen ist namensweit („spielbar, wenn IRGENDEINE
+   * Kopie es ist"), der Klick kann aber eine ANDERE Kopie als die gesenkte treffen (Client hebt je Name hervor, CPU nimmt die
+   * erste). Traegt die geklickte Kopie keinen befristeten Rabatt (`_handLevelOffsetsExpireTurn`, Divine Gift of Magic, Fiona),
+   * eine gleichnamige andere aber schon, wandert der Rabatt auf die gespielte Kopie — er wird damit genau einmal verbraucht
+   * und bleibt nicht auf einer uebrig gebliebenen Kopie stehen. Nach dem Gate, vor dem Hand-Splice aufrufen.
+   */
+  kopienRabattAufGespielteKopie(pi, cardName, handIndex) {
+    const ps = this.gs?.players?.[pi];
+    const ex = ps?._handLevelOffsetsExpireTurn, tm = ps?._handLevelOffsetsTransient;
+    if (!ex || !tm || !Number.isInteger(handIndex) || ps.hand?.[handIndex] !== cardName) return;
+    if (ex[handIndex] != null || (tm[handIndex] || 0) < 0) return;
+    const hf = ps._handLevelOffsetHeroFilter;
+    const j = Object.keys(ex).find(k => ps.hand[+k] === cardName && (tm[k] || 0) < 0 && !(hf && hf[k] != null));
+    if (j === undefined) return;
+    tm[handIndex] = tm[j]; ex[handIndex] = ex[j];
+    delete tm[j]; delete ex[j];
+  }
+
   /** `fn()` mit `gs._wirkerSeite` fuer einen geliehenen Helden (synchron). */
   _mitWirker(pi, heroIdx, heroOwner, fn) {
     if (heroOwner == null || heroOwner === pi) return fn();
