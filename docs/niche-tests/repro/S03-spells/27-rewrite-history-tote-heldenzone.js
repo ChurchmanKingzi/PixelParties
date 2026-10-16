@@ -5,6 +5,8 @@
 // Kontrolle: `doPlayCreature` in die Zone eines besiegten Helden ⇒ false.
 // Beobachtet: Rewrite History setzt die Kreatur in die Zone des toten Helden (`zoneFrei` prüft nur `hero.name`, nicht `hp > 0`).
 // Frage an Al: Soll „same Support Zone" auch dann gelten, wenn der Held dieser Zone besiegt ist? (ja / nein)
+// ★ Welle 14 (Q179, Al 16.10.2026): „Ja. Bei 'place' ist der Zustand des Heroes generell egal!" – dieses Repro prüft jetzt die NEUE Regel
+//   (vorher: Kreatur darf NICHT in die Zone des besiegten Helden).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -22,6 +24,6 @@ const H = require('../../lib/h.js');
   t.gs.players[0].heroes[0].hp = 0;
   t.script.push({ match: d => d.type === 'cardGallery', answer: (d) => ({ cardName: d.cards[0].name }) });
   const r = await t.play(0, 'Rewrite History', { hero: 1, noGrant: true });
-  R.check('Kreatur wird NICHT in die Zone des besiegten Helden gestellt', t.gs.players[0].supportZones[0][0].length === 0 && !(t.gs.players[0].supportZones[0][0] || []).includes('Lamenting Knight'), { r, zone: t.gs.players[0].supportZones[0] });
+  R.check('Kreatur wird in die Zone des besiegten Helden zurückgestellt (Welle 14: bei „place" ist der Heldenzustand egal)', r === true && t.gs.players[0].supportZones[0][0].includes('Lamenting Knight'), { r, zone: t.gs.players[0].supportZones[0] });
   R.finish();
 })();
