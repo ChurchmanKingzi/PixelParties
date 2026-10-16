@@ -54,7 +54,7 @@ function kandidaten(engine, pi, seite, heroIdx) {
   for (const besitzer of piles) {
     for (const name of (engine.gs.players[besitzer]?.discardPile || [])) {
       if (gesehen.has(name) || !istEquip(engine, name)) continue;
-      if (!istAusruestTraeger(engine, pi, heroIdx, name, seite)) continue;
+      if (!istAusruestTraeger(engine, pi, heroIdx, name, seite, besitzer)) continue;   // W14b (Q153): Control Device nur aus der Gegner-Ablage
       gesehen.add(name);
       out.push({ name, besitzer });
     }

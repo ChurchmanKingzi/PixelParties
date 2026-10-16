@@ -144,6 +144,7 @@ function _getBorrowableCreatures(engine, gs, pi, level) {
       // Effects-suppressed gate (same predicate the engine uses).
       const c = inst.counters || {};
       if (c.negated || c.nulled || c.frozen || c.stunned) continue;
+      if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152): Unwanted Audience sperrt den aktiven Effekt
 
       // Summoning sickness — same rule the standard HOPT path enforces.
       if (inst.turnPlayed === (gs.turn || 0)) continue;
@@ -215,6 +216,7 @@ function _getOwnSingableCreatures(engine, gs, pi, level) {
 
       const c = inst.counters || {};
       if (c.negated || c.nulled || c.frozen || c.stunned) continue;
+      if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152)
       if (inst.turnPlayed === (gs.turn || 0)) continue;
 
       let canActivate = true;
@@ -347,6 +349,7 @@ module.exports = {
     if (!stillThere || stillThere.zone !== 'support' || stillThere.faceDown) return false;
     const c = stillThere.counters || {};
     if (c.negated || c.nulled || c.frozen || c.stunned) return false;
+    if (engine.isCreatureActiveEffectLocked(stillThere)) return false;   // W14b (Q152)
 
     engine.log(picked.isOwn ? 'singing_megu_own' : 'singing_borrow', {
       player: gs.players[pi].username, hero: hero.name,

@@ -29,10 +29,12 @@
 //  • ★ DER DRITTE ZAUBER: nur bei Magic Arts 3 UND drei gewaehlten
 //    Karten. Angeboten werden nur Zauber, die der Nutzer auch WIRKLICH
 //    wirken kann (`heroMeetsLevelReq`) — der Text sagt „perform … with
-//    the user", nicht „regardless of its level". Die anderen zwei
-//    werden geloescht (Hand → Geloescht, mit Flug), dann laeuft der
-//    dritte ueber `_castSpellImmediately` — die Bruecke wirkt ihn OHNE
-//    Aktionskosten, genau das meint „as an additional Action".
+//    the user", nicht „regardless of its level". Der dritte laeuft ueber
+//    `_castSpellImmediately` — die Bruecke wirkt ihn OHNE Aktionskosten,
+//    genau das meint „as an additional Action". ★ W14b (Q159): die
+//    anderen zwei werden erst am Zusagepunkt des gewirkten Zaubers
+//    geloescht (Hand → Geloescht, mit Flug); bricht der Spieler dessen
+//    Zielwahl ab, bleiben alle drei Karten auf der Hand.
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -75,6 +77,23 @@ async function loescheAusHand(engine, pi, name) {
   const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'hand' && c.name === name);
   if (inst) engine._untrackCard(inst.id);
   await engine._delay(650);
+  if (!ps.deletedPile) ps.deletedPile = [];
+  engine.handKartenBesitzerPs(ps, name).deletedPile.push(name);   // W3/W5a: Stapel des permanenten Besitzers
+  engine.sync();
+  return true;
+}
+
+/** Wie `loescheAusHand`, aber synchron (feuert am Zusagepunkt mitten in der Aufloesung des gewirkten Zaubers). */
+function loescheAusHandSync(engine, pi, name) {
+  const ps = engine.gs.players[pi];
+  const idx = (ps.hand || []).indexOf(name);
+  if (idx < 0) return false;
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName: name, from: 'hand', to: 'deleted', fromHandIdx: idx,
+  });
+  engine.takeFromPileSync(ps, 'hand', idx);
+  const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'hand' && c.name === name);
+  if (inst) engine._untrackCard(inst.id);
   if (!ps.deletedPile) ps.deletedPile = [];
   engine.handKartenBesitzerPs(ps, name).deletedPile.push(name);   // W3/W5a: Stapel des permanenten Besitzers
   engine.sync();
@@ -198,19 +217,46 @@ module.exports = {
       const gewirkt = pick.cardName;
       if (!wirkbar.includes(gewirkt)) return;   // nur ein angebotener (wirkbarer) Zauber
 
-      // Die anderen zwei loeschen …
-      for (const name of geholt) {
-        if (name === gewirkt) continue;
-        await loescheAusHand(engine, pi, name);
-      }
+      // ★ W14b (Q159, Al: „Das Deleten soll erst passieren, nachdem der gewählte Spell komplett committed wurde; wird er abgebrochen,
+      // verbleiben die Karten auf der Hand."): die anderen zwei werden erst am ZUSAGEPUNKT des gewählten Zaubers gelöscht (erste bestätigte
+      // Antwort seiner Aufloesung, spätestens sein Ende — dieselbe Allgemeinregel wie Taio, Welle 13); Abbruch lässt alle drei Karten
+      // unberührt auf der Hand. Das Löschen ist dabei synchron (Flug-Ereignis, kein Warten), weil es mitten in einer Abfrage feuert.
+      const andere = geholt.filter(n => n !== gewirkt);
+      let committed = false;
+      const geloescht = [];   // [{ name, idx }] — fuer die Rueckgabe, falls der Guss NACH dem Zusagepunkt doch abbricht (CPU: Zusage sofort)
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        for (const name of andere) {
+          const idx = ps.hand.indexOf(name);
+          if (loescheAusHandSync(engine, pi, name)) geloescht.push({ name, idx });
+        }
+      };
+      const zusage = engine._zusageAuftrittVormerken(commit, pi);
       // … dann den dritten sofort wirken (ohne Aktionskosten).
       const handIdx = ps.hand.indexOf(gewirkt);
-      if (handIdx < 0) return;
+      if (handIdx < 0) { engine._zusageAuftrittVerwerfen(zusage); return; }
       engine.log('aurora_perform', { player: ps.username, card: gewirkt });
-      await engine._castSpellImmediately(pi, heroIdx, gewirkt, {
-        fromZone: 'hand', pool: ps.hand, poolIndex: handIdx, by: CARD_NAME,
-        alsZusatzaktion: true,   // v1352
-      });
+      let res = null;
+      try {
+        res = await engine._castSpellImmediately(pi, heroIdx, gewirkt, {
+          fromZone: 'hand', pool: ps.hand, poolIndex: handIdx, by: CARD_NAME,
+          alsZusatzaktion: true,   // v1352
+        });
+      } finally {
+        if (!res || res.cancelled) engine._zusageAuftrittVerwerfen(zusage); else engine._feuereZusageAuftritte(zusage);
+      }
+      // Abbruch NACH dem Zusagepunkt (CPU: sofort; Mensch: spaetere Stufe einer mehrstufigen Wahl): die zwei Zauber kommen zurueck auf die Hand.
+      if ((!res || res.cancelled) && committed) {
+        for (const g of geloescht.slice().reverse()) {
+          const dIdx = (ps.deletedPile || []).lastIndexOf(g.name);
+          if (dIdx < 0) continue;
+          engine.takeFromPileSync(ps, 'deleted', dIdx, { source: CARD_NAME });
+          engine.returnToPile(pi, 'hand', g.name, Math.min(g.idx, ps.hand.length));
+          engine._trackCard(g.name, pi, 'hand');
+        }
+        engine.sync();
+      }
       engine.sync();
     },
   },

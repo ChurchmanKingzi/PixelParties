@@ -359,6 +359,10 @@ const STATUS_EFFECTS = {
   // ausdruecklich „This counts as a negative status effect" — also
   // negativ und heilbar wie Stunned.
   frightened: { negative: true, cleansable: true, label: 'Frightened', icon: '😱', immuneKey: 'frighten_immune' },
+  // `active_locked` (W14b, Q152, Unwanted Audience; Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): eine KREATUR kann
+  // ihren AKTIVEN Effekt nicht aktivieren. Anders als `negated` ruht nichts anderes — Passive, Trigger und Reaktionen laufen weiter.
+  // Gelesen von `engine.isCreatureActiveEffectLocked` (Aktivierungs-Tor, Angebotsliste, CPU, Grimoire/Kohta-Wiederholung).
+  active_locked: { negative: true, cleansable: true, label: 'Active Effects Locked', icon: '🎭', immuneKey: 'negate_immune' },
   // `berserked` — applied by Berserk Attachment Spell. The bearer:
   //   • cannot cast Spells (gated in `validateActionPlay`'s Spell branch),
   //   • cannot summon Creatures (gated in `validateActionPlay`'s Creature branch),

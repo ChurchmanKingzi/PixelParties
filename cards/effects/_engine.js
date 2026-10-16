@@ -13167,8 +13167,29 @@ class GameEngine {
       }
       return rest;
     };
-    def('push', function (...items) { return Array.prototype.push.apply(this, filtern(items)); });
-    def('unshift', function (...items) { return Array.prototype.unshift.apply(this, filtern(items)); });
+    // ★ W14b (Q150): jede Karte, die WIRKLICH in die Ablage gelangt (nach der Root-Umleitung), wird gemeldet (`_ablageMeldung`).
+    def('push', function (...items) { const rest = filtern(items); const r = Array.prototype.push.apply(this, rest); engine._ablageMeldung(pi, rest); return r; });
+    def('unshift', function (...items) { const rest = filtern(items); const r = Array.prototype.unshift.apply(this, rest); engine._ablageMeldung(pi, rest); return r; });
+  }
+
+  /**
+   * ★ W14b (Q150, Al: Divine Gift of Time „soll auf alles reagieren können, was den Discard erreicht"): „WENN KARTEN IN DIE ABLAGE GESCHICKT
+   * WERDEN" — EINE Stelle (Gegenstück zu `_geloeschtMeldung` des Geloescht-Stapels). Alle Wege in die Ablage von `pi` laufen über `push`/`unshift`
+   * ihres Stapels (Mill, Abwurf, Kreaturentod, zerstörte Ausrüstung/Attachments, ausgelöste Surprises, gewirkte Zauber, Tränke, Artefakte …);
+   * Rückgaben (`returnToPile`, `splice`) zählen nicht. Hält der Spieler auf der Hand eine Karte, deren Skript `onCardsSentToDiscard(engine, pi, names)`
+   * trägt (Divine Gift of Time), wird sie benachrichtigt. Nicht in Bewertungsproben (`_fastMode`/`_inMctsSim`).
+   */
+  _ablageMeldung(pi, items) {
+    if (!items?.length || this._fastMode || this._inMctsSim) return;
+    const hand = this.gs.players[pi]?.hand;
+    if (!hand?.length) return;
+    for (const n of new Set(hand)) {
+      let script = null;
+      try { script = loadCardEffect(n); } catch { script = null; }
+      if (typeof script?.onCardsSentToDiscard !== 'function') continue;
+      try { script.onCardsSentToDiscard(this, pi, items.slice()); }
+      catch (err) { console.error(`[onCardsSentToDiscard] ${n}:`, err.message); }
+    }
   }
 
   /**
@@ -16337,14 +16358,35 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @returns {boolean}
    */
-  canEquipCardToHero(cardName, playerIdx, heroIdx) {
+  canEquipCardToHero(cardName, playerIdx, heroIdx, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     let script = null;
     try { script = loadCardEffect(cardName); } catch { script = null; }
+    // ★ W14b (Q153, Al: „Control Device soll NUR an gegnerische Heroes anlegbar sein!"): eine Ausrüstung mit `placesOnOpponentBoard` (Future Tech
+    // Control Device: „Equip this card to a Hero your opponent controls") darf nie an einen Helden, den der KARTENBESITZER kontrolliert.
+    // `opts.kartenBesitzer` = wem die Karte gehört (Stapel-/Handbesitzer), `opts.kontrolleur` = wer den Träger kontrolliert (Standard: die
+    // Brettseite `playerIdx`). Ohne Angabe gilt „eigener Held eigener Karte" ⇒ nicht erlaubt; so sind alle Stapel-/Effekt-Ausrüster (Looting,
+    // Weapon Collecting Wight, Riffel, Backpack, Bill, Dajan …) mit EINER Stelle abgedeckt. Looting aus der GEGNER-Ablage übergibt den
+    // Besitzer und bleibt erlaubt (der Nutzer ist dann der Gegner des Kartenbesitzers).
+    if (script?.placesOnOpponentBoard === true) {
+      const kontrolleur = opts.kontrolleur ?? playerIdx;
+      const besitzer = opts.kartenBesitzer ?? kontrolleur;
+      if (kontrolleur === besitzer) return false;
+    }
     if (typeof script?.canEquipToHero !== 'function') return true;
     try { return !!script.canEquipToHero(this.gs, playerIdx, heroIdx, this); }
     catch { return false; }
+  }
+
+  /**
+   * ★ W14b (Q153): `opts` für `canEquipCardToHero`, wenn eine schon LIEGENDE Ausrüstung `inst` umgehängt wird: eine Gegnerseiten-Ausrüstung
+   * (Control Device, `placesOnOpponentBoard`) liegt auf der Seite des Gegners ihres Besitzers (`originalOwner`, sonst der Gegner der Gastgeberseite)
+   * — sie darf weiter nur an Helden, die der Besitzer nicht kontrolliert. Andere Karten: `{}`.
+   */
+  ausruestOpts(inst) {
+    if (!inst || loadCardEffect(inst.counters?._effectOverride || inst.name)?.placesOnOpponentBoard !== true) return {};
+    return { kartenBesitzer: inst.originalOwner ?? this.opponentOf(inst.owner) };
   }
 
   /**
@@ -16383,7 +16425,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // werden"). Vorgelagerte Aufrufer sollten das schon im Auslöser
     // pruefen; hier steht der Riegel, damit kein Weg daran vorbeikommt.
     if (!opts.ignoreEquipRestriction
-        && !this.canEquipCardToHero(inst.name, toPlayerIdx, destHeroIdx)) {
+        && !this.canEquipCardToHero(inst.name, toPlayerIdx, destHeroIdx, this.ausruestOpts(inst))) {
       this.log('equip_transfer_blocked', {
         card: inst.name, hero: toPs.heroes?.[destHeroIdx]?.name,
         by: opts.sourceName || 'Transfer',
@@ -19563,6 +19605,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
     if (this._creatureNegationProof(inst)) return false;
     return true;
+  }
+
+  /**
+   * ★ W14b (Q152, Unwanted Audience; Al: „NUR aktive Effekte, passive Komponenten bleiben unberührt!"): ist der AKTIVE Effekt dieser Kreatur
+   * gesperrt (Status `active_locked`)? Gilt NUR für das Aktivieren (Aktivierungs-Tor in server.js, Angebotsliste/CPU über
+   * `creatureEffectScriptAllows`, Wiederholung durch Grimoire/Kohta); Passive laufen weiter. Der Status ist ein negativer Status:
+   * Lunatic-Immunität (`negative_status_immune`) hebt ihn auf, wie bei jedem anderen.
+   */
+  isCreatureActiveEffectLocked(inst) {
+    if (!inst?.counters?.active_locked) return false;
+    return !this._creatureNegStatusImmune(inst);
   }
 
   /**
@@ -26329,6 +26382,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.prepareCreatureEffect) return { ok: false, plan: null };
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return { ok: false, plan: null };
+    if (this.isCreatureActiveEffectLocked(inst)) return { ok: false, plan: null };   // W14b (Q152)
 
     const ctx = this._createContext(inst, {});
     ctx._isRetrigger = true;
@@ -26359,6 +26413,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
+    if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): auch geliehene Wiederholungen (Grimoire, Kohta) sind „aktivieren"
     // v748: „cannot be used another time for the rest of the turn in
     // ANY way" (Spirit of the Forbidden Grimoire). Die Marke sperrt
     // auch geschenkte Wiederholungen — Kohta kann einen so verbrauchten
@@ -28094,8 +28149,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('staff_illusion_return', { player: ps.username, creature: inst.name });
       this.sync();
       if (entry.oppDrawCount > 0 && !gs.result) {
-        await this.actionDrawCards(entry.opponent, entry.oppDrawCount, {});
-        this.log('illusion_opp_draw', { player: gs.players[entry.opponent]?.username, amount: entry.oppDrawCount });
+        // ★ W14b (Q162, Al: „Ja, soll er ablehnen können"): „your opponent MAY draw as many cards as the Creature's level" — der Gegner
+        // wird gefragt (Ja/Nein). Die CPU nimmt an, ausser ein Deck-Out droht (weniger Karten im Deck als zu ziehen sind;
+        // Skript-`cpuResponse` von Create Illusion, Titel = Kartenname).
+        const gegner = gs.players[entry.opponent];
+        const frage = await this.promptGeneric(entry.opponent, {
+          type: 'confirm',
+          title: entry.quelle || 'Create Illusion',
+          message: `${inst.name} returned to ${ps.username}'s deck. Draw ${entry.oppDrawCount} card${entry.oppDrawCount > 1 ? 's' : ''}?`,
+          showCard: entry.quelle || 'Create Illusion',
+          confirmLabel: `🎴 Draw ${entry.oppDrawCount}`,
+          cancelLabel: 'No',
+          cancellable: true,
+          illusionDraw: { count: entry.oppDrawCount, deckSize: (gegner?.mainDeck || []).length },
+        });
+        if (this._confirmSaidYes(frage)) {
+          await this.actionDrawCards(entry.opponent, entry.oppDrawCount, {});
+          this.log('illusion_opp_draw', { player: gegner?.username, amount: entry.oppDrawCount });
+        } else {
+          this.log('illusion_opp_draw_declined', { player: gegner?.username, amount: entry.oppDrawCount });
+        }
       }
     }
     gs._staffIllusions = bleibt.length ? bleibt : undefined;
@@ -32419,6 +32492,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return false;
     const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
     if (!script?.creatureEffect) return false;
+    if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): Unwanted Audience sperrt NUR den aktiven Effekt
     if (!script.canActivateCreatureEffect) return true;
     try {
       const ctx = this._createContext(inst, { event: 'canCreatureEffectCheck' });
@@ -37286,6 +37360,30 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!hadAoeFlag2) delete syntheticSource._isAoeCheck;
     }
     return null;
+  }
+
+  /**
+   * ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen wie Poisoned Well."): das „is hit by an Attack, Spell or Creature
+   * effect"-Fenster (Booby Trap, Toxic Trap …) für Zauber, die Helden NUR mit einem Status treffen (Poisoned Well, Iceage, Medusa's Curse):
+   * kein Schaden, also nie `dealDamageToTargets`. Öffnet dieselben Helden-Surprise-Fenster wie ein Flächenschlag (nichts wird „gewählt":
+   * „chosen by"-Surprises bleiben zu) VOR dem Status. Liefert das Ergebnis; `effectNegated` ⇒ der Aufrufer bricht ab (die Negierung ist
+   * bereits an Zauber/Quelle vermerkt). Die Vormerkungen werden hier wieder geräumt: es folgt kein Schadenstreffer, der sie verbraucht.
+   * @param {object} cardInst  die wirkende Zauberinstanz (`ctx.card`)
+   * @param {Array}  heroes    [{ owner (Brettseite), heroIdx }]
+   * @param {string} damageType Schulen-Tag des Zaubers ('decay_spell' …)
+   */
+  async statusHitSurpriseWindow(cardInst, heroes, damageType = 'decay_spell') {
+    if (!cardInst || !heroes?.length) return null;
+    const targets = heroes.map(h => ({
+      type: 'hero', owner: h.owner, heroIdx: h.heroIdx,
+      cardName: this.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name,
+    }));
+    try {
+      return await this.aoeSurpriseVorab(cardInst, targets, { damageType });
+    } finally {
+      for (const k of (this._aoeSurpriseKeys || [])) this.gs._surpriseCheckedHeroes?.delete(k);
+      this._aoeSurpriseKeys = null;
+    }
   }
 
   /**

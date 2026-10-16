@@ -6927,7 +6927,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "You can only activate 1 \"Divine Gift\" card per game.\nPlay this card immediately when 1 or more Creatures you control would take damage. Negate any damage those Creatures would take until the beginning of your next turn.",
+    "effect": "You can only activate 1 \"Divine Gift\" card per game.\nPlay this card immediately when 1 or more Creatures you control would take damage. Negate any damage Creatures you control would take until the beginning of your next turn.",
     "archetype": "",
     "setID": "PP DIB",
     "banned": "Banned",

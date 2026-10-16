@@ -51,6 +51,7 @@ function eligibleTargets(engine, pi, selfId) {
     const script = loadCardEffect(effectName);
     if (!script?.creatureEffect) continue;
     if (typeof script.onCreatureEffect !== 'function') continue;
+    if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152): Unwanted Audience sperrt den aktiven Effekt
     if (typeof script.canActivateCreatureEffect === 'function') {
       let activatable = false;
       try {

@@ -63,6 +63,10 @@ module.exports = {
 
       if (targets.length === 0) return;
 
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier.
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, targets.filter(t => t.type === 'hero'), 'decay_spell');
+      if (sr?.effectNegated) return;
+
       // Play purple water animation on all targets simultaneously
       for (const t of targets) {
         engine._broadcastEvent('play_zone_animation', {

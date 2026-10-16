@@ -78,7 +78,7 @@ function bewegbareKarten(engine, pi, nutzer, ziel) {
   if (engine.isSupportZoneLocked?.(ziel.seite, ziel.heroIdx, { cardName: CARD_NAME, via: 'move' })) return [];
   return engine.cardInstances
     .filter(c => c.zone === 'support' && c.owner === nutzer.seite && c.heroIdx === nutzer.heroIdx && c.zoneSlot >= 0 && c.zoneSlot <= 2)
-    .filter(c => verschiebbar(engine, c) && engine.canEquipCardToHero(c.name, ziel.seite, ziel.heroIdx))
+    .filter(c => verschiebbar(engine, c) && engine.canEquipCardToHero(c.name, ziel.seite, ziel.heroIdx, engine.ausruestOpts(c)))   // W14b (Q153)
     .sort((a, b) => a.zoneSlot - b.zoneSlot);
 }
 

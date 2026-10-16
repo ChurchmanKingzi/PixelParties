@@ -129,8 +129,8 @@ function zonenFuerAnhang(engine, pi, inst, art) {
     if (!hero?.name || hero.hp <= 0) continue;                                  // tote Helden: weder Equips noch Attachments
     if (engine.heroSideOf(pi, hero) !== pi) continue;                           // abgegebene Helden zählen nicht
     if (art === 'equip') {
-      if (!istAusruestTraeger(engine, pi, hi, inst.name)) continue;             // lebend, nicht Frozen, Basis-Zone frei, Kartenbeschränkung
-    } else if (!engine.canEquipCardToHero(inst.name, pi, hi)) continue;         // Kartenbeschränkung gilt auch für Anhängsel
+      if (!istAusruestTraeger(engine, pi, hi, inst.name, pi, engine.ausruestOpts(inst).kartenBesitzer ?? pi)) continue;             // lebend, nicht Frozen, Basis-Zone frei, Kartenbeschränkung (W14b Q153: Besitzer der liegenden Karte)
+    } else if (!engine.canEquipCardToHero(inst.name, pi, hi, engine.ausruestOpts(inst))) continue;         // Kartenbeschränkung gilt auch für Anhängsel
     if (engine.isSupportZoneLocked(pi, hi, { cardName: inst.name, via: 'move' })) continue;
     for (const si of freieBasisZonen(ps, hi, engine, pi)) {
       out.push({ owner: pi, heroIdx: hi, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });

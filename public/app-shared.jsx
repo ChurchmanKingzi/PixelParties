@@ -7844,6 +7844,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       duration: (() => { const r = restrundenFuer('magic_silenced', s.magic_silenced || c.magic_silenced); return r > 1 ? r : null; })(),   // v1163
     });
   }
+  // W14b (Q152, Unwanted Audience): nur der AKTIVE Effekt der Kreatur ist gesperrt, Passive laufen weiter.
+  if (c.active_locked) {
+    badges.push({
+      key: 'active_locked', icon: '🎭',
+      tooltip: 'Active Effects Locked: Cannot activate its active effects. Passive effects still work.' + dur(c.active_locked, 'active_locked'),
+      duration: (() => { const r = restrundenFuer('active_locked', c.active_locked); return r > 1 ? r : null; })(),
+    });
+  }
   // v879 (Howling in the Night): eigener Status, eigenes Abzeichen.
   // Gleiche Wirkung wie Magic Silenced, aber andere Quelle und Dauer —
   // im Spiel soll man beide auseinanderhalten koennen.

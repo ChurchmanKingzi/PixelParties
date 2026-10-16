@@ -8,10 +8,12 @@
 // Beobachtet: Die Galerie bietet sie an; sie liegt danach in der Support Zone von Held 0 des Wirkers; im nächsten Zug von Sitz 1 ist sie über die Cross-Side-Aktivierung nutzbar,
 //   d. h. der Gegner darf den Helden von Sitz 0 übernehmen („take control of this Hero"). Aus der Gegner-Ablage (Karte gehört dem Gegner) ist dieselbe Lage stimmig (Hero des Gegners des Kartenbesitzers) – nur der Weg aus der EIGENEN Ablage widerspricht dem Text.
 // Ursache (vermutet): `istAusruestTraeger` (_equip-shared.js ~64) kennt die Cross-Side-Klausel (`placesOnOpponentBoard`, future-tech-control-device.js) nicht; `looting.js kandidaten()` nimmt beide Ablagen ungeprüft.
+// ★ W14 (Q153, Al: „Control Device soll NUR an gegnerische Heroes anlegbar sein!"): NEUE Regel – aus der EIGENEN Ablage wird die Control Device nie angeboten. Damit Looting
+//   überhaupt angeboten wird (sonst gäbe es keinen legalen Kandidaten), liegt zusätzlich ein gewöhnliches Equip (Glass Sword) in der Ablage; das Repro prüft, dass nur dieses angeboten wird.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
-  const t = await H.fresh({ hand: [['Fireball', 'Looting'], []], hp: 800, discard: [['Future Tech Control Device'], []] });
+  const t = await H.fresh({ hand: [['Fireball', 'Looting'], []], hp: 800, discard: [['Future Tech Control Device', 'Glass Sword'], []] });
   t.hero(1, 2).hp = 100;
   t.setAbilities(0, 0, [['Destruction Magic'], ['Support Magic'], []]);
   t.grantFor(0, 0, 'Fireball'); t.grantFor(0, 0, 'Looting');

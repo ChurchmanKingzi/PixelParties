@@ -115,6 +115,10 @@ module.exports = {
         if (bestaetigt) dauer = DAUER_STARK;
       }
 
+      // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier.
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell');
+      if (sr?.effectNegated) return;
+
       // ── Der Blizzard ────────────────────────────────────────────
       engine._broadcastEvent('iceage_blizzard', { owner: pi, duration: dauer });
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });

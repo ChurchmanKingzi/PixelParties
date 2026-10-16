@@ -33,6 +33,12 @@
 //
 //  Play gate: opp must control 1+ Surprises (per
 //  the definition above) at play time.
+//
+//  ★ W14b (Q163, Al): NUR Karten mit Untertyp „Surprise" zählen. Eine per
+//  Create Secret Room verdeckt in die Surprise Zone gelegte Nicht-
+//  Surprise wird beim Wirken vorübergehend aufgedeckt (Bestätigung wie
+//  bei einer Suche, `deckSearchReveal` an den Detection-Nutzer) und
+//  bleibt verdeckt liegen — nicht entfernt, nicht gezählt.
 // ═══════════════════════════════════════════
 
 const { ZONES } = require('./_hooks');
@@ -46,6 +52,25 @@ const DRAW_PER_REMOVED = 2;
  * with subtype "Surprise" the opponent currently controls, irrespective
  * of face state or which zone it sits in.
  */
+/** ★ W14b (Q163): ist diese Karte eine Surprise im Sinne des Textes (Untertyp „Surprise")? */
+function _istSurprise(engine, cardName) {
+  return String(engine._getCardDB()[cardName]?.subtype || '').toLowerCase() === 'surprise';
+}
+
+/**
+ * ★ W14b (Q163, Al: „Nur Karten mit Subtype Surprise. Aber eine verdeckte Nicht-Surprise sollte vorübergehend aufgedeckt werden, der Gegner soll sie,
+ * wie eine Suche, bestätigen müssen, und dann wird sie wieder verdeckt."): verdeckte Nicht-Surprise-Karten in den Surprise Zones des Gegners
+ * (Create Secret Room). Sie zählen NICHT als Surprise (nicht entfernt, keine Karten gezogen), werden dem Spieler aber gezeigt.
+ */
+function _getOppHiddenNonSurprises(engine, oppIdx) {
+  const out = [];
+  for (const e of engine._getAllSurpriseEntries(oppIdx)) {
+    if (e.isBakhmSlot) continue;
+    if (!_istSurprise(engine, e.cardName)) out.push({ cardName: e.cardName, heroIdx: e.heroIdx, seite: e.seite ?? oppIdx });
+  }
+  return out;
+}
+
 function _getOppSurprises(engine, oppIdx) {
   const gs = engine.gs;
   const ps = gs.players[oppIdx];
@@ -62,6 +87,7 @@ function _getOppSurprises(engine, oppIdx) {
     const seite = e.seite ?? oppIdx;
     const hi = e.heroIdx;
     const cardName = e.cardName;
+    if (!_istSurprise(engine, cardName)) continue;   // W14b (Q163): nur Karten mit Untertyp Surprise (eine per Create Secret Room versteckte Fireball ist keine)
     const inst = engine.cardInstances.find(c =>
       c.owner === seite && c.zone === ZONES.SURPRISE
       && c.heroIdx === hi && c.name === cardName
@@ -132,6 +158,19 @@ module.exports = {
       // etc.). If opp now has zero Surprises, fizzle back to hand.
       const surprises = _getOppSurprises(engine, oppIdx);
       if (surprises.length === 0) { gs._spellCancelled = true; return; }
+
+      // ★ W14b (Q163): verdeckte Nicht-Surprise-Karten in den Surprise Zones des Gegners werden dem Spieler wie bei einer Suche gezeigt (er bestätigt)
+      // und bleiben danach verdeckt liegen — sie werden weder entfernt noch gezählt.
+      for (const v of _getOppHiddenNonSurprises(engine, oppIdx)) {
+        engine.log('detection_peek', { player: ps.username, hero: gs.players[v.seite]?.heroes?.[v.heroIdx]?.name });
+        await engine.promptGeneric(pi, {
+          type: 'deckSearchReveal',
+          cardName: v.cardName,
+          searcherName: ops.username || 'Opponent',
+          title: CARD_NAME,
+          cancellable: false,
+        });
+      }
 
       // Defending the Gate covers Support-Zone removals; trigger once
       // up front if any of our targets live in opp Support Zones.

@@ -110,6 +110,7 @@ module.exports = {
 
       const script = loadCardEffect(summoned.name);
       if (!script?.creatureEffect || !script?.onCreatureEffect) return;
+      if (engine.isCreatureActiveEffectLocked(summoned)) return;   // W14b (Q152): Unwanted Audience
 
       // Eigene Bedingung der Kreatur beachten.
       if (typeof script.canActivateCreatureEffect === 'function') {
