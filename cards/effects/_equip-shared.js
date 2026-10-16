@@ -61,7 +61,7 @@ function freieBasisZonen(ps, heroIdx, engine = null, pi = null) {
  * `ausruesten` erlaubt (`engine.darfFremdAusruesten`); ein an den Gegner
  * abgegebener eigener Held nicht.
  */
-function istAusruestTraeger(engine, pi, heroIdx, cardName, seite = pi) {
+function istAusruestTraeger(engine, pi, heroIdx, cardName, seite = pi, kartenBesitzer = pi) {
   const ps = engine.gs.players[seite];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
@@ -72,7 +72,9 @@ function istAusruestTraeger(engine, pi, heroIdx, cardName, seite = pi) {
     if (engine.heroSideOf && engine.heroSideOf(pi, hero) !== pi) return false;
   }
   if (freieBasisZonen(ps, heroIdx, engine, seite).length === 0) return false;
-  return engine.canEquipCardToHero(cardName, seite, heroIdx);
+  // W14b (Q153): `kartenBesitzer` = wem die Karte gehoert (Looting aus der Gegner-Ablage: der Gegner); `pi` kontrolliert den Traeger.
+  // Gegnerseiten-Ausruestung (Control Device) nur an Helden, die der Kartenbesitzer NICHT kontrolliert.
+  return engine.canEquipCardToHero(cardName, seite, heroIdx, { kartenBesitzer, kontrolleur: pi });
 }
 
 /** Alle eigenen Helden, die `cardName` tragen koennen. */
@@ -154,12 +156,11 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   // Die Karte liegt dort, gehoert aber `pi` (`originalOwner`).
   const seite = (isSeat(engine, opts.seite)) ? opts.seite : pi;
   const zps = engine.gs.players[seite];
-  if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite)) return null;
-  if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
-
   // 12.10. (Looting, „from either discard pile"): `opts.stapelBesitzer` = wessen Stapel die Karte hergibt (Standard: `pi`). Die Karte gehoert dem Deck, aus dem sie
   // stammt (`originalOwner`), und landet spaeter wieder in DESSEN Ablage.
   const stapelBesitzer = (isSeat(engine, opts.stapelBesitzer)) ? opts.stapelBesitzer : pi;
+  if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite, stapelBesitzer)) return null;
+  if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
   const genommen = await engine.takeFromPile(engine.gs.players[stapelBesitzer], stapel, cardName,
     { source: opts.source, ...(stapelBesitzer !== pi ? { sourceOwner: pi } : {}) });
   if (!genommen) return null;

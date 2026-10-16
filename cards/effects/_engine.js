@@ -16333,14 +16333,35 @@ this._deathWatch = (this._deathWatchStack || []).length
    *
    * @returns {boolean}
    */
-  canEquipCardToHero(cardName, playerIdx, heroIdx) {
+  canEquipCardToHero(cardName, playerIdx, heroIdx, opts = {}) {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     let script = null;
     try { script = loadCardEffect(cardName); } catch { script = null; }
+    // ★ W14b (Q153, Al: „Control Device soll NUR an gegnerische Heroes anlegbar sein!"): eine Ausrüstung mit `placesOnOpponentBoard` (Future Tech
+    // Control Device: „Equip this card to a Hero your opponent controls") darf nie an einen Helden, den der KARTENBESITZER kontrolliert.
+    // `opts.kartenBesitzer` = wem die Karte gehört (Stapel-/Handbesitzer), `opts.kontrolleur` = wer den Träger kontrolliert (Standard: die
+    // Brettseite `playerIdx`). Ohne Angabe gilt „eigener Held eigener Karte" ⇒ nicht erlaubt; so sind alle Stapel-/Effekt-Ausrüster (Looting,
+    // Weapon Collecting Wight, Riffel, Backpack, Bill, Dajan …) mit EINER Stelle abgedeckt. Looting aus der GEGNER-Ablage übergibt den
+    // Besitzer und bleibt erlaubt (der Nutzer ist dann der Gegner des Kartenbesitzers).
+    if (script?.placesOnOpponentBoard === true) {
+      const kontrolleur = opts.kontrolleur ?? playerIdx;
+      const besitzer = opts.kartenBesitzer ?? kontrolleur;
+      if (kontrolleur === besitzer) return false;
+    }
     if (typeof script?.canEquipToHero !== 'function') return true;
     try { return !!script.canEquipToHero(this.gs, playerIdx, heroIdx, this); }
     catch { return false; }
+  }
+
+  /**
+   * ★ W14b (Q153): `opts` für `canEquipCardToHero`, wenn eine schon LIEGENDE Ausrüstung `inst` umgehängt wird: eine Gegnerseiten-Ausrüstung
+   * (Control Device, `placesOnOpponentBoard`) liegt auf der Seite des Gegners ihres Besitzers (`originalOwner`, sonst der Gegner der Gastgeberseite)
+   * — sie darf weiter nur an Helden, die der Besitzer nicht kontrolliert. Andere Karten: `{}`.
+   */
+  ausruestOpts(inst) {
+    if (!inst || loadCardEffect(inst.counters?._effectOverride || inst.name)?.placesOnOpponentBoard !== true) return {};
+    return { kartenBesitzer: inst.originalOwner ?? this.opponentOf(inst.owner) };
   }
 
   /**
@@ -16379,7 +16400,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // werden"). Vorgelagerte Aufrufer sollten das schon im Auslöser
     // pruefen; hier steht der Riegel, damit kein Weg daran vorbeikommt.
     if (!opts.ignoreEquipRestriction
-        && !this.canEquipCardToHero(inst.name, toPlayerIdx, destHeroIdx)) {
+        && !this.canEquipCardToHero(inst.name, toPlayerIdx, destHeroIdx, this.ausruestOpts(inst))) {
       this.log('equip_transfer_blocked', {
         card: inst.name, hero: toPs.heroes?.[destHeroIdx]?.name,
         by: opts.sourceName || 'Transfer',
