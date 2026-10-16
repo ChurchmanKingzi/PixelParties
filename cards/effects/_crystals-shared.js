@@ -124,6 +124,19 @@ function refreshWeakeningCrystalNegation(engine, opts = {}) {
       if (hasCrystal) {
         if (!opts.reapply) continue;               // nur aufraeumen
         if (engine.heroIgnoresHaltStatuses?.(pi, ps.heroes.indexOf(hero))) continue;   // W12 (Al, Q114): Karian wird nie durch Negation gehindert
+        // ★ Welle 14 (Al, Q11 aus W13c / A08-28): „Immunität gegen jeden Status negiert auch Crystal." — „This counts as a negative status effect":
+        // ein Held mit ZUSTANDS-Immunität gegen negative Status (Petrification Break am Träger, `negative_status_immune`-Buff [Divine Gift of
+        // Coolness], Light Ball, Einzel-Immunität `negate_immune`) bekommt die Negation gar nicht erst.
+        // Karian ist weiterhin über `heroIgnoresHaltStatuses` oben ausgenommen. Bewusst NICHT geprüft: Anfangsschutz (`shielded`, gilt gegen den
+        // Gegner), CC-`immune` (kurzlebig), Submerged und Johannas Schutz (ihr laufendes Passiv ruht, sobald derselbe Kristall sie negiert —
+        // die Prüfung hinge von der Heldenreihenfolge ab).
+        {
+          const hi = ps.heroes.indexOf(hero);
+          if (engine.heroHasStatusImmunityAttachment?.(pi, hi)
+              || hero.buffs?.negative_status_immune
+              || hero.statuses?.negate_immune
+              || engine._lightBallProtects?.(pi, 'hero', hi)) continue;
+        }
         const cur = hero.statuses?.negated;
         // Ein FREMDES `negated` nicht ueberschreiben.
         if (cur && cur._byWeakeningCrystal !== true) continue;
