@@ -25,6 +25,13 @@ const { isSummonablePileCreature, hasCardType } = require('./_hooks');
 const CARD_NAME = 'Create Illusion';
 
 module.exports = {
+  // ★ W14b (Q162, Al: „Ja, soll er ablehnen können"): die Ja/Nein-Frage „your opponent MAY draw …" (Engine `_illusionenZurueck`) geht an den GEGNER.
+  // CPU: annehmen, ausser ein Deck-Out droht (weniger Karten im Deck als zu ziehen). Titel der Frage = Kartenname.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'confirm' || !promptData.illusionDraw) return undefined;
+    const { count, deckSize } = promptData.illusionDraw;
+    return { confirmed: deckSize >= count };
+  },
   inherentAction: true,
   cpuMeta: { scalesWithSchool: 'Magic Arts' },
 

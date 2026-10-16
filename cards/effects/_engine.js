@@ -28124,8 +28124,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('staff_illusion_return', { player: ps.username, creature: inst.name });
       this.sync();
       if (entry.oppDrawCount > 0 && !gs.result) {
-        await this.actionDrawCards(entry.opponent, entry.oppDrawCount, {});
-        this.log('illusion_opp_draw', { player: gs.players[entry.opponent]?.username, amount: entry.oppDrawCount });
+        // ★ W14b (Q162, Al: „Ja, soll er ablehnen können"): „your opponent MAY draw as many cards as the Creature's level" — der Gegner
+        // wird gefragt (Ja/Nein). Die CPU nimmt an, ausser ein Deck-Out droht (weniger Karten im Deck als zu ziehen sind;
+        // Skript-`cpuResponse` von Create Illusion, Titel = Kartenname).
+        const gegner = gs.players[entry.opponent];
+        const frage = await this.promptGeneric(entry.opponent, {
+          type: 'confirm',
+          title: entry.quelle || 'Create Illusion',
+          message: `${inst.name} returned to ${ps.username}'s deck. Draw ${entry.oppDrawCount} card${entry.oppDrawCount > 1 ? 's' : ''}?`,
+          showCard: entry.quelle || 'Create Illusion',
+          confirmLabel: `🎴 Draw ${entry.oppDrawCount}`,
+          cancelLabel: 'No',
+          cancellable: true,
+          illusionDraw: { count: entry.oppDrawCount, deckSize: (gegner?.mainDeck || []).length },
+        });
+        if (this._confirmSaidYes(frage)) {
+          await this.actionDrawCards(entry.opponent, entry.oppDrawCount, {});
+          this.log('illusion_opp_draw', { player: gegner?.username, amount: entry.oppDrawCount });
+        } else {
+          this.log('illusion_opp_draw_declined', { player: gegner?.username, amount: entry.oppDrawCount });
+        }
       }
     }
     gs._staffIllusions = bleibt.length ? bleibt : undefined;
