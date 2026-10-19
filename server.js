@@ -4726,6 +4726,9 @@ function sendGameState(room, playerIdx, extra) {
         if (inst && inst.knownToOpponent) return cn;
         // 29.9.: eigene Karte auf der Gegenseite (geliehener Held, Trapping)
         if (inst && inst.originalOwner === playerIdx) return cn;
+        // W19b (Al, 19.10.): „diese muss der Gegner, wenn er die Kontrolle uebernimmt, sehen koennen" — solange `playerIdx` den Helden
+        // (Charme, Paraseed, Styx, FTCD …) kontrolliert, sieht er dessen verdeckte Surprise. Keine Live-Anzeige danach: ohne Kontrolle wieder '?'.
+        if (inst && room.engine?._surpriseKontrolleurRoh?.(pi, hi) === playerIdx) return cn;
         return '?';
       })),
       surpriseFaceDown: ps.surpriseZones.map((sz, hi) => {
@@ -4736,7 +4739,8 @@ function sendGameState(room, playerIdx, extra) {
       surpriseKnown: ps.surpriseZones.map((sz, hi) => {
         if (!sz || sz.length === 0) return false;
         const inst = room.engine?.cardInstances.find(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === sz[0]);
-        return !!(inst && inst.faceDown && inst.knownToOpponent);
+        // W19b: dem Kontrolleur des Helden ist die verdeckte Surprise „bekannt“ (halbtransparent aufgedeckt, solange er ihn kontrolliert)
+        return !!(inst && inst.faceDown && (inst.knownToOpponent || (pi !== playerIdx && room.engine?._surpriseKontrolleurRoh?.(pi, hi) === playerIdx)));
       }),
       // Effective per-Surprise level after board-wide reductions
       // (Spider Hive's `globalReduceCardLevel`, any future "reduce
@@ -4758,7 +4762,7 @@ function sendGameState(room, playerIdx, extra) {
         if (pi !== playerIdx && !gs.isPuzzle) {
           const inst = room.engine?.cardInstances.find(c =>
             c.owner === pi && c.zone === 'surprise' && c.heroIdx === hi && c.name === name);
-          if (inst?.faceDown && !inst?.knownToOpponent) return null;
+          if (inst?.faceDown && !inst?.knownToOpponent && room.engine?._surpriseKontrolleurRoh?.(pi, hi) !== playerIdx) return null;   // W19b: der Kontrolleur sieht sie
         }
         try { return room.engine.effectiveCardLevel(cd, pi); }
         catch { return null; }
