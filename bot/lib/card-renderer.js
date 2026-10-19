@@ -143,10 +143,10 @@ function cropScore(art, rect) {
 
 /**
  * Ein zufälliger, aber abwechslungsreicher quadratischer Ausschnitt der Kartenkunst (nie nur Himmel oder Einheitsfläche):
- * von `tries` Kandidaten gewinnt der mit dem meisten Kontrast. Größe = `fraction` der kürzeren Bildseite (Pixel-Art 76×51 → ca. 18×18).
+ * von `tries` Kandidaten gewinnt der mit dem meisten Kontrast. Größe = `fraction` der kürzeren Bildseite (Pixel-Art 76×51 → Start 8×8).
  * @returns {Promise<{x:number,y:number,w:number,h:number}|null>} Koordinaten im Kunstbild
  */
-async function pickArtCrop(name, { rng = Math.random, fraction = 0.36, tries = 14 } = {}) {
+async function pickArtCrop(name, { rng = Math.random, fraction = 0.16, tries = 24 } = {}) {
   const art = await artOf(name);
   if (!art) return null;
   const size = Math.max(8, Math.round(Math.min(art.sw, art.sh) * fraction));
@@ -157,6 +157,12 @@ async function pickArtCrop(name, { rng = Math.random, fraction = 0.36, tries = 1
     if (!best || score > best.score) best = { rect, score };
   }
   return best.rect;
+}
+
+/** Breite und Höhe der Kunst in Bildpunkten (null, wenn es keine gibt). */
+async function artSize(name) {
+  const a = await artOf(name);
+  return a ? { w: a.sw, h: a.sh } : null;
 }
 
 /** Den Ausschnitt als PNG (`px`×`px`); Pixel-Art wird ohne Glättung vergrößert. */
@@ -178,4 +184,4 @@ async function reload() {
   return init();
 }
 
-module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt, pickArtCrop, renderArtCrop };
+module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt, pickArtCrop, renderArtCrop, artSize };

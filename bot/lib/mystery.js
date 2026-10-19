@@ -70,4 +70,22 @@ function eligibleCards(cards, hasArt, recentNames = []) {
   return fresh.length ? fresh : pool;
 }
 
-module.exports = { judgeGuess, reward, berlinDay, nextBerlinMidnightSec, dayState, eligibleCards, MIN_GUESS_LEN };
+// ── Ausschnitt: klein beginnen, mit jedem falschen Tipp (von irgendwem) etwas größer ──
+// Größen als Anteil der kürzeren Bildseite (Pixel-Art 76×51 → Start 8 Bildpunkte, +1 je falschem Tipp, höchstens 31).
+const CROP_START = 0.16, CROP_STEP = 0.02, CROP_MAX = 0.6, CROP_MIN_PX = 6;
+
+/** Kantenlänge (Bildpunkte der Kunst) nach `wrong` falschen Tipps. */
+function cropSize(artW, artH, wrong = 0) {
+  const m = Math.min(artW, artH);
+  const start = Math.max(CROP_MIN_PX, Math.round(m * CROP_START));
+  const step = Math.max(1, Math.round(m * CROP_STEP));
+  return Math.min(Math.max(start, Math.round(m * CROP_MAX)), start + step * Math.max(0, wrong));
+}
+
+/** Quadrat der Kantenlänge `size` um `center` (Bildpunkte der Kunst), am Bildrand nach innen geschoben — der Mittelpunkt bleibt, soweit es geht. */
+function cropRect(artW, artH, center, size) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  return { x: clamp(Math.round(center.x - size / 2), 0, artW - size), y: clamp(Math.round(center.y - size / 2), 0, artH - size), w: size, h: size };
+}
+
+module.exports = { judgeGuess, reward, cropSize, cropRect, CROP_START, berlinDay, nextBerlinMidnightSec, dayState, eligibleCards, MIN_GUESS_LEN };

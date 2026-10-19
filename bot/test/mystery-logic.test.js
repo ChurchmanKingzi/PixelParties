@@ -62,3 +62,22 @@ test('Kartenauswahl: nur mit Kunst, keine Token, möglichst nicht die letzten', 
   assert.deepEqual(m.eligibleCards(cards, has, ['A']).map(c => c.name), ['C']);
   assert.deepEqual(m.eligibleCards(cards, has, ['A', 'C']).map(c => c.name), ['A', 'C'], 'sind alle zuletzt dran, gilt wieder der ganze Vorrat');
 });
+
+test('Ausschnitt: klein beginnen, +1 je falschem Tipp, nach oben begrenzt; am Rand nach innen geschoben', () => {
+  // Pixel-Art 76×51: Start 8, Schritt 1, Obergrenze 31
+  assert.equal(m.cropSize(76, 51, 0), 8);
+  assert.equal(m.cropSize(76, 51, 1), 9);
+  assert.equal(m.cropSize(76, 51, 5), 13);
+  assert.equal(m.cropSize(76, 51, 500), 31);
+  assert.ok(m.cropSize(76, 51, 0) < 18, 'deutlich kleiner als vorher (18)');
+  // Vollbild-Kunst: proportional
+  assert.equal(m.cropSize(750, 1050, 0), 120);
+  assert.equal(m.cropSize(750, 1050, 1), 135);
+  // nie kleiner als 6, auch bei winzigem Bild
+  assert.equal(m.cropSize(20, 20, 0), 6);
+  // Lage: Mittelpunkt bleibt, am Rand wird nach innen geschoben, nie außerhalb
+  assert.deepEqual(m.cropRect(76, 51, { x: 40, y: 25 }, 8), { x: 36, y: 21, w: 8, h: 8 });
+  assert.deepEqual(m.cropRect(76, 51, { x: 40, y: 25 }, 10), { x: 35, y: 20, w: 10, h: 10 });
+  assert.deepEqual(m.cropRect(76, 51, { x: 2, y: 2 }, 12), { x: 0, y: 0, w: 12, h: 12 });
+  assert.deepEqual(m.cropRect(76, 51, { x: 75, y: 50 }, 12), { x: 64, y: 39, w: 12, h: 12 });
+});

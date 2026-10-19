@@ -62,7 +62,7 @@ test('nur im Rätsel-Kanal; ohne Rätsel erzeugt !mystery eines (Ausschnitt als 
   assert.equal(img.width, 384);
   assert.equal((await w.db.kvGet('mystery_day')).count, 1);
   const cur = await w.current();
-  assert.ok(cur.card && cur.crop.w >= 8);
+  assert.ok(cur.card && cur.center && Number.isFinite(cur.center.x));
   // erneutes !mystery zeigt DASSELBE Rätsel, zählt nicht neu
   await w.say('100000000000000002', '!mystery');
   assert.equal((await w.current()).card, cur.card);
@@ -197,4 +197,49 @@ test('Ausschnitte: klein, aus der Kunst, abwechslungsreich und reproduzierbar (f
     assert.ok(r && r.x >= 0 && r.y >= 0, c.name);
     assert.ok(isPng(await renderer.renderArtCrop(c.name, r)), c.name);
   }
+});
+
+test('Ausschnitt startet klein und wird mit JEDEM falschen Tipp (egal von wem) um einen Bildpunkt größer — gleicher Mittelpunkt, neues Bild sofort', async () => {
+  const w = await world();
+  await w.say('100000000000000001', '!mystery');
+  const cur0 = await w.current();
+  const art = await renderer.artSize(cur0.card);
+  const start = await w.ctx._mystery.rectFor(cur0);
+  assert.equal(start.w, start.h);
+  assert.ok(start.w < Math.min(art.w, art.h) * 0.2, `Start klein: ${start.w} von ${art.w}x${art.h}`);
+
+  const wrongs = renderer.allCards().filter(c => c.name !== cur0.card && renderer.hasArt(c.name) && !/token/i.test(c.cardType)).slice(10, 14).map(c => c.name);
+  const users = ['100000000000000001', '100000000000000002', '100000000000000003', '100000000000000001'];
+  let prev = start;
+  for (let i = 0; i < wrongs.length; i++) {
+    await new Promise(r => setTimeout(r, 1600));
+    const msg = await w.say(users[i], '!guess ' + wrongs[i]);
+    assert.match(msg.replies[0].content, /❌/);
+    assert.ok(isPng(msg.replies[0].files[0].attachment), 'neues Bild gleich dabei');
+    const rect = await w.ctx._mystery.rectFor(await w.current());
+    assert.equal(rect.w, prev.w + Math.max(1, Math.round(Math.min(art.w, art.h) * 0.02)), 'minimal größer: +1 Bildpunkt');
+    // Mittelpunkt bleibt (außer am Bildrand)
+    const c0 = { x: start.x + start.w / 2, y: start.y + start.h / 2 }, c1 = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+    if (start.x > 4 && start.y > 4 && rect.x + rect.w < art.w - 1 && rect.y + rect.h < art.h - 1) assert.ok(Math.abs(c0.x - c1.x) <= 1 && Math.abs(c0.y - c1.y) <= 1);
+    prev = rect;
+  }
+  // doppelte, unbekannte und mehrdeutige Tipps lassen das Bild unverändert
+  await new Promise(r => setTimeout(r, 1600));
+  await w.say('100000000000000002', '!guess ' + wrongs[0]);
+  await new Promise(r => setTimeout(r, 1600));
+  await w.say('100000000000000002', '!guess qzxwvkjq');
+  assert.deepEqual(await w.ctx._mystery.rectFor(await w.current()), prev);
+  // !mystery zeigt die aktuelle (vergrößerte) Fassung
+  const again = await w.say('100000000000000002', '!mystery');
+  assert.match(again.replies[0].content, /zooms out a little with every wrong guess/);
+  assert.ok(isPng(again.replies[0].files[0].attachment));
+});
+
+test('Rätsel aus der Vorversion (crop-Rechteck statt center) laufen weiter', async () => {
+  const w = await world();
+  await w.say('100000000000000001', '!mystery');
+  const cur = await w.current();
+  const old = { card: cur.card, crop: { x: 20, y: 10, w: 18, h: 18 }, number: 1, guesses: {}, tried: [], createdAt: 1 };
+  const r = await w.ctx._mystery.rectFor(old);
+  assert.ok(r && r.w >= 6 && r.x >= 0);
 });
