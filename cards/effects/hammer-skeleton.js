@@ -35,7 +35,9 @@ function collectTargets(engine) {
     if (!cd) continue;
     if (cd.cardType !== 'Spell') continue;
     const sub = (cd.subtype || '').toLowerCase();
-    if (inst.zone === 'support' && sub === 'attachment') {
+    // W16c (A05-24): jeder Spell in einer Support Zone IST an den Helden angehaengt - nicht nur Subtyp 'Attachment', auch angehaengte
+    // Surprises (Crimson Web: "attach this card to the attacker", Subtyp 'Surprise').
+    if (inst.zone === 'support' && sub !== 'area') {
       targets.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',
