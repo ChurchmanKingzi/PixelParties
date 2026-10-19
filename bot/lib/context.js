@@ -46,7 +46,10 @@ function createContext({ client, config, db, game }) {
       const m = /^(\S+)(?:\s+([\s\S]*))?$/.exec(msg.content.slice(config.prefix.length));
       const entry = m && commands.get(m[1].toLowerCase());
       if (entry) {
-        if (!msg.member) msg.member = await msg.guild.members.fetch(msg.author.id).catch(() => null);
+        if (!msg.member) {   // Message#member ist nur lesbar → auf der Instanz überschreiben
+          const fetched = await msg.guild.members.fetch(msg.author.id).catch(() => null);
+          Object.defineProperty(msg, 'member', { value: fetched, configurable: true });
+        }
         if (entry.staff && !helpers.isStaff(msg.member)) {
           return void msg.reply('Only **Creator** and **Deputy Monia [MOD]** can use that command.');
         }

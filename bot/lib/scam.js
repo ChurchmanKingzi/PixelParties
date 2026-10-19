@@ -35,7 +35,8 @@ function isNewMember(joinedTimestamp, now = Date.now(), days = 183) {
 /** Domains aus Text ziehen (klein, ohne www.). */
 function domainsIn(text) {
   const out = new Set();
-  const re = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?::\d+)?(?:[\/?#]|$|\s|>)/gi;
+  // Ende der Domain = nächstes Zeichen, das nicht zu einem Hostnamen gehört (auch „)“ eines Markdown-Links, „,“ „!“ …)
+  const re = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?![a-z0-9-])/gi;
   const s = String(text || '').replace(/[|*_~`]/g, '');
   let m;
   while ((m = re.exec(s))) out.add(m[1].toLowerCase().replace(/^www\./, ''));

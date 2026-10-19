@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Collection } = require('discord.js');
-const { role, member, guild, message, setup } = require('./helpers');
+const { role, member, guild, message, setup, adoptRoles } = require('./helpers');
 
 const creator = role('R_CREATOR', 'Creator');
 const deputy = role('R_DEP', 'Deputy Monia [MOD]');
@@ -204,9 +204,11 @@ test('Rollenabgleich: Rang nach Elo, Skin Collector ab 50, Entzug bei Abstieg', 
   const { ctx } = await setup({ linked: async () => ({ users: [view] }) });
   const m = member({ id: view.discordId });
   const g = guild({ roles, members: [m] });
+  assert.deepEqual(await ctx._account.syncMember(g, view), { added: [], removed: [] }, 'ohne !setupRoles fasst der Bot nichts an');
+  await adoptRoles(ctx, g, member({ id: '900000000000000099', roles: [creator] }));
 
-  const r1 = await ctx._account.syncMember(g, view);
-  assert.deepEqual(r1.added.sort(), ['Gold', 'Skin Collector']);
+  await new Promise(r => setTimeout(r, 30));   // !setupRoles gleicht im Hintergrund sofort ab
+  assert.deepEqual([...m.roles.cache.values()].map(x => x.name).sort(), ['Gold', 'Skin Collector']);
   assert.deepEqual(m.calls.rolesRemoved, []);
 
   view.elo = 1810; view.skins = 49;
@@ -227,6 +229,7 @@ test('Rollenabgleich: fremde Rollen bleiben unberührt, Rollen über dem Bot wer
   const { ctx } = await setup();
   const m = member({ id: view.discordId, roles: [other] });
   const g = guild({ roles: [other, bronzeHigh, silver], members: [m] });
+  await adoptRoles(ctx, g, member({ id: '900000000000000098', roles: [creator] }));
   const r = await ctx._account.syncMember(g, view);
   assert.deepEqual(r.added, ['Silver']);
   assert.ok(m.roles.cache.has('RX'));
@@ -243,6 +246,7 @@ test('!link: Code eingelöst, Nachricht gelöscht, Rollen vergeben; falscher Cod
   });
   const m = member({ id: '900000000000000001' });
   const g = guild({ roles: [role('RB', 'Bronze', 2)], members: [m] });
+  await adoptRoles(ctx, g, member({ id: '900000000000000097', roles: [creator] }));
   let msg = message({ guild: g, member: m, content: '!link abcd2345' });
   msg.content = '!link ABCD2345';
   await ctx.handleMessage(msg);
@@ -265,4 +269,60 @@ test('!help zeigt Admin-Befehle nur Admins', async () => {
   msg = message({ guild: g, member: boss, content: '!help' }); await ctx.handleMessage(msg);
   assert.ok(msg.replies[0].content.includes('!setupReaction'));
   assert.ok(msg.replies[0].content.includes('!addsc'));
+});
+
+test('Rollenabgleich: eine von Hand vergebene gleichnamige Rolle bleibt unangetastet, solange sie nicht übernommen wurde', async () => {
+  const champion = role('RC', 'Champion', 3), silver = role('RS', 'Silver', 3);
+  const view = { discordId: '800000000000000003', username: 'Cy', elo: 1250, skins: 0, wins: 0, losses: 0, leaderboardRank: null };
+  const { ctx, db } = await setup();
+  const m = member({ id: view.discordId, roles: [champion] });
+  const g = guild({ roles: [champion, silver], members: [m] });
+  // Nur Silver ist verwaltet (z. B. nach dem Löschen der übrigen Rollen und erneutem !setupRoles ohne Champion):
+  await db.kvSet('managed_roles', { silver: 'RS' });
+  const r = await ctx._account.syncMember(g, view);
+  assert.deepEqual(r.added, ['Silver']);
+  assert.ok(m.roles.cache.has('RC'), 'fremde „Champion“-Rolle bleibt');
+});
+
+test('syncAll: wer sich im Spiel entkoppelt hat, verliert die Rollen', async () => {
+  const roles = [role('RB', 'Bronze', 2), role('RS', 'Silver', 2)];
+  let users = [{ discordId: '800000000000000004', username: 'Di', elo: 1250, skins: 0, wins: 0, losses: 0, leaderboardRank: null }];
+  const { ctx } = await setup({ linked: async () => ({ users }) });
+  const m = member({ id: '800000000000000004' });
+  const g = guild({ roles, members: [m] });
+  await adoptRoles(ctx, g, member({ id: '900000000000000096', roles: [creator] }));
+  await ctx._account.syncAll(g);
+  assert.ok(m.roles.cache.has('RS'));
+  users = [];                                   // im Spiel entkoppelt
+  await ctx._account.syncAll(g);
+  assert.equal(m.roles.cache.has('RS'), false);
+});
+
+test('Antwort auf Alice + „@Bob“ im Text: Ziel ist Bob (Reihenfolge im Text, nicht die API-Erwähnungsliste)', async () => {
+  const calls = [];
+  const { ctx } = await setup({ adjustSc: async (uid, delta) => { calls.push(uid); return { username: 'x', before: 0, after: delta, applied: delta }; } });
+  const boss = member({ id: '600000000000000001', roles: [deputy] });
+  const g = guild({ roles: [deputy], members: [boss] });
+  const alice = '600000000000000011', bob = '600000000000000012';
+  const msg = message({ guild: g, member: boss, content: `!addsc 5 <@${bob}>`, mentions: { users: { first: () => ({ id: alice }) } } });   // API-Liste: Alice (Antwort-Ziel) zuerst
+  await ctx.handleMessage(msg);
+  assert.deepEqual(calls, [bob]);
+});
+
+test('Reaction Roles: Rollen mit Mod-/Verwaltungsrechten, Bot-Admin-Rollen und verwaltete Rangrollen werden abgelehnt; Buttons nicht an bestehende Nachricht', async () => {
+  const modRole = role('222000000000000001', 'Helper', 5, { permissions: { has: f => f === require('discord.js').PermissionsBitField.Flags.BanMembers } });
+  const staffRole = role('222000000000000002', 'Deputy Monia [MOD]', 5);
+  const rank = role('222000000000000003', 'Gold', 5);
+  const fine = role('222000000000000004', 'Gamer', 5);
+  const { ctx, db } = await setup();
+  await db.kvSet('managed_roles', { gold: rank.id });
+  const boss = member({ id: '400000000000000009', roles: [creator] });
+  const g = guild({ roles: [creator, modRole, staffRole, rank, fine], members: [boss] });
+  const run = async content => { const msg = message({ guild: g, member: boss, content }); msg.channel.send = async () => ({ id: '1', channelId: 'C1', url: 'u', react: async () => {} }); await ctx.handleMessage(msg); return msg.replies[0]?.content || ''; };
+  const out = await run('!setupReaction\nPick\n🔥 Helper\n🎮 Deputy Monia [MOD]\n⭐ Gold');
+  assert.match(out, /Helper\*\* — it has powerful permissions \(BanMembers\)/);
+  assert.match(out, /bot-admin role/);
+  assert.match(out, /managed by the bot/);
+  assert.match(await run('!setupReaction buttons 500000000000000077\nPick\n🔥 Gamer'), /only be added to a \*\*new\*\* post/);
+  assert.equal((await run('!setupReaction\nPick\n🔥 Gamer')), '', 'harmlose Rolle wird eingerichtet (keine Fehlerantwort)');
 });

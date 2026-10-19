@@ -101,3 +101,30 @@ test('Befehle: nur Creator/Deputy; !strikes und !clearstrikes', async () => {
   await ctx.handleMessage(msg);
   assert.equal((await db.allStrikes('G1', '200000000000000002')).length, 0);
 });
+
+test('Link-Vorschau (messageUpdate ohne Textänderung) und Bearbeitung derselben Nachricht → nur EIN Strike', async () => {
+  const { ctx, db, client } = await setup();
+  const m = member({ id: 'U5' });
+  const g = guild({ roles: [creator], members: [m] });
+  const msg = message({ guild: g, member: m, content: LINK_PING });
+  await ctx.messageFilters[0](msg);
+  const unfurled = { ...msg, partial: false, guild: g, member: m, author: m.user, content: LINK_PING };
+  client.emit('messageUpdate', msg, unfurled);             // Embed-Vorschau: Text gleich
+  client.emit('messageUpdate', { ...msg, content: 'x' }, unfurled);   // Text „geändert“, aber dieselbe Nachricht (ID)
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal((await db.allStrikes('G1', 'U5')).length, 1);
+  assert.equal(m.calls.timeout.length, 1);
+});
+
+test('Raid-Schutz: 8 Beitritte in 60 s → Verifizierungsstufe hoch + Alarm (kein Absturz)', async () => {
+  const { ctx, client } = await setup();
+  const g = guild();
+  g.verificationLevel = 1; g.setVerificationLevel = async lvl => { g.levels = (g.levels || []).concat(lvl); };
+  const logged = [];
+  ctx.modlog = async (_guild, x) => { logged.push(x); };
+  // moderation.js hat ctx.modlog beim Registrieren ersetzt; der Raid-Handler ruft ctx.modlog zur Laufzeit auf
+  for (let i = 0; i < 8; i++) client.emit('guildMemberAdd', { guild: g, id: 'N' + i, user: { bot: false } });
+  await new Promise(r => setTimeout(r, 30));
+  assert.deepEqual(g.levels, [4], 'VeryHigh (=4) gesetzt');
+  assert.match(logged[0].title, /Possible raid/);
+});

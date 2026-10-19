@@ -162,7 +162,8 @@ as_svc npm run build
 # (deploy/moniabot-setup.sh), sonst bleibt alles wie bisher.
 if [ -d bot ] && systemctl list-unit-files moniabot.service >/dev/null 2>&1 && systemctl is-enabled --quiet moniabot.service 2>/dev/null; then
         log "MoniaBot: Abhängigkeiten installieren"
-        as_svc npm ci --omit=dev --no-audit --no-fund --prefix bot
+        # Ein Fehler beim Bot darf das Ausrollen des Spiels nicht abbrechen (set -e!), sonst fehlen Neustart, Gesundheitsprüfung und Rückfall.
+        as_svc npm ci --omit=dev --no-audit --no-fund --prefix bot || warn "MoniaBot: npm ci fehlgeschlagen — der Bot bleibt auf dem alten Stand stehen oder startet nicht; Spiel wird trotzdem ausgerollt."
 fi
 
 # ── 3. Neustart ───────────────────────────────────────────────
@@ -210,6 +211,10 @@ reset_bewahrend "$PREVIOUS"
 as_svc npm ci --omit=dev --no-audit --no-fund
 as_svc npm run build
 systemctl restart "$SERVICE"
+# Auch der Bot kehrt zum alten Stand zurück (er wurde oben schon auf dem neuen neu gestartet).
+if systemctl is-enabled --quiet moniabot.service 2>/dev/null; then
+        systemctl restart moniabot.service || true
+fi
 
 sleep 5
 if curl -fsS -o /dev/null --max-time 3 "$HEALTH_URL"; then

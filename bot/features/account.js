@@ -20,10 +20,10 @@ const path = require('path');
 const { AttachmentBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const renderer = require('../lib/card-renderer');
 const rolesLogic = require('../lib/roles-logic');
-const { key } = require('../lib/util');
+const { key, mentionedIds } = require('../lib/util');
 
 module.exports = function register(ctx) {
-  const { client, config, game, helpers } = ctx;
+  const { client, config, db, game, helpers } = ctx;
   const { GameApiError } = game;
 
   const DAILY_TEXT = 'Your challenge for today: Win a game with 2, or 3 of these Heroes:';
@@ -38,25 +38,32 @@ module.exports = function register(ctx) {
     return 'Something went wrong talking to the game server.';
   }
 
-  const mentioned = (msg, args) => {
-    const id = msg.mentions.users.first()?.id || args.find(a => /^\d{15,25}$/.test(a));
-    return id || null;
-  };
+  // Erste im TEXT erwähnte Person (nicht `msg.mentions`: das enthält bei einer Antwort auch den Autor der Ursprungsnachricht).
+  const mentioned = (msg, args) => mentionedIds(msg.content)[0] || args.find(a => /^\d{15,25}$/.test(a)) || null;
 
   // ── Rollen-Abgleich ────────────────────────────────────────
   const managed = rolesLogic.managedRoleDefs(config);
   const managedKeys = new Set(managed.map(m => key(m.name)));
-  const roleByName = (guild) => {
+  /**
+   * Die Rollen, die der Bot verwaltet — NUR die, die `!setupRoles` angelegt oder (auf ausdrücklichen Admin-Befehl) übernommen hat,
+   * gemerkt als IDs. Eine zufällig gleichnamige Rolle (z. B. von Hand vergebenes „Champion“) fasst der Bot nie an.
+   * @returns {Promise<Map<string, import('discord.js').Role>>} Schlüssel (Rollenname normalisiert) → Rolle
+   */
+  async function managedRoles(guild) {
+    const ids = await db.kvGet('managed_roles', {});
     const map = new Map();
-    for (const r of guild.roles.cache.values()) if (managedKeys.has(key(r.name)) && !map.has(key(r.name))) map.set(key(r.name), r);
+    for (const [k, id] of Object.entries(ids)) {
+      const role = guild.roles.cache.get(id);
+      if (role && managedKeys.has(k)) map.set(k, role);
+    }
     return map;
-  };
+  }
 
   /** Gleicht Rang-/Erfolgsrollen (und optional den Spitznamen) eines Mitglieds ab. @returns {{added:string[], removed:string[]}} */
   async function syncMember(guild, user) {
     const member = await guild.members.fetch(user.discordId).catch(() => null);
     if (!member) return { added: [], removed: [] };
-    const have = roleByName(guild);
+    const have = await managedRoles(guild);
     const wantNames = rolesLogic.desiredRoleNames(user, config).map(key);
     const add = [], remove = [];
     for (const [k, role] of have) {
@@ -88,13 +95,18 @@ module.exports = function register(ctx) {
       const r = await syncMember(guild, u);
       if (r.added.length || r.removed.length) changed++;
     }
+    // Wer sich im SPIEL entkoppelt hat, fehlt jetzt in der Liste, trägt aber noch Rollen: nachträglich abnehmen.
+    const now = users.map(u => u.discordId);
+    const before = await db.kvGet('synced_discord_ids', []);
+    for (const id of before) if (!now.includes(id)) { await removeManagedRoles(guild, id); changed++; }
+    await db.kvSet('synced_discord_ids', now);
     return { total: users.length, changed };
   }
 
   async function removeManagedRoles(guild, discordId) {
     const member = await guild.members.fetch(discordId).catch(() => null);
     if (!member) return;
-    const mine = [...roleByName(guild).values()].filter(r => member.roles.cache.has(r.id));
+    const mine = [...(await managedRoles(guild)).values()].filter(r => member.roles.cache.has(r.id));
     if (mine.length) await member.roles.remove(mine, 'MoniaBot: Verknüpfung gelöst').catch(() => {});
   }
 
@@ -210,6 +222,7 @@ module.exports = function register(ctx) {
       const { users } = await game.linked();
       const me = users.find(u => u.discordId === msg.author.id);
       if (!me) return msg.reply(notLinked());
+      if (!Object.keys(await db.kvGet('managed_roles', {})).length) return msg.reply('The rank roles aren’t set up yet — an admin needs to run `' + config.prefix + 'setupRoles` first.');
       const r = await syncMember(msg.guild, me);
       return msg.reply(r.added.length || r.removed.length
         ? `Updated your roles${r.added.length ? ' · added: ' + r.added.join(', ') : ''}${r.removed.length ? ' · removed: ' + r.removed.join(', ') : ''}.`
@@ -225,13 +238,19 @@ module.exports = function register(ctx) {
   ctx.command('setuproles', { staff: true, help: '`!setupRoles` — create missing rank/achievement roles' }, async (msg) => {
     const guild = msg.guild;
     if (!guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) return msg.reply('I need the **Manage Roles** permission.');
-    const have = roleByName(guild);
+    // Vorhandene Rolle gleichen Namens wird ÜBERNOMMEN (der Admin hat den Befehl ausdrücklich gegeben), sonst neu angelegt.
+    // Gemerkt werden die IDs; nur diese Rollen verwaltet der Bot später.
+    const ids = await db.kvGet('managed_roles', {});
     const created = [], existing = [];
     for (const def of managed) {
-      if (have.has(key(def.name))) { existing.push(def.name); continue; }
-      try { await guild.roles.create({ name: def.name, color: def.color, reason: 'MoniaBot: !setupRoles', permissions: [] }); created.push(def.name); }
-      catch (err) { return msg.reply(`Couldn’t create **${def.name}**: ${err.message}`); }
+      const k = key(def.name);
+      let role = ids[k] && guild.roles.cache.get(ids[k]);
+      if (!role) role = guild.roles.cache.find(r => key(r.name) === k && !r.managed);
+      if (role) { ids[k] = role.id; existing.push(def.name); continue; }
+      try { role = await guild.roles.create({ name: def.name, colors: { primaryColor: def.color }, reason: 'MoniaBot: !setupRoles', permissions: [] }); ids[k] = role.id; created.push(def.name); }
+      catch (err) { await db.kvSet('managed_roles', ids); return msg.reply(`Couldn’t create **${def.name}**: ${err.message}`); }
     }
+    await db.kvSet('managed_roles', ids);
     await msg.reply(`✅ Created: ${created.join(', ') || 'nothing new'}${existing.length ? `\nAlready there: ${existing.join(', ')}` : ''}\n` +
       '**Important:** in *Server Settings → Roles*, drag **MoniaBot**’s role above these roles, and place the rank roles above your default roles so the name colour shows.');
     syncAll(guild).catch(() => {});

@@ -11,7 +11,9 @@ function createHelpers(config) {
   const adminIds = new Set(config.adminRoleIds);
 
   /** Admin im Sinne des Bots: Creator / Deputy Monia [MOD] (oder per ID). Der Server-Besitzer zählt NICHT automatisch. */
-  const isStaffRole = r => adminIds.has(r.id) || adminNames.has(key(r.name));
+  // Sind ADMIN_ROLE_IDS gesetzt, zählen NUR diese IDs. Namen sind fälschbar: wer „Rollen verwalten“ hat, könnte sich sonst
+  // eine Rolle „Creator“ anlegen und wäre Bot-Admin.
+  const isStaffRole = r => (adminIds.size ? adminIds.has(r.id) : adminNames.has(key(r.name)));
   function isStaff(member) {
     if (!member || !member.roles || !member.roles.cache) return false;
     return member.roles.cache.some(isStaffRole);
@@ -39,6 +41,24 @@ function createHelpers(config) {
   return { isStaff, isStaffRole, isExempt, clip, findRole, key };
 }
 
+/** Rechte, die eine selbst zuweisbare Rolle (Reaction Role) nie haben darf. */
+const DANGEROUS_PERMISSIONS = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageMessages', 'ManageNicknames', 'ManageWebhooks',
+  'BanMembers', 'KickMembers', 'ModerateMembers', 'MentionEveryone', 'ViewAuditLog', 'ManageEvents', 'ManageThreads'];
+function dangerousPermissions(role) {
+  return DANGEROUS_PERMISSIONS.filter(p => role.permissions && role.permissions.has(PermissionsBitField.Flags[p]));
+}
+
+/**
+ * Die in der Nachricht erwähnten Nutzer-IDs in der Reihenfolge, in der sie im TEXT stehen.
+ * `message.mentions.users` taugt dafür nicht: es enthält bei einer Antwort auch den Autor der Ursprungsnachricht
+ * und liegt in API-Reihenfolge — ein Admin, der auf Alice antwortet und `@Bob` schreibt, träfe sonst Alice.
+ */
+function mentionedIds(content) {
+  const out = [];
+  for (const m of String(content || '').matchAll(/<@!?(\d{15,25})>/g)) if (!out.includes(m[1])) out.push(m[1]);
+  return out;
+}
+
 /** Emoji → stabiler Schlüssel: Unicode-Zeichen selbst bzw. ID eines eigenen Emotes. */
 const stripVs = s => String(s).replace(/\uFE0F/g, '');   // ❤ und ❤️ sind derselbe Emoji
 function emojiKey(emoji) { return emoji.id || stripVs(emoji.name); }
@@ -53,4 +73,4 @@ function parseLeadingEmoji(line) {
   return null;
 }
 
-module.exports = { key, createHelpers, emojiKey, parseLeadingEmoji };
+module.exports = { key, createHelpers, emojiKey, parseLeadingEmoji, dangerousPermissions, mentionedIds };

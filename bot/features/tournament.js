@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
 const bracket = require('../lib/bracket');
+const { mentionedIds } = require('../lib/util');
 
 module.exports = function register(ctx) {
   const { client, config, db, helpers } = ctx;
@@ -49,7 +50,17 @@ module.exports = function register(ctx) {
     await msg.channel.send({ content: lines.join('\n\n') || undefined, embeds: [bracketEmbed(state)], allowedMentions: ping(newMatches || []) });
   }
 
-  const userArg = (msg, args) => msg.mentions.users.first()?.id || args.find(a => /^\d{15,25}$/.test(a));
+  // Alle Zustandsänderungen je Server nacheinander: sonst überschreiben sich gleichzeitige Klicks/Befehle gegenseitig
+  // (verlorene Anmeldungen, ein „Join“, der ein soeben gestartetes Turnier wieder auf „Anmeldung“ zurücksetzt).
+  const queues = new Map();
+  const serialized = (guildId, fn) => {
+    const prev = queues.get(guildId) || Promise.resolve();
+    const next = prev.then(fn, fn);
+    queues.set(guildId, next.catch(() => {}));
+    return next;
+  };
+
+  const userArg = (msg, args) => mentionedIds(msg.content)[0] || args.find(a => /^\d{15,25}$/.test(a));
 
   async function cmd(msg, args, rest) {
     const guild = msg.guild;
@@ -114,10 +125,14 @@ module.exports = function register(ctx) {
     return msg.reply('Usage: `!tournament create <name>` · `start` · `win @user` · `dq @user` · `bracket` · `cancel`');
   }
 
-  ctx.command('tournament', { aliases: ['tourney'], help: '`!tournament bracket` — current tournament; admins: `create <name>`, `start`, `win @user`, `dq @user`, `cancel`' }, (msg, args, rest) => cmd(msg, args, rest));
+  ctx.command('tournament', { aliases: ['tourney'], help: '`!tournament bracket` — current tournament; admins: `create <name>`, `start`, `win @user`, `dq @user`, `cancel`' }, (msg, args, rest) => serialized(msg.guild.id, () => cmd(msg, args, rest)));
 
   ctx.interactionHandlers.push(async (i) => {
     if (!i.isButton() || !i.customId.startsWith('tn:')) return false;
+    return serialized(i.guildId, () => onButton(i));
+  });
+
+  async function onButton(i) {
     const cur = await db.activeTournament(i.guildId);
     const reply = text => i.reply({ content: text, flags: MessageFlags.Ephemeral });
     if (!cur || cur.state.messageId !== i.message.id) { await reply('This sign-up is no longer active.'); return true; }
@@ -135,5 +150,5 @@ module.exports = function register(ctx) {
     await db.saveTournament(id, state);
     await i.update({ embeds: [signupEmbed(state)], components: [signupRow()], allowedMentions: { parse: [] } });
     return true;
-  });
+  }
 };

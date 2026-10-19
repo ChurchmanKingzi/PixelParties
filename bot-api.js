@@ -122,13 +122,14 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
     for (const r of rows) out[r.item_type] = Number(r.n);
     return out;
   }
-  async function publicView(u) {
+  /** `withAvatar: false` lässt das (bis zu 3 MB große) Avatar-Bild weg — die Sammelabfrage für den Rollenabgleich braucht es nicht. */
+  async function publicView(u, { withAvatar = true } = {}) {
     const counts = await shopCounts(u.id);
     return {
       id: u.id, username: u.username, discordId: u.discord_id,
       elo: u.elo, color: u.color || '#00f0ff', sc: u.sc || 0,
       wins: u.wins || 0, losses: u.losses || 0, rankedGames: u.ranked_games || 0,
-      avatar: u.avatar || null, createdAt: u.created_at,
+      ...(withAvatar ? { avatar: u.avatar || null } : {}), createdAt: u.created_at,
       skins: counts.skin || 0, avatars: counts.avatar || 0, sleeves: counts.sleeve || 0,
     };
   }
@@ -142,11 +143,13 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
       sweep();
       const entry = codes.get(code);
       if (!entry) return res.status(404).json({ error: 'invalid_code' });
-      const taken = await db.get('SELECT id, username FROM users WHERE discord_id = ?', [discordId]);
-      if (taken && taken.id !== entry.userId) return res.status(409).json({ error: 'discord_already_linked', username: taken.username });
-      await db.run('UPDATE users SET discord_id = ? WHERE id = ?', [discordId, entry.userId]);
+      // Code SOFORT verbrauchen (vor den Datenbank-Aufrufen): zwei gleichzeitige Anfragen mit demselben Code dürfen nicht beide gelten.
       codes.delete(code);
       codeOfUser.delete(entry.userId);
+      const taken = await db.get('SELECT id, username FROM users WHERE discord_id = ?', [discordId]);
+      if (taken && taken.id !== entry.userId) return res.status(409).json({ error: 'discord_already_linked', username: taken.username });
+      try { await db.run('UPDATE users SET discord_id = ? WHERE id = ?', [discordId, entry.userId]); }
+      catch { return res.status(409).json({ error: 'discord_already_linked' }); }   // eindeutiger Index: jemand war schneller
       const u = await db.get('SELECT * FROM users WHERE id = ?', [entry.userId]);
       res.json({ user: await publicView(u) });
     } catch (err) { console.error('[bot/link]', err.message); res.status(500).json({ error: 'link_failed' }); }
@@ -174,7 +177,7 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
       const board = await db.all('SELECT id FROM users WHERE ranked_games > 0 ORDER BY elo DESC, username ASC LIMIT 20');
       const rankOf = new Map(board.map((r, i) => [r.id, i + 1]));
       const users = [];
-      for (const u of rows) users.push({ ...(await publicView(u)), leaderboardRank: rankOf.get(u.id) || null });
+      for (const u of rows) users.push({ ...(await publicView(u, { withAvatar: false })), leaderboardRank: rankOf.get(u.id) || null });
       res.json({ users });
     } catch (err) { console.error('[bot/linked]', err.message); res.status(500).json({ error: 'failed' }); }
   });

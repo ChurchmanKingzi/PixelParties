@@ -63,6 +63,27 @@ ln -sf "$APP_DIR/deploy/systemd/moniabot.service" /etc/systemd/system/moniabot.s
 systemctl daemon-reload
 systemctl enable moniabot.service >/dev/null
 
+# ── 4b. Caddy: Bot-Routen von außen sperren ───────────────────
+# setup.sh kopiert das Caddyfile nur, wenn es fehlt; spätere Änderungen im Repo erreichen /etc/caddy/Caddyfile nie von selbst.
+# Hier wird die Sperre einmalig nachgetragen (mit Sicherung und Prüfung). Der Schutz durch BOT_SECRET und den Proxy-Header-Check
+# im Spiel besteht ohnehin — das hier ist der zweite Riegel.
+CADDYFILE=/etc/caddy/Caddyfile
+if [ -f "$CADDYFILE" ] && ! grep -q '@botapi' "$CADDYFILE"; then
+	if grep -q 'reverse_proxy 127.0.0.1:3000' "$CADDYFILE"; then
+		log "Caddyfile: /api/bot von außen sperren"
+		cp "$CADDYFILE" "$CADDYFILE.vor-moniabot"
+		awk '/reverse_proxy 127\.0\.0\.1:3000/ && !done { print "\t@botapi path /api/bot /api/bot/*"; print "\trespond @botapi 404"; done=1 } { print }' "$CADDYFILE.vor-moniabot" > "$CADDYFILE"
+		if caddy validate --config "$CADDYFILE" --adapter caddyfile >/dev/null 2>&1; then
+			systemctl reload caddy || warn "Caddy-Reload fehlgeschlagen — bitte prüfen."
+		else
+			cp "$CADDYFILE.vor-moniabot" "$CADDYFILE"
+			warn "Caddyfile-Änderung ungültig — zurückgesetzt. Nicht schlimm: der Schutz durch BOT_SECRET gilt trotzdem."
+		fi
+	else
+		warn "In $CADDYFILE steht keine Zeile 'reverse_proxy 127.0.0.1:3000' — Sperre nicht eingetragen (Schutz durch BOT_SECRET gilt trotzdem)."
+	fi
+fi
+
 # ── 5. Spielserver neu starten (damit BOT_SECRET gilt) ────────
 # Achtung: das meldet alle angemeldeten Spieler ab (Sitzungen liegen im Arbeitsspeicher).
 if systemctl is-active --quiet pixelparties.service; then

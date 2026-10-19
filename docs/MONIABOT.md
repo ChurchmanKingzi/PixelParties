@@ -45,6 +45,7 @@ In Discord: **Benutzereinstellungen → Erweitert → Entwicklermodus** einschal
 | Was | Wie | Pflicht? |
 |---|---|---|
 | **Server-ID** | Rechtsklick auf den Server-Namen → *Server-ID kopieren* | ja |
+| IDs der Rollen **Creator** und **Deputy Monia [MOD]** | Servereinstellungen → Rollen → Rechtsklick auf die Rolle → *Rollen-ID kopieren*; in `bot/.env` als `ADMIN_ROLE_IDS=ID1,ID2` | **empfohlen** — dann zählen nur diese IDs; mit bloßem Namensvergleich könnte sich jemand mit dem Recht „Rollen verwalten“ eine Rolle „Creator“ anlegen |
 | Mod-Log-Kanal | Rechtsklick auf den Kanal → *Kanal-ID kopieren* (Kanal nur für Mods sichtbar!) | empfohlen |
 | Kanal für neue Karten, Patchnotes, Rangliste, Karte des Tages, Bug-Meldungen | genauso | optional |
 
@@ -102,8 +103,10 @@ Melde dich per SSH an dem Server an (wie sonst auch) und führe nacheinander aus
 2. **Rang- und Erfolgsrollen anlegen:** im Server `!setupRoles` schreiben. Der Bot legt Bronze, Silver, Gold, Platinum,
    Diamond, Master, Grandmaster (mit den Farben des Spiels) sowie Skin Collector, Veteran, Top 10 und Champion an. Danach die
    Rang-Rollen in der Rollenliste **über** die Standardrollen ziehen, damit die Namensfarbe sichtbar wird.
-   > Gibt es auf dem Server schon eine Rolle mit genau so einem Namen (z. B. „Gold“ als Spenderrolle), übernimmt der Bot
-   > sie und verwaltet sie automatisch. Dann vorher umbenennen.
+   > Gibt es auf dem Server schon eine Rolle mit genau so einem Namen, **übernimmt** `!setupRoles` sie — und vergibt/entzieht sie danach
+   > automatisch. Hat der Server z. B. ein von Hand vergebenes „Champion“ für Turniersieger, vorher umbenennen. Der Bot verwaltet **nur**
+   > die Rollen, die `!setupRoles` angelegt oder übernommen hat (er merkt sich deren IDs); alles andere fasst er nie an. Vor dem ersten
+   > `!setupRoles` vergibt er gar keine Rang-Rollen.
 3. **AutoMod-Grundnetz (optional):** `!setupAutomod` — blockt „@everyone/@here + Link“ wirklich *vor* dem Senden.
 4. **Regeln mit Bestätigungs-Button (optional):** `NEWCOMER_ROLE_ID` und `VERIFIED_ROLE_ID` in `bot/.env` setzen,
    dann im Regelkanal `!setupRules <Regeltext>`.
@@ -147,7 +150,7 @@ zusammengesetzt und immer auf dem Stand des Spiels. Einen eigenen Bilderordner g
 
 **Rollen:** Rang nach Elo (Bronze ab 0, Silver 1200, Gold 1400, Platinum 1600, Diamond 1800, Master 2000, Grandmaster 2200 —
 dieselben Stufen wie im Spiel), dazu *Skin Collector* (50+ Skins), *Veteran* (300+ Spiele), *Top 10* und *Champion* (Rangliste).
-Der Abgleich läuft alle 10 Minuten, bei `!link` und `!sync`. Schwellen und Funktionen lassen sich in `bot/.env` ändern
+Der Abgleich läuft alle 10 Minuten, bei `!link` und `!sync`; wer sich im Spiel entkoppelt, verliert die Rollen beim nächsten Durchlauf. Schwellen und Funktionen lassen sich in `bot/.env` ändern
 (`SKIN_COLLECTOR_MIN`, `VETERAN_GAMES`); wer eine Erfolgsrolle nicht möchte, löscht sie einfach.
 
 **Was Discord nicht kann:** einen *individuellen* Namens­farbton (Namen färben nur Rollen, max. 250 pro Server — deshalb Rang-Rollen)
@@ -165,7 +168,9 @@ Erste Zeile = Befehl, dann Titel (Zeilen ohne Emoji), dann je Zeile `Emoji Rolle
 Der Bot postet den Beitrag, reagiert selbst mit allen Emotes und merkt sich die Zuordnung. Wer reagiert, bekommt die Rolle; wer die
 Reaktion zurücknimmt, verliert sie. Varianten: `!setupReaction buttons` (Knöpfe statt Reaktionen), `!setupReaction <Nachrichten-ID>`
 (bestehenden Beitrag dieses Kanals anbinden). `!listReactions`, `!removeReaction <Nachrichten-ID>`.
-Rollen über der Bot-Rolle und Rollen mit Administrator-Recht lehnt der Bot ab.
+Der Bot lehnt Rollen ab, die über seiner eigenen liegen, Rollen mit Verwaltungs-/Moderationsrechten (Administrator, Rollen/Nachrichten/Kanäle verwalten,
+Bannen, Kicken, Timeout, @everyone erwähnen …), die Admin-Rollen des Bots und die Rang-/Erfolgsrollen — beim Einrichten und bei jeder Vergabe. Knöpfe (`buttons`) gibt es nur
+für **neue** Beiträge des Bots, nicht für bestehende Nachrichten.
 
 ### Moderation
 * **Neues Mitglied** (< 6 Monate auf dem Server) pingt `@everyone`, `@here` oder eine Rolle **und** die Nachricht enthält einen

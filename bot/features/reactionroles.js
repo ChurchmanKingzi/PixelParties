@@ -16,10 +16,25 @@
 //  !listReactions                     zeigt alle Reaction-Role-Beiträge
 // ═══════════════════════════════════════════════════════════════════
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionsBitField, MessageFlags } = require('discord.js');
-const { emojiKey, parseLeadingEmoji } = require('../lib/util');
+const { emojiKey, parseLeadingEmoji, dangerousPermissions } = require('../lib/util');
 
 module.exports = function register(ctx) {
   const { client, config, db, helpers } = ctx;
+
+  /**
+   * Darf diese Rolle per Reaktion/Knopf vergeben werden? Nein bei: Rechten mit Moderations-/Verwaltungswirkung, Bot-Admin-Rollen
+   * und den vom Bot selbst verwalteten Rang-/Erfolgsrollen. Wird bei der Einrichtung UND bei jeder Vergabe geprüft
+   * (Rollenrechte können sich danach ändern).
+   * @returns {Promise<string|null>} Grund der Ablehnung oder null
+   */
+  async function whyNotGrantable(guild, role) {
+    const perms = dangerousPermissions(role);
+    if (perms.length) return `it has powerful permissions (${perms.join(', ')})`;
+    if (helpers.isStaffRole(role)) return 'it is a bot-admin role';
+    const managedIds = Object.values(await db.kvGet('managed_roles', {}));
+    if (managedIds.includes(role.id)) return 'it is a rank/achievement role managed by the bot';
+    return null;
+  }
 
   /** Zeilen → { description, pairs:[{emoji, role}], errors }. Reine Funktion der Eingabe (für Tests). */
   function parseSetup(guild, text) {
@@ -66,8 +81,10 @@ module.exports = function register(ctx) {
     // Der Bot muss die Rollen auch vergeben dürfen (Rollenhierarchie)
     const tooHigh = pairs.filter(p => guild.roles.cache.get(p.roleId).position >= me.roles.highest.position);
     if (tooHigh.length) return msg.reply('I can’t manage these roles — they are at or above my own role. Move **MoniaBot**’s role higher in Server Settings → Roles: ' + tooHigh.map(p => `**${p.roleName}**`).join(', '));
-    const dangerous = pairs.filter(p => guild.roles.cache.get(p.roleId).permissions.has(PermissionsBitField.Flags.Administrator));
-    if (dangerous.length) return msg.reply('Refusing: these roles have the Administrator permission: ' + dangerous.map(p => `**${p.roleName}**`).join(', '));
+    const refused = [];
+    for (const p of pairs) { const why = await whyNotGrantable(guild, guild.roles.cache.get(p.roleId)); if (why) refused.push(`**${p.roleName}** — ${why}`); }
+    if (refused.length) return msg.reply('Refusing to make these roles self-assignable:\n' + refused.map(r => '• ' + r).join('\n'));
+    if (mode === 'buttons' && existingId) return msg.reply('Buttons can only be added to a **new** post (I can’t edit someone else’s message). Use reactions for an existing message, or leave out the message ID.');
 
     let target;
     if (existingId) {
@@ -123,8 +140,12 @@ module.exports = function register(ctx) {
       const row = await db.reactionRole(message.id, emojiKey(reaction.emoji));
       if (!row || row.mode !== 'reaction') return;
       const member = await message.guild.members.fetch(user.id);
-      if (add) await member.roles.add(row.role_id, 'MoniaBot: Reaction Role');
-      else await member.roles.remove(row.role_id, 'MoniaBot: Reaction Role entfernt');
+      if (add) {
+        const role = message.guild.roles.cache.get(row.role_id);
+        const why = role ? await whyNotGrantable(message.guild, role) : 'the role no longer exists';
+        if (why) { ctx.modlog(message.guild, { title: '⚠️ Reaction role refused', description: `<@${user.id}> reacted for <@&${row.role_id}> but ${why}.` }); return; }
+        await member.roles.add(row.role_id, 'MoniaBot: Reaction Role');
+      } else await member.roles.remove(row.role_id, 'MoniaBot: Reaction Role entfernt');
     } catch (err) {
       console.error('[reactionroles]', err.message);
       if (reaction && reaction.message && reaction.message.guild) {
@@ -145,6 +166,9 @@ module.exports = function register(ctx) {
       const row = await db.reactionRoleByRole(i.message.id, roleId);
       if (!row) { await i.reply({ content: 'This role post is no longer active.', flags: MessageFlags.Ephemeral }); return true; }
       const has = i.member.roles.cache.has(roleId);
+      const role = i.guild.roles.cache.get(roleId);
+      const why = !has && (role ? await whyNotGrantable(i.guild, role) : 'the role no longer exists');
+      if (why) { await i.reply({ content: 'I can’t give you that role anymore. Please ping a moderator.', flags: MessageFlags.Ephemeral }); ctx.modlog(i.guild, { title: '⚠️ Reaction role refused', description: `<@${i.user.id}> pressed <@&${roleId}> but ${why}.` }); return true; }
       if (has) await i.member.roles.remove(roleId, 'MoniaBot: Reaction Role (Button)');
       else await i.member.roles.add(roleId, 'MoniaBot: Reaction Role (Button)');
       await i.reply({ content: has ? `Removed <@&${roleId}>.` : `You now have <@&${roleId}>.`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });

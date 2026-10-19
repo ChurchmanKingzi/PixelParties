@@ -19,8 +19,9 @@
 //  wirklich VOR dem Senden blockt (gilt dann für alle, nicht nur neue Mitglieder).
 // ═══════════════════════════════════════════════════════════════════
 const path = require('path');
-const { EmbedBuilder, PermissionsBitField, AutoModerationRuleEventType, AutoModerationRuleTriggerType, AutoModerationActionType, VerificationLevel } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField, AutoModerationRuleEventType, AutoModerationRuleTriggerType, AutoModerationActionType, GuildVerificationLevel } = require('discord.js');
 const scam = require('../lib/scam');
+const { mentionedIds } = require('../lib/util');
 
 const COLORS = { warn: 0xf0a020, ban: 0xd32f2f, info: 0x4a90d9, ok: 0x43a047 };
 
@@ -101,7 +102,7 @@ module.exports = function register(ctx) {
 
   // ── Prüfung einer Nachricht ────────────────────────────────
   /** @returns {Promise<boolean>} true = die Nachricht wurde behandelt (gelöscht) */
-  async function check(message) {
+  async function check(message, { claim = false } = {}) {
     if (!message.guild || message.author.bot || message.system) return false;
     const text = message.content || '';
     if (!text) return false;
@@ -115,16 +116,32 @@ module.exports = function register(ctx) {
     const newPing = scam.isNewMember(member.joinedTimestamp, Date.now(), config.newMemberDays)
       && scam.hasMassPing(text, message.mentions);
     if (!phishing && !newPing) return false;
+    if (claim && alreadyHandled(message.id)) return true;
 
     await punish({ guild: message.guild, member, message, reason: phishing ? 'phishing' : 'newmember-ping-link' });
     return true;
   }
 
-  ctx.messageFilters.push(check);
-  client.on('messageUpdate', async (_old, updated) => {
+  // Jede Nachricht wird höchstens EINMAL bestraft: Discord meldet `messageUpdate` auch, wenn nur eine Link-Vorschau
+  // entsteht — ohne diese Sperre gäbe das zweite/dritte Strikes für dieselbe Nachricht (und schlüge das Löschen fehl, Strike um Strike bis zum Bann).
+  const handled = new Map();                          // Nachrichten-ID → Zeitpunkt
+  const alreadyHandled = (id) => {
+    const now = Date.now();
+    for (const [k, t] of handled) if (now - t > 10 * 60 * 1000) handled.delete(k);
+    if (handled.has(id)) return true;
+    handled.set(id, now);
+    return false;
+  };
+  ctx.messageFilters.push(async (message) => {
+    const hit = await check(message, { claim: true });
+    return hit;
+  });
+  client.on('messageUpdate', async (old, updated) => {
     try {
       const m = updated.partial ? await updated.fetch() : updated;
-      if (m.guild && m.guild.id === config.guildId) await check(m);
+      if (!m.guild || m.guild.id !== config.guildId) return;
+      if (old && !old.partial && old.content === m.content) return;     // nur Vorschau/Embed, kein bearbeiteter Text
+      await check(m, { claim: true });
     } catch { /* Nachricht weg */ }
   });
 
@@ -141,9 +158,9 @@ module.exports = function register(ctx) {
     const guild = member.guild;
     let lock = '';
     const prev = guild.verificationLevel;
-    if (config.raidLockdownMinutes > 0 && prev < VerificationLevel.VeryHigh) {
+    if (config.raidLockdownMinutes > 0 && prev < GuildVerificationLevel.VeryHigh) {
       try {
-        await guild.setVerificationLevel(VerificationLevel.VeryHigh, 'MoniaBot: Raid-Verdacht');
+        await guild.setVerificationLevel(GuildVerificationLevel.VeryHigh, 'MoniaBot: Raid-Verdacht');
         lock = `\nVerification level temporarily raised to **Very High** (back to normal in ${config.raidLockdownMinutes} min).`;
       } catch (err) { lock = '\n⚠️ Couldn’t raise the verification level: ' + err.message; }
     }
@@ -162,7 +179,7 @@ module.exports = function register(ctx) {
 
   // ── Befehle für Admins ─────────────────────────────────────
   const targetUser = async (msg, args) => {
-    const id = msg.mentions.users.first()?.id || args.find(a => /^\d{15,25}$/.test(a)) || (args[0] || '').replace(/[<@!>]/g, '');
+    const id = mentionedIds(msg.content)[0] || args.find(a => /^\d{15,25}$/.test(a)) || '';
     if (!/^\d{15,25}$/.test(id)) return null;
     try { return await client.users.fetch(id); } catch { return null; }
   };

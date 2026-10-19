@@ -41,6 +41,13 @@ test('Phishing: Liste, Unterdomänen, Lookalikes — echte Seiten bleiben unber�
   }
 });
 
+test('Phishing: versteckte Links und Satzzeichen hinter der Domain', () => {
+  const blocked = loadBlockedDomains(path.join(__dirname, '..', 'data', 'blocked-domains.txt'));
+  for (const t of ['[trade](https://steamcomminuty.com)', 'https://steamcomminuty.com, here', 'go to steamcomminuty.com!', '(steamcomminuty.com)',
+    '<https://steamcomminuty.com/x>', 'STEAMCOMMINUTY.COM/offer', '||https://discord-nitro.gift||']) assert.ok(isPhishing(t, blocked), t);
+  assert.ok(!isPhishing('https://steamcomminuty.com.example.org is not it', ['example.net']));
+});
+
 test('defang macht Links unklickbar', () => {
   const d = defang('https://evil.example.com/x');
   assert.ok(!d.includes('http://') && !d.includes('https://') && !/\.com/.test(d));

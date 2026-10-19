@@ -9,7 +9,6 @@ Type=simple
 User=pixelparties
 Group=pixelparties
 WorkingDirectory=/opt/pixelparties/bot
-Slice=pixelparties.slice
 
 # Zugangsdaten stehen in /opt/pixelparties/bot/.env (chmod 600), das liest der Bot selbst.
 Environment=NODE_ENV=production

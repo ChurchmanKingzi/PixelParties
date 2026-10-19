@@ -43,10 +43,11 @@ function guild({ roles = [], members = [] } = {}) {
   return g;
 }
 
+let nextMessageId = 1000000000000000;
 function message({ guild: g, member: m, content, mentions = {} }) {
   const sent = [];
   const msg = {
-    guild: g, member: m, author: m.user, content, system: false, partial: false, attachments: new Collection(),
+    id: String(nextMessageId++), guild: g, member: m, author: m.user, content, system: false, partial: false, attachments: new Collection(),
     mentions: { everyone: false, roles: { size: 0 }, users: { first: () => undefined }, ...mentions },
     deleted: false, deletable: true, replies: sent,
     delete: async () => { msg.deleted = true; },
@@ -67,4 +68,11 @@ async function setup(gameApi = {}) {
   return { ctx, db, client, config };
 }
 
-module.exports = { role, member, guild, message, setup, config };
+/** Rollen „übernehmen“, wie es der Admin mit !setupRoles tut. */
+async function adoptRoles(ctx, g, boss) {
+  const msg = message({ guild: g, member: boss, content: '!setupRoles' });
+  await ctx.commands.get('setuproles').handler(msg, [], '');
+  return msg;
+}
+
+module.exports = { role, member, guild, message, setup, config, adoptRoles };
