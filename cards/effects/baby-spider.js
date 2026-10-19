@@ -41,12 +41,13 @@ const CARD_NAME = 'Baby Spider';
  * True iff `pi` controls at least one Spider Creature that ISN'T this
  * Baby Spider (the card text reads "another 'Spider' Creature").
  */
-function controlsAnotherSpider(engine, pi) {
+function controlsAnotherSpider(engine, pi, selfId = null) {
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    if (inst.name === CARD_NAME) continue;
+    // W16c (A05-26): nur DIESE Karte selbst ist nicht "another" - eine schon liegende (andere) Baby Spider zaehlt.
+    if (selfId != null && inst.id === selfId) continue;
     if (isSpiderCreature(inst.name, engine)) return true;
   }
   return false;
@@ -133,7 +134,7 @@ module.exports = {
     if (ctx._summonedFromDiscard || ctx._reviveAfterDeath
         || ctx._summonedByLivingIllusion || ctx._summonedByPlacement) return true;
     if (inherentUsedThisTurn(gs, pi)) return true;
-    if (!controlsAnotherSpider(engine, pi)) return true;
+    if (!controlsAnotherSpider(engine, pi, ctx.card?.id)) return true;
     // Inherent path — mark the once-per-turn slot used.
     gs.players[pi]._babySpiderInherentUsedTurn = gs.turn;
     return true;
