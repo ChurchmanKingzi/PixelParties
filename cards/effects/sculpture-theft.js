@@ -76,10 +76,24 @@ module.exports = {
     // einen wirksamen Boris, faellt SEINE Seite als Quelle weg — die
     // eigene bleibt waehlbar.
     const nurEigene = engine.borisHidesOpponentSide?.(pi) === true;
+    // W16c (A06-01): "Choose one of THOSE Creatures" - nur die durch das ausloesende Ereignis eingefrorenen Kreaturen (Fenster-Kontext
+    // `reactionWindowEvent`: `hookCtx.targets` bei Massen-Freeze, sonst `hookCtx.target`); fruehere Gefrorene zaehlen nicht.
+    // Ohne Fensterkontext (z. B. Aufruf von aussen) bleibt es bei allen gefrorenen Kreaturen.
+    let ausloeser = null;
+    try {
+      const hc = engine.reactionWindowEvent?.()?.hookCtx;
+      if (hc) {
+        const liste = (Array.isArray(hc.targets) && hc.targets.length)
+          ? hc.targets.filter(en => en.onCreature).map(en => en.target)
+          : (hc._onCreature && hc.target ? [hc.target] : []);
+        if (liste.length) ausloeser = new Set(liste.filter(Boolean).map(i => i.id));
+      }
+    } catch { ausloeser = null; }
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       if (!inst.counters?.frozen) continue;
+      if (ausloeser && !ausloeser.has(inst.id)) continue;
       if (nurEigene && inst.owner !== pi) continue;
       candidates.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,

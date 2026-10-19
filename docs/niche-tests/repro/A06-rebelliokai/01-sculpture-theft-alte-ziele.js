@@ -19,9 +19,12 @@ const H = require('../../lib/h.js');
   t.targetFn = (valid) => { const hit = valid.find(v => v.cardName === 'Loyal Beagle'); return hit ? [hit.id] : [valid[0].id]; };
   const r = await t.play(0, 'The White Army', { hero: 0 });
   const theft = t.targets.find(x => x.config && x.config.title === 'Sculpture Theft');
-  R.check('The White Army gespielt, Theft ausgelöst', r === true && !!theft, { r, hand1: t.pile(1, 'hand') });
+  // W16c: Gibt es nur EIN gültiges Ziel, nimmt Theft es ohne Zielwahl (kein Picker) – dann zählt das Ergebnis: Beagle auf der Hand, alte Dummy bleibt.
+  const hand = t.pile(1, 'hand'), altDa = t.gs.players[1].supportZones[0][0].length === 1;
+  R.check('The White Army gespielt, Theft ausgelöst', r === true && (!!theft || hand.includes('Loyal Beagle')), { r, hand1: hand });
   R.check('Theft bietet NUR die neu gefrorene Beagle an (nicht die alte Dummy)',
-    !!theft && theft.valid.length === 1 && theft.valid[0].cardName === 'Loyal Beagle', theft && theft.valid.map(v => v.cardName + '@' + v.slotIdx));
+    theft ? (theft.valid.length === 1 && theft.valid[0].cardName === 'Loyal Beagle') : (hand.includes('Loyal Beagle') && !hand.includes(D) && altDa),
+    theft ? theft.valid.map(v => v.cardName + '@' + v.slotIdx) : { hand, altDa });
   R.check('keine Engine-Fehler / Zustand sauber', t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   R.finish();
 })();
