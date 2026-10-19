@@ -120,8 +120,9 @@ function collectNonHeroBoardTargets(gs, engine) {
       });
     } else if (inst.zone === 'surprise') {
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-surprise`,
-        type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
+        // W16d (A07-24): Client-ID einer Surprise-Zone (wie _targeting-shared v706) – die alte `equip-…-surprise`-ID war unklickbar.
+        id: `surprise-${inst.owner}-${inst.heroIdx}`,
+        type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
     }

@@ -59,9 +59,8 @@ module.exports = {
       // Check if this slot contains the newly attached ability
       const inst = abilityInfo.cardInstance;
       if (inst && inst.zoneSlot === z && slot.includes(abilityInfo.cardName)) {
-        // This slot contains the new ability — only count as "other" if there are other slots too
-        // If the new ability was STACKED onto an existing ability, the slot had abilities before
-        if (slot.length > 1) otherAbilityCount++; // Pre-existing stack
+        // This slot contains the new ability. W16d (A08-25): auch ein Stapel (dieselbe Fähigkeit eine Stufe höher) ist
+        // KEINE „different Ability" – die Optionenliste in onSurpriseActivate überspringt diesen Platz ebenso.
         continue;
       }
       otherAbilityCount++;
