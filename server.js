@@ -13836,6 +13836,38 @@ function cubeBuildTimerMs(cd) {
   return cubeDraftBuildTimerSec(cd?.buildTimerSec) * 1000;
 }
 
+const CUBE_BUILD_BACKUP_SEC = 300;   // Reservetimer bei ausgeschaltetem Deckbau-Timer, s. cubeBuildCheckBackup
+
+/**
+ * Reservetimer fuer „Deckbau-Timer AUS“: Sind ALLE Menschen, die noch nicht Ready sind, getrennt, wuerde der Raum
+ * sonst ewig warten. Dann laufen 300 s; danach bekommen die Fehlenden ein Auto-Deck (wie beim normalen Timer).
+ * Kehrt einer von ihnen zurueck, wird der Reservetimer abgebrochen. Bei eingeschaltetem Deckbau-Timer ohne Wirkung
+ * (der regulaere Timer deckt den Fall ab). Aufrufen, wenn sich Verbindung oder Ready-Stand aendern.
+ */
+function cubeBuildCheckBackup(room, io) {
+  const cd = room?.cubeDraft;
+  if (!cd || cd.phase !== 'building' || cubeBuildTimerMs(cd) > 0) return;
+  const wartende = room.players.filter((p, i) => !p.isBot && !cd.readySeats?.[i]);
+  const alleWeg = wartende.length > 0 && wartende.every(p => !p.socketId);
+  if (alleWeg && !cd.buildTimerHandle) {
+    cd.buildBackupActive = true;
+    cd.buildTimerEndsAt = Date.now() + CUBE_BUILD_BACKUP_SEC * 1000;
+    cd.buildTimerHandle = setTimeout(() => {
+      cd.buildBackupActive = false;
+      cubeBuildAutoFillNonReady(room, io).catch(err => console.error('[cubeBuildAutoFillNonReady]', err.message));
+    }, CUBE_BUILD_BACKUP_SEC * 1000);
+    console.log(`[cube_build] room ${room.id}: alle Wartenden getrennt — Reservetimer ${CUBE_BUILD_BACKUP_SEC}s`);
+    cubeBuildBroadcast(room, io);
+  } else if (!alleWeg && cd.buildBackupActive) {
+    clearTimeout(cd.buildTimerHandle);
+    cd.buildTimerHandle = null;
+    cd.buildBackupActive = false;
+    cd.buildTimerEndsAt = null;
+    console.log(`[cube_build] room ${room.id}: Reservetimer abgebrochen — jemand ist zurueck`);
+    cubeBuildBroadcast(room, io);
+  }
+}
+
 /** Auto-fill any non-ready human seats with a random legal deck and
  *  flip them to Ready. Called when the build-phase timer expires. */
 async function cubeBuildAutoFillNonReady(room, io) {
@@ -14483,7 +14515,7 @@ io.on('connection', (socket) => {
       // rejoiner so the client can render the right screen.
       if (room.cubeDraft) {
         if (room.cubeDraft.phase === 'drafting') cubeDraftBroadcast(room, io);
-        else if (room.cubeDraft.phase === 'building') cubeBuildBroadcast(room, io);
+        else if (room.cubeDraft.phase === 'building') { cubeBuildCheckBackup(room, io); cubeBuildBroadcast(room, io); }
         else if (room.cubeDraft.phase === 'tournament') cubeTournamentBroadcast(room, io);
       }
       // If spectator re-joins during a game, send them the current game state
@@ -14821,7 +14853,10 @@ io.on('connection', (socket) => {
         clearTimeout(room.cubeDraft.buildTimerHandle);
         room.cubeDraft.buildTimerHandle = null;
       }
+      room.cubeDraft.buildBackupActive = false;
       cubeStartTournament(room, io);
+    } else {
+      cubeBuildCheckBackup(room, io);   // sind die uebrigen Wartenden alle getrennt?
     }
   });
 
@@ -19319,6 +19354,7 @@ function handleLeaveRoom(socket, roomId, user) {
     } else {
       room.spectators = room.spectators.filter(s => s.username !== user.username);
     }
+    if (room.cubeDraft.phase === 'building') cubeBuildCheckBackup(room, io);
     // Ist kein Mensch mehr online, den Raum nach einer Karenzzeit aufraeumen
     // (sonst bliebe ein pausierter Draft fuer immer im Speicher).
     if (!room.players.some(p => !p.isBot && p.socketId) && !room._verlassenTimer) {
