@@ -61,6 +61,9 @@ module.exports = {
   // Hooks auch im stillgelegten Zustand — sie rufen nur den Abgleich, der die Stilllegung selbst prüft.
   bypassStatusFilter: true,
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, ...): die Negation gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: async (ctx) => { await syncBishopNegation(ctx._engine); },
+
   hooks: {
     onStatusApplied: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
     onStatusRemoved: async (ctx) => { if (ctx.card?.zone === 'support') await syncBishopNegation(ctx._engine); },
