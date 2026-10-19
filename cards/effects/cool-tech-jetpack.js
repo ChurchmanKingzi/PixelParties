@@ -42,6 +42,9 @@ module.exports = {
     if (heroIdx == null || heroIdx < 0) return false;
     const hoptKey = `cool-tech-jetpack:${inst?.id || `${pi}-${heroIdx}`}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
+    // W16e (F01-26): „is CHOSEN by a card or effect" — ein Flaechenschlag waehlt niemanden (CARD_API „Ein Flaechenschlag WAEHLT niemanden";
+    // die Engine stempelt `_isAoeCheck` auf die Quelle): kein Angebot, nichts wird negiert.
+    if (sourceCard?._isAoeCheck) return false;
     const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (sourceOwner === pi) return false;
     const ps = gs.players[pi];

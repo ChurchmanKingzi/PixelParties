@@ -40,15 +40,14 @@ const CARD_NAME = 'Sleeping Beauty';
 const ON_DEFEAT_DAMAGE = 300;
 const HARD_KEY = 'sleeping-beauty-hard';   // W13 (Rueckfrage 8)
 
-function _eligibleLinkHeroes(gs, pi) {
-  const ps = gs.players[pi];
-  if (!ps) return [];
+function _eligibleLinkHeroes(engine, pi) {
+  // W16e (C04-03): „a Hero you permanently control" = eigene Spalte ohne die abgegebenen
+  // PLUS dauerhaft uebernommene Gegnerhelden (Paraseed Control …) — `heroesControlledBy(pi, { permanentOnly })`.
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi, { permanentOnly: true })) {
     if (!h?.name || h.hp <= 0) continue;
-    if (h.charmedBy != null) continue; // not "permanently controlled"
-    out.push(hi);
+    if (h.charmedBy != null && h.permaControlBy !== pi) continue; // vorlaeufig gecharmt: nicht „permanently controlled"
+    out.push({ owner: physOwner, heroIdx: hi, hero: h });
   }
   return out;
 }
@@ -76,15 +75,15 @@ module.exports = {
       const ps     = gs.players[pi];
       if (!ps) return;
 
-      const eligible = _eligibleLinkHeroes(gs, pi);
+      const eligible = _eligibleLinkHeroes(engine, pi);
       if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
-      const targets = eligible.map(hi => ({
-        id: `hero-${pi}-${hi}`,
+      const targets = eligible.map(e => ({
+        id: `hero-${e.owner}-${e.heroIdx}`,
         type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+        owner: e.owner,
+        heroIdx: e.heroIdx,
+        cardName: e.hero.name,
       }));
 
       const picked = await engine.promptEffectTarget(pi, targets, {
@@ -101,17 +100,18 @@ module.exports = {
 
       // Defensive default: if the pick was somehow dismissed, link to
       // the host hero so the on-summon mandate always resolves.
+      let chosenOwner = pi;
       let chosenIdx = ctx.card.heroIdx;
       if (picked && picked.length > 0) {
         const found = targets.find(t => t.id === picked[0]);
-        if (found) chosenIdx = found.heroIdx;
+        if (found) { chosenOwner = found.owner; chosenIdx = found.heroIdx; }
       }
 
-      ctx.card.counters._linkedHeroOwner = pi;
+      ctx.card.counters._linkedHeroOwner = chosenOwner;
       ctx.card.counters._linkedHeroIdx = chosenIdx;
       engine.log('sleeping_beauty_link', {
         player: ps.username,
-        target: ps.heroes[chosenIdx]?.name || 'Hero',
+        target: gs.players[chosenOwner]?.heroes?.[chosenIdx]?.name || 'Hero',
       });
       engine.sync();
     },
@@ -162,7 +162,7 @@ module.exports = {
     // the hero ALREADY USED their effect, which is the trigger
     // condition for Sleeping Beauty to re-cast it.
     // Schluessel ueber die Engine (v1275: Kartenname + Spieler, ohne Heldenindex).
-    const hoptKey = engine.heroHoptKey(linkedHero.name, linkedOwner);
+    const hoptKey = engine.heroHoptKey(linkedHero.name, engine.heroSideOf(linkedOwner, linkedHero));   // Stempel des Kontrolleurs
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) return false;
 
     const { loadCardEffect } = require('./_loader');

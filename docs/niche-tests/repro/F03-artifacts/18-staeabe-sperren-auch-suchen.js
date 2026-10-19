@@ -6,12 +6,14 @@
 // Erwartung (Lesart Text/Jewel-Ruling): Suchen bleibt erlaubt; nur Ziehen ist gesperrt. Das Skript sperrt zusätzlich `blockedByHandLock`-Karten (Cheese ist damit unspielbar).
 // Beobachtet (✗): Sickly Cheese / Spice Mortar sind nach dem Stab nicht spielbar (`handLocked`).
 // Ursache: `staff-of-the-teleporter.js` (Z. ~156 `ps.handLocked = true`) und `staff-of-uncontrollable-destruction.js` setzen `handLocked` statt `drawLocked`.
+// W16e: Deck so gelegt, dass die Stab-Ziehung (Teleporter/Uncontrollable ziehen 1+ Karten) das Ziel der Suche (Accusation) nicht wegzieht — sonst ist
+// Sickly Cheese mangels Suchziel zu Recht unspielbar.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
   for (const staff of ['Staff of the Teleporter', 'Staff of Uncontrollable Destruction']) {
     for (const sucher of ['Sickly Cheese', 'Spice Mortar']) {
-      const t = await H.fresh({ hand: [[staff, sucher], []], deck: [['Accusation', 'Bird', 'Bird'], ['Acid Vial', 'Bird', 'Bird']], gold: 100 });
+      const t = await H.fresh({ hand: [[staff, sucher], []], deck: [['Bird', 'Bird', 'Bird', 'Accusation', 'Bird'], ['Acid Vial', 'Bird', 'Bird']], gold: 100 });
       t.script.push({ match: d => d.type === 'handPick', answer: () => ({ selectedCards: [] }), once: false });
       t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Sickly Cheese', answer: () => ({ cardName: 'Accusation', source: 'deck' }), once: false });
       t.script.push({ match: d => d.type === 'deckPeekPick', answer: () => ({ cancelled: true }), once: false });

@@ -197,6 +197,7 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   // Eintritt: Surprise-Fenster beim Ausruesten + Beobachter.
   await engine.runHooks('onCardEnterZone', {
     enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+    _isEffectEquip: true,   // W16e (F03-21): Anlegen per EFFEKT (nicht aus der Hand) — Summoning Instructions: X = 1 ohne Frage
   });
   engine.sync();
   return inst;

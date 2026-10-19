@@ -19,9 +19,12 @@ const H = require('../../lib/h.js');
   t.script.push({ match: d => d.type === 'forceDiscardCancellable', answer: () => ({ cardName: 'ZZ Filler', handIndex: 0 }) });
   const frei = async () => { t.gs.activePlayer = 0; t.phase(2); return t.run(() => t.host.doActivateFreeAbility(t.room, 0, { heroIdx: 0, zoneIdx: 0 })); };
   const a1 = await frei();
-  const a2 = await frei();
+  // W16e: „immediately use it an additional time AFTER THAT" — die Zusatznutzung folgt SOFORT auf die erste Nutzung (Ja/Nein-Angebot im selben Zug
+  // der Aktivierung), kein zweiter Aktivierungsaufruf; die Tagessperre der Ability selbst bleibt (ein weiterer Aufruf wird abgelehnt).
   R.check('(b) erste Aktivierung ok', a1 === true, a1);
-  R.check('(b) zweite Aktivierung (Lab) ist erlaubt', a2 === true, { a2, ablage: t.pile(0, 'discardPile').length });
+  R.check('(b) Zusatznutzung durch das Lab: zwei Abwürfe', t.pile(0, 'discardPile').length === 2, t.pile(0, 'discardPile'));
+  const a2 = await frei();
+  R.check('(b) ein weiterer Aufruf bleibt gesperrt (Ability once per turn; Lab nur einmal pro Zug)', a2 === false && t.pile(0, 'discardPile').length === 2, { a2, ablage: t.pile(0, 'discardPile').length });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

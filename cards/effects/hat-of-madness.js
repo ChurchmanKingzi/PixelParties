@@ -60,9 +60,13 @@ module.exports = {
       const ich = ctx.card;
       if (!ich || ich.zone !== 'support') return;
 
-      // Nur Handlungen DIESES Helden.
-      const seite = engine.physicalSide(ich);
+      // Nur Handlungen DIESES Helden. W16e (F02-04): `brett` = Spalte des Hutes/Helden, `seite` = Kontrolleur des Helden
+      // (`heroSideOf`) — „its controller" ist der Handelnde: ein vom Gegner uebernommener Hut-Traeger laesst DEN Gegner die Karte geben.
+      const brett = engine.physicalSide(ich);
+      const traeger = gs.players[brett]?.heroes?.[ich.heroIdx];
+      const seite = engine.heroSideOf(brett, traeger);
       if (ctx.playerIdx !== seite) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== brett) return;
       if (ctx.heroIdx !== ich.heroIdx) return;
 
       // Nur echte Aktionen (siehe Kopf) — dieselbe Auslegung wie Bleed.

@@ -106,7 +106,7 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   await engine.runHooks('onPlay', {
     _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: slotIdx,
   });
-  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true });   // W16e (F03-21): per Effekt angelegt
   engine.sync();
   return inst;
 }

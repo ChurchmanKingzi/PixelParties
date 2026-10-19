@@ -37,12 +37,14 @@ module.exports = {
   cpuMeta: { statusHealChannel: true }, // Status-Heilungs-Lernkanal (siehe _deck-profile.js)
   isTargetingArtifact: true,
 
-  canActivate(gs, pi) {
-    const ps = gs.players[pi];
+  // W16e (F01-11): „a Hero you control" = Kontrolle (`heroesControlledBy`: eigene Spalte ohne abgegebene + uebernommene), IDs/`owner` = Brettseite.
+  canActivate(gs, pi, engine) {
     const negKeys = getCleansableStatuses();
     const currentTurn = gs.turn || 0;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    const helden = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi).map(e => e.hero)
+      : (gs.players[pi].heroes || []);
+    for (const hero of helden) {
       if (!hero?.name || hero.hp <= 0) continue;
       if (!hero.statuses) continue;
       const hasOld = negKeys.some(k => hero.statuses[k] && hero.statuses[k].appliedTurn < currentTurn);
@@ -52,18 +54,19 @@ module.exports = {
   },
 
   getValidTargets(gs, pi, engine) {
-    const ps = gs.players[pi];
     const targets = [];
     const currentTurn = gs.turn || 0;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    const helden = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi)
+      : (gs.players[pi].heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx: hi, hero } of helden) {
       if (!hero?.name || hero.hp <= 0) continue;
-      const statuses = getEligibleStatuses(hero, currentTurn, engine, pi, hi);
+      const statuses = getEligibleStatuses(hero, currentTurn, engine, physOwner, hi);
       if (statuses.length === 0) continue;
       targets.push({
-        id: `hero-${pi}-${hi}`,
+        id: `hero-${physOwner}-${hi}`,
         type: 'hero',
-        owner: pi,
+        owner: physOwner,
         heroIdx: hi,
         cardName: hero.name,
       });
@@ -90,13 +93,13 @@ module.exports = {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target || target.type !== 'hero') return;
 
-    const ps = engine.gs.players[pi];
-    const hero = ps.heroes[target.heroIdx];
+    const seite = target.owner ?? pi;   // Brettseite des (ggf. uebernommenen) Helden
+    const hero = engine.gs.players[seite]?.heroes?.[target.heroIdx];
     if (!hero?.name) return;
     const currentTurn = engine.gs.turn || 0;
 
     // Step 1: Status selection (only non-this-turn statuses)
-    const statuses = getEligibleStatuses(hero, currentTurn, engine, pi, target.heroIdx);
+    const statuses = getEligibleStatuses(hero, currentTurn, engine, seite, target.heroIdx);
     if (statuses.length === 0) return;
 
     const statusResult = await engine.promptGeneric(pi, {
@@ -114,10 +117,10 @@ module.exports = {
     if (removedStatuses.length === 0) return; // Nothing selected — fizzle
 
     // Step 2: Remove selected statuses
-    engine.cleanseHeroStatuses(hero, pi, target.heroIdx, removedStatuses, 'Coffee');
+    engine.cleanseHeroStatuses(hero, seite, target.heroIdx, removedStatuses, 'Coffee');
 
     // Play coffee animation on hero
-    engine._broadcastEvent('play_zone_animation', { type: 'coffee_steam', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1 });
+    engine._broadcastEvent('play_zone_animation', { type: 'coffee_steam', owner: seite, heroIdx: target.heroIdx, zoneSlot: -1 });
     engine.sync();
     await engine._delay(600);
 
@@ -125,6 +128,7 @@ module.exports = {
     await engine.performImmediateAction(pi, target.heroIdx, {
       title: 'Coffee',
       description: `Use an additional Action with ${hero.name}!`,
+      ...(seite !== pi ? { heroOwner: seite } : {}),
     });
   },
 };

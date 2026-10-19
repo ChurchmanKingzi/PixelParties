@@ -11182,7 +11182,7 @@ async function doActivateDiscardEffect(room, pi, { instId }) {
   return true;
 }
 
-async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
+async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: heroOwnerParam }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -11205,7 +11205,27 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // Auch hier ueber das Override: eine Copy Device, die zu einem
     // Control Device geworden ist, liegt cross-side, heisst aber nicht so.
     && loadCardEffect(c.counters?._effectOverride || c.name)?.placesOnOpponentBoard);
-  const ps = _crossInst ? gs.players[oi] : gs.players[pi];
+  // ★ W16e (F02-22): Ausruestung an einem UEBERNOMMENEN Helden (Paraseed Control, Styx, Golden Apple …): die Karte liegt auf der BRETTSEITE des Helden
+  // (Gegenspalte), aktivieren darf sie sein KONTROLLEUR (CARD_API „Uebernommene Helden gelten als Helden des Kontrolleurs") — nicht die Brettseite,
+  // die den Helden gerade nicht kontrolliert. `heroOwner` (optional) nennt die Spalte; ohne Angabe: die eigene Spalte, sofern der Held dort mir
+  // gehoert und dort etwas liegt, sonst ein von mir kontrollierter Fremdheld mit dieser Karte an (heroIdx, zoneSlot).
+  let _brett = _crossInst ? oi : pi;
+  if (!_crossInst) {
+    const _hatKarte = (seite) => ((gs.players[seite]?.supportZones?.[heroIdx] || [])[zoneSlot] || []).length > 0;
+    const _meinHeld = (seite) => {
+      const h = gs.players[seite]?.heroes?.[heroIdx];
+      return !!h?.name && room.engine.heroSideOf(seite, h) === pi;
+    };
+    if (Number.isInteger(heroOwnerParam) && gs.players[heroOwnerParam]) {
+      _brett = heroOwnerParam;
+    } else if (!(_hatKarte(pi) && _meinHeld(pi))) {
+      const fremd = room.engine.heroesControlledBy(pi).find(e => e.physOwner !== pi && e.heroIdx === heroIdx && _hatKarte(e.physOwner));
+      if (fremd) _brett = fremd.physOwner;
+    }
+    // Wer den Helden nicht kontrolliert, aktiviert nichts an ihm.
+    if (!_meinHeld(_brett)) return false;
+  }
+  const ps = gs.players[_brett];
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   // Bound blocks "Actions" only — equip-effect activations are an
@@ -11223,7 +11243,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   // Zweig fand der Server die Karte nicht und der Klick verpuffte
   // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
   const inst = _crossInst || room.engine.cardInstances.find(c =>
-    room.engine.physicalSide(c) === pi && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
+    room.engine.physicalSide(c) === _brett && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot   // Z1: Brettseite
   );
   if (!inst) return false;
 
@@ -11235,6 +11255,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   // (der Fehler aus v567, hier vorweggenommen).
   const script = loadCardEffect(inst.counters?._effectOverride || cardName);
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
+  // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
+  if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
   if (!script.bypassHostStatusFilter) {
     if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
     if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;

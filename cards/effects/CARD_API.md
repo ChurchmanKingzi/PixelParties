@@ -20837,3 +20837,45 @@ Triage der 35 roten Repros: 1 = Fehler mit eindeutiger Erwartung (behoben), 2 = 
 **Fragen an Al (offen, Code unverändert bzw. Lesart in Klammern):** A08-06 (Big Gwen Guard + Grinning Cat: Abwurf der Katze als Kosten vor der Sperre?), A08-12 (Trial of Dominance + Paraseed: Einnisten oder Löschen?), C03-07 Fall B (Grave Worm bei geliehener Kreatur: Lesart „nur wenn sie in MEINE Ablage geht" ist umgesetzt, Gegenlesart: Beschwörung in die Zone auf der Gegnerseite).
 
 **Neue Engine-Verträge:** `engine.uebernahmeUnzulaessig`, `engine.ushabtiEingelagert`, `engine.todesEreignisSchluessel`, Skript-Haken `eintrittsLimitErreicht(engine, pi)` (gelesen von `_eintrittsLimitErreicht`), Glied-Haken `link._nachAufloesung`, Todes-Hook-Felder `ziel`/`ablageBesitzer`, `clearArmedArrows` ist `async`.
+## ★ Welle 16 / W16e — Restbefunde C04/C05 (Kreaturen) und F01/F02/F03 (Artefakte) (19.10.2026)
+
+Abarbeitung der 36 roten Repros nach den Triage-Regeln (1 = Fehler, Erwartung eindeutig → behoben; 2 = Repro misst falsch; 3 = echte Regelfrage → nicht geändert, Frage an Al; 4 = zu groß). Neue Repros: `docs/niche-tests/repro/W16/e-*.js` (Exit 0 = korrekt).
+
+| Befund | Einordnung | Ergebnis |
+|---|---|---|
+| C04-03 Sleeping Beauty | 1 | „a Hero you permanently control" = `engine.heroesControlledBy(pi, { permanentOnly: true })` (eigene Spalte ohne abgegebene PLUS dauerhaft übernommene Gegnerhelden); Link trägt die Brettseite (`_linkedHeroOwner`), Held-Stempel des Kontrolleurs. Repro `e-c04-03`. |
+| C04-04 Spirit of the Shattered Trident | 1 (+2) | Die Aktionsphase kennt EINE Aktion je Spieler: hat ein anderer Held sie verbraucht, ist die Löschung eines Artefakts Pflicht (kein „Use the Action"-Angebot); vorher war die Beschwörung gratis. Repro-Erwartung angepasst (Spirit steht nur gegen Löschung des Tridents). |
+| C04-05 Spirit of the Relic Hammer | 3 | Nicht geändert, Frage an Al (siehe Abgabe). |
+| C04-06 Powder Keg | 1 | „an opponent's Hero" nach KONTROLLE (`heroSideOf`), Support Zone auf der Brettseite; liegt das Fass in der Spalte eines vom Gegner kontrollierten eigenen Helden, führt der Gegner es (`markiereSeitenfremd`, `originalOwner` = Spieler). Repro `e-c04-06`. |
+| C05-05 Water Golem | 1 | Beim Abgang nur die EIGENE Negierung zurücknehmen (`sourceBound`/`negatedSourceBound` = Water Golem); Stowaway & Co. bleiben. |
+| C05-06 The Spawn Mother | 1 | Text „summoned from your hand": nur Beschwörung aus der Hand löst den Einsatz-Schaden aus; Ablage/Deck/Wiederbelebung (Herkunftszeichen `_summonedFromDiscard/-Deck/-Pile`, `_reviveAfterDeath`, `_isForcefulRevival`) nicht, ohne Prompt und ohne Stempel. |
+| C05-07 The Spawn Mother (gestohlen) | 1 | „your hand" = Hand des Kontrolleurs (`toPlayer`, Vorbild Moonlight Butterfly W6). |
+| F01-01 Cool Repair | 1 | Galerie und Zielliste respektieren `canEquipCardToHero` (Crusader's, Grimoire, Cloak …). Repro `e-f01-01`. |
+| F01-04 Blade of the Frostbringer | 1 | „cannot be Frozen in 2 consecutive turns" gilt auch für Kreaturen: Zugstempel `counters._frostbringerTurn` (gefroren in t → in t+2 nicht erneut). Repro `e-f01-04`. |
+| F01-05 Cool Cheese | 1 | Die Grundkosten werden erst NACH `resolve` abgebucht: „double the Cost" wird nur angeboten, wenn Grundkosten + 4 zusammen zahlbar sind (`artifactPlayCost` des auflösenden Handslots, `canAffordGold`). |
+| F01-10 Deepsea Idol | 1 | `_checkCreatureDamageBatchReactions`: „Creatures you control" zählt nach Kontrolleur (`controller ?? owner`), nicht nach `inst.owner`. |
+| F01-11 Coffee / Angry Cheese | 1 | „a Hero you control" = `heroesControlledBy`, IDs/Animationen auf Brettseite; Zusatzaktion mit übernommenem Helden über `heroOwner`. |
+| F01-15 Flying Island in the Sky | 1 | `removeIslandZones`: Inselkreaturen werden über `actionMoveCard(… fireCreatureDeath)` besiegt (Todes-Hooks, Token/Besitzer-Routing) statt Phantom-`onHeroKO`. Repro `e-f01-15`. |
+| F01-17 Bow of the Hunt Goddess | 4 | Nicht geändert (siehe Abgabe). |
+| F01-18 Diver Helmet | 1 | The Seventh Circle of Hell (Zugende-Wahl und Abgangs-Wahl) bietet Helm-Held und seine Support-Zonen-Karten nicht an; Dark Ocean nimmt Helm-Kreaturen aus (`_isDiverHelmetProtectedTarget`). |
+| F01-20 Arcane Lamp | 1 | `statuses.immune` (Auftau-Puffer) schützt nur vor Frozen/Stunned/Negated/Bound, nicht vor Brand. (Gleiches Muster in `heat-wave.js` Z. 82 — nicht Teil dieser Gruppe, unverändert.) |
+| F01-22 Cloak of Edge | 1 | Als Ability zählende Ausrüstung (`countsAsAbilityInZone`) unterliegt `abilityActivationBlocked()` (The Thing in the Ship): `getActivatableEquips` und `doActivateEquipEffect`. |
+| F01-23 Explosivo's Sword | 1 | `equipOwnSideOnly: true` („Equip this card to a Hero you control"). |
+| F01-26 Cool Tech Jetpack | 1 | „is chosen by": ein Flächenschlag wählt niemanden. Die Engine stempelt `_isAoeCheck` jetzt auch um das Nach-Ziel-Fenster des Flächenwegs (`dealDamageToTargets`), das Jetpack liest es. Gilt damit auch für Dream Dust, Dream World Switcheroo, Secret Room (lasen das Flag schon). |
+| F02-01 Mana-Consuming Blade | 1 | +10 ATK umgesetzt (`grantAtk`/`revokeAtk`). „Mana Spells" (Namensregel: nur Mana Beacon) trifft keinen Helden — keine Wirkung nötig. |
+| F02-02 Secret Lab Entrance | 1 (+2) | Ausrüstbeschränkung (`canEquipToHero`: Held mit Inventing-Stapel) und Zusatznutzung (Hook `onActiveEffectUsed` der freien Inventing, Ja/Nein, einmal pro Zug und Lab, Stempel erst nach gelungener Nutzung). Repro-Erwartung angepasst: die Zusatznutzung folgt SOFORT (kein zweiter Aktivierungsaufruf). Repro `e-f02-02`. |
+| F02-03 Sacred Hammer of the Volcano | 1 | „increased by the attacker's Attack stat" = aktuelle ATK (nicht `baseAtk`). |
+| F02-04 Hat of Madness | 1 | „its controller" = Kontrolleur des Trägers (`heroSideOf`), Brettseite wird über `ctx.heroOwner` geprüft. |
+| F02-05 Heart of Ice | 1 | Überschreibt keine bestehende Frost-Immunität (Broghan, Sun Sword); beim Abgang bleibt sie. |
+| F02-08 Magic Cobalt / Magic Ruby | 1 | „a Hero you control" / „a Hero your opponent controls" nach Kontrolle. Magic Amethyst und Golden Apple (Zusatz im Bericht) nicht umgestellt. |
+| F02-09 Heart of Cards | 1 | Die Löschung der obersten Karte meldet `onMill` (`deleteMode`): Mystery Box zieht 2. |
+| F02-12 Renewable Energy | 1 | Basisname im Galerie-Filter, Auswahl nach Basisnamen entdoppelt („different names"). |
+| F02-15 Juice | 1 | `canActivate(gs, pi, engine)` fragt die echte Zielliste (Kreaturen zählen). |
+| F02-16 Rocket Sneeze | 1 | Dedup-Flag trägt jetzt Quelle + laufenden Effekt statt eines bis `onChainResolve` stehenden Booleans: neues Schadensereignis ohne Kette fragt neu. |
+| F02-17 Initiation Ritual | 1 | Karten der Ability Zones werden GELÖSCHT („deleting"); Ability-Typ-Karten aus Support Zones gehen weiter in die Ablage. |
+| F02-22 Aktive Ausrüstung am übernommenen Helden | 1 | `doActivateEquipEffect` löst Brettseite über die Kontrolle auf (optional `heroOwner`); der Brettseiten-Besitzer, der den Helden nicht kontrolliert, darf nicht; `getActivatableEquips` läuft nach Kontrolle. |
+| F03-01 The White Eye | 1 | Heldentod-Aufräumen kennt die Umleitung `_returnToHand` (Haken ohne `toZone` gilt als „sent to your discard pile"). Wirkt auch für Spirit of the Shattered Trident. |
+| F03-02 The Sun Sword | 1 | Frost-Immunität als Stempel-Abgleich nach Kontrolle (`abgleichen`): bei Anlegen, Abgang, Eintritt, `onTakeControl`, `onHeroRevive`, Zugwechsel; eigene Immunität einer Kreatur (SnowItAll) bleibt. Repro `e-f03-02`. |
+| F03-08 Slippery Fridge | 1 | Ziele des Umhängens respektieren `heroCanBeEquipped` und `canEquipCardToHero(… ausruestOpts)`. |
+| F03-18 Staff of the Teleporter / Uncontrollable Destruction | 1 (+2) | Al (Welle 3, Frage 107): „Stäbe sperren nur das Ziehen" → `drawLocked` statt `handLocked` (Ablagesperre bleibt in `_discardLockedTurn`). Repro-Deck angepasst (die Stab-Ziehung zog das Suchziel weg). |
+| F03-21 Treasure Hunter's Backpack | 1 | Anlegen per Effekt trägt `_isEffectEquip` (Backpack, `_equip-shared.ruesteAusStapelAus`, `_orchestra-shared.equipArtifactToHero`); Summoning Instructions: X = 1 ohne Frage. |

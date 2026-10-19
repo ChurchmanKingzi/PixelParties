@@ -39,7 +39,7 @@ const CARD_NAME = 'Arcane Lamp';
 function heroCanBeBurned(hero, engine = null, quelle = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.burned) return false;
-  if (hero.statuses?.immune) return false;
+  // W16e (F01-20): `statuses.immune` (Auftau-Puffer) schuetzt nur vor Frozen/Stunned/Negated/Bound (`CC_STATUSES`), nicht vor Brand — kein Ausschluss.
   // Charme schuetzt nur in seiner Auspraegung (Charme Lv3: alles, Golden
   // Apple: nur gegen den Kontrolleur, Styx: gar nicht) — `_charmBlocksFrom`.
   if (hero.statuses?.charmed && (engine?._charmBlocksFrom ? engine._charmBlocksFrom(hero, quelle) : true)) return false;

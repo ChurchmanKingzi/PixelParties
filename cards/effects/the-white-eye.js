@@ -121,7 +121,9 @@ module.exports = {
      */
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      if (ctx.toZone !== 'discard') return;
+      // W16e (F03-01): das Heldentod-Aufraeumen ruft den Haken ohne `toZone` (die Ausruestung geht dort in die Ablage) — auch das ist
+      // "sent to your discard pile".
+      if (ctx.toZone !== undefined && ctx.toZone !== 'discard') return;
 
       // Confirm the leaving card is The White Eye itself (match by slot)
       const engine = ctx._engine;

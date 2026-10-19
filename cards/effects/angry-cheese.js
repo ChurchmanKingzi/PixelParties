@@ -26,7 +26,7 @@ const { getCardDB: _getCardDB } = require('./_card-db');
 async function zahleKosten(engine, pi, selectedIds, validTargets) {
   const target = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
   if (!target || target.type !== 'hero') return false;
-  const hero = engine.gs.players[pi]?.heroes?.[target.heroIdx];
+  const hero = engine.gs.players[target.owner ?? pi]?.heroes?.[target.heroIdx];   // W16e (F01-11): Brettseite des kontrollierten Helden
   if (!hero?.name || hero.hp <= 0) return false;
   await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other', { festesZiel: true });   // Selbstkosten (Als Ruling 9.10.)
   engine.sync();
@@ -46,11 +46,13 @@ module.exports = {
   isTargetingArtifact: true,
   blockedByHandLock: true,
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     // Need at least 1 living hero to take the damage cost
-    const hasHero = (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    const hasHero = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi).some(({ hero: h }) => h?.name && h.hp > 0)
+      : (ps.heroes || []).some(h => h?.name && h.hp > 0);
     if (!hasHero) return false;
     // Must have at least 1 Destruction Magic Spell left in deck
     const cardDB = _getCardDB();
@@ -61,15 +63,17 @@ module.exports = {
     });
   },
 
-  getValidTargets(gs, pi) {
-    const ps = gs.players[pi];
+  // W16e (F01-11): „a Hero you control" = Kontrolle (`heroesControlledBy`), IDs/`owner` = Brettseite.
+  getValidTargets(gs, pi, engine) {
     const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    const helden = engine?.heroesControlledBy
+      ? engine.heroesControlledBy(pi)
+      : (gs.players[pi].heroes || []).map((hero, heroIdx) => ({ physOwner: pi, heroIdx, hero }));
+    for (const { physOwner, heroIdx: hi, hero } of helden) {
       if (!hero?.name || hero.hp <= 0) continue;
       targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero', owner: pi, heroIdx: hi,
+        id: `hero-${physOwner}-${hi}`,
+        type: 'hero', owner: physOwner, heroIdx: hi,
         cardName: hero.name,
       });
     }

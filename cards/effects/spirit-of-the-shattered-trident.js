@@ -124,8 +124,12 @@ module.exports = {
     if (kandidaten.length === 0) return true;        // sollte `inherentAction` verhindern
 
     // Stand diesem Helden noch eine regulaere Aktion offen?
+    // W16e (C04-04): die Aktionsphase kennt EINE Aktion je Spieler (nicht je Held) — hat ein anderer Held
+    // sie verbraucht, ist die Loeschung PFLICHT (Bauform Potion Juggler `aktionFrei`; Bonus-Aktion zaehlt als frei).
+    const bonusFrei = (ps.bonusActions?.heroIdx === heroIdx && (ps.bonusActions.heroOwner ?? pi) === pi && ps.bonusActions.remaining > 0)
+      || ((ps._bonusMainActions || 0) > 0);
     const hatteAktion = gs.currentPhase === 3
-      && !(ps.heroesActedThisTurn || []).includes(heroIdx);
+      && ((ps.heroesActedThisTurn || []).length === 0 || bonusFrei);
 
     if (hatteAktion) {
       const ja = await engine.promptGeneric(pi, {

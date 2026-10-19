@@ -87,7 +87,7 @@ module.exports = {
       // erneut fragen — X gehoert zur Karte, nicht zum Eintritt.
       if (inst.counters?.levelGapCoverage) return;
       // v1263: per Effekt angelegt → X = 1 ohne Frage (siehe frageX).
-      await frageX(ctx._engine, inst, (ctx._isPlacement || ctx._isMove) ? 1 : null);
+      await frageX(ctx._engine, inst, (ctx._isPlacement || ctx._isMove || ctx._isEffectEquip) ? 1 : null);
     },
   },
 

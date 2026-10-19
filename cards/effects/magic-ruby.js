@@ -18,27 +18,30 @@ const { opponentOfGs } = require('./_opp');
 const CARD_NAME = 'Magic Ruby';
 const STUN_DURATION = 1;
 
+/** Helden, die der Gegner von `pi` kontrolliert (ohne Engine: dessen Spalte). */
+function gegnerHelden(gs, pi, engine) {
+  const oi = opponentOfGs(gs, pi);
+  if (engine?.heroesControlledBy) return engine.heroesControlledBy(oi);
+  return (gs.players[oi]?.heroes || []).map((hero, heroIdx) => ({ physOwner: oi, heroIdx, hero }));
+}
+
 module.exports = {
   isTargetingArtifact: true,
   activeIn: ['hand'],
 
-  canActivate(gs, pi) {
+  // W16e (F02-08): „a Hero your opponent controls" = Kontrolle (`heroSideOf`), IDs = Brettseite — beide Spalten.
+  canActivate(gs, pi, engine) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one alive opponent hero. Existing immunities are
     // checked by the standard status-application gate at apply time.
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
-    return (ops?.heroes || []).some(h => h?.name && h.hp > 0);
+    return gegnerHelden(gs, pi, engine).some(({ hero: h }) => h?.name && h.hp > 0);
   },
 
-  getValidTargets(gs, pi) {
-    const oi = opponentOfGs(gs, pi);
-    const ops = gs.players[oi];
+  getValidTargets(gs, pi, engine) {
     const out = [];
-    for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-      const h = ops.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of gegnerHelden(gs, pi, engine)) {
       if (!h?.name || h.hp <= 0) continue;
-      out.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
+      out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h.name });
     }
     return out;
   },
@@ -60,7 +63,8 @@ module.exports = {
     if (!m) return { keepInHand: false };
     const tpi = parseInt(m[1]);
     const hi = parseInt(m[2]);
-    if (tpi === pi) return { keepInHand: false }; // must be opponent
+    const ziel = engine.gs.players[tpi]?.heroes?.[hi];
+    if (!ziel?.name || engine.heroSideOf(tpi, ziel) === pi) return { keepInHand: false }; // must be opponent (Kontrolle, W16e)
 
     await engine.addHeroStatus(tpi, hi, 'stunned', {
       duration: STUN_DURATION,

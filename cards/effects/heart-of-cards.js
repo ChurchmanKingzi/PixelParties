@@ -119,6 +119,11 @@ module.exports = {
       ps.deletedPile.push(oben);
       engine._trackCard(oben, pi, 'deleted');
       engine.log('card_deleted', { player: ps.username, card: oben, from: 'deck', by: CARD_NAME });
+      // W16e (F02-09): „deleted from your DECK" ist ein Mill in den Geloescht-Stapel — `onMill` melden (Mystery Box zieht 2; Jean & Co.),
+      // wie `actionMillCards` mit `deleteMode`.
+      await engine.runHooks('onMill', {
+        playerIdx: pi, milledCards: [oben], count: 1, source: CARD_NAME, deleteMode: true, _skipReactionCheck: true,
+      });
     }
     engine.sync();
     return true;
