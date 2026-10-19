@@ -33986,14 +33986,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
 
   // Check if a Spell or Attack can be used by ANY hero (level/spell school reqs, no zone needed)
-  const canActionCardBePlayed = (card) => {
+  const canActionCardBePlayed = (card, handIdx) => {
     if (!card) return false;
     if (card.cardType === 'Creature') return canCreatureBePlayed(card);
     // Spells and Attacks: just need a hero that meets spell school requirements
-    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card))) return true;
+    if ([0,1,2].some(hi => canHeroPlayCard(me, hi, card, handIdx))) return true;
     // Also check charmed opponent heroes
     for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
-      if (opp.heroes[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) return true;
+      if (opp.heroes[hi]?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, handIdx)) return true;
     }
     // Wolflesia-style Creature spell-casters: any matching Creature is
     // a valid cast path even when no Hero qualifies normally.
@@ -34173,7 +34173,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // so once the first copy has been summoned the second copy
         // must grey out even before the Action Phase.
         if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
-        if (!canActionCardBePlayed(card)) return true;
+        if (!canActionCardBePlayed(card, fromCreation ? null : handIdx)) return true;
         if ((gameState.blockedSpells || []).includes(cardName)) return true;
         return false; // Un-gray: playable
       }
@@ -34261,7 +34261,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
       if (card.cardType === 'Creature' && me.summonLocked) return true;
       if ((gameState.blockedSpells || []).includes(cardName)) return true;
-      if (!canActionCardBePlayed(card)) return true;
+      if (!canActionCardBePlayed(card, fromCreation ? null : handIdx)) return true;
       return false;
     }
     return true; // Start, Resource, End phases: all dimmed
@@ -34886,8 +34886,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx))
     || ((gameState.fremdAufstiegZiele || {})[cardName] || []).length > 0;
 
-  const canHeroPlayCard = (playerData, heroIdx, card) => {
+  const canHeroPlayCard = (playerData, heroIdx, card, handIdx) => {
     const isOwn = playerData === me;
+    // ★ W16a (Al: „Hervorheben für den Rabatt-Effekt? Dann nur die rabattierte Karte!"): wirkt in der Hand ein Kopien-Rabatt (Divine Gift of Magic, Fiona), liefert der Server für diese
+    // Handkarte eine Liste JE HANDINDEX (`heroPlayableCards.kopien`) — dann gilt sie statt der Namensliste, und nur die rabattierte Kopie leuchtet. Ohne `handIdx`/Block: Namensliste.
+    if (handIdx != null && (me.hand || [])[handIdx] === card?.name) {
+      const proKopie = gameState.heroPlayableCards?.kopien?.[isOwn ? 'own' : 'charmed']?.[handIdx];
+      if (Array.isArray(proKopie)) return proKopie.includes(heroIdx);
+    }
     const playableMap = isOwn
       ? (gameState.heroPlayableCards?.own || {})
       : (gameState.heroPlayableCards?.charmed || {});
@@ -35963,7 +35969,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const attHosts = (gameState.attachmentHostTargets || {})[cardName] || null;
                 const canPlayHere = attHosts
                   ? attHosts.some(h => h.heroIdx === hi && h.slotIdx === si)
-                  : (isHeroAction || canHeroPlayCard(me, hi, card));
+                  : (isHeroAction || canHeroPlayCard(me, hi, card, fromCreation ? null : idx));
                 if (!canPlayHere) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
@@ -36212,7 +36218,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
               } else {
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                  if (canHeroPlayCard(me, hi, card)) { targetHero = hi; break; }
+                  if (canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) { targetHero = hi; break; }
                 }
               }
             }
@@ -36275,7 +36281,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const zoneOwnerIdx = isOwn ? myIdx : (myIdx === 0 ? 1 : 0);
               const darfHier = attHostsSp
                 ? attHostsSp.some(h => (h.owner ?? myIdx) === zoneOwnerIdx && h.heroIdx === hi && h.slotIdx === si)
-                : (isOwn && canHeroPlayCard(me, hi, card));
+                : (isOwn && canHeroPlayCard(me, hi, card, fromCreation ? null : idx));
               if (!isIsland && si < 3 && darfHier) {
                 const zonePs = isOwn ? me : opp;
                 const slotCards = (zonePs.supportZones?.[hi] || [])[si] || [];
@@ -36352,7 +36358,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 ? ((gameState.attachmentHostTargets || {})[cardName] || null) : null;
               const darfWirken = attHostsHz
                 ? attHostsHz.some(h => (h.owner ?? myIdx) === myIdx && h.heroIdx === hi)
-                : (isHeroAction || canHeroPlayCard(me, hi, card));
+                : (isHeroAction || canHeroPlayCard(me, hi, card, fromCreation ? null : idx));
               if (darfWirken) {
                 if (isAttachmentCard) {
                   // Auto-place: only if hero has a free support zone
@@ -36365,7 +36371,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             } else if (el.dataset.heroOwner === 'opp') {
               // Check if this is a charmed hero we control
               const oppHero = opp.heroes?.[hi];
-              if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
+              if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) {
                 targetHero = hi;
                 targetCharmedOwner = oppIdx;
               }
@@ -36598,13 +36604,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
               } else {
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
-                  if (canHeroPlayCard(me, hi, card)) {
+                  if (canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) {
                     eligible.push({ idx: hi, name: me.heroes[hi].name });
                   }
                 }
                 for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
                   const oppHero = opp.heroes[hi];
-                  if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card)) {
+                  if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) {
                     eligible.push({ idx: hi, name: oppHero.name, charmedOwner: oppIdx });
                   }
                 }
@@ -49084,7 +49090,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const _attHostsHeroOwn = _attHostsHero ? _attHostsHero.filter(h => (h.owner ?? myIdx) === myIdx) : null;
           const spellAttackIneligible = _attHostsHeroOwn
             ? !_attHostsHeroOwn.some(h => h.heroIdx === i)
-            : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card));
+            : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx));
           // Persistent "dragging a Surprise card" check (true throughout the
           // whole drag, not just when the cursor is currently over a Surprise
           // Zone) — so eligible zones can stay highlighted the entire time.
@@ -50537,7 +50543,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : null;
               const canPlayHere = _attHosts
                 ? _attHosts.some(h => h.heroIdx === i && h.slotIdx === z)
-                : (heroActionCoversCard || (!!playDrag?.card && canHeroPlayCard(me, i, playDrag.card)));
+                : (heroActionCoversCard || (!!playDrag?.card && canHeroPlayCard(me, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx)));
               // Bounce-place target: OCCUPIED slot listed server-side as
               // a valid swap destination for the card being dragged. Used
               // by the Deepsea archetype (drop on an existing bounceable
@@ -50684,7 +50690,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && opp.heroes?.[i]?.charmedBy === myIdx
                 && (opp.heroes?.[i]?.hp > 0)
                 && z < ((opp.supportZones?.[i] || []).length || 3)
-                && canHeroPlayCard(opp, i, playDrag.card);
+                && canHeroPlayCard(opp, i, playDrag.card, playDrag.fromCreation ? null : playDrag.idx);
               // Als Vorgabe 29.9.: Ausruestung an einen GELIEHENEN Helden (Styx,
               // Golden Apple, FTCD …) — freie Basiszonen der Helden aus
               // `kontrollAusruestZiele` leuchten beim Equip-Drag.

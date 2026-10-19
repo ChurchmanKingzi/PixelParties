@@ -8101,7 +8101,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
   // ★ W15b (C2): Wisdom-Kosten der konkreten Handkarte (Rabatt „nur die eine Kopie"); geliehener Held/Vorrat: namensweit.
-  const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData, (!fromCreation && heroOwner === pi) ? handIndex : undefined);
+  // ★ W16a (Al, Frage 6): auch beim geliehenen/gecharmten Helden zählt die konkrete Handkopie des Kontrolleurs `pi` (Hand und Rabatt des Kontrolleurs, nicht des Helden-Besitzers).
+  const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData, !fromCreation ? handIndex : undefined, heroOwner !== pi ? pi : undefined);
 
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (
