@@ -204,8 +204,9 @@ Nur im Rätsel-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanäle
 ### Feeds und Gemeinschaft
 * **Neue Karten:** Ändert sich `data/cards.json` (z. B. durch ein Deploy), postet der Bot die neuen Karten als Bilder
   in `NEW_CARDS_CHANNEL_ID`. Der allererste Lauf merkt sich nur den Bestand.
-* **Patchnotes:** neue Commits (ohne Merge-Commits) als Liste in `PATCHNOTES_CHANNEL_ID`. Es sind die Commit-Titel — wer lesbare
-  Patchnotes möchte, schreibt sie als Commit-Titel.
+* **Patchnotes:** Karten, deren Eintrag in `data/cards.json` sich seit dem letzten Stand **verändert** hat (Text, HP, ATK, Kosten, Level …), werden als **Bilder**
+  in `PATCHNOTES_CHANNEL_ID` gepostet, mit dem Hinweis, was sich geändert hat („changed: effect text, HP“). Commit-Texte erscheinen nicht. Ganz neue Karten
+  kommen nicht hierher, sondern in den Feed für neue Karten; rein interne Felder (`skilltestLegal`, `setID`) lösen nichts aus.
 * **Rangliste:** `LEADERBOARD_CHANNEL_ID` → eine Nachricht, die alle 10 Minuten aktualisiert wird.
 * **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit.
 * `!duel` — offene Herausforderung; wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).

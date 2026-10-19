@@ -92,28 +92,62 @@ test('Turnier: anlegen, beitreten per Button, starten, Ergebnisse, Sieger — nu
   assert.equal(await db.activeTournament('G1'), null, 'beendetes Turnier ist nicht mehr aktiv');
 });
 
-test('Patchnotes: erster Lauf merkt nur, danach neue Commits ohne Merges', async () => {
+test('Patchnotes: nur Bilder geänderter Karten (keine Commit-Texte, keine neuen Karten, keine Nebensächlichkeiten)', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-git-'));
   const git = (...a) => execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { encoding: 'utf8' });
+  const real = JSON.parse(fs.readFileSync(path.join(config.repoRoot, 'data', 'cards.json'), 'utf8'));
+  const pick = n => JSON.parse(JSON.stringify(real.find(c => c.name === n)));
+  const names = ['Acid Rain', 'Fireball', 'Teocuilatl, the Embodiment of Gods', 'Alchemic Journal'];
+  let cards = names.slice(0, 3).map(pick);
+  const write = () => fs.writeFileSync(path.join(dir, 'cards.json.tmp'), '') || (fs.mkdirSync(path.join(dir, 'data'), { recursive: true }), fs.writeFileSync(path.join(dir, 'data', 'cards.json'), JSON.stringify(cards, null, 1)));
+  const commit = msg => { git('add', '.'); git('commit', '-qm', msg); };
   git('init', '-q', '-b', 'main');
-  fs.writeFileSync(path.join(dir, 'a'), '1'); git('add', '.'); git('commit', '-qm', 'Erster Stand');
-  const { ctx, db, client } = await setup();
+  write(); commit('Erster Stand');
+
+  const fresh = await setup();
   const sent = [];
-  const ch = { isTextBased: () => true, send: async p => { sent.push(p); } };
   const g = guild();
-  g.channels.cache.set('PN', ch);
-  client.guilds.cache.set('G1', g);
+  g.channels.cache.set('PN', { isTextBased: () => true, send: async p => { sent.push(p); } });
+  fresh.client.guilds.cache.set('G1', g);
   config.repoRoot = dir; config.channels.patchnotes = 'PN';
-  // feeds hat repoRoot beim Registrieren gelesen → neuen Kontext bauen
-  const fresh = await setup(); fresh.client.guilds.cache.set('G1', g);
-  await fresh.ctx._feeds.pollPatchnotes();
+  // feeds hat repoRoot beim Registrieren gelesen → neuen Kontext NACH der Umstellung bauen
+  const ctx2 = (await setup()); ctx2.client.guilds.cache.set('G1', g);
+  const feeds = ctx2.ctx._feeds;
+
+  await feeds.pollPatchnotes();
   assert.equal(sent.length, 0, 'erster Lauf postet nichts');
-  fs.writeFileSync(path.join(dir, 'b'), '2'); git('add', '.'); git('commit', '-qm', 'Neue Karte: Fireball überarbeitet');
-  fs.writeFileSync(path.join(dir, 'c'), '3'); git('add', '.'); git('commit', '-qm', 'Tooltip im Pixel-Stil');
-  await fresh.ctx._feeds.pollPatchnotes();
+
+  // Commit 1: Text von Acid Rain und HP des Heroes geändert, Fireball bleibt, Alchemic Journal ist NEU, interne Markierung bei Fireball
+  cards[0].effect += ' Test.'; cards[2].hp += 10; cards[1].skilltestLegal = !cards[1].skilltestLegal; cards.push(pick(names[3]));
+  write(); commit('Balance: Acid Rain und Teocuilatl angepasst');
+  await feeds.pollPatchnotes();
   assert.equal(sent.length, 1);
-  assert.match(sent[0].content, /Patch notes\*\*\n• Neue Karte: Fireball überarbeitet\n• Tooltip im Pixel-Stil/);
-  await fresh.ctx._feeds.pollPatchnotes();
+  const msg = sent[0];
+  assert.match(msg.content, /Patch notes\*\* — 2 cards changed/);
+  assert.match(msg.content, /\*\*Acid Rain\*\* — changed: effect text/);
+  assert.match(msg.content, /\*\*Teocuilatl, the Embodiment of Gods\*\* — changed: HP/);
+  assert.ok(!/Balance|angepasst/.test(msg.content), 'keine Commit-Texte');
+  assert.ok(!/Fireball|Alchemic/.test(msg.content), 'weder interne Markierung noch neue Karte');
+  assert.equal(msg.files.length, 2);
+  assert.ok(msg.files.every(f => f.attachment.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))));
+
+  // Commit 2: nur eine andere Datei → nichts
+  fs.writeFileSync(path.join(dir, 'x.txt'), '1'); commit('Nur Code');
+  await feeds.pollPatchnotes();
+  assert.equal(sent.length, 1);
+  await feeds.pollPatchnotes();
   assert.equal(sent.length, 1, 'nichts Neues → nichts gepostet');
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('diffCards: nur veränderte Karten; neue/entfernte/Nebenfelder zählen nicht', async () => {
+  const { ctx } = await setup();
+  const d = ctx._feeds.diffCards;
+  const A = { name: 'A', effect: 'x', hp: 10, setID: 's1' }, B = { name: 'B', effect: 'y' };
+  assert.deepEqual(d([A, B], [A, B]), []);
+  assert.deepEqual(d([A, B], [{ ...A, effect: 'z', hp: 11 }, B]), [{ name: 'A', fields: ['effect text', 'HP'] }]);
+  assert.deepEqual(d([A], [A, { name: 'NEU', effect: 'q' }]), [], 'neue Karte');
+  assert.deepEqual(d([A, B], [A]), [], 'entfernte Karte');
+  assert.deepEqual(d([A], [{ ...A, setID: 's2', skilltestLegal: true }]), [], 'nur Nebenfelder');
+  assert.deepEqual(d([A], [{ ...A, cost: 3 }]), [{ name: 'A', fields: ['cost'] }], 'neues Feld');
 });
