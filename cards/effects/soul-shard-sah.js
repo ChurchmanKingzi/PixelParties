@@ -166,12 +166,17 @@ module.exports = {
       try {
         for (const chosenName of chosenNames) {
           inst.counters._effectOverride = chosenName;
+          // ★ W16b (A01-pollution-11): Sah BESCHWÖRT die gewählten Shards nicht, er löst nur deren Effekt aus. Das „1 pro Zug"-Stempeln
+          // am Anfang ihres `onPlay` (`markSoulShardSummoned(…, CARD_NAME)`) darf die Sperre der echten Karte nicht belegen.
+          const _stempel = (ps._soulShardSummonedThisTurn ||= {});
+          const _hatteStempel = !!_stempel[chosenName];
           await engine.runHooks('onPlay', {
             _onlyCard: inst, playedCard: inst,
             cardName: chosenName, zone: 'support',
             heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
             ...summonExtras,
           });
+          if (!_hatteStempel && ps._soulShardSummonedThisTurn) delete ps._soulShardSummonedThisTurn[chosenName];
         }
       } finally {
         delete inst.counters._effectOverride;
