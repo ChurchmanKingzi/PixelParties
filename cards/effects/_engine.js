@@ -36044,9 +36044,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Count entries that would actually deal damage to pi's side —
       // immune / pre-cancelled entries don't count toward "would take
       // damage" semantically.
+      // W16e (F01-10): „Creatures YOU CONTROL" — nach Kontrolleur (wie `creatureDamageBatchResolve` des Idols), nicht nach `inst.owner`.
       const ownDmgEntries = entries.filter(e =>
         !e.cancelled && !e._immuneCreature
-        && e.inst && e.inst.owner === pi);
+        && e.inst && (e.inst.controller ?? e.inst.owner) === pi);
       if (ownDmgEntries.length < 2) continue;
 
       // ── Same-Source-Gate (Als Ruling, Deepsea-Idol-Kartentext:
@@ -44362,16 +44363,18 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const result = [];
 
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // W16e (F02-22): Helden nach KONTROLLE — eigene Spalte ohne die abgegebenen, dazu uebernommene Helden der Gegenspalte
+    // (ihre Ausruestung liegt auf der Brettseite `seite`, aktivieren darf sie der Kontrolleur).
+    for (const { physOwner: seite, heroIdx: hi, hero } of this.heroesControlledBy(playerIdx)) {
+      const sps = this.gs.players[seite];
       if (!hero?.name || hero.hp <= 0) continue;
       const heroParalysed = !!(hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.webbed);
 
-      for (let zi = 0; zi < (ps.supportZones[hi] || []).length; zi++) {
-        const slot = (ps.supportZones[hi] || [])[zi] || [];
+      for (let zi = 0; zi < (sps.supportZones[hi] || []).length; zi++) {
+        const slot = (sps.supportZones[hi] || [])[zi] || [];
         if (slot.length === 0) continue;
         const cardName = slot[0];
-        const inst = this.kreaturAnBrett(playerIdx, hi, zi);   // Z1: Brettseite
+        const inst = this.kreaturAnBrett(seite, hi, zi);   // Z1: Brettseite
         if (!inst || inst.faceDown) continue;
 
         // ★ Geliehene Identitaet: eine Karte kann Ausruestung SEIN,
@@ -44379,6 +44382,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // kommt dann aus dem Override — genau wie in `getHook`.
         const script = loadCardEffect(inst.counters?._effectOverride || cardName);
         if (!script?.equipEffect) continue;
+        // W16e (F01-22): eine Ausruestung, die als ABILITY zaehlt (Cloak of Edge), hat einen „active effect of an Ability" — The Thing in the Ship sperrt ihn.
+        if (script.countsAsAbilityInZone && this.abilityActivationBlocked()) continue;
         // Bound doesn't block equip-effect activation — equip effects
         // are "effects" per the Bound spec, not Actions. Frozen / Stunned
         // / Webbed DO block by default; a script may opt out via
@@ -44401,7 +44406,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         result.push({
-          owner: playerIdx, heroIdx: hi, zoneSlot: zi,
+          owner: seite, heroIdx: hi, zoneSlot: zi,
           cardName, canActivate, exhausted, instId: inst.id,
         });
       }
@@ -48124,7 +48129,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           slotIdx: e.inst.zoneSlot, cardName: e.inst.name,
         })),
       ];
-      const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, reaktionsQuelle, { damageType });
+      // W16e (F01-26): auch das Nach-Ziel-Fenster sieht einen Flaechenschlag als solchen — „is chosen by"-Reaktionen (Cool Tech Jetpack,
+      // Dream Dust, Switcheroo, Secret Room lesen `_isAoeCheck`) oeffnen nicht; gestempelt wie im Surprise-Fenster oben.
+      const hadAoeFlag2 = reaktionsQuelle?._isAoeCheck;
+      if (reaktionsQuelle && typeof reaktionsQuelle === 'object') reaktionsQuelle._isAoeCheck = true;
+      let ptResult;
+      try {
+        ptResult = await this._checkPostTargetHandReactions(aoeTargets2, reaktionsQuelle, { damageType });
+      } finally {
+        if (reaktionsQuelle && typeof reaktionsQuelle === 'object' && !hadAoeFlag2) delete reaktionsQuelle._isAoeCheck;
+      }
       if (ptResult?.effectNegated) {
         // Wie in `preDamageMultiTargetWindow`: die Quelle gilt als negiert (Karte wandert als negiert
         // in die Ablage, kein weiterer Schaden dieser Aufloesung), Vormerkungen werden geraeumt.
@@ -48491,7 +48505,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Symmetrisch: schuetzt die Creatures BEIDER Spieler.
     if (this.isDarkOceanActive()) {
       const durch = new Set(['attack', 'destruction_spell']);
-      const geblockt = entries.filter(e => e.isStatusDamage || !durch.has(e.type));
+      // W16e (F01-18): Diver Helmet — Kreaturen am Helm-Helden sind „unaffected by Areas": Dark Ocean schuetzt sie nicht.
+      const geblockt = entries.filter(e => (e.isStatusDamage || !durch.has(e.type)) && !this._isDiverHelmetProtectedTarget(e.inst));
       for (const e of geblockt) {
         this.log('dark_ocean_damage_blocked', {
           creature: e.inst?.name,
@@ -49928,7 +49943,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         const discardPs = this.gs.players[inst.originalOwner];
         if (discardPs) {
           if (isToken) this.tokenAbgang(inst);   // W5a: Token verschwindet, nur eine echte Karte darunter wird gelöscht
-          else discardPs.discardPile.push(inst.name);
+          else if (inst._returnToHand) {
+            // W16e (F03-01): ein Austritts-Haken hat die Umleitung "zurueck auf die Hand" verlangt (The White Eye, Spirit of the Shattered
+            // Trident) — dieselbe Marke, die `actionMoveCard` einloest; das Heldentod-Aufraeumen kannte sie nicht.
+            delete inst._returnToHand;
+            discardPs.hand.push(inst.name);
+            this.log('card_added_to_hand', { player: discardPs.username, card: inst.name, by: 'Heldentod-Aufraeumen' });
+          } else discardPs.discardPile.push(inst.name);
         }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
         // ── GETAKTET (Als Befund 17.8.) ────────────────────────────
@@ -50049,9 +50070,19 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Fire death hooks for the creature
         const hero = ps.heroes[heroIdx];
         this.log('island_zone_defeat', { card: cardName, hero: hero?.name });
-        await this.runHooks(HOOKS.ON_HERO_KO, { hero: { name: cardName, hp: 0 }, source: null });
         // Move to discard — use original owner's pile
         const inst = this.cardInstances.find(c => c.owner === playerIdx && c.zone === 'support' && c.heroIdx === heroIdx && c.name === cardName);
+        // ★ W16e (F01-15): „any Creatures in those Support Zones are DEFEATED" — der kanonische Weg (Todes-Hooks `onCreatureDeath`, Token-/Besitzer-
+        // Ablage, Wiederbelebungs-/Rueckhol-Fenster) statt des frueheren Phantom-`onHeroKO` mit Fake-Helden ohne `onCreatureDeath`. `actionMoveCard`
+        // stuft Support->Ablage einer Kreatur selbst als Tod ein. Nur wenn die Karte dabei auf dem Brett bleibt (Schutz/Abbruch), greift der Rest unten.
+        if (inst) {
+          try {
+            await this.actionMoveCard(inst, ZONES.DISCARD, -1, -1, { source: 'Flying Island in the Sky', sourceName: 'Flying Island in the Sky', fireCreatureDeath: true });
+          } catch (err) {
+            console.error('[island] defeat:', err.message);
+          }
+          if (inst.zone !== ZONES.SUPPORT) continue;   // abgewandert (Ablage, Hand-Rueckholung, Wiederbelebung): erledigt
+        }
         const islandDiscardPs = this.gs.players[inst?.originalOwner ?? playerIdx];
         // Tokens kommen nie in die Ablage, sondern in den Gelöscht-Stapel (F01-16).
         const islandCd = (inst ? this.getEffectiveCardData(inst) : null) || this._getCardDB()[cardName];
