@@ -51,7 +51,10 @@ module.exports = {
     const oppIdx = targetLink.owner;
     const oppPs = gs.players[oppIdx];
     const castingHi = targetLink.heroIdx ?? -1;
-    const castingHero = oppPs?.heroes?.[castingHi];
+    // W16g (R02-22): bei einem geliehenen Wirker (Charme …) liegt der Held auf der Brettseite `casterOwner`, nicht beim
+    // Kontrolleur `owner`; Hand/Abwurf bleiben beim Kontrolleur (`oppIdx`).
+    const heroSeite = targetLink.casterOwner ?? oppIdx;
+    const castingHero = gs.players[heroSeite]?.heroes?.[castingHi];
     const spellName = targetLink.cardName;
     const spellCd = engine._getCardDB()[spellName];
 
@@ -69,14 +72,14 @@ module.exports = {
     const currentLevel = prevOverride != null ? prevOverride : (spellCd.level || 0);
     castingHero.levelOverrideCards[spellName] = currentLevel + 1;
 
-    const newCost = engine.getWisdomDiscardCost(oppIdx, castingHi, spellCd);
+    const newCost = engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd);
 
     // Restore override exactly as it was
     if (!hadOverride) delete castingHero.levelOverrideCards[spellName];
     else castingHero.levelOverrideCards[spellName] = prevOverride;
     // W5b-B9 (Al, Welle 5): der erhöhte Level kostet bei Wisdom-Helden den Zusatz-Abwurf TATSÄCHLICH. Die ursprünglichen
     // Wisdom-Kosten zahlt `doPlaySpell` erst nach der Auflösung (Kosten vorab berechnet, `oldCost`); hier kommt nur die Differenz dazu.
-    const oldCost = Math.max(0, engine.getWisdomDiscardCost(oppIdx, castingHi, spellCd));
+    const oldCost = Math.max(0, engine.getWisdomDiscardCost(heroSeite, castingHi, spellCd));
 
     // newCost: -1 means uncoverable (no Wisdom path exists), otherwise the
     // required extra discards. Spell survives iff the caster CAN cover it
@@ -86,7 +89,7 @@ module.exports = {
     const affordable = coverable && engine._handIndizesOhneAufloesende(oppPs).length >= newCost;
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'plague_smoke', owner: oppIdx,
+      type: 'plague_smoke', owner: heroSeite,
       heroIdx: castingHi >= 0 ? castingHi : 0, zoneSlot: -1,
     });
     await engine._delay(500);
