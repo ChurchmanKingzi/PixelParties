@@ -13,7 +13,8 @@ async function bau(name, negieren, voll, n) {
   t.put(0, 0, 0, D); t.put(0, 0, 1, D); if (voll) t.put(0, 0, 2, D);
   alt(t);
   t.policy.confirm = true;
-  t.targetFn = (v) => v.filter(x => !x.ineligible).slice(0, n).map(x => x.id);
+  // W19a (Al, 19.10.2026): beim Wurf auf einen belegten Platz ist der Insasse der Zielzone Pflicht-Opfer (wird nicht mehr gefragt) - gewählt werden nur die weiteren n-1.
+  t.targetFn = (v) => v.filter(x => !x.ineligible).slice(0, voll ? n - 1 : n).map(x => x.id);
   return t;
 }
 (async () => {

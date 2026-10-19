@@ -125,10 +125,13 @@ function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
  * Opfer von DIESEM Helden. Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
  * Helden (geliehene Helden der Gegenspalte).
  */
-function fullDropSpec(engine, pi, heroIdx, heroOwner = pi, base = makeSacrificeSpec(engine, pi)) {
-  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
-  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
-  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
+// ★ W19a (Al, 19.10.2026): „Es ist jede Zone ein Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man eine Zone mit 2 Creatures
+// darin, müssen beide geopfert werden, bei mehr Creatures als benötigten Opfern ist eine Zone nicht viable." Alle Insassen der Zielzone
+// (`slotIdx`) sind Pflicht-Opfer (`requiredInstIds`, `engine.zoneInsassen`); die übrigen Opfer sind frei. Löst die W17a-Regel
+// „Alice-Stapel kein Ziel" ab (vorher: „mindestens ein Opfer von diesem Helden", Stapel-Insassen zählten nicht).
+function fullDropSpec(engine, pi, heroIdx, heroOwner = pi, base = makeSacrificeSpec(engine, pi), slotIdx = null) {
+  const ids = slotIdx != null ? engine.zoneInsassen(heroOwner, heroIdx, slotIdx).map(c => c.id) : [];
+  return ids.length > 0 ? { ...base, requiredInstIds: ids } : base;
 }
 
 /**
@@ -159,10 +162,10 @@ function occupiedDropSlots(gs, pi, engine) {
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
     if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
-    if (!engine.canSatisfySacrifice(pi, fullDropSpec(engine, pi, hi, physOwner, spec))) continue;
     for (const z of slots) {
       if ((zones[z] || []).length === 0) continue;
-      if (!engine.zoneFreiNachKostenzahlung(physOwner, hi, z)) continue;   // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Stapel nein)
+      // W19a (Al, 19.10.2026): die Zone ist ein Ziel, wenn die 2 Opfer sie ganz leeren koennen (Insassen <= 2, alle opferbar).
+      if (!engine.zoneLeerbarDurchOpfer(pi, physOwner, hi, z, spec)) continue;
       out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
     }
   }
@@ -217,7 +220,7 @@ async function zahleHpKosten(engine, pi, heroIdx, heroOwner = pi) {
  * KOSTEN: erst die Kreaturen opfern, dann die HP. `false` = Opferwahl abgebrochen (nichts bezahlt).
  * Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
  */
-async function zahleKosten(ctx, allFullDrop) {
+async function zahleKosten(ctx, allFullDrop, req = null) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
@@ -226,10 +229,11 @@ async function zahleKosten(ctx, allFullDrop) {
   // Zielhelden (fehlt → pi). Opfer zahlt `pi`, die HP der Zielheld.
   const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
   const base = makeSacrificeSpec(engine, pi, heroIdx, heroOwner);
+  const slotIdx = (req || gs.players[pi]?._requestedBouncePlaceSlot)?.slotIdx ?? null;
   const spec = allFullDrop
     ? {
-        ...fullDropSpec(engine, pi, heroIdx, heroOwner, base),
-        description: `${base.description} At least one of them must come from the summoning Hero's Support Zones.`,
+        ...fullDropSpec(engine, pi, heroIdx, heroOwner, base, slotIdx),
+        description: `${base.description} The Creature(s) in the targeted Support Zone must be among them.`,
       }
     : base;
 
@@ -279,7 +283,8 @@ module.exports = {
   async paySummonCost(ctx) {
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
-    return (await zahleKosten(ctx, allFullDrop)) ? { allFullDrop } : false;
+    const req = ps?._requestedBouncePlaceSlot || null;
+    return (await zahleKosten(ctx, allFullDrop, req)) ? { allFullDrop, req } : false;
   },
 
   async beforeSummon(ctx) {
@@ -296,13 +301,16 @@ module.exports = {
     // Helden kommen, sonst wird dort kein Platz frei.
     const pre = ctx._summonKosten;   // W4b: Kosten schon vor dem Reaktionsfenster bezahlt
     const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
+    const reqSlot = (pre ? pre.req : ps?._requestedBouncePlaceSlot) || null;   // W19a: die gewaehlte Zielzone
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    if (!pre && !(await zahleKosten(ctx, allFullDrop))) return false;
+    if (!pre && !(await zahleKosten(ctx, allFullDrop, reqSlot))) return false;
 
     if (allFullDrop) {
       const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
-      const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
+      // W19a: die gewaehlte Zielzone ist durch die Pflicht-Opfer leer - dort landet die Karte (sonst der erste freie Platz).
+      const freedSlot = (reqSlot && (supZones[reqSlot.slotIdx] || []).length === 0)
+        ? reqSlot.slotIdx : [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false;
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,

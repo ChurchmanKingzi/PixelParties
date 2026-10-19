@@ -112,10 +112,13 @@ function heroCanSummonHere(engine, pi, heroIdx, heroOwner = pi) {
  * Helden. Styx 28.9.: `mustIncludeFromHeroOwner` = Seite des
  * Helden (geliehene Helden der Gegenspalte).
  */
-function fullDropSpec(base, heroIdx, pi, heroOwner = pi) {
-  // `mustIncludeFromHeroOwner` = Seite des Helden (Styx 28.9.): nur ein
-  // Opfer aus DIESER Spalte schafft dort Platz; weitere Opfer bleiben frei.
-  return { ...base, mustIncludeFromHeroIdx: heroIdx, mustIncludeFromHeroOwner: heroOwner };
+// ★ W19a (Al, 19.10.2026): „Es ist jede Zone ein Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man eine Zone mit 2 Creatures
+// darin, müssen beide geopfert werden …" Alle Insassen der Zielzone (`slotIdx`) sind Pflicht-Opfer (`requiredInstIds`,
+// `engine.zoneInsassen`); die übrigen Opfer sind frei (2+ Opfer, Summe der Max-HP >= 300 wie bisher). Löst die W17a-Regel
+// „Alice-Stapel kein Ziel" ab (vorher: „mindestens ein Opfer von diesem Helden", Stapel-Insassen zählten nicht).
+function fullDropSpec(engine, base, heroIdx, pi, heroOwner = pi, slotIdx = null) {
+  const ids = slotIdx != null ? engine.zoneInsassen(heroOwner, heroIdx, slotIdx).map(c => c.id) : [];
+  return ids.length > 0 ? { ...base, requiredInstIds: ids } : base;
 }
 
 /**
@@ -124,7 +127,7 @@ function fullDropSpec(base, heroIdx, pi, heroOwner = pi) {
  * Nur bei Helden, deren Zonen KOMPLETT voll sind — nur dort schafft das
  * Opfern ueberhaupt erst den Platz, in den Dragon Pilot dann faellt.
  * Geprueft wird mit GENAU dem Spec, den `beforeSummon` anschliessend
- * benutzt (inklusive `mustIncludeFromHeroIdx`), damit Hervorhebung und
+ * benutzt (inklusive der Pflicht-Opfer der Zielzone, W19a), damit Hervorhebung und
  * spaetere Bezahlung nie auseinanderlaufen.
  *
  * Welcher Spec das ist, haengt am Beschwoerungsweg: sobald ein reines
@@ -151,10 +154,10 @@ function occupiedDropSlots(gs, pi, engine) {
     const slots = [0, 1, 2];
     if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
     if (!heroCanSummonHere(engine, pi, hi, physOwner)) continue;
-    if (!engine.canSatisfySacrifice(pi, fullDropSpec(spec, hi, pi, physOwner))) continue;
     for (const z of slots) {
       if ((zones[z] || []).length === 0) continue;
-      if (!engine.zoneFreiNachKostenzahlung(physOwner, hi, z)) continue;   // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Stapel nein)
+      // W19a (Al, 19.10.2026): die Zone ist ein Ziel, wenn die Opfer (2+, Max-HP >= 300) sie ganz leeren koennen (alle Insassen opferbar).
+      if (!engine.zoneLeerbarDurchOpfer(pi, physOwner, hi, z, spec)) continue;
       out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
     }
   }
@@ -167,17 +170,18 @@ const USE_KEY = 'dragonPilot';
  * KOSTEN: die Opfer (inhärent nur Level ≤ 1; bei einem Wurf auf einen belegten Platz mindestens eines vom Beschwörer-Helden).
  * `false` = abgebrochen. Eine Stelle für `paySummonCost` (vor dem Reaktionsfenster) und den Fallback in `beforeSummon`.
  */
-async function zahleOpfer(ctx, allFullDrop) {
+async function zahleOpfer(ctx, allFullDrop, req = null) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
   const heroIdx = ctx.cardHeroIdx;
   const heroOwner = (isSeat(gs, ctx.cardHeroOwner)) ? ctx.cardHeroOwner : pi;
   const baseSpec = ctx.isInherentAction ? makeLv1SacrificeSpec(engine) : makeSacrificeSpec(engine);
+  const slotIdx = (req || gs.players[pi]?._requestedBouncePlaceSlot)?.slotIdx ?? null;
   const spec = allFullDrop
     ? {
-        ...fullDropSpec(baseSpec, heroIdx, pi, heroOwner),
-        description: `${baseSpec.description} At least one sacrifice must come from the summoning Hero's Support Zones.`,
+        ...fullDropSpec(engine, baseSpec, heroIdx, pi, heroOwner, slotIdx),
+        description: `${baseSpec.description} The Creature(s) in the targeted Support Zone must be among them.`,
       }
     : baseSpec;
   return !!(await engine.resolveSacrificeCost(ctx, spec));
@@ -233,8 +237,8 @@ module.exports = attachSteamEngine({
   // drop on any occupied slot of that Hero — the drop is treated as a
   // "summon from this Hero" gesture, NOT a forced-tribute gesture. The
   // player still picks their sacrifices freely in the prompt; the only
-  // constraint is that ≥1 must come from THIS Hero's zones, enforced in
-  // beforeSummon via mustIncludeFromHeroIdx.
+  // constraint (W19a, Al 19.10.2026) is that the Creature(s) of the DROPPED zone
+  // must all be among the sacrifices (`requiredInstIds`, see fullDropSpec).
   //
   // Damit der Client die belegten Plaetze auch ANZEIGT und den Wurf
   // zulaesst (Korrektur 8.8.). Der fruehere Kommentar hier sagte, ein
@@ -273,10 +277,10 @@ module.exports = attachSteamEngine({
   //     returns true, the server's normal summonCreature places Dragon
   //     Pilot into the drop slot.
   //   • All-full drop (ps._requestedBouncePlaceSlot is set): the
-  //     summoning Hero had no free slots. ≥1 tribute must come from
-  //     THIS Hero's zones (enforced via mustIncludeFromHeroIdx). After
-  //     the sacrifice frees a slot, Dragon Pilot is placed manually
-  //     into the first freed slot and we signal the server to skip its
+  //     summoning Hero had no free slots. W19a: ALL Creatures in the
+  //     dropped zone are forced tributes (`requiredInstIds`). After
+  //     the sacrifice empties that zone, Dragon Pilot is placed manually
+  //     into it and we signal the server to skip its
   //     default placement by setting _placementConsumedByCard.
   // ★ W4b (Al, Welle 4): die Opfer sind KOSTEN der Beschwörung und werden VOR dem Reaktionsfenster bezahlt
   // (`paySummonCost`, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …),
@@ -285,7 +289,8 @@ module.exports = attachSteamEngine({
   async paySummonCost(ctx) {
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;   // bleibt gesetzt: `beforeSummon` liest es aus den Kosten-Daten
-    return (await zahleOpfer(ctx, allFullDrop)) ? { allFullDrop } : false;
+    const req = ps?._requestedBouncePlaceSlot || null;
+    return (await zahleOpfer(ctx, allFullDrop, req)) ? { allFullDrop, req } : false;
   },
 
   async beforeSummon(ctx) {
@@ -303,15 +308,18 @@ module.exports = attachSteamEngine({
     // Hero had no free slots (canPlaceOnOccupiedSlot gates on that).
     const pre = ctx._summonKosten;   // W4b: Opfer schon vor dem Reaktionsfenster bezahlt
     const allFullDrop = pre ? !!pre.allFullDrop : !!ps?._requestedBouncePlaceSlot;
+    const reqSlot = (pre ? pre.req : ps?._requestedBouncePlaceSlot) || null;   // W19a: die gewaehlte Zielzone
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    if (!pre && !(await zahleOpfer(ctx, allFullDrop))) return false;
+    if (!pre && !(await zahleOpfer(ctx, allFullDrop, reqSlot))) return false;
 
     // All-full path: manually place into a freed slot on the summoning
     // Hero, then tell the server to skip its default summonCreature.
     if (allFullDrop) {
       const supZones = gs.players[heroOwner]?.supportZones?.[heroIdx] || [];
-      const freedSlot = [0, 1, 2].find(z => (supZones[z] || []).length === 0);
+      // W19a: die gewaehlte Zielzone ist durch die Pflicht-Opfer leer - dort landet die Karte (sonst der erste freie Platz).
+      const freedSlot = (reqSlot && (supZones[reqSlot.slotIdx] || []).length === 0)
+        ? reqSlot.slotIdx : [0, 1, 2].find(z => (supZones[z] || []).length === 0);
       if (freedSlot == null) return false; // shouldn't happen
       await engine.actionPlaceCreature(CARD_NAME, pi, heroIdx, freedSlot, {
         source: 'external', sourceName: CARD_NAME, fireHooks: true,

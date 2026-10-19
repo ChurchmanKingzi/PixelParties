@@ -7,6 +7,12 @@
 // Szene: volles Brett; Alice teilt Zonen (zwei gleichnamige Kreaturen in EINER Zone = Stapel). Erwartung:
 //   (N) alle belegten Zonen sind Stapel -> die Karte ist nicht spielbar (kein Wurfziel, Spielweg lehnt ab, Karte bleibt auf der Hand, nichts geopfert);
 //   (P) eine Zone mit genau einer Karte -> dort spielbar, im Stapel nicht.
+//
+// ★ W19a (Al, 19.10.2026) hat die Regel für MEHR-OPFER-Karten (Blue-Ice Dragon, Foresta, Steam Dwarf Dragon Pilot; `opfer: 2` unten) umgestellt:
+//   „Es ist jede Zone ein Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man also eine Zone mit 2 Creatures darin, müssen beide geopfert werden,
+//   bei mehr Creatures als benötigten Opfern ist eine Zone nicht viable." Hier sind alle Zonen Stapel aus 2 Karten -> für diese drei Karten sind die Stapel
+//   Wurfziele (beide Insassen werden geopfert); die Ausnahme „Stapel kein Ziel" gilt unverändert für Karten mit EINEM Opfer (Egg of God, Teocuilatl-Trio,
+//   Suspicious Monster, Deepsea-Linie, Trex). Die volle Matrix (2 / 1 / 3 Karten je Zone, alle Karten) steht in `W19/a-2-ersetzen-zone-leerbar-durch-opfer.js`.
 // Exit 0 = korrekt.
 const H = require('../../lib/h.js');
 const ALICE = 'Alice, the Transfer Student';
@@ -38,7 +44,16 @@ const imStapel = (t) => t.gs.players[0].supportZones.flat().filter(z => z.length
   const R = H.runner();
   for (const k of KARTEN) {
     const sc = require(FX + k.n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.js');
-    R.section(`${k.n} - (N) nur Stapel-Zonen`);
+    R.section(`${k.n} - (N) nur Stapel-Zonen${k.opfer >= 2 ? ' (Mehr-Opfer-Karte, W19a: Stapel aus 2 Karten SIND Ziele)' : ''}`);
+    if (k.opfer >= 2) {
+      const t = await brett(k, 'N'); t.grantFor(0, 0, k.n);
+      const ziele = typeof sc.getBouncePlacementTargets === 'function' ? (sc.getBouncePlacementTargets(t.gs, 0, t.engine) || []) : [];
+      R.check('Stapel-Zonen aus 2 Karten sind Wurfziele (die 2 Opfer leeren sie)', ziele.length > 0 && typeof sc.canPlaceOnOccupiedSlot === 'function' && sc.canPlaceOnOccupiedSlot(t.gs, 0, 0, 0, t.engine, 0), ziele);
+      const r = await t.play(0, k.n, { hero: 0, slot: 0 });
+      const da = t.inst(c => c.name === k.n && c.zone === 'support' && c.owner === 0 && c.heroIdx === 0 && c.zoneSlot === 0);
+      R.check('Wurf auf den Stapel (0,0): gespielt, die Karte steht dort, die Insassen sind geopfert', r === true && da.length === 1 && t.gs.players[0].supportZones[0][0].length === 1, { r, da: da.length, z0: t.gs.players[0].supportZones[0][0] });
+      R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
+    } else
     { const t = await brett(k, 'N');
       const vorher = t.census();
       const ziele = typeof sc.getBouncePlacementTargets === 'function' ? (sc.getBouncePlacementTargets(t.gs, 0, t.engine) || []) : [];
@@ -50,11 +65,15 @@ const imStapel = (t) => t.gs.players[0].supportZones.flat().filter(z => z.length
       R.check('keine Engine-Fehler', t.errors.length === 0, t.errors); }
 
     R.section(`${k.n} - (P) eine Einzel-Zone (Held 0, Platz 1)`);
-    { const t = await brett(k, 'P');
+    { const t = await brett(k, 'P'); t.grantFor(0, 0, k.n);
       const ziele = typeof sc.getBouncePlacementTargets === 'function' ? (sc.getBouncePlacementTargets(t.gs, 0, t.engine) || []) : [];
       const stapelZiel = ziele.some(z => !(z.heroIdx === 0 && z.slotIdx === 1));
+      if (k.opfer >= 2) {   // W19a: Stapel aus 2 Karten sind Ziele (Opferzahl 2, beide geopfert)
+        R.check('Stapel-Zonen aus 2 Karten sind Wurfziele (W19a)', stapelZiel, ziele);
+      } else {
       R.check('Stapel-Zonen sind keine Wurfziele', !stapelZiel, ziele);
       R.check('Wurf auf Stapel (0,0) nicht erlaubt', !(typeof sc.canPlaceOnOccupiedSlot === 'function' && sc.canPlaceOnOccupiedSlot(t.gs, 0, 0, 0, t.engine, 0)));
+      }
       if (k.einzeln !== false) {
         t.targetFn = (valid) => { const w = valid.find(v => v.heroIdx === 0 && v.slotIdx === 1 && v.owner === 0); return [(w || valid[0]).id]; };   // Pflicht-Opfer: die Einzel-Zone
         const r = await t.play(0, k.n, { hero: 0, slot: 1 });

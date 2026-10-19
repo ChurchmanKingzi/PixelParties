@@ -109,10 +109,17 @@ function _collectTributeCandidates(engine, playerIdx, selfId) {
  * wenn `pi` den Helden dort gerade kontrolliert — sonst wuerde DDG ueber
  * einen fremden Helden beschworen.
  */
-function _landingAllowed(engine, pi, inst) {
+function _landingAllowed(engine, pi, inst, verfuegbar) {
   if (!inst) return false;
-  // W17a (Al, 19.10.2026): Landen nur in Zonen mit exakt EINER Karte (Alice-Stapel: die Zone wird durch die Rueckgabe nicht frei).
-  if (!engine.zoneFreiNachKostenzahlung(inst.owner, inst.heroIdx, inst.zoneSlot)) return false;
+  // W19a (Al, 19.10.2026): „Es ist jede Zone ein Ziel, die durch Opfern für die Beschwörung leer wird; bei mehr Creatures als benötigten
+  // Opfern ist eine Zone nicht viable." (löst W17a „nur Zonen mit exakt einer Karte" ab.) DDG gibt eine beliebige Zahl (>= 2) Kreaturen
+  // zurück: eine Zone ist Landeplatz, wenn ALLE ihre Insassen zurückgegeben werden — `verfuegbar` = Set der Instanz-IDs, die zurückgegeben
+  // werden können (alle Tribut-Kandidaten) bzw. werden (die gewählten).
+  // Das Zonen-Array zählt (wie bisher): so viele zurückgebbare Kreaturen wie Karten in der Zone müssen dort stehen.
+  const zonenKarten = engine.gs?.players?.[inst.owner]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
+  if (!Array.isArray(zonenKarten) || zonenKarten.length === 0) return false;
+  const gedeckt = engine.zoneInsassen(inst.owner, inst.heroIdx, inst.zoneSlot).filter(c => verfuegbar.has(c.id)).length;
+  if (gedeckt < zonenKarten.length) return false;
   if (inst.owner === pi) return true;
   const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
   return engine.heroSideOf(inst.owner, hero) === pi;
@@ -203,13 +210,25 @@ async function _zahleTribut(ctx) {
   }
 
   // ── Step 1: pick the tribute set ─────────
-  const targets = candidates.map(c => ({
-    id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`,
-    type: 'equip', owner: c.inst.owner,
-    heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
-    cardName: c.cardName, cardInstance: c.inst,
-    _meta: { level: c.level, maxHp: c.maxHp },
-  }));
+  const targets = [];
+  for (const c of candidates) {
+    const id = `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`;
+    const da = targets.find(t => t.id === id);
+    if (da) {
+      // W19a: ein Alice-Stapel (mehrere Karten in EINER Zone) ist EIN Ziel (der Client klickt Zonen): Anklicken gibt alle seine Kreaturen zurück.
+      da._insts.push(c.inst);
+      da._meta.level += c.level || 0; da._meta.maxHp += c.maxHp || 0;
+      continue;
+    }
+    targets.push({
+      id,
+      type: 'equip', owner: c.inst.owner,
+      heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
+      cardName: c.cardName, cardInstance: c.inst, _insts: [c.inst],
+      _meta: { level: c.level || 0, maxHp: c.maxHp || 0 },
+    });
+  }
+  const hatStapel = targets.some(t => t._insts.length > 1);
 
   const picked = await engine.promptEffectTarget(pi, targets, {
     title: `${CARD_NAME} — Tribute`,
@@ -218,27 +237,34 @@ async function _zahleTribut(ctx) {
     confirmClass: 'btn-danger',
     cancellable: true,
     maxTotal: targets.length,
-    minRequired: SACRIFICE_SPEC.minCount,
+    minRequired: hatStapel ? 1 : SACRIFICE_SPEC.minCount,   // W19a: ein Stapel-Ziel zaehlt fuer mehrere Kreaturen (unten nachgeprueft)
     minSumLevel: SACRIFICE_SPEC.minSumLevel,
   });
-  if (!picked || picked.length < SACRIFICE_SPEC.minCount) return false;
+  if (!picked || picked.length < 1) return false;
 
-  const chosenTargets = picked.map(id => targets.find(t => t.id === id)).filter(Boolean);
-  if (chosenTargets.length < SACRIFICE_SPEC.minCount) return false;
+  const chosenTargets = [...new Set(picked)].map(id => targets.find(t => t.id === id)).filter(Boolean);
+  const chosenInsts = chosenTargets.flatMap(t => t._insts);   // W19a: ein Stapel-Ziel = alle seine Kreaturen
+  if (chosenInsts.length < SACRIFICE_SPEC.minCount) return false;
   const sumLvl = chosenTargets.reduce((s, t) => s + (t._meta.level || 0), 0);
   if (sumLvl < SACRIFICE_SPEC.minSumLevel) return false;
 
   // ── Step 2: pick DDG's placement slot (one of the tribute slots) ──
   // Styx 28.9.: geliehene Helden der Gegenspalte — Landeplatz auf der
   // Gegenspalte nur ueber einen Helden, den `pi` kontrolliert.
-  const zones = chosenTargets.filter(t => _landingAllowed(engine, pi, t.cardInstance)).map(t => {
+  // W19a: eine Zone mit mehreren Karten (Alice) ist Landeplatz, wenn alle ihre Insassen gewaehlt sind (einmal je Zone anbieten).
+  const gewaehlteIds = new Set(chosenInsts.map(i => i.id));
+  const zones = [];
+  for (const t of chosenTargets) {
+    if (!_landingAllowed(engine, pi, t.cardInstance, gewaehlteIds)) continue;
+    if (zones.some(z => z.heroIdx === t.heroIdx && z.slotIdx === t.slotIdx && (z.owner ?? pi) === t.owner)) continue;
     const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-    return {
+    const namen = t._insts.map(i => i.name).join(' + ');
+    zones.push({
       heroIdx: t.heroIdx, slotIdx: t.slotIdx,
       ...(t.owner !== pi ? { owner: t.owner } : {}),
-      label: `${hero?.name || 'Hero'} — ${t.cardName} (Slot ${t.slotIdx + 1})`,
-    };
-  });
+      label: `${hero?.name || 'Hero'} — ${namen} (Slot ${t.slotIdx + 1})`,
+    });
+  }
   if (zones.length === 0) return false;
   const zonePick = await ctx.promptZonePick(zones, {
     title: `${CARD_NAME} — Rise From`,
@@ -256,10 +282,10 @@ async function _zahleTribut(ctx) {
   // Non-landing tributes first, landing tribute last so the destination
   // slot stays "occupied by a departing sacrifice" right up to the
   // moment DDG takes its place.
-  const landingInst = chosenTargets.find(_istLandung)?.cardInstance;
+  const landingInsts = chosenTargets.filter(_istLandung).flatMap(t => t._insts);   // W19a: bei einem Alice-Stapel mehrere
   const others = chosenTargets
     .filter(t => !_istLandung(t))
-    .map(t => t.cardInstance);
+    .flatMap(t => t._insts);
   // ★ Welle 10 (Al, R3 / A02-deepsea-16): „returning 2 or more Creatures" ist EIN Rückgabe-Ereignis — Siphem/Teppes/Analyzer/Gatherer
   // reagieren einmal (nicht je Kreatur); Blood Moon zählt weiter je Kreatur (liest `returnedInsts`).
   const batch = [];
@@ -267,14 +293,15 @@ async function _zahleTribut(ctx) {
     if (!inst) continue;
     await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
   }
-  if (landingInst) {
+  for (const landingInst of landingInsts) {
+    if (!landingInst) continue;
     await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
   }
   await fireReturnedBatch(engine, batch, CARD_NAME);
 
   return {
     heroIdx: zonePick.heroIdx, slotIdx: zonePick.slotIdx, landSeite,
-    tributed: chosenTargets.map(t => t.cardName),
+    tributed: chosenInsts.map(i => i.name),
   };
 }
 
@@ -343,7 +370,7 @@ module.exports = {
       ...SACRIFICE_SPEC,
       filter: (c) => (c.inst?.turnPlayed || 0) !== turn,
     }, null)
-      && _collectTributeCandidates(engine, pi, null).some(c => _landingAllowed(engine, pi, c.inst));   // W17a: es muss eine freiwerdende Zone geben
+      && (() => { const cs = _collectTributeCandidates(engine, pi, null); const ids = new Set(cs.map(c => c.inst.id)); return cs.some(c => _landingAllowed(engine, pi, c.inst, ids)); })();   // W17a/W19a: es muss eine freiwerdende Zone geben
   },
 
   // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
@@ -351,15 +378,22 @@ module.exports = {
   // `pi` den Helden dort kontrolliert (`_landingAllowed`).
   canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) => {
     const cands = _collectTributeCandidates(engine, pi, null);
+    const ids = new Set(cands.map(c => c.inst.id));
     return cands.some(c => c.inst.owner === heroOwner
       && c.inst.heroIdx === heroIdx && c.inst.zoneSlot === slotIdx
-      && _landingAllowed(engine, pi, c.inst));
+      && _landingAllowed(engine, pi, c.inst, ids));
   },
-  getBouncePlacementTargets: (gs, pi, engine) =>
-    _collectTributeCandidates(engine, pi, null)
-      .filter(c => _landingAllowed(engine, pi, c.inst))
-      .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot,
-        ...(c.inst.owner !== pi ? { owner: c.inst.owner } : {}) })),
+  getBouncePlacementTargets: (gs, pi, engine) => {
+    const cands = _collectTributeCandidates(engine, pi, null);
+    const ids = new Set(cands.map(c => c.inst.id));
+    const out = [];
+    for (const c of cands) {
+      if (!_landingAllowed(engine, pi, c.inst, ids)) continue;
+      const z = { heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, ...(c.inst.owner !== pi ? { owner: c.inst.owner } : {}) };
+      if (!out.some(o => o.heroIdx === z.heroIdx && o.slotIdx === z.slotIdx && (o.owner ?? pi) === (z.owner ?? pi))) out.push(z);   // W19a: ein Alice-Stapel nur einmal
+    }
+    return out;
+  },
 
   paySummonCost: async (ctx) => (ctx._monstrosityCopy ? {} : _zahleTribut(ctx)),   // W4b: Tribut vor dem Reaktionsfenster
 
