@@ -85,7 +85,15 @@ module.exports = attachSteamEngine({
     if (ps.mainDeck.indexOf(result.cardName) < 0) return false;
 
     // Pay the HP cost now — we've committed
+    // ★ W16b (A03-futuretech-06, Text „reduce this Creature's CURRENT and max HP by 100", Muster Rha'Bi/Gobbo): beide Werte zahlen.
+    // `decreaseCreatureMaxHp` stutzt die aktuellen HP nur auf das neue Maximum — erst Max senken, dann die aktuellen HP auf
+    // (vorher − Preis) setzen (Boden 1 wie bei Rha'Bi: der Preis tötet den Diver nicht).
+    const _maxVorher = inst.counters?.maxHp ?? engine._getCardDB()[inst.name]?.hp ?? 0;
+    const _curVorher = inst.counters?.currentHp ?? _maxVorher;
     decreaseCreatureMaxHp(engine, inst, HP_COST);
+    if (inst.counters && inst.counters.maxHp != null) {
+      inst.counters.currentHp = Math.max(1, Math.min(_curVorher - HP_COST, inst.counters.maxHp));
+    }
 
     // Route through the canonical helper so ON_CARD_ADDED_TO_HAND fires
     // (Cosmic Depths Analyzer / Gatherer key off this hook for any
