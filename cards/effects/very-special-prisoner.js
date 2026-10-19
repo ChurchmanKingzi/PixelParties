@@ -178,6 +178,14 @@ module.exports = {
       return;
     }
 
+    // ★ W15a (Al, R3: „Ja" — die Divinity-Anleger prallen an Resistance ab): Anlegen PER EFFEKT — vor jeder Kartenbewegung gefragt;
+    // Divinity bleibt in Hand/Deck, die Reaktion ist gespielt.
+    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
+      engine.log('very_special_prisoner_blocked', { player: ps.username, hero: ps.heroes[targetHeroIdx]?.name });
+      engine.sync();
+      return;
+    }
+
     // Splice the Divinity out of its source pile.
     const removeFromPile = (pile) => {
       const idx = pile.indexOf(DIVINITY);

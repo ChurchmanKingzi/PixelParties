@@ -132,6 +132,23 @@ module.exports = {
       const expiresAtTurn = (gs.turn || 0) + 2;
       const expiresForPlayer = pi;
 
+      // ★ W15a (Al, R01-10 + Q156: „Jeder Treffer zählt, auch reines Status-Zufügen"): Fläche ohne Schaden öffnet wie ein Flächenschlag die „hit by"-Surprises
+      // und die Hand-Reaktionen (Divine Gift of Rain, Barrier of Faith, Anti Magic Shield …) über ALLE Ziele des Bretts, bevor etwas wirkt.
+      {
+        const ziele = [];
+        for (let p = 0; p < engine.playerCount(); p++) {
+          (gs.players[p]?.heroes || []).forEach((h, hi) => { if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: p, heroIdx: hi }); });
+        }
+        for (const inst of engine.cardInstances) {
+          if (inst.zone !== 'support' || inst.faceDown) continue;
+          const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          ziele.push({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name });
+        }
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell', { ziele });
+        if (sr?.effectNegated) return;
+      }
+
       // Board-wide dark-magic swarm — hits every alive Hero AND
       // every face-up Creature on both sides simultaneously, so the
       // global silence reads as ONE big beat. Per-target swarm anims

@@ -352,6 +352,14 @@ module.exports = {
     const gestaltName = gewaehlt.cardName;
     const quelle = gewaehlt.source;
 
+    // ★ W15a (Al, R3 und Regel W14a Q5): das Anlegen des Helden ist ein Effekt auf den Träger — Resistance fängt es ab (vor jeder Kartenbewegung; die Karte bleibt in
+    // Hand/Deck/Ablage, kein Mischen). Der Einsatz zählt als genutzt.
+    if (await engine.heroNonDamageEffectBlocked(hs, heroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('shapeshifter_blocked', { player: ps.username, equip: gestaltName });
+      engine.sync();
+      return true;
+    }
+
     // ── Karte aus ihrer Quelle nehmen ─────────────────────────────
     // Der Index wird HIER frisch gesucht, nicht oben gemerkt: zwischen
     // Galerie und Zonenwahl liegen zwei Abfragen, und die koennen die

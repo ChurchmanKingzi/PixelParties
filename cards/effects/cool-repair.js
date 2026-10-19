@@ -226,6 +226,14 @@ module.exports = {
       engine.log('gold_spend', { player: ps.username, amount: repairCost, total: ps.gold, for: 'Cool Repair' });
     }
 
+    // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT — Resistance des Trägers fängt es ab (vor jeder Kartenbewegung; die Ausrüstung bleibt in der Ablage).
+    // Cool Repair ist gespielt, die Kosten sind bezahlt.
+    if (await engine.heroNonDamageEffectBlocked(pi, destHeroIdx, 'equip', { sourceOwner: pi, source: 'Cool Repair' })) {
+      engine.log('cool_repair_blocked', { player: ps.username, equip: equipName, hero: ps.heroes[destHeroIdx]?.name, goldPaid: repairCost });
+      engine.sync();
+      return true;
+    }
+
     // ── Step 5: Remove equip from discard pile ──
     const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', equipName, { source: 'cool-repair' });   // v820: Stapel-Schicht
     if (!_taken_discardIdx) return { cancelled: true };

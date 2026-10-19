@@ -52,6 +52,14 @@ module.exports = {
         return;
       }
 
+      // ★ W15a (Al, R01-10): Fläche ohne Schaden — Hand-Reaktionen (Divine Gift of Rain, Anti Magic Shield …) über alle Kreaturen des Bretts, vor dem Frost.
+      {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [], 'decay_spell', {
+          ziele: targets.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name })),
+        });
+        if (sr?.effectNegated) return;
+      }
+
       // Per-target freeze via the centralised helper (handles immunity,
       // animation, and onStatusApplied hook fire so listeners like
       // Bear Rider's hand-level recompute and Chilly Wizard's mirror

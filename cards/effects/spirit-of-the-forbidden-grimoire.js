@@ -93,6 +93,7 @@ function sammleKandidaten(engine) {
 
     let grund = null;
     if (inst.counters?.negated || inst.counters?.nulled) grund = 'negated';
+    else if (engine.isCreatureActiveEffectLocked(inst)) grund = 'active effects locked';   // W15a (Al, R6): Unwanted Audience sperrt auch die geliehene Aktivierung — ausgegraut statt wählbar-und-wirkungslos
     else if (inst.counters?._effectLockedTurn === engine.gs.turn) grund = 'used this turn';
     else if (!hasNumericCreatureLevel(cd)) grund = 'no level';   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     else if (levelVon(engine, inst) > MAX_SUMME) grund = `level ${levelVon(engine, inst)}`;

@@ -65,6 +65,22 @@ module.exports = {
       // ── Pay cost ── (Normalweg: schon in `payActivationCost` bezahlt; sonst Fallback)
       if (!kostenSchonBezahlt(ctx)) await placePollutionTokens(engine, pi, 2, 'Null Zone', { promptCtx: ctx });
 
+      // ── ★ W15a (Al, R01-10 + Q156): Fläche ohne Schaden — „hit by"-Surprises und Hand-Reaktionen über alle Ziele des Bretts, nach der Kostenzahlung ──
+      {
+        const ziele = [];
+        for (let p = 0; p < gs.players.length; p++) {
+          (gs.players[p]?.heroes || []).forEach((h, hi) => { if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: p, heroIdx: hi }); });
+        }
+        for (const inst of engine.cardInstances) {
+          if (inst.zone !== 'support' || inst.faceDown) continue;
+          const cd = inst.counters?._cardDataOverride || cardDB[inst.name];
+          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          ziele.push({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name });
+        }
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'magic_arts_spell', { ziele });
+        if (sr?.effectNegated) return;
+      }
+
       // ── Apply effects ──
       // Expiry: "end of your next turn" = Beginn des ersten Zuges NACH dem
       // naechsten eigenen Zug (T + 3, Zug des Gegners) — wie Disruption Ray;
