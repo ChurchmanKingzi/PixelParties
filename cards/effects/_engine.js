@@ -27970,6 +27970,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // The substitute itself stays exempt from `spec.filter` below: the
     // restriction describes the tribute being REPLACED, not the
     // replacement. Opt out per-cost via `spec.noHandSubstitute`.
+    // ★ W16b (A02-deepsea-34): ein Opfer ist ein BESIEGEN — eine per Succubus geliehene Kreatur „cannot be defeated while you control it"
+    // (`actionDestroyCard` bricht bei `_stealImmortal` ab): kein Opferkandidat, sonst gälte der Preis als gezahlt, ohne gezahlt zu sein.
+    // Nur hier (generische Opferkosten), NICHT in `getSacrificableCreatures`; Specs mit `returnsToHand` (Dark Deepsea God gibt die Kreatur nur
+    // auf die Hand zurück, Al 14.10.: geliehene Kreaturen sind dort als Tribut erlaubt) nehmen sie aus.
+    if (!spec?.returnsToHand) board = board.filter(c => !c.inst.counters?._stealImmortal);   // `returnsToHand`: Tribut wird nur zurück auf die Hand gegeben (Dark Deepsea God)
     //
     // Card gates that ask "can I pay this?" via
     // `getSacrificableCreatures(pi).some(<same filter>)` are exactly

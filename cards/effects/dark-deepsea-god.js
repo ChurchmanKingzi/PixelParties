@@ -84,6 +84,7 @@ const MANIFEST_HALF_MS = 1250;
 const SACRIFICE_SPEC = {
   minCount: 2,
   minSumLevel: 4,
+  returnsToHand: true,   // W16b: Tribut = Rückgabe auf die Hand, kein Besiegen — geliehene (`_stealImmortal`) Kreaturen bleiben zulässig
 };
 
 function _collectTributeCandidates(engine, playerIdx, selfId) {
