@@ -225,6 +225,12 @@ async function checkPuppetHeroDefeat(engine, pi, heroIdx, source, excludeId) {
   const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0 || !isPuppetHero(hero.name)) return false;
   if (puppetTokensInColumn(engine, pi, heroIdx, { excludeId }).length > 0) return false;
+  // ★ W16b (A03-futuretech-04, Text „has no Tokens in its Support Zones"): gezählt wird, was PHYSISCH in den Zonen dieses Helden steht —
+  // auch ein gestohlener Token (Kontrolle beim Gegner) steht weiter in der Spalte; er hält den Helden am Leben.
+  const _physisch = engine.cardInstances.some(c =>
+    c.zone === ZONES.SUPPORT && c.heroIdx === heroIdx && isPuppetToken(c.name)
+    && engine.physicalSide(c) === pi && (!excludeId || c.id !== excludeId));
+  if (_physisch) return false;
   engine.log('puppet_hero_no_tokens', { hero: hero.name, player: engine.gs.players[pi]?.username });
   await engine.actionDefeatHero(source || { name: hero.name, owner: pi, heroIdx }, hero, {
     respectFirstTurnProtection: false, reason: 'no_puppet_tokens',
