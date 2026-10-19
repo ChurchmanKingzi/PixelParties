@@ -47,7 +47,7 @@ module.exports = {
     if (!inst || inst.zone !== 'hand') return 0;
     if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     if (typeof heroIdx !== 'number' || heroIdx < 0) return 0;
-    return engine.heroSchoolLevel('Singing', ownerIdx, heroIdx);   // W4a: harte Negierung -> Stufe 0
+    return engine.effectiveSchoolLevelForCaster('Singing', ownerIdx, heroIdx, ownerIdx);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
   },
 
   spellPlayCondition(gs, pi, engine) {
@@ -65,10 +65,10 @@ module.exports = {
       const chosen = await engine.promptEffectTarget(pi, targets, {
         title: CARD_NAME, source: CARD_NAME,
         description: 'Choose a defeated Hero either player controls and revive it with full HP.',
-        confirmLabel: '🎶 Revive!', confirmClass: 'btn-success', cancellable: false,
+        confirmLabel: '🎶 Revive!', confirmClass: 'btn-success', cancellable: true,   // W16g (S02-10): Regel 23.9 — Abbruch = nichts ist passiert (Karte bleibt auf der Hand, kein Einmal-Stempel)
         maxTotal: 1, minRequired: 1, allowDeadHeroes: true,
       });
-      if (!chosen || chosen.length === 0) return;
+      if (!chosen || chosen.length === 0) { gs._spellCancelled = true; return; }
       const sel = targets.find(t => t.id === chosen[0]) || targets[0];
       const hero = gs.players[sel.owner]?.heroes?.[sel.heroIdx];
       if (!hero) return;
