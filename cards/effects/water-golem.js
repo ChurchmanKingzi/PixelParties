@@ -112,11 +112,13 @@ async function negationLoesen(engine, golem) {
   const ziel = zielVon(engine, golem);
   delete golem.counters._golemTarget;
   if (!ziel) return;
+  // W16e (C05-05): nur DIE EIGENE Negierung zuruecknehmen (wie `negationRuhen`); eine fremde (Stowaway, Decisive Defeat, Null …) bleibt.
   if (ziel.type === 'hero') {
-    if (ziel.hero.statuses?.negated) {
+    const ng = ziel.hero.statuses?.negated;
+    if (ng && ng.sourceBound && ng.source === CARD_NAME) {
       await engine.removeHeroStatus(ziel.owner, ziel.heroIdx, 'negated', { bypassUnhealable: true });
     }
-  } else if (ziel.inst.counters?.negated) {
+  } else if (ziel.inst.counters?.negated && ziel.inst.counters.negatedSourceBound === CARD_NAME) {
     delete ziel.inst.counters.negated;
     delete ziel.inst.counters.negatedSourceBound;
     engine.log('status_remove', { target: ziel.inst.name, status: 'negated', by: CARD_NAME });
