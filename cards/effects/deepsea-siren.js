@@ -232,6 +232,10 @@ module.exports = {
           }
         }
 
+        // ★ W16b (A02-deepsea-27): der Tod-Teil ist im Schadenspfad erledigt (Spiegeltreffer auf Gegner-Kill) — `onCreatureDeath`
+        // darf ihn nicht ein zweites Mal auslösen.
+        if (willDie && isEnemy) selfInst.counters._sirenKillDone = true;
+
         // If Siren is about to die, the linked target's "Linked" badge
         // becomes stale — clear it now since onCardLeaveZone won't fire
         // on an untracked Siren.
@@ -244,6 +248,38 @@ module.exports = {
           amount, willDie, isEnemy,
         });
       }
+    },
+
+    // ★ W16b (A02-deepsea-27, Text „When this Creature is defeated by an opponent's card or effect, also defeat the chosen target"):
+    // auch Besiegen-/Zerstören-Effekte (Deepsea Reaper, `actionDestroyCard`) geben den Tod weiter, nicht nur tödlicher Schaden
+    // (der bleibt im Schadenspfad oben; `_sirenKillDone` verhindert die Doppelung). Muster Ghoul Guard (eigene Instanz, Quelle = Gegner).
+    // Gilt auch für eine Deepsea Monstrosity, die den Einsatz-Effekt der Siren kopiert hat (die Link-Marken liegen an der Instanz).
+    onCreatureDeath: async (ctx) => {
+      const death = ctx.creature;
+      const selfInst = ctx.card;
+      if (!death || !selfInst || death.instId !== selfInst.id) return;
+      const c = selfInst.counters || {};
+      if (!c._sirenLinkType || c._sirenKillDone) return;
+      const engine = ctx._engine;
+      const src = ctx.source;
+      const srcOwner = src?.controller ?? src?.owner ?? src?.heroOwner ?? -1;
+      const ctrl = death.controller ?? death.owner;
+      if (!src || srcOwner < 0 || srcOwner === ctrl) return;        // nur „by an opponent's card or effect"
+      const linked = _resolveLinkedTarget(engine, selfInst);
+      if (!linked) return;
+      c._sirenKillDone = true;
+      await engine.showTriggeredEffect(selfInst.name || CARD_NAME, { playerIdx: ctrl });   // Auftritt: die Karte (Siren bzw. kopierende Monstrosity) zieht das Ziel mit
+      const quelle = { name: CARD_NAME, owner: ctrl, heroIdx: death.heroIdx };
+      if (linked.type === 'creature') {
+        await engine.actionDestroyCard(quelle, linked.inst, { fireCreatureDeath: true });
+      } else if (linked.hero?.hp > 0) {
+        await engine.actionDefeatHero(quelle, linked.hero);
+      }
+      _clearLinkFlags(engine, linked);
+      engine.log('siren_link_defeat', {
+        siren: CARD_NAME, target: linked.type === 'hero' ? linked.hero.name : linked.inst.name,
+      });
+      engine.sync();
     },
 
     // Fires only for non-damage destruction paths (Poltergeister, Silver

@@ -39,6 +39,14 @@ const {
   promptOptionalOnSummon,
 } = require('./_deepsea-shared');
 const { loadCardEffect } = require('./_loader');
+const sirenSkript = require('./deepsea-siren');
+
+// ★ W16b (A02-deepsea-25): kopiert die Monstrosity den Einsatz-Effekt der Siren („choose any target. Any damage this Creature takes is also
+// applied to that target … defeat the chosen target"), gilt die Verknüpfung für DIESE Kreatur. Die Link-Marken liegen an der Instanz;
+// die Wirkung (Schaden weitergeben, Tod weitergeben) sind die Hooks der Siren — hier nur durchgereicht, wenn die Marken da sind.
+function _sirenDurchreichen(name) {
+  return (ctx) => (ctx.card?.counters?._sirenLinkType ? sirenSkript.hooks[name](ctx) : undefined);
+}
 
 const CARD_NAME = 'Deepsea Monstrosity';
 
@@ -52,6 +60,9 @@ module.exports = {
   canSummon: (ctx) => canSummonPerTurnLimit(ctx, CARD_NAME),
 
   hooks: {
+    beforeCreatureDamageBatch: _sirenDurchreichen('beforeCreatureDamageBatch'),
+    onCreatureDeath: _sirenDurchreichen('onCreatureDeath'),
+    onCardLeaveZone: _sirenDurchreichen('onCardLeaveZone'),
     onPlay: async (ctx) => {
       markSummonedPerTurnLimit(ctx, CARD_NAME);
       // Don't recurse — if this is being fired via Blood Moon retrigger or
