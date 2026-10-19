@@ -26459,6 +26459,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
+    // W16g (S02-13): auch Frozen/Stunned/Magic Silenced (und Aura-Negation) sperren die Wiederholung — dasselbe Praedikat wie die
+    // regulaere Aktivierung (`doActivateCreatureEffect`: `isCreatureEffectSuppressed`); gilt fuer Great Offensive, Kohta, Grimoire.
+    if (this.isCreatureEffectSuppressed(inst)) return false;
     if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): auch geliehene Wiederholungen (Grimoire, Kohta) sind „aktivieren"
     // v748: „cannot be used another time for the rest of the turn in
     // ANY way" (Spirit of the Forbidden Grimoire). Die Marke sperrt
@@ -26469,9 +26472,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Effekt sich nicht selbst noch einmal anstossen kann).
     if (!opts.ignoreEffectLock && inst.counters?._effectLockedTurn === this.gs.turn) return false;
     // v752: Die EIGENE Aktivierungsbedingung der Karte gilt auch fuer
-    // W16g (S02-13): auch Frozen/Stunned/Magic Silenced (und Aura-Negation) sperren die Wiederholung — dasselbe Praedikat wie die
-    // regulaere Aktivierung (`doActivateCreatureEffect`: `isCreatureEffectSuppressed`); gilt fuer Great Offensive, Kohta, Grimoire.
-    if (this.isCreatureEffectSuppressed(inst)) return false;
     // eine geliehene oder geschenkte Aufloesung (Als Befund 5.9.:
     // Grimoire liess Cosmic Skeleton feuern, obwohl dessen Bedingung
     // nicht erfuellt war). `canActivateCreatureEffect` ist der Ort, an
@@ -38405,6 +38405,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // normalen Zaubern ausgeschlossen, konnte aber weiter reagieren.
     // Dieselbe Ausnahme wie im Hauptweg: eine Karte darf sich per
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
+    // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     if (cardData.cardType === 'Spell'
         && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked)) {
       const script = loadCardEffect(cardName);
@@ -38425,7 +38426,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canPlayCard` des Helden und seiner Ausruestung. Surprises und
     // Hand-Reaktionen liefen daran vorbei: Santa konnte reagieren, ohne
     // die 2 Handkarten bezahlen zu koennen.
-    // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     {
       const herkunft = { fromHand: !!opts.spellInHand };
       const heroScript = this.heroScript(hero);
