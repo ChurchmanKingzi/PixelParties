@@ -41,6 +41,7 @@
 // ═══════════════════════════════════════════
 
 const { opponentOfGs } = require('./_opp');
+const { hatEffekt } = require('./_gained-effects-shared');
 const CARD_NAME = "Rha'Bi, the Living Skeleton";
 const KOSTEN    = 100;
 const SCHADEN   = 100;   // v1029 (Als Anpassung 12.9.; 200 → 150 → 100)
@@ -398,7 +399,9 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const gefallen = ctx.hero;
-      if (!gefallen?.name || gefallen.name !== CARD_NAME) return;
+      // W16f (H03-02): auch der Träger des GEWONNENEN Effekts (Pseudonia); es fällt genau der Träger dieser Instanz.
+      if (!gefallen?.name || !hatEffekt(gefallen, CARD_NAME)) return;
+      if (ctx.attachedHero && ctx.attachedHero !== gefallen) return;
 
       const liegend = platzierte(engine, pi);
       if (liegend.length === 0) return;

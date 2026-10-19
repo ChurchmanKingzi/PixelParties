@@ -29,6 +29,8 @@ function applyBonus(engine, card, hero, ownerIdx, heroIdx, copyIndex) {
 
 module.exports = {
   activeIn: ['ability'],
+  // W16f (M02-08): die Rücknahme des ATK-Bonus beim Abgang der Kopie läuft auch bei gefrorenem/betäubtem/negiertem Helden (Engine: runHooks-Filter).
+  bypassStatusFilterOnLeave: true,
   // Lizbeth/Smugbeth: Fighting is opted OUT of the engine's auto-mirror
   // because the spec wants override semantics (highest opponent
   // Fighting bonus replaces Lizbeth's own if greater, only one

@@ -176,6 +176,7 @@ module.exports = {
 
       // Set shield active for subsequent batches in this resolution
       gs._moniaShieldActive = protectOwner;
+      gs._moniaShieldSource = trigger ? { name: trigger } : null;   // W16f (H01-08): der Schild gehört zu dieser Karte/diesem Effekt
 
       // Cancel ONLY negatable entries for the protected controller.
       // Unnegatable damage (Acid Vial, Ida) still goes through — Monia "wastes" the effect.
@@ -299,6 +300,11 @@ module.exports = {
 
       heldenSperreSetzen(gs, 'monia-protect', ctx.cardOwner);   // v1275; Styx 28.9.: Kontrolleur
       gs._moniaShieldActive = protectOwner;
+      {   // W16f (H01-08): Quelle des geschützten Effekts merken (Schild gilt nur für sie)
+        const q = ctx.source;
+        const qn = typeof q === 'string' ? q : (q?.name || q?.cardName);
+        gs._moniaShieldSource = qn ? { name: qn } : null;
+      }
       ctx.cancelled = true;
 
       engine.log('monia_protect', {

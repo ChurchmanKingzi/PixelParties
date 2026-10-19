@@ -140,6 +140,8 @@ module.exports = {
 
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
       if (feld !== pi) tempInst.heroOwner = feld;   // Styx 28.9.: wie der Server bei Uebernahme
+      // W16f (H02-08): „Re-cast skips costs" — Token-Kosten im `onPlay` (Goldify: `kostenSchonBezahlt`) gelten als schon bezahlt.
+      tempInst._kostenBezahlt = true;
 
       try {
         await engine.runHooks('onPlay', {

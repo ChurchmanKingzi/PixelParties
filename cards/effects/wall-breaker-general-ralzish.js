@@ -63,7 +63,9 @@ function creaturesInSupport(engine, ownerIdx, heroIdx) {
   let n = 0;
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.owner !== ownerIdx || inst.heroIdx !== heroIdx) continue;
+    // W16f (H04-10): "in this Hero's Support Zones" = BRETTSEITE (physicalSide), nicht Besitzer: eine seitenfremde Kreatur (Elusive Hind
+    // & Co.: owner = Beschwörer, controller = Brettseite) steht in der Zone und zählt.
+    if (engine.physicalSide(inst) !== ownerIdx || inst.heroIdx !== heroIdx) continue;
     if (inst.faceDown) continue;
     if (inst.counters?.treatAsEquip) continue; // Equip Artifact, not a Creature
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
@@ -99,8 +101,10 @@ function collectTargets(engine, controllerIdx) {
       const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
       const isCreature = !inst.counters?.treatAsEquip && cd && hasCardType(cd, 'Creature');
       if (isCreature && (inst.turnPlayed || 0) > threshold) continue;
-      targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
-        owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      // W16f (H04-10): Adresse = Brettseite (eindeutige Ziel-ID, Klick auf das Brettfeld findet sie wieder).
+      const seite = engine.physicalSide(inst);
+      targets.push({ id: `equip-${seite}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
+        owner: seite, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
         cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'ability') {
       const slot = gs.players[inst.owner]?.abilityZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
@@ -300,7 +304,7 @@ module.exports = {
       const isStack = sel.type === 'coolnessStackTop';
       const ramTarget = isStack
         ? { owner: sel.owner, heroIdx: -1, zoneSlot: -1, zoneType: 'coolnessStack' }
-        : { owner: targetInst.owner, heroIdx: targetInst.heroIdx, zoneSlot: targetInst.zoneSlot, zoneType: targetInst.zone };
+        : { owner: targetInst.zone === 'support' ? engine.physicalSide(targetInst) : targetInst.owner, heroIdx: targetInst.heroIdx, zoneSlot: targetInst.zoneSlot, zoneType: targetInst.zone };   // W16f: Brettseite für die Animation
 
       const ramEvent = {
         sourceOwner: feld, sourceHeroIdx: heroIdx,

@@ -12,6 +12,8 @@
 //  future steal effect.
 // ═══════════════════════════════════════════
 
+const { istHeldenTraeger } = require('./_gained-effects-shared');
+
 module.exports = {
   activeIn: ['hero'],
 
@@ -36,7 +38,7 @@ module.exports = {
      * (passive can't fire from a corpse).
      */
     onCardTakenFromOpponent: async (ctx) => {
-      if (ctx.cardZone !== 'hero') return;
+      if (!istHeldenTraeger(ctx.card)) return;   // W16f (H03-02): auch die Träger-Instanz eines GEWONNENEN Effekts (Pseudonia) liegt nicht in Zone 'hero'
       if (ctx.takerPi !== ctx.cardOwner) return;
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;

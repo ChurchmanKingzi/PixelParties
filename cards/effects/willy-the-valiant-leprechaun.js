@@ -2,7 +2,7 @@
 //  CARD EFFECT: "Willy, the Valiant Leprechaun"
 //  Hero — At the end of your first turn, choose:
 //  Draw 5 cards OR Gain 30 Gold.
-//  No hand size limit during your first turn.
+//  No hand size limit until the start of your second turn (W16f: bis einschliesslich der Gegnerrunde dazwischen).
 // ═══════════════════════════════════════════
 
 // Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
@@ -48,7 +48,9 @@ module.exports = {
       hero._willyEffectUsed = false;
 
       // Generic hand-limit bypass: enforceHandLimit checks this
-      ps._noHandLimitUntilTurn = firstTurn;
+      // W16f (H04-08): gedruckt "until the START of your second turn" - der Bypass gilt bis einschliesslich des Zuges VOR dem zweiten
+      // eigenen Zug (2 Spieler: firstTurn + 1, also auch die Gegnerrunde dazwischen), nicht nur im ersten Zug.
+      ps._noHandLimitUntilTurn = firstTurn + Math.max(1, (gs.players || []).length - 1);
     },
 
     /**

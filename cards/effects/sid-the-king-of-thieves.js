@@ -189,7 +189,9 @@ module.exports = {
           const newInst = await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
           const newHandIdx = ps.hand.length - 1;
 
-          newInst.originalOwner = oi;
+          // W16f (H04-12): Herkunft über die EINE Stelle (platzbasiert `_handOriginals` + Instanz) — Spielen/Abwerfen lesen zuerst den
+          // Platz; ohne ihn landete die geraubte Karte in SIDS Ablage statt in der des Besitzers.
+          if (!engine._tagHandCardOrigin(pi, name, oi, newHandIdx) && newInst) newInst.originalOwner = oi;
 
           // Per-card level rebate — Lv1/2/3 Attacks, Spells, and
           // Creatures become effective Lv0 when Sid himself plays /

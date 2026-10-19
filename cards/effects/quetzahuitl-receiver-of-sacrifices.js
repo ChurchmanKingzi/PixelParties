@@ -237,6 +237,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero) continue;
+    // W16f (H03-06): „delete all your Heroes" — die Heldenkarte selbst landet im Gelöscht-Stapel (Konvention `engine.deleteHero`), nicht im Nichts.
+    if (hero.name) {
+      if (!ps.deletedPile) ps.deletedPile = [];
+      ps.deletedPile.push(hero.name);
+    }
     hero.name = null;
     hero.hp = 0;
     hero.maxHp = 0;

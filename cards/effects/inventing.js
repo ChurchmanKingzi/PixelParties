@@ -33,8 +33,10 @@ module.exports = {
     if (level >= 3) {
       const engine = ctx._engine;
       const pi     = ctx.cardOwner;
-      const handNames = new Set(ps.hand);
-      return (ps.mainDeck || []).some(cn => !handNames.has(cn) || cn !== cn); // any different-named card
+      // W16f (M01-09): es muss eine Handkarte H (die abgeworfen wird) und eine Deckkarte D mit anderem Namen geben (D != H) -
+      // vorher verlangte der Test eine Deckkarte, deren Name auf KEINER Handkarte steht (`|| cn !== cn` war immer falsch).
+      const handNames = [...new Set(ps.hand)];
+      return (ps.mainDeck || []).some(cn => handNames.some(h => h !== cn)); // any different-named card
     }
     return true;
   },

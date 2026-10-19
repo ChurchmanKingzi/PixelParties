@@ -7,7 +7,8 @@
 //  Spell from their hand, the controller may immediately cast that
 //  Spell as an additional Action with Archibald. The Spell's level
 //  is temporarily increased by 1 for the duration of this cast.
-//  Triggers on ANY discard, including during the opponent's turn —
+//  Triggers on ANY discard during the controller's own turn (W16f: gedruckt
+//  "during your turn" — ein Abwurf im Gegnerzug löst NICHT aus) —
 //  Wisdom cost, Acid Rain delete, Magenta self-mill, Forced Discard,
 //  etc. all count.
 //
@@ -363,6 +364,9 @@ module.exports = {
 
       const engine = ctx._engine;
       const gs = engine.gs;
+
+      // W16f (H01-01): gedruckt „during your turn" — ein Abwurf im Zug des Gegners löst nicht aus.
+      if (gs.activePlayer !== ctx.cardOwner) return;
 
       // Re-entry guard — same one castSpellAsArchibald uses.
       if (gs._archibaldCasting) return;

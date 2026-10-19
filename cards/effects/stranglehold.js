@@ -15,8 +15,26 @@
 //  scaleX squeeze on the target zone).
 // ═══════════════════════════════════════════
 
+const { getNegativeStatuses, STATUS_EFFECTS } = require('./_hooks');
+
 const DAMAGE_PER_STATUS = 50;
-const NEGATIVE_STATUSES = ['frozen', 'stunned', 'burned', 'poisoned', 'negated'];
+// W16f (M02-01): ALLE negativen Status der Engine (`negative: true`), nicht nur fünf - der Kartentext schränkt nicht ein.
+// Poison-Stapel zählen als EIN Status; `blinded` und `blinded_hit` sind zwei Quellen desselben Status "Blinded" (gleiche Beschriftung) und
+// zählen zusammen einmal. Anhängsel, die als negativer Status zählen (Decisive Defeat, Stowaway ...), kommen über `cleansableHeroEntries`.
+const NEGATIVE_STATUSES = getNegativeStatuses();
+
+function zaehleStatusSchluessel(vorhanden) {
+  const labels = new Set();
+  let n = 0;
+  for (const s of NEGATIVE_STATUSES) {
+    if (!vorhanden(s)) continue;
+    const label = STATUS_EFFECTS[s]?.label || s;
+    if (labels.has(label)) continue;
+    labels.add(label);
+    n++;
+  }
+  return n;
+}
 
 /**
  * Count negative status effects on a target.
@@ -27,8 +45,9 @@ function countNegativeStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero) return 0;
-    for (const s of NEGATIVE_STATUSES) {
-      if (hero.statuses?.[s]) count++;
+    count += zaehleStatusSchluessel(s => !!hero.statuses?.[s]);
+    for (const e of (engine.cleansableHeroEntries?.(target.owner, target.heroIdx) || [])) {
+      if (typeof e.key === 'string' && e.key.startsWith('attach:')) count++;   // Anhängsel ohne eigenen Statusschlüssel
     }
   } else if (target.type === 'equip') {
     const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -36,9 +55,7 @@ function countNegativeStatuses(target, engine) {
       c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
     );
     if (!inst) return 0;
-    for (const s of NEGATIVE_STATUSES) {
-      if (inst.counters[s]) count++;
-    }
+    count += zaehleStatusSchluessel(s => !!inst.counters?.[s]);
   }
   return count;
 }

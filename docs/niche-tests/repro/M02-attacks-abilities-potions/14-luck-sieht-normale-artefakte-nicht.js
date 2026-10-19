@@ -16,7 +16,11 @@ const H = require('../../lib/h.js');
     await t.run(() => t.host.doActivateFreeAbility(t.room, 0, { heroIdx: 0, zoneIdx: 0 }));
     const vor = t.pile(0, 'hand').length;
     await t.endTurn();
-    t.targetFn = (valid) => { const v = valid.find(x => x.owner === 0); return v ? [v.id] : null; };
+    // W16f: Messfehler behoben - das Ziel war der erste Held von Sitz 0 = Lucks Träger; Snow Cannon/Magic Cobalt frieren/schlagen ihn, bevor das Ereignis
+    // gezählt wird, und der gefrorene Träger ist stumm (Luck ist keine "cannot be negated"-Karte). Gewählt wird deshalb ein ANDERER Held (Index 1).
+    // Magic Cobalt: "Choose a Hero YOU control" -> eigener Held des Spielers (Sitz 1).
+    const zielSeite = name === 'Magic Cobalt' ? 1 : 0;
+    t.targetFn = (valid) => { const v = valid.find(x => x.owner === zielSeite && x.heroIdx !== 0) || valid.find(x => x.owner === zielSeite); return v ? [v.id] : null; };
     const r = await t.play(1, name, { hero: 0 });
     const gezogen = t.pile(0, 'hand').length - vor;
     R.check(`Luck Lv1 auf "${name}" (${name === 'Life Serum' ? 'Kontrolle: Trank' : 'Normal-Artefakt'}): 2 Karten gezogen`, r === true && gezogen === 2, { r, gezogen });

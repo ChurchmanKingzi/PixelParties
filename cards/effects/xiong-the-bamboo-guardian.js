@@ -76,9 +76,9 @@ async function tryTutor(ctx) {
   // resolution (`_resolvingCard`) is excluded — it has not yet been
   // pushed to discard at this trigger point, but we filter
   // defensively.
+  // W16f (H04-04): KEIN Ausschluss per NAME - die gerade aufloesende Attack liegt noch auf der Hand (nicht in der Ablage); eine
+  // gleichnamige, schon abgelegte Kopie ist eine Ablagekarte wie jede andere und wird angeboten.
   const exclude = new Set();
-  const resolving = ownPs._resolvingCard?.name;
-  if (resolving) exclude.add(resolving);
 
   const counts = new Map();
   // BORIS-EINSCHRAENKUNG: hat der Gegner einen wirksamen Boris, faellt

@@ -101,6 +101,17 @@ module.exports = {
             });
           }
         }
+        // W16f (H03-08): „a target" gilt auch für Kreaturen — `applyCreatureStatus` feuert den Hook mit `_onCreature` (der Kopfkommentar
+        // oben ist überholt). Ein Burn auf einer Kreatur ohne Dauer bleibt liegen (= „rest of the game"); er löst seinen eigenen Hook
+        // aus, der Effekt 2 (Ziehen) für beide Lunas bedient.
+        else if (ctx._onCreature && target?.zone === 'support' && !target.counters?.burned) {
+          await engine.applyCreatureStatus(target, 'burned', {
+            sourceOwner: pi,
+            source: { name: CARD_NAME, owner: pi },
+            _skipBoardGuard: true,
+          });
+          engine.log('luna_pele_burn_apply', { player: gs.players[pi]?.username, target: target.name });
+        }
         // Fall through — even if effect 1 triggered, effect 2 must
         // also be checked (the burn application above will fire its
         // own onStatusApplied('burned') which separately runs effect

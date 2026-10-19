@@ -49,8 +49,12 @@ function isEligibleArea(cd, engine, pi) {
   return isTutorableArea(cd, engine, pi);
 }
 
-/** Player already controls an Area → Planet in a Bottle is locked out. */
-function playerControlsArea(gs, pi) {
+/**
+ * Player kann keine weitere Area legen → Planet in a Bottle ist gesperrt. W16f (M02-21): die EINE Stelle der Engine
+ * (`canPlaceAnotherArea`: Limit 1, mit Spatial Crevice 3 VERSCHIEDENE Areas) statt eines harten "irgendeine Area liegt".
+ */
+function playerControlsArea(gs, pi, engine) {
+  if (engine && typeof engine.canPlaceAnotherArea === 'function') return !engine.canPlaceAnotherArea(pi);
   return (gs.areaZones?.[pi] || []).length > 0;
 }
 
@@ -69,6 +73,7 @@ function buildAreaGallery(ps, cardDB, engine, pi) {
       if (seen.has(key)) continue;
       const cd = cardDB[name];
       if (!isEligibleArea(cd, engine, pi)) continue;
+      if (engine?.canPlaceAnotherArea && !engine.canPlaceAnotherArea(pi, name)) continue;   // W16f: dieselbe Area liegt schon (Crevice: nur VERSCHIEDENE)
       seen.add(key);
       const lvl = engine?.effectiveCardLevel
         ? engine.effectiveCardLevel(cd, pi)
@@ -99,7 +104,7 @@ module.exports = {
 
     // Hard gate: one Area per player. No replace option — if the player
     // already controls an Area, Planet in a Bottle is grayed out.
-    if (playerControlsArea(gs, pi)) return false;
+    if (playerControlsArea(gs, pi, engine)) return false;
 
     const cardDB = engine ? engine._getCardDB() : null;
     if (!cardDB) return true; // Fallback: let resolve() re-check.
@@ -114,7 +119,7 @@ module.exports = {
 
     // Re-check the one-Area gate: game state can change between canActivate
     // and resolve (reaction chains, etc.).
-    if (playerControlsArea(gs, pi)) return { cancelled: true };
+    if (playerControlsArea(gs, pi, engine)) return { cancelled: true };
 
     const cardDB = engine._getCardDB();
     const gallery = buildAreaGallery(ps, cardDB, engine, pi);

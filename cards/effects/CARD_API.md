@@ -20879,3 +20879,52 @@ Abarbeitung der 36 roten Repros nach den Triage-Regeln (1 = Fehler, Erwartung ei
 | F03-08 Slippery Fridge | 1 | Ziele des Umhängens respektieren `heroCanBeEquipped` und `canEquipCardToHero(… ausruestOpts)`. |
 | F03-18 Staff of the Teleporter / Uncontrollable Destruction | 1 (+2) | Al (Welle 3, Frage 107): „Stäbe sperren nur das Ziehen" → `drawLocked` statt `handLocked` (Ablagesperre bleibt in `_discardLockedTurn`). Repro-Deck angepasst (die Stab-Ziehung zog das Suchziel weg). |
 | F03-21 Treasure Hunter's Backpack | 1 | Anlegen per Effekt trägt `_isEffectEquip` (Backpack, `_equip-shared.ruesteAusStapelAus`, `_orchestra-shared.equipArtifactToHero`); Summoning Instructions: X = 1 ohne Frage. |
+## ★ Welle 16 / W16f — restliche Befunde H01–H04 (Helden) und M01/M02 (Attacks, Abilities, Potions) (19.10.2026)
+
+Al hat das Go für die restlichen Fälle gegeben; 39 rote Repros wurden nach den Triage-Regeln (1 echter Fehler, 2 Repro misst falsch, 3 Regelfrage, 4 zu groß) abgearbeitet. Neue Repros: `docs/niche-tests/repro/W16/f-*.js` (Exit 0 = korrekt). Einordnung 1 = behoben, 2 = nur Repro korrigiert, 3 = Frage an Al, 4 = zu groß.
+
+| Befund | Einordnung | Ergebnis |
+|---|---|---|
+| H01-01 Archibald | 1 | „during your turn": `onDiscard` löst nur aus, wenn `gs.activePlayer` der Besitzer ist (Kopfkommentar „including during the opponent's turn" war eine Auslassung, keine Entscheidung). |
+| H01-05 Alice, Puppeteer Girl | 1 | `_qualifies` schloss per `stolenBy != null` jede gestohlene Kreatur aus; eine von MIR gestohlene Kreatur hat `controller == pi` und zählt („Creatures you control"). |
+| H01-08 Cool Rescuer Monia | 1 (+2) | Schild `_moniaShieldActive` endet mit der Auflösung: `endeEffektImmunitaeten()` (Aktionsende, Abbruch, End-Phase) räumt ihn auch, wenn Monia tot/gefroren ist; er trägt die auslösende Quelle (`_moniaShieldSource`), ein anderer benannter Effekt wird nicht geblockt (`engine.moniaSchildBlockt`). Repro schloss den Bare-Primitiv-Aufruf nicht mit dem Aktionsende ab (`onAnyActionResolved` nachgeholt). |
+| H01-24 Monia / Status | 4 | `applyCreatureStatus`/`actionNegateCreature` öffnen `beforeCreatureAffected` nicht (nur Gift, Heilung, Zerstörung, Bewegung, Unwanted Audience). Gleiche Wurzel wie A01-09 (Warrior of Teocuilatl) und A05-20 (Winged Skeleton): EIN zentrales Status-Fenster in `applyCreatureStatus` löst alle drei (Monias Hook liest es schon generisch). Aufwand ca. 3–4 h (Fenster + Dedupe gegen die drei bestehenden Einzelfenster Gift/Harpyformer/Unwanted Audience + Prüfung der Listener Winged Skeleton/Elusive Hind/Warrior). Nicht angefasst, weil W16b/W16c an derselben Stelle arbeiten. |
+| H02-01 Jean (Löschen) | 1 | `onMill` ignoriert `ctx.deleteMode` („sent to the discard pile"). |
+| H02-02 Jean (wählt) | 1 | Der Gegner WÄHLT die 2 Zusatzkarten (`cardGalleryMulti`, Pflicht, nicht abbrechbar; fehlende Wahl füllt von oben auf), Mill per `targetCardNames`. |
+| H02-06 Ida | 1 | `onHeroRevive` setzt `forcesSingleTarget` sofort wieder. |
+| H02-08 Grisgar | 1 | Zweitwurf („Re-cast skips costs"): `tempInst._kostenBezahlt = true` → `kostenSchonBezahlt` in Goldify zahlt den Token nicht zweimal. |
+| H02-09 Jenny | 1 | „Heroes you permanently control": `engine.heroesControlledBy(pi, { permanentOnly: true })`, Ability-Zonen der Brettseite (`physOwner`), Karten tragen `originalOwner` (Ablage beim Vorbesitzer). Support-Zonen-Abilities (Cloak of Edge) nur an eigenen Helden. Nachprobe `f-h02-09`. |
+| H02-22 Kazena | 3 | Ziehsperre-Teil ist seit Welle 5 grün; offen nur „leeres Deck" (siehe Fragen). |
+| H02-24 Krates | 1 | `_checkOppDeckSearchInterceptors` fragt `heroesControlledBy(Gegner)` statt der Spalte; `holder` = Kontrolleur, `heroOwner` = Brettseite. |
+| H02-25 Layn Master | 1 | Zonen „Heroes you control": `getFreeSupportZones(pi, { nachKontrolle: true })` (Insel-Zonen wie bisher nicht), Platzierung auf der Brettseite mit `markiereSeitenfremd`. Nachprobe `f-h02-25`. |
+| H02-29 Kit (Modus C) | 1 | `actionDiscardHandCard(…, { sourceOwner: pi })` → Erstrunden-Schutz und Handinteraktions-Fenster greifen. |
+| H02-30 Koperniko | 1 | Tutor-Strichliste trägt `turn`; Koperniko ignoriert Altbuchungen früherer Züge und Quellen, die weder Spell/Attack noch Artifact sind. Nachprobe `f-h02-30`. |
+| H03-01 Nao | 1 | Überheilung nur, wenn die Quelle keine Kreatur ist (`isCreatureSource`), in `actionHealHero`/`actionHealCreature`. Nachprobe `f-h03-01`. |
+| H03-02 Pseudonia-Namensbindung | 1 | Pete, Rha'Bi (`hatEffekt` + Träger-Held), Monia Bot (`hatEffekt`), Rafflesia (Heldeninstanz des Platzes statt Name), Lilly (`istHeldenTraeger`). Damsel war seit Q121 grün. |
+| H03-06 Quetzahuitl | 1 | Die Heldenkarten selbst gehen in den Gelöscht-Stapel (Konvention `deleteHero`). |
+| H03-08 Luna Pele | 1 | Gift auf eine Kreatur (`_onCreature`) → `applyCreatureStatus(…, 'burned')` (ohne Dauer = rest of the game). |
+| H03-09 Sabrina | 1 | Opferkandidaten über `engine.getSacrificableCreatures` (Cardinal Beasts, „cannot be sacrificed"). |
+| H03-10 Monia Bot | 1 | `_redirectedTrueDamage` endet mit der Auflösung (`endeEffektImmunitaeten`); Gegenprobe `f-h03-10` (umgeleiteter Schaden bleibt True Damage). |
+| H03-11 Rafflesia | 1 (+2) | `afterSpellResolved` verlangt `activePlayer == pi` („during your Action Phase"); das Repro maß als Vorbedingung „Phase 3 nach dem Zauber", was nur wegen `_preventPhaseAdvance` des Fehlers stimmte. |
+| H03-23 Luna/Firewall | 1 | `firewallMods` liest `engine.heroScript(hero)` (verschmolzenes Skript) statt `loadCardEffect(hero.name)`. |
+| H04-04 Xiong | 1 | Kein Ausschluss per Name: die gerade aufgelöste Attack liegt noch auf der Hand, eine abgelegte gleichnamige Kopie wird angeboten. |
+| H04-08 Willy | 1 | `_noHandLimitUntilTurn = firstTurn + (Spielerzahl − 1)` („until the start of your second turn"). |
+| H04-10 Ralzish | 1 | `physicalSide` statt `owner` bei Zählung und Ziel-ID/Animation. |
+| H04-12 Sid | 1 | Raub über `_tagHandCardOrigin(pi, name, oi, handIdx)` (platzbasierte Herkunft). |
+| H04-14 Sett (Zugende nach Statusablauf) | 2 | Welle 3 (Al): „End-of-turn-Trigger dürfen feuern, nachdem der Status abgelaufen ist → gewollt". Repro auf diese Regel umgestellt. |
+| H04-18 Crestina | 1 (+2) | `isCreationZoneUsable` über `heroesControlledBy` („While you control this Hero"); Repro las den Vorrat erst NACH dem Ausspielen. |
+| H04-20 Xal | 1 | `doPlayAbility`: die drei Support-Zweige rufen `verbraucheAbilityAnlegen` (Standard- dann Zusatzplatz, Blessed-Buff). |
+| M01-09 Inventing Lv3 | 1 | Gate: Handkarte H und Deckkarte D mit D ≠ H (vorher `|| cn !== cn`). |
+| M01-14 Hammer Throw | 1 | Item Lock trifft den KONTROLLEUR des Ziels (`kontrolleurVonHeld` / `controller ?? owner`), vor dem Schaden bestimmt. |
+| M01-15 Charme Lv1 | 1 | Gate-Kontext der geliehenen Ability trägt `cardHeroIdx`/`cardHeroOwner` des Charme-Helden (Infiltration, Necromancy …). |
+| M02-01 Stranglehold | 1 | `getNegativeStatuses()` statt Fünferliste; `blinded`+`blinded_hit` zählen einmal (gleiches Label), Poison-Stapel einmal, Anhängsel (`attach:`) einzeln. |
+| M02-04 Rocket Fist / Whirlwind Strike | 1 | `requiresTarget: true` (Blinded-Sperre). Ein repo-weiter Sweep über alle zielenden Karten ohne die Marke wurde NICHT gemacht (Aufwand ca. 2 h, Befund-Vermutung dort: weitere Karten). |
+| M02-08 Toughness | 1 | `bypassStatusFilter` (gedruckt „cannot be negated"); Fighting: neues Skript-Flag `bypassStatusFilterOnLeave` (runHooks-Filter) — die Rücknahme des Stempel-Bonus beim Abgang der eigenen Kopie läuft in jedem Heldenzustand. Das Welle-7/8-Ruling (Al: Toughness-HP und Fighting-ATK bleiben bei gefrorenem/betäubtem/negiertem Helden stehen) bleibt unberührt — nur das Anlegen und die Rücknahme beim Abgang der Karte laufen jetzt in jedem Zustand. |
+| M02-14 Luck | 1 (+2) | Hook `afterArtifactUsed`; Repro zielte bei Snow Cannon auf Lucks eigenen (dann gefrorenen) Träger, bei Magic Cobalt auf den falschen Spieler. |
+| M02-15 Punch in the Box | 1 | `isAfterCreatureDamageReaction` (Fenster für eigene Kreatur, nur bei Überleben wie beim Helden). |
+| M02-16 Tears of Creation | 1 | Helden über `heroesControlledBy(pi)` (Kontrolle, Brettseite). |
+| M02-21 Planet in a Bottle | 1 | `engine.canPlaceAnotherArea(pi[, name])` statt „irgendeine Area liegt" (Spatial Crevice). |
+
+**Eingriffe außerhalb des Auftragsbereichs** (alle klein, lokal): `_engine.js` `endeEffektImmunitaeten` (Z2: räumt zusätzlich Monias Schild und Monia-Bot-True-Damage-Stempel), `moniaSchildBlockt`; `_checkOppDeckSearchInterceptors` und `isCreationZoneUsable` (Z1: Kontrolle statt Spalte); `actionHealHero`/`actionHealCreature` (Nao); `noteDeckTutor` (Zugstempel); `runHooks`-Filter (`bypassStatusFilterOnLeave`); `server.js` `doPlayAbility` (Xal).
+
+**Fragen an Al** (offen): H02-22 Kazena — soll der Heldeneffekt bei leerem Deck (0 ziehbare Karten) gar nicht aktivierbar sein und seinen Einsatz behalten (wie unter Zieh-/Handsperre), oder bleibt er aktivierbar und verbraucht den Einsatz? Dazu die Nebenfrage zu H04-08: Soll Willys handlimitfreie Phase enden, wenn Willy vor dem Start seines zweiten Zuges stirbt oder stummgeschaltet wird (heute ein Spielerstempel, unabhängig von Willy)?

@@ -174,6 +174,16 @@ module.exports = {
     },
 
     /**
+     * Normal Artifacts played by the opponent (W16f, M02-14): they enter no zone (Equipment/Areas do, via onCardEnterZone) and are
+     * neither Spell nor Potion - their only signal is `afterArtifactUsed` (server: doUseArtifactEffect and the targeting-artifact flow).
+     * Board-placing artifacts are excluded there, so nothing counts twice.
+     */
+    afterArtifactUsed: async (ctx) => {
+      if (ctx.artifactName == null) return;
+      await module.exports.hooks._triggerLuck(ctx, ctx.artifactName, ctx.playerIdx);
+    },
+
+    /**
      * At the start of owner's turn: clear the declared target.
      */
     onTurnStart: (ctx) => {

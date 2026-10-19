@@ -26,6 +26,10 @@ function applyBonus(engine, card, hero, ownerIdx, heroIdx, copyIndex) {
 
 module.exports = {
   activeIn: ['ability'],
+  // W16f (M02-08): gedruckt "This Ability cannot be negated." -> `bypassStatusFilter` (Konvention Welle 8: nur mit ausdrücklichem
+  // "cannot be negated"). Vergabe beim Anlegen und Rücknahme beim Abgang laufen in jedem Heldenzustand (negiert/gefroren/betäubt);
+  // sonst blieb der HP-Bonus einer abgeworfenen Kopie dauerhaft stehen (Kartenbilanz der Stempel) bzw. wurde nie vergeben.
+  bypassStatusFilter: true,
   // Lizbeth/Smugbeth: Toughness is explicitly excluded from ability
   // borrowing per spec — Lizbeth does NOT gain HP from opponent's
   // Toughness. `disableLizbethMirror` is honoured by the engine's

@@ -88,7 +88,7 @@ module.exports = {
         c.zone === 'hero'
         && c.owner === (ctx.cardHeroOwner ?? ctx.cardOwner)
         && c.heroIdx === ctx.cardHeroIdx
-        && c.name === CARD_NAME
+        // W16f (H03-02): die Heldeninstanz dieses Platzes, auch wenn Rafflesias Effekt gewonnen ist (Pseudonia) — kein Namensvergleich
       );
       if (!inst?.counters) return;
       const t = inst.counters.additionalActionType;
@@ -116,6 +116,7 @@ module.exports = {
 
       if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
       if (gs.currentPhase !== 3) return; // Action Phase only
+      if (gs.activePlayer !== pi) return;   // W16f (H03-11): "during YOUR Action Phase" - nicht im Gegnerzug (Reaktion)
 
       const hoptKey = heldenSperreKey(HOPT_KEY, pi);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
@@ -159,7 +160,7 @@ module.exports = {
       });
 
       const inst = engine.cardInstances.find(c =>
-        c.zone === 'hero' && c.owner === feld && c.heroIdx === heroIdx && c.name === CARD_NAME
+        c.zone === 'hero' && c.owner === feld && c.heroIdx === heroIdx   // W16f (H03-02): Platz statt Name (gewonnener Effekt, Pseudonia)
       );
       if (inst) engine.grantAdditionalAction(inst, typeId);
 

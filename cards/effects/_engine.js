@@ -3326,8 +3326,12 @@ class GameEngine {
         if ((c.zone === 'hero' || _istHeldenTraeger)
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
+        // W16f (M02-08): Skript-Flag `bypassStatusFilterOnLeave` - die Rücknahme eines Stempel-Bonus (Fighting-ATK) beim Abgang der EIGENEN Karte
+        // ist Buchführung und läuft in jedem Heldenzustand (sonst bliebe der Bonus einer nicht mehr vorhandenen Karte dauerhaft stehen).
         if (c.zone === 'ability'
             && !loadCardEffect(c.name)?.bypassStatusFilter
+            && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
+                 && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
             && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
@@ -8280,6 +8284,25 @@ class GameEngine {
    */
   endeEffektImmunitaeten() {
     if (this.gs?._effectImmunities?.length) this.gs._effectImmunities.length = 0;
+    // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
+    // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
+    if (this.gs && this.gs._moniaShieldActive != null) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; }
+    // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
+    if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
+  }
+
+  /**
+   * W16f (H01-08): blockt Monias Schild (`gs._moniaShieldActive` = geschützte Seite) einen Effekt auf `inst`? Der Schild gehört zu der
+   * Karte/dem Effekt, die ihn ausgelöst hat (`gs._moniaShieldSource.name`): eine ANDERE benannte Quelle (unabhängiger Effekt im selben
+   * Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle auf einer der beiden Seiten gilt der Schild wie bisher.
+   */
+  moniaSchildBlockt(inst, source) {
+    const seite = this.gs?._moniaShieldActive;
+    if (seite == null || !inst) return false;
+    const schildQuelle = this.gs._moniaShieldSource?.name;
+    const q = typeof source === 'string' ? source : (source?.name || source?.cardName);
+    if (schildQuelle && q && q !== schildQuelle) return false;
+    return true;
   }
 
   async _actionDealDamageImpl(source, target, amount, type, opts) {
@@ -10351,7 +10374,8 @@ class GameEngine {
     if (source && source.owner != null && source.heroIdx >= 0) {
       const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
       const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
-      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && target.hp <= maxHp) allowOverheal = true;
+      // W16f (H03-01): "When this Hero heals" - eine Kreatur in Naos Spalte (Skeleton Healer ...) ist nicht Nao.
+      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && target.hp <= maxHp && !require('./_hooks').isCreatureSource(this, source)) allowOverheal = true;
     }
     const hpBefore = target.hp;
     // Allow Resistance to cancel healing
@@ -10440,7 +10464,7 @@ class GameEngine {
     if (source && source.owner != null && source.heroIdx >= 0) {
       const heroOwnerIdx = source.heroOwner != null ? source.heroOwner : source.owner;
       const flagKey = `${heroOwnerIdx}-${source.heroIdx}`;
-      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && currentHp <= baseHp) allowOverheal = true;
+      if (this.heroFlagsLive(heroOwnerIdx, source.heroIdx)?.overhealPassive && currentHp <= baseHp && !require('./_hooks').isCreatureSource(this, source)) allowOverheal = true;   // W16f (H03-01): nur der Held selbst
     }
     if (allowOverheal) {
       target.counters.currentHp = currentHp + amount;
@@ -19466,7 +19490,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._lightBallProtects(ownerIdx, 'creature')) return false;
     }
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
-    if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive) return false;
+    if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive && this.moniaSchildBlockt(inst, source)) return false;
     return true;
   }
 
@@ -20484,7 +20508,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const statusDef = STATUS_EFFECTS[statusName];
     const immuneKey = statusDef?.immuneKey || (statusName + '_immune');
     if (inst.counters[immuneKey]) return false;
-    if (this.gs._moniaShieldActive != null && (inst.controller ?? inst.owner) === this.gs._moniaShieldActive) return false;
+    if (this.gs._moniaShieldActive != null && (inst.controller ?? inst.owner) === this.gs._moniaShieldActive && this.moniaSchildBlockt(inst, opts.source)) return false;
     return true;
   }
 
@@ -20992,8 +21016,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   isCreationZoneUsable(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.creationZone || []).length === 0) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // W16f (H04-18): "While YOU control this Hero" - Kontrolle statt Spalte: ein gestohlener Crestina öffnet den Vorrat des Diebs,
+    // nicht mehr den des Besitzers.
+    for (const { hero } of this.heroesControlledBy(playerIdx)) {
       if (hero?.name !== CRESTINA_ASCENDED) continue;
       // tot — ausser `opts.schadensberechnung` und der Tod ist im laufenden
       // Flaechenschlag nur vorgemerkt (Todes-Aufschub 28.9.)
@@ -26537,16 +26562,16 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkOppDeckSearchInterceptors(searcherIdx, cardName, opts = {}) {
     if (this._inDeckSearchIntercept || this._fastMode) return false;
     const holder = this.opponentOf(searcherIdx);
-    const heroes = this.gs.players[holder]?.heroes || [];
-    for (let hi = 0; hi < heroes.length; hi++) {
-      const hero = heroes[hi];
+    // W16f (H02-24): „your opponent" = der KONTROLLEUR des Helden (Charme/Übernahme), nicht die Spalte; `heroIdx` und die
+    // Stummschaltung gelten für die Brettseite (`physOwner`), `holder` bleibt der Krates-Spieler.
+    for (const { physOwner, heroIdx: hi, hero } of this.heroesControlledBy(holder)) {
       if (!hero?.name || hero.hp <= 0) continue;
       const script = loadCardEffect(hero.name);
       if (!script?.interceptsOppDeckSearch || typeof script.interceptOppDeckSearch !== 'function') continue;
-      if (this._isHeroEffectSilenced(holder, hi)) continue;
+      if (this._isHeroEffectSilenced(physOwner, hi)) continue;
       this._inDeckSearchIntercept = true;
       try {
-        if (await script.interceptOppDeckSearch(this, { searcher: searcherIdx, holder, heroIdx: hi, firstName: cardName, opts })) return true;
+        if (await script.interceptOppDeckSearch(this, { searcher: searcherIdx, holder, heroIdx: hi, heroOwner: physOwner, firstName: cardName, opts })) return true;
       } finally {
         this._inDeckSearchIntercept = false;
       }
@@ -26730,7 +26755,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   noteDeckTutor(pi, cardName, source, spec) {
     if (!this._deckAddTally || this._deckAddTally.source !== source
         || this._deckAddTally.pi !== pi) {
-      this._deckAddTally = { pi, source, names: [], spec: spec || null };
+      this._deckAddTally = { pi, source, names: [], spec: spec || null, turn: this.gs?.turn };   // W16f (H02-30): Zugstempel — Koperniko liest keine Altbuchung früherer Züge
     }
     this._deckAddTally.names.push(cardName);
     if (spec) this._deckAddTally.spec = spec;

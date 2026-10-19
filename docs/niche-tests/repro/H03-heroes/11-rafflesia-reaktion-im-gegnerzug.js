@@ -24,7 +24,8 @@ const RAFFLESIA = 'Rafflesia, the Poison Princess';
   t.targetFn = (v) => [v.find(x => x.type === 'hero' && x.owner === 0 && x.heroIdx === 0).id];
   const r = await t.play(1, 'Fireball', { hero: 0 });
   R.check('Aufbau: Rafflesia hat mit Spectral Armor reagiert (Karte in der Ablage)', r === true && t.pile(0, 'discardPile').includes('Spectral Armor'), { r, abl: t.pile(0, 'discardPile') });
-  R.check('der Gegner ist am Zug (activePlayer 1), Phase = Action Phase', t.gs.activePlayer === 1 && t.gs.currentPhase === 3, [t.gs.activePlayer, t.gs.currentPhase]);
+  // W16f: nach dem Fix hält der Anspruch die Phase nicht mehr fest (`_preventPhaseAdvance`), Fireball beendet die Action Phase des Gegners regulär – gemessen wird nur, dass der Gegner am Zug ist.
+  R.check('der Gegner ist am Zug (activePlayer 1)', t.gs.activePlayer === 1, [t.gs.activePlayer, t.gs.currentPhase]);
   const claim = t.engine.findAdditionalActionForCategory(0, 'spell', 0, 0);
   R.check('kein Zusatzaktions-Anspruch im Gegnerzug', !claim, claim && Object.keys(claim).length);
   R.check('HOPT „rafflesia_chain" nicht verbrannt', !Object.keys(t.gs.hoptUsed || {}).some(k => /rafflesia/.test(k)), Object.keys(t.gs.hoptUsed || {}));
