@@ -33,22 +33,24 @@
 // ═══════════════════════════════════════════
 const CARD_NAME = 'Ultimate Weapon Experiment';
 
-function bedingungErfuellt(engine, pi, heroIdx, name) {
+// W16g (S03-14): „a Hero YOU CONTROL“ — Kontrolle statt Spalte (Vorgabe 29.9.: Aufstieg auch auf einen geliehenen Helden). `heroOwner` = Brettseite
+// des Wirts (Standard: die eigene); Adresse (Seite, Index) bleibt physisch.
+function bedingungErfuellt(engine, pi, heroIdx, name, heroOwner = pi) {
   const gs = engine.gs;
-  const hero = gs.players[pi]?.heroes?.[heroIdx];
+  const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (!engine.getAscendedFormsFor(hero.name).includes(name)) return false;
   const script = require('./_loader').loadCardEffect(name);
   if (script?.plainHeroForm) return false;
   if (typeof script?.ascensionCondition === 'function') {
     // Als Vorgabe 29.9.: Brettseite (`heroOwner`) = eigene Spalte.
-    try { return !!script.ascensionCondition(gs, pi, heroIdx, engine, pi); } catch { return false; }
+    try { return !!script.ascensionCondition(gs, pi, heroIdx, engine, heroOwner); } catch { return false; }
   }
   return !!hero.ascensionReady
     && (hero.ascensionTarget === name || (hero.ascensionTargets || []).includes(name));
 }
 
-/** { name → [heroIdx …] } fuer alle Ascended Heroes im Deck mit mind. einem Wirt. */
+/** { name → [{ owner, heroIdx } …] } fuer alle Ascended Heroes im Deck mit mind. einem Wirt (kontrollierte Helden, `owner` = Brettseite). */
 function kandidaten(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return new Map();
@@ -57,7 +59,9 @@ function kandidaten(engine, pi) {
   const out = new Map();
   for (const name of new Set(ps.mainDeck || [])) {
     if (db[name]?.cardType !== 'Ascended Hero') continue;
-    const wirte = (ps.heroes || []).map((_, hi) => hi).filter(hi => bedingungErfuellt(engine, pi, hi, name));
+    const wirte = engine.heroesControlledBy(pi)
+      .filter(({ physOwner, heroIdx: hi }) => bedingungErfuellt(engine, pi, hi, name, physOwner))
+      .map(({ physOwner, heroIdx: hi }) => ({ owner: physOwner, heroIdx: hi }));
     if (wirte.length) out.set(name, wirte);
   }
   return out;
@@ -99,14 +103,15 @@ module.exports = {
         if (!name || !k.has(name)) { abbruch(); return; }
 
         // ② Auf welchen Helden? — nur fragen, wenn mehrere passen.
-        let heroIdx = k.get(name)[0];
+        let heroIdx = k.get(name)[0].heroIdx;
+        let heroOwner = k.get(name)[0].owner;
         if (k.get(name).length > 1) {
           const wirte = k.get(name);
-          const ziele = (ps.heroes || []).map((h, hi) => ({
-            id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h?.name,
+          const ziele = engine.heroesControlledBy(pi).map(({ physOwner, heroIdx: hi, hero: h }) => ({
+            id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: h?.name,
             // Helden, die die Bedingung NICHT erfuellen, ausgegraut zeigen.
-            ...(wirte.includes(hi) ? {} : { ineligible: true }),
-          })).filter(t => t.cardName && (ps.heroes[t.heroIdx]?.hp > 0));
+            ...(wirte.some(w => w.owner === physOwner && w.heroIdx === hi) ? {} : { ineligible: true }),
+          })).filter(t => t.cardName && (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp > 0));
           const ids = await engine.promptEffectTarget(pi, ziele, {
             title: CARD_NAME, source: CARD_NAME, previewCardName: name,
             description: `Choose the Hero ${name} is played on top of.`,
@@ -117,9 +122,10 @@ module.exports = {
           const t = ziele.find(z => z.id === ids?.[0] && !z.ineligible);
           if (!t) { abbruch(); return; }
           heroIdx = t.heroIdx;
+          heroOwner = t.owner;
         }
         // Zustand kann sich zwischen Angebot und Antwort verschoben haben.
-        if (!bedingungErfuellt(engine, pi, heroIdx, name)) { abbruch(); return; }
+        if (!bedingungErfuellt(engine, pi, heroIdx, name, heroOwner)) { abbruch(); return; }
 
         // ── ZUSAGEPUNKT: ab hier sieht der Gegner die Karte ──
         gs._holdCardReveal = false;
@@ -127,6 +133,7 @@ module.exports = {
 
         const res = await engine.performAscension(pi, heroIdx, name, -1, {
           fromDeck: true, skipChain: true, source: CARD_NAME,
+          ...(heroOwner !== pi ? { heroOwner } : {}),
         });
         if (!res?.success) {
           engine.log('ultimate_weapon_experiment', { player: ps.username, card: name, ok: false });
@@ -135,13 +142,13 @@ module.exports = {
         }
 
         // ③ Voll heilen, alle entfernbaren negativen Status weg.
-        const hero = ps.heroes[heroIdx];
+        const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
         if (hero?.name && hero.hp > 0) {
           const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx ?? -1 };
           const fehlt = (hero.maxHp || 0) - hero.hp;
           if (fehlt > 0) await engine.actionHealHero(quelle, hero, fehlt);
           const keys = engine.getRemovableHeroStatuses(hero);
-          if (keys.length) engine.cleanseHeroStatuses(hero, pi, heroIdx, keys, CARD_NAME);
+          if (keys.length) engine.cleanseHeroStatuses(hero, heroOwner, heroIdx, keys, CARD_NAME);
         }
 
         // ④ Rundenende der Ascension — NACH dieser Karte (Ruling).
