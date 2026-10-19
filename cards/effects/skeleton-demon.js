@@ -113,7 +113,9 @@ module.exports = {
       // perspective". Resource-phase auto-draws are excluded by the
       // engine gating and don't reach us.
       if (ctx.playerIdx === ctx.cardOwner) return;
-      const amount = ctx.amount || 0;
+      // W16c (A05-21): "times the number of cards" = die tatsaechlich gezogenen Karten - die Ansage wird auf das Deck des Ziehenden gekappt
+      // (kleines Deck / leeres Deck: weniger bzw. kein Schaden; der Hook feuert VOR dem Ziehen).
+      const amount = Math.min(ctx.amount || 0, ctx._engine.gs.players[ctx.playerIdx]?.mainDeck?.length ?? 0);
       if (amount <= 0) return;
       await offerDamage(ctx, amount);
     },
