@@ -171,6 +171,14 @@ module.exports = {
 
       const quelle = { name: CARD_NAME, owner: pi, heroIdx, controller: pi };
       const areaWahl = treffer.find(z => z.type === 'area');
+      // ★ W16a (Al, Frage 2: „Attachments ja"): das Wegschicken der Anhängsel/Ausrüstung des getroffenen HELDEN ist ein Nicht-Schaden-Effekt auf ihn — Resistance fängt ihn ab
+      // (der Schaden oben und der Area-Zweig bleiben unberührt).
+      if (!areaWahl && tgtHero
+          && await engine.heroNonDamageEffectBlocked(target.owner, target.heroIdx, 'unequip', { sourceOwner: pi, source: CARD_NAME })) {
+        engine.log('pressure_projectile_blocked', { player: ps.username, hero: tgtHero.name });
+        engine.sync();
+        return;
+      }
       if (areaWahl) {
         engine._broadcastEvent('play_zone_animation', {
           type: 'pressure_shatter', owner: areaWahl.owner, heroIdx: -1, zoneSlot: -1, zoneType: 'area',

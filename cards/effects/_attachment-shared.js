@@ -274,6 +274,13 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
     engine._playAntiMagicBlockedAnim(hero);
     return null;
   }
+  // ★ W16a (Al, 19.10.2026, Frage 2: „Attachments ja"): ein Spell-Anhang am Helden ist ein Nicht-Schaden-Effekt auf ihn — Resistance fängt das Anlegen ab (Curse & Co.; auch der eigene
+  // Anhang am eigenen Helden, Regel W14a Q5). Nach dem Anti-Magic-Schutz und vor jeder Kartenbewegung gefragt: bei `true` liegt die Karte nicht am Helden (wie Anti Magic: Rückgabe `null`,
+  // `_spellPlacedOnBoard` bleibt aus → der Zauber geht in die Ablage), kein Status, kein Hook.
+  if (!opts.skipResistance && await engine.heroNonDamageEffectBlocked(host.owner, host.heroIdx, 'attach_spell', { sourceOwner: pi, source: CARD_NAME })) {
+    engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'resistance' });
+    return null;
+  }
   if (!hps.supportZones[host.heroIdx]) hps.supportZones[host.heroIdx] = [[], [], []];
   let slot = host.slotIdx;
   if ((hps.supportZones[host.heroIdx][slot] || []).length > 0) {
