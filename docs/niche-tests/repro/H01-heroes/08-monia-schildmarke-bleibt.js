@@ -23,6 +23,8 @@ const D = H.INERT.creature;
     const b = t.put(0, 2, 0, D); b.turnPlayed = 1;
     t.script.push({ match: d => d.type === 'optionPicker' && /Cool Rescue/.test(d.title || ''), answer: (d) => ({ optionId: d.options[0].id }), once: true });
     await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Test', owner: 1, heroIdx: 0 }, a, 60, 'creature', { sourceOwner: 1 }));
+    // W16f: ein bloßer Primitivaufruf hat kein Aktionsende; im Spielweg beendet `onAnyActionResolved` die Auflösung (Schild endet mit ihr).
+    await t.run(() => t.engine.runHooks('onAnyActionResolved', { actionType: 'ability', playerIdx: 1, heroIdx: 0, isAdditional: false, isInherent: false, isFree: false, _skipReactionCheck: true }));
     return { t, a, b };
   }
   R.section('Monia schützt Kreatur a vor einem Kreaturen-/Karteneffekt (Handkarte wird abgeworfen)');

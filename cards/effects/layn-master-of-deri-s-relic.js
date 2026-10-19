@@ -86,21 +86,22 @@ function hasEligibleCreature(ps, cardDB) {
  * reinforce zones on a fallen Hero's column. Only empty hero slots
  * (no `h.name`) are excluded; those columns don't exist.
  */
-function collectFreeZones(ps) {
+function collectFreeZones(engine, pi) {
+  // W16f (H02-25): „Heroes you control" = nach KONTROLLE (Styx 28.9.), nicht nach Spalte: ein an den Gegner abgegebener eigener Held
+  // zählt nicht, ein übernommener Gegnerheld (Paraseed …, `kontrollRechte.beschwoeren`) schon. Zonen tragen `owner` = Brettseite.
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const z of engine.getFreeSupportZones(pi, { nachKontrolle: true })) {
+    if (z.slotIdx >= 3) continue;                       // Insel-Zonen wie bisher nicht
+    const h = engine.gs.players[z.owner]?.heroes?.[z.heroIdx];
     if (!h?.name) continue;
-    for (let si = 0; si < 3; si++) {
-      if ((ps.supportZones?.[hi]?.[si] || []).length === 0) {
-        const koTag = h.hp <= 0 ? ' (KO)' : '';
-        out.push({
-          heroIdx: hi,
-          slotIdx: si,
-          label: `${h.name}${koTag} — Slot ${si + 1}`,
-        });
-      }
-    }
+    const koTag = h.hp <= 0 ? ' (KO)' : '';
+    out.push({
+      owner: z.owner,
+      ownerIdx: z.owner,
+      heroIdx: z.heroIdx,
+      slotIdx: z.slotIdx,
+      label: `${h.name}${koTag} — Slot ${z.slotIdx + 1}`,
+    });
   }
   return out;
 }
@@ -121,7 +122,7 @@ module.exports = {
     if (!ps) return false;
     const cardDB = engine._getCardDB();
     if (!hasEligibleCreature(ps, cardDB)) return false;
-    if (collectFreeZones(ps).length === 0) return false;
+    if (collectFreeZones(engine, pi).length === 0) return false;
     return true;
   },
 
@@ -175,7 +176,7 @@ module.exports = {
     // ── Step 2: loop placements one zone at a time, up to `cap` ─────────────
     let placedCount = 0;
     while (placedCount < cap) {
-      const freeZones = collectFreeZones(ps);
+      const freeZones = collectFreeZones(engine, pi);
       if (freeZones.length === 0) break;
 
       const zonePick = await ctx.promptZonePick(freeZones, {
@@ -196,22 +197,30 @@ module.exports = {
 
       const destHeroIdx = zonePick.heroIdx;
       const destSlot    = zonePick.slotIdx;
+      // Brettseite der Zone: nur aus der Liste der freien Zonen (nie geraten); fehlt `owner` im Pick, gilt die einzige passende Zone.
+      const zonenZiel = freeZones.find(z => z.heroIdx === destHeroIdx && z.slotIdx === destSlot
+        && (zonePick.owner == null || z.owner === zonePick.owner))
+        || freeZones.find(z => z.heroIdx === destHeroIdx && z.slotIdx === destSlot);
+      if (!zonenZiel) break;
+      const seite = zonenZiel.owner;
+      const fps = gs.players[seite];
 
       // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
       const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: CARD_NAME });
       if (!ab) break;
 
-      if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-      ps.supportZones[destHeroIdx][destSlot] = [chosenName];
+      if (!fps.supportZones[destHeroIdx]) fps.supportZones[destHeroIdx] = [[], [], []];
+      fps.supportZones[destHeroIdx][destSlot] = [chosenName];
 
-      const inst = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
+      const inst = engine._trackCard(chosenName, seite, 'support', destHeroIdx, destSlot);
+      if (seite !== pi) engine.markiereSeitenfremd(inst, pi);   // W16f: Kreatur in der Zone eines übernommenen Helden gehört dem Kontrolleur
       inst.turnPlayed = gs.turn; // Summoning sickness — placed this turn
       const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
       engine._broadcastEvent('summon_effect', {
-        owner: pi, heroIdx: destHeroIdx, zoneSlot: destSlot, cardName: chosenName,
+        owner: seite, heroIdx: destHeroIdx, zoneSlot: destSlot, cardName: chosenName,
       });
       await engine._delay(400);
 

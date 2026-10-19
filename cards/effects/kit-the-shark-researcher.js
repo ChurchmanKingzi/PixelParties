@@ -436,6 +436,7 @@ async function _runModeC(engine, pi, oppPi) {
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {
     source: CARD_NAME,
+    sourceOwner: pi,   // W16f (H02-29): fremde Quelle — Erstrunden-Schutz und Hand-Interaktions-Fenster greifen nur mit sourceOwner
   });
 
   engine.log('kit_mode_c', {

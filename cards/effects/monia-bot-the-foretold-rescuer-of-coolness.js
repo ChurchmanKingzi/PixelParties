@@ -28,6 +28,7 @@
 // ═══════════════════════════════════════════
 
 const { ASCEND_TARGET, moniaAscensionMet } = require('./_monia-shared');
+const { hatEffekt } = require('./_gained-effects-shared');
 
 const CARD_NAME = ASCEND_TARGET;
 
@@ -81,7 +82,7 @@ module.exports = {
   // beim Gegner, `ownerIdx` ist der Kontrolleur.
   canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard, physOwner = ownerIdx) {
     const monia = gs.players[physOwner]?.heroes?.[heroIdx];
-    if (!monia?.name || monia.name !== CARD_NAME || monia.hp <= 0) return false;
+    if (!monia?.name || !hatEffekt(monia, CARD_NAME) || monia.hp <= 0) return false;   // W16f (H03-02): auch Pseudonia mit gewonnenem Effekt
     const srcOwner = sourceCard?.heroOwner ?? sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner === ownerIdx) return false;                    // nur gegnerische Karten/Effekte
     // Kontrolle statt Seite (Styx 28.9.): ein Ziel, das ich KONTROLLIERE.

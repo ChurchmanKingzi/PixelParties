@@ -62,6 +62,17 @@ module.exports = {
       if (flags) delete flags.forcesSingleTarget;
     },
 
+    // W16f (H02-06): Wiederbelebung (Golden Ankh, Styx …) feuert nur `onHeroRevive` — der Deckel muss sofort wieder stehen,
+    // nicht erst zum nächsten Zugbeginn (sonst trifft Idas Zauber im selben Zug wieder mehrere Ziele).
+    onHeroRevive: (ctx) => {
+      const hero = ctx.attachedHero ?? ctx.gameState.players[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.name || hero.hp <= 0 || ctx.hero !== hero) return;
+      const gs = ctx.gameState;
+      if (!gs.heroFlags) gs.heroFlags = {};
+      const key = `${ctx.cardOriginalOwner}-${ctx.cardHeroIdx}`;
+      gs.heroFlags[key] = { ...(gs.heroFlags[key] || {}), forcesSingleTarget: true };
+    },
+
     onTurnStart: (ctx) => {
       // Ida is alive + active (hooks filter dead / frozen / stunned /
       // negated heroes). Re-assert the flag so revives don't leave her

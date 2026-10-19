@@ -24,7 +24,7 @@ const { hasCardType } = require('./_hooks');
 function _qualifies(inst, pi, currentTurn, cardDB) {
   if (inst.zone !== 'support') return false;
   if ((inst.controller ?? inst.owner) !== pi) return false;
-  if (inst.stolenBy != null) return false;
+  // W16f (H01-05): eine von mir gestohlene Kreatur ist „a Creature you control" (controller == pi) und zählt mit.
   if (inst.turnPlayed === currentTurn) return false;
   const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
   if (!cd || !hasCardType(cd, 'Creature')) return false;

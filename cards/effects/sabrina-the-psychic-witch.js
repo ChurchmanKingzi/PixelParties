@@ -76,10 +76,14 @@ function minDeckSurpriseLevel(engine, pi) {
 function ownControlledCreatures(engine, pi) {
   const out = [];
   const cardDB = engine._getCardDB();
+  // W16f (H03-09): nur wirklich OPFERBARE Kreaturen (Cardinal Beasts sind effektimmun, Boulder in a Bottle "cannot be sacrificed") —
+  // die eine Stelle dafür ist `engine.getSacrificableCreatures`.
+  const opferbar = new Set(engine.getSacrificableCreatures(pi).map(e => e.inst));
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
+    if (!opferbar.has(inst)) continue;
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (!hasNumericCreatureLevel(cd)) continue;   // das Level der Opfer-Creature zaehlt — Artifact Creatures haben keins (Als Ruling 9.10.)

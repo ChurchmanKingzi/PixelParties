@@ -130,6 +130,13 @@ async function pruefeUndBiete(ctx) {
 
   const tally = engine._deckAddTally;
   if (!tally || tally.pi !== pi) return;
+  // W16f (H02-30): „when an Artifact or Spell allows you…" — eine Buchung aus einem früheren Zug oder von einer Quelle, die weder
+  // Spell/Attack noch Artifact ist (Kreatur, Held, Ability: Hell Fox …), gehört nicht zum gerade aufgelösten Zauber/Artefakt.
+  {
+    const quellKarte = tally.source ? engine._getCardDB()[tally.source] : null;
+    const quelleOk = !quellKarte || hasCardType(quellKarte, 'Spell') || hasCardType(quellKarte, 'Attack') || hasCardType(quellKarte, 'Artifact');
+    if ((tally.turn != null && tally.turn !== gs.turn) || !quelleOk) { engine._deckAddTally = null; return; }
+  }
   if (tally.names.length !== 1) { engine._deckAddTally = null; return; }
   // Die eigene Zusatzsuche darf sich nicht selbst ausloesen.
   if (tally.source === CARD_NAME) { engine._deckAddTally = null; return; }
