@@ -132,6 +132,7 @@ module.exports = {
         const applied = await engine.applyCreatureStatus(inst, 'burned', {
           sourceOwner: pi,
           source: CARD_NAME,
+          _skipAffectedWindow: true,   // W16b: Fenster oben schon aufgegangen
         });
         if (applied) engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME });
       }

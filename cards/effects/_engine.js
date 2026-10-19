@@ -11258,6 +11258,7 @@ class GameEngine {
       addStacks: true,
       sourceOwner: source?.owner ?? -1,
       source,
+      _skipAffectedWindow: true,   // W16b: das Fenster ist oben schon aufgegangen
     });
     this.log('poison_applied', {
       target: inst.name, stacks: inst.counters.poisonStacks, by: source?.name,
@@ -18395,6 +18396,24 @@ this._deathWatch = (this._deathWatchStack || []).length
         inst.counters.poisonStacks = inc;
       }
     }
+    // ★ W16b (A01-pollution-09): „would be affected by a card or effect" — das Setzen eines Status (Frozen, Stunned, Burned, Negated …)
+    // öffnet das Schutzfenster `beforeCreatureAffected` wie Gift (`actionApplyCreaturePoison`), Heilung, Zerstörung und Bewegung
+    // (Warrior of Teocuilatl, Cool Rescuer Monia, Elusive Hind, Winged Skeleton lauschen darauf). Nur bei einer Quelle (Karte/Effekt);
+    // Aufrufer, die das Fenster schon selbst geöffnet haben, setzen `_skipAffectedWindow`.
+    if (!opts._skipAffectedWindow && inst.zone === ZONES.SUPPORT && !inst.faceDown
+        && (sourceObj || typeof opts.sourceOwner === 'number')) {
+      const _fenster = {
+        creature: inst, effectType: 'status',
+        source: sourceObj || { owner: opts.sourceOwner },
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await this.runHooks('beforeCreatureAffected', _fenster);
+      if (_fenster.cancelled) {
+        this.log('status_blocked', { card: inst.name, status: statusName, reason: 'creature_protection' });
+        return false;
+      }
+    }
+
     if (opts.duration && opts.duration > 1) {
       const prev = inst.counters[statusName + 'Duration'] || 0;
       inst.counters[statusName + 'Duration'] = Math.max(prev, opts.duration);
@@ -18988,6 +19007,21 @@ this._deathWatch = (this._deathWatchStack || []).length
     // enough for eval-state scoring during simulation.
     if (!this._inMctsSim && !this._fastMode) {
       const engine = this;
+    // ★ W16b (A01-pollution-09): auch eine Negation ist ein „affected by a card or effect" — Schutzfenster `beforeCreatureAffected`
+    // (Warrior of Teocuilatl & Co.). Nicht für Eigen-Platzierungen (`selfInflicted`: Kosten der negierenden Karte selbst) und nicht für
+    // unverhinderbare Negationen (`unpreventable`); Aufrufer mit eigenem Fenster (Unwanted Audience) setzen `_skipAffectedWindow`.
+    if (!opts._skipAffectedWindow && !opts.selfInflicted && !hart && inst.zone === 'support') {
+      const _fenster = {
+        creature: inst, effectType: 'status',
+        source: typeof source === 'string' ? { name: source, ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) } : (source || { name: 'effect' }),
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await this.runHooks('beforeCreatureAffected', _fenster);
+      if (_fenster.cancelled) {
+        this.log('negation_blocked', { creature: inst.name, source: _fenster.source.name || 'effect', reason: 'creature_protection' });
+        return;
+      }
+    }
       const capturedInst = inst;
       const capturedKey = statusKey;
       Promise.resolve().then(async () => {
