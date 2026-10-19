@@ -108,7 +108,13 @@ module.exports = {
     // shown when the player actually has enough Gold to pay extra —
     // otherwise the lock is inevitable.
     let paidExtra = false;
-    if ((ps.gold || 0) >= EXTRA_COST && !engine.goldSpendBlocked(pi)) {   // G1 (A09-11): Goldsperre
+    // W16e (F01-05): die Grundkosten werden vom Server erst NACH `resolve` abgebucht (`doConfirmPotion`/`doUseArtifactEffect`) — „double this
+    // Artifact's Cost" ist nur zahlbar, wenn Grundkosten (noch offen) UND die Verdopplung zusammen aufgebracht werden koennen (Kreditrahmen
+    // inklusive, `canAffordGold`). Sonst waere die Sperre gratis umgangen: `_payCardCost` klemmt bei 0.
+    const { getResolvingHandIndex } = require('./_hand-resolve');
+    const aufHand = getResolvingHandIndex(ps);
+    const offeneGrundkosten = aufHand >= 0 ? engine.artifactPlayCost(pi, 'Cool Cheese', aufHand).cost : 0;
+    if (engine.canAffordGold(pi, offeneGrundkosten + EXTRA_COST, 'Cool Cheese') && !engine.goldSpendBlocked(pi)) {   // G1 (A09-11): Goldsperre
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: 'Cool Cheese',
