@@ -676,7 +676,9 @@
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '') : asc ? [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n') : '',
       skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '') : ''),
-      hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? c.cost : c.atk,
+      // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
+      // statt der Zahl in `cost` (die der Server weiter rechnet).
+      hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,
       level: type === 'spell' || type === 'summon' ? c.level : null,
       school: type === 'spell' || type === 'summon' ? (c.cardType === 'Attack' ? 'fight' : schoolKey(c)) : null,
       kind: kindMap && kindMap[c.subtype] || null,
@@ -746,7 +748,11 @@
     if (o.noAtk) spec.noAtk = true;
     // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
     if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
-    if (o.kost != null && card.cost != null && o.kost !== card.cost) { spec.costOver = o.kost; spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED; }
+    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
+    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
+      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
+      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
+    }
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;

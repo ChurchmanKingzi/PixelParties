@@ -2121,7 +2121,7 @@ At least one of these must be present, or the loader will ignore the file.
 | `isWildcardAbility` | `bool` | `false` | When stacked on an ability, counts as that ability's spell school for school-requirement checks. |
 | `potionLockAfterN` | `number` | — | Hero flag: after the controlling player uses N potions in a turn, their potions are locked. |
 | `customPlacement` | `{ canPlace(zone) → bool }` | — | Overrides standard ability placement logic. Receives the current zone array, returns whether this card can be placed there. |
-| `manualGoldCost` | `bool` | `false` | Artifact handles its own gold deduction in `resolve()` instead of the engine auto-deducting. |
+| `manualGoldCost` | `bool` | `false` | Artifact handles its own gold deduction in `resolve()` instead of the engine auto-deducting. **Variable Kosten gehören auch in `cards.json`:** das Feld `costLabel` (`"4X"`, `"5X"`, `"10X"`, `"X"`) steht auf Karte, Tooltips, `!show` und `!card` statt der Zahl in `cost` (die der Server weiter rechnet; bei „nX" ist n gleich `cost`). `scripts/check-cost-label.js` prüft, dass keine Karte mit `manualGoldCost` ohne Label bleibt. |
 | `deferBroadcast` | `bool` | `false` | Don't broadcast the card reveal to the opponent before resolution (card handles it manually). |
 | `noDefaultFlash` | `bool` | `false` | Skip the default activation flash animation. |
 | `animationType` | `string` | `'explosion'` | Animation played on resolved potion/artifact targets. Use `'none'` to skip. |

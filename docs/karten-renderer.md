@@ -47,6 +47,12 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   Stellenzahl. `drawLine(…, { ink: true })` zentriert dafür die sichtbare Tinte statt des Vorschubs (die Schrift
   lässt hinter jedem Zeichen 1 Schrift-Pixel Abstand, `INK_TRAIL_U`); gemessen: Tintenmitte = Feldmitte bei 1–4
   Stellen. Creature-, Artifact- und Boss-Rahmen sind unverändert.
+* **Variable Kosten (Artifacts):** Karten mit modularen Kosten tragen in `cards.json` das Feld `costLabel` — „4X" (Beer, Book of Doom,
+  Capture Net, Cool Presents, Possessed Blade), „5X" (Dark Gear), „10X" (Staff of Illusions), „X" (Cool Repair, Tool Freezer,
+  Future Tech Copy Device). `specFromCard` druckt es im Wertefeld der Mitte statt der Zahl aus `cost` (die der Server weiter rechnet);
+  Tooltips (`cardCostText`) und der Discord-Bot (`!card`) zeigen es ebenso, `!show` rendert dieselbe Datei wie das Spiel. Die Hand-Überschreibung
+  (`?kost=`) behält das „X" (aus 4X wird 8X) und entfällt bei reinem „X". `scripts/check-cost-label.js` hält Skripte mit
+  `manualGoldCost` und `costLabel` zusammen.
 * **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
   Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
   gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
