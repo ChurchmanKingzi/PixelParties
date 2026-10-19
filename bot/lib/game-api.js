@@ -30,7 +30,7 @@ function createGameApi({ baseUrl, secret, timeoutMs = 8000 }) {
     linked: () => call('GET', '/api/bot/linked'),
     daily: discordId => call('GET', '/api/bot/daily/' + encodeURIComponent(discordId)),
     decks: discordId => call('GET', '/api/bot/decks/' + encodeURIComponent(discordId)),
-    adjustSc: (discordId, delta, adminDiscordId) => call('POST', '/api/bot/sc', { discordId, delta, adminDiscordId }),
+    adjustSc: (discordId, delta, adminDiscordId, reason) => call('POST', '/api/bot/sc', { discordId, delta, adminDiscordId, reason }),
     leaderboard: () => call('GET', '/api/leaderboard'),   // öffentlich; das Secret schadet nicht
   };
 }

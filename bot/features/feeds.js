@@ -3,7 +3,8 @@
 //  Feeds
 //   • Neue Karten: ändert sich data/cards.json (z. B. nach einem Deploy), postet der Bot die neuen
 //     Karten als Bilder in NEW_CARDS_CHANNEL_ID.
-//   • Patchnotes: neue Commits des Repos (ohne Merge-Commits) als Liste in PATCHNOTES_CHANNEL_ID.
+//   • Patchnotes: Karten, deren Eintrag in data/cards.json sich seit dem letzten Stand VERÄNDERT hat (Text, Werte, Kosten …),
+//     als Bilder in PATCHNOTES_CHANNEL_ID — keine Commit-Texte. Ganz neue Karten gehören in den Neue-Karten-Feed.
 //  Beim allerersten Lauf wird der Ist-Stand nur gemerkt, nichts gepostet — sonst käme die ganze Geschichte.
 // ═══════════════════════════════════════════════════════════════════
 const fs = require('fs');
@@ -28,6 +29,25 @@ module.exports = function register(ctx) {
     return ch && ch.isTextBased() ? ch : null;
   }
 
+  /**
+   * Kartenbilder in Päckchen zu je 10 posten (Discord-Grenze), höchstens MAX_CARDS_POSTED; der Rest steht als Namensliste dahinter.
+   * @param {{card:object, note?:string}[]} items  `note` steht hinter dem Namen („changed: HP“)
+   */
+  async function postCards(ch, heading, items) {
+    const line = it => `• ${it.note ? `**${it.card.name}**` : it.card.name}${it.note ? ' — ' + it.note : ''}`;
+    const shown = items.slice(0, MAX_CARDS_POSTED);
+    for (let i = 0; i < shown.length; i += PER_MESSAGE) {
+      const batch = shown.slice(i, i + PER_MESSAGE);
+      const files = [];
+      for (const it of batch) {
+        const buf = await ctx.cardPng(it.card.name);
+        if (buf) files.push(new AttachmentBuilder(buf, { name: it.card.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' }));
+      }
+      await ch.send({ content: (i === 0 ? heading + '\n' : '') + batch.map(line).join('\n'), files, allowedMentions: { parse: [] } });
+    }
+    if (items.length > shown.length) await ch.send({ content: `…and ${items.length - shown.length} more: ${items.slice(shown.length).map(it => it.card.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+  }
+
   // ── Neue Karten ──
   async function pollCards() {
     let stat;
@@ -37,8 +57,7 @@ module.exports = function register(ctx) {
 
     await ctx.cardsReload();                       // neue Karten + neue Kunst einlesen
     const known = await db.kvGet('known_cards');
-    const current = renderer.allCards();
-    const withArt = current.filter(c => renderer.hasArt(c.name));
+    const withArt = renderer.allCards().filter(c => renderer.hasArt(c.name));
     if (!known) {                                  // erster Lauf: nur merken
       await db.kvSet('known_cards', withArt.map(c => c.name));
       console.log('[feeds] Kartenstand gemerkt:', withArt.length);
@@ -49,46 +68,71 @@ module.exports = function register(ctx) {
     if (!fresh.length) return;
 
     const ch = await channel(config.channels.newCards);
-    if (ch) {
-      const shown = fresh.slice(0, MAX_CARDS_POSTED);
-      for (let i = 0; i < shown.length; i += PER_MESSAGE) {
-        const batch = shown.slice(i, i + PER_MESSAGE);
-        const files = [];
-        for (const c of batch) {
-          const buf = await ctx.cardPng(c.name);
-          if (buf) files.push(new AttachmentBuilder(buf, { name: c.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' }));
-        }
-        await ch.send({
-          content: i === 0 ? `✨ **New cards!** ${fresh.length === 1 ? '' : `(${fresh.length})`}\n${batch.map(c => '• ' + c.name).join('\n')}` : batch.map(c => '• ' + c.name).join('\n'),
-          files, allowedMentions: { parse: [] },
-        });
-      }
-      if (fresh.length > shown.length) await ch.send({ content: `…and ${fresh.length - shown.length} more: ${fresh.slice(shown.length).map(c => c.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
-    }
+    if (ch) await postCards(ch, `✨ **New cards!**${fresh.length === 1 ? '' : ` (${fresh.length})`}`, fresh.map(c => ({ card: c })));
     await db.kvSet('known_cards', [...new Set([...known, ...fresh.map(c => c.name)])]);
     console.log('[feeds] neue Karten:', fresh.length);
   }
 
   // ── Patchnotes ──
   const git = (...args) => new Promise((resolve, reject) =>
-    execFile('git', ['-c', 'safe.directory=*', '-C', config.repoRoot, ...args], { timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, (err, out) => err ? reject(err) : resolve(String(out).trim())));
+    execFile('git', ['-c', 'safe.directory=*', '-C', config.repoRoot, ...args], { timeout: 20000, maxBuffer: 64 * 1024 * 1024 }, (err, out) => err ? reject(err) : resolve(String(out))));
+
+  // Anzeigenamen der Felder in cards.json, die sich ändern können
+  const FIELD_LABELS = { effect: 'effect text', hp: 'HP', atk: 'ATK', cost: 'cost', level: 'level', cardType: 'type', subtype: 'subtype',
+    archetype: 'archetype', startingAbility1: 'starting ability', startingAbility2: 'starting ability', spellSchool1: 'school', spellSchool2: 'school',
+    banned: 'ban status', foil: 'rarity' };
+  // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus
+  const IGNORED_FIELDS = new Set(['skilltestLegal', 'setID']);
+
+  /**
+   * Karten, die in BEIDEN Ständen vorkommen, deren Eintrag sich aber verändert hat. Neue Karten (nur im neuen Stand) gehören in den
+   * Neue-Karten-Feed, entfernte Karten gibt es nicht mehr zu zeigen.
+   * @returns {{name:string, fields:string[]}[]}
+   */
+  function diffCards(oldCards, newCards) {
+    const before = new Map(oldCards.map(c => [c.name, c]));
+    const out = [];
+    for (const c of newCards) {
+      const o = before.get(c.name);
+      if (!o) continue;
+      const fields = [];
+      for (const k of new Set([...Object.keys(o), ...Object.keys(c)])) {
+        if (IGNORED_FIELDS.has(k)) continue;
+        if (JSON.stringify(o[k] ?? null) !== JSON.stringify(c[k] ?? null)) {
+          const label = FIELD_LABELS[k] || k;
+          if (!fields.includes(label)) fields.push(label);
+        }
+      }
+      if (fields.length) out.push({ name: c.name, fields });
+    }
+    return out;
+  }
 
   async function pollPatchnotes() {
     let head;
-    try { head = await git('rev-parse', 'HEAD'); } catch { return; }       // kein Git (Entwicklungsrechner o. Ä.)
+    try { head = (await git('rev-parse', 'HEAD')).trim(); } catch { return; }       // kein Git (Entwicklungsrechner o. Ä.)
     const last = await db.kvGet('patch_last');
     if (!last) { await db.kvSet('patch_last', head); return; }
     if (last === head) return;
-    let subjects;
-    try { subjects = (await git('log', '--no-merges', '--reverse', '--format=%s', `${last}..${head}`)).split('\n').filter(Boolean); }
-    catch { await db.kvSet('patch_last', head); return; }                   // alter Stand unbekannt (force-push) → neu ansetzen
+
+    let changed;
+    try {
+      const read = async ref => JSON.parse(await git('show', `${ref}:data/cards.json`));
+      changed = diffCards(await read(last), await read(head));
+    } catch { await db.kvSet('patch_last', head); return; }                         // alter Stand unbekannt (force-push) → neu ansetzen
     await db.kvSet('patch_last', head);
-    if (!subjects.length) return;
+    if (!changed.length) return;
+
     const ch = await channel(config.channels.patchnotes);
     if (!ch) return;
-    const lines = subjects.slice(-25).map(s => '• ' + s.slice(0, 220));
-    const extra = subjects.length > 25 ? `\n*…and ${subjects.length - 25} earlier changes*` : '';
-    await ch.send({ content: `📝 **Patch notes**\n${lines.join('\n')}${extra}`.slice(0, 1990), allowedMentions: { parse: [] } });
+    await ctx.cardsReload();                                                        // die Bilder müssen den NEUEN Kartentext zeigen
+    await renderer.init();
+    const byName = new Map(renderer.allCards().map(c => [c.name, c]));
+    const items = changed.filter(c => byName.has(c.name) && renderer.hasArt(c.name))
+      .map(c => ({ card: byName.get(c.name), note: 'changed: ' + c.fields.join(', ') }));
+    if (!items.length) return;
+    await postCards(ch, `📝 **Patch notes** — ${items.length} card${items.length === 1 ? '' : 's'} changed`, items);
+    console.log('[feeds] Patchnotes:', items.length, 'geänderte Karten');
   }
 
   ctx.onReady.push(() => {
@@ -100,5 +144,5 @@ module.exports = function register(ctx) {
     t.unref && t.unref();
     setTimeout(run, 15 * 1000).unref();
   });
-  ctx._feeds = { pollCards, pollPatchnotes };
+  ctx._feeds = { pollCards, pollPatchnotes, diffCards };
 };

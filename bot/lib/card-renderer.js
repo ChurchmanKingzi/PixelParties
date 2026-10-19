@@ -111,6 +111,64 @@ async function renderCardsRow(names, { gap = 24, scale = 1 } = {}) {
 
 function allCards() { return cardsByName ? [...cardsByName.values()] : []; }
 
+// ── Bildausschnitte (Mystery-Spiel) ──
+/** Kunst der Karte: Quelle + Ausschnitt im Atlas bzw. ganzes Bild. null, wenn es keine gibt. */
+async function artOf(name) {
+  await init();
+  const a = await CR.getArt(name);
+  if (!a) return null;
+  return a.sw ? a : { ...a, sx: 0, sy: 0, sw: a.src.width, sh: a.src.height };
+}
+
+/** Wie viel Kontrast steckt in einem Ausschnitt? (Farbvielfalt + Helligkeitsstreuung; durchsichtige Ränder zählen gegen ihn) */
+function cropScore(art, rect) {
+  const n = Math.min(rect.w, 24);
+  const cv = createCanvas(n, n), g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(art.src, art.sx + rect.x, art.sy + rect.y, rect.w, rect.h, 0, 0, n, n);
+  const d = g.getImageData(0, 0, n, n).data;
+  const colors = new Set();
+  let sum = 0, sum2 = 0, opaque = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 200) continue;
+    opaque++;
+    const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+    sum += l; sum2 += l * l;
+    colors.add((d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | (d[i + 2] >> 4));
+  }
+  if (opaque < n * n * 0.9) return 0;
+  const mean = sum / opaque;
+  return Math.sqrt(Math.max(0, sum2 / opaque - mean * mean)) + colors.size * 1.5;
+}
+
+/**
+ * Ein zufälliger, aber abwechslungsreicher quadratischer Ausschnitt der Kartenkunst (nie nur Himmel oder Einheitsfläche):
+ * von `tries` Kandidaten gewinnt der mit dem meisten Kontrast. Größe = `fraction` der kürzeren Bildseite (Pixel-Art 76×51 → ca. 18×18).
+ * @returns {Promise<{x:number,y:number,w:number,h:number}|null>} Koordinaten im Kunstbild
+ */
+async function pickArtCrop(name, { rng = Math.random, fraction = 0.36, tries = 14 } = {}) {
+  const art = await artOf(name);
+  if (!art) return null;
+  const size = Math.max(8, Math.round(Math.min(art.sw, art.sh) * fraction));
+  let best = null;
+  for (let i = 0; i < tries; i++) {
+    const rect = { x: Math.floor(rng() * (art.sw - size + 1)), y: Math.floor(rng() * (art.sh - size + 1)), w: size, h: size };
+    const score = cropScore(art, rect);
+    if (!best || score > best.score) best = { rect, score };
+  }
+  return best.rect;
+}
+
+/** Den Ausschnitt als PNG (`px`×`px`); Pixel-Art wird ohne Glättung vergrößert. */
+async function renderArtCrop(name, rect, px = 384) {
+  const art = await artOf(name);
+  if (!art) return null;
+  const cv = createCanvas(px, px), g = cv.getContext('2d');
+  g.imageSmoothingEnabled = rect.w >= 120;
+  g.drawImage(art.src, art.sx + rect.x, art.sy + rect.y, rect.w, rect.h, 0, 0, px, px);
+  return cv.encode('png');
+}
+
 /** Hat die Karte Kunst (und lässt sich damit rendern)? */
 function hasArt(name) { return !!(CR && CR.hasArt(name)); }
 
@@ -120,4 +178,4 @@ async function reload() {
   return init();
 }
 
-module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt };
+module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt, pickArtCrop, renderArtCrop };
