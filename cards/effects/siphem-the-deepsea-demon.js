@@ -153,7 +153,7 @@ module.exports = {
 
     const target = await ctx.promptDamageTarget({
       side: 'any', types: ['hero', 'creature'],
-      damageType: 'creature',
+      damageType: 'hero',   // ★ W16b (A02-deepsea-33): Schaden aus einem aktivierbaren HELDEN-Effekt (CARD_API „Schadenstyp 'hero'", v905) — Frog/Crocodile Race Boat erkennen ihn
       baseDamage: damage,
       title: CARD_NAME,
       description: `Deal ${damage} damage to a target.`,
@@ -180,11 +180,11 @@ module.exports = {
     if (target.type === 'hero') {
       const tHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tHero?.name && tHero.hp > 0) {
-        await ctx.dealDamage(tHero, damage, 'creature');
+        await ctx.dealDamage(tHero, damage, 'hero');
       }
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
-        ctx.card, target.cardInstance, damage, 'creature',
+        ctx.card, target.cardInstance, damage, 'hero',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

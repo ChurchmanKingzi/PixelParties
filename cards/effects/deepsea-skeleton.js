@@ -85,17 +85,15 @@ module.exports = {
         'Choose up to 2 cards in your deck to send to the discard pile?'
       ))) return;
 
-      // Build a gallery of unique card names in the deck — same shape as
-      // Magenta's effect. Sorted alphabetically so duplicates of the same
-      // name collapse to one tile (actionMillCards with targetCardName
+      // Build a gallery of the deck's cards — same shape as
+      // Magenta's effect. Sorted alphabetically (actionMillCards with targetCardName
       // pulls a specific copy per call, so two picks of the same name
       // mill two copies).
       const cardDB = engine._getCardDB();
-      const seen = new Set();
+      // ★ W16b (A02-deepsea-08, Text „choose up to 2 cards from your deck"): EINE Kachel je Karte (auch gleichnamige) — der Client
+      // wählt nach Galerie-Index, so lassen sich beide Exemplare derselben Karte gemeinsam in die Ablage schicken.
       const gallery = [];
       for (const cn of ps.mainDeck) {
-        if (seen.has(cn)) continue;
-        seen.add(cn);
         if (!cardDB[cn]) continue;
         gallery.push({ name: cn, source: 'deck' });
       }

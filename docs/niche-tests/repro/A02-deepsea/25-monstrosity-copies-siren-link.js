@@ -30,7 +30,9 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Src', owner: 1 }, m, 30, 'creature', { sourceOwner: 1 }));
   R.check('Der verknüpfte Dummy nimmt die 30 Schaden der Monstrosity mit', (victim.counters.currentHp ?? 1000) === 970, { monstrosity: m.counters.currentHp, dummy: victim.counters.currentHp ?? 1000 });
   await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Src', owner: 1 }, m, 500, 'creature', { sourceOwner: 1 }));
-  R.check('Stirbt die Monstrosity durch den Gegner, stirbt auch der Dummy', victim.zone !== 'support', { dummyZone: victim.zone });
+  // ★ W16b: ein per Schaden gestorbenes Ziel behält am Objekt `zone === 'support'` — gemessen wird wie in 27 an der Instanzliste der Engine.
+  const dummyLebt = t.engine.cardInstances.includes(victim) && victim.zone === 'support';
+  R.check('Stirbt die Monstrosity durch den Gegner, stirbt auch der Dummy', !dummyLebt, { dummyZone: victim.zone, getrackt: t.engine.cardInstances.includes(victim) });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

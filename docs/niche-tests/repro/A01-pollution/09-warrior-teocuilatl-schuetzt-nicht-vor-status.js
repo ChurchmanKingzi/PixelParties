@@ -26,7 +26,10 @@ const tgt = (v) => [v.find(x => x.type === 'equip' && x.owner === 1 && x.heroIdx
     const ba = t.find('Soul Shard Ba', 'support');
     R.check('Warrior bot das Negieren an', t.prompts.some(p => p.d.title === 'Warrior of Teocuilatl'), t.prompts.map(p => p.d.title));
     R.check('Ba unberührt (kein Freeze/Stun/Null) und lebt', !!ba && !wirkt(ba), ba && ba.counters);
-    R.check('1 Counter von der Uhr entfernt (5 → 4)', uhr.counters.doom === 4, uhr.counters.doom);
+    // ★ W16b: Medusa's Curse und Null Zone treffen ALLE Kreaturen — also auch den Warrior selbst; jede betroffene Kreatur öffnet ihr eigenes Fenster
+    //   („Ja" überall) → ein Counter je Kreatur (Ba + Warrior = 2). Cold Coffin / Goldify treffen nur Ba (1).
+    const erwartet = (spell === "Medusa's Curse" || spell === 'Null Zone') ? 2 : 1;
+    R.check(`${erwartet} Counter von der Uhr entfernt (5 → ${5 - erwartet}), je betroffener Kreatur einer`, uhr.counters.doom === 5 - erwartet, uhr.counters.doom);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

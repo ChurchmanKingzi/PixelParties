@@ -9820,6 +9820,8 @@ class GameEngine {
 
     let _ersterDurchlauf = false;
     let _toeterBesitzer = -1;
+    let _koKontrolle = ownerIdx;   // W16b (A01-pollution-06): Kontrolleur zum Todeszeitpunkt (das Aufräumen kann die Übernahme lösen)
+    try { _koKontrolle = this.heroSideOf(ownerIdx, target) ?? ownerIdx; } catch { /* Rückfall: Besitzer */ }
     if (!target._koProcessed) {
       _ersterDurchlauf = true;
       // Wer hat den Tod verursacht? Vor dem Aufraeumen berechnen — es leert `statuses`.
@@ -9894,6 +9896,9 @@ class GameEngine {
     }
 
     if (!opts.skipAllDeadCheck) await this.checkAllHeroesDead();
+    // ★ W16b (A01-pollution-06): endgültig besiegt (kein Extra Life, keine Rettung) — „targets are defeated" zählt auch Helden. NACH der
+    // Spielende-Prüfung: ist die Partie entschieden („alle Gegner getötet" geht vor, Welle 9), legen Zuhörer (Doom Clock) nichts mehr.
+    if (_ersterDurchlauf) await this._vermerkeHeldNiederlage(target, ownerIdx, source, _koKontrolle);
     return false;
   }
 
@@ -11253,6 +11258,7 @@ class GameEngine {
       addStacks: true,
       sourceOwner: source?.owner ?? -1,
       source,
+      _skipAffectedWindow: true,   // W16b: das Fenster ist oben schon aufgegangen
     });
     this.log('poison_applied', {
       target: inst.name, stacks: inst.counters.poisonStacks, by: source?.name,
@@ -11857,6 +11863,7 @@ class GameEngine {
     if (toDiscard <= 0) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
+    const _abwurfOp = toDiscard > 1 ? this._neueAbwurfVorgangsId() : undefined;   // W16b (A03-futuretech-07): ein Vorgang
     for (let i = 0; i < toDiscard; i++) {
       const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
       const fromHandIdx = ps.hand.length; // Pre-Splice-Index des gepoppten Slots
@@ -11884,6 +11891,7 @@ class GameEngine {
           sourceOwner: this._deriveEffectOwner(opts, playerIdx),
           selfInflicted: !!opts.selfInflicted,
           _fromHand: true,
+          ...(_abwurfOp != null ? { discardOp: _abwurfOp } : {}),   // W16b
         });
       }
       // Als Takt: eine Karte nach der anderen, ~0.5s je Karte.
@@ -14740,6 +14748,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       selfInflicted: !!opts.selfInflicted,
       _fromHand: true,
       _skipReactionCheck: opts.skipReactionCheck !== false,
+      ...((this.gs._batchDiscardDepth || 0) > 0 && this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b
     };
     // Inside an open discard batch, defer the per-card on-discard
     // reactors until ALL discards in the batch have landed in the
@@ -15738,6 +15747,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (await opts._landungsFenster(inst, actualSlot)) return { negated: true, inst: null, actualSlot: -1 };
     }
 
+    // ★ W16b (A01-pollution-22): optionaler Haken zwischen Landung und Einsatz-Effekten — für Beschwörungen, die die Kreatur NEGIEREN
+    // müssen, bevor ihr `onPlay` läuft (Soul Shard Ka: „… summon it …, but negate its effects", wie Necromancy). Rein additiv.
+    if (typeof opts._vorHooks === 'function') await opts._vorHooks(inst, actualSlot);
+
     if (!opts.skipHooks) {
       // "Place" semantics: a placed Creature targets ANY Hero's Support
       // Zone (own/opp, alive/dead/Frozen/Stunned/negated/Bound) and
@@ -16249,6 +16262,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     await this.runHooks('onCardLeaveZone', {
       _onlyCard: inst, card: inst,
       fromZone: 'support', fromHeroIdx: srcHeroIdx,
+      isTransfer: true,   // W16b (A01-pollution-33): Umzug auf dem Brett — die Kreatur verlaesst das Brett nicht (nur additiv, ohne `toZone`)
       _skipReactionCheck: true,
     });
 
@@ -17151,6 +17165,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    * effects (Glass of Marbles, Skull Necklace) resolve those effects
    * AFTER the entire batch is in the discard pile — not interleaved.
    */
+  /**
+   * ★ W16b (A03-futuretech-07): Kennung eines ABWURFVORGANGS. „When you discard 1 or more cards" (Steam Dwarf Dragon Pilot) antwortet je
+   * Vorgang einmal, nicht je Karte (Konvention wie `_drawBatch` beim Ziehen). Die Hook-Kontexte von `onDiscard` tragen `discardOp`
+   * (Stapelabfrage/`withDiscardBatch`: eine Kennung je äußerer Klammer; `actionDiscardCardsAnimated`: eine je Aufruf); Einzelabwürfe ohne Klammer
+   * tragen keine (jeder ist ein eigener Vorgang). Rein additiv.
+   */
+  _neueAbwurfVorgangsId() {
+    this._abwurfVorgangsSeq = (this._abwurfVorgangsSeq || 0) + 1;
+    return this._abwurfVorgangsSeq;
+  }
+
   async withDiscardBatch(playerIdx, opts, fn) {
     if (typeof opts === 'function') { fn = opts; opts = {}; }
     if (!opts) opts = {};
@@ -17158,6 +17183,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs._batchDiscardCount = 0;
       this.gs._batchDiscardCountByPlayer = {};
       this.gs._batchDiscardPendingHooks = [];
+      this.gs._batchDiscardOp = this._neueAbwurfVorgangsId();   // W16b (A03-futuretech-07)
     }
     this.gs._batchDiscardDepth = (this.gs._batchDiscardDepth || 0) + 1;
     try {
@@ -17284,6 +17310,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs._batchDiscardCount = 0;
       this.gs._batchDiscardCountByPlayer = {};
       this.gs._batchDiscardPendingHooks = [];
+      this.gs._batchDiscardOp = this._neueAbwurfVorgangsId();   // W16b (A03-futuretech-07)
     }
     this.gs._batchDiscardDepth = (this.gs._batchDiscardDepth || 0) + 1;
 
@@ -17558,6 +17585,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               selfInflicted: !!opts.selfInflicted,
               sourceOwner: this._deriveEffectOwner(opts, playerIdx),
               _fromHand: true, _skipReactionCheck: true,
+              ...(this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b (A03-futuretech-07)
             },
           });
         }
@@ -18368,6 +18396,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (!canApply) return false;
 
+    // ★ W16b (A01-pollution-09): „would be affected by a card or effect" — das Setzen eines Status (Frozen, Stunned, Burned, Negated …)
+    // öffnet das Schutzfenster `beforeCreatureAffected` wie Gift (`actionApplyCreaturePoison`), Heilung, Zerstörung und Bewegung
+    // (Warrior of Teocuilatl, Cool Rescuer Monia, Elusive Hind, Winged Skeleton lauschen darauf). Nur bei einer Quelle (Karte/Effekt);
+    // Aufrufer, die das Fenster schon selbst geöffnet haben, setzen `_skipAffectedWindow`.
+    if (!opts._skipAffectedWindow && inst.zone === ZONES.SUPPORT && !inst.faceDown
+        && (sourceObj || typeof opts.sourceOwner === 'number')) {
+      const _fenster = {
+        creature: inst, effectType: 'status',
+        source: sourceObj || { owner: opts.sourceOwner },
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await this.runHooks('beforeCreatureAffected', _fenster);
+      if (_fenster.cancelled) {
+        this.log('status_blocked', { card: inst.name, status: statusName, reason: 'creature_protection' });
+        return false;
+      }
+    }
+
     if (!inst.counters) inst.counters = {};
     // Presence flag — every creature status uses `counters[name] = 1`
     // as the "this status is on me" gate. Engine reads (frozen, stunned,
@@ -18958,6 +19004,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       const negOwner = source?.owner ?? source?.controller;
       if (negOwner !== (inst.controller ?? inst.owner) && this._creatureNegationProof(inst)) {
         this.log('negation_blocked', { creature: inst.name, source: source?.name || 'effect', reason: 'negation_proof' });
+        return;
+      }
+    }
+    // ★ W16b (A01-pollution-09): auch eine Negation ist ein „affected by a card or effect" — Schutzfenster `beforeCreatureAffected`
+    // (Warrior of Teocuilatl & Co.). Nicht für Eigen-Platzierungen (`selfInflicted`: Kosten der negierenden Karte selbst) und nicht für
+    // unverhinderbare Negationen (`unpreventable`); Aufrufer mit eigenem Fenster (Unwanted Audience) setzen `_skipAffectedWindow`.
+    if (!opts._skipAffectedWindow && !opts.selfInflicted && !hart && inst.zone === 'support') {
+      const _fenster = {
+        creature: inst, effectType: 'status',
+        source: typeof source === 'string' ? { name: source, ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) } : (source || { name: 'effect' }),
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await this.runHooks('beforeCreatureAffected', _fenster);
+      if (_fenster.cancelled) {
+        this.log('negation_blocked', { creature: inst.name, source: _fenster.source.name || 'effect', reason: 'creature_protection' });
         return;
       }
     }
@@ -22978,6 +23039,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           heroIdx, casterIdx: playerIdx,
           damageTargets: uniqueTargets,
           isSecondCast: !!this.gs._bartasSecondCast,
+          // ★ W16b (A01-pollution-24): Herkunft des Gusses — nur ein Zauber aus der HAND zählt für „plays a Spell from their hand"
+          // (Acid Rain). Circle-Replays (Wegwerf-Pool aus dem Gelöscht-Stapel), Deck-/Ablage-Güsse sind keine Handzauber.
+          spellFromHand: fromZone === 'hand' && pool === ps.hand,
           _skipReactionCheck: true,
         });
       }
@@ -25464,13 +25528,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return 0;
     let limit = 0;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    // ★ W16b (A03-futuretech-25): „If YOU spend Gold …" — der Held zählt für seinen KONTROLLEUR (übernommene Helden: der Übernehmer, nicht der
+    // Besitzer; CARD_API „Übernommene Helden gelten als Helden des Kontrolleurs"). Vorher: Helden der physischen Seite.
+    for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {
+      if (hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.goldOverdraft !== 'function') continue;
-      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): der Kredit ruht bei Frost/Betäubung/Negation
+      if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent): der Kredit ruht bei Frost/Betäubung/Negation
       try { limit = Math.max(limit, script.goldOverdraft(this, playerIdx) || 0); }
       catch { /* eine kaputte Karte darf keinen Kredit erzwingen */ }
     }
@@ -25798,13 +25863,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // eine Aktion erlaubt ist, fragt `areActionsBlocked` — sonst
     // niemanden.
     if (ps.actionLocked) return true;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {   // W16b (A03-futuretech-25): Helden des KONTROLLEURS
+      if (hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.blocksActions !== 'function') continue;
-      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): „While your Gold is negative …" ruht
+      if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent): „While your Gold is negative …" ruht
       try { if (script.blocksActions(this, playerIdx)) return true; }
       catch { /* defensiv: eine kaputte Karte sperrt nichts */ }
     }
@@ -25849,13 +25913,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inGoldStateRules) return;
     this._inGoldStateRules = true;
     try {
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name) continue;
+      for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {   // W16b (A03-futuretech-25): Helden des KONTROLLEURS
         let script = null;
         try { script = this.heroScript(hero); } catch { continue; }
         if (typeof script?.goldStateRule !== 'function') continue;
-        if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent, Logan): Zustandsregel ruht bei Frost/Betäubung/Negation
+        if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent, Logan): Zustandsregel ruht bei Frost/Betäubung/Negation
         try { script.goldStateRule(this, playerIdx); }
         catch (err) {
           console.error(`[Engine] goldStateRule "${hero.name}" warf:`, err?.message || err);
@@ -27955,6 +28017,11 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _collectSacrificeCandidates(playerIdx, spec, selfId) {
     let board = this.getSacrificableCreatures(playerIdx);
+    // ★ W16b (A02-deepsea-34): ein Opfer ist ein BESIEGEN — eine per Succubus geliehene Kreatur „cannot be defeated while you control it"
+    // (`actionDestroyCard` bricht bei `_stealImmortal` ab): kein Opferkandidat, sonst gälte der Preis als gezahlt, ohne gezahlt zu sein.
+    // Nur hier (generische Opferkosten), NICHT in `getSacrificableCreatures`; Specs mit `returnsToHand` (Dark Deepsea God gibt die Kreatur nur
+    // auf die Hand zurück, Al 14.10.: geliehene Kreaturen sind dort als Tribut erlaubt) nehmen sie aus.
+    if (!spec?.returnsToHand) board = board.filter(c => !c.inst.counters?._stealImmortal);   // `returnsToHand`: Tribut wird nur zurück auf die Hand gegeben (Dark Deepsea God)
     if (selfId != null) board = board.filter(c => c.inst.id !== selfId);
     if (spec?.filter) board = board.filter(c => spec.filter(c));
     // ── Precondition for hand substitutes (Als Ruling) ──
@@ -28883,8 +28950,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const idx = gs.areaZones[ownerIdx].indexOf(cardName);
       if (idx >= 0) gs.areaZones[ownerIdx].splice(idx, 1);
     }
-    if (!ps.discardPile) ps.discardPile = [];
-    ps.discardPile.push(cardName);
+    // ★ W16b (A01-pollution-08, Welle 5: „Karten gehen immer zum permanenten Besitzer"): die Area liegt in der Zone des
+    // Zonen-Besitzers (`owner`), ihre KARTE gehoert aber dem Leger (`originalOwner`, z. B. Doom Prophecy in der Gegnerzone).
+    const _ablagePs = gs.players[cardInstance.originalOwner ?? ownerIdx] || ps;
+    if (!_ablagePs.discardPile) _ablagePs.discardPile = [];
+    _ablagePs.discardPile.push(cardName);
 
     this.log('area_removed', { player: ps.username, area: cardName, by: sourceName });
     // ★ Der Leave-Hook laeuft VOR dem Zonenwechsel (Als Befund 19.8.:
@@ -28954,9 +29024,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
     });
     cardInstance.zone = 'deleted';
-    if (!ps.deletedPile) ps.deletedPile = [];
-    this._geloeschtVerfolgen(ownerIdx);
-    ps.deletedPile.push(cardName);   // Push-Ueberlagerung meldet die Karte (`_geloeschtMeldung`)
+    // ★ W16b (A01-pollution-08): wie `removeArea` — der Gelöscht-Stapel des Kartenbesitzers (Leger), nicht der Zonen-Besitzer.
+    const _loeschIdx = cardInstance.originalOwner ?? ownerIdx;
+    const _loeschPs = gs.players[_loeschIdx] || ps;
+    if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+    this._geloeschtVerfolgen(_loeschIdx);
+    _loeschPs.deletedPile.push(cardName);   // Push-Ueberlagerung meldet die Karte (`_geloeschtMeldung`)
     this.syncAlleAtkAuren();
     this.sync();
     await this._delay(750);
@@ -34750,10 +34823,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       return await fn();
     } finally {
       this._niederlagenTiefe--;
-      if (this._niederlagenTiefe === 0 && (this._niederlagen || []).length > 0) {
-        const liste = this._niederlagen;
+      if (this._niederlagenTiefe === 0 && ((this._niederlagen || []).length > 0 || (this._niederlagenHelden || []).length > 0)) {
+        const liste = this._niederlagen || [];
+        const helden = this._niederlagenHelden || [];   // W16b (A01-pollution-06)
         this._niederlagen = [];
-        await this._liefereNiederlagen(liste);
+        this._niederlagenHelden = [];
+        await this._liefereNiederlagen(liste, helden);
       }
     }
   }
@@ -34803,17 +34878,46 @@ this._deathWatch = (this._deathWatchStack || []).length
    * defeated" reagieren (Junshi). ctx traegt `defeated` (dieselbe Liste,
    * beide Seiten). Wie alle Todes-Hooks ohne allgemeines Kettenfenster.
    */
-  async _liefereNiederlagen(liste) {
-    try {
-      await this._checkCreaturesDefeatedHandReactions(liste);
-    } catch (err) {
-      console.error('[CreaturesDefeatedReaction] Fenster:', err.message);
+  async _liefereNiederlagen(liste, helden = []) {
+    if (liste.length > 0) {
+      try {
+        await this._checkCreaturesDefeatedHandReactions(liste);
+      } catch (err) {
+        console.error('[CreaturesDefeatedReaction] Fenster:', err.message);
+      }
+      try {
+        await this.runHooks('onCreaturesDefeated', { defeated: liste, _skipReactionCheck: true });
+      } catch (err) {
+        console.error('[onCreaturesDefeated]', err.message);
+      }
     }
-    try {
-      await this.runHooks('onCreaturesDefeated', { defeated: liste, _skipReactionCheck: true });
-    } catch (err) {
-      console.error('[onCreaturesDefeated]', err.message);
+    // ★ W16b (A01-pollution-06): „1 or more TARGETS are defeated" (Doom Clock) — Helden und Kreaturen zusammen, EIN Aufruf je Vorgang
+    // (`onTargetsDefeated`, `ctx.defeated` = Kreaturen-Einträge wie bei `onCreaturesDefeated` + Helden-Einträge `{ hero: true, … }`).
+    if (liste.length > 0 || helden.length > 0) {
+      try {
+        await this.runHooks('onTargetsDefeated', { defeated: [...liste, ...helden], _skipReactionCheck: true });
+      } catch (err) {
+        console.error('[onTargetsDefeated]', err.message);
+      }
     }
+  }
+
+  /**
+   * ★ W16b (A01-pollution-06): ein Held ist endgültig besiegt (nach Extra Life / Rettung). Gehört zum selben Vorgang wie die Kreaturentode
+   * eines Flächenschlags, wenn ein Sammler offen ist (`_mitNiederlagenSammler`); sonst sofort als eigener Vorgang. Nur der Hook
+   * `onTargetsDefeated` sieht Helden — `onCreaturesDefeated` und die Hand-Fenster bleiben reine Kreaturen-Wege.
+   */
+  async _vermerkeHeldNiederlage(hero, ownerIdx, source, kontrolleur) {
+    const heroIdx = (this.gs.players[ownerIdx]?.heroes || []).indexOf(hero);
+    const eintrag = {
+      hero: true, name: hero.name, owner: ownerIdx, controller: kontrolleur ?? ownerIdx,
+      heroIdx, source: source || null, type: null,
+    };
+    if ((this._niederlagenTiefe || 0) > 0) {
+      (this._niederlagenHelden || (this._niederlagenHelden = [])).push(eintrag);
+      return;
+    }
+    await this._liefereNiederlagen([], [eintrag]);
   }
 
   async _checkCreaturesDefeatedHandReactions(liste) {
@@ -37501,6 +37605,11 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** True iff this source's effect was negated by a post-target reaction. */
   _isEffectSourceNegated(source) {
+    // ★ W16b (A03-futuretech-13): ein im Angriffsfenster NEGIERTER Angriff (`source._attackNegated`, Future Tech Doomsday Bomb) ist ein
+    // Vorgang ohne jede Wirkung: sein Schaden entfällt als `cancelled`, damit auch die Zusatzeffekte der Attack-Karte (Stun, Blind, Gift,
+    // Abwurf — sie prüfen `result.cancelled`) unterbleiben. An die Quell-INSTANZ gebunden (nicht an owner:name), ein späterer Angriff
+    // derselben Karte im selben Zug bleibt unberührt.
+    if (source && source._attackNegated) return true;
     const set = this.gs._negatedEffectSources;
     if (!set || set.size === 0) return false;
     const key = this._effectNegationKey(source);
@@ -46967,6 +47076,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       console.error(`[STATUS] turn=${this.gs?.turn} +${statusName} → p${playerIdx} ${hero.name} (hp=${hero.hp})`);
     }
 
+    // ★ W16b (A01-pollution-31, Text „… make the Hero unaffected by a Spell that hits it"): ein Status-Zauber (Cold Coffin, Medusa's Curse,
+    // Null Zone) „trifft" den Helden auch ohne Schaden — das AME-Angebot lief bisher nur lazy aus `actionDealDamage`. Jetzt fragt auch das
+    // Setzen eines NEGATIVEN Status durch einen Zauber (lazy, je Zauber und Held einmal gemerkt, `_maybePromptAntiMagicEnchantment`).
+    if (STATUS_EFFECTS[statusName]?.negative && !this._isAmeShieldedHero(playerIdx, heroIdx)) {
+      const _ameQuelle = (typeof opts.source === 'string' && opts.source) || this._currentResolvingSpellName();
+      if (_ameQuelle) await this._maybePromptAntiMagicEnchantment(hero, { name: _ameQuelle });
+    }
+
     // Anti Magic Enchantment shield: the current spell already "hit" this
     // hero visually, but the enchantment owner spent a charge to nullify
     // the spell's effects — so downstream status applications are skipped.
@@ -48570,7 +48687,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // outside a spell resolution (DDG's on-summon AoE vs Divine Gift
     // of Rain). Per-entry, so mixed-source batches keep their
     // unaffected entries.
-    entries = entries.filter(e => !this._isEffectSourceNegated(e.source));
+    // W16b (A03-futuretech-13): der Eintrag gilt als `cancelled` (Zusatzeffekte der Karte lesen `result.cancelled`, Gegenstück zum Heldenpfad).
+    entries = entries.filter(e => {
+      if (!this._isEffectSourceNegated(e.source)) return true;
+      e.cancelled = true;
+      return false;
+    });
     if (entries.length === 0) return;
 
     // Per-call heap check (matches the hero damage path). Damage

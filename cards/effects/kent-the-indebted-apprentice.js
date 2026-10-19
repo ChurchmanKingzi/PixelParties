@@ -58,8 +58,10 @@ const OVERDREW = '_kentOverdrewTurn';
 
 /** Steht ein lebender Kent auf dieser Seite? */
 function kentAlive(engine, pi) {
-  return (engine?.gs?.players?.[pi]?.heroes || [])
-    .some(h => h?.name === CARD_NAME && h.hp > 0);
+  // ★ W16b (A03-futuretech-25): „you" = KONTROLLEUR — ein von Sitz `pi` kontrollierter Kent zählt (auch ein übernommener), ein von
+  // anderen kontrollierter nicht.
+  return engine.heroesControlledBy(pi)
+    .some(e => e.hero.name === CARD_NAME && e.hero.hp > 0);
 }
 
 module.exports = {
@@ -125,11 +127,12 @@ module.exports = {
     });
     // Rote Muenzen fallen — dieselbe Bildsprache wie Logans Verfall,
     // hier fuer „du hast dich verschuldet".
-    const heroIdx = (ps.heroes || []).findIndex(h => h?.name === CARD_NAME && h.hp > 0);
+    const kentEintrag = engine.heroesControlledBy(playerIdx).find(e => e.hero.name === CARD_NAME && e.hero.hp > 0);
+    const heroIdx = kentEintrag ? kentEintrag.heroIdx : -1;
     if (heroIdx >= 0) {
       engine._broadcastEvent('play_zone_animation', {
         type: 'debt_incurred',
-        owner: playerIdx, heroIdx, zoneSlot: -1,
+        owner: kentEintrag.physOwner, heroIdx, zoneSlot: -1,
         count: Math.min(12, Math.max(3, Math.ceil(-(ps.gold || 0) / 2))),
       });
     }

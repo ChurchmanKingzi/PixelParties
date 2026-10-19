@@ -101,8 +101,17 @@ module.exports = {
     await engine._delay(560);
 
     if (abzug > 0) {
-      if (!ps._magicLevelReductions) ps._magicLevelReductions = [];
-      ps._magicLevelReductions.push({ cardName: name, amount: abzug });
+      // ★ W16b (A03-futuretech-03, Muster Divine Gift of Magic / Al Q165 „Nur die eine Kopie", W15b): „That Spell's level is reduced … while it
+      // stays revealed" meint die EINE aufgedeckte Kopie, nicht jede gleichnamige. Handindex-Rabatt mit Verfallsstempel statt des
+      // namensweiten `_magicLevelReductions`-Eintrags (fällt am Zugbeginn, wandert bei Hand-Splices mit der Kopie).
+      let handIdx = Number.isInteger(wahl.handIndex) ? wahl.handIndex : -1;
+      if (handIdx < 0 || ps.hand[handIdx] !== name) handIdx = ps.hand.indexOf(name);
+      if (handIdx >= 0) {
+        if (!ps._handLevelOffsetsTransient) ps._handLevelOffsetsTransient = {};
+        if (!ps._handLevelOffsetsExpireTurn) ps._handLevelOffsetsExpireTurn = {};
+        ps._handLevelOffsetsTransient[handIdx] = Math.min(ps._handLevelOffsetsTransient[handIdx] || 0, -abzug);
+        ps._handLevelOffsetsExpireTurn[handIdx] = gs.turn;
+      }
     }
 
     engine.log('ft_magic_modifier', {

@@ -86,6 +86,7 @@ async function sleepCreature(engine, inst, ownerPi) {
   // (`engine.isCreatureActiveEffectLocked`). Ablauf, Heilbarkeit (Beer/Juice) und Schutzprüfungen wie gehabt über `actionNegateCreature`.
   await engine.actionNegateCreature(inst, CARD_NAME, {
     statusKey: 'active_locked',
+    _skipAffectedWindow: true,   // W16b: das Monia-Fenster ist oben schon aufgegangen
     // Current turn is the OPPONENT's; it ends when ownerPi's next
     // turn starts (gs.turn + 1 / expiresForPlayer = ownerPi). Same
     // arithmetic Jump in the River uses for its turn-scoped buff.

@@ -149,6 +149,10 @@ module.exports = {
     engine._broadcastEvent('card_reveal', {
       cardName: name, playerIdx: pi, sfx: 'ability_activate',
     });
+    // ★ W16b (A03-futuretech-09): die Umbenennung ändert die Zählung in der Ablage SOFORT — Karten, die „Cards of that name in your discard
+    // pile" zählen (Future Tech Gun: +40 ATK je Kopie), rechnen jetzt nach, nicht erst am nächsten Aktions-Hook (sonst trifft der
+    // nächste Angriff mit dem alten Wert).
+    await engine.runHooks('onFtAliasChanged', { playerIdx: pi, _skipReactionCheck: true });
     engine.log('ft_prototypes', { player: ps.username, renamedTo: name });
     engine.sync();
     return true;
@@ -172,6 +176,7 @@ module.exports = {
     const { loescheAblageAlias } = require('./_future-tech-shared');
     loescheAblageAlias(gs, besitzer, CARD_NAME, inst.id);
     delete inst.counters._ftCopyOf;
+    await engine.runHooks('onFtAliasChanged', { playerIdx: besitzer, _skipReactionCheck: true });   // W16b (A03-futuretech-09)
     engine.log('ft_prototypes_expire', { player: gs.players[besitzer]?.username });
   },
 };

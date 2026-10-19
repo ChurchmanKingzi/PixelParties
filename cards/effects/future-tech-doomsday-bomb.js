@@ -127,8 +127,8 @@ module.exports = {
       if (!q) return;
       if (q.heroIdx !== inst.heroIdx) return;
       if ((q.owner ?? q.controller) !== inst.owner) return;
-      // Nur, wenn wirklich etwas ausgeteilt würde.
-      if (!(ctx.amount > 0)) return;
+      // ★ W16b (A03-futuretech-13): KEINE Mindest-ATK-Bedingung mehr. Der Text sagt „would hit 1 or more targets … with an Attack" — auch ein
+      // Angriff eines Helden mit ATK 0 trifft seine Ziele und wird negiert (vorher: `ctx.amount > 0`, die Bombe zündete bei ATK 0 nie).
       // ★ Und nur bei mindestens einem GEGNERISCHEN Ziel.
       if (!trifftGegner(engine, ctx.target, gegner)) return;
 
@@ -140,7 +140,10 @@ module.exports = {
       inst.counters._doomsdayFired = true;
 
       // ── „negate that Attack" ──
+      // ★ W16b (A03-futuretech-13): ganz negiert — nicht nur der Schaden. `_attackNegated` am Quellobjekt lässt jeden Schaden dieses Angriffs als
+      // `cancelled` verpuffen (`_isEffectSourceNegated`), womit auch Stun/Blind/Gift/Abwurf der Attack-Karte unterbleiben.
       ctx.setAmount(0);
+      q._attackNegated = true;
 
       const kopien = kopienUeberall(gs);
       const schaden = SCHADEN_JE_KOPIE * kopien;

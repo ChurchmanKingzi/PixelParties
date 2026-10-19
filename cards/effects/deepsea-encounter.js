@@ -24,6 +24,14 @@
 
 const { isSummonablePileCreature, hasCardType, baseCardName, isArtifactCreature } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
+const { canSummonInvaderViaSource, invaderLimitAllows } = require('./_cosmic-shared');
+
+// ★ W16b (A02-deepsea-19): die Ersatz-Kreatur wird zwar „platziert", das ist aber eine Unterform der Beschwörung (Al, Welle 9 Q10) —
+// die Beschwörungsbeschränkungen des Invaders gelten: nur durch den Effekt einer „Cosmic"-Karte (Encounter ist keine) und höchstens
+// 1 kontrollierter Invader. Dieselben Helfer nutzen Argos und Life-Searcher.
+function _platzierbar(engine, pi, name) {
+  return canSummonInvaderViaSource(name, CARD_NAME) && invaderLimitAllows(engine, pi, name);
+}
 
 const CARD_NAME = 'Deepsea Encounter';
 
@@ -89,6 +97,7 @@ module.exports = {
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
         if (!cd || !isSummonablePileCreature(cd)) continue;
+        if (!_platzierbar(engine, pi, name)) continue;
         // Effective level honours hand-active reducers (Whoolmoth, …).
         if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         return true;
@@ -128,6 +137,7 @@ module.exports = {
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];
       if (!cd || !isSummonablePileCreature(cd)) continue;
+      if (!_platzierbar(engine, pi, n)) continue;
       const lvl = engine.effectiveCardLevel(cd, pi);
       if (lvl > maxLevel) continue;
       seen.add(n);

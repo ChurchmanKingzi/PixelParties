@@ -67,8 +67,9 @@ module.exports = {
     },
 
     /**
-     * Besiegungen. `onCreaturesDefeated` (Sammel-Hook, CARD_API „One or
-     * more of your Creatures are defeated") liefert die in EINEM
+     * Besiegungen. `onTargetsDefeated` (Sammel-Hook, W16b: Kreaturen UND
+     * Helden — „targets", A01-pollution-06; Vorläufer `onCreaturesDefeated`
+     * kannte nur Kreaturen) liefert die in EINEM
      * Vorgang besiegten Ziele EINMAL; die ersten vier solcher Ereignisse
      * pro Zug legen je einen Counter auf jede Uhr.
      *
@@ -78,7 +79,7 @@ module.exports = {
      * der die meisten Ziele verloren hat; bei Gleichstand der
      * Zugspieler.
      */
-    onCreaturesDefeated: async (ctx) => {
+    onTargetsDefeated: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const uhren = D.getDoomClocks(engine);
@@ -86,6 +87,8 @@ module.exports = {
 
       const defeated = ctx.defeated || [];
       if (defeated.length === 0) return;
+      // Ist die Partie schon entschieden (z. B. letzter Held eines Archer-Schusses, Welle 9), legt die Uhr nichts mehr.
+      if (gs.result || gs._endGameLaeuft) return;
 
       const bisher = gs._doomDefeatTriggers || 0;
       if (bisher >= D.DEFEAT_TRIGGERS_PER_TURN) return;

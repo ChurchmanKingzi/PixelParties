@@ -25,6 +25,7 @@
 'use strict';
 
 const { modelBase, debtTriggerCheck, debtChargesLeft } = require('./_debt-o-tron-shared');
+const { collectNonHeroBoardTargets } = require('./_targeting-shared');
 
 const CARD_NAME = 'Debt-O-Tron Model Scrap Plow';
 const MAX_PER_TURN = 1;
@@ -53,18 +54,10 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) return;
 
-      // „any card on the board that is not a Hero" — beide Seiten,
-      // Support- und Ability-Zonen, aber keine Helden.
-      const ziele = [];
-      for (const inst of (engine.cardInstances || [])) {
-        if (inst.zone !== 'support' && inst.zone !== 'ability') continue;
-        if (inst.faceDown) continue;
-        ziele.push({
-          id: `${inst.zone}-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
-          type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
-          slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
-        });
-      }
+      // „any card on the board that is not a Hero" — ★ W16b (A03-futuretech-16): derselbe gemeinsame Sammler wie Destructive Puppet Shishi /
+      // The Yeeting / Antonia (`collectNonHeroBoardTargets`): Support, Ability-Spitze, Permanent, AREA, verdeckte Surprise; IDs nach
+      // Brettseite (nicht Besitzer), Erst-Runden-Schutz. Vorher baute die Karte die Liste selbst und ließ alles außer Support/Ability weg.
+      const ziele = collectNonHeroBoardTargets(gs, engine);
       if (ziele.length === 0) return;
 
       const gewaehlt = await engine.promptEffectTarget(pi, ziele, {
@@ -79,7 +72,7 @@ module.exports = {
       const id = Array.isArray(gewaehlt) ? gewaehlt[0] : gewaehlt;
       if (!id) return;
       const ziel = ziele.find(t => t.id === id);
-      if (!ziel?.cardInstance) return;
+      if (!ziel?._cardInstance) return;
 
       // Erst JETZT verbuchen — der Spieler hat ein Ziel bestaetigt.
       // Vorher zog die Pruefung die Ladung sofort ab, ein Abbruch
@@ -95,7 +88,7 @@ module.exports = {
       // Standardziel; Karten, die den Zerstoerungsversuch abfangen
       // (Cool Rescuer Monia & Co.), duerfen das weiterhin.
       const quelle = { name: CARD_NAME, owner: pi, heroIdx: ctx.card?.heroIdx ?? -1 };
-      await engine.actionDestroyCard(quelle, ziel.cardInstance, {
+      await engine.actionDestroyCard(quelle, ziel._cardInstance, {
         fireCreatureDeath: true,
       });
       engine.log('debt_scrap_plow', {

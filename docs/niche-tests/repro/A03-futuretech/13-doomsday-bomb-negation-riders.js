@@ -29,7 +29,8 @@ const H = require('../../lib/h.js');
   t0.hero(0, 0).atk = 0; t0.hero(0, 0).baseAtk = 0;
   t0.targetFn = (v) => [v.find(x => x.owner === 1 && x.type === 'hero' && x.heroIdx === 0).id];
   await t0.play(0, 'Heavy Hit', { hero: 0 });
-  R.check('Held mit ATK 0: Heavy Hit trifft (gestunnt) UND Doomsday Bomb zündet (liegt danach in der Ablage)', !!(t0.hero(1, 0).statuses || {}).stunned && t0.pile(0, 'discardPile').filter(n => n === DB_).length === 2,
+  // ★ W16b: umgestellt auf die behobene Regel — auch der Angriff eines Helden mit ATK 0 „hits" seine Ziele: die Bombe zündet UND der Angriff ist negiert (kein Stun).
+  R.check('Held mit ATK 0: Doomsday Bomb zündet (liegt danach in der Ablage) und der negierte Heavy Hit stunnt nicht', !(t0.hero(1, 0).statuses || {}).stunned && t0.pile(0, 'discardPile').filter(n => n === DB_).length === 2,
     { stunned: !!(t0.hero(1, 0).statuses || {}).stunned, brett: t0.zone(0, 0, 0), ablage: t0.pile(0, 'discardPile') });
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });

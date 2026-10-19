@@ -28,7 +28,19 @@
 //     number" and "any number" includes zero).
 // ═══════════════════════════════════════════
 
-const { onSlipperyTurnStart, slipperyOnMoveGate, isSlipperyCard } = require('./_slippery-shared');
+const { onSlipperyTurnStart, slipperyOnMoveGate, isSlipperyCard, ARCHETYPE } = require('./_slippery-shared');
+
+/**
+ * ★ W16b (A02-deepsea-05): „If you discard at least 1 "Slippery" card" meint JEDE Slippery-Karte, nicht nur Kreaturen —
+ * Archetyp „Slippery" (Slippery Ice, Slippery Skates …) oder Namensbezug (Slippery Fridge trägt keinen Archetyp-Eintrag).
+ * `isSlipperyCard` bleibt Kreaturen-Helfer für die Beweger.
+ */
+function isSlipperyAnyCard(cardName, engine) {
+  if (!cardName) return false;
+  if (isSlipperyCard(cardName, engine)) return true;
+  const cd = engine._getCardDB()[cardName];
+  return cd?.archetype === ARCHETYPE || /^Slippery /.test(cardName);
+}
 
 const CARD_NAME = 'Slippery Snobbit';
 
@@ -70,7 +82,7 @@ module.exports = {
             source: CARD_NAME,
           });
           if (!ok) break;
-          if (isSlipperyCard(cardName, engine)) slipperyTouched = true;
+          if (isSlipperyAnyCard(cardName, engine)) slipperyTouched = true;
           n++;
           // Sync + stagger AFTER each discard so the client renders
           // this discard's hand→discard flight before the next one

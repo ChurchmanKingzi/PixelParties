@@ -94,6 +94,7 @@ module.exports = {
     onMill: (ctx) => zuschlagNachrechnen(ctx),
     onCreatureDeath: (ctx) => zuschlagNachrechnen(ctx),
     onTurnStart: (ctx) => zuschlagNachrechnen(ctx),
+    onFtAliasChanged: (ctx) => zuschlagNachrechnen(ctx),   // W16b (A03-futuretech-09): Prototypes/Alias-Wechsel ändert die Zählung sofort
 
     // Standard-Rücknahme. Der strenge Slot-Vergleich stellt sicher,
     // dass nur DIESES Exemplar beim Verlassen SEINER Zone abzieht.
