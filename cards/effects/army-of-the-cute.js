@@ -31,7 +31,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, isSummonablePileCreature } = require('./_hooks');
-const { heroHasCuteWings, isCuteCreatureCard } = require('./_cute-shared');
+const { heroHasCuteWings, isCuteCreatureCard, schoolLevelMitSupport } = require('./_cute-shared');
 
 const CARD_NAME = 'Army of the Cute';
 
@@ -51,7 +51,7 @@ function isArmyPick(engine, cd, pi, heroIdx, hs = pi) {
 
 /** Casting Hero's Summoning Magic level, clamped to [1, 3]. */
 function levelBudget(engine, pi, heroIdx) {
-  const sm = engine.heroSchoolLevel('Summoning Magic', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
+  const sm = schoolLevelMitSupport(engine, 'Summoning Magic', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0; W16c (A04-29): Xals Support-Stapel zaehlen mit
   return Math.max(1, Math.min(3, sm));
 }
 
