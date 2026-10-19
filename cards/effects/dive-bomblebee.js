@@ -144,6 +144,22 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     }
   }
 
+  // W16c (A05-20): das rohe Splice-and-Push umgeht `actionMoveCard`, das `beforeCreatureAffected` ('move') feuert - Schutzkarten
+  // (Winged Skeleton: "chosen by an opponent's card ... negate") muessen auch hier zum Zug kommen.
+  if (fromZone === 'support' && !istToken) {
+    const affCtx = {
+      creature: targetInst, effectType: 'move',
+      source: { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
+      cancelled: false, _skipReactionCheck: true,
+    };
+    await engine.runHooks('beforeCreatureAffected', affCtx);
+    if (affCtx.cancelled) {
+      engine.log('dive_bomblebee_blocked', { player: gs.players[pi]?.username, target: cardName, reason: 'creature protection' });
+      engine.sync();
+      return;
+    }
+  }
+
   // Cosmic Depths "removal of own CD Creature" hand-reaction window —
   // gives the target's owner a chance to negate the deck-bottom move
   // via Cosmic Malfunction. The helper returns `true` if cancelled.
