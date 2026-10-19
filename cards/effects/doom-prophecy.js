@@ -65,6 +65,9 @@ module.exports = {
 
       if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       const inst = engine._trackCard(D.CLOCK_NAME, ziel, 'deck');
+      // ★ W16b (A01-pollution-08, Welle 5 „Karten gehen zum permanenten Besitzer"): die Uhr kam aus MEINEM Deck — in der Gegnerzone
+      // bleibt `owner` = Zonen-Besitzer, `originalOwner` = Leger; Ablage/Gelöscht-Stapel lesen den Leger.
+      inst.originalOwner = pi;
       // Als Befund (A01-pollution-07): `placeArea` liest den aufloesenden Zauber
       // vom BESITZER der Area-Zone. Liegt die Uhr beim Gegner, ist dort keiner
       // → die Engine stempelt `_spellPlacedOnBoard` ("der Zauber liegt selbst
@@ -83,11 +86,15 @@ module.exports = {
       });
       engine.shuffleDeck?.(pi);
       engine.sync();
+      // ★ W16b (A01-pollution-13): Area-Limit (`areaLimitFor`, Ruling 14.9.) gilt auch für die per Effekt gelegte Uhr — der Zonen-Besitzer
+      // legt den Überhang ab (`enforceAreaLimit`, er wählt). Ist es die neue Uhr selbst, die geht, bleiben ihr die Startzähler erspart.
+      await engine.enforceAreaLimit(ziel, CARD_NAME);
+      engine.sync();
 
       // Die drei Startzaehler legt der ANWENDER — bei nur 3 Stueck kann
       // das noch niemanden das Spiel kosten, der Weg ist aber derselbe
       // wie ueberall (Hook feuert, Grenze wird geprueft).
-      for (let n = 0; n < START_COUNTERS; n++) {
+      for (let n = 0; n < START_COUNTERS && inst.zone === 'area'; n++) {
         const ende = await D.placeCounter(engine, inst, pi, { sourceName: CARD_NAME });
         if (ende) return;
       }

@@ -28841,8 +28841,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       const idx = gs.areaZones[ownerIdx].indexOf(cardName);
       if (idx >= 0) gs.areaZones[ownerIdx].splice(idx, 1);
     }
-    if (!ps.discardPile) ps.discardPile = [];
-    ps.discardPile.push(cardName);
+    // ★ W16b (A01-pollution-08, Welle 5: „Karten gehen immer zum permanenten Besitzer"): die Area liegt in der Zone des
+    // Zonen-Besitzers (`owner`), ihre KARTE gehoert aber dem Leger (`originalOwner`, z. B. Doom Prophecy in der Gegnerzone).
+    const _ablagePs = gs.players[cardInstance.originalOwner ?? ownerIdx] || ps;
+    if (!_ablagePs.discardPile) _ablagePs.discardPile = [];
+    _ablagePs.discardPile.push(cardName);
 
     this.log('area_removed', { player: ps.username, area: cardName, by: sourceName });
     // ★ Der Leave-Hook laeuft VOR dem Zonenwechsel (Als Befund 19.8.:
@@ -28912,9 +28915,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
     });
     cardInstance.zone = 'deleted';
-    if (!ps.deletedPile) ps.deletedPile = [];
-    this._geloeschtVerfolgen(ownerIdx);
-    ps.deletedPile.push(cardName);   // Push-Ueberlagerung meldet die Karte (`_geloeschtMeldung`)
+    // ★ W16b (A01-pollution-08): wie `removeArea` — der Gelöscht-Stapel des Kartenbesitzers (Leger), nicht der Zonen-Besitzer.
+    const _loeschIdx = cardInstance.originalOwner ?? ownerIdx;
+    const _loeschPs = gs.players[_loeschIdx] || ps;
+    if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+    this._geloeschtVerfolgen(_loeschIdx);
+    _loeschPs.deletedPile.push(cardName);   // Push-Ueberlagerung meldet die Karte (`_geloeschtMeldung`)
     this.syncAlleAtkAuren();
     this.sync();
     await this._delay(750);
