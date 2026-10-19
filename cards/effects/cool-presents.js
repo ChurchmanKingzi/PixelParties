@@ -156,9 +156,18 @@ module.exports = {
     // engine's standard post-resolve cleanup uses `getResolvingHandIndex`
     // (name lookup), so the artifact's discard still lands correctly.
     const sorted = [...targets].sort((a, b) => b.handIndex - a.handIndex);
+    // W16d (A08-31): EIN Hand-Interaktionsfenster (Ambush the Scout) für das ganze Geben, wie Live Show – ein Effekt, eine Frage.
+    // Wird er negiert, ist der Preis bezahlt und nichts wird verschenkt.
+    if (await engine.checkHandInteractionReaction(oi, 'insert',
+          { byPi: pi, count: sorted.length, sourceName: CARD_NAME })) {
+      engine.log('cool_presents_resolve', { player: ps.username, gifted: 0, cost: totalCost, negated: true });
+      engine.sync();
+      return;
+    }
     for (const t of sorted) {
       const ok = await engine.actionTransferCardToOppHand(pi, t.handIndex, {
         source: CARD_NAME,
+        windowChecked: true,
       });
       if (!ok) break; // opp.handLocked mid-loop — bail.
       await engine._delay(150);

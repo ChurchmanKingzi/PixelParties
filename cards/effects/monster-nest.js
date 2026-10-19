@@ -39,6 +39,8 @@
 
 const { isPileCreature, isArtifactCreature, ZONES } = require('./_hooks');
 const nest = require('./_nest-shared');
+const { loadCardEffect } = require('./_loader');
+const multizone = require('./_multizone-shared');
 
 const CARD_NAME = 'Monster Nest';
 const MAX_LEVEL = 3;
@@ -57,7 +59,7 @@ const MAX_LEVEL = 3;
  * Riegel in `summonCreatureWithHooks` wuerde sie ohnehin abweisen —
  * die Galerie soll aber gar nicht erst luegen.
  */
-function eligibleFromDeck(engine, pi) {
+function eligibleFromDeck(engine, pi, nestInst = null) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
   const cardDB = engine._getCardDB();
@@ -68,6 +70,16 @@ function eligibleFromDeck(engine, pi) {
     if (!isPileCreature(cd)) continue;
     if (isArtifactCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
+    const skript = loadCardEffect(cn);
+    // W16d (C03-11): „cannot be summoned from anywhere, except your hand" (Ifrit) - das Nest beschwört aus dem Deck.
+    if (skript?.summonOnlyFromHand) continue;
+    // W16d (C03-19): eine Mehrzonen-Kreatur (Land Sharks: „occupies 3 Support Zones") braucht ihre weiteren Zonen FREI - der
+    // eigene Platz (hier das Nest) zählt mit, die Nachbarn nicht, wenn sie belegt sind.
+    if (skript?.multiZone && nestInst) {
+      const seite = engine.physicalSide(nestInst);
+      const frei = multizone.freieZonen(engine, seite, nestInst.heroIdx, cn, null).length;
+      if (frei + 1 < skript.multiZone) continue;
+    }
     zaehler.set(cn, (zaehler.get(cn) || 0) + 1);
   }
   return [...zaehler.entries()]
@@ -94,7 +106,7 @@ module.exports = {
     // (`reactivateCreatureEffect`, v752).
     if (inst.zone !== 'support') return false;
     if (inst.counters?._nestCoverId) return false;
-    return eligibleFromDeck(engine, ctx.cardOwner).length > 0;
+    return eligibleFromDeck(engine, ctx.cardOwner, inst).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -104,7 +116,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (!ps || inst.zone !== 'support') return false;
 
-    const gallery = eligibleFromDeck(engine, pi);
+    const gallery = eligibleFromDeck(engine, pi, inst);
     if (gallery.length === 0) return false;
 
     const picked = await engine.promptGeneric(pi, {
