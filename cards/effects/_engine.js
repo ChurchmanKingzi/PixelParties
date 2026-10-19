@@ -15747,6 +15747,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.skipHooks) {
       // "Place" semantics: a placed Creature targets ANY Hero's Support
       // Zone (own/opp, alive/dead/Frozen/Stunned/negated/Bound) and
+    // ★ W16b (A01-pollution-22): optionaler Haken zwischen Landung und Einsatz-Effekten — für Beschwörungen, die die Kreatur NEGIEREN
+    // müssen, bevor ihr `onPlay` läuft (Soul Shard Ka: „… summon it …, but negate its effects", wie Necromancy). Rein additiv.
+    if (typeof opts._vorHooks === 'function') await opts._vorHooks(inst, actualSlot);
+
       // bypasses the normal-summoning gates that block plays onto an
       // incapacitated Hero. Caller signals this via `opts.isPlacement`
       // when the source card's text says "place"; the flag forces the

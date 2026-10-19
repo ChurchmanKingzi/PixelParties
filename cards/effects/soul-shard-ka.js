@@ -191,6 +191,15 @@ module.exports = {
             _summonedBySoulShard: true,
             _isNormalSummon: false,
           },
+          // ★ W16b (A01-pollution-22, Text „… but negate its effects until the end of the turn"; Muster Necromancy): die Negation steht VOR
+          // dem Einsatz-Effekt der gesuchten Kreatur — `runHooks` überspringt negierte Kreaturen, ihr `onPlay` (Archer: 4 Gold,
+          // Sleeping Beauty: Verknüpfung …) unterbleibt.
+          _vorHooks: (placed) => engine.actionNegateCreature(placed, CARD_NAME, {
+            expiresAtTurn: gs.turn + 1,
+            expiresForPlayer: engine.opponentOf(pi),
+            buffKey: 'soul_shard_ka_negated',
+            selfInflicted: true,
+          }),
         },
       );
       if (!placeRes) {
@@ -213,15 +222,8 @@ module.exports = {
         zoneSlot: placeRes.actualSlot, cardName: chosenName,
       });
 
-      // Negate the placed Creature's effects until end of THIS turn —
-      // expires when opp's next turn starts.
+      // (Negation: siehe `_vorHooks` oben — sie steht jetzt VOR dem Einsatz-Effekt.)
       const oi = engine.opponentOf(pi);
-      await engine.actionNegateCreature(placeRes.inst, CARD_NAME, {
-        expiresAtTurn: gs.turn + 1,
-        expiresForPlayer: oi,
-        buffKey: 'soul_shard_ka_negated',
-        selfInflicted: true,
-      });
 
       await engine.runHooks('onActionUsed', {
         actionType: 'creature', source: CARD_NAME, playerIdx: pi,
