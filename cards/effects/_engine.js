@@ -14677,7 +14677,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     // play_pile_transfer-Handler), es wurde nur nie genutzt.
     const pileOwner = this._handCardPileOwner(playerIdx, cardName);
     const pilePs = this.gs.players[pileOwner] || ps;
+    const _ablageLaenge = pilePs.discardPile.length;
     pilePs.discardPile.push(cardName);
+    // W16c (A04-25): Wildur leitet den Push auf den Coolness Stack um (Ablage waechst nicht) und legt dort eine EIGENE Instanz an -
+    // die Hand-Instanz darf nicht als Waise in Zone 'discard' zurueckbleiben (Abraeumen nach den On-Discard-Hooks).
+    const _umgeleitet = pilePs.discardPile.length === _ablageLaenge;
     // Expliziter Per-Karte-Flug vom exakten Hand-Slot (v696, gleiches
     // Muster wie actionPromptForceDiscard / actionDiscardCardsAnimated):
     // Broadcast VOR dem sync, damit der Client das Slot-Rect fängt,
@@ -14747,11 +14751,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     // resolve both Marble draws). Standalone calls (no wrapper)
     // fire the hook immediately — single-discard semantics
     // unchanged.
+    const _waiseAbraeumen = () => {
+      if (_umgeleitet && inst && inst.zone === ZONES.DISCARD && this.cardInstances.includes(inst)) this._untrackCard(inst.id);
+    };
     if ((this.gs._batchDiscardDepth || 0) > 0) {
       if (!this.gs._batchDiscardPendingHooks) this.gs._batchDiscardPendingHooks = [];
       this.gs._batchDiscardPendingHooks.push({ hookName: HOOKS.ON_DISCARD, ctx: discardCtx });
+      if (_umgeleitet) this.gs._batchDiscardPendingHooks.push({ fn: _waiseAbraeumen });
     } else {
       await this.runHooks(HOOKS.ON_DISCARD, discardCtx);
+      _waiseAbraeumen();
     }
     return true;
   }
@@ -17188,6 +17197,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete this.gs._batchDiscardPendingHooks;
     for (const entry of pending) {
       try {
+        if (entry.fn) { entry.fn(); continue; }   // W16c: Aufraeum-Eintrag (Wildur-Waise)
         await this.runHooks(entry.hookName, entry.ctx);
       } catch (err) {
         console.error(`[discard batch] deferred ${entry.hookName} failed:`, err.message);
@@ -50293,6 +50303,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (dest === 'hand') {
       ps.hand.push(cardName);
       if (inst) inst.zone = ZONES.HAND;
+      this._autoRevealOnEnterHand(playerIdx, ps.hand.length - 1, cardName);   // W16c (A04-12): "add it to your hand" deckt auf (Elephant), wie jeder Hand-Zugang
       toZone = ZONES.HAND;
     } else if (dest === 'discard') {
       ps.discardPile.push(cardName);
