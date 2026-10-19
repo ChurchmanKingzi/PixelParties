@@ -133,27 +133,33 @@ module.exports = {
       if (!picked || picked.cancelled || !picked.cardName) return;
 
       const chosenName = picked.cardName;
-      // Find which pile the chosen card came from. Players sometimes
-      // hold the same name in both — prefer deck (then shuffle), fall
-      // back to discard. Matches the standard tutor convention.
+      // Find which pile the chosen card came from.
+      // ★ W16b (A02-deepsea-18): die Galerie bietet eine Kachel je Quelle (Deck / Ablage); die gewählte Quelle gilt (`picked.source`).
+      // Nur ohne Quellenangabe (Skript-/CPU-Antwort) gilt wie früher der Namensrückfall: erst Deck (dann mischen), dann Ablage.
+      const vonAblage = picked.source === 'discard';
       let removedFromDeck = false;
-      // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt
-      // (nur, wenn die Karte aus dem DECK kommt — die Ablage ist keine Deck-Suche).
-      const kratesNamen = new Set(gallery.map(g => g.name));
-      if (await engine.interceptDeckSearch(pi, chosenName, {
-        source: CARD_NAME, searchSpec: { label: 'Creature', filter: (cd, n) => kratesNamen.has(n) },
-      })) {
-        engine.shuffleDeck(pi);
-        engine.log('slippery_narw_tutor', { player: ps?.username, creature: chosenName, from: 'deck', krates: true });
-        engine.sync();
-        return;
+      if (!vonAblage) {
+        // Krates, the Smartass & Co.: Suche des Gegners umgebaut → Karten bereits verteilt
+        // (nur, wenn die Karte aus dem DECK kommt — die Ablage ist keine Deck-Suche).
+        const kratesNamen = new Set(gallery.map(g => g.name));
+        if (await engine.interceptDeckSearch(pi, chosenName, {
+          source: CARD_NAME, searchSpec: { label: 'Creature', filter: (cd, n) => kratesNamen.has(n) },
+        })) {
+          engine.shuffleDeck(pi);
+          engine.log('slippery_narw_tutor', { player: ps?.username, creature: chosenName, from: 'deck', krates: true });
+          engine.sync();
+          return;
+        }
       }
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
-      if (_taken_deckIdx) {
-        removedFromDeck = true;
+      const _ausDeck = () => engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
+      const _ausAblage = () => engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });
+      const _erste = vonAblage ? _ausAblage : _ausDeck;
+      if (await _erste()) {
+        removedFromDeck = !vonAblage;
+      } else if (await (vonAblage ? _ausDeck : _ausAblage)()) {
+        removedFromDeck = vonAblage;
       } else {
-        const _taken_dIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
-        if (!_taken_dIdx) return;
+        return;
       }
 
       await engine.revealSearchedCards(pi, [chosenName], CARD_NAME);
