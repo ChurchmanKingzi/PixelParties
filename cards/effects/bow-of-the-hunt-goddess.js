@@ -28,7 +28,9 @@
 //     keine Artefakt-/Item-/Such-/Stapelsperre); sonst bleibt er stumm.
 //   • „Once per turn" gilt je Bow (Kopie), Stempel beim tatsächlichen
 //     Einsatz; bricht der Spieler die Pfeilwahl ab, bleibt er frei. Wird
-//     der gespielte Pfeil danach negiert, bleibt der Stempel (gespielt).
+//     der gespielte Pfeil danach NEGIERT (oder fizzelt), geht der Stempel
+//     zurück (W19c, Al): der Bow darf im selben Zug erneut; die Kosten des
+//     Pfeils bleiben bezahlt, der Pfeil geht in die Ablage.
 //   • Nach der Suche wird das Deck gemischt (Such-Konvention).
 // ═══════════════════════════════════════════
 
@@ -112,5 +114,11 @@ module.exports = {
   equipReactionCommit(engine, pi, inst) {
     if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
     engine.gs.hoptUsed[`${stempelKey(inst)}:${pi}`] = engine.gs.turn;
+  },
+
+  /** W19c (Al): der gespielte Pfeil wurde negiert (oder fizzelt) -> der Einsatz zählt nicht, „once per turn" ist wieder frei. */
+  equipReactionRefund(engine, pi, inst) {
+    const h = engine.gs.hoptUsed;
+    if (h && h[`${stempelKey(inst)}:${pi}`] === engine.gs.turn) delete h[`${stempelKey(inst)}:${pi}`];
   },
 };

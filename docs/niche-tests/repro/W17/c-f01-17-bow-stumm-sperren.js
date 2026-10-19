@@ -90,7 +90,7 @@ const nichts = (t, deckLen, was) => ({ kein: !t.prompts.some(istBowPrompt), deck
     R.check('Zustand sauber, keine Engine-Fehler', t.audit().length === 0 && t.errors.length === 0, { a: t.audit(), e: t.errors });
   }
 
-  R.section('Negation des Bow-Pfeils (Rusty Touch): Pfeil in der Ablage, Stempel bleibt');
+  R.section('Negation des Bow-Pfeils (Rusty Touch): Pfeil in der Ablage, Stempel zurück (W19c, Al: „Nicht verbrauchen")');
   {
     const s = await aufbau({ hand1: ['Rusty Touch'] }); const { t } = s;
     t.put(0, 0, 0, BOW); t.grantFor(1, 0, 'Rusty Touch');
@@ -100,7 +100,8 @@ const nichts = (t, deckLen, was) => ({ kein: !t.prompts.some(istBowPrompt), deck
     R.check('Rusty Touch negierte den Pfeil: Pfeil in der Ablage, nicht gebrannt', t.pile(0, 'discardPile').includes('Flame Arrow') && !t.gs.players[1].heroes[0].statuses?.burned, { d: t.pile(0, 'discardPile'), st: t.gs.players[1].heroes[0].statuses });
     t.reset(); t.addHand(0, 'Attack');
     await t.play(0, 'Attack', { hero: 0 });
-    R.check('der negierte Pfeil zählt als gespielt: Bow im selben Zug verbraucht', !t.prompts.some(istBowPrompt), t.prompts.map(p => p.d.title));
+    // W19c (Al, Welle 19): die ALTE Regel (W17c: negierter Pfeil verbraucht den Einsatz) ist umgestellt — der Bow ist im selben Zug wieder frei.
+    R.check('der negierte Pfeil verbraucht den Einsatz NICHT: Bow im selben Zug wieder angeboten (W19c)', t.prompts.some(istBowPrompt), t.prompts.map(p => p.d.title));
     R.check('Zustand sauber, keine Engine-Fehler', t.audit().length === 0 && t.errors.length === 0, { a: t.audit(), e: t.errors });
   }
 

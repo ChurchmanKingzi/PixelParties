@@ -40366,6 +40366,8 @@ this._deathWatch = (this._deathWatchStack || []).length
           goldCost: pCost, wisdomCost: 0,
           isInitialCard: false, negated: false, chainClosed: false,
           fromDeck: pPile === 'deck', fromEquip: eInst.id,
+          // W19c (Al): wird dieses Glied negiert/fizzelt, gibt die Ausruestung ihren Einmal-Stempel zurueck (Kosten bleiben bezahlt).
+          _equipRefund: typeof script.equipReactionRefund === 'function' ? () => script.equipReactionRefund(this, pi, eInst, pick) : null,
           resolve: pScript?.resolve
             ? async (ch, idx) => pScript.resolve(engine, reactionOwner, null, null, ch, idx)
             : null,
@@ -40713,6 +40715,12 @@ this._deathWatch = (this._deathWatchStack || []).length
             card: link.cardName, player: this.gs.players[link.owner]?.username,
             hero: this.gs.players[_wo]?.heroes?.[_whi]?.name || null, reason: link.fizzleReason,
           });
+        }
+        // W19c (Al, Bow of the Hunt Goddess): das vom Bow gespielte Glied wurde negiert/fizzelt -> der Einmal-Stempel der Ausruestung
+        // geht zurueck (Z7b-Leitfrage „durfte die Karte resolven?"); Kosten und Kartenbewegung bleiben, wie bei jedem negierten Glied.
+        if (link.fromEquip && typeof link._equipRefund === 'function') {
+          try { link._equipRefund(); }
+          catch (err) { console.error(`[Engine] equipReactionRefund for ${link.cardName} failed:`, err.message); }
         }
         await this._delay(600);
 
