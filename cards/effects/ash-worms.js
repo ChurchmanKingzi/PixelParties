@@ -28,6 +28,13 @@ const HOPT_KEY = 'ash-worms';
 module.exports = {
   activeIn: ['support'],
 
+  // W16d (C01-02): „You can only summon 1 "Ash Worms" per turn" gilt für JEDEN Eintritt aufs Brett (Handspiel, Rettung, Platzieren) –
+  // gleiche Regel wie Mausoleum Worm (Al, Welle 11/12, Q80: „Für alle Wege kombiniert", Engine-Vertrag `playLimitKey`).
+  playLimitKey: HOPT_KEY,
+  canSummon(ctx) {
+    return !ctx._engine._eintrittsLimitErreicht(CARD_NAME, ctx.cardOwner);
+  },
+
   /** CPU: das Angebot immer annehmen (kostenlos, zieht eine Karte). */
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic' || promptData?.title !== CARD_NAME) return undefined;
@@ -41,7 +48,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
     if (!ps || gs.result) return;
-    if (gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === gs.turn) return;   // 1 je Zug
+    if (engine._eintrittsLimitErreicht(CARD_NAME, pi)) return;   // 1 je Zug (alle Eintrittswege, W16d)
 
     const zonen = eligibleSummonZones(engine, pi, CARD_NAME, { nachKontrolle: true });
     if (zonen.length === 0) return;

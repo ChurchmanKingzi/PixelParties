@@ -23,7 +23,7 @@ const H = require('../../lib/h.js');
   t.targetFn = (v) => [v.find(x => x.cardName === 'Dragolfin').id];
   t.gs.activePlayer = 0; t.phase(2);
   await t.activateCreature(0, 0, 0);
-  R.check('Vorbedingung: Dragolfin trägt den Baihu-Marker', !!drag.counters._baihuStunned, drag.counters);
+  R.check('Vorbedingung: Dragolfin trägt den Baihu-Marker', !!(drag.counters._baihuStunned || drag.counters._petrified), drag.counters);   // W16d: seit dem Fix hängt der Marker `_petrified` am echten Stun
   R.check('versteinerte Kreatur trägt das Stunned-Flag', !!drag.counters.stunned, drag.counters);
 
   await t.endTurn();                                               // Zug 6: Sitz 1
@@ -38,7 +38,7 @@ const H = require('../../lib/h.js');
   t.gs.hoptUsed = {};
   t.targetFn = (v) => [v.find(x => x.cardInstance && x.cardInstance.id === immun.id).id];
   await t.activateCreature(0, 0, 0);
-  R.check('Ziel mit stun_immune wird NICHT versteinert (Stun haftet nicht → kein „takes no damage")', !immun.counters._baihuStunned && !immun.counters._baihuPetrify, immun.counters);
+  R.check('Ziel mit stun_immune wird NICHT versteinert (Stun haftet nicht → kein „takes no damage")', !immun.counters._baihuStunned && !immun.counters._baihuPetrify && !immun.counters._petrified && !immun.counters.stunned, immun.counters);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

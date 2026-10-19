@@ -129,7 +129,7 @@ module.exports = {
     // ★ v1328: auch gefizzelt (Arthor waehrend der Kette handlungsunfaehig).
     if (attackResult?.negated || attackResult?.fizzled) {
       delete gs._spellDamageLog;
-      clearArmedArrows(engine, pi);
+      await clearArmedArrows(engine, pi);
       return true;
     }
 
@@ -158,7 +158,7 @@ module.exports = {
     // for normal Spell/Attack plays via doPlaySpell, but the hero-
     // effect path doesn't go through there, so we clean up manually.
     // Idempotent: no-op if no arrows were armed.
-    clearArmedArrows(engine, pi);
+    await clearArmedArrows(engine, pi);
 
     engine.log('arthor_ascended_strike', {
       player: ps.username, target: target.cardName, damage: DAMAGE,

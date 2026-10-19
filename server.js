@@ -5828,7 +5828,7 @@ function sendGameState(room, playerIdx, extra) {
       const ps2 = gs.players[playerIdx];
       const result = [];
       for (const inst of room.engine.cardInstances) {
-        if (inst.owner !== playerIdx || inst.zone !== 'surprise' || !inst.ushabtiPlaced) continue;
+        if ((inst.ushabtiSide ?? inst.owner) !== playerIdx || inst.zone !== 'surprise' || !inst.ushabtiPlaced) continue;   // W16d (A08-17): Seite der Zone, nicht der Besitzer
         if (inst.ushabtiTurn >= currentTurn) continue; // Can't summon same turn
         const hi = inst.heroIdx;
         const hero = ps2?.heroes?.[hi];
@@ -8379,7 +8379,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         // Drop any arrows armed for this negated attack — otherwise a
         // follow-up attack this turn would inherit them.
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
-        clearArmedArrows(room.engine, pi);
+        await clearArmedArrows(room.engine, pi);
       } else if (cardData.cardType === 'Spell') {
         ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
       }
@@ -8491,7 +8491,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // (sonst verstaerken sie den naechsten Angriff – „THAT Attack's damage").
       if (cardData.cardType === 'Attack') {
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
-        clearArmedArrows(room.engine, pi);
+        await clearArmedArrows(room.engine, pi);
       }
       // Roll back ALL action-economy bookkeeping — the Spell never
       // resolved, so the Action resource wasn't actually spent. Without
@@ -8666,7 +8666,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // when nothing is armed.
     if (cardData.cardType === 'Attack') {
       const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
-      clearArmedArrows(room.engine, pi);
+      await clearArmedArrows(room.engine, pi);
     }
 
     await room.engine.resolveDeferredRecoil();
@@ -15245,9 +15245,7 @@ io.on('connection', (socket) => {
     const sz = ps.surpriseZones?.[heroIdx] || [];
     if (sz.length === 0) return;
     const cardName = sz[0];
-    const inst = room.engine.cardInstances.find(c =>
-      c.owner === pi && c.zone === 'surprise' && c.heroIdx === heroIdx && c.ushabtiPlaced
-    );
+    const inst = room.engine.ushabtiEingelagert(pi, heroIdx);   // W16d (A08-17): Seite der Zone, nicht der Besitzer
     if (!inst) return;
     const currentTurn = gs.turn || 0;
     if (inst.ushabtiTurn >= currentTurn) return; // Can't summon same turn
@@ -15294,6 +15292,7 @@ io.on('connection', (socket) => {
     inst.faceDown = false;
     delete inst.ushabtiPlaced;
     delete inst.ushabtiTurn;
+    delete inst.ushabtiSide;
     inst.turnPlayed = currentTurn;
 
     room.engine.notePlayedFromHand(pi);

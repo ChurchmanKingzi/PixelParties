@@ -75,9 +75,10 @@ function areaLiegt(gs) {
   return (gs.areaZones || []).some(z => (z || []).length > 0);
 }
 
-function kontrolliertSpirit(engine, pi) {
+function kontrolliertSpirit(engine, pi, ausserId = null) {
   return (engine.cardInstances || []).some(c =>
     c.zone === 'support' && !c.faceDown
+    && c.id !== ausserId
     && (c.counters?._effectOverride || c.name) === SPIRIT
     && (c.controller ?? c.owner) === pi);
 }
@@ -108,10 +109,11 @@ function handLevelAbgleichen(engine) {
 }
 
 /** ④ Haste nachziehen, solange ein Spirit steht. */
-function hasteAbgleichen(engine, inst) {
+function hasteAbgleichen(engine, inst, ausserId = null) {
   if (!inst || inst.zone !== 'support') return;
   const pi = inst.controller ?? inst.owner;
-  if (kontrolliertSpirit(engine, pi)) {
+  // `ausserId`: der Spirit, der GERADE geht (W16d, C01-09) - zur Hook-Zeit steht seine Instanz noch als 'support'.
+  if (kontrolliertSpirit(engine, pi, ausserId)) {
     if (!inst.counters) inst.counters = {};
     inst.counters._hasHaste = 1;
   } else if (inst.counters?._hasHaste && inst.turnPlayed === engine.gs.turn) {
@@ -198,7 +200,10 @@ module.exports = {
     // Der Kill-Stempel selbst kommt aus der Engine; hier wird nur das
     // Handlevel nachgezogen, sobald sich etwas geaendert haben kann.
     onHeroKO: async (ctx) => { handLevelAbgleichen(ctx._engine); },
-    onCreatureDeath: async (ctx) => { handLevelAbgleichen(ctx._engine); },
+    onCreatureDeath: async (ctx) => {
+      handLevelAbgleichen(ctx._engine);
+      if (ctx.creature?.name === SPIRIT) hasteAbgleichen(ctx._engine, ctx.card, ctx.creature.instId);   // W16d (C01-09): stirbt der Spirit, fällt die Haste sofort
+    },
 
     // ── Handlevel und Haste aktuell halten ───────────────────────
     onTurnStart: async (ctx) => {
@@ -226,6 +231,9 @@ module.exports = {
 
     onCardLeaveZone: async (ctx) => {
       handLevelAbgleichen(ctx._engine);
+      // W16d (C01-09): verlässt der Spirit das Brett (Zerstörung, Diebstahl), fällt die Haste sofort - nicht erst zum nächsten Phasenstart.
+      const geht = ctx.leavingCard || ctx.card;
+      if (geht && geht.id !== ctx.card?.id && (geht.counters?._effectOverride || geht.name) === SPIRIT) hasteAbgleichen(ctx._engine, ctx.card, geht.id);
     },
 
     // Weitere Auffrischpunkte: eine frisch gezogene Kopie und das Ende

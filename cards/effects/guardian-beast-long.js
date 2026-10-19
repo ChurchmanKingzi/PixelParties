@@ -38,6 +38,8 @@ function countBurnedTargets(engine) {
   }
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
+    // W16d (A07-10): nur Kreaturen zählen (Ausrüstung ist kein „target on the board")
+    if (!engine.isChoosableAsCreature(inst, engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name])) continue;
     if (inst.counters?.burned) n++;
   }
   return n;

@@ -273,7 +273,7 @@ async function bonusOppDiscards2(ctx, engine, pi) {
 async function bonusDeal50x3(ctx, engine, pi) {
   const target = await ctx.promptDamageTarget({
     side: 'any', types: ['hero', 'creature'],
-    damageType: 'destruction_spell', baseDamage: 50,
+    damageType: 'creature', baseDamage: 50,   // W16d (A09-08): Kreatureneffekt, kein Zauber (Dark Ocean blockt ihn)
     title: 'Infernous Demon',
     description: 'Deal 50 damage to a target 3 times.',
     confirmLabel: '🔥 Burn! (50×3)', confirmClass: 'btn-danger', cancellable: true,
@@ -296,7 +296,7 @@ async function bonusDeal50x3(ctx, engine, pi) {
         type: 'explosion', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
       });
       await engine._delay(300);
-      await engine.actionDealDamage(sourceMeta, hero, 50, 'destruction_spell');
+      await engine.actionDealDamage(sourceMeta, hero, 50, 'creature');
     } else {
       const inst = target.cardInstance || engine.kreaturAnBrett(target.owner, target.heroIdx, target.slotIdx);   // Z1: Brettseite
       if (!inst || inst.zone !== 'support') break;
@@ -305,7 +305,7 @@ async function bonusDeal50x3(ctx, engine, pi) {
       });
       await engine._delay(300);
       await engine.processCreatureDamageBatch([{
-        inst, amount: 50, type: 'destruction_spell', source: ctx.card, sourceOwner: pi,
+        inst, amount: 50, type: 'creature', source: ctx.card, sourceOwner: pi,
       }]);
     }
     // Render THIS hit's -50 before pacing into the next explosion.

@@ -156,6 +156,9 @@ module.exports = {
       sourceName: CARD_NAME,
       countAsSummon: false,
       animationType: 'summon',
+      // W16d (A07-27): „negate its effects" gilt wie bei Necromancy/The Master's Key schon für den Einsatz-Effekt
+      // (Soul-Shard-Texte: „effects don't get negated when summoned by Necromancy") – Negation VOR den Eintritts-Hooks.
+      negateEffects: true,
     });
     if (!res?.inst) return false;
 
@@ -166,11 +169,6 @@ module.exports = {
     // lockstep with the buff. `negated_placement` parallels the flag
     // `actionPlaceCreature` would set under `negateEffects: true`,
     // keeping placement-style negate state consistent.
-    await engine.applyCreatureStatus(res.inst, 'negated', {
-      sourceOwner: pi,
-      source: CARD_NAME,
-      keinStatus: true,   // „negate its effects until …" — kein Statuseffekt, nicht heilbar
-    });
     res.inst.counters.negated_placement = 1;
     await engine.actionAddCreatureBuff(res.inst, NEGATED_BUFF, {
       // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2.

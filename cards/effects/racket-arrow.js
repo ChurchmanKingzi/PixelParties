@@ -74,6 +74,7 @@ module.exports = {
       cancellable: false, // Discard already paid (artifact consumed on reaction-add).
       exclusiveTypes: true,
       maxPerType: { equip: 1 },
+      types: ['creature'],   // W16d (A09-03): Kreatur-only -> „unaffected by effects that can't affect Heroes" (Bonded Companion) fällt heraus
     });
     if (!picked || picked.length === 0) return false;
     const target = targets.find(t => t.id === picked[0]);

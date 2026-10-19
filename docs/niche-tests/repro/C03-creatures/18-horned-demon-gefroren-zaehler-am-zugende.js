@@ -4,7 +4,10 @@
 // Konvention (B-querschnitt B-01…B-03): eine gefrorene/betäubte Kreatur verliert ihre Effekte (`isCreatureEffectSuppressed`).
 // Aufbau: Sitz 0: Horned Demon (alt, 1 Counter). Sitz 1 friert/betäubt ihn in SEINEM Zug (realistisch: Status hält über den ganzen nächsten Zug von Sitz 0).
 //   Dann Zug von Sitz 0: Demon kann nicht aktiviert werden (✓ gefroren); Zugende von Sitz 0.
-// Erwartung: Zähler bleibt unverändert (der Demon war den ganzen Zug gefroren/betäubt).
+// Erwartung (ursprünglich): Zähler bleibt unverändert (der Demon war den ganzen Zug gefroren/betäubt).
+// ★ W16d (Repro überholt): Al hat das in Welle 3 entschieden - „End-of-turn-Trigger nach Frozen/Stunned dürfen feuern, nachdem der Status
+//   abgelaufen ist → Ist-Zustand GEWOLLT (C03-18, A03-28, H04-14 = kein Fehler)" (FIXES-WELLE-3.md); Welle 7 bestätigt: „Zugende-Trigger nach Ablauf bleiben".
+//   Das Repro misst deshalb jetzt den gewollten Zustand: der Counter kommt am Zugende (+1).
 // Beobachtet: Zähler +1. Reihenfolge in der End-Phase (_engine.js ~22923 vs. ~23479): erst `processStatusExpiry('END')` (Frost/Betäubung fallen),
 //   DANACH laufen die onTurnEnd-Hooks – der Demon ist beim Hook nicht mehr gefroren. (Gegenprobe Mimic: Zugbeginn-Hook, gefroren ⇒ kein Klau ✓.)
 const H = require('../../lib/h.js');
@@ -23,7 +26,7 @@ const H = require('../../lib/h.js');
     R.check(status + ': Aktivierung abgewiesen', r === false, r);
     const vorher = demon.counters.demonCounter;
     await t.endTurn();                                    // Zugende von Sitz 0
-    R.check(status + ': kein neuer Counter am Zugende (erwartet ' + vorher + ')', demon.counters.demonCounter === vorher, demon.counters.demonCounter);
+    R.check(status + ': Counter am Zugende nach Ablauf des Status (gewollt, Al Welle 3; erwartet ' + (vorher + 1) + ')', demon.counters.demonCounter === vorher + 1, demon.counters.demonCounter);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   R.finish();

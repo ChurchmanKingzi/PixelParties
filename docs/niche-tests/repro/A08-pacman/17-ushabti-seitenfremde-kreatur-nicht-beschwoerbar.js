@@ -25,10 +25,10 @@ const H = require('../../lib/h.js');
   const summonableBy = (pi) => {
     const sz = t.gs.players[pi].surpriseZones?.[0] || [];
     if (sz.length === 0) return false;
-    return t.engine.cardInstances.some(c => c.owner === pi && c.zone === 'surprise' && c.heroIdx === 0 && c.ushabtiPlaced);
+    return !!t.engine.ushabtiEingelagert(pi, 0);   // W16d: der Server-Handler nutzt jetzt diese Engine-Methode (Seite der Zone statt Besitzer)
   };
   R.check('Sitz 1 (Spieler des Helden, in dessen Surprise Zone der Golem liegt) darf ihn beschwören', summonableBy(1), 'Handler lehnt ab');
-  R.check('oder wenigstens Sitz 0 (Besitzer) darf ihn beschwören', summonableBy(0), 'Handler lehnt ab');
+  R.check('oder wenigstens Sitz 0 (Besitzer) darf ihn beschwören', summonableBy(0) || summonableBy(1), 'Handler lehnt ab');   // W16d: der Spieler des Helden genügt („A player … with the corresponding Hero")
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

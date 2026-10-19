@@ -74,6 +74,7 @@ module.exports = {
       cancellable: true,
       exclusiveTypes: true,
       maxPerType: { equip: 1 },
+      types: ['creature'],   // W16d (A09-03): Kreatur-only -> „unaffected by effects that can't affect Heroes" (Bonded Companion) fällt heraus
     });
     if (!picked || picked.length === 0) { engine.sync(); return; }
     const target = targets.find(t => t.id === picked[0]);
@@ -86,7 +87,7 @@ module.exports = {
 
     await engine.actionDealCreatureDamage(
       { name: CARD_NAME, owner: pi, heroIdx: -1 },
-      target.cardInstance, BOMB_DAMAGE, 'destruction_spell',
+      target.cardInstance, BOMB_DAMAGE, 'artifact',   // W16d (A09-08): Artefaktschaden, kein Zauber – Dark Ocean (Ruling 5.8.: nur attack/destruction_spell) blockt ihn
       { sourceOwner: pi, canBeNegated: true },
     );
     engine.log('bomb_arrow_creature_hit', {

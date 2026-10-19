@@ -528,6 +528,9 @@ function buildAllBoardTargets(engine, opts = {}) {
     if (!cd) continue;
     if (opts.excludeInstId === inst.id) continue;
     if (typeof opts.excludeName === 'string' && inst.name === opts.excludeName) continue;
+    // W16d (A07-10): „targets on the board" = Helden und KREATUREN (Konvention wie Kohta, CARD_API) – Ausrüstung,
+    // Anhängsel & Co. in den Support Zones sind keine Ziele (Artifact Creatures zählen als Kreatur).
+    if (!engine.isChoosableAsCreature(inst, cd)) continue;
     if (typeof opts.creaturesOnly === 'function' && !opts.creaturesOnly(inst, cd)) continue;
     out.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',

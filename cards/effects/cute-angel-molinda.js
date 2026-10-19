@@ -250,7 +250,7 @@ module.exports = {
         if (engine._isSideNondamageShielded?.(tgtCtrl)) continue;
         if (engine.isCreatureImmune?.(inst, 'control_immune')) continue;
         if (inst.counters?._cardinalImmune) continue;
-        if (inst.counters?._baihuPetrify) continue;
+        if (inst.counters?._baihuPetrify || inst.counters?._petrified) continue;
         if (inst.counters?._damageDestroyImmune) continue;
         if (inst.counters?._guardianImmune) continue;
         if (inst.counters?._stealImmortal) continue;
