@@ -22,13 +22,14 @@ const H = require('../../lib/h.js');
     await t.engine.actionStealCreature(0, Y);
     await new Promise(r => setTimeout(r, 250));   // Steal-Kette (Reaktionsfenster) läuft kurz nach; sie sperrt Handkarten (_chainResolvingLock)
     await t.play(0, 'Flame Avalanche', { hero: 0 });
-    const [x0, y0, z0] = [X, Y, Z].map(i => i.counters.currentHp);
+    const hpv = (i) => i.counters.currentHp ?? 1000;   // W15b: ohne Treffer fehlt currentHp (= volle 1000 HP); sonst rechnete `y0 - 100` mit undefined
+    const [x0, y0, z0] = [X, Y, Z].map(hpv);
     await t.engine.actionDealCreatureDamage(src, Z, 100, 'destruction_spell', { sourceOwner: 0 });
     await t.engine.actionDealCreatureDamage(src, X, 100, 'destruction_spell', { sourceOwner: 0 });
     await t.engine.actionDealCreatureDamage(src, Y, 100, 'destruction_spell', { sourceOwner: 0 });
-    R.check('Kontrolle: normale Gegnerkreatur gesperrt', Z.counters.currentHp === z0, [z0, Z.counters.currentHp]);
-    R.check('vom Gegner kontrollierte Kreatur ist gesperrt', X.counters.currentHp === x0, [x0, X.counters.currentHp]);
-    R.check('von mir kontrollierte Kreatur ist NICHT gesperrt', Y.counters.currentHp === y0 - 100, [y0, Y.counters.currentHp]);
+    R.check('Kontrolle: normale Gegnerkreatur gesperrt', hpv(Z) === z0, [z0, hpv(Z)]);
+    R.check('vom Gegner kontrollierte Kreatur ist gesperrt', hpv(X) === x0, [x0, hpv(X)]);
+    R.check('von mir kontrollierte Kreatur ist NICHT gesperrt', hpv(Y) === y0 - 100, [y0, hpv(Y)]);
   }
   {
     R.section('Helden (dauerhafte Kontrolle, damit keine Charme-Immunität stört)');

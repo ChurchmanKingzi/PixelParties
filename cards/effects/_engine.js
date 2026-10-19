@@ -9040,11 +9040,15 @@ class GameEngine {
     // ALL damage to opponent's targets becomes 0 (ABSOLUTE — overrides everything)
     const srcOwner = source?.owner ?? source?.controller ?? -1;
     if (srcOwner >= 0 && this.gs.players[srcOwner]?.damageLocked) {
-      let targetOwner = -1;
+      // ★ W15b (Al, C3/S02-05: „prüfe nach aktuellem Kontrolleur!"): „targets your opponent controls" — gesperrt ist, was der GEGNER
+      // gerade kontrolliert (Charme/Übernahme beachtet, `kontrolleurVonHeld`), nicht was in seiner Spalte steht: ein vom Gegner
+      // kontrollierter eigener Held ist gesperrt, ein von mir kontrollierter Gegnerheld nicht.
+      let targetOwner = -1, targetHeroIdx = -1;
       for (let pi = 0; pi < this.playerCount(); pi++) {
-        if ((this.gs.players[pi]?.heroes || []).includes(target)) { targetOwner = pi; break; }
+        const _hi = (this.gs.players[pi]?.heroes || []).indexOf(target);
+        if (_hi >= 0) { targetOwner = pi; targetHeroIdx = _hi; break; }
       }
-      if (targetOwner >= 0 && targetOwner !== srcOwner) {
+      if (targetOwner >= 0 && this.kontrolleurVonHeld(targetOwner, targetHeroIdx) !== srcOwner) {
         hookCtx.amount = 0;
       }
     }
@@ -48857,7 +48861,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // it AFTER the multiplier so halving / doubling can't touch it.
       if (e._flatBonus) e.amount += e._flatBonus;
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
-        if (e.inst.owner !== e.sourceOwner) {
+        // ★ W15b (Al, C3/S02-05): nach aktuellem KONTROLLEUR (gestohlene Kreatur = Gegnerziel; meine Kreatur auf der Gegnerseite nicht).
+        if (this.kontrolleurVon(e.inst) !== e.sourceOwner) {
           e.amount = 0;
         }
       }
