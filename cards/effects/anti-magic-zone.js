@@ -229,6 +229,10 @@ module.exports = {
       ctx.card.counters = ctx.card.counters || {};
       ctx.card.counters._amzExpiresAtTurn   = expiresAtTurn;
       ctx.card.counters._amzExpiresForPlayer = expiresForPlayer;
+      // W16g (S01-07): ohne diese Marke entsorgte der Spielweg die Instanz nach der Aufloesung (`_untrackCard`) und mit ihr den
+      // Stempel — der Ablage-Haken unten (`onCardEnterZone`) fand nie eine Instanz und spaeter beschworene Kreaturen blieben
+      // ungestillt. Muster Weapon Unleashing / Mission of the Light Brigade.
+      gs._spellKeepInstance = true;
 
       engine.log('anti_magic_zone_cast', {
         player: gs.players[pi]?.username,
