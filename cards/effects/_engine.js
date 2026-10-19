@@ -37265,7 +37265,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (ref && _gz.ref === ref
           && normalized.every(t => _gz.ids.has(`${t.type}-${t.owner}-${t.heroIdx}-${t.slotIdx ?? ''}`))) return;
     }
-    const ptResult = await this._checkPostTargetHandReactions(normalized, source, {});
+    // ★ W15a (Al, R01-10): Zauber OHNE Schaden (`opts.dealsDamage === false`, Status-Flächenzauber) melden das den Reaktionen
+    // (Schadens-Reaktionen springen ab) und geben den Schulen-Tag mit (Anti Magic Shield: „hit by an opponent's Spell").
+    const ptResult = await this._checkPostTargetHandReactions(normalized, source,
+      opts.dealsDamage === false ? { dealsDamage: false, damageType: opts.damageType } : {});
     // CRITICAL: unlike promptDamageTarget / promptMultiTarget /
     // actionAoeHit (which set `_spellNegatedByEffect` and return an
     // empty target list so the caster's onPlay deals nothing), the
@@ -37391,18 +37394,34 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {Array}  heroes    [{ owner (Brettseite), heroIdx }]
    * @param {string} damageType Schulen-Tag des Zaubers ('decay_spell' …)
    */
-  async statusHitSurpriseWindow(cardInst, heroes, damageType = 'decay_spell') {
-    if (!cardInst || !heroes?.length) return null;
-    const targets = heroes.map(h => ({
-      type: 'hero', owner: h.owner, heroIdx: h.heroIdx,
-      cardName: this.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name,
-    }));
-    try {
-      return await this.aoeSurpriseVorab(cardInst, targets, { damageType });
-    } finally {
-      for (const k of (this._aoeSurpriseKeys || [])) this.gs._surpriseCheckedHeroes?.delete(k);
-      this._aoeSurpriseKeys = null;
+  async statusHitSurpriseWindow(cardInst, heroes, damageType = 'decay_spell', opts = {}) {
+    if (!cardInst) return null;
+    if (heroes?.length) {
+      const targets = heroes.map(h => ({
+        type: 'hero', owner: h.owner, heroIdx: h.heroIdx,
+        cardName: this.gs.players[h.owner]?.heroes?.[h.heroIdx]?.name,
+      }));
+      let sr = null;
+      try {
+        sr = await this.aoeSurpriseVorab(cardInst, targets, { damageType });
+      } finally {
+        for (const k of (this._aoeSurpriseKeys || [])) this.gs._surpriseCheckedHeroes?.delete(k);
+        this._aoeSurpriseKeys = null;
+      }
+      if (sr?.effectNegated) return sr;
     }
+    // ★ W15a (Al, R01-10: „Ja, sollen sie"): nach den Surprises gehen auch die Hand-Reaktionen auf (Post-Target-Fenster: Divine Gift of Rain,
+    // Barrier of Faith, Anti Magic Shield …) — wie bei einem Flächenschlag, nur ohne Schaden (`dealsDamage: false`). `opts.ziele` = ALLE
+    // betroffenen Ziele (Helden und Kreaturen). Negiert eine Reaktion den Zauber, ist das wie dort an Zauber/Quelle vermerkt: der Aufrufer bricht ab.
+    if (opts.ziele?.length) {
+      const alle = opts.ziele.map(z => ({
+        type: z.type, owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx,
+        cardName: z.cardName || z.name || (z.type === 'hero' ? this.gs.players[z.owner]?.heroes?.[z.heroIdx]?.name : z.inst?.name),
+      }));
+      const pr = await this.preDamageMultiTargetWindow(cardInst, alle, { dealsDamage: false, damageType });
+      if (pr?.effectNegated) return pr;
+    }
+    return null;
   }
 
   /**

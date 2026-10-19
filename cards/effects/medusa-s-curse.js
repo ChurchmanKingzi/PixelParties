@@ -106,7 +106,10 @@ module.exports = {
 
       // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier
       // (nach der Kostenzahlung, wie jede andere Abwehr der gewirkten Karte).
-      const sr = await engine.statusHitSurpriseWindow(ctx.card, heroTargets, 'decay_spell');
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, heroTargets, 'decay_spell', {   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
+        ziele: [...heroTargets.map(h => ({ type: 'hero', owner: h.owner, heroIdx: h.heroIdx })),
+                ...creatureTargets.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name }))],
+      });
       if (sr?.effectNegated) return;
 
       // ── Animation: petrify on every affected target ──
@@ -139,6 +142,8 @@ module.exports = {
           expiresForPlayer,
         });
         // Parallel damage-block buff (damageMultiplier: 0 comes from BUFF_EFFECTS).
+        // ★ W15a: ein per Reaktion (Barrier of Faith) geschützter Held ist von ALLEN Wirkungen der Karte ausgenommen — auch vom Schadensschutz-Buff.
+        if (engine.hasEffectImmunity(ht.owner, ht.heroIdx, ctx.card)) continue;
         await engine.actionAddBuff(ht.hero, ht.owner, ht.heroIdx, 'medusa_petrified', {
           sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           expiresAtTurn,

@@ -116,7 +116,7 @@ module.exports = {
       }
 
       // ★ W14b (Q156, Al: „Jeder Treffer zählt, auch reines Status-Zufügen"): „hit by"-Surprises (Booby Trap, Toxic Trap) öffnen auch hier.
-      const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell');
+      const sr = await engine.statusHitSurpriseWindow(ctx.card, ziele.filter(z => z.type === 'hero'), 'decay_spell', { ziele });   // W15a (R01-10): + Hand-Reaktionen (Post-Target)
       if (sr?.effectNegated) return;
 
       // ── Der Blizzard ────────────────────────────────────────────

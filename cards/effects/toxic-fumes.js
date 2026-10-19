@@ -74,6 +74,14 @@ module.exports = {
         return;
       }
 
+      // ★ W15a (Al, R01-10): Fläche ohne Schaden — Hand-Reaktionen (Divine Gift of Rain, Anti Magic Shield …) über alle Kreaturen des Bretts, vor dem Gift.
+      {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [], 'decay_spell', {
+          ziele: creatureInsts.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name })),
+        });
+        if (sr?.effectNegated) return;
+      }
+
       // Purple toxic gas on every creature — even immune ones still get
       // the visual so the area-wide nature of the effect reads clearly.
       for (const inst of creatureInsts) {
