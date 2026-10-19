@@ -58,7 +58,7 @@ function getDeadHeroes(gs) {
 
 /** Casting Hero's Support Magic count from their own ability zones. */
 function supportMagicLevelOfHero(engine, ps, heroIdx) {
-  return engine.heroSchoolLevel('Support Magic', engine.gs.players.indexOf(ps), heroIdx);   // W4a: harte Negierung -> Stufe 0
+  return engine.effectiveSchoolLevelForCaster('Support Magic', engine.gs.players.indexOf(ps), heroIdx, engine.gs.players.indexOf(ps));   // W4a: harte Negierung -> Stufe 0; W16g (S01-20): + Xals Support-Zonen-Stapel
 }
 
 module.exports = {
@@ -122,7 +122,13 @@ module.exports = {
       // Main Phase = inherent-additional path (commit to 2+).
       // Action Phase = regular Action (1+).
       const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
-      const minRequired = isMainPhase ? 2 : 1;
+      // W16g (S01-21): „If at least 2 Heroes are revived by this effect, this counts as an additional Action.“ `inherentAction` wertet
+      // VOR der Wahl aus; die Zusatzaktion traegt diesen Einsatz nur, wenn wirklich 2+ erweckt werden. Steht ein Rueckfall bereit
+      // (Grund-/Bonus-/Geber-Aktion), reicht 1 Held — der Einsatz kostet dann die Aktion (`gs._spellForcesActionConsume`, s. unten);
+      // sonst (Main Phase, Aktion schon verbraucht) gilt wie bisher: mindestens 2 (Muster Frost Breaker).
+      const inhaerent = !gs._immediateActionContext && gs._spellWasInherent === true;
+      const rueckfall = inhaerent && !!engine.hasPayableActionFor?.(pi, 'Divine Gift of Death', heroIdx);
+      const minRequired = (isMainPhase || (inhaerent && !rueckfall)) ? 2 : 1;
 
       // Defensive: if maxPicks < minRequired (only possible if state
       // shifted between hand-grayout and resolve, e.g. a dead hero was
@@ -181,6 +187,9 @@ module.exports = {
       if (isMainPhase && revived < 2) {
         engine.log('divine_gift_death_race', { revived, expected: '2+' });
       }
+
+      // W16g (S01-21): nur 1 erweckt -> keine Zusatzaktion, der Einsatz kostet die Aktion.
+      if (inhaerent && revived < 2) gs._spellForcesActionConsume = true;
 
       engine.log('divine_gift_death', {
         player: ps.username, revived,
