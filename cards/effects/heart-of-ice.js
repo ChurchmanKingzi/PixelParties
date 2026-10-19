@@ -41,10 +41,12 @@ function traeger(engine, inst) {
 }
 
 function immunSetzen(hero) {
+  // W16e (F02-05): eine schon bestehende Frost-Immunitaet (Broghan angeboren, The Sun Sword) nicht ueberschreiben — sonst
+  // loescht der Abgang des Heart sie mit (`immunEntfernen` raeumt nur den eigenen Stempel).
   if (!hero.statuses) hero.statuses = {};
-  hero.statuses.freeze_immune = { source: CARD_NAME };
+  if (!hero.statuses.freeze_immune) hero.statuses.freeze_immune = { source: CARD_NAME };
   if (!hero.buffs) hero.buffs = {};
-  hero.buffs.freeze_immune = { source: CARD_NAME };
+  if (!hero.buffs.freeze_immune) hero.buffs.freeze_immune = { source: CARD_NAME };
 }
 
 function immunEntfernen(engine, pi, hi, ausserId) {
