@@ -57,7 +57,7 @@ module.exports = function register(ctx) {
 
     await ctx.cardsReload();                       // neue Karten + neue Kunst einlesen
     const known = await db.kvGet('known_cards');
-    const withArt = renderer.allCards().filter(c => renderer.hasArt(c.name));
+    const withArt = renderer.allCards().filter(c => renderer.canRender(c.name));
     if (!known) {                                  // erster Lauf: nur merken
       await db.kvSet('known_cards', withArt.map(c => c.name));
       console.log('[feeds] Kartenstand gemerkt:', withArt.length);
@@ -128,7 +128,7 @@ module.exports = function register(ctx) {
     await ctx.cardsReload();                                                        // die Bilder müssen den NEUEN Kartentext zeigen
     await renderer.init();
     const byName = new Map(renderer.allCards().map(c => [c.name, c]));
-    const items = changed.filter(c => byName.has(c.name) && renderer.hasArt(c.name))
+    const items = changed.filter(c => byName.has(c.name) && renderer.canRender(c.name))
       .map(c => ({ card: byName.get(c.name), note: 'changed: ' + c.fields.join(', ') }));
     if (!items.length) return;
     await postCards(ch, `📝 **Patch notes** — ${items.length} card${items.length === 1 ? '' : 's'} changed`, items);

@@ -17,6 +17,8 @@ const CARDGEN = path.join(ROOT, 'public', 'cardgen') + path.sep;
 const RENDER_JS = path.join(ROOT, 'public', 'card-render.js');
 const META_JSON = path.join(ROOT, 'data', 'card-render.json');
 const CARDS_JSON = path.join(ROOT, 'data', 'cards.json');
+let CARDS_DIR = path.join(ROOT, 'cards');             // fertige Kartenbilder für Karten ohne Atlas-Kunst (wie im Spiel)
+const cardImages = require(path.join(ROOT, 'card-images.js'));   // dieselbe Zuordnung Karte → Bilddatei wie im Spiel
 
 /** Dateizugriff statt Netzwerk: `fetch('/cardgen/art.json')` liest direkt von der Platte. */
 function localFetch(url) {
@@ -38,9 +40,17 @@ class NodeImage {
   get src() { return this._src; }
 }
 
+/**
+ * PNG synchron kodieren (Hauptthread). `canvas.encode()` läuft im Hintergrund-Thread der Bibliothek; unter Last stürzte der Prozess dort
+ * gelegentlich mit SIGSEGV ab (in Tests unter paralleler Last reproduziert). Eine Karte kostet so ~50 ms im Hauptthread — für den Bot
+ * unerheblich, ein Absturz dagegen nicht.
+ */
+const toPng = cv => cv.toBuffer('image/png');
+
 let CR = null;
 let initPromise = null;
 let cardsByName = null;
+let staticImages = new Map();       // Kartenname → Pfad der fertigen Bilddatei (nur Karten, die es wirklich als Datei gibt)
 
 function buildContext() {
   const sandbox = {
@@ -78,17 +88,51 @@ async function init() {
     await CR.loadArtIndex();
     const cards = JSON.parse(fs.readFileSync(CARDS_JSON, 'utf8'));
     cardsByName = new Map(cards.map(c => [c.name, c]));
+    staticImages = findStaticImages(cards);
   })();
   return initPromise;
 }
 
-/** Karte (Objekt aus cards.json oder Name) → PNG-Buffer 750×1050, oder null, wenn die Kunst fehlt. */
-async function renderCardPng(cardOrName, opts) {
+/**
+ * Karten, für die es KEINE Atlas-Kunst, aber eine fertige Bilddatei in ./cards gibt (ältere Karten). Das Spiel zeigt sie genauso:
+ * card-image-shim.js fällt auf die Datei zurück, wo der Renderer keine Kunst hat. Die Zuordnung Name → Datei kommt aus card-images.js.
+ */
+function findStaticImages(cards) {
+  const map = new Map();
+  let available = {};
+  try { available = cardImages.availableImageMap(cards, CARDS_DIR); } catch { return map; }
+  for (const [name, file] of Object.entries(available)) {
+    if (CR && CR.hasArt(name)) continue;                      // Atlas-Kunst hat Vorrang
+    const full = path.join(CARDS_DIR, file);
+    if (fs.existsSync(full)) map.set(name, full);
+  }
+  return map;
+}
+
+/** Fertiges Bild als Canvas (so groß wie die Datei; Karten sind 750×1050). */
+async function staticCardCanvas(file) {
+  const img = await loadImage(file);
+  const cv = createCanvas(img.width, img.height);
+  cv.getContext('2d').drawImage(img, 0, 0);
+  return cv;
+}
+
+/** Die Karte als Canvas: zusammengesetzt aus der Atlas-Kunst, sonst die fertige Bilddatei, sonst null. */
+async function cardCanvas(cardOrName, opts) {
   await init();
   const card = typeof cardOrName === 'string' ? cardsByName.get(cardOrName) : cardOrName;
   if (!card) return null;
   const cv = await CR.renderCard(card, opts);
-  return cv ? cv.encode('png') : null;
+  if (cv) return cv;
+  const file = staticImages.get(card.name);
+  if (!file) return null;
+  try { return await staticCardCanvas(file); } catch (err) { console.error('[cards] Bilddatei unlesbar:', file, err.message); return null; }
+}
+
+/** Karte (Objekt aus cards.json oder Name) → PNG-Buffer (750×1050), oder null, wenn es weder Kunst noch Bilddatei gibt. */
+async function renderCardPng(cardOrName, opts) {
+  const cv = await cardCanvas(cardOrName, opts);
+  return cv ? toPng(cv) : null;
 }
 
 /** Mehrere Karten nebeneinander (z. B. die drei Helden der Daily Challenge) als EIN PNG. */
@@ -96,8 +140,7 @@ async function renderCardsRow(names, { gap = 24, scale = 1 } = {}) {
   await init();
   const cvs = [];
   for (const n of names) {
-    const card = typeof n === 'string' ? cardsByName.get(n) : n;
-    const cv = card ? await CR.renderCard(card, {}) : null;
+    const cv = await cardCanvas(n, {});
     if (cv) cvs.push(cv);
   }
   if (!cvs.length) return null;
@@ -106,7 +149,7 @@ async function renderCardsRow(names, { gap = 24, scale = 1 } = {}) {
   const g = out.getContext('2d');
   g.imageSmoothingEnabled = false;
   cvs.forEach((cv, i) => g.drawImage(cv, i * (w + gap), 0, w, h));
-  return out.encode('png');
+  return toPng(out);
 }
 
 function allCards() { return cardsByName ? [...cardsByName.values()] : []; }
@@ -172,11 +215,24 @@ async function renderArtCrop(name, rect, px = 384) {
   const cv = createCanvas(px, px), g = cv.getContext('2d');
   g.imageSmoothingEnabled = rect.w >= 120;
   g.drawImage(art.src, art.sx + rect.x, art.sy + rect.y, rect.w, rect.h, 0, 0, px, px);
-  return cv.encode('png');
+  return toPng(cv);
 }
 
-/** Hat die Karte Kunst (und lässt sich damit rendern)? */
+/** Hat die Karte Atlas-Kunst? (Nur dann gibt es einen Kunst-Ausschnitt — Mystery.) */
 function hasArt(name) { return !!(CR && CR.hasArt(name)); }
+
+/** Lässt sich die Karte als Bild zeigen — aus Atlas-Kunst ODER aus einer fertigen Bilddatei? */
+function canRender(name) { return hasArt(name) || staticImages.has(name); }
+
+/** Zählt, woher die Kartenbilder kommen — fürs Protokoll beim Start (Hinweis, falls Karten gar kein Bild haben). */
+function imageStats() {
+  const all = allCards();
+  const atlas = all.filter(c => hasArt(c.name)).length, files = all.filter(c => !hasArt(c.name) && staticImages.has(c.name)).length;
+  return { total: all.length, atlas, files, none: all.length - atlas - files };
+}
+
+/** Nur für Tests: anderer Ordner für die fertigen Kartenbilder; danach reload() aufrufen. */
+function setCardsDir(dir) { CARDS_DIR = dir; }
 
 /** Nach einem Update (neue Karten/Kunst auf der Platte): alles neu einlesen, in frischem Kontext. */
 async function reload() {
@@ -184,4 +240,4 @@ async function reload() {
   return init();
 }
 
-module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt, pickArtCrop, renderArtCrop, artSize };
+module.exports = { init, reload, renderCardPng, renderCardsRow, allCards, hasArt, canRender, imageStats, setCardsDir, pickArtCrop, renderArtCrop, artSize };

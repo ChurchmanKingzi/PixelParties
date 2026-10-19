@@ -133,6 +133,9 @@ Admins sind die Rollen **Creator** und **Deputy Monia [MOD]** (Server-Besitzer o
 
 Die Bilder entstehen mit **demselben Renderer wie im Spiel** (`public/card-render.js`), sind also vollständig
 zusammengesetzt und immer auf dem Stand des Spiels. Einen eigenen Bilderordner gibt es nicht.
+Karten, die das Spiel nicht aus dem Kunst-Atlas zusammensetzt, sondern als fertige Bilddatei aus `cards/` zeigt (ältere Karten), zeigt der Bot genauso — mit
+derselben Zuordnung Kartenname → Datei wie das Spiel (`card-images.js`). Nur Karten, die es weder im Atlas noch als Datei gibt, erscheinen bei `!show` als Text.
+Beim Start steht im Protokoll (`journalctl -u moniabot`), wie viele Karten aus Atlas, Dateien oder gar keinem Bild stammen. Ins Mystery-Spiel kommen nur Karten mit Atlas-Kunst.
 
 ### Dein Pixel-Parties-Konto
 1. Im Spiel: **Profil → Link Discord** → es erscheint `!link ABCD2345` (10 Minuten gültig).
