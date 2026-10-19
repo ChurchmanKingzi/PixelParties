@@ -218,6 +218,12 @@ async function runSpawn(engine, inst, ctx) {
       owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: chosen.slotIdx,
     });
     await engine._delay(220);
+    // ★ W16b (A02-deepsea-11): ein gelegter Token betritt die Support Zone — Eintritts-Fenster wie bei jeder Platzierung (Ruling 3.10./Welle 9 Q10:
+    // „place" zählt für Trigger und Reaktionen; Aquatic Arrows, Cybug RHINOCEROS …). Pollution-/Mummy-Token feuern denselben Hook.
+    await engine.runHooks('onCardEnterZone', {
+      enteringCard: placeRes.inst, toZone: 'support', toHeroIdx: chosen.heroIdx,
+      _bypassDeadHeroFilter: true, _isPlacement: true,
+    });
   }
 
   engine.log('analyzer_spawn', {

@@ -34,7 +34,9 @@ const H = require('../../lib/h.js');
     t.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ owner: 1, heroIdx: 0, slotIdx: d.zones.find(z => z.owner === 1 && z.heroIdx === 0).slotIdx }) });
     t.phase(2);
     await t.activateCreature(0, 1, 0);
-    R.check('Vorbedingung: der Token liegt in Held 0 des Gegners', t.gs.players[1].supportZones[0].some(z => z[0] === 'Invader Token'), t.gs.players[1].supportZones[0]);
+    // ★ W16b: nach der Behebung trifft Arrows (100 Schaden an allen Kreaturen des Helden) auch den frisch gelegten Token und besiegt ihn — die Vorbedingung
+    //   „Token liegt" wird deshalb am Log der Platzierung gemessen, nicht am Brettzustand.
+    R.check('Vorbedingung: der Token wurde in Held 0 des Gegners gelegt', t.lg('creature_summoned').some(e => (e.card || e.data?.card) === 'Invader Token'), t.lg('creature_summoned'));
     R.check('Arrows ausgelöst (Surprise abgelegt)', t.gs.players[0].surpriseZones[0].length === 0, t.gs.players[0].surpriseZones[0]);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
