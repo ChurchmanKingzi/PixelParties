@@ -22,7 +22,7 @@ module.exports = {
   // graut ueber `cardGateBlockedCards` erst aus, wenn KEIN eigener Held
   // sie mehr spielen kann.
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
-    const smLevel = engine.heroSchoolLevel('Support Magic', heldSeite(gs, pi, heroIdx), heroIdx);   // W4a: harte Negierung -> Stufe 0
+    const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, heldSeite(gs, pi, heroIdx));   // W16g (S02-18): + Xals Support-Zonen-Stapel   // W4a: harte Negierung -> Stufe 0
     const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
     return !drawWouldBeBlocked(engine, pi, drawCount);
   },
@@ -37,7 +37,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level
-      const smLevel = engine.heroSchoolLevel('Support Magic', ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
+      const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, ctx.cardHeroOwner ?? pi);   // W16g (S02-18): + Xals Support-Zonen-Stapel   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
 
       // Confirm

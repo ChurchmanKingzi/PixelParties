@@ -95,7 +95,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level on this hero
-      const smLevel = engine.heroSchoolLevel('Support Magic', ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
+      const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, ctx.cardHeroOwner ?? pi);   // W16g (S02-18): + Xals Support-Zonen-Stapel   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       const healAmount = smLevel >= 3 ? 300 : smLevel >= 2 ? 200 : 150;
 
       // Prompt: select any target (hero or creature, either side)
