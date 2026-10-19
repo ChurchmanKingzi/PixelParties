@@ -1,0 +1,20 @@
+{
+  "name": "moniabot",
+  "version": "1.0.0",
+  "description": "MoniaBot — Discord-Bot für den Pixel-Parties-Server",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "deploy-commands": "node deploy-commands.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@napi-rs/canvas": "^0.1.65",
+    "discord.js": "^14.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -564,6 +564,72 @@ function getRank(elo) {
   return RANK_TIERS[0];
 }
 
+// ═══════════════════════════════════════════
+//  DISCORD VERKNÜPFEN (MoniaBot)
+//  Der Spieler erzeugt hier einen Einmalcode und tippt im Discord `!link CODE`. Damit bekommt er
+//  Rang-/Erfolgsrollen und kann !sc / !daily nutzen. Ohne BOT_SECRET am Server (kein Bot) bleibt der Block unsichtbar.
+// ═══════════════════════════════════════════
+function DiscordLinkSection({ isGuest }) {
+  const [status, setStatus] = useState(null);       // { linked, enabled }
+  const [code, setCode] = useState(null);           // { code, expiresInSec }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try { setStatus(await api('/discord/status')); } catch { setStatus({ enabled: false }); }
+  };
+  useEffect(() => { load(); }, []);
+  // Ist der Code eingelöst, zeigt ein gelegentliches Nachfragen „Verknüpft“ an.
+  useEffect(() => {
+    if (!code) return undefined;
+    const t = setInterval(async () => {
+      try { const st = await api('/discord/status'); if (st.linked) { setStatus(st); setCode(null); } } catch {}
+    }, 4000);
+    const expire = setTimeout(() => setCode(null), code.expiresInSec * 1000);
+    return () => { clearInterval(t); clearTimeout(expire); };
+  }, [code]);
+
+  if (!status || !status.enabled || isGuest) return null;
+
+  const makeCode = async () => {
+    setBusy(true); setError('');
+    try { setCode(await api('/discord/link-code', { method: 'POST' })); }
+    catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+  const unlink = async () => {
+    setBusy(true); setError('');
+    try { await api('/discord/unlink', { method: 'POST' }); setCode(null); await load(); }
+    catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid var(--bg4)', margin: '12px 0', paddingTop: 12 }}>
+      <div className="profile-section-label">DISCORD</div>
+      {status.linked ? (
+        <div style={{ marginTop: 6, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--green, #4caf50)' }}>✓ Linked to Discord</div>
+          <div style={{ fontSize: 9, color: 'var(--text2)', margin: '4px 0 8px' }}>Your rank and achievement roles on the server follow your Elo and collection. Type !sc or !daily there.</div>
+          <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={unlink} disabled={busy}>UNLINK</button>
+        </div>
+      ) : code ? (
+        <div style={{ marginTop: 6, textAlign: 'center' }}>
+          <div style={{ fontSize: 9, color: 'var(--text2)' }}>Type this in the Pixel Parties Discord server:</div>
+          <div style={{ fontSize: 18, letterSpacing: 2, margin: '6px 0', userSelect: 'all', cursor: 'text' }}>!link {code.code}</div>
+          <div style={{ fontSize: 9, color: 'var(--text2)' }}>Valid for {Math.round(code.expiresInSec / 60)} minutes.</div>
+        </div>
+      ) : (
+        <div style={{ marginTop: 6, textAlign: 'center' }}>
+          <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 8 }}>Connect your Discord account to get rank roles and use !sc and !daily on the server.</div>
+          <button className="btn" style={{ padding: '6px 14px', fontSize: 11 }} onClick={makeCode} disabled={busy}>LINK DISCORD</button>
+        </div>
+      )}
+      {error && <div style={{ fontSize: 10, color: 'var(--red, #e55)', marginTop: 6, textAlign: 'center' }}>{error}</div>}
+    </div>
+  );
+}
+
 function ProfileScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
   const [color, setColor] = useState(user.color || '#00f0ff');
@@ -871,6 +937,8 @@ function ProfileScreen() {
                 Profile data is stored in the cloud and persists across updates.
               </div>
             </div>
+
+            <DiscordLinkSection isGuest={!!user.isGuest} />
 
             {/* Save button at bottom of identity panel */}
             <div style={{ marginTop: 'auto', paddingTop: 16 }}>

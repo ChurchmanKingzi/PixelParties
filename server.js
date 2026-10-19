@@ -69,6 +69,7 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
+const botApi = require('./bot-api');   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
@@ -1276,6 +1277,7 @@ async function initDatabase() {
 
   // Private Chats, Herausforderungen, Blockierungen (social.js)
   await social.init();
+  await botApi.ensureSchema(db);   // users.discord_id (MoniaBot)
 
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
@@ -2629,6 +2631,10 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to start daily challenge' });
   }
 });
+
+// ===== MONIABOT (Discord) =====
+// Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
+botApi.mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);

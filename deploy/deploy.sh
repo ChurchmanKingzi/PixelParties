@@ -158,6 +158,13 @@ as_svc npm ci --omit=dev --no-audit --no-fund
 log "Frontend bauen"
 as_svc npm run build
 
+# MoniaBot (Discord) hat eigene Abhängigkeiten (bot/package.json). Nur wenn er eingerichtet ist
+# (deploy/moniabot-setup.sh), sonst bleibt alles wie bisher.
+if [ -d bot ] && systemctl list-unit-files moniabot.service >/dev/null 2>&1 && systemctl is-enabled --quiet moniabot.service 2>/dev/null; then
+        log "MoniaBot: Abhängigkeiten installieren"
+        as_svc npm ci --omit=dev --no-audit --no-fund --prefix bot
+fi
+
 # ── 3. Neustart ───────────────────────────────────────────────
 # Achtung, bekannte Folge: Die Sitzungen liegen in einer Map im
 # Arbeitsspeicher (sessions in server.js). Jeder Neustart meldet
@@ -169,6 +176,12 @@ log "Dienst neu starten"
 # aus dem Speicher weiter und warnt nur beilaeufig.
 systemctl daemon-reload
 systemctl restart "$SERVICE"
+
+# MoniaBot nach dem Spiel neu starten: er liest Karten und Kartenkunst beim Start ein und meldet
+# neue Karten/Patchnotes erst, wenn er die neuen Dateien sieht. Ein Fehler hier darf das Ausrollen nicht kippen.
+if systemctl is-enabled --quiet moniabot.service 2>/dev/null; then
+        systemctl restart moniabot.service || warn "MoniaBot-Neustart fehlgeschlagen — bitte pruefen: journalctl -u moniabot -n 50"
+fi
 
 # Gleiches gilt fuer das Caddyfile: auch versioniert, auch nicht von
 # selbst neu eingelesen.

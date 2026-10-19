@@ -20,6 +20,10 @@
         request_body {
                 max_size 12MB
         }
+        # MoniaBot-Schnittstelle: nur der Bot auf diesem Server darf sie aufrufen (direkt auf 127.0.0.1:3000).
+        # Von außen gibt es sie nicht — selbst mit gültigem Geheimnis nicht.
+        @botapi path /api/bot /api/bot/*
+        respond @botapi 404
         reverse_proxy 127.0.0.1:3000
         log {
                 output file /var/log/caddy/pixelparties.log {

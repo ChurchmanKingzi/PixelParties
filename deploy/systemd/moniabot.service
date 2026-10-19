@@ -1,0 +1,47 @@
+[Unit]
+Description=MoniaBot — Discord-Bot für den Pixel-Parties-Server
+Documentation=https://github.com/ChurchmanKingzi/PixelParties/blob/main/docs/MONIABOT.md
+After=network-online.target pixelparties.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pixelparties
+Group=pixelparties
+WorkingDirectory=/opt/pixelparties/bot
+Slice=pixelparties.slice
+
+# Zugangsdaten stehen in /opt/pixelparties/bot/.env (chmod 600), das liest der Bot selbst.
+Environment=NODE_ENV=production
+# Das Rendern der Kartenbilder braucht Speicher; der Bot bleibt klein und darf bei Bedarf neu starten.
+Environment=NODE_OPTIONS=--max-old-space-size=768
+MemoryMax=1200M
+
+ExecStart=/usr/bin/node index.js
+
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+# ── Härtung (wie der Spielserver) ──────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Schreiben darf der Bot nur in seine eigene Datenbank.
+ReadWritePaths=/opt/pixelparties/bot/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moniabot
+
+[Install]
+WantedBy=multi-user.target
