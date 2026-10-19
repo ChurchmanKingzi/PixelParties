@@ -4,7 +4,9 @@
 //
 //  When the opponent plays an Artifact,
 //  chain this and negate it. The opponent
-//  still has to pay the Artifact's Gold cost.
+//  still has to pay the Artifact's Gold cost
+//  (genau EINMAL — W19c: ein Reaktions-Artefakt hat
+//  seinen Preis beim Aktivieren schon bezahlt).
 //
 //  Animation: rust corrosion effect.
 // ═══════════════════════════════════════════
@@ -76,7 +78,10 @@ module.exports = {
     // Force-deduct the Artifact's gold cost BEFORE negating
     const oppIdx = targetLink.owner;
     const oppPs = gs.players[oppIdx];
-    const goldCost = targetLink.goldCost || 0;
+    // ★ W19c (Al: „Rusty Touch soll die Kosten nur einmal abziehen"): erzwungen wird NUR die Zahlung, die sonst ausfiele — die der
+    // Initialkarte (der Server bucht den Artefaktpreis erst NACH der Kette und nur ohne Negation). Ein Reaktions-Artefakt (Hand-/Bow-
+    // Pfeil, Arrow Slit …) hat seinen Preis beim Aktivieren schon bezahlt (`_rxPay`); ein zweiter Abzug wäre eine Doppelbuchung.
+    const goldCost = targetLink.isInitialCard ? (targetLink.goldCost || 0) : 0;
     if (goldCost > 0 && oppPs) {
       await engine._payCardCost(oppIdx, goldCost);
       engine.log('rusty_touch_gold', {

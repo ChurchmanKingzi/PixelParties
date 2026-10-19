@@ -352,8 +352,12 @@ module.exports = {
         }
 
         const eligibleIndices = [];
+        // W19c: wirkt in der Hand ein Kopien-Rabatt (`kopien`, W16a), ist nur die rabattierte Kopie spielbar (nicht die Namensliste).
+        const kopienListe = heroSeite === pi ? playableMap.kopien?.own : playableMap.kopien?.charmed;
         for (let i = 0; i < ps.hand.length; i++) {
-          if (eligibleNames.has(ps.hand[i])) eligibleIndices.push(i);
+          if (!eligibleNames.has(ps.hand[i])) continue;
+          if (kopienListe && Array.isArray(kopienListe[i]) && !kopienListe[i].includes(sel.heroIdx)) continue;
+          eligibleIndices.push(i);
         }
 
         if (eligibleIndices.length === 0) {
@@ -385,8 +389,15 @@ module.exports = {
         const { handIndex, cardName: chosenName } = result.selectedCards[0];
         if (handIndex < 0 || handIndex >= ps.hand.length
             || ps.hand[handIndex] !== chosenName) return;
+        if (!eligibleIndices.includes(handIndex)) return;   // W19c: der Server prüft nach — nur angebotene Handplätze
         const chosenCd = cardDB[chosenName];
         if (!chosenCd) return;
+        // W19c (Al: „Hand des aktuellen Kontrolleurs"): Wisdom-Abwurfkosten nach den Schulen/Stufen des HELDEN (`heroSeite`), aber Hand, Rabatte
+        // und Ermäßigungen vom KONTROLLEUR (`pi`, `levelSourcePi`) und der konkreten Kopie (`handIndex`). Gerechnet VOR dem Entnehmen der Karte
+        // (danach fehlt die rabattierte Kopie in der Hand); bezahlt wird wie bisher erst nach dem Guss.
+        const wisdomCostVorab = chosenCd.cardType === 'Spell'
+          ? engine.getWisdomDiscardCost(heroSeite, sel.heroIdx, chosenCd, handIndex, heroSeite !== pi ? pi : undefined)
+          : 0;
 
         // ── Resolve the inner cast (charmedOwner semantics) ──
         // Splice from caster's hand, track with heroOwner = oi so
@@ -459,7 +470,7 @@ module.exports = {
         // wenn er nicht abgebrochen wurde — vorher zahlte man vor der
         // Zielwahl und verlor die Abwuerfe bei einem Abbruch.
         if (!innerCancelled && chosenCd.cardType === 'Spell' && !gs.result) {
-          const wisdomCost = engine.getWisdomDiscardCost(heroSeite, sel.heroIdx, chosenCd);
+          const wisdomCost = wisdomCostVorab;
           if (wisdomCost > 0) {
             await engine.actionPromptForceDiscard(pi, wisdomCost, {
               title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
