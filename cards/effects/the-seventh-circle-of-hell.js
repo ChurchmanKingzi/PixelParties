@@ -21,9 +21,19 @@ const {
   verlaesstBrett, loeschenUndSpielen, cpuBejahen,
 } = require('./_hell-circles-shared');
 
+const { heroHasDiverHelmet, isAreaImmuneInst } = require('./_diver-helmet-shared');
+
 const CARD_NAME = 'The Seventh Circle of Hell';
 const ENDE = 100;
 const ABGANG = 150;
+
+// W16e (F01-18): Diver Helmet — „unaffected by Areas" (CARD_API „Areas — respect Diver Helmet"): der Helm-Held und seine Support-Zonen-Karten
+// werden von dieser Area nie zur Wahl angeboten. `t` = Zielobjekt des Pickers (Brettseite in `owner`).
+function helmGeschuetzt(engine, t) {
+  if (!t) return false;
+  if (t.type === 'hero') return heroHasDiverHelmet(engine, t.owner, t.heroIdx);
+  return t.cardInstance ? isAreaImmuneInst(engine, t.cardInstance) : heroHasDiverHelmet(engine, t.owner, t.heroIdx);
+}
 
 // `festesZiel`: der Zugspieler waehlt SEINE eigenen Ziele selbst (Zugende-Zweig) — Submerged/Stealth
 // & Co. („solange es andere Ziele gibt") schuetzen dann nicht (Als Ruling 9.10.).
@@ -59,7 +69,7 @@ module.exports = {
       const engine = ctx._engine;
       const tp = ctx.activePlayer;
       if (!isSeat(engine, tp)) return;
-      const ziele = [...engine.getHeroTargets(tp), ...engine.getCreatureTargets(tp)];
+      const ziele = [...engine.getHeroTargets(tp), ...engine.getCreatureTargets(tp)].filter(t => !helmGeschuetzt(engine, t));
       if (ziele.length === 0) return;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });
       // pflichtwahl: der Text sagt „must choose" — kein Abbruch
@@ -96,6 +106,7 @@ module.exports = {
         confirmLabel: `🔥 ${ABGANG} Damage!`,
         confirmClass: 'btn-danger',
         cancellable: false,
+        condition: (t, eng) => !helmGeschuetzt(eng || engine, t),
       });
       if (!ziel) return;
       const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: -1 };
