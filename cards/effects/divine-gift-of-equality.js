@@ -144,7 +144,7 @@ module.exports = {
         description: 'Choose any target on the board. Its HP will be halved (rounded up), and your Hero revives with the leftover HP.',
         confirmLabel: '⚖️ Halve!',
         confirmClass: 'btn-info',
-        cancellable: false,
+        cancellable: true,   // W16g (S01-25): noch nichts verbraucht (Halbieren/Wiederbeleben folgt erst) -> abbrechbar
         exclusiveTypes: true,
         maxPerType: { hero: 1, equip: 1 },
         maxTotal: 1,
