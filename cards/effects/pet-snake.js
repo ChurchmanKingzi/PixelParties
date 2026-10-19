@@ -28,6 +28,18 @@
 //      HOPT key — managed by the engine.
 // ═══════════════════════════════════════════
 
+/**
+ * W16d (A09-16): ist das Gift dieses Helden HEILBAR? Unter Stinky Stables (Gift-Heilsperre), mit `unhealable`-Gift
+ * oder Fluch-Sperre ist „heal a Poisoned Hero from its Poison" nicht zahlbar -> keine Zusatzbeschwörung.
+ */
+function giftHeilbar(engine, pi, hi, hero) {
+  if (!hero?.statuses?.poisoned) return false;
+  if (hero.statuses.poisoned.unhealable) return false;
+  if (engine && engine._isPoisonHealLocked?.() && !engine._isDiverHelmetProtectedTarget?.(hero)) return false;
+  if (engine && engine._heroStatusRemovalBlocked?.(pi, hi, 'poisoned')) return false;
+  return true;
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -43,8 +55,10 @@ module.exports = {
     if (gs.hoptUsed?.[`pet-snake-alt:${pi}`] === gs.turn) return false;
     const ps = gs.players[pi];
     if (!ps) return false;
-    for (const h of (ps.heroes || [])) {
-      if (h?.name && h.hp > 0 && h.statuses?.poisoned) return true;
+    const eng = engine || gs._engineRef;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const h = ps.heroes[hi];
+      if (h?.name && h.hp > 0 && h.statuses?.poisoned && giftHeilbar(eng, pi, hi, h)) return true;
     }
     return false;
   },
@@ -138,6 +152,7 @@ module.exports = {
         const h = ps.heroes[hi];
         if (!h?.name || h.hp <= 0) continue;
         if (!h.statuses?.poisoned) continue;
+        if (!giftHeilbar(engine, pi, hi, h)) continue;   // W16d (A09-16): nur heilbares Gift ist zahlbar
         poisonedHeroes.push({
           id: `hero-${pi}-${hi}`, type: 'hero',
           owner: pi, heroIdx: hi, cardName: h.name,
@@ -163,6 +178,8 @@ module.exports = {
       await engine._delay(400);
 
       await engine.removeHeroStatus(pi, chosen.heroIdx, 'poisoned');
+      // W16d (A09-16): nur wenn die Heilung wirklich gelang, sind die Kosten bezahlt (sonst kein Einmal-pro-Zug-Stempel).
+      if (ps.heroes?.[chosen.heroIdx]?.statuses?.poisoned) { engine.sync(); return; }
       engine.claimHOPT('pet-snake-alt', pi);
 
       engine.log('pet_snake_alt_summon', {
