@@ -194,7 +194,7 @@ für **neue** Beiträge des Bots, nicht für bestehende Nachrichten.
 > Die AutoMod-Regel aus `!setupAutomod` tut das wirklich vorher, gilt dafür aber für alle Nicht-Admins.
 
 ### Mystery-Spiel
-Nur im Rätsel-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanäle bekommen einen Hinweis).
+Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanäle bekommen einen Hinweis).
 
 | Befehl | Wirkung |
 |---|---|

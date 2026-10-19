@@ -97,7 +97,7 @@ module.exports = function register(ctx) {
     return true;
   }
 
-  ctx.command('mystery', { help: '`!mystery` — show the current mystery card (only in the mystery channel); admins: `!mystery skip`' }, (msg, args) => serialized(async () => {
+  ctx.command('mystery', { help: '`!mystery` — show the current mystery card (only in the minigames channel); admins: `!mystery skip`' }, (msg, args) => serialized(async () => {
     if (!guard(msg)) return;
     const sub = (args[0] || '').toLowerCase();
 
@@ -121,7 +121,7 @@ module.exports = function register(ctx) {
 
   const lastGuess = new Map();
 
-  ctx.command('guess', { help: '`!guess <card name>` — guess the mystery card (only in the mystery channel)' }, (msg, args, rest) => serialized(async () => {
+  ctx.command('guess', { help: '`!guess <card name>` — guess the mystery card (only in the minigames channel)' }, (msg, args, rest) => serialized(async () => {
     if (!guard(msg)) return;
     const cur = await db.kvGet(KEY.current);
     if (!cur) return msg.reply(`There’s no active puzzle right now. Type \`${config.prefix}mystery\` to start one.`);
