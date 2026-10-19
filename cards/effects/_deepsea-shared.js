@@ -221,6 +221,8 @@ function _bounceableAt(engine, pi, side, hi, si) {
   const gs = engine.gs;
   const slot = (gs.players[side]?.supportZones?.[hi] || [])[si] || [];
   if (slot.length === 0) return null;
+  // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Stapel: die Zone wird durch eine Rueckgabe nicht frei).
+  if (!engine.zoneFreiNachKostenzahlung(side, hi, si)) return null;
   const inst = engine.cardInstances.find(c =>
     c.owner === side &&
     (c.controller ?? c.owner) === pi &&

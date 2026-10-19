@@ -111,6 +111,8 @@ function _collectTributeCandidates(engine, playerIdx, selfId) {
  */
 function _landingAllowed(engine, pi, inst) {
   if (!inst) return false;
+  // W17a (Al, 19.10.2026): Landen nur in Zonen mit exakt EINER Karte (Alice-Stapel: die Zone wird durch die Rueckgabe nicht frei).
+  if (!engine.zoneFreiNachKostenzahlung(inst.owner, inst.heroIdx, inst.zoneSlot)) return false;
   if (inst.owner === pi) return true;
   const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
   return engine.heroSideOf(inst.owner, hero) === pi;
@@ -340,7 +342,8 @@ module.exports = {
     return engine.canSatisfySacrifice(pi, {
       ...SACRIFICE_SPEC,
       filter: (c) => (c.inst?.turnPlayed || 0) !== turn,
-    }, null);
+    }, null)
+      && _collectTributeCandidates(engine, pi, null).some(c => _landingAllowed(engine, pi, c.inst));   // W17a: es muss eine freiwerdende Zone geben
   },
 
   // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
