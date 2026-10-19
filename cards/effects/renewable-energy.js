@@ -41,7 +41,7 @@ module.exports = {
     const gallery = [];
     for (const name of (ps.discardPile || [])) {
       if (seen.has(baseCardName(name))) continue;
-      seen.add(name);
+      seen.add(baseCardName(name));   // W16e (F02-12): Basisname merken ([B]/[W] sind Kosmetik, CARD_API 11.9.)
       gallery.push({ name, source: 'discard' });
     }
     if (gallery.length === 0) return { cancelled: true };
@@ -63,7 +63,14 @@ module.exports = {
       return { cancelled: true };
     }
 
-    const selectedNames = result.selectedCards;
+    // „different names" (Basisnamen) — eine Auswahl mit [B]+[W] derselben Karte (veraenderter Client) zaehlt nur einmal; hoechstens 3.
+    const gesehen = new Set();
+    const selectedNames = result.selectedCards.filter(n => {
+      const b = baseCardName(n);
+      if (gesehen.has(b) || gesehen.size >= 3) return false;
+      gesehen.add(b);
+      return true;
+    });
 
     const recycled = await engine.actionRecycleCards(pi, selectedNames, {
       source: 'Renewable Energy',
