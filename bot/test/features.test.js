@@ -170,7 +170,7 @@ test('!daily: drei Helden als EIN Bild, exakte Nachricht; ohne Daily/Verknüpfun
     daily: async () => {
       if (state.mode === 'unlinked') throw Object.assign(new (require('../lib/game-api').GameApiError)(404, 'not_linked'), {});
       return state.mode === 'active'
-        ? { active: true, heroes: ['Teocuilatl, the Embodiment of Gods', '"Bloom", the Continent Corruptor', 'Alice, the Puppeteer Girl'], nextResetTs: 1 }
+        ? { active: true, heroes: ['Teocuilatl, the Embodiment of Gods', 'Alice, the Transfer Student', 'Alice, the Puppeteer Girl'], nextResetTs: 1 }
         : { active: false, heroes: [], nextResetTs: 1900000000 };
     },
   });
