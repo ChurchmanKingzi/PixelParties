@@ -25481,13 +25481,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return 0;
     let limit = 0;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    // ★ W16b (A03-futuretech-25): „If YOU spend Gold …" — der Held zählt für seinen KONTROLLEUR (übernommene Helden: der Übernehmer, nicht der
+    // Besitzer; CARD_API „Übernommene Helden gelten als Helden des Kontrolleurs"). Vorher: Helden der physischen Seite.
+    for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {
+      if (hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.goldOverdraft !== 'function') continue;
-      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): der Kredit ruht bei Frost/Betäubung/Negation
+      if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent): der Kredit ruht bei Frost/Betäubung/Negation
       try { limit = Math.max(limit, script.goldOverdraft(this, playerIdx) || 0); }
       catch { /* eine kaputte Karte darf keinen Kredit erzwingen */ }
     }
@@ -25815,13 +25816,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // eine Aktion erlaubt ist, fragt `areActionsBlocked` — sonst
     // niemanden.
     if (ps.actionLocked) return true;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {   // W16b (A03-futuretech-25): Helden des KONTROLLEURS
+      if (hero.hp <= 0) continue;
       let script = null;
       try { script = this.heroScript(hero); } catch { continue; }
       if (typeof script?.blocksActions !== 'function') continue;
-      if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent): „While your Gold is negative …" ruht
+      if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent): „While your Gold is negative …" ruht
       try { if (script.blocksActions(this, playerIdx)) return true; }
       catch { /* defensiv: eine kaputte Karte sperrt nichts */ }
     }
@@ -25866,13 +25866,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._inGoldStateRules) return;
     this._inGoldStateRules = true;
     try {
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name) continue;
+      for (const { hero, physOwner, heroIdx: hi } of this.heroesControlledBy(playerIdx)) {   // W16b (A03-futuretech-25): Helden des KONTROLLEURS
         let script = null;
         try { script = this.heroScript(hero); } catch { continue; }
         if (typeof script?.goldStateRule !== 'function') continue;
-        if (this.isHeroPassiveDormant(playerIdx, hi)) continue;   // W8 (Kent, Logan): Zustandsregel ruht bei Frost/Betäubung/Negation
+        if (this.isHeroPassiveDormant(physOwner, hi)) continue;   // W8 (Kent, Logan): Zustandsregel ruht bei Frost/Betäubung/Negation
         try { script.goldStateRule(this, playerIdx); }
         catch (err) {
           console.error(`[Engine] goldStateRule "${hero.name}" warf:`, err?.message || err);
