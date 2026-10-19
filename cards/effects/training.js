@@ -83,6 +83,7 @@ function getEligibleDeckAbilities(engine, playerIdx, heroIdx, feld = playerIdx) 
 async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx, feld = playerIdx) {
   if (feld !== playerIdx) return doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, trainingZoneIdx, feld);
   let attached = 0;
+  let blockiert = false;   // ★ W16a (Al, Frage 3): von Resistance abgefangen → Einmal-Einsatz verbraucht
 
   for (let i = 0; i < maxAttach; i++) {
     // Recalculate eligible each iteration (hand changes after each attach)
@@ -122,6 +123,8 @@ async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneI
       targetZoneSlot: result.zoneSlot, // Respect the player's chosen zone (important for Performance)
     });
 
+    // ★ W16a (Al, Frage 3: „Ja!"): das Anlegen prallt an Resistance ab (die Karte bleibt auf der Hand) — der Effekt war gewählt und läuft nicht weiter; Training zählt als gewirkt.
+    if (attachResult.blocked) { blockiert = true; break; }
     if (attachResult.success) {
       attached++;
 
@@ -146,7 +149,7 @@ async function doHandAttach(engine, playerIdx, heroIdx, maxAttach, trainingZoneI
   engine.gs.effectPrompt = null;
   engine.sync();
 
-  return attached;
+  return attached || (blockiert ? 1 : 0);   // abgefangen = gewirkt (Rückgabe > 0 → HOPT verbraucht)
 }
 
 /**
@@ -159,6 +162,7 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
   const ps = engine.gs.players[playerIdx];
   const heroName = engine.gs.players[feld]?.heroes?.[heroIdx]?.name || 'Hero';
   let attached = 0;
+  let blockiert = false;   // ★ W16a (Al, Frage 3): von Resistance abgefangen → Einmal-Einsatz verbraucht
   for (let i = 0; i < maxAttach; i++) {
     const eligible = getEligibleHandAbilities(engine, playerIdx, heroIdx, feld);
     if (eligible.length === 0) break;
@@ -176,6 +180,7 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
     const attachResult = await engine.attachAbilityFromHand(playerIdx, pick.cardName, heroIdx, {
       skipAbilityGivenCheck: true, heroOwner: feld,
     });
+    if (attachResult.blocked) { blockiert = true; break; }   // ★ W16a (Al, Frage 3): abgefangen = gewirkt
     if (!attachResult.success) break;
     attached++;
     if (attached === 1) {
@@ -190,7 +195,7 @@ async function doHandAttachFremd(engine, playerIdx, heroIdx, maxAttach, training
     engine.sync();
     await engine._delay(300);
   }
-  return attached;
+  return attached || (blockiert ? 1 : 0);
 }
 
 /**

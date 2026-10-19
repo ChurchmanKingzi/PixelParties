@@ -20745,7 +20745,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // hand cards to actually pay the discard cost (the spell itself
       // is in hand and would leave on cast, so subtract 1).
       if (cd.cardType === 'Spell') {
-        const wisdomCost = this.getWisdomDiscardCost(hs, heroIdx, cd);
+        const wisdomCost = this.getWisdomDiscardCost(hs, heroIdx, cd, undefined, hs !== playerIdx ? playerIdx : undefined);   // W16a (Frage 6): Rabatt/Hand des Kontrolleurs
         // v1279: Boris & Co. erlassen die Abwurfkosten — dann darf die
         // Handgroesse nicht sperren (Als Befund 22.9.).
         if (wisdomCost > 0 && this.handFodderFor(playerIdx, cardName) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;   // v1288
@@ -20910,6 +20910,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = gs.players[playerIdx];
     if (!ps) return { own: {}, charmed: {} };
     const charmedFrei = !!opts.charmedIgnoresActionCost;
+    // ★ W16a (Al, Frage 5: „Hervorheben für den Rabatt-Effekt? Dann nur die rabattierte Karte!"): `opts.nurKopie` = Handindex EINER Kopie — dann wertet die Liste nur diese Karte
+    // (Stufenprüfung und Wisdom-Kosten der konkreten Kopie, `_kopieNurIndex`). Damit baut der Aufruf ohne `nurKopie` unten den Block `kopien` (Liste je Handindex).
+    const nurKopie = Number.isInteger(opts.nurKopie) ? opts.nurKopie : null;
+    const kopieLv = nurKopie != null ? { handIdx: nurKopie } : {};
 
     const cardDB = this._getCardDB();
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
@@ -20930,7 +20934,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const vorrat = this.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []) : [];
     const handCards = [];
     const seen = new Set();
-    for (const cardName of [...(ps.hand || []), ...vorrat]) {
+    for (const cardName of (nurKopie != null ? [(ps.hand || [])[nurKopie]] : [...(ps.hand || []), ...vorrat])) {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
@@ -21122,10 +21126,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         // caster for those Spells. Those Spells are surfaced via
         // `getCreatureSpellCasters` so the client highlights the
         // Creature herself as the caster, never the host.
-        if (!this.heroMeetsLevelReq(playerIdx, hi, cd)) continue;
+        if (!this.heroMeetsLevelReq(playerIdx, hi, cd, kopieLv)) continue;
         // Wisdom hand-size check: player must have enough cards to pay the discard cost
         if (cd.cardType === 'Spell') {
-          const wisdomCost = this.getWisdomDiscardCost(playerIdx, hi, cd);
+          const wisdomCost = this.getWisdomDiscardCost(playerIdx, hi, cd, nurKopie ?? undefined);
           if (wisdomCost > 0 && this.handFodderFor(playerIdx, cd.name) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;   // v1279/v1288
         }
         // Hero script card restriction (e.g. Ghuanjun duplicate attack ban)
@@ -21310,10 +21314,10 @@ this._deathWatch = (this._deathWatchStack || []).length
           // `levelSourcePi` fragte die Pruefung die Handablagen der
           // falschen Seite ab: ein auf 0 reduzierter „Cataclysm" galt
           // dem geliehenen Helden als Lv3 und blieb unspielbar.
-          if (!this.heroMeetsLevelReq(oppIdx, hi, cd, { levelSourcePi: playerIdx })) continue;
+          if (!this.heroMeetsLevelReq(oppIdx, hi, cd, { levelSourcePi: playerIdx, ...kopieLv })) continue;
           // Wisdom hand-size check: acting player (ps) must have enough cards to pay
           if (cd.cardType === 'Spell') {
-            const wisdomCost = this.getWisdomDiscardCost(oppIdx, hi, cd);
+            const wisdomCost = this.getWisdomDiscardCost(oppIdx, hi, cd, nurKopie ?? undefined, playerIdx);   // W16a (Frage 6): Rabatt/Hand des Kontrolleurs
             // v1288: Abwurf und Boris-Verzicht gehoeren dem HANDELNDEN Spieler
             // (die Karte liegt in seiner Hand, der Server laesst ihn zahlen) —
             // v1279 fragte hier faelschlich den Gegner.
@@ -21392,7 +21396,46 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ W16a (Frage 5): wirkt in der Hand ein Kopien-Rabatt (Divine Gift of Magic, Fiona … — Spell/Attack mit ≥ 2 Kopien, davon mindestens eine mit eigener Stufe), kommt zusätzlich die Liste
+    // JE HANDINDEX: `kopien.own|charmed[handIdx] = [heroIdx …]`. Der Client nimmt für diese Handkarte NUR diese Liste (leuchtet nur die rabattierte Kopie); ohne Rabatt fehlt der Block,
+    // und alles bleibt bei der Namensliste.
+    if (nurKopie == null) {
+      const sonder = this._kopienMitSonderstufe(playerIdx);
+      if (sonder.length > 0) {
+        const kopien = { own: {}, charmed: {} };
+        for (const { name, idx } of sonder) {
+          const r = this.getHeroPlayableCards(playerIdx, { ...opts, nurKopie: idx });
+          kopien.own[idx] = Object.keys(r.own).filter(h => (r.own[h] || []).includes(name)).map(Number);
+          kopien.charmed[idx] = Object.keys(r.charmed).filter(h => (r.charmed[h] || []).includes(name)).map(Number);
+        }
+        return { own, charmed, kopien };
+      }
+    }
     return { own, charmed };
+  }
+
+  /**
+   * ★ W16a (Frage 5): Handkopien (Spell/Attack), deren Stufe NUR für diese Kopie gilt und von den Schwesterkopien gleichen Namens abweicht: Rabatt je Handindex
+   * (`_handLevelOffsets`, `_handLevelOffsetsTransient`) oder Stufen-Setzung der Instanz (`levelSet`). Nur Namen mit ≥ 2 Kopien in der Hand zählen — bei einer einzigen Kopie
+   * ist die Namensliste schon exakt. Liefert [{ name, idx }] für ALLE Kopien dieser Namen.
+   */
+  _kopienMitSonderstufe(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    const hand = ps?.hand;
+    if (!Array.isArray(hand) || hand.length < 2) return [];
+    const off = ps._handLevelOffsets, trans = ps._handLevelOffsetsTransient;
+    if (!off && !trans && !hand.some((_, i) => this._handLevelSetFor(playerIdx, hand[i], i) != null)) return [];
+    const db = this._getCardDB();
+    const proName = {};
+    hand.forEach((n, i) => { (proName[n] || (proName[n] = [])).push(i); });
+    const out = [];
+    for (const [name, idxs] of Object.entries(proName)) {
+      const cd = db[name];
+      if (idxs.length < 2 || (cd?.cardType !== 'Spell' && cd?.cardType !== 'Attack')) continue;
+      const sonder = idxs.some(i => (off && off[i]) || (trans && trans[i]) || this._handLevelSetFor(playerIdx, name, i) != null);
+      if (sonder) for (const idx of idxs) out.push({ name, idx });
+    }
+    return out;
   }
 
   /**
@@ -21950,15 +21993,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // school/level requirement when the matching additional-action
     // type is flagged `bypassesCasterRequirement: true`.
     const _bypassesCasterReq = this.canBypassCasterRequirementForSpell(heroOwner, heroIdx, cardData, cardName);
-    // ★ W15b (C2): die konkrete Handkarte prüfen (Rabatt „nur die eine Kopie"); bei geliehenem Helden/Vorrat bleibt es namensweit.
-    const _kopieIdx = (!opts.fromCreation && heroOwner === pi && !opts.sofortGuss) ? handIndex : undefined;
-    if (!opts.sofortGuss && !_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData, _kopieIdx !== undefined ? { handIdx: _kopieIdx } : {})) return null;
+    // ★ W15b (C2): die konkrete Handkarte prüfen (Rabatt „nur die eine Kopie"); beim vorrat bleibt es namensweit.
+    // ★ W16a (Al, Frage 6: „Lies die Hand des aktuellen Kontrolleurs"): auch bei geliehenem/gecharmtem Helden (`heroOwner !== pi`) zählt die konkrete Handkopie des Kontrolleurs `pi`
+    // (Rabatt, Wisdom-Kosten) — `levelSourcePi` liest Hand und Ermäßigungen von SEINER Seite, nicht von der des Helden-Besitzers.
+    const _kopieIdx = (!opts.fromCreation && !opts.sofortGuss) ? handIndex : undefined;
+    const _lvOpts = { ...(_kopieIdx !== undefined ? { handIdx: _kopieIdx } : {}), ...(heroOwner !== pi ? { levelSourcePi: pi } : {}) };
+    if (!opts.sofortGuss && !_bypassesCasterReq && !this.heroMeetsLevelReq(heroOwner, heroIdx, cardData, _lvOpts)) return null;
     // ★ W7b (M02-25, Al 14.10.: der Server prueft nach): Wisdom-Abwurf braucht Material. Dieselbe Pruefung wie die
     // Spielbarkeitslisten (`getHeroPlayableCards`, v1279/v1288) – hier als autoritatives Tor, damit ein Zauber ueber
     // der eigenen Stufe nicht gratis wirkt, wenn ein veraenderter Client/die CPU an der UI-Liste vorbeispielt.
     // Boris & Co. (`discardCostWaived`) erlassen die Kosten; Sofort-Guss und Kreatur-Wirker zahlen hier nichts.
     if (!opts.sofortGuss && !_bypassesCasterReq && cardData.cardType === 'Spell') {
-      const _wisdomCost = this.getWisdomDiscardCost(heroOwner, heroIdx, cardData, _kopieIdx);
+      const _wisdomCost = this.getWisdomDiscardCost(heroOwner, heroIdx, cardData, _kopieIdx, heroOwner !== pi ? pi : undefined);
       if (_wisdomCost > 0 && this.handFodderFor(pi, cardName) < _wisdomCost && !this.discardCostWaived(pi)) return null;
     }
 
@@ -22586,7 +22632,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
     if (_leihSeite != null && hasCardType(cardData, 'Creature')) return { retry: true };   // Als Vorgabe 29.9.
     // ★ W15b (C2): „exakt die ausgewählte Karte" — der Rabatt einer ANDEREN Kopie macht diese nicht spielbar.
-    if (!fromCreation && _leihSeite == null && !this._kopieStufeOk(playerIdx, heroIdx, cardData, handIndex)) return { retry: true };
+    if (!fromCreation && !this._kopieStufeOk(playerIdx, heroIdx, cardData, handIndex, _leihSeite ?? playerIdx)) return { retry: true };   // W16a (Frage 6): auch für den geliehenen Helden
 
     if (hasCardType(cardData, 'Creature')) {
       if (zoneSlot === undefined || zoneSlot < 0) return { retry: true };
@@ -22839,7 +22885,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
     const _wisdomKosten = cardData.cardType === 'Spell'
       ? this.getWisdomDiscardCost(wirkerSeite, heroIdx, cardData,
-          (fromZone === 'hand' && wirkerSeite === playerIdx && pool === ps.hand) ? poolIndex : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie
+          (fromZone === 'hand' && pool === ps.hand) ? poolIndex : undefined,
+          wirkerSeite !== playerIdx ? playerIdx : undefined) : 0;   // wie doPlaySpell: Seite des Wirkers; W15b (C2): konkrete Handkopie; W16a (Frage 6): auch beim geliehenen Helden (Hand des Kontrolleurs)
     this.gs._immediateActionContext = true;
     // ★ v1469 (Als Befund 28.9.: „Bartas hat mich nicht gepromptet, ein
     // zweites Ziel mit ‚Phoenix Tackle' anzugreifen"). Der Sofort-Guss
@@ -28955,9 +29002,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // landen in den Zonen DIESES Helden (wie doPlayAbilityFremd).
     const hps = gs.players[heroOwner] || ps;
 
-    // ★ W15a (Al, R3: Chuck „Ja"; Regel W14a Q5): der Aufstiegsbonus legt Abilities PER EFFEKT an — Resistance am aufgestiegenen Helden fängt ihn ab (EIN Effekt, einmal gefragt,
-    // vor jeder Kartenbewegung; die Abilities bleiben in Deck/Hand). Chuck, the Storyteller (eigene Anlegeschleife) fragt selbst.
-    if (await this.abilityAnlegenDurchResistanceBlockiert(pi, heroOwner, heroIdx, 'Ascension Bonus')) return;
+    // ★ W16a (Al, 19.10.2026, Frage 4: „Nein, von keinem"): der Aufstiegsbonus wird von Resistance von KEINEM Ascended Hero abgefangen — die Prüfung aus W15a (R3) ist
+    // zurückgenommen (auch bei Chuck, the Storyteller). Der Bonus ist Teil des Aufstiegs, kein Effekt auf den Helden.
 
     const abZones = hps.abilityZones?.[heroIdx] || [[], [], []];
     while (abZones.length < 3) abZones.push([]);
@@ -45595,10 +45641,12 @@ this._deathWatch = (this._deathWatchStack || []).length
    * wegen des Rabatts einer ANDEREN Kopie durchkäme.
    */
   _kopieStufeOk(pi, heroIdx, cardData, handIndex, hs = pi) {
-    if (hs !== pi || !cardData) return true;
+    if (!cardData) return true;
     if (this._kopieNurIndex(this.gs.players[pi]?.hand, cardData, handIndex) == null) return true;
-    if (this.canBypassCasterRequirementForSpell(pi, heroIdx, cardData, cardData.name)) return true;
-    return this.heroMeetsLevelReq(pi, heroIdx, cardData, { handIdx: handIndex }) || !this.heroMeetsLevelReq(pi, heroIdx, cardData);
+    if (this.canBypassCasterRequirementForSpell(hs, heroIdx, cardData, cardData.name)) return true;
+    // ★ W16a (Al, Frage 6): auch für einen geliehenen/gecharmten Helden (`hs` = Brettseite) zählt die konkrete Kopie in der Hand des Kontrolleurs `pi` (`levelSourcePi`).
+    const lv = hs !== pi ? { levelSourcePi: pi } : {};
+    return this.heroMeetsLevelReq(hs, heroIdx, cardData, { handIdx: handIndex, ...lv }) || !this.heroMeetsLevelReq(hs, heroIdx, cardData, lv);
   }
 
   /** `fn()` mit `gs._wirkerSeite` fuer einen geliehenen Helden (synchron). */
@@ -46643,7 +46691,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return handIndicesWithoutResolving(ps);
   }
 
-  getWisdomDiscardCost(playerIdx, heroIdx, cardData, handIdx) {
+  getWisdomDiscardCost(playerIdx, heroIdx, cardData, handIdx, levelSourcePi) {
     if (cardData.cardType !== 'Spell') return 0;
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
@@ -46659,10 +46707,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // effective rawLevel input. The hero filter (Sparkfly Queen)
     // applies here too: an offset reserved for a specific host hero
     // shouldn't reduce another hero's Wisdom cost.
-    const handArr_w = ps?.hand;
-    const offMap_w  = ps?._handLevelOffsets;
-    const transMap_w = ps?._handLevelOffsetsTransient;
-    const filterMap_w = ps?._handLevelOffsetHeroFilter;
+    // ★ W16a (Al, Frage 6: „Lies die Hand des aktuellen Kontrolleurs"): `levelSourcePi` = Kontrolleur eines geliehenen/gecharmten Helden — Hand, Rabatte (Offsets) und
+    // Ermäßigungen kommen von SEINER Seite, der Held (Schulen, Stufen) bleibt `playerIdx`. Ohne Angabe wie bisher.
+    const lps_w = (typeof levelSourcePi === 'number') ? (this.gs.players[levelSourcePi] || ps) : ps;
+    const handArr_w = lps_w?.hand;
+    const offMap_w  = lps_w?._handLevelOffsets;
+    const transMap_w = lps_w?._handLevelOffsetsTransient;
+    const filterMap_w = lps_w?._handLevelOffsetHeroFilter;
     if (cardData.name && handArr_w && (offMap_w || transMap_w)) {
       let bestOffset = 0;
       const _nurKopie_w = this._kopieNurIndex(handArr_w, cardData, handIdx);   // ★ W15b (C2): konkrete Kopie, siehe `heroMeetsLevelReq`
@@ -46699,7 +46750,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx, _trotzNeg_w);
     let bestCost = -1; // -1 = not playable
     for (const abZones of candidates) {
-      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx);
+      const cost = this._wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi);
       if (cost === 0) return 0;
       if (cost > 0 && (bestCost === -1 || cost < bestCost)) bestCost = cost;
     }
@@ -46707,9 +46758,12 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** Per-zone-set Wisdom cost — extracted for the per-opponent walk. */
-  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx) {
+  _wisdomCostForZones(cardData, hero, rawLevel, abZones, playerIdx, heroIdx, levelSourcePi) {
     const levelAfterAbility = this._applySpellLevelReductions(cardData, rawLevel, abZones);
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
+    // W16a (Frage 6): Ermäßigungen des Kontrolleurs (wie `_testLevelReqForZones`: `lvrPi` + `castHeroSide`)
+    const level = (typeof levelSourcePi === 'number' && levelSourcePi !== playerIdx)
+      ? this._applyCardLevelReductions(cardData, levelAfterAbility, levelSourcePi, heroIdx, { levelSourcePi, castHeroSide: playerIdx })
+      : this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
 
     const gap = this._spellLevelGap(cardData, level, abZones);
     if (gap === 0) return 0;

@@ -112,6 +112,16 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
+      // ★ W16a (Al, Welle 16 Frage 1: „Ja"): Hand-Reaktionen (Post-Target) über ALLE Kreaturen, die der Zauber übernehmen würde: Divine Gift of Rain,
+      // MOE Shield, Storm Ring (ab 2 Zielen) negieren ihn, Golden Wings schützt eine gewählte Kreatur (`_cardinalImmune` → der Diebstahl prallt ab).
+      // Heldenreaktionen (Anti Magic Shield, Barrier of Faith, Test Flight …) bleiben zu: es wird kein Held getroffen.
+      {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [], 'magic_arts_spell', {
+          ziele: beute.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name })),
+        });
+        if (sr?.effectNegated) return;
+      }
+
       // ★ Erst die Herzen auf ALLE Ziele, dann die Uebernahme — so
       //   sieht man, wen es erwischt, bevor sich die Seiten aendern.
       for (const inst of beute) {

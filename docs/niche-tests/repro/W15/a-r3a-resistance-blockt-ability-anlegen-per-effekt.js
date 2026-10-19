@@ -3,7 +3,9 @@
 //   Training an Resistance abprallen?" — „Ja."
 // Erwartet (Regel W14a Q5: Standard-Spielaktion ≠ Effekt): Legt einer dieser Effekte eine Ability an einen Helden mit Resistance Lv3 an, prallt das Anlegen ab — VOR jeder Kartenbewegung:
 //   die Ability bleibt in Hand/Deck/Ablage (kein Mischen), Kosten (Opfer, Abwurf, Karte selbst) bleiben bezahlt. Kontrolle ohne Resistance: wie bisher angelegt.
-//   Gleiches Muster, nicht von Al genannt: Training (Deck-Option) und der Aufstiegsbonus (`performAscensionBonus`). Exit 0 = korrekt.
+//   Gleiches Muster, nicht von Al genannt: Training (Deck-Option). Exit 0 = korrekt.
+//   ★ W16a (Al, 19.10.2026, Frage 4: „Nein, von keinem"): UMGESTELLT — der Aufstiegsbonus (`performAscensionBonus`, Chuck, the Storyteller und alle anderen Ascended Heroes) wird von Resistance
+//   NICHT abgefangen; die Abschnitte „Chuck" und „Aufstiegsbonus" erwarten jetzt den Bonus auch bei Resistance Lv3 (Absicherung: `W16/a-4-…`).
 const H = require('../../lib/h.js');
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const RES = (lv) => Array(lv).fill('Resistance');
@@ -103,7 +105,7 @@ const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
     R.check(`${label}: keine Engine-Fehler / Zustand sauber`, sauber(t), { e: t.errors, a: t.audit() });
   }
 
-  R.section('Chuck, the Storyteller: Aufstiegsbonus „bis zu drei Abilities von außerhalb" — Resistance Lv3 fängt ihn ab');
+  R.section('Chuck, the Storyteller: Aufstiegsbonus „bis zu drei Abilities von außerhalb" — W16a: Resistance Lv3 fängt ihn NICHT ab');
   {
     const CH = 'Chuck, the Storyteller';
     for (const [label, lv] of [['Resistance Lv3', 3], ['ohne Resistance (Kontrolle)', 0]]) {
@@ -116,8 +118,7 @@ const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
       await t.run(() => script.onAscensionBonus(t.engine, 0, 0, 0));
       const gal = t.prompts.filter(p => p.d.type === 'cardGallery' && p.d.title === CH).length;
       const hat = zonen(t, 0).includes('Fighting');
-      if (lv) R.check(`${label}: kein Bonus — keine Galerie, keine Ability`, gal === 0 && !hat, { gal, zonen: zonen(t, 0) });
-      else R.check(`${label}: Bonus läuft — Galerie, Fighting angelegt`, gal >= 1 && hat, { gal, zonen: zonen(t, 0) });
+      R.check(`${label}: Bonus läuft trotz Resistance (W16a) — Galerie, Fighting angelegt`, gal >= 1 && hat, { gal, zonen: zonen(t, 0) });
       R.check(`${label}: keine Engine-Fehler / Zustand sauber`, sauber(t), { e: t.errors, a: t.audit() });
     }
   }
@@ -138,15 +139,14 @@ const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
     R.check(`${label}: keine Engine-Fehler / Zustand sauber`, sauber(t), { e: t.errors, a: t.audit() });
   }
 
-  R.section('Gleiches Muster: Aufstiegsbonus (`performAscensionBonus`, z. B. Arthor/Riffel/Kohta/Taio …) auf einen Helden mit Resistance Lv3');
+  R.section('Aufstiegsbonus (`performAscensionBonus`, z. B. Arthor/Riffel/Kohta/Taio …) auf einen Helden mit Resistance Lv3 — W16a: nicht abgefangen');
   for (const [label, lv] of [['Resistance Lv3', 3], ['ohne Resistance (Kontrolle)', 0]]) {
     const t = await H.fresh({ deck: [['Fighting', 'Fighting', 'Fighting', 'ZZ Dummy'], []], hand: [[], []] });
     t.setAbilities(0, 0, [lv ? RES(lv) : [], [], []]);
     const deck0 = t.pile(0, 'mainDeck').join('|');
     await t.run(() => t.engine.performAscensionBonus(0, 0, ['Fighting'], 0));
     const n = zonen(t, 0).filter(x => x === 'Fighting').length;
-    if (lv) R.check(`${label}: kein Bonus — keine Fighting angelegt, Deck unverändert`, n === 0 && t.pile(0, 'mainDeck').join('|') === deck0, { n, deck: t.pile(0, 'mainDeck') });
-    else R.check(`${label}: drei Fighting angelegt`, n === 3, { n });
+    R.check(`${label}: drei Fighting angelegt (W16a: Resistance fängt den Aufstiegsbonus nicht ab)`, n === 3, { n });
     R.check(`${label}: keine Engine-Fehler / Zustand sauber`, sauber(t), { e: t.errors, a: t.audit() });
   }
 

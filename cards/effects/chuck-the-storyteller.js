@@ -214,9 +214,7 @@ module.exports = {
     engine.sync();
 
     // ② Bis zu drei Abilities von ausserhalb des Spiels.
-    // ★ W15a (Al, R3: „Ja" — Chuck prallt an Resistance ab): das Anlegen der Abilities ist EIN Effekt auf diesen Helden (Anlegen per Effekt, nicht die Standard-Spielaktion) —
-    // trägt er Resistance, bleibt der Bonus aus (die volle Heilung oben ist davon getrennt: sie läuft schon über den Heil-Hook).
-    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, hs, heroIdx, CARD_NAME)) { engine.sync(); return; }
+    // ★ W16a (Al, 19.10.2026, Frage 4: „Nein, von keinem"): Resistance fängt den Aufstiegsbonus NICHT ab (W15a zurückgenommen) — Chuck bekommt seine Abilities trotz Resistance.
     const pool = abilityPool(engine);
     for (let runde = 0; runde < MAX_WAHLEN; runde++) {
       const passend = pool.filter(n => entscheide(engine, pi, hs, heroIdx, n));

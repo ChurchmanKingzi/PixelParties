@@ -93,6 +93,19 @@ module.exports = {
     const expiresAtTurn = (gs.turn || 0) + 2;
     const expiresForPlayer = pi;
 
+    // ★ W16a (Al, Welle 16 Frage 1: „Ja"): Hand-Reaktionen (Post-Target) über alle Kreaturen, die der Himmel negieren würde (ohne „Cute"):
+    // Divine Gift of Rain negiert die Karte, Golden Wings schützt eine gewählte Kreatur (`_cardinalImmune` → `actionNegateCreature` prallt ab).
+    // Spell-/Heldenreaktionen (Storm Ring, MOE Shield, Anti Magic Shield, Barrier of Faith …) bleiben zu: ein Artefakt, das keinen Helden trifft.
+    // Quelle = schlichtes Objekt (Muster Bottled Lightning); die Negation spielt ihre Bilder über `spellVisual`.
+    {
+      const ziele = alleKreaturen(engine).filter(inst => !isCuteCreatureInst(engine, inst))
+        .map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name }));
+      const sr = ziele.length
+        ? await engine.statusHitSurpriseWindow({ name: CARD_NAME, owner: pi, heroIdx: -1 }, [], 'other', { ziele })
+        : null;
+      if (sr?.effectNegated) { engine.sync(); return { ok: true }; }
+    }
+
     // ── DER HIMMEL ────────────────────────────────────────────────
     // Brettweit, auf der Hintergrund-Ebene und UEBER den
     // Area-Hintergruenden (Als Vorgabe) — siehe `layer: 'overAreas'`

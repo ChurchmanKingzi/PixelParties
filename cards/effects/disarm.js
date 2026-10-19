@@ -147,6 +147,15 @@ module.exports = {
       const treffer = ids.map(id => frisch.find(z => z.id === id)).filter(z => z?.cardInstance);
       if (treffer.length === 0) { gs._spellCancelled = true; return; }
 
+      // ★ W16a (Al, 19.10.2026, Frage 2: „Attachments ja"): Disarm wählt einen HELDEN und löscht dessen Ausrüstung — ein Nicht-Schaden-Effekt auf den Helden, den Resistance abfängt
+      // (auch gegen den eigenen Helden, Regel W14a Q5). Die Artefakte bleiben liegen, der Zauber ist gewirkt (Karte in der Ablage, Zusatzaktion bleibt). Effekte, die die Artefakte
+      // selbst wählen (Fire Bomb, Overheat …), zielen nicht auf den Helden und fragen nicht.
+      if (await engine.heroNonDamageEffectBlocked(wahl.seite, wahl.heroIdx, 'unequip', { sourceOwner: pi, source: CARD_NAME })) {
+        engine.log('disarm_blocked', { player: ps.username, hero: wahl.hero.name });
+        engine.sync();
+        return;
+      }
+
       // ── Bild: Ring um jedes Artefakt, Zerfall ──
       engine._broadcastEvent('play_zone_animation', {
         type: 'disarm_snap', zoneType: 'board', owner: wahl.seite, heroIdx: -1, zoneSlot: -1, duration: DAUER_MS,

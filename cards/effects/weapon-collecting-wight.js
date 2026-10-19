@@ -96,8 +96,10 @@ module.exports = {
     });
     if (!platz) return false;
 
-    const inst = await ruesteAusStapelAus(engine, pi, 'discard', name, platz.heroIdx, platz.slot, { source: CARD_NAME, seite: platz.seite });
-    if (!inst) return false;
+    const eqOpts = { source: CARD_NAME, seite: platz.seite };
+    const inst = await ruesteAusStapelAus(engine, pi, 'discard', name, platz.heroIdx, platz.slot, eqOpts);
+    // ★ W16a (Al, Frage 3: „Ja!"): von Resistance abgefangen → der Einmal-Einsatz ist verbraucht (true), die Karte bleibt in der Ablage.
+    if (!inst) return !!eqOpts.blockiert;
 
     engine.log('weapon_collecting_wight', {
       player: ps.username, card: name, hero: engine.gs.players[platz.seite ?? pi]?.heroes?.[platz.heroIdx]?.name, slot: platz.slot,
