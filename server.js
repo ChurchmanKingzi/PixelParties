@@ -2634,7 +2634,7 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
 
 // ===== MONIABOT (Discord) =====
 // Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
-botApi.mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 });
+botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);

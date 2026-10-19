@@ -164,15 +164,15 @@ test('!addsc / !removesc: Argumente, Admin-Pflicht, Antwort', async () => {
   assert.equal(calls.length, 3);
 });
 
-test('!daily: drei Helden als EIN Bild, exakte Nachricht; ohne Daily/Verknüpfung Hinweis', async () => {
-  const state = { mode: 'active' };
+test('!daily: drei Helden als EIN Bild, exakte Nachricht; ohne Daily wird sie gestartet; ohne Verknüpfung Hinweis', async () => {
+  const state = { mode: 'active', started: 0, startResult: 'ok' };
+  const HEROES = ['Teocuilatl, the Embodiment of Gods', 'Alice, the Transfer Student', 'Alice, the Puppeteer Girl'];
   const { ctx } = await setup({
     daily: async () => {
       if (state.mode === 'unlinked') throw Object.assign(new (require('../lib/game-api').GameApiError)(404, 'not_linked'), {});
-      return state.mode === 'active'
-        ? { active: true, heroes: ['Teocuilatl, the Embodiment of Gods', 'Alice, the Transfer Student', 'Alice, the Puppeteer Girl'], nextResetTs: 1 }
-        : { active: false, heroes: [], nextResetTs: 1900000000 };
+      return state.mode === 'active' ? { active: true, heroes: HEROES, nextResetTs: 1 } : { active: false, heroes: [], nextResetTs: 1900000000 };
     },
+    startDaily: async () => { state.started++; return state.startResult === 'ok' ? { active: true, created: true, heroes: HEROES, nextResetTs: 1 } : { active: false, heroes: [], nextResetTs: 1 }; },
   });
   const m = member({ id: '700000000000000001' });
   const g = guild({ members: [m] });
@@ -182,19 +182,57 @@ test('!daily: drei Helden als EIN Bild, exakte Nachricht; ohne Daily/Verknüpfun
   assert.equal(r.content, 'Your challenge for today: Win a game with 2, or 3 of these Heroes:');
   assert.equal(r.files.length, 1);
   assert.ok(isPng(r.files[0].attachment));
+  assert.equal(state.started, 0, 'läuft schon eine → nichts neu gewürfelt');
   const { loadImage } = require('@napi-rs/canvas');
   const img = await loadImage(r.files[0].attachment);
   assert.ok(img.width > img.height * 2, 'drei Karten nebeneinander: ' + img.width + 'x' + img.height);
 
-  state.mode = 'none';
+  state.mode = 'none';                       // noch keine Challenge → der Bot startet sie
   msg = message({ guild: g, member: m, content: '!daily' });
   await ctx.handleMessage(msg);
-  assert.match(msg.replies[0].content, /haven’t started today’s challenge/);
+  assert.equal(state.started, 1);
+  assert.equal(msg.replies.at(-1).content, 'Your challenge for today: Win a game with 2, or 3 of these Heroes:');
+  assert.ok(isPng(msg.replies.at(-1).files[0].attachment));
+
+  state.startResult = 'fail';
+  msg = message({ guild: g, member: m, content: '!daily' });
+  await ctx.handleMessage(msg);
+  assert.match(msg.replies[0].content, /couldn’t start your daily challenge/);
 
   state.mode = 'unlinked';
   msg = message({ guild: g, member: m, content: '!daily' });
   await ctx.handleMessage(msg);
   assert.match(msg.replies[0].content, /haven’t linked/);
+  assert.equal(state.started, 2, 'ohne Verknüpfung wird nichts gestartet (Zähler bleibt bei den zwei Starts davor)');
+});
+
+test('SC-Meldungen zeigen den DISCORD-Namen, nicht den Spielnamen', async () => {
+  const { ctx } = await setup({
+    user: async () => ({ user: { username: 'SpielName', sc: 1234, elo: 1000, wins: 0, losses: 0, skins: 0, color: '#00f0ff' } }),
+    adjustSc: async () => ({ username: 'SpielName', before: 100, after: 150, applied: 50 }),
+  });
+  const boss = member({ id: '600000000000000001', roles: [deputy], tag: 'Chef#0001' });
+  const player = member({ id: '600000000000000009', tag: 'DiscordNick#0002' });
+  const g = guild({ roles: [deputy], members: [boss, player] });
+
+  let msg = message({ guild: g, member: player, content: '!sc' });
+  await ctx.handleMessage(msg);
+  assert.equal(msg.replies[0].content, '🪙 **DiscordNick** has **1,234 SC**');
+
+  msg = message({ guild: g, member: boss, content: '!sc <@600000000000000009>' });
+  await ctx.handleMessage(msg);
+  assert.equal(msg.replies[0].content, '🪙 **DiscordNick** has **1,234 SC**');
+
+  msg = message({ guild: g, member: boss, content: '!addsc 50 <@600000000000000009>' });
+  await ctx.handleMessage(msg);
+  assert.match(msg.replies[0].content, /^🪙 \*\*DiscordNick\*\*: 100 → \*\*150 SC\*\*/);
+  assert.ok(!msg.replies[0].content.includes('SpielName'));
+
+  msg = message({ guild: g, member: player, content: '!profile' });
+  await ctx.handleMessage(msg);
+  const e = msg.replies[0].embeds[0].data;
+  assert.equal(e.title, 'DiscordNick');
+  assert.ok(e.fields.some(f => f.name === 'In-game name' && f.value === 'SpielName'));
 });
 
 test('Rollenabgleich: Rang nach Elo, Skin Collector ab 50, Entzug bei Abstieg', async () => {
