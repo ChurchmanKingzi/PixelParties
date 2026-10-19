@@ -5,7 +5,25 @@
 //  Once per game (shared "Divine Gift" key).
 //  Fires when 1+ targets the player controls
 //  would be affected by an opponent's card or
-//  effect. Negates the effect entirely.
+//  effect. Negate any effects that card or effect
+//  would have on targets YOU control.
+//
+//  W18a (R01-05, Al 19.10.2026: „Nur eigene Ziele
+//  werden beschützt!"): Rain wirkt NUR auf die Ziele
+//  des Reagierenden.
+//    • Sind ALLE Ziele des Fensters eigene (einseitige
+//      Ziel-/Flächenzauber), bleibt es bei der
+//      Negierung der ganzen Karte (`effectNegated`,
+//      unverändert) — die Wirkung der Karte besteht
+//      dann ohnehin nur aus Wirkung auf eigene Ziele.
+//    • Trifft die Karte AUCH fremde Ziele (Armageddon,
+//      Cataclysm, Snowstorm Mischief … treffen beide
+//      Seiten), wird sie NICHT negiert: jedes eigene Ziel
+//      (Held, Kreatur) bekommt Effekt-Immunität gegen
+//      diese Auflösung (`grantEffectImmunity` /
+//      `grantCreatureEffectImmunity`: Schaden, Status,
+//      Zerstörung …), die fremden Ziele werden weiter
+//      getroffen.
 //
 //  Uses isPostTargetReaction so it fires AFTER
 //  targets are known (single-target, AoE heroes,
@@ -67,7 +85,25 @@ module.exports = {
 
     engine.sync();
 
-    // Negate the entire effect
-    return { effectNegated: true };
+    // W18a: nur die Wirkung auf die EIGENEN Ziele negieren.
+    const eigene = (targetedHeroes || []).filter(t => t.owner === pi);
+    const fremde = (targetedHeroes || []).filter(t => t.owner !== pi);
+    if (fremde.length === 0) {
+      // Einseitig (nur eigene Ziele): die ganze Karte negieren wie bisher.
+      return { effectNegated: true };
+    }
+    const quelle = (sourceCard && typeof sourceCard === 'object') ? sourceCard : { name: 'effect' };
+    for (const t of eigene) {
+      if (t.type === 'hero') {
+        engine.grantEffectImmunity(t.owner, t.heroIdx, quelle);
+      } else {
+        const inst = t.cardInstance || (engine.cardInstances || []).find(c =>
+          c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
+          && engine.physicalSide(c) === t.owner && !c.faceDown)
+          || null;
+        if (inst) engine.grantCreatureEffectImmunity(inst, quelle);
+      }
+    }
+    return {};
   },
 };
