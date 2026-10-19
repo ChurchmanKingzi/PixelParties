@@ -83,34 +83,41 @@ const DEATH_DAMAGE = 150;
  */
 function getOppPlacementTargets(gs, pi) {
   const oppIdx = opponentOfGs(gs, pi);
-  const oppPs = gs.players[oppIdx];
-  if (!oppPs) return [];
   const out = [];
-  for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-    const hero = oppPs.heroes[hi];
-    if (!hero?.name) continue; // empty Hero slot has no Support Zones to use
-    const supZones = oppPs.supportZones?.[hi] || [];
-    const freeSlots = [];
-    for (let si = 0; si < 3; si++) {
-      if ((supZones[si] || []).length === 0) freeSlots.push(si);
-    }
-    if (freeSlots.length === 0) continue;
-    out.push({
-      id: `hero-${oppIdx}-${hi}`,
-      type: 'hero',
-      owner: oppIdx,
-      heroIdx: hi,
-      cardName: hero.name,
-    });
-    for (const si of freeSlots) {
+  // W16e (C04-06): „an opponent's Hero" zaehlt nach KONTROLLE (CARD_API „Uebernommene Helden gelten als Helden des Kontrolleurs",
+  // `heroSideOf`): ein von mir uebernommener Gegnerheld ist keiner; ein vom Gegner uebernommener eigener Held schon. Die Support Zone
+  // liegt auf der BRETTSEITE (`physOwner`) des Helden — Ziel-IDs tragen die Brettseite.
+  for (let side = 0; side < (gs.players || []).length; side++) {
+    const sidePs = gs.players[side];
+    if (!sidePs) continue;
+    for (let hi = 0; hi < (sidePs.heroes || []).length; hi++) {
+      const hero = sidePs.heroes[hi];
+      if (!hero?.name) continue; // empty Hero slot has no Support Zones to use
+      const kontrolle = hero.charmedBy ?? hero.permaControlBy ?? side;   // = engine.heroSideOf(side, hero)
+      if (kontrolle !== oppIdx) continue;
+      const supZones = sidePs.supportZones?.[hi] || [];
+      const freeSlots = [];
+      for (let si = 0; si < 3; si++) {
+        if ((supZones[si] || []).length === 0) freeSlots.push(si);
+      }
+      if (freeSlots.length === 0) continue;
       out.push({
-        id: `slot-${oppIdx}-${hi}-${si}`,
-        type: 'equip',
-        owner: oppIdx,
+        id: `hero-${side}-${hi}`,
+        type: 'hero',
+        owner: side,
         heroIdx: hi,
-        slotIdx: si,
-        cardName: null, // empty slot has no card name
+        cardName: hero.name,
       });
+      for (const si of freeSlots) {
+        out.push({
+          id: `slot-${side}-${hi}-${si}`,
+          type: 'equip',
+          owner: side,
+          heroIdx: hi,
+          slotIdx: si,
+          cardName: null, // empty slot has no card name
+        });
+      }
     }
   }
   return out;
@@ -304,6 +311,13 @@ module.exports = {
     // player's discard pile — Powder Keg conceptually belongs to
     // whoever fired it, even though it sits on opp's side.
     placed.inst.originalOwner = pi;
+    // W16e (C04-06): liegt das Fass in der Spalte eines Helden, den der GEGNER kontrolliert (eigener Held, vom Gegner uebernommen),
+    // fuehrt der Gegner es — Brettseite = Spalte, Kontrolleur = Heldenkontrolleur (Weg der Kreaturen ueber geliehene Helden).
+    const hostKontrolle = hostPs.heroes?.[hostHeroIdx]?.charmedBy ?? hostPs.heroes?.[hostHeroIdx]?.permaControlBy ?? hostOwner;
+    if (hostKontrolle !== hostOwner) {
+      engine.markiereSeitenfremd(placed.inst, hostKontrolle);
+      placed.inst.originalOwner = pi;
+    }
 
     // Suppress the doConfirmPotion hand-to-discard disposition
     // (server.js:6379). Powder Keg now LIVES on the board as the
