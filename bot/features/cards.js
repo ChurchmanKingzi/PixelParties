@@ -108,7 +108,7 @@ module.exports = function register(ctx) {
   ctx.command('random', { help: '`!random` — a random card' }, async (msg) => {
     if (cooling(msg.author.id)) return;
     await renderer.init();
-    const pool = renderer.allCards().filter(c => renderer.hasArt(c.name) && !/token/i.test(c.cardType));
+    const pool = renderer.allCards().filter(c => renderer.canRender(c.name) && !/token/i.test(c.cardType));
     const c = pool[Math.floor(Math.random() * pool.length)];
     const buf = c && await png(c.name);
     if (!buf) return msg.reply('Couldn’t draw a card right now.');
@@ -120,7 +120,7 @@ module.exports = function register(ctx) {
   const berlinHour = (d = new Date()) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(d));
   function cardOfDay(dateStr) {
     // Deterministisch je Datum: alle sehen dieselbe Karte, auch nach einem Neustart.
-    const pool = renderer.allCards().filter(c => renderer.hasArt(c.name) && !/token/i.test(c.cardType)).sort((a, b) => a.name.localeCompare(b.name));
+    const pool = renderer.allCards().filter(c => renderer.canRender(c.name) && !/token/i.test(c.cardType)).sort((a, b) => a.name.localeCompare(b.name));
     let h = 2166136261;
     for (const ch of dateStr) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
     return pool[(h >>> 0) % pool.length];
@@ -174,5 +174,8 @@ module.exports = function register(ctx) {
     return files.length > 0;
   });
 
-  ctx.onReady.push(() => renderer.init().then(() => console.log('[cards] Renderer bereit,', renderer.allCards().length, 'Karten')).catch(e => console.error('[cards] Renderer-Fehler:', e)));
+  ctx.onReady.push(() => renderer.init().then(() => {
+    const s = renderer.imageStats();
+    console.log(`[cards] Renderer bereit: ${s.total} Karten — ${s.atlas} aus Kunst-Atlas, ${s.files} aus fertigen Bilddateien (cards/), ${s.none} ganz ohne Bild (werden als Text gezeigt)`);
+  }).catch(e => console.error('[cards] Renderer-Fehler:', e)));
 };
