@@ -4751,7 +4751,9 @@ window.potionPermissions = potionPermissions;
 window.potionDeckAccepts = potionDeckAccepts;
 window.potionClauseTeamConflict = potionClauseTeamConflict;
 
-function isDeckLegal(deck) {
+/** `opts.heroCount`: verlangte Starthelden-Zahl statt 3 (bzw. 2 mit Zhigao) — Draft-Deckbau, wenn der
+ *  gedraftete Pool weniger Starthelden hergibt. */
+function isDeckLegal(deck, opts) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
   const reasons = [];
   if (isCubeDeck(deck)) {
@@ -4768,9 +4770,10 @@ function isDeckLegal(deck) {
     }
   }
   const filledHeroes = (deck.heroes || []).filter(h => h && h.hero);
-  const heroSoll = requiredHeroCount(deck);
+  const heroSoll = (opts && opts.heroCount != null) ? opts.heroCount : requiredHeroCount(deck);
   if (filledHeroes.length !== heroSoll) {
-    reasons.push(heroSoll === 2
+    reasons.push((opts && opts.heroCount != null) ? 'Need ' + heroSoll + ' Hero' + (heroSoll === 1 ? '' : 'es') + ' (' + filledHeroes.length + '/' + heroSoll + ')'
+      : heroSoll === 2
       ? 'With ' + ZHIGAO + ' you may only bring 1 other Hero (' + filledHeroes.length + '/2)'
       : 'Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
   }
@@ -5117,7 +5120,11 @@ function getCardMax(deck, cardName) {
   return max;
 }
 
-function canAddCard(deck, cardName, section) {
+/** `opts.ignoreCopyLimit`: ohne die Kopiengrenzen (4 je Karte, 2 je Potion, 4 Helden im Main Deck …) — Draft-Deckbau:
+ *  dort begrenzt der gedraftete Pool die Kopien; alle anderen Deckbauregeln (Nicolas, Gewuerze, Potion-Deck-Klauseln,
+ *  Zhigao, Sacred Mirror, Heldenteam …) gelten unveraendert. */
+function canAddCard(deck, cardName, section, opts) {
+  const noCopyLimit = !!(opts && opts.ignoreCopyLimit);
   const card = window.CARDS_BY_NAME[cardName];
   if (!card) return false;
   const ct = card.cardType;
@@ -5133,7 +5140,7 @@ function canAddCard(deck, cardName, section) {
     if ((deck.mainDeck || []).length >= CUBE_SIZE) return false;
     return true;
   }
-  const effMax = getCardMax(deck, cardName);
+  const effMax = noCopyLimit ? Infinity : getCardMax(deck, cardName);
   if (section === 'main') {
     // Heroes are now legal in main deck up to 4 copies (Goff-style
     // attach mechanic — main-deck Heroes are drawable and can be
@@ -5143,7 +5150,7 @@ function canAddCard(deck, cardName, section) {
     if (ct === 'Hero') {
       if ((deck.mainDeck || []).length >= mainDeckMax(deck)) return false;
       const inMain = (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
-      if (inMain >= 4) return false;
+      if (!noCopyLimit && inMain >= 4) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
@@ -7332,6 +7339,7 @@ window.countInDeck = countInDeck;
 window.hasNicolasHero = hasNicolasHero;
 window.canAddCard = canAddCard;
 window.isNonStartingHero = isNonStartingHero;
+window.MULTI_TEAM_HEROES = MULTI_TEAM_HEROES;
 window.getCardMax = getCardMax;
 window.trimOverLimitCopies = trimOverLimitCopies;
 window.hasSacredJewelArtifactBonus = hasSacredJewelArtifactBonus;

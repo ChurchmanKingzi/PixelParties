@@ -447,9 +447,14 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
 //  CUBE DRAFT — DECK BUILDING SCREEN
 //  Restricted deck builder for the post-draft phase. Right-side gallery
 //  shows ONLY drafted cards (with copy counts) plus all non-Performance
-//  Abilities at infinite quantity. Hero rule: deck must contain exactly
-//  min(3, heroesInPool) heroes — relaxed for players with sparse hero
-//  draws. Click cards to add (auto-routed to hero / main slots), click
+//  Abilities at infinite quantity. Hero rule: 3 Starting Heroes (2 with
+//  Zhigao), capped by what the pool offers — relaxed for players with
+//  sparse hero draws. Heroes that "cannot be one of your Starting Heroes"
+//  (Quetzahuitl) and any surplus Hero go into the Main Deck. All other
+//  deck-building rules (Nicolas, Secret Spices, Potion Deck clauses,
+//  Sacred Mirror, …) come from the normal deck editor (canAddCard /
+//  isDeckLegal); only the copy limits are replaced by the drafted pool.
+//  Click cards to add (auto-routed to hero / main slots), click
 //  to remove. Player names the deck and clicks Ready when done.
 // ═══════════════════════════════════════════
 function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
@@ -483,11 +488,20 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     return c;
   }, [build?.pool]);
 
-  const heroesInPool = useMemo(() =>
-    (build?.pool || []).filter(n => cardDB[n]?.cardType === 'Hero').length,
-    [build?.pool, cardDB]
-  );
-  const requiredHeroes = Math.min(3, heroesInPool);
+  // Starthelden-Kandidaten: „This cannot be one of your Starting Heroes“ (Quetzahuitl) gehoert ins Main Deck.
+  // Das Team fasst je Vorname nur einen Helden (Peter Röll beliebig oft) — mehr gibt der Pool nicht her.
+  const isNonStartingHero = (n) => !!(window.isNonStartingHero && window.isNonStartingHero(n));
+  const isStarter = (n) => cardDB[n]?.cardType === 'Hero' && !isNonStartingHero(n);
+  const starterCapacity = useMemo(() => {
+    const firstNames = new Set();
+    let multi = 0;
+    for (const n of (build?.pool || [])) {
+      if (!isStarter(n)) continue;
+      if (window.MULTI_TEAM_HEROES && window.MULTI_TEAM_HEROES.has(n)) multi++;
+      else firstNames.add(String(n).split(',')[0].trim());
+    }
+    return firstNames.size + multi;
+  }, [build?.pool, cardDB]);
 
   // Deck state — independent of pool changes (server only pushes pool once).
   const [deckName, setDeckName] = useState('');
@@ -504,15 +518,20 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     if (bootstrappedRef.current || !build?.pool) return;
     bootstrappedRef.current = true;
     setDeckName(`${user?.username || 'Drafter'}'s ${build.cubeName || 'Cube'} Draft`);
-    const heroesFromPool = (build.pool || []).filter(n => cardDB[n]?.cardType === 'Hero');
+    // Vorbelegung des Teams: erst die regulaer baubaren Helden, jeweils nur wenn `canAddCard` sie zulaesst
+    // (kein Quetzahuitl, kein zweiter Held gleichen Vornamens, Zhigao nur mit einem weiteren, …).
     const slots = [null, null, null];
-    for (let i = 0; i < Math.min(3, heroesFromPool.length); i++) {
-      const cd = cardDB[heroesFromPool[i]];
-      slots[i] = {
-        hero: heroesFromPool[i],
-        ability1: cd?.startingAbility1 || null,
-        ability2: cd?.startingAbility2 || null,
-      };
+    const probe = { heroes: slots, mainDeck: [], potionDeck: [], sideDeck: [] };
+    const heroesFromPool = (build.pool || []).filter(n => cardDB[n]?.cardType === 'Hero');
+    const withoutZhigao = heroesFromPool.filter(n => window.requiredHeroCount({ heroes: [{ hero: n }] }) !== 2);
+    // Zhigao nur als Notnagel: hat der Pool drei andere Helden, bleibt er in Reserve.
+    const ordered = withoutZhigao.length >= 3 ? withoutZhigao : [...heroesFromPool.filter(n => !withoutZhigao.includes(n)), ...withoutZhigao];
+    for (const name of ordered) {
+      const empty = slots.findIndex(x => !x);
+      if (empty < 0) break;
+      if (!window.canAddCard(probe, name, 'hero', { ignoreCopyLimit: true })) continue;
+      const cd = cardDB[name];
+      slots[empty] = { hero: name, ability1: cd?.startingAbility1 || null, ability2: cd?.startingAbility2 || null };
     }
     setHeroes(slots);
   }, [build?.pool]);
@@ -526,6 +545,13 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     for (const n of sideDeck) c[n] = (c[n] || 0) + 1;
     return c;
   }, [heroes, mainDeck, potionDeck, sideDeck]);
+
+  // Das Deck fuer die Deckbauregeln (dieselben wie im normalen Deck-Editor: window.canAddCard / isDeckLegal).
+  const deckForRules = { heroes, mainDeck, potionDeck, sideDeck };
+  // Starthelden: 3 (mit Zhigao 2), aber nie mehr, als der Pool hergibt.
+  const requiredHeroes = Math.min(window.requiredHeroCount(deckForRules), starterCapacity);
+  // Kopiengrenzen entfallen im Draft — der gedraftete Pool ist die Grenze (`remainingFor`).
+  const RULES_OPTS = { ignoreCopyLimit: true };
 
   const isFreeAbility = (name) => cardDB[name]?.cardType === 'Ability' && name !== 'Performance';
 
@@ -564,52 +590,47 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     ? availableList.filter(e => e.name.toLowerCase().includes(filter.toLowerCase()))
     : availableList;
 
+  // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
+  const sfx = (n) => { if (window.playSFX) window.playSFX(n, { dedupe: 40 }); };
+  const POTION_MAX = 15, SIDE_MAX = 15;
+
+  // Alle Hinzufuegen-Wege fragen dieselbe Regelfunktion wie der normale Deck-Editor (canAddCard):
+  // Nicolas / Gewuerze fuer Potions im Main Deck, Potion-Deck-Klauseln (Chaos-Diamond, Pinta, Kerthwack),
+  // Zhigao-Team, Sacred Mirror (80 Karten), „cannot be one of your Starting Heroes“ (Quetzahuitl) …
+  // Dazu kommt nur die Pool-Grenze (`remainingFor`).
   const addToHero = (name) => {
-    if (cardDB[name]?.cardType !== 'Hero') return;
-    if (remainingFor(name) <= 0) return;
+    if (remainingFor(name) <= 0) return false;
+    if (!window.canAddCard(deckForRules, name, 'hero', RULES_OPTS)) return false;
     sfx('draw');
     setHeroes(prev => {
       const slots = [...prev];
       const empty = slots.findIndex(s => !s?.hero);
       if (empty < 0) return prev;
-      // Potion-Deck-Klauseln: Chaos-Diamond und Pinta schliessen einander aus.
-      if (window.potionClauseTeamConflict && window.potionClauseTeamConflict({ heroes: slots }, name)) return prev;
       const cd = cardDB[name];
       slots[empty] = { hero: name, ability1: cd?.startingAbility1 || null, ability2: cd?.startingAbility2 || null };
       return slots;
     });
+    return true;
   };
 
   const addToMain = (name) => {
-    if (mainDeck.length >= 60) return;
-    if (remainingFor(name) <= 0) return;
-    if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'main')) return;
+    if (remainingFor(name) <= 0) return false;
+    if (!window.canAddCard(deckForRules, name, 'main', RULES_OPTS)) return false;
     sfx('draw');
     setMainDeck(prev => [...prev, name]);
+    return true;
   };
 
-  // Klaenge wie im normalen Deckbauer: Hinzufuegen = draw, Entfernen = discard.
-  const sfx = (n) => { if (window.playSFX) window.playSFX(n, { dedupe: 40 }); };
-  const POTION_MAX = 15, SIDE_MAX = 15;
-  const deckForRules = { heroes };
   const addToPotion = (name) => {
-    if (potionDeck.length >= POTION_MAX) return false;
     if (remainingFor(name) <= 0) return false;
-    if (window.canCardTypeEnterSection && !window.canCardTypeEnterSection(deckForRules, name, 'potion')) return false;
-    // Erlaubnis (Kerthwack: „any card, but only up to 2 copies of each card"): Karten, die nur dank ihr im Potion Deck liegen,
-    // höchstens `copyCap` Kopien je Name (ohne strenge Klausel; Potions haben ihre eigene Grenze).
-    if (window.potionPermissions && cardDB[name]?.cardType !== 'Potion' && window.potionClauses({ heroes }).length === 0) {
-      const erl = window.potionPermissions({ heroes });
-      if (erl.length > 0 && potionDeck.filter(n => window.copyFamilyKey(n) === window.copyFamilyKey(name)).length >= window.PotionDeckClauses.copyCap(erl)) return false;
-    }
+    if (!window.canAddCard(deckForRules, name, 'potion', RULES_OPTS)) return false;
     setPotionDeck(prev => [...prev, name]);
     sfx('draw');
     return true;
   };
   const addToSide = (name) => {
-    if (sideDeck.length >= SIDE_MAX) return false;
     if (remainingFor(name) <= 0) return false;
-    if (cardDB[name]?.cardType === 'Token') return false;
+    if (!window.canAddCard(deckForRules, name, 'side', RULES_OPTS)) return false;
     setSideDeck(prev => [...prev, name]);
     sfx('draw');
     return true;
@@ -627,42 +648,48 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     setMainDeck(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const onCardClick = (name) => {
+  const onCardClick = (name, forceMain) => {
     const ct = cardDB[name]?.cardType;
+    let ok;
     if (ct === 'Hero') {
-      // Prefer hero slot if any open and not yet at requiredHeroes; else main.
+      // Erst in ein freies Team-Feld, solange die Starthelden noch nicht komplett sind; sonst (oder mit Strg/Cmd+Klick,
+      // oder wenn der Held kein Starthelden sein darf — Quetzahuitl) ins Main Deck.
       const filled = heroes.filter(h => h?.hero).length;
-      if (filled < requiredHeroes) addToHero(name);
-      else addToMain(name);
+      ok = (!forceMain && filled < requiredHeroes && addToHero(name)) || addToMain(name);
     } else if (ct === 'Potion') {
-      // Potions gehoeren ins Potion Deck; ist es voll, geht es (mit Nicolas) ins Main Deck.
-      if (!addToPotion(name)) addToMain(name);
+      // Potions gehoeren ins Potion Deck; ist es voll, geht es (mit Nicolas / Gewuerz) ins Main Deck.
+      ok = addToPotion(name) || addToMain(name);
     } else {
-      addToMain(name);
+      ok = addToMain(name);
     }
+    if (!ok) notify(cannotAddReason(name), 'error');
   };
-  // Shift+Klick → Potion Deck, Rechtsklick → Side Deck, Klick → automatisch.
+  // Warum ging die Karte nirgends hinein? (Kurzfassung der haeufigsten Gruende)
+  const cannotAddReason = (name) => {
+    const ct = cardDB[name]?.cardType;
+    if (mainDeck.length >= window.mainDeckMax(deckForRules)) return 'Main Deck is full';
+    if (ct === 'Potion') return 'Potions need Nicolas (or a matching Secret Spice) for the Main Deck — or room in the Potion Deck';
+    return 'Cannot add card';
+  };
+  // Shift+Klick → Potion Deck, Strg/Cmd+Klick → Main Deck (auch Helden), Rechtsklick → Side Deck, Klick → automatisch.
   const onCardPointer = (e, name) => {
     if (e.shiftKey) { if (!addToPotion(name)) notify('Cannot add to Potion Deck', 'error'); return; }
+    if (e.ctrlKey || e.metaKey) { if (!addToMain(name)) notify(cannotAddReason(name), 'error'); return; }
     onCardClick(name);
   };
 
   const filledHeroes = heroes.filter(h => h?.hero).length;
-  const heroOk = filledHeroes === requiredHeroes;
-  const mainOk = mainDeck.length === 60;
   // Potion-Deck-Klausel eines Starthelden (Chaos-Diamond, Pinta, …): genaue Kartenzahl statt 0 oder 5–15.
   const potionKlauseln = window.potionClauses ? window.potionClauses({ heroes }) : [];
   const hasChaos = potionKlauseln.length > 0;
   const potionSoll = hasChaos ? window.PotionDeckClauses.requiredSize(potionKlauseln) : null;
   const potionOk = hasChaos ? potionDeck.length === potionSoll : (potionDeck.length === 0 || (potionDeck.length >= 5 && potionDeck.length <= 15));
-  const mainPotionsOk = hasChaos || (window.hasNicolasHero && window.hasNicolasHero({ heroes })) || !mainDeck.some(n => cardDB[n]?.cardType === 'Potion');
-  const deckLegal = heroOk && mainOk && potionOk && mainPotionsOk && deckName.trim().length > 0;
-  const deckProblems = [];
-  if (!heroOk) deckProblems.push(`Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (have ${filledHeroes})`);
-  if (!mainOk) deckProblems.push(`Main deck must be 60 cards (have ${mainDeck.length})`);
-  if (!potionOk) deckProblems.push(hasChaos ? `Potion Deck must be exactly ${potionSoll} (have ${potionDeck.length})` : `Potion Deck must be 0 or 5–15 (have ${potionDeck.length})`);
-  if (!mainPotionsOk) deckProblems.push('Potions in the Main Deck need Nicolas');
+  // Legalitaet wie im normalen Deck-Editor (isDeckLegal: Main-Deck-Groesse inkl. Sacred Mirror, Potion-Deck-Klauseln,
+  // Potions im Main Deck nur mit Nicolas/Gewuerz, 15er-Potiongrenze, …) — nur die Heldenzahl richtet sich nach dem Pool.
+  const legality = window.isDeckLegal(deckForRules, { heroCount: requiredHeroes });
+  const deckProblems = [...legality.reasons];
   if (!deckName.trim()) deckProblems.push('Deck needs a name');
+  const deckLegal = deckProblems.length === 0;
 
   const submitReady = () => {
     if (!deckLegal) { notify('Deck not ready: ' + deckProblems.join(', '), 'error'); return; }
@@ -757,6 +784,11 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
       {build.assignedHero && (
         <div style={{ background: 'rgba(255,170,0,.12)', borderBottom: '1px solid #ffaa33', padding: '6px 16px', fontSize: 11, textAlign: 'center', color: '#ffcc44' }}>
           🎲 You drafted no Heroes. The system assigned <strong>{build.assignedHero}</strong> to you.
+        </div>
+      )}
+      {buildTimerMsLeft == null && build.buildTimerTotalMs === 0 && (
+        <div style={{ background: 'rgba(0,240,255,.06)', borderBottom: '1px solid var(--bg4)', padding: '4px 16px', fontSize: 11, textAlign: 'center', color: 'var(--text2)' }}>
+          ⏱ Deck building timer is off — the tournament starts once everyone is ready.
         </div>
       )}
       {buildTimerMsLeft != null && (() => {
@@ -869,7 +901,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
           <div className="orbit-font" style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>
             AVAILABLE CARDS
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 6 }}>Click: add · Shift+click: Potion Deck · Right-click: Side Deck</div>
+          <div style={{ fontSize: 9, color: 'var(--text2)', marginBottom: 6 }}>Click: add · Shift+click: Potion Deck · Ctrl+click: Main Deck (Heroes too) · Right-click: Side Deck</div>
           <input className="input" placeholder="🔍 Filter by name..." value={filter} onChange={e => setFilter(e.target.value)}
             style={{ marginBottom: 8, fontSize: 11, padding: '4px 8px' }} />
           <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -889,6 +921,12 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
                     {/* `filter` NICHT am Wrapper: ein Vorfahre mit `filter` wird zum Bezugsrahmen fuer `position: fixed` und
                         liess den Tooltip riesig im Kasten statt in der rechten Leiste erscheinen. Der Filter sitzt an der Karte. */}
                     <CardMini card={cardDB[name]} onClick={() => {}} style={{ width: '100%', height: '100%', filter: dimmed ? 'grayscale(.8) brightness(.6)' : 'none' }} />
+                    {isNonStartingHero(name) && (
+                      <div style={{
+                        position: 'absolute', top: 2, left: 2, background: 'rgba(255,170,0,.9)', color: '#2a1a00',
+                        borderRadius: 4, padding: '1px 5px', fontSize: 8, fontWeight: 800, lineHeight: 1.2, pointerEvents: 'none',
+                      }} title="Cannot be a Starting Hero — play it in the Main Deck">MAIN ONLY</div>
+                    )}
                     <div style={{
                       position: 'absolute', bottom: 2, right: 2,
                       background: free ? 'rgba(154,216,255,.85)' : 'rgba(0,0,0,.85)',
@@ -1207,6 +1245,8 @@ function PlayScreen() {
   const [draftPackTimerSec, setDraftPackTimerSec] = useState(60);
   const [draftPickTimerSec, setDraftPickTimerSec] = useState(5);
   const [draftTimerDisabled, setDraftTimerDisabled] = useState(false);
+  const [draftBuildTimerSec, setDraftBuildTimerSec] = useState(300);   // Deckbau-Timer; 0 = AUS
+  const [promoteName, setPromoteName] = useState(null);   // Draft-Lobby: Spieler, dessen Befoerderungs-Knopf der Host gerade offen hat
   const [draftPrelimsBo, setDraftPrelimsBo] = useState(1);
   const [draftFinaleBo, setDraftFinaleBo] = useState(3);
   const [draftFlow, setDraftFlow] = useState('simultaneous'); // 'simultaneous' | 'consecutive'
@@ -1463,6 +1503,7 @@ function PlayScreen() {
           packTimerSec: packT,
           pickTimerSec: pickT,
           timerDisabled: !!draftTimerDisabled,
+          buildTimerSec: Math.max(0, Math.min(3600, Number.isFinite(parseInt(draftBuildTimerSec, 10)) ? parseInt(draftBuildTimerSec, 10) : 300)),
           prelimsBo: draftPrelimsBo,
           finaleBo: draftFinaleBo,
           flow: draftFlow,
@@ -1584,6 +1625,8 @@ function PlayScreen() {
     const seats = lobby.seats || [];
     const filledSeats = seats.filter(s => s).length;
     const canStart = filledSeats >= 2;
+    // Vom Host beförderte Spieler (Co-Hosts) duerfen ebenfalls Leute einladen.
+    const isCohost = !isHost && seats.some(s => s && s.username === user.username && s.isCohost);
     return (
       <div className="screen-full">
         <div className="top-bar">
@@ -1601,7 +1644,7 @@ function PlayScreen() {
         </div>
         <div className="lobby-raum lobby-content animate-in" style={{ '--lobby-w': '720px' }}>
           {/* Wer ist online? Der Raumbesitzer lädt hier per Klick → Invite ein (app-social.jsx) */}
-          {user && !user.isGuest && <SocialSidePanel meId={user.id} room={lobby} isHost={isHost} />}
+          {user && !user.isGuest && <SocialSidePanel meId={user.id} room={lobby} isHost={isHost || isCohost} />}
           <div className="lobby-raum-mitte">
           <div className="panel" style={{ width: 720, maxWidth: '92%' }}>
             <div className="orbit-font" style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>
@@ -1612,29 +1655,48 @@ function PlayScreen() {
               {Array.from({ length: 8 }).map((_, i) => {
                 const seat = seats[i] || null;
                 const occupied = !!seat;
+                // Der Host kann Mitspieler per Klick befördern (Co-Host: darf ebenfalls einladen) bzw. wieder abstufen.
+                const promotable = isHost && occupied && !seat.isHost && !seat.isBot;
+                const promoteOpen = promotable && promoteName === seat.username;
                 return (
-                  <div key={i} style={{
-                    border: '2px solid ' + (occupied ? (seat.isHost ? 'var(--accent)' : 'var(--accent2)') : 'var(--bg4)'),
+                  <div key={i}
+                    onClick={promotable ? () => setPromoteName(promoteOpen ? null : seat.username) : undefined}
+                    title={promotable ? 'Click to promote — promoted players can invite others' : undefined}
+                    style={{
+                    border: '2px solid ' + (occupied ? (seat.isHost ? 'var(--accent)' : (seat.isCohost ? 'var(--accent4)' : 'var(--accent2)')) : 'var(--bg4)'),
                     borderStyle: occupied ? 'solid' : 'dashed',
                     borderRadius: 8,
                     padding: '12px 8px',
                     background: occupied ? 'rgba(0,240,255,.04)' : 'transparent',
                     textAlign: 'center',
                     opacity: occupied ? 1 : .5,
+                    cursor: promotable ? 'pointer' : 'default',
                   }}>
                     <div style={{ fontSize: 22, marginBottom: 6 }}>
-                      {occupied ? (seat.isHost ? '👑' : (seat.isBot ? '🤖' : '⚔️')) : `${i + 1}`}
+                      {occupied ? (seat.isHost ? '👑' : (seat.isCohost ? '⭐' : (seat.isBot ? '🤖' : '⚔️'))) : `${i + 1}`}
                     </div>
                     <div style={{ fontWeight: 700, fontSize: 12, color: occupied ? (seat.isHost ? 'var(--accent)' : 'var(--accent2)') : 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {occupied ? seat.username : 'Open Seat'}
                     </div>
                     <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 2 }}>
-                      {occupied ? (seat.isHost ? 'HOST' : seat.isBot ? 'BOT' : 'PLAYER') : ' '}
+                      {occupied ? (seat.isHost ? 'HOST' : seat.isBot ? 'BOT' : seat.isCohost ? 'CO-HOST' : 'PLAYER') : ' '}
                     </div>
+                    {promoteOpen && (
+                      <button className="btn" style={{ fontSize: 10, padding: '3px 8px', marginTop: 8 }}
+                        onClick={(e) => { e.stopPropagation(); socket.emit('cube_promote_player', { roomId: lobby.id, username: seat.username, promote: !seat.isCohost }); setPromoteName(null); }}>
+                        {seat.isCohost ? '⬇ DEMOTE' : '⭐ PROMOTE'}
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            {isHost && filledSeats > 1 && (
+              <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 12, textAlign: 'center' }}>
+                Click a player to promote them to ⭐ co-host — promoted players can invite others too.
+              </div>
+            )}
 
             <div style={{ background: 'var(--bg2)', borderRadius: 4, padding: '8px 12px', marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11, color: 'var(--text2)' }}>
               {lobby.cubeDraft.timerDisabled ? (
@@ -1645,6 +1707,7 @@ function PlayScreen() {
                   <div>➕ Bonus per Pick: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.pickTimerSec}s</strong></div>
                 </>
               )}
+              <div style={{ gridColumn: '1/3' }}>🛠 Deck building timer: <strong style={{ color: lobby.cubeDraft.buildTimerSec === 0 ? 'var(--accent)' : 'var(--text)' }}>{lobby.cubeDraft.buildTimerSec === 0 ? 'Off' : (Math.floor(lobby.cubeDraft.buildTimerSec / 60) + ':' + String(lobby.cubeDraft.buildTimerSec % 60).padStart(2, '0'))}</strong>{lobby.cubeDraft.buildTimerSec === 0 ? ' — no limit.' : ' after the first drafter is ready.'}</div>
               <div>🎮 Prelims: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.prelimsBo}</strong></div>
               <div>🏆 Finale: <strong style={{ color: 'var(--text)' }}>Bo{lobby.cubeDraft.finaleBo}</strong></div>
               <div>🥉 Third-place match: <strong style={{ color: 'var(--text)' }}>{lobby.cubeDraft.thirdPlace ? 'Yes' : 'No'}</strong></div>
@@ -2016,6 +2079,12 @@ function PlayScreen() {
                       <input className="input" type="number" min={0} max={60} value={draftPickTimerSec}
                         onChange={e => setDraftPickTimerSec(e.target.value)} disabled={draftTimerDisabled}
                         title="Extra seconds added to the pack budget for each pick." />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4, whiteSpace: 'nowrap' }}>Deck Build (s) · 0 = OFF</div>
+                      <input className="input" type="number" min={0} max={3600} value={draftBuildTimerSec}
+                        onChange={e => setDraftBuildTimerSec(e.target.value)}
+                        title="Deck building time limit, starting when the first drafter clicks Ready. Undone decks are auto-completed when it runs out. 0 = no limit." />
                     </div>
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text2)' }}

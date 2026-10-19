@@ -428,7 +428,8 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
       try {
         const info = roomInviteInfo ? roomInviteInfo(String(data?.roomId || '')) : null;
         if (!info) return reply(ack, { error: 'Room not found.' });
-        if (info.hostId !== uid) return reply(ack, { error: 'Only the room owner can invite players.' });
+        // Einladen darf der Besitzer — und wer er in der Lobby befördert hat (Cube Draft: `inviterIds`).
+        if (!(info.inviterIds || [info.hostId]).includes(uid)) return reply(ack, { error: 'Only the room owner can invite players.' });
         if (!info.open) return reply(ack, { error: 'This room is no longer open for invitations.' });
         if (info.full) return reply(ack, { error: 'The room is full.' });
         const peer = await loadPeer(String(data?.to || ''));
@@ -465,6 +466,8 @@ function createSocial({ db, io, uuidv4, isInGame, startChallengeGame, roomInvite
         if (inv.to !== uid || inv.id !== String(data?.id || '')) continue;
         invites.delete(k);
         inviteDeclined.set(k, Date.now());
+        // Der Einladende (Besitzer oder befoerderter Spieler) sieht die Absage in seiner Liste.
+        emitToUser(inv.from, 'room_invite_declined', { roomId: inv.roomId, userId: uid });
       }
     });
 
