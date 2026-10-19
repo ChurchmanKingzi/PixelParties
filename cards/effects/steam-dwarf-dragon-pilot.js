@@ -354,6 +354,14 @@ module.exports = attachSteamEngine({
       const freiDP = usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN });
       if (freiDP <= 0) return;
 
+      // ★ W16b (A03-futuretech-07, Text „when you discard 1 OR MORE cards"): ein Abwurfvorgang (Stapelabfrage, Klammer, Mehrfach-Abwurf) ist EIN
+      // Auslöser, nicht einer je Karte. Die Engine kennzeichnet die Karten eines Vorgangs mit derselben `discardOp`; angeboten wird einmal
+      // je Vorgang (auch bei „No" — die weiteren Karten desselben Vorgangs fragen nicht erneut).
+      if (ctx.discardOp != null) {
+        if (inst.counters._pilotLetzterAbwurf === ctx.discardOp) return;
+        inst.counters._pilotLetzterAbwurf = ctx.discardOp;
+      }
+
       // Offer activation — this is optional, so player can decline.
       const confirm = await engine.promptGeneric(pi, {
         type: 'confirm',

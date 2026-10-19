@@ -11863,6 +11863,7 @@ class GameEngine {
     if (toDiscard <= 0) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
+    const _abwurfOp = toDiscard > 1 ? this._neueAbwurfVorgangsId() : undefined;   // W16b (A03-futuretech-07): ein Vorgang
     for (let i = 0; i < toDiscard; i++) {
       const cardName = ps.hand.splice(ps.hand.length - 1, 1)[0];   // per splice (nicht pop): Herkunft des Platzes wird so mitgefuehrt
       const fromHandIdx = ps.hand.length; // Pre-Splice-Index des gepoppten Slots
@@ -11890,6 +11891,7 @@ class GameEngine {
           sourceOwner: this._deriveEffectOwner(opts, playerIdx),
           selfInflicted: !!opts.selfInflicted,
           _fromHand: true,
+          ...(_abwurfOp != null ? { discardOp: _abwurfOp } : {}),   // W16b
         });
       }
       // Als Takt: eine Karte nach der anderen, ~0.5s je Karte.
@@ -14746,6 +14748,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       selfInflicted: !!opts.selfInflicted,
       _fromHand: true,
       _skipReactionCheck: opts.skipReactionCheck !== false,
+      ...((this.gs._batchDiscardDepth || 0) > 0 && this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b
     };
     // Inside an open discard batch, defer the per-card on-discard
     // reactors until ALL discards in the batch have landed in the
@@ -17162,6 +17165,17 @@ this._deathWatch = (this._deathWatchStack || []).length
    * effects (Glass of Marbles, Skull Necklace) resolve those effects
    * AFTER the entire batch is in the discard pile — not interleaved.
    */
+  /**
+   * ★ W16b (A03-futuretech-07): Kennung eines ABWURFVORGANGS. „When you discard 1 or more cards" (Steam Dwarf Dragon Pilot) antwortet je
+   * Vorgang einmal, nicht je Karte (Konvention wie `_drawBatch` beim Ziehen). Die Hook-Kontexte von `onDiscard` tragen `discardOp`
+   * (Stapelabfrage/`withDiscardBatch`: eine Kennung je äußerer Klammer; `actionDiscardCardsAnimated`: eine je Aufruf); Einzelabwürfe ohne Klammer
+   * tragen keine (jeder ist ein eigener Vorgang). Rein additiv.
+   */
+  _neueAbwurfVorgangsId() {
+    this._abwurfVorgangsSeq = (this._abwurfVorgangsSeq || 0) + 1;
+    return this._abwurfVorgangsSeq;
+  }
+
   async withDiscardBatch(playerIdx, opts, fn) {
     if (typeof opts === 'function') { fn = opts; opts = {}; }
     if (!opts) opts = {};
@@ -17169,6 +17183,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs._batchDiscardCount = 0;
       this.gs._batchDiscardCountByPlayer = {};
       this.gs._batchDiscardPendingHooks = [];
+      this.gs._batchDiscardOp = this._neueAbwurfVorgangsId();   // W16b (A03-futuretech-07)
     }
     this.gs._batchDiscardDepth = (this.gs._batchDiscardDepth || 0) + 1;
     try {
@@ -17295,6 +17310,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs._batchDiscardCount = 0;
       this.gs._batchDiscardCountByPlayer = {};
       this.gs._batchDiscardPendingHooks = [];
+      this.gs._batchDiscardOp = this._neueAbwurfVorgangsId();   // W16b (A03-futuretech-07)
     }
     this.gs._batchDiscardDepth = (this.gs._batchDiscardDepth || 0) + 1;
 
@@ -17569,6 +17585,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               selfInflicted: !!opts.selfInflicted,
               sourceOwner: this._deriveEffectOwner(opts, playerIdx),
               _fromHand: true, _skipReactionCheck: true,
+              ...(this.gs._batchDiscardOp != null ? { discardOp: this.gs._batchDiscardOp } : {}),   // W16b (A03-futuretech-07)
             },
           });
         }
