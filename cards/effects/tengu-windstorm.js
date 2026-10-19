@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Tengu Windstorm"
 //  Spell (Decay Magic Lv0, Normal). BANNED.
@@ -171,6 +171,10 @@ function _collectBoardTargets(gs, engine) {
         cardName: inst.name,
         _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
   return targets;
@@ -198,6 +202,25 @@ async function _bounceToDeck(engine, inst, position /* 'top' | 'bottom' */, sour
   const owner = inst.originalOwner != null ? inst.originalOwner : inst.owner;
   const ownerPs = gs.players[owner];
   if (!ownerPs) return false;
+  // W19a (Al, 19.10.2026): oberste Karte eines Coolness Stacks -> Stack abbauen (`actionPopCoolnessStackTo(…, 'board')`: Array +
+  // Instanz), Karte oben/unten ins Deck des Besitzers; kein Flug (der Client kennt keinen Stack->Deck-Flug).
+  if (inst.zone === 'coolnessStack') {
+    const stack = gs.players[inst.owner]?.coolnessStack || [];
+    if (stack.length === 0 || stack[stack.length - 1] !== inst.name) return false;
+    const popped = await engine.actionPopCoolnessStackTo(inst.owner, 'board');
+    if (!popped) return false;
+    await engine.runHooks('onCardLeaveZone', {
+      card: popped.inst, cardName: popped.cardName, leavingCardName: popped.cardName,
+      fromZone: 'coolnessStack', fromOwner: inst.owner, toOwner: owner, toZone: 'deck',
+      _skipReactionCheck: true,
+    });
+    if (!ownerPs.mainDeck) ownerPs.mainDeck = [];
+    if (position === 'top') ownerPs.mainDeck.unshift(popped.cardName);
+    else ownerPs.mainDeck.push(popped.cardName);
+    engine.log('tengu_windstorm_bounce', { player: ownerPs.username, card: popped.cardName, from: 'coolnessStack', position, by: sourceName });
+    engine.sync();
+    return true;
+  }
   const fromZone = inst.zone;
   const fromHeroIdx = inst.heroIdx;
   const fromZoneSlot = inst.zoneSlot;
@@ -458,7 +481,7 @@ module.exports = {
         confirmClass: 'btn-info',
         cancellable:  !vorab,   // W4b: Kosten schon gezahlt → nicht mehr abbrechbar
         exclusiveTypes: true,
-        maxPerType:   { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+        maxPerType:   { hero: 1, equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
       });
 
       if (!cardPick || cardPick.length === 0) {

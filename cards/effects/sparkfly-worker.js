@@ -78,7 +78,7 @@ module.exports = {
         confirmClass: 'btn-success',
         cancellable: true,
         exclusiveTypes: true,
-        maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+        maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
       });
       if (!picked || picked.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 

@@ -12756,6 +12756,20 @@ class GameEngine {
 
   async _actionDestroyCardKern(source, targetCard, opts = {}) {
     if (!targetCard) return;
+    // W19a (Al, 19.10.2026: „any card on the board that is not a Hero" schließt die oberste Karte des Coolness Stacks ein): eine
+    // Stack-Karte hat keine Zonen-Arrays zum Räumen - `_removeCardFromState` kennt die Zone nicht, die Karte stand vorher in Stack UND
+    // Ablage (Scrap Plow, Shishi, Antonia). Zerstören = die oberste Karte in die Ablage ihres Besitzers (`actionPopCoolnessStackTo`).
+    if (targetCard.zone === ZONES.COOLNESS_STACK) {
+      if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
+        return;
+      }
+      const stapel = this.gs.players[targetCard.owner]?.coolnessStack || [];
+      if (stapel.length > 0 && stapel[stapel.length - 1] === targetCard.name) {
+        await this.actionPopCoolnessStackTo(targetCard.owner, 'discard', { source: source?.name || opts.sourceName || null });
+      }
+      return;
+    }
     // v1375: Ability Zone eines temporaer gesteuerten Helden — unberuehrbar.
     if (!opts._ignoreCharmSchutz && this.abilityZoneGeschuetzt(targetCard)) {
       this.log('ability_protected_by_control', { card: targetCard.name, by: source?.name || null });
@@ -16121,11 +16135,35 @@ this._deathWatch = (this._deathWatchStack || []).length
    * exakt EINE Karte liegt" - mit „Alice, the Transfer Student" teilen sich mehrere Kreaturen eine Zone, das Entfernen einer einzelnen
    * macht sie nicht frei. `side` = physische Seite der Zone. Mit `inst` (die zu entfernende Karte) muss sie genau diese Zone belegen.
    */
-  zoneFreiNachKostenzahlung(side, heroIdx, zoneSlot, inst = null) {
+  zoneFreiNachKostenzahlung(side, heroIdx, zoneSlot, inst = null, maxEntfernbar = 1) {
     const slot = this.gs?.players?.[side]?.supportZones?.[heroIdx]?.[zoneSlot];
-    if (!Array.isArray(slot) || slot.length !== 1) return false;
+    // W19a (Al, 19.10.2026): „Jede Zone ist ein Ziel, die durch Opfern für die Beschwörung leer wird; bei mehr Creatures als benötigten Opfern
+    // ist eine Zone nicht viable." `maxEntfernbar` = wie viele Karten die Kostenzahlung höchstens entfernt (Standard 1 = nur Einzelzonen, wie W17a).
+    if (!Array.isArray(slot) || slot.length < 1 || slot.length > Math.max(1, maxEntfernbar)) return false;
     if (inst && !(inst.zone === 'support' && inst.heroIdx === heroIdx && inst.zoneSlot === zoneSlot)) return false;
     return true;
+  }
+  /**
+   * W19a (Al, 19.10.2026): Instanzen, die diese Support Zone (physische Seite `side`) belegen - bei einem Alice-Stapel mehrere.
+   */
+  zoneInsassen(side, heroIdx, zoneSlot) {
+    return this.cardInstances.filter(c => c.zone === ZONES.SUPPORT && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+      && this.physicalSide(c) === side);
+  }
+  /**
+   * ★ W19a (Al, 19.10.2026, Mehr-Opfer-Karten Blue-Ice Dragon, Foresta, Steam Dwarf Dragon Pilot): Ist diese belegte Zone ein gültiges
+   * Beschwörungsziel, weil die Opferkosten `spec` sie VOLLSTÄNDIG leeren können? Al: „Es ist jede Zone ein Ziel, die durch Opfern für die
+   * Beschwörung leer wird. Wählt man eine Zone mit 2 Creatures darin, müssen beide geopfert werden, bei mehr Creatures als benötigten
+   * Opfern ist eine Zone nicht viable." Alle Insassen der Zone sind Pflicht-Opfer (`spec.requiredInstIds`: opferbar, nicht „in diesem Zug
+   * beschworen", höchstens `maxCount` Stück, Summenbedingungen weiter erfüllbar). Dieselben Pflicht-Opfer zahlt danach `resolveSacrificeCost`
+   * (`zoneInsassen(...)` als `requiredInstIds`); Rest der Opfer frei.
+   */
+  zoneLeerbarDurchOpfer(pi, side, heroIdx, zoneSlot, spec, selfId = null) {
+    const slot = this.gs?.players?.[side]?.supportZones?.[heroIdx]?.[zoneSlot];
+    if (!Array.isArray(slot) || slot.length === 0) return false;
+    const ids = this.zoneInsassen(side, heroIdx, zoneSlot).map(c => c.id);
+    if (ids.length !== slot.length) return false;
+    return this.canSatisfySacrifice(pi, { ...spec, requiredInstIds: ids }, selfId);
   }
   /** W17a: Teilt sich diese Zone mehrere Karten (Alice-Stapel)? Nur der Stapel-Fall (>= 2 Eintraege); fehlt das Zonen-Array, gilt sie nicht als geteilt. */
   _zoneGeteilt(side, heroIdx, zoneSlot) {
@@ -28294,6 +28332,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Required tributes must be present among the candidates, otherwise
     // no valid subset can satisfy the spec.
     if (spec.requiredInstIds && spec.requiredInstIds.length > 0) {
+      if (spec.maxCount != null && spec.requiredInstIds.length > spec.maxCount) return false;   // W19a: mehr Pflicht-Opfer als erlaubte Opfer
       for (const id of spec.requiredInstIds) {
         if (!candidates.some(c => c.inst.id === id)) return false;
       }

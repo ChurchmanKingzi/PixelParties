@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Smug Mastermind Antonia"
 //  Creature (Summoning Magic Lv 0, 50 HP)
@@ -125,6 +125,10 @@ function collectNonHeroBoardTargets(gs, engine) {
         type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
 
@@ -161,7 +165,7 @@ async function runAntoniaEffect(ctx) {
     confirmClass: 'btn-danger',
     cancellable: true,
     exclusiveTypes: true,
-    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
   });
   if (!pick || pick.length === 0) return false;
 

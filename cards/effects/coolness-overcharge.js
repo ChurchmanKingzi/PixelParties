@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  SPELL: "Coolness Overcharge"
 //  Stack must have ≥6 cards.
@@ -193,10 +193,8 @@ function collectTargets(engine) {
       targets.push({ id: `surprise-${inst.owner}-${inst.heroIdx}`, type: 'surprise',
         owner: inst.owner, heroIdx: inst.heroIdx, cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'coolnessStack') {
-      const stack = gs.players[inst.owner]?.coolnessStack || [];
-      if (stack.length === 0 || stack[stack.length - 1] !== inst.name) continue;
-      targets.push({ id: `coolness-${inst.owner}`, type: 'coolnessStackTop',
-        owner: inst.owner, heroIdx: -1, cardName: inst.name, _cardInstance: inst });
+      const spitze = coolnessSpitzeZiel(engine, inst);   // W19a: Stack-Spitze an EINER Stelle (_targeting-shared)
+      if (spitze) targets.push(spitze);
     }
   }
   return targets;

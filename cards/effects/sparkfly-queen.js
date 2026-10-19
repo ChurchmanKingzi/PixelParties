@@ -553,7 +553,7 @@ async function runWorkerGift(ctx, engine, gs, pi, oi) {
     confirmClass: 'btn-warning',
     cancellable: false,
     exclusiveTypes: true,
-    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1 },
+    maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
   });
   if (!picked || picked.length === 0) {
     // Forced prompt with no pick — pick the first target as fallback

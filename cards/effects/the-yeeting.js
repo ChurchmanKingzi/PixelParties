@@ -444,6 +444,7 @@ function _hasNonHeroCards(gs) {
     for (let hi = 0; hi < 3; hi++) {
       if ((ps.surpriseZones?.[hi] || []).length > 0) return true;
     }
+    if ((ps.coolnessStack || []).length > 0) return true;   // W19a: die Stack-Spitze ist ein gültiges Ziel (_targeting-shared.coolnessSpitzeZiel)
   }
   if (gs.areaZones) {
     for (let p = 0; p < gs.players.length; p++) {
