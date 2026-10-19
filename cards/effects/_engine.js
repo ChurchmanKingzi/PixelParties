@@ -22992,6 +22992,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v1469: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
       if (_aeussererLog === undefined) delete this.gs._spellDamageLog;
       else this.gs._spellDamageLog = _aeussererLog;
+          // ★ W16b (A01-pollution-24): Herkunft des Gusses — nur ein Zauber aus der HAND zählt für „plays a Spell from their hand"
+          // (Acid Rain). Circle-Replays (Wegwerf-Pool aus dem Gelöscht-Stapel), Deck-/Ablage-Güsse sind keine Handzauber.
+          spellFromHand: fromZone === 'hand' && pool === ps.hand,
       // v1364: eigener Brett-Stempel auswerten, aeusseren wiederherstellen.
       _aufsBrett = !!this.gs._spellPlacedOnBoard;
       if (_placedVorher) this.gs._spellPlacedOnBoard = true;

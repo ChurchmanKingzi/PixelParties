@@ -86,6 +86,10 @@ module.exports = {
         return;
       }
 
+      // ★ W16b (A01-pollution-24, Text „plays a Spell from their hand"): Sofort-Güsse aus Deck/Ablage/Gelöscht-Stapel
+      // (Circle-Replay, Chaos Diamond, Call for Help …) zählen nicht — `spellFromHand === false` markiert sie.
+      if (ctx.spellFromHand === false) return;
+
       // Only the TURN PLAYER's own Spells count, per card text.
       const turnPlayer = gs.activePlayer;
       if (ctx.casterIdx !== turnPlayer) return;
