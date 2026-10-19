@@ -9,6 +9,7 @@
 // ═══════════════════════════════════════════
 
 const { isAttackSpellOrCreatureSource } = require('./_hooks');
+const { collectBoardTargets } = require('./_waflav-shared');
 
 module.exports = {
   isSurprise: true,
@@ -44,19 +45,9 @@ module.exports = {
       execute: async (eng) => {
         // Prompt the owner to choose any target to Stun
         // Create a temporary target picker context
-        const allTargets = [];
-        for (let pIdx = 0; pIdx < eng.gs.players.length; pIdx++) {
-          const ps = eng.gs.players[pIdx];
-          if (!ps) continue;
-          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            const hero = ps.heroes[hi];
-            if (!hero?.name || hero.hp <= 0) continue;
-            allTargets.push({
-              id: `hero-${pIdx}-${hi}`, type: 'hero', owner: pIdx,
-              heroIdx: hi, cardName: hero.name,
-            });
-          }
-        }
+        // W16g (R01-03): „any target on the board“ = Helden UND Kreaturen (Al, Welle 10 Q55;
+        // gleicher Sammler wie Thunderstruck Waflav).
+        const allTargets = collectBoardTargets(eng);
 
         if (allTargets.length === 0) return;
 
@@ -71,7 +62,23 @@ module.exports = {
 
         if (!selectedIds || selectedIds.length === 0) return;
         const picked = allTargets.find(t => t.id === selectedIds[0]);
-        if (!picked || picked.type !== 'hero') return;
+        if (!picked) return;
+
+        if (picked.type !== 'hero') {
+          const kreatur = picked.cardInstance;
+          if (!kreatur || kreatur.zone !== 'support') return;
+          eng._broadcastEvent('jumpscare_box', {
+            owner: picked.owner, heroIdx: picked.heroIdx, slotIdx: picked.slotIdx,
+          });
+          await eng._delay(700);
+          await eng.applyCreatureStatus(kreatur, 'stunned', { duration: 2, appliedBy: pi });
+          eng.log('jumpscare_stun', {
+            player: eng.gs.players[pi]?.username,
+            target: picked.cardName,
+          });
+          eng.sync();
+          return;
+        }
 
         const tgtHero = eng.gs.players[picked.owner]?.heroes?.[picked.heroIdx];
         if (!tgtHero || tgtHero.hp <= 0) return;
