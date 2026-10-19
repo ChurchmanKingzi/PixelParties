@@ -307,6 +307,8 @@ module.exports = {
       // satisfied (modulo bizarre mid-resolution hand mutations,
       // which we still tolerate gracefully via the empty-hand check).
       let discarded = 0;
+      // W16c (A04-16): die Klick-Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
+      await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
       while ((ps.hand || []).length > 0) {
         const remaining = SUMMON_DISCARD_MIN - discarded;
         const isMandatory = discarded < SUMMON_DISCARD_MIN;
@@ -345,6 +347,7 @@ module.exports = {
         discarded++;
         engine.sync();
       }
+      });   // end withDiscardBatch
 
       if (discarded > 0) {
         inst.counters.headCounter = (inst.counters.headCounter || 0) + discarded;
