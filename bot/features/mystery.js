@@ -1,7 +1,8 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════════
 //  Mystery-Spiel
-//   !mystery        zeigt das aktuelle Rätsel: ein winziger Ausschnitt aus der Kunst einer Karte
+//   !mystery        zeigt das aktuelle Rätsel: ein winziger Ausschnitt aus der Kunst einer Karte (Start ca. 8×8 Bildpunkte);
+//                   mit jedem falschen Tipp von irgendwem wird er um einen Bildpunkt größer (gleicher Mittelpunkt)
 //   !guess <Name>   Tipp. Richtig → der Sieger bekommt 20 SC (−2 für jeden falschen Tipp, den ER für diese Karte schon
 //                   abgegeben hat), die Karte wird gezeigt und ein neues Rätsel beginnt.
 //   !mystery skip   (Admin) Rätsel überspringen: Lösung zeigen, nächstes starten
@@ -43,7 +44,8 @@ module.exports = function register(ctx) {
       const card = pool[Math.floor(Math.random() * pool.length)];
       const crop = await ctx.renderQueue(() => renderer.pickArtCrop(card.name));
       if (!crop) continue;
-      const puzzle = { card: card.name, crop, number: day.count + 1, guesses: {}, tried: [], createdAt: Date.now() };
+      const center = { x: crop.x + crop.w / 2, y: crop.y + crop.h / 2 };      // der Ausschnitt wächst um diesen Punkt
+      const puzzle = { card: card.name, center, number: day.count + 1, guesses: {}, tried: [], createdAt: Date.now() };
       await db.kvSet(KEY.current, puzzle);
       await db.kvSet(KEY.day, { date: day.date, count: day.count + 1 });
       await db.kvSet(KEY.recent, [...recent, card.name].slice(-RECENT_KEEP));
@@ -52,14 +54,24 @@ module.exports = function register(ctx) {
     return null;
   }
 
+  /** Der Ausschnitt des Rätsels in seiner aktuellen Größe: Start klein, +1 Bildpunkt je falschem Tipp (egal von wem). */
+  async function rectFor(puzzle) {
+    const art = await renderer.artSize(puzzle.card);
+    if (!art) return null;
+    const center = puzzle.center || { x: puzzle.crop.x + puzzle.crop.w / 2, y: puzzle.crop.y + puzzle.crop.h / 2 };   // Rätsel aus der Vorversion
+    return mystery.cropRect(art.w, art.h, center, mystery.cropSize(art.w, art.h, puzzle.tried.length));
+  }
+
   const rewardText = () => `**${config.mysteryReward} SC** — minus ${config.mysteryPenalty} for each wrong guess you’ve already made on this card`;
 
   async function puzzleMessage(puzzle, { intro } = {}) {
-    const png = await ctx.renderQueue(() => renderer.renderArtCrop(puzzle.card, puzzle.crop));
+    const rect = await rectFor(puzzle);
+    const png = await ctx.renderQueue(() => renderer.renderArtCrop(puzzle.card, rect));
     const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join(', ')}` : '';
     return {
       content: `${intro ? intro + '\n\n' : ''}🕵️ **Mystery card #${puzzle.number} today** — which card is this?\n` +
-        `Guess with \`${config.prefix}guess <card name>\`. Reward: ${rewardText()}. (Link your account with \`${config.prefix}link\` to receive SC.)${tried}`,
+        `Guess with \`${config.prefix}guess <card name>\`. Reward: ${rewardText()}. (Link your account with \`${config.prefix}link\` to receive SC.)\n` +
+        `The picture zooms out a little with every wrong guess.${tried}`,
       files: [attach(png, 'mystery.png')],
       allowedMentions: { parse: [] },
     };
@@ -132,7 +144,11 @@ module.exports = function register(ctx) {
       cur.tried.push(verdict.best.name);
       await db.kvSet(KEY.current, cur);
       const next = mystery.reward(config.mysteryReward, config.mysteryPenalty, n);
-      return msg.reply({ content: `❌ Not **${verdict.best.name}**. (Your wrong guesses on this card: ${n} → a win would pay ${next} SC.)`, allowedMentions: { parse: [] } });
+      // Das Bild wird mit jedem falschen Tipp etwas größer — gleich das neue zeigen, sonst sieht es niemand.
+      const rect = await rectFor(cur);
+      const png = await ctx.renderQueue(() => renderer.renderArtCrop(cur.card, rect));
+      return msg.reply({ content: `❌ Not **${verdict.best.name}**. (Your wrong guesses on this card: ${n} → a win would pay ${next} SC.)\n🔍 The picture just zoomed out a bit:`,
+        files: png ? [attach(png, 'mystery.png')] : [], allowedMentions: { parse: [] } });
     }
 
     // ── richtig ──
@@ -156,5 +172,5 @@ module.exports = function register(ctx) {
     else await msg.channel.send(await exhaustedText());
   }));
 
-  ctx._mystery = { generate, KEY };
+  ctx._mystery = { generate, rectFor, KEY };
 };

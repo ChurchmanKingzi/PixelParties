@@ -191,13 +191,14 @@ Nur im Rätsel-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanäle
 
 | Befehl | Wirkung |
 |---|---|
-| `!mystery` | zeigt das aktuelle Rätsel: ein winziger Ausschnitt (ca. 18×18 Bildpunkte, stark vergrößert) aus der Kunst einer Karte. Gibt es noch keins, entsteht eins. |
+| `!mystery` | zeigt das aktuelle Rätsel: ein winziger Ausschnitt aus der Kunst einer Karte. Er **beginnt bei 8×8 Bildpunkten** (stark vergrößert) und wird mit **jedem falschen Tipp von irgendjemandem um einen Bildpunkt größer** (gleicher Mittelpunkt, höchstens 31×31). Nach einem falschen Tipp zeigt der Bot gleich das neue Bild. Gibt es noch kein Rätsel, entsteht eins. |
 | `!guess <Kartenname>` | Tipp. Richtig → Gewinner bekommt **20 SC, minus 2 für jeden falschen Tipp, den er für diese Karte schon abgegeben hat** (nie unter 0); die Karte wird komplett gezeigt und ein **neues Rätsel** startet. |
 | 🔒 `!mystery skip` | Rätsel überspringen (Lösung zeigen, nächstes starten) |
 
 * **Höchstens 5 neue Rätsel pro Tag** (Berliner Kalendertag). Ist das Kontingent aufgebraucht, schreibt der Bot, wann es weitergeht, und der Kanal bleibt bis Mitternacht ruhig. Ein ungelöstes Rätsel bleibt über Nacht stehen und verbraucht kein neues Kontingent.
 * **SC** gibt es nur mit verknüpftem Konto (`!link`). Alle anderen dürfen mitraten und gewinnen, bekommen aber keine SC (der Bot sagt es ihnen). Die Buchung steht in `sc_log` mit dem Grund `bot:mystery`.
 * Tipps werden großzügig erkannt (Groß-/Kleinschreibung, Tippfehler, fehlende Leerzeichen, bei Heroes reicht der Teil vor dem Komma, sofern eindeutig). Tipps, die **keiner Karte ähneln**, bereits **getippte** Karten und **mehrdeutige** Tipps („Alice“ passt auf mehrere Heroes) zählen nicht.
+* Doppelte, unbekannte und mehrdeutige Tipps lassen das Bild unverändert. Die Startgröße und der Schritt (16 % bzw. 2 % der kürzeren Bildseite) stehen in `bot/lib/mystery.js` (`CROP_START`, `CROP_STEP`, `CROP_MAX`).
 * Die Ausschnitte werden aus mehreren zufälligen Kandidaten nach Kontrast gewählt, damit es nie nur Himmel oder eine Einheitsfläche ist; die zuletzt gespielten 60 Karten kommen nicht wieder dran.
 * Einstellbar in `bot/.env` (alles optional, **nichts davon ist nötig**): `MYSTERY_CHANNEL_ID`, `MYSTERY_DAILY_MAX=5`, `MYSTERY_REWARD=20`, `MYSTERY_PENALTY=2`.
 
