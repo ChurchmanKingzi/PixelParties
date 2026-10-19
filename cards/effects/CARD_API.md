@@ -20685,3 +20685,48 @@ Antworten wörtlich von Al; Repros unter `docs/niche-tests/repro/W15/b-*.js` (Ex
 | C3 Schadenssperre Flame Avalanche / Last Resort (S02-05) | „Ja, prüfe nach aktuellem Kontrolleur!" | „…to targets your opponent controls": die Sperre `ps.damageLocked` prüft in `actionDealDamage` (Helden) den Kontrolleur `kontrolleurVonHeld(Spalte, Index)` (Charme/Übernahme) und im Kreaturen-Schadensstapel `kontrolleurVon(inst)` (`controller ?? owner`) statt Besitzer/Brettseite. Gesperrt (0 Schaden): vom Gegner gestohlene/kontrollierte Kreatur, gecharmter/übernommener eigener Held (aus Sicht des Wirkers Gegnerziel). Nicht gesperrt: von mir gestohlene Gegnerkreatur, meine seitenfremd beschworene Kreatur auf der Gegnerseite („Elven Rider"-Muster, `markiereSeitenfremd`), von mir kontrollierter Gegnerheld. Heat Wave (`gegnerKontrolliert`, W14) und die Engine-Sperre sind damit deckungsgleich. `S02-spells/05` gilt (✓; Messfehler im Repro korrigiert: `currentHp` fehlt ohne Treffer = volle HP); Repro `b-c3`. |
 
 Repros: `docs/niche-tests/repro/W15/b-c1-…`, `b-c2-…`, `b-c3-…` (Exit 0 = korrekt).
+
+## ★ Welle 16 / W16c — Restbefunde A04-cute, A05-skeletons, A06-rebelliokai (19.10.2026)
+
+Abarbeitung der 32 noch roten Repros dieser drei Gruppen nach den Triage-Regeln (1 = echter Fehler, Erwartung eindeutig · 2 = Repro misst falsch · 3 = echte Regelfrage → Frage an Al, nichts geändert · 4 = zu groß). Neue Repros: `docs/niche-tests/repro/W16/c-a04-…`, `c-a05-…`, `c-a06-…` (Exit 0 = korrekt; Gegenproben zu den Fixes). 30 der 32 Repros sind grün, 2 bleiben bewusst rot (Fragen an Al).
+
+| Befund | Einordnung | Ergebnis |
+|---|---|---|
+| A04-04 Swagdri + Crescent Moon ohne New Moon | 1 | „as if it was part of your hand": nur die KOSTEN entfallen. Der Ausrüstungs-Zweig fragt `engine.canEquipCardToHero` (greift `canEquipToHero` des Artefakts) in `canActivateCreatureEffect` und in der Heldenliste. |
+| A04-07 Cute Cat vom Coolness Stack | 1 | `onDiscard` akzeptiert auch `ctx._fromCoolnessStack` („from anywhere"). |
+| A04-12 Elephant per Cool Rescue | 1 | `actionPopCoolnessStackTo(… 'hand')` ruft `_autoRevealOnEnterHand` wie jeder Hand-Zugang. |
+| A04-13 Clown → geliehene Kreatur | 1 | Option „1 Counter auf jede andere Circus-Kreatur" überspringt omni-immune Ziele (Cute Conversion: „unaffected by all cards and effects"); die eigenen Selbst-Effekte einer Leihgabe (Strongman auf sich) bleiben erlaubt. |
+| A04-14 Thorad „single target" | 1 | Gleiche Auslegung wie Frog Race Boat (Vorgabe 10.10.: ein Schlag mit Mehrziel-Klammer `_multiHitScope.total ≥ 2` ist kein Einzelziel): Heldenzweig (`beforeDamage`) und Kreaturenzweig (`beforeCreatureDamageBatch`) geben den Bonus nur noch bei Einzelziel. Fireball auf 2 Ziele und Flame Avalanche: kein Bonus. |
+| A04-16 Bunny ← Hydra/Dog | 1 + Repro 2 | Die Klick-Abwurfschleifen von Cute Hydra und Cute Dog laufen in `engine.withDiscardBatch` (wie Annoyance Mini): Cute Bunny sieht „2 oder mehr durch einen Effekt". Repro: Bunnys Zug kommt VOR der Dog-Suche und zog die erste Suchkarte weg – Füllkarte oben im Deck. |
+| A04-18 Familiar + Wildur | 1 | Liegt der Kadaver (`_wildurKadaver`) auf dem Stack – auch unter einer später aufgelegten Karte (Wowhalla legt am Zugende nach) –, nimmt die Rückkehr ihn von dort (wie die Phoenix-Wiederbelebung, A04-17). |
+| A04-20 Lunar Eclipse | 1 | `payActivationCost`: bei verschiedenen Cycles wählt der Besitzer (`zonePick`, Abbruch = keine Aktivierung). Repro: Antwortform der Zonenwahl. |
+| A04-21 Cooldin + Spatial Crevice | 1 | `canActivateHeroEffect` und Kandidatenliste prüfen `engine.canPlaceAnotherArea(pi[, name])` statt „Area-Zone leer". |
+| A04-25 Wildur-Waise | 1 | `actionDiscardHandCard` erkennt die Umleitung (Ablage wächst nicht) und räumt die Hand-Instanz nach den On-Discard-Hooks ab (im Batch als `fn`-Eintrag in `_batchDiscardPendingHooks`). Andere Zonenwege unverändert. |
+| A04-29 Army/Familiar + Xal | 1 | `_cute-shared.schoolLevelMitSupport` (Ability-Zonen + `heroSupportAbilityStacks`, harte Negierung → 0) in `levelBudget` und `eligibleCharmeHeroes`/`eligibleReviveHosts`/Zonenwahl-Label. |
+| A04-30 Swagdri löscht Ausrüstung später | 3 | **Frage an Al** (unten); heutiges Verhalten: Ablage. Repro bleibt rot. |
+| A05-01 Burning Fuse | 1 | `findOwnBomblebees(…, { excludeSummonedThisTurn: true })`. |
+| A05-05 Bomblebee Cluster | 1 | „Summon …" → Stufe gilt (Q25): Kandidaten über `heroMeetsLevelReq` gefiltert. |
+| A05-09 Blob ↔ Slime Rancher | 1 | Rancher meldet die zusätzliche Aktivierung über den neuen Hook `onSummonEffectRepeated`; Sandy Blob hört darauf (gleiche Prüfungen, gleiche 3er-Kappe). |
+| A05-13 Sparkfly Worker, Fremdkreatur | 1 | `stealBoardCardToHand` setzt die Herkunft auch als Hand-PLATZMARKE (`handZugangSync(…, { originalOwner })`) – der Abwurf liest erst den Platz, dann die Instanz. |
+| A05-16 Bonegrinder auf der Hand | 1 | Dauereffekt der AUSLIEGENDEN Area: `onCardLeaveZone`/`onDiscard`/`onMill` brechen ab, wenn `ctx.cardZone !== 'area'`. |
+| A05-17 Bonegrinder, gestohlene Skelette | 1 | „your discard pile" = Ablage des (permanenten) Besitzers: `engine.kartenBesitzerVon(leaving)` statt Kontrolleur. |
+| A05-19 Skeleton Bard | (a) 1 · (b) 3 | (a) `engine.isCreatureEffectSuppressed` schließt negierte/gefrorene/betäubte Skelette als Ziel aus. (b) frisch beschworenes Skelett: **Frage an Al**; heutiges Verhalten unverändert (Repro-Punkt (b) bleibt rot). |
+| A05-20 Winged Skeleton | 1 | Burning Skeleton, Skeleton Death Knight (Creature-Zweig), Dive Bomblebee und `stealBoardCardToHand` (Sparkfly Worker/Queen-Gabe) feuern `beforeCreatureAffected` (`status`/`move`) wie Grunge Harpyformer, `actionApplyCreaturePoison` und `actionMoveCard`. Andere Statuswege nicht angefasst. |
+| A05-21 Skeleton Demon | 1 | `beforeDrawBatch`: Menge = `min(Ansage, Deckgröße des Ziehenden)`. |
+| A05-24 Hammer Skeleton ↔ Crimson Web | 1 | Jeder Spell in einer Support Zone ist „attached to a Hero" (nicht nur Subtyp `Attachment`). |
+| A05-25 Crimson Web, Kreaturenwurf | 1 | Wirkt eine Kreatur den Zauber (`isCreatureSource`), negiert das Web, hängt aber nichts an (kein Held als Angreifer, „if possible") und geht in die Ablage des Besitzers. |
+| A05-26 Baby Spider | 1 | `controlsAnotherSpider` schließt nur DIESE Karte aus (Instanz-ID), nicht jede Baby Spider. |
+| A05-28 Spider Hive auf der Hand | 1 + Repro 2 | `reduceCardLevel` nur für `inst.zone === 'area'`. Repro: Fireball ist Lv2 – mit Destruction Magic 1 wurde nie gespielt (alle Läufe hp 800). |
+| A06-01 Sculpture Theft | 1 + Repro 2 | Kandidaten = die durch das Fenster-Ereignis gefrorenen Kreaturen (`engine.reactionWindowEvent().hookCtx`, `targets` bzw. `target`). Bei genau einem Ziel gibt es keine Zielwahl – Repro misst jetzt das Ergebnis. |
+| A06-04 The White Army | 1 | `countOwnLv0Creatures`: aktuelles Level (`level + counters.level`, nie < 0); Kreaturen ohne numerisches Level zählen weiter nicht. |
+| A06-14 Gorinthian, Dauer | 1 | Der Schutz hängt an der liegenden Betäubung dieses Effekts (`statuses.stunned.appliedByCard` bzw. `stunnedAppliedByCard`), nicht an einem Zug-Stempel `turn + 2`. |
+| A06-28 Gorinthian, kein Stun | 1 | Gleiche Änderung: kein Schutz, wenn die Betäubung abgewehrt oder vorzeitig geheilt wurde. |
+| A06-30 Tuscan Artist | 1 | Ruling 16.8. (`_draw-block-shared`): Pawn Sacrifice (`spellPlayCondition`) und Timid Tanuki (`canActivateCreatureEffect`/`onCreatureEffect`) fragen die Zugmenge ab – gesperrt, nichts wird geopfert, kein Stempel. Tanuki mit nur 1 verschiedenem Rebelliokai bleibt aktivierbar (1er-Zug). |
+| A06-31 Bear Rider, Sitze 2/3 | 1 | `recomputeBearRiderHandLevelAllPlayers` läuft über `engine.playerCount()`. |
+| A06-32 Wiederbelebung ohne Hooks | 1 | `onRevive` (Konvention seit v1292) für SnowItAll (`freeze_immune`, `_hasHaste`), Cykyran, Censpartan, Bishop of Kings [B] (sofortiger Abgleich). |
+
+**Fragen an Al (Ja/Nein):**
+1. *A04-30 Swagdri:* „Once per turn, if the top card of your Coolness Stack is an Artifact, you may immediately play it without paying its Cost as if it was part of your hand. If you do, delete the Artifact if it would be sent to the discard pile." Soll eine so ausgerüstete **Ausrüstung** auch später, wenn sie das Brett verlässt (zerstört, Träger stirbt), im Gelöscht-Stapel statt in der Ablage landen? (Lesart A: ja, die Klausel gilt dauerhaft; Lesart B: nein, sie gilt nur für das Ausspielen selbst. Heute: Ablage – die Skriptmarke `_swagdriRouteToDelete` wird von niemandem gelesen.)
+2. *A05-19b Skeleton Bard:* „… choose another "Skeleton" Creature you control with a once per turn effect. It may immediately use its once per turn effect an additional time." Darf der Bard ein Skelett wählen, das **diesen Zug beschworen wurde** (Summoning Sickness)? (Lesart A: nein, „an additional time" setzt voraus, dass es seinen Effekt nutzen dürfte; Lesart B: ja, der Bard erlaubt die Nutzung ausdrücklich „immediately". Heute: ja.)
+
+Neue Hooks/Helfer: Hook `onSummonEffectRepeated` (Slime Rancher → Sandy Blob), `schoolLevelMitSupport(engine, school, seite, heroIdx)` in `_cute-shared.js` (Stufe inkl. Xals Support-Stapel), Batch-Eintrag `{ fn }` in `_batchDiscardPendingHooks`.
