@@ -32,7 +32,8 @@ module.exports = {
   cpuMeta: { scalesWithSchool: 'Decay Magic' },
   /** Block play if the caster's opp-hand interaction is already locked. */
   spellPlayCondition(gs, playerIdx) {
-    return !gs.players[playerIdx]?.oppHandLocked;
+    // W16g (S03-02): EINE Regel („cannot interact with your opponent's hand“), zwei Flaggen — beide lesen (Spreading Rumor sperrt Slow).
+    return !gs.players[playerIdx]?.oppHandLocked && gs.players[playerIdx]?._oppHandInteractionLockedTurn !== gs.turn;
   },
 
   hooks: {
@@ -71,6 +72,7 @@ module.exports = {
 
       // Lock: no more hand interaction with the opponent this turn
       ps.oppHandLocked = true;
+      ps._oppHandInteractionLockedTurn = gs.turn;   // W16g (S03-02): auch fuer Spreading Rumor, Rain of Spores, Accusation, Gather Intel, Live Show, Letter of Misinformations
 
       engine.log('slow_resolved', {
         player: ps.username, discards: discardCount, decayLevel,
