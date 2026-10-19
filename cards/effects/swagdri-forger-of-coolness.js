@@ -59,6 +59,9 @@ module.exports = {
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen) continue;
+        // W16c (A04-04): „as if it was part of your hand" — nur die KOSTEN entfallen, die Spielbedingung der Ausrüstung
+        // (`canEquipToHero`, z. B. Crescent Moon: mind. 1 New Moon auf dem Brett) gilt weiter.
+        if (!engine.canEquipCardToHero(top, pi, hi)) continue;
         const slots = ps.supportZones?.[hi] || [];
         if (slots.some(s => !s || s.length === 0)) return true;
       }
@@ -119,6 +122,7 @@ module.exports = {
         if (!hero?.name || hero.hp <= 0) continue;
         // Frozen Heroes can't accept new equipment.
         if (hero.statuses?.frozen) continue;
+        if (!engine.canEquipCardToHero(top, pi, hi)) continue;   // W16c (A04-04): Spielbedingung bleibt (nur Kosten entfallen)
         const slots = ps.supportZones?.[hi] || [];
         let leftmostFree = -1;
         for (let si = 0; si < slots.length; si++) {
