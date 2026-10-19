@@ -9,10 +9,10 @@
 //  bounce attempt is refused):
 //
 //  1. AOE-ON-SUMMON (`hooks.onPlay`):
-//     Fires whenever Spawn Mother enters a
-//     Support Zone — hand summon, free-Action
-//     summon (Trample Sounds, etc.), revive,
-//     illusion, all of them. Per-player HOPT
+//     Fires when Spawn Mother is summoned FROM THE HAND
+//     (W16e: Kartentext „from your hand") — hand summon,
+//     free-Action summon (Trample Sounds, etc.); NOT from the
+//     discard pile / deck / revive. Per-player HOPT
 //     ensures only the FIRST Spawn Mother that
 //     lands per turn fires the AOE; later copies
 //     skip silently. Player picks one of two
@@ -137,11 +137,13 @@ module.exports = {
     onPlay: async (ctx) => {
       // Self-only — onPlay fires for any played card.
       if (ctx.playedCard?.id !== ctx.card.id) return;
-      // Fires for ANY summon path — hand-play, free additional Action
-      // (Trample Sounds), revive, illusion, etc. The per-player HOPT
-      // below caps the AOE to once per turn, which is the only intended
-      // gate. (No `_isNormalSummon` filter — summon-source distinctions
-      // are not part of this card's text.)
+      // W16e (C05-06): Kartentext „When this Creature is summoned FROM YOUR HAND" — nur eine Beschwoerung aus der Hand
+      // (Spielweg, Zusatzaktion, Reaktion aus der Hand …) loest aus. Aus Ablage/Deck/Wiederbelebung (The Root of all Evil,
+      // Necromancy, Undurdle, Living Illusion …) kein Schaden, kein Prompt, kein Stempel. Ein positives „aus der Hand"-Zeichen gibt es
+      // nicht; die Herkunfts-Zeichen der Nicht-Hand-Wege (`ablageHookExtras`/`deckHookExtras`, Wiederbelebung) sind dagegen zentral
+      // gesetzt (Waechter check-discard-summon / check-deck-summon).
+      if (ctx._summonedFromDiscard || ctx._summonedFromDeck || ctx._summonedFromPile
+          || ctx._reviveAfterDeath || ctx._isForcefulRevival) return;
 
       const engine = ctx._engine;
       const gs     = engine.gs;
@@ -304,7 +306,8 @@ module.exports = {
     // into hand array, instance zone update. The destination hand
     // is `inst.owner`'s (matching the engine's standard support→hand
     // routing — see actionMoveCard's HAND case).
-    await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: ctrl });
+    // W16e (C05-07, Vorbild Moonlight Butterfly W6): „this Creature you control … to YOUR hand" — gestohlen: Hand des Kontrolleurs (`toPlayer`).
+    await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: ctrl, toPlayer: ctrl });
     engine.log('spawn_mother_bounce', {
       owner: inst.owner, hero: engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx]?.name,
     });
