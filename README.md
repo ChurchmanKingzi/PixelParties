@@ -112,6 +112,7 @@ pixel-parties/
 
 The `data/cards.json` file contains all 1,385 cards with:
 - name, cardType, subtype, level, hp, atk, cost
+- costLabel (optional, Artifacts mit variablen Kosten): the cost as printed — `"4X"`, `"5X"`, `"10X"` or just `"X"`; `cost` stays the number the server calculates with
 - effect text, archetype, set ID
 - spellSchool1/2 (for non-Hero cards)
 - startingAbility1/2 (for Hero/Ascended Hero cards)

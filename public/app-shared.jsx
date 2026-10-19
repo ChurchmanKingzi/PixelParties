@@ -7160,7 +7160,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
               {card.level != null && <span>Lv{card.level}</span>}
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥{card.hp}</span>}
               {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔{card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{card.cost}</span>}
+              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{cardCostText(card)}</span>}
             </div>
           </>
         )}
@@ -7219,7 +7219,7 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
         <TTHeader card={card} name={card.name} level={card.level} />
         <div className="tt-body">
-          <TTStats hp={card.hp} atk={card.atk} cost={card.cost} />
+          <TTStats hp={card.hp} atk={card.atk} cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
           <TTEffectBox card={card} text={effectText} />
@@ -8186,6 +8186,18 @@ function BuffColumn({ buffs, cardName, statuses }) {
 //                      CardMini components trigger it automatically.
 // ═══════════════════════════════════════════
 
+/**
+ * Die gedruckten Kosten einer Karte als Text (Als Vorgabe 19.10.). Variable Kosten tragen `costLabel` in cards.json — „4X"
+ * (Beer, Book of Doom, Capture Net, Cool Presents, Possessed Blade), „5X" (Dark Gear), „10X" (Staff of Illusions) oder nur „X"
+ * (Cool Repair, Tool Freezer, Future Tech Copy Device) —, sonst steht die Zahl aus `cost`. Ohne Kosten: null.
+ */
+function cardCostText(card) {
+  if (!card) return null;
+  if (card.costLabel) return String(card.costLabel);
+  return card.cost != null ? String(card.cost) : null;
+}
+window.cardCostText = cardCostText;
+
 // ── Farben im Karten-Tooltip (Als Vorgabe 12.10.) ───────────────────
 // HP gruen, ATK rot, Kosten (Artifacts) golden. Helle Toene, weil der
 // Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
@@ -8521,7 +8533,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             hp={card._liveHp != null ? card._liveHp : card.hp}
             hpMax={card._liveMaxHp != null ? card._liveMaxHp : null}
             atk={card._liveAtk != null ? card._liveAtk : card.atk}
-            cost={card.cost} />
+            cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): sie liegen sichtbar in den Ability-Zonen, und bei
               Ascended Heroes beschreiben die startingAbility-Felder den Ascension Bonus — der steht hier als ganzer Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}

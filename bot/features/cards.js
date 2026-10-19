@@ -73,8 +73,9 @@ module.exports = function register(ctx) {
     });
   }
 
+  // Variable Kosten stehen als `costLabel` in cards.json („4X", „X" …) und werden statt der Zahl gezeigt — wie auf dem Kartenbild.
   function textEmbed(c) {
-    const stats = [c.level != null ? `Level ${c.level}` : null, c.hp != null ? `HP ${c.hp}` : null, c.atk != null ? `ATK ${c.atk}` : null, c.cost != null ? `Cost ${c.cost}` : null].filter(Boolean).join(' · ');
+    const stats = [c.level != null ? `Level ${c.level}` : null, c.hp != null ? `HP ${c.hp}` : null, c.atk != null ? `ATK ${c.atk}` : null, c.cost != null ? `Cost ${c.costLabel || c.cost}` : null].filter(Boolean).join(' · ');
     const e = new EmbedBuilder().setColor(0x7e57c2).setTitle(c.name.slice(0, 250))
       .setDescription(String(c.effect || '*No effect text.*').slice(0, 3900));
     const fields = [];

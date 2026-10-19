@@ -78,7 +78,7 @@ module.exports = function register(ctx) {
     execFile('git', ['-c', 'safe.directory=*', '-C', config.repoRoot, ...args], { timeout: 20000, maxBuffer: 64 * 1024 * 1024 }, (err, out) => err ? reject(err) : resolve(String(out))));
 
   // Anzeigenamen der Felder in cards.json, die sich ändern können
-  const FIELD_LABELS = { effect: 'effect text', hp: 'HP', atk: 'ATK', cost: 'cost', level: 'level', cardType: 'type', subtype: 'subtype',
+  const FIELD_LABELS = { effect: 'effect text', hp: 'HP', atk: 'ATK', cost: 'cost', costLabel: 'cost', level: 'level', cardType: 'type', subtype: 'subtype',
     archetype: 'archetype', startingAbility1: 'starting ability', startingAbility2: 'starting ability', spellSchool1: 'school', spellSchool2: 'school',
     banned: 'ban status', foil: 'rarity' };
   // Felder ohne Bedeutung für Spielerinnen und Spieler (z. B. interne Test-Markierungen) lösen keine Meldung aus

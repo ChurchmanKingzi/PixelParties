@@ -52714,10 +52714,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const handBaseCostAfterCrystal = handCardData?.cost != null
                   ? applyCrystalCostMods(me, item.card, handCardData.cost)
                   : null;
+                // Variable Kosten („4X", „X", `costLabel` in cards.json): ein reines „X" hat keine Zahl, die sich anzeigen liesse; bei „nX"
+                // gilt nur die Verdopplung durch Rusting Crystal (aus 4X wird 8X) — ein Rabatt (Play Money …) greift auf den ENDPREIS,
+                // dessen X erst beim Spielen feststeht, und laesst sich auf der Karte nicht darstellen.
+                const handKostenLabel = handCardData?.costLabel || null;
+                const handKostenVariabel = !!handKostenLabel;
+                const handKostenNurX = handKostenVariabel && !/^\d/.test(handKostenLabel);
                 const handEffectiveCost = handBaseCostAfterCrystal != null
+                  && !handKostenNurX
+                  && !(handKostenVariabel && handCostReduction > 0)
                   && (handCostReduction > 0 || handBaseCostAfterCrystal !== handCardData.cost)
                   ? Math.max(0, handBaseCostAfterCrystal - handCostReduction)
                   : null;
+                const handKostenSuffix = handKostenLabel ? String(handKostenLabel).replace(/^\d+/, '') : '';
                 // Erklaerungen fuer den Hover-Tooltip (frueher Tooltips der beiden Abzeichen auf der Karte): Die Karte selbst
                 // zeigt die aktuellen Werte, der Tooltip die gedruckten — und sagt, woher die Abweichung kommt.
                 const handNotes = [];
@@ -52732,7 +52741,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const teile = [];
                   if (handBaseCostAfterCrystal !== handCardData.cost) teile.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
                   if (handCostReduction > 0) teile.push(`Reduced by ${handCostReduction} this turn`);
-                  handNotes.push({ color: kFarbe, text: `Cost ${handEffectiveCost} in your hand (printed ${handCardData.cost})` + (teile.length ? ': ' + teile.join('. ') : '') + '.' });
+                  handNotes.push({ color: kFarbe, text: `Cost ${handEffectiveCost}${handKostenSuffix} in your hand (printed ${window.cardCostText(handCardData)})` + (teile.length ? ': ' + teile.join('. ') : '') + '.' });
+                }
+                else if (handKostenVariabel && handCostReduction > 0) {
+                  // variable Kosten mit Rabatt: nicht auf die Karte druckbar (s. o.), aber im Tooltip genannt
+                  handNotes.push({ color: '#4ade80', text: `Cost reduced by ${handCostReduction} this turn (printed ${window.cardCostText(handCardData)}).` });
                 }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
@@ -53563,7 +53576,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
                 {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
                 {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {window.cardCostText(card)}</span>}
                 {shownLevel != null && (
                   <span style={hoverStamp > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
                     Lv {shownLevel}{hoverStamp > 0 ? ` (+${hoverStamp})` : ''}
