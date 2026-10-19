@@ -3,6 +3,8 @@
 // Aufbau: Held 0 ohne Destruction Magic; Hand: Divine Gift of Magic, Fireball (Lv2) ×2 (+ später gezogene dritte Kopie). Offenbart wird die ZWEITE Kopie (Handindex 2).
 // Erwartet: nur diese Kopie ist gesenkt (spielbar ohne Destruction Magic); die erste und eine später dazugekommene Kopie bleiben auf Lv2 (nicht spielbar);
 //   die Senkung hängt an der Kopie (Hand-Splice durch das Ausspielen des Gifts verschiebt sie mit) und verfällt am Zugbeginn.
+// ★ W15b (C2, Al: „Der Rabatt soll exakt die geklickte/ausgewählte Karte treffen."): umgestellt auf die NEUE Regel – der Rabatt wandert NICHT mehr auf die gespielte Kopie um.
+//   Wird eine andere Kopie gleichen Namens geklickt, ist sie nicht spielbar (kein Rabatt); gespielt werden kann nur die offenbarte Kopie (per Handindex).
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -21,7 +23,11 @@ const H = require('../../lib/h.js');
   R.check('die erste Kopie bleibt auf Lv2 (Stufe 2)', lvl(idxs[0]) === 2, idxs);
   R.check('die offenbarte (zweite) Kopie ist gesenkt (Stufe 0)', kann(idxs[1]), idxs);
   R.check('die später dazugekommene dritte Kopie bleibt auf Lv2', lvl(idxs[2]) === 2, idxs);
-  const r = await t.play(0, 'Fireball', { hero: 0, noGrant: true, keepActions: true });
+  const rAndere = await t.play(0, 'Fireball', { hero: 0, noGrant: true, keepActions: true, handIndex: idxs[0] });   // ANDERE Kopie geklickt
+  R.check('(W15b) die geklickte andere Kopie (ohne Rabatt) ist NICHT spielbar, der Rabatt bleibt an der offenbarten Kopie', rAndere === false && lvl(idxs[1]) === 0 && ps.hand.filter(n => n === 'Fireball').length === 3, { rAndere, hand: ps.hand });
+  const rDritte = await t.play(0, 'Fireball', { hero: 0, noGrant: true, keepActions: true, handIndex: idxs[2] });
+  R.check('(W15b) auch die später dazugekommene Kopie ist nicht spielbar', rDritte === false, rDritte);
+  const r = await t.play(0, 'Fireball', { hero: 0, noGrant: true, keepActions: true, handIndex: idxs[1] });
   R.check('Fireball spielbar über den echten Spielweg (nur die offenbarte Kopie ging durch)', r === true, r);
   R.check('es bleiben zwei Fireballs auf der Hand', ps.hand.filter(n => n === 'Fireball').length === 2, ps.hand);
   const idx2 = ps.hand.map((n, i) => n === 'Fireball' ? i : -1).filter(i => i >= 0);

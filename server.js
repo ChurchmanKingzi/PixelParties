@@ -8045,7 +8045,6 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner, fromCreation });
   if (!v) return _bail('validateActionPlay: nein (Level/Schule, Sperre, Handindex oder spellPlayCondition)');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, wasBerserkGranted } = v;
-  if (!fromCreation) room.engine.kopienRabattAufGespielteKopie(pi, cardName, handIndex);   // W14 (Q165): „nur die eine Kopie" wird mit dem Ausspielen verbraucht
 
   // ★ EINMAL PRO SPIEL — DAS TOR FEHLTE HIER (v1030, Als Auftrag 12.9.).
   // Der Zauberweg STEMPELTE zwar laengst, pruefte den Stempel aber
@@ -8101,7 +8100,8 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   }
 
   const heroOwner = charmedOwner != null ? charmedOwner : pi;
-  const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData);
+  // ★ W15b (C2): Wisdom-Kosten der konkreten Handkarte (Rabatt „nur die eine Kopie"); geliehener Held/Vorrat: namensweit.
+  const wisdomDiscardCost = room.engine.getWisdomDiscardCost(heroOwner, heroIdx, cardData, (!fromCreation && heroOwner === pi) ? handIndex : undefined);
 
   const actionsPlayedThisPhase = ps._actionsPlayedThisPhase || 0;
   const hasBonusAction = isActionPhase && (

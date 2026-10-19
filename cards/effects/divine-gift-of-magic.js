@@ -30,6 +30,10 @@
 //  Verfallsstempel `_handLevelOffsetsExpireTurn`,
 //  den der Zugbeginn abraeumt = „until the end of this
 //  turn" (Muster Fiona, the Empty Vessel).
+//  ★ Welle 15 (Al, C2: „Der Rabatt soll exakt die geklickte/
+//  ausgewaehlte Karte treffen"): der Rabatt gilt NUR, wenn genau
+//  diese Kopie gespielt wird; eine andere Kopie gleichen Namens
+//  bekommt keinen (Stufenpruefung je Handindex, `_kopieNurIndex`).
 //
 //  Animation: a screen-wide arcane burst —
 //  concentric shockwaves, a rotating star glyph,
