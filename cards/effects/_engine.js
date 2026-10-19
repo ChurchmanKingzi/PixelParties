@@ -12960,7 +12960,7 @@ class GameEngine {
       // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
       const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
       const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
-      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
+      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || targetCard._swagdriRouteToDelete || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -14096,6 +14096,16 @@ class GameEngine {
       toZone    = ZONES.DELETED;
       toHeroIdx = -1;
       toSlot    = -1;
+    }
+    // W18a (Swagdri, A04-30, Al: „Ja, deleten"): „delete the Artifact if it would be sent to the discard pile" gilt DAUERHAFT für die von
+    // Swagdri ausgespielte Ausrüstung — jede Bewegung dieser Instanz in die Ablage wird zu Gelöscht (Marke `_swagdriRouteToDelete`, bleibt
+    // an der Instanz, anders als das einmalige `_redirectToDeleted`). Rückkehr auf die Hand/ins Deck bleibt unberührt.
+    if (cardInstance._swagdriRouteToDelete && toZone === ZONES.DISCARD) {
+      toZone    = ZONES.DELETED;
+      toHeroIdx = -1;
+      toSlot    = -1;
+    } else if (cardInstance._swagdriRouteToDelete && toZone !== ZONES.SUPPORT) {
+      delete cardInstance._swagdriRouteToDelete;   // zurück auf die Hand/ins Deck: die Klausel endet (ein erneutes Ausspielen von der Hand ist normal)
     }
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
     // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
@@ -45890,8 +45900,13 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Divine Gift of Skill lock — the chosen hero cannot perform an Action
-   * for the rest of the turn unless they have Magic Arts >= 1. Returns
+   * for the rest of the turn unless THE USER has Magic Arts >= 1. Returns
    * `true` when an Action play should be blocked.
+   *
+   * W18a (S01-04, Al: „The user ist der Zauberwirker"): „the user" = der Held, der
+   * Divine Gift of Skill gewirkt hat (`hero._skillLockUser = {side, heroIdx}`, vom Skript
+   * gesetzt) — SEINE aktuelle Magic-Arts-Stufe entscheidet, nicht die des gewählten
+   * Helden. Ohne gemerkten Nutzer (Altzustand) gilt die Stufe des gesperrten Helden.
    *
    * Used at every Action-resource gate (Spell/Attack/Creature plays via
    * validateActionPlay, ability-action activations, hero-effect
@@ -45903,7 +45918,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[heroIdx];
     if (!hero) return false;
     if (hero._skillLockTurn !== this.gs.turn) return false;
-    if (this.heroSchoolLevel('Magic Arts', playerIdx, heroIdx) >= 1) return false;   // W4a: harte Negierung -> Stufe 0
+    const _nutzer = hero._skillLockUser;
+    const _hatNutzer = _nutzer && this.gs.players[_nutzer.side]?.heroes?.[_nutzer.heroIdx];
+    const _seite = _hatNutzer ? _nutzer.side : playerIdx;
+    const _hi = _hatNutzer ? _nutzer.heroIdx : heroIdx;
+    if (this.heroSchoolLevel('Magic Arts', _seite, _hi) >= 1) return false;   // W4a: harte Negierung -> Stufe 0
     return true;
   }
 
@@ -50451,7 +50470,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             owner: inst.owner,
             cardName: inst.name,
             from: 'support',
-            to: isToken ? 'deleted' : 'discard',
+            to: (isToken || inst._swagdriRouteToDelete) ? 'deleted' : 'discard',   // W18a (Swagdri): von Swagdri ausgespielte Ausrüstung wird gelöscht
             fromHeroIdx: hi,
             fromSlotIdx: slotIdx,
           });
@@ -50467,7 +50486,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             delete inst._returnToHand;
             discardPs.hand.push(inst.name);
             this.log('card_added_to_hand', { player: discardPs.username, card: inst.name, by: 'Heldentod-Aufraeumen' });
-          } else discardPs.discardPile.push(inst.name);
+          } else if (inst._swagdriRouteToDelete) discardPs.deletedPile.push(inst.name);   // W18a (Swagdri, A04-30): statt Ablage in den Gelöscht-Stapel des Besitzers
+          else discardPs.discardPile.push(inst.name);
         }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
         // ── GETAKTET (Als Befund 17.8.) ────────────────────────────
@@ -51787,6 +51807,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._refreshAscensionReadiness();
+    // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
+    // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.
+    for (const _bps of (this.gs.players || [])) {
+      const _bheroes = _bps?.heroes || [];
+      for (let _bhi = 0; _bhi < _bheroes.length; _bhi++) {
+        const _bb = _bheroes[_bhi]?.buffs?.blessed_skill;
+        if (_bb) _bb.locked = this.isHeroSkillLocked(this.gs.players.indexOf(_bps), _bhi);
+      }
+    }
     // v1443: Lethe-Stempel je Karte — bei jedem Abgleich nachziehen, damit
     // eine gegangene und wiedergekommene Karte nicht den alten Stempel
     // erbt. Kostet nichts, solange niemand gestempelt ist.

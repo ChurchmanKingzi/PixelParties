@@ -73,8 +73,10 @@ const H = require('../../lib/h.js');
   const weitere = [
     ['Anti Magic Zone', (t, kr, ek) => [0, 1, 2].every(h => t.hero(1, h).statuses.magic_silenced) && !!kr.counters.magic_silenced, (t, kr) => [0, 1, 2].every(h => !t.hero(1, h).statuses.magic_silenced) && !kr.counters.magic_silenced],
     ['Null Zone', (t, kr, ek) => [0, 1, 2].every(h => t.hero(1, h).statuses.nulled) && !!kr.counters.nulled, (t, kr) => [0, 1, 2].every(h => !t.hero(1, h).statuses.nulled) && !kr.counters.nulled],
-    ['Snowstorm Mischief', (t, kr, ek) => !!kr.counters.frozen && !!ek.counters.frozen, (t, kr, ek) => !kr.counters.frozen && !ek.counters.frozen],
-    ['Toxic Fumes', (t, kr, ek) => (kr.counters.poisonStacks || 0) > 0 && (ek.counters.poisonStacks || 0) > 0, (t, kr, ek) => !(kr.counters.poisonStacks || 0) && !(ek.counters.poisonStacks || 0)],
+    // W18a (Al, R01-05: „Nur eigene Ziele werden beschützt!"): Divine Gift of Rain schützt bei diesen beidseitigen Flächenzaubern NUR die Kreatur des Reagierenden (kr);
+    // die Kreatur des Wirkers (ek) wird weiter getroffen (`unberuehrt` heißt hier: kr geschützt, ek betroffen).
+    ['Snowstorm Mischief', (t, kr, ek) => !!kr.counters.frozen && !!ek.counters.frozen, (t, kr, ek) => !kr.counters.frozen && !!ek.counters.frozen],
+    ['Toxic Fumes', (t, kr, ek) => (kr.counters.poisonStacks || 0) > 0 && (ek.counters.poisonStacks || 0) > 0, (t, kr, ek) => !(kr.counters.poisonStacks || 0) && (ek.counters.poisonStacks || 0) > 0],
   ];
   for (const [src, betroffen, unberuehrt] of weitere) {
     // Anti Magic Shield: „a Hero that can use this Spell is hit by an opponent's Spell" — nur bei Zaubern, die einen HELDEN treffen (Anti Magic Zone [Lv2], Null Zone [Lv1]).
@@ -90,7 +92,7 @@ const H = require('../../lib/h.js');
         R.check(`${src} ohne Reaktion: wirkt (Kontrolle)`, betroffen(t, kr, ek), { kr: kr.counters, ek: ek.counters });
       } else {
         R.check(`${src} vs ${rx}: Fenster ging auf, Karte verbraucht`, t.prompts.some(p => p.d.title === rx) && !t.pile(1, 'hand').includes(rx), { prompts: t.prompts.map(p => p.d.title), hand: t.pile(1, 'hand') });
-        R.check(`${src} vs ${rx}: Zauber negiert — nichts wirkt`, unberuehrt(t, kr, ek), { kr: kr.counters, ek: ek.counters, st: t.hero(1, 0).statuses });
+        R.check(`${src} vs ${rx}: ` + (rx === 'Divine Gift of Rain' && (src === 'Snowstorm Mischief' || src === 'Toxic Fumes') ? 'nur die Kreatur des Reagierenden geschützt (W18a)' : 'Zauber negiert — nichts wirkt'), unberuehrt(t, kr, ek), { kr: kr.counters, ek: ek.counters, st: t.hero(1, 0).statuses });
         R.check(`${src} vs ${rx}: keine Engine-Fehler / Zustand sauber`, t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
       }
     }
