@@ -23,7 +23,10 @@ const H = require('../../lib/h.js');
   t.script.push({ match: d => d.type === 'confirm' && /Delete an Artifact/.test(d.message || ''), answer: () => ({ confirmed: false }) });   // „Use the Action"
   const r = await t.play(0, SP, { hero: 1, keepActions: true, slot: 2 });
   const onBoard = !!t.find(SP, 'support');
-  R.check('Spirit wird ohne Löschung des Tridents NICHT beschworen (keine Aktion mehr frei)', !onBoard, { r, onBoard, trident: !!t.zone(0, 1, 0), acted: t.gs.players[0].heroesActedThisTurn, phase: t.gs.currentPhase });
+  // W16e: Ist die Aktion verbraucht, ist die Loeschung PFLICHT (kein „Use the Action"-Angebot): der Spirit steht nur, wenn das Trident
+  // als Kosten der Zusatzaktion fiel (Held 1 nicht als gehandelt verbucht); ohne Loeschung darf er nie auf dem Brett stehen.
+  const gefragt = t.prompts.some(p => p.d.type === 'confirm' && /Delete an Artifact/.test(p.d.message || ''));
+  R.check('Spirit steht nur gegen Loeschung des Tridents (Zusatzaktion bezahlt), kein „Use the Action"-Angebot', !gefragt && (!onBoard || (!t.zone(0, 1, 0) && !t.gs.players[0].heroesActedThisTurn.includes(1))), { r, onBoard, gefragt, trident: !!t.zone(0, 1, 0), acted: t.gs.players[0].heroesActedThisTurn, phase: t.gs.currentPhase });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();
