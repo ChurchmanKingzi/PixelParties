@@ -32,8 +32,8 @@
 //     Engine fuehrt es ausdruecklich fuer genau solche Faelle). Heisst:
 //     hat der Gegner mir eine Kreatur gestohlen, hole ich sie zurueck
 //     und tue ihr NICHTS.
-//     Nur Kreaturen koennen den Besitzer wechseln — bei einem Helden
-//     greift die Abzweigung nie.
+//     W16g (S03-07): auch ein HELD meiner Spalte, den der Gegner (dauerhaft)
+//     uebernommen hat, wird so zurueckgeholt (`actionReturnHeroControl`).
 //
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: dunkle Magie, deren Blast groesser und zerstoererischer
@@ -95,8 +95,12 @@ module.exports = {
       // ① 10 × Karten im GEGNERISCHEN Ablagestapel.
       const schaden = (ops.discardPile || []).length * PRO_KARTE;
 
+      // W16g (S03-07): „a target your opponent CONTROLS“ — Kontrolle statt Spalte: `side: 'any'` + Kontrollfilter (`zielSeite`) bietet
+      // auch meinen vom Gegner uebernommenen Helden / meine vom Gegner gestohlene Kreatur an (Ziel der Rueckholung) und laesst
+      // Ziele aus, die ich selbst kontrolliere.
       const target = await ctx.promptDamageTarget({
-        side: 'enemy',
+        side: 'any',
+        condition: (t) => engine.zielSeite(t) === oppIdx,
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
         baseDamage: schaden,
@@ -115,6 +119,21 @@ module.exports = {
           && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
       }
       const warMeine = !!inst && (inst.originalOwner ?? inst.owner) === pi;
+      // W16g (S03-07): ein HELD steht immer in der Spalte seines Besitzers — „originally controlled by you“ = meine Spalte, vom Gegner
+      // uebernommen (Paraseed Control …): Kontrolle dauerhaft zurueck (`actionReturnHeroControl`), KEIN Schaden.
+      if (target.type === 'hero' && target.owner === pi) {
+        const meinHeld = gs.players[pi]?.heroes?.[target.heroIdx];
+        if (meinHeld?.name && meinHeld.hp > 0 && engine.heroSideOf(pi, meinHeld) !== pi) {
+          await engine.spielZauberBilder(CARD_NAME, {
+            owner: pi, heroIdx: ctx.cardHeroIdx, targets: [target], power: 0.35,
+          });
+          await engine._delay(420);
+          await engine.actionReturnHeroControl(pi, target.heroIdx, { sourceName: CARD_NAME });
+          engine.log('memory_blast', { player: ps.username, reclaimed: meinHeld.name });
+          engine.sync();
+          return;
+        }
+      }
 
       if (warMeine) {
         // Erste freie Zone auf meiner Seite suchen.
