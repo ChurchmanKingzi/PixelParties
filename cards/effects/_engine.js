@@ -28955,9 +28955,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // landen in den Zonen DIESES Helden (wie doPlayAbilityFremd).
     const hps = gs.players[heroOwner] || ps;
 
-    // ★ W15a (Al, R3: Chuck „Ja"; Regel W14a Q5): der Aufstiegsbonus legt Abilities PER EFFEKT an — Resistance am aufgestiegenen Helden fängt ihn ab (EIN Effekt, einmal gefragt,
-    // vor jeder Kartenbewegung; die Abilities bleiben in Deck/Hand). Chuck, the Storyteller (eigene Anlegeschleife) fragt selbst.
-    if (await this.abilityAnlegenDurchResistanceBlockiert(pi, heroOwner, heroIdx, 'Ascension Bonus')) return;
+    // ★ W16a (Al, 19.10.2026, Frage 4: „Nein, von keinem"): der Aufstiegsbonus wird von Resistance von KEINEM Ascended Hero abgefangen — die Prüfung aus W15a (R3) ist
+    // zurückgenommen (auch bei Chuck, the Storyteller). Der Bonus ist Teil des Aufstiegs, kein Effekt auf den Helden.
 
     const abZones = hps.abilityZones?.[heroIdx] || [[], [], []];
     while (abZones.length < 3) abZones.push([]);
