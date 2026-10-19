@@ -48490,7 +48490,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // geblockt, ausdruecklich auch Gift- und Brand-Ticks.
     // Symmetrisch: schuetzt die Creatures BEIDER Spieler.
     if (this.isDarkOceanActive()) {
-      const durch = new Set(['attack', 'destruction_spell']);
+      // W16g (S01-03): + 'magic_arts_spell' (Butterfly Cloud: ein Zauber, Schadenstyp '<school>_spell'). 'decay_spell' (Forbidden Zone)
+      // bleibt wie bisher geblockt — nicht Teil dieses Befunds, siehe Abgabe W16g.
+      const durch = new Set(['attack', 'destruction_spell', 'magic_arts_spell']);
       const geblockt = entries.filter(e => e.isStatusDamage || !durch.has(e.type));
       for (const e of geblockt) {
         this.log('dark_ocean_damage_blocked', {
