@@ -41,7 +41,7 @@ const HOPT_KEY  = 'guard-change';
 /** Casting Hero's Support Magic level (base + Performance wildcard). */
 function supportMagicLevel(engine, pi, heroIdx) {
   if (!engine || heroIdx == null || heroIdx < 0) return 0;
-  return engine.heroSchoolLevel('Support Magic', pi, heroIdx);   // W4a: harte Negierung -> Stufe 0
+  return engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, pi);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
 }
 
 /** Own support-zone CREATURE instances (NOT Equip Artifacts, which
@@ -54,6 +54,10 @@ function ownSupportCreatures(engine, pi) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
+    // W16g (S02-12): eine GESTOHLENE Kreatur (Kontrolle bei `pi`, Platz auf dem Brett des Besitzers) laesst sich nicht in die
+    // Zonen von `pi` verschieben — `moveCreature`/`swapCreatures` arbeiten in `players[pi].supportZones`. Sie wird nicht angeboten
+    // (sonst wiederholte sich die Abfrage bis zur Schleifenbremse und der Zug scheiterte still).
+    if (engine.physicalSide(inst) !== pi) continue;
     if (inst.counters?.treatAsEquip) continue; // Equip Artifact, not a Creature
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
