@@ -158,6 +158,15 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
+      // ★ W16a (Al, Welle 16 Frage 1: „Ja"): Hand-Reaktionen (Post-Target) über alle betroffenen Kreaturen beider Seiten — Divine Gift of Rain,
+      // MOE Shield, Storm Ring (ab 2 Zielen) negieren den Zauber, Golden Wings schützt eine gewählte Kreatur (`_cardinalImmune` bleibt stehen).
+      {
+        const sr = await engine.statusHitSurpriseWindow(ctx.card, [], 'decay_spell', {
+          ziele: ziele.map(inst => ({ type: 'creature', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name })),
+        });
+        if (sr?.effectNegated) return;
+      }
+
       // ── ① Alles ins Deck ────────────────────────────────────────
       const proSpieler = [0, 0];
       for (const inst of ziele) {
