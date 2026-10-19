@@ -52,6 +52,8 @@ function eligibleTargets(engine, pi, selfId) {
     if (!script?.creatureEffect) continue;
     if (typeof script.onCreatureEffect !== 'function') continue;
     if (engine.isCreatureActiveEffectLocked(inst)) continue;   // W14b (Q152): Unwanted Audience sperrt den aktiven Effekt
+    // W16c (A05-19): negierte/eingefrorene/betaeubte Kreaturen haben keinen nutzbaren Effekt - auch keine "zusaetzliche" Nutzung.
+    if (engine.isCreatureEffectSuppressed(inst)) continue;
     if (typeof script.canActivateCreatureEffect === 'function') {
       let activatable = false;
       try {
