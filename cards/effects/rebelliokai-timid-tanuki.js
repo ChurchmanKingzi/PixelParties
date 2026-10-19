@@ -134,7 +134,11 @@ module.exports = {
     const ps     = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     if (drawBlockedFor(engine, ctx.cardOwner)) return false;   // D1: reiner Zug - auch unter der Zieh-Sperre (drawLocked) gesperrt
-    return countDifferentRebelliokaiInDiscard(ps, engine, 3) > 0;
+    const n = countDifferentRebelliokaiInDiscard(ps, engine, 3);
+    // W16c (A06-30, Ruling 16.8. in _draw-block-shared): Zug ist der einzige Nutzen - wuerde Tuscan Artist genau diese Menge (2/3) negieren,
+    // ist der Effekt gesperrt (ausgegraut) und verbraucht sein Einmal-pro-Zug nicht.
+    if (drawBlockedFor(engine, ctx.cardOwner, n)) return false;
+    return n > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -145,6 +149,7 @@ module.exports = {
 
     const draws = countDifferentRebelliokaiInDiscard(ps, engine, 3);
     if (draws <= 0) return false;
+    if (drawBlockedFor(engine, pi, draws)) return false;   // W16c (A06-30): Tuscan Artist negiert den Zug -> Effekt feuert nicht (kein Stempel)
 
     await engine.actionDrawCards(pi, draws, { source: CARD_NAME });
 

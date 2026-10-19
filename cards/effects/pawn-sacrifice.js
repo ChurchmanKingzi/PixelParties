@@ -56,6 +56,8 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
     if (gs.hoptUsed?.[key(pi)] === gs.turn) return false;
+    // W16c (A06-30, Ruling 16.8.): der Zug (immer 2 oder 3) ist der einzige Nutzen - unter Tuscan Artist gesperrt, nichts wird geopfert.
+    if (drawWouldBeBlocked(engine, pi, 2)) return false;
     return pawnsOnBoard(engine, pi).length > 0 || pawnsInDiscard(engine, pi).length > 0;
   },
 
