@@ -53,6 +53,18 @@ function _hasHeroWithFreeZone(ps) {
   return false;
 }
 
+/** W16e (F01-01): gibt es einen lebenden, nicht eingefrorenen Helden mit freier Zone, der `cardName` laut Ausruestregeln tragen darf? */
+function _hatLegalenTraeger(engine, ps, cardName) {
+  const pi = engine.gs.players.indexOf(ps);
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0 || hero.statuses?.frozen) continue;
+    if (!engine.canEquipCardToHero(cardName, pi, hi)) continue;
+    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) return true;
+  }
+  return false;
+}
+
 /**
  * Build deduplicated gallery of eligible equips from the player's discard pile.
  * Each entry: { name, cost, count } where count = eligible copies.
@@ -70,6 +82,9 @@ function _buildEligibleGallery(gs, pi, engine) {
     // Bezahlbarkeit des halben Preises (inkl. Kreditrahmen).
     if (engine && !engine.canAffordGold(pi, Math.ceil(equipCost / 2), 'Cool Repair')) continue;
     if (!engine && Math.ceil(equipCost / 2) > gold) continue;
+
+    // W16e (F01-01): nur Ausruestung, die irgendein eigener Held tragen darf (`canEquipToHero`: Crusader's, Grimoire, Cloak …).
+    if (engine && !_hatLegalenTraeger(engine, ps, cardName)) continue;
 
     if (seen.has(cardName)) continue; // Dedup — count handled below
     seen.set(cardName, { cost: equipCost, count: _countIn(ps.discardPile, cardName) });
@@ -155,6 +170,7 @@ module.exports = {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen) continue; // Can't equip to frozen heroes
+      if (!engine.canEquipCardToHero(equipName, pi, hi)) continue;   // W16e (F01-01): Ausruestregeln des Skripts (`canEquipToHero`) wie beim Handweg
       let hasFree = false;
       for (let si = 0; si < 3; si++) {
         if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
