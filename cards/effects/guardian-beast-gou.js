@@ -101,6 +101,8 @@ function countEligibleOwnTargets(engine, pi, selfInstId) {
     if (inst.zone !== 'support' || inst.faceDown) continue;
     if (inst.id === selfInstId) continue;
     if (inst.name === CARD_NAME) continue;
+    // W16d (A07-10): nur Kreaturen zählen (Ausrüstung ist kein „target on the board")
+    if (!engine.isChoosableAsCreature(inst, engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name])) continue;
     n++;
   }
   return n;
