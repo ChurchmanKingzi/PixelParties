@@ -68,7 +68,13 @@ module.exports = {
         description: `Add a "Future Tech" card from your deck to your hand (${i + 1}/${wieViele}).`,
         cancellable: true,
       });
-      if (!name) break;
+      if (!name) {
+        // ★ W16b (A03-futuretech-17, CARD_API „Zielende Karten sind immer abbrechbar … Abbruch heißt: nichts ist passiert"): Abbruch der ERSTEN
+        // Wahl = nichts gewählt, nichts geholt → Karte zurück auf die Hand, Kosten erstattet (wie Blueprints / Mysterious Core). Ein Abbruch
+        // erst nach einer gewählten Karte beendet die Auswahl (die gewählte bleibt).
+        if (gewaehlt.length === 0) return { cancelled: true };
+        break;
+      }
       gewaehlt.push(name);
       await engine.actionAddCardFromDeckToHand(pi, name, {
         source: CARD_NAME, reveal: true,
