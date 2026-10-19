@@ -49,6 +49,7 @@ function collectAreasFromSource(names, cardDB, source, engine, pi) {
     // Erster fast richtig (Spell + Attack), aber ohne Creature und ohne
     // den Level-Riegel.
     if (!isTutorableArea(cd, engine, pi)) continue;
+    if (!engine.canPlaceAnotherArea(pi, name)) continue;   // W16c (A04-21): Limit/Dopplung wie der normale Area-Spielweg
     out.push({ name, source, sourceIdx: i });
   }
   return out;
@@ -212,7 +213,8 @@ module.exports = {
     // Can only cast an Area if the caster's own Area zone is empty
     // (generic Area rule, enforced by validateActionPlay). We enforce it
     // here too so Cooldin's button grays out when the zone is occupied.
-    if ((gs.areaZones?.[pi] || []).length > 0) return false;
+    // W16c (A04-21): Limit statt "Zone leer": mit Spatial Crevice (bis zu 3 verschiedene Areas) ist noch Platz.
+    if (!engine.canPlaceAnotherArea(pi)) return false;
     // Reality Crack's turn-long area lock also blocks Cooldin.
     if (ps._cantPlayAreaThisTurn === gs.turn) return false;
 
