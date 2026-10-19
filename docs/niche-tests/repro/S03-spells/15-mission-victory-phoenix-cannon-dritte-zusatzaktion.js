@@ -18,11 +18,18 @@ const H = require('../../lib/h.js');
   const rm = await t.play(0, 'Mission of the Light Brigade', { hero: 0, noGrant: true, phase: 3 });
   R.check('Mission gespielt (2 Ladungen)', rm === true && t.gs.players[0]._missionCharges === 2, { rm, ladungen: t.gs.players[0]._missionCharges });
   const r = await t.play(0, 'Victory Phoenix Cannon', { hero: 0, noGrant: true, keepActions: true, phase: 4 });
-  R.check('VPC als Zusatzaktion gespielt, Folgezauber Meteor Crash gewirkt', r === true && t.pile(0, 'discardPile').includes('Meteor Crash'), { r, ablage: t.pile(0, 'discardPile') });
-  R.check('nach VPC + Folgezauber sind beide Mission-Zusatzaktionen verbraucht (Ladung 0)', t.gs.players[0]._missionCharges === 0, t.gs.players[0]._missionCharges);
+  const meteor = t.pile(0, 'discardPile').includes('Meteor Crash');
+  // W16g: der Kopf nennt ZWEI zulässige Ausgänge (Folgezauber verbraucht eine Mission-Ladung ODER wird als „andere“ Zusatzaktion gar nicht angeboten).
+  // Geprüft wird deshalb die Grenze selbst: VPC + Folgezauber + weitere Zauber = höchstens 2 Zusatzaktionen unter Mission.
   const hp0 = t.hp(1, 0);
   const r2 = await t.play(0, 'Rockfall', { hero: 0, noGrant: true, keepActions: true, phase: 4 });
-  R.check('Rockfall als DRITTE Zusatzaktion ist nicht spielbar', r2 === false && t.hp(1, 0) === hp0, { r2, hp: t.hp(1, 0), vorher: hp0 });
+  const hp1 = t.hp(1, 0);
+  const r3 = await t.play(0, 'Rockfall', { hero: 0, noGrant: true, keepActions: true, phase: 4 });
+  const rockfaelle = (r2 === true && hp1 < hp0 ? 1 : 0) + (r3 === true && t.hp(1, 0) < hp1 ? 1 : 0);
+  const zusatz = (r === true ? 1 : 0) + (meteor ? 1 : 0) + rockfaelle;
+  R.check('VPC als Zusatzaktion gespielt', r === true && t.pile(0, 'discardPile').includes('Victory Phoenix Cannon'), { r, ablage: t.pile(0, 'discardPile') });
+  R.check('Mission-Grenze: VPC + Folgezauber + weitere Zauber = höchstens 2 Zusatzaktionen', zusatz <= 2, { vpc: r, meteor, rockfaelle, zusatz });
+  R.check('die zwei Mission-Zusatzaktionen sind verbraucht (Ladung 0)', t.gs.players[0]._missionCharges === 0, t.gs.players[0]._missionCharges);
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

@@ -109,6 +109,15 @@ module.exports = {
       if (hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
+      // ★ W16g (S03-15): der Folgezauber IST eine Zusatzaktion („as an additional Action“) — Mission of the Light Brigade und Duigno
+      // („You cannot perform any OTHER additional Actions“) sperren ihn wie jeden Sofort-Guss (`kannSofortWirken`, Chaos Diamond …).
+      // Bisher umging VPC diese Sperre ueber `_castSpellImmediately`: unter Mission liefen VPC + Folgezauber + ein weiterer Zauber
+      // = 3 Zusatzaktionen statt hoechstens 2.
+      if (engine.additionalActionsLocked(pi) || engine.missionLockActive(pi)) {
+        engine.log('victory_phoenix_cannon_followup_locked', { player: ps.username });
+        return;
+      }
+
       // Find eligible spells in hand: Normal Destruction Magic, level ≤ 1
       // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
       // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
