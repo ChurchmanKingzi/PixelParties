@@ -4,7 +4,8 @@
 //  Grants +30 ATK to the equipped Hero.
 //  When the Hero hits a Burned target with an
 //  Attack, additionally increase that Attack's
-//  damage by the Hero's base ATK.
+//  damage by the Hero's ATK (W16e F02-03: aktuelle Attack stat —
+//  Text: „the attacker's Attack stat", nicht „base").
 //  Uses generic grantAtk/revokeAtk system.
 // ═══════════════════════════════════════════
 
@@ -43,7 +44,9 @@ module.exports = {
 
     /**
      * Before damage: if this hero is attacking a Burned target,
-     * add the hero's base ATK to the damage.
+     * add the hero's current Attack stat to the damage
+     * (Text: „the attacker's Attack stat" — Buffs/Ausruestung zaehlen,
+     * W16e F02-03; andere Karten sagen ausdruecklich „base Attack stat").
      */
     beforeDamage: (ctx) => {
       // Only applies to attack-type damage
@@ -60,15 +63,15 @@ module.exports = {
       const isBurned = target.statuses?.burned || target.counters?.burned;
       if (!isBurned) return;
 
-      // Add hero's base ATK to the damage
+      // Add the hero's current Attack stat to the damage
       const hero = ctx.attachedHero;
       if (!hero) return;
-      const baseAtk = hero.baseAtk || 0;
-      if (baseAtk <= 0) return;
+      const atk = hero.atk || 0;
+      if (atk <= 0) return;
 
-      ctx.modifyAmount(baseAtk);
+      ctx.modifyAmount(atk);
       ctx._engine.log('sacred_hammer_bonus', {
-        hero: hero.name, baseAtk, target: target.name || 'target',
+        hero: hero.name, baseAtk: atk, target: target.name || 'target',
       });
     },
   },
