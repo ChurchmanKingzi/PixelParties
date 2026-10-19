@@ -12756,6 +12756,20 @@ class GameEngine {
 
   async _actionDestroyCardKern(source, targetCard, opts = {}) {
     if (!targetCard) return;
+    // W19a (Al, 19.10.2026: „any card on the board that is not a Hero" schließt die oberste Karte des Coolness Stacks ein): eine
+    // Stack-Karte hat keine Zonen-Arrays zum Räumen - `_removeCardFromState` kennt die Zone nicht, die Karte stand vorher in Stack UND
+    // Ablage (Scrap Plow, Shishi, Antonia). Zerstören = die oberste Karte in die Ablage ihres Besitzers (`actionPopCoolnessStackTo`).
+    if (targetCard.zone === ZONES.COOLNESS_STACK) {
+      if (this.gs.firstTurnProtectedPlayer != null && targetCard.owner === this.gs.firstTurnProtectedPlayer) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'first-turn protection' });
+        return;
+      }
+      const stapel = this.gs.players[targetCard.owner]?.coolnessStack || [];
+      if (stapel.length > 0 && stapel[stapel.length - 1] === targetCard.name) {
+        await this.actionPopCoolnessStackTo(targetCard.owner, 'discard', { source: source?.name || opts.sourceName || null });
+      }
+      return;
+    }
     // v1375: Ability Zone eines temporaer gesteuerten Helden — unberuehrbar.
     if (!opts._ignoreCharmSchutz && this.abilityZoneGeschuetzt(targetCard)) {
       this.log('ability_protected_by_control', { card: targetCard.name, by: source?.name || null });

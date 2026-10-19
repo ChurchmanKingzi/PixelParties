@@ -58,6 +58,28 @@ function _brettSeite(engine, inst) {
   return inst.controller ?? inst.owner;
 }
 
+/**
+ * W19a (Al, 19.10.2026: „Tengu Windstorm, Sparkfly Worker … Yeeting und andere vergleichbare Effekte auch"): „any card on the board
+ * that is not a Hero" schließt die OBERSTE Karte des Coolness Stacks jedes Spielers ein. EINE Stelle für Ziel-ID und -Art
+ * (`coolness-<Seite>` / `coolnessStackTop`, wie Coolness Overcharge und Ralzish sie von jeher anbieten); jeder Sammler
+ * („Nicht-Helden-Zielmenge") ruft sie in seiner Zonen-Schleife für Instanzen der Zone `coolnessStack`. Gibt das Ziel zurück
+ * oder `null` (nicht die oberste Karte; bei gleichnamigen Karten im Stapel gilt nur die oberste Instanz - kein doppeltes Ziel).
+ * Das Entfernen aus dem Stapel läuft über `engine.actionPopCoolnessStackTo` bzw. `actionDestroyCard` (leitet Stack-Karten dorthin).
+ */
+function coolnessSpitzeZiel(engine, inst) {
+  if (!inst || inst.zone !== 'coolnessStack') return null;
+  if (inst.counters?.immovable) return null;
+  const stack = engine?.gs?.players?.[inst.owner]?.coolnessStack || [];
+  if (stack.length === 0 || stack[stack.length - 1] !== inst.name) return null;
+  const spitze = engine.getCoolnessStackTopInst?.(inst.owner);
+  if (spitze && spitze !== inst) return null;
+  return {
+    id: `coolness-${inst.owner}`,
+    type: 'coolnessStackTop', owner: inst.owner, heroIdx: -1,
+    cardName: inst.name, _cardInstance: inst,
+  };
+}
+
 function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
@@ -144,18 +166,13 @@ function collectNonHeroBoardTargets(gs, engine) {
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'coolnessStack') {
-      // Only the TOP of each player's Coolness Stack is targetable.
-      const stack = gs.players[inst.owner]?.coolnessStack || [];
-      if (stack.length === 0 || stack[stack.length - 1] !== inst.name) continue;
-      targets.push({
-        id: `coolness-${inst.owner}`,
-        type: 'coolnessStackTop', owner: inst.owner, heroIdx: -1,
-        cardName: inst.name, _cardInstance: inst,
-      });
+      // Only the TOP of each player's Coolness Stack is targetable (W19a: `coolnessSpitzeZiel`).
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
 
   return targets;
 }
 
-module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId };
+module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId, coolnessSpitzeZiel };

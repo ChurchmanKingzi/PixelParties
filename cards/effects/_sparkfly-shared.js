@@ -1,4 +1,4 @@
-const { areaTargetId } = require('./_targeting-shared');
+const { areaTargetId, coolnessSpitzeZiel } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  Shared Sparkfly archetype helpers.
 //
@@ -274,6 +274,10 @@ function collectNonHeroBoardTargets(gs, engine) {
         type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
+    } else if (inst.zone === 'coolnessStack') {
+      // W19a (Al, 19.10.2026): „any card on the board that is not a Hero" bietet auch die oberste Karte der Coolness Stacks an.
+      const spitze = coolnessSpitzeZiel(engine, inst);
+      if (spitze) targets.push(spitze);
     }
   }
 
@@ -302,6 +306,9 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     engine.log('steal_to_hand_blocked', { card: targetInst.name, by: sourceName, reason: 'handLocked' });
     return false;
   }
+
+  // W19a (Al, 19.10.2026): die oberste Karte eines Coolness Stacks ist ein gültiges Ziel („any card on the board that is not a Hero").
+  if (targetInst.zone === 'coolnessStack') return await _stackSpitzeAufHand(engine, pi, targetInst, sourceName);
 
   const owner    = targetInst.owner;
   const heroIdx  = targetInst.heroIdx;
@@ -458,6 +465,40 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     source: sourceName, _skipReactionCheck: true,
   });
 
+  engine.sync();
+  return true;
+}
+
+/**
+ * W19a: oberste Karte des Coolness Stacks (`targetInst.owner`) auf die Hand von `pi`; sie bleibt Eigentum ihres Besitzers
+ * (`originalOwner`, wie jede Brettkarte hier). Der Stapel wird über `actionPopCoolnessStackTo(…, 'board')` abgebaut (Array + Instanz).
+ */
+async function _stackSpitzeAufHand(engine, pi, targetInst, sourceName) {
+  const gs = engine.gs;
+  const ps = gs.players[pi];
+  const owner = targetInst.owner;
+  const stack = gs.players[owner]?.coolnessStack || [];
+  if (!ps || stack.length === 0 || stack[stack.length - 1] !== targetInst.name) return false;
+  const popped = await engine.actionPopCoolnessStackTo(owner, 'board');
+  if (!popped) return false;
+  const cardName = popped.cardName;
+  await engine.runHooks('onCardLeaveZone', {
+    card: popped.inst, cardName, leavingCardName: cardName,
+    fromZone: 'coolnessStack', fromOwner: owner, toZone: 'hand', toOwner: pi,
+    _skipReactionCheck: true,
+  });
+  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett', originalOwner: owner });
+  if (newInst) newInst.originalOwner = owner;
+  engine.log('sparkfly_steal', {
+    by: sourceName, player: ps.username, card: cardName,
+    fromZone: 'coolnessStack', fromOwner: gs.players[owner]?.username,
+  });
+  if (newInst) {
+    await engine.runHooks('onCardAddedToHand', {
+      playerIdx: pi, card: newInst, cardName,
+      source: sourceName, _skipReactionCheck: true,
+    });
+  }
   engine.sync();
   return true;
 }
