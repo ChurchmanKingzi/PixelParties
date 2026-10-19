@@ -26166,8 +26166,8 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 /* Stufenzeilen einer Ability auf dem Brett: aktuelle Stufe hervorgehoben (goldener Pixelbalken, getoente Zeile), die anderen grau. */
 .tt-stufe { padding: 2px 4px; margin-left: -4px; margin-right: -4px; }
 .tt-stufe-aktiv {
-  background: rgba(255, 226, 110, .13);
-  box-shadow: inset 3px 0 0 rgb(255, 226, 110);
+  background: rgba(255, 226, 110, .10);
+  box-shadow: inset 2px 0 0 rgba(255, 232, 130, .7);
 }
 .tt-stufe-aktiv .tt-nummer { background: rgb(255, 226, 110); color: #1a1408; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .3), 0 0 0 1px var(--pp-kontur); }
-.tt-stufe-aus { opacity: .38; filter: grayscale(1); }
+.tt-stufe-aus { opacity: .6; filter: grayscale(.8); }   /* wie im Kartenbild: nicht zu dunkel (Als Befund 19.10.) */
