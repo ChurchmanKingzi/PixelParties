@@ -47022,6 +47022,14 @@ this._deathWatch = (this._deathWatchStack || []).length
             sourceOwner: opts.appliedBy ?? -1,
             source: opts.source,
             duration: opts.duration,
+    // ★ W16b (A01-pollution-31, Text „… make the Hero unaffected by a Spell that hits it"): ein Status-Zauber (Cold Coffin, Medusa's Curse,
+    // Null Zone) „trifft" den Helden auch ohne Schaden — das AME-Angebot lief bisher nur lazy aus `actionDealDamage`. Jetzt fragt auch das
+    // Setzen eines NEGATIVEN Status durch einen Zauber (lazy, je Zauber und Held einmal gemerkt, `_maybePromptAntiMagicEnchantment`).
+    if (STATUS_EFFECTS[statusName]?.negative && !this._isAmeShieldedHero(playerIdx, heroIdx)) {
+      const _ameQuelle = (typeof opts.source === 'string' && opts.source) || this._currentResolvingSpellName();
+      if (_ameQuelle) await this._maybePromptAntiMagicEnchantment(hero, { name: _ameQuelle });
+    }
+
           });
           this.log('status_add', { target: ci.name, status: statusName, owner: redirect.owner });
           this.sync();
