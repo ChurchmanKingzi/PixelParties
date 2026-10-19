@@ -80,8 +80,9 @@ module.exports = {
       for (let hi = 0; hi < heroes.length; hi++) {
         const hero = heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
-        // ★ Welle 14 (Q144/Q7): Nicht-Schaden-Effekt auf einen Helden (ATK/Max-HP-Gewinn) — Resistance blockt ihn je Held (eigene und fremde).
-        if (await engine.heroNonDamageEffectBlocked(p, hi, mode === 'atk' ? 'atk_gain' : 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: mode === 'atk' ? 40 : 80 })) continue;
+        // ★ Welle 14 (Q144/Q7): Max-HP-Gewinn auf einen Helden — Resistance blockt ihn je Held (eigene und fremde).
+        // ★ Welle 15 (Al, R1: ATK-Gewinne prallen NICHT an Resistance ab — „Nein, sollen sie nicht."): der +40-ATK-Zweig fragt den Prüfer nicht mehr (wie Nero, Toras, Taio).
+        if (mode !== 'atk' && await engine.heroNonDamageEffectBlocked(p, hi, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: 80 })) continue;
         if (mode === 'atk') {
           engine._applyHeroAtkDelta(hero, p, hi, 40);
         } else {
