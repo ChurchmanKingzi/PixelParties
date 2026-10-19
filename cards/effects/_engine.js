@@ -40120,6 +40120,33 @@ this._deathWatch = (this._deathWatchStack || []).length
         countByName.set(cInst.name, 1);
       }
 
+      // ── Ausruestungs-Reaktionen (W17c, F01-17: Bow of the Hunt Goddess) ──
+      // Eine AUSRUESTUNG an einem Helden, den `pi` kontrolliert, deren Skript `isEquipReaction` + `equipReactionCondition(gs, pi, engine,
+      // chainCtx, inst)` traegt, nimmt am selben Fenster teil — ohne Handkarte, wie die Board-Creature-Reaktion darueber. Je NAME ein Angebot
+      // (die erste taugliche Kopie). Fuer Helden ohne solche Ausruestung laeuft die Schleife ohne Wirkung durch (nur Skript-Abfragen).
+      for (const { physOwner: eSeite, heroIdx: eHi } of this.heroesControlledBy(pi)) {
+        for (const slot of (this.gs.players[eSeite]?.supportZones?.[eHi] || [])) {
+          const eNamen = Array.isArray(slot) ? slot : (slot ? [slot] : []);
+          for (const eName of eNamen) {
+            if (eligibleByName.has(eName)) continue;
+            const eScript = this.supportCardScript(eSeite, eHi, eName);
+            if (!eScript?.isEquipReaction || typeof eScript.equipReactionCondition !== 'function') continue;
+            const eInst = this.cardInstances.find(c => c.zone === ZONES.SUPPORT && c.heroIdx === eHi && c.name === eName
+              && this.physicalSide(c) === eSeite && !c.faceDown);
+            if (!eInst) continue;
+            let okE = false;
+            try { okE = !!eScript.equipReactionCondition(this.gs, pi, this, chainCtx, eInst); } catch { okE = false; }
+            if (!okE) continue;
+            eligibleByName.set(eName, {
+              handIdx: -1, cost: 0, script: eScript, cardData: allCards[eName] || null, cardName: eName,
+              eligibleHeroIdxs: [eHi], wisdomCost: 0,
+              fromEquip: { instId: eInst.id, heroIdx: eHi, seite: eSeite }, source: 'board',
+            });
+            countByName.set(eName, 1);
+          }
+        }
+      }
+
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -40156,7 +40183,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             name,
             source: eligibleByName.get(name)?.source || 'hand',
             count: countByName.get(name) || 1,
-            ...(eligibleByName.get(name)?.fromCreature ? { label: 'BOARD' } : {}),
+            ...((eligibleByName.get(name)?.fromCreature || eligibleByName.get(name)?.fromEquip) ? { label: 'BOARD' } : {}),
           }));
         const picked = await this.promptGeneric(pi, {
           type: 'cardGallery',
@@ -40253,6 +40280,56 @@ this._deathWatch = (this._deathWatchStack || []).length
           reactionCardName: chosenName, reactionOwner: pi, chain,
           _skipReactionCheck: true, _isReaction: true,
         });
+        this.sync();
+        return true;
+      }
+
+      // ── Ausruestungs-Reaktion aktivieren (W17c, Bow of the Hunt Goddess) ──
+      // Die Ausruestung bleibt, wo sie ist; sie SPIELT eine Karte aus einem Stapel (Vertrag: `equipReactionPick(engine, pi, chainCtx, inst)`
+      // → `{ cardName, cost, pile }` oder null = abgebrochen, nichts verbraucht). Reihenfolge: Karte aus dem Stapel nehmen (scheitert → keine
+      // Reaktion, nichts verbraucht) → Kosten zahlen → Stempel (`equipReactionCommit`) → Glied bauen. Das Glied traegt `fromDeck` (Ablage statt
+      // Handflug) und kein `fromHandIdx`; es loest wie eine Handreaktion auf und geht danach in die Ablage des Besitzers.
+      if (info.fromEquip) {
+        const eInst = this.cardInstances.find(c => c.id === info.fromEquip.instId);
+        if (!eInst || eInst.zone !== ZONES.SUPPORT) continue;
+        const pick = await script.equipReactionPick(this, pi, chainCtx, eInst);
+        if (!pick?.cardName) continue;
+        const pName = pick.cardName;
+        const pScript = loadCardEffect(pName);
+        const pCost = pick.cost || 0;
+        const pPile = pick.pile || 'deck';
+        const taken = await this.takeFromPile(pi, pPile, pName, { source: chosenName, sourceOwner: pi, shuffle: true });
+        if (!taken) continue;
+        await this._rxPay(ps, pCost, { cardName: pName, inHandIdx: -1 });
+        if (typeof script.equipReactionCommit === 'function') script.equipReactionCommit(this, pi, eInst, pick);
+        await this.showTriggeredEffect(chosenName, { replace: true, delayMs: 300 });
+        this.log('reaction_activated', { card: pName, player: ps.username, chainPosition: chain.length, source: 'equip', by: chosenName });
+        this._broadcastEvent('card_reveal', { cardName: pName });
+        const engine = this;
+        const reactionOwner = pi;
+        const eLink = {
+          id: uuidv4().substring(0, 12),
+          cardName: pName, owner: pi,
+          cardType: allCards[pName]?.cardType || 'Unknown',
+          casterHeroIdx: -1, heroIdx: -1,
+          goldCost: pCost, wisdomCost: 0,
+          isInitialCard: false, negated: false, chainClosed: false,
+          fromDeck: pPile === 'deck', fromEquip: eInst.id,
+          resolve: pScript?.resolve
+            ? async (ch, idx) => pScript.resolve(engine, reactionOwner, null, null, ch, idx)
+            : null,
+          script: pScript,
+        };
+        chain.push(eLink);
+        if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        await this.runHooks('onReactionActivated', {
+          reactionCardName: pName, reactionOwner: pi, chain,
+          _skipReactionCheck: true, _isReaction: true,
+        });
+        if (pScript?.onChainAdd) {
+          await pScript.onChainAdd(this, pi, chain, eLink);
+          if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        }
         this.sync();
         return true;
       }
@@ -40638,7 +40715,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // Handmitte.
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
-              from: 'hand', to: toDeleted ? 'deleted' : 'discard',
+              from: link.fromDeck ? 'deck' : 'hand', to: toDeleted ? 'deleted' : 'discard',
               ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
             });
             // 3. Landung ERST NACH der Animation.
@@ -40755,7 +40832,7 @@ this._deathWatch = (this._deathWatchStack || []).length
               // bisherige generische Startpunkt.
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
-                from: 'hand', to: zumLoeschen ? 'deleted' : 'discard',
+                from: link.fromDeck ? 'deck' : 'hand', to: zumLoeschen ? 'deleted' : 'discard',
                 ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
