@@ -9820,6 +9820,8 @@ class GameEngine {
 
     let _ersterDurchlauf = false;
     let _toeterBesitzer = -1;
+    let _koKontrolle = ownerIdx;   // W16b (A01-pollution-06): Kontrolleur zum Todeszeitpunkt (das Aufräumen kann die Übernahme lösen)
+    try { _koKontrolle = this.heroSideOf(ownerIdx, target) ?? ownerIdx; } catch { /* Rückfall: Besitzer */ }
     if (!target._koProcessed) {
       _ersterDurchlauf = true;
       // Wer hat den Tod verursacht? Vor dem Aufraeumen berechnen — es leert `statuses`.
@@ -9894,6 +9896,9 @@ class GameEngine {
     }
 
     if (!opts.skipAllDeadCheck) await this.checkAllHeroesDead();
+    // ★ W16b (A01-pollution-06): endgültig besiegt (kein Extra Life, keine Rettung) — „targets are defeated" zählt auch Helden. NACH der
+    // Spielende-Prüfung: ist die Partie entschieden („alle Gegner getötet" geht vor, Welle 9), legen Zuhörer (Doom Clock) nichts mehr.
+    if (_ersterDurchlauf) await this._vermerkeHeldNiederlage(target, ownerIdx, source, _koKontrolle);
     return false;
   }
 
@@ -34704,10 +34709,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       return await fn();
     } finally {
       this._niederlagenTiefe--;
-      if (this._niederlagenTiefe === 0 && (this._niederlagen || []).length > 0) {
-        const liste = this._niederlagen;
+      if (this._niederlagenTiefe === 0 && ((this._niederlagen || []).length > 0 || (this._niederlagenHelden || []).length > 0)) {
+        const liste = this._niederlagen || [];
+        const helden = this._niederlagenHelden || [];   // W16b (A01-pollution-06)
         this._niederlagen = [];
-        await this._liefereNiederlagen(liste);
+        this._niederlagenHelden = [];
+        await this._liefereNiederlagen(liste, helden);
       }
     }
   }
@@ -34757,16 +34764,27 @@ this._deathWatch = (this._deathWatchStack || []).length
    * defeated" reagieren (Junshi). ctx traegt `defeated` (dieselbe Liste,
    * beide Seiten). Wie alle Todes-Hooks ohne allgemeines Kettenfenster.
    */
-  async _liefereNiederlagen(liste) {
-    try {
-      await this._checkCreaturesDefeatedHandReactions(liste);
-    } catch (err) {
-      console.error('[CreaturesDefeatedReaction] Fenster:', err.message);
+  async _liefereNiederlagen(liste, helden = []) {
+    if (liste.length > 0) {
+      try {
+        await this._checkCreaturesDefeatedHandReactions(liste);
+      } catch (err) {
+        console.error('[CreaturesDefeatedReaction] Fenster:', err.message);
+      }
+      try {
+        await this.runHooks('onCreaturesDefeated', { defeated: liste, _skipReactionCheck: true });
+      } catch (err) {
+        console.error('[onCreaturesDefeated]', err.message);
+      }
     }
-    try {
-      await this.runHooks('onCreaturesDefeated', { defeated: liste, _skipReactionCheck: true });
-    } catch (err) {
-      console.error('[onCreaturesDefeated]', err.message);
+    // ★ W16b (A01-pollution-06): „1 or more TARGETS are defeated" (Doom Clock) — Helden und Kreaturen zusammen, EIN Aufruf je Vorgang
+    // (`onTargetsDefeated`, `ctx.defeated` = Kreaturen-Einträge wie bei `onCreaturesDefeated` + Helden-Einträge `{ hero: true, … }`).
+    if (liste.length > 0 || helden.length > 0) {
+      try {
+        await this.runHooks('onTargetsDefeated', { defeated: [...liste, ...helden], _skipReactionCheck: true });
+      } catch (err) {
+        console.error('[onTargetsDefeated]', err.message);
+      }
     }
   }
 
@@ -34838,6 +34856,24 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+  /**
+   * ★ W16b (A01-pollution-06): ein Held ist endgültig besiegt (nach Extra Life / Rettung). Gehört zum selben Vorgang wie die Kreaturentode
+   * eines Flächenschlags, wenn ein Sammler offen ist (`_mitNiederlagenSammler`); sonst sofort als eigener Vorgang. Nur der Hook
+   * `onTargetsDefeated` sieht Helden — `onCreaturesDefeated` und die Hand-Fenster bleiben reine Kreaturen-Wege.
+   */
+  async _vermerkeHeldNiederlage(hero, ownerIdx, source, kontrolleur) {
+    const heroIdx = (this.gs.players[ownerIdx]?.heroes || []).indexOf(hero);
+    const eintrag = {
+      hero: true, name: hero.name, owner: ownerIdx, controller: kontrolleur ?? ownerIdx,
+      heroIdx, source: source || null, type: null,
+    };
+    if ((this._niederlagenTiefe || 0) > 0) {
+      (this._niederlagenHelden || (this._niederlagenHelden = [])).push(eintrag);
+      return;
+    }
+    await this._liefereNiederlagen([], [eintrag]);
+  }
+
    * ★ v1292 — Eine Hand-Reaktion EINSETZEN: Flug Hand → Ablage (vor dem
    * Splice), Ablage-Routing, Gold, Wisdom, SC-Zaehler, Einmal-pro-Spiel,
    * Abgleich, Auftritt. Gemeinsam fuer das Einzel- und das Sammel-Fenster

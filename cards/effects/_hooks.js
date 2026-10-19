@@ -108,6 +108,9 @@ const HOOKS = {
   // Zerstoerung) mit ALLEN Opfern — `ctx.defeated`. Fuer passive Effekte
   // auf „one or more … are defeated" (Junshi). Siehe `_liefereNiederlagen`.
   ON_CREATURES_DEFEATED: 'onCreaturesDefeated',
+  // W16b (A01-pollution-06): wie `onCreaturesDefeated`, aber für „1 or more TARGETS are defeated" — Kreaturen UND Helden desselben
+  // Vorgangs in `ctx.defeated` (Helden-Einträge tragen `hero: true`, `controller`). Doom Clock.
+  ON_TARGETS_DEFEATED: 'onTargetsDefeated',
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
