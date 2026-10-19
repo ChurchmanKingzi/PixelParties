@@ -26662,7 +26662,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     {
       // W16d (A08-04): die Instanz an POSITION `handIdx` (k-te Karte dieses Namens, wie Crystal Well/Mary rechnen),
       // nicht der erste Namens-Treffer – sonst wandert bei gleichnamigen Handkarten die falsche (originalOwner vertauscht).
-      inst = this._findHandInstanceAt(fromPi, handIdx);
+      inst = this._findHandInstanceAt(fromPi, handIdx)
+        // Fallback (alter Weg): keine Rang-Zuordnung möglich -> erste Instanz dieses Namens, sonst entstünde eine Geister-Instanz.
+        || this.cardInstances.find(c => c.owner === fromPi && c.zone === ZONES.HAND && c.name === cardName) || null;
     }
 
     fromPs.hand.splice(handIdx, 1);

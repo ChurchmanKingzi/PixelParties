@@ -20727,3 +20727,8 @@ Triage der 35 roten Repros: 1 = Fehler mit eindeutiger Erwartung (behoben), 2 = 
 | C03-11 Monster Nest | 1 | `summonOnlyFromHand` (Ifrit) wird nicht angeboten. |
 | C03-18 Horned Demon | 2 | Repro überholt: Al hat in Welle 3 entschieden, dass Zugende-Trigger nach dem Ablauf von Frost/Betäubung feuern dürfen (Ist-Zustand gewollt). Repro erwartet jetzt +1. |
 | C03-19 Monster Nest + Land Sharks | 1 | Mehrzonen-Kreaturen (`multiZone`) werden nur angeboten, wenn die weiteren Zonen frei sind (Nest-Zone zählt mit). |
+| A09-02 (Folge von A09-03) | 2 | Repro Teil 1 geht über Racket Arrow, das den Companion jetzt nicht mehr anbietet; Maßstab dort „höchstens eine Kopie", die Rücknahme prüft Teil 2 (direkter Aufruf). |
+
+**Fragen an Al (offen, Code unverändert bzw. Lesart in Klammern):** A08-06 (Big Gwen Guard + Grinning Cat: Abwurf der Katze als Kosten vor der Sperre?), A08-12 (Trial of Dominance + Paraseed: Einnisten oder Löschen?), C03-07 Fall B (Grave Worm bei geliehener Kreatur: Lesart „nur wenn sie in MEINE Ablage geht" ist umgesetzt, Gegenlesart: Beschwörung in die Zone auf der Gegnerseite).
+
+**Neue Engine-Verträge:** `engine.uebernahmeUnzulaessig`, `engine.ushabtiEingelagert`, `engine.todesEreignisSchluessel`, Skript-Haken `eintrittsLimitErreicht(engine, pi)` (gelesen von `_eintrittsLimitErreicht`), Glied-Haken `link._nachAufloesung`, Todes-Hook-Felder `ziel`/`ablageBesitzer`, `clearArmedArrows` ist `async`.
