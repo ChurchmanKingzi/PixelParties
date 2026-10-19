@@ -465,21 +465,31 @@
 
   // ═════════════ Stufe einer Ability hervorheben ═════════════
   // Fähigkeitskarten (`skill3`) haben drei Textboxen, je eine pro Stufe. Steht die Karte auf dem Brett, hebt `stufe` (1–3) die
-  // Box ihrer aktuellen Stufe hervor (heller, goldene Pixelkante) und graut die beiden anderen aus (entsaettigt, abgedunkelt).
+  // Box ihrer aktuellen Stufe hervor (etwas heller, schmale blasse Kante) und graut die beiden anderen aus (teilentsaettigt, leicht
+  // abgedunkelt). Erste Fassung: goldene 10-px-Kante und Dunkelheit .58 — „Grayout etwas zu dunkel, Rahmen zu praegnant"
+  // (Als Befund 19.10.), daher jetzt 5 px, blasses Gold mit Deckkraft .55 und Dunkelheit .30.
   // Innenflaechen der Boxen im Rahmenraster (Kartenpixel): x 70–680, y 600–730 / 740–870 / 880–1000.
   const STUFEN_BOXEN = [[600, 130], [740, 130], [880, 120]];
+  const STUFE = {
+    heller: 'rgba(255,255,255,.10)',          // aktive Box: Aufhellung
+    kante: 'rgba(255,238,160,.55)', kanteDicke: 5,
+    grau: .8,                                  // inaktive Box: Anteil der Entsaettigung (0–1)
+    dunkel: 'rgba(14,12,26,.30)',              // inaktive Box: Abdunklung
+  };
   function markStufe(ctx, stufe) {
-    const X = 70, B = 610;
+    const X = 70, B = 610, d = STUFE.kanteDicke;
     STUFEN_BOXEN.forEach(([y, h], i) => {
       ctx.save();
       ctx.beginPath(); ctx.rect(X, y, B, h); ctx.clip();
       if (i + 1 === stufe) {
-        ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(X, y, B, h);
-        ctx.fillStyle = 'rgb(255,226,110)';
-        ctx.fillRect(X, y, B, 10); ctx.fillRect(X, y + h - 10, B, 10); ctx.fillRect(X, y, 10, h); ctx.fillRect(X + B - 10, y, 10, h);
+        ctx.fillStyle = STUFE.heller; ctx.fillRect(X, y, B, h);
+        ctx.fillStyle = STUFE.kante;
+        ctx.fillRect(X, y, B, d); ctx.fillRect(X, y + h - d, B, d); ctx.fillRect(X, y + d, d, h - 2 * d); ctx.fillRect(X + B - d, y + d, d, h - 2 * d);
       } else {
+        ctx.globalAlpha = STUFE.grau;
         ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = 'rgb(128,128,128)'; ctx.fillRect(X, y, B, h);
-        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(14,12,26,.58)'; ctx.fillRect(X, y, B, h);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = STUFE.dunkel; ctx.fillRect(X, y, B, h);
       }
       ctx.restore();
     });
