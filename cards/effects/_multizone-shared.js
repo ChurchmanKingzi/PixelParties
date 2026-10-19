@@ -268,7 +268,8 @@ async function handleIslandRemoval(engine, pi, heroIdx, abIdx) {
       const zielPs = engine.gs.players[inst.originalOwner ?? inst.owner];
       if (zielPs) {
         if (!zielPs.discardPile) zielPs.discardPile = [];
-        zielPs.discardPile.push(inst.name);
+        if (inst._swagdriRouteToDelete) zielPs.deletedPile.push(inst.name);   // W18a (Swagdri, A04-30): von Swagdri ausgespielt → gelöscht statt Ablage
+        else zielPs.discardPile.push(inst.name);
       }
       engine.log('multizone_no_room', {
         player: ps.username, card: inst.name, hero: ps.heroes?.[heroIdx]?.name,

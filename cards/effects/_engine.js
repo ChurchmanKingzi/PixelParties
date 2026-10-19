@@ -12959,7 +12959,7 @@ class GameEngine {
       // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
       const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
       const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
-      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
+      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || targetCard._swagdriRouteToDelete || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -14094,6 +14094,16 @@ class GameEngine {
       toZone    = ZONES.DELETED;
       toHeroIdx = -1;
       toSlot    = -1;
+    }
+    // W18a (Swagdri, A04-30, Al: „Ja, deleten"): „delete the Artifact if it would be sent to the discard pile" gilt DAUERHAFT für die von
+    // Swagdri ausgespielte Ausrüstung — jede Bewegung dieser Instanz in die Ablage wird zu Gelöscht (Marke `_swagdriRouteToDelete`, bleibt
+    // an der Instanz, anders als das einmalige `_redirectToDeleted`). Rückkehr auf die Hand/ins Deck bleibt unberührt.
+    if (cardInstance._swagdriRouteToDelete && toZone === ZONES.DISCARD) {
+      toZone    = ZONES.DELETED;
+      toHeroIdx = -1;
+      toSlot    = -1;
+    } else if (cardInstance._swagdriRouteToDelete && toZone !== ZONES.SUPPORT) {
+      delete cardInstance._swagdriRouteToDelete;   // zurück auf die Hand/ins Deck: die Klausel endet (ein erneutes Ausspielen von der Hand ist normal)
     }
     // M01-08: Tokens (Biomancy Token, Boulder in a Bottle, Mummy Token …) werden
     // beim Verlassen des Bretts gelöscht — wie im Schadenspfad
@@ -50311,7 +50321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             owner: inst.owner,
             cardName: inst.name,
             from: 'support',
-            to: isToken ? 'deleted' : 'discard',
+            to: (isToken || inst._swagdriRouteToDelete) ? 'deleted' : 'discard',   // W18a (Swagdri): von Swagdri ausgespielte Ausrüstung wird gelöscht
             fromHeroIdx: hi,
             fromSlotIdx: slotIdx,
           });
@@ -50327,7 +50337,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             delete inst._returnToHand;
             discardPs.hand.push(inst.name);
             this.log('card_added_to_hand', { player: discardPs.username, card: inst.name, by: 'Heldentod-Aufraeumen' });
-          } else discardPs.discardPile.push(inst.name);
+          } else if (inst._swagdriRouteToDelete) discardPs.deletedPile.push(inst.name);   // W18a (Swagdri, A04-30): statt Ablage in den Gelöscht-Stapel des Besitzers
+          else discardPs.discardPile.push(inst.name);
         }
         this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
         // ── GETAKTET (Als Befund 17.8.) ────────────────────────────
