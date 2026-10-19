@@ -72,6 +72,7 @@ const config = {
     leaderboard: env('LEADERBOARD_CHANNEL_ID'),
     cardOfDay: env('CARD_OF_DAY_CHANNEL_ID'),
     bugs: env('BUG_CHANNEL_ID'),
+    mystery: env('MYSTERY_CHANNEL_ID', '1561796630762623036'),   // einziger Kanal für !mystery / !guess (ohne .env-Eintrag gilt dieser)
   },
 
   // Moderation
@@ -93,6 +94,11 @@ const config = {
   syncNicknames: flag('SYNC_NICKNAMES', false),
   skinCollectorMin: num('SKIN_COLLECTOR_MIN', 50),
   veteranGames: num('VETERAN_GAMES', 300),
+
+  // Mystery-Spiel (!mystery / !guess)
+  mysteryDailyMax: num('MYSTERY_DAILY_MAX', 5),   // so viele neue Rätsel je Tag (Berliner Zeit)
+  mysteryReward: num('MYSTERY_REWARD', 20),       // SC für den Gewinner …
+  mysteryPenalty: num('MYSTERY_PENALTY', 2),      // … minus so viele je falschem Tipp, den er für diese Karte schon abgegeben hat
 
   // Feeds
   feedPollMinutes: num('FEED_POLL_MINUTES', 5),

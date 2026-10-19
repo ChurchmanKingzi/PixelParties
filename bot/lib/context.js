@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const { createHelpers } = require('./util');
 
-const FEATURES = ['moderation', 'welcome', 'reactionroles', 'cards', 'account', 'leaderboard', 'feeds', 'duel', 'deck', 'tournament', 'bug'];
+const FEATURES = ['moderation', 'welcome', 'reactionroles', 'cards', 'account', 'leaderboard', 'feeds', 'duel', 'deck', 'tournament', 'mystery', 'bug'];
 
 function createContext({ client, config, db, game }) {
   const helpers = createHelpers(config);

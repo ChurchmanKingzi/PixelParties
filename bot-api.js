@@ -30,6 +30,8 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // ohne 0/O/1/I: wird abgetippt
 const CODE_LEN = 8;
 const MAX_ADMIN_SC_DELTA = 1000000;
+/** Wofür der Bot SC bucht (steht in sc_log.reward_id). Alles andere wird als Admin-Buchung geführt. */
+const SC_REASONS = new Set(['admin:discord', 'bot:mystery']);
 
 function createCode() {
   let s = '';
@@ -201,8 +203,8 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
   });
 
   /**
-   * Admin: SC erhöhen/senken. `delta` ganze Zahl ≠ 0. Das Guthaben fällt nie unter 0.
-   * Jede Buchung steht in sc_log (reward_id `admin:discord`), `opponent_id` trägt die Discord-ID des Admins.
+   * SC erhöhen/senken (Admin-Befehle, Mystery-Gewinne). `delta` ganze Zahl ≠ 0. Das Guthaben fällt nie unter 0.
+   * Jede Buchung steht in sc_log (reward_id = `reason`, Voreinstellung `admin:discord`), `opponent_id` trägt die Discord-ID des Auslösers.
    */
   app.post(bot('/sc'), botAuth, async (req, res) => {
     try {
@@ -216,7 +218,7 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
       // Atomar gegen gleichzeitige Spielbuchungen: relativ ändern, nicht den gelesenen Wert zurückschreiben.
       await db.run('UPDATE users SET sc = MAX(0, COALESCE(sc, 0) + ?) WHERE id = ?', [delta, u.id]);
       await db.run('INSERT INTO sc_log (id, user_id, reward_id, opponent_id, amount) VALUES (?, ?, ?, ?, ?)',
-        [uuidv4(), u.id, 'admin:discord', String(req.body?.adminDiscordId || ''), applied]);
+        [uuidv4(), u.id, SC_REASONS.has(req.body?.reason) ? req.body.reason : 'admin:discord', String(req.body?.adminDiscordId || ''), applied]);
       const now = await db.get('SELECT sc FROM users WHERE id = ?', [u.id]);
       res.json({ username: u.username, before, after: now?.sc ?? after, applied });
     } catch (err) { console.error('[bot/sc]', err.message); res.status(500).json({ error: 'failed' }); }
