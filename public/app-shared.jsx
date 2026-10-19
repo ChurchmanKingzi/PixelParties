@@ -7737,8 +7737,9 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // gewaehlten HELDEN fuer den Rest des Zuges — als Debuff direkt am
   // Helden, wie Stunned oder Negated (nicht als Spieler-Debuff: die
   // anderen Helden duerfen weiter handeln).
+  // W19a (Al, 19.10.2026: „The user ist der Zauberwirker"): die Sperre entfaellt, wenn der WIRKER (nicht der gesperrte Held) Magic Arts 1 hat.
   if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
-    tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless it has at least Magic Arts 1.' });
+    tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless the Hero that cast Divine Gift of Skill (\"the user\") has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
