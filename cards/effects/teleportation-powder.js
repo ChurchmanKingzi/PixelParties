@@ -324,6 +324,9 @@ async function zurueckstellen(engine, auftrag) {
   }
 
   ps._teleportedAway = Math.max(0, (ps._teleportedAway || 0) - 1);
+  // W18b (Al 19.10.: „via Teleport Powder zurueckkehrende Heroes bekommen automatisch den Status/Debuff"): laeuft eine Anti Magic Zone,
+  // ist der Rueckkehrer gesperrt. Keine Eintritts-Hooks (Regel 11.9.) — nur der Zonen-Status.
+  await engine.amzFensterAufHeldAnwenden(auftrag.besitzer, hi);
 
   engine._broadcastEvent('play_zone_animation', {
     type: 'gold_sparkle', owner: auftrag.besitzer, heroIdx: hi, zoneSlot: -1,

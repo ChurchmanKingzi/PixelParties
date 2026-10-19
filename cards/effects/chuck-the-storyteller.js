@@ -203,6 +203,7 @@ module.exports = {
     delete hero.diedOnTurn;
     delete hero._koProcessed;
     if (ausDemTod) engine.zaehleHeldenWiederbelebung(hero, CARD_NAME);
+    if (ausDemTod) await engine.amzFensterAufHeldAnwenden(hs, heroIdx);   // W18b: Anti Magic Zone
 
     // ① Volle Heilung („fully heal its HP"). Als Heilung statt als
     // direkter HP-Wert, damit Heil-Zuhoerer sie sehen.

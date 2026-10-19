@@ -83,6 +83,7 @@ module.exports = {
     delete hero.maxHpCapped;
     delete hero.diedOnTurn;
     delete hero._koProcessed;
+    if (ausDemTod) await engine.amzFensterAufHeldAnwenden(heroOwner ?? pi, heroIdx);   // W18b: Anti Magic Zone
     engine.sync();
   },
 
