@@ -18,6 +18,8 @@ const H = require('../../lib/h.js');
     setup(t);
     t.reset();
     t.script.push({ match: d => d.type === 'optionPicker' && d._icPhase === 'hp', answer: () => ({ optionId: '60' }) });
+    // W16g: die Statuswahl von Divine Zeal ist jetzt abbrechbar (S02-16); die Harness-Standardantwort auf abbrechbare Abfragen ist „abbrechen" – also ausdrücklich alle Status wählen.
+    t.script.push({ match: d => d.type === 'statusSelect', answer: (d) => ({ selectedStatuses: (d.statuses || []).map(s => s.key) }) });
     t.targetFn = (valid, cfg) => {
       if (cfg && cfg.title === 'Inheritance Ceremony') return [(valid.find(v => v.type === 'hero' && v.heroIdx === 1) || valid[0]).id];
       return [(valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 2) || valid[0]).id];
