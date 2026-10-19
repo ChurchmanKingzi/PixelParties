@@ -120,7 +120,9 @@ module.exports = {
       // Welle 12 (Al): bei negierten ABILITIES des Wirts (harte Form) nur Stufe-0-Bomblebees („Summoning Magic weg").
       const blanked = engine.heroAbilityLevelsBlanked(feld, hostHeroIdx);
       const candidates = bomblebeeNamesInHand(ps, usedNames)
-        .filter(n => !blanked || require('./_summon-eligibility').beschwoerStufeOk(engine, feld, hostHeroIdx, engine._getCardDB()[n]));
+        .filter(n => !blanked || require('./_summon-eligibility').beschwoerStufeOk(engine, feld, hostHeroIdx, engine._getCardDB()[n]))
+        // W16c (A05-05): "Summon ..." (nicht "place") - die Stufe des Helden gilt weiter (Al, Q25); nur die AKTION entfaellt.
+        .filter(n => { const cd = engine._getCardDB()[n]; return !cd || engine.heroMeetsLevelReq(feld, hostHeroIdx, cd, { levelSourcePi: pi }); });
       if (candidates.length === 0) break;
 
       const slot = findFreeSupportSlot(fps, hostHeroIdx);
