@@ -45764,8 +45764,13 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /**
    * Divine Gift of Skill lock — the chosen hero cannot perform an Action
-   * for the rest of the turn unless they have Magic Arts >= 1. Returns
+   * for the rest of the turn unless THE USER has Magic Arts >= 1. Returns
    * `true` when an Action play should be blocked.
+   *
+   * W18a (S01-04, Al: „The user ist der Zauberwirker"): „the user" = der Held, der
+   * Divine Gift of Skill gewirkt hat (`hero._skillLockUser = {side, heroIdx}`, vom Skript
+   * gesetzt) — SEINE aktuelle Magic-Arts-Stufe entscheidet, nicht die des gewählten
+   * Helden. Ohne gemerkten Nutzer (Altzustand) gilt die Stufe des gesperrten Helden.
    *
    * Used at every Action-resource gate (Spell/Attack/Creature plays via
    * validateActionPlay, ability-action activations, hero-effect
@@ -45777,7 +45782,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[heroIdx];
     if (!hero) return false;
     if (hero._skillLockTurn !== this.gs.turn) return false;
-    if (this.heroSchoolLevel('Magic Arts', playerIdx, heroIdx) >= 1) return false;   // W4a: harte Negierung -> Stufe 0
+    const _nutzer = hero._skillLockUser;
+    const _hatNutzer = _nutzer && this.gs.players[_nutzer.side]?.heroes?.[_nutzer.heroIdx];
+    const _seite = _hatNutzer ? _nutzer.side : playerIdx;
+    const _hi = _hatNutzer ? _nutzer.heroIdx : heroIdx;
+    if (this.heroSchoolLevel('Magic Arts', _seite, _hi) >= 1) return false;   // W4a: harte Negierung -> Stufe 0
     return true;
   }
 
@@ -51658,6 +51667,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._refreshAscensionReadiness();
+    // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
+    // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.
+    for (const _bps of (this.gs.players || [])) {
+      const _bheroes = _bps?.heroes || [];
+      for (let _bhi = 0; _bhi < _bheroes.length; _bhi++) {
+        const _bb = _bheroes[_bhi]?.buffs?.blessed_skill;
+        if (_bb) _bb.locked = this.isHeroSkillLocked(this.gs.players.indexOf(_bps), _bhi);
+      }
+    }
     // v1443: Lethe-Stempel je Karte — bei jedem Abgleich nachziehen, damit
     // eine gegangene und wiedergekommene Karte nicht den alten Stempel
     // erbt. Kostet nichts, solange niemand gestempelt ist.

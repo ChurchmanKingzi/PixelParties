@@ -7,8 +7,15 @@
 //  Choose a Hero you control. Up to 4 additional
 //  Abilities may be attached to that Hero this
 //  turn. That Hero cannot perform an Action for
-//  the rest of the turn unless they have at least
+//  the rest of the turn unless THE USER has at least
 //  Magic Arts 1.
+//
+//  W18a (S01-04, Al 19.10.2026: „The user ist der Zauberwirker."):
+//  „the user" = der Held, der Divine Gift of Skill wirkt — seine
+//  (aktuelle) Magic-Arts-Stufe entscheidet, ob die Sperre des
+//  gewählten Helden greift, nicht die des gewählten Helden.
+//  Der Wirker wird als `hero._skillLockUser = {side, heroIdx}`
+//  am gesperrten Helden gemerkt (`engine.isHeroSkillLocked`).
 //
 //  State surfaces:
 //    • `ps._bonusAbilityAttachments[heroIdx] = 4`
@@ -21,9 +28,7 @@
 //      (validateActionPlay) and action-cost
 //      ability / hero-effect activations
 //      (server.js gates). The lock auto-bypasses
-//      once the hero has Magic Arts >= 1, so
-//      stacking on the bonus slots up to that
-//      threshold restores normal Action play.
+//      once the USER (der Wirker) has Magic Arts >= 1.
 // ═══════════════════════════════════════════
 
 const BONUS_ATTACHMENTS = 4;
@@ -76,7 +81,7 @@ module.exports = {
 
       const picked = await engine.promptEffectTarget(pi, targets, {
         title: 'Divine Gift of Skill',
-        description: `Choose a Hero. They may attach up to ${BONUS_ATTACHMENTS} additional Abilities this turn, but cannot perform an Action this turn unless they have Magic Arts 1+.`,
+        description: `Choose a Hero. They may attach up to ${BONUS_ATTACHMENTS} additional Abilities this turn, but cannot perform an Action this turn unless the user (the Hero casting this) has Magic Arts 1+.`,
         confirmLabel: '🎓 Bless!',
         confirmClass: 'btn-success',
         cancellable: true,
@@ -121,6 +126,9 @@ module.exports = {
       // Lock Actions for this hero this turn (auto-bypassed when their
       // Magic Arts level reaches 1+).
       hero._skillLockTurn = gs.turn;
+      // W18a: „the user" = der wirkende Held (ohne Wirker, z. B. künstlicher Aufruf: Stufe des gesperrten Helden).
+      if (ctx.cardHeroIdx != null && ctx.cardHeroIdx >= 0) hero._skillLockUser = { side: ctx.cardHeroOwner ?? pi, heroIdx: ctx.cardHeroIdx };
+      else delete hero._skillLockUser;
 
       // Visible Blessed buff icon — `BuffColumn` reads `hero.buffs[name]`
       // and renders the entry in BUFF_ICONS. The tooltip's function form
