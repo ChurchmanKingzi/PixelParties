@@ -231,9 +231,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   const ringList = [];
   if (myRingPos >= 0) {
     for (let i = 0; i < ringSize; i++) {
-      const ringPos = draft.direction === 'left'
-        ? (myRingPos + i) % ringSize
-        : (myRingPos - i + ringSize) % ringSize;
+      // Feste Ring-Reihenfolge ab mir — sie bleibt ueber alle Packs gleich. Nur die Pfeile drehen sich:
+      // 'left' = Packs gehen an den NAECHSTEN Ringplatz (die Zeile darunter, ↓), 'right' = an den
+      // vorherigen (die Zeile darueber, ↑). Wuerde zusaetzlich die Liste umsortiert, kaemen beide
+      // Umkehrungen zusammen und das Bild zeigte in jedem Pack dieselbe Reihenfolge.
+      const ringPos = (myRingPos + i) % ringSize;
       const seatIdx = seatOrder[ringPos];
       const player = draft.players[seatIdx];
       ringList.push({ ringPos, seatIdx, username: player?.username || `Seat ${seatIdx}`, isBot: !!player?.isBot, isMe: seatIdx === draft.seatIdx, picked: draft.seatPicked[seatIdx] });
