@@ -64,7 +64,7 @@ function beute(engine, pi) {
     if ((inst.controller ?? inst.owner) !== oppIdx) continue;
     const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if (engine.isOmniImmune(inst)) continue;          // Kardinalbestien
+    if (engine.isOmniImmune(inst, pi)) continue;      // Kardinalbestien (Golden Wings: nur gegen den Gegner, W17b)
     out.push(inst);
   }
   return out;

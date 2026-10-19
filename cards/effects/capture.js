@@ -89,7 +89,7 @@ function istZiel(engine, pi, inst, maxLv, mitSchutz) {
   if (!hasNumericCreatureLevel(cd)) return false;                       // Artifact-Kreaturen haben kein Level
   if (engine.effectiveCardLevel(cd, ktrl, { heroIdx: inst.heroIdx, inst }) > maxLv) return false;
   // Kontrolle nicht wechselbar: Cardinal Beasts, „Control of this Creature cannot change", control_immune
-  if (engine.isOmniImmune(inst) || engine.controlIsLocked(inst) || engine.isCreatureImmune(inst, 'control_immune')) return false;
+  if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst) || engine.isCreatureImmune(inst, 'control_immune')) return false;
   if (mitSchutz) {
     if (inst.counters?.untargetable_all || engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;

@@ -9527,6 +9527,7 @@ function doTriggerTreacherousCrystal(room, pi) {
     if (inst.faceDown) continue;
     if (inst.stolenBy != null) continue;
     if (inst.counters?._cardinalImmune) continue;
+    if (room.engine.kreaturGegnerEffektImmun(inst, pi)) continue;   // W17b: Golden Wings (eigene Marke `_gwImmune`)
     if (CARDINAL_NAMES.includes(inst.name)) continue;
     // Restrict to Creature card type. Equipment / token instances
     // shouldn't be stealable, even if some future card flagged them

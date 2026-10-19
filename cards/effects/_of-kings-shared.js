@@ -163,7 +163,7 @@ function sourceOwnerOf(source, engine) {
  * Effekt-Immunitaet.
  */
 function protectorAffectable(engine, inst, source) {
-  if (engine.isOmniImmune?.(inst)) return false;
+  if (engine.isOmniImmune?.(inst, source)) return false;   // W17b: Golden Wings quellenbewusst
   const so = sourceOwnerOf(source, engine);
   if (inst.name === 'Sparkfly Queen' || inst.counters?._sparkflyAttendantAura) require('./_sparkfly-shared').refreshAttendantAura(engine, inst.controller ?? inst.owner);   // W5b-Z3
   if (inst.counters?._oppEffectImmune && so != null && so !== (inst.controller ?? inst.owner)) return false;

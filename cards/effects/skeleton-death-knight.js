@@ -155,6 +155,7 @@ module.exports = {
         await engine.runHooks('beforeCreatureAffected', hookCtx);
         if (hookCtx.cancelled) { engine.sync(); return true; }
         await engine.actionNegateCreature(inst, CARD_NAME, {
+          gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
           expiresAtTurn: gs.turn + 2,
           expiresForPlayer: pi,
           cleansable: true,   // „This counts as a status effect."

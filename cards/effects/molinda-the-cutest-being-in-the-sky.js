@@ -38,7 +38,7 @@ function stealableTargets(engine, pi) {
     if ((c.controller ?? c.owner) !== opp || c.zone !== 'support' || c.stolenBy != null || c.faceDown) continue;
     const cd = engine.getEffectiveCardData?.(c) || engine._getCardDB()[c.name];
     if (!cd || !engine.isChoosableAsCreature(c, cd)) continue;   // Tokens/Artifact Creatures sind Ziele (Als Sweep 9.10.)
-    if (engine.isOmniImmune?.(c)) continue;
+    if (engine.isOmniImmune?.(c, pi)) continue;
     n++;
   }
   return n;

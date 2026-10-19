@@ -149,7 +149,7 @@ module.exports = {
       for (const ziel of circusCreatures(engine, inst)) {
         // W16c (A04-13): Cute Conversion: geliehene Kreaturen sind "unaffected by all cards and effects" - der Counter eines
         // ANDEREN Clowns ist so ein Effekt (die eigenen Effekte der Leihgabe auf sich selbst bleiben erlaubt).
-        if (engine.isOmniImmune(ziel)) continue;
+        if (engine.isOmniImmune(ziel, inst)) continue;   // W17b: Golden Wings – Quelle = dieser Clown
         await placeApplause(engine, ziel, 1, { source: CARD_NAME });
       }
     }

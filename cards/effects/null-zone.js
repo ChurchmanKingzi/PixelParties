@@ -110,6 +110,7 @@ module.exports = {
           zoneSlot: inst.zoneSlot,
         });
         await engine.actionNegateCreature(inst, 'Null Zone', {
+          gwSourceOwner: pi,   // W17b: Golden Wings – nur der Gegner ist ausgenommen
           expiresAtTurn,
           expiresForPlayer,
           statusKey: 'nulled',

@@ -263,10 +263,10 @@ async function _zahleTribut(ctx) {
   const batch = [];
   for (const inst of others) {
     if (!inst) continue;
-    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch });
+    await returnSupportCreatureToHand(engine, inst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
   }
   if (landingInst) {
-    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch });
+    await returnSupportCreatureToHand(engine, landingInst, CARD_NAME, { toPlayer: pi, batch, sourceOwner: pi });
   }
   await fireReturnedBatch(engine, batch, CARD_NAME);
 

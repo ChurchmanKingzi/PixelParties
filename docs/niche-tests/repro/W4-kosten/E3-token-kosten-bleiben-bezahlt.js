@@ -16,7 +16,7 @@ const FALLE = [
   { spell: 'Goldify', kosten: 1, bau: (t) => { t.put(1, 0, 0, D); }, effekt: (t) => t.inst(c => c.zone === 'support' && c.owner === 1 && c.name === D).length === 0 },
   { spell: 'Reincarnation', kosten: 2, bau: (t) => { t.gs.players[0].heroes[2].hp = 0; }, effekt: (t) => t.hp(0, 2) > 0 },
   { spell: 'Mass Multiplication', kosten: 1, hand: ['Mass Multiplication', 'Fireball'], deck: ['Fireball', 'Fireball', 'Fireball', D, D], effekt: (t) => t.pile(0, 'hand').filter(n => n === 'Fireball').length === 3 },
-  { spell: 'Golden Wings', kosten: 1, bau: (t) => { t.put(0, 0, 0, D); }, effekt: (t) => t.inst(c => c.zone === 'support' && c.owner === 0 && c.name === D)[0]?.counters?._cardinalImmune === true },
+  { spell: 'Golden Wings', kosten: 1, bau: (t) => { t.put(0, 0, 0, D); }, effekt: (t) => t.inst(c => c.zone === 'support' && c.owner === 0 && c.name === D)[0]?.counters?._gwImmune === true },
 ];
 async function bau(f, silence) {
   const t = await H.fresh({ hand: [f.hand || [f.spell], silence ? ['Silence'] : []], discard: [['Soul Shard Ba'], []], deck: f.deck ? [f.deck, []] : undefined });

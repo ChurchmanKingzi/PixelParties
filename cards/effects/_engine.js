@@ -12741,6 +12741,7 @@ class GameEngine {
       }
     }
     if (!_u && targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity (source-blind)
+    if (!_u && this.kreaturGegnerEffektImmun(targetCard, source, opts)) return;   // W17b: Golden Wings – nur gegen gegnerische Quellen
     // Sparkfly Attendant gift: blocks destroys from the opponent only.
     // Own-side sacrifices etc. still resolve.
     if (!_u && this.isOppEffectImmuneFrom(targetCard, source)) return;
@@ -13936,6 +13937,7 @@ class GameEngine {
       return;
     }
     if (!_u && cardInstance.counters?._cardinalImmune && toZone !== cardInstance.zone) return; // Cardinal Beast immunity
+    if (!_u && toZone !== cardInstance.zone && this.kreaturGegnerEffektImmun(cardInstance, opts.deathSource || opts.source, opts)) return;   // W17b: Golden Wings – nur gegen gegnerische Quellen
     // `_oppEffectImmune` (Sparkfly Attendant gift) is source-AWARE and
     // therefore checked at call sites that pass source — actionDestroyCard,
     // actionNegateCreature, the damage batch (via `_oppDamageImmune`) and
@@ -16281,7 +16283,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // pre-transfer animation, so opp sees the visual flourish but
     // the Creature stays put. Same contract used by damage paths
     // (`_immuneCreature` cancel) and status applies.
-    if (this.isOmniImmune(inst)) {
+    if (this.isOmniImmune(inst, neuerKtrl, opts)) {   // W17b: Golden Wings – Quelle = Übernehmender (außer `sourceOwner`)
       this.log('transfer_fizzle', {
         creature: inst.name, reason: 'omni_immune',
         from: fromPs.username, to: toPs.username,
@@ -18460,7 +18462,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!opts.ignoreGateShield && inst.zone === ZONES.SUPPORT) {
       await this._triggerGateCheck(inst.controller ?? inst.owner, sourceObj?.name || null, this._gateQuelleVon(sourceObj, opts));   // v1377
     }
-    const canApply = this.canApplyCreatureStatus(inst, statusName, sourceObj);
+    const canApply = this.canApplyCreatureStatus(inst, statusName, sourceObj, { gwSourceOwner: opts.sourceOwner });   // W17b: Golden Wings braucht den Besitzer der Quelle
     // Play the source's intended animation BEFORE the immunity bail,
     // so omni-immune Creatures (Cardinal Beasts, Golden-Wings wearers,
     // …) still get the visual "hit" the picker selected them for —
@@ -18786,6 +18788,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot be buffed
     if (inst.counters?._cardinalImmune) return false; // Cardinal Beast immunity (source-blind by design)
+    if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Buffs; ohne Quelle geschützt
     // No `_oppEffectImmune` check here — the buff path takes no source
     // argument, so we can't distinguish own-side beneficial buffs (which
     // must reach an Attendant-protected Queen normally) from opp-applied
@@ -18840,6 +18843,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // the buff from ever coming back off).
     if (!opts.forceClear) {
       if (inst.counters?._cardinalImmune) return; // Cardinal Beast immunity (source-blind)
+      if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return;   // W17b: Golden Wings – nur gegnerisches Entfernen; ohne Quelle geschützt
       // `_oppEffectImmune` is source-aware; this call site has no source
       // arg, so a lenient default lets own-side cleanses through.
       if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
@@ -19091,6 +19095,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Necromancy, Diplomacy, Null Zone, etc. The name-list fallback
     // covers pre-placed beasts whose onPlay never fired.
     if (inst.counters?._cardinalImmune) return;
+    if (this.kreaturGegnerEffektImmun(inst, source, opts)) return;   // W17b: Golden Wings – nur gegnerische Negation
     // Sparkfly Attendant gift: opp-applied negations only — own-side
     // self-negations (test scaffolding, future "negate your own
     // creature" cards) still work.
@@ -19469,7 +19474,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canTargetForStatus` (which omits this check) so omni-immune
     // creatures appear in the picker; this helper stays as the
     // authoritative "would the status actually stick" gate.
-    if (this.isOmniImmune(inst)) return false;
+    if (this.isOmniImmune(inst, typeof opts.gwSourceOwner === 'number' ? opts.gwSourceOwner : source)) return false;   // W17b: Golden Wings – nur gegnerische Status
     // Source-aware opp-effect immunity (Sparkfly Attendant gift, etc.):
     // status applications from the opp fizzle, own-side ones land.
     if (this.isOppEffectImmuneFrom(inst, source)) return false;
@@ -19554,13 +19559,36 @@ this._deathWatch = (this._deathWatchStack || []).length
    * at each engine site via `isOppEffectImmuneFrom(inst, source)`,
    * NOT here, because they only apply to opp-applied effects.
    */
-  isOmniImmune(inst) {
+  isOmniImmune(inst, quelle, opts) {
     if (!inst) return false;
     if (inst.counters?._cardinalImmune) return true;
+    if (this.kreaturGegnerEffektImmun(inst, quelle, opts)) return true;   // W17b: Golden Wings quellenbewusst
     if (inst.counters?._omniImmune) return true;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name)) return true;
     return false;
+  }
+
+  /**
+   * ★ W17b (A01-25, Al: „die restlichen Fälle"): Golden Wings — „unaffected by your OPPONENT'S cards and
+   * effects until the end of this turn". Eigene Marke `counters._gwImmune` (nicht mehr `_cardinalImmune`, das
+   * quellenblind ALLES sperrt und den Cardinal Beasts / Stowaway / Cute Conversion bleibt): sie schützt NUR gegen
+   * Quellen eines anderen Spielers als des Kontrolleurs der Kreatur (Kontrolle zählt, nicht Brettseite). Eigene
+   * Karten/Effekte/Kosten (Buffs, Heilen, Opfer, Goldify, eigener Schaden …) wirken normal.
+   * `quelle`: Zahl (Besitzer-Index) ODER Quellobjekt/-Karte mit `controller`/`owner`; `opts.sourceOwner` gewinnt
+   * (gleiche Auflösung wie `_gateQuelleVon`); `opts.gwSourceOwner` (nur für Golden Wings, ohne Nebenwirkung auf Tor-/Schutzfenster)
+   * nennt den Besitzer, wenn die Quelle ein bloßer Name ist. Ist KEINE Quelle bekannt (String-Quelle, -1, fehlend), bleibt es
+   * beim bisherigen Verhalten = geschützt, damit Golden Wings nirgends schwächer wird.
+   * Wer mit Quelle prüft, übergibt sie; Pfade ohne Quelle fragen ohne Argument (= geschützt).
+   */
+  kreaturGegnerEffektImmun(inst, quelle, opts = {}) {
+    if (!inst?.counters?._gwImmune) return false;
+    let q;
+    if (typeof opts?.gwSourceOwner === 'number') q = opts.gwSourceOwner;   // ausdrücklicher Hinweis des Aufrufers (String-Quellen ohne Besitzer)
+    else if (typeof quelle === 'number') q = quelle;
+    else q = this._gateQuelleVon(quelle, opts || {});
+    if (typeof q !== 'number' || q < 0) return true;     // Quelle unbekannt → geschützt
+    return q !== (inst.controller ?? inst.owner);
   }
 
   /**
@@ -19737,7 +19765,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.counters?._cardinalImmune) return null;
     const seite = inst.controller ?? inst.owner;
     const nach = gs._creatureEffectsNegated;
-    if (nach && nach.turn === (gs.turn || 0)) {
+    if (nach && nach.turn === (gs.turn || 0) && !this.kreaturGegnerEffektImmun(inst, nach.source)) {   // W17b: Golden Wings nur gegen die gegnerische Aura
       if (nach.source === seite || !this._creatureNegationProof(inst)) return { typ: 'nachwirkung' };
     }
     if (hatCreatureAura(inst.counters?._effectOverride || inst.name)) return null;
@@ -19746,6 +19774,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!hatCreatureAura(g.counters?._effectOverride || g.name)) continue;
       if (this.isCreatureEffectSuppressed(g, { ignoriereAura: true })) continue;
       if ((g.controller ?? g.owner) !== seite && this._creatureNegationProof(inst)) continue;
+      if (this.kreaturGegnerEffektImmun(inst, g)) continue;   // W17b: Golden Wings – Aura-Quelle des Gegners
       return { typ: 'aura', quelle: g.name };
     }
     return null;
@@ -27340,7 +27369,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // caller's pre-steal animation already played, but the Creature
     // stays put on its original side. Matches `actionTransferCreature`
     // and the damage/status fizzle contract.
-    if (this.isOmniImmune(inst)) {
+    if (this.isOmniImmune(inst, stealerPi)) {   // W17b: Golden Wings – Quelle = Dieb
       this.log('steal_fizzle', {
         creature: inst.name, reason: 'omni_immune',
         by: opts.sourceName || 'Steal',
@@ -28045,9 +28074,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // that was wrong; Sacrifice to Divinity and similar cards work on
       // anything you control.)
       // Cardinal Beasts (and anything else that picks up the
-      // `_cardinalImmune` counter, e.g. Golden Wings) are immune to
+      // `_cardinalImmune` counter) are immune to
       // ANY effect — they cannot be sacrificed even by your own
-      // cards. The counter check covers normally-played beasts.
+      // cards. (W17b: Golden Wings trägt `_gwImmune` und gilt nur gegen
+      // den Gegner — die eigene Kreatur bleibt opferbar.) The counter check covers normally-played beasts.
       // The name check is a belt-and-suspenders fallback: pre-placed
       // beasts (puzzle setup, game-start support zones) don't fire
       // their onPlay hook, so the counter never gets stamped — but a
@@ -42732,6 +42762,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const zone = inst.zone;
     if (zone !== ZONES.SUPPORT && zone !== ZONES.ABILITY) return false;
     if (inst.counters?.immovable || inst.counters?._cardinalImmune) return false;
+    if (this.kreaturGegnerEffektImmun(inst, opts.source, opts)) return false;   // W17b: Golden Wings – nur gegnerische Quelle; ohne Quelle geschützt
     const ownerIdx = inst.owner;
     if (!this.gs.players[ownerIdx]) return false;
     if (zone === ZONES.SUPPORT) {
@@ -48769,6 +48800,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (inst?.counters?._cardinalImmune || inst?.counters?._petrified
           || inst?.counters?._baihuPetrify
           || isCardinalBeastByName(inst?.name)) {
+        e._immuneCreature = true;
+      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner })) {
+        // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
+        // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
       } else if (inst?.counters?._damageDestroyImmune && !this.isCardPassiveDormant(inst)) {   // W7a (A05-04): stillgelegt -> nicht immun
         // Generic "fully damage- and destroy-immune" flag. Time Bomblebee

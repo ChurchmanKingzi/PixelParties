@@ -79,7 +79,7 @@ function istBetroffen(engine, pi, inst) {
   if (!inst || (inst.zone !== 'support' && inst.zone !== 'area')) return false;
   if ((inst.originalOwner ?? inst.owner) !== pi) return false;
   if ((inst.controller ?? inst.owner) === pi) return false;
-  if (engine.isOmniImmune(inst) || engine.controlIsLocked(inst)) return false;
+  if (engine.isOmniImmune(inst, pi) || engine.controlIsLocked(inst)) return false;
   return true;
 }
 

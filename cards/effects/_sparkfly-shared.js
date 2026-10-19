@@ -316,7 +316,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // the steal-to-hand silently fizzles. Mirrors the same guard in
   // actionTransferCreature / actionDestroyCard / the Deepsea
   // return-to-hand helper. Callers treat `false` as "didn't move".
-  if (engine.isOmniImmune?.(targetInst)) {
+  if (engine.isOmniImmune?.(targetInst, pi)) {   // W17b: Golden Wings – Quelle = der Nehmende
     engine.log('cardinal_immune_block', {
       card: cardName, by: sourceName, action: 'steal_to_hand',
     });

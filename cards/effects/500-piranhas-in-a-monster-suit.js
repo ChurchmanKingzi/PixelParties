@@ -73,7 +73,7 @@ function _validVictims(engine, pi) {
     if ((inst.controller ?? inst.owner) !== oi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Creature')) continue;
-    if (engine.isOmniImmune(inst)) continue;          // Cardinal / omni
+    if (engine.isOmniImmune(inst, pi)) continue;      // Cardinal / omni (Golden Wings: nur gegen den Gegner, W17b)
     if (inst.counters?._damageDestroyImmune) continue; // Time Bomblebee armed
     if (inst.counters?.immovable) continue;
     if (inst.counters?._stealImmortal) continue;      // Stolen-and-immortal

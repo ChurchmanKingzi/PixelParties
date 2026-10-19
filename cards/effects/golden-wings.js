@@ -37,18 +37,21 @@
 //       is a valid target; the buff applies
 //       preemptively.
 //
-//  Immunity: sets `_cardinalImmune` (engine's
-//  generic absolute-creature-shield: blocks damage,
-//  destroy, move, buff add/remove, AND — with the
-//  canApplyCreatureStatus update — status effects)
-//  plus `untargetable_by_opponent` so opponent
-//  targeting UIs skip this creature on future
-//  plays. Both counters are cleared on buff expiry
-//  via `clearCountersOnExpire`; the buff's
-//  `expiresForceClear: true` lets the expiry path
-//  bypass _cardinalImmune's own guard against
-//  actionRemoveCreatureBuff — without that bypass
-//  the protection would be self-perpetuating.
+//  Immunity: ★ W17b (A01-25): sets `_gwImmune` — eine EIGENE,
+//  QUELLENBEWUSSTE Marke (nicht mehr `_cardinalImmune`, das
+//  quellenblind alles sperrt und den Cardinal Beasts bleibt):
+//  „unaffected by your OPPONENT'S cards and effects" — Schaden,
+//  Zerstören, Zonenwechsel/Stehlen/Bewegen, Buff hinzufügen/
+//  entfernen, Status, Negation und Aura-Negation prallen NUR ab,
+//  wenn die Quelle einem anderen Spieler als dem Kontrolleur der
+//  Kreatur gehört (`engine.kreaturGegnerEffektImmun`). Eigene
+//  Karten/Effekte/Kosten (Opfer, Goldify, Buffs …) wirken normal;
+//  ist keine Quelle bekannt, bleibt sie geschützt.
+//  Dazu `untargetable_by_opponent`, damit gegnerische
+//  Zielwahlen die Kreatur überspringen. Beide Zähler fallen beim
+//  Ablauf über `clearCountersOnExpire`; `expiresForceClear: true`
+//  lässt den Ablauf die Sperre von `actionRemoveCreatureBuff`
+//  umgehen — sonst wäre der Schutz selbsterhaltend.
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, hasFreeZone, payTokenCost, kostenSchonBezahlt } = require('./_pollution-shared');
@@ -118,19 +121,19 @@ async function applyBuff(engine, pi, inst, promptCtxShim, vorab) {
   });
   await engine._delay(1100);
 
-  // Order matters: add buff FIRST (while _cardinalImmune is still unset so
+  // Order matters: add buff FIRST (while _gwImmune is still unset so
   // actionAddCreatureBuff's own guard doesn't reject it), then set the
   // immunity counters. On expiry, clearCountersOnExpire strips both
   // flags together, and expiresForceClear lets the expiry path bypass
-  // _cardinalImmune's guard in actionRemoveCreatureBuff.
+  // _gwImmune's guard in actionRemoveCreatureBuff.
   await engine.actionAddCreatureBuff(inst, 'golden_wings', {
     expiresAtTurn: gs.turn + 1,
     expiresForPlayer: engine.opponentOf(gs.activePlayer), // end of current half-turn, whichever side we're on
     expiresForceClear: true,
     source: 'Golden Wings',
-    clearCountersOnExpire: ['_cardinalImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
+    clearCountersOnExpire: ['_gwImmune', 'untargetable_by_opponent', 'untargetable_by_opponent_pi'],
   });
-  inst.counters._cardinalImmune = true;
+  inst.counters._gwImmune = true;   // W17b: quellenbewusst (nur Gegner), nicht `_cardinalImmune`
   inst.counters.untargetable_by_opponent = 1;
   inst.counters.untargetable_by_opponent_pi = engine.opponentOf(pi);
 

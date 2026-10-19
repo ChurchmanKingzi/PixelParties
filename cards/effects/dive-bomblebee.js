@@ -194,7 +194,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // Arrow's fizzling 100-damage on Cardinal Beasts). No
   // `creature_zone_move` broadcast either, since no creature is
   // actually moving zones.
-  if (engine.isOmniImmune(targetInst)) {
+  if (engine.isOmniImmune(targetInst, pi)) {   // W17b: Golden Wings quellenbewusst
     await engine._delay(450);
     engine.log('dive_bomblebee_fizzle', {
       player: gs.players[pi]?.username,

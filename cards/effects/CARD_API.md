@@ -20985,3 +20985,37 @@ Neue Engine-Stellen: `afterCreatureHeal` (Hook), Skript-Marke `attachmentDamageC
 8. Dark Ocean: auch `decay_spell` (Forbidden Zone) durchlassen („except from Attacks and Spells")?
 
 Repros: `docs/niche-tests/repro/W16/g-s02-15-…` (Exit 0 = korrekt). Korrigierte alte Repros: `S01-spells/07` ((C) nur Notiz), `S01-spells/25` (Sacrifice Stufe 2), `S03-spells/15` (Grenze statt fester Ausgang), Harness-Antworten ergänzt in `S01-spells/16`, `S02-spells/03`, `S02-spells/04`, `W14/b-q162`, `W14/c-q168`.
+
+
+## ★ Welle 17 / W17b — Golden Wings: „unaffected by your OPPONENT'S cards and effects" (A01-25, 19.10.2026)
+
+Kartentext: „… Choose a Creature you control. That Creature is unaffected by your opponent's cards and effects until the end of this turn."
+Bis W16 setzte Golden Wings die Marke `_cardinalImmune` — **quellenblind** (alles sperren, auch Opferkosten, eigenes Goldify, eigene Buffs/Freeze/Schaden;
+Repro `A01-pollution/25`). Jetzt gilt die Regel des Textes: **nur Karten/Effekte eines anderen Spielers als des Kontrolleurs der Kreatur** prallen ab
+(Kontrolle zählt, nicht die Brettseite); eigene Quellen wirken normal.
+
+* **Eigene Marke `counters._gwImmune`** (gesetzt in `golden-wings.js`, geräumt über `clearCountersOnExpire` + `expiresForceClear`). `_cardinalImmune` bleibt
+  Cardinal Beasts, Stowaway und Cute Conversion (`omniImmune`) vorbehalten und **ändert sein Verhalten nicht** (weiter quellenblind). Nebeneffekt: Cute Conversions
+  Rückgabe (`_revertStolenCreatures` löscht `_cardinalImmune` nur mit `_stealOmniImmune`) kann die Golden-Wings-Immunität nie mehr versehentlich mitlöschen.
+* **Zentrale Prüfung `engine.kreaturGegnerEffektImmun(inst, quelle, opts)`** (`_engine.js`, bei `isOmniImmune`): `true`, wenn `_gwImmune` steht und die Quelle einem
+  anderen Spieler als `inst.controller ?? inst.owner` gehört. `quelle` = Zahl (Besitzer-Index) oder Quellobjekt (`controller ?? owner`, gleiche Auflösung wie
+  `_gateQuelleVon`); `opts.sourceOwner` zählt mit; `opts.gwSourceOwner` ist ein reiner Golden-Wings-Hinweis für Aufrufer mit Namens-Quelle (ohne die
+  Nebenwirkung von `sourceOwner` auf Tor-/Monia-Fenster). **Ist keine Quelle bekannt** (String-Quelle ohne Besitzer, `sourceOwner: -1`, fehlend, Status-Tick),
+  bleibt die Kreatur **geschützt** (= bisheriges Verhalten; Golden Wings wird nirgends schwächer). `isOmniImmune(inst, quelle, opts)` nimmt die Quelle optional mit:
+  ohne Argument = geschützt (alte Aufrufer unverändert), mit Quelle quellenbewusst.
+* **Stellen im Engine-Kern** (alle ziehen die Quelle nach): `actionDestroyCard` (`source`), `_actionMoveCardKern` (Zonenwechsel; `opts.deathSource || opts.source`),
+  `sendBoardCardToDiscard`, `actionTransferCreature` (Quelle = Übernehmender, außer `opts.sourceOwner`), `actionStealCreature` (Quelle = Dieb),
+  `actionAddCreatureBuff` / `actionRemoveCreatureBuff` (`opts.source`; der Selbstablauf läuft weiter über `forceClear`), `actionNegateCreature` (`source`/`opts`),
+  `canApplyCreatureStatus` (Quelle über `applyCreatureStatus`: `source`, sonst `opts.sourceOwner`), Schadens-Batch `_markCreatureDamageImmunity` (`e.source`/`e.sourceOwner`),
+  Aura-Negation `creatureAuraInfo` (Clown of Heaven: Aura-Quelle bzw. Nachwirkungs-Besitzer).
+* **Skript-Stellen**: Treacherous-Crystal-Schleife (`server.js`), `getSacrificableCreatures` (liest nur eigene Kreaturen — Golden Wings sperrt das Opfern nicht mehr),
+  Bounce `returnSupportCreatureToHand` (`opts.sourceOwner`; Creepy Villager, Dark Deepsea God, Deepsea Encounter/Monstrosity, Divine Gift of the Deepsea, Moonlight Butterfly,
+  Racket Arrow geben ihn mit), `stealBoardCardToHand` (Sparkfly), Mass Routing, Surprising Opportunity, Cute Angel Molinda, Capture, Liberation, Secret Spell Book,
+  Spirit of the Heart Bow, 500 Piranhas, Fun-Fun Circus Clown, Dive Bomblebee, (Spirit of the) Super Killing Knife, Molinda (Zählung), Board of Kings (`protectorAffectable`);
+  eigene Negationen mit `gwSourceOwner`: Anti Magic Zone, Null Zone, Pink Sky, Skeleton Death Knight, Mao, Dirty Smuggler.
+* **Unverändert**: Anhängsel-/Ausrüstungs-/Surprise-Filter mit `_cardinalImmune` (Pressure Projectile, Breakthrough, Disarm, Weapon Absorption, `_ability-cost-shared`) —
+  Golden Wings steht nur auf Kreaturen. Zielwahl-Schutz (`untargetable_by_opponent` + `_pi`) war schon quellenbewusst. Heilen las `_cardinalImmune` nie (kein Schutz, keine Änderung).
+  Pangaia (`isOmniImmune?.(entering)` ohne Quelle) und `doActivateCreatureEffect` (Charme-Tor) bleiben beim alten Verhalten.
+* **Repro-Korrekturen**: `A01-pollution/25` las die Marke `_cardinalImmune` und zielte mit Archer auf Slot 1, den der Pollution Token von Golden Wings belegt (jetzt `_gwImmune`, Slot 2);
+  `W4-kosten/E3` las `_cardinalImmune` als Wirkungsnachweis von Golden Wings (jetzt `_gwImmune`).
+* Wächter: `docs/niche-tests/repro/W17/b-golden-wings-nur-gegner.js` (Gegner-Quellen prallen ab, unbekannte Quelle geschützt, eigene Quellen wirken, Cardinal quellenblind, Ablauf).

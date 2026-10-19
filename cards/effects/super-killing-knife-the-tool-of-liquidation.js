@@ -76,7 +76,7 @@ module.exports = {
 
         const opfer = e.inst;
         if (!opfer || opfer.zone !== 'support') continue;   // schon gefallen
-        if (engine.isOmniImmune(opfer)) continue;
+        if (engine.isOmniImmune(opfer, inst)) continue;   // W17b: Golden Wings quellenbewusst
 
         // Welle 12 (Q101, Al: „Doch, das soll zählen."): ein Knife-Kill zählt als „der Held besiegt das Ziel (mit einem Angriff)" — `heldQuelle`
         // nennt die Angriffs-Quelle des Helden (Wanted Poster zieht 2, Skullmael's Greatsword löst aus); Schutzprüfungen laufen weiter gegen das Knife.

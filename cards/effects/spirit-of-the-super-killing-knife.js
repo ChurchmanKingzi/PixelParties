@@ -77,7 +77,7 @@ module.exports = {
         if (inst.id === spirit.id) continue;              // „any OTHER Creature\"
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        if (engine.isOmniImmune(inst)) continue;
+        if (engine.isOmniImmune(inst, spirit)) continue;
         ziele.push({
           id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
           type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
