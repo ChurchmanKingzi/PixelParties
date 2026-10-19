@@ -66,6 +66,8 @@ module.exports = {
     // D1 (H02-22): der Zug ist der einzige Nutzen (die Folgesperre ist nur sein Nachteil) - unter Hand-/Zieh-Sperre nicht aktivierbar.
     // W5b-Z4 (Al, Welle 5): gegen Tuscan Artist nur gesperrt, wenn genau 2 oder 3 Karten zu ziehen wären.
     if (drawBlockedFor(ctx._engine, ctx.cardOwner, 7 - (ps.hand || []).length)) return false;
+    // W17a (H02-22, Al 19.10.2026): „Kazenas Effekt KANN bei leerem Deck aktiviert werden - und führt dann zu Niederlage durch Deck-Out." Ein leeres Deck sperrt
+    // die Aktivierung also bewusst NICHT; `actionDrawCards` löst beim Ziehen aus dem leeren Deck das reguläre Deck-Out aus (bei Hand >= 7 wird nichts gezogen).
     return (ps.hand || []).length < 7;
   },
 
