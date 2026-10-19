@@ -257,6 +257,14 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx, 
 
   if (!picked || !picked.cardName) return false;
 
+  // ★ W15a (Al, R3 und Regel W14a Q5): Anlegen PER EFFEKT (Training Option B) prallt an Resistance ab — vor jeder Kartenbewegung gefragt; die Ability bleibt im Deck
+  // (kein Mischen). Die Wahl war getroffen und ein Lv2-Abwurf ist bezahlt: der Einsatz zählt als gewirkt (true), er wurde nur abgefangen.
+  if (await engine.abilityAnlegenDurchResistanceBlockiert(playerIdx, feld, heroIdx, 'Training')) {
+    engine.log('training_blocked', { player: ps.username, ability: picked.cardName, hero: heroName });
+    engine.sync();
+    return true;
+  }
+
   // Verify the card is in the deck
   const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', picked.cardName, { source: 'training' });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;

@@ -326,6 +326,14 @@ module.exports = {
         explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
       }
 
+      // ★ W15a (Al, R3: „Ja" — Alex prallt an Resistance ab): Anlegen PER EFFEKT an den gewählten anderen Helden — vor jeder Kartenbewegung gefragt.
+      // Die Ability bleibt im Deck (kein Mischen, kein Aufdecken); der Alex-Einsatz zählt als genutzt (die Wahl war getroffen).
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
+        engine.log('alex_ability_tutor_blocked', { player: ps.username, ability: chosenAbility, to: ps.heroes[targetHeroIdx]?.name });
+        engine.sync();
+        return;
+      }
+
       // ── Attach from deck ──
       // We inline the placement rather than funnelling through
       // `attachAbilityFromHand` because the source is the deck, not the

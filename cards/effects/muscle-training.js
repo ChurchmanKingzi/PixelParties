@@ -134,6 +134,14 @@ module.exports = {
       });
       await engine._delay(1600);
 
+      // ★ W15a (Al, R3: „Ja" — Muscle Training prallt an Resistance ab): Anlegen PER EFFEKT auf den Nutzer — nach der Animation, vor jeder Kartenbewegung
+      // (Fighting bleibt im Deck, kein Mischen; der Angriff ist gespielt).
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, hs, heroIdx, 'Muscle Training')) {
+        engine.log('muscle_training_blocked', { player: ps.username, hero: hero.name });
+        engine.sync();
+        return;
+      }
+
       // ── Remove Fighting from deck ──
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Muscle Training' }))) return;   // v820: Stapel-Schicht
 

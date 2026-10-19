@@ -196,6 +196,14 @@ module.exports = {
         return;
       }
 
+      // ★ W15a (Al, R3: „Ja" — die Divinity-Anleger prallen an Resistance ab): Anlegen PER EFFEKT (Regel W14a Q5, nicht die Standard-Spielaktion) —
+      // vor jeder Kartenbewegung gefragt: Divinity bleibt in Hand/Deck/Ablage, das Opfer (Kosten) bleibt bezahlt, der Zauber ist gewirkt.
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
+        engine.log('sacrifice_to_divinity_blocked', { player: ps.username, hero: ps.heroes[targetHeroIdx]?.name });
+        engine.sync();
+        return;
+      }
+
       // ── Step 4: pull the Divinity from its source pile and attach ──
       // Z6 (S03-03): Deck/Ablage ueber die Stapel-Schicht (Stapel-, Stab- und Eye-Sperre), Hand wie bisher.
       const removeFromPile = (pile) => {

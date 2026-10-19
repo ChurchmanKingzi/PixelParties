@@ -279,7 +279,10 @@ async function performDescent(engine, pi, dyingHero, handInst) {
 
   // ── 4. Attach up to 3 Divinity copies from deck / hand / discard. ──
   let attached = 0;
-  for (let n = 0; n < 3; n++) {
+  // ★ W15a (Al, R3: „Ja" — die Divinity-Anleger prallen an Resistance ab): das Anlegen der bis zu drei Kopien ist EIN Effekt auf den Helden — einmal gefragt, vor jeder
+  // Kartenbewegung. (Quetzahuitl steht frisch mit leeren Ability Zones da; ein Resistance-Schutz kann hier nur über fremde Wege liegen — die Prüfung ist die Regel, nicht der Normalfall.)
+  const blockiert = await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME);
+  for (let n = 0; n < (blockiert ? 0 : 3); n++) {
     if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, { allowRestricted: true })) break;
     const pulledFrom = pullDivinityFromAnySource(ps, engine);
     if (!pulledFrom) break;
