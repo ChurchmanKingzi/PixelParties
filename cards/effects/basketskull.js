@@ -21,6 +21,52 @@ const D = require('./_doom-clock-shared');
 const CARD_NAME = 'Basketskull';
 const DAMAGE_PER_COUNTER = 70;
 
+/**
+ * Uhr und Menge wählen, die Counter entfernen. Gibt die Zahl der entfernten Counter zurück, 0 = abgebrochen / nichts bezahlt.
+ */
+async function zahleCounter(ctx) {
+  const engine = ctx._engine;
+  const pi = ctx.cardOwner;
+
+  const uhr = await D.pickClock(engine, pi, D.clocksWithCounters(engine), {
+    title: CARD_NAME,
+    message: 'Remove counters from which Doom Clock?',
+    cancellable: true,
+  });
+  if (!uhr) return 0;
+
+  // Auswahl als DROPDOWN (Als Vorgabe 5.8.: "dieselbe Art Dropdown
+  // wie Siphem"). Bei bis zu 19 moeglichen Countern waere eine
+  // Knopfreihe unbrauchbar — `renderAs: 'dropdown'` ist genau
+  // dafuer da. Ids im selben Format wie bei Siphem (`n-<zahl>`),
+  // damit das Muster wiedererkennbar bleibt.
+  const max = D.counterCount(uhr);
+  const optionen = [];
+  for (let n = 1; n <= max; n++) {
+    optionen.push({
+      id: `n-${n}`,
+      label: `${n} counter${n > 1 ? 's' : ''} → ${n * DAMAGE_PER_COUNTER} damage`,
+    });
+  }
+  const wahl = await engine.promptGeneric(pi, {
+    type: 'optionPicker',
+    renderAs: 'dropdown',
+    title: CARD_NAME,
+    description: `This Doom Clock has ${max} Doom Counter${max > 1 ? 's' : ''}. Remove how many?`,
+    confirmLabel: 'Confirm',
+    options: optionen,
+    cancellable: true,
+  });
+  if (!wahl || wahl.cancelled || !wahl.optionId) return 0;
+  const treffer = String(wahl.optionId).match(/^n-(\d+)$/);
+  if (!treffer) return 0;
+  const anzahl = parseInt(treffer[1], 10);
+  if (!(anzahl >= 1 && anzahl <= max)) return 0;
+
+  const entfernt = D.removeCounters(engine, uhr, anzahl);
+  return entfernt > 0 ? entfernt : 0;   // faengt auch NaN ab
+}
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
   // Negation spielt die Engine diese Bilder, damit der abgewehrte
@@ -42,47 +88,29 @@ module.exports = {
     return D.clocksWithCounters(engine).length > 0;
   },
 
+  // ★ W16b (A01-pollution-17b, Welle 4 „Kosten ‚to play this card' werden VOR dem Reaktionsfenster bezahlt"): die Counter sind der
+  // Kostenpunkt und bleiben bei Ganz-Negierung bezahlt. Wahl von Uhr und Menge steht deshalb hier (abbrechbar → `false` = nichts
+  // bezahlt, Karte bleibt auf der Hand); das Gezahlte merkt sich die Instanz (`_kostenBezahlt` = Zahl der entfernten Counter).
+  // Ohne diesen Lauf (Sofort-Guss, Spiegelkopie) zahlt `onPlay` wie früher selbst.
+  async payActivationCost(ctx) {
+    const entfernt = await zahleCounter(ctx);
+    if (!entfernt) return false;
+    if (ctx.card) ctx.card._kostenBezahlt = entfernt;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
 
-      const uhr = await D.pickClock(engine, pi, D.clocksWithCounters(engine), {
-        title: CARD_NAME,
-        message: 'Remove counters from which Doom Clock?',
-      });
-      if (!uhr) return false;
-
-      // Auswahl als DROPDOWN (Als Vorgabe 5.8.: "dieselbe Art Dropdown
-      // wie Siphem"). Bei bis zu 19 moeglichen Countern waere eine
-      // Knopfreihe unbrauchbar — `renderAs: 'dropdown'` ist genau
-      // dafuer da. Ids im selben Format wie bei Siphem (`n-<zahl>`),
-      // damit das Muster wiedererkennbar bleibt.
-      const max = D.counterCount(uhr);
-      const optionen = [];
-      for (let n = 1; n <= max; n++) {
-        optionen.push({
-          id: `n-${n}`,
-          label: `${n} counter${n > 1 ? 's' : ''} → ${n * DAMAGE_PER_COUNTER} damage`,
-        });
+      let entfernt = ctx.card?._kostenBezahlt || 0;
+      const vorab = entfernt > 0;
+      if (ctx.card) delete ctx.card._kostenBezahlt;
+      if (!vorab) {
+        entfernt = await zahleCounter(ctx);
+        // Abbruch der Mengenwahl = nichts ist passiert: Karte zurück auf die Hand, Aktion erstattet (Regel 23.9; A01-pollution-23).
+        if (!entfernt) { engine.gs._spellCancelled = true; return false; }
       }
-      const wahl = await engine.promptGeneric(pi, {
-        type: 'optionPicker',
-        renderAs: 'dropdown',
-        title: CARD_NAME,
-        description: `This Doom Clock has ${max} Doom Counter${max > 1 ? 's' : ''}. Remove how many?`,
-        confirmLabel: 'Confirm',
-        options: optionen,
-        cancellable: true,
-      });
-      if (!wahl || wahl.cancelled || !wahl.optionId) return false;
-      const treffer = String(wahl.optionId).match(/^n-(\d+)$/);
-      if (!treffer) return false;
-      const anzahl = parseInt(treffer[1], 10);
-      if (!(anzahl >= 1 && anzahl <= max)) return false;
-
-      const entfernt = D.removeCounters(engine, uhr, anzahl);
-      if (!(entfernt > 0)) return false;   // faengt auch NaN ab
       const schaden = entfernt * DAMAGE_PER_COUNTER;
 
       const ziel = await ctx.promptDamageTarget({
