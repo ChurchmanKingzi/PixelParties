@@ -48,9 +48,12 @@ module.exports = {
   activeIn: ['hand'],
 
   /** Ohne einen erreichbaren gegnerischen Helden bewirkt die Karte nichts. */
-  spellPlayCondition(gs, playerIdx) {
+  spellPlayCondition(gs, playerIdx, engine) {
     const oi = opponentOfGs(gs, playerIdx);
     if (gs.firstTurnProtectedPlayer === oi) return false;
+    // W16g (S02-02): „Heroes your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`).
+    const eng = engine || gs._engineRef;
+    if (eng?.heroesControlledBy) return eng.heroesControlledBy(oi).some(({ hero }) => hero?.name && hero.hp > 0);
     return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
@@ -87,13 +90,11 @@ module.exports = {
 
       const getroffen = [];
       const ops = gs.players[oi];
-      for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
-        const hero = ops.heroes[hi];
+      // W16g (S02-02): Kontrolle statt Spalte — ein Held, den der Gegner kontrolliert (auch aus MEINER Spalte), wird getroffen;
+      // ein Gegnerheld unter meiner Kontrolle nicht (`heroesControlledBy` schliesst ihn aus).
+      for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(oi)) {
         if (!hero?.name || hero.hp <= 0) continue;
-        // Helden, die der GEGNER besitzt, aber ich kontrolliere, sind
-        // nicht „Heroes your opponent controls".
-        if (hero.permaControlBy === pi || hero.charmedBy === pi) continue;
-        await engine.addHeroStatus(oi, hi, STATUS, {
+        await engine.addHeroStatus(physOwner, hi, STATUS, {
           expiresAtTurn,
           expiresForPlayer: pi,
           appliedBy: pi,

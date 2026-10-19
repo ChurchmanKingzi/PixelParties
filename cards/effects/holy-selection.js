@@ -172,7 +172,7 @@ module.exports = {
           description: `Ida focuses — deal ${DAMAGE} damage to a single eligible target.`,
           confirmLabel: `✨ ${DAMAGE} Damage!`,
           confirmClass: 'btn-danger',
-          cancellable: false,
+          cancellable: true,   // W16g (S02-14): Regel 23.9 — die Einzelzielwahl ist die erste Abfrage, Abbruch = Karte bleibt auf der Hand
           condition: (t) => validIds.has(t.id),
         });
 

@@ -14,7 +14,15 @@ const H = require('../../lib/h.js');
   let n = 0; const call = (k) => { n++; return n === 1; };
   await t.play(0, 'Divine Gift of Sacrifice', { hero: 0 });
   const stufen = t.targets.map(x => x.config && x.config.cancellable);
-  R.check('Divine Gift of Sacrifice: jede Wahlstufe ist abbrechbar', stufen.length >= 1 && stufen.every(c => c === true), stufen);
+  // W16g: seit Z7c (Opfer = Kosten, bezahlt vor dem Reaktionsfenster) liegt die Buff-Wahl (Stufe 2) NACH dem Zusagepunkt und ist als Pflichtwahl
+  // ausgenommen (Regel 23.9) — geprüft wird nur noch die Opferwahl (Stufe 1); Abbruch dort = Karte bleibt auf der Hand.
+  R.check('Divine Gift of Sacrifice: die Opferwahl (Stufe 1, vor den Kosten) ist abbrechbar', stufen.length >= 1 && stufen[0] === true, stufen);
+  R.note('Divine Gift of Sacrifice: Buff-Wahl nach bezahltem Opfer (Pflichtwahl, ausgenommen)', stufen);
+  { const t2 = await H.fresh({ hand: [['Divine Gift of Sacrifice'], []], abilities: { 0: { 0: [['Decay Magic'], [], []] } } });
+    t2.targetFn = () => null;
+    await t2.play(0, 'Divine Gift of Sacrifice', { hero: 0 });
+    R.check('Divine Gift of Sacrifice: Abbruch der Opferwahl → Karte bleibt auf der Hand, kein Held geopfert',
+      t2.pile(0, 'hand').includes('Divine Gift of Sacrifice') && [0, 1, 2].every(h => t2.hp(0, h) === 800), { hand: t2.pile(0, 'hand'), hp: [0, 1, 2].map(h => t2.hp(0, h)) }); }
   // Divine Gift of Equality
   t = await H.fresh({ hand: [['Divine Gift of Equality'], []], abilities: { 0: { 0: [['Support Magic'], [], []] } } });
   t.gs.players[0].heroes[1].hp = 0;

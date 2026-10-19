@@ -7296,6 +7296,13 @@ class GameEngine {
     if (owner < 0) return false;
     const heroIdx = (this.gs.players[owner]?.heroes || []).indexOf(target);
     if (heroIdx < 0) return false;
+    // W16g (R02-04): ANHANG mit `attachmentDamageCannotBeReducedOrNegated` (Prophecy of Tempeste: „Damage this Hero takes
+    // cannot be reduced or negated by other cards or effects") — Anhaenge ruhen nicht bei Frost/Betaeubung des Traegers
+    // (W7a), gelten also auch ohne `_isHeroEffectSilenced`.
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'support' || inst.faceDown || inst.owner !== owner || inst.heroIdx !== heroIdx) continue;
+      if (loadCardEffect(inst.name)?.attachmentDamageCannotBeReducedOrNegated) return true;
+    }
     const flag = this.heroScript(target)?.heroDamageCannotBeReducedOrNegated;
     if (!flag) return false;
     if (this._isHeroEffectSilenced(owner, heroIdx)) return false;
@@ -10487,6 +10494,16 @@ class GameEngine {
     }
     // v1382: Field Medic — tatsaechlicher Zuwachs, Ueberheilung eingeschlossen.
     this._scNoteHeal(source, target.counters.currentHp - currentHp, target.controller ?? target.owner);
+    // W16g (R02-17): eigener Haken `afterCreatureHeal` (NICHT `afterHeal`: dessen Leser — Lifeforce Howitzer, Stormblade … — meinen
+    // Helden). Kontext wie `afterHeal`, `targetOwner` = Kontrolleur der Kreatur. Heute liest ihn nur Tarleinn's Floating Island.
+    const _gewachsen = target.counters.currentHp - currentHp;
+    if (_gewachsen > 0 && target.zone === 'support') {
+      await this.runHooks('afterCreatureHeal', {
+        target, healedAmount: _gewachsen, source,
+        targetOwner: target.controller ?? target.owner, targetHeroIdx: target.heroIdx,
+        _skipReactionCheck: true,
+      });
+    }
   }
 
   /**
@@ -26644,6 +26661,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
+    // W16g (S02-13): auch Frozen/Stunned/Magic Silenced (und Aura-Negation) sperren die Wiederholung — dasselbe Praedikat wie die
+    // regulaere Aktivierung (`doActivateCreatureEffect`: `isCreatureEffectSuppressed`); gilt fuer Great Offensive, Kohta, Grimoire.
+    if (this.isCreatureEffectSuppressed(inst)) return false;
     if (this.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): auch geliehene Wiederholungen (Grimoire, Kohta) sind „aktivieren"
     // v748: „cannot be used another time for the rest of the turn in
     // ANY way" (Spirit of the Forbidden Grimoire). Die Marke sperrt
@@ -38681,8 +38701,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // normalen Zaubern ausgeschlossen, konnte aber weiter reagieren.
     // Dieselbe Ausnahme wie im Hauptweg: eine Karte darf sich per
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
+    // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     if (cardData.cardType === 'Spell'
-        && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {
+        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked)) {
       const script = loadCardEffect(cardName);
       let bypass = false;
       if (typeof script?.canPlayDespiteStatuses === 'function') {
@@ -48851,7 +48872,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // geblockt, ausdruecklich auch Gift- und Brand-Ticks.
     // Symmetrisch: schuetzt die Creatures BEIDER Spieler.
     if (this.isDarkOceanActive()) {
-      const durch = new Set(['attack', 'destruction_spell']);
+      // W16g (S01-03): + 'magic_arts_spell' (Butterfly Cloud: ein Zauber, Schadenstyp '<school>_spell'). 'decay_spell' (Forbidden Zone)
+      // bleibt wie bisher geblockt — nicht Teil dieses Befunds, siehe Abgabe W16g.
+      const durch = new Set(['attack', 'destruction_spell', 'magic_arts_spell']);
       // W16e (F01-18): Diver Helmet — Kreaturen am Helm-Helden sind „unaffected by Areas": Dark Ocean schuetzt sie nicht.
       const geblockt = entries.filter(e => (e.isStatusDamage || !durch.has(e.type)) && !this._isDiverHelmetProtectedTarget(e.inst));
       for (const e of geblockt) {

@@ -104,6 +104,18 @@ function pingIstScharf(engine, pi) {
   return false;
 }
 
+/** W16g (S02-03): Heilung waehrend einer Zauber-Aufloesung vormerken (nur das liegende Permanent). */
+function merkeHeilung(ctx) {
+  if (ctx.card?.zone !== 'permanent') return;
+  if (!((ctx.healedAmount || 0) > 0)) return;
+  const engine = ctx._engine;
+  const zauber = engine._currentResolvingSpellName?.();
+  if (!zauber) return;
+  const gs = engine.gs;
+  if (!gs._heilteImZauber) gs._heilteImZauber = new Set();
+  gs._heilteImZauber.add(zauber);
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -197,6 +209,18 @@ module.exports = {
     },
 
     /**
+     * W16g (S02-03): „… a Support Magic Spell that does NOT heal the HP of one or more targets“ — tatsaechliche Heilung zaehlt.
+     * Jede Heilung (Held oder Kreatur, > 0 HP), die waehrend der Aufloesung eines Zaubers geschieht, merkt sich der Zauber-Name;
+     * `afterSpellResolved` unten ueberspringt solche Zauber (zusaetzlich zum statischen Skript-Flag `includesHealing`:
+     * Energy Drain, Inheritance Ceremony, Refreshing Night … tragen keins). Gemerkt wird erst beim ersten Treffer, aufgeraeumt
+     * wird nach der Handlung bzw. zum Zugbeginn.
+     */
+    afterHeal: (ctx) => merkeHeilung(ctx),
+    afterCreatureHeal: (ctx) => merkeHeilung(ctx),
+    onAnyActionResolved: (ctx) => { if (ctx._engine.gs._heilteImZauber) delete ctx._engine.gs._heilteImZauber; },
+    onTurnStart: (ctx) => { if (ctx._engine.gs._heilteImZauber) delete ctx._engine.gs._heilteImZauber; },
+
+    /**
      * After any spell resolves: check if it was a non-healing Support Spell,
      * and trigger the healing prompt for the caster (einmal pro Zug, Q168).
      */
@@ -218,6 +242,7 @@ module.exports = {
       // Skip healing spells
       const script = loadCardEffect(spellData.name || ctx.spellName);
       if (script?.includesHealing) return;
+      if (engine.gs._heilteImZauber?.has(spellData.name || ctx.spellName)) return;   // W16g (S02-03): hat tatsaechlich geheilt
 
       const spellCasterIdx = ctx.casterIdx;
       const spellHeroIdx = ctx.heroIdx;

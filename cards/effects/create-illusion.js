@@ -20,7 +20,7 @@
 //  (_illusionSummon) as Staff of Illusions.
 // ═══════════════════════════════════════════
 
-const { isSummonablePileCreature, hasCardType } = require('./_hooks');
+const { isSummonablePileCreature, hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Create Illusion';
 
@@ -34,6 +34,13 @@ module.exports = {
   },
   inherentAction: true,
   cpuMeta: { scalesWithSchool: 'Magic Arts' },
+
+  /** W16g (S01-15): der Nutzer selbst braucht eine freie Support Zone („a free Support Zone of the user“). */
+  canPlayWithHero(gs, pi, heroIdx) {
+    const ps = gs.players[pi];
+    if (heldSeite(gs, pi, heroIdx) !== pi) return true;   // geliehener Wirker: wie bisher (eigene Helden, s. `onPlay`)
+    return (ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0);
+  },
 
   /** Cannot play without an eligible deck creature and a free support zone. */
   spellPlayCondition(gs, playerIdx) {
@@ -61,8 +68,9 @@ module.exports = {
       const cardDB = engine._getCardDB();
 
       // Max level = Magic Arts level on this hero
-      const magicArtsLevel = engine.heroSchoolLevel(
-        'Magic Arts', ctx.cardHeroOwner ?? pi, heroIdx,   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
+      // W16g (S01-20): `effectiveSchoolLevelForCaster` zaehlt auch Xals Support-Zonen-Stapel und „as if“-Stufen.
+      const magicArtsLevel = engine.effectiveSchoolLevelForCaster(
+        'Magic Arts', pi, heroIdx, ctx.cardHeroOwner ?? pi,   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
       );
       const maxLevel = Math.max(1, Math.min(magicArtsLevel, 3));
 
@@ -122,7 +130,11 @@ module.exports = {
       // Gigantisaur-occupied Hero when the auto-sacrifice can't run.
 
       const freeZones = [];
+      // W16g (S01-15): „a free Support Zone of THE USER“ — nur die Zonen des wirkenden Helden (wie Create Secret Room:
+      // „the user's Surprise Zone“). Bei einem geliehenen Wirker (andere Brettseite) bleibt es bei den eigenen Helden.
+      const nurNutzer = (ctx.cardHeroOwner ?? pi) === pi && Number.isInteger(heroIdx) && heroIdx >= 0;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        if (nurNutzer && hi !== heroIdx) continue;
         const h = ps.heroes[hi];
         if (!h?.name || h.hp <= 0) continue;
         if (!engine.isCreatureSummonable(chosenName, pi, hi, { _bypassBeforeSummon: true })) continue;
@@ -146,7 +158,7 @@ module.exports = {
         const zonePick = await ctx.promptZonePick(freeZones, {
           title: CARD_NAME,
           description: `Choose where to place the illusion of ${chosenName}.`,
-          cancellable: false,
+          cancellable: true,   // W16g (S01-25): vor dem Verbrauch (Deck-Entnahme) abbrechbar -> Karte bleibt auf der Hand
         });
         if (!zonePick) { gs._spellCancelled = true; return; }
         destHeroIdx = zonePick.heroIdx;

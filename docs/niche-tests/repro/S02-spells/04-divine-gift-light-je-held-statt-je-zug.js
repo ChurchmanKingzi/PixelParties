@@ -13,6 +13,8 @@ const H = require('../../lib/h.js');
   t.heroStatus(0, 0, 'burned'); t.heroStatus(0, 1, 'burned');
   t.reset();
   t.targetFn = (valid) => [valid[0].id];
+  // W16g: die Statuswahl von Divine Zeal ist abbrechbar (S02-16); die Harness-Standardantwort auf abbrechbare Abfragen ist „abbrechen“ — ausdrücklich alle Status wählen.
+  t.script.push({ match: d => d.type === 'statusSelect', answer: (d) => ({ selectedStatuses: (d.statuses || []).map(s => s.key) }) });
   const n = () => t.targets.filter(x => x.config && x.config.title === 'Divine Gift of The Light').length;
   await t.play(0, 'Divine Zeal', { hero: 0 });
   const nach1 = n();

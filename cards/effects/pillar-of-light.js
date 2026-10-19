@@ -165,7 +165,9 @@ module.exports = {
       // ── Der Gegner sucht ────────────────────────────────────────
       const trifft = (n) => baseCardName(n) === baseCardName(genannt);   // v875
       const idx = (ops.mainDeck || []).findIndex(trifft);
-      const gefunden = idx >= 0;
+      // W16g (S03-11): „if possible“ / „if they find a card“ — verweigert `takeFromPile` die Entnahme (Siege, Knight of Kings [B], Such-/Hand-
+      // sperren), hat der Gegner nichts GEFUNDEN: keine Zieh-Frage, die Aktion wird wie bei „nicht gefunden“ verbraucht.
+      let gefunden = idx >= 0;
 
       if (gefunden) {
         const name = ops.mainDeck[idx];
@@ -175,6 +177,8 @@ module.exports = {
           await engine.handZugang(ops, name, { von: 'deck', source: CARD_NAME });
           engine.sync();
           await engine._delay(500);
+        } else {
+          gefunden = false;
         }
       }
 

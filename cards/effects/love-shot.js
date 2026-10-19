@@ -160,8 +160,12 @@ module.exports = {
       // (school/level/Wisdom/etc.) is checked later via
       // getHeroPlayableCards once a Hero is locked in.
       const heroTargets = [];
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        const h = ops.heroes[hi];
+      // W16g (S02-15): „a Hero your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`): ein Gegnerheld, den ich selbst
+      // kontrolliere (Paraseed, Styx, Charme), ist kein Ziel mehr. Nur Helden der Gegnerspalte (`physOwner === oi`): der Nachguss
+      // (`getHeroPlayableCards().charmed`, Zonen, `heroOwner`) ist spaltenweise aufgebaut — ein vom Gegner kontrollierter Held MEINER
+      // Spalte ist damit noch nicht waehlbar (Stufe 4, siehe Abgabe W16g).
+      for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
+        if (physOwner !== oi) continue;
         if (!h?.name || h.hp <= 0) continue;
         if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
             || h.statuses?.bound || h.statuses?.negated) continue;

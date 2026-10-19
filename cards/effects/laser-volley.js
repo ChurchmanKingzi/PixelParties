@@ -136,10 +136,18 @@ module.exports = {
         // committed.
         const sparePick = await engine.promptGeneric(oi, {
           type: 'cardGallery',
-          cards: remaining.map(t => ({
-            name: t.cardName, source: t.kind === 'hero' ? 'hero' : 'support',
-            heroIdx: t.heroIdx,
-          })),
+          // W16g (S02-07): gleichnamige Ziele muessen unterscheidbar bleiben — die Client-Antwort ist nur `{ cardName, source }`
+          // (ohne Slot), also traegt `source` die Ziel-ID und `label` den Platz (v862-Muster, wie Great Offensive).
+          cards: remaining.map(t => {
+            const inst = t.kind === 'hero' ? null : engine.cardInstances.find(c => c.id === t.instId);
+            const hostName = engine.gs.players[inst ? engine.physicalSide(inst) : t.physOwner]?.heroes?.[t.heroIdx]?.name || '';
+            const kurz = hostName.split(',')[0].split(' ').slice(-1)[0] || `Hero ${t.heroIdx + 1}`;
+            return {
+              name: t.cardName, source: t.id,
+              label: t.kind === 'hero' ? 'Hero' : `${kurz} · ${t.slotIdx + 1}`,
+              heroIdx: t.heroIdx,
+            };
+          }),
           title: CARD_NAME,
           description: `Choose a target to spare from ${VOLLEY_DAMAGE} damage.`,
           confirmLabel: '🛡️ Spare',
@@ -149,9 +157,8 @@ module.exports = {
         if (!sparePick?.cardName) break;
         // Match by name AND slot to avoid picking a duplicate-named
         // creature that was already spared.
-        const matchedSpare = remaining.find(t =>
-          t.cardName === sparePick.cardName,
-        );
+        const matchedSpare = remaining.find(t => t.id === sparePick.source)   // W16g (S02-07): eindeutig ueber die Ziel-ID
+          || remaining.find(t => t.cardName === sparePick.cardName);
         if (matchedSpare) sparedIds.add(matchedSpare.id);
       }
 

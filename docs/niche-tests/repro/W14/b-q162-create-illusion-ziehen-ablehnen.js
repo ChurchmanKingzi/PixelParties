@@ -12,6 +12,8 @@ const H = require('../../lib/h.js');
     let frage = null;
     t.script.push({ match: d => d.type === 'confirm' && d.title === 'Create Illusion', answer: (d) => { frage = d; return antwort; } });
     t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Create Illusion', answer: () => ({ cardName: C }) });
+    // W16g: die Zonenwahl von Create Illusion ist abbrechbar (S01-25); die Harness-Standardantwort auf abbrechbare Abfragen ist „abbrechen“ — ausdrücklich die erste Zone wählen.
+    t.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx }) });
     await t.play(0, 'Create Illusion', { hero: 0, noGrant: true });
     await t.endTurn();                                  // Gegnerzug beginnt (zieht 1)
     return { t, frage: () => frage };

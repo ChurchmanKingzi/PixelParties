@@ -86,7 +86,9 @@ module.exports = {
       // ── AoE 50 damage to all enemy targets ──
       await ctx.aoeHit({
         damage: 50,
-        damageType: 'other',
+        // W16g (R01-09, S01-03): ein ZAUBER → Typ '<school>_spell' (nicht 'other'); sonst blockt Dark Ocean ihn und
+        // Corpse Explosion erkennt den Tod nicht als „Attack or Spell".
+        damageType: 'magic_arts_spell',
         side: 'enemy',
         types: ['hero', 'creature'],
         animationType: 'none',

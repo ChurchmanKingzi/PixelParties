@@ -49,7 +49,7 @@ function getSacrificeTargets(gs, pi) {
  * KOSTEN (Z7c): Opfer wählen und besiegen. Läuft vor dem Reaktionsfenster
  * (`payActivationCost`) bzw. als Fallback am Anfang von `onPlay`.
  * Rückgabe: `{ heroIdx, name, maxHp }` des Opfers oder `null` (nicht zahlbar,
- * nichts passiert). Die Wahl ist nicht abbrechbar (wie bisher).
+ * nichts passiert). W16g (S01-25): die Opferwahl ist abbrechbar (Rueckgabe `null`).
  */
 async function payOpferKosten(engine, pi, inst) {
   const gs = engine.gs;
@@ -64,7 +64,7 @@ async function payOpferKosten(engine, pi, inst) {
     description: 'Choose a Hero to sacrifice.',
     confirmLabel: '🐍 Sacrifice!',
     confirmClass: 'btn-danger',
-    cancellable: false,
+    cancellable: true,   // W16g (S01-25): die Opferwahl ist die KOSTENwahl, noch nichts bezahlt -> Abbruch = Karte bleibt auf der Hand
     exclusiveTypes: true,
     maxPerType: { hero: 1 },
     maxTotal: 1,
@@ -147,7 +147,7 @@ async function doSacrifice(engine, pi, opfer) {
       description: `Choose a Hero to receive +${opfer.maxHp} max HP from ${opfer.name}.`,
       confirmLabel: '✨ Empower!',
       confirmClass: 'btn-success',
-      cancellable: false,
+      cancellable: false,   // W16g: Pflichtwahl NACH dem Zusagepunkt — das Opfer (Kosten) ist schon bezahlt
       greenSelect: true,
       exclusiveTypes: true,
       maxPerType: { hero: 1 },
@@ -345,6 +345,7 @@ module.exports = {
   async payActivationCost(ctx) {
     const opfer = await payOpferKosten(ctx._engine, ctx.cardOwner, ctx.card);
     if (opfer && ctx.card) ctx.card._opfer = opfer;
+    if (!opfer) return false;   // W16g (S01-25): Abbruch der Opferwahl = Kosten nicht bezahlt -> Karte bleibt auf der Hand (server.js `_kostenAbbruch`)
   },
 
   hooks: {

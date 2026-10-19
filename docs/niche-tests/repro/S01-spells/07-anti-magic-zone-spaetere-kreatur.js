@@ -23,7 +23,8 @@ const H = require('../../lib/h.js');
   R.check('Kreatur, die der Gegner im Fenster beschwört, ist negiert', rb === true && neuB && t.engine.isCreatureEffectSuppressed(neuB), { rb, neu: !!neuB });
   // Zusatzfall (Stufe C): ein im Fenster wiederbelebter Held ist ein „Ziel", das keine Zauber wirken dürfte
   await t.run(() => t.engine.actionReviveHero(1, 2, 100));
-  R.check('(C) im Fenster wiederbelebter Held trägt „magic_silenced" (darf keine Zauber wirken)', !!t.gs.players[1].heroes[2].statuses.magic_silenced, Object.keys(t.gs.players[1].heroes[2].statuses));
+  // W16g: (C) ist eine Regelfrage (Stufe C laut Bericht: „beim wiederbelebten Helden nennt der Text kein Verhalten") — Frage an Al, hier nur festgehalten.
+  R.note('(C) im Fenster wiederbelebter Held: magic_silenced? (Regelfrage an Al, heute: nein)', Object.keys(t.gs.players[1].heroes[2].statuses));
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();
 })();

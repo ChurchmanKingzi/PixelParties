@@ -172,8 +172,9 @@ module.exports = {
           title: `${CARD_NAME} — ${target.cardName} (${ti + 1}/${selectedTargets.length})`,
           description: `Choose status effects to remove from ${target.cardName}.`,
           confirmLabel: ti === selectedTargets.length - 1 ? '✨ Cleanse!' : 'Next →',
-          cancellable: false,
+          cancellable: true,   // W16g (S02-16): Regel 23.9 — vor dem Entfernen ist nichts passiert; Abbruch = ganze Karte zurueck auf die Hand
         });
+        if (!result || result.cancelled) { gs._spellCancelled = true; return; }
         cleanseActions.push({ target, statuses: result?.selectedStatuses || [] });
       }
 

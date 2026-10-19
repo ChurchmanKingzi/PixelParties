@@ -77,7 +77,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Calculate Support Magic level on the caster hero's ability zones
-      const smLevel = engine.heroSchoolLevel('Support Magic', heroOwner, heroIdx);   // W4a: harte Negierung -> Stufe 0
+      const smLevel = engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, heroOwner);   // W4a: harte Negierung -> Stufe 0; W16g (S02-18): + Xals Support-Zonen-Stapel
       const healAmount = smLevel >= 3 ? 200 : smLevel >= 2 ? 150 : 100;
 
       // Confirm prompt (no targeting, just confirm/cancel)

@@ -28,7 +28,7 @@ const CARD_NAME = 'Dark Deal';
 
 // „Chooses a target": das Kennzeichen `requiresTarget` fehlt bei etlichen Skripten, die trotzdem ein Ziel waehlen
 // lassen — deshalb zusaetzlich der Quelltext (Zielwahl-Aufrufe), je Name gemerkt.
-const ZIELWAHL = /prompt(Damage|Effect)?Target\s*\(|promptTarget\s*\(|promptZonePick|zonePick/;
+const ZIELWAHL = /prompt(Damage|Effect|Multi)?Target\s*\(|promptTarget\s*\(|promptZonePick|zonePick/;
 const _zielCache = new Map();
 function waehltZiel(name, script) {
   if (script?.requiresTarget) return true;

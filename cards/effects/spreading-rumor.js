@@ -173,6 +173,7 @@ module.exports = {
         // path already consumed nothing, so no further action
         // bookkeeping is needed.
         ps._oppHandInteractionLockedTurn = gs.turn;
+        ps.oppHandLocked = true;   // W16g (S03-02): auch fuer Slow und Arthor (gleiche Regel, zweite Flagge)
         engine.log('rumor_inherent', { player: ps.username });
       } else {
         // Fumble — revoke the inherent status. Server-side rider

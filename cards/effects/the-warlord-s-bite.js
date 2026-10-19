@@ -67,8 +67,10 @@ module.exports = {
       // override) — Performance is read from the actual host hero's
       // ability zones, never overridden.
       const decayLevel = engine.effectiveSchoolLevelForCaster('Decay Magic', pi, heroIdx);
-      const perfLevel = engine.heroSchoolLevel('Performance', ctx.cardHeroOwner ?? pi, heroIdx);   // Als Befund 29.9.: Zonen des Wirkers auf seiner Brettseite; W4a: harte Negierung -> Stufe 0
-      const combinedLevel = decayLevel + perfLevel;
+      // W16g (S03-01): Performance zaehlt als JOKER schon IN `effectiveSchoolLevelForCaster` (`isWildcardAbility`, CARD_API „Performance
+      // zählt beim LEVEL als Joker mit") — ein zweites Addieren (`+ heroSchoolLevel('Performance')`) zaehlte sie doppelt (Decay 1 +
+      // Performance = Stufe 2 -> 2 Stacks, nicht 4).
+      const combinedLevel = decayLevel;
       const stacks = combinedLevel >= 3 ? 4 : combinedLevel >= 2 ? 2 : 1;
 
       // Prompt for target — only unpoisoned heroes/creatures.

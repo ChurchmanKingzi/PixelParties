@@ -151,6 +151,27 @@ module.exports = {
     return { amountOverride: halved };
   },
 
+  // ── Kreaturen (W16g, R02-16) ─────────────────────────────────────
+  // „a target you control would take any damage“ — Ziele sind Helden UND Kreaturen (wie Strong Shield; Al Q134 fuer Cloud in a
+  // Bottle). Das Kreaturen-Fenster (`_checkCreaturePreDamageHandReactions`) fragt je Schadenseintrag den Kontrolleur.
+  isCreaturePreDamageReaction: true,
+  creaturePreDamageCondition(gs, ownerIdx, engine, creatureInst, source, amount /*, type */) {
+    return amount > 0;
+  },
+  async creaturePreDamageResolve(engine, ownerIdx, creatureInst, source, amount /*, type */) {
+    const halved = Math.ceil(amount / 2);
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'spectral_armor', owner: engine.physicalSide ? engine.physicalSide(creatureInst) : creatureInst.owner,
+      heroIdx: creatureInst.heroIdx, zoneSlot: creatureInst.zoneSlot,
+    });
+    await engine._delay(450);
+    engine.log('spectral_armor', {
+      player: engine.gs.players[ownerIdx]?.username, hero: creatureInst.name,
+      originalDamage: amount, halvedDamage: halved,
+    });
+    return { amountOverride: halved };
+  },
+
   /**
    * CPU decision-maker — fires for the pre-damage prompt path. The
    * post-target prompt is a generic confirm with no extra context;

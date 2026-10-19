@@ -62,12 +62,9 @@ function countAllValidTargets(engine) {
     for (const h of (ps.heroes || [])) {
       if (h?.name && h.hp > 0) n++;
     }
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      for (let z = 0; z < 3; z++) {
-        const slot = ps.supportZones?.[hi]?.[z] || [];
-        if (slot.length > 0) n++;
-      }
-    }
+    // W16g (S01-06): „Ziele“ = Helden + KREATUREN (nicht jede belegte Support Zone — Ausruestung/Anhaenge sind keine Ziele);
+    // dieselbe Menge, aus der die Zielwahl danach waehlt (`getCreatureTargets` = die Kreaturen, die `pi` kontrolliert).
+    n += engine.getCreatureTargets(pi).length;
   }
   return n;
 }
