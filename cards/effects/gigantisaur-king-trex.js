@@ -57,6 +57,9 @@ const {
   isGigantisaurCreature,
 } = require('./_gigantisaurs-shared');
 
+const T = require('./_teocuilatl-shared');   // W17a: Landung im frei gewordenen Platz (`placeAfterSacrificeSwap`), Held-Prüfung
+const { isSeat } = require('./_opp');
+
 const CARD_NAME = 'Gigantisaur King Trex';
 
 /**
@@ -71,6 +74,29 @@ function _trexSacrificeCandidates(engine, pi, selfId) {
     && c.cardName !== CARD_NAME
     && (!selfId || c.inst.id !== selfId)
   );
+}
+
+// ── W17a (Al, 19.10.2026): Ersetzen bei vollem Brett ─────────────────────────────────────────────────────────────
+// „Das ist eine generelle Regel für ALLE Creatures, die andere Karten in Support Zonen ersetzen": Trex opfert einen Gigantisaur und darf
+// dessen Platz einnehmen (Wurf auf den Gigantisaur), auch wenn das Brett sonst voll ist - NUR in Zonen mit exakt EINER Karte
+// (`engine.zoneFreiNachKostenzahlung`; Alice, the Transfer Student kann mehrere Karten in eine Zone legen).
+/** Opferbarer Gigantisaur im Platz (`heroOwner` = Brettseite, `heroIdx`, `slotIdx`), dessen Zone danach frei ist - sonst null. */
+function _tributImPlatz(engine, pi, heroIdx, slotIdx, heroOwner = pi) {
+  if (!engine.zoneFreiNachKostenzahlung(heroOwner, heroIdx, slotIdx)) return null;
+  if (!T.heroCanSummon(engine, pi, heroIdx, CARD_NAME, heroOwner)) return null;
+  const c = _trexSacrificeCandidates(engine, pi, null).find(x => x.inst.zone === 'support'
+    && (x.inst.owner ?? pi) === heroOwner && x.inst.heroIdx === heroIdx && x.inst.zoneSlot === slotIdx);
+  return c || null;
+}
+/** Alle Wurfziele (Platz eines opferbaren Gigantisaurs). `owner` = Brettseite, nur gesetzt, wenn != pi. */
+function _wurfZiele(engine, pi) {
+  const out = [];
+  for (const c of _trexSacrificeCandidates(engine, pi, null)) {
+    const seite = c.inst.owner ?? pi;
+    if (c.inst.zone !== 'support' || !_tributImPlatz(engine, pi, c.inst.heroIdx, c.inst.zoneSlot, seite)) continue;
+    out.push(seite !== pi ? { heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, owner: seite } : { heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot });
+  }
+  return out;
 }
 
 /**
@@ -172,6 +198,50 @@ function _clearOverrides(engine, pi) {
     }
   }
   delete ps._kingTrexOverrideRegistry;
+}
+
+/**
+ * Den Tribut ohne Rueckfrage opfern (Messer-Bild, `onCreatureSacrificed`, Zerstoerung mit Todes-Signalen). `true` = bezahlt.
+ * Ausgelagert aus `paySummonCost` (W17a), damit der Wurf auf den Gigantisaur-Platz denselben Ablauf nutzt.
+ */
+async function _opfereTribut(engine, pi, heroIdx, onHero) {
+  const tribute = onHero.inst;
+  const tributeName = onHero.cardName;
+  const source = { name: CARD_NAME, owner: pi, heroIdx };
+  // ON_CREATURE_SACRIFICED before destroy — same ordering
+  // `resolveSacrificeCost` uses so listeners see the live inst.
+  try {
+    // Flavor: Trex chomps its tribute — same `dino_bite` animation
+    // Spinor uses, scaled to a moderate-strong bite.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'dino_bite',
+      owner: tribute.owner,
+      heroIdx: tribute.heroIdx,
+      zoneSlot: tribute.zoneSlot,
+      damage: 300,
+    });
+    await engine._delay(550);
+    await engine.runHooks('onCreatureSacrificed', {
+      creature: tribute,
+      cardName: tributeName,
+      owner: tribute.owner,
+      heroIdx: tribute.heroIdx,
+      zoneSlot: tribute.zoneSlot,
+      source,
+      _skipReactionCheck: true,
+    });
+    await engine.actionDestroyCard(source, tribute, {
+      fireCreatureDeath: true,
+    });
+  } catch (err) {
+    console.error(`[${CARD_NAME}] auto-tribute failed:`, err.message);
+    return false;
+  }
+  engine.log('king_trex_auto_tribute', {
+    player: engine.gs.players[pi]?.username,
+    tribute: tributeName, heroIdx,
+  });
+  return true;
 }
 
 module.exports = {
@@ -283,47 +353,23 @@ module.exports = {
     const candidates = _trexSacrificeCandidates(engine, pi, selfId);
     if (candidates.length === 0) return false;
 
+    // W17a: Wurf auf den Platz eines Gigantisaurs (Ersetzen bei vollem Brett) - genau DIESEN opfern und seinen Platz einnehmen. Die Marke
+    // bleibt gesetzt (`beforeSummon` räumt sie ab); der Platz ist bis zur Landung gehalten (kein Todes-Trigger schnappt ihn weg).
+    const req = engine.gs.players[pi]?._requestedBouncePlaceSlot;
+    if (req) {
+      const heroOwner = isSeat(engine.gs, req.heroOwner) ? req.heroOwner : pi;
+      const occ = _tributImPlatz(engine, pi, req.heroIdx, req.slotIdx, heroOwner);
+      if (!occ) return false;
+      engine.haltePlatzFuerTausch(heroOwner, req.heroIdx, req.slotIdx);
+      if (!(await _opfereTribut(engine, pi, req.heroIdx, occ))) return false;
+      return { kind: 'swap', heroIdx: req.heroIdx, slotIdx: req.slotIdx, heroOwner, occName: occ.cardName };
+    }
+
     // Auto-sacrifice path: a sacrificable Gigantisaur sits ON the
     // target Hero. Pick it without prompting.
     const onHero = candidates.find(c => c.inst.heroIdx === heroIdx);
     if (onHero) {
-      const tribute = onHero.inst;
-      const tributeName = onHero.cardName;
-      const source = { name: CARD_NAME, owner: pi, heroIdx };
-      // ON_CREATURE_SACRIFICED before destroy — same ordering
-      // `resolveSacrificeCost` uses so listeners see the live inst.
-      try {
-        // Flavor: Trex chomps its tribute — same `dino_bite` animation
-        // Spinor uses, scaled to a moderate-strong bite.
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'dino_bite',
-          owner: tribute.owner,
-          heroIdx: tribute.heroIdx,
-          zoneSlot: tribute.zoneSlot,
-          damage: 300,
-        });
-        await engine._delay(550);
-        await engine.runHooks('onCreatureSacrificed', {
-          creature: tribute,
-          cardName: tributeName,
-          owner: tribute.owner,
-          heroIdx: tribute.heroIdx,
-          zoneSlot: tribute.zoneSlot,
-          source,
-          _skipReactionCheck: true,
-        });
-        await engine.actionDestroyCard(source, tribute, {
-          fireCreatureDeath: true,
-        });
-      } catch (err) {
-        console.error(`[${CARD_NAME}] auto-tribute failed:`, err.message);
-        return false;
-      }
-      engine.log('king_trex_auto_tribute', {
-        player: engine.gs.players[pi]?.username,
-        tribute: tributeName, heroIdx,
-      });
-      return true;
+      return (await _opfereTribut(engine, pi, heroIdx, onHero)) ? { kind: 'none' } : false;
     }
 
     // Standard prompt path — Hero has no Gigantisaur, pick one from
@@ -346,10 +392,37 @@ module.exports = {
       sacrificeAnimationDelay: 550,
       sacrificeAnimationExtras: { damage: 300 },
     });
-    return !!sacrificed;
+    return sacrificed ? { kind: 'none' } : false;
   },
 
-  beforeSummon: async (ctx) => (ctx._summonKosten ? true : (await module.exports.paySummonCost(ctx)) !== false),
+  async beforeSummon(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt -> nur noch landen (W17a: bei einem Tausch im Platz des Gigantisaurs).
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      return pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+    }
+    // Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.): wie früher selbst zahlen; eine Wurf-Marke gilt dort nicht.
+    if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+    return (await module.exports.paySummonCost(ctx)) !== false;
+  },
+
+  // W17a (Al, 19.10.2026): Ersetzen-Vertrag (Muster Teocuilatl-Trio): Trex darf bei vollem Brett den Platz des geopferten Gigantisaurs
+  // einnehmen - nur in Zonen mit exakt einer Karte. Die Opferung ist eine Handlung des Helden (gefroren/betäubt/negiert: nein).
+  requiresActiveCaster: true,
+  canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
+    return _wurfZiele(engine, pi).some(s => s.heroIdx === heroIdx && (s.owner ?? pi) === pi);
+  },
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!_tributImPlatz(engine, pi, heroIdx, slotIdx, heroOwner);
+  },
+  getBouncePlacementTargets(gs, pi, engine) {
+    return _wurfZiele(engine, pi);
+  },
 
   hooks: {
     /**

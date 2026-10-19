@@ -16065,6 +16065,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Todes-Trigger (Corpse Cannibal, Green Dragoneer) darf ihn wegschnappen (frueher: atomarer Tausch). `side` = physische Seite.
    */
   haltePlatzFuerTausch(side, heroIdx, zoneSlot) { this._tauschPlatz = { side, heroIdx, zoneSlot, turn: this.gs?.turn }; }
+
+  /**
+   * ★ W17a (Al, 19.10.2026, Pollution Piranha / A01-20): „Zone nach Kostenzahlung frei?" - DIE eine Frage hinter jeder Kreatur, die zur
+   * Beschwörung eine andere Karte aus einer Support Zone entfernt (Pollution Piranha: Token, Opfer-/Tribut-Kreaturen, Deepsea-Rückgabe …)
+   * und deshalb den Platz der entfernten Karte einnehmen darf, auch wenn das Brett sonst voll ist. Al: „Das gilt NUR für Zonen, in denen
+   * exakt EINE Karte liegt" - mit „Alice, the Transfer Student" teilen sich mehrere Kreaturen eine Zone, das Entfernen einer einzelnen
+   * macht sie nicht frei. `side` = physische Seite der Zone. Mit `inst` (die zu entfernende Karte) muss sie genau diese Zone belegen.
+   */
+  zoneFreiNachKostenzahlung(side, heroIdx, zoneSlot, inst = null) {
+    const slot = this.gs?.players?.[side]?.supportZones?.[heroIdx]?.[zoneSlot];
+    if (!Array.isArray(slot) || slot.length !== 1) return false;
+    if (inst && !(inst.zone === 'support' && inst.heroIdx === heroIdx && inst.zoneSlot === zoneSlot)) return false;
+    return true;
+  }
+  /** W17a: Teilt sich diese Zone mehrere Karten (Alice-Stapel)? Nur der Stapel-Fall (>= 2 Eintraege); fehlt das Zonen-Array, gilt sie nicht als geteilt. */
+  _zoneGeteilt(side, heroIdx, zoneSlot) {
+    const slot = this.gs?.players?.[side]?.supportZones?.[heroIdx]?.[zoneSlot];
+    return Array.isArray(slot) && slot.length > 1;
+  }
   isSwapSlotHeld(side, heroIdx, zoneSlot) {
     const t = this._tauschPlatz;
     return !!t && t.turn === this.gs?.turn && t.side === side && t.heroIdx === heroIdx && t.zoneSlot === zoneSlot;
@@ -16223,6 +16242,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _vomPflichtHelden(inst, spec) {
     if (!inst || inst.heroIdx !== spec.mustIncludeFromHeroIdx) return false;
+    // W17a (Al, 19.10.2026): das Pflicht-Opfer macht den Landeplatz frei - nur, wenn seine Zone danach leer ist (Alice-Zone mit 2+ Karten: nein).
+    if (inst.zone === 'support' && this._zoneGeteilt(inst.owner, inst.heroIdx, inst.zoneSlot)) return false;
     if (spec.mustIncludeFromHeroOwner == null) return true;
     return inst.owner === spec.mustIncludeFromHeroOwner;
   }
@@ -29921,7 +29942,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (c.minSumLevel != null && c.minSumLevel > 0 && sel.reduce((n, t) => n + (t._meta?.level || 0), 0) < c.minSumLevel) return 'min_sum_level';
     if (c.mustIncludeFromHeroIdx != null
         && !sel.some(t => t.type === 'equip' && t.heroIdx === c.mustIncludeFromHeroIdx
-          && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner))) return 'must_include_from_hero';
+          && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner)
+          && !this._zoneGeteilt(t.owner, t.heroIdx, t.slotIdx))) return 'must_include_from_hero';   // W17a: das Pflicht-Opfer muss seine Zone leeren
     return null;
   }
 
@@ -29954,7 +29976,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!untergrenze()) return true;
     const rest = waehlbar.filter(t => !res.includes(t.id));
     const musterfuellt = (t) => c.mustIncludeFromHeroIdx != null && t.type === 'equip' && t.heroIdx === c.mustIncludeFromHeroIdx
-      && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner);
+      && (c.mustIncludeFromHeroOwner == null || t.owner === c.mustIncludeFromHeroOwner)
+      && !this._zoneGeteilt(t.owner, t.heroIdx, t.slotIdx);   // W17a
     const wert = (t) => (c.minSumMaxHp > 0 ? (t._meta?.maxHp || 0) : 0) + (c.minSumLevel > 0 ? (t._meta?.level || 0) : 0);
     rest.sort((a, b) => (Number(musterfuellt(b)) - Number(musterfuellt(a))) || (wert(b) - wert(a)));   // stabil: sonst Listenreihenfolge
     for (const t of rest) {
@@ -30704,7 +30727,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._isHeroEffectSilenced(physOwner, hi)) continue;   // W7a (H03-heroes-04): ein EINZIGER Prüfer (kennt auch Mummy Token)
       if (hero.bypassHandLimit) return true;
       const script = this.heroScript(hero);
-      if (script?.bypassHandLimit) return true;
+      // W17a (H04-08, Willy): ein Skript darf `bypassHandLimit` auch als Funktion (engine, pi, hero, physOwner, heroIdx) liefern -
+      // fuer zeitlich begrenzte Freiheit, die am Helden haengt (tot/gefroren/betaeubt/negiert -> Limit sofort wieder da).
+      if (typeof script?.bypassHandLimit === 'function') {
+        if (script.bypassHandLimit(this, playerIdx, hero, physOwner, hi)) return true;
+      } else if (script?.bypassHandLimit) return true;
     }
     // Area-card-based bypass (Big Gwen, etc.) — walks every Area the player
     // controls and asks its module if it's currently bypassing the limit.

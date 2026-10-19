@@ -189,7 +189,8 @@ function collectTargets(engine) {
       targets.push({ id: areaTargetId(inst.owner, stapelPlatz), type: 'area',
         owner: inst.owner, heroIdx: -1, cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'surprise') {
-      targets.push({ id: `equip-${inst.owner}-${inst.heroIdx}-surprise`, type: 'equip',
+      // W17a (Al, 19.10.2026: any card on the board that is not a Hero - auch verdeckte Surprises): Client-ID einer Surprise-Zone wie _targeting-shared (v706); die alte equip-…-surprise-ID war unklickbar.
+      targets.push({ id: `surprise-${inst.owner}-${inst.heroIdx}`, type: 'surprise',
         owner: inst.owner, heroIdx: inst.heroIdx, cardName: inst.name, _cardInstance: inst });
     } else if (inst.zone === 'coolnessStack') {
       const stack = gs.players[inst.owner]?.coolnessStack || [];

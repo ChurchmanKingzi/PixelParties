@@ -60,6 +60,8 @@ function findOccupant(engine, pi, heroIdx, slotIdx, CARD_NAME_ARG, heroOwner = p
   const gs = engine.gs;
   const slot = (gs.players[heroOwner]?.supportZones?.[heroIdx] || [])[slotIdx] || [];
   if (slot.length === 0) return null;
+  // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Zone mit 2+ Karten wird durch ein Opfer nicht frei).
+  if (!engine.zoneFreiNachKostenzahlung(heroOwner, heroIdx, slotIdx)) return null;
   if (!heroCanSummon(engine, pi, heroIdx, CARD_NAME_ARG, heroOwner)) return null;
   const inst = engine.cardInstances.find(c =>
     c.zone === 'support' && (c.controller ?? c.owner) === pi && c.owner === heroOwner
@@ -79,6 +81,7 @@ function sacrificeableSlots(engine, pi, CARD_NAME_ARG) {
   const turn = engine.gs.turn;
   return engine.getSacrificableCreatures(pi)
     .filter(c => c.inst.zone === 'support' && c.inst.turnPlayed !== turn
+      && engine.zoneFreiNachKostenzahlung(c.inst.owner ?? pi, c.inst.heroIdx, c.inst.zoneSlot)   // W17a: nur Zonen mit exakt einer Karte
       && heroCanSummon(engine, pi, c.inst.heroIdx, CARD_NAME_ARG, c.inst.owner ?? pi))
     .map(c => ({ heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, owner: c.inst.owner ?? pi, cardName: c.cardName, inst: c.inst }));
 }

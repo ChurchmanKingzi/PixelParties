@@ -9,9 +9,8 @@
 //  ② Once per turn: reduce this Creature's
 //    current & max HP by 100, then search your
 //    deck for any card, reveal it, and add it
-//    to your hand. (Requires maxHp >= 200: max
-//    can never drop below 1, but the cost is
-//    100 so we require a healthy buffer.)
+//    to your hand. (W17a, Al: nicht aktivierbar,
+//    wenn aktuelle ODER maximale HP <= 100.)
 // ═══════════════════════════════════════════
 
 const { attachSteamEngine, decreaseCreatureMaxHp } = require('./_steam-dwarf-shared');
@@ -28,11 +27,12 @@ module.exports = attachSteamEngine({
     if (!inst || inst.zone !== 'support') return false;
     if (inst.counters?.negated || inst.counters?.nulled) return false;
 
-    // Must be able to pay the HP cost without dying (max must stay
-    // above 0 after paying; we also want some current HP buffer).
+    // W17a (A03-06, Al 19.10.2026): „Der Diver sollte bei <=100 HP (current oder max) gar nicht aktivierbar sein!" - der Preis
+    // (je 100 aktuelle UND maximale HP) muss voll bezahlbar sein, ohne den Diver zu toeten; ein Boden bei 1 entfaellt.
     const cd = engine._getCardDB()[inst.name];
     const maxHp = inst.counters?.maxHp ?? cd?.hp ?? 0;
-    if (maxHp <= HP_COST) return false;
+    const curHp = inst.counters?.currentHp ?? maxHp;
+    if (maxHp <= HP_COST || curHp <= HP_COST) return false;
 
     // Must have at least one card in main deck to search
     const ps = engine.gs.players[ctx.cardOwner];
@@ -87,12 +87,13 @@ module.exports = attachSteamEngine({
     // Pay the HP cost now — we've committed
     // ★ W16b (A03-futuretech-06, Text „reduce this Creature's CURRENT and max HP by 100", Muster Rha'Bi/Gobbo): beide Werte zahlen.
     // `decreaseCreatureMaxHp` stutzt die aktuellen HP nur auf das neue Maximum — erst Max senken, dann die aktuellen HP auf
-    // (vorher − Preis) setzen (Boden 1 wie bei Rha'Bi: der Preis tötet den Diver nicht).
+    // (vorher − Preis) setzen. W17a: `canActivateCreatureEffect` garantiert aktuell > 100 und max > 100 (kein Boden 1 mehr noetig).
     const _maxVorher = inst.counters?.maxHp ?? engine._getCardDB()[inst.name]?.hp ?? 0;
     const _curVorher = inst.counters?.currentHp ?? _maxVorher;
+    if (_maxVorher <= HP_COST || _curVorher <= HP_COST) return false;   // W17a: HP haben sich waehrend der Wahl verringert -> Preis nicht mehr zahlbar
     decreaseCreatureMaxHp(engine, inst, HP_COST);
     if (inst.counters && inst.counters.maxHp != null) {
-      inst.counters.currentHp = Math.max(1, Math.min(_curVorher - HP_COST, inst.counters.maxHp));
+      inst.counters.currentHp = Math.min(_curVorher - HP_COST, inst.counters.maxHp);
     }
 
     // Route through the canonical helper so ON_CARD_ADDED_TO_HAND fires

@@ -268,9 +268,10 @@ function collectNonHeroBoardTargets(gs, engine) {
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'surprise') {
+      // W17a (Al, 19.10.2026: any card on the board that is not a Hero - auch verdeckte Surprises): Client-ID einer Surprise-Zone wie _targeting-shared (v706); die alte equip-…-surprise-ID war unklickbar.
       targets.push({
-        id: `equip-${inst.owner}-${inst.heroIdx}-surprise`,
-        type: 'equip', owner: inst.owner, heroIdx: inst.heroIdx,
+        id: `surprise-${inst.owner}-${inst.heroIdx}`,
+        type: 'surprise', owner: inst.owner, heroIdx: inst.heroIdx,
         cardName: inst.name, _cardInstance: inst,
       });
     }

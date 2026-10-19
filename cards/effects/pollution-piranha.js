@@ -33,8 +33,37 @@ const {
   countPollutionTokens,
 } = require('./_pollution-shared');
 
+const T = require('./_teocuilatl-shared');   // W17a: Landung im frei gewordenen Platz (`placeAfterSacrificeSwap`)
+const { isSeat } = require('./_opp');
+
 const CARD_NAME = 'Pollution Piranha';
 const BITE_DAMAGE = 50;
+
+// ── W17a (Al, 19.10.2026, A01-20): Ersetzen des Tokens ───────────────────────────────────────────────────────────
+// „Das ist eine generelle Regel für ALLE Creatures, die andere Karten in Support Zonen ersetzen" - die Piranha darf bei vollem Brett
+// in die Zone ihres Tokens (Wurf auf den Token). NUR für Zonen mit genau EINER Karte (`engine.zoneFreiNachKostenzahlung`):
+// mit „Alice, the Transfer Student" kann eine Zone mehrere Karten tragen, dann macht das Entfernen des Tokens sie nicht frei.
+/** Mein Token (Kontrolle `pi`) auf dem Platz (`heroOwner` = Brettseite, `heroIdx`, `slotIdx`), dessen Zone danach frei ist - sonst null. */
+function tokenImPlatz(engine, pi, heroIdx, slotIdx, heroOwner = pi) {
+  if (!engine.zoneFreiNachKostenzahlung(heroOwner, heroIdx, slotIdx)) return null;
+  return getPollutionTokens(engine, pi).find(inst =>
+    engine.physicalSide(inst) === heroOwner && inst.heroIdx === heroIdx && inst.zoneSlot === slotIdx) || null;
+}
+/** Kann dieser Held die Piranha beschwören (lebt, Stufe), von `pi` kontrolliert, Zone `heroOwner`? */
+function heldKannBeschwoeren(engine, pi, heroIdx, heroOwner = pi) {
+  return T.heroCanSummon(engine, pi, heroIdx, CARD_NAME, heroOwner);
+}
+/** Alle Token-Plätze, in die die Piranha ersetzend fallen darf. `owner` = Brettseite, nur gesetzt, wenn ≠ pi. */
+function tokenPlaetze(engine, pi) {
+  const out = [];
+  for (const inst of getPollutionTokens(engine, pi)) {
+    const seite = engine.physicalSide(inst);
+    if (!tokenImPlatz(engine, pi, inst.heroIdx, inst.zoneSlot, seite)) continue;
+    if (!heldKannBeschwoeren(engine, pi, inst.heroIdx, seite)) continue;
+    out.push(seite !== pi ? { heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, owner: seite } : { heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot });
+  }
+  return out;
+}
 
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
@@ -57,6 +86,19 @@ module.exports = {
   // (Living Illusion etc.) via engine.isCreatureSummonable.
   canSummon(ctx) {
     return countPollutionTokens(ctx._engine, ctx.cardOwner) > 0;
+  },
+
+  // W17a (A01-20): Ersetzen-Vertrag (Muster Teocuilatl-Trio): die Zone des entfernten Tokens ist nach der Kostenzahlung frei - auch bei
+  // sonst vollem Brett. Die Kosten sind eine Handlung des Helden: gefroren/betäubt/negiert kann er sie nicht ausführen.
+  requiresActiveCaster: true,
+  canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
+    return tokenPlaetze(engine, pi).some(s => s.heroIdx === heroIdx && (s.owner ?? pi) === pi);
+  },
+  canPlaceOnOccupiedSlot(gs, pi, heroIdx, slotIdx, engine, heroOwner = pi) {
+    return !!tokenImPlatz(engine, pi, heroIdx, slotIdx, heroOwner) && heldKannBeschwoeren(engine, pi, heroIdx, heroOwner);
+  },
+  getBouncePlacementTargets(gs, pi, engine) {
+    return tokenPlaetze(engine, pi);
   },
 
   /**
@@ -83,6 +125,27 @@ module.exports = {
 
     const pool = getPollutionTokens(engine, pi);
     if (pool.length === 0) return false;
+
+    // W17a (A01-20): Wurf auf einen belegten Platz = genau DIESEN Token entfernen und seinen Platz einnehmen (Tausch). Die Marke
+    // bleibt gesetzt, `beforeSummon` räumt sie ab; der Platz ist bis zur Landung gehalten (kein Todes-Trigger schnappt ihn weg).
+    const req = ps._requestedBouncePlaceSlot;
+    if (req) {
+      const heroOwner = isSeat(engine.gs, req.heroOwner) ? req.heroOwner : pi;
+      const tok = tokenImPlatz(engine, pi, req.heroIdx, req.slotIdx, heroOwner);
+      if (!tok || !heldKannBeschwoeren(engine, pi, req.heroIdx, heroOwner)) return false;
+      engine.haltePlatzFuerTausch(heroOwner, req.heroIdx, req.slotIdx);
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'piranha_bite', owner: heroOwner, heroIdx: tok.heroIdx, zoneSlot: tok.zoneSlot,
+      });
+      await engine._delay(450);
+      const tokId = tok.id;
+      const { removed } = await removePollutionTokens(engine, pi, 1, CARD_NAME, {
+        promptCtx: ctx,
+        filter: (inst) => inst.id === tokId,
+      });
+      if (removed <= 0) return false;
+      return { kind: 'swap', heroIdx: req.heroIdx, slotIdx: req.slotIdx, heroOwner, occName: 'Pollution Token' };
+    }
 
     let chosen;
     if (pool.length === 1) {
@@ -129,10 +192,24 @@ module.exports = {
       promptCtx: ctx,
       filter: (inst) => inst.id === chosenId,
     });
-    return removed > 0;
+    return removed > 0 ? { kind: 'none' } : false;
   },
 
-  beforeSummon: async (ctx) => (ctx._summonKosten ? true : (await module.exports.paySummonCost(ctx)) !== false),
+  async beforeSummon(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const ps = engine.gs.players[pi];
+    // W4b: Kosten schon vor dem Reaktionsfenster bezahlt -> nur noch landen (W17a: bei einem Tausch im Platz des Tokens).
+    const pre = ctx._summonKosten;
+    if (pre) {
+      if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+      if (ps?._requestedNormalSummonSlot) delete ps._requestedNormalSummonSlot;
+      return pre.kind === 'swap' ? await T.placeAfterSacrificeSwap(engine, pi, pre, CARD_NAME) : true;
+    }
+    // Ohne `paySummonCost`-Lauf (Effekt-Beschwörung o. ä.): wie früher selbst zahlen; eine Wurf-Marke gilt dort nicht.
+    if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+    return (await module.exports.paySummonCost(ctx)) !== false;
+  },
 
   // ── Activated ability: once per turn, deal 50 damage ──
   creatureEffect: true,

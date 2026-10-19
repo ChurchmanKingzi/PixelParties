@@ -162,6 +162,7 @@ function occupiedDropSlots(gs, pi, engine) {
     if (!engine.canSatisfySacrifice(pi, fullDropSpec(engine, pi, hi, physOwner, spec))) continue;
     for (const z of slots) {
       if ((zones[z] || []).length === 0) continue;
+      if (!engine.zoneFreiNachKostenzahlung(physOwner, hi, z)) continue;   // W17a (Al, 19.10.2026): Ersetzen nur in Zonen mit exakt EINER Karte (Alice-Stapel nein)
       out.push(physOwner !== pi ? { heroIdx: hi, slotIdx: z, owner: physOwner } : { heroIdx: hi, slotIdx: z });
     }
   }
