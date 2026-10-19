@@ -37559,6 +37559,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     return owner + ':' + source.name;
   }
 
+    // ★ W16b (A03-futuretech-13): ein im Angriffsfenster NEGIERTER Angriff (`source._attackNegated`, Future Tech Doomsday Bomb) ist ein
+    // Vorgang ohne jede Wirkung: sein Schaden entfällt als `cancelled`, damit auch die Zusatzeffekte der Attack-Karte (Stun, Blind, Gift,
+    // Abwurf — sie prüfen `result.cancelled`) unterbleiben. An die Quell-INSTANZ gebunden (nicht an owner:name), ein späterer Angriff
+    // derselben Karte im selben Zug bleibt unberührt.
+    if (source && source._attackNegated) return true;
   /** True iff this source's effect was negated by a post-target reaction. */
   _isEffectSourceNegated(source) {
     const set = this.gs._negatedEffectSources;
@@ -48630,7 +48635,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // outside a spell resolution (DDG's on-summon AoE vs Divine Gift
     // of Rain). Per-entry, so mixed-source batches keep their
     // unaffected entries.
-    entries = entries.filter(e => !this._isEffectSourceNegated(e.source));
+    // W16b (A03-futuretech-13): der Eintrag gilt als `cancelled` (Zusatzeffekte der Karte lesen `result.cancelled`, Gegenstück zum Heldenpfad).
+    entries = entries.filter(e => {
+      if (!this._isEffectSourceNegated(e.source)) return true;
+      e.cancelled = true;
+      return false;
+    });
     if (entries.length === 0) return;
 
     // Per-call heap check (matches the hero damage path). Damage
