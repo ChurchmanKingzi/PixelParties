@@ -266,7 +266,10 @@ function countOwnLv0Creatures(engine, pi) {
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd) continue;
     if (!hasCardType(cd, 'Creature')) continue;
-    if ((cd.level ?? -1) !== 0) continue;
+    // W16c (A06-04): "level 0 Creatures" = aktuelles Level (gedrucktes Level + Aenderungen, z. B. Calamitusk -1), wie `kreaturLevelJetzt`;
+    // Kreaturen ohne numerisches Level (Subtyp-Kreaturen) zaehlen weiter nicht.
+    if (cd.level == null) continue;
+    if (Math.max(0, cd.level + (inst.counters?.level || 0)) !== 0) continue;
     n++;
   }
   return n;
@@ -324,8 +327,9 @@ function recomputeBearRiderHandLevel(engine, pi) {
  *  (Frozen count is global). */
 function recomputeBearRiderHandLevelAllPlayers(engine) {
   if (!engine) return;
-  recomputeBearRiderHandLevel(engine, 0);
-  recomputeBearRiderHandLevel(engine, 1);
+  // W16c (A06-31): alle Sitze (2-4 Spieler), nicht nur 0 und 1 - die Frost-Zahl ist global, die Hand gehoert jedem Sitz.
+  const n = typeof engine.playerCount === 'function' ? engine.playerCount() : (engine.gs?.players?.length || 2);
+  for (let pi = 0; pi < n; pi++) recomputeBearRiderHandLevel(engine, pi);
 }
 
 module.exports = {
