@@ -26459,6 +26459,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Effekt sich nicht selbst noch einmal anstossen kann).
     if (!opts.ignoreEffectLock && inst.counters?._effectLockedTurn === this.gs.turn) return false;
     // v752: Die EIGENE Aktivierungsbedingung der Karte gilt auch fuer
+    // W16g (S02-13): auch Frozen/Stunned/Magic Silenced (und Aura-Negation) sperren die Wiederholung — dasselbe Praedikat wie die
+    // regulaere Aktivierung (`doActivateCreatureEffect`: `isCreatureEffectSuppressed`); gilt fuer Great Offensive, Kohta, Grimoire.
+    if (this.isCreatureEffectSuppressed(inst)) return false;
     // eine geliehene oder geschenkte Aufloesung (Als Befund 5.9.:
     // Grimoire liess Cosmic Skeleton feuern, obwohl dessen Bedingung
     // nicht erfuellt war). `canActivateCreatureEffect` ist der Ort, an
