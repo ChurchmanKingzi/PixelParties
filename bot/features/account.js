@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
-const { AttachmentBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { AttachmentBuilder, EmbedBuilder, PermissionsBitField, escapeMarkdown } = require('discord.js');
 const renderer = require('../lib/card-renderer');
 const rolesLogic = require('../lib/roles-logic');
 const { key, mentionedIds } = require('../lib/util');
@@ -39,6 +39,12 @@ module.exports = function register(ctx) {
   }
 
   // Erste im TEXT erwähnte Person (nicht `msg.mentions`: das enthält bei einer Antwort auch den Autor der Ursprungsnachricht).
+  /** Name, wie er im Discord-Server erscheint (Spitzname, sonst Anzeigename/Nutzername) — NICHT der Spielname. */
+  async function discordName(guild, discordId) {
+    const member = guild.members.cache.get(discordId) || await guild.members.fetch(discordId).catch(() => null);
+    return escapeMarkdown(member ? member.displayName : 'Unknown user');
+  }
+
   const mentioned = (msg, args) => mentionedIds(msg.content)[0] || args.find(a => /^\d{15,25}$/.test(a)) || null;
 
   // ── Rollen-Abgleich ────────────────────────────────────────
@@ -155,7 +161,7 @@ module.exports = function register(ctx) {
     try {
       const u = await viewOf(id);
       if (!u) return msg.reply(id === msg.author.id ? notLinked() : notLinked('That player'));
-      return msg.reply({ content: `🪙 **${u.username}** has **${Number(u.sc).toLocaleString('en-US')} SC**`, allowedMentions: { parse: [] } });
+      return msg.reply({ content: `🪙 **${await discordName(msg.guild, id)}** has **${Number(u.sc).toLocaleString('en-US')} SC**`, allowedMentions: { parse: [] } });
     } catch (err) { return msg.reply(apiError(err)); }
   });
 
@@ -183,8 +189,9 @@ module.exports = function register(ctx) {
       if (!u) return msg.reply(id === msg.author.id ? notLinked() : notLinked('That player'));
       const tier = rolesLogic.rankFor(u.elo);
       const games = u.wins + u.losses;
-      const e = new EmbedBuilder().setTitle(u.username).setColor(/^#[0-9a-f]{6}$/i.test(u.color) ? parseInt(u.color.slice(1), 16) : tier.color)
+      const e = new EmbedBuilder().setTitle(await discordName(msg.guild, id)).setColor(/^#[0-9a-f]{6}$/i.test(u.color) ? parseInt(u.color.slice(1), 16) : tier.color)
         .addFields(
+          { name: 'In-game name', value: u.username, inline: true },
           { name: 'Rank', value: `${tier.name} · ${u.elo} Elo`, inline: true },
           { name: 'SC', value: Number(u.sc).toLocaleString('en-US'), inline: true },
           { name: 'Record', value: games ? `${u.wins}W / ${u.losses}L (${Math.round(100 * u.wins / games)}%)` : 'No games yet', inline: true },
@@ -197,12 +204,12 @@ module.exports = function register(ctx) {
     } catch (err) { return msg.reply(apiError(err)); }
   });
 
-  ctx.command('daily', { help: '`!daily` — your Daily Challenge (three heroes)' }, async (msg) => {
+  ctx.command('daily', { help: '`!daily` — your Daily Challenge (three heroes); starts it if you haven’t yet' }, async (msg) => {
     try {
-      const d = await game.daily(msg.author.id);
-      if (!d.active) {
-        return msg.reply(`You haven’t started today’s challenge yet. Start it in the game (main menu → **Daily**), then ask me again! The next daily reset is <t:${d.nextResetTs}:R>.`);
-      }
+      let d = await game.daily(msg.author.id);
+      // Noch keine Challenge heute → hier nach den Regeln des Spiels würfeln; sie gilt damit auch im Spiel.
+      if (!d.active) d = await game.startDaily(msg.author.id);
+      if (!d.active) return msg.reply('I couldn’t start your daily challenge right now — please try again in a minute.');
       await msg.channel.sendTyping().catch(() => {});
       await renderer.init();
       const buf = await ctx.renderQueue(() => renderer.renderCardsRow(d.heroes, { scale: 0.75 }));
@@ -271,7 +278,7 @@ module.exports = function register(ctx) {
       const r = await game.adjustSc(p.uid, sign * p.n, msg.author.id);
       const note = r.applied !== sign * p.n ? ` (balance can’t go below 0, applied ${r.applied})` : '';
       await ctx.modlog(msg.guild, { title: `🪙 SC ${sign > 0 ? 'added' : 'removed'}`, color: 0xfbc02d, description: `<@${msg.author.id}> → **${r.username}** (<@${p.uid}>): ${r.applied > 0 ? '+' : ''}${r.applied} SC · ${r.before} → ${r.after}` });
-      return msg.reply({ content: `🪙 **${r.username}**: ${r.before} → **${r.after} SC**${note}`, allowedMentions: { parse: [] } });
+      return msg.reply({ content: `🪙 **${await discordName(msg.guild, p.uid)}**: ${r.before} → **${r.after} SC**${note}`, allowedMentions: { parse: [] } });
     } catch (err) {
       if (err instanceof GameApiError && err.code === 'not_linked') return msg.reply('That user hasn’t linked a Pixel Parties account.');
       return msg.reply(apiError(err));

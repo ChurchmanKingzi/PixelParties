@@ -140,9 +140,9 @@ zusammengesetzt und immer auf dem Stand des Spiels. Einen eigenen Bilderordner g
 
 | Befehl | Wirkung |
 |---|---|
-| `!sc [@Nutzer]` | Smug Coins |
+| `!sc [@Nutzer]` | Smug Coins — angezeigt mit dem **Discord-Namen** (nicht dem Spielnamen) |
 | `!profile [@Nutzer]` | Elo, Rang, SC, Bilanz, Skins, Avatar |
-| `!daily` | deine Daily Challenge: die drei Helden als **ein** Bild mit dem Text *„Your challenge for today: Win a game with 2, or 3 of these Heroes:“*. Gestartet wird die Challenge weiterhin im Spiel. |
+| `!daily` | deine Daily Challenge: die drei Helden als **ein** Bild mit dem Text *„Your challenge for today: Win a game with 2, or 3 of these Heroes:“*. Hast du heute noch keine, **startet `!daily` sie**: Die Helden werden nach den Regeln des Spiels gewürfelt und am Konto gespeichert, die Challenge gilt also sofort auch im Spiel (Anzeige und Belohnung). Läuft schon eine, bleibt sie unverändert. |
 | `!sync`, `!unlink` | Rollen sofort abgleichen; Verknüpfung lösen |
 | `!top [n]` | Rangliste |
 | 🔒 `!addsc <Zahl> @Nutzer`, `!removesc <Zahl> @Nutzer` | SC erhöhen/senken (nie unter 0, jede Buchung steht in `sc_log` und im Mod-Log) |

@@ -118,3 +118,59 @@ test('ohne BOT_SECRET sind die Bot-Routen aus', async () => {
     assert.equal(res.status, 404);
   } finally { server.close(); process.env.BOT_SECRET = saved; }
 });
+
+test('Daily per Discord starten: würfelt nach den Spielregeln, gilt im Spiel, läuft schon eine → unverändert, atomar', async () => {
+  const { db, server, call } = await (async () => {
+    const client = createClient({ url: ':memory:' });
+    const db = {
+      execute: (s, a) => client.execute({ sql: s, args: a || [] }),
+      run: async (s, a = []) => { const r = await client.execute({ sql: s, args: a }); return { rowsAffected: r.rowsAffected }; },
+      get: async (s, a = []) => (await client.execute({ sql: s, args: a })).rows[0],
+      all: async (s, a = []) => (await client.execute({ sql: s, args: a })).rows,
+    };
+    await db.execute(`CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT, elo INTEGER DEFAULT 1000, color TEXT, avatar TEXT, sc INTEGER DEFAULT 0,
+      wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0, ranked_games INTEGER DEFAULT 0, created_at INTEGER DEFAULT 0, is_guest INTEGER DEFAULT 0,
+      daily_heroes TEXT, daily_start_ts INTEGER DEFAULT 0, daily_claimed_big INTEGER DEFAULT 0)`);
+    await db.execute('CREATE TABLE user_shop_items (id TEXT PRIMARY KEY, user_id TEXT, item_type TEXT, item_id TEXT)');
+    await botApi.ensureSchema(db);
+    await db.run("INSERT INTO users (id, username, discord_id) VALUES ('u1','Alice','111111111111111111')");
+    const app = express(); app.use(express.json());
+    let rolls = 0;
+    // wie im Spiel: aktiv, wenn gestartet und innerhalb von 24 h
+    const getActiveDaily = u => (u.daily_start_ts && Date.now() / 1000 - u.daily_start_ts < 86400 ? { heroes: JSON.parse(u.daily_heroes), startTs: u.daily_start_ts, expiresTs: u.daily_start_ts + 86400, claimedBig: 0 } : null);
+    botApi.mount({ app, db, authMiddleware: (q, r, n) => n(), getActiveDaily, rollDailyHeroes: () => ['H' + (++rolls) + 'a', 'H' + rolls + 'b', 'H' + rolls + 'c'],
+      nextNoonCETAfter: () => 99, mostRecentNoonCETSec: () => 11, uuidv4: () => 'x' });
+    const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+    const base = 'http://127.0.0.1:' + server.address().port;
+    const call = async (method, p, { headers } = {}) => {
+      const res = await fetch(base + p, { method, headers: { 'content-type': 'application/json', ...headers } });
+      return { status: res.status, json: await res.json().catch(() => null) };
+    };
+    return { db, server, call };
+  })();
+  try {
+    const id = '111111111111111111';
+    assert.equal((await call('GET', '/api/bot/daily/' + id, { headers: bot })).json.active, false);
+    assert.equal((await call('POST', '/api/bot/daily/' + id + '/start')).status, 403, 'ohne Secret');
+    assert.equal((await call('POST', '/api/bot/daily/999/start', { headers: bot })).status, 404);
+
+    const first = await call('POST', '/api/bot/daily/' + id + '/start', { headers: bot });
+    assert.equal(first.status, 200);
+    assert.equal(first.json.created, true);
+    assert.deepEqual(first.json.heroes, ['H1a', 'H1b', 'H1c']);
+    const row = await db.get("SELECT daily_heroes, daily_start_ts, daily_claimed_big FROM users WHERE id = 'u1'");
+    assert.deepEqual(JSON.parse(row.daily_heroes), ['H1a', 'H1b', 'H1c'], 'am Spielerkonto gespeichert → gilt im Spiel');
+    assert.ok(row.daily_start_ts > 0 && row.daily_claimed_big === 0);
+
+    const again = await call('POST', '/api/bot/daily/' + id + '/start', { headers: bot });
+    assert.equal(again.json.created, false);
+    assert.deepEqual(again.json.heroes, ['H1a', 'H1b', 'H1c'], 'läuft schon → unverändert');
+    assert.deepEqual((await call('GET', '/api/bot/daily/' + id, { headers: bot })).json.heroes, ['H1a', 'H1b', 'H1c']);
+
+    // abgelaufen (älter als 24 h) → neu würfeln; zwei gleichzeitige Starts → genau EINE Challenge
+    await db.run("UPDATE users SET daily_start_ts = ? WHERE id = 'u1'", [Math.floor(Date.now() / 1000) - 90000]);
+    const [a, b] = await Promise.all([call('POST', '/api/bot/daily/' + id + '/start', { headers: bot }), call('POST', '/api/bot/daily/' + id + '/start', { headers: bot })]);
+    assert.equal([a, b].filter(x => x.json.created).length, 1);
+    assert.deepEqual(a.json.heroes, b.json.heroes, 'beide sehen dieselbe Challenge');
+  } finally { server.close(); }
+});

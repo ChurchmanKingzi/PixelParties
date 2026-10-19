@@ -56,11 +56,12 @@ async function ensureSchema(db) {
  * @param {object} o.db                  db.js (get/all/run)
  * @param {Function} o.authMiddleware
  * @param {Function} o.getActiveDaily    (userRow, nowSec) → { heroes, startTs, expiresTs, claimedBig } | null
+ * @param {Function} o.rollDailyHeroes   () → drei Heldennamen (die Würfelregel des Spiels, server.js)
  * @param {Function} o.nextNoonCETAfter
  * @param {Function} o.mostRecentNoonCETSec
  * @param {Function} o.uuidv4
  */
-function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 }) {
+function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 }) {
   const secret = process.env.BOT_SECRET || '';
   /** code → { userId, expires } */
   const codes = new Map();
@@ -200,6 +201,37 @@ function mount({ app, db, authMiddleware, getActiveDaily, nextNoonCETAfter, most
         lastResetTs: mostRecentNoonCETSec(nowSec),
       });
     } catch (err) { console.error('[bot/daily]', err.message); res.status(500).json({ error: 'failed' }); }
+  });
+
+  /**
+   * Daily Challenge STARTEN — genau wie im Spiel (POST /api/daily/start): würfelt drei Helden nach den Regeln des Spiels und
+   * speichert sie am Spielerkonto, sodass die Challenge dort sofort gilt (Anzeige und Belohnung beim Spielende).
+   * Läuft schon eine, bleibt sie unverändert (`created: false`). Das Schreiben ist atomar gegen gleichzeitiges Starten
+   * (im Spiel und über Discord): nur wer den bisherigen Startzeitpunkt noch vorfindet, schreibt.
+   */
+  app.post(bot('/daily/:discordId/start'), botAuth, async (req, res) => {
+    try {
+      const u = await db.get('SELECT * FROM users WHERE discord_id = ?', [String(req.params.discordId)]);
+      if (!u) return res.status(404).json({ error: 'not_linked' });
+      const nowSec = Math.floor(Date.now() / 1000);
+      let created = false;
+      let row = u;
+      if (!getActiveDaily(u, nowSec)) {
+        const heroes = rollDailyHeroes();
+        if (heroes.length < 3) return res.status(500).json({ error: 'hero_pool_exhausted' });
+        const r = await db.run(
+          'UPDATE users SET daily_heroes = ?, daily_start_ts = ?, daily_claimed_big = 0 WHERE id = ? AND COALESCE(daily_start_ts, 0) = ?',
+          [JSON.stringify(heroes), nowSec, u.id, u.daily_start_ts || 0]);
+        created = r.rowsAffected > 0;
+        row = await db.get('SELECT * FROM users WHERE id = ?', [u.id]);   // bei verlorenem Wettlauf: die Challenge des Gewinners
+      }
+      const active = getActiveDaily(row, nowSec);
+      res.json({
+        username: u.username, created,
+        active: !!active, heroes: active ? active.heroes : [], expiresTs: active ? active.expiresTs : 0,
+        nextResetTs: nextNoonCETAfter(nowSec), lastResetTs: mostRecentNoonCETSec(nowSec),
+      });
+    } catch (err) { console.error('[bot/daily/start]', err.message); res.status(500).json({ error: 'failed' }); }
   });
 
   /**
