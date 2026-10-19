@@ -11,6 +11,8 @@ const H = require('../../lib/h.js');
   const C = 'Elven Archer';
   const t = await H.fresh({ hand: [['Create Illusion'], []], deck: [[C, 'Fireball', 'Fireball'], ['ZZ Dummy', 'ZZ Dummy']], abilities: { 0: { 0: [['Magic Arts'], [], []] } } });
   t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Create Illusion', answer: () => ({ cardName: C }) });
+  // W16g: die Zonenwahl von Create Illusion ist abbrechbar (S01-25); die Harness-Standardantwort auf abbrechbare Abfragen ist „abbrechen“ — ausdrücklich die erste Zone wählen.
+  t.script.push({ match: d => d.type === 'zonePick', answer: (d) => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx }) });
   let gefragt = false;
   t.script.push({ match: d => d.type === 'confirm' && d.title === 'Create Illusion', answer: () => { gefragt = true; return null; } });
   await t.play(0, 'Create Illusion', { hero: 0, noGrant: true });
