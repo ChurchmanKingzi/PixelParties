@@ -8191,12 +8191,12 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 /* ═══ REACTION CHAIN VISUALIZATION ═══ */
 .reaction-chain-overlay {
   position: fixed;
-  right: 82px;
+  right: 82px;          /* Rueckfall; die rechte Kante liegt sonst auf der linken Kante der Deck-Spalte (ReactionChainOverlay, app-board.jsx) */
   bottom: 30%;
   z-index: 10040;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;   /* Titel MITTIG ueber den Karten (Als Vorgabe 19.10.) */
   gap: 6px;
   pointer-events: none;
 }
@@ -8208,6 +8208,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   font-size: 11px;
   color: var(--accent);
   letter-spacing: 2px;
+  text-indent: 2px;      /* gleicht den Buchstabenabstand hinter dem letzten Zeichen aus: sonst sitzt der Titel optisch zu weit links */
   text-transform: uppercase;
   text-shadow: 0 0 8px rgba(0,240,255,.4);
 }
