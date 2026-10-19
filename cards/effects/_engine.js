@@ -21368,7 +21368,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ── Phase-aware action economy (single source of truth) ──
 
         // Action Phase: after a hero has already acted, cards need bonus action, inherent action, or additional action coverage
-        if (isActionPhase && (heroActed || this.mainActionSpent(playerIdx, hi))) {
+        // W17d (S02-15): `charmedIgnoresActionCost` (nur Love Shot) gilt auch für einen vom Gegner kontrollierten Helden MEINER Spalte — der Guss ist eine Zusatzaktion.
+        if (isActionPhase && !charmedFrei && (heroActed || this.mainActionSpent(playerIdx, hi))) {
           if (hasBonusMainAction) {
             // Generic bonus main action (Torchure, Dragon Pilot Lv1 sacrifice, etc.):
             // no hero restriction, no type restriction — any action card is playable.
@@ -21400,7 +21401,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
 
         // Main Phase: action cards need inherent action or additional action coverage
-        if (isMainPhase) {
+        if (isMainPhase && !charmedFrei) {
           // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
           let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
           // Berserk's free-Attack grant — see the post-acted Action

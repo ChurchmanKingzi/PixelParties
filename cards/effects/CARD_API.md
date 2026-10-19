@@ -20985,3 +20985,15 @@ Neue Engine-Stellen: `afterCreatureHeal` (Hook), Skript-Marke `attachmentDamageC
 8. Dark Ocean: auch `decay_spell` (Forbidden Zone) durchlassen („except from Attacks and Spells")?
 
 Repros: `docs/niche-tests/repro/W16/g-s02-15-…` (Exit 0 = korrekt). Korrigierte alte Repros: `S01-spells/07` ((C) nur Notiz), `S01-spells/25` (Sacrifice Stufe 2), `S03-spells/15` (Grenze statt fester Ausgang), Harness-Antworten ergänzt in `S01-spells/16`, `S02-spells/03`, `S02-spells/04`, `W14/b-q162`, `W14/c-q168`.
+
+## ★ Welle 17 / W17d — S02-15 Love Shot: Heldenwahl und Nachguss nach KONTROLLE (19.10.2026)
+
+Al hat das Go für die in W16g als „zu groß" eingestufte Hälfte gegeben: „choose a Hero your opponent controls" — ein Held MEINER Spalte, den der Gegner kontrolliert (Paraseed, Styx, Charme), ist ein Gegnerheld und wählbar. Repro `S02-spells/15` jetzt Exit 0.
+
+* **Heldenwahl** (`love-shot.js`): `engine.heroesControlledBy(oi)` ohne Spaltenfilter; Ziel-Id und `owner` tragen die SPALTE des Helden (`hero-<Spalte>-<idx>`), nicht den Kontrolleur. Ein von mir kontrollierter Gegnerheld bleibt ausgeschlossen (W16g). Ohne Kontrollwechsel ist die Liste bit-gleich zu vorher (`1:0, 1:1, 1:2`).
+* **Nachguss, Held der Gegnerspalte:** unverändert (`getHeroPlayableCards().charmed`, `heroOwner` = Gegnerspalte, geliehener Held).
+* **Nachguss, Held meiner Spalte (vom Gegner kontrolliert):** der Held steht physisch bei mir, während des Gusses kontrolliere ich ihn (temporäre Charme-Marke `charmedBy = pi`, danach Rückgabe der VORHERIGEN Marken/Status, auch `permaControlBy` bleibt unangetastet). Spielbar-Liste = `getHeroPlayableCards(pi, { charmedIgnoresActionCost: true }).own[heroIdx]` — Schulen/Stufen aus den Ability Zones DIESES Helden, Karten aus MEINER Hand, Wisdom-Abwurf aus meiner Hand; die Instanz wird wie ein ganz normaler eigener Guss geführt (`heroOwner` bleibt ungesetzt, da Spalte = Wirker). Kontrollrechte (kein Beschwören/Ausrüsten) und `_loveShot`-Marke (kein Schadensschutz) gelten wie bisher.
+* **Engine (`_engine.js`, `getHeroPlayableCards`, zwei Bedingungen, nur Zweig `own`):** die phasenbewusste Aktionsprüfung entfällt, wenn `opts.charmedIgnoresActionCost` gesetzt ist (bisher galt die Option nur im Zweig `charmed`). Die Option übergibt ausschließlich Love Shot; Listen ohne die Option sind unverändert.
+* **Abgrenzung / Beobachtung (nicht geändert):** Der Besitzer eines abgegebenen Helden kann mit diesem Helden heute weiter normal wirken (`own` und `doPlaySpell` prüfen `heroSideOf` nicht; für Surprises gilt dagegen „Der Besitzer setzt an seinem abgegebenen Helden nichts", s. o.) — Frage an Al in der Abgabe W17d.
+
+Neue Repros `docs/niche-tests/repro/W17/d-s02-15-*.js` (Exit 0 = korrekt): eigener Held dauerhaft vom Gegner kontrolliert (`…-dauerhaft`) bzw. per Charme/Diebstahl (`…-charme`), Spiegel Sitz 1 + Gegenprobe Normalspiel (`…-spiegel-sitz1-und-gegenprobe-normalspiel`), Sperren/Abbruch/Zusatzaktion (`…-sperren-abbruch-zusatzaktion`).
