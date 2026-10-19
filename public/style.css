@@ -8192,7 +8192,6 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .reaction-chain-overlay {
   position: fixed;
   right: 82px;
-  transition: right .18s ease;
   bottom: 30%;
   z-index: 10040;
   display: flex;
@@ -8201,15 +8200,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   gap: 6px;
   pointer-events: none;
 }
-/* Tooltip rechts, Ketten-Anzeige links daneben: erscheint ein Hover-Tooltip, wandert die GANZE Anzeige links an ihn
-   heran (Tooltip-Breite + 8 px); verschwindet er, geht sie zurueck. Mit Token-Tooltip (steht links vom Haupt-
-   Tooltip, gleiche Breite) entsprechend eine Spalte weiter. */
-body:has(.board-tooltip) .reaction-chain-overlay {
-  right: calc(var(--tt-col-w, 360px) + 8px);
-}
-body:has(.board-tooltip-token) .reaction-chain-overlay {
-  right: calc(var(--tt-col-w, 360px) * 2 + 8px);
-}
+/* Die Ketten-Anzeige BLEIBT, wo sie ist, und liegt UEBER dem Hover-Tooltip (z-index 10040 gegen 9999) — Als Vorgabe 19.10.
+   Frueher rueckte sie links neben den Tooltip, sobald einer stand. Hovert man dann eine Chain-Karte, wanderte sie durch IHREN
+   eigenen Tooltip nach links, der Zeiger lag nicht mehr auf ihr, der Tooltip verschwand, sie sprang zurueck, man hoverte sie
+   wieder, usw. — ein Flackern. Jetzt gibt es keine Abhaengigkeit mehr vom Tooltip. */
 .reaction-chain-label {
   font-size: 11px;
   color: var(--accent);
@@ -10797,9 +10791,8 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   overflow-y: auto;
   font-size: 14px;
 }
-/* When chain is visible, shift tooltip to the left of the chain panel */
-/* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige weicht ihm aus (siehe `.reaction-chain-overlay` weiter
-   unten: solange ein Tooltip steht, rueckt sie links neben ihn, danach zurueck). */
+/* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige liegt ueber ihm (siehe `.reaction-chain-overlay`, sie weicht
+   nicht mehr aus). */
 
 /* In battle / puzzle-player mode the player's hand strip
   (`.game-hand-me`, z-index 10000) renders ABOVE the tooltip
@@ -17193,9 +17186,6 @@ body:has(.textbox-overlay) .tooltip {
      `.board-tooltip > div:last-child { display: none }` ist RAUS.) */
   .board-tooltip img { max-width: 100%; }
   .board-tooltip-token { display: none !important; }
-  /* Schmaler Tooltip (240px) → die Ketten-Anzeige rueckt entsprechend weniger. */
-  body:has(.board-tooltip) .reaction-chain-overlay { right: calc(240px + 8px); }
-
   /* Scale down status/buff/immune icons */
   .status-badge { width: 12px !important; height: 12px !important; font-size: 7px !important; }
   .buff-icon { width: 14px !important; height: 14px !important; font-size: 8px !important; }
@@ -26176,3 +26166,81 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 }
 .tt-stufe-aktiv .tt-nummer { background: rgb(255, 226, 110); color: #1a1408; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .3), 0 0 0 1px var(--pp-kontur); }
 .tt-stufe-aus { opacity: .6; filter: grayscale(.8); }   /* wie im Kartenbild: nicht zu dunkel (Als Befund 19.10.) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   HAUPTMENUE: ACTIVE DECK UND DECKLISTE (Als Vorgabe 19.10.)
+
+   „Das Active Deck im Hauptmenue sollte etwas mehr gehighlightet sein und
+   die Scrollbar bei den eigenen Decks sollte etwas prominenter sein."
+
+   • Aktive Kachel (oben das „Active Deck" UND die markierte Zeile in der
+     Liste): staerkere Toenung mit Raster, 3 px Kante in der vollen
+     Spielerfarbe, breiterer Farbbalken links, Schein ringsum, der Name
+     weiss mit Pixelschatten; die Marke „● ACTIVE" ist ein gefuelltes
+     Schild in der Spielerfarbe statt blasser Schrift.
+   • Scrollbar der Deckliste (`.menu-side-scroll`): 20 statt 14 px, dunklere
+     Schiene mit Kontur, groesserer Griff mit kraeftigem Farbton, 3 px
+     Kontur und breiten Griffrillen. Nur diese Liste; die uebrigen Leisten
+     behalten die allgemeine Pixel-Scrollbar (s. „Scrollbars" oben).
+   ═══════════════════════════════════════════════════════════════════ */
+.main-menu-screen .menu-deck-card.is-active {
+  border: 3px solid var(--player-color, #00f0ff);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--player-color, #00f0ff) 40%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #00f0ff) 17%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 9px 0 0 var(--player-color, #00f0ff),
+    inset 0 -3px 0 rgba(0, 0, 0, .35),
+    0 0 20px color-mix(in srgb, var(--player-color, #00f0ff) 50%, transparent);
+}
+.main-menu-screen .menu-deck-card.is-active .menu-deck-name {
+  color: #fff;
+  text-shadow: 2px 2px 0 #000, 0 0 12px color-mix(in srgb, var(--player-color, #00f0ff) 65%, transparent);
+}
+.main-menu-screen .menu-deck-card.is-active .menu-deck-flag {
+  padding: 2px 5px;
+  background: var(--player-color, #00f0ff);
+  color: #05040a;
+  text-shadow: none;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 rgba(255, 255, 255, .45), inset -2px -2px 0 rgba(0, 0, 0, .3);
+}
+.main-menu-screen .menu-deck-card.is-active.is-editable:hover {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--player-color, #00f0ff) 50%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #00f0ff) 24%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 9px 0 0 var(--player-color, #00f0ff),
+    0 0 26px color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent);
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .menu-side-scroll::-webkit-scrollbar { width: 20px; }
+  .menu-side-scroll::-webkit-scrollbar-track {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+      color-mix(in srgb, var(--player-color, var(--accent)) 10%, #05040a);
+    box-shadow: inset 0 0 0 2px var(--pp-kontur), inset 4px 4px 0 rgba(0, 0, 0, .55);
+  }
+  .menu-side-scroll::-webkit-scrollbar-thumb {
+    background:
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% calc(50% - 6px) / 10px 3px no-repeat,
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% 50% / 10px 3px no-repeat,
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% calc(50% + 6px) / 10px 3px no-repeat,
+      color-mix(in srgb, var(--player-color, var(--accent)) 82%, #fff);
+    border: 3px solid var(--pp-kontur);
+    box-shadow: inset 3px 3px 0 rgba(255, 255, 255, .6), inset -3px -3px 0 rgba(0, 0, 0, .38);
+    min-height: 48px;
+  }
+  .menu-side-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--player-color, var(--accent)) 55%, #fff);
+  }
+}
+@supports not selector(::-webkit-scrollbar) {
+  .menu-side-scroll { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--player-color, var(--accent)) 82%, #fff) #05040a; }
+}
