@@ -1,5 +1,6 @@
 'use strict';
 // H04-14 · „At the end of your turn"-Heldeneffekte laufen NACH dem Ablauf von Frost/Betäubung/Negation des eigenen Zuges  [Stufe C, Querschnitt]
+// W16f: Al hat in Welle 3 entschieden: Ist-Zustand GEWOLLT (FIXES-WELLE-3.md) - das Repro prüft jetzt diese Regel.
 //
 // Beispiel Sett, the Adept of Necromancy: „At the end of your turn, send all Creatures in this Hero's Support Zones that were not summoned this turn to the discard pile."
 // Engine-Regel: Frozen/Stunned/Negated schalten Heldeneffekte stumm (`_isHeroEffectSilenced`, Hook-Verteiler `runHooks`); Sett setzt kein `bypassStatusFilter`.
@@ -28,7 +29,9 @@ const H = require('../../lib/h.js');
   R.check('Kontrolle: gesunder Sett räumt seine alte Kreatur am Zugende ab', norm.kreaturNoch === false, norm);
   for (const st of ['frozen', 'stunned', 'negated']) {
     const o = await lauf(st);
-    R.check(`Sett ${st} über den ganzen Zug (vor dem Zugende stumm: ${o.stummVorZugende}): Zugende-Klausel bleibt stumm, die Kreatur bleibt`, o.stummVorZugende === true && o.kreaturNoch === true, o);
+    // W16f (Al, Welle 3: "End-of-turn-Trigger nach Frozen/Stunned dürfen feuern, nachdem der Status abgelaufen ist -> Ist-Zustand gewollt"):
+    // Erwartung umgestellt - der Status läuft vor den Zugende-Hooks ab, die Klausel feuert, die alte Kreatur wird abgeräumt.
+    R.check(`Sett ${st} über den ganzen Zug (vor dem Zugende stumm: ${o.stummVorZugende}): Status läuft vor den Zugende-Hooks ab, die Klausel feuert (Welle 3: gewollt)`, o.stummVorZugende === true && o.kreaturNoch === false, o);
   }
   const sb = await lauf('negated', { sourceBound: true });
   R.check('Gegenprobe: quellgebundene Negation (läuft nicht ab) hält Sett still', sb.kreaturNoch === true, sb);

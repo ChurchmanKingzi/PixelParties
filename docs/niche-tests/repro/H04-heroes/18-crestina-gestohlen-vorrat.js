@@ -37,8 +37,10 @@ const H = require('../../lib/h.js');
   t.grantFor(1, 1, 'Fireball'); t.targetFn = tgt(0, 1);
   t.gs.currentPhase = 3; t.gs.players[1]._actionsThisTurn = 0;
   const b2 = t.hp(0, 1);
+  // W16f: Messfehler behoben - der Vorrat wird VOR dem Ausspielen gelesen (nach erfolgreichem Spielen ist die Karte verbraucht, der Vorrat leer).
+  const vorratVorSpiel = t.gs.players[1].creationZone.slice();
   const r = await t.run(() => t.host.doPlaySpell(t.room, 1, { cardName: 'Fireball', handIndex: 0, heroIdx: 1, fromCreation: true }));
-  R.check('(b) Dieb hat gesucht (Vorrat belegt, Zug verzichtet)', t.gs.players[1].creationZone.length === 1 && t.gs._skipResourceDraw === true, t.gs.players[1].creationZone);
+  R.check('(b) Dieb hat gesucht (Vorrat belegt, Zug verzichtet)', vorratVorSpiel.length === 1 && t.gs._skipResourceDraw === true, vorratVorSpiel);
   R.check('(b) Dieb kann die gesuchte Vorratskarte spielen', r === true && t.hp(0, 1) < b2, { r, schaden: b2 - t.hp(0, 1), usable: t.engine.isCreationZoneUsable(1) });
   R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   R.finish();

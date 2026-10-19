@@ -88,6 +88,19 @@ module.exports = {
       });
       await engine._delay(150);
 
+      // W16f (M01-14): "The target's CONTROLLER must delete a card ..." - Kontrolle statt Brettseite (gestohlene Kreatur, übernommener
+      // Held). Vor dem Schaden bestimmt, weil das Ziel dabei sterben kann.
+      let sperrSeite = tgtOwner;
+      if (target.type === 'hero') {
+        sperrSeite = engine.kontrolleurVonHeld(tgtOwner, tgtHeroIdx);
+      } else {
+        const _ziel = target.cardInstance || engine.cardInstances.find(c =>
+          c.owner === tgtOwner && c.zone === 'support' &&
+          c.heroIdx === tgtHeroIdx && c.zoneSlot === target.slotIdx
+        );
+        if (_ziel) sperrSeite = _ziel.controller ?? _ziel.owner;
+      }
+
       // Deal ATK damage
       let negated = false;
 
@@ -121,7 +134,7 @@ module.exports = {
 
       // Apply Itemlock to target's controller (not on turn 1)
       if ((gs.turn || 1) > 1 && !negated) {
-        const oppIdx = tgtOwner;
+        const oppIdx = sperrSeite;
         const oppPs = gs.players[oppIdx];
         if (oppPs) {
           // ── "A player can only be affected by this effect every other

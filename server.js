@@ -7239,8 +7239,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       ps.abilityZones[heroIdx] = abZones;
       (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
       room.engine.notePlayedFromHand(pi);
-      if (!ps.abilityGivenThisTurn) ps.abilityGivenThisTurn = [];
-      ps.abilityGivenThisTurn[heroIdx] = true;
+      room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
       room.engine.log('ability_attached', {
         player: ps.username, card: cardName, hero: hero.name, zone: 'ability',
       });
@@ -7255,8 +7254,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     room.engine._trackCard(cardName, pi, 'support', heroIdx, ziel);
     (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
     room.engine.notePlayedFromHand(pi);
-    if (!ps.abilityGivenThisTurn) ps.abilityGivenThisTurn = [];
-    ps.abilityGivenThisTurn[heroIdx] = true;
+    room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
     room.engine.log('ability_attached', {
       player: ps.username, card: cardName, hero: hero.name, zone: 'support',
     });
@@ -7294,8 +7292,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     ps.abilityZones[heroIdx] = abZones;
     (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
     room.engine.notePlayedFromHand(pi);
-    if (!ps.abilityGivenThisTurn) ps.abilityGivenThisTurn = [];
-    ps.abilityGivenThisTurn[heroIdx] = true;
+    room.engine.verbraucheAbilityAnlegen(pi, heroIdx);   // W16f (H04-20): Standardplatz zuerst, sonst Zusatzplatz (Divine Gift of Skill) + Blessed-Buff - auch beim Anlegen in Support Zones (Xal)
     room.engine.log('ability_attached', {
       player: ps.username, card: cardName,
       hero: hero.name, zone: 'support',

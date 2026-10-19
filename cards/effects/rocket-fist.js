@@ -24,6 +24,8 @@
 const CARD_NAME = 'Rocket Fist';
 
 module.exports = {
+  requiresTarget: true,
+  // ^ W16f (M02-04): Blinded-Sperre (wie Quick Attack) - die Karte wählt Ziele ("Choose a target" / "Choose up to 2 Heroes").
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
   // Negation spielt die Engine diese Bilder, damit der abgewehrte
   // Zauber sichtbar bleibt.

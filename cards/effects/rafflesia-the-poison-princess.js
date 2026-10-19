@@ -116,6 +116,7 @@ module.exports = {
 
       if ((ctx.heroOwner ?? ctx.casterIdx) !== feld || ctx.heroIdx !== heroIdx) return;
       if (gs.currentPhase !== 3) return; // Action Phase only
+      if (gs.activePlayer !== pi) return;   // W16f (H03-11): "during YOUR Action Phase" - nicht im Gegnerzug (Reaktion)
 
       const hoptKey = heldenSperreKey(HOPT_KEY, pi);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;

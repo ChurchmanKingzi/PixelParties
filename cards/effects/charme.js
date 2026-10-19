@@ -161,7 +161,7 @@ module.exports = {
       // Lv1: opponent must have activatable abilities
       // During Main Phase: free-activation abilities
       // During Action Phase: action-cost abilities
-      const abilities = _getOpponentActivatableAbilities(gs, pi, engine);
+      const abilities = _getOpponentActivatableAbilities(gs, pi, engine, { heroIdx, heroOwner: feld });
       if (isMainPhase) return abilities.some(a => a.isFree);
       if (isActionPhase) return abilities.some(a => !a.isFree);
       return false;
@@ -194,7 +194,7 @@ module.exports = {
 //  LEVEL 1: Copy-activate opponent's ability
 // ═══════════════════════════════════════════
 
-function _getOpponentActivatableAbilities(gs, pi, engine) {
+function _getOpponentActivatableAbilities(gs, pi, engine, host = null) {
   const oi = opponentOfGs(gs, pi);
   const ops = gs.players[oi];
   const results = [];
@@ -271,6 +271,9 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
             // Prüfung still abgeschaltet — genau die Falle, die in
             // dieser Sitzung mehrfach zugeschlagen hat.
             cardName: abName,
+            // W16f (M01-15): Gate-Kontext des Ausleihers - die geliehene Ability gilt als an DIESEM Helden liegend; Gates, die den
+            // Helden lesen (Infiltration, Necromancy, ...), fanden sonst keinen und verneinten immer.
+            ...(host ? { cardHeroIdx: host.heroIdx, cardHeroOwner: host.heroOwner } : {}),
           };
           erlaubt = gate.call(script, ctx, slot.length) !== false;
         } catch { erlaubt = true; }
@@ -283,7 +286,7 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
 }
 
 async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops, feld = pi) {
-  const allAbilities = _getOpponentActivatableAbilities(gs, pi, engine);
+  const allAbilities = _getOpponentActivatableAbilities(gs, pi, engine, { heroIdx, heroOwner: feld });
   const isActionPhase = gs.currentPhase === 3;
   // During Action Phase: only action-cost abilities; during Main Phase: only free abilities
   const abilities = isActionPhase

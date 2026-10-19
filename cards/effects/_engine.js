@@ -3326,8 +3326,12 @@ class GameEngine {
         if ((c.zone === 'hero' || _istHeldenTraeger)
             && !loadCardEffect(c.name)?.bypassStatusFilter
             && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
+        // W16f (M02-08): Skript-Flag `bypassStatusFilterOnLeave` - die Rücknahme eines Stempel-Bonus (Fighting-ATK) beim Abgang der EIGENEN Karte
+        // ist Buchführung und läuft in jedem Heldenzustand (sonst bliebe der Bonus einer nicht mehr vorhandenen Karte dauerhaft stehen).
         if (c.zone === 'ability'
             && !loadCardEffect(c.name)?.bypassStatusFilter
+            && !(hookName === 'onCardLeaveZone' && hookCtx.leavingCard && hookCtx.leavingCard.id === c.id
+                 && loadCardEffect(c.name)?.bypassStatusFilterOnLeave)
             && this._isHeroAbilityPassiveSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
@@ -8283,6 +8287,8 @@ class GameEngine {
     // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
     if (this.gs && this.gs._moniaShieldActive != null) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; }
+    // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
+    if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
 
   /**
@@ -20881,8 +20887,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   isCreationZoneUsable(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.creationZone || []).length === 0) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
+    // W16f (H04-18): "While YOU control this Hero" - Kontrolle statt Spalte: ein gestohlener Crestina öffnet den Vorrat des Diebs,
+    // nicht mehr den des Besitzers.
+    for (const { hero } of this.heroesControlledBy(playerIdx)) {
       if (hero?.name !== CRESTINA_ASCENDED) continue;
       // tot — ausser `opts.schadensberechnung` und der Tod ist im laufenden
       // Flaechenschlag nur vorgemerkt (Todes-Aufschub 28.9.)

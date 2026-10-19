@@ -9,6 +9,8 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  requiresTarget: true,
+  // ^ W16f (M02-04): Blinded-Sperre (wie Quick Attack) - die Karte wählt Ziele ("Choose a target" / "Choose up to 2 Heroes").
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
