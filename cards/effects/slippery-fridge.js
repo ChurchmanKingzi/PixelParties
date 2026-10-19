@@ -17,7 +17,7 @@
 //  Support Zone (slots 0–2, not island zones).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heroCanBeEquipped } = require('./_hooks');
 
 const { loadCardEffect } = require('./_loader');
 const { getCardDB: _getCardDB } = require('./_card-db');
@@ -47,6 +47,19 @@ function _isEquipInstance(inst) {
   const cd = cardDB[inst.name];
   if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
   return false;
+}
+
+/**
+ * W16e (F03-08): darf `inst` an Held `hi` (Brettseite `seite`)? Die Karte, die umgehaengt wird, zaehlt dabei nicht mit — Grenzen wie
+ * "You can only have 1 X equipped to your Heroes" (Future Tech Gear, The Stormblade; `kopienAnKontrolliertenHelden` zaehlt Karten im
+ * Support) duerfen das Verschieben der einzigen Kopie nicht verbieten ("nur eine ANLEGE-Sperre"). Deshalb ist sie waehrend der Pruefung
+ * kurz aus der Support-Zone ausgeklammert.
+ */
+function darfAn(engine, inst, seite, hi) {
+  const zone = inst.zone;
+  inst.zone = '_umhaengen';
+  try { return engine.canEquipCardToHero(inst.name, seite, hi, engine.ausruestOpts(inst)); }
+  finally { inst.zone = zone; }
 }
 
 // ─── ZONE HELPERS ────────────────────────
@@ -311,6 +324,10 @@ module.exports = {
         if (hi === srcHeroIdx) continue;
         const hero = ps.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
+        // W16e (F03-08): Ausruestregeln gelten auch fuer das Umhaengen — gefrorene/besiegte Helden (`heroCanBeEquipped`) und die Grenzen
+        // des Skripts (`canEquipToHero`: "1 Wanted Poster je Held", Vampiric Sword, Crusader's, Race Boats …) wie beim Handweg.
+        if (!heroCanBeEquipped(hero)) continue;
+        if (!darfAn(engine, inst, equipOwner, hi)) continue;
         const freeZones = freieZonenVon(equipOwner, hi);
         for (const si of freeZones) {
           destTargets.push({
