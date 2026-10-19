@@ -21,7 +21,7 @@ const H = require('../../lib/h.js');
   await t.run(() => t.engine.actionPromptForceDiscard(0, 2, { source: 'Test', selfInflicted: true }));
   R.check('Gegenprobe actionPromptForceDiscard(2): Bunny zieht 1', t.pile(0, 'hand').length === h0 - 2 + 1, { vorher: h0, nachher: t.pile(0, 'hand').length });
 
-  t = await H.fresh({ hand: [[H.INERT.filler, H.INERT.filler, H.INERT.filler], []], deck: [['Cute Phoenix', 'Cute Hydra', ...deck()], []] });
+  t = await H.fresh({ hand: [[H.INERT.filler, H.INERT.filler, H.INERT.filler], []], deck: [[H.INERT.creature, 'Cute Phoenix', 'Cute Hydra', ...deck()], []] });   // W16c: Füller OBEN – Bunnys Zug (nach den 2 Abwürfen, vor der Suche) soll keine der beiden Suchkarten wegziehen
   t.put(0, 0, 0, 'Cute Bunny'); const dog = t.put(0, 0, 1, 'Cute Dog'); dog.turnPlayed = 0; wahl(t);
   t.script.push({ match: d => d.type === 'cardGalleryMulti', answer: (d) => ({ selectedCards: d.cards.slice(0, 2).map(c => c.name) }) });
   const h1 = t.pile(0, 'hand').length;

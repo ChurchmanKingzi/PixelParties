@@ -323,6 +323,25 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     return false;
   }
 
+  // W16c (A05-20): Schutzkarten (Winged Skeleton: "chosen by an opponent's card ... negate") lesen `beforeCreatureAffected` ('move') -
+  // dieser Brett->Hand-Weg macht rohe Zonen-Splices und umgeht `actionMoveCard`, das den Haken sonst feuert.
+  if (zone === 'support' && !engine.isTokenCard?.(targetInst)) {
+    const cdAff = engine.getEffectiveCardData?.(targetInst) || engine._getCardDB()[cardName];
+    if (cdAff && require('./_hooks').hasCardType(cdAff, 'Creature')) {
+      const affCtx = {
+        creature: targetInst, effectType: 'move',
+        source: { name: sourceName, owner: pi },
+        cancelled: false, _skipReactionCheck: true,
+      };
+      await engine.runHooks('beforeCreatureAffected', affCtx);
+      if (affCtx.cancelled) {
+        engine.log('steal_to_hand_blocked', { card: cardName, by: sourceName, reason: 'creature protection' });
+        engine.sync();
+        return false;
+      }
+    }
+  }
+
   // Defending the Gate — the Surprise that shields a side's Support
   // Zone cards. Any effect that moves a Support-Zone card off the
   // board must trigger + honour it (the engine's actionDestroyCard /
@@ -394,7 +413,9 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
     engine.sync();
     return true;
   }
-  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett' });
+  // W16c (A05-13): die Herkunft wird auch als Hand-PLATZ-Marke gesetzt (`originalOwner`-Option) - der Abwurf/Spielweg liest zuerst den Platz,
+  // erst danach die Instanz; ohne die Platzmarke landete eine dauerhaft uebernommene Fremdkreatur in der Ablage des Uebernehmers.
+  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett', originalOwner: engine.kartenBesitzerVon(targetInst) });
   // W3 (Al 14.10.2026): die Karte bleibt Eigentum ihres PERMANENTEN Besitzers (nicht der Brettseite, auf der sie gerade liegt).
   newInst.originalOwner = engine.kartenBesitzerVon(targetInst);
 

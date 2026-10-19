@@ -118,6 +118,16 @@ module.exports = {
     onDeathBenefit: 0,
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, "does not trigger on-summon effects"): "cannot be Frozen" ist eine Dauereigenschaft,
+  // kein On-Summon-Effekt - sie gehoert auch der wiederbelebten Karte (Konvention `onRevive`, wie Doomed Town Guards Schirm).
+  onRevive(ctx) {
+    const inst = ctx.card;
+    if (!inst || inst.zone !== 'support') return;
+    if (!inst.counters) inst.counters = {};
+    inst.counters.freeze_immune = 1;
+    inst.counters._hasHaste = true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const inst = ctx.card;

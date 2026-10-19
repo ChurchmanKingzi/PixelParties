@@ -34,6 +34,7 @@
 // ═══════════════════════════════════════════
 
 const { kontrolliert } = require('./_double-shared');
+const { schoolLevelMitSupport } = require('./_cute-shared');   // W16c (A04-29)
 
 const CARD_NAME = 'Cute Familiar';
 const REQUIRED_CHARME = 2;
@@ -73,7 +74,7 @@ function eligibleCharmeHeroes(engine, pi) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
     if (h._actionLockedTurn === gs.turn) continue;
-    if (engine.heroSchoolLevel('Charme', pi, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
+    if (schoolLevelMitSupport(engine, 'Charme', pi, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
     out.push(hi);
   }
   return out;
@@ -92,7 +93,7 @@ function eligibleReviveHosts(engine, pi) {
   for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     const hps = engine.gs.players[physOwner];
-    if (engine.heroSchoolLevel('Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
+    if (schoolLevelMitSupport(engine, 'Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
     const sup = hps.supportZones?.[hi] || [];
     if (!sup.some(slot => (slot || []).length === 0)) continue;
     out.push({ owner: physOwner, heroIdx: hi });
@@ -181,7 +182,7 @@ module.exports = {
     } else {
       const zones = heroes.map(hi => ({
         heroIdx: hi, slotIdx: -1,
-        label: `${ps.heroes[hi].name} (Charme ${engine.heroSchoolLevel('Charme', pi, hi)})`,
+        label: `${ps.heroes[hi].name} (Charme ${schoolLevelMitSupport(engine, 'Charme', pi, hi)})`,
       }));
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -394,7 +395,22 @@ module.exports = {
       // Pop from discard pile array (the dead Familiar) and untrack
       // the parker before placing.
       // v1389: Bausteine der EINEN Ablage-Stelle (eigene Inszenierung).
-      const ab = await engine.ablageEntnahme(pi, pi, CARD_NAME, { source: CARD_NAME });
+      let ab = await engine.ablageEntnahme(pi, pi, CARD_NAME, { source: CARD_NAME });
+      // W16c (A04-18): Hat Wildur die Leiche auf den Coolness Stack umgeleitet (sie war nie in der Ablage), ist die
+      // obenauf liegende Kadaver-Kopie die Karte, die zurueckkehrt (wie bei der Phoenix-Wiederbelebung, A04-17).
+      let vomStack = false;
+      if (!ab) {
+        // Der Kadaver liegt nicht zwingend oben (Wowhalla legt am Zugende noch eine Karte darauf) - wie Thrysh:
+        // eine beliebige Kopie des Namens aus dem Stapel nehmen, die Kadaver-Instanz abraeumen.
+        const kadaver = engine.findCards({ owner: pi, zone: 'coolnessStack', name: CARD_NAME }).find(c => c._wildurKadaver);
+        const si = ps.coolnessStack.lastIndexOf(CARD_NAME);
+        if (kadaver && si >= 0) {
+          ps.coolnessStack.splice(si, 1);
+          engine._untrackCard(kadaver.id);
+          engine._broadcastEvent('coolness_stack_change', { owner: pi, mode: 'pop', card: CARD_NAME, dest: 'board' });
+          ab = { name: CARD_NAME, pileOwner: pi, idx: -1, lethe: 0 }; vomStack = true;
+        }
+      }
       engine._untrackCard(ctx.card.id);
       if (!ab) return;
 
@@ -404,9 +420,13 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): Feldseite = Held, Kontrolle = `pi`.
       const placeRes = engine.safePlaceInSupport(CARD_NAME, chosen.owner, chosen.heroIdx, chosen.slotIdx,
         chosen.owner !== pi ? { controller: pi } : {});
-      if (!placeRes) { engine.ablageRueckgabe(ab); return; }
+      if (!placeRes) {
+        if (vomStack) { ps.coolnessStack.push(CARD_NAME); engine._trackCard(CARD_NAME, pi, 'coolnessStack'); engine.sync(); }
+        else engine.ablageRueckgabe(ab);
+        return;
+      }
       const { inst, actualSlot } = placeRes;
-      const ablageExtras = engine.ablageLandung(inst, ab, 'place');
+      const ablageExtras = vomStack ? {} : engine.ablageLandung(inst, ab, 'place');
 
       engine._broadcastEvent('summon_effect', {
         owner: chosen.owner, heroIdx: chosen.heroIdx, zoneSlot: actualSlot, cardName: CARD_NAME,

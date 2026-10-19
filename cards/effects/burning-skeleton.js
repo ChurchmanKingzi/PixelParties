@@ -111,6 +111,15 @@ module.exports = {
         && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx,
       );
       if (inst) {
+        // W16c (A05-20): Schutzkarten ("when a Creature is chosen by an opponent's card" - Winged Skeleton) lesen `beforeCreatureAffected`;
+        // gleiche Bauform wie Grunge Harpyformer / Unwanted Audience.
+        const hookCtx = {
+          creature: inst, effectType: 'status',
+          source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+          cancelled: false, _skipReactionCheck: true,
+        };
+        await engine.runHooks('beforeCreatureAffected', hookCtx);
+        if (hookCtx.cancelled) { engine.sync(); return true; }
         const applied = await engine.applyCreatureStatus(inst, 'burned', {
           sourceOwner: pi,
           source: CARD_NAME,

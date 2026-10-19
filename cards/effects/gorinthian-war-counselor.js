@@ -53,15 +53,16 @@ const CARD_NAME = 'Gorinthian War Counselor';
 const NEEDED_DISTINCT = 2;
 const STUN_TURNS = 2;
 
-/** Bis zu welchem Zug schuetzt ein jetzt gesetzter Merker? */
-function shieldUntil(engine) {
-  return (engine.gs.turn || 0) + STUN_TURNS;
-}
-
-/** Traegt dieses Ziel einen noch gueltigen Gorinthian-Merker? */
+/**
+ * W16c (A06-14, A06-28): "Any damage targets Stunned BY THIS EFFECT would take becomes 0" - der Schutz haengt an der tatsaechlich liegenden
+ * Betaeubung, die dieser Effekt gesetzt hat (Status `appliedByCard`): er endet mit ihr (Ablauf nach 2 Zuegen, vorzeitiges Heilen) und
+ * entsteht nie, wenn die Betaeubung abgewehrt wurde. Vorher: ein Zug-Stempel `gs.turn + 2`, der einen Zug VOR der Betaeubung endete.
+ */
 function isShielded(engine, bag) {
-  const until = bag?._gorinthianStun;
-  return typeof until === 'number' && (engine.gs.turn || 0) <= until;
+  if (!bag) return false;
+  // Held: `statuses.stunned` traegt `appliedByCard`; Kreatur (counters): `stunned` + `stunnedAppliedByCard`.
+  if (bag.statuses) return !!bag.statuses.stunned && bag.statuses.stunned.appliedByCard === CARD_NAME;
+  return !!bag.stunned && bag.stunnedAppliedByCard === CARD_NAME;
 }
 
 module.exports = {
@@ -124,21 +125,18 @@ module.exports = {
     });
     await engine._delay(420);
 
-    const until = shieldUntil(engine);
+    const until = (gs.turn || 0) + STUN_TURNS;   // nur fuers Log; der Schutz liest die liegende Betaeubung (`isShielded`)
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero || !(hero.hp > 0)) return false;
       await engine.addHeroStatus(target.owner, target.heroIdx, 'stunned', {
-        duration: STUN_TURNS, appliedBy: pi,
+        duration: STUN_TURNS, appliedBy: pi,   // `appliedByCard` setzt die Engine aus der laufenden Effektquelle
       });
-      hero._gorinthianStun = until;
     } else if (target.cardInstance) {
       const applied = await engine.applyCreatureStatus(target.cardInstance, 'stunned', {
         sourceOwner: pi, duration: STUN_TURNS, source: CARD_NAME,
       });
       if (!applied) return false;
-      if (!target.cardInstance.counters) target.cardInstance.counters = {};
-      target.cardInstance.counters._gorinthianStun = until;
     } else {
       return false;
     }
@@ -159,7 +157,7 @@ module.exports = {
       const engine = ctx._engine;
       const target = ctx.target;
       if (!target || target.hp === undefined) return;
-      if (!isShielded(engine, target)) return;
+      if (!isShielded(engine, target)) return;   // Held-Objekt (`statuses`)
       ctx.setAmount(0);
       engine._broadcastEvent('play_damage_zero', {
         owner: engine._findHeroOwner?.(target) ?? -1,

@@ -198,6 +198,7 @@ module.exports = {
      * keeps the redirect path symmetrical with Vacarn's hero hook.
      */
     onCardLeaveZone: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): Dauereffekt der AUSLIEGENDEN Area - die Handkopie reagiert nicht
       // Filter:
       //   • leaving from support → discard.
       //   • leaving creature is owned by Bonegrinder's controller.
@@ -209,9 +210,11 @@ module.exports = {
       if (!leaving) return;
       if (leaving._redirectToDeleted) return;
       const myController = ctx.cardController ?? ctx.cardOwner;
-      const targetController = leaving.controller ?? leaving.owner;
-      if (targetController !== myController) return;
       const engine = ctx._engine;
+      // W16c (A05-17): "YOUR discard pile" - gemeint ist die Ablage, in die das Skelett geht: die seines (permanenten) BESITZERS
+      // (Ruling "Gestohlene Karten gehen in die Ablage ihres Besitzers"), nicht die seines Kontrolleurs.
+      const targetController = engine.kartenBesitzerVon(leaving);
+      if (targetController !== myController) return;
       if (!isSkeletonCreature(leaving.name, engine)) return;
 
       // Per-turn cap on this Bonegrinder instance.
@@ -267,6 +270,7 @@ module.exports = {
      * pile arrays ourselves.
      */
     onDiscard: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): nur die ausliegende Area, nicht die Handkopie
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;
       // Only react when the discard happened on the SAME side as
@@ -354,6 +358,7 @@ module.exports = {
      * sent to your discard pile") doesn't apply.
      */
     onMill: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;   // W16c (A05-16): nur die ausliegende Area, nicht die Handkopie
       if (ctx.deleteMode) return;
       const engine = ctx._engine;
       const myController = ctx.cardController ?? ctx.cardOwner;

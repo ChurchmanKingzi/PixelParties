@@ -160,7 +160,7 @@ module.exports = {
     // that side. Cross-side listeners use the same event payload and
     // re-target onto the same player; HOPT dedupes.
     onDiscard: async (ctx) => {
-      if (!ctx._fromHand) return;
+      if (!ctx._fromHand && !ctx._fromCoolnessStack) return;   // W16c (A04-07): "from anywhere" - auch von der Stack-Spitze
       if (ctx.discardedCardName !== CARD_NAME) return;
       if (ctx.playerIdx == null) return;
       await tryMillCuteCat(ctx._engine, ctx.playerIdx);

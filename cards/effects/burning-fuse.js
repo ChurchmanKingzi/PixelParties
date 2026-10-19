@@ -56,7 +56,8 @@ const ANIM_TYPE = 'bomblebee_fuse';
 // Counter traegt) NICHT zerstoert. (Frueher ausgeschlossen: Zaehler waere mit dem
 // Besiegen verloren gegangen.)
 function eligibleBomblebees(engine, pi) {
-  return findOwnBomblebees(engine, pi);
+  // W16c (A05-01): Text "that were not summoned this turn" - frisch beschworene Bomblebees feuern nicht und werden nicht besiegt.
+  return findOwnBomblebees(engine, pi, { excludeSummonedThisTurn: true });
 }
 
 async function runEffect(engine, pi) {

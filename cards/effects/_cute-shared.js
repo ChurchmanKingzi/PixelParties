@@ -91,4 +91,18 @@ function isCuteCreatureInst(engine, inst) {
   return false;
 }
 
-module.exports = { hasCuteInName, isCuteCreatureCard, CUTE_WINGS, heroHasCuteWings, isCuteCreatureInst };
+/**
+ * W16c (A04-29): Stufe einer Schule am Helden INKLUSIVE der Ability-Stapel in seinen Support Zones (Xal) - wie
+ * `heroSchoolLevel` (harte Negierung -> 0), nur mit `heroSupportAbilityStacks` dazu (derselbe Griff wie
+ * `effectiveSchoolLevelForCaster`, ohne dessen Zauber-Overrides).
+ */
+function schoolLevelMitSupport(engine, school, seite, heroIdx) {
+  if (engine.heroAbilityLevelsBlanked(seite, heroIdx)) return 0;
+  const ps = engine.gs.players[seite];
+  return engine.countAbilitiesForSchool(school, [
+    ...(ps?.abilityZones?.[heroIdx] || []),
+    ...engine.heroSupportAbilityStacks(seite, heroIdx),
+  ]);
+}
+
+module.exports = { hasCuteInName, isCuteCreatureCard, CUTE_WINGS, heroHasCuteWings, isCuteCreatureInst, schoolLevelMitSupport };

@@ -166,6 +166,8 @@ module.exports = {
     // factoring in distinct deck names + hand size — so "Done" never
     // appears when a 2nd discard wouldn't actually help.
     let discarded = 0;
+    // W16c (A04-16): die Klick-Abwuerfe sind EIN Batch, damit Cute Bunny ("2 or more ... through an effect") reagiert.
+    await engine.withDiscardBatch(pi, { source: CARD_NAME }, async () => {
     while (discarded < maxN && (ps.hand || []).length > 0) {
       // Re-check distinct names after the first discard — an onDiscard
       // hook from the just-discarded card could in theory mill / move
@@ -199,6 +201,7 @@ module.exports = {
       discarded++;
       engine.sync();
     }
+    });   // end withDiscardBatch
 
     if (discarded === 0) return false; // mandatory first iteration didn't resolve
 

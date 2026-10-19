@@ -227,6 +227,9 @@ module.exports = {
     return true;
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, Zombified Assault, ...): die Verdopplung gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: (ctx) => resyncFromCtx(ctx),
+
   hooks: {
     // Bedingung UND Grundwert koennen sich bei jedem dieser Ereignisse
     // aendern — kein Filter auf die gespielte Karte, gerade FREMDE

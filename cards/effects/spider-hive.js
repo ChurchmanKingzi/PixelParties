@@ -46,8 +46,10 @@ module.exports = {
    * effective levels of Surprises in hand will show the reduction
    * too, which is harmless.
    */
-  reduceCardLevel(cardData, engine /*, ownerIdx, inst, heroIdx */) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst /*, heroIdx */) {
     if (!cardData) return 0;
+    // W16c (A05-28): Dauereffekt der AUSLIEGENDEN Area - die Kopie auf der Hand ('hand' ist nur fuer das Selbstlegen) senkt nichts.
+    if (inst && inst.zone !== 'area') return 0;
     if (cardData.subtype !== 'Surprise') return 0;
     if (!engine) return 0;
     const spiderCount = countSpiderCreaturesOnBoard(engine);

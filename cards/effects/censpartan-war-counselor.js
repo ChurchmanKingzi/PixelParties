@@ -200,6 +200,9 @@ module.exports = {
     return true;
   },
 
+  // W16c (A06-32): Wiederbelebung OHNE Hooks (Rewrite History, ...): der Schirm gleicht sich sofort ab, nicht erst am Zugende.
+  onRevive: (ctx) => resyncFromCtx(ctx),
+
   hooks: {
     // Der Schirm haengt am Feldzustand — nach jedem Ereignis, das ihn
     // aendern kann, neu ausrichten. Alle Hooks laufen ueber ALLE

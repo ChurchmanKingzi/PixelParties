@@ -29,6 +29,7 @@ async function szene(vorbereiten) {
   const a = await szene(async (t, mage) => { await t.run(() => t.engine.actionNegateCreature(mage, 'test')); });
   R.check('(a) negiertes Skeleton Mage zieht nicht über den Bard', a.plus === 0, { r: a.r, plus: a.plus });
   const b = await szene(async (t, mage) => { mage.turnPlayed = t.gs.turn; });
+  // W16c: (b) ist eine offene Regelfrage an Al (Welle 16, A05-19b) - das Verhalten bleibt unverändert, der Prüfpunkt bleibt bis zur Antwort rot.
   R.check('(b) diesen Zug beschworenes Skeleton Mage zieht nicht über den Bard (Summoning Sickness)', b.plus === 0, { r: b.r, plus: b.plus });
   R.finish();
 })();
