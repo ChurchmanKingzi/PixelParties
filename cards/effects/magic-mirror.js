@@ -191,12 +191,11 @@ module.exports = {
       } finally {
         delete gs._immediateActionContext;
         delete gs._magicMirrorBypassLevel;
-        // Move the synthetic instance to the user's discard (or deleted pile,
-        // depending on the card's own `_spellPlacedOnBoard` flag). Standard
-        // spells get discarded; placed-on-board ones handled themselves.
+        // Die synthetische Instanz ist eine KOPIE, keine Karte: sie verschwindet nach der Ausführung.
+        // ★ W16b (A01-pollution-15, Text „performs a copy of it"): sie landet NICHT in der Ablage des Spiegel-Besitzers
+        // (sonst Kartenvermehrung + Rückholfutter); das Original liegt in der Ablage seines Spielers. Auf dem Brett
+        // platzierte Kopien (`_spellPlacedOnBoard`) kümmern sich selbst um sich.
         if (!gs._spellPlacedOnBoard) {
-          const ps = gs.players[ownerIdx];
-          if (ps) ps.discardPile.push(sourceCard);
           engine._untrackCard(synthInst.id);
         } else {
           delete gs._spellPlacedOnBoard;
