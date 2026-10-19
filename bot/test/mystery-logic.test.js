@@ -81,3 +81,22 @@ test('Ausschnitt: klein beginnen, +1 je falschem Tipp, nach oben begrenzt; am Ra
   assert.deepEqual(m.cropRect(76, 51, { x: 2, y: 2 }, 12), { x: 0, y: 0, w: 12, h: 12 });
   assert.deepEqual(m.cropRect(76, 51, { x: 75, y: 50 }, 12), { x: 64, y: 39, w: 12, h: 12 });
 });
+
+test('Farbvarianten ([B]/[W]) sind EINE Karte: Tipp mit dem vollen Namen oder ohne Zusatz ist richtig, nie „mehrdeutig“', () => {
+  const variants = real.filter(c => /\[(B|W)\]$/.test(c.name));
+  assert.ok(variants.length >= 2, 'Testdaten enthalten Varianten');
+  for (const v of variants) {
+    assert.equal(m.judgeGuess(real, v, v.name).kind, 'correct', v.name);
+    assert.equal(m.judgeGuess(real, v, m.plainName(v.name)).kind, 'correct', m.plainName(v.name));
+  }
+  assert.equal(m.plainName('Rook of Kings [B]'), 'Rook of Kings');
+  assert.equal(m.plainName('Fireball'), 'Fireball');
+});
+
+test('judgeGuess: jede Karte des Spiels wird mit ihrem eigenen vollen Namen als richtig erkannt', () => {
+  for (const c of real) {
+    const v = m.judgeGuess(real, c, c.name);
+    assert.ok(v.kind === 'correct' || v.kind === 'ambiguous' && real.filter(x => x.name === c.name).length > 1, `${c.name}: ${v.kind}`);
+    assert.notEqual(v.kind, 'ambiguous', `${c.name} darf mit dem vollen Namen nie mehrdeutig sein`);
+  }
+});

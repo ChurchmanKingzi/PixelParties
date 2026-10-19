@@ -52,8 +52,8 @@ module.exports = function register(ctx) {
     if (!i.isButton() || i.customId !== 'rules:accept') return false;
     const member = i.member;
     try {
-      if (config.verifiedRoleId) await member.roles.add(config.verifiedRoleId, 'MoniaBot: Regeln bestätigt');
-      if (config.newcomerRoleId) await member.roles.remove(config.newcomerRoleId, 'MoniaBot: Regeln bestätigt');
+      if (config.verifiedRoleId) await member.roles.add(config.verifiedRoleId, 'MoniaBot: rules accepted');
+      if (config.newcomerRoleId) await member.roles.remove(config.newcomerRoleId, 'MoniaBot: rules accepted');
       await i.reply({ content: 'Thanks! Have a **cool** time! 😎', flags: MessageFlags.Ephemeral });
     } catch (err) {
       console.error('[rules]', err.message);

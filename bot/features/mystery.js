@@ -107,7 +107,7 @@ module.exports = function register(ctx) {
       if (!cur) return msg.reply('There is no active puzzle.');
       await db.kvSet(KEY.current, null);
       const next = await generate();
-      await msg.channel.send({ content: `⏭️ Skipped. The answer was **${cur.card}**.`, files: await reveal(cur), allowedMentions: { parse: [] } });
+      await msg.channel.send({ content: `⏭️ Skipped. The answer was **${mystery.plainName(cur.card)}**.`, files: await reveal(cur), allowedMentions: { parse: [] } });
       return next ? msg.channel.send(await puzzleMessage(next)) : msg.channel.send(await exhaustedText());
     }
 
@@ -135,19 +135,20 @@ module.exports = function register(ctx) {
     const verdict = mystery.judgeGuess(renderer.allCards(), target, rest);
 
     if (verdict.kind === 'unknown') return msg.reply('I don’t know a card like that — not counted.');
-    if (verdict.kind === 'ambiguous') return msg.reply(`That matches several cards (like **${verdict.best.name}**) — please be more specific. Not counted.`);
+    if (verdict.kind === 'ambiguous') return msg.reply(`That matches several cards (like **${mystery.plainName(verdict.best.name)}**) — please be more specific. Not counted.`);
 
     if (verdict.kind === 'wrong') {
-      if (cur.tried.includes(verdict.best.name)) return msg.reply({ content: `**${verdict.best.name}** was already guessed — not counted.`, allowedMentions: { parse: [] } });
+      const guessed = mystery.plainName(verdict.best.name);
+      if (cur.tried.includes(guessed)) return msg.reply({ content: `**${guessed}** was already guessed — not counted.`, allowedMentions: { parse: [] } });
       const n = (cur.guesses[msg.author.id] || 0) + 1;
       cur.guesses[msg.author.id] = n;
-      cur.tried.push(verdict.best.name);
+      cur.tried.push(guessed);
       await db.kvSet(KEY.current, cur);
       const next = mystery.reward(config.mysteryReward, config.mysteryPenalty, n);
       // Das Bild wird mit jedem falschen Tipp etwas größer — gleich das neue zeigen, sonst sieht es niemand.
       const rect = await rectFor(cur);
       const png = await ctx.renderQueue(() => renderer.renderArtCrop(cur.card, rect));
-      return msg.reply({ content: `❌ Not **${verdict.best.name}**. (Your wrong guesses on this card: ${n} → a win would pay ${next} SC.)\n🔍 The picture just zoomed out a bit:`,
+      return msg.reply({ content: `❌ Not **${guessed}**. (Your wrong guesses on this card: ${n} → a win would pay ${next} SC.)\n🔍 The picture just zoomed out a bit:`,
         files: png ? [attach(png, 'mystery.png')] : [], allowedMentions: { parse: [] } });
     }
 
@@ -166,7 +167,7 @@ module.exports = function register(ctx) {
         else { console.error('[mystery] SC-Buchung fehlgeschlagen:', err.message); scLine = `⚠️ I couldn’t pay out the ${amount} SC right now — please ping a moderator.`; }
       }
     }
-    await msg.reply({ content: `🎉 <@${msg.author.id}> got it: **${target.name}**! ${scLine}`, files: await reveal(cur), allowedMentions: { users: [msg.author.id] } });
+    await msg.reply({ content: `🎉 <@${msg.author.id}> got it: **${mystery.plainName(target.name)}**! ${scLine}`, files: await reveal(cur), allowedMentions: { users: [msg.author.id] } });
     const next = await generate();
     if (next) await msg.channel.send(await puzzleMessage(next, { intro: '▶️ Next one:' }));
     else await msg.channel.send(await exhaustedText());

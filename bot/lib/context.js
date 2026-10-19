@@ -32,7 +32,7 @@ function createContext({ client, config, db, game }) {
       if (c.staff && !staff) continue;
       lines.push((c.staff ? '🔒 ' : '') + c.help);
     }
-    lines.push('`[[Kartenname]]` — in einer Nachricht: zeigt die Karte', '`/bug` — Fehler melden');
+    lines.push('`[[card name]]` — anywhere in a message: shows the card (up to 3)', '`/bug` — report a bug in the game');
     return msg.reply({ content: '**MoniaBot**\n' + lines.join('\n'), allowedMentions: { parse: [] } });
   });
 
