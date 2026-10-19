@@ -148,6 +148,13 @@ module.exports = {
 
     // Final validation: slot still free + deck still contains the equip
     if (((zps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
+    // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT — Resistance des Trägers fängt es ab (vor jeder Kartenbewegung; die Ausrüstung bleibt im Deck, kein Mischen).
+    // Der Artefakt-Einsatz ist gespielt und verbraucht.
+    if (await engine.heroNonDamageEffectBlocked(seite, destHeroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) {
+      engine.log('treasure_hunters_backpack_blocked', { player: ps.username, equip: equipName, hero: zps.heroes[destHeroIdx]?.name });
+      engine.sync();
+      return true;
+    }
     const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_stillIdx) return { aborted: true };
     if (!zps.supportZones[destHeroIdx]) zps.supportZones[destHeroIdx] = [[], [], []];

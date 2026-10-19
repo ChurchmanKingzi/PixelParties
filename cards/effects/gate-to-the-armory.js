@@ -269,6 +269,9 @@ module.exports = {
         }));
       }
 
+      // ★ W15a (Al, R3 und Regel W14a Q5): das Direkt-Ausrüsten ist ein Effekt auf den Nutzer — Resistance fängt ihn ab; die Karte geht dann auf die Hand (Tutor-Teil bleibt).
+      if (direkt && await engine.heroNonDamageEffectBlocked(userSeite, heroIdx, 'equip', { sourceOwner: pi, source: CARD_NAME })) direkt = false;
+
       if (!kratesUmgebaut) {
       // Remove the chosen copy from its source pile.
       // Z6 (S02-22): ueber die Stapel-Schicht (Stapel-/Stab-/Eye-/Such-Sperre) statt eigenem Splice.

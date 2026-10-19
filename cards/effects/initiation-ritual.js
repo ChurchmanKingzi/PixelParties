@@ -158,6 +158,14 @@ module.exports = {
     const livingHero = ps.heroes[livingHeroIdx];
     if (!livingHero?.name || livingHero.hp <= 0 || targetSlot === undefined) return { aborted: true };
 
+    // ★ W15a (Al, R3 und Regel W14a Q5): das Anlegen des gefallenen Helden ist ein Effekt auf den lebenden Helden — Resistance fängt ihn ab (vor jeder Kartenbewegung;
+    // der Gefallene bleibt, wo er ist, seine Ability Zones werden nicht geleert). Der Artefakt-Einsatz ist gespielt.
+    if (await engine.heroNonDamageEffectBlocked(pi, livingHeroIdx, 'equip', { sourceOwner: pi, source: 'Initiation Ritual' })) {
+      engine.log('initiation_ritual_blocked', { player: ps.username, hero: livingHero.name, equipped: deadHeroName });
+      engine.sync();
+      return true;
+    }
+
     // ── Animation: card transfer from dead hero zone to support zone ──
     engine._broadcastEvent('play_card_transfer', {
       sourceOwner: pi, sourceHeroIdx: deadHeroIdx, sourceZoneSlot: -1,

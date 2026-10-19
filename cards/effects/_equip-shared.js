@@ -161,6 +161,9 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   const stapelBesitzer = (isSeat(engine, opts.stapelBesitzer)) ? opts.stapelBesitzer : pi;
   if (!istAusruestTraeger(engine, pi, heroIdx, cardName, seite, stapelBesitzer)) return null;
   if (((zps.supportZones[heroIdx] || [])[slot] || []).length > 0) return null;
+  // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT (Weapon Collecting Wight, Riffel, Looting …) ist ein Nicht-Schaden-Effekt auf den Träger — Resistance fängt ihn ab.
+  // Vor jeder Kartenbewegung gefragt: bei `true` bleibt die Karte im Stapel (Rückgabe `null` = nicht ausgerüstet, wie bei jedem anderen Fehlschlag).
+  if (await engine.heroNonDamageEffectBlocked(seite, heroIdx, 'equip', { sourceOwner: pi, source: opts.source })) return null;
   const genommen = await engine.takeFromPile(engine.gs.players[stapelBesitzer], stapel, cardName,
     { source: opts.source, ...(stapelBesitzer !== pi ? { sourceOwner: pi } : {}) });
   if (!genommen) return null;
