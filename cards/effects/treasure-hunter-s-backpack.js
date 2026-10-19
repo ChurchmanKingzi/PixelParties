@@ -206,6 +206,7 @@ module.exports = {
     });
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
+      _isEffectEquip: true,   // W16e (F03-21): per Effekt angelegt — Summoning Instructions: X = 1 ohne Frage
     });
 
     // ── Step 6: lock the chosen Hero out of acting THIS turn ──
