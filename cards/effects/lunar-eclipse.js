@@ -88,11 +88,27 @@ module.exports = {
   payActivationCost: async (engine, pi) => {
     const insts = ownLunaticCycleInsts(engine, pi);
     if (insts.length === 0) return false;
-    // Send the first one to discard. (All five moons satisfy the cost
-    // equally — no benefit to prompting which.)
-    await engine.actionMoveCard(insts[0], 'discard');
+    // W16c (A04-20): der Spieler waehlt, WELCHER Cycle geht (jede Phase hat einen anderen Nutzen; Golem/Hawk zaehlen
+    // verschiedene Cycles). Nur eine Auswahl, wenn es verschiedene Namen gibt; Abbruch = Kosten nicht bezahlt = keine Aktivierung.
+    let gewaehlt = insts[0];
+    if (new Set(insts.map(c => c.name)).size > 1) {
+      const zonen = insts.map(c => ({
+        owner: engine.physicalSide(c), heroIdx: c.heroIdx, slotIdx: c.zoneSlot,
+        label: `${c.name} (${engine.gs.players[engine.physicalSide(c)]?.heroes?.[c.heroIdx]?.name || 'Hero'})`,
+      }));
+      const wahl = await engine.promptGeneric(pi, {
+        type: 'zonePick', zones: zonen, title: CARD_NAME,
+        description: 'Choose the "Lunatic Cycle" card to send to the discard pile.',
+        cancellable: true, heroShortcut: false, previewCardName: CARD_NAME,
+      });
+      if (!wahl || wahl.cancelled) return false;
+      gewaehlt = insts.find(c => c.heroIdx === wahl.heroIdx && c.zoneSlot === wahl.slotIdx
+        && engine.physicalSide(c) === (wahl.owner ?? engine.physicalSide(c)));
+      if (!gewaehlt) return false;
+    }
+    await engine.actionMoveCard(gewaehlt, 'discard');
     engine.log('lunar_eclipse_cost', {
-      player: engine.gs.players[pi]?.username, sent: insts[0].name,
+      player: engine.gs.players[pi]?.username, sent: gewaehlt.name,
     });
     engine.sync();
     return true;

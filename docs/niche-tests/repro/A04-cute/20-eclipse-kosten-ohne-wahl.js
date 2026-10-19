@@ -16,11 +16,12 @@ const H = require('../../lib/h.js');
   t.put(0, 1, 0, 'Lunatic Cycle - New Moon'); t.put(0, 2, 0, 'Lunatic Cycle - Full Moon');
   t.targetFn = (v) => [v.find(x => x.type === 'hero' && x.owner === 0 && x.heroIdx === 0).id];
   // Der Eclipse-Besitzer möchte den FULL MOON opfern und den New Moon behalten – falls die Engine ihn danach fragt, wählt er so:
-  t.script.push({ match: d => /gallery|zonePick|cardPick|optionPicker/i.test(d.type) && /Lunatic|Eclipse/.test(JSON.stringify(d).slice(0, 400)), answer: (d) => ({ cardName: 'Lunatic Cycle - Full Moon', optionId: 'Lunatic Cycle - Full Moon' }) });
+  t.script.push({ match: d => /gallery|zonePick|cardPick|optionPicker/i.test(d.type) && /Lunatic|Eclipse/.test(JSON.stringify(d).slice(0, 400)), answer: (d) => ({ cardName: 'Lunatic Cycle - Full Moon', optionId: 'Lunatic Cycle - Full Moon', owner: 0, heroIdx: 2, slotIdx: 0 }) });   // W16c: Antwortform der Zonenwahl (Full Moon liegt bei Held 2, Slot 0)
   await t.play(1, 'Fireball', { hero: 0 });
   const abgelegt = t.pile(0, 'discardPile').filter(n => n.startsWith('Lunatic Cycle'));
   const fragen = t.prompts.filter(p => p.d.type !== 'confirm').length;
   R.note('abgelegte Cycles / Rückfragen außer Ja-Nein', { abgelegt, fragen });
+  R.check('Der gewählte Full Moon geht in die Ablage, der New Moon bleibt', abgelegt.length === 1 && abgelegt[0] === 'Lunatic Cycle - Full Moon', abgelegt);
   R.check('Es gibt eine Auswahl, welcher Cycle abgelegt wird (oder der Spieler konnte Full Moon wählen)', fragen > 0 || abgelegt.includes('Lunatic Cycle - Full Moon'), { abgelegt, fragen });
   R.finish();
 })().catch(e => { console.error(e); process.exit(2); });
