@@ -9885,6 +9885,7 @@ class GameEngine {
     if (this._consumeExtraLife(target, ownerIdx)) {
       delete target.diedOnTurn;
       delete target._koProcessed;
+      await this.amzFensterAufHeldAnwenden(ownerIdx, (this.gs.players[ownerIdx]?.heroes || []).indexOf(target));   // W18b: Anti Magic Zone
       this.sync();
       // ★ v1491: auch ein Extra Life ist eine Wiederbelebung (Hand-Fenster Triumphant Return).
       await this._checkHeroRevivedHandReactions(target, ownerIdx, 'Extra Life');
@@ -10636,8 +10637,43 @@ class GameEngine {
 
     await this.runHooks(HOOKS.ON_HERO_REVIVE, { playerIdx, heroIdx, hero, hp: reviveHp, source: opts.source });
     // ★ v1491: Hand-Fenster „ein Held, den du kontrollierst, wurde wiederbelebt" (Triumphant Return) — nach den Wiederbelebungs-Haken.
+    await this.amzFensterAufHeldAnwenden(playerIdx, heroIdx);   // W18b: Anti Magic Zone gilt auch fuer neu ins Spiel kommende Helden
     await this._checkHeroRevivedHandReactions(hero, playerIdx, opts.source);
     return true;
+  }
+
+  /**
+   * ★ W18b (Al 19.10.2026, Anti Magic Zone: „Wiederbelebte (oder z.B. via Teleport Powder zurueckkehrende) Heroes bekommen automatisch
+   * den Status/Debuff und koennen nicht casten!"): Jeder Held, der waehrend der Laufzeit einer Anti Magic Zone NEU ins Spiel kommt
+   * (Wiederbelebung, Extra Life, Aufstieg aus dem Tod, Teleportation-Powder-Rueckkehr, Quetzahuitls Ankunft), bekommt `magic_silenced`
+   * mit dem Ablauf der Zone. Die Zonen stehen im Spielstand (`gs._amzFenster`, vom Skript beim Wirken gefuellt) — nicht an der
+   * Ablage-Instanz, damit das Fenster den Weg der Karte ueberlebt. Idempotent (addHeroStatus ueberschreibt mit gleichem Ablauf);
+   * bei mehreren Zonen gilt die mit dem spaetesten Ablauf. Anti-Magic-geschuetzte Helden (magic_immune) bleiben wie beim Wirken frei.
+   */
+  async amzFensterAufHeldAnwenden(playerIdx, heroIdx) {
+    const gs = this.gs;
+    const liste = gs._amzFenster;
+    if (!Array.isArray(liste) || liste.length === 0) return;
+    const aktiv = f => {
+      if (!f || typeof f.expiresAtTurn !== 'number') return false;
+      const t = gs.turn ?? 0;
+      if (t < f.expiresAtTurn) return true;
+      if (t > f.expiresAtTurn) return false;
+      return (gs.activePlayer ?? -1) !== f.expiresForPlayer;   // bis der Aufraeumlauf zu Beginn des Zugs der Wirkerin laeuft
+    };
+    gs._amzFenster = liste.filter(aktiv);
+    if (gs._amzFenster.length === 0) { delete gs._amzFenster; return; }
+    const hero = gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    if (this._isHeroSpellProtected(hero, 'Anti Magic Zone')) return;
+    const f = gs._amzFenster.reduce((a, b) => (b.expiresAtTurn > a.expiresAtTurn ? b : a));
+    await this.addHeroStatus(playerIdx, heroIdx, 'magic_silenced', {
+      expiresAtTurn: f.expiresAtTurn,
+      expiresForPlayer: f.expiresForPlayer,
+      appliedBy: f.sourceOwner,
+      source: 'Anti Magic Zone',
+      animationType: 'dark_swarm',
+    });
   }
 
   /**
@@ -27427,6 +27463,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.controller = inst.stolenFromOwner ?? inst.owner;
       delete inst.stolenBy;
       delete inst.stolenFromOwner;
+      // W18b (Guard Change): eine gestohlene Kreatur, die der Dieb in eine Zone SEINER Seite gezogen hat (`inst.owner` = Brettseite),
+      // gehört dem Besitzer wieder und steht dann seitenfremd auf der Dieb-Seite; steht sie wieder auf der Seite des Besitzers, fällt die Marke.
+      if (inst.controller !== inst.owner) { inst.counters = inst.counters || {}; inst.counters.crossSideControlled = inst.controller; }
+      else if (inst.counters) delete inst.counters.crossSideControlled;
       if (inst.counters) delete inst.counters._stealImmortal;
       // ★ Nur die Immunitaet abraeumen, die MIT dem Diebstahl kam.
       if (inst.counters?._stealOmniImmune) {
@@ -48867,14 +48907,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // ── DARK OCEAN ───────────────────────────────────────────────────
     // "Creatures take no damage, except from Attacks and Spells."
-    // Als Ruling 5.8.: NUR `attack` und `destruction_spell` kommen
+    // Als Ruling 5.8.: NUR `attack` und Zauber (`destruction_spell`, seit W18b alle `*_spell`) kommen
     // durch — alles andere (creature, artifact, status, other) wird
     // geblockt, ausdruecklich auch Gift- und Brand-Ticks.
     // Symmetrisch: schuetzt die Creatures BEIDER Spieler.
     if (this.isDarkOceanActive()) {
-      // W16g (S01-03): + 'magic_arts_spell' (Butterfly Cloud: ein Zauber, Schadenstyp '<school>_spell'). 'decay_spell' (Forbidden Zone)
-      // bleibt wie bisher geblockt — nicht Teil dieses Befunds, siehe Abgabe W16g.
-      const durch = new Set(['attack', 'destruction_spell', 'magic_arts_spell']);
+      // W16g (S01-03): + 'magic_arts_spell' (Butterfly Cloud: ein Zauber, Schadenstyp '<school>_spell').
+      // W18b (Al 19.10.2026: „decay_spell ist eine Form von Spell und sollte damit durchkommen"): ALLE Zauber-Schadenstypen der Form
+      // '<school>_spell' (destruction/decay/magic_arts/support …, auch das Alias 'spell') kommen durch, dazu 'attack'. Alles andere
+      // (creature, artifact, status, other) bleibt geblockt, Gift-/Brand-Ticks ebenfalls (`isStatusDamage`).
+      const durch = { has: (t) => t === 'attack' || t === 'spell' || (typeof t === 'string' && t.endsWith('_spell')) };
       // W16e (F01-18): Diver Helmet — Kreaturen am Helm-Helden sind „unaffected by Areas": Dark Ocean schuetzt sie nicht.
       const geblockt = entries.filter(e => (e.isStatusDamage || !durch.has(e.type)) && !this._isDiverHelmetProtectedTarget(e.inst));
       for (const e of geblockt) {
