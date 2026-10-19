@@ -7292,6 +7292,13 @@ class GameEngine {
     if (owner < 0) return false;
     const heroIdx = (this.gs.players[owner]?.heroes || []).indexOf(target);
     if (heroIdx < 0) return false;
+    // W16g (R02-04): ANHANG mit `attachmentDamageCannotBeReducedOrNegated` (Prophecy of Tempeste: „Damage this Hero takes
+    // cannot be reduced or negated by other cards or effects") — Anhaenge ruhen nicht bei Frost/Betaeubung des Traegers
+    // (W7a), gelten also auch ohne `_isHeroEffectSilenced`.
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'support' || inst.faceDown || inst.owner !== owner || inst.heroIdx !== heroIdx) continue;
+      if (loadCardEffect(inst.name)?.attachmentDamageCannotBeReducedOrNegated) return true;
+    }
     const flag = this.heroScript(target)?.heroDamageCannotBeReducedOrNegated;
     if (!flag) return false;
     if (this._isHeroEffectSilenced(owner, heroIdx)) return false;

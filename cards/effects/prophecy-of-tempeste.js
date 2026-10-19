@@ -90,6 +90,8 @@ function bereitsImSpiel(ps) {
 }
 
 module.exports = {
+  // W16g (R02-04): Engine-Marke — Schaden an den Traeger kann nicht verringert/negiert werden (`_isHeroDamageUnstoppable`).
+  attachmentDamageCannotBeReducedOrNegated: true,
   activeIn: ['hand', 'support'],
 
   /**
@@ -226,7 +228,11 @@ module.exports = {
           original: ctx.amount, capped: DAMAGE_CAP,
           source: ctx.source?.name || undefined,
         });
+        // W16g (R02-04): der Deckel ist Tempestes EIGENE Regel und von „cannot be reduced" ausgenommen — die Engine klammert
+        // Schaden an den Traeger (`_isHeroDamageUnstoppable`), `setAmount` wuerde den Deckel sonst abweisen.
+        ctx.setFlag('cannotBeReduced', false);
         ctx.setAmount(DAMAGE_CAP);
+        ctx.setFlag('cannotBeReduced', true);
       }
       // ★ W8 (Al, 14.10.2026, Frage 2): die Umleitung läuft bei Freeze/Stun NICHT weiter - sie ruht bei Frost/Betäubung/Negation
       // des Wirts (EIN Prüfer `_isHeroEffectSilenced`: mit Chilly-Dog-Ausnahme, Webbed, Mumie); nur der Deckel (statische Regel) gilt weiter.
