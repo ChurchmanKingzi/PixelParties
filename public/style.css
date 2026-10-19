@@ -25751,12 +25751,17 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .social-row-menu .btn { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
 .social-invite-btn { border-color: var(--success) !important; color: var(--success) !important; background: rgba(51, 255, 136, .08) !important; }
 .social-invite-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Einladung verschickt, aber noch nicht beantwortet (orange) bzw. abgelehnt (rot) */
+.social-invite-btn.is-pending { border-color: var(--accent4, #ffaa00) !important; color: var(--accent4, #ffaa00) !important; background: rgba(255, 170, 0, .1) !important; }
+.social-invite-btn.is-declined { border-color: var(--danger) !important; color: var(--danger) !important; background: rgba(255, 51, 102, .1) !important; }
+.social-invite-btn.is-declined:disabled { opacity: .75; }
 .social-row-error { flex-basis: 100%; padding: 5px 7px; font-size: 12px; color: #fff; background: rgba(255, 51, 102, .25); border: 1px solid var(--danger); }
 .social-tag {
   flex-shrink: 0; padding: 0 5px; font-size: 10px; letter-spacing: 1px; line-height: 16px;
   color: var(--text2); border: 1px solid rgba(255, 255, 255, .18);
 }
-.social-tag--sent { color: var(--success); border-color: rgba(51, 255, 136, .5); }
+.social-tag--sent { color: var(--accent4, #ffaa00); border-color: rgba(255, 170, 0, .5); }
+.social-tag--declined { color: var(--danger); border-color: rgba(255, 51, 102, .5); }
 .social-invite-hint { padding: 0 16px 6px; font-size: 11px; color: var(--text2); }
 
 /* Einladung: Fenster in der Mitte, der Rest des Hauptmenüs liegt abgedunkelt dahinter (und ist nicht bedienbar) */

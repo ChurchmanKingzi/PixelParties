@@ -37,11 +37,24 @@ const _social = {
   state: { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] },
   msgs: {},            // peerId -> Nachrichten (nur, was geladen wurde)
   chatPeer: null,      // offenes Chatfenster ({ id, name, color }) — gilt für Hauptmenü UND Online-Lobby
+  sentInvites: {},     // `<raumId>:<spielerId>` -> { state: 'pending' | 'declined', at } — von DIR (oder dem Raum) verschickte Einladungen
   invites: [],         // eingegangene Raum-Einladungen ({ id, roomId, kind, label, type, at, got, valid, from: { id, name, color } })
   listeners: new Set(),
 };
 const SOCIAL_INVITE_KEEP_MS = 10 * 60 * 1000;   // so lange hebt der Client eine Einladung auf (der Server lässt sie nach 15 Min. verfallen)
 function _socialChanged() { _social.listeners.forEach(f => f()); }
+
+/** Stand der Einladung von `userId` in diesen Raum: 'pending' (gesendet, offen), 'declined' oder `null`. */
+function socialSentInviteState(roomId, userId) {
+  const e = _social.sentInvites[roomId + ':' + userId];
+  if (!e) return null;
+  if (e.state === 'pending' && Date.now() - e.at > SOCIAL_INVITE_KEEP_MS) return null;   // verfallen
+  return e.state;
+}
+function socialSetSentInvite(roomId, userId, state) {
+  _social.sentInvites = { ..._social.sentInvites, [roomId + ':' + userId]: { state, at: Date.now() } };
+  _socialChanged();
+}
 
 function useSocial() {
   const [, force] = useState(0);
@@ -122,7 +135,7 @@ function SocialHost({ user, bgmMode, screen, onOpenPlay }) {
 
   useEffect(() => {
     if (!active) {
-      _social.presence = []; _social.msgs = {}; _social.chatPeer = null; _social.invites = [];
+      _social.presence = []; _social.msgs = {}; _social.chatPeer = null; _social.invites = []; _social.sentInvites = {};
       _social.state = { unread: {}, incoming: [], extras: [], blocked: [], blockedBy: [] };
       _socialChanged();
       return;
@@ -158,6 +171,9 @@ function SocialHost({ user, bgmMode, screen, onOpenPlay }) {
     socket.on('dm_message', onMessage);
     socket.on('dm_update', onUpdate);
     socket.on('room_invite', onInvite);
+    // Der Eingeladene hat abgelehnt → der Einladen-Knopf wird rot.
+    const onInviteDeclined = (d) => { if (d && d.roomId && d.userId) socialSetSentInvite(d.roomId, d.userId, 'declined'); };
+    socket.on('room_invite_declined', onInviteDeclined);
     socket.emit('social_sync');
 
     // Eingaben melden (der Server entscheidet über AFK). Die erste Eingabe nach einer Pause geht sofort raus.
@@ -183,6 +199,7 @@ function SocialHost({ user, bgmMode, screen, onOpenPlay }) {
       socket.off('dm_message', onMessage);
       socket.off('dm_update', onUpdate);
       socket.off('room_invite', onInvite);
+      socket.off('room_invite_declined', onInviteDeclined);
       socket.off('connect', onConnect);
       evts.forEach(e => window.removeEventListener(e, ping, { capture: true }));
       document.removeEventListener('visibilitychange', onVis);
@@ -268,11 +285,10 @@ function SocialLamp({ status }) {
 function WhosOnlineList({ meId, onOpen, invite }) {
   useSocial();
   const [openId, setOpenId] = useState(null);      // aufgeklappte Zeile (nur im Einladungs-Modus)
-  const [invited, setInvited] = useState({});      // userId -> true, sobald der Server die Einladung angenommen hat
   const [busyId, setBusyId] = useState(null);
   const [err, setErr] = useState('');
   const roomId = invite ? invite.roomId : null;
-  useEffect(() => { setInvited({}); setOpenId(null); setErr(''); }, [roomId]);
+  useEffect(() => { setOpenId(null); setErr(''); }, [roomId]);
   const rows = socialBuildRows(meId);
   if (rows.length === 0) return <div className="menu-side-empty">Nobody else is online right now.</div>;
 
@@ -280,8 +296,12 @@ function WhosOnlineList({ meId, onOpen, invite }) {
     setErr(''); setBusyId(r.id);
     socket.emit('room_invite_send', { to: r.id, roomId }, (res) => {
       setBusyId(null);
-      if (res && res.error) { setErr(res.error); if (window.playSFX) window.playSFX('ui_error'); return; }
-      setInvited(m => ({ ...m, [r.id]: true }));
+      if (res && res.error) {
+        setErr(res.error); if (window.playSFX) window.playSFX('ui_error');
+        if (/declined/i.test(res.error)) socialSetSentInvite(roomId, r.id, 'declined');   // z.B. nach dem Neuladen der Seite
+        return;
+      }
+      socialSetSentInvite(roomId, r.id, 'pending');
     });
   };
 
@@ -289,7 +309,8 @@ function WhosOnlineList({ meId, onOpen, invite }) {
     <ul className="social-list">
       {rows.map(r => {
         const inRoom = !!invite && invite.members.includes(r.name);
-        const canInviteRow = !!invite && !inRoom && (r.status === 'online' || r.status === 'afk');
+        const sent = invite && !inRoom ? socialSentInviteState(roomId, r.id) : null;   // 'pending' | 'declined' | null
+        const canInviteRow = !!invite && !inRoom && sent !== 'declined' && (r.status === 'online' || r.status === 'afk');
         const open = !!invite && openId === r.id;
         const click = () => { if (invite) { setErr(''); setOpenId(open ? null : r.id); } else onOpen(r); };
         return (
@@ -300,16 +321,21 @@ function WhosOnlineList({ meId, onOpen, invite }) {
               <SocialLamp status={r.status} />
               <span className="social-name" style={{ color: r.color || 'var(--accent)' }}>{r.name}</span>
               {inRoom && <span className="social-tag" title="Already in this room">IN ROOM</span>}
-              {!inRoom && invited[r.id] && <span className="social-tag social-tag--sent" title="Invitation sent">INVITED</span>}
+              {!inRoom && sent === 'pending' && <span className="social-tag social-tag--sent" title="Invitation sent">INVITED</span>}
+              {!inRoom && sent === 'declined' && <span className="social-tag social-tag--declined" title="Declined the invitation">DECLINED</span>}
               {r.challenge && <span className="social-badge social-badge--challenge" title="Open challenge">!</span>}
               {r.unread > 0 && <span className="social-badge" title="Unread messages">{r.unread > 99 ? '99+' : r.unread}</span>}
             </div>
             {open && (
               <div className="social-row-menu">
-                <button className="btn social-invite-btn" disabled={!canInviteRow || busyId === r.id}
-                        title={inRoom ? 'Already in this room' : (r.status === 'ingame' ? r.name + ' is in a game' : (r.status === 'offline' ? r.name + ' is offline' : 'Invite to your room'))}
+                <button className={'btn social-invite-btn' + (sent === 'pending' ? ' is-pending' : '') + (sent === 'declined' ? ' is-declined' : '')}
+                        disabled={!canInviteRow || busyId === r.id}
+                        title={inRoom ? 'Already in this room'
+                          : sent === 'declined' ? r.name + ' declined an invitation to this room'
+                          : sent === 'pending' ? 'Invitation sent — waiting for ' + r.name + ' (click to send again)'
+                          : (r.status === 'ingame' ? r.name + ' is in a game' : (r.status === 'offline' ? r.name + ' is offline' : 'Invite to your room'))}
                         onClick={() => sendInvite(r)}>
-                  {invited[r.id] ? '✉ INVITE AGAIN' : '✉ INVITE'}
+                  ✉ INVITE
                 </button>
                 <button className="btn" onClick={() => onOpen(r)}>💬 CHAT</button>
                 {err && <div className="social-row-error" role="alert">{err}</div>}
