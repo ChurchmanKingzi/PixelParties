@@ -50,7 +50,7 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
 * **Variable Kosten (Artifacts):** Karten mit modularen Kosten tragen in `cards.json` das Feld `costLabel` — „4X" (Beer, Book of Doom,
   Capture Net, Cool Presents, Possessed Blade), „5X" (Dark Gear), „10X" (Staff of Illusions), „X" (Cool Repair, Tool Freezer,
   Future Tech Copy Device). `specFromCard` druckt es im Wertefeld der Mitte statt der Zahl aus `cost` (die der Server weiter rechnet);
-  Tooltips (`cardCostText`) und der Discord-Bot (`!card`) zeigen es ebenso, `!show` rendert dieselbe Datei wie das Spiel. Die Hand-Überschreibung
+  Tooltips (`cardCostText`) und der Discord-Bot (`!card`) zeigen es ebenso, `!show` rendert dieselbe Datei wie das Spiel. Das X ist ein eigenes Glyph in Ziffernhöhe (6 statt 7 Schrift-Pixel, `COST_X` / `drawLine` `costX`), damit es mit den Ziffern abschließt. Die Hand-Überschreibung
   (`?kost=`) behält das „X" (aus 4X wird 8X) und entfällt bei reinem „X". `scripts/check-cost-label.js` hält Skripte mit
   `manualGoldCost` und `costLabel` zusammen.
 * **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der

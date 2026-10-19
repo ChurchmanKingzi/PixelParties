@@ -84,6 +84,17 @@
     return (r[2] * 10 + SYM_SPACE) * (symSize / SYM_FONT) * UPM / (20 * PT);
   }
 
+  // Das „X" der variablen Kosten („4X", „X"): das Grossbuchstaben-X der Schrift ist 7 Schrift-Pixel hoch, die Ziffern nur 6 — beide
+  // stehen auf derselben Grundlinie, das X ragte also oben einen Pixel heraus („etwas hoeher als die Zahlen", Als Befund 19.10.).
+  // Fuer gedruckte Kosten gibt es deshalb ein X in Ziffernhoehe (6 Reihen, gleiche Strichstaerke, Pixelraster 200 Einheiten):
+  //   XX..XX / .XXXX. / ..XX.. / ..XX.. / .XXXX. / XX..XX
+  // Es liegt unter einem Zeichen aus dem privaten Bereich und wird nur ueber `drawLine(…, { costX: true })` eingesetzt.
+  const COST_X = '\uE0F0';
+  function costXPath() {
+    const reihen = [[[0, 400], [800, 1200]], [[200, 1000]], [[400, 800]], [[400, 800]], [[200, 1000]], [[0, 400], [800, 1200]]];   // von unten nach oben
+    return reihen.map((runs, i) => runs.map(([x0, x1]) => `M${x0} ${i * 200}L${x1} ${i * 200}L${x1} ${i * 200 + 200}L${x0} ${i * 200 + 200}Z`).join('')).join('');
+  }
+
   function adv(ch) {
     if (ch === ' ') return SPACE_U;
     if (ZERO_WIDTH.includes(ch)) return 0;
@@ -143,6 +154,7 @@
       ]);
       sprites = { img, rects: json.rects };
       GL = glyphs.glyphs;
+      GL[COST_X] = { a: 1400, d: costXPath() };
     })();
     return initPromise;
   }
@@ -296,7 +308,7 @@
   // der Box, wird die Schrift bis `min` verkleinert; ist eine Zeile danach noch zu breit, wird sie horizontal
   // gestaucht (MSE „shrink-overflow“).
   function drawLine(ctx, text, o) {
-    const lines = String(text == null ? '' : text).split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = String(text == null ? '' : text).split('\n').map(l => l.trim()).filter(Boolean).map(l => o.costX ? l.replace(/X/g, COST_X) : l);
     if (!lines.length) return;
     const fitsH = pt => lines.length * pt * PT * LINE_U / UPM <= o.height + 1e-6;
     let pt = o.size;
@@ -581,7 +593,7 @@
       if (!spec.noAtk && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
         height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : stat, ink: heroBox,
-        outline: kostet ? OVER_OUTLINE : null,
+        outline: kostet ? OVER_OUTLINE : null, costX: isArti2(t),
       });
     }
 
