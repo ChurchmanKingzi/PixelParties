@@ -38386,7 +38386,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dieselbe Ausnahme wie im Hauptweg: eine Karte darf sich per
     // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
     if (cardData.cardType === 'Spell'
-        && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {
+        && (hero.statuses?.magic_silenced || hero.statuses?.frightened || hero.statuses?.nulled || hero.statuses?.berserked)) {
       const script = loadCardEffect(cardName);
       let bypass = false;
       if (typeof script?.canPlayDespiteStatuses === 'function') {
@@ -38405,6 +38405,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `canPlayCard` des Helden und seiner Ausruestung. Surprises und
     // Hand-Reaktionen liefen daran vorbei: Santa konnte reagieren, ohne
     // die 2 Handkarten bezahlen zu koennen.
+    // W16g (R01-11): auch `nulled` (Null Zone) und `berserked` (Berserk) sperren Spells wie in `validateActionPlay`.
     {
       const herkunft = { fromHand: !!opts.spellInHand };
       const heroScript = this.heroScript(hero);
