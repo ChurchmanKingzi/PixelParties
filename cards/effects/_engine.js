@@ -10465,6 +10465,16 @@ class GameEngine {
     }
     // v1382: Field Medic — tatsaechlicher Zuwachs, Ueberheilung eingeschlossen.
     this._scNoteHeal(source, target.counters.currentHp - currentHp, target.controller ?? target.owner);
+    // W16g (R02-17): eigener Haken `afterCreatureHeal` (NICHT `afterHeal`: dessen Leser — Lifeforce Howitzer, Stormblade … — meinen
+    // Helden). Kontext wie `afterHeal`, `targetOwner` = Kontrolleur der Kreatur. Heute liest ihn nur Tarleinn's Floating Island.
+    const _gewachsen = target.counters.currentHp - currentHp;
+    if (_gewachsen > 0 && target.zone === 'support') {
+      await this.runHooks('afterCreatureHeal', {
+        target, healedAmount: _gewachsen, source,
+        targetOwner: target.controller ?? target.owner, targetHeroIdx: target.heroIdx,
+        _skipReactionCheck: true,
+      });
+    }
   }
 
   /**
