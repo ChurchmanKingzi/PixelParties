@@ -66,7 +66,7 @@ function betroffene(engine, maxLevel) {
  * Bauform `returnSupportCreatureToHand` (_deepsea-shared), nur mit dem
  * Deck als Ziel. Gemischt wird NICHT hier — s. Kopf.
  */
-async function insDeck(engine, inst, maxLevel) {
+async function insDeck(engine, inst, maxLevel, pi) {
   if (!inst || inst.zone !== 'support') return null;
   const gs = engine.gs;
   const kontrolleur = engine.physicalSide(inst);       // Brettseite (nicht der Kontrolleur): eine gestohlene Kreatur liegt weiter beim Besitzer (S03-04)
@@ -83,7 +83,7 @@ async function insDeck(engine, inst, maxLevel) {
     type: 'deep_sea_bubbles', owner: kontrolleur, heroIdx, zoneSlot: slotIdx,
   });
 
-  if (inst.counters?._cardinalImmune || isCardinalBeastByName(inst.name)) {
+  if (inst.counters?._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi) || isCardinalBeastByName(inst.name)) {   // W17b: Golden Wings nur gegen den Gegner
     engine.log('cardinal_immune_block', { card: cardName, by: CARD_NAME, action: 'shuffle_into_deck' });
     return null;
   }
@@ -137,7 +137,7 @@ module.exports = {
     const hi = Number.isInteger(link?.heroIdx) ? link.heroIdx : -1;
     const dm = hi >= 0 ? engine.effectiveSchoolLevelForCaster(SCHULE, pi, hi) : 3;
     const maxLevel = Math.max(1, Math.min(3, dm));
-    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !isCardinalBeastByName(i.name));
+    return betroffene(engine, maxLevel).some(i => engine.physicalSide(i) === pi && !i.counters?._cardinalImmune && !engine.kreaturGegnerEffektImmun(i, pi) && !isCardinalBeastByName(i.name));
   },
 
   hooks: {
@@ -170,7 +170,7 @@ module.exports = {
       // ── ① Alles ins Deck ────────────────────────────────────────
       const proSpieler = [0, 0];
       for (const inst of ziele) {
-        const heim = await insDeck(engine, inst, maxLevel);
+        const heim = await insDeck(engine, inst, maxLevel, pi);
         if (heim != null) proSpieler[heim] = (proSpieler[heim] || 0) + 1;
       }
 

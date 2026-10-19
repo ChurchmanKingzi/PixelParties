@@ -80,7 +80,7 @@ module.exports = {
     const target = targets.find(t => t.id === picked[0]);
     if (!target?.cardInstance) return false;
 
-    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME);
+    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME, { sourceOwner: pi });
     engine.log('racket_arrow_bounce', {
       player: engine.gs.players[pi]?.username, target: target.cardName,
     });

@@ -146,7 +146,7 @@ module.exports = {
     if (replacements.length === 0) return null;
 
     // Bounce the target.
-    await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME);
+    await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME, { sourceOwner: pi });
 
     // v1360 (Audit „same Support Zone"): Austritts-Listener (Rider Warg →
     // „als geopfert" → Corpse Cannibal) koennen den Platz sofort fuellen.

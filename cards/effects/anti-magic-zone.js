@@ -81,7 +81,7 @@ async function applyToHero(engine, ownerIdx, heroIdx, expiresAtTurn, expiresForP
  *    • the canonical buffs[<buffKey>].clearCountersOnExpire pattern
  *      so the standard status-expiry sweep clears the silence at
  *      `expiresAtTurn` / `expiresForPlayer`. */
-async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer) {
+async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer, quelleOwner) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return;
   await engine.actionNegateCreature(inst, CARD_NAME, {
     statusKey: STATUS_NAME,
@@ -91,6 +91,7 @@ async function applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer) {
     // future "negated-but-cleansable" cards.
     cleansable: true,
     selfInflicted: true,
+    gwSourceOwner: quelleOwner,   // W17b: Golden Wings – nur der Gegner des Wirkers ist ausgenommen
     expiresAtTurn,
     expiresForPlayer,
     buffKey: '_anti_magic_zone_silenced',
@@ -217,7 +218,7 @@ module.exports = {
         if (inst.faceDown) continue;
         const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];   // wirksame Daten (Als Sweep 9.10.)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
-        await applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer);
+        await applyToCreature(engine, inst, expiresAtTurn, expiresForPlayer, pi);
       }
 
       // Stamp the cast's expiry on this card instance — the
@@ -260,7 +261,7 @@ module.exports = {
       const expiresForPlayer = ctx.card.counters?._amzExpiresForPlayer;
       if (!windowActive(engine.gs, expiresAtTurn, expiresForPlayer)) return;
 
-      await applyToCreature(engine, entering, expiresAtTurn, expiresForPlayer);
+      await applyToCreature(engine, entering, expiresAtTurn, expiresForPlayer, ctx.cardOwner);
     },
   },
 };

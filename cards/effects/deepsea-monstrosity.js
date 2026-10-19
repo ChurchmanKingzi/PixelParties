@@ -118,7 +118,7 @@ module.exports = {
       const copiedName = chosenInst.name;
 
       // Step 1: bounce the chosen creature back to hand.
-      await returnSupportCreatureToHand(engine, chosenInst, CARD_NAME);
+      await returnSupportCreatureToHand(engine, chosenInst, CARD_NAME, { sourceOwner: pi });
 
       // Step 2: invoke the copied creature's on-summon effect with
       // Monstrosity's instance as the firing card, BUT the copied name

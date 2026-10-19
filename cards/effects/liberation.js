@@ -63,7 +63,7 @@ function zurueckholbare(engine, pi) {
     // Kardinalbestien & Co. lassen sich von nichts anfassen — sie
     // wuerden in `actionTransferCreature` ohnehin abprallen, sollen
     // die Option aber auch nicht kuenstlich am Leben halten.
-    if (engine.isOmniImmune(inst)) continue;
+    if (engine.isOmniImmune(inst, pi)) continue;   // W17b: Golden Wings quellenbewusst
     out.push(inst);
   }
   return out;

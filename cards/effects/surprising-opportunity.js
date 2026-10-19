@@ -43,10 +43,10 @@ const BILD_MS = 1000;        // Länge der Animation (deckt sich mit `surprising
 const FLUG_PAUSE_MS = 380;   // Abstand zwischen zwei fliegenden Karten
 
 /** Darf diese Brettkarte überhaupt in die Hand genommen werden? (Karte, sichtbar, beweglich) */
-function nimmbar(engine, inst) {
+function nimmbar(engine, inst, pi) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   const c = inst.counters || {};
-  if (c.immovable || c._gainedEffectOnly || c._cardinalImmune) return false;
+  if (c.immovable || c._gainedEffectOnly || c._cardinalImmune || engine.kreaturGegnerEffektImmun(inst, pi)) return false;   // W17b: Golden Wings nur gegen den Gegner
   if (isCardinalBeastByName(inst.name)) return false;
   const roh = engine._getCardDB()[inst.name];
   const cd = engine.getEffectiveCardData(inst) || roh;
@@ -59,7 +59,7 @@ function nimmbar(engine, inst) {
 
 /** Wählbar für den Wirker `pi`? (zusätzlich: kein „cannot be chosen"-Schutz) */
 function waehlbar(engine, pi, inst) {
-  if (!nimmbar(engine, inst)) return false;
+  if (!nimmbar(engine, inst, pi)) return false;
   if (inst.counters?.untargetable_all) return false;
   const ktrl = inst.controller ?? inst.owner;
   if (ktrl !== pi && typeof engine._isSideNondamageShielded === 'function' && engine._isSideNondamageShielded(ktrl)) return false;

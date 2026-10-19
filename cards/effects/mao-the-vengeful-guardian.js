@@ -217,6 +217,7 @@ module.exports = {
     // app-shared.jsx).
     // `gs.turn` zaehlt pro Spielerwechsel: naechste eigene Runde = +2 (A07-28).
     await engine.actionNegateCreature(inst, CARD_NAME, {
+      gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
       expiresAtTurn: gs.activePlayer === pi ? gs.turn + 2 : gs.turn + 1,
       expiresForPlayer: pi,
       buffKey: 'mao_negated',

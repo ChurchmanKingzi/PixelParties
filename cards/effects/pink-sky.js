@@ -133,6 +133,7 @@ module.exports = {
       }
       await engine.actionNegateCreature(inst, CARD_NAME, {
         selfInflicted: true,
+        gwSourceOwner: pi,   // W17b: Golden Wings – nur der Gegner ist ausgenommen
         expiresAtTurn,
         expiresForPlayer,
         buffKey: '_pink_sky_negated',

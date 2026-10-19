@@ -20,9 +20,10 @@ const H = require('../../lib/h.js');
   t.grantFor(0, 0, 'Archer of Teocuilatl');
   t.policy.confirm = true; t.targetFn = pickOwn;
   await t.play(0, 'Golden Wings', { hero: 0 });
-  R.check('Aufbau: Golden Wings liegt auf der Kreatur', !!alt.counters._cardinalImmune, alt.counters);
-  const r = await t.play(0, 'Archer of Teocuilatl', { hero: 0, slot: 1, keepActions: false });
-  R.check('(a) Archer ist spielbar: Opfer der eigenen (geschützten) Kreatur', r === true && !!t.find('Archer of Teocuilatl', 'support'), { r, hand: t.pile(0, 'hand') });
+  R.check('Aufbau: Golden Wings liegt auf der Kreatur', !!alt.counters._gwImmune, alt.counters);
+  // W17b: Slot 2 (Slot 1 belegt der Pollution Token von Golden Wings – der alte Wert 1 zielte auf diesen Token)
+  const r = await t.play(0, 'Archer of Teocuilatl', { hero: 0, slot: 2, keepActions: false });
+  R.check('(a) Archer ist spielbar: Opfer der eigenen (geschützten) Kreatur', r === true && !!t.find('Archer of Teocuilatl', 'support') && alt.zone !== 'support', { r, hand: t.pile(0, 'hand'), altZone: alt.zone });
 
   // (b) eigener Goldify
   t = await H.fresh({ hand: [['Golden Wings', 'Goldify'], []] });

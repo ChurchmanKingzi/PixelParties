@@ -176,7 +176,7 @@ module.exports = {
 
       // ── Step 2: bounce ──
       const bounceRes = await returnSupportCreatureToHand(
-        engine, bouncedInst, 'Divine Gift of the Deepsea'
+        engine, bouncedInst, 'Divine Gift of the Deepsea', { sourceOwner: pi }
       );
       if (!bounceRes?.returned) {
         // Cardinal-immune or similar absolute block — refund.

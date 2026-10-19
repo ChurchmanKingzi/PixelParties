@@ -84,6 +84,7 @@ module.exports = {
         const naechster = engine.opponentOf(gs.activePlayer);
         await engine.actionNegateCreature(inst, CARD_NAME, {
           selfInflicted: true,
+          gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
           expiresAtTurn: gs.turn + 1,
           expiresForPlayer: naechster,
         });
