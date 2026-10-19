@@ -29454,6 +29454,87 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
 }
 
 // Renders an ability zone stack — handles Performance visual transformation
+// ═══════════════════════════════════════════
+//  KETTEN-ANZEIGE (Reaction Chain)
+//
+//  Als Vorgabe 19.10.: „Die Platzierung der Chain ist mit nichts aligned … ihre rechte Kante soll mit der linken Kante des
+//  Containers fuer die Decks aligned sein." Die Anzeige steht deshalb nicht mehr bei festen `right: 82px`, sondern ihre rechte
+//  Kante liegt auf der linken Kante von `.board-util-right` (die Spalte mit den Decks). Die Spalte liegt ausserhalb der gekippten
+//  Brettebene, ihre Kante ist also eine echte Bildschirmkante; gemessen wird sie samt Overlay, und der Abstand zur rechten
+//  Bildschirmseite so lange nachgestellt, bis beide Kanten uebereinstimmen (das trifft auch dann, wenn ein Vorfahre skaliert).
+//  Der Titel steht mittig ueber den Karten (CSS: `align-items: center`). Ohne Deck-Spalte (Sonderansichten) bleibt der
+//  Abstand aus dem CSS.
+// ═══════════════════════════════════════════
+function ReactionChainOverlay({ chain, myIdx }) {
+  const ref = useRef(null);
+  const [rechts, setRechts] = useState(null);   // Abstand zur rechten Bildschirmseite in px; null = der aus dem CSS
+  const versuche = useRef(0);
+  const messen = useCallback(() => {
+    const el = ref.current, spalte = document.querySelector('.board-util-right');
+    if (!el || !spalte) return;
+    const abweichung = el.getBoundingClientRect().right - spalte.getBoundingClientRect().left;   // > 0: ragt ueber die Kante hinaus
+    if (Math.abs(abweichung) < 0.5) { versuche.current = 0; return; }
+    if (versuche.current >= 8) return;      // Sicherung gegen Endlosschleifen (z. B. ein skalierender Vorfahre)
+    versuche.current++;
+    setRechts(r => (r == null ? (parseFloat(getComputedStyle(el).right) || 0) : r) + abweichung);
+  }, []);
+  // Nach jedem Render pruefen und ggf. nachstellen: der naechste Schritt laeuft im folgenden Render.
+  useLayoutEffect(() => { messen(); });
+  // Aendert sich die Spalte (Brett-Massstab, Fenstergroesse), von vorn messen.
+  useEffect(() => {
+    const spalte = document.querySelector('.board-util-right');
+    const neu = () => { versuche.current = 0; messen(); };
+    const ro = spalte && typeof ResizeObserver === 'function' ? new ResizeObserver(neu) : null;
+    if (ro) ro.observe(spalte);
+    window.addEventListener('resize', neu);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', neu); };
+  }, [messen]);
+  return (
+    <div className="reaction-chain-overlay" ref={ref} style={rechts != null ? { right: rechts } : undefined}>
+      <div className="reaction-chain-label orbit-font">Chain</div>
+      <div className="reaction-chain-cards">
+        {chain.map((link, i) => (
+          <div key={link.id}
+            data-chain-idx={i}
+            data-chain-card={link.cardName}
+            className={
+            'reaction-chain-card'
+            + (link.status === 'resolving' ? ' chain-glow' : '')
+            + (link.status === 'negated' ? ' chain-negated' : '')
+            + (link.status === 'resolved' ? ' chain-resolved' : '')
+          }>
+            <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+            {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
+            {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+            {link.status === 'negated' && link.negationStyle === 'thief' && (
+              /* Key, the Cursed Thief (v691): ein Griff ins Glied —
+                 Schluesselchen kreisen, ein Schleier faellt ueber die
+                 Karte, ein Handschuh packt sie. */
+              <div className="chain-thief-overlay">
+                <div className="chain-thief-key" style={{ left: 10, top: 14, animationDelay: '0ms' }}>🗝</div>
+                <div className="chain-thief-key" style={{ left: 52, top: 40, animationDelay: '120ms' }}>🗝</div>
+                <div className="chain-thief-key" style={{ left: 22, top: 70, animationDelay: '240ms' }}>🗝</div>
+                <div className="chain-thief-hand">🫳</div>
+              </div>
+            )}
+            {link.status === 'negated' && link.negationStyle === 'ice' && (
+              <div className="chain-ice-overlay">
+                <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
+                <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
+                <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
+              </div>
+            )}
+            <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AbilityStack({ cards }) {
   // Gleiche Bauform wie AttachableCreatureCard oben — der Hover tauscht
   // das Bild der obersten Performance-Karte, also dieselbe Falle.
@@ -53351,50 +53432,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Reaction Chain Visualization ── */}
-      {reactionChain && reactionChain.length >= 2 && (
-        <div className="reaction-chain-overlay">
-          <div className="reaction-chain-label orbit-font">Chain</div>
-          <div className="reaction-chain-cards">
-            {reactionChain.map((link, i) => (
-              <div key={link.id}
-                data-chain-idx={i}
-                data-chain-card={link.cardName}
-                className={
-                'reaction-chain-card'
-                + (link.status === 'resolving' ? ' chain-glow' : '')
-                + (link.status === 'negated' ? ' chain-negated' : '')
-                + (link.status === 'resolved' ? ' chain-resolved' : '')
-              }>
-                <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
-                {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
-                {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
-                {link.status === 'negated' && link.negationStyle === 'thief' && (
-                  /* Key, the Cursed Thief (v691): ein Griff ins Glied —
-                     Schluesselchen kreisen, ein Schleier faellt ueber die
-                     Karte, ein Handschuh packt sie. */
-                  <div className="chain-thief-overlay">
-                    <div className="chain-thief-key" style={{ left: 10, top: 14, animationDelay: '0ms' }}>🗝</div>
-                    <div className="chain-thief-key" style={{ left: 52, top: 40, animationDelay: '120ms' }}>🗝</div>
-                    <div className="chain-thief-key" style={{ left: 22, top: 70, animationDelay: '240ms' }}>🗝</div>
-                    <div className="chain-thief-hand">🫳</div>
-                  </div>
-                )}
-                {link.status === 'negated' && link.negationStyle === 'ice' && (
-                  <div className="chain-ice-overlay">
-                    <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
-                    <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
-                    <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
-                  </div>
-                )}
-                <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {reactionChain && reactionChain.length >= 2 && <ReactionChainOverlay chain={reactionChain} myIdx={myIdx} />}
 
       {/* ── Guardian Beast Zhu skip-turn (Boar zodiac, sloth themed) ──
            Fullscreen gray-out fade with floating "Zzz" glyphs and a
@@ -55578,6 +55616,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 window.BoardCard = BoardCard;
 window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
 window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
+window.ReactionChainOverlay = ReactionChainOverlay;
 window.HeroIdleSprite = HeroIdleSprite;   // Skill Test (Vorbereitungs-Basis: animierte Helden)
 window.HeroSpriteEbene = HeroSpriteEbene; // Skill Test
 window.HeroIdleAnims = HeroIdleAnims;     // Skill Test
