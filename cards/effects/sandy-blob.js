@@ -234,3 +234,6 @@ module.exports = {
     },
   },
 };
+
+// W16c (A05-09): Slime Ranchers zusaetzliche Aktivierung des On-Summon-Effekts zaehlt wie eine Aktivierung (gleiche Pruefungen, gleiche 3er-Kappe).
+module.exports.hooks.onSummonEffectRepeated = module.exports.hooks.onCardEnterZone;

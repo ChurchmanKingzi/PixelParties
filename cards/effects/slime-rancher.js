@@ -69,6 +69,14 @@ module.exports = {
         _skipReactionCheck: true,
         _slimeRancherDouble: true,
       });
+      // W16c (A05-09): die ZUSAETZLICHE Aktivierung ist fuer Sandy Blob ("when the on-summon effect ... activates") eine eigene Aktivierung -
+      // ohne neues Eintrittssignal meldet Rancher sie ueber einen eigenen Hook (nur Blob hoert zu; kein onCardEnterZone-Doppelfeuer).
+      await engine.runHooks('onSummonEffectRepeated', {
+        enteringCard: entering, toZone: 'support',
+        cardName: entering.name, heroIdx: entering.heroIdx, zoneSlot: entering.zoneSlot,
+        _skipReactionCheck: true,
+        _slimeRancherDouble: true,
+      });
     },
   },
 };
