@@ -93,11 +93,9 @@ function istAusruestbar(engine, pi, heroIdx, cardName) {
   if (!cd || !hasCardType(cd, 'Artifact') || cd.subtype !== 'Equipment') return false;
   const script = loadCardEffect(cardName);
   if (script?.neverPlayable) return false;
-  if (typeof script?.canEquipToHero === 'function') {
-    try {
-      if (!script.canEquipToHero(engine.gs, pi, heroIdx, engine)) return false;
-    } catch { return false; }
-  }
+  // W16g (S03-17): EINE Stelle fuer „darf diese Karte an diesen Helden“ (`canEquipCardToHero`): `canEquipToHero` UND Q153 (Al: „Control Device
+  // soll NUR an gegnerische Heroes anlegbar sein“, `placesOnOpponentBoard`) — Overcharge rüstet immer den EIGENEN Helden aus.
+  if (!engine.canEquipCardToHero(cardName, pi, heroIdx)) return false;
   if (script?.oncePerGame) {
     const key = script.oncePerGameKey || cardName;
     if (engine.gs.players[pi]?._oncePerGameUsed?.has(key)) return false;
