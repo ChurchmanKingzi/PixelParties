@@ -22,7 +22,9 @@ const { returnSupportCreatureToHand } = require(H.ROOT + '/cards/effects/_deepse
     await t.play(0, 'Attack', { hero: 0 });
     const diff = t.censusDiff(before, t.census());
     const n = t.pile(1, 'hand').filter(x => x === 'Bonded Companion Humby').length + t.pile(1, 'discardPile').filter(x => x === 'Bonded Companion Humby').length;
-    R.check('Companion liegt genau einmal (Hand oder Ablage)', n === 1, { hand: t.pile(1, 'hand'), discard: t.pile(1, 'discardPile') });
+    // W16d: seit A09-03 bietet Racket Arrow den Companion nicht mehr an (unaffected by effects that can't affect Heroes) - er bleibt auf dem Brett (n = 0);
+    // die Rücknahme selbst prüft der zweite Teil (direkter Aufruf). Maßstab hier: nie mehr als EINE Kopie.
+    R.check('Companion liegt höchstens einmal (Hand oder Ablage)', n <= 1, { hand: t.pile(1, 'hand'), discard: t.pile(1, 'discardPile') });
     R.check('Kartenbilanz unverändert (Hand/Ablage zählen gleich)', !diff.some(d => /Bonded/.test(d)), diff);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }

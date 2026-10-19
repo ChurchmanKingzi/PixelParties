@@ -20685,3 +20685,45 @@ Antworten wörtlich von Al; Repros unter `docs/niche-tests/repro/W15/b-*.js` (Ex
 | C3 Schadenssperre Flame Avalanche / Last Resort (S02-05) | „Ja, prüfe nach aktuellem Kontrolleur!" | „…to targets your opponent controls": die Sperre `ps.damageLocked` prüft in `actionDealDamage` (Helden) den Kontrolleur `kontrolleurVonHeld(Spalte, Index)` (Charme/Übernahme) und im Kreaturen-Schadensstapel `kontrolleurVon(inst)` (`controller ?? owner`) statt Besitzer/Brettseite. Gesperrt (0 Schaden): vom Gegner gestohlene/kontrollierte Kreatur, gecharmter/übernommener eigener Held (aus Sicht des Wirkers Gegnerziel). Nicht gesperrt: von mir gestohlene Gegnerkreatur, meine seitenfremd beschworene Kreatur auf der Gegnerseite („Elven Rider"-Muster, `markiereSeitenfremd`), von mir kontrollierter Gegnerheld. Heat Wave (`gegnerKontrolliert`, W14) und die Engine-Sperre sind damit deckungsgleich. `S02-spells/05` gilt (✓; Messfehler im Repro korrigiert: `currentHp` fehlt ohne Treffer = volle HP); Repro `b-c3`. |
 
 Repros: `docs/niche-tests/repro/W15/b-c1-…`, `b-c2-…`, `b-c3-…` (Exit 0 = korrekt).
+
+## ★ Welle 16 / W16d — Restbefunde A07 (Guardian Beasts), A08 (Pacman), A09 (Idej), C01/C02/C03 (Kreaturen) (19.10.2026)
+
+Triage der 35 roten Repros: 1 = Fehler mit eindeutiger Erwartung (behoben), 2 = Repro korrigiert, 3 = echte Regelfrage (nicht geändert, Frage an Al), 4 = zu groß. Neue Repros: `docs/niche-tests/repro/W16/d-01…d-04` (Exit 0 = korrekt).
+
+| Befund | Einordnung | Ergebnis |
+|---|---|---|
+| A07-03 Baihu | 1 | Kreatur wird über `applyCreatureStatus('stunned', {duration:3})` echt betäubt (Stun-Immunität/Schutztore gelten, Aktivierung gesperrt); die Schadensimmunität hängt als `_petrified` AM Stun (Muster Petrifier). `_baihuStunned` nur noch für alte Spielstände. Molinda liest `_petrified` mit. Repro: Vorbedingung auf `_petrified` erweitert. |
+| A07-06 Xuanwu + Pangaia | 1 | „current and max HP become 1" ist der letzte Schritt: HP werden nach den Eintritts-Hooks nochmals auf 1/1 gesetzt. |
+| A07-09 Shu | 1 | „deck and/or discard pile": Kopien aus Deck UND eigener Ablage zählen (Deck zuerst, dann Ablage; nach den Löschkosten neu gezählt; Such-Sperre je Stapel). |
+| A07-10 Hou/She/Long/Ji/Gou | 1 | `buildAllBoardTargets` und die Zähler von Long/Gou nehmen nur Helden und Kreaturen (`isChoosableAsCreature`), keine Ausrüstung. |
+| A07-16 Pangaia/Cardinal Beast | 1 | `isOmniImmune` → kein +200 (Ruling Q113: „unaffected" gilt für alle Effektarten). |
+| A07-24 Antonia | 1 | Surprise-Ziel mit Client-ID `surprise-<Seite>-<Held>` und Typ `surprise`. |
+| A07-27 Vullary | 1 | `negateEffects: true` beim Platzieren: Einsatz-Effekt feuert nicht (wie Necromancy/Master's Key; die Soul-Shard-Texte „don't get negated when summoned by Necromancy" zeigen, dass Negation den Einsatz-Effekt erfasst). Gleiche Klasse wie A01-pollution-22 (Soul Shard Ka, andere Gruppe). |
+| A07-31 Übernahme vs. Einzigkeit | 1 | `engine.uebernahmeUnzulaessig(inst, neuerKtrl, zielSeite, zielHeld)`: „only control 1" (Ruling W5b-B3) und „1 Gigantisaur pro Held" an `actionTransferCreature` (Fizzle `ruleBlocked`) und `actionStealCreature` (nur „only control 1"). Dark Gear bietet verbotene Ziele/Helden gar nicht erst an; die übrigen Übernahme-Karten fizzeln am zentralen Tor. |
+| A08-03 Letter | 1 | Das Mischen der Gegnerhand (Skript-Eigenheit, nicht im Text) bleibt, aber die handindizierten Marken wandern wie bei `reorder_hand` mit. |
+| A08-04 Geschenk | 1 | `actionTransferCardToOppHand` nimmt die Instanz an der Handposition (`_findHandInstanceAt`), nicht den ersten Namenstreffer; die Instanz rückt ans Ende von `cardInstances` (Rangzuordnung bleibt stimmig). |
+| A08-05 Paraseed Control + Aufstieg | 1 | „cannot be increased in any way": der Aufstiegs-Zuschlag respektiert `maxHpCapped`. |
+| A08-06 Big Gwen Guard + Grinning Cat | 3 | Nicht geändert (Frage an Al). |
+| A08-07 Extra Life | 1 | Extra Life greift auch bei Zerstörung („defeat": Afflicted Vermin, Trial of Dominance): `_reviveAfterDeath` im Zerstörungspfad; die Wiederbelebung geht vor der Löschumleitung. Opfer sind kein „defeat". |
+| A08-12 Dominance + Paraseed | 3 | Nicht geändert (Frage an Al). |
+| A08-13 Cactus Creature | 1 | Neues Fenster `_checkSurpriseOnCreatureStatus` in `applyCreatureStatus` (negative Status, nicht bei „negate its effects"); Cactus kennt eine Kreatur als Ursprung. |
+| A08-17 Ushabti | 1 | `inst.ushabtiSide` = Seite der Surprise Zone; `engine.ushabtiEingelagert(pi, held)` für Handler und Anzeige in `server.js`. Repro: Prädikat auf die Engine-Methode umgestellt, „oder"-Prüfung zusammengelegt. |
+| A08-25 Noble Mummy Guards | 1 | Ein Stapel derselben Fähigkeit ist keine „different Ability" (Trigger passt jetzt zur Optionenliste). |
+| A08-31 Cool Presents | 1 | EIN Hand-Interaktionsfenster für das ganze Geben (Muster Live Show), `windowChecked: true` je Karte. |
+| A09-03 Bomb/Racket Arrow | 1 | `types: ['creature']` → Bonded Companion (unaffected by effects that can't affect Heroes) fällt aus der Zielliste. |
+| A09-08 Bomb Arrow/Infernous | 1 | Schadenstypen `artifact` bzw. `creature` statt `destruction_spell` → Dark Ocean (Ruling 5.8.) blockt. |
+| A09-09 Arrow Slit | 1 | Die zweite Aktivierung hängt als `link._nachAufloesung` am Pfeil-Glied und läuft nach dessen erster Auflösung; ein negierter Pfeil hat keine. |
+| A09-10 Golden Arrow | 1 | Treffer werden je Ziel mitgezählt; `clearArmedArrows` (jetzt `async`, `await` an allen fünf Aufrufern) zahlt Gold + Sperre nur bei genau einem getroffenen Ziel. |
+| A09-14 Tuscan Mystic | 1 | Ersetzt genau EINEN Zug (wie Philosopher's Stone); bei mehreren Zügen wird je Zug erneut gefragt, der Rest normal gezogen. |
+| A09-16 Pet Snake | 1 | `giftHeilbar`: unter Stinky Stables/`unhealable`/Fluch-Sperre keine Zusatzbeschwörung und kein Einmal-Stempel; Stempel nur nach gelungener Heilung. |
+| C01-02 Ash Worms | 1 | `playLimitKey` + `canSummon` (Ruling Q80 Mausoleum Worm: alle Wege zusammen). |
+| C01-03 Black Marketeer | 1 | `beforeSummon` + neuer Skript-Haken `eintrittsLimitErreicht(engine, pi)` (von `_eintrittsLimitErreicht` gelesen, sperrt auch `actionPlaceCreature`). |
+| C01-04 Black Marketeer Galerie | 1 | Jede Ablagekarte ein eigener Galerieeintrag („up to 5 cards"). |
+| C01-09 Coreling | 1 | Verlässt der Spirit das Brett (Tod/Abgang), fällt `_hasHaste` sofort. |
+| C01-17 Cats of the Pharaoh | 1 | `hasCardType(cd,'Creature')`: Kreatur-Tokens/Artifact Creatures zählen als Kreaturen. |
+| C02-03 Doomed Town Guard | 1 | Klammer „one or more" je Sterbe-Ereignis (`engine.todesEreignisSchluessel()`: Zerstörungsschleife bzw. äußerster Niederlagen-Sammler), nicht je Zug. |
+| C02-04 Drill Sergeant | 1 | `actionPlaceCreature` prüft `nurEinerSchonKontrolliert` zentral (Ruling W5b-B3); Drill Sergeant bietet solche Karten nicht an. |
+| C03-07 Grave Worm | 1 | Todes-Hooks tragen `ziel`/`ablageBesitzer`; der Wurm reagiert nur, wenn die Karte wirklich in SEINE Ablage ging (nicht gelöscht, nicht in die Ablage des Besitzers einer geliehenen Kreatur). Fall B (geliehene Kreatur) zusätzlich als Frage an Al. |
+| C03-11 Monster Nest | 1 | `summonOnlyFromHand` (Ifrit) wird nicht angeboten. |
+| C03-18 Horned Demon | 2 | Repro überholt: Al hat in Welle 3 entschieden, dass Zugende-Trigger nach dem Ablauf von Frost/Betäubung feuern dürfen (Ist-Zustand gewollt). Repro erwartet jetzt +1. |
+| C03-19 Monster Nest + Land Sharks | 1 | Mehrzonen-Kreaturen (`multiZone`) werden nur angeboten, wenn die weiteren Zonen frei sind (Nest-Zone zählt mit). |

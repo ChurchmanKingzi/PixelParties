@@ -12805,6 +12805,23 @@ class GameEngine {
         return;
       }
     }
+    // W16d (A08-07): Extra Life (Trial of Coolness) greift bei JEDEM „defeat" einer Kreatur, nicht nur beim Schadenstod:
+    // gleiche Stempelung wie im Schadens-Batch, die Wiederbelebung löst `actionMoveCard` ein. Ein Opfer ist kein „defeat"
+    // (sonst wären Opferkosten umsonst) und bleibt außen vor.
+    if (isCreatureTarget && !opts.isSacrifice && targetCard.counters?._extraLife && !targetCard._reviveAfterDeath) {
+      const lifeMark = this._popExtraLife(targetCard.counters);
+      targetCard._reviveAfterDeath = {
+        name: targetCard.name,
+        owner: targetCard.owner,
+        originalOwner: targetCard.originalOwner,
+        heroIdx: targetCard.heroIdx,
+        zoneSlot: targetCard.zoneSlot,
+        by: lifeMark?.by || 'Extra Life',
+        fireHooks: true,
+        bypassSummoningSickness: true,
+      };
+      this.log('extra_life_creature_revive', { creature: targetCard.name, by: lifeMark?.by || 'Extra Life' });
+    }
     this.log('destroy', { source: source?.name, target: targetCard.name });
 
     // Zone-anchored discard flight for board → discard moves. The
@@ -12893,7 +12910,7 @@ class GameEngine {
       // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
       const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
       const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
-      const _zielPile = (targetCard._redirectToDeleted || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';
+      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -14023,7 +14040,7 @@ class GameEngine {
     // cards already heading to deleted (Cosmic Manipulation etc.) or
     // staying on the board (return-to-hand, bounce-place) are
     // unaffected.
-    if (cardInstance._redirectToDeleted && toZone === ZONES.DISCARD) {
+    if (cardInstance._redirectToDeleted && toZone === ZONES.DISCARD && !cardInstance._reviveAfterDeath) {   // W16d: Wiederbelebung (Extra Life) geht vor der Löschumleitung
       delete cardInstance._redirectToDeleted;
       toZone    = ZONES.DELETED;
       toHeroIdx = -1;
@@ -14348,6 +14365,9 @@ class GameEngine {
         // ★ v1334: Level ZUM TODESZEITPUNKT (Grund + Aenderungen) — nach
         // dem Tod ist die Instanz weg („30 times its level", Core Explosion).
         level: this.kreaturLevelJetzt(cardInstance),
+        // W16d (C03-07): WOHIN die Karte ging (nach allen Umleitungen): 'discard' (in die Ablage von `ablageBesitzer`), 'deleted', …
+        ziel: toZone === ZONES.DISCARD ? 'discard' : (toZone === ZONES.DELETED ? 'deleted' : String(toZone)),
+        ablageBesitzer: cardInstance.originalOwner ?? cardInstance.owner,
       };
       // ★ Welle 10 (Al, Q38 / A06-rebelliokai-03: „Ja, Bone Dog feuert zuerst“): eine „immediately"-Wiederbelebung (`_reviveAfterDeath.sofort`,
       // Loyal Bone Dog) wird VOR den Todes-Triggern anderer Karten (Loyal Shepherd, Terrier …) aufgelöst; sie sehen den Platz dann belegt.
@@ -16232,6 +16252,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         from: fromPs.username, to: toPs.username,
       });
       return { success: false, controlLocked: true };
+    }
+    // W16d (A07-31): Beschränkungen der Kreatur gelten auch bei der Übernahme (Brachion „only control 1", Gigantisaur „1 pro Held").
+    {
+      const _grund = this.uebernahmeUnzulaessig(inst, neuerKtrl, toPlayerIdx, destHeroIdx);
+      if (_grund) {
+        this.log('transfer_fizzle', { creature: inst.name, reason: _grund, from: fromPs.username, to: toPs.username });
+        return { success: false, ruleBlocked: _grund };
+      }
     }
 
     const cardName = inst.name;
@@ -18368,6 +18396,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (!canApply) return false;
 
+    // W16d (A08-13): Status-Umleitungs-Surprise (Cactus Creature) gilt für „a target you control" – auch für Kreaturen.
+    // Nur negative Status, nicht bei „negate its effects" (keinStatus), nicht innerhalb einer Surprise-Auflösung.
+    if (STATUS_EFFECTS[statusName]?.negative && !opts.keinStatus && !opts._fromSurpriseRedirect
+        && !this._inSurpriseResolution && !this._inMctsSim && inst.zone === ZONES.SUPPORT && !inst.faceDown) {
+      const redirect = await this._checkSurpriseOnCreatureStatus(inst, statusName, opts);
+      if (redirect) {
+        if (redirect.type === 'hero') {
+          await this.addHeroStatus(redirect.owner, redirect.heroIdx, statusName, {
+            stacks: opts.stacks, addStacks: opts.addStacks, duration: opts.duration,
+            appliedBy: typeof opts.sourceOwner === 'number' ? opts.sourceOwner : -1,
+            _fromSurpriseRedirect: true,
+          });
+        } else if (redirect.type === 'equip' && redirect.cardInstance) {
+          await this.applyCreatureStatus(redirect.cardInstance, statusName, { ...opts, _fromSurpriseRedirect: true });
+          this.log('status_add', { target: redirect.cardInstance.name, status: statusName, owner: redirect.owner });
+        }
+        this.sync();
+        return false;
+      }
+    }
+
     if (!inst.counters) inst.counters = {};
     // Presence flag — every creature status uses `counters[name] = 1`
     // as the "this status is on me" gate. Engine reads (frozen, stunned,
@@ -20397,6 +20446,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters.crossSideControlled = controller;
     if (inst.originalOwner === inst.owner) inst.originalOwner = controller;
     return inst;
+  }
+
+  /**
+   * W16d (A08-17): die von Ushabti eingelagerte Kreatur in der Surprise Zone von (Seite `pi`, Held `heroIdx`) – oder null.
+   * Maßgeblich ist die Seite der Zone (`ushabtiSide`), nicht der Kartenbesitzer (seitenfremd beschworene Kreaturen).
+   */
+  ushabtiEingelagert(pi, heroIdx) {
+    return this.cardInstances.find(c => c.zone === 'surprise' && c.ushabtiPlaced && c.heroIdx === heroIdx
+      && (c.ushabtiSide ?? c.owner) === pi) || null;
   }
 
   physicalSide(inst) {
@@ -26602,12 +26660,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // array.
     let inst = null;
     {
-      const matches = this.cardInstances.filter(c =>
-        c.owner === fromPi && c.zone === ZONES.HAND && c.name === cardName,
-      );
-      // Take the first matching inst — engine state already keeps inst
-      // ordering in sync with hand array order.
-      inst = matches[0] || null;
+      // W16d (A08-04): die Instanz an POSITION `handIdx` (k-te Karte dieses Namens, wie Crystal Well/Mary rechnen),
+      // nicht der erste Namens-Treffer – sonst wandert bei gleichnamigen Handkarten die falsche (originalOwner vertauscht).
+      inst = this._findHandInstanceAt(fromPi, handIdx);
     }
 
     fromPs.hand.splice(handIdx, 1);
@@ -26620,6 +26675,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.zone = ZONES.HAND;
       inst.heroIdx = -1;
       inst.zoneSlot = -1;
+      // W16d (A08-04): die Rang-Zuordnung (Handplatz <-> k-te Instanz des Namens in `cardInstances`) bleibt nur stimmig, wenn die
+      // Instanz in der Reihenfolge des Eintreffens steht (die Hand wird per push erweitert) – ans Ende der Liste.
+      const ci = this.cardInstances.indexOf(inst);
+      if (ci >= 0 && ci !== this.cardInstances.length - 1) { this.cardInstances.splice(ci, 1); this.cardInstances.push(inst); }
     } else {
       inst = this._trackCard(cardName, toPi, ZONES.HAND);
       // No prior inst — `_trackCard` defaults `originalOwner` to the
@@ -27130,6 +27189,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return false;
     }
+    // W16d (A07-31): „You can only control 1 X" gilt auch bei der (zeitweiligen) Übernahme; die Zone ändert sich nicht (kein Gigantisaur-Test).
+    {
+      const _grund = this.uebernahmeUnzulaessig(inst, stealerPi);
+      if (_grund) {
+        this.log('steal_fizzle', { creature: inst.name, reason: _grund, by: opts.sourceName || 'Steal' });
+        return false;
+      }
+    }
 
     inst.stolenBy = stealerPi;
     inst.stolenFromOwner = originalOwner;
@@ -27237,7 +27304,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   _eintrittsLimitErreicht(cardName, playerIdx) {
-    const key = loadCardEffect(cardName)?.playLimitKey;
+    const _sc = loadCardEffect(cardName);
+    // W16d (C01-03): Karten mit einem Limit, das nicht „1 pro Zug" ist (Black Marketeer: „1 pro Spiel"), melden es über
+    // `eintrittsLimitErreicht(engine, pi)` – dieselben Wege (Platzieren, Ausgrauen, Wahl-Filter) sperren dann ebenso.
+    if (typeof _sc?.eintrittsLimitErreicht === 'function' && _sc.eintrittsLimitErreicht(this, playerIdx)) return true;
+    const key = _sc?.playLimitKey;
     if (!key) return false;
     if (this.gs.hoptUsed?.[`${key}:${playerIdx}`] === this.gs.turn) return true;
     return this.cardInstances.some(c => c.name === cardName && c.zone === ZONES.SUPPORT
@@ -27300,6 +27371,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Welle 12 (Al, Rueckfrage 12): „You can only play 1 'X' per turn" sperrt auch das Platzieren (Mausoleum Worm), bevor etwas entnommen wird.
     if (this._eintrittsLimitErreicht(cardName, playerIdx)) {
       this.log('placement_blocked', { card: cardName, by: opts.sourceName || 'Placement', reason: 'play_limit' });
+      return null;
+    }
+    // W16d (C02-04): „You can only control 1 X" gilt auch beim Platzieren (Ruling W5b-B3, Army of the Cute & Co. prüfen es einzeln) -
+    // hier EINMAL zentral, damit kein Platzier-Effekt (Drill Sergeant …) eine zweite Kopie legt. Vor jeder Entnahme.
+    if (!opts.selfPlacement && this.nurEinerSchonKontrolliert(playerIdx, cardName)) {
+      this.log('placement_blocked', { card: cardName, by: opts.sourceName || 'Placement', reason: 'only_control_1' });
       return null;
     }
 
@@ -33400,6 +33477,30 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * W16d (A08-13): dasselbe Status-Fenster (Cactus Creature: „a target you control would be affected by a status effect") für eine
+   * KREATUR als Ziel. Die Instanz geht als `statusInfo.targetCreature` mit; es reagiert ihr Kontrolleur.
+   */
+  async _checkSurpriseOnCreatureStatus(inst, statusName, opts) {
+    if (this._surpriseNestingBlocked()) return null;
+    const reaktor = inst.controller ?? inst.owner;
+    const statusInfo = {
+      targetOwner: inst.owner, targetHeroIdx: inst.heroIdx, targetController: reaktor,
+      targetCreature: inst, statusName, opts,
+    };
+    const statusLabel = STATUS_EFFECTS[statusName]?.label || statusName;
+    const _pend = this.gs._pendingPlayLog?.data;
+    const _trigger = opts?.sourceName || opts?.source?.name || (typeof opts?.source === 'string' ? opts.source : null)
+      || _pend?.card || _pend?.effect || null;
+    const _src = _trigger ? `the opponent's "${_trigger}"` : 'an opponent effect';
+    const result = await this._scanSurpriseEntriesForPlayer(reaktor, 'surpriseStatusTrigger', statusInfo, {
+      message: () => `${inst.name} is about to be ${statusLabel} by ${_src}!`,
+      confirmLabel: '🌵 Activate Surprise!',
+    });
+    if (result?.redirect) return result.redirect;
+    return null;
+  }
+
+  /**
    * Check if the gainer's opponent has a Surprise that triggers on the
    * gainer's Gold gain (Gold Trap and any future analog). Called from
    * `actionGainGold` AFTER `ON_RESOURCE_GAIN` hooks have run, so the
@@ -34699,6 +34800,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  zoneSlot, instId, source, type }] — nur die Tode der Seite `pi`.
   // ═══════════════════════════════════════════════════════════════
   async _mitNiederlagenSammler(fn) {
+    // W16d (C02-03): jeder aeusserste Sammler ist ein eigenes Sterbe-Ereignis (Kennung fuer „one or more targets", Doomed Town Guard).
+    if (!(this._niederlagenTiefe > 0)) this._niederlagenEreignisId = (this._niederlagenEreignisId || 0) + 1;
     this._niederlagenTiefe = (this._niederlagenTiefe || 0) + 1;
     try {
       return await fn();
@@ -40301,6 +40404,8 @@ this._deathWatch = (this._deathWatchStack || []).length
             const _hoptVorher = link.isInitialCard ? this._hoptAbzug() : null;
             try {
               result = await link.resolve(chain, i);
+              // W16d (A09-09): Nachaufloesung am Glied (Arrow Slit: zweite Aktivierung unmittelbar nach der ersten).
+              if (typeof link._nachAufloesung === 'function') await link._nachAufloesung();
             } finally {
               this._rxResolvingOwner = _vorherAufloeser;
               this._rxResolvingCard = _vorherKarte;
@@ -41029,6 +41134,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * alle folgenden Einzelzerstoerungen stumm.
    */
   beginDestroyScope(anzahl) {
+    if (!this._destroyScope) this._destroyScopeId = (this._destroyScopeId || 0) + 1;   // W16d (C02-03): Kennung des Sammel-Ereignisses
     this._destroyScope = { total: anzahl || 0, tiefe: (this._destroyScope?.tiefe || 0) + 1 };
     return this._destroyScope;
   }
@@ -41037,6 +41143,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this._destroyScope) return;
     if ((this._destroyScope.tiefe || 1) <= 1) this._destroyScope = null;
     else this._destroyScope.tiefe -= 1;
+  }
+
+  /**
+   * W16d (C02-03): Kennung des laufenden STERBE-EREIGNISSES („one or more targets are defeated"): ein Flaechenschlag oder eine
+   * Zerstoerungsschleife ist EIN Ereignis, zwei getrennte Zerstoerungen/Schlaege sind zwei. `null` = ausserhalb jedes Sammlers
+   * (jeder Tod ein eigenes Ereignis).
+   */
+  todesEreignisSchluessel() {
+    if (this._destroyScope) return `s${this._destroyScopeId}`;
+    if ((this._niederlagenTiefe || 0) > 0) return `n${this._niederlagenEreignisId}`;
+    return null;
   }
 
   /** Zerstoert der laufende Effekt genau EINE Karte? */
@@ -41363,6 +41480,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
     return this.cardInstances.some(c => c.name === cardName && c.zone === 'support' && !c.faceDown
       && (c.controller ?? c.owner) === pi);
+  }
+
+  /**
+   * W16d (A07-31): darf `inst` unter die Kontrolle von `neuerKtrl` wechseln (Dark Gear, Diplomacy, Capture, Memory Blast, Liberation …)?
+   * Die Beschränkungen im Text der Kreatur gelten auch bei der Übernahme (Ruling W5b-B3: „You can only control 1" auch beim
+   * Platzieren/Übernehmen):
+   *  • „You can only control 1 X" (Gigantisaur Brachion, Ethan, …): `nurEinerSchonKontrolliert` für den neuen Kontrolleur;
+   *  • „A Hero can only have 1 Gigantisaur Creature in its Support Zones": nur wenn die Kreatur in eine NEUE Zone (Seite+Held) zieht.
+   * Liefert den Grund (String) oder null.
+   */
+  uebernahmeUnzulaessig(inst, neuerKtrl, zielSeite = null, zielHeroIdx = null) {
+    if (!inst || neuerKtrl == null) return null;
+    if ((inst.controller ?? inst.owner) !== neuerKtrl && this.nurEinerSchonKontrolliert(neuerKtrl, inst.name)) return 'only_control_1';
+    if (zielSeite != null && zielHeroIdx != null && zielHeroIdx >= 0) {
+      const { isGigantisaurCreature } = require('./_gigantisaurs-shared');
+      if (isGigantisaurCreature(inst.name, this)) {
+        const belegt = this.cardInstances.some(c => c.id !== inst.id && c.zone === ZONES.SUPPORT && !c.faceDown
+          && this.physicalSide(c) === zielSeite && c.heroIdx === zielHeroIdx && isGigantisaurCreature(c.name, this));
+        if (belegt) return 'gigantisaur_per_hero';
+      }
+    }
+    return null;
   }
 
   /**
@@ -49481,6 +49620,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         _creatureDeath: true,
       });
     }
+    // W16d (C03-07): Ziel der Karte fuer die Todes-Hooks (siehe actionMoveCard-Pfad): 'discard' | 'deleted' | 'rescued' | null (beansprucht).
+    deathInfo.ziel = _creatureDest;
+    deathInfo.ablageBesitzer = e.inst.originalOwner ?? e.inst.owner;
     // Attached Hero (Goff/Gon-style) follows the host Creature into
     // the same original-owner's discard pile when the host dies.
     // The Hero was never tracked as an instance — only stored as a
@@ -51560,7 +51702,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     const oldName = hero.name;
     const oldBaseMaxHp = cardDB[oldName]?.hp || 0;
     const newBaseMaxHp = newCardData.hp || oldBaseMaxHp;
-    const ascensionDelta = newBaseMaxHp - oldBaseMaxHp;
+    let ascensionDelta = newBaseMaxHp - oldBaseMaxHp;
+    // W16d (A08-05): „cannot be increased in any way" (Paraseed Control, Divine Gift of Death …) gilt auch für den Aufstiegszuschlag.
+    if (ascensionDelta > 0 && hero.maxHpCapped != null) {
+      ascensionDelta = Math.max(0, Math.min(ascensionDelta, hero.maxHpCapped - (hero.maxHp || oldBaseMaxHp)));
+    }
     const newMaxHp = Math.max(1, (hero.maxHp || oldBaseMaxHp) + ascensionDelta);
     const newHp = Math.max(1, (hero.hp || 0) + ascensionDelta);
 

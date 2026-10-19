@@ -290,20 +290,12 @@ async function applyArrowsAfterDamage(engine, source, target, dealt, _origAmount
       }
     }
     // Gold gain per N damage dealt (Golden Arrow).
-    if (typeof arrow.goldRatio === 'number' && arrow.goldRatio > 0 && dealt > 0) {
-      const gold = Math.floor(dealt / arrow.goldRatio);
-      if (gold > 0 && ps && !ps.goldLocked) {
-        await engine.actionGainGold(pi, gold);
-        engine.log('arrow_gold_gain', {
-          player: ps.username, gold, source: arrow.sourceCard || 'Arrow',
-        });
-      }
-      if (arrow.goldLockAfter && ps) {
-        ps.goldLocked = true;
-        engine.log('gold_locked', {
-          player: ps.username, by: arrow.sourceCard || 'Golden Arrow',
-        });
-      }
+    // W16d (A09-10): „hits EXACTLY 1 target" – ob der Angriff genau ein Ziel trifft, steht erst am Ende fest (Whirlwind Strike,
+    // Ricochet & Co. treffen mehrere). Deshalb hier nur MITZÄHLEN (je Ziel); ausgezahlt wird in `clearArmedArrows`.
+    if (typeof arrow.goldRatio === 'number' && arrow.goldRatio > 0) {
+      if (!arrow._goldTreffer) arrow._goldTreffer = new Map();
+      const key = targetLoc.kind === 'hero' ? `h${targetLoc.owner}-${targetLoc.heroIdx}` : `c${targetLoc.inst?.id}`;
+      arrow._goldTreffer.set(key, (arrow._goldTreffer.get(key) || 0) + (dealt > 0 ? dealt : 0));
     }
   }
 }
@@ -313,13 +305,31 @@ async function applyArrowsAfterDamage(engine, source, target, dealt, _origAmount
  * Hero of `pi`. Called after the triggering Attack's
  * `afterSpellResolved` hook and on negation.
  */
-function clearArmedArrows(engine, pi) {
+async function clearArmedArrows(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
   // Styx 28.9.: auch geliehene Angreifer (Brettseite des Gegners).
   const helden = new Set(ps.heroes || []);
   if (typeof engine.heroesControlledBy === 'function') {
     for (const { hero } of engine.heroesControlledBy(pi)) helden.add(hero);
+  }
+  // W16d (A09-10): Golden Arrow zahlt erst jetzt – und nur, wenn der Angriff GENAU EIN Ziel getroffen hat.
+  for (const hero of helden) {
+    if (!hero?._armedArrows) continue;
+    for (const arrow of hero._armedArrows) {
+      if (!(arrow.goldRatio > 0) || !arrow._goldTreffer || arrow._goldTreffer.size !== 1) continue;
+      const dealt = [...arrow._goldTreffer.values()][0];
+      if (!(dealt > 0)) continue;
+      const gold = Math.floor(dealt / arrow.goldRatio);
+      if (gold > 0 && !ps.goldLocked) {
+        await engine.actionGainGold(pi, gold);
+        engine.log('arrow_gold_gain', { player: ps.username, gold, source: arrow.sourceCard || 'Arrow' });
+      }
+      if (arrow.goldLockAfter) {
+        ps.goldLocked = true;
+        engine.log('gold_locked', { player: ps.username, by: arrow.sourceCard || 'Golden Arrow' });
+      }
+    }
   }
   for (const hero of helden) {
     if (!hero) continue;

@@ -26,6 +26,10 @@ function kontrolliert(engine, pi, hero) {
 function uebernommeneHelden(engine, pi) {
   return engine.heroesControlledBy(pi).filter(e => e.physOwner !== pi && e.hero?.name && e.hero.hp > 0);
 }
+/** W16d (A08-13): ist die Kreatur an dieser Stelle das ursprüngliche Ziel (Status-Fenster einer Kreatur)? */
+function istUrsprungKreatur(statusInfo, inst) {
+  return !!(statusInfo.targetCreature && inst && statusInfo.targetCreature.id === inst.id);
+}
 /** Kann der Held diesen Status (noch) bekommen? Gift nur mit mehr Stapeln. */
 function heldKannEmpfangen(hero, sName, newStacks) {
   if (!hero.statuses?.[sName]) return true;
@@ -62,7 +66,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (ownerIdx === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
+      if (!statusInfo.targetCreature && ownerIdx === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
       if (!kontrolliert(engine, ownerIdx, hero)) {
         // Held gerade nicht unter unserer Kontrolle — nur seine Kreaturen
       } else if (hero.statuses?.[sName]) {
@@ -81,6 +85,7 @@ module.exports = {
         );
         const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[slot[0]];   // wirksame Daten (Als Sweep 9.10.)
         if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+        if (istUrsprungKreatur(statusInfo, inst)) continue;   // W16d: die betroffene Kreatur selbst ist kein „any other target"
         if (inst?.counters?.[sName]) {
           if (sName === 'poisoned' && newStacks > (inst.counters.poisonStacks || 1)) return true;
         } else {
@@ -89,7 +94,7 @@ module.exports = {
       }
     }
     for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, ownerIdx)) {
-      if (physOwner === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
+      if (!statusInfo.targetCreature && physOwner === statusInfo.targetOwner && hi === statusInfo.targetHeroIdx) continue;
       if (heldKannEmpfangen(hero, sName, newStacks)) return true;
     }
     return false; // No valid redirect targets
@@ -247,8 +252,8 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      // Exclude original target
-      if (pi === origOwner && hi === origHeroIdx) continue;
+      // Exclude original target (bei einer Kreatur als Ursprung: nur diese Kreatur, W16d A08-13)
+      if (!sourceInfo.targetCreature && pi === origOwner && hi === origHeroIdx) continue;
       const heldMeiner = kontrolliert(engine, pi, hero);
       // Check if hero can receive this status
       if (heldMeiner && hero.statuses?.[statusName]) {
@@ -277,6 +282,7 @@ module.exports = {
         );
         const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[cardName];   // wirksame Daten (Als Sweep 9.10.)
         if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+        if (istUrsprungKreatur(sourceInfo, inst)) continue;   // W16d: die betroffene Kreatur selbst ausnehmen
         if (inst?.faceDown) continue; // Face-down surprises are not targetable
         // Check if creature already has this status
         if (inst?.counters?.[statusName]) {
@@ -299,7 +305,7 @@ module.exports = {
       }
     }
     for (const { physOwner, heroIdx: hi, hero } of uebernommeneHelden(engine, pi)) {
-      if (physOwner === origOwner && hi === origHeroIdx) continue;
+      if (!sourceInfo.targetCreature && physOwner === origOwner && hi === origHeroIdx) continue;
       if (!heldKannEmpfangen(hero, statusName, newPoisonStacks)) continue;
       targets.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
     }
@@ -321,10 +327,10 @@ module.exports = {
     const target = targets.find(t => t.id === selectedIds[0]);
     if (!target) return null;
 
-    // Cactus animation on original target (hero)
+    // Cactus animation on original target (hero; bei einer Kreatur ihre Zone)
     engine._broadcastEvent('play_zone_animation', {
       type: 'cactus_burst', owner: origOwner,
-      heroIdx: origHeroIdx, zoneSlot: -1,
+      heroIdx: origHeroIdx, zoneSlot: sourceInfo.targetCreature ? sourceInfo.targetCreature.zoneSlot : -1,
     });
     // Cactus animation on new target
     if (target.type === 'hero') {
@@ -342,7 +348,7 @@ module.exports = {
 
     engine.log('status_redirected', {
       status: sourceInfo.statusName,
-      from: gs.players[origOwner]?.heroes?.[origHeroIdx]?.name,
+      from: sourceInfo.targetCreature ? sourceInfo.targetCreature.name : gs.players[origOwner]?.heroes?.[origHeroIdx]?.name,
       to: target.cardName,
       by: 'Cactus Creature',
     });

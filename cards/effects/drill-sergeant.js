@@ -52,6 +52,7 @@ function eligibleHandCards(engine, pi) {
     const cd = db[name];
     if (!cd || !isSummonablePileCreature(cd)) continue;
     if (typeof cd.level !== 'number' || cd.level > MAX_LEVEL) continue;
+    if (engine.nurEinerSchonKontrolliert(pi, name)) continue;   // W16d (C02-04): „You can only control 1" - nicht anbieten
     counts.set(name, (counts.get(name) || 0) + 1);
   }
   return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count }));

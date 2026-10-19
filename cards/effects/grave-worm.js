@@ -180,6 +180,10 @@ module.exports = {
       // creature actually landed in our discard pile (not deleted /
       // exiled).
       if (!(ps.discardPile || []).includes(death.name)) return;
+      // W16d (C03-07): die besiegte Karte muss WIRKLICH in MEINE Ablage gegangen sein - nicht gelöscht (Hell Fox: „delete it", Ghazma,
+      // Token) und nicht in die Ablage des Besitzers einer geliehenen Kreatur; ein anderes Exemplar desselben Namens in meiner Ablage
+      // genügt nicht. Die Todes-Hooks tragen `ziel`/`ablageBesitzer`; fehlen sie (alte Pfade), gilt weiter die Namensprüfung.
+      if (death.ziel !== undefined && (death.ziel !== 'discard' || death.ablageBesitzer !== pi)) return;
 
       // State-based "am I in the discard pile?" gate. This is the
       // real check that lets us listen broadly across zones — works

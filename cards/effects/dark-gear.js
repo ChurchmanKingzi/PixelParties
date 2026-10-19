@@ -40,10 +40,13 @@ const BASE_COST = 5;
  * destinations. Matches the engine-wide "Creatures are independent
  * of their Hero" rule.
  */
-function getFreeZones(gs, playerIdx) {
+function getFreeZones(gs, playerIdx, uebernahmeInst = null, engine = null) {
   const ps = gs.players[playerIdx];
   const zones = [];
+  const eng = engine || gs._engineRef;
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // W16d (A07-31): „A Hero can only have 1 Gigantisaur" - Helden, die schon einen tragen, sind für einen Gigantisaurier kein Ziel.
+    if (uebernahmeInst && eng && eng.uebernahmeUnzulaessig(uebernahmeInst, playerIdx, playerIdx, hi) === 'gigantisaur_per_hero') continue;
     const hero = ps.heroes[hi];
     const heroLabel = hero?.name
       ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
@@ -98,6 +101,7 @@ function getStealableCreatures(engine, playerIdx) {
     const inst = t.cardInstance;
     if (inst && engine.isCreatureImmune(inst, 'targeting_immune')) return false;
     if (inst && engine.isCreatureImmune(inst, 'control_immune')) return false;
+    if (inst && engine.uebernahmeUnzulaessig(inst, playerIdx) === 'only_control_1') return false;   // W16d (A07-31): „You can only control 1" (Brachion)
     // Read the EFFECTIVE card data — instances may carry a per-instance
     // override (Biomancy Token: a Potion repurposed as a Creature/Token
     // with `_cardDataOverride.level = 0/1/2` based on its Biomancy
@@ -221,7 +225,7 @@ module.exports = {
     }
 
     // Prompt for a free support zone on the player's side
-    const freeZones = getFreeZones(gs, pi);
+    const freeZones = getFreeZones(gs, pi, target.cardInstance, engine);
     if (freeZones.length === 0) {
       engine.log('dark_gear_fizzle', { player: ps.username, reason: 'no_free_zones' });
       return { aborted: true };

@@ -88,6 +88,9 @@ module.exports = {
     inst.knownToOpponent = true;
     inst.ushabtiPlaced = true;
     inst.ushabtiTurn = gs.turn || 0;
+    // W16d (A08-17): die Surprise Zone gehört zur SEITE des Helden (`heroOwner`) – bei einer seitenfremd beschworenen Kreatur
+    // (Plant Golem: Besitzer 0, steht auf Seite 1) ist das nicht `inst.owner`. Der Beschwörungsweg (server.js) liest diese Seite.
+    inst.ushabtiSide = heroOwner;
 
     engine.log('ushabti_entomb', { card: cardName, player: ps.username, hero: ps.heroes?.[heroIdx]?.name });
 
