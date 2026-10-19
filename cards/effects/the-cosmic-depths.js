@@ -214,12 +214,12 @@ module.exports = {
 
     // ── Step 3: build the filtered deck-Creature gallery ─────────────
     // Re-read state in case onDiscard-style hooks shifted something.
-    // The shuffled card's NAME is excluded: "the card shuffled back"
-    // cannot itself be the search payoff. Name-based exclusion is
-    // intentional (see helper comment) — with multiple copies of the
-    // same Creature, none of them are searchable this activation.
+    // ★ W16b (A02-deepsea-23): KEIN Ausschluss der zurückgemischten Karte. Der Text sagt „shuffle a card from their hand back into their
+    // deck to search their deck for a Creature …" — die Karte liegt danach im Deck und ist suchbar, sofern ihre Stufe passt. Der frühere
+    // Namensausschluss war eine Zusatzregel (nicht im Text), und `canActivateAreaEffect` prüfte ohne ihn: Aktivierung angeboten, Karte
+    // gemischt, nichts beschworen.
     const ownedLevels = getOwnedCreatureLevels(engine, activator);
-    const eligibleNames = getEligibleDeckCreatures(engine, activator, ownedLevels, shuffledName);
+    const eligibleNames = getEligibleDeckCreatures(engine, activator, ownedLevels);
     if (eligibleNames.length === 0) {
       // Cost paid, no payoff — HOPT stays claimed (the area's gate had
       // at least one valid creature at click time; state may have
