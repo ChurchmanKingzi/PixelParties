@@ -153,8 +153,11 @@ module.exports = {
     // opp source only (Als Vorgabe 29.9.: handelnder Spieler, nicht Seite)
     if ((sourceInfo.controller ?? sourceInfo.owner) === ownerIdx) return false;
     if (sourceInfo.heroIdx == null || sourceInfo.heroIdx < 0) return false;
+    // W16c (A05-25): wirkt eine KREATUR den Zauber (Skeleton Priest/Wizard, Demon's Gate: `_creatureCasterForSource`), ist der Angreifer
+    // die Kreatur, nicht der Wirtsheld - das Netz negiert, kann aber an keinen Helden angehaengt werden ("if possible").
+    const kreaturWirkt = require('./_hooks').isCreatureSource(engine, sourceInfo);
     const attacker = gs.players[sourceInfo.owner]?.heroes?.[sourceInfo.heroIdx];
-    if (!attacker || attacker.hp <= 0) return false;
+    if (!kreaturWirkt && (!attacker || attacker.hp <= 0)) return false;
     // Source must be a Spell or Attack CARD. Demon's Gate-style
     // creature-caster annotation preserves the source name in cardDB
     // so we still read the actual cardType.
@@ -164,7 +167,7 @@ module.exports = {
     if (!srcData) return false;
     if (srcData.cardType !== 'Spell' && srcData.cardType !== 'Attack') return false;
     // Free Support Zone on the attacker for the attach.
-    if (findFreeSupportSlot(gs.players[sourceInfo.owner], sourceInfo.heroIdx) < 0) return false;
+    if (!kreaturWirkt && findFreeSupportSlot(gs.players[sourceInfo.owner], sourceInfo.heroIdx) < 0) return false;
     return true;
   },
 
@@ -193,6 +196,27 @@ module.exports = {
 
     const attackerPs = gs.players[attackerOwner];
     const attackerHero = attackerPs?.heroes?.[attackerHi];
+    // W16c (A05-25): Kreatur als Wirker -> negieren, aber nichts anhaengen (kein Held als Angreifer); die Karte geht in die Ablage.
+    if (require('./_hooks').isCreatureSource(engine, sourceInfo)) {
+      const ownerPs0 = gs.players[zonenSeite];
+      const inst0 = ctx.card;
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'crimson_web', owner: attackerOwner, heroIdx: attackerHi, zoneSlot: -1,
+        von: { owner: zonenSeite, heroIdx: ownerHi, zoneType: 'surprise' },
+        bleibt: false, duration: 2100,
+      });
+      await engine._delay(1100);
+      const sz0 = ownerPs0?.surpriseZones?.[ownerHi];
+      if (sz0) {
+        const idx0 = sz0.indexOf(CARD_NAME);
+        if (idx0 >= 0) sz0.splice(idx0, 1);
+      }
+      gs.players[ctx.cardOriginalOwner ?? zonenSeite]?.discardPile?.push(CARD_NAME);
+      if (inst0) engine._untrackCard(inst0.id);
+      engine.log('crimson_web_no_attach', { reason: 'attacker_is_creature', player: ownerPs0?.username });
+      engine.sync();
+      return { effectNegated: true };
+    }
     if (!attackerHero || attackerHero.hp <= 0) return null;
 
     const freeSlot = findFreeSupportSlot(attackerPs, attackerHi);
