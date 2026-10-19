@@ -7,7 +7,7 @@
 const H = require('../../lib/h.js');
 async function lauf(wo) {
   const t = await H.fresh({ hand: [['Fireball', ...(wo === 'hand' ? ['Spider Hive'] : [])], []] });
-  t.setAbilities(0, 0, [['Destruction Magic'], [], []]);
+  t.setAbilities(0, 0, [['Destruction Magic', 'Destruction Magic'], [], []]);   // W16c: Fireball ist Lv2 – mit Destruction Magic 1 wurde der Zauber gar nicht gespielt (alle Läufe zeigten hp 800)
   t.setAbilities(1, 0, [['Decay Magic'], [], []]);            // Decay Magic 1: Crimson Web (Lv3) eigentlich nicht auslösbar
   const s1 = t.put(0, 2, 0, 'Cute Spider'); s1.turnPlayed = 1;
   const s2 = t.put(1, 2, 0, 'Cute Spider'); s2.turnPlayed = 1;
