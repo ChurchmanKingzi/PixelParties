@@ -173,6 +173,10 @@ Bannen, Kicken, Timeout, @everyone erwähnen …), die Admin-Rollen des Bots und
 für **neue** Beiträge des Bots, nicht für bestehende Nachrichten.
 
 ### Moderation
+* **Der Bot pingt nie `@everyone`, `@here` oder eine Rolle** — nicht bei neuen Karten, geänderten Karten, Spielen, Daily oder sonst irgendwo. Das ist hart eingebaut
+  (`bot/lib/mention-guard.js`): Jede ausgehende Nachricht läuft durch eine Sperre, die solche Pings entfernt, selbst wenn irgendwo im Code oder im Text etwas anderes steht.
+  Einzelne Personen werden nur dort angesprochen, wo es die Funktion verlangt: Begrüßung neuer Mitglieder, „Nuh-uh“, Mystery-Sieger, Turnier-Paarungen und
+  angenommene Duelle.
 * **Neues Mitglied** (< 6 Monate auf dem Server) pingt `@everyone`, `@here` oder eine Rolle **und** die Nachricht enthält einen
   Link → Nachricht wird gelöscht, MoniaBot antwortet **„Nuh-uh, not cool, @Nutzer!“**, der Nutzer ist **eine Stunde stummgeschaltet**.
 * **Phishing-/Scam-Links** (Liste in `bot/data/blocked-domains.txt` + typische Lookalikes) werden unabhängig von Mitgliedsdauer und Ping genauso behandelt.

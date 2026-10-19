@@ -144,8 +144,8 @@ module.exports = function register(ctx) {
         const role = message.guild.roles.cache.get(row.role_id);
         const why = role ? await whyNotGrantable(message.guild, role) : 'the role no longer exists';
         if (why) { ctx.modlog(message.guild, { title: '⚠️ Reaction role refused', description: `<@${user.id}> reacted for <@&${row.role_id}> but ${why}.` }); return; }
-        await member.roles.add(row.role_id, 'MoniaBot: Reaction Role');
-      } else await member.roles.remove(row.role_id, 'MoniaBot: Reaction Role entfernt');
+        await member.roles.add(row.role_id, 'MoniaBot: reaction role');
+      } else await member.roles.remove(row.role_id, 'MoniaBot: reaction role removed');
     } catch (err) {
       console.error('[reactionroles]', err.message);
       if (reaction && reaction.message && reaction.message.guild) {
@@ -169,8 +169,8 @@ module.exports = function register(ctx) {
       const role = i.guild.roles.cache.get(roleId);
       const why = !has && (role ? await whyNotGrantable(i.guild, role) : 'the role no longer exists');
       if (why) { await i.reply({ content: 'I can’t give you that role anymore. Please ping a moderator.', flags: MessageFlags.Ephemeral }); ctx.modlog(i.guild, { title: '⚠️ Reaction role refused', description: `<@${i.user.id}> pressed <@&${roleId}> but ${why}.` }); return true; }
-      if (has) await i.member.roles.remove(roleId, 'MoniaBot: Reaction Role (Button)');
-      else await i.member.roles.add(roleId, 'MoniaBot: Reaction Role (Button)');
+      if (has) await i.member.roles.remove(roleId, 'MoniaBot: reaction role (button)');
+      else await i.member.roles.add(roleId, 'MoniaBot: reaction role (button)');
       await i.reply({ content: has ? `Removed <@&${roleId}>.` : `You now have <@&${roleId}>.`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
     } catch (err) {
       console.error('[reactionroles/button]', err.message);

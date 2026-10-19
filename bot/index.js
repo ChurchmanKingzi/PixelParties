@@ -8,6 +8,7 @@ const config = require('./config');
 const { openDb } = require('./lib/db');
 const { createGameApi } = require('./lib/game-api');
 const { createContext } = require('./lib/context');
+const { installMentionGuard } = require('./lib/mention-guard');
 
 const INVITE_PERMISSIONS = new PermissionsBitField([
   'ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles', 'AddReactions', 'ReadMessageHistory', 'UseExternalEmojis',
@@ -28,6 +29,8 @@ async function main() {
   if (!config.guildId) problems.push('GUILD_ID fehlt (Rechtsklick auf den Server → Server-ID kopieren)');
   if (!config.botSecret) problems.push('BOT_SECRET fehlt (muss mit dem des Spielservers übereinstimmen)');
   if (problems.length) { console.error('Konfiguration unvollständig:\n - ' + problems.join('\n - ')); process.exit(1); }
+
+  installMentionGuard();   // nie @everyone/@here/Rollen pingen — egal, was irgendwo in einer Nachricht steht
 
   const db = openDb(config.dataDir);
   await db.init();

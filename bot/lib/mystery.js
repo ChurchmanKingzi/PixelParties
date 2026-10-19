@@ -21,9 +21,13 @@ function judgeGuess(cards, target, guess) {
   const results = searchCards(cards, guess, { limit: 6 });
   if (!results.length) return { kind: 'unknown' };
   const best = results[0];
-  const tied = closeAlternatives(results);                       // andere Karten fast gleichauf
-  const targetInTie = tied.some(r => r.card.name === target.name);
-  if (best.card.name === target.name) {
+  // Farbvarianten („Rook of Kings [B]“ / „[W]“) sind für das Raten EINE Karte: gleicher Name ohne den Zusatz.
+  const same = (a, b) => norm(a.name) === norm(b.name);
+  // Ein (nahezu) exakter Name ist nie mehrdeutig, auch wenn ein Hero mit längerem Namen knapp dahinter liegt („Cool Rescue“ vs. „Cool Rescuer Monia“).
+  const exact = best.score >= 0.99;
+  const tied = exact ? [] : closeAlternatives(results).filter(r => !same(r.card, best.card));   // andere Karten fast gleichauf
+  const targetInTie = tied.some(r => same(r.card, target));
+  if (same(best.card, target)) {
     const gap = best.score - (results[1] ? results[1].score : 0);
     const clear = best.score >= GOOD_SCORE || (best.score >= OKAY_SCORE && gap >= CLEAR_GAP);   // „alice puppeteer“: nur ein Teil des Namens, aber eindeutig
     if (clear) return { kind: tied.length ? 'ambiguous' : 'correct', best: best.card };
@@ -88,4 +92,7 @@ function cropRect(artW, artH, center, size) {
   return { x: clamp(Math.round(center.x - size / 2), 0, artW - size), y: clamp(Math.round(center.y - size / 2), 0, artH - size), w: size, h: size };
 }
 
-module.exports = { judgeGuess, reward, cropSize, cropRect, CROP_START, berlinDay, nextBerlinMidnightSec, dayState, eligibleCards, MIN_GUESS_LEN };
+/** Anzeigename ohne Farbvarianten-Zusatz. */
+const plainName = name => String(name).replace(/\s*\[(?:B|W)\]$/, '');
+
+module.exports = { plainName, judgeGuess, reward, cropSize, cropRect, CROP_START, berlinDay, nextBerlinMidnightSec, dayState, eligibleCards, MIN_GUESS_LEN };

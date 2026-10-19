@@ -72,15 +72,15 @@ module.exports = function register(ctx) {
     let action = '';
     if (banNow) {
       try {
-        await guild.members.ban(user.id, { reason: `MoniaBot: ${count} Strikes (zuletzt: ${reason})`, deleteMessageSeconds: 3600 });
+        await guild.members.ban(user.id, { reason: `MoniaBot: ${count} strikes (latest: ${reason})`, deleteMessageSeconds: 3600 });
         action = '🔨 **Banned**';
       } catch (err) {
         action = '⚠️ Ban failed: ' + err.message;
-        try { await member.timeout(config.muteMinutes * 60 * 1000, 'MoniaBot: Bann fehlgeschlagen, ersatzweise Timeout'); action += ` — muted for ${config.muteMinutes} min instead`; } catch { /* nichts zu machen */ }
+        try { await member.timeout(config.muteMinutes * 60 * 1000, 'MoniaBot: ban failed, muted instead'); action += ` — muted for ${config.muteMinutes} min instead`; } catch { /* nichts zu machen */ }
       }
     } else {
       try {
-        await member.timeout(config.muteMinutes * 60 * 1000, `MoniaBot: ${reason} (Strike ${count}/${config.strikeLimit})`);
+        await member.timeout(config.muteMinutes * 60 * 1000, `MoniaBot: ${reason} (strike ${count}/${config.strikeLimit})`);
         action = `🔇 Muted for ${config.muteMinutes} min`;
       } catch (err) { action = '⚠️ Timeout failed: ' + err.message; }
     }
@@ -160,13 +160,13 @@ module.exports = function register(ctx) {
     const prev = guild.verificationLevel;
     if (config.raidLockdownMinutes > 0 && prev < GuildVerificationLevel.VeryHigh) {
       try {
-        await guild.setVerificationLevel(GuildVerificationLevel.VeryHigh, 'MoniaBot: Raid-Verdacht');
+        await guild.setVerificationLevel(GuildVerificationLevel.VeryHigh, 'MoniaBot: possible raid');
         lock = `\nVerification level temporarily raised to **Very High** (back to normal in ${config.raidLockdownMinutes} min).`;
       } catch (err) { lock = '\n⚠️ Couldn’t raise the verification level: ' + err.message; }
     }
     lockdownTimer = setTimeout(async () => {
       lockdownTimer = null;
-      if (lock.includes('Very High')) { try { await guild.setVerificationLevel(prev, 'MoniaBot: Raid-Schutz beendet'); } catch { /* egal */ } }
+      if (lock.includes('Very High')) { try { await guild.setVerificationLevel(prev, 'MoniaBot: raid protection ended'); } catch { /* egal */ } }
     }, Math.max(1, config.raidLockdownMinutes) * 60 * 1000);
     lockdownTimer.unref && lockdownTimer.unref();
 

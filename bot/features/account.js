@@ -84,12 +84,12 @@ module.exports = function register(ctx) {
       console.warn('[roles] Einige Rollen liegen über der Bot-Rolle und wurden übersprungen — MoniaBot-Rolle in der Rollenliste nach oben ziehen.');
     }
     try {
-      if (addOk.length) await member.roles.add(addOk, 'MoniaBot: Rollenabgleich');
-      if (removeOk.length) await member.roles.remove(removeOk, 'MoniaBot: Rollenabgleich');
+      if (addOk.length) await member.roles.add(addOk, 'MoniaBot: role sync');
+      if (removeOk.length) await member.roles.remove(removeOk, 'MoniaBot: role sync');
     } catch (err) { console.error('[roles] Abgleich', user.username, err.message); return { added: [], removed: [] }; }
 
     if (config.syncNicknames && member.manageable && member.nickname !== user.username && member.displayName !== user.username) {
-      try { await member.setNickname(user.username.slice(0, 32), 'MoniaBot: Spielname'); } catch { /* Besitzer o. höhere Rolle */ }
+      try { await member.setNickname(user.username.slice(0, 32), 'MoniaBot: in-game name'); } catch { /* Besitzer o. höhere Rolle */ }
     }
     return { added: addOk.map(r => r.name), removed: removeOk.map(r => r.name) };
   }
@@ -113,7 +113,7 @@ module.exports = function register(ctx) {
     const member = await guild.members.fetch(discordId).catch(() => null);
     if (!member) return;
     const mine = [...(await managedRoles(guild)).values()].filter(r => member.roles.cache.has(r.id));
-    if (mine.length) await member.roles.remove(mine, 'MoniaBot: Verknüpfung gelöst').catch(() => {});
+    if (mine.length) await member.roles.remove(mine, 'MoniaBot: account unlinked').catch(() => {});
   }
 
   ctx.onReady.push(() => {
