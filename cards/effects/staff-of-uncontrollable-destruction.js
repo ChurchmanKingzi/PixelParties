@@ -105,7 +105,9 @@ module.exports = {
     // Apply the rest-of-turn locks. Order: AFTER the draw so this
     // staff's own +1 lands; BEFORE engine.sync() so the next render
     // reflects the lock state.
-    ps.handLocked = true;
+    // W16e (F03-18, Al Welle 3: "Staebe sperren nur das Ziehen"): reiner Zieh-Lock wie The Sacred Jewel (Suchen/Hinzufuegen bleibt erlaubt);
+    // das Verbot, Karten aus der Ablage zu bewegen, tragen `_discardLockedTurn`/`_discardLockHard`.
+    ps.drawLocked = true;
     ps._discardLockedTurn = gs.turn;
     ps._discardLockHard = gs.turn;   // Z6 (F03-10): harte Sperre - der Freikauf des Eye of Ren gilt hier nicht
 
