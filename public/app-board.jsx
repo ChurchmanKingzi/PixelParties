@@ -47994,18 +47994,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // carries a `swaps` list of instIds it may exchange zones with.
   if (isMyEffectPrompt && (ep.type === 'slipperyMove' || ep.type === 'guardChangeMove')) {
     for (const c of (ep.creatures || [])) {
-      slipperyCreatureSet.add(`${myIdx}-${c.heroIdx}-${c.zoneSlot}`);
+      slipperyCreatureSet.add(`${c.owner ?? myIdx}-${c.heroIdx}-${c.zoneSlot}`);   // W18b: Guard Change nennt die Brettseite (`owner`) — auch gestohlene Kreaturen beim Gegner
     }
     slipperySelectedEntry = (ep.creatures || []).find(c => c.instId === slipperySelected) || null;
     if (slipperySelectedEntry) {
       for (const d of (slipperySelectedEntry.dests || [])) {
-        slipperyDestSet.add(`${myIdx}-${d.heroIdx}-${d.slotIdx}`);
+        slipperyDestSet.add(`${d.owner ?? myIdx}-${d.heroIdx}-${d.slotIdx}`);   // W18b: Zonen übernommener Helden auf der Gegnerseite
       }
       // Guard Change: highlight the selected Creature's swap partners
       // (Slippery never sends `swaps`, so this stays empty for it).
       for (const sid of (slipperySelectedEntry.swaps || [])) {
         const partner = (ep.creatures || []).find(c => c.instId === sid);
-        if (partner) slipperySwapSet.add(`${myIdx}-${partner.heroIdx}-${partner.zoneSlot}`);
+        if (partner) slipperySwapSet.add(`${partner.owner ?? myIdx}-${partner.heroIdx}-${partner.zoneSlot}`);
       }
     }
   }
@@ -50784,7 +50784,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Slippery archetype Start-Phase sub-mode
               const isSlipperyCreature = slipperyCreatureSet.has(`${pi}-${i}-${z}`);
               const slipperyInstHere = isSlipperyCreature
-                ? (ep.creatures || []).find(c => c.heroIdx === i && c.zoneSlot === z)
+                ? (ep.creatures || []).find(c => c.heroIdx === i && c.zoneSlot === z && (c.owner ?? myIdx) === pi)
                 : null;
               const isSlipperyCreatureSelected = isSlipperyCreature
                 && slipperyInstHere
@@ -50917,7 +50917,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     setSlipperySelected(prev => prev === instId ? null : instId);
                   } : isSlipperyDest ? () => {
                     if (slipperySelected == null) return;
-                    respondToPrompt({ instId: slipperySelected, destHeroIdx: i, destSlot: z });
+                    respondToPrompt({ instId: slipperySelected, destHeroIdx: i, destSlot: z, destOwner: pi });
                     setSlipperySelected(null);
                   } : (stackHere && stackHere.length >= 2) ? () => {
                     // ── Geteilte Zone: ein Klick IRGENDWO auf der Karte

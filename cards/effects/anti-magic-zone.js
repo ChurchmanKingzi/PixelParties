@@ -234,6 +234,10 @@ module.exports = {
       // Stempel — der Ablage-Haken unten (`onCardEnterZone`) fand nie eine Instanz und spaeter beschworene Kreaturen blieben
       // ungestillt. Muster Weapon Unleashing / Mission of the Light Brigade.
       gs._spellKeepInstance = true;
+      // W18b (Al 19.10.: „Wiederbelebte (oder via Teleport Powder zurückkehrende) Heroes bekommen automatisch den Status"): das Fenster steht
+      // im Spielstand; die Engine (`amzFensterAufHeldAnwenden`) belegt jeden Helden, der bis zum Ablauf neu ins Spiel kommt.
+      if (!Array.isArray(gs._amzFenster)) gs._amzFenster = [];
+      gs._amzFenster.push({ expiresAtTurn, expiresForPlayer, sourceOwner: pi });
 
       engine.log('anti_magic_zone_cast', {
         player: gs.players[pi]?.username,

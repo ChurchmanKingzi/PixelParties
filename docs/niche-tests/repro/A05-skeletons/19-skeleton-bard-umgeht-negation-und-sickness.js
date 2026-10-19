@@ -2,12 +2,13 @@
 // A05-skeletons-19 · Skeleton Bard lässt auch negierte bzw. diesen Zug beschworene Skelette ihren Effekt „zusätzlich" benutzen
 // Kartentext (Skeleton Bard): „You may once per turn choose another "Skeleton" Creature you control with a once per turn effect. It may immediately use its once
 //   per turn effect an additional time."
-// Regel (Engine): Kreatureneffekte sind nicht nutzbar, solange die Kreatur negiert/eingefroren/betäubt ist (`isCreatureEffectSuppressed`) und am Beschwörungstag
-//   (Summoning Sickness: `turnPlayed === turn`, außer `_hasHaste`). „An additional time" setzt voraus, dass die Kreatur ihren Effekt überhaupt benutzen dürfte.
+// Regel (Engine): Kreatureneffekte sind nicht nutzbar, solange die Kreatur negiert/eingefroren/betäubt ist (`isCreatureEffectSuppressed`). „An additional time" setzt voraus,
+//   dass die Kreatur ihren Effekt überhaupt benutzen dürfte.
 // Aufbau: Skeleton Bard (alt) + Skeleton Mage („draw 2, discard 1"; Handnetto +1). (a) Mage negiert; (b) Mage diesen Zug beschworen.
-// Erwartung: Bard bietet die Kreatur nicht an / sie zieht nicht.
-// Beobachtet: In beiden Fällen wird sie angeboten und zieht 2/legt 1 ab (Hand +1).
-// Ursache: `skeleton-bard.js` `eligibleTargets()` prüft weder `engine.isCreatureEffectSuppressed(inst)` noch die Summoning-Sickness; `onCreatureEffect` ruft das Ziel-Skript direkt.
+// Erwartung (a): Bard bietet das negierte Skelett nicht an / es zieht nicht (W16c behoben).
+// ★ W18b (Entscheidung Al, 19.10.2026, A05-19b: „Darf der Bard ein Skelett wählen, das diesen Zug beschworen wurde?" – „Ja"): (b) ist ERLAUBT. Der Bard erlaubt die Nutzung
+//   ausdrücklich „immediately"; ein frisch beschworenes Skelett (Summoning Sickness) darf er wählen und es zieht 2/legt 1 ab (Hand +1). Das Repro prüfte die verworfene Lesart A
+//   („nicht anbietbar") und ist auf die bestätigte Regel umgestellt; das Skript blieb unverändert (Ist-Zustand).
 const H = require('../../lib/h.js');
 async function szene(vorbereiten) {
   const t = await H.fresh({ hand: [['ZZ Filler', 'ZZ Filler'], []] });
@@ -29,7 +30,8 @@ async function szene(vorbereiten) {
   const a = await szene(async (t, mage) => { await t.run(() => t.engine.actionNegateCreature(mage, 'test')); });
   R.check('(a) negiertes Skeleton Mage zieht nicht über den Bard', a.plus === 0, { r: a.r, plus: a.plus });
   const b = await szene(async (t, mage) => { mage.turnPlayed = t.gs.turn; });
-  // W16c: (b) ist eine offene Regelfrage an Al (Welle 16, A05-19b) - das Verhalten bleibt unverändert, der Prüfpunkt bleibt bis zur Antwort rot.
-  R.check('(b) diesen Zug beschworenes Skeleton Mage zieht nicht über den Bard (Summoning Sickness)', b.plus === 0, { r: b.r, plus: b.plus });
+  // W18b: Al hat „Ja" gesagt – ein diesen Zug beschworenes Skelett darf der Bard wählen (Summoning Sickness hindert hier nicht).
+  R.check('(b) diesen Zug beschworenes Skeleton Mage zieht über den Bard (Al: „Ja")', b.r === true && b.plus === 1, { r: b.r, plus: b.plus });
+  R.check('(b) keine Engine-Fehler', b.t.errors.length === 0, b.t.errors);
   R.finish();
 })();

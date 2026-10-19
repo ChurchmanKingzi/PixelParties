@@ -272,6 +272,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   if (!ps.supportZones[targetHeroIdx]) ps.supportZones[targetHeroIdx] = [[], [], []];
 
   engine._trackCard(CARD_NAME, pi, 'hero', targetHeroIdx);
+  await engine.amzFensterAufHeldAnwenden(pi, targetHeroIdx);   // W18b: neu ins Spiel kommender Held (Anti Magic Zone)
 
   engine._broadcastEvent('play_zone_animation', {
     type: 'holy_revival', owner: pi, heroIdx: targetHeroIdx, zoneSlot: -1,
