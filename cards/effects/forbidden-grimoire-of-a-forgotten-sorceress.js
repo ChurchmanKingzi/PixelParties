@@ -76,6 +76,7 @@ module.exports = {
     if (inst.heroIdx !== heroIdx || inst.owner !== ownerIdx) return;
     const ohneGrimoire = engine.heroMeetsLevelReq(ownerIdx, heroIdx, cardData, {
       excludeReducerInstId: inst.id,
+      handIdx: _handIndex,   // W15b (C2): GENAU diese Handkopie (Rabatt einer anderen Kopie zählt nicht)
     });
     if (!inst.counters) inst.counters = {};
     if (ohneGrimoire) {

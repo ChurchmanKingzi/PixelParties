@@ -21,9 +21,15 @@
 //     Everything else (non-Normal Spells, level
 //     4+, already resolved this game, non-Spells)
 //     just counts toward the 5.
+//   • ★ W15b (Al): Ein aufgedeckter, sonst legaler Spell, der
+//     wegen einer Restriktion fizzelt (verbrauchter Einmal-Stempel,
+//     Zustand, keine Ziele …), IST der von Chaos Magic gewirkte
+//     Zauber (fizzelt sichtbar, Chaos Magic ist beendet), zählt aber
+//     NICHT als aufgelöst: er kommt nicht in die Liste unten und kann
+//     von einem späteren Chaos Magic wieder aufgedeckt werden.
 //   • "Resolved this game" is tracked per-PLAYER by
 //     Spell NAME (any Hero, normal cast OR via
-//     Chaos Magic; negated Spells don't count) in
+//     Chaos Magic; negated/fizzled Spells don't count) in
 //     `ps._spellsResolvedThisGame` — populated by
 //     server.js doPlaySpell and, for the copied
 //     sub-Spell, here.
@@ -128,8 +134,6 @@ module.exports = {
       }
 
       if (found) {
-        // Record the copied Spell so a later Chaos Magic skips it.
-        if (!resolved.includes(found)) resolved.push(found);
         engine.log('chaos_magic_become', { player: ps.username, spell: found });
         await engine._delay(250);
 
@@ -144,8 +148,10 @@ module.exports = {
           engine.log('chaos_magic_fizzle', { player: ps.username, reason: 'cannot_cast_found_spell', spell: found });
           await engine.zeigeFizzle(found, { playerIdx: pi, grund: 'cannot_cast_now' });
           engine.sync();
-          return;
+          return;   // ★ W15b (Al, C1): ein FIZZELNDER Zauber zählt nicht als „resolved" — nicht in der Liste, ein späteres Chaos Magic kann ihn wieder aufdecken.
         }
+        // Record the copied Spell so a later Chaos Magic skips it (nur, wenn er wirklich aufgelöst wird; s. o.).
+        if (!resolved.includes(found)) resolved.push(found);
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = [];
         const subInst = engine._trackCard(found, pi, 'hand', heroIdx, -1);
