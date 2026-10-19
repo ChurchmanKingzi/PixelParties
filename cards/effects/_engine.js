@@ -16262,6 +16262,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
     });
 
+      isTransfer: true,   // W16b (A01-pollution-33): Umzug auf dem Brett — die Kreatur verlaesst das Brett nicht (nur additiv, ohne `toZone`)
     // Transfer animation
     if (!opts.skipAnimation) {
       const dur = opts.animDuration || 800;

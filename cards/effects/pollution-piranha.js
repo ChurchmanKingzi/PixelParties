@@ -217,6 +217,8 @@ module.exports = {
       const self = ctx.card; // listener = this Piranha
 
       if (ctx.fromZone !== 'support') return;
+      // ★ W16b (A01-pollution-33): „leaves the board" — ein Umzug auf dem Brett (Transfer/Versetzen) ist kein Verlassen.
+      if (ctx.isTransfer || ctx.toZone === 'support') return;
       // Z1 (A01-33): `fromOwner` ist die BRETTSEITE, `cardOwner` der Kontrolleur — eine gestohlene
       // Piranha liegt auf der Seite des Besitzers; verglichen wird deshalb mit ihrer Brettseite.
       const _seite = self ? engine.physicalSide(self) : ctx.cardOwner;
