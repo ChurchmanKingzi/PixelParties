@@ -161,20 +161,20 @@ module.exports = {
       // getHeroPlayableCards once a Hero is locked in.
       const heroTargets = [];
       // W16g (S02-15): „a Hero your opponent CONTROLS“ — Kontrolle statt Spalte (`heroesControlledBy`): ein Gegnerheld, den ich selbst
-      // kontrolliere (Paraseed, Styx, Charme), ist kein Ziel mehr. Nur Helden der Gegnerspalte (`physOwner === oi`): der Nachguss
-      // (`getHeroPlayableCards().charmed`, Zonen, `heroOwner`) ist spaltenweise aufgebaut — ein vom Gegner kontrollierter Held MEINER
-      // Spalte ist damit noch nicht waehlbar (Stufe 4, siehe Abgabe W16g).
+      // kontrolliere (Paraseed, Styx, Charme), ist kein Ziel mehr.
+      // W17d (S02-15, Teil 2): ein vom Gegner kontrollierter Held MEINER Spalte (`physOwner === pi`) ist wählbar. „Held, den der Gegner
+      // kontrolliert“ = Kontrolleur, nicht Brettseite. Id/`owner` tragen die SPALTE (`physOwner`), der Nachguss läuft dann als
+      // eigener Guss (`playableMap.own`, `heroOwner` = Spalte; Hand, Wisdom-Abwurf und Aktion gehören ohnehin mir).
       for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(oi)) {
-        if (physOwner !== oi) continue;
         if (!h?.name || h.hp <= 0) continue;
         if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed
             || h.statuses?.bound || h.statuses?.negated) continue;
-        if (engine.isHeroSkillLocked(oi, hi)) continue;
-        if (engine.heroActionCapReached(oi, hi)) continue;   // W8: ruht bei Frost/Betäubung/Negation
+        if (engine.isHeroSkillLocked(physOwner, hi)) continue;
+        if (engine.heroActionCapReached(physOwner, hi)) continue;   // W8: ruht bei Frost/Betäubung/Negation
         if (h._actionLockedTurn === gs.turn) continue;
         heroTargets.push({
-          id: `hero-${oi}-${hi}`, type: 'hero',
-          owner: oi, heroIdx: hi, cardName: h.name,
+          id: `hero-${physOwner}-${hi}`, type: 'hero',
+          owner: physOwner, heroIdx: hi, cardName: h.name,
         });
       }
 
@@ -208,7 +208,8 @@ module.exports = {
 
       const sel = heroTargets.find(t => t.id === picked[0]);
       if (!sel) return;
-      const targetHero = ops.heroes[sel.heroIdx];
+      const heroSeite = sel.owner;   // W17d: Spalte des Helden (Gegnerspalte oder, bei vom Gegner kontrolliertem eigenem Helden, meine)
+      const targetHero = gs.players[heroSeite]?.heroes?.[sel.heroIdx];
       if (!targetHero?.name || targetHero.hp <= 0) return;
 
       // ── Heart projectile (fires ALWAYS, even against protected
@@ -226,7 +227,7 @@ module.exports = {
       engine._broadcastEvent('play_projectile_animation', {
         sourceOwner: pi,
         sourceHeroIdx: ctx.cardHeroIdx,
-        targetOwner: oi,
+        targetOwner: heroSeite,
         targetHeroIdx: sel.heroIdx,
         targetZoneSlot: -1,
         projectileClass: 'projectile-love-heart',
@@ -238,7 +239,7 @@ module.exports = {
       // Landing burst on the target — a flutter of small pink
       // hearts. Plays unconditionally (see the rule above).
       engine._broadcastEvent('play_zone_animation', {
-        type: 'love_burst', owner: oi, heroIdx: sel.heroIdx, zoneSlot: -1,
+        type: 'love_burst', owner: heroSeite, heroIdx: sel.heroIdx, zoneSlot: -1,
       });
       engine.sync();
       await engine._delay(250);
@@ -264,7 +265,7 @@ module.exports = {
       // we don't re-check it here.
       if (engine._isHeroSpellProtected(targetHero, CARD_NAME)) {
         engine._broadcastEvent('play_zone_animation', {
-          type: 'anti_magic_block', owner: oi, heroIdx: sel.heroIdx, zoneSlot: -1,
+          type: 'anti_magic_block', owner: heroSeite, heroIdx: sel.heroIdx, zoneSlot: -1,
         });
         engine.log('love_shot_blocked', {
           player: ps.username, target: targetHero.name, reason: 'anti_magic',
@@ -273,7 +274,7 @@ module.exports = {
         return;
       }
       const beforeEffectCtx = {
-        playerIdx: oi, heroIdx: sel.heroIdx, hero: targetHero,
+        playerIdx: heroSeite, heroIdx: sel.heroIdx, hero: targetHero,
         effectType: 'love_shot', cancelled: false, _skipReactionCheck: true,
       };
       await engine.runHooks('beforeHeroEffect', beforeEffectCtx);
@@ -293,7 +294,7 @@ module.exports = {
       // ★ Effekt-Immunitaet respektieren (Als Vorgabe 21.8.) — wie bei
       // Charme steht der Riegel hier von Hand, weil `charmed` kein
       // Katalogstatus ist und nicht ueber `addHeroStatus` laeuft.
-      if (engine.hasEffectImmunity?.(oi, sel.heroIdx, null)) {
+      if (engine.hasEffectImmunity?.(heroSeite, sel.heroIdx, null)) {
         engine.log('effect_immunity', { hero: targetHero.name, status: 'charmed' });
         engine.sync();
         return;
@@ -307,7 +308,7 @@ module.exports = {
         kontrollRechte: targetHero._kontrollRechte,
       };
       targetHero.charmedBy = pi;
-      targetHero.charmedFromOwner = oi;
+      targetHero.charmedFromOwner = heroSeite;
       targetHero.charmedHeroIdx = sel.heroIdx;
       if (!targetHero.statuses) targetHero.statuses = {};
       targetHero.statuses.charmed = { controller: pi, appliedTurn: gs.turn, _loveShot: true };
@@ -331,7 +332,11 @@ module.exports = {
         // seinerseits als Zusatzaktion gespielt wurde (Learning Lv1) —
         // und die Abfrage wird kommentarlos uebersprungen.
         const playableMap = engine.getHeroPlayableCards(pi, { charmedIgnoresActionCost: true });
-        const fromCharmed = (playableMap.charmed && playableMap.charmed[sel.heroIdx]) || [];
+        // W17d: Held der Gegnerspalte = geliehener Held (`charmed`); Held meiner eigenen Spalte (vom Gegner kontrolliert) = Liste `own`
+        // (Hand/Spalte/Schulen sind meine; `charmedIgnoresActionCost` gilt dort ebenfalls, der Guss ist eine Zusatzaktion).
+        const fromCharmed = (heroSeite === pi
+          ? (playableMap.own && playableMap.own[sel.heroIdx])
+          : (playableMap.charmed && playableMap.charmed[sel.heroIdx])) || [];
         const cardDB = engine._getCardDB();
         const eligibleNames = new Set();
         const attackSpellLocked = ps._attackSpellLockedTurn === gs.turn;
@@ -391,7 +396,7 @@ module.exports = {
         // window already fired).
         engine.takeFromPileSync(ps, 'hand', handIndex);
         const inst = engine._trackCard(chosenName, pi, 'hand', sel.heroIdx, -1);
-        inst.heroOwner = oi;
+        if (heroSeite !== pi) inst.heroOwner = heroSeite;   // W17d: eigene Spalte = ganz normaler eigener Guss (wie in doPlaySpell)
 
 
         gs._immediateActionContext = true;
@@ -439,7 +444,7 @@ module.exports = {
           delete gs._spellNegatedByEffect;
           // v1364: „counts as an additional Action" — als Aktion melden.
           if (!innerCancelled && !gs._spellCancelled) {
-            await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: oi });
+            await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: heroSeite });
           }
         } finally {
           // v1476: aeusseres Protokoll zurueck (auch bei Fehler/Abbruch).
@@ -454,7 +459,7 @@ module.exports = {
         // wenn er nicht abgebrochen wurde — vorher zahlte man vor der
         // Zielwahl und verlor die Abwuerfe bei einem Abbruch.
         if (!innerCancelled && chosenCd.cardType === 'Spell' && !gs.result) {
-          const wisdomCost = engine.getWisdomDiscardCost(oi, sel.heroIdx, chosenCd);
+          const wisdomCost = engine.getWisdomDiscardCost(heroSeite, sel.heroIdx, chosenCd);
           if (wisdomCost > 0) {
             await engine.actionPromptForceDiscard(pi, wisdomCost, {
               title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
