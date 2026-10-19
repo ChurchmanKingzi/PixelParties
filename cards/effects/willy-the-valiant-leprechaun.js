@@ -29,6 +29,16 @@ module.exports = {
     return { optionId: 'gold' };
   },
 
+  /**
+   * "You do not have a hand size limit until the start of your second turn." (W16f: bis einschliesslich der Gegnerrunde dazwischen;
+   * 2 Spieler: firstTurn + 1). Die Engine fragt nur lebende, nicht stillgelegte Helden (`_isHeroEffectSilenced`, Welle 7).
+   */
+  bypassHandLimit(engine, pi, hero) {
+    const first = hero?._willyFirstTurn;
+    if (first == null) return false;
+    return (engine.gs.turn || 1) <= first + Math.max(1, (engine.gs.players || []).length - 1);
+  },
+
   hooks: {
     /**
      * On game start: record the owner's first turn number
@@ -47,10 +57,9 @@ module.exports = {
       hero._willyFirstTurn = firstTurn;
       hero._willyEffectUsed = false;
 
-      // Generic hand-limit bypass: enforceHandLimit checks this
-      // W16f (H04-08): gedruckt "until the START of your second turn" - der Bypass gilt bis einschliesslich des Zuges VOR dem zweiten
-      // eigenen Zug (2 Spieler: firstTurn + 1, also auch die Gegnerrunde dazwischen), nicht nur im ersten Zug.
-      ps._noHandLimitUntilTurn = firstTurn + Math.max(1, (gs.players || []).length - 1);
+      // W17a (H04-08, Al 19.10.2026): die handlimitfreie Phase ist KEIN Spielerzustand mehr, sondern haengt an Willys aktuellem Zustand
+      // (`bypassHandLimit` unten, von `_shouldBypassHandLimit` gelesen): stirbt Willy oder ist er gefroren/betaeubt/negiert, gilt das
+      // Handlimit sofort wieder; endet das vor dem Start seines zweiten Zuges, gilt die Freiheit bis dahin wieder.
     },
 
     /**

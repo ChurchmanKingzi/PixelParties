@@ -30704,7 +30704,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._isHeroEffectSilenced(physOwner, hi)) continue;   // W7a (H03-heroes-04): ein EINZIGER Prüfer (kennt auch Mummy Token)
       if (hero.bypassHandLimit) return true;
       const script = this.heroScript(hero);
-      if (script?.bypassHandLimit) return true;
+      // W17a (H04-08, Willy): ein Skript darf `bypassHandLimit` auch als Funktion (engine, pi, hero, physOwner, heroIdx) liefern -
+      // fuer zeitlich begrenzte Freiheit, die am Helden haengt (tot/gefroren/betaeubt/negiert -> Limit sofort wieder da).
+      if (typeof script?.bypassHandLimit === 'function') {
+        if (script.bypassHandLimit(this, playerIdx, hero, physOwner, hi)) return true;
+      } else if (script?.bypassHandLimit) return true;
     }
     // Area-card-based bypass (Big Gwen, etc.) — walks every Area the player
     // controls and asks its module if it's currently bypassing the limit.
