@@ -20685,3 +20685,61 @@ Antworten wörtlich von Al; Repros unter `docs/niche-tests/repro/W15/b-*.js` (Ex
 | C3 Schadenssperre Flame Avalanche / Last Resort (S02-05) | „Ja, prüfe nach aktuellem Kontrolleur!" | „…to targets your opponent controls": die Sperre `ps.damageLocked` prüft in `actionDealDamage` (Helden) den Kontrolleur `kontrolleurVonHeld(Spalte, Index)` (Charme/Übernahme) und im Kreaturen-Schadensstapel `kontrolleurVon(inst)` (`controller ?? owner`) statt Besitzer/Brettseite. Gesperrt (0 Schaden): vom Gegner gestohlene/kontrollierte Kreatur, gecharmter/übernommener eigener Held (aus Sicht des Wirkers Gegnerziel). Nicht gesperrt: von mir gestohlene Gegnerkreatur, meine seitenfremd beschworene Kreatur auf der Gegnerseite („Elven Rider"-Muster, `markiereSeitenfremd`), von mir kontrollierter Gegnerheld. Heat Wave (`gegnerKontrolliert`, W14) und die Engine-Sperre sind damit deckungsgleich. `S02-spells/05` gilt (✓; Messfehler im Repro korrigiert: `currentHp` fehlt ohne Treffer = volle HP); Repro `b-c3`. |
 
 Repros: `docs/niche-tests/repro/W15/b-c1-…`, `b-c2-…`, `b-c3-…` (Exit 0 = korrekt).
+
+## ★ Welle 16 / W16g — Restbefunde R01/R02 (Reaktionen, Areas, Anhänge, Surprises) und S01/S02/S03 (Zauber) (19.10.2026)
+
+39 rote Repros abgearbeitet. Einordnung nach den Welle-16-Triage-Regeln: 1 = echter Fehler, Erwartung eindeutig (behoben) · 2 = Repro misst falsch/überholt (nur Repro korrigiert) · 3 = echte Regelfrage (nicht geändert, Frage an Al) · 4 = zu groß. Neue Repros: `docs/niche-tests/repro/W16/g-*.js` (Exit 0 = korrekt).
+
+| Befund | Einordnung | Ergebnis |
+|---|---|---|
+| R01-03 Jumpscare | 1 | „any target on the board" = Helden UND Kreaturen (Al Q55): `jumpscare.js` nimmt `_waflav-shared.collectBoardTargets` und betäubt auch Kreaturen (`applyCreatureStatus`, 2 Züge). |
+| R01-05 Divine Gift of Rain | 3 | „Negate any effects that card or effect would have on targets you control": heute negiert Rain die GANZE Karte (Welle 15, R7: Rain/Anti Magic Shield/Storm Ring/MOE Shield „negieren den Zauber"); bei Flächenzaubern, die beide Seiten treffen (Armageddon, Cataclysm, Snowstorm Mischief …), stünde dagegen dem Wortlaut nach nur der Schutz der eigenen Ziele. Nicht geändert (erster Entwurf mit `grantEffectImmunity` je eigenem Ziel wieder zurückgenommen, brach `W15/a-r7`) — Frage an Al. |
+| R01-08 Dark Deal | 1 | `waehltZiel()`-Regex erkennt `promptMultiTarget` (Mr. Jiggles, Land Sharks). |
+| R01-09 Corpse Explosion / S01-03 Butterfly Cloud | 1 | Butterfly Cloud schlägt mit Typ `'magic_arts_spell'` zu (statt `'other'`); Dark Ocean lässt zusätzlich `magic_arts_spell` durch (Ruling 5.8. „NUR attack und destruction_spell" um diesen Zaubertyp erweitert; `decay_spell` (Forbidden Zone) bleibt geblockt — Hinweis, nicht Teil des Befunds). |
+| R01-11 Berserk/Nulled | 1 | `_canHeroActivateSurprise` sperrt Spells auch bei `nulled`/`berserked` (wie `validateActionPlay`). |
+| R02-04 Prophecy of Tempeste | 1 | Skript-Marke `attachmentDamageCannotBeReducedOrNegated`; `_isHeroDamageUnstoppable` klammert Schaden am Träger (nicht verringer-/negierbar, Anhänge ruhen nicht); Tempestes eigener 100er-Deckel ist ausgenommen. |
+| R02-16 Spectral Armor | 1 | Kreaturen-Fenster (`isCreaturePreDamageReaction`) wie Strong Shield; Al Q134 (Cloud in a Bottle) analog. |
+| R02-17 Tarleinn's Floating Island | 1 | neuer Haken `afterCreatureHeal` in `actionHealCreature` (bewusst nicht `afterHeal`: dessen Leser meinen Helden). |
+| R02-22 Shamanic Curse | 1 | geliehener Wirker: Held/Wisdom über `casterOwner` (Brettseite), Abwurf bleibt beim Kontrolleur. |
+| S01-04 Divine Gift of Skill | 3 | „unless the user has at least Magic Arts 1": der Wirker oder der gewählte Held? — Frage an Al. Unverändert (heute: der gewählte Held). |
+| S01-06 Dance of the Flame Pillars | 1 | „Ziele auf dem Brett" = Helden + Kreaturen (`getCreatureTargets`), nicht jede belegte Support Zone. |
+| S01-07 Anti Magic Zone | 1 / 3 | Später beschworene Kreaturen sind negiert (`gs._spellKeepInstance`, damit der Ablage-Haken die Fenster-Marke findet). Teil (C) „im Fenster wiederbelebter Held" ist Regelfrage → im Repro nur noch Notiz. |
+| S01-12 Call for Help | 1 | bietet nur Zauber an, die nach der Wahl wirklich wirkbar sind (Aktionssperre, Support-Sperre, `spellPlayCondition`/`canPlayWithHero`). |
+| S01-15 Create Illusion | 1 | „free Support Zone of the user": nur Zonen des Nutzers; `canPlayWithHero` verlangt eine freie Zone des Nutzers. |
+| S01-17 Dangerous Knowledge | 1 | Erstrunden-Immunität filtert die Kandidaten; auch EIN Kandidat läuft durch `promptEffectTarget` (kein Auto-Pick). |
+| S01-20 / S02-18 Xal-Stapel | 1 | `effectiveSchoolLevelForCaster` (Xals Support-Zonen-Stapel, „as if"-Stufen) in Divine Gift of Death, Create Illusion, Haste, Heal, Healing Melody, Instant Cryo Stasis, Guard Change, Hymn of Rebirth. |
+| S01-21 Divine Gift of Death | 1 | Zusatzaktion nur bei 2+ Erweckten: nur 1 erweckt ⇒ `gs._spellForcesActionConsume` (Muster Frost Breaker); ohne Rückfall-Aktion Mindestwahl 2. |
+| S01-23 Divine Gift of Forgetting | 1 | „Heroes they control": `heroesControlledBy` (Kontrolle statt Spalte). |
+| S01-25 Mehrstufige Wahlen | 1 / 2 | Opferwahl von Divine Gift of Sacrifice (Kostenwahl, `payActivationCost` ⇒ `false` = Karte bleibt auf der Hand), Zweitziel von Divine Gift of Equality, Zonenwahl von Create Illusion abbrechbar. Die Buff-Wahl von Sacrifice liegt seit Z7c NACH dem bezahlten Opfer (Pflichtwahl nach dem Zusagepunkt) ⇒ Repro auf Stufe 1 korrigiert. |
+| S01-27 Such-Sperre | 3 | Frage an Al; unverändert. |
+| S02-02 Howling in the Night | 1 | `heroesControlledBy` (Kontrolle statt Spalte), auch in `spellPlayCondition`. |
+| S02-03 Divine Gift of The Light | 1 | tatsächliche Heilung zählt: Heilungen (Held/Kreatur, > 0) während der Zauberauflösung merkt das Permanent (`gs._heilteImZauber`); zusätzlich bleibt das statische `includesHealing`. Repro: Harness-Antwort für die jetzt abbrechbare Statuswahl von Divine Zeal ergänzt. |
+| S02-07 Laser Volley | 1 | Spar-Galerie trägt die Ziel-ID als `source` und den Platz als `label` (v862-Muster wie Great Offensive); gleichnamige Ziele sind unterscheidbar. |
+| S02-10 Hymn of Rebirth | 1 | Zielwahl abbrechbar, Abbruch ⇒ `_spellCancelled` (Karte bleibt auf der Hand). |
+| S02-12 Guard Change | 1 | gestohlene Kreaturen (Platz auf der Gegenseite) werden nicht angeboten — `moveCreature`/`swapCreatures` arbeiten nur in den eigenen Zonen. |
+| S02-13 Great Offensive | 1 | `reactivateCreatureEffect` prüft `isCreatureEffectSuppressed` (Frozen/Stunned/Magic Silenced/Aura-Negation); gilt auch für Kohta und Spirit of the Forbidden Grimoire. |
+| S02-14 Holy Selection (Ida) | 1 | Einzelzielwahl abbrechbar. (Die Ida-Wahlen in `actionAoeHit` und Laser Volley sind weiter `cancellable: false`.) |
+| S02-15 Love Shot | 1 / 4 | Teil 1: ein von mir kontrollierter Gegnerheld wird nicht mehr angeboten (`heroesControlledBy`, Repro `W16/g-s02-15`). Teil 2 (vom Gegner kontrollierter Held MEINER Spalte als Ziel) ist Stufe 4: `getHeroPlayableCards().charmed`, Zonen und `heroOwner` des Nachgusses sind spaltenweise gebaut. |
+| S02-16 Divine Zeal | 1 | Statuswahl abbrechbar, Abbruch ⇒ Karte zurück. (Die CPU wählt über `_cpu.js` weiter alle Status; die Harness-Standardantwort auf abbrechbare Abfragen ist „abbrechen".) |
+| S03-01 The Warlord's Bite | 1 | Performance zählt schon als Joker in `effectiveSchoolLevelForCaster`; kein zweites Addieren. |
+| S03-02 Slow / Spreading Rumor | 1 | EINE Regel, beide Flaggen (`oppHandLocked`, `_oppHandInteractionLockedTurn`) werden von beiden Karten gesetzt/gelesen. |
+| S03-07 Memory Blast | 1 | `side: 'any'` + Kontrollfilter (`zielSeite`); ein vom Gegner übernommener Held meiner Spalte wird per `actionReturnHeroControl` zurückgeholt (kein Schaden). |
+| S03-11 Pillar of Light | 1 | verweigert `takeFromPile` (Siege …), gilt „nicht gefunden". |
+| S03-13 Telekinesis | 1 | `spellPlayCondition` nutzt dieselbe Liste wie `onPlay` (inkl. `_canHeroActivateSurprise`); leere Liste ⇒ `_spellCancelled`. |
+| S03-14 Ultimate Weapon Experiment | 1 | Wirte = vom Spieler kontrollierte Helden (`heroesControlledBy`), `performAscension(…, { heroOwner })`. |
+| S03-15 Mission + Victory Phoenix Cannon | 1 / 2 / 3 | Der VPC-Folgezauber ist eine „andere" Zusatzaktion: unter Mission/Duigno-Sperre wird er nicht angeboten (wie jeder Sofort-Guss, `kannSofortWirken`). Repro auf die Grenze selbst (höchstens 2 Zusatzaktionen) umgestellt; Frage an Al (Folgezauber verbraucht stattdessen eine Mission-Ladung?). |
+| S03-17 Overcharge | 1 | `engine.canEquipCardToHero` (Q153: Control Device nur an Gegnerhelden). |
+
+Neue Engine-Stellen: `afterCreatureHeal` (Hook), Skript-Marke `attachmentDamageCannotBeReducedOrNegated`, `isCreatureEffectSuppressed` in `reactivateCreatureEffect`, Dark-Ocean-Weiche `*_spell`, Spell-Sperre `nulled`/`berserked` in `_canHeroActivateSurprise`.
+
+**Offene Rückfragen an Al aus W16g** (Ja/Nein; alle Stände unverändert bzw. wie beschrieben, Details in der Abgabe):
+1. Divine Gift of Rain (R01-05): bei Flächenzaubern, die beide Seiten treffen, nur die Wirkung auf die Ziele des Reagierenden negieren (statt der ganzen Karte)?
+2. Divine Gift of Skill (S01-04): „the user" = der wirkende Held (statt wie heute der gewählte Held)?
+3. Such-Sperre (S01-27): „cannot search" auch bei Deck-Suchen, die aufs Brett führen (Create Illusion, Create Secret Room, Divine Gift of the Deepsea)?
+4. Anti Magic Zone (S01-07 C): ein im Fenster wiederbelebter Held darf ebenfalls keine Zauber wirken?
+5. Mission + Victory Phoenix Cannon (S03-15): der VPC-Folgezauber verbraucht stattdessen eine Mission-Ladung (statt unter Mission gesperrt zu sein)?
+6. Guard Change (S02-12): gestohlene Kreaturen dürfen in freie Zonen meiner Helden ziehen (statt nicht angeboten zu werden)?
+7. Ida (S02-14): auch die übrigen Einzelzielwahlen (`actionAoeHit`, Laser Volley) abbrechbar?
+8. Dark Ocean: auch `decay_spell` (Forbidden Zone) durchlassen („except from Attacks and Spells")?
+
+Repros: `docs/niche-tests/repro/W16/g-s02-15-…` (Exit 0 = korrekt). Korrigierte alte Repros: `S01-spells/07` ((C) nur Notiz), `S01-spells/25` (Sacrifice Stufe 2), `S03-spells/15` (Grenze statt fester Ausgang), Harness-Antworten ergänzt in `S01-spells/16`, `S02-spells/03`, `S02-spells/04`, `W14/b-q162`, `W14/c-q168`.
