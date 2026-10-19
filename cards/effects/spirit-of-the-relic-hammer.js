@@ -15,7 +15,9 @@
 //  ② AURA: „the FIRST Creature EACH PLAYER summons during EACH OF THEIR
 //    turns\" — je Spieler und je Zug genau eine. Gezaehlt wird der Zug
 //    der Beschwoerung, nicht der eigene: beschwoert der Gegner in
-//    seinem Zug, greift es bei ihm. Die Marke ist `counters._hasHaste`,
+//    seinem Zug, greift es bei ihm — auch wenn nur der ANDERE Spieler
+//    einen Hammer-Spirit hat (W18a, Al 19.10.2026: „Auch der Gegner ohne
+//    Hammer-Spirit bekommt den Buff einmal pro Runde."). Die Marke ist `counters._hasHaste`,
 //    dieselbe, die Server und Client fuer die Beschwoerungsstarre
 //    lesen.
 //    Der Stempel `ps._relicHammerTurn` haelt fest, dass die Freikarte
@@ -45,11 +47,10 @@ function hatHammer(engine, pi, heroIdx) {
     && !c.faceDown && (c.counters?._effectOverride || c.name) === HAMMER);
 }
 
-/** Steht irgendwo ein wirksamer Hammer-Spirit dieses Spielers? */
-function spiritSteht(engine, pi) {
+/** Steht irgendwo ein wirksamer Hammer-Spirit — egal wessen? (W18a, Al: „each player", auch der Gegner ohne eigenen Spirit.) */
+function spiritSteht(engine) {
   return (engine.cardInstances || []).some(c =>
     c.zone === 'support' && !c.faceDown && c.name === CARD_NAME
-    && (c.controller ?? c.owner) === pi
     && !c.counters?.negated && !c.counters?.nulled);
 }
 
@@ -102,9 +103,11 @@ module.exports = {
       const besitzer = rein.controller ?? rein.owner;
       if (besitzer !== gs.activePlayer) return;
 
-      // Die Aura muss aus Sicht dieses Spielers wirken: sie kommt von
-      // MEINEM Spirit. Steht bei ihm keiner, hilft ihm auch keiner.
-      if (!spiritSteht(engine, besitzer)) return;
+      // W18a (C04-05, Al: „Auch der Gegner ohne Hammer-Spirit bekommt den
+      // Buff einmal pro Runde."): Es genügt IRGENDEIN wirksamer Spirit auf
+      // dem Brett — wessen, ist gleich. Je Spieler bleibt es bei einer
+      // Freikarte pro eigenem Zug (Stempel `ps._relicHammerTurn`).
+      if (!spiritSteht(engine)) return;
 
       const ps = gs.players[besitzer];
       if (!ps) return;
