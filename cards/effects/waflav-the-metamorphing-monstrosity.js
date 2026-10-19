@@ -119,6 +119,14 @@ async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
   const picked = choice?.cardName || null;
   if (!picked) return false;
 
+  // ★ W16a (Al, Frage 3: „Ja!"): Anlegen PER EFFEKT prallt an Resistance ab — VOR jeder Kartenbewegung gefragt (die Ability bleibt im Deck, kein Mischen). Die Wahl war getroffen:
+  // der Effekt zählt als gewirkt (true → Evolution Counter bezahlt, Einmal-Stempel des Effekts gesetzt).
+  if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, hs, heroIdx, CARD_NAME)) {
+    engine.log('waflav_attach_blocked', { player: ps.username, card: picked });
+    engine.sync();
+    return true;
+  }
+
   const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', picked, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
@@ -127,7 +135,7 @@ async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
   // card only lifts the once-per-turn limit ("additional").
   engine.handZugangSync(ps, picked, { von: 'transit', source: CARD_NAME });
   const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
-    skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
+    skipAbilityGivenCheck: true, resistanzGeprueft: true, ...(hs !== pi ? { heroOwner: hs } : {}),
   });
   if (!res?.success) {
     // No legal slot — put it back rather than eating the card.
@@ -148,6 +156,7 @@ async function doDeckAttach(engine, pi, heroIdx, hs = pi) {
 async function doHandAttach(engine, pi, heroIdx, hs = pi) {
   const ps = engine.gs.players[pi];
   let attached = 0;
+  let blockiert = false;
   for (let i = 0; i < MAX_HAND_ATTACH; i++) {
     const names = abilityNamesIn(engine, pi, heroIdx, ps.hand, hs);
     if (names.length === 0) break;
@@ -164,11 +173,12 @@ async function doHandAttach(engine, pi, heroIdx, hs = pi) {
     const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
       skipAbilityGivenCheck: true, ...(hs !== pi ? { heroOwner: hs } : {}),
     });
+    if (res?.blocked) { blockiert = true; break; }   // ★ W16a (Al, Frage 3): von Resistance abgefangen (Karte bleibt auf der Hand) = gewirkt
     if (!res?.success) break;
     attached++;
     engine.sync();
   }
-  if (attached === 0) return false;
+  if (attached === 0) return blockiert;
   engine.log('waflav_hand_attach', {
     player: ps.username, amount: attached, hero: CARD_NAME,
   });

@@ -171,8 +171,10 @@ module.exports = {
     // Riffel bisher), und das Surprise-Fenster beim Ausruesten oeffnet
     // wie beim Handweg (vorher `_skipReactionCheck`). Flug Deck → Zone
     // wie bisher.
-    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, { source: CARD_NAME, seite });
-    if (!inst) return false;
+    const eqOpts = { source: CARD_NAME, seite };
+    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, eqOpts);
+    // ★ W16a (Al, Frage 3: „Ja!"): von Resistance abgefangen → der Einmal-Einsatz ist verbraucht (true), die Kopie bleibt im Deck (kein Mischen).
+    if (!inst) return !!eqOpts.blockiert;
 
     engine.shuffleDeck(pi, 'main');                // „Search your deck"
 
