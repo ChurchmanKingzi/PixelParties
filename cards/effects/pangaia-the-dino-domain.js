@@ -82,6 +82,9 @@ module.exports = {
       // Diver Helmet: a Creature in the equipped Hero's Support Zones
       // is unaffected by Areas — no +200 HP buff.
       if (isAreaImmuneInst(engine, entering)) return;
+      // W16d (A07-16): „unaffected by all cards and effects" (Cardinal Beasts, Ruling Q113 Ida: alle Arten von Effekten)
+      // – Pangaia erhöht ihre HP nicht.
+      if (engine.isOmniImmune?.(entering)) return;
 
       // The buff lands on the freshly-placed instance. `increaseMaxHp`
       // handles the creature path: bumps counters.maxHp and counters.currentHp

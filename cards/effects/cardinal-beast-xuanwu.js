@@ -152,6 +152,12 @@ module.exports = {
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
       _skipReactionCheck: true, ...ablageExtras,
     });
+    // W16d (A07-06): „its current and max HP become 1" ist der LETZTE Schritt – Eintritts-Hooks, die HP addieren
+    // (Pangaia +200 auf Lv3+) dürfen die Setzung nicht überlagern.
+    if (inst.zone === 'support' && inst.counters) {
+      inst.counters.currentHp = 1;
+      inst.counters.maxHp = 1;
+    }
 
     engine.sync();
     return true;
