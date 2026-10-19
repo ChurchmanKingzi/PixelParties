@@ -79,6 +79,9 @@ function kandidaten(gs, pi, heroIdx, engine, seite = pi) {
     if ((cd.subtype || '') !== 'Equipment') continue;   // „equippable"
     if (!imDeck.has(name)) continue;                    // Kopie im Deck noetig
     if (schonAngelegt(gs.players[seite], heroIdx, name)) continue;
+    // ★ W16b (A03-futuretech-12): eine Karte mit geliehener Identität (Copy Device als Gun) liegt unter IHREM Namen in der Zone — „no copies
+    // equipped" zählt die wirksame Identität (`_effectOverride`), wie der Aufstiegs-Check (`hasEquipped`).
+    if (hasEquipped(engine, seite, heroIdx, name)) continue;
     // v1268: kartenseitige Ausruest-Beschraenkung (Crusader's & Co.) —
     // ohne diese Pruefung waere die Wahl erlaubt, das Anlegen danach aber
     // nicht (`_equip-shared`).
