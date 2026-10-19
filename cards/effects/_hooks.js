@@ -931,15 +931,19 @@ function heldSeite(gs, pi, heroIdx) {
 }
 
 function kontrollRechteVon(hero) {
-  const alle = { beschwoeren: true, ausruesten: true, abilities: true };
-  if (!hero || !hero.name) return { beschwoeren: false, ausruesten: false, abilities: false };
-  if (hero.permaControlBy != null) return alle;                    // zaehlt wie ein eigener
+  // W19b (Al, 19.10.): `zauber`/`attacken` — „Manche Kontrolleffekte koennen explizit ausschliessen, mit dem Hero Attacks/Spells
+  // auszufuehren". Nur ein ausdruecklich gestempeltes `false` sperrt (heute stempelt keine Karte so); die Sperre gilt fuer JEDEN, der den
+  // Helden dafuer nutzen will (Kontrolleur wie Besitzer). Ohne Stempel / ohne Uebernahme: erlaubt.
+  const frei = (r) => ({ zauber: !(r && r.zauber === false), attacken: !(r && r.attacken === false) });
+  const alle = { beschwoeren: true, ausruesten: true, abilities: true, zauber: true, attacken: true };
+  if (!hero || !hero.name) return { beschwoeren: false, ausruesten: false, abilities: false, zauber: false, attacken: false };
+  if (hero.permaControlBy != null) return { ...alle, ...frei(hero._kontrollRechte) };           // zaehlt wie ein eigener
   if (hero.charmedBy == null && hero.controlledBy == null) return alle;   // nicht uebernommen
   const r = hero._kontrollRechte;
-  if (r) return { beschwoeren: !!r.beschwoeren, ausruesten: !!r.ausruesten, abilities: !!r.abilities };
+  if (r) return { beschwoeren: !!r.beschwoeren, ausruesten: !!r.ausruesten, abilities: !!r.abilities, ...frei(r) };
   if (hero.statuses && hero.statuses.charmed && hero.statuses.charmed.abilitiesErlaubt) return alle;
-  if (hero.charmedBy != null) return { beschwoeren: true, ausruesten: true, abilities: false };
-  return { beschwoeren: false, ausruesten: false, abilities: false };
+  if (hero.charmedBy != null) return { beschwoeren: true, ausruesten: true, abilities: false, zauber: true, attacken: true };
+  return { beschwoeren: false, ausruesten: false, abilities: false, zauber: true, attacken: true };
 }
 
 /** Vorlagen fuer `_kontrollRechte` je Uebernahme-Art. */
