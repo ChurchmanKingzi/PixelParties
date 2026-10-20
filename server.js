@@ -8396,7 +8396,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         const { clearArmedArrows } = require('./cards/effects/_arrows-shared');
         await clearArmedArrows(room.engine, pi);
       } else if (cardData.cardType === 'Spell') {
-        ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
+        await room.engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner, name: cardName, karte: true });   // W36a: EIN Zählschritt für jede gespielte Spell-Karte (wie die Attack-Karten)
       }
       if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
       if (!isInherentAction && !additionalConsumed && !isReactionSubtype && !ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
@@ -8790,7 +8790,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // grant is now spent.
       if (wasBerserkGranted) hero._berserkChargeUsedTurn = gs.turn;
     } else if (cardData.cardType === 'Spell') {
-      ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
+      await room.engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner, name: cardName, karte: true });   // W36a: s. o.
     }
 
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !isReactionSubtype) {

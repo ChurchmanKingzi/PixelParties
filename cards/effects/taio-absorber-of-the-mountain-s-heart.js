@@ -318,6 +318,10 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked, feld = pi) {
       });
     }
     // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
+    // W36a (Al, 22.10.2026): der Nachguss ist eine GESPIELTE Attack bzw. ein gespielter Spell — er zaehlt wie jede gespielte Karte (Attack-Zaehler W35a, Spell-Zaehler W36a).
+    if (!abgebrochen && (cardData.cardType === 'Attack' || cardData.cardType === 'Spell')) {
+      await engine.zaehleAlsArt(cardData.cardType === 'Attack' ? 'attack' : 'spell', { pi, heroIdx, heroOwner: feld, name: cardName, karte: true });
+    }
     if (!abgebrochen) { commit(); await engine.meldeGussAlsAktion(pi, heroIdx, cardName, feld !== pi ? { heroOwner: feld } : {}); }
     delete gs._spellNegatedByEffect;
   } finally {

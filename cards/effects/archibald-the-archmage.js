@@ -190,6 +190,9 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
     return { abgebrochen: true };
   }
 
+  // W36a (Al, 22.10.2026): der Nachguss ist ein gespielter Spell und zaehlt wie jeder (`spellsPlayedThisTurn`; auch ganz negiert, nur ein Abbruch zaehlt nicht).
+  await engine.zaehleAlsArt('spell', { pi: ctx.cardOwner, heroIdx: ctx.cardHeroIdx, heroOwner: feld, name: cardName, karte: true });
+
   // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — wie im
   // regulaeren Zauber-Weg; ein abgebrochener Guss kostet nichts. Die Hoehe
   // richtet sich weiter nach dem GEHOBENEN Level.

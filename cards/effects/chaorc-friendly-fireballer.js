@@ -133,7 +133,10 @@ module.exports = {
         isSecondCast: false, _skipReactionCheck: true,
       });
       // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-      if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, FIREBALL);
+      if (!gs._spellCancelled) {
+        await engine.zaehleAlsArt('spell', { pi, heroIdx, name: FIREBALL, karte: true });   // W36a (Al): der Fireball zaehlt als gespielter Spell
+        await engine.meldeGussAlsAktion(pi, heroIdx, FIREBALL);
+      }
     } catch (err) {
       console.error(`[${CARD_NAME}] sub-Fireball error:`, err?.message || err);
     }
