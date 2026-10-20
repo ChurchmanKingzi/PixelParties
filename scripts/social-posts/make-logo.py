@@ -35,7 +35,85 @@ def mix(a, b, t):
     return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
 
+def art_heart():
+    """Das große Herz aus der Kartenkunst (data/card-art/native/Cool_Rescuer_Monia.png), Pixel für Pixel. Monia und ihr Jetpack
+    verdecken es dort; diese Stellen werden aus den Nachbarpixeln des Herzens aufgefüllt (Diffusion), damit hinter ihr ein ganzes Herz steht."""
+    art = np.asarray(Image.open(ROOT / 'data' / 'card-art' / 'native' / 'Cool_Rescuer_Monia.png').convert('RGB')).astype(np.int32)
+    h, w, _ = art.shape
+    r, g, b = art[..., 0], art[..., 1], art[..., 2]
+    pink = (r > 130) & (b > g + 10) & (r > b + 30)                       # rosa (Flammen, Haut, Haare haben b ≈ g oder b < g)
+    # größte zusammenhängende Fläche = das große Herz (die kleinen Herzen fallen heraus)
+    seen = np.zeros_like(pink)
+    best = []
+    for y0 in range(h):
+        for x0 in range(w):
+            if pink[y0, x0] and not seen[y0, x0]:
+                comp, st = [], [(y0, x0)]
+                seen[y0, x0] = True
+                while st:
+                    y, x = st.pop()
+                    comp.append((y, x))
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        yy, xx = y + dy, x + dx
+                        if 0 <= yy < h and 0 <= xx < w and pink[yy, xx] and not seen[yy, xx]:
+                            seen[yy, xx] = True
+                            st.append((yy, xx))
+                if len(comp) > len(best):
+                    best = comp
+    mask = np.zeros_like(pink)
+    for y, x in best:
+        mask[y, x] = True
+    # Löcher = Nicht-Rosa, das vom Bildrand aus nicht erreichbar ist (Monia, Jetpack): die Kerbe oben zwischen den Herzlappen ist
+    # dagegen mit dem Himmel verbunden und bleibt leer
+    exterior = np.zeros_like(pink)
+    st = [(y, x) for y in range(h) for x in range(w) if (y in (0, h - 1) or x in (0, w - 1)) and not pink[y, x]]
+    for y, x in st:
+        exterior[y, x] = True
+    while st:
+        y, x = st.pop()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            yy, xx = y + dy, x + dx
+            if 0 <= yy < h and 0 <= xx < w and not pink[yy, xx] and not exterior[yy, xx]:
+                exterior[yy, xx] = True
+                st.append((yy, xx))
+    ys0, xs0 = np.where(mask)
+    box = np.zeros_like(mask)
+    box[ys0.min():ys0.max() + 1, xs0.min():xs0.max() + 1] = True
+    hole = ~pink & ~exterior & box
+    # Ausreißer unter den Herzpixeln (Flammenreste): nicht in der Palette des Herzens → auch als Loch behandeln
+    from collections import Counter
+    cols = Counter(tuple(art[y, x]) for y, x in zip(*np.where(mask)))
+    palette = np.array([c for c, _ in cols.most_common(9)])
+    dist = np.sqrt(((art[..., None, :] - palette[None, None]) ** 2).sum(-1)).min(-1)
+    outlier = mask & (dist > 45)
+    hole = hole | outlier
+    mask = mask & ~outlier
+    sil = mask | hole
+    img = art.astype(np.float32)
+    for _ in range(400):                                                # Löcher aus den Rändern heraus weichzeichnen
+        pad = np.pad(img, ((1, 1), (1, 1), (0, 0)), mode='edge')
+        avg = (pad[:-2, 1:-1] + pad[2:, 1:-1] + pad[1:-1, :-2] + pad[1:-1, 2:]) / 4
+        img = np.where(hole[..., None], avg, img)
+    # aufgefüllte Stellen auf die Palette des Herzens einrasten lassen (Pixel-Look statt Weichzeichner)
+    flat = img[hole]
+    if len(flat):
+        d2 = ((flat[:, None, :] - palette[None]) ** 2).sum(-1)
+        img[hole] = palette[d2.argmin(axis=1)]
+    ys, xs = np.where(sil)
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    out = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
+    out[..., :3] = np.clip(img[y0:y1, x0:x1], 0, 255).astype(np.uint8)
+    out[..., 3] = sil[y0:y1, x0:x1] * 255
+    return Image.fromarray(out, 'RGBA')
+
+
 def heart_layer(cell, w=46, h=42):
+    """Das Herz aus der Karte, jeder Kunstpixel = cell Bildpunkte."""
+    ah = art_heart()
+    return ah.resize((ah.width * cell, ah.height * cell), Image.NEAREST)
+
+
+def heart_layer_old(cell, w=46, h=42):
     """Großes Pixel-Herz mit Kontur, Licht oben links und Schatten unten rechts."""
     cells = {}
     for j in range(h):
@@ -187,7 +265,7 @@ def dark_background(size):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # 1) Logo, transparent: Monia (16 px je Sprite-Pixel) vor dem Herz, Schriftband 3 px je Logo-Pixel
-    logo = scene((1400, 1200), px=16, wm_scale=3, heart_cell=18, wm_y=895, monia_cy=420)
+    logo = scene((1400, 1200), px=16, wm_scale=3, heart_cell=16, wm_y=940, monia_cy=420)
     bbox = logo.getbbox()
     logo = logo.crop((max(0, bbox[0] - 40), max(0, bbox[1] - 40), min(logo.width, bbox[2] + 40), min(logo.height, bbox[3] + 40)))
     logo.save(OUT / 'logo-monia.png')
@@ -198,10 +276,10 @@ def main():
     # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus: alles Wichtige in den mittleren ~900 px)
     bg = dark_background((1080, 1080))
     a = bg.copy()
-    a.alpha_composite(scene((1080, 1080), px=14, wm_scale=2, heart_cell=16, wm_y=840, monia_cy=395, glints=True, spread=0.9))
+    a.alpha_composite(scene((1080, 1080), px=12, wm_scale=3, heart_cell=12, wm_y=780, monia_cy=345, glints=True, spread=0.9))
     a.convert('RGB').save(OUT / 'profil-monia-logo.png')
     b = bg.copy()
-    b.alpha_composite(scene((1080, 1080), px=18, wm_scale=2, heart_cell=19, with_wordmark=False, monia_cy=470, glints=True, spread=0.66))
+    b.alpha_composite(scene((1080, 1080), px=18, wm_scale=2, heart_cell=15, with_wordmark=False, monia_cy=470, glints=True, spread=0.66))
     b.convert('RGB').save(OUT / 'profil-monia.png')
     print('fertig:', OUT)
 
