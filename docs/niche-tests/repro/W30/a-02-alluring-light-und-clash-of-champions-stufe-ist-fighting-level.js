@@ -7,6 +7,7 @@
 // selbst bleibt ein Spell der gedruckten Stufe. Clash of Champions hat noch kein Kartenskript: der Zweikampf-Helfer `_hero-duel-shared.js` kennt die Option `alsHeldenAngriff` (je Schlag Stempel
 // mit dem Fighting-Level des SCHLAGENDEN Helden); Duel („perform a normal Attack") blieb in W30a unverändert (Frage an Al).
 // ★ W32a (Al, 22.10.2026): Duel ebenfalls „auch Fighting-Level!" – `duel.js` setzt `alsHeldenAngriff: true` (Prüfung: `W32/a-04`); der Duel-Pfad-Test unten prüft nur noch den Helfer OHNE die Option.
+// ★ W34a (Punkt 1): ein hart negierter (nicht angriffsfähiger) Held ist als gezwungener Angreifer nicht mehr wählbar — der Abschnitt „harte Negierung“ unten prüft das statt „Level 0 → Glass Wall wehrt ab“.
 // ★ W32a, Punkt 3: der Alluring-Light-TREFFER ist ein Attack des gezwungenen Helden (Quelle = Heldenkarte, Typ `attack`), die Karte selbst bleibt ein Spell Lv 1 (Prüfung: `W32/a-03`).
 // Aufruf: node docs/niche-tests/repro/W30/a-02-alluring-light-und-clash-of-champions-stufe-ist-fighting-level.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
@@ -75,9 +76,19 @@ const sauber = (R, r, was) => R.check(`${was}: sauber`, r.t.errors.length === 0 
       sauber(R, r, 'Heldenwahl');
     }
     // harte Negierung der Abilities des gewählten Helden = Level 0
+    // ★ W34a (Al, 22.10.2026, Punkt 1: „der von Alluring Light gezwungene Held ist geblockt, wenn er nicht angreifen kann"): ein hart negierter Held kann nicht angreifen und ist als
+    // gezwungener Angreifer GAR NICHT mehr wählbar — die frühere Prüfung „Level 0 → Glass Wall wehrt ab" ist nicht mehr erreichbar. Stattdessen: nicht wählbar (Liste), der Stempel einer
+    // harten Negierung ist weiter Level 0 (Engine-Ebene), und ein anderer Held (Fighting 0) wird gewählt.
     {
-      const r = await szene(me, op, GW, { F: 3, vorbereiten: (t) => t.heroStatus(op, 0, 'negated') });
-      R.check('Abilities des gewählten Helden hart negiert (Fighting 3 zählt nicht) → Level 0 → Glass Wall wehrt ab', gefragt(r.t, GW) >= 1 && r.schaden === 0, { g: gefragt(r.t, GW), s: r.schaden });
+      const angeboten = [];
+      const r = await szene(me, op, GW, { F: 3, vorbereiten: (t) => t.heroStatus(op, 0, 'negated'), targetFn: (v) => {
+        const gegner = v.filter(x => x.owner === op && x.type === 'hero');
+        if (gegner.length) { angeboten.push(gegner.map(x => x.heroIdx)); return [gegner.find(x => x.heroIdx === 1).id]; }
+        return [v.find(x => x.owner === me && x.type === 'hero' && x.heroIdx === 0).id];
+      } });
+      R.check('Abilities des gewählten Helden hart negiert → Held 0 ist als gezwungener Angreifer NICHT wählbar (W34a, Punkt 1)', angeboten.length === 1 && angeboten[0].join() === '1,2', angeboten);
+      R.check('harte Negierung der Abilities: das Fighting-Level des Helden ist 0 (Stempel-Level, Engine)', r.t.engine.heldenAngriffStempel(op, 0).level === 0, r.t.engine.heldenAngriffStempel(op, 0).level);
+      sauber(R, r, 'harte Negierung');
     }
     // Abbruch der Opferwahl: kein Stempel bleibt hängen
     {

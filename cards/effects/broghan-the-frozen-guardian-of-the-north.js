@@ -68,7 +68,9 @@ module.exports = {
 
   // Always activatable — there's always a target on the board (if not, the
   // engine will fizzle the prompt).
-  canActivateHeroEffect(_ctx) {
+  canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Broghan, the Frozen Guardian of the North' })) return false;
     return true;
   },
 

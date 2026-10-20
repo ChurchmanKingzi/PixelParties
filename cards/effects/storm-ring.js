@@ -98,7 +98,9 @@ module.exports = {
     const cd = (sourceCard && engine.getEffectiveCardData
       ? engine.getEffectiveCardData(sourceCard)
       : null) || (sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null);
-    if (!cd || !hasCardType(cd, 'Spell')) return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 2): auch ein Effekt, der als Spell ZÄHLT, ist „a Spell" — die Kartentext-Bedingung „would hit MORE THAN 1 target" bleibt unverändert:
+    // Alice trifft genau EIN Ziel und löst Storm Ring deshalb nie aus (`targetedHeroes.length < 2` unten); ein künftiger Mehrziel-Effekt dieser Art würde regulär geprüft.
+    if (!(cd && hasCardType(cd, 'Spell')) && engine._zaehltAlsArt(sourceCard) !== 'spell') return false;
 
     // ACTUAL targets, not potential — the hub passes the real
     // post-selection list, UNFILTERED by side. Count DISTINCT targets

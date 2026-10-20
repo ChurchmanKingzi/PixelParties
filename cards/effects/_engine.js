@@ -13977,7 +13977,9 @@ class GameEngine {
   }
 
   async _checkBoardSentToDiscardHandReactions(roh) {
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
+    // ★ W34a (Al, 22.10.2026, Dark Ocean): „generell darf man unter Dark Ocean immer auf SEINE EIGENEN Creatures reagieren, nur nicht auf gegnerische" — die Sperre hängt am
+    // Reagierenden (`darkOceanBlocksReaction(reaktor)`: Quelle = Creature UND Kontrolleur ≠ Reagierender), nicht pauschal an jeder Creature-Quelle.
+    if (this.darkOceanBlocksReaction(roh.ownerIdx, null)) return;
     if (this._inBoardDiscardReaction) return;
     const ownerIdx = roh.ownerIdx;
     const ps = this.gs.players[ownerIdx];
@@ -23231,14 +23233,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
-    if (_leihSeite != null && hasCardType(cardData, 'Creature')) return { retry: true };   // Als Vorgabe 29.9.
+    if (_leihSeite != null && hasCardType(cardData, 'Creature') && !angebot.chainAnyHero) return { retry: true };   // Als Vorgabe 29.9.; W34a: die AnyHero-Aktion (Guardian Beast Hu) beschwoert auch ueber einen uebernommenen Helden
     // ★ W15b (C2): „exakt die ausgewählte Karte" — der Rabatt einer ANDEREN Kopie macht diese nicht spielbar.
     if (!fromCreation && !this._kopieStufeOk(playerIdx, heroIdx, cardData, handIndex, _leihSeite ?? playerIdx)) return { retry: true };   // W16a (Frage 6): auch für den geliehenen Helden
 
     if (hasCardType(cardData, 'Creature')) {
       if (zoneSlot === undefined || zoneSlot < 0) return { retry: true };
-      if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-      if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { retry: true };
+      // ★ W34a: uebernommener Held (Gegenspalte): die Zonen liegen auf seiner Brettseite, der Beschwoerer (Kontrolleur) bleibt `playerIdx` (wie `doPlayCreature` mit `charmedOwner`).
+      const zonenPs = _leihSeite != null ? this.gs.players[_leihSeite] : ps;
+      if (!zonenPs.supportZones[heroIdx]) zonenPs.supportZones[heroIdx] = [[], [], []];
+      if ((zonenPs.supportZones[heroIdx][zoneSlot] || []).length > 0) return { retry: true };
 
       quelle.splice(handIndex, 1);
 
@@ -23250,10 +23254,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // flag so triggers like Spawn Mother's AOE / Orthos's Loyal
       // gate still fire for additional-action plays.
       const placeResult = await this.summonCreatureWithHooks(
-        cardName, playerIdx, heroIdx, zoneSlot,
+        cardName, _leihSeite ?? playerIdx, heroIdx, zoneSlot,
         {
           source: config.title,
           hookExtras: { _isNormalSummon: true },
+          ...(_leihSeite != null ? { controller: playerIdx } : {}),   // W34a
         },
       );
       if (!placeResult) {
@@ -23279,7 +23284,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       } else {
         const { actualSlot } = placeResult;
-        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
+        this._broadcastEvent('summon_effect', { owner: _leihSeite ?? playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
         this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
         if (config.zusageAuftritt) this._feuereZusageAuftritte(this._zusageAuftrittVormerken(config.zusageAuftritt, playerIdx));   // v1302
       }
@@ -23292,6 +23297,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // path returns earlier).
       await this.runHooks('onAnyActionResolved', {
         actionType: 'creature', playerIdx, cardName, playedCardName: cardName, heroIdx,
+        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // W34a
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
       });
@@ -23771,20 +23777,35 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     const cardDB = this._getCardDB();
     const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      let karten = this.getHeroEligibleActionCards(playerIdx, hi);
+    // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" = nach AKTUELLER Kontrolle — `_zusatzaktionsHelden` (eigene Spalte ohne abgegebene Helden + uebernommene
+    // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur eigene Spalte.
+    for (const { seite, heroIdx: hi } of this._zusatzaktionsHelden(playerIdx)) {
+      const fremd = seite !== playerIdx;
+      let karten = this.getHeroEligibleActionCards(playerIdx, hi, fremd ? seite : null);
       if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
       if (typeof config.cardNameFilter === 'function') {
         try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
       }
       if (karten.length > 0) return true;
+      if (fremd) continue;
       if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
       if (!eingeschraenkt && !config.skipHeroEffects
           && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
     }
     return false;
+  }
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Guardian Beast Hu: „additional Action with any Hero you control" muss nach aktueller Kontrolle gehen): die lebenden Helden, mit denen `playerIdx`
+   * eine geschenkte Zusatzaktion ausfuehren darf — `heroesControlledBy` (Charme, Diebstahl, dauerhafte Uebernahme, Styx; ein an den Gegner abgegebener eigener Held faellt heraus).
+   * Eigene Spalte zuerst (stabile Reihenfolge: bestehende Prompts/Tests bleiben gleich), dann uebernommene Helden der Gegenspalte. `seite` = Brettseite des Helden.
+   * @returns {Array<{seite:number, heroIdx:number, hero:object}>}
+   */
+  _zusatzaktionsHelden(playerIdx) {
+    const alle = this.heroesControlledBy(playerIdx)
+      .filter(({ hero }) => hero?.name && hero.hp > 0)
+      .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
+    return [...alle.filter(h => h.seite === playerIdx), ...alle.filter(h => h.seite !== playerIdx)];
   }
   /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
@@ -23831,11 +23852,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Brett-Effekt. Gleiche Regel wie in `performImmediateAction`.
     const eingeschraenktAny = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
 
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" nach aktueller Kontrolle (`_zusatzaktionsHelden`): ein uebernommener Gegnerheld wird als
+    // Aktionstraeger angeboten (`fremdeHelden`, nur Hand-Karten: Attack/Spell/Kreatur; Abilities/Heldeneffekte nur eigene Spalte), ein abgegebener eigener Held nicht.
+    const fremdeHelden = {};
+    for (const { seite: heldSeite, heroIdx: hi, hero } of this._zusatzaktionsHelden(playerIdx)) {
+      const fremdHeld = heldSeite !== playerIdx;
 
-      let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi);
+      let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi, fremdHeld ? heldSeite : null);
       if (config.allowedCardTypes) {
         heroEligible = heroEligible.filter(name => {
           const cd = cardDB[name];
@@ -23852,9 +23875,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       for (const name of heroEligible) {
         eligibleSet.add(name);
+        if (fremdHeld) {
+          (fremdeHelden[name] || (fremdeHelden[name] = [])).push({ heroOwner: heldSeite, heroIdx: hi });
+          continue;
+        }
         if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
         heroIndicesByCard[name].push(hi);
       }
+      if (fremdHeld) continue;
 
       // Activatable abilities on this hero — ueber den echten Sammler,
       // gleiche Begruendung wie in `performImmediateAction`.
@@ -23881,6 +23909,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
       heroIndicesByCard,
+      ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       activatableAbilities,
       activatableHeroEffects,
       // Kein `showCard` — hier steht der handelnde Held noch nicht
@@ -23911,11 +23940,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Helden alle im selben Feld.
     const handelnderHeld = actionResult.heroIdx;
     if (handelnderHeld == null) return { played: false };
-    const heldObjekt = ps.heroes[handelnderHeld];
+    // ★ W34a: Antwort mit `heroOwner` = Brettseite eines UEBERNOMMENEN Helden (nur gueltig, wenn der Prompt ihn fuer genau diese Karte angeboten hat; Hand-Karten allein).
+    const antwortSeite = isSeat(this, actionResult.heroOwner) && actionResult.heroOwner !== playerIdx ? actionResult.heroOwner : null;
+    if (antwortSeite != null) {
+      const erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
+      if (!erlaubt || actionResult.heroEffectActivation || actionResult.abilityActivation) continue;
+    }
+    const heldObjekt = (antwortSeite != null ? this.gs.players[antwortSeite] : ps).heroes[handelnderHeld];
     if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
 
     const ergebnis = await this._resolveImmediateActionPick(
-      playerIdx, handelnderHeld, heldObjekt, actionResult, config,
+      playerIdx, handelnderHeld, heldObjekt, actionResult, antwortSeite != null ? { ...config, heroOwner: antwortSeite } : config,
       { activatableHeroEffects, chainAnyHero: true });
     if (!ergebnis?.retry) return ergebnis;
     continue;
@@ -33169,6 +33204,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * der ganzen Kette: loese ich einen Kreatur-Effekt aus, darf der
    * Gegner nichts — chaine ich aber selbst eine Reaktion darauf, darf
    * er auf DIESE reagieren, nur weiterhin nicht auf die Creature.
+   *
+   * ★ W34a (Al, 22.10.2026): „generell darf man unter Dark Ocean immer auf SEINE EIGENEN Creatures reagieren, nur nicht auf gegnerische" — allgemeine Regel für JEDES
+   * Reaktionsfenster (Hand-Reaktionen, Surprises, Arrows, Kettenfenster, Hook-Fenster): gesperrt ist nur, wer auf eine Creature-Quelle reagiert, deren KONTROLLEUR
+   * (`owner` des obersten Glieds bzw. der laufenden Quelle) ein anderer ist als der Reagierende. Jedes Fenster fragt diese Funktion mit SEINEM Reagierenden (`pi`);
+   * die früheren pauschalen Sperren („irgendeine Creature-Quelle ⇒ niemand reagiert") sind entfallen.
    */
   /** Loest gerade eine CREATURE auf? (fuer die Fenster ohne pi-Kontext) */
   _currentEffectSourceIsCreature() {
@@ -34512,7 +34552,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return NULL_RESULT;
     }
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inPreDamageReaction) return NULL_RESULT;
 
     // Demon's Gate-style creature-caster annotation — pre-damage
@@ -34530,6 +34569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
     const targetOwner = this.heroSideOf(zielPhys, target);
+    if (this.darkOceanBlocksReaction(targetOwner, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
     // Wirkt der GETROFFENE Held selbst (`casterIsTarget`): ab W20c auch ein uebernommener Held der Gegenspalte (`targetSeite: zielPhys`).
 
     // Schadenskontext für den Reaktions-Lernkanal (siehe _rxDamageTag).
@@ -34808,7 +34848,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inPreDamageReaction) return NULL_RESULT;
 
     // Demon's Gate-style creature-caster annotation.
@@ -34825,6 +34864,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(pi, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -34982,7 +35022,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inCreaturePreDamageReaction) return NULL_RESULT;
     if (!creatureInst) return NULL_RESULT;
 
@@ -34993,6 +35032,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35135,7 +35175,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inCreaturePreDamageReaction) return NULL_RESULT;
     if (!creatureInst) return NULL_RESULT;
 
@@ -35147,6 +35186,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(pi, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35295,7 +35335,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return false;
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
 
@@ -35316,6 +35355,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return false;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35623,7 +35663,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkCreaturesDefeatedHandReactions(liste) {
     if (!Array.isArray(liste) || liste.length === 0) return;
     if (this._inCreaturesDefeatedReaction) return;
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     const allCards = this._getCardDB();
     for (let ownerIdx = 0; ownerIdx < this.playerCount(); ownerIdx++) {
       const defeated = liste.filter(d => (d.controller ?? d.owner) === ownerIdx);
@@ -35631,6 +35670,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ps = this.gs.players[ownerIdx];
       if (!ps) continue;
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
+      if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
       const seen = new Set();
       for (let hi = 0; hi < (ps.hand || []).length; hi++) {
         const cardName = ps.hand[hi];
@@ -36057,7 +36097,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkCreatureDefeatedHandReaktor(deathInfo, source, type, reaktor) {
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inCreatureDefeatedReaction) return;
     if (!deathInfo) return;
 
@@ -36066,6 +36105,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -36143,7 +36183,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inAfterDamageReaction) return;
     // When the triggering hit DEFEATED the target, only cards that
     // explicitly opt in (`firesOnLethalDamage`) may react. Survival-
@@ -36185,6 +36224,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const isOpponentPass = reactorIdx !== targetOwner;
       const ps = this.gs.players[reactorIdx];
       if (!ps) continue;
+      if (this.darkOceanBlocksReaction(reactorIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       // Turn-1 lockout: the first-turn-protected player cannot activate
       // any hand cards during the opening turn (no interaction allowed).
@@ -36372,7 +36412,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inAfterCreatureDamageReaction) return;
     if (!creatureInst) return;
     // Lethal-hit gate — mirrors the hero hub: a defeated Creature only
@@ -36407,6 +36446,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Opening-turn lockout — same as every other hand-reaction window.
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
+      if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       const seen = new Set();
       for (let hi = 0; hi < ps.hand.length; hi++) {
@@ -36791,12 +36831,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inPostSummonReaction) return;
     if (!summonedInst) return;
 
     const ps = this.gs.players[summoningPi];
     if (!ps) return;
+    if (this.darkOceanBlocksReaction(summoningPi, null)) return;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     if (this.gs.firstTurnProtectedPlayer === summoningPi) return;
 
@@ -40332,6 +40372,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       isPlacement: !!cardInfo.isPlacement,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
+      // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
+      // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
+      zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
@@ -40427,6 +40470,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
    */
   async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    // ★ W34a (Al, 22.10.2026, Punkt 3): EIN Treffer-Ereignis = EIN Zählschritt der Attack-Zähler (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`):
+    // Quick Attack („first Attack"), Berserk (2), Knife Throw, Rioting Village (1), Blow of the Venom Snake & Co. — wie eine gespielte Attack-Karte (`doPlaySpell`, auch wenn die Kette
+    // sie negiert). Die Sperren prüfen die Aufrufer VOR dem Treffer über `heroKannAngreifen`. Hier und nirgends sonst gezählt (kein Doppelzählen mit der Kette).
+    await this.zaehleAlsArt('attack', { pi, heroIdx, heroOwner, name });
     if (this._inReactionCheck || this._inMctsSim) {
       const r = resolve ? await resolve() : null;
       return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
@@ -40437,13 +40484,67 @@ this._deathWatch = (this._deathWatchStack || []).length
       res = await this.executeCardWithChain({
         cardName: name, owner: pi, cardType: 'Attack', heroIdx,
         casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
-        fromBoard: true, resolve,
+        fromBoard: true, resolve, zaehltAlsArt: 'attack',
         ...(casterCheck === false ? { casterCheck: false } : {}),
       });
     } finally {
       await clearArmedArrows(this, pi);
     }
     return res;
+  }
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Punkt 2): Gegenstück zu `alsAttackKette` für einen Effekt, der als SPELL eines Helden zählt (Alice, the Puppeteer Girl: „Treated as a Destruction Magic Spell").
+   * Aufruf NACH der Zielwahl, VOR dem Treffer (`resolve` = Beam + Schaden): zählt den Spell-Zähler (`spellsPlayedThisTurn`; verbraucht den Silence-Bonus), öffnet ein Reaktionsfenster mit
+   * einem Glied vom Typ `Spell` (Besitzer `pi`, wirkender Held `heroIdx`/`heroOwner`, `fromBoard`, `zaehltAlsArt: 'spell'`) — Silence, Idej Projector und Negierer lesen es wie einen
+   * Spell. Shamanic Curse schließt das Glied aus (der Spell müsste in den Ablagestapel gehen), The Master's Plan/Lunar Eclipse lesen `fromBoard` (kein Handspiel).
+   * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) bzw. im MCTS-Rollout läuft der Treffer direkt. Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`).
+   */
+  async alsSpellKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    await this.zaehleAlsArt('spell', { pi, heroIdx, heroOwner, name });
+    if (this._inReactionCheck || this._inMctsSim) {
+      const r = resolve ? await resolve() : null;
+      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+    }
+    return this.executeCardWithChain({
+      cardName: name, owner: pi, cardType: 'Spell', heroIdx,
+      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+      fromBoard: true, resolve, zaehltAlsArt: 'spell',
+      ...(casterCheck === false ? { casterCheck: false } : {}),
+    });
+  }
+
+  /**
+   * ★ W34a: Zählschritt für einen Effekt, der als Attack/Spell ZÄHLT — dieselben Zähler wie `doPlaySpell` für eine gespielte Karte. Attack: Spieler-Zähler
+   * `attacksPlayedThisTurn`, Helden-Liste `heroesAttackedThisTurn` (Index), Helden-Zähler `hero._attacksThisTurn`; Spell: `spellsPlayedThisTurn` (und der Silence-Bonus
+   * `_silenceBonusSpell` ist verbraucht, wie in `doPlaySpell`). Danach `onEffectCountedAsArt` ({ art, playerIdx, heroIdx, heroOwner, effectName }) für Karten, die Attacks/Spells
+   * über eigene Hook-Zähler führen (Mirjam: `onActionUsed` feuert nur für Aktionen).
+   * @param {'attack'|'spell'} art
+   * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
+   */
+  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name }) {
+    const gs = this.gs;
+    const ps = gs?.players?.[pi];
+    if (!ps || (art !== 'attack' && art !== 'spell')) return;
+    const seite = Number.isInteger(heroOwner) ? heroOwner : pi;
+    const hero = Number.isInteger(heroIdx) && heroIdx >= 0 ? gs.players[seite]?.heroes?.[heroIdx] : null;
+    if (art === 'attack') {
+      ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
+      if (hero) {
+        if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
+        if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+        hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+      }
+    } else {
+      ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
+      if (ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`)
+      // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
+      if (!this._inMctsSim) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
+    }
+    if (this._inMctsSim) return;
+    try {
+      await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name });
+    } catch (err) { console.error('[zaehleAlsArt]', err.message); }
   }
 
   /**
@@ -46237,7 +46338,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Negierung „nur der Effekt" sperrt nicht), Heldenskript-/Support-Sperren (`canHeroPerformAction`: Saint Nicolas, Plant Golem), Kontrollrechte (`attacken === false`), Blendung
    * (diese Effekte brauchen alle ein Ziel) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
    */
-  heroKannAngreifen(seite, heroIdx, pi) {
+  heroKannAngreifen(seite, heroIdx, pi, opts = {}) {
     const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (this.isHeroIncapacitated(seite, heroIdx)) return false;
@@ -46245,9 +46346,81 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
     if (this.kontrollRechte(seite, heroIdx).attacken === false) return false;
     if (this._isHeroBlinded(seite, heroIdx)) return false;
-    const ps = this.gs.players[Number.isInteger(pi) ? pi : seite];
+    const p = Number.isInteger(pi) ? pi : seite;
+    const ps = this.gs.players[p];
     if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 3): Effekte, die als Attack zählen, unterliegen auch den Attack-ZÄHLERN und -Sperren (wie `validateActionPlay` für eine Attack-Karte):
+    // Berserk (nie mehr als 2 Attacks je Zug und Held), Knife Throw („the only Attack you play this turn"), Area-Sperren (`blocksCardPlay`: Rioting Village „1 Attack pro Zug") und
+    // Helden-/Ausrüstungs-Sperren (`canPlayCard`: Mirjam „1 Attack pro Zug", Idej Sword - Muras). Die Zähler füllt `alsAttackKette` (`zaehleAlsArt`).
+    if (hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) return false;
+    if (ps && ps._soleAttackTurn === this.gs.turn) return false;
+    if (this._effektKartenSperre(p, seite, heroIdx, this._effektAlsKarte('attack', opts.name, 'Fighting'))) return false;
     return true;
+  }
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Punkt 2/3): Gegenstück zu `heroKannAngreifen` für Effekte, die als SPELL eines Helden zählen (Alice): kann dieser Held (Brettseite `seite`, Index `heroIdx`,
+   * Kontrolleur `pi`) gerade zaubern? Dieselben kartenunabhängigen Sperren wie `validateActionPlay` für eine Spell-Karte: tot/Frozen/Stunned/Webbed/Bound/harte Negierung,
+   * Heldenskript-Sperren, Kontrollrechte (`zauber === false`), die Spell-Status Nulled (Null Zone), Magic Silenced, Frightened (Howling in the Night) und Berserked, Blendung,
+   * die Attack-/Spell-Sperre des Zuges (Trial of …), die Spell-Sperre (Eraser Beam, Silence; der Silence-Bonus lässt EINEN Spell durch) und Area-/Helden-/Ausrüstungs-Sperren
+   * (`blocksCardPlay`, `canPlayCard`: Idej Sword - Kogarasu „1 Spell pro Zug"). `opts`: `name`, `schule`, `stufe` (für die Pseudo-Karte).
+   */
+  heroKannZaubern(seite, heroIdx, pi, opts = {}) {
+    const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (this.isHeroIncapacitated(seite, heroIdx)) return false;
+    if (hero.statuses?.webbed) return false;
+    if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
+    if (this.kontrollRechte(seite, heroIdx).zauber === false) return false;
+    const st = hero.statuses || {};
+    if (st.nulled || st.magic_silenced || st.frightened || st.berserked) return false;
+    if (this._isHeroBlinded(seite, heroIdx)) return false;
+    const p = Number.isInteger(pi) ? pi : seite;
+    const ps = this.gs.players[p];
+    if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    if (ps && ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell !== this.gs.turn) return false;
+    if (this._effektKartenSperre(p, seite, heroIdx, this._effektAlsKarte('spell', opts.name, opts.schule, opts.stufe))) return false;
+    return true;
+  }
+
+  /** ★ W34a: Pseudo-Karte für Sperrprüfungen eines Effekts, der als Attack/Spell zählt (`blocksCardPlay`/`canPlayCard` lesen nur Typ, Stufe, Schule, Name). */
+  _effektAlsKarte(art, name, schule, stufe) {
+    return {
+      name: name || (art === 'attack' ? 'Treated-as Attack' : 'Treated-as Spell'),
+      cardType: art === 'attack' ? 'Attack' : 'Spell', subtype: 'Normal', level: stufe || 0,
+      ...(schule ? { spellSchool1: schule } : {}), _effektAlsKarte: true,
+    };
+  }
+
+  /**
+   * ★ W34a: die kartenunabhängigen Spielsperren aus `validateActionPlay`, auf einen Effekt ohne Karte (`karte` = `_effektAlsKarte`) angewandt: (1) Area-/Brett-Sperren
+   * (`blocksCardPlay`, alle aktiven Instanzen; Rioting Village), (2) das Heldenskript (`canPlayCard`, solange es nicht ruht) und (3) markierte Ausrüstung am Helden
+   * (`counters.treatAsEquip`). `herkunft.alsEffekt` kennzeichnet den Aufruf. true = GESPERRT.
+   */
+  _effektKartenSperre(pi, seite, heroIdx, karte) {
+    const gs = this.gs;
+    for (const inst of this.cardInstances) {
+      if (inst.faceDown) continue;
+      if (!inst.isActiveIn()) continue;
+      const sperre = loadCardEffect(inst.name)?.blocksCardPlay;
+      if (typeof sperre !== 'function') continue;
+      try { if (sperre(gs, pi, karte, this, inst)) return true; }
+      catch (err) { console.error(`[blocksCardPlay] ${inst.name}:`, err.message); }
+    }
+    const hero = gs.players[seite]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const herkunft = { handIndex: -1, fromHand: false, fromCreation: false, alsEffekt: true };
+    try {
+      const heroScript = this.heroScript(hero);
+      if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(seite, heroIdx) && !heroScript.canPlayCard(gs, seite, heroIdx, karte, this, herkunft)) return true;
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== seite || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
+        if (!inst.counters?.treatAsEquip) continue;
+        const equipScript = loadCardEffect(inst.name);
+        if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, seite, heroIdx, karte, this, herkunft)) return true;
+      }
+    } catch (err) { console.error('[_effektKartenSperre]', err.message); }
+    return false;
   }
 
   /**

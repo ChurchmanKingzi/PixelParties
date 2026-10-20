@@ -2,6 +2,11 @@
 //  CARD EFFECT: "Shamanic Curse"
 //  Spell (Reaction) — Decay Magic Lv3
 //
+//  ★ W34a (Al, 22.10.2026): reagiert NICHT auf Effekte, die nur als Spell
+//  ZÄHLEN (Alice): der Spell müsste in den Ablagestapel geschickt werden
+//  können — ein Effekt ohne Karte kann das nicht (`zaehltAlsArt`-Marke der
+//  virtuellen Kette).
+//
 //  When an opponent's Hero uses a Spell, increase that
 //  Spell's level by 1. If the Hero can no longer
 //  meet the level requirement — even via Wisdom
@@ -27,6 +32,9 @@ module.exports = {
     const lastLink = chainCtx.chain[chainCtx.chain.length - 1];
     if (!lastLink || lastLink.owner === pi) return false;
     if (lastLink.cardType !== 'Spell') return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 2): „Shamanic Curse nicht, da der Spell nicht zum Discard geschickt werden könnte" — ein Effekt, der nur als Spell ZÄHLT (Alice; virtuelle
+    // Kette `alsSpellKette`), ist kein gespielter Spell und hat keine Karte, die in die Ablage ginge: keine Reaktion. Gegenprobe: ein echter Spell (Kette ohne Marke) → reagiert.
+    if (lastLink.zaehltAlsArt) return false;
 
     const ps = gs.players[pi];
     if (!ps) return false;

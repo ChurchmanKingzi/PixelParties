@@ -187,5 +187,24 @@ module.exports = {
       }
       hero._mirjamAttacksUsed += 1;
     },
+
+    /**
+     * ★ W34a (Al, 22.10.2026, Punkt 3): Effekte, die als Attack ZÄHLEN (Gegenstandseffekte, Greatmaw …), sind keine Aktion (`onActionUsed` feuert nicht), zählen aber
+     * für „never use more than 1 Attack per turn" — `engine.zaehleAlsArt` meldet sie hier (`canPlayCard` sperrt dann auch den nächsten als Attack zählenden Effekt).
+     */
+    onEffectCountedAsArt: async (ctx) => {
+      if (ctx.art !== 'attack') return;
+      if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      if (ctx.playerIdx !== ctx.cardOwner) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
+      const hero = ctx.attachedHero;
+      if (!hero) return;
+      const turn = ctx._engine.gs.turn;
+      if (hero._mirjamAttackTurn !== turn) {
+        hero._mirjamAttackTurn = turn;
+        hero._mirjamAttacksUsed = 0;
+      }
+      hero._mirjamAttacksUsed += 1;
+    },
   },
 };

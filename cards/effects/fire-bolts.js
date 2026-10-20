@@ -85,6 +85,11 @@ function isFirstDMSpellThisTurn(engine, playerIdx) {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     if (entry.turn !== currentTurn) continue;
+    // ★ W34a (Al, 22.10.2026, Punkt 3): ein Effekt, der als Spell ZÄHLT (Alice: Destruction Magic), ist ein früherer Destruction-Magic-Spell dieses Zuges (`engine.zaehleAlsArt`).
+    if (entry.type === 'effect_counted_as_spell') {
+      if (entry.player === playerName && entry.school === 'Destruction Magic') { sawEarlierDM = true; break; }
+      continue;
+    }
     if (entry.type !== 'spell_played' && entry.type !== 'immediate_action') continue;
     if (entry.player !== playerName) continue;
     const cd = cardDB[entry.card];

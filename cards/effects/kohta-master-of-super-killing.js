@@ -85,6 +85,8 @@ module.exports = {
    * der Spieler haette seine Aktion verplant.
    */
   canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Kohta, Master of Super-Killing' })) return false;
     return !hartGesperrt(ctx._engine, ctx.cardOwner);
   },
 

@@ -69,6 +69,10 @@ module.exports = {
     const currentTurn = engine.gs.turn || 0;
     const cardDB = engine._getCardDB();
 
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Spell zählt, unterliegt den Spell-Sperren (Nulled/Null Zone, Magic Silenced, Frightened/Howling in the Night, Berserk,
+    // Trial of …, Eraser Beam/Silence, Idej Sword - Kogarasu …) — `heroKannZaubern`.
+    if (!engine.heroKannZaubern(ctx.cardHeroOwner ?? pi, ctx.cardHeroIdx, pi, { name: 'Alice, the Puppeteer Girl', schule: 'Destruction Magic' })) return false;
+
     return engine.cardInstances.some(inst => _qualifies(inst, pi, currentTurn, cardDB));
   },
 
@@ -109,6 +113,10 @@ module.exports = {
 
     if (!target) return false; // Cancelled
 
+    // ★ W34a (Al, 22.10.2026, Punkt 2/3): „Treated as a Destruction Magic Spell" — der Treffer zählt als Spell (Spell-Zähler) und öffnet ein Reaktionsfenster wie ein Spell
+    // (virtuelle Spell-Kette `alsSpellKette`, NACH der Zielwahl, VOR dem Treffer): Silence negiert ihn; Shamanic Curse reagiert nicht (kein Kartenspiel); MOE Shield (Nach-Zielwahl-
+    // Fenster der Zielwahl) und Magic Mirror (Treffer-Fenster) lesen die Quelle über `_zaehltAlsArt`.
+    const spellErgebnis = await engine.alsSpellKette({ name: 'Alice, the Puppeteer Girl', pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
     // Play laser beam animation from Alice to target
     const targetZoneSlot = target.type === 'equip' ? target.slotIdx : -1;
     engine._broadcastEvent('play_beam_animation', {
@@ -141,6 +149,13 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true }
         );
       }
+    }
+    return true;
+    } });
+    // Negiert (Silence …) oder gefizzelt: der Spell hat nie aufgelöst — kein `afterSpellResolved`; die Aktivierung gilt als gebraucht (Muster Arthor/Broghan).
+    if (spellErgebnis?.negated || spellErgebnis?.fizzled) {
+      engine.sync();
+      return true;
     }
 
     // Fire `afterSpellResolved` so passive on-spell-cast listeners
