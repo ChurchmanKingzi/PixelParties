@@ -28,7 +28,7 @@ const HOPT_PREFIX = 'bomblebee';
 // face-up opp creature in a support zone. Cardinal-immune creatures stay
 // in the picker (they're targetable; the damage fizzles silently at the
 // engine's immunity gate, matching the convention used by Bomb Arrow).
-function opponentTargets(engine, listenerOwner) {
+function opponentTargets(engine, listenerOwner, excludeInstId = null) {
   const gs = engine.gs;
   const oi = engine.opponentOf(listenerOwner);
   const ops = gs.players[oi];
@@ -51,6 +51,8 @@ function opponentTargets(engine, listenerOwner) {
   for (const inst of engine.cardInstances) {
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
+    // W24d (N4-09): die soeben besiegte Kreatur (Instanz im Todes-Hook noch `support`) ist kein Ziel mehr.
+    if (excludeInstId != null && inst.id === excludeInstId) continue;
     const owner = inst.controller ?? inst.owner;
     if (owner !== oi) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
@@ -80,7 +82,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
   }
 
-  const targets = opponentTargets(engine, pi);
+  const targets = opponentTargets(engine, pi, opts.excludeInstId ?? null);
   if (targets.length === 0) return;
 
   // Cancellable per text ("you may"). Engine wraps the prompt; if the
@@ -191,7 +193,7 @@ module.exports = {
       // The dying creature might be ANOTHER Bomblebee on this side that
       // got hit by an opp effect — but isOpponentTargetDeath already
       // gates on the opp side, so a self-side death never reaches here.
-      await runOpponentDeathPayload(ctx._engine, ctx.card);
+      await runOpponentDeathPayload(ctx._engine, ctx.card, { excludeInstId: ctx.creature?.instId ?? null });
     },
     onHeroKO: async (ctx) => {
       if (!isOpponentTargetDeath(ctx, ctx.cardOwner)) return;
