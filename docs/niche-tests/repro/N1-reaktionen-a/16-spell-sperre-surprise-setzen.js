@@ -4,7 +4,9 @@
 // Engine-Regel (v880, `_canHeroActivateSurprise`): „SPELL-SPERREN GELTEN AUCH HIER … Surprises und Hand-Reaktionen sind Spells" – das gilt für das AKTIVIEREN. Das Setzen aus der Hand
 //   (`doPlaySurprise`) prüft keinen Held-Status.
 // ENTSCHIEDEN (Al, 21.10.2026, W25a: „setzen ja, aktivieren (falls es ein Spell ist) nein"): Ein Held mit „cannot use any Spells" darf eine Surprise verdeckt SETZEN (Ist-Zustand), sie aber nicht
-//   AKTIVIEREN, wenn sie ein Spell ist (Spell-Surprises: Booby Trap …); Kreatur-Surprises (Afflicted Vermin) bleiben aktivierbar (`_canHeroActivateSurprise` sperrt nur `cardType === 'Spell'`).
+//   AKTIVIEREN, wenn sie ein Spell ist (Spell-Surprises: Booby Trap …); Kreatur-Surprises (Afflicted Vermin) bleiben bei reinen Zauber-Sperren (magic_silenced / nulled / frightened) aktivierbar.
+// ERGÄNZT (Al, 21.10.2026, W28a: „Korrekt, auch keine Creature-Surprises"): ein Held, der keine Kreaturen beschwören darf (`berserked`: „cannot use any Spells or summon Creatures"),
+//   aktiviert auch KEINE Kreatur-Surprise (Afflicted Vermin bleibt verdeckt liegen). Weitere Fälle: `docs/niche-tests/repro/W28/a-01`.
 // Aufbau: Sitz 0, Main Phase 1, Hand [Booby Trap]; Held 0 trägt den Status (berserked / magic_silenced / nulled / frightened); Gegenprobe ohne Status und Kontrolle „normaler Spell wird abgelehnt" (Fireball).
 // Zweiter Teil: Sitz 1 hält die Surprise am gesperrten Helden 1:0; Sitz 0 trifft ihn mit Fireball (Spell-Surprise) bzw. beschwört eine Kreatur (Kreatur-Surprise).
 const H = require('../../lib/h.js');
@@ -34,14 +36,20 @@ const STATI = ['berserked', 'magic_silenced', 'nulled', 'frightened'];
       R.check(`${status}: die gesetzte Spell-Surprise (Booby Trap) wird NICHT aktiviert (kein Fenster, Fireball trifft, Angreifer unversehrt)`, !t.prompts.some(p => p.pi === 1 && p.d.title === 'Booby Trap') && t.hp(1, 0) === 650 && t.hp(0, 0) === 800, { prompts: t.prompts.map(p => p.d.title), hp: [t.hp(0, 0), t.hp(1, 0)] });
       R.check(`${status}: Booby Trap liegt weiter verdeckt`, t.gs.players[1].surpriseZones[0].length === 1, t.gs.players[1].surpriseZones[0]);
       R.check(`${status}: keine Engine-Fehler`, t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() }); }
-    if (status !== 'berserked') { // Kreatur-Surprise bleibt aktivierbar
+    { // Kreatur-Surprise: W28a (Al, 21.10.2026: „Korrekt, auch keine Creature-Surprises") – bei `berserked` („cannot … summon Creatures") NICHT aktivierbar;
+      // bei den reinen Zauber-Sperren (magic_silenced / nulled / frightened) weiter aktivierbar
       const t = await H.fresh({ hand: [[], []] });
       t.setHand(0, [H.INERT.creature]);
       t.put(1, 0, 0, H.INERT.creature);
       t.putSurprise(1, 0, 'Afflicted Vermin'); t.grantFor(1, 0, 'Afflicted Vermin');
       t.heroStatus(1, 0, status);
       await t.play(0, H.INERT.creature, { hero: 0 });
-      R.check(`${status}: die Kreatur-Surprise (Afflicted Vermin) bleibt aktivierbar`, t.prompts.some(p => p.pi === 1 && p.d.title === 'Afflicted Vermin'), t.prompts.map(p => p.pi + ':' + p.d.title));
+      const fenster = t.prompts.some(p => p.pi === 1 && p.d.title === 'Afflicted Vermin');
+      if (status === 'berserked') {
+        R.check(`${status}: die Kreatur-Surprise (Afflicted Vermin) wird NICHT aktiviert (Held darf keine Kreaturen beschwören)`, !fenster && t.gs.players[1].surpriseZones[0].length === 1, t.prompts.map(p => p.pi + ':' + p.d.title));
+      } else {
+        R.check(`${status}: die Kreatur-Surprise (Afflicted Vermin) bleibt aktivierbar`, fenster, t.prompts.map(p => p.pi + ':' + p.d.title));
+      }
       R.check(`${status}: keine Engine-Fehler`, t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() }); }
   }
   { // Gegenprobe: ohne Status feuert die gesetzte Booby Trap

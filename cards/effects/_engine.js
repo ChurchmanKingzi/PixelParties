@@ -39405,6 +39405,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (reaktor !== playerIdx && !opts.isBakhmSlot && hasCardType(cardData, 'Creature')
         && !this.kontrollRechte(playerIdx, heroIdx).beschwoeren) return false;
 
+    // W28a (Al, 21.10.2026, Rueckfrage zu N1-16: „Korrekt, auch keine Creature-Surprises"): ein Held, der KEINE Kreaturen beschwoeren darf, aktiviert auch keine
+    // Kreatur-Surprise (die Aktivierung IST eine Beschwoerung/Platzierung, Ruling 3.10.). Gesperrt durch: Berserk (`berserked`, „cannot … summon Creatures"; wie
+    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg), `bound` (kein aktionsfaehiger Beschwoerer, wie `canHeroSummon`) und die spielerweiten
+    // Beschwoerungssperren des AUSLOESERS (`getSummonBlockedFor`: `summonLocked` „cannot summon Creatures for the rest of the turn", Greatmaw-Remora-Teilsperre,
+    // Grinning Cat). Schulen/Stufe, Frozen/Stunned/Webbed und Hero-`canPlayCard` (Cute Crown/Mary) prueften die Gates oben schon. NUR-Zauber-Sperren
+    // (`magic_silenced`, `nulled`, `frightened`) betreffen Kreatur-Surprises weiterhin nicht. Spell-Surprises bleiben wie in W25a.
+    if (hasCardType(cardData, 'Creature')) {
+      if (hero.statuses?.berserked || hero.statuses?.bound) {
+        const _cs = loadCardEffect(cardName);
+        let _bypass = false;
+        if (typeof _cs?.canPlayDespiteStatuses === 'function') {
+          try { _bypass = !!_cs.canPlayDespiteStatuses(this.gs, playerIdx, heroIdx, cardData, this); } catch {}
+        }
+        if (!_bypass) return false;
+      }
+      if (this.getSummonBlockedFor(reaktor, cardName)) return false;
+    }
+
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
     if (!opts.isBakhmSlot && hasCardType(cardData, 'Creature')) {
       let hasFreeSlot = false;
