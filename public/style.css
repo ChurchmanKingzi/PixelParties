@@ -26186,6 +26186,9 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 .tt-icon { display: inline-block; flex: 0 0 auto; shape-rendering: crispEdges; image-rendering: pixelated; }
 /* Hinweisfeld (Ascension Bonus, Orbs, geerbte Effekte) und die Textbox des Effekttexts */
 .tt-callout { padding: 6px 10px 7px; font-size: 14px; line-height: 1.5; }
+/* Statuseffekte im Effekttext und in den Remindern (Als Vorgabe 20.10.): fett, Farbe aus `CardRender.STATUS_TERMS`, dunkle Kontur wie auf der Karte */
+.tt-status { font-weight: 700; text-shadow: 0 1px 0 rgba(0, 0, 0, .75), 1px 0 0 rgba(0, 0, 0, .75), -1px 0 0 rgba(0, 0, 0, .75), 0 -1px 0 rgba(0, 0, 0, .75); }
+.tt-reminder { font-size: 13px; line-height: 1.5; }
 .tt-callout-titel { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
 .tt-textbox { padding: 9px 11px 10px; }
 /* Nummernmarke der Faehigkeitsstufen */

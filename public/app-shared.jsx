@@ -8350,9 +8350,68 @@ function TTCallout({ color, title, children }) {
   );
 }
 
-/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben. */
+// ── Statuseffekte im Effekttext (Als Vorgabe 20.10.) ──
+// Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint — fett und farbig, wie auf der Karte; Erkennung
+// und Farben kommen aus dem Kartenrenderer (`CardRender.STATUS_TERMS` / `statusMatches`), damit Bild und Tooltip nie auseinanderlaufen.
+// NUR im Effekttext, nie in Namen: Kartennamen im Text stehen in Anfuehrungszeichen und bleiben unberuehrt.
+// Darunter steht fuer jeden erwaehnten Status ein Remindertext (`TTStatusReminders`).
+const TT_STATUS_BOX = '#a3a9bd';
+const TT_STATUS_REMINDER = {
+  poison: 'Poisoned targets take 30 damage per Stack at the start of each of their owner\'s turns. Poison Stacks and lasts until cleansed or healed.',
+  burn:   'Burned targets take 60 damage at the start of each of their owner\'s turns. It lasts until cleansed or healed.',
+  stun:   'Stunned targets cannot act, and their effects and Abilities are negated. It wears off at the end of their owner\'s turn, unless the card says otherwise.',
+  negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A Negated Hero or Creature has its effects negated (Heroes also lose their attached Abilities) until the end of its owner\'s turn.',
+  bleed:  'Bleeding targets take 50 damage after each of their own actions (Attacks, Spells, Creatures, and Abilities or Hero effects that cost an Action), after active Hero effects without Action cost and after active Creature effects. It lasts until cleansed.',
+  freeze: 'Frozen targets cannot act, and their effects and Abilities are negated. Frozen Heroes cannot be equipped with Artifacts. It wears off at the end of their owner\'s turn, unless the card says otherwise.',
+  blind:  'Blinded targets cannot use Attacks, Spells or activated effects that need to choose a target. Effects that do not choose targets still work.',
+};
+/** Statusbegriffe in `text` (ausserhalb von Anfuehrungszeichen): [{ start, end, key }] — leer, wenn der Renderer fehlt. */
+function ttStatusMatches(text) {
+  const CR = window.CardRender;
+  return CR && typeof CR.statusMatches === 'function' ? CR.statusMatches(text) : [];
+}
+function ttStatusTerm(key) {
+  const CR = window.CardRender;
+  return (CR && CR.STATUS_TERMS && CR.STATUS_TERMS.find(t => t.key === key)) || null;
+}
+/** Ein Text ohne Anfuehrungszeichen, die Statusbegriffe darin fett und farbig. */
+function ttMarkStatus(text, basis) {
+  const ms = ttStatusMatches(text);
+  if (!ms.length) return text;
+  const teile = []; let pos = 0;
+  ms.forEach((m, i) => {
+    const term = ttStatusTerm(m.key);
+    if (m.start > pos) teile.push(text.slice(pos, m.start));
+    teile.push(<b key={basis + '-' + i} className="tt-status" style={{ color: term ? term.hell : undefined }}>{text.slice(m.start, m.end)}</b>);
+    pos = m.end;
+  });
+  if (pos < text.length) teile.push(text.slice(pos));
+  return <React.Fragment key={basis}>{teile}</React.Fragment>;
+}
+
+/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben; Statusbegriffe ausserhalb davon fett und farbig. */
 function ttQuoted(text) {
-  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : t));
+  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : ttMarkStatus(t, i)));
+}
+
+/** Rubrik unter dem Effekttext: ein Remindertext je erwähntem Statuseffekt (Reihenfolge des ersten Auftretens); ohne Treffer: nichts. */
+function TTStatusReminders({ text }) {
+  const keys = [];
+  for (const m of ttStatusMatches(String(text || ''))) if (!keys.includes(m.key)) keys.push(m.key);
+  if (!keys.length) return null;
+  return (
+    <TTCallout color={TT_STATUS_BOX} title="Status Effects">
+      {keys.map((k, i) => {
+        const term = ttStatusTerm(k);
+        return (
+          <div key={k} className="tt-reminder" style={{ marginTop: i ? 7 : 0 }}>
+            <b className="tt-status" style={{ color: term ? term.hell : undefined }}>{term ? term.label : k}</b>
+            <span style={{ opacity: .92 }}> — {TT_STATUS_REMINDER[k]}</span>
+          </div>
+        );
+      })}
+    </TTCallout>
+  );
 }
 
 /**
@@ -8385,7 +8444,12 @@ function TTText({ text, aktiv }) {
 /** Die Textbox des Effekttexts: Pixel-Box in der Kartenfarbe, darin die Absaetze (ohne Text: nichts). */
 function TTEffectBox({ card, text, aktiv }) {
   if (!String(text || '').trim()) return null;
-  return <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>;
+  return (
+    <>
+      <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>
+      <TTStatusReminders text={text} />
+    </>
+  );
 }
 
 /** Der Effekttext, ohne den Satz, den der Ascension-Bonus-Hinweis schon sagt (Beato steht der Bonus auch im Effekt). */
