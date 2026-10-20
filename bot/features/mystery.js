@@ -3,12 +3,12 @@
 //  Mystery-Spiel
 //   !mystery        zeigt das aktuelle Rätsel: ein winziger Ausschnitt aus der Kunst einer Karte (Start ca. 8×8 Bildpunkte);
 //                   mit jedem falschen Tipp von irgendwem wird er um einen Bildpunkt größer (gleicher Mittelpunkt)
-//   !guess <Name>   Tipp. Richtig → der Sieger bekommt 20 SC (−2 für jeden falschen Tipp, den ER für diese Karte schon
-//                   abgegeben hat), die Karte wird gezeigt und ein neues Rätsel beginnt.
+//   !guess <Name>   Tipp. Richtig → die Karte wird gezeigt und ein neues Rätsel beginnt. Ist das Rätsel SC wert, bekommt der
+//                   Sieger 20 SC (−2 für jeden falschen Tipp, den ER für diese Karte schon abgegeben hat).
 //   !mystery skip   (Admin) Rätsel überspringen: Lösung zeigen, nächstes starten
 //
 //  • nur im Rätsel-Kanal (MYSTERY_CHANNEL_ID, voreingestellt auf den Kanal des Servers)
-//  • höchstens 5 NEUE Rätsel je Tag (Berliner Kalendertag); ist das Kontingent aufgebraucht, bleibt der Kanal bis Mitternacht ruhig
+//  • Rätsel entstehen unbegrenzt — aber nur das ERSTE neu erzeugte Rätsel jeder vollen Stunde ist SC wert (alle weiteren sind Übung)
 //  • SC gibt es nur mit verknüpftem Konto (!link); alle anderen dürfen mitspielen und gewinnen, bekommen aber keine SC
 //  • Tipps, die keiner Karte ähneln, oder die schon einmal getippt wurden, zählen nicht
 // ═══════════════════════════════════════════════════════════════════
@@ -29,14 +29,15 @@ module.exports = function register(ctx) {
   const serialized = fn => { const run = chain.then(fn, fn); chain = run.catch(() => {}); return run; };
 
   const attach = (buf, name) => new AttachmentBuilder(buf, { name });
-  const KEY = { current: 'mystery_current', day: 'mystery_day', recent: 'mystery_recent' };
+  const KEY = { current: 'mystery_current', scHour: 'mystery_sc_hour', recent: 'mystery_recent' };
+  let clock = () => Date.now();                       // für Tests austauschbar
 
-  async function dayInfo() { return mystery.dayState(await db.kvGet(KEY.day)); }
-
-  /** Neues Rätsel, wenn das Tageskontingent es erlaubt. @returns {Promise<object|null>} das Rätsel oder null (Kontingent leer / keine Karte) */
+  /**
+   * Neues Rätsel. Unbegrenzt viele — aber nur das erste, das in einer vollen Stunde ENTSTEHT, ist SC wert (`scWorth`).
+   * Das Merkmal wird bei der Erzeugung festgelegt: ein offenes SC-Rätsel bleibt es auch über den Stundenwechsel hinweg.
+   * @returns {Promise<object|null>} das Rätsel oder null (keine passende Karte)
+   */
   async function generate() {
-    const day = await dayInfo();
-    if (day.count >= config.mysteryDailyMax) return null;
     await renderer.init();
     const recent = await db.kvGet(KEY.recent, []);
     const pool = mystery.eligibleCards(renderer.allCards(), renderer.hasArt, recent);
@@ -44,10 +45,12 @@ module.exports = function register(ctx) {
       const card = pool[Math.floor(Math.random() * pool.length)];
       const crop = await ctx.renderQueue(() => renderer.pickArtCrop(card.name));
       if (!crop) continue;
+      const now = clock();
+      const scWorth = mystery.isScWorthy(await db.kvGet(KEY.scHour), now);
+      if (scWorth) await db.kvSet(KEY.scHour, mystery.hourIndex(now));
       const center = { x: crop.x + crop.w / 2, y: crop.y + crop.h / 2 };      // der Ausschnitt wächst um diesen Punkt
-      const puzzle = { card: card.name, center, number: day.count + 1, guesses: {}, tried: [], createdAt: Date.now() };
+      const puzzle = { card: card.name, center, scWorth, guesses: {}, tried: [], createdAt: now };
       await db.kvSet(KEY.current, puzzle);
-      await db.kvSet(KEY.day, { date: day.date, count: day.count + 1 });
       await db.kvSet(KEY.recent, [...recent, card.name].slice(-RECENT_KEEP));
       return puzzle;
     }
@@ -62,23 +65,24 @@ module.exports = function register(ctx) {
     return mystery.cropRect(art.w, art.h, center, mystery.cropSize(art.w, art.h, puzzle.tried.length));
   }
 
-  const rewardText = () => `**${config.mysteryReward} SC** — minus ${config.mysteryPenalty} for each wrong guess you’ve already made on this card`;
+  // Rätsel aus der Vorversion (ohne scWorth) galten alle als SC wert.
+  const worthSc = puzzle => puzzle.scWorth !== false;
+
+  const rewardText = puzzle => worthSc(puzzle)
+    ? `💰 Worth **${config.mysteryReward} SC** — minus ${config.mysteryPenalty} for each wrong guess you’ve already made on this card. (Link your account with \`${config.prefix}link\` to receive SC.)`
+    : `No SC for this one — only the first new puzzle each full hour pays. The next hour starts <t:${mystery.nextHourSec(clock())}:R>.`;
 
   async function puzzleMessage(puzzle, { intro } = {}) {
     const rect = await rectFor(puzzle);
     const png = await ctx.renderQueue(() => renderer.renderArtCrop(puzzle.card, rect));
     const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join(', ')}` : '';
     return {
-      content: `${intro ? intro + '\n\n' : ''}🕵️ **Mystery card #${puzzle.number} today** — which card is this?\n` +
-        `Guess with \`${config.prefix}guess <card name>\`. Reward: ${rewardText()}. (Link your account with \`${config.prefix}link\` to receive SC.)\n` +
+      content: `${intro ? intro + '\n\n' : ''}🕵️ **Mystery card** — which card is this?\n` +
+        `Guess with \`${config.prefix}guess <card name>\`. ${rewardText(puzzle)}\n` +
         `The picture zooms out a little with every wrong guess.${tried}`,
       files: [attach(png, 'mystery.png')],
       allowedMentions: { parse: [] },
     };
-  }
-
-  async function exhaustedText() {
-    return `That was today’s last mystery card (${config.mysteryDailyMax} per day)! New ones start <t:${mystery.nextBerlinMidnightSec()}:R>.`;
   }
 
   async function reveal(puzzle) {
@@ -108,13 +112,13 @@ module.exports = function register(ctx) {
       await db.kvSet(KEY.current, null);
       const next = await generate();
       await msg.channel.send({ content: `⏭️ Skipped. The answer was **${mystery.plainName(cur.card)}**.`, files: await reveal(cur), allowedMentions: { parse: [] } });
-      return next ? msg.channel.send(await puzzleMessage(next)) : msg.channel.send(await exhaustedText());
+      return msg.channel.send(next ? await puzzleMessage(next) : 'I couldn’t find a new card right now — type `' + config.prefix + 'mystery` to try again.');
     }
 
     let cur = await db.kvGet(KEY.current);
     if (!cur) {
       cur = await generate();
-      if (!cur) return msg.reply(`All ${config.mysteryDailyMax} mystery cards for today are done! New ones start <t:${mystery.nextBerlinMidnightSec()}:R>.`);
+      if (!cur) return msg.reply('I couldn’t find a card for a puzzle right now — please try again in a moment.');
     }
     return msg.reply(await puzzleMessage(cur));
   }));
@@ -126,8 +130,8 @@ module.exports = function register(ctx) {
     const cur = await db.kvGet(KEY.current);
     if (!cur) return msg.reply(`There’s no active puzzle right now. Type \`${config.prefix}mystery\` to start one.`);
     if (!rest) return msg.reply(`Usage: \`${config.prefix}guess <card name>\``);
-    if (Date.now() - (lastGuess.get(msg.author.id) || 0) < GUESS_COOLDOWN_MS) return;
-    lastGuess.set(msg.author.id, Date.now());
+    if (clock() - (lastGuess.get(msg.author.id) || 0) < GUESS_COOLDOWN_MS) return;
+    lastGuess.set(msg.author.id, clock());
 
     await renderer.init();
     const target = renderer.allCards().find(c => c.name === cur.card);
@@ -144,20 +148,22 @@ module.exports = function register(ctx) {
       cur.guesses[msg.author.id] = n;
       cur.tried.push(guessed);
       await db.kvSet(KEY.current, cur);
-      const next = mystery.reward(config.mysteryReward, config.mysteryPenalty, n);
+      const next = worthSc(cur) ? mystery.reward(config.mysteryReward, config.mysteryPenalty, n) : 0;
+      const outlook = worthSc(cur) ? `a win would pay ${next} SC` : 'no SC on this puzzle';
       // Das Bild wird mit jedem falschen Tipp etwas größer — gleich das neue zeigen, sonst sieht es niemand.
       const rect = await rectFor(cur);
       const png = await ctx.renderQueue(() => renderer.renderArtCrop(cur.card, rect));
-      return msg.reply({ content: `❌ Not **${guessed}**. (Your wrong guesses on this card: ${n} → a win would pay ${next} SC.)\n🔍 The picture just zoomed out a bit:`,
+      return msg.reply({ content: `❌ Not **${guessed}**. (Your wrong guesses on this card: ${n} → ${outlook}.)\n🔍 The picture just zoomed out a bit:`,
         files: png ? [attach(png, 'mystery.png')] : [], allowedMentions: { parse: [] } });
     }
 
     // ── richtig ──
     const wrongBefore = cur.guesses[msg.author.id] || 0;
-    const amount = mystery.reward(config.mysteryReward, config.mysteryPenalty, wrongBefore);
+    const amount = worthSc(cur) ? mystery.reward(config.mysteryReward, config.mysteryPenalty, wrongBefore) : 0;
     await db.kvSet(KEY.current, null);                         // zuerst abschließen: kein zweiter Gewinner
     let scLine;
-    if (amount <= 0) scLine = 'No SC this time — too many wrong guesses.';
+    if (!worthSc(cur)) scLine = 'No SC for this one — only the first new puzzle each full hour pays.';
+    else if (amount <= 0) scLine = 'No SC this time — too many wrong guesses.';
     else {
       try {
         const r = await game.adjustSc(msg.author.id, amount, client.user ? client.user.id : '', 'bot:mystery');
@@ -170,8 +176,7 @@ module.exports = function register(ctx) {
     await msg.reply({ content: `🎉 <@${msg.author.id}> got it: **${mystery.plainName(target.name)}**! ${scLine}`, files: await reveal(cur), allowedMentions: { users: [msg.author.id] } });
     const next = await generate();
     if (next) await msg.channel.send(await puzzleMessage(next, { intro: '▶️ Next one:' }));
-    else await msg.channel.send(await exhaustedText());
   }));
 
-  ctx._mystery = { generate, rectFor, KEY };
+  ctx._mystery = { generate, rectFor, KEY, setClock: f => { clock = f; } };
 };

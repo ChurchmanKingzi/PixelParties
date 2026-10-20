@@ -95,8 +95,7 @@ const config = {
   skinCollectorMin: num('SKIN_COLLECTOR_MIN', 50),
   veteranGames: num('VETERAN_GAMES', 300),
 
-  // Mystery-Spiel (!mystery / !guess)
-  mysteryDailyMax: num('MYSTERY_DAILY_MAX', 5),   // so viele neue Rätsel je Tag (Berliner Zeit)
+  // Mystery-Spiel (!mystery / !guess): unbegrenzt viele Rätsel, aber nur das erste neu erzeugte jeder vollen Stunde ist SC wert
   mysteryReward: num('MYSTERY_REWARD', 20),       // SC für den Gewinner …
   mysteryPenalty: num('MYSTERY_PENALTY', 2),      // … minus so viele je falschem Tipp, den er für diese Karte schon abgegeben hat
 

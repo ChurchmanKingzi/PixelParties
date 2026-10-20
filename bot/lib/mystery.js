@@ -42,29 +42,17 @@ function reward(base, penalty, wrongBefore) {
   return Math.max(0, base - penalty * Math.max(0, wrongBefore));
 }
 
-/** Berliner Kalendertag (YYYY-MM-DD) — Tagesgrenze für das Rätsel-Kontingent. */
-function berlinDay(ms = Date.now()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-}
+/** Laufende Nummer der vollen Stunde (UTC; Berliner Stunden fallen wegen ganzzahliger Zeitzonen-Verschiebung auf dieselben Grenzen). */
+function hourIndex(ms = Date.now()) { return Math.floor(ms / 3600000); }
 
-/** Unix-Sekunden des nächsten Berliner Mitternachts (für <t:…:R>). */
-function nextBerlinMidnightSec(ms = Date.now()) {
-  const today = berlinDay(ms);
-  // Sommer-/Winterzeit: der Mitternachtszeitpunkt liegt 22 oder 23 Stunden UTC vor dem nächsten Tag — beide Kandidaten prüfen.
-  const [y, m, d] = today.split('-').map(Number);
-  const nextUtcMidnight = Date.UTC(y, m - 1, d + 1, 0, 0, 0);
-  for (const offsetH of [2, 1]) {
-    const cand = nextUtcMidnight - offsetH * 3600000;
-    if (berlinDay(cand) !== today && berlinDay(cand - 1000) === today) return Math.floor(cand / 1000);
-  }
-  return Math.floor((nextUtcMidnight - 3600000) / 1000);
-}
+/** Unix-Sekunden, ab denen die nächste volle Stunde beginnt (für <t:…:R>). */
+function nextHourSec(ms = Date.now()) { return (hourIndex(ms) + 1) * 3600; }
 
-/** Kontingent des Tages fortschreiben: { date, count } → am neuen Tag wieder 0. */
-function dayState(saved, ms = Date.now()) {
-  const today = berlinDay(ms);
-  return saved && saved.date === today ? { date: today, count: saved.count } : { date: today, count: 0 };
-}
+/**
+ * Ist ein JETZT erzeugtes Rätsel SC wert? Nur das ERSTE neu erzeugte Rätsel jeder vollen Stunde: Solange in dieser Stunde noch
+ * keines erzeugt wurde (`lastScHour` ≠ aktuelle Stunde), ja — alle weiteren bis zur nächsten vollen Stunde nein.
+ */
+function isScWorthy(lastScHour, ms = Date.now()) { return lastScHour !== hourIndex(ms); }
 
 /** Karten, aus denen Rätsel entstehen: mit Kunst, keine Marker-Token, nicht die zuletzt gespielten. */
 function eligibleCards(cards, hasArt, recentNames = []) {
@@ -95,4 +83,4 @@ function cropRect(artW, artH, center, size) {
 /** Anzeigename ohne Farbvarianten-Zusatz. */
 const plainName = name => String(name).replace(/\s*\[(?:B|W)\]$/, '');
 
-module.exports = { plainName, judgeGuess, reward, cropSize, cropRect, CROP_START, berlinDay, nextBerlinMidnightSec, dayState, eligibleCards, MIN_GUESS_LEN };
+module.exports = { plainName, judgeGuess, reward, cropSize, cropRect, CROP_START, hourIndex, nextHourSec, isScWorthy, eligibleCards, MIN_GUESS_LEN };

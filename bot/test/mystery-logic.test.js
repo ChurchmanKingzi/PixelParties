@@ -40,19 +40,18 @@ test('Belohnung: 20 SC, −2 je eigenem falschem Tipp, nie unter 0', () => {
   assert.equal(m.reward(20, 2, 50), 0);
 });
 
-test('Tageskontingent folgt dem Berliner Kalendertag; nächste Mitternacht auch über die Zeitumstellung', () => {
-  const t1 = Date.UTC(2026, 5, 10, 21, 59, 0);      // 23:59 Berlin (Sommerzeit)
-  const t2 = Date.UTC(2026, 5, 10, 22, 1, 0);       // 00:01 Berlin am Folgetag
-  assert.equal(m.berlinDay(t1), '2026-06-10');
-  assert.equal(m.berlinDay(t2), '2026-06-11');
-  assert.deepEqual(m.dayState({ date: '2026-06-10', count: 4 }, t1), { date: '2026-06-10', count: 4 });
-  assert.deepEqual(m.dayState({ date: '2026-06-10', count: 5 }, t2), { date: '2026-06-11', count: 0 });
-  assert.deepEqual(m.dayState(null, t1), { date: '2026-06-10', count: 0 });
-  assert.equal(m.nextBerlinMidnightSec(t1), Math.floor(Date.UTC(2026, 5, 10, 22, 0, 0) / 1000));
-  assert.equal(m.nextBerlinMidnightSec(Date.UTC(2026, 0, 10, 12, 0, 0)), Math.floor(Date.UTC(2026, 0, 10, 23, 0, 0) / 1000), 'Winterzeit');
-  // Umstellung 29.3.2026 (Berlin springt 02→03 Uhr): Mitternacht davor 23:00 UTC, danach 22:00 UTC
-  assert.equal(m.nextBerlinMidnightSec(Date.UTC(2026, 2, 28, 12, 0, 0)), Math.floor(Date.UTC(2026, 2, 28, 23, 0, 0) / 1000));
-  assert.equal(m.nextBerlinMidnightSec(Date.UTC(2026, 2, 29, 12, 0, 0)), Math.floor(Date.UTC(2026, 2, 29, 22, 0, 0) / 1000));
+test('SC-Rätsel: nur das ERSTE neu erzeugte jeder vollen Stunde; neue Stunde → wieder das erste', () => {
+  const h = (hh, mm = 0) => Date.UTC(2026, 5, 10, hh, mm, 0);
+  assert.equal(m.hourIndex(h(12, 0)), m.hourIndex(h(12, 59)), 'gleiche volle Stunde');
+  assert.notEqual(m.hourIndex(h(12, 59)), m.hourIndex(h(13, 0)));
+  assert.equal(m.isScWorthy(null, h(12, 5)), true, 'noch nie eins → ja');
+  const last = m.hourIndex(h(12, 5));
+  assert.equal(m.isScWorthy(last, h(12, 6)), false, 'zweites in derselben Stunde → nein');
+  assert.equal(m.isScWorthy(last, h(12, 59)), false);
+  assert.equal(m.isScWorthy(last, h(13, 0)), true, 'neue volle Stunde → wieder ja');
+  assert.equal(m.isScWorthy(last, h(15, 30)), true, 'auch nach mehreren Stunden Pause');
+  assert.equal(m.nextHourSec(h(12, 5)), Math.floor(h(13, 0) / 1000));
+  assert.equal(m.nextHourSec(h(12, 59)), Math.floor(h(13, 0) / 1000));
 });
 
 test('Kartenauswahl: nur mit Kunst, keine Token, möglichst nicht die letzten', () => {
