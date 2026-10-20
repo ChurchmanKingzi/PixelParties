@@ -199,15 +199,15 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 | Befehl | Wirkung |
 |---|---|
 | `!mystery` | zeigt das aktuelle Rätsel: ein winziger Ausschnitt aus der Kunst einer Karte. Er **beginnt bei 8×8 Bildpunkten** (stark vergrößert) und wird mit **jedem falschen Tipp von irgendjemandem um einen Bildpunkt größer** (gleicher Mittelpunkt, höchstens 31×31). Nach einem falschen Tipp zeigt der Bot gleich das neue Bild. Gibt es noch kein Rätsel, entsteht eins. |
-| `!guess <Kartenname>` | Tipp. Richtig → Gewinner bekommt **20 SC, minus 2 für jeden falschen Tipp, den er für diese Karte schon abgegeben hat** (nie unter 0); die Karte wird komplett gezeigt und ein **neues Rätsel** startet. |
-| 🔒 `!mystery skip` | Rätsel überspringen (Lösung zeigen, nächstes starten) |
+| `!guess <Kartenname>` | Tipp. Richtig → die Karte wird komplett gezeigt und ein **neues Rätsel** startet. Ist das Rätsel SC wert (siehe unten), bekommt der Gewinner **20 SC, minus 2 für jeden falschen Tipp, den er für diese Karte schon abgegeben hat** (nie unter 0). |
+| 🔒 `!mystery skip` | Rätsel überspringen (Lösung zeigen, nächstes starten; das neue Rätsel folgt denselben Stunden-Regeln) |
 
-* **Höchstens 5 neue Rätsel pro Tag** (Berliner Kalendertag). Ist das Kontingent aufgebraucht, schreibt der Bot, wann es weitergeht, und der Kanal bleibt bis Mitternacht ruhig. Ein ungelöstes Rätsel bleibt über Nacht stehen und verbraucht kein neues Kontingent.
+* **Rätsel entstehen unbegrenzt — aber nur das erste neu erzeugte Rätsel jeder vollen Stunde ist SC wert** (Uhrzeit-Stunden: 12:00–12:59, 13:00–13:59 …). Alle weiteren in derselben Stunde sind Übungsrätsel: gleiches Spiel, keine SC. Ob ein Rätsel SC zahlt, steht in seiner Nachricht („💰 Worth 20 SC“ bzw. „No SC for this one …“). Es wird bei der **Erzeugung** festgelegt: ein offenes SC-Rätsel bleibt SC wert, auch wenn es erst Stunden später gelöst wird. Wird in einer Stunde nichts gespielt, ist das nächste erzeugte Rätsel wieder SC wert.
 * **SC** gibt es nur mit verknüpftem Konto (`!link`). Alle anderen dürfen mitraten und gewinnen, bekommen aber keine SC (der Bot sagt es ihnen). Die Buchung steht in `sc_log` mit dem Grund `bot:mystery`.
 * Tipps werden großzügig erkannt (Groß-/Kleinschreibung, Tippfehler, fehlende Leerzeichen, bei Heroes reicht der Teil vor dem Komma, sofern eindeutig). Tipps, die **keiner Karte ähneln**, bereits **getippte** Karten und **mehrdeutige** Tipps („Alice“ passt auf mehrere Heroes) zählen nicht.
 * Doppelte, unbekannte und mehrdeutige Tipps lassen das Bild unverändert. Die Startgröße und der Schritt (16 % bzw. 2 % der kürzeren Bildseite) stehen in `bot/lib/mystery.js` (`CROP_START`, `CROP_STEP`, `CROP_MAX`).
 * Die Ausschnitte werden aus mehreren zufälligen Kandidaten nach Kontrast gewählt, damit es nie nur Himmel oder eine Einheitsfläche ist; die zuletzt gespielten 60 Karten kommen nicht wieder dran.
-* Einstellbar in `bot/.env` (alles optional, **nichts davon ist nötig**): `MYSTERY_CHANNEL_ID`, `MYSTERY_DAILY_MAX=5`, `MYSTERY_REWARD=20`, `MYSTERY_PENALTY=2`.
+* Einstellbar in `bot/.env` (alles optional, **nichts davon ist nötig**): `MYSTERY_CHANNEL_ID`, `MYSTERY_REWARD=20`, `MYSTERY_PENALTY=2`.
 
 ### Feeds und Gemeinschaft
 * **Neue Karten:** Ändert sich `data/cards.json` (z. B. durch ein Deploy), postet der Bot die neuen Karten als Bilder
