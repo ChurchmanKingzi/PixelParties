@@ -13977,7 +13977,9 @@ class GameEngine {
   }
 
   async _checkBoardSentToDiscardHandReactions(roh) {
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
+    // ★ W34a (Al, 22.10.2026, Dark Ocean): „generell darf man unter Dark Ocean immer auf SEINE EIGENEN Creatures reagieren, nur nicht auf gegnerische" — die Sperre hängt am
+    // Reagierenden (`darkOceanBlocksReaction(reaktor)`: Quelle = Creature UND Kontrolleur ≠ Reagierender), nicht pauschal an jeder Creature-Quelle.
+    if (this.darkOceanBlocksReaction(roh.ownerIdx, null)) return;
     if (this._inBoardDiscardReaction) return;
     const ownerIdx = roh.ownerIdx;
     const ps = this.gs.players[ownerIdx];
@@ -33202,6 +33204,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    * der ganzen Kette: loese ich einen Kreatur-Effekt aus, darf der
    * Gegner nichts — chaine ich aber selbst eine Reaktion darauf, darf
    * er auf DIESE reagieren, nur weiterhin nicht auf die Creature.
+   *
+   * ★ W34a (Al, 22.10.2026): „generell darf man unter Dark Ocean immer auf SEINE EIGENEN Creatures reagieren, nur nicht auf gegnerische" — allgemeine Regel für JEDES
+   * Reaktionsfenster (Hand-Reaktionen, Surprises, Arrows, Kettenfenster, Hook-Fenster): gesperrt ist nur, wer auf eine Creature-Quelle reagiert, deren KONTROLLEUR
+   * (`owner` des obersten Glieds bzw. der laufenden Quelle) ein anderer ist als der Reagierende. Jedes Fenster fragt diese Funktion mit SEINEM Reagierenden (`pi`);
+   * die früheren pauschalen Sperren („irgendeine Creature-Quelle ⇒ niemand reagiert") sind entfallen.
    */
   /** Loest gerade eine CREATURE auf? (fuer die Fenster ohne pi-Kontext) */
   _currentEffectSourceIsCreature() {
@@ -34545,7 +34552,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       return NULL_RESULT;
     }
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inPreDamageReaction) return NULL_RESULT;
 
     // Demon's Gate-style creature-caster annotation — pre-damage
@@ -34563,6 +34569,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
     const targetOwner = this.heroSideOf(zielPhys, target);
+    if (this.darkOceanBlocksReaction(targetOwner, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
     // Wirkt der GETROFFENE Held selbst (`casterIsTarget`): ab W20c auch ein uebernommener Held der Gegenspalte (`targetSeite: zielPhys`).
 
     // Schadenskontext für den Reaktions-Lernkanal (siehe _rxDamageTag).
@@ -34841,7 +34848,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inPreDamageReaction) return NULL_RESULT;
 
     // Demon's Gate-style creature-caster annotation.
@@ -34858,6 +34864,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(pi, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35015,7 +35022,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inCreaturePreDamageReaction) return NULL_RESULT;
     if (!creatureInst) return NULL_RESULT;
 
@@ -35026,6 +35032,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35168,7 +35175,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inCreaturePreDamageReaction) return NULL_RESULT;
     if (!creatureInst) return NULL_RESULT;
 
@@ -35180,6 +35186,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     if (!ps) return NULL_RESULT;
     if (this.gs.firstTurnProtectedPlayer === pi) return NULL_RESULT;
+    if (this.darkOceanBlocksReaction(pi, null)) return NULL_RESULT;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35328,7 +35335,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return false;
     if (this._inCreaturePreDefeatReaction) return false;
     if (!creatureInst) return false;
 
@@ -35349,6 +35355,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
     const ps = this.gs.players[ownerIdx];
     if (!ps) return false;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return false;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -35656,7 +35663,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _checkCreaturesDefeatedHandReactions(liste) {
     if (!Array.isArray(liste) || liste.length === 0) return;
     if (this._inCreaturesDefeatedReaction) return;
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     const allCards = this._getCardDB();
     for (let ownerIdx = 0; ownerIdx < this.playerCount(); ownerIdx++) {
       const defeated = liste.filter(d => (d.controller ?? d.owner) === ownerIdx);
@@ -35664,6 +35670,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const ps = this.gs.players[ownerIdx];
       if (!ps) continue;
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
+      if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
       const seen = new Set();
       for (let hi = 0; hi < (ps.hand || []).length; hi++) {
         const cardName = ps.hand[hi];
@@ -36090,7 +36097,6 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _checkCreatureDefeatedHandReaktor(deathInfo, source, type, reaktor) {
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inCreatureDefeatedReaction) return;
     if (!deathInfo) return;
 
@@ -36099,6 +36105,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
+    if (this.darkOceanBlocksReaction(ownerIdx, null)) return;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -36176,7 +36183,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inAfterDamageReaction) return;
     // When the triggering hit DEFEATED the target, only cards that
     // explicitly opt in (`firesOnLethalDamage`) may react. Survival-
@@ -36218,6 +36224,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const isOpponentPass = reactorIdx !== targetOwner;
       const ps = this.gs.players[reactorIdx];
       if (!ps) continue;
+      if (this.darkOceanBlocksReaction(reactorIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       // Turn-1 lockout: the first-turn-protected player cannot activate
       // any hand cards during the opening turn (no interaction allowed).
@@ -36405,7 +36412,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inAfterCreatureDamageReaction) return;
     if (!creatureInst) return;
     // Lethal-hit gate — mirrors the hero hub: a defeated Creature only
@@ -36440,6 +36446,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Opening-turn lockout — same as every other hand-reaction window.
       if (this.gs.firstTurnProtectedPlayer === ownerIdx) continue;
+      if (this.darkOceanBlocksReaction(ownerIdx, null)) continue;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
       const seen = new Set();
       for (let hi = 0; hi < ps.hand.length; hi++) {
@@ -36824,12 +36831,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
-    if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inPostSummonReaction) return;
     if (!summonedInst) return;
 
     const ps = this.gs.players[summoningPi];
     if (!ps) return;
+    if (this.darkOceanBlocksReaction(summoningPi, null)) return;   // W34a: Dark Ocean nur gegen Effekte GEGNERISCHER Creatures (eigene: erlaubt)
 
     if (this.gs.firstTurnProtectedPlayer === summoningPi) return;
 
