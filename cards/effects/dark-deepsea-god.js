@@ -120,7 +120,9 @@ function _landingAllowed(engine, pi, inst, verfuegbar) {
   if (!Array.isArray(zonenKarten) || zonenKarten.length === 0) return false;
   const gedeckt = engine.zoneInsassen(inst.owner, inst.heroIdx, inst.zoneSlot).filter(c => verfuegbar.has(c.id)).length;
   if (gedeckt < zonenKarten.length) return false;
-  if (inst.owner === pi) return true;
+  // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporären Kontrolleurs"): der Landeplatz gehört einem Helden, den `pi`
+  // KONTROLLIERT — auch in der eigenen Spalte (`heroSideOf` ≠ `pi` bei einem an den Gegner abgegebenen eigenen Helden, temporär wie dauerhaft: dem Besitzer wird die
+  // Zone nicht angeboten; vorher bot sie DDG an und bei dauerhafter Abgabe verwarf `actionPlaceCreature` die Landung, nachdem die Tribute schon zurückgegeben waren).
   const hero = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
   return engine.heroSideOf(inst.owner, hero) === pi;
 }
