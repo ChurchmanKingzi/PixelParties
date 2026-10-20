@@ -56,13 +56,14 @@ function portalKandidaten(engine, pi, loadCardEffect) {
   return out;
 }
 
-/** Ist die Quelle eine Attack- oder Spell-KARTE? */
-function istAttackOderSpell(engine, quelle, hasCardType) {
+/** Ist die Quelle eine Attack- oder Spell-KARTE — oder ein Effekt, der als Attack/Spell ZÄHLT (W30a, Al 21.10.2026: Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer; `damageType` des Fensters nötig)? */
+function istAttackOderSpell(engine, quelle, hasCardType, damageType) {
   const name = quelle?.name || quelle?.cardName;
   const cd = quelle?.cardInstance
     ? (engine.getEffectiveCardData?.(quelle.cardInstance) || engine._getCardDB()[name])
     : engine._getCardDB()[name];
-  return !!cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'));
+  if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return true;
+  return !!name && damageType != null && typeof engine._heldenEffektStufe === 'function' && engine._heldenEffektStufe(name, damageType, quelle) != null;
 }
 
 /**
