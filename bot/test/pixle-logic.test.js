@@ -48,16 +48,17 @@ test('Schule: gleiche Menge = grün; gemeinsame = gelb; keine gemeinsame = rot; 
   assert.equal(cell(px.compareCards(C({ spellSchool1: 'Decay Magic', spellSchool2: 'Support Magic' }), sec), 'school').text, 'Decay+Support');
 });
 
-test('Typ, Subtyp, Archetyp, Set: exakt; Hero ↔ Ascended Hero ist gelb; leere Werte vergleichen sich als gleich', () => {
-  const r = px.compareCards(C({ cardType: 'Hero', subtype: '', archetype: '', setID: 'PP Z' }), C({ cardType: 'Ascended Hero', subtype: '', archetype: '', setID: 'PP A' }));
+test('Typ, Subtyp, Set: exakt; Hero ↔ Ascended Hero ist gelb; leere Werte vergleichen sich als gleich; der Archetyp ist KEIN Hinweis', () => {
+  const r = px.compareCards(C({ cardType: 'Hero', subtype: '', archetype: 'X', setID: 'PP Z' }), C({ cardType: 'Ascended Hero', subtype: '', archetype: 'Y', setID: 'PP A' }));
+  assert.equal(r.cells.some(c => c.key === 'archetype'), false, 'keine Archetyp-Spalte');
+  assert.deepEqual(px.COLUMNS, ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'set']);
   assert.equal(cell(r, 'type').status, 'partial');
   assert.equal(cell(r, 'type').text, 'Hero');
   assert.equal(cell(r, 'subtype').status, 'match');
   assert.equal(cell(r, 'subtype').text, '–');
-  assert.equal(cell(r, 'archetype').status, 'match');
   assert.equal(cell(r, 'set').status, 'miss');
   assert.equal(cell(px.compareCards(C({ cardType: 'Spell' }), C({ cardType: 'Creature' })), 'type').status, 'miss');
-  assert.equal(cell(px.compareCards(C({ archetype: 'Pollution' }), C({ archetype: 'Doom Clock' })), 'archetype').status, 'miss');
+  assert.equal(px.compareCards(C({ archetype: 'Pollution' }), C({ archetype: 'Doom Clock' })).cells.every(c => c.status === 'match'), true, 'verschiedener Archetyp ändert nichts');
 });
 
 test('Farbvarianten ([B]/[W]) gelten als dieselbe Karte', () => {

@@ -2,8 +2,8 @@
 // ═══════════════════════════════════════════════════════════════════
 //  Pixle — reine Regeln (ohne Discord): Tipp → Karte auflösen, Karten vergleichen, Tageswechsel, Belohnung.
 //
-//  Jeden Tag gibt es EINE geheime Karte (für alle gleich). Jeder tippt Kartennamen und sieht, wie Typ, Subtyp, Level, HP, ATK,
-//  Kosten, Zauberschule, Archetyp und Set des Tipps zur geheimen Karte stehen:
+//  Jede Person hat ihre EIGENE geheime Karte. Man tippt Kartennamen und sieht, wie Typ, Subtyp, Level, HP, ATK,
+//  Kosten, Zauberschule und Set des Tipps zur geheimen Karte stehen:
 //    match   (grün)   gleich
 //    partial (gelb)   nah dran / teilweise gleich (Zahl ±wenig, eine gemeinsame Schule, Hero ↔ Ascended Hero …)
 //    miss    (rot)    anders
@@ -12,7 +12,7 @@
 const { searchCards, closeAlternatives } = require('./card-search');
 const { plainName } = require('./mystery');
 
-const COLUMNS = ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'archetype', 'set'];
+const COLUMNS = ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'set'];
 
 const SCHOOL_SHORT = { 'Magic Arts': 'Arts', 'Summoning Magic': 'Summon', Fighting: 'Fighting', 'Decay Magic': 'Decay', 'Support Magic': 'Support', 'Destruction Magic': 'Destruct.' };
 const TYPE_SHORT = { 'Ascended Hero': 'Asc. Hero', 'Creature/Token': 'Crea./Token' };
@@ -55,7 +55,6 @@ function compareCards(guess, secret) {
   const common = gs.filter(x => ss.includes(x)).length;
   cells.push({ key: 'school', label: 'School', text: gs.length ? gs.map(x => SCHOOL_SHORT[x] || x).join('+') : '–',
     status: gs.length === ss.length && common === gs.length ? 'match' : common > 0 ? 'partial' : 'miss', arrow: null });
-  cells.push({ key: 'archetype', label: 'Archetype', text: dash(guess.archetype), status: same(guess.archetype, secret.archetype) ? 'match' : 'miss', arrow: null });
   cells.push({ key: 'set', label: 'Set', text: dash(guess.setID), status: same(guess.setID, secret.setID) ? 'match' : 'miss', arrow: null });
   return { correct: plainName(guess.name) === plainName(secret.name), cells };
 }

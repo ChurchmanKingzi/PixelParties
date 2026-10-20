@@ -211,20 +211,20 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 * Einstellbar in `bot/.env` (alles optional, **nichts davon ist nötig**): `MINIGAMES_CHANNEL_ID` (gemeinsamer Kanal aller Minispiele; die ältere Variable `MYSTERY_CHANNEL_ID` gilt weiter als Rückfall), `MYSTERY_REWARD=20`, `MYSTERY_PENALTY=2`.
 
 ### Pixle (tägliches Karten-Ratespiel)
-Das erste Spiel des Tages ist die **tägliche Karte**: eine geheime Karte, für alle dieselbe (Tageswechsel um Mitternacht Berliner Zeit). Man rät Kartennamen und sieht nach jedem Tipp, wie dessen Eigenschaften zur geheimen Karte stehen — so grenzt man sie ein und lernt nebenbei Typen, Schulen, Archetypen und Sets kennen. Nur im Minigames-Kanal.
+**Jede Person hat ihr eigenes Pixle:** eine eigene geheime Karte, die der Bot zufällig wählt und speichert (Tageswechsel um Mitternacht Berliner Zeit). Das erste Spiel des Tages ist die **tägliche Karte** der Person. Weil die Karten individuell sind, kann niemand bei anderen mitlesen oder deren Lösung „snipen“ — fremde Tipps und Bretter helfen nichts. Man rät Kartennamen und sieht nach jedem Tipp, wie dessen Eigenschaften zur geheimen Karte stehen — so grenzt man sie ein und lernt nebenbei Typen, Werte, Schulen und Sets kennen. Nur im Minigames-Kanal.
 
 | Befehl | Wirkung |
 |---|---|
-| `!pixle` | Regeln bzw. dein laufendes Spiel mit Brett (am neuen Tag: dazu die Karte von gestern) |
+| `!pixle` | Regeln bzw. dein laufendes Spiel mit Brett (am neuen Tag: dazu deine vorherige tägliche Karte) |
 | `!pixle <Kartenname>` | ein Tipp; danach kommt dein Brett als Bild: eine Zeile je Tipp |
 
-* **Spalten:** Type, Subtype, Level, HP, ATK, Cost, School, Archetype, Set. Farben: 🟩 gleich · 🟨 nah dran bzw. teilweise gleich (Zahl ±1 bei Level/Kosten, ±15 % bei HP/ATK; eine gemeinsame Schule; Hero ↔ Ascended Hero) · 🟥 anders. Bei Zahlen zeigt ein **▲/▼**, ob die **geheime** Karte mehr oder weniger hat. „–“ heißt: die Karte hat den Wert nicht (haben beide keinen, ist das ebenfalls grün).
+* **Spalten:** Type, Subtype, Level, HP, ATK, Cost, School, Set (der Archetyp ist bewusst kein Hinweis). Farben: 🟩 gleich · 🟨 nah dran bzw. teilweise gleich (Zahl ±1 bei Level/Kosten, ±15 % bei HP/ATK; eine gemeinsame Schule; Hero ↔ Ascended Hero) · 🟥 anders. Bei Zahlen zeigt ein **▲/▼**, ob die **geheime** Karte mehr oder weniger hat. „–“ heißt: die Karte hat den Wert nicht (haben beide keinen, ist das ebenfalls grün).
 * **10 Tipps pro Person und Spiel** (jede Person hat ihre eigenen Spiele und Bretter). Sind alle Tipps verbraucht, nennt der Bot die Lösung — nur als **Spoiler**.
 * **Nach jedem Spiel startet sofort ein neues** (gelöst oder nicht): ein **Übungsspiel** mit einer frischen, eigenen Karte (nie die tägliche, nie eine der zuletzt geübten), unbegrenzt oft. Die Spiele laufen pro Person nacheinander; `!pixle <Name>` gilt immer für das laufende. Am neuen Tag beginnt alles wieder mit der neuen täglichen Karte.
-* **SC gibt es nur für das erste Spiel des Tages — die tägliche Karte, also höchstens einmal pro Tag:** 30 SC, minus 3 für jeden falschen Tipp davor, mindestens 3 — nur mit verknüpftem Konto (Buchung mit dem Grund `bot:pixle`). Übungsspiele zahlen nie SC, auch nicht, wenn man die tägliche Karte verfehlt hat.
+* **SC gibt es nur für das erste Spiel des Tages — die tägliche Karte, also höchstens einmal pro Tag UND Person:** 30 SC, minus 3 für jeden falschen Tipp davor, mindestens 3 — nur mit verknüpftem Konto (Buchung mit dem Grund `bot:pixle`). Übungsspiele zahlen nie SC, auch nicht, wenn man die tägliche Karte verfehlt hat.
 * **Spoilerschutz:** Beim Lösen steht die Karte nur in Spoiler-Tags (Text und Bild), und das Brett zeigt die richtige Zeile als „SOLVED!“. Der Sieg im Übungsspiel pingt niemanden.
 * Tipps werden großzügig erkannt (Tippfehler, Groß-/Kleinschreibung, Leerzeichen); unbekannte, doppelte und mehrdeutige Tipps („Alice“) zählen nicht. Farbvarianten (`[B]`/`[W]`) gelten als dieselbe Karte.
-* Die geheime Karte wird **zufällig** gewählt und gespeichert (nicht aus dem Datum berechenbar — der Code ist öffentlich), die letzten 120 Tage kommen nicht wieder dran. Es erscheinen nur Karten, die der Bot als Bild zeigen kann, keine Token.
+* Die geheime Karte jeder Person wird beim ersten Aufruf des Tages **zufällig** gewählt und gespeichert (nicht aus dem Datum berechenbar — der Code ist öffentlich); die Karten der letzten 120 Tage dieser Person kommen nicht wieder dran. Es erscheinen nur Karten, die der Bot als Bild zeigen kann, keine Token.
 * Einstellbar in `bot/.env` (alles optional): `PIXLE_MAX_GUESSES=10` (je Spiel), `PIXLE_REWARD=30`, `PIXLE_PENALTY=3`.
 
 ### Feeds und Gemeinschaft

@@ -35,10 +35,11 @@ async function world(gameApi = {}) {
     return msg;
   };
   const state = () => db.kvGet('pixle_state');
-  const secret = async () => { const s = await ctx._pixle.today(); return renderer.allCards().find(c => c.name === s.secret); };
-  // verschiedene, eindeutig auflösbare Karten, die NICHT die geheime sind
-  const wrongNames = async (n) => {
-    const s = await secret();
+  // die geheime Karte einer Person (jede hat ihre eigene)
+  const secret = async (uid = '100000000000000001') => { const { p } = await ctx._pixle.prepare(uid); return renderer.allCards().find(c => c.name === p.secret); };
+  // verschiedene, eindeutig auflösbare Karten, die NICHT die geheime der Person sind
+  const wrongNames = async (n, uid) => {
+    const s = await secret(uid);
     return renderer.allCards().filter(c => plainName(c.name) !== plainName(s.name) && !/\[(B|W)\]$/.test(c.name) && renderer.canRender(c.name) && px.resolveCard(renderer.allCards(), c.name).kind === 'ok')
       .filter((_, i) => i % 37 === 0).slice(0, n).map(c => c.name);
   };
@@ -60,7 +61,10 @@ test('nur im Minigames-Kanal; ohne Tipp: Regeln (10 Tipps, 30 SC), noch kein Bre
   assert.match(r.content, /🟩 same/);
   assert.ok(!r.files, 'noch kein Brett');
   const st = await w.state();
-  assert.ok(st.secret && st.date === '2026-06-10');
+  assert.ok(st.players['100000000000000001'].secret && st.date === '2026-06-10', 'die Person hat ihre eigene geheime Karte');
+  assert.match(r.content, /guess your own secret card/);
+  assert.match(r.content, /Everybody gets their own/);
+  assert.ok(!/archetype/i.test(r.content), 'kein Archetyp mehr in den Regeln');
 });
 
 test('Tipp: unbekannt / mehrdeutig / doppelt zählen nicht; ein falscher Tipp zeigt das Brett als Bild', async () => {
@@ -79,7 +83,7 @@ test('Tipp: unbekannt / mehrdeutig / doppelt zählen nicht; ein falscher Tipp ze
   assert.ok(isPng(r.files[0].attachment));
   assert.equal(r.files[0].name, 'pixle.png');
   const img = await loadImage(r.files[0].attachment);
-  assert.ok(img.width > 1400 && img.height > 100, `${img.width}x${img.height}`);
+  assert.ok(img.width > 1200 && img.width < 1500 && img.height > 100, `${img.width}x${img.height}`);
 
   msg = await w.say(u, '!pixle ' + a);
   assert.match(msg.replies[0].content, /already guessed .* not counted/);
@@ -159,18 +163,19 @@ test('Limit: nach 10 (hier 3) Tipps endet das Spiel — Lösung nur als Spoiler 
 
 test('ohne verknüpftes Konto: Hinweis statt SC; SC-Fehler wird gemeldet; beides löst das Rätsel trotzdem', async () => {
   const w = await world();
-  const s = await w.secret();
+  const s = await w.secret('100000000000000099');
   let msg = await w.say('100000000000000099', '!pixle ' + s.name);
   assert.match(msg.replies[0].content, /You’d have won \*\*30 SC\*\* — link your account with `!link`/);
   assert.equal(w.pays.length, 0);
   assert.equal(((await w.state()).players['100000000000000099']).solved, true);
 
   w.ctx.game.adjustSc = async () => { throw new GameApiError(0, 'unreachable'); };
-  msg = await w.say('100000000000000002', '!pixle ' + s.name);
+  const s2 = await w.secret('100000000000000002');
+  msg = await w.say('100000000000000002', '!pixle ' + s2.name);
   assert.match(msg.replies[0].content, /couldn’t pay out the 30 SC/);
   assert.equal(((await w.state()).players['100000000000000002']).solved, true, 'trotzdem gelöst, keine Doppelzahlung beim Wiederholen');
   w.ctx.game.adjustSc = async (uid, d, a, reason) => { w.pays.push({ uid, d }); return { applied: d, before: 0, after: d }; };
-  await w.say('100000000000000002', '!pixle ' + s.name);        // jetzt ein Tipp im Übungsspiel — zahlt nie
+  await w.say('100000000000000002', '!pixle ' + s2.name);       // jetzt ein Tipp im Übungsspiel — zahlt nie
   assert.equal(w.pays.length, 0);
 });
 
@@ -185,23 +190,82 @@ test('zwei gleichzeitige richtige Tipps derselben Person zahlen nur einmal', asy
   assert.match(second.replies[0].content, /Practice Pixle #1 · Guess 1\/10/, 'der zweite Tipp landet im bereits gestarteten Übungsspiel (und zahlt nichts)');
 });
 
-test('Tag, Zufall und Gestern: die geheime Karte bleibt den ganzen Tag gleich, wechselt um Mitternacht (Berlin); gestern wird genannt, Fortschritt beginnt neu', async () => {
+test('Tag: die geheime Karte einer Person bleibt den ganzen Tag gleich, wechselt um Mitternacht (Berlin); die vorherige wird genannt, nie dieselbe zweimal hintereinander', async () => {
   const w = await world();
   const u = '100000000000000001';
-  const s1 = await w.secret();
-  const [a] = await w.wrongNames(1);
+  const s1 = await w.secret(u);
+  const [a] = await w.wrongNames(1, u);
   await w.say(u, '!pixle ' + a);
   w.w.t = Date.UTC(2026, 5, 10, 21, 30, 0);                      // 23:30 Berlin — derselbe Tag
-  assert.equal((await w.secret()).name, s1.name);
+  assert.equal((await w.secret(u)).name, s1.name);
   assert.equal((await w.state()).players[u].guesses.length, 1);
 
   w.w.t = Date.UTC(2026, 5, 10, 22, 5, 0);                       // 00:05 Berlin — neuer Tag
   const msg = await w.say(u, '!pixle');
   const st = await w.state();
   assert.equal(st.date, '2026-06-11');
-  assert.deepEqual(st.players, {}, 'Fortschritt beginnt neu (gestern gemachte Tipps sind weg)');
-  assert.ok(msg.replies[0].content.includes(`Yesterday’s card was **${plainName(s1.name)}**`), msg.replies[0].content);
-  assert.notEqual(st.secret, s1.name, 'nie zweimal hintereinander dieselbe Karte');
+  assert.equal(st.players[u].guesses.length, 0, 'Fortschritt beginnt neu (gestern gemachte Tipps sind weg)');
+  assert.ok(msg.replies[0].content.includes(`Your previous daily card was **${plainName(s1.name)}**`), msg.replies[0].content);
+  assert.notEqual(st.players[u].secret, s1.name, 'nie zweimal hintereinander dieselbe Karte');
+});
+
+test('JEDE Person hat ihr eigenes Pixle: eigene Karte, eigene Tipps, eigene SC — niemand kann bei anderen mitlesen oder „snipen“', async () => {
+  const w = await world();
+  const ids = ['100000000000000001', '100000000000000002', '100000000000000003', '100000000000000004', '100000000000000005', '100000000000000006'];
+  const secrets = [];
+  for (const id of ids) secrets.push((await w.secret(id)).name);
+  assert.ok(new Set(secrets).size > 1, 'die Karten unterscheiden sich: ' + secrets.join(' | '));
+
+  // zwei Personen mit verschiedenen Karten
+  let iA = 0, iB = 1;
+  while (secrets[iA] === secrets[iB]) iB++;
+  const A = ids[iA], B = ids[iB], secA = secrets[iA], secB = secrets[iB];
+  assert.equal((await w.secret(A)).name, secA, 'Karte bleibt stabil');
+  // A tippt die Karte von B — das ist für A nur ein Tipp (kein Sieg, keine SC)
+  let msg = await w.say(A, '!pixle ' + secB);
+  assert.ok(!msg.replies[0].content.startsWith('🎉'), 'fremde Lösung löst nichts');
+  assert.equal(w.pays.length, 0);
+  assert.equal((await w.state()).players[B].guesses.length, 0, 'B bleibt unberührt');
+  // jeder löst SEINE Karte und bekommt SEINE tägliche SC (einmal pro Person und Tag)
+  msg = await w.say(B, '!pixle ' + secB);
+  assert.match(msg.replies[0].content, new RegExp(`🎉 <@${B}> solved today’s Pixle in \\*\\*1\\*\\* guess! \\*\\*\\+30 SC`));
+  msg = await w.say(A, '!pixle ' + secA);
+  assert.match(msg.replies[0].content, new RegExp(`🎉 <@${A}> solved today’s Pixle in \\*\\*2\\*\\* guesses! \\*\\*\\+27 SC`));
+  assert.deepEqual(w.pays.map(x => [x.uid, x.delta]).sort(), [[A, 27], [B, 30]].sort());
+  // danach zahlt für beide nur noch Übung — nichts
+  for (const id of [A, B]) {
+    const pl = (await w.state()).players[id];
+    await w.say(id, '!pixle ' + pl.practice.secret);
+  }
+  assert.equal(w.pays.length, 2, 'einmal pro Tag UND Person');
+});
+
+test('„Vorherige Karte“ nennt nur die eigene; Zustand der Vorversion (gemeinsame Karte) wird sauber übernommen', async () => {
+  const w = await world();
+  const A = '100000000000000001', B = '100000000000000002';
+  const sA = await w.secret(A), sB = await w.secret(B);
+  w.w.t = Date.UTC(2026, 5, 11, 12, 0, 0);
+  const mA = await w.say(A, '!pixle');
+  assert.ok(mA.replies[0].content.includes(`**${plainName(sA.name)}**`));
+  if (plainName(sA.name) !== plainName(sB.name)) assert.ok(!mA.replies[0].content.includes(plainName(sB.name)), 'nicht die Karte der anderen Person');
+
+  // Zustand der Vorversion: eine gemeinsame geheime Karte, Person A hatte schon getippt, B noch nicht
+  const [x] = await w.wrongNames(1, A);
+  await w.db.kvSet('pixle_state', { date: '2026-06-11', secret: x, players: { [A]: { guesses: ['Fireball'], solved: false } } });
+  assert.equal((await w.secret(A)).name, x, 'angefangenes Spiel behält die gemeinsame Karte');
+  const sB2 = await w.secret(B);
+  assert.ok(sB2.name, 'wer noch nicht gespielt hatte, bekommt eine eigene Karte');
+  assert.equal((await w.state()).players[B].secret, sB2.name);
+});
+
+test('das Brett hat keine Archetyp-Spalte mehr (acht Hinweis-Spalten)', async () => {
+  const w = await world();
+  const u = '100000000000000001';
+  const [a] = await w.wrongNames(1, u);
+  const msg = await w.say(u, '!pixle ' + a);
+  const { ORDER } = require('../lib/pixle-board');
+  assert.deepEqual(ORDER, ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'set']);
+  assert.ok(isPng(msg.replies[0].files[0].attachment));
 });
 
 test('Übungsspiele: beliebig viele nacheinander, jedes mit frischer Karte (nie die tägliche, nie ein Wiederholer), nie SC; Brett zeigt „SOLVED!“-Zeile erst beim Lösen', async () => {
