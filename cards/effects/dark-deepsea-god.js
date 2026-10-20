@@ -191,6 +191,51 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 }
 
 /**
+ * ★ W20b (Al, 20.10.2026: „ja, auch einzelne aus einer Zone sollten möglich sein"): Welche Kreaturen eines angeklickten Alice-Stapels
+ * gibt der Spieler zurück? Der Client klickt nur Zonen, darum eine Folgewahl NUR bei mehreren Insassen: „alle zurückgeben?" (Ja = alle, die
+ * Zone kann Landeplatz sein; Nein = einzelne), dann je eine Kreatur über die vorhandene `instancePick`-Abfrage (HP/Status sichtbar), bis der
+ * Spieler keine weitere mehr will. Mindestens eine, höchstens n-1 (alle = „Ja"). Die CPU bestätigt „alle" (`_cpuAutoConfirm`, wie bisher).
+ * Rückgabe: Teilmenge von `t._insts` und ob es eine echte Teilmenge ist.
+ */
+async function _waehleStapelTeil(engine, pi, t) {
+  const alice = require('./_alice-shared');
+  const alle = t._insts;
+  const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+  const antwort = await engine.promptGeneric(pi, {
+    type: 'confirm', title: `${CARD_NAME} — Tribute`,
+    message: `${hero?.name || 'Hero'}, Slot ${t.slotIdx + 1} holds ${alle.length} Creatures (${alle.map(i => i.name).join(' + ')}). `
+      + 'Return all of them to your hand? Only a zone whose Creatures ALL return can be the landing spot.',
+    confirmLabel: 'Return all', cancelLabel: 'Choose which ones',
+    cancellable: false, _cpuAutoConfirm: true, showCard: CARD_NAME,
+  });
+  if (antwort?.confirmed === true) return { insts: alle, teil: false };
+  const gewaehlt = [];
+  let rest = alle.slice();
+  while (rest.length > 1) {
+    const wahl = await engine.promptGeneric(pi, {
+      type: 'instancePick', title: `${CARD_NAME} — Tribute`,
+      description: gewaehlt.length === 0
+        ? 'Choose the Creature of this shared zone that you return to your hand.'
+        : 'Choose another Creature of this shared zone to return to your hand.',
+      instances: rest.map(i => alice.describeInstance(engine, i)),
+      cancellable: false,
+    });
+    const inst = (wahl && wahl.instId != null ? rest.find(i => i.id === wahl.instId) : null) || rest[rest.length - 1];
+    gewaehlt.push(inst);
+    rest = rest.filter(i => i !== inst);
+    if (rest.length <= 1) break;   // die letzte bleibt: „alle" wäre die Ja-Antwort oben
+    const mehr = await engine.promptGeneric(pi, {
+      type: 'confirm', title: `${CARD_NAME} — Tribute`,
+      message: `Return another Creature of this zone as well? (${gewaehlt.length} chosen so far)`,
+      confirmLabel: 'Yes, another', cancelLabel: 'No, that is all',
+      cancellable: false, showCard: CARD_NAME,
+    });
+    if (mehr?.confirmed !== true) break;
+  }
+  return { insts: gewaehlt, teil: true };
+}
+
+/**
  * ★ W4b (Al, Welle 4): der TRIBUT (Wahl der Kreaturen, Landeplatz, Rückkehr auf die Hand) ist der Kostenpunkt
  * („You can only play this Creature by returning 2 or more Creatures …") und läuft VOR dem Reaktionsfenster der
  * Beschwörung (`paySummonCost`); wird die Beschwörung danach komplett negiert (Off Duty …), bleiben die Kreaturen auf
@@ -229,24 +274,43 @@ async function _zahleTribut(ctx) {
     });
   }
   const hatStapel = targets.some(t => t._insts.length > 1);
+  for (const t of targets) if (t._insts.length > 1) t._eigeneStapelWahl = true;   // W20b: die Folgewahl unten ersetzt die Engine-Rückfrage „welche Kopie?"
+  const levelVon = new Map(candidates.map(c => [c.inst.id, c.level || 0]));
 
-  const picked = await engine.promptEffectTarget(pi, targets, {
-    title: `${CARD_NAME} — Tribute`,
-    description: 'Select 2+ of your Creatures (not summoned this turn) whose combined original levels are 4 or higher. They will be returned to your hand.',
-    confirmLabel: '🌊 Confirm Tribute',
-    confirmClass: 'btn-danger',
-    cancellable: true,
-    maxTotal: targets.length,
-    minRequired: hatStapel ? 1 : SACRIFICE_SPEC.minCount,   // W19a: ein Stapel-Ziel zaehlt fuer mehrere Kreaturen (unten nachgeprueft)
-    minSumLevel: SACRIFICE_SPEC.minSumLevel,
-  });
-  if (!picked || picked.length < 1) return false;
+  let chosenTargets, chosenInsts;
+  for (;;) {
+    const picked = await engine.promptEffectTarget(pi, targets, {
+      title: `${CARD_NAME} — Tribute`,
+      description: 'Select 2+ of your Creatures (not summoned this turn) whose combined original levels are 4 or higher. They will be returned to your hand.'
+        + (hatStapel ? ' In a shared zone you may return just some of its Creatures.' : ''),
+      confirmLabel: '🌊 Confirm Tribute',
+      confirmClass: 'btn-danger',
+      cancellable: true,
+      maxTotal: targets.length,
+      minRequired: hatStapel ? 1 : SACRIFICE_SPEC.minCount,   // W19a: ein Stapel-Ziel zaehlt fuer mehrere Kreaturen (unten nachgeprueft)
+      minSumLevel: SACRIFICE_SPEC.minSumLevel,
+    });
+    if (!picked || picked.length < 1) return false;
 
-  const chosenTargets = [...new Set(picked)].map(id => targets.find(t => t.id === id)).filter(Boolean);
-  const chosenInsts = chosenTargets.flatMap(t => t._insts);   // W19a: ein Stapel-Ziel = alle seine Kreaturen
-  if (chosenInsts.length < SACRIFICE_SPEC.minCount) return false;
-  const sumLvl = chosenTargets.reduce((s, t) => s + (t._meta.level || 0), 0);
-  if (sumLvl < SACRIFICE_SPEC.minSumLevel) return false;
+    chosenTargets = [...new Set(picked)].map(id => targets.find(t => t.id === id)).filter(Boolean);
+    // W20b: ein Alice-Stapel liefert nur die Kreaturen, die der Spieler zurückgibt (Folgewahl); sonst wie W19a alle seine Kreaturen.
+    let teilGewaehlt = false;
+    for (const t of chosenTargets) {
+      if (t._insts.length > 1) {
+        const w = await _waehleStapelTeil(engine, pi, t);
+        t._gewaehlt = w.insts; teilGewaehlt = teilGewaehlt || w.teil;
+      } else t._gewaehlt = t._insts;
+    }
+    chosenInsts = chosenTargets.flatMap(t => t._gewaehlt);
+    const sumLvl = chosenInsts.reduce((s, i) => s + (levelVon.get(i.id) || 0), 0);
+    const gewaehlteIds = new Set(chosenInsts.map(i => i.id));
+    const hatLandeplatz = chosenTargets.some(t => _landingAllowed(engine, pi, t.cardInstance, gewaehlteIds));
+    if (chosenInsts.length >= SACRIFICE_SPEC.minCount && sumLvl >= SACRIFICE_SPEC.minSumLevel && (hatLandeplatz || !teilGewaehlt)) break;
+    // Ohne Teilwahl wie bisher: abgebrochen. Mit Teilwahl hat der Spieler die Bedingungen u. U. nur wegen der Teilmenge verfehlt
+    // (Level-Summe, Anzahl, kein vollständig zurückgegebener Landeplatz) - dann neu fragen (CPU/Schnellmodus: Abbruch).
+    if (!teilGewaehlt || engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode) return false;
+    engine._broadcastEvent('hero_announcement', { text: `${CARD_NAME}: return 2+ Creatures (Levels 4+) and ALL Creatures of at least one zone` });
+  }
 
   // ── Step 2: pick DDG's placement slot (one of the tribute slots) ──
   // Styx 28.9.: geliehene Helden der Gegenspalte — Landeplatz auf der
@@ -258,7 +322,7 @@ async function _zahleTribut(ctx) {
     if (!_landingAllowed(engine, pi, t.cardInstance, gewaehlteIds)) continue;
     if (zones.some(z => z.heroIdx === t.heroIdx && z.slotIdx === t.slotIdx && (z.owner ?? pi) === t.owner)) continue;
     const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-    const namen = t._insts.map(i => i.name).join(' + ');
+    const namen = t._gewaehlt.map(i => i.name).join(' + ');
     zones.push({
       heroIdx: t.heroIdx, slotIdx: t.slotIdx,
       ...(t.owner !== pi ? { owner: t.owner } : {}),
@@ -282,10 +346,10 @@ async function _zahleTribut(ctx) {
   // Non-landing tributes first, landing tribute last so the destination
   // slot stays "occupied by a departing sacrifice" right up to the
   // moment DDG takes its place.
-  const landingInsts = chosenTargets.filter(_istLandung).flatMap(t => t._insts);   // W19a: bei einem Alice-Stapel mehrere
+  const landingInsts = chosenTargets.filter(_istLandung).flatMap(t => t._gewaehlt);   // W19a: bei einem Alice-Stapel mehrere
   const others = chosenTargets
     .filter(t => !_istLandung(t))
-    .flatMap(t => t._insts);
+    .flatMap(t => t._gewaehlt);
   // ★ Welle 10 (Al, R3 / A02-deepsea-16): „returning 2 or more Creatures" ist EIN Rückgabe-Ereignis — Siphem/Teppes/Analyzer/Gatherer
   // reagieren einmal (nicht je Kreatur); Blood Moon zählt weiter je Kreatur (liest `returnedInsts`).
   const batch = [];
