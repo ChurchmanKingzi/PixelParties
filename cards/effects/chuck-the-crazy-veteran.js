@@ -63,7 +63,7 @@ const CARD_NAME = 'Chuck, the Crazy Veteran';
  * qualify, otherwise Chuck would lose his shield against any source
  * his team has even partial mitigation for.
  */
-function _isImmuneToSource(hero, type, engine, festesZiel = false) {
+function _isImmuneToSource(hero, type, engine, festesZiel = false, source = null, durchschlag = false) {
   if (!hero) return true;
   // Tot zaehlt als immun — AUSSER der Tod ist im laufenden
   // Flaechenschlag nur vorgemerkt: dann steht der Held fuer die
@@ -84,6 +84,9 @@ function _isImmuneToSource(hero, type, engine, festesZiel = false) {
   // itself or the type+'ed' form.
   const statusByType = STATUS_EFFECTS?.[type] || STATUS_EFFECTS?.[type + 'ed'];
   if (statusByType?.immuneKey && hero.statuses?.[statusByType.immuneKey]) return true;
+  // N5-06 (Al, Welle 25, „ja"): Anti Magic (`magic_immune`) macht den Helden gegen Zauber bis Stufe N immun - das zaehlt als „immun gegen diese
+  // Quelle" (dieselbe Pruefung wie die Engine-Schadenssperre, `_wouldHeroDamageBeVoided`; unabwehrbarer Schaden - `cannotBeNegated` - schlaegt durch).
+  if (!durchschlag && source && engine?._wouldHeroDamageBeVoided?.(hero, source, type)) return true;
   return false;
 }
 
@@ -157,7 +160,7 @@ module.exports = {
         // Mitspieler, der frueher im selben Flaechenschlag gefallen ist,
         // ist nur vorgemerkt und zaehlt hier noch als lebend.
         if (!h?.name || (h.hp <= 0 && !engine.heldTodAufgeschoben(h))) continue;
-        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel)) {
+        if (!_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated)) {
           anyVulnerable = true;
           verwundbarerName = h.name;
           break;
@@ -169,7 +172,7 @@ module.exports = {
       } else {
         _diag('schild-faellt', {
           mitspieler: heroes.map(h => (h?.name
-            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel) ? ' IMMUN' : ''}` : 'leer')),
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type, engine, ctx.festesZiel, ctx.source, !!ctx.cannotBeNegated) ? ' IMMUN' : ''}` : 'leer')),
         });
       }
     },
