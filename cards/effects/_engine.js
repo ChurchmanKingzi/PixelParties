@@ -46616,6 +46616,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _rewriteSourceForCreatureCaster(source) {
     const cc = this.gs._spellCasterCreature;
     if (!cc || !source) return source;
+    // ★ W32a (Al, 22.10.2026, Punkt 7: „der Hero soll der Angreifer sein"): ein Treffer, der als Attack EINES HELDEN zählt (Infected Greatmaw, Sacrificial Dagger/Bamboo Staff
+    // im Kreatureneffekt, Alluring Light …), trägt den Stempel `treatedAsAttack` (bzw. `_heroAttackSource`) am Quellobjekt — Angreifer ist der Held, nicht die
+    // wirkende Kreatur: Crimson Web hängt sich an den Helden, Tharxian Horse/Frost Rune/Booby Trap treffen ihn. Echte Kreaturen-Zauber (Demon's Gate …) tragen keinen Stempel.
+    if (source.treatedAsAttack || source._heroAttackSource) return source;
     const srcInstId = source.cardInstance?.id ?? source.id;
     if (srcInstId != null && srcInstId === cc.id) return source;
     if (source._creatureCasterForSource?.id === cc.id) return source;
