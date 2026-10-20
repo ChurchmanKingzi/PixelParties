@@ -286,14 +286,14 @@ class Sprite:
         xs = cols % self.fw
         self.left, self.right = int(xs.min()), int(xs.max()) + 1
         self.foot = self.meta.get('footY', self.bottom)
-        # Mitte der Figur (nicht des Gesichts): Mittel der Umriss-Mitten je Frame. Sonst sitzt ein Held mit Stab
-        # oder Flügeln optisch schief. `anchorX` im Sheet-JSON hat Vorrang.
+        # Ausrichtung: Gesichtsmitte (genau zwischen den Augen, `faceX` im Sheet-JSON, vom Spiel je Sheet vermessen) liegt
+        # auf der Kartenmitte; `anchorX` hat Vorrang. Ohne beides: Mittel der Umriss-Mitten je Frame.
         mids = []
         for i in range(self.n):
             fx_ = np.nonzero(a[:, i * self.fw:(i + 1) * self.fw])[1]
             if fx_.size:
                 mids.append((fx_.min() + fx_.max() + 1) / 2)
-        self.center_x = float(self.meta.get('anchorX', float(np.mean(mids))))
+        self.center_x = float(self.meta.get('anchorX', self.meta.get('faceX', float(np.mean(mids)))))
 
         self._cache = {}
 
@@ -461,9 +461,11 @@ def main():
         ornaments.place_divider(mid, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
         ornaments.place_divider(mid, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
 
-    # Sprite-Lage: Gesicht über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
+    # Sprite-Lage: Gesichtsmitte über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
-    sx = card_x + CARD_W // 2 - round(spr.center_x * SPRITE_PX / U) * U      # auf dem Raster, Figurenmitte über der Kartenmitte
+    if 'anchorX' in hero_cfg:
+        spr.center_x = float(hero_cfg['anchorX'])
+    sx = round(card_x + CARD_W / 2 - spr.center_x * SPRITE_PX)      # Gesichtsmitte (zwischen den Augen) genau über der Kartenmitte
     sy = feet_y - spr.foot * SPRITE_PX
     shadow = pixel_ellipse(24, 4, INK, 170)
 
