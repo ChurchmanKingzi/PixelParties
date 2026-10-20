@@ -43,6 +43,12 @@ function _isCreatureTarget(t, engine) {
   return !isArtifactCreature(cd);
 }
 
+/** W20b: leert die Rückgabe dieser Kreatur ihre Zone ganz (kein Alice-Stapel)? */
+function _zoneLeerNachRueckgabe(engine, t) {
+  const i = t.cardInstance;
+  return !!i && engine.zoneFreiNachKostenzahlung(engine.physicalSide(i), i.heroIdx, i.zoneSlot, i);
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -77,8 +83,10 @@ module.exports = {
     if (!isAttack && !isSpell && !isCreatureEffect && !dmgTypeMatches) return false;
 
     // At least one target must be a Creature in one of OUR Support Zones.
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
+    // der Ersatz kommt in die Zone der Kreatur - nur Zonen, die ihre Rückgabe leert (kein Alice-Stapel).
     const ownCreatureTargets = targetedHeroes.filter(t =>
-      _isCreatureTarget(t, engine) && t.owner === pi
+      _isCreatureTarget(t, engine) && t.owner === pi && _zoneLeerNachRueckgabe(engine, t)
     );
     if (ownCreatureTargets.length === 0) return false;
 
@@ -113,7 +121,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
 
     // Pick the first own creature-target from the list.
-    const tgt = targetedHeroes.find(t => _isCreatureTarget(t, engine) && t.owner === pi);
+    const tgt = targetedHeroes.find(t => _isCreatureTarget(t, engine) && t.owner === pi && _zoneLeerNachRueckgabe(engine, t));
     if (!tgt) return null;
     const bouncedInst = tgt.cardInstance;
     const bouncedName = bouncedInst.name;

@@ -228,6 +228,8 @@ module.exports = {
     const candidates = findSacrificeCandidates(engine, pi);
     const out = [];
     for (const inst of candidates) {
+      // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): die Queen kommt in die Zone des Opfers - nur Zonen, die das EINE Opfer leert (kein Alice-Stapel).
+      if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
       const sources = queenSourcesFor(gs, ps, inst);
       if (!sources.hand && !sources.deck) continue;
       out.push({

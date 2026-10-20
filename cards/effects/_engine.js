@@ -30362,7 +30362,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const alice = require('./_alice-shared');
     for (const id of pickedIds) {
       const t = (validTargets || []).find(v => v && v.id === id);
-      if (!t || t.type !== 'equip') continue;
+      if (!t || t.type !== 'equip' || t._eigeneStapelWahl) continue;   // W20b: Dark Deepsea God fragt den Stapel selbst (Teilauswahl)
       const side = t.cardInstance
         ? (t.cardInstance.controller ?? t.cardInstance.owner)
         : t.owner;

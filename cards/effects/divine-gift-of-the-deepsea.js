@@ -99,7 +99,10 @@ function hasValidReplacement(engine, ps, pi, inst) {
 function getValidBounceTargets(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return [];
+  // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
+  // der Ersatz kommt in die Zone der Kreatur - nur Zonen, die ihre Rückgabe leert (kein Alice-Stapel; „1 pro Spiel" nicht für ein Fizzle verbrennen).
   return getOwnControlledCreatureInsts(engine, pi)
+    .filter(inst => engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst))
     .filter(inst => hasValidReplacement(engine, ps, pi, inst));
 }
 

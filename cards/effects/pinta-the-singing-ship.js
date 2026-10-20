@@ -49,9 +49,17 @@
 //     Creature Opfer (Blue-Ice Dragon), waehlt der Spieler NACH dem
 //     Aufdecken die Zone, in die sie soll — die Creature, die dort steht,
 //     wird dadurch automatisch zu einem der Opfer (`_requiredSacrificeInstIds`
-//     → `resolveSacrificeCost`), die uebrigen waehlt er wie gewohnt. Nur
-//     Zonen, deren Creature als Opfer taugt, stehen zur Wahl; bleibt nur
-//     eine, entfaellt auch diese Wahl.
+//     → `resolveSacrificeCost`), die uebrigen waehlt er wie gewohnt.
+//     ★ W20b (Al, 20.10.2026; allgemeine Regel aus W19: „Es ist jede Zone ein
+//     Ziel, die durch Opfern für die Beschwörung leer wird. Wählt man eine Zone
+//     mit 2 Creatures darin, müssen beide geopfert werden, bei mehr Creatures
+//     als benötigten Opfern ist eine Zone nicht viable."): angeboten werden nur
+//     Zonen, die die geforderten Opfer VOLLSTÄNDIG leeren können
+//     (`engine.zoneLeerbarDurchOpfer`: Insassen <= Opferzahl, alle opferbar,
+//     Mindestopfer-Summen weiter erfüllbar); ALLE Insassen der gewählten Zone
+//     (Alice-Stapel!) sind Pflicht-Opfer. Sind keine Zonen viable, beschwört
+//     Pinta nicht („if possible"); das Potion Deck wird trotzdem gemischt.
+//     Bleibt nur eine Zone, entfaellt auch die Wahl.
 //
 //     „IF POSSIBLE" heisst: Pinta ist ein tauglicher Beschwoerer (lebendig,
 //     nicht Frozen/Stunned/Webbed/Bound/Negated, Level-/Schulanforderung der
@@ -95,10 +103,10 @@ function moeglicheZonen(engine, pi, feld, heroIdx, name) {
 }
 
 /**
- * Sind ALLE Zonen Pintas belegt und verlangt die Karte Opfer: die Zonen, deren Creature als Opfer taugt. Die
- * Creature dort wird automatisch zu einem der Opfer. Die Karte nennt ihre Kosten ueber den Vertrag
- * `summonSacrificeSpec(engine)` (Blue-Ice Dragon); ohne ihn gibt es keinen Weg in eine belegte Zone.
- * Eintraege wie die von `eligibleSummonZones`, dazu `opferInstId`.
+ * Sind ALLE Zonen Pintas belegt und verlangt die Karte Opfer: die Zonen, die die geforderten Opfer vollstaendig leeren
+ * koennen (W20b: `engine.zoneLeerbarDurchOpfer`). ALLE Insassen der Zone werden automatisch zu Opfern. Die Karte nennt
+ * ihre Kosten ueber den Vertrag `summonSacrificeSpec(engine)` (Blue-Ice Dragon); ohne ihn gibt es keinen Weg in eine
+ * belegte Zone. Eintraege wie die von `eligibleSummonZones`, dazu `opferInstIds`.
  */
 function opferZonen(engine, pi, feld, heroIdx, name) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
@@ -111,16 +119,14 @@ function opferZonen(engine, pi, feld, heroIdx, name) {
   const zonen = engine.gs.players[feld]?.supportZones?.[heroIdx] || [];
   const anzahl = Math.min(zonen.length, 3);
   for (let z = 0; z < anzahl; z++) if (!engine.supportSlotBelegt(feld, heroIdx, z)) return [];   // sonst nimmt Pinta die erste freie
-  const opfer = engine.getSacrificableCreatures(pi);
   const out = [];
   for (let z = 0; z < anzahl; z++) {
-    const eintrag = opfer.find(c => c.inst.zone === 'support' && c.inst.heroIdx === heroIdx
-      && c.inst.zoneSlot === z && engine.physicalSide(c.inst) === feld);
-    if (!eintrag) continue;
-    if (!engine.canSatisfySacrifice(pi, { ...spec, requiredInstIds: [eintrag.inst.id] })) continue;
+    // W20b: eine Zone ist viable, wenn die geforderten Opfer sie ganz leeren koennen; alle ihre Insassen sind Pflicht-Opfer.
+    if (!engine.zoneLeerbarDurchOpfer(pi, feld, heroIdx, z, spec)) continue;
+    const insassen = engine.zoneInsassen(feld, heroIdx, z);
     out.push({
-      heroIdx, slotIdx: z, label: `${hero.name} — Slot ${z + 1} (sacrifices ${eintrag.cardName})`,
-      opferInstId: eintrag.inst.id,
+      heroIdx, slotIdx: z, label: `${hero.name} — Slot ${z + 1} (sacrifices ${insassen.map(c => c.name).join(' + ')})`,
+      opferInstIds: insassen.map(c => c.id),
       ...(feld !== pi ? { owner: feld } : {}),
     });
   }
@@ -227,7 +233,7 @@ module.exports = {
         hookExtras: {
           _isNormalSummon: false,
           // Die Creature in der gewaehlten Zone wird automatisch zu einem der Opfer.
-          ...(ziel.opferInstId ? { _requiredSacrificeInstIds: [ziel.opferInstId] } : {}),
+          ...(ziel.opferInstIds ? { _requiredSacrificeInstIds: ziel.opferInstIds } : {}),
         },
         ...(feld !== pi ? { heldSeite: feld } : {}),
       });
