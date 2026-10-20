@@ -73,6 +73,8 @@ if (!FALL) {
     t.gs.activePlayer = 0; t.phase(3);
     t.gs.players[0].heroesActedThisTurn = [0];
     t.gs.players[0]._actionsPlayedThisPhase = 1;
+    // W20a (Al, 20.10.): Love Shot stempelt `charmedBy = pi` am Zielhelden, bevor es die Liste erhebt (der Kontrolleur wirkt) — hier nachgestellt; ohne Stempel wirkt der Besitzer nicht.
+    t.gs.players[0].heroes[2].charmedBy = 0;
     const ohne = t.engine.getHeroPlayableCards(0).own[2] || [];
     const mit = t.engine.getHeroPlayableCards(0, { charmedIgnoresActionCost: true }).own[2] || [];
     t.say('own[2] ohne/mit Option', JSON.stringify(ohne), JSON.stringify(mit));
