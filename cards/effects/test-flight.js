@@ -49,12 +49,18 @@ function quellStufe(engine, sourceCard) {
   return src.level || 0;
 }
 
-/** Darf der eigene getroffene Held `hi` Test Flight gegen diese Stufe wirken? (Stufe strikt höher, Held kann die Karte wirken.) */
-function heldPasst(engine, pi, hi, stufe) {
-  const hero = engine.gs.players[pi]?.heroes?.[hi];
+/**
+ * Darf der getroffene Held `hi` (Brettseite `seite`, Standard = `pi`) Test Flight gegen diese Stufe wirken? (Stufe strikt höher, Held kann die Karte wirken.)
+ * W20c (Al 20.10.): „a Hero you control" — auch ein von `pi` übernommener Held der Gegenspalte (`seite` ≠ `pi`); Stufe aus SEINEN Ability Zones.
+ */
+function heldPasst(engine, pi, hi, stufe, seite = pi) {
+  const hero = engine.gs.players[seite]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return false;
-  if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME, { spellInHand: true })) return false;
-  return stufe < engine.effectiveSchoolLevelForCaster(SCHOOL, pi, hi);
+  const darf = seite === pi
+    ? engine._canHeroActivateSurprise(pi, hi, CARD_NAME, { spellInHand: true })
+    : engine._canHeroActivateSurprise(seite, hi, CARD_NAME, { spellInHand: true, reaktor: pi });
+  if (!darf) return false;
+  return stufe < engine.effectiveSchoolLevelForCaster(SCHOOL, pi, hi, seite);
 }
 
 module.exports = {
@@ -68,29 +74,30 @@ module.exports = {
   postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard) {
     const stufe = quellStufe(engine, sourceCard);
     if (stufe == null) return false;
-    return (targetedHeroes || []).some(t => t.owner === pi && t.type === 'hero' && heldPasst(engine, pi, t.heroIdx, stufe));
+    return (targetedHeroes || []).some(t => t.type === 'hero' && engine.zielSeite(t) === pi && heldPasst(engine, pi, t.heroIdx, stufe, t.owner));
   },
 
   /** Wirker: nur ein GETROFFENER eigener Held, dessen Magic-Arts-Stufe die der Quelle übertrifft. */
-  reactionCasterAllowed(gs, pi, heroIdx, engine, info) {
+  reactionCasterAllowed(gs, pi, heroIdx, engine, info, seite = pi) {
     if (!info?.postTarget) return false;
     const stufe = quellStufe(engine, info.sourceCard);
     if (stufe == null) return false;
-    const getroffen = (info.targetedHeroes || []).some(t => t.owner === pi && t.type === 'hero' && t.heroIdx === heroIdx);
-    return getroffen && heldPasst(engine, pi, heroIdx, stufe);
+    const getroffen = (info.targetedHeroes || []).some(t => t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx && engine.zielSeite(t) === pi);
+    return getroffen && heldPasst(engine, pi, heroIdx, stufe, seite);
   },
 
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard, opts) {
     const gs = engine.gs;
     const hi = opts?.casterIdx;
     if (!Number.isInteger(hi)) return {};
+    const seite = opts?.casterSeite ?? pi;   // W20c: Brettseite des Wirkers (übernommener Held)
     // Der Wirker ist der geschützte Held — und muss unter den Zielen stehen.
-    const ziel = (targetedHeroes || []).find(t => t.owner === pi && t.type === 'hero' && t.heroIdx === hi);
+    const ziel = (targetedHeroes || []).find(t => t.owner === seite && t.type === 'hero' && t.heroIdx === hi);
     if (!ziel) return {};
-    const hero = gs.players[pi]?.heroes?.[hi];
+    const hero = gs.players[seite]?.heroes?.[hi];
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'test_flight', owner: pi, heroIdx: hi, zoneSlot: -1,
+      type: 'test_flight', owner: seite, heroIdx: hi, zoneSlot: -1,
     });
     await engine._delay(FLUG_MS * 0.55);   // der Treffer geht erst vorbei, wenn der Held in der Luft ist
 
@@ -98,7 +105,7 @@ module.exports = {
       player: gs.players[pi]?.username, hero: hero?.name || ziel.cardName,
       negated: sourceCard?.name || 'an Attack or Spell',
     });
-    engine.grantEffectImmunity(pi, hi, sourceCard);
+    engine.grantEffectImmunity(seite, hi, sourceCard);
     engine.sync();
     return {};
   },

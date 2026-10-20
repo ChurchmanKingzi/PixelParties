@@ -96,18 +96,20 @@ function withCastZones(engine, pi, heroIdx, zonesAtCast, fn) {
   try { return fn(); } finally { ps.abilityZones[heroIdx] = live; }
 }
 
-function meetsWith(engine, pi, heroIdx, cd, k, zonesAtCast) {
+// W20c (Al 20.10.): `pi` = Brettseite des Helden (Spalte), `actor` = der Spieler, der die Karte wirkt (Kontrolleur; Standard `pi`).
+// Bei einem uebernommenen Zielheld der Gegenspalte zaehlen SEINE Zonen, aber Hand/Rabatte des Kontrolleurs (`levelSourcePi`).
+function meetsWith(engine, pi, heroIdx, cd, k, zonesAtCast, actor = pi) {
   const probe = { ...cd, level: Math.max(0, (cd.level || 0) - k) };
   return withCastZones(engine, pi, heroIdx, zonesAtCast,
-    () => engine.heroMeetsLevelReq(pi, heroIdx, probe, { noPlacementBypass: true }));
+    () => engine.heroMeetsLevelReq(pi, heroIdx, probe, { noPlacementBypass: true, ...(actor !== pi ? { levelSourcePi: actor } : {}) }));
 }
 
 // Wisdom-Abwurf, der bei k geschickten Abilities noch faellig waere
 // (0 = keine Luecke oder Divinity deckt sie).
-function wisdomFor(engine, pi, heroIdx, cd, k, zonesAtCast) {
+function wisdomFor(engine, pi, heroIdx, cd, k, zonesAtCast, actor = pi) {
   const probe = { ...cd, level: Math.max(0, (cd.level || 0) - k) };
   return withCastZones(engine, pi, heroIdx, zonesAtCast,
-    () => Math.max(0, engine.getWisdomDiscardCost(pi, heroIdx, probe)));
+    () => Math.max(0, engine.getWisdomDiscardCost(pi, heroIdx, probe, undefined, actor !== pi ? actor : undefined)));
 }
 
 /**
@@ -127,13 +129,14 @@ function plan(engine, pi, heroIdx, opts = {}) {
   if (!hero?.name || hero.hp <= 0) return null;
   const cd = engine._getCardDB()[CARD_NAME];
   if (!cd) return null;
+  const actor = opts.actor ?? pi;   // W20c: Kontrolleur eines uebernommenen Helden (Hand fuer den Wisdom-Abwurf)
   const { abilities, equips } = sendables(engine, pi, heroIdx);
   const total = abilityCardCount(abilities);
-  const handFree = Math.max(0, (ps.hand || []).length - (opts.cardStillInHand ? 1 : 0));
+  const handFree = Math.max(0, (gs.players[actor]?.hand || []).length - (opts.cardStillInHand ? 1 : 0));
   let minFree = -1, minPaid = -1;
   for (let k = 0; k <= total; k++) {
-    if (!meetsWith(engine, pi, heroIdx, cd, k)) continue;
-    const w = wisdomFor(engine, pi, heroIdx, cd, k);
+    if (!meetsWith(engine, pi, heroIdx, cd, k, undefined, actor)) continue;
+    const w = wisdomFor(engine, pi, heroIdx, cd, k, undefined, actor);
     if (w === 0) { minFree = k; break; }
     if (minPaid < 0 && handFree >= w) minPaid = k;
   }
@@ -189,17 +192,22 @@ module.exports = {
    * das Level, indem er Abilities schickt. Tote Helden nie (die
    * Engine fragt den Bypass auch im Toten-Zweig).
    */
-  canBypassLevelReq(gs, pi, heroIdx, cardData, engine) {
+  // W20c: 6. Argument `evalOpts` (nur `levelSourcePi` zaehlt) — Kontrolleur eines uebernommenen Helden.
+  canBypassLevelReq(gs, pi, heroIdx, cardData, engine, evalOpts) {
     if (cardData?.name !== CARD_NAME) return false;
     const hero = gs.players[pi]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
-    return castable(plan(engine, pi, heroIdx, { cardStillInHand: true }));
+    const actor = typeof evalOpts?.levelSourcePi === 'number' ? evalOpts.levelSourcePi : pi;
+    return castable(plan(engine, pi, heroIdx, { cardStillInHand: true, actor }));
   },
 
   preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount /*, type */) {
     if (!(amount > 0)) return false;
     if (!target || target.hp <= 0) return false;
-    return castable(plan(engine, ownerIdx, heroIdx, { cardStillInHand: true }));
+    // W20c: der Zielheld kann ein von `ownerIdx` uebernommener Held der Gegenspalte sein (Brettseite `seite`).
+    const seite = engine._findHeroOwner(target);
+    if (seite < 0) return false;
+    return castable(plan(engine, seite, heroIdx, { cardStillInHand: true, actor: ownerIdx }));
   },
 
   /**
@@ -212,16 +220,18 @@ module.exports = {
   async preDamageResolve(engine, ownerIdx, target, heroIdx, source, amount /*, type */) {
     const ps = engine.gs.players[ownerIdx];
     const heroName = target?.name || 'the user';
+    // W20c: Brettseite des Nutzers (uebernommener Held der Gegenspalte moeglich); `ps` bleibt die Hand des Kontrolleurs.
+    const seite = engine._findHeroOwner(target);
     let sent = 0, abilitiesSent = 0, schleifen = 0;
     // Schnappschuss der Ability-Zonen zum Cast-Zeitpunkt (s. withCastZones).
-    const zonesAtCast = (ps?.abilityZones?.[heroIdx] || [[], [], []]).map(z => (z || []).slice());
+    const zonesAtCast = (engine.gs.players[seite]?.abilityZones?.[heroIdx] || [[], [], []]).map(z => (z || []).slice());
 
     // Der Cast steht — ab hier laufen Auswahl und Abwurf als Effekt,
     // Wisdom bemisst sich an dem, was NACH der Auswahl noch fehlt.
     const remainingWisdom = () => {
       const cd = engine._getCardDB()[CARD_NAME];
-      if (meetsWith(engine, ownerIdx, heroIdx, cd, abilitiesSent, zonesAtCast)) {
-        return wisdomFor(engine, ownerIdx, heroIdx, cd, abilitiesSent, zonesAtCast);
+      if (meetsWith(engine, seite, heroIdx, cd, abilitiesSent, zonesAtCast, ownerIdx)) {
+        return wisdomFor(engine, seite, heroIdx, cd, abilitiesSent, zonesAtCast, ownerIdx);
       }
       return -1; // Luecke ohne Deckung
     };
@@ -235,7 +245,7 @@ module.exports = {
     // Schleifenkappe: eine Karte je Durchlauf, hoechstens 3 Ability-Slots
     // × 3 Kopien + 3 Equips = 12 Sendungen; 40 ist reichlich.
     while (schleifen++ < 40) {
-      const ziele = targetsFor(engine, ownerIdx, heroIdx);
+      const ziele = targetsFor(engine, seite, heroIdx);
       if (ziele.length === 0) break;
       const fertigErlaubt = doneAllowed();
       const w = remainingWisdom();
@@ -261,7 +271,7 @@ module.exports = {
         // das CPU-Gehirn entscheidet daran je Schritt, ob und was
         // geschickt wird; Menschen sehen das Feld nie (Weisse Liste).
         _abilityCost: {
-          cardName: CARD_NAME, heroIdx, sent, abilitiesSent, amount: amount || 0,
+          cardName: CARD_NAME, heroIdx, heroSeite: seite, sent, abilitiesSent, amount: amount || 0,
           // Luecke NICHT durch Aufhoeren schliessbar → es MUSS eine Ability kommen
           needMore: w < 0 || (w > 0 && (ps.hand || []).length < w),
           // Aufhoeren ginge, kostet aber Wisdom-Abwuerfe
@@ -304,7 +314,7 @@ module.exports = {
 
     const heal = sent * HEAL_PER_CARD;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'weapon_absorption', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'weapon_absorption', owner: seite, heroIdx, zoneSlot: -1,
     });
     await engine._delay(300);
     await engine.actionHealHero({ name: CARD_NAME, owner: ownerIdx }, target, heal);
@@ -336,9 +346,10 @@ module.exports = {
       const ctx = promptData?._preDamageContext;
       if (!ctx) return false;
       const { targetOwner, targetHeroIdx, amount } = ctx;
-      const hero = engine.gs?.players?.[targetOwner]?.heroes?.[targetHeroIdx];
+      const seite = ctx.targetSeite ?? targetOwner;   // W20c: Brettseite des (uebernommenen) Zielhelden
+      const hero = engine.gs?.players?.[seite]?.heroes?.[targetHeroIdx];
       if (!hero) return false;
-      const p = plan(engine, targetOwner, targetHeroIdx, { cardStillInHand: true });
+      const p = plan(engine, seite, targetHeroIdx, { cardStillInHand: true, actor: targetOwner });
       if (!castable(p)) return false;
       const need = Math.max(p.minFree >= 0 ? p.minFree : p.minPaid, 1);
       const maxCards = p.total + p.equips;
@@ -355,7 +366,7 @@ module.exports = {
     const st = config?._abilityCost;
     if (!st || !Array.isArray(validTargets) || validTargets.length === 0) return undefined;
     if (engine.isPuzzle) return undefined;         // Puzzle: alles schicken (Engine-Standard)
-    const hero = engine.gs?.players?.[playerIdx]?.heroes?.[st.heroIdx];
+    const hero = engine.gs?.players?.[st.heroSeite ?? playerIdx]?.heroes?.[st.heroIdx];
     if (!hero) return undefined;
     // Mehr als bis Max-HP heilt keine Karte — sonst schickt die CPU
     // alles, obwohl es nichts mehr bringt.

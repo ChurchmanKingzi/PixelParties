@@ -54,13 +54,23 @@ function legalCasters(engine, pi) {
     if (!engine._canHeroActivateSurprise(pi, hi, CARD_NAME, { spellInHand: true })) return;
     const level = engine.effectiveSchoolLevelForCaster(SCHOOL, pi, hi);
     const wisdom = cd ? Math.max(0, engine.getWisdomDiscardCost(pi, hi, cd)) : 0;
-    out.push({ heroIdx: hi, level, cost: costFor(level), wisdom });
+    out.push({ seite: pi, heroIdx: hi, level, cost: costFor(level), wisdom });
   });
+  // W20c (Al 20.10.): auch ein von `pi` uebernommener Held der Gegenspalte wirkt (SEINE Support-Magic-Stufe, Wisdom aus der Hand von `pi`).
+  for (const { seite, heroIdx: hi, hero: h } of engine.fremdeReaktionsWirker(pi, module.exports)) {
+    if (!h?.name || h.hp <= 0) continue;
+    if (!engine._canHeroActivateSurprise(seite, hi, CARD_NAME, { spellInHand: true, reaktor: pi })) continue;
+    const level = engine.effectiveSchoolLevelForCaster(SCHOOL, pi, hi, seite);
+    const wisdom = cd ? Math.max(0, engine._rxWisdomKosten(pi, seite, hi, cd)) : 0;
+    out.push({ seite, heroIdx: hi, level, cost: costFor(level), wisdom });
+  }
   return out;
 }
 
-function ownHeroTargets(pi, targetedHeroes) {
-  return (targetedHeroes || []).filter(t => t.owner === pi && t.type === 'hero');
+// W20c: „a Hero you control" = Kontrolle (eigene Spalte ohne die abgegebenen Helden, plus uebernommene der Gegenspalte); die Adresse
+// bleibt physisch (`t.owner` = Brettseite).
+function ownHeroTargets(engine, pi, targetedHeroes) {
+  return (targetedHeroes || []).filter(t => t.type === 'hero' && engine.zielSeite(t) === pi);
 }
 
 module.exports = {
@@ -76,14 +86,14 @@ module.exports = {
   isPostTargetReaction: true,
 
   postTargetCondition(gs, pi, engine, targetedHeroes /*, sourceCard, opts */) {
-    const eigene = ownHeroTargets(pi, targetedHeroes);
+    const eigene = ownHeroTargets(engine, pi, targetedHeroes);
     if (eigene.length === 0) return false;
     const casters = legalCasters(engine, pi);
     if (casters.length === 0) return false;
     const cheapest = Math.min(...casters.map(c => c.cost));
     // Mindestens ein betroffener Held hat genug Ability-Karten fuer
     // mindestens einen Caster.
-    return eigene.some(t => abilityCardCount(sendables(engine, pi, t.heroIdx).abilities) >= cheapest);
+    return eigene.some(t => abilityCardCount(sendables(engine, t.owner, t.heroIdx).abilities) >= cheapest);
   },
 
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard) {
@@ -91,10 +101,10 @@ module.exports = {
     const ps = gs.players[pi];
     const casters = legalCasters(engine, pi);
     if (casters.length === 0) return {};
-    const cardsOf = (hi) => abilityCardCount(sendables(engine, pi, hi).abilities);
-    const eigene = ownHeroTargets(pi, targetedHeroes);
+    const cardsOf = (seite, hi) => abilityCardCount(sendables(engine, seite, hi).abilities);
+    const eigene = ownHeroTargets(engine, pi, targetedHeroes);
     // Nur Caster, fuer deren Kosten mindestens ein betroffener Held aufkommt.
-    const nutzbar = casters.filter(c => eigene.some(t => cardsOf(t.heroIdx) >= c.cost));
+    const nutzbar = casters.filter(c => eigene.some(t => cardsOf(t.owner, t.heroIdx) >= c.cost));
     if (nutzbar.length === 0) return {};
 
     // 1) WER castet? Button-Auswahl der Helden (derselbe optionPicker
@@ -103,10 +113,10 @@ module.exports = {
     let caster = nutzbar[0];
     if (nutzbar.length > 1) {
       const heroOptions = nutzbar.map(c => {
-        const h = ps.heroes[c.heroIdx];
+        const h = engine.gs.players[c.seite]?.heroes?.[c.heroIdx];
         return {
-          id: `hero-${c.heroIdx}`,
-          heroIdx: c.heroIdx,
+          id: c.seite === pi ? `hero-${c.heroIdx}` : `hero-${c.seite}-${c.heroIdx}`,
+          heroIdx: c.heroIdx, seite: c.seite,
           label: h?.name || `Hero ${c.heroIdx + 1}`,
           description: `Support Magic ${c.level} → send ${c.cost} Abilit${c.cost === 1 ? 'y' : 'ies'}${c.wisdom > 0 ? ` (Wisdom: discard ${c.wisdom})` : ''}.`,
           color: '#66ccff',
@@ -120,17 +130,18 @@ module.exports = {
         cancellable: false,
       });
       const sel = heroOptions.find(o => o.id === choice?.optionId);
-      if (sel) caster = nutzbar.find(c => c.heroIdx === sel.heroIdx) || caster;
+      if (sel) caster = nutzbar.find(c => c.heroIdx === sel.heroIdx && c.seite === sel.seite) || caster;
     }
     const n = caster.cost;
 
     // 2) WER wird geschuetzt? („that Hero" — er zahlt die Abilities.)
-    const kandidaten = eigene.filter(t => cardsOf(t.heroIdx) >= n);
+    const kandidaten = eigene.filter(t => cardsOf(t.owner, t.heroIdx) >= n);
     if (kandidaten.length === 0) return {};
     let ziel = kandidaten[0];
     if (kandidaten.length > 1) {
-      const erlaubt = new Set(kandidaten.map(t => t.heroIdx));
-      const auswahl = engine.getHeroTargets(pi).filter(t => erlaubt.has(t.heroIdx));
+      const erlaubt = new Set(kandidaten.map(t => `${t.owner}:${t.heroIdx}`));
+      const auswahl = [...new Set(kandidaten.map(t => t.owner))]
+        .flatMap(o => engine.getHeroTargets(o)).filter(t => erlaubt.has(`${t.owner}:${t.heroIdx}`));   // W20c: Adresse physisch
       if (auswahl.length > 1) {
         const wahl = await engine.promptEffectTarget(pi, auswahl, {
           title: CARD_NAME,
@@ -143,7 +154,7 @@ module.exports = {
         });
         const id = Array.isArray(wahl) ? wahl[0] : wahl;
         const g = auswahl.find(t => t.id === id);
-        if (g) ziel = kandidaten.find(t => t.heroIdx === g.heroIdx) || ziel;
+        if (g) ziel = kandidaten.find(t => t.owner === g.owner && t.heroIdx === g.heroIdx) || ziel;
       }
     }
 
@@ -155,22 +166,23 @@ module.exports = {
       });
     }
 
-    const hero = ps.heroes[ziel.heroIdx];
+    const hero = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
     const res = await sendCardsLoop(engine, pi, ziel.heroIdx, {
       cardName: CARD_NAME, kinds: ['ability'], min: n, max: n, amount: 0,
+      ...(ziel.owner !== pi ? { heroOwner: ziel.owner } : {}),   // W20c: Brettseite des geschuetzten (uebernommenen) Helden
       confirmLabel: '✨ Send',
       describe: (sent, _a, remaining) => `Send ${remaining} more Abilit${remaining === 1 ? 'y' : 'ies'} attached to ${hero?.name || 'the Hero'} to the discard pile (${sent}/${n} sent).`,
     });
     if (res.aborted || res.sent < n) return {};
     engine._broadcastEvent('play_zone_animation', {
-      type: 'barrier_of_faith', owner: pi, heroIdx: ziel.heroIdx, zoneSlot: -1,
+      type: 'barrier_of_faith', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1,
     });
     await engine._delay(480);
     engine.log('barrier_of_faith', {
       player: ps.username, hero: hero?.name || ziel.cardName, sent: n,
       negated: sourceCard?.name || 'a card or effect',
     });
-    engine.grantEffectImmunity(pi, ziel.heroIdx, sourceCard);
+    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard);
     engine.sync();
     return {};
   },

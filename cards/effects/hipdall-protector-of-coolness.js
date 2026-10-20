@@ -147,7 +147,7 @@ async function summonFromStack(engine, pi, cardName) {
     // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (Frozen/Stunned/Webbed/Bound; gleiche Menge wie `canHeroSummon`).
     // Welle 12 (Al, Rückfrage 2): ein Negierter beschwört wieder — Effekt-negiert normal, Abilities-negiert (harte Form) nur Lv-0 (die Ausnahme
     // „Negated + Lv0" gilt wieder): das erledigt die Stufenprüfung `heroMeetsLevelReq` unten (harte Form -> leere Zonenmenge).
-    if (!require('./_summon-eligibility').heroAgiert(hero)) continue;
+    if (!require('./_summon-eligibility').heroAgiert(hero, engine, pi)) continue;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
     if (engine._isHeroMummified?.(pi, hi)) continue;
     // ★ Al, Welle 9 (Q25): „Sagt der Effekt 'summon', ist das Level nötig, bei
     // 'place' nicht." Hipdall/Swagdri/Wildur werden vom Coolness Stack

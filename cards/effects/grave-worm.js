@@ -214,7 +214,7 @@ module.exports = {
       // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound) — `heroAgiert`.
       // Welle 12 (Al): Negated sperrt nicht (auch die leichte Form beschwört wie vor Welle 11); die harte Form (Abilities negiert) lässt über
       // `heroMeetsLevelReq` nur Stufe 0 zu - der Grave Worm ist Stufe 0.
-      if (!require('./_summon-eligibility').heroAgiert(hostHero)) return;
+      if (!require('./_summon-eligibility').heroAgiert(hostHero, engine, pi)) return;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
       if (ps.summonLocked) return;
       const ourCardData = cardDB[CARD_NAME];
       if (!ourCardData) return;

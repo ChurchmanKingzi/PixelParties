@@ -59,7 +59,8 @@ function getValidTargets(gs, engine, excludeHeroKey) {
 /**
  * Core cleanse + heal logic used by both proactive and reaction paths.
  */
-async function doCure(engine, pi, target, casterHeroIdx) {
+// W20c: `casterSeite` = Brettseite des Wirkers (uebernommener Held der Gegenspalte), Standard `pi`.
+async function doCure(engine, pi, target, casterHeroIdx, casterSeite = pi) {
   const negKeys = getCleansableStatuses();
   let removed = 0;
 
@@ -76,7 +77,7 @@ async function doCure(engine, pi, target, casterHeroIdx) {
   const sourceInst = engine.cardInstances.find(c =>
     c.owner === pi && c.name === 'Cure'
   );
-  const healSource = sourceInst || { name: 'Cure', owner: pi, heroIdx: heroIdxForSource };
+  const healSource = sourceInst || { name: 'Cure', owner: pi, heroIdx: heroIdxForSource, ...(casterSeite !== pi ? { heroOwner: casterSeite } : {}) };
 
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
@@ -153,10 +154,9 @@ module.exports = {
     if (chainCtx?.eventDesc !== 'The phase has ended') return false;
     if (!engine) return false;
     // Ein Held muss wirken koennen UND es muss ein Ziel ausser ihm geben.
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      if (!engine._canHeroActivateSurprise(pi, hi, 'Cure')) continue;
-      if (getValidTargets(gs, engine, `${pi}-${hi}`).length > 0) return true;
+    // W20c (Al 20.10.): auch ein uebernommener Held der Gegenspalte wirkt (`reaktionsWirkerFuer`: eigene + kontrollierte).
+    for (const { seite, heroIdx } of engine.reaktionsWirkerFuer(pi, 'Cure')) {
+      if (getValidTargets(gs, engine, `${seite}-${heroIdx}`).length > 0) return true;
     }
     return false;
   },
@@ -184,7 +184,8 @@ module.exports = {
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const excludeKey = `${pi}-${heroIdx}`;
+      const heldSeite = ctx.cardHeroOwner ?? pi;   // W20c: Brettseite des Wirkers (uebernommener Held)
+      const excludeKey = `${heldSeite}-${heroIdx}`;
 
       const targets = getValidTargets(gs, engine, excludeKey);
       if (targets.length === 0) {
@@ -221,7 +222,7 @@ module.exports = {
       // Ensure card is revealed to opponent (belt-and-suspenders with _pendingCardReveal)
       if (gs._pendingCardReveal) engine._firePendingCardReveal();
 
-      const removed = await doCure(engine, pi, target, heroIdx);
+      const removed = await doCure(engine, pi, target, heroIdx, heldSeite);
       engine.log('cure', { player: gs.players[pi]?.username, target: target.cardName, removed });
     },
   },
@@ -233,7 +234,8 @@ module.exports = {
     // v1379: „except the user" auch hier — der Wirker ist der im
     // Reaktionsfenster gewaehlte Held.
     const _wirker = chain?.[chainIdx]?.casterHeroIdx;
-    const targets = getValidTargets(engine.gs, engine, (_wirker != null && _wirker >= 0) ? `${pi}-${_wirker}` : null);
+    const _wirkerSeite = chain?.[chainIdx]?.casterOwner ?? pi;   // W20c: Brettseite des Wirkers
+    const targets = getValidTargets(engine.gs, engine, (_wirker != null && _wirker >= 0) ? `${_wirkerSeite}-${_wirker}` : null);
     if (targets.length === 0) {
       engine.log('reaction_fizzle', { card: 'Cure', reason: 'no valid targets' });
       return false;
@@ -263,7 +265,7 @@ module.exports = {
     // overheal in particular gates on
     // `source.heroIdx >= 0 && gs.heroFlags['<owner>-<heroIdx>'].overhealPassive`.
     const casterHeroIdx = chain?.[chainIdx]?.casterHeroIdx;
-    const removed = await doCure(engine, pi, target, casterHeroIdx);
+    const removed = await doCure(engine, pi, target, casterHeroIdx, _wirkerSeite);
     engine.log('cure', { player: engine.gs.players[pi]?.username, target: target.cardName, removed });
     return true;
   },

@@ -76,7 +76,7 @@ module.exports = {
     target.hp = 1;
     target.maxHp = 1;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'emergency_spell_armor', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'emergency_spell_armor', owner: engine._findHeroOwner(target), heroIdx, zoneSlot: -1,   // W20c: Brettseite des Helden
     });
     engine.log('emergency_spell_armor', {
       player: ps?.username, hero: target?.name || 'Hero',

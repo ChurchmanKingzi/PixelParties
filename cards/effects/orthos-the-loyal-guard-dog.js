@@ -74,7 +74,7 @@ module.exports = {
       if (!ps || !orthos?.name || orthos.hp <= 0) return;
       // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer — Orthos selbst beschwört den zweiten Loyal
       // (nicht Frozen / Stunned / Webbed / Bound / Negated).
-      if (!require('./_summon-eligibility').heroAgiert(orthos)) return;
+      if (!require('./_summon-eligibility').heroAgiert(orthos, ctx._engine, pi)) return;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
 
       // Once per turn, scoped per Orthos instance.
       const hoptKey = heldenSperreKey('orthos_chain', pi);

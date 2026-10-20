@@ -51,7 +51,8 @@ module.exports = {
     if (srcOwner === pi) return false;
 
     // At least one target must belong to this player
-    const hasOwnTarget = targetedHeroes.some(t => t.owner === pi);
+    // W20c (Al 20.10.): „targets you control“ = Kontrolle (ein uebernommener Held der Gegenspalte zaehlt, ein abgegebener eigener nicht).
+    const hasOwnTarget = targetedHeroes.some(t => engine.zielSeite(t) === pi);
     if (!hasOwnTarget) return false;
 
     return true;
@@ -86,8 +87,8 @@ module.exports = {
     engine.sync();
 
     // W18a: nur die Wirkung auf die EIGENEN Ziele negieren.
-    const eigene = (targetedHeroes || []).filter(t => t.owner === pi);
-    const fremde = (targetedHeroes || []).filter(t => t.owner !== pi);
+    const eigene = (targetedHeroes || []).filter(t => engine.zielSeite(t) === pi);   // W20c: nach Kontrolle, Adresse bleibt physisch
+    const fremde = (targetedHeroes || []).filter(t => engine.zielSeite(t) !== pi);
     if (fremde.length === 0) {
       // Einseitig (nur eigene Ziele): die ganze Karte negieren wie bisher.
       return { effectNegated: true };

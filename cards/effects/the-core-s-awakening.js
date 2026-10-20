@@ -77,7 +77,7 @@ module.exports = {
     // Ohne Kopie im Deck waere die Reaktion folgenlos
     const ps = gs.players[pi];
     if (!ps || !(ps.mainDeck || []).includes(letzte.cardName)) return false;
-    return wirkenderHeld(gs, pi, engine) >= 0;
+    return wirkenderHeld(gs, pi, engine) >= 0 || !!engine.fremderHeldKannStufe(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {

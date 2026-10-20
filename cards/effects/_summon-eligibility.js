@@ -167,13 +167,32 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
 }
 
 /**
+ * ★ W20c: ist `hero` (Objekt oder Adresse `(feld, heroIdx)`) ein von `pi` ABGEGEBENER eigener Held — er steht in der Spalte von `pi`, wird aber von einem anderen
+ * kontrolliert (`heroSideOf`: Charme-Marke > dauerhafte Uebernahme > Brettseite)? Dann beschwoert `pi` mit ihm nichts. `controlledBy` (Controlled Attack)
+ * zaehlt nicht: dort bleibt der Held beim Besitzer.
+ */
+function heroAbgegeben(engine, pi, heroOrFeld, heroIdx) {
+  if (!engine?.heroSideOf) return false;
+  const hero = (typeof heroOrFeld === 'number') ? engine.gs?.players?.[heroOrFeld]?.heroes?.[heroIdx] : heroOrFeld;
+  if (!hero?.name) return false;
+  const feld = (typeof heroOrFeld === 'number') ? heroOrFeld : engine._findHeroOwner?.(hero);
+  if (feld !== pi) return false;
+  return engine.heroSideOf(feld, hero) !== pi;
+}
+
+/**
  * ★ Welle 11 (Al, R5): „… Reaction-Creatures können, sofern sie nichts anderes spezifizieren (der Term 'place' beinhaltet z.B., dass kein
  * aktionsfähiger Hero notwendig ist) NUR von Heroes beschworen werden, die aktionsfähig sind, dasselbe für Effekte, die spezifisch 'summon' sagen."
  * EINE Statusfrage für jedes „summon" eines Helden-Beschwörers: nicht Frozen / Stunned / Webbed / Bound (seit Welle 12 ohne Negated) — gleiche Menge wie
  * `canHeroSummon`, für Skripte mit eigener Zonen-/Helden-Auswahl. Bei „place" (Monster Nest, Garius, Steam Dwarf Engineer …) NICHT benutzen.
  */
-function heroAgiert(hero) {
+function heroAgiert(hero, engine = null, pi = null) {
   if (!hero?.name || hero.hp <= 0) return false;
+  // ★ W20c (Al, 20.10.2026: „nur der aktuelle Kontrolleur darf mit einem Hero Creatures beschwören"): nennt der Aufrufer den beschwoerenden Spieler `pi`
+  // (und die Engine), beschwoert ein an den Gegner ABGEGEBENER EIGENER Held (steht in der Spalte von `pi`, `heroSideOf` ≠ `pi`) fuer `pi` nichts.
+  // Helden der Gegenspalte bleiben unberuehrt (uebernommene gelten ohnehin; der Held der Zone einer gestohlenen Kreatur — A09-15, Al 14.10.: seitenfremd
+  // beschwoeren — ist weiter zulaessig). Ohne `engine`/`pi` (alte Aufrufer) bleibt die Pruefung rein statusbezogen.
+  if (engine && Number.isInteger(pi) && heroAbgegeben(engine, pi, hero)) return false;
   const st = hero.statuses || {};
   // Welle 12 (Al, Rueckfrage 2): „Nein, ein effekt-negierter Held kann ganz normal Aktionen ausführen und also beschwören." — `negated` gehoert nicht
   // mehr zu den sperrenden Status (Frozen / Stunned / Webbed / Bound bleiben). Die harte Form („Abilities negiert") begrenzt nur die STUFE
@@ -205,4 +224,4 @@ function hatOnSummonText(cd) {
   return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
 }
 
-module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, beschwoerStufeOk };
+module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, heroAbgegeben, beschwoerStufeOk };

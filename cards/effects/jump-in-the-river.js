@@ -89,11 +89,10 @@ async function doJumpCascade(engine, pi) {
 
   while (true) {
     // ── Check: eligible heroes exist? ──
-    // Als Vorgabe 29.9. (Runde 3): eigene Helden, die ich kontrolliere,
-    // plus DAUERHAFT uebernommene (Paraseed) — als { seite, hi }.
+    // Als Vorgabe 29.9. (Runde 3) / W20c (Al 20.10.: alle Reactions): alle Helden, die ich kontrolliere — eigene und uebernommene
+    // (dauerhaft oder temporaer) — als { seite, hi }.
     const eligible = [];
-    for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
-      if (seite !== pi && h.permaControlBy !== pi) continue;
+    for (const { physOwner: seite, heroIdx: hi } of engine.heroesControlledBy(pi)) {
       if (usedThisCascade.has(`${seite}:${hi}`)) continue;
       if (heroCanUseJump(gs, gs.players[seite], hi, engine, pi)) eligible.push({ seite, hi });
     }
@@ -247,8 +246,7 @@ async function doJumpCascade(engine, pi) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
-  // Als Vorgabe 29.9. (Runde 3): nur dauerhaft uebernommene Helden (Paraseed).
-  fremdeWirker: 'dauerhaft',
+  // W20c (Al 20.10.): uebernommene Helden (dauerhaft oder temporaer) wirken fuer ALLE Reaktionen — kein Karten-Schalter mehr noetig.
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -306,10 +304,9 @@ module.exports = {
       gs._jumpPromptDone = gs.turn;
 
       // Pre-check: any eligible heroes at all?
-      // Als Vorgabe 29.9. (Runde 3): auch dauerhaft uebernommene Helden.
+      // Als Vorgabe 29.9. (Runde 3) / W20c: auch uebernommene Helden (dauerhaft oder temporaer).
       let anyEligible = false;
-      for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
-        if (seite !== pi && h.permaControlBy !== pi) continue;
+      for (const { physOwner: seite, heroIdx: hi } of engine.heroesControlledBy(pi)) {
         if (heroCanUseJump(gs, gs.players[seite], hi, engine, pi)) { anyEligible = true; break; }
       }
       if (!anyEligible) return; // No eligible heroes — skip silently

@@ -44,7 +44,7 @@ function heroCanHostDruidTutor(engine, pi, heroIdx, cardData, feld = pi) {
   const hero = engine.gs.players[feld]?.heroes?.[heroIdx];
   if (!hero?.name) return false;
   if (hero.hp <= 0) return false;
-  if (!require('./_summon-eligibility').heroAgiert(hero)) return false;   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
+  if (!require('./_summon-eligibility').heroAgiert(hero, engine, pi)) return false;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden   // Welle 11 (Al, R5): „summon" erfordert einen aktionsfähigen Beschwörer (nicht Frozen/Stunned/Webbed/Bound/Negated) — `heroAgiert`.
   if (ps?.summonLocked) return false;
   return feld === pi
     ? engine.heroMeetsLevelReq(pi, heroIdx, cardData)

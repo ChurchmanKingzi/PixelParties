@@ -57,8 +57,8 @@ function areaImSpiel(gs) {
  * `effectiveSchoolLevelForCaster` rechnet Performance-Joker und
  * geliehene Ability-Zonen (Xal) korrekt mit.
  */
-// Als Vorgabe 29.9. (Runde 3): `seite` = Brettseite eines dauerhaft
-// uebernommenen Helden (Standard `pi`).
+// Als Vorgabe 29.9. (Runde 3): `seite` = Brettseite eines uebernommenen
+// Helden (Standard `pi`; W20c: dauerhaft oder temporaer).
 function heldKannWirken(engine, pi, heroIdx, seite = pi) {
   const ps = engine.gs.players[seite];
   const hero = ps?.heroes?.[heroIdx];
@@ -181,11 +181,10 @@ module.exports = {
       if (!areaImSpiel(gs)) return;
 
       while (ps.hand.includes(CARD_NAME)) {
-        // Als Vorgabe 29.9. (Runde 3): eigene Helden, die ich kontrolliere,
-        // plus DAUERHAFT uebernommene (Paraseed) — als { seite, hi }.
+        // Als Vorgabe 29.9. (Runde 3) / W20c (Al 20.10.: alle Reactions): alle Helden, die ich kontrolliere — eigene und uebernommene
+        // (dauerhaft oder temporaer) — als { seite, hi }.
         const waehlbar = [];
         for (const { physOwner: seite, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
-          if (seite !== pi && h.permaControlBy !== pi) continue;
           if (istGetaucht(gs, h)) continue;   // schon unten
           if (heldKannWirken(engine, pi, hi, seite)) waehlbar.push({ seite, hi });
         }

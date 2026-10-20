@@ -44,14 +44,8 @@ module.exports = {
 
     // At least 1 hero must be able to cast this (Decay Magic Lv1)
     if (engine) {
-      let canCast = false;
-      const ps = gs.players[pi];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (engine._canHeroActivateSurprise(pi, hi, 'Loot the Leftovers')) {
-          canCast = true; break;
-        }
-      }
-      if (!canCast) return false;
+      // W20c: auch ein uebernommener Held der Gegenspalte wirkt (`reaktionsWirkerFuer`: eigene + kontrollierte).
+      if (engine.reaktionsWirkerFuer(pi, 'Loot the Leftovers').length === 0) return false;
     }
 
     return true;

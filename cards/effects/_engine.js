@@ -13782,14 +13782,14 @@ class GameEngine {
       this._inHeroDefeatedReaction = true;
       try {
         if (script.heroDefeatedResolve) {
-          lebt = !!(await script.heroDefeatedResolve(this, pi, info, { casterIdx: rxCast.casterIdx }));
+          lebt = !!(await script.heroDefeatedResolve(this, pi, info, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? pi }));
         }
       } catch (err) {
         console.error(`[HeroDefeatedReaction] ${cardName} threw:`, err.message);
       } finally {
         this._inHeroDefeatedReaction = false;
       }
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
       this.sync();
       return lebt && target.hp > 0;
     }
@@ -21311,6 +21311,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const cd of handCards) {
         if (this._handPlayLockedFor(ps, cd.name)) continue;   // v818 Hand-Spielsperre
         if (heroAbgegeben && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) continue;
+        // W20c (Al, 20.10.): auch keine Beschwoerung aus der Hand mit einem abgegebenen Helden (Spiegel von `validateActionPlay`); Platzier-Karten ausgenommen.
+        if (heroAbgegeben && hasCardType(cd, 'Creature')) {
+          const _s = loadCardEffect(cd.name);
+          let _platz = false;
+          if (typeof _s?.canBypassFreeZoneRequirement === 'function' && !_s.requiresActiveCaster) {
+            try { _platz = !!_s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch { _platz = false; }
+          }
+          if (!_platz) continue;
+        }
         // Frozen / Stunned heroes only host PLACEMENTS. A card opts
         // into this path by exporting canBypassFreeZoneRequirement
         // and returning true right now (Deepsea when a bounceable
@@ -22116,6 +22125,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // wirkt ueber den `charmed`-Weg (`charmedOwner`, `hero.charmedBy === pi`). Love Shot stempelt `charmedBy = pi` auch an Helden der EIGENEN Spalte, dann
     // ist `pi` der Kontrolleur. (`controlledBy` — Controlled Attack: nur Abilities/Heldeneffekt — gibt keine Zauberkontrolle, `heroSideOf` ignoriert es.)
     if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack') && this.heroSideOf(heroOwner, hero) !== pi) return null;
+    // ★ W20c (Al, 20.10.): „nur der aktuelle Kontrolleur darf mit einem Hero Creatures beschwören“ — dasselbe fuer die Beschwoerung aus der Hand: ein abgegebener
+    // eigener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed …) beschwoert fuer seinen BESITZER nichts, solange der Gegner ihn kontrolliert.
+    // Ausnahme bleibt das PLATZIEREN (Kartentext „place“: Deepsea-Tausch, Tribut-Plaetze …): der Held ist dort nur Adresse, kein aktionsfaehiger Beschwoerer
+    // (`canBypassFreeZoneRequirement` ohne `requiresActiveCaster`, dieselbe Auslegung wie fuer handlungsunfaehige Helden unten).
+    if (hasCardType(cardData, 'Creature') && this.heroSideOf(heroOwner, hero) !== pi) {
+      const _cs = loadCardEffect(cardData.name);
+      let _platzieren = false;
+      if (typeof _cs?.canBypassFreeZoneRequirement === 'function' && !_cs.requiresActiveCaster) {
+        try { _platzieren = !!_cs.canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, this); } catch { _platzieren = false; }
+      }
+      if (!_platzieren) return null;
+    }
     // Incapacitated heroes (dead / frozen / stunned / bound) can't ACT.
     // Bound is the lightest of the four — it ONLY blocks Actions, not
     // ability/hero/creature passives or hooks (those keep firing in
@@ -34163,9 +34184,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const targetHeroIdx = this.gs.players[zielPhys]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
     const targetOwner = this.heroSideOf(zielPhys, target);
-    // Wirkt der GETROFFENE Held selbst (`casterIsTarget`), muss er in der
-    // Spalte des Reagierenden stehen — geliehene Helden casten hier nicht.
-    const casterZielIdx = zielPhys === targetOwner ? targetHeroIdx : null;
+    // Wirkt der GETROFFENE Held selbst (`casterIsTarget`): ab W20c auch ein uebernommener Held der Gegenspalte (`targetSeite: zielPhys`).
 
     // Schadenskontext für den Reaktions-Lernkanal (siehe _rxDamageTag).
     this._rxDamageCtx = { tag: this._rxDamageTag(target, source, amount, targetOwner) };
@@ -34217,7 +34236,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
       // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
       // und Potions nicht — siehe `_rxHandCastingHero`.
-      const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: casterZielIdx, zielNichtCastbar: casterZielIdx == null });
+      const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx, targetSeite: zielPhys });
       if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
@@ -34256,13 +34275,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         _preDamageContext: {
           targetOwner, targetHeroIdx, amount, type,
           casterHeroIdx: rxCast.casterIdx, wisdomCost: rxCast.wisdomCost,
+          targetSeite: zielPhys,   // W20c: Brettseite des Zielhelden (uebernommener Held der Gegenspalte)
           sourceName: srcName,
           sourceOwner: source?.owner ?? -1,
         },
       });
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
-      if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: casterZielIdx, zielNichtCastbar: casterZielIdx == null }))) continue;
+      if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx, targetSeite: zielPhys }))) continue;
 
       // Activate: remove from hand, deduct gold, mark once-per-game.
       //
@@ -34397,7 +34417,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inPreDamageReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
@@ -34578,7 +34598,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inPreDamageReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
@@ -34734,7 +34754,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreaturePreDamageReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
@@ -34885,7 +34905,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreaturePreDamageReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
@@ -35023,7 +35043,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreaturePreDefeatReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // Same routing as the other hand-reaction windows.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
@@ -35299,14 +35319,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreaturesDefeatedReaction = true;
         try {
           if (script.creaturesDefeatedResolve) {
-            await script.creaturesDefeatedResolve(this, ownerIdx, defeated, { casterIdx: rxCast.casterIdx });
+            await script.creaturesDefeatedResolve(this, ownerIdx, defeated, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? ownerIdx });
           }
         } catch (err) {
           console.error(`[CreaturesDefeatedReaction] ${cardName} threw:`, err.message);
         } finally {
           this._inCreaturesDefeatedReaction = false;
         }
-        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
         this.sync();
         break;                        // eine Reaktion je Seite und Vorgang
       }
@@ -35712,7 +35732,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       try {
         if (script.creatureDefeatedResolve) {
           // v1334: Wirker mitgeben wie im Sammel-Fenster (`{ casterIdx }`).
-          await script.creatureDefeatedResolve(this, ownerIdx, deathInfo, source, { casterIdx: rxCast.casterIdx });
+          await script.creatureDefeatedResolve(this, ownerIdx, deathInfo, source, { casterIdx: rxCast.casterIdx, casterSeite: rxCast.casterSeite ?? ownerIdx });
         }
       } catch (err) {
         console.error(`[CreatureDefeatedReaction] ${cardName} threw:`, err.message);
@@ -35720,7 +35740,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCreatureDefeatedReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
       this.sync();
       return;                       // eine Reaktion je Todesfall
     }
@@ -35813,9 +35833,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // z.B. Fireshield „a Hero you control that can use it"). Vorher
         // durfte bei einem ueberlebenden eigenen Helden NUR dieser wirken.
         const _adZielIdx = (reactorIdx === targetOwner && !_defeated) ? targetHeroIdx : undefined;
-        // Styx 28.9.: geliehener Zielheld → kein Wirken ueber ihn.
-        const _adGeliehen = reactorIdx === targetOwner && zielPhys !== targetOwner;
-        const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: _adGeliehen ? undefined : _adZielIdx, zielNichtCastbar: _adGeliehen });
+        // Styx 28.9.: geliehener Zielheld → bis W20c kein Wirken ueber ihn; jetzt wirkt eine `casterIsTarget`-Karte ueber ihn (`targetSeite`).
+        const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx: _adZielIdx, targetSeite: zielPhys });
         if (!rxCast) continue;
 
         // Prompt
@@ -35834,7 +35853,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
         if (!confirmed) continue;
         // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
-        if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adGeliehen ? undefined : _adZielIdx, zielNichtCastbar: _adGeliehen }))) continue;
+        if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { targetHeroIdx: _adZielIdx, targetSeite: zielPhys }))) continue;
 
         // Activate: remove from hand, deduct gold
         const actualIdx = ps.hand.indexOf(cardName);
@@ -35904,7 +35923,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             await this.runHooks('afterSpellResolved', {
               spellName: cardName,
               spellCardData: cardData,
-              heroOwner: reactorIdx,
+              heroOwner: rxCast.casterSeite ?? reactorIdx,   // W20c: Brettseite des Wirkers
               heroIdx: typeof _rxWirker === 'number' ? _rxWirker : -1,
               casterIdx: reactorIdx,
               damageTargets: [],
@@ -35916,7 +35935,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
         // v1157: Handlung des Wirkers („performs an Action")
-        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { spellHook: false });
+        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { spellHook: false, heroOwner: rxCast.casterSeite });
 
         // (Card was already routed to its destination pile alongside
         // the hand splice above.)
@@ -36097,7 +36116,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             await this.runHooks('afterSpellResolved', {
               spellName: cardName,
               spellCardData: cardData,
-              heroOwner: ownerIdx,
+              heroOwner: rxCast?.casterSeite ?? ownerIdx,   // W20c: Brettseite des Wirkers
               heroIdx: typeof _rxWirker === 'number' ? _rxWirker : -1, casterIdx: ownerIdx,
               damageTargets: [],
               isSecondCast: false,
@@ -36108,7 +36127,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
         // v1157: Handlung des Wirkers („performs an Action")
-        await this._rxAufgeloest(ps, cardName, rxCast?.casterIdx, { spellHook: false });
+        await this._rxAufgeloest(ps, cardName, rxCast?.casterIdx, { spellHook: false, heroOwner: rxCast?.casterSeite });
 
         this.sync();
         // One reaction per PLAYER — `break` (not `return`) so the
@@ -36265,7 +36284,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inResourcePhaseReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+      await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
 
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
@@ -36348,7 +36367,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         } finally {
           this._inPotionDrawReaction = false;
         }
-        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx);
+        await this._rxAufgeloest(ps, cardName, rxCast.casterIdx, { heroOwner: rxCast.casterSeite });
         this.sync();
         rest -= 1;          // dieser Zug ist ersetzt („instead")
         gespielt = true;    // fuer den naechsten Zug erneut fragen
@@ -36407,14 +36426,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // level (Wisdom is a valid path). Artifacts skip this check.
       const isArtifact = cardData?.cardType === 'Artifact';
       let castingHeroIdx = -1;
+      let castingSeite = summoningPi;   // W20c: Brettseite des Wirkers (uebernommener Held der Gegenspalte moeglich)
       if (!isArtifact) {
-        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-          if (this._canHeroActivateSurprise(summoningPi, heroI, cardName, { spellInHand: true })) {
-            castingHeroIdx = heroI;
-            break;
-          }
-        }
-        if (castingHeroIdx < 0) continue;
+        const _w0 = this._rxErsterWirker(summoningPi, cardName, script);
+        if (!_w0) continue;
+        castingHeroIdx = _w0.heroIdx; castingSeite = _w0.seite;
       }
 
       const confirmed = await this.promptGeneric(summoningPi, {
@@ -36430,9 +36446,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
-        const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
+        const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan))) continue;
         castingHeroIdx = _plan.casterIdx;
+        castingSeite = _plan.casterSeite ?? summoningPi;
       }
 
       const actualIdx = ps.hand.indexOf(cardName);
@@ -36449,7 +36466,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Wisdom (level-gap coverage) — pay BEFORE resolution so a turn-end
       // fired during the reaction can't skip the cost.
       const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this.getWisdomDiscardCost(summoningPi, castingHeroIdx, cardData)
+        ? this._rxWisdomKosten(summoningPi, castingSeite, castingHeroIdx, cardData)
         : 0;
       if (wisdomCost > 0) {
         await this.actionPromptForceDiscard(summoningPi, wisdomCost, {
@@ -36468,7 +36485,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inPostSummonReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx);
+      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
 
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
         ps.deletedPile.push(cardName);
@@ -36772,14 +36789,11 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const isArtifact = cardData?.cardType === 'Artifact';
       let castingHeroIdx = -1;
+      let castingSeite = victimOwner;   // W20c: Brettseite des Wirkers
       if (!isArtifact) {
-        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-          if (this._canHeroActivateSurprise(victimOwner, heroI, cardName, { spellInHand: true })) {
-            castingHeroIdx = heroI;
-            break;
-          }
-        }
-        if (castingHeroIdx < 0) continue;
+        const _w0 = this._rxErsterWirker(victimOwner, cardName, script);
+        if (!_w0) continue;
+        castingHeroIdx = _w0.heroIdx; castingSeite = _w0.seite;
       }
 
       const confirmed = await this.promptGeneric(victimOwner, {
@@ -36795,9 +36809,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
-        const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
+        const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan))) continue;
         castingHeroIdx = _plan.casterIdx;
+        castingSeite = _plan.casterSeite ?? victimOwner;
       }
 
       const actualIdx = ps.hand.indexOf(cardName);
@@ -36836,7 +36851,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
 
       const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this.getWisdomDiscardCost(victimOwner, castingHeroIdx, cardData)
+        ? this._rxWisdomKosten(victimOwner, castingSeite, castingHeroIdx, cardData)
         : 0;
       if (wisdomCost > 0) {
         await this.actionPromptForceDiscard(victimOwner, wisdomCost, {
@@ -36856,7 +36871,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inCdMovementReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx);
+      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
 
       // Routing — Cosmic Malfunction's text says "Delete this card",
       // so it goes to deletedPile. Scripts opt in via deleteOnUse.
@@ -36923,14 +36938,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // shape as _checkAscensionHandReactions.
       const isArtifact = cardData?.cardType === 'Artifact';
       let castingHeroIdx = -1;
+      let castingSeite = reactorIdx;   // W20c: Brettseite des Wirkers
       if (!isArtifact) {
-        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-          if (this._canHeroActivateSurprise(reactorIdx, heroI, cardName, { spellInHand: true })) {
-            castingHeroIdx = heroI;
-            break;
-          }
-        }
-        if (castingHeroIdx < 0) continue;
+        const _w0 = this._rxErsterWirker(reactorIdx, cardName, script);
+        if (!_w0) continue;
+        castingHeroIdx = _w0.heroIdx; castingSeite = _w0.seite;
       }
 
       const confirmed = await this.promptGeneric(reactorIdx, {
@@ -36946,9 +36958,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
-        const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
+        const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan))) continue;
         castingHeroIdx = _plan.casterIdx;
+        castingSeite = _plan.casterSeite ?? reactorIdx;
       }
 
       const actualIdx = ps.hand.indexOf(cardName);
@@ -36965,7 +36978,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Wisdom (level-gap coverage) — pay BEFORE resolution so a turn-
       // end fired during the reaction can't skip the cost.
       const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this.getWisdomDiscardCost(reactorIdx, castingHeroIdx, cardData)
+        ? this._rxWisdomKosten(reactorIdx, castingSeite, castingHeroIdx, cardData)
         : 0;
       if (wisdomCost > 0) {
         await this.actionPromptForceDiscard(reactorIdx, wisdomCost, {
@@ -36984,7 +36997,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inOppActionPhaseReaction = false;
       }
       // v1157: Handlung des Wirkers melden (Santa, „performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx);
+      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { heroOwner: castingSeite });
 
       // Routing matches the resource-phase reaction handler.
       if (cardData?.cardType === 'Potion' || script?.deleteOnUse) {
@@ -38070,14 +38083,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // exclude the spell's own slot (`hand.length - 1 >= cost`).
         const isArtifact = cardData?.cardType === 'Artifact';
         let castingHeroIdx = -1;
+        let castingSeite = pi;   // W20c: Brettseite des Wirkers (uebernommener Held der Gegenspalte moeglich)
         if (!isArtifact) {
-          for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-            if (this._canHeroActivateSurprise(pi, heroI, cardName, { spellInHand: true })) {
-              castingHeroIdx = heroI;
-              break;
-            }
-          }
-          if (castingHeroIdx < 0) continue;
+          const _w0 = this._rxErsterWirker(pi, cardName, script);
+          if (!_w0) continue;
+          castingHeroIdx = _w0.heroIdx; castingSeite = _w0.seite;
         }
 
         // Build prompt message
@@ -38118,9 +38128,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ 10.10. (Test Flight): `fensterInfo` reicht das Zielfenster an `reactionCasterAllowed` weiter — „a Hero you control that
         // can use this Spell would be hit" bindet den Wirker an einen GETROFFENEN Helden. Bisher bekam das Skript hier `null`;
         // keine bestehende Post-Target-Karte definiert `reactionCasterAllowed`, das Verhalten aller anderen bleibt gleich.
-        let castingSeite = pi;
         if (!isArtifact) {
-          const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
+          const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
           if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan,
             { fensterInfo: { postTarget: true, targetedHeroes, sourceCard, damageType, dealsDamage } }))) continue;
           castingHeroIdx = _plan.casterIdx;
@@ -38213,7 +38222,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // paying N discards. Pay BEFORE resolution so a turn-end fired
         // mid-reaction (Flashbang / Terror) can't skip it.
         const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-          ? this.getWisdomDiscardCost(pi, castingHeroIdx, cardData)
+          ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
           : 0;
         if (wisdomCost > 0) {
           await this.actionPromptForceDiscard(pi, wisdomCost, {
@@ -38248,7 +38257,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
           try {
             await this.runHooks('afterSpellResolved', {
-              heroOwner: pi,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
+              heroOwner: castingSeite,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt (W20c: Brettseite des Wirkers)
               spellName: cardName,
               spellCardData: cardData,
               heroIdx: castingHeroIdx,
@@ -38262,7 +38271,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           }
         }
         // v1157: Handlung des Wirkers („performs an Action")
-        await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false });
+        await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false, heroOwner: castingSeite });
 
         // (Card was already routed to its destination pile alongside
         // the hand splice above. The sync below picks up any
@@ -38413,14 +38422,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Wisdom affordability check excludes the spell's own slot.
       const isArtifact = cardData?.cardType === 'Artifact';
       let castingHeroIdx = -1;
+      let castingSeite = pi;   // W20c: Brettseite des Wirkers (uebernommener Held der Gegenspalte moeglich)
       if (!isArtifact) {
-        for (let heroI = 0; heroI < (ps.heroes || []).length; heroI++) {
-          if (this._canHeroActivateSurprise(pi, heroI, cardName, { spellInHand: true })) {
-            castingHeroIdx = heroI;
-            break;
-          }
-        }
-        if (castingHeroIdx < 0) continue;
+        const _w0 = this._rxErsterWirker(pi, cardName, script);
+        if (!_w0) continue;
+        castingHeroIdx = _w0.heroIdx; castingSeite = _w0.seite;
       }
 
       // Prompt the ascending player to confirm activation.
@@ -38437,9 +38443,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!confirmed) continue;
       // v1155: 2+ moegliche Wirker → Auswahl (Abbruch = keine Reaktion)
       if (!isArtifact) {
-        const _plan = { casterIdx: castingHeroIdx, wisdomCost: 0 };
+        const _plan = { casterIdx: castingHeroIdx, casterSeite: castingSeite, wisdomCost: 0 };
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, _plan))) continue;
         castingHeroIdx = _plan.casterIdx;
+        castingSeite = _plan.casterSeite ?? pi;
       }
 
       // Consume from hand + pay gold
@@ -38457,7 +38464,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // reactions. Pay BEFORE resolution so a turn-end fired during
       // the reaction (Flashbang / Terror) can't skip the cost.
       const wisdomCost = (!isArtifact && castingHeroIdx >= 0)
-        ? this.getWisdomDiscardCost(pi, castingHeroIdx, cardData)
+        ? this._rxWisdomKosten(pi, castingSeite, castingHeroIdx, cardData)
         : 0;
       if (wisdomCost > 0) {
         await this.actionPromptForceDiscard(pi, wisdomCost, {
@@ -38482,7 +38489,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (!isArtifact && (cardData?.cardType === 'Spell' || cardData?.cardType === 'Attack') && castingHeroIdx >= 0) {   // v1154: auch Attacks
         try {
           await this.runHooks('afterSpellResolved', {
-            heroOwner: pi,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt
+            heroOwner: castingSeite,   // Styx 28.9.: Reihe, in die `heroIdx` zeigt (W20c: Brettseite des Wirkers)
             spellName: cardName, spellCardData: cardData,
             heroIdx: castingHeroIdx, casterIdx: pi,
             damageTargets: [], isSecondCast: false,
@@ -38493,7 +38500,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
       // v1157: Handlung des Wirkers („performs an Action")
-      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false });
+      await this._rxAufgeloest(ps, cardName, castingHeroIdx, { spellHook: false, heroOwner: castingSeite });
 
       // Discard the spent card
       ps.discardPile.push(cardName);
@@ -38606,12 +38613,61 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {Array<{seite:number, heroIdx:number, hero:object}>}
    */
   fremdeReaktionsWirker(pi, script) {
-    const modus = script?.fremdeWirker;
-    if (modus !== 'alle' && modus !== 'dauerhaft') return [];
+    // ★ W20c (Al, 20.10.2026: „das gilt generell für alle Reactions"): JEDER Held, den `pi` gerade kontrolliert (dauerhaft oder
+    // temporär übernommen, auch in der Gegnerspalte), ist für ALLE Hand-Reaktionen ein gültiger Wirker — vorher nur per Karten-Schalter
+    // `fremdeWirker` ('alle' | 'dauerhaft': Furious Anger, Jump in the River, Stealthy Pursuit). Die Karten-Bedingungen (Schule/Stufe des
+    // übernommenen Helden aus SEINEN Ability Zones, Cast-Sperren, Kosten) prüfen die Aufrufer über `_canHeroActivateSurprise(…, { reaktor })`.
+    // `fremdeWirker: false` ist nur noch ein Ausstieg für eine Karte, die ausdrücklich keinen geliehenen Wirker verträgt.
+    if (script?.fremdeWirker === false) return [];
     return this.heroesControlledBy(pi)
-      .filter(({ physOwner, hero }) => physOwner !== pi
-        && (modus === 'alle' || hero.permaControlBy === pi))
+      .filter(({ physOwner }) => physOwner !== pi)
       .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
+  }
+
+  /**
+   * ★ W20c: Grobpruefung fuer die `reactionCondition` von Skripten mit eigener Heldenschleife (Silence, The Master's Plan, Rusty Touch …):
+   * gibt es einen von `pi` UEBERNOMMENEN Helden der Gegenspalte, der die Karte stufenmaessig wirken kann (lebend, nicht Frozen/Stunned,
+   * Schule/Stufe aus SEINEN Ability Zones, Hand/Rabatte des Kontrolleurs `pi`)? Dieselben Praedikate wie die eigenen Schleifen der Skripte;
+   * die endgueltige Wirkerpruefung macht das Fenster (`_canHeroActivateSurprise`). Rueckgabe `{ seite, heroIdx }` des ersten oder `null`.
+   */
+  fremderHeldKannStufe(pi, cardName) {
+    const cd = this._getCardDB()[cardName];
+    if (!cd) return null;
+    for (const { seite, heroIdx, hero } of this.fremdeReaktionsWirker(pi, loadCardEffect(cardName))) {
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+      if (this.heroMeetsLevelReq(seite, heroIdx, cd, { levelSourcePi: pi })) return { seite, heroIdx };
+    }
+    return null;
+  }
+
+  /**
+   * ★ W20c: ALLE Helden, mit denen `pi` die Hand-Reaktion `cardName` jetzt wirken darf — erst die eigenen (Spalte von `pi`, von `pi`
+   * kontrolliert), dann die übernommenen der Gegenspalte. `opts` geht an `_canHeroActivateSurprise` (z. B. `{ spellInHand: true }`).
+   * Rückgabe `[{ seite, heroIdx }]` (`seite` = Brettseite). Ein abgegebener eigener Held fehlt (Kontrolleur-Regel, W20a).
+   */
+  reaktionsWirkerFuer(pi, cardName, script = null, opts = {}) {
+    const out = [];
+    const ps = this.gs.players[pi];
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+      if (this._canHeroActivateSurprise(pi, hi, cardName, opts)) out.push({ seite: pi, heroIdx: hi });
+    }
+    const sc = script || loadCardEffect(cardName);
+    for (const { seite, heroIdx } of this.fremdeReaktionsWirker(pi, sc)) {
+      if (this._canHeroActivateSurprise(seite, heroIdx, cardName, { ...opts, reaktor: pi })) out.push({ seite, heroIdx });
+    }
+    return out;
+  }
+
+  /** ★ W20c: erster castfaehiger Wirker fuer die Fenster mit einfacher Suche — eigene Helden zuerst, dann uebernommene Helden der Gegenspalte. `null` = keiner. */
+  _rxErsterWirker(pi, cardName, script = null) {
+    const w = this.reaktionsWirkerFuer(pi, cardName, script, { spellInHand: true });
+    return w.length ? { heroIdx: w[0].heroIdx, seite: w[0].seite } : null;
+  }
+
+  /** ★ W20c: Wisdom-Abwurf eines Wirkers auf der Brettseite `seite`; Hand/Rabatte des Reagierenden `pi` (W16a Frage 6) bei uebernommenem Helden. */
+  _rxWisdomKosten(pi, seite, heroIdx, cardData) {
+    return this.getWisdomDiscardCost(seite, heroIdx, cardData, undefined, seite !== pi ? pi : undefined);
   }
 
   _rxCastKandidaten(ps, cardName, script, opts = {}) {
@@ -38626,9 +38682,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Reagierenden (geliehen) — eine „casterIsTarget"-Karte hat dann
     // keinen Wirker, statt auf beliebige Helden auszuweichen.
     if (script?.casterIsTarget && opts.zielNichtCastbar) return [];
-    const candidates = (script?.casterIsTarget && Number.isInteger(opts.targetHeroIdx))
-      ? [opts.targetHeroIdx]
-      : heroes.map((_, hi) => hi);
+    // ★ W20c: steht der getroffene Held in der Gegenspalte und wird von `pi` kontrolliert (`opts.targetSeite` ≠ `pi`), ist ER der Wirker
+    // einer `casterIsTarget`-Karte (Al: „alle Reaktionen über jeden kontrollierten Helden"); dann kommen die eigenen Helden nicht in Frage.
+    const zielGeliehen = !!script?.casterIsTarget && Number.isInteger(opts.targetHeroIdx)
+      && Number.isInteger(opts.targetSeite) && opts.targetSeite !== pi;
+    const candidates = zielGeliehen ? []
+      : (script?.casterIsTarget && Number.isInteger(opts.targetHeroIdx))
+        ? [opts.targetHeroIdx]
+        : heroes.map((_, hi) => hi);
     const out = [];
     for (const hi of candidates) {
       if (!this._canHeroActivateSurprise(pi, hi, cardName, { spellInHand: true })) continue;
@@ -38644,9 +38705,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         ? Math.max(0, this.getWisdomDiscardCost(pi, hi, cd)) : 0;
       out.push({ casterIdx: hi, casterSeite: pi, wisdomCost: w });
     }
-    // Als Vorgabe 29.9. (Runde 3): geliehene Wirker, wenn die Karte sie erlaubt.
-    if (!script?.casterIsTarget) {
+    // Als Vorgabe 29.9. (Runde 3) / W20c: uebernommene Wirker (jede Karte, `fremdeWirker: false` ausgenommen).
+    if (!script?.casterIsTarget || zielGeliehen) {
       for (const { seite, heroIdx: hi } of this.fremdeReaktionsWirker(pi, script)) {
+        if (zielGeliehen && !(seite === opts.targetSeite && hi === opts.targetHeroIdx)) continue;
         if (!this._canHeroActivateSurprise(seite, hi, cardName, { spellInHand: true, reaktor: pi })) continue;
         if (typeof script?.reactionCasterAllowed === 'function') {
           let erlaubt = false;
@@ -38657,7 +38719,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!erlaubt) continue;
         }
         const w = (cd.cardType === 'Spell' && !script?.handlesOwnWisdomCost)
-          ? Math.max(0, this.getWisdomDiscardCost(seite, hi, cd)) : 0;
+          ? Math.max(0, this._rxWisdomKosten(pi, seite, hi, cd)) : 0;
         out.push({ casterIdx: hi, casterSeite: seite, wisdomCost: w });
       }
     }
@@ -38891,7 +38953,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Check spell school / level requirements (centralized — respects
     // Wisdom paid coverage, Performance wildcards, levelOverrideCards,
     // bypassLevelReq, etc.).
-    if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cardData)) return false;
+    // ★ W20c: ein übernommener Held (`reaktor` ≠ Brettseite) wirkt mit SEINEN Schulen/Stufen, aber die Hand/Rabatte des Kontrolleurs gelten (W16a Frage 6).
+    const _lvQuelle = reaktor !== playerIdx ? { levelSourcePi: reaktor } : undefined;
+    if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cardData, _lvQuelle)) return false;
 
     // ★★ v1154 („Santa Klaus", Als Befund 17.9.): dieselben Helden-
     // Sperren wie im normalen Spielweg (`validateActionPlay`) — das
@@ -38929,7 +38993,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     //            another zone (Archibald's discard-trigger, etc.).
     //            The full hand counts.
     if (cardData.cardType === 'Spell') {
-      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
+      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData, undefined, _lvQuelle?.levelSourcePi);
       if (wisdomCost > 0) {
         // Als Vorgabe 29.9.: abgeworfen wird aus der Hand des Ausloesers.
         const handLen = (this.gs.players[reaktor]?.hand || []).length;
@@ -40146,7 +40210,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             // you have enough hand cards to ever afford this".
             const _e0 = reactionEligibleHeroIdxs[0];
             reactionWisdomCost = typeof _e0 === 'object'
-              ? this.getWisdomDiscardCost(_e0.seite, _e0.hi, cardData)
+              ? this._rxWisdomKosten(pi, _e0.seite, _e0.hi, cardData)
               : this.getWisdomDiscardCost(pi, _e0, cardData);
           }
         }
@@ -40185,7 +40249,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!this._canHeroActivateSurprise(sSeite, shi, sName, { reaktor: pi })) continue;
         const sData = allCards[sName];
         const sWisdom = sData?.cardType === 'Spell'
-          ? this.getWisdomDiscardCost(sSeite, shi, sData) : 0;
+          ? this._rxWisdomKosten(pi, sSeite, shi, sData) : 0;
         eligibleByName.set(sName, {
           handIdx: -1, cost: 0, script: sScript, cardData: sData, cardName: sName,
           eligibleHeroIdxs: [shi], wisdomCost: sWisdom,
@@ -40591,7 +40655,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the player chose.
       let wisdomCost = 0;
       if (cardData?.cardType === 'Spell' && reactionCasterHeroIdx >= 0) {
-        wisdomCost = this.getWisdomDiscardCost(reactionCasterSeite, reactionCasterHeroIdx, cardData);
+        wisdomCost = this._rxWisdomKosten(pi, reactionCasterSeite, reactionCasterHeroIdx, cardData);
       }
 
       await this._rxPay(ps, cost, { cardName: chosenName, inHandIdx: actualHandIdx });   // inHandIdx: die Karte liegt hier noch in der Hand (Item-Lock-Kosten duerfen sie nicht treffen)
@@ -46312,7 +46376,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const cardScript = loadCardEffect(cardData.name);
       if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
         try {
-          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+          if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, opts)) return true;
         } catch (err) {
           console.error(`[canBypassLevelReq dead-hero] ${cardData.name} threw:`, err.message);
         }
@@ -46522,7 +46586,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Revival nie einlöst.
     if (typeof cardScript?.canBypassLevelReq === 'function' && !evalOpts.noPlacementBypass) {
       try {
-        if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
+        if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this, evalOpts)) return true;
       } catch (err) {
         console.error(`[canBypassLevelReq] ${cardData.name} threw:`, err.message);
       }

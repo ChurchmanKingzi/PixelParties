@@ -4299,6 +4299,8 @@ function listEligibleHeroesForActionCard(engine, pi, cardData) {
     const _swapOk = cardCanBouncePlaceAtHero(engine, pi, hi, cardData?.name);
     if (!_swapOk) {
       if (hero.hp <= 0) continue;
+      // W20a/W20c (Al, 20.10.): nur der aktuelle Kontrolleur wirkt/beschwoert mit einem Helden — ein abgegebener eigener Held ist kein Kandidat.
+      if (engine.heroSideOf && engine.heroSideOf(pi, hero) !== pi) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
       if (hero.statuses?.negated && cardData.cardType === 'Spell') continue;
       if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;

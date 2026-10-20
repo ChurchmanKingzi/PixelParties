@@ -132,8 +132,7 @@ module.exports = {
 
   isReaction: true,
   deleteOnUse: true,                       // „Delete this card."
-  // Als Vorgabe 29.9. (Runde 3): nur dauerhaft uebernommene Helden (Paraseed).
-  fremdeWirker: 'dauerhaft',
+  // W20c (Al 20.10.): uebernommene Helden (dauerhaft oder temporaer) wirken fuer ALLE Reaktionen — kein Karten-Schalter mehr noetig.
 
   // Nie proaktiv — nur als Glied einer Kette.
   canActivate: () => false,

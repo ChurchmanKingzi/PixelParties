@@ -381,5 +381,5 @@ function _hasCaster(gs, pi, engine) {
     if (engine?._canHeroActivateSurprise?.(pi, hi, CARD_NAME)) return true;
     if (engine?.heroMeetsLevelReq?.(pi, hi, cardData)) return true;
   }
-  return false;
+  return !!engine?.fremderHeldKannStufe?.(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
 }

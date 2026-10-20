@@ -77,7 +77,7 @@ module.exports = {
     const letzte = chainCtx.chain[chainCtx.chain.length - 1];
     // „a player" — eigene UND gegnerische Artefakte.
     if (letzte.cardType !== 'Artifact') return false;
-    return wirkenderHeld(gs, pi, engine) >= 0;
+    return wirkenderHeld(gs, pi, engine) >= 0 || !!engine.fremderHeldKannStufe(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, selectedIds, validTargets, chain, myIndex) => {
