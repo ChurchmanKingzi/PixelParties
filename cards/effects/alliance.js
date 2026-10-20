@@ -49,6 +49,7 @@
 const { hasCardType, hasSpellSchool } = require('./_hooks');
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Alliance';
 
@@ -62,10 +63,19 @@ function verbuendeter(inst) {
 /** Deckt das Verbot diese Quelle ab? Attacks/Spells, aber kein Support. */
 function quelleBetroffen(info) {
   const cd = info.sourceData;
-  if (!cd) return false;
-  if (!(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
-  if (hasSpellSchool(cd, 'Support Magic')) return false;   // ausdruecklich ausgenommen
-  return true;
+  if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) {
+    if (hasSpellSchool(cd, 'Support Magic')) return false;   // ausdruecklich ausgenommen
+    return true;
+  }
+  // W29a (Al, 21.10.2026: „Alliance und Dive Down schützen ausdrücklich auch vor Effekten, die als Attacks/Spells *zählen*"): Heldeneffekte und Gegenstandseffekte,
+  // die als Attack/Spell gelten (Broghan & Co., Alice, Crusader's, Bamboo Staff, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, der Treffer von Infected Greatmaw),
+  // tragen keine Attack-/Spell-Karte als Quelle; `info.treatedAsLevel` (Engine: `heroBlocksTargeting`/`_heldenEffektStufe`) ist ihr Kennzeichen, wie bei Flooding.
+  if (info.treatedAsLevel != null) {
+    const ts = /_spell$|^spell$/.test(String(info.damageType || '')) ? loadCardEffect(info.cardName)?.treatedAsSpell : null;
+    if (ts && /Support Magic/.test(String(ts.school || ''))) return false;   // als Support-Magic-Spell geltend: ausgenommen
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -182,7 +192,8 @@ module.exports = {
     // Brettseite des waehlenden Helden: `chooserIdx` ist der Spieler; wirkt
     // er ueber einen geliehenen Helden, nennt `gs._wirkerSeite` die Spalte.
     const w = gs._wirkerSeite;
-    const waehlerSeite = (w && w.pi === info.chooserIdx && w.heroIdx === info.chooserHeroIdx)
+    const waehlerSeite = info.chooserHeroOwner != null ? info.chooserHeroOwner   // W29a: Held der Quelle (übernommen: physische Seite)
+      : (w && w.pi === info.chooserIdx && w.heroIdx === info.chooserHeroIdx)
       ? w.heroOwner : info.chooserIdx;
 
     // Betrifft die Wahl genau dieses Paar — in einer der beiden

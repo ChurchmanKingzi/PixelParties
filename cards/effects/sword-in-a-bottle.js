@@ -75,6 +75,21 @@ function angreifer(gs, pi) {
  * Denselben Wert liest `attack.js` und `ctx.executeAttack`; einen
  * Helfer der Engine dafuer gibt es nicht.
  */
+/**
+ * W29a (Al, 21.10.2026: Alliance und Dive Down schuetzen auch vor Effekten, die als Attack ZAEHLEN): Paarregel „Angreifer-Held ↔ Opfer" (Alliance) —
+ * Angreifer und Opfer werden in EINEM Fenster gewaehlt, die flache Zielliste kennt das Paar nicht. Wahr, wenn dieser Angreifer dieses Opfer-Ziel nicht waehlen darf.
+ */
+function paarGesperrt(engine, pi, angreiferT, opferT, validTargets) {
+  if (!engine || !angreiferT || !opferT || opferT.type !== 'hero') return false;
+  const opfer = (validTargets || []).filter(t => t && seiteDesZiels(engine.gs, t) !== pi);
+  try {
+    return !!engine.heroBlocksTargeting(opferT.owner, opferT.heroIdx, {
+      sourceData: engine._getCardDB()[CARD_NAME], cardName: CARD_NAME, damageType: 'attack', chooserIdx: pi,
+      chooserHeroIdx: angreiferT.heroIdx, chooserHeroOwner: angreiferT.owner, allTargets: opfer,
+    });
+  } catch { return false; }
+}
+
 function angriffswert(engine, pi, heroIdx) {
   const hero = engine?.gs?.players?.[pi]?.heroes?.[heroIdx];
   return hero?.atk || 0;
@@ -157,7 +172,7 @@ module.exports = {
    * Genau ein eigener Held (Angreifer) und genau ein gegnerisches Ziel
    * (Opfer). Reihenfolge egal — der Spieler klickt, was er zuerst sieht.
    */
-  validateSelection(selectedIds, validTargets) {
+  validateSelection(selectedIds, validTargets, engine, pi) {
     if (!selectedIds || selectedIds.length !== 2) return false;
     const gewaehlt = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (gewaehlt.length !== 2) return false;
@@ -168,7 +183,10 @@ module.exports = {
     // nicht zuschlagen.
     const eigenes = gewaehlt.find(t => validTargets.some(v => v.id === t.id) && t.type === 'hero'
       && gewaehlt.some(o => seite(o) !== seite(t)));
-    return !!eigenes;
+    if (!eigenes) return false;
+    // W29a: Paarregel (Alliance) – `engine`/`pi` liefert der Server (`doConfirmPotion`); ohne sie (alte Aufrufer) entfaellt die Pruefung.
+    if (engine && typeof pi === 'number' && paarGesperrt(engine, pi, eigenes, gewaehlt.find(o => o !== eigenes), validTargets)) return false;
+    return true;
   },
 
   // ★ KEINE Huellen-Animation (Als Befund 12.9.) ────────────────────
@@ -217,6 +235,16 @@ module.exports = {
       // Ein toedlicher Schlag schlaegt jeden Wert.
       if (hp <= bestAtk) wert += 10000 - hp;
       if (wert > bestwert) { bestwert = wert; opfer = t; }
+    }
+    // W29a: gesperrtes Paar (Alliance) → das staerkste erlaubte Paar suchen (Angreifer-Held ↔ Opfer); gibt es keins, keine Antwort.
+    if (paarGesperrt(engine, pi, angreiferZiel, opfer, ziele)) {
+      let paar = null, best = -1;
+      for (const a of eigene) for (const o of fremde) {
+        if (o.ineligible || paarGesperrt(engine, pi, a, o, ziele)) continue;
+        const atk = angriffswert(engine, a.owner, a.heroIdx);
+        if (atk > best) { best = atk; paar = [a, o]; }
+      }
+      return paar ? [paar[0].id, paar[1].id] : undefined;
     }
     return [angreiferZiel.id, opfer.id];
   },

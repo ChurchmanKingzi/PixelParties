@@ -11412,7 +11412,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   const { potionName, handIndex, validTargets, cardType, goldCost, fromCreation } = gs.potionTargeting;
   const script = loadCardEffect(potionName);
   if (!script) { gs.potionTargeting = null; return false; }
-  if (script.validateSelection && !script.validateSelection(selectedIds, validTargets)) return false;
+  if (script.validateSelection && !script.validateSelection(selectedIds, validTargets, room.engine, pi)) return false;   // W29a: Engine/Spieler fuer Paarregeln (Sword in a Bottle × Alliance)
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, potionName, room.engine)) {
     gs.potionTargeting = null;
     return false;
@@ -12032,11 +12032,17 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
   if (engine && cardName && typeof casterPi === 'number' && !config?.ignoreUntargetable && !config?._truthSeeingEye
       && typeof engine._heldenEffektStufe === 'function' && engine._heldenEffektStufe(cardName, config?.damageType) != null) {
     const geblockt = [];
+    // W29a: Alliance/Dive Down zaehlen diese Effekte ebenfalls als Attack. „Andere moegliche Ziele" = die moeglichen OPFER (nicht die eigenen Angreifer-Helden);
+    // Paarregeln (Alliance: Angreifer-Held ↔ Opfer) sperren das Opfer hier nur, wenn JEDER moegliche Angreifer-Held gesperrt ist – einzelne Paare lehnt
+    // `validateSelection` des Tranks ab.
+    const opferListe = validTargets.filter(t => t && engine.zielSeite(t) !== casterPi);
+    const angreiferListe = validTargets.filter(t => t && t.type === 'hero' && !t.ineligible && engine.zielSeite(t) === casterPi);
     for (const t of validTargets) {
       if (!t || t.type !== 'hero' || t.ineligible || engine.zielSeite(t) === casterPi) continue;
-      if (engine.heroBlocksTargeting(t.owner, t.heroIdx, {
-        sourceData: getCardDB()[cardName], cardName, damageType: config.damageType, chooserIdx: casterPi, allTargets: validTargets,
-      })) geblockt.push(t);
+      const basis = { sourceData: getCardDB()[cardName], cardName, damageType: config.damageType, chooserIdx: casterPi, allTargets: opferListe };
+      const waehler = angreiferListe.length > 0 ? angreiferListe : [null];
+      if (waehler.every(a => engine.heroBlocksTargeting(t.owner, t.heroIdx,
+        a ? { ...basis, chooserHeroIdx: a.heroIdx, chooserHeroOwner: a.owner } : basis))) geblockt.push(t);
     }
     for (const t of geblockt) t.ineligible = true;
   }

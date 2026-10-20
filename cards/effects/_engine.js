@@ -5132,7 +5132,10 @@ class GameEngine {
                       // Regeln zwischen zwei einzelnen Helden
                       // (Alliance) — der Spielerindex allein reicht
                       // dafuer nicht.
-                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      // W29a: „treated as that Hero hitting the target with an Attack" (Greatmaw, Sacrificial Dagger, Javelin Throw): WAEHLER ist der
+                      // Held der Quelle (`attackerSourceOverride`), nicht die ausloesende Karte; uebernommener Held: physische Seite in `heroOwner`.
+                      chooserHeroIdx: config.attackerSourceOverride?.heroIdx ?? cardInstance?.heroIdx ?? -1,
+                      chooserHeroOwner: config.attackerSourceOverride?.heroOwner,
                       // v871 (Als Klarstellung): die LEGALEN Ziele
                       // dieser Quelle. Eine Regel der Bauart „nur,
                       // solange es andere moegliche Ziele gibt"
