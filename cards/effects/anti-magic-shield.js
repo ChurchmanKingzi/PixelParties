@@ -46,17 +46,20 @@ module.exports = {
     const amsData = cardDB['Anti Magic Shield'];
 
     for (const tgt of targetedHeroes) {
-      if (tgt.owner !== pi || tgt.type !== 'hero') continue;
+      // W20c (Al 20.10.: alle Reactions ueber jeden kontrollierten Helden): „a Hero that can use this Spell is hit" — auch ein von `pi`
+      // uebernommener Held der Gegenspalte (Brettseite `tgt.owner`), mit SEINEN Ability Zones; Hand/Rabatte des Kontrolleurs `pi`.
+      if (tgt.type !== 'hero' || engine.zielSeite(tgt) !== pi) continue;
       const hi = tgt.heroIdx;
-      const hero = ps.heroes?.[hi];
+      const seite = tgt.owner;
+      const hero = gs.players[seite]?.heroes?.[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
 
       // Must meet Shield's own level req (Magic Arts Lv1)
-      if (!engine.heroMeetsLevelReq(pi, hi, amsData)) continue;
+      if (!engine.heroMeetsLevelReq(seite, hi, amsData, seite !== pi ? { levelSourcePi: pi } : undefined)) continue;
 
       // Count Magic Arts level on this hero (with Performance)
-      const abZones = ps.abilityZones[hi] || [];
+      const abZones = gs.players[seite]?.abilityZones?.[hi] || [];
       let maLevel = 0;
       for (const slot of abZones) {
         if (!slot || slot.length === 0) continue;

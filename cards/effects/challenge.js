@@ -36,22 +36,30 @@ function heroCanUseChallenge(engine, pi, heroIdx) {
  * Find heroes that can use Challenge AND are valid targets for the effect.
  * Excludes the currently selected target (no point redirecting to same target).
  */
+// W20c (Al 20.10.: alle Reactions ueber jeden kontrollierten Helden): `{ seite, hi }` — `seite` = Brettseite des Helden (eigene Spalte
+// oder uebernommener Held der Gegenspalte); der Held ist zugleich der Wirker UND das neue Ziel.
 function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
   const ps = gs.players[pi];
   const eligible = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!heroCanUseChallenge(engine, pi, hi)) continue;
+  const kandidaten = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) kandidaten.push({ seite: pi, hi });
+  for (const f of (engine?.fremdeReaktionsWirker ? engine.fremdeReaktionsWirker(pi, module.exports) : [])) kandidaten.push({ seite: f.seite, hi: f.heroIdx });
+  for (const { seite, hi } of kandidaten) {
+    const darf = seite === pi
+      ? heroCanUseChallenge(engine, pi, hi)
+      : engine._canHeroActivateSurprise(seite, hi, 'Challenge', { spellInHand: true, reaktor: pi });
+    if (!darf) continue;
 
     // Must NOT be the already-selected target
-    if (selected.type === 'hero' && selected.owner === pi && selected.heroIdx === hi) continue;
+    if (selected.type === 'hero' && selected.owner === seite && selected.heroIdx === hi) continue;
 
     // Must be a valid target for the original effect
     const isValidTarget = validTargets.some(t =>
-      t.type === 'hero' && t.owner === pi && t.heroIdx === hi
+      t.type === 'hero' && t.owner === seite && t.heroIdx === hi
     );
     if (!isValidTarget) continue;
 
-    eligible.push(hi);
+    eligible.push({ seite, hi });
   }
   return eligible;
 }
@@ -112,15 +120,16 @@ module.exports = {
 
     // ── Select Hero to take the hit ──
     let selectedHeroIdx;
+    let heroSeite = pi;   // W20c: Brettseite des Challenge-Helden
     if (eligible.length === 1) {
-      selectedHeroIdx = eligible[0];
+      ({ hi: selectedHeroIdx, seite: heroSeite } = eligible[0]);
     } else {
-      const heroTargets = eligible.map(hi => ({
-        id: `hero-${pi}-${hi}`,
+      const heroTargets = eligible.map(({ seite, hi }) => ({
+        id: `hero-${seite}-${hi}`,
         type: 'hero',
-        owner: pi,
+        owner: seite,
         heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+        cardName: gs.players[seite].heroes[hi].name,
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
@@ -139,9 +148,10 @@ module.exports = {
       const target = heroTargets.find(t => t.id === picked[0]);
       if (!target) return null;
       selectedHeroIdx = target.heroIdx;
+      heroSeite = target.owner;
     }
 
-    const challengeHero = ps.heroes[selectedHeroIdx];
+    const challengeHero = gs.players[heroSeite]?.heroes?.[selectedHeroIdx];
     if (!challengeHero?.name) return null;
 
     // ── Chain visualization ──
@@ -185,14 +195,14 @@ module.exports = {
       type: 'anger_mark', owner: attackerOwner, heroIdx: attackerHeroIdx, zoneSlot: attackerZoneSlot,
     });
     engine._broadcastEvent('play_zone_animation', {
-      type: 'anger_mark', owner: pi, heroIdx: selectedHeroIdx, zoneSlot: -1,
+      type: 'anger_mark', owner: heroSeite, heroIdx: selectedHeroIdx, zoneSlot: -1,
     });
     await engine._delay(600);
 
     // ── Build the redirect target ──
     // Find the matching target in validTargets for the Challenge hero
     const redirectTarget = validTargets.find(t =>
-      t.type === 'hero' && t.owner === pi && t.heroIdx === selectedHeroIdx
+      t.type === 'hero' && t.owner === heroSeite && t.heroIdx === selectedHeroIdx
     );
 
     if (!redirectTarget) return null;

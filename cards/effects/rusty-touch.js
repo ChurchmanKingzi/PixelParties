@@ -49,7 +49,7 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned) continue;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
       if (engine.heroMeetsLevelReq(pi, hi, cardData)) return true;
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, 'Rusty Touch');   // W20c: auch ein uebernommener Held wirkt
   },
 
   /**

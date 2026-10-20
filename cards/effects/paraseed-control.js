@@ -65,12 +65,8 @@ module.exports = {
     // Ein lebender, handlungsfaehiger Held von mir muss die Karte
     // wirken koennen (Decay Magic Lv0) — Regel v619.
     if (engine) {
-      let kannWirken = false;
-      const ps = gs.players[pi];
-      for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-        if (engine._canHeroActivateSurprise(pi, hi, CARD_NAME)) { kannWirken = true; break; }
-      }
-      if (!kannWirken) return false;
+      // W20c: auch ein uebernommener Held der Gegenspalte wirkt (`reaktionsWirkerFuer`: eigene + kontrollierte).
+      if (engine.reaktionsWirkerFuer(pi, CARD_NAME).length === 0) return false;
     }
     return true;
   },

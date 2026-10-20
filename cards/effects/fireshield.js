@@ -54,12 +54,14 @@ module.exports = {
     const ps = gs.players[pi];
 
     // Count Destruction Magic level on the damaged hero (with Performance)
-    const dmLevel = engine.heroSchoolLevel('Destruction Magic', pi, targetHeroIdx);   // W4a: harte Negierung -> Stufe 0
+    // W20c: ein uebernommener Zielheld der Gegenspalte steht auf der Brettseite `seite` (Schulen aus SEINEN Ability Zones).
+    const seite = engine._findHeroOwner(target);
+    const dmLevel = engine.heroSchoolLevel('Destruction Magic', seite, targetHeroIdx);   // W4a: harte Negierung -> Stufe 0
 
     const recoil = dmLevel >= 3 ? amount : Math.ceil(amount / 2);
 
     // Fire corona animation on the Fireshield user
-    engine._broadcastEvent('fireshield_corona', { owner: pi, heroIdx: targetHeroIdx });
+    engine._broadcastEvent('fireshield_corona', { owner: seite, heroIdx: targetHeroIdx });
     await engine._delay(600);
 
     if (isCreatureSource(engine, source)) {
@@ -69,7 +71,7 @@ module.exports = {
       const rc = resolveSourceCreature(engine, source);
       if (rc) {
         await engine.actionDealCreatureDamage(
-          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
+          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx, ...(seite !== pi ? { heroOwner: seite } : {}) },
           rc, recoil, 'other',
           { sourceOwner: pi, canBeNegated: false },
         );
@@ -84,7 +86,7 @@ module.exports = {
       const srcHero = gs.players[source.owner]?.heroes?.[source.heroIdx];
       if (srcHero && srcHero.hp > 0) {
         await engine.actionDealDamage(
-          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx },
+          { name: 'Fireshield', owner: pi, heroIdx: targetHeroIdx, ...(seite !== pi ? { heroOwner: seite } : {}) },
           srcHero, recoil, 'other',
           { festesZiel: true },   // Rueckstoss trifft immer den Angreifer
         );

@@ -67,7 +67,7 @@ module.exports = {
           && !ps.heroes[hi].statuses?.frozen
           && !ps.heroes[hi].statuses?.stunned) return true;   // W13 (Al, A2): `negated` sperrt die Reaktion nicht mehr
     }
-    return false;
+    return !!engine.fremderHeldKannStufe(pi, CARD_NAME);   // W20c: auch ein uebernommener Held wirkt
   },
 
   resolve: async (engine, pi, _selectedIds, _validTargets, _chain, _myIdx) => {

@@ -120,7 +120,7 @@ async function uebernehmen(t, v, ctrl = 1, besitzer = 0) {
     }
     R.check(`${v}: keine Engine-Fehler, Zustand sauber`, t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   }
-  R.section('Teil 2: der KONTROLLEUR wirkt Hand-Reaktionen über den übernommenen Helden (bestehender Weg `fremdeWirker`, Jump in the River: nur dauerhaft)');
+  R.section('Teil 2: der KONTROLLEUR wirkt Hand-Reaktionen über den übernommenen Helden (Jump in the River: seit W20c dauerhaft und temporär)');
   {
     const jump = H.loadCardEffect('Jump in the River');
     for (const v of ['dauerhaft', 'temporaer']) {
@@ -130,7 +130,8 @@ async function uebernehmen(t, v, ctrl = 1, besitzer = 0) {
       R.check(`${v}: Fenster-Prüfung Cure — Kontrolleur darf über 0:0 (Prädikat), Besitzer nicht`, t.engine._canHeroActivateSurprise(0, 0, 'Cure', { spellInHand: true, reaktor: 1 }) === true && t.engine._canHeroActivateSurprise(0, 0, 'Cure', { spellInHand: true, reaktor: 0 }) === false && t.engine._canHeroActivateSurprise(0, 0, 'Cure', { spellInHand: true }) === false, null);
       const kand = t.engine._rxCastKandidaten(t.gs.players[1], 'Jump in the River', jump).map(c => c.casterSeite + ':' + c.casterIdx);
       const kandB = t.engine._rxCastKandidaten(t.gs.players[0], 'Jump in the River', jump).map(c => c.casterSeite + ':' + c.casterIdx);
-      R.check(`${v}: Wirker-Kandidaten für Jump in the River: Kontrolleur ${v === 'dauerhaft' ? 'enthält' : 'enthält nicht'} 0:0, Besitzer nie`, kand.includes('0:0') === (v === 'dauerhaft') && !kandB.includes('0:0'), [kand, kandB]);
+      // W20c (Al 20.10.): Reactions gelten für JEDEN kontrollierten Helden, dauerhaft ODER temporär (vorher nur dauerhaft, Karten-Schalter `fremdeWirker`).
+      R.check(`${v}: Wirker-Kandidaten für Jump in the River: Kontrolleur enthält 0:0 (dauerhaft und temporär), Besitzer nie`, kand.includes('0:0') && !kandB.includes('0:0'), [kand, kandB]);
     }
   }
   R.section('Teil 2: nach der Rückgabe wirkt der Besitzer wieder (Fenster-Prüfung)');

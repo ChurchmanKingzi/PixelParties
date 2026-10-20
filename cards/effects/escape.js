@@ -109,7 +109,9 @@ module.exports = {
     // Wisdom, Divinity gap-coverage, etc.
     const escapeCd = engine._getCardDB()[CARD_NAME];
     if (!escapeCd) return false;
-    if (!engine.heroMeetsLevelReq(ownerIdx, heroIdx, escapeCd)) return false;
+    // W20c: ein uebernommener Zielheld der Gegenspalte (Brettseite `seite` ≠ Kontrolleur `ownerIdx`) wirkt mit SEINEN Schulen/Stufen.
+    const seite = engine._findHeroOwner(target);
+    if (!engine.heroMeetsLevelReq(seite, heroIdx, escapeCd, seite !== ownerIdx ? { levelSourcePi: ownerIdx } : undefined)) return false;
 
     // Need at least one extra card to pay the discard cost. At
     // condition-check time, Escape itself is still in hand — so
@@ -145,7 +147,7 @@ module.exports = {
     // `app-board.jsx#ANIM_REGISTRY.escape_dodge`; the visual is a
     // ~700ms left-right shimmy of the Hero Zone DOM element itself.
     engine._broadcastEvent('play_zone_animation', {
-      type: 'escape_dodge', owner: ownerIdx, heroIdx, zoneSlot: -1,
+      type: 'escape_dodge', owner: engine._findHeroOwner(target), heroIdx, zoneSlot: -1,   // W20c: Brettseite des Helden
     });
     engine.log('escape_negate', {
       player: engine.gs.players[ownerIdx]?.username,
