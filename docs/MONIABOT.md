@@ -233,6 +233,12 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 * **Patchnotes:** Karten, deren Eintrag in `data/cards.json` sich seit dem letzten Stand **verändert** hat (Text, HP, ATK, Kosten, Level …), werden als **Bilder**
   in `PATCHNOTES_CHANNEL_ID` gepostet, mit dem Hinweis, was sich geändert hat („changed: effect text, HP“). Commit-Texte erscheinen nicht. Ganz neue Karten
   kommen nicht hierher, sondern in den Feed für neue Karten; rein interne Felder (`skilltestLegal`, `setID`) lösen nichts aus.
+* **Bugfixes:** Nach jedem Deploy (Bot erkennt einen neuen Git-Stand) postet der Bot die Karten, deren **Effekt-Skript** (`cards/effects/<karte>.js`) **geändert** wurde, als Bilder
+  in den Bugfix-Kanal (Standard `1562197315437989889`, überschreibbar mit `BUGFIXES_CHANNEL_ID` — in `bot/.env` musst du nichts eintragen).
+  Zählt nur, wenn sich echter Code geändert hat (Kommentare/Leerraum ignoriert); neu hinzugekommene oder gelöschte Skripte gelten nicht als Bugfix.
+  Wird ein gemeinsamer Baustein (`cards/effects/_*.js`) geändert, erscheinen die Karten, die ihn nutzen („fixed via shared logic“). Betrifft er mehr als
+  `BUGFIX_MAX_SHARED` Karten (Standard 12), gibt es nur eine Textzeile mit Baustein und Kartenanzahl, keine Bilder. Commit-Texte erscheinen nie; niemand wird gepingt.
+  Der allererste Lauf merkt sich nur den Stand.
 * **Rangliste:** `LEADERBOARD_CHANNEL_ID` → eine Nachricht, die alle 10 Minuten aktualisiert wird.
 * **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit.
 * `!duel` — offene Herausforderung; wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).
