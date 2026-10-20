@@ -18,13 +18,21 @@ const { opponentOfGs } = require('./_opp');
 
 const CARD_NAME = 'Magic Amethyst';
 
-/** True iff the opp hero at `hi` has at least 1 Ability stacked anywhere. */
-function _heroHasAbilities(ps, hi) {
+/**
+ * N5-12: Abilities in SUPPORT Zonen (Xal/Xalibur: echte Ability-Stapel; Cloak of Edge: "treated as an Ability") hängen genauso am Helden
+ * (Engine-Konvention `collectSupportZoneAbilities`, Weird Doll/Fire Bomb/Idej Sword lesen sie) - Spielbarkeit, Ziel und Galerie zählen sie mit.
+ */
+function _supportAbilities(engine, oi, hi) {
+  try { return engine?.collectSupportZoneAbilities?.(oi, hi) || []; } catch { return []; }
+}
+
+/** True iff the opp hero at `hi` has at least 1 Ability stacked anywhere (Ability Zones oder Support Zonen). */
+function _heroHasAbilities(ps, hi, engine, oi) {
   const zones = ps.abilityZones?.[hi] || [];
   for (const slot of zones) {
     if ((slot || []).length > 0) return true;
   }
-  return false;
+  return _supportAbilities(engine, oi, hi).length > 0;
 }
 
 /**
@@ -39,7 +47,7 @@ function _anzeigeName(slot) {
 }
 
 /** Build the abilityChoice gallery — one entry per top-of-stack ability. */
-function _buildAbilityGallery(ps, hi) {
+function _buildAbilityGallery(ps, hi, engine, oi) {
   const zones = ps.abilityZones?.[hi] || [];
   const out = [];
   for (let z = 0; z < zones.length; z++) {
@@ -58,6 +66,17 @@ function _buildAbilityGallery(ps, hi) {
       label: 'ABILITY',
       _zoneSlot: z,
       _stackHeight: slot.length,
+    });
+  }
+  // N5-12: Abilities in Support Zonen (Quelle `support:<slot>`; bei einem Xal-Stapel vertritt die oberste Kopie den Stapel).
+  for (const e of _supportAbilities(engine, oi, hi)) {
+    out.push({
+      name: e.cardName,
+      realName: e.cardName,
+      source: `support:${e.slotIdx}`,
+      label: 'ABILITY',
+      _supportInstId: e.inst?.id,   // nur die ID (die Galerie geht als JSON an den Client)
+      _stackHeight: e.level,
     });
   }
   return out;
@@ -82,10 +101,12 @@ module.exports = {
           const h = oppPs.heroes[hi];
           if (!h?.name || h.hp <= 0) continue;
           const zones = oppPs.abilityZones?.[hi];
-          if (!Array.isArray(zones)) continue;
-          for (const z of zones) {
-            if (Array.isArray(z) ? z.length > 0 : !!z) return true;
+          if (Array.isArray(zones)) {
+            for (const z of zones) {
+              if (Array.isArray(z) ? z.length > 0 : !!z) return true;
+            }
           }
+          if (_supportAbilities(engine, oppIdx, hi).length > 0) return true;   // N5-12
         }
       } catch { /* konservativ: Gate entscheidet */ }
       return false;
@@ -94,7 +115,7 @@ module.exports = {
   isTargetingArtifact: true,
   activeIn: ['hand'],
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     if (!canPlayMagicGem(gs, pi, CARD_NAME)) return false;
     // Need at least one opp hero with at least one ability to discard.
     const oi = opponentOfGs(gs, pi);
@@ -103,19 +124,19 @@ module.exports = {
     for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
       const h = ops.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      if (_heroHasAbilities(ops, hi)) return true;
+      if (_heroHasAbilities(ops, hi, engine, oi)) return true;
     }
     return false;
   },
 
-  getValidTargets(gs, pi) {
+  getValidTargets(gs, pi, engine) {
     const oi = opponentOfGs(gs, pi);
     const ops = gs.players[oi];
     const out = [];
     for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
       const h = ops.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
-      if (!_heroHasAbilities(ops, hi)) continue;
+      if (!_heroHasAbilities(ops, hi, engine, oi)) continue;
       out.push({ id: `hero-${oi}-${hi}`, type: 'hero', owner: oi, heroIdx: hi, cardName: h.name });
     }
     return out;
@@ -144,7 +165,7 @@ module.exports = {
 
     // Re-build the gallery at resolve time — the board state may have
     // shifted between target pick and resolve (rare via reactions).
-    const gallery = _buildAbilityGallery(ops, hi);
+    const gallery = _buildAbilityGallery(ops, hi, engine, oi);
     if (gallery.length === 0) {
       // No abilities left → silent fizzle on the main effect.
       return await maybeKeepGemInHand(engine, pi, CARD_NAME);
@@ -164,6 +185,7 @@ module.exports = {
     let chosen = picked?.cardName;
     let chosenSlot = -1;
     const _ausQuelle = /^ability:(\d+)$/.exec(picked?.source || '');
+    const _ausSupport = /^support:(\d+)$/.exec(picked?.source || '');
     // Match by name → pick the matching gallery entry's _zoneSlot. If
     // the engine returned no choice (CPU defer / disconnect / etc.),
     // fall back to the LAST gallery entry — symmetric to the
@@ -171,8 +193,21 @@ module.exports = {
     // gem still does something meaningful.
     const entry = chosen
       ? ((_ausQuelle && gallery.find(g => g._zoneSlot === Number(_ausQuelle[1])))
+        || (_ausSupport && gallery.find(g => g._supportInstId && g.source === `support:${_ausSupport[1]}`))
         || gallery.find(g => g.name === chosen))
       : gallery[gallery.length - 1];
+    // N5-12: Ability aus einer Support Zone → der EINE Brett→Ablage-Weg (wie Weird Doll), die Ability Zones bleiben unberührt.
+    if (entry?._supportInstId) {
+      const sInst = engine.cardInstances.find(c => c.id === entry._supportInstId);
+      if (sInst && sInst.zone === 'support') {
+        await engine.sendBoardCardToDiscard(sInst, { source: { name: CARD_NAME, owner: pi } });
+        engine.log('magic_amethyst_discard', {
+          player: ops.username, ability: entry.realName, hero: ops.heroes[hi]?.name,
+        });
+        engine.sync();
+      }
+      return await maybeKeepGemInHand(engine, pi, CARD_NAME);
+    }
     if (entry) {
       chosen = entry.realName;   // die tatsaechlich oberste Karte (bei Performance nicht der Anzeigename)
       chosenSlot = entry._zoneSlot;
