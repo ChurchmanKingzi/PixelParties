@@ -1,4 +1,20 @@
 {
-  "Zsos'Ssar, the Serpent Warlord": ["poison"],
-  "Nao, the Barrier Priestess": ["holy"]
+  "Zsos'Ssar, the Serpent Warlord": {
+    "themes": [
+      "poison"
+    ]
+  },
+  "Nao, the Barrier Priestess": {
+    "themes": [
+      "holy"
+    ]
+  },
+  "Bomb Berserker Bartas": {
+    "themes": [
+      "explosion"
+    ],
+    "name": "Bartas",
+    "title": "Bomb Berserker",
+    "music": "bgm_bartas.ogg"
+  }
 }

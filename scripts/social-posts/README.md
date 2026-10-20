@@ -14,7 +14,7 @@ und `post.mp4` (mindestens 30 s, der Loop wird wiederholt).
 |---|---|
 | `--duration S` | Mindestlänge des Videos in Sekunden (Standard 30) |
 | `--music DATEI` / `--music-start S` | Musik aus `public/music/` und Startzeit; Standard `bgm_<erstes Wort>.ogg` |
-| `--themes poison,fire,…` | Partikel-Themen erzwingen (`poison`, `fire`, `heal`, `holy`, `arcane`, `fight`, `ice`, `stars`); sonst aus `hero-themes.json`, danach automatisch aus Effekttext und Start-Fähigkeiten |
+| `--themes poison,fire,…` | Partikel-Themen erzwingen (`poison`, `fire`, `explosion`, `heal`, `holy`, `arcane`, `fight`, `ice`, `stars`); sonst aus `hero-themes.json`, danach automatisch aus Effekttext und Start-Fähigkeiten |
 | `--accent #rrggbb` | Akzentfarbe statt der aus dem Sprite abgeleiteten |
 | `--feet PX` | Standlinie des Sprites, px ab Kartenoberkante |
 | `--no-video` | nur Einzelbilder und Standbild |
@@ -22,7 +22,7 @@ und `post.mp4` (mindestens 30 s, der Loop wird wiederholt).
 Abhängigkeiten: Python 3 mit `pillow` und `numpy`, `ffmpeg`, Node mit `playwright` (Karte wird mit dem
 Spiel-Renderer `public/card-render.js` in Chromium gezeichnet).
 
-Das Thema je Hero steht in `hero-themes.json` (Kartenname → Liste).
+Die Einstellungen je Hero stehen in `hero-themes.json` (Kartenname → `themes`, optional `name` und `title` für Namenszeile und Beiname, `music` für die Datei in `public/music`).
 
 Bausteine: `build-post.py` (Layout, Hintergrund, Sprite, Video), `ornaments.py` (Rahmen-Schnörkel),
 `fx.py` (Partikel-Themen), `render-card.js` (Karte), `pxcommon.py` (Raster und Farben).

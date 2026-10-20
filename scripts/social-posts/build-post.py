@@ -235,6 +235,43 @@ def tinted_logo(accent, scale_div=2):
     return res.resize((logo.width // scale_div, logo.height // scale_div), Image.NEAREST)
 
 
+def body_mask(frame):
+    """Alpha-Maske (0/255) von Körper und anhängenden Teilen. Sprite-eigene Funken und Splitter, die mehr als
+    2 Sprite-Pixel vom Körper entfernt schweben, bekommen keine Outline (sonst steckt jeder in einem Kasten)."""
+    a = np.asarray(frame.split()[3]) > 40
+    h, w = a.shape
+    seen = np.zeros((h, w), bool)
+    comps = []
+    for y0 in range(h):
+        for x0 in range(w):
+            if a[y0, x0] and not seen[y0, x0]:
+                stack, comp = [(y0, x0)], []
+                seen[y0, x0] = True
+                while stack:
+                    y, x = stack.pop()
+                    comp.append((y, x))
+                    for dy in (-1, 0, 1):
+                        for dx in (-1, 0, 1):
+                            yy, xx = y + dy, x + dx
+                            if 0 <= yy < h and 0 <= xx < w and a[yy, xx] and not seen[yy, xx]:
+                                seen[yy, xx] = True
+                                stack.append((yy, xx))
+                comps.append(comp)
+    out = np.zeros((h, w), np.uint8)
+    if not comps:
+        return Image.fromarray(out, 'L')
+    main = max(comps, key=len)
+    near = np.zeros((h, w), np.uint8)
+    for (y, x) in main:
+        near[y, x] = 255
+    near = np.asarray(Image.fromarray(near, 'L').filter(ImageFilter.MaxFilter(5))) > 0     # 2 Pixel Umkreis
+    for comp in comps:
+        if comp is main or any(near[y, x] for (y, x) in comp):
+            for (y, x) in comp:
+                out[y, x] = 255
+    return Image.fromarray(out, 'L')
+
+
 class Sprite:
     def __init__(self, hero_dir_slug):
         base = ROOT / 'data' / 'hero-animations'
@@ -269,8 +306,10 @@ class Sprite:
         f = self.sheet.crop((i * self.fw, 0, (i + 1) * self.fw, self.fh))
         pad = 3
         f = pad_image(f, pad)
+        body = body_mask(f)
+        half = body.resize((body.width * 2, body.height * 2), Image.NEAREST)
+        a = half
         half = f.resize((f.width * 2, f.height * 2), Image.NEAREST)
-        a = half.split()[3].point(lambda v: 255 if v > 40 else 0)
 
         def ring(k, color):
             g = a.filter(ImageFilter.MaxFilter(2 * k + 1))
@@ -344,12 +383,15 @@ class Particles:
 # ── Hauptprogramm ─────────────────────────────────────────────────────────────
 
 def music_path(card_name, override):
+    """Musik: ausdrückliche Datei → bgm_<erstes Wort>.ogg → bgm_<ein anderes Wort des Namens>.ogg."""
+    base = ROOT / 'public' / 'music'
     if override:
-        return ROOT / 'public' / 'music' / override
-    first = card_name.split(',')[0]
-    key = ''.join(ch for ch in first.lower() if ch.isalnum())
-    p = ROOT / 'public' / 'music' / f'bgm_{key}.ogg'
-    return p if p.exists() else None
+        return base / override
+    words = [''.join(ch for ch in w.lower() if ch.isalnum()) for w in card_name.replace(',', ' ').split()]
+    for key in [words[0]] + words[1:] + words[::-1]:
+        if key and (base / f'bgm_{key}.ogg').exists():
+            return base / f'bgm_{key}.ogg'
+    return None
 
 
 def main():
@@ -366,6 +408,7 @@ def main():
 
     spr = Sprite(args.slug)
     card_name = spr.meta['hero']
+    hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
     out = OUT / args.slug
     (out / 'frames').mkdir(parents=True, exist_ok=True)
 
@@ -404,13 +447,15 @@ def main():
     mid.alpha_composite(logo, ((W - logo.width) // 2, 40))
     # Fuß: Name (groß) und Beiname
     parts = card_name.split(',', 1)
-    short = parts[0].upper()
-    sub = parts[1].strip().upper() if len(parts) > 1 else ''
+    short = hero_cfg.get('name', parts[0]).upper()
+    sub = hero_cfg.get('title', parts[1].strip() if len(parts) > 1 else '').upper()
     name_y, sub_y = (1238, 1295) if sub else (1252, 0)
-    nx, ny, nw, nh = draw_text(mid, short, 8, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
+    scale = next((sc for sc in (8, 7, 6, 5, 4) if pixel_text_mask(short).width * sc <= 640), 4)   # lange Namen kleiner setzen
+    nx, ny, nw, nh = draw_text(mid, short, scale, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
     # Trennlinien mit Edelstein links und rechts vom Namen, kürzere beim Beinamen
-    ornaments.place_divider(mid, accent, nx - 2 * U, name_y - U, 16, -1)
-    ornaments.place_divider(mid, accent, nx + nw + 2 * U, name_y - U, 16, 1)
+    dl = max(4, min(16, (nx - 2 * U - 4 * U - 5 * U) // U))
+    ornaments.place_divider(mid, accent, nx - 2 * U, name_y - U, dl, -1)
+    ornaments.place_divider(mid, accent, nx + nw + 2 * U, name_y - U, dl, 1)
     if sub:
         sx_, sy_, sw_, sh_ = draw_text(mid, sub, 3, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
         ornaments.place_divider(mid, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
@@ -425,7 +470,7 @@ def main():
     parts_bg = Particles(args.slug, accent, 40, (U * 3, 0, W - U * 3, H), loop)
     cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
     card_data = next(c for c in cards if c['name'] == card_name)
-    pinned = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name)
+    pinned = hero_cfg.get('themes')
     names = fx.themes_for(card_data, args.themes.split(',') if args.themes else pinned)
     print('Partikel-Themen:', ', '.join(names))
     box = (sx + spr.left * SPRITE_PX, sy + spr.top * SPRITE_PX, sx + spr.right * SPRITE_PX, feet_y)
@@ -460,7 +505,7 @@ def main():
 
     if args.no_video:
         return
-    music = music_path(card_name, args.music)
+    music = music_path(card_name, args.music or hero_cfg.get('music'))
     loops = max(1, math.ceil(args.duration / (loop / float(fps))))
     vf = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(fps), '-stream_loop', str(loops - 1),
           '-i', str(out / 'frames' / 'f%03d.png')]

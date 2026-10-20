@@ -24,6 +24,7 @@ PAL = {
 THEMES = {
     'poison': [('gasfloor', 'poison', 22), ('gas', 'poison', 70), ('bubble', 'poison_bubble', 8), ('spark', 'poison_bubble', 4)],
     'fire':   [('cloud', 'smoke', 5), ('ember', 'fire', 18), ('spark', 'gold', 4)],
+    'explosion': [('boom', 'fire', 11), ('gas', 'smoke', 26), ('ember', 'fire', 20), ('spark', 'gold', 4)],
     'heal':   [('heart', 'heal', 8), ('spark', 'gold', 10)],
     'arcane': [('orb', 'arcane', 9), ('spark', 'arcane', 8)],
     'fight':  [('cloud', 'dust', 5), ('spark', 'gold', 10)],
@@ -134,6 +135,42 @@ def orb_stamp():
     return out
 
 
+FIRE_RAMP = [(255, 250, 224), (255, 220, 90), (255, 150, 30), (222, 60, 20), (110, 36, 24)]
+
+
+def fire_color(c):
+    """c ∈ [0,1]: 0 = Kern (weißgelb) … 1 = Rand/Abkühlung (dunkelrot)."""
+    c = min(max(c, 0.0), 0.999) * (len(FIRE_RAMP) - 1)
+    i = int(c)
+    return FIRE_RAMP[i + 1] if c - i > 0.5 else FIRE_RAMP[i]
+
+
+def fireball_stamp(R, seed):
+    """Unregelmäßiger Feuerball: Zelle → Abstand zum nächsten Kreismittelpunkt (0 Mitte … 1 Rand)."""
+    key = ('fire', R, seed)
+    if key in _STAMPS:
+        return _STAMPS[key]
+    rnd = random.Random(seed * 17 + R)
+    discs = [(0.0, 0.0, float(R))]
+    for _ in range(5):
+        ang = rnd.random() * 2 * math.pi
+        dist = R * rnd.uniform(0.45, 0.75)
+        discs.append((math.cos(ang) * dist, math.sin(ang) * dist, R * rnd.uniform(0.45, 0.65)))
+    out = {}
+    span = int(R * 1.6) + 2
+    for j in range(-span, span + 1):
+        for i in range(-span, span + 1):
+            best = None
+            for cx, cy, rr in discs:
+                t = math.hypot(i - cx, j - cy) / rr
+                if best is None or t < best:
+                    best = t
+            if best <= 1.0:
+                out[(i, j)] = best
+    _STAMPS[key] = out
+    return out
+
+
 class ThemeFX:
     """Alle Partikel eines Heroes. `box` = deckender Sprite-Kasten (x0, y0, x1, y1) auf dem Canvas, `feet` = Standlinie."""
 
@@ -148,7 +185,16 @@ class ThemeFX:
                 for k in range(count):
                     side = r.choice([-1, 1])
                     spread = r.uniform(0.2, 1.0)
-                    if kind == 'gas':
+                    x0 = y0 = 0.0
+                    if kind == 'boom':
+                        cyc = r.choice([4, 5, 6])
+                        spots = []
+                        for n in range(cyc):
+                            side = r.choice([-1, 1])
+                            spots.append((cx + side * r.uniform(0.3, 1.0) * ((bx1 - bx0) / 2 + 170),
+                                          r.uniform(by0 + 10, feet + 10), r.choice([5, 6, 8, 10]), r.randrange(1000)))
+                        it = dict(rise=0, drift=0, r=1, grow=0, seed=0, sway=0, spots=spots, cycles=cyc)
+                    elif kind == 'gas':
                         x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 150)
                         y0 = feet - r.uniform(-20, 330)
                         it = dict(rise=r.uniform(90, 210), drift=r.uniform(-40, 40), r=r.choice([1, 1, 2, 2, 3]), grow=1,
@@ -209,7 +255,8 @@ class ThemeFX:
                         y0 = r.uniform(by0, feet)
                         it = dict(rise=r.uniform(60, 160), drift=0, r=1, grow=0, seed=0, sway=0)
                     it.setdefault('amax', 1.0)
-                    it.update(kind=kind, pal=PAL[pal], x0=x0, y0=y0, cycles=r.choice([1, 1, 2]), phase=r.random())
+                    it.update(kind=kind, pal=PAL[pal], x0=x0, y0=y0, phase=r.random())
+                    it.setdefault('cycles', r.choice([1, 1, 2]))
                     self.items.append(it)
 
     def draw(self, layer, f):
@@ -227,6 +274,9 @@ class ThemeFX:
                         if cell_visible(a, bx + i, by + j):
                             px, py = (bx + i) * U, (by + j) * U
                             d.rectangle([px, py, px + U - 1, py + U - 1], fill=p['pal'][3 if hf > 0.6 else 2] + (255,))
+                continue
+            if p['kind'] == 'boom':
+                self._boom(d, p, t)
                 continue
             u = (t * p['cycles'] + p['phase']) % 1.0
             a = min(p['amax'], u / 0.22, (1 - u) / 0.38)
@@ -267,3 +317,52 @@ class ThemeFX:
                     continue
                 px, py = gx * U, gy * U
                 d.rectangle([px, py, px + U - 1, py + U - 1], fill=pal[idx] + (255,))
+
+    def _boom(self, d, p, t):
+        """Eine Explosion je Zyklus an wechselnder Stelle: Blitz → Feuerball (weiß→gelb→orange→rot) → Druckwelle, Funken, Rauch."""
+        x = t * p['cycles'] + p['phase']
+        n, u = int(x), x % 1.0
+        sx, sy, size, seed = p['spots'][n % p['cycles']]
+        cx, cy = int(round(sx / U)), int(round(sy / U))
+
+        def cell(i, j, col):
+            px, py = (cx + i) * U, (cy + j) * U
+            d.rectangle([px, py, px + U - 1, py + U - 1], fill=col + (255,))
+
+        if u < 0.7:                                    # Feuerball
+            k = u / 0.7
+            R = max(1, int(round(size * (0.35 + 0.85 * math.sqrt(k)))))
+            a = min(1.0, (1 - k) / 0.35)
+            for (i, j), rt in fireball_stamp(R, seed).items():
+                if cell_visible(a, cx + i, cy + j):
+                    cell(i, j, fire_color(k * 0.85 + rt * 0.4))
+        if u < 0.1:                                    # Blitz: Plus aus Weiß
+            s = int(size * 0.9 * (1 - u / 0.1)) + 1
+            for q in range(-s, s + 1):
+                cell(q, 0, WHITE)
+                cell(0, q, WHITE)
+        if 0.05 < u < 0.5:                             # Druckwelle
+            k = (u - 0.05) / 0.45
+            Rr = size * (0.7 + 2.0 * k)
+            a = 0.85 * (1 - k)
+            span = int(Rr) + 2
+            for j in range(-span, span + 1):
+                for i in range(-span, span + 1):
+                    if abs(math.hypot(i, j) - Rr) < 0.65 and cell_visible(a, cx + i, cy + j):
+                        cell(i, j, (255, 236, 160))
+        if u < 0.65:                                   # Funken fliegen nach außen
+            k = u / 0.65
+            rnd = random.Random(seed)
+            for q in range(9):
+                ang = rnd.random() * 2 * math.pi
+                dist = size * (0.6 + rnd.uniform(1.4, 2.8) * math.sqrt(k))
+                if cell_visible(1 - k, cx + int(dist * math.cos(ang)), cy + int(dist * math.sin(ang))):
+                    cell(int(round(dist * math.cos(ang))), int(round(dist * math.sin(ang))), (255, 226, 110) if q % 2 else (255, 150, 30))
+        if u > 0.35:                                   # Rauchpuff, steigt auf
+            k = (u - 0.35) / 0.65
+            a = min(0.8, k / 0.3, (1 - k) / 0.5)
+            R = max(2, int(size * (0.7 + 0.5 * k)))
+            for (i, j), idx in cloud_stamp(R, seed, soft=True).items():
+                jj = j - int(k * size * 1.2)
+                if cell_visible(a, cx + i, cy + jj):
+                    cell(i, jj, PAL['smoke'][idx])
