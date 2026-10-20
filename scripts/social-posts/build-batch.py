@@ -29,7 +29,9 @@ ROOT = HERE.parents[1]
 OUT = HERE / 'out'
 REELS = OUT / 'reels'
 GENERIC = {'battle', 'battle1', 'battle2', 'battle3', 'menu', 'menu_diamond', 'shop', 'shop_diamond', 'login', 'puzzle'}
-EXCLUDE = {'Rubin, the Dragoneer Champion'}
+EXCLUDE = {'Rubin, the Dragoneer Champion',                     # Fehltreffer bei der Musik (nur wegen des Worts „Champion“)
+           'Definitely not Andras, the Human Weapon',           # keine Kartenkunst, Karte lässt sich nicht zeichnen
+           'Champion, the Eye of the Storm'}                    # dito
 
 
 def slugify(n):

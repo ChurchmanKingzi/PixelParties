@@ -58,7 +58,13 @@ def accent_from_sprite(sheet, meta):
     fw, n = meta['frameWidth'], meta['frames']
     a = np.asarray(sheet.convert('RGBA'), dtype=np.float32) / 255.0
     px = a.reshape(-1, 4)
-    px = px[px[:, 3] > 0.9][:, :3]
+    for thr in (0.9, 0.5, 0.05):                 # durchscheinende Sprites (Geister) haben kaum volle Deckkraft
+        sel = px[px[:, 3] > thr][:, :3]
+        if len(sel) >= 20:
+            break
+    px = sel
+    if len(px) == 0:
+        return (120, 200, 255)
     hsv = np.array([colorsys.rgb_to_hsv(*p) for p in px[::3]])
     ok = (hsv[:, 1] > 0.35) & (hsv[:, 2] > 0.3)
     if not ok.any():
@@ -290,6 +296,12 @@ class Sprite:
         cols = np.where(a.any(axis=0))[0]
         xs = cols % self.fw
         self.left, self.right = int(xs.min()), int(xs.max()) + 1
+        # sichtbare Ausdehnung (auch durchscheinende Teile, Alpha > 20): maßgeblich für die Größenwahl
+        av = np.asarray(self.sheet)[..., 3] > 20
+        vrows = np.where(av.any(axis=1))[0]
+        vcols = np.where(av.any(axis=0))[0] % self.fw
+        self.vtop, self.vbottom = int(vrows.min()), int(vrows.max()) + 1
+        self.vleft, self.vright = int(vcols.min()), int(vcols.max()) + 1
         self.foot = self.meta.get('footY', self.bottom)
         # Ausrichtung: Gesichtsmitte (genau zwischen den Augen, `faceX` im Sheet-JSON, vom Spiel je Sheet vermessen) liegt
         # auf der Kartenmitte; `anchorX` hat Vorrang. Ohne beides: Mittel der Umriss-Mitten je Frame.
@@ -320,8 +332,10 @@ class Sprite:
         k_light = max(1, round(U / hp))                      # Outline innen ≈ 7 px, außen ≈ 14 px (bei px=14: 1 und 2 halbe Pixel)
         k_dark = max(k_light + 1, round(2 * U / hp))
 
+        solid = a.point(lambda v: 0 if v else 255)           # überall außer auf dem Sprite selbst: durchscheinende Körper nicht weiß füllen
+
         def ring(k, color):
-            g = a.filter(ImageFilter.MaxFilter(2 * k + 1))
+            g = ImageChops.darker(a.filter(ImageFilter.MaxFilter(2 * k + 1)), solid)
             im = Image.new('RGBA', half.size, color + (255,))
             im.putalpha(g)
             return im.resize((im.width * hp, im.height * hp), Image.NEAREST)
@@ -396,8 +410,8 @@ def choose_px(spr, cfg):
     300…540 px und Breite ≤ 760 px bleiben; sonst der größte gerade Maßstab, der in 540 × 760 passt."""
     if 'px' in cfg:
         return int(cfg['px'])
-    ow = spr.right - spr.left
-    oh = max(1, spr.foot - spr.top)
+    ow = spr.vright - spr.vleft
+    oh = max(1, max(spr.foot, spr.vbottom) - spr.vtop)
     if 300 <= oh * SPRITE_PX <= 540 and ow * SPRITE_PX <= 760:
         return SPRITE_PX
     best = 4
@@ -446,6 +460,7 @@ def main():
     ap.add_argument('--music')
     ap.add_argument('--music-start', type=float, default=None, help='Startzeit im Stück; ohne Angabe: Wert aus hero-themes.json (musicStart), sonst das energiereichste Fenster')
     ap.add_argument('--no-video', action='store_true')
+    ap.add_argument('--cover-only', type=int, default=None, metavar='FRAME', help='nur dieses eine Bild rendern (schnelle Vorschau) und als preview-<slug>.png ablegen')
     ap.add_argument('--clean', action='store_true', help='Einzelbilder nach dem Kodieren löschen (spart Platz)')
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
@@ -538,9 +553,9 @@ def main():
     card_data = next(c for c in cards if c['name'] == card_name)
     pinned = hero_cfg.get('themes')
     names = fx.themes_for(card_data, args.themes.split(',') if args.themes else pinned)
-    print('Partikel-Themen:', ', '.join(names))
-    box = (sx + spr.left * spr.px, sy + spr.top * spr.px, sx + spr.right * spr.px, feet_y)
-    theme_fx = fx.ThemeFX(names, args.slug, box, feet_y, loop)
+    print('Partikel:', 'eigene (hero-themes.json)' if hero_cfg.get('particles') and not args.themes else ', '.join(names))
+    box = (sx + spr.vleft * spr.px, sy + spr.vtop * spr.px, sx + spr.vright * spr.px, feet_y)
+    theme_fx = fx.ThemeFX(fx.specs_for(names, None if args.themes else hero_cfg.get('particles')), args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
 
     # Einblenden (nur erste Schleife): Pixel-Auflösung der Ebenen, dann Blitz beim Auftauchen des Sprites
@@ -590,6 +605,11 @@ def main():
             canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
         return canvas.convert('RGB')
 
+    if args.cover_only is not None:
+        prev = OUT / f'preview-{args.slug}-{tag}.png'
+        render(args.cover_only % loop, False).save(prev)
+        print('Vorschau', prev)
+        return
     for f in range(loop):
         render(f, False).save(fdir / f'f{f:03d}.png')
     if intro_on:

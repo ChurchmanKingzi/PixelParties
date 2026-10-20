@@ -22,6 +22,25 @@ PAL = {
     'storm_smoke': [(20, 24, 40), (50, 56, 80), (90, 100, 130), (150, 160, 190)],
     'shadow': [(14, 8, 30), (40, 20, 70), (80, 45, 120), (150, 110, 190)],
     'pinkwing': [(120, 40, 140), (200, 90, 200), (255, 150, 230), (255, 230, 250)],
+    'void': [(0, 0, 0), (14, 8, 20), (36, 24, 48), (76, 62, 98)],
+    'crimson': [(60, 0, 10), (150, 10, 30), (230, 40, 60), (255, 170, 170)],
+    'blood': [(60, 0, 10), (120, 10, 20), (190, 20, 30), (255, 90, 90)],
+    'blood_mist': [(40, 0, 8), (100, 8, 20), (160, 20, 30), (220, 70, 60)],
+    'bone': [(90, 80, 70), (170, 160, 140), (225, 215, 190), (255, 250, 235)],
+    'steel': [(30, 34, 44), (80, 90, 104), (140, 150, 165), (215, 225, 240)],
+    'ink': [(5, 10, 30), (20, 40, 90), (50, 80, 150), (140, 170, 230)],
+    'bubblegum': [(150, 50, 110), (235, 110, 190), (255, 180, 230), (255, 240, 252)],
+    'candy': [(120, 10, 20), (200, 30, 40), (240, 240, 240), (255, 255, 255)],
+    'spectral': [(40, 60, 90), (100, 140, 190), (170, 210, 240), (240, 250, 255)],
+    'goldwing': [(120, 70, 10), (214, 150, 30), (255, 200, 70), (255, 245, 180)],
+    'crystalpink': [(70, 10, 70), (160, 40, 150), (230, 90, 210), (255, 210, 250)],
+    'voidpurple': [(20, 0, 40), (90, 30, 160), (170, 90, 255), (235, 210, 255)],
+    'sakura': [(150, 60, 100), (235, 130, 170), (255, 190, 215), (255, 235, 245)],
+    'deepsea': [(0, 10, 30), (10, 40, 80), (20, 90, 130), (70, 170, 190)],
+    'glow': [(0, 60, 70), (0, 150, 160), (60, 230, 220), (200, 255, 250)],
+    'soul': [(30, 10, 60), (80, 40, 140), (150, 90, 220), (220, 190, 255)],
+    'web': [(80, 80, 100), (160, 160, 185), (220, 220, 240), (255, 255, 255)],
+    'webspider': [(10, 5, 15), (60, 30, 70), (150, 60, 160), (255, 120, 255)],
     'holy_white': [(150, 140, 175), (214, 208, 232), (246, 243, 252), (255, 255, 255)],
     'ice': [(30, 70, 120), (90, 160, 220), (170, 220, 250), (240, 252, 255)],
 }
@@ -184,22 +203,90 @@ def fireball_stamp(R, seed):
     return out
 
 
+# Formen: '.' leer, O Kontur, D Schatten, X Mitte, H Licht; mehrere Einträge = Einzelbilder (wechseln im Takt)
+GLYPH_Z = {'drop': 1}      # Vergrößerung (Zellen je Formpixel), Standard 2
+
+GLYPHS = {
+    'note': [['...HH', '...XX', '...X.', '.OOX.', 'OXXX.', '.XX..']],
+    'coin': [['.XX.', 'XHDX', 'XDHX', '.XX.'], ['.XX.', 'XHXX', 'XHXX', '.XX.'], ['.X.', 'XHX', 'XHX', '.X.']],
+    'skull': [['.XXX.', 'XXXXX', 'XOXOX', '.XXX.', '.X.X.']],
+    'grave': [['.X.', 'XXX', '.X.', '.X.', '.X.']],
+    'bat': [['X.....X', 'XX.X.XX', 'XXXXXXX', '.X...X.'], ['.......', 'XXX.XXX', '.XXXXX.', '..X.X..']],
+    'fish': [['..XXX.X', '.XXHXXX', '..XXX.X']],
+    'drop': [['.X.', 'XHX', 'XXX', '.X.']],
+    'gear': [['.X.X.', 'XXXXX', 'XX.XX', 'XXXXX', '.X.X.'], ['X.X.X', '.XXX.', 'XX.XX', '.XXX.', 'X.X.X']],
+    'flame': [['.X.', '.XX', 'XXX', 'XHX', '.X.'], ['.X.', 'XX.', 'XXX', 'XHX', '.X.']],
+    'eye': [['.XXX.', 'XHOHX', '.XXX.'], ['.XXX.', 'XXXXX', '.XXX.'], ['.....', 'XXXXX', '.....']],
+    'shard': [['..H..', '.XHX.', 'XXHXX', '.XDX.', '..D..']],
+    'sword': [['..H', '.XH', '.X.', '.X.', 'XXX', '.X.']],
+    'arrow': [['.....H', 'DDDDDXH', '.....H']],
+    'paw': [['X.X.X', '.....', '.XXX.', 'XXXXX', '.XXX.']],
+    'candy': [['.XXH', 'XD.H', 'XD..', 'XD..']],
+    'crown': [['X.X.X', 'XXXXX', 'XHXHX']],
+    'gem': [['.XXX.', 'XHXXX', '.XXX.', '..X..']],
+    'bone': [['XX...XX', '.XXXXX.', 'XX...XX']],
+    'spider': [['X.....X', '.X.O.X.', '..XOX..', '.XXOXX.', '..XOX..', '.X.O.X.', 'X.....X']],
+    'butterfly': [['XX...XX', 'XHXOXHX', '.XXOXX.', 'XXDODXX', 'X.....X'], ['..X.X..', '.XXOXX.', '.XHOHX.', '..XOX..']],
+    'web': [['X.X.X', '.XXX.', 'XXHXX', '.XXX.', 'X.X.X']],
+    'slash': [['....H', '...XH', '..X..', '.X...', 'X....']],
+}
+
+
+def zoom(stamp, z):
+    if z <= 1:
+        return stamp
+    return {(i * z + dx, j * z + dy): idx for (i, j), idx in stamp.items() for dx in range(z) for dy in range(z)}
+
+
+def glyph_stamp(name, frame, mirror=False):
+    rows = GLYPHS[name][frame % len(GLYPHS[name])]
+    h, w = len(rows), len(rows[0])
+    idx = {'O': 0, 'D': 1, 'X': 2, 'H': 3}
+    out = {}
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch in idx:
+                ii = (w - 1 - i) if mirror else i
+                out[(ii - w // 2, j - h // 2)] = idx[ch]
+    return out
+
+
 class ThemeFX:
     """Alle Partikel eines Heroes. `box` = deckender Sprite-Kasten (x0, y0, x1, y1) auf dem Canvas, `feet` = Standlinie."""
 
-    def __init__(self, names, seed, box, feet, loop):
+    def __init__(self, specs, seed, box, feet, loop):
         self.loop = loop
         self.items = []
         r = random.Random(seed)
         bx0, by0, bx1, by1 = box
         cx = (bx0 + bx1) / 2
-        for name in names:
-            for kind, pal, count in THEMES[name]:
+        for kind, pal, count, opts in specs:
+            if True:
                 for k in range(count):
                     side = r.choice([-1, 1])
                     spread = r.uniform(0.2, 1.0)
                     x0 = y0 = 0.0
-                    if kind == 'boom':
+                    if kind == 'glyph':
+                        mv = opts.get('move', 'rise')
+                        w_half = (bx1 - bx0) / 2
+                        it = dict(r=1, grow=0, seed=0, g=opts['g'], move=mv, sway=0, rise=0, drift=0)
+                        if mv == 'rise':
+                            x0, y0 = cx + r.uniform(-1, 1) * (w_half + 140), feet - r.uniform(-10, 320)
+                            it.update(rise=r.uniform(90, 220), drift=r.uniform(-30, 30), sway=r.choice([0, 1, 2]) * U)
+                        elif mv == 'fall':
+                            x0, y0 = cx + r.uniform(-1, 1) * (w_half + 120), by0 - r.uniform(0, 120)
+                            it.update(rise=-r.uniform(260, 400), drift=r.uniform(-30, 30), sway=r.choice([1, 2]) * U)
+                        elif mv == 'float':
+                            x0, y0 = cx + r.uniform(-1, 1) * (w_half + 130), r.uniform(by0, feet)
+                            it.update(rise=r.uniform(20, 70), drift=r.uniform(-30, 30), sway=r.choice([1, 2, 3]) * U)
+                        elif mv == 'cross':
+                            dirn = r.choice([-1, 1])
+                            x0, y0 = cx - dirn * 420, r.uniform(by0 + 20, feet)
+                            it.update(drift=dirn * 840)
+                        elif mv == 'dangle':
+                            x0, y0 = cx + r.uniform(-1, 1) * (w_half + 110), by0 - r.uniform(0, 60)
+                            it.update(dangle=r.uniform(120, 260))
+                    elif kind == 'boom':
                         cyc = r.choice([4, 5, 6])
                         spots = []
                         for n in range(cyc):
@@ -313,8 +400,33 @@ class ThemeFX:
                 continue
             x = p['x0'] + p['drift'] * u + (math.sin((u + p['phase']) * 2 * math.pi) * p['sway'] if p['sway'] else 0)
             y = p['y0'] - p['rise'] * u
+            dangle = p.get('move') == 'dangle'
+            if dangle:                                  # Spinne an der Seidenfaden: sinkt und zieht sich wieder hoch
+                y = p['y0'] + p['dangle'] * (0.5 - 0.5 * math.cos(2 * math.pi * u))
+                a = 1.0
             cx, cy = int(round(x / U)), int(round(y / U))
             kind, pal = p['kind'], p['pal']
+            if kind == 'glyph':
+                g = p['g']
+                if g == 'eye':
+                    frame = [0, 0, 0, 0, 1, 2, 1][int(u * 28) % 7]
+                elif g in ('flame', 'bat', 'gear', 'coin'):
+                    frame = int(u * 24)
+                else:
+                    frame = 0
+                stamp = zoom(glyph_stamp(g, frame, mirror=p['drift'] < 0 and p.get('move') == 'cross'), p.get('z', GLYPH_Z.get(g, 2)))
+                if dangle:
+                    ty = int(round(p['y0'] / U))
+                    for j in range(ty, cy):
+                        if cell_visible(1.0, cx, j):
+                            px, py = cx * U, j * U
+                            d.rectangle([px, py, px + U - 1, py + U - 1], fill=pal[1] + (255,))
+                for (i, j), idx in stamp.items():
+                    gx, gy = cx + i, cy + j
+                    if cell_visible(a, gx, gy):
+                        px, py = gx * U, gy * U
+                        d.rectangle([px, py, px + U - 1, py + U - 1], fill=pal[idx] + (255,))
+                continue
             if kind in ('cloud', 'fog'):
                 stamp = cloud_stamp(p['r'] + int(u * p['grow']), p['seed'])
             elif kind in ('gas', 'gasfloor'):
@@ -335,10 +447,7 @@ class ThemeFX:
                 stamp = ({(0, 0): 2, (1, 0): 3, (-1, 1): 2, (0, 1): 2, (1, 1): 2, (-1, 2): 1, (0, 2): 2} if int(u * 6) % 2 else
                          {(0, 0): 2, (1, 0): 2, (0, 1): 3, (1, 1): 2, (2, 1): 2, (1, 2): 1})
             elif kind == 'butterfly':
-                if int(u * 40) % 2:
-                    stamp = {(-2, -1): 2, (-1, -1): 3, (1, -1): 3, (2, -1): 2, (-2, 0): 2, (-1, 0): 2, (1, 0): 2, (2, 0): 2, (0, 0): 0, (-1, 1): 1, (1, 1): 1}
-                else:
-                    stamp = {(-1, -1): 3, (1, -1): 3, (-1, 0): 2, (1, 0): 2, (0, 0): 0}
+                stamp = zoom(glyph_stamp('butterfly', int(u * 40)), 2)
             elif kind == 'feather':
                 stamp = {k: 2 for k in ((2, -2), (1, -2), (1, -1), (0, -1), (0, 0), (-1, 0), (-1, 1), (-2, 1), (-2, 2))}
                 stamp.update({(1, -1): 3, (0, -1): 3, (0, 0): 3, (2, -2): 3})
@@ -422,3 +531,13 @@ class ThemeFX:
                     continue
                 px, py = (cx + i + q) * U, (cy + j) * U
                 d.rectangle([px, py, px + U - 1, py + U - 1], fill=p['pal'][flick if q == 0 else 2] + (255,))
+
+
+def specs_for(names=None, particles=None):
+    """Emitter-Liste: ausdrücklich angegebene Partikel (aus hero-themes.json: [Art, Palette, Anzahl, {Optionen}]) oder die Themen."""
+    if particles:
+        return [(p[0], p[1], p[2], p[3] if len(p) > 3 else {}) for p in particles]
+    out = []
+    for n in names:
+        out += [(k, pal, c, {}) for (k, pal, c) in THEMES[n]]
+    return out

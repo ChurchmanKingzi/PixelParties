@@ -1,287 +1,1179 @@
 {
-  "Zsos'Ssar, the Serpent Warlord": {
-    "themes": [
-      "poison"
-    ],
-    "anchorX": 19.3,
-    "musicStart": 4
-  },
-  "Nao, the Barrier Priestess": {
-    "themes": [
-      "holy"
-    ],
-    "musicStart": 4
-  },
-  "Bomb Berserker Bartas": {
-    "themes": [
-      "explosion"
-    ],
-    "name": "Bartas",
-    "title": "Bomb Berserker",
-    "music": "bgm_bartas.ogg",
-    "musicStart": 4
-  },
-  "Alleria, the Queen of Spiders": {
-    "themes": [
-      "poison"
-    ]
-  },
-  "Andras, the Human Weapon": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Argos, the Eye of the Cosmos": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Arthor, Inheritor of the Barbarian Sword": {
-    "themes": [
-      "fire"
-    ]
-  },
-  "Arthor, the King of Blackport": {
-    "themes": [
-      "water"
-    ]
-  },
-  "Baaliel, the Demon General": {
-    "themes": [
-      "fire"
-    ]
-  },
-  "Bakhm, the Desert Digger": {
-    "themes": [
-      "dust"
-    ]
-  },
-  "Beato, the Butterfly Witch": {
-    "themes": [
-      "butterfly"
-    ]
-  },
-  "Beato, the Eternal Butterfly": {
-    "themes": [
-      "butterfly"
-    ]
-  },
-  "Calamitusk, the Chaorc War Chief": {
-    "themes": [
-      "dust",
-      "fight"
-    ]
-  },
-  "Champion, the Eye of the Storm": {
-    "themes": [
-      "storm"
-    ]
-  },
-  "Champion, the Stormbringer": {
-    "themes": [
-      "storm"
-    ]
-  },
-  "Chaos-Diamond, the Cracked Keeper": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Damus, the Prophet of Apocalypse": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Definitely not Andras, the Human Weapon": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Ghuanjun, the Undead Martial Artist": {
-    "themes": [
-      "necro"
-    ]
-  },
-  "Null, the Mage Slayer": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Hel, the Bound Specter": {
-    "themes": [
-      "necro"
-    ]
-  },
-  "Kit, the Shark Researcher": {
-    "themes": [
-      "water"
-    ]
-  },
-  "Klaus, the Cult Leader": {
-    "themes": [
-      "necro"
-    ]
-  },
-  "Layn, Defender of Deri": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Layn, Master of Deri's Relic": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Lilly, the Charming Infiltrator": {
-    "themes": [
-      "heal"
-    ]
-  },
-  "Luna Pele, the Flame Dancer": {
-    "themes": [
-      "fire"
-    ]
-  },
-  "Mao, the Vengeful Guardian": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Maya, the Nature Fairy": {
-    "themes": [
-      "nature"
-    ]
-  },
-  "Nero Zira, the Mastermind": {
-    "themes": [
-      "shadow"
-    ]
-  },
-  "Orthos, the Loyal Guard Dog": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Reiza, the Chief Tormentor": {
-    "themes": [
-      "shadow"
-    ]
-  },
-  "Siphem, the Deepsea Demon": {
-    "themes": [
-      "water"
-    ]
-  },
-  "Sol Rym, the Thunder Djinn": {
-    "themes": [
-      "storm"
-    ]
-  },
-  "Stellan, the Calm Cat": {
-    "themes": [
-      "stars"
-    ]
-  },
-  "Taio, Absorber of the Mountain's Heart": {
-    "themes": [
-      "dust"
-    ]
-  },
-  "Taio, the Sun Fencer": {
-    "themes": [
-      "holy"
-    ]
-  },
-  "Archibald, the Archmage": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Thep, the Court Scribe": {
-    "themes": [
-      "arcane"
-    ]
-  },
-  "Thorad, Strength of Coolness": {
-    "themes": [
-      "ice"
-    ]
-  },
-  "Toras, Master of all Weapons": {
-    "themes": [
-      "fight"
-    ]
-  },
-  "Vacarn, the Dark Goblin Necromancer": {
-    "themes": [
-      "necro"
-    ]
-  },
-  "Victorica, the Eternal Empress": {
-    "themes": [
-      "holy"
-    ]
-  },
-  "Xiong, the Bamboo Guardian": {
-    "themes": [
-      "nature"
-    ]
-  },
-  "Bubbles, the Bouncy Bunny": {
-    "themes": [
-      "water"
-    ]
-  },
-  "Bow Sniper Darge": {
-    "themes": [
-      "fight"
-    ],
-    "name": "Darge",
-    "title": "Bow Sniper"
-  },
-  "Cute Annoyance Mini": {
-    "themes": [
-      "heal"
-    ],
-    "name": "Mini",
-    "title": "Cute Annoyance"
-  },
-  "Idej Lord Daiyo": {
-    "themes": [
-      "fight"
-    ],
-    "name": "Daiyo",
-    "title": "Idej Lord"
-  },
-  "Silent Water Mizune": {
-    "themes": [
-      "water"
-    ],
-    "name": "Mizune",
-    "title": "Silent Water"
-  },
-  "Timeless King Zi": {
-    "themes": [
-      "arcane"
-    ],
-    "name": "Zi",
-    "title": "Timeless King"
-  },
-  "Tarleinn the Traveler": {
-    "themes": [
-      "stars"
-    ],
-    "name": "Tarleinn",
-    "title": "the Traveler"
-  },
-  "Mary Crestmas": {
-    "themes": [
-      "ice"
-    ]
-  },
-  "Santa Klaus": {
-    "themes": [
-      "ice"
-    ]
-  }
+ "Zsos'Ssar, the Serpent Warlord": {
+  "themes": [
+   "poison"
+  ],
+  "anchorX": 19.3,
+  "musicStart": 4
+ },
+ "Nao, the Barrier Priestess": {
+  "themes": [
+   "holy"
+  ],
+  "musicStart": 4
+ },
+ "Bomb Berserker Bartas": {
+  "themes": [
+   "explosion"
+  ],
+  "name": "Bartas",
+  "title": "Bomb Berserker",
+  "music": "bgm_bartas.ogg",
+  "musicStart": 4
+ },
+ "Alleria, the Queen of Spiders": {
+  "particles": [
+   [
+    "glyph",
+    "webspider",
+    7,
+    {
+     "g": "spider",
+     "move": "dangle"
+    }
+   ],
+   [
+    "glyph",
+    "web",
+    9,
+    {
+     "g": "web",
+     "move": "float"
+    }
+   ],
+   [
+    "gas",
+    "poison",
+    24
+   ]
+  ]
+ },
+ "Andras, the Human Weapon": {
+  "particles": [
+   [
+    "glyph",
+    "fire",
+    16,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "ember",
+    "fire",
+    20
+   ],
+   [
+    "gas",
+    "smoke",
+    18
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Argos, the Eye of the Cosmos": {
+  "particles": [
+   [
+    "fog",
+    "void",
+    12
+   ],
+   [
+    "gas",
+    "void",
+    70
+   ],
+   [
+    "glyph",
+    "crimson",
+    8,
+    {
+     "g": "eye",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "holy_white",
+    10
+   ]
+  ]
+ },
+ "Arthor, Inheritor of the Barbarian Sword": {
+  "particles": [
+   [
+    "gas",
+    "blood_mist",
+    40
+   ],
+   [
+    "glyph",
+    "blood",
+    14,
+    {
+     "g": "drop",
+     "move": "rise"
+    }
+   ],
+   [
+    "ember",
+    "blood",
+    18
+   ]
+  ]
+ },
+ "Arthor, the King of Blackport": {
+  "particles": [
+   [
+    "glyph",
+    "gold",
+    14,
+    {
+     "g": "coin",
+     "move": "rise"
+    }
+   ],
+   [
+    "bubble",
+    "water",
+    12
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Baaliel, the Demon General": {
+  "particles": [
+   [
+    "glyph",
+    "blood",
+    9,
+    {
+     "g": "bat",
+     "move": "float"
+    }
+   ],
+   [
+    "ember",
+    "fire",
+    22
+   ],
+   [
+    "gas",
+    "smoke",
+    20
+   ]
+  ]
+ },
+ "Bakhm, the Desert Digger": {
+  "particles": [
+   [
+    "gas",
+    "dust",
+    40
+   ],
+   [
+    "glyph",
+    "bone",
+    8,
+    {
+     "g": "bone",
+     "move": "float"
+    }
+   ],
+   [
+    "mote",
+    "dust",
+    24
+   ]
+  ]
+ },
+ "Beato, the Butterfly Witch": {
+  "particles": [
+   [
+    "butterfly",
+    "goldwing",
+    10
+   ],
+   [
+    "mote",
+    "gold",
+    30
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Beato, the Eternal Butterfly": {
+  "particles": [
+   [
+    "butterfly",
+    "goldwing",
+    14
+   ],
+   [
+    "beam",
+    "gold",
+    3
+   ],
+   [
+    "mote",
+    "gold",
+    40
+   ],
+   [
+    "spark",
+    "holy_white",
+    6
+   ]
+  ]
+ },
+ "Calamitusk, the Chaorc War Chief": {
+  "particles": [
+   [
+    "ember",
+    "fire",
+    22
+   ],
+   [
+    "gas",
+    "smoke",
+    26
+   ],
+   [
+    "mote",
+    "dust",
+    20
+   ]
+  ]
+ },
+ "Champion, the Eye of the Storm": {
+  "particles": [
+   [
+    "bolt",
+    "gold",
+    6
+   ],
+   [
+    "gas",
+    "storm_smoke",
+    30
+   ],
+   [
+    "glyph",
+    "water",
+    30,
+    {
+     "g": "drop",
+     "move": "fall"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    5
+   ]
+  ]
+ },
+ "Champion, the Stormbringer": {
+  "particles": [
+   [
+    "bolt",
+    "gold",
+    6
+   ],
+   [
+    "gas",
+    "storm_smoke",
+    30
+   ],
+   [
+    "glyph",
+    "water",
+    30,
+    {
+     "g": "drop",
+     "move": "fall"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    5
+   ]
+  ]
+ },
+ "Chaos-Diamond, the Cracked Keeper": {
+  "particles": [
+   [
+    "glyph",
+    "crystalpink",
+    12,
+    {
+     "g": "shard",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "crystalpink",
+    10
+   ],
+   [
+    "gas",
+    "shadow",
+    20
+   ]
+  ]
+ },
+ "Damus, the Prophet of Apocalypse": {
+  "particles": [
+   [
+    "ember",
+    "fire",
+    20
+   ],
+   [
+    "gas",
+    "smoke",
+    26
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ },
+ "Definitely not Andras, the Human Weapon": {
+  "themes": [
+   "fight"
+  ]
+ },
+ "Ghuanjun, the Undead Martial Artist": {
+  "particles": [
+   [
+    "glyph",
+    "bone",
+    10,
+    {
+     "g": "skull",
+     "move": "float"
+    }
+   ],
+   [
+    "glyph",
+    "bone",
+    6,
+    {
+     "g": "grave",
+     "move": "float"
+    }
+   ],
+   [
+    "gas",
+    "ecto",
+    30
+   ],
+   [
+    "orb",
+    "ecto",
+    4
+   ]
+  ]
+ },
+ "Null, the Mage Slayer": {
+  "particles": [
+   [
+    "bolt",
+    "voidpurple",
+    4
+   ],
+   [
+    "gas",
+    "shadow",
+    36
+   ],
+   [
+    "spark",
+    "voidpurple",
+    8
+   ]
+  ]
+ },
+ "Hel, the Bound Specter": {
+  "particles": [
+   [
+    "gas",
+    "spectral",
+    34
+   ],
+   [
+    "glyph",
+    "spectral",
+    6,
+    {
+     "g": "flame",
+     "move": "float"
+    }
+   ],
+   [
+    "orb",
+    "spectral",
+    5
+   ]
+  ]
+ },
+ "Kit, the Shark Researcher": {
+  "particles": [
+   [
+    "glyph",
+    "water",
+    8,
+    {
+     "g": "fish",
+     "move": "cross"
+    }
+   ],
+   [
+    "bubble",
+    "water",
+    16
+   ],
+   [
+    "gas",
+    "water",
+    14
+   ]
+  ]
+ },
+ "Klaus, the Cult Leader": {
+  "particles": [
+   [
+    "gas",
+    "shadow",
+    34
+   ],
+   [
+    "ember",
+    "blood",
+    16
+   ],
+   [
+    "spark",
+    "blood",
+    8
+   ]
+  ]
+ },
+ "Layn, Defender of Deri": {
+  "particles": [
+   [
+    "mote",
+    "gold",
+    36
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ],
+   [
+    "glyph",
+    "gold",
+    4,
+    {
+     "g": "crown",
+     "move": "float"
+    }
+   ]
+  ]
+ },
+ "Layn, Master of Deri's Relic": {
+  "particles": [
+   [
+    "glyph",
+    "gold",
+    8,
+    {
+     "g": "gem",
+     "move": "float"
+    }
+   ],
+   [
+    "orb",
+    "gold",
+    5
+   ],
+   [
+    "mote",
+    "gold",
+    30
+   ],
+   [
+    "spark",
+    "holy_white",
+    6
+   ]
+  ]
+ },
+ "Lilly, the Charming Infiltrator": {
+  "particles": [
+   [
+    "heart",
+    "heal",
+    12
+   ],
+   [
+    "spark",
+    "bubblegum",
+    10
+   ],
+   [
+    "glyph",
+    "gold",
+    6,
+    {
+     "g": "coin",
+     "move": "rise"
+    }
+   ]
+  ]
+ },
+ "Luna Pele, the Flame Dancer": {
+  "particles": [
+   [
+    "glyph",
+    "fire",
+    20,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "ember",
+    "fire",
+    18
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Mao, the Vengeful Guardian": {
+  "particles": [
+   [
+    "glyph",
+    "blood",
+    8,
+    {
+     "g": "slash",
+     "move": "float"
+    }
+   ],
+   [
+    "gas",
+    "shadow",
+    30
+   ],
+   [
+    "spark",
+    "blood",
+    6
+   ]
+  ]
+ },
+ "Maya, the Nature Fairy": {
+  "particles": [
+   [
+    "leaf",
+    "leafgreen",
+    14
+   ],
+   [
+    "leaf",
+    "sakura",
+    8
+   ],
+   [
+    "mote",
+    "leafgreen",
+    34
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Nero Zira, the Mastermind": {
+  "particles": [
+   [
+    "glyph",
+    "steel",
+    10,
+    {
+     "g": "gear",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "spectral",
+    10
+   ],
+   [
+    "gas",
+    "storm_smoke",
+    18
+   ]
+  ]
+ },
+ "Orthos, the Loyal Guard Dog": {
+  "particles": [
+   [
+    "glyph",
+    "fire",
+    20,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "ember",
+    "fire",
+    16
+   ],
+   [
+    "gas",
+    "smoke",
+    20
+   ]
+  ]
+ },
+ "Reiza, the Chief Tormentor": {
+  "particles": [
+   [
+    "glyph",
+    "blood",
+    9,
+    {
+     "g": "bat",
+     "move": "float"
+    }
+   ],
+   [
+    "glyph",
+    "blood",
+    12,
+    {
+     "g": "drop",
+     "move": "rise"
+    }
+   ],
+   [
+    "gas",
+    "shadow",
+    30
+   ]
+  ]
+ },
+ "Siphem, the Deepsea Demon": {
+  "particles": [
+   [
+    "gas",
+    "deepsea",
+    36
+   ],
+   [
+    "bubble",
+    "water",
+    14
+   ],
+   [
+    "mote",
+    "glow",
+    24
+   ]
+  ]
+ },
+ "Sol Rym, the Thunder Djinn": {
+  "particles": [
+   [
+    "bolt",
+    "gold",
+    8
+   ],
+   [
+    "gas",
+    "storm_smoke",
+    30
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Stellan, the Calm Cat": {
+  "particles": [
+   [
+    "glyph",
+    "bubblegum",
+    10,
+    {
+     "g": "paw",
+     "move": "rise"
+    }
+   ],
+   [
+    "heart",
+    "heal",
+    8
+   ],
+   [
+    "spark",
+    "gold",
+    6
+   ]
+  ]
+ },
+ "Taio, Absorber of the Mountain's Heart": {
+  "particles": [
+   [
+    "glyph",
+    "fire",
+    16,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "ember",
+    "fire",
+    22
+   ],
+   [
+    "gas",
+    "dust",
+    22
+   ]
+  ]
+ },
+ "Taio, the Sun Fencer": {
+  "particles": [
+   [
+    "beam",
+    "gold",
+    5
+   ],
+   [
+    "glyph",
+    "fire",
+    10,
+    {
+     "g": "flame",
+     "move": "rise"
+    }
+   ],
+   [
+    "mote",
+    "gold",
+    30
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ },
+ "Archibald, the Archmage": {
+  "particles": [
+   [
+    "orb",
+    "arcane",
+    9
+   ],
+   [
+    "spark",
+    "arcane",
+    10
+   ],
+   [
+    "mote",
+    "arcane",
+    24
+   ]
+  ]
+ },
+ "Thep, the Court Scribe": {
+  "particles": [
+   [
+    "feather",
+    "holy_white",
+    10
+   ],
+   [
+    "glyph",
+    "ink",
+    12,
+    {
+     "g": "drop",
+     "move": "fall"
+    }
+   ],
+   [
+    "mote",
+    "gold",
+    20
+   ]
+  ]
+ },
+ "Thorad, Strength of Coolness": {
+  "particles": [
+   [
+    "flake",
+    "ice",
+    16
+   ],
+   [
+    "spark",
+    "ice",
+    8
+   ],
+   [
+    "gas",
+    "water",
+    14
+   ]
+  ]
+ },
+ "Toras, Master of all Weapons": {
+  "particles": [
+   [
+    "glyph",
+    "steel",
+    10,
+    {
+     "g": "sword",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    10
+   ],
+   [
+    "gas",
+    "dust",
+    14
+   ]
+  ]
+ },
+ "Vacarn, the Dark Goblin Necromancer": {
+  "particles": [
+   [
+    "gas",
+    "soul",
+    34
+   ],
+   [
+    "glyph",
+    "bone",
+    8,
+    {
+     "g": "skull",
+     "move": "float"
+    }
+   ],
+   [
+    "orb",
+    "soul",
+    5
+   ]
+  ]
+ },
+ "Victorica, the Eternal Empress": {
+  "particles": [
+   [
+    "mote",
+    "gold",
+    36
+   ],
+   [
+    "glyph",
+    "gold",
+    6,
+    {
+     "g": "crown",
+     "move": "float"
+    }
+   ],
+   [
+    "glyph",
+    "blood",
+    6,
+    {
+     "g": "gem",
+     "move": "float"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ },
+ "Xiong, the Bamboo Guardian": {
+  "particles": [
+   [
+    "leaf",
+    "leafgreen",
+    20
+   ],
+   [
+    "mote",
+    "leafgreen",
+    30
+   ],
+   [
+    "spark",
+    "gold",
+    4
+   ]
+  ]
+ },
+ "Bubbles, the Bouncy Bunny": {
+  "particles": [
+   [
+    "bubble",
+    "bubblegum",
+    20
+   ],
+   [
+    "spark",
+    "bubblegum",
+    10
+   ],
+   [
+    "heart",
+    "heal",
+    8
+   ]
+  ]
+ },
+ "Bow Sniper Darge": {
+  "name": "Darge",
+  "title": "Bow Sniper",
+  "particles": [
+   [
+    "glyph",
+    "steel",
+    8,
+    {
+     "g": "arrow",
+     "move": "cross"
+    }
+   ],
+   [
+    "gas",
+    "dust",
+    20
+   ],
+   [
+    "spark",
+    "gold",
+    5
+   ]
+  ]
+ },
+ "Cute Annoyance Mini": {
+  "name": "Mini",
+  "title": "Cute Annoyance",
+  "particles": [
+   [
+    "heart",
+    "heal",
+    14
+   ],
+   [
+    "spark",
+    "bubblegum",
+    12
+   ]
+  ]
+ },
+ "Idej Lord Daiyo": {
+  "name": "Daiyo",
+  "title": "Idej Lord",
+  "particles": [
+   [
+    "leaf",
+    "sakura",
+    20
+   ],
+   [
+    "gas",
+    "ecto",
+    20
+   ],
+   [
+    "mote",
+    "sakura",
+    14
+   ]
+  ]
+ },
+ "Silent Water Mizune": {
+  "name": "Mizune",
+  "title": "Silent Water",
+  "particles": [
+   [
+    "bubble",
+    "water",
+    14
+   ],
+   [
+    "glyph",
+    "water",
+    12,
+    {
+     "g": "drop",
+     "move": "rise"
+    }
+   ],
+   [
+    "gas",
+    "water",
+    20
+   ],
+   [
+    "spark",
+    "holy_white",
+    6
+   ]
+  ]
+ },
+ "Timeless King Zi": {
+  "name": "Zi",
+  "title": "Timeless King",
+  "particles": [
+   [
+    "glyph",
+    "steel",
+    8,
+    {
+     "g": "gear",
+     "move": "float"
+    }
+   ],
+   [
+    "orb",
+    "arcane",
+    7
+   ],
+   [
+    "spark",
+    "arcane",
+    8
+   ],
+   [
+    "mote",
+    "gold",
+    20
+   ]
+  ]
+ },
+ "Tarleinn the Traveler": {
+  "name": "Tarleinn",
+  "title": "the Traveler",
+  "particles": [
+   [
+    "glyph",
+    "gold",
+    10,
+    {
+     "g": "note",
+     "move": "rise"
+    }
+   ],
+   [
+    "leaf",
+    "sakura",
+    8
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ },
+ "Mary Crestmas": {
+  "particles": [
+   [
+    "flake",
+    "ice",
+    16
+   ],
+   [
+    "glyph",
+    "gold",
+    6,
+    {
+     "g": "note",
+     "move": "rise"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ },
+ "Santa Klaus": {
+  "particles": [
+   [
+    "flake",
+    "ice",
+    16
+   ],
+   [
+    "glyph",
+    "candy",
+    6,
+    {
+     "g": "candy",
+     "move": "fall"
+    }
+   ],
+   [
+    "spark",
+    "gold",
+    8
+   ]
+  ]
+ }
 }
