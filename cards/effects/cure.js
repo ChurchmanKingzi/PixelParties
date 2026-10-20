@@ -161,7 +161,7 @@ module.exports = {
     return false;
   },
 
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
     // Proactive: need at least 1 valid target (no engine access here, optimistic check)
     const negKeys = getCleansableStatuses();
     for (let phi = 0; phi < gs.players.length; phi++) {
@@ -172,6 +172,9 @@ module.exports = {
         if (hero.statuses && negKeys.some(k => hero.statuses[k])) return true;
       }
     }
+    // W24a (N1-06): „any target on the board" schliesst Kreaturen ein — auch eine Kreatur mit negativem Status (oder ein Held nur mit
+    // Decisive Defeat) macht Cure spielbar. Der Wirker ist hier noch unbekannt; `onPlay` schliesst ihn aus und bricht ohne Ziel ab.
+    if (engine && getValidTargets(gs, engine, null).length > 0) return true;
     return false;
   },
 

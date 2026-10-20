@@ -3771,7 +3771,7 @@ class GameEngine {
       this._rewriteProtokoll(hookCtx);
     }
     if (hookName === HOOKS.ON_CREATURE_DEATH && !hookCtx._skipPostDefeatReaction) {
-      await this._checkCreatureDefeatedHandReactions(hookCtx.creature, hookCtx.source);
+      await this._checkCreatureDefeatedHandReactions(hookCtx.creature, hookCtx.source, hookCtx.type);   // W24a (N1-05): `type` nur bei Schadenstod gesetzt
       // ★ v1292: dieselbe Stelle speist auch das SAMMEL-Fenster
       // („one or more of your Creatures are defeated", Zombified
       // Assault) — gesammelt je Schadens-Durchgang bzw. Zerstoerung,
@@ -9919,7 +9919,7 @@ class GameEngine {
     // ★ v1340: HAND-Fenster „Held wurde besiegt" (Cheat Chair) — nach
     // Aufraeumen, Extra Life und Surprise-Rettung, VOR der Spielende-
     // Pruefung: ein wiederbelebter letzter Held haelt die Seite am Leben.
-    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx);
+    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden });
     if (handRettung && target.hp > 0) {
       delete target.diedOnTurn;
       this.sync();
@@ -10191,7 +10191,8 @@ class GameEngine {
     // SC (v1381): Insta-Kill und Opfer zaehlen wie Schaden in Hoehe der
     // restlichen HP — ein eigenes Opfer ist „50%+ damage" (Als Ruling 24.9.).
     this._scNoteHeroHpLoss(target, _scHpVorher);
-    await this._runHeroDefeatSequence(target, source, targetOwner);
+    // W24a (N1-05): Besiegen OHNE Schaden durch Attack/Spell → Corpse Explosion (ueber das Hand-Fenster "Held besiegt"); nicht bei Opfer/Eigenabgang/HP-Kosten/unaufhaltsam.
+    await this._runHeroDefeatSequence(target, source, targetOwner, { ohneSchaden: !_u && !opts.isSacrifice && !opts.eigenerAbgang && !opts.hpKosten });
     // Welle 11 (Al, Q61: „Auch Heroes"): ein Helden-OPFER ist ein „sacrifice a target" — Hook NACH dem Todesablauf (Bonded Companion Thuly:
     // „when you sacrifice a target"). Opferer = `source.owner`; nicht mehr nach Spielende.
     // Welle 12 (Al, Rueckfrage 4, Foresta): „Der Hero stirbt ja nicht, weil er durch einen Effekt 'sacrificed' wird, sondern durch HP-Verlust!" —
@@ -13732,7 +13733,7 @@ class GameEngine {
    * `checkAllHeroesDead`. Wirker/Kosten/Flug/Auftritt: `_rxHandkarteEinsetzen`.
    * @returns {Promise<boolean>} true = der Held lebt wieder
    */
-  async _checkHeroDefeatedHandReactions(target, source, ownerIdx) {
+  async _checkHeroDefeatedHandReactions(target, source, ownerIdx, extra = {}) {
     if (this._inHeroDefeatedReaction) return false;
     if (this.gs.result) return false;
     const pi = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
@@ -13747,7 +13748,7 @@ class GameEngine {
     const sourceOwner = (isSeat(this, roh)) ? roh : this._deriveEffectOwner({ source }, pi);
     const lebende = this.heroesControlledBy(pi, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
     const letzterHeld = lebende.length === 0 && !((ps._teleportedAway || 0) > 0);
-    const info = { hero: target, heroIdx, ownerIdx: pi, source: source || null, sourceOwner, letzterHeld };
+    const info = { hero: target, heroIdx, ownerIdx: pi, source: source || null, sourceOwner, letzterHeld, ohneSchaden: !!extra.ohneSchaden };   // W24a (N1-05): `ohneSchaden` = Insta-Kill (`actionDefeatHero`)
     const allCards = this._getCardDB();
 
     const seen = new Set();
@@ -35705,7 +35706,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     return Math.max(0, (cd?.level || 0) + (inst.counters?.level || 0));
   }
 
-  async _checkCreatureDefeatedHandReactions(deathInfo, source) {
+  async _checkCreatureDefeatedHandReactions(deathInfo, source, type) {
     if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inCreatureDefeatedReaction) return;
     if (!deathInfo) return;
@@ -35742,7 +35743,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       if (script.creatureDefeatedCondition
-          && !script.creatureDefeatedCondition(this.gs, ownerIdx, this, deathInfo, source)) continue;
+          && !script.creatureDefeatedCondition(this.gs, ownerIdx, this, deathInfo, source, type)) continue;
 
       const tgtName = deathInfo.name || 'A Creature';
       const confirmed = await this.promptGeneric(ownerIdx, {
@@ -47905,6 +47906,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
       delete statusOpts.addStacks; // Clean up
     }
+    // ★ W24a (N1-09): es gibt EINEN `negated`-Eintrag je Held. Traegt er die Negierung eines Anhaengsels (Decisive Defeat, Stowaway), darf eine
+    // fremde (befristete) Negierung ihn nicht ersetzen — sonst faellt die Karte mit dem fremden Ablauf ab (`heilenWirftAb`). Die fremde Negierung
+    // wird als Ueberlagerung `_fremd` am Eintrag der Karte gemerkt: sie laeuft zum selben Zeitpunkt ab wie eine gewoehnliche (processStatusExpiry),
+    // und faellt die Karte vorher, tritt sie an ihre Stelle (`anhaengselStatusHooks.onCardLeaveZone`).
+    if (statusName === 'negated' && hero.statuses.negated?._fromAttachment && !statusOpts._fromAttachment) {
+      hero.statuses.negated._fremd = statusOpts;
+      this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx, overlay: true });
+      this.sync();
+      return;
+    }
     const _warAktiv = !!hero.statuses[statusName];   // Welle 10 (Q55): Erneuerung, kein initiales Hinzufuegen
     hero.statuses[statusName] = statusOpts;
     this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx });
@@ -48080,6 +48091,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ Z2 (C05-02/-03): ebenso ANHAENGSEL-Negierung (Decisive Defeat, Stowaway: `_fromAttachment` /
         //   `permanent`) — sie lebt genau so lange wie die Karte (CARD_API: „Lasts as long as … remains
         //   attached"); die Karte nimmt sie selbst zurueck (Austritt, Heilen).
+        // ★ W24a (N1-09): eine fremde Negierung, die ueber der Anhaengsel-Negierung lag (`_fremd`), endet wie eine gewoehnliche.
+        if (hero.statuses.negated?._fromAttachment && hero.statuses.negated._fremd) {
+          delete hero.statuses.negated._fremd;
+          this.log('status_remove', { target: hero.name, status: 'negated', owner: ap, overlay: true });
+        }
         if (hero.statuses.negated && !hero.statuses.negated.sourceBound
             && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
           await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;

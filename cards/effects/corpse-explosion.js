@@ -85,6 +85,13 @@ async function explode(engine, defeatedControllerSide, loc) {
   engine.sync();
 }
 
+/** W24a (N1-05): war die Todesquelle eine Attack- oder Spell-KARTE (Besiegen ohne Schaden)? */
+function quelleIstAttackOderSpell(engine, source) {
+  const cd = source?.name ? engine._getCardDB()[source.name] : null;
+  const typ = String(cd?.cardType || '');
+  return typ.includes('Attack') || typ.includes('Spell');
+}
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -114,12 +121,47 @@ module.exports = {
     // owner, or (via `firesForOpponentDefeat`) that owner's opponent.
     // The AoE direction keys off the defeated HERO's owner, not the
     // player, so it stays "the opponent of the defeated target".
-    const defeatedControllerSide = engine.gs.players.findIndex(
+    const physSide = engine.gs.players.findIndex(
       p => (p.heroes || []).includes(target));
-    if (defeatedControllerSide < 0) return;
+    if (physSide < 0) return;
+    // W24a (N1-04): Kontrolle statt Seite — bei einem uebernommenen Helden ist sein KONTROLLEUR die Seite des Gefallenen
+    // (`heroSideOf`), die Explosion zielt auf dessen Gegner; der Blitz bleibt an der physischen Heldenposition.
+    const defeatedControllerSide = engine.heroSideOf ? engine.heroSideOf(physSide, target) : physSide;
     await explode(engine, defeatedControllerSide, {
-      owner: defeatedControllerSide, heroIdx: targetHeroIdx, zoneSlot: -1,
+      owner: physSide, heroIdx: targetHeroIdx, zoneSlot: -1,
     });
+  },
+
+  // ── W24a (N1-05): „defeated by an Attack or Spell" auch OHNE Schaden ──
+  // Trial of Dominance, Goldify (Kreaturen) und Insta-Kills wie Hand of Death (Helden) besiegen ohne Schadenseintrag; die Nach-Schaden-Fenster
+  // oben sehen sie nie. Die Einzel-Fenster „Kreatur/Held besiegt" melden sie (Zwilling von Core Explosion); Schadenstode laufen weiter
+  // NUR ueber die Nach-Schaden-Fenster (kein `type` bzw. kein `ohneSchaden`), damit die Karte nie doppelt angeboten wird.
+  isCreatureDefeatedReaction: true,
+
+  creatureDefeatedCondition(gs, pi, engine, deathInfo, source, type) {
+    if (type || !deathInfo) return false;                       // Schadenstod: Nach-Schaden-Fenster
+    // Ein Opfer (Pawn Sacrifice & Co.: `_sacrificedTurn`-Stempel) ist kein „Besiegen durch einen Spell".
+    const inst = engine.cardInstances.find(c => c.id === deathInfo.instId);
+    if (inst?.counters?._sacrificedTurn === gs.turn) return false;
+    return quelleIstAttackOderSpell(engine, source);
+  },
+
+  async creatureDefeatedResolve(engine, pi, deathInfo) {
+    const seite = deathInfo.controller ?? deathInfo.owner;
+    await explode(engine, seite, { owner: deathInfo.owner, heroIdx: deathInfo.heroIdx, zoneSlot: deathInfo.zoneSlot });
+  },
+
+  isHeroDefeatedReaction: true,
+
+  heroDefeatedCondition(gs, pi, engine, info) {
+    if (!info?.ohneSchaden || !info.hero) return false;
+    if (engine.heroSideOf(pi, info.hero) !== pi) return false;   // Kontrolle statt Seite: nur der Kontrolleur reagiert
+    return quelleIstAttackOderSpell(engine, info.source);
+  },
+
+  async heroDefeatedResolve(engine, pi, info) {
+    await explode(engine, engine.heroSideOf(pi, info.hero), { owner: pi, heroIdx: info.heroIdx, zoneSlot: -1 });
+    return false;                                               // der Held bleibt besiegt
   },
 
   // ── CREATURE defeated → additive creature after-damage hub ──

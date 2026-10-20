@@ -281,6 +281,13 @@ async function placeAttachment(ctx, CARD_NAME, host, opts = {}) {
     engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'resistance' });
     return null;
   }
+  // ★ W24a (N1-08): Effekt-Immunitaet fuer diese Aufloesung (Barrier of Faith: „negate any effects that card would have on the Hero"). Das Anlegen IST
+  // ein Effekt auf den Helden; vorher wehrten nur die Statuswege (`addHeroStatus`) ab — Curse/Berserk blieben als tote Karte liegen, Decisive Defeat
+  // schrieb seinen Status am Riegel vorbei. Wie bei Anti Magic/Resistance: `null` → keine Karte am Helden, der Zauber geht in die Ablage.
+  if (!opts.skipEffectImmunity && engine.hasEffectImmunity(host.owner, host.heroIdx, CARD_NAME)) {
+    engine.log('attach_blocked', { card: CARD_NAME, target: hero.name, reason: 'effect_immunity' });
+    return null;
+  }
   if (!hps.supportZones[host.heroIdx]) hps.supportZones[host.heroIdx] = [[], [], []];
   let slot = host.slotIdx;
   if ((hps.supportZones[host.heroIdx][slot] || []).length > 0) {
@@ -359,12 +366,14 @@ function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME, e
   // W12 (Al, Q114): Karian wird NIE durch Negation (oder Frost/Betaeubung) am Handeln gehindert — der Anhaengsel-Status wird bei ihr nicht angelegt.
   if (STATUS_NAME === 'negated' && engine.heroIgnoresHaltStatuses?.(owner, heroIdx)) return false;
   if (!wirt.statuses) wirt.statuses = {};
+  const alt = wirt.statuses[STATUS_NAME];
   wirt.statuses[STATUS_NAME] = {
     permanent: true,
     appliedTurn: engine.gs.turn || 0,
     _fromAttachment: CARD_NAME,
     ...(extras || {}),   // S1: z. B. `abilitiesNegated` (Stowaway: harte Form „effect and Abilities")
   };
+  if (STATUS_NAME === 'negated' && alt && !alt._fromAttachment) wirt.statuses[STATUS_NAME]._fremd = alt;   // W24a (N1-09): laufende fremde Negierung bleibt darunter erhalten
   engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME });   // v1399
   return true;
 }
@@ -385,7 +394,7 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       if (inst.zone !== 'support' || inst.faceDown) return;
       const engine = ctx._engine;
       const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
-      if (!wirt?.name || wirt.statuses?.[STATUS_NAME]) return;
+      if (!wirt?.name || (wirt.statuses?.[STATUS_NAME] && !(STATUS_NAME === 'negated' && !wirt.statuses[STATUS_NAME]._fromAttachment))) return;   // W24a (N1-09): eine fremde Negierung steht dem Anlegen nicht im Weg
       setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME, optionen.statusExtras);
       engine.sync();
     },
@@ -406,7 +415,9 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
       if (kopienAmWirt(engine, CARD_NAME, owner, heroIdx, inst).length > 0) return;
       // Direkt statt `removeHeroStatus`: kein `onStatusRemoved`, sonst
       // liefe `heilenWirftAb` gegen die Karte, die ohnehin schon geht.
-      delete wirt.statuses[STATUS_NAME];
+      // W24a (N1-09): eine darunter liegende fremde Negierung (`_fremd`) laeuft weiter statt mitzuverschwinden.
+      const fremd = wirt.statuses[STATUS_NAME]._fremd;
+      if (fremd) wirt.statuses[STATUS_NAME] = fremd; else delete wirt.statuses[STATUS_NAME];
       engine.log('status_remove', { target: wirt.name, status: STATUS_NAME, by: CARD_NAME });
       engine.sync();
     },

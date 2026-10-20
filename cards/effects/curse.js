@@ -55,7 +55,7 @@
 //  host's ATK and discards every Curse copy.
 // ═══════════════════════════════════════════
 
-const { getCleansableStatuses } = require('./_hooks');
+const { getNegativeStatuses } = require('./_hooks');
 const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
@@ -79,8 +79,10 @@ const STATUS_NAME = 'cursed';
  */
 function _heroQualifiesForCurse(engine, hero, ownerIdx, heroIdx) {
   if (!hero?.name || hero.hp <= 0) return false;
-  const cleansable = getCleansableStatuses();
-  const hasStatus = cleansable.some(k => hero.statuses?.[k]);
+  // W24a (N1-10): „afflicted by at least 1 status effect" = JEDER negative Status — auch die nicht heilbaren (`nulled`: Null Zone „counts as a
+  // status effect"; `soul_transmitted`). Vorher nur die heilbaren (`getCleansableStatuses`).
+  const negativ = getNegativeStatuses();
+  const hasStatus = negativ.some(k => hero.statuses?.[k]);
   if (!hasStatus) return false;
   // Walk the Support Zones once: a) require at least one empty slot,
   // b) reject if any slot's top card is a Spell (Curse can't stack
@@ -396,8 +398,11 @@ module.exports = {
       // Restore ATK + clear status. Both must fire even if the
       // status was already missing (defensive sync); the
       // accumulator key only exists while cursed.
-      if (hero.statuses?.cursed) {
-        delete hero.statuses.cursed;
+      // ★ W24a (N1-01): beim Heldentod leert `handleHeroDeathCleanup` ZUERST `hero.statuses` und feuert danach erst diesen Austritt — der
+      // Status ist dann schon weg, der Zwischenspeicher (`_cursedAtkSuppressed`) aber noch da. Auch dann die ATK zurueckgeben.
+      const statusNochDa = !!hero.statuses?.cursed;
+      if (statusNochDa || hero._cursedAtkSuppressed !== undefined) {
+        if (statusNochDa) delete hero.statuses.cursed;
         const restored = hero._cursedAtkSuppressed || 0;
         delete hero._cursedAtkSuppressed;
         if (restored > 0) {
@@ -407,11 +412,13 @@ module.exports = {
           // — gleiches Ergebnis wie das fruehere `hero.atk = restored`.
           engine._applyHeroAtkDelta(hero, hostOwner, hostHeroIdx, restored);
         }
-        await engine.runHooks('onStatusRemoved', {
-          target: hero, status: STATUS_NAME,
-          heroOwner: hostOwner, heroIdx: hostHeroIdx,
-          _viaCleanse: false, _skipReactionCheck: true,
-        });
+        if (statusNochDa) {
+          await engine.runHooks('onStatusRemoved', {
+            target: hero, status: STATUS_NAME,
+            heroOwner: hostOwner, heroIdx: hostHeroIdx,
+            _viaCleanse: false, _skipReactionCheck: true,
+          });
+        }
         engine.sync();
       }
     },

@@ -58,17 +58,9 @@ module.exports = {
       // Must meet Shield's own level req (Magic Arts Lv1)
       if (!engine.heroMeetsLevelReq(seite, hi, amsData, seite !== pi ? { levelSourcePi: pi } : undefined)) continue;
 
-      // Count Magic Arts level on this hero (with Performance)
-      const abZones = gs.players[seite]?.abilityZones?.[hi] || [];
-      let maLevel = 0;
-      for (const slot of abZones) {
-        if (!slot || slot.length === 0) continue;
-        const base = slot[0];
-        for (const ab of slot) {
-          if (ab === 'Magic Arts') maLevel++;
-          else if (ab === 'Performance' && base === 'Magic Arts') maLevel++;
-        }
-      }
+      // Magic Arts-Stufe des Helden ueber den Engine-Helfer (W24a, N1-15): zaehlt auch Abilities in Support Zones (Xal), Performance-Joker und die
+      // Negations-Blankung — vorher eine eigene Zaehlung nur ueber die Ability Zones.
+      const maLevel = engine.effectiveSchoolLevelForCaster('Magic Arts', pi, hi, seite);
 
       if (maLevel >= spellLevel) return true;
     }
