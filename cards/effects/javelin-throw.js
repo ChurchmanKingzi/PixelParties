@@ -69,6 +69,8 @@ function eligibleHeroes(engine, pi) {
   const out = [];
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (engine.isHeroIncapacitated(physOwner, hi)) continue;
+    // W32a (Al, 22.10.2026): der Wurf ist ein Attack DES HELDEN — Frozen/Stunned/Webbed/Negated/Attack-Sperren blocken (`heroKannAngreifen`, wie `validateActionPlay`).
+    if (!engine.heroKannAngreifen(physOwner, hi, pi)) continue;
     if (equippedArtifacts(engine, physOwner, hi).length === 0) continue;
     out.push({ physOwner, heroIdx: hi });
   }
@@ -83,8 +85,9 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
-  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-  treatedAsAttack: { level: 0 },
+  // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+  // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten Helden (nicht mehr fix 0).
+  treatedAsAttack: { ability: 'Fighting' },
   isTargetingArtifact: true,
   requiresTarget: true,
   animationType: 'none',
@@ -120,7 +123,7 @@ module.exports = {
     const hi = sel.heroIdx;
     const heroOwner = sel.owner ?? pi;   // physische Seite des Helden
     const hero = gs.players[heroOwner]?.heroes?.[hi];
-    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi)) return { aborted: true };
+    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi) || !engine.heroKannAngreifen(heroOwner, hi, pi)) return { aborted: true };   // W32a: nicht angriffsfähig → blockiert
     if (engine.heroSideOf(heroOwner, hero) !== pi) return { aborted: true };
 
     // ── Artefakt waehlen ──────────────────────────────────────────
@@ -216,6 +219,8 @@ module.exports = {
 
     // Typ 'attack', Quelle mit heroIdx → Attack-Declare-Lauscher,
     // Angriffsmodifikatoren.
+    // W32a (Al, 22.10.2026): der Wurf zählt als Attack des Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: hi, heroOwner, resolve: async () => {
     if (target.type === 'hero') {
       const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tgtHero && tgtHero.hp > 0) await engine.actionDealDamage(attackSource, tgtHero, damage, 'attack');
@@ -223,6 +228,8 @@ module.exports = {
       await engine.actionDealCreatureDamage(attackSource, target.cardInstance, damage, 'attack',
         { sourceOwner: pi, canBeNegated: true });
     }
+    return true;
+    } });
     engine.sync();
     return true;
   },

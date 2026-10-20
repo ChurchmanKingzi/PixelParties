@@ -35,6 +35,8 @@ async function dolchSchlag(ctx, pi) {
   const gs = engine.gs;
   const hero = ctx.attachedHero;
   const heroIdx = ctx.cardHeroIdx;
+  // W32a (Al, 22.10.2026): der Schlag ist ein Attack DES TRÄGERS — kann er nicht angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), schlägt der Dolch nicht zu (Stempel unberührt).
+  if (!engine.heroKannAngreifen(ctx.cardHeroOwner ?? pi, heroIdx, pi)) return;
 
   // Once per turn, per Dagger. Peek now; claim only on commit so a
   // declined "may" stays usable on a later sacrifice this turn.
@@ -102,6 +104,8 @@ async function dolchSchlag(ctx, pi) {
   const damage = Math.max(0, liveHero?.atk || 0);
   const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
 
+  // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
   if (tHero) {
     await engine.actionDealDamage(source, tHero, damage, 'attack');
   } else if (tInst) {
@@ -110,6 +114,8 @@ async function dolchSchlag(ctx, pi) {
       { sourceOwner: pi, canBeNegated: true },
     );
   }
+  return true;
+  } });
 
   engine.log('sacrificial_dagger', {
     player: gs.players[pi]?.username, hero: hero.name,
@@ -121,7 +127,8 @@ async function dolchSchlag(ctx, pi) {
 module.exports = {
   // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
   // W30a (Al, 21.10.2026): This counts as the equipped Hero hitting that target with an Attack → Stufe = FIGHTING-LEVEL des ausgerüsteten Helden (`fightingOfHost`; ohne Instanz 0).
-  treatedAsAttack: { level: 0, fightingOfHost: true },
+  // W32a (Al, 22.10.2026): allgemeine Regel „Zählt als Attack eines Helden = Ability-Level dieses Helden" (hier Fighting-Level des Trägers); die Deklaration trägt keine Sonderstufe mehr.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['support'],
 
   cpuMeta: {

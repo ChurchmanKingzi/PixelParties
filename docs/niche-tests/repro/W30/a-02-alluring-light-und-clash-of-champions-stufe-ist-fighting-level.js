@@ -5,7 +5,9 @@
 // Helden, NICHT die gedruckte Stufe der Karte. Gleiche Leser wie beim Greatmaw (W29a): Stealth, Future Tech Jetpack, Glass Wall, Test Flight, Future Tech Escape Device.
 // „Der gewählte Held" bei Alluring Light = der GEGNERISCHE Held, den man als Angreifer wählt (Schritt ①); das Opfer (Schritt ②) ist ein eigenes Ziel – die Leser liegen dort. Die Wahl des Angreifers
 // selbst bleibt ein Spell der gedruckten Stufe. Clash of Champions hat noch kein Kartenskript: der Zweikampf-Helfer `_hero-duel-shared.js` kennt die Option `alsHeldenAngriff` (je Schlag Stempel
-// mit dem Fighting-Level des SCHLAGENDEN Helden); Duel („perform a normal Attack") bleibt unverändert (Frage an Al in der Abgabe).
+// mit dem Fighting-Level des SCHLAGENDEN Helden); Duel („perform a normal Attack") blieb in W30a unverändert (Frage an Al).
+// ★ W32a (Al, 22.10.2026): Duel ebenfalls „auch Fighting-Level!" – `duel.js` setzt `alsHeldenAngriff: true` (Prüfung: `W32/a-04`); der Duel-Pfad-Test unten prüft nur noch den Helfer OHNE die Option.
+// ★ W32a, Punkt 3: der Alluring-Light-TREFFER ist ein Attack des gezwungenen Helden (Quelle = Heldenkarte, Typ `attack`), die Karte selbst bleibt ein Spell Lv 1 (Prüfung: `W32/a-03`).
 // Aufruf: node docs/niche-tests/repro/W30/a-02-alluring-light-und-clash-of-champions-stufe-ist-fighting-level.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const { duell } = require('../../../../cards/effects/_hero-duel-shared.js');

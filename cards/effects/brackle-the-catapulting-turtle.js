@@ -120,8 +120,9 @@ function _eligibleSacrificeCandidates(engine, pi) {
 }
 
 module.exports = {
-  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte zählt für Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) als LEVEL 0 (Engine: `_heldenEffektStufe`).
-  treatedAsAttack: { level: 0 },
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Brackles (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['hero'],
   heroEffect: true,
   // Rein schaedlich: eigene Kreatur opfern, um Schaden auszuteilen. Unter
@@ -299,6 +300,8 @@ module.exports = {
     // ── Step 5: deal damage as an Attack ─────────────────────────────────
     const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
       ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette; das Opfer (Kosten) bleibt bezahlt, auch wenn sie den Treffer negiert.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {
@@ -310,6 +313,8 @@ module.exports = {
         { sourceOwner: pi, canBeNegated: true },
       );
     }
+    return true;
+    } });
 
     // Wait for the IMPACT phase to finish before running the
     // sacrifice — the explosion at the target plays during this

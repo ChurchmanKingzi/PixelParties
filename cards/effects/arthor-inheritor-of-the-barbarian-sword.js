@@ -28,8 +28,9 @@ const FAKE_ATTACK_DATA = {
 };
 
 module.exports = {
-  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte zählt für Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) als LEVEL 0 (Engine: `_heldenEffektStufe`).
-  treatedAsAttack: { level: 0 },
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Arthors (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],

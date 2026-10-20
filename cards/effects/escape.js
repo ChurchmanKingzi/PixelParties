@@ -88,7 +88,7 @@ module.exports = {
    * @param {number} amount    - Incoming damage
    * @returns {boolean}
    */
-  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount /*, type */) {
+  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount, type) {
     if (!(amount > 0)) return false;
     // Trigger condition: damage would be lethal. `target.hp` is the
     // current HP at the moment of the check; the reaction is offered
@@ -102,7 +102,9 @@ module.exports = {
     // from the lookup and are filtered out here.
     const cd = engine._getCardDB()[source?.name];
     if (!cd) return false;
-    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') return false;
+    // W32a (Al, 22.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Heldeneffekte Broghan & Co./Alice, Gegenstandseffekte, Greatmaw-Treffer, Alluring-Light-Angriff).
+    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell'
+        && !require('./_hooks').quelleIstAttackOderSpell(engine, source, type)) return false;
 
     // The target Hero must be able to play Escape themselves. The
     // engine's standard level-req helper handles Performance,

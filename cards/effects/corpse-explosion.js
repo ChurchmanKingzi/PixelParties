@@ -87,9 +87,8 @@ async function explode(engine, defeatedControllerSide, loc) {
 
 /** W24a (N1-05): war die Todesquelle eine Attack- oder Spell-KARTE (Besiegen ohne Schaden)? */
 function quelleIstAttackOderSpell(engine, source) {
-  const cd = source?.name ? engine._getCardDB()[source.name] : null;
-  const typ = String(cd?.cardType || '');
-  return typ.includes('Attack') || typ.includes('Spell');
+  // W32a (Al, 22.10.2026): auch ein Effekt, der als Attack/Spell ZÄHLT (Kohta „defeat it … treated as … an Attack", Gegenstandseffekte) — zentrale Klassifikation in `_hooks.js`.
+  return require('./_hooks').quelleIstAttackOderSpell(engine, source);
 }
 
 module.exports = {

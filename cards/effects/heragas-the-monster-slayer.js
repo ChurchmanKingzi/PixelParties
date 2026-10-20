@@ -60,8 +60,9 @@ function eligibleCreatures(engine, pi) {
 }
 
 module.exports = {
-  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte zählt für Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) als LEVEL 0 (Engine: `_heldenEffektStufe`).
-  treatedAsAttack: { level: 0 },
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Heragas' (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['hero'],
   heroEffect: true,
   // Nur die Zeitmarken-Buchfuehrung im onTurnEnd laeuft auch durch
@@ -134,8 +135,12 @@ module.exports = {
     });
 
     const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
-    await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
-      { sourceOwner: pi, canBeNegated: true });
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
+      await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
+        { sourceOwner: pi, canBeNegated: true });
+      return true;
+    } });
 
     engine.log('heragas_slay', {
       player: gs.players[pi].username, creature: inst.name, damage: betrag,

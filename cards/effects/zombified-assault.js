@@ -50,7 +50,9 @@ function durchGegnerAttackOderSpell(engine, pi, d) {
   if (d.type && STATUS_TYPEN.has(d.type)) return false;
   if (d.type === 'attack' || (typeof d.type === 'string' && d.type.includes('spell'))) return true;
   const cd = d.source?.name ? engine._getCardDB()[d.source.name] : null;
-  return !!cd && (cd.cardType === 'Spell' || cd.cardType === 'Attack');
+  if (!!cd && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) return true;
+  // W32a (Al, 22.10.2026): auch ein Besiegen ohne Schaden durch einen Effekt, der als Attack/Spell ZÄHLT (Kohta, Gegenstandseffekte).
+  return require('./_hooks').quelleIstAttackOderSpell(engine, d.source, d.type);
 }
 
 /** Kann diese Karte ueberhaupt als Creature zurueck aufs Brett? */

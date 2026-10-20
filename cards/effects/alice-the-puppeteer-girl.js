@@ -34,7 +34,9 @@ function _qualifies(inst, pi, currentTurn, cardDB) {
 module.exports = {
   // ★ W12 (Al, Q108/H01-heroes-06): „Ja, Alices Effekt soll blockbar sein und als lv 0 gelten!" — der Effekt zaehlt fuer Stufen-Spell-
   // Immunitaeten (Anti Magic: `magic_immune` Stufe >= 0) als Destruction Magic Spell der Stufe 0 (Engine: `_spellLevelAlsQuelle`).
-  treatedAsSpell: { level: 0, school: 'Destruction Magic' },
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": Alice zählt als Destruction-Magic-Spell der Stufe = ihr DESTRUCTION-MAGIC-LEVEL
+  // (nicht mehr fix 0) — Anti Magic (Spell-Immunität nach Stufe), Anti Magic Shield, Glass Wall & Co. lesen sie über `_heldenEffektStufe`/`_spellLevelAlsQuelle`.
+  treatedAsSpell: { school: 'Destruction Magic' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
@@ -134,7 +136,8 @@ module.exports = {
       );
       if (inst) {
         await engine.actionDealCreatureDamage(
-          { name: 'Alice, the Puppeteer Girl', heroIdx }, inst, damage, 'destruction_spell',
+          // W32a (Al, 22.10.2026): die Quelle nennt Spieler und Brettseite des Helden wie bei jedem Heldeneffekt (Reaktionen auf „Spell besiegt Kreatur": Zombified Assault …; Stufe = Destruction-Level).
+          { name: 'Alice, the Puppeteer Girl', owner: pi, controller: pi, heroIdx, ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) }, inst, damage, 'destruction_spell',
           { sourceOwner: pi, canBeNegated: true }
         );
       }

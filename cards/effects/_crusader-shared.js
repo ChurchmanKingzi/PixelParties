@@ -244,8 +244,10 @@ function makeCrusaderArtifact(spec) {
   return {
     activeIn: ['support'],
 
-    // W27a (Al, 21.10.2026): „That is treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-    treatedAsAttack: { level: 0 },
+    // W27a (Al, 21.10.2026): „That is treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+    // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des Trägers (Cecilia; nicht mehr fix 0). Kann der Träger nicht
+    // angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), ist der Effekt nicht aktivierbar (`canActivateEquipEffect`).
+    treatedAsAttack: { ability: 'Fighting' },
 
     canEquipToHero(gs, pi, heroIdx, engine) {
       return darfAufHeld(gs, pi, heroIdx, engine, cardName);
@@ -255,7 +257,10 @@ function makeCrusaderArtifact(spec) {
 
     canActivateEquipEffect(ctx) {
       const inst = ctx.card;
-      return !!inst && inst.zone === 'support';
+      if (!(inst && inst.zone === 'support')) return false;
+      const engine = ctx._engine;
+      if (!engine || typeof engine.heroKannAngreifen !== 'function') return true;
+      return engine.heroKannAngreifen(ctx.cardHeroOwner ?? (inst.controller ?? inst.owner), inst.heroIdx, ctx.cardOwner ?? (inst.controller ?? inst.owner));   // W32a: der Träger muss angreifen können
     },
 
     // Die Engine wertet den Rueckgabewert aus: `false` heisst
@@ -299,6 +304,9 @@ function makeCrusaderArtifact(spec) {
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette;
+      // negiert eine Reaktion den Schlag, hat auch die eigene Klausel (Schaden/Besiegen) keinen Anlass.
+      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, resolve: async () => {
       if (attackAnim) {
         await attackAnim(ctx, {
           engine, pi, feld, heroIdx, target,
@@ -317,6 +325,8 @@ function makeCrusaderArtifact(spec) {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
       const hatSchaden = hero ? (hero.hp < hpVorher) : false;
       const besiegt = hero ? (hpVorher > 0 && hero.hp <= 0) : false;

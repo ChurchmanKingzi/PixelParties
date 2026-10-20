@@ -81,7 +81,8 @@ module.exports = {
   // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
   // W30a (Al, 21.10.2026): Bamboo Staff nennt den Helden als Angreifer (treated as that Hero hitting the target with an Attack) → die Stufe ist das FIGHTING-LEVEL
   // des ausgerüsteten Helden (`fightingOfHost`: Quelle = Karteninstanz in den Zielwahl-/Reaktionsfenstern; im Treffer trägt das Quellobjekt den dynamischen Stempel). Ohne Instanz: 0.
-  treatedAsAttack: { level: 0, fightingOfHost: true },
+  // W32a (Al, 22.10.2026): allgemeine Regel „Zählt als Attack eines Helden = Ability-Level dieses Helden" (hier Fighting-Level des Trägers); die Deklaration trägt keine Sonderstufe mehr.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -117,6 +118,8 @@ module.exports = {
       const feld    = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
       const hero    = gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // W32a (Al, 22.10.2026): der Schlag ist ein Attack DES TRÄGERS — kann er nicht angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), löst der Stab nicht aus.
+      if (!engine.heroKannAngreifen(feld, heroIdx, pi)) return;
 
       // Per-instance soft-HOPT.
       if (ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
@@ -185,6 +188,8 @@ module.exports = {
       await engine._delay(380);
 
       const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
@@ -196,6 +201,8 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
       // Collect unique struck targets from the damage log (matches
       // Arthor's "treat as Attack" pattern), then fire afterSpellResolved

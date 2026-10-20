@@ -6,7 +6,10 @@
 // liest `_heldenEffektStufe` die Deklaration `treatedAsAttack: { fightingOfHost: true }` (Träger-Fighting-Level).
 // Je Gegenstand, Fighting-Level F = 0..3 und Sitz: jeder Leser schützt genau dann, wenn F die Bedingung erfüllt (Stealth Lv1/Lv2, Jetpack 0/1 Kopien, Glass Wall „level 1 or lower", Test Flight
 // „lower than the Magic Arts level" [2], Escape Device „equal to or lower than the number of … in your discard pile" [0]). Dazu: der TRÄGER zählt (nicht ein anderer Held), Xalibur-Fighting,
-// harte Negierung, Helfer direkt, Gegenprobe Javelin Throw / Sword in a Bottle / Crusader's (Text nennt keinen Angreifer-Helden → bleiben Level 0).
+// harte Negierung, Helfer direkt.
+// ★ W32a (Al, 22.10.2026): die Gegenprobe „Javelin Throw / Sword in a Bottle / Crusader's bleiben Level 0" ist überholt – ALLGEMEINE REGEL „Zählt als Attack eines Helden = Ability-Level dieses Helden":
+// auch diese gelten mit dem Fighting-Level ihres Helden (Al: „Sie nehmen trotzdem das Fighting-Level"); der Helfer-Block unten prüft jetzt das (volle Staffel: `W32/a-01`). Die „harte Negierung der
+// Abilities" ist hier die Stowaway-Form (Abilities weg, Held bleibt handlungsfähig): ein hart negierter Held (Standardform) kann nach W32a gar nicht mehr angreifen (Bamboo Staff/Dagger ruhen).
 // Aufruf: node docs/niche-tests/repro/W30/a-01-bamboo-staff-und-sacrificial-dagger-stufe-ist-fighting-level.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const JET = 'Future Tech Jetpack', GW = 'Glass Wall', TF = 'Test Flight', ED = 'Future Tech Escape Device';
@@ -93,8 +96,8 @@ const sauber = (R, r, was) => R.check(`${was}: sauber`, r.t.errors.length === 0 
         R.check('Support Zone: keine Engine-Fehler', r.t.errors.length === 0, r.t.errors);
       }
       {
-        const r = await szene(item, me, op, GW, { F: 3, vorbereiten: (t) => t.heroStatus(me, 0, 'negated') });
-        R.check('Abilities hart negiert (Fighting 3 zählt nicht) → Level 0 → Glass Wall wehrt ab', gefragt(r.t, GW) >= 1 && r.schaden === 0, { g: gefragt(r.t, GW), s: r.schaden });
+        const r = await szene(item, me, op, GW, { F: 3, vorbereiten: (t) => { t.hero(me, 0).statuses.negated = { appliedTurn: 0, _fromAttachment: 'Stowaway', abilitiesNegated: true }; } });
+        R.check('Abilities negiert (Stowaway-Form; Fighting 3 zählt nicht) → Level 0 → Glass Wall wehrt ab', gefragt(r.t, GW) >= 1 && r.schaden === 0, { g: gefragt(r.t, GW), s: r.schaden });
         sauber(R, r, 'Negierung');
       }
     }
@@ -113,7 +116,9 @@ const sauber = (R, r, was) => R.check(`${was}: sauber`, r.t.errors.length === 0 
       R.check(`${n}: Instanz, aber Schadenstyp spell → keine Stufe`, e._heldenEffektStufe(n, 'destruction_spell', inst) === null, e._heldenEffektStufe(n, 'destruction_spell', inst));
     }
     for (const n of ['Javelin Throw', 'Sword in a Bottle', "Crusader's Arm-Cannon", "Crusader's Cutlass", "Crusader's Flintlock", "Crusader's Hookshot"]) {
-      R.check(`${n} (Text nennt keinen Angreifer-Helden): bleibt Level 0, auch mit Fighting 3 beim Helden`, e._heldenEffektStufe(n, 'attack', { name: n, owner: 0, heroIdx: 0, zone: 'support' }) === 0, e._heldenEffektStufe(n, 'attack', { name: n, owner: 0, heroIdx: 0, zone: 'support' }));
+      // W32a (Al, 22.10.2026): ebenfalls das Fighting-Level des Helden (hier 3), ohne Held-Bezug (nur der Name) die Untergrenze 0
+      R.check(`${n} (W32a: zählt als Attack des Helden): Fighting-Level 3 des Helden 0`, e._heldenEffektStufe(n, 'attack', { name: n, owner: 0, heroIdx: 0, zone: 'support' }) === 3, e._heldenEffektStufe(n, 'attack', { name: n, owner: 0, heroIdx: 0, zone: 'support' }));
+      R.check(`${n}: nur der Name (ohne Held) → Untergrenze 0`, e._heldenEffektStufe(n, 'attack') === 0, e._heldenEffektStufe(n, 'attack'));
     }
     const st = e.heldenAngriffStempel(0, 0);
     R.check('heldenAngriffStempel: dynamisch (Fighting 3 → 3, danach negiert → 0)', st.level === 3 && (t.heroStatus(0, 0, 'negated'), st.level === 0), st.level);

@@ -6,6 +6,9 @@
 // (b) Jetpack (0 Kopien in der Ablage: 0 ≤ 0) schützt vor Attack-Heldeneffekten — Alice (Spell) wird von der Jetpack NICHT erfasst („Attacks");
 // (c) Gegenproben: ein gewöhnlicher Heldeneffekt (Siphem, keine Attack) ist keine Quelle mit Stufe, Stealth/Jetpack lassen ihn durch; eine echte Attack-Karte behält ihre gedruckte Stufe
 // (Stealth Lv1 schützt vor Lv-1-Attacken, nicht vor Lv-2); Stealth schützt nicht vor dem EIGENEN Heldeneffekt.
+// ★ W32a (Al, 22.10.2026): ALLGEMEINE REGEL „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden" – statt „IMMER Level 0" ist die Quellstufe das Fighting-Level (Alice: Destruction Magic)
+// des wirkenden Helden. Dieser Repro läuft mit Helden OHNE Ability (Level 0 = Untergrenze: Stealth Lv1 und Jetpack schützen) und prüft zusätzlich Held mit Ability-Level 2 (Stealth Lv1 schützt
+// NICHT mehr); die volle Staffel steht in `W32/a-02`.
 // Aufruf: node docs/niche-tests/repro/W27/a-02-heldeneffekte-level-0-bei-stealth-und-jetpack.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const JET = 'Future Tech Jetpack';
@@ -65,6 +68,21 @@ async function zielen(t, me, op, held, rec) {
         await zielen(t, me, op, held, rec);
         R.check(`Jetpack: Träger ${attack ? 'wird NICHT angeboten (Attack, Level 0 ≤ 0)' : 'bleibt wählbar (keine Attack)'}`, rec.gesehen && (rec.angeboten === !attack), rec);
         R.check('sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() }); }
+    }
+  }
+  // (W32a) mit Ability-Level 2 des wirkenden Helden schützt Stealth Lv1 („level 1 or lower") nicht mehr
+  for (const [me, op] of [[0, 1], [1, 0]]) {
+    for (const held of ['Broghan', 'Brackle', 'Arthor', 'Kohta', 'Alice']) {
+      R.section(`(W32a) Sitz ${me}: ${held} mit Ability-Level 2 gegen Stealth Lv1`);
+      const t = await H.fresh({ hand: [[], []], deckSize: 30 });
+      t.setAbilities(op, 0, [['Stealth'], [], []]);
+      wirker(t, me, held);
+      const schule = held === 'Alice' ? 'Destruction Magic' : 'Fighting';
+      t.setAbilities(me, 0, [[schule, schule], [], []]);
+      const rec = {};
+      await zielen(t, me, op, held, rec);
+      R.check('Stealth Lv1 schützt nicht (Quelle Stufe 2 > 1): Träger wird angeboten', rec.gesehen && rec.angeboten, rec);
+      R.check('sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
     }
   }
   // Treffer-Pfad „or HIT" (Jetpack): Flächen-/Direktschaden einer Heldeneffekt-Quelle prallt ab — Broghan trifft über actionDealDamage mit Typ 'attack'

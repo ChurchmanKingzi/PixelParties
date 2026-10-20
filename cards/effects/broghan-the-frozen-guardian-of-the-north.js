@@ -45,8 +45,9 @@ function computeDamage(deckSize) {
 }
 
 module.exports = {
-  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte zählt für Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) als LEVEL 0 (Engine: `_heldenEffektStufe`).
-  treatedAsAttack: { level: 0 },
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte — Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device …) lesen die Quellstufe.
+  // W32a (Al, 22.10.2026): „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": die Quellstufe ist das FIGHTING-LEVEL Broghans (nicht mehr fix 0) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
@@ -113,6 +114,8 @@ module.exports = {
     const attackSource = { name: CARD_NAME, owner: pi, heroIdx, controller: pi,
       ...(ctx.cardHeroOwner != null && ctx.cardHeroOwner !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.: Brettseite des Angreifers
 
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Reaktionen auf Attacks (Magic Topaz, Arrows …) greifen über die virtuelle Attack-Kette (Muster Arthor).
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
     if (target.type === 'hero') {
       const targetHero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (targetHero && targetHero.hp > 0) {
@@ -130,6 +133,8 @@ module.exports = {
         );
       }
     }
+    return true;
+    } });
 
     engine.sync();
     await engine._delay(800);

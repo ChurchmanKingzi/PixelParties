@@ -217,7 +217,9 @@ module.exports = {
       if (src.heroIdx !== ctx.cardHeroIdx) return;
       const cd = engine._getCardDB()[src.name];
       if (!cd) return;
-      const isAttack = cd.cardType === 'Attack';
+      // W32a (Al, 22.10.2026): auch ein Effekt, der als Attack dieses Helden ZÄHLT (Bamboo Staff/Sacrificial Dagger am Träger, Javelin Throw, Sword in a Bottle,
+      // Infected Greatmaw-Treffer) ist „eine Attack".
+      const isAttack = cd.cardType === 'Attack' || engine._heldenEffektStufe?.(src.name, 'attack', src) != null;
       const isDMSpell = cd.cardType === 'Spell'
         && (cd.spellSchool1 === 'Destruction Magic'
             || cd.spellSchool2 === 'Destruction Magic');

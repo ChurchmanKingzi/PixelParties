@@ -12042,7 +12042,8 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
       const basis = { sourceData: getCardDB()[cardName], cardName, damageType: config.damageType, chooserIdx: casterPi, allTargets: opferListe };
       const waehler = angreiferListe.length > 0 ? angreiferListe : [null];
       if (waehler.every(a => engine.heroBlocksTargeting(t.owner, t.heroIdx,
-        a ? { ...basis, chooserHeroIdx: a.heroIdx, chooserHeroOwner: a.owner } : basis))) geblockt.push(t);
+        // W32a (Al, 22.10.2026): die Quellstufe ist das FIGHTING-LEVEL des gewaehlten Angreifer-Helden (Stealth/Jetpack lesen `info.treatedAsLevel`).
+        a ? { ...basis, chooserHeroIdx: a.heroIdx, chooserHeroOwner: a.owner, source: { name: cardName, owner: casterPi, controller: casterPi, heroIdx: a.heroIdx, heroOwner: a.owner } } : basis))) geblockt.push(t);
     }
     for (const t of geblockt) t.ineligible = true;
   }

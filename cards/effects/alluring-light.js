@@ -147,14 +147,21 @@ module.exports = {
         // ★ „treated as the chosen Hero attacking" — die Quelle ist der
         // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
         // der Angriff ihm, samt allem, was daran haengt.
+        // ★ W32a (Al, 22.10.2026): „Alluring Light selbst zählt als Lv-1-Spell. Der von Alluring Light provozierte Angriff zählt NICHT als Spell, sondern als Attack mit dem
+        // Fighting-Level des von Light zum Angriff gezwungenen Heroes." Die Quelle des Treffers ist deshalb der gezwungene HELD (Name = Heldenkarte, Schadenstyp `attack`),
+        // NICHT die Spell-Karte „Alluring Light": Anti Magic Shield / Magic Mirror / Anti Magic (Spell-Leser) sehen keinen Spell, Attack-Reaktionen (Escape, Magic Topaz,
+        // Arrows, Bluff …) sehen den Angriff. Die Karte selbst (die Wahl) bleibt ein Spell der Stufe 1 (Instanz `ctx.card`).
         const attackSource = {
-          name: CARD_NAME,
+          name: angreifer.name,
           owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
           usesHeroAtk: true,
           // W30a (Al, 21.10.2026): „treated as the chosen Hero attacking" → die Quellstufe ist das FIGHTING-LEVEL des gewählten (gegnerischen) Helden,
           // NICHT die gedruckte Stufe 1 der Karte (Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …: `engine._heldenEffektStufe`).
           treatedAsAttack: angriffStempel,
         };
+        // W32a: der provozierte Angriff gehört dem GEGNER (Held des Angriffs) — Attack-Reaktionen (Magic Topaz, Arrows …) seiner Seite über die virtuelle Attack-Kette;
+        // der gezwungene Held muss dafür nicht angriffsfähig sein (er wird gelockt, nicht aktiv: `casterCheck: false`).
+        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, resolve: async () => {
         const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
         // ── Animation ② der angelockte Held rammt hinein ──────────────
@@ -182,6 +189,8 @@ module.exports = {
             );
           }
         }
+        return true;
+        } });
 
         engine._broadcastEvent('play_zone_animation', {
           type: 'explosion', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,

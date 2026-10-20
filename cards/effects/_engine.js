@@ -7350,15 +7350,51 @@ class GameEngine {
    * `treatedAsSpell: { level }` deklariert (Alice, the Puppeteer Girl: „treated as … a Destruction Magic Spell", Al: „soll blockbar sein und
    * als lv 0 gelten"), zaehlt mit dieser Stufe. EINE Stelle fuer alle drei Anti-Magic-Sperrpunkte (Schaden, Voraussage, Nicht-Schaden).
    */
-  _spellLevelAlsQuelle(sourceName, damageType) {
+  _spellLevelAlsQuelle(sourceName, damageType, source) {
     if (!sourceName) return null;
     const card = this._getCardDB()[sourceName];
     if (card?.cardType === 'Spell') return card.level || 0;
     // `treatedAsSpell` gilt nur fuer den Spell-Schaden der Karte selbst (nicht fuer ihre sonstigen Treffer unter demselben Namen).
     if (damageType != null && damageType !== 'destruction_spell' && damageType !== 'spell') return null;
     const ts = loadCardEffect(sourceName)?.treatedAsSpell;
-    if (ts && typeof ts === 'object') return Number.isFinite(ts.level) ? ts.level : 0;
+    // ★ W32a (Al, 22.10.2026): „Zählt als Spell eines Helden" = ABILITY-LEVEL dieses Helden in der genannten Schule (Alice: Destruction Magic) — `_deklStufe`.
+    if (ts && typeof ts === 'object') return this._deklStufe(ts, source, sourceName, null);
     return null;
+  }
+
+  /**
+   * ★ W32a (Al, 22.10.2026, „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden"): Held hinter einem Effekt, der als Attack/Spell ZÄHLT — `{ seite, heroIdx }`
+   * (Brettseite + Index) oder `null`. Quelle der Wahrheit sind die Koordinaten des Quellobjekts (`heroOwner ?? owner` + `heroIdx`; Heldenskript-Quellen, Gegenstandsquellen mit
+   * Helden-Index, Karteninstanzen eines Gegenstands auf dem Brett: Träger); ohne Koordinaten (Karteninstanz in der Hand, nur der Name) bei Heldenkarten der erste lebende Held dieses
+   * Namens (aktiver Spieler zuerst). Ohne Held-Bezug (reine Namensabfrage, z. B. `normalizeValidTargets`) → `null`: die Stufe ist dann die Untergrenze 0.
+   */
+  _effektHeld(source, sourceName) {
+    const src = source?.cardInstance || source;
+    const seite = src?.heroOwner ?? src?.owner;
+    const hi = src?.heroIdx;
+    if (Number.isInteger(seite) && Number.isInteger(hi) && hi >= 0 && this.gs.players[seite]?.heroes?.[hi]?.name) return { seite, heroIdx: hi };
+    const card = sourceName ? this._getCardDB()[sourceName] : null;
+    if (card && /Hero/.test(String(card.cardType || ''))) {
+      const reihe = [this.gs.activePlayer, ...this.gs.players.map((_, i) => i).filter(i => i !== this.gs.activePlayer)];
+      for (const i of reihe) {
+        const idx = (this.gs.players[i]?.heroes || []).findIndex(h => h?.name === sourceName && h.hp > 0);
+        if (idx >= 0) return { seite: i, heroIdx: idx };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * ★ W32a: Stufe einer Deklaration `treatedAsAttack` / `treatedAsSpell` — ABILITY-LEVEL des Helden hinter dem Effekt (`_effektHeld`): bei „Attack" das Fighting-Level
+   * (`ability: 'Fighting'`, Standard), bei „Spell einer Schule" das Level der genannten Schule (`school`). Veraltete Deklaration ohne Schule/Fähigkeit (`{ level }`): feste Stufe.
+   * Ohne erkennbaren Helden: `decl.level` bzw. 0 (Untergrenze). Immer das AKTUELLE Level (Negierung der Abilities = 0, Xalibur-Stapel zählen).
+   */
+  _deklStufe(decl, source, sourceName, standardSchule) {
+    const schule = decl?.school || decl?.ability || standardSchule || null;
+    if (!schule) return Number.isFinite(decl?.level) ? decl.level : 0;
+    const h = this._effektHeld(source, sourceName);
+    if (!h) return Number.isFinite(decl?.level) ? decl.level : 0;
+    return this.effectiveSchoolLevelForCaster(schule, h.seite, h.heroIdx, h.seite) || 0;
   }
 
   /**
@@ -7391,6 +7427,11 @@ class GameEngine {
    * `treatedAsAttack`) für Stufen-Bedingungen von Reaktionen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) — immer LEVEL 0 (Deklaration
    * `{ level }`, Standard 0). Nur Heldenkarten und nur für den passenden Schadenstyp (`attack` bzw. `*_spell`); sonst `null` (keine Stufe, keine Entscheidung).
    * Anti Magic (Spell-Immunität) liest weiter `_spellLevelAlsQuelle`.
+   * ★ W32a (Al, 22.10.2026) — ALLGEMEINE REGEL „Zählt als Attack/Spell eines Helden = ABILITY-LEVEL dieses Helden": die Stufe ist NICHT mehr fix 0, sondern das aktuelle
+   * Ability-Level des Helden, der den Effekt wirkt (Attack: Fighting; Spell einer Schule: diese Schule — Alice: Destruction Magic): Heldeneffekte (Broghan, Brackle, Arthor, Heragas,
+   * Kohta, Alice) UND Gegenstandseffekte (Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger). Deklaration im Skript: `treatedAsAttack: { ability: 'Fighting' }`
+   * bzw. `treatedAsSpell: { school: '…' }` (keine Stufe in der Deklaration); der Held ergibt sich aus den Koordinaten des Quellobjekts (`_effektHeld`), die Stufe liest `_deklStufe`.
+   * Quellobjekte, die einen ANDEREN Namen tragen als der Effekt (Greatmaw-Treffer, Bamboo/Dagger [Heldenname], Alluring Light, Duel/Clash) stempeln `treatedAsAttack: heldenAngriffStempel(…)`.
    * ★ W27a (Al, 21.10.2026): gilt ÜBERALL, wo irgendeine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Future Tech Escape Device, Stealth,
    * Future Tech Jetpack) — und auch für als Attack geltende Gegenstandseffekte (Skript-Deklaration `treatedAsAttack` an Artefakt-/Trankkarten, oder Stempel
    * `treatedAsAttack` am Quellobjekt, optionaler 3. Parameter `source`). Gewöhnliche Attack-/Spell-Karten behalten ihre gedruckte Stufe (`null` hier).
@@ -7411,13 +7452,10 @@ class GameEngine {
         && !hasCardType(card, 'Attack') && !hasCardType(card, 'Spell') && !hasCardType(card, 'Creature')) {
       const gs0 = loadCardEffect(sourceName)?.treatedAsAttack;
       if (gs0 && typeof gs0 === 'object') {
-        // W30a (Al, 21.10.2026): Deklaration `fightingOfHost: true` (Bamboo Staff, Sacrificial Dagger: „treated as that Hero hitting … with an Attack"):
-        // Quelle ist die Karteninstanz selbst → Stufe = Fighting-Level des Trägers (Brettseite = `owner` der Instanz); ohne Instanz bleibt `level` (0).
-        const inst = source?.cardInstance || source;
-        if (gs0.fightingOfHost && inst && inst.name === sourceName && Number.isInteger(inst.heroIdx) && inst.heroIdx >= 0 && Number.isInteger(inst.owner)) {
-          return this.heldenAngriffStempel(inst.owner, inst.heroIdx).level;
-        }
-        return Number.isFinite(gs0.level) ? gs0.level : 0;
+        // ★ W32a (Al, 22.10.2026): ALLGEMEINE REGEL „Zählt als Attack/Spell eines Helden = Ability-Level dieses Helden": auch die Gegenstandseffekte (Javelin Throw,
+        // Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger) zählen mit dem FIGHTING-LEVEL des Helden (Träger bzw. gewählter Held, `_effektHeld`); ohne
+        // Held-Bezug (nur der Name, Karteninstanz in der Hand) bleibt die Untergrenze 0. (W30a: `fightingOfHost` nur für Bamboo/Dagger — jetzt für alle.)
+        return this._deklStufe(gs0, source, sourceName, 'Fighting');
       }
     }
     if (!card || !/Hero/.test(String(card.cardType || ''))) return null;
@@ -7425,7 +7463,8 @@ class GameEngine {
     const dt = String(damageType || '');
     const decl = (dt === 'attack' && sc?.treatedAsAttack) || ((dt === 'spell' || /_spell$/.test(dt)) && sc?.treatedAsSpell) || null;
     if (!decl || typeof decl !== 'object') return null;
-    return Number.isFinite(decl.level) ? decl.level : 0;
+    // ★ W32a (Al, 22.10.2026): Heldeneffekt, der als Attack/Spell zählt → Ability-Level DIESES Helden (Attack: Fighting; Spell: die genannte Schule) statt fix 0.
+    return this._deklStufe(decl, source, sourceName, dt === 'attack' ? 'Fighting' : null);
   }
 
   /**
@@ -7466,7 +7505,7 @@ class GameEngine {
     // Anti Magic (`magic_immune` buff) — Spell-source-only, level
     // ≤ buff.level, with `bypassesMagicImmune` opt-out honored.
     if (target.buffs?.magic_immune) {
-      const srcLevel = this._spellLevelAlsQuelle(source.name, damageType);   // W12 (Q108): auch Alice („treated as a Spell")
+      const srcLevel = this._spellLevelAlsQuelle(source.name, damageType, source);   // W12 (Q108): auch Alice („treated as a Spell"); W32a: Stufe = Destruction-Level
       if (srcLevel != null) {
         const buffLevel = target.buffs.magic_immune.level;
         if (typeof buffLevel === 'number' && srcLevel <= buffLevel) {
@@ -8964,7 +9003,7 @@ class GameEngine {
         && hookCtx.amount > 0
         && !hookCtx.cannotBeNegated
         && source?.name) {
-      const srcLevel = this._spellLevelAlsQuelle(source.name, type);   // W12 (Q108): auch Alice („treated as a Spell", Stufe 0)
+      const srcLevel = this._spellLevelAlsQuelle(source.name, type, source);   // W12 (Q108): auch Alice („treated as a Spell"); W32a: Stufe = Destruction-Level
       if (srcLevel != null) {
         const buffLevel = target.buffs.magic_immune.level;
         if (typeof buffLevel === 'number' && srcLevel <= buffLevel) {
@@ -31256,6 +31295,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   sourceEffectKind(sourceCard) {
     if (!sourceCard) return null;
+    // ★ W32a (Al, 22.10.2026: Effekte, die als Attack/Spell ZÄHLEN, sind für die Umleiter/Schutzkarten „ein Attack/Spell"): Heldeneffekt mit `treatedAsAttack`/`treatedAsSpell`
+    // (Broghan, Brackle, Arthor, Heragas, Kohta / Alice), Gegenstandseffekt (Javelin Throw, Sword in a Bottle, Crusader's, Bamboo Staff, Sacrificial Dagger), Greatmaw-Treffer
+    // und Alluring-Light-Angriff (Quellobjekt mit Stempel). Gewöhnliche Heldeneffekte (Locke, Siphem …) bleiben 'hero' (Alleria-Muster).
+    const _zaehlt = this._zaehltAlsArt(sourceCard);
+    if (_zaehlt) return _zaehlt;
     const zone = sourceCard.zone;
     if (zone === 'hero') return 'hero';
     if (zone === 'surprise') return 'surprise';
@@ -31269,6 +31313,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hasCardType(cd, 'Artifact')) return 'artifact';
     if (hasCardType(cd, 'Ability')) return 'ability';
     if (hasCardType(cd, 'Hero')) return 'hero';
+    return null;
+  }
+
+  /**
+   * ★ W32a: Art eines Effekts, der als Attack/Spell ZÄHLT, aber keine Attack-/Spell-Karte ist — `'attack'`, `'spell'` oder `null`. Quellen: Stempel `treatedAsAttack` am Quellobjekt
+   * (Greatmaw/Dagger/Bamboo/Alluring Light) bzw. seiner Karteninstanz, Skript-Deklaration `treatedAsAttack`/`treatedAsSpell` an Heldenkarten und Artefakt-/Trank-Gegenständen
+   * (nie an echten Attack-/Spell-/Creature-Karten: die behalten ihren Kartentyp). Eine Namensabfrage; die Stufe liefert `_heldenEffektStufe`.
+   */
+  _zaehltAlsArt(sourceCard) {
+    if (!sourceCard) return null;
+    if (sourceCard.treatedAsAttack || sourceCard.cardInstance?.treatedAsAttack) return 'attack';
+    const name = sourceCard.name || sourceCard.cardName;
+    const card = name ? this._getCardDB()[name] : null;
+    if (!card || hasCardType(card, 'Attack') || hasCardType(card, 'Spell') || hasCardType(card, 'Creature')) return null;
+    const sc = loadCardEffect(name);
+    if (/Hero/.test(String(card.cardType || ''))) {
+      if (sc?.treatedAsAttack && typeof sc.treatedAsAttack === 'object') return 'attack';
+      if (sc?.treatedAsSpell && typeof sc.treatedAsSpell === 'object') return 'spell';
+      return null;
+    }
+    if (/Artifact|Potion/.test(String(card.cardType || '')) && sc?.treatedAsAttack && typeof sc.treatedAsAttack === 'object') return 'attack';
     return null;
   }
 
@@ -37815,7 +37880,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const srcName = sourceCard?.name;
     const srcData = srcName ? cardDB[srcName] : null;
-    if (!srcData || srcData.cardType !== 'Spell') return null;
+    // W32a (Al, 22.10.2026): auch ein Effekt, der als Spell ZÄHLT (Alice: Heldeneffekt „treated as a Destruction Magic Spell").
+    if (!srcData || (srcData.cardType !== 'Spell' && this._zaehltAlsArt(sourceCard) !== 'spell')) return null;
 
     const shieldedHeroes = [];
     for (const t of targetedHeroes) {
@@ -37918,7 +37984,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const srcName = source?.name;
     const srcData = srcName ? cardDB[srcName] : null;
-    if (!srcData || srcData.cardType !== 'Spell') return false;
+    // W32a (Al, 22.10.2026): auch ein Effekt, der als Spell ZÄHLT (Alice: Heldeneffekt „treated as a Destruction Magic Spell").
+    if (!srcData || (srcData.cardType !== 'Spell' && this._zaehltAlsArt(source) !== 'spell')) return false;
 
     const enchOwner = this._ameHalter(armedArtifact, owner, hero);
     this._inAntiMagicEnchantmentCheck = true;
@@ -37991,6 +38058,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const sourceCard = cardDB[source.name];
       const ct = sourceCard?.cardType;
       if (ct === 'Spell' || ct === 'Attack') isAttackOrSpell = true;
+      else if (this._zaehltAlsArt(source)) isAttackOrSpell = true;   // W32a (Al, 22.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Alice u. a.)
     }
     if (!isAttackOrSpell) return;
 
@@ -40346,6 +40414,35 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._noteFizzledPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
     }
     return result;
+  }
+
+  /**
+   * ★ W32a (Al, 22.10.2026, Punkt 5: „Reactions wie Magic Topaz oder Arrows, die auf Attacks reagieren" reagieren auch auf Effekte, die als Attack ZÄHLEN): virtuelle
+   * Attack-Kette um den Treffer eines Effekts, der als Attack EINES HELDEN zählt — Muster von Arthor, Inheritor of the Barbarian Sword, jetzt für alle (Broghan, Brackle,
+   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light). Aufruf NACH der Zielwahl, VOR dem
+   * Schaden: `resolve` ist der Schaden. Die Kette trägt Typ `Attack`, Besitzer `pi` (der Spieler, dessen Held zuschlägt) und den schlagenden Helden (`heroIdx` auf der Brettseite
+   * `heroOwner`) — Arrows/Magic Topaz (`arrowTriggerCondition`), Attack-Reaktionen und Negierer sehen den Effekt wie eine Attack-Karte. Danach werden die Arrows abgeräumt
+   * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
+   * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
+   */
+  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    if (this._inReactionCheck || this._inMctsSim) {
+      const r = resolve ? await resolve() : null;
+      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+    }
+    const { clearArmedArrows } = require('./_arrows-shared');
+    let res;
+    try {
+      res = await this.executeCardWithChain({
+        cardName: name, owner: pi, cardType: 'Attack', heroIdx,
+        casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+        fromBoard: true, resolve,
+        ...(casterCheck === false ? { casterCheck: false } : {}),
+      });
+    } finally {
+      await clearArmedArrows(this, pi);
+    }
+    return res;
   }
 
   /**
@@ -46130,6 +46227,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W32a (Al, 22.10.2026): „Sie werden geblockt, wenn der Hero nicht angreifen kann (etwa, weil er Frozen ist)." Kann dieser Held (Brettseite `seite`, Index `heroIdx`) gerade
+   * ANGREIFEN? Eine Stelle für alle Effekte, die als Attack EINES HELDEN zählen (Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected
+   * Greatmaw): dieselben Sperren wie `validateActionPlay` für eine Attack-Karte — tot, Frozen, Stunned/Webbed, Bound, harte Negierung (`isHeroIncapacitated`; die leichte
+   * Negierung „nur der Effekt" sperrt nicht), Heldenskript-/Support-Sperren (`canHeroPerformAction`: Saint Nicolas, Plant Golem), Kontrollrechte (`attacken === false`), Blendung
+   * (diese Effekte brauchen alle ein Ziel) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
+   */
+  heroKannAngreifen(seite, heroIdx, pi) {
+    const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (this.isHeroIncapacitated(seite, heroIdx)) return false;
+    if (hero.statuses?.webbed) return false;
+    if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
+    if (this.kontrollRechte(seite, heroIdx).attacken === false) return false;
+    if (this._isHeroBlinded(seite, heroIdx)) return false;
+    const ps = this.gs.players[Number.isInteger(pi) ? pi : seite];
+    if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    return true;
+  }
+
+  /**
    * Centralized "Hero is incapacitated for Action purposes" gate.
    * Returns true when the Hero CANNOT take an Action — used by
    * `inherentAction` capacity checks and any future card script that
@@ -46577,6 +46694,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _rewriteSourceForCreatureCaster(source) {
     const cc = this.gs._spellCasterCreature;
     if (!cc || !source) return source;
+    // ★ W32a (Al, 22.10.2026, Punkt 7: „der Hero soll der Angreifer sein"): ein Treffer, der als Attack EINES HELDEN zählt (Infected Greatmaw, Sacrificial Dagger/Bamboo Staff
+    // im Kreatureneffekt, Alluring Light …), trägt den Stempel `treatedAsAttack` (bzw. `_heroAttackSource`) am Quellobjekt — Angreifer ist der Held, nicht die
+    // wirkende Kreatur: Crimson Web hängt sich an den Helden, Tharxian Horse/Frost Rune/Booby Trap treffen ihn. Echte Kreaturen-Zauber (Demon's Gate …) tragen keinen Stempel.
+    if (source.treatedAsAttack || source._heroAttackSource) return source;
     const srcInstId = source.cardInstance?.id ?? source.id;
     if (srcInstId != null && srcInstId === cc.id) return source;
     if (source._creatureCasterForSource?.id === cc.id) return source;
