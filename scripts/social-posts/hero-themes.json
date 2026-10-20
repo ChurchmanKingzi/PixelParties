@@ -103,9 +103,11 @@
     10
    ]
   ],
-  "px": 7,
-  "feet": 640,
-  "logoFront": true
+  "px": 8,
+  "logoFront": true,
+  "eyeAt": 330,
+  "nameFront": true,
+  "noShadow": true
  },
  "Arthor, Inheritor of the Barbarian Sword": {
   "particles": [

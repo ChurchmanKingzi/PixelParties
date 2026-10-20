@@ -534,6 +534,7 @@ def main():
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
     mid_a.alpha_composite(orn)
     logo = tinted_logo(accent)
+    name_front = bool(hero_cfg.get('nameFront'))            # Name/Beiname/Link-Schild vor dem Sprite (bei sehr großen, tiefen Sprites)
     logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
     logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy))
@@ -574,6 +575,9 @@ def main():
     print('Sprite-Maßstab:', spr.px, 'px je Sprite-Pixel')
     sx = round(card_x + CARD_W / 2 - spr.center_x * spr.px)      # Gesichtsmitte (zwischen den Augen) genau über der Kartenmitte
     sy = feet_y - spr.foot * spr.px
+    if 'eyeAt' in hero_cfg and 'faceY' in spr.meta:            # Sprite so setzen, dass sein Auge/Gesicht (faceY) bei y = eyeAt (px ab Kartenoberkante) liegt
+        sy = card_y + hero_cfg['eyeAt'] - spr.meta['faceY'] * spr.px
+        feet_y = sy + spr.foot * spr.px
     shadow = pixel_ellipse(max(10, min(44, round((spr.right - spr.left) * spr.px * 0.75 / U))), 4, INK, 170)
 
     parts_bg = Particles(args.slug, accent, 40 if not reel else 56, (U * 3, 0, W - U * 3, H), loop)
@@ -605,7 +609,7 @@ def main():
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         parts_bg.draw(layer, f)
         canvas.alpha_composite(layer)
-        for lay, (t0, t1) in ((mid_a, T_A), (mid_b, T_B)):
+        for lay, (t0, t1) in ((mid_a, T_A),) if name_front else ((mid_a, T_A), (mid_b, T_B)):
             l2 = dissolve(lay, (ts - t0) / (t1 - t0) if intro else 1.0)
             if l2 is not None:
                 canvas.alpha_composite(l2)
@@ -621,13 +625,18 @@ def main():
                 dd.rectangle([gx - U // 2, gy - n * U, gx + U // 2, gy + n * U], fill=WHITE + (255,))
         canvas.alpha_composite(layer)
         if intro and ts < T_SPR:
+            if name_front:
+                l2 = dissolve(mid_b, (ts - T_B[0]) / (T_B[1] - T_B[0]))
+                if l2 is not None:
+                    canvas.alpha_composite(l2)
             if logo_front:
                 l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]))
                 if l2 is not None:
                     canvas.alpha_composite(l2)
             return canvas.convert('RGB')
         o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
-        canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
+        if not hero_cfg.get('noShadow'):
+            canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
         flash = intro and ts < T_SPR + T_FLASH
         for im in (o_dark, o_light, sp):
             if flash:                          # beim Auftauchen als weiße Silhouette
@@ -635,6 +644,10 @@ def main():
                 white.putalpha(im.split()[3])
                 im = white
             canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
+        if name_front:
+            l2 = dissolve(mid_b, (ts - T_B[0]) / (T_B[1] - T_B[0]) if intro else 1.0)
+            if l2 is not None:
+                canvas.alpha_composite(l2)
         if logo_front:
             l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]) if intro else 1.0)
             if l2 is not None:
