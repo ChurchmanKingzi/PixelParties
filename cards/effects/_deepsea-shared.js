@@ -185,6 +185,16 @@ function clearSwapInheritedStatus(inst) {
  * @param {string} [opts.excludeInstId] - Skip this instance (self-exclude when
  *   deciding if the card being placed qualifies as a bounce target).
  */
+/**
+ * ★ W21a (Al, 20.10.2026, Frage 2 aus W20c): darf `pi` in die Zonen des Helden (`side`, `hi`) PLATZIEREN (Deepsea-Tausch)? Der Kontrolleur ja; der BESITZER eines
+ * abgegebenen Helden bei temporaerer Kontrolle weiter ja, bei dauerhafter nicht (`engine.zonenRechtAmHeld`). Eine fremde Spalte ohne Kontrolle: nein (wie bisher).
+ */
+function _darfHierPlatzieren(engine, pi, side, hi) {
+  const hero = engine.gs.players[side]?.heroes?.[hi];
+  if (engine.heroSideOf(side, hero) === pi) return true;
+  return side === pi && engine.zonenRechtAmHeld(pi, side, hi);
+}
+
 function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
   const gs = engine.gs;
   const ps = gs.players[playerIdx];
@@ -198,7 +208,7 @@ function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
     const sps = gs.players[side];
     if (!sps) continue;
     for (let hi = 0; hi < (sps.heroes || []).length; hi++) {
-      if (engine.heroSideOf(side, sps.heroes[hi]) !== playerIdx) continue;
+      if (!_darfHierPlatzieren(engine, playerIdx, side, hi)) continue;
       for (let si = 0; si < 3; si++) {
         const inst = _bounceableAt(engine, playerIdx, side, hi, si);
         if (!inst) continue;
@@ -1048,8 +1058,7 @@ function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine, he
   if (!engine) return false;
   // Styx 28.9.: geliehene Helden der Gegenspalte. `heroOwner` = physische
   // Seite des Zielplatzes; der Held dort muss von `pi` kontrolliert werden.
-  const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
-  if (engine.heroSideOf(heroOwner, hero) !== pi) return false;
+  if (!_darfHierPlatzieren(engine, pi, heroOwner, heroIdx)) return false;   // W21a: Besitzer bei temporaerer Kontrolle ja, dauerhaft nein
   // "Not summoned this turn" / Infected-Squirrel-Ausnahme / Kontrolle —
   // alles in `_bounceableAt` (dieselbe Pruefung wie die Aufzaehlung).
   return !!_bounceableAt(engine, pi, heroOwner, heroIdx, slotIdx);
@@ -1159,6 +1168,8 @@ function ownSupportCreatures(engine, pi, opts = {}) {
     // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
     // `zoneLeerNachRueckgabe` = nur Kreaturen, deren Rückgabe ihre Zone ganz leert (kein Alice-Stapel; `atomicSwap` überschriebe sonst den Mitbewohner).
     if (opts.zoneLeerNachRueckgabe && !engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
+    // W21a (Al, 20.10.2026): Tausch (Platzieren) in die Zone eines DAUERHAFT abgegebenen eigenen Helden gibt es nicht (temporaer weiter).
+    if (!engine.zonenRechtAmHeld(pi, engine.physicalSide(inst), inst.heroIdx)) continue;
     out.push(inst);
   }
   return out;

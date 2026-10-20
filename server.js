@@ -9881,7 +9881,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // Per-Held-Regeln gelten fuer die Seite, auf der die Kreatur LANDET.
   if (!room.engine.isCreatureSummonable(cardName, heroOwner, heroIdx)) return _no('cansummon-nein');
   const creatureHero = ps.heroes?.[heroIdx];
-  if (creatureHero?.statuses?.charmed) return _no('held-charmed');
+  // ★ W21a (Al, 20.10.2026, Frage 2 aus W20c: Besitzer platziert bei TEMPORAERER Kontrolle weiter): ein eigener, von einem anderen kontrollierter Held
+  // (Charme) blockiert hier nicht mehr — `validateActionPlay` hat ihn fuer den Besitzer ohnehin nur als Adresse einer Platzier-Karte zugelassen
+  // (Beschwoeren: nur der Kontrolleur; dauerhaft abgegeben: gar nicht).
+  if (creatureHero?.statuses?.charmed && !(charmedOwner == null && room.engine.heroSideOf(pi, creatureHero) !== pi)) return _no('held-charmed');
 
   // Reaction-subtype Creatures are exempt from the action-economy
   // machinery — see the Spell/Attack path for the rationale.

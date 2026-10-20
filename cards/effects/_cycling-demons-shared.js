@@ -399,6 +399,10 @@ function buildDemonHooks(cardName) {
         const seite = death.seite ?? death.owner ?? pi;
         const sps = gs.players[seite];
         if (!sps) return;
+        // ★ W21a (Al, 20.10.2026, Fragen 2 und 4 aus W20c: „nur der aktuelle Kontrolleur"): der Nachfolger wird nur in die Zone eines Helden gesetzt, den der Platzierende
+        // kontrolliert (Zustand des Helden egal). Der Held der Zone einer GESTOHLENEN Kreatur, den der Besitzer behaelt, zaehlt nicht mehr (die Ausnahme aus A09-15 ist
+        // ersetzt); der Besitzer eines abgegebenen eigenen Helden platziert bei temporaerer Kontrolle weiter, bei dauerhafter nicht.
+        if (!engine.zonenRechtAmHeld(pi, seite, death.heroIdx, { nurKontrolleur: true })) return;
 
         const successor = def.successor;
 

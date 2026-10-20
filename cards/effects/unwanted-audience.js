@@ -148,6 +148,9 @@ module.exports = {
 
       const ps = gs.players[pi];
       if (!ps?.hand?.includes(CARD_NAME)) return;
+      // ★ W21a (Al, 20.10.2026: „ja"): Wirker-Held mit Decay Magic 1 (Magic Arts zaehlt als zweite Schule laut Kartendaten) noetig —
+      // eigener oder uebernommener; sonst kein Angebot.
+      if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
 
       const want = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -163,6 +166,10 @@ module.exports = {
       // discard-resident listener for later summons).
       const removeIdx = ps.hand.indexOf(CARD_NAME);
       if (removeIdx < 0) return;
+      // ★ W21a: Wirker waehlen (vor jeder Entnahme; Abbruch = nichts passiert).
+      const wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
+      if (!wirkerPlan) return;
+      if (ps.hand.indexOf(CARD_NAME) !== removeIdx) return;
 
       // Zone-anchored hand→discard flight. This card is removed from
       // hand here and pushed to discard only AFTER executeCardWithChain
@@ -192,6 +199,7 @@ module.exports = {
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
       // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
       engine.sync();
+      await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
       const inst = engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
 

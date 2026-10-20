@@ -1,4 +1,5 @@
 'use strict';
+// W21a (Al, 20.10.2026): umgestellt — Divine Gift of Time braucht jetzt einen Wirker-Helden mit Magic Arts 2 (hier Sitz 0, Held 2 mit Magic Arts x2); vorher prüfte die Karte keinen Helden.
 // W15a · R5 (Rückfrage 5 aus W14b) · Al, 16.10.2026: „Divine Gift of Time auch bei der gerade gewirkten eigenen Karte, die selbst in die Ablage geht?" — „Ja."
 // Erwartet: Wirkt der Time-Besitzer selbst einen Zauber/Angriff, öffnet sich beim Weg dieser Karte in die Ablage die Abfrage „Divine Gift of Time"; bei „Ja" liegt die gerade gewirkte
 //   Karte wieder auf der Hand (Time in der Ablage, „1 pro Spiel" verbraucht), bei „Nein" bleibt sie in der Ablage. Gilt für Zauber, Angriffe und den Fehlschlag. Exit 0 = korrekt.
@@ -12,7 +13,7 @@ const gefragt = (t) => t.prompts.filter(p => p.d.title === 'Divine Gift of Time'
   for (const karte of ['Fireball', 'Attack']) {
     R.section(`die gerade gewirkte eigene Karte (${karte}) geht in die Ablage — Ja`);
     {
-      const t = await H.fresh({ hand: [['Divine Gift of Time', karte], []] });
+      const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', karte], []] });
       ziel(t);
       const r = await t.play(0, karte, { hero: 0 });
       await sleep(80);
@@ -24,7 +25,7 @@ const gefragt = (t) => t.prompts.filter(p => p.d.title === 'Divine Gift of Time'
     }
     R.section(`… Nein: ${karte} bleibt in der Ablage, Time bleibt auf der Hand`);
     {
-      const t = await H.fresh({ hand: [['Divine Gift of Time', karte], []] });
+      const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', karte], []] });
       ziel(t);
       t.script.push({ match: d => d.title === 'Divine Gift of Time', answer: () => null, once: true });
       await t.play(0, karte, { hero: 0 });
@@ -35,7 +36,7 @@ const gefragt = (t) => t.prompts.filter(p => p.d.title === 'Divine Gift of Time'
 
   R.section('Gegenprobe: der Zauber des GEGNERS (landet in SEINER Ablage) löst die Abfrage nicht aus');
   {
-    const t = await H.fresh({ hand: [['Divine Gift of Time'], ['Fireball']] });
+    const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time'], ['Fireball']] });
     t.targetFn = (valid) => [valid.find(v => v.type === 'hero' && v.owner === 0 && v.heroIdx === 0).id];
     await t.play(1, 'Fireball', { hero: 0, active: 1 });
     await sleep(80);
