@@ -14,7 +14,7 @@
 //  CARD_API „FRONT SOLDIER"). Die Kamera wird angeboten, wenn der
 //  GEGNER eine Reaction (Spell/Attack/Artifact – keine Creature) auf
 //  eine Karte/einen Effekt des Kamerabesitzers spielt (Quelle bekannt:
-//  `ctx.sourceOwner`; unbekannt = angeboten), und negiert sie
+//  `ctx.sourceOwner`; W26a: unbekannt = KEIN Angebot), und negiert sie
 //  (`_reactionNegated`). Kosten 4 Gold (+3: der Gegner kann nicht
 //  reagieren – dann ohne `onReactionPlayed` für die Kamera selbst).
 // ═══════════════════════════════════════════
@@ -42,7 +42,9 @@ module.exports = {
       if (ctx.reactionOwner == null || ctx.reactionOwner === pi) return;   // nur Reaktionen des GEGNERS
       if (ctx._reactionNegated) return;                                     // schon negiert (andere Kamera / Front Soldier)
       if (ctx.reactionCardType === 'Creature') return;                      // Text: „Reaction Spell or Artifact"
-      if (ctx.sourceOwner != null && ctx.sourceOwner !== pi) return;        // „in reaction to YOUR card or effect"
+      // W26a (Al, Welle 26): NUR in Reaktion auf eine gespielte Gegner-Reaktion, die deine Karte/deinen Effekt beantwortet: ist die Quelle des Fensters unbekannt
+      // (z. B. Tod-Fenster ohne bekannten Verursacher), gibt es kein Angebot.
+      if (!Number.isInteger(ctx.sourceOwner) || ctx.sourceOwner !== pi) return;   // „in reaction to YOUR card or effect"
       const inst = ctx.card;
       if (!inst || inst.zone !== 'hand') return;
       const ps = gs.players[pi];
