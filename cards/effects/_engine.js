@@ -20989,7 +20989,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hps = this.gs.players[hs];
     const hero = hps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return [];
-    if (fremd && this.heroSideOf(hs, hero) !== playerIdx) return [];
+    // W20a (Al, 20.10.): nur der aktuelle Kontrolleur wirkt mit dem Helden — auch ein ABGEGEBENER eigener Held (Brettseite = `playerIdx`) liefert dem Besitzer nichts.
+    if (this.heroSideOf(hs, hero) !== playerIdx) return [];
     // ★ v1323 (Tester-Befund 23.9.): Divine Gift of Skill — „That Hero
     // cannot perform an Action for the rest of the turn". Das gilt auch
     // fuer ZUSATZaktionen: diese Liste speist jede geschenkte Aktion
@@ -21304,9 +21305,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hasBonusAction = isActionPhase && this.bonusAktionFuer(playerIdx, hi);
       const actionsPlayed = ps._actionsPlayedThisPhase || 0;
       const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && actionsPlayed === 1;
+      // W20a (Al, 20.10.): ein abgegebener Held (fremde Kontrolle) wirkt fuer den Besitzer keine Zauber/Attacken (Spiegel von `validateActionPlay`).
+      const heroAbgegeben = this.heroSideOf(playerIdx, hero) !== playerIdx;
 
       for (const cd of handCards) {
         if (this._handPlayLockedFor(ps, cd.name)) continue;   // v818 Hand-Spielsperre
+        if (heroAbgegeben && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) continue;
         // Frozen / Stunned heroes only host PLACEMENTS. A card opts
         // into this path by exporting canBypassFreeZoneRequirement
         // and returning true right now (Deepsea when a bounceable
@@ -22104,9 +22108,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = heroPs?.heroes?.[heroIdx];
     if (!hero?.name) return null;
     // W19b (Al, 19.10.): Kontrolleffekte koennen ausdruecklich ausschliessen, mit dem Helden Attacks/Spells auszufuehren
-    // (`_kontrollRechte.zauber/attacken === false`) — dann darf niemand ihn dafuer nutzen, weder Kontrolleur noch Besitzer.
+    // (`_kontrollRechte.zauber/attacken === false`) — dann darf der Kontrolleur ihn nicht dafuer nutzen (Welle 20: der Besitzer ohnehin nicht).
     { const _kr = this.kontrollRechte(heroOwner, heroIdx);
       if ((cardData.cardType === 'Spell' && !_kr.zauber) || (cardData.cardType === 'Attack' && !_kr.attacken)) return null; }
+    // ★ W20a (Al, 20.10.): „nur der aktuelle Kontrolleur eines Heroes darf mit ihm casten“ — ein Held unter fremder Kontrolle (Charme, Golden Apple, Love Shot,
+    // Styx, Paraseed …) wirkt fuer seinen BESITZER weder Zauber noch Attacken; er wirkt sie wieder, sobald der Besitzer ihn wieder kontrolliert. Der Kontrolleur
+    // wirkt ueber den `charmed`-Weg (`charmedOwner`, `hero.charmedBy === pi`). Love Shot stempelt `charmedBy = pi` auch an Helden der EIGENEN Spalte, dann
+    // ist `pi` der Kontrolleur. (`controlledBy` — Controlled Attack: nur Abilities/Heldeneffekt — gibt keine Zauberkontrolle, `heroSideOf` ignoriert es.)
+    if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack') && this.heroSideOf(heroOwner, hero) !== pi) return null;
     // Incapacitated heroes (dead / frozen / stunned / bound) can't ACT.
     // Bound is the lightest of the four — it ONLY blocks Actions, not
     // ability/hero/creature passives or hooks (those keep firing in
@@ -22664,7 +22673,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hs = (isSeat(this, config.heroOwner)) ? config.heroOwner : playerIdx;
     const hero = this.gs.players[hs]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { played: false };
-    if (hs !== playerIdx && this.heroSideOf(hs, hero) !== playerIdx) return { played: false };
+    if (this.heroSideOf(hs, hero) !== playerIdx) return { played: false };   // W20a: auch ein abgegebener eigener Held wirkt nicht fuer den Besitzer
 
     // ── ★ 28.8. (Als Vorgabe): ABBRUCH FUEHRT ZURUECK ZUR AUSWAHL ──
     // Wer eine Aktion waehlt und sie dann abbricht (Zielwahl weg-
@@ -31529,15 +31538,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let shi = 0; shi < (zps?.heroes || []).length; shi++) {
         if (seite !== targetOwnerIdx && this.surpriseKontrolleur(seite, shi) !== targetOwnerIdx) continue;
         _umleitZonen.push({ seite, shi });
-        // W19b (Al, 19.10.): der BESITZER eines abgegebenen Helden darf dessen Umleit-Surprise ebenfalls ausloesen — als zweiter Reaktor,
-        // solange er nicht selbst der Angreifer ist (der Kontrolleur behaelt sein Fenster fuer den abgegebenen Helden als Ziel).
-        if (seite === targetOwnerIdx && this._surpriseKontrolleurRoh(seite, shi) !== seite
-            && this._surpriseQuellenSpieler(sourceCard) !== seite && this._besitzerKenntSurprise(seite, shi)) _umleitZonen.push({ seite, shi, reaktor: seite });
       }
     }
-    for (const { seite, shi, reaktor: _reaktorVorgabe } of _umleitZonen) {
+    for (const { seite, shi } of _umleitZonen) {
       const sps = this.gs.players[seite];
-      const reaktor = _reaktorVorgabe ?? this.surpriseKontrolleur(seite, shi);
+      const reaktor = this.surpriseKontrolleur(seite, shi);
       const sHero = sps.heroes[shi];
       if (!sHero?.name || sHero.hp <= 0) continue;
       const sz = sps.surpriseZones?.[shi] || [];
@@ -31589,7 +31594,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Redirect-mode extras the Surprise's onSurpriseActivate reads.
         selected, validTargets, _redirectMode: true,
       };
-      const sResult = await this._activateSurprise(seite, shi, sName, sInfo, sScript, { reaktor });
+      const sResult = await this._activateSurprise(seite, shi, sName, sInfo, sScript);
       // ── NEGATION statt Umleitung (v701, Rolling Boulder) ───────────
       // Eine `isSurpriseRedirect`-Karte darf statt `{ redirectTo }` auch
       // `{ negateEffect: true }` liefern: der anvisierende Effekt wird
@@ -33043,7 +33048,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     let gateHeroIdx = -1;
     let gateName = null;
     let gateSeite = targetOwnerIdx;
-    for (const entry of this._getAllSurpriseEntries(targetOwnerIdx, { mitAbgegebenen: true })) {   // W19b: auch abgegebene eigene Helden
+    for (const entry of this._getAllSurpriseEntries(targetOwnerIdx)) {
       if (entry.isBakhmSlot) continue;
       const hi = entry.heroIdx;
       const hero = this.gs.players[entry.seite]?.heroes?.[hi];
@@ -33111,7 +33116,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // Use centralized _activateSurprise — handles flip, logging, hooks (Bakhm), discard
       const script = loadCardEffect(gateName);
-      await this._activateSurprise(gateSeite, gateHeroIdx, gateName, {}, script, { reaktor: targetOwnerIdx });
+      await this._activateSurprise(gateSeite, gateHeroIdx, gateName, {}, script);
       
       return this.gs._gateShieldActive === targetOwnerIdx;
     } finally {
@@ -33219,7 +33224,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Brettseite der Zone. Bakhm-Slots bleiben auf der eigenen Spalte
    * (Kreaturen gehen nicht mit dem Helden mit).
    */
-  _getAllSurpriseEntries(playerIdx, opts = {}) {
+  _getAllSurpriseEntries(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     const entries = [];
@@ -33231,20 +33236,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let heroIdx = 0; heroIdx < (sps.heroes || []).length; heroIdx++) {
         const surpriseZone = sps.surpriseZones?.[heroIdx] || [];
         if (surpriseZone.length === 0) continue;
-        // W19b (Al, 19.10.): auch der BESITZER eines abgegebenen Helden darf dessen Surprises aktivieren — nur die AKTIVIERUNGS-Fenster
-        // fragen mit `mitAbgegebenen`; Kostenzaehlungen („Surprises you control"), Detection & Co. behalten die Kontroll-Lesart.
-        const _abgegeben = seite === playerIdx && this._surpriseKontrolleurRoh(seite, heroIdx) !== playerIdx;
-        if (this.surpriseKontrolleur(seite, heroIdx) !== playerIdx && !(opts.mitAbgegebenen && _abgegeben)) continue;
-        // Eine vom Kontrolleur gesetzte Karte (`originalOwner` = Kontrolleur, Trapping/`doPlaySurpriseFremd`) bleibt seine — der Besitzer
-        // des Helden kennt sie nicht und loest sie nicht aus.
-        if (_abgegeben && this.surpriseKontrolleur(seite, heroIdx) !== playerIdx && !this._besitzerKenntSurprise(seite, heroIdx)) continue;
+        if (this.surpriseKontrolleur(seite, heroIdx) !== playerIdx) continue;
         entries.push({
           heroIdx,
           cardName: surpriseZone[0],
           isBakhmSlot: false,
           zoneSlot: -1,
           seite,
-          abgegeben: _abgegeben,
         });
       }
     }
@@ -33317,7 +33315,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _scanSurpriseEntriesForPlayer(playerIdx, triggerFlag, triggerInfo, promptConfig) {
-    const entries = this._getAllSurpriseEntries(playerIdx, { mitAbgegebenen: true });   // W19b: auch abgegebene eigene Helden
+    const entries = this._getAllSurpriseEntries(playerIdx);
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
     this.gs.surprisePending = true;
     try {
@@ -33375,7 +33373,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       if (!confirmed) continue;
 
-      const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : { reaktor: playerIdx };   // W19b: der Besitzer loest selbst aus
+      const activateOpts = entry.isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot: entry.zoneSlot } : {};
       const result = await this._activateSurprise(seite, entry.heroIdx, entry.cardName, triggerInfo, script, activateOpts);
 
       // For summon triggers: check if newly placed creature triggers more surprises
@@ -37305,7 +37303,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Scan every hero the reacting player controls; each may hold a face-down
     // surprise whose script opts in to creature/hero damage triggers.
-    for (const entry of this._getAllSurpriseEntries(reaktor, { mitAbgegebenen: true })) {   // W19b: auch abgegebene eigene Helden
+    for (const entry of this._getAllSurpriseEntries(reaktor)) {
       if (entry.isBakhmSlot) continue;
       const seite = entry.seite;
       const hi = entry.heroIdx;
@@ -37374,7 +37372,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
       if (!confirmed) continue;
 
-      const result = await this._activateSurprise(seite, hi, surpriseCardName, sourceInfo, script, { reaktor });
+      const result = await this._activateSurprise(seite, hi, surpriseCardName, sourceInfo, script);
       if (result?.damageReduced) totalReduced += result.damageReduced;
       if (result?.effectNegated) {
         negated = true;
@@ -38797,28 +38795,15 @@ this._deathWatch = (this._deathWatchStack || []).length
    * sonst die Brettseite. Die Surprise Zone geht mit dem Helden mit.
    */
   surpriseKontrolleur(seite, heroIdx) {
-    // W19b: loest der BESITZER eine Surprise am abgegebenen Helden aus, handelt der Held waehrend der Aufloesung fuer ihn (`_activateSurprise`).
-    const _ak = this._surpriseAktivierer;
-    if (_ak && _ak.size) { const v = _ak.get(seite + '-' + heroIdx); if (v != null) return v; }
-    return this._surpriseKontrolleurRoh(seite, heroIdx);
-  }
-
-  /** W19b: liegt in der Surprise Zone des Helden (`seite`, `heroIdx`) eine Karte des Helden-Besitzers (nicht vom Kontrolleur gesetzt)? */
-  _besitzerKenntSurprise(seite, heroIdx) {
-    const name = this.gs.players[seite]?.surpriseZones?.[heroIdx]?.[0];
-    if (!name) return false;
-    const si = this.cardInstances.find(c => c.owner === seite && c.zone === ZONES.SURPRISE && c.heroIdx === heroIdx && c.name === name);
-    return !(si && si.originalOwner != null && si.originalOwner !== seite);
-  }
-
-  /** W19b: der echte Kontrolleur (ohne die Aufloesungs-Ueberschreibung des Besitzers). */
-  _surpriseKontrolleurRoh(seite, heroIdx) {
     const hero = this.gs.players[seite]?.heroes?.[heroIdx];
     if (!hero?.name) return seite;
     const k = this.heroSideOf(seite, hero);
     if (k !== seite) return k;
     return hero.controlledBy != null ? hero.controlledBy : seite;
   }
+
+  /** W20a: Alias fuer `surpriseKontrolleur` (so heisst der Helfer seit W19b im Server, `sendGameState`-Sichtbarkeit); es gibt keine Besitzer-Ueberschreibung mehr. */
+  _surpriseKontrolleurRoh(seite, heroIdx) { return this.surpriseKontrolleur(seite, heroIdx); }
 
   /**
    * Als Vorgabe 29.9.: welcher SPIELER handelt mit einer Surprise-Quelle?
@@ -38855,13 +38840,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Styx 28.9.: ein Held, den gerade der GEGNER kontrolliert, castet fuer
     // seinen Besitzer keine Reaktion und loest keine Surprise aus.
     // Als Vorgabe 29.9.: mit `reaktor` loest der Kontrolleur aus.
-    // ★ W19b (Al, 19.10.: „Ja, und auch Surprises aktivieren"): ein abgegebener Held bleibt fuer seinen BESITZER handlungsfaehig —
-    // er wirkt Reaktionszauber und loest die Surprises seiner Zone aus (wie schon normale Zauber/Attacken). Neben dem Kontrolleur darf
-    // also auch die Brettseite (`reaktor === playerIdx`) ausloesen; ohne `reaktor` gilt die Brettseite wie immer (die Sperre von
-    // Styx 28.9. entfaellt). Eine ausdrueckliche Rechte-Sperre (`kontrollRechte(…).zauber/attacken === false`) gilt fuer niemanden.
-    const _kontrolleurRoh = this._surpriseKontrolleurRoh(playerIdx, heroIdx);
-    if (opts.reaktor != null && reaktor !== playerIdx && _kontrolleurRoh !== reaktor) return false;
-    const _abgegebenAnBesitzer = _kontrolleurRoh !== playerIdx && reaktor === playerIdx;
+    if (opts.reaktor != null) {
+      if (this.surpriseKontrolleur(playerIdx, heroIdx) !== reaktor) return false;
+    } else if (this.heroSideOf(playerIdx, hero) !== playerIdx) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) return false;
     // v619 (Als Regel 29.8.): ein NEGIERTER Held castete keine Reaktion — ★ Welle 13 (Al, A2) aufgehoben: „Ein Held, der *nur* seinen
     // Effekt negiert hat, darf ganz normal beschwören. Sind seine *Abilities* negiert, ist er auf Lv 0 beschränkt, genau wie bei anderen
@@ -38871,8 +38852,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
-    // W19b (Al): Kontrolleffekte koennen ausdruecklich ausschliessen, mit dem Helden Attacks/Spells auszufuehren — dann darf NIEMAND
-    // (weder Kontrolleur noch Besitzer) ihn dafuer nutzen (`_kontrollRechte.zauber/attacken === false`; heute stempelt keine Karte so).
+    // W19b (Al): Kontrolleffekte koennen ausdruecklich ausschliessen, mit dem Helden Attacks/Spells auszufuehren — dann darf auch der
+    // Kontrolleur ihn dafuer nicht nutzen (`_kontrollRechte.zauber/attacken === false`; heute stempelt keine Karte so).
     {
       const _kr = this.kontrollRechte(playerIdx, heroIdx);
       if (cardData.cardType === 'Spell' && !_kr.zauber) return false;
@@ -38959,9 +38940,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Als Vorgabe 29.9.: eine Surprise-Kreatur am geliehenen Helden ist
     // eine Beschwoerung ueber ihn — nur mit dem Beschwoerungsrecht.
-    // W19b: gilt ebenso, wenn der BESITZER die Kreatur-Surprise am abgegebenen Helden ausloest — wie beim normalen Beschwoeren ist das
-    // Recht `beschwoeren` der Uebernahme massgeblich, egal wer den Helden benutzt (vorsichtigste Lesart: gesperrt = fuer niemanden).
-    if ((reaktor !== playerIdx || _abgegebenAnBesitzer) && !opts.isBakhmSlot && hasCardType(cardData, 'Creature')
+    if (reaktor !== playerIdx && !opts.isBakhmSlot && hasCardType(cardData, 'Creature')
         && !this.kontrollRechte(playerIdx, heroIdx).beschwoeren) return false;
 
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
@@ -39163,7 +39142,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _surpriseIsSpell = _surpriseCardData?.cardType === 'Spell';
     if (_surpriseIsSpell) this._pushResolvingSpell(cardName);
     let _steuerInst = null, _steuerVorher;   // 29.9.: Ausloeser als controller (s.u.)
-    let _aktivierungsSchluessel = null, _aktivierungsVorher;   // W19b: Besitzer loest am abgegebenen Helden aus (s.u.)
     try {
     const ps = this.gs.players[playerIdx];
     const hero = ps.heroes[heroIdx];
@@ -39212,20 +39190,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Ablage- und Deck-Aktivierungen bleiben bei `playerIdx`.
     // Ablage/Deck: `opts.steuerer` (Sabrina, Cute Spider ueber einen
     // geliehenen Helden — Karte aus Deck/Ablage des Ausloesers).
-    // ★ W19b (Al, 19.10.): loest der BESITZER die Surprise an seinem abgegebenen Helden aus (`opts.reaktor === playerIdx`), ist er der
-    // Ausloeser; der Held handelt waehrend der Aufloesung fuer ihn (`_surpriseAktivierer`, von `surpriseKontrolleur`/`effektiveSeiten` gelesen).
-    const _besitzerLoestAus = !isBakhmSlot && !opts.fromDiscard && !opts.fromDeck && opts.reaktor === playerIdx
-      && this._surpriseKontrolleurRoh(playerIdx, heroIdx) !== playerIdx;
     const steuerer = isBakhmSlot ? playerIdx
       : (opts.fromDiscard || opts.fromDeck)
         ? (Number.isInteger(opts.steuerer) ? opts.steuerer : playerIdx)
-        : (_besitzerLoestAus ? playerIdx : this.surpriseKontrolleur(playerIdx, heroIdx));
-    if (_besitzerLoestAus) {
-      if (!this._surpriseAktivierer) this._surpriseAktivierer = new Map();
-      _aktivierungsSchluessel = `${playerIdx}-${heroIdx}`;
-      _aktivierungsVorher = this._surpriseAktivierer.get(_aktivierungsSchluessel);
-      this._surpriseAktivierer.set(_aktivierungsSchluessel, playerIdx);
-    }
+        : this.surpriseKontrolleur(playerIdx, heroIdx);
 
     // Find and update the CardInstance — flip face-up
     let inst;
@@ -39583,10 +39551,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Kreatur steht auf der Brettseite, handelt fuer den Ausloeser
         // (wie eine seitenfremde Beschwoerung). Die KARTE gehoert weiter
         // ihrem Besitzer (`originalOwner` bleibt).
+        // ★ W20a (Al, 20.10.: „die Creature bleibt, solange sie faceup ist, Besitz des sie aktivierenden Spielers“): die aufgedeckte Kreatur gehoert
+        // dem AKTIVIERENDEN — auch wenn ein anderer die Karte gelegt hat (vom Kontrolleur gelegte Surprise, die der Besitzer nach der Rueckgabe ausloest).
         if (steuerer !== playerIdx) {
-          const _besitzer = inst.originalOwner;
           this.markiereSeitenfremd(inst, steuerer);
-          inst.originalOwner = _besitzer;
+          inst.originalOwner = steuerer;
+        } else if (inst.originalOwner != null && inst.originalOwner !== playerIdx) {
+          inst.originalOwner = playerIdx;
         }
         this._syncGuardianImmunity(inst, playerIdx);
         // Als Vorgabe 19.8.: die Kreatur soll sich SICHTBAR von ihrer
@@ -39684,11 +39655,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
       this._activeSurpriseHeroes?.delete(heroKey);
       if (_surpriseIsSpell) this._popResolvingSpell();
-      // W19b: die Ueberschreibung „Besitzer handelt am abgegebenen Helden" endet mit der Aufloesung.
-      if (_aktivierungsSchluessel != null && this._surpriseAktivierer) {
-        if (_aktivierungsVorher != null) this._surpriseAktivierer.set(_aktivierungsSchluessel, _aktivierungsVorher);
-        else this._surpriseAktivierer.delete(_aktivierungsSchluessel);
-      }
       // 29.9.: liegt die Instanz noch in der Surprise Zone (staysFaceUp),
       // bestimmt wieder `effektiveSeiten` den Kontrolleur.
       if (_steuerInst && _steuerInst.zone === ZONES.SURPRISE && _steuerInst.controller !== _steuerVorher) {
@@ -40206,7 +40172,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // card.) Additive: the hand scan above is untouched.
       // Als Vorgabe 29.9.: Zonen nach KONTROLLE (`_getAllSurpriseEntries`),
       // auch am geliehenen Helden; `seite` = Brettseite der Zone.
-      for (const sEntry of this._getAllSurpriseEntries(pi, { mitAbgegebenen: true })) {   // W19b: auch abgegebene eigene Helden
+      for (const sEntry of this._getAllSurpriseEntries(pi)) {
         if (sEntry.isBakhmSlot) continue;
         const shi = sEntry.heroIdx;
         const sSeite = sEntry.seite ?? pi;

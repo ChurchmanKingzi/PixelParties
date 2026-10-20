@@ -10,23 +10,25 @@
 //  4) Zielwahl-Fenster: Rolling Boulder in der Zone des abgegebenen Helden 0:0; der Gegner wählt mit einem Kreaturen-Effekt (Cavalry) den NICHT abgegebenen Helden 0:1
 //     → der Besitzer wird gefragt, der Effekt wird negiert, Cavalry besiegt.
 // Gegenprobe: Normalspiel ohne Kontrollwechsel liefert dieselben Zahlen (Teil 2, 3 und 4).
+// ★ W20a (Al, 20.10.2026) UMGESTELLT: „nur der aktuelle Kontrolleur eines Heroes darf mit ihm casten“ — Teil 1 erwartet jetzt, dass der Besitzer mit dem abgegebenen Helden 0:0
+//   NICHT wirkt (abgelehnt, Karten bleiben auf der Hand); Teil 2–4 erwarten im Fall „dauerhaft“, dass der Besitzer von seinem abgegebenen Helden NICHT gefragt wird (Spear/Cure/Boulder
+//   bleiben liegen bzw. in der Hand); das Normalspiel („normal“) bleibt unverändert. Volle Matrix inkl. Kontrolleur und Rückgabe: W20/a-1 und W20/a-2.
 const H = require('../../lib/h.js');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const ziel11 = (t) => { t.targetFn = (valid) => [valid.find(x => x.type === 'hero' && x.owner === 1 && x.heroIdx === 1).id]; };
 (async () => {
   const R = H.runner();
-  R.section('1) Zauber und Attacke mit dem abgegebenen Helden (heutiger Zustand bleibt)');
+  R.section('1) Zauber und Attacke mit dem abgegebenen Helden: der Besitzer wirkt nicht (W20a)');
   {
     const t = await H.fresh({ hand: [['Fireball', 'Attack'], []], deckSize: 30 });
     await t.engine.actionTakeHeroPermanently(1, 0, 0); await sleep(300);
     ziel11(t);
     const hp0 = t.hp(1, 1);
     const r1 = await t.play(0, 'Fireball', { hero: 0 });
-    R.check('Fireball über den abgegebenen Helden 0:0 wird gespielt, −150', r1 === true && t.hp(1, 1) === hp0 - 150, [r1, hp0, t.hp(1, 1)]);
-    const hp1 = t.hp(1, 1);
+    R.check('Fireball über den abgegebenen Helden 0:0 wird abgelehnt, kein Schaden', r1 === false && t.hp(1, 1) === hp0, [r1, hp0, t.hp(1, 1)]);
     const r2 = await t.play(0, 'Attack', { hero: 0 });
-    R.check('„Attack" über den abgegebenen Helden 0:0 trifft (Angriffswert 40)', r2 === true && t.hp(1, 1) === hp1 - t.gs.players[0].heroes[0].atk && t.hp(1, 1) < hp1, [r2, hp1, t.hp(1, 1)]);
-    R.check('beide Karten liegen in der Ablage des Besitzers', t.pile(0, 'discardPile').includes('Fireball') && t.pile(0, 'discardPile').includes('Attack'), t.pile(0, 'discardPile'));
+    R.check('„Attack“ über den abgegebenen Helden 0:0 wird abgelehnt, kein Schaden', r2 === false && t.hp(1, 1) === hp0, [r2, hp0, t.hp(1, 1)]);
+    R.check('beide Karten bleiben auf der Hand des Besitzers', t.pile(0, 'hand').includes('Fireball') && t.pile(0, 'hand').includes('Attack') && t.pile(0, 'discardPile').length === 0, [t.pile(0, 'hand'), t.pile(0, 'discardPile')]);
     R.check('keine Engine-Fehler, Zustand sauber', t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   }
   for (const v of ['dauerhaft', 'normal']) {
@@ -40,9 +42,10 @@ const ziel11 = (t) => { t.targetFn = (valid) => [valid.find(x => x.type === 'her
     const r = await t.play(0, 'Fireball', { hero: 1, noGrant: true });
     const fragen = t.prompts.filter(p => p.d.title === 'Aquatic Spear').map(p => p.pi);
     R.check(`${v}: Fireball über Held 0:1 gespielt`, r === true, r);
-    R.check(`${v}: der Besitzer (Sitz 0) wird nach der Spear gefragt, Sitz 1 nicht`, fragen.length === 1 && fragen[0] === 0, fragen);
-    R.check(`${v}: Fireball −150 und Spear −80 → ${hp0 - 230}`, t.hp(1, 1) === hp0 - 230, [hp0, t.hp(1, 1)]);
-    R.check(`${v}: Spear liegt in der Ablage des Besitzers, Zone leer`, t.pile(0, 'discardPile').includes('Aquatic Spear') && t.gs.players[0].surpriseZones[0].length === 0, [t.pile(0, 'discardPile'), t.gs.players[0].surpriseZones]);
+    const ab = v === 'dauerhaft';
+    R.check(`${v}: ${ab ? 'der Besitzer wird NICHT gefragt (W20a: nur der Kontrolleur; Sitz 1 reagiert nicht auf einen Treffer des Gegners)' : 'der Besitzer (Sitz 0) wird nach der Spear gefragt, Sitz 1 nicht'}`, ab ? fragen.length === 0 : (fragen.length === 1 && fragen[0] === 0), fragen);
+    R.check(`${v}: Fireball ${ab ? '−150' : '−150 und Spear −80'} → ${hp0 - (ab ? 150 : 230)}`, t.hp(1, 1) === hp0 - (ab ? 150 : 230), [hp0, t.hp(1, 1)]);
+    R.check(`${v}: Spear ${ab ? 'bleibt in der Zone des abgegebenen Helden' : 'liegt in der Ablage des Besitzers, Zone leer'}`, ab ? t.gs.players[0].surpriseZones[0].includes('Aquatic Spear') : (t.pile(0, 'discardPile').includes('Aquatic Spear') && t.gs.players[0].surpriseZones[0].length === 0), [t.pile(0, 'discardPile'), t.gs.players[0].surpriseZones]);
     R.check(`${v}: keine Engine-Fehler, Zustand sauber`, t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   }
   for (const v of ['dauerhaft', 'normal']) {
@@ -53,8 +56,13 @@ const ziel11 = (t) => { t.targetFn = (valid) => [valid.find(x => x.type === 'her
     t.reset();
     t.script.push({ match: d => d.type === 'confirm' && /Cure/.test(d.title || ''), answer: () => ({ confirmed: true }) });
     await t.endTurn();   // Sitz 1 beginnt seinen Zug: Phasenfenster
-    R.check(`${v}: Sitz 0 wird nach Cure gefragt`, t.prompts.some(p => p.pi === 0 && /Cure/.test(p.d.title || '')), t.prompts.map(p => [p.pi, p.d.title]));
-    R.check(`${v}: Burn von 1:1 geheilt, Cure in der Ablage von Sitz 0`, !t.gs.players[1].heroes[1].statuses?.burned && t.pile(0, 'discardPile').includes('Cure') && t.pile(0, 'hand').length === 0, [t.gs.players[1].heroes[1].statuses, t.pile(0, 'discardPile'), t.pile(0, 'hand')]);
+    if (v === 'dauerhaft') {
+      R.check(`${v}: Sitz 0 (Besitzer) wird NICHT nach Cure gefragt (W20a)`, !t.prompts.some(p => p.pi === 0 && /Cure/.test(p.d.title || '')), t.prompts.map(p => [p.pi, p.d.title]));
+      R.check(`${v}: Burn von 1:1 bleibt, Cure bleibt auf der Hand von Sitz 0`, !!t.gs.players[1].heroes[1].statuses?.burned && t.pile(0, 'hand').includes('Cure') && !t.pile(0, 'discardPile').includes('Cure'), [t.gs.players[1].heroes[1].statuses, t.pile(0, 'discardPile'), t.pile(0, 'hand')]);
+    } else {
+      R.check(`${v}: Sitz 0 wird nach Cure gefragt`, t.prompts.some(p => p.pi === 0 && /Cure/.test(p.d.title || '')), t.prompts.map(p => [p.pi, p.d.title]));
+      R.check(`${v}: Burn von 1:1 geheilt, Cure in der Ablage von Sitz 0`, !t.gs.players[1].heroes[1].statuses?.burned && t.pile(0, 'discardPile').includes('Cure') && t.pile(0, 'hand').length === 0, [t.gs.players[1].heroes[1].statuses, t.pile(0, 'discardPile'), t.pile(0, 'hand')]);
+    }
     R.check(`${v}: keine Engine-Fehler, Zustand sauber`, t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   }
   for (const v of ['dauerhaft', 'normal']) {
@@ -69,8 +77,13 @@ const ziel11 = (t) => { t.targetFn = (valid) => [valid.find(x => x.type === 'her
     const hp = t.hp(0, 1);
     const r = await t.activateCreature(1, 0, 1);
     R.check(`${v}: Cavalry aktiviert`, r === true, r);
-    R.check(`${v}: der Besitzer (Sitz 0) wird nach Rolling Boulder gefragt`, t.prompts.some(p => p.pi === 0 && p.d.title === 'Rolling Boulder'), t.prompts.map(p => [p.pi, p.d.title]));
-    R.check(`${v}: Effekt negiert (Held 0:1 unverletzt), Cavalry besiegt, Boulder in der Ablage des Besitzers`, t.hp(0, 1) === hp && !t.find('Cavalry', 'support') && t.pile(0, 'discardPile').includes('Rolling Boulder'), [hp, t.hp(0, 1), t.pile(0, 'discardPile')]);
+    if (v === 'dauerhaft') {
+      R.check(`${v}: der Besitzer (Sitz 0) wird NICHT nach Rolling Boulder gefragt (W20a: nur der Kontrolleur)`, !t.prompts.some(p => p.pi === 0 && p.d.title === 'Rolling Boulder'), t.prompts.map(p => [p.pi, p.d.title]));
+      R.check(`${v}: Effekt läuft (Held 0:1 verliert HP), Cavalry lebt, Boulder bleibt in der Zone`, t.hp(0, 1) < hp && !!t.find('Cavalry', 'support') && t.gs.players[0].surpriseZones[0].includes('Rolling Boulder'), [hp, t.hp(0, 1), t.pile(0, 'discardPile'), t.gs.players[0].surpriseZones]);
+    } else {
+      R.check(`${v}: der Besitzer (Sitz 0) wird nach Rolling Boulder gefragt`, t.prompts.some(p => p.pi === 0 && p.d.title === 'Rolling Boulder'), t.prompts.map(p => [p.pi, p.d.title]));
+      R.check(`${v}: Effekt negiert (Held 0:1 unverletzt), Cavalry besiegt, Boulder in der Ablage des Besitzers`, t.hp(0, 1) === hp && !t.find('Cavalry', 'support') && t.pile(0, 'discardPile').includes('Rolling Boulder'), [hp, t.hp(0, 1), t.pile(0, 'discardPile')]);
+    }
     R.check(`${v}: keine Engine-Fehler, Zustand sauber`, t.errors.length === 0 && t.audit().length === 0, [t.errors, t.audit()]);
   }
   R.finish();

@@ -31,7 +31,7 @@ async function lauf(R, v) {
   } });
   t.script.push({ match: d => /forceDiscard|handPick|pickHandCard/.test(d.type || '') && /Wisdom/.test((d.title || '') + (d.source || '')), answer: () => { const i = ps0.hand.findIndex(n => n === 'ZZ Filler'); return { cardName: 'ZZ Filler', handIndex: i, selectedCards: [{ cardName: 'ZZ Filler', handIndex: i }], selectedIndices: [i] }; } });
   const fillerVor = ps0.hand.filter(n => n === 'ZZ Filler').length;
-  const r = await t.play(0, 'Love Shot', { hero: 0 });
+  const r = await t.play(0, 'Love Shot', { hero: v === 'c' ? 1 : 0 });   // W20a (Al, 20.10.): der Besitzer wirkt nicht mit seinem abgegebenen Helden 0:0 — Love Shot kommt in Variante c von Held 0:1 (0:0 ist nur Ziel)
   t.say('Love Shot ->', r, '| spielbar', JSON.stringify(eligible), '| Hand', JSON.stringify(ps0.hand), '| Abl', JSON.stringify(ps0.discardPile));
   const filler = ps0.discardPile.filter(n => n === 'ZZ Filler').length;
   if (v === 'b') {
