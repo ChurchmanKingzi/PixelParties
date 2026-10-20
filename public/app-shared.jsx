@@ -8356,15 +8356,21 @@ function TTCallout({ color, title, children }) {
 // NUR im Effekttext, nie in Namen: Kartennamen im Text stehen in Anfuehrungszeichen und bleiben unberuehrt.
 // Darunter steht fuer jeden erwaehnten Status ein Remindertext (`TTStatusReminders`).
 const TT_STATUS_BOX = '#a3a9bd';
+// Die Remindertexte sind die Definitionen aus den Regeln des Spiels (`RulesScreen`, Abschnitt „Status Effects“ in app-screens.jsx), Wort
+// fuer Wort — `scripts/check-status-terms.js` haelt sie gleich. Negate hat dort keinen eigenen Eintrag; der Text steht nur hier.
 const TT_STATUS_REMINDER = {
-  poison: 'Poisoned targets take 30 damage per Stack at the start of each of their owner\'s turns. Poison Stacks and lasts until cleansed or healed.',
-  burn:   'Burned targets take 60 damage at the start of each of their owner\'s turns. It lasts until cleansed or healed.',
-  stun:   'Stunned targets cannot act, and their effects and Abilities are negated. It wears off at the end of their owner\'s turn, unless the card says otherwise.',
-  negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A Negated Hero or Creature has its effects negated (Heroes also lose their attached Abilities) until the end of its owner\'s turn.',
-  bleed:  'Bleeding targets take 50 damage after each of their own actions (Attacks, Spells, Creatures, and Abilities or Hero effects that cost an Action), after active Hero effects without Action cost and after active Creature effects. It lasts until cleansed.',
-  freeze: 'Frozen targets cannot act, and their effects and Abilities are negated. Frozen Heroes cannot be equipped with Artifacts. It wears off at the end of their owner\'s turn, unless the card says otherwise.',
-  blind:  'Blinded targets cannot use Attacks, Spells or activated effects that need to choose a target. Effects that do not choose targets still work.',
+  poison: 'The target takes 30 damage during each of its owner\'s Start Phases. Poisoning effects usually revolve around stacking multiple instances, increasing its damage.',
+  burn:   'The target takes 60 damage during each of its owner\'s Start Phases.',
+  stun:   'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated.',
+  negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A target whose effects are negated cannot use or trigger them; if it is a Hero, its Abilities are negated as well.',
+  bleed:  'The target takes 50 damage whenever it performs an Action, activates its active effect or activates the active effect of one of its Abilities.',
+  freeze: 'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated. Additionally, it cannot be equipped with Artifacts.',
+  blind:  'The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.',
 };
+// Regel unter der Statusliste: gilt fuer alles, was Aktionen oder Effekte verhindert (hier: Stun, Freeze, Blind)
+const TT_STATUS_RECOVERY = 'After recovering from a Freeze, Stun, Blind or any other status effect that includes negating a target\'s effect or preventing it from performing Actions, that target becomes completely immune to the opponent\'s incapacitating effects for 1 turn (until the beginning of its owner\'s next turn)!';
+const TT_STATUS_INCAPACITATING = ['stun', 'freeze', 'blind'];
+
 /** Statusbegriffe in `text` (ausserhalb von Anfuehrungszeichen): [{ start, end, key }] — leer, wenn der Renderer fehlt. */
 function ttStatusMatches(text) {
   const CR = window.CardRender;
@@ -8410,6 +8416,9 @@ function TTStatusReminders({ text }) {
           </div>
         );
       })}
+      {keys.some(k => TT_STATUS_INCAPACITATING.includes(k)) && (
+        <div className="tt-reminder" style={{ marginTop: 9, paddingTop: 7, borderTop: '1px solid rgba(255,255,255,.12)', opacity: .85 }}>{TT_STATUS_RECOVERY}</div>
+      )}
     </TTCallout>
   );
 }

@@ -21,6 +21,17 @@
 //    4. NUR TEXTBLÖCKE — der Stil wird nur in `wordsOf` (Effekttext, `drawBlock`) berechnet, nie in `drawLine` (Namen, Werte); im
 //       Tooltip steht `ttMarkStatus` nur in `ttQuoted` (Effekttext), nicht im Kopf (`TTHeader`).
 //
+//    5. SCHUTZ, KEIN STATUS — „cannot be negated" (auch „can't be …") wird nicht hervorgehoben (Als Vorgabe 20.10.); „Negate that Spell"
+//       und „cannot be Frozen" bleiben Treffer.
+//
+//    6. REMINDER = REGELN — die Remindertexte von Stun, Freeze, Blind, Poison, Burn und Bleed sind WORT FÜR WORT die Definitionen im
+//       Regelwerk (`RulesScreen`, „Status Effects" in app-screens.jsx), ebenso der Hinweis zur Immunität nach dem Ausfall.
+//
+//    7. LESBAR AUF JEDEM RAHMEN — auf den sechs gemessenen Textbox-Farben (Artifact-Creme, Lila der Helden, Braun der Potions, Blau der
+//       Fähigkeiten, Rot der Spells/Creatures, Grau der Tokens) hat jeder Begriff genug Kontrast: ohne Kontur ≥ 4,5 zum Untergrund; mit
+//       dunkler Kontur ≥ 6 zur Kontur und Kontur oder Ton hebt sich vom Untergrund ab; mit heller Kontur ≥ 3,5 zur Kontur und ≥ 3 zum
+//       Untergrund. Neuer Rahmen oder neue Farbe? In `RAHMEN` unten eintragen (Messung: Mittelwert der Textbox vor dem Text).
+//
 //  Aufruf:  node scripts/check-status-terms.js        Rückgabe 0 = sauber, 1 = Verstöße.
 // ════════════════════════════════════════════════════════════════
 'use strict';
@@ -86,8 +97,53 @@ if (CR.statusMatches('Stunned and Poisoned. Negate it. Burn, Freeze, Bleed and B
   if (/ttMarkStatus|ttQuoted|TTStatusReminders/.test(sharedSrc.slice(kopf, kopfEnde))) fehler.push('TTHeader (Kartenname) greift auf die Statushervorhebung zu.');
 }
 
+// 5. Schutz, kein Status
+for (const [text, erwartet] of [['This Ability cannot be negated.', 0], ["These effects can't be Negated or redirected.", 0], ['Negate that Spell and delete it.', 1],
+  ['A target cannot be Frozen in 2 consecutive turns.', 1], ['Negate the effect. It cannot be negated.', 1]]) {
+  const n = CR.statusMatches(text).length;
+  if (n !== erwartet) fehler.push(`„${text}": ${n} Treffer, erwartet ${erwartet}.`);
+}
+
+// 6. Reminder = Regeln
+{
+  const regeln = fs.readFileSync(path.join(WURZEL, 'public', 'app-screens.jsx'), 'utf8');
+  const a = sharedSrc.indexOf('const TT_STATUS_REMINDER = {');
+  const block = sharedSrc.slice(a, sharedSrc.indexOf('\n};', a));
+  const reminder = {};
+  for (const m of block.matchAll(/^\s{2}([a-z_]+):\s*'((?:[^'\\]|\\.)*)'/gm)) reminder[m[1]] = m[2].replace(/\\'/g, "'");
+  const REGEL_NAME = { stun: 'Stunned', freeze: 'Frozen', blind: 'Blinded', poison: 'Poisoned', burn: 'Burned', bleed: 'Bleeding' };
+  for (const [key, name] of Object.entries(REGEL_NAME)) {
+    const m = new RegExp(`<div className="rules-status-name">${name}</div>\\s*<p>([^<]*)</p>`).exec(regeln);
+    if (!m) { fehler.push(`Regelwerk: kein Eintrag „${name}" unter „Status Effects" gefunden (app-screens.jsx).`); continue; }
+    if (reminder[key] !== m[1].trim()) fehler.push(`Reminder '${key}' weicht vom Regelwerk ab:\n      Reminder: ${reminder[key]}\n      Regeln:   ${m[1].trim()}`);
+  }
+  const callout = /After recovering from a Freeze[\s\S]*?\(until the beginning of its owner's next turn\)!/.exec(regeln.replace(/<\/?strong>/g, ''));
+  const rec = (/const TT_STATUS_RECOVERY = '((?:[^'\\]|\\.)*)';/.exec(sharedSrc) || [])[1];
+  if (!callout) fehler.push('Regelwerk: der Hinweis zur Immunität nach dem Ausfall wurde nicht gefunden.');
+  else if (!rec || rec.replace(/\\'/g, "'") !== callout[0]) fehler.push('TT_STATUS_RECOVERY weicht vom Hinweis im Regelwerk ab.');
+}
+
+// 7. Lesbar auf jedem Rahmen
+{
+  const RAHMEN = { 'Artifact (Creme)': [247, 247, 172], 'Held (Lila)': [160, 65, 254], 'Potion (Braun)': [176, 103, 70], 'Fähigkeit (Blau)': [56, 102, 240],
+    'Spell/Creature (Rot)': [254, 81, 84], 'Token (Grau)': [146, 146, 146] };
+  const rgb = c => (c.startsWith('#') ? [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) : c.match(/\d+/g).map(Number));
+  const K = CR._kontrast, DUNKEL = rgb(CR.STATUS_OUTLINES.dark), HELL = rgb(CR.STATUS_OUTLINES.light);
+  for (const [rahmen, bg] of Object.entries(RAHMEN)) for (const t of terme) {
+    const d = CR._statusDarstellung(t, bg, false), c = rgb(d.color), wo = `${t.key} auf ${rahmen}`;
+    if (d.outline == null) { if (K(c, bg) < 4.5) fehler.push(`${wo}: ohne Kontur nur Kontrast ${K(c, bg).toFixed(1)} (< 4,5).`); }
+    else if (d.outline === CR.STATUS_OUTLINES.dark) {
+      if (K(c, DUNKEL) < 6) fehler.push(`${wo}: Ton gegen dunkle Kontur nur ${K(c, DUNKEL).toFixed(1)} (< 6).`);
+      if (K(DUNKEL, bg) < 3 && K(c, bg) < 2.2) fehler.push(`${wo}: weder Kontur (${K(DUNKEL, bg).toFixed(1)}) noch Ton (${K(c, bg).toFixed(1)}) heben sich vom Untergrund ab.`);
+    } else {
+      if (K(c, HELL) < 3.5) fehler.push(`${wo}: Ton gegen helle Kontur nur ${K(c, HELL).toFixed(1)} (< 3,5).`);
+      if (K(HELL, bg) < 3) fehler.push(`${wo}: helle Kontur gegen den Untergrund nur ${K(HELL, bg).toFixed(1)} (< 3).`);
+    }
+  }
+}
+
 if (fehler.length) {
   for (const f of fehler) console.error('[check-status-terms] ' + f);
   process.exit(1);
 }
-console.log(`[check-status-terms] OK — ${terme.length} Begriffe mit Farbe und Reminder, ${geprueft} Kartennamen mit Statuswort bleiben im Text ungefärbt, nur Textblöcke gestylt.`);
+console.log(`[check-status-terms] OK — ${terme.length} Begriffe mit Farbe und Reminder, ${geprueft} Kartennamen mit Statuswort bleiben im Text ungefärbt, nur Textblöcke gestylt, Reminder = Regelwerk, lesbar auf allen 6 Rahmenfarben.`);
