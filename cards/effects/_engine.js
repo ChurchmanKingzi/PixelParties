@@ -5129,12 +5129,16 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
+                      source: config.attackerSourceOverride,   // W29a: Stempel `treatedAsAttack` (Infected Greatmaw: Stufe = Fighting-Level des gewaehlten Helden)
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
                       // (Alliance) — der Spielerindex allein reicht
                       // dafuer nicht.
-                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      // W29a: „treated as that Hero hitting the target with an Attack" (Greatmaw, Sacrificial Dagger, Javelin Throw): WAEHLER ist der
+                      // Held der Quelle (`attackerSourceOverride`), nicht die ausloesende Karte; uebernommener Held: physische Seite in `heroOwner`.
+                      chooserHeroIdx: config.attackerSourceOverride?.heroIdx ?? cardInstance?.heroIdx ?? -1,
+                      chooserHeroOwner: config.attackerSourceOverride?.heroOwner,
                       // v871 (Als Klarstellung): die LEGALEN Ziele
                       // dieser Quelle. Eine Regel der Bauart „nur,
                       // solange es andere moegliche Ziele gibt"
@@ -45511,9 +45515,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `bypassHostStatusFilter: true` (Crimson Web's "discard 1 to
         // untangle" — the locked Hero IS Webbed by this very card and
         // must still be able to fire the untangle action through it).
-        // W27a (Al, 21.10.2026): Spell-Anhängsel liegen bei Frozen/Stunned nicht still (Prayer) — nur Webbed sperrt weiter.
+        // W27a (Al, 21.10.2026): Spell-Anhängsel liegen bei Frozen/Stunned nicht still (Prayer); W29a (Al, 21.10.2026: „Webbed negiert NICHT Attachments!"): auch nicht bei Webbed.
         if (heroParalysed && !script.bypassHostStatusFilter
-            && !(this._istSpellAnhaengsel(inst) && !hero.statuses?.webbed)) continue;
+            && !this._istSpellAnhaengsel(inst)) continue;
 
         // Soft HOPT per equip instance
         const hoptKey = `equip-effect:${inst.id}`;

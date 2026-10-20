@@ -2,7 +2,7 @@
 // W27a · Entscheidung Al (21.10.2026): „Nein, nimm das Ruling zurück. Das neue allgemeine Ruling lautet 'Attachments liegen bei Frozen/Stunned nicht still'."
 // Das Welle-8-Ruling (Frage 2: Prophecy-Umleitung läuft nicht unter Freeze/Stun) ist ZURÜCKGENOMMEN: Spell-Anhängsel (Untertyp Attachment) wirken bei Frozen/Stunned/Negated
 // des Trägers weiter. Geprüft: (a) Prophecy of Tempeste leitet Helden- UND Kreaturenschaden um, mit Rückfrage, Deckel 100 (Zustände frozen, stunned, negiert hart/leicht);
-// (b) Prayer (Klick-Effekt eines Anhängsels) bleibt bei gefrorenem/betäubtem Träger aktivierbar (Gegenprobe: Webbed sperrt weiter, wie bisher);
+// (b) Prayer (Klick-Effekt eines Anhängsels) bleibt bei gefrorenem/betäubtem Träger aktivierbar (Webbed: W29a – Al: „Webbed negiert NICHT Attachments!" – sperrt ebenfalls nicht mehr; Repro W29/a-03);
 // (c) statische Gegenprobe: kein Anhangs-Skript liest einen Ruhe-Prüfer des Wirts.
 // Aufruf: node docs/niche-tests/repro/W27/a-01-attachments-liegen-bei-frozen-stunned-nicht-still.js   (Exit 0 = korrekt)
 const fs = require('fs');
@@ -58,7 +58,7 @@ async function szene(set) {
   }
 
   // (b) Prayer: Klick-Effekt eines Anhängsels am gefrorenen/betäubten Träger
-  for (const [name, status, soll] of [['ohne Status', null, true], ['gefroren', 'frozen', true], ['betäubt', 'stunned', true], ['negiert', 'negated', true], ['verwebt (Webbed)', 'webbed', false]]) {
+  for (const [name, status, soll] of [['ohne Status', null, true], ['gefroren', 'frozen', true], ['betäubt', 'stunned', true], ['negiert', 'negated', true], ['verwebt (Webbed)', 'webbed', true]]) {
     R.section(`Prayer, Träger ${name}`);
     const t = await H.fresh({ hand: [['Prayer', 'Fighting', 'Fighting'], []], hp: 800, phase: 2 });
     t.targetFn = (valid) => { const h = valid.find(v => v.type === 'hero' && v.owner === 0 && v.heroIdx === 0); return [(h || valid[0]).id]; };

@@ -73,9 +73,12 @@ function gedeckteQuelle(info, kontrolleur = info.heroOwner) {
   // Als Vorgabe 29.9.: „your opponent" = Gegner des KONTROLLEURS.
   if (info.chooserIdx == null || info.chooserIdx === kontrolleur) return false;
   const cd = info.sourceData;
-  if (!cd) return false;
-  return hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')
-    || hasCardType(cd, 'Creature') || hasCardType(cd, 'Token');
+  if (cd && (hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell')
+    || hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return true;
+  // W29a (Al, 21.10.2026: „Alliance und Dive Down schützen ausdrücklich auch vor Effekten, die als Attacks/Spells *zählen*"): als Attack/Spell geltende Heldeneffekte
+  // (Broghan & Co., Alice) und Gegenstandseffekte (Crusader's, Bamboo Staff, Javelin Throw, Sword in a Bottle, Sacrificial Dagger) sowie der Treffer von Infected Greatmaw
+  // haben keine Attack-/Spell-Karte als Quelle; `info.treatedAsLevel` (Engine: `heroBlocksTargeting`) ist ihr Kennzeichen, wie bei Flooding.
+  return info.treatedAsLevel != null;
 }
 
 /**

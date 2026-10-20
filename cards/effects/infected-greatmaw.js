@@ -24,6 +24,15 @@
 //    `attackerSourceOverride` makes the reaction windows AND the
 //    damage attribute the hit to the CHOSEN Hero, so retaliation
 //    (Booby Trap, Fireshield, …) punishes that Hero, not Infected.
+//  • ★ W29a (Al, 21.10.2026): der Treffer zaehlt als Attack des gewaehlten
+//    Helden, und seine STUFE ist gleich dessen FIGHTING-LEVEL (ohne
+//    Fighting = Level 0): „Lv gleich dem Fighting-Level des Heroes". Die
+//    Quellobjekte (`attackerSourceOverride` fuer Zielwahl und Reaktions-
+//    fenster, `source` fuer den Treffer) tragen den Stempel
+//    `treatedAsAttack: { level }` — dynamisch (Getter), also immer das
+//    aktuelle Fighting-Level; Leser: Stealth, Jetpack, Glass Wall, Test
+//    Flight, Escape Device, Alliance, Dive Down ueber
+//    `engine._heldenEffektStufe` bzw. `info.treatedAsLevel`.
 // ═══════════════════════════════════════════
 
 const { buildGreatmawSacSpec } = require('./_greatmaw-shared');
@@ -36,6 +45,11 @@ function livingHeroes(engine, pi) {
   return engine.heroesControlledBy(pi)
     .filter(e => e.hero.hp > 0)
     .map(e => ({ physOwner: e.physOwner, heroIdx: e.heroIdx, hero: e.hero }));
+}
+
+/** W29a: Stempel „zaehlt als Attack dieses Helden" mit Level = aktuelles Fighting-Level (inkl. Fighting in Support Zones; negiert = 0). */
+function attackStempel(engine, owner, heroIdx) {
+  return { get level() { return engine.effectiveSchoolLevelForCaster('Fighting', owner, heroIdx, owner) || 0; } };
 }
 
 module.exports = {
@@ -144,6 +158,7 @@ module.exports = {
       attackerSourceOverride: {
         name: attacker.hero.name, owner: pi, controller: pi,
         heroIdx: attackerHeroIdx, zone: 'hand', _heroAttackSource: true,
+        treatedAsAttack: attackStempel(engine, attackerOwner, attackerHeroIdx),   // W29a: Stufe = Fighting-Level des Helden
         // Uebernommener Held: physische Seite wie beim Charme-Angriff.
         ...(attackerOwner !== pi ? { heroOwner: attackerOwner } : {}),
       },
@@ -178,7 +193,7 @@ module.exports = {
     // "Treated as that Hero hitting the target with an Attack" — the
     // damage source is the Hero, type 'attack', so afterDamage-style
     // retaliation (Fireshield) routes to the Hero, not Infected.
-    const source = { name: hero.name, owner: pi, heroIdx: attackerHeroIdx };
+    const source = { name: hero.name, owner: pi, heroIdx: attackerHeroIdx, treatedAsAttack: attackStempel(engine, attackerOwner, attackerHeroIdx) };   // W29a: Stufe = Fighting-Level
     // Uebernommener Held: `heroOwner` = physische Seite (Konvention
     // der Charme-Angriffe in der Engine), `owner` bleibt der Spieler.
     if (attackerOwner !== pi) { source.controller = pi; source.heroOwner = attackerOwner; }
