@@ -59,7 +59,7 @@ module.exports = {
       for (const name of (ps.discardPile || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+        if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { pileSide: 'discard' }) === 0 && canPlaceOnHere(name)) {   // W26a (Al, Welle 26): wirksame Stufe in der Ablage (Lethe-Stempel), nicht die gedruckte
           seen.add(name);
           eligibleCards.push({ name, source: 'discard' });
         }
@@ -105,7 +105,7 @@ module.exports = {
         for (const name of (ps.discardPile || [])) {
           if (currentSeen.has(name)) continue;
           const c = cardDB[name];
-          if (c && isSummonablePileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+          if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { pileSide: 'discard' }) === 0 && canPlaceOnHere(name)) {   // W26a (Al, Welle 26): wirksame Stufe in der Ablage (Lethe-Stempel), nicht die gedruckte
             currentSeen.add(name);
             currentEligible.push({ name, source: 'discard' });
           }
