@@ -36,6 +36,10 @@
 //    Creature.
 //  • On-Summon- und On-Death-Trigger zaehlen
 //    ebenfalls als "Effekte der Creature".
+//  • W25a (Al 21.10.2026, N1-12): „Ocean verhindert Surprises
+//    (cannot react to)" — auch Surprises oeffnen gegen Effekte
+//    gegnerischer Creatures kein Fenster (`_canHeroActivateSurprise`).
+//    Surprises gegen Attacks/Spells bleiben unberuehrt.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Dark Ocean';
