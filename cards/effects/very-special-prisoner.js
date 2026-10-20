@@ -182,7 +182,7 @@ module.exports = {
         title: CARD_NAME, source: CARD_NAME,
         description: 'Attach "Divinity" to one of your Heroes.',
         confirmLabel: '🔧 Attach', confirmClass: 'btn-info',
-        maxTotal: 1, cancellable: false, greenSelect: true,
+        maxTotal: 1, cancellable: false, greenSelect: true,   // pflichtwahl: die Reaktion ist schon ausgeloest (kein Abbruch moeglich) - wie die Heldenwahl oben (abilityAttachTarget, cancellable: false)
         previewCardName: DIVINITY,
       });
       ziel = (Array.isArray(ids) && ids.length > 0) ? helden.find(h => `hero-${h.phys}-${h.heroIdx}` === ids[0]) : null;
