@@ -15760,6 +15760,15 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die eine solche Creature setzen darf. Zentral hier statt in den
     // neunzehn Pool-Buildern: die Regel kann so nicht umgangen werden,
     // auch nicht von kuenftigen Karten.
+    // ★ W21a (Al, 20.10.2026, Fragen 2/4 aus W20c): der BESITZER eines an den Gegner abgegebenen Helden beschwoert nicht in dessen Zonen (nur der aktuelle
+    // Kontrolleur); platzieren (`isPlacement`) darf er bei temporaerer Kontrolle weiter, bei dauerhafter nicht. Beschwoerer = `controller`, sonst die Feldseite.
+    {
+      const _beschwoerer = opts.controller ?? playerIdx;
+      if (_beschwoerer === playerIdx && !this.zonenRechtAmHeld(_beschwoerer, playerIdx, heroIdx, { beschwoeren: !opts.isPlacement })) {
+        this.log('summon_blocked', { card: cardName, reason: 'hero_not_controlled', heroIdx });
+        return null;
+      }
+    }
     if (!opts.crossSidePlacement) {
       const _csScript = loadCardEffect(cardName);
       if (_csScript?.placesOnOpponentBoard) {
@@ -21318,6 +21327,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (typeof _s?.canBypassFreeZoneRequirement === 'function' && !_s.requiresActiveCaster) {
             try { _platz = !!_s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch { _platz = false; }
           }
+          if (_platz && !this.zonenRechtAmHeld(playerIdx, playerIdx, hi)) _platz = false;   // W21a: dauerhaft abgegebener Held — auch kein Platzieren
           if (!_platz) continue;
         }
         // Frozen / Stunned heroes only host PLACEMENTS. A card opts
@@ -22135,6 +22145,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (typeof _cs?.canBypassFreeZoneRequirement === 'function' && !_cs.requiresActiveCaster) {
         try { _platzieren = !!_cs.canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, this); } catch { _platzieren = false; }
       }
+      // ★ W21a (Al, 20.10.2026, Frage 2): bei DAUERHAFT abgegebenem Helden platziert der Besitzer auch nicht (bei temporaerer Kontrolle weiter).
+      if (_platzieren && !this.zonenRechtAmHeld(pi, heroOwner, heroIdx)) _platzieren = false;
       if (!_platzieren) return null;
     }
     // Incapacitated heroes (dead / frozen / stunned / bound) can't ACT.
@@ -27341,6 +27353,27 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W21a (Al, 20.10.2026, Fragen 2 und 4 aus W20c): darf `pi` in die Zonen des Helden (`seite`, `heroIdx`) PLATZIEREN bzw. BESCHWOEREN?
+   *  • Kontrolleur des Helden (`heroSideOf` === `pi`): ja, immer (Zustand des Helden egal — Welle 5/11: „place" braucht keinen aktionsfaehigen Helden).
+   *  • BESITZER eines abgegebenen Helden (steht in der Spalte von `pi`, kontrolliert ein anderer): BESCHWOEREN nie (nur der aktuelle Kontrolleur);
+   *    PLATZIEREN bei TEMPORAERER Kontrolle (Charme, Love Shot, Golden Apple, Styx — enden am Zugende o. ae.) ja, bei DAUERHAFTER (`permaControlBy`,
+   *    Paraseed Control) nein (Al: „bei temporaerer, aber nicht bei permanenter Kontrolle").
+   *  • Held der anderen Spalte, den `pi` nicht kontrolliert: unveraendert erlaubt (Karten, die bewusst auf die gegnerische Seite legen), ausser
+   *    `opts.nurKontrolleur` (Nachfolger in die Zone einer gestohlenen Kreatur, A09-15: Al „nur der aktuelle Kontrolleur").
+   * @param {object} [opts]  `{ beschwoeren, nurKontrolleur }`
+   */
+  zonenRechtAmHeld(pi, seite, heroIdx, opts = {}) {
+    const hero = this.gs.players[seite]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    if (this.heroSideOf(seite, hero) === pi) return true;
+    if (seite === pi) {
+      if (opts.beschwoeren) return false;
+      return !(hero.permaControlBy != null && hero.permaControlBy !== pi);
+    }
+    return !opts.nurKontrolleur;
+  }
+
+  /**
    * Alle Helden, die `playerIdx` gerade kontrolliert — eigene Spalte
    * ohne die abgegebenen, plus die aus der Gegenspalte uebernommenen.
    * @returns {Array<{physOwner:number, heroIdx:number, hero:object}>}
@@ -27677,6 +27710,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // einen verzauberten Helden). Hand/Ablage bleiben die von `playerIdx`.
     const feld = (opts.heldSeite != null && gs.players[opts.heldSeite]) ? opts.heldSeite : playerIdx;
     const fps = gs.players[feld];
+    // ★ W21a (Al, 20.10.2026, Frage 2 aus W20c): der BESITZER eines dauerhaft abgegebenen Helden (Paraseed Control …) platziert nicht in dessen Zonen;
+    // bei temporaerer Kontrolle darf er weiter platzieren (Zustand des Helden egal, die Kontrolle bzw. der Besitz zaehlt). Der Kontrolleur platziert wie bisher.
+    if (!this.zonenRechtAmHeld(playerIdx, feld, heroIdx)) {
+      this.log('placement_blocked', { card: cardName, reason: 'hero_not_controlled', heroIdx });
+      return null;
+    }
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad).
     if (this.isSupportZoneLocked(feld, heroIdx, { source: opts.source, cardName, via: 'place' })) {
       this.log('placement_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
@@ -28154,7 +28193,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // erlaubt (Charme sperrt „its Support Zones").
         const erlaubt = new Set(this.heroesControlledBy(playerIdx)
           .filter(e => e.physOwner === seite && kontrollRechteVon(e.hero).beschwoeren).map(e => e.heroIdx));
-        for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true })) {
+        for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true, _nachKontrolle: true })) {
           if (!erlaubt.has(z.heroIdx)) continue;
           out.push({ ...z, owner: seite });
         }
@@ -28170,6 +28209,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[hi];
       if (livingOnly && (!hero?.name || hero.hp <= 0)) continue;
       if (namedOnly && !hero?.name) continue;
+      if (!opts._nachKontrolle && !this.zonenRechtAmHeld(playerIdx, playerIdx, hi)) continue;   // W21a (Al, 20.10.2026): dauerhaft abgegebener Held — der Besitzer platziert dort nicht (die Kontrollsicht prueft `heroesControlledBy` selbst)
       // v704 (Puppets): gesperrte Zonen nicht anbieten (Opt-out includeLocked).
       if (!opts.includeLocked && this.isSupportZoneLocked(playerIdx, hi, { source: opts.source, via: 'pick' })) continue;
       // v607: Insel-Zonen (Flying Island in the Sky, Slots 3+) zaehlen
