@@ -131,10 +131,12 @@ module.exports = {
             sourceOwner: pi,
             source: 'Cold Coffin',
             duration: 9999,
+            unhealable: true,   // N5-09: die Marke VOR dem Reaktionsfenster (The Melting), nicht erst danach
           });
           if (applied) {
             // The engine's cleanseCreatureStatuses() checks for key+'Unhealable'
-            // and skips removal — this is the canonical way to make a status stick.
+            // and skips removal — this is the canonical way to make a status stick
+            // (`applyCreatureStatus` setzt sie über `opts.unhealable`).
             inst.counters.frozenUnhealable = true;
             engine.log('freeze_applied', {
               target: inst.name, by: 'Cold Coffin', unhealable: true,

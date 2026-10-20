@@ -18652,6 +18652,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         inst.counters.poisonStacks = inc;
       }
     }
+    // N5-09: „unheilbar"-Marke VOR dem Reaktionsfenster (`onStatusApplied` unten) setzen - sonst taut The Melting & Co. die Kreatur im Fenster ihres
+    // eigenen Freeze noch auf (Cold Coffin stempelte erst nach dem Aufruf). Gleiche Konvention: `<status>Unhealable` am Zaehler.
+    if (opts.unhealable) inst.counters[statusName + 'Unhealable'] = true;
     if (opts.duration && opts.duration > 1) {
       const prev = inst.counters[statusName + 'Duration'] || 0;
       inst.counters[statusName + 'Duration'] = Math.max(prev, opts.duration);
