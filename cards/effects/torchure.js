@@ -32,7 +32,13 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
   // Kosten: ein eigener, lebender, nicht vergifteter Held muss da sein.
-  spellPlayCondition(gs, pi) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `heroesControlledBy` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; Gift, Animation und Statusziel laufen ueber die BRETTSEITE `target.owner`).
+  spellPlayCondition(gs, pi, engine) {
+    if (engine) {
+      return engine.heroesControlledBy(pi).some(({ physOwner, heroIdx, hero: h }) => h?.name && h.hp > 0 && !h.statuses?.poisoned
+        && !(physOwner !== pi && engine.heroBlocksStatusNow(physOwner, heroIdx, 'poisoned', { appliedBy: pi })));
+    }
     const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp > 0 && !h.statuses?.poisoned);
   },
@@ -64,6 +70,9 @@ module.exports = {
         cancellable: true,
         condition: (t) => {
           const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
+          // W28a: ein uebernommener Gegnerheld, der den Giftstapel nicht annimmt (temporaere Kontrolle/Charme schuetzt vor negativen Status), kann die Kosten
+          // nicht tragen (wie Sickly Cheese, W7b F03-12) — fuer den eigenen Helden aendert sich nichts.
+          if (t.owner !== pi && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) return false;
           return h && !h.statuses?.poisoned;
         },
       });
@@ -75,13 +84,13 @@ module.exports = {
 
       // Torch + Torture: erst die Szene, dann das Gift.
       engine._broadcastEvent('play_zone_animation', {
-        type: 'torchure', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
+        type: 'torchure', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
         duration: 2000,
       });
       await engine._delay(1250);
 
       // 4 Stacks, dauerhaft; die Marke reitet am Gift-Status mit.
-      await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
+      await engine.addHeroStatus(target.owner, target.heroIdx, 'poisoned', {
         stacks: POISON_STACKS,
         permanent: true,
         _torchure: { owner: pi, turn: gs.turn },
@@ -91,7 +100,7 @@ module.exports = {
 
       engine.log('torchure_poison', {
         player: ps.username,
-        hero: ps.heroes[target.heroIdx]?.name,
+        hero: gs.players[target.owner]?.heroes?.[target.heroIdx]?.name,
       });
     },
   },

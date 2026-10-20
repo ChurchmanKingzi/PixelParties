@@ -53,21 +53,24 @@ function _availableDivinitySources(ps, engine, pi) {
   return out;
 }
 
-/** Hero columns that can legally receive a fresh Divinity attachment. */
-function _eligibleHeroIdxs(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
+/**
+ * Helden, die `pi` KONTROLLIERT und die eine frische Divinity-Anlage aufnehmen koennen.
+ * W28a (Al, 21.10.2026: „'you control' bezieht sich IMMER auf aktuelle Kontrolle, also Kontrolleur und nicht Besitzer"):
+ * `heroesControlledBy` — ein von `pi` uebernommener Gegnerheld (gecharmt/gestohlen, dauerhaft oder temporaer) ist ein
+ * gueltiger Wirt (Anlegen PER EFFEKT: es genuegt die Kontrolle, `byEffect`; ein Held ganz ohne Rechte — Charme Lv3 „unaffected" —
+ * bleibt ausgenommen), ein an den Gegner abgegebener eigener Held nicht. Die Divinity landet in den Ability Zones der
+ * BRETTSEITE `phys` des Helden.
+ * @returns {Array<{phys:number, heroIdx:number}>}
+ */
+function _eligibleHeroes(engine, pi) {
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;
-    if (engine.heroSideOf(pi, hero) !== pi) continue;   // W25a (N1-11, Al: „nach aktueller Kontrolle"): ein abgegebener eigener Held ist kein „Hero you control"
     // `allowRestricted: true` so Divinity's normal restrictedAttachment
     // block doesn't filter us out — same pattern Sacrifice to Divinity
     // uses (sacrifice-to-divinity.js:113).
-    if (engine.canAttachAbilityToHero(pi, DIVINITY, hi, { allowRestricted: true })) {
-      out.push(hi);
-    }
+    const opts = physOwner !== pi ? { heroOwner: physOwner, byEffect: true, allowRestricted: true } : { allowRestricted: true };
+    if (engine.canAttachAbilityToHero(pi, DIVINITY, heroIdx, opts)) out.push({ phys: physOwner, heroIdx });
   }
   return out;
 }
@@ -101,7 +104,7 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (_availableDivinitySources(ps, engine, pi).length === 0) return false;
-    if (_eligibleHeroIdxs(engine, pi).length === 0) return false;
+    if (_eligibleHeroes(engine, pi).length === 0) return false;
     return true;
   },
 
@@ -138,19 +141,19 @@ module.exports = {
       pickedSource = sourceRes?.optionId || sources[0].source;
     }
 
-    // Hero pick.
-    const eligibleHeroIdxs = _eligibleHeroIdxs(engine, pi);
-    if (eligibleHeroIdxs.length === 0) return;
+    // Hero pick (W28a: alle vom Spieler KONTROLLIERTEN Helden, auch uebernommene Gegnerhelden).
+    const helden = _eligibleHeroes(engine, pi);
+    if (helden.length === 0) return;
 
-    let targetHeroIdx = -1;
+    let ziel = null;           // { phys, heroIdx }
     let explicitZone = -1;
-    if (eligibleHeroIdxs.length === 1) {
-      targetHeroIdx = eligibleHeroIdxs[0];
-    } else {
+    if (helden.length === 1) {
+      ziel = helden[0];
+    } else if (helden.every(h => h.phys === pi)) {
       const pickRes = await engine.promptGeneric(pi, {
         type: 'abilityAttachTarget',
         cardName: DIVINITY,
-        eligibleHeroIdxs,
+        eligibleHeroIdxs: helden.map(h => h.heroIdx),
         // Reaction-cast attachment doesn't consume the per-turn
         // hand-attach budget (`abilityGivenThisTurn`). Same shortcut
         // Sacrifice to Divinity takes.
@@ -163,15 +166,36 @@ module.exports = {
         // No graceful cancel in a reaction — the trigger has already
         // been consumed by the reaction window. Fall back to first
         // eligible hero so the card resolves productively.
-        targetHeroIdx = eligibleHeroIdxs[0];
+        ziel = helden[0];
       } else {
-        targetHeroIdx = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : eligibleHeroIdxs[0];
+        const hi = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : helden[0].heroIdx;
+        ziel = helden.find(h => h.heroIdx === hi) || helden[0];
         explicitZone = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
       }
+    } else {
+      // Mit uebernommenem Gegnerhelden unter den Zielen: Heldenwahl ueber Brett-Klick (die Anlege-Maske
+      // `abilityAttachTarget` kennt nur die eigene Heldenreihe) — wie Pressed Skill.
+      const ids = await engine.promptEffectTarget(pi, helden.map(h => ({
+        id: `hero-${h.phys}-${h.heroIdx}`, type: 'hero', owner: h.phys, heroIdx: h.heroIdx,
+        cardName: gs.players[h.phys]?.heroes?.[h.heroIdx]?.name || '',
+      })), {
+        title: CARD_NAME, source: CARD_NAME,
+        description: 'Attach "Divinity" to one of your Heroes.',
+        confirmLabel: '🔧 Attach', confirmClass: 'btn-info',
+        maxTotal: 1, cancellable: false, greenSelect: true,   // pflichtwahl: die Reaktion ist schon ausgeloest (kein Abbruch moeglich) - wie die Heldenwahl oben (abilityAttachTarget, cancellable: false)
+        previewCardName: DIVINITY,
+      });
+      ziel = (Array.isArray(ids) && ids.length > 0) ? helden.find(h => `hero-${h.phys}-${h.heroIdx}` === ids[0]) : null;
+      if (!ziel) ziel = helden[0];   // keine Abbruchmoeglichkeit in einer Reaktion (s. o.)
     }
+    const targetHeroIdx = ziel.heroIdx;
+    const feld = ziel.phys;                       // Brettseite des Helden (= Seite seiner Ability Zones)
+    const fremd = feld !== pi;
+    const seitenOpt = fremd ? { heroOwner: feld, byEffect: true, allowRestricted: true } : { allowRestricted: true };
+    const hps = gs.players[feld];
 
     // Defensive re-check — state could shift through an inner prompt.
-    if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, { allowRestricted: true })) {
+    if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, seitenOpt)) {
       engine.log('very_special_prisoner_attach_failed', {
         player: ps.username, reason: 'no_legal_zone',
       });
@@ -181,8 +205,8 @@ module.exports = {
 
     // ★ W15a (Al, R3: „Ja" — die Divinity-Anleger prallen an Resistance ab): Anlegen PER EFFEKT — vor jeder Kartenbewegung gefragt;
     // Divinity bleibt in Hand/Deck, die Reaktion ist gespielt.
-    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
-      engine.log('very_special_prisoner_blocked', { player: ps.username, hero: ps.heroes[targetHeroIdx]?.name });
+    if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, feld, targetHeroIdx, CARD_NAME)) {
+      engine.log('very_special_prisoner_blocked', { player: ps.username, hero: hps.heroes[targetHeroIdx]?.name });
       engine.sync();
       return;
     }
@@ -208,11 +232,11 @@ module.exports = {
     // when given, else stack onto an existing Divinity slot (cap 3) or
     // fall back to the first free slot. Same tie-breaker the standard
     // ability-attach path uses.
-    const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
-    ps.abilityZones[targetHeroIdx] = abZones;
+    const abZones = hps.abilityZones[targetHeroIdx] || [[], [], []];
+    hps.abilityZones[targetHeroIdx] = abZones;
     // v1349: gewuenschter Platz und Rueckfall an EINER Stelle
     // (`engine.abilityZielZone` — verwahrte Abilities, Madame Guillotine).
-    const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
+    const targetZone = engine.abilityZielZone(feld, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
     if (targetZone < 0) {
       // Race: zones filled between the canAttach check and the splice.
       // Refund the Divinity back to its source pile so it isn't lost.
@@ -228,7 +252,8 @@ module.exports = {
     if (!abZones[targetZone]) abZones[targetZone] = [];
     abZones[targetZone].push(DIVINITY);
 
-    const inst = engine._trackCard(DIVINITY, pi, 'ability', targetHeroIdx, targetZone);
+    const inst = engine._trackCard(DIVINITY, feld, 'ability', targetHeroIdx, targetZone);
+    if (fremd) inst.originalOwner = pi;   // W28a: die Karte gehoert dem Spieler (wie `attachAbilityFromHand` bei geliehenem Helden)
 
     // Deck-source etiquette — reveal to opponent and reshuffle. Mirrors
     // Sacrifice to Divinity's deck-source branch.
@@ -255,14 +280,14 @@ module.exports = {
     });
 
     engine._broadcastEvent('ability_activated', {
-      owner: pi, heroIdx: targetHeroIdx, zoneIdx: targetZone,
+      owner: feld, heroIdx: targetHeroIdx, zoneIdx: targetZone,
       abilityName: DIVINITY,
     });
 
     engine.log('very_special_prisoner_attach', {
       player: ps.username,
       from: pickedSource,
-      to: ps.heroes[targetHeroIdx]?.name,
+      to: hps.heroes[targetHeroIdx]?.name,
       zone: targetZone,
     });
     engine.sync();

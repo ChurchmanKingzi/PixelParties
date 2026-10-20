@@ -70,9 +70,11 @@ module.exports = {
    * delete this Crystal from hand), so the gate just confirms there
    * IS a target to take the damage.
    */
-  canHandActivate(gs, pi, _engine) {
+  canHandActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
+    // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets`.
+    if (engine) return engine.getControlledHeroTargets(pi).length > 0;
     return (ps.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
@@ -84,16 +86,9 @@ module.exports = {
     if (!ps) return false;
     const handIndex = ctx.handIndex;
 
-    // Build target list: every alive Hero on our side.
-    const targets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi,
-        cardName: h.name,
-      });
-    }
+    // Build target list: every alive Hero we CONTROL (W28a: abgegebener eigener Held nein, uebernommener Gegnerheld ja; `owner` = Brettseite).
+    // Der Schaden ist der KOSTENPUNKT: ein temporaer uebernommener Gegnerheld (Charme Lv3: „unaffected by other cards and effects") nimmt ihn nicht an und ist kein Ziel.
+    const targets = engine.getControlledHeroTargets(pi).filter(t => t.owner === pi || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], pi, { loveShotOhneSchutz: true }));
     if (targets.length === 0) return false;
 
     const selected = await engine.promptEffectTarget(pi, targets, {
@@ -108,12 +103,12 @@ module.exports = {
     const target = targets.find(t => t.id === selected[0]);
     if (!target) return false;
 
-    const hero = ps.heroes?.[target.heroIdx];
+    const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
 
     const source = { name: CARD_NAME, owner: pi, heroIdx: -1 };
     engine._broadcastEvent('play_zone_animation', {
-      type: 'red_cut', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
+      type: 'red_cut', owner: target.owner, heroIdx: target.heroIdx, zoneSlot: -1,
     });
     await engine._delay(300);
     await engine.actionDealDamage(source, hero, SELF_DAMAGE, 'other', {

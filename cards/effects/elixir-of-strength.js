@@ -18,27 +18,16 @@
 module.exports = {
   isPotion: true,
 
-  canActivate(gs, pi) {
-    return (gs.players[pi]?.heroes || []).some(h => h?.name && h.hp > 0 && !h.buffs?.empowered_strike);
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (ein abgegebener eigener Held
+  // faellt heraus, ein uebernommener Gegnerheld zaehlt; ID/`owner` = Brettseite).
+  canActivate(gs, pi, engine) {
+    if (!engine) return (gs.players[pi]?.heroes || []).some(h => h?.name && h.hp > 0 && !h.buffs?.empowered_strike);
+    return engine.getControlledHeroTargets(pi).some(t => !gs.players[t.owner]?.heroes?.[t.heroIdx]?.buffs?.empowered_strike);
   },
 
-  getValidTargets(gs, pi) {
-    const targets = [];
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      // Don't double-apply — a hero already empowered isn't a valid target.
-      if (hero.buffs?.empowered_strike) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: hero.name,
-      });
-    }
-    return targets;
+  getValidTargets(gs, pi, engine) {
+    // Don't double-apply — a hero already empowered isn't a valid target.
+    return engine.getControlledHeroTargets(pi).filter(t => !gs.players[t.owner]?.heroes?.[t.heroIdx]?.buffs?.empowered_strike);
   },
 
   targetingConfig: {

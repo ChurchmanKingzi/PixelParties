@@ -46,6 +46,15 @@ function getSacrificeTargets(gs, pi) {
 }
 
 /**
+ * W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „Choose ANOTHER Hero YOU CONTROL" = die kontrollierten Helden (`getControlledHeroTargets`;
+ * ein abgegebener eigener Held nein, ein uebernommener Gegnerheld ja; `owner` = Brettseite) ohne das Opfer (`opferIdx` = Index in der EIGENEN Spalte).
+ * Das Opfer selbst („a Hero ORIGINALLY controlled by you") bleibt Besitz-/Spaltenregel des Kartentextes.
+ */
+function empfaengerFuer(engine, pi, opferIdx) {
+  return engine.getControlledHeroTargets(pi).filter(t => !(t.owner === pi && t.heroIdx === opferIdx));
+}
+
+/**
  * KOSTEN (Z7c): Opfer wählen und besiegen. Läuft vor dem Reaktionsfenster
  * (`payActivationCost`) bzw. als Fallback am Anfang von `onPlay`.
  * Rückgabe: `{ heroIdx, name, maxHp }` des Opfers oder `null` (nicht zahlbar,
@@ -55,8 +64,8 @@ async function payOpferKosten(engine, pi, inst) {
   const gs = engine.gs;
   const ps = gs.players[pi];
 
-  const sacrificeTargets = getSacrificeTargets(gs, pi);
-  if (sacrificeTargets.length < 2) return null; // Need 2+ to sacrifice one and buff another
+  const sacrificeTargets = getSacrificeTargets(gs, pi).filter(t => empfaengerFuer(engine, pi, t.heroIdx).length > 0);   // W28a: es braucht einen Empfaenger, den ich kontrolliere
+  if (sacrificeTargets.length < 1) return null;   // 1 Opfer + 1 anderer kontrollierter Held
 
   // Step 1: Pick hero to sacrifice
   const sacrificePick = await engine.promptEffectTarget(pi, sacrificeTargets, {
@@ -130,8 +139,7 @@ async function doSacrifice(engine, pi, opfer) {
   if (gs.result) return true;
 
   // Step 2: Pick hero to receive the buff (exclude sacrificed hero)
-  const sacrificeTargets = getSacrificeTargets(gs, pi);
-  const buffTargets = sacrificeTargets.filter(t => t.heroIdx !== opfer.heroIdx);
+  const buffTargets = empfaengerFuer(engine, pi, opfer.heroIdx);   // W28a: „another Hero you control"
   if (buffTargets.length === 0) {
     // Kosten sind bezahlt (Z7c), aber es gibt keinen Empfänger mehr (in der Kette gefallen): verpufft.
     engine.log('divine_gift_sacrifice_no_target', { player: ps.username, sacrificed: opfer.name });
@@ -159,19 +167,19 @@ async function doSacrifice(engine, pi, opfer) {
     if (!buffTarget) return true;
   }
 
-  const buffHero = ps.heroes[buffTarget.heroIdx];
+  const buffHero = gs.players[buffTarget.owner]?.heroes?.[buffTarget.heroIdx];
   if (!buffHero?.name || buffHero.hp <= 0) return true;
 
   // Step 5: Golden sparkles on buffed hero
   engine._broadcastEvent('play_zone_animation', {
-    type: 'gold_sparkle', owner: pi,
+    type: 'gold_sparkle', owner: buffTarget.owner,
     heroIdx: buffTarget.heroIdx, zoneSlot: -1,
   });
   await engine._delay(400);
 
   // Step 6: Increase current and max HP
   // W13 (Q144): Resistance blockt den Max-HP-Gewinn (zentraler Pruefer; Opfer und Animation sind schon passiert).
-  if (await engine.heroNonDamageEffectBlocked(pi, buffTarget.heroIdx, 'max_hp', { sourceOwner: pi, source: 'Divine Gift of Sacrifice', amount: opfer.maxHp })) {
+  if (await engine.heroNonDamageEffectBlocked(buffTarget.owner, buffTarget.heroIdx, 'max_hp', { sourceOwner: pi, source: 'Divine Gift of Sacrifice', amount: opfer.maxHp })) {
     engine.sync();
     return true;
   }
@@ -333,7 +341,8 @@ module.exports = {
    * Play condition: need 2+ originally-owned alive heroes (one to sacrifice,
    * one to receive the buff).
    */
-  spellPlayCondition(gs, pi) {
+  spellPlayCondition(gs, pi, engine) {
+    if (engine) return getSacrificeTargets(gs, pi).some(t => empfaengerFuer(engine, pi, t.heroIdx).length > 0);   // W28a
     return getSacrificeTargets(gs, pi).length >= 2;
   },
 

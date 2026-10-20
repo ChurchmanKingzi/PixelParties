@@ -15,25 +15,15 @@
 module.exports = {
   isPotion: true,
 
-  canActivate(gs, pi) {
-    return (gs.players[pi]?.heroes || []).some(h => h?.name && h.hp > 0);
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (ein abgegebener eigener Held
+  // faellt heraus, ein uebernommener Gegnerheld zaehlt; ID/`owner` = Brettseite).
+  canActivate(gs, pi, engine) {
+    if (!engine) return (gs.players[pi]?.heroes || []).some(h => h?.name && h.hp > 0);
+    return engine.getControlledHeroTargets(pi).length > 0;
   },
 
-  getValidTargets(gs, pi) {
-    const targets = [];
-    const ps = gs.players[pi];
-    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      targets.push({
-        id: `hero-${pi}-${hi}`,
-        type: 'hero',
-        owner: pi,
-        heroIdx: hi,
-        cardName: hero.name,
-      });
-    }
-    return targets;
+  getValidTargets(gs, pi, engine) {
+    return engine.getControlledHeroTargets(pi);
   },
 
   targetingConfig: {

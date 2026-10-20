@@ -21,6 +21,9 @@
 // ═══════════════════════════════════════════
 const { loadCardEffect } = require('./_loader');
 const { getCardDB: _getCardDB } = require('./_card-db');
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = die EINE Auslegungsstelle fuer Effekt-Ausruester
+// (`_equip-shared.js`): eigene Helden ohne die abgegebenen, plus uebernommene Gegnerhelden mit Recht `ausruesten` (Regel 29.9.).
+const { ausruestTraegerMitSeite, waehleAusruestPlatz } = require('./_equip-shared');
 
 // ─── MODULE-LEVEL CARD DB (cached) ───────
 
@@ -41,8 +44,15 @@ function _isEquipByData(cardName) {
   return (cd.subtype || '').toLowerCase() === 'equipment';
 }
 
-/** Check if a player has at least 1 living hero with a free base Support Zone. */
-function _hasHeroWithFreeZone(ps) {
+/** Check if a player controls at least 1 living hero with a free base Support Zone (W28a: nach Kontrolle, `_equip-shared`). */
+function _hasHeroWithFreeZone(ps, engine, pi) {
+  if (engine) {
+    for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
+      if (!hero?.name || hero.hp <= 0) continue;
+      for (let si = 0; si < 3; si++) if (!engine.supportSlotBelegt(physOwner, heroIdx, si)) return true;
+    }
+    return false;
+  }
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
@@ -53,16 +63,10 @@ function _hasHeroWithFreeZone(ps) {
   return false;
 }
 
-/** W16e (F01-01): gibt es einen lebenden, nicht eingefrorenen Helden mit freier Zone, der `cardName` laut Ausruestregeln tragen darf? */
+/** W16e (F01-01) / W28a: gibt es einen kontrollierten, lebenden, nicht eingefrorenen Helden mit freier Zone, der `cardName` laut Ausruestregeln tragen darf? */
 function _hatLegalenTraeger(engine, ps, cardName) {
   const pi = engine.gs.players.indexOf(ps);
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0 || hero.statuses?.frozen) continue;
-    if (!engine.canEquipCardToHero(cardName, pi, hi)) continue;
-    for (let si = 0; si < 3; si++) if (((ps.supportZones[hi] || [])[si] || []).length === 0) return true;
-  }
-  return false;
+  return ausruestTraegerMitSeite(engine, pi, cardName).length > 0;
 }
 
 /**
@@ -121,7 +125,7 @@ module.exports = {
 
   canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
-    if (!_hasHeroWithFreeZone(ps)) return false;
+    if (!_hasHeroWithFreeZone(ps, engine, pi)) return false;
     const gallery = _buildEligibleGallery(gs, pi, engine);
     return gallery.length > 0;
   },
@@ -165,76 +169,21 @@ module.exports = {
     }
 
     // ── Step 3: Select destination hero + support zone ──
-    const destTargets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen) continue; // Can't equip to frozen heroes
-      if (!engine.canEquipCardToHero(equipName, pi, hi)) continue;   // W16e (F01-01): Ausruestregeln des Skripts (`canEquipToHero`) wie beim Handweg
-      let hasFree = false;
-      for (let si = 0; si < 3; si++) {
-        if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
-          hasFree = true;
-          destTargets.push({
-            id: `equip-${pi}-${hi}-${si}`,
-            type: 'equip',
-            owner: pi,
-            heroIdx: hi,
-            slotIdx: si,
-            cardName: '',
-          });
-        }
-      }
-      // Also allow clicking the hero directly
-      if (hasFree) {
-        destTargets.push({
-          id: `hero-${pi}-${hi}`,
-          type: 'hero',
-          owner: pi,
-          heroIdx: hi,
-          cardName: hero.name,
-        });
-      }
-    }
-
-    if (destTargets.length === 0) return { cancelled: true };
-
-    const destIds = await engine.promptEffectTarget(pi, destTargets, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
-      title: `Cool Repair — Equip ${equipName}`,
-      source: 'Cool Repair', // Skript-Dispatch trotz dynamischem Titel
+    // W28a: Traeger = Helden, die `pi` KONTROLLIERT (`_equip-shared`: abgegebener eigener Held nein, uebernommener Gegnerheld mit Recht `ausruesten` ja);
+    // `platz.seite` = Brettseite des Traegers. (Titel bleibt „Cool Repair" fuer den Skript-Dispatch der CPU.)
+    const platz = await waehleAusruestPlatz(engine, pi, equipName, {
+      title: 'Cool Repair',
       description: `Select a Support Zone to equip ${equipName} to. (Cost: ${repairCost}G)`,
       confirmLabel: '🔧 Equip!',
-      confirmClass: 'btn-info',
-      cancellable: true,
-      greenSelect: true,
-      exclusiveTypes: false,
-      maxPerType: { hero: 1, equip: 1 },
     });
-
-    if (!destIds || destIds.length === 0) return { cancelled: true };
-
-    const dest = destTargets.find(t => t.id === destIds[0]);
-    if (!dest) return { cancelled: true };
-
-    let destHeroIdx, destSlot;
-    if (dest.type === 'equip') {
-      destHeroIdx = dest.heroIdx;
-      destSlot = dest.slotIdx;
-    } else {
-      destHeroIdx = dest.heroIdx;
-      // Auto-pick first free base zone
-      for (let si = 0; si < 3; si++) {
-        if (((ps.supportZones[destHeroIdx] || [])[si] || []).length === 0) {
-          destSlot = si;
-          break;
-        }
-      }
-      if (destSlot === undefined) return { cancelled: true };
-    }
+    if (!platz) return { cancelled: true };
+    const destHeroIdx = platz.heroIdx;
+    const destSlot = platz.slot;
+    const destSeite = platz.seite;
+    const dps = gs.players[destSeite];
 
     // Final validation: slot still free?
-    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { cancelled: true };
+    if (((dps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { cancelled: true };
 
     // ── Step 4: Deduct dynamic gold cost ──
     if (repairCost > 0) {
@@ -244,8 +193,8 @@ module.exports = {
 
     // ★ W15a (Al, R3 und Regel W14a Q5): Ausrüsten PER EFFEKT — Resistance des Trägers fängt es ab (vor jeder Kartenbewegung; die Ausrüstung bleibt in der Ablage).
     // Cool Repair ist gespielt, die Kosten sind bezahlt.
-    if (await engine.heroNonDamageEffectBlocked(pi, destHeroIdx, 'equip', { sourceOwner: pi, source: 'Cool Repair' })) {
-      engine.log('cool_repair_blocked', { player: ps.username, equip: equipName, hero: ps.heroes[destHeroIdx]?.name, goldPaid: repairCost });
+    if (await engine.heroNonDamageEffectBlocked(destSeite, destHeroIdx, 'equip', { sourceOwner: pi, source: 'Cool Repair' })) {
+      engine.log('cool_repair_blocked', { player: ps.username, equip: equipName, hero: dps.heroes[destHeroIdx]?.name, goldPaid: repairCost });
       engine.sync();
       return true;
     }
@@ -255,12 +204,13 @@ module.exports = {
     if (!_taken_discardIdx) return { cancelled: true };
 
     // ── Step 6: Place equip in support zone ──
-    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-    if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
-    ps.supportZones[destHeroIdx][destSlot].push(equipName);
+    if (!dps.supportZones[destHeroIdx]) dps.supportZones[destHeroIdx] = [[], [], []];
+    if (!dps.supportZones[destHeroIdx][destSlot]) dps.supportZones[destHeroIdx][destSlot] = [];
+    dps.supportZones[destHeroIdx][destSlot].push(equipName);
 
-    // Track as card instance
-    const inst = engine._trackCard(equipName, pi, 'support', destHeroIdx, destSlot);
+    // Track as card instance (W28a: auf der Brettseite des Traegers; die Karte gehoert weiter `pi`, Regel 29.9.)
+    const inst = engine._trackCard(equipName, destSeite, 'support', destHeroIdx, destSlot);
+    if (destSeite !== pi) inst.originalOwner = pi;
     // v668: Herkunftsmarke — Cool Tech Jetpack bleibt NUR liegen, wenn es
     // ueber Cool Repair kam („except with the effect of Cool Repair").
     inst.counters._viaCoolRepair = true;
@@ -272,7 +222,7 @@ module.exports = {
     // can't leak past an MCTS rollout boundary (see Treasure Hunter's
     // Backpack for the full rationale — same pattern, same bug class).
     const broadcastExplosion = () => engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion', owner: pi,
+      type: 'explosion', owner: destSeite,
       heroIdx: destHeroIdx, zoneSlot: destSlot,
     });
     broadcastExplosion();
@@ -296,7 +246,7 @@ module.exports = {
     engine.log('cool_repair', {
       player: ps.username,
       equip: equipName,
-      hero: ps.heroes[destHeroIdx]?.name || '?',
+      hero: dps.heroes[destHeroIdx]?.name || '?',
       slot: destSlot,
       goldPaid: repairCost,
     });

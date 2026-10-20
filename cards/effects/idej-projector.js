@@ -48,6 +48,9 @@ function eligibleIdejHeroes(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Idej-Held ist kein „Idej Hero you control".
+    // (Ein uebernommener Idej-Gegnerheld bleibt ausgenommen: `attachIdejCardToHero` legt nur in die EIGENE Spalte — gemeldet, nicht umgebaut.)
+    if (engine.heroSideOf(pi, hero) !== pi) continue;
     if (!isIdejHero(hero.name, engine)) continue;
     if (freeSupportSlots(ps, hi).length === 0) continue;
     out.push({ heroIdx: hi, name: hero.name });

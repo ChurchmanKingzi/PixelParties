@@ -4995,6 +4995,9 @@ class GameEngine {
             if (!hero?.name || hero.hp <= 0) continue;
             // Skip heroes charmed by the caster (they're on the caster's side)
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
+            // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): `side: 'my'` („a target you control") nimmt einen an den Gegner
+            // abgegebenen eigenen Helden (Charme-Marke / dauerhafte Uebernahme) NICHT; uebernommene Gegnerhelden kommen unten dazu.
+            if (side === 'my' && engine.heroSideOf(playerIdx, hero) !== pi) continue;
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
@@ -5591,6 +5594,7 @@ class GameEngine {
             const hero = ps2.heroes[hi];
             if (!hero?.name || hero.hp <= 0) continue;
             if (hero.charmedBy === pi && playerIdx !== pi) continue;
+            if (side === 'my' && engine.heroSideOf(playerIdx, hero) !== pi) continue;   // W28a: „a target you control" = Kontrolle (s. promptDamageTarget)
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
@@ -24852,7 +24856,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Zugbeginn: den ersten eigenen Zug nach dem Wirken festhalten. */
   _torchureZugMerken(pi) {
-    for (const hero of (this.gs.players[pi]?.heroes || [])) {
+    for (const hero of (this.gs.players || []).flatMap(p => p?.heroes || [])) {   // W28a: auch ein uebernommener Gegnerheld (Torchure auf einen kontrollierten Helden)
       const m = hero?.statuses?.poisoned?._torchure;
       if (!m || m.owner !== pi) continue;
       if (m.naechsterZug == null && m.turn < this.gs.turn) m.naechsterZug = this.gs.turn;
@@ -24863,7 +24867,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   _torchureZusatz(pi) {
     const ps = this.gs.players[pi];
     if (!ps) return;
-    const hero = (ps.heroes || []).find(h => h?.name && h.hp > 0
+    const hero = (this.gs.players || []).flatMap(p => p?.heroes || []).find(h => h?.name && h.hp > 0   // W28a: auch ein uebernommener Gegnerheld
       && h.statuses?.poisoned?._torchure?.owner === pi
       && h.statuses.poisoned._torchure.naechsterZug === this.gs.turn);
     if (!hero) return;
@@ -39405,6 +39409,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (reaktor !== playerIdx && !opts.isBakhmSlot && hasCardType(cardData, 'Creature')
         && !this.kontrollRechte(playerIdx, heroIdx).beschwoeren) return false;
 
+    // W28a (Al, 21.10.2026, Rueckfrage zu N1-16: „Korrekt, auch keine Creature-Surprises"): ein Held, der KEINE Kreaturen beschwoeren darf, aktiviert auch keine
+    // Kreatur-Surprise (die Aktivierung IST eine Beschwoerung/Platzierung, Ruling 3.10.). Gesperrt durch: Berserk (`berserked`, „cannot … summon Creatures"; wie
+    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg), `bound` (kein aktionsfaehiger Beschwoerer, wie `canHeroSummon`) und die spielerweiten
+    // Beschwoerungssperren des AUSLOESERS (`getSummonBlockedFor`: `summonLocked` „cannot summon Creatures for the rest of the turn", Greatmaw-Remora-Teilsperre,
+    // Grinning Cat). Schulen/Stufe, Frozen/Stunned/Webbed und Hero-`canPlayCard` (Cute Crown/Mary) prueften die Gates oben schon. NUR-Zauber-Sperren
+    // (`magic_silenced`, `nulled`, `frightened`) betreffen Kreatur-Surprises weiterhin nicht. Spell-Surprises bleiben wie in W25a.
+    if (hasCardType(cardData, 'Creature')) {
+      if (hero.statuses?.berserked || hero.statuses?.bound) {
+        const _cs = loadCardEffect(cardName);
+        let _bypass = false;
+        if (typeof _cs?.canPlayDespiteStatuses === 'function') {
+          try { _bypass = !!_cs.canPlayDespiteStatuses(this.gs, playerIdx, heroIdx, cardData, this); } catch {}
+        }
+        if (!_bypass) return false;
+      }
+      if (this.getSummonBlockedFor(reaktor, cardName)) return false;
+    }
+
     // Creature surprises need a free Support Zone (skip for Bakhm slots — already in support)
     if (!opts.isBakhmSlot && hasCardType(cardData, 'Creature')) {
       let hasFreeSlot = false;
@@ -43304,6 +43326,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       targets.push({ id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name });
+    }
+    return targets;
+  }
+
+  /**
+   * W28a (Al, 21.10.2026: „'you control' bezieht sich IMMER auf aktuelle Kontrolle, also Kontrolleur und nicht Besitzer"): Gegenstueck zu `getHeroTargets`
+   * fuer Karten mit „a Hero you control" — alle LEBENDEN Helden, die `playerIdx` gerade KONTROLLIERT (`heroesControlledBy`): ein an den Gegner abgegebener eigener
+   * Held (dauerhaft oder gecharmt) faellt heraus, ein uebernommener Gegnerheld kommt dazu. ID/`owner` = BRETTSEITE des Helden (`hero-<Seite>-<Index>`),
+   * die eigene Spalte zuerst. `getHeroTargets(p)` bleibt die rein physische Spalte (fuer „Hero your opponent controls"-Sammler und Adressen).
+   * `opts.defeated: true` liefert stattdessen die BESIEGTEN kontrollierten Helden („a defeated Hero you control": Golden Ankh, Soul Transmigration Ritual …).
+   */
+  getControlledHeroTargets(playerIdx, opts = {}) {
+    const targets = [];
+    const liste = this.heroesControlledBy(playerIdx).filter(h => h.hero?.name && (opts.defeated ? h.hero.hp <= 0 : h.hero.hp > 0));
+    liste.sort((a, b) => (a.physOwner === playerIdx ? 0 : 1) - (b.physOwner === playerIdx ? 0 : 1));
+    for (const { physOwner, heroIdx, hero } of liste) {
+      targets.push({ id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name });
     }
     return targets;
   }

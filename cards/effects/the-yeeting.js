@@ -113,7 +113,12 @@ module.exports = {
     return _hasNonHeroCards(gs);
   },
 
-  getValidTargets(gs, pi) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; ID/`owner` = Brettseite des Helden).
+  getValidTargets(gs, pi, engine) {
+    // Der Schaden ist der KOSTENPUNKT des Helden: ein temporaer uebernommener Gegnerheld (Charme Lv3: „unaffected by other cards and effects") nimmt ihn nicht an
+    // und ist kein Ziel (wie Sickly Cheese, W7b F03-12) — der eigene Held bleibt wie bisher.
+    if (engine) return engine.getControlledHeroTargets(pi).filter(t => t.owner === pi || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], pi, { loveShotOhneSchutz: true }));
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -153,8 +158,10 @@ module.exports = {
     const match = (selectedIds[0] || '').match(/^hero-(\d+)-(\d+)$/);
     if (!match) return { cancelled: true };
     const heroIdx = parseInt(match[2]);
-    const hero = ps.heroes[heroIdx];
+    const heroSeite = parseInt(match[1]);   // W28a: Brettseite des gewaehlten (kontrollierten) Helden
+    const hero = gs.players[heroSeite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { cancelled: true };
+    if (engine.heroSideOf(heroSeite, hero) !== pi) return { cancelled: true };   // „a Hero you control": nur der aktuelle Kontrolleur
 
     // ── Select non-Hero card from board (click-to-target) ──
     const boardTargets = _collectBoardTargets(gs, engine);
@@ -206,7 +213,7 @@ module.exports = {
     const tgtZoneType = targetInst.zone; // 'support', 'ability', 'permanent', etc.
 
     const ramEvent = {
-      sourceOwner: pi, sourceHeroIdx: heroIdx,
+      sourceOwner: heroSeite, sourceHeroIdx: heroIdx,
       targetOwner: tgtOwner, targetHeroIdx: tgtHeroIdx >= 0 ? tgtHeroIdx : 0,
       cardName: hero.name, duration: 1200,
     };
@@ -257,7 +264,7 @@ module.exports = {
     engine._broadcastEvent('play_zone_animation', explEvent);
     await engine._delay(200);
 
-    const dmgSource = { name: 'The Yeeting', owner: pi, heroIdx };
+    const dmgSource = { name: 'The Yeeting', owner: pi, heroIdx, ...(heroSeite !== pi ? { heroOwner: heroSeite } : {}) };
 
     // ── Zerstoerungs-Reaktion ZUERST (v1057, Als Regel 14.9.) ────────
     // „Negate that card or effect — die ganze Karte, ausser was schon
