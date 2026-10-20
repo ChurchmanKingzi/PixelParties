@@ -51,7 +51,7 @@ const ARCHETYPE = 'Gigantisaurs';
  * Creature card-type.
  *
  * @param {object} engine
- * @param {number} pi          - Hero's controller side
+ * @param {number} pi          - Hero's board side (physical side, not controller)
  * @param {number} heroIdx     - Hero whose slots we're checking
  * @param {string} [selfInstId] - Optional inst-id self-exclusion so
  *   the just-being-summoned dummy isn't counted as occupant of its
@@ -61,7 +61,7 @@ function heroHasGigantisaur(engine, pi, heroIdx, selfInstId = null) {
   const cardDB = engine._getCardDB();
   for (const c of engine.cardInstances) {
     if (c.zone !== 'support') continue;
-    if ((c.controller ?? c.owner) !== pi) continue;
+    if (engine.physicalSide(c) !== pi) continue;   // N5-03: die Zonen eines Helden sind seitengebunden (Brettseite), nicht kontrollgebunden - wie `uebernahmeUnzulaessig`
     if (c.heroIdx !== heroIdx) continue;
     if (selfInstId && c.id === selfInstId) continue;
     const cd = c.counters?._cardDataOverride || cardDB[c.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
@@ -88,7 +88,8 @@ function gigantisaursCanSummon(ctx) {
 
   // ── Per-Hero check ──
   if (typeof heroIdx === 'number' && heroIdx >= 0) {
-    return !heroHasGigantisaur(engine, pi, heroIdx, selfInstId);
+    // Held einer geliehenen Seite: `cardHeroOwner` ist die Brettseite des Helden (der Beschwörer `cardOwner` steht ggf. auf der anderen).
+    return !heroHasGigantisaur(engine, ctx.cardHeroOwner ?? pi, heroIdx, selfInstId);
   }
 
   // ── Card-wide check (greyout signal) ──

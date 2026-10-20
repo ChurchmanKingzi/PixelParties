@@ -18,6 +18,8 @@
 //    Effekt (der Kartentext kennt nur den Startblatt-Effekt).
 // ═══════════════════════════════════════════
 
+const { drawBlockedFor } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Glimpse of the Future';
 
 module.exports = {
@@ -34,6 +36,9 @@ module.exports = {
     async resolve(engine, pi, opts = {}) {
       const ps = engine.gs.players[pi];
       if (!ps) return null;
+      // N5-10 (Regel D1 / Tuscan Artist): der Zug ist der EINZIGE Nutzen - ist er gesperrt (Hand-/Zieh-Sperre, Tuscan Artist: genau 2), gibt es kein
+      // Angebot und keine (dauerhafte) Aufdeckung (Gegenstück: Grasp the Future unter der Such-Sperre).
+      if (drawBlockedFor(engine, pi, 2)) return null;
       const ok = await engine.promptStartingHandYesNo(pi, CARD_NAME,
         'You may immediately reveal it to draw 2 cards. Those cards count as part of your starting hand.',
         '👁️ Reveal & draw 2!');

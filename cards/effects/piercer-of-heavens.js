@@ -68,7 +68,7 @@ module.exports = {
         description: `Choose any target — ${DAMAGE} damage that cannot be reduced or negated. Nothing can hide from the Piercer.`,
         confirmLabel: `☄️ ${DAMAGE} Damage!`,
         confirmClass: 'btn-danger',
-        cancellable: false,
+        cancellable: true,   // N5-11 (Regel 23.9): keine Kosten vor der Zielwahl, kein Zusagepunkt → abbrechbar (wie Rockfall); `if (!target) return` unten
         _skipPostTargetReactions: true,
       });
       if (!target) return;

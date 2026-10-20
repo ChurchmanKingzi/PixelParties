@@ -136,7 +136,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const ps = engine.gs.players[pi];
       if (!ps) return;
-      if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      if (ps.handLocked || engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 + N5-02 (Such-Sperre): wirkt nicht → Blob stumm
 
       // Galerie der passenden Deckkarten, Kopien zusammengefasst.
       const counts = {};

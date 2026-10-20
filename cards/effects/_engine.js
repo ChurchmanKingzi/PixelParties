@@ -18694,6 +18694,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         inst.counters.poisonStacks = inc;
       }
     }
+    // N5-09: „unheilbar"-Marke VOR dem Reaktionsfenster (`onStatusApplied` unten) setzen - sonst taut The Melting & Co. die Kreatur im Fenster ihres
+    // eigenen Freeze noch auf (Cold Coffin stempelte erst nach dem Aufruf). Gleiche Konvention: `<status>Unhealable` am Zaehler.
+    if (opts.unhealable) inst.counters[statusName + 'Unhealable'] = true;
     if (opts.duration && opts.duration > 1) {
       const prev = inst.counters[statusName + 'Duration'] || 0;
       inst.counters[statusName + 'Duration'] = Math.max(prev, opts.duration);
@@ -34523,6 +34526,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // (card_reveal lief bereits VOR dem Konterfenster — v693.)
       this.log('pre_damage_reaction', { card: cardName, player: ps.username });
+      // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+      if (await this._reaktionGespielt(targetOwner, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); return NULL_RESULT; }
 
       let negated = false;
       let amountOverride;
@@ -34704,6 +34709,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(300);
 
       this.log('opp_pre_damage_reaction', { card: cardName, player: ps.username });
+      // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+      if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); return NULL_RESULT; }
 
       let negated = false;
       let amountOverride;
@@ -34862,6 +34869,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('card_reveal', { cardName, playerIdx: ownerIdx });
       await this._delay(300);
       this.log('creature_pre_damage_reaction', { card: cardName, player: ps.username, target: creatureInst.name });
+      // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+      if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); return NULL_RESULT; }
 
       let negated = false;
       let amountOverride = undefined;
@@ -35013,6 +35022,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
       await this._delay(300);
       this.log('opp_creature_pre_damage_reaction', { card: cardName, player: ps.username, target: creatureInst.name });
+      // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+      if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); return NULL_RESULT; }
 
       let negated = false;
       let amountOverride = undefined;
@@ -35473,17 +35484,32 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`ON_NEGATION_DEALT`).
    * @returns {Promise<boolean>} true = negiert (die Wirkung der Reaction fällt aus)
    */
-  async _reaktionGespielt(ownerIdx, cardName, cardType) {
+  async _reaktionGespielt(ownerIdx, cardName, cardType, extra = {}) {
     if (this._inMctsSim) return false;
-    const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardType || null, _skipReactionCheck: true };
+    // N5-04: `extra.sourceOwner` = Besitzer der Karte/des Effekts, auf den die Reaction antwortet (Cute Camera: „in reaction to YOUR card or
+    // effect"); fehlt er (ältere Fenster), kennt der Zuhörer die Quelle nicht und darf nicht danach filtern.
+    const rxHook = { reactionOwner: ownerIdx, reactionCardName: cardName, reactionCardType: cardType || null, _skipReactionCheck: true,
+      sourceOwner: Number.isInteger(extra.sourceOwner) && extra.sourceOwner >= 0 ? extra.sourceOwner : undefined };
     await this.runHooks('onReactionPlayed', rxHook);
     if (!rxHook._reactionNegated) return false;
+    // Z7b: eine GANZ negierte Reaction verbraucht ihren Einmal-pro-Spiel-Stempel nicht (die Fenster stempeln beim Verlassen der Hand).
+    {
+      const _sc = loadCardEffect(cardName);
+      const _k = _sc?.oncePerGameKey || (_sc?.oncePerGame ? cardName : null);
+      if (_k) this.gs.players[ownerIdx]?._oncePerGameUsed?.delete(_k);
+    }
     this.log('reaction_negated', { negator: rxHook._reactionNegatedBy || 'a reaction', negated: cardName, owner: ownerIdx });
     await this._meldeNegation({ negatedOwner: ownerIdx, negatorOwner: undefined, cardName, kind: 'reaction' });
     return true;
   }
 
-  async _rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast) {
+  /** N5-04: Besitzer (Sitz) der Quelle eines Fensters (`source.controller ?? source.owner`) oder `undefined`, wenn unbekannt. */
+  _rxQuellBesitzer(source) {
+    const o = source?.controller ?? source?.owner;
+    return Number.isInteger(o) && o >= 0 ? o : undefined;
+  }
+
+  async _rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast, extra = {}) {
     const ps = this.gs.players[ownerIdx];
     const cardData = this._getCardDB()[cardName];
     const cost = cardData?.cost || 0;
@@ -35497,7 +35523,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     ps.hand.splice(actualIdx, 1);
     if (inDieLoeschung) ps.deletedPile.push(cardName);
     else ps.discardPile.push(cardName);
-    await this._rxPay(ps, cost, { cardName });
+    await this._rxPay(ps, cost + (extra.zusatzKosten || 0), { cardName });   // N5-04: Cute Camera „increase this Artifact's Cost by 3"
     await this._rxPayWisdom(ps, rxCast);
     this.notePlayedFromHand(ownerIdx);
     if (script?.oncePerGame || script?.oncePerGameKey) {
@@ -35510,7 +35536,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ „When your opponent PLAYS A REACTION" (Front Soldier): die Reaction ist bezahlt und aufgedeckt, ihre Wirkung steht noch aus —
     // `_reaktionGespielt` fragt die Hand-Zuhörer des Gegners. Negiert: der Aufrufer sieht `false` und überspringt die Wirkung, die Karte
     // liegt in der Ablage, die Kosten sind bezahlt (wie bei jeder negierten Karte).
-    if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType)) { this.sync(); return false; }
+    // N5-04: `extra.ohneReaktion` = „your opponent cannot react to this card's activation" (Cute Camera mit +3 Gold).
+    if (!extra.ohneReaktion && await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: extra.sourceOwner })) { this.sync(); return false; }
     return true;
   }
 
@@ -36012,6 +36039,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this._delay(300);
 
         this.log('after_damage_reaction', { card: cardName, player: ps.username });
+        // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+        if (await this._reaktionGespielt(reactorIdx, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); break; }
 
         this._inAfterDamageReaction = true;
         try {
@@ -36219,6 +36248,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         this.log('after_creature_damage_reaction', {
           card: cardName, player: ps.username, target: creatureInst.name,
         });
+        // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+        if (await this._reaktionGespielt(ownerIdx, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(source) })) { this.sync(); break; }
 
         this._inAfterCreatureDamageReaction = true;
         try {
@@ -38353,6 +38384,9 @@ this._deathWatch = (this._deathWatchStack || []).length
             title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
           });
         }
+
+        // N5-04: „when your opponent plays a Reaction" (Cute Camera, Front Soldier) gilt auch in diesem Fenster (löst inline auf, nicht über `_rxHandkarteEinsetzen`)
+        if (await this._reaktionGespielt(pi, cardName, cardData?.cardType, { sourceOwner: this._rxQuellBesitzer(sourceCard) })) { this.sync(); continue; }
 
         this._inPostTargetReaction = true;
         let resolveResult = null;

@@ -9527,7 +9527,7 @@ function doTriggerTreacherousCrystal(room, pi) {
   let stolenCount = 0;
   for (const inst of room.engine.cardInstances) {
     if (inst.zone !== 'support') continue;
-    if (inst.owner !== oi) continue;
+    if ((inst.controller ?? inst.owner) !== oi) continue;   // N5-01: „Creatures you control" = Kontrolleur, nicht Brettseite
     if (inst.faceDown) continue;
     if (inst.stolenBy != null) continue;
     if (inst.counters?._cardinalImmune) continue;

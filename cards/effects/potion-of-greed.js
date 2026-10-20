@@ -40,6 +40,8 @@ module.exports = {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;
+    // N5-07: Potion-Deck-Zieh-Verbot (Chaos-Diamond/Pinta: "never draw from the Potion Deck") - dann bliebe nur der Nachteil (wie Potion Juggler).
+    if (ps.potionDrawBanned) return false;
     if (gs.currentPhase !== 2) return false;
     return true;
   },
