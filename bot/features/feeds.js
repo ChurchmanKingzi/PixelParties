@@ -191,7 +191,7 @@ module.exports = function register(ctx) {
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);
     }
-    const list = [...items.values()];
+    const list = [...items.values()].sort((a, b) => Boolean(b.detail) - Boolean(a.detail));   // Karten mit Fehlerbeschreibung zuerst, damit sie unter dem Bilderlimit (MAX_CARDS_POSTED) nicht untergehen
     const broad = found.shared.filter(x => x.broad);
     if (!list.length && !broad.length) return;
 
