@@ -5438,6 +5438,7 @@ class GameEngine {
                 const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
                 if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
               }
+              gs._zielNegiertDurchSchutz = true;   // W36a: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
               return null;
             }
             if (redirected) {
@@ -40615,6 +40616,24 @@ this._deathWatch = (this._deathWatchStack || []).length
     try {
       await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name, karte: !!karte });   // W35a: `karte` = eine echte Attack-KARTE (doPlaySpell, Zusatzaktions-Guss), sonst ein Effekt
     } catch (err) { console.error('[zaehleAlsArt]', err.message); }
+  }
+
+  /**
+   * ★ W36a (Al, 22.10.2026, Antwort auf die W35a-Rückfrage 1): Zielwahl eines Heldeneffekts, der als Attack/Spell zählt (Broghan, Brackle, Arthor, Heragas, Kohta; Muster Alice/Javelin Throw).
+   * Wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, MOE Shield, Magic Mirror, Surprises, Schutz-/Redirect-Negation: `promptDamageTarget` liefert `null` MIT
+   * `gs._spellNegatedByEffect` bzw. `gs._zielNegiertDurchSchutz`), ist der Effekt für die Runde VERBRAUCHT und zählt als gespielte Attack/Spell; ein Abbruch des Spielers (`null` ohne
+   * Flag) bleibt ein Abbruch. Liefert `{ target, negiert }`; die Flags werden zurückgesetzt (kein Rest für den nächsten Effekt). Der Aufrufer zählt/stempelt bei `negiert` selbst
+   * (`zaehleAlsArt`, Rückgabe `true` aus `onHeroEffect`).
+   */
+  async heldenEffektZielwahl(ctx, config) {
+    const gs = this.gs;
+    const negVorher = gs._spellNegatedByEffect;
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+    const target = await ctx.promptDamageTarget(config);
+    const negiert = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    if (negVorher) gs._spellNegatedByEffect = negVorher; else { delete gs._spellNegatedByEffect; if (negiert) delete gs._negationWhole; }
+    delete gs._zielNegiertDurchSchutz;
+    return { target, negiert };
   }
 
   /**

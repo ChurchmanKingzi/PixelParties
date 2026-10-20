@@ -68,7 +68,8 @@ module.exports = {
     gs._spellDamageLog = [];
 
     // Prompt for any target
-    const target = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'attack',
@@ -80,6 +81,12 @@ module.exports = {
       cancellable: true,
     });
 
+    if (negiert) {
+      delete gs._spellDamageLog;
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!target) {
       delete gs._spellDamageLog;
       return false;
