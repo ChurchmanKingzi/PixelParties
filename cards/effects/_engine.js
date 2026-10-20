@@ -7356,10 +7356,26 @@ class GameEngine {
    * `treatedAsAttack`) für Stufen-Bedingungen von Reaktionen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) — immer LEVEL 0 (Deklaration
    * `{ level }`, Standard 0). Nur Heldenkarten und nur für den passenden Schadenstyp (`attack` bzw. `*_spell`); sonst `null` (keine Stufe, keine Entscheidung).
    * Anti Magic (Spell-Immunität) liest weiter `_spellLevelAlsQuelle`.
+   * ★ W27a (Al, 21.10.2026): gilt ÜBERALL, wo irgendeine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Future Tech Escape Device, Stealth,
+   * Future Tech Jetpack) — und auch für als Attack geltende Gegenstandseffekte (Skript-Deklaration `treatedAsAttack` an Artefakt-/Trankkarten, oder Stempel
+   * `treatedAsAttack` am Quellobjekt, optionaler 3. Parameter `source`). Gewöhnliche Attack-/Spell-Karten behalten ihre gedruckte Stufe (`null` hier).
    */
-  _heldenEffektStufe(sourceName, damageType) {
+  _heldenEffektStufe(sourceName, damageType, source) {
+    const dt0 = String(damageType || '');
+    // W27a (Al, 21.10.2026): ein Quellobjekt, das selbst als Attack gilt (Stempel `treatedAsAttack: { level }` — Gegenstandseffekte, die den
+    // Helden als Quelle nennen: Bamboo Staff, Sacrificial Dagger), zählt für Attack-Schaden mit dieser Stufe (Standard 0).
+    const stempel = source?.treatedAsAttack || source?.cardInstance?.treatedAsAttack;
+    if (dt0 === 'attack' && stempel && typeof stempel === 'object') return Number.isFinite(stempel.level) ? stempel.level : 0;
     if (!sourceName) return null;
     const card = this._getCardDB()[sourceName];
+    // W27a (Al, 21.10.2026, Entscheidung 3): als Attack geltende GEGENSTANDSEFFEKTE (Crusader's Arm-Cannon/Cutlass/Flintlock/Hookshot, Bamboo Staff,
+    // Javelin Throw, Sacrificial Dagger, Sword in a Bottle) zählen wie die Heldeneffekte als LEVEL 0. Deklaration im Skript: `treatedAsAttack: { level: 0 }`;
+    // nur Artefakt-/Trank-Karten (nie eine echte Attack-/Spell-/Creature-Karte — die behalten ihre gedruckte Stufe) und nur für Attack-Schaden.
+    if (card && dt0 === 'attack' && /Artifact|Potion/.test(String(card.cardType || ''))
+        && !hasCardType(card, 'Attack') && !hasCardType(card, 'Spell') && !hasCardType(card, 'Creature')) {
+      const gs0 = loadCardEffect(sourceName)?.treatedAsAttack;
+      if (gs0 && typeof gs0 === 'object') return Number.isFinite(gs0.level) ? gs0.level : 0;
+    }
     if (!card || !/Hero/.test(String(card.cardType || ''))) return null;
     const sc = loadCardEffect(sourceName);
     const dt = String(damageType || '');
@@ -8149,6 +8165,11 @@ class GameEngine {
   heroBlocksTargeting(heroOwner, heroIdx, info = {}) {
     const ps = this.gs.players[heroOwner];
     if (!ps) return false;
+    // W27a (Al, 21.10.2026): als Attack/Spell geltende Heldeneffekte und als Attack geltende Gegenstandseffekte zählen für Stufen-Schutz (Stealth, Future Tech Jetpack)
+    // als Level 0 — `info.treatedAsLevel` = Stufe der Quelle (je nach `damageType` Attack oder Spell) oder null (keine solche Quelle). Quellenobjekt optional in `info.source` (Treffer-Pfad).
+    if (info.treatedAsLevel === undefined) {
+      info = { ...info, treatedAsLevel: this._heldenEffektStufe(info.cardName, info.damageType, info.source) };
+    }
     for (const slot of (ps.supportZones?.[heroIdx] || [])) {
       for (const cardName of (Array.isArray(slot) ? slot : (slot ? [slot] : []))) {
         // Override-bewusst: ein kopiertes Jetpack schuetzt genauso.
@@ -8553,6 +8574,7 @@ class GameEngine {
         sourceData: source?.name ? this._getCardDB()[source.name] : null,
         damageType: type,
         cardName: source?.name || null,
+        source,   // W27a: Quellobjekt (Stempel `treatedAsAttack`)
         chooserIdx: source?.controller ?? source?.owner ?? null,
         ignoreUntargetable: opts?.ignoreUntargetable,
         // ★ v1327: DIES IST DER TREFFER, NICHT DIE WAHL. Die Zielwaehler

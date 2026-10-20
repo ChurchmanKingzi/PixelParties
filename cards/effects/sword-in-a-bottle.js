@@ -81,6 +81,8 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { level: 0 },
   // ★ PFLICHTFLAGGE (Als Befund 12.9.): `doUsePotion` steigt ohne sie
   //   STILL aus (`if (!script?.isPotion) return false;`). Die Karte war
   //   im Client als nutzbar hervorgehoben, der Klick lief ins Leere —

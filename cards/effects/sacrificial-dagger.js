@@ -60,6 +60,7 @@ async function dolchSchlag(ctx, pi) {
     attackerSourceOverride: {
       name: hero.name, owner: pi, controller: pi,
       heroIdx, zone: 'hand', _heroAttackSource: true,
+      treatedAsAttack: { level: 0 },   // W27a: Level-0-Stempel (Quelle ist der Held)
     },
   });
   if (!target) return; // declined — HOPT untouched
@@ -99,7 +100,7 @@ async function dolchSchlag(ctx, pi) {
   const feld = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
   const liveHero = gs.players[feld]?.heroes?.[heroIdx];
   const damage = Math.max(0, liveHero?.atk || 0);
-  const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
+  const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: { level: 0 } };   // W27a: Level-0-Stempel (Quelle ist der Held)
 
   if (tHero) {
     await engine.actionDealDamage(source, tHero, damage, 'attack');
@@ -118,6 +119,8 @@ async function dolchSchlag(ctx, pi) {
 }
 
 module.exports = {
+  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { level: 0 },
   activeIn: ['support'],
 
   cpuMeta: {

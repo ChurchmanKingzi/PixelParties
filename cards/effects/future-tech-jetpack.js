@@ -53,6 +53,10 @@ module.exports = {
     // NUR Attacken. Der Kartentyp entscheidet; ohne Katalogeintrag gibt
     // es keine Stufe und damit keine Entscheidung (Lehre aus Escape
     // Device, 21.8.).
+    // W27a (Al, 21.10.2026): als Attack geltende Heldeneffekte (Broghan & Co.) und Gegenstandseffekte (Bamboo Staff, Crusader's …) sind IMMER Level 0.
+    if (info?.treatedAsLevel != null && info.damageType === 'attack') {   // nur Attacks (Alice = Spell, `destruction_spell`, bleibt außen vor)
+      return info.treatedAsLevel <= zaehleInAblage(gs, info.heroOwner, CARD_NAME);
+    }
     const src = info?.sourceData;
     if (!src || src.cardType !== 'Attack') return false;
 

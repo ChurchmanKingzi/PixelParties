@@ -83,6 +83,8 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
+  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { level: 0 },
   isTargetingArtifact: true,
   requiresTarget: true,
   animationType: 'none',

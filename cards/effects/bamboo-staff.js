@@ -78,6 +78,8 @@ async function zeigeAuftritt(engine, ownerIdx) {
 }
 
 module.exports = {
+  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+  treatedAsAttack: { level: 0 },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -180,7 +182,7 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx };
+      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: { level: 0 } };   // W27a: Level-0-Stempel (Quelle ist der Held)
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
