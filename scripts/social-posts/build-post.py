@@ -442,8 +442,8 @@ def music_path(card_name, override):
     """Musik: ausdrückliche Datei, sonst wie im Spiel (server.js `bgmSlugForHero`): längste zusammenhängende Wortfolge des
     Namens, für die `public/music/bgm_<slug>.ogg` existiert (so findet „Luna Pele“ `bgm_lunapele.ogg`)."""
     base = ROOT / 'public' / 'music'
-    if override:
-        return base / override
+    if override:                                   # Dateiname in public/music oder Pfad ab Repo-Wurzel (enthält „/")
+        return ROOT / override if '/' in override else base / override
     toks = [''.join(ch for ch in w.lower() if ch.isalnum()) for w in card_name.replace(',', ' ').replace("'", ' ').split()]
     toks = [t for t in toks if t]
     best = None
@@ -486,10 +486,10 @@ def main():
     # Karte vom Spiel-Renderer
     card_png = out / 'card.png'
     if not card_png.exists():
-        subprocess.run(['node', str(HERE / 'render-card.js'), card_name, str(card_png)], check=True)
+        subprocess.run(['node', str(HERE / 'render-card.js'), card_name, str(card_png)] + ([json.dumps(hero_cfg['card'])] if hero_cfg.get('card') else []), check=True)
     card = Image.open(card_png).convert('RGBA').resize((CARD_W, CARD_H), Image.BOX)
 
-    accent = hexcol(args.accent) if args.accent else accent_from_sprite(spr.sheet, spr.meta)
+    accent = hexcol(args.accent or hero_cfg['accent']) if (args.accent or hero_cfg.get('accent')) else accent_from_sprite(spr.sheet, spr.meta)
     print('Akzent', '#%02x%02x%02x' % accent)
 
     # Zeitraster: Videoframes je Sprite-Frame so, dass fps in 24…60 liegt

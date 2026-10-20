@@ -29,6 +29,7 @@ ROOT = HERE.parents[1]
 OUT = HERE / 'out'
 REELS = OUT / 'reels'
 GENERIC = {'battle', 'battle1', 'battle2', 'battle3', 'menu', 'menu_diamond', 'shop', 'shop_diamond', 'login', 'puzzle'}
+EXTRA = ['Cool Rescuer Monia']                  # ohne Treffer in public/music, Musik und Einstellungen stehen in hero-themes.json
 EXCLUDE = {'Rubin, the Dragoneer Champion',                     # Fehltreffer bei der Musik (nur wegen des Worts „Champion“)
            'Definitely not Andras, the Human Weapon',           # keine Kartenkunst, Karte lässt sich nicht zeichnen
            'Champion, the Eye of the Storm'}                    # dito
@@ -58,6 +59,11 @@ def bgm_for(name, slugs):
     return best
 
 
+def cfg_music(name):
+    cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(name, {})
+    return Path(cfg['music']).stem.replace('bgm_', '') if cfg.get('music') else None
+
+
 def heroes_with_music():
     cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
     slugs = bgm_slugs()
@@ -68,7 +74,9 @@ def heroes_with_music():
             sl = slugify(c['name'])
             if b and (ROOT / 'data' / 'hero-animations' / f'{sl}.json').exists():
                 rows.append(dict(name=c['name'], slug=sl, music=b, kind=c['cardType']))
-    return rows
+    by_name = {c['name']: c for c in cards}
+    extra = [dict(name=n, slug=slugify(n), music=(cfg_music(n) or '?'), kind=by_name[n]['cardType']) for n in EXTRA if n in by_name]
+    return extra + [r for r in rows if r['name'] not in EXTRA]
 
 
 def render(row, force):

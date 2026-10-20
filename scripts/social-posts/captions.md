@@ -1,6 +1,6 @@
 # Captions für alle Reels (Entwürfe, Englisch)
 
-51 Heroes mit eigenem Musikstück. Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
+52 Heroes mit eigenem Musikstück (Monia, die erste, eingeschlossen). Je Reel liegt dieselbe Caption als Textdatei neben dem Video (`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.
 
 Hinweise:
 
@@ -9,6 +9,25 @@ Hinweise:
 - Jede Fähigkeit folgt dem Kartentext (`data/cards.json`). Über das Spiel steht nur „free", „online", „TCG" und „almost 200 animated pixel Heroes". „Free" ist vom Auftraggeber bestätigt. Nicht behauptet wird z. B. „no download" oder eine Spielerzahl.
 - Die vier Aufruf-Varianten wechseln sich ab, damit nicht jeder Beitrag gleich endet.
 - Cover: `<slug>.png` neben dem Video (fertiges Bild nach dem Einblenden).
+
+---
+
+## Cool Rescuer Monia
+
+Datei: `cool-rescuer-monia.mp4`
+
+**Caption**
+
+> Meet Monia, the face of Pixel Parties. 💙🚀
+>
+> Cool Rescuer Monia swoops in on her jetpack. Once per turn, when Creatures of either player would be affected by a card or effect, she can discard 1 card to negate that effect on all Creatures.
+>
+> Pixel Parties is a free online TCG about assembling your party of Heroes and annihilating your opponent's party!
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
+>
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Heroine #Jetpack
+
+**Alt-Text**: Animated pixel art trading card of Cool Rescuer Monia, a blue-haired girl flying on a flaming jetpack, with drifting white clouds, floating hearts, glints and falling jet sparks around her.
 
 ---
 

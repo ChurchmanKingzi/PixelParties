@@ -28,6 +28,11 @@ CTAS = [
 
 # Kartenname: (Aufhänger, Beschreibung der Fähigkeit, Alt-Text-Zusatz, zusätzliche Hashtags)
 HEROES = {
+    "Cool Rescuer Monia": (
+        "Meet Monia, the face of Pixel Parties. 💙🚀",
+        "Cool Rescuer Monia swoops in on her jetpack. Once per turn, when Creatures of either player would be affected by a card or effect, she can discard 1 card to negate that effect on all Creatures.",
+        "drifting white clouds, floating hearts, glints and falling jet sparks",
+        "#Heroine #Jetpack"),
     "Alleria, the Queen of Spiders": (
         "Redirect the attack. Spring the trap. 🕷️",
         "Once per turn, Alleria can redirect an opponent's single-target Attack, Spell or Creature effect to one of your Heroes that has a Surprise waiting. The damage then can't be reduced or negated, except by a Surprise. And whenever a Surprise in her own Surprise Zone activates, you draw a card.",
@@ -291,9 +296,10 @@ def slugify(n):
 
 
 def build(name, i):
+    i = 0 if name == 'Cool Rescuer Monia' else i
     hook, body, alt_bits, tags = HEROES[name]
     cap = f"{hook}\n\n{body}\n\n{CTAS[i % len(CTAS)]}\n\n{BASE_TAGS} {tags}"
-    alt = f"Animated pixel art trading card of {name}, with {alt_bits} around the hero."
+    alt = f"Animated pixel art trading card of {name}, a blue-haired girl flying on a flaming jetpack, with {alt_bits} around her." if name == 'Cool Rescuer Monia' else f"Animated pixel art trading card of {name}, with {alt_bits} around the hero."
     return cap, alt
 
 
@@ -310,7 +316,7 @@ def main():
     lines = [
         '# Captions für alle Reels (Entwürfe, Englisch)',
         '',
-        f'{len(rows)} Heroes mit eigenem Musikstück. Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
+        f'{len(rows)} Heroes mit eigenem Musikstück (Monia, die erste, eingeschlossen). Je Reel liegt dieselbe Caption als Textdatei neben dem Video '
         '(`scripts/social-posts/out/reels/<slug>.txt`), zum direkten Einfügen. Erzeugt von `captions.py`; dort lassen sich die Texte ändern.',
         '',
         'Hinweise:',
@@ -325,7 +331,9 @@ def main():
         '',
     ]
     OUT.mkdir(parents=True, exist_ok=True)
-    for i, r in enumerate(rows):
+    others = [r for r in rows if r['name'] != 'Cool Rescuer Monia']
+    for r in rows:
+        i = others.index(r) if r in others else 0
         cap, alt = build(r['name'], i)
         lines += [f"## {r['name']}", '', f"Datei: `{r['slug']}.mp4`", '', '**Caption**', '']
         lines += ['> ' + ln if ln else '>' for ln in cap.split('\n')]

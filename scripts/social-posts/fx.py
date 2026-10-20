@@ -41,6 +41,8 @@ PAL = {
     'soul': [(30, 10, 60), (80, 40, 140), (150, 90, 220), (220, 190, 255)],
     'web': [(80, 80, 100), (160, 160, 185), (220, 220, 240), (255, 255, 255)],
     'webspider': [(10, 5, 15), (60, 30, 70), (150, 60, 160), (255, 120, 255)],
+    'skycloud': [(110, 140, 215), (180, 205, 245), (230, 240, 255), (255, 255, 255)],
+    'glint': [(40, 120, 200), (110, 200, 255), (200, 240, 255), (255, 255, 255)],
     'holy_white': [(150, 140, 175), (214, 208, 232), (246, 243, 252), (255, 255, 255)],
     'ice': [(30, 70, 120), (90, 160, 220), (170, 220, 250), (240, 252, 255)],
 }
@@ -61,6 +63,8 @@ THEMES = {
     'shadow': [('gas', 'shadow', 46), ('spark', 'shadow', 8)],
     'dust':   [('gas', 'dust', 42), ('mote', 'dust', 24)],
     'butterfly': [('butterfly', 'pinkwing', 9), ('mote', 'heal', 24), ('spark', 'pinkwing', 5)],
+    'cool':   [('skycloud', 'skycloud', 9), ('heart', 'heal', 11), ('glyph', 'glint', 8, {'g': 'starglint', 'move': 'float'}),
+               ('glyph', 'fire', 26, {'g': 'jetspark', 'move': 'drip'}), ('spark', 'glint', 6)],
     'holy':   [('beam', 'gold', 5), ('mote', 'gold', 64), ('orb', 'gold', 6), ('feather', 'holy_white', 14), ('cross', 'gold', 10), ('spark', 'holy_white', 7)],
     'stars':  [('spark', 'gold', 12), ('spark', 'arcane', 8)],
 }
@@ -204,7 +208,7 @@ def fireball_stamp(R, seed):
 
 
 # Formen: '.' leer, O Kontur, D Schatten, X Mitte, H Licht; mehrere Einträge = Einzelbilder (wechseln im Takt)
-GLYPH_Z = {'drop': 1}      # Vergrößerung (Zellen je Formpixel), Standard 2
+GLYPH_Z = {'drop': 1, 'jetspark': 1}      # Vergrößerung (Zellen je Formpixel), Standard 2
 
 GLYPHS = {
     'note': [['...HH', '...XX', '...X.', '.OOX.', 'OXXX.', '.XX..']],
@@ -227,6 +231,8 @@ GLYPHS = {
     'bone': [['XX...XX', '.XXXXX.', 'XX...XX']],
     'spider': [['X.....X', '.X.O.X.', '..XOX..', '.XXOXX.', '..XOX..', '.X.O.X.', 'X.....X']],
     'butterfly': [['XX...XX', 'XHXOXHX', '.XXOXX.', 'XXDODXX', 'X.....X'], ['..X.X..', '.XXOXX.', '.XHOHX.', '..XOX..']],
+    'starglint': [['..H..', '..X..', 'HXXXH', '..X..', '..H..'], ['H...H', '.X.X.', '..H..', '.X.X.', 'H...H']],
+    'jetspark': [['H']],
     'web': [['X.X.X', '.XXX.', 'XXHXX', '.XXX.', 'X.X.X']],
     'slash': [['....H', '...XH', '..X..', '.X...', 'X....']],
 }
@@ -279,6 +285,10 @@ class ThemeFX:
                         elif mv == 'float':
                             x0, y0 = cx + r.uniform(-1, 1) * (w_half + 130), r.uniform(by0, feet)
                             it.update(rise=r.uniform(20, 70), drift=r.uniform(-30, 30), sway=r.choice([1, 2, 3]) * U)
+                        elif mv == 'drip':               # Funken fallen von den Düsen (links/rechts am Körper)
+                            side2 = r.choice([-1, 1])
+                            x0, y0 = cx + side2 * r.uniform(0.35, 0.95) * w_half, feet - r.uniform(60, 280)
+                            it.update(rise=-r.uniform(180, 320), drift=side2 * r.uniform(0, 30), sway=r.choice([0, 0, 1]) * U)
                         elif mv == 'cross':
                             dirn = r.choice([-1, 1])
                             x0, y0 = cx - dirn * 420, r.uniform(by0 + 20, feet)
@@ -294,6 +304,10 @@ class ThemeFX:
                             spots.append((cx + side * r.uniform(0.3, 1.0) * ((bx1 - bx0) / 2 + 170),
                                           r.uniform(by0 + 10, feet + 10), r.choice([5, 6, 8, 10]), r.randrange(1000)))
                         it = dict(rise=0, drift=0, r=1, grow=0, seed=0, sway=0, spots=spots, cycles=cyc)
+                    elif kind == 'skycloud':
+                        dirn = r.choice([-1, 1])
+                        x0, y0 = cx - dirn * 360 + r.uniform(-60, 60), r.uniform(by0 - 30, feet + 50)
+                        it = dict(rise=0, drift=dirn * r.uniform(420, 620), r=r.choice([4, 5, 6]), grow=0, seed=r.randrange(1000), sway=0, amax=0.8)
                     elif kind == 'gas':
                         x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 150)
                         y0 = feet - r.uniform(-20, 330)
@@ -429,7 +443,7 @@ class ThemeFX:
                 continue
             if kind in ('cloud', 'fog'):
                 stamp = cloud_stamp(p['r'] + int(u * p['grow']), p['seed'])
-            elif kind in ('gas', 'gasfloor'):
+            elif kind in ('gas', 'gasfloor', 'skycloud'):
                 stamp = cloud_stamp(p['r'] + int(u * p['grow']), p['seed'], soft=True)
             elif kind == 'bubble':
                 stamp = bubble_stamp(p['r'])
@@ -539,5 +553,5 @@ def specs_for(names=None, particles=None):
         return [(p[0], p[1], p[2], p[3] if len(p) > 3 else {}) for p in particles]
     out = []
     for n in names:
-        out += [(k, pal, c, {}) for (k, pal, c) in THEMES[n]]
+        out += [(e[0], e[1], e[2], e[3] if len(e) > 3 else {}) for e in THEMES[n]]
     return out

@@ -1185,5 +1185,23 @@
     8
    ]
   ]
+ },
+ "Cool Rescuer Monia": {
+  "name": "Monia",
+  "title": "Cool Rescuer",
+  "music": "scripts/social-posts/music/bgm_monia.ogg",
+  "themes": [
+   "cool"
+  ],
+  "card": {
+   "normalFrame": true,
+   "crop": [
+    10,
+    23,
+    76,
+    51
+   ]
+  },
+  "accent": "#5aa8ff"
  }
 }

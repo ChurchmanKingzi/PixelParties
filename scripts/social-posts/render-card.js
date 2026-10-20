@@ -26,7 +26,11 @@ function startServer() {
   return new Promise(r => srv.listen(0, '127.0.0.1', () => r(srv)));
 }
 
-async function renderCards(names) {
+// items: Kartenname oder { name, opts }. opts.normalFrame: normaler Heldenrahmen statt Fullart; opts.crop [x, y, w, h]: Ausschnitt der
+// Kunst (in Kunstpixeln), der ins normale Bildfenster kommt (76×51).
+async function renderCards(items) {
+  const names = items.map(i => (typeof i === 'string' ? i : i.name));
+  const optsOf = Object.fromEntries(items.map(i => [typeof i === 'string' ? i : i.name, (typeof i === 'string' ? {} : i.opts) || {}]));
   const srv = await startServer();
   const base = 'http://127.0.0.1:' + srv.address().port;
   const cards = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'cards.json'), 'utf-8'));
@@ -40,15 +44,26 @@ async function renderCards(names) {
   for (const name of names) {
     const card = cards.find(c => c.name === name);
     if (!card) throw new Error('Karte nicht gefunden: ' + name);
-    out[name] = await page.evaluate(async ({ card, base }) => {
+    out[name] = await page.evaluate(async ({ card, base, opts }) => {
       if (!window.__init) {
         await CardRender.init({ base: base + '/cardgen/' });
-        await CardRender.loadMeta(base + '/data/card-render.json');
+        window.__meta = await CardRender.loadMeta(base + '/data/card-render.json');
         window.__init = true;
       }
-      const cv = await CardRender.renderCard(card);
+      const m = Object.assign({}, window.__meta.cards[card.name]);
+      if (opts.normalFrame) delete m.f;
+      window.__meta.cards[card.name] = m;
+      let cv;
+      if (opts.crop) {
+        const art = await CardRender.getArt(card.name);
+        if (!art) return null;
+        const [x, y, w, h] = opts.crop;
+        cv = CardRender.draw(CardRender.specFromCard(card, m), { src: art.src, sx: (art.sx || 0) + x, sy: (art.sy || 0) + y, sw: w, sh: h });
+      } else {
+        cv = await CardRender.renderCard(card);
+      }
       return cv ? cv.toDataURL('image/png') : null;
-    }, { card, base });
+    }, { card, base, opts: optsOf[name] });
   }
   await browser.close();
   srv.close();
@@ -58,8 +73,8 @@ async function renderCards(names) {
 module.exports = { renderCards };
 
 if (require.main === module) {
-  const [name, file] = process.argv.slice(2);
-  renderCards([name]).then(o => {
+  const [name, file, optsJson] = process.argv.slice(2);
+  renderCards([{ name, opts: optsJson ? JSON.parse(optsJson) : {} }]).then(o => {
     const d = o[name];
     if (!d) throw new Error('keine Kunst für ' + name);
     fs.writeFileSync(file, Buffer.from(d.split(',')[1], 'base64'));
