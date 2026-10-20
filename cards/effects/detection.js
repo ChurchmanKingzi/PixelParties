@@ -193,7 +193,9 @@ module.exports = {
 
         // W24b N2-03: Reaktionen auf eine vorher abgelegte Surprise (Furious Anger, Water Golem) koennen spaetere Ziele schon
         // vom Brett genommen haben — dann nicht noch einmal splicen/ablegen.
-        if (t.cardInstance && !engine.cardInstances.includes(t.cardInstance)) continue;
+        if (t.cardInstance && (!engine.cardInstances.includes(t.cardInstance)
+            || t.cardInstance.zone !== (t.zoneType === 'surprise' ? ZONES.SURPRISE : ZONES.SUPPORT)
+            || (t.zoneType === 'support' && t.cardInstance.zoneSlot !== t.zoneSlot))) continue;   // z. B. Water Golem: beschwoert sich selbst ins Support
 
         // Zone-anchored pile flight BEFORE the splice — the diff
         // animator otherwise keys flights by card name and would pick
