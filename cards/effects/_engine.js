@@ -15473,27 +15473,60 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {{ inst: CardInstance, actualSlot: number } | null}
    */
   /**
+   * ★ W25b (N2-05, Al): Divine Gift of the Guardian — „Negate any damage Creatures you control would take until the
+   * beginning of your next turn." gilt LAUFEND fuer alle Kreaturen, die der Halter zum Zeitpunkt eines moeglichen
+   * Schadens gerade KONTROLLIERT (auch spaeter beschworene und erbeutete; gestohlene, die er nicht mehr kontrolliert,
+   * nicht). Massgeblich ist die Zeitraum-Marke am SPIELER: `ps._guardianShield = { armedTurn }` (Muster:
+   * `damageLocked`, Spieler-Flag); sie endet zum Beginn des naechsten eigenen Zuges (`_guardianShieldAblauf`, im
+   * frueheren Ablauf-Durchgang vor dem Statusschaden). `true` = diese Kreatur ist gerade geschuetzt.
+   */
+  _guardianSchutzFuer(inst) {
+    if (!inst) return false;
+    return !!this.gs.players[inst.controller ?? inst.owner]?._guardianShield;
+  }
+
+  /** Marke am Spieler setzen (Divine Gift of the Guardian); die Anzeige-Spiegel stempelt die Karte. */
+  _guardianSchutzSetzen(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    ps._guardianShield = { armedTurn: this.gs.turn };
+  }
+
+  /** Beginn des naechsten eigenen Zuges: die Marke endet (nach dem Ausspielen, nie im selben Zug). */
+  _guardianShieldAblauf(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    const f = ps?._guardianShield;
+    if (!f || !(this.gs.turn > f.armedTurn)) return false;
+    delete ps._guardianShield;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || !inst.counters) continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      if (inst.counters._guardianImmune) delete inst.counters._guardianImmune;
+      if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
+    }
+    return true;
+  }
+
+  /**
    * Sync guardian immunity on a creature to match its controller's side.
    * Adds immunity if siblings have it, removes if they don't.
    * Called on summon (propagate) and on control change (equalize).
+   * ★ W25b (N2-05): `_guardianImmune`/`buffs.guardian` an der Kreatur sind nur noch der ANZEIGE-Spiegel der
+   * Spieler-Marke (`_guardianSchutzFuer` entscheidet den Schaden); hier wird er der Lage der Kreatur angeglichen.
    */
   _syncGuardianImmunity(inst, controllerIdx) {
-    const existing = this.cardInstances.find(c =>
-      c.id !== inst.id && c.zone === ZONES.SUPPORT &&
-      (c.controller ?? c.owner) === controllerIdx &&
-      c.counters?._guardianImmune && c.counters?.buffs?.guardian
-    );
-    if (existing) {
-      // New side has guardian — propagate
+    const f = this.gs.players[controllerIdx]?._guardianShield;
+    if (f) {
       inst.counters._guardianImmune = true;
       if (!inst.counters.buffs) inst.counters.buffs = {};
-      inst.counters.buffs.guardian = { ...existing.counters.buffs.guardian };
-    } else {
-      // New side has no guardian — remove if present
-      if (inst.counters._guardianImmune) {
-        delete inst.counters._guardianImmune;
-        if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
-      }
+      inst.counters.buffs.guardian = {
+        expiresForPlayer: controllerIdx,   // kein expiresAtTurn: das Ende regelt die Spieler-Marke (`_guardianShieldAblauf`)
+        clearCountersOnExpire: ['_guardianImmune'],
+        source: 'Divine Gift of the Guardian',
+      };
+    } else if (inst.counters._guardianImmune) {
+      delete inst.counters._guardianImmune;
+      if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
     }
   }
 
@@ -19057,6 +19090,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const activePlayer = this.gs.activePlayer;
     const filterEarly = opts.beforeStatusDamage;
     let expired = false;
+
+    // ★ W25b (N2-05): Divine Gift of the Guardian endet zum Beginn des naechsten eigenen Zuges, VOR dem Statusschaden.
+    if (filterEarly !== false && this._guardianShieldAblauf(activePlayer)) expired = true;
 
     // Hero buffs
     for (let pi = 0; pi < this.playerCount(); pi++) {
@@ -27662,6 +27698,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.stolenBy = stealerPi;
     inst.stolenFromOwner = originalOwner;
     inst.controller = stealerPi;
+    this._syncGuardianImmunity(inst, stealerPi);   // W25b (N2-05): Anzeige-Spiegel des Divine-Gift-Schutzes an die neue Kontrolle
     if (opts.damageImmune) {
       inst.counters = inst.counters || {};
       inst.counters._stealImmortal = 1;
@@ -27722,6 +27759,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.controller = inst.stolenFromOwner ?? inst.owner;
       delete inst.stolenBy;
       delete inst.stolenFromOwner;
+      if (inst.counters) this._syncGuardianImmunity(inst, inst.controller);   // W25b (N2-05)
       // W18b (Guard Change): eine gestohlene Kreatur, die der Dieb in eine Zone SEINER Seite gezogen hat (`inst.owner` = Brettseite),
       // gehört dem Besitzer wieder und steht dann seitenfremd auf der Dieb-Seite; steht sie wieder auf der Seite des Besitzers, fällt die Marke.
       if (inst.controller !== inst.owner) { inst.counters = inst.counters || {}; inst.counters.crossSideControlled = inst.controller; }
@@ -49348,7 +49386,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // abgewehrt, und Schaden, der Negation durchbricht (Idas Zauber
         // und Verwandte), kommt durch und toetet trotzdem.
         e._immuneCreature = true;
-      } else if (inst?.counters?._guardianImmune && e.canBeNegated !== false) {
+      } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
       } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.

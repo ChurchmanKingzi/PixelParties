@@ -5,8 +5,9 @@
 //   (a) eine Kreatur, die der Spieler NACH dem Ausspielen (im selben Zug, vor „the beginning of your next turn") beschwört, bleibt verwundbar,
 //   (b) eine Kreatur, die der Gegner dem Spieler danach stiehlt, behält den Schutz (obwohl er sie nicht mehr kontrolliert),
 //   (c) eine Kreatur, die der Spieler nach dem Ausspielen stiehlt, ist ungeschützt.
-// Lesart A (Text als Zeitraum-Regel: „Creatures you control would take" gilt laufend bis zu deinem nächsten Zug): (a) und (c) geschützt, (b) nicht.
-// Lesart B (heute): Momentaufnahme beim Ausspielen. Stufe C — Frage an Al.
+// ★ W25b (Al, Welle 25: „genau, alle, die zum Zeitpunkt eines möglichen Effekts gerade kontrolliert werden"): Lesart A gilt — der Schutz ist eine Zeitraum-Marke am Spieler
+// (`ps._guardianShield`, bis zum Beginn seines nächsten Zuges): (a) und (c) geschützt, (b) nicht; danach (d) Ablauf zum nächsten eigenen Zugbeginn. Exit 0 = Regel erfüllt.
+// (Lesart B = Momentaufnahme beim Ausspielen war der Stand bis Welle 24.)
 const H = require('../../lib/h.js');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
@@ -43,6 +44,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       R.check('(b) die gestohlene Kreatur (Kontrolle jetzt beim Gegner) ist NICHT mehr „Creature you control" → nimmt Schaden', (gestohlen.counters.currentHp ?? 200) === 100, gestohlen.counters.currentHp);
       await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Fireball', owner: op, heroIdx: 0 }, fremd, 100, 'destruction_spell', { sourceOwner: op }));
       R.check('(c) die erbeutete Kreatur (Kontrolle beim Halter) ist geschützt', (fremd.counters.currentHp ?? 200) === 200, fremd.counters.currentHp);
+    }
+    R.section(`(d) Ablauf zum Beginn des nächsten Zuges des Halters (Sitz ${me})`);
+    {
+      const t = await H.fresh({ hand: [0, 1].map(i => i === me ? ['Divine Gift of the Guardian'] : ['Fireball', 'Fireball', 'Fireball']) });
+      t.grantFor(me, 0, 'Divine Gift of the Guardian');
+      const a = t.put(me, 0, 0, H.INERT.creature);
+      t.targetFn = (v) => [v.find(x => x.type === 'equip' && x.owner === me && x.heroIdx === 0).id];
+      await t.play(op, 'Fireball', { hero: 0 });
+      const c = t.put(me, 1, 0, H.INERT.creature);
+      await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Fireball', owner: op, heroIdx: 0 }, c, 100, 'destruction_spell', { sourceOwner: op }));
+      R.check('(d) vor dem nächsten Zug des Halters geschützt', (c.counters.currentHp ?? 200) === 200, c.counters.currentHp);
+      await t.endTurn(); await t.endTurn();   // Zug des Gegners, dann Zugbeginn des Halters
+      R.check('(d) nach dem Zugbeginn des Halters ist der Schutz vorbei (Spieler-Marke weg)', !t.gs.players[me]._guardianShield, !!t.gs.players[me]._guardianShield);
+      await t.run(() => t.engine.actionDealCreatureDamage({ name: 'Fireball', owner: op, heroIdx: 0 }, c, 100, 'destruction_spell', { sourceOwner: op }));
+      R.check('(d) danach nimmt die Kreatur wieder Schaden', (c.counters.currentHp ?? 200) === 100, c.counters.currentHp);
+      R.check('keine Engine-Fehler / sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
     }
   }
   R.finish();

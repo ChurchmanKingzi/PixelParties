@@ -140,7 +140,11 @@ module.exports = {
       }
 
       // Apply guardian immunity to ALL player's creatures
-      const expiresAtTurn = gs.turn + (gs.activePlayer === pi ? 2 : 1);
+      // ★ W25b (N2-05, Al: „alle, die zum Zeitpunkt eines möglichen Effekts gerade kontrolliert werden"): der Schutz ist eine
+      // ZEITRAUM-Marke am Spieler (`ps._guardianShield`, bis zum Beginn seines naechsten Zuges) und gilt laufend fuer jede Kreatur,
+      // die er gerade kontrolliert — auch spaeter beschworene/erbeutete, nicht mehr gestohlene. Die Marken an den Kreaturen
+      // (`_guardianImmune`, `buffs.guardian`) sind nur der Anzeige-Spiegel (Engine `_syncGuardianImmunity`).
+      engine._guardianSchutzSetzen(pi);
       const cardDB = engine._getCardDB();
 
       for (const inst of engine.cardInstances) {
@@ -150,26 +154,7 @@ module.exports = {
         const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];   // wirksame Daten: Tokens/Artifact Creatures auf dem Brett (Als Sweep 9.10.)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
 
-        // Set immunity counter
-        inst.counters._guardianImmune = true;
-
-        // Add buff with timed expiry (after status damage, like cloudy)
-        if (!inst.counters.buffs) inst.counters.buffs = {};
-        inst.counters.buffs.guardian = {
-          expiresAtTurn,
-          expiresForPlayer: pi,
-          // "…until the BEGINNING of your next turn" — der Schutz endet
-          // AM Rundenbeginn, der Giftschaden dort geht also durch.
-          // Ohne dieses Flag lief der Buff im ZWEITEN Ablauf-Durchgang
-          // (`_processBuffExpiry({ beforeStatusDamage: false })`) und
-          // damit NACH dem Statusschaden — Als Mitschnitt zeigt genau
-          // das: `creature_immune_block … by Poison` in Zug 8, und erst
-          // danach `buff_remove guardian`. Der frühe Durchgang läuft vor
-          // dem Statusschaden (dieselbe Stelle, die Immortal nutzt).
-          expiresBeforeStatusDamage: true,
-          clearCountersOnExpire: ['_guardianImmune'],
-          source: 'Divine Gift of the Guardian',
-        };
+        engine._syncGuardianImmunity(inst, pi);   // Anzeige-Spiegel (Zaehler + Buff-Eintrag)
 
         // Red shield animation on each creature
         engine._broadcastEvent('play_zone_animation', {
