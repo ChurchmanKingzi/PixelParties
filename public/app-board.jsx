@@ -49276,10 +49276,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // eigener Kanal aus dem Prompt heraus. Ohne ihn bliebe die
           // Heldenkarte unbeleuchtet und der Klick tot; genau das
           // Muster, das bei Control Device vier Anlaeufe gekostet hat.
-          const heroActionEffectEntry = (!isOpp
-            && gameState.effectPrompt?.type === 'heroAction'
+          // W35a (Guardian Beast Hu, Al: „Ja, sollen sie!"): auch ein UEBERNOMMENER Gegnerheld bietet seinen Effekt an (Eintrag mit `charmedOwner` = seine Brettseite).
+          const heroActionEffectEntry = (gameState.effectPrompt?.type === 'heroAction'
             && gameState.effectPrompt?.ownerIdx === myIdx)
-            ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i)
+            ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i && (isOpp ? e.charmedOwner === oppIdx : !e.charmedOwner))
             : null;
           const isHeroEffectActive = (!!heroEffectEntry || !!heroActionEffectEntry) && !klickPfadOffen;   // Klick-Pfad einer Handkarte: kein Heldeneffekt (s. klickPfadOffen)
           // Skill Test: bereit (noch nicht erschöpft) / erschöpft — gilt für alle Spieler (Vorschau der Round).
@@ -49457,6 +49457,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 ? () => respondToPrompt({
                     heroEffectActivation: true, heroIdx: i,
                     effectName: heroActionEffectEntry.effectName,
+                    ...(isOpp ? { heroOwner: oppIdx } : {}),   // W35a: uebernommener Gegnerheld
                   })
                 : () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner }))
             : (klickHeilungOffen
@@ -50214,7 +50215,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const isFreeExhausted = freeAbilityEntry && !freeAbilityEntry.canActivate;
                 const isAbilityHandLockBlocked = freeAbilityEntry?.handLockBlocked === true;
                 // Also activatable during heroAction if listed
-                const heroActionPromptAbilities = (!isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx) ? (gameState.effectPrompt.activatableAbilities || []) : [];
+                // W35a (Guardian Beast Hu): auch die Abilities eines UEBERNOMMENEN Gegnerhelden (Eintrag mit `charmedOwner` = Brettseite).
+                const heroActionPromptAbilities = (gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx)
+                  ? (gameState.effectPrompt.activatableAbilities || []).filter(a => isOpp ? a.charmedOwner === oppIdx : !a.charmedOwner) : [];
                 const isHeroActionActivatable = heroActionPromptAbilities.some(a => a.heroIdx === i && a.zoneIdx === z);
                 // Boris beim Gegner sperrt Steal-/Kontroll-Abilities
                 // (Charme Lv2). Serverseitig laeuft die Sperre in
@@ -50317,7 +50320,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // Free activation — no confirmation needed, activate directly
                         socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, zoneKind: freeAbilityEntry?.zoneKind, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
                       } else {
-                        setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner, borrowedFromOwner: activatableEntry?.borrowedFromOwner });
+                        setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner, borrowedFromOwner: activatableEntry?.borrowedFromOwner, heroActionOwner: isHeroActionActivatable && isOpp ? oppIdx : undefined });
                       }
                     } : (isValidPotionTarget ? () => togglePotionTarget(abTargetId) : undefined);
                 return (
@@ -55036,7 +55039,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const pa = pendingAbilityActivation;
                 setPendingAbilityActivation(null);
                 if (pa.isHeroAction) {
-                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx });
+                  ppSendePromptAntwort(gameState, { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, ...(pa.heroActionOwner != null ? { heroOwner: pa.heroActionOwner } : {}) });   // W35a: uebernommener Gegnerheld (Hu)
                 } else {
                   socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }

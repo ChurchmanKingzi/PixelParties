@@ -23090,18 +23090,20 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Als Vorgabe 29.9.: geliehener Held — nur Attack/Spell aus der Hand.
     const _leihSeite = (isSeat(this, config.heroOwner)) && config.heroOwner !== playerIdx
       ? config.heroOwner : null;
-    if (_leihSeite != null && (actionResult.heroEffectActivation || actionResult.abilityActivation)) return { retry: true };
+    // W35a: nur die AnyHero-Aktion (Guardian Beast Hu) bietet Abilities/Heldeneffekte eines uebernommenen Helden an (`angebot.chainAnyHero`); die Antwort wird gegen die angebotenen Eintraege geprueft.
+    if (_leihSeite != null && !angebot.chainAnyHero && (actionResult.heroEffectActivation || actionResult.abilityActivation)) return { retry: true };
 
     // ── Helden-Effekt als Zusatzaktion ─────────────────────────────
     if (actionResult.heroEffectActivation) {
       const eintrag = activatableHeroEffects.find(e =>
         e.heroIdx === heroIdx
+        && (e.charmedOwner ?? null) === _leihSeite   // W35a: eigener Held (kein `charmedOwner`) oder genau der angebotene uebernommene Held
         && (!actionResult.effectName || e.effectName === actionResult.effectName));
       if (!eintrag) return { retry: true };
       const script = loadCardEffect(eintrag.effectName);
       if (!script?.onHeroEffect) return { retry: true };
       const inst = this.cardInstances.find(c =>
-        c.owner === playerIdx && c.zone === 'hero' && c.heroIdx === heroIdx
+        c.owner === (_leihSeite ?? playerIdx) && c.zone === 'hero' && c.heroIdx === heroIdx
       );
       if (!inst) return { retry: true };
 
@@ -23121,6 +23123,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           inst,
           hoptKey: this.heroHoptKey(eintrag.effectName, playerIdx),
         }, {
+          ...(_leihSeite != null ? { charmedOwner: _leihSeite } : {}),   // W35a: uebernommener Held (wie `doActivateHeroEffect` mit `charmedOwner`)
           // Die Aktion WURDE bezahlt (vom gewaehrenden Effekt), also
           // feuert `onAnyActionResolved` — aber als Zusatzaktion, und
           // ohne Phasenwechsel: der Haupt-Slot ist unberuehrt.
@@ -23146,7 +23149,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Handle ability activation
     if (actionResult.abilityActivation) {
       const { zoneIdx } = actionResult;
-      const slot = (ps.abilityZones[heroIdx] || [])[zoneIdx] || [];
+      // ★ W35a (Al, Frage 3): Ability eines UEBERNOMMENEN Helden (Guardian Beast Hu) — nur, wenn der Prompt genau diesen Zonenstapel angeboten hat (Eintrag mit `charmedOwner`); Zonen und
+      // Instanz liegen auf der Brettseite des Helden (`abSeite`), Spieler (HOPT, Sperren, Hand/Gold) bleibt `playerIdx` — wie `doActivateAbility` mit `charmedOwner`.
+      const abSeite = _leihSeite ?? playerIdx;
+      if (_leihSeite != null && !(angebot.activatableAbilities || []).some(e =>
+        e.heroIdx === heroIdx && e.zoneIdx === zoneIdx && e.charmedOwner === _leihSeite && e.zoneKind !== 'support')) return { retry: true };
+      const slot = (this.gs.players[abSeite]?.abilityZones?.[heroIdx] || [])[zoneIdx] || [];
       if (slot.length === 0) return { retry: true };
       const abilityName = slot[0];
       const level = slot.length;
@@ -23158,7 +23166,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.gs.hoptUsed[hoptKey] = this.gs.turn;
 
       const inst = this.cardInstances.find(c =>
-        c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
+        c.owner === abSeite && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
       );
       if (!inst) {
         // Stempel wieder loesen — die Aktivierung hat nie stattgefunden.
@@ -23166,9 +23174,17 @@ this._deathWatch = (this._deathWatchStack || []).length
         return { retry: true };
       }
 
-      this._broadcastEvent('ability_activated', { owner: playerIdx, heroIdx, zoneIdx, abilityName });
-      const ctx = this._createContext(inst, {});
-      const abErgebnis = await this._alsAkteur(ctx, () => script.onActivate(ctx, level));
+      this._broadcastEvent('ability_activated', { owner: abSeite, heroIdx, zoneIdx, abilityName });
+      // W35a: uebernommener Held — die Instanz gehoert waehrend der Aktivierung dem Kontrolleur, `heroOwner` = Brettseite (Muster `doActivateAbility`); danach wiederhergestellt.
+      const _abOrig = _leihSeite != null ? { controller: inst.controller, owner: inst.owner } : null;
+      if (_abOrig) { inst.controller = playerIdx; inst.owner = playerIdx; inst.heroOwner = _leihSeite; }
+      let abErgebnis;
+      try {
+        const ctx = this._createContext(inst, {});
+        abErgebnis = await this._alsAkteur(ctx, () => script.onActivate(ctx, level));
+      } finally {
+        if (_abOrig) { inst.controller = _abOrig.controller; inst.owner = _abOrig.owner; delete inst.heroOwner; }
+      }
       // ── Abbruch (Als Vorgabe 28.8.) ────────────────────────────
       // `onActivate` liefert `false`, wenn der Spieler die eigene
       // Abfrage der Ability weggeklickt hat. Der normale Weg
@@ -23195,6 +23211,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // dieselbe Ability fuer Flashbang und Lunatic Cycle unsichtbar.
       await this.runHooks('onAnyActionResolved', {
         actionType: 'ability_activation', playerIdx, abilityName, heroIdx,
+        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // W35a
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
       });
@@ -23792,10 +23809,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
       }
       if (karten.length > 0) return true;
-      if (fremd) continue;
-      if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
+      // ★ W35a (Al, 22.10.2026, Frage 3): Guardian Beast Hu (`config.mitUebernommenenAktionen`) bietet auch Abilities und Heldeneffekte mit Aktionskosten eines UEBERNOMMENEN Helden an;
+      // die uebrigen Nutzer (Master's Plan, Lunar Eclipse, Off Duty, Dream Dust, Shamanic Curse, Spider Dance, Pavi, Traveler, Third Circle) bleiben bei Hand-Karten.
+      if (fremd && !config.mitUebernommenenAktionen) continue;
+      const seitenOpt = fremd ? { heroSide: seite } : {};
+      if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true, ...seitenOpt })
+          .filter(e => !fremd || e.zoneKind !== 'support').length > 0) return true;
       if (!eingeschraenkt && !config.skipHeroEffects
-          && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
+          && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true, ...seitenOpt }).length > 0) return true;
     }
     return false;
   }
@@ -23887,19 +23908,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
         heroIndicesByCard[name].push(hi);
       }
-      if (fremdHeld) continue;
+      // ★ W35a (Al, 22.10.2026, Frage 3: „Ja, sollen sie!"): bei Guardian Beast Hu (`config.mitUebernommenenAktionen`) bietet ein UEBERNOMMENER Held auch Abilities und Heldeneffekte mit
+      // Aktionskosten an — dieselben Sammler und Voraussetzungen wie beim eigenen Helden (`heroSide` = Brettseite; die Eintraege tragen `charmedOwner`). Die uebrigen Nutzer bleiben bei Hand-Karten.
+      if (fremdHeld && !config.mitUebernommenenAktionen) continue;
+      const seitenOpt = fremdHeld ? { heroSide: heldSeite } : {};
 
       // Activatable abilities on this hero — ueber den echten Sammler,
       // gleiche Begruendung wie in `performImmediateAction`.
       if (!config.skipAbilities) {
         for (const e of this.getActivatableAbilities(playerIdx, {
-          ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true,
-        })) activatableAbilities.push(e);
+          ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true, ...seitenOpt,
+        })) { if (!fremdHeld || e.zoneKind !== 'support') activatableAbilities.push(e); }   // Support-Zonen-Abilities (Xal) eines uebernommenen Helden: wie beim normalen Aktivieren nicht angeboten
       }
       // Aktive Helden-Effekte mit Aktionskosten (Champion & Co.)
       if (!eingeschraenktAny && !config.skipHeroEffects) {
         for (const e of this.getActiveHeroEffects(playerIdx, {
-          ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true,
+          ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true, ...seitenOpt,
         })) activatableHeroEffects.push(e);
       }
     }
@@ -23948,15 +23972,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ W34a: Antwort mit `heroOwner` = Brettseite eines UEBERNOMMENEN Helden (nur gueltig, wenn der Prompt ihn fuer genau diese Karte angeboten hat; Hand-Karten allein).
     const antwortSeite = isSeat(this, actionResult.heroOwner) && actionResult.heroOwner !== playerIdx ? actionResult.heroOwner : null;
     if (antwortSeite != null) {
-      const erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
-      if (!erlaubt || actionResult.heroEffectActivation || actionResult.abilityActivation) continue;
+      // ★ W35a: Hand-Karten (`fremdeHelden`), Abilities (`activatableAbilities`) und Heldeneffekte (`activatableHeroEffects`) — jeweils nur, wenn der Prompt genau diese Aktion fuer genau diesen
+      // uebernommenen Helden angeboten hat (Eintraege mit `charmedOwner` = Brettseite).
+      let erlaubt;
+      if (actionResult.heroEffectActivation) {
+        erlaubt = activatableHeroEffects.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld
+          && (!actionResult.effectName || e.effectName === actionResult.effectName));
+      } else if (actionResult.abilityActivation) {
+        erlaubt = activatableAbilities.some(e => e.charmedOwner === antwortSeite && e.heroIdx === handelnderHeld && e.zoneIdx === actionResult.zoneIdx);
+      } else {
+        erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
+      }
+      if (!erlaubt) continue;
     }
     const heldObjekt = (antwortSeite != null ? this.gs.players[antwortSeite] : ps).heroes[handelnderHeld];
     if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
 
     const ergebnis = await this._resolveImmediateActionPick(
       playerIdx, handelnderHeld, heldObjekt, actionResult, antwortSeite != null ? { ...config, heroOwner: antwortSeite } : config,
-      { activatableHeroEffects, chainAnyHero: true });
+      { activatableHeroEffects, activatableAbilities, chainAnyHero: true });
     if (!ergebnis?.retry) return ergebnis;
     continue;
     } // end re-prompt while-loop
@@ -44223,9 +44257,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!granted && !isActionPhase && !hasAdditional) return [];
 
     const chillyDogOwnSide = this._isChillyDogActiveFor(playerIdx);
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // ★ W35a (Al, 22.10.2026, Guardian Beast Hu: „any Hero you control" gilt auch fuer Abilities uebernommener Helden): `opts.heroSide` = Brettseite eines UEBERNOMMENEN Helden
+    // (Charme, Diebstahl, dauerhafte Uebernahme, Styx). Held, Zonen, Stapel, Ability-Negierung und Skill-Sperre kommen dann von DIESER Seite (`hs`/`hps`); Spieler-Sperren, HOPT-Schluessel
+    // und Hand-/Such-/Zieh-Sperren bleiben beim handelnden Spieler `playerIdx` (wie `doActivateAbility` mit `charmedOwner`). Ohne `heroSide`: `hs === playerIdx`, nichts aendert sich.
+    const hs = isSeat(this, opts.heroSide) ? opts.heroSide : playerIdx;
+    const hps = this.gs.players[hs] || ps;
+    for (let hi = 0; hi < (hps.heroes || []).length; hi++) {
       if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
-      const hero = ps.heroes[hi];
+      const hero = hps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       // Bound blocks "Actions" (Spell/Attack/Creature plays from
       // hand) only — Ability activations like Alchemy / Adventurousness
@@ -44242,19 +44281,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Divine Gift of Skill lock — action-cost ability activations
       // are Actions, so the lock applies. Mirror in the charmed/
       // controlled branches below (they consume the same Action slot).
-      if (this.isHeroSkillLocked(playerIdx, hi)) continue;
+      if (this.isHeroSkillLocked(hs, hi)) continue;
       // Generic hero-script Action gate (Saint Nicolas no-Potion lock).
-      if (!this.canHeroPerformAction(playerIdx, hi)) continue;
+      if (!this.canHeroPerformAction(hs, hi)) continue;
 
       // v769: Support-Zonen-Abilities (Xal) sind aktivierbar wie jede
       // andere. Sie laufen durch DIESELBE Schleife; nur die Herkunft
       // wird mitgefuehrt (`zoneKind`), damit Server und Client wissen,
       // in welcher Zonenart der Stapel liegt.
       const _zonenListe = [
-        ...((ps.abilityZones[hi] || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }))),
-        ...this.heroSupportAbilityStacks(playerIdx, hi).map((slot) => ({
+        ...((hps.abilityZones[hi] || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }))),
+        ...this.heroSupportAbilityStacks(hs, hi).map((slot) => ({
           slot,
-          zi: (ps.supportZones[hi] || []).findIndex(s => (s || [])[0] === slot[0]),
+          zi: (hps.supportZones[hi] || []).findIndex(s => (s || [])[0] === slot[0]),
           zoneKind: 'support',
         })),
       ];
@@ -44270,7 +44309,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (GameEngine.abilityHasActiveEffect(script) && this.abilityActivationBlocked()) continue;
         // ★ v1096 („Forbidden Curse of Aging"): einzelne Ability am
         // Wirtshelden negiert — `negatesHostAbilities` am Anhaengsel.
-        if (this._abilityNegatedOnHero(playerIdx, hi, abilityName)) continue;
+        if (this._abilityNegatedOnHero(hs, hi, abilityName)) continue;
         // Blinded silences targeting ability activations on the host hero.
         if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
 
@@ -44296,7 +44335,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // click a button that silently rejects.
         if (script.shufflesFromHandOrDiscardIntoDeck && this._handShuffleBackFullyBlocked(playerIdx)) continue;
 
-        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, zoneKind: _eintrag.zoneKind });
+        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, zoneKind: _eintrag.zoneKind, ...(hs !== playerIdx ? { charmedOwner: hs } : {}) });
       }
     }
 
@@ -44856,9 +44895,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const actionsBlocked = this.areActionsBlocked(playerIdx);
 
     const chillyDogOwnSideHE = this._isChillyDogActiveFor(playerIdx);
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // ★ W35a (Al, 22.10.2026, Guardian Beast Hu): `opts.heroSide` = Brettseite eines UEBERNOMMENEN Helden — Held, Heldeninstanz, Skill-Sperre und Handlungsfaehigkeit kommen von DIESER
+    // Seite (`hs`); Aktionssperre, Einmal-Stempel (`heroHoptKey(Name, playerIdx)`), Einmal-pro-Spiel, Spielstart-Schutz und Handsperren bleiben beim handelnden Spieler (wie
+    // `doActivateHeroEffect` mit `charmedOwner`). Ohne `heroSide` ist `hs === playerIdx`: nichts aendert sich.
+    const hs = isSeat(this, opts.heroSide) ? opts.heroSide : playerIdx;
+    const hps = this.gs.players[hs] || ps;
+    for (let hi = 0; hi < (hps.heroes || []).length; hi++) {
       if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
-      const hero = ps.heroes[hi];
+      const hero = hps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       // Per-Held-Riegel (Treasure Hunter's Backpack, Lethe) — gleicher
       // Geltungsbereich wie die spielerweite Sperre: nur Effekte mit
@@ -44914,8 +44958,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Zusatzaktion. Wer keine Aktionen mehr ausfuehren darf, darf
         // auch die geschenkte nicht in einen Helden-Effekt stecken.
         if (actionsBlocked || heroLocked) continue;
-        if (this.isHeroSkillLocked(playerIdx, hi)) continue;
-        if (!this.canHeroPerformAction(playerIdx, hi)) continue;
+        if (this.isHeroSkillLocked(hs, hi)) continue;
+        if (!this.canHeroPerformAction(hs, hi)) continue;
         if (!granted && !canSpendHeroActionCost(hi)) continue;
       } else if (granted) {
         // Eine gewaehrte Aktion bezahlt nur Effekte, die eine Aktion
@@ -44939,7 +44983,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (script.canActivateHeroEffect) {
         try {
           const inst = this.cardInstances.find(c =>
-            c.owner === playerIdx && c.zone === 'hero' && c.heroIdx === hi
+            c.owner === hs && c.zone === 'hero' && c.heroIdx === hi
           );
           if (!inst) continue;
           const ctx = this._createContext(inst, { event: 'canHeroEffectCheck' });
@@ -44955,7 +44999,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // gewaehlten Effekt beim Server-Vertrag `chosenEffectName`
       // wieder einreicht. Fuer die bestehenden Leser ist es ein
       // zusaetzliches Feld ohne Wirkung.
-      result.push({ heroIdx: hi, heroName: hero.name, effectName: quelle?.name || hero.name, actionCost: isActionCost });
+      result.push({ heroIdx: hi, heroName: hero.name, effectName: quelle?.name || hero.name, actionCost: isActionCost, ...(hs !== playerIdx ? { charmedOwner: hs } : {}) });
     }
     // Eine gewaehrte Zusatzaktion sieht nur die Basis-Helden-Effekte:
     // der Equip-Zweig darunter ist per Definition frei und Main-Phase-

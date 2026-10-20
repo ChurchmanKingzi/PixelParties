@@ -27,6 +27,15 @@
 //    Attack/Spell/Kreatur), ein abgegebener eigener Held nicht
 //    (`engine._zusatzaktionsHelden`).
 //
+//  • ★ W35a (Al, 22.10.2026, Frage 3: „Ja, sollen sie!"): fuer einen UEBERNOMMENEN Helden werden
+//    AUCH Abilities und Heldeneffekte mit Aktionskosten angeboten und ausgefuehrt (nicht nur
+//    Hand-Karten) — `mitUebernommenenAktionen: true` an `performImmediateActionAnyHero` /
+//    `canPerformImmediateActionAnyHero`, unter denselben Voraussetzungen wie beim eigenen Helden
+//    (Frozen/Stunned/Webbed/Negated, Einmal-Stempel je Spieler und Zug, Kosten, Zielregeln).
+//    Nur Hu setzt das Flag: Master's Plan, Lunar Eclipse, Off Duty, Dream Dust und Shamanic Curse
+//    sprechen von „a different/an additional Action" ohne „with any Hero you control" und bleiben
+//    bei Hand-Karten; Spider Dance, Pavi, Traveler und Third Circle sind auf Karten eingeschraenkt.
+//
 //  • The `Any-Hero` variant doesn't lock the
 //    activation to a specific Hero — the player
 //    chooses card first, hero second (or together
@@ -83,7 +92,7 @@ module.exports = {
     // spielbar, eine Ability-/Helden-Aktion moeglich) - sonst waeren die 5 Karten umsonst geloescht. Die Pruefung laeuft
     // vor der Zahlung; ein Guardian Beast auf der Hand ist erst spielbar, wenn die EIGENE Ablage leer ist (`canSummon`).
     // Reichen die Loeschkosten dafuer (hoechstens 5 Karten in der eigenen Ablage), gilt die leere Ablage als erreichbar.
-    const aktion = { title: CARD_NAME };
+    const aktion = { title: CARD_NAME, mitUebernommenenAktionen: true };   // W35a
     if (engine.canPerformImmediateActionAnyHero(pi, aktion)) return true;
     const eigene = ps.discardPile || [];
     if (eigene.length > 0 && eigene.length <= DELETE_COST) {
@@ -124,6 +133,7 @@ module.exports = {
     const result = await engine.performImmediateActionAnyHero(pi, {
       title: CARD_NAME,
       description: 'Use an additional Action with any of your Heroes!',
+      mitUebernommenenAktionen: true,   // W35a (Al, Frage 3): auch Abilities/Heldeneffekte uebernommener Helden
       cancellable: true,
     });
     // ★ W7b (A07-13, Al 14.10.): findet die Aktion nicht statt (Aktionswahl abgebrochen oder nichts spielbar), gehen die
