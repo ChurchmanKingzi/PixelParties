@@ -5129,7 +5129,7 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
-                      source: config.attackerSourceOverride,   // W29a: Stempel `treatedAsAttack` (Infected Greatmaw: Stufe = Fighting-Level des gewaehlten Helden)
+                      source: config.attackerSourceOverride || cardInstance,   // W29a: Stempel `treatedAsAttack` (Infected Greatmaw: Stufe = Fighting-Level des gewaehlten Helden); W30a: sonst die Karteninstanz (Bamboo Staff: Fighting-Level des Traegers)
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
@@ -5354,6 +5354,7 @@ class GameEngine {
           // value hero instead of the highest-threat one.
           baseDamage: config.baseDamage,
           damageType: config.damageType,
+          _quellObjekt: config.attackerSourceOverride || cardInstance,   // W30a: Quellobjekt fuer `blocksTargeting` am Flaschenhals (Stempel / Traeger-Fighting-Level)
           isBuff: config.isBuff,
           isHeal: config.isHeal,
           // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
@@ -5728,6 +5729,7 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
+                      source: cardInstance,   // W30a: Quellobjekt (Stempel / Traeger-Fighting-Level, s. `_heldenEffektStufe`)
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
@@ -5935,6 +5937,7 @@ class GameEngine {
           // Forward intent fields — see promptDamageTarget for rationale.
           baseDamage: config.baseDamage,
           damageType: config.damageType,
+          _quellObjekt: cardInstance,   // W30a: s. promptDamageTarget
           isBuff: config.isBuff,
           isHeal: config.isHeal,
           // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
@@ -7360,6 +7363,31 @@ class GameEngine {
   }
 
   /**
+   * ★ W30a (Al, 21.10.2026): Stempel „zählt als Attack DIESES Helden" mit dynamischer Stufe = FIGHTING-LEVEL des Helden (Brettseite `seite`, Index `heroIdx`;
+   * `effectiveSchoolLevelForCaster`: eigene Ability Zones + Fighting-Stapel in Support Zones, 0 ohne Fighting und bei harter Negierung der Abilities).
+   * Quellobjekte tragen ihn als `treatedAsAttack: engine.heldenAngriffStempel(seite, heroIdx)` (Infected Greatmaw, Bamboo Staff, Sacrificial Dagger,
+   * Alluring Light, Clash of Champions); Getter, also immer das AKTUELLE Level. Feste Stufen (Broghan & Co., Crusader's …) bleiben `{ level: 0 }`.
+   */
+  heldenAngriffStempel(seite, heroIdx) {
+    const engine = this;
+    return { get level() { return engine.effectiveSchoolLevelForCaster('Fighting', seite, heroIdx, seite) || 0; } };
+  }
+
+  /**
+   * ★ W30a: Stufe aus dem Stempel `treatedAsAttack` eines Quellobjekts (oder dessen `cardInstance`) für Attack-Schaden — oder `null` (kein Stempel / kein Attack).
+   * Der Stempel gilt auch für echte Karten als Quelle (Alluring Light, Clash of Champions): dann zählt die Stufe des Helden, nicht die gedruckte Kartenstufe.
+   * Leser von Quellstufen (Glass Wall, Test Flight, Escape Device …) fragen ZUERST dies, danach die gedruckte Stufe.
+   * Schadenstyp `attack` ODER leer: die Zielwahl-Fenster eines Zaubers, der als Attack gilt (Alluring Light), tragen noch keinen Schadenstyp.
+   */
+  _stempelStufe(source, damageType) {
+    const dt = String(damageType || '');
+    if (dt !== 'attack' && dt !== '') return null;
+    const stempel = source?.treatedAsAttack || source?.cardInstance?.treatedAsAttack;
+    if (!stempel || typeof stempel !== 'object') return null;
+    return Number.isFinite(stempel.level) ? stempel.level : 0;
+  }
+
+  /**
    * ★ W26a (Al, Welle 26): Stufe eines als Attack/Spell GELTENDEN Heldeneffekts ohne Karte (Alice `treatedAsSpell`; Broghan, Brackle, Arthor, Heragas, Kohta
    * `treatedAsAttack`) für Stufen-Bedingungen von Reaktionen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) — immer LEVEL 0 (Deklaration
    * `{ level }`, Standard 0). Nur Heldenkarten und nur für den passenden Schadenstyp (`attack` bzw. `*_spell`); sonst `null` (keine Stufe, keine Entscheidung).
@@ -7372,8 +7400,9 @@ class GameEngine {
     const dt0 = String(damageType || '');
     // W27a (Al, 21.10.2026): ein Quellobjekt, das selbst als Attack gilt (Stempel `treatedAsAttack: { level }` — Gegenstandseffekte, die den
     // Helden als Quelle nennen: Bamboo Staff, Sacrificial Dagger), zählt für Attack-Schaden mit dieser Stufe (Standard 0).
-    const stempel = source?.treatedAsAttack || source?.cardInstance?.treatedAsAttack;
-    if (dt0 === 'attack' && stempel && typeof stempel === 'object') return Number.isFinite(stempel.level) ? stempel.level : 0;
+    // W30a: der Stempel schlägt auch die gedruckte Stufe einer echten Karte als Quelle (Alluring Light, Clash of Champions) — `_stempelStufe`.
+    const st0 = this._stempelStufe(source, damageType);
+    if (st0 != null) return st0;
     if (!sourceName) return null;
     const card = this._getCardDB()[sourceName];
     // W27a (Al, 21.10.2026, Entscheidung 3): als Attack geltende GEGENSTANDSEFFEKTE (Crusader's Arm-Cannon/Cutlass/Flintlock/Hookshot, Bamboo Staff,
@@ -7382,7 +7411,15 @@ class GameEngine {
     if (card && dt0 === 'attack' && /Artifact|Potion/.test(String(card.cardType || ''))
         && !hasCardType(card, 'Attack') && !hasCardType(card, 'Spell') && !hasCardType(card, 'Creature')) {
       const gs0 = loadCardEffect(sourceName)?.treatedAsAttack;
-      if (gs0 && typeof gs0 === 'object') return Number.isFinite(gs0.level) ? gs0.level : 0;
+      if (gs0 && typeof gs0 === 'object') {
+        // W30a (Al, 21.10.2026): Deklaration `fightingOfHost: true` (Bamboo Staff, Sacrificial Dagger: „treated as that Hero hitting … with an Attack"):
+        // Quelle ist die Karteninstanz selbst → Stufe = Fighting-Level des Trägers (Brettseite = `owner` der Instanz); ohne Instanz bleibt `level` (0).
+        const inst = source?.cardInstance || source;
+        if (gs0.fightingOfHost && inst && inst.name === sourceName && Number.isInteger(inst.heroIdx) && inst.heroIdx >= 0 && Number.isInteger(inst.owner)) {
+          return this.heldenAngriffStempel(inst.owner, inst.heroIdx).level;
+        }
+        return Number.isFinite(gs0.level) ? gs0.level : 0;
+      }
     }
     if (!card || !/Hero/.test(String(card.cardType || ''))) return null;
     const sc = loadCardEffect(sourceName);
@@ -8635,7 +8672,8 @@ class GameEngine {
           let syntheticSource = source.cardInstance
             || (source.id && source.zone ? source : null)  // source IS a CardInstance
             || { name: source.name, controller: source.owner, owner: source.owner,
-                 heroIdx: source.heroIdx, zone: source.zone || 'hand' };
+                 heroIdx: source.heroIdx, zone: source.zone || 'hand',
+                 ...(source.treatedAsAttack ? { treatedAsAttack: source.treatedAsAttack } : {}) };   // W30a: Stempel (Fighting-Level) bleibt im Fenster sichtbar
           // Demon's Gate-style "Creature casts a Spell": present the
           // Creature as the source so Booby Trap / Surprise routing
           // targets the Creature instead of the host Hero.
@@ -30145,6 +30183,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           chooserIdx: playerIdx,
           chooserHeroIdx: config.chooserHeroIdx ?? -1,
           damageType: config.damageType,
+          source: config._quellObjekt,   // W30a: Stempel `treatedAsAttack` / Karteninstanz (Bamboo Staff: Fighting-Level des Traegers)
           allTargets: validTargets,
         })) _geblockt.push(t);
       }

@@ -5,7 +5,8 @@
 //
 //  Kartenneutral — der Kartenname, die Animation und die Rundenzahl kommen vom Aufrufer; hier steht nur die Mechanik:
 //
-//    duell(engine, { name, a, b, maxRunden, animation, erstMs, folgeMs, heimMs })
+//    duell(engine, { name, a, b, maxRunden, animation, erstMs, folgeMs, heimMs, alsHeldenAngriff })
+//      alsHeldenAngriff (W30a): true für Karten, deren Schläge „als Attack des Helden" zählen (Clash of Champions): Quellstufe = Fighting-Level des schlagenden Helden, nicht die Kartenstufe
 //      a / b  { controller, side, heroIdx }   `controller` = wer den Helden kontrolliert (Angreifer im Sinne der Karte), `side` = Brettspalte des Helden
 //      → { runden, aGefallen, bGefallen, unentschieden }
 //
@@ -37,10 +38,13 @@ const BILD_MS = 960;     // Lebensdauer der Pixelart-Animation je Hit (Aufprall 
 const held = (engine, x) => engine.gs.players[x.side]?.heroes?.[x.heroIdx] || null;
 const lebt = (h) => !!h && !!h.name && (h.hp || 0) > 0;
 
-/** Quellobjekt eines Angriffs mit Heldenwert (wie `executeAttack` es baut). */
-function angriffsQuelle(name, x) {
+/** Quellobjekt eines Angriffs mit Heldenwert (wie `executeAttack` es baut).
+ *  W30a (Al, 21.10.2026): mit `engine` + `alsHeldenAngriff` (Clash of Champions: „treated as them performing an Attack") trägt der Schlag den Stempel
+ *  `treatedAsAttack` = Fighting-Level DIESES Helden statt der gedruckten Kartenstufe (Leser: Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …). */
+function angriffsQuelle(name, x, engine, alsHeldenAngriff) {
   const q = { name, owner: x.controller, controller: x.controller, heroIdx: x.heroIdx, usesHeroAtk: true };
   if (x.side !== x.controller) q.heroOwner = x.side;
+  if (alsHeldenAngriff && engine && typeof engine.heldenAngriffStempel === 'function') q.treatedAsAttack = engine.heldenAngriffStempel(x.side, x.heroIdx);
   return q;
 }
 
@@ -65,7 +69,7 @@ async function duell(engine, cfg) {
       runden = r;
 
       // ── 2. Angriffswerte lesen, Angriffsfenster ──
-      const quelleA = angriffsQuelle(name, a), quelleB = angriffsQuelle(name, b);
+      const quelleA = angriffsQuelle(name, a, engine, cfg.alsHeldenAngriff), quelleB = angriffsQuelle(name, b, engine, cfg.alsHeldenAngriff);
       const zielA = { type: 'hero', owner: b.side, heroIdx: b.heroIdx };     // A trifft B
       const zielB = { type: 'hero', owner: a.side, heroIdx: a.heroIdx };     // B trifft A
       const atkA = await engine._fireAttackDeclare(quelleA, zielA, Math.max(0, A.atk || 0));

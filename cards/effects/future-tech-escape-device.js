@@ -89,6 +89,9 @@ module.exports = {
     //   ausserdem der halbe Kartentext: ohne Katalogeintrag gibt es
     //   keine Stufe, also auch keine Entscheidung.
     const db = engine._getCardDB();
+    // W30a (Al, 21.10.2026): Stempel `treatedAsAttack` (Alluring Light, Clash of Champions …) = Fighting-Level des Helden statt gedruckter Kartenstufe.
+    const stempel = engine._stempelStufe?.(sourceCard, opts?.damageType);
+    if (stempel != null) return stempel <= zaehleInAblage(gs, pi, CARD_NAME);
     const srcData = sourceCard?.name ? db[sourceCard.name] : null;
     if (!srcData) return false;
     if (srcData.cardType !== 'Attack' && srcData.cardType !== 'Spell') {

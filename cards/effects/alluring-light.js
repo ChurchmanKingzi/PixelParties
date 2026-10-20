@@ -108,79 +108,91 @@ module.exports = {
       const angreifer = gs.players[angreiferZiel.owner]?.heroes?.[angreiferZiel.heroIdx];
       if (!angreifer?.name || angreifer.hp <= 0) { gs._spellCancelled = true; return; }
 
-      // ── ② Das OPFER waehlen: ein Ziel auf der EIGENEN Seite ───────
-      const eigene = [
-        ...kontrollierteHeldenZiele(engine, pi),
-        ...engine.getCreatureTargets(pi),
-      ];
-      if (eigene.length === 0) { gs._spellCancelled = true; return; }
-      const opferWahl = await engine.promptEffectTarget(pi, eigene, {
-        title: CARD_NAME,
-        description: `Choose one of YOUR targets for ${angreifer.name} to attack.`,
-        confirmLabel: '💥 Take the hit!',
-        maxSelect: 1, maxTotal: 1,
-        cancellable: true,
-      });
-      const opfer = zielVonAntwort(opferWahl, eigene);
-      if (!opfer) { gs._spellCancelled = true; return; }
+      // ★ W30a (Al, 21.10.2026): ab hier gilt der Treffer als Attack des gewaehlten Helden — die Quellstufe ist dessen FIGHTING-LEVEL, NICHT die gedruckte Stufe 1
+      // der Karte. Der Stempel liegt (nur waehrend der Aufloesung) auch auf der Karteninstanz, damit die Fenster der Opferwahl (Surprises, Hand-Reaktionen:
+      // Glass Wall, Test Flight, Escape Device …) ihn sehen; das Treffer-Quellobjekt `attackSource` traegt ihn ebenfalls. Die Wahl des Angreifers (①) bleibt
+      // ein Spell der gedruckten Stufe.
+      const angriffStempel = engine.heldenAngriffStempel(angreiferZiel.owner, angreiferZiel.heroIdx);
+      ctx.card.treatedAsAttack = angriffStempel;
+      try {
+        // ── ② Das OPFER waehlen: ein Ziel auf der EIGENEN Seite ───────
+        const eigene = [
+          ...kontrollierteHeldenZiele(engine, pi),
+          ...engine.getCreatureTargets(pi),
+        ];
+        if (eigene.length === 0) { gs._spellCancelled = true; return; }
+        const opferWahl = await engine.promptEffectTarget(pi, eigene, {
+          title: CARD_NAME,
+          description: `Choose one of YOUR targets for ${angreifer.name} to attack.`,
+          confirmLabel: '💥 Take the hit!',
+          maxSelect: 1, maxTotal: 1,
+          cancellable: true,
+          sourceCard: ctx.card,   // W30a: die Fenster der Opferwahl sehen die Karteninstanz mit dem Stempel (Fighting-Level des Angreifers)
+        });
+        const opfer = zielVonAntwort(opferWahl, eigene);
+        if (!opfer) { gs._spellCancelled = true; return; }
 
-      const opferSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
-      const atk = angreifer.atk || 0;
+        const opferSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
+        const atk = angreifer.atk || 0;
 
-      // ── Animation ① das Anlock-Leuchten auf dem OPFER ─────────────
-      // ★ v1173: laenger stehen lassen (Al 17.9.) — die Ebene raeumt die
-      // Animation nach `duration` ab, der Guss wartet entsprechend.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'lure_beacon', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,
-        duration: 2400,
-      });
-      await engine._delay(1300);
+        // ── Animation ① das Anlock-Leuchten auf dem OPFER ─────────────
+        // ★ v1173: laenger stehen lassen (Al 17.9.) — die Ebene raeumt die
+        // Animation nach `duration` ab, der Guss wartet entsprechend.
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'lure_beacon', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,
+          duration: 2400,
+        });
+        await engine._delay(1300);
 
-      // ★ „treated as the chosen Hero attacking" — die Quelle ist der
-      // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
-      // der Angriff ihm, samt allem, was daran haengt.
-      const attackSource = {
-        name: CARD_NAME,
-        owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
-        usesHeroAtk: true,
-      };
-      const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
+        // ★ „treated as the chosen Hero attacking" — die Quelle ist der
+        // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
+        // der Angriff ihm, samt allem, was daran haengt.
+        const attackSource = {
+          name: CARD_NAME,
+          owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
+          usesHeroAtk: true,
+          // W30a (Al, 21.10.2026): „treated as the chosen Hero attacking" → die Quellstufe ist das FIGHTING-LEVEL des gewählten (gegnerischen) Helden,
+          // NICHT die gedruckte Stufe 1 der Karte (Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …: `engine._heldenEffektStufe`).
+          treatedAsAttack: angriffStempel,
+        };
+        const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
-      // ── Animation ② der angelockte Held rammt hinein ──────────────
-      engine._broadcastEvent('play_ram_animation', {
-        sourceOwner: angreiferZiel.owner, sourceHeroIdx: angreiferZiel.heroIdx,
-        targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
-        targetZoneSlot: opferSlot,
-        cardName: angreifer.name, duration: 1100,
-      });
-      await engine._delay(620);
+        // ── Animation ② der angelockte Held rammt hinein ──────────────
+        engine._broadcastEvent('play_ram_animation', {
+          sourceOwner: angreiferZiel.owner, sourceHeroIdx: angreiferZiel.heroIdx,
+          targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
+          targetZoneSlot: opferSlot,
+          cardName: angreifer.name, duration: 1100,
+        });
+        await engine._delay(620);
 
-      if (opfer.type === 'hero') {
-        const h = gs.players[opfer.owner]?.heroes?.[opfer.heroIdx];
-        if (h && h.hp > 0) {
-          await engine.actionDealDamage(attackSource, h, finalDmg, 'attack');
+        if (opfer.type === 'hero') {
+          const h = gs.players[opfer.owner]?.heroes?.[opfer.heroIdx];
+          if (h && h.hp > 0) {
+            await engine.actionDealDamage(attackSource, h, finalDmg, 'attack');
+          }
+        } else {
+          const inst = opfer.cardInstance || engine.cardInstances.find(c =>
+            c.owner === opfer.owner && c.zone === 'support'
+            && c.heroIdx === opfer.heroIdx && c.zoneSlot === opfer.slotIdx);
+          if (inst && inst.zone === 'support') {
+            await engine.actionDealCreatureDamage(
+              attackSource, inst, finalDmg, 'attack',
+              { sourceOwner: oppIdx, canBeNegated: true },
+            );
+          }
         }
-      } else {
-        const inst = opfer.cardInstance || engine.cardInstances.find(c =>
-          c.owner === opfer.owner && c.zone === 'support'
-          && c.heroIdx === opfer.heroIdx && c.zoneSlot === opfer.slotIdx);
-        if (inst && inst.zone === 'support') {
-          await engine.actionDealCreatureDamage(
-            attackSource, inst, finalDmg, 'attack',
-            { sourceOwner: oppIdx, canBeNegated: true },
-          );
-        }
-      }
 
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,
-      });
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'explosion', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,
+        });
 
-      engine.log('alluring_light', {
-        player: gs.players[pi]?.username,
-        lured: angreifer.name, victim: opfer.cardName, atk,
-      });
-      engine.sync();
+        engine.log('alluring_light', {
+          player: gs.players[pi]?.username,
+          lured: angreifer.name, victim: opfer.cardName, atk,
+        });
+        engine.sync();
+      } finally { delete ctx.card.treatedAsAttack; }
     },
   },
 };

@@ -79,7 +79,9 @@ async function zeigeAuftritt(engine, ownerIdx) {
 
 module.exports = {
   // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-  treatedAsAttack: { level: 0 },
+  // W30a (Al, 21.10.2026): Bamboo Staff nennt den Helden als Angreifer (treated as that Hero hitting the target with an Attack) → die Stufe ist das FIGHTING-LEVEL
+  // des ausgerüsteten Helden (`fightingOfHost`: Quelle = Karteninstanz in den Zielwahl-/Reaktionsfenstern; im Treffer trägt das Quellobjekt den dynamischen Stempel). Ohne Instanz: 0.
+  treatedAsAttack: { level: 0, fightingOfHost: true },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -182,7 +184,7 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: { level: 0 } };   // W27a: Level-0-Stempel (Quelle ist der Held)
+      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
