@@ -10,7 +10,7 @@ const creator = role('R_CREATOR', 'Creator');
 const CH = '1561796630762623036';
 
 async function world(gameApi = {}) {
-  config.channels.mystery = CH;
+  config.channels.minigames = CH;
   const pays = [];
   const linked = new Set(['100000000000000001', '100000000000000002']);
   const { ctx, db } = await setup({
