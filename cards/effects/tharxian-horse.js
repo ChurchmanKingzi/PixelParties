@@ -42,7 +42,7 @@
 //     attacker to damage). Same gate Frost Rune / Magic Mirror use.
 // ═══════════════════════════════════════════
 
-const { hasCardType, resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { hasCardType, resolveSourceCreature, isCreatureSource, zaehltAlsAttackOderSpell } = require('./_hooks');
 
 const CARD_NAME = 'Tharxian Horse';
 const DAMAGE_PER_TARGET = 50;
@@ -166,7 +166,8 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const cd = sourceInfo.cardName ? cardDB[sourceInfo.cardName] : null;
     if (!cd) return false;
-    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell') return false;
+    // W30a (Al, 21.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer) — wie Flooding.
+    if (cd.cardType !== 'Attack' && cd.cardType !== 'Spell' && !zaehltAlsAttackOderSpell(engine, sourceInfo)) return false;
     // Live attacker required — mirrors Booby Trap / Frost Rune.
     if (isCreatureSource(engine, sourceInfo)) {
       return !!resolveSourceCreature(engine, sourceInfo);

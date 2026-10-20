@@ -43,6 +43,10 @@ const BRUCH_MS = 420;           // bis die Scheibe bricht (deckt sich mit BRUCH 
 /** Gedruckte Stufe der Quellkarte (Attack/Spell: die Karte; Creature-Effekt: die Kreatur); null = keine Karte, keine Stufe. */
 function quellStufe(engine, quelle) {
   const name = quelle?.cardName || quelle?.cardInstance?.name || quelle?.name;
+  // W30a (Al, 21.10.2026): zählt der Effekt als Attack EINES HELDEN (Stempel `treatedAsAttack`: Infected Greatmaw, Bamboo Staff, Sacrificial Dagger, Alluring Light,
+  // Clash of Champions), ist die Quellstufe das Fighting-Level dieses Helden — NICHT die gedruckte Stufe der Karte.
+  const stempel = engine._stempelStufe?.(quelle, quelle?.damageType);
+  if (stempel != null) return stempel;
   const cd = name ? engine._getCardDB()[name] : null;
   if (cd && typeof cd.level === 'number') return cd.level;
   // W24b N2-08: ein Heldeneffekt, der „als Spell" gilt (Alice, `treatedAsSpell`, Q108), zählt mit der dort erklärten Stufe (Alice: 0).

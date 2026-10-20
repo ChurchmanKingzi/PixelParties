@@ -31,9 +31,10 @@ module.exports = {
   isPostTargetReaction: true,
   spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
 
-  postTargetCondition(gs, pi, engine, ziele, quelle) {
+  postTargetCondition(gs, pi, engine, ziele, quelle, opts) {
     if (quelle?._isAoeCheck || quelle?.cardInstance?._isAoeCheck) return false;
-    if (!istAttackOderSpell(engine, quelle, hasCardType)) return false;
+    // W30a (Al, 21.10.2026): „chosen by an Attack or Spell" — auch Effekte, die als Attack/Spell ZÄHLEN (wie Bluff, Crimson Web, Tharxian Horse, Flooding).
+    if (!istAttackOderSpell(engine, quelle, hasCardType, opts?.damageType)) return false;
     if (!(ziele || []).some(t => t?.type === 'hero' && t.owner === pi)) return false;
     return freieTraeger(engine, pi, ziele).length > 0;
   },

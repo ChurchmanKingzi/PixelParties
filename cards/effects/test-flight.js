@@ -43,6 +43,9 @@ const FLUG_MS = 900;      // Länge der Animation (deckt sich mit `test_flight` 
 
 /** Stufe der Quelle, wenn sie eine echte Attack-/Spell-Karte ist; sonst null (keine Entscheidung). */
 function quellStufe(engine, sourceCard, damageType) {
+  // W30a (Al, 21.10.2026): Stempel `treatedAsAttack` (Effekt zählt als Attack eines Helden: Alluring Light, Clash of Champions …) = Fighting-Level des Helden statt gedruckter Kartenstufe.
+  const stempel = engine._stempelStufe?.(sourceCard, damageType);
+  if (stempel != null) return stempel;
   const src = sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null;
   if (!src) return null;
   // W26a (Al, Welle 26): als Attack/Spell geltender Heldeneffekt (Alice, Broghan, Brackle, Arthor, Heragas, Kohta) = Stufe 0.

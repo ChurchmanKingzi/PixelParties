@@ -165,7 +165,8 @@ module.exports = {
     const srcName = sourceInfo.cardName || sourceInfo.cardInstance?.name;
     const srcData = srcName ? cardDB[srcName] : null;
     if (!srcData) return false;
-    if (srcData.cardType !== 'Spell' && srcData.cardType !== 'Attack') return false;
+    // W30a (Al, 21.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer) — wie Flooding.
+    if (srcData.cardType !== 'Spell' && srcData.cardType !== 'Attack' && !require('./_hooks').zaehltAlsAttackOderSpell(engine, sourceInfo)) return false;
     // Free Support Zone on the attacker for the attach.
     if (!kreaturWirkt && findFreeSupportSlot(gs.players[sourceInfo.owner], sourceInfo.heroIdx) < 0) return false;
     return true;

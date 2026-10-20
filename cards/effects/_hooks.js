@@ -845,6 +845,19 @@ function isAttackSpellOrCreatureSource(engine, sourceInfo, opts = {}) {
 }
 
 /**
+ * ★ W30a (Al, 21.10.2026: „Ja" — Bluff, Crimson Web, Tharxian Horse, Future Tech Weathercock reagieren auch auf Effekte, die als Attack/Spell ZÄHLEN):
+ * Zählt die Quelle eines Zielwahl-Fensters als Attack oder Spell OHNE eine Attack-/Spell-Karte zu sein? Heldeneffekte (Broghan, Brackle, Arthor, Heragas, Kohta:
+ * `treatedAsAttack`; Alice: `treatedAsSpell`), Gegenstandseffekte (Crusader's ×4, Bamboo Staff, Javelin Throw, Sacrificial Dagger, Sword in a Bottle) und der
+ * Treffer von Infected Greatmaw. Kennzeichen wie bei Flooding/Alliance/Dive Down: `engine._heldenEffektStufe(…) != null`. Gewöhnliche Heldeneffekte (Siphem u. ä.),
+ * Statusticks und Kreatureneffekte haben keine Stufe → `false`.
+ */
+function zaehltAlsAttackOderSpell(engine, sourceInfo) {
+  if (!sourceInfo || !engine || typeof engine._heldenEffektStufe !== 'function') return false;
+  const name = sourceInfo.cardName || sourceInfo.cardInstance?.name || sourceInfo.name;
+  return engine._heldenEffektStufe(name, sourceInfo.damageType, sourceInfo.cardInstance || sourceInfo) != null;
+}
+
+/**
  * Darf `cardName` durch einen GENERISCHEN „beschwöre / belebe eine
  * Creature"-Effekt auf die EIGENE Bretthaelfte gelegt werden?
  *
@@ -1088,6 +1101,6 @@ module.exports = {
   KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
   isSummonablePileCreature,
-  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,
+  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource, zaehltAlsAttackOderSpell,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

@@ -7,6 +7,8 @@
 // der Effekt wird abgewehrt (Schaden 0). Gegenprobe: eine echte Attack-Karte behält ihre gedruckte Stufe (Glass Wall reagiert nicht auf Lv-2-Attacken).
 // Nicht abgedeckt, weil der Engine-Weg das Fenster nicht öffnet: Sword in a Bottle löst die Hand-Reaktionen vor dem Treffer (Test Flight, Escape Device) nicht aus (Trank-Zielweg,
 // unabhängig von der Stufe) — dort nur Glass Wall, Stealth, Jetpack.
+// ★ W30a (Al, 21.10.2026): Bamboo Staff und Sacrificial Dagger (treated as that Hero hitting …) zählen seitdem mit dem FIGHTING-LEVEL ihres Trägers (`W30/a-01`); dieser Repro läuft mit Trägern OHNE
+// Fighting (Fighting 0 = Level 0) und prüft für die beiden weiter die Untergrenze 0. Javelin Throw, Sword in a Bottle, Crusader's ×4 bleiben Level 0 (Text nennt keinen Angreifer-Helden).
 // Aufruf: node docs/niche-tests/repro/W27/a-03-gegenstandseffekte-als-attack-zaehlen-als-level-0.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const JET = 'Future Tech Jetpack', CECILIA = 'Cecilia, the Harrowing Crusader';
