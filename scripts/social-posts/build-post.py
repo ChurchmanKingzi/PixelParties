@@ -24,7 +24,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import fx
 import ornaments
@@ -260,7 +260,14 @@ class Sprite:
         xs = cols % self.fw
         self.left, self.right = int(xs.min()), int(xs.max()) + 1
         self.foot = self.meta.get('footY', self.bottom)
-        self.face_x = self.meta.get('faceX', self.fw / 2)
+        # Mitte der Figur (nicht des Gesichts): Mittel der Umriss-Mitten je Frame. Sonst sitzt ein Held mit Stab
+        # oder Flügeln optisch schief. `anchorX` im Sheet-JSON hat Vorrang.
+        mids = []
+        for i in range(self.n):
+            fx_ = np.nonzero(a[:, i * self.fw:(i + 1) * self.fw])[1]
+            if fx_.size:
+                mids.append((fx_.min() + fx_.max() + 1) / 2)
+        self.center_x = float(self.meta.get('anchorX', float(np.mean(mids))))
 
         self._cache = {}
 
@@ -276,12 +283,8 @@ class Sprite:
         half = f.resize((f.width * 2, f.height * 2), Image.NEAREST)
         a = half.split()[3].point(lambda v: 255 if v > 40 else 0)
 
-        ext = a.copy()
-        ImageDraw.floodfill(ext, (0, 0), 128)                      # Hintergrund, der den Rand erreicht
-        exterior = ext.point(lambda v: 255 if v == 128 else 0)
-
         def ring(k, color):
-            g = ImageChops.darker(a.filter(ImageFilter.MaxFilter(2 * k + 1)), exterior)
+            g = a.filter(ImageFilter.MaxFilter(2 * k + 1))
             im = Image.new('RGBA', half.size, color + (255,))
             im.putalpha(g)
             return im.resize((im.width * U, im.height * U), Image.NEAREST)
@@ -432,7 +435,7 @@ def main():
 
     # Sprite-Lage: Gesicht über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
-    sx = card_x + CARD_W // 2 - int(spr.face_x * SPRITE_PX)
+    sx = card_x + CARD_W // 2 - round(spr.center_x * SPRITE_PX / U) * U      # auf dem Raster, Figurenmitte über der Kartenmitte
     sy = feet_y - spr.foot * SPRITE_PX
     shadow = pixel_ellipse(24, 4, INK, 170)
 
