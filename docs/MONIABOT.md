@@ -239,6 +239,10 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
   Wird ein gemeinsamer Baustein (`cards/effects/_*.js`) geändert, erscheinen die Karten, die ihn nutzen („fixed via shared logic“). Betrifft er mehr als
   `BUGFIX_MAX_SHARED` Karten (Standard 12), gibt es nur eine Textzeile mit Baustein und Kartenanzahl, keine Bilder. Commit-Texte erscheinen nie; niemand wird gepingt.
   Der allererste Lauf merkt sich nur den Stand.
+  **Balancing ist kein Bugfix:** Hat sich der Eintrag einer Karte in `data/cards.json` geändert (Effekttext, HP, Kosten …), erscheint sie nur in den Patchnotes — auch wenn das Skript mitgeändert wurde.
+  **Fehlerbeschreibung:** Wer einen Bug behebt, schreibt in die Commit-Nachricht pro Karte/Baustein eine Zeile `Bugfix-Note: <Kartenname oder _baustein> | <was schiefgelaufen ist, Englisch>`
+  (steht auch in `CLAUDE.md`, damit Agenten es tun). Der Bot zeigt den Text unter der Karte; bei breiten Bausteinen hinter dem Namen. Eine Karte mit `Bugfix-Note` erscheint auch dann,
+  wenn die Erkennung sie nicht fand oder sie wegen einer gleichzeitigen Textänderung als Balancing galt. Ohne Note erscheint die Karte ohne Erklärung.
 * **Rangliste:** `LEADERBOARD_CHANNEL_ID` → eine Nachricht, die alle 10 Minuten aktualisiert wird.
 * **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit.
 * `!duel` — offene Herausforderung; wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).

@@ -14,7 +14,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { AttachmentBuilder } = require('discord.js');
 const renderer = require('../lib/card-renderer');
-const { findBugfixes } = require('../lib/bugfix');
+const { findBugfixes, readNotes, normName } = require('../lib/bugfix');
 
 const MAX_CARDS_POSTED = 40;
 const PER_MESSAGE = 10;
@@ -37,16 +37,23 @@ module.exports = function register(ctx) {
    * @param {{card:object, note?:string}[]} items  `note` steht hinter dem Namen („changed: HP“)
    */
   async function postCards(ch, heading, items) {
-    const line = it => `• ${it.note ? `**${it.card.name}**` : it.card.name}${it.note ? ' — ' + it.note : ''}`;
+    const line = it => `• ${it.note ? `**${it.card.name}**` : it.card.name}${it.note ? ' — ' + it.note : ''}${it.detail ? `\n  ↳ ${it.detail}` : ''}`;
     const shown = items.slice(0, MAX_CARDS_POSTED);
-    for (let i = 0; i < shown.length; i += PER_MESSAGE) {
-      const batch = shown.slice(i, i + PER_MESSAGE);
+    // Päckchen: höchstens PER_MESSAGE Bilder und unter dem Textlimit von Discord (2000 Zeichen)
+    const batches = [];
+    for (let cur = [], len = 0, i = 0; i <= shown.length; i++) {
+      const l = i < shown.length ? line(shown[i]).length + 1 : 0;
+      if (cur.length && (i === shown.length || cur.length >= PER_MESSAGE || len + l > 1800)) { batches.push(cur); cur = []; len = 0; }
+      if (i < shown.length) { cur.push(shown[i]); len += l; }
+    }
+    for (let b = 0; b < batches.length; b++) {
+      const batch = batches[b];
       const files = [];
       for (const it of batch) {
         const buf = await ctx.cardPng(it.card.name);
         if (buf) files.push(new AttachmentBuilder(buf, { name: it.card.name.replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.png' }));
       }
-      await ch.send({ content: (i === 0 ? heading + '\n' : '') + batch.map(line).join('\n'), files, allowedMentions: { parse: [] } });
+      await ch.send({ content: (b === 0 ? heading + '\n' : '') + batch.map(line).join('\n'), files, allowedMentions: { parse: [] } });
     }
     if (items.length > shown.length) await ch.send({ content: `…and ${items.length - shown.length} more: ${items.slice(shown.length).map(it => it.card.name).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
   }
@@ -148,21 +155,42 @@ module.exports = function register(ctx) {
 
     await ctx.cardsReload();                                                        // aktuelle Karten (cards.json) für die Zuordnung
     await renderer.init();
+    // Balancing-Änderungen (cards.json-Eintrag der Karte geändert) sind kein Bugfix → gehören in die Patchnotes
+    let balanced = new Set();
+    try {
+      const read = async ref => JSON.parse(await git('show', `${ref}:data/cards.json`));
+      balanced = new Set(diffCards(await read(last), await read(head)).map(c => c.name));
+    } catch { /* cards.json nicht lesbar: dann keine Ausnahmen */ }
     let found;
-    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared }); }
+    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared, balanced }); }
     catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
+    const notes = await readNotes({ git, last, head });                             // `Bugfix-Note: <Karte oder _baustein> | <was schieflief>`
     await db.kvSet('bugfix_last', head);
 
+    const byNorm = new Map(renderer.allCards().map(c => [normName(c.name), c]));
+    const noteOfCard = c => notes.get(normName(c.name));
     // Karten zusammenführen: direkte Korrekturen zuerst; über schmale Bausteine betroffene Karten mit Hinweis; jede Karte nur einmal
     const items = new Map();
     for (const d of found.direct) if (!items.has(d.card.name)) items.set(d.card.name, { card: d.card, note: 'fixed: card script updated' });
     const via = new Map();
-    for (const sh of found.shared.filter(x => !x.broad)) for (const c of sh.cards) {
+    for (const sh of found.shared.filter(x => !x.broad && x.count)) for (const c of sh.cards) {
       if (items.has(c.name) && items.get(c.name).note.startsWith('fixed: card script')) continue;
       if (!via.has(c.name)) via.set(c.name, { card: c, modules: [] });
       via.get(c.name).modules.push(sh.module);
     }
-    for (const [name, v] of via) items.set(name, { card: v.card, note: `fixed via shared logic (\`${v.modules.join('`, `')}\`)` });
+    for (const [name, v] of via) {
+      const detail = [...new Set(v.modules.map(m => notes.get(normName(m))).filter(Boolean))].join(' ');
+      items.set(name, { card: v.card, note: `fixed via shared logic (\`${v.modules.join('`, `')}\`)`, detail });
+    }
+    // Beschreibung der Karte selbst; eine Karte mit Beschreibung wird auch gezeigt, wenn die Erkennung sie nicht fand oder sie wegen Balancing
+    // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
+    for (const [key, text] of notes) {
+      const c = byNorm.get(key);
+      if (!c) continue;
+      const it = items.get(c.name) || { card: c, note: 'fixed' };
+      it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
+      items.set(c.name, it);
+    }
     const list = [...items.values()];
     const broad = found.shared.filter(x => x.broad);
     if (!list.length && !broad.length) return;
@@ -171,7 +199,8 @@ module.exports = function register(ctx) {
     if (!ch) return;
     if (list.length) await postCards(ch, `🛠️ **Bug fixes** — ${list.length} card${list.length === 1 ? '' : 's'}`, list);
     if (broad.length) {
-      await ch.send({ content: `🛠️ **Shared engine code was fixed** (it touches many cards, so no card images): ${broad.map(b => `\`${b.module}\` (${b.count} cards)`).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+      const lines = broad.map(x => `• \`${x.module}\` (${x.count} cards)${notes.get(normName(x.module)) ? ' — ' + notes.get(normName(x.module)) : ''}`);
+      await ch.send({ content: `🛠️ **Shared engine code was fixed** (it touches many cards, so no card images):\n${lines.join('\n')}`.slice(0, 1900), allowedMentions: { parse: [] } });
     }
     console.log('[feeds] Bugfixes:', list.length, 'Karten,', broad.length, 'breite Bausteine');
   }
