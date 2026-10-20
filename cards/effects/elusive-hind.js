@@ -57,6 +57,7 @@ async function bezahlen(engine, inst, ctrl, was) {
   await engine.actionPromptForceDiscard(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
     title: CARD_NAME, source: CARD_NAME, selfInflicted: true, cancellable: true,
+    cancelOnlyFirst: true,   // N3-18 (W24): nach der ersten Karte kein Abbruch mehr (Kosten ganz oder gar nicht)
     description: `Discard ${DISCARD_COST} cards to negate ${was} on ${CARD_NAME}?`,
   });
   return ps.hand.length === vorher - DISCARD_COST;
@@ -141,6 +142,9 @@ module.exports = {
       const inst = ctx.card;
       if (inst?.zone !== 'support' || ctx.cancelled) return;
       if (!ctx.creature || ctx.creature.id !== inst.id) return;
+      // N3-07 (W24): ein Opfer (Tribut/Kosten des eigenen Kontrolleurs, z. B. Foresta) ist kein fremder Zugriff — wie Cool Rescuer Monia
+      // (`ctx.isSacrifice`, Ruling 1.8.): kein Angebot, sonst zaehlte die Negation als bezahltes Opfer.
+      if (ctx.isSacrifice) return;
       const ctrl = inst.controller ?? inst.owner;
       if (!(await bezahlen(engine, inst, ctrl, 'that effect'))) return;
       ctx.cancelled = true;

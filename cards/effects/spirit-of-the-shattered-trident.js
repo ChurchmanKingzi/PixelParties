@@ -44,7 +44,7 @@
 //    haengt am einzelnen Kartenzug, eine Buendelung gibt es dort nicht.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Shattered Trident';
 const TRIDENT = 'Shattered Trident, Treasure of the Deepsea';
@@ -81,13 +81,14 @@ function spiritSteht(engine, pi) {
 
 module.exports = {
   activeIn: ['support'],
+  seesEquipLeaveOnHeroDeath: true,   // N3-12 (W24): auch der Abgang der Ausruestung mit dem Heldentod (`handleHeroDeathCleanup`) wird gemeldet
 
   cpuMeta: { dealsDamage: false, castTriggersDraw: true },
 
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatDreizack(engine, pi, heroIdx);
+    return hatDreizack(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   /** ② Die Zusatzaktion steht nur, wenn die Kosten zahlbar sind. */

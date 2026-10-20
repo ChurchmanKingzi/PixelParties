@@ -125,6 +125,9 @@ module.exports = {
       // stieg eine Zeile spaeter kommentarlos aus.
       const kosten = Number(wahl?.optionId ?? wahl?.id ?? 0);
       if (!(kosten > 0)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // N3-17 (W24): Antwort des Clients nachpruefen (Haertung, wie W7b/W20 fuer Zielwahlen): nur die angebotenen Stufen — ganzzahliges Vielfaches
+      // von 5 bis `maxStufen` × 5 (also höchstens `MAX_KARTEN` Karten); alles andere gilt wie „nichts bezahlt".
+      if (!Number.isInteger(kosten) || kosten % GOLD_PRO_KARTE !== 0 || kosten > maxStufen * GOLD_PRO_KARTE) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
 
       // Nach der Abfrage neu pruefen — waehrend des Ueberlegens kann
       // ein Effekt das Gold oder das Deck veraendert haben.

@@ -319,6 +319,13 @@ const secondActionHooks = {
     if (ctx.leavingCard?.id !== ctx.card.id) return;
     const engine = ctx._engine;
     if (!isSecondActionGrant(engine, ctx.card)) return;
+    // N3-05 (W24): „While you control this Creature, you may perform a second Action …" — verlaesst der Anbieter das Brett
+    // (Zerstoerung, Rueckkehr auf die Hand, Loeschen …), verfaellt der noch offene Zuschlag; `engine._zusatzAnbieterVon` prueft die Zone
+    // der toten Instanz in der Ablage nicht. Nur der Zweitaktions-Zuschlag (ein gleichzeitiger anderer Zuschlag, Hawk Stufe 4, bleibt), und nur
+    // beim Abgang vom Brett (nicht beim Zonenwechsel `support` → `support`).
+    if (ctx.fromZone === 'support' && ctx.toZone !== 'support') {
+      for (const tid of secondActionTypeIds(engine, ctx.card, true)) engine.expireAdditionalActionType(ctx.card, tid);
+    }
     // Exclude self from the "any other grant?" check — Ba is leaving,
     // its own grant doesn't count toward keeping the badge alive.
     clearBadgeIfNoOtherGrants(engine, grantSeite(ctx.card), ctx.card.heroIdx, ctx.card.id);

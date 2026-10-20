@@ -355,7 +355,9 @@ module.exports = {
 
       const engine = ctx._engine;
       const cardDB = engine._getCardDB();
-      const hostOwner = death.owner;
+      // N3-21 (W24): die Reihe ist die der BRETTSEITE (`physicalSide`), nicht die des Besitzers — eine Hind / ein Golem (Plant-Golem-Weg: `owner` =
+      // Beschwoerer, nur `controller` zeigt auf die Brettseite) liegt in der Reihe und wird getroffen; gestohlene/seitenfremde (owner = Brettseite) wie bisher.
+      const hostOwner = ctx.card ? engine.physicalSide(ctx.card) : death.owner;
       const hostHeroIdx = death.heroIdx;
       const ownSlot = death.zoneSlot;
 
@@ -365,7 +367,7 @@ module.exports = {
       // path; engine guarantees one inst per zone slot.
       const victims = [];
       for (const inst of engine.cardInstances) {
-        if (inst.owner !== hostOwner) continue;
+        if (engine.physicalSide(inst) !== hostOwner) continue;
         if (inst.zone !== 'support') continue;
         if (inst.heroIdx !== hostHeroIdx) continue;
         if (inst.zoneSlot === ownSlot) continue;

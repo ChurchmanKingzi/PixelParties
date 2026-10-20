@@ -29,7 +29,7 @@
 //  gleichzeitig mit einem zweiten aufloesen kann.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Heart Bow';
 const BOW = 'Heart-Shaped Bow, the Final Proof of Cuteness';
@@ -91,7 +91,7 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatBogen(engine, pi, heroIdx);
+    return hatBogen(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   canActivateCreatureEffect(ctx) {

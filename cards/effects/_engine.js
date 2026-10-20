@@ -2855,6 +2855,9 @@ class GameEngine {
     if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
       const sp = this.gs.players[hookCtx.casterIdx];
       if (sp) sp._spellResolvedTurn = this.gs.turn;
+      // N3-11 (W24): laufende Nummer JEDES Aufloesungs-Durchgangs — Lauscher, die „einmal je gewirktem Zauber" (nicht je Kopie auf der Hand) antworten
+      // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
+      hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
     }
     // ★ W8 (Al, 15.10.2026): Bonded-Companion-Pool beim Ende des Ruhens neu verknüpfen (Statuswechsel, Phasen-/Zugbeginn).
     if (hookName === 'onStatusApplied' || hookName === 'onStatusRemoved' || hookName === 'onPhaseStart' || hookName === 'onTurnStart') {
@@ -17547,6 +17550,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (effektiveHand() === 0) break;
 
         const standardListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: Auswahl, die die Engine selbst festlegt
+        // N3-18 (W24): `opts.cancelOnlyFirst` — Kosten „ganz oder gar nicht": nur die ERSTE Wahl ist abbrechbar (= „Nein"), danach ist die Zahlung Pflicht.
+        const kannAbbrechen = !!opts.cancellable && !(opts.cancelOnlyFirst && i > 0);
         let result = await this.promptGeneric(playerIdx, {
           type: 'forceDiscard',
           // ★ v1041: Kosten-Marken durchreichen — so bedient auch
@@ -17571,7 +17576,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // `cancellable` ist opt-in: ein ERZWUNGENER Abwurf darf nicht
           // abgebrochen werden, ein freiwilliger als Kosten sehr wohl
           // („You MAY discard a card…" — Cute Nerd Magenta).
-          cancellable: !!opts.cancellable,
+          cancellable: kannAbbrechen,
         });
 
         // ★ Abbruch bei freiwilligen Kosten: nichts abwerfen, sauber
@@ -17582,7 +17587,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // „Ihren Effekt zu canceln wirft automatisch die ganz rechte
         // Karte ab." Deshalb greift der Ausstieg jetzt bei JEDER
         // Antwort ohne Namen, nicht nur bei gesetztem `cancelled`.
-        if (opts.cancellable && (!result || result.cancelled || result.cardName == null)) break;
+        if (kannAbbrechen && (!result || result.cancelled || result.cardName == null)) break;
 
         // ★ Z4: eine Antwort AUSSERHALB der von der Engine festgelegten Auswahl (die aufloesende Karte) gilt nicht — sie wird wie
         // eine Antwort ohne Karte behandelt (Notbremse unten: letzte waehlbare Karte). Falscher/fehlender Platz: erste waehlbare Kopie desselben Namens.
@@ -19625,7 +19630,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `immuneKey` entry.
     const statusDef = STATUS_EFFECTS[statusName];
     const immuneKey = statusDef?.immuneKey || (statusName + '_immune');
-    if (inst.counters[immuneKey]) return false;
+    if (inst.counters[immuneKey]) {
+      // N3-10 (W24): „This Creature cannot be Frozen" (Embodiment of Biseria, SnowItAll: Skript-Flag `selfFreezeImmune`) ist ein Passiv der Karte und ruht
+      // mit Frost/Betaeubung/Negation (Welle 7: Kreatur = ganzer Kartentext-Passiv). Ein fremder Stempel (The Sun Sword: `buffs.freeze_immune`) bleibt.
+      const eigenRuhend = immuneKey === 'freeze_immune' && !inst.counters.buffs?.freeze_immune
+        && loadCardEffect(inst.counters._effectOverride || inst.name)?.selfFreezeImmune === true
+        && this.isCardPassiveDormant(inst);
+      if (!eigenRuhend) return false;
+    }
     // Universal negative-status immunity — creature parity with the
     // hero-side `negative_status_immune` buff (see addHeroStatus). A
     // creature carrying the `negative_status_immune` buff in
@@ -26819,6 +26831,26 @@ this._deathWatch = (this._deathWatchStack || []).length
    *                    selbst abgebrochen)
    */
   /**
+   * ★ N3-04 (W24) — „use the active effects of up to 2 Creatures on the board" (Spirit of the Forbidden Grimoire; wie „as if you controlled it",
+   * Aligning Goals): wirkt `pi` den Effekt einer Kreatur, die ein ANDERER kontrolliert, meinen „you / your opponent / your deck" im geliehenen
+   * Effekt den NUTZER. Dafuer wird die Kontrolle fuer die Dauer des Effekts auf den Nutzer gestellt (dieselben Felder wie `actionStealCreature`:
+   * `stolenBy`/`controller`, ohne `onTakeControl`-Fenster, ohne Immunitaet); die BRETTSEITE (`physicalSide` = `inst.owner`) bleibt. Gibt die
+   * Rueckstellung zurueck (oder null, wenn nichts zu tun ist: eigene Kreatur, oder Kreatur der Plant-Golem-Art, deren Brettseite nur `controller` traegt).
+   */
+  _leiheKontrolle(inst, pi) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || !isSeat(this, pi)) return null;
+    if (this.kontrolleurVon(inst) === pi || this.physicalSide(inst) !== inst.owner) return null;
+    const alt = { stolenBy: inst.stolenBy, stolenFromOwner: inst.stolenFromOwner, controller: inst.controller };
+    inst.stolenBy = pi;
+    inst.stolenFromOwner = alt.controller ?? inst.owner;
+    inst.controller = pi;
+    return () => {
+      for (const k of ['stolenBy', 'stolenFromOwner']) { if (alt[k] === undefined) delete inst[k]; else inst[k] = alt[k]; }
+      inst.controller = alt.controller;
+    };
+  }
+
+  /**
    * ZIELWAHL VORZIEHEN (v749) — erste Stufe des zweistufigen
    * Kreaturen-Vertrags.
    *
@@ -26837,6 +26869,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async prepareCreatureEffectFor(inst, playerIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return { ok: false, plan: null };
+    if (!opts._kontrolleGeliehen) {   // N3-04 (W24): geliehene Gegnerkreatur → Effekt fuer den Nutzer
+      const undo = this._leiheKontrolle(inst, playerIdx);
+      if (undo) { try { return await this.prepareCreatureEffectFor(inst, playerIdx, { ...opts, _kontrolleGeliehen: true }); } finally { undo(); } }
+    }
     const script = loadCardEffect(inst.name);
     if (!script?.prepareCreatureEffect) return { ok: false, plan: null };
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return { ok: false, plan: null };
@@ -26868,6 +26904,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async reactivateCreatureEffect(inst, playerIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    if (!opts._kontrolleGeliehen) {   // N3-04 (W24): geliehene Gegnerkreatur → Effekt fuer den Nutzer
+      const undo = this._leiheKontrolle(inst, playerIdx);
+      if (undo) { try { return await this.reactivateCreatureEffect(inst, playerIdx, { ...opts, _kontrolleGeliehen: true }); } finally { undo(); } }
+    }
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
@@ -50755,6 +50795,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           fromZone: 'support', fromHeroIdx: hi, fromOwner: inst.owner, fromZoneSlot: inst.zoneSlot ?? -1,
           _bypassDeadHeroFilter: true,
         });
+        // N3-12 (W24): Beobachter des Abgangs fremder Ausruestung (Skript-Flag `seesEquipLeaveOnHeroDeath`, Spirit of the Shattered Trident:
+        // „would be moved from the board to anywhere except your hand … add them back") hoeren den Heldentod-Abgang ebenfalls — gezielt je
+        // Beobachter (`_onlyCard`), nicht an alle Lauscher (die obige Meldung gilt bewusst nur dem Abgaenger). Umleitung ueber `inst._returnToHand`.
+        for (const beob of this.cardInstances.filter(c => c.zone === 'support' && c.id !== inst.id && loadCardEffect(c.name)?.seesEquipLeaveOnHeroDeath)) {
+          await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+            _onlyCard: beob, card: beob, leavingCard: inst,
+            fromZone: 'support', toZone: 'discard', fromHeroIdx: hi, fromOwner: inst.owner, fromZoneSlot: inst.zoneSlot ?? -1,
+            _bypassDeadHeroFilter: true,
+          });
+        }
         // Locate the equip's current support slot BEFORE removing it. Tokens
         // route to the deleted pile; everything else to the discard pile.
         const supZones = ps.supportZones[hi] || [];

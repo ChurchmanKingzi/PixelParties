@@ -179,7 +179,7 @@ async function landeNachTausch(engine, pi, data) {
     _skipReactionCheck: true, _bypassDeadHeroFilter: onDeadHero,
   });
   engine.sync();
-  return true; // placement consumed — server skips its own placement.
+  return false; // placement consumed (`_placementConsumedByCard`) — wie bei den Deepsea-Tauschen `false`: der Server platziert nicht selbst, und Wege mit `summonCreatureWithHooks` (Sofort-Aktion aus der Hand) legen nicht ein zweites Mal (N3-06, W24).
 }
 
 /** Alter atomarer Tausch (Platzierung VOR den Todes-Signalen) — Fallback fuer Wege ohne `paySummonCost` (Effekt-Beschwoerungen u. ä.). */
@@ -339,7 +339,7 @@ async function sacrificeSwapAtomar(ctx) {
   });
   engine.sync();
 
-  return true; // placement consumed — server skips its own placement.
+  return false; // placement consumed (`_placementConsumedByCard`) — wie bei den Deepsea-Tauschen `false`: der Server platziert nicht selbst, und Wege mit `summonCreatureWithHooks` (Sofort-Aktion aus der Hand) legen nicht ein zweites Mal (N3-06, W24).
 }
 
 module.exports = {
@@ -462,6 +462,10 @@ module.exports = {
       if (pre.kind !== 'swap') return true;   // Platz war frei: normale Beschwörung, die Engine platziert
       return await landeNachTausch(engine, pi, pre);
     }
+    // N3-06 (W24): Effekt-Beschwoerungen (Slave Trader, Tharxian Horse, Master's Key …) legen die Karte in eine FREIE Zone und
+    // zahlen kein Opfer — der Tausch ist ein Wahlweg der Hand-Beschwoerung (`_isNormalSummon`). Ohne diese Pruefung lief der
+    // Fallback zusaetzlich zur Engine-Platzierung (zwei Kopien, Opfer in der Ablage, Kartenbilanz +1).
+    if (ctx._isNormalSummon !== true) return true;
     return await sacrificeSwapAtomar(ctx);
   },
 

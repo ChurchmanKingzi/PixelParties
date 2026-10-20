@@ -93,7 +93,15 @@ module.exports = {
       // also weder fuer sich noch verbraucht er sie — sonst waere die
       // Karte in ihrem eigenen Zug wirkungslos. Gilt fuer jede Kopie,
       // egal an welcher Stelle der Beschwoerungsreihe sie kommt.
-      if (rein.name === CARD_NAME) return;
+      if (rein.name === CARD_NAME) {
+        // N3-19 (W24): Eintritte von Hammer-Spirits dieses Zuges merken (Zugzaehler `_creaturesSummonedThisTurn` zaehlt sie mit, s. u.).
+        const sp = gs.players[rein.controller ?? rein.owner];
+        if (sp) {
+          if (!sp._relicSpiritEintritte || sp._relicSpiritEintritte.turn !== gs.turn) sp._relicSpiritEintritte = { turn: gs.turn, ids: [] };
+          if (!sp._relicSpiritEintritte.ids.includes(rein.id)) sp._relicSpiritEintritte.ids.push(rein.id);
+        }
+        return;
+      }
 
       // Nur eine BESCHWOERUNG in diesem Zug, kein Umzug einer laengst
       // stehenden Kreatur (die traegt ihr altes `turnPlayed`).
@@ -112,6 +120,11 @@ module.exports = {
       const ps = gs.players[besitzer];
       if (!ps) return;
       if (ps._relicHammerTurn === gs.turn) return;      // Freikarte vergeben
+      // N3-19 (W24): „The FIRST Creature each player summons during each of their turns" — die erste Kreatur des ZUGES (Zugzaehler, Q47), nicht die
+      // erste NACH dem Spirit: wurde schon eine andere Kreatur beschworen (auch VOR dem Spirit), ist diese hier nicht die erste. Die Spirits selbst
+      // zaehlen nicht mit (Ruling 5.9.), die einlaufende Kreatur ist im Zaehler schon enthalten.
+      const spirits = ps._relicSpiritEintritte?.turn === gs.turn ? ps._relicSpiritEintritte.ids.length : 0;
+      if ((ps._creaturesSummonedThisTurn || 0) - spirits > 1) return;
       ps._relicHammerTurn = gs.turn;
 
       if (!rein.counters) rein.counters = {};
