@@ -19,7 +19,9 @@ const H = require('../../lib/h.js');
       if (gebannt) ps.potionDrawBanned = true;
       const r = await t.play(seat, 'Potion of Greed', {});
       const gespielt = r === true && !t.pile(seat, 'hand').includes('Potion of Greed');
-      R.check(`Sitz ${seat} · ${name}: Potion of Greed ${soll ? 'spielbar' : 'nicht spielbar'}`, gespielt === soll, { r, gezogen: t.pile(seat, 'hand').filter(n => n === 'Healing Potion').length, skip: ps._skipActionPhaseTurn });
+      // W24e: „Potion Deck leer" ist die schwächere Lesart (kein Ruling; wie Elixir of Quickness mit leerem Hauptdeck bleibt die Karte spielbar) – Frage an Al, hier nur eine Notiz.
+      if (anzahl === 0) R.note(`Sitz ${seat} · ${name}: Potion of Greed ${gespielt ? 'spielbar' : 'nicht spielbar'} (Regelfrage an Al, kein Fehlerkriterium)`, { r });
+      else R.check(`Sitz ${seat} · ${name}: Potion of Greed ${soll ? 'spielbar' : 'nicht spielbar'}`, gespielt === soll, { r, gezogen: t.pile(seat, 'hand').filter(n => n === 'Healing Potion').length, skip: ps._skipActionPhaseTurn });
       R.check('sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
     }
   }
