@@ -10729,6 +10729,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   position: absolute;
   left: 0;
   width: 100%;
+  /* Die Karte mittig in der Zone — wie jede Einzelkarte (`.board-zone` zentriert per Flex). Linksbündig lag sie bei
+     jedem Maßstab außer 1 neben der Stapelmitte, auf der der Zähler unten sitzt (Als Befund 20.10.). */
+  display: flex;
+  justify-content: center;
 }
 .board-ability-stack-card:first-child { position: relative; }
 .board-ability-stack .board-card-label {
@@ -10736,6 +10740,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   bottom: 2px; left: 50%; right: auto;
   transform: translateX(-50%);
   font-size: calc(13px * var(--board-scale));
+  /* Die Pixel-Schrift lässt hinter jeder Ziffer eine Lücke (~0,05 em): ohne Ausgleich sitzt die Zahl optisch zu weit links. */
+  padding-left: .1em;
   z-index: 5;
 }
 .board-card-text {
@@ -10785,7 +10791,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .deck-empty-label {
   box-sizing: border-box;
   min-width: calc(30px * var(--board-scale));
-  padding: calc(3px * var(--board-scale)) calc(5px * var(--board-scale)) calc(2px * var(--board-scale));
+  /* links 0,1 em mehr: die Schrift lässt hinter jeder Ziffer eine Lücke, die Zahl säße sonst ~1 px links der Mitte */
+  padding: calc(3px * var(--board-scale)) calc(5px * var(--board-scale)) calc(2px * var(--board-scale)) calc(5px * var(--board-scale) + .1em);
   bottom: calc(4px * var(--board-scale)); right: calc(4px * var(--board-scale));
   font-size: calc(20px * var(--board-scale));
   line-height: 1;
