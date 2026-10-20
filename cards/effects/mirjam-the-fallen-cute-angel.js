@@ -59,6 +59,11 @@
 //      is a HARDER ceiling than the standard
 //      1-action-per-turn rule, so Coffee / Psychic
 //      Scout / Ghuanjun combo can't lift it.
+//      ★ W35a: gezählt wird über `onEffectCountedAsArt`
+//      (`engine.zaehleAlsArt`), nicht mehr über
+//      `onActionUsed` — so zählen auch inhärente
+//      Zusatzaktionen (Quick Attack), negierte
+//      Attacks und Sofort-Güsse (s. Hook unten).
 //
 //   3) „HP cannot be healed in any way" — der
 //      Vertrag `hpCannotBeHealed` (v1467). Die
@@ -163,34 +168,12 @@ module.exports = {
     },
 
     /**
-     * Attack-per-turn counter. Fires for both standard and
-     * additional-action paths (server.js:3924 and 3929 both
-     * fire `onActionUsed`), so bonus-action Attacks still count
-     * toward the cap.
-     */
-    onActionUsed: async (ctx) => {
-      if (ctx.actionType !== 'attack') return;
-      if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      // Effective controller — survives hero theft (a stealer
-      // playing an Attack from Mirjam's column still trips her cap).
-      if (ctx.playerIdx !== ctx.cardOwner) return;
-      // Styx 28.9.: `heroOwner` = Brettseite des Angreifers (gleicher Index ≠ Mirjam).
-      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
-      const hero = ctx.attachedHero;
-      if (!hero) return;
-      // Neuer Zug → neuer Zaehler. Ersetzt den frueheren Reset in
-      // `onTurnStart`, der bei toter Mirjam ausfiel (v1465).
-      const turn = ctx._engine.gs.turn;
-      if (hero._mirjamAttackTurn !== turn) {
-        hero._mirjamAttackTurn = turn;
-        hero._mirjamAttacksUsed = 0;
-      }
-      hero._mirjamAttacksUsed += 1;
-    },
-
-    /**
-     * ★ W34a (Al, 22.10.2026, Punkt 3): Effekte, die als Attack ZÄHLEN (Gegenstandseffekte, Greatmaw …), sind keine Aktion (`onActionUsed` feuert nicht), zählen aber
-     * für „never use more than 1 Attack per turn" — `engine.zaehleAlsArt` meldet sie hier (`canPlayCard` sperrt dann auch den nächsten als Attack zählenden Effekt).
+     * ★ W35a (Al, 22.10.2026, Frage 4: „‚Can never use more than 1 Attack per turn' ist ziemlich eindeutig"): der Zähler hing bis hier an `onActionUsed` — und der feuert nur für
+     * Attacks, die die normale/zusätzliche Aktion verbrauchen. Inhärente Zusatzaktionen (Quick Attack als „first Attack", Amazing Finding, Muscle Training, Vengeful Attack, die
+     * Berserk-Attack), negierte Attacks und Sofort-Güsse (Guardian Beast Hu, Coffee, Elixir of Rage, Nieht, Love Shot …) übergingen den Zähler; danach konnte Mirjam noch eine Attack
+     * spielen. Jetzt zählt EINE Stelle jede Attack: `engine.zaehleAlsArt('attack')` (aus `doPlaySpell`, `_castSpellImmediately`, `alsAttackKette` …) meldet `onEffectCountedAsArt` —
+     * kein `onActionUsed`-Zähler mehr (sonst würde doppelt gezählt). Das ist der EINE Attack-Zähler (W34a: Effekte, die als Attack ZÄHLEN [Gegenstandseffekte, Greatmaw …];
+     * W35a: auch jede gespielte Attack-KARTE, `ctx.karte`) — `canPlayCard` sperrt danach jede weitere Attack (Karte oder als Attack zählender Effekt).
      */
     onEffectCountedAsArt: async (ctx) => {
       if (ctx.art !== 'attack') return;

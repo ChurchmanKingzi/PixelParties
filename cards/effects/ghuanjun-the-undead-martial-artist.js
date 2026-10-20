@@ -187,6 +187,19 @@ module.exports = {
       engine.sync();
     },
 
+    // ★ W35a (Al, 22.10.2026, Frage 4, gleichartige Lücke wie Mirjam): „never more than 1 copy of the same Attack per turn" hing an `onActionUsed`/`onAdditionalActionUsed` —
+    // beide feuern nicht für inhärente Zusatzaktionen (Quick Attack), Berserk-Attack und Sofort-Güsse (Hu, Coffee …). `onEffectCountedAsArt` (`karte`) meldet JEDE gespielte
+    // Attack-KARTE; Effekte ohne Karte (`karte` falsch) haben keinen Attack-Namen und zählen hier nicht (W34a: Ghuanjun ist namensbasiert).
+    onEffectCountedAsArt: (ctx) => {
+      if (ctx.art !== 'attack' || !ctx.karte || !ctx.effectName) return;
+      if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner) return;
+      if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
+      const hero = ctx.attachedHero ?? ctx.players?.[ctx.cardOriginalOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero) return;
+      if (!hero.ghuanjunAttacksUsed) hero.ghuanjunAttacksUsed = [];
+      if (!hero.ghuanjunAttacksUsed.includes(ctx.effectName)) hero.ghuanjunAttacksUsed.push(ctx.effectName);
+    },
+
     onAdditionalActionUsed: (ctx) => {
       if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner || ctx.actionType !== 'attack') return;
       if ((ctx.heroOwner ?? ctx.playerIdx) !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;   // Styx 28.9.

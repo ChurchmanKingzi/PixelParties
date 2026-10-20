@@ -216,7 +216,10 @@ module.exports = {
           _skipReactionCheck: true,
         });
         // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
-        if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, bonusName, { heroOwner: feld });
+        if (!gs._spellCancelled) {
+          await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: bonusName, karte: true });   // W35a (Al, Frage 4): die Bonus-Attack zaehlt als gespielte Attack
+          await engine.meldeGussAlsAktion(pi, heroIdx, bonusName, { heroOwner: feld });
+        }
       } catch (err) {
         console.error(`[Engine] Nieht bonus Attack error for "${bonusName}":`, err.message);
       }

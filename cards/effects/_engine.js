@@ -23654,6 +23654,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.sync();
       return { cancelled: true };
     }
+    // ★ W35a (Al, 22.10.2026, Frage 4): eine Attack, die als Zusatzaktion/Sofort-Guss laeuft (Guardian Beast Hu, Coffee, Elixir of Rage, Junshi, Call for Help, Friedhelm …), ist eine
+    // GESPIELTE Attack — sie zaehlt wie in `doPlaySpell` (auch bei Teil-/Ganz-Negierung; nur ein Abbruch zaehlt nicht): `attacksPlayedThisTurn`, `heroesAttackedThisTurn`,
+    // `hero._attacksThisTurn` UND `onEffectCountedAsArt` (Mirjam „never more than 1 Attack per turn", Ghuanjun „never 2 copies of the same Attack"). Vorher blieb dieser Weg komplett
+    // ungezaehlt (Quick Attack „first Attack", Berserk-Limit, Knife Throw, Rioting Village, Idej Sword - Muras sahen die Attack nicht).
+    if (cardData.cardType === 'Attack') await this.zaehleAlsArt('attack', { pi: playerIdx, heroIdx, heroOwner: wirkerSeite, name: cardName, karte: true });
     // ★ JETZT ERST: ENTNAHME UND FLUG (v979) ──────────────────────────
     // Der Zauber hat aufgeloest — hier verlaesst die Karte die Hand,
     // und zwar sichtbar (Hausregel 17.8.: Flug VOR der Entnahme; jeder
@@ -40522,7 +40527,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {'attack'|'spell'} art
    * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
    */
-  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name }) {
+  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte }) {
     const gs = this.gs;
     const ps = gs?.players?.[pi];
     if (!ps || (art !== 'attack' && art !== 'spell')) return;
@@ -40543,7 +40548,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (this._inMctsSim) return;
     try {
-      await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name });
+      await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name, karte: !!karte });   // W35a: `karte` = eine echte Attack-KARTE (doPlaySpell, Zusatzaktions-Guss), sonst ein Effekt
     } catch (err) { console.error('[zaehleAlsArt]', err.message); }
   }
 
