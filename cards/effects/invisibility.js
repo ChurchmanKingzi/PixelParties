@@ -57,6 +57,7 @@
 // ═══════════════════════════════════════════
 
 const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { isCreatureSource } = require('./_hooks');
 const CARD_NAME = 'Invisibility';
 
 /** Free Support Zone slot index on `heroIdx` of `ps`, or -1. */
@@ -243,6 +244,8 @@ module.exports = {
     afterDamage: async (ctx) => {
       if (ctx.card.zone !== 'support') return;
       if (ctx.sourceHeroIdx !== ctx.cardHeroIdx) return;
+      // W24b N2-01: „the Hero chooses" — der Effekt einer Kreatur im Support des Trägers ist ihr eigener, nicht der des Helden.
+      if (isCreatureSource(ctx._engine, ctx.source)) return;
       // Styx 28.9.: „dieser Held" = Brettseite + Index (geliehener Held).
       if (!ctx._engine.quelleIstHeld(ctx.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) return;
       if ((ctx.amount || 0) <= 0) return;
@@ -267,6 +270,7 @@ module.exports = {
       for (const e of (ctx.entries || [])) {
         if (!e || e.cancelled) continue;
         if ((e.amount || 0) <= 0) continue;
+        if (isCreatureSource(ctx._engine, e.source)) continue;   // W24b N2-01: Kreatureneffekt ≠ Effekt des Helden
         const srcHeroIdx = e.source?.heroIdx;
         if (srcHeroIdx !== ctx.cardHeroIdx) continue;
         const srcOwner = e.source?.heroOwner ?? e.source?.owner ?? e.sourceOwner;
