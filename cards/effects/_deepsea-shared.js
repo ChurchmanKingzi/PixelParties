@@ -1156,6 +1156,9 @@ function ownSupportCreatures(engine, pi, opts = {}) {
     const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (opts.needsLevel && isArtifactCreature(cd)) continue;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel für jede Beschwörung/Platzierung, die über das Entfernen EINER Karte eine Zone freimacht):
+    // `zoneLeerNachRueckgabe` = nur Kreaturen, deren Rückgabe ihre Zone ganz leert (kein Alice-Stapel; `atomicSwap` überschriebe sonst den Mitbewohner).
+    if (opts.zoneLeerNachRueckgabe && !engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
     out.push(inst);
   }
   return out;

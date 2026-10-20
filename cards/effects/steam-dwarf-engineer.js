@@ -39,6 +39,8 @@ module.exports = attachSteamEngine({
     if (!inst || inst.zone !== 'support') return false;
     if (inst.counters?.negated || inst.counters?.nulled) return false;
     if (inst.turnPlayed === (gs.turn || 0)) return false;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): das neue Wesen kommt in die Zone des Engineers - nur wenn dessen Opferung sie leert (kein Alice-Stapel).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
 
     const cd = engine._getCardDB()[inst.name];
     const curHp = inst.counters?.currentHp ?? cd?.hp ?? 0;

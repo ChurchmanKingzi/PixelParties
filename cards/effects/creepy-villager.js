@@ -67,6 +67,8 @@ module.exports = {
     const pi = inst.controller ?? inst.owner;
     // „that was not summoned this turn"
     if ((inst.turnPlayed || 0) === (engine.gs.turn || 0)) return false;
+    // W20b (Al, 20.10.2026: Opfer-Zonen-Regel gilt für jede Opfer-Beschwörung): der Gott kommt in die Zone des Villagers - nur wenn dessen Rückgabe sie leert (kein Alice-Stapel; sonst überschriebe er den Mitbewohner).
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) return false;
     return gottAufDerHand(engine, pi) >= 0;
   },
 
