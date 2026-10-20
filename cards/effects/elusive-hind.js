@@ -141,6 +141,9 @@ module.exports = {
       const inst = ctx.card;
       if (inst?.zone !== 'support' || ctx.cancelled) return;
       if (!ctx.creature || ctx.creature.id !== inst.id) return;
+      // N3-07 (W24): ein Opfer (Tribut/Kosten des eigenen Kontrolleurs, z. B. Foresta) ist kein fremder Zugriff — wie Cool Rescuer Monia
+      // (`ctx.isSacrifice`, Ruling 1.8.): kein Angebot, sonst zaehlte die Negation als bezahltes Opfer.
+      if (ctx.isSacrifice) return;
       const ctrl = inst.controller ?? inst.owner;
       if (!(await bezahlen(engine, inst, ctrl, 'that effect'))) return;
       ctx.cancelled = true;
