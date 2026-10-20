@@ -15,6 +15,7 @@ const sup = (t, s, h) => t.gs.players[s].supportZones[h].map(z => z[0] || '');
     const heroes = [null, null]; heroes[me] = ['Idej Lord Daiyo', H.BLANK_HEROES[1], H.BLANK_HEROES[2]];
     const t = await H.fresh({ heroes, hand: me === 0 ? [['Inheritance Ceremony'], []] : [[], ['Inheritance Ceremony']], deckSize: 30 });
     t.put(me, 0, 0, 'Idej Projection'); t.put(me, 0, 1, 'Idej Sword - Kogarasu');
+    t.gs.players[me].heroes[1].hp = 500;   // W24b: Fehl-HP, damit die Zeremonie (HP-Übertrag) spielbar bleibt, auch wenn keine Karte verschiebbar ist
     t.script.push({ match: d => d.type === 'confirm', answer: () => ({ confirmed: true }) });
     let angebot = null;
     t.targetFn = (v, cfg) => {

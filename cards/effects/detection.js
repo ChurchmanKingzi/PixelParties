@@ -191,6 +191,12 @@ module.exports = {
           continue;
         }
 
+        // W24b N2-03: Reaktionen auf eine vorher abgelegte Surprise (Furious Anger, Water Golem) koennen spaetere Ziele schon
+        // vom Brett genommen haben — dann nicht noch einmal splicen/ablegen.
+        if (t.cardInstance && (!engine.cardInstances.includes(t.cardInstance)
+            || t.cardInstance.zone !== (t.zoneType === 'surprise' ? ZONES.SURPRISE : ZONES.SUPPORT)
+            || (t.zoneType === 'support' && t.cardInstance.zoneSlot !== t.zoneSlot))) continue;   // z. B. Water Golem: beschwoert sich selbst ins Support
+
         // Zone-anchored pile flight BEFORE the splice — the diff
         // animator otherwise keys flights by card name and would pick
         // the leftmost duplicate.
@@ -259,6 +265,15 @@ module.exports = {
         });
 
         engine.sync();
+        // W24b N2-03: „Brett → Ablage durch Effekt" — Detection laeuft an actionMoveCard vorbei (manueller Splice + Push) und muss das
+        // Fenster selbst oeffnen (wie Silent Water Mizune): Furious Anger (Hand) und Water Golem (Surprise) reagieren darauf.
+        await engine._fireBoardSentToDiscard({
+          cardName: t.cardName,
+          ownerIdx: t.cardInstance?.controller ?? t.cardInstance?.owner ?? tSeite,
+          fromZone: t.zoneType, fromHeroIdx: t.heroIdx,
+          zoneSlot: t.zoneSlot ?? -1,
+          source: CARD_NAME, sourceOwner: pi,
+        });
         // Stagger so duplicate-named Surprises don't collide on one
         // client frame.
         if (i < surprises.length - 1) await engine._delay(140);

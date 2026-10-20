@@ -12,12 +12,13 @@
 //  returning `{ effectNegated: true }` aborts the
 //  triggering effect with no targets hit.
 //
-//  Source-type gate: ONLY Attack and Spell card
-//  sources qualify. Creature effects, Artifact
-//  effects, and Hero effects whose damage is
-//  merely "treated as a Spell" (Alice the Puppeteer
-//  Girl etc.) do NOT trigger Flooding — per card
-//  text "an Attack or Spell".
+//  Source-type gate: Attack and Spell card sources
+//  qualify, and so do Hero effects that the card
+//  text says are "treated as" an Attack/Spell
+//  (Broghan: Attack, Alice: Spell, Q108 — W24b
+//  N2-08, same gate as Frost Rune). Creature effects,
+//  Artifact effects and plain Hero effects (damage
+//  type 'hero') do NOT trigger Flooding.
 //
 //  Multi-target Attacks & Spells DO trigger
 //  Flooding when the user is one of the chosen
@@ -43,7 +44,7 @@
 //  Frost Rune / Magic Mirror).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isAttackSpellOrCreatureSource } = require('./_hooks');
 
 const CARD_NAME = 'Flooding';
 
@@ -71,15 +72,9 @@ module.exports = {
     // never open Flooding.
     if (sourceInfo.cardInstance?._isAoeCheck) return false;
 
-    // Source must be an actual Attack or Spell CARD. Effective card
-    // data (handles type overrides like Living Illusion / Spell-
-    // transforms) → fall back to the static card DB by name.
-    const cd = sourceInfo.cardInstance
-      ? (engine.getEffectiveCardData?.(sourceInfo.cardInstance)
-        || engine._getCardDB()[sourceInfo.cardName])
-      : engine._getCardDB()[sourceInfo.cardName];
-    if (!cd) return false;
-    if (!hasCardType(cd, 'Attack') && !hasCardType(cd, 'Spell')) return false;
+    // Source must be an Attack or Spell: die Karte selbst ODER ein Effekt, der laut Text als Attack/Spell GILT (W24b N2-08: Broghan
+    // 'attack', Alice '*_spell' — wie Frost Rune/Firewall/Jumpscare). Effective card data (Living Illusion u. ä.) liest der Helfer mit.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo, { kinds: ['attack', 'spell'] })) return false;
 
     return true;
   },

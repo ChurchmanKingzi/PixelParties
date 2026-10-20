@@ -14,7 +14,7 @@
 //  ── ERSTE AKTIVIERUNG (gewöhnliche Surprise, Bauform „Frost Rune") ──────
 //  `surpriseTrigger`: der Träger wird von einem Attack, Spell oder Creature-Effekt GEWÄHLT (`isAttackSpellOrCreatureSource`) und die Quelle hat die Stufe 1 oder niedriger.
 //  Die Stufe ist die gedruckte der Quellkarte (Attack/Spell: die Karte; Creature-Effekt: die Kreatur). Quellen ohne Katalogeintrag (Heldeneffekte) haben keine Stufe und
-//  lösen nicht aus. `onSurpriseActivate` liefert `{ effectNegated: true }` (die Quelle wird ganz negiert) und fragt: „You may leave this activated Surprise face-up" —
+//  lösen nicht aus — außer „als Spell geltende" (`treatedAsSpell`, Alice: Stufe 0; W24b N2-08). `onSurpriseActivate` liefert `{ effectNegated: true }` (die Quelle wird ganz negiert) und fragt: „You may leave this activated Surprise face-up" —
 //  `stayFaceUp: true` in der Antwort lässt die Karte offen in der Surprise Zone liegen (neu in der Engine, `_activateSurprise`; wie `staysFaceUpOnActivation`, aber als
 //  Entscheidung zur Laufzeit). Nein = die Karte geht wie jede Surprise in die Ablage. Eine offen liegende Karte löst NICHT ein zweites Mal als Surprise aus
 //  (`_checkSurpriseWindow` überspringt offene Karten).
@@ -44,7 +44,10 @@ const BRUCH_MS = 420;           // bis die Scheibe bricht (deckt sich mit BRUCH 
 function quellStufe(engine, quelle) {
   const name = quelle?.cardName || quelle?.cardInstance?.name || quelle?.name;
   const cd = name ? engine._getCardDB()[name] : null;
-  return (cd && typeof cd.level === 'number') ? cd.level : null;
+  if (cd && typeof cd.level === 'number') return cd.level;
+  // W24b N2-08: ein Heldeneffekt, der „als Spell" gilt (Alice, `treatedAsSpell`, Q108), zählt mit der dort erklärten Stufe (Alice: 0).
+  const lv = name ? engine._spellLevelAlsQuelle?.(name, quelle?.damageType) : null;
+  return Number.isFinite(lv) ? lv : null;
 }
 
 /** Träger der offen liegenden Karte: Brettseite (`inst.owner`), Heldenindex, Held. */

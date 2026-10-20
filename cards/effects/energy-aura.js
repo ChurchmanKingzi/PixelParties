@@ -127,6 +127,16 @@ async function raeumeAb(engine, inst) {
 }
 
 module.exports = {
+  // W24b N2-11: „A Hero can only have 1 Energy Aura attached" gilt auch beim UMHAENGEN (Inheritance Ceremony, Secret Spell Book, Transfer:
+  // `engine.canEquipCardToHero`). Gezaehlt werden LIEGENDE Auren am Ziel; eine gerade umgehaengte Karte (`zone` '_umhaengen', Secret Spell Book)
+  // zaehlt nicht mit, damit sie innerhalb ihres Helden den Platz wechseln darf.
+  canEquipToHero(gs, pi, heroIdx, engine) {
+    if (engine?.cardInstances) {
+      return !engine.cardInstances.some(c => c.name === CARD_NAME && c.zone === 'support' && c.heroIdx === heroIdx && engine.physicalSide(c) === pi);
+    }
+    return !hatBereitsAura(gs, pi, heroIdx);
+  },
+
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
@@ -140,6 +150,8 @@ module.exports = {
 
   // ★ Der Engine-Vertrag. Alles Weitere macht `heroSpellWardBlocks`.
   heroSpellWard: true,
+  // W24b N2-13: Abraeumen fuer Tick-Spells ohne `afterSpellResolved` (Gathering Storm) — `engine.raeumeVerbrauchteSpellSchilde()`.
+  settleWard: (engine, inst) => raeumeAb(engine, inst),
 
   spellPlayCondition(gs, pi, engine) {
     return attachmentHostsFor(gs, pi, engine, hostOpts()).length > 0;

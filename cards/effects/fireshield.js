@@ -14,7 +14,7 @@
 //  the routing never diverges between cards.
 // ═══════════════════════════════════════════
 
-const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 module.exports = {
   isAfterDamageReaction: true,
@@ -42,6 +42,9 @@ module.exports = {
     }
 
     // Hero source (Spell / Attack): need a living attacker Hero.
+    // W24b N2-02: „Attack, Spell or Creature effect" — ein gewoehnlicher Heldeneffekt (Siphem, Schadenstyp 'hero') loest NICHT aus;
+    // als Attack/Spell geltende Heldeneffekte (Broghan 'attack', Alice '*_spell') schon (Helfer `isAttackSpellOrCreatureSource`, wie Frost Rune).
+    if (!isAttackSpellOrCreatureSource(engine, { ...source, cardName: source.name, damageType: type })) return false;
     const srcHeroIdx = source.heroIdx ?? -1;
     if (srcHeroIdx < 0) return false;
     const srcHero = srcPs.heroes?.[srcHeroIdx];

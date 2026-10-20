@@ -38,7 +38,9 @@ const CARD_NAME = 'Emergency Spell Armor';
 const DRAW_COUNT = 2;
 
 /** Kommt der Treffer von einem Spell oder einer Kreatur? */
-function spellOrCreatureSource(engine, source) {
+function spellOrCreatureSource(engine, source, type) {
+  // W24b N2-07: ein Heldeneffekt, der „als Spell" gilt (Alice, Q108), traegt den Schadenstyp `*_spell` — Spell im Sinne des Textes.
+  if (/_spell$/.test(String(type || ''))) return true;
   const name = typeof source === 'string' ? source : source?.name;
   if (!name) return false;
   const cd = engine._getCardDB()[name];
@@ -62,12 +64,12 @@ module.exports = {
   firesOnDefeat: true,
   casterIsTarget: true,
 
-  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount /*, type */) {
+  preDamageCondition(gs, ownerIdx, engine, target, heroIdx, source, amount, type) {
     if (!(amount > 0)) return false;
     if (target?.hp == null || amount < target.hp) return false;   // nicht toedlich
     if (target.hp <= 1) return false;                              // „with more than 1 HP"
     if (engine.heroSideOf(ownerIdx, target) !== ownerIdx) return false;   // „a Hero you control"
-    return spellOrCreatureSource(engine, source);
+    return spellOrCreatureSource(engine, source, type);
   },
 
   async preDamageResolve(engine, ownerIdx, target, heroIdx /*, source, amount, type */) {
