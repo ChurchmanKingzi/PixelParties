@@ -19156,7 +19156,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!this._ablaufFaellig(statusData.expiresAtTurn, statusData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
-          await this.removeHeroStatus(pi, hi, statusName);
+          await this.removeHeroStatus(pi, hi, statusName, { natuerlichesEnde: true });
           if (statusName === 'negated') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: pi, onlyHero: hi });   // Z2 (A08-20), s. processStatusExpiry
           expired = true;
         }
@@ -48087,7 +48087,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // („er wurde nie wirklich zugefuegt"), passiert mit
     // `bypassUnhealable` — der Fluch soll fremde Abfang-Effekte nicht
     // umdeuten, sondern nur das nachtraegliche Entfernen sperren.
-    if (!opts.bypassUnhealable && this._heroStatusRemovalBlocked(playerIdx, heroIdx, statusName)) {
+    // ★ W25b (N2-04, Al): Aging sperrt nur das Entfernen DURCH EFFEKTE (Heilen/Cleanse) — ein befristeter Status
+    // (Frost „for 1 turn", Betaeubung, Immun-Schutz …) laeuft am Ablaufzeitpunkt normal aus: `natuerlichesEnde`.
+    if (!opts.bypassUnhealable && !opts.natuerlichesEnde && this._heroStatusRemovalBlocked(playerIdx, heroIdx, statusName)) {
       this.log('status_remove_blocked', { target: hero.name, status: statusName, reason: 'curse_of_aging' });
       return;
     }
@@ -48156,7 +48158,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           for (const key of Object.keys(st)) {
             if (!STATUS_EFFECTS[key]?.endsAtTurnEnd || !st[key]) continue;
             const seit = st[key].armedTurn;
-            if (seit == null || seit <= this.gs.turn) await this.removeHeroStatus(spi, hi, key);
+            if (seit == null || seit <= this.gs.turn) await this.removeHeroStatus(spi, hi, key, { natuerlichesEnde: true });
           }
         }
       }
@@ -48171,7 +48173,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // noch der Zug ist, in dem der Schutz entstand.
         const dp = hero.statuses.damage_proof;
         if (dp && dp.armedTurn !== this.gs.turn) {
-          await this.removeHeroStatus(ap, hi, 'damage_proof');
+          await this.removeHeroStatus(ap, hi, 'damage_proof', { natuerlichesEnde: true });
         }
         let clearedCC = false;
         if (hero.statuses.frozen) {
@@ -48184,7 +48186,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             fr.duration--;
             this.log('status_tick', { target: hero.name, status: 'frozen', remaining: fr.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'frozen');
+            await this.removeHeroStatus(ap, hi, 'frozen', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48195,7 +48197,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             stun.duration--;
             this.log('status_tick', { target: hero.name, status: 'stunned', remaining: stun.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'stunned');
+            await this.removeHeroStatus(ap, hi, 'stunned', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48217,7 +48219,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (hero.statuses.negated && !hero.statuses.negated.sourceBound
             && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
-          await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
+          await this.removeHeroStatus(ap, hi, 'negated', { natuerlichesEnde: true }); clearedCC = true;
           // ★ Z2 (A08-20): lag eine FREMDE Negation auf dem Helden, hielt die Kristall-Anlage still (sie
           // ueberschreibt Fremdes nicht); laeuft die Fremde ab, gilt der Kristall in der Hand wieder SOFORT
           // (nur dieser Held — eine Heilung bleibt bis zum naechsten Rundenbeginn, Ruling v1103).
@@ -48236,7 +48238,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             bd.duration--;
             this.log('status_tick', { target: hero.name, status: 'bound', remaining: bd.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'bound');
+            await this.removeHeroStatus(ap, hi, 'bound', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48253,7 +48255,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             bl.duration--;
             this.log('status_tick', { target: hero.name, status: 'blinded', remaining: bl.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'blinded');
+            await this.removeHeroStatus(ap, hi, 'blinded', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48331,8 +48333,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || !hero.statuses) continue;
-        if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded');
-        if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune');
+        if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded', { natuerlichesEnde: true });
+        if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune', { natuerlichesEnde: true });
         // Untargetable expires at the start of the caster's next turn
         if (hero.statuses.untargetable) {
           delete hero.statuses.untargetable;

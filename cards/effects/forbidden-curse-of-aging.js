@@ -20,7 +20,11 @@
 //    `blocksHostHeal: true`              → Heilung am Wirt verpufft
 //    `blocksHostStatusRemoval: true`     → seine UEBRIGEN Status sind
 //                                          eingefroren; `aged` selbst
-//                                          bleibt entfernbar („other")
+//                                          bleibt entfernbar („other").
+//                                          ★ W25b (N2-04, Al): gesperrt ist nur das Entfernen
+//                                          DURCH EFFEKTE (Heilen/Cleanse); ein befristeter
+//                                          Status (Frost, Betaeubung …) laeuft zum
+//                                          Ablaufzeitpunkt normal aus (`natuerlichesEnde`).
 //    `negatesHostAbilities: ['Charme']`  → Charme am Wirt ist tot
 //
 //  Alle drei greifen nur, solange `aged` am Wirt liegt
