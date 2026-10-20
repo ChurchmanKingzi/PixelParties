@@ -37548,8 +37548,31 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // W25a (N1-14, Al 21.10.2026: „ja, soll verhindert werden!"): „damage they take cannot be reduced further" (Dichotomy of Luna and Tempeste) gilt auch
+    // fuer Vor-Schaden-Reduktionen von Surprises (Aquatic Shield −100): die Surprise loest aus, ihre Reduktion zaehlt nicht (Schaden bleibt unreduziert).
+    if (totalReduced > 0 && this._surpriseReduktionGesperrt(targetInfo, dmgInfo.source)) {
+      this.log('surprise_reduction_locked', { target: targetInfo.cardName, reduced: totalReduced });
+      totalReduced = 0;
+    }
+
     if (totalReduced === 0 && !negated) return null;
     return { damageReduced: totalReduced, effectNegated: negated };
+  }
+
+  /**
+   * W25a (N1-14): sperrt eine Karte auf dem Brett die Vor-Schaden-Reduktion durch Surprises fuer dieses Ziel? Kartenvertrag
+   * `sperrtSurpriseReduktion(engine, inst, targetInfo, source)` → true (Dichotomy of Luna and Tempeste).
+   * @param {{kind:'hero'|'creature', owner:number, heroIdx:number, hero?:object, inst?:object}} targetInfo
+   */
+  _surpriseReduktionGesperrt(targetInfo, source) {
+    for (const inst of this.cardInstances) {
+      if (!inst || inst.zone !== ZONES.SUPPORT) continue;
+      let sc = null;
+      try { sc = loadCardEffect(inst.name); } catch { sc = null; }
+      if (typeof sc?.sperrtSurpriseReduktion !== 'function') continue;
+      try { if (sc.sperrtSurpriseReduktion(this, inst, targetInfo, source)) return true; } catch { /* Karte entscheidet nie ueber Absturz */ }
+    }
+    return false;
   }
 
   /**

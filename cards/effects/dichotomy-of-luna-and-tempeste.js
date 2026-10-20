@@ -108,6 +108,32 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand', 'support'],
 
+  /**
+   * W25a (N1-14, Al 21.10.2026): „damage they take cannot be reduced further" sperrt auch die Vor-Schaden-Reduktion einer Surprise
+   * (Aquatic Shield −100), die VOR den `beforeDamage`-Hooks laeuft. Spiegel der Halbierungs-Bedingungen unten: Dichotomy liegt in der
+   * Support Zone eines lebenden Helden, das Ziel (Held oder Kreatur) ist Burned und steht unter der Kontrolle des Anhangs-Spielers,
+   * die Quelle ist nicht der eigene Burn-Tick. Engine-Vertrag `sperrtSurpriseReduktion` (`_surpriseReduktionGesperrt`).
+   */
+  sperrtSurpriseReduktion(engine, inst, ziel, source) {
+    if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
+    if (isBurnTick(source)) return false;
+    const seiten = engine.effektiveSeiten(inst);
+    const ownerIdx = seiten.owner;
+    const host = engine.gs.players[inst.controller ?? inst.owner]?.heroes?.[inst.heroIdx];
+    if (!host?.name || host.hp <= 0) return false;
+    if (ziel?.kind === 'hero') {
+      const hero = ziel.hero || engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+      if (!hero?.statuses?.burned) return false;
+      return engine.heroSideOf(ziel.owner, hero) === ownerIdx;
+    }
+    if (ziel?.kind === 'creature') {
+      const c = ziel.inst;
+      if (!c?.counters?.burned) return false;
+      return (c.controller ?? c.owner) === ownerIdx;
+    }
+    return false;
+  },
+
   spellPlayCondition(gs, pi, engine) {
     return candidateHosts(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }).length > 0;
   },
