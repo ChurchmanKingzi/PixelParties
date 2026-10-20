@@ -39415,12 +39415,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // W28a (Al, 21.10.2026, Rueckfrage zu N1-16: „Korrekt, auch keine Creature-Surprises"): ein Held, der KEINE Kreaturen beschwoeren darf, aktiviert auch keine
     // Kreatur-Surprise (die Aktivierung IST eine Beschwoerung/Platzierung, Ruling 3.10.). Gesperrt durch: Berserk (`berserked`, „cannot … summon Creatures"; wie
-    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg), `bound` (kein aktionsfaehiger Beschwoerer, wie `canHeroSummon`) und die spielerweiten
+    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg; `bound` NICHT mehr, s. W31a unten) und die spielerweiten
     // Beschwoerungssperren des AUSLOESERS (`getSummonBlockedFor`: `summonLocked` „cannot summon Creatures for the rest of the turn", Greatmaw-Remora-Teilsperre,
     // Grinning Cat). Schulen/Stufe, Frozen/Stunned/Webbed und Hero-`canPlayCard` (Cute Crown/Mary) prueften die Gates oben schon. NUR-Zauber-Sperren
     // (`magic_silenced`, `nulled`, `frightened`) betreffen Kreatur-Surprises weiterhin nicht. Spell-Surprises bleiben wie in W25a.
     if (hasCardType(cardData, 'Creature')) {
-      if (hero.statuses?.berserked || hero.statuses?.bound) {
+      // W31a (Al, 22.10.2026: „Creature Surprises kosten und gelten als KEINE Actions!"): `bound` („cannot perform an Action") und andere reine Action-Sperren
+      // sperren Kreatur-Surprises NICHT — nur das Beschwoerungsverbot (Berserk, `summonLocked` & Co.).
+      if (hero.statuses?.berserked) {
         const _cs = loadCardEffect(cardName);
         let _bypass = false;
         if (typeof _cs?.canPlayDespiteStatuses === 'function') {

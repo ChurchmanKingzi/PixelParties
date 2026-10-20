@@ -7,6 +7,7 @@
 //   AKTIVIEREN, wenn sie ein Spell ist (Spell-Surprises: Booby Trap …); Kreatur-Surprises (Afflicted Vermin) bleiben bei reinen Zauber-Sperren (magic_silenced / nulled / frightened) aktivierbar.
 // ERGÄNZT (Al, 21.10.2026, W28a: „Korrekt, auch keine Creature-Surprises"): ein Held, der keine Kreaturen beschwören darf (`berserked`: „cannot use any Spells or summon Creatures"),
 //   aktiviert auch KEINE Kreatur-Surprise (Afflicted Vermin bleibt verdeckt liegen). Weitere Fälle: `docs/niche-tests/repro/W28/a-01`.
+// ZURÜCKGENOMMEN für `bound` (Al, 22.10.2026, W31a: „Creature Surprises kosten und gelten als KEINE Actions!"): gebunden → Kreatur-Surprise aktivierbar; berserked → nicht.
 // Aufbau: Sitz 0, Main Phase 1, Hand [Booby Trap]; Held 0 trägt den Status (berserked / magic_silenced / nulled / frightened); Gegenprobe ohne Status und Kontrolle „normaler Spell wird abgelehnt" (Fireball).
 // Zweiter Teil: Sitz 1 hält die Surprise am gesperrten Helden 1:0; Sitz 0 trifft ihn mit Fireball (Spell-Surprise) bzw. beschwört eine Kreatur (Kreatur-Surprise).
 const H = require('../../lib/h.js');
@@ -52,6 +53,17 @@ const STATI = ['berserked', 'magic_silenced', 'nulled', 'frightened'];
       }
       R.check(`${status}: keine Engine-Fehler`, t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() }); }
   }
+  { // W31a (Al, 22.10.2026: „Creature Surprises kosten und gelten als KEINE Actions!"): `bound` („cannot perform an Action") sperrt Kreatur-Surprises NICHT (W28a sperrte sie);
+    // die Spell-Surprise bleibt (wie jede Karte, die der gebundene Held wirkt) davon unberührt geprüft in W28/a-01; hier nur die Kreatur-Surprise.
+    const t = await H.fresh({ hand: [[], []] });
+    t.setHand(0, [H.INERT.creature]);
+    t.put(1, 0, 0, H.INERT.creature);
+    t.putSurprise(1, 0, 'Afflicted Vermin'); t.grantFor(1, 0, 'Afflicted Vermin');
+    t.heroStatus(1, 0, 'bound');
+    await t.play(0, H.INERT.creature, { hero: 0 });
+    const fenster = t.prompts.some(p => p.pi === 1 && p.d.title === 'Afflicted Vermin');
+    R.check('bound: die Kreatur-Surprise (Afflicted Vermin) bleibt aktivierbar (keine Action)', fenster, t.prompts.map(p => p.pi + ':' + p.d.title));
+    R.check('bound: keine Engine-Fehler', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() }); }
   { // Gegenprobe: ohne Status feuert die gesetzte Booby Trap
     const t = await H.fresh({ hand: [['Fireball'], []] });
     t.putSurprise(1, 0, 'Booby Trap'); t.grantFor(1, 0, 'Booby Trap');
