@@ -7,7 +7,7 @@
 //                   Sieger 20 SC (−2 für jeden falschen Tipp, den ER für diese Karte schon abgegeben hat).
 //   !mystery skip   (Admin) Rätsel überspringen: Lösung zeigen, nächstes starten
 //
-//  • nur im Rätsel-Kanal (MYSTERY_CHANNEL_ID, voreingestellt auf den Kanal des Servers)
+//  • nur im Minigames-Kanal (MINIGAMES_CHANNEL_ID, voreingestellt auf den Kanal des Servers)
 //  • Rätsel entstehen unbegrenzt — aber nur das ERSTE neu erzeugte Rätsel jeder vollen Stunde ist SC wert (alle weiteren sind Übung)
 //  • SC gibt es nur mit verknüpftem Konto (!link); alle anderen dürfen mitspielen und gewinnen, bekommen aber keine SC
 //  • Tipps, die keiner Karte ähneln, oder die schon einmal getippt wurden, zählen nicht
@@ -22,7 +22,7 @@ const GUESS_COOLDOWN_MS = 1500;
 module.exports = function register(ctx) {
   const { client, config, db, game, helpers } = ctx;
   const GameApiError = game.GameApiError;
-  const channelId = () => config.channels.mystery;
+  const channelId = () => config.channels.minigames;
 
   // Alles, was den Spielstand ändert, nacheinander: zwei gleichzeitige richtige Tipps dürfen nicht beide gewinnen.
   let chain = Promise.resolve();

@@ -31,7 +31,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // ohne 0/O/1/I: wir
 const CODE_LEN = 8;
 const MAX_ADMIN_SC_DELTA = 1000000;
 /** Wofür der Bot SC bucht (steht in sc_log.reward_id). Alles andere wird als Admin-Buchung geführt. */
-const SC_REASONS = new Set(['admin:discord', 'bot:mystery']);
+const SC_REASONS = new Set(['admin:discord', 'bot:mystery', 'bot:pixle']);
 
 function createCode() {
   let s = '';
