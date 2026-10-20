@@ -439,15 +439,20 @@ def pick_music_start(path, window, lo=2.0, hi=75.0):
 
 
 def music_path(card_name, override):
-    """Musik: ausdrückliche Datei → bgm_<erstes Wort>.ogg → bgm_<ein anderes Wort des Namens>.ogg."""
+    """Musik: ausdrückliche Datei, sonst wie im Spiel (server.js `bgmSlugForHero`): längste zusammenhängende Wortfolge des
+    Namens, für die `public/music/bgm_<slug>.ogg` existiert (so findet „Luna Pele“ `bgm_lunapele.ogg`)."""
     base = ROOT / 'public' / 'music'
     if override:
         return base / override
-    words = [''.join(ch for ch in w.lower() if ch.isalnum()) for w in card_name.replace(',', ' ').split()]
-    for key in [words[0]] + words[1:] + words[::-1]:
-        if key and (base / f'bgm_{key}.ogg').exists():
-            return base / f'bgm_{key}.ogg'
-    return None
+    toks = [''.join(ch for ch in w.lower() if ch.isalnum()) for w in card_name.replace(',', ' ').replace("'", ' ').split()]
+    toks = [t for t in toks if t]
+    best = None
+    for i in range(len(toks)):
+        for j in range(i + 1, len(toks) + 1):
+            cand = ''.join(toks[i:j])
+            if (base / f'bgm_{cand}.ogg').exists() and (best is None or len(cand) > len(best)):
+                best = cand
+    return base / f'bgm_{best}.ogg' if best else None
 
 
 def main():
@@ -643,7 +648,7 @@ def main():
             m_start = pick_music_start(music, dur)
             print(f'Musik: energiereichstes Fenster ab {m_start:.1f} s')
         cmd += ['-ss', str(m_start), '-i', str(music)]
-        amap = ['-map', f'{n_in}:a', '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2', '-c:a', 'aac', '-b:a', '192k']
+        amap = ['-map', f'{n_in}:a', '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
     else:
