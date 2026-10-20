@@ -21,6 +21,12 @@
 //    card directly onto a target Hero / zone.
 //    Same UX as a normal Action Phase action.
 //
+//  • ★ W34a (Al, 22.10.2026): „any Hero you control" nach AKTUELLER Kontrolle:
+//    ein vom Spieler kontrollierter Gegnerheld (temporaer oder dauerhaft
+//    uebernommen) wird als Aktionstraeger angeboten (Hand-Karten:
+//    Attack/Spell/Kreatur), ein abgegebener eigener Held nicht
+//    (`engine._zusatzaktionsHelden`).
+//
 //  • The `Any-Hero` variant doesn't lock the
 //    activation to a specific Hero — the player
 //    chooses card first, hero second (or together
@@ -71,7 +77,8 @@ module.exports = {
     if (total < DELETE_COST) return false;
     // At least one alive Hero must exist on this side — otherwise the
     // bonus action has no possible recipient.
-    if (!(ps.heroes || []).some(h => h?.name && h.hp > 0)) return false;
+    // ★ W34a (Al, 22.10.2026): „any Hero you control" = AKTUELLE Kontrolle — ein uebernommener Gegnerheld zaehlt, ein abgegebener eigener nicht.
+    if (engine._zusatzaktionsHelden(pi).length === 0) return false;
     // ★ W7b (A07-13, Al 14.10.): Hu ist nur aktivierbar, wenn die geschenkte Aktion auch stattfinden kann (eine Handkarte
     // spielbar, eine Ability-/Helden-Aktion moeglich) - sonst waeren die 5 Karten umsonst geloescht. Die Pruefung laeuft
     // vor der Zahlung; ein Guardian Beast auf der Hand ist erst spielbar, wenn die EIGENE Ablage leer ist (`canSummon`).

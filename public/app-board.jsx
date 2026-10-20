@@ -34579,6 +34579,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           cardName: pick.cardName,
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
           heroIdx: h.idx,
+          ...(h.charmedOwner != null ? { heroOwner: h.charmedOwner } : {}),   // W34a: uebernommener Gegnerheld (Guardian Beast Hu)
         };
         if (pick.isCreature && h.zoneSlot != null) {
           response.zoneSlot = h.zoneSlot;
@@ -36371,7 +36372,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             } else if (el.dataset.heroOwner === 'opp') {
               // Check if this is a charmed hero we control
               const oppHero = opp.heroes?.[hi];
-              if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) {
+              if (isHeroAction && ((heroActionPrompt.fremdeHelden || {})[cardName] || []).some(f => f.heroOwner === oppIdx && f.heroIdx === hi)) {
+                // W34a (Guardian Beast Hu): geschenkte Zusatzaktion mit einem uebernommenen Gegnerheld (der Server hat ihn fuer diese Karte angeboten).
+                targetHero = hi;
+                targetCharmedOwner = oppIdx;
+              } else if (oppHero?.charmedBy === myIdx && canHeroPlayCard(opp, hi, card, fromCreation ? null : idx)) {
                 targetHero = hi;
                 targetCharmedOwner = oppIdx;
               }
@@ -36602,6 +36607,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const h = me.heroes[hi];
                   if (h?.name && h.hp > 0) eligible.push({ idx: hi, name: h.name });
                 }
+                // W34a (Guardian Beast Hu): „any Hero you control" — uebernommene Gegnerhelden (`fremdeHelden`, Brettseite `heroOwner`).
+                for (const f of ((heroActionPrompt.fremdeHelden || {})[cardName] || [])) {
+                  const h = (f.heroOwner === oppIdx ? opp : null)?.heroes?.[f.heroIdx];
+                  if (h?.name && h.hp > 0) eligible.push({ idx: f.heroIdx, name: h.name, charmedOwner: f.heroOwner });
+                }
               } else {
                 for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                   if (canHeroPlayCard(me, hi, card, fromCreation ? null : idx)) {
@@ -36632,7 +36642,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // `play_spell` would fail server-side because no
                 // additional-action token covers the card.
                 if (isHeroAction) {
-                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, ...(eligible[0].charmedOwner != null ? { heroOwner: eligible[0].charmedOwner } : {}) });
                 } else {
                   socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
                 }
@@ -36688,8 +36698,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   if (slot < 0) continue;
                   eligible.push({ idx: hi, name: h.name, zoneSlot: slot });
                 }
+                // W34a (Guardian Beast Hu): uebernommene Gegnerhelden mit freier Support Zone auf ihrer Brettseite.
+                for (const f of ((heroActionPrompt.fremdeHelden || {})[cardName] || [])) {
+                  const h = (f.heroOwner === oppIdx ? opp : null)?.heroes?.[f.heroIdx];
+                  if (!h?.name || h.hp <= 0) continue;
+                  const slot = findFreeSupportSlot(opp, f.heroIdx);
+                  if (slot < 0) continue;
+                  eligible.push({ idx: f.heroIdx, name: h.name, zoneSlot: slot, charmedOwner: f.heroOwner });
+                }
                 if (eligible.length === 1) {
-                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot });
+                  ppSendePromptAntwort(gameState, { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot, ...(eligible[0].charmedOwner != null ? { heroOwner: eligible[0].charmedOwner } : {}) });
                 } else if (eligible.length > 1) {
                   setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isCreature: true, isHeroAction: true });
                 }
@@ -37150,7 +37168,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           // Hero Action mode (Coffee) — send as effect_prompt_response
           if (isHeroAction) {
-            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero });
+            ppSendePromptAntwort(gameState, { cardName: prev.cardName, handIndex: prev.idx, heroIdx: prev.targetHero, ...(prev.charmedOwner != null ? { heroOwner: prev.charmedOwner } : {}) });   // W34a: heroOwner bei uebernommenem Gegnerheld
             return null;
           }
 

@@ -23231,14 +23231,16 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
-    if (_leihSeite != null && hasCardType(cardData, 'Creature')) return { retry: true };   // Als Vorgabe 29.9.
+    if (_leihSeite != null && hasCardType(cardData, 'Creature') && !angebot.chainAnyHero) return { retry: true };   // Als Vorgabe 29.9.; W34a: die AnyHero-Aktion (Guardian Beast Hu) beschwoert auch ueber einen uebernommenen Helden
     // ★ W15b (C2): „exakt die ausgewählte Karte" — der Rabatt einer ANDEREN Kopie macht diese nicht spielbar.
     if (!fromCreation && !this._kopieStufeOk(playerIdx, heroIdx, cardData, handIndex, _leihSeite ?? playerIdx)) return { retry: true };   // W16a (Frage 6): auch für den geliehenen Helden
 
     if (hasCardType(cardData, 'Creature')) {
       if (zoneSlot === undefined || zoneSlot < 0) return { retry: true };
-      if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-      if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { retry: true };
+      // ★ W34a: uebernommener Held (Gegenspalte): die Zonen liegen auf seiner Brettseite, der Beschwoerer (Kontrolleur) bleibt `playerIdx` (wie `doPlayCreature` mit `charmedOwner`).
+      const zonenPs = _leihSeite != null ? this.gs.players[_leihSeite] : ps;
+      if (!zonenPs.supportZones[heroIdx]) zonenPs.supportZones[heroIdx] = [[], [], []];
+      if ((zonenPs.supportZones[heroIdx][zoneSlot] || []).length > 0) return { retry: true };
 
       quelle.splice(handIndex, 1);
 
@@ -23250,12 +23252,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       // flag so triggers like Spawn Mother's AOE / Orthos's Loyal
       // gate still fire for additional-action plays.
       const placeResult = await this.summonCreatureWithHooks(
-        cardName, playerIdx, heroIdx, zoneSlot,
+        cardName, _leihSeite ?? playerIdx, heroIdx, zoneSlot,
         {
           source: config.title,
           hookExtras: { _isNormalSummon: true },
         },
       );
+          ...(_leihSeite != null ? { controller: playerIdx } : {}),   // W34a
       if (!placeResult) {
         // Self-place inside beforeSummon (DDG bounce-place, 500
         // Piranhas tribute) — the card is already on the board, no
@@ -23279,7 +23282,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       } else {
         const { actualSlot } = placeResult;
-        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
+        this._broadcastEvent('summon_effect', { owner: _leihSeite ?? playerIdx, heroIdx, zoneSlot: actualSlot, cardName });
         this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
         if (config.zusageAuftritt) this._feuereZusageAuftritte(this._zusageAuftrittVormerken(config.zusageAuftritt, playerIdx));   // v1302
       }
@@ -23294,6 +23297,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         actionType: 'creature', playerIdx, cardName, playedCardName: cardName, heroIdx,
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
+        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // W34a
       });
       // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
       // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
@@ -23771,10 +23775,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps) return false;
     const cardDB = this._getCardDB();
     const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      let karten = this.getHeroEligibleActionCards(playerIdx, hi);
+    // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" = nach AKTUELLER Kontrolle — `_zusatzaktionsHelden` (eigene Spalte ohne abgegebene Helden + uebernommene
+    // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur eigene Spalte.
+    for (const { seite, heroIdx: hi } of this._zusatzaktionsHelden(playerIdx)) {
+      const fremd = seite !== playerIdx;
+      let karten = this.getHeroEligibleActionCards(playerIdx, hi, fremd ? seite : null);
       if (config.allowedCardTypes) karten = karten.filter(n => cardDB[n] && config.allowedCardTypes.includes(cardDB[n].cardType));
       if (typeof config.cardNameFilter === 'function') {
         try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
@@ -23782,12 +23787,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (karten.length > 0) return true;
       if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
       if (!eingeschraenkt && !config.skipHeroEffects
+      if (fremd) continue;
           && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
     }
     return false;
   }
   /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Guardian Beast Hu: „additional Action with any Hero you control" muss nach aktueller Kontrolle gehen): die lebenden Helden, mit denen `playerIdx`
+   * eine geschenkte Zusatzaktion ausfuehren darf — `heroesControlledBy` (Charme, Diebstahl, dauerhafte Uebernahme, Styx; ein an den Gegner abgegebener eigener Held faellt heraus).
+   * Eigene Spalte zuerst (stabile Reihenfolge: bestehende Prompts/Tests bleiben gleich), dann uebernommene Helden der Gegenspalte. `seite` = Brettseite des Helden.
+   * @returns {Array<{seite:number, heroIdx:number, hero:object}>}
+   */
+  _zusatzaktionsHelden(playerIdx) {
+    const alle = this.heroesControlledBy(playerIdx)
+      .filter(({ hero }) => hero?.name && hero.hp > 0)
+      .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
+    return [...alle.filter(h => h.seite === playerIdx), ...alle.filter(h => h.seite !== playerIdx)];
+  }
    * without restricting to a single hero — the player drags a card onto
    * whichever hero they want, just like during the normal Action Phase.
    * @param {number} playerIdx
@@ -23831,11 +23850,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Brett-Effekt. Gleiche Regel wie in `performImmediateAction`.
     const eingeschraenktAny = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
 
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+    // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" nach aktueller Kontrolle (`_zusatzaktionsHelden`): ein uebernommener Gegnerheld wird als
+    // Aktionstraeger angeboten (`fremdeHelden`, nur Hand-Karten: Attack/Spell/Kreatur; Abilities/Heldeneffekte nur eigene Spalte), ein abgegebener eigener Held nicht.
+    const fremdeHelden = {};
+    for (const { seite: heldSeite, heroIdx: hi, hero } of this._zusatzaktionsHelden(playerIdx)) {
+      const fremdHeld = heldSeite !== playerIdx;
 
-      let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi);
+      let heroEligible = this.getHeroEligibleActionCards(playerIdx, hi, fremdHeld ? heldSeite : null);
       if (config.allowedCardTypes) {
         heroEligible = heroEligible.filter(name => {
           const cd = cardDB[name];
@@ -23854,9 +23875,14 @@ this._deathWatch = (this._deathWatchStack || []).length
         eligibleSet.add(name);
         if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
         heroIndicesByCard[name].push(hi);
+        if (fremdHeld) {
+          (fremdeHelden[name] || (fremdeHelden[name] = [])).push({ heroOwner: heldSeite, heroIdx: hi });
+          continue;
+        }
       }
 
       // Activatable abilities on this hero — ueber den echten Sammler,
+      if (fremdHeld) continue;
       // gleiche Begruendung wie in `performImmediateAction`.
       if (!config.skipAbilities) {
         for (const e of this.getActivatableAbilities(playerIdx, {
@@ -23883,6 +23909,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       heroIndicesByCard,
       activatableAbilities,
       activatableHeroEffects,
+      ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       // Kein `showCard` — hier steht der handelnde Held noch nicht
       // fest, ein Bild waere geraten. Die Platzierung gilt trotzdem:
       // geklickt wird auf der eigenen Seite.
@@ -23911,11 +23938,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Helden alle im selben Feld.
     const handelnderHeld = actionResult.heroIdx;
     if (handelnderHeld == null) return { played: false };
-    const heldObjekt = ps.heroes[handelnderHeld];
+    // ★ W34a: Antwort mit `heroOwner` = Brettseite eines UEBERNOMMENEN Helden (nur gueltig, wenn der Prompt ihn fuer genau diese Karte angeboten hat; Hand-Karten allein).
+    const antwortSeite = isSeat(this, actionResult.heroOwner) && actionResult.heroOwner !== playerIdx ? actionResult.heroOwner : null;
+    if (antwortSeite != null) {
+      const erlaubt = (fremdeHelden[actionResult.cardName] || []).some(f => f.heroOwner === antwortSeite && f.heroIdx === handelnderHeld);
+      if (!erlaubt || actionResult.heroEffectActivation || actionResult.abilityActivation) continue;
+    }
+    const heldObjekt = (antwortSeite != null ? this.gs.players[antwortSeite] : ps).heroes[handelnderHeld];
     if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
 
     const ergebnis = await this._resolveImmediateActionPick(
-      playerIdx, handelnderHeld, heldObjekt, actionResult, config,
+      playerIdx, handelnderHeld, heldObjekt, actionResult, antwortSeite != null ? { ...config, heroOwner: antwortSeite } : config,
       { activatableHeroEffects, chainAnyHero: true });
     if (!ergebnis?.retry) return ergebnis;
     continue;
