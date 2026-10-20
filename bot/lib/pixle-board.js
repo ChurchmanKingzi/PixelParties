@@ -19,10 +19,10 @@ function ensureFont() {
 }
 
 const COLORS = { match: '#2e9e4f', partial: '#c9a227', miss: '#a63b3b', name: '#2b2a4a', header: '#1a1830', bg: '#12102a', text: '#ffffff', headText: '#9d9ad6', shadow: 'rgba(0,0,0,0.6)' };
-// Spaltenbreiten (Bildpunkte): Name, dann die neun Eigenschaften in der Reihenfolge von lib/pixle.js COLUMNS
+// Spaltenbreiten (Bildpunkte): Name, dann die acht Eigenschaften in der Reihenfolge von lib/pixle.js COLUMNS
 const NAME_W = 390;
-const WIDTHS = { type: 128, subtype: 118, level: 86, hp: 96, atk: 96, cost: 86, school: 150, archetype: 190, set: 128 };
-const ORDER = ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'archetype', 'set'];
+const WIDTHS = { type: 134, subtype: 124, level: 90, hp: 100, atk: 100, cost: 90, school: 160, set: 140 };
+const ORDER = ['type', 'subtype', 'level', 'hp', 'atk', 'cost', 'school', 'set'];
 const PAD = 10, GAP = 6, ROW_H = 54, HEAD_H = 40;
 
 /** Schrift so verkleinern, dass der Text in `maxW` passt; reicht auch die kleinste Größe nicht, mit „…“ kürzen. */
@@ -67,7 +67,7 @@ function renderBoard(rows) {
   g.fillStyle = COLORS.bg; g.fillRect(0, 0, width, height);
 
   // Kopfzeile
-  const labels = { type: 'Type', subtype: 'Subtype', level: 'Level', hp: 'HP', atk: 'ATK', cost: 'Cost', school: 'School', archetype: 'Archetype', set: 'Set' };
+  const labels = { type: 'Type', subtype: 'Subtype', level: 'Level', hp: 'HP', atk: 'ATK', cost: 'Cost', school: 'School', set: 'Set' };
   let x = PAD;
   g.fillStyle = COLORS.header; g.fillRect(PAD, PAD, width - PAD * 2, HEAD_H);
   g.font = `18px ${family}`; g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = COLORS.headText;
