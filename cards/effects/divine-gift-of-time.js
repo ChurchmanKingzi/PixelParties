@@ -40,6 +40,9 @@
 //  cards; on confirm, the entire batch is spliced
 //  out of discard and pushed to hand.
 //
+//  ★ W21a (Al, 20.10.2026: ja): wie jede Hand-Reaktion braucht Time einen Wirker-Helden mit Magic Arts 2
+//  (eigener oder uebernommener; Schule/Stufe von ihm, Hand/Wisdom vom Kontrolleur).
+//
 //  Time has no proactive hand-play path —
 //  `spellPlayCondition` refuses normal hand plays
 //  so the player never spends an Action playing it
@@ -60,6 +63,8 @@ function queueTimeRescue(engine, ps, pi, names, viaPush) {
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   // Time must still be in hand to spend.
   if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  // ★ W21a (Al, 20.10.2026: „ja"): ohne einen Wirker-Helden mit Magic Arts 2 (eigener oder uebernommener) wird die Karte nicht angeboten.
+  if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;
   // Defensive — bail if there are no rescuable names.
   const cleaned = (names || []).filter(n => n && n !== CARD_NAME);
   if (cleaned.length === 0) return;
@@ -112,6 +117,7 @@ async function tryTimeRescue(engine, pi, ps, names) {
   // shifted since the events that filled the queue.
   if (ps._oncePerGameUsed?.has('divineGift')) return;
   if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+  if (!engine.hookReaktionWirkerVorhanden(pi, CARD_NAME)) return;   // W21a: Wirker-Held mit passender Schule/Stufe (Board kann sich verschoben haben)
 
   // Only names actually still in discard are rescuable. A name might
   // have landed in discard and then been moved out again by another
@@ -143,9 +149,17 @@ async function tryTimeRescue(engine, pi, ps, names) {
   const timeHandIdx = (ps.hand || []).indexOf(CARD_NAME);
   if (timeHandIdx < 0) return;
 
+  // ★ W21a: Wirker waehlen (2+ Wirker: Picker; Abbruch = nichts passiert), vor jeder Zahlung.
+  const _wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, CARD_NAME);
+  if (!_wirkerPlan) return;
+  if (ps._oncePerGameUsed?.has('divineGift')) return;
+  if ((ps.hand || []).indexOf(CARD_NAME) < 0) return;
+
   // Mark Divine Gift used now to block re-entry.
   if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
   ps._oncePerGameUsed.add('divineGift');
+  // ★ W21a: Wisdom-Abwurf des Wirkers (Hand des Kontrolleurs), solange Time selbst noch auf der Hand liegt (zaehlt nicht als Abwurf).
+  await engine.hookReaktionWisdomZahlen(pi, CARD_NAME, _wirkerPlan);
 
   // Screen-wide clock-rewinding burst — fires once per activation,
   // regardless of batch size. Plays in parallel with the per-card

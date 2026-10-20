@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Divine Gift of the Guardian"
-//  Spell (Reaction, Magic Arts Lv0)
+//  Spell (Reaction, Summoning Magic Lv1 laut Kartendaten)
+//  ★ W21a (Al, 20.10.2026): braucht einen Wirker-Helden mit dieser Schule/Stufe (eigener oder uebernommener).
 //  Once per game (Divine Gift key).
 //
 //  Triggers from hand when 1+ of the player's
@@ -65,6 +66,9 @@ module.exports = {
       // Once per game check
       if (ps._oncePerGameUsed?.has('divineGift')) return;
 
+      // ★ W21a (Al, 20.10.2026: „ja"): Wirker-Held mit Summoning Magic 1 (laut Kartendaten; eigener oder uebernommener) noetig.
+      if (!engine.hookReaktionWirkerVorhanden(pi, 'Divine Gift of the Guardian')) return;
+
       // Prompt the player to play this card
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -77,6 +81,11 @@ module.exports = {
       });
 
       if (!confirmed || confirmed.cancelled) return;
+
+      // ★ W21a: Wirker waehlen (2+ Wirker: Picker; Abbruch = nichts passiert), vor Stempel und Entnahme.
+      const wirkerPlan = await engine.hookReaktionWirkerWaehlen(pi, 'Divine Gift of the Guardian');
+      if (!wirkerPlan) return;
+      if (ps._oncePerGameUsed?.has('divineGift')) return;
 
       // Mark once per game
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -111,6 +120,7 @@ module.exports = {
         engine.notePlayedFromHand(pi);
         engine.handKartenBesitzerPs(ps, 'Divine Gift of the Guardian').discardPile.push('Divine Gift of the Guardian');   // W3/W5a: Stapel des permanenten Besitzers
       }
+      await engine._rxPayWisdom(ps, wirkerPlan);   // W21a: Wisdom-Abwurf des Wirkers (Karte ist schon aus der Hand)
 
       // Untrack hand instance
       const handInst = engine.cardInstances.find(c =>

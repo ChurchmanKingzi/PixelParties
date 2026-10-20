@@ -38670,6 +38670,46 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this.getWisdomDiscardCost(seite, heroIdx, cardData, undefined, seite !== pi ? pi : undefined);
   }
 
+  /**
+   * ★ W21a (Al, 20.10.2026, Frage 1 aus W20c: „ja"): Hand-Reaktionen OHNE Kettenfenster, die sich über einen eigenen Hook anbieten
+   * (Divine Gift of Time, Unwanted Audience, Divine Gift of the Guardian), brauchen einen Wirker-Helden mit der Schule/Stufe laut
+   * Kartendaten — eigener oder übernommener (Schule/Stufe von IHM, Hand und Gold vom Kontrolleur; ein abgegebener eigener Held
+   * ist nie Wirker). Dieselbe Wirkersuche wie die Fenster (`_rxCastKandidaten`: Cast-Sperren, Wisdom-Abdeckung, `fremdeReaktionsWirker`).
+   * @returns {boolean} gibt es mindestens einen Wirker?
+   */
+  hookReaktionWirkerVorhanden(pi, cardName) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    const k = this._rxCastKandidaten(ps, cardName, loadCardEffect(cardName));
+    return k === null || k.length > 0;   // null = Karte braucht keinen Wirker
+  }
+
+  /**
+   * ★ W21a: Wirker für eine Hook-Reaktion wählen (nach der Bestätigung, vor jeder Entnahme/Zahlung). Bei 2+ Wirkern fragt der
+   * Wirker-Picker (CPU: automatisch). Rückgabe `{ casterIdx, casterSeite, wisdomCost }` oder `null` (kein Wirker / Abbruch).
+   */
+  async hookReaktionWirkerWaehlen(pi, cardName) {
+    const ps = this.gs.players[pi];
+    if (!ps) return null;
+    const script = loadCardEffect(cardName);
+    const k = this._rxCastKandidaten(ps, cardName, script);
+    if (k === null) return { casterIdx: -1, casterSeite: pi, wisdomCost: 0 };
+    if (!k.length) return null;
+    const plan = { casterIdx: k[0].casterIdx, casterSeite: k[0].casterSeite, wisdomCost: k[0].wisdomCost };
+    if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, plan))) return null;
+    return plan;
+  }
+
+  /**
+   * ★ W21a: Wisdom-Abwurf einer Hook-Reaktion, solange die Karte selbst noch in der Hand liegt (Divine Gift of Time): die Karte zählt
+   * währenddessen nicht als abwerfbare Handkarte (`mitZusatzAufloesung`).
+   */
+  async hookReaktionWisdomZahlen(pi, cardName, plan) {
+    if (!(plan?.wisdomCost > 0)) return;
+    const ps = this.gs.players[pi];
+    await require('./_hand-resolve').mitZusatzAufloesung(ps, cardName, () => this._rxPayWisdom(ps, plan));
+  }
+
   _rxCastKandidaten(ps, cardName, script, opts = {}) {
     const pi = this._rxOwnerIdx(ps, '_rxCastKandidaten');
     if (pi < 0) return [];

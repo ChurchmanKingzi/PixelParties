@@ -1,4 +1,5 @@
 'use strict';
+// W21a (Al, 20.10.2026): umgestellt — Divine Gift of Time braucht jetzt einen Wirker-Helden mit Magic Arts 2 (hier Sitz 0, Held 2 mit Magic Arts x2); vorher prüfte die Karte keinen Helden.
 // W14b · Q150 (R01-06, Divine Gift of Time) · Al, 16.10.2026: „Ja, Gift of Time soll auf **alles** reagieren können, was den Discard erreicht, inklusive zerstörter Equips/Attachments oder genutzter Surprises!"
 // Kartentext: „Play this card immediately when 1 or more cards are sent to your discard pile from anywhere. Add those cards to your hand instead."
 // Erwartet: jede Karte, die die Ablage des Time-Besitzers erreicht, öffnet EINE Abfrage „Divine Gift of Time": Mill, Abwurf, Kreaturentod, zerstörte Ausrüstung,
@@ -8,7 +9,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const gefragt = (t) => t.prompts.filter(p => p.d.title === 'Divine Gift of Time');
 (async () => {
   const R = H.runner();
-  const szene = async (extra = {}) => H.fresh({ hand: [['Divine Gift of Time', 'ZZ Filler'], extra.hand1 || []], ...extra.opts });
+  const szene = async (extra = {}) => H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', 'ZZ Filler'], extra.hand1 || []], ...extra.opts });
 
   R.section('Mill (Kontrolle) – eine Abfrage mit beiden Karten');
   {

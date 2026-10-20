@@ -1,4 +1,5 @@
 'use strict';
+// W21a (Al, 20.10.2026): umgestellt — Divine Gift of Time braucht jetzt einen Wirker-Helden mit Magic Arts 2 (hier Sitz 0, Held 2 mit Magic Arts x2); vorher prüfte die Karte keinen Helden.
 // R01-06 · Divine Gift of Time reagiert nur auf Mill, Abwurf und Kreaturentod – nicht auf andere Wege in die Ablage
 // Kartentext: „You can only activate 1 "Divine Gift" card per game. Play this card immediately when 1 or more cards are sent to your discard pile from anywhere.
 //   Add those cards to your hand instead."
@@ -12,20 +13,20 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 (async () => {
   const R = H.runner();
   {
-    const t = await H.fresh({ hand: [['Divine Gift of Time', 'ZZ Filler'], []] });
+    const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', 'ZZ Filler'], []] });
     await t.run(() => t.engine.actionMillCards(0, 2, { selfInflicted: true }));
     await sleep(50);
     R.check('(a) Mill löst die Abfrage aus (Kontrolle)', t.prompts.some(p => p.d.title === 'Divine Gift of Time'), t.prompts.map(p => p.d.title));
   }
   {
-    const t = await H.fresh({ hand: [['Divine Gift of Time', 'ZZ Filler'], []] });
+    const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', 'ZZ Filler'], []] });
     const c = t.put(0, 0, 0, 'Curse');
     await t.run(() => t.engine.actionDestroyCard({ name: 'Test', owner: 1 }, c));
     await sleep(50);
     R.check('(b) zerstörtes Attachment (Curse → Ablage) löst die Abfrage aus', t.prompts.some(p => p.d.title === 'Divine Gift of Time') && t.pile(0, 'hand').includes('Curse'), { disc: t.pile(0, 'discardPile'), prompts: t.prompts.map(p => p.d.title) });
   }
   {
-    const t = await H.fresh({ hand: [['Divine Gift of Time', 'ZZ Filler'], ['Fireball']] });
+    const t = await H.fresh({ abilities: { 0: { 2: [['Magic Arts', 'Magic Arts']] } }, hand: [['Divine Gift of Time', 'ZZ Filler'], ['Fireball']] });
     t.putSurprise(0, 0, 'Booby Trap'); t.grantFor(0, 0, 'Booby Trap');
     t.targetFn = (valid) => [valid.find(v => v.type === 'hero' && v.owner === 0 && v.heroIdx === 0).id];
     await t.play(1, 'Fireball', { hero: 0 });
