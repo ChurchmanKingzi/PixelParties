@@ -81,6 +81,7 @@ function spiritSteht(engine, pi) {
 
 module.exports = {
   activeIn: ['support'],
+  seesEquipLeaveOnHeroDeath: true,   // N3-12 (W24): auch der Abgang der Ausruestung mit dem Heldentod (`handleHeroDeathCleanup`) wird gemeldet
 
   cpuMeta: { dealsDamage: false, castTriggersDraw: true },
 

@@ -50757,6 +50757,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           fromZone: 'support', fromHeroIdx: hi, fromOwner: inst.owner, fromZoneSlot: inst.zoneSlot ?? -1,
           _bypassDeadHeroFilter: true,
         });
+        // N3-12 (W24): Beobachter des Abgangs fremder Ausruestung (Skript-Flag `seesEquipLeaveOnHeroDeath`, Spirit of the Shattered Trident:
+        // „would be moved from the board to anywhere except your hand … add them back") hoeren den Heldentod-Abgang ebenfalls — gezielt je
+        // Beobachter (`_onlyCard`), nicht an alle Lauscher (die obige Meldung gilt bewusst nur dem Abgaenger). Umleitung ueber `inst._returnToHand`.
+        for (const beob of this.cardInstances.filter(c => c.zone === 'support' && c.id !== inst.id && loadCardEffect(c.name)?.seesEquipLeaveOnHeroDeath)) {
+          await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
+            _onlyCard: beob, card: beob, leavingCard: inst,
+            fromZone: 'support', toZone: 'discard', fromHeroIdx: hi, fromOwner: inst.owner, fromZoneSlot: inst.zoneSlot ?? -1,
+            _bypassDeadHeroFilter: true,
+          });
+        }
         // Locate the equip's current support slot BEFORE removing it. Tokens
         // route to the deleted pile; everything else to the discard pile.
         const supZones = ps.supportZones[hi] || [];
