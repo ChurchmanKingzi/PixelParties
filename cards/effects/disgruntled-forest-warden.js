@@ -32,10 +32,10 @@ const DAMAGE = 150;
 
 /** Does `pi` control at least one Ascended Hero right now? */
 function controlsAscendedHero(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return false;
+  if (!engine.gs.players[pi]) return false;
   const cardDB = engine._getCardDB();
-  return (ps.heroes || []).some(h =>
+  // N3-02 (W24): „Hero you control" = nur der aktuelle Kontrolleur (Welle 22): uebernommene Aufgestiegene zaehlen, abgegebene nicht.
+  return engine.heroesControlledBy(pi).some(({ hero: h }) =>
     h?.name && h.hp > 0 && cardDB[h.name]?.cardType === 'Ascended Hero');
 }
 
