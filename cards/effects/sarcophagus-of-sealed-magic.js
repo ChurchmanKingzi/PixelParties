@@ -97,7 +97,9 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
-    const pi = engine.physicalSide(ctx.card) ?? ctx.cardOwner;
+    // W31a (Al, 22.10.2026: „Creatures sind unabhaengig von Heroes und haben ihren *eigenen* owner"): gezaehlt wird beim KONTROLLEUR der Kreatur (wie `onCreatureEffect`), nicht
+    // bei der Brettseite ihrer Zone (gestohlene/seitenfremde Kreatur, Kreatur in der Zone eines uebernommenen Helden).
+    const pi = engine.kontrolleurVon(ctx.card);
     return schulenZaehlen(engine, pi) > 0;
   },
 

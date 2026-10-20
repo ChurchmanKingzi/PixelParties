@@ -46,7 +46,7 @@ function kandidaten(engine, pi) {
     if (!cd || cd.cardType !== 'Artifact') continue;
     if ((cd.subtype || '') !== 'Equipment') continue;          // „equippable"
     if ((cd.cost || 0) > MAX_KOSTEN) continue;                 // „Cost of 15 or less"
-    if (ausruestTraegerMitSeite(engine, pi, name).length === 0) continue;   // Als Vorgabe 29.9.: inkl. uebernommener Helden
+    if (ausruestTraegerMitSeite(engine, pi, name, { ausserImmun: true }).length === 0) continue;   // Als Vorgabe 29.9.: inkl. uebernommener Helden; W31a „one of your Heroes": ausser durch die Kontrolle immune
     out.push(name);
   }
   return out.sort((a, b) => a.localeCompare(b));
@@ -93,6 +93,7 @@ module.exports = {
       title: `${CARD_NAME} — Equip ${name}`,
       description: `Select a Hero or a Support Zone to equip ${name} to.`,
       confirmLabel: '⚔️ Equip!',
+      ausserImmun: true,   // W31a (Al, 22.10.2026): „one of your Heroes" — ein durch die Kontrolle gegen eigene Karten immuner Held (Charme Lv3, Golden Apple) ist kein Traeger
     });
     if (!platz) return false;
 

@@ -27,19 +27,21 @@ function zuschlag(pi, heroIdx) {
   return { pi, heroIdx, amount: 1, filter: (cd) => istDoppelSpell(cd) };
 }
 
-/** Double Spells, die Held `hi` MIT dem +1 jetzt wirken koennte (synchron). */
-function wirkbar(engine, pi, hi) {
-  const hero = engine.gs.players[pi]?.heroes?.[hi];
-  if (!hero?.name || hero.hp <= 0 || engine.isHeroIncapacitated(pi, hi)) return [];
-  // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist nicht
-  // „one of your Heroes". (Uebernommene der Gegenspalte kann
-  // performImmediateAction nicht fuehren — sie bleiben aussen vor.)
-  if (engine.heroSideOf(pi, hero) !== pi) return [];
+/**
+ * Double Spells, die Held `hi` MIT dem +1 jetzt wirken koennte (synchron).
+ * W31a (Al, 22.10.2026: „one of your Heroes" gilt nach aktueller KONTROLLE, auch temporaer uebernommene Helden): `hs` = Brettseite des Helden (Standard: eigene Spalte);
+ * ein uebernommener Gegnerheld wirkt fuer den Kontrolleur (Hand/Kosten bei `pi`, Stufe/Zonen am Helden — `performImmediateAction` mit `heroOwner`, Attacks/Spells).
+ */
+function wirkbar(engine, pi, hi, hs = pi) {
+  const hero = engine.gs.players[hs]?.heroes?.[hi];
+  if (!hero?.name || hero.hp <= 0 || engine.isHeroIncapacitated(hs, hi)) return [];
+  // Kontrolle statt Seite (Styx 28.9.) — ein abgegebener Held ist nicht „one of your Heroes".
+  if (engine.heroSideOf(hs, hero) !== pi) return [];
   const db = engine._getCardDB();
-  const z = zuschlag(pi, hi);
+  const z = zuschlag(hs, hi);   // der Levelzuschlag haengt an der Brettseite des Helden (`heroMeetsLevelReq(hs, hi, …)`)
   if (!engine._levelZuschlaege) engine._levelZuschlaege = [];
   engine._levelZuschlaege.push(z);
-  try { return engine.getHeroEligibleActionCards(pi, hi).filter(n => istDoppelSpell(db[n])); }
+  try { return engine.getHeroEligibleActionCards(pi, hi, hs !== pi ? hs : null).filter(n => istDoppelSpell(db[n])); }
   finally { engine._levelZuschlaege = engine._levelZuschlaege.filter(e => e !== z); }
 }
 
@@ -84,7 +86,8 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
-    return (engine.gs.players[pi]?.heroes || []).some((_, hi) => wirkbar(engine, pi, hi).length > 0);
+    // W31a: Helden, die `pi` kontrolliert (ohne die durch die Kontrolle gegen eigene Karten immunen).
+    return engine.getControlledHeroTargets(pi, { ausserImmun: true }).some(t => wirkbar(engine, pi, t.heroIdx, t.owner).length > 0);
   },
 
   async onCreatureEffect(ctx) {
@@ -92,13 +95,13 @@ module.exports = {
     const gs = engine.gs;
     const pi = ctx.cardOwner;
     const ps = gs.players[pi];
-    const ziele = (ps.heroes || []).map((h, hi) => ({
-      id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: h?.name,
-      ...(wirkbar(engine, pi, hi).length > 0 ? {} : { ineligible: true }),
-    })).filter(t => t.cardName && ps.heroes[t.heroIdx]?.hp > 0);
+    const ziele = engine.getControlledHeroTargets(pi, { ausserImmun: true }).map(t => ({
+      ...t, ...(wirkbar(engine, pi, t.heroIdx, t.owner).length > 0 ? {} : { ineligible: true }),
+    }));
     const waehlbar = ziele.filter(t => !t.ineligible);
     if (waehlbar.length === 0) return false;
     let hi = waehlbar[0].heroIdx;
+    let hs = waehlbar[0].owner;   // Brettseite des gewaehlten Helden
     if (waehlbar.length > 1) {
       const ids = await engine.promptEffectTarget(pi, ziele, {
         title: CARD_NAME, source: CARD_NAME,
@@ -109,16 +112,19 @@ module.exports = {
       const t = ziele.find(z => z.id === ids?.[0] && !z.ineligible);
       if (!t) return false;
       hi = t.heroIdx;
+      hs = t.owner;
     }
     const db = engine._getCardDB();
-    const res = await engine.mitLevelZuschlag(zuschlag(pi, hi), () => engine.performImmediateAction(pi, hi, {
+    const heldName = gs.players[hs]?.heroes?.[hi]?.name;
+    const res = await engine.mitLevelZuschlag(zuschlag(hs, hi), () => engine.performImmediateAction(pi, hi, {
+      ...(hs !== pi ? { heroOwner: hs } : {}),
       title: CARD_NAME,
-      description: `${ps.heroes[hi].name} uses a Double Spell from your hand — its level is increased by 1!`,
+      description: `${heldName} uses a Double Spell from your hand — its level is increased by 1!`,
       allowedCardTypes: ['Spell'],
       cardNameFilter: (n) => istDoppelSpell(db[n]),
     }));
     if (!res?.played) return false;
-    engine.log('double_class', { player: ps.username, card: CARD_NAME, text: `${ps.heroes[hi]?.name} used ${res.cardName} (+1 level)` });
+    engine.log('double_class', { player: ps.username, card: CARD_NAME, text: `${heldName} used ${res.cardName} (+1 level)` });
     engine.sync();
     return true;
   },

@@ -38,9 +38,9 @@ module.exports = {
     if (!engine) return [];
     // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a target you control" gilt fuer Helden wie fuer Kreaturen nach Kontrolle
     // (`getControlledHeroTargets`: abgegebener eigener Held nein, uebernommener Gegnerheld ja). Ein TEMPORAER uebernommener Gegnerheld (Charme Lv3: „unaffected by
-    // other cards and effects") nimmt das Gift nicht an und ist kein Ziel.
-    const helden = engine.getControlledHeroTargets(playerIdx)
-      .filter(t => t.owner === playerIdx || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], playerIdx, { loveShotOhneSchutz: true }));
+    // other cards and effects") nimmt das Gift nicht an. W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): er bleibt trotzdem
+    // wählbares Ziel; das Gift verpufft (Kosten bezahlt).
+    const helden = engine.getControlledHeroTargets(playerIdx);
     return [...helden, ...engine.getCreatureTargets(playerIdx)];
   },
 
@@ -67,7 +67,8 @@ module.exports = {
     if (target.type === 'hero') {
       const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
-      hero._experimentalPotion = true;
+      // W31a (Al, 22.10.2026): ein temporaer uebernommener (Charme-)Gegnerheld ist gueltiges Ziel, die Wirkung verpufft aber vollstaendig (Charme: „unaffected") — auch die Dauermarke.
+      if (!engine._charmBlocksFrom(hero, pi)) hero._experimentalPotion = true;
       await engine.addHeroStatus(target.owner, target.heroIdx, 'poisoned', { addStacks: 1, appliedBy: pi });
     } else {
       const inst = target.cardInstance || engine.cardInstances.find(c =>

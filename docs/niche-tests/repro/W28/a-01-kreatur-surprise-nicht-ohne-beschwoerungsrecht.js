@@ -1,7 +1,7 @@
 'use strict';
 // W28a · Frage von W25a zu N1-16 · Al, 21.10.2026: „Soll ein Berserk-Held (Text: ‚cannot summon Creatures') auch Kreatur-Surprises nicht aktivieren dürfen?" – „Korrekt, auch keine Creature-Surprises".
 // Regel: Ein Held, der keine Kreaturen beschwören darf, aktiviert auch KEINE Kreatur-Surprise (Pure Advantage Camel, Cactus Creature, Afflicted Vermin, Jumper Spider, Man-Eater Birds, Banner Bearer …;
-//   die Aktivierung ist eine Beschwörung/Platzierung, Ruling 3.10.). Gesperrt: Berserk (`berserked`), `bound` (kein aktionsfähiger Beschwörer, wie `canHeroSummon`) und die spielerweiten Beschwörungssperren des
+//   die Aktivierung ist eine Beschwörung/Platzierung, Ruling 3.10.). Gesperrt: Berserk (`berserked`) und die spielerweiten Beschwörungssperren des
 //   Auslösers (`summonLocked`, Greatmaw-Remora-Teilsperre, Grinning Cat in der Hand). Reine Zauber-Sperren (`magic_silenced`, `nulled`, `frightened`) betreffen Kreatur-Surprises NICHT; Spell-Surprises
 //   (Booby Trap) bleiben für Zauber-gesperrte Helden nicht aktivierbar (W25a, unverändert).
 // Aufbau: `_canHeroActivateSurprise` (zentrales Tor aller Surprise-Fenster) je Karte/Zustand, beide Seiten (Sitz 0 und Sitz 1 halten die Surprise), Held normal / dauerhaft übernommen / gecharmt (dann
@@ -11,8 +11,9 @@ const H = require('../../lib/h.js');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const sauber = (t) => t.errors.length === 0 && t.audit().length === 0;
 const KREATUR_SURPRISES = ['Pure Advantage Camel', 'Cactus Creature', 'Afflicted Vermin', 'Jumper Spider', 'Man-Eater Birds', 'Mischief Militia - Banner Bearer'];
-const GESPERRT = ['berserked', 'bound'];              // Held darf nicht beschwören
-const NUR_ZAUBER = ['magic_silenced', 'nulled', 'frightened'];   // sperren nur Zauber
+// UMGESTELLT in W31a (Al, 22.10.2026: „Creature Surprises kosten und gelten als KEINE Actions!"): `bound` („cannot perform an Action") sperrt Kreatur-Surprises NICHT mehr (war W28a: gesperrt).
+const GESPERRT = ['berserked'];                       // Held darf nicht beschwören
+const NUR_ZAUBER = ['magic_silenced', 'nulled', 'frightened', 'bound'];   // sperren nur Zauber bzw. Actions — Kreatur-Surprises bleiben aktivierbar
 
 const bau = async () => H.fresh({ hand: [[], []], deckSize: 30 });
 const kann = (t, seite, hi, name, opts) => !!t.engine._canHeroActivateSurprise(seite, hi, name, opts || {});
@@ -71,7 +72,7 @@ const kann = (t, seite, hi, name, opts) => !!t.engine._canHeroActivateSurprise(s
   }
 
   R.section('Echter Spielweg: Pure Advantage Camel (Gegner zieht ausserhalb der Resource Phase)');
-  for (const [status, erwartet] of [[null, true], ['berserked', false], ['bound', false], ['magic_silenced', true]]) {
+  for (const [status, erwartet] of [[null, true], ['berserked', false], ['bound', true], ['magic_silenced', true]]) {
     const t = await H.fresh({ hand: [[], []], deckSize: 30, active: 0, phase: 3 });
     t.putSurprise(1, 0, 'Pure Advantage Camel'); t.grantFor(1, 0, 'Pure Advantage Camel');
     if (status) t.heroStatus(1, 0, status);

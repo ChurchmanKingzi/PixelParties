@@ -100,7 +100,10 @@ async function handleHandTrigger(ctx) {
 
   const dyingHero = ctx.hero;
   if (!dyingHero?.name) return;
-  if (!isLastLivingHero(ps, dyingHero)) return;
+  // ★ W31a (Al, 22.10.2026: „one of your Heroes" / „your Heroes" gilt nach aktueller KONTROLLE; Text: „When the LAST Hero YOU CONTROL is defeated …"): massgeblich ist,
+  // wer die Helden GERADE KONTROLLIERT — nicht, in wessen Spalte sie stehen. Ein an den Gegner abgegebener eigener Held zaehlt nicht, ein uebernommener Gegnerheld
+  // schon (dauerhaft; auf dem Gegnerzug gibt es keine temporaere Kontrolle des Spielers mehr).
+  if (!isLastLivingHero(engine, pi, dyingHero)) return;
 
   // Reentrancy guard — protects against a second hand-resident
   // Quetzahuitl firing in the same KO cascade.
@@ -113,14 +116,65 @@ async function handleHandTrigger(ctx) {
   }
 }
 
-function isLastLivingHero(ps, dyingHero) {
-  const heroes = ps.heroes || [];
-  if (!heroes.includes(dyingHero)) return false;
-  for (const h of heroes) {
+function isLastLivingHero(engine, pi, dyingHero) {
+  // W31a: Kontrolle statt Spalte (`heroesControlledBy`: eigene Spalte ohne die abgegebenen Helden, plus uebernommene Gegnerhelden).
+  const mine = engine.heroesControlledBy(pi);
+  if (!mine.some(e => e.hero === dyingHero)) return false;
+  for (const { hero: h } of mine) {
     if (h === dyingHero) continue;
     if (h?.name && h.hp > 0) return false;
   }
   return true;
+}
+
+/**
+ * W31a: Hero Zone in der EIGENEN Spalte, in die Quetzahuitl einzieht. Stand der fallende Held in der eigenen Spalte, ist es sein Platz (wie bisher). War es ein
+ * uebernommener Gegnerheld, nimmt Quetzahuitl den ersten Platz der eigenen Spalte, den `pi` kontrolliert (eigener Held, besiegt oder lebend) oder der leer ist —
+ * ein an den Gegner abgegebener eigener Held wird nie ueberschrieben. -1 = kein Platz.
+ */
+function findeHeroZone(engine, pi, dyingHero) {
+  const ps = engine.gs.players[pi];
+  const imi = (ps.heroes || []).findIndex(h => h === dyingHero);
+  if (imi >= 0) return imi;
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const h = ps.heroes[hi];
+    if (!h?.name || engine.heroSideOf(pi, h) === pi) return hi;
+  }
+  return -1;
+}
+
+/**
+ * W31a: „delete all your Heroes and all cards in their Support and Ability Zones" fuer einen UEBERNOMMENEN Gegnerhelden (Spalte `phys` ≠ `pi`): seine Zonen werden
+ * geleert (jede Karte in den Geloescht-Stapel IHRES Besitzers), die Heldenkarte kommt in den Geloescht-Stapel seines Besitzers (Spalteninhaber, Konvention
+ * `engine.deleteHero`), der Platz bleibt als leere Huelle ohne Kontrollmarken. Die eigene Spalte laeuft unveraendert im Hauptzweig von `performDescent`.
+ */
+async function loescheUebernommenenHelden(engine, phys, hi) {
+  const gs = engine.gs;
+  const hps = gs.players[phys];
+  const hero = hps?.heroes?.[hi];
+  if (!hero?.name) return;
+  const insts = engine.cardInstances.filter(c => engine.physicalSide(c) === phys && c.heroIdx === hi && (c.zone === 'ability' || c.zone === 'support'));
+  for (const inst of insts) {
+    await engine.runHooks('onCardLeaveZone', {
+      _onlyCard: inst, card: inst, fromZone: inst.zone, fromOwner: inst.owner, fromHeroIdx: inst.heroIdx, fromZoneSlot: inst.zoneSlot, _skipReactionCheck: true,
+    });
+  }
+  const loesche = (zoneKey, zi, name) => {
+    const inst = insts.find(c => c.zone === zoneKey && c.zoneSlot === zi && c.name === name);
+    const besitzer = gs.players[inst ? engine.kartenBesitzerVon(inst) : phys] || hps;
+    if (!besitzer.deletedPile) besitzer.deletedPile = [];
+    besitzer.deletedPile.push(name);
+  };
+  const abZones = hps.abilityZones?.[hi];
+  if (Array.isArray(abZones)) for (let zi = 0; zi < abZones.length; zi++) { for (const name of (abZones[zi] || [])) loesche('ability', zi, name); abZones[zi] = []; }
+  const supZones = hps.supportZones?.[hi];
+  if (Array.isArray(supZones)) for (let zi = 0; zi < supZones.length; zi++) { for (const name of (supZones[zi] || [])) loesche('support', zi, name); supZones[zi] = []; }
+  engine.cardInstances = engine.cardInstances.filter(c => !(engine.physicalSide(c) === phys && c.heroIdx === hi && (c.zone === 'ability' || c.zone === 'support' || c.zone === 'hero')));
+  if (!hps.deletedPile) hps.deletedPile = [];
+  hps.deletedPile.push(hero.name);
+  hero.name = null; hero.hp = 0; hero.maxHp = 0; hero.atk = 0; hero.baseAtk = 0; hero.ability1 = null; hero.ability2 = null; hero.statuses = {};
+  for (const k of ['permaControlBy', 'permaControlFrom', 'permaControlHeroIdx', 'charmedBy', 'charmedFromOwner', 'charmedHeroIdx', 'controlledBy', '_kontrolleBisZumTod', '_kontrollRechte']) delete hero[k];
+  if (Array.isArray(gs._charmedSupportLocked)) gs._charmedSupportLocked = gs._charmedSupportLocked.filter(e => !(e.owner === phys && e.heroIdx === hi));
 }
 
 async function performDescent(engine, pi, dyingHero, handInst) {
@@ -128,8 +182,12 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   const ps = gs.players[pi];
   if (!ps) return;
 
-  const targetHeroIdx = (ps.heroes || []).findIndex(h => h === dyingHero);
+  const targetHeroIdx = findeHeroZone(engine, pi, dyingHero);   // W31a: Hero Zone der eigenen Spalte (bei uebernommenem fallenden Held: ein von `pi` kontrollierter/leerer Platz)
   if (targetHeroIdx < 0) return;
+  // Alle Helden, die `pi` GERADE KONTROLLIERT (vor der Loeschung festgehalten) — in der eigenen Spalte und uebernommene der anderen Spalten.
+  const kontrolliert = engine.heroesControlledBy(pi);
+  const kontrolliertDerHeroen = new Set(kontrolliert.filter(e => e.physOwner === pi).map(e => e.heroIdx));
+  const fremdUebernommen = kontrolliert.filter(e => e.physOwner !== pi);
 
   // ── 1. Pull Quetzahuitl out of hand. ──
   const handIdx = ps.hand.indexOf(CARD_NAME);
@@ -175,6 +233,8 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   //       before their inst is untracked. `_onlyCard: inst` keeps
   //       same-named siblings on unrelated heroes from misfiring.
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    // W31a: ein an den Gegner abgegebener eigener Held ist nicht „your Hero" - er und seine Zonen bleiben unberuehrt.
+    if (ps.heroes[hi]?.name && !kontrolliertDerHeroen.has(hi)) continue;
     const abZones = ps.abilityZones?.[hi];
     const supZones = ps.supportZones?.[hi];
 
@@ -237,6 +297,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero) continue;
+    if (hero.name && !kontrolliertDerHeroen.has(hi)) continue;   // W31a: abgegebener eigener Held bleibt
     // W16f (H03-06): „delete all your Heroes" — die Heldenkarte selbst landet im Gelöscht-Stapel (Konvention `engine.deleteHero`), nicht im Nichts.
     if (hero.name) {
       if (!ps.deletedPile) ps.deletedPile = [];
@@ -251,6 +312,9 @@ async function performDescent(engine, pi, dyingHero, handInst) {
     hero.ability2 = null;
     hero.statuses = {};
   }
+
+  // W31a: uebernommene Gegnerhelden gehoeren zu „all your Heroes" und werden mit ihren Zonen geloescht.
+  for (const e of fremdUebernommen) await loescheUebernommenenHelden(engine, e.physOwner, e.heroIdx);
 
   // ── 3. Install Quetzahuitl in the dying Hero's slot. ──
   const cardDB = engine._getCardDB();

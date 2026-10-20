@@ -39,7 +39,7 @@ async function kontrolle(t, z) {
     t.targetFn = (valid) => { if (!angeboten) angeboten = adr(valid); return null; };
     t.policy.cancelTargets = true;
     const r = await t.play(0, 'Experimental Potion', { hero: 1 });
-    const erw = z === 'uebernommen-temporaer' ? EIGENE : soll(z, true);   // temporär übernommen (Charme-Status) nimmt das Gift nicht an
+    const erw = soll(z, true);   // W31a (Al, 22.10.2026): temporär übernommen (Charme) ist gültiges Ziel, auch wenn das Gift verpufft (W28a schloss ihn aus)
     R.check(`Experimental Potion / ${z}: Helden ${erw.join(', ')}`, gleich(angeboten, erw), { angeboten, r });
     R.check(`Experimental Potion / ${z}: sauber`, sauber(t), { e: t.errors, a: t.audit() });
   }

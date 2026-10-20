@@ -69,6 +69,9 @@ function candidateHosts(gs, pi, engine, opts = {}) {
     // W25a (N1-11, Al 21.10.2026: „geht immer nach aktueller Kontrolle"): „Attach … to a Hero you control" — ein an den Gegner (dauerhaft oder
     // zeitweise) abgegebener eigener Held in der eigenen Spalte ist kein Wirt; uebernommene Gegnerhelden kommen ueber `fremdAusruestHelden` hinzu.
     if (!opts.sides && side === pi && typeof engine?.heroSideOf === 'function' && engine.heroSideOf(side, h) !== pi) return;
+    // W31a (Al, 22.10.2026): Form „one of your Heroes" (nicht „a Hero you control"): ein uebernommener Held, der durch die Kontrolle ausdruecklich immun gegen eigene
+    // Karten/Effekte ist (Charme Lv3, Golden Apple, Sixth Circle), ist kein Wirt — `opts.ausserImmun` (Siege).
+    if (opts.ausserImmun && !opts.sides && typeof engine?.heroImmunGegenEigene === 'function' && engine.heroImmunGegenEigene(side, hi, pi)) return;
     if (opts.heroFilter && !opts.heroFilter(h, hi, side, engine)) return;
     for (const si of freeSlots(ps, hi)) out.push({ side, heroIdx: hi, slotIdx: si });
   };

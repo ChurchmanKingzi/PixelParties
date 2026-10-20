@@ -36,8 +36,9 @@ module.exports = {
   // uebernommener Gegnerheld ja; Gift, Animation und Statusziel laufen ueber die BRETTSEITE `target.owner`).
   spellPlayCondition(gs, pi, engine) {
     if (engine) {
-      return engine.heroesControlledBy(pi).some(({ physOwner, heroIdx, hero: h }) => h?.name && h.hp > 0 && !h.statuses?.poisoned
-        && !(physOwner !== pi && engine.heroBlocksStatusNow(physOwner, heroIdx, 'poisoned', { appliedBy: pi })));
+      // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): ein temporär übernommener (Charme-)Gegnerheld IST ein gültiges
+      // Kostenziel — das Gift verpufft dort (Charme-Schutz), die Kosten sind bezahlt (W28a hatte ihn ausgeschlossen).
+      return engine.heroesControlledBy(pi).some(({ hero: h }) => h?.name && h.hp > 0 && !h.statuses?.poisoned);
     }
     const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp > 0 && !h.statuses?.poisoned);
@@ -70,9 +71,7 @@ module.exports = {
         cancellable: true,
         condition: (t) => {
           const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
-          // W28a: ein uebernommener Gegnerheld, der den Giftstapel nicht annimmt (temporaere Kontrolle/Charme schuetzt vor negativen Status), kann die Kosten
-          // nicht tragen (wie Sickly Cheese, W7b F03-12) — fuer den eigenen Helden aendert sich nichts.
-          if (t.owner !== pi && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) return false;
+          // W31a: kein Ausschluss mehr fuer einen temporaer uebernommenen (Charme-)Gegnerheld — gueltiges Ziel, das Gift verpufft dort (Kosten bezahlt).
           return h && !h.statuses?.poisoned;
         },
       });

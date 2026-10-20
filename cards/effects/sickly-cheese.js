@@ -40,7 +40,9 @@ function getValidTargets(gs, pi, engine) {
   // uebernommener Gegnerheld ja; `owner` = Brettseite).
   const targets = engine ? engine.getControlledHeroTargets(pi) : (gs.players[pi].heroes || []).map((hero, hi) => ({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero?.name })).filter(t => t.cardName && gs.players[pi].heroes[t.heroIdx].hp > 0);
   for (const t of targets) {
-    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) t.ineligible = true;
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): echte Giftimmunität (W7b) macht ein Ziel weiter ineligible; der bloße
+    // Charme-Schutz eines temporär übernommenen Gegnerhelden nicht (`ohneCharme`) — Ziel bleibt wählbar, der Giftstapel verpufft, die Karte wird gespielt.
+    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi, ohneCharme: true })) t.ineligible = true;
   }
   return targets;
 }

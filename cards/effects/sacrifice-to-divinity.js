@@ -140,19 +140,20 @@ module.exports = {
       }
 
       // ── Step 3: pick which Hero to attach Divinity to ──
-      const eligibleHeroIdxs = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
+      // ★ W31a (Al, 22.10.2026: „one of your Heroes" gilt nach aktueller KONTROLLE; „auch temporäre Heroes zählen, außer, sie sind durch die Kontrolle explizit immun
+      // gegen eigene Karten/Effekte"): Wirte = die Helden, die `pi` KONTROLLIERT (`getControlledHeroTargets(…, { ausserImmun })`) — ein abgegebener eigener Held nicht,
+      // ein uebernommener Gegnerheld (dauerhaft/temporaer) ja, ausser Charme Lv3 / Golden Apple / Sixth Circle (immun gegen eigene Karten). Anlegen PER EFFEKT
+      // (`byEffect`: es genuegt die Kontrolle, Recht `abilities` entfaellt); die Divinity liegt in den Ability Zones der BRETTSEITE `feld`, `originalOwner = pi`.
+      const wirte = [];   // { phys, heroIdx }
+      for (const t of engine.getControlledHeroTargets(pi, { ausserImmun: true })) {
         // Bypass Divinity's normal restrictedAttachment block — this
         // card is one of the few effects that legitimately attaches
         // it. Standard placement rules (free zone OR existing
         // Divinity stack < 3) still apply.
-        if (engine.canAttachAbilityToHero(pi, DIVINITY, hi, { allowRestricted: true })) {
-          eligibleHeroIdxs.push(hi);
-        }
+        const opts = t.owner !== pi ? { heroOwner: t.owner, byEffect: true, allowRestricted: true } : { allowRestricted: true };
+        if (engine.canAttachAbilityToHero(pi, DIVINITY, t.heroIdx, opts)) wirte.push({ phys: t.owner, heroIdx: t.heroIdx });
       }
-      if (eligibleHeroIdxs.length === 0) {
+      if (wirte.length === 0) {
         engine.log('sacrifice_to_divinity_no_hero', { player: ps.username });
         engine.sync();
         return;
@@ -161,11 +162,12 @@ module.exports = {
       // Skip the prompt if there's exactly one legal hero AND a
       // deterministic placement (single free zone or single legal
       // stack target) — same usability shortcut Alex uses.
-      let targetHeroIdx = -1;
+      let ziel = null;           // { phys, heroIdx }
       let explicitZone  = -1;
-      if (eligibleHeroIdxs.length === 1) {
-        targetHeroIdx = eligibleHeroIdxs[0];
-      } else {
+      if (wirte.length === 1) {
+        ziel = wirte[0];
+      } else if (wirte.every(h => h.phys === pi)) {
+        const eligibleHeroIdxs = wirte.map(h => h.heroIdx);
         const pickRes = await engine.promptGeneric(pi, {
           type: 'abilityAttachTarget',
           cardName: DIVINITY,
@@ -181,16 +183,37 @@ module.exports = {
         if (!pickRes || pickRes.cancelled) {
           // No graceful cancel here — the sacrifice is already paid.
           // Fall back to the first eligible hero.
-          targetHeroIdx = eligibleHeroIdxs[0];
+          ziel = wirte[0];
         } else {
-          targetHeroIdx = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : eligibleHeroIdxs[0];
+          const hi = typeof pickRes.heroIdx === 'number' ? pickRes.heroIdx : eligibleHeroIdxs[0];
+          ziel = wirte.find(h => h.heroIdx === hi) || wirte[0];
           explicitZone  = typeof pickRes.zoneSlot === 'number' ? pickRes.zoneSlot : -1;
         }
+      } else {
+        // Mit uebernommenem Gegnerhelden unter den Wirten: Heldenwahl ueber Brett-Klick (die Anlege-Maske `abilityAttachTarget` kennt nur die eigene Heldenreihe) —
+        // wie Very Special Prisoner. Das Opfer ist bezahlt: Pflichtwahl, Fallback der erste Wirt.
+        const ids = await engine.promptEffectTarget(pi, wirte.map(h => ({
+          id: `hero-${h.phys}-${h.heroIdx}`, type: 'hero', owner: h.phys, heroIdx: h.heroIdx,
+          cardName: gs.players[h.phys]?.heroes?.[h.heroIdx]?.name || '',
+        })), {
+          title: CARD_NAME, source: CARD_NAME,
+          description: 'Attach "Divinity" to one of your Heroes.',
+          confirmLabel: '🔧 Attach', confirmClass: 'btn-info',
+          maxTotal: 1, cancellable: false, greenSelect: true,   // pflichtwahl: das Opfer („to play this card") ist schon bezahlt - kein Abbruch mehr moeglich (wie die Heldenwahl oben)
+          previewCardName: DIVINITY,
+        });
+        ziel = (Array.isArray(ids) && ids.length > 0) ? wirte.find(h => `hero-${h.phys}-${h.heroIdx}` === ids[0]) : null;
+        if (!ziel) ziel = wirte[0];
       }
+      const targetHeroIdx = ziel.heroIdx;
+      const feld = ziel.phys;                       // Brettseite des Helden (= Seite seiner Ability Zones)
+      const fremd = feld !== pi;
+      const seitenOpt = fremd ? { heroOwner: feld, byEffect: true, allowRestricted: true } : { allowRestricted: true };
+      const hps = gs.players[feld];
 
       // Re-verify the chosen hero can still receive Divinity (defensive
       // — state can shift during async prompts).
-      if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, { allowRestricted: true })) {
+      if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, seitenOpt)) {
         engine.log('sacrifice_to_divinity_attach_failed', { player: ps.username, reason: 'no_legal_zone' });
         engine.sync();
         return;
@@ -198,8 +221,8 @@ module.exports = {
 
       // ★ W15a (Al, R3: „Ja" — die Divinity-Anleger prallen an Resistance ab): Anlegen PER EFFEKT (Regel W14a Q5, nicht die Standard-Spielaktion) —
       // vor jeder Kartenbewegung gefragt: Divinity bleibt in Hand/Deck/Ablage, das Opfer (Kosten) bleibt bezahlt, der Zauber ist gewirkt.
-      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
-        engine.log('sacrifice_to_divinity_blocked', { player: ps.username, hero: ps.heroes[targetHeroIdx]?.name });
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, feld, targetHeroIdx, CARD_NAME)) {
+        engine.log('sacrifice_to_divinity_blocked', { player: ps.username, hero: hps.heroes[targetHeroIdx]?.name });
         engine.sync();
         return;
       }
@@ -224,11 +247,11 @@ module.exports = {
       // Pick a target zone: respect the player's drag slot when given,
       // otherwise auto-find a stack with Divinity (slot[0] === DIVINITY,
       // length < 3) or the first empty slot.
-      const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
-      ps.abilityZones[targetHeroIdx] = abZones;
+      const abZones = hps.abilityZones[targetHeroIdx] || [[], [], []];
+      hps.abilityZones[targetHeroIdx] = abZones;
       // v1349: gewuenschter Platz und Rueckfall an EINER Stelle
       // (`engine.abilityZielZone` — verwahrte Abilities, Madame Guillotine).
-      const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
+      const targetZone = engine.abilityZielZone(feld, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
       if (targetZone < 0) {
         // Race: zones filled between check and now. Refund Divinity
         // back to its source so it isn't silently lost.
@@ -245,7 +268,8 @@ module.exports = {
       // Track the new card instance + fire downstream attach hooks
       // (onCardEnterZone for Alex / Megu / etc., though Alex doesn't
       // re-tutor on Divinity since restrictedAttachment blocks it).
-      const inst = engine._trackCard(DIVINITY, pi, 'ability', targetHeroIdx, targetZone);
+      const inst = engine._trackCard(DIVINITY, feld, 'ability', targetHeroIdx, targetZone);
+      if (fremd) inst.originalOwner = pi;   // W31a: die Karte gehoert dem Spieler (wie Very Special Prisoner / `attachAbilityFromHand` bei geliehenem Helden)
       if (pickedSource === 'deck') {
         engine._broadcastEvent('deck_search_add', { cardName: DIVINITY, playerIdx: pi });
         engine.shuffleDeck(pi, 'main');
@@ -269,14 +293,14 @@ module.exports = {
       });
 
       engine._broadcastEvent('ability_activated', {
-        owner: pi, heroIdx: targetHeroIdx, zoneIdx: targetZone,
+        owner: feld, heroIdx: targetHeroIdx, zoneIdx: targetZone,
         abilityName: DIVINITY,
       });
 
       engine.log('sacrifice_to_divinity_attach', {
         player: ps.username,
         from: pickedSource,
-        to: ps.heroes[targetHeroIdx]?.name,
+        to: hps.heroes[targetHeroIdx]?.name,
         zone: targetZone,
         sacrificed: (sacrificed === true)
           ? null

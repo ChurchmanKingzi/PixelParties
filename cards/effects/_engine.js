@@ -3874,13 +3874,12 @@ class GameEngine {
       // NICHT die Kreaturen in seinen Support Zones.
       //
       // Gilt fuer die TEMPORAERE Uebernahme (Charme Lv3, Love Shot,
-      // Golden Apple). Die DAUERHAFTE Uebernahme setzt dieselbe Marke,
-      // ist aber ein Besitzwechsel („zaehlt wie ein eigener", Als
-      // Ruling 4.9.) — dort wandert alles mit, deshalb der Vorbehalt
-      // auf `permaControlBy`.
-      const _dauerhaft = heroObj?.permaControlBy != null;
+      // Golden Apple).
+      // ★ W31a (Al, 22.10.2026: „Creatures sind unabhaengig von Heroes und haben ihren *eigenen* owner … Den Hero zu stehlen, stiehlt NICHT seine Creatures
+      // mit!"): das gilt auch fuer die DAUERHAFTE Uebernahme (`permaControlBy`, frueher Vorbehalt „wandert alles mit"). Eine Kreatur in der Zone eines
+      // uebernommenen Helden behaelt IMMER ihre eigene Kontrolle (`inst.controller ?? inst.owner`, = `kontrolleurVon`); `cardOwner` des Kreaturen-Kontexts ist
+      // dieselbe Wahrheit wie `kontrolleurVon`/`getCreatureTargets`. Wechsel nur ueber Kreaturen-Wechsel (Dark Gear, Steal Creature, Charme der Kreatur).
       const _istKreatur = cardInstance.zone === 'support'
-        && !_dauerhaft
         && engine._istKreaturenInstanz(cardInstance);
       if (heroObj?.charmedBy != null && !_istKreatur) {
         effectiveController = heroObj.charmedBy;
@@ -39454,12 +39453,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // W28a (Al, 21.10.2026, Rueckfrage zu N1-16: „Korrekt, auch keine Creature-Surprises"): ein Held, der KEINE Kreaturen beschwoeren darf, aktiviert auch keine
     // Kreatur-Surprise (die Aktivierung IST eine Beschwoerung/Platzierung, Ruling 3.10.). Gesperrt durch: Berserk (`berserked`, „cannot … summon Creatures"; wie
-    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg), `bound` (kein aktionsfaehiger Beschwoerer, wie `canHeroSummon`) und die spielerweiten
+    // `validateActionPlay` mit dem `canPlayDespiteStatuses`-Ausweg; `bound` NICHT mehr, s. W31a unten) und die spielerweiten
     // Beschwoerungssperren des AUSLOESERS (`getSummonBlockedFor`: `summonLocked` „cannot summon Creatures for the rest of the turn", Greatmaw-Remora-Teilsperre,
     // Grinning Cat). Schulen/Stufe, Frozen/Stunned/Webbed und Hero-`canPlayCard` (Cute Crown/Mary) prueften die Gates oben schon. NUR-Zauber-Sperren
     // (`magic_silenced`, `nulled`, `frightened`) betreffen Kreatur-Surprises weiterhin nicht. Spell-Surprises bleiben wie in W25a.
     if (hasCardType(cardData, 'Creature')) {
-      if (hero.statuses?.berserked || hero.statuses?.bound) {
+      // W31a (Al, 22.10.2026: „Creature Surprises kosten und gelten als KEINE Actions!"): `bound` („cannot perform an Action") und andere reine Action-Sperren
+      // sperren Kreatur-Surprises NICHT — nur das Beschwoerungsverbot (Berserk, `summonLocked` & Co.).
+      if (hero.statuses?.berserked) {
         const _cs = loadCardEffect(cardName);
         let _bypass = false;
         if (typeof _cs?.canPlayDespiteStatuses === 'function') {
@@ -43379,15 +43380,34 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Held (dauerhaft oder gecharmt) faellt heraus, ein uebernommener Gegnerheld kommt dazu. ID/`owner` = BRETTSEITE des Helden (`hero-<Seite>-<Index>`),
    * die eigene Spalte zuerst. `getHeroTargets(p)` bleibt die rein physische Spalte (fuer „Hero your opponent controls"-Sammler und Adressen).
    * `opts.defeated: true` liefert stattdessen die BESIEGTEN kontrollierten Helden („a defeated Hero you control": Golden Ankh, Soul Transmigration Ritual …).
+   * ★ W31a (Al, 22.10.2026: „one of your Heroes" zaehlt nach aktueller KONTROLLE; übernommene Helden — dauerhaft UND temporär — zählen, „außer, sie sind durch die
+   * Kontrolle explizit immun gegen eigene Karten/Effekte"): `opts.ausserImmun: true` laesst Helden weg, die der Kontrolleur NICHT mit eigenen Karten treffen darf
+   * (`heroImmunGegenEigene`: Charme Lv3 „unaffected by other cards and effects", Golden Apple / The Sixth Circle „unaffected by YOUR other cards"). Fuer die Form
+   * „a Hero you control" bleibt es ohne die Option (Wirkung verpufft, Ziel bleibt gueltig — W31a, Angry Cheese).
    */
   getControlledHeroTargets(playerIdx, opts = {}) {
     const targets = [];
-    const liste = this.heroesControlledBy(playerIdx).filter(h => h.hero?.name && (opts.defeated ? h.hero.hp <= 0 : h.hero.hp > 0));
+    const liste = this.heroesControlledBy(playerIdx).filter(h => h.hero?.name && (opts.defeated ? h.hero.hp <= 0 : h.hero.hp > 0)
+      && !(opts.ausserImmun && this.heroImmunGegenEigene(h.physOwner, h.heroIdx, playerIdx)));
     liste.sort((a, b) => (a.physOwner === playerIdx ? 0 : 1) - (b.physOwner === playerIdx ? 0 : 1));
     for (const { physOwner, heroIdx, hero } of liste) {
       targets.push({ id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name });
     }
     return targets;
+  }
+
+  /**
+   * ★ W31a (Al, 22.10.2026): Ist der Held (Spalte `physOwner`, `heroIdx`), den `pi` GERADE UEBERNOMMEN hat, durch die Kontrolle AUSDRUECKLICH immun gegen die eigenen
+   * Karten/Effekte von `pi`? Dann zaehlt er fuer „one of your Heroes" (Anlege-/Ausruest-/Wiederbelebungs-Wirte u. a.) nicht. Ja bei den Marken des `charmed`-Status
+   * mit Schutzklausel: Charme Lv3 („unaffected by other cards and effects" — auch die eigenen anderen Karten), Golden Apple und The Sixth Circle of Hell
+   * („unaffected by YOUR other cards", `onlyFromController`) — dieselbe Frage wie das Schutz-Tor (`_charmBlocksFrom`, Quelle = `pi`). Nein bei dauerhafter
+   * Uebernahme, Styx/FTCD/Molinda/Succubus (`ohneSchutz`) und Love Shot (nur eine Handlung, kein Schutz); ebenso nie fuer einen eigenen, nicht abgegebenen Helden.
+   */
+  heroImmunGegenEigene(physOwner, heroIdx, pi) {
+    const hero = this.gs.players[physOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || physOwner === pi || this.heroSideOf(physOwner, hero) !== pi) return false;
+    if (hero.permaControlBy != null) return false;
+    return !!hero.statuses?.charmed && this._charmBlocksFrom(hero, pi, { loveShotOhneSchutz: true });
   }
 
   /**
@@ -48055,7 +48075,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name) return true;
     const statusDef = STATUS_EFFECTS[statusName];
-    if (statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): `opts.ohneCharme` laesst den Charme-Schutz (ein temporaer
+    // uebernommener Held, dessen Wirkung nur verpufft) ausser Acht — fuer Kostenkarten (Sickly Cheese), bei denen nur ECHTE Immunitaet ein Ziel ineligible macht.
+    if (!opts.ohneCharme && statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
     if (hero.statuses?.shielded && statusName !== 'shielded') return true;
     if (statusDef?.negative) {
       if (this._johannaSchuetzt(hero)) return true;

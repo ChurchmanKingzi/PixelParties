@@ -61,16 +61,18 @@ function eachAliveHeroHasCreature(engine, ownerIdx) {
   if (!ps) return false;
   const cardDB = engine._getCardDB();
   let anyAlive = false;
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // W31a (Al, 22.10.2026: „each of your Heroes" gilt nach aktueller KONTROLLE; auch uebernommene Gegnerhelden zaehlen, ein abgegebener eigener Held nicht):
+  // die Helden, die `ownerIdx` kontrolliert, ihre Zonen stehen auf der BRETTSEITE `phys` (eigene Spalte zuerst).
+  const helden = engine.heroesControlledBy(ownerIdx).sort((a, b) => (a.physOwner === ownerIdx ? 0 : 1) - (b.physOwner === ownerIdx ? 0 : 1));
+  for (const { physOwner: phys, heroIdx: hi, hero } of helden) {
     if (!hero?.name || hero.hp <= 0) continue;
     anyAlive = true;
-    const zones = ps.supportZones?.[hi] || [];
+    const zones = engine.gs.players[phys]?.supportZones?.[hi] || [];
     let hasCreature = false;
     for (let si = 0; si < zones.length; si++) {
       const slot = zones[si];
       if (!slot || slot.length === 0) continue;
-      if (slotHoldsCreature(engine, cardDB, ownerIdx, hi, si, slot)) { hasCreature = true; break; }
+      if (slotHoldsCreature(engine, cardDB, phys, hi, si, slot)) { hasCreature = true; break; }
     }
     if (!hasCreature) return false;
   }
