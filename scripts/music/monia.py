@@ -6,7 +6,9 @@ drauf, sehr cool, rettet nebenbei andere, ein Tomboy. Das Stück ist Power-Pop-/
 frech, mitreißend, mit einem Refrain zum Mitpfeifen.
 
   • A-Dur, 152 BPM, treibender Rock-Beat, Palm-Mute-Gitarren (rough, Tomboy), funkige Clean-Gitarren-Kratzer (cool),
-    Slap-artiger Bass, Blech-Stiche („Hey!“), Pfeifen-Lead im Vers (das Grinsen), Charang-Lead + Blech im Refrain.
+    Slap-artiger Bass; TROMPETEN sind die Hauptstimmen (gedämpfte Trompete im Vers = das Grinsen, offene Trompete
+    + Blechsatz im Refrain und Solo) und ein richtiger CHOR: Gang-„Hey!“ im Vers, Hook-Gesang im Refrain, Aahs in
+    der Brücke, Oohs als Unterstimme.
   • Jetpack: ein steigendes Sägezahn-/Sinus-Heulen mit Pitch-Bend + Reverse-Becken zündet das Stück (Intro), kehrt im
     „Flug“-Teil und im Ausklang wieder.
   • Refrain-Hook (8 Takte, A – E – F#m – D | A – E – D – E): aufsteigende Dreiklangs-Girlande, Sprung auf das hohe
@@ -16,18 +18,20 @@ frech, mitreißend, mit einem Refrain zum Mitpfeifen.
   • Brücke „Rettung“: breite, heldenhafte Streicher-Melodie (Fis-Moll – D – A – E …), sie trägt alle, die Monia
     unterwegs rettet; endet auf Fis7 → Rückung nach H-Dur.
   • Ausklang: aus H-Dur zurück: E (IV von H = V von A) → E7 → Loop auf A.
-Form (80 Takte = 2:06): Intro 4 · Vers 8 · Refrain 8 · Vers 8 · Refrain 8 · Brücke 8 · Flug 16 · Finale 16 · Outro 4
+Form (78 Takte = 2:03): Intro 2 · Vers 8 · Refrain 8 · Vers 8 · Refrain 8 · Brücke 8 · Flug 16 · Finale 16 · Outro 4
 """
 import os, sys, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import *
 
-BPM, BARS = 152, 80
+BPM, BARS = 152, 78
 song = Song(BPM, BARS)
 rng = random.Random(2024)
 
-song.inst('whistle', 'whistle', vol=96, pan=62)
-song.inst('lead', 'charang', vol=92, pan=66)
+song.inst('mute', 'muted', vol=94, pan=60)          # gedämpfte Trompete: frech, grinsend
+song.inst('trumpet', 'trumpet', vol=100, pan=66)    # offene Trompete: die Hauptstimme
+song.inst('choir', 'choir', vol=84, pan=64)         # Chor-Aahs
+song.inst('oohs', 'oohs', vol=76, pan=72)           # Voice Oohs (Unterstimme)
 song.inst('brass', 'brass', vol=88, pan=76)
 song.inst('gtrL', 'rockgtr', vol=90, pan=22)
 song.inst('gtrR', 'rockgtr', vol=88, pan=106)
@@ -126,7 +130,7 @@ def bend(name, beat, norm):
     ch = song.ch[name][0]
     song.ev.append((int(round(beat * TPB)), 0, mido.Message('pitchwheel', channel=ch, pitch=int(max(-8192, min(8191, norm * 8192))))))
 
-bend_setup('jet'); bend_setup('whistle'); bend_setup('lead')
+bend_setup('jet'); bend_setup('mute'); bend_setup('trumpet')
 
 def whoosh(beat, dur, lo=-0.95, hi=0.95, note='A3', vel=84, steps=32):
     """Jetpack: Sinus + Sweep-Pad, Tonhöhe gleitet von lo bis hi (±12 Halbtöne)."""
@@ -201,6 +205,25 @@ def stab(bar0, k, beat, ch, shift=0, vel=88, dur=0.4):
     for m in (T[0] + 12, T[1] + 12, T[2] + 12):
         song.add('brass', song.bar(bar0 + k) + beat, dur, m, hv(vel))
 
+def hey(bar0, k, beat, ch, shift=0, vel=104, dur=0.28):
+    """Gang-„Hey!“: kurzer Chor-Akkord (Aahs + Oohs) auf einem Blech-Stich."""
+    T = tones(ch, 4, shift)
+    for m in (T[0], T[1], T[2]):
+        song.add('choir', song.bar(bar0 + k) + beat, dur, m, hv(vel))
+    song.add('oohs', song.bar(bar0 + k) + beat, dur, T[0] - 12, hv(vel - 12))
+
+def choir_hook(bar0, bars, end, shift=0, vel=70):
+    """Der Chor singt den Hook: Aahs im Unisono, Oohs eine Oktave tiefer."""
+    mel('choir', bar0, bars, shift=shift, vel=vel); mel('choir', bar0 + 7, [end], shift=shift, vel=vel)
+    mel('oohs', bar0, bars, shift=shift, vel=vel - 14, octave=-1); mel('oohs', bar0 + 7, [end], shift=shift, vel=vel - 14, octave=-1)
+
+def choir_pad(bar0, chords, shift=0, vel=58):
+    for k, off, dur, ch in spans(chords):
+        T = tones(ch, 3, shift)
+        for m in (T[1], T[2], T[0] + 12):
+            song.add('choir', song.bar(bar0 + k) + off, dur - 0.05, m, vel)
+        song.add('oohs', song.bar(bar0 + k) + off, dur - 0.05, T[2] + 12, vel - 10)
+
 def drums(bar0, nbars, style, crash=True, fill_every=4, fill_last=True):
     """style: 'verse' (Rock-Beat, 8tel-Hat) · 'chorus' (+Clap, offene Hat) · 'fly' (Vierviertel-Kick, Clap) · 'half'."""
     for k in range(nbars):
@@ -229,102 +252,116 @@ def drums(bar0, nbars, style, crash=True, fill_every=4, fill_last=True):
 
 # ═══ Arrangement ══════════════════════════════════════════════════════════════════════════════════
 b = 0
-# ── Intro (4): Jetpack-Zündung, Countdown-Snares, Blechstoß, Anlauf in den Vers ───────────────────────
-whoosh(song.bar(b), 4.0, lo=-0.9, hi=0.55, note='A3', vel=88)
-song.dr(song.bar(b), CRASH, 70, 3.0)
-for i in range(16):                                         # Reverse-Becken-Effekt: Snare-Crescendo
-    song.dr(song.bar(b) + i * 0.25, SNARE, 40 + i * 3, 0.1)
-for i in range(4):                                          # Countdown 4-3-2-1
-    song.dr(song.bar(b + 1) + i, SIDESTICK, 104, 0.1)
-    song.add('glock', song.bar(b + 1) + i, 0.3, pn('A5'), 78)
-for m in (pn('A2'), pn('A3'), pn('E4'), pn('A4')):         # Powerchord-Stoß + Blech: LOS!
-    song.add('gtrL', song.bar(b + 2), 1.6, m, 104); song.add('gtrR', song.bar(b + 2), 1.6, m, 104)
-stab(b, 2, 0, 'A', vel=100, dur=1.2); song.dr(song.bar(b + 2), CRASH, 108, 1.5); song.dr(song.bar(b + 2), KICK, 110, 0.3)
-song.add('bass', song.bar(b + 2), 1.6, pn('A1'), 108)
-mel('whistle', b + 3, [[(None, 2), ('A4', .25), ('B4', .25), ('C#5', .25), ('D5', .25), ('E5', .25), ('F#5', .25), ('G#5', .25), ('A5', .25)]], vel=96)
-for i in range(4): song.dr(song.bar(b + 3) + 2 + i * 0.5, TOM_L if i < 2 else TOM_H, 96 + i * 6, 0.12)
-b += 4
+# ── Intro (2): Jetpack hebt weich ab, Puls läuft sofort, Trompeten-Fanfare, dann direkt der Vers ──────────
+#   (kein lauter Einzelton, keine Pause: Takt 1 = Zündung + Puls, Takt 2 = Anlauf mit Wirbel → Vers-Downbeat)
+whoosh(song.bar(b), 4.0, lo=-0.8, hi=0.35, note='A3', vel=52)
+for i in range(8): song.dr(song.bar(b) + i * 0.5, HAT, 92 + (10 if i % 2 == 0 else 0), 0.08)
+song.dr(song.bar(b), KICK, 92, 0.2); song.dr(song.bar(b) + 2, KICK, 88, 0.2)
+song.dr(song.bar(b) + 1, SIDESTICK, 96, 0.1); song.dr(song.bar(b) + 3, SIDESTICK, 100, 0.1)
+song.add('bass', song.bar(b), 1.8, pn('A1'), 86); song.add('bass', song.bar(b) + 2, 1.8, pn('A1') + 7, 82)
+mel('mute', b, [[(None, 2), ('A4', .5), ('C#5', .5), ('E5', .5), ('A5', .5)]], vel=92)      # Fanfaren-Auftakt
+scoop('mute', song.bar(b) + 2)
+mel('trumpet', b + 1, [[('B5', 1.5), ('A5', .5), ('E5', 1), (None, 1)]], vel=92)          # Antwort
+for m in (pn('A3'), pn('E4'), pn('A4')):                                                  # Chor „Oh!“ auf der 3
+    song.add('choir', song.bar(b + 1) + 2.5, 0.4, m, 84)
+for i in range(8):                                                                         # Wirbel im Anlauf (rutscht in den Vers)
+    song.dr(song.bar(b + 1) + 2 + i * 0.25, SNARE, 52 + i * 8, 0.1)
+chug(b + 1, ['A'], vel=62)
+song.add('bass', song.bar(b + 1), 1.8, pn('A1'), 90)
+for i in range(4): song.add('bass', song.bar(b + 1) + 2 + i * 0.5, 0.4, pn('A1') + (12 if i == 3 else 0), 92)
+b += 2
 
-# ── Vers 1 (8): Pfeife frech, Gitarren chuggen, Clean-Kratzer, Glockenspiel-Funkeln ─────────────────────
-mel('whistle', b, VERSE, vel=94); mel('whistle', b + 7, [VERSE_END], vel=94)
-for k in (3, 7): scoop('whistle', song.bar(b + k))
+# ── Vers 1 (8): gedämpfte Trompete frech, Gitarren chuggen, Clean-Kratzer, Chor-„Hey!“ ───────────────────
+mel('mute', b, VERSE, vel=94); mel('mute', b + 7, [VERSE_END], vel=94)
+for k in (3, 7): scoop('mute', song.bar(b + k))
 chug(b, VERSE_CH, vel=72)
 scratch(b, VERSE_CH, vel=56)
 bass8(b, VERSE_CH, vel=94)
-stab(b, 7, 2.5, 'E', vel=98)                                # „Hey!“ auf die Pause
-mel('glock', b + 3, [[('E6', .5), ('C#6', .5), ('A5', 2)]], vel=64, legato=.7)   # kleines Echo der Hookfigur
-drums(b, 8, 'verse')
-b += 8
-
-# ── Refrain 1 (8): Hook im Lead + Pfeife, offene Powerchords, Orgel ─────────────────────────────────────
-mel('lead', b, HOOK, vel=94); mel('lead', b + 7, [HOOK_END_OPEN], vel=94)
-mel('whistle', b, HOOK, vel=66); mel('whistle', b + 7, [HOOK_END_OPEN], vel=66)
-strum(b, HOOK_CH, vel=88)
-bass8(b, HOOK_CH, vel=98)
-organ(b, HOOK_CH, vel=50)
-for k in (0, 4): stab(b, k, 0, HOOK_CH[k], vel=86, dur=0.5)
-mel('glock', b, HOOK, vel=52, octave=1, legato=.6)
-drums(b, 8, 'chorus')
-b += 8
-
-# ── Vers 2 (8): wie Vers 1, dazu Blech-Antworten und zweite Stimme ─────────────────────────────────────
-mel('whistle', b, VERSE, vel=96); mel('whistle', b + 7, [VERSE_END], vel=96)
-mel('lead', b, VERSE, vel=52, octave=-1); mel('lead', b + 7, [VERSE_END], vel=52, octave=-1)
-for k in (3, 7): scoop('whistle', song.bar(b + k))
-chug(b, VERSE_CH, vel=76)
-scratch(b, VERSE_CH, vel=60)
-bass8(b, VERSE_CH, vel=96)
-for k in (1, 3, 5): stab(b, k, 3.5, VERSE_CH[k] if not isinstance(VERSE_CH[k], tuple) else VERSE_CH[k][0], vel=86)
-stab(b, 7, 2.5, 'E', vel=100)
+stab(b, 7, 2.5, 'E', vel=98); hey(b, 7, 2.5, 'E')
+for k in (1, 3, 5):
+    stab(b, k, 3.5, VERSE_CH[k], vel=80); hey(b, k, 3.5, VERSE_CH[k], vel=92)
 mel('glock', b + 3, [[('E6', .5), ('C#6', .5), ('A5', 2)]], vel=64, legato=.7)
 drums(b, 8, 'verse')
 b += 8
 
-# ── Refrain 2 (8): größer — Blechsatz doppelt den Lead, Violine singt mit ────────────────────────────────
-mel('lead', b, HOOK, vel=98); mel('lead', b + 7, [HOOK_END_CLOSED], vel=98)
+# ── Refrain 1 (8): offene Trompete + Chor singen den Hook ───────────────────────────────────────────────
+mel('trumpet', b, HOOK, vel=98); mel('trumpet', b + 7, [HOOK_END_OPEN], vel=98)
+choir_hook(b, HOOK, HOOK_END_OPEN, vel=70)
+strum(b, HOOK_CH, vel=86)
+bass8(b, HOOK_CH, vel=98)
+organ(b, HOOK_CH, vel=46)
+for k in (0, 4): stab(b, k, 0, HOOK_CH[k], vel=84, dur=0.5)
+mel('glock', b, HOOK, vel=52, octave=1, legato=.6)
+drums(b, 8, 'chorus')
+b += 8
+
+# ── Vers 2 (8): zweite Trompete im Kanon-Echo, mehr „Hey!“ ───────────────────────────────────────────────
+mel('mute', b, VERSE, vel=96); mel('mute', b + 7, [VERSE_END], vel=96)
+mel('trumpet', b, VERSE, vel=50, octave=-1); mel('trumpet', b + 7, [VERSE_END], vel=50, octave=-1)
+for k in (3, 7): scoop('mute', song.bar(b + k))
+chug(b, VERSE_CH, vel=76)
+scratch(b, VERSE_CH, vel=60)
+bass8(b, VERSE_CH, vel=96)
+for k in (1, 3, 5):
+    c0 = VERSE_CH[k] if not isinstance(VERSE_CH[k], tuple) else VERSE_CH[k][0]
+    stab(b, k, 3.5, c0, vel=86); hey(b, k, 3.5, c0, vel=96)
+    hey(b, k, 1.5, c0, vel=84)                                     # Frage-Antwort: zwei „Hey!“ je Takt
+stab(b, 7, 2.5, 'E', vel=100); hey(b, 7, 2.5, 'E', vel=108)
+mel('glock', b + 3, [[('E6', .5), ('C#6', .5), ('A5', 2)]], vel=64, legato=.7)
+drums(b, 8, 'verse')
+b += 8
+
+# ── Refrain 2 (8): Trompeten im Satz (Blech eine Oktave tiefer), Chor volle Kraft ─────────────────────────
+mel('trumpet', b, HOOK, vel=102); mel('trumpet', b + 7, [HOOK_END_CLOSED], vel=102)
 mel('brass', b, HOOK, vel=64, octave=-1); mel('brass', b + 7, [HOOK_END_CLOSED], vel=64, octave=-1)
-mel('whistle', b, HOOK, vel=72); mel('whistle', b + 7, [HOOK_END_CLOSED], vel=72)
-strum(b, HOOK_CH_CLOSED, vel=92)
+mel('mute', b, HOOK, vel=60); mel('mute', b + 7, [HOOK_END_CLOSED], vel=60)
+choir_hook(b, HOOK, HOOK_END_CLOSED, vel=78)
+strum(b, HOOK_CH_CLOSED, vel=90)
 bass8(b, HOOK_CH_CLOSED, vel=100)
-organ(b, HOOK_CH_CLOSED, vel=54)
-strings(b, HOOK_CH_CLOSED, vel=50)
+organ(b, HOOK_CH_CLOSED, vel=50)
+strings(b, HOOK_CH_CLOSED, vel=48)
 mel('glock', b, HOOK, vel=56, octave=1, legato=.6)
 drums(b, 8, 'chorus')
 b += 8
 
-# ── Brücke „Rettung“ (8): Streicher + Violine tragen, Gitarren halten sich zurück ────────────────────
-mel('violin', b, BRIDGE, vel=92)
-mel('lead', b, BRIDGE, vel=54)
-strings(b, BRIDGE_CH, vel=64)
-organ(b, BRIDGE_CH, vel=52)
+# ── Brücke „Rettung“ (8): Trompetensolo über Streichern und Chor-Aahs ────────────────────────────────────
+mel('trumpet', b, BRIDGE, vel=92, octave=0)
+mel('violin', b, BRIDGE, vel=60)
+choir_pad(b, BRIDGE_CH, vel=62)
+strings(b, BRIDGE_CH, vel=60)
+organ(b, BRIDGE_CH, vel=46)
 bass8(b, BRIDGE_CH, vel=88, push=False)
-for k in range(8):                                          # Gitarren: breite Halbe, kein Chug
+for k in range(8):
     T = tones(BRIDGE_CH[k], 2)
     for name in ('gtrL', 'gtrR'):
         for m in (T[0] + 12, T[0] + 19):
-            song.add(name, song.bar(b + k), 1.9, m, 66); song.add(name, song.bar(b + k) + 2, 1.9, m, 62)
+            song.add(name, song.bar(b + k), 1.9, m, 62); song.add(name, song.bar(b + k) + 2, 1.9, m, 58)
 drums(b, 8, 'half', fill_last=False)
-for i in range(16):                                         # Snare-Wirbel in den Flug
+for i in range(16):
     song.dr(song.bar(b + 7) + 2 + i * 0.125, SNARE, 60 + i * 4, 0.08)
-whoosh(song.bar(b + 7) + 2, 2.0, lo=-0.9, hi=0.9, note='F#3', vel=80)
+whoosh(song.bar(b + 7) + 2, 2.0, lo=-0.9, hi=0.9, note='F#3', vel=64)
 b += 8
 
-# ── Flug (16): oben! Arpeggien, Jetpack-Rufe, dann Gitarrensolo ──────────────────────────────────────────
+# ── Flug (16): Arpeggien, Jetpack-Rufe; dann Trompeten-Solo (Hook-Fragmente, Scoops) mit Chor-Riffs ─────────────
 FLY_CH = ['A', 'E', 'F#m', 'D', 'A', 'E', 'D', 'E']
 arp = (0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2)
 for rep in range(2):
     base = b + 8 * rep
-    for k, ch in enumerate(FLY_CH):                         # schnelle Glocken-/Lead-Arpeggien
+    for k, ch in enumerate(FLY_CH):
         T = tones(ch, 5 if rep == 0 else 4)
         for i in range(16):
-            inst = 'glock' if rep == 0 else 'lead'
-            song.add(inst, song.bar(base + k) + i * 0.25, 0.2, T[arp[i]] + (12 if i % 8 >= 4 else 0), hv(60 if rep == 0 else 56))
-    organ(base, FLY_CH, vel=50)
+            inst = 'glock' if rep == 0 else 'mute'
+            song.add(inst, song.bar(base + k) + i * 0.25, 0.2, T[arp[i]] + (12 if i % 8 >= 4 else 0), hv(60 if rep == 0 else 54))
+    organ(base, FLY_CH, vel=48)
     bass8(base, FLY_CH, vel=96)
     drums(base, 8, 'fly', crash=True)
-whoosh(song.bar(b) + 0, 3.5, lo=-0.5, hi=0.9, note='E3', vel=76)
-whoosh(song.bar(b + 4), 3.5, lo=-0.9, hi=0.9, note='A3', vel=76)
-# Zweiter Teil: Gitarrensolo (Lead) über dem Refrain-Gerüst — Hook-Fragmente, Bends
+whoosh(song.bar(b) + 0, 3.5, lo=-0.5, hi=0.9, note='E3', vel=60)
+whoosh(song.bar(b + 4), 3.5, lo=-0.9, hi=0.9, note='A3', vel=60)
+for k in (0, 4):                                              # Chor: „Oh-oh!“ über dem Flug
+    for j, off in enumerate((0, 1.5, 3)):
+        T = tones(FLY_CH[k], 4)
+        for m in (T[0], T[1], T[2]):
+            song.add('choir', song.bar(b + k) + off, 0.4, m, 76)
 SOLO = [
     [('A5', .5), ('C#6', .5), ('E6', 1), ('C#6', .5), ('A5', .5), ('E5', 1)],
     [('G#5', 1), ('B5', 1), ('E6', 2)],
@@ -335,48 +372,51 @@ SOLO = [
     [('A5', 1), ('D6', 1), ('F#6', 1), ('D6', 1)],
     [('E6', 3), (None, 1)],
 ]
-mel('lead', b + 8, SOLO, vel=100)
-mel('whistle', b + 8, SOLO, vel=56)
-for k in (1, 3, 5): scoop('lead', song.bar(b + 8 + k), depth=-0.25)
-strum(b + 8, FLY_CH, vel=88)
+mel('trumpet', b + 8, SOLO, vel=100, octave=-1)                    # Trompeten-Tessitur: eine Oktave tiefer notiert
+mel('mute', b + 8, SOLO, vel=48, octave=-1)
+for k in (1, 3, 5): scoop('trumpet', song.bar(b + 8 + k), depth=-0.2)
+strum(b + 8, FLY_CH, vel=84)
+for k in (3, 7):
+    hey(b, 8 + k, 3.5, FLY_CH[k], vel=100)
 b += 16
 
-# ── Finale (16): H-Dur (+2) — der Refrain, jetzt mit allem, Hook zweimal ────────────────────────────────
+# ── Finale (16): H-Dur (+2) — Trompeten, Chor, alles; Hook zweimal ────────────────────────────────────────
 S = 2
 for rep in range(2):
     base = b + 8 * rep
     end = HOOK_END_CLOSED if rep == 1 else HOOK_END_OPEN
     chs = HOOK_CH_CLOSED if rep == 1 else HOOK_CH
-    mel('lead', base, HOOK, shift=S, vel=100); mel('lead', base + 7, [end], shift=S, vel=100)
-    mel('whistle', base, HOOK, shift=S, vel=78); mel('whistle', base + 7, [end], shift=S, vel=78)
-    mel('brass', base, HOOK, shift=S, vel=72, octave=-1); mel('brass', base + 7, [end], shift=S, vel=72, octave=-1)
-    mel('violin', base, HOOK, shift=S, vel=66); mel('violin', base + 7, [end], shift=S, vel=66)
+    mel('trumpet', base, HOOK, shift=S, vel=104); mel('trumpet', base + 7, [end], shift=S, vel=104)
+    mel('mute', base, HOOK, shift=S, vel=66); mel('mute', base + 7, [end], shift=S, vel=66)
+    mel('brass', base, HOOK, shift=S, vel=74, octave=-1); mel('brass', base + 7, [end], shift=S, vel=74, octave=-1)
+    mel('violin', base, HOOK, shift=S, vel=60); mel('violin', base + 7, [end], shift=S, vel=60)
+    choir_hook(base, HOOK, end, shift=S, vel=84)
     mel('glock', base, HOOK, shift=S, vel=60, octave=1, legato=.6)
     strum(base, chs, shift=S, vel=96)
     bass8(base, chs, shift=S, vel=102)
-    organ(base, chs, shift=S, vel=56)
+    organ(base, chs, shift=S, vel=52)
     strings(base, chs, shift=S, vel=54)
     drums(base, 8, 'chorus', crash=True)
 for k in (0, 4, 8, 12): stab(b, k, 0, HOOK_CH[k % 8], shift=S, vel=96, dur=0.6)
 b += 16
 
-# ── Outro (4): E-Dur-Pivot (IV von H = V von A) → E7 → Loop auf A; Jetpack zieht davon ──────────────────
-# Takt 1–2: Refrain-Schluss in H-Dur klingt als E aus; Takt 3–4: E7 mit Wirbel
-mel('lead', b, [[('G#5', 1.5), ('B5', .5), ('E6', 2)], [('B5', 1.5), ('G#5', .5), ('E5', 2)], [('D5', 1), ('G#5', 1), ('B5', 2)], [('G#5', 4)]], vel=92)
-mel('whistle', b + 2, [[('E6', .5), ('D6', .5), ('B5', 1), ('G#5', 2)], [('E5', 1.5), ('G#5', .5), ('B5', 2)]], vel=84)
+# ── Outro (4): E → E7 → Loop auf A; Chor hält, Trompeten rufen, Jetpack zieht davon ──────────────────────
+mel('trumpet', b, [[('G#5', 1.5), ('B5', .5), ('E6', 2)], [('B5', 1.5), ('G#5', .5), ('E5', 2)], [('D5', 1), ('G#5', 1), ('B5', 2)], [('G#5', 4)]], vel=94, octave=0)
+mel('mute', b + 2, [[('E6', .5), ('D6', .5), ('B5', 1), ('G#5', 2)], [('E5', 1.5), ('G#5', .5), ('B5', 2)]], vel=80)
+choir_pad(b, ['E', 'E', 'E7', 'E7'], vel=70)
 for k, ch in enumerate(['E', 'E', 'E7', 'E7']):
     T = tones(ch, 2)
     for name in ('gtrL', 'gtrR'):
         for m in (T[0] + 12, T[0] + 19, T[0] + 24):
-            song.add(name, song.bar(b + k), 3.8, m, 90)
-    song.add('bass', song.bar(b + k), 3.8, T[0] + 12 - 12 if T[0] + 12 > 50 else T[0] + 12, 100)
-organ(b, ['E', 'E', 'E7', 'E7'], vel=56)
-strings(b, ['E', 'E', 'E7', 'E7'], vel=58)
+            song.add(name, song.bar(b + k), 3.8, m, 88)
+    song.add('bass', song.bar(b + k), 3.8, T[0] + 12 if T[0] + 12 <= 50 else T[0], 100)
+organ(b, ['E', 'E', 'E7', 'E7'], vel=52)
+strings(b, ['E', 'E', 'E7', 'E7'], vel=56)
 drums(b, 2, 'half', crash=True, fill_last=False)
 for k in (2, 3):
     t = song.bar(b + k)
     for i in range(16): song.dr(t + i * 0.25, SNARE if k == 3 else TOM_M, 50 + 3 * i + (30 if k == 3 else 0), 0.1)
-whoosh(song.bar(b + 2), 8.0, lo=-0.9, hi=0.95, note='E3', vel=78)
+whoosh(song.bar(b + 2), 8.0, lo=-0.9, hi=0.95, note='E3', vel=60)
 b += 4
 assert b == BARS, (b, BARS)
 
