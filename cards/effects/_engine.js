@@ -9370,10 +9370,13 @@ class GameEngine {
       // nur echter Schaden > 0 und nur mit Verursacher — Status-Ticks
       // (Burn/Poison, ohne Besitzer) zaehlen nicht (Als Ruling 1.9.).
       if (this.gs.players[srcOwner]) this.gs.players[srcOwner].dealtDamageAnyTarget = true;
-      for (let pi = 0; pi < this.playerCount(); pi++) {
-        if (pi !== srcOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
+      // W24d (N4-18): „Gegner-Ziel" = Ziel unter fremder KONTROLLE (wie beim Kreaturenpfad):
+      // ein vom Schadenden uebernommener Held (Brettseite Gegner) zaehlt nicht, ein an den Gegner
+      // abgegebener eigener Held (Brettseite eigen) zaehlt.
+      {
+        const _tSeite = this._findHeroOwner(target);
+        if (_tSeite >= 0 && this.gs.players[srcOwner] && this.heroSideOf(_tSeite, target) !== srcOwner) {
           this.gs.players[srcOwner].dealtDamageToOpponent = true;
-          break;
         }
       }
     }
@@ -9506,10 +9509,11 @@ class GameEngine {
       // Track dealt-damage for SC / opponent tracking (mirrors actionDealDamage).
       if (dealt > 0 && sourceOwner >= 0) {
         if (this.gs.players[sourceOwner]) this.gs.players[sourceOwner].dealtDamageAnyTarget = true;   // v1271
-        for (let pi = 0; pi < this.playerCount(); pi++) {
-          if (pi !== sourceOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
+        // W24d (N4-18): Kontrolle statt Brettseite (siehe `actionDealDamage`).
+        {
+          const _tSeite = this._findHeroOwner(target);
+          if (_tSeite >= 0 && this.gs.players[sourceOwner] && this.heroSideOf(_tSeite, target) !== sourceOwner) {
             this.gs.players[sourceOwner].dealtDamageToOpponent = true;
-            break;
           }
         }
       }

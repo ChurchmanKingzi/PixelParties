@@ -16,7 +16,12 @@ async function lauf(modus) {
   t.putSurprise(0, 0, 'Spider Silk Bridge');
   t.put(0, 1, 0, H.INERT.big).turnPlayed = 1;
   t.put(1, 0, 0, H.INERT.big);
-  if (modus === 'uebernommen') { await t.run(() => t.engine.actionStealHero(0, 1, 1)); await sleep(300); }
+  if (modus === 'uebernommen') {
+    await t.run(() => t.engine.actionStealHero(0, 1, 1)); await sleep(300);
+    // W24d: echter Charme (Lv3) macht den Helden schadensimmun (damage_blocked 'charmed') – dann fiele gar kein Schaden an.
+    // Styx/FTCD-Kontrolle ist „ohneSchutz" (reine Kontrolle): so wird der Fall wirklich gemessen.
+    t.hero(1, 1).statuses.charmed.ohneSchutz = true;
+  }
   if (modus === 'eigener') await t.run(() => t.engine.actionDealDamage({ name: 'X', owner: 1, heroIdx: 0 }, t.hero(0, 2), 50, 'spell'));
   if (modus === 'uebernommen') await t.run(() => t.engine.actionDealDamage({ name: 'X', owner: 1, heroIdx: 0 }, t.hero(1, 1), 50, 'spell'));
   t.reset();
