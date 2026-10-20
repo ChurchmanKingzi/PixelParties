@@ -69,13 +69,14 @@ function eligibleCharmeHeroes(engine, pi) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // W33a (Al, 22.10.2026: „Hero you control" = aktuelle Kontrolle): alle Helden, die `pi` kontrolliert — ein abgegebener eigener Held fällt heraus, ein übernommener
+  // Gegnerheld zählt (Schulen aus SEINEN Ability Zones). Eintrag: Index in der eigenen Spalte (Zahl, wie bisher) bzw. { owner, heroIdx } für einen übernommenen Helden.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp <= 0) continue;
     if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.bound) continue;
     if (h._actionLockedTurn === gs.turn) continue;
-    if (schoolLevelMitSupport(engine, 'Charme', pi, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
-    out.push(hi);
+    if (schoolLevelMitSupport(engine, 'Charme', physOwner, hi) < REQUIRED_CHARME) continue;   // W4a: harte Negierung -> Stufe 0
+    out.push({ owner: physOwner, heroIdx: hi });
   }
   return out;
 }
@@ -176,13 +177,13 @@ module.exports = {
 
     // Pick which Charme-2+ Hero gets the extra Action. Auto-select
     // when only one is eligible.
-    let targetHi;
+    let target;
     if (heroes.length === 1) {
-      targetHi = heroes[0];
+      target = heroes[0];
     } else {
-      const zones = heroes.map(hi => ({
-        heroIdx: hi, slotIdx: -1,
-        label: `${ps.heroes[hi].name} (Charme ${schoolLevelMitSupport(engine, 'Charme', pi, hi)})`,
+      const zones = heroes.map(e => ({
+        heroIdx: e.heroIdx, slotIdx: -1, ...(e.owner !== pi ? { owner: e.owner } : {}),
+        label: `${engine.gs.players[e.owner].heroes[e.heroIdx].name} (Charme ${schoolLevelMitSupport(engine, 'Charme', e.owner, e.heroIdx)})`,
       }));
       const picked = await engine.promptGeneric(pi, {
         type: 'zonePick',
@@ -192,11 +193,13 @@ module.exports = {
         cancellable: true,
       });
       if (!picked || picked.cancelled) return false;
-      targetHi = typeof picked.heroIdx === 'number' ? picked.heroIdx : heroes[0];
-      if (!heroes.includes(targetHi)) targetHi = heroes[0];
+      target = typeof picked.heroIdx === 'number'
+        ? heroes.find(e => e.heroIdx === picked.heroIdx && e.owner === (picked.owner ?? pi))
+        : null;
+      if (!target) target = heroes[0];
     }
-
-    const targetHero = ps.heroes?.[targetHi];
+    const targetHi = target.heroIdx;
+    const targetHero = engine.gs.players[target.owner]?.heroes?.[targetHi];
     if (!targetHero?.name || targetHero.hp <= 0) return false;
 
     // Grant the bonus Action via the canonical helper. Returns
@@ -206,6 +209,7 @@ module.exports = {
     const result = await engine.performImmediateAction(pi, targetHi, {
       title: CARD_NAME,
       description: `${targetHero.name} may perform an additional Action — but cannot perform any other Actions this turn.`,
+      ...(target.owner !== pi ? { heroOwner: target.owner } : {}),   // W33a: übernommener Gegnerheld (Brettseite)
     });
     if (!result?.played) return false;
 

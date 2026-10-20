@@ -86,10 +86,10 @@ module.exports = {
       : null) || (sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null);
     if (!cd || !hasCardType(cd, 'Spell')) return false;
 
-    // „would affect 1 or more targets YOU control" — hier zaehlt die
-    // Seite.
+    // „would affect 1 or more targets YOU control" — W33a: zaehlt die
+    // KONTROLLE (`zielSeite`), nicht die Brettseite.
     if (!Array.isArray(targets)) return false;
-    return targets.some(t => t && t.owner === pi);
+    return targets.some(t => t && engine.zielSeite(t) === pi);   // W33a: „targets you control" = Kontrolle (Adresse `t.owner` bleibt die Brettseite)
   },
 
   /**
