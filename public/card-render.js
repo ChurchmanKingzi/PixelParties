@@ -31,7 +31,7 @@
   const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -77,6 +77,53 @@
     if (OPT.symMode === 'all') return t;
     return t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
   };
+  // ── Statuseffekte im Regeltext (Als Vorgabe 20.10.) ──
+  // Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint: fett und farbig — aber NUR im Effekttext
+  // (`drawBlock`), nie in Namen. Auch Kartennamen im Text bleiben unberuehrt: sie stehen in Anfuehrungszeichen („Poison Vial“,
+  // „Rafflesia, the Poison Princess“, „Terror“), und alles zwischen Anfuehrungszeichen wird nicht gefaerbt.
+  // `hell` steht auf den dunklen Textboxen (fast alle Karten), `dunkel` auf den hellen (Artifacts, Tokens). Die Tooltips des Spiels
+  // lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`), damit Karte und Tooltip nie auseinanderlaufen.
+  const STATUS_TERMS = [
+    { key: 'poison', label: 'Poison', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burn',   re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stun',   re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
+    { key: 'bleed',  label: 'Bleed',  re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Freeze', re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blind',  re: 'blind(?:s|ed)?',             hell: '#7be8ab', dunkel: '#1f8f55' },
+  ];
+  const STATUS_IDX = Object.create(null);
+  STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
+  const STATUS_RE = new RegExp('\\b(?:' + STATUS_TERMS.map(t => '(' + t.re + ')').join('|') + ')\\b', 'gi');
+  // „Fett“ in Pixel Intv: die Schrift hat 2 Pixel dicke Staemme, 1 Pixel duenne Balken und ueberall 1 Pixel breite Luecken (Counter)
+  // — jedes Verbreitern um ein ganzes Schrift-Pixel (200 Einheiten) schliesst sie, aus „Frozen“ wird „Froze■“. Deshalb: das Zeichen
+  // doppelt, nur `OPT.boldU` (50 = ein Viertel Schrift-Pixel, gut ein Bildpixel) versetzt und um dasselbe weiter vorgeschoben, dazu eine
+  // dunkle Kontur von `OPT.statusOutline` Schrift-Pixeln (8 Richtungen) — die Woerter stehen kraeftig und scharf vor jedem Untergrund.
+  /** Statusbegriffe in `text` ausserhalb von Anfuehrungszeichen: [{ start, end, key }] */
+  function statusMatches(text) {
+    const t = String(text == null ? '' : text), out = [], quoted = [];
+    t.replace(/"[^"]*"/g, (m, i) => { quoted.push([i, i + m.length]); return m; });
+    STATUS_RE.lastIndex = 0;
+    let m;
+    while ((m = STATUS_RE.exec(t))) {
+      const a = m.index, b = a + m[0].length;
+      if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
+      let k = 1;
+      while (k < m.length && m[k] === undefined) k++;
+      out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
+    }
+    return out;
+  }
+  /** Stil je Zeichen eines Absatzes (Index in STATUS_TERMS + 1, sonst 0); null ohne Treffer. */
+  function statusStyles(p) {
+    if (OPT.status === false) return null;
+    const ms = statusMatches(p);
+    if (!ms.length) return null;
+    const st = new Array(p.length).fill(0);
+    for (const m of ms) for (let i = m.start; i < m.end; i++) st[i] = STATUS_IDX[m.key] + 1;
+    return st;
+  }
+
   let symSize = 8.5;                              // Symbolgroesse des Textfelds, das gerade gesetzt wird
   function symAdv(ch) {                           // Breite in Font-Einheiten (haengt nicht von der Schriftgroesse ab)
     const r = sprites && sprites.rects['sym.' + SYM_KEY[ch]];
@@ -102,7 +149,7 @@
     const g = GL[ch];
     return g ? g.a : 1400;
   }
-  function unitsOf(s) { let n = 0; for (const c of s) n += adv(c); return n; }
+  function unitsOf(s, st) { let n = 0, i = 0; for (const c of s) { n += adv(c) + (st && st[i] ? OPT.boldU : 0); i += c.length; } return n; }
   function glyphPath(ch) {
     const g = GL[ch];
     if (!g) return null;
@@ -237,8 +284,20 @@
     let t = String(text == null ? '' : text);
     if (soft || OPT.nl === 'soft') t = t.replace(/ *\n */g, ' ');
     else t = t.replace(/ +\n/g, ' ');
-    return t.split('\n').map(p => p.trim()).filter(Boolean)
-      .map(p => p.split(/ +/).filter(Boolean).map(s => ({ s, u: unitsOf(s) })));
+    return t.split('\n').map(p => p.trim()).filter(Boolean).map(wordsOf);
+  }
+  // Absatz -> Woerter { s, u, st }; `st` (Stil je Zeichen, Statusbegriffe) nur an Woertern mit Treffer
+  function wordsOf(p) {
+    const st = statusStyles(p), out = [], re = / +/g;
+    let a = 0, m;
+    const push = b => {
+      if (b <= a) return;
+      const s = p.slice(a, b), w = st ? st.slice(a, b) : null, has = !!(w && w.some(Boolean));
+      out.push({ s, st: has ? w : null, u: unitsOf(s, has ? w : null) });
+    };
+    while ((m = re.exec(p))) { push(m.index); a = m.index + m[0].length; }
+    push(p.length);
+    return out;
   }
 
   // Passende Schriftgroesse: wie MSE per Halbierung zwischen `min` und `size` (bsteps Schritte), das groesste
@@ -294,9 +353,28 @@
       let x = x0;
       if (o.align === 'center') x = x0 + (innerW - lineU * em / UPM) / 2;
       for (let wi = 0; wi < l.words.length; wi++) {
-        for (const ch of l.words[wi].s) {
-          if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt); else putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
-          x += adv(ch) * k;
+        const word = l.words[wi];
+        let ci = 0;
+        for (const ch of word.s) {
+          const sty = word.st ? word.st[ci] : 0;
+          ci += ch.length;
+          if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt);
+          else if (sty) {
+            // Statusbegriff: dunkle Kontur, dann Farbe der Tabelle (in der Textmaske bleibt es weiss), fett = zweimal, leicht versetzt
+            if (OPT.statusOutline && !TEXT_MASK) {
+              const d = OPT.statusOutline * 200 * k, dark = OVER_OUTLINE;
+              ctx.fillStyle = dark;
+              for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) {
+                putGlyph(ctx, ch, x + OPT.dx + ox, y + oy, k, 1);
+                if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k + ox, y + oy, k, 1);
+              }
+            }
+            if (!TEXT_MASK) ctx.fillStyle = o.light ? STATUS_TERMS[sty - 1].dunkel : STATUS_TERMS[sty - 1].hell;
+            putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
+            if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k, y, k, 1);
+            if (!TEXT_MASK) ctx.fillStyle = o.color;
+          } else putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
+          x += (adv(ch) + (sty ? OPT.boldU : 0)) * k;
         }
         x += gapU * k;
       }
@@ -612,6 +690,7 @@
       drawBlock(ctx, spec.text, {
         left: 95, top: rule.top, width: 560, height: rule.height, padL: 1, padT: 2, padR: 0, padB: 0,
         size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: 1, color: ruleColor(spec), main: true, soft: spec.soft,
+        light: isArti2(t) || isToken(t),                 // helle Textbox (dunkle Schrift): dunkle Statusfarben
       });
     }
 
@@ -1224,5 +1303,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches };
 })(typeof window !== 'undefined' ? window : globalThis);
