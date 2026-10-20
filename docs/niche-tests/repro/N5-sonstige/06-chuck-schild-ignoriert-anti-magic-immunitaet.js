@@ -8,6 +8,7 @@
 // ENTSCHIEDEN (Al, Welle 25, „ja!"): ein Held, der durch Anti Magic gegen Zauber immun ist, gilt für Chucks Schild als „immun gegen diese Quelle"; Chuck nimmt dann den
 //   Zauberschaden. Gegenproben (direkter Engine-Aufruf mit gesetztem Buff `magic_immune`): Zauber über der Stufe des Buffs → Held 1 NICHT immun → Chuck bleibt unverwundbar;
 //   Quelle ist kein Zauber (Angriff/Kreatur) → Chuck bleibt unverwundbar; Zauber der Stufe ≤ Buff → Chuck nimmt Schaden. Exit 0 = Regel gilt.
+// Nachtrag (Al, Welle 25): auch Status-Immunität gegen Burn/Gift (Light Ball …) zählt – siehe docs/niche-tests/repro/W25/c-chuck-status-immunitaet.js.
 // Aufruf: node docs/niche-tests/repro/N5-sonstige/06-chuck-schild-ignoriert-anti-magic-immunitaet.js   (✗ = Fehler tritt auf)
 const H = require('../../lib/h.js');
 (async () => {
