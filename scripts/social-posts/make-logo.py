@@ -262,6 +262,19 @@ def dark_background(size):
     return im
 
 
+def avatar(px, heart_cell, monia_top, wordmark_scale=None, wm_y=None, heart_cy=None):
+    """Profilbild: nur das Kartenherz als Hintergrund, Monia groß, Schriftband groß davor. Kein weiteres Beiwerk,
+    damit Monia und der Schriftzug auch im kleinen Kreis (ca. 100 px) lesbar bleiben."""
+    bg = dark_background((1080, 1080))
+    heart = heart_layer(heart_cell)
+    put(bg, heart, 540, heart_cy if heart_cy is not None else 540)
+    m_im, (fx_, foot) = monia(px)
+    bg.alpha_composite(m_im, (int(540 - fx_), int(monia_top)))
+    if wordmark_scale:
+        put(bg, wordmark(wordmark_scale), 540, wm_y)
+    return bg.convert('RGB')
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # 1) Logo, transparent: Monia (16 px je Sprite-Pixel) vor dem Herz, Schriftband 3 px je Logo-Pixel
@@ -273,14 +286,9 @@ def main():
     dark.alpha_composite(logo)
     dark.convert('RGB').save(OUT / 'logo-monia-dunkel.png')
 
-    # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus: alles Wichtige in den mittleren ~900 px)
-    bg = dark_background((1080, 1080))
-    a = bg.copy()
-    a.alpha_composite(scene((1080, 1080), px=12, wm_scale=3, heart_cell=12, wm_y=780, monia_cy=345, glints=True, spread=0.9))
-    a.convert('RGB').save(OUT / 'profil-monia-logo.png')
-    b = bg.copy()
-    b.alpha_composite(scene((1080, 1080), px=18, wm_scale=2, heart_cell=15, with_wordmark=False, monia_cy=470, glints=True, spread=0.66))
-    b.convert('RGB').save(OUT / 'profil-monia.png')
+    # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus)
+    avatar(px=22, heart_cell=19, monia_top=100, wordmark_scale=3, wm_y=775, heart_cy=520).save(OUT / 'profil-monia-logo.png')
+    avatar(px=26, heart_cell=19, monia_top=70, heart_cy=520).save(OUT / 'profil-monia.png')
     print('fertig:', OUT)
 
 
