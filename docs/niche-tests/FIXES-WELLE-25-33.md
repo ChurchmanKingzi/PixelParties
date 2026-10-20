@@ -38,13 +38,10 @@ Nach dem Bericht [FIXES-WELLE-24.md](FIXES-WELLE-24.md) (61 A/B-Befunde der Tief
 
 ## Nicht geändert / Hinweise
 
-* **Guardian Beast Hu** („additional Action with any Hero you control") sammelt nur die eigene Spalte; ein übernommener Gegnerheld wird nicht als Aktionsträger angeboten (Aufwand mittel, nicht angefasst).
+* **Guardian Beast Hu** wurde in Welle 34 nachgezogen.
 * **Dark Gear**: Zonenliste ist die eigene Spalte inkl. leerer Heldenplätze. **Golden Wings / Deepsea Encounter**: Kreaturen-Ziele laufen über die Brettseite (Kreaturen-Form, nicht „Hero you control"). **Bamboo Shield**: „a Hero would take damage" ohne „you control" – Auslegung auf die eigene Spalte bewusst.
 * Ohne Skript (unverändert): Meditation, Expedition, Motharch Squire, Anti Intruder System, Last Second Escape, Homecoming, Wendy, Unholy Combination, Metamorphosis of Serket, Bad Birthday Girl Cecilia, Trident Spirit – Hammer Absorbed, Patty, Clash of Champions (Helfer vorbereitet).
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Alluring Light (W32a):** Soll der von Alluring Light gezwungene Held ebenfalls geblockt sein, wenn er nicht angreifen kann (gefroren, betäubt usw.)? (heute geblockt wie die anderen Fighting-Level-Effekte)
-2. **Alice (W32a):** Sollen „spielt/aktiviert einen Spell"-Reaktionen (Silence, Shamanic Curse, MOE Shield, Storm Ring) und Magic Mirror (nur negieren, Kopie nicht möglich) auch auf Alices als Spell zählenden Kreaturenschaden reagieren?
-3. **Zähler und Sperren (W32a):** Sollen Effekte, die als Attack zählen, auch für Attack-Zähler und -Sperren zählen (Berserk-Limit 2, Knife Throw „nur Attack", Rioting Village „1 Attack pro Zug")? (heute nein)
-4. **Dark Ocean (W32a):** Ist es richtig, dass unter Dark Ocean die eigenen Arrows des Besitzers auf den Greatmaw-Treffer reagieren dürfen, während die Reaktionen des Gegners geblockt bleiben?
+Die vier Rückfragen aus W32a sind beantwortet und in [FIXES-WELLE-34.md](FIXES-WELLE-34.md) umgesetzt (dort stehen auch die neuen Rückfragen).
