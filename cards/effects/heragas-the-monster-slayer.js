@@ -107,7 +107,8 @@ module.exports = {
 
     // Ziel-Picker mit Angriffs-Semantik (Taunt, Untargetable, Truth-
     // Seeing Eye …) — die Frische-Regel als `condition` obendrauf.
-    const target = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',
       types: ['creature'],
       damageType: 'attack',
@@ -118,6 +119,11 @@ module.exports = {
       cancellable: true,
       condition: (t) => !!t.cardInstance && erlaubt.has(t.cardInstance.id),
     });
+    if (negiert) {
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!target?.cardInstance) return false;   // abgebrochen — HOPT bleibt
     const inst = target.cardInstance;
 

@@ -103,7 +103,7 @@ module.exports = {
     // Invisibility Cloak …) den Effekt, liefert `promptDamageTarget` `null` MIT `gs._spellNegatedByEffect` — das ist KEIN Abbruch (Muster Javelin Throw): der Effekt gilt als gespielt
     // (Spell-Zähler), der Einmal-Stempel bleibt gesetzt (Rückgabe `true`). Nur ein echter Abbruch (`false`) gibt die Aktivierung frei. Wie bei Silence (virtuelle Spell-Kette unten).
     const _negVorher = engine.gs._spellNegatedByEffect;
-    delete engine.gs._spellNegatedByEffect;
+    delete engine.gs._spellNegatedByEffect; delete engine.gs._zielNegiertDurchSchutz;   // W36a: auch die Negation durch Schutz-/Redirect-Fenster (Preserve-Wächter …) ist eine Negierung
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
       types: ['hero', 'creature'],
@@ -116,7 +116,8 @@ module.exports = {
       cancellable: true,
     });
 
-    const _negiert = !target && !!engine.gs._spellNegatedByEffect;
+    const _negiert = !target && (!!engine.gs._spellNegatedByEffect || !!engine.gs._zielNegiertDurchSchutz);
+    delete engine.gs._zielNegiertDurchSchutz;
     if (_negVorher) engine.gs._spellNegatedByEffect = _negVorher; else { delete engine.gs._spellNegatedByEffect; if (_negiert) delete engine.gs._negationWhole; }
     if (_negiert) {
       await engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: 'Alice, the Puppeteer Girl' });   // der negierte Effekt zählt als gespielter Spell (wie bei Silence)

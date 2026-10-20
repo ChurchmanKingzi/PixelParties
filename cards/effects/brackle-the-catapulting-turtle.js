@@ -192,6 +192,7 @@ module.exports = {
     let creatureInst;
     let baseDamage;
     let target;
+    let negiert = false;
     while (true) {
       const candidates = _eligibleSacrificeCandidates(engine, pi);
       if (candidates.length === 0) return false;
@@ -244,7 +245,9 @@ module.exports = {
       baseDamage = Math.min(engine.creatureCurrentHp(creatureInst), MAX_DAMAGE);
 
       // ── Target picker — Cancel reads as "Back" (return to sac picker) ──
-      target = await ctx.promptDamageTarget({
+      // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht
+      // (Einmal-Stempel bleibt, Rückgabe `true`), zählt als gespielte Attack (Muster Alice) und das Opfer (Kosten) bleibt bezahlt; ein „Back" des Spielers bleibt ein Abbruch.
+      ({ target, negiert } = await engine.heldenEffektZielwahl(ctx, {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -260,9 +263,24 @@ module.exports = {
         // Das Opfer wird erst nach dem Schaden abgelegt, steht aber nicht
         // mehr zur Wahl (sonst Selbstbeschuss + doppelte Ablage, H01-heroes-17).
         condition: (t) => t.cardInstance?.id !== creatureInst.id,
-      });
-      if (target) break;     // Have both a sacrifice AND a target — proceed.
+      }));
+      if (target || negiert) break;     // Have both a sacrifice AND a target (or a negated hit) — proceed.
       // Target prompt cancelled → loop back to sacrifice picker.
+    }
+
+    if (negiert) {
+      // W36a: Treffer negiert — kein Katapultflug, kein Schaden; das Opfer ist als Kosten bezahlt, der Treffer zählt als Attack dieses Helden.
+      const quelleNeg = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
+        ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };
+      await engine.zaehleAlsArt('attack', { pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+      await engine.runHooks('onCreatureSacrificed', {
+        creature: creatureInst, cardName: creatureInst.name, owner: creatureInst.owner,
+        heroIdx: creatureInst.heroIdx, zoneSlot: creatureInst.zoneSlot, source: quelleNeg, _skipReactionCheck: true,
+      });
+      await engine.actionDestroyCard(quelleNeg, creatureInst, { fireCreatureDeath: true });
+      engine.log('brackle_catapult', { player: ps.username, hero: CARD_NAME, sacrificed: creatureInst.name, damage: baseDamage, negated: true });
+      engine.sync();
+      return true;
     }
 
     // ── Step 3: catapult animation (load → hold → fire) ─────────────────

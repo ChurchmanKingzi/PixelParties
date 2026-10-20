@@ -143,7 +143,8 @@ module.exports = {
     // Engine-Weg gelaufen ist (Sleeping Beauty & Co.), faellt hier raus.
     if (hartGesperrt(engine, pi)) return false;
 
-    const ziel = await ctx.promptDamageTarget({
+    // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
+    const { target: ziel, negiert } = await engine.heldenEffektZielwahl(ctx, {
       side: 'any',                       // „any target on the board" — auch eigene
       types: ['hero', 'creature'],
       damageType: 'attack',              // gilt als Angriff dieses Helden
@@ -164,6 +165,13 @@ module.exports = {
       maxTotal: 1,
       minRequired: 1,
     });
+    if (negiert) {
+      // Negiert: der Effekt ist verbraucht (harte Sperre gesetzt) und zählt als Attack dieses Helden.
+      if (!engine.claimHOPT(HOPT_KEY, pi)) return false;
+      await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
+      engine.sync();
+      return true;
+    }
     if (!ziel) return false;
 
     // ── Punkt ohne Rueckkehr: jetzt die harte Sperre beanspruchen ────

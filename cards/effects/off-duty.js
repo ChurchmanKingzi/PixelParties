@@ -118,6 +118,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(gegner, {
         title: CARD_NAME,
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your summon was negated and the Creature was shuffled back into your deck. '
           + 'You may perform a different Action with any Hero — or skip.',
         cancellable: true,

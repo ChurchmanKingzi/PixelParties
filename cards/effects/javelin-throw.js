@@ -161,7 +161,7 @@ module.exports = {
     const attackSource = { name: CARD_NAME, owner: pi, heroIdx: hi, controller: pi };
     // Uebernommener Held: physische Seite wie beim Charme-Angriff.
     if (heroOwner !== pi) attackSource.heroOwner = heroOwner;
-    delete gs._spellNegatedByEffect;
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;   // W36a: auch die Negation durch Schutz-/Redirect-Fenster zaehlt als Negierung
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
       types: ['hero', 'creature'],
@@ -177,8 +177,8 @@ module.exports = {
     // Negiert (Invisibility Cloak): die Karte IST gespielt — Wurf-Artefakt
     // weg (Textreihenfolge: erst abwerfen, dann Ziel), OPT verbraucht,
     // kein Schaden. Nur ein echter Abbruch gibt die Karte zurueck.
-    const negated = !target && !!gs._spellNegatedByEffect;
-    delete gs._spellNegatedByEffect;
+    const negated = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
     if (!target && !negated) return { aborted: true };
 
     // ── Ab hier ist die Karte gespielt ─────────────────────────────

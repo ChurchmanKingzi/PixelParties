@@ -5438,6 +5438,7 @@ class GameEngine {
                 const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
                 if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
               }
+              gs._zielNegiertDurchSchutz = true;   // W36a: Negation durch Schutz-/Redirect-Fenster (kein Abbruch) — gelesen von `heldenEffektZielwahl`
               return null;
             }
             if (redirected) {
@@ -23483,6 +23484,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[wirkerSeite]?.heroes?.[heroIdx];
     const cardData = this._getCardDB()[cardName];
     if (!ps || !hero || !cardData) return { cancelled: true };
+    // W36a: ein unter Silence-Sperre zugelassener Guss (Bonus-Spell) verbraucht den Bonus — der Stand VOR dem Guss zaehlt (Silence kann im Guss selbst keinen neuen Bonus gewaehren, `_skipReactionCheck`).
+    const _silenceBonusVorher = ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell === this.gs.turn;
     // ★ Z7 (S01-11, H04-05/-17): EINMAL PRO SPIEL gilt für JEDEN Sofort-Guss (Zi, Saya, Call for
     // Help, Aurora …), nicht nur mit `opts.pruefen`: der Stempel setzt sich unten schon, das
     // Tor fehlte — ein zweites Divine Gift ließ sich so über Zusatzaktionen einschleusen.
@@ -23616,7 +23619,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
       delete this.gs._immediateActionContext;
       if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
-          && !this.gs._spellNegatedByEffect) {
+          && !this.gs._spellNegatedByEffect
+          && !this.gs._spellCancelled) {   // W36a: ein ABGEBROCHENER Guss hat nie aufgeloest — kein `afterSpellResolved` (stempelte u. a. `_spellResolvedTurn` für Eraser Beam „only Spell")
         const uniqueTargets = [];
         const seenIds = new Set();
         for (const t of (this.gs._spellDamageLog || [])) {
@@ -23705,6 +23709,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `hero._attacksThisTurn` UND `onEffectCountedAsArt` (Mirjam „never more than 1 Attack per turn", Ghuanjun „never 2 copies of the same Attack"). Vorher blieb dieser Weg komplett
     // ungezaehlt (Quick Attack „first Attack", Berserk-Limit, Knife Throw, Rioting Village, Idej Sword - Muras sahen die Attack nicht).
     if (cardData.cardType === 'Attack') await this.zaehleAlsArt('attack', { pi: playerIdx, heroIdx, heroOwner: wirkerSeite, name: cardName, karte: true });
+    // ★ W36a (Al, 22.10.2026, W35a-Rückfrage 3: „Ja, auf jeden Fall"): dasselbe für Spell-KARTEN — jeder Sofort-Guss (Hu, Coffee, Elixir of Rage, Junshi, Call for Help, Friedhelm …) zählt in
+    // `spellsPlayedThisTurn` (Teleportal „first Spell", Eraser Beam „only Spell", Trial of …, Silence-Bonus-Spell) und meldet `onEffectCountedAsArt` — EIN Zählschritt je Spell (auch ganz/teil-negiert wie in
+    // `doPlaySpell`; ein Abbruch zählt nicht). `doPlaySpell` zählt über denselben Helfer, die Spell-Kette `alsSpellKette` zählt nur Effekte (kein Doppelzählen).
+    if (cardData.cardType === 'Spell') {
+      await this.zaehleAlsArt('spell', { pi: playerIdx, heroIdx, heroOwner: wirkerSeite, name: cardName, karte: true });
+      if (_silenceBonusVorher && ps._silenceBonusSpell === this.gs.turn) ps._silenceBonusSpell = -1;   // Silence-Bonus-Spell verbraucht (s. o.)
+    }
     // ★ JETZT ERST: ENTNAHME UND FLUG (v979) ──────────────────────────
     // Der Zauber hat aufgeloest — hier verlaesst die Karte die Hand,
     // und zwar sichtbar (Hausregel 17.8.: Flug VOR der Entnahme; jeder
@@ -23760,7 +23771,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!(_aufsBrett && inst.zone && inst.zone !== 'hand')) this._untrackCard(inst.id);
     // v1338: ohne Abfrage aufgeloest → jetzt zeigen (idempotent).
     this.gussAuftrittBeenden(_auftritt);
-    this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
+    // W36a (Al): `player` gehoert in den Eintrag — Fire Bolts („first Destruction Magic Spell"), Kitsune Transformation (erster Magic-Arts-Spell) und Tengu Windstorm (erste Aktion) filtern das Log nach
+    // `entry.player`; ohne das Feld sahen sie jeden Sofort-Guss (Hu, Coffee …) nie.
+    this.log('immediate_action', { player: ps.username, hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
     // v1316: Wisdom jetzt — der Zauber liegt schon in der Ablage und kann
     // nicht versehentlich mit abgeworfen werden.
     if (_wisdomKosten > 0 && !this.gs.result) {
@@ -40607,14 +40620,32 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     } else {
       ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
-      if (ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`)
+      if (!karte && ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`); Karten: schon bei der Pruefung (doPlaySpell) bzw. am Anfang des Sofort-Gusses
       // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
-      if (!this._inMctsSim) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
+      if (!this._inMctsSim && !karte) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
     }
     if (this._inMctsSim && !karte) return;   // W35a: gespielte Attack-KARTEN melden auch im Rollout (vorher feuerte dort `onActionUsed` fuer Mirjam)
     try {
       await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name, karte: !!karte });   // W35a: `karte` = eine echte Attack-KARTE (doPlaySpell, Zusatzaktions-Guss), sonst ein Effekt
     } catch (err) { console.error('[zaehleAlsArt]', err.message); }
+  }
+
+  /**
+   * ★ W36a (Al, 22.10.2026, Antwort auf die W35a-Rückfrage 1): Zielwahl eines Heldeneffekts, der als Attack/Spell zählt (Broghan, Brackle, Arthor, Heragas, Kohta; Muster Alice/Javelin Throw).
+   * Wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, MOE Shield, Magic Mirror, Surprises, Schutz-/Redirect-Negation: `promptDamageTarget` liefert `null` MIT
+   * `gs._spellNegatedByEffect` bzw. `gs._zielNegiertDurchSchutz`), ist der Effekt für die Runde VERBRAUCHT und zählt als gespielte Attack/Spell; ein Abbruch des Spielers (`null` ohne
+   * Flag) bleibt ein Abbruch. Liefert `{ target, negiert }`; die Flags werden zurückgesetzt (kein Rest für den nächsten Effekt). Der Aufrufer zählt/stempelt bei `negiert` selbst
+   * (`zaehleAlsArt`, Rückgabe `true` aus `onHeroEffect`).
+   */
+  async heldenEffektZielwahl(ctx, config) {
+    const gs = this.gs;
+    const negVorher = gs._spellNegatedByEffect;
+    delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+    const target = await ctx.promptDamageTarget(config);
+    const negiert = !target && (!!gs._spellNegatedByEffect || !!gs._zielNegiertDurchSchutz);
+    if (negVorher) gs._spellNegatedByEffect = negVorher; else { delete gs._spellNegatedByEffect; if (negiert) delete gs._negationWhole; }
+    delete gs._zielNegiertDurchSchutz;
+    return { target, negiert };
   }
 
   /**
