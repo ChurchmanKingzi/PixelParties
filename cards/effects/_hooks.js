@@ -186,6 +186,7 @@ const HOOKS = {
   ON_ACTIVE_EFFECT_USED: 'onActiveEffectUsed',
 
   // ── Actions ──
+  ON_EFFECT_COUNTED_AS_ART:  'onEffectCountedAsArt',    // W34a: ein Effekt, der als Attack/Spell ZÄHLT, wurde gezählt ({ art, playerIdx, heroIdx, heroOwner, effectName }) — für Karten mit eigenem Attack-/Spell-Hook-Zähler (Mirjam)
   ON_ACTION_USED:            'onActionUsed',            // Fires when any action is consumed (spell, creature, ability activation, etc.)
   ON_ADDITIONAL_ACTION_USED: 'onAdditionalActionUsed',  // Fires when an additional action is consumed (Necromancy summon, Slime Rancher, etc.)
 

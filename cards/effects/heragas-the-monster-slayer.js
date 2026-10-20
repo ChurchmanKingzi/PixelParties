@@ -86,6 +86,9 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const hero = ctx.attachedHero;
     if (!hero?.name || hero.hp <= 0) return false;
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Heragas, the Monster Slayer' })) return false;
+
     return eligibleCreatures(ctx._engine, ctx.cardOwner).length > 0;
   },
 

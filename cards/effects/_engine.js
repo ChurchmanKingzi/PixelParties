@@ -23258,9 +23258,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         {
           source: config.title,
           hookExtras: { _isNormalSummon: true },
+          ...(_leihSeite != null ? { controller: playerIdx } : {}),   // W34a
         },
       );
-          ...(_leihSeite != null ? { controller: playerIdx } : {}),   // W34a
       if (!placeResult) {
         // Self-place inside beforeSummon (DDG bounce-place, 500
         // Piranhas tribute) — the card is already on the board, no
@@ -23297,9 +23297,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // path returns earlier).
       await this.runHooks('onAnyActionResolved', {
         actionType: 'creature', playerIdx, cardName, playedCardName: cardName, heroIdx,
+        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // W34a
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
-        ...(_leihSeite != null ? { heroOwner: _leihSeite } : {}),   // W34a
       });
       // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
       // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
@@ -23787,15 +23787,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         try { karten = karten.filter(n => !!config.cardNameFilter(n)); } catch { karten = []; }
       }
       if (karten.length > 0) return true;
+      if (fremd) continue;
       if (!config.skipAbilities && this.getActivatableAbilities(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true }).length > 0) return true;
       if (!eingeschraenkt && !config.skipHeroEffects
-      if (fremd) continue;
           && this.getActiveHeroEffects(playerIdx, { ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true }).length > 0) return true;
     }
     return false;
   }
-  /**
-   * Perform an immediate action with ANY hero. Shows the heroAction UI
 
   /**
    * ★ W34a (Al, 22.10.2026, Guardian Beast Hu: „additional Action with any Hero you control" muss nach aktueller Kontrolle gehen): die lebenden Helden, mit denen `playerIdx`
@@ -23809,6 +23807,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
     return [...alle.filter(h => h.seite === playerIdx), ...alle.filter(h => h.seite !== playerIdx)];
   }
+  /**
+   * Perform an immediate action with ANY hero. Shows the heroAction UI
    * without restricting to a single hero — the player drags a card onto
    * whichever hero they want, just like during the normal Action Phase.
    * @param {number} playerIdx
@@ -23875,16 +23875,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       for (const name of heroEligible) {
         eligibleSet.add(name);
-        if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
-        heroIndicesByCard[name].push(hi);
         if (fremdHeld) {
           (fremdeHelden[name] || (fremdeHelden[name] = [])).push({ heroOwner: heldSeite, heroIdx: hi });
           continue;
         }
+        if (!heroIndicesByCard[name]) heroIndicesByCard[name] = [];
+        heroIndicesByCard[name].push(hi);
       }
+      if (fremdHeld) continue;
 
       // Activatable abilities on this hero — ueber den echten Sammler,
-      if (fremdHeld) continue;
       // gleiche Begruendung wie in `performImmediateAction`.
       if (!config.skipAbilities) {
         for (const e of this.getActivatableAbilities(playerIdx, {
@@ -23909,9 +23909,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
       heroIndicesByCard,
+      ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       activatableAbilities,
       activatableHeroEffects,
-      ...(Object.keys(fremdeHelden).length > 0 ? { fremdeHelden } : {}),   // W34a: uebernommene Helden je Karte `[{ heroOwner, heroIdx }]`
       // Kein `showCard` — hier steht der handelnde Held noch nicht
       // fest, ein Bild waere geraten. Die Platzierung gilt trotzdem:
       // geklickt wird auf der eigenen Seite.
@@ -40372,6 +40372,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       isPlacement: !!cardInfo.isPlacement,
       // W5b-Z1b: Beschwörung als inhärente Zusatzaktion (Priests: die Kosten sind das Zurückmischen, `beforeSummon` NACH dem Fenster).
       isInherentAction: !!cardInfo.isInherentAction,
+      // ★ W34a: virtuelle Kette eines Effekts, der als Attack/Spell ZÄHLT (`alsAttackKette` / `alsSpellKette`): `'attack' | 'spell'`. Leser, die ein echtes Kartenspiel
+      // verlangen (Shamanic Curse: der Zauber müsste in den Ablagestapel gehen), schließen solche Glieder aus.
+      zaehltAlsArt: cardInfo.zaehltAlsArt || null,
       goldCost: goldCost || 0,
       isInitialCard: true,
       negated: false,
@@ -40467,6 +40470,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
    */
   async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    // ★ W34a (Al, 22.10.2026, Punkt 3): EIN Treffer-Ereignis = EIN Zählschritt der Attack-Zähler (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`):
+    // Quick Attack („first Attack"), Berserk (2), Knife Throw, Rioting Village (1), Blow of the Venom Snake & Co. — wie eine gespielte Attack-Karte (`doPlaySpell`, auch wenn die Kette
+    // sie negiert). Die Sperren prüfen die Aufrufer VOR dem Treffer über `heroKannAngreifen`. Hier und nirgends sonst gezählt (kein Doppelzählen mit der Kette).
+    await this.zaehleAlsArt('attack', { pi, heroIdx, heroOwner, name });
     if (this._inReactionCheck || this._inMctsSim) {
       const r = resolve ? await resolve() : null;
       return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
@@ -40477,13 +40484,67 @@ this._deathWatch = (this._deathWatchStack || []).length
       res = await this.executeCardWithChain({
         cardName: name, owner: pi, cardType: 'Attack', heroIdx,
         casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
-        fromBoard: true, resolve,
+        fromBoard: true, resolve, zaehltAlsArt: 'attack',
         ...(casterCheck === false ? { casterCheck: false } : {}),
       });
     } finally {
       await clearArmedArrows(this, pi);
     }
     return res;
+  }
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Punkt 2): Gegenstück zu `alsAttackKette` für einen Effekt, der als SPELL eines Helden zählt (Alice, the Puppeteer Girl: „Treated as a Destruction Magic Spell").
+   * Aufruf NACH der Zielwahl, VOR dem Treffer (`resolve` = Beam + Schaden): zählt den Spell-Zähler (`spellsPlayedThisTurn`; verbraucht den Silence-Bonus), öffnet ein Reaktionsfenster mit
+   * einem Glied vom Typ `Spell` (Besitzer `pi`, wirkender Held `heroIdx`/`heroOwner`, `fromBoard`, `zaehltAlsArt: 'spell'`) — Silence, Idej Projector und Negierer lesen es wie einen
+   * Spell. Shamanic Curse schließt das Glied aus (der Spell müsste in den Ablagestapel gehen), The Master's Plan/Lunar Eclipse lesen `fromBoard` (kein Handspiel).
+   * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) bzw. im MCTS-Rollout läuft der Treffer direkt. Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`).
+   */
+  async alsSpellKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    await this.zaehleAlsArt('spell', { pi, heroIdx, heroOwner, name });
+    if (this._inReactionCheck || this._inMctsSim) {
+      const r = resolve ? await resolve() : null;
+      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+    }
+    return this.executeCardWithChain({
+      cardName: name, owner: pi, cardType: 'Spell', heroIdx,
+      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+      fromBoard: true, resolve, zaehltAlsArt: 'spell',
+      ...(casterCheck === false ? { casterCheck: false } : {}),
+    });
+  }
+
+  /**
+   * ★ W34a: Zählschritt für einen Effekt, der als Attack/Spell ZÄHLT — dieselben Zähler wie `doPlaySpell` für eine gespielte Karte. Attack: Spieler-Zähler
+   * `attacksPlayedThisTurn`, Helden-Liste `heroesAttackedThisTurn` (Index), Helden-Zähler `hero._attacksThisTurn`; Spell: `spellsPlayedThisTurn` (und der Silence-Bonus
+   * `_silenceBonusSpell` ist verbraucht, wie in `doPlaySpell`). Danach `onEffectCountedAsArt` ({ art, playerIdx, heroIdx, heroOwner, effectName }) für Karten, die Attacks/Spells
+   * über eigene Hook-Zähler führen (Mirjam: `onActionUsed` feuert nur für Aktionen).
+   * @param {'attack'|'spell'} art
+   * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
+   */
+  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name }) {
+    const gs = this.gs;
+    const ps = gs?.players?.[pi];
+    if (!ps || (art !== 'attack' && art !== 'spell')) return;
+    const seite = Number.isInteger(heroOwner) ? heroOwner : pi;
+    const hero = Number.isInteger(heroIdx) && heroIdx >= 0 ? gs.players[seite]?.heroes?.[heroIdx] : null;
+    if (art === 'attack') {
+      ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
+      if (hero) {
+        if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
+        if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
+        hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+      }
+    } else {
+      ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
+      if (ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`)
+      // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
+      if (!this._inMctsSim) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
+    }
+    if (this._inMctsSim) return;
+    try {
+      await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name });
+    } catch (err) { console.error('[zaehleAlsArt]', err.message); }
   }
 
   /**
@@ -46277,7 +46338,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Negierung „nur der Effekt" sperrt nicht), Heldenskript-/Support-Sperren (`canHeroPerformAction`: Saint Nicolas, Plant Golem), Kontrollrechte (`attacken === false`), Blendung
    * (diese Effekte brauchen alle ein Ziel) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
    */
-  heroKannAngreifen(seite, heroIdx, pi) {
+  heroKannAngreifen(seite, heroIdx, pi, opts = {}) {
     const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (this.isHeroIncapacitated(seite, heroIdx)) return false;
@@ -46285,9 +46346,81 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
     if (this.kontrollRechte(seite, heroIdx).attacken === false) return false;
     if (this._isHeroBlinded(seite, heroIdx)) return false;
-    const ps = this.gs.players[Number.isInteger(pi) ? pi : seite];
+    const p = Number.isInteger(pi) ? pi : seite;
+    const ps = this.gs.players[p];
     if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 3): Effekte, die als Attack zählen, unterliegen auch den Attack-ZÄHLERN und -Sperren (wie `validateActionPlay` für eine Attack-Karte):
+    // Berserk (nie mehr als 2 Attacks je Zug und Held), Knife Throw („the only Attack you play this turn"), Area-Sperren (`blocksCardPlay`: Rioting Village „1 Attack pro Zug") und
+    // Helden-/Ausrüstungs-Sperren (`canPlayCard`: Mirjam „1 Attack pro Zug", Idej Sword - Muras). Die Zähler füllt `alsAttackKette` (`zaehleAlsArt`).
+    if (hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) return false;
+    if (ps && ps._soleAttackTurn === this.gs.turn) return false;
+    if (this._effektKartenSperre(p, seite, heroIdx, this._effektAlsKarte('attack', opts.name, 'Fighting'))) return false;
     return true;
+  }
+
+  /**
+   * ★ W34a (Al, 22.10.2026, Punkt 2/3): Gegenstück zu `heroKannAngreifen` für Effekte, die als SPELL eines Helden zählen (Alice): kann dieser Held (Brettseite `seite`, Index `heroIdx`,
+   * Kontrolleur `pi`) gerade zaubern? Dieselben kartenunabhängigen Sperren wie `validateActionPlay` für eine Spell-Karte: tot/Frozen/Stunned/Webbed/Bound/harte Negierung,
+   * Heldenskript-Sperren, Kontrollrechte (`zauber === false`), die Spell-Status Nulled (Null Zone), Magic Silenced, Frightened (Howling in the Night) und Berserked, Blendung,
+   * die Attack-/Spell-Sperre des Zuges (Trial of …), die Spell-Sperre (Eraser Beam, Silence; der Silence-Bonus lässt EINEN Spell durch) und Area-/Helden-/Ausrüstungs-Sperren
+   * (`blocksCardPlay`, `canPlayCard`: Idej Sword - Kogarasu „1 Spell pro Zug"). `opts`: `name`, `schule`, `stufe` (für die Pseudo-Karte).
+   */
+  heroKannZaubern(seite, heroIdx, pi, opts = {}) {
+    const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (this.isHeroIncapacitated(seite, heroIdx)) return false;
+    if (hero.statuses?.webbed) return false;
+    if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
+    if (this.kontrollRechte(seite, heroIdx).zauber === false) return false;
+    const st = hero.statuses || {};
+    if (st.nulled || st.magic_silenced || st.frightened || st.berserked) return false;
+    if (this._isHeroBlinded(seite, heroIdx)) return false;
+    const p = Number.isInteger(pi) ? pi : seite;
+    const ps = this.gs.players[p];
+    if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    if (ps && ps._spellLockTurn === this.gs.turn && ps._silenceBonusSpell !== this.gs.turn) return false;
+    if (this._effektKartenSperre(p, seite, heroIdx, this._effektAlsKarte('spell', opts.name, opts.schule, opts.stufe))) return false;
+    return true;
+  }
+
+  /** ★ W34a: Pseudo-Karte für Sperrprüfungen eines Effekts, der als Attack/Spell zählt (`blocksCardPlay`/`canPlayCard` lesen nur Typ, Stufe, Schule, Name). */
+  _effektAlsKarte(art, name, schule, stufe) {
+    return {
+      name: name || (art === 'attack' ? 'Treated-as Attack' : 'Treated-as Spell'),
+      cardType: art === 'attack' ? 'Attack' : 'Spell', subtype: 'Normal', level: stufe || 0,
+      ...(schule ? { spellSchool1: schule } : {}), _effektAlsKarte: true,
+    };
+  }
+
+  /**
+   * ★ W34a: die kartenunabhängigen Spielsperren aus `validateActionPlay`, auf einen Effekt ohne Karte (`karte` = `_effektAlsKarte`) angewandt: (1) Area-/Brett-Sperren
+   * (`blocksCardPlay`, alle aktiven Instanzen; Rioting Village), (2) das Heldenskript (`canPlayCard`, solange es nicht ruht) und (3) markierte Ausrüstung am Helden
+   * (`counters.treatAsEquip`). `herkunft.alsEffekt` kennzeichnet den Aufruf. true = GESPERRT.
+   */
+  _effektKartenSperre(pi, seite, heroIdx, karte) {
+    const gs = this.gs;
+    for (const inst of this.cardInstances) {
+      if (inst.faceDown) continue;
+      if (!inst.isActiveIn()) continue;
+      const sperre = loadCardEffect(inst.name)?.blocksCardPlay;
+      if (typeof sperre !== 'function') continue;
+      try { if (sperre(gs, pi, karte, this, inst)) return true; }
+      catch (err) { console.error(`[blocksCardPlay] ${inst.name}:`, err.message); }
+    }
+    const hero = gs.players[seite]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const herkunft = { handIndex: -1, fromHand: false, fromCreation: false, alsEffekt: true };
+    try {
+      const heroScript = this.heroScript(hero);
+      if (heroScript?.canPlayCard && !this.isHeroPassiveDormant(seite, heroIdx) && !heroScript.canPlayCard(gs, seite, heroIdx, karte, this, herkunft)) return true;
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== seite || inst.zone !== 'support' || inst.heroIdx !== heroIdx) continue;
+        if (!inst.counters?.treatAsEquip) continue;
+        const equipScript = loadCardEffect(inst.name);
+        if (equipScript?.canPlayCard && !equipScript.canPlayCard(gs, seite, heroIdx, karte, this, herkunft)) return true;
+      }
+    } catch (err) { console.error('[_effektKartenSperre]', err.message); }
+    return false;
   }
 
   /**

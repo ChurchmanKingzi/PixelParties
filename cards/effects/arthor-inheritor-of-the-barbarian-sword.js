@@ -46,6 +46,8 @@ module.exports = {
   },
 
   canActivateHeroEffect(ctx) {
+    // ★ W34a (Al, 22.10.2026): ein Effekt, der als Attack zählt, unterliegt den Attack-Zählern und -Sperren (Berserk-Limit, Knife Throw, Rioting Village, Mirjam, Muras …) — `heroKannAngreifen`.
+    if (!ctx._engine.heroKannAngreifen(ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.cardOwner, { name: 'Arthor, Inheritor of the Barbarian Sword' })) return false;
     return true; // HOPT handled by engine; hero must be alive (engine checks)
   },
 
@@ -98,6 +100,8 @@ module.exports = {
     // BEFORE damage applies — Arrows can join, arm the attacker, and
     // the existing `applyArrowsBeforeDamage` / `applyArrowsAfterDamage`
     // pipeline kicks in for the actual hit.
+    // ★ W34a (Al, 22.10.2026, Punkt 3): ein Treffer-Ereignis = ein Zählschritt der Attack-Zähler (wie `alsAttackKette`, das Arthor mit eigener Kette ersetzt).
+    await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: CARD_NAME });
     const attackResult = await engine.executeCardWithChain({
       cardName: CARD_NAME,
       owner: pi,
@@ -105,6 +109,7 @@ module.exports = {
       heroIdx,
       casterOwner: feld,   // Styx 28.9.: Seite des Wirkers
       fromBoard: true,
+      zaehltAlsArt: 'attack',
       resolve: async () => {
         engine._broadcastEvent('red_lightning_rain', {
           owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: tgtSlot,
