@@ -23,9 +23,12 @@ async function aufbau(karte, z, o = {}) {
 }
 // UMGESTELLT in W31a (Al, 22.10.2026: „Doch, auch temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): ein TEMPORÄR übernommener Gegnerheld (Charme) ist auch bei
 // den Karten mit Kosten am Helden (Torchure, The Yeeting, Mana Absorbing Crystal, Sickly Cheese) ein gültiges Ziel (W28a schloss ihn aus); die Wirkung verpufft (s. `W31/a-01`).
-const erwartet = (z, fremdOk = true, gift = false) => {
+// UMGESTELLT in W33a (Al, 22.10.2026: „Sickly Cheese kann spezifisch NUR aktiviert werden, wenn das Ziel vergiftbar ist"): bei Sickly Cheese ist der Charme-geschützte (temporär übernommene) Gegnerheld
+// `ineligible` (nicht wählbar, `charmOk: false`); die anderen Karten bieten ihn weiter an (W31a). Siehe `W33/a-01`.
+const erwartet = (z, fremdOk = true, gift = false, charmOk = true) => {
   if (z === 'normal') return ['0:0', '0:1', '0:2'];
   if (z.startsWith('abgegeben')) return ['0:1', '0:2'];
+  if (z === 'uebernommen-temporaer' && !charmOk) return ['0:0', '0:1', '0:2'];
   return fremdOk ? ['0:0', '0:1', '0:2', '1:0'] : ['0:0', '0:1', '0:2'];
 };
 const adr = (valid) => valid.filter(v => v.type === 'hero').map(v => `${v.owner}:${v.heroIdx}`).sort();
@@ -38,7 +41,7 @@ const KARTEN = [
   { name: 'Future Tech Doping', discard: ['Future Tech Gun', 'Future Tech Bazooka'], wirkt: (t, s, h) => t.hero(s, h).maxHp === 860 },
   { name: 'Divine Gift of Skill', fremdOk: false, wirkt: (t, s, h) => (t.gs.players[0]._bonusAbilityAttachments || {})[h] === 4 },
   { name: 'Torchure', gift: true, wirkt: (t, s, h) => !!t.hero(s, h).statuses?.poisoned },
-  { name: 'Sickly Cheese', gift: true, deck: ['Accusation'], wirkt: (t, s, h) => !!t.hero(s, h).statuses?.poisoned },
+  { name: 'Sickly Cheese', gift: true, charmOk: false, deck: ['Accusation'], wirkt: (t, s, h) => !!t.hero(s, h).statuses?.poisoned },
   { name: 'The Yeeting', gift: true, wirkt: (t, s, h) => t.hp(s, h) === 650 },
 ];
 
@@ -52,7 +55,7 @@ const KARTEN = [
       t.targetFn = (valid) => { if (!angeboten) angeboten = adr(valid); return null; };
       t.policy.cancelTargets = true;
       const r = await t.play(0, k.name, { hero: 1 });
-      const soll = erwartet(z, k.fremdOk !== false, !!k.gift);
+      const soll = erwartet(z, k.fremdOk !== false, !!k.gift, k.charmOk !== false);
       R.check(`${k.name} / ${z}: angeboten ${soll.join(', ')}`, gleich(angeboten, soll), { angeboten, r });
       R.check(`${k.name} / ${z}: nach Abbruch nichts verbraucht (Karte auf der Hand)`, t.pile(0, 'hand').includes(k.name) || r === false, t.pile(0, 'hand'));
       R.check(`${k.name} / ${z}: sauber`, sauber(t), { e: t.errors, a: t.audit() });

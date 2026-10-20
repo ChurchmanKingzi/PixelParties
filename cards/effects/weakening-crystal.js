@@ -15,6 +15,10 @@
 //   • Hero-effect negation — als ECHTER `negated`-
 //     Status mit `_byWeakeningCrystal`-Marke.
 //
+//  ★ W33a (Al, 22.10.2026): „the effects of all YOUR Heroes" = die Helden,
+//  die der Halter GERADE KONTROLLIERT; die Negierung folgt dem Helden bei
+//  jedem Kontrollwechsel (siehe `_crystals-shared.js`, `_wcFor`).
+//
 //  ★ v1103 (Als Ruling 15.9.): „Den Status zu
 //  cleansen, entfernt ihn TEMPORAER. Solange
 //  Crystal auf der Hand ist, wird der Effekt (mit

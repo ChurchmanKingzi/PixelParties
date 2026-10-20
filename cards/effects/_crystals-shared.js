@@ -111,55 +111,80 @@ function selfRevealEffectsSuppressed(engine, pi) {
 function refreshWeakeningCrystalNegation(engine, opts = {}) {
   const players = engine?.gs?.players;
   if (!Array.isArray(players)) return;
-  for (let pi = 0; pi < players.length; pi++) {
-    if (typeof opts.onlyFor === 'number' && opts.onlyFor !== pi) continue;
-    const ps = players[pi];
+  // ★ W33a (Al, 22.10.2026: „Weakening Crystal noch nachziehen!"): „the effects of all YOUR Heroes are negated" = die Helden, die der Halter des Kristalls
+  // GERADE KONTROLLIERT (`heroSideOf`: Charme-Marke > dauerhafte Übernahme > Spalte) – nicht die Spalte der Hand. Der Status `negated` (Marke `_byWeakeningCrystal`)
+  // trägt jetzt `_wcFor` = den Kristall-Halter, für den er gilt, und FOLGT dem Helden:
+  //   • Kontrollwechsel (Charme, Diebstahl, dauerhafte Übernahme, Rückgabe, Zugende-Rückfall): die Negierung des bisherigen Kontrolleurs fällt SOFORT, die des neuen
+  //     (liegt bei ihm ein Kristall in der Hand) wird SOFORT angelegt – erkannt am Vergleich mit dem beim letzten Abgleich gemerkten Kontrolleur (`_wcKontrolle`,
+  //     nicht aufzählbar am Heldenobjekt, ein neues Heldenobjekt startet bei seiner Spalte). Ohne Kontrollwechsel bleibt alles wie in v1103 (Anlage nur beim Eintritt in
+  //     die Hand, zu Rundenbeginn, bei Neuanlage nach Fremd-Negation; Heilung gilt bis zum nächsten Rundenbeginn).
+  //   • Ausnahmen wie bisher (Karian, Zustandsimmunität, Big Gwen Guard) plus: ein übernommener Held, der durch die Kontrolle ausdrücklich gegen die EIGENEN Karten des
+  //     Kontrolleurs immun ist (Charme Lv3, Golden Apple/The Sixth Circle; `heroImmunGegenEigene`, W31a), bekommt die Negierung nicht – sie zählt als negativer Status.
+  // `opts.onlyFor` ohne `onlyHero` = nur Helden dieses KONTROLLEURS; mit `onlyHero` (Aufrufer: Statusablauf/Heilung eines einzelnen Helden) = Brettseite `onlyFor`.
+  const hatKristall = players.map((ps, pi) => !!ps?.hand && ps.hand.includes(WEAKENING_CRYSTAL) && !selfRevealEffectsSuppressed(engine, pi));
+  const neuAngelegt = players.map(() => 0);
+  for (let seite = 0; seite < players.length; seite++) {
+    const ps = players[seite];
     if (!ps?.heroes) continue;
-    const hasCrystal = (ps.hand || []).includes(WEAKENING_CRYSTAL)
-      && !selfRevealEffectsSuppressed(engine, pi);
-    let neuAngelegt = 0;
-    for (const hero of ps.heroes) {
+    for (let hi = 0; hi < ps.heroes.length; hi++) {
+      const hero = ps.heroes[hi];
       if (!hero?.name) continue;
-      if (typeof opts.onlyHero === 'number' && ps.heroes.indexOf(hero) !== opts.onlyHero) continue;   // Z2: nur dieser Held
-      if (hasCrystal) {
-        if (!opts.reapply) continue;               // nur aufraeumen
-        if (engine.heroIgnoresHaltStatuses?.(pi, ps.heroes.indexOf(hero))) continue;   // W12 (Al, Q114): Karian wird nie durch Negation gehindert
-        // ★ Welle 14 (Al, Q11 aus W13c / A08-28): „Immunität gegen jeden Status negiert auch Crystal." — „This counts as a negative status effect":
-        // ein Held mit ZUSTANDS-Immunität gegen negative Status (Petrification Break am Träger, `negative_status_immune`-Buff [Divine Gift of
-        // Coolness], Light Ball, Einzel-Immunität `negate_immune`) bekommt die Negation gar nicht erst.
-        // Karian ist weiterhin über `heroIgnoresHaltStatuses` oben ausgenommen. Bewusst NICHT geprüft: Anfangsschutz (`shielded`, gilt gegen den
-        // Gegner), CC-`immune` (kurzlebig), Submerged und Johannas Schutz (ihr laufendes Passiv ruht, sobald derselbe Kristall sie negiert —
-        // die Prüfung hinge von der Heldenreihenfolge ab).
-        {
-          const hi = ps.heroes.indexOf(hero);
-          if (engine.heroHasStatusImmunityAttachment?.(pi, hi)
-              || hero.buffs?.negative_status_immune
-              || hero.statuses?.negate_immune
-              || engine._lightBallProtects?.(pi, 'hero', hi)) continue;
-        }
-        const cur = hero.statuses?.negated;
-        // Ein FREMDES `negated` nicht ueberschreiben.
-        if (cur && cur._byWeakeningCrystal !== true) continue;
-        if (cur) continue;                         // liegt schon
-        if (!hero.statuses) hero.statuses = {};
-        hero.statuses.negated = {
-          _byWeakeningCrystal: true,
-          // ★ v1169: PASSIV — die Karte auf der Hand haelt den Status
-          // aufrecht. Heilen wirkt nur bis zum naechsten Rundenbeginn,
-          // uebertragen (Tea) geht gar nicht.
-          sourceBound: true,
-          appliedTurn: engine.gs?.turn ?? 0,
-        };
-        engine._heldenStatusVerursacher(hero.statuses.negated, { appliedBy: pi, source: 'Weakening Crystal' });   // v1399: eigene Hand → selbst verursacht
-        neuAngelegt++;
-      } else if (hero.statuses?.negated?._byWeakeningCrystal === true) {
-        // ★ Die Karte ist weg → der Status faellt SOFORT, nicht erst
-        // zum naechsten Rundenbeginn.
-        delete hero.statuses.negated;
+      const kontrolleur = engine.heroSideOf(seite, hero);
+      // Kontrollwechsel erkennen (Merker unsichtbar am Heldenobjekt; fehlt er, gilt die Spalte als bisheriger Kontrolleur).
+      const vorher = Object.prototype.hasOwnProperty.call(hero, '_wcKontrolle') ? hero._wcKontrolle : seite;
+      if (vorher !== kontrolleur || !Object.prototype.hasOwnProperty.call(hero, '_wcKontrolle')) {
+        Object.defineProperty(hero, '_wcKontrolle', { value: kontrolleur, writable: true, configurable: true, enumerable: false });
       }
+      const gewechselt = vorher !== kontrolleur;
+      const cur = hero.statuses?.negated;
+      const meins = cur?._byWeakeningCrystal === true;
+      // Aufräumen: der Kristall des bisherigen Halters gilt nicht mehr (Karte weg ODER der Held wird nicht mehr von ihm kontrolliert).
+      if (meins) {
+        const eigner = cur._wcFor ?? seite;   // ältere Marke ohne `_wcFor` = Halter in der Spalte
+        if (eigner !== kontrolleur || !hatKristall[eigner]) { delete hero.statuses.negated; }
+      }
+      if (!hatKristall[kontrolleur]) continue;
+      // Anlegen nur, wenn gefordert: Kontrollwechsel (sofort) oder `reapply` (Eintritt in die Hand / Rundenbeginn / Laden / Ablauf einer Fremd-Negation).
+      let anlegen = gewechselt;
+      if (!anlegen && opts.reapply) {
+        if (typeof opts.onlyHero === 'number') anlegen = opts.onlyFor === seite && opts.onlyHero === hi;
+        else if (typeof opts.onlyFor === 'number') anlegen = opts.onlyFor === kontrolleur;
+        else anlegen = true;
+      }
+      if (!anlegen) continue;
+      if (engine.heroIgnoresHaltStatuses?.(seite, hi)) continue;   // W12 (Al, Q114): Karian wird nie durch Negation gehindert
+      // ★ Welle 14 (Al, Q11 aus W13c / A08-28): „Immunität gegen jeden Status negiert auch Crystal." — „This counts as a negative status effect":
+      // ein Held mit ZUSTANDS-Immunität gegen negative Status (Petrification Break am Träger, `negative_status_immune`-Buff [Divine Gift of
+      // Coolness], Light Ball, Einzel-Immunität `negate_immune`) bekommt die Negation gar nicht erst.
+      // Karian ist weiterhin über `heroIgnoresHaltStatuses` oben ausgenommen. Bewusst NICHT geprüft: Anfangsschutz (`shielded`, gilt gegen den
+      // Gegner), CC-`immune` (kurzlebig), Submerged und Johannas Schutz (ihr laufendes Passiv ruht, sobald derselbe Kristall sie negiert —
+      // die Prüfung hinge von der Heldenreihenfolge ab).
+      if (engine.heroHasStatusImmunityAttachment?.(seite, hi)
+          || hero.buffs?.negative_status_immune
+          || hero.statuses?.negate_immune
+          || engine._lightBallProtects?.(seite, 'hero', hi)) continue;
+      if (kontrolleur !== seite && engine.heroImmunGegenEigene?.(seite, hi, kontrolleur)) continue;   // W33a: Charme-Schutz gegen eigene Karten
+      const aktuell = hero.statuses?.negated;
+      // Ein FREMDES `negated` nicht überschreiben; liegt unser Kristall-`negated` schon, bleibt es.
+      if (aktuell) continue;
+      if (!hero.statuses) hero.statuses = {};
+      hero.statuses.negated = {
+        _byWeakeningCrystal: true,
+        _wcFor: kontrolleur,
+        // ★ v1169: PASSIV — die Karte auf der Hand haelt den Status
+        // aufrecht. Heilen wirkt nur bis zum naechsten Rundenbeginn,
+        // uebertragen (Tea) geht gar nicht.
+        sourceBound: true,
+        appliedTurn: engine.gs?.turn ?? 0,
+      };
+      engine._heldenStatusVerursacher(hero.statuses.negated, { appliedBy: kontrolleur, source: 'Weakening Crystal' });   // v1399: eigene Hand → selbst verursacht
+      neuAngelegt[kontrolleur]++;
     }
-    // Kleine Animation, wenn wirklich neu angelegt wurde (Als Vorgabe).
-    if (neuAngelegt > 0 && typeof engine._broadcastEvent === 'function') {
+  }
+  // Kleine Animation, wenn wirklich neu angelegt wurde (Als Vorgabe).
+  if (typeof engine._broadcastEvent === 'function') {
+    for (let pi = 0; pi < players.length; pi++) {
+      if (neuAngelegt[pi] <= 0) continue;
       engine._broadcastEvent('play_zone_animation', {
         type: 'crystal_drain', zoneType: 'board', layer: 'background',
         owner: pi, heroIdx: -1, zoneSlot: -1, duration: 1200,

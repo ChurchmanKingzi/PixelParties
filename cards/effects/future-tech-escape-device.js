@@ -59,6 +59,22 @@ function sperreFrei(gs, ownerIdx, heroIdx) {
   return gs.hoptUsed?.[`ft-escape:${heroIdx}:${ownerIdx}`] !== gs.turn;
 }
 
+/**
+ * ★ W33a (Al, 22.10.2026: „Escape Device soll, wie ALLE Karten, die 'Hero you control' sagen, nach aktueller Kontrolle gehen, also Kontrolleur, nicht Owner."):
+ * „a Hero you control" = der Held, den `pi` GERADE kontrolliert (`heroSideOf`: Charme-Marke > dauerhafte Übernahme > Spalte) – ein übernommener Gegnerheld ja, ein
+ * abgegebener eigener Held nein. `t.owner` bleibt die BRETTSEITE (Ziel-ID, Immunität, Animation). Schlüssel der Einmal-Sperre: Held der eigenen Spalte wie bisher der
+ * Index, ein übernommener Gegnerheld `<Seite>:<Index>` (sonst Kollision mit dem gleich indizierten eigenen Helden).
+ */
+function kontrolliert(engine, pi, t) {
+  if (!t || t.type !== 'hero') return false;
+  const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+  if (!hero?.name) return t.owner === pi;
+  return engine.heroSideOf(t.owner, hero) === pi;
+}
+function heldSchluessel(pi, t) {
+  return t.owner === pi ? t.heroIdx : `${t.owner}:${t.heroIdx}`;
+}
+
 module.exports = {
   // ★ KEIN `isReaction: true` (Als Befund 21.8.: „feuert bei jeder
   //   Gelegenheit, inklusive Phasenwechsel"). Das Flag meldet eine
@@ -77,7 +93,7 @@ module.exports = {
     if (!targetedHeroes || targetedHeroes.length === 0) return false;
     // Eigene Helden unter den Zielen, fuer die die Sperre noch frei ist.
     const eigene = targetedHeroes.filter(t =>
-      t.owner === pi && t.type === 'hero' && sperreFrei(gs, pi, t.heroIdx));
+      kontrolliert(engine, pi, t) && sperreFrei(gs, pi, heldSchluessel(pi, t)));
     if (eigene.length === 0) return false;
 
     // ★ NUR eine echte Attack- oder Spell-KARTE (Als Befund 21.8.:
@@ -107,7 +123,7 @@ module.exports = {
   async postTargetResolve(engine, pi, targetedHeroes, sourceCard) {
     const gs = engine.gs;
     const eigene = (targetedHeroes || []).filter(t =>
-      t.owner === pi && t.type === 'hero' && sperreFrei(gs, pi, t.heroIdx));
+      kontrolliert(engine, pi, t) && sperreFrei(gs, pi, heldSchluessel(pi, t)));
     if (eigene.length === 0) return {};
 
     // Bei mehreren eigenen Zielen entscheidet der Spieler, wer entkommt.
@@ -119,8 +135,8 @@ module.exports = {
     //   Klickflaechen abbildet — mit ihnen bewirkt ein Klick nichts.
     let ziel = eigene[0];
     if (eigene.length > 1) {
-      const erlaubt = new Set(eigene.map(t => t.heroIdx));
-      const auswahl = engine.getHeroTargets(pi).filter(t => erlaubt.has(t.heroIdx));
+      const erlaubt = new Set(eigene.map(t => `${t.owner}:${t.heroIdx}`));
+      const auswahl = engine.getControlledHeroTargets(pi).filter(t => erlaubt.has(`${t.owner}:${t.heroIdx}`));   // W33a: kontrollierte Helden (Brettseite in der ID)
       if (auswahl.length > 1) {
         const wahl = await engine.promptEffectTarget(pi, auswahl, {
           title: CARD_NAME,
@@ -133,13 +149,13 @@ module.exports = {
         });
         const id = Array.isArray(wahl) ? wahl[0] : wahl;
         const gewaehlt = auswahl.find(t => t.id === id);
-        if (gewaehlt) ziel = eigene.find(t => t.heroIdx === gewaehlt.heroIdx) || ziel;
+        if (gewaehlt) ziel = eigene.find(t => t.owner === gewaehlt.owner && t.heroIdx === gewaehlt.heroIdx) || ziel;
       } else if (auswahl.length === 1) {
-        ziel = eigene.find(t => t.heroIdx === auswahl[0].heroIdx) || ziel;
+        ziel = eigene.find(t => t.owner === auswahl[0].owner && t.heroIdx === auswahl[0].heroIdx) || ziel;
       }
     }
 
-    if (!engine.claimHOPT(`ft-escape:${ziel.heroIdx}`, pi)) return {};
+    if (!engine.claimHOPT(`ft-escape:${heldSchluessel(pi, ziel)}`, pi)) return {};
 
     engine._broadcastEvent('play_zone_animation', {
       type: 'shield_bubble', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1,
@@ -157,7 +173,7 @@ module.exports = {
     //   Die Karte laeuft also sichtbar durch; nur an diesem einen
     //   Helden prallt alles ab. Frueher hat der Ein-Ziel-Fall die
     //   ganze Karte negiert — das unterdrueckte auch ihre Anzeige.
-    engine.grantEffectImmunity(pi, ziel.heroIdx, sourceCard);
+    engine.grantEffectImmunity(ziel.owner, ziel.heroIdx, sourceCard);   // W33a: Brettseite des Helden (bei eigenem Helden = pi)
     engine.sync();
     return {};
   },

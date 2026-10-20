@@ -68,7 +68,7 @@ module.exports = {
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
     if (srcOwner < 0 || srcOwner === pi) return false;
     // "a target YOU control" — at least one chosen target is yours.
-    if (!Array.isArray(targetedHeroes) || !targetedHeroes.some(t => t?.owner === pi)) return false;
+    if (!Array.isArray(targetedHeroes) || !targetedHeroes.some(t => t && engine.zielSeite(t) === pi)) return false;   // W33a: „a target you control" = Kontrolle (Held abgegeben nein, übernommen ja)
     // Need a non-target Chaorc Creature to sacrifice.
     return availableTributes(engine, pi, targetedHeroes).length > 0;
   },
@@ -95,9 +95,9 @@ module.exports = {
     // den Chaorc — und erst im Nachlauf (`nachBilder`) fliegt er von
     // dort zur Ablage. Sein eigener Flug vom Brett entfaellt dafuer
     // (`skipPileTransfer`).
-    const zielT = (targetedHeroes || []).find(t => t?.owner === pi);
+    const zielT = (targetedHeroes || []).find(t => t && engine.zielSeite(t) === pi);
     const ziel = zielT
-      ? { owner: pi, heroIdx: zielT.heroIdx, zoneSlot: zielT.type === 'hero' ? -1 : (zielT.slotIdx ?? -1) }
+      ? { owner: zielT.owner ?? pi, heroIdx: zielT.heroIdx, zoneSlot: zielT.type === 'hero' ? -1 : (zielT.slotIdx ?? -1) }
       : null;
     const wurfKey = `ci-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     let geworfen = false;

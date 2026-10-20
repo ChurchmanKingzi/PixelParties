@@ -27450,6 +27450,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       stealer: gs.players[stealerPi]?.username,
       original: gs.players[heroOwnerPi]?.username,
     });
+    this._refreshWeakeningCrystalNegation();   // W33a: Weakening Crystal folgt dem Kontrollwechsel sofort (Negierung des Besitzers fällt, die des Diebs wird angelegt)
     // Fire-and-forget — `actionStealHero` is sync, but the hook opens a
     // reaction window (Very Special Prisoner). Schedule on a microtask
     // so the caller's sync flow isn't blocked; the reaction window is
@@ -45196,6 +45197,9 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (slotInsts.length === 0) continue;
           for (const inst of slotInsts) {
           if (inst.faceDown) continue;
+          // W33a (Al, 22.10.2026: „Nur der aktuelle Kontrolleur einer Creature kann ihren Effekt aktivieren!"): eine Kreatur auf meiner Brettseite, die ein anderer
+          // kontrolliert (vom Gegner gestohlen, seitenfremd beschworen), bekommt der BESITZER/Brettinhaber nicht angeboten. Gegenstück: die Schleife unten.
+          if (this.kontrolleurVon(inst) !== playerIdx) continue;
           // CC-locked creatures cannot fire their own effects — mirrors the
           // engine's hook filter at runHooks (frozen/stunned/negated/nulled
           // creatures are skipped). Spawn Mother's bounce, Slime's split,
@@ -45318,13 +45322,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (oppPs) {
       for (const inst of this.cardInstances) {
         if (inst.zone !== 'support') continue;
-        if (inst.owner !== oi) continue;
-        if (inst.stolenBy !== playerIdx) continue;
+        // W33a (Al, 22.10.2026): jede Kreatur auf der GEGENSEITE, die ich KONTROLLIERE — gestohlen (`stolenBy`, Controller = Dieb) UND seitenfremd beschworen
+        // (`markiereSeitenfremd`: Brettseite = Gegner, Controller = ich); vorher nur die gestohlenen (`inst.owner === oi && stolenBy`).
+        if (this.physicalSide(inst) !== oi) continue;
+        if (this.kontrolleurVon(inst) !== playerIdx) continue;
         if (inst.faceDown) continue;
-        // Charmed-hero pass at the top already handled creatures whose
-        // host is charmed by us — avoid double-listing.
+        // (Der frühere Ausschluss „Host-Held von uns verzaubert" entfällt: der Charme-Scan der Gegenseite ist seit v1197 weg, die Kreatur ginge sonst ganz verloren.)
         const hero = oppPs.heroes?.[inst.heroIdx];
-        if (hero?.charmedBy === playerIdx) continue;
         // CC-locked stolen creatures: same gate as the own-creature loop
         // above. Slimer / Null Zone debuffs apply regardless of whose
         // turn the creature is being fired on.
