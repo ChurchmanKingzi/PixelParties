@@ -166,3 +166,61 @@ def frame_ornaments(plate_x, plate_y, plate_w, plate_h, accent, canvas_size):
         gem = {fn(x, y) for (x, y) in gem_c}
         stamp(cells, gem, ox, oy)
     return layer, gems
+
+
+# ── Äußerer Rahmen und Trennlinien ────────────────────────────────────────────
+
+def _paste(layer, cells, accent, gem, ox, oy):
+    """Zellmenge mit Ursprung (ox, oy) in Zellen auf die Ebene setzen (auch teilweise außerhalb)."""
+    im, (x0, y0) = render(cells, accent, gem)
+    layer.paste(im, ((ox + x0) * U, (oy + y0) * U), im)
+
+
+def post_border(accent, size):
+    """Rand des Posts: Kontur, Akzentlinie, gemusterte Rille (helle Perlen) und Kontur; Eckblöcke und Mittelstücke mit Edelstein."""
+    w, h = size
+    layer = Image.new('RGBA', size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    light = mix(accent, WHITE, 0.5)
+    deep = mix(accent, INK, 0.78)
+    d.rectangle([0, 0, w - 1, h - 1], outline=INK, width=U)
+    d.rectangle([U, U, w - 1 - U, h - 1 - U], outline=accent, width=U)
+    d.rectangle([2 * U, 2 * U, w - 1 - 2 * U, h - 1 - 2 * U], outline=deep, width=U)
+    d.rectangle([3 * U, 3 * U, w - 1 - 3 * U, h - 1 - 3 * U], outline=INK, width=U)
+    # Perlenreihe in der Rille: jede dritte Zelle hell
+    cw, ch = w // U, h // U
+    for i in range(6, cw - 6, 3):
+        for y in (2, ch - 3):
+            d.rectangle([i * U, y * U, i * U + U - 1, y * U + U - 1], fill=light)
+    for j in range(6, ch - 6, 3):
+        for x in (2, cw - 3):
+            d.rectangle([x * U, j * U, x * U + U - 1, j * U + U - 1], fill=light)
+    # Eckblöcke 8×8 mit Edelstein und abgeschnittener Außenecke
+    block = {(x, y) for x in range(8) for y in range(8) if not (x + y < 2)}
+    gem = gem_cells(4, 4, 2)
+    for fx, fy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        cells = {((7 - x) if fx else x, (7 - y) if fy else y) for (x, y) in block}
+        g = {((7 - x) if fx else x, (7 - y) if fy else y) for (x, y) in gem}
+        _paste(layer, cells, accent, g, 0 if not fx else cw - 8, 0 if not fy else ch - 8)
+    # Mittelstücke: Sechseck-Raute mit Edelstein, je Seite
+    lozenge = {(x, y) for x in range(15) for y in range(4) if abs(x - 7) <= 7 - (1 if y in (0, 3) else 0) * 2}
+    for (px_, py_, trans) in ((cw // 2 - 7, 0, False), (cw // 2 - 7, ch - 4, False), (0, ch // 2 - 7, True), (cw - 4, ch // 2 - 7, True)):
+        cells = {(y, x) for (x, y) in lozenge} if trans else set(lozenge)
+        g = gem_cells(1, 7, 1) if trans else gem_cells(7, 1, 1)
+        _paste(layer, cells, accent, g, px_, py_)
+    return layer
+
+
+def divider(length, accent, direction=1, thick=2, gem_r=2):
+    """Trennlinie mit Edelstein am Ende und kleinem Stein in der Mitte, Ursprung = Innenseite, direction = ±1."""
+    cells = stroke([(0, 0), (length, 0)], thick)
+    gem = gem_cells(length + gem_r + 1, thick // 2, gem_r) | gem_cells(length // 2, thick // 2, 1 if thick > 1 else 0)
+    if direction < 0:
+        cells = {(-x, y) for (x, y) in cells}
+        gem = {(-x, y) for (x, y) in gem}
+    return cells, gem
+
+
+def place_divider(layer, accent, x_px, y_px, length, direction, thick=2, gem_r=2):
+    cells, gem = divider(length, accent, direction, thick, gem_r)
+    _paste(layer, cells, accent, gem, x_px // U, y_px // U)

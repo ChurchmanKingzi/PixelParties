@@ -169,7 +169,7 @@ class Background:
             for x in range(2 * U + (step // 2 // U * U if row % 2 else 0), W, step):
                 dd.rectangle([x, y, x + U - 1, y + U - 1], fill=dotc)
         self.dots = dots
-        self.border = post_border(accent)
+        self.border = ornaments.post_border(accent, (W, H))
 
     def frame(self, t):
         ray = np.sin((self.ang * self.RAYS + t * 2 * math.pi) )          # t: 0…1 = ein Strahlenpaar weiter
@@ -217,17 +217,6 @@ def bevel_frame(size, accent, thick=32):
     for cx, cy in ((0, 0), (w - 3 * U, 0), (0, h - 3 * U), (w - 3 * U, h - 3 * U)):
         d.rectangle([cx, cy, cx + 3 * U - 1, cy + 3 * U - 1], fill=INK)
         d.rectangle([cx + U, cy + U, cx + 2 * U - 1, cy + 2 * U - 1], fill=light)
-    return im
-
-
-def post_border(accent):
-    """Äußerer Rand des Posts (CI): dunkel – Akzent – dunkel, mit Eckrauten."""
-    im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    dark = mix(accent, INK, 0.7)
-    d.rectangle([0, 0, W - 1, H - 1], outline=INK, width=U)
-    d.rectangle([U, U, W - 1 - U, H - 1 - U], outline=dark, width=U)
-    d.rectangle([2 * U, 2 * U, W - 1 - 2 * U, H - 1 - 2 * U], outline=accent, width=U // 2 * 1)
     return im
 
 
@@ -417,9 +406,15 @@ def main():
     parts = card_name.split(',', 1)
     short = parts[0].upper()
     sub = parts[1].strip().upper() if len(parts) > 1 else ''
-    draw_text(mid, short, 8, (W // 2, 1243 if sub else 1256), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
+    name_y, sub_y = (1238, 1295) if sub else (1252, 0)
+    nx, ny, nw, nh = draw_text(mid, short, 8, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
+    # Trennlinien mit Edelstein links und rechts vom Namen, kürzere beim Beinamen
+    ornaments.place_divider(mid, accent, nx - 2 * U, name_y - U, 16, -1)
+    ornaments.place_divider(mid, accent, nx + nw + 2 * U, name_y - U, 16, 1)
     if sub:
-        draw_text(mid, sub, 3, (W // 2, 1301), color=accent, outline=None, shadow=INK)
+        sx_, sy_, sw_, sh_ = draw_text(mid, sub, 3, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
+        ornaments.place_divider(mid, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
+        ornaments.place_divider(mid, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
 
     # Sprite-Lage: Gesicht über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
