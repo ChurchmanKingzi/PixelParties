@@ -74,6 +74,8 @@ function canHeroSummon(engine, pi, heroIdx, cd, opts = {}) {
   // Welle 12 (Al, Rueckfrage 2): ein NEGIERTER Held kann „ganz normal Aktionen ausfuehren und also beschwoeren" — `negated` sperrt hier nicht mehr.
   // Sind seine ABILITIES negiert (harte Form), faellt die Summoning Magic weg: `heroMeetsLevelReq` laesst dann nur noch Stufe-0-Kreaturen zu.
   if (st.frozen || st.stunned || st.webbed || st.bound) return false;
+  // W24a (N1-02): Berserk — "cannot … summon Creatures" gilt auch fuer Effekt-Beschwoerungen (`validateActionPlay` sperrt nur den Handweg).
+  if (st.berserked) return false;
   if (!cd) return false;
   if (opts.alsAktion && heroActionLocked(engine, pi, heroIdx, physOwner)) return false;
   return engine.heroMeetsLevelReq(physOwner, heroIdx, cd);
