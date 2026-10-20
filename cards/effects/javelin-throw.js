@@ -83,8 +83,9 @@ function heroTargets(engine, pi) {
 }
 
 module.exports = {
-  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-  treatedAsAttack: { level: 0 },
+  // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+  // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten Helden (nicht mehr fix 0).
+  treatedAsAttack: { ability: 'Fighting' },
   isTargetingArtifact: true,
   requiresTarget: true,
   animationType: 'none',

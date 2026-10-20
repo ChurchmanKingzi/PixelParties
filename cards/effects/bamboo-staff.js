@@ -81,7 +81,8 @@ module.exports = {
   // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
   // W30a (Al, 21.10.2026): Bamboo Staff nennt den Helden als Angreifer (treated as that Hero hitting the target with an Attack) → die Stufe ist das FIGHTING-LEVEL
   // des ausgerüsteten Helden (`fightingOfHost`: Quelle = Karteninstanz in den Zielwahl-/Reaktionsfenstern; im Treffer trägt das Quellobjekt den dynamischen Stempel). Ohne Instanz: 0.
-  treatedAsAttack: { level: 0, fightingOfHost: true },
+  // W32a (Al, 22.10.2026): allgemeine Regel „Zählt als Attack eines Helden = Ability-Level dieses Helden" (hier Fighting-Level des Trägers); die Deklaration trägt keine Sonderstufe mehr.
+  treatedAsAttack: { ability: 'Fighting' },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

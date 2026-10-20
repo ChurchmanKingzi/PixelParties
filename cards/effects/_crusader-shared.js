@@ -244,8 +244,10 @@ function makeCrusaderArtifact(spec) {
   return {
     activeIn: ['support'],
 
-    // W27a (Al, 21.10.2026): „That is treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-    treatedAsAttack: { level: 0 },
+    // W27a (Al, 21.10.2026): „That is treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+    // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des Trägers (Cecilia; nicht mehr fix 0). Kann der Träger nicht
+    // angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), ist der Effekt nicht aktivierbar (`canActivateEquipEffect`).
+    treatedAsAttack: { ability: 'Fighting' },
 
     canEquipToHero(gs, pi, heroIdx, engine) {
       return darfAufHeld(gs, pi, heroIdx, engine, cardName);

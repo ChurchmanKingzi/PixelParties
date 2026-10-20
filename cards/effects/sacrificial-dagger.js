@@ -121,7 +121,8 @@ async function dolchSchlag(ctx, pi) {
 module.exports = {
   // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
   // W30a (Al, 21.10.2026): This counts as the equipped Hero hitting that target with an Attack → Stufe = FIGHTING-LEVEL des ausgerüsteten Helden (`fightingOfHost`; ohne Instanz 0).
-  treatedAsAttack: { level: 0, fightingOfHost: true },
+  // W32a (Al, 22.10.2026): allgemeine Regel „Zählt als Attack eines Helden = Ability-Level dieses Helden" (hier Fighting-Level des Trägers); die Deklaration trägt keine Sonderstufe mehr.
+  treatedAsAttack: { ability: 'Fighting' },
   activeIn: ['support'],
 
   cpuMeta: {

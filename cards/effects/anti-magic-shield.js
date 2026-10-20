@@ -37,7 +37,8 @@ module.exports = {
     const isSpellDamageType = /_spell$/.test(dmgType || '');
     if (!isSpellCard && !isSpellDamageType) return false;
 
-    const spellLevel = isSpellCard ? (srcData.level || 0) : 0;
+    // W32a (Al, 22.10.2026): ein Heldeneffekt, der als Spell zählt (Alice), hat als Stufe das ABILITY-LEVEL seines Helden (Destruction Magic) — nicht mehr fix 0.
+    const spellLevel = isSpellCard ? (srcData.level || 0) : (engine._heldenEffektStufe?.(sourceCard?.name, dmgType, sourceCard) ?? 0);
 
     // At least one targeted hero must belong to this player
     // AND have Magic Arts level >= spell level

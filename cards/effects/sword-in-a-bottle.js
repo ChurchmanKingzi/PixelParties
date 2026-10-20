@@ -86,6 +86,8 @@ function paarGesperrt(engine, pi, angreiferT, opferT, validTargets) {
     return !!engine.heroBlocksTargeting(opferT.owner, opferT.heroIdx, {
       sourceData: engine._getCardDB()[CARD_NAME], cardName: CARD_NAME, damageType: 'attack', chooserIdx: pi,
       chooserHeroIdx: angreiferT.heroIdx, chooserHeroOwner: angreiferT.owner, allTargets: opfer,
+      // W32a (Al, 22.10.2026): Quellstufe = Fighting-Level DES gewaehlten Angreifer-Helden (Stealth/Jetpack lesen `info.treatedAsLevel`).
+      source: { name: CARD_NAME, owner: pi, controller: pi, heroIdx: angreiferT.heroIdx, heroOwner: angreiferT.owner },
     });
   } catch { return false; }
 }
@@ -96,8 +98,10 @@ function angriffswert(engine, pi, heroIdx) {
 }
 
 module.exports = {
-  // W27a (Al, 21.10.2026): „treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
-  treatedAsAttack: { level: 0 },
+  // W27a (Al, 21.10.2026): „treated as an Attack" — Leser der Quellstufe (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) fragen `_heldenEffektStufe`.
+  // W32a (Al, 22.10.2026): „Sie nehmen trotzdem das Fighting-Level": die Quellstufe ist das FIGHTING-LEVEL des gewählten eigenen Helden (nicht mehr fix 0). Der gewählte
+  // Held ist der ANGREIFER (Punkt 6): die Quelle trägt Brettseite + Index — Crimson Web hängt sich an ihn, Tharxian Horse trifft ihn. Kann er nicht angreifen (Frozen …), blockt der Trank.
+  treatedAsAttack: { ability: 'Fighting' },
   // ★ PFLICHTFLAGGE (Als Befund 12.9.): `doUsePotion` steigt ohne sie
   //   STILL aus (`if (!script?.isPotion) return false;`). Die Karte war
   //   im Client als nutzbar hervorgehoben, der Klick lief ins Leere —
