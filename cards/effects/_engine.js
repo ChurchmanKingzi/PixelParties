@@ -8686,9 +8686,22 @@ class GameEngine {
     const _eingangsBetrag = amount;
     // Alleria redirect: damage cannot be reduced/negated except by Surprises
     if (this.gs._redirectedOnlyReducibleBySurprise) {
-      hookCtx.cannotBeNegated = true;
-      hookCtx.onlyReducibleBySurprise = true;
-      delete this.gs._redirectedOnlyReducibleBySurprise;
+      // W24d (N4-02): nur der Treffer des umgeleiteten Effekts (Zielheld + Quellspieler, gleicher Zug)
+      // verbraucht die Marke; ein Effekt ohne Schaden (Burn …) laesst sie nicht fuer fremde Treffer stehen.
+      const _st = this.gs._redirectedOnlyReducibleStamp;
+      const _qs = source?.controller ?? source?.owner;
+      const _passt = !_st || (_st.turn === this.gs.turn
+        && target === this.gs.players[_st.owner]?.heroes?.[_st.heroIdx]
+        && (_st.srcOwner == null || _qs === _st.srcOwner));
+      if (_passt) {
+        hookCtx.cannotBeNegated = true;
+        hookCtx.onlyReducibleBySurprise = true;
+        delete this.gs._redirectedOnlyReducibleBySurprise;
+        delete this.gs._redirectedOnlyReducibleStamp;
+      } else if (_st.turn !== this.gs.turn) {
+        delete this.gs._redirectedOnlyReducibleBySurprise;
+        delete this.gs._redirectedOnlyReducibleStamp;
+      }
     }
     // v668: „True Damage" nach einer Selbst-Umleitung (Monia Bot). Der
     // Umleiter setzt `gs._redirectedTrueDamage = { owner, heroIdx, turn }`;
