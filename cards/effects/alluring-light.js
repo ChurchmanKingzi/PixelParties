@@ -75,7 +75,9 @@ module.exports = {
     const oppIdx = opponentOfGs(gs, pi);
     if (!engine) return false;
     // Kontrolle statt Seite (Styx 28.9.)
-    const hatHelden = engine.heroesControlledBy(oppIdx).some(({ hero: h }) => h?.name && h.hp > 0);
+    // ★ W34a (Al, 22.10.2026, Punkt 1: „Ja, ist korrekt"): der gezwungene Held ist geblockt, wenn er nicht angreifen kann (Frozen, Stunned, Webbed, Bound, harte Negierung,
+    // Attack-Sperren/-Zähler: `heroKannAngreifen`) — ohne einen angriffsfähigen Gegnerheld ist die Karte nicht spielbar.
+    const hatHelden = engine.heroesControlledBy(oppIdx).some(({ physOwner, heroIdx: hi, hero: h }) => h?.name && h.hp > 0 && engine.heroKannAngreifen(physOwner, hi, oppIdx, { name: h.name }));
     if (!hatHelden) return false;
     try { return kontrollierteHeldenZiele(engine, pi).length + engine.getCreatureTargets(pi).length > 0; }
     catch { return false; }
@@ -89,7 +91,8 @@ module.exports = {
       const oppIdx = engine.opponentOf(pi);
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
-      const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx);   // Kontrolle statt Seite (Styx 28.9.)
+      // W34a: nur Helden, die ANGREIFEN können (`heroKannAngreifen`, Kontrolleur = Gegner) sind als Angreifer wählbar.
+      const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx).filter(z => engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));   // Kontrolle statt Seite (Styx 28.9.)
       const heldWahl = await engine.promptEffectTarget(pi, gegnerZiele, {
         title: CARD_NAME,
         description: "Choose an opponent's Hero — it will be lured into attacking.",
@@ -134,6 +137,13 @@ module.exports = {
 
         const opferSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
         const atk = angreifer.atk || 0;
+
+        // ★ W34a: zwischen Wahl und Treffer eingefroren/betäubt/gesperrt (Reaktion, Sperre): der gezwungene Held greift nicht an — die Karte ist verbraucht, es passiert nichts.
+        if (!engine.heroKannAngreifen(angreiferZiel.owner, angreiferZiel.heroIdx, oppIdx, { name: angreifer.name })) {
+          engine.log('alluring_light_blocked', { player: gs.players[pi]?.username, lured: angreifer.name });
+          engine.sync();
+          return;
+        }
 
         // ── Animation ① das Anlock-Leuchten auf dem OPFER ─────────────
         // ★ v1173: laenger stehen lassen (Al 17.9.) — die Ebene raeumt die
