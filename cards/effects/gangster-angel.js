@@ -73,6 +73,22 @@ function gegnerHelden(engine, oi) {
     }));
 }
 
+/**
+ * N3-09 (W24): Kreaturen, die `oi` kontrolliert — ALLE, auch „cannot be chosen" (Thicket). „all targets your opponent controls" waehlt nicht,
+ * der Schutz gilt nur Wahl-Effekten (Kopfkommentar thicket.js; Spirit of the Barbarian Sword, Biseria-Frost). `getCreatureTargets` laesst
+ * `untargetable_all` aus (gedacht fuer Targeting-Artefakte), deshalb hier ueber die Instanzen; Zielform wie dort (`kreaturZiel`: Brettseite).
+ */
+function gegnerKreaturen(engine, oi) {
+  const out = [];
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.faceDown || engine.kontrolleurVon(inst) !== oi) continue;
+    const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
+    if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
+    out.push(engine.kreaturZiel(inst));
+  }
+  return out;
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -93,7 +109,7 @@ module.exports = {
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const oi = engine.opponentOf(ctx.cardOwner);
-    return (gegnerHelden(engine, oi).length + engine.getCreatureTargets(oi).length) > 0;
+    return (gegnerHelden(engine, oi).length + gegnerKreaturen(engine, oi).length) > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -102,7 +118,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const oi = engine.opponentOf(pi);
 
-    const ziele = [...gegnerHelden(engine, oi), ...engine.getCreatureTargets(oi)];
+    const ziele = [...gegnerHelden(engine, oi), ...gegnerKreaturen(engine, oi)];
     if (ziele.length === 0) return false;
 
     for (const t of ziele) {
