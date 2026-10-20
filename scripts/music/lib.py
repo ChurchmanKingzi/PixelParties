@@ -90,7 +90,7 @@ class Song:
         ch = 9 if name == 'drum' else self.ch[name][0]
         self.ev.append((int(round(beat * TPB)), 0, mido.Message('control_change', channel=ch, control=control, value=int(value))))
 
-    def render(self, sf2, out, gain=0.7, target_rms=0.29, verbose=True, saturate=True, compress=False):
+    def render(self, sf2, out, gain=0.7, target_rms=0.29, verbose=True, saturate=True, compress=False, air_cut=0.0):
         """saturate=True  (Standard, bisherige Tracks): weiche tanh-Sättigung vor dem Limiter — macht Schlagzeug-
         lastige Duell-Tracks dicht und laut, verzerrt aber spitzenreiche Klänge (Klavier, Harfe, Zupfer) hörbar.
         saturate=False, compress=True: für akustische/leise Stücke (Draft-Musik …): sanfter Kompressor + Lookahead-
@@ -118,6 +118,11 @@ class Song:
         loop_len = int(round(self.bars * self.bpb * 60 / self.bpm * sr))
         body, tail = data[:loop_len].copy(), data[loop_len:]
         k = min(len(tail), len(body)); body[:k] += tail[:k]      # Ausklang auf den Anfang
+        if air_cut > 0:
+            # Sanfte Höhenabsenkung (ab ≈ 5 kHz, air_cut 0…1; 0,4 ≈ −4 dB): nimmt Blech, Becken und Pfeifen das Schrille.
+            from scipy.signal import butter, sosfilt
+            sos = butter(2, 5000, btype='highpass', fs=sr, output='sos')
+            body = body - air_cut * sosfilt(sos, body, axis=0)
         # Lautheit + Limiter
         if saturate:
             body = body / np.sqrt((body ** 2).mean()) * 0.30
