@@ -4,7 +4,7 @@
 // Nachteil „Skip your Action Phase", also sperrt die Karte. Potion Juggler (Ziehen aus dem Potion Deck + Nachteil) sperrt deshalb auch bei `ps.potionDrawBanned` und bei zu kleinem Potion Deck.
 // Potion of Greed prüft nur `drawWouldBeBlocked` (Tuscan Artist), `handLocked` und die Phase — `potionDrawBanned` (Chaos-Diamond/Pinta-Starthelden: kein Ziehen aus dem Potion Deck)
 // und ein leeres Potion Deck lassen sie spielbar: nichts wird gezogen, die Aktionsphase entfällt trotzdem.
-// Erwartet: Potion of Greed ist bei Potion-Deck-Zieh-Sperre nicht spielbar (Karte bleibt auf der Hand, `_skipActionPhaseTurn` nicht gesetzt).
+// Erwartet (W26a: auch bei leerem Potion Deck): Potion of Greed ist bei Potion-Deck-Zieh-Sperre nicht spielbar (Karte bleibt auf der Hand, `_skipActionPhaseTurn` nicht gesetzt).
 // Beobachtet: gespielt, 0 Karten gezogen, `_skipActionPhaseTurn` gesetzt.
 // Aufruf: node docs/niche-tests/repro/N5-sonstige/07-potion-of-greed-spielbar-ohne-ziehmoeglichkeit.js   (✗ = Fehler tritt auf)
 const H = require('../../lib/h.js');
@@ -19,9 +19,8 @@ const H = require('../../lib/h.js');
       if (gebannt) ps.potionDrawBanned = true;
       const r = await t.play(seat, 'Potion of Greed', {});
       const gespielt = r === true && !t.pile(seat, 'hand').includes('Potion of Greed');
-      // W24e: „Potion Deck leer" ist die schwächere Lesart (kein Ruling; wie Elixir of Quickness mit leerem Hauptdeck bleibt die Karte spielbar) – Frage an Al, hier nur eine Notiz.
-      if (anzahl === 0) R.note(`Sitz ${seat} · ${name}: Potion of Greed ${gespielt ? 'spielbar' : 'nicht spielbar'} (Regelfrage an Al, kein Fehlerkriterium)`, { r });
-      else R.check(`Sitz ${seat} · ${name}: Potion of Greed ${soll ? 'spielbar' : 'nicht spielbar'}`, gespielt === soll, { r, gezogen: t.pile(seat, 'hand').filter(n => n === 'Healing Potion').length, skip: ps._skipActionPhaseTurn });
+      // W26a (Al, 21.10.2026): „1 ja" – auch bei LEEREM Potion Deck ist Potion of Greed nicht spielbar (Konvention D1).
+      R.check(`Sitz ${seat} · ${name}: Potion of Greed ${soll ? 'spielbar' : 'nicht spielbar'}`, gespielt === soll, { r, gezogen: t.pile(seat, 'hand').filter(n => n === 'Healing Potion').length, skip: ps._skipActionPhaseTurn });
       R.check('sauber', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
     }
   }
