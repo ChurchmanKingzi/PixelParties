@@ -5126,6 +5126,7 @@ class GameEngine {
                         ? engine._getCardDB()[cardInstance.name] : null,
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
+                      source: config.attackerSourceOverride,   // W29a: Stempel `treatedAsAttack` (Infected Greatmaw: Stufe = Fighting-Level des gewaehlten Helden)
                       chooserIdx: pi,
                       // v870: WELCHER HELD waehlt. Gebraucht fuer
                       // Regeln zwischen zwei einzelnen Helden
@@ -45472,9 +45473,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `bypassHostStatusFilter: true` (Crimson Web's "discard 1 to
         // untangle" — the locked Hero IS Webbed by this very card and
         // must still be able to fire the untangle action through it).
-        // W27a (Al, 21.10.2026): Spell-Anhängsel liegen bei Frozen/Stunned nicht still (Prayer) — nur Webbed sperrt weiter.
+        // W27a (Al, 21.10.2026): Spell-Anhängsel liegen bei Frozen/Stunned nicht still (Prayer); W29a (Al, 21.10.2026: „Webbed negiert NICHT Attachments!"): auch nicht bei Webbed.
         if (heroParalysed && !script.bypassHostStatusFilter
-            && !(this._istSpellAnhaengsel(inst) && !hero.statuses?.webbed)) continue;
+            && !this._istSpellAnhaengsel(inst)) continue;
 
         // Soft HOPT per equip instance
         const hoptKey = `equip-effect:${inst.id}`;
