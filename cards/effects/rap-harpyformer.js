@@ -38,6 +38,8 @@ module.exports = {
       const ps = engine.gs.players[pi];
       if (!ps) return;
 
+      // N5-02: unter Such-/Hand-Sperre kann die Suche nichts finden → gar nicht erst fragen, Effekt wirkt nicht → Blob stumm
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
       if (!(ps.mainDeck || []).includes(ABILITY_NAME)) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4 (Al): kein Treffer → wirkt nicht → Blob stumm
 
       const confirm = await ctx.promptConfirmEffect({
