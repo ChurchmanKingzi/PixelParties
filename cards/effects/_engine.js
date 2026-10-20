@@ -9975,11 +9975,15 @@ class GameEngine {
     // ★ v1340: HAND-Fenster „Held wurde besiegt" (Cheat Chair) — nach
     // Aufraeumen, Extra Life und Surprise-Rettung, VOR der Spielende-
     // Pruefung: ein wiederbelebter letzter Held haelt die Seite am Leben.
-    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden });
+    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden, kontrolleur: _koKontrolle });
     if (handRettung && target.hp > 0) {
       delete target.diedOnTurn;
       this.sync();
       return true;
+    }
+    // W25a (Corpse-Explosion-Nachtrag c): ein uebernommener Held — Reaktionen mit `heroDefeatedFuerKontrolleur` gehoeren dem KONTROLLEUR, nicht der Brettseite.
+    if (Number.isInteger(_koKontrolle) && _koKontrolle !== ownerIdx && target.hp <= 0) {
+      await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden, kontrolleur: _koKontrolle, reaktor: _koKontrolle });
     }
 
     if (!opts.skipAllDeadCheck) await this.checkAllHeroesDead();
@@ -11370,7 +11374,7 @@ class GameEngine {
    * @param {object}       source - { name, owner, heroIdx } of the effect source
    * @param {CardInstance} inst   - Target creature instance
    */
-  async actionApplyCreaturePoison(source, inst, stacks = 1) {
+  async actionApplyCreaturePoison(source, inst, stacks = 1, opts = {}) {   // W25a (N5-09-Klasse): `opts.unhealable` (Venom Infusion Lv3) - Marke VOR dem Reaktionsfenster
     if (!inst || inst.zone !== 'support') return;
     if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
 
@@ -11392,6 +11396,7 @@ class GameEngine {
       addStacks: true,
       sourceOwner: source?.owner ?? -1,
       source,
+      unhealable: opts.unhealable ? true : undefined,
       _skipAffectedWindow: true,   // W16b: das Fenster ist oben schon aufgegangen
     });
     this.log('poison_applied', {
@@ -13792,19 +13797,23 @@ class GameEngine {
   async _checkHeroDefeatedHandReactions(target, source, ownerIdx, extra = {}) {
     if (this._inHeroDefeatedReaction) return false;
     if (this.gs.result) return false;
-    const pi = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
+    const phys = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
+    // W25a (Corpse-Explosion-Nachtrag c): `extra.reaktor` = KONTROLLEUR des gefallenen Helden (Kontrolle zum Todeszeitpunkt), wenn er nicht die Brettseite ist
+    // (dauerhaft uebernommener Held) — dieser Durchgang bietet nur Karten mit `heroDefeatedFuerKontrolleur` an, aus der Hand des Kontrolleurs.
+    const kontrollPass = Number.isInteger(extra.reaktor) && extra.reaktor !== phys;
+    const pi = kontrollPass ? extra.reaktor : phys;
     const ps = this.gs.players[pi];
     if (!ps || !target || target.hp > 0) return false;
-    const heroIdx = (ps.heroes || []).indexOf(target);
+    const heroIdx = ((this.gs.players[phys]?.heroes) || []).indexOf(target);
     if (heroIdx < 0) return false;
-    const kandidaten = (ps.hand || []).filter(n => loadCardEffect(n)?.isHeroDefeatedReaction);
+    const kandidaten = (ps.hand || []).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
     if (kandidaten.length === 0) return false;
 
     const roh = source?.controller ?? source?.owner;
     const sourceOwner = (isSeat(this, roh)) ? roh : this._deriveEffectOwner({ source }, pi);
-    const lebende = this.heroesControlledBy(pi, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
-    const letzterHeld = lebende.length === 0 && !((ps._teleportedAway || 0) > 0);
-    const info = { hero: target, heroIdx, ownerIdx: pi, source: source || null, sourceOwner, letzterHeld, ohneSchaden: !!extra.ohneSchaden };   // W24a (N1-05): `ohneSchaden` = Insta-Kill (`actionDefeatHero`)
+    const lebende = this.heroesControlledBy(phys, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
+    const letzterHeld = lebende.length === 0 && !((this.gs.players[phys]?._teleportedAway || 0) > 0);
+    const info = { hero: target, heroIdx, ownerIdx: phys, kontrolleur: Number.isInteger(extra.kontrolleur) ? extra.kontrolleur : phys, source: source || null, sourceOwner, letzterHeld, ohneSchaden: !!extra.ohneSchaden };   // W24a (N1-05): `ohneSchaden` = Insta-Kill (`actionDefeatHero`)
     const allCards = this._getCardDB();
 
     const seen = new Set();
@@ -13814,6 +13823,7 @@ class GameEngine {
       if (this._handPlayLockedFor(ps, cardName)) continue;
       const script = loadCardEffect(cardName);
       if (!script?.isHeroDefeatedReaction) continue;
+      if (kontrollPass && !script.heroDefeatedFuerKontrolleur) continue;
       this._noteRxWindow(ps, cardName, 'seen');
       if (script.heroDefeatedCondition && !script.heroDefeatedCondition(this.gs, pi, this, info)) continue;
       const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
@@ -35877,12 +35887,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     return Math.max(0, (cd?.level || 0) + (inst.counters?.level || 0));
   }
 
+  /**
+   * W25a (Corpse-Explosion-Nachtrag a, Al 21.10.2026): wie im Schadenpfad (`_checkAfterCreatureDamageHandReactions`) darf auch der GEGNER des Kontrolleurs
+   * der besiegten Kreatur reagieren — nur Karten mit `firesForOpponentDefeat` (Corpse Explosion) und nur, wenn er ein Mensch ist (CPU nie, sie wuerde sich selbst treffen).
+   */
   async _checkCreatureDefeatedHandReactions(deathInfo, source, type) {
+    if (!deathInfo) return;
+    const ownerIdx = deathInfo.controller ?? deathInfo.owner;
+    await this._checkCreatureDefeatedHandReaktor(deathInfo, source, type, null);
+    if (!isSeat(this, ownerIdx)) return;
+    const oppIdx = this.opponentOf(ownerIdx);
+    if (isSeat(this, oppIdx) && oppIdx !== ownerIdx && !this.isCpuPlayer(oppIdx)) {
+      await this._checkCreatureDefeatedHandReaktor(deathInfo, source, type, oppIdx);
+    }
+  }
+
+  async _checkCreatureDefeatedHandReaktor(deathInfo, source, type, reaktor) {
     if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inCreatureDefeatedReaction) return;
     if (!deathInfo) return;
 
-    const ownerIdx = deathInfo.controller ?? deathInfo.owner;
+    const ownerIdx = reaktor ?? (deathInfo.controller ?? deathInfo.owner);
+    const istGegnerDurchgang = reaktor != null;
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
@@ -35897,6 +35923,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const script = loadCardEffect(cardName);
       if (!script?.isCreatureDefeatedReaction) continue;
+      if (istGegnerDurchgang && !script.firesForOpponentDefeat) continue;   // W25a: der Gegner-Durchgang sieht nur Opt-in-Karten
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
@@ -37645,8 +37672,31 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // W25a (N1-14, Al 21.10.2026: „ja, soll verhindert werden!"): „damage they take cannot be reduced further" (Dichotomy of Luna and Tempeste) gilt auch
+    // fuer Vor-Schaden-Reduktionen von Surprises (Aquatic Shield −100): die Surprise loest aus, ihre Reduktion zaehlt nicht (Schaden bleibt unreduziert).
+    if (totalReduced > 0 && this._surpriseReduktionGesperrt(targetInfo, dmgInfo.source)) {
+      this.log('surprise_reduction_locked', { target: targetInfo.cardName, reduced: totalReduced });
+      totalReduced = 0;
+    }
+
     if (totalReduced === 0 && !negated) return null;
     return { damageReduced: totalReduced, effectNegated: negated };
+  }
+
+  /**
+   * W25a (N1-14): sperrt eine Karte auf dem Brett die Vor-Schaden-Reduktion durch Surprises fuer dieses Ziel? Kartenvertrag
+   * `sperrtSurpriseReduktion(engine, inst, targetInfo, source)` → true (Dichotomy of Luna and Tempeste).
+   * @param {{kind:'hero'|'creature', owner:number, heroIdx:number, hero?:object, inst?:object}} targetInfo
+   */
+  _surpriseReduktionGesperrt(targetInfo, source) {
+    for (const inst of this.cardInstances) {
+      if (!inst || inst.zone !== ZONES.SUPPORT) continue;
+      let sc = null;
+      try { sc = loadCardEffect(inst.name); } catch { sc = null; }
+      if (typeof sc?.sperrtSurpriseReduktion !== 'function') continue;
+      try { if (sc.sperrtSurpriseReduktion(this, inst, targetInfo, source)) return true; } catch { /* Karte entscheidet nie ueber Absturz */ }
+    }
+    return false;
   }
 
   /**
@@ -39198,6 +39248,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
     const reaktor = opts.reaktor ?? playerIdx;
     if (this._reaktionGesperrt(reaktor)) return false;   // v1293 Reaktionssperre
+    // W25a (N1-12, Al 21.10.2026: „Ocean verhindert Surprises (cannot react to)"): unter Dark Ocean oeffnet KEIN Surprise-Fenster gegen den Effekt einer
+    // GEGNERISCHEN Kreatur (wie bei den Hand-Reaktionen, Ruling 5.8.; die Hand-Fenster pruefen die Sperre selbst, `spellInHand` bleibt unberuehrt).
+    // Surprises gegen Attacks/Spells (oberstes Glied keine Kreatur) bleiben unberuehrt. EINE Stelle fuer alle Surprise-Fenster.
+    if (!opts.spellInHand && this.isDarkOceanActive() && this.darkOceanBlocksReaction(reaktor, null)) return false;
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;

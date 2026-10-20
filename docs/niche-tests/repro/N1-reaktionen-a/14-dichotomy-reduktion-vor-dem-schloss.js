@@ -7,7 +7,8 @@
 // Aufbau: Held 1:0 ist Burned, Dichotomy liegt an Held 1:1 (Sitz 1), Aquatic Shield (Magic Arts 2 + Support Magic 2) verdeckt an Held 1:0. Sitz 0 trifft Held 1:0 mit 200 Schaden (Typ attack).
 // Gegenprobe: ohne Aquatic Shield 200 → 100, auch mit Stoneskin (−80 gegen Attacks) bleibt es bei 100 – dessen Reduktion läuft nach der Halbierung und wird gesperrt.
 // Erwartet (Lesart A: nach Dichotomy keine Reduktion mehr): 100 Schaden – die Surprise reduziert nicht. Lesart B (Reihenfolge der Fenster): (200 − 100) / 2 = 50.
-// Beobachtet: 50 (die Surprise reduziert VOR der Halbierung, die Sperre kommt zu spät).
+// Beobachtet (vor W25a): 50 (die Surprise reduzierte VOR der Halbierung, die Sperre kam zu spät).
+// ENTSCHIEDEN (Al, 21.10.2026, W25a: „ja, soll verhindert werden!"): Lesart A – die Surprise löst aus, ihre Reduktion zählt nicht (`_surpriseReduktionGesperrt`, Vertrag `sperrtSurpriseReduktion`); Exit 0 = 100.
 const H = require('../../lib/h.js');
 const SRC = { name: 'ZZ', owner: 0, controller: 0, heroIdx: 0, counters: {} };
 const lauf = async (aufbau) => {

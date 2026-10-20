@@ -61,6 +61,7 @@ function _eligibleHeroIdxs(engine, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    if (engine.heroSideOf(pi, hero) !== pi) continue;   // W25a (N1-11, Al: „nach aktueller Kontrolle"): ein abgegebener eigener Held ist kein „Hero you control"
     // `allowRestricted: true` so Divinity's normal restrictedAttachment
     // block doesn't filter us out — same pattern Sacrifice to Divinity
     // uses (sacrifice-to-divinity.js:113).

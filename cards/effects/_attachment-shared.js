@@ -66,6 +66,9 @@ function candidateHosts(gs, pi, engine, opts = {}) {
     const ps = gs.players[side];
     const h = ps?.heroes?.[hi];
     if (!h?.name || h.hp <= 0) return;
+    // W25a (N1-11, Al 21.10.2026: „geht immer nach aktueller Kontrolle"): „Attach … to a Hero you control" — ein an den Gegner (dauerhaft oder
+    // zeitweise) abgegebener eigener Held in der eigenen Spalte ist kein Wirt; uebernommene Gegnerhelden kommen ueber `fremdAusruestHelden` hinzu.
+    if (!opts.sides && side === pi && typeof engine?.heroSideOf === 'function' && engine.heroSideOf(side, h) !== pi) return;
     if (opts.heroFilter && !opts.heroFilter(h, hi, side, engine)) return;
     for (const si of freeSlots(ps, hi)) out.push({ side, heroIdx: hi, slotIdx: si });
   };
