@@ -73,6 +73,7 @@ module.exports = {
       engine.queuePostChainAction(async () => {
         await engine.performImmediateActionAnyHero(gegner, {
           title: CARD_NAME,
+          mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
           description: 'Your card was negated by Dream Dust. You may immediately perform an additional Action — or skip.',
           cancellable: true,
         });

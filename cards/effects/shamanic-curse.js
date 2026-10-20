@@ -132,6 +132,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(oppIdx, {
         title: 'Shamanic Curse',
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your Spell was negated. You may perform an additional Action with any Hero — or skip.',
         cancellable: true,
       });

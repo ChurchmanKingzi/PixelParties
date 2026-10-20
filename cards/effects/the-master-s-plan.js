@@ -165,6 +165,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(oppIdx, {
         title: "The Master's Plan",
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your card was negated. You may perform a different Action with any Hero — or skip.',
         cancellable: true,
       });

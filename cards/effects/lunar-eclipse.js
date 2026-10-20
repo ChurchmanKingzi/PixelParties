@@ -188,6 +188,7 @@ module.exports = {
     engine.queuePostChainAction(async () => {
       await engine.performImmediateActionAnyHero(oppIdx, {
         title: CARD_NAME,
+        mitUebernommenenAktionen: true,   // W36a (Al, 22.10.2026): auch Abilities/Heldeneffekte eines UEBERNOMMENEN Helden des Opfers (allgemeine Regel: Klau-Effekte hindern das Handeln nicht)
         description: 'Your card was negated and deleted. You may perform a different Action with any Hero — or skip.',
         cancellable: true,
       });
