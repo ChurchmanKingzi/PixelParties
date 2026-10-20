@@ -46,7 +46,8 @@ function quellStufe(engine, quelle) {
   const cd = name ? engine._getCardDB()[name] : null;
   if (cd && typeof cd.level === 'number') return cd.level;
   // W24b N2-08: ein Heldeneffekt, der „als Spell" gilt (Alice, `treatedAsSpell`, Q108), zählt mit der dort erklärten Stufe (Alice: 0).
-  const lv = name ? engine._spellLevelAlsQuelle?.(name, quelle?.damageType) : null;
+  // W26a (Al, Welle 26): auch Broghan, Brackle, Arthor, Heragas, Kohta (als Attack geltend) zählen als Stufe 0 (`_heldenEffektStufe`).
+  const lv = name ? (engine._spellLevelAlsQuelle?.(name, quelle?.damageType) ?? engine._heldenEffektStufe?.(name, quelle?.damageType)) : null;
   return Number.isFinite(lv) ? lv : null;
 }
 

@@ -53,6 +53,8 @@ function eigenerHeld(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // W26a (Al, Welle 26): als Attack geltender Heldeneffekt ohne Karte zählt für Stufen-Bedingungen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) als LEVEL 0 (Engine: `_heldenEffektStufe`).
+  treatedAsAttack: { level: 0 },
   activeIn: ['hero'],
   heroEffect: true,
 

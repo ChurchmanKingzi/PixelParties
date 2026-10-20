@@ -7352,6 +7352,23 @@ class GameEngine {
   }
 
   /**
+   * ★ W26a (Al, Welle 26): Stufe eines als Attack/Spell GELTENDEN Heldeneffekts ohne Karte (Alice `treatedAsSpell`; Broghan, Brackle, Arthor, Heragas, Kohta
+   * `treatedAsAttack`) für Stufen-Bedingungen von Reaktionen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) — immer LEVEL 0 (Deklaration
+   * `{ level }`, Standard 0). Nur Heldenkarten und nur für den passenden Schadenstyp (`attack` bzw. `*_spell`); sonst `null` (keine Stufe, keine Entscheidung).
+   * Anti Magic (Spell-Immunität) liest weiter `_spellLevelAlsQuelle`.
+   */
+  _heldenEffektStufe(sourceName, damageType) {
+    if (!sourceName) return null;
+    const card = this._getCardDB()[sourceName];
+    if (!card || !/Hero/.test(String(card.cardType || ''))) return null;
+    const sc = loadCardEffect(sourceName);
+    const dt = String(damageType || '');
+    const decl = (dt === 'attack' && sc?.treatedAsAttack) || ((dt === 'spell' || /_spell$/.test(dt)) && sc?.treatedAsSpell) || null;
+    if (!decl || typeof decl !== 'object') return null;
+    return Number.isFinite(decl.level) ? decl.level : 0;
+  }
+
+  /**
    * Would the damage `source → target` be fully voided by an
    * already-active protection on the target side, ignoring any
    * piercing flag (`hookCtx.cannotBeNegated`) that may apply?
