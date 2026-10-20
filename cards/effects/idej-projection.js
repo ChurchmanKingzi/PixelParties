@@ -27,7 +27,7 @@
 //     several Projections is only asked once per incoming hit.
 // ═══════════════════════════════════════════
 
-const { discardAttachedIdejCard } = require('./_idej-shared');
+const { discardAttachedIdejCard, canEquipToIdejHero } = require('./_idej-shared');
 
 const CARD_NAME = 'Idej Projection';
 
@@ -42,6 +42,12 @@ module.exports = {
   // Only relevant while attached in a Support Zone — inert in hand
   // (it has no play-effect) and elsewhere.
   activeIn: ['support'],
+
+  // W24b N2-10: „can only be attached to an "Idej" Hero" — auch beim Umhaengen (Inheritance Ceremony: `engine.canEquipCardToHero`),
+  // wie die acht Idej-Equips. Das Anlegen durch Idej Lords/Idej Projector trifft ohnehin nur Idej-Helden.
+  canEquipToHero(gs, pi, heroIdx, engine) {
+    return canEquipToIdejHero(gs, pi, heroIdx, engine);
+  },
 
   // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
   // beforeDamage-Confirm (Gegner-Angriff, plan-los).
