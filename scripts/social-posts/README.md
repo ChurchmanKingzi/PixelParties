@@ -34,5 +34,7 @@ Texte für die Beschreibungen: `captions.py` erzeugt `captions.md` (alle Texte) 
 
 Stapellauf für alle Heroes mit eigenem Musikstück: `build-batch.py` (Ergebnis in `out/reels/`).
 
+Logo und Profilbilder mit Monia: `make-logo.py` (Ergebnis in `out/branding/`).
+
 Bausteine: `build-post.py` (Layout, Hintergrund, Sprite, Video), `ornaments.py` (Rahmen-Schnörkel),
 `fx.py` (Partikel-Themen), `render-card.js` (Karte), `pxcommon.py` (Raster und Farben).
