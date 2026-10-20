@@ -455,6 +455,8 @@ module.exports = {
           delete gs._spellNegatedByEffect;
           // v1364: „counts as an additional Action" — als Aktion melden.
           if (!innerCancelled && !gs._spellCancelled) {
+            // W35a (Al, Frage 4): eine so gespielte Attack zaehlt wie jede gespielte Attack (Mirjam, Rioting Village, Quick Attack …).
+            if (chosenCd.cardType === 'Attack') await engine.zaehleAlsArt('attack', { pi, heroIdx: sel.heroIdx, heroOwner: heroSeite, name: chosenName, karte: true });
             await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: heroSeite });
           }
         } finally {

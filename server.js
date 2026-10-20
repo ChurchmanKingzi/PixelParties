@@ -8366,10 +8366,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         room.engine.restoreAdditionalAction(consumedInst);
       }
       if (cardData.cardType === 'Attack') {
-        ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
-        if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
-        if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
-        hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+        // ★ W35a (Al, 22.10.2026, Frage 4): EIN Zählschritt für jede gespielte Attack (auch inhärente/negierte): `engine.zaehleAlsArt` zählt Spieler-/Helden-Zähler UND meldet
+        // `onEffectCountedAsArt` (Mirjam, Ghuanjun) — `onActionUsed` feuert für inhärente/freie Aktionen nicht.
+        await room.engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner, name: cardName, karte: true });
         // Negated-attack path mirrors the resolved-attack path:
         // attacksPlayedThisTurn / _attacksThisTurn are bumped because
         // the Attack WAS played (the Reaction just negated its
@@ -8769,10 +8768,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
 
     if (cardData.cardType === 'Attack') {
-      ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
-      if (!ps.heroesAttackedThisTurn) ps.heroesAttackedThisTurn = [];
-      if (!ps.heroesAttackedThisTurn.includes(heroIdx)) ps.heroesAttackedThisTurn.push(heroIdx);
-      hero._attacksThisTurn = (hero._attacksThisTurn || 0) + 1;
+      await room.engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner, name: cardName, karte: true });   // W35a: s. o. (ein Zählschritt für jede gespielte Attack)
       // Berserk charge consumed: the validation pass made this Attack
       // inherent on Berserk's behalf (rather than the Attack's own
       // script-level `inherentAction` flag), so the once-per-turn

@@ -99,6 +99,11 @@ module.exports = {
     const damage = 50 * creatureCount;
 
     // Prompt: select an enemy target (hero or creature)
+    // ★ W35a (Al, 22.10.2026, Frage 1): „Wenn Alices Effekt abgeblockt/negiert wird, ist er für die Runde verbraucht." Negiert ein Reaktionsfenster der Zielwahl (MOE Shield, Magic Mirror,
+    // Invisibility Cloak …) den Effekt, liefert `promptDamageTarget` `null` MIT `gs._spellNegatedByEffect` — das ist KEIN Abbruch (Muster Javelin Throw): der Effekt gilt als gespielt
+    // (Spell-Zähler), der Einmal-Stempel bleibt gesetzt (Rückgabe `true`). Nur ein echter Abbruch (`false`) gibt die Aktivierung frei. Wie bei Silence (virtuelle Spell-Kette unten).
+    const _negVorher = engine.gs._spellNegatedByEffect;
+    delete engine.gs._spellNegatedByEffect;
     const target = await ctx.promptDamageTarget({
       side: 'enemy',
       types: ['hero', 'creature'],
@@ -111,6 +116,13 @@ module.exports = {
       cancellable: true,
     });
 
+    const _negiert = !target && !!engine.gs._spellNegatedByEffect;
+    if (_negVorher) engine.gs._spellNegatedByEffect = _negVorher; else { delete engine.gs._spellNegatedByEffect; if (_negiert) delete engine.gs._negationWhole; }
+    if (_negiert) {
+      await engine.zaehleAlsArt('spell', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: 'Alice, the Puppeteer Girl' });   // der negierte Effekt zählt als gespielter Spell (wie bei Silence)
+      engine.sync();
+      return true;
+    }
     if (!target) return false; // Cancelled
 
     // ★ W34a (Al, 22.10.2026, Punkt 2/3): „Treated as a Destruction Magic Spell" — der Treffer zählt als Spell (Spell-Zähler) und öffnet ein Reaktionsfenster wie ein Spell
