@@ -21761,7 +21761,6 @@ Vier Antworten von Al auf die offenen Fragen aus W28a. Neue Repros: `docs/niche-
 ### Ergebnis (W31a)
 Siehe die Abgabe: alle Repros, `check-*.js`, Skilltest-E2E und Dauerfeuer gegenüber dem Ausgangsstand d6ebba2.
 
-<<<<<<< HEAD
 
 ## ★ Welle 32 / W32a — „Zählt als Attack/Spell eines Helden" = Ability-Level dieses Helden: allgemeine Regel, Sperre bei nicht angriffsfähigem Helden, Attack-/Spell-Leser überall (Entscheidung Welle 32, 22.10.2026)
 
@@ -21799,7 +21798,6 @@ Sieben Antworten von Al auf die offenen Rückfragen aus Welle 30 (W30a). Neue Re
 
 ### Ergebnis (W32a)
 Siehe die Abgabe: alle Repros, `check-*.js`, Skilltest-E2E und Dauerfeuer gegenüber dem Ausgangsstand 58420ab.
-=======
 ## ★ Welle 33 / W33a — Weakening Crystal folgt der Kontrolle; Sickly Cheese nur bei vergiftbarem Ziel; Hand-Reaktions-Kreaturen sind Actions; Kreatureneffekt nur durch den Kontrolleur; Escape Device nach Kontrolle (Entscheidung Welle 33, 22.10.2026)
 
 Fünf Entscheidungen von Al (Wortlaut je Punkt). Neue Repros: `docs/niche-tests/repro/W33/a-00` … `a-04` (Exit 0 = korrekt); umgestellt (alte Regel → neue): `W31/a-01` (Sickly Cheese, Abschnitt „Sickly Cheese · ${z}") und `W28/a-03` (Sickly Cheese, temporär übernommener Held: jetzt `ineligible`, Flag `charmOk: false`).
@@ -21845,4 +21843,3 @@ Kartentext: „While this card is in your hand, the effects of all **your** Hero
 
 ### Ergebnis (W33a)
 Siehe die Abgabe: alle Repros, `check-*.js`, Skilltest-E2E und Dauerfeuer gegenüber dem Ausgangsstand 985a20b.
->>>>>>> wave33/W33a
