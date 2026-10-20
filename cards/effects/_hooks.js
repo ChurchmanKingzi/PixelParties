@@ -841,6 +841,13 @@ function isAttackSpellOrCreatureSource(engine, sourceInfo, opts = {}) {
   if (kinds.has('attack') && (dt === 'attack' || hasCardType(cd, 'Attack'))) return true;
   if (kinds.has('spell') && (/_spell$/.test(dt) || hasCardType(cd, 'Spell'))) return true;
   if (kinds.has('creature') && (dt === 'creature' || isCreatureSource(engine, sourceInfo))) return true;
+  // ★ W32a (Al, 22.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN, ohne dass die Quelle einen Schadenstyp trägt (Besiegt-Hooks: `ctx.source`): Heldeneffekte (Broghan & Co., Alice),
+  // Gegenstandseffekte, Greatmaw-Treffer, Alluring-Light-Angriff — Art über `engine._zaehltAlsArt` (Skript-Deklaration bzw. Stempel).
+  if ((kinds.has('attack') || kinds.has('spell')) && typeof engine._zaehltAlsArt === 'function') {
+    const obj = srcInst || sourceInfo;
+    const art = engine._zaehltAlsArt(obj.name ? obj : { ...obj, name });
+    if (art && kinds.has(art)) return true;
+  }
   return false;
 }
 
@@ -855,6 +862,27 @@ function zaehltAlsAttackOderSpell(engine, sourceInfo) {
   if (!sourceInfo || !engine || typeof engine._heldenEffektStufe !== 'function') return false;
   const name = sourceInfo.cardName || sourceInfo.cardInstance?.name || sourceInfo.name;
   return engine._heldenEffektStufe(name, sourceInfo.damageType, sourceInfo.cardInstance || sourceInfo) != null;
+}
+
+/**
+ * ★ W32a (Al, 22.10.2026, Punkt 5: „ALLE Karten, die auf Attacks und/oder Spells reagieren, zählen auch Effekte, die als Attack/Spell ZÄHLEN"): ZENTRALE Klassifikation
+ * für Leser, die nur einen Kartentyp der Quelle prüfen und KEINEN Schadenstyp zur Hand haben (Besiegen ohne Schaden: Kohta, Insta-Kills; Pre-Damage-Fenster mit Kartenquelle):
+ * die Quelle ist eine Attack-/Spell-KARTE ODER ein Effekt, der als Attack/Spell zählt (Heldeneffekte Broghan & Co./Alice, Gegenstandseffekte, Greatmaw-Treffer, Alluring-Light-Angriff —
+ * `engine._heldenEffektStufe(…) != null`, dasselbe Kennzeichen wie Flooding/Alliance/Dive Down). Mit `damageType` (falls bekannt) gilt der Schadenstyp; ohne ihn zählt die Deklaration
+ * des Skripts als Attack ODER Spell. Statusticks, gewöhnliche Heldeneffekte (Siphem u. ä.) und Kreatureneffekte → `false`.
+ */
+function quelleIstAttackOderSpell(engine, source, damageType) {
+  if (!source || !engine) return false;
+  const name = source.cardName || source.cardInstance?.name || source.name;
+  if (!name) return false;
+  const cd = engine._getCardDB()[name];
+  const typ = String(cd?.cardType || '');
+  if (typ.includes('Attack') || typ.includes('Spell')) return true;
+  if (typeof engine._heldenEffektStufe !== 'function') return false;
+  const obj = source.cardInstance || source;
+  const dt = damageType ?? source.damageType;
+  if (dt) return engine._heldenEffektStufe(name, dt, obj) != null;
+  return engine._heldenEffektStufe(name, 'attack', obj) != null || engine._heldenEffektStufe(name, 'spell', obj) != null;
 }
 
 /**
@@ -1101,6 +1129,6 @@ module.exports = {
   KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
   isSummonablePileCreature,
-  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource, zaehltAlsAttackOderSpell,
+  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource, zaehltAlsAttackOderSpell, quelleIstAttackOderSpell,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

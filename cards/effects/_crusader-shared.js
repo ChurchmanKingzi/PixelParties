@@ -304,6 +304,9 @@ function makeCrusaderArtifact(spec) {
       const impactSlot = target.type === 'hero' ? -1 : target.slotIdx;
       const tgtZoneSlot = target.type === 'hero' ? undefined : target.slotIdx;
 
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette;
+      // negiert eine Reaktion den Schlag, hat auch die eigene Klausel (Schaden/Besiegen) keinen Anlass.
+      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, resolve: async () => {
       if (attackAnim) {
         await attackAnim(ctx, {
           engine, pi, feld, heroIdx, target,
@@ -322,6 +325,8 @@ function makeCrusaderArtifact(spec) {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
       const hatSchaden = hero ? (hero.hp < hpVorher) : false;
       const besiegt = hero ? (hpVorher > 0 && hero.hp <= 0) : false;

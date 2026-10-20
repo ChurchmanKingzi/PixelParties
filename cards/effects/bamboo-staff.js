@@ -188,6 +188,8 @@ module.exports = {
       await engine._delay(380);
 
       const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
+      // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
@@ -199,6 +201,8 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+      return true;
+      } });
 
       // Collect unique struck targets from the damage log (matches
       // Arthor's "treat as Attack" pattern), then fire afterSpellResolved

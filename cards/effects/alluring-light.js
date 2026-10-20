@@ -159,6 +159,9 @@ module.exports = {
           // NICHT die gedruckte Stufe 1 der Karte (Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …: `engine._heldenEffektStufe`).
           treatedAsAttack: angriffStempel,
         };
+        // W32a: der provozierte Angriff gehört dem GEGNER (Held des Angriffs) — Attack-Reaktionen (Magic Topaz, Arrows …) seiner Seite über die virtuelle Attack-Kette;
+        // der gezwungene Held muss dafür nicht angriffsfähig sein (er wird gelockt, nicht aktiv: `casterCheck: false`).
+        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, resolve: async () => {
         const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
         // ── Animation ② der angelockte Held rammt hinein ──────────────
@@ -186,6 +189,8 @@ module.exports = {
             );
           }
         }
+        return true;
+        } });
 
         engine._broadcastEvent('play_zone_animation', {
           type: 'explosion', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,

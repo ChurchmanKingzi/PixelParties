@@ -104,6 +104,8 @@ async function dolchSchlag(ctx, pi) {
   const damage = Math.max(0, liveHero?.atk || 0);
   const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
 
+  // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
   if (tHero) {
     await engine.actionDealDamage(source, tHero, damage, 'attack');
   } else if (tInst) {
@@ -112,6 +114,8 @@ async function dolchSchlag(ctx, pi) {
       { sourceOwner: pi, canBeNegated: true },
     );
   }
+  return true;
+  } });
 
   engine.log('sacrificial_dagger', {
     player: gs.players[pi]?.username, hero: hero.name,

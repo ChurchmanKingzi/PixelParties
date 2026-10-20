@@ -291,14 +291,39 @@ module.exports = {
       heroOwner: held.owner,   // physische Spalte des Angreifers (wie bei bezauberten Helden)
     };
 
+    // ── Reaktionsfenster nach der Wahl (W32a, Al 22.10.2026, Punkt 5: Schutzkarten gelten auch gegen Effekte, die als Attack zählen) ──
+    // Der Trank-Zielweg (`doConfirmPotion`) öffnet sie nicht selbst. Wie `promptDamageTarget`: Umleitung (Challenge, Martyry, Anti-Magnet …), Surprise-Fenster eines
+    // gewählten KREATURENZIELS (Heldenziele öffnen es im Schadenspfad), dann die Post-Target-Handreaktionen (Test Flight, Future Tech Escape Device, Invisibility Cloak …).
+    let opferZ = opfer, negiert = false;
+    {
+      const liste = (validTargets || []).filter(t => t && seiteDesZiels(gs, t) !== pi);
+      const red = await engine._checkTargetRedirect(opferZ.owner, opferZ, liste, { damageType: 'attack', title: CARD_NAME }, quelle);
+      if (red?._redirectNegated || red?._dropTargetIds) negiert = true;
+      else if (red) opferZ = red;
+      if (!negiert && opferZ.type !== 'hero' && opferZ.cardInstance) {
+        const sr = await engine._checkSurpriseWindow([opferZ], quelle, { damageType: 'attack' });
+        if (sr?.effectNegated) negiert = true;
+      }
+      if (!negiert) {
+        const pt = await engine._checkPostTargetHandReactions([opferZ], quelle, { damageType: 'attack', dealsDamage: true });
+        if (pt?.effectNegated) { await engine.negationsBilder(quelle, [opferZ], pt); negiert = true; }
+        else if (pt?.newTargets?.length) opferZ = pt.newTargets[0];
+      }
+    }
+    if (negiert || (opferZ.type === 'hero' && !(gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx]?.hp > 0))) {
+      engine.log('sword_in_a_bottle', { player: gs.players[pi]?.username, attacker: angreiferHeld.name, target: opferZ.cardName, negated: true });
+      engine.sync();
+      return;
+    }
+
     // ── Inszenierung: Dash, dann Schnitt (Muster von Phoenix Tackle) ──
     // Der Angreifer fliegt sichtbar ins Ziel und zurueck — so ist ohne
     // Textzeile klar, WER zuschlaegt. Der Schnitt kommt erst im Moment
     // des Aufpralls, und nur auf dem Ziel.
-    const zielSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
+    const zielSlot = opferZ.type === 'hero' ? -1 : opferZ.slotIdx;
     engine._broadcastEvent('play_ram_animation', {
       sourceOwner: held.owner, sourceHeroIdx: held.heroIdx,
-      targetOwner: opfer.owner, targetHeroIdx: opfer.heroIdx,
+      targetOwner: opferZ.owner, targetHeroIdx: opferZ.heroIdx,
       targetZoneSlot: zielSlot,
       cardName: angreiferHeld.name, duration: 1000,
     });
@@ -306,29 +331,33 @@ module.exports = {
     await engine._delay(150);
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'quick_slash', owner: opfer.owner,
-      heroIdx: opfer.heroIdx, zoneSlot: zielSlot,
+      type: 'quick_slash', owner: opferZ.owner,
+      heroIdx: opferZ.heroIdx, zoneSlot: zielSlot,
     });
     await engine._delay(180);
 
-    if (opfer.type === 'hero') {
-      const ziel = gs.players[opfer.owner]?.heroes?.[opfer.heroIdx];
+    // W32a (Al, 22.10.2026): der Schlag zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, resolve: async () => {
+    if (opferZ.type === 'hero') {
+      const ziel = gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx];
       if (ziel?.name && ziel.hp > 0) {
         await engine.actionDealDamage(quelle, ziel, schaden, 'attack');
       }
     } else {
-      const inst = opfer.cardInstance
-        || engine.findCards({ controller: opfer.owner, zone: 'support', heroIdx: opfer.heroIdx })
-             .find(c => c.zoneSlot === opfer.slotIdx);
+      const inst = opferZ.cardInstance
+        || engine.findCards({ controller: opferZ.owner, zone: 'support', heroIdx: opferZ.heroIdx })
+             .find(c => c.zoneSlot === opferZ.slotIdx);
       if (inst) {
         await engine.actionDealCreatureDamage(quelle, inst, schaden, 'attack', { sourceOwner: pi });
       }
     }
+    return true;
+    } });
 
     engine.log('sword_in_a_bottle', {
       player: gs.players[pi]?.username,
       attacker: angreiferHeld.name,
-      target: opfer.cardName,
+      target: opferZ.cardName,
       damage: schaden,
     });
     engine.sync();

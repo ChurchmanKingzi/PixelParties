@@ -235,6 +235,8 @@ module.exports = {
     await engine._delay(200);
 
     // Damage, dealt as that Hero's Attack.
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, resolve: async () => {
     if (tHero) {
       await engine.actionDealDamage(source, tHero, damage, 'attack');
     } else if (tInst) {
@@ -243,6 +245,8 @@ module.exports = {
         { sourceOwner: pi, canBeNegated: true },
       );
     }
+    return true;
+    } });
 
     engine.log('infected_greatmaw', {
       player: ps.username, hero: hero.name, damage,

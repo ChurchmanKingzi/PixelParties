@@ -31296,6 +31296,11 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   sourceEffectKind(sourceCard) {
     if (!sourceCard) return null;
+    // ★ W32a (Al, 22.10.2026: Effekte, die als Attack/Spell ZÄHLEN, sind für die Umleiter/Schutzkarten „ein Attack/Spell"): Heldeneffekt mit `treatedAsAttack`/`treatedAsSpell`
+    // (Broghan, Brackle, Arthor, Heragas, Kohta / Alice), Gegenstandseffekt (Javelin Throw, Sword in a Bottle, Crusader's, Bamboo Staff, Sacrificial Dagger), Greatmaw-Treffer
+    // und Alluring-Light-Angriff (Quellobjekt mit Stempel). Gewöhnliche Heldeneffekte (Locke, Siphem …) bleiben 'hero' (Alleria-Muster).
+    const _zaehlt = this._zaehltAlsArt(sourceCard);
+    if (_zaehlt) return _zaehlt;
     const zone = sourceCard.zone;
     if (zone === 'hero') return 'hero';
     if (zone === 'surprise') return 'surprise';
@@ -31309,6 +31314,27 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (hasCardType(cd, 'Artifact')) return 'artifact';
     if (hasCardType(cd, 'Ability')) return 'ability';
     if (hasCardType(cd, 'Hero')) return 'hero';
+    return null;
+  }
+
+  /**
+   * ★ W32a: Art eines Effekts, der als Attack/Spell ZÄHLT, aber keine Attack-/Spell-Karte ist — `'attack'`, `'spell'` oder `null`. Quellen: Stempel `treatedAsAttack` am Quellobjekt
+   * (Greatmaw/Dagger/Bamboo/Alluring Light) bzw. seiner Karteninstanz, Skript-Deklaration `treatedAsAttack`/`treatedAsSpell` an Heldenkarten und Artefakt-/Trank-Gegenständen
+   * (nie an echten Attack-/Spell-/Creature-Karten: die behalten ihren Kartentyp). Eine Namensabfrage; die Stufe liefert `_heldenEffektStufe`.
+   */
+  _zaehltAlsArt(sourceCard) {
+    if (!sourceCard) return null;
+    if (sourceCard.treatedAsAttack || sourceCard.cardInstance?.treatedAsAttack) return 'attack';
+    const name = sourceCard.name || sourceCard.cardName;
+    const card = name ? this._getCardDB()[name] : null;
+    if (!card || hasCardType(card, 'Attack') || hasCardType(card, 'Spell') || hasCardType(card, 'Creature')) return null;
+    const sc = loadCardEffect(name);
+    if (/Hero/.test(String(card.cardType || ''))) {
+      if (sc?.treatedAsAttack && typeof sc.treatedAsAttack === 'object') return 'attack';
+      if (sc?.treatedAsSpell && typeof sc.treatedAsSpell === 'object') return 'spell';
+      return null;
+    }
+    if (/Artifact|Potion/.test(String(card.cardType || '')) && sc?.treatedAsAttack && typeof sc.treatedAsAttack === 'object') return 'attack';
     return null;
   }
 
@@ -37855,7 +37881,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const srcName = sourceCard?.name;
     const srcData = srcName ? cardDB[srcName] : null;
-    if (!srcData || srcData.cardType !== 'Spell') return null;
+    // W32a (Al, 22.10.2026): auch ein Effekt, der als Spell ZÄHLT (Alice: Heldeneffekt „treated as a Destruction Magic Spell").
+    if (!srcData || (srcData.cardType !== 'Spell' && this._zaehltAlsArt(sourceCard) !== 'spell')) return null;
 
     const shieldedHeroes = [];
     for (const t of targetedHeroes) {
@@ -37958,7 +37985,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const srcName = source?.name;
     const srcData = srcName ? cardDB[srcName] : null;
-    if (!srcData || srcData.cardType !== 'Spell') return false;
+    // W32a (Al, 22.10.2026): auch ein Effekt, der als Spell ZÄHLT (Alice: Heldeneffekt „treated as a Destruction Magic Spell").
+    if (!srcData || (srcData.cardType !== 'Spell' && this._zaehltAlsArt(source) !== 'spell')) return false;
 
     const enchOwner = this._ameHalter(armedArtifact, owner, hero);
     this._inAntiMagicEnchantmentCheck = true;
@@ -38031,6 +38059,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const sourceCard = cardDB[source.name];
       const ct = sourceCard?.cardType;
       if (ct === 'Spell' || ct === 'Attack') isAttackOrSpell = true;
+      else if (this._zaehltAlsArt(source)) isAttackOrSpell = true;   // W32a (Al, 22.10.2026): auch Effekte, die als Attack/Spell ZÄHLEN (Alice u. a.)
     }
     if (!isAttackOrSpell) return;
 
@@ -40384,6 +40413,35 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._noteFizzledPlay(owner, cardName, heroIdx, cardType, cardInfo.casterOwner);
     }
     return result;
+  }
+
+  /**
+   * ★ W32a (Al, 22.10.2026, Punkt 5: „Reactions wie Magic Topaz oder Arrows, die auf Attacks reagieren" reagieren auch auf Effekte, die als Attack ZÄHLEN): virtuelle
+   * Attack-Kette um den Treffer eines Effekts, der als Attack EINES HELDEN zählt — Muster von Arthor, Inheritor of the Barbarian Sword, jetzt für alle (Broghan, Brackle,
+   * Heragas, Kohta, Crusader's ×4, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light). Aufruf NACH der Zielwahl, VOR dem
+   * Schaden: `resolve` ist der Schaden. Die Kette trägt Typ `Attack`, Besitzer `pi` (der Spieler, dessen Held zuschlägt) und den schlagenden Helden (`heroIdx` auf der Brettseite
+   * `heroOwner`) — Arrows/Magic Topaz (`arrowTriggerCondition`), Attack-Reaktionen und Negierer sehen den Effekt wie eine Attack-Karte. Danach werden die Arrows abgeräumt
+   * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
+   * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
+   */
+  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+    if (this._inReactionCheck || this._inMctsSim) {
+      const r = resolve ? await resolve() : null;
+      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+    }
+    const { clearArmedArrows } = require('./_arrows-shared');
+    let res;
+    try {
+      res = await this.executeCardWithChain({
+        cardName: name, owner: pi, cardType: 'Attack', heroIdx,
+        casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+        fromBoard: true, resolve,
+        ...(casterCheck === false ? { casterCheck: false } : {}),
+      });
+    } finally {
+      await clearArmedArrows(this, pi);
+    }
+    return res;
   }
 
   /**

@@ -135,8 +135,12 @@ module.exports = {
     });
 
     const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
-    await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
-      { sourceOwner: pi, canBeNegated: true });
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
+      await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
+        { sourceOwner: pi, canBeNegated: true });
+      return true;
+    } });
 
     engine.log('heragas_slay', {
       player: gs.players[pi].username, creature: inst.name, damage: betrag,

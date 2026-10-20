@@ -300,6 +300,8 @@ module.exports = {
     // ── Step 5: deal damage as an Attack ─────────────────────────────────
     const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
       ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette; das Opfer (Kosten) bleibt bezahlt, auch wenn sie den Treffer negiert.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {
@@ -311,6 +313,8 @@ module.exports = {
         { sourceOwner: pi, canBeNegated: true },
       );
     }
+    return true;
+    } });
 
     // Wait for the IMPACT phase to finish before running the
     // sacrifice — the explosion at the target plays during this

@@ -181,6 +181,8 @@ module.exports = {
     // `setAmount(0)`). Dann IST der Angriff erklaert worden, er verpufft
     // nur: kein Kill, aber Aktion und Sperre bleiben verbraucht.
     const basis = Math.max(1, held?.atk || 1);
+    // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette um Angriffsfenster und Kill.
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
     const nachFenster = await engine._fireAttackDeclare(quelle, ziel, basis);
     if (!(nachFenster > 0)) {
       engine.log('kohta_super_kill_negated', {
@@ -214,6 +216,8 @@ module.exports = {
       targetType: ziel.type,
     });
     engine.sync();
+    return true;
+    } });
     return true;
   },
 };
