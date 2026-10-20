@@ -46,7 +46,7 @@
 //  ihn nicht noch einmal leihen.
 // ═══════════════════════════════════════════
 
-const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
+const { hasCardType, hasNumericCreatureLevel, heldSeite } = require('./_hooks');
 const { GRIMOIRE_NAME, hasGrimoire } = require('./_fiona-shared');
 
 const CARD_NAME = 'Spirit of the Forbidden Grimoire';
@@ -178,7 +178,7 @@ module.exports = {
   /** „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hasGrimoire(engine, pi, heroIdx);
+    return hasGrimoire(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   canActivateCreatureEffect(ctx) {

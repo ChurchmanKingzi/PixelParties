@@ -32,7 +32,7 @@
 //  im selben Moment ausgeloest, danach faellt der Schaden.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 const { isTutorableArea } = require('./_area-shared');
 
 const CARD_NAME = 'Spirit of the Barbarian Sword';
@@ -116,7 +116,7 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatSchwert(engine, pi, heroIdx);
+    return hatSchwert(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   /** ③ Kosten: es muss mindestens eine Area liegen, und das Deck etwas hergeben. */

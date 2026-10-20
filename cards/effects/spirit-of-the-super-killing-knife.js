@@ -32,7 +32,7 @@
 //  geloescht, wenn er faellt — solange er noch steht, gilt seine Aura.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, heldSeite } = require('./_hooks');
 
 const CARD_NAME = 'Spirit of the Super-Killing Knife';
 const KNIFE = 'Super-Killing Knife, the Tool of Liquidation';
@@ -59,7 +59,7 @@ module.exports = {
   /** ① „can only be summoned by a Hero equipped with …\" */
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     if (!engine) return true;
-    return hatMesser(engine, pi, heroIdx);
+    return hatMesser(engine, heldSeite(gs, pi, heroIdx), heroIdx);   // N3-03 (W24): Brettseite des uebernommenen Helden
   },
 
   hooks: {
