@@ -7,8 +7,9 @@ Schreibt scripts/social-posts/captions.md (alle Texte, zum Überarbeiten) und je
 scripts/social-posts/out/reels/<slug>.txt (Caption zum Einfügen + Alt-Text).
 
 Die Texte stehen unten in HEROES. Jede Aussage folgt dem Kartentext aus data/cards.json; über das Spiel selbst steht nur,
-was im Repo belegt ist (Online-Mehrspieler-Kartenspiel, fast 200 animierte Heroes). NICHT behauptet wird „free", „no download"
-o. Ä. Der Link steht in der Bio, denn Links in Instagram-Beschreibungen sind nicht klickbar.
+was belegt ist: Online-Mehrspieler-Kartenspiel, fast 200 animierte Heroes (laut Daten 198) und „free" (vom Auftraggeber bestätigt).
+NICHT behauptet wird z. B. „no download" oder Spielerzahlen. Der Link steht in der Bio, denn Links in Instagram-Beschreibungen
+sind nicht klickbar.
 """
 import re
 from pathlib import Path
@@ -16,13 +17,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OUT = HERE / 'out' / 'reels'
 
-BASE_TAGS = '#PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame'
+BASE_TAGS = '#PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay'
 
 CTAS = [
-    "Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.\n👉 Play now: pixelpartiestcg.com (link in bio)",
-    "Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.\n👉 pixelpartiestcg.com (link in bio)",
-    "Build your team of Heroes and play online against other players in Pixel Parties.\n👉 Check it out: pixelpartiestcg.com (link in bio)",
-    "This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.\n👉 pixelpartiestcg.com (link in bio)",
+    "Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.\n👉 Play for free: pixelpartiestcg.com (link in bio)",
+    "Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.\n👉 pixelpartiestcg.com (link in bio)",
+    "Build your team of Heroes and play online against other players, for free, in Pixel Parties.\n👉 Check it out: pixelpartiestcg.com (link in bio)",
+    "This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.\n👉 Play for free: pixelpartiestcg.com (link in bio)",
 ]
 
 # Kartenname: (Aufhänger, Beschreibung der Fähigkeit, Alt-Text-Zusatz, zusätzliche Hashtags)
@@ -316,7 +317,7 @@ def main():
         '',
         '- Links in Instagram-Beschreibungen sind **nicht klickbar**. `pixelpartiestcg.com` muss in der Profil-Bio stehen; die Texte verweisen darauf („link in bio").',
         '- Der erste Satz ist der Aufhänger: Instagram zeigt nur die ersten etwa 125 Zeichen, bevor „mehr" erscheint.',
-        '- Jede Fähigkeit folgt dem Kartentext (`data/cards.json`). Über das Spiel steht nur „online multiplayer", „almost 200 animated pixel Heroes" und „trading card game". Nicht behauptet wird „free", „no download" o. Ä.',
+        '- Jede Fähigkeit folgt dem Kartentext (`data/cards.json`). Über das Spiel steht nur „free", „online multiplayer", „almost 200 animated pixel Heroes" und „trading card game". „Free" ist vom Auftraggeber bestätigt. Nicht behauptet wird z. B. „no download" oder eine Spielerzahl.',
         '- Die vier Aufruf-Varianten wechseln sich ab, damit nicht jeder Beitrag gleich endet.',
         '- Cover: `<slug>.png` neben dem Video (fertiges Bild nach dem Einblenden).',
         '',

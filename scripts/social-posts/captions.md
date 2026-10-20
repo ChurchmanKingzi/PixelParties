@@ -6,7 +6,7 @@ Hinweise:
 
 - Links in Instagram-Beschreibungen sind **nicht klickbar**. `pixelpartiestcg.com` muss in der Profil-Bio stehen; die Texte verweisen darauf („link in bio").
 - Der erste Satz ist der Aufhänger: Instagram zeigt nur die ersten etwa 125 Zeichen, bevor „mehr" erscheint.
-- Jede Fähigkeit folgt dem Kartentext (`data/cards.json`). Über das Spiel steht nur „online multiplayer", „almost 200 animated pixel Heroes" und „trading card game". Nicht behauptet wird „free", „no download" o. Ä.
+- Jede Fähigkeit folgt dem Kartentext (`data/cards.json`). Über das Spiel steht nur „free", „online multiplayer", „almost 200 animated pixel Heroes" und „trading card game". „Free" ist vom Auftraggeber bestätigt. Nicht behauptet wird z. B. „no download" oder eine Spielerzahl.
 - Die vier Aufruf-Varianten wechseln sich ab, damit nicht jeder Beitrag gleich endet.
 - Cover: `<slug>.png` neben dem Video (fertiges Bild nach dem Einblenden).
 
@@ -22,10 +22,10 @@ Datei: `alleria-the-queen-of-spiders.mp4`
 >
 > Once per turn, Alleria can redirect an opponent's single-target Attack, Spell or Creature effect to one of your Heroes that has a Surprise waiting. The damage then can't be reduced or negated, except by a Surprise. And whenever a Surprise in her own Surprise Zone activates, you draw a card.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #DarkFantasy #Spiders
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Spiders
 
 **Alt-Text**: Animated pixel art trading card of Alleria, the Queen of Spiders, with spiders dangling on silk threads and drifting purple poison gas around the hero.
 
@@ -41,10 +41,10 @@ Datei: `andras-the-human-weapon.mp4`
 >
 > When Andras hits exactly one target with a normal Attack whose original level is lower than his Fighting level, you may choose a second target for the Attack to hit afterwards. The Human Weapon lives up to his name.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Warrior #FantasyArt
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Warrior #FantasyArt
 
 **Alt-Text**: Animated pixel art trading card of Andras, the Human Weapon, with jet flames, embers and smoke around the hero.
 
@@ -60,10 +60,10 @@ Datei: `argos-the-eye-of-the-cosmos.mp4`
 >
 > Argos collects a Change Counter for every card in your opponent's hand. Then you can cash them in once per turn to place a "Cosmic Depths" Creature of that level straight into his Support Zone.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #DarkFantasy #Cosmic
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Cosmic
 
 **Alt-Text**: Animated pixel art trading card of Argos, the Eye of the Cosmos, with black fog, floating red eyes and stars around the hero.
 
@@ -79,10 +79,10 @@ Datei: `arthor-inheritor-of-the-barbarian-sword.mp4`
 >
 > Arthor ascends on top of "Arthor, the King of Blackport" once he is equipped with the Legendary Sword of a Barbarian King and a Summoning Circle. Then, once per turn, he can deal 300 damage to any target. It counts as an Attack.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #DarkFantasy #Barbarian
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #DarkFantasy #Barbarian
 
 **Alt-Text**: Animated pixel art trading card of Arthor, Inheritor of the Barbarian Sword, with a blood-red column, blood mist and drifting drops around the hero.
 
@@ -98,10 +98,10 @@ Datei: `arthor-the-king-of-blackport.mp4`
 >
 > Whenever the King of Blackport casts a Spell while your opponent holds more than 1 card, they must discard a card of their choice. If he is equipped with "The White Eye", they must discard 2 cards instead.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Pirates #FantasyArt
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Pirates #FantasyArt
 
 **Alt-Text**: Animated pixel art trading card of Arthor, the King of Blackport, with gold coins, sea bubbles and golden sparkles around the hero.
 
@@ -117,10 +117,10 @@ Datei: `baaliel-the-demon-general.mp4`
 >
 > Baaliel can summon "Horned Demon" Creatures regardless of their level, and once per turn such a summon counts as an additional Action. Whenever a target is defeated, every Horned Demon on the board gets a Demon Counter.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Demon #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Demon #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Baaliel, the Demon General, with bats, embers and dark smoke around the hero.
 
@@ -136,10 +136,10 @@ Datei: `bakhm-the-desert-digger.mp4`
 >
 > Bakhm's Support Zones can double as Surprise Zones for face-down Surprise Creatures. And whenever a Surprise is activated, you choose a target and deal 100 damage to it.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Desert #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Desert #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Bakhm, the Desert Digger, with swirling desert dust and scattered bones around the hero.
 
@@ -155,10 +155,10 @@ Datei: `beato-the-butterfly-witch.mp4`
 >
 > Beato can use any level 1 Spell and Creature. And she is only the first step: use all 5 Spell Schools, and she can ascend into the Eternal Butterfly.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Witch #Butterfly
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Witch #Butterfly
 
 **Alt-Text**: Animated pixel art trading card of Beato, the Butterfly Witch, with golden butterflies and golden sparkles around the hero.
 
@@ -174,10 +174,10 @@ Datei: `beato-the-eternal-butterfly.mp4`
 >
 > After using all 5 Spell Schools, Beato ascends from the Butterfly Witch: add up to 2 different Spells or Creatures from your deck to your hand, and from then on she can use any Spell or Creature, regardless of level or school.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Witch #Butterfly
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Witch #Butterfly
 
 **Alt-Text**: Animated pixel art trading card of Beato, the Eternal Butterfly, with golden butterflies, golden light beams and sparkles around the hero.
 
@@ -193,10 +193,10 @@ Datei: `bomb-berserker-bartas.mp4`
 >
 > When Bomb Berserker Bartas hits exactly one target with a normal Destruction Magic Spell whose original level is lower than his Destruction Magic level, you may choose a second target for it to hit afterwards. A Super Rare that turns every blast into a double hit.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Explosion #FantasyArt
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Explosion #FantasyArt
 
 **Alt-Text**: Animated pixel art trading card of Bomb Berserker Bartas, with fireballs, explosions and smoke around the hero.
 
@@ -212,10 +212,10 @@ Datei: `bow-sniper-darge.mp4`
 >
 > When Darge hits exactly one target with an Attack, the damage goes up by 50 for each "Arrow" Artifact you play in Reaction to it. The bonus is unaffected by effects that double damage.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Archer #FantasyArt
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Archer #FantasyArt
 
 **Alt-Text**: Animated pixel art trading card of Bow Sniper Darge, with arrows flying across the card and drifting dust around the hero.
 
@@ -231,10 +231,10 @@ Datei: `calamitusk-the-chaorc-war-chief.mp4`
 >
 > Once per turn, you may sacrifice a Creature you control that was not summoned this turn to summon a "Chaorc" Creature with a different name from your hand or deck as an additional Action. That Chaorc has its level reduced by 1.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Orc #WarChief
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Orc #WarChief
 
 **Alt-Text**: Animated pixel art trading card of Calamitusk, the Chaorc War Chief, with embers, dust and dark smoke around the hero.
 
@@ -250,10 +250,10 @@ Datei: `champion-the-stormbringer.mp4`
 >
 > Spend your Action to discard up to 5 cards from your hand and draw that many. Then your opponent must discard the same number of cards and draw that many, and this draw cannot be prevented. Once per turn.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Lightning #Storm
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Lightning #Storm
 
 **Alt-Text**: Animated pixel art trading card of Champion, the Stormbringer, with lightning bolts, storm clouds and falling rain around the hero.
 
@@ -269,10 +269,10 @@ Datei: `chaos-diamond-the-cracked-keeper.mp4`
 >
 > As a starting Hero, Chaos-Diamond needs a Potion Deck of exactly 15 Spells with different names. Spend your Action to reveal its top 2 cards and have him perform them in order as additional Actions, regardless of their levels.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Crystals #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Crystals #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Chaos-Diamond, the Cracked Keeper, with pink crystal shards, sparkles and shadow mist around the hero.
 
@@ -288,10 +288,10 @@ Datei: `cute-annoyance-mini.mp4`
 >
 > Once per turn, discard 1 card to search your deck for a "Cute" Creature. Discard 1 more, and Mini immediately summons it as an additional Action.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Cute #Kawaii
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cute #Kawaii
 
 **Alt-Text**: Animated pixel art trading card of Cute Annoyance Mini, with floating hearts and pink sparkles around the hero.
 
@@ -307,10 +307,10 @@ Datei: `damus-the-prophet-of-apocalypse.mp4`
 >
 > Damus places "Ifrit" Creatures into your Heroes' free Support Zones and shields them from your opponent's cards and effects. Every Ifrit you control also makes the "Armageddon" Spells in your hand cheaper.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Prophet #FireMagic
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Prophet #FireMagic
 
 **Alt-Text**: Animated pixel art trading card of Damus, the Prophet of Apocalypse, with embers, ash and smoke around the hero.
 
@@ -326,10 +326,10 @@ Datei: `ghuanjun-the-undead-martial-artist.mp4`
 >
 > Ghuanjun can perform up to 2 Attacks as additional Actions, but then none of your other Heroes can act this turn. Targets he hits can't drop below 1 HP until the end of the turn.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #MartialArts #Undead
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #MartialArts #Undead
 
 **Alt-Text**: Animated pixel art trading card of Ghuanjun, the Undead Martial Artist, with floating skulls, grave crosses and green ghostly mist around the hero.
 
@@ -345,10 +345,10 @@ Datei: `null-the-mage-slayer.mp4`
 >
 > Null's Attacks negate the effects of every target they hit for 2 turns. It counts as a status effect, and he brings 100 Attack to the fight.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Armor #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Armor #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Null, the Mage Slayer, with purple lightning, dark mist and sparks around the hero.
 
@@ -364,10 +364,10 @@ Datei: `hel-the-bound-specter.mp4`
 >
 > At the start of the game, Hel equips an Artifact from your deck for free. If it is lost, you must re-equip one with the same name by paying its cost at the end of your turn, or she is defeated. While equipped this way, she takes half damage.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Ghost #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Ghost #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Hel, the Bound Specter, with pale spectral mist, ghostly flames and floating orbs around the hero.
 
@@ -383,10 +383,10 @@ Datei: `idej-lord-daiyo.mp4`
 >
 > At the start of the game, Daiyo searches your deck for up to 3 "Idej Projection" cards and attaches them to himself. A glass cannon with a lot of help.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Samurai #CherryBlossom
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Samurai #CherryBlossom
 
 **Alt-Text**: Animated pixel art trading card of Idej Lord Daiyo, with falling cherry blossom petals and green spirit mist around the hero.
 
@@ -402,10 +402,10 @@ Datei: `kit-the-shark-researcher.mp4`
 >
 > Whenever an Ability is attached to Kit, you may reveal a Creature from your deck and pick an effect: add it to your hand, make your opponent choose 2 targets to take 50 damage, or make them discard a random card. Each effect once per turn.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Shark #Ocean
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Shark #Ocean
 
 **Alt-Text**: Animated pixel art trading card of Kit, the Shark Researcher, with fish swimming across the card, bubbles and water around the hero.
 
@@ -421,10 +421,10 @@ Datei: `klaus-the-cult-leader.mp4`
 >
 > When Klaus uses a Decay Spell, you may immediately place a Creature from your hand with a lower level than that Spell into one of his free Support Zones.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Cult #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cult #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Klaus, the Cult Leader, with dark mist, red embers and sparks around the hero.
 
@@ -440,10 +440,10 @@ Datei: `layn-defender-of-deri.mp4`
 >
 > Any Creature you summon gets +100 current and max HP. A defender in the truest sense.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Knight #Defender
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Knight #Defender
 
 **Alt-Text**: Animated pixel art trading card of Layn, Defender of Deri, with golden motes, small crowns and sparkles around the hero.
 
@@ -459,10 +459,10 @@ Datei: `layn-master-of-deri-s-relic.mp4`
 >
 > Layn ascends on top of "Layn, Defender of Deri" once he is equipped with "Earth-Shattering Hammer, Relic of Deri". Then, once per turn, he places up to 3 level 1 Creatures with the same name from your discard pile into free Support Zones.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Knight #Relic
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Knight #Relic
 
 **Alt-Text**: Animated pixel art trading card of Layn, Master of Deri's Relic, with golden gems, orbs and sparkles around the hero.
 
@@ -478,10 +478,10 @@ Datei: `lilly-the-charming-infiltrator.mp4`
 >
 > Whenever you add a card from your opponent's deck or hand to your hand, Lilly lets you draw 1 card.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Cute #Charm
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cute #Charm
 
 **Alt-Text**: Animated pixel art trading card of Lilly, the Charming Infiltrator, with floating hearts, gold coins and pink sparkles around the hero.
 
@@ -497,10 +497,10 @@ Datei: `luna-pele-the-flame-dancer.mp4`
 >
 > Whenever a target is Poisoned, it is also Burned for the rest of the game. And up to 4 times per turn, when a target is Burned, you draw a card.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FireMagic #Dancer
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #FireMagic #Dancer
 
 **Alt-Text**: Animated pixel art trading card of Luna Pele, the Flame Dancer, with rising flames, embers and sparks around the hero.
 
@@ -516,10 +516,10 @@ Datei: `mao-the-vengeful-guardian.mp4`
 >
 > Once per turn, choose a "Guardian Beast" Creature you control that was summoned this turn. Delete 5 cards total from both discard piles to immediately activate its active effect. Its effects are negated until the beginning of your next turn afterwards.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Guardian #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Guardian #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Mao, the Vengeful Guardian, with red claw slashes, dark mist and sparks around the hero.
 
@@ -535,10 +535,10 @@ Datei: `mary-crestmas.mp4`
 >
 > Whenever you add cards from your hand to your opponent's hand, Mary lets you draw the same number of cards. And once per turn, she can negate damage by forcing your opponent to discard a card originally owned by you.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Christmas #Winter
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Christmas #Winter
 
 **Alt-Text**: Animated pixel art trading card of Mary Crestmas, with falling snowflakes, music notes and golden sparkles around the hero.
 
@@ -554,10 +554,10 @@ Datei: `maya-the-nature-fairy.mp4`
 >
 > Whenever a Creature is placed into one of your Heroes' Support Zones, you may choose a target you control and increase its current and max HP by 50.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Fairy #Nature
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Fairy #Nature
 
 **Alt-Text**: Animated pixel art trading card of Maya, the Nature Fairy, with drifting leaves, flower petals and glowing green motes around the hero.
 
@@ -573,10 +573,10 @@ Datei: `nao-the-barrier-priestess.mp4`
 >
 > When Nao heals a Hero, she can restore HP beyond their maximum, while the maximum itself stays unchanged. Build a wall of HP and let your opponent try to break through.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Priestess #HolyMagic
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Priestess #HolyMagic
 
 **Alt-Text**: Animated pixel art trading card of Nao, the Barrier Priestess, with beams of golden light, drifting feathers and sparkles around the hero.
 
@@ -592,10 +592,10 @@ Datei: `nero-zira-the-mastermind.mp4`
 >
 > Up to 5 times per turn, when a Creature is placed into one of your Heroes' Support Zones, Nero Zira permanently gains 30 Attack.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Robot #Inventor
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Robot #Inventor
 
 **Alt-Text**: Animated pixel art trading card of Nero Zira, the Mastermind, with turning gears, blue lightning and sparks around the hero.
 
@@ -611,10 +611,10 @@ Datei: `orthos-the-loyal-guard-dog.mp4`
 >
 > Once per turn, if Orthos summons a "Loyal" Creature, you may immediately have it summon a second "Loyal" Creature from your hand as an additional Action.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Hellhound #Dog
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Hellhound #Dog
 
 **Alt-Text**: Animated pixel art trading card of Orthos, the Loyal Guard Dog, with rising flames, embers and smoke around the hero.
 
@@ -630,10 +630,10 @@ Datei: `reiza-the-chief-tormentor.mp4`
 >
 > Whenever Reiza hits exactly one target with an Attack, it is Stunned for 1 turn and receives 1 Stack of Poison. If all targets your opponent controls are Poisoned, she can perform a second Action every turn.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Vampire #DarkFantasy
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Vampire #DarkFantasy
 
 **Alt-Text**: Animated pixel art trading card of Reiza, the Chief Tormentor, with bats, blood drops and dark mist around the hero.
 
@@ -649,10 +649,10 @@ Datei: `santa-klaus.mp4`
 >
 > Whenever Santa Klaus uses an Attack or Spell, you must add 2 cards from your hand to your opponent's hand. Merry Christmas?
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Christmas #SantaClaus
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Christmas #SantaClaus
 
 **Alt-Text**: Animated pixel art trading card of Santa Klaus, with falling snowflakes, candy canes and golden sparkles around the hero.
 
@@ -668,10 +668,10 @@ Datei: `silent-water-mizune.mp4`
 >
 > Once per turn, send a Surprise from your side of the board to the discard pile to draw a card. Draw another if the Surprise was in a Zone of a Hero that could activate it, and another if it was face-up.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Water #FantasyArt
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Water #FantasyArt
 
 **Alt-Text**: Animated pixel art trading card of Silent Water Mizune, with water bubbles, rising droplets and sparkles around the hero.
 
@@ -687,10 +687,10 @@ Datei: `siphem-the-deepsea-demon.mp4`
 >
 > Whenever you return cards from your side of the board to your hand, Siphem gains a Deepsea Counter. Once per turn, remove any number of them to deal 50 damage per counter to a target.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Deepsea #Demon
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Deepsea #Demon
 
 **Alt-Text**: Animated pixel art trading card of Siphem, the Deepsea Demon, with dark deep-sea water, bubbles and glowing plankton around the hero.
 
@@ -706,10 +706,10 @@ Datei: `sol-rym-the-thunder-djinn.mp4`
 >
 > Sol Rym can use the Spell "Chain Lightning" regardless of its level. The catch: he can never perform more than 1 Action per turn.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Lightning #Djinn
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Lightning #Djinn
 
 **Alt-Text**: Animated pixel art trading card of Sol Rym, the Thunder Djinn, with lightning bolts and dark storm clouds around the hero.
 
@@ -725,10 +725,10 @@ Datei: `stellan-the-calm-cat.mp4`
 >
 > Once per turn, when Stellan is affected by an opponent's card or effect or takes damage, you may immediately place up to 3 level 0 Creatures with different names from your hand, or 1 level 0 Creature from your deck, into his free Support Zones.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Cat #Cute
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Cat #Cute
 
 **Alt-Text**: Animated pixel art trading card of Stellan, the Calm Cat, with paw prints, floating hearts and sparkles around the hero.
 
@@ -744,10 +744,10 @@ Datei: `taio-absorber-of-the-mountain-s-heart.mp4`
 >
 > Taio ascends on top of "Taio, the Sun Fencer" once he is equipped with "The Sun Sword" and has defeated an opposing Hero with an Attack or Destruction Magic Spell. Once per turn, he can follow an Attack with a Destruction Magic Spell, or the other way around, as an additional Action.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Fire #Swordsman
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Fire #Swordsman
 
 **Alt-Text**: Animated pixel art trading card of Taio, Absorber of the Mountain's Heart, with rising flames, embers and desert dust around the hero.
 
@@ -763,10 +763,10 @@ Datei: `taio-the-sun-fencer.mp4`
 >
 > While Taio has an Artifact with a cost of 10 or more equipped, his Destruction Spells are reduced in level by his Fighting level. And he gains 20 Attack for every Artifact equipped to him.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Fire #Swordsman
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Fire #Swordsman
 
 **Alt-Text**: Animated pixel art trading card of Taio, the Sun Fencer, with golden light beams, flames and sparkles around the hero.
 
@@ -782,10 +782,10 @@ Datei: `tarleinn-the-traveler.mp4`
 >
 > Once per turn, when a Hero you control with two or more different Spell Schools uses a Spell, you may choose a target you control and heal its HP by 40, 80 or 150, depending on the Spell's level.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Bard #Traveler
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Bard #Traveler
 
 **Alt-Text**: Animated pixel art trading card of Tarleinn the Traveler, with music notes, flower petals and golden sparkles around the hero.
 
@@ -801,10 +801,10 @@ Datei: `archibald-the-archmage.mp4`
 >
 > Once per turn, when you discard a Normal Spell from your hand, Archibald may use it immediately as an additional Action, at +1 level. He can never perform 2 of the same Spell in one turn.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Wizard #Archmage
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Wizard #Archmage
 
 **Alt-Text**: Animated pixel art trading card of Archibald, the Archmage, with arcane orbs, sparkles and magic dust around the hero.
 
@@ -820,10 +820,10 @@ Datei: `thep-the-court-scribe.mp4`
 >
 > Once per turn, Thep brings a "Soul Shard" Creature back from your discard pile, one that was not sent there this turn, into one of his free Support Zones.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Scribe #Quill
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Scribe #Quill
 
 **Alt-Text**: Animated pixel art trading card of Thep, the Court Scribe, with falling feathers, ink drops and golden motes around the hero.
 
@@ -839,10 +839,10 @@ Datei: `thorad-strength-of-coolness.mp4`
 >
 > Any damage Thorad deals to a single target with Attacks or Spells is increased by 40 for each card in your Coolness Stack.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Thunder #Lightning
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Thunder #Lightning
 
 **Alt-Text**: Animated pixel art trading card of Thorad, Strength of Coolness, with lightning bolts, storm clouds and sparks around the hero.
 
@@ -858,10 +858,10 @@ Datei: `timeless-king-zi.mp4`
 >
 > Spend your Action to reveal 3 Spells with different names and total levels of 6 or less from your deck. Your opponent picks one, Zi performs it regardless of its level, and the other Spells are deleted.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #King #Time
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #King #Time
 
 **Alt-Text**: Animated pixel art trading card of Timeless King Zi, with turning gears, arcane orbs and golden sparkles around the hero.
 
@@ -877,10 +877,10 @@ Datei: `toras-master-of-all-weapons.mp4`
 >
 > Toras gains 40 Attack for every Artifact with a different name equipped to him. But he can never hit more than 1 target with an Attack.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Swordsman #Weapons
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Swordsman #Weapons
 
 **Alt-Text**: Animated pixel art trading card of Toras, Master of all Weapons, with floating swords, sparks and dust around the hero.
 
@@ -896,10 +896,10 @@ Datei: `vacarn-the-dark-goblin-necromancer.mp4`
 >
 > "Skeleton" Creatures Vacarn summons with Necromancy keep their effects and may use their active effects the turn they're summoned. But Creatures in his Support Zones that are defeated are deleted.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Necromancer #Goblin
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Necromancer #Goblin
 
 **Alt-Text**: Animated pixel art trading card of Vacarn, the Dark Goblin Necromancer, with purple soul mist, floating skulls and glowing orbs around the hero.
 
@@ -915,10 +915,10 @@ Datei: `victorica-the-eternal-empress.mp4`
 >
 > Once per turn, Victorica removes a Pollution Token from your side of the board that was not placed there this turn.
 >
-> This is one of almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 pixelpartiestcg.com (link in bio)
+> This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Empress #Royalty
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Empress #Royalty
 
 **Alt-Text**: Animated pixel art trading card of Victorica, the Eternal Empress, with golden motes, floating crowns and red gems around the hero.
 
@@ -934,10 +934,10 @@ Datei: `zsos-ssar-the-serpent-warlord.mp4`
 >
 > Zsos'Ssar deals +40 extra damage for every poisoned target on the board. The catch: every Decay spell he casts forces you to poison one of your own Heroes first. Risky? Absolutely.
 >
-> Meet almost 200 animated pixel Heroes in Pixel Parties, the online multiplayer card game.
-> 👉 Play now: pixelpartiestcg.com (link in bio)
+> Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.
+> 👉 Play for free: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Snake #Poison
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Snake #Poison
 
 **Alt-Text**: Animated pixel art trading card of Zsos'Ssar, the Serpent Warlord, with drifting purple poison gas around the hero.
 
@@ -953,10 +953,10 @@ Datei: `xiong-the-bamboo-guardian.mp4`
 >
 > Whenever Xiong defeats a target with an Attack, you may choose a card from either player's discard pile and add it to your hand.
 >
-> Pixel Parties is an online multiplayer trading card game with almost 200 animated pixel Heroes.
+> Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.
 > 👉 pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Bamboo #Guardian
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Bamboo #Guardian
 
 **Alt-Text**: Animated pixel art trading card of Xiong, the Bamboo Guardian, with falling bamboo leaves and green motes around the hero.
 
@@ -972,10 +972,10 @@ Datei: `bubbles-the-bouncy-bunny.mp4`
 >
 > You may redirect any damage Creatures would take to Bubbles. If she is defeated by redirected damage, you draw until you have 7 cards in your hand.
 >
-> Build your team of Heroes and play online against other players in Pixel Parties.
+> Build your team of Heroes and play online against other players, for free, in Pixel Parties.
 > 👉 Check it out: pixelpartiestcg.com (link in bio)
 >
-> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #Bunny #Cute
+> #PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay #Bunny #Cute
 
 **Alt-Text**: Animated pixel art trading card of Bubbles, the Bouncy Bunny, with colorful bubbles, sparkles and floating hearts around the hero.
 
