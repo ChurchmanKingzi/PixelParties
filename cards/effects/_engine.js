@@ -25665,6 +25665,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         const bonusCtx = { playerIdx, amount: bonus.delta, sourceName: bonus.card?.name, cancelled: false, _skipReactionCheck: true };
         await this.runHooks('onIncomeBonusGain', bonusCtx);
         if (bonusCtx.cancelled) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
+        else if (bonus.delta > 0) {
+          // W24b N2-09: derselbe Zuschlag ist auch fuer Gold Trap „Gold through an effect" — Fenster nur fuer den Zuschlag, das Grund-Einkommen bleibt.
+          const trap = await this._checkSurpriseOnResourceGain(playerIdx, bonus.delta);
+          if (trap?.redirected) hookCtx.amount = Math.max(0, hookCtx.amount - bonus.delta);
+        }
       }
     }
     // Opponent's Surprise window — Gold Trap (and any future
