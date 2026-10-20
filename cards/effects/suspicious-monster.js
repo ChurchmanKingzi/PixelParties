@@ -462,6 +462,10 @@ module.exports = {
       if (pre.kind !== 'swap') return true;   // Platz war frei: normale Beschwörung, die Engine platziert
       return await landeNachTausch(engine, pi, pre);
     }
+    // N3-06 (W24): Effekt-Beschwoerungen (Slave Trader, Tharxian Horse, Master's Key …) legen die Karte in eine FREIE Zone und
+    // zahlen kein Opfer — der Tausch ist ein Wahlweg der Hand-Beschwoerung (`_isNormalSummon`). Ohne diese Pruefung lief der
+    // Fallback zusaetzlich zur Engine-Platzierung (zwei Kopien, Opfer in der Ablage, Kartenbilanz +1).
+    if (ctx._isNormalSummon !== true) return true;
     return await sacrificeSwapAtomar(ctx);
   },
 
