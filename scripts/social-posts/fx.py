@@ -16,6 +16,12 @@ PAL = {
     'heal': [(150, 40, 90), (226, 80, 140), (255, 140, 190), (255, 220, 235)],
     'gold': [(120, 80, 10), (214, 160, 30), (255, 214, 80), (255, 245, 190)],
     'arcane': [(30, 20, 100), (70, 60, 200), (120, 150, 255), (200, 235, 255)],
+    'ecto': [(10, 50, 40), (30, 110, 90), (80, 190, 150), (190, 250, 220)],
+    'leafgreen': [(20, 70, 20), (50, 140, 40), (110, 200, 70), (200, 250, 150)],
+    'water': [(10, 50, 110), (30, 110, 190), (90, 180, 240), (220, 245, 255)],
+    'storm_smoke': [(20, 24, 40), (50, 56, 80), (90, 100, 130), (150, 160, 190)],
+    'shadow': [(14, 8, 30), (40, 20, 70), (80, 45, 120), (150, 110, 190)],
+    'pinkwing': [(120, 40, 140), (200, 90, 200), (255, 150, 230), (255, 230, 250)],
     'holy_white': [(150, 140, 175), (214, 208, 232), (246, 243, 252), (255, 255, 255)],
     'ice': [(30, 70, 120), (90, 160, 220), (170, 220, 250), (240, 252, 255)],
 }
@@ -29,6 +35,13 @@ THEMES = {
     'arcane': [('orb', 'arcane', 9), ('spark', 'arcane', 8)],
     'fight':  [('cloud', 'dust', 5), ('spark', 'gold', 10)],
     'ice':    [('flake', 'ice', 16), ('spark', 'ice', 6)],
+    'necro':  [('gas', 'ecto', 44), ('orb', 'ecto', 6), ('spark', 'ecto', 6)],
+    'nature': [('leaf', 'leafgreen', 16), ('mote', 'leafgreen', 34), ('spark', 'gold', 5)],
+    'water':  [('bubble', 'water', 18), ('gas', 'water', 18), ('spark', 'water', 6)],
+    'storm':  [('bolt', 'gold', 6), ('gas', 'storm_smoke', 30), ('spark', 'gold', 6)],
+    'shadow': [('gas', 'shadow', 46), ('spark', 'shadow', 8)],
+    'dust':   [('gas', 'dust', 42), ('mote', 'dust', 24)],
+    'butterfly': [('butterfly', 'pinkwing', 9), ('mote', 'heal', 24), ('spark', 'pinkwing', 5)],
     'holy':   [('beam', 'gold', 5), ('mote', 'gold', 64), ('orb', 'gold', 6), ('feather', 'holy_white', 14), ('cross', 'gold', 10), ('spark', 'holy_white', 7)],
     'stars':  [('spark', 'gold', 12), ('spark', 'arcane', 8)],
 }
@@ -225,6 +238,19 @@ class ThemeFX:
                         x0 = cx + side * ((bx1 - bx0) / 2 + r.uniform(0, 70)) * spread
                         y0 = feet - r.uniform(0, 200)
                         it = dict(rise=r.uniform(180, 280), drift=side * 20, r=1, grow=0, seed=0, sway=2 * U)
+                    elif kind == 'leaf':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 120)
+                        y0 = by0 - r.uniform(0, 100)
+                        it = dict(rise=-r.uniform(280, 400), drift=r.uniform(-40, 40), r=1, grow=0, seed=0, sway=r.choice([2, 3]) * U)
+                    elif kind == 'butterfly':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 130)
+                        y0 = feet - r.uniform(0, 300)
+                        it = dict(rise=r.uniform(50, 130), drift=r.uniform(-60, 60), r=1, grow=0, seed=0, sway=r.choice([3, 4, 5]) * U)
+                    elif kind == 'bolt':
+                        cyc = r.choice([3, 4, 5])
+                        spots = [(cx + r.choice([-1, 1]) * r.uniform(0.3, 1.0) * ((bx1 - bx0) / 2 + 150), by0 - r.uniform(40, 140),
+                                  r.randrange(12, 26), r.randrange(1000)) for _ in range(cyc)]
+                        it = dict(rise=0, drift=0, r=1, grow=0, seed=0, sway=0, spots=spots, cycles=cyc)
                     elif kind == 'mote':
                         x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 130)
                         y0 = feet - r.uniform(-10, 300)
@@ -278,6 +304,9 @@ class ThemeFX:
             if p['kind'] == 'boom':
                 self._boom(d, p, t)
                 continue
+            if p['kind'] == 'bolt':
+                self._bolt(d, p, t)
+                continue
             u = (t * p['cycles'] + p['phase']) % 1.0
             a = min(p['amax'], u / 0.22, (1 - u) / 0.38)
             if a <= 0:
@@ -302,6 +331,14 @@ class ThemeFX:
             elif kind == 'cross':
                 stamp = {(0, j): (3 if j == 0 else 2) for j in range(-2, 4)}
                 stamp.update({(-1, 0): 2, (1, 0): 2})
+            elif kind == 'leaf':
+                stamp = ({(0, 0): 2, (1, 0): 3, (-1, 1): 2, (0, 1): 2, (1, 1): 2, (-1, 2): 1, (0, 2): 2} if int(u * 6) % 2 else
+                         {(0, 0): 2, (1, 0): 2, (0, 1): 3, (1, 1): 2, (2, 1): 2, (1, 2): 1})
+            elif kind == 'butterfly':
+                if int(u * 40) % 2:
+                    stamp = {(-2, -1): 2, (-1, -1): 3, (1, -1): 3, (2, -1): 2, (-2, 0): 2, (-1, 0): 2, (1, 0): 2, (2, 0): 2, (0, 0): 0, (-1, 1): 1, (1, 1): 1}
+                else:
+                    stamp = {(-1, -1): 3, (1, -1): 3, (-1, 0): 2, (1, 0): 2, (0, 0): 0}
             elif kind == 'feather':
                 stamp = {k: 2 for k in ((2, -2), (1, -2), (1, -1), (0, -1), (0, 0), (-1, 0), (-1, 1), (-2, 1), (-2, 2))}
                 stamp.update({(1, -1): 3, (0, -1): 3, (0, 0): 3, (2, -2): 3})
@@ -366,3 +403,22 @@ class ThemeFX:
                 jj = j - int(k * size * 1.2)
                 if cell_visible(a, cx + i, cy + jj):
                     cell(i, jj, PAL['smoke'][idx])
+
+    def _bolt(self, d, p, t):
+        """Blitz: zackige Linie von oben, nur kurz sichtbar (erste 18 % des Zyklus), flackert."""
+        x = t * p['cycles'] + p['phase']
+        n, u = int(x), x % 1.0
+        sx, sy, length, seed = p['spots'][n % p['cycles']]
+        if u > 0.18:
+            return
+        rnd = random.Random(seed)
+        cx, cy = int(round(sx / U)), int(round(sy / U))
+        i = 0
+        flick = 3 if int(u * 40) % 2 else 2
+        for j in range(length):
+            i += rnd.choice([-1, 0, 0, 1])
+            for q, idx in ((0, 3), (-1, 2), (1, 2)):
+                if q != 0 and u > 0.1:
+                    continue
+                px, py = (cx + i + q) * U, (cy + j) * U
+                d.rectangle([px, py, px + U - 1, py + U - 1], fill=p['pal'][flick if q == 0 else 2] + (255,))

@@ -277,7 +277,8 @@ def body_mask(frame):
 
 
 class Sprite:
-    def __init__(self, hero_dir_slug):
+    def __init__(self, hero_dir_slug, px=SPRITE_PX):
+        self.px = px                       # px je Sprite-Pixel (gerade, damit die halben Pixel der Outline aufgehen)
         base = ROOT / 'data' / 'hero-animations'
         self.meta = json.loads((base / (hero_dir_slug + '.json')).read_text(encoding='utf-8'))
         self.sheet = Image.open(base / self.meta['sheet']).convert('RGBA')
@@ -308,20 +309,24 @@ class Sprite:
         if i in self._cache:
             return self._cache[i]
         f = self.sheet.crop((i * self.fw, 0, (i + 1) * self.fw, self.fh))
-        pad = 3
+        pad = max(3, -(-2 * U * 2 // self.px) + 1)
         f = pad_image(f, pad)
         body = body_mask(f)
         half = body.resize((body.width * 2, body.height * 2), Image.NEAREST)
         a = half
         half = f.resize((f.width * 2, f.height * 2), Image.NEAREST)
 
+        hp = self.px // 2                                   # px je halbem Sprite-Pixel
+        k_light = max(1, round(U / hp))                      # Outline innen ≈ 7 px, außen ≈ 14 px (bei px=14: 1 und 2 halbe Pixel)
+        k_dark = max(k_light + 1, round(2 * U / hp))
+
         def ring(k, color):
             g = a.filter(ImageFilter.MaxFilter(2 * k + 1))
             im = Image.new('RGBA', half.size, color + (255,))
             im.putalpha(g)
-            return im.resize((im.width * U, im.height * U), Image.NEAREST)
+            return im.resize((im.width * hp, im.height * hp), Image.NEAREST)
 
-        res = (ring(2, dark), ring(1, light), f.resize((f.width * SPRITE_PX, f.height * SPRITE_PX), Image.NEAREST), pad * SPRITE_PX)
+        res = (ring(k_dark, dark), ring(k_light, light), f.resize((f.width * self.px, f.height * self.px), Image.NEAREST), pad * self.px)
         self._cache[i] = res
         return res
 
@@ -386,6 +391,39 @@ class Particles:
 
 # ── Hauptprogramm ─────────────────────────────────────────────────────────────
 
+def choose_px(spr, cfg):
+    """Maßstab so wählen, dass die deckende Figur gut ins Layout passt: 14 px (= 2 Kartenpixel), wenn Höhe
+    300…540 px und Breite ≤ 760 px bleiben; sonst der größte gerade Maßstab, der in 540 × 760 passt."""
+    if 'px' in cfg:
+        return int(cfg['px'])
+    ow = spr.right - spr.left
+    oh = max(1, spr.foot - spr.top)
+    if 300 <= oh * SPRITE_PX <= 540 and ow * SPRITE_PX <= 760:
+        return SPRITE_PX
+    best = 4
+    for px in range(4, 29, 2):
+        if oh * px <= 540 and ow * px <= 760:
+            best = px
+    return best
+
+
+def pick_music_start(path, window, lo=2.0, hi=75.0):
+    """Beginn des energiereichsten Fensters (mittlere Lautstärke) im Stück, damit kein leiser Anfang gewählt wird."""
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(path), '-ac', '1', '-ar', '8000', '-f', 's16le', '-'],
+                         capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+    step = 4000                                          # 0,5-s-Blöcke
+    n = len(x) // step
+    rms = np.sqrt((x[:n * step].reshape(n, step) ** 2).mean(axis=1))
+    w = int(round(window / 0.5))
+    best, best_v = lo, -1.0
+    for i in range(int(lo / 0.5), min(n - w, int(hi / 0.5))):
+        v = rms[i:i + w].mean()
+        if v > best_v:
+            best, best_v = i * 0.5, v
+    return best
+
+
 def music_path(card_name, override):
     """Musik: ausdrückliche Datei → bgm_<erstes Wort>.ogg → bgm_<ein anderes Wort des Namens>.ogg."""
     base = ROOT / 'public' / 'music'
@@ -406,8 +444,9 @@ def main():
     ap.add_argument('--duration', type=float, default=None, help='Mindestlänge des MP4 in Sekunden (Standard: Post 30, Reel 15)')
     ap.add_argument('--themes', help='Partikel-Themen, kommagetrennt (poison, fire, heal, arcane, fight, ice, stars); sonst automatisch')
     ap.add_argument('--music')
-    ap.add_argument('--music-start', type=float, default=0.0)
+    ap.add_argument('--music-start', type=float, default=None, help='Startzeit im Stück; ohne Angabe: Wert aus hero-themes.json (musicStart), sonst das energiereichste Fenster')
     ap.add_argument('--no-video', action='store_true')
+    ap.add_argument('--clean', action='store_true', help='Einzelbilder nach dem Kodieren löschen (spart Platz)')
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
     args = ap.parse_args()
@@ -468,7 +507,8 @@ def main():
     ornaments.place_divider(mid_b, accent, nx - 2 * U, name_y - U, dl, -1)
     ornaments.place_divider(mid_b, accent, nx + nw + 2 * U, name_y - U, dl, 1)
     if sub:
-        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, 3, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
+        sub_scale = 3 if pixel_text_mask(sub).width * 3 <= 640 else 2
+        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, sub_scale, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
         ornaments.place_divider(mid_b, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
         ornaments.place_divider(mid_b, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
     if reel:                                  # Link-Schild unter dem Beinamen (im sicheren Bereich)
@@ -487,9 +527,11 @@ def main():
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
     if 'anchorX' in hero_cfg:
         spr.center_x = float(hero_cfg['anchorX'])
-    sx = round(card_x + CARD_W / 2 - spr.center_x * SPRITE_PX)      # Gesichtsmitte (zwischen den Augen) genau über der Kartenmitte
-    sy = feet_y - spr.foot * SPRITE_PX
-    shadow = pixel_ellipse(24, 4, INK, 170)
+    spr.px = choose_px(spr, hero_cfg)
+    print('Sprite-Maßstab:', spr.px, 'px je Sprite-Pixel')
+    sx = round(card_x + CARD_W / 2 - spr.center_x * spr.px)      # Gesichtsmitte (zwischen den Augen) genau über der Kartenmitte
+    sy = feet_y - spr.foot * spr.px
+    shadow = pixel_ellipse(max(10, min(44, round((spr.right - spr.left) * spr.px * 0.75 / U))), 4, INK, 170)
 
     parts_bg = Particles(args.slug, accent, 40 if not reel else 56, (U * 3, 0, W - U * 3, H), loop)
     cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
@@ -497,7 +539,7 @@ def main():
     pinned = hero_cfg.get('themes')
     names = fx.themes_for(card_data, args.themes.split(',') if args.themes else pinned)
     print('Partikel-Themen:', ', '.join(names))
-    box = (sx + spr.left * SPRITE_PX, sy + spr.top * SPRITE_PX, sx + spr.right * SPRITE_PX, feet_y)
+    box = (sx + spr.left * spr.px, sy + spr.top * spr.px, sx + spr.right * spr.px, feet_y)
     theme_fx = fx.ThemeFX(names, args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
 
@@ -576,7 +618,11 @@ def main():
                ['-framerate', str(fps), '-i', str(fdir / first)]
         vfilter, n_in = [], 1
     if music:
-        cmd += ['-ss', str(args.music_start), '-i', str(music)]
+        m_start = args.music_start if args.music_start is not None else hero_cfg.get('musicStart')
+        if m_start is None:
+            m_start = pick_music_start(music, dur)
+            print(f'Musik: energiereichstes Fenster ab {m_start:.1f} s')
+        cmd += ['-ss', str(m_start), '-i', str(music)]
         amap = ['-map', f'{n_in}:a', '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
@@ -589,6 +635,9 @@ def main():
                              '-tune', 'animation', '-maxrate', '10M', '-bufsize', '20M', '-movflags', '+faststart', str(mp4)]
     subprocess.run(cmd, check=True)
     print('Video', mp4, f'{dur:.1f}s', 'mit Musik' if music else 'ohne Musik')
+    if args.clean:
+        import shutil
+        shutil.rmtree(fdir, ignore_errors=True)
 
 
 if __name__ == '__main__':

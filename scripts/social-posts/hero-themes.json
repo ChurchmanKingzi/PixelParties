@@ -3,12 +3,14 @@
     "themes": [
       "poison"
     ],
-    "anchorX": 19.3
+    "anchorX": 19.3,
+    "musicStart": 4
   },
   "Nao, the Barrier Priestess": {
     "themes": [
       "holy"
-    ]
+    ],
+    "musicStart": 4
   },
   "Bomb Berserker Bartas": {
     "themes": [
@@ -16,6 +18,270 @@
     ],
     "name": "Bartas",
     "title": "Bomb Berserker",
-    "music": "bgm_bartas.ogg"
+    "music": "bgm_bartas.ogg",
+    "musicStart": 4
+  },
+  "Alleria, the Queen of Spiders": {
+    "themes": [
+      "poison"
+    ]
+  },
+  "Andras, the Human Weapon": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Argos, the Eye of the Cosmos": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Arthor, Inheritor of the Barbarian Sword": {
+    "themes": [
+      "fire"
+    ]
+  },
+  "Arthor, the King of Blackport": {
+    "themes": [
+      "water"
+    ]
+  },
+  "Baaliel, the Demon General": {
+    "themes": [
+      "fire"
+    ]
+  },
+  "Bakhm, the Desert Digger": {
+    "themes": [
+      "dust"
+    ]
+  },
+  "Beato, the Butterfly Witch": {
+    "themes": [
+      "butterfly"
+    ]
+  },
+  "Beato, the Eternal Butterfly": {
+    "themes": [
+      "butterfly"
+    ]
+  },
+  "Calamitusk, the Chaorc War Chief": {
+    "themes": [
+      "dust",
+      "fight"
+    ]
+  },
+  "Champion, the Eye of the Storm": {
+    "themes": [
+      "storm"
+    ]
+  },
+  "Champion, the Stormbringer": {
+    "themes": [
+      "storm"
+    ]
+  },
+  "Chaos-Diamond, the Cracked Keeper": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Damus, the Prophet of Apocalypse": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Definitely not Andras, the Human Weapon": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Ghuanjun, the Undead Martial Artist": {
+    "themes": [
+      "necro"
+    ]
+  },
+  "Null, the Mage Slayer": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Hel, the Bound Specter": {
+    "themes": [
+      "necro"
+    ]
+  },
+  "Kit, the Shark Researcher": {
+    "themes": [
+      "water"
+    ]
+  },
+  "Klaus, the Cult Leader": {
+    "themes": [
+      "necro"
+    ]
+  },
+  "Layn, Defender of Deri": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Layn, Master of Deri's Relic": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Lilly, the Charming Infiltrator": {
+    "themes": [
+      "heal"
+    ]
+  },
+  "Luna Pele, the Flame Dancer": {
+    "themes": [
+      "fire"
+    ]
+  },
+  "Mao, the Vengeful Guardian": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Maya, the Nature Fairy": {
+    "themes": [
+      "nature"
+    ]
+  },
+  "Nero Zira, the Mastermind": {
+    "themes": [
+      "shadow"
+    ]
+  },
+  "Orthos, the Loyal Guard Dog": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Reiza, the Chief Tormentor": {
+    "themes": [
+      "shadow"
+    ]
+  },
+  "Siphem, the Deepsea Demon": {
+    "themes": [
+      "water"
+    ]
+  },
+  "Sol Rym, the Thunder Djinn": {
+    "themes": [
+      "storm"
+    ]
+  },
+  "Stellan, the Calm Cat": {
+    "themes": [
+      "stars"
+    ]
+  },
+  "Taio, Absorber of the Mountain's Heart": {
+    "themes": [
+      "dust"
+    ]
+  },
+  "Taio, the Sun Fencer": {
+    "themes": [
+      "holy"
+    ]
+  },
+  "Archibald, the Archmage": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Thep, the Court Scribe": {
+    "themes": [
+      "arcane"
+    ]
+  },
+  "Thorad, Strength of Coolness": {
+    "themes": [
+      "ice"
+    ]
+  },
+  "Toras, Master of all Weapons": {
+    "themes": [
+      "fight"
+    ]
+  },
+  "Vacarn, the Dark Goblin Necromancer": {
+    "themes": [
+      "necro"
+    ]
+  },
+  "Victorica, the Eternal Empress": {
+    "themes": [
+      "holy"
+    ]
+  },
+  "Xiong, the Bamboo Guardian": {
+    "themes": [
+      "nature"
+    ]
+  },
+  "Bubbles, the Bouncy Bunny": {
+    "themes": [
+      "water"
+    ]
+  },
+  "Bow Sniper Darge": {
+    "themes": [
+      "fight"
+    ],
+    "name": "Darge",
+    "title": "Bow Sniper"
+  },
+  "Cute Annoyance Mini": {
+    "themes": [
+      "heal"
+    ],
+    "name": "Mini",
+    "title": "Cute Annoyance"
+  },
+  "Idej Lord Daiyo": {
+    "themes": [
+      "fight"
+    ],
+    "name": "Daiyo",
+    "title": "Idej Lord"
+  },
+  "Silent Water Mizune": {
+    "themes": [
+      "water"
+    ],
+    "name": "Mizune",
+    "title": "Silent Water"
+  },
+  "Timeless King Zi": {
+    "themes": [
+      "arcane"
+    ],
+    "name": "Zi",
+    "title": "Timeless King"
+  },
+  "Tarleinn the Traveler": {
+    "themes": [
+      "stars"
+    ],
+    "name": "Tarleinn",
+    "title": "the Traveler"
+  },
+  "Mary Crestmas": {
+    "themes": [
+      "ice"
+    ]
+  },
+  "Santa Klaus": {
+    "themes": [
+      "ice"
+    ]
   }
 }
