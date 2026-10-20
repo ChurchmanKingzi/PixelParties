@@ -39094,6 +39094,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
     const reaktor = opts.reaktor ?? playerIdx;
     if (this._reaktionGesperrt(reaktor)) return false;   // v1293 Reaktionssperre
+    // W25a (N1-12, Al 21.10.2026: „Ocean verhindert Surprises (cannot react to)"): unter Dark Ocean oeffnet KEIN Surprise-Fenster gegen den Effekt einer
+    // GEGNERISCHEN Kreatur (wie bei den Hand-Reaktionen, Ruling 5.8.; die Hand-Fenster pruefen die Sperre selbst, `spellInHand` bleibt unberuehrt).
+    // Surprises gegen Attacks/Spells (oberstes Glied keine Kreatur) bleiben unberuehrt. EINE Stelle fuer alle Surprise-Fenster.
+    if (!opts.spellInHand && this.isDarkOceanActive() && this.darkOceanBlocksReaction(reaktor, null)) return false;
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
