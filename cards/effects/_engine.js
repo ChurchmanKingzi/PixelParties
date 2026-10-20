@@ -3874,13 +3874,12 @@ class GameEngine {
       // NICHT die Kreaturen in seinen Support Zones.
       //
       // Gilt fuer die TEMPORAERE Uebernahme (Charme Lv3, Love Shot,
-      // Golden Apple). Die DAUERHAFTE Uebernahme setzt dieselbe Marke,
-      // ist aber ein Besitzwechsel („zaehlt wie ein eigener", Als
-      // Ruling 4.9.) — dort wandert alles mit, deshalb der Vorbehalt
-      // auf `permaControlBy`.
-      const _dauerhaft = heroObj?.permaControlBy != null;
+      // Golden Apple).
+      // ★ W31a (Al, 22.10.2026: „Creatures sind unabhaengig von Heroes und haben ihren *eigenen* owner … Den Hero zu stehlen, stiehlt NICHT seine Creatures
+      // mit!"): das gilt auch fuer die DAUERHAFTE Uebernahme (`permaControlBy`, frueher Vorbehalt „wandert alles mit"). Eine Kreatur in der Zone eines
+      // uebernommenen Helden behaelt IMMER ihre eigene Kontrolle (`inst.controller ?? inst.owner`, = `kontrolleurVon`); `cardOwner` des Kreaturen-Kontexts ist
+      // dieselbe Wahrheit wie `kontrolleurVon`/`getCreatureTargets`. Wechsel nur ueber Kreaturen-Wechsel (Dark Gear, Steal Creature, Charme der Kreatur).
       const _istKreatur = cardInstance.zone === 'support'
-        && !_dauerhaft
         && engine._istKreaturenInstanz(cardInstance);
       if (heroObj?.charmedBy != null && !_istKreatur) {
         effectiveController = heroObj.charmedBy;
