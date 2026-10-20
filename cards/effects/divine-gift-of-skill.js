@@ -33,12 +33,16 @@
 
 const BONUS_ATTACHMENTS = 4;
 
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme —
+// Spiegel von `engine.heroSideOf`) ist KEIN „Hero you control". Ein uebernommener Gegnerheld bleibt hier ausgenommen: der Bonus-Zaehler `ps._bonusAbilityAttachments`
+// ist nach Heldenindex der EIGENEN Spalte geschluesselt (Zaehler-Kollision mit dem gleich indizierten eigenen Helden) — gemeldet, nicht umgebaut.
 function getOwnLivingHeroTargets(gs, pi) {
   const ps = gs.players[pi];
   const targets = [];
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    if ((hero.charmedBy ?? hero.permaControlBy ?? pi) !== pi) continue;
     targets.push({
       id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi,
       cardName: hero.name,

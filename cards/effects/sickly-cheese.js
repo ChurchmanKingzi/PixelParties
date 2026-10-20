@@ -18,9 +18,9 @@ const { getCardDB: _getCardDB } = require('./_card-db');
 async function zahleKosten(engine, pi, selectedIds, validTargets) {
   const target = (validTargets || []).find(t => t.id === (selectedIds || [])[0]);
   if (!target || target.type !== 'hero') return false;
-  const hero = engine.gs.players[pi]?.heroes?.[target.heroIdx];
+  const hero = engine.gs.players[target.owner ?? pi]?.heroes?.[target.heroIdx];   // W28a: Brettseite des (kontrollierten) Helden
   if (!hero?.name || hero.hp <= 0) return false;
-  await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
+  await engine.addHeroStatus(target.owner ?? pi, target.heroIdx, 'poisoned', {
     addStacks: 1, appliedBy: pi,
   });
   engine.log('poison_applied', {
@@ -36,20 +36,11 @@ async function zahleKosten(engine, pi, selectedIds, validTargets) {
  * `negative_status_immune`, Johanna/Light-Ball-Schutz, Shielded …), ist `ineligible` (ausgegraut, serverseitig nicht waehlbar).
  */
 function getValidTargets(gs, pi, engine) {
-  const ps = gs.players[pi];
-  const targets = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    const t = {
-      id: `hero-${pi}-${hi}`,
-      type: 'hero',
-      owner: pi,
-      heroIdx: hi,
-      cardName: hero.name,
-    };
-    if (engine && engine.heroBlocksStatusNow(pi, hi, 'poisoned', { appliedBy: pi })) t.ineligible = true;
-    targets.push(t);
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (abgegebener eigener Held nein,
+  // uebernommener Gegnerheld ja; `owner` = Brettseite).
+  const targets = engine ? engine.getControlledHeroTargets(pi) : (gs.players[pi].heroes || []).map((hero, hi) => ({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero?.name })).filter(t => t.cardName && gs.players[pi].heroes[t.heroIdx].hp > 0);
+  for (const t of targets) {
+    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) t.ineligible = true;
   }
   return targets;
 }
@@ -70,7 +61,7 @@ module.exports = {
   canActivate(gs, pi, engine) {
     // Must have at least 1 living hero under control
     const ps = gs.players[pi];
-    const hasHero = (ps.heroes || []).some(h => h?.name && h.hp > 0);
+    const hasHero = engine ? engine.getControlledHeroTargets(pi).length > 0 : (ps.heroes || []).some(h => h?.name && h.hp > 0);   // W28a: kontrollierte Helden
     if (!hasHero) return false;
     // ★ W7b (F03-12, Al 14.10.): „Giftimmun macht ein Ziel ineligible" - die Karte ist nur gesperrt, wenn es GAR KEIN
     // waehlbares Ziel gibt, d. h. kein lebender Held, der den Giftstapel (die Kosten) annehmen wuerde.

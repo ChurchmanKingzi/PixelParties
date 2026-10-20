@@ -68,18 +68,20 @@ const OPFER = 3;
 
 const STATUS = 'soul_transmitted';
 
-/** Besiegte eigene Helden, die diese Karte waehlen kann. */
+/**
+ * Besiegte Helden, die `pi` KONTROLLIERT und die diese Karte waehlen kann (W28a, Al 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer":
+ * ein besiegter, an den Gegner abgegebener Held nein, ein besiegter uebernommener Gegnerheld ja). Eintraege `{ owner (Brettseite), heroIdx }`.
+ */
 function waehlbareHelden(engine, pi) {
-  const ps = engine.gs.players?.[pi];
   const out = [];
-  for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  for (const { id, owner, heroIdx } of engine.getControlledHeroTargets(pi, { defeated: true })) {
+    const h = engine.gs.players[owner]?.heroes?.[heroIdx];
     if (!h?.name || h.hp > 0) continue;
     // v1466: volle Heilung — bei 0 max HP kein Ziel (s. _revive-shared).
     // v1467: „healing its HP completely" — nicht heilbare Helden auch nicht.
     if (!engine.canReviveHero(h, { heilt: true })) continue;
     if (engine._isHeroSpellProtected?.(h, CARD_NAME)) continue;
-    out.push(hi);
+    out.push({ id, owner, heroIdx });
   }
   return out;
 }
@@ -97,21 +99,21 @@ const FADEN_MS = 1500;
  * die Opfer fallen und der Held aufsteht. Hand-Ersatz (Chosen Sacrifice)
  * hat keinen Brettplatz und bekommt keinen Faden.
  */
-async function faedenZiehen(engine, pi, heroIdx, gewaehlt) {
+async function faedenZiehen(engine, heldSeite, heroIdx, gewaehlt) {
   const quellen = (gewaehlt || [])
     .map(t => t?.cardInstance)
     .filter(i => i && i.zone === 'support' && i.heroIdx >= 0 && i.zoneSlot >= 0)
     .map(i => ({ owner: i.owner, heroIdx: i.heroIdx, zoneSlot: i.zoneSlot }));
   if (quellen.length === 0) return;
   engine._broadcastEvent('play_tether_animation', {
-    sources: quellen, targetOwner: pi, targetHeroIdx: heroIdx, targetZoneSlot: -1,
+    sources: quellen, targetOwner: heldSeite, targetHeroIdx: heroIdx, targetZoneSlot: -1,
     duration: FADEN_MS, color: '#b56cff', glow: 'rgba(70,10,130,0.9)', sfx: 'elem_dark',
   });
   await engine._delay(FADEN_MS - 150);
 }
 
 /** Der Preis: genau 3 Creatures mit Level 0. */
-function opferSpec(zielHeroIdx) {
+function opferSpec(ziel) {
   return {
     minCount: OPFER, maxCount: OPFER,
     filter: c => c.hasLevel && aktuellesLevel(c) === 0,   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
@@ -122,9 +124,9 @@ function opferSpec(zielHeroIdx) {
     confirmClass: 'btn-danger',
     cancellable: true,
     // Faeden statt Messer — die Opferung IST das Ritual.
-    ...(Number.isInteger(zielHeroIdx) ? {
+    ...(ziel && Number.isInteger(ziel.heroIdx) ? {
       sacrificeAnimation: false,
-      onTributesChosen: (ctx, gewaehlt) => faedenZiehen(ctx._engine, ctx.cardOwner, zielHeroIdx, gewaehlt),
+      onTributesChosen: (ctx, gewaehlt) => faedenZiehen(ctx._engine, ziel.owner, ziel.heroIdx, gewaehlt),
     } : {}),
   };
 }
@@ -188,9 +190,9 @@ module.exports = {
       // ── 1. Ziel ──────────────────────────────────────────────────
       const kandidaten = waehlbareHelden(engine, pi);
       if (kandidaten.length === 0) { abbruch(); return; }
-      const ziele = kandidaten.map(hi => ({
-        id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi,
-        cardName: ps.heroes[hi].name,
+      const ziele = kandidaten.map(k => ({
+        id: k.id, type: 'hero', owner: k.owner, heroIdx: k.heroIdx,
+        cardName: gs.players[k.owner].heroes[k.heroIdx].name,
       }));
       const wahl = await engine.promptEffectTarget(pi, ziele, {
         title: CARD_NAME,
@@ -208,17 +210,17 @@ module.exports = {
 
       // ── 2. Preis ─────────────────────────────────────────────────
       if (!vorab) {
-        const bezahlt = await engine.resolveSacrificeCost(ctx, opferSpec(ziel.heroIdx));
+        const bezahlt = await engine.resolveSacrificeCost(ctx, opferSpec(ziel));
         if (!bezahlt) { gs._spellCancelled = true; return; }   // Abbruch — oder Rettung (Server: fizzelt)
       }
 
       // ── 3. Wiederbeleben ─────────────────────────────────────────
-      const held = ps.heroes[ziel.heroIdx];
+      const held = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
       if (!held?.name || held.hp > 0) {
         engine.log('soul_transmigration_fizzle', { player: ps.username, reason: 'target_gone' });
         return;                     // Preis bezahlt, Ziel weg — Karte gespielt, keine Wirkung
       }
-      const ok = await engine.actionReviveHero(pi, ziel.heroIdx, held.maxHp || 0, {
+      const ok = await engine.actionReviveHero(ziel.owner, ziel.heroIdx, held.maxHp || 0, {
         source: CARD_NAME, animationType: 'undead_revival', animDelay: 900,
         heilt: true,   // v1467
       });
@@ -235,7 +237,7 @@ module.exports = {
       };
       engine._heldenStatusVerursacher(held.statuses[STATUS], { appliedBy: pi, source: ctx.card });   // v1399
       engine._broadcastEvent('play_zone_animation', {
-        type: 'soul_shard_dark_grant', owner: pi, heroIdx: ziel.heroIdx, zoneSlot: -1,
+        type: 'soul_shard_dark_grant', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: -1,
       });
       engine.log('status_add', { target: held.name, status: STATUS, source: CARD_NAME });
       engine.log('soul_transmigration', { player: ps.username, hero: held.name });

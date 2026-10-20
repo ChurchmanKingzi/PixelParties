@@ -88,15 +88,19 @@ module.exports = {
     return false;
   },
 
-  canActivate(gs, pi) {
-    const ps = gs.players[pi];
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a defeated Hero you control" = `getControlledHeroTargets(pi, { defeated: true })`
+  // (ein besiegter, an den Gegner abgegebener Held nein; ein besiegter uebernommener Gegnerheld ja; `owner` = Brettseite).
+  canActivate(gs, pi, engine) {
     // Must have at least one dead hero
     // ★ v1466: „revive it with 100 HP" wird auf die max HP gedeckelt —
     // ein Held mit 0 max HP bliebe bei 0 und zaehlt nicht (s. _revive-shared).
+    if (engine) return engine.getControlledHeroTargets(pi, { defeated: true }).some(t => canReviveHero(gs.players[t.owner].heroes[t.heroIdx]));
+    const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp <= 0 && canReviveHero(h));
   },
 
-  getValidTargets(gs, pi) {
+  getValidTargets(gs, pi, engine) {
+    if (engine) return engine.getControlledHeroTargets(pi, { defeated: true }).filter(t => canReviveHero(gs.players[t.owner].heroes[t.heroIdx]));   // v1466
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -132,12 +136,12 @@ module.exports = {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target || target.type !== 'hero') return false;
 
-    const hero = engine.gs.players[pi]?.heroes?.[target.heroIdx];
+    const hero = engine.gs.players[target.owner ?? pi]?.heroes?.[target.heroIdx];   // W28a: Brettseite des kontrollierten Helden
     if (!hero?.name) return false;
     if (hero.hp > 0) return false;
 
     // Revive with min(100, maxHP), auto-kill at end of turn
-    await engine.actionReviveHero(pi, target.heroIdx, 100, {
+    await engine.actionReviveHero(target.owner ?? pi, target.heroIdx, 100, {
       forceKillAtTurnEnd: true,
       animationType: 'golden_ankh_revival',
       source: 'Golden Ankh',

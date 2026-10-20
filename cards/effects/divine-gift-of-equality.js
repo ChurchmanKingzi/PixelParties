@@ -30,7 +30,13 @@ function heroHasSpellSchoolAbility(ps, heroIdx) {
   return false;
 }
 
-function getDeadOwnedTargetsNoSchool(gs, pi) {
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a defeated Hero you control" = `engine.getControlledHeroTargets(pi, { defeated: true })`
+// (ein besiegter, an den Gegner abgegebener Held nein; ein besiegter uebernommener Gegnerheld ja; `owner` = Brettseite, dort liegen seine Ability Zones).
+function getDeadOwnedTargetsNoSchool(gs, pi, engine) {
+  if (engine) {
+    return engine.getControlledHeroTargets(pi, { defeated: true })
+      .filter(t => !heroHasSpellSchoolAbility(gs.players[t.owner], t.heroIdx));
+  }
   const ps = gs.players[pi];
   const targets = [];
   for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
@@ -96,7 +102,7 @@ module.exports = {
   cpuMeta: { reviveCard: true },
 
   spellPlayCondition(gs, pi, engine) {
-    if (getDeadOwnedTargetsNoSchool(gs, pi).length === 0) return false;
+    if (getDeadOwnedTargetsNoSchool(gs, pi, engine).length === 0) return false;
     return buildAnyTargetList(engine).length > 0;
   },
 
@@ -109,7 +115,7 @@ module.exports = {
       if (!ps) return;
 
       // Step 1: pick own dead hero with no Spell School abilities.
-      const reviveTargets = getDeadOwnedTargetsNoSchool(gs, pi);
+      const reviveTargets = getDeadOwnedTargetsNoSchool(gs, pi, engine);
       if (reviveTargets.length === 0) {
         gs._spellCancelled = true;
         return;
@@ -226,7 +232,7 @@ module.exports = {
       // future increases to that ceiling — matches the Resuscitation /
       // Death pattern. The revive HP is also leftover.
       if (leftover > 0) {
-        await engine.actionReviveHero(pi, reviveT.heroIdx, leftover, {
+        await engine.actionReviveHero(reviveT.owner ?? pi, reviveT.heroIdx, leftover, {
           maxHpCap: leftover,
           source: 'Divine Gift of Equality',
         });

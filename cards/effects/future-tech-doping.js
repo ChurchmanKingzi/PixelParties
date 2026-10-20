@@ -33,13 +33,15 @@ module.exports = {
   isPotion: true,
   requiresTarget: true,
 
-  canActivate(gs, playerIdx) {
+  // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets`.
+  canActivate(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
+    if (engine) return engine.getControlledHeroTargets(playerIdx).length > 0;
     return !!ps && (ps.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
   getValidTargets(gs, playerIdx, engine) {
-    return engine.getHeroTargets(playerIdx);
+    return engine.getControlledHeroTargets(playerIdx);
   },
 
   // ★ OHNE DIESEN BLOCK PASSIERT GAR NICHTS (Als Befund 21.8.: „lässt
