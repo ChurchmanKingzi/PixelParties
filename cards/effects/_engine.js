@@ -11357,7 +11357,7 @@ class GameEngine {
    * @param {object}       source - { name, owner, heroIdx } of the effect source
    * @param {CardInstance} inst   - Target creature instance
    */
-  async actionApplyCreaturePoison(source, inst, stacks = 1) {
+  async actionApplyCreaturePoison(source, inst, stacks = 1, opts = {}) {   // W25a (N5-09-Klasse): `opts.unhealable` (Venom Infusion Lv3) - Marke VOR dem Reaktionsfenster
     if (!inst || inst.zone !== 'support') return;
     if (!this.canApplyCreatureStatus(inst, 'poisoned')) return;
 
@@ -11379,6 +11379,7 @@ class GameEngine {
       addStacks: true,
       sourceOwner: source?.owner ?? -1,
       source,
+      unhealable: opts.unhealable ? true : undefined,
       _skipAffectedWindow: true,   // W16b: das Fenster ist oben schon aufgegangen
     });
     this.log('poison_applied', {

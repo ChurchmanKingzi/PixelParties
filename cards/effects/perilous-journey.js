@@ -162,17 +162,12 @@ module.exports = {
       if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
       const cd = engine._getCardDB()[inst.name];
       if (!cd || !/creature/i.test(cd.cardType || '')) continue;
+      // W25a (N5-09-Klasse): `opts.unhealable` setzt `burnedUnhealable` VOR dem Reaktionsfenster des Status (Kanonischer Weg, siehe Cold Coffin):
+      // die zentrale Statusentfernung prueft `<key>Unhealable` am Zaehler.
       const ok = await engine.applyCreatureStatus(inst, 'burned', {
-        sourceOwner: pi, source: CARD_NAME,
+        sourceOwner: pi, source: CARD_NAME, unhealable: true,
       });
-      if (ok) {
-        // Kanonischer Weg, einen Kreaturen-Status unheilbar zu machen
-        // (siehe Cold Coffin): die zentrale Statusentfernung prueft
-        // `<key>Unhealable` am Zaehler.
-        if (!inst.counters) inst.counters = {};
-        inst.counters.burnedUnhealable = true;
-        gebrannt++;
-      }
+      if (ok) gebrannt++;
     }
 
     engine.log('perilous_journey_price', {
