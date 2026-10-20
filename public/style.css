@@ -10767,6 +10767,42 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   transform: rotate(180deg);
   top: 2px; bottom: auto; left: 3px; right: auto;
 }
+/* ── STAPELZAHLEN (Als Vorgabe 20.10.: „Die Zahlen für Anzahl Karten in
+   Decks/Piles sollten größer sein, aktuell sind sie schwer lesbar") ──
+   Die Zahl war 10 px × Brettmaßstab groß (bei 0,7 also 7 px) und lag ohne
+   Untergrund auf dem Kartenbild. Jetzt steht sie doppelt so groß auf einer
+   dunklen Pixel-Plakette mit hellem Rand — wie der Rest der Oberfläche, und
+   auf jeder Kartenrückseite und jedem Ablage-Bild gleich gut zu lesen.
+   Gilt für Deck, Potion-Deck, Ablage und Gelöscht im Duell wie im Puzzle-
+   Editor (dort tragen die Zonen dieselben Klassen). Die kleinen Zonen
+   „Coolness"/„Creation" im Editor (50×70) bekommen die Plakette eine Stufe
+   kleiner. Die Ability-Stapel haben eine eigene Regel oben und bleiben. */
+.board-zone > .board-card-label,
+.board-zone-deck .board-card-label,
+.board-zone-potion .board-card-label,
+.board-zone-discard .board-card-label,
+.board-zone-deleted .board-card-label,
+.deck-empty-label {
+  box-sizing: border-box;
+  min-width: calc(30px * var(--board-scale));
+  padding: calc(3px * var(--board-scale)) calc(5px * var(--board-scale)) calc(2px * var(--board-scale));
+  bottom: calc(4px * var(--board-scale)); right: calc(4px * var(--board-scale));
+  font-size: calc(20px * var(--board-scale));
+  line-height: 1;
+  text-align: center;
+  text-shadow: none;
+  background: rgba(10, 8, 20, .88);
+  border: max(2px, calc(2px * var(--board-scale))) solid rgba(240, 234, 255, .92);
+  box-shadow: 0 0 0 max(1px, calc(1px * var(--board-scale))) var(--pp-kontur, #05040a);
+  z-index: 6;
+  pointer-events: none;
+}
+.board-zone > .board-card-label { font-size: calc(15px * var(--board-scale)); min-width: calc(22px * var(--board-scale)); }
+.board-zone-deck .board-card-label,
+.board-zone-potion .board-card-label,
+.board-zone-discard .board-card-label,
+.board-zone-deleted .board-card-label { font-size: calc(20px * var(--board-scale)); min-width: calc(30px * var(--board-scale)); }
+.deck-empty-label { opacity: .6; }
 .board-stack {
   position: relative;
   width: calc(64px * var(--board-scale)); height: calc(90px * var(--board-scale));
