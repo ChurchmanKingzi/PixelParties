@@ -78,7 +78,8 @@ module.exports = {
     });
     await engine._delay(1100);
     // Ab jetzt gehoert die Aktivierung mir: Zielwahl, „du" und „Gegner" des Effekts sind meine Seite.
-    inst._darkDealVorher = inst.stolenBy ?? null;
+    // W24a (N1-03): zweite Kopie in derselben Kette — das "Vorher" der ersten Aufloesung gilt, nicht das von ihr schon gesetzte `stolenBy`.
+    if (inst._darkDealVon == null) inst._darkDealVorher = inst.stolenBy ?? null;
     inst._darkDealVon = pi;
     inst.stolenBy = pi;
     engine.log('dark_deal', { player: gs.players[pi]?.username, creature: inst.name });
