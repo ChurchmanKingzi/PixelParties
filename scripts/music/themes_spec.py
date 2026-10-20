@@ -62,6 +62,8 @@ HERO_TITLES = {
     'chaosdiamond': ('Chaos-Diamond, the Cracked Keeper', 'Critical Meltdown'),
     'bubbles': ('Bubbles, the Bouncy Bunny', 'Big Bunny Bounce'),
     'damus': ('Damus, the Prophet of Apocalypse', 'The Hour of Ashes'),
+    # Monia: Cool Rescuer Monia, Cool Birthday Girl Monia und Monia Bot teilen sich den Slug 'monia' (Namensregel).
+    'monia': ('Cool Rescuer Monia', 'Jetpack Grin'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
