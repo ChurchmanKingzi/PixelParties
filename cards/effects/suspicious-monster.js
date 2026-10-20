@@ -179,7 +179,7 @@ async function landeNachTausch(engine, pi, data) {
     _skipReactionCheck: true, _bypassDeadHeroFilter: onDeadHero,
   });
   engine.sync();
-  return true; // placement consumed — server skips its own placement.
+  return false; // placement consumed (`_placementConsumedByCard`) — wie bei den Deepsea-Tauschen `false`: der Server platziert nicht selbst, und Wege mit `summonCreatureWithHooks` (Sofort-Aktion aus der Hand) legen nicht ein zweites Mal (N3-06, W24).
 }
 
 /** Alter atomarer Tausch (Platzierung VOR den Todes-Signalen) — Fallback fuer Wege ohne `paySummonCost` (Effekt-Beschwoerungen u. ä.). */
@@ -339,7 +339,7 @@ async function sacrificeSwapAtomar(ctx) {
   });
   engine.sync();
 
-  return true; // placement consumed — server skips its own placement.
+  return false; // placement consumed (`_placementConsumedByCard`) — wie bei den Deepsea-Tauschen `false`: der Server platziert nicht selbst, und Wege mit `summonCreatureWithHooks` (Sofort-Aktion aus der Hand) legen nicht ein zweites Mal (N3-06, W24).
 }
 
 module.exports = {
