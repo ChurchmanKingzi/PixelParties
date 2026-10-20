@@ -21311,6 +21311,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const cd of handCards) {
         if (this._handPlayLockedFor(ps, cd.name)) continue;   // v818 Hand-Spielsperre
         if (heroAbgegeben && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) continue;
+        // W20c (Al, 20.10.): auch keine Beschwoerung aus der Hand mit einem abgegebenen Helden (Spiegel von `validateActionPlay`); Platzier-Karten ausgenommen.
+        if (heroAbgegeben && hasCardType(cd, 'Creature')) {
+          const _s = loadCardEffect(cd.name);
+          let _platz = false;
+          if (typeof _s?.canBypassFreeZoneRequirement === 'function' && !_s.requiresActiveCaster) {
+            try { _platz = !!_s.canBypassFreeZoneRequirement(gs, playerIdx, hi, cd, this); } catch { _platz = false; }
+          }
+          if (!_platz) continue;
+        }
         // Frozen / Stunned heroes only host PLACEMENTS. A card opts
         // into this path by exporting canBypassFreeZoneRequirement
         // and returning true right now (Deepsea when a bounceable
@@ -22116,6 +22125,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     // wirkt ueber den `charmed`-Weg (`charmedOwner`, `hero.charmedBy === pi`). Love Shot stempelt `charmedBy = pi` auch an Helden der EIGENEN Spalte, dann
     // ist `pi` der Kontrolleur. (`controlledBy` — Controlled Attack: nur Abilities/Heldeneffekt — gibt keine Zauberkontrolle, `heroSideOf` ignoriert es.)
     if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack') && this.heroSideOf(heroOwner, hero) !== pi) return null;
+    // ★ W20c (Al, 20.10.): „nur der aktuelle Kontrolleur darf mit einem Hero Creatures beschwören“ — dasselbe fuer die Beschwoerung aus der Hand: ein abgegebener
+    // eigener Held (Charme, Golden Apple, Love Shot, Styx, Paraseed …) beschwoert fuer seinen BESITZER nichts, solange der Gegner ihn kontrolliert.
+    // Ausnahme bleibt das PLATZIEREN (Kartentext „place“: Deepsea-Tausch, Tribut-Plaetze …): der Held ist dort nur Adresse, kein aktionsfaehiger Beschwoerer
+    // (`canBypassFreeZoneRequirement` ohne `requiresActiveCaster`, dieselbe Auslegung wie fuer handlungsunfaehige Helden unten).
+    if (hasCardType(cardData, 'Creature') && this.heroSideOf(heroOwner, hero) !== pi) {
+      const _cs = loadCardEffect(cardData.name);
+      let _platzieren = false;
+      if (typeof _cs?.canBypassFreeZoneRequirement === 'function' && !_cs.requiresActiveCaster) {
+        try { _platzieren = !!_cs.canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, this); } catch { _platzieren = false; }
+      }
+      if (!_platzieren) return null;
+    }
     // Incapacitated heroes (dead / frozen / stunned / bound) can't ACT.
     // Bound is the lightest of the four — it ONLY blocks Actions, not
     // ability/hero/creature passives or hooks (those keep firing in

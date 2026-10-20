@@ -61,10 +61,12 @@ function supportLevel(engine, pi, heroIdx) {
 /** Hoechstes Support-Magic-Level unter den lebenden eigenen Helden (Wirker). */
 function besteWirkerStufe(engine, pi) {
   let best = 0;
-  (engine.gs.players[pi]?.heroes || []).forEach((h, hi) => {
-    if (!h?.name || h.hp <= 0) return;
-    best = Math.max(best, supportLevel(engine, pi, hi));
-  });
+  // W20c (Al 20.10.: alle Reactions ueber jeden kontrollierten Helden): eigene Helden (ohne die abgegebenen) UND uebernommene der Gegenspalte,
+  // jeweils mit SEINEN Ability Zones (`physOwner` = Brettseite).
+  for (const { physOwner, heroIdx, hero } of engine.heroesControlledBy(pi)) {
+    if (!hero?.name || hero.hp <= 0) continue;
+    best = Math.max(best, engine.effectiveSchoolLevelForCaster('Support Magic', pi, heroIdx, physOwner) || 0);
+  }
   return best;
 }
 
@@ -78,7 +80,7 @@ function beschwoerbar(engine, pi, heroIdx, name, cd) {
   const ps = gs.players[pi];
   if (ps?.summonLocked) return false;
   // Welle 11 (Al, R5): „summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound/Negated).
-  if (!require('./_summon-eligibility').heroAgiert(ps?.heroes?.[heroIdx])) return false;
+  if (!require('./_summon-eligibility').heroAgiert(ps?.heroes?.[heroIdx], engine, pi)) return false;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
   try {
     if (engine.getSummonBlocked(pi).includes(name)) return false;
   } catch { /* eine defekte Sperre darf die Karte nicht sprengen */ }

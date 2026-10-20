@@ -60,6 +60,8 @@ function _heroCanHostCreature(engine, pi, heroIdx, cd, ctrl = pi) {
   const ps = engine.gs.players[pi];
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
+  // W20c (Al, 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden (ein abgegebener eigener Held faellt heraus).
+  if (pi === ctrl && engine.heroSideOf(pi, hero) !== ctrl) return false;
   // Z6 (A06-27): "summon ... as additional Actions" ist eine echte Beschwoerung - Beschwoerungssperre des Kontrolleurs `ctrl`
   // und die Aktionssperren des Hosts gelten (Ruling 8.8./28.8., `_summon-eligibility`).
   if (engine.gs.players[ctrl]?.summonLocked) return false;

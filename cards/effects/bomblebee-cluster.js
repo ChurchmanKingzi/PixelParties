@@ -95,7 +95,7 @@ module.exports = {
     const host = fps?.heroes?.[hostHeroIdx];
     // Welle 11 (Al, R5): „Summon … with the same Hero" — der Beschwörer muss aktionsfähig sein (nicht Frozen/Stunned/Webbed/Bound; Welle 12: Negated nur
     // noch als Stufe-0-Grenze bei negierten Abilities, siehe `blanked` unten).
-    if (!host?.name || host.hp <= 0 || !require('./_summon-eligibility').heroAgiert(host)) {
+    if (!host?.name || host.hp <= 0 || !require('./_summon-eligibility').heroAgiert(host, engine, pi))   /* W20c: nur der Kontrolleur beschwoert */ {
       // Host hero died between the summon firing and this reaction
       // resolving — nothing to do, but still apply the summon-lock
       // because text says "afterwards" unconditionally.

@@ -78,6 +78,7 @@ function eligibleSummonSlots(engine, pi, miniHeroIdx, creatureCd, feld = pi) {
   const fs = engine.gs.players[feld];
   const hero = fs?.heroes?.[miniHeroIdx];
   if (!hero?.name || hero.hp <= 0) return [];
+  if (feld === pi && engine.heroSideOf(feld, hero) !== pi) return [];   // W20c (Al, 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden (abgegebener eigener Held faellt heraus)
   // Mini herself must still meet the level req for the chosen
   // creature (the summon is "with this Hero", so Mini is the host).
   if (!engine.heroMeetsLevelReq(feld, miniHeroIdx, creatureCd)) return [];
