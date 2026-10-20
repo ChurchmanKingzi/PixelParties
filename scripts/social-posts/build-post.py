@@ -316,10 +316,29 @@ class Sprite:
 
     def layers(self, i, light, dark):
         """(Umriss außen, Umriss innen, Sprite) für Frame i, alle auf dem Raster U.
-        Der Umriss wird in halben Sprite-Pixeln (= U) auf einem 2×-Bild gewachsen und dann ×U skaliert."""
+        Der Umriss wird in halben Sprite-Pixeln (= U) auf einem 2×-Bild gewachsen und dann ×U skaliert.
+        Ungerade Maßstäbe (z. B. 7): doppelt so groß rechnen (14) und mit NEAREST halbieren; jedes Sprite-Pixel bleibt exakt 7 px."""
         i %= self.n
         if i in self._cache:
             return self._cache[i]
+        if self.px % 2:
+            real = self.px
+            self.px = real * 2
+            self._ou = 2 * U
+            try:
+                self._cache.pop(i, None)
+                od, ol, sp, pad = self._layers_even(i, light, dark)
+            finally:
+                self.px = real
+                self._ou = U
+            half = lambda im: im.resize((im.width // 2, im.height // 2), Image.NEAREST)
+            res = (half(od), half(ol), half(sp), pad // 2)
+            self._cache[i] = res
+            return res
+        return self._layers_even(i, light, dark)
+
+    def _layers_even(self, i, light, dark):
+        ou = getattr(self, '_ou', U)
         f = self.sheet.crop((i * self.fw, 0, (i + 1) * self.fw, self.fh))
         pad = max(3, -(-2 * U * 2 // self.px) + 1)
         f = pad_image(f, pad)
@@ -329,8 +348,8 @@ class Sprite:
         half = f.resize((f.width * 2, f.height * 2), Image.NEAREST)
 
         hp = self.px // 2                                   # px je halbem Sprite-Pixel
-        k_light = max(1, round(U / hp))                      # Outline innen ≈ 7 px, außen ≈ 14 px (bei px=14: 1 und 2 halbe Pixel)
-        k_dark = max(k_light + 1, round(2 * U / hp))
+        k_light = max(1, round(ou / hp))                     # Outline innen ≈ 7 px, außen ≈ 14 px (bei px=14: 1 und 2 halbe Pixel)
+        k_dark = max(k_light + 1, round(2 * ou / hp))
 
         solid = a.point(lambda v: 0 if v else 255)           # überall außer auf dem Sprite selbst: durchscheinende Körper nicht weiß füllen
 
