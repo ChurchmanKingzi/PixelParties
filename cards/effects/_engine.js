@@ -39481,6 +39481,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const surpriseHookCtx = {
       surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
       surpriseController: steuerer,
+      // W24d (N4-04): Herkunft der Karte – aus Ablage/Deck lag sie in KEINER Surprise Zone (Alleria: „in this Hero's Surprise Zone").
+      _fromDiscard: fromDiscard, _fromDeck: fromDeck,
       sourceInfo, _skipReactionCheck: true,
     };
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);

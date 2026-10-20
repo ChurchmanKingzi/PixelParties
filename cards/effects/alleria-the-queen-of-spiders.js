@@ -203,6 +203,8 @@ module.exports = {
       // „this Hero's Surprise Zone": Brettseite + Index (Styx 28.9.).
       if (ctx.surpriseOwner !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // W24d (N4-04): eine aus der Ablage aktivierte Surprise (Cute Spider) lag nie in einer Surprise Zone.
+      if (ctx._fromDiscard) return;
       // Alleria must be alive and not incapacitated
       const hero = ctx.attachedHero;
       if (!hero || hero.hp <= 0) return;
