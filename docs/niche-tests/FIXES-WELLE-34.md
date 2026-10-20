@@ -23,9 +23,6 @@ Umgestellter alter Repro: `W30/a-02` (Abschnitt „harte Negierung": ein hart ne
 * Dauerfeuer: 25 betroffene Karten × beide Seiten, 0 Abweichungen zur Basis.
 * **Nicht geprüft:** die geänderten Klick- und Drag-Pfade von Hu im Browser (`app-board.jsx`; nur Build-Check `check-bundles.js` grün).
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Einmal-Stempel bei negiertem Alice-Effekt:** Ein von Silence, MOE Shield oder Magic Mirror negierter Alice-Effekt verbraucht heute den Einmal-pro-Zug-Stempel (wie bei Arthor/Broghan nach der Zielwahl). Soll der Stempel stattdessen frei bleiben wie bei einer ganz negierten Karte?
-2. **Magic Mirror bei Alice:** Magic Mirror legt heute so viele Pollution Tokens wie Alices Destruction-Magic-Level. Soll es bei einem Effekt ohne Spell-Karte stattdessen gar keine Tokens geben?
-3. **Hu und übernommene Helden:** Sollen bei Hu auch Abilities und Heldeneffekte mit Aktionskosten eines übernommenen Helden angeboten werden? (heute nur Hand-Karten, wie bei `performImmediateAction` mit geliehenem Helden; Aufwand mittel)
-4. **Mirjam (Nebenfund):** Mirjams Zähler übergeht Attacks, die als inhärente Zusatzaktion laufen (Quick Attack als „first Attack"); sie kann danach noch eine Attack spielen. Soll das behoben werden?
+Alle vier sind beantwortet und in [FIXES-WELLE-35.md](FIXES-WELLE-35.md) umgesetzt (dort stehen die neuen Rückfragen).
