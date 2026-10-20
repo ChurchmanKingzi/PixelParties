@@ -16,10 +16,11 @@ PAL = {
     'heal': [(150, 40, 90), (226, 80, 140), (255, 140, 190), (255, 220, 235)],
     'gold': [(120, 80, 10), (214, 160, 30), (255, 214, 80), (255, 245, 190)],
     'arcane': [(30, 20, 100), (70, 60, 200), (120, 150, 255), (200, 235, 255)],
+    'holy_white': [(150, 140, 175), (214, 208, 232), (246, 243, 252), (255, 255, 255)],
     'ice': [(30, 70, 120), (90, 160, 220), (170, 220, 250), (240, 252, 255)],
 }
 
-# Theme → Emitter-Liste. kind: gas (kleine Schwaden) | gasfloor (Schwaden am Boden) | fog (Bodennebel) | cloud | bubble | ember | spark | heart | flake | orb
+# Theme → Emitter-Liste (mote = kleine Lichtfunken, cross = Kreuz-Funkeln, feather = fallende Feder). kind: gas (kleine Schwaden) | gasfloor (Schwaden am Boden) | fog (Bodennebel) | cloud | bubble | ember | spark | heart | flake | orb
 THEMES = {
     'poison': [('gasfloor', 'poison', 22), ('gas', 'poison', 70), ('bubble', 'poison_bubble', 8), ('spark', 'poison_bubble', 4)],
     'fire':   [('cloud', 'smoke', 5), ('ember', 'fire', 18), ('spark', 'gold', 4)],
@@ -27,6 +28,7 @@ THEMES = {
     'arcane': [('orb', 'arcane', 9), ('spark', 'arcane', 8)],
     'fight':  [('cloud', 'dust', 5), ('spark', 'gold', 10)],
     'ice':    [('flake', 'ice', 16), ('spark', 'ice', 6)],
+    'holy':   [('beam', 'gold', 5), ('mote', 'gold', 64), ('orb', 'gold', 6), ('feather', 'holy_white', 14), ('cross', 'gold', 10), ('spark', 'holy_white', 7)],
     'stars':  [('spark', 'gold', 12), ('spark', 'arcane', 8)],
 }
 
@@ -177,6 +179,23 @@ class ThemeFX:
                         x0 = cx + side * ((bx1 - bx0) / 2 + r.uniform(0, 70)) * spread
                         y0 = feet - r.uniform(0, 200)
                         it = dict(rise=r.uniform(180, 280), drift=side * 20, r=1, grow=0, seed=0, sway=2 * U)
+                    elif kind == 'mote':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 130)
+                        y0 = feet - r.uniform(-10, 300)
+                        it = dict(rise=r.uniform(70, 190), drift=r.uniform(-25, 25), r=r.choice([1, 1, 1, 2]), grow=0, seed=0, sway=r.choice([1, 2]) * U)
+                    elif kind == 'beam':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 150)
+                        y0 = by0 - 90
+                        it = dict(rise=0, drift=0, r=1, grow=0, seed=0, sway=0, w=r.choice([6, 8, 10, 12]),
+                                  h=int((feet - by0 + 90) / U))
+                    elif kind == 'cross':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 110)
+                        y0 = r.uniform(by0 + 30, feet)
+                        it = dict(rise=r.uniform(30, 90), drift=0, r=1, grow=0, seed=0, sway=0)
+                    elif kind == 'feather':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 100)
+                        y0 = by0 - r.uniform(0, 80)
+                        it = dict(rise=-r.uniform(300, 420), drift=r.uniform(-30, 30), r=1, grow=0, seed=0, sway=r.choice([2, 3]) * U)
                     elif kind == 'flake':
                         x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 110)
                         y0 = by0 - r.uniform(0, 100)
@@ -197,6 +216,18 @@ class ThemeFX:
         d = ImageDraw.Draw(layer)
         t = f / self.loop
         for p in self.items:
+            if p['kind'] == 'beam':                    # Lichtschaft: pulsiert, oben hell, zur Mitte hin gedämpft, dithered
+                pulse = 0.5 + 0.5 * math.sin((t * p['cycles'] + p['phase']) * 2 * math.pi)
+                bx, by = int(round(p['x0'] / U)), int(round(p['y0'] / U))
+                for j in range(p['h']):
+                    vf = 1 - 0.8 * j / p['h']
+                    for i in range(p['w']):
+                        hf = 1 - abs(i + 0.5 - p['w'] / 2) / (p['w'] / 2)
+                        a = (0.18 + 0.5 * pulse) * (0.3 + 0.7 * hf) * vf
+                        if cell_visible(a, bx + i, by + j):
+                            px, py = (bx + i) * U, (by + j) * U
+                            d.rectangle([px, py, px + U - 1, py + U - 1], fill=p['pal'][3 if hf > 0.6 else 2] + (255,))
+                continue
             u = (t * p['cycles'] + p['phase']) % 1.0
             a = min(p['amax'], u / 0.22, (1 - u) / 0.38)
             if a <= 0:
@@ -215,6 +246,15 @@ class ThemeFX:
                 stamp = heart_stamp()
             elif kind == 'orb':
                 stamp = orb_stamp()
+            elif kind == 'mote':
+                big = p['r'] > 1
+                stamp = {(0, 0): 3, (1, 0): 2, (0, 1): 2, (1, 1): 2} if big else {(0, 0): 2 if int(u * 6) % 2 else 3}
+            elif kind == 'cross':
+                stamp = {(0, j): (3 if j == 0 else 2) for j in range(-2, 4)}
+                stamp.update({(-1, 0): 2, (1, 0): 2})
+            elif kind == 'feather':
+                stamp = {k: 2 for k in ((2, -2), (1, -2), (1, -1), (0, -1), (0, 0), (-1, 0), (-1, 1), (-2, 1), (-2, 2))}
+                stamp.update({(1, -1): 3, (0, -1): 3, (0, 0): 3, (2, -2): 3})
             elif kind in ('ember', 'flake'):
                 stamp = {(0, 0): 2 if int(u * 8) % 2 else 3}
             else:                                  # spark: Plus, atmet in 4 Stufen

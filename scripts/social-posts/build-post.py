@@ -2,7 +2,7 @@
 """Instagram-Post für einen Hero: Karte im Pixel-Rahmen, Sprite ragt heraus, loopend animiert.
 
 Aufruf (aus dem Repo-Root):
-    python3 scripts/social-posts/build-post.py zsos-ssar-the-serpent-warlord --number 1
+    python3 scripts/social-posts/build-post.py zsos-ssar-the-serpent-warlord 
 
 Erzeugt in scripts/social-posts/out/<slug>/:
     post.png        Standbild 1080×1350 (4:5)
@@ -366,7 +366,6 @@ def music_path(card_name, override):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('slug')
-    ap.add_argument('--number', type=int, default=1)
     ap.add_argument('--accent')
     ap.add_argument('--duration', type=float, default=30.0, help='Mindestlänge des MP4 in Sekunden (der Loop wird wiederholt)')
     ap.add_argument('--themes', help='Partikel-Themen, kommagetrennt (poison, fire, heal, arcane, fight, ice, stars); sonst automatisch')
@@ -414,17 +413,6 @@ def main():
     # Kopf: Logo in Akzentfarbe
     logo = tinted_logo(accent)
     mid.alpha_composite(logo, ((W - logo.width) // 2, 40))
-    # Nummer: Schild an der oberen rechten Plattenecke
-    tag = f'HERO #{args.number:03d}'
-    tw = pixel_text_mask(tag)
-    scale = 3
-    tag_w, tag_h = tw.width * scale + 6 * U, tw.height * scale + 4 * U
-    tx0, ty0 = plate_x + plate.width - tag_w - 18 * U, plate_y - tag_h - 6 * U
-    d = ImageDraw.Draw(mid)
-    d.rectangle([tx0 + U, ty0, tx0 + tag_w - U - 1, ty0 + tag_h - 1], fill=INK)
-    d.rectangle([tx0, ty0 + U, tx0 + tag_w - 1, ty0 + tag_h - U - 1], fill=INK)
-    d.rectangle([tx0 + U, ty0 + U, tx0 + tag_w - U - 1, ty0 + tag_h - U - 1], fill=accent)
-    draw_text(mid, tag, scale, (tx0 + tag_w // 2, ty0 + tag_h // 2), color=INK, outline=None, anchor='mm')
     # Fuß: Name (groß) und Beiname
     parts = card_name.split(',', 1)
     short = parts[0].upper()
@@ -442,7 +430,8 @@ def main():
     parts_bg = Particles(args.slug, accent, 40, (U * 3, 0, W - U * 3, H), loop)
     cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
     card_data = next(c for c in cards if c['name'] == card_name)
-    names = fx.themes_for(card_data, args.themes.split(',') if args.themes else None)
+    pinned = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name)
+    names = fx.themes_for(card_data, args.themes.split(',') if args.themes else pinned)
     print('Partikel-Themen:', ', '.join(names))
     box = (sx + spr.left * SPRITE_PX, sy + spr.top * SPRITE_PX, sx + spr.right * SPRITE_PX, feet_y)
     theme_fx = fx.ThemeFX(names, args.slug, box, feet_y, loop)
