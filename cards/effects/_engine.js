@@ -47906,6 +47906,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
       delete statusOpts.addStacks; // Clean up
     }
+    // ★ W24a (N1-09): es gibt EINEN `negated`-Eintrag je Held. Traegt er die Negierung eines Anhaengsels (Decisive Defeat, Stowaway), darf eine
+    // fremde (befristete) Negierung ihn nicht ersetzen — sonst faellt die Karte mit dem fremden Ablauf ab (`heilenWirftAb`). Die fremde Negierung
+    // wird als Ueberlagerung `_fremd` am Eintrag der Karte gemerkt: sie laeuft zum selben Zeitpunkt ab wie eine gewoehnliche (processStatusExpiry),
+    // und faellt die Karte vorher, tritt sie an ihre Stelle (`anhaengselStatusHooks.onCardLeaveZone`).
+    if (statusName === 'negated' && hero.statuses.negated?._fromAttachment && !statusOpts._fromAttachment) {
+      hero.statuses.negated._fremd = statusOpts;
+      this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx, overlay: true });
+      this.sync();
+      return;
+    }
     const _warAktiv = !!hero.statuses[statusName];   // Welle 10 (Q55): Erneuerung, kein initiales Hinzufuegen
     hero.statuses[statusName] = statusOpts;
     this.log('status_add', { target: hero.name, status: statusName, owner: playerIdx });
@@ -48081,6 +48091,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // ★ Z2 (C05-02/-03): ebenso ANHAENGSEL-Negierung (Decisive Defeat, Stowaway: `_fromAttachment` /
         //   `permanent`) — sie lebt genau so lange wie die Karte (CARD_API: „Lasts as long as … remains
         //   attached"); die Karte nimmt sie selbst zurueck (Austritt, Heilen).
+        // ★ W24a (N1-09): eine fremde Negierung, die ueber der Anhaengsel-Negierung lag (`_fremd`), endet wie eine gewoehnliche.
+        if (hero.statuses.negated?._fromAttachment && hero.statuses.negated._fremd) {
+          delete hero.statuses.negated._fremd;
+          this.log('status_remove', { target: hero.name, status: 'negated', owner: ap, overlay: true });
+        }
         if (hero.statuses.negated && !hero.statuses.negated.sourceBound
             && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
           await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;

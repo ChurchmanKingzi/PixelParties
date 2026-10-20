@@ -118,10 +118,13 @@ module.exports = {
       // W12 (Al, Q114): Karian wird NIE durch Negation am Handeln gehindert — bei ihr wird der Status nicht angelegt.
       if (wirt?.name && !engine.heroIgnoresHaltStatuses?.(res.host.owner, res.host.heroIdx)) {
         if (!wirt.statuses) wirt.statuses = {};
+        const altNeg = wirt.statuses.negated;   // W24a (N1-09): Eintrag-Hand-Over — fremde Negierung (oder die schon vom Eintritts-Hook darunter gelegte) bleibt erhalten
+        const fremdeNegierung = altNeg ? (altNeg._fromAttachment ? altNeg._fremd : altNeg) : null;
         wirt.statuses.negated = {
           permanent: true,
           appliedTurn: gs.turn,
           _fromAttachment: CARD_NAME,
+          ...(fremdeNegierung ? { _fremd: fremdeNegierung } : {}),   // laufende fremde Negierung bleibt darunter erhalten
         };
         engine._heldenStatusVerursacher(wirt.statuses.negated, { appliedBy: ctx.cardOwner, source: ctx.card });   // v1399
       }
