@@ -2381,6 +2381,7 @@ async function activateCreatureEffects(engine, helpers) {
           c.owner === cpuIdx && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
         );
         if (!inst) continue;
+        if ((inst.controller ?? inst.owner) !== cpuIdx) continue;   // W33a: nur der aktuelle Kontrolleur aktiviert (gestohlene Kreatur des CPU-Brettes nicht)
         if (inst.faceDown) continue; // face-down surprises aren't actives
         if (inst.turnPlayed === gs.turn && !inst.counters?._hasHaste) continue; // summoning sickness
 

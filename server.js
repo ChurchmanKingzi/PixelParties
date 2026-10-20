@@ -9075,7 +9075,10 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   const anyPlayer = charmedOwner != null && charmedOwner !== pi
     && !!loadCardEffect(inst.counters?._effectOverride || creatureName)?.activatableByAnyPlayer
     && inst.stolenBy !== pi && (inst.controller ?? inst.owner) !== pi;
-  if (charmedOwner != null && !anyPlayer && !hero?.name) return false;
+  // W33a (Al, 22.10.2026: „Nur der aktuelle Kontrolleur einer Creature kann ihren Effekt aktivieren!"): EIN Tor für alle Wege (Eigen-Brett, gestohlen, seitenfremd beschworen):
+  // aktivieren darf nur, wer die Kreatur gerade kontrolliert (`controller ?? owner`) – der Besitzer einer gestohlenen Kreatur und der Brettinhaber einer seitenfremd beschworenen
+  // nicht. Ausnahme bleibt der Kartentext „either player may spend an Action" (`anyPlayer`, The Creepy Clown of Heaven).
+  if (!anyPlayer && (inst.controller ?? inst.owner) !== pi) return false;
   const actHero = anyPlayer ? room.engine.anyPlayerActorHero(pi) : heroIdx;
   if (anyPlayer && actHero == null) return false;
   const actHeroOwner = anyPlayer ? pi : (charmedOwner ?? pi);
@@ -9096,17 +9099,12 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   if (room.engine.isCreatureEffectSuppressed(inst)) return false;   // v818: EIN Praedikat
   if (room.engine.isCreatureActiveEffectLocked(inst)) return false;   // W14b (Q152): Unwanted Audience — nur der AKTIVE Effekt ist gesperrt
 
-  if (charmedOwner != null && !anyPlayer
-      && hero.charmedBy !== pi && hero.controlledBy !== pi
-      && inst.stolenBy !== pi) return false;
   // ★★ v1197 (Als Ruling 18.9.): eine Kreatur geht NICHT mit dem
   // uebernommenen Helden mit. Wer den Helden verzaubert hat, darf ihre
   // Effekte nicht aktivieren — nur wer sich die KREATUR selbst geliehen
   // hat (`stolenBy`, Deepsea Succubus / Cute Conversion). Ohne diesen
   // Riegel kaeme der Klick trotz der gestrichenen Angebotsliste durch,
   // weil das Tor darueber den Charme ausdruecklich durchlaesst.
-  if (charmedOwner != null && !anyPlayer && inst.stolenBy !== pi
-      && (inst.controller ?? inst.owner) !== pi) return false;
   // Cardinal Beast immunity — Cardinals + Golden-Wings wearers
   // resist Treacherous Crystal's lend. Check by counter AND name:
   // the counter is set in Cardinal Beasts' onPlay hook, which
