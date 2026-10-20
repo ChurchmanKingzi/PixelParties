@@ -86,6 +86,9 @@ module.exports = {
       // just can't add a card. Keeps parity with other draw-only effects.
       if (ps.handLocked) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
+      // W24d (N4-14, W11/R4): unter Such-Sperre wie Deepsea Witch gar nicht erst anbieten – der Effekt wirkt nicht → Blob stumm.
+      if (engine._isSearchBlocked(pi, {}, 'deck')) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
+
       const cardDB = engine._getCardDB();
       const seen = new Set();
       const gallery = [];

@@ -112,6 +112,8 @@ module.exports = {
       // — Surprises in hand). On-board face-down Surprises going to
       // discard go through different code paths.
       if (!ctx._fromHand) return;
+      // W24d (N4-03): der Regel-Abwurf des Handlimits ist kein Karteneffekt („through an effect", Ruling Q93).
+      if (ctx._handLimitRegel) return;
 
       // Soft HOPT per Cute Spider instance.
       if (!gs.hoptUsed) gs.hoptUsed = {};

@@ -346,8 +346,10 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   // valid (the opponent picks any). Without this set, the first forcer
   // would splice the second out and break "multiple taunters, pick any".
   const forcerIds = new Set();
+  // W24d (N4-07): Ziel-IDs tragen die BRETTSEITE (`physicalSide`), nicht den Kontrolleur – sonst findet
+  // ein seitenfremd/gestohlen gefuehrter Spoetter (Hardy Slime, Horror Clown, Town Guard) seine eigene ID nicht.
   for (const f of creatureForcers) {
-    const side = f.controller ?? f.owner;
+    const side = engine.physicalSide(f);
     forcerIds.add(`equip-${side}-${f.heroIdx}-${f.zoneSlot}`);
   }
   for (const hf of heroForcers) {
@@ -363,8 +365,8 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   // source targeting a creature forcer), we don't filter — heroes stay
   // targetable and the effect goes through normally.
   for (const forcer of creatureForcers) {
-    const forcerSide = forcer.controller ?? forcer.owner;
-    const forcerTargetId = `equip-${forcerSide}-${forcer.heroIdx}-${forcer.zoneSlot}`;
+    const forcerSide = forcer.controller ?? forcer.owner;   // KONTROLLEUR: „seine Seite" = alles, was er kontrolliert
+    const forcerTargetId = `equip-${engine.physicalSide(forcer)}-${forcer.heroIdx}-${forcer.zoneSlot}`;
     if (!targets.find(t => t.id === forcerTargetId)) continue;
     // v849: Nur-Creatures-Variante (siehe Kopfkommentar).
     const nurCreatures = !!(forcer.counters?.forcesTargeting_creaturesOnly
@@ -372,7 +374,7 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
     for (let i = targets.length - 1; i >= 0; i--) {
       const t = targets[i];
       if (forcerIds.has(t.id)) continue;
-      if (t.owner !== forcerSide) continue;
+      if (engine.zielSeite(t, t.owner) !== forcerSide) continue;   // W24d (N4-07): Kontrolle statt Brettseite
       // Remove creatures AND heroes on the forcer's side.
       if (t.type !== 'equip' && t.type !== 'hero') continue;
       if (nurCreatures && t.type !== 'equip') continue;   // Helden bleiben waehlbar
@@ -8706,9 +8708,22 @@ class GameEngine {
     const _eingangsBetrag = amount;
     // Alleria redirect: damage cannot be reduced/negated except by Surprises
     if (this.gs._redirectedOnlyReducibleBySurprise) {
-      hookCtx.cannotBeNegated = true;
-      hookCtx.onlyReducibleBySurprise = true;
-      delete this.gs._redirectedOnlyReducibleBySurprise;
+      // W24d (N4-02): nur der Treffer des umgeleiteten Effekts (Zielheld + Quellspieler, gleicher Zug)
+      // verbraucht die Marke; ein Effekt ohne Schaden (Burn …) laesst sie nicht fuer fremde Treffer stehen.
+      const _st = this.gs._redirectedOnlyReducibleStamp;
+      const _qs = source?.controller ?? source?.owner;
+      const _passt = !_st || (_st.turn === this.gs.turn
+        && target === this.gs.players[_st.owner]?.heroes?.[_st.heroIdx]
+        && (_st.srcOwner == null || _qs === _st.srcOwner));
+      if (_passt) {
+        hookCtx.cannotBeNegated = true;
+        hookCtx.onlyReducibleBySurprise = true;
+        delete this.gs._redirectedOnlyReducibleBySurprise;
+        delete this.gs._redirectedOnlyReducibleStamp;
+      } else if (_st.turn !== this.gs.turn) {
+        delete this.gs._redirectedOnlyReducibleBySurprise;
+        delete this.gs._redirectedOnlyReducibleStamp;
+      }
     }
     // v668: „True Damage" nach einer Selbst-Umleitung (Monia Bot). Der
     // Umleiter setzt `gs._redirectedTrueDamage = { owner, heroIdx, turn }`;
@@ -9390,10 +9405,13 @@ class GameEngine {
       // nur echter Schaden > 0 und nur mit Verursacher — Status-Ticks
       // (Burn/Poison, ohne Besitzer) zaehlen nicht (Als Ruling 1.9.).
       if (this.gs.players[srcOwner]) this.gs.players[srcOwner].dealtDamageAnyTarget = true;
-      for (let pi = 0; pi < this.playerCount(); pi++) {
-        if (pi !== srcOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
+      // W24d (N4-18): „Gegner-Ziel" = Ziel unter fremder KONTROLLE (wie beim Kreaturenpfad):
+      // ein vom Schadenden uebernommener Held (Brettseite Gegner) zaehlt nicht, ein an den Gegner
+      // abgegebener eigener Held (Brettseite eigen) zaehlt.
+      {
+        const _tSeite = this._findHeroOwner(target);
+        if (_tSeite >= 0 && this.gs.players[srcOwner] && this.heroSideOf(_tSeite, target) !== srcOwner) {
           this.gs.players[srcOwner].dealtDamageToOpponent = true;
-          break;
         }
       }
     }
@@ -9526,10 +9544,11 @@ class GameEngine {
       // Track dealt-damage for SC / opponent tracking (mirrors actionDealDamage).
       if (dealt > 0 && sourceOwner >= 0) {
         if (this.gs.players[sourceOwner]) this.gs.players[sourceOwner].dealtDamageAnyTarget = true;   // v1271
-        for (let pi = 0; pi < this.playerCount(); pi++) {
-          if (pi !== sourceOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
+        // W24d (N4-18): Kontrolle statt Brettseite (siehe `actionDealDamage`).
+        {
+          const _tSeite = this._findHeroOwner(target);
+          if (_tSeite >= 0 && this.gs.players[sourceOwner] && this.heroSideOf(_tSeite, target) !== sourceOwner) {
             this.gs.players[sourceOwner].dealtDamageToOpponent = true;
-            break;
           }
         }
       }
@@ -20751,7 +20770,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.zone === 'surprise') return inst.owner;
     // Styx 28.9.: ueber einen geliehenen Helden beschworen — liegt auf der
     // Seite des Helden (`owner`), kontrolliert vom Beschwoerer.
-    if (inst.counters?.crossSideControlled != null) return inst.owner;
+    // W24d (N4-06): waehrend der Aktivierung kippt der Server `inst.owner` auf den Kontrolleur
+    // (`inst.heroOwner` = Brettseite des geliehenen Helden) – dann gilt `heroOwner`, sonst fehlt die Kreatur am Brett.
+    if (inst.counters?.crossSideControlled != null) return inst.heroOwner ?? inst.owner;
     return inst.controller ?? inst.owner;
   }
 
@@ -39527,6 +39548,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const surpriseHookCtx = {
       surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
       surpriseController: steuerer,
+      // W24d (N4-04): Herkunft der Karte – aus Ablage/Deck lag sie in KEINER Surprise Zone (Alleria: „in this Hero's Surprise Zone").
+      _fromDiscard: fromDiscard, _fromDeck: fromDeck,
       sourceInfo, _skipReactionCheck: true,
     };
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);

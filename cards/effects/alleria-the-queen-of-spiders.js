@@ -10,6 +10,7 @@
 // ═══════════════════════════════════════════
 
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
+const { hasCardType } = require('./_hooks');
 
 /**
  * Umleitungsziele: „any of your Heroes that has a Surprise in its Surprise
@@ -17,7 +18,7 @@ const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensp
  * kontrolliert (auch uebernommene der Gegenspalte), Surprise-Zone auf der
  * Brettseite, ohne das urspruengliche Ziel (Seite + Index).
  */
-function umleitungsZiele(gs, ownerIdx, selected, engine) {
+function umleitungsZiele(gs, ownerIdx, selected, engine, validTargets = null) {
   const out = [];
   const helden = engine?.heroesControlledBy
     ? engine.heroesControlledBy(ownerIdx)
@@ -27,9 +28,38 @@ function umleitungsZiele(gs, ownerIdx, selected, engine) {
     if (!hero?.name || hero.hp <= 0) continue;
     const surprises = (gs.players[physOwner]?.surpriseZones || [])[hi] || [];
     if (surprises.length === 0) continue;
-    out.push({ id: `hero-${physOwner}-${hi}`, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
+    const id = `hero-${physOwner}-${hi}`;
+    // W24d (N4-13): wird eine KREATUR umgeleitet, muss der Effekt den Helden auch waehlen koennen
+    // (steht in seiner Zielliste) – sonst ginge die Umleitung stumm verloren.
+    if (validTargets && !validTargets.some(v => v && v.id === id)) continue;
+    out.push({ id, type: 'hero', owner: physOwner, heroIdx: hi, cardName: hero.name });
   }
   return out;
+}
+
+/** W24d (N4-13): Lesart „target" = Held ODER Kreatur (Al): ist das gewaehlte Ziel eine Kreatur? */
+function istKreaturZiel(engine, sel) {
+  if (!sel || sel.type !== 'equip') return false;
+  const inst = sel.cardInstance || sel._cardInstance || sel.inst;
+  const cd = (inst && engine?.getEffectiveCardData ? engine.getEffectiveCardData(inst) : null)
+    || engine?._getCardDB?.()[sel.cardName];
+  return !!cd && hasCardType(cd, 'Creature');
+}
+
+/**
+ * W24d (N4-12): „exactly 1 target you control" – Anzahl der vom Gegner GEWAEHLTEN Ziele, die `ownerIdx`
+ * kontrolliert (die Fenster geben die ganze Auswahl in `config._redirectPickedIds` mit).
+ */
+function gewaehlteEigeneZiele(engine, ownerIdx, selected, validTargets, config) {
+  const ids = Array.isArray(config?._redirectPickedIds) && config._redirectPickedIds.length
+    ? config._redirectPickedIds : [selected.id];
+  let n = 0;
+  for (const id of ids) {
+    const v = id === selected.id ? selected : (validTargets || []).find(t => t && t.id === id);
+    if (!v) continue;
+    if ((engine?.zielSeite ? engine.zielSeite(v) : v.owner) === ownerIdx) n++;
+  }
+  return n;
 }
 
 module.exports = {
@@ -82,11 +112,16 @@ module.exports = {
 
     // Only redirect hero targets on our own side
     // Kontrolle statt Seite (Styx 28.9.).
-    if (selected.type !== 'hero' || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
+    // W24d (N4-13): der Text sagt „target", nicht „Hero" – auch eine einzeln gewaehlte eigene KREATUR
+    // darf auf einen Helden mit Surprise umgeleitet werden (Al).
+    const istKreatur = istKreaturZiel(engine, selected);
+    if ((selected.type !== 'hero' && !istKreatur) || (engine?.zielSeite ? engine.zielSeite(selected) : selected.owner) !== ownerIdx) return false;
+    // W24d (N4-12): „exactly 1 target you control" – bei mehreren gewaehlten eigenen Zielen keine Umleitung.
+    if (gewaehlteEigeneZiele(engine, ownerIdx, selected, validTargets, config) !== 1) return false;
 
     // Check for at least 1 OTHER hero with a Surprise in its Surprise Zone
     if (!gs.players[ownerIdx]) return false;
-    return umleitungsZiele(gs, ownerIdx, selected, engine).length > 0;
+    return umleitungsZiele(gs, ownerIdx, selected, engine, istKreatur ? validTargets : null).length > 0;
   },
 
   /**
@@ -97,7 +132,7 @@ module.exports = {
     const gs = engine.gs;
 
     // Build list of eligible redirect targets (controlled heroes with Surprises, not original target)
-    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine);
+    const eligible = umleitungsZiele(gs, ownerIdx, selected, engine, istKreaturZiel(engine, selected) ? validTargets : null);
 
     if (eligible.length === 0) return null;
 
@@ -144,6 +179,12 @@ module.exports = {
     // Mark the redirected damage as only reducible by Surprises
     // This flag is checked by the engine's BEFORE_DAMAGE hook handlers
     gs._redirectedOnlyReducibleBySurprise = true;
+    // W24d (N4-02): die Sperre gilt nur fuer den Schaden DIESES Effekts – Stempel mit Zielheld, Zug und
+    // Quellspieler; `actionDealDamage` verbraucht ihn nur beim passenden Treffer und verwirft ihn im naechsten Zug.
+    gs._redirectedOnlyReducibleStamp = {
+      owner: redirectTarget.owner, heroIdx: redirectTarget.heroIdx, turn: gs.turn,
+      srcOwner: sourceCard?.controller ?? sourceCard?.owner ?? null,
+    };
 
     // Sparkle on Alleria
     engine._broadcastEvent('play_zone_animation', {
@@ -162,6 +203,8 @@ module.exports = {
       // „this Hero's Surprise Zone": Brettseite + Index (Styx 28.9.).
       if (ctx.surpriseOwner !== (ctx.cardHeroOwner ?? ctx.cardOriginalOwner)) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
+      // W24d (N4-04): eine aus der Ablage aktivierte Surprise (Cute Spider) lag nie in einer Surprise Zone.
+      if (ctx._fromDiscard) return;
       // Alleria must be alive and not incapacitated
       const hero = ctx.attachedHero;
       if (!hero || hero.hp <= 0) return;

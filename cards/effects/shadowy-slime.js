@@ -95,7 +95,7 @@ module.exports = {
         title: 'Shadowy Slime',
         message: 'Summon a Lv 0 Creature from your discard pile? (You won\'t be able to summon any more Creatures this turn!)',
       });
-      if (!confirmed) return;
+      if (!confirmed) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14, W11/R4): abgelehntes „you may" = kein feuernder Effekt
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       while (true) {
@@ -110,18 +110,18 @@ module.exports = {
             currentEligible.push({ name, source: 'discard' });
           }
         }
-        if (currentEligible.length === 0) return;
+        if (currentEligible.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14)
 
         const selected = await ctx.promptCardGallery(currentEligible, {
           title: 'Shadowy Slime',
           description: 'Select a Lv 0 Creature from your discard pile.',
           cancellable: true,
         });
-        if (!selected) return; // Escape = abort
+        if (!selected) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; } // Escape = abort   // W24d (N4-14)
 
         // Step 3: Pick a zone (same hero only)
         const freeZones = getFreeZones();
-        if (freeZones.length === 0) return;
+        if (freeZones.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14)
 
         const zone = await ctx.promptZonePick(freeZones, {
           title: 'Shadowy Slime',
@@ -134,7 +134,7 @@ module.exports = {
         const cardName = selected.cardName;
         // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
         const ab = await engine.ablageEntnahme(pi, pi, cardName, { source: 'shadowy-slime' });
-        if (!ab) return;
+        if (!ab) { await engine.summonEffektFizzelt(ctx.card, 'Shadowy Slime', { stumm: true }); return; }   // W24d (N4-14): Ablage-Entnahme verweigert (Sperre)
 
         // Place into support zone
         const si = zone.slotIdx;

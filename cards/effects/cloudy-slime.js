@@ -43,10 +43,12 @@ module.exports = {
       // Find lv 0 Creatures in hand (excluding the just-summoned Cloudy Slime itself)
       const eligibleCards = [];
       const seen = new Set();
-      for (const name of (ps.hand || [])) {
+      for (let hi2 = 0; hi2 < (ps.hand || []).length; hi2++) {
+        const name = ps.hand[hi2];
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && isSummonablePileCreature(c) && (c.level || 0) === 0) {
+        // W24d (N4-11): „level 0" nach WIRKSAMER Stufe der Handkarte (Rocky Slime & Co.), wie Psychic Scout.
+        if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { handIdx: hi2 }) === 0) {
           seen.add(name);
           eligibleCards.push({ name, source: 'hand' });
         }
@@ -87,7 +89,7 @@ module.exports = {
         title: 'Cloudy Slime',
         message: 'Summon another Lv 0 Creature from your hand?',
       });
-      if (!confirmed) return;
+      if (!confirmed) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; }   // W24d (N4-14, W11/R4): abgelehntes „you may" = kein feuernder Effekt
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       //
@@ -107,27 +109,28 @@ module.exports = {
       let runden = 0;
       const MAX_RUNDEN = 24;
       while (true) {
-        if (++runden > MAX_RUNDEN) return;
+        if (++runden > MAX_RUNDEN) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; }   // W24d (N4-14)
         // Recompute eligible cards (hand may have changed if multiple effects)
         const currentEligible = [];
         const currentSeen = new Set();
-        for (const name of (ps.hand || [])) {
+        for (let hi2 = 0; hi2 < (ps.hand || []).length; hi2++) {
+          const name = ps.hand[hi2];
           if (currentSeen.has(name)) continue;
           if (ohneZone.has(name)) continue;
           const c = cardDB[name];
-          if (c && isSummonablePileCreature(c) && (c.level || 0) === 0) {
+          if (c && isSummonablePileCreature(c) && engine.effectiveCardLevel(c, pi, { handIdx: hi2 }) === 0) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'hand' });
           }
         }
-        if (currentEligible.length === 0) return; // No more eligible
+        if (currentEligible.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // No more eligible   // W24d (N4-14)
 
         const selected = await ctx.promptCardGallery(currentEligible, {
           title: 'Cloudy Slime',
           description: 'Select a Lv 0 Creature to place.',
           cancellable: true,
         });
-        if (!selected) return; // Escape = abort
+        if (!selected) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Escape = abort   // W24d (N4-14)
 
         // Step 3: Pick a zone — filter by the selected Creature's
         // per-Hero `canSummon` rule.
@@ -146,8 +149,11 @@ module.exports = {
 
         // Execute placement
         const cardName = selected.cardName;
-        const idx = ps.hand.indexOf(cardName);
-        if (idx < 0) return; // Card no longer in hand
+        // W24d (N4-11): die Kopie mit wirksamer Stufe 0 (nicht blind die erste gleichnamige).
+        let idx = ps.hand.findIndex((n, i2) => n === cardName && cardDB[n]
+          && engine.effectiveCardLevel(cardDB[n], pi, { handIdx: i2 }) === 0);
+        if (idx < 0) idx = ps.hand.indexOf(cardName);
+        if (idx < 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Card no longer in hand   // W24d (N4-14)
         engine.takeFromPileSync(ps, 'hand', idx);
 
         // Place into support zone (eigene Spalte wie bisher; uebernommener Held der Gegenspalte: seitenfremd, kontrolliert von `pi`)
