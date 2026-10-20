@@ -20,10 +20,10 @@ OUT = HERE / 'out' / 'reels'
 BASE_TAGS = '#PixelParties #TCG #CardGame #PixelArt #IndieGame #TradingCardGame #FreeToPlay'
 
 CTAS = [
-    "Meet almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.\n👉 Play for free: pixelpartiestcg.com (link in bio)",
-    "Pixel Parties is a free online multiplayer trading card game with almost 200 animated pixel Heroes.\n👉 pixelpartiestcg.com (link in bio)",
-    "Build your team of Heroes and play online against other players, for free, in Pixel Parties.\n👉 Check it out: pixelpartiestcg.com (link in bio)",
-    "This is one of almost 200 animated pixel Heroes in Pixel Parties, the free online multiplayer card game.\n👉 Play for free: pixelpartiestcg.com (link in bio)",
+    "Pixel Parties is a free online multiplayer TCG about assembling your party of Heroes and annihilating your opponent's party!\n👉 Play for free: pixelpartiestcg.com (link in bio)",
+    "Assemble your party of Heroes, then annihilate your opponent's! Pixel Parties is a free online multiplayer TCG with almost 200 animated pixel Heroes.\n👉 pixelpartiestcg.com (link in bio)",
+    "Pick your Heroes, build your party, crush the other side. That's Pixel Parties, the free online multiplayer TCG!\n👉 Play for free: pixelpartiestcg.com (link in bio)",
+    "One of almost 200 animated Heroes you can lead into battle in Pixel Parties, the free online multiplayer TCG where parties clash!\n👉 pixelpartiestcg.com (link in bio)",
 ]
 
 # Kartenname: (Aufhänger, Beschreibung der Fähigkeit, Alt-Text-Zusatz, zusätzliche Hashtags)
