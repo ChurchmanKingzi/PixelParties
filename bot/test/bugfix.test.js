@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { findBugfixes, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
+const { findBugfixes, readNotes, fingerprint, parseNameStatus, parseRequires } = require('../lib/bugfix');
 const { guild, setup, config } = require('./helpers');
 
 const real = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'cards.json'), 'utf8'));
@@ -154,7 +154,7 @@ test('Feed: Kartenbilder im Bugfix-Kanal (direkte Korrekturen, schmale Bausteine
     r.write(r.E('_big-shared'), "exports.big = 'fix';\n"); r.commit('Engine');
     await poll();
     assert.equal(sent.length, 2);
-    assert.match(sent[1].content, /Shared engine code was fixed.*`_big-shared` \(14 cards\)/);
+    assert.match(sent[1].content, /Shared engine code was fixed[\s\S]*• `_big-shared` \(14 cards\)$/);
     assert.ok(!sent[1].files, 'breiter Baustein: keine Kartenbilder');
 
     r.write(r.E('fireball'), "// nur ein Kommentar\nmodule.exports = { effect: 2 };\n"); r.write('server.js', '// z\n');
@@ -178,4 +178,71 @@ test('Feed ohne Kanal und ohne Git stürzt nicht ab', async () => {
     const b = await setup();
     await b.ctx._feeds.pollBugfixes();
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
+});
+
+test('Balancing-Änderung (cards.json) ist kein Bugfix; Bugfix-Note beschreibt den Fehler', async () => {
+  const r = makeRepo();
+  try {
+    // cards.json mit zwei Karten im Repo (echte Namen, damit Bilder/Zuordnung klappen)
+    const mk = (acid, fire) => JSON.stringify(real.map(c => c.name === 'Acid Rain' ? { ...c, effect: acid } : c.name === 'Fireball' ? { ...c, effect: fire } : c));
+    r.write('data/cards.json', mk('A', 'F'));
+    r.head = r.commit('cards.json');
+    config.repoRoot = r.dir; config.channels.bugfixes = 'BF'; config.bugfixMaxShared = 12;
+    const { ctx, client, db } = await setup();
+    const sent = [];
+    const g = guild();
+    g.channels.cache.set('BF', { isTextBased: () => true, send: async p => { sent.push(p); } });
+    client.guilds.cache.set('G1', g);
+    await ctx._feeds.pollBugfixes();                          // merkt den Stand
+    assert.equal(sent.length, 0);
+
+    // Acid Rain: Skript UND Effekttext geändert = Balancing; Fireball: nur Skript = Bugfix
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'balance' };\n");
+    r.write(r.E('fireball'), "module.exports = { effect: 'bugfix' };\n");
+    r.write('data/cards.json', mk('B', 'F'));
+    r.commit('Balancing + Fix\n\nBugfix-Note: Fireball | Damage was dealt twice when the target had a shield.');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].content, /Bug fixes\*\* — 1 card\n/);
+    assert.match(sent[0].content, /\*\*Fireball\*\* — fixed: card script updated\n {2}↳ Damage was dealt twice when the target had a shield\./);
+    assert.ok(!/Acid Rain/.test(sent[0].content), 'Balancing-Änderung nicht als Bugfix');
+
+    // Gleiche Karte mit Beschreibung → ausdrücklich Bugfix (z. B. fehlerhafter Effekttext korrigiert)
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'balance2' };\n");
+    r.write('data/cards.json', mk('C', 'F'));
+    r.commit('Textfehler\n\n* Bugfix-Note: acid rain | The card text promised 2 damage but the script dealt 1.');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 2);
+    assert.match(sent[1].content, /\*\*Acid Rain\*\* — fixed\n {2}↳ The card text promised 2 damage but the script dealt 1\./);
+
+    // Baustein-Beschreibung: schmal (an den Karten) und breit (in der Zeile)
+    r.write(r.E('_alice-shared'), "exports.x = 'z';\n"); r.write(r.E('_big-shared'), "exports.big = 'z';\n");
+    r.commit('Bausteine\n\nBugfix-Note: _alice-shared | Summons no longer stay on the board after their owner leaves.\nBugfix-Note: _big-shared | Hooks fired in the wrong order.');
+    await ctx._feeds.pollBugfixes();
+    assert.equal(sent.length, 4);
+    assert.match(sent[2].content, /Alice, the Puppeteer Girl\*\* — fixed via shared logic \(`_alice-shared`\)\n {2}↳ Summons no longer stay on the board/);
+    assert.match(sent[3].content, /• `_big-shared` \(14 cards\) — Hooks fired in the wrong order\.$/);
+    assert.ok(sent.every(m => JSON.stringify(m.allowedMentions) === '{"parse":[]}'));
+  } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }
+});
+
+test('readNotes: Zeilenformat, Aufzählungszeichen, Kürzung, mehrere Zeilen pro Ziel; findBugfixes lässt balancierte Karten aus', async () => {
+  const r = makeRepo();
+  try {
+    const from = r.head;
+    r.write(r.E('fireball'), "module.exports = { effect: 'b' };\n");
+    r.commit('Eins\n\nBugfix-Note: Fireball | First part.\n- Bugfix-Note: Fireball | Second part.\nBugfix-Note: kaputt ohne Trenner\nBugfix-Note: Acid Rain |   ');
+    r.write(r.E('acid-rain'), "module.exports = { effect: 'b' };\n");
+    r.commit('Zwei\n\nBugfix-Note: "Deadly Poison" | ' + 'x'.repeat(500));
+    const n = await readNotes({ git: r.git, last: from, head: r.head = r.sync('rev-parse', 'HEAD').trim() });
+    assert.equal(n.get('fireball'), 'First part.; Second part.');
+    assert.equal(n.get('deadlypoison').length, 220, 'lange Beschreibung wird gekürzt');
+    assert.ok(!n.has('acidrain') && n.size === 2, 'leere/kaputte Zeilen ignoriert');
+
+    const f = await findBugfixes({ git: r.git, last: from, head: r.head, cards: real, balanced: new Set(['Acid Rain']) });
+    assert.deepEqual(names(f.direct), ['Fireball']);
+    const g = await findBugfixes({ git: r.git, last: from, head: r.head, cards: real });
+    assert.deepEqual(names(g.direct), ['Acid Rain', 'Fireball']);
+    assert.deepEqual(await readNotes({ git: r.git, last: 'deadbeef', head: r.head }), new Map(), 'unbekannter Stand → keine Beschreibungen, kein Absturz');
+  } finally { r.clean(); }
 });

@@ -8,6 +8,9 @@
 //    • geänderter gemeinsamer Baustein     → die Karten, deren Skripte ihn (auch über andere Bausteine) einbinden
 //  Nicht gezählt: neu hinzugekommene Dateien (neue Umsetzung, keine Korrektur), gelöschte, reine Kommentar-/Leerraum-Änderungen.
 //  Betrifft ein Baustein sehr viele Karten (Engine-Teile wie `_loader`), werden keine Kartenbilder gezeigt, sondern nur sein Name samt Anzahl.
+//  Gezielte BALANCING-Änderungen (Eintrag der Karte in cards.json hat sich geändert, z. B. der Effekttext) sind kein Bugfix: Diese Karten werden
+//  übergeben (`balanced`) und hier ausgelassen — sie gehören in die Patchnotes.
+//  Die genaue Fehlerbeschreibung stammt aus Commit-Zeilen der Form `Bugfix-Note: <Kartenname oder _baustein> | <Beschreibung>` (siehe readNotes).
 // ═══════════════════════════════════════════════════════════════════
 const path = require('path');
 
@@ -60,6 +63,28 @@ function closure(deps, start) {
   return seen;
 }
 
+const normName = n => String(n).toLowerCase().replace(/[^a-z0-9]+/g, '');
+const NOTE_RE = /^\s*(?:[*-]\s+)?Bugfix-Note:[ \t]*([^|\n]+?)[ \t]*\|[ \t]*(.+?)[ \t]*$/gim;
+const NOTE_MAX = 220;
+
+/**
+ * Fehlerbeschreibungen aus den Commit-Nachrichten zwischen zwei Ständen: Zeilen `Bugfix-Note: <Kartenname oder _baustein> | <Beschreibung>`
+ * (eine Zeile je Karte/Baustein; auch mit „* “/„- “ davor, wie sie bei Squash-Merges entstehen). Mehrere Zeilen für dasselbe Ziel werden verbunden.
+ * @returns {Promise<Map<string,string>>}  normalisiertes Ziel → Beschreibung
+ */
+async function readNotes({ git, last, head }) {
+  const out = new Map();
+  let log = '';
+  try { log = await git('log', '--format=%B%x1e', `${last}..${head}`); } catch { return out; }
+  for (const m of log.matchAll(NOTE_RE)) {
+    const key = normName(m[1]);
+    const text = m[2].replace(/\s+/g, ' ').slice(0, NOTE_MAX);
+    if (!key || !text) continue;
+    out.set(key, out.has(key) ? `${out.get(key)}; ${text}`.slice(0, NOTE_MAX * 2) : text);
+  }
+  return out;
+}
+
 /**
  * @param {object} o
  * @param {(...args:string[]) => Promise<string>} o.git   führt git im Repo aus
@@ -67,9 +92,10 @@ function closure(deps, start) {
  * @param {string} o.head   aktueller Stand
  * @param {{name:string}[]} o.cards   alle Karten (cards.json im aktuellen Stand)
  * @param {number} [o.maxShared=12]   ab so vielen betroffenen Karten gilt ein Baustein als „breit“
+ * @param {Set<string>} [o.balanced]   Namen der Karten mit Balancing-Änderung (cards.json) — sie zählen nicht als Bugfix
  * @returns {Promise<{direct:{card:object, file:string}[], shared:{module:string, cards:object[], count:number, broad:boolean}[]}>}
  */
-async function findBugfixes({ git, last, head, cards, maxShared = 12 }) {
+async function findBugfixes({ git, last, head, cards, maxShared = 12, balanced = new Set() }) {
   const changed = parseNameStatus(await git('diff', '--name-status', '--no-renames', last, head, '--', EFFECTS_DIR))
     .filter(e => e.status === 'M');                                   // nur bestehende Dateien: A (neu) und D (gelöscht) sind keine Korrektur
   const real = [];
@@ -84,7 +110,7 @@ async function findBugfixes({ git, last, head, cards, maxShared = 12 }) {
   for (const c of cards) { const s = nameToFile(c.name); if (!bySlug.has(s)) bySlug.set(s, []); bySlug.get(s).push(c); }
 
   const direct = [];
-  for (const f of real.filter(f => !isShared(f))) for (const c of bySlug.get(baseOf(f)) || []) direct.push({ card: c, file: baseOf(f) });
+  for (const f of real.filter(f => !isShared(f))) for (const c of (bySlug.get(baseOf(f)) || []).filter(c => !balanced.has(c.name))) direct.push({ card: c, file: baseOf(f) });
 
   const sharedFiles = real.filter(isShared);
   const shared = [];
@@ -97,7 +123,7 @@ async function findBugfixes({ git, last, head, cards, maxShared = 12 }) {
       const cs = [];
       for (const slug of cardFiles) {
         if (!deps.has(slug)) continue;
-        if (closure(deps, slug).has(mod)) cs.push(...bySlug.get(slug));
+        if (closure(deps, slug).has(mod)) cs.push(...bySlug.get(slug).filter(c => !balanced.has(c.name)));
       }
       shared.push({ module: mod, cards: cs, count: cs.length, broad: cs.length > maxShared });
     }
@@ -105,4 +131,4 @@ async function findBugfixes({ git, last, head, cards, maxShared = 12 }) {
   return { direct, shared };
 }
 
-module.exports = { findBugfixes, fingerprint, parseNameStatus, parseRequires, closure, nameToFile };
+module.exports = { findBugfixes, readNotes, normName, fingerprint, parseNameStatus, parseRequires, closure, nameToFile };
