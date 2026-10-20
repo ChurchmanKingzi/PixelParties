@@ -47,7 +47,8 @@ function quellStufe(engine, quelle) {
   if (cd && typeof cd.level === 'number') return cd.level;
   // W24b N2-08: ein Heldeneffekt, der „als Spell" gilt (Alice, `treatedAsSpell`, Q108), zählt mit der dort erklärten Stufe (Alice: 0).
   // W26a (Al, Welle 26): auch Broghan, Brackle, Arthor, Heragas, Kohta (als Attack geltend) zählen als Stufe 0 (`_heldenEffektStufe`).
-  const lv = name ? (engine._spellLevelAlsQuelle?.(name, quelle?.damageType) ?? engine._heldenEffektStufe?.(name, quelle?.damageType)) : null;
+  // W27a (Al, 21.10.2026): auch als Attack geltende Gegenstandseffekte (Bamboo Staff, Crusader's, Javelin Throw, Sword in a Bottle …) = Stufe 0.
+  const lv = name ? (engine._spellLevelAlsQuelle?.(name, quelle?.damageType) ?? engine._heldenEffektStufe?.(name, quelle?.damageType, quelle)) : null;
   return Number.isFinite(lv) ? lv : null;
 }
 

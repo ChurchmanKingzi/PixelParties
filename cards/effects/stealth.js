@@ -50,6 +50,11 @@ function kontrolleur(engine, seite, heroIdx) {
 /** Ist diese Quelle ein gegnerischer Attack/Spell, den Stealth-Level `lvl` abdeckt? */
 function coveredBy(engine, lvl, info, ctrl) {
   if (lvl <= 0) return false;
+  // W27a (Al, 21.10.2026): als Attack geltende Heldeneffekte (Broghan & Co.) und Gegenstandseffekte (Bamboo Staff, Crusader's …) sind IMMER Level 0.
+  if (info.treatedAsLevel != null) {
+    if (info.chooserIdx === ctrl || info.chooserIdx == null) return false; // eigene Karten
+    return info.treatedAsLevel <= lvl;
+  }
   const cd = info.sourceData;
   if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
   if (info.chooserIdx === ctrl || info.chooserIdx == null) return false; // eigene Karten

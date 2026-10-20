@@ -11262,9 +11262,14 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
   if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
+  // W27a (Al, 21.10.2026): Spell-Anhängsel (Prayer) liegen bei Frozen/Stunned nicht still — nur Webbed sperrt weiter.
   if (!script.bypassHostStatusFilter) {
-    if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
-    if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+    const _anhaengsel = room.engine._istSpellAnhaengsel(inst);
+    if (hero.statuses?.webbed) return false;
+    if (!_anhaengsel) {
+      if (hero.statuses?.stunned) return false;
+      if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+    }
   }
 
   const hoptKey = `equip-effect:${inst.id}`;
@@ -12020,6 +12025,20 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
   if (engine && typeof casterPi === 'number' && !config?._truthSeeingEye
       && typeof engine.applyForcedTargetingFilter === 'function') {
     engine.applyForcedTargetingFilter(validTargets, casterPi);
+  }
+  // ★ W27a (Al, 21.10.2026: als Attack geltende Gegenstandseffekte sind Level 0): Ziel-Traenke/-Artefakte laufen nicht durch die Engine-Picker und kannten
+  // den Zielschutz `blocksTargeting` (Stealth, Future Tech Jetpack) bisher nicht. Nur fuer Karten, die als Attack gelten (`treatedAsAttack`, z. B. Sword in a Bottle) —
+  // alle anderen Ziel-Karten bleiben unveraendert. Eigene Helden (der Angreifer-Anteil) sind kein „gewaehltes Ziel".
+  if (engine && cardName && typeof casterPi === 'number' && !config?.ignoreUntargetable && !config?._truthSeeingEye
+      && typeof engine._heldenEffektStufe === 'function' && engine._heldenEffektStufe(cardName, config?.damageType) != null) {
+    const geblockt = [];
+    for (const t of validTargets) {
+      if (!t || t.type !== 'hero' || t.ineligible || engine.zielSeite(t) === casterPi) continue;
+      if (engine.heroBlocksTargeting(t.owner, t.heroIdx, {
+        sourceData: getCardDB()[cardName], cardName, damageType: config.damageType, chooserIdx: casterPi, allTargets: validTargets,
+      })) geblockt.push(t);
+    }
+    for (const t of geblockt) t.ineligible = true;
   }
   return validTargets;
 }

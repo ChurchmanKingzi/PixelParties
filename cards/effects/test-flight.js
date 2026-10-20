@@ -46,7 +46,8 @@ function quellStufe(engine, sourceCard, damageType) {
   const src = sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null;
   if (!src) return null;
   // W26a (Al, Welle 26): als Attack/Spell geltender Heldeneffekt (Alice, Broghan, Brackle, Arthor, Heragas, Kohta) = Stufe 0.
-  if (src.cardType !== 'Attack' && src.cardType !== 'Spell') return engine._heldenEffektStufe?.(sourceCard.name, damageType) ?? null;
+  // W27a (Al, 21.10.2026): ebenso als Attack geltende Gegenstandseffekte (Bamboo Staff, Crusader's, Javelin Throw, Sacrificial Dagger, Sword in a Bottle).
+  if (src.cardType !== 'Attack' && src.cardType !== 'Spell') return engine._heldenEffektStufe?.(sourceCard.name, damageType, sourceCard) ?? null;
   return src.level || 0;
 }
 

@@ -210,8 +210,7 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
       // ★ W7a (R02-23, Al): „Damage this Hero would take cannot exceed 100" ist ein Dauerdeckel des ANHANGS — Anhänge sind
-      // eigene Karten und ruhen nicht, nur weil der Träger gefroren/betäubt/negiert ist. Der Deckel gilt deshalb immer;
-      // die Umleitung („you may redirect") bleibt wie bisher an einen handlungsfähigen Wirt gebunden (Skriptentscheidung).
+      // eigene Karten und ruhen nicht, nur weil der Träger gefroren/betäubt/negiert ist. W27a: das gilt jetzt auch für die Umleitung.
 
       // ★ v1280 (Als Befund 22.9.: „Prophecy of Tempeste cappt eingehenden
       // Schaden gegen den Hero noch nicht bei 100 — sollte ALLER Schaden an
@@ -234,9 +233,8 @@ module.exports = {
         ctx.setAmount(DAMAGE_CAP);
         ctx.setFlag('cannotBeReduced', true);
       }
-      // ★ W8 (Al, 14.10.2026, Frage 2): die Umleitung läuft bei Freeze/Stun NICHT weiter - sie ruht bei Frost/Betäubung/Negation
-      // des Wirts (EIN Prüfer `_isHeroEffectSilenced`: mit Chilly-Dog-Ausnahme, Webbed, Mumie); nur der Deckel (statische Regel) gilt weiter.
-      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? ownerIdx, ctx.cardHeroIdx)) return;
+      // ★ W27a (Al, 21.10.2026): „Attachments liegen bei Frozen/Stunned nicht still" — das Welle-8-Ruling (Umleitung ruht bei
+      // Frost/Betäubung/Negation des Wirts) ist ZURÜCKGENOMMEN. Die Umleitung läuft wie der Deckel unabhängig vom Zustand des Wirts.
 
       // Target must be a hero on the SAME side, NOT the host itself.
       const target = ctx.target;
@@ -332,7 +330,7 @@ module.exports = {
 
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (engine._isHeroEffectSilenced(ctx.cardHeroOwner ?? ownerIdx, ctx.cardHeroIdx)) return;   // W8: die Umleitung ruht (s. beforeDamage)
+      // W27a: kein Ruhe-Prüfer mehr — Anhänge liegen bei Frost/Betäubung/Negation des Wirts nicht still (s. beforeDamage).
 
       const hoptKey = `tempeste_redirect:${ctx.card.id}`;
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;

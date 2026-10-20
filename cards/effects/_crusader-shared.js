@@ -244,6 +244,9 @@ function makeCrusaderArtifact(spec) {
   return {
     activeIn: ['support'],
 
+    // W27a (Al, 21.10.2026): „That is treated as an Attack" zählt als LEVEL 0 überall, wo eine Karte die Stufe der Quelle liest (Glass Wall, Test Flight, Escape Device, Stealth, Jetpack) — Engine: `_heldenEffektStufe`.
+    treatedAsAttack: { level: 0 },
+
     canEquipToHero(gs, pi, heroIdx, engine) {
       return darfAufHeld(gs, pi, heroIdx, engine, cardName);
     },
