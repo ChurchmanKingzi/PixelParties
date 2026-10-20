@@ -21,8 +21,6 @@ Al hat die vier Rückfragen aus [FIXES-WELLE-34.md](FIXES-WELLE-34.md) beantwort
 * **Nicht im Browser geprüft:** die Klickpfade von Hu in `app-board.jsx` (nur Build-Check).
 * Bot-Tests (`bot/test`) brauchen `npm install` im Ordner `bot/` und wurden nicht ausgeführt; der Bot-Code ist unverändert gegenüber `main`.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Broghan, Brackle, Arthor, Heragas, Kohta:** Wird ihr Treffer im Zielfenster negiert (z. B. Invisibility Cloak), bleibt heute der Einmal-Stempel frei und der Treffer zählt nicht als Attack. Soll hier dieselbe Regel gelten wie bei Alice (negiert = verbraucht und zählt)?
-2. **Master's Plan, Lunar Eclipse, Off Duty, Dream Dust, Shamanic Curse („a different/an additional Action"):** Sollen sie für übernommene Helden ebenfalls Abilities und Heldeneffekte anbieten? (Eigene Helden bieten sie schon an; Hu ist nach Welle 35 die Ausnahme.)
-3. **Spell-Zähler bei Sofort-Güssen:** `_castSpellImmediately` zählt Spell-Karten nicht in `spellsPlayedThisTurn`; Teleportal („first Spell"), Eraser Beam, Trial of … und der Silence-Bonus-Spell sehen einen per Hu oder Coffee gewirkten Spell nicht. Soll das wie bei den Attacks behoben werden?
+Alle drei sind beantwortet und in [FIXES-WELLE-36.md](FIXES-WELLE-36.md) umgesetzt (dort stehen die neuen Rückfragen).

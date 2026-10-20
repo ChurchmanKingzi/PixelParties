@@ -1,6 +1,6 @@
-# Bugfix-Notes der Nischenfall-Kampagne (Wellen 1–35)
+# Bugfix-Notes der Nischenfall-Kampagne (Wellen 1–36)
 
-Auswahl der für Spielerinnen und Spieler relevantesten Korrekturen, als `Bugfix-Note:`-Zeilen für den Discord-Bugfix-Kanal (MoniaBot, siehe `CLAUDE.md`). Die Zeilen stehen auch in der Commit-Nachricht des Commits, der diese Datei hinzufügt. Vollständige Liste aller Korrekturen: `docs/niche-tests/FIXES-WELLE-*.md`.
+Auswahl der für Spielerinnen und Spieler relevantesten Korrekturen, als `Bugfix-Note:`-Zeilen für den Discord-Bugfix-Kanal (MoniaBot, siehe `CLAUDE.md`). Die Zeilen stehen auch in den Commit-Nachrichten der Commits, die diese Datei hinzufügen bzw. erweitern. Vollständige Liste aller Korrekturen: `docs/niche-tests/FIXES-WELLE-*.md`.
 
 - `_engine` – Control changes are now consistent: only a Hero's current controller can act with it, "you control" always means current control, and a stolen Hero is a valid target even if the effect fizzles.
 - `_engine` – Effects that "count as an Attack/Spell" now use the Hero's Ability level, are blocked when that Hero cannot attack, and set off Attack/Spell reactions, counters and limits.
@@ -46,3 +46,5 @@ Auswahl der für Spielerinnen und Spieler relevantesten Korrekturen, als `Bugfix
 - `Mirjam, the Fallen Cute Angel` – Her "1 Attack per turn" limit ignored Attacks played as bonus Actions (Quick Attack, Berserk), negated Attacks and instant casts; every Attack now counts.
 - `Magic Mirror` – It now also reacts to effects that count as Spells, and negating Alice's effect no longer lets her use it again in the same turn.
 - `Ghuanjun, the Undead Martial Artist` – His same-name Attack lock missed Attacks played as bonus Actions and instant casts; every Attack now counts.
+- `Broghan, the Frozen Guardian of the North` – If his hit was negated (e.g. by Invisibility Cloak) the once-per-turn effect stayed unused and the hit did not count as an Attack; it is now used up and counts.
+- `Teleportal` – "First Spell" ignored Spells cast instantly by other cards (Guardian Beast Hu, Coffee, Elixir of Rage ...); all Spells now count.
