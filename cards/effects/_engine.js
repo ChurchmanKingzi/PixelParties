@@ -7150,12 +7150,12 @@ class GameEngine {
     };
     const chain = [link];
     const chainCtx = { chain, eventDesc: `${this.gs.players[reactorOwner]?.username} plays ${cardName}`, hookName: 'preDamageReaction', hookCtx: {} };
-    for (let hi = 0; hi < (gps.heroes || []).length; hi++) {
-      const hero = gps.heroes[hi];
+    // ★ W21a (Al, 20.10.2026): nur der aktuelle Kontrolleur des Helden (siehe Kettenfenster).
+    for (const { physOwner: hSeite, heroIdx: hi, hero } of this.heroesControlledBy(gegner)) {
       if (!hero?.name || hero.hp <= 0) continue;
       const script = this.heroScript(hero);
       if (!script?.isHeroReaction || typeof script.heroReactionCondition !== 'function') continue;
-      if (this._isHeroEffectSilenced(gegner, hi)) continue;
+      if (this._isHeroEffectSilenced(hSeite, hi)) continue;
       let ok = false;
       try { ok = !!script.heroReactionCondition(this.gs, gegner, this, chainCtx, hi); } catch { ok = false; }
       if (!ok) continue;
@@ -7169,7 +7169,7 @@ class GameEngine {
         const paid = await script.payActivationCost(this, gegner, chainCtx, hi);
         if (paid === false) continue;
       }
-      this._broadcastEvent('hero_effect_reaction', { owner: gegner, heroIdx: hi, heroName: hero.name });
+      this._broadcastEvent('hero_effect_reaction', { owner: hSeite, heroIdx: hi, heroName: hero.name });
       await this.showTriggeredEffect(hero.name, { replace: true, delayMs: 300 });   // v694: loest die Reaktion ab
       this.log('reaction_activated', { card: hero.name, player: gps.username, chainPosition: 0, source: 'hero' });
       if (typeof script.heroReactionResolve === 'function') {
@@ -40304,20 +40304,21 @@ this._deathWatch = (this._deathWatchStack || []).length
       // ohne Handkarte, ohne Zone. Nur lebend und nicht stummgeschaltet
       // (dieselbe Regel wie der Hook-Filter). Additiv: Hand- und
       // Surprise-Zweige oben sind unveraendert.
-      for (let hhi = 0; hhi < (ps.heroes || []).length; hhi++) {
-        const hero = ps.heroes[hhi];
+      // ★ W21a (Al, 20.10.2026: „nur der aktuelle Kontrolleur"): angeboten wird dem KONTROLLEUR des Helden (`heroesControlledBy`): ein an den Gegner
+      // abgegebener eigener Held fehlt, ein vom Spieler kontrollierter Gegnerheld zaehlt (Seite `seite` = Brettspalte; Bedingung/Kosten laufen ueber `pi`).
+      for (const { physOwner: hSeite, heroIdx: hhi, hero } of this.heroesControlledBy(pi)) {
         if (!hero?.name || hero.hp <= 0) continue;
         if (eligibleByName.has(hero.name)) continue;
         const hScript = this.heroScript(hero);
         if (!hScript?.isHeroReaction || typeof hScript.heroReactionCondition !== 'function') continue;
-        if (this._isHeroEffectSilenced(pi, hhi)) continue;
+        if (this._isHeroEffectSilenced(hSeite, hhi)) continue;
         let okH = false;
         try { okH = !!hScript.heroReactionCondition(this.gs, pi, this, chainCtx, hhi); } catch { okH = false; }
         if (!okH) continue;
         eligibleByName.set(hero.name, {
           handIdx: -1, cost: 0, script: hScript, cardData: allCards[hero.name] || null, cardName: hero.name,
           eligibleHeroIdxs: [hhi], wisdomCost: 0,
-          fromHero: { heroIdx: hhi }, source: 'hero',
+          fromHero: { heroIdx: hhi, seite: hSeite }, source: 'hero',
         });
         countByName.set(hero.name, 1);
       }
@@ -40446,7 +40447,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const paid = await script.payActivationCost(this, pi, chainCtx, hHeroIdx);
           if (paid === false) continue;
         }
-        this._broadcastEvent('hero_effect_reaction', { owner: pi, heroIdx: hHeroIdx, heroName: chosenName });
+        this._broadcastEvent('hero_effect_reaction', { owner: info.fromHero.seite ?? pi, heroIdx: hHeroIdx, heroName: chosenName });
         // v694 (Al): der Held wird bei der Aktivierung ANGEZEIGT und
         // loest damit die Karte ab, auf die er reagiert.
         await this.showTriggeredEffect(chosenName, { replace: true, delayMs: 300 });
