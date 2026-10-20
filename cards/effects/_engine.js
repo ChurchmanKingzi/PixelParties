@@ -346,8 +346,10 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   // valid (the opponent picks any). Without this set, the first forcer
   // would splice the second out and break "multiple taunters, pick any".
   const forcerIds = new Set();
+  // W24d (N4-07): Ziel-IDs tragen die BRETTSEITE (`physicalSide`), nicht den Kontrolleur – sonst findet
+  // ein seitenfremd/gestohlen gefuehrter Spoetter (Hardy Slime, Horror Clown, Town Guard) seine eigene ID nicht.
   for (const f of creatureForcers) {
-    const side = f.controller ?? f.owner;
+    const side = engine.physicalSide(f);
     forcerIds.add(`equip-${side}-${f.heroIdx}-${f.zoneSlot}`);
   }
   for (const hf of heroForcers) {
@@ -363,8 +365,8 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
   // source targeting a creature forcer), we don't filter — heroes stay
   // targetable and the effect goes through normally.
   for (const forcer of creatureForcers) {
-    const forcerSide = forcer.controller ?? forcer.owner;
-    const forcerTargetId = `equip-${forcerSide}-${forcer.heroIdx}-${forcer.zoneSlot}`;
+    const forcerSide = forcer.controller ?? forcer.owner;   // KONTROLLEUR: „seine Seite" = alles, was er kontrolliert
+    const forcerTargetId = `equip-${engine.physicalSide(forcer)}-${forcer.heroIdx}-${forcer.zoneSlot}`;
     if (!targets.find(t => t.id === forcerTargetId)) continue;
     // v849: Nur-Creatures-Variante (siehe Kopfkommentar).
     const nurCreatures = !!(forcer.counters?.forcesTargeting_creaturesOnly
@@ -372,7 +374,7 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
     for (let i = targets.length - 1; i >= 0; i--) {
       const t = targets[i];
       if (forcerIds.has(t.id)) continue;
-      if (t.owner !== forcerSide) continue;
+      if (engine.zielSeite(t, t.owner) !== forcerSide) continue;   // W24d (N4-07): Kontrolle statt Brettseite
       // Remove creatures AND heroes on the forcer's side.
       if (t.type !== 'equip' && t.type !== 'hero') continue;
       if (nurCreatures && t.type !== 'equip') continue;   // Helden bleiben waehlbar
@@ -20738,7 +20740,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (inst.zone === 'surprise') return inst.owner;
     // Styx 28.9.: ueber einen geliehenen Helden beschworen — liegt auf der
     // Seite des Helden (`owner`), kontrolliert vom Beschwoerer.
-    if (inst.counters?.crossSideControlled != null) return inst.owner;
+    // W24d (N4-06): waehrend der Aktivierung kippt der Server `inst.owner` auf den Kontrolleur
+    // (`inst.heroOwner` = Brettseite des geliehenen Helden) – dann gilt `heroOwner`, sonst fehlt die Kreatur am Brett.
+    if (inst.counters?.crossSideControlled != null) return inst.heroOwner ?? inst.owner;
     return inst.controller ?? inst.owner;
   }
 
