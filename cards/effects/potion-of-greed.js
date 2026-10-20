@@ -42,6 +42,8 @@ module.exports = {
     if (ps.handLocked) return false;
     // N5-07: Potion-Deck-Zieh-Verbot (Chaos-Diamond/Pinta: "never draw from the Potion Deck") - dann bliebe nur der Nachteil (wie Potion Juggler).
     if (ps.potionDrawBanned) return false;
+    // W26a (Al, Welle 26): auch bei LEEREM Potion Deck nicht spielbar (nichts zu ziehen = nur der Nachteil, Konvention D1). Mit mindestens 1 Karte spielbar (zieht, was da ist).
+    if (engine?.deckLeer?.(pi, 'potion')) return false;
     if (gs.currentPhase !== 2) return false;
     return true;
   },

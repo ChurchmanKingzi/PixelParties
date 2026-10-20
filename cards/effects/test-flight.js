@@ -42,10 +42,11 @@ const SCHOOL = 'Magic Arts';
 const FLUG_MS = 900;      // Länge der Animation (deckt sich mit `test_flight` im Client)
 
 /** Stufe der Quelle, wenn sie eine echte Attack-/Spell-Karte ist; sonst null (keine Entscheidung). */
-function quellStufe(engine, sourceCard) {
+function quellStufe(engine, sourceCard, damageType) {
   const src = sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null;
   if (!src) return null;
-  if (src.cardType !== 'Attack' && src.cardType !== 'Spell') return null;
+  // W26a (Al, Welle 26): als Attack/Spell geltender Heldeneffekt (Alice, Broghan, Brackle, Arthor, Heragas, Kohta) = Stufe 0.
+  if (src.cardType !== 'Attack' && src.cardType !== 'Spell') return engine._heldenEffektStufe?.(sourceCard.name, damageType) ?? null;
   return src.level || 0;
 }
 
@@ -71,8 +72,8 @@ module.exports = {
 
   isPostTargetReaction: true,
 
-  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard) {
-    const stufe = quellStufe(engine, sourceCard);
+  postTargetCondition(gs, pi, engine, targetedHeroes, sourceCard, opts) {
+    const stufe = quellStufe(engine, sourceCard, opts?.damageType);
     if (stufe == null) return false;
     return (targetedHeroes || []).some(t => t.type === 'hero' && engine.zielSeite(t) === pi && heldPasst(engine, pi, t.heroIdx, stufe, t.owner));
   },
@@ -80,7 +81,7 @@ module.exports = {
   /** Wirker: nur ein GETROFFENER eigener Held, dessen Magic-Arts-Stufe die der Quelle übertrifft. */
   reactionCasterAllowed(gs, pi, heroIdx, engine, info, seite = pi) {
     if (!info?.postTarget) return false;
-    const stufe = quellStufe(engine, info.sourceCard);
+    const stufe = quellStufe(engine, info.sourceCard, info.damageType);
     if (stufe == null) return false;
     const getroffen = (info.targetedHeroes || []).some(t => t.owner === seite && t.type === 'hero' && t.heroIdx === heroIdx && engine.zielSeite(t) === pi);
     return getroffen && heldPasst(engine, pi, heroIdx, stufe, seite);

@@ -91,7 +91,12 @@ module.exports = {
     const db = engine._getCardDB();
     const srcData = sourceCard?.name ? db[sourceCard.name] : null;
     if (!srcData) return false;
-    if (srcData.cardType !== 'Attack' && srcData.cardType !== 'Spell') return false;
+    if (srcData.cardType !== 'Attack' && srcData.cardType !== 'Spell') {
+      // W26a (Al, Welle 26): als Attack/Spell geltender Heldeneffekt (Alice, Broghan, Brackle, Arthor, Heragas, Kohta) zählt als Stufe 0
+      // (Statusticks und sonstige Heldeneffekte haben weiter keine Stufe).
+      const hs = engine._heldenEffektStufe?.(sourceCard.name, opts?.damageType);
+      return hs != null && hs <= zaehleInAblage(gs, pi, CARD_NAME);
+    }
 
     return (srcData.level || 0) <= zaehleInAblage(gs, pi, CARD_NAME);
   },

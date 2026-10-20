@@ -205,6 +205,8 @@ module.exports = {
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
       // W24d (N4-04): eine aus der Ablage aktivierte Surprise (Cute Spider) lag nie in einer Surprise Zone.
       if (ctx._fromDiscard) return;
+      // W26a (Al, Welle 26): ebenso eine aus dem Deck gesuchte und sofort aktivierte Surprise (Sabrina) – sie lag nie in einer Surprise Zone.
+      if (ctx._fromDeck) return;
       // Alleria must be alive and not incapacitated
       const hero = ctx.attachedHero;
       if (!hero || hero.hp <= 0) return;

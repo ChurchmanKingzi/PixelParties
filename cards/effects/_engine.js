@@ -7352,6 +7352,23 @@ class GameEngine {
   }
 
   /**
+   * ★ W26a (Al, Welle 26): Stufe eines als Attack/Spell GELTENDEN Heldeneffekts ohne Karte (Alice `treatedAsSpell`; Broghan, Brackle, Arthor, Heragas, Kohta
+   * `treatedAsAttack`) für Stufen-Bedingungen von Reaktionen ("level X or lower": Glass Wall, Test Flight, Future Tech Escape Device) — immer LEVEL 0 (Deklaration
+   * `{ level }`, Standard 0). Nur Heldenkarten und nur für den passenden Schadenstyp (`attack` bzw. `*_spell`); sonst `null` (keine Stufe, keine Entscheidung).
+   * Anti Magic (Spell-Immunität) liest weiter `_spellLevelAlsQuelle`.
+   */
+  _heldenEffektStufe(sourceName, damageType) {
+    if (!sourceName) return null;
+    const card = this._getCardDB()[sourceName];
+    if (!card || !/Hero/.test(String(card.cardType || ''))) return null;
+    const sc = loadCardEffect(sourceName);
+    const dt = String(damageType || '');
+    const decl = (dt === 'attack' && sc?.treatedAsAttack) || ((dt === 'spell' || /_spell$/.test(dt)) && sc?.treatedAsSpell) || null;
+    if (!decl || typeof decl !== 'object') return null;
+    return Number.isFinite(decl.level) ? decl.level : 0;
+  }
+
+  /**
    * Would the damage `source → target` be fully voided by an
    * already-active protection on the target side, ignoring any
    * piercing flag (`hookCtx.cannotBeNegated`) that may apply?
@@ -13652,7 +13669,7 @@ class GameEngine {
             });
             if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
             if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
-            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) { abgelehnt.add(cardName); continue; }
+            if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner }))) { abgelehnt.add(cardName); continue; }   // W26a: Quelle für Cute Camera
             this.log(V.log, { card: cardName, player: ps.username, target: target.name });
             try {
               if (script[V.res]) {
@@ -13735,7 +13752,7 @@ class GameEngine {
           });
           if (!this._confirmSaidYes(confirmed)) { abgelehnt.add(cardName); continue; }
           if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) { abgelehnt.add(cardName); continue; }
-          if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) { abgelehnt.add(cardName); continue; }
+          if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner: this._rxQuellBesitzer(source) }))) { abgelehnt.add(cardName); continue; }   // W26a: Quelle für Cute Camera
           this.log('hero_revived_window_reaction', { card: cardName, player: ps.username, target: hero.name });
           try {
             if (script.heroRevivedResolve) {
@@ -13816,7 +13833,7 @@ class GameEngine {
       });
       if (!this._confirmSaidYes(confirmed)) continue;
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) continue;
-      if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast))) continue;
+      if (!(await this._rxHandkarteEinsetzen(pi, cardName, script, rxCast, { sourceOwner }))) continue;   // W26a: Quelle für Cute Camera
       this.log('hero_defeated_reaction', { card: cardName, player: ps.username, target: target.name });
       let lebt = false;
       this._inHeroDefeatedReaction = true;
@@ -13881,7 +13898,7 @@ class GameEngine {
       });
       if (!this._confirmSaidYes(confirmed)) continue;
       if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast, { fensterInfo: info }))) continue;
-      if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast))) continue;
+      if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast, { sourceOwner: verursacher }))) continue;   // W26a: Quelle für Cute Camera
       this.log('board_discard_reaction', { card: cardName, player: ps.username, target: roh.cardName });
       this._inBoardDiscardReaction = true;
       try {
@@ -35485,7 +35502,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         if (!confirmed) continue;
         if (!(await this._rxCastWirkerWaehlen(ps, cardName, script, rxCast))) continue;
-        if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast))) continue;
+        // W26a: Quelle für Cute Camera nur, wenn alle Niederlagen dieser Seite von derselben bekannten Quelle stammen.
+        const _quellen = new Set(defeated.map(d => this._rxQuellBesitzer(d.source)));
+        const _quelle = _quellen.size === 1 ? [..._quellen][0] : undefined;
+        if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast, { sourceOwner: _quelle }))) continue;
         this.log('creatures_defeated_reaction', {
           card: cardName, player: ps.username, target: namen.join(', '),
         });
@@ -35544,7 +35564,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   /** N5-04: Besitzer (Sitz) der Quelle eines Fensters (`source.controller ?? source.owner`) oder `undefined`, wenn unbekannt. */
   _rxQuellBesitzer(source) {
     const o = source?.controller ?? source?.owner;
-    return Number.isInteger(o) && o >= 0 ? o : undefined;
+    if (Number.isInteger(o) && o >= 0) return o;
+    // W26a: ohne Besitzer an der Quelle (Name/Kartenobjekt) aus dem Namen ableiten; eindeutig oder unbekannt (Cute Camera bietet bei unbekannter Quelle nichts an).
+    const d = source ? this._deriveEffectOwner({ source }) : null;
+    return Number.isInteger(d) && d >= 0 ? d : undefined;
   }
 
   async _rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast, extra = {}) {
@@ -35911,7 +35934,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       // v1292: Einsetzen ueber den gemeinsamen Helfer (Flug, Ablage,
       // Kosten, Wisdom, Zaehler, Auftritt) — Zwilling des Sammel-Fensters.
-      if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast))) continue;
+      if (!(await this._rxHandkarteEinsetzen(ownerIdx, cardName, script, rxCast, { sourceOwner: this._rxQuellBesitzer(source) }))) continue;   // W26a: Quelle für Cute Camera
       this.log('creature_defeated_reaction', { card: cardName, player: ps.username, target: deathInfo.name });
 
       // Der Riegel umschliesst den Resolver: eine Karte, die selbst

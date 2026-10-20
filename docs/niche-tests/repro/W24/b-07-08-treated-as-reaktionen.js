@@ -1,7 +1,7 @@
 'use strict';
 // W24b · N2-07/N2-08 „als Attack/Spell geltende" Heldeneffekte: Alice = Spell Stufe 0 (Q108), Broghan = Attack ('attack'); Siphem = gewöhnlicher Heldeneffekt ('hero').
 //   Emergency Spell Armor („Spell or Creature effect"): Alice ja, Broghan (Attack) nein, Siphem nein.
-//   Flooding („Attack or Spell"): Alice ja, Broghan ja, Siphem nein.   Glass Wall („level 1 or lower Attack, Spell or Creature effect"): Alice ja (Stufe 0), Siphem nein.
+//   Flooding („Attack or Spell"): Alice ja, Broghan ja, Siphem nein.   Glass Wall („level 1 or lower Attack, Spell or Creature effect"): Alice ja (Stufe 0), Broghan ja (W26a, Al: als Attack geltende Heldeneffekte = Stufe 0), Siphem nein.
 const H = require('../../lib/h.js');
 const gefragt = (t, n) => t.prompts.filter(p => p.d.title === n).length;
 function wirker(t, me, held) {
@@ -41,14 +41,14 @@ function wirker(t, me, held) {
         R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
       }
       // Glass Wall
-      if (held !== 'Broghan') {
+      {   // W26a (Al, 21.10.2026): auch Broghan (als Attack geltend) zählt als Stufe 0 → Glass Wall öffnet sich
         const t = await H.fresh({ hand: [[], []], deckSize: 30 });
         t.putSurprise(op, 0, 'Glass Wall'); t.grantFor(op, 0, 'Glass Wall');
         t.script.push({ match: d => d.type === 'confirm', answer: () => ({ confirmed: true }) });
         wirker(t, me, held);
         t.targetFn = (v) => [v.find(x => x.type === 'hero' && x.owner === op && x.heroIdx === 0).id];
         await t.activateHero(me, 0);
-        const erwartet = held === 'Alice';
+        const erwartet = held !== 'Siphem';
         R.check(`Glass Wall ${erwartet ? 'öffnet sich (Stufe 0)' : 'bleibt verdeckt'}`, (gefragt(t, 'Glass Wall') >= 1) === erwartet, gefragt(t, 'Glass Wall'));
         R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
       }
