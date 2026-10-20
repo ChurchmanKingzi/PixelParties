@@ -116,9 +116,9 @@ module.exports = {
   // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a Hero you control" = `getControlledHeroTargets` (abgegebener eigener Held nein,
   // uebernommener Gegnerheld ja; ID/`owner` = Brettseite des Helden).
   getValidTargets(gs, pi, engine) {
-    // Der Schaden ist der KOSTENPUNKT des Helden: ein temporaer uebernommener Gegnerheld (Charme Lv3: „unaffected by other cards and effects") nimmt ihn nicht an
-    // und ist kein Ziel (wie Sickly Cheese, W7b F03-12) — der eigene Held bleibt wie bisher.
-    if (engine) return engine.getControlledHeroTargets(pi).filter(t => t.owner === pi || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], pi, { loveShotOhneSchutz: true }));
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): auch ein temporär übernommener (Charme-)Gegnerheld ist Ziel/Kostenträger;
+    // der Schaden verpufft dort (Charme Lv3), die Kosten sind bezahlt.
+    if (engine) return engine.getControlledHeroTargets(pi);
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {

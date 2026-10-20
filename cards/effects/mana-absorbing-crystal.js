@@ -87,8 +87,8 @@ module.exports = {
     const handIndex = ctx.handIndex;
 
     // Build target list: every alive Hero we CONTROL (W28a: abgegebener eigener Held nein, uebernommener Gegnerheld ja; `owner` = Brettseite).
-    // Der Schaden ist der KOSTENPUNKT: ein temporaer uebernommener Gegnerheld (Charme Lv3: „unaffected by other cards and effects") nimmt ihn nicht an und ist kein Ziel.
-    const targets = engine.getControlledHeroTargets(pi).filter(t => t.owner === pi || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], pi, { loveShotOhneSchutz: true }));
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): auch ein temporär übernommener (Charme-)Gegnerheld ist Ziel; der Schaden verpufft.
+    const targets = engine.getControlledHeroTargets(pi);
     if (targets.length === 0) return false;
 
     const selected = await engine.promptEffectTarget(pi, targets, {

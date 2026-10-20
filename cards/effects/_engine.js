@@ -48018,7 +48018,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name) return true;
     const statusDef = STATUS_EFFECTS[statusName];
-    if (statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
+    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): `opts.ohneCharme` laesst den Charme-Schutz (ein temporaer
+    // uebernommener Held, dessen Wirkung nur verpufft) ausser Acht — fuer Kostenkarten (Sickly Cheese), bei denen nur ECHTE Immunitaet ein Ziel ineligible macht.
+    if (!opts.ohneCharme && statusDef?.negative && this._charmBlocksFrom(hero, opts.appliedBy ?? opts.sourceOwner)) return true;
     if (hero.statuses?.shielded && statusName !== 'shielded') return true;
     if (statusDef?.negative) {
       if (this._johannaSchuetzt(hero)) return true;

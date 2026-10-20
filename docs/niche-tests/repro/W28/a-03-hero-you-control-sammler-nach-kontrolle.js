@@ -21,11 +21,11 @@ async function aufbau(karte, z, o = {}) {
   if (z === 'uebernommen-temporaer') { await t.engine.actionStealHero(0, 1, 0); await sleep(250); }
   return t;
 }
-// `gift`: die Kosten sind ein negativer Status (Gift) — ein TEMPORÄR übernommener Gegnerheld (Charme-Status) nimmt ihn nicht an und ist kein Kostenziel (wie Sickly Cheese, W7b F03-12).
+// UMGESTELLT in W31a (Al, 22.10.2026: „Doch, auch temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): ein TEMPORÄR übernommener Gegnerheld (Charme) ist auch bei
+// den Karten mit Kosten am Helden (Torchure, The Yeeting, Mana Absorbing Crystal, Sickly Cheese) ein gültiges Ziel (W28a schloss ihn aus); die Wirkung verpufft (s. `W31/a-01`).
 const erwartet = (z, fremdOk = true, gift = false) => {
   if (z === 'normal') return ['0:0', '0:1', '0:2'];
   if (z.startsWith('abgegeben')) return ['0:1', '0:2'];
-  if (z === 'uebernommen-temporaer' && gift) return ['0:0', '0:1', '0:2'];   // `gift` gilt auch für Schadens-Kosten (Charme Lv3: „unaffected by other cards and effects")
   return fremdOk ? ['0:0', '0:1', '0:2', '1:0'] : ['0:0', '0:1', '0:2'];
 };
 const adr = (valid) => valid.filter(v => v.type === 'hero').map(v => `${v.owner}:${v.heroIdx}`).sort();
