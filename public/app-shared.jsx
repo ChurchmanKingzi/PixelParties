@@ -7228,6 +7228,8 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
           <TTEffectBox card={card} text={effectText} />
+          {/* Genannte Tokens (Bild + Effekt) ganz unten (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
         </div>
       </div>
     </div>
@@ -8423,6 +8425,56 @@ function TTStatusReminders({ text }) {
   );
 }
 
+// ── Tokens am Ende des Karten-Tooltips (Als Vorgabe 20.10.) ──
+// Nennt der Effekttext einer Karte einen Token („Pollution Tokens", „Mummy Token"), steht ganz unten im Tooltip dieser Karte das Bild des Tokens,
+// gefolgt von seinem Effekt — in JEDEM Menue und Modus (Spielbrett, Puzzle-Editor, Deckeditor, Galerien, Regeln). Frueher oeffnete das Brett dafuer
+// einen zweiten, angeschnittenen Tooltip links neben dem Karten-Tooltip, nur im Spiel und nur fuer Pollution/Mummy. Tokens nennen keine weiteren
+// Tokens (die Puppen verweisen aufeinander): kein Nest. Erkannt wird der Kartenname im Text, auch im Plural; die Token-Karten kommen aus
+// `CARDS_BY_NAME` (Kartentyp „Token" bzw. „Creature/Token").
+function ttIstToken(card) { return !!card && (card.cardType === 'Token' || card.cardType === 'Creature/Token'); }
+const _ttTokenListe = { n: -1, liste: [] };
+function ttTokenKarten() {
+  const by = window.CARDS_BY_NAME || {};
+  const namen = Object.keys(by);
+  if (_ttTokenListe.n !== namen.length) { _ttTokenListe.liste = namen.map(k => by[k]).filter(ttIstToken); _ttTokenListe.n = namen.length; }
+  return _ttTokenListe.liste;
+}
+/** Die Token-Karten, die der Effekttext von `card` nennt, in der Reihenfolge ihres ersten Auftretens; Tokens selbst: keine. */
+function ttRelatedTokens(card) {
+  const text = String((card && card.effect) || '');
+  if (!text || ttIstToken(card)) return [];
+  const treffer = [];
+  for (const t of ttTokenKarten()) {
+    if (t.name === card.name) continue;
+    const m = new RegExp('\\b' + t.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 's?\\b').exec(text);
+    if (m) treffer.push([m.index, t]);
+  }
+  return treffer.sort((x, y) => x[0] - y[0]).map(x => x[1]);
+}
+/** Ein Token: Name, Bild, (Werte,) Effekt. */
+function TTTokenBox({ token }) {
+  const color = tooltipTypeColor(token.cardType);
+  const url = cardImageUrl(token.name);
+  return (
+    <TTBox color={color} className="tt-token">
+      <div className="tt-token-kopf">
+        <span className="tt-token-marke">Token</span>
+        <span className="tt-token-name" style={{ color }}>{token.name}</span>
+      </div>
+      {url && <img className="tt-token-bild" src={url} alt="" />}
+      <TTStats hp={token.hp} atk={token.atk} cost={null} />
+      <TTText text={token.effect} />
+    </TTBox>
+  );
+}
+/** Rubrik am Ende des Tooltips: je genanntem Token ein Kasten; ohne Token nichts. */
+function TTTokenSektion({ card }) {
+  const tokens = ttRelatedTokens(card);
+  if (!tokens.length) return null;
+  return <>{tokens.map(t => <TTTokenBox key={t.name} token={t} />)}</>;
+}
+window.TTTokenSektion = TTTokenSektion;
+
 /**
  * Regeltext als Absaetze. Wie im Kartenrenderer ist ein Zeilenumbruch hinter einem Leerzeichen nur ein weicher Umbruch der
  * Vorlage (wird zum Leerzeichen), alle anderen Umbrueche sind echte Absaetze. „1) … 2) … 3) …“ (Faehigkeitsstufen) bekommen
@@ -8657,6 +8709,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
             </TTCallout>
           )}
           {children}
+          {/* Genannte Tokens (Bild + Effekt) ganz unten — in jedem Menue und Modus (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
         </div>
       </div>
     </>
