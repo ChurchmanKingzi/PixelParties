@@ -123,10 +123,10 @@ module.exports = {
       // Recursion guard
       if (gs._intrudeResolving) return;
 
-      // Host hero must be alive and functional
+      // Host hero must be alive
       const hero = ctx.attachedHero;
       if (!hero?.name || hero.hp <= 0) return;
-      if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
+      // ★ W25b (N2-06, Al): kein Ruhen bei Frost/Betäubung/Negation des Trägers — Spell-Anhängsel bleiben aktiv (Anhänge sind eigene Karten).
 
       const drawCount = ctx.amount;
       if (drawCount <= 0) return;

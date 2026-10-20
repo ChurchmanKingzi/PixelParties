@@ -210,10 +210,11 @@ module.exports = {
       // Only fires when the opponent is the active player (their turn start).
       if (gs.activePlayer !== oppIdx) return;
 
-      // Host must still be alive + functional (frozen/stunned/negated kill the trigger).
+      // Host must still be alive.
+      // ★ W25b (N2-06, Al: „Spell-Anhängsel liegen an gefrorenem/betäubtem/negiertem Träger NICHT still"): die frühere
+      // Prüfung frozen/stunned/negated entfällt — der Sturm tickt auch bei gestatusem Träger (Anhänge sind eigene Karten).
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
-      if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
 
       const oppPs = gs.players[oppIdx];
       if (!oppPs) return;
