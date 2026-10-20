@@ -147,8 +147,12 @@ module.exports = {
         // ★ „treated as the chosen Hero attacking" — die Quelle ist der
         // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
         // der Angriff ihm, samt allem, was daran haengt.
+        // ★ W32a (Al, 22.10.2026): „Alluring Light selbst zählt als Lv-1-Spell. Der von Alluring Light provozierte Angriff zählt NICHT als Spell, sondern als Attack mit dem
+        // Fighting-Level des von Light zum Angriff gezwungenen Heroes." Die Quelle des Treffers ist deshalb der gezwungene HELD (Name = Heldenkarte, Schadenstyp `attack`),
+        // NICHT die Spell-Karte „Alluring Light": Anti Magic Shield / Magic Mirror / Anti Magic (Spell-Leser) sehen keinen Spell, Attack-Reaktionen (Escape, Magic Topaz,
+        // Arrows, Bluff …) sehen den Angriff. Die Karte selbst (die Wahl) bleibt ein Spell der Stufe 1 (Instanz `ctx.card`).
         const attackSource = {
-          name: CARD_NAME,
+          name: angreifer.name,
           owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
           usesHeroAtk: true,
           // W30a (Al, 21.10.2026): „treated as the chosen Hero attacking" → die Quellstufe ist das FIGHTING-LEVEL des gewählten (gegnerischen) Helden,
