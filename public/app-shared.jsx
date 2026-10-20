@@ -2234,6 +2234,11 @@ function playSFXForLog(entry) {
     case 'creature_stolen':
     case 'ability_attached':
     case 'surprise_set':
+    // ★ 20.10. (Als Befund: „Eine Surprise-Creature mit dem eigenen Effekt wieder verdeckt zu setzen, spielt noch keinen Sound
+    // ab"): `surpriseCreatureReset` (Pure Advantage Camel, Afflicted Vermin/Pests, Cactus Creature, Noble Mummy Guards, Mummy
+    // Maker Machine) loggt `surprise_reset`. Die Sand-Animation (`sand_reset`) bleibt bewusst stumm — der Klang kommt wie beim
+    // Setzen aus dem Log.
+    case 'surprise_reset':
     case 'artifact_equipped':
     case 'artifact_creature_placed':
       playSFX('placement');
