@@ -7,11 +7,11 @@
 //
 //  BAUART
 //  ──────
-//  • Ausloeser: `onPlay` mit Selbsttest und Zonenpruefung, dazu
-//    `counters.isPlacement` als Riegel — PLATZIEREN ist keine
-//    BESCHWOERUNG (Muster Knight of Kings). Eine Effektbeschwoerung
-//    (Skullmael's Greatsword, Necromancy) ist dagegen eine und loest
-//    mit aus.
+//  • Ausloeser: `onPlay` mit Selbsttest und Zonenpruefung.
+//    ★ W25c (N3-13, Al): „place triggert On-Summon" - auch das PLATZIEREN
+//    (Drill Sergeant & Co.) und jede Effektbeschwoerung (Skullmael's
+//    Greatsword, Necromancy) loesen den Effekt aus (der fruehere
+//    `isPlacement`-Riegel ist entfallen).
 //
 //  • „half its CURRENT HP (rounded up)": gerechnet wird auf dem
 //    aktuellen Wert des ZIELS, nicht auf dem Maximum —
@@ -50,7 +50,6 @@ module.exports = {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const ziel = await ctx.promptDamageTarget({
         side: 'any',

@@ -6,6 +6,7 @@
 // Beobachtet: Der Drill Sergeant ist NICHT aktivierbar (er liest `cd.level` = 9, `drill-sergeant.js` Z. 54, Kopfkommentar „liest den gedruckten Level der Handkarte");
 //   Slave Trader (`engine.effectiveCardLevel(cd, pi, { handIdx })`) akzeptiert Biseria bei effektiver Stufe 3 als Level-3-Kosten (Gegenprobe), Psychic Scout rechnet ebenso mit `effectiveCardLevel`.
 // Frage an Al: siehe Bericht.
+// ENTSCHIEDEN (Al, Welle 25, „ja“): Der Drill Sergeant liest die Hand-Stufe nach Senkung (wie Slave Trader und Psychic Scout); eine auf Stufe 1 gesenkte Embodiment of Biseria ist platzierbar. Exit 0 = Regel gilt.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();

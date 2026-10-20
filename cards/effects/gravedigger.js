@@ -12,9 +12,9 @@
 //
 //  BAUART
 //  ──────
-//  • TEIL 1 haengt an `onPlay` mit Selbsttest, Zonenpruefung und dem
-//    `isPlacement`-Riegel: PLATZIEREN ist keine BESCHWOERUNG (Muster
-//    Knight of Kings, Wire Hatchling).
+//  • TEIL 1 haengt an `onPlay` mit Selbsttest und Zonenpruefung.
+//    ★ W25c (N3-13, Al): „place triggert On-Summon" - auch das PLATZIEREN
+//    loest Teil 1 aus (der fruehere `isPlacement`-Riegel ist entfallen).
 //
 //  • ★ DER GEGNER WAEHLT („their choice"), also laeuft der Picker bei
 //    IHM — im fremden Zug. Deshalb `beginHumanWait`/`endHumanWait` um
@@ -171,7 +171,6 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const pi = ctx.cardOwner;
       const oi = engine.opponentOf(pi);

@@ -9,9 +9,10 @@
 //
 //  BAUART
 //  ──────
-//  • Ausloeser `onPlay` mit Selbsttest, Zonenpruefung und dem
-//    `isPlacement`-Riegel: PLATZIEREN ist keine BESCHWOERUNG (Muster
-//    Knight of Kings, Wire Hatchling, Gravedigger).
+//  • Ausloeser `onPlay` mit Selbsttest und Zonenpruefung.
+//    ★ W25c (N3-13, Al): „place triggert On-Summon" - auch das PLATZIEREN
+//    (Drill Sergeant & Co.) loest den Effekt aus; der fruehere
+//    `isPlacement`-Riegel ist entfallen (CARD_API „Platzieren triggert On-Summon").
 //
 //  • ★ „FROM OUTSIDE THE GAME" — die Karten kommen aus KEINEM Stapel.
 //    Also auch KEIN Flug: `card_reveal` (beide Spieler sehen, WAS
@@ -50,7 +51,6 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (ctx.playedCard?.id !== ctx.card?.id || ctx.card.zone !== 'support') return;
-      if (ctx.card.counters?.isPlacement) return;        // platziert ≠ beschworen
 
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];

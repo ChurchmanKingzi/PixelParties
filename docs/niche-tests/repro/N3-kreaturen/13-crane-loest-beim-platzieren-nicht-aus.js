@@ -5,7 +5,9 @@
 // Ruling Welle 9 / Q9 (A02-deepsea-10, Al): „‚place' ist eine Unterform von ‚summon' für Trigger und Reaktionen, die auf Beschwörungen reagieren."  Welle 10 / Q47: jede Platzierung zählt als Beschwörung.
 //   Gegenläufig: der Kopfkommentar von scavenging-crane.js („Beschwörung, keine Platzierung", Muster Knight of Kings/Wire Hatchling, Vorgabe 2.10.) – `counters.isPlacement` als Riegel (`scavenging-crane.js` Z. 37).
 // Aufbau: Drill Sergeant platziert (Effekt, „place") Frolake bzw. Crane aus der Hand.
-// Beobachtet: Frolake zieht 2 Karten; Crane tut nichts (kein Ordnen, kein Ziehen).
+// Beobachtet (vor Welle 25): Frolake zieht 2 Karten; Crane tut nichts (kein Ordnen, kein Ziehen).
+// ENTSCHIEDEN (Al, Welle 25: „ja, definitiv! … place triggert On-Summon"): auch beim PLATZIEREN löst „When you summon this Creature, …" aus. Das Repro prüft diese Regel (Exit 0 = Crane zieht
+//   beim Platzieren wie Frolake); die allgemeine Regel samt Platzierer-Liste steht in CARD_API.md („Platzieren triggert On-Summon"), weitere Repros: docs/niche-tests/repro/W25/c-place-triggert-on-summon.js.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();

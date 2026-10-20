@@ -10,6 +10,9 @@
 // Unklar (daher C): Q9 (Welle 9) sagt, „place" sei eine Unterform von „summon" nur für Trigger/Reaktionen; Voraussetzungen, die „summon" sagen, gelten beim Platzieren nicht. Dann dürfte der Sergeant die Karte
 //   wörtlich in die EIGENE Zone legen (Lesart c) – heute verlegt die Karte sich aber bei freiem Gegnerplatz selbst (`onPlay`) und bleibt nur bei vollem Gegnerbrett liegen: inkonsistent in beide Richtungen.
 // Ursache: cards/effects/drill-sergeant.js `eligibleHandCards` (Z. ~56): `isSummonablePileCreature` + Stufe, aber kein `canSummon`/`isCreatureSummonable`; `hind.onPlay`/`golem.onPlay` (`free.length === 0 → return`) verlegen dann nichts.
+// ENTSCHIEDEN (Al, Welle 25, „Korrekt"): Der Drill Sergeant bietet Elusive Hind / Plant Golem bei vollem Gegnerbrett gar nicht erst an (wie Psychic Scout und Slave Trader);
+//   die Karte bleibt auf der Hand, nichts liegt in der eigenen Zone. Bei freiem Gegnerbrett legt er sie wie bisher (Verlegung zum Gegner, Gegenprobe 1).
+// Exit 0 = Karte wird bei vollem Gegnerbrett nicht angeboten und bleibt auf der Hand.
 const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
@@ -41,11 +44,25 @@ const H = require('../../lib/h.js');
       t.put(0, 0, 0, 'Drill Sergeant').turnPlayed = 1;
       t.script.push({ match: d => d.type === 'cardGallery', answer: () => ({ cardName: karte }) });
       t.script.push({ match: d => d.type === 'zonePick', answer: d => ({ heroIdx: d.zones[0].heroIdx, slotIdx: d.zones[0].slotIdx }) });
+      let angeboten = null;
+      t.script.unshift({ match: d => d.type === 'cardGallery' && d.title === 'Drill Sergeant', answer: d => { angeboten = d.cards.map(c => c.name); return { cardName: karte }; } });
       t.gs.activePlayer = 0; t.phase(2); t.resetActions(0);
       await t.activateCreature(0, 0, 0);
       const i = t.find(karte, 'support');
-      R.check(`${karte}: Gegnerbrett voll → liegt NICHT als gewöhnliche Kreatur auf der eigenen Seite`, !i || (i.controller ?? i.owner) === 1, i && { owner: i.owner, controller: i.controller, zone: [i.heroIdx, i.zoneSlot] });
+      R.check(`${karte}: Gegnerbrett voll → wird nicht angeboten`, angeboten === null, angeboten);
+      R.check(`${karte}: Gegnerbrett voll → liegt nirgends auf dem Brett, bleibt auf der Hand`, !i && t.pile(0, 'hand').includes(karte), i && { owner: i.owner, controller: i.controller, zone: [i.heroIdx, i.zoneSlot] });
       R.check(`${karte}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
+    }
+    // Mischfall: neben der Karte liegt eine gewöhnliche Stufe-0-Kreatur auf der Hand – angeboten wird nur diese
+    {
+      const t = await H.fresh({ hand: [[karte, 'Scavenging Crane'], []] });
+      for (let hi = 0; hi < 3; hi++) for (let si = 0; si < 3; si++) t.put(1, hi, si, H.INERT.creature);
+      t.put(0, 0, 0, 'Drill Sergeant').turnPlayed = 1;
+      let angeboten = null;
+      t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Drill Sergeant', answer: d => { angeboten = d.cards.map(c => c.name); return null; } });
+      t.gs.activePlayer = 0; t.phase(2); t.resetActions(0);
+      await t.activateCreature(0, 0, 0);
+      R.check(`${karte}: Mischfall – nur die gewöhnliche Kreatur wird angeboten`, Array.isArray(angeboten) && angeboten.length === 1 && angeboten[0] === 'Scavenging Crane', angeboten);
     }
   }
   R.finish();

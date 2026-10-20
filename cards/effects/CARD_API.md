@@ -2086,6 +2086,42 @@ Skill Test: alle anderen Sitze der Reihe nach.
 Kartentext **jeden** Gegner, gehört `engine.opponentsOf(pi)` hin — im Normalspiel ist das eine
 Liste mit einem Eintrag, im Skill Test alle anderen.
 
+## ★ PLATZIEREN TRIGGERT ON-SUMMON („place" = „summon" für Einsatz-Effekte) (Als Regel Welle 25, 21.10.2026 — MANDATORY)
+
+> Al (N3-13): „ja, definitiv! Das gehört auch als allgemeine Regel in die API: place triggert On-Summon."
+
+**Regel.** Wer eine Kreatur auf das Brett **platziert** („place" – Drill Sergeant, Army of the Cute, Glorious Rebirth, Deepsea-Tausch, Teocuilatl,
+Create Illusion, Staff of Illusions, Layn, Xuanwu, Necromancy, Monster in a Bottle, Barker, die Slimes, Suspicious Monster, Elixir of Immortality …),
+löst damit die **On-Summon-Effekte der platzierten Kreatur** aus („When you summon this Creature, …" – das ist `hooks.onPlay` der Kreatur) –
+genau wie beim Beschwören. Das ist die Fortschreibung der Welle-9/10-Regeln (Q9 „place ist eine Unterform von summon für Trigger und Reaktionen",
+Q47 „… auch für den Zähler `_creaturesSummonedThisTurn`") auf die Einsatz-Effekte der Kreatur selbst.
+
+**Was daraus folgt (Verträge für Skripte und Platzierer):**
+* **Kein `isPlacement`-Riegel um einen On-Summon-Effekt.** Ein `if (ctx.card.counters?.isPlacement) return;` in `hooks.onPlay` ist verboten (entfernt in
+  Scavenging Crane, Wire Hatchling, Barkeeper, Gravedigger, Knight of Kings [W]/[B], Queen of Kings [W]/[B]). Ein Effekt, der **nur** in bestimmten Fällen
+  gilt, sagt das im Kartentext („summoned via an effect", „from your discard pile", „with the effect of X") – dann prüft das Skript genau diese Bedingung
+  (`ctx._summonedBy…`, `_summonedFromDiscard`, `summonEffectActivates`), nie „platziert oder nicht".
+* **Jeder Platzierer feuert `onPlay` der platzierten Kreatur – vor `onCardEnterZone`.** Die zentrale Primitive `engine.actionPlaceCreature` tut das schon
+  (`runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot, _skipReactionCheck: true, _bypassDeadHeroFilter: true,
+  _isPlacement: true, …extras })`, danach `onCardEnterZone`). Wer die Kreatur selbst ins Feld legt (`_trackCard`), muss **beide** Hooks in dieser Reihenfolge feuern
+  (Muster: `staff-of-illusions.js`, `create-illusion.js`, `layn-master-of-deri-s-relic.js`, `cardinal-beast-xuanwu.js`; `onPlay` allein ohne `onCardEnterZone`
+  wäre ebenso falsch, weil Sandy Blob & Co. am Eintritt hängen). Ein Platzierer, der nur `onCardEnterZone` feuert, ist ein Fehler.
+* **Genau einmal.** Die Kreatur trägt ihren On-Summon-Effekt an **einem** Hook (`onPlay`; Sonderfall `beforeSummon` bei Dark Deepsea God/Archer, die ihre Beschwörung
+  umklammern). Kein Skript darf denselben Einsatz-Effekt zusätzlich über `onCardEnterZone` feuern (geprüft: keine der 89 Kreaturen mit On-Summon-Text hat beides).
+  „Once per turn"-Stempel (Festive Werz, Cloudy Slime …) und Sperren (`summonLocked`, Hand-/Such-Sperre) gelten für den Platzier-Weg wie für den Hand-Weg.
+* **Sandy Blob / R4 bleibt:** Der Blob reagiert nur auf einen **wirklich feuernden** On-Summon-Effekt (`summonEffektFizzelt`-Stempel). Mit der Regel feuert beim Platzieren
+  auch der Effekt wirklich – vorher löste der Blob bei einer platzierten Crane/Barkeeper/… aus, obwohl deren Effekt stumm geblieben war.
+* **Stufenanforderung nur, wo der Text „summon" sagt** (unverändert, Q9): Platzieren umgeht Schulen-/Stufen-Voraussetzungen des Helden; der Einsatz-Effekt der platzierten
+  Kreatur läuft trotzdem.
+* **Nicht gemeint (bleibt „kein Platzieren"):** Umsetzen/Übernehmen einer **schon liegenden** Kreatur (Guard Change, Slippery-Karten, Dark Gear, Diplomacy, Capture, `actionTransferCreature`)
+  feuert nur `onCardEnterZone` mit `_isMove: true` (Q119) – der Einsatz-Effekt feuert nicht erneut. Ebenso nicht: die Wiederbelebung nach dem Tod (`_reviveAfterDeath`,
+  Loyal Bone Dog …), `summonFromDiscard({ mode: 'revive' })`, verdeckte Platzierungen (Rha-Bi, Trapping, Surprise-Zone) und Pollution-Token.
+* **Negierte Platzierung bleibt stumm:** Omikrons Illusion (und `actionPlaceCreature({ negateEffects: true })`) wird **vor** dem Eintritt negiert – ihre eigenen Effekte feuern nicht (nur
+  fremde Beobachter über `onCardEnterZone`).
+* **Zähler und Stempel zählen die Platzierung mit** (Knight/Queen of Kings: „Knight diesen Zug beschworen" ist nach einer Platzierung gesetzt).
+
+Repro: `docs/niche-tests/repro/W25/c-place-triggert-on-summon.js`.
+
 ## Quick Start
 
 ```js
@@ -19916,7 +19952,7 @@ Spell (Normal, Lv 3, Magic Arts): „Choose a Hero you control, except the user.
 
 **Local Idol.** Reaktions-Artefakt (Muster Tool Freezer/Key): `reactionCondition` prüft den gegnerischen Trank in der Kette und `potionsUsedThisTurn === 1` (der Zähler steigt erst nach der Auflösung → es ist der ZWEITE); `negateChainLink(…, { stealToHandOf: pi })` legt den negierten Trank in die Hand des Idol-Spielers.
 
-**Scavenging Crane.** `onPlay` (Beschwörung, keine Platzierung): oberste ≤ 5 Karten privat ordnen (je Platz eine Galerie, `engine.reorderDeck`), „you may shuffle" (confirm → `shuffleDeck`), danach `actionDrawCards(pi, 1)`.
+**Scavenging Crane.** `onPlay` (Beschwörung UND Platzierung – seit Welle 25 „place triggert On-Summon", s. u.): oberste ≤ 5 Karten privat ordnen (je Platz eine Galerie, `engine.reorderDeck`), „you may shuffle" (confirm → `shuffleDeck`), danach `actionDrawCards(pi, 1)`.
 
 **Stowaway.** `playOnAnyHeroSide` + Cross-Side-Hinweis (Muster Chilly Wizard, Level: irgendein eigener Held Decay+Summoning ≥ 1). Der Wirt („corresponding Hero" = Held der Zone, Als Ruling 2.10.) bekommt den echten, heilbaren Status `negated` (Muster Decisive Defeat: `attachmentStatus`, `countsAsNegativeStatus`, `anhaengselStatusHooks`; im Puzzle legt der Puzzle-Loader den Status an). Neu: `deleteOnCleanse` am Skript → `engine.anhaengselAbraeumen(inst, source)` löscht (statt abzulegen) beim Heilen; `onHeroKO` löscht beim Tod des Wirts; `unaffectedByOthers` → `counters._cardinalImmune` („unaffected by all other cards and effects"), die eigene Löschung läuft `unaufhaltsam`. Ungültige Zielzone (besiegter Held) → der Passagier verfällt, statt den eigenen Helden zu negieren.
 
@@ -21489,3 +21525,27 @@ Quelle: Bericht `docs/niche-tests/N1-reaktionen-a.md`. Repros: umgestellt `N1-re
 
 ### Ergebnis (W25a)
 Siehe die Abgabe: alle Repros, `check-*.js`, Skilltest-E2E und Dauerfeuer gegenüber dem Ausgangsstand f797c2a.
+## ★ Welle 25 / W25c — Kreaturen & Sonstige: Entscheidungen von Al zu N3-08/13/14/15/16/20 und N5-06 (21.10.2026)
+
+Sieben Stufe-C-Entscheidungen von Al zu den Berichten `N3-kreaturen` und `N5-sonstige` (Repros `docs/niche-tests/repro/N3-kreaturen/` und `N5-sonstige/` auf die entschiedene Regel umgestellt, neu `docs/niche-tests/repro/W25/c-*.js`).
+
+| Befund | Entscheidung (Al) | Umsetzung |
+|---|---|---|
+| N3-08 Drill Sergeant ↔ Elusive Hind / Plant Golem bei vollem Gegnerbrett | „Korrekt" – der Sergeant bietet beide bei vollem Gegnerbrett gar nicht erst an (wie Psychic Scout / Slave Trader). | `drill-sergeant.js` `eligibleHandCards`: Karten mit `playOnOppSideOnly` (Hind, Golem) nur, wenn `engine.isCreatureSummonable(name, pi)` (= ihr `canSummon`: freie Gegnerzone) wahr ist. Nur dieser Teil von `canSummon` gilt beim Platzieren (Q9 bleibt: andere „summon"-Voraussetzungen nicht). |
+| N3-13 „When you summon this Creature, …" beim Platzieren | „ja, definitiv! … place triggert On-Summon" – allgemeine Regel in der API. | Neuer Abschnitt **„Platzieren triggert On-Summon"** (vor „Quick Start"). `isPlacement`-Riegel entfernt in Scavenging Crane, Wire Hatchling, Barkeeper, Gravedigger, Knight of Kings [W]/[B], Queen of Kings [W]/[B]. Die vier Platzierer, die nur `onCardEnterZone` feuerten, feuern jetzt auch `onPlay` der platzierten Kreatur: Create Illusion, Staff of Illusions, Layn (Master of Deri's Relic), Cardinal Beast Xuanwu. |
+| N3-14 Spirit of the Super-Killing Knife | „Deleted" für geopferte Kreaturen (Ist-Zustand); „Creatures werden auch nach Status-Schaden defeated, also auch deleted". | Opfer (Tribut/Kosten) wandern schon über `onCardLeaveZone` des Spirits in den Gelöscht-Stapel (bleibt). **Gefunden und behoben:** der Schadens-Batch (`processCreatureDamageBatch`: Schaden, Brand, Gift) legte besiegte Kreaturen trotz Spirit in die Ablage – `_gefalleneKreaturenGeloescht()` kennt jetzt auch Spirits (Skript-Flag `deletesDefeatedCreaturesWhileOnBoard`, Aura ruht bei Frost/Betäubung/Negation wie bisher). Helden: Tod an Brand/Gift löschte schon (`onHeroKO`). |
+| N3-15 Drill Sergeant: „level 1 or lower … from your hand" | „ja" – Hand-Stufe nach Senkung. | `eligibleHandCards` liest `engine.effectiveCardLevel(cd, pi, { handIdx })`; die Platzierung nimmt genau die geprüfte Kopie (`actionPlaceCreature({ sourceIdx })`, Hand erneut geprüft). |
+| N3-16 Doomed Town Guard / Explosive Drone: Gift-/Brandtod | „nein" – zählt NICHT als „defeated by an opponent's card or effect". | Ist-Zustand bestätigt, kein Code geändert. Repro 16 prüft die Regel (Gift/Brand bieten nichts an, direkter Gegnerschaden schon). |
+| N3-20 Spirit of the Relic Hammer | „nein" – der Spirit gilt nicht selbst als „erste Kreatur"; die erste ANDERE Kreatur danach bekommt Haste. | Ist-Zustand bestätigt, kein Code geändert. Repro 20 prüft das heutige Verhalten. |
+| N5-06 Chuck, Schild | „ja!" – ein durch Anti Magic gegen Zauber immuner Held gilt als „immun gegen diese Quelle". | `chuck-the-crazy-veteran.js` `_isImmuneToSource(hero, type, engine, festesZiel, source, durchschlag)`: zusätzlich `engine._wouldHeroDamageBeVoided(hero, source, type)` (dieselbe Prüfung wie die Engine-Schadenssperre: Zauberstufe ≤ Buff `magic_immune`, `bypassesMagicImmune`; unabwehrbarer Schaden `cannotBeNegated` schlägt durch). Quelle kein Zauber oder Zauberstufe über dem Buff → nicht immun. Burn-/Gift-Schaden: s. Nachtrag unten (Status-Immunität zählt). |
+
+### Verträge
+* **Platzieren triggert On-Summon** – siehe den eigenen Abschnitt weiter oben; Wächter: `docs/niche-tests/repro/W25/c-place-triggert-on-summon.js`. Neue Platzierer feuern `onPlay` (mit `_isPlacement: true`) **und** `onCardEnterZone`; Umsetzen (`_isMove`) feuert nur Letzteres.
+* **Löschende Auren** (`deletesDefeatedCreaturesWhileOnBoard: true` am Kreaturen-Skript): „besiegte Kreaturen werden gelöscht" gilt für BEIDE Todespfade der Engine (`actionDestroyCard` und Schadens-Batch) über `_gefalleneKreaturenGeloescht()`; wirksam nur, solange die Karte offen auf dem Brett liegt und nicht ruht (`isCardPassiveDormant`, `negated`/`nulled`).
+* **`playOnOppSideOnly`-Kreaturen** (Hind, Golem) werden von Platzier-Effekten, die eine Handkarte auswählen lassen, nur bei freier Gegnerzone angeboten (`isCreatureSummonable`).
+* **Handstufe** („level N or lower … from your hand"): immer `effectiveCardLevel(cd, pi, { handIdx })`, nie `cd.level`.
+
+### Nachtrag W25c (Antworten von Al auf die drei Rückfragen)
+* **Bewegung löst nie On-Summon aus; nur „Kreatur in Zone gesetzt"-Beobachter feuern** („Korrekt, Bewegung löst nie On-Summon-Effekte aus, nur On-Creature-in-Zone-gesetzt, etwa Ingo oder Pes'Zet"). Ist-Zustand, per Repro gesichert (`W25/c-umsetzen-ist-kein-platzieren.js`): `actionTransferCreature` (eigenes Umsetzen und Kontrollwechsel), Guard Change und Slippery Skates feuern `onCardEnterZone` mit `_isMove: true` ohne `_onlyCard` – Ingo (+4 Gold) und Pes'zet (Gift) reagieren darauf, der Einsatz-Effekt der bewegten Kreatur (Scavenging Crane) bleibt stumm. Auch die Slippery-Selbstverschiebung (`_slippery-shared`, Slippery Ice) feuert denselben Hook. Randfall nicht angefasst: das Umsetzen einer Mehrzonen-Kreatur beim Wegfall einer Inselzone (`_multizone-shared`, „reseated") feuert keinen Eintritts-Hook.
+* **Of-Kings-Stempel nur für Platzieren/Beschwören:** „Platzieren im Sinne von 'place' ja, im Sinne von 'von einer Zone in die andere bewegen' nicht." Knight of Kings [W]/[B] und Queen of Kings [W]/[B] stempeln in `onPlay`; Bewegungswege feuern kein `onPlay` – weder Stempel noch `_creaturesSummonedThisTurn` ändern sich (Repro prüft 4 Karten × 3 Wege, Gegenprobe: `actionPlaceCreature` setzt die Stempel). Regel für neue Bewegungswege: nur `onCardEnterZone` mit `_isMove: true`, nie `onPlay`.
+* **Chuck, the Crazy Veteran – Status-Immunität zählt für Burn/Gift** („Ja, wenn alle anderen eigenen Heroes immun gegen Burn/Poison-Damage sind, inklusive weil sie etwa via Light Ball geschützt werden, dann wird Chuck dafür anfällig!"): `_isImmuneToSource(hero, type, engine, festesZiel, source, durchschlag, ort)` fragt bei Statustick-Quellen (`STATUS_EFFECTS[k].dealsTickDamage` mit `damageSourceName` = Quellname, also Burn → `burned`, Poison → `poisoned`) zusätzlich `engine.heroBlocksStatusNow(physOwner, heroIdx, status)` – dieselbe Prüfung wie beim Setzen des Status (Light Ball, Immunitäts-Anhängsel wie Petrification Break, Johanna, `negative_status_immune`, `burn_immune`/`poison_immune`, Shielded, Submerged, Charme). „All OTHER Heroes": Light Ball schützt seinen Träger nicht selbst; ein einziger lebender, nicht immuner anderer Held lässt Chucks Schild stehen. Zauberschaden bleibt davon unberührt (Light Ball macht nicht immun gegen Fireball). Repro `W25/c-chuck-status-immunitaet.js` (21 Prüfungen inkl. echtem Burn-/Gift-Tick).

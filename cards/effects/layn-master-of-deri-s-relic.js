@@ -48,10 +48,9 @@
 //  • Manual placement (splice discard → push to
 //    supportZones → `_trackCard` → mark
 //    `turnPlayed` for summoning sickness → fire
-//    `onCardEnterZone`). Does NOT fire `onPlay`
-//    — this is "place from discard", not summon,
-//    matching the old behaviour for revive-style
-//    effects in this game.
+//    `onCardEnterZone`). W25c (N3-13, Al): feuert
+//    AUCH `onPlay` der platzierten Kreatur — „place
+//    triggert On-Summon".
 //
 //  • Engine HOPT for hero effects is auto-stamped
 //    when `onHeroEffect` returns truthy (see
@@ -224,12 +223,14 @@ module.exports = {
       });
       await engine._delay(400);
 
+      // W25c (N3-13, Al: „place triggert On-Summon"): die platzierte Kreatur loest ihre eigenen Einsatz-Effekte aus
+      // (Beagle-Gold, Hell-Fox-Suche ...); der fruehere Vertrag „onPlay wird bewusst NICHT gefeuert" ist aufgehoben.
+      await engine.runHooks('onPlay', {
+        _onlyCard: inst, playedCard: inst, cardName: chosenName, zone: 'support', heroIdx: destHeroIdx, zoneSlot: destSlot,
+        _skipReactionCheck: true, _bypassDeadHeroFilter: true, _isPlacement: true, ...ablageExtras,
+      });
       // Fire enter-zone hooks so passive listeners (Ingo, Maya, Layn's own
-      // aura, archetype-counters, etc.) react to the placement. `onPlay`
-      // is intentionally NOT fired — this is "place from discard", not a
-      // summon, matching the old single-copy version's contract so
-      // on-summon riders (Beagle gold, Hell Fox tutor) don't retrigger
-      // on revived bodies.
+      // aura, archetype-counters, etc.) react to the placement.
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
         _skipReactionCheck: true, ...ablageExtras,

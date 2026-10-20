@@ -214,6 +214,12 @@ module.exports = {
       hero: dps.heroes[destHeroIdx]?.name,
     });
 
+    // W25c (N3-13, Al: „place triggert On-Summon"): die platzierte Kreatur loest ihre eigenen Einsatz-Effekte aus.
+    await engine.runHooks('onPlay', {
+      _onlyCard: inst, playedCard: inst, cardName: chosenName, zone: 'support', heroIdx: destHeroIdx, zoneSlot: destSlot,
+      _skipReactionCheck: true, _bypassDeadHeroFilter: true, _isPlacement: true,
+      ...(_taken_deckIdx ? engine.deckLandung(inst, _taken_deckIdx) : {}),
+    });
     // Fire enter-zone hooks (Ingo, Maya, Layn, etc.). Placement onto
     // any Hero (alive / dead / Frozen / Stunned / negated / Bound) is
     // legal per the universal "place" rule, and the placed Creature's
