@@ -40,9 +40,11 @@ function getValidTargets(gs, pi, engine) {
   // uebernommener Gegnerheld ja; `owner` = Brettseite).
   const targets = engine ? engine.getControlledHeroTargets(pi) : (gs.players[pi].heroes || []).map((hero, hi) => ({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero?.name })).filter(t => t.cardName && gs.players[pi].heroes[t.heroIdx].hp > 0);
   for (const t of targets) {
-    // W31a (Al, 22.10.2026: „temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft"): echte Giftimmunität (W7b) macht ein Ziel weiter ineligible; der bloße
-    // Charme-Schutz eines temporär übernommenen Gegnerhelden nicht (`ohneCharme`) — Ziel bleibt wählbar, der Giftstapel verpufft, die Karte wird gespielt.
-    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi, ohneCharme: true })) t.ineligible = true;
+    // W33a (Al, 22.10.2026, ersetzt die W31a-Ausnahme `ohneCharme`): „Sickly Cheese kann spezifisch NUR aktiviert werden, wenn das Ziel vergiftbar ist, also in beiden Fällen
+    // unspielbar." Ein Ziel, das den Giftstapel (die Kosten) nicht annähme, ist `ineligible`: echte Giftimmunität (W7b) UND der Charme-Schutz eines temporär übernommenen Helden
+    // (`heroBlocksStatusNow` ohne `ohneCharme`). Gilt NUR für diese Karte; Torchure, The Yeeting, Mana Absorbing Crystal, Experimental Potion, Angry Cheese bieten den
+    // temporär übernommenen Helden weiter an (W31a). Ist kein Ziel vergiftbar, ist die Karte unspielbar (`canActivate`).
+    if (engine && engine.heroBlocksStatusNow(t.owner, t.heroIdx, 'poisoned', { appliedBy: pi })) t.ineligible = true;
   }
   return targets;
 }

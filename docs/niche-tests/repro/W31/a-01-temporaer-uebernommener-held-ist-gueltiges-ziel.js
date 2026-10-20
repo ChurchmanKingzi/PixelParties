@@ -2,6 +2,7 @@
 // W31a · Frage 1 aus W28a (Angry Cheese) · Al, 22.10.2026: „Doch, auch temporäre Heroes sind mögliche Ziele, auch wenn der Schaden verpufft. Also korrekt as is."
 // ALLGEMEINE REGEL: ein TEMPORÄR übernommener Gegnerheld (Charme Lv3: „unaffected by other cards and effects") ist ein gültiges Ziel bzw. Kostenziel für Karten mit „Hero/target you control";
 //   dass die Wirkung am Helden verpufft (Schaden/Gift prallt ab), macht ihn NICHT zum ungültigen Ziel. Die Kosten gelten als bezahlt, der Rest der Karte läuft.
+//   ★ W33a (Al, 22.10.2026): AUSNAHME NUR Sickly Cheese – „kann spezifisch NUR aktiviert werden, wenn das Ziel vergiftbar ist": Charme-geschützter Held = ineligible (Abschnitt unten umgestellt).
 //   W28a hatte den Charme-Gegnerhelden bei Torchure, The Yeeting, Mana Absorbing Crystal, Experimental Potion und Sickly Cheese ausgeschlossen („nimmt Gift/Schaden nicht an") – zurückgenommen.
 // AUSNAHME (Ruling W7b/F03-12, Al 14.10.: „Giftimmun macht ein Ziel ineligible"): Sickly Cheese bleibt bei ECHTER Giftimmunität (`negative_status_immune`-Buff, Immunitäts-Anhängsel, Light Ball,
 //   Johanna …) gesperrt (`ineligible`). Der bloße Charme-Schutz zählt dafür NICHT (Entscheidung W31a: die allgemeinere Regel von heute gewinnt; kein Konflikt mit W7b, das echte Immunität meint).
@@ -70,13 +71,15 @@ const deck30 = (spitze) => spitze.concat(Array(30 - spitze.length).fill('Firebal
       R.check(`Experimental Potion / ${z}: sauber`, sauber(t), { e: t.errors, a: t.audit() }); }
 
     R.section(`Sickly Cheese · ${z}`);
+    // W33a (Al, 22.10.2026): Sickly Cheese ist NUR aktivierbar, wenn das Ziel VERGIFTBAR ist – ein Charme-geschützter (temporär übernommener) Held ist KEIN gültiges Ziel
+    // (ineligible, ersetzt die W31a-Ausnahme `ohneCharme`); die dauerhaft Übernommenen sind normal vergiftbar. Detailprüfung: W33/a-01.
     { const t = await aufbau('Sickly Cheese', z, { keinGrant: true, deck: deck30(['Accusation']) });
       t.script.push({ match: d => d.type === 'cardGallery', answer: () => ({ cardName: 'Accusation' }) });
       waehle10(t);
       const r = await t.play(0, 'Sickly Cheese', { hero: 1 });
-      const angeboten = t.targets.some(e => e.valid.some(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0));
-      R.check(`Sickly Cheese / ${z}: der übernommene Gegnerheld 1:0 ist wählbar (nur Charme-Schutz macht ihn NICHT ineligible)`, angeboten, t.targets.map(e => e.valid.map(v => v.id)));
-      R.check(`Sickly Cheese / ${z}: Karte gespielt, Gift ${wirkt ? 'liegt auf 1:0' : 'verpufft'}, die Suche läuft trotzdem (Accusation auf der Hand)`,
+      const angeboten = t.targets.some(e => e.valid.some(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0 && !v.ineligible));
+      R.check(`Sickly Cheese / ${z}: der übernommene Gegnerheld 1:0 ist ${wirkt ? 'wählbar (vergiftbar)' : 'NICHT wählbar (Charme-Schutz = nicht vergiftbar, W33a)'}`, angeboten === wirkt, t.targets.map(e => e.valid.map(v => v.id + (v.ineligible ? '!' : ''))));
+      R.check(`Sickly Cheese / ${z}: Karte gespielt (an einem anderen vergiftbaren Helden), Gift ${wirkt ? 'liegt auf 1:0' : 'liegt NICHT auf 1:0'}, die Suche läuft (Accusation auf der Hand)`,
         r === true && !!t.hero(1, 0).statuses?.poisoned === wirkt && t.pile(0, 'hand').includes('Accusation'), { r, st: Object.keys(t.hero(1, 0).statuses || {}), hand: t.pile(0, 'hand') });
       R.check(`Sickly Cheese / ${z}: sauber`, sauber(t), { e: t.errors, a: t.audit() }); }
 
