@@ -195,6 +195,12 @@ module.exports = {
         hero: ps.heroes[destHeroIdx]?.name,
       });
 
+      // W25c (N3-13, Al: „place triggert On-Summon"): die platzierte Kreatur loest ihre eigenen Einsatz-Effekte aus (wie bei jeder Platzierung).
+      await engine.runHooks('onPlay', {
+        _onlyCard: inst, playedCard: inst, cardName: chosenName, zone: 'support', heroIdx: destHeroIdx, zoneSlot: destSlot,
+        _skipReactionCheck: true, _bypassDeadHeroFilter: true, _isPlacement: true,
+        ...engine.deckLandung(inst, _taken_deckIdx),
+      });
       // Fire enter-zone hooks (Ingo, Maya, Layn, Summoning Circle, etc.)
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,

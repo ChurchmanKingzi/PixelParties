@@ -2086,6 +2086,42 @@ Skill Test: alle anderen Sitze der Reihe nach.
 Kartentext **jeden** Gegner, gehört `engine.opponentsOf(pi)` hin — im Normalspiel ist das eine
 Liste mit einem Eintrag, im Skill Test alle anderen.
 
+## ★ PLATZIEREN TRIGGERT ON-SUMMON („place" = „summon" für Einsatz-Effekte) (Als Regel Welle 25, 21.10.2026 — MANDATORY)
+
+> Al (N3-13): „ja, definitiv! Das gehört auch als allgemeine Regel in die API: place triggert On-Summon."
+
+**Regel.** Wer eine Kreatur auf das Brett **platziert** („place" – Drill Sergeant, Army of the Cute, Glorious Rebirth, Deepsea-Tausch, Teocuilatl,
+Create Illusion, Staff of Illusions, Layn, Xuanwu, Necromancy, Monster in a Bottle, Barker, die Slimes, Suspicious Monster, Elixir of Immortality …),
+löst damit die **On-Summon-Effekte der platzierten Kreatur** aus („When you summon this Creature, …" – das ist `hooks.onPlay` der Kreatur) –
+genau wie beim Beschwören. Das ist die Fortschreibung der Welle-9/10-Regeln (Q9 „place ist eine Unterform von summon für Trigger und Reaktionen",
+Q47 „… auch für den Zähler `_creaturesSummonedThisTurn`") auf die Einsatz-Effekte der Kreatur selbst.
+
+**Was daraus folgt (Verträge für Skripte und Platzierer):**
+* **Kein `isPlacement`-Riegel um einen On-Summon-Effekt.** Ein `if (ctx.card.counters?.isPlacement) return;` in `hooks.onPlay` ist verboten (entfernt in
+  Scavenging Crane, Wire Hatchling, Barkeeper, Gravedigger, Knight of Kings [W]/[B], Queen of Kings [W]/[B]). Ein Effekt, der **nur** in bestimmten Fällen
+  gilt, sagt das im Kartentext („summoned via an effect", „from your discard pile", „with the effect of X") – dann prüft das Skript genau diese Bedingung
+  (`ctx._summonedBy…`, `_summonedFromDiscard`, `summonEffectActivates`), nie „platziert oder nicht".
+* **Jeder Platzierer feuert `onPlay` der platzierten Kreatur – vor `onCardEnterZone`.** Die zentrale Primitive `engine.actionPlaceCreature` tut das schon
+  (`runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot, _skipReactionCheck: true, _bypassDeadHeroFilter: true,
+  _isPlacement: true, …extras })`, danach `onCardEnterZone`). Wer die Kreatur selbst ins Feld legt (`_trackCard`), muss **beide** Hooks in dieser Reihenfolge feuern
+  (Muster: `staff-of-illusions.js`, `create-illusion.js`, `layn-master-of-deri-s-relic.js`, `cardinal-beast-xuanwu.js`; `onPlay` allein ohne `onCardEnterZone`
+  wäre ebenso falsch, weil Sandy Blob & Co. am Eintritt hängen). Ein Platzierer, der nur `onCardEnterZone` feuert, ist ein Fehler.
+* **Genau einmal.** Die Kreatur trägt ihren On-Summon-Effekt an **einem** Hook (`onPlay`; Sonderfall `beforeSummon` bei Dark Deepsea God/Archer, die ihre Beschwörung
+  umklammern). Kein Skript darf denselben Einsatz-Effekt zusätzlich über `onCardEnterZone` feuern (geprüft: keine der 89 Kreaturen mit On-Summon-Text hat beides).
+  „Once per turn"-Stempel (Festive Werz, Cloudy Slime …) und Sperren (`summonLocked`, Hand-/Such-Sperre) gelten für den Platzier-Weg wie für den Hand-Weg.
+* **Sandy Blob / R4 bleibt:** Der Blob reagiert nur auf einen **wirklich feuernden** On-Summon-Effekt (`summonEffektFizzelt`-Stempel). Mit der Regel feuert beim Platzieren
+  auch der Effekt wirklich – vorher löste der Blob bei einer platzierten Crane/Barkeeper/… aus, obwohl deren Effekt stumm geblieben war.
+* **Stufenanforderung nur, wo der Text „summon" sagt** (unverändert, Q9): Platzieren umgeht Schulen-/Stufen-Voraussetzungen des Helden; der Einsatz-Effekt der platzierten
+  Kreatur läuft trotzdem.
+* **Nicht gemeint (bleibt „kein Platzieren"):** Umsetzen/Übernehmen einer **schon liegenden** Kreatur (Guard Change, Slippery-Karten, Dark Gear, Diplomacy, Capture, `actionTransferCreature`)
+  feuert nur `onCardEnterZone` mit `_isMove: true` (Q119) – der Einsatz-Effekt feuert nicht erneut. Ebenso nicht: die Wiederbelebung nach dem Tod (`_reviveAfterDeath`,
+  Loyal Bone Dog …), `summonFromDiscard({ mode: 'revive' })`, verdeckte Platzierungen (Rha-Bi, Trapping, Surprise-Zone) und Pollution-Token.
+* **Negierte Platzierung bleibt stumm:** Omikrons Illusion (und `actionPlaceCreature({ negateEffects: true })`) wird **vor** dem Eintritt negiert – ihre eigenen Effekte feuern nicht (nur
+  fremde Beobachter über `onCardEnterZone`).
+* **Zähler und Stempel zählen die Platzierung mit** (Knight/Queen of Kings: „Knight diesen Zug beschworen" ist nach einer Platzierung gesetzt).
+
+Repro: `docs/niche-tests/repro/W25/c-place-triggert-on-summon.js`.
+
 ## Quick Start
 
 ```js
@@ -19916,7 +19952,7 @@ Spell (Normal, Lv 3, Magic Arts): „Choose a Hero you control, except the user.
 
 **Local Idol.** Reaktions-Artefakt (Muster Tool Freezer/Key): `reactionCondition` prüft den gegnerischen Trank in der Kette und `potionsUsedThisTurn === 1` (der Zähler steigt erst nach der Auflösung → es ist der ZWEITE); `negateChainLink(…, { stealToHandOf: pi })` legt den negierten Trank in die Hand des Idol-Spielers.
 
-**Scavenging Crane.** `onPlay` (Beschwörung, keine Platzierung): oberste ≤ 5 Karten privat ordnen (je Platz eine Galerie, `engine.reorderDeck`), „you may shuffle" (confirm → `shuffleDeck`), danach `actionDrawCards(pi, 1)`.
+**Scavenging Crane.** `onPlay` (Beschwörung UND Platzierung – seit Welle 25 „place triggert On-Summon", s. u.): oberste ≤ 5 Karten privat ordnen (je Platz eine Galerie, `engine.reorderDeck`), „you may shuffle" (confirm → `shuffleDeck`), danach `actionDrawCards(pi, 1)`.
 
 **Stowaway.** `playOnAnyHeroSide` + Cross-Side-Hinweis (Muster Chilly Wizard, Level: irgendein eigener Held Decay+Summoning ≥ 1). Der Wirt („corresponding Hero" = Held der Zone, Als Ruling 2.10.) bekommt den echten, heilbaren Status `negated` (Muster Decisive Defeat: `attachmentStatus`, `countsAsNegativeStatus`, `anhaengselStatusHooks`; im Puzzle legt der Puzzle-Loader den Status an). Neu: `deleteOnCleanse` am Skript → `engine.anhaengselAbraeumen(inst, source)` löscht (statt abzulegen) beim Heilen; `onHeroKO` löscht beim Tod des Wirts; `unaffectedByOthers` → `counters._cardinalImmune` („unaffected by all other cards and effects"), die eigene Löschung läuft `unaufhaltsam`. Ungültige Zielzone (besiegter Held) → der Passagier verfällt, statt den eigenen Helden zu negieren.
 
