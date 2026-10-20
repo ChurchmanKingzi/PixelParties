@@ -53,9 +53,15 @@ module.exports = {
       const target = selected[0];
 
       if (target.type === 'hero') {
+        // W24d (N4-15): „until your next turn". Der Heldenstatus 'negated' faellt sonst am Zugende des Spielers,
+        // in dessen Spalte der Held steht – ein EIGENER Held waere also schon am Ende des laufenden Zuges frei.
+        // Dann: befristet bis zum Beginn des naechsten eigenen Zuges (`expiresAtTurn`, wie Locke) und vom
+        // Zugende-Abbau ausgenommen (`permanent`). Gegnerische Helden enden wie bisher an SEINEM Zugende.
+        const eigeneSpalte = target.owner === ctx.cardOwner;
         await engine.addHeroStatus(target.owner, target.heroIdx, 'negated', {
           appliedBy: ctx.cardOwner,
           animationType: 'electric_strike',
+          ...(eigeneSpalte ? { permanent: true, expiresAtTurn: engine.gs.turn + 2, expiresForPlayer: ctx.cardOwner } : {}),
         });
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
