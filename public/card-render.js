@@ -81,16 +81,18 @@
   // Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint: fett und farbig — aber NUR im Effekttext
   // (`drawBlock`), nie in Namen. Auch Kartennamen im Text bleiben unberuehrt: sie stehen in Anfuehrungszeichen („Poison Vial“,
   // „Rafflesia, the Poison Princess“, „Terror“), und alles zwischen Anfuehrungszeichen wird nicht gefaerbt.
-  // `hell` steht auf den dunklen Textboxen (fast alle Karten), `dunkel` auf den hellen (Artifacts, Tokens). Die Tooltips des Spiels
-  // lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`), damit Karte und Tooltip nie auseinanderlaufen.
+  // `hell` steht auf dunklen und mittleren Textboxen (mit dunkler Kontur), `dunkel` auf hellen (Artifacts, Tokens, … — ohne Kontur, nur so
+  // weit abgedunkelt, wie der Kontrast zum Untergrund es verlangt). Welcher Ton gilt, entscheidet `statusDarstellung` je Textbox anhand
+  // ihrer tatsaechlichen Farbe (`boxHintergrund`), nicht nach Kartentyp: so liest sich jedes Wort auf jedem Rahmen. `fest` (Blind, weiss)
+  // behaelt seinen Ton immer. Die Tooltips des Spiels lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`).
   const STATUS_TERMS = [
-    { key: 'poison', label: 'Poison', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
-    { key: 'burn',   label: 'Burn',   re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
-    { key: 'stun',   label: 'Stun',   re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
     { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
-    { key: 'bleed',  label: 'Bleed',  re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
-    { key: 'freeze', label: 'Freeze', re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
-    { key: 'blind',  label: 'Blind',  re: 'blind(?:s|ed)?',             hell: '#7be8ab', dunkel: '#1f8f55' },
+    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
   ];
   const STATUS_IDX = Object.create(null);
   STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
@@ -108,11 +110,50 @@
     while ((m = STATUS_RE.exec(t))) {
       const a = m.index, b = a + m[0].length;
       if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
+      // „… cannot be negated“ nennt einen Schutz, keinen Status: nicht hervorheben (Als Vorgabe 20.10.)
+      if (/\b(?:cannot|can't|can not) be\s+$/i.test(t.slice(Math.max(0, a - 16), a)) && /^negat/i.test(m[0])) continue;
       let k = 1;
       while (k < m.length && m[k] === undefined) k++;
       out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
     }
     return out;
+  }
+  // Kontrast nach WCAG (Verhaeltnis der relativen Leuchtdichten), fuer die Wahl des Tons je Untergrund
+  const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const linC = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const leucht = c => 0.2126 * linC(c[0]) + 0.7152 * linC(c[1]) + 0.0722 * linC(c[2]);
+  const kontrast = (a, b) => { const x = leucht(a), y = leucht(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const STATUS_MIN_CONTRAST = 4.5, STATUS_MAX_DARKEN = 0.6;      // so weit darf ein dunkler Ton abgedunkelt werden, bevor die helle Fassung gilt
+  const STATUS_DISTINCT = 2.2, STATUS_EDGE = 3;                  // Mindestabstand des hellen Tons zum Untergrund; Mindestkontrast der Kontur zum Untergrund
+  const OUT_DARK = 'rgb(8,6,12)', OUT_LIGHT = 'rgb(255,248,232)', OUT_DARK_RGB = [8, 6, 12], OUT_LIGHT_RGB = [255, 248, 232];
+  /** Mittlere Farbe der Textbox, BEVOR Text darauf kommt (Fuellung des Rahmens); null, wenn nicht lesbar (Textmaske, kein Rahmen). */
+  function boxHintergrund(ctx, o) {
+    if (TEXT_MASK) return null;
+    try {
+      const x = Math.round(o.left + o.width * 0.1), y = Math.round(o.top + o.height * 0.1);
+      const w = Math.max(1, Math.round(o.width * 0.8)), h = Math.max(1, Math.round(o.height * 0.8));
+      const d = ctx.getImageData(x, y, w, h).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4 * 5) { if (d[i + 3] < 200) continue; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      return n > 40 ? [r / n, g / n, b / n] : null;
+    } catch (e) { return null; }
+  }
+  /** Darstellung eines Begriffs auf diesem Untergrund: { color, outline: null | OUT_DARK | OUT_LIGHT }. Der Reihe nach:
+   *   1. heller Untergrund (Artifacts): der tiefe Ton, bei Bedarf abgedunkelt, ohne Kontur;
+   *   2. der helle Ton mit dunkler Kontur, wenn er sich vom Untergrund abhebt (der Normalfall auf dunklen und mittleren Boxen);
+   *   3. gleicher Farbton wie der Untergrund (Bleed auf Rot, Poison auf Lila, Negate auf Grau): der tiefe Ton mit heller Kontur;
+   *   4. Rueckfall: der helle Ton mit dunkler Kontur.
+   *  `fest` (Blind, weiss) behaelt Ton und dunkle Kontur immer. `light`: Rueckfall ohne Messung. */
+  function statusDarstellung(term, bg, light) {
+    if (term.fest) return { color: term.hell, outline: OUT_DARK };
+    if (!bg) return light ? { color: term.dunkel, outline: null } : { color: term.hell, outline: OUT_DARK };
+    const dunkel = hexRgb(term.dunkel);
+    const abgedunkelt = (von, bis) => { for (let f = von; f >= bis - 1e-9; f -= 0.05) { const c = dunkel.map(v => Math.round(v * f)); if (kontrast(c, bg) >= STATUS_MIN_CONTRAST) return c; } return null; };
+    const tief = abgedunkelt(1, STATUS_MAX_DARKEN);
+    if (tief) return { color: 'rgb(' + tief.join(',') + ')', outline: null };
+    if (kontrast(hexRgb(term.hell), bg) >= STATUS_DISTINCT) return { color: term.hell, outline: OUT_DARK };
+    if (kontrast(OUT_LIGHT_RGB, bg) >= STATUS_EDGE && kontrast(dunkel, OUT_LIGHT_RGB) >= STATUS_MIN_CONTRAST - 1) return { color: term.dunkel, outline: OUT_LIGHT };
+    return { color: term.hell, outline: OUT_DARK };
   }
   /** Stil je Zeichen eines Absatzes (Index in STATUS_TERMS + 1, sonst 0); null ohne Treffer. */
   function statusStyles(p) {
@@ -341,6 +382,10 @@
     let top = o.top + (o.padT || 0);
     if (o.vAlign === 'middle') top += (innerH - total) / 2;
     ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
+    // Statusbegriffe: Darstellung je Begriff nach der echten Farbe dieser Textbox (vor dem ersten Buchstaben gemessen)
+    const bgBox = lines.some(l => l.words.some(w => w.st)) ? boxHintergrund(ctx, o) : null;
+    const darst = STATUS_TERMS.map(t => statusDarstellung(t, bgBox, o.light));
+    root.CardRender.last.bg = bgBox; root.CardRender.last.darst = darst;
     const k = em / UPM;
     const base = em * ASC / UPM;
     const x0 = o.left + (o.padL || 0);
@@ -361,15 +406,16 @@
           if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt);
           else if (sty) {
             // Statusbegriff: dunkle Kontur, dann Farbe der Tabelle (in der Textmaske bleibt es weiss), fett = zweimal, leicht versetzt
-            if (OPT.statusOutline && !TEXT_MASK) {
-              const d = OPT.statusOutline * 200 * k, dark = OVER_OUTLINE;
-              ctx.fillStyle = dark;
+            const dd = darst[sty - 1];
+            if (OPT.statusOutline && dd.outline && !TEXT_MASK) {
+              const d = OPT.statusOutline * 200 * k;
+              ctx.fillStyle = dd.outline;
               for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) {
                 putGlyph(ctx, ch, x + OPT.dx + ox, y + oy, k, 1);
                 if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k + ox, y + oy, k, 1);
               }
             }
-            if (!TEXT_MASK) ctx.fillStyle = o.light ? STATUS_TERMS[sty - 1].dunkel : STATUS_TERMS[sty - 1].hell;
+            if (!TEXT_MASK) ctx.fillStyle = dd.color;
             putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
             if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k, y, k, 1);
             if (!TEXT_MASK) ctx.fillStyle = o.color;
@@ -1303,5 +1349,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

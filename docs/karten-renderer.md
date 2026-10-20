@@ -43,19 +43,28 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
   Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
 * **Statusbegriffe im Effekttext:** Poison (lila), Burn (orange), Stun (gelb), Negate (grau), Bleed (rot), Freeze/Frozen (eisblau)
-  und Blind (mint) stehen im Effekt- und Fähigkeitentext **kräftig und farbig** — auf der Karte und im Tooltip. **Nur im Effekttext,
+  und Blind (weiß) stehen im Effekt- und Fähigkeitentext **kräftig und farbig** — auf der Karte und im Tooltip. **Nur im Effekttext,
   niemals in Namen:** Kartenname, Namenszeilen und Werte sind unberührt, und auch Kartennamen IM Text bleiben normal, weil sie in
   Anführungszeichen stehen („Poison Vial", „Rafflesia, the Poison Princess", „Terror"); „negative" oder „Burnbringer" sind keine
-  Treffer. Tabelle und Erkennung: `STATUS_TERMS` / `statusMatches` in `card-render.js` (Formen wie Poisoned, Burns, Negating; je Begriff
-  `hell` für die dunklen Textboxen und `dunkel` für die hellen der Artifacts und Tokens); der Tooltip liest sie von dort. Neuer
-  Begriff: dort eintragen **und** einen Remindertext in `TT_STATUS_REMINDER` (`app-shared.jsx`) schreiben — `scripts/check-status-terms.js`
-  besteht darauf. *Fett im Bild:* Pixel Intv hat 2 Pixel dicke Stämme und überall 1 Pixel breite Lücken, jedes Verbreitern um ein
-  ganzes Schrift-Pixel schließt sie („Frozen" wird zu „Froze■"). Darum: Zeichen doppelt, nur `OPT.boldU` (50 = ein Viertel
-  Schrift-Pixel) versetzt und um dasselbe weiter vorgeschoben, dazu eine dunkle Kontur von `OPT.statusOutline` (0,5 Schrift-Pixel,
-  8 Richtungen). In der Textmaske des Foil-Glanzes (`TEXT_MASK`) bleibt es weiß. Auswirkung auf die Textgröße: von 295 Karten mit
-  Statusbegriff ändert sich bei 16 minimal Größe oder Umbruch, nichts läuft über.
-  **Tooltip:** `ttQuoted` setzt die Begriffe fett in der Farbe; darunter steht in `TTStatusReminders` die Rubrik „Status Effects" mit
-  einem Remindertext je erwähntem Status (Reihenfolge des ersten Auftretens).
+  Treffer. **„… cannot be negated" (auch „can't be …") ist ein Schutz, kein Status und wird nicht hervorgehoben** (und löst keinen
+  Reminder aus); „Negate that Spell" und „cannot be Frozen" bleiben Treffer. Tabelle und Erkennung: `STATUS_TERMS` / `statusMatches`
+  in `card-render.js` (Formen wie Poisoned, Burns, Negating); der Tooltip liest sie von dort.
+  * **Lesbar auf jedem Rahmen:** Der Ton wird je Textbox nach ihrer *echten* Farbe gewählt (`boxHintergrund` misst den Mittelwert, bevor Text
+    daraufkommt; `statusDarstellung` entscheidet), nicht nach Kartentyp: (1) heller Untergrund (Artifacts): der tiefe Ton `dunkel`, nur so weit
+    abgedunkelt, dass der Kontrast ≥ 4,5 ist, ohne Kontur — so steht Stunned als dunkles Amber auf dem gelben Artifact; (2) sonst der helle Ton
+    `hell` mit dunkler Kontur, wenn er sich vom Untergrund abhebt (Kontrast ≥ 2,2); (3) gleicher Farbton wie der Untergrund (Bleed auf Rot, Poison auf
+    Lila, Negate auf Grau): der tiefe Ton mit heller Kontur. `fest` (Blind, weiß) behält Ton und dunkle Kontur immer. Gemessene Textbox-Farben
+    (alle 1421 Karten): Artifact-Creme, Lila der Helden, Braun der Potions, Blau der Fähigkeiten, Rot der Spells/Creatures, Grau der Tokens.
+  * *Fett im Bild:* Pixel Intv hat 2 Pixel dicke Stämme und überall 1 Pixel breite Lücken, jedes Verbreitern um ein ganzes Schrift-Pixel schließt
+    sie („Frozen" wird zu „Froze■"). Darum: Zeichen doppelt, nur `OPT.boldU` (50 = ein Viertel Schrift-Pixel) versetzt und um dasselbe weiter
+    vorgeschoben, dazu eine Kontur von `OPT.statusOutline` (0,5 Schrift-Pixel, 8 Richtungen). In der Textmaske des Foil-Glanzes (`TEXT_MASK`)
+    bleibt es weiß. Auswirkung auf die Textgröße: von 281 Karten mit Statusbegriff ändert sich bei 13 minimal Größe oder Umbruch, nichts läuft über.
+  * **Tooltip:** `ttQuoted` setzt die Begriffe fett in der Farbe; darunter steht in `TTStatusReminders` die Rubrik „Status Effects" mit einem
+    Remindertext je erwähntem Status (Reihenfolge des ersten Auftretens). **Die Reminder sind die Definitionen aus den Regeln des Spiels**
+    (`RulesScreen`, „Status Effects" in `app-screens.jsx`) Wort für Wort — Stunned, Frozen, Blinded, Poisoned, Burned, Bleeding —, bei Stun/Freeze/
+    Blind kommt der Immunitäts-Hinweis aus den Regeln dazu. Negate hat dort keinen eigenen Eintrag (Text nur im Tooltip). Neuer Begriff: in
+    `STATUS_TERMS` eintragen **und** einen Remindertext in `TT_STATUS_REMINDER` (`app-shared.jsx`) schreiben; `scripts/check-status-terms.js`
+    besteht darauf, hält die Reminder gleich den Regeln und prüft den Kontrast auf allen sechs Rahmenfarben.
 * **Werte der Helden (HP / ATK):** Die Zahlen stehen exakt mittig in ihren Rahmenfeldern — HP-Feld x 180–380,
   ATK-Feld x 470–670 (Kartenraster 750 × 1050, Rahmen `hero` / `fullartHero` / `superhero`), unabhängig von der
   Stellenzahl. `drawLine(…, { ink: true })` zentriert dafür die sichtbare Tinte statt des Vorschubs (die Schrift
