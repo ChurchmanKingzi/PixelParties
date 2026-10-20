@@ -20079,6 +20079,19 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W27a (Al, 21.10.2026): „Attachments liegen bei Frozen/Stunned nicht still." Ist diese Support-Zonen-Karte ein SPELL-/ATTACK-ANHÄNGSEL
+   * (Untertyp Attachment: Prophecy of Tempeste, Prayer, Curse …)? Anhänge sind eigene Karten — ihre Effekte laufen bei Frost, Betäubung und
+   * Negierung des Trägers weiter (sie stehen deshalb auch nicht in `isCardPassiveDormant`). Gelesen vom Klick-Tor der Support-Karten
+   * (`getActivatableEquips` / Server `doActivateEquipEffect`), das sonst jede Support-Karte bei gefrorenem/betäubtem Träger sperrt.
+   */
+  _istSpellAnhaengsel(inst) {
+    if (!inst) return false;
+    const cd = this.getEffectiveCardData?.(inst) || this._getCardDB()[inst.name];
+    return !!cd && String(cd.subtype || '').toLowerCase() === 'attachment'
+      && (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack'));
+  }
+
+  /**
    * ★ W8 (Entscheidung Al, Welle 8, 14.10.2026): „Sofern ein Effekt/eine Beschränkung nicht explizit nicht negiert/abgestellt
    * werden kann, ja - dann ist er während Freeze/Stun/Negation deaktiviert." Erweitert die W7a-Regel auf Beschränkungen,
    * Pflichten, Selbstlöschungen und geteilte Pools: Heldenskript-Verträge, die die Engine DIREKT liest (`canPlayCard`,
@@ -45376,7 +45389,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `bypassHostStatusFilter: true` (Crimson Web's "discard 1 to
         // untangle" — the locked Hero IS Webbed by this very card and
         // must still be able to fire the untangle action through it).
-        if (heroParalysed && !script.bypassHostStatusFilter) continue;
+        // W27a (Al, 21.10.2026): Spell-Anhängsel liegen bei Frozen/Stunned nicht still (Prayer) — nur Webbed sperrt weiter.
+        if (heroParalysed && !script.bypassHostStatusFilter
+            && !(this._istSpellAnhaengsel(inst) && !hero.statuses?.webbed)) continue;
 
         // Soft HOPT per equip instance
         const hoptKey = `equip-effect:${inst.id}`;

@@ -1,7 +1,8 @@
 'use strict';
-// W8/05 · Welle 8 (Al, 14.10.2026, Frage 2 aus Welle 7): „Nein, die Umleitung soll bei Freeze/Stun NICHT weiterlaufen."
-// Prophecy of Tempeste: die Umleitung („you may redirect") ruht bei Frost/Betäubung/Negation des Wirts - Held- UND Kreaturenschaden;
-// nur der 100-Deckel (statische Regel, W7a) gilt weiter. Kontrolle: ohne Status wird umgeleitet (Rückfrage, Wirt nimmt ≤ 100).
+// W8/05 · Welle 8 (Al, 14.10.2026, Frage 2 aus Welle 7) hatte entschieden: „Die Umleitung soll bei Freeze/Stun NICHT weiterlaufen."
+// ★ ÜBERHOLT / ZURÜCKGENOMMEN in Welle 27 (W27a, Al, 21.10.2026): „Nein, nimm das Ruling zurück. Das neue allgemeine Ruling lautet
+// 'Attachments liegen bei Frozen/Stunned nicht still'." Dieses Repro prüft jetzt die NEUE Regel: Prophecy of Tempeste leitet bei Frost/
+// Betäubung/Negation des Wirts GENAUSO um wie ohne Status (Held- UND Kreaturenschaden, Rückfrage, Wirt nimmt ≤ 100); der 100-Deckel gilt immer.
 // Aufruf: node docs/niche-tests/repro/W8/05-prophecy-of-tempeste-umleitung-ruht.js   (Exit 1 = Fehler tritt auf)
 const H = require('../../lib/h.js');
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -30,9 +31,10 @@ async function szene(set) {
       await wait(900);
       const umgeleitet = t.hp(0, 1) === 800 && t.hp(0, 0) === 740;
       const direkt = t.hp(0, 1) === 740 && t.hp(0, 0) === 800;
-      R.check(`Prophecy (${name || 'ohne Status'}), Held: ${name ? 'KEINE Umleitung - der Held trifft es selbst' : 'Schaden wird auf den Wirt umgeleitet'}`,
-        name ? direkt : umgeleitet, { held1: t.hp(0, 1), wirt: t.hp(0, 0) });
-      R.check(`Prophecy (${name || 'ohne Status'}), Held: ${name ? 'keine Rückfrage' : 'Rückfrage erschien'}`, name ? t.prompts.length === 0 : t.prompts.length >= 1, t.prompts.length);
+      void direkt;
+      R.check(`Prophecy (${name || 'ohne Status'}), Held: Schaden wird auf den Wirt umgeleitet (W27a: Anhänge liegen nicht still)`,
+        umgeleitet, { held1: t.hp(0, 1), wirt: t.hp(0, 0) });
+      R.check(`Prophecy (${name || 'ohne Status'}), Held: Rückfrage erschien`, t.prompts.length >= 1, t.prompts.length);
       R.check(`Prophecy (${name || 'ohne Status'}), Held: keine Engine-Fehler`, t.errors.length === 0, t.errors);
     }
     // (b) Schaden an eine eigene KREATUR
@@ -43,8 +45,9 @@ async function szene(set) {
       await wait(900);
       const umgeleitet = t.hp(0, 0) === 740 && (c.counters.currentHp ?? 200) === 200;
       const direkt = t.hp(0, 0) === 800 && (c.counters.currentHp ?? 200) === 140;
-      R.check(`Prophecy (${name || 'ohne Status'}), Kreatur: ${name ? 'KEINE Umleitung' : 'Schaden wird auf den Wirt umgeleitet'}`,
-        name ? direkt : umgeleitet, { wirt: t.hp(0, 0), kreatur: c.counters.currentHp });
+      void direkt;
+      R.check(`Prophecy (${name || 'ohne Status'}), Kreatur: Schaden wird auf den Wirt umgeleitet (W27a)`,
+        umgeleitet, { wirt: t.hp(0, 0), kreatur: c.counters.currentHp });
       R.check(`Prophecy (${name || 'ohne Status'}), Kreatur: keine Engine-Fehler`, t.errors.length === 0, t.errors);
     }
     // (c) der Deckel gegen den Wirt gilt immer (W7a)

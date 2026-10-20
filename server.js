@@ -11262,9 +11262,14 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot, heroOwner: h
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   // W16e (F01-22): als Ability zaehlende Ausruestung (Cloak of Edge) — The Thing in the Ship sperrt ihren aktiven Effekt auch auf dem Socket-Weg.
   if (script.countsAsAbilityInZone && room.engine.abilityActivationBlocked()) return false;
+  // W27a (Al, 21.10.2026): Spell-Anhängsel (Prayer) liegen bei Frozen/Stunned nicht still — nur Webbed sperrt weiter.
   if (!script.bypassHostStatusFilter) {
-    if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
-    if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+    const _anhaengsel = room.engine._istSpellAnhaengsel(inst);
+    if (hero.statuses?.webbed) return false;
+    if (!_anhaengsel) {
+      if (hero.statuses?.stunned) return false;
+      if (hero.statuses?.frozen && !room.engine._isChillyDogActiveFor(pi)) return false;
+    }
   }
 
   const hoptKey = `equip-effect:${inst.id}`;
