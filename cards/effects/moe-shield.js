@@ -84,7 +84,8 @@ module.exports = {
     const cd = (sourceCard && engine.getEffectiveCardData
       ? engine.getEffectiveCardData(sourceCard)
       : null) || (sourceCard?.name ? engine._getCardDB()[sourceCard.name] : null);
-    if (!cd || !hasCardType(cd, 'Spell')) return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 2: „MOE Shield ja"): auch ein Effekt, der als Spell ZÄHLT (Alice), ist „a Spell that would affect …" (`engine._zaehltAlsArt`).
+    if (!(cd && hasCardType(cd, 'Spell')) && engine._zaehltAlsArt(sourceCard) !== 'spell') return false;
 
     // „would affect 1 or more targets YOU control" — W33a: zaehlt die
     // KONTROLLE (`zielSeite`), nicht die Brettseite.

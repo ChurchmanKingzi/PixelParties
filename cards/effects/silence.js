@@ -2,6 +2,13 @@
 //  CARD EFFECT: "Silence"
 //  Spell (Reaction) — Decay Magic Lv2
 //
+//  ★ W34a (Al, 22.10.2026): reagiert auch auf Effekte, die als Spell ZÄHLEN
+//  (Alice, the Puppeteer Girl: virtuelle Spell-Kette `alsSpellKette`) —
+//  negiert den Effekt, sperrt Spells für den Rest des Zuges und gewährt den
+//  einen Bonus-Spell wie beim echten Spell. Kartentext: „… plays a Spell."
+//  (das Relikt „that is not a Creature" ist gestrichen — Creatures sind
+//  keine Spells, die Unterscheidung läuft über `cardType`).
+//
 //  When the opponent plays a Spell, negate it.
 //  The opponent may immediately play ONE more
 //  Spell as an additional Action (doesn't cost

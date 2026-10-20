@@ -74,7 +74,9 @@ module.exports = {
     if (!sourceCard) return false;
     const cd = cardDB[sourceCard];
     if (!cd) return false;
-    if (!hasCardType(cd, 'Spell')) return false;
+    // ★ W34a (Al, 22.10.2026, Punkt 2: „Magic Mirror funktioniert"): auch ein Effekt, der als Spell ZÄHLT (Alice), ist „a Spell" — er wird negiert. Eine Kopie gibt es nur für
+    // eine echte Spell-KARTE (`script.hooks.onPlay` fehlt am Heldenskript); die Pollution Tokens zählen die Stufe der Quelle (Alice: ihr Destruction-Magic-Level).
+    if (!hasCardType(cd, 'Spell') && engine._zaehltAlsArt(sourceInfo) !== 'spell') return false;
     // Welle 9: die Kopie eines „once per game"-Zaubers braucht das EIGENE Limit des Spiegel-Besitzers frei.
     if (eigenesLimitVerbraucht(gs, ownerIdx, loadCardEffect(sourceCard), sourceCard)) return false;
     return true;
@@ -99,7 +101,9 @@ module.exports = {
     const sourceCd = cardDB[sourceCard];
     if (!sourceCd) return null;
 
-    const spellLevel = sourceCd.level || 0;
+    // W34a: ein Effekt, der als Spell zählt, hat als Stufe das Ability-Level seines Helden (`_spellLevelAlsQuelle`); eine Spell-Karte ihre gedruckte Stufe.
+    const spellLevel = hasCardType(sourceCd, 'Spell') ? (sourceCd.level || 0)
+      : (engine._spellLevelAlsQuelle(sourceCard, sourceInfo?.damageType, sourceInfo?.cardInstance || sourceInfo) || 0);
 
     // ── Animation: Magic Mirror shimmer on host Hero ──
     // No dedicated animation yet — use plague_smoke as a placeholder for the
