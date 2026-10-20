@@ -44,6 +44,8 @@ const CARD_NAME = 'Infected Greatmaw';
 function livingHeroes(engine, pi) {
   return engine.heroesControlledBy(pi)
     .filter(e => e.hero.hp > 0)
+    // W32a (Al, 22.10.2026): „treated as that Hero hitting the target with an Attack" — nur Helden, die ANGREIFEN können (nicht Frozen/Stunned/Webbed/Negated/gesperrt).
+    .filter(e => engine.heroKannAngreifen(e.physOwner, e.heroIdx, pi))
     .map(e => ({ physOwner: e.physOwner, heroIdx: e.heroIdx, hero: e.hero }));
 }
 

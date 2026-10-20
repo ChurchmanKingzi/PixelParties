@@ -54,8 +54,9 @@ function seiteDesZiels(gs, t) {
   return seiteVon(t.owner, gs?.players?.[t.owner]?.heroes?.[t.heroIdx]);
 }
 
-/** Kontrollierte Helden, die zuschlagen koennen (lebend, mit Angriffswert). */
-function angreifer(gs, pi) {
+/** Kontrollierte Helden, die zuschlagen koennen (lebend, mit Angriffswert).
+ *  W32a (Al, 22.10.2026): mit `engine` + `nurAngriffsfaehig` nur Helden, die ANGREIFEN koennen (`heroKannAngreifen`: nicht Frozen/Stunned/Webbed/Negated/gesperrt). */
+function angreifer(gs, pi, engine, nurAngriffsfaehig) {
   const out = [];
   for (let p = 0; p < (gs?.players || []).length; p++) {
     const helden = gs.players[p]?.heroes || [];
@@ -63,6 +64,7 @@ function angreifer(gs, pi) {
       const h = helden[hi];
       if (!h?.name || h.hp <= 0) continue;
       if (seiteVon(p, h) !== pi) continue;
+      if (nurAngriffsfaehig && engine && !engine.heroKannAngreifen(p, hi, pi)) continue;
       out.push({ physOwner: p, heroIdx: hi, hero: h });
     }
   }
@@ -108,9 +110,9 @@ module.exports = {
   //   kein Fehler, kein Log. Alle 29 anderen Potion-Skripte tragen sie.
   isPotion: true,
 
-  canActivate(gs, playerIdx) {
+  canActivate(gs, playerIdx, engine) {
     if (schonGespielt(gs, playerIdx)) return false;
-    if (angreifer(gs, playerIdx).length === 0) return false;
+    if (angreifer(gs, playerIdx, engine, true).length === 0) return false;
     const gegner = opponentOfGs(gs, playerIdx);
     // Runde 1: der Gegner ist gegen alles immun — dann gibt es kein
     // legales Opfer und der Trank bleibt grau, statt ins Leere zu laufen.
@@ -135,6 +137,7 @@ module.exports = {
       for (const t of engine.getHeroTargets(p)) {
         const seite = engine.heroSideOf(p, gs.players[p]?.heroes?.[t.heroIdx]);
         if (seite === gegner && schutz) continue;
+        if (seite === playerIdx && !engine.heroKannAngreifen(p, t.heroIdx, playerIdx)) continue;   // W32a: nur angriffsfaehige eigene Helden als Angreifer
         ziele.push({ ...t, seite });
       }
     }
@@ -188,6 +191,7 @@ module.exports = {
     const eigenes = gewaehlt.find(t => validTargets.some(v => v.id === t.id) && t.type === 'hero'
       && gewaehlt.some(o => seite(o) !== seite(t)));
     if (!eigenes) return false;
+    if (engine && typeof pi === 'number' && !engine.heroKannAngreifen(eigenes.owner, eigenes.heroIdx, pi)) return false;   // W32a: der Angreifer muss angreifen koennen
     // W29a: Paarregel (Alliance) – `engine`/`pi` liefert der Server (`doConfirmPotion`); ohne sie (alte Aufrufer) entfaellt die Pruefung.
     if (engine && typeof pi === 'number' && paarGesperrt(engine, pi, eigenes, gewaehlt.find(o => o !== eigenes), validTargets)) return false;
     return true;
@@ -270,6 +274,7 @@ module.exports = {
     const angreiferHeld = gs.players[held.owner]?.heroes?.[held.heroIdx];
     if (!angreiferHeld?.name || angreiferHeld.hp <= 0) return;
     if (seiteVon(held.owner, angreiferHeld) !== pi) return;
+    if (!engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return { aborted: true };   // W32a: zwischen Wahl und Aufloesung eingefroren/betaeubt/gesperrt → blockiert, Karte bleibt auf der Hand (Konvention `aborted`)
 
     const schaden = angriffswert(engine, held.owner, held.heroIdx);
     if (!(schaden > 0)) return;

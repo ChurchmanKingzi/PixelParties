@@ -69,6 +69,8 @@ function eligibleHeroes(engine, pi) {
   const out = [];
   for (const { physOwner, heroIdx: hi } of engine.heroesControlledBy(pi)) {
     if (engine.isHeroIncapacitated(physOwner, hi)) continue;
+    // W32a (Al, 22.10.2026): der Wurf ist ein Attack DES HELDEN — Frozen/Stunned/Webbed/Negated/Attack-Sperren blocken (`heroKannAngreifen`, wie `validateActionPlay`).
+    if (!engine.heroKannAngreifen(physOwner, hi, pi)) continue;
     if (equippedArtifacts(engine, physOwner, hi).length === 0) continue;
     out.push({ physOwner, heroIdx: hi });
   }
@@ -121,7 +123,7 @@ module.exports = {
     const hi = sel.heroIdx;
     const heroOwner = sel.owner ?? pi;   // physische Seite des Helden
     const hero = gs.players[heroOwner]?.heroes?.[hi];
-    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi)) return { aborted: true };
+    if (!hero?.name || engine.isHeroIncapacitated(heroOwner, hi) || !engine.heroKannAngreifen(heroOwner, hi, pi)) return { aborted: true };   // W32a: nicht angriffsfähig → blockiert
     if (engine.heroSideOf(heroOwner, hero) !== pi) return { aborted: true };
 
     // ── Artefakt waehlen ──────────────────────────────────────────

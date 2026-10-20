@@ -46149,6 +46149,26 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W32a (Al, 22.10.2026): „Sie werden geblockt, wenn der Hero nicht angreifen kann (etwa, weil er Frozen ist)." Kann dieser Held (Brettseite `seite`, Index `heroIdx`) gerade
+   * ANGREIFEN? Eine Stelle für alle Effekte, die als Attack EINES HELDEN zählen (Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected
+   * Greatmaw): dieselben Sperren wie `validateActionPlay` für eine Attack-Karte — tot, Frozen, Stunned/Webbed, Bound, harte Negierung (`isHeroIncapacitated`; die leichte
+   * Negierung „nur der Effekt" sperrt nicht), Heldenskript-/Support-Sperren (`canHeroPerformAction`: Saint Nicolas, Plant Golem), Kontrollrechte (`attacken === false`), Blendung
+   * (diese Effekte brauchen alle ein Ziel) und die spielerweite Attack-/Spell-Sperre des Zuges (Trial of Coolness; `pi` = Kontrolleur, sonst die Brettseite).
+   */
+  heroKannAngreifen(seite, heroIdx, pi) {
+    const hero = this.gs?.players?.[seite]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (this.isHeroIncapacitated(seite, heroIdx)) return false;
+    if (hero.statuses?.webbed) return false;
+    if (!this.canHeroPerformAction(seite, heroIdx, { ohneStatus: true })) return false;
+    if (this.kontrollRechte(seite, heroIdx).attacken === false) return false;
+    if (this._isHeroBlinded(seite, heroIdx)) return false;
+    const ps = this.gs.players[Number.isInteger(pi) ? pi : seite];
+    if (ps && ps._attackSpellLockedTurn === this.gs.turn) return false;
+    return true;
+  }
+
+  /**
    * Centralized "Hero is incapacitated for Action purposes" gate.
    * Returns true when the Hero CANNOT take an Action — used by
    * `inherentAction` capacity checks and any future card script that

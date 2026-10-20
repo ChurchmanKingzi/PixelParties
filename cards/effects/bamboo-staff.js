@@ -118,6 +118,8 @@ module.exports = {
       const feld    = ctx.cardHeroOwner ?? pi;   // Styx 28.9.: Brettseite des Helden
       const hero    = gs.players[feld]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
+      // W32a (Al, 22.10.2026): der Schlag ist ein Attack DES TRÄGERS — kann er nicht angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), löst der Stab nicht aus.
+      if (!engine.heroKannAngreifen(feld, heroIdx, pi)) return;
 
       // Per-instance soft-HOPT.
       if (ctx.card.counters._bambooFiredOnTurn === gs.turn) return;

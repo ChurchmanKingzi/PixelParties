@@ -35,6 +35,8 @@ async function dolchSchlag(ctx, pi) {
   const gs = engine.gs;
   const hero = ctx.attachedHero;
   const heroIdx = ctx.cardHeroIdx;
+  // W32a (Al, 22.10.2026): der Schlag ist ein Attack DES TRÄGERS — kann er nicht angreifen (Frozen, Stunned, Webbed, Negated, Attack-Sperren), schlägt der Dolch nicht zu (Stempel unberührt).
+  if (!engine.heroKannAngreifen(ctx.cardHeroOwner ?? pi, heroIdx, pi)) return;
 
   // Once per turn, per Dagger. Peek now; claim only on commit so a
   // declined "may" stays usable on a later sacrifice this turn.

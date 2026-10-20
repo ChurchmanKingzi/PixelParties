@@ -257,7 +257,10 @@ function makeCrusaderArtifact(spec) {
 
     canActivateEquipEffect(ctx) {
       const inst = ctx.card;
-      return !!inst && inst.zone === 'support';
+      if (!(inst && inst.zone === 'support')) return false;
+      const engine = ctx._engine;
+      if (!engine || typeof engine.heroKannAngreifen !== 'function') return true;
+      return engine.heroKannAngreifen(ctx.cardHeroOwner ?? (inst.controller ?? inst.owner), inst.heroIdx, ctx.cardOwner ?? (inst.controller ?? inst.owner));   // W32a: der Träger muss angreifen können
     },
 
     // Die Engine wertet den Rueckgabewert aus: `false` heisst
