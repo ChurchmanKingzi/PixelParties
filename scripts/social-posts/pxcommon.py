@@ -1,7 +1,10 @@
 """Gemeinsame Konstanten und Hilfen für die Post-Bausteine."""
+import os
+
 import numpy as np
 
-W, H = 1080, 1350
+W = 1080
+H = int(os.environ.get("PP_CANVAS_H", 1350))      # 1350 = Feed (4:5), 1920 = Reel (9:16)
 U = 7                      # Raster (= px je Kartenpixel)
 NAVY = (14, 10, 28)
 INK = (7, 6, 13)

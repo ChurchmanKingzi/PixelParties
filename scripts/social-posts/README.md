@@ -1,18 +1,24 @@
 # Instagram-Posts für Heroes
 
-Erzeugt aus einem Hero einen 4:5-Post (1080×1350): Karte im Pixel-Rahmen mit Schnörkeln, der animierte
+Erzeugt aus einem Hero einen 4:5-Post (1080×1350) oder ein Reel (1080×1920): Karte im Pixel-Rahmen mit Schnörkeln, der animierte
 Sprite ragt aus dem Kartenbild, Themen-Partikel (z. B. Giftwolken) und Musik des Heroes.
 
 ```bash
 python3 scripts/social-posts/build-post.py nao-the-barrier-priestess
 ```
 
+```bash
+python3 scripts/social-posts/build-post.py nao-the-barrier-priestess --format reel
+```
+
 `<slug>` ist der Dateiname des Sheets in `data/hero-animations/` (ohne Endung). Ausgabe: `out/<slug>/post.png`
-und `post.mp4` (mindestens 30 s, der Loop wird wiederholt).
+und `post.mp4` (mindestens 30 s, der Loop wird wiederholt). Mit `--format reel`: `reel.mp4` (mindestens 15 s, mit Einblenden am Anfang und Link-Schild) und `reel-cover.png`. Das Reel hält Name, Link und Karte im sicheren Bereich (oben ca. 180 px, unten ca. 340 px bleiben frei für die Oberfläche von Instagram).
 
 | Option | Wirkung |
 |---|---|
-| `--duration S` | Mindestlänge des Videos in Sekunden (Standard 30) |
+| `--format post\|reel` | Feed (Standard) oder Reel |
+| `--intro on\|off` | Einblenden am Anfang (Standard: Reel an, Post aus) |
+| `--duration S` | Mindestlänge des Videos in Sekunden (Post 30, Reel 15) |
 | `--music DATEI` / `--music-start S` | Musik aus `public/music/` und Startzeit; Standard `bgm_<erstes Wort>.ogg` |
 | `--themes poison,fire,…` | Partikel-Themen erzwingen (`poison`, `fire`, `explosion`, `heal`, `holy`, `arcane`, `fight`, `ice`, `stars`); sonst aus `hero-themes.json`, danach automatisch aus Effekttext und Start-Fähigkeiten |
 | `--accent #rrggbb` | Akzentfarbe statt der aus dem Sprite abgeleiteten |
@@ -23,6 +29,8 @@ Abhängigkeiten: Python 3 mit `pillow` und `numpy`, `ffmpeg`, Node mit `playwrig
 Spiel-Renderer `public/card-render.js` in Chromium gezeichnet).
 
 Die Einstellungen je Hero stehen in `hero-themes.json` (Kartenname → `themes`, optional `name` und `title` für Namenszeile und Beiname, `music` für die Datei in `public/music`).
+
+Texte für die Beschreibung: `captions.md`.
 
 Bausteine: `build-post.py` (Layout, Hintergrund, Sprite, Video), `ornaments.py` (Rahmen-Schnörkel),
 `fx.py` (Partikel-Themen), `render-card.js` (Karte), `pxcommon.py` (Raster und Farben).

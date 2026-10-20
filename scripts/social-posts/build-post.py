@@ -14,6 +14,7 @@ mit BOX auf 525 px verkleinert (10 → 7 px je Kartenpixel, Blockkanten bleiben 
 ganzzahlig auf 14 px je Sprite-Pixel (= 2 Raster) hochskaliert.
 """
 import argparse
+import os
 import colorsys
 import json
 import math
@@ -24,7 +25,10 @@ from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+
+if '--format' in sys.argv and sys.argv[sys.argv.index('--format') + 1] == 'reel':
+    os.environ['PP_CANVAS_H'] = '1920'          # muss vor `import pxcommon` gesetzt sein
 
 import fx
 import ornaments
@@ -397,20 +401,28 @@ def music_path(card_name, override):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('slug')
+    ap.add_argument('--format', choices=['post', 'reel'], default='post', help='post = Feed 1080×1350, reel = 1080×1920')
     ap.add_argument('--accent')
-    ap.add_argument('--duration', type=float, default=30.0, help='Mindestlänge des MP4 in Sekunden (der Loop wird wiederholt)')
+    ap.add_argument('--duration', type=float, default=None, help='Mindestlänge des MP4 in Sekunden (Standard: Post 30, Reel 15)')
     ap.add_argument('--themes', help='Partikel-Themen, kommagetrennt (poison, fire, heal, arcane, fight, ice, stars); sonst automatisch')
     ap.add_argument('--music')
     ap.add_argument('--music-start', type=float, default=0.0)
     ap.add_argument('--no-video', action='store_true')
+    ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
     args = ap.parse_args()
+    reel = args.format == 'reel'
+    tag = args.format
+    intro_on = (args.intro == 'on') if args.intro else reel
+    duration = args.duration if args.duration else (15.0 if reel else 30.0)
+    oy = 180 if reel else 0                  # Reel: Inhalt höher, unten bleibt Platz für die Oberfläche (Beschreibung, Knöpfe)
 
     spr = Sprite(args.slug)
     card_name = spr.meta['hero']
     hero_cfg = json.loads((HERE / 'hero-themes.json').read_text(encoding='utf-8')).get(card_name, {})
     out = OUT / args.slug
-    (out / 'frames').mkdir(parents=True, exist_ok=True)
+    fdir = out / f'frames-{tag}'
+    fdir.mkdir(parents=True, exist_ok=True)
 
     # Karte vom Spiel-Renderer
     card_png = out / 'card.png'
@@ -431,35 +443,45 @@ def main():
     # Layout (alles Vielfache von U; Plattenkante = Kartenkante ± plate_pad)
     plate_pad = 6 * U
     card_x = 40 * U                      # 280 px (Karte 525 px breit → ±2,5 px aus der Mitte)
-    card_y = 48 * U                      # 336 px
+    card_y = 48 * U + oy                 # 336 px (Post)
     plate = bevel_frame((CARD_W + 2 * plate_pad, CARD_H + 2 * plate_pad), accent, plate_pad)
     plate_x, plate_y = card_x - plate_pad, card_y - plate_pad
-    plate_b = plate_y + plate.height
     bg = Background(accent, (W // 2, card_y + CARD_H // 2))
 
-    mid = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    mid.alpha_composite(plate, (plate_x, plate_y))
-    mid.alpha_composite(card, (card_x, card_y))
+    # Zwei Ebenen, damit sie beim Einblenden nacheinander erscheinen können:
+    # A = Platte, Karte, Schnörkel, Logo; B = Name, Beiname, Trennlinien, Link-Schild
+    mid_a = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    mid_a.alpha_composite(plate, (plate_x, plate_y))
+    mid_a.alpha_composite(card, (card_x, card_y))
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
-    mid.alpha_composite(orn)
-    # Kopf: Logo in Akzentfarbe
+    mid_a.alpha_composite(orn)
     logo = tinted_logo(accent)
-    mid.alpha_composite(logo, ((W - logo.width) // 2, 40))
-    # Fuß: Name (groß) und Beiname
+    mid_a.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy))
+    mid_b = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     parts = card_name.split(',', 1)
     short = hero_cfg.get('name', parts[0]).upper()
     sub = hero_cfg.get('title', parts[1].strip() if len(parts) > 1 else '').upper()
-    name_y, sub_y = (1238, 1295) if sub else (1252, 0)
+    name_y, sub_y = (1238 + oy, 1295 + oy) if sub else (1252 + oy, 0)
     scale = next((sc for sc in (8, 7, 6, 5, 4) if pixel_text_mask(short).width * sc <= 640), 4)   # lange Namen kleiner setzen
-    nx, ny, nw, nh = draw_text(mid, short, scale, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
-    # Trennlinien mit Edelstein links und rechts vom Namen, kürzere beim Beinamen
+    nx, ny, nw, nh = draw_text(mid_b, short, scale, (W // 2, name_y), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
     dl = max(4, min(16, (nx - 2 * U - 4 * U - 5 * U) // U))
-    ornaments.place_divider(mid, accent, nx - 2 * U, name_y - U, dl, -1)
-    ornaments.place_divider(mid, accent, nx + nw + 2 * U, name_y - U, dl, 1)
+    ornaments.place_divider(mid_b, accent, nx - 2 * U, name_y - U, dl, -1)
+    ornaments.place_divider(mid_b, accent, nx + nw + 2 * U, name_y - U, dl, 1)
     if sub:
-        sx_, sy_, sw_, sh_ = draw_text(mid, sub, 3, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
-        ornaments.place_divider(mid, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
-        ornaments.place_divider(mid, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
+        sx_, sy_, sw_, sh_ = draw_text(mid_b, sub, 3, (W // 2, sub_y), color=accent, outline=None, shadow=INK)
+        ornaments.place_divider(mid_b, accent, sx_ - 2 * U, sub_y - U // 2, 9, -1, thick=1, gem_r=1)
+        ornaments.place_divider(mid_b, accent, sx_ + sw_ + 2 * U, sub_y - U // 2, 9, 1, thick=1, gem_r=1)
+    if reel:                                  # Link-Schild unter dem Beinamen (im sicheren Bereich)
+        url = 'PIXELPARTIESTCG.COM'
+        um = pixel_text_mask(url)
+        us = 3
+        pw, ph = um.width * us + 8 * U, um.height * us + 5 * U
+        px0, py0 = (W - pw) // 2, (sub_y if sub else name_y + 40) + 30
+        dr = ImageDraw.Draw(mid_b)
+        dr.rectangle([px0 + U, py0, px0 + pw - U - 1, py0 + ph - 1], fill=INK)
+        dr.rectangle([px0, py0 + U, px0 + pw - 1, py0 + ph - U - 1], fill=INK)
+        dr.rectangle([px0 + U, py0 + U, px0 + pw - U - 1, py0 + ph - U - 1], fill=accent)
+        draw_text(mid_b, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
 
     # Sprite-Lage: Gesichtsmitte über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
@@ -469,7 +491,7 @@ def main():
     sy = feet_y - spr.foot * SPRITE_PX
     shadow = pixel_ellipse(24, 4, INK, 170)
 
-    parts_bg = Particles(args.slug, accent, 40, (U * 3, 0, W - U * 3, H), loop)
+    parts_bg = Particles(args.slug, accent, 40 if not reel else 56, (U * 3, 0, W - U * 3, H), loop)
     cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
     card_data = next(c for c in cards if c['name'] == card_name)
     pinned = hero_cfg.get('themes')
@@ -479,12 +501,29 @@ def main():
     theme_fx = fx.ThemeFX(names, args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
 
-    for f in range(loop):
+    # Einblenden (nur erste Schleife): Pixel-Auflösung der Ebenen, dann Blitz beim Auftauchen des Sprites
+    noise = np.random.default_rng(7).random((-(-H // U), -(-W // U)))
+    def dissolve(layer, p):
+        if p >= 1:
+            return layer
+        if p <= 0:
+            return None
+        m = np.repeat(np.repeat((noise < p).astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+        out_l = layer.copy()
+        out_l.putalpha(ImageChops.multiply(layer.split()[3], Image.fromarray(m, 'L')))
+        return out_l
+    T_A, T_B, T_SPR, T_FLASH = (0.15, 0.75), (0.5, 1.0), 0.75, 0.14       # Sekunden
+
+    def render(f, intro):
+        ts = f / float(fps)
         canvas = bg.frame(f / loop)
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         parts_bg.draw(layer, f)
         canvas.alpha_composite(layer)
-        canvas.alpha_composite(mid)
+        for lay, (t0, t1) in ((mid_a, T_A), (mid_b, T_B)):
+            l2 = dissolve(lay, (ts - t0) / (t1 - t0) if intro else 1.0)
+            if l2 is not None:
+                canvas.alpha_composite(l2)
         # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         theme_fx.draw(layer, f)
@@ -496,29 +535,60 @@ def main():
                 dd.rectangle([gx - n * U, gy - U // 2, gx + n * U, gy + U // 2], fill=WHITE + (255,))
                 dd.rectangle([gx - U // 2, gy - n * U, gx + U // 2, gy + n * U], fill=WHITE + (255,))
         canvas.alpha_composite(layer)
+        if intro and ts < T_SPR:
+            return canvas.convert('RGB')
         o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
         canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
+        flash = intro and ts < T_SPR + T_FLASH
         for im in (o_dark, o_light, sp):
+            if flash:                          # beim Auftauchen als weiße Silhouette
+                white = Image.new('RGBA', im.size, WHITE + (255,))
+                white.putalpha(im.split()[3])
+                im = white
             canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
-        canvas.convert('RGB').save(out / 'frames' / f'f{f:03d}.png')
-    still = Image.open(out / 'frames' / 'f000.png')
-    still.save(out / 'post.png')
-    print('Standbild', out / 'post.png')
+        return canvas.convert('RGB')
+
+    for f in range(loop):
+        render(f, False).save(fdir / f'f{f:03d}.png')
+    if intro_on:
+        for f in range(loop):
+            render(f, True).save(fdir / f'i{f:03d}.png')
+    cover = Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
+    cover_path = out / ('reel-cover.png' if reel else 'post.png')
+    cover.save(cover_path)
+    print('Standbild', cover_path)
 
     if args.no_video:
         return
     music = music_path(card_name, args.music or hero_cfg.get('music'))
-    loops = max(1, math.ceil(args.duration / (loop / float(fps))))
-    vf = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(fps), '-stream_loop', str(loops - 1),
-          '-i', str(out / 'frames' / 'f%03d.png')]
-    dur = loop / float(fps) * loops
+    loop_s = loop / float(fps)
+    loops = max(1, math.ceil(duration / loop_s))
+    dur = loop_s * loops
+    cmd = ['ffmpeg', '-y', '-loglevel', 'error']
+    if intro_on and loops >= 2:
+        cmd += ['-framerate', str(fps), '-i', str(fdir / 'i%03d.png'),
+                '-framerate', str(fps), '-stream_loop', str(loops - 2), '-i', str(fdir / 'f%03d.png')]
+        vfilter = ['-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]']
+        n_in = 2
+    else:
+        first = 'i%03d.png' if intro_on else 'f%03d.png'
+        cmd += ['-framerate', str(fps), '-stream_loop', str(loops - 1), '-i', str(fdir / first)] if not intro_on else \
+               ['-framerate', str(fps), '-i', str(fdir / first)]
+        vfilter, n_in = [], 1
     if music:
-        vf += ['-ss', str(args.music_start), '-i', str(music),
-               '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2', '-c:a', 'aac', '-b:a', '192k']
-    vf += ['-t', f'{dur:.3f}', '-c:v', 'libx264', '-preset', 'slow', '-crf', '12', '-pix_fmt', 'yuv420p',
-           '-tune', 'animation', '-movflags', '+faststart', str(out / 'post.mp4')]
-    subprocess.run(vf, check=True)
-    print('Video', out / 'post.mp4', f'{dur:.1f}s', 'mit Musik' if music else 'ohne Musik')
+        cmd += ['-ss', str(args.music_start), '-i', str(music)]
+        amap = ['-map', f'{n_in}:a', '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2', '-c:a', 'aac', '-b:a', '192k']
+        if not vfilter:
+            vfilter = ['-map', '0:v']
+    else:
+        amap = []
+        if not vfilter:
+            vfilter = ['-map', '0:v']
+    mp4 = out / ('reel.mp4' if reel else 'post.mp4')
+    cmd += vfilter + amap + ['-t', f'{dur:.3f}', '-c:v', 'libx264', '-preset', 'slow', '-crf', '14', '-pix_fmt', 'yuv420p',
+                             '-tune', 'animation', '-maxrate', '10M', '-bufsize', '20M', '-movflags', '+faststart', str(mp4)]
+    subprocess.run(cmd, check=True)
+    print('Video', mp4, f'{dur:.1f}s', 'mit Musik' if music else 'ohne Musik')
 
 
 if __name__ == '__main__':
