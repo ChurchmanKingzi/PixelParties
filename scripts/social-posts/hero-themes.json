@@ -633,6 +633,11 @@
     }
    ],
    [
+    "bolt",
+    "glow",
+    6
+   ],
+   [
     "spark",
     "spectral",
     10
@@ -851,19 +856,24 @@
  "Thorad, Strength of Coolness": {
   "particles": [
    [
-    "flake",
-    "ice",
-    16
-   ],
-   [
-    "spark",
-    "ice",
+    "bolt",
+    "spectral",
     8
    ],
    [
     "gas",
-    "water",
-    14
+    "storm_smoke",
+    28
+   ],
+   [
+    "spark",
+    "spectral",
+    8
+   ],
+   [
+    "spark",
+    "gold",
+    4
    ]
   ]
  },
