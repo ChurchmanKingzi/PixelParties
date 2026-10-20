@@ -87,10 +87,11 @@ async function szene(quelle, me, op, reaktion) {
         R.check(`${re} ${soll ? 'löst aus (der Effekt zählt als Attack/Spell)' : 'bleibt verdeckt (gewöhnlicher Heldeneffekt)'}`, r.ausgeloest === soll, { prompts: r.t.prompts.map(p => p.d.title) });
         if (soll) {
           if (re === 'Bluff') R.check('Bluff: 3 Karten gezogen, der Effekt läuft normal weiter (Gegner-Held 0 nimmt Schaden)', r.hand === 3 && r.schadenOp > 0, { hand: r.hand, s: r.schadenOp });
-          // Sword in a Bottle (Trank): die Quelle nennt keinen Angreifer-Helden (`heroIdx` −1) – die Reaktion löst aus und negiert, Netz/Rückschaden entfallen (Frage an Al);
-          const ohneAngreifer = q === 'Sword in a Bottle' || q === 'Infected Greatmaw';   // Greatmaw: die Engine meldet die Kreatur als Wirker (`_creatureCasterForSource`) → Rückschaden/Netz träfen die Kreatur bzw. entfallen (Bestand, nicht Teil der Entscheidung)
-          if (re === 'Crimson Web') R.check(ohneAngreifer ? 'Crimson Web: Effekt negiert (kein Schaden am Träger); kein Angreifer-Held erkennbar (Sword in a Bottle / Greatmaw-Kreatur)' : 'Crimson Web: Effekt negiert (kein Schaden am Träger), Netz am Angreifer-Helden', r.schadenOp === 0 && (ohneAngreifer || r.genetzt), { s: r.schadenOp, genetzt: r.genetzt });
-          if (re === 'Tharxian Horse') R.check(ohneAngreifer ? 'Tharxian Horse: Effekt negiert (kein Schaden am Träger); kein Angreifer-Held erkennbar (Sword in a Bottle / Greatmaw-Kreatur)' : 'Tharxian Horse: Effekt negiert (kein Schaden am Träger), der Angreifer nimmt Rückschaden', r.schadenOp === 0 && (ohneAngreifer || r.schadenMe > 0), { op: r.schadenOp, me: r.schadenMe });
+          // ★ W32a (Al, 22.10.2026, Punkte 6/7): der Angreifer ist bei Sword in a Bottle der gewählte eigene Held und beim Greatmaw-Treffer der gewählte Held (nicht die Kreatur) –
+          // Netz und Rückschaden treffen ihn immer (volle Prüfung: `W32/a-06`). (Früher: „ohne Angreifer-Held erkennbar" – Frage an Al, jetzt beantwortet.)
+          const ohneAngreifer = false;
+          if (re === 'Crimson Web') R.check('Crimson Web: Effekt negiert (kein Schaden am Träger), Netz am Angreifer-Helden', r.schadenOp === 0 && (ohneAngreifer || r.genetzt), { s: r.schadenOp, genetzt: r.genetzt });
+          if (re === 'Tharxian Horse') R.check('Tharxian Horse: Effekt negiert (kein Schaden am Träger), der Angreifer nimmt Rückschaden', r.schadenOp === 0 && (ohneAngreifer || r.schadenMe > 0), { op: r.schadenOp, me: r.schadenMe });
         } else {
           R.check(`${re}: der Heldeneffekt trifft normal (Schaden am Träger)`, r.schadenOp > 0, r.schadenOp);
         }

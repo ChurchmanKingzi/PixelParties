@@ -9,6 +9,9 @@
 // unabhängig von der Stufe) — dort nur Glass Wall, Stealth, Jetpack.
 // ★ W30a (Al, 21.10.2026): Bamboo Staff und Sacrificial Dagger (treated as that Hero hitting …) zählen seitdem mit dem FIGHTING-LEVEL ihres Trägers (`W30/a-01`); dieser Repro läuft mit Trägern OHNE
 // Fighting (Fighting 0 = Level 0) und prüft für die beiden weiter die Untergrenze 0. Javelin Throw, Sword in a Bottle, Crusader's ×4 bleiben Level 0 (Text nennt keinen Angreifer-Helden).
+// ★ W32a (Al, 22.10.2026): ALLGEMEINE REGEL „Zählt als Attack eines Helden = Ability-Level dieses Helden" – auch Javelin Throw, Sword in a Bottle und die Crusader's nehmen das FIGHTING-LEVEL ihres Helden
+// (Al: „Sie nehmen trotzdem das Fighting-Level"), nicht mehr fix 0. Dieser Repro läuft mit Helden OHNE Fighting (Level 0 = Untergrenze) und prüft zusätzlich Fighting 3 (die Stufe-1-Schutzkarten
+// schützen dann nicht mehr: ganzer Treiber-Satz, Abschnitt „(W32a)"); die volle Staffel samt Sperre bei nicht angriffsfähigem Helden steht in `W32/a-01`.
 // Aufruf: node docs/niche-tests/repro/W27/a-03-gegenstandseffekte-als-attack-zaehlen-als-level-0.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const JET = 'Future Tech Jetpack', CECILIA = 'Cecilia, the Harrowing Crusader';
@@ -78,12 +81,13 @@ for (const k of ["Crusader's Arm-Cannon", "Crusader's Cutlass", "Crusader's Flin
   };
 }
 
-async function szene(item, me, op, leser) {
+async function szene(item, me, op, leser, F = 0) {
   const spec = ITEMS[item];
   const opHand = leser === 'Test Flight' ? ['Test Flight'] : leser === 'Escape Device' ? ['Future Tech Escape Device'] : [];
   const hands = me === 0 ? [spec.hand ? spec.hand(me) : [], opHand] : [opHand, spec.hand ? spec.hand(me) : []];
   const t = await H.fresh({ hand: hands, discard: me === 0 ? [spec.discard ? spec.discard() : [], []] : [[], spec.discard ? spec.discard() : []], deckSize: 30, hp: 800 });
   if (spec.held) t.setHero(me, 0, spec.held, 800);
+  if (F > 0) t.setAbilities(me, item === 'Sword in a Bottle' ? 1 : 0, [Array(F).fill('Fighting'), [], []]);   // W32a: Fighting-Level des Angreifer-Helden (Sword: der gewählte Held 1)
   if (leser === 'Stealth') t.setAbilities(op, 0, [['Stealth'], [], []]);
   if (leser === 'Jetpack') t.put(op, 0, 0, JET);
   if (leser === 'Glass Wall') { t.putSurprise(op, 0, 'Glass Wall'); t.grantFor(op, 0, 'Glass Wall'); }
@@ -118,6 +122,17 @@ async function szene(item, me, op, leser) {
           const name = leser === 'Escape Device' ? 'Future Tech Escape Device' : leser;
           R.check(`${leser}: wird angeboten (Quelle Level 0) und wehrt den Effekt ab`, gefragt(r.t, name) >= 1 && r.schaden === 0, { gefragt: gefragt(r.t, name), schaden: r.schaden, rec: r.rec });
         }
+        R.check(`${leser}: sauber`, r.t.errors.length === 0 && r.t.audit().length === 0, { e: r.t.errors, a: r.t.audit() });
+      }
+    }
+  }
+  // (W32a) mit Fighting 3 des Angreifer-Helden schützen die Stufe-1-Leser nicht mehr: der Effekt trifft
+  for (const item of Object.keys(ITEMS)) {
+    for (const [me, op] of [[0, 1], [1, 0]]) {
+      R.section(`(W32a) ${item}: Sitz ${me}, Held mit Fighting 3`);
+      for (const leser of ['Stealth', 'Jetpack', 'Glass Wall']) {
+        const r = await szene(item, me, op, leser, 3);
+        R.check(`${leser} schützt nicht (Quelle Stufe 3 statt 0): der Gegner-Held 0 wird getroffen`, r.schaden > 0 && gefragt(r.t, 'Glass Wall') === 0, { s: r.schaden, g: gefragt(r.t, 'Glass Wall') });
         R.check(`${leser}: sauber`, r.t.errors.length === 0 && r.t.audit().length === 0, { e: r.t.errors, a: r.t.audit() });
       }
     }
