@@ -230,6 +230,7 @@ module.exports = {
     const pi = ctx.cardOwner;
     const db = engine._getCardDB();
     return (ps.heroes || []).some((h, hi) => h?.name && h.hp > 0
+      && engine.heroSideOf(pi, h) === pi   // W25a (N1-11, Al: „nach aktueller Kontrolle"): „a Hero you control" — kein abgegebener Held
       && engine.kannAbilityAnlegen(pi, hi)
       && (ps.mainDeck || []).some(cn => db[cn] && hasCardType(db[cn], 'Ability') && engine.canAttachAbilityToHero(pi, cn, hi)));
   },
@@ -257,6 +258,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
+      if (engine.heroSideOf(pi, h) !== pi) continue;   // W25a (N1-11): „a Hero you control" = aktuelle Kontrolle
       // v1356 (Als Befund): Ska legt NICHT „additionally" an — das Anlegen
       // kostet das eine Anlegen des Ziel-Helden fuer diesen Zug. Ein Held,
       // der es schon verbraucht hat (und keinen Bonus-Platz hat), ist kein Ziel.
