@@ -26,8 +26,10 @@
 //    `crossSideControlled` wie beim Beschwoeren ueber einen geliehenen
 //    Helden). Vorher wurde der Index auf die EIGENE Spalte des Diebes
 //    abgebildet.
-//  · „level 1 or lower" liest den gedruckten Level der Handkarte;
-//    nur echte Kreaturen (`isSummonablePileCreature`: keine Artifact
+//  · „level 1 or lower" liest die Stufe der Karte IN DER HAND (Welle 25,
+//    N3-15, Al „ja": `effectiveCardLevel` mit `handIdx` - wie Slave Trader
+//    und Psychic Scout; eine auf Stufe 1 gesenkte Embodiment of Biseria ist
+//    platzierbar); nur echte Kreaturen (`isSummonablePileCreature`: keine Artifact
 //    Creatures, keine Tokens).
 //  · Aktiver Effekt ohne Aktionskosten (`creatureEffect`), soft once
 //    per turn — die Engine stempelt `creature-effect:<id>`. Abbruch
@@ -39,6 +41,7 @@
 // ═══════════════════════════════════════════
 
 const { isSummonablePileCreature } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Drill Sergeant';
 const MAX_LEVEL = 1;
@@ -48,14 +51,21 @@ function eligibleHandCards(engine, pi) {
   const ps = engine.gs.players[pi];
   const db = engine._getCardDB();
   const counts = new Map();
-  for (const name of (ps?.hand || [])) {
+  const firstIdx = new Map();
+  const hand = ps?.hand || [];
+  for (let i = 0; i < hand.length; i++) {
+    const name = hand[i];
     const cd = db[name];
     if (!cd || !isSummonablePileCreature(cd)) continue;
-    if (typeof cd.level !== 'number' || cd.level > MAX_LEVEL) continue;
+    if (typeof cd.level !== 'number' || engine.effectiveCardLevel(cd, pi, { handIdx: i }) > MAX_LEVEL) continue;   // N3-15: Handstufe nach Senkung
+    // N3-08 (Al, Welle 25: „Korrekt"): Elusive Hind / Plant Golem („Summon this card into a free Support Zone of a Hero your opponent controls")
+    // werden bei vollem Gegnerbrett gar nicht erst angeboten (wie Psychic Scout / Slave Trader) - nur dieser Teil von `canSummon` gilt beim Platzieren.
+    if (loadCardEffect(name)?.playOnOppSideOnly && !engine.isCreatureSummonable(name, pi)) continue;
     if (engine.nurEinerSchonKontrolliert(pi, name)) continue;   // W16d (C02-04): „You can only control 1" - nicht anbieten
     counts.set(name, (counts.get(name) || 0) + 1);
+    if (!firstIdx.has(name)) firstIdx.set(name, i);
   }
-  return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count }));
+  return [...counts.entries()].map(([name, count]) => ({ name, source: 'hand', count, handIdx: firstIdx.get(name) }));
 }
 
 /** Freie Support Zones (inkl. Insel) des Helden, unter dem der Sergeant liegt (Brettseite `seite`, Q74). */
@@ -118,8 +128,11 @@ module.exports = {
       dest = match;
     }
 
+    const jetzt = eligibleHandCards(engine, pi).find(c => c.name === cardName);   // Hand kann sich waehrend der Wahl geaendert haben
+    if (!jetzt) return false;
     const placed = await engine.actionPlaceCreature(cardName, pi, dest.heroIdx, dest.slotIdx, {
       source: 'hand',
+      sourceIdx: jetzt.handIdx,   // N3-15: genau die Kopie, deren Handstufe <= 1 ist
       sourceName: CARD_NAME,
       ...(seite !== pi ? { heldSeite: seite } : {}),   // Q74: gestohlener Sergeant -> Zone auf der Gegnerseite, Kontrolle beim Dieb
     });
