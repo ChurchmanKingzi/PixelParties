@@ -88,9 +88,12 @@ function ausruestTraeger(engine, pi, cardName) {
 }
 
 /** Als Vorgabe 29.9.: alle Traeger inkl. uebernommener Helden — [{ seite, heroIdx }]. */
-function ausruestTraegerMitSeite(engine, pi, cardName) {
+function ausruestTraegerMitSeite(engine, pi, cardName, opts = {}) {
   const out = ausruestTraeger(engine, pi, cardName).map(hi => ({ seite: pi, heroIdx: hi }));
   for (const { physOwner, heroIdx } of (engine.fremdAusruestHelden?.(pi) || [])) {
+    // W31a (Al, 22.10.2026): Form „one of your Heroes" (`opts.ausserImmun`, Weapon Collecting Wight): ein durch die Kontrolle ausdruecklich gegen eigene Karten immuner Held
+    // (Charme Lv3, Golden Apple, Sixth Circle) ist kein Traeger. Die Form „a Hero you control" (Cool Repair, Backpack …) bleibt ohne die Option.
+    if (opts.ausserImmun && engine.heroImmunGegenEigene?.(physOwner, heroIdx, pi)) continue;
     if (istAusruestTraeger(engine, pi, heroIdx, cardName, physOwner)) out.push({ seite: physOwner, heroIdx });
   }
   return out;
@@ -107,7 +110,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   // Als Vorgabe 29.9.: auch uebernommene Helden (Brettseite `seite`);
   // `nurHelden` meint eigene Helden.
   const helden = (cfg.nurHelden ? ausruestTraeger(engine, pi, cardName).map(hi => ({ seite: pi, heroIdx: hi }))
-    : ausruestTraegerMitSeite(engine, pi, cardName))
+    : ausruestTraegerMitSeite(engine, pi, cardName, { ausserImmun: !!cfg.ausserImmun }))
     .filter(h => !cfg.nurHelden || cfg.nurHelden.includes(h.heroIdx));
   if (helden.length === 0) return null;
 

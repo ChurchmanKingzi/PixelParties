@@ -41,7 +41,8 @@ const { PHASES } = require('./_hooks');
 const CARD_NAME = 'Siege';
 
 function hostOpts() {
-  return { ownSideOnly: true };
+  // W31a (Al, 22.10.2026): „one of your Heroes" - nach Kontrolle, ausser ein uebernommener Held ist durch die Kontrolle immun gegen eigene Karten (`ausserImmun`).
+  return { ownSideOnly: true, ausserImmun: true };
 }
 
 module.exports = {

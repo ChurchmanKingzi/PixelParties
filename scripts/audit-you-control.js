@@ -29,6 +29,7 @@ const KONTROLLE = [
   'heroesControlledBy', 'heroSideOf', 'kontrolleurVon', 'kontrolleurVonHeld', '.controller', 'effektiveSeiten', 'kreaturPasstZurSeite',
   'nachKontrolle', 'kopienAnKontrolliertenHelden', 'getKontrollAusruestZiele', 'zonenRechtAmHeld',
   'fremdAusruestHelden', 'candidateHosts', 'eligibleSummonZones', 'stolenBy', 'charmedBy', 'permaControlBy', 'kontrollRechte',
+  'getControlledHeroTargets', 'heroImmunGegenEigene',
 ];
 
 function quellen(file) {
@@ -42,10 +43,16 @@ function quellen(file) {
   return out;
 }
 
+// W31a (Al, 22.10.2026): `--form=your-heroes` prueft statt „you control" die Ausnahme-Form „one of your Heroes" / „your (other) Heroes" / „each of your Heroes" …
+// (gleiche Regel: nach aktueller KONTROLLE; ausser durch die Kontrolle ausdruecklich immun gegen eigene Karten — `engine.getControlledHeroTargets(pi, { ausserImmun: true })`).
+// Possessiv-Formen („one of your Heroes' Support Zones") sind Zonen-Formen und zaehlen hier nicht.
+const FORM = (process.argv.find(a => a.startsWith('--form=')) || '').split('=')[1];
+const RE_YOUR_HEROES = /[^.]*(?:\b(?:one|any|each|all|both|another|other|up to \d+|at least \d+|\d+) of your (?:other |starting |defeated |undefeated )?(?:\w+ )?Heroes?(?![\u2019'a-z])|\byour (?:other |defeated |undefeated )?Heroes?(?![\u2019'a-z])|Hero of yours)[^.]*\./gi;
+
 const zeilen = [];
 for (const c of cards) {
   const text = String(c.effect || '').replace(/\s+/g, ' ');
-  const treffer = text.match(/[^.]*\byou (?:permanently )?control\b[^.]*\./gi);
+  const treffer = FORM === 'your-heroes' ? text.match(RE_YOUR_HEROES) : text.match(/[^.]*\byou (?:permanently )?control\b[^.]*\./gi);
   if (!treffer) continue;
   const file = path.join(EFF, slug(c.name) + '.js');
   if (!fs.existsSync(file)) { zeilen.push({ name: c.name, typ: c.cardType, klasse: '-', grund: 'kein Skript', saetze: treffer.length }); continue; }
@@ -63,6 +70,6 @@ const sel = want ? zeilen.filter(z => z.klasse === want) : zeilen;
 if (process.argv.includes('--json')) console.log(JSON.stringify(sel, null, 1));
 else {
   const n = { A: 0, B: 0, C: 0, '-': 0 }; for (const z of zeilen) n[z.klasse]++;
-  console.log(`Karten mit „you control": ${zeilen.length} · A (Besitz ohne Kontrolle): ${n.A} · B (gemischt): ${n.B} · C (unauffällig): ${n.C} · ohne Skript: ${n['-']}`);
+  console.log(`Karten mit ${FORM === 'your-heroes' ? '„your Heroes"-Form' : '„you control"'}: ${zeilen.length} · A (Besitz ohne Kontrolle): ${n.A} · B (gemischt): ${n.B} · C (unauffällig): ${n.C} · ohne Skript: ${n['-']}`);
   for (const z of sel) if (z.klasse !== 'C') console.log(`${z.klasse} ${z.name} [${z.typ}] ${JSON.stringify(z.risk || {})} kontrolle=${(z.kontrolle || []).join(',')}\n    ${z.text || z.grund}`);
 }

@@ -43341,15 +43341,34 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Held (dauerhaft oder gecharmt) faellt heraus, ein uebernommener Gegnerheld kommt dazu. ID/`owner` = BRETTSEITE des Helden (`hero-<Seite>-<Index>`),
    * die eigene Spalte zuerst. `getHeroTargets(p)` bleibt die rein physische Spalte (fuer „Hero your opponent controls"-Sammler und Adressen).
    * `opts.defeated: true` liefert stattdessen die BESIEGTEN kontrollierten Helden („a defeated Hero you control": Golden Ankh, Soul Transmigration Ritual …).
+   * ★ W31a (Al, 22.10.2026: „one of your Heroes" zaehlt nach aktueller KONTROLLE; übernommene Helden — dauerhaft UND temporär — zählen, „außer, sie sind durch die
+   * Kontrolle explizit immun gegen eigene Karten/Effekte"): `opts.ausserImmun: true` laesst Helden weg, die der Kontrolleur NICHT mit eigenen Karten treffen darf
+   * (`heroImmunGegenEigene`: Charme Lv3 „unaffected by other cards and effects", Golden Apple / The Sixth Circle „unaffected by YOUR other cards"). Fuer die Form
+   * „a Hero you control" bleibt es ohne die Option (Wirkung verpufft, Ziel bleibt gueltig — W31a, Angry Cheese).
    */
   getControlledHeroTargets(playerIdx, opts = {}) {
     const targets = [];
-    const liste = this.heroesControlledBy(playerIdx).filter(h => h.hero?.name && (opts.defeated ? h.hero.hp <= 0 : h.hero.hp > 0));
+    const liste = this.heroesControlledBy(playerIdx).filter(h => h.hero?.name && (opts.defeated ? h.hero.hp <= 0 : h.hero.hp > 0)
+      && !(opts.ausserImmun && this.heroImmunGegenEigene(h.physOwner, h.heroIdx, playerIdx)));
     liste.sort((a, b) => (a.physOwner === playerIdx ? 0 : 1) - (b.physOwner === playerIdx ? 0 : 1));
     for (const { physOwner, heroIdx, hero } of liste) {
       targets.push({ id: `hero-${physOwner}-${heroIdx}`, type: 'hero', owner: physOwner, heroIdx, cardName: hero.name });
     }
     return targets;
+  }
+
+  /**
+   * ★ W31a (Al, 22.10.2026): Ist der Held (Spalte `physOwner`, `heroIdx`), den `pi` GERADE UEBERNOMMEN hat, durch die Kontrolle AUSDRUECKLICH immun gegen die eigenen
+   * Karten/Effekte von `pi`? Dann zaehlt er fuer „one of your Heroes" (Anlege-/Ausruest-/Wiederbelebungs-Wirte u. a.) nicht. Ja bei den Marken des `charmed`-Status
+   * mit Schutzklausel: Charme Lv3 („unaffected by other cards and effects" — auch die eigenen anderen Karten), Golden Apple und The Sixth Circle of Hell
+   * („unaffected by YOUR other cards", `onlyFromController`) — dieselbe Frage wie das Schutz-Tor (`_charmBlocksFrom`, Quelle = `pi`). Nein bei dauerhafter
+   * Uebernahme, Styx/FTCD/Molinda/Succubus (`ohneSchutz`) und Love Shot (nur eine Handlung, kein Schutz); ebenso nie fuer einen eigenen, nicht abgegebenen Helden.
+   */
+  heroImmunGegenEigene(physOwner, heroIdx, pi) {
+    const hero = this.gs.players[physOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || physOwner === pi || this.heroSideOf(physOwner, hero) !== pi) return false;
+    if (hero.permaControlBy != null) return false;
+    return !!hero.statuses?.charmed && this._charmBlocksFrom(hero, pi, { loveShotOhneSchutz: true });
   }
 
   /**

@@ -18,16 +18,20 @@ module.exports = {
   cpuMeta: { reviveCard: true },
   isTargetingArtifact: true, // Uses the targeting flow
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     // HOPT: once per GAME (use a persistent key)
     const hoptKey = `resuscitation-potion:${pi}`;
     if (gs.hoptUsed?.[hoptKey] === -1) return false; // -1 = permanently used
     // Must have at least one dead hero
+    // W31a (Al, 22.10.2026: „one of your Heroes" gilt nach aktueller KONTROLLE, auch temporaer uebernommene Helden, ausser durch die Kontrolle immune):
+    // „one of your defeated Heroes" = `getControlledHeroTargets(pi, { defeated: true, ausserImmun: true })` (`owner` = Brettseite).
+    if (engine) return engine.getControlledHeroTargets(pi, { defeated: true, ausserImmun: true }).length > 0;
     const ps = gs.players[pi];
     return (ps.heroes || []).some(h => h?.name && h.hp <= 0);
   },
 
-  getValidTargets(gs, pi) {
+  getValidTargets(gs, pi, engine) {
+    if (engine) return engine.getControlledHeroTargets(pi, { defeated: true, ausserImmun: true });
     const ps = gs.players[pi];
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -61,8 +65,8 @@ module.exports = {
     const target = validTargets.find(t => t.id === selectedIds[0]);
     if (!target || target.type !== 'hero') return false;
 
-    const ps = engine.gs.players[pi];
-    const hero = ps.heroes?.[target.heroIdx];
+    const feld = target.owner ?? pi;   // W31a: Brettseite des (kontrollierten) Helden
+    const hero = engine.gs.players[feld]?.heroes?.[target.heroIdx];
     if (!hero?.name) return false;
     if (hero.hp > 0) return false; // Safety: hero must actually be dead
 
@@ -71,7 +75,7 @@ module.exports = {
     engine.gs.hoptUsed[`resuscitation-potion:${pi}`] = -1; // -1 = permanent
 
     // Revive with 50 HP, cap max HP at 50
-    await engine.actionReviveHero(pi, target.heroIdx, 50, {
+    await engine.actionReviveHero(feld, target.heroIdx, 50, {
       maxHpCap: 50,
       source: 'Resuscitation Potion',
     });

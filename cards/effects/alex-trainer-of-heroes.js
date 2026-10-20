@@ -232,16 +232,16 @@ module.exports = {
       const zaehler = { key: USE_KEY, max: MAX_USES_PER_TURN };
       if (usesLeft(alex, engine.gs, zaehler) <= 0) return;
 
-      // Live "other heroes" on Alex's side.
-      const otherHeroIndices = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        // Alex selbst nur ueberspringen, wenn er in der eigenen Spalte steht.
-        if (hi === ctx.cardHeroIdx && feld === pi) continue;
-        const h = ps.heroes[hi];
-        if (!h?.name || h.hp <= 0) continue;
-        otherHeroIndices.push(hi);
+      // Live "other heroes" — ★ W31a (Al, 22.10.2026: „one of your Heroes" gilt nach aktueller KONTROLLE; „auch temporäre Heroes zählen, außer, sie sind durch die Kontrolle
+      // explizit immun gegen eigene Karten/Effekte"): alle Helden, die `pi` kontrolliert (`getControlledHeroTargets`: abgegebener eigener Held nein, uebernommener Gegnerheld
+      // ja, ausser Charme Lv3 / Golden Apple / Sixth Circle), ohne Alex selbst. `phys` = Brettseite des Wirts (Ability Zones), Anlegen PER EFFEKT (`byEffect`).
+      const andere = [];   // { phys, heroIdx }
+      for (const t of engine.getControlledHeroTargets(pi, { ausserImmun: true })) {
+        if (t.heroIdx === ctx.cardHeroIdx && t.owner === feld) continue;   // Alex selbst
+        andere.push({ phys: t.owner, heroIdx: t.heroIdx });
       }
-      if (otherHeroIndices.length === 0) return;
+      if (andere.length === 0) return;
+      const wirtOpts = (e) => (e.phys !== pi ? { heroOwner: e.phys, byEffect: true } : {});
 
       // Gallery: Ability cards in deck that can be attached to at least ONE
       // of the other heroes right now. Per-hero legality is re-checked after
@@ -253,7 +253,7 @@ module.exports = {
         if (!(cardName in eligible)) {
           const cd = cardDB[cardName];
           eligible[cardName] = !!(cd && hasCardType(cd, 'Ability') &&
-            otherHeroIndices.some(hi => engine.canAttachAbilityToHero(pi, cardName, hi)));
+            andere.some(e => engine.canAttachAbilityToHero(pi, cardName, e.heroIdx, wirtOpts(e))));
         }
         if (eligible[cardName]) countMap[cardName] = (countMap[cardName] || 0) + 1;
       }
@@ -281,10 +281,9 @@ module.exports = {
       if ((ps.mainDeck || []).indexOf(chosenAbility) < 0) { zurueck(); return; }
 
       // Which other heroes can host THIS specific ability?
-      const eligibleHeroes = otherHeroIndices.filter(hi =>
-        engine.canAttachAbilityToHero(pi, chosenAbility, hi)
-      );
-      if (eligibleHeroes.length === 0) { zurueck(); return; }
+      const eligibleWirte = andere.filter(e => engine.canAttachAbilityToHero(pi, chosenAbility, e.heroIdx, wirtOpts(e)));
+      if (eligibleWirte.length === 0) { zurueck(); return; }
+      const eligibleHeroes = eligibleWirte.map(e => e.heroIdx);   // nur fuer die Anlege-Maske der eigenen Spalte
 
       // Hero / zone pick. The `abilityAttachTarget` prompt hijacks the same
       // client-side click-to-attach machinery used for hand-driven attach
@@ -293,10 +292,12 @@ module.exports = {
       // when there's only one legal hero AND one legal zone — no UI.
       let targetHeroIdx = -1;
       let explicitZone = -1;
-      if (eligibleHeroes.length === 1) {
-        const onlyHero = eligibleHeroes[0];
-        const abZonesCheck = ps.abilityZones[onlyHero] || [[], [], []];
-        const zone = findTargetZone(abZonesCheck, chosenAbility, engine, pi, onlyHero);
+      let zielFeld = pi;   // Brettseite des gewaehlten Wirts
+      if (eligibleWirte.length === 1) {
+        const onlyHero = eligibleWirte[0].heroIdx;
+        const onlyFeld = eligibleWirte[0].phys;
+        const abZonesCheck = engine.gs.players[onlyFeld].abilityZones[onlyHero] || [[], [], []];
+        const zone = findTargetZone(abZonesCheck, chosenAbility, engine, onlyFeld, onlyHero);
         // Single hero + the placement is deterministic (stack slot or only
         // free slot) → no need to bother the player with a prompt.
         const ambiguous = zone < 0 ? false : abZonesCheck.filter((s, z) => {
@@ -307,8 +308,27 @@ module.exports = {
         }).length > 0;
         if (!ambiguous) {
           targetHeroIdx = onlyHero;
+          zielFeld = onlyFeld;
           explicitZone = zone;
         }
+      }
+      if (targetHeroIdx < 0 && eligibleWirte.some(e => e.phys !== pi)) {
+        // Mit uebernommenem Gegnerhelden unter den Wirten: Heldenwahl ueber Brett-Klick (die Anlege-Maske `abilityAttachTarget` kennt nur die eigene Heldenreihe) —
+        // wie Very Special Prisoner / Sacrifice to Divinity.
+        const ids = await engine.promptEffectTarget(pi, eligibleWirte.map(e => ({
+          id: `hero-${e.phys}-${e.heroIdx}`, type: 'hero', owner: e.phys, heroIdx: e.heroIdx,
+          cardName: engine.gs.players[e.phys]?.heroes?.[e.heroIdx]?.name || '',
+        })), {
+          title: CARD_NAME, source: CARD_NAME,
+          description: `Attach ${chosenAbility} to one of your other Heroes.`,
+          confirmLabel: '🔧 Attach', confirmClass: 'btn-info',
+          maxTotal: 1, cancellable: true, greenSelect: true,
+          previewCardName: chosenAbility,
+        });
+        const gewaehlt = (Array.isArray(ids) && ids.length > 0) ? eligibleWirte.find(e => `hero-${e.phys}-${e.heroIdx}` === ids[0]) : null;
+        if (!gewaehlt) { zurueck(); return; }
+        targetHeroIdx = gewaehlt.heroIdx;
+        zielFeld = gewaehlt.phys;
       }
       if (targetHeroIdx < 0) {
         const pickRes = await engine.promptGeneric(pi, {
@@ -328,8 +348,9 @@ module.exports = {
 
       // ★ W15a (Al, R3: „Ja" — Alex prallt an Resistance ab): Anlegen PER EFFEKT an den gewählten anderen Helden — vor jeder Kartenbewegung gefragt.
       // Die Ability bleibt im Deck (kein Mischen, kein Aufdecken); der Alex-Einsatz zählt als genutzt (die Wahl war getroffen).
-      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, pi, targetHeroIdx, CARD_NAME)) {
-        engine.log('alex_ability_tutor_blocked', { player: ps.username, ability: chosenAbility, to: ps.heroes[targetHeroIdx]?.name });
+      const hps = engine.gs.players[zielFeld];
+      if (await engine.abilityAnlegenDurchResistanceBlockiert(pi, zielFeld, targetHeroIdx, CARD_NAME)) {
+        engine.log('alex_ability_tutor_blocked', { player: ps.username, ability: chosenAbility, to: hps.heroes[targetHeroIdx]?.name });
         engine.sync();
         return;
       }
@@ -343,12 +364,12 @@ module.exports = {
       const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) { zurueck(); return; }
 
-      const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
-      ps.abilityZones[targetHeroIdx] = abZones;
+      const abZones = hps.abilityZones[targetHeroIdx] || [[], [], []];
+      hps.abilityZones[targetHeroIdx] = abZones;
       // If the player clicked a specific zone, respect it (after re-validating
       // legality). Otherwise fall back to the auto-picker.
       // v1349: gewuenschter Platz und Rueckfall an EINER Stelle.
-      const targetZone = findTargetZone(abZones, chosenAbility, engine, pi, targetHeroIdx, explicitZone);
+      const targetZone = findTargetZone(abZones, chosenAbility, engine, zielFeld, targetHeroIdx, explicitZone);
       if (targetZone < 0) {
         // Race: the target zone filled between canAttach check and now.
         ps.mainDeck.push(chosenAbility);
@@ -359,13 +380,14 @@ module.exports = {
       if (!abZones[targetZone]) abZones[targetZone] = [];
       abZones[targetZone].push(chosenAbility);
 
-      const inst = engine._trackCard(chosenAbility, pi, 'ability', targetHeroIdx, targetZone);
+      const inst = engine._trackCard(chosenAbility, zielFeld, 'ability', targetHeroIdx, targetZone);
+      if (zielFeld !== pi) inst.originalOwner = pi;   // W31a: die Karte gehoert dem Spieler (wie bei jedem Anlegen an einen uebernommenen Helden)
       engine._broadcastEvent('deck_search_add', { cardName: chosenAbility, playerIdx: pi });
       engine.log('alex_ability_tutor', {
         player: ps.username,
         ability: chosenAbility,
         from: alex.name,
-        to: ps.heroes[targetHeroIdx]?.name,
+        to: hps.heroes[targetHeroIdx]?.name,
       });
 
       // Fire downstream placement hooks so the new ability wires up cleanly
@@ -382,7 +404,7 @@ module.exports = {
       });
 
       engine._broadcastEvent('ability_activated', {
-        owner: pi, heroIdx: targetHeroIdx, zoneIdx: targetZone,
+        owner: zielFeld, heroIdx: targetHeroIdx, zoneIdx: targetZone,
         abilityName: chosenAbility,
       });
 

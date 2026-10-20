@@ -96,7 +96,8 @@ module.exports = {
     // Als Vorgabe 29.9.: dazu uebernommene Helden der Gegenseite mit Recht
     // `ausruesten` (Styx, Golden Apple …) — Ziel-ID/owner = Brettseite.
     const _plaetze = (ps.heroes || []).map((_, hi) => ({ seite: pi, hi }))
-      .concat((engine.fremdAusruestHelden?.(pi) || []).map(e => ({ seite: e.physOwner, hi: e.heroIdx })));
+      // W31a (Al, 22.10.2026): „one of your Heroes" - ein uebernommener Held, der durch die Kontrolle ausdruecklich immun gegen eigene Karten ist (Charme Lv3, Golden Apple), zaehlt nicht.
+      .concat((engine.fremdAusruestHelden?.(pi) || []).filter(e => !engine.heroImmunGegenEigene?.(e.physOwner, e.heroIdx, pi)).map(e => ({ seite: e.physOwner, hi: e.heroIdx })));
     for (const { seite, hi } of _plaetze) {
       const sps = engine.gs.players[seite];
       const hero = sps.heroes[hi];
