@@ -30,7 +30,9 @@ Spiel-Renderer `public/card-render.js` in Chromium gezeichnet).
 
 Die Einstellungen je Hero stehen in `hero-themes.json` (Kartenname → `themes`, optional `name` und `title` für Namenszeile und Beiname, `music` für die Datei in `public/music`).
 
-Texte für die Beschreibung: `captions.md`.
+Texte für die Beschreibungen: `captions.py` erzeugt `captions.md` (alle Texte) und je Reel `out/reels/<slug>.txt` (Caption zum Einfügen und Alt-Text). Geändert werden die Texte direkt in `captions.py`, danach neu ausführen.
+
+Stapellauf für alle Heroes mit eigenem Musikstück: `build-batch.py` (Ergebnis in `out/reels/`).
 
 Bausteine: `build-post.py` (Layout, Hintergrund, Sprite, Video), `ornaments.py` (Rahmen-Schnörkel),
 `fx.py` (Partikel-Themen), `render-card.js` (Karte), `pxcommon.py` (Raster und Farben).
