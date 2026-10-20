@@ -196,6 +196,23 @@ const BED = {
       const r = await t.run(() => t.engine.performImmediateActionAnyHero(h, { title: 'Shamanic Curse', cancellable: true }));
       R.check('ohne Flag: der (nicht angebotene) Ability-Versuch wird abgelehnt; nur Abbruch bleibt — kein Gold, nichts gespielt', t.gs.players[h].gold === g0 && r.played === false, { r });
       R.check('sauber', sauber(t), { e: t.errors, a: t.audit() }); }
+
+    // ── 8 · Bleed: es blutet der HANDELNDE (übernommene) Held, nicht der gleich nummerierte eigene ──
+    R.section(`Halter Sitz ${h} · Bleed nach der Aktion des übernommenen Helden trifft den übernommenen Helden (Charme-Schutz gilt wie sonst)`);
+    for (const art of ['ability', 'effect']) for (const uebernahme of ['temporaer', 'dauerhaft']) {
+      const { t } = await aufbau(h, art === 'ability' ? { hand: [] } : undefined);
+      if (art === 'ability') t.setAbilities(o, 0, [[ADV, ADV], [], []]); else t.setHero(o, 0, CH, 800);
+      await uebernehmen(t, h, o, uebernahme);
+      t.heroStatus(o, 0, 'bleeding'); t.heroStatus(h, 0, 'bleeding');   // der übernommene Held 0 UND der gleich nummerierte eigene Held 0 bluten; nur der handelnde zahlt
+      skript(t, () => (art === 'ability' ? { abilityActivation: true, heroIdx: 0, zoneIdx: 0, heroOwner: o } : { heroEffectActivation: true, heroIdx: 0, effectName: CH, heroOwner: o }));
+      t.script.push({ match: d => d && d.type === 'handPick', answer: () => ({ selectedCards: [{ cardName: F, handIndex: 0 }], selectedIndices: [0] }) });
+      const eigen0 = t.hp(h, 0), fremd0 = t.hp(o, 0);
+      await t.activateCreature(h, 1, 0);
+      const bleed = t.lg('bleed_damage').length, blockiert = t.lg('damage_blocked').some(l => l.reason === 'charmed');
+      R.check(`${art === 'ability' ? 'Ability' : 'Heldeneffekt'} (${uebernahme}): der gleich nummerierte EIGENE Held verliert nichts`, t.hp(h, 0) === eigen0, { eigen: eigen0 - t.hp(h, 0) });
+      R.check(`${art === 'ability' ? 'Ability' : 'Heldeneffekt'} (${uebernahme}): der übernommene (handelnde) Held blutet — ${uebernahme === 'dauerhaft' ? '50 Schaden' : 'der Charme-Schutz fängt den Schaden ab'}`, bleed === 1 && (uebernahme === 'dauerhaft' ? t.hp(o, 0) === fremd0 - 50 : (t.hp(o, 0) === fremd0 && blockiert)), { bleed, fremd: fremd0 - t.hp(o, 0), blockiert });
+      R.check('sauber', sauber(t), { e: t.errors, a: t.audit() });
+    }
   }
   R.finish();
 })();

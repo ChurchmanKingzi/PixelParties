@@ -2806,13 +2806,16 @@ class GameEngine {
     if (!this._bleedTriggersForAction(info)) return false;
     const pi = info.playerIdx;
     const hi = info.heroIdx;
-    const hero = this.gs.players?.[pi]?.heroes?.[hi];
+    // ★ W35a (Hu mit uebernommenem Helden): der HANDELNDE Held blutet — bei einem uebernommenen Helden steht er auf der Brettseite `info.heroOwner`, nicht beim handelnden Spieler `pi`
+    // (vorher traf der Schaden den gleich nummerierten EIGENEN Helden des Spielers).
+    const seite = isSeat(this, info.heroOwner) ? info.heroOwner : pi;
+    const hero = this.gs.players?.[seite]?.heroes?.[hi];
     if (!hero?.name || hero.hp <= 0 || !hero.statuses?.bleeding) return false;
-    const amount = await this._bleedDamageAmount({ kind: 'hero', owner: pi, heroIdx: hi });
+    const amount = await this._bleedDamageAmount({ kind: 'hero', owner: seite, heroIdx: hi });
     if (amount <= 0) return false;
     this.log('bleed_damage', { player: this.gs.players[pi]?.username, hero: hero.name, amount, after: info.actionType });
-    this._broadcastEvent('bleed_tick', { heroes: [{ owner: pi, heroIdx: hi, heroName: hero.name }] });
-    this._broadcastEvent('play_zone_animation', { type: 'bleed_tick', owner: pi, heroIdx: hi, zoneSlot: -1 });
+    this._broadcastEvent('bleed_tick', { heroes: [{ owner: seite, heroIdx: hi, heroName: hero.name }] });
+    this._broadcastEvent('play_zone_animation', { type: 'bleed_tick', owner: seite, heroIdx: hi, zoneSlot: -1 });
     await this._delay(350);
     await this.actionDealDamage({ name: 'Bleed' }, hero, amount, 'status', {
       isStatusDamage: true, skipSurpriseCheck: true, canBeNegated: true,
@@ -2822,7 +2825,7 @@ class GameEngine {
     // verhandelt, hier ist er gefallen. Beide Bleed-Wege feuern es mit
     // derselben Nutzlast, damit eine Karte nicht zwei Faelle braucht.
     await this.runHooks('afterBleedDamage', {
-      bleedTarget: { kind: 'hero', owner: pi, heroIdx: hi },
+      bleedTarget: { kind: 'hero', owner: seite, heroIdx: hi },
       amount, after: info.actionType, _skipReactionCheck: true,
     });
     this.sync();
@@ -23800,7 +23803,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cardDB = this._getCardDB();
     const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
     // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" = nach AKTUELLER Kontrolle — `_zusatzaktionsHelden` (eigene Spalte ohne abgegebene Helden + uebernommene
-    // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur eigene Spalte.
+    // der Gegenspalte). Ein uebernommener Held (`seite !== playerIdx`) bietet Attack-/Spell-/Kreatur-Karten aus der Hand; Abilities und Heldeneffekte nur mit `config.mitUebernommenenAktionen` (Hu, W35a).
     for (const { seite, heroIdx: hi } of this._zusatzaktionsHelden(playerIdx)) {
       const fremd = seite !== playerIdx;
       let karten = this.getHeroEligibleActionCards(playerIdx, hi, fremd ? seite : null);
@@ -23879,7 +23882,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const eingeschraenktAny = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
 
     // ★ W34a (Al, 22.10.2026, Guardian Beast Hu): „any Hero you control" nach aktueller Kontrolle (`_zusatzaktionsHelden`): ein uebernommener Gegnerheld wird als
-    // Aktionstraeger angeboten (`fremdeHelden`, nur Hand-Karten: Attack/Spell/Kreatur; Abilities/Heldeneffekte nur eigene Spalte), ein abgegebener eigener Held nicht.
+    // Aktionstraeger angeboten (`fremdeHelden`: Hand-Karten Attack/Spell/Kreatur; Abilities/Heldeneffekte mit Aktionskosten nur mit `config.mitUebernommenenAktionen` [Hu, W35a]), ein abgegebener eigener Held nicht.
     const fremdeHelden = {};
     for (const { seite: heldSeite, heroIdx: hi, hero } of this._zusatzaktionsHelden(playerIdx)) {
       const fremdHeld = heldSeite !== playerIdx;
@@ -40558,8 +40561,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    * `attacksPlayedThisTurn`, Helden-Liste `heroesAttackedThisTurn` (Index), Helden-Zähler `hero._attacksThisTurn`; Spell: `spellsPlayedThisTurn` (und der Silence-Bonus
    * `_silenceBonusSpell` ist verbraucht, wie in `doPlaySpell`). Danach `onEffectCountedAsArt` ({ art, playerIdx, heroIdx, heroOwner, effectName }) für Karten, die Attacks/Spells
    * über eigene Hook-Zähler führen (Mirjam: `onActionUsed` feuert nur für Aktionen).
+   * ★ W35a (Al, Frage 4): derselbe Zählschritt gilt für jede gespielte Attack-KARTE (`q.karte`): `doPlaySpell` (auch inhärent/negiert), `_castSpellImmediately` (Sofort-Güsse: Hu, Coffee …),
+   * Love Shot, Nieht. `ctx.karte` im Hook unterscheidet Karte (Kartenname in `effectName`) von Effekt.
    * @param {'attack'|'spell'} art
-   * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
+   * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string, karte?:boolean }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
    */
   async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte }) {
     const gs = this.gs;
@@ -40580,7 +40585,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
       if (!this._inMctsSim) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
     }
-    if (this._inMctsSim) return;
+    if (this._inMctsSim && !karte) return;   // W35a: gespielte Attack-KARTEN melden auch im Rollout (vorher feuerte dort `onActionUsed` fuer Mirjam)
     try {
       await this.runHooks('onEffectCountedAsArt', { art, playerIdx: pi, heroIdx, heroOwner: seite, effectName: name, karte: !!karte });   // W35a: `karte` = eine echte Attack-KARTE (doPlaySpell, Zusatzaktions-Guss), sonst ein Effekt
     } catch (err) { console.error('[zaehleAlsArt]', err.message); }
@@ -44732,7 +44737,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // v712 (Bleed): Heldeneffekt OHNE Action-Kosten (Elana) blutet auch —
       // der Action-Pfad meldet nur kostenpflichtige ueber onAnyActionResolved.
       if (!isActionCost) {
-        try { await this._processBleedAfterAction({ actionType: 'hero_effect', playerIdx: pi, heroIdx, isFree: true }); }
+        try { await this._processBleedAfterAction({ actionType: 'hero_effect', playerIdx: pi, heroIdx, isFree: true, ...(heroOwner !== pi ? { heroOwner } : {}) }); }
         catch (err) { console.error('[Bleed] hero effect failed:', err.message); }
       }
       if (this.gs._pendingCardReveal) this._firePendingCardReveal();
@@ -44782,6 +44787,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           cardName:     chosen.name,
           playedCardName: chosen.name,
           heroIdx,
+          ...(heroOwner !== pi ? { heroOwner } : {}),   // W35a: uebernommener Held — Brettseite des Handelnden (wie Spell/Attack/Ability)
           isAdditional: !!istZusatzaktion,
           // Immer false: der Haken feuert hier nur noch, wenn eine
           // Aktion bezahlt wurde — "inherent" hieße das Gegenteil.
