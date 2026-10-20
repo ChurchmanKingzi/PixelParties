@@ -129,6 +129,22 @@ module.exports = {
   },
   attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, opponentOfGs(gs, pi)] }); }, // v651: beide Seiten als Drop-Ziel
 
+  /**
+   * Umhaengen (Inheritance Ceremony, 12.10.): der Schutz liegt jetzt an einem anderen Helden — den `magic_immune`-Buff dort anlegen, auf die HOECHSTE Stufe unter allen
+   * Anti-Magic-Kopien dort (am alten Wirt hat `onCardLeaveZone` ihn neu berechnet).
+   */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    const hero = engine.gs.players[toOwner]?.heroes?.[toHeroIdx];
+    if (!hero?.name) return;
+    const level = Math.max(inst.counters?.antiMagicLevel || 0, highestRemainingLevel(engine, toOwner, toHeroIdx, inst.id));
+    if (level > 0) {
+      await engine.actionAddBuff(hero, toOwner, toHeroIdx, 'magic_immune', {
+        sourceOwner: inst.counters?.antiMagicCastBy ?? toOwner, level, source: CARD_NAME,
+      });
+    }
+    engine.sync();
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand' || ctx.playedCard?.id !== ctx.card.id) return;

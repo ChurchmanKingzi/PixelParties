@@ -28,9 +28,10 @@
   const PT = 4 / 3;                       // MSE: Punkt -> Pixel
   const UPM = 2048, ASC = 1900, DESC = 500;   // Pixel Intv (hhea)
   const LINE_U = ASC + DESC;
+  const OVER_GREEN = 'rgb(76,235,112)', OVER_RED = 'rgb(255,72,72)', OVER_OUTLINE = 'rgb(8,6,12)';   // aktuelle Werte: verringert / erhoeht, Kontur
   let TEXT_MASK = false;                      // waehrend `textLayer` gesetzt: aller Text weiss (Maske), siehe `draw(…, textOnly)`
   const INK_TRAIL_U = 200;                    // Vorschub minus Tintenbreite: 1 Schrift-Pixel Abstand hinter jedem Zeichen
-  const OPT = { dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
+  const OPT = { boldU: 50, statusOutline: 0.5, dy: 0, dx: 0, slack: 0, trail: false, step: 0.05, hextra: 0, forcePt: 0, bsteps: 7, silverRim: true, nl: 'space', symDx: 0, symDy: 0, symMode: 'rule', hardOutlines: true };
 
   // ── Schrift: Umrisse und Vorschubbreiten aus cardgen/glyphs.json ──
   // Pixel Intv besteht nur aus Rechtecken, hat kein Kerning und Breiten in Vielfachen von 200 Einheiten.
@@ -76,11 +77,110 @@
     if (OPT.symMode === 'all') return t;
     return t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
   };
+  // ── Statuseffekte im Regeltext (Als Vorgabe 20.10.) ──
+  // Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint: fett und farbig — aber NUR im Effekttext
+  // (`drawBlock`), nie in Namen. Auch Kartennamen im Text bleiben unberuehrt: sie stehen in Anfuehrungszeichen („Poison Vial“,
+  // „Rafflesia, the Poison Princess“, „Terror“), und alles zwischen Anfuehrungszeichen wird nicht gefaerbt.
+  // `hell` steht auf dunklen und mittleren Textboxen (mit dunkler Kontur), `dunkel` auf hellen (Artifacts, Tokens, … — ohne Kontur, nur so
+  // weit abgedunkelt, wie der Kontrast zum Untergrund es verlangt). Welcher Ton gilt, entscheidet `statusDarstellung` je Textbox anhand
+  // ihrer tatsaechlichen Farbe (`boxHintergrund`), nicht nach Kartentyp: so liest sich jedes Wort auf jedem Rahmen. `fest` (Blind, weiss)
+  // behaelt seinen Ton immer. Die Tooltips des Spiels lesen dieselbe Tabelle (`CardRender.STATUS_TERMS` / `statusMatches`).
+  const STATUS_TERMS = [
+    { key: 'poison', label: 'Poisoned', re: 'poison(?:s|ed|ing)?',        hell: '#c98aff', dunkel: '#7a2bd0' },
+    { key: 'burn',   label: 'Burned',  re: 'burn(?:s|ed|ing)?',          hell: '#ff9b3a', dunkel: '#cf5f00' },
+    { key: 'stun',   label: 'Stunned', re: 'stun(?:s|ned)?',             hell: '#ffe23d', dunkel: '#a87c00' },
+    { key: 'negate', label: 'Negate', re: 'negat(?:e|es|ed|ing|ion)',   hell: '#9aa3b6', dunkel: '#59606e' },
+    { key: 'bleed',  label: 'Bleeding', re: 'bleed(?:s|ing)?',            hell: '#ff5c5c', dunkel: '#c0141c' },
+    { key: 'freeze', label: 'Frozen',  re: 'freez(?:e|es|ing)|frozen',   hell: '#7fdfff', dunkel: '#1788bd' },
+    { key: 'blind',  label: 'Blinded', re: 'blind(?:s|ed)?',             hell: '#ffffff', dunkel: '#ffffff', fest: true },   // weiss (Als Vorgabe 20.10.), immer mit dunkler Kontur
+  ];
+  const STATUS_IDX = Object.create(null);
+  STATUS_TERMS.forEach((t, i) => { STATUS_IDX[t.key] = i; });
+  const STATUS_RE = new RegExp('\\b(?:' + STATUS_TERMS.map(t => '(' + t.re + ')').join('|') + ')\\b', 'gi');
+  // „Fett“ in Pixel Intv: die Schrift hat 2 Pixel dicke Staemme, 1 Pixel duenne Balken und ueberall 1 Pixel breite Luecken (Counter)
+  // — jedes Verbreitern um ein ganzes Schrift-Pixel (200 Einheiten) schliesst sie, aus „Frozen“ wird „Froze■“. Deshalb: das Zeichen
+  // doppelt, nur `OPT.boldU` (50 = ein Viertel Schrift-Pixel, gut ein Bildpixel) versetzt und um dasselbe weiter vorgeschoben, dazu eine
+  // dunkle Kontur von `OPT.statusOutline` Schrift-Pixeln (8 Richtungen) — die Woerter stehen kraeftig und scharf vor jedem Untergrund.
+  /** Statusbegriffe in `text` ausserhalb von Anfuehrungszeichen: [{ start, end, key }] */
+  function statusMatches(text) {
+    const t = String(text == null ? '' : text), out = [], quoted = [];
+    t.replace(/"[^"]*"/g, (m, i) => { quoted.push([i, i + m.length]); return m; });
+    STATUS_RE.lastIndex = 0;
+    let m;
+    while ((m = STATUS_RE.exec(t))) {
+      const a = m.index, b = a + m[0].length;
+      if (quoted.some(([x, y]) => a >= x && b <= y)) continue;
+      // „… cannot be negated“ nennt einen Schutz, keinen Status: nicht hervorheben (Als Vorgabe 20.10.)
+      if (/\b(?:cannot|can't|can not) be\s+$/i.test(t.slice(Math.max(0, a - 16), a)) && /^negat/i.test(m[0])) continue;
+      let k = 1;
+      while (k < m.length && m[k] === undefined) k++;
+      out.push({ start: a, end: b, key: STATUS_TERMS[k - 1].key });
+    }
+    return out;
+  }
+  // Kontrast nach WCAG (Verhaeltnis der relativen Leuchtdichten), fuer die Wahl des Tons je Untergrund
+  const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const linC = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const leucht = c => 0.2126 * linC(c[0]) + 0.7152 * linC(c[1]) + 0.0722 * linC(c[2]);
+  const kontrast = (a, b) => { const x = leucht(a), y = leucht(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const STATUS_MIN_CONTRAST = 4.5, STATUS_MAX_DARKEN = 0.6;      // so weit darf ein dunkler Ton abgedunkelt werden, bevor die helle Fassung gilt
+  const STATUS_DISTINCT = 2.2, STATUS_EDGE = 3;                  // Mindestabstand des hellen Tons zum Untergrund; Mindestkontrast der Kontur zum Untergrund
+  const OUT_DARK = 'rgb(8,6,12)', OUT_LIGHT = 'rgb(255,248,232)', OUT_DARK_RGB = [8, 6, 12], OUT_LIGHT_RGB = [255, 248, 232];
+  /** Mittlere Farbe der Textbox, BEVOR Text darauf kommt (Fuellung des Rahmens); null, wenn nicht lesbar (Textmaske, kein Rahmen). */
+  function boxHintergrund(ctx, o) {
+    if (TEXT_MASK) return null;
+    try {
+      const x = Math.round(o.left + o.width * 0.1), y = Math.round(o.top + o.height * 0.1);
+      const w = Math.max(1, Math.round(o.width * 0.8)), h = Math.max(1, Math.round(o.height * 0.8));
+      const d = ctx.getImageData(x, y, w, h).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4 * 5) { if (d[i + 3] < 200) continue; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      return n > 40 ? [r / n, g / n, b / n] : null;
+    } catch (e) { return null; }
+  }
+  /** Darstellung eines Begriffs auf diesem Untergrund: { color, outline: null | OUT_DARK | OUT_LIGHT }. Der Reihe nach:
+   *   1. heller Untergrund (Artifacts): der tiefe Ton, bei Bedarf abgedunkelt, ohne Kontur;
+   *   2. der helle Ton mit dunkler Kontur, wenn er sich vom Untergrund abhebt (der Normalfall auf dunklen und mittleren Boxen);
+   *   3. gleicher Farbton wie der Untergrund (Bleed auf Rot, Poison auf Lila, Negate auf Grau): der tiefe Ton mit heller Kontur;
+   *   4. Rueckfall: der helle Ton mit dunkler Kontur.
+   *  `fest` (Blind, weiss) behaelt Ton und dunkle Kontur immer. `light`: Rueckfall ohne Messung. */
+  function statusDarstellung(term, bg, light) {
+    if (term.fest) return { color: term.hell, outline: OUT_DARK };
+    if (!bg) return light ? { color: term.dunkel, outline: null } : { color: term.hell, outline: OUT_DARK };
+    const dunkel = hexRgb(term.dunkel);
+    const abgedunkelt = (von, bis) => { for (let f = von; f >= bis - 1e-9; f -= 0.05) { const c = dunkel.map(v => Math.round(v * f)); if (kontrast(c, bg) >= STATUS_MIN_CONTRAST) return c; } return null; };
+    const tief = abgedunkelt(1, STATUS_MAX_DARKEN);
+    if (tief) return { color: 'rgb(' + tief.join(',') + ')', outline: null };
+    if (kontrast(hexRgb(term.hell), bg) >= STATUS_DISTINCT) return { color: term.hell, outline: OUT_DARK };
+    if (kontrast(OUT_LIGHT_RGB, bg) >= STATUS_EDGE && kontrast(dunkel, OUT_LIGHT_RGB) >= STATUS_MIN_CONTRAST - 1) return { color: term.dunkel, outline: OUT_LIGHT };
+    return { color: term.hell, outline: OUT_DARK };
+  }
+  /** Stil je Zeichen eines Absatzes (Index in STATUS_TERMS + 1, sonst 0); null ohne Treffer. */
+  function statusStyles(p) {
+    if (OPT.status === false) return null;
+    const ms = statusMatches(p);
+    if (!ms.length) return null;
+    const st = new Array(p.length).fill(0);
+    for (const m of ms) for (let i = m.start; i < m.end; i++) st[i] = STATUS_IDX[m.key] + 1;
+    return st;
+  }
+
   let symSize = 8.5;                              // Symbolgroesse des Textfelds, das gerade gesetzt wird
   function symAdv(ch) {                           // Breite in Font-Einheiten (haengt nicht von der Schriftgroesse ab)
     const r = sprites && sprites.rects['sym.' + SYM_KEY[ch]];
     if (!r) return 1400;
     return (r[2] * 10 + SYM_SPACE) * (symSize / SYM_FONT) * UPM / (20 * PT);
+  }
+
+  // Das „X" der variablen Kosten („4X", „X"): das Grossbuchstaben-X der Schrift ist 7 Schrift-Pixel hoch, die Ziffern nur 6 — beide
+  // stehen auf derselben Grundlinie, das X ragte also oben einen Pixel heraus („etwas hoeher als die Zahlen", Als Befund 19.10.).
+  // Fuer gedruckte Kosten gibt es deshalb ein X in Ziffernhoehe (6 Reihen, gleiche Strichstaerke, Pixelraster 200 Einheiten):
+  //   XX..XX / .XXXX. / ..XX.. / ..XX.. / .XXXX. / XX..XX
+  // Es liegt unter einem Zeichen aus dem privaten Bereich und wird nur ueber `drawLine(…, { costX: true })` eingesetzt.
+  const COST_X = '\uE0F0';
+  function costXPath() {
+    const reihen = [[[0, 400], [800, 1200]], [[200, 1000]], [[400, 800]], [[400, 800]], [[200, 1000]], [[0, 400], [800, 1200]]];   // von unten nach oben
+    return reihen.map((runs, i) => runs.map(([x0, x1]) => `M${x0} ${i * 200}L${x1} ${i * 200}L${x1} ${i * 200 + 200}L${x0} ${i * 200 + 200}Z`).join('')).join('');
   }
 
   function adv(ch) {
@@ -90,7 +190,7 @@
     const g = GL[ch];
     return g ? g.a : 1400;
   }
-  function unitsOf(s) { let n = 0; for (const c of s) n += adv(c); return n; }
+  function unitsOf(s, st) { let n = 0, i = 0; for (const c of s) { n += adv(c) + (st && st[i] ? OPT.boldU : 0); i += c.length; } return n; }
   function glyphPath(ch) {
     const g = GL[ch];
     if (!g) return null;
@@ -142,6 +242,7 @@
       ]);
       sprites = { img, rects: json.rects };
       GL = glyphs.glyphs;
+      GL[COST_X] = { a: 1400, d: costXPath() };
     })();
     return initPromise;
   }
@@ -224,8 +325,20 @@
     let t = String(text == null ? '' : text);
     if (soft || OPT.nl === 'soft') t = t.replace(/ *\n */g, ' ');
     else t = t.replace(/ +\n/g, ' ');
-    return t.split('\n').map(p => p.trim()).filter(Boolean)
-      .map(p => p.split(/ +/).filter(Boolean).map(s => ({ s, u: unitsOf(s) })));
+    return t.split('\n').map(p => p.trim()).filter(Boolean).map(wordsOf);
+  }
+  // Absatz -> Woerter { s, u, st }; `st` (Stil je Zeichen, Statusbegriffe) nur an Woertern mit Treffer
+  function wordsOf(p) {
+    const st = statusStyles(p), out = [], re = / +/g;
+    let a = 0, m;
+    const push = b => {
+      if (b <= a) return;
+      const s = p.slice(a, b), w = st ? st.slice(a, b) : null, has = !!(w && w.some(Boolean));
+      out.push({ s, st: has ? w : null, u: unitsOf(s, has ? w : null) });
+    };
+    while ((m = re.exec(p))) { push(m.index); a = m.index + m[0].length; }
+    push(p.length);
+    return out;
   }
 
   // Passende Schriftgroesse: wie MSE per Halbierung zwischen `min` und `size` (bsteps Schritte), das groesste
@@ -269,6 +382,10 @@
     let top = o.top + (o.padT || 0);
     if (o.vAlign === 'middle') top += (innerH - total) / 2;
     ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
+    // Statusbegriffe: Darstellung je Begriff nach der echten Farbe dieser Textbox (vor dem ersten Buchstaben gemessen)
+    const bgBox = lines.some(l => l.words.some(w => w.st)) ? boxHintergrund(ctx, o) : null;
+    const darst = STATUS_TERMS.map(t => statusDarstellung(t, bgBox, o.light));
+    root.CardRender.last.bg = bgBox; root.CardRender.last.darst = darst;
     const k = em / UPM;
     const base = em * ASC / UPM;
     const x0 = o.left + (o.padL || 0);
@@ -281,9 +398,29 @@
       let x = x0;
       if (o.align === 'center') x = x0 + (innerW - lineU * em / UPM) / 2;
       for (let wi = 0; wi < l.words.length; wi++) {
-        for (const ch of l.words[wi].s) {
-          if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt); else putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
-          x += adv(ch) * k;
+        const word = l.words[wi];
+        let ci = 0;
+        for (const ch of word.s) {
+          const sty = word.st ? word.st[ci] : 0;
+          ci += ch.length;
+          if (SYM_KEY[ch]) putSymbol(ctx, ch, x, y, pt);
+          else if (sty) {
+            // Statusbegriff: dunkle Kontur, dann Farbe der Tabelle (in der Textmaske bleibt es weiss), fett = zweimal, leicht versetzt
+            const dd = darst[sty - 1];
+            if (OPT.statusOutline && dd.outline && !TEXT_MASK) {
+              const d = OPT.statusOutline * 200 * k;
+              ctx.fillStyle = dd.outline;
+              for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) {
+                putGlyph(ctx, ch, x + OPT.dx + ox, y + oy, k, 1);
+                if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k + ox, y + oy, k, 1);
+              }
+            }
+            if (!TEXT_MASK) ctx.fillStyle = dd.color;
+            putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
+            if (OPT.boldU) putGlyph(ctx, ch, x + OPT.dx + OPT.boldU * k, y, k, 1);
+            if (!TEXT_MASK) ctx.fillStyle = o.color;
+          } else putGlyph(ctx, ch, x + OPT.dx, y, k, 1);
+          x += (adv(ch) + (sty ? OPT.boldU : 0)) * k;
         }
         x += gapU * k;
       }
@@ -295,7 +432,7 @@
   // der Box, wird die Schrift bis `min` verkleinert; ist eine Zeile danach noch zu breit, wird sie horizontal
   // gestaucht (MSE „shrink-overflow“).
   function drawLine(ctx, text, o) {
-    const lines = String(text == null ? '' : text).split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = String(text == null ? '' : text).split('\n').map(l => l.trim()).filter(Boolean).map(l => o.costX ? l.replace(/X/g, COST_X) : l);
     if (!lines.length) return;
     const fitsH = pt => lines.length * pt * PT * LINE_U / UPM <= o.height + 1e-6;
     let pt = o.size;
@@ -318,8 +455,18 @@
       if (o.align === 'center') x = o.left + (o.width - w) / 2;
       else if (o.align === 'right') x = o.left + o.width - w;
       const y = top + li * pitch + em * ASC / UPM + OPT.dy;
-      let cx = x + OPT.dx;
-      for (const ch of line) { putGlyph(ctx, ch, cx, y, k, sx); cx += adv(ch) * k * sx; }
+      const paint = (ox, oy) => {
+        let cx = x + OPT.dx + ox;
+        for (const ch of line) { putGlyph(ctx, ch, cx, y + oy, k, sx); cx += adv(ch) * k * sx; }
+      };
+      // `outline`: dunkle Kontur um die Zahl (8 Richtungen, 0,7 Schrift-Pixel) — hebt farbige Werte (gruen/rot) auf jedem Rahmen ab
+      if (o.outline && !TEXT_MASK) {
+        const d = Math.max(2, Math.round(pt * PT * 200 / UPM * 0.7));
+        ctx.fillStyle = o.outline;
+        for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) paint(ox, oy);
+        ctx.fillStyle = TEXT_MASK ? '#fff' : o.color;
+      }
+      paint(0, 0);
     });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -452,6 +599,38 @@
     else sprite(lc, maskKey, 0, 0, dw, dh);
   }
 
+  // ═════════════ Stufe einer Ability hervorheben ═════════════
+  // Fähigkeitskarten (`skill3`) haben drei Textboxen, je eine pro Stufe. Steht die Karte auf dem Brett, hebt `stufe` (1–3) die
+  // Box ihrer aktuellen Stufe hervor (etwas heller, schmale blasse Kante) und graut die beiden anderen aus (teilentsaettigt, leicht
+  // abgedunkelt). Erste Fassung: goldene 10-px-Kante und Dunkelheit .58 — „Grayout etwas zu dunkel, Rahmen zu praegnant"
+  // (Als Befund 19.10.), daher jetzt 5 px, blasses Gold mit Deckkraft .55 und Dunkelheit .30.
+  // Innenflaechen der Boxen im Rahmenraster (Kartenpixel): x 70–680, y 600–730 / 740–870 / 880–1000.
+  const STUFEN_BOXEN = [[600, 130], [740, 130], [880, 120]];
+  const STUFE = {
+    heller: 'rgba(255,255,255,.10)',          // aktive Box: Aufhellung
+    kante: 'rgba(255,238,160,.55)', kanteDicke: 5,
+    grau: .8,                                  // inaktive Box: Anteil der Entsaettigung (0–1)
+    dunkel: 'rgba(14,12,26,.30)',              // inaktive Box: Abdunklung
+  };
+  function markStufe(ctx, stufe) {
+    const X = 70, B = 610, d = STUFE.kanteDicke;
+    STUFEN_BOXEN.forEach(([y, h], i) => {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(X, y, B, h); ctx.clip();
+      if (i + 1 === stufe) {
+        ctx.fillStyle = STUFE.heller; ctx.fillRect(X, y, B, h);
+        ctx.fillStyle = STUFE.kante;
+        ctx.fillRect(X, y, B, d); ctx.fillRect(X, y + h - d, B, d); ctx.fillRect(X, y + d, d, h - 2 * d); ctx.fillRect(X + B - d, y + d, d, h - 2 * d);
+      } else {
+        ctx.globalAlpha = STUFE.grau;
+        ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = 'rgb(128,128,128)'; ctx.fillRect(X, y, B, h);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = STUFE.dunkel; ctx.fillRect(X, y, B, h);
+      }
+      ctx.restore();
+    });
+  }
+
   // ═════════════ Karte zeichnen ═════════════
   // spec: { type, rarity, name, text, skillBox, skillBox2, hp, atk, level, school, kind }
   // art:  { src: CanvasImageSource, sx, sy, sw, sh } | null
@@ -503,8 +682,10 @@
     // 5) Zauberschule (links) und Stufe (rechts) — Zauber und Kreaturen
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
-      if (spec.level != null) drawLine(ctx, String(spec.level), {
-        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle', color: levelColor(spec),
+      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur
+      if (spec.level != null || spec.lvOver != null) drawLine(ctx, String(spec.lvOver != null ? spec.lvOver : spec.level), {
+        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle',
+        color: spec.lvOver != null ? spec.lvColor : levelColor(spec), outline: spec.lvOver != null ? OVER_OUTLINE : null,
       });
     }
     // Kartenart-Symbol unten links (Falle, Reaktion, Flaeche, Anhang)
@@ -531,9 +712,12 @@
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
       const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (!spec.noAtk && (spec.atk != null || isHero3(t) || sup)) drawLine(ctx, spec.atk != null ? String(spec.atk) : '?', {
+      // `costOver`: aktuelle Kosten eines Artifacts (sitzen im Wertefeld der Mitte), gruen/rot mit dunkler Kontur
+      const kostet = isArti2(t) && spec.costOver != null;
+      if (!spec.noAtk && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
-        height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
+        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : stat, ink: heroBox,
+        outline: kostet ? OVER_OUTLINE : null, costX: isArti2(t),
       });
     }
 
@@ -552,8 +736,11 @@
       drawBlock(ctx, spec.text, {
         left: 95, top: rule.top, width: 560, height: rule.height, padL: 1, padT: 2, padR: 0, padB: 0,
         size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: 1, color: ruleColor(spec), main: true, soft: spec.soft,
+        light: isArti2(t) || isToken(t),                 // helle Textbox (dunkle Schrift): dunkle Statusfarben
       });
     }
+
+    if (t === 'skill3' && !textOnly && spec.stufe >= 1 && spec.stufe <= 3) markStufe(ctx, spec.stufe);
 
     // 9) Seltenheits-Stempel unten rechts
     const stamp = STAMP[spec.rarity];
@@ -626,7 +813,9 @@
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '') : asc ? [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n') : '',
       skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '') : ''),
-      hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? c.cost : c.atk,
+      // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
+      // statt der Zahl in `cost` (die der Server weiter rechnet).
+      hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,
       level: type === 'spell' || type === 'summon' ? c.level : null,
       school: type === 'spell' || type === 'summon' ? (c.cardType === 'Attack' ? 'fight' : schoolKey(c)) : null,
       kind: kindMap && kindMap[c.subtype] || null,
@@ -675,6 +864,8 @@
    * @param {object} [o]   { skin: Skin-Name } — Skins zeigen dieselbe Karte mit eigener Kunst und eigenem Namen
    *                       { hp: Zahl } — druckt diese HP statt der aus cards.json (Tooltip: aktuelle max. HP)
    *                       { noHp, noAtk: true } — laesst die gedruckte HP bzw. ATK weg (Brett: Live-Werte darueber)
+   *                       { lv, kost: Zahl } — druckt diese aktuelle Stufe / Kosten (Hand): gruen = verringert, rot = erhoeht
+   *                       { stufe: 1–3 } — Fähigkeitskarte: hebt die Box dieser Stufe hervor, die anderen beiden grau (Brett, Tooltip)
    * @returns {Promise<HTMLCanvasElement|null>} null, wenn die Kunst fehlt
    */
   async function renderCard(card, o) {
@@ -690,7 +881,15 @@
     const spec = specFromCard(card, m, skin ? { name: skin.name || o.skin } : null);
     if (o.hp != null) spec.hp = o.hp;
     if (o.noHp) spec.noHp = true;
+    if (o.stufe >= 1 && o.stufe <= 3) spec.stufe = o.stufe;
     if (o.noAtk) spec.noAtk = true;
+    // aktuelle Stufe / Kosten (Hand): gruen, wenn niedriger als gedruckt, rot, wenn hoeher; gleich -> unveraendert gedruckt
+    if (o.lv != null && card.level != null && o.lv !== card.level) { spec.lvOver = o.lv; spec.lvColor = o.lv < card.level ? OVER_GREEN : OVER_RED; }
+    // Variable Kosten („4X"): das X bleibt dran (aus 4X wird 8X); ein reines „X" hat keine Zahl, die man ersetzen koennte.
+    if (o.kost != null && card.cost != null && o.kost !== card.cost && (!card.costLabel || /^\d/.test(card.costLabel))) {
+      spec.costOver = o.kost + (card.costLabel ? String(card.costLabel).replace(/^\d+/, '') : '');
+      spec.costColor = o.kost < card.cost ? OVER_GREEN : OVER_RED;
+    }
     // Skin-Holo: der Name steht golden auf der Karte (siehe unten, HOLO-TEXTUR); die schillernden Schichten
     // darueber zeichnet das Spiel als eigene DOM-Lage (SkinHolo in app-shared.jsx).
     if (skin && holoOn(skin)) spec.nameGold = true;
@@ -1150,5 +1349,5 @@
     return job;
   }
 
-  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs };
+  root.CardRender = { OPT, last: {}, meta_card: (n, r) => { meta.cards[n] = Object.assign(meta.cards[n] || {}, { r: r === 'common' ? undefined : r }); }, meta_set: (k, name) => { meta.skins[k] = Object.assign(meta.skins[k] || {}, { name }); }, init, draw, specFromCard, renderCard, holoLayers, holoFor, holoCached, nameShimmerFor, nameCached, textShimmerFor, textCached, textLayer, hatchFor, hatchCached, hatchEligible, rimKind, rimFor, rimCached, openCache, cacheGet, cachePut, cacheDel, cacheStats, toBlob, HOLO, getArt, hasArt, loadMeta, loadArtIndex, W, H, _adv: adv, _unitsOf: unitsOf, _paragraphs: paragraphs, STATUS_TERMS, statusMatches, _statusDarstellung: statusDarstellung, _kontrast: kontrast, STATUS_OUTLINES: { dark: OUT_DARK, light: OUT_LIGHT } };
 })(typeof window !== 'undefined' ? window : globalThis);

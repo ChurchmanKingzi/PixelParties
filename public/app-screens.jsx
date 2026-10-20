@@ -2427,7 +2427,7 @@ function PpIdleSprite({ name, box = 96, grey }) {
   const scale = PP_IDLE_SCALE;
   const fenster = Math.round(box / scale);                       // Boxgröße in Sprite-Pixeln
   const bw = kern.x1 - kern.x0, bh = kern.y1 - kern.y0;
-  const gesichtX = typeof m.faceX === 'number' ? m.faceX : kern.fx;
+  const gesichtX = typeof m.anchorX === 'number' ? m.anchorX : typeof m.faceX === 'number' ? m.faceX : kern.fx;   // `anchorX` (ausdrücklich abweichende Mitte) hat Vorrang, wie auf dem Brett
   const gesichtY = typeof m.faceY === 'number' ? m.faceY : kern.fy;   // `faceY` (Gesichtsmitte) steht optional im Sheet-JSON, wie `faceX`
   const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   // Ganzzahlige Fensterkanten, damit die Pixel scharf bleiben.
@@ -2534,6 +2534,73 @@ function ProfileSkinMenus({ ownedSkins, selected, onSelect, onClose }) {
         </div>
       ), 1100)}
     </>
+  );
+}
+
+// ═══════════════════════════════════════════
+//  DISCORD VERKNÜPFEN (MoniaBot)
+//  Der Spieler erzeugt hier einen Einmalcode und tippt im Discord `!link CODE`. Damit bekommt er
+//  Rang-/Erfolgsrollen und kann !sc / !daily nutzen. Ohne BOT_SECRET am Server (kein Bot) und für Gäste bleibt der Block unsichtbar.
+//  Sitzt als Zeile im Fenster „Email & Recovery“ (die Profilseite soll auf einen Bildschirm passen).
+// ═══════════════════════════════════════════
+function DiscordLinkRow({ isGuest }) {
+  const [status, setStatus] = useState(null);       // { linked, enabled }
+  const [code, setCode] = useState(null);           // { code, expiresInSec }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try { setStatus(await api('/discord/status')); } catch { setStatus({ enabled: false }); }
+  };
+  useEffect(() => { load(); }, []);
+  // Ist der Code eingelöst, zeigt gelegentliches Nachfragen „Verknüpft“ an; nach Ablauf verschwindet der Code.
+  useEffect(() => {
+    if (!code) return undefined;
+    const t = setInterval(async () => {
+      try { const st = await api('/discord/status'); if (st.linked) { setStatus(st); setCode(null); } } catch {}
+    }, 4000);
+    const expire = setTimeout(() => setCode(null), code.expiresInSec * 1000);
+    return () => { clearInterval(t); clearTimeout(expire); };
+  }, [code]);
+
+  if (!status || !status.enabled || isGuest) return null;
+
+  const makeCode = async () => {
+    setBusy(true); setError('');
+    try { setCode(await api('/discord/link-code', { method: 'POST' })); }
+    catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+  const unlink = async () => {
+    setBusy(true); setError('');
+    try { await api('/discord/unlink', { method: 'POST' }); setCode(null); await load(); }
+    catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid var(--bg4)', marginTop: 12, paddingTop: 10 }}>
+      <div className="profile-section-label">DISCORD</div>
+      {status.linked ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--success)', border: '1px solid var(--success)', borderRadius: 4, padding: '1px 6px' }}>LINKED</span>
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>Rank roles follow your Elo. Try !sc and !daily on the server.</span>
+          <button className="btn" style={{ padding: '6px 14px', fontSize: 10, marginLeft: 'auto' }} onClick={unlink} disabled={busy}>UNLINK</button>
+        </div>
+      ) : code ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>Type in the Discord server:</span>
+          <span style={{ fontSize: 16, letterSpacing: 2, color: 'var(--text)', userSelect: 'all', cursor: 'text' }}>!link {code.code}</span>
+          <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 'auto' }}>valid {Math.round(code.expiresInSec / 60)} min</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: 'var(--text2)' }}>Get rank roles and use !sc / !daily on the server.</span>
+          <button className="btn" style={{ padding: '6px 14px', fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }} onClick={makeCode} disabled={busy}>LINK DISCORD</button>
+        </div>
+      )}
+      {error && <div style={{ fontSize: 10, color: 'var(--danger, #e55)', marginTop: 6 }}>{error}</div>}
+    </div>
   );
 }
 
@@ -3521,6 +3588,7 @@ function ProfileScreen() {
                 )}
               </div>
             )}
+            <DiscordLinkRow isGuest={!!user.isGuest} />
           </div>
           </div>
 

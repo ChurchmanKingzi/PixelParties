@@ -7661,29 +7661,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   cursor: url("/cursor-arrow.png?v=4") 2 2, default;
 }
 
-/* Per-instance Artifact cost-override badge (Play Money). Top-left of
-   the card, blue-tinted to match the gold-cost diamond used in
-   tooltips. Auto-pointer so the hover-tooltip explains the discount. */
-.hand-cost-override {
-  position: absolute;
-  /* Als Vorgabe 2.10.: rechts auf Hoehe des Level-Abzeichens (`.creature-level`), wo bei anderen Karten das verringerte Level steht */
-  right: 2px;
-  top: 45%;
-  padding: 2px 5px;
-  background: rgba(20, 30, 60, 0.92);
-  border: 1px solid #44aaff;
-  border-radius: 4px;
-  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
-  font-size: calc(10px * var(--board-scale));
-  font-weight: bold;
-  color: #88ddff;
-  text-shadow: 0 0 4px #000, 1px 1px 0 #000;
-  box-shadow: 0 0 6px rgba(68, 170, 255, 0.55);
-  z-index: 5;
-  pointer-events: auto;
-  cursor: url("/cursor-arrow.png?v=4") 2 2, default;
-  line-height: 1;
-}
+/* (Das Kosten-Abzeichen der Handkarten `.hand-cost-override` ist entfallen: die aktuellen Kosten stehen seit 13.10. auf der
+   Karte selbst, s. `CardRender.renderCard` { kost } und `BoardCard` `handCost`.) */
 
 /* Additional Action provider icon */
 .additional-action-icon {
@@ -8212,29 +8191,24 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 /* ═══ REACTION CHAIN VISUALIZATION ═══ */
 .reaction-chain-overlay {
   position: fixed;
-  right: 82px;
-  transition: right .18s ease;
+  right: 82px;          /* Rueckfall; die rechte Kante liegt sonst auf der linken Kante der Deck-Spalte (ReactionChainOverlay, app-board.jsx) */
   bottom: 30%;
   z-index: 10040;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;   /* Titel MITTIG ueber den Karten (Als Vorgabe 19.10.) */
   gap: 6px;
   pointer-events: none;
 }
-/* Tooltip rechts, Ketten-Anzeige links daneben: erscheint ein Hover-Tooltip, wandert die GANZE Anzeige links an ihn
-   heran (Tooltip-Breite + 8 px); verschwindet er, geht sie zurueck. Mit Token-Tooltip (steht links vom Haupt-
-   Tooltip, gleiche Breite) entsprechend eine Spalte weiter. */
-body:has(.board-tooltip) .reaction-chain-overlay {
-  right: calc(var(--tt-col-w, 360px) + 8px);
-}
-body:has(.board-tooltip-token) .reaction-chain-overlay {
-  right: calc(var(--tt-col-w, 360px) * 2 + 8px);
-}
+/* Die Ketten-Anzeige BLEIBT, wo sie ist, und liegt UEBER dem Hover-Tooltip (z-index 10040 gegen 9999) — Als Vorgabe 19.10.
+   Frueher rueckte sie links neben den Tooltip, sobald einer stand. Hovert man dann eine Chain-Karte, wanderte sie durch IHREN
+   eigenen Tooltip nach links, der Zeiger lag nicht mehr auf ihr, der Tooltip verschwand, sie sprang zurueck, man hoverte sie
+   wieder, usw. — ein Flackern. Jetzt gibt es keine Abhaengigkeit mehr vom Tooltip. */
 .reaction-chain-label {
   font-size: 11px;
   color: var(--accent);
   letter-spacing: 2px;
+  text-indent: 2px;      /* gleicht den Buchstabenabstand hinter dem letzten Zeichen aus: sonst sitzt der Titel optisch zu weit links */
   text-transform: uppercase;
   text-shadow: 0 0 8px rgba(0,240,255,.4);
 }
@@ -10755,6 +10729,10 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   position: absolute;
   left: 0;
   width: 100%;
+  /* Die Karte mittig in der Zone — wie jede Einzelkarte (`.board-zone` zentriert per Flex). Linksbündig lag sie bei
+     jedem Maßstab außer 1 neben der Stapelmitte, auf der der Zähler unten sitzt (Als Befund 20.10.). */
+  display: flex;
+  justify-content: center;
 }
 .board-ability-stack-card:first-child { position: relative; }
 .board-ability-stack .board-card-label {
@@ -10762,6 +10740,8 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   bottom: 2px; left: 50%; right: auto;
   transform: translateX(-50%);
   font-size: calc(13px * var(--board-scale));
+  /* Die Pixel-Schrift lässt hinter jeder Ziffer eine Lücke (~0,05 em): ohne Ausgleich sitzt die Zahl optisch zu weit links. */
+  padding-left: .1em;
   z-index: 5;
 }
 .board-card-text {
@@ -10793,6 +10773,43 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   transform: rotate(180deg);
   top: 2px; bottom: auto; left: 3px; right: auto;
 }
+/* ── STAPELZAHLEN (Als Vorgabe 20.10.: „Die Zahlen für Anzahl Karten in
+   Decks/Piles sollten größer sein, aktuell sind sie schwer lesbar") ──
+   Die Zahl war 10 px × Brettmaßstab groß (bei 0,7 also 7 px) und lag ohne
+   Untergrund auf dem Kartenbild. Jetzt steht sie doppelt so groß auf einer
+   dunklen Pixel-Plakette mit hellem Rand — wie der Rest der Oberfläche, und
+   auf jeder Kartenrückseite und jedem Ablage-Bild gleich gut zu lesen.
+   Gilt für Deck, Potion-Deck, Ablage und Gelöscht im Duell wie im Puzzle-
+   Editor (dort tragen die Zonen dieselben Klassen). Die kleinen Zonen
+   „Coolness"/„Creation" im Editor (50×70) bekommen die Plakette eine Stufe
+   kleiner. Die Ability-Stapel haben eine eigene Regel oben und bleiben. */
+.board-zone > .board-card-label,
+.board-zone-deck .board-card-label,
+.board-zone-potion .board-card-label,
+.board-zone-discard .board-card-label,
+.board-zone-deleted .board-card-label,
+.deck-empty-label {
+  box-sizing: border-box;
+  min-width: calc(30px * var(--board-scale));
+  /* links 0,1 em mehr: die Schrift lässt hinter jeder Ziffer eine Lücke, die Zahl säße sonst ~1 px links der Mitte */
+  padding: calc(3px * var(--board-scale)) calc(5px * var(--board-scale)) calc(2px * var(--board-scale)) calc(5px * var(--board-scale) + .1em);
+  bottom: calc(4px * var(--board-scale)); right: calc(4px * var(--board-scale));
+  font-size: calc(20px * var(--board-scale));
+  line-height: 1;
+  text-align: center;
+  text-shadow: none;
+  background: rgba(10, 8, 20, .88);
+  border: max(2px, calc(2px * var(--board-scale))) solid rgba(240, 234, 255, .92);
+  box-shadow: 0 0 0 max(1px, calc(1px * var(--board-scale))) var(--pp-kontur, #05040a);
+  z-index: 6;
+  pointer-events: none;
+}
+.board-zone > .board-card-label { font-size: calc(15px * var(--board-scale)); min-width: calc(22px * var(--board-scale)); }
+.board-zone-deck .board-card-label,
+.board-zone-potion .board-card-label,
+.board-zone-discard .board-card-label,
+.board-zone-deleted .board-card-label { font-size: calc(20px * var(--board-scale)); min-width: calc(30px * var(--board-scale)); }
+.deck-empty-label { opacity: .6; }
 .board-stack {
   position: relative;
   width: calc(64px * var(--board-scale)); height: calc(90px * var(--board-scale));
@@ -10818,9 +10835,8 @@ body:has(.board-tooltip-token) .reaction-chain-overlay {
   overflow-y: auto;
   font-size: 14px;
 }
-/* When chain is visible, shift tooltip to the left of the chain panel */
-/* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige weicht ihm aus (siehe `.reaction-chain-overlay` weiter
-   unten: solange ein Tooltip steht, rueckt sie links neben ihn, danach zurueck). */
+/* Der Tooltip steht IMMER buendig rechts; die Ketten-Anzeige liegt ueber ihm (siehe `.reaction-chain-overlay`, sie weicht
+   nicht mehr aus). */
 
 /* In battle / puzzle-player mode the player's hand strip
   (`.game-hand-me`, z-index 10000) renders ABOVE the tooltip
@@ -14078,7 +14094,9 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   animation: summonLockPulse 2s ease-in-out infinite;
 }
 
-/* ===== TOKEN TOOLTIP (left of main tooltip) ===== */
+/* ===== TOKEN TOOLTIP (left of main tooltip) =====
+   Nur noch die ANGESAGTE Karte von Luck (Als Vorgabe 20.10.): Tokens, die eine Karte nennt, stehen im Tooltip der Karte selbst ganz unten
+   (`.tt-token`, `TTTokenSektion`). */
 .board-tooltip-token {
   right: 360px;
   border-right: 1px solid var(--accent);
@@ -15937,8 +15955,7 @@ body:has(.textbox-overlay) .tooltip {
    der Highlight-Klon mit (TextBox, `data-tb-hover`). Per `opacity`, nicht
    `visibility`: das Element muss den Zeiger weiter annehmen, sonst
    ginge der Hover sofort wieder verloren und die Karte flackerte. */
-[data-tb-hover],
-[data-tb-hover] + .hand-badge-layer {
+[data-tb-hover] {
   opacity: 0 !important;
 }
 /* Handkarten (Als Befund 26.9.): Umrandung wie beim Hover in der Hand —
@@ -17215,9 +17232,6 @@ body:has(.textbox-overlay) .tooltip {
      `.board-tooltip > div:last-child { display: none }` ist RAUS.) */
   .board-tooltip img { max-width: 100%; }
   .board-tooltip-token { display: none !important; }
-  /* Schmaler Tooltip (240px) → die Ketten-Anzeige rueckt entsprechend weniger. */
-  body:has(.board-tooltip) .reaction-chain-overlay { right: calc(240px + 8px); }
-
   /* Scale down status/buff/immune icons */
   .status-badge { width: 12px !important; height: 12px !important; font-size: 7px !important; }
   .buff-icon { width: 14px !important; height: 14px !important; font-size: 8px !important; }
@@ -25468,28 +25482,6 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
   opacity: .92;
 }
 
-/* ── Handkarten-Abzeichen ÜBER allen Karten (Als Vorgabe 2.10.) ─────
-   Level-/Kosten-Abzeichen sitzen in einer eigenen Ebene NEBEN der Karte (nicht darin: die Karte trägt ein z-index und
-   sperrte sie unter ihren Nachbarn ein). Die Ebene deckt die Karte exakt ab, dreht sich mit dem Fächerwinkel und
-   zoomt beim Hover mit — z-index 100 liegt über der gehoverten Karte (60). `.hand-slot` ist kein Stapelkontext. */
-.game-hand-me .hand-slot > .hand-badge-layer {
-  position: absolute;
-  left: 0; top: 0;
-  width: var(--hand-card-w);
-  height: var(--hand-card-h);
-  rotate: var(--fan-rot, 0deg);
-  transform-origin: 50% 50%;
-  transition: transform .16s ease-out, rotate .16s ease-out;
-  z-index: 100;
-  pointer-events: none;
-}
-.game-hand-me .hand-slot > .hand-badge-layer > * { pointer-events: none; }
-.game-hand-me .game-hand-cards:not([data-pp-dragging]) .hand-slot > .board-card:hover + .hand-badge-layer {
-  transform: translateY(calc(-1 * var(--hand-hover-lift)))
-             scale(var(--hand-hover-scale))
-             rotate(var(--hand-tilt, 0deg));
-}
-
 /* Als Vorgabe 2.10.: die Handkarten (samt Hover-Zoom) liegen über den Trennlinien und Clustern der Handzeile. */
 .game-hand-me .game-hand-cards { z-index: 5; }
 
@@ -25795,12 +25787,17 @@ body.summon-pick .board-zone.board-zone-ability:not(.zone-drag-valid):not(.board
 .social-row-menu .btn { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
 .social-invite-btn { border-color: var(--success) !important; color: var(--success) !important; background: rgba(51, 255, 136, .08) !important; }
 .social-invite-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Einladung verschickt, aber noch nicht beantwortet (orange) bzw. abgelehnt (rot) */
+.social-invite-btn.is-pending { border-color: var(--accent4, #ffaa00) !important; color: var(--accent4, #ffaa00) !important; background: rgba(255, 170, 0, .1) !important; }
+.social-invite-btn.is-declined { border-color: var(--danger) !important; color: var(--danger) !important; background: rgba(255, 51, 102, .1) !important; }
+.social-invite-btn.is-declined:disabled { opacity: .75; }
 .social-row-error { flex-basis: 100%; padding: 5px 7px; font-size: 12px; color: #fff; background: rgba(255, 51, 102, .25); border: 1px solid var(--danger); }
 .social-tag {
   flex-shrink: 0; padding: 0 5px; font-size: 10px; letter-spacing: 1px; line-height: 16px;
   color: var(--text2); border: 1px solid rgba(255, 255, 255, .18);
 }
-.social-tag--sent { color: var(--success); border-color: rgba(51, 255, 136, .5); }
+.social-tag--sent { color: var(--accent4, #ffaa00); border-color: rgba(255, 170, 0, .5); }
+.social-tag--declined { color: var(--danger); border-color: rgba(255, 51, 102, .5); }
 .social-invite-hint { padding: 0 16px 6px; font-size: 11px; color: var(--text2); }
 
 /* Einladung: Fenster in der Mitte, der Rest des Hauptmenüs liegt abgedunkelt dahinter (und ist nicht bedienbar) */
@@ -26107,3 +26104,199 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 .pz-zahl::-webkit-outer-spin-button,
 .pz-zahl::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .pz-zahl-einzeln { margin-top: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   KARTEN-TOOLTIP IM PIXEL-STIL (Als Vorgabe 13.10.)
+
+   „Der eigentliche Effekttext sollte auch noch eine Textbox bekommen, und
+   die vorhandenen Boxelemente passen stilistisch noch nicht richtig — das
+   sollte alles pixelartig aussehen, nicht so ‚modern'."
+
+   Bis hier trugen Plaketten, Wertekacheln und Hinweisfelder abgerundete
+   Ecken, duenne Linien und weiche Verlaeufe. Jetzt dieselbe Sprache wie die
+   Karten und die Menuefenster (`.pp-fenster`):
+     • Rahmen als 9-Slice-Pixelbild (`border-image`, SVG mit crispEdges,
+       in JS je Farbe gebaut: `ttFrame` in app-shared.jsx): abgeschnittene
+       Ecken, aussen die dunkle Kontur `--pp-kontur`, darin ein Farbring —
+       oben/links hell, unten/rechts dunkel, wie die abgeschraegten Raender
+       der Menuefenster;
+     • Flaeche mit 2x2-Raster (Dither) wie die Textfenster der Karten,
+       innen eine Pixel-Kante (Licht oben/links, Schatten unten/rechts),
+       aussen ein harter Schlagschatten;
+     • keine weichen Verlaeufe: der Kopf ist in harten Stufen getoent,
+       Schatten am Text sind Pixelversatz ohne Weichzeichnung.
+   Eine Einheit des Rahmens (`--u`) ist 2 px (Plaketten: 1 px), er ist also
+   4 px (Plaketten: 2 px) breit.
+   ═══════════════════════════════════════════════════════════════════ */
+.tt-kopf {
+  --zier: #aa44ff;
+  padding: 10px 14px 12px;
+  border-top: 4px solid color-mix(in srgb, var(--zier) 70%, #fff);
+  border-bottom: 4px solid color-mix(in srgb, var(--zier) 55%, #000);
+  box-shadow: 0 -2px 0 var(--pp-kontur), 0 2px 0 var(--pp-kontur);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--zier) 30%, #0b0a14) 0 25%,
+      color-mix(in srgb, var(--zier) 23%, #0b0a14) 25% 50%,
+      color-mix(in srgb, var(--zier) 16%, #0b0a14) 50% 75%,
+      color-mix(in srgb, var(--zier) 10%, #0b0a14) 75% 100%);
+}
+.tt-name {
+  font-size: 19px; font-weight: 700; line-height: 1.25;
+  text-shadow: 2px 2px 0 #000;
+}
+.tt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+
+/* Basis aller Pixel-Boxen: Rahmen kommt als `border-image-source` aus JS (Farbe), Rest ist hier. */
+.tt-box {
+  --zier: #8888aa;
+  --u: 2px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: calc(var(--u) * 2);
+  border-image-slice: 2;
+  border-image-width: calc(var(--u) * 2);
+  border-image-repeat: stretch;
+  border-radius: 0;
+  image-rendering: pixelated;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.045'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.045'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    color-mix(in srgb, var(--zier) 13%, #0b0a14);
+  /* die Ecken des Rahmens sind ausgeschnitten: der Hintergrund darf nicht darunter durchscheinen */
+  background-clip: padding-box;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, .08),
+    inset -2px -2px 0 rgba(0, 0, 0, .42),
+    3px 3px 0 rgba(0, 0, 0, .45);
+}
+/* Plakette (Typ, Untertyp, Archetyp, Stufe, Schule): schmaler Rahmen, kein Schlagschatten. */
+.tt-chip {
+  --u: 1px;
+  display: inline-block;
+  padding: 1px 7px 2px;
+  font-size: 12px; font-weight: 700; letter-spacing: .3px; line-height: 1.45;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .1), inset -1px -1px 0 rgba(0, 0, 0, .4);
+}
+/* Wertekachel (HP / ATK / Cost) */
+.tt-stat { flex: 1 1 0; min-width: 0; padding: 4px 6px 5px; text-align: center; }
+.tt-stat-label {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 10px; letter-spacing: .8px; text-transform: uppercase; line-height: 1;
+}
+.tt-stat-wert { font-size: 18px; font-weight: 700; line-height: 1.3; text-shadow: 2px 2px 0 rgba(0, 0, 0, .75); }
+.tt-icon { display: inline-block; flex: 0 0 auto; shape-rendering: crispEdges; image-rendering: pixelated; }
+/* Hinweisfeld (Ascension Bonus, Orbs, geerbte Effekte) und die Textbox des Effekttexts */
+.tt-callout { padding: 6px 10px 7px; font-size: 14px; line-height: 1.5; }
+/* Statuseffekte im Effekttext und in den Remindern (Als Vorgabe 20.10.): fett, Farbe aus `CardRender.STATUS_TERMS`, dunkle Kontur wie auf der Karte */
+.tt-status { font-weight: 700; text-shadow: 0 1px 0 rgba(0, 0, 0, .75), 1px 0 0 rgba(0, 0, 0, .75), -1px 0 0 rgba(0, 0, 0, .75), 0 -1px 0 rgba(0, 0, 0, .75); }
+.tt-reminder { font-size: 13px; line-height: 1.5; }
+/* Token am Ende des Tooltips (`TTTokenSektion`): Marke und Name, Bild, Werte, Effekt */
+.tt-token { padding: 9px 11px 11px; }
+.tt-token-kopf { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.tt-token-marke { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text2); text-shadow: 1px 1px 0 #000; }
+.tt-token-name { font-size: 16px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
+.tt-token-bild { display: block; width: 62%; aspect-ratio: 750 / 1050; object-fit: cover; margin: 0 auto 10px; box-shadow: 0 0 0 2px var(--pp-kontur, #05040a), 0 3px 0 rgba(0, 0, 0, .5); }
+.tt-token .tt-stat { margin-bottom: 9px; }
+.tt-callout-titel { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
+.tt-textbox { padding: 9px 11px 10px; }
+/* Nummernmarke der Faehigkeitsstufen */
+.tt-nummer {
+  flex-shrink: 0; min-width: 22px; padding: 0 4px; text-align: center;
+  font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.5;
+  background: rgba(255, 255, 255, .1);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 0 0 1px var(--pp-kontur);
+}
+/* Die Boxen im Koerper sind so breit wie der Kopf (Als Befund 13.10.: „Warum ist die Effektbox schmaler als die Namensbox?"):
+   kein seitlicher Rand, damit Namensband, Wertekacheln, Hinweisfelder und Textbox buendig mit dem Kartenbild abschliessen.
+   Der Schlagschatten faellt dort nur nach unten (seitlich wuerde ihn der Tooltip abschneiden). */
+.tt-body { padding: 14px 0 18px; display: flex; flex-direction: column; gap: 14px; }
+.tt-body > .tt-box {
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .08), inset -2px -2px 0 rgba(0, 0, 0, .42), 0 3px 0 rgba(0, 0, 0, .45);
+}
+/* Stufenzeilen einer Ability auf dem Brett: aktuelle Stufe hervorgehoben (goldener Pixelbalken, getoente Zeile), die anderen grau. */
+.tt-stufe { padding: 2px 4px; margin-left: -4px; margin-right: -4px; }
+.tt-stufe-aktiv {
+  background: rgba(255, 226, 110, .10);
+  box-shadow: inset 2px 0 0 rgba(255, 232, 130, .7);
+}
+.tt-stufe-aktiv .tt-nummer { background: rgb(255, 226, 110); color: #1a1408; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .3), 0 0 0 1px var(--pp-kontur); }
+.tt-stufe-aus { opacity: .6; filter: grayscale(.8); }   /* wie im Kartenbild: nicht zu dunkel (Als Befund 19.10.) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   HAUPTMENUE: ACTIVE DECK UND DECKLISTE (Als Vorgabe 19.10.)
+
+   „Das Active Deck im Hauptmenue sollte etwas mehr gehighlightet sein und
+   die Scrollbar bei den eigenen Decks sollte etwas prominenter sein."
+
+   • Aktive Kachel (oben das „Active Deck" UND die markierte Zeile in der
+     Liste): staerkere Toenung mit Raster, 3 px Kante in der vollen
+     Spielerfarbe, breiterer Farbbalken links, Schein ringsum, der Name
+     weiss mit Pixelschatten; die Marke „● ACTIVE" ist ein gefuelltes
+     Schild in der Spielerfarbe statt blasser Schrift.
+   • Scrollbar der Deckliste (`.menu-side-scroll`): 20 statt 14 px, dunklere
+     Schiene mit Kontur, groesserer Griff mit kraeftigem Farbton, 3 px
+     Kontur und breiten Griffrillen. Nur diese Liste; die uebrigen Leisten
+     behalten die allgemeine Pixel-Scrollbar (s. „Scrollbars" oben).
+   ═══════════════════════════════════════════════════════════════════ */
+.main-menu-screen .menu-deck-card.is-active {
+  border: 3px solid var(--player-color, #00f0ff);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--player-color, #00f0ff) 40%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #00f0ff) 17%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 9px 0 0 var(--player-color, #00f0ff),
+    inset 0 -3px 0 rgba(0, 0, 0, .35),
+    0 0 20px color-mix(in srgb, var(--player-color, #00f0ff) 50%, transparent);
+}
+.main-menu-screen .menu-deck-card.is-active .menu-deck-name {
+  color: #fff;
+  text-shadow: 2px 2px 0 #000, 0 0 12px color-mix(in srgb, var(--player-color, #00f0ff) 65%, transparent);
+}
+.main-menu-screen .menu-deck-card.is-active .menu-deck-flag {
+  padding: 2px 5px;
+  background: var(--player-color, #00f0ff);
+  color: #05040a;
+  text-shadow: none;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 2px 2px 0 rgba(255, 255, 255, .45), inset -2px -2px 0 rgba(0, 0, 0, .3);
+}
+.main-menu-screen .menu-deck-card.is-active.is-editable:hover {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.06'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--player-color, #00f0ff) 50%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--player-color, #00f0ff) 24%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 9px 0 0 var(--player-color, #00f0ff),
+    0 0 26px color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent);
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .menu-side-scroll::-webkit-scrollbar { width: 20px; }
+  .menu-side-scroll::-webkit-scrollbar-track {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+      color-mix(in srgb, var(--player-color, var(--accent)) 10%, #05040a);
+    box-shadow: inset 0 0 0 2px var(--pp-kontur), inset 4px 4px 0 rgba(0, 0, 0, .55);
+  }
+  .menu-side-scroll::-webkit-scrollbar-thumb {
+    background:
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% calc(50% - 6px) / 10px 3px no-repeat,
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% 50% / 10px 3px no-repeat,
+      linear-gradient(rgba(0, 0, 0, .5) 0 0) 50% calc(50% + 6px) / 10px 3px no-repeat,
+      color-mix(in srgb, var(--player-color, var(--accent)) 82%, #fff);
+    border: 3px solid var(--pp-kontur);
+    box-shadow: inset 3px 3px 0 rgba(255, 255, 255, .6), inset -3px -3px 0 rgba(0, 0, 0, .38);
+    min-height: 48px;
+  }
+  .menu-side-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--player-color, var(--accent)) 55%, #fff);
+  }
+}
+@supports not selector(::-webkit-scrollbar) {
+  .menu-side-scroll { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--player-color, var(--accent)) 82%, #fff) #05040a; }
+}

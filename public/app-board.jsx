@@ -297,7 +297,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, children }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, orbs, effectiveLevel, stampBonus, showLevelBadge, handLevel, handCost, handNotes, abilityLevel, children }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // Auf dem Brett liegen die LIVE-Werte (HP, bei Helden auch ATK) ueber der Karte —
@@ -305,7 +305,17 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   // neben und unter den Live-Zahlen durch, sobald die Stellenzahl abweicht.
   // Nur fuers Bild; Tooltip und Foil behalten die normale `imgUrl`.
   const ohneGedruckt = [hp != null && hpPosition ? 'hp' : null, hpPosition === 'hero' && atk != null ? 'atk' : null].filter(Boolean);
-  const boardImgUrl = imgUrl && ohneGedruckt.length ? imgUrl + '?ohne=' + ohneGedruckt.join(',') : imgUrl;
+  // Handkarten (Als Vorgabe 13.10.): AKTUELLE Stufe und Kosten stehen auf der Karte selbst — gruen, wenn verringert, rot, wenn
+  // erhoeht (der Renderer vergleicht mit dem gedruckten Wert). `handLevel` / `handCost` kommen nur, wenn sie vom Druck abweichen.
+  // Der Hover-Tooltip zeigt weiter die gedruckten Werte; `handNotes` erklaert dort, woher die Abweichung kommt.
+  const bildParams = [];
+  if (ohneGedruckt.length) bildParams.push('ohne=' + ohneGedruckt.join(','));
+  if (handLevel != null) bildParams.push('lv=' + handLevel);
+  if (handCost != null) bildParams.push('kost=' + handCost);
+  // Ability auf dem Brett (Als Vorgabe 13.10.): die Box der aktuellen Stufe (1–3) ist hervorgehoben, die anderen beiden sind grau.
+  // Der Renderer wendet das nur auf Faehigkeitskarten mit drei Stufen an; bei allen anderen Karten bleibt es ohne Wirkung.
+  if (abilityLevel != null) bildParams.push('stufe=' + abilityLevel);
+  const boardImgUrl = imgUrl && bildParams.length ? imgUrl + '?' + bildParams.join('&') : imgUrl;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
   // the hover tooltip renders without changing the card image / name by
   // passing `tooltipCardOverride`. Falls back to the canonical card.
@@ -335,7 +345,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
     const hasLiveOrbs = Array.isArray(orbs) && orbs.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities && !hasLiveOrbs && !(handNotes && handNotes.length) && abilityLevel == null) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -364,6 +374,10 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _liveAbilities: hasLiveAbilities ? abilities : tooltipBase._liveAbilities,
       // Beato: gesammelte Ascension-Orbs (s. CardTooltipContent).
       _liveOrbs: hasLiveOrbs ? orbs : tooltipBase._liveOrbs,
+      // Hand: Erklaerung, warum Stufe/Kosten auf der Karte vom Druck abweichen (s. `handLevel` / `handCost`).
+      _handNotes: (handNotes && handNotes.length) ? handNotes : tooltipBase._handNotes,
+      // Ability auf dem Brett: aktuelle Stufe — der Tooltip hebt sie im Kartenbild und im Text hervor.
+      _abilityLevel: abilityLevel != null ? abilityLevel : tooltipBase._abilityLevel,
     };
   })();
 
@@ -29594,6 +29608,87 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, sha
 }
 
 // Renders an ability zone stack — handles Performance visual transformation
+// ═══════════════════════════════════════════
+//  KETTEN-ANZEIGE (Reaction Chain)
+//
+//  Als Vorgabe 19.10.: „Die Platzierung der Chain ist mit nichts aligned … ihre rechte Kante soll mit der linken Kante des
+//  Containers fuer die Decks aligned sein." Die Anzeige steht deshalb nicht mehr bei festen `right: 82px`, sondern ihre rechte
+//  Kante liegt auf der linken Kante von `.board-util-right` (die Spalte mit den Decks). Die Spalte liegt ausserhalb der gekippten
+//  Brettebene, ihre Kante ist also eine echte Bildschirmkante; gemessen wird sie samt Overlay, und der Abstand zur rechten
+//  Bildschirmseite so lange nachgestellt, bis beide Kanten uebereinstimmen (das trifft auch dann, wenn ein Vorfahre skaliert).
+//  Der Titel steht mittig ueber den Karten (CSS: `align-items: center`). Ohne Deck-Spalte (Sonderansichten) bleibt der
+//  Abstand aus dem CSS.
+// ═══════════════════════════════════════════
+function ReactionChainOverlay({ chain, myIdx }) {
+  const ref = useRef(null);
+  const [rechts, setRechts] = useState(null);   // Abstand zur rechten Bildschirmseite in px; null = der aus dem CSS
+  const versuche = useRef(0);
+  const messen = useCallback(() => {
+    const el = ref.current, spalte = document.querySelector('.board-util-right');
+    if (!el || !spalte) return;
+    const abweichung = el.getBoundingClientRect().right - spalte.getBoundingClientRect().left;   // > 0: ragt ueber die Kante hinaus
+    if (Math.abs(abweichung) < 0.5) { versuche.current = 0; return; }
+    if (versuche.current >= 8) return;      // Sicherung gegen Endlosschleifen (z. B. ein skalierender Vorfahre)
+    versuche.current++;
+    setRechts(r => (r == null ? (parseFloat(getComputedStyle(el).right) || 0) : r) + abweichung);
+  }, []);
+  // Nach jedem Render pruefen und ggf. nachstellen: der naechste Schritt laeuft im folgenden Render.
+  useLayoutEffect(() => { messen(); });
+  // Aendert sich die Spalte (Brett-Massstab, Fenstergroesse), von vorn messen.
+  useEffect(() => {
+    const spalte = document.querySelector('.board-util-right');
+    const neu = () => { versuche.current = 0; messen(); };
+    const ro = spalte && typeof ResizeObserver === 'function' ? new ResizeObserver(neu) : null;
+    if (ro) ro.observe(spalte);
+    window.addEventListener('resize', neu);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', neu); };
+  }, [messen]);
+  return (
+    <div className="reaction-chain-overlay" ref={ref} style={rechts != null ? { right: rechts } : undefined}>
+      <div className="reaction-chain-label orbit-font">Chain</div>
+      <div className="reaction-chain-cards">
+        {chain.map((link, i) => (
+          <div key={link.id}
+            data-chain-idx={i}
+            data-chain-card={link.cardName}
+            className={
+            'reaction-chain-card'
+            + (link.status === 'resolving' ? ' chain-glow' : '')
+            + (link.status === 'negated' ? ' chain-negated' : '')
+            + (link.status === 'resolved' ? ' chain-resolved' : '')
+          }>
+            <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
+            {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
+            {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+            {link.status === 'negated' && link.negationStyle === 'thief' && (
+              /* Key, the Cursed Thief (v691): ein Griff ins Glied —
+                 Schluesselchen kreisen, ein Schleier faellt ueber die
+                 Karte, ein Handschuh packt sie. */
+              <div className="chain-thief-overlay">
+                <div className="chain-thief-key" style={{ left: 10, top: 14, animationDelay: '0ms' }}>🗝</div>
+                <div className="chain-thief-key" style={{ left: 52, top: 40, animationDelay: '120ms' }}>🗝</div>
+                <div className="chain-thief-key" style={{ left: 22, top: 70, animationDelay: '240ms' }}>🗝</div>
+                <div className="chain-thief-hand">🫳</div>
+              </div>
+            )}
+            {link.status === 'negated' && link.negationStyle === 'ice' && (
+              <div className="chain-ice-overlay">
+                <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
+                <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
+                <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
+                <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
+              </div>
+            )}
+            <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AbilityStack({ cards }) {
   // Gleiche Bauform wie AttachableCreatureCard oben — der Hover tauscht
   // das Bild der obersten Performance-Karte, also dieselbe Falle.
@@ -29616,7 +29711,7 @@ function AbilityStack({ cards }) {
         }
         return (
           <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
-            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} />
+            <BoardCard cardName={hovered && ci === cards.length - 1 && isTopPerformance ? 'Performance' : showName} abilityLevel={Math.min(3, cards.length)} />
           </div>
         );
       })}
@@ -51632,7 +51727,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
               const isSelected = isBlindPick && blindPickSelected.has(i);
               const maxSelect = isBlindPick ? (gameState.effectPrompt.maxSelect || 2) : 0;
-              const isFull = isBlindPick && !isSelected && blindPickSelected.size >= maxSelect;
+              // `eligibleIndices` (Live Show, 12.10.: die eben verschenkten Karten sind tabu): nur diese Plaetze sind waehlbar, der Rest ist ausgegraut und tot.
+              const blindGesperrt = isBlindPick && Array.isArray(gameState.effectPrompt.eligibleIndices) && !gameState.effectPrompt.eligibleIndices.includes(i);
+              const isFull = isBlindPick && !isSelected && (blindGesperrt || blindPickSelected.size >= maxSelect);
               // Letter of Misinformations / "pick a card from opp's
               // hand" prompt. The server already populated
               // `_revealedHandIndices` for the eligible slots, so
@@ -51706,9 +51803,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // eigenen Hand (sie haengt oben am Bild).
                     ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
                     ...((oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
-                    || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
+                    || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : (((isBlindPick && !blindGesperrt) || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
                   }}
                   onClick={isBlindPick ? () => {
+                    if (blindGesperrt) return;
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
                     // updaters (StrictMode dev, batching), so the
@@ -52818,13 +52916,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const handBaseCostAfterCrystal = handCardData?.cost != null
                   ? applyCrystalCostMods(me, item.card, handCardData.cost)
                   : null;
+                // Variable Kosten („4X", „X", `costLabel` in cards.json): ein reines „X" hat keine Zahl, die sich anzeigen liesse; bei „nX"
+                // gilt nur die Verdopplung durch Rusting Crystal (aus 4X wird 8X) — ein Rabatt (Play Money …) greift auf den ENDPREIS,
+                // dessen X erst beim Spielen feststeht, und laesst sich auf der Karte nicht darstellen.
+                const handKostenLabel = handCardData?.costLabel || null;
+                const handKostenVariabel = !!handKostenLabel;
+                const handKostenNurX = handKostenVariabel && !/^\d/.test(handKostenLabel);
                 const handEffectiveCost = handBaseCostAfterCrystal != null
+                  && !handKostenNurX
+                  && !(handKostenVariabel && handCostReduction > 0)
                   && (handCostReduction > 0 || handBaseCostAfterCrystal !== handCardData.cost)
                   ? Math.max(0, handBaseCostAfterCrystal - handCostReduction)
                   : null;
-                const handCostIsBoosted = handEffectiveCost != null
-                  && handCardData?.cost != null
-                  && handEffectiveCost > handCardData.cost;
+                const handKostenSuffix = handKostenLabel ? String(handKostenLabel).replace(/^\d+/, '') : '';
+                // Erklaerungen fuer den Hover-Tooltip (frueher Tooltips der beiden Abzeichen auf der Karte): Die Karte selbst
+                // zeigt die aktuellen Werte, der Tooltip die gedruckten — und sagt, woher die Abweichung kommt.
+                const handNotes = [];
+                if (handEffectiveLevel != null) {
+                  const lvFarbe = handEffectiveLevel > (handCardData?.level ?? 0) ? '#ff5555' : '#4ade80';
+                  handNotes.push({ color: lvFarbe, text: `Level ${handEffectiveLevel} in your hand (printed ${handCardData?.level}).` });
+                  if (handLevelIsHeroFiltered) handNotes.push({ color: lvFarbe, text: `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.` });
+                  if (manaCrystalBoost) handNotes.push({ color: '#ff5555', text: 'Mana Absorbing Crystal in your hand: Spells read +1 level.' });
+                }
+                if (handEffectiveCost != null) {
+                  const kFarbe = handEffectiveCost > handCardData.cost ? '#ff5555' : '#4ade80';
+                  const teile = [];
+                  if (handBaseCostAfterCrystal !== handCardData.cost) teile.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
+                  if (handCostReduction > 0) teile.push(`Reduced by ${handCostReduction} this turn`);
+                  handNotes.push({ color: kFarbe, text: `Cost ${handEffectiveCost}${handKostenSuffix} in your hand (printed ${window.cardCostText(handCardData)})` + (teile.length ? ': ' + teile.join('. ') : '') + '.' });
+                }
+                else if (handKostenVariabel && handCostReduction > 0) {
+                  // variable Kosten mit Rabatt: nicht auf die Karte druckbar (s. o.), aber im Tooltip genannt
+                  handNotes.push({ color: '#4ade80', text: `Cost reduced by ${handCostReduction} this turn (printed ${window.cardCostText(handCardData)}).` });
+                }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
@@ -52848,54 +52972,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
-                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
-                    {(handEffectiveLevel != null || handEffectiveCost != null) && <div className="hand-badge-layer">
-                    {handEffectiveLevel != null && (() => {
-                      // "Boosted" = effective level is HIGHER than the
-                      // printed base (Mana Absorbing Crystal's +1).
-                      // Render the badge in red so the player visually
-                      // distinguishes a punishing increase from a
-                      // friendly reduction.
-                      const baseLevel = handCardData?.level ?? 0;
-                      const isBoosted = handEffectiveLevel > baseLevel;
-                      return (
-                        <div
-                          className={'creature-level' + (handLevelIsHeroFiltered ? ' creature-level-hero-filtered' : '')}
-                          onMouseEnter={handLevelIsHeroFiltered
-                            ? (e) => showGameTooltip(e, `Reduced level only applies when ${me.heroes?.[handLevelHostHeroIdx]?.name || 'the corresponding Hero'} plays this card.`)
-                            : undefined}
-                          onMouseLeave={handLevelIsHeroFiltered ? hideGameTooltip : undefined}
-                          style={isBoosted ? {
-                            color: '#ff5555',
-                            textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                          } : undefined}>
-                          Lv{handEffectiveLevel}
-                        </div>
-                      );
-                    })()}
-                    {handEffectiveCost != null && (
-                      <div className="hand-cost-override"
-                        onMouseEnter={e => {
-                          const parts = [];
-                          if (handBaseCostAfterCrystal !== handCardData.cost) {
-                            parts.push(`Rusting Crystal doubles the cost (base ${handCardData.cost} → ${handBaseCostAfterCrystal})`);
-                          }
-                          if (handCostReduction > 0) {
-                            parts.push(`Reduced by ${handCostReduction} this turn`);
-                          }
-                          showGameTooltip(e, parts.length
-                            ? parts.join('. ') + '.'
-                            : `Effective cost ${handEffectiveCost} (printed ${handCardData.cost}).`);
-                        }}
-                        onMouseLeave={hideGameTooltip}
-                        style={handCostIsBoosted ? {
-                          color: '#ff5555',
-                          textShadow: '0 0 6px rgba(255,90,90,0.7), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                        } : undefined}>
-                        ◆{handEffectiveCost}
-                      </div>
-                    )}
-                    </div>}
+                    <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins}
+                      handLevel={handEffectiveLevel} handCost={handEffectiveCost} handNotes={handNotes} />
                     {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {(me.handApplause?.[item.origIdx] > 0) && <ApplauseBadge n={me.handApplause[item.origIdx]} hand akey={`h:${myIdx}:${item.origIdx}`} />}
                     {isHandLockBlocked && <div className="hand-lock-indicator">⦸</div>}
@@ -53569,50 +53647,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Reaction Chain Visualization ── */}
-      {reactionChain && reactionChain.length >= 2 && (
-        <div className="reaction-chain-overlay">
-          <div className="reaction-chain-label orbit-font">Chain</div>
-          <div className="reaction-chain-cards">
-            {reactionChain.map((link, i) => (
-              <div key={link.id}
-                data-chain-idx={i}
-                data-chain-card={link.cardName}
-                className={
-                'reaction-chain-card'
-                + (link.status === 'resolving' ? ' chain-glow' : '')
-                + (link.status === 'negated' ? ' chain-negated' : '')
-                + (link.status === 'resolved' ? ' chain-resolved' : '')
-              }>
-                <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
-                {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
-                {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
-                {link.status === 'negated' && link.negationStyle === 'thief' && (
-                  /* Key, the Cursed Thief (v691): ein Griff ins Glied —
-                     Schluesselchen kreisen, ein Schleier faellt ueber die
-                     Karte, ein Handschuh packt sie. */
-                  <div className="chain-thief-overlay">
-                    <div className="chain-thief-key" style={{ left: 10, top: 14, animationDelay: '0ms' }}>🗝</div>
-                    <div className="chain-thief-key" style={{ left: 52, top: 40, animationDelay: '120ms' }}>🗝</div>
-                    <div className="chain-thief-key" style={{ left: 22, top: 70, animationDelay: '240ms' }}>🗝</div>
-                    <div className="chain-thief-hand">🫳</div>
-                  </div>
-                )}
-                {link.status === 'negated' && link.negationStyle === 'ice' && (
-                  <div className="chain-ice-overlay">
-                    <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 55, top: 30, fontSize: 18, animationDelay: '50ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 20, top: 55, fontSize: 12, animationDelay: '100ms' }}>❆</div>
-                    <div className="chain-ice-crystal" style={{ left: 50, top: 75, fontSize: 16, animationDelay: '150ms' }}>❄</div>
-                    <div className="chain-ice-crystal" style={{ left: 12, top: 85, fontSize: 14, animationDelay: '200ms' }}>❅</div>
-                    <div className="chain-ice-crystal" style={{ left: 40, top: 15, fontSize: 11, animationDelay: '80ms' }}>❆</div>
-                  </div>
-                )}
-                <div className="chain-owner-dot" style={{ background: link.owner === myIdx ? 'var(--accent)' : 'var(--danger)' }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {reactionChain && reactionChain.length >= 2 && <ReactionChainOverlay chain={reactionChain} myIdx={myIdx} />}
 
       {/* ── Guardian Beast Zhu skip-turn (Boar zodiac, sloth themed) ──
            Fullscreen gray-out fade with floating "Zzz" glyphs and a
@@ -53743,13 +53778,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 8, display: 'flex', gap: 12 }}>
                 {card.hp != null && <span style={{ color: '#ff6666' }}>♥ HP {card.hp}</span>}
                 {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔ ATK {card.atk}</span>}
-                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {card.cost}</span>}
+                {card.cost != null && <span style={{ color: '#44aaff' }}>◆ Cost {window.cardCostText(card)}</span>}
                 {shownLevel != null && (
                   <span style={hoverStamp > 0 ? { color: '#c4a8ff', fontWeight: 700 } : undefined}>
                     Lv {shownLevel}{hoverStamp > 0 ? ` (+${hoverStamp})` : ''}
                   </span>
                 )}
               </div>
+              {/* Genannte Tokens (Bild + Effekt) ganz unten, wie in jedem Karten-Tooltip (Als Vorgabe 20.10.) */}
+              {window.TTTokenSektion && <div className="tt-body" style={{ padding: '14px 0 4px' }}><window.TTTokenSektion card={card} /></div>}
             </div>
           </div>
         );
@@ -53757,21 +53794,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Board card hover tooltip (shared single instance) */}
       {tooltipCard && !hoveredPileCard && (() => {
-        // Token mapping — cards that create tokens show the token tooltip alongside
-        const CARD_TOKEN_MAP = {
-          'Pyroblast': ['Pollution Token'],
-          'Mummy Maker Machine': ['Mummy Token'],
-        };
-        const relatedTokens = [...(CARD_TOKEN_MAP[tooltipCard.name] || [])];
-        // Generic: any card whose effect text mentions "Pollution Token"
-        // surfaces the Pollution Token's tooltip alongside (same treatment
-        // Pyroblast already got hard-coded). Skip if the hovered card IS
-        // the Pollution Token so we don't duplicate it.
-        if (tooltipCard.name !== 'Pollution Token'
-            && /Pollution Token/i.test(tooltipCard.effect || '')
-            && !relatedTokens.includes('Pollution Token')) {
-          relatedTokens.push('Pollution Token');
-        }
+        // Tokens, die eine Karte nennt (Pollution, Mummy …), stehen seit 20.10. IM Tooltip der Karte ganz unten (`TTTokenSektion`, app-shared) —
+        // in jedem Menue und Modus, nicht mehr als zweiter, angeschnittener Tooltip daneben. Hier bleibt nur die ANGESAGTE Karte von Luck.
+        const relatedTokens = [];
         // Luck declared target — show the declared card alongside ONLY for the specific hovered Luck
         if (tooltipCard.name === 'Luck' && _activeLuckTooltipTarget) {
           if (!relatedTokens.includes(_activeLuckTooltipTarget)) relatedTokens.push(_activeLuckTooltipTarget);
@@ -55796,6 +55821,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 window.BoardCard = BoardCard;
 window.BoardZone = BoardZone;       // Skill Test (Vorbereitungs-Basis)
 window.AbilityStack = AbilityStack; // Skill Test (Vorbereitungs-Basis)
+window.ReactionChainOverlay = ReactionChainOverlay;
 window.HeroIdleSprite = HeroIdleSprite;   // Skill Test (Vorbereitungs-Basis: animierte Helden)
 window.HeroSpriteEbene = HeroSpriteEbene; // Skill Test
 window.HeroIdleAnims = HeroIdleAnims;     // Skill Test

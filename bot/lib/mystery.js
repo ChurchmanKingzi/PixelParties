@@ -1,0 +1,86 @@
+'use strict';
+// ═══════════════════════════════════════════════════════════════════
+//  Mystery-Spiel — reine Regeln (ohne Discord), damit sie einzeln testbar sind.
+// ═══════════════════════════════════════════════════════════════════
+const { searchCards, closeAlternatives, norm } = require('./card-search');
+
+const MIN_GUESS_LEN = 3;
+const GOOD_SCORE = 0.88, OKAY_SCORE = 0.7, CLEAR_GAP = 0.15;
+
+/**
+ * Beurteilt einen Tipp.
+ *  - unknown   : keine Karte, die so heißt/ähnlich klingt  → zählt nicht
+ *  - ambiguous : passt gleich gut auf mehrere Karten, darunter die gesuchte („Alice“) → zählt nicht, bitte genauer
+ *  - correct   : die ähnlichste Karte IST die gesuchte (Tippfehler, fehlende Leerzeichen, nur der Hero-Vorname sind okay)
+ *  - wrong     : eine andere Karte  → zählt
+ * `best` ist die Karte, für die der Tipp gehalten wurde (für die Antwort des Bots).
+ * @returns {{kind:'unknown'|'ambiguous'|'correct'|'wrong', best?:object}}
+ */
+function judgeGuess(cards, target, guess) {
+  if (norm(guess).replace(/ /g, '').length < MIN_GUESS_LEN) return { kind: 'unknown' };
+  const results = searchCards(cards, guess, { limit: 6 });
+  if (!results.length) return { kind: 'unknown' };
+  const best = results[0];
+  // Farbvarianten („Rook of Kings [B]“ / „[W]“) sind für das Raten EINE Karte: gleicher Name ohne den Zusatz.
+  const same = (a, b) => norm(a.name) === norm(b.name);
+  // Ein (nahezu) exakter Name ist nie mehrdeutig, auch wenn ein Hero mit längerem Namen knapp dahinter liegt („Cool Rescue“ vs. „Cool Rescuer Monia“).
+  const exact = best.score >= 0.99;
+  const tied = exact ? [] : closeAlternatives(results).filter(r => !same(r.card, best.card));   // andere Karten fast gleichauf
+  const targetInTie = tied.some(r => same(r.card, target));
+  if (same(best.card, target)) {
+    const gap = best.score - (results[1] ? results[1].score : 0);
+    const clear = best.score >= GOOD_SCORE || (best.score >= OKAY_SCORE && gap >= CLEAR_GAP);   // „alice puppeteer“: nur ein Teil des Namens, aber eindeutig
+    if (clear) return { kind: tied.length ? 'ambiguous' : 'correct', best: best.card };
+    return { kind: 'wrong', best: best.card };
+  }
+  if (targetInTie) return { kind: 'ambiguous', best: best.card };
+  return { kind: 'wrong', best: best.card };
+}
+
+/** SC für den Gewinner: Grundbetrag minus Abzug je falschem Tipp, den ER für diese Karte schon abgegeben hat; nie unter 0. */
+function reward(base, penalty, wrongBefore) {
+  return Math.max(0, base - penalty * Math.max(0, wrongBefore));
+}
+
+/** Laufende Nummer der vollen Stunde (UTC; Berliner Stunden fallen wegen ganzzahliger Zeitzonen-Verschiebung auf dieselben Grenzen). */
+function hourIndex(ms = Date.now()) { return Math.floor(ms / 3600000); }
+
+/** Unix-Sekunden, ab denen die nächste volle Stunde beginnt (für <t:…:R>). */
+function nextHourSec(ms = Date.now()) { return (hourIndex(ms) + 1) * 3600; }
+
+/**
+ * Ist ein JETZT erzeugtes Rätsel SC wert? Nur das ERSTE neu erzeugte Rätsel jeder vollen Stunde: Solange in dieser Stunde noch
+ * keines erzeugt wurde (`lastScHour` ≠ aktuelle Stunde), ja — alle weiteren bis zur nächsten vollen Stunde nein.
+ */
+function isScWorthy(lastScHour, ms = Date.now()) { return lastScHour !== hourIndex(ms); }
+
+/** Karten, aus denen Rätsel entstehen: mit Kunst, keine Marker-Token, nicht die zuletzt gespielten. */
+function eligibleCards(cards, hasArt, recentNames = []) {
+  const recent = new Set(recentNames);
+  const pool = cards.filter(c => hasArt(c.name) && !/token/i.test(c.cardType || ''));
+  const fresh = pool.filter(c => !recent.has(c.name));
+  return fresh.length ? fresh : pool;
+}
+
+// ── Ausschnitt: klein beginnen, mit jedem falschen Tipp (von irgendwem) etwas größer ──
+// Größen als Anteil der kürzeren Bildseite (Pixel-Art 76×51 → Start 8 Bildpunkte, +1 je falschem Tipp, höchstens 31).
+const CROP_START = 0.16, CROP_STEP = 0.02, CROP_MAX = 0.6, CROP_MIN_PX = 6;
+
+/** Kantenlänge (Bildpunkte der Kunst) nach `wrong` falschen Tipps. */
+function cropSize(artW, artH, wrong = 0) {
+  const m = Math.min(artW, artH);
+  const start = Math.max(CROP_MIN_PX, Math.round(m * CROP_START));
+  const step = Math.max(1, Math.round(m * CROP_STEP));
+  return Math.min(Math.max(start, Math.round(m * CROP_MAX)), start + step * Math.max(0, wrong));
+}
+
+/** Quadrat der Kantenlänge `size` um `center` (Bildpunkte der Kunst), am Bildrand nach innen geschoben — der Mittelpunkt bleibt, soweit es geht. */
+function cropRect(artW, artH, center, size) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  return { x: clamp(Math.round(center.x - size / 2), 0, artW - size), y: clamp(Math.round(center.y - size / 2), 0, artH - size), w: size, h: size };
+}
+
+/** Anzeigename ohne Farbvarianten-Zusatz. */
+const plainName = name => String(name).replace(/\s*\[(?:B|W)\]$/, '');
+
+module.exports = { plainName, judgeGuess, reward, cropSize, cropRect, CROP_START, hourIndex, nextHourSec, isScWorthy, eligibleCards, MIN_GUESS_LEN };

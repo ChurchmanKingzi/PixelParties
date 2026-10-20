@@ -69,6 +69,7 @@ const { sendMail } = require('./mailer');
 // v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
 // Identitaet in game_history und die Route leben komplett in diesem Modul.
 const playerProfile = require('./player-profile');
+const botApi = require('./bot-api');   // MoniaBot (Discord): Konto-Verknüpfung + Bot-Routen
 const skillTest = require('./skilltest');   // Modus „Skill Test" (Lobby, Vorbereitung, Rounds)
 const { K: ELO_K, placementDelta } = require('./placement-elo');   // Ranked-Elo nach Platzierung (Draft + Skill Test)
 const { isSeat, opponentOfGs, playerCountGs, emitToOpponentsGs } = require('./cards/effects/_opp');
@@ -1276,6 +1277,7 @@ async function initDatabase() {
 
   // Private Chats, Herausforderungen, Blockierungen (social.js)
   await social.init();
+  await botApi.ensureSchema(db);   // users.discord_id (MoniaBot)
 
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
@@ -2629,6 +2631,10 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to start daily challenge' });
   }
 });
+
+// ===== MONIABOT (Discord) =====
+// Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
+botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -4364,11 +4370,20 @@ function roomIsOpenLobby(room) {
 }
 
 /** Was die Einladungs-Logik (social.js) über einen Raum wissen muss; `null` = kein Raum. */
+/** Befoerderte Spieler (Co-Hosts) eines Cube-Draft-Raums, die noch am Tisch sitzen. */
+function cubeCohostIds(room) {
+  const ids = room?.cubeDraft?.cohostIds;
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  return ids.filter(id => room.players.some(p => p.userId === id && !p.isBot));
+}
+
 function roomInviteInfo(roomId) {
   const room = rooms.get(roomId);
   if (!room || room.parentCubeRoomId) return null;
   return {
     hostId: room.hostId,
+    // Cube Draft: der Besitzer darf Mitspielern das Einladen erlauben (`cube_promote_player`).
+    inviterIds: [room.hostId, ...cubeCohostIds(room)],
     open: roomIsOpenLobby(room),
     full: room.players.length >= (room.maxPlayers || 2),
     kind: room.cubeDraft ? 'draft' : (room.skillTest ? 'skilltest' : 'game'),
@@ -12710,6 +12725,30 @@ function cubeBuildPacks(cubeCards, cardDB, packCount = CUBE_PACKS_PER_ROUND * CU
   return packs.map(pk => cubeShuffle(pk));
 }
 
+/**
+ * Ring-Reihenfolge fuer den Draft: Ringposition → Sitz. Die Menschen werden
+ * gleichmaessig um den Ring verteilt (Abstand ~ Ringgroesse / Menschenzahl), die
+ * Bots fuellen die Luecken. Drehung, Reihenfolge der Menschen und der Bots sind
+ * zufaellig — nur die Gleichverteilung ist fest. Ohne Menschen/Bots oder bei
+ * unvollstaendigem Tisch bleibt es beim reinen Zufallsring.
+ */
+function cubeDraftSeatOrder(players, seats = CUBE_SEATS) {
+  const humanSeats = [], botSeats = [];
+  for (let i = 0; i < seats; i++) {
+    const p = players[i];
+    if (p && !p.isBot) humanSeats.push(i); else botSeats.push(i);
+  }
+  if (humanSeats.length === 0 || botSeats.length === 0) return cubeShuffle(Array.from({ length: seats }, (_, i) => i));
+  const h = humanSeats.length;
+  const offset = Math.floor(Math.random() * seats);
+  const humanRing = new Set();
+  for (let k = 0; k < h; k++) humanRing.add((offset + Math.floor((k * seats) / h)) % seats);
+  const humans = cubeShuffle(humanSeats), bots = cubeShuffle(botSeats);
+  const order = new Array(seats);
+  for (let pos = 0; pos < seats; pos++) order[pos] = humanRing.has(pos) ? humans.pop() : bots.pop();
+  return order;
+}
+
 /** Effective remaining-pack-budget for a seat, accounting for time
  *  already elapsed in the open pick window. Returns ms; clamps to 0. */
 function cubeDraftSeatRemainingMs(draft, seatIdx) {
@@ -12755,10 +12794,10 @@ async function cubeDraftStart(room, db, parseDeck, io) {
   // (need the cube contents to know which heroes are NOT in the cube).
   cd.cubeCards = [...cubeCards];
 
-  // Random ring order (0..7 → seat indices). The host stays at seat 0
-  // physically but the ring position can be anywhere — this only
-  // governs which-seat-passes-to-which during the snake.
-  const seatOrder = cubeShuffle([0, 1, 2, 3, 4, 5, 6, 7]);
+  // Ring order (0..7 → seat indices) — governs which seat passes to which
+  // during the snake. Menschen sitzen GLEICHMAESSIG verteilt im Ring (nie ein
+  // Pulk aus Menschen bzw. Bots nebeneinander), sonst zufaellig.
+  const seatOrder = cubeDraftSeatOrder(room.players);
 
   cd.draftState = {
     seatOrder,                                                        // ring pos → seat idx
@@ -13067,7 +13106,9 @@ function cubeDraftFinalize(room, io) {
   // instead." Bots are skipped (they don't build decks).
   const cardDB = getCardDB();
   const cubeCardSet = new Set(cd.cubeCards || []);
-  const allHeroNames = Object.keys(cardDB).filter(n => cardDB[n]?.cardType === 'Hero');
+  // Nur Helden, die Starthelden sein duerfen („This cannot be one of your Starting Heroes“,
+  // z.B. Quetzahuitl, zaehlen nicht: sie gehoeren ins Main Deck).
+  const allHeroNames = Object.keys(cardDB).filter(n => cardDB[n]?.cardType === 'Hero' && !isNonStartingHero(n));
   const nonCubeHeroes = allHeroNames.filter(n => !cubeCardSet.has(n));
   const cubeHeroes = allHeroNames.filter(n => cubeCardSet.has(n));
   cd.assignedHeroes = {}; // seatIdx → heroName (read by build screen + final standings)
@@ -13076,14 +13117,14 @@ function cubeDraftFinalize(room, io) {
     const player = room.players[seatIdx];
     if (!player || player.isBot) continue;
     const pool = draft.pools[seatIdx];
-    const hasHero = pool.some(name => cardDB[name]?.cardType === 'Hero');
+    const hasHero = pool.some(name => cardDB[name]?.cardType === 'Hero' && !isNonStartingHero(name));
     if (!hasHero) {
       const source = nonCubeHeroes.length > 0 ? nonCubeHeroes : cubeHeroes;
       if (source.length === 0) continue; // no heroes anywhere — give up
       const assigned = source[Math.floor(Math.random() * source.length)];
       pool.push(assigned);
       cd.assignedHeroes[seatIdx] = assigned;
-      console.log(`[cube_draft] seat ${seatIdx} (${player.username}) drafted 0 heroes — assigned ${assigned}`);
+      console.log(`[cube_draft] seat ${seatIdx} (${player.username}) drafted 0 starting heroes — assigned ${assigned}`);
     }
   }
 
@@ -13173,7 +13214,7 @@ function cubeBuildBroadcast(room, io) {
       humanCount,
       humanSeats,
       buildTimerEndsAt: cd.buildTimerEndsAt || null,
-      buildTimerTotalMs: CUBE_BUILD_TIMER_MS,
+      buildTimerTotalMs: cubeBuildTimerMs(cd),
     });
   }
   for (const spec of room.spectators) {
@@ -13186,7 +13227,7 @@ function cubeBuildBroadcast(room, io) {
       humanCount,
       humanSeats,
       buildTimerEndsAt: cd.buildTimerEndsAt || null,
-      buildTimerTotalMs: CUBE_BUILD_TIMER_MS,
+      buildTimerTotalMs: cubeBuildTimerMs(cd),
     });
   }
 }
@@ -13201,6 +13242,21 @@ function cubeBuildBroadcast(room, io) {
  *   • mainDeck size must equal 60 (standard cap). potionDeck stays
  *     0/5-15 (re-using existing rules). sideDeck up to 15.
  */
+/** Wie viele verschiedene Starthelden das Team aus diesem Pool hoechstens fassen kann: je Vorname
+ *  einer („Alice, …“ und „Alice, …“ schliessen einander aus, mehrere Kopien desselben Helden
+ *  gibt es im Team nicht) — ausser Peter Röll, den man beliebig oft mitnehmen darf. */
+const CUBE_MULTI_TEAM_HEROES = new Set(['Peter Röll, the Protagonist']);
+function cubeStarterCapacity(pool, cardDB) {
+  const firstNames = new Set();
+  let multi = 0;
+  for (const n of pool) {
+    if (cardDB[n]?.cardType !== 'Hero' || isNonStartingHero(n)) continue;
+    if (CUBE_MULTI_TEAM_HEROES.has(n)) multi++;
+    else firstNames.add(String(n).split(',')[0].trim());
+  }
+  return firstNames.size + multi;
+}
+
 function validateDraftedDeck(deck, pool, cardDB) {
   if (!deck || typeof deck !== 'object') return { ok: false, reason: 'No deck' };
   const heroes = Array.isArray(deck.heroes) ? deck.heroes : [];
@@ -13213,16 +13269,23 @@ function validateDraftedDeck(deck, pool, cardDB) {
   const poolCounts = {};
   for (const name of pool) poolCounts[name] = (poolCounts[name] || 0) + 1;
 
-  // Heroes-in-pool = heroes drafted (incl. assigned).
-  const heroesInPool = pool.filter(n => cardDB[n]?.cardType === 'Hero').length;
-  const requiredHeroes = Math.min(3, heroesInPool);
-  const filledHeroes = heroes.filter(h => h && h.hero).length;
+  // Starthelden-Kandidaten im Pool (inkl. zugewiesenem Helden). Helden mit „cannot be one of your
+  // Starting Heroes“ (Quetzahuitl) zaehlen nicht — sie duerfen nur im Main Deck liegen.
+  const filledList = heroes.filter(h => h && h.hero);
+  for (const h of filledList) {
+    if (cardDB[h.hero]?.cardType !== 'Hero') return { ok: false, reason: `"${h.hero}" is not a Hero` };
+    if (isNonStartingHero(h.hero)) return { ok: false, reason: `"${h.hero}" cannot be one of your Starting Heroes (play it in the Main Deck)` };
+  }
+  const startersInPool = cubeStarterCapacity(pool, cardDB);
+  // 3 Starthelden, mit Zhigao 2 — und nie mehr, als der Pool hergibt.
+  const requiredHeroes = Math.min(benoetigteHeldenzahl(filledList), startersInPool);
+  const filledHeroes = filledList.length;
   if (filledHeroes !== requiredHeroes) {
     return { ok: false, reason: `Need ${requiredHeroes} hero${requiredHeroes === 1 ? '' : 'es'} (you have ${filledHeroes})` };
   }
 
-  // Main deck size — keep standard 60.
-  if (mainDeck.length !== 60) {
+  // Main deck size — 60 (mit 4x The Sacred Mirror 60–80).
+  if (!mainDeckSizeOk(mainDeck, sideDeck)) {
     return { ok: false, reason: `Main deck must be exactly 60 cards (currently ${mainDeck.length})` };
   }
 
@@ -13903,15 +13966,26 @@ function cubeAutoBuildDeck(pool, cardDB, deckName) {
     { hero: null, ability1: null, ability2: null },
     { hero: null, ability1: null, ability2: null },
   ];
-  const heroNames = pool.filter(n => cardDB[n]?.cardType === 'Hero');
-  const reqHeroes = Math.min(3, heroNames.length);
-  const shuffledHeroes = cubeShuffle(heroNames);
-  const usedHeroNames = new Set();
+  // Nur Starthelden-Kandidaten (kein Quetzahuitl & Co.). Zhigao nimmt nur EINEN weiteren Helden mit:
+  // gibt es drei andere, bleibt er draussen; sonst bildet er mit einem weiteren das Team.
+  const starterNames = pool.filter(n => cardDB[n]?.cardType === 'Hero' && !isNonStartingHero(n));
+  const isZhigao = (n) => n === ZHIGAO_HELD || n.startsWith(ZHIGAO_HELD + ' (');
+  const ohneZhigao = starterNames.filter(n => !isZhigao(n));
+  let teamPool;
+  if (ohneZhigao.length >= 3) teamPool = cubeShuffle(ohneZhigao);
+  else {
+    const zhigao = starterNames.find(isZhigao);
+    teamPool = zhigao ? [zhigao, ...cubeShuffle(ohneZhigao)] : cubeShuffle(ohneZhigao);
+  }
+  const reqHeroes = Math.min(benoetigteHeldenzahl(teamPool.slice(0, 3)), cubeStarterCapacity(teamPool, cardDB), 3);
+  const shuffledHeroes = teamPool;
+  const usedHeroNames = new Set();   // je Vorname nur ein Held im Team
   let placed = 0;
   for (const name of shuffledHeroes) {
     if (placed >= reqHeroes) break;
-    if (usedHeroNames.has(name)) continue;
-    usedHeroNames.add(name);
+    const key = name.split(',')[0].trim();
+    if (usedHeroNames.has(key)) continue;
+    usedHeroNames.add(key);
     const cd = cardDB[name];
     heroes[placed] = {
       hero: name,
@@ -13975,7 +14049,51 @@ function cubeAutoBuildDeck(pool, cardDB, deckName) {
   return { name: deckName, heroes, mainDeck, potionDeck: [], sideDeck: [] };
 }
 
-const CUBE_BUILD_TIMER_MS = 5 * 60 * 1000; // 5 minutes once the first player Readies
+const CUBE_BUILD_TIMER_DEFAULT_SEC = 5 * 60; // Standard: 5 Minuten, sobald der erste Spieler Ready drueckt
+const CUBE_BUILD_TIMER_MAX_SEC = 60 * 60;
+/** Deckbau-Timer aus der Raumeinstellung: ganze Sekunden, 0 = AUS; ungueltig/fehlend = Standard. */
+function cubeDraftBuildTimerSec(raw) {
+  if (raw == null || raw === '') return CUBE_BUILD_TIMER_DEFAULT_SEC;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return CUBE_BUILD_TIMER_DEFAULT_SEC;
+  return Math.max(0, Math.min(CUBE_BUILD_TIMER_MAX_SEC, n));
+}
+/** Laenge des Deckbau-Timers in ms (0 = kein Timer). */
+function cubeBuildTimerMs(cd) {
+  return cubeDraftBuildTimerSec(cd?.buildTimerSec) * 1000;
+}
+
+const CUBE_BUILD_BACKUP_SEC = 300;   // Reservetimer bei ausgeschaltetem Deckbau-Timer, s. cubeBuildCheckBackup
+
+/**
+ * Reservetimer fuer „Deckbau-Timer AUS“: Sind ALLE Menschen, die noch nicht Ready sind, getrennt, wuerde der Raum
+ * sonst ewig warten. Dann laufen 300 s; danach bekommen die Fehlenden ein Auto-Deck (wie beim normalen Timer).
+ * Kehrt einer von ihnen zurueck, wird der Reservetimer abgebrochen. Bei eingeschaltetem Deckbau-Timer ohne Wirkung
+ * (der regulaere Timer deckt den Fall ab). Aufrufen, wenn sich Verbindung oder Ready-Stand aendern.
+ */
+function cubeBuildCheckBackup(room, io) {
+  const cd = room?.cubeDraft;
+  if (!cd || cd.phase !== 'building' || cubeBuildTimerMs(cd) > 0) return;
+  const wartende = room.players.filter((p, i) => !p.isBot && !cd.readySeats?.[i]);
+  const alleWeg = wartende.length > 0 && wartende.every(p => !p.socketId);
+  if (alleWeg && !cd.buildTimerHandle) {
+    cd.buildBackupActive = true;
+    cd.buildTimerEndsAt = Date.now() + CUBE_BUILD_BACKUP_SEC * 1000;
+    cd.buildTimerHandle = setTimeout(() => {
+      cd.buildBackupActive = false;
+      cubeBuildAutoFillNonReady(room, io).catch(err => console.error('[cubeBuildAutoFillNonReady]', err.message));
+    }, CUBE_BUILD_BACKUP_SEC * 1000);
+    console.log(`[cube_build] room ${room.id}: alle Wartenden getrennt — Reservetimer ${CUBE_BUILD_BACKUP_SEC}s`);
+    cubeBuildBroadcast(room, io);
+  } else if (!alleWeg && cd.buildBackupActive) {
+    clearTimeout(cd.buildTimerHandle);
+    cd.buildTimerHandle = null;
+    cd.buildBackupActive = false;
+    cd.buildTimerEndsAt = null;
+    console.log(`[cube_build] room ${room.id}: Reservetimer abgebrochen — jemand ist zurueck`);
+    cubeBuildBroadcast(room, io);
+  }
+}
 
 /** Auto-fill any non-ready human seats with a random legal deck and
  *  flip them to Ready. Called when the build-phase timer expires. */
@@ -14533,6 +14651,10 @@ io.on('connection', (socket) => {
           // drafters can take as long as they want. Bots still pick on
           // their normal short delay so the draft doesn't stall on them.
           timerDisabled: !!cubeDraft.timerDisabled,
+          // Deckbau-Timer in Sekunden (laeuft ab dem ersten Ready); 0 = AUS, alle bauen so lange sie wollen.
+          buildTimerSec: cubeDraftBuildTimerSec(cubeDraft.buildTimerSec),
+          // Vom Host beförderte Spieler (userIds): duerfen in der Lobby ebenfalls Leute einladen.
+          cohostIds: [],
           prelimsBo: [1, 3, 5].includes(cubeDraft.prelimsBo) ? cubeDraft.prelimsBo : 1,
           finaleBo: [1, 3, 5].includes(cubeDraft.finaleBo) ? cubeDraft.finaleBo : 3,
           flow: cubeDraft.flow === 'consecutive' ? 'consecutive' : 'simultaneous',
@@ -14620,7 +14742,7 @@ io.on('connection', (socket) => {
       // rejoiner so the client can render the right screen.
       if (room.cubeDraft) {
         if (room.cubeDraft.phase === 'drafting') cubeDraftBroadcast(room, io);
-        else if (room.cubeDraft.phase === 'building') cubeBuildBroadcast(room, io);
+        else if (room.cubeDraft.phase === 'building') { cubeBuildCheckBackup(room, io); cubeBuildBroadcast(room, io); }
         else if (room.cubeDraft.phase === 'tournament') cubeTournamentBroadcast(room, io);
       }
       // If spectator re-joins during a game, send them the current game state
@@ -14794,6 +14916,21 @@ io.on('connection', (socket) => {
     await cubeDraftStart(room, db, parseDeck, io);
   });
 
+  // Host-only: einen Mitspieler in der Draft-Lobby befoerdern (Co-Host) bzw. wieder abstufen.
+  // Befoerderte Spieler duerfen — wie der Host — Leute in den Raum einladen (social.js `room_invite_send`).
+  socket.on('cube_promote_player', ({ roomId, username, promote }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room.cubeDraft || room.cubeDraft.phase !== 'lobby') return;
+    if (room.hostId !== currentUser.userId) return;
+    const target = room.players.find(p => !p.isBot && p.username === username);
+    if (!target || target.userId === room.hostId) return;
+    const ids = new Set(cubeCohostIds(room));
+    if (promote) ids.add(target.userId); else ids.delete(target.userId);
+    room.cubeDraft.cohostIds = [...ids];
+    io.to('room:' + roomId).emit('room_update', sanitizeRoom(room));
+  });
+
   socket.on('cube_draft_pick', ({ roomId, cardName }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
@@ -14919,16 +15056,18 @@ io.on('connection', (socket) => {
     room.cubeDraft.builtDecks[seatIdx] = deck;
     room.cubeDraft.readySeats[seatIdx] = true;
 
-    // Start the 5-minute auto-ready countdown on the FIRST player's
+    // Start the auto-ready countdown (Raum-Einstellung, Standard 5 min) on the FIRST player's
     // Ready submission. Stragglers get their decks auto-completed when
     // the timer expires (`cubeBuildAutoFillNonReady`).
-    if (room.cubeDraft.buildTimerEndsAt == null) {
-      room.cubeDraft.buildTimerEndsAt = Date.now() + CUBE_BUILD_TIMER_MS;
+    // Steht der Deckbau-Timer des Raums auf 0 (AUS), gibt es keinen: es wird auf alle gewartet.
+    const buildMs = cubeBuildTimerMs(room.cubeDraft);
+    if (buildMs > 0 && room.cubeDraft.buildTimerEndsAt == null) {
+      room.cubeDraft.buildTimerEndsAt = Date.now() + buildMs;
       room.cubeDraft.buildTimerHandle = setTimeout(() => {
         cubeBuildAutoFillNonReady(room, io).catch(err =>
           console.error('[cubeBuildAutoFillNonReady]', err.message));
-      }, CUBE_BUILD_TIMER_MS);
-      console.log(`[cube_build] room ${roomId} build timer started — 5 min`);
+      }, buildMs);
+      console.log(`[cube_build] room ${roomId} build timer started — ${Math.round(buildMs / 1000)}s`);
     }
 
     cubeBuildBroadcast(room, io);
@@ -14941,7 +15080,10 @@ io.on('connection', (socket) => {
         clearTimeout(room.cubeDraft.buildTimerHandle);
         room.cubeDraft.buildTimerHandle = null;
       }
+      room.cubeDraft.buildBackupActive = false;
       cubeStartTournament(room, io);
+    } else {
+      cubeBuildCheckBackup(room, io);   // sind die uebrigen Wartenden alle getrennt?
     }
   });
 
@@ -19441,6 +19583,7 @@ function handleLeaveRoom(socket, roomId, user) {
     } else {
       room.spectators = room.spectators.filter(s => s.username !== user.username);
     }
+    if (room.cubeDraft.phase === 'building') cubeBuildCheckBackup(room, io);
     // Ist kein Mensch mehr online, den Raum nach einer Karenzzeit aufraeumen
     // (sonst bliebe ein pausierter Draft fuer immer im Speicher).
     if (!room.players.some(p => !p.isBot && p.socketId) && !room._verlassenTimer) {
@@ -19578,7 +19721,7 @@ function sanitizeRoom(room, forUser) {
           ? skillTest.seatsOf(room)
           : Array.from({ length: room.maxPlayers || 2 }, (_, i) => {
               const p = room.players[i];
-              return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host } : null;
+              return p ? { username: p.username, isBot: !!p.isBot, isHost: p.username === room.host, isCohost: !!room.cubeDraft && cubeCohostIds(room).includes(p.userId) } : null;
             }))
       : undefined,
     spectators: room.spectators.map(s => s.username),
@@ -19589,6 +19732,7 @@ function sanitizeRoom(room, forUser) {
       packTimerSec: room.cubeDraft.packTimerSec,
       pickTimerSec: room.cubeDraft.pickTimerSec,
       timerDisabled: !!room.cubeDraft.timerDisabled,
+      buildTimerSec: cubeDraftBuildTimerSec(room.cubeDraft.buildTimerSec),
       prelimsBo: room.cubeDraft.prelimsBo,
       finaleBo: room.cubeDraft.finaleBo,
       flow: room.cubeDraft.flow,

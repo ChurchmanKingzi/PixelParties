@@ -88,6 +88,8 @@ const { heldSeite } = require('./_hooks');
 const { opponentOfGs } = require('./_opp');   // Als Befund 29.9.: Brettseite geliehener Helden
 const CARD_NAME = 'Overheal Shock';
 
+const CARD_NAME_OHS = 'Overheal Shock';
+
 module.exports = {
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
@@ -259,6 +261,18 @@ module.exports = {
         return -(total / shocked);
       } catch { return 0; }
     },
+  },
+
+  /**
+   * Umhaengen (Inheritance Ceremony, 12.10.): der Schock liegt jetzt an einem anderen Helden — `healReversed` dort setzen (am alten hat es `onCardLeaveZone` genommen,
+   * sofern keine zweite Kopie dort liegt).
+   */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    const hero = engine.gs.players[toOwner]?.heroes?.[toHeroIdx];
+    if (!hero?.name) return;
+    if (!hero.statuses) hero.statuses = {};
+    if (!hero.statuses.healReversed) hero.statuses.healReversed = { source: CARD_NAME_OHS, appliedBy: inst.originalOwner ?? toOwner };
+    engine.sync();
   },
 
   hooks: {

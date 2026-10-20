@@ -28,11 +28,12 @@
 //  4. „add any number of cards from your hand to your opponent's hand": EINE `handPick`-Auswahl aus den EIGENEN Handkarten (die gerade aufgelöste Karte ist ausgenommen), 0 bis
 //     alle — als Zusatzaktion mindestens 2. Nicht abbrechbar (sonst wäre es ein kostenloser Blick). Ein Reaktionsfenster `insert` für das GANZE Geben (nicht je Karte), dann
 //     wandern die Karten einzeln (`actionTransferCardToOppHand`, Flug, Hook `onCardTransferredToOppHand`).
-//  5. „and add up to that many cards from your opponent's hand to your hand afterwards": NACH dem Geben, aus der Gegnerhand, wie sie dann ist — die gerade verschenkten Karten
-//     sind also zurückholbar (Annahme: „afterwards" heisst nach dem Geben). Obergrenze = tatsächlich übergebene Karten (als Zusatzaktion minus 2), offen sichtbare Hand,
-//     `blindHandPick` mit `minSelect: 0` (bis zu N, auch keine). Das Nehmen läuft als Hand-Diebstahl: `actionStealFromHand` mit den vorab gewählten Karten
-//     (`preselectedIndices`) — Erstrunden-Schutz, Reaktionsfenster `steal`, Flug, Besitzerwechsel, Hook `onCardTakenFromOpponent`. Unter Boris (`stealsOpponentCards`)
-//     und einer Hand-Sperre des Spielers entfällt das Nehmen.
+//  5. „and add up to that many cards from your opponent's hand to your hand afterwards": NACH dem Geben, aber NUR aus den Karten, die der Gegner schon VOR dem Geben auf der
+//     Hand hatte — die gerade verschenkten Karten dürfen NICHT zurückgenommen werden (Vorgabe 12.10.). Obergrenze = tatsächlich übergebene Karten (als Zusatzaktion minus 2),
+//     höchstens die Zahl der ursprünglichen Gegnerkarten; offen sichtbare Hand, `blindHandPick` mit `minSelect: 0` (bis zu N, auch keine) und `eligibleIndices` (die
+//     verschenkten Karten liegen ausgegraut am Ende der Hand und sind nicht anklickbar; der Server filtert zusätzlich). Das Nehmen läuft als Hand-Diebstahl:
+//     `actionStealFromHand` mit den vorab gewählten Karten (`preselectedIndices`) — Erstrunden-Schutz, Reaktionsfenster `steal`, Flug, Besitzerwechsel, Hook
+//     `onCardTakenFromOpponent`. Unter Boris (`stealsOpponentCards`) und einer Hand-Sperre des Spielers entfällt das Nehmen.
 //  Logs (der Gegner kennt die Karten, unbeteiligte Sitze nicht — das Protokoll nennt nur Anzahlen): `live_show_look`, `live_show_result`.
 //
 //  ── CPU ─────────────────────────────────────────────────────────────────
@@ -204,25 +205,28 @@ module.exports = {
         }
       }
 
-      // ── 5. Nehmen: bis zu (gegeben − 2 als Zusatzaktion) Karten aus der Gegnerhand, wie sie NACH dem Geben ist ──
+      // ── 5. Nehmen: bis zu (gegeben − 2 als Zusatzaktion) Karten aus der URSPRÜNGLICHEN Gegnerhand — die verschenkten Karten (angehängt am Ende) sind tabu ──
       let genommen = 0;
       const boris = engine.isBorisBlocked({ stealsOpponentCards: true }, pi);
-      const obergrenze = Math.min(Math.max(0, gegeben - (zusatz ? UEBERSCHUSS : 0)), (ops.hand || []).length);
+      const ursprung = Math.max(0, (ops.hand || []).length - gegeben);                 // Plätze 0 … ursprung−1 gehören dem Gegner von vornherein
+      const nehmbar = Array.from({ length: ursprung }, (_, i) => i);
+      const obergrenze = Math.min(Math.max(0, gegeben - (zusatz ? UEBERSCHUSS : 0)), ursprung);
       if (obergrenze > 0 && !boris && !ps.handLocked) {
         const wahl = await mitOffenerGegnerhand(engine, ops, () => engine.promptGeneric(pi, {
           type: 'blindHandPick',
           title: CARD_NAME,
           _lsPhase: 'take',
-          description: `Take up to ${obergrenze} card${obergrenze === 1 ? '' : 's'} from ${ops.username}'s hand (the cards you just gave are among them).`,
+          description: `Take up to ${obergrenze} card${obergrenze === 1 ? '' : 's'} from ${ops.username}'s hand. The cards you just gave cannot be taken back.`,
           maxSelect: obergrenze,
           minSelect: 0,
+          eligibleIndices: nehmbar,
           confirmLabel: '🫳 Take!',
           oppHandCount: (ops.hand || []).length,
           // pflichtwahl: das Geben ist schon geschehen; 0 gewählte Karten (Bestätigen ohne Auswahl) sind erlaubt
           cancellable: false,
         }));
         const roh = Array.isArray(wahl?.selectedIndices) ? wahl.selectedIndices : [];
-        const sel = [...new Set(roh.filter(i => Number.isInteger(i) && i >= 0 && i < (ops.hand || []).length))].slice(0, obergrenze);
+        const sel = [...new Set(roh.filter(i => Number.isInteger(i) && nehmbar.includes(i)))].slice(0, obergrenze);
         if (sel.length > 0) {
           const r = await engine.actionStealFromHand(pi, { count: sel.length, preselectedIndices: sel, sourceName: CARD_NAME });
           genommen = (r?.stolen || []).length;
@@ -248,7 +252,7 @@ module.exports = {
     }
     if (promptData._lsPhase === 'take') {
       const hand = ops?.hand || [];
-      const idxs = hand.map((_, i) => i).sort((a, b) => kartenWert(engine, hand[b]) - kartenWert(engine, hand[a]));
+      const idxs = (promptData.eligibleIndices || hand.map((_, i) => i)).slice().sort((a, b) => kartenWert(engine, hand[b]) - kartenWert(engine, hand[a]));
       return { selectedIndices: idxs.slice(0, promptData.maxSelect || 0) };
     }
     return undefined;

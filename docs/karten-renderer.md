@@ -42,19 +42,58 @@ Textboxen und die Zeilenabstände stammen. Die MSE-Dateien selbst gehören **nic
   (Symbolgröße 8,5 bzw. 10,5 / `image font size` 30, Flächenmittel-Skalierung, mittig in der Zeile); ein
   Symbol zählt im Umbruch wie ein einzelnes Zeichen. Kartennamen und Fähigkeitsfelder der Helden bleiben Text.
   Weitere Symbole: Eintrag in `SYMBOLS`, Bild in `scripts/build-cardgen-sprites.py` (`SYMBOL_FILES`).
+* **Statusbegriffe im Effekttext:** Poison (lila), Burn (orange), Stun (gelb), Negate (grau), Bleed (rot), Freeze/Frozen (eisblau)
+  und Blind (weiß) stehen im Effekt- und Fähigkeitentext **kräftig und farbig** — auf der Karte und im Tooltip. **Nur im Effekttext,
+  niemals in Namen:** Kartenname, Namenszeilen und Werte sind unberührt, und auch Kartennamen IM Text bleiben normal, weil sie in
+  Anführungszeichen stehen („Poison Vial", „Rafflesia, the Poison Princess", „Terror"); „negative" oder „Burnbringer" sind keine
+  Treffer. **„… cannot be negated" (auch „can't be …") ist ein Schutz, kein Status und wird nicht hervorgehoben** (und löst keinen
+  Reminder aus); „Negate that Spell" und „cannot be Frozen" bleiben Treffer. Tabelle und Erkennung: `STATUS_TERMS` / `statusMatches`
+  in `card-render.js` (Formen wie Poisoned, Burns, Negating); der Tooltip liest sie von dort.
+  * **Lesbar auf jedem Rahmen:** Der Ton wird je Textbox nach ihrer *echten* Farbe gewählt (`boxHintergrund` misst den Mittelwert, bevor Text
+    daraufkommt; `statusDarstellung` entscheidet), nicht nach Kartentyp: (1) heller Untergrund (Artifacts): der tiefe Ton `dunkel`, nur so weit
+    abgedunkelt, dass der Kontrast ≥ 4,5 ist, ohne Kontur — so steht Stunned als dunkles Amber auf dem gelben Artifact; (2) sonst der helle Ton
+    `hell` mit dunkler Kontur, wenn er sich vom Untergrund abhebt (Kontrast ≥ 2,2); (3) gleicher Farbton wie der Untergrund (Bleed auf Rot, Poison auf
+    Lila, Negate auf Grau): der tiefe Ton mit heller Kontur. `fest` (Blind, weiß) behält Ton und dunkle Kontur immer. Gemessene Textbox-Farben
+    (alle 1421 Karten): Artifact-Creme, Lila der Helden, Braun der Potions, Blau der Fähigkeiten, Rot der Spells/Creatures, Grau der Tokens.
+  * *Fett im Bild:* Pixel Intv hat 2 Pixel dicke Stämme und überall 1 Pixel breite Lücken, jedes Verbreitern um ein ganzes Schrift-Pixel schließt
+    sie („Frozen" wird zu „Froze■"). Darum: Zeichen doppelt, nur `OPT.boldU` (50 = ein Viertel Schrift-Pixel) versetzt und um dasselbe weiter
+    vorgeschoben, dazu eine Kontur von `OPT.statusOutline` (0,5 Schrift-Pixel, 8 Richtungen). In der Textmaske des Foil-Glanzes (`TEXT_MASK`)
+    bleibt es weiß. Auswirkung auf die Textgröße: von 281 Karten mit Statusbegriff ändert sich bei 13 minimal Größe oder Umbruch, nichts läuft über.
+  * **Tooltip:** `ttQuoted` setzt die Begriffe fett in der Farbe; darunter steht in `TTStatusReminders` die Rubrik „Status Effects" mit einem
+    Remindertext je erwähntem Status (Reihenfolge des ersten Auftretens). **Die Reminder sind die Definitionen aus den Regeln des Spiels**
+    (`RulesScreen`, „Status Effects" in `app-screens.jsx`) Wort für Wort — Stunned, Frozen, Blinded, Poisoned, Burned, Bleeding —, bei Stun/Freeze/
+    Blind kommt der Immunitäts-Hinweis aus den Regeln dazu. Negate hat dort keinen eigenen Eintrag (Text nur im Tooltip). Neuer Begriff: in
+    `STATUS_TERMS` eintragen **und** einen Remindertext in `TT_STATUS_REMINDER` (`app-shared.jsx`) schreiben; `scripts/check-status-terms.js`
+    besteht darauf, hält die Reminder gleich den Regeln und prüft den Kontrast auf allen sechs Rahmenfarben.
 * **Werte der Helden (HP / ATK):** Die Zahlen stehen exakt mittig in ihren Rahmenfeldern — HP-Feld x 180–380,
   ATK-Feld x 470–670 (Kartenraster 750 × 1050, Rahmen `hero` / `fullartHero` / `superhero`), unabhängig von der
   Stellenzahl. `drawLine(…, { ink: true })` zentriert dafür die sichtbare Tinte statt des Vorschubs (die Schrift
   lässt hinter jedem Zeichen 1 Schrift-Pixel Abstand, `INK_TRAIL_U`); gemessen: Tintenmitte = Feldmitte bei 1–4
   Stellen. Creature-, Artifact- und Boss-Rahmen sind unverändert.
+* **Variable Kosten (Artifacts):** Karten mit modularen Kosten tragen in `cards.json` das Feld `costLabel` — „4X" (Beer, Book of Doom,
+  Capture Net, Cool Presents, Possessed Blade), „5X" (Dark Gear), „10X" (Staff of Illusions), „X" (Cool Repair, Tool Freezer,
+  Future Tech Copy Device). `specFromCard` druckt es im Wertefeld der Mitte statt der Zahl aus `cost` (die der Server weiter rechnet);
+  Tooltips (`cardCostText`) und der Discord-Bot (`!card`) zeigen es ebenso, `!show` rendert dieselbe Datei wie das Spiel. Das X ist ein eigenes Glyph in Ziffernhöhe (6 statt 7 Schrift-Pixel, `COST_X` / `drawLine` `costX`), damit es mit den Ziffern abschließt. Die Hand-Überschreibung
+  (`?kost=`) behält das „X" (aus 4X wird 8X) und entfällt bei reinem „X". `scripts/check-cost-label.js` hält Skripte mit
+  `manualGoldCost` und `costLabel` zusammen.
 * **HP-Override:** `CardRender.renderCard(karte, { hp })` druckt eine andere HP als die aus `cards.json` — der
   Karten-Tooltip (`TooltipCardImage` in `app-shared.jsx`) zeigt damit die aktuelle max. HP, sobald sie von der
   gedruckten abweicht. Solche Bilder laufen nicht über `card-image-shim.js` und den dauerhaften Cache.
-* **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt (Helden: HP und ATK, Wesen: HP),
-  fordert es das Bild mit `?ohne=hp,atk` bzw. `?ohne=hp` an. `card-image-shim.js` liest die Variante aus der URL,
-  hängt sie an die Cache-ID (`card:Name|atk,hp`) und ruft `renderCard(karte, { noHp, noAtk })` auf — die Karte
-  entsteht ohne die gedruckte Zahl, die Box bleibt leer. Tooltip, Foil und alle Karten ohne Live-Werte (Hand,
-  Ablage, Menüs) nehmen weiter die normale URL und zeigen die gedruckten Werte.
+* **Bild-Varianten per URL:** `BoardCard` fordert das Kartenbild mit einem Query an; `card-image-shim.js` liest ihn,
+  hängt ihn an die Cache-ID (`card:Name|o=atk,hp|l=2|k=3`, auch beim Vorwärmen) und ruft `renderCard` mit den Optionen auf.
+  Tooltip, Foil und alle Karten ohne Variante nehmen die normale URL.
+  * `?ohne=hp,atk` bzw. `?ohne=hp` — **Brett ohne gedruckte Werte:** Wo `BoardCard` Live-Werte über die Karte legt
+    (Helden: HP und ATK, Wesen: HP), entsteht die Karte ohne die gedruckte Zahl (`{ noHp, noAtk }`), die Box bleibt leer.
+  * `?lv=2` / `?kost=3` — **Handkarten mit aktueller Stufe und aktuellen Kosten:** Weicht die Stufe (Spells, Wesen) oder
+    der Preis (Artifacts, sitzt im Wertefeld der Mitte) in der Hand vom Druck ab, steht die AKTUELLE Zahl auf der Karte
+    (`{ lv, kost }`): grün, wenn niedriger als gedruckt, rot, wenn höher, jeweils mit dunkler Kontur (`drawLine` `outline`).
+    Der Hover-Tooltip zeigt weiter die gedruckten Werte und erklärt die Abweichung (`handNotes` → „In your hand").
+    Das ersetzt die früheren Abzeichen `.creature-level` / `.hand-cost-override` auf der Handkarte.
+  * `?stufe=2` — **Fähigkeitskarten auf dem Brett:** Die Box der aktuellen Stufe (1 = oben, 2 = Mitte, 3 = unten; Stufe =
+    Stapelhöhe, höchstens 3) ist hervorgehoben (etwas heller, schmale blasse Kante), die beiden anderen sind teilentsättigt und
+    leicht abgedunkelt (`{ stufe }`, `markStufe` in `card-render.js`, Stellschrauben in der Konstante `STUFE`). `AbilityStack` und die Ability-Zonen des Puzzle-Editors
+    reichen `abilityLevel` an `BoardCard` weiter; der Hover-Tooltip bekommt `_abilityLevel` und hebt die Stufe im Kartenbild
+    und im Text hervor (`TooltipCardImage`, `TTText` `aktiv`). Wirkt nur auf Karten mit drei Stufenfeldern (`skill3`).
 
 ## Skin-Holo (Foil nur für Skin-Karten)
 

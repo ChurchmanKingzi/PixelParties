@@ -442,6 +442,12 @@ Variante ohne Krone/Flügel), Hintergründe/Auren der Karte gehören nicht zum S
 * **`anchorX`** (optional): ausdrücklich abweichender Bildmittelpunkt in
   denselben Einheiten; hat Vorrang vor `faceX` („sofern nicht anders
   angegeben, ist das Gesicht die Mitte").
+  Nötig bei langen oder fliegenden Figuren, deren Kopf am Rand sitzt:
+  Quetzahuitl (Drache, Kopf rechts, Körper und Flügel links davon) hing mit
+  dem Kopf auf der Kartenmitte fast eine Kartenbreite daneben. Dort steht
+  `anchorX` zwischen Umrissmitte und Massenschwerpunkt über alle Frames
+  (Quetzahuitl 73 bzw. 43 als Skin, Brackle 51,5). Das Menü richtet sich
+  ebenfalls danach.
 * **`footY`** (optional): Standlinie in Frame-Pixeln von oben – hier steht
   der Held auf der Kartenmitte. Ohne Angabe gilt das unterste deckende
   Pixel. Nötig, wenn unter den Füßen noch etwas liegt (Medeas Schlangen);

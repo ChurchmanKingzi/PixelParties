@@ -22,7 +22,7 @@
 //  ── ZWEITE AKTIVIERUNG (offen in der Surprise Zone) ─────────────────────
 //  „would be hit by an Attack": das Board-Post-Target-Fenster (`isPostTargetBoardReaction`, wie Castling) — feuert einmal je Quelle, nachdem die Ziele feststehen, für
 //  Einzelziel UND Fläche; die Engine nimmt dafür seit 12.10. auch OFFEN liegende Karten in Surprise Zonen mit (`_checkPostTargetBoardReactions`). Bedingungen: die Quelle
-//  ist ein Attack (`isAttackSpellOrCreatureSource` mit `kinds: ['attack']`: Attack-Karte oder als Attack geltender Effekt), der Träger steht unter den GETROFFENEN Helden
+//  ist ein Attack (`isAttackSpellOrCreatureSource` mit `kinds: ['attack']`: Attack-Karte ODER ein Hero-/Artifact-Effekt, der als Attack gilt — er läuft über `promptDamageTarget` mit `damageType: 'attack'`, das Fenster reicht es als `info.damageType` durch; Vorgabe 12.10.: auch dann, ohne Stufenprüfung; Zauberschaden wie `destruction_spell` zählt nicht), der Träger steht unter den GETROFFENEN Helden
 //  (egal wie viele weitere Ziele), er lebt — KEINE Stufenregel, KEIN Fähigkeits-/Statuscheck des Helden (die Karte wirkt von selbst). „you may": Bestätigung. Dann geht die Karte in
 //  die Ablage (Ablage ihres Besitzers) und der Held ist gegen diese Quelle immun (`engine.grantEffectImmunity`: Schaden, Status und alles, was über `addHeroStatus` läuft;
 //  andere Ziele bleiben betroffen und die Attack läuft sichtbar durch). Eigene Attacks können es ebenfalls auslösen (der Text sagt nicht „opponent's").

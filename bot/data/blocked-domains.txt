@@ -1,0 +1,13 @@
+# Bekannte Phishing-/Scam-Domains. Eine pro Zeile, ohne https:// — Unterdomänen zählen mit.
+# Zeilen mit # sind Kommentare. Änderungen greifen nach `sudo systemctl restart moniabot`.
+# Zusätzlich fängt der Bot typische Lookalikes ab (siehe lib/scam.js: LOOKALIKE_PATTERNS).
+discord-nitro.gift
+discordnitro.gift
+discord-gifts.com
+discordgift.site
+discord-app.gift
+dlscord.gift
+dicsord.gift
+steamcommunlty.com
+steamcommunnity.com
+steamcomminuty.com

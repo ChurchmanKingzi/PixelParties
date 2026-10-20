@@ -63,7 +63,26 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 const { candidateHosts, attachToHero } = require('./_attachment-shared');
 const { opponentOfGs } = require('./_opp');
 
+/** Berserk am Wirt anlegen — fuer das Spielen der Karte UND das Umhaengen (Inheritance Ceremony, 12.10.). */
+async function berserkAnlegen(engine, appliedBy, owner, heroIdx) {
+  const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0 || hero.statuses?.berserked) return false;
+  await engine.addHeroStatus(owner, heroIdx, STATUS_NAME, {
+    appliedBy,
+    source: CARD_NAME,
+    animationType: 'dark_swarm',
+    festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewaehlt (Als Ruling 9.10.)
+  });
+  return true;
+}
+
 module.exports = {
+  /** Umhaengen (Inheritance Ceremony): den Status am neuen Wirt wieder anlegen (am alten hat ihn `onCardLeaveZone` genommen). */
+  async attachmentMovedToHost(engine, inst, { toOwner, toHeroIdx }) {
+    await berserkAnlegen(engine, inst.originalOwner ?? toOwner, toOwner, toHeroIdx);
+    engine.sync();
+  },
+
   // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
   // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
   // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
@@ -114,12 +133,7 @@ module.exports = {
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero.statuses?.berserked) {
-        await engine.addHeroStatus(targetOwner, targetHeroIdx, STATUS_NAME, {
-          appliedBy: pi,
-          source: CARD_NAME,
-          animationType: 'dark_swarm',
-          festesZiel: true,   // „the Hero this Spell is attached to": der Wirt wurde schon gewaehlt (Als Ruling 9.10.)
-        });
+        await berserkAnlegen(engine, pi, targetOwner, targetHeroIdx);
       } else {
         engine.log('berserk_extra_copy_noop', {
           player: gs.players[pi]?.username,

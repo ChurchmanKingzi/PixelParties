@@ -2234,6 +2234,11 @@ function playSFXForLog(entry) {
     case 'creature_stolen':
     case 'ability_attached':
     case 'surprise_set':
+    // ★ 20.10. (Als Befund: „Eine Surprise-Creature mit dem eigenen Effekt wieder verdeckt zu setzen, spielt noch keinen Sound
+    // ab"): `surpriseCreatureReset` (Pure Advantage Camel, Afflicted Vermin/Pests, Cactus Creature, Noble Mummy Guards, Mummy
+    // Maker Machine) loggt `surprise_reset`. Die Sand-Animation (`sand_reset`) bleibt bewusst stumm — der Klang kommt wie beim
+    // Setzen aus dem Log.
+    case 'surprise_reset':
     case 'artifact_equipped':
     case 'artifact_creature_placed':
       playSFX('placement');
@@ -4751,7 +4756,9 @@ window.potionPermissions = potionPermissions;
 window.potionDeckAccepts = potionDeckAccepts;
 window.potionClauseTeamConflict = potionClauseTeamConflict;
 
-function isDeckLegal(deck) {
+/** `opts.heroCount`: verlangte Starthelden-Zahl statt 3 (bzw. 2 mit Zhigao) — Draft-Deckbau, wenn der
+ *  gedraftete Pool weniger Starthelden hergibt. */
+function isDeckLegal(deck, opts) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
   const reasons = [];
   if (isCubeDeck(deck)) {
@@ -4768,9 +4775,10 @@ function isDeckLegal(deck) {
     }
   }
   const filledHeroes = (deck.heroes || []).filter(h => h && h.hero);
-  const heroSoll = requiredHeroCount(deck);
+  const heroSoll = (opts && opts.heroCount != null) ? opts.heroCount : requiredHeroCount(deck);
   if (filledHeroes.length !== heroSoll) {
-    reasons.push(heroSoll === 2
+    reasons.push((opts && opts.heroCount != null) ? 'Need ' + heroSoll + ' Hero' + (heroSoll === 1 ? '' : 'es') + ' (' + filledHeroes.length + '/' + heroSoll + ')'
+      : heroSoll === 2
       ? 'With ' + ZHIGAO + ' you may only bring 1 other Hero (' + filledHeroes.length + '/2)'
       : 'Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
   }
@@ -5117,7 +5125,11 @@ function getCardMax(deck, cardName) {
   return max;
 }
 
-function canAddCard(deck, cardName, section) {
+/** `opts.ignoreCopyLimit`: ohne die Kopiengrenzen (4 je Karte, 2 je Potion, 4 Helden im Main Deck …) — Draft-Deckbau:
+ *  dort begrenzt der gedraftete Pool die Kopien; alle anderen Deckbauregeln (Nicolas, Gewuerze, Potion-Deck-Klauseln,
+ *  Zhigao, Sacred Mirror, Heldenteam …) gelten unveraendert. */
+function canAddCard(deck, cardName, section, opts) {
+  const noCopyLimit = !!(opts && opts.ignoreCopyLimit);
   const card = window.CARDS_BY_NAME[cardName];
   if (!card) return false;
   const ct = card.cardType;
@@ -5133,7 +5145,7 @@ function canAddCard(deck, cardName, section) {
     if ((deck.mainDeck || []).length >= CUBE_SIZE) return false;
     return true;
   }
-  const effMax = getCardMax(deck, cardName);
+  const effMax = noCopyLimit ? Infinity : getCardMax(deck, cardName);
   if (section === 'main') {
     // Heroes are now legal in main deck up to 4 copies (Goff-style
     // attach mechanic — main-deck Heroes are drawable and can be
@@ -5143,7 +5155,7 @@ function canAddCard(deck, cardName, section) {
     if (ct === 'Hero') {
       if ((deck.mainDeck || []).length >= mainDeckMax(deck)) return false;
       const inMain = (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
-      if (inMain >= 4) return false;
+      if (!noCopyLimit && inMain >= 4) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
@@ -7153,7 +7165,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
               {card.level != null && <span>Lv{card.level}</span>}
               {card.hp != null && <span style={{ color: '#ff6666' }}>♥{card.hp}</span>}
               {card.atk != null && <span style={{ color: '#ffaa44' }}>⚔{card.atk}</span>}
-              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{card.cost}</span>}
+              {card.cost != null && <span style={{ color: '#44aaff' }}>◆{cardCostText(card)}</span>}
             </div>
           </>
         )}
@@ -7211,11 +7223,13 @@ function CardSideTooltip({ card, imgUrl, inGallery }) {
       )}
       <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
         <TTHeader card={card} name={card.name} level={card.level} />
-        <div style={TT_BODY}>
-          <TTStats hp={card.hp} atk={card.atk} cost={card.cost} />
+        <div className="tt-body">
+          <TTStats hp={card.hp} atk={card.atk} cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.); bei Ascended Heroes steht der Ascension Bonus als Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
-          <TTText text={effectText} />
+          <TTEffectBox card={card} text={effectText} />
+          {/* Genannte Tokens (Bild + Effekt) ganz unten (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
         </div>
       </div>
     </div>
@@ -7332,6 +7346,7 @@ window.countInDeck = countInDeck;
 window.hasNicolasHero = hasNicolasHero;
 window.canAddCard = canAddCard;
 window.isNonStartingHero = isNonStartingHero;
+window.MULTI_TEAM_HEROES = MULTI_TEAM_HEROES;
 window.getCardMax = getCardMax;
 window.trimOverLimitCopies = trimOverLimitCopies;
 window.hasSacredJewelArtifactBonus = hasSacredJewelArtifactBonus;
@@ -8188,6 +8203,18 @@ function BuffColumn({ buffs, cardName, statuses }) {
 //                      CardMini components trigger it automatically.
 // ═══════════════════════════════════════════
 
+/**
+ * Die gedruckten Kosten einer Karte als Text (Als Vorgabe 19.10.). Variable Kosten tragen `costLabel` in cards.json — „4X"
+ * (Beer, Book of Doom, Capture Net, Cool Presents, Possessed Blade), „5X" (Dark Gear), „10X" (Staff of Illusions) oder nur „X"
+ * (Cool Repair, Tool Freezer, Future Tech Copy Device) —, sonst steht die Zahl aus `cost`. Ohne Kosten: null.
+ */
+function cardCostText(card) {
+  if (!card) return null;
+  if (card.costLabel) return String(card.costLabel);
+  return card.cost != null ? String(card.cost) : null;
+}
+window.cardCostText = cardCostText;
+
 // ── Farben im Karten-Tooltip (Als Vorgabe 12.10.) ───────────────────
 // HP gruen, ATK rot, Kosten (Artifacts) golden. Helle Toene, weil der
 // Tooltip auf dunklem Grund (`--bg2`) steht. Der Kartentyp traegt die
@@ -8204,43 +8231,77 @@ function tooltipTypeColor(cardType) {
   return cardType === 'Ascended Hero' ? TT_ASCENDED_COLOR : typeColor(cardType);
 }
 
-// ── Aufbau des Tooltips unter dem Kartenbild (Als Vorgabe 12.10.: „nur eine grosse, zugetextete Box") ──
+// ── Aufbau des Tooltips unter dem Kartenbild (Als Vorgabe 12./13.10.) ───────
 // Kopf mit Name und Plaketten (Typ in Kartenfarbe, Untertyp, Archetyp, Stufe, Zauberschulen), darunter Wertekacheln,
-// ein Hinweisfeld fuer den Ascension Bonus, der Regeltext als Absaetze (nummerierte Faehigkeitsstufen, Kartennamen in
-// Anfuehrungszeichen hervorgehoben) und die Zusatzfelder (Orbs, geerbte Effekte). Beide Tooltips (Spielbrett und
-// Menues/Galerie) bauen sich aus denselben Stuecken, damit sie nicht auseinanderlaufen.
+// ein Hinweisfeld fuer den Ascension Bonus, der Regeltext in einer eigenen Textbox (Absaetze, nummerierte Faehigkeitsstufen,
+// Kartennamen in Anfuehrungszeichen hervorgehoben) und die Zusatzfelder (Orbs, geerbte Effekte). Alles im Pixel-Stil der
+// Karten und Menuefenster (CSS: „KARTEN-TOOLTIP IM PIXEL-STIL" in style.css). Beide Tooltips (Spielbrett und Menues/Galerie)
+// bauen sich aus denselben Stuecken, damit sie nicht auseinanderlaufen.
 const TT_QUOTE_COLOR = '#9ecbff';
 const TT_GOLD_NOTE = '#ffcc44';
+const TT_NEUTRAL = '#8a8aa8';
 const TT_SCHOOL_COLORS = {   // wie die Orbs von Beato (cards/effects/beato-the-butterfly-witch.js)
   'Destruction Magic': '#ff4444', 'Decay Magic': '#aa44ff', 'Magic Arts': '#4488ff',
   'Support Magic': '#ffdd44', 'Summoning Magic': '#44ff88',
 };
-const TT_BODY = { padding: '12px 14px 16px', display: 'flex', flexDirection: 'column', gap: 12 };
 
-/** "#rgb" / "#rrggbb" + Deckkraft -> rgba(...) */
-function ttRgba(hex, a) {
+/** "#rgb" / "#rrggbb" -> [r, g, b] */
+function ttRgb(hex) {
   let h = String(hex || '#888888').replace('#', '');
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
   const n = parseInt(h, 16) || 0;
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+/** Hex-Farbe `a` um den Anteil `t` zu `b` (ebenfalls Hex) gemischt, als "#rrggbb". */
+function ttMix(a, b, t) {
+  const A = ttRgb(a), B = ttRgb(b);
+  return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
 
-/** Kleine Plakette; mit `color` getoent und umrandet, sonst neutral. */
+// Pixel-Rahmen als 9-Slice-Bild: 5 x 5 Einheiten, Ecken 2 x 2 (Slice 2). Aussen die dunkle Kontur mit abgeschnittenen Ecken,
+// darin ein Farbring — oben/links hell, unten/rechts dunkel (wie die abgeschraegten Raender der Menuefenster).
+const _ttFrames = new Map();
+function ttFrame(color) {
+  const key = String(color);
+  let url = _ttFrames.get(key);
+  if (url) return url;
+  const K = '#05040a', lit = ttMix(key, '#ffffff', .45), mid = key, dark = ttMix(key, '#000000', .5);
+  const r = (x, y, c) => `<rect x='${x}' y='${y}' width='1' height='1' fill='${c}'/>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='5' height='5' shape-rendering='crispEdges'>` + [
+    r(1, 0, K), r(0, 1, K), r(1, 1, lit),                 // oben links (Ecke abgeschnitten)
+    r(2, 0, K), r(2, 1, lit),                              // oben
+    r(3, 0, K), r(3, 1, mid), r(4, 1, K),                  // oben rechts
+    r(0, 2, K), r(1, 2, lit),                              // links
+    r(3, 2, dark), r(4, 2, K),                             // rechts
+    r(0, 3, K), r(1, 3, mid), r(1, 4, K),                  // unten links
+    r(2, 3, dark), r(2, 4, K),                             // unten
+    r(3, 3, dark), r(4, 3, K), r(3, 4, K),                 // unten rechts
+  ].join('') + '</svg>';
+  url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  _ttFrames.set(key, url);
+  return url;
+}
+
+/** Pixel-Box in `color` (Hex): Rahmen aus `ttFrame`, Flaeche mit Raster — Stil und Masse in style.css (`.tt-box`). */
+function TTBox({ color, u, className, style, children }) {
+  return <div className={'tt-box' + (className ? ' ' + className : '')}
+    style={{ '--zier': color, ...(u ? { '--u': u + 'px' } : null), borderImageSource: ttFrame(color), ...style }}>{children}</div>;
+}
+
+/** Kleine Plakette (Typ, Untertyp, Schule, Stufe) im Pixel-Rahmen; ohne `color` neutral grau. */
 function TTChip({ color, children }) {
-  const st = color
-    ? { color, background: ttRgba(color, .16), border: '1px solid ' + ttRgba(color, .55) }
-    : { color: 'var(--text)', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.14)' };
-  return <span style={{ ...st, display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, letterSpacing: .3, lineHeight: 1.45 }}>{children}</span>;
+  const c = color || TT_NEUTRAL;
+  return <TTBox color={c} className="tt-chip" style={{ color: color || 'var(--text)' }}>{children}</TTBox>;
 }
 
-/** Kopf: Name in Kartenfarbe auf einem Farbverlauf, darunter die Plaketten. */
+/** Kopf: Name in Kartenfarbe auf einem in Stufen getoenten Band, darunter die Plaketten. */
 function TTHeader({ card, name, level, levelBonus }) {
   const color = tooltipTypeColor(card.cardType);
   const schools = card.cardType !== 'Creature' ? [card.spellSchool1, card.spellSchool2].filter(Boolean) : [];
   return (
-    <div style={{ padding: '10px 14px 11px', borderTop: '3px solid ' + color, background: `linear-gradient(180deg, ${ttRgba(color, .24)} 0%, ${ttRgba(color, .04)} 100%)` }}>
-      <div style={{ fontWeight: 700, fontSize: 19, lineHeight: 1.25, color, textShadow: '0 1px 0 rgba(0,0,0,.65)' }}>{name}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+    <div className="tt-kopf" style={{ '--zier': color }}>
+      <div className="tt-name" style={{ color }}>{name}</div>
+      <div className="tt-chips">
         <TTChip color={color}>{card.cardType}</TTChip>
         {card.subtype && <TTChip>{card.subtype}</TTChip>}
         {card.archetype && <TTChip>{card.archetype}</TTChip>}
@@ -8251,13 +8312,31 @@ function TTHeader({ card, name, level, levelBonus }) {
   );
 }
 
-/** Eine Wertekachel (HP / ATK / Cost): kleine Beschriftung, grosse Zahl. */
-function TTStat({ icon, label, color, children }) {
+// Kleine Pixel-Bilder fuer die Wertekacheln (je Zeile eine Pixelreihe, X = Pixel).
+const TT_ICONS = {
+  hp:   ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'],
+  atk:  ['...X...', '..XXX..', '..XXX..', '..XXX..', '.XXXXX.', '...X...', '...X...'],
+  cost: ['...X...', '..XXX..', '.XXXXX.', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'],
+};
+/** Pixel-Icon (`hp` | `atk` | `cost`) in `color`; ein Pixel = `px` CSS-Pixel. */
+function TTIcon({ kind, color, px = 2 }) {
+  const rows = TT_ICONS[kind];
+  if (!rows) return null;
+  const d = rows.map((row, y) => [...row].map((c, x) => c === 'X' ? `M${x} ${y}h1v1h-1z` : '').join('')).join('');
   return (
-    <div style={{ flex: '1 1 0', minWidth: 0, padding: '5px 8px 6px', borderRadius: 5, textAlign: 'center', background: ttRgba(color, .12), border: '1px solid ' + ttRgba(color, .45) }}>
-      <div style={{ fontSize: 10, letterSpacing: .7, textTransform: 'uppercase', color: ttRgba(color, .85) }}>{icon} {label}</div>
-      <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.25, color }}>{children}</div>
-    </div>
+    <svg className="tt-icon" width={rows[0].length * px} height={rows.length * px} viewBox={`0 0 ${rows[0].length} ${rows.length}`} aria-hidden="true">
+      <path d={d} fill={color} />
+    </svg>
+  );
+}
+
+/** Eine Wertekachel (HP / ATK / Cost): Pixel-Icon und Beschriftung klein, die Zahl gross. */
+function TTStat({ kind, label, color, children }) {
+  return (
+    <TTBox color={color} className="tt-stat">
+      <div className="tt-stat-label" style={{ color: ttMix(color, '#ffffff', .15) }}><TTIcon kind={kind} color={color} />{label}</div>
+      <div className="tt-stat-wert" style={{ color }}>{children}</div>
+    </TTBox>
   );
 }
 
@@ -8265,35 +8344,153 @@ function TTStat({ icon, label, color, children }) {
 function TTStats({ hp, hpMax, atk, cost }) {
   if (hp == null && atk == null && cost == null) return null;
   return (
-    <div style={{ display: 'flex', gap: 6 }}>
-      {hp != null && <TTStat icon="♥" label="HP" color={TT_HP_COLOR}>{hp}{hpMax != null && <span style={{ fontSize: 12, opacity: .7 }}> / {hpMax}</span>}</TTStat>}
-      {atk != null && <TTStat icon="⚔" label="ATK" color={TT_ATK_COLOR}>{atk}</TTStat>}
-      {cost != null && <TTStat icon="◆" label="Cost" color={TT_COST_COLOR}>{cost}</TTStat>}
+    <div style={{ display: 'flex', gap: 10 }}>
+      {hp != null && <TTStat kind="hp" label="HP" color={TT_HP_COLOR}>{hp}{hpMax != null && <span style={{ fontSize: 12, opacity: .75 }}> / {hpMax}</span>}</TTStat>}
+      {atk != null && <TTStat kind="atk" label="ATK" color={TT_ATK_COLOR}>{atk}</TTStat>}
+      {cost != null && <TTStat kind="cost" label="Cost" color={TT_COST_COLOR}>{cost}</TTStat>}
     </div>
   );
 }
 
-/** Hinweisfeld mit farbigem Balken links (Ascension Bonus, Orbs, geerbte Effekte); `title` optional. */
+/** Hinweisfeld im Pixel-Rahmen (Ascension Bonus, Orbs, geerbte Effekte, Handhinweise); `title` optional. */
 function TTCallout({ color, title, children }) {
   return (
-    <div style={{ padding: '8px 10px', borderLeft: '3px solid ' + color, borderRadius: '0 5px 5px 0', background: ttRgba(color, .1), fontSize: 14, lineHeight: 1.5 }}>
-      {title && <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: .4, color, marginBottom: 4 }}>{title}</div>}
+    <TTBox color={color} className="tt-callout">
+      {title && <div className="tt-callout-titel" style={{ color }}>{title}</div>}
       {children}
-    </div>
+    </TTBox>
   );
 }
 
-/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben. */
-function ttQuoted(text) {
-  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : t));
+// ── Statuseffekte im Effekttext (Als Vorgabe 20.10.) ──
+// Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint — fett und farbig, wie auf der Karte; Erkennung
+// und Farben kommen aus dem Kartenrenderer (`CardRender.STATUS_TERMS` / `statusMatches`), damit Bild und Tooltip nie auseinanderlaufen.
+// NUR im Effekttext, nie in Namen: Kartennamen im Text stehen in Anfuehrungszeichen und bleiben unberuehrt.
+// Darunter steht fuer jeden erwaehnten Status ein Remindertext (`TTStatusReminders`).
+const TT_STATUS_BOX = '#a3a9bd';
+// Die Remindertexte sind die Definitionen aus den Regeln des Spiels (`RulesScreen`, Abschnitt „Status Effects“ in app-screens.jsx), Wort
+// fuer Wort — `scripts/check-status-terms.js` haelt sie gleich. Negate hat dort keinen eigenen Eintrag; der Text steht nur hier.
+const TT_STATUS_REMINDER = {
+  poison: 'The target takes 30 damage during each of its owner\'s Start Phases. Poisoning effects usually revolve around stacking multiple instances, increasing its damage.',
+  burn:   'The target takes 60 damage during each of its owner\'s Start Phases.',
+  stun:   'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated.',
+  negate: 'To negate an Attack, Spell, summoning or effect is to cancel it: it has no effect. A target whose effects are negated cannot use or trigger them; if it is a Hero, its Abilities are negated as well.',
+  bleed:  'The target takes 50 damage whenever it performs an Action, activates its active effect or activates the active effect of one of its Abilities.',
+  freeze: 'The target cannot perform Actions. Its effects and Abilities (if it is a Hero) are negated. Additionally, it cannot be equipped with Artifacts.',
+  blind:  'The target cannot choose anything the opponent controls as a target for Attacks, Spells, or effects.',
+};
+// Regel unter der Statusliste: gilt fuer alles, was Aktionen oder Effekte verhindert (hier: Stun, Freeze, Blind)
+const TT_STATUS_RECOVERY = 'After recovering from a Freeze, Stun, Blind or any other status effect that includes negating a target\'s effect or preventing it from performing Actions, that target becomes completely immune to the opponent\'s incapacitating effects for 1 turn (until the beginning of its owner\'s next turn)!';
+const TT_STATUS_INCAPACITATING = ['stun', 'freeze', 'blind'];
+
+/** Statusbegriffe in `text` (ausserhalb von Anfuehrungszeichen): [{ start, end, key }] — leer, wenn der Renderer fehlt. */
+function ttStatusMatches(text) {
+  const CR = window.CardRender;
+  return CR && typeof CR.statusMatches === 'function' ? CR.statusMatches(text) : [];
 }
+function ttStatusTerm(key) {
+  const CR = window.CardRender;
+  return (CR && CR.STATUS_TERMS && CR.STATUS_TERMS.find(t => t.key === key)) || null;
+}
+/** Ein Text ohne Anfuehrungszeichen, die Statusbegriffe darin fett und farbig. */
+function ttMarkStatus(text, basis) {
+  const ms = ttStatusMatches(text);
+  if (!ms.length) return text;
+  const teile = []; let pos = 0;
+  ms.forEach((m, i) => {
+    const term = ttStatusTerm(m.key);
+    if (m.start > pos) teile.push(text.slice(pos, m.start));
+    teile.push(<b key={basis + '-' + i} className="tt-status" style={{ color: term ? term.hell : undefined }}>{text.slice(m.start, m.end)}</b>);
+    pos = m.end;
+  });
+  if (pos < text.length) teile.push(text.slice(pos));
+  return <React.Fragment key={basis}>{teile}</React.Fragment>;
+}
+
+/** Text mit Kartennamen in Anfuehrungszeichen hervorgehoben; Statusbegriffe ausserhalb davon fett und farbig. */
+function ttQuoted(text) {
+  return String(text).split(/("[^"]*")/).map((t, i) => (i % 2 ? <span key={i} style={{ color: TT_QUOTE_COLOR }}>{t}</span> : ttMarkStatus(t, i)));
+}
+
+/** Rubrik unter dem Effekttext: ein Remindertext je erwähntem Statuseffekt (Reihenfolge des ersten Auftretens); ohne Treffer: nichts. */
+function TTStatusReminders({ text }) {
+  const keys = [];
+  for (const m of ttStatusMatches(String(text || ''))) if (!keys.includes(m.key)) keys.push(m.key);
+  if (!keys.length) return null;
+  return (
+    <TTCallout color={TT_STATUS_BOX} title="Status Effects">
+      {keys.map((k, i) => {
+        const term = ttStatusTerm(k);
+        return (
+          <div key={k} className="tt-reminder" style={{ marginTop: i ? 7 : 0 }}>
+            <b className="tt-status" style={{ color: term ? term.hell : undefined }}>{term ? term.label : k}</b>
+            <span style={{ opacity: .92 }}> — {TT_STATUS_REMINDER[k]}</span>
+          </div>
+        );
+      })}
+      {keys.some(k => TT_STATUS_INCAPACITATING.includes(k)) && (
+        <div className="tt-reminder" style={{ marginTop: 9, paddingTop: 7, borderTop: '1px solid rgba(255,255,255,.12)', opacity: .85 }}>{TT_STATUS_RECOVERY}</div>
+      )}
+    </TTCallout>
+  );
+}
+
+// ── Tokens am Ende des Karten-Tooltips (Als Vorgabe 20.10.) ──
+// Nennt der Effekttext einer Karte einen Token („Pollution Tokens", „Mummy Token"), steht ganz unten im Tooltip dieser Karte das Bild des Tokens,
+// gefolgt von seinem Effekt — in JEDEM Menue und Modus (Spielbrett, Puzzle-Editor, Deckeditor, Galerien, Regeln). Frueher oeffnete das Brett dafuer
+// einen zweiten, angeschnittenen Tooltip links neben dem Karten-Tooltip, nur im Spiel und nur fuer Pollution/Mummy. Tokens nennen keine weiteren
+// Tokens (die Puppen verweisen aufeinander): kein Nest. Erkannt wird der Kartenname im Text, auch im Plural; die Token-Karten kommen aus
+// `CARDS_BY_NAME` (Kartentyp „Token" bzw. „Creature/Token").
+function ttIstToken(card) { return !!card && (card.cardType === 'Token' || card.cardType === 'Creature/Token'); }
+const _ttTokenListe = { n: -1, liste: [] };
+function ttTokenKarten() {
+  const by = window.CARDS_BY_NAME || {};
+  const namen = Object.keys(by);
+  if (_ttTokenListe.n !== namen.length) { _ttTokenListe.liste = namen.map(k => by[k]).filter(ttIstToken); _ttTokenListe.n = namen.length; }
+  return _ttTokenListe.liste;
+}
+/** Die Token-Karten, die der Effekttext von `card` nennt, in der Reihenfolge ihres ersten Auftretens; Tokens selbst: keine. */
+function ttRelatedTokens(card) {
+  const text = String((card && card.effect) || '');
+  if (!text || ttIstToken(card)) return [];
+  const treffer = [];
+  for (const t of ttTokenKarten()) {
+    if (t.name === card.name) continue;
+    const m = new RegExp('\\b' + t.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 's?\\b').exec(text);
+    if (m) treffer.push([m.index, t]);
+  }
+  return treffer.sort((x, y) => x[0] - y[0]).map(x => x[1]);
+}
+/** Ein Token: Name, Bild, (Werte,) Effekt. */
+function TTTokenBox({ token }) {
+  const color = tooltipTypeColor(token.cardType);
+  const url = cardImageUrl(token.name);
+  return (
+    <TTBox color={color} className="tt-token">
+      <div className="tt-token-kopf">
+        <span className="tt-token-marke">Token</span>
+        <span className="tt-token-name" style={{ color }}>{token.name}</span>
+      </div>
+      {url && <img className="tt-token-bild" src={url} alt="" />}
+      <TTStats hp={token.hp} atk={token.atk} cost={null} />
+      <TTText text={token.effect} />
+    </TTBox>
+  );
+}
+/** Rubrik am Ende des Tooltips: je genanntem Token ein Kasten; ohne Token nichts. */
+function TTTokenSektion({ card }) {
+  const tokens = ttRelatedTokens(card);
+  if (!tokens.length) return null;
+  return <>{tokens.map(t => <TTTokenBox key={t.name} token={t} />)}</>;
+}
+window.TTTokenSektion = TTTokenSektion;
 
 /**
  * Regeltext als Absaetze. Wie im Kartenrenderer ist ein Zeilenumbruch hinter einem Leerzeichen nur ein weicher Umbruch der
  * Vorlage (wird zum Leerzeichen), alle anderen Umbrueche sind echte Absaetze. „1) … 2) … 3) …“ (Faehigkeitsstufen) bekommen
  * eine Nummernmarke mit haengendem Einzug.
  */
-function TTText({ text }) {
+function TTText({ text, aktiv }) {
   const paras = String(text || '').replace(/ +\n/g, ' ').split('\n').map(t => t.trim()).filter(Boolean);
   if (paras.length === 0) return null;
   return (
@@ -8302,14 +8499,27 @@ function TTText({ text }) {
         const m = /^(\d+)\)\s*([\s\S]*)$/.exec(p);
         const abstand = i ? 8 : 0;
         if (!m) return <div key={i} style={{ marginTop: abstand }}>{ttQuoted(p)}</div>;
+        // Ability auf dem Brett (`aktiv` = aktuelle Stufe): die Zeile der Stufe ist hervorgehoben, die anderen sind grau.
+        const stufenKlasse = aktiv ? (parseInt(m[1], 10) === aktiv ? ' tt-stufe-aktiv' : ' tt-stufe-aus') : '';
         return (
-          <div key={i} style={{ marginTop: abstand, display: 'flex', gap: 8, alignItems: 'baseline' }}>
-            <span style={{ flexShrink: 0, minWidth: 20, textAlign: 'center', padding: '0 4px', borderRadius: 3, fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,.1)', color: 'var(--text)' }}>{m[1]}</span>
+          <div key={i} className={'tt-stufe' + stufenKlasse} style={{ marginTop: abstand, display: 'flex', gap: 9, alignItems: 'baseline' }}>
+            <span className="tt-nummer">{m[1]}</span>
             <span>{ttQuoted(m[2])}</span>
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** Die Textbox des Effekttexts: Pixel-Box in der Kartenfarbe, darin die Absaetze (ohne Text: nichts). */
+function TTEffectBox({ card, text, aktiv }) {
+  if (!String(text || '').trim()) return null;
+  return (
+    <>
+      <TTBox color={tooltipTypeColor(card.cardType)} className="tt-textbox"><TTText text={text} aktiv={aktiv} /></TTBox>
+      <TTStatusReminders text={text} />
+    </>
   );
 }
 
@@ -8369,7 +8579,8 @@ function ascensionBonusText(card) {
 }
 
 // ── Karte mit aktueller max. HP (Als Vorgabe 12.10.) ────────────────
-// Weicht die aktuelle max. HP eines Helden/Wesens von der gedruckten ab
+// Weicht die aktuelle max. HP eines Helden/Wesens von der gedruckten ab (oder steht eine Ability auf dem Brett, deren aktuelle Stufe
+// hervorgehoben werden soll)
 // (Buffs, Ascension, Effekte), zeigt das Tooltip-Bild die AKTUELLE Zahl
 // auf der Karte. Der Renderer zeichnet die Karte dafuer mit `hp`-Override
 // neu; bis sie fertig ist (und wenn der Renderer fehlt) bleibt das normale
@@ -8377,9 +8588,10 @@ function ascensionBonusText(card) {
 // Hovern nicht neu zeichnet.
 const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
 const TT_HP_KARTEN_MAX = 24;
-function TooltipCardImage({ card, src, hp, style }) {
+function TooltipCardImage({ card, src, hp, stufe, style }) {
   const skin = skinOfUrl(src);
-  const key = hp != null ? `${card.name}|${skin || ''}|${hp}` : null;
+  // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
+  const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;
   const [alt, setAlt] = useState(() => (key && _ttHpKarten.get(key)) || null);
   useEffect(() => {
     if (key == null) { setAlt(null); return; }
@@ -8393,7 +8605,7 @@ function TooltipCardImage({ card, src, hp, style }) {
       try {
         // Kanonische Kartendaten wie beim normalen Bild — nur die HP weicht ab.
         const basis = window.CARDS_BY_NAME?.[card.name] || card;
-        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp });
+        const cv = await CR.renderCard(basis, { skin: skin || undefined, hp: hp != null ? hp : undefined, stufe: stufe != null ? stufe : undefined });
         if (!cv || tot) return;
         const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
         if (!blob || tot) return;
@@ -8438,11 +8650,13 @@ function CardTooltipContent({ card, children, imageUrl }) {
   const bildHp = liveMaxHp != null && liveMaxHp !== card.hp ? liveMaxHp : null;
   const bonus = ascensionBonusText(card);
   const effectText = ttEffectText(card.effect, bonus);
+  // Ability auf dem Brett: aktuelle Stufe (1 = oberes, 2 = mittleres, 3 = unteres Feld) — im Bild und im Text hervorgehoben
+  const stufe = card.cardType === 'Ability' && card._abilityLevel >= 1 && card._abilityLevel <= 3 ? card._abilityLevel : null;
   return (
     <>
       {imgUrl && (
         <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} style={{
+          <TooltipCardImage card={card} src={imgUrl} hp={bildHp} stufe={stufe} style={{
             width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
             border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
@@ -8453,17 +8667,26 @@ function CardTooltipContent({ card, children, imageUrl }) {
       <div>
         <TTHeader card={card} name={displayName}
           level={card._liveLevel != null ? card._liveLevel : card.level} levelBonus={card._stampBonus || 0} />
-        <div style={TT_BODY}>
+        <div className="tt-body">
           {/* Werte: live (`_liveHp` / `_liveMaxHp` / `_liveAtk`, von BoardCard auf dem Brett gesetzt) vor den Kartenwerten. */}
           <TTStats
             hp={card._liveHp != null ? card._liveHp : card.hp}
             hpMax={card._liveMaxHp != null ? card._liveMaxHp : null}
             atk={card._liveAtk != null ? card._liveAtk : card.atk}
-            cost={card.cost} />
+            cost={cardCostText(card)} />
           {/* Heroes zeigen KEINE Abilities im Tooltip (Als Vorgabe 12.10.): sie liegen sichtbar in den Ability-Zonen, und bei
               Ascended Heroes beschreiben die startingAbility-Felder den Ascension Bonus — der steht hier als ganzer Satz. */}
           {bonus && <TTCallout color={TT_ASCENDED_COLOR}>{bonus}</TTCallout>}
-          <TTText text={effectText} />
+          <TTEffectBox card={card} text={effectText} aktiv={stufe} />
+          {/* Handkarte mit aktuellen Werten: die Karte zeigt Stufe/Kosten wie sie jetzt sind (gruen = verringert, rot = erhoeht),
+              dieser Tooltip die gedruckten — und sagt hier, woher die Abweichung kommt (`handNotes` aus BoardCard). */}
+          {Array.isArray(card._handNotes) && card._handNotes.length > 0 && (
+            <TTCallout color={card._handNotes[0].color} title="In your hand">
+              {card._handNotes.map((n, i) => (
+                <div key={i} style={{ color: n.color, fontSize: 13, lineHeight: 1.45, marginTop: i ? 5 : 0 }}>{n.text}</div>
+              ))}
+            </TTCallout>
+          )}
           {/* Ascension-Orbs (Beato): welche Zauberschulen schon gesammelt sind. Steht im Karten-Tooltip statt in eigenen
               Orb-Tooltips — die Orbs auf der Karte nehmen den Zeiger nicht mehr an, ein Hover genau darauf ist also ein
               ganz normaler Hover der Karte. */}
@@ -8496,6 +8719,8 @@ function CardTooltipContent({ card, children, imageUrl }) {
             </TTCallout>
           )}
           {children}
+          {/* Genannte Tokens (Bild + Effekt) ganz unten — in jedem Menue und Modus (Als Vorgabe 20.10.) */}
+          <TTTokenSektion card={card} />
         </div>
       </div>
     </>
