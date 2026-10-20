@@ -199,9 +199,18 @@ def wordmark(scale):
     return small.resize((small.width * scale, small.height * scale), Image.NEAREST)
 
 
-def monia(px, frame=10):
+# Das Funkeln neben ihrem Gesicht soll das schlichte weiße „+" der Karte sein (5×5 Pixel, Mitte (23, 12) im Frame); im Sheet sind die vier
+# Spitzen hellcyan, auf der Karte weiß. Frame 21 ist die Zwinker-Pose (rechtes Auge geschlossen) mit genau diesem Plus.
+PLUS = [(23, 10), (23, 11), (23, 12), (23, 13), (23, 14), (21, 12), (22, 12), (24, 12), (25, 12)]
+WINK_FRAME = 21
+
+
+def monia(px, frame=WINK_FRAME):
     spr = bp.Sprite(SLUG)
     spr.px = px
+    if frame == WINK_FRAME:
+        for (x, y) in PLUS:
+            spr.sheet.putpixel((frame * spr.fw + x, y), (255, 255, 255, 255))
     o_dark, o_light, sp, pad = spr.layers(frame, mix(WHITE, ACCENT, 0.25), INK)
     im = Image.new('RGBA', sp.size, (0, 0, 0, 0))
     for layer in (o_dark, o_light, sp):
@@ -313,7 +322,9 @@ def avatar(px, heart_cell, monia_top, words_scale=None, words_top=None, heart_cy
     heart = heart_layer(heart_cell)
     put(bg, heart, 540, heart_cy if heart_cy is not None else 540)
     m_im, (fx_, foot) = monia(px)
-    bg.alpha_composite(m_im, (int(540 - fx_), int(monia_top)))
+    bb = m_im.getbbox()
+    top = monia_top if words_scale else monia_top - (bb[1] + bb[3]) / 2      # ohne Schriftzug: monia_top = gewünschte Mitte (y) des sichtbaren Umrisses
+    bg.alpha_composite(m_im, (int(540 - fx_), int(top)))
     if words_scale:
         y = words_top
         for w in logo_words():
@@ -336,7 +347,7 @@ def main():
 
     # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus)
     avatar(px=26, heart_cell=21, monia_top=95, words_scale=5, words_top=640, heart_cy=560).save(OUT / 'profil-monia-logo.png')
-    avatar(px=28, heart_cell=21, monia_top=75, heart_cy=560).save(OUT / 'profil-monia.png')
+    avatar(px=26, heart_cell=21, monia_top=535, heart_cy=540).save(OUT / 'profil-monia.png')
     print('fertig:', OUT)
 
 
