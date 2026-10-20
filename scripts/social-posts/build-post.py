@@ -24,29 +24,24 @@ from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+
+import fx
+import ornaments
+from pxcommon import BAYER4, H, INK, NAVY, U, W, WHITE, mix
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 OUT = HERE / 'out'
 
-W, H = 1080, 1350
-U = 7                      # Raster (= px je Kartenpixel)
 SPRITE_PX = 14             # px je Sprite-Pixel (2 Raster)
 CARD_W, CARD_H = 525, 735  # Karte (750×1050 · 0,7)
-NAVY = (14, 10, 28)
-INK = (7, 6, 13)
-WHITE = (244, 244, 240)
 
 # ── Hilfen ────────────────────────────────────────────────────────────────────
 
 def slugify(n):
     import re
     return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(n).lower()))
-
-
-def mix(a, b, t):
-    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
 
 def hexcol(s):
@@ -132,7 +127,6 @@ def draw_text(img, text, scale, xy, color=WHITE, outline=INK, shadow=None, ancho
 
 
 # ── Hintergrund ───────────────────────────────────────────────────────────────
-BAYER4 = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0
 
 
 def dither_ramp(v, ramp, cell):
@@ -262,6 +256,9 @@ class Sprite:
         a = np.asarray(self.sheet)[..., 3] > 160
         rows = np.where(a.any(axis=1))[0]
         self.top, self.bottom = int(rows.min()), int(rows.max()) + 1
+        cols = np.where(a.any(axis=0))[0]
+        xs = cols % self.fw
+        self.left, self.right = int(xs.min()), int(xs.max()) + 1
         self.foot = self.meta.get('footY', self.bottom)
         self.face_x = self.meta.get('faceX', self.fw / 2)
 
@@ -279,8 +276,12 @@ class Sprite:
         half = f.resize((f.width * 2, f.height * 2), Image.NEAREST)
         a = half.split()[3].point(lambda v: 255 if v > 40 else 0)
 
+        ext = a.copy()
+        ImageDraw.floodfill(ext, (0, 0), 128)                      # Hintergrund, der den Rand erreicht
+        exterior = ext.point(lambda v: 255 if v == 128 else 0)
+
         def ring(k, color):
-            g = a.filter(ImageFilter.MaxFilter(2 * k + 1))
+            g = ImageChops.darker(a.filter(ImageFilter.MaxFilter(2 * k + 1)), exterior)
             im = Image.new('RGBA', half.size, color + (255,))
             im.putalpha(g)
             return im.resize((im.width * U, im.height * U), Image.NEAREST)
@@ -364,7 +365,8 @@ def main():
     ap.add_argument('slug')
     ap.add_argument('--number', type=int, default=1)
     ap.add_argument('--accent')
-    ap.add_argument('--loops', type=int, default=3, help='Wiederholungen des Loops im MP4')
+    ap.add_argument('--duration', type=float, default=30.0, help='Mindestlänge des MP4 in Sekunden (der Loop wird wiederholt)')
+    ap.add_argument('--themes', help='Partikel-Themen, kommagetrennt (poison, fire, heal, arcane, fight, ice, stars); sonst automatisch')
     ap.add_argument('--music')
     ap.add_argument('--music-start', type=float, default=0.0)
     ap.add_argument('--no-video', action='store_true')
@@ -404,15 +406,17 @@ def main():
     mid = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     mid.alpha_composite(plate, (plate_x, plate_y))
     mid.alpha_composite(card, (card_x, card_y))
+    orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
+    mid.alpha_composite(orn)
     # Kopf: Logo in Akzentfarbe
     logo = tinted_logo(accent)
     mid.alpha_composite(logo, ((W - logo.width) // 2, 40))
     # Nummer: Schild an der oberen rechten Plattenecke
     tag = f'HERO #{args.number:03d}'
     tw = pixel_text_mask(tag)
-    scale = 4
+    scale = 3
     tag_w, tag_h = tw.width * scale + 6 * U, tw.height * scale + 4 * U
-    tx0, ty0 = plate_x + plate.width - tag_w - 2 * U, plate_y - tag_h + U
+    tx0, ty0 = plate_x + plate.width - tag_w - 18 * U, plate_y - tag_h - 6 * U
     d = ImageDraw.Draw(mid)
     d.rectangle([tx0 + U, ty0, tx0 + tag_w - U - 1, ty0 + tag_h - 1], fill=INK)
     d.rectangle([tx0, ty0 + U, tx0 + tag_w - 1, ty0 + tag_h - U - 1], fill=INK)
@@ -422,10 +426,9 @@ def main():
     parts = card_name.split(',', 1)
     short = parts[0].upper()
     sub = parts[1].strip().upper() if len(parts) > 1 else ''
-    foot_mid = (plate_b + (H - 3 * U)) // 2
-    draw_text(mid, short, 9, (W // 2, foot_mid - (22 if sub else 0)), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
+    draw_text(mid, short, 8, (W // 2, 1243 if sub else 1256), color=WHITE, outline=None, shadow=mix(accent, INK, 0.45))
     if sub:
-        draw_text(mid, sub, 4, (W // 2, foot_mid + 44), color=accent, outline=None, shadow=INK)
+        draw_text(mid, sub, 3, (W // 2, 1301), color=accent, outline=None, shadow=INK)
 
     # Sprite-Lage: Gesicht über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
     feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
@@ -434,7 +437,12 @@ def main():
     shadow = pixel_ellipse(24, 4, INK, 170)
 
     parts_bg = Particles(args.slug, accent, 40, (U * 3, 0, W - U * 3, H), loop)
-    parts_fg = Particles(args.slug + 'fg', mix(accent, WHITE, 0.3), 14, (sx, 0, sx + spr.fw * SPRITE_PX, H), loop)
+    cards = json.loads((ROOT / 'data' / 'cards.json').read_text(encoding='utf-8'))
+    card_data = next(c for c in cards if c['name'] == card_name)
+    names = fx.themes_for(card_data, args.themes.split(',') if args.themes else None)
+    print('Partikel-Themen:', ', '.join(names))
+    box = (sx + spr.left * SPRITE_PX, sy + spr.top * SPRITE_PX, sx + spr.right * SPRITE_PX, feet_y)
+    theme_fx = fx.ThemeFX(names, args.slug, box, feet_y, loop)
     stick_col = mix(WHITE, accent, 0.25)
 
     for f in range(loop):
@@ -443,13 +451,21 @@ def main():
         parts_bg.draw(layer, f)
         canvas.alpha_composite(layer)
         canvas.alpha_composite(mid)
+        # Themen-Partikel und Funkeln der Edelsteine: nur HINTER dem Sprite, damit nie etwas über dem Kopf liegt
+        layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        theme_fx.draw(layer, f)
+        dd = ImageDraw.Draw(layer)
+        for k, (gx, gy) in enumerate(gems):
+            ph = (f / loop + k / len(gems)) % 1.0
+            if ph < 0.25:
+                n = [1, 2, 3, 2][int(ph / 0.0625)]
+                dd.rectangle([gx - n * U, gy - U // 2, gx + n * U, gy + U // 2], fill=WHITE + (255,))
+                dd.rectangle([gx - U // 2, gy - n * U, gx + U // 2, gy + n * U], fill=WHITE + (255,))
+        canvas.alpha_composite(layer)
         o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
         canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
         for im in (o_dark, o_light, sp):
             canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
-        layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-        parts_fg.draw(layer, f)
-        canvas.alpha_composite(layer)
         canvas.convert('RGB').save(out / 'frames' / f'f{f:03d}.png')
     still = Image.open(out / 'frames' / 'f000.png')
     still.save(out / 'post.png')
@@ -458,9 +474,10 @@ def main():
     if args.no_video:
         return
     music = music_path(card_name, args.music)
-    vf = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(fps), '-stream_loop', str(args.loops - 1),
+    loops = max(1, math.ceil(args.duration / (loop / float(fps))))
+    vf = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(fps), '-stream_loop', str(loops - 1),
           '-i', str(out / 'frames' / 'f%03d.png')]
-    dur = loop / float(fps) * args.loops
+    dur = loop / float(fps) * loops
     if music:
         vf += ['-ss', str(args.music_start), '-i', str(music),
                '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2', '-c:a', 'aac', '-b:a', '192k']
