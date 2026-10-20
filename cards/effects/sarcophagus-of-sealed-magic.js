@@ -25,9 +25,10 @@
 //    auf einem Helden ist EINS; Decay Magic auf zwei Helden ist auch
 //    EINS. Der Hoechstwert ist damit 5 × 60 = 300.
 //
-//  • „undefeated Heroes": nur Helden mit HP > 0. Der Zaehler ist die
-//    SEITE der Kreatur (`physicalSide`) — bei einer uebernommenen
-//    Kreatur zaehlen die Helden dessen, der sie kontrolliert. Der
+//  • „undefeated Heroes": nur Helden mit HP > 0. Gezaehlt wird beim
+//    KONTROLLEUR der Kreatur (`kontrolleurVon`, N3-01) — bei einer
+//    uebernommenen Kreatur zaehlen die Helden dessen, der sie kontrolliert
+//    (`heroesControlledBy`: auch uebernommene Helden, nicht abgegebene). Der
 //    eigene Wirtsheld muss NICHT leben: Kreaturen sind von ihrem Slot-
 //    Helden unabhaengig, und der Kartentext stellt keine Bedingung an
 //    ihn (anders als Cosmic Skeleton).
@@ -59,11 +60,12 @@ function schulenZaehlen(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps) return 0;
   const namen = new Set();
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const hero = ps.heroes[hi];
+  // N3-01 (W24): „your Heroes" = die Helden, die `pi` GERADE kontrolliert (eigene Spalte ohne abgegebene, plus uebernommene) —
+  // nicht die Spalte des Kartenbesitzers; die Ability-Zonen gehoeren dem Helden (Spalte `physOwner`).
+  for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
     if (!hero?.name || hero.hp <= 0) continue;               // „undefeated"
-    if (engine.heroAbilityLevelsBlanked(pi, hi)) continue;    // W4a (Al): Abilities negiert -> zaehlen nicht (Skalierung 0)
-    for (const s of spellSchoolAbilitiesOn(ps.abilityZones?.[hi], SPELL_SCHOOL_ABILITIES)) {
+    if (engine.heroAbilityLevelsBlanked(physOwner, hi)) continue;    // W4a (Al): Abilities negiert -> zaehlen nicht (Skalierung 0)
+    for (const s of spellSchoolAbilitiesOn(engine.gs.players[physOwner]?.abilityZones?.[hi], SPELL_SCHOOL_ABILITIES)) {
       namen.add(s);
     }
   }
@@ -103,7 +105,7 @@ module.exports = {
     const engine = ctx._engine;
     const gs = engine.gs;
     const ich = ctx.card;
-    const pi = engine.physicalSide(ich) ?? ctx.cardOwner;
+    const pi = engine.kontrolleurVon(ich);
     const heroOwner = ctx.cardHeroOwner;
     const heroIdx = ctx.cardHeroIdx;
     const zoneSlot = ich.zoneSlot;
