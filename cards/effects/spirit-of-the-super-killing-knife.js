@@ -54,6 +54,8 @@ function spiritSteht(engine) {
 module.exports = {
   activeIn: ['support'],
 
+  deletesDefeatedCreaturesWhileOnBoard: true,   // W25c (N3-14): Engine-Schadens-Batch (`_gefalleneKreaturenGeloescht`) loescht besiegte Kreaturen (Schaden/Brand/Gift)
+
   cpuMeta: { dealsDamage: true },
 
   /** ① „can only be summoned by a Hero equipped with …\" */

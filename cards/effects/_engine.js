@@ -13373,6 +13373,13 @@ class GameEngine {
    */
   _gefalleneKreaturenGeloescht() {
     if (this._wurzelAktiv()) return true;   // The Root of all Evil: Creatures, die in eine Ablage kaemen, werden geloescht
+    // W25c (N3-14, Al): Spirit of the Super-Killing Knife - „any Hero or Creature that is defeated is deleted". Auch der Schadens-Batch
+    // (Schaden, Brand, Gift) loescht jetzt; `actionDestroyCard` und Opfer laufen zusaetzlich ueber die Umleitung im `onCardLeaveZone` des Spirits.
+    for (const c of this.cardInstances || []) {
+      if (c.zone !== ZONES.SUPPORT || c.faceDown || c.counters?.negated || c.counters?.nulled) continue;
+      if (!loadCardEffect(c.name)?.deletesDefeatedCreaturesWhileOnBoard || this.isCardPassiveDormant(c)) continue;
+      return true;
+    }
     for (let p = 0; p < (this.gs.players || []).length; p++) {
       const heroes = this.gs.players[p]?.heroes || [];
       for (let hi = 0; hi < heroes.length; hi++) {
