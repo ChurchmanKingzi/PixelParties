@@ -1,27 +1,34 @@
 'use strict';
-// N4-archetypen-17 · Mischief Militia - Heli Troopers: „Freeze it for 1 turn" – stirbt die Kreatur im Zug des Gegners, trifft das Einfrieren dessen Held nur noch für den Rest dieses Zuges (Stufe C – Lesart)
+// N4-archetypen-17 · Mischief Militia - Heli Troopers: „Freeze it for 1 turn" bei Tod im Zug des Gegners (Al, Welle 24: heutiges Verhalten stimmt)
 // Kartentext (Heli Troopers): „When this Creature is defeated, you may choose a target on the board and Freeze it for 1 turn."
-// Heute: `applyFreezeToTarget(engine, target, 1, pi)` setzt immer Dauer 1; der Frost tickt zum Zugende der Seite des Ziels ab. Tötet der Gegner (Sitz 1) die Troopers in SEINEM Zug und Sitz 0 friert dessen
-//   Helden ein, endet der Frost am Ende desselben Zuges – kein einziger ganzer Zug des Gegners wird beeinträchtigt (nur der Rest des laufenden Zuges, falls der Held noch nicht gehandelt hat).
-// Lesart A (heute): „for 1 turn" = bis zum Ende des Zuges, in dem das Ziel gerade ist (bzw. bis zum Ende seines nächsten Zuges, wenn es nicht am Zug ist).
-// Lesart B: „for 1 turn" = der nächste volle Zug des Ziels wird übersprungen/gesperrt (wie Icy Slime „bis zum Ende deines nächsten Zuges": eigene Ziele 2 Zugenden, fremde 1).
-// Erwartung hier nach Lesart B: der Gegnerheld ist zu Beginn von Zug 7 (seinem nächsten vollen Zug) noch eingefroren; ✗ = heutiges Verhalten (Lesart A).
+// Al: „Frost soll nur am Ende der Runde des Besitzers des gefrorenen Ziels enden, also bei applied Freeze gegen ein Ziel von Spieler A während des laufenden Zugs von Spieler A nur bis zum Ende des Zugs."
+// Grundsatz (CARD_API.md, Welle 24): Frost endet am Ende des Zuges des Besitzers des gefrorenen Ziels. Wirkung im Zug des Zielbesitzers = bis zu dessen Zugende; Wirkung im Zug des Gegners = bis Ende des
+//   nächsten Zuges des Zielbesitzers („1 turn").
+// Erwartung (Exit 0): (a) Troopers sterben im Zug des Gegners (Sitz 1, Zug 5), Sitz 0 friert dessen Held 0 ein → gefroren nur für den Rest von Zug 5 (Zug 6 und 7: frei).
+//   (b) Gegenprobe: Troopers sterben im EIGENEN Zug (Sitz 0 am Zug), friert den Gegnerheld ein → gefroren in dessen nächstem Zug (Zug 6), frei zu Beginn von Zug 7.
 const H = require('../../lib/h.js');
-(async () => {
-  const R = H.runner();
-  const t = await H.fresh({ hand: [['ZZ Filler'], ['ZZ Filler']], deckSize: 30, active: 1 });   // Zug 5 gehört dem Gegner (Sitz 1)
+async function lauf(imGegnerzug) {
+  const t = await H.fresh({ hand: [['ZZ Filler'], ['ZZ Filler']], deckSize: 30, active: imGegnerzug ? 1 : 0 });
   const heli = t.put(0, 0, 0, 'Mischief Militia - Heli Troopers'); heli.turnPlayed = 1;
   t.put(1, 0, 0, H.INERT.big);
   t.script.push({ match: d => d.type === 'confirm', answer: () => ({ confirmed: true }) });
   t.targetFn = (valid) => [valid.find(v => v.type === 'hero' && v.owner === 1 && v.heroIdx === 0).id];
-  t.gs.activePlayer = 1;
-  await t.run(() => t.engine.actionDealCreatureDamage({ name: 'X', owner: 1, heroIdx: 0 }, heli, 500, 'creature', { sourceOwner: 1 }));
-  const verlauf = [`Zug ${t.gs.turn} (Sitz ${t.gs.activePlayer}) nach dem Tod: ${t.hero(1, 0).statuses.frozen ? 'F' : '-'}`];
-  R.check('Aufbau: Gegnerheld wurde eingefroren', !!t.hero(1, 0).statuses.frozen, verlauf[0]);
-  await t.endTurn(); verlauf.push(`Beginn Zug ${t.gs.turn} (Sitz ${t.gs.activePlayer}): ${t.hero(1, 0).statuses.frozen ? 'F' : '-'}`);
-  await t.endTurn(); verlauf.push(`Beginn Zug ${t.gs.turn} (Sitz ${t.gs.activePlayer}): ${t.hero(1, 0).statuses.frozen ? 'F' : '-'}`);
-  const z8 = !!t.hero(1, 0).statuses.frozen;
-  R.note('Verlauf', verlauf.join(' | '));
-  R.check('Gegnerheld ist zu Beginn seines nächsten vollen Zuges (Zug 7, Sitz 1) noch eingefroren (Lesart B)', z8, verlauf);
+  t.gs.activePlayer = imGegnerzug ? 1 : 0;
+  await t.run(() => t.engine.actionDealCreatureDamage({ name: 'X', owner: imGegnerzug ? 1 : 0, heroIdx: 0 }, heli, 500, 'creature', { sourceOwner: imGegnerzug ? 1 : 0 }));
+  const f = () => !!t.hero(1, 0).statuses.frozen;
+  const v = { z5: f() };
+  await t.endTurn(); v.z6 = f();
+  await t.endTurn(); v.z7 = f();
+  return { t, v };
+}
+(async () => {
+  const R = H.runner();
+  const a = await lauf(true);
+  R.check('(a) Aufbau: Gegnerheld wurde eingefroren (Zug 5, Zug des Gegners)', a.v.z5, a.v);
+  R.check('(a) Frost endet am Ende des Zuges des Zielbesitzers: Zug 6 und Zug 7 frei', !a.v.z6 && !a.v.z7, a.v);
+  const b = await lauf(false);
+  R.check('(b) Aufbau: Gegnerheld wurde im eigenen Zug eingefroren', b.v.z5, b.v);
+  R.check('(b) Gegenprobe: bis Ende des nächsten Zuges des Zielbesitzers: Zug 6 gefroren, Zug 7 frei', b.v.z6 && !b.v.z7, b.v);
+  R.check('keine Engine-Fehler', a.t.errors.length === 0 && b.t.errors.length === 0, [a.t.errors, b.t.errors]);
   R.finish();
 })();
