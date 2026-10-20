@@ -37224,6 +37224,25 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): Rang einer Surprise im Mehrziel-Fenster. `true` = „Treffer-Reaktion" —
+   * feuert erst, wenn der Zauber WIRKLICH trifft: Trigger „is/would be hit by …" (Firewall, Toxic Trap, Spider Avalanche, Jumper Spider,
+   * Booby Trap) oder Wirkung „After the Attack, Spell or effect resolves" (Jumpscare). `false` = Negierer („chosen by … Negate":
+   * Flooding, Frost Rune, Glass Wall …; auch „would be hit by … Negate", Magic Mirror) und Reaktionen auf das blosse Waehlen (Bluff).
+   * Aus dem Kartentext abgeleitet; ein Skript kann mit `surpriseHitReaction: true|false` ueberstimmen.
+   */
+  _surpriseIstTrefferReaktion(cardName) {
+    const sc = loadCardEffect(cardName);
+    if (typeof sc?.surpriseHitReaction === 'boolean') return sc.surpriseHitReaction;
+    const txt = String(this._getCardDB()[cardName]?.effect || '');
+    const m = txt.match(/Activate this Surprise when ([^.]*)\.\s*([^]*)/i);
+    if (m) {
+      if (/\b(?:is|would be) hit by\b/i.test(m[1]) && !/^\s*Negate\b/i.test(m[2])) return true;
+      if (/^\s*After the [^.]*\bresolves\b/i.test(m[2])) return true;
+    }
+    return false;
+  }
+
+  /**
    * @param {Array} targetedHeroes - hero targets the source card is hitting
    * @param {object} sourceCard - the source card / synthetic source
    * @param {object} [opts] - { damageType?: string } — caller can mark
@@ -37268,8 +37287,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
     this.gs.surprisePending = true;
+    // ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): bei MEHREREN Zielen eines Zaubers loesen zuerst alle Negierer auf
+    // (Phase 'negierer'), danach feuern die Treffer-Reaktionen (Phase 'treffer', `_surpriseIstTrefferReaktion`) nur, wenn der Zauber
+    // wirklich trifft; das Ergebnis haengt so nicht von der Zielreihenfolge ab. Je Ziel hoechstens EINE Aktivierung ueber beide Phasen
+    // (`zustand.aktiviert`). Aufrufer, die ihre Helden einzeln abfragen (`aoeSurpriseVorab`), geben `_phase`/`_surpriseZustand` selbst mit.
+    const zustand = opts._surpriseZustand || { aktiviert: new Set(), sr: new Set() };
+    const phasen = opts._phase ? [opts._phase] : (targetedHeroes.length > 1 ? ['negierer', 'treffer'] : [null]);
     try {
 
+    for (const phase of phasen) {
     for (const target of targetedHeroes) {
       // v703 (Mountain Tear River): „the user OR a Creature in one of its
       // Support Zones is chosen". Ein Kreaturenziel oeffnet das Fenster
@@ -37295,6 +37321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // discard at the end of _activateSurprise).
       const heroKey = `${tOwner}-${tHeroIdx}`;
       if (this._activeSurpriseHeroes?.has(heroKey)) continue;
+      if (zustand.aktiviert.has(heroKey + (viaCreature ? 'c' : ''))) continue;   // W25b (N2-12): hoechstens eine Aktivierung je Ziel
 
       // Als Vorgabe 29.9.: ausloesen darf nur, wer den anvisierten Helden
       // gerade KONTROLLIERT (geliehen: der Kontrolleur, nicht die Seite).
@@ -37326,11 +37353,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           candidates.push({ hostHeroIdx: hi, cardName: sz[0] });
         }
       }
+      if (phase === 'treffer') {   // W25b: schon behandelte Geheimraum-Kandidaten nicht noch einmal
+        for (let ci = candidates.length - 1; ci >= 0; ci--) {
+          if (zustand.sr.has(`${tOwner}-${candidates[ci].hostHeroIdx}-${candidates[ci].cardName}`)) candidates.splice(ci, 1);
+        }
+      }
       if (candidates.length === 0) continue;
 
       // ★ 11.10. (Create Secret Room): eine als „Geheimraum" abgelegte Karte reagiert auf „chosen by an opponent's card or effect" mit „add to hand" oder
       // „activate now" — vor den gewoehnlichen Surprise-Ausloesern. Ein behandelter Kandidat wird nicht noch einmal gewoehnlich angeboten.
-      {
+      if (phase !== 'treffer') {   // W25b (N2-12): Geheimraum nur einmal je Ziel (erste Phase)
         const srSource = this._surpriseSourceInfo(sourceCard, opts, viaCreature, target);
         const SR = require('./_secret-room-shared');
         for (let ci = candidates.length - 1; ci >= 0; ci--) {
@@ -37338,6 +37370,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             tOwner, tHeroIdx, hostHeroIdx: candidates[ci].hostHeroIdx, sourceInfo: srSource, sourceCard, viaCreature,
           });
           if (!r.handled) continue;
+          zustand.sr.add(`${tOwner}-${candidates[ci].hostHeroIdx}-${candidates[ci].cardName}`);
           candidates.splice(ci, 1);
           if (r.effectNegated) return { effectNegated: true };
         }
@@ -37351,6 +37384,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!script?.isSurprise) continue;
         if (!script.onSurpriseActivate) continue;
         if (viaCreature && !script.surpriseFiresOnSupportCreature) continue;
+        if (phase && (phase === 'treffer') !== this._surpriseIstTrefferReaktion(surpriseCardName)) continue;   // W25b (N2-12)
         // Skip surprises that have their own dedicated trigger systems
         if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
             script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
@@ -37453,6 +37487,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           tOwner, tHeroIdx, surpriseCardName, sourceInfo, script,
           hostHeroIdx !== tHeroIdx ? { hostHeroIdx } : {}
         );
+        zustand.aktiviert.add(heroKey + (viaCreature ? 'c' : ''));   // W25b (N2-12)
         if (result?.effectNegated) {
           return { effectNegated: true };
         }
@@ -37460,6 +37495,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         break;
       }
     }
+    }   // W25b (N2-12): Ende der Phasen-Schleife
 
     return null;
     } finally {
@@ -38049,6 +38085,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hadAoeFlag2 = syntheticSource._isAoeCheck;
     syntheticSource._isAoeCheck = true;
     try {
+    // ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): zwei Durchgaenge ueber die Helden — erst die Negierer, dann die
+    // Treffer-Reaktionen (nur wenn nichts negiert hat); vorgemerkt wird erst im zweiten Durchgang.
+    const _phZustand = { aktiviert: new Set(), sr: new Set() };
+    for (const _phase of ['negierer', 'treffer']) {
     for (const t of heroes) {
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.shielded) continue;
@@ -38058,10 +38098,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (gs._surpriseCheckedHeroes.has(heroKey)) continue;
       const result = await this._checkSurpriseWindow(
         [{ type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: hero.name }],
-        syntheticSource, { damageType: type },
+        syntheticSource, { damageType: type, _phase, _surpriseZustand: _phZustand },
       );
-      gs._surpriseCheckedHeroes.add(heroKey);
-      keys.push(heroKey);
+      if (_phase === 'treffer') {
+        gs._surpriseCheckedHeroes.add(heroKey);
+        keys.push(heroKey);
+      }
       if (result?.effectNegated) {
         if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
         const nkey = this._effectNegationKey(source);
@@ -38075,6 +38117,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return result;
       }
     }
+    }   // W25b (N2-12): Ende der Durchgaenge
     } finally {
       if (!hadAoeFlag2) delete syntheticSource._isAoeCheck;
     }
