@@ -152,15 +152,17 @@ module.exports = {
   },
 
   isHeroDefeatedReaction: true,
+  // W25a (Al 21.10.2026): bei einem uebernommenen Helden bekommt der KONTROLLEUR (zum Todeszeitpunkt, `info.kontrolleur`) das Fenster, nicht die Brettseite.
+  heroDefeatedFuerKontrolleur: true,
 
   heroDefeatedCondition(gs, pi, engine, info) {
     if (!info?.ohneSchaden || !info.hero) return false;
-    if (engine.heroSideOf(pi, info.hero) !== pi) return false;   // Kontrolle statt Seite: nur der Kontrolleur reagiert
+    if ((info.kontrolleur ?? info.ownerIdx) !== pi) return false;   // Kontrolle statt Seite: nur der Kontrolleur reagiert
     return quelleIstAttackOderSpell(engine, info.source);
   },
 
   async heroDefeatedResolve(engine, pi, info) {
-    await explode(engine, engine.heroSideOf(pi, info.hero), { owner: pi, heroIdx: info.heroIdx, zoneSlot: -1 });
+    await explode(engine, info.kontrolleur ?? pi, { owner: info.ownerIdx ?? pi, heroIdx: info.heroIdx, zoneSlot: -1 });
     return false;                                               // der Held bleibt besiegt
   },
 

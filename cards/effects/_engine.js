@@ -9958,11 +9958,15 @@ class GameEngine {
     // ★ v1340: HAND-Fenster „Held wurde besiegt" (Cheat Chair) — nach
     // Aufraeumen, Extra Life und Surprise-Rettung, VOR der Spielende-
     // Pruefung: ein wiederbelebter letzter Held haelt die Seite am Leben.
-    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden });
+    const handRettung = await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden, kontrolleur: _koKontrolle });
     if (handRettung && target.hp > 0) {
       delete target.diedOnTurn;
       this.sync();
       return true;
+    }
+    // W25a (Corpse-Explosion-Nachtrag c): ein uebernommener Held — Reaktionen mit `heroDefeatedFuerKontrolleur` gehoeren dem KONTROLLEUR, nicht der Brettseite.
+    if (Number.isInteger(_koKontrolle) && _koKontrolle !== ownerIdx && target.hp <= 0) {
+      await this._checkHeroDefeatedHandReactions(target, source, ownerIdx, { ohneSchaden: !!opts.ohneSchaden, kontrolleur: _koKontrolle, reaktor: _koKontrolle });
     }
 
     if (!opts.skipAllDeadCheck) await this.checkAllHeroesDead();
@@ -13775,19 +13779,23 @@ class GameEngine {
   async _checkHeroDefeatedHandReactions(target, source, ownerIdx, extra = {}) {
     if (this._inHeroDefeatedReaction) return false;
     if (this.gs.result) return false;
-    const pi = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
+    const phys = Number.isInteger(ownerIdx) ? ownerIdx : this._findHeroOwner(target);
+    // W25a (Corpse-Explosion-Nachtrag c): `extra.reaktor` = KONTROLLEUR des gefallenen Helden (Kontrolle zum Todeszeitpunkt), wenn er nicht die Brettseite ist
+    // (dauerhaft uebernommener Held) — dieser Durchgang bietet nur Karten mit `heroDefeatedFuerKontrolleur` an, aus der Hand des Kontrolleurs.
+    const kontrollPass = Number.isInteger(extra.reaktor) && extra.reaktor !== phys;
+    const pi = kontrollPass ? extra.reaktor : phys;
     const ps = this.gs.players[pi];
     if (!ps || !target || target.hp > 0) return false;
-    const heroIdx = (ps.heroes || []).indexOf(target);
+    const heroIdx = ((this.gs.players[phys]?.heroes) || []).indexOf(target);
     if (heroIdx < 0) return false;
-    const kandidaten = (ps.hand || []).filter(n => loadCardEffect(n)?.isHeroDefeatedReaction);
+    const kandidaten = (ps.hand || []).filter(n => { const sc = loadCardEffect(n); return sc?.isHeroDefeatedReaction && (!kontrollPass || sc.heroDefeatedFuerKontrolleur); });
     if (kandidaten.length === 0) return false;
 
     const roh = source?.controller ?? source?.owner;
     const sourceOwner = (isSeat(this, roh)) ? roh : this._deriveEffectOwner({ source }, pi);
-    const lebende = this.heroesControlledBy(pi, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
-    const letzterHeld = lebende.length === 0 && !((ps._teleportedAway || 0) > 0);
-    const info = { hero: target, heroIdx, ownerIdx: pi, source: source || null, sourceOwner, letzterHeld, ohneSchaden: !!extra.ohneSchaden };   // W24a (N1-05): `ohneSchaden` = Insta-Kill (`actionDefeatHero`)
+    const lebende = this.heroesControlledBy(phys, { permanentOnly: true }).filter(({ hero }) => hero.hp > 0);
+    const letzterHeld = lebende.length === 0 && !((this.gs.players[phys]?._teleportedAway || 0) > 0);
+    const info = { hero: target, heroIdx, ownerIdx: phys, kontrolleur: Number.isInteger(extra.kontrolleur) ? extra.kontrolleur : phys, source: source || null, sourceOwner, letzterHeld, ohneSchaden: !!extra.ohneSchaden };   // W24a (N1-05): `ohneSchaden` = Insta-Kill (`actionDefeatHero`)
     const allCards = this._getCardDB();
 
     const seen = new Set();
@@ -13797,6 +13805,7 @@ class GameEngine {
       if (this._handPlayLockedFor(ps, cardName)) continue;
       const script = loadCardEffect(cardName);
       if (!script?.isHeroDefeatedReaction) continue;
+      if (kontrollPass && !script.heroDefeatedFuerKontrolleur) continue;
       this._noteRxWindow(ps, cardName, 'seen');
       if (script.heroDefeatedCondition && !script.heroDefeatedCondition(this.gs, pi, this, info)) continue;
       const rxCast = this._rxCastPlan(ps, cardName, script, { fensterInfo: info });
@@ -35816,12 +35825,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     return Math.max(0, (cd?.level || 0) + (inst.counters?.level || 0));
   }
 
+  /**
+   * W25a (Corpse-Explosion-Nachtrag a, Al 21.10.2026): wie im Schadenpfad (`_checkAfterCreatureDamageHandReactions`) darf auch der GEGNER des Kontrolleurs
+   * der besiegten Kreatur reagieren — nur Karten mit `firesForOpponentDefeat` (Corpse Explosion) und nur, wenn er ein Mensch ist (CPU nie, sie wuerde sich selbst treffen).
+   */
   async _checkCreatureDefeatedHandReactions(deathInfo, source, type) {
+    if (!deathInfo) return;
+    const ownerIdx = deathInfo.controller ?? deathInfo.owner;
+    await this._checkCreatureDefeatedHandReaktor(deathInfo, source, type, null);
+    if (!isSeat(this, ownerIdx)) return;
+    const oppIdx = this.opponentOf(ownerIdx);
+    if (isSeat(this, oppIdx) && oppIdx !== ownerIdx && !this.isCpuPlayer(oppIdx)) {
+      await this._checkCreatureDefeatedHandReaktor(deathInfo, source, type, oppIdx);
+    }
+  }
+
+  async _checkCreatureDefeatedHandReaktor(deathInfo, source, type, reaktor) {
     if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return;
     if (this._inCreatureDefeatedReaction) return;
     if (!deathInfo) return;
 
-    const ownerIdx = deathInfo.controller ?? deathInfo.owner;
+    const ownerIdx = reaktor ?? (deathInfo.controller ?? deathInfo.owner);
+    const istGegnerDurchgang = reaktor != null;
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
     if (this.gs.firstTurnProtectedPlayer === ownerIdx) return;
@@ -35836,6 +35861,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const script = loadCardEffect(cardName);
       if (!script?.isCreatureDefeatedReaction) continue;
+      if (istGegnerDurchgang && !script.firesForOpponentDefeat) continue;   // W25a: der Gegner-Durchgang sieht nur Opt-in-Karten
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
