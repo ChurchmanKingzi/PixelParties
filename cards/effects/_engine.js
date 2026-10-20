@@ -7503,7 +7503,8 @@ class GameEngine {
 
       // Der Schluessel ist der gerade aufloesende Spell; ohne Stapel
       // (direkter Aufruf) der gemeldete Quellname.
-      const spell = this._currentResolvingSpellName() || sourceCardName;
+      const stapelSpell = this._currentResolvingSpellName();
+      const spell = stapelSpell || sourceCardName;
 
       for (const inst of this.cardInstances) {
         if (inst.zone !== 'support') continue;
@@ -7514,11 +7515,14 @@ class GameEngine {
         const verbraucht = inst.counters?._wardSpentOn;
         if (verbraucht) {
           // Schon verbraucht: nur noch fuer DENSELBEN Spell blocken.
-          if (verbraucht === spell) return true;
+          // W24b N2-13: nicht, wenn der Verbrauch OHNE aufloesenden Spell geschah (Tick-Spell wie Gathering Storm im Zugbeginn-Hook):
+          // dort gibt es keinen „zweiten Effekt desselben Zaubers" — ein weiterer Tick (anderer Gathering Storm) ist „the next time" nach dem ersten.
+          if (verbraucht === spell && !inst.counters._wardOhneStapel) return true;
           continue;
         }
         if (!inst.counters) inst.counters = {};
         inst.counters._wardSpentOn = spell;
+        if (!stapelSpell) inst.counters._wardOhneStapel = true;   // W24b N2-13: ohne Spell-Stapel verbraucht -> `raeumeVerbrauchteSpellSchilde` raeumt sofort ab
         this.log('spell_ward_block', {
           hero: this._heroLabel(target), ward: inst.name, spell,
         });
@@ -7529,6 +7533,19 @@ class GameEngine {
       }
     } catch { /* defensiv: im Zweifel kein Schutz */ }
     return false;
+  }
+
+  /**
+   * W24b N2-13: raeumt Spell-Schilde (`heroSpellWard`, Energy Aura) ab, die OHNE aufloesenden Spell verbraucht wurden — Tick-Spells im
+   * Zugbeginn-Hook (Gathering Storm) loesen `afterSpellResolved` nie aus. Der Aufrufer ruft es nach seinem Schlag; die Karte entscheidet
+   * ueber `settleWard(engine, inst)`. Spells mit Stapel raeumt weiter `afterSpellResolved` ab (der zweite Effekt desselben Zaubers bleibt geblockt).
+   */
+  async raeumeVerbrauchteSpellSchilde() {
+    for (const inst of [...this.cardInstances]) {
+      if (inst.zone !== 'support' || !inst.counters?._wardSpentOn || !inst.counters._wardOhneStapel || inst.counters._wardSettled) continue;
+      const settle = loadCardEffect(inst.name)?.settleWard;
+      if (typeof settle === 'function') await settle(this, inst);
+    }
   }
 
   /**

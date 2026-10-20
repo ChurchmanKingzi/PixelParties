@@ -336,6 +336,10 @@ module.exports = {
         }
       } finally { await engine.endMultiHit(); }
 
+      // W24b N2-13: ein Tick ist kein gewirkter Spell (`afterSpellResolved` feuert nie) — eine dabei verbrauchte Energy Aura sofort abraeumen
+      // (Ablage + 2 Karten), damit sie nicht bis zum Zugende liegt und den naechsten Tick (anderer Gathering Storm) abwehrt.
+      await engine.raeumeVerbrauchteSpellSchilde();
+
       engine.log('gathering_storm_tick', {
         player: gs.players[ownerIdx]?.username,
         opponent: oppPs.username,

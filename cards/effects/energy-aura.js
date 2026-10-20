@@ -150,6 +150,8 @@ module.exports = {
 
   // ★ Der Engine-Vertrag. Alles Weitere macht `heroSpellWardBlocks`.
   heroSpellWard: true,
+  // W24b N2-13: Abraeumen fuer Tick-Spells ohne `afterSpellResolved` (Gathering Storm) — `engine.raeumeVerbrauchteSpellSchilde()`.
+  settleWard: (engine, inst) => raeumeAb(engine, inst),
 
   spellPlayCondition(gs, pi, engine) {
     return attachmentHostsFor(gs, pi, engine, hostOpts()).length > 0;
