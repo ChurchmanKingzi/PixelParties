@@ -19,9 +19,9 @@ PAL = {
     'ice': [(30, 70, 120), (90, 160, 220), (170, 220, 250), (240, 252, 255)],
 }
 
-# Theme → Emitter-Liste. kind: fog (Bodennebel) | cloud | bubble | ember | spark | heart | flake | orb
+# Theme → Emitter-Liste. kind: gas (kleine Schwaden) | gasfloor (Schwaden am Boden) | fog (Bodennebel) | cloud | bubble | ember | spark | heart | flake | orb
 THEMES = {
-    'poison': [('fog', 'poison', 8), ('cloud', 'poison', 13), ('bubble', 'poison_bubble', 10), ('spark', 'poison_bubble', 5)],
+    'poison': [('gasfloor', 'poison', 22), ('gas', 'poison', 70), ('bubble', 'poison_bubble', 8), ('spark', 'poison_bubble', 4)],
     'fire':   [('cloud', 'smoke', 5), ('ember', 'fire', 18), ('spark', 'gold', 4)],
     'heal':   [('heart', 'heal', 8), ('spark', 'gold', 10)],
     'arcane': [('orb', 'arcane', 9), ('spark', 'arcane', 8)],
@@ -57,8 +57,8 @@ def themes_for(card, override=None):
 _STAMPS = {}
 
 
-def cloud_stamp(r, seed):
-    key = ('cloud', r, seed)
+def cloud_stamp(r, seed, soft=False):
+    key = ('cloud', r, seed, soft)
     if key in _STAMPS:
         return _STAMPS[key]
     rnd = random.Random(seed * 131 + r)
@@ -77,7 +77,9 @@ def cloud_stamp(r, seed):
     for (i, j) in cells:
         edge = any(n not in cells for n in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)))
         lit = (-i * 0.55 - j * 0.85) / (r * 1.4)
-        if edge:
+        if soft:                       # Gas: keine dunkle Kontur, nur drei Töne
+            idx = 3 if lit > 0.35 else (2 if lit > -0.35 else 1)
+        elif edge:
             idx = 0 if lit < 0.2 else 1
         else:
             idx = 3 if lit > 0.5 else (2 if lit > -0.15 else 1)
@@ -144,7 +146,17 @@ class ThemeFX:
                 for k in range(count):
                     side = r.choice([-1, 1])
                     spread = r.uniform(0.2, 1.0)
-                    if kind == 'fog':
+                    if kind == 'gas':
+                        x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 150)
+                        y0 = feet - r.uniform(-20, 330)
+                        it = dict(rise=r.uniform(90, 210), drift=r.uniform(-40, 40), r=r.choice([1, 1, 2, 2, 3]), grow=1,
+                                  seed=r.randrange(1000), sway=r.choice([1, 2, 3]) * U, amax=0.85)
+                    elif kind == 'gasfloor':
+                        x0 = cx + r.uniform(-1, 1) * 310
+                        y0 = feet + r.uniform(-20, 30)
+                        it = dict(rise=r.uniform(40, 100), drift=r.uniform(-60, 60), r=r.choice([3, 3, 4]), grow=1,
+                                  seed=r.randrange(1000), sway=r.choice([1, 2]) * U, amax=0.8)
+                    elif kind == 'fog':
                         x0 = cx + r.uniform(-1, 1) * 300
                         y0 = feet + r.uniform(-10, 30)
                         it = dict(rise=r.uniform(50, 120), drift=r.uniform(-50, 50), r=r.choice([5, 6]), grow=1, seed=r.randrange(1000), sway=0)
@@ -177,6 +189,7 @@ class ThemeFX:
                         x0 = cx + r.uniform(-1, 1) * ((bx1 - bx0) / 2 + 100)
                         y0 = r.uniform(by0, feet)
                         it = dict(rise=r.uniform(60, 160), drift=0, r=1, grow=0, seed=0, sway=0)
+                    it.setdefault('amax', 1.0)
                     it.update(kind=kind, pal=PAL[pal], x0=x0, y0=y0, cycles=r.choice([1, 1, 2]), phase=r.random())
                     self.items.append(it)
 
@@ -185,7 +198,7 @@ class ThemeFX:
         t = f / self.loop
         for p in self.items:
             u = (t * p['cycles'] + p['phase']) % 1.0
-            a = min(1.0, u / 0.22, (1 - u) / 0.38)
+            a = min(p['amax'], u / 0.22, (1 - u) / 0.38)
             if a <= 0:
                 continue
             x = p['x0'] + p['drift'] * u + (math.sin((u + p['phase']) * 2 * math.pi) * p['sway'] if p['sway'] else 0)
@@ -194,6 +207,8 @@ class ThemeFX:
             kind, pal = p['kind'], p['pal']
             if kind in ('cloud', 'fog'):
                 stamp = cloud_stamp(p['r'] + int(u * p['grow']), p['seed'])
+            elif kind in ('gas', 'gasfloor'):
+                stamp = cloud_stamp(p['r'] + int(u * p['grow']), p['seed'], soft=True)
             elif kind == 'bubble':
                 stamp = bubble_stamp(p['r'])
             elif kind == 'heart':
