@@ -17529,6 +17529,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (effektiveHand() === 0) break;
 
         const standardListe = opts.eligibleIndices === undefined ? ohneAufl() : undefined;   // Z4: Auswahl, die die Engine selbst festlegt
+        // N3-18 (W24): `opts.cancelOnlyFirst` — Kosten „ganz oder gar nicht": nur die ERSTE Wahl ist abbrechbar (= „Nein"), danach ist die Zahlung Pflicht.
+        const kannAbbrechen = !!opts.cancellable && !(opts.cancelOnlyFirst && i > 0);
         let result = await this.promptGeneric(playerIdx, {
           type: 'forceDiscard',
           // ★ v1041: Kosten-Marken durchreichen — so bedient auch
@@ -17553,7 +17555,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // `cancellable` ist opt-in: ein ERZWUNGENER Abwurf darf nicht
           // abgebrochen werden, ein freiwilliger als Kosten sehr wohl
           // („You MAY discard a card…" — Cute Nerd Magenta).
-          cancellable: !!opts.cancellable,
+          cancellable: kannAbbrechen,
         });
 
         // ★ Abbruch bei freiwilligen Kosten: nichts abwerfen, sauber
@@ -17564,7 +17566,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // „Ihren Effekt zu canceln wirft automatisch die ganz rechte
         // Karte ab." Deshalb greift der Ausstieg jetzt bei JEDER
         // Antwort ohne Namen, nicht nur bei gesetztem `cancelled`.
-        if (opts.cancellable && (!result || result.cancelled || result.cardName == null)) break;
+        if (kannAbbrechen && (!result || result.cancelled || result.cardName == null)) break;
 
         // ★ Z4: eine Antwort AUSSERHALB der von der Engine festgelegten Auswahl (die aufloesende Karte) gilt nicht — sie wird wie
         // eine Antwort ohne Karte behandelt (Notbremse unten: letzte waehlbare Karte). Falscher/fehlender Platz: erste waehlbare Kopie desselben Namens.

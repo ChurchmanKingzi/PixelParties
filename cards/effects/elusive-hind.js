@@ -57,6 +57,7 @@ async function bezahlen(engine, inst, ctrl, was) {
   await engine.actionPromptForceDiscard(ctrl, DISCARD_COST, {
     costFor: CARD_NAME, costKind: 'protect',
     title: CARD_NAME, source: CARD_NAME, selfInflicted: true, cancellable: true,
+    cancelOnlyFirst: true,   // N3-18 (W24): nach der ersten Karte kein Abbruch mehr (Kosten ganz oder gar nicht)
     description: `Discard ${DISCARD_COST} cards to negate ${was} on ${CARD_NAME}?`,
   });
   return ps.hand.length === vorher - DISCARD_COST;
