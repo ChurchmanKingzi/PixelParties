@@ -117,6 +117,11 @@ module.exports = {
         && hpOf(engine, inst) > 0;
       if (stillAlive) break;
 
+      // W24d (N4-10): Gefroren/Betaeubt/Negiert (oder von der Wirkung vom Brett genommen) unterbricht die Kette
+      // („use this effect again" ist ein Gebrauch des Effekts; Ruling Welle 7).
+      if (ctx.card.zone !== 'support' || !engine.cardInstances.includes(ctx.card)
+          || engine.isCreatureEffectSuppressed(ctx.card)) break;
+
       // Stop the chain if there are no remaining opp creatures to hit.
       const oi = engine.opponentOf(pi);
       const remaining = engine.cardInstances.some(c =>
