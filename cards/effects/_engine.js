@@ -26796,6 +26796,26 @@ this._deathWatch = (this._deathWatchStack || []).length
    *                    selbst abgebrochen)
    */
   /**
+   * ★ N3-04 (W24) — „use the active effects of up to 2 Creatures on the board" (Spirit of the Forbidden Grimoire; wie „as if you controlled it",
+   * Aligning Goals): wirkt `pi` den Effekt einer Kreatur, die ein ANDERER kontrolliert, meinen „you / your opponent / your deck" im geliehenen
+   * Effekt den NUTZER. Dafuer wird die Kontrolle fuer die Dauer des Effekts auf den Nutzer gestellt (dieselben Felder wie `actionStealCreature`:
+   * `stolenBy`/`controller`, ohne `onTakeControl`-Fenster, ohne Immunitaet); die BRETTSEITE (`physicalSide` = `inst.owner`) bleibt. Gibt die
+   * Rueckstellung zurueck (oder null, wenn nichts zu tun ist: eigene Kreatur, oder Kreatur der Plant-Golem-Art, deren Brettseite nur `controller` traegt).
+   */
+  _leiheKontrolle(inst, pi) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || !isSeat(this, pi)) return null;
+    if (this.kontrolleurVon(inst) === pi || this.physicalSide(inst) !== inst.owner) return null;
+    const alt = { stolenBy: inst.stolenBy, stolenFromOwner: inst.stolenFromOwner, controller: inst.controller };
+    inst.stolenBy = pi;
+    inst.stolenFromOwner = alt.controller ?? inst.owner;
+    inst.controller = pi;
+    return () => {
+      for (const k of ['stolenBy', 'stolenFromOwner']) { if (alt[k] === undefined) delete inst[k]; else inst[k] = alt[k]; }
+      inst.controller = alt.controller;
+    };
+  }
+
+  /**
    * ZIELWAHL VORZIEHEN (v749) — erste Stufe des zweistufigen
    * Kreaturen-Vertrags.
    *
@@ -26814,6 +26834,10 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async prepareCreatureEffectFor(inst, playerIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return { ok: false, plan: null };
+    if (!opts._kontrolleGeliehen) {   // N3-04 (W24): geliehene Gegnerkreatur → Effekt fuer den Nutzer
+      const undo = this._leiheKontrolle(inst, playerIdx);
+      if (undo) { try { return await this.prepareCreatureEffectFor(inst, playerIdx, { ...opts, _kontrolleGeliehen: true }); } finally { undo(); } }
+    }
     const script = loadCardEffect(inst.name);
     if (!script?.prepareCreatureEffect) return { ok: false, plan: null };
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return { ok: false, plan: null };
@@ -26845,6 +26869,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   async reactivateCreatureEffect(inst, playerIdx, opts = {}) {
     if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    if (!opts._kontrolleGeliehen) {   // N3-04 (W24): geliehene Gegnerkreatur → Effekt fuer den Nutzer
+      const undo = this._leiheKontrolle(inst, playerIdx);
+      if (undo) { try { return await this.reactivateCreatureEffect(inst, playerIdx, { ...opts, _kontrolleGeliehen: true }); } finally { undo(); } }
+    }
     const script = loadCardEffect(inst.name);
     if (!script?.onCreatureEffect) return false;
     if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;

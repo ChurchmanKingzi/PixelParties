@@ -80,7 +80,7 @@ function levelVon(engine, inst) {
  * Die dynamischen Schranken — gleicher Name, Restbudget nach der
  * ersten Wahl — regelt der Picker live (`uniqueBy`, `maxBudget`).
  */
-function sammleKandidaten(engine) {
+function sammleKandidaten(engine, pi = null) {
   const { loadCardEffect } = require('./_loader');
   const out = [];
   for (const inst of (engine.cardInstances || [])) {
@@ -98,11 +98,14 @@ function sammleKandidaten(engine) {
     else if (!hasNumericCreatureLevel(cd)) grund = 'no level';   // Artifact Creatures haben kein Level (Als Ruling 9.10.)
     else if (levelVon(engine, inst) > MAX_SUMME) grund = `level ${levelVon(engine, inst)}`;
     else if (typeof script.canActivateCreatureEffect === 'function') {
+      // N3-04 (W24): die Voraussetzung gilt aus Sicht des NUTZERS (Gegnerkreatur: Effekt „als ob du sie kontrollierst").
+      const undo = pi != null ? engine._leiheKontrolle(inst, pi) : null;
       try {
         if (!script.canActivateCreatureEffect(engine._createContext(inst, { _borrowedUse: true }))) {   // W12 (Q5): eigenes Limit steht nicht im Weg
           grund = 'requirements not met';
         }
       } catch { grund = 'requirements not met'; }
+      finally { if (undo) undo(); }
     }
     out.push({ inst, ineligible: !!grund, grund });
   }
@@ -110,8 +113,8 @@ function sammleKandidaten(engine) {
 }
 
 /** Nur die tatsaechlich ausleihbaren. */
-function ausleihbar(engine) {
-  return sammleKandidaten(engine).filter(k => !k.ineligible).map(k => k.inst);
+function ausleihbar(engine, pi = null) {
+  return sammleKandidaten(engine, pi).filter(k => !k.ineligible).map(k => k.inst);
 }
 
 /**
@@ -182,7 +185,7 @@ module.exports = {
   },
 
   canActivateCreatureEffect(ctx) {
-    return ausleihbar(ctx._engine).length > 0;
+    return ausleihbar(ctx._engine, ctx.cardOwner).length > 0;
   },
 
   async onCreatureEffect(ctx) {
@@ -191,7 +194,7 @@ module.exports = {
 
     // ── Schritt 1: BEIDE Kreaturen in EINEM Picker waehlen, bevor
     //    irgendein Ziel gewaehlt wird. ─────────────────────────────
-    const kandidaten = sammleKandidaten(engine);
+    const kandidaten = sammleKandidaten(engine, pi);
     if (!kandidaten.some(k => !k.ineligible)) return false;
 
     const geliehen = await waehleBeide(engine, pi, kandidaten);
