@@ -52,18 +52,18 @@ const REVIVE_HP = 100;
  * the Waflav ruling for free.
  */
 function revivableHeroes(engine, pi) {
-  const ps = engine.gs.players[pi];
-  if (!ps) return [];
   const cardDB = engine._getCardDB();
   const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    const h = ps.heroes[hi];
+  // W24a (N1-07): „THEIR Ascended Heroes" = Helden, die der Spieler KONTROLLIERT (Ruling „Hero you control", Welle 20–22: nur der aktuelle
+  // Kontrolleur) — ein an den Gegner abgegebener eigener Held gehoert dem Gegner, ein uebernommener Gegnerheld gehoert dem Dieb.
+  // `physOwner` ist die Brettspalte (dort wird wiederbelebt), `heroIdx` der Index darin.
+  for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
     if (!h?.name || h.hp > 0) continue;
     // v1466: „with 100 HP" wird auf die max HP gedeckelt — bei 0 max HP
     // kein Ziel (s. _revive-shared).
     if (!engine.canReviveHero(h)) continue;
     if (cardDB[h.name]?.cardType !== 'Ascended Hero') continue;
-    out.push({ heroIdx: hi, hero: h });
+    out.push({ physOwner, heroIdx: hi, hero: h });
   }
   return out;
 }
@@ -126,9 +126,9 @@ module.exports = {
     // "choose ONE of their Ascended Heroes" — mandatory once activated,
     // the text has no "you may" on the choice itself.
     const targets = candidates.map(c => ({
-      id: `hero-${activator}-${c.heroIdx}`,
+      id: `hero-${c.physOwner}-${c.heroIdx}`,
       type: 'hero',
-      owner: activator,
+      owner: c.physOwner,
       heroIdx: c.heroIdx,
       cardName: c.hero.name,
     }));
@@ -151,7 +151,7 @@ module.exports = {
     if (!chosen || chosen.length === 0) return false;
     const sel = targets.find(t => t.id === chosen[0]) || targets[0];
 
-    const ok = await engine.actionReviveHero(activator, sel.heroIdx, REVIVE_HP, {
+    const ok = await engine.actionReviveHero(sel.owner, sel.heroIdx, REVIVE_HP, {
       source: CARD_NAME,
       // "defeated at the end of its owner's turn. That cannot be negated."
       forceKillAtTurnEnd: true,
