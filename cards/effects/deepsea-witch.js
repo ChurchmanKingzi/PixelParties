@@ -56,7 +56,7 @@ module.exports = {
       // haette der Spieler trotzdem gesehen.
       if (engine._isSearchBlocked(pi, {}, 'deck')) {
         engine.log('search_offer_skipped', { player: ps.username, card: CARD_NAME });
-        return;
+        return engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W24d (N4-14, W11/R4): Such-Sperre → wirkt nicht → Blob stumm
       }
 
       const seen = new Set();

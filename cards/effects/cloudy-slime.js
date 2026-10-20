@@ -89,7 +89,7 @@ module.exports = {
         title: 'Cloudy Slime',
         message: 'Summon another Lv 0 Creature from your hand?',
       });
-      if (!confirmed) return;
+      if (!confirmed) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; }   // W24d (N4-14, W11/R4): abgelehntes „you may" = kein feuernder Effekt
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       //
@@ -109,7 +109,7 @@ module.exports = {
       let runden = 0;
       const MAX_RUNDEN = 24;
       while (true) {
-        if (++runden > MAX_RUNDEN) return;
+        if (++runden > MAX_RUNDEN) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; }   // W24d (N4-14)
         // Recompute eligible cards (hand may have changed if multiple effects)
         const currentEligible = [];
         const currentSeen = new Set();
@@ -123,14 +123,14 @@ module.exports = {
             currentEligible.push({ name, source: 'hand' });
           }
         }
-        if (currentEligible.length === 0) return; // No more eligible
+        if (currentEligible.length === 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // No more eligible   // W24d (N4-14)
 
         const selected = await ctx.promptCardGallery(currentEligible, {
           title: 'Cloudy Slime',
           description: 'Select a Lv 0 Creature to place.',
           cancellable: true,
         });
-        if (!selected) return; // Escape = abort
+        if (!selected) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Escape = abort   // W24d (N4-14)
 
         // Step 3: Pick a zone — filter by the selected Creature's
         // per-Hero `canSummon` rule.
@@ -153,7 +153,7 @@ module.exports = {
         let idx = ps.hand.findIndex((n, i2) => n === cardName && cardDB[n]
           && engine.effectiveCardLevel(cardDB[n], pi, { handIdx: i2 }) === 0);
         if (idx < 0) idx = ps.hand.indexOf(cardName);
-        if (idx < 0) return; // Card no longer in hand
+        if (idx < 0) { await engine.summonEffektFizzelt(ctx.card, 'Cloudy Slime', { stumm: true }); return; } // Card no longer in hand   // W24d (N4-14)
         engine.takeFromPileSync(ps, 'hand', idx);
 
         // Place into support zone (eigene Spalte wie bisher; uebernommener Held der Gegenspalte: seitenfremd, kontrolliert von `pi`)
