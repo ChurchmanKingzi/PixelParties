@@ -19609,7 +19609,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // `immuneKey` entry.
     const statusDef = STATUS_EFFECTS[statusName];
     const immuneKey = statusDef?.immuneKey || (statusName + '_immune');
-    if (inst.counters[immuneKey]) return false;
+    if (inst.counters[immuneKey]) {
+      // N3-10 (W24): „This Creature cannot be Frozen" (Embodiment of Biseria, SnowItAll: Skript-Flag `selfFreezeImmune`) ist ein Passiv der Karte und ruht
+      // mit Frost/Betaeubung/Negation (Welle 7: Kreatur = ganzer Kartentext-Passiv). Ein fremder Stempel (The Sun Sword: `buffs.freeze_immune`) bleibt.
+      const eigenRuhend = immuneKey === 'freeze_immune' && !inst.counters.buffs?.freeze_immune
+        && loadCardEffect(inst.counters._effectOverride || inst.name)?.selfFreezeImmune === true
+        && this.isCardPassiveDormant(inst);
+      if (!eigenRuhend) return false;
+    }
     // Universal negative-status immunity — creature parity with the
     // hero-side `negative_status_immune` buff (see addHeroStatus). A
     // creature carrying the `negative_status_immune` buff in
