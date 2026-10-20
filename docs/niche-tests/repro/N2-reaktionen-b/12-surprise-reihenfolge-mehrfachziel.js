@@ -8,7 +8,9 @@
 // Beobachtet:  Reihenfolge Firewall → Flooding : Firewall feuert (Angreifer −100, verbrannt) und ist verbraucht, danach negiert Flooding den Zauber — der Träger wurde nie „hit".
 //              Reihenfolge Flooding → Firewall : Flooding negiert zuerst, Firewall bleibt verdeckt und der Angreifer unversehrt.
 //              Jumpscare verhält sich gleich (verbraucht, aber kein Betäuben, weil der Zauber negiert wurde — `_executeDeferredSurprises` überspringt).
-// Erwartung (Lesart A): ein „hit by"-Effekt feuert nicht für einen Zauber, der gar nicht trifft; Negierer („chosen by") laufen zuerst. Lesart B (heute): Zielreihenfolge. Stufe C — Frage an Al.
+// ★ W25b (Al, Welle 25: „korrekt, erst Negation, dann Reaktion auf Hits"): Lesart A gilt — ein „hit by"-Effekt feuert nicht für einen Zauber, der gar nicht trifft; Negierer („chosen by") laufen zuerst;
+//   das Ergebnis hängt nicht von der Zielreihenfolge ab. Umgesetzt in `_checkSurpriseWindow` (Phasen 'negierer' → 'treffer') und `aoeSurpriseVorab`. Exit 0 = Regel erfüllt.
+//   Weitere Fälle (3 Ziele, Frost Rune/Glass Wall, Gegenprobe ohne Negierer, Flächenschlag): docs/niche-tests/repro/W25/b-n2-12-mehrziel-negierer-vor-treffer.js.
 const H = require('../../lib/h.js');
 const gefragt = (t, n) => t.prompts.filter(p => p.d.title === n).length;
 async function lauf(erster, zweiter, me, op) {

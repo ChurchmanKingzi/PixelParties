@@ -15473,27 +15473,60 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {{ inst: CardInstance, actualSlot: number } | null}
    */
   /**
+   * ★ W25b (N2-05, Al): Divine Gift of the Guardian — „Negate any damage Creatures you control would take until the
+   * beginning of your next turn." gilt LAUFEND fuer alle Kreaturen, die der Halter zum Zeitpunkt eines moeglichen
+   * Schadens gerade KONTROLLIERT (auch spaeter beschworene und erbeutete; gestohlene, die er nicht mehr kontrolliert,
+   * nicht). Massgeblich ist die Zeitraum-Marke am SPIELER: `ps._guardianShield = { armedTurn }` (Muster:
+   * `damageLocked`, Spieler-Flag); sie endet zum Beginn des naechsten eigenen Zuges (`_guardianShieldAblauf`, im
+   * frueheren Ablauf-Durchgang vor dem Statusschaden). `true` = diese Kreatur ist gerade geschuetzt.
+   */
+  _guardianSchutzFuer(inst) {
+    if (!inst) return false;
+    return !!this.gs.players[inst.controller ?? inst.owner]?._guardianShield;
+  }
+
+  /** Marke am Spieler setzen (Divine Gift of the Guardian); die Anzeige-Spiegel stempelt die Karte. */
+  _guardianSchutzSetzen(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return;
+    ps._guardianShield = { armedTurn: this.gs.turn };
+  }
+
+  /** Beginn des naechsten eigenen Zuges: die Marke endet (nach dem Ausspielen, nie im selben Zug). */
+  _guardianShieldAblauf(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    const f = ps?._guardianShield;
+    if (!f || !(this.gs.turn > f.armedTurn)) return false;
+    delete ps._guardianShield;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || !inst.counters) continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      if (inst.counters._guardianImmune) delete inst.counters._guardianImmune;
+      if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
+    }
+    return true;
+  }
+
+  /**
    * Sync guardian immunity on a creature to match its controller's side.
    * Adds immunity if siblings have it, removes if they don't.
    * Called on summon (propagate) and on control change (equalize).
+   * ★ W25b (N2-05): `_guardianImmune`/`buffs.guardian` an der Kreatur sind nur noch der ANZEIGE-Spiegel der
+   * Spieler-Marke (`_guardianSchutzFuer` entscheidet den Schaden); hier wird er der Lage der Kreatur angeglichen.
    */
   _syncGuardianImmunity(inst, controllerIdx) {
-    const existing = this.cardInstances.find(c =>
-      c.id !== inst.id && c.zone === ZONES.SUPPORT &&
-      (c.controller ?? c.owner) === controllerIdx &&
-      c.counters?._guardianImmune && c.counters?.buffs?.guardian
-    );
-    if (existing) {
-      // New side has guardian — propagate
+    const f = this.gs.players[controllerIdx]?._guardianShield;
+    if (f) {
       inst.counters._guardianImmune = true;
       if (!inst.counters.buffs) inst.counters.buffs = {};
-      inst.counters.buffs.guardian = { ...existing.counters.buffs.guardian };
-    } else {
-      // New side has no guardian — remove if present
-      if (inst.counters._guardianImmune) {
-        delete inst.counters._guardianImmune;
-        if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
-      }
+      inst.counters.buffs.guardian = {
+        expiresForPlayer: controllerIdx,   // kein expiresAtTurn: das Ende regelt die Spieler-Marke (`_guardianShieldAblauf`)
+        clearCountersOnExpire: ['_guardianImmune'],
+        source: 'Divine Gift of the Guardian',
+      };
+    } else if (inst.counters._guardianImmune) {
+      delete inst.counters._guardianImmune;
+      if (inst.counters.buffs?.guardian) delete inst.counters.buffs.guardian;
     }
   }
 
@@ -19058,6 +19091,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const filterEarly = opts.beforeStatusDamage;
     let expired = false;
 
+    // ★ W25b (N2-05): Divine Gift of the Guardian endet zum Beginn des naechsten eigenen Zuges, VOR dem Statusschaden.
+    if (filterEarly !== false && this._guardianShieldAblauf(activePlayer)) expired = true;
+
     // Hero buffs
     for (let pi = 0; pi < this.playerCount(); pi++) {
       const ps = this.gs.players[pi];
@@ -19156,7 +19192,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (!this._ablaufFaellig(statusData.expiresAtTurn, statusData.expiresForPlayer, currentTurn, activePlayer)) continue;
           if (filterEarly === true && !statusData.expiresBeforeStatusDamage) continue;
           if (filterEarly === false && statusData.expiresBeforeStatusDamage) continue;
-          await this.removeHeroStatus(pi, hi, statusName);
+          await this.removeHeroStatus(pi, hi, statusName, { natuerlichesEnde: true });
           if (statusName === 'negated') this._refreshWeakeningCrystalNegation({ reapply: true, onlyFor: pi, onlyHero: hi });   // Z2 (A08-20), s. processStatusExpiry
           expired = true;
         }
@@ -27662,6 +27698,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.stolenBy = stealerPi;
     inst.stolenFromOwner = originalOwner;
     inst.controller = stealerPi;
+    this._syncGuardianImmunity(inst, stealerPi);   // W25b (N2-05): Anzeige-Spiegel des Divine-Gift-Schutzes an die neue Kontrolle
     if (opts.damageImmune) {
       inst.counters = inst.counters || {};
       inst.counters._stealImmortal = 1;
@@ -27722,6 +27759,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       inst.controller = inst.stolenFromOwner ?? inst.owner;
       delete inst.stolenBy;
       delete inst.stolenFromOwner;
+      if (inst.counters) this._syncGuardianImmunity(inst, inst.controller);   // W25b (N2-05)
       // W18b (Guard Change): eine gestohlene Kreatur, die der Dieb in eine Zone SEINER Seite gezogen hat (`inst.owner` = Brettseite),
       // gehört dem Besitzer wieder und steht dann seitenfremd auf der Dieb-Seite; steht sie wieder auf der Seite des Besitzers, fällt die Marke.
       if (inst.controller !== inst.owner) { inst.counters = inst.counters || {}; inst.counters.crossSideControlled = inst.controller; }
@@ -37186,6 +37224,25 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): Rang einer Surprise im Mehrziel-Fenster. `true` = „Treffer-Reaktion" —
+   * feuert erst, wenn der Zauber WIRKLICH trifft: Trigger „is/would be hit by …" (Firewall, Toxic Trap, Spider Avalanche, Jumper Spider,
+   * Booby Trap) oder Wirkung „After the Attack, Spell or effect resolves" (Jumpscare). `false` = Negierer („chosen by … Negate":
+   * Flooding, Frost Rune, Glass Wall …; auch „would be hit by … Negate", Magic Mirror) und Reaktionen auf das blosse Waehlen (Bluff).
+   * Aus dem Kartentext abgeleitet; ein Skript kann mit `surpriseHitReaction: true|false` ueberstimmen.
+   */
+  _surpriseIstTrefferReaktion(cardName) {
+    const sc = loadCardEffect(cardName);
+    if (typeof sc?.surpriseHitReaction === 'boolean') return sc.surpriseHitReaction;
+    const txt = String(this._getCardDB()[cardName]?.effect || '');
+    const m = txt.match(/Activate this Surprise when ([^.]*)\.\s*([^]*)/i);
+    if (m) {
+      if (/\b(?:is|would be) hit by\b/i.test(m[1]) && !/^\s*Negate\b/i.test(m[2])) return true;
+      if (/^\s*After the [^.]*\bresolves\b/i.test(m[2])) return true;
+    }
+    return false;
+  }
+
+  /**
    * @param {Array} targetedHeroes - hero targets the source card is hitting
    * @param {object} sourceCard - the source card / synthetic source
    * @param {object} [opts] - { damageType?: string } — caller can mark
@@ -37230,8 +37287,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     this.gs._surprisePendingCount = (this.gs._surprisePendingCount || 0) + 1;
     this.gs.surprisePending = true;
+    // ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): bei MEHREREN Zielen eines Zaubers loesen zuerst alle Negierer auf
+    // (Phase 'negierer'), danach feuern die Treffer-Reaktionen (Phase 'treffer', `_surpriseIstTrefferReaktion`) nur, wenn der Zauber
+    // wirklich trifft; das Ergebnis haengt so nicht von der Zielreihenfolge ab. Je Ziel hoechstens EINE Aktivierung ueber beide Phasen
+    // (`zustand.aktiviert`). Aufrufer, die ihre Helden einzeln abfragen (`aoeSurpriseVorab`), geben `_phase`/`_surpriseZustand` selbst mit.
+    const zustand = opts._surpriseZustand || { aktiviert: new Set(), sr: new Set() };
+    const phasen = opts._phase ? [opts._phase] : (targetedHeroes.length > 1 ? ['negierer', 'treffer'] : [null]);
     try {
 
+    for (const phase of phasen) {
     for (const target of targetedHeroes) {
       // v703 (Mountain Tear River): „the user OR a Creature in one of its
       // Support Zones is chosen". Ein Kreaturenziel oeffnet das Fenster
@@ -37257,6 +37321,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // discard at the end of _activateSurprise).
       const heroKey = `${tOwner}-${tHeroIdx}`;
       if (this._activeSurpriseHeroes?.has(heroKey)) continue;
+      if (zustand.aktiviert.has(heroKey + (viaCreature ? 'c' : ''))) continue;   // W25b (N2-12): hoechstens eine Aktivierung je Ziel
 
       // Als Vorgabe 29.9.: ausloesen darf nur, wer den anvisierten Helden
       // gerade KONTROLLIERT (geliehen: der Kontrolleur, nicht die Seite).
@@ -37288,11 +37353,16 @@ this._deathWatch = (this._deathWatchStack || []).length
           candidates.push({ hostHeroIdx: hi, cardName: sz[0] });
         }
       }
+      if (phase === 'treffer') {   // W25b: schon behandelte Geheimraum-Kandidaten nicht noch einmal
+        for (let ci = candidates.length - 1; ci >= 0; ci--) {
+          if (zustand.sr.has(`${tOwner}-${candidates[ci].hostHeroIdx}-${candidates[ci].cardName}`)) candidates.splice(ci, 1);
+        }
+      }
       if (candidates.length === 0) continue;
 
       // ★ 11.10. (Create Secret Room): eine als „Geheimraum" abgelegte Karte reagiert auf „chosen by an opponent's card or effect" mit „add to hand" oder
       // „activate now" — vor den gewoehnlichen Surprise-Ausloesern. Ein behandelter Kandidat wird nicht noch einmal gewoehnlich angeboten.
-      {
+      if (phase !== 'treffer') {   // W25b (N2-12): Geheimraum nur einmal je Ziel (erste Phase)
         const srSource = this._surpriseSourceInfo(sourceCard, opts, viaCreature, target);
         const SR = require('./_secret-room-shared');
         for (let ci = candidates.length - 1; ci >= 0; ci--) {
@@ -37300,6 +37370,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             tOwner, tHeroIdx, hostHeroIdx: candidates[ci].hostHeroIdx, sourceInfo: srSource, sourceCard, viaCreature,
           });
           if (!r.handled) continue;
+          zustand.sr.add(`${tOwner}-${candidates[ci].hostHeroIdx}-${candidates[ci].cardName}`);
           candidates.splice(ci, 1);
           if (r.effectNegated) return { effectNegated: true };
         }
@@ -37313,6 +37384,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!script?.isSurprise) continue;
         if (!script.onSurpriseActivate) continue;
         if (viaCreature && !script.surpriseFiresOnSupportCreature) continue;
+        if (phase && (phase === 'treffer') !== this._surpriseIstTrefferReaktion(surpriseCardName)) continue;   // W25b (N2-12)
         // Skip surprises that have their own dedicated trigger systems
         if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
             script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
@@ -37415,6 +37487,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           tOwner, tHeroIdx, surpriseCardName, sourceInfo, script,
           hostHeroIdx !== tHeroIdx ? { hostHeroIdx } : {}
         );
+        zustand.aktiviert.add(heroKey + (viaCreature ? 'c' : ''));   // W25b (N2-12)
         if (result?.effectNegated) {
           return { effectNegated: true };
         }
@@ -37422,6 +37495,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         break;
       }
     }
+    }   // W25b (N2-12): Ende der Phasen-Schleife
 
     return null;
     } finally {
@@ -38011,6 +38085,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hadAoeFlag2 = syntheticSource._isAoeCheck;
     syntheticSource._isAoeCheck = true;
     try {
+    // ★ W25b (N2-12, Al: „erst Negation, dann Reaktion auf Hits"): zwei Durchgaenge ueber die Helden — erst die Negierer, dann die
+    // Treffer-Reaktionen (nur wenn nichts negiert hat); vorgemerkt wird erst im zweiten Durchgang.
+    const _phZustand = { aktiviert: new Set(), sr: new Set() };
+    for (const _phase of ['negierer', 'treffer']) {
     for (const t of heroes) {
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.shielded) continue;
@@ -38020,10 +38098,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (gs._surpriseCheckedHeroes.has(heroKey)) continue;
       const result = await this._checkSurpriseWindow(
         [{ type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: hero.name }],
-        syntheticSource, { damageType: type },
+        syntheticSource, { damageType: type, _phase, _surpriseZustand: _phZustand },
       );
-      gs._surpriseCheckedHeroes.add(heroKey);
-      keys.push(heroKey);
+      if (_phase === 'treffer') {
+        gs._surpriseCheckedHeroes.add(heroKey);
+        keys.push(heroKey);
+      }
       if (result?.effectNegated) {
         if ((gs._spellResolutionDepth || 0) > 0) gs._spellNegatedByEffect = true;
         const nkey = this._effectNegationKey(source);
@@ -38037,6 +38117,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         return result;
       }
     }
+    }   // W25b (N2-12): Ende der Durchgaenge
     } finally {
       if (!hadAoeFlag2) delete syntheticSource._isAoeCheck;
     }
@@ -48087,7 +48168,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // („er wurde nie wirklich zugefuegt"), passiert mit
     // `bypassUnhealable` — der Fluch soll fremde Abfang-Effekte nicht
     // umdeuten, sondern nur das nachtraegliche Entfernen sperren.
-    if (!opts.bypassUnhealable && this._heroStatusRemovalBlocked(playerIdx, heroIdx, statusName)) {
+    // ★ W25b (N2-04, Al): Aging sperrt nur das Entfernen DURCH EFFEKTE (Heilen/Cleanse) — ein befristeter Status
+    // (Frost „for 1 turn", Betaeubung, Immun-Schutz …) laeuft am Ablaufzeitpunkt normal aus: `natuerlichesEnde`.
+    if (!opts.bypassUnhealable && !opts.natuerlichesEnde && this._heroStatusRemovalBlocked(playerIdx, heroIdx, statusName)) {
       this.log('status_remove_blocked', { target: hero.name, status: statusName, reason: 'curse_of_aging' });
       return;
     }
@@ -48156,7 +48239,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           for (const key of Object.keys(st)) {
             if (!STATUS_EFFECTS[key]?.endsAtTurnEnd || !st[key]) continue;
             const seit = st[key].armedTurn;
-            if (seit == null || seit <= this.gs.turn) await this.removeHeroStatus(spi, hi, key);
+            if (seit == null || seit <= this.gs.turn) await this.removeHeroStatus(spi, hi, key, { natuerlichesEnde: true });
           }
         }
       }
@@ -48171,7 +48254,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // noch der Zug ist, in dem der Schutz entstand.
         const dp = hero.statuses.damage_proof;
         if (dp && dp.armedTurn !== this.gs.turn) {
-          await this.removeHeroStatus(ap, hi, 'damage_proof');
+          await this.removeHeroStatus(ap, hi, 'damage_proof', { natuerlichesEnde: true });
         }
         let clearedCC = false;
         if (hero.statuses.frozen) {
@@ -48184,7 +48267,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             fr.duration--;
             this.log('status_tick', { target: hero.name, status: 'frozen', remaining: fr.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'frozen');
+            await this.removeHeroStatus(ap, hi, 'frozen', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48195,7 +48278,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             stun.duration--;
             this.log('status_tick', { target: hero.name, status: 'stunned', remaining: stun.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'stunned');
+            await this.removeHeroStatus(ap, hi, 'stunned', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48217,7 +48300,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         if (hero.statuses.negated && !hero.statuses.negated.sourceBound
             && !hero.statuses.negated._fromAttachment && !hero.statuses.negated.permanent) {
-          await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
+          await this.removeHeroStatus(ap, hi, 'negated', { natuerlichesEnde: true }); clearedCC = true;
           // ★ Z2 (A08-20): lag eine FREMDE Negation auf dem Helden, hielt die Kristall-Anlage still (sie
           // ueberschreibt Fremdes nicht); laeuft die Fremde ab, gilt der Kristall in der Hand wieder SOFORT
           // (nur dieser Held — eine Heilung bleibt bis zum naechsten Rundenbeginn, Ruling v1103).
@@ -48236,7 +48319,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             bd.duration--;
             this.log('status_tick', { target: hero.name, status: 'bound', remaining: bd.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'bound');
+            await this.removeHeroStatus(ap, hi, 'bound', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48253,7 +48336,7 @@ this._deathWatch = (this._deathWatchStack || []).length
             bl.duration--;
             this.log('status_tick', { target: hero.name, status: 'blinded', remaining: bl.duration });
           } else {
-            await this.removeHeroStatus(ap, hi, 'blinded');
+            await this.removeHeroStatus(ap, hi, 'blinded', { natuerlichesEnde: true });
             clearedCC = true;
           }
         }
@@ -48331,8 +48414,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || !hero.statuses) continue;
-        if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded');
-        if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune');
+        if (hero.statuses.shielded) await this.removeHeroStatus(ap, hi, 'shielded', { natuerlichesEnde: true });
+        if (hero.statuses.immune) await this.removeHeroStatus(ap, hi, 'immune', { natuerlichesEnde: true });
         // Untargetable expires at the start of the caster's next turn
         if (hero.statuses.untargetable) {
           delete hero.statuses.untargetable;
@@ -49346,7 +49429,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // abgewehrt, und Schaden, der Negation durchbricht (Idas Zauber
         // und Verwandte), kommt durch und toetet trotzdem.
         e._immuneCreature = true;
-      } else if (inst?.counters?._guardianImmune && e.canBeNegated !== false) {
+      } else if (this._guardianSchutzFuer(inst) && e.canBeNegated !== false) {   // W25b (N2-05): Spieler-Marke, nicht Momentaufnahme
         e._immuneCreature = true;
       } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.

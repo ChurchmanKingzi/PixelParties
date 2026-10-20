@@ -253,7 +253,7 @@ module.exports = {
         if (engine.kreaturGegnerEffektImmun(inst, ctx.cardOwner)) continue;   // W17b: Golden Wings
         if (inst.counters?._baihuPetrify || inst.counters?._petrified) continue;
         if (inst.counters?._damageDestroyImmune) continue;
-        if (inst.counters?._guardianImmune) continue;
+        if (engine._guardianSchutzFuer(inst)) continue;   // W25b (N2-05): Spieler-Marke massgeblich
         if (inst.counters?._stealImmortal) continue;
 
         const freeZones = _molindaFreeZones(engine, ctx);

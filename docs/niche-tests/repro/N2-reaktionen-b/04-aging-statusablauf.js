@@ -5,8 +5,8 @@
 // Beobachtet: Ein Held mit „Aged" bleibt nach Icebolt unbegrenzt gefroren (4 Zugwechsel getestet) — `processStatusExpiry` ruft `removeHeroStatus(…,'frozen')` ohne Ausnahme, und
 //   `_heroStatusRemovalBlocked` sperrt auch dieses Ablaufen. Gleichzeitig legt dieselbe Ablaufstelle den Status `immune` (Schutz nach dem Auftauen) an, obwohl `frozen` bleibt
 //   (Zustand „gefroren UND frostimmun").
-// Erwartet (Lesart A, Standard: „removed" = durch einen Effekt entfernt, wie Cure/Heal/Cleanse): die Dauer läuft normal ab, Aging sperrt nur Effekte.
-// Lesart B (Aging als Dauerfrost): Status bleiben bis die Karte fällt — dann dürfte aber `immune` nicht entstehen. Es ist als Stufe C gemeldet (Frage an Al).
+// ★ W25b (Al, Welle 25: „ja, die sollen normal auslaufen"): Lesart A gilt — „removed" = durch einen Effekt entfernt (Cure/Heal/Cleanse); die Dauer läuft normal ab,
+// Aging sperrt nur Effekte; kein Zustand „gefroren UND frostimmun". Behoben über `natuerlichesEnde` an `removeHeroStatus` (Ablaufstellen). Exit 0 = Regel erfüllt.
 // Gegenprobe: ohne Aging taut derselbe Held nach seinem Zug auf.
 const H = require('../../lib/h.js');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
