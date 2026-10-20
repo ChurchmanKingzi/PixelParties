@@ -72,6 +72,7 @@ const config = {
     leaderboard: env('LEADERBOARD_CHANNEL_ID'),
     cardOfDay: env('CARD_OF_DAY_CHANNEL_ID'),
     bugs: env('BUG_CHANNEL_ID'),
+    bugfixes: env('BUGFIXES_CHANNEL_ID', '1562197315437989889'),   // Bugfixes an Karten/Wechselwirkungen mit Kartenbildern (ohne .env-Eintrag gilt dieser)
     // Kanal der Minispiele (!mystery, !guess, !pixle). Ohne .env-Eintrag gilt dieser; die ältere Variable MYSTERY_CHANNEL_ID bleibt als Rückfall gültig.
     minigames: env('MINIGAMES_CHANNEL_ID', env('MYSTERY_CHANNEL_ID', '1561796630762623036')),
   },
@@ -104,6 +105,9 @@ const config = {
   pixleMaxGuesses: num('PIXLE_MAX_GUESSES', 10),
   pixleReward: num('PIXLE_REWARD', 30),            // SC fürs Lösen …
   pixlePenalty: num('PIXLE_PENALTY', 3),           // … minus so viel je falschem Tipp davor (mindestens 3 SC)
+
+  // Bugfix-Feed: ab so vielen betroffenen Karten gilt ein gemeinsamer Baustein als „breit“ (dann nur Name und Anzahl, keine Bilder)
+  bugfixMaxShared: num('BUGFIX_MAX_SHARED', 12),
 
   // Feeds
   feedPollMinutes: num('FEED_POLL_MINUTES', 5),

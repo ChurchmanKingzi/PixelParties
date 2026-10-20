@@ -5,6 +5,8 @@
 //     Karten als Bilder in NEW_CARDS_CHANNEL_ID.
 //   • Patchnotes: Karten, deren Eintrag in data/cards.json sich seit dem letzten Stand VERÄNDERT hat (Text, Werte, Kosten …),
 //     als Bilder in PATCHNOTES_CHANNEL_ID — keine Commit-Texte. Ganz neue Karten gehören in den Neue-Karten-Feed.
+//   • Bugfixes: inhaltliche Änderungen an bestehenden Karten-Skripten (cards/effects/*.js) und gemeinsamen Bausteinen für Wechselwirkungen
+//     (cards/effects/_*.js) seit dem letzten Stand, als Kartenbilder in BUGFIXES_CHANNEL_ID (siehe lib/bugfix.js).
 //  Beim allerersten Lauf wird der Ist-Stand nur gemerkt, nichts gepostet — sonst käme die ganze Geschichte.
 // ═══════════════════════════════════════════════════════════════════
 const fs = require('fs');
@@ -12,6 +14,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { AttachmentBuilder } = require('discord.js');
 const renderer = require('../lib/card-renderer');
+const { findBugfixes } = require('../lib/bugfix');
 
 const MAX_CARDS_POSTED = 40;
 const PER_MESSAGE = 10;
@@ -135,14 +138,53 @@ module.exports = function register(ctx) {
     console.log('[feeds] Patchnotes:', items.length, 'geänderte Karten');
   }
 
+  // ── Bugfixes (Karten-Skripte und gemeinsame Bausteine) ──
+  async function pollBugfixes() {
+    let head;
+    try { head = (await git('rev-parse', 'HEAD')).trim(); } catch { return; }
+    const last = await db.kvGet('bugfix_last');
+    if (!last) { await db.kvSet('bugfix_last', head); return; }
+    if (last === head) return;
+
+    await ctx.cardsReload();                                                        // aktuelle Karten (cards.json) für die Zuordnung
+    await renderer.init();
+    let found;
+    try { found = await findBugfixes({ git, last, head, cards: renderer.allCards(), maxShared: config.bugfixMaxShared }); }
+    catch { await db.kvSet('bugfix_last', head); return; }                          // alter Stand unbekannt (force-push) → neu ansetzen
+    await db.kvSet('bugfix_last', head);
+
+    // Karten zusammenführen: direkte Korrekturen zuerst; über schmale Bausteine betroffene Karten mit Hinweis; jede Karte nur einmal
+    const items = new Map();
+    for (const d of found.direct) if (!items.has(d.card.name)) items.set(d.card.name, { card: d.card, note: 'fixed: card script updated' });
+    const via = new Map();
+    for (const sh of found.shared.filter(x => !x.broad)) for (const c of sh.cards) {
+      if (items.has(c.name) && items.get(c.name).note.startsWith('fixed: card script')) continue;
+      if (!via.has(c.name)) via.set(c.name, { card: c, modules: [] });
+      via.get(c.name).modules.push(sh.module);
+    }
+    for (const [name, v] of via) items.set(name, { card: v.card, note: `fixed via shared logic (\`${v.modules.join('`, `')}\`)` });
+    const list = [...items.values()];
+    const broad = found.shared.filter(x => x.broad);
+    if (!list.length && !broad.length) return;
+
+    const ch = await channel(config.channels.bugfixes);
+    if (!ch) return;
+    if (list.length) await postCards(ch, `🛠️ **Bug fixes** — ${list.length} card${list.length === 1 ? '' : 's'}`, list);
+    if (broad.length) {
+      await ch.send({ content: `🛠️ **Shared engine code was fixed** (it touches many cards, so no card images): ${broad.map(b => `\`${b.module}\` (${b.count} cards)`).join(', ')}`.slice(0, 1900), allowedMentions: { parse: [] } });
+    }
+    console.log('[feeds] Bugfixes:', list.length, 'Karten,', broad.length, 'breite Bausteine');
+  }
+
   ctx.onReady.push(() => {
     const run = () => {
       pollCards().catch(e => console.error('[feeds] Karten:', e.message));
       pollPatchnotes().catch(e => console.error('[feeds] Patchnotes:', e.message));
+      pollBugfixes().catch(e => console.error('[feeds] Bugfixes:', e.message));
     };
     const t = setInterval(run, Math.max(1, config.feedPollMinutes) * 60 * 1000);
     t.unref && t.unref();
     setTimeout(run, 15 * 1000).unref();
   });
-  ctx._feeds = { pollCards, pollPatchnotes, diffCards };
+  ctx._feeds = { pollCards, pollPatchnotes, pollBugfixes, diffCards };
 };
