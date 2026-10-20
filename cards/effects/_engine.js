@@ -27411,6 +27411,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       stealer: gs.players[stealerPi]?.username,
       original: gs.players[heroOwnerPi]?.username,
     });
+    this._refreshWeakeningCrystalNegation();   // W33a: Weakening Crystal folgt dem Kontrollwechsel sofort (Negierung des Besitzers fällt, die des Diebs wird angelegt)
     // Fire-and-forget — `actionStealHero` is sync, but the hook opens a
     // reaction window (Very Special Prisoner). Schedule on a microtask
     // so the caller's sync flow isn't blocked; the reaction window is
