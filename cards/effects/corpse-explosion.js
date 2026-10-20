@@ -140,6 +140,9 @@ module.exports = {
 
   creatureDefeatedCondition(gs, pi, engine, deathInfo, source, type) {
     if (type || !deathInfo) return false;                       // Schadenstod: Nach-Schaden-Fenster
+    // Ein Opfer (Pawn Sacrifice & Co.: `_sacrificedTurn`-Stempel) ist kein „Besiegen durch einen Spell".
+    const inst = engine.cardInstances.find(c => c.id === deathInfo.instId);
+    if (inst?.counters?._sacrificedTurn === gs.turn) return false;
     return quelleIstAttackOderSpell(engine, source);
   },
 

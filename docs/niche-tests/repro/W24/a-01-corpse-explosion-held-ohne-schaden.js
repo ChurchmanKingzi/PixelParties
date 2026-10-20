@@ -18,5 +18,17 @@ const H = require('../../lib/h.js');
   await lauf('Hand of Death', {}, true, 'Spell-Insta-Kill (Hand of Death)');
   await lauf('Burning Skeleton', {}, false, 'Kreatureneffekt-Kill');
   await lauf('Hand of Death', { isSacrifice: true }, false, 'freiwilliges Opfer');
+  // Kreatur: Opfer durch einen Spell ist kein "Besiegen"; Zerstörung durch einen Spell schon
+  for (const [opfer, soll] of [[true, false], [false, true]]) {
+    const t = await H.fresh({ hand: [[], ['Corpse Explosion']] });
+    t.grantFor(1, 1, 'Corpse Explosion');
+    const k = t.put(1, 1, 0, H.INERT.frail);
+    const src = { name: 'Pawn Sacrifice', owner: 1, heroIdx: 1, controller: 1, counters: {} };
+    if (opfer) await t.run(() => t.engine.runHooks('onCreatureSacrificed', { creature: k, cardName: k.name, owner: 1, heroIdx: 0, zoneSlot: 0, source: src, _skipReactionCheck: true }));
+    await t.run(() => t.engine.actionDestroyCard(src, k, opfer ? { isSacrifice: true } : {}));
+    const angeboten = t.prompts.some(p => p.pi === 1 && p.d.title === 'Corpse Explosion');
+    R.check(`Kreatur ${opfer ? 'geopfert' : 'durch Spell zerstört'}: Corpse Explosion ${soll ? 'wird angeboten' : 'wird NICHT angeboten'}`, angeboten === soll, t.prompts.map(p => p.pi + ':' + p.d.title));
+    R.check(`Kreatur ${opfer ? 'geopfert' : 'durch Spell zerstört'}: keine Engine-Fehler`, t.errors.length === 0, t.errors);
+  }
   R.finish();
 })();
