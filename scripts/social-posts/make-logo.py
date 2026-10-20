@@ -287,7 +287,7 @@ def main():
     dark.convert('RGB').save(OUT / 'logo-monia-dunkel.png')
 
     # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus)
-    avatar(px=22, heart_cell=19, monia_top=100, wordmark_scale=3, wm_y=775, heart_cy=520).save(OUT / 'profil-monia-logo.png')
+    avatar(px=22, heart_cell=19, monia_top=70, wordmark_scale=3, wm_y=770, heart_cy=520).save(OUT / 'profil-monia-logo.png')
     avatar(px=26, heart_cell=19, monia_top=70, heart_cy=520).save(OUT / 'profil-monia.png')
     print('fertig:', OUT)
 
