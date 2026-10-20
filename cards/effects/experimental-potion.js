@@ -36,7 +36,12 @@ module.exports = {
 
   getValidTargets(gs, playerIdx, engine) {
     if (!engine) return [];
-    return [...engine.getHeroTargets(playerIdx), ...engine.getCreatureTargets(playerIdx)];
+    // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): „a target you control" gilt fuer Helden wie fuer Kreaturen nach Kontrolle
+    // (`getControlledHeroTargets`: abgegebener eigener Held nein, uebernommener Gegnerheld ja). Ein TEMPORAER uebernommener Gegnerheld (Charme Lv3: „unaffected by
+    // other cards and effects") nimmt das Gift nicht an und ist kein Ziel.
+    const helden = engine.getControlledHeroTargets(playerIdx)
+      .filter(t => t.owner === playerIdx || !engine._charmBlocksFrom(gs.players[t.owner].heroes[t.heroIdx], playerIdx, { loveShotOhneSchutz: true }));
+    return [...helden, ...engine.getCreatureTargets(playerIdx)];
   },
 
   targetingConfig: {

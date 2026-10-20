@@ -21,6 +21,11 @@
 
 // ─── HELPERS ─────────────────────────────
 
+// W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): ein an den Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme —
+// Spiegel von `engine.heroSideOf`) ist KEIN „Hero you control". Ein uebernommener Gegnerheld bleibt hier ausgenommen: das Ankleben des Helden als „Artifact" in die
+// Support Zone eines anderen Helden und das Loeschen seiner Zonen arbeitet ueber die EIGENE Spalte (gemeldet, nicht umgebaut).
+const kontrolliertVon = (hero, pi) => (hero.charmedBy ?? hero.permaControlBy ?? pi) === pi;
+
 /** Get dead heroes NOT killed this turn. */
 function getDeadHeroes(gs, pi) {
   const ps = gs.players[pi];
@@ -28,6 +33,7 @@ function getDeadHeroes(gs, pi) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name) continue;       // Empty slot
+    if (!kontrolliertVon(hero, pi)) continue;   // W28a: abgegeben
     if (hero.hp > 0) continue;       // Alive
     if (hero.diedOnTurn === gs.turn) continue; // Died this turn
     result.push({ heroIdx: hi, heroName: hero.name });
@@ -36,11 +42,12 @@ function getDeadHeroes(gs, pi) {
 }
 
 /** Get living heroes with at least 1 free base Support Zone. */
-function getLivingHeroesWithFreeZone(ps) {
+function getLivingHeroesWithFreeZone(ps, pi) {
   const result = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || hero.hp <= 0) continue;
+    if (pi != null && !kontrolliertVon(hero, pi)) continue;   // W28a: abgegeben
     for (let si = 0; si < 3; si++) {
       if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
         result.push({ heroIdx: hi, heroName: hero.name, freeSlot: si });
@@ -60,7 +67,7 @@ module.exports = {
 
   canActivate(gs, pi) {
     if (getDeadHeroes(gs, pi).length === 0) return false;
-    return getLivingHeroesWithFreeZone(gs.players[pi]).length > 0;
+    return getLivingHeroesWithFreeZone(gs.players[pi], pi).length > 0;
   },
 
   getValidTargets(gs, pi) {
@@ -102,7 +109,7 @@ module.exports = {
     const deadHeroName = deadHero.name;
 
     // ── Select living hero with free zone ──
-    const livingOptions = getLivingHeroesWithFreeZone(ps);
+    const livingOptions = getLivingHeroesWithFreeZone(ps, pi);
     if (livingOptions.length === 0) return { aborted: true };
 
     let livingHeroIdx, targetSlot;

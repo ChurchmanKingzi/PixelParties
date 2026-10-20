@@ -49,6 +49,9 @@ function equipDestinations(engine, pi, cardName, opts = {}) {
     for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      // W28a (Al, 21.10.2026: „'you control' = aktuelle Kontrolle, nicht Besitzer"): in der Form „a Hero you control" (nur die eigene Seite gefragt) ist ein an den
+      // Gegner abgegebener eigener Held (Charme-Marke / dauerhafte Uebernahme) KEIN Ziel; die Orchester-Form („Heroes on the board", mehrere Seiten) bleibt.
+      if (sides.length === 1 && side === pi && opts.uebernommene !== false && engine.heroSideOf && engine.heroSideOf(side, hero) !== pi) continue;
       // Als Vorgabe 29.9.: tot/Frozen/Uebernahme ohne `ausruesten` (Charme) sperrt.
       if (!heroCanBeEquipped(hero)) continue;
       if (!engine.canEquipCardToHero(cardName, side, hi)) continue;
