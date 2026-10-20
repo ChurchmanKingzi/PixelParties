@@ -40,9 +40,12 @@
 //    • Bypass of normal summon path: we go through
 //      `summonCreatureWithHooks`, which routes
 //      through `safePlaceInSupport` + fires onPlay.
-//      `canSummon` / spell-school / action-phase
-//      checks are skipped — that's the whole point
-//      of "except with its own effect".
+//      `canSummon` / action-phase checks are skipped
+//      ("except with its own effect": keine Aktion,
+//      kein Gold, keine Phase). ★ W22a (Al, 20.10.2026):
+//      den Beschwoerer-Helden mit der Schule/Stufe der
+//      Karte (Summoning Magic 1) verlangt der Rider
+//      trotzdem — `heldBeschwoertRider`.
 //    • Opposing-turn safety: the reaction can
 //      trigger during the opponent's turn. That's
 //      correct per card text. The summon does not
@@ -81,6 +84,33 @@ function riderSeite(deathInfo, ownerIdx) {
 }
 
 /**
+ * Darf der Held der Zone den Rider beschwoeren? (Trigger-Pruefung UND erneute Pruefung nach der Bestaetigung.)
+ *  - Welle 11 (Al, R5): „Reaction-Creatures koennen ... NUR von Heroes beschworen werden, die aktionsfaehig sind" — nicht Frozen / Stunned / Webbed / Bound
+ *    (Welle 12: Negated sperrt nicht mehr); W20c (Al): nur der aktuelle Kontrolleur beschwoert mit dem Helden (`heroAgiert(…, engine, pi)`); fuer die
+ *    seitenfremde Zone einer gestohlenen Kreatur (A09-15) gilt seit W22a wieder das Ruling vom 14.10. (s. u.).
+ *  - ★ W22a (Al, 20.10.2026: „Ja, soll er" — wie Doomed Town Guard & Co. einen Beschwoerer-Helden mit Summoning Magic 1 verlangen): zusaetzlich die
+ *    Schul-/Stufenanforderung der Karte (`heroMeetsLevelReq`: Summoning Magic 1, Ascension-/Wisdom-Bypaesse, harte Negation sperrt Stufe 1). „Except with its own
+ *    effect" nimmt dem Rider nur die NORMALE Hand-Beschwoerung (Aktion, Gold, Phase) — den Beschwoerer-Helden ersetzt es nicht. Ohne tauglichen Helden gibt es kein
+ *    Angebot: der Rider bleibt auf der Hand, nichts wird verbraucht. Die Hand-Ermaessigungen zaehlen vom Kontrolleur (`levelSourcePi`).
+ */
+function heldBeschwoertRider(engine, deathInfo, ownerIdx) {
+  const rider = engine._getCardDB()[CARD_NAME];
+  const se = require('./_summon-eligibility');
+  const seite = riderSeite(deathInfo, ownerIdx);
+  const hero = engine.gs.players[seite]?.heroes?.[deathInfo.heroIdx];
+  const taugt = (feld, hi, h) => se.heroAgiert(h, engine, ownerIdx)
+    && engine.heroMeetsLevelReq(feld, hi, rider, { levelSourcePi: ownerIdx });
+  // Seitenfremde Zone (A09-15, Ruling Al 14.10.2026, bestaetigt 20.10.: „Das Ruling vom 14. [gilt]"): die gestohlene Elven stand in der Zone eines Helden der
+  // Gegenseite, den der Kontrolleur NICHT kontrolliert — er beschwoert den Rider trotzdem seitenfremd dorthin, aber mit einem tauglichen EIGENEN Helden
+  // (kontrolliert, aktionsfaehig, Summoning Magic 1). Der Besitzer der Zone, der die Elven nicht kontrollierte, bekommt nie einen Rider (isValidRiderTrigger).
+  if (seite !== ownerIdx && hero?.name && engine.heroSideOf(seite, hero) !== ownerIdx) {
+    return engine.heroesControlledBy(ownerIdx).some(({ physOwner, heroIdx, hero: h }) => taugt(physOwner, heroIdx, h));
+  }
+  // Sonst beschwoert der Held der Zone selbst (eigene Zone oder kontrollierter Held der Gegenspalte); ein abgegebener eigener Held beschwoert fuer den Spieler nichts.
+  return taugt(seite, deathInfo.heroIdx, hero);
+}
+
+/**
  * Narrow check: is this `onCreatureDeath` event a valid trigger for a
  * Rider in our hand? Requires the deceased to be an Elven Creature we
  * controlled at the time of death, AND the slot it occupied to now be
@@ -102,11 +132,8 @@ function isValidRiderTrigger(engine, deathInfo, ownerIdx) {
   if (!isElvenCreature(cd)) return false;
   const ps = engine.gs.players[riderSeite(deathInfo, ownerIdx)];
   if (!ps) return false;
-  // Welle 11 (Al, R5): „Reaction-Creatures können … NUR von Heroes beschworen werden, die aktionsfähig sind" — der Held der Zone beschwört den
-  // Rider: nicht Frozen / Stunned / Webbed / Bound (Welle 12: Negated sperrt nicht mehr, nur die Stufe, s. u.).
-  if (!require('./_summon-eligibility').heroAgiert(ps.heroes?.[deathInfo.heroIdx], engine, ownerIdx)) return false;   // W20c (Al 20.10.): nur der aktuelle Kontrolleur beschwoert mit dem Helden
-  // Welle 12 (Al): ein nur Effekt-negierter Held beschwoert normal; sind seine ABILITIES negiert (harte Form), geht nur Stufe 0 - der Rider ist Stufe 1.
-  if (!require('./_summon-eligibility').beschwoerStufeOk(engine, riderSeite(deathInfo, ownerIdx), deathInfo.heroIdx, cardDB[CARD_NAME])) return false;
+  // Der Held der Zone beschwoert den Rider: aktionsfaehig, vom Spieler kontrolliert UND mit der Schule/Stufe der Karte (W22a, s. `heldBeschwoertRider`).
+  if (!heldBeschwoertRider(engine, deathInfo, ownerIdx)) return false;
   // Slot must be empty RIGHT NOW. The engine clears the slot just
   // before firing this hook, so this normally passes — but another
   // reaction in the batch could conceivably have filled it.
@@ -247,6 +274,9 @@ module.exports = {
       // lost it between the prompt and confirm via another effect.)
       const handIdx = ps.hand.indexOf(CARD_NAME);
       if (handIdx < 0) return;
+
+      // W22a: waehrend der Abfrage kann der Held Status/Schule verloren haben (Kettenreaktionen) — wie Doomed Town Guard neu pruefen.
+      if (!heldBeschwoertRider(engine, death, pi)) return;
 
       // Re-verify the slot is empty (belt-and-suspenders)
       const seite = riderSeite(death, pi);   // W4: Brettseite der Zone (bei gestohlener Elven die des Besitzers)
