@@ -19882,3 +19882,9 @@ Gemeinsam: Kartenbilder aus den Bildern 43–47 (nativ **96×65**, Live Show **7
 „Search your deck for a Surprise and place it face-down into the Surprise Zone of any Hero you control without showing it to your opponent. If the user has at least Magic Arts 1 or Trapping 1, this counts as an additional Action."
 - Private Galerie der verschiedenen Surprises des Hauptdecks (`_privat: true`), Held mit freier ECHTER Surprise Zone (lebend, kontrolliert; auch ein geliehener), kein Reveal an den Gegner (verdeckte Flüge, Log ohne Kartennamen), Deck wird danach gemischt; `blockedBySearchLock`. `inherentAction` als Funktion (Magic Arts ODER Trapping ≥ 1 des Wirkers). Leere Suche: gespielt, nichts gelegt, Deck gemischt (`masterpiece_none`).
 - **Bild und Klang:** `masterpiece_paint` (Goldrahmen, Pinsel malt bunte Striche, Glanz). Logs `masterpiece_set`, `masterpiece_none`.
+
+## ★ SURPRISE WIEDER VERDECKT SETZEN KLINGT (Als Befund 20.10.)
+
+> „Eine Surprise-Creature (zB Pure Advantage Camel) mit dem eigenen Effekt wieder verdeckt zu setzen, spielt noch keinen Sound ab!"
+
+`surpriseCreatureReset` (Pure Advantage Camel, Afflicted Vermin/Pests, Cactus Creature, Noble Mummy Guards, Mummy Maker Machine; auf Bakhm-Helden als Umdrehen am Platz) schickt `play_zone_animation sand_reset` (bewusst stumm, Baseline), `creature_zone_move` und `surprise_reset` und loggt `surprise_reset`. Das Setzen aus der Hand klingt über das Log `surprise_set` (`placement`); für `surprise_reset` fehlte der Eintrag in `playSFXForLog` (`app-shared.jsx`). Jetzt steht er in derselben Gruppe — derselbe Klang wie beim Setzen. **Wächter:** `scripts/check-event-sounds.js` (`LOG_KLAENGE`: `case '<typ>'` und der Klang dahinter); neue Log-Typen mit Klangpflicht dort eintragen.
