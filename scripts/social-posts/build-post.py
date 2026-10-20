@@ -515,7 +515,11 @@ def main():
     orn, gems = ornaments.frame_ornaments(plate_x, plate_y, plate.width, plate.height, accent, (W, H))
     mid_a.alpha_composite(orn)
     logo = tinted_logo(accent)
-    mid_a.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy))
+    logo_front = bool(hero_cfg.get('logoFront'))            # Logo vor dem Sprite (bei Helden, die es überragen)
+    logo_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    logo_layer.alpha_composite(logo, ((W - logo.width) // 2, 40 + oy))
+    if not logo_front:
+        mid_a.alpha_composite(logo_layer)
     mid_b = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     parts = card_name.split(',', 1)
     short = hero_cfg.get('name', parts[0]).upper()
@@ -544,7 +548,7 @@ def main():
         draw_text(mid_b, url, us, (W // 2, py0 + ph // 2), color=INK, outline=None, anchor='mm')
 
     # Sprite-Lage: Gesichtsmitte über der Kartenmitte, Füße auf der Standlinie (im Kartenbild)
-    feet_y = card_y + (args.feet if args.feet is not None else int(CARD_H * 0.52))
+    feet_y = card_y + (args.feet if args.feet is not None else hero_cfg.get('feet', int(CARD_H * 0.52)))
     if 'anchorX' in hero_cfg:
         spr.center_x = float(hero_cfg['anchorX'])
     spr.px = choose_px(spr, hero_cfg)
@@ -598,6 +602,10 @@ def main():
                 dd.rectangle([gx - U // 2, gy - n * U, gx + U // 2, gy + n * U], fill=WHITE + (255,))
         canvas.alpha_composite(layer)
         if intro and ts < T_SPR:
+            if logo_front:
+                l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]))
+                if l2 is not None:
+                    canvas.alpha_composite(l2)
             return canvas.convert('RGB')
         o_dark, o_light, sp, pad_px = spr.layers(f // per, stick_col, INK)
         canvas.alpha_composite(shadow, (card_x + CARD_W // 2 - shadow.width // 2, feet_y - U))
@@ -608,6 +616,10 @@ def main():
                 white.putalpha(im.split()[3])
                 im = white
             canvas.alpha_composite(im, (sx - pad_px, sy - pad_px))
+        if logo_front:
+            l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]) if intro else 1.0)
+            if l2 is not None:
+                canvas.alpha_composite(l2)
         return canvas.convert('RGB')
 
     if args.cover_only is not None:

@@ -102,7 +102,10 @@
     "holy_white",
     10
    ]
-  ]
+  ],
+  "px": 6,
+  "feet": 520,
+  "logoFront": true
  },
  "Arthor, Inheritor of the Barbarian Sword": {
   "particles": [
@@ -647,7 +650,10 @@
     "storm_smoke",
     18
    ]
-  ]
+  ],
+  "px": 8,
+  "feet": 430,
+  "logoFront": true
  },
  "Orthos, the Loyal Guard Dog": {
   "particles": [
