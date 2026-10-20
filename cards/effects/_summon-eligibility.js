@@ -167,20 +167,18 @@ async function sofortAusHandBeschwoeren(engine, pi, name, opts = {}) {
 }
 
 /**
- * ★ W20c/W21a: ist `hero` (Objekt oder Adresse `(feld, heroIdx)`) ein Held, den `pi` NICHT kontrolliert (`heroSideOf` ≠ `pi`; urspruenglich nur ein von `pi` ABGEGEBENER
- * eigener Held, seit W21a jede Spalte) — er steht in der Spalte von `pi`, wird aber von einem anderen
+ * ★ W20c: ist `hero` (Objekt oder Adresse `(feld, heroIdx)`) ein von `pi` ABGEGEBENER eigener Held — er steht in der Spalte von `pi`, wird aber von einem anderen
  * kontrolliert (`heroSideOf`: Charme-Marke > dauerhafte Uebernahme > Brettseite)? Dann beschwoert `pi` mit ihm nichts. `controlledBy` (Controlled Attack)
  * zaehlt nicht: dort bleibt der Held beim Besitzer.
+ * ★ W22a (Al, 20.10.2026: „Das Ruling vom 14. [gilt]“): die W21a-Verallgemeinerung auf JEDE Spalte ist ZURÜCKGENOMMEN — der Held der Zone einer gestohlenen Kreatur in der
+ * Gegenspalte bleibt zulaessig (A09-15, seitenfremde Beschwoerung durch den Kontrolleur der gestorbenen Kreatur); nur ein abgegebener EIGENER Held sperrt.
  */
 function heroAbgegeben(engine, pi, heroOrFeld, heroIdx) {
   if (!engine?.heroSideOf) return false;
   const hero = (typeof heroOrFeld === 'number') ? engine.gs?.players?.[heroOrFeld]?.heroes?.[heroIdx] : heroOrFeld;
   if (!hero?.name) return false;
   const feld = (typeof heroOrFeld === 'number') ? heroOrFeld : engine._findHeroOwner?.(hero);
-  // ★ W21a (Al, 20.10.2026, Frage 4 aus W20c: „nur der aktuelle Kontrolleur"): gilt fuer JEDEN Helden, nicht nur fuer abgegebene der eigenen Spalte —
-  // auch die seitenfremde Beschwoerung in die Zone einer gestohlenen Kreatur (A09-15) braucht den Helden dieser Zone unter der Kontrolle des
-  // Beschwoerers. Die frühere Ausnahme („Held der Gegenspalte bleibt zulaessig") ist ersetzt.
-  if (!Number.isInteger(feld) || feld < 0) return false;
+  if (feld !== pi) return false;
   return engine.heroSideOf(feld, hero) !== pi;
 }
 
@@ -194,8 +192,8 @@ function heroAgiert(hero, engine = null, pi = null) {
   if (!hero?.name || hero.hp <= 0) return false;
   // ★ W20c (Al, 20.10.2026: „nur der aktuelle Kontrolleur darf mit einem Hero Creatures beschwören"): nennt der Aufrufer den beschwoerenden Spieler `pi`
   // (und die Engine), beschwoert ein an den Gegner ABGEGEBENER EIGENER Held (steht in der Spalte von `pi`, `heroSideOf` ≠ `pi`) fuer `pi` nichts.
-  // ★ W21a (Al, 20.10.2026): gilt jetzt fuer JEDEN Helden — auch der Held der Zone einer gestohlenen Kreatur (A09-15, seitenfremd) muss von `pi` kontrolliert
-  // werden (die W20c-Ausnahme ist ersetzt). Ohne `engine`/`pi` (alte Aufrufer) bleibt die Pruefung rein statusbezogen.
+  // Helden der Gegenspalte bleiben unberuehrt (uebernommene gelten ohnehin; der Held der Zone einer gestohlenen Kreatur — A09-15, Al 14.10.: seitenfremd
+  // beschwoeren — ist weiter zulaessig). Ohne `engine`/`pi` (alte Aufrufer) bleibt die Pruefung rein statusbezogen.
   if (engine && Number.isInteger(pi) && heroAbgegeben(engine, pi, hero)) return false;
   const st = hero.statuses || {};
   // Welle 12 (Al, Rueckfrage 2): „Nein, ein effekt-negierter Held kann ganz normal Aktionen ausführen und also beschwören." — `negated` gehoert nicht

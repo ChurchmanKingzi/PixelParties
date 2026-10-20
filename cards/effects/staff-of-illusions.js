@@ -71,7 +71,12 @@ module.exports = {
     } else
     // Player needs at least 10 gold (level 1 minimum cost) - es sei denn, eine Stufe-0-Kreatur kostet nichts - and a free support zone
     if ((ps.gold || 0) < COST_PER_LEVEL && !hatStufe0) return false;
-    const hasFreeZone = (ps.heroes || []).some((h, hi) =>
+    // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporaeren Kontrolleurs"): Helden, die `pi` kontrolliert
+    // (nicht der abgegebene eigene Held, dafuer der uebernommene der Gegenspalte).
+    const hasFreeZone = engine && engine.heroesControlledBy ? engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi, hero: h }) =>
+      h?.name && h.hp > 0 &&
+      (gs.players[physOwner]?.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
+    ) : (ps.heroes || []).some((h, hi) =>
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
     );
@@ -128,16 +133,18 @@ module.exports = {
     // `beforeSummon`, so cards like King Trex re-apply their strict
     // per-Hero archetype rule (no Gigantisaur-occupied Hero when the
     // auto-sacrifice can't run).
+    // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporaeren Kontrolleurs"): die Zonen der Helden, die `pi`
+    // KONTROLLIERT (`heroesControlledBy`): ein abgegebener eigener Held (dauerhaft oder temporaer) wird dem Besitzer nicht angeboten, ein uebernommener Held der
+    // Gegenspalte seinem Kontrolleur (Zone traegt `owner` = Brettseite; die Illusion steht dann seitenfremd, kontrolliert von `pi`).
     const freeZones = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const h = ps.heroes[hi];
+    for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name) continue;
-      if (!engine.isCreatureSummonable(chosenName, pi, hi, { _bypassBeforeSummon: true })) continue;
+      if (!engine.isCreatureSummonable(chosenName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
       for (let si = 0; si < 3; si++) {
-        if ((ps.supportZones?.[hi]?.[si] || []).length === 0) {
+        if ((gs.players[physOwner]?.supportZones?.[hi]?.[si] || []).length === 0) {
           const dead = h.hp <= 0;
           freeZones.push({
-            heroIdx: hi, slotIdx: si,
+            heroIdx: hi, slotIdx: si, owner: physOwner,
             label: `${h.name}${dead ? ' (KO\'d)' : ''} — Slot ${si + 1}`,
           });
         }
@@ -145,10 +152,11 @@ module.exports = {
     }
     if (freeZones.length === 0) return { aborted: true };
 
-    let destHeroIdx, destSlot;
+    let destHeroIdx, destSlot, destSeite = pi;
     if (freeZones.length === 1) {
       destHeroIdx = freeZones[0].heroIdx;
       destSlot    = freeZones[0].slotIdx;
+      destSeite   = freeZones[0].owner;
     } else {
       const ctx   = engine._createContext(
         engine.cardInstances.find(c => c.owner === pi && c.name === CARD_NAME) || { owner: pi, heroIdx: -1, zoneSlot: -1, counters: {} },
@@ -161,8 +169,12 @@ module.exports = {
         cancellable: false,
       });
       if (!zonePick) return { aborted: true };
-      destHeroIdx = zonePick.heroIdx;
-      destSlot    = zonePick.slotIdx;
+      const zone = freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx && z.owner === (zonePick.owner ?? pi))
+        || (zonePick.owner == null ? freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx) : null);
+      if (!zone) return { aborted: true };
+      destHeroIdx = zone.heroIdx;
+      destSlot    = zone.slotIdx;
+      destSeite   = zone.owner;
     }
 
     // ── Step 3: remove from source, deduct gold, place ──────────────────
@@ -179,10 +191,12 @@ module.exports = {
     await engine._payCardCost(pi, goldCost);
 
     // Place in support zone
-    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-    ps.supportZones[destHeroIdx][destSlot] = [chosenName];
+    const dps = gs.players[destSeite];   // W22a: Brettseite der Zone (uebernommener Held der Gegenspalte)
+    if (!dps.supportZones[destHeroIdx]) dps.supportZones[destHeroIdx] = [[], [], []];
+    dps.supportZones[destHeroIdx][destSlot] = [chosenName];
 
-    const inst     = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
+    const inst     = engine._trackCard(chosenName, destSeite, 'support', destHeroIdx, destSlot);
+    if (destSeite !== pi) engine.markiereSeitenfremd(inst, pi);
     inst.turnPlayed = gs.turn;
 
     // Light-blue illusion visual filter (same as Xuanwu revived creatures)
@@ -191,13 +205,13 @@ module.exports = {
     ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
     engine._broadcastEvent('summon_effect', {
-      owner: pi, heroIdx: destHeroIdx, zoneSlot: destSlot, cardName: chosenName,
+      owner: destSeite, heroIdx: destHeroIdx, zoneSlot: destSlot, cardName: chosenName,
     });
     await engine._delay(400);
 
     engine.log('staff_illusion_place', {
       player: ps.username, creature: chosenName, goldCost,
-      hero: ps.heroes[destHeroIdx]?.name,
+      hero: dps.heroes[destHeroIdx]?.name,
     });
 
     // Fire enter-zone hooks (Ingo, Maya, Layn, etc.). Placement onto

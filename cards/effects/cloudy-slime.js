@@ -60,17 +60,19 @@ module.exports = {
       // Creature's `canSummon` rule with `_bypassBeforeSummon: true`
       // (placement skips `beforeSummon`, so cards like King Trex
       // re-apply their strict per-Hero archetype rule).
+      // ★ W22a (Al, 20.10.2026, „Hero you control": „Nur der aktuelle Kontrolleur, inklusive eines temporaeren Kontrolleurs"): die Helden, die `pi` KONTROLLIERT
+      // (`heroesControlledBy`) — ein an den Gegner abgegebener eigener Held (dauerhaft oder temporaer) wird dem Besitzer nicht angeboten, ein uebernommener Held der
+      // Gegenspalte seinem Kontrolleur (Zone traegt `owner` = Brettseite; Platzierung unten seitenfremd, wie `actionPlaceCreature` mit `heldSeite`).
       const getFreeZones = (forCardName = null) => {
         const zones = [];
-        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          const hero = ps.heroes[hi];
+        for (const { physOwner, heroIdx: hi, hero } of engine.heroesControlledBy(pi)) {
           if (!hero?.name || hero.hp <= 0) continue;
           if (forCardName
-              && !engine.isCreatureSummonable(forCardName, pi, hi, { _bypassBeforeSummon: true })) continue;
-          const supZones = ps.supportZones[hi] || [];
+              && !engine.isCreatureSummonable(forCardName, physOwner, hi, { _bypassBeforeSummon: true })) continue;
+          const supZones = gs[physOwner]?.supportZones?.[hi] || [];
           for (let s = 0; s < 3; s++) { // Base zones only
             if ((supZones[s] || []).length === 0) {
-              zones.push({ heroIdx: hi, slotIdx: s, label: `${hero.name} — Support ${s + 1}` });
+              zones.push({ heroIdx: hi, slotIdx: s, owner: physOwner, label: `${hero.name} — Support ${s + 1}` });
             }
           }
         }
@@ -132,12 +134,15 @@ module.exports = {
         const freeZones = getFreeZones(selected.cardName);
         if (freeZones.length === 0) { ohneZone.add(selected.cardName); continue; }
 
-        const zone = await ctx.promptZonePick(freeZones, {
+        const gewaehlt = await ctx.promptZonePick(freeZones, {
           title: 'Cloudy Slime',
           description: `Place ${selected.cardName} into a Support Zone.`,
           cancellable: true,
         });
-        if (!zone) continue; // Escape = back to creature picker
+        if (!gewaehlt) continue; // Escape = back to creature picker
+        const zone = freeZones.find(z => z.heroIdx === gewaehlt.heroIdx && z.slotIdx === gewaehlt.slotIdx && z.owner === (gewaehlt.owner ?? pi))
+          || (gewaehlt.owner == null ? freeZones.find(z => z.heroIdx === gewaehlt.heroIdx && z.slotIdx === gewaehlt.slotIdx) : null);
+        if (!zone) continue;
 
         // Execute placement
         const cardName = selected.cardName;
@@ -145,14 +150,17 @@ module.exports = {
         if (idx < 0) return; // Card no longer in hand
         engine.takeFromPileSync(ps, 'hand', idx);
 
-        // Place into support zone
+        // Place into support zone (eigene Spalte wie bisher; uebernommener Held der Gegenspalte: seitenfremd, kontrolliert von `pi`)
         const hi = zone.heroIdx;
         const si = zone.slotIdx;
-        if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
-        ps.supportZones[hi][si] = [cardName];
+        const feld = zone.owner;
+        const fps = gs[feld];
+        if (!fps.supportZones[hi]) fps.supportZones[hi] = [[], [], []];
+        fps.supportZones[hi][si] = [cardName];
 
         // Track card instance with placement flag
-        const inst = engine._trackCard(cardName, pi, 'support', hi, si);
+        const inst = engine._trackCard(cardName, feld, 'support', hi, si);
+        if (feld !== pi) engine.markiereSeitenfremd(inst, pi);
         inst.counters.isPlacement = 1;
         engine.zaehleBeschwoerung(pi);   // Welle 10 (Q47): Platzierung zaehlt als Beschwoerung
 
@@ -162,8 +170,8 @@ module.exports = {
         engine.gs.hoptUsed[hoptKey] = engine.gs.turn;
 
         // Emit summon effect glow + wind animation
-        engine._broadcastEvent('summon_effect', { owner: pi, heroIdx: hi, zoneSlot: si, cardName });
-        engine._broadcastEvent('play_zone_animation', { type: 'wind', owner: pi, heroIdx: hi, zoneSlot: si });
+        engine._broadcastEvent('summon_effect', { owner: feld, heroIdx: hi, zoneSlot: si, cardName });
+        engine._broadcastEvent('play_zone_animation', { type: 'wind', owner: feld, heroIdx: hi, zoneSlot: si });
 
         // Fire on-summon hooks
         await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx: hi, zoneSlot: si });
