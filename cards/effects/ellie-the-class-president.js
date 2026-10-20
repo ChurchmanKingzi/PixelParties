@@ -57,8 +57,15 @@ module.exports = {
       const pi = ctx.cardOwner;
       if (ctx.casterIdx !== pi) return;
       if (!istDoppelSpell(ctx.spellCardData)) return;
-      if (engine._ellieLetzterSpell === ctx.spellCardData && gs._ellieLetzterZug === gs.turn) return;
-      engine._ellieLetzterSpell = ctx.spellCardData; gs._ellieLetzterZug = gs.turn;
+      // Entprellung: EIN Angebot je gewirktem Double Spell (mehrere Ellie-Kopien auf der Hand feuern im selben Durchgang). N3-11 (W24): der Durchgang
+      // (`_spellRound`, laufende Nummer je Aufloesung) statt Kartendaten + Zug — ein zweites Wirken desselben Zaubers im Zug ist ein neuer Ausloeser.
+      if (ctx._spellRound != null) {
+        if (engine._ellieLetzterDurchgang === ctx._spellRound) return;
+        engine._ellieLetzterDurchgang = ctx._spellRound;
+      } else {
+        if (engine._ellieLetzterSpell === ctx.spellCardData && gs._ellieLetzterZug === gs.turn) return;
+        engine._ellieLetzterSpell = ctx.spellCardData; gs._ellieLetzterZug = gs.turn;
+      }
       const ps = gs.players[pi];
       if (!(ps.hand || []).includes(CARD_NAME) || kontrolliert(engine, pi, CARD_NAME)) return;
       if (require('./_summon-eligibility').eligibleSummonZones(engine, pi, CARD_NAME).length === 0) return;

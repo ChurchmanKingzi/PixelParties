@@ -2855,6 +2855,9 @@ class GameEngine {
     if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
       const sp = this.gs.players[hookCtx.casterIdx];
       if (sp) sp._spellResolvedTurn = this.gs.turn;
+      // N3-11 (W24): laufende Nummer JEDES Aufloesungs-Durchgangs — Lauscher, die „einmal je gewirktem Zauber" (nicht je Kopie auf der Hand) antworten
+      // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
+      hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
     }
     // ★ W8 (Al, 15.10.2026): Bonded-Companion-Pool beim Ende des Ruhens neu verknüpfen (Statuswechsel, Phasen-/Zugbeginn).
     if (hookName === 'onStatusApplied' || hookName === 'onStatusRemoved' || hookName === 'onPhaseStart' || hookName === 'onTurnStart') {
