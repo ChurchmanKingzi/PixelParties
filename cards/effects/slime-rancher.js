@@ -2,7 +2,8 @@
 //  CARD EFFECT: "Slime Rancher"
 //  Creature — Passive (while in own Support Zone):
 //
-//  When ANOTHER "Slime" Creature on the same side
+//  When ANOTHER "Slime" Creature (of either player —
+//  the text does not say "you control", Al 20.10.2026)
 //  is summoned (i.e. fires its onPlay as it enters
 //  the support zone), re-run that Creature's
 //  onPlay one additional time.
@@ -45,8 +46,10 @@ module.exports = {
 
       const entering = ctx.enteringCard;
       if (!entering) return;
-      // Kontrolle statt Seite (Styx 28.9.): Slimes, die ich kontrolliere.
-      if ((entering.controller ?? entering.owner) !== ctx.cardOwner) return;
+      // W24d (N4-16, Al 20.10.2026): Der Kartentext sagt bei den Slimes NICHT „you control" („the effects of "Slime"
+      // Creatures that activate when they are summoned") – der Rancher verdoppelt die Einsatz-Effekte ALLER Slimes,
+      // auch der vom Gegner beschworenen (anders als Sandy Blob: „a Creature you control"). Die Zusatz-Aktivierung
+      // gehoert dem Kontrolleur des Slimes (ihm gelten die Zielwahlen/Prompts).
       if (entering.id === ctx.card.id) return;
       if (SLIMES_NOT_DOUBLED.has(entering.name)) return;
 
