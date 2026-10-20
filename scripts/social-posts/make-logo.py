@@ -262,16 +262,64 @@ def dark_background(size):
     return im
 
 
-def avatar(px, heart_cell, monia_top, wordmark_scale=None, wm_y=None, heart_cy=None):
-    """Profilbild: nur das Kartenherz als Hintergrund, Monia groß, Schriftband groß davor. Kein weiteres Beiwerk,
-    damit Monia und der Schriftzug auch im kleinen Kreis (ca. 100 px) lesbar bleiben."""
+def logo_words():
+    """Die Buchstaben „Pixel" und „Parties" einzeln aus dem Logo (data/logo.png): weiße Buchstaben plus ihre dunkle Umrandung,
+    ohne Schriftband. 1 Pixel im Ergebnis = 1 Logo-Pixel (in der Datei 4 × 4)."""
+    logo = Image.open(ROOT / 'data' / 'logo.png').convert('RGBA')
+    sm = logo.resize((logo.width // 4, logo.height // 4), Image.NEAREST)
+    a = np.asarray(sm).astype(int)
+    lum = a[..., :3].mean(-1)
+    white = (lum >= 252) & (a[..., 3] > 200)
+    white[:10, :] = False                                  # Glanzlinie des Bandes oben und Randlinien links/rechts nicht mitnehmen
+    white[:, :36] = False
+    white[:, 305:] = False
+    # Öffnen mit 3×3: dünne Linien (Glanzkante, Randlinien) verschwinden, die dicken Buchstabenstriche bleiben
+    def dil(m):
+        p = np.pad(m, 1)
+        out = np.zeros_like(m)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                out |= p[1 + dy:1 + dy + m.shape[0], 1 + dx:1 + dx + m.shape[1]]
+        return out
+    white = ~dil(~white)                                   # Erosion
+    white = dil(white)                                     # Dilatation
+    pad = np.pad(white, 1)
+    near = np.zeros_like(white)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            near |= pad[1 + dy:1 + dy + white.shape[0], 1 + dx:1 + dx + white.shape[1]]
+    below = np.zeros_like(white)                           # Schatten eine Zeile tiefer
+    below[1:] = white[:-1]
+    ring = (near | below) & ~white & (lum < 90)
+    layer = np.zeros(white.shape + (4,), np.uint8)
+    layer[white] = (255, 255, 255, 255)
+    layer[ring] = INK + (255,)
+    cols = np.where(white.any(axis=0))[0]
+    # größte Lücke zwischen den Wörtern
+    gap = max(range(len(cols) - 1), key=lambda i: cols[i + 1] - cols[i])
+    split = (cols[gap] + cols[gap + 1]) // 2
+    words = []
+    for x0, x1 in ((0, split), (split, layer.shape[1])):
+        part = layer[:, x0:x1]
+        ys, xs = np.where(part[..., 3] > 0)
+        words.append(Image.fromarray(part[ys.min():ys.max() + 1, xs.min():xs.max() + 1], 'RGBA'))
+    return words
+
+
+def avatar(px, heart_cell, monia_top, words_scale=None, words_top=None, heart_cy=None, gap=2):
+    """Profilbild: Kartenherz als Hintergrund (füllt den Kreis), Monia groß, darüber der Schriftzug zweizeilig und groß.
+    Im kleinen Kreis (ca. 100 px) muss alles lesbar bleiben, deshalb kein Beiwerk."""
     bg = dark_background((1080, 1080))
     heart = heart_layer(heart_cell)
     put(bg, heart, 540, heart_cy if heart_cy is not None else 540)
     m_im, (fx_, foot) = monia(px)
     bg.alpha_composite(m_im, (int(540 - fx_), int(monia_top)))
-    if wordmark_scale:
-        put(bg, wordmark(wordmark_scale), 540, wm_y)
+    if words_scale:
+        y = words_top
+        for w in logo_words():
+            big = w.resize((w.width * words_scale, w.height * words_scale), Image.NEAREST)
+            bg.alpha_composite(big, (540 - big.width // 2, y))
+            y += big.height + gap * words_scale
     return bg.convert('RGB')
 
 
@@ -287,8 +335,8 @@ def main():
     dark.convert('RGB').save(OUT / 'logo-monia-dunkel.png')
 
     # 2) Profilbilder 1080×1080 (Instagram schneidet einen Kreis aus)
-    avatar(px=22, heart_cell=19, monia_top=70, wordmark_scale=3, wm_y=770, heart_cy=520).save(OUT / 'profil-monia-logo.png')
-    avatar(px=26, heart_cell=19, monia_top=70, heart_cy=520).save(OUT / 'profil-monia.png')
+    avatar(px=26, heart_cell=21, monia_top=95, words_scale=5, words_top=640, heart_cy=560).save(OUT / 'profil-monia-logo.png')
+    avatar(px=28, heart_cell=21, monia_top=75, heart_cy=560).save(OUT / 'profil-monia.png')
     print('fertig:', OUT)
 
 
