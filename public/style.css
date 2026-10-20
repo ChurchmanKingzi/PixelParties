@@ -14094,7 +14094,9 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
   animation: summonLockPulse 2s ease-in-out infinite;
 }
 
-/* ===== TOKEN TOOLTIP (left of main tooltip) ===== */
+/* ===== TOKEN TOOLTIP (left of main tooltip) =====
+   Nur noch die ANGESAGTE Karte von Luck (Als Vorgabe 20.10.): Tokens, die eine Karte nennt, stehen im Tooltip der Karte selbst ganz unten
+   (`.tt-token`, `TTTokenSektion`). */
 .board-tooltip-token {
   right: 360px;
   border-right: 1px solid var(--accent);
@@ -26189,6 +26191,13 @@ body.pp-dialog-offen .skin-holo:not(.modal-overlay .skin-holo):not(.card-tooltip
 /* Statuseffekte im Effekttext und in den Remindern (Als Vorgabe 20.10.): fett, Farbe aus `CardRender.STATUS_TERMS`, dunkle Kontur wie auf der Karte */
 .tt-status { font-weight: 700; text-shadow: 0 1px 0 rgba(0, 0, 0, .75), 1px 0 0 rgba(0, 0, 0, .75), -1px 0 0 rgba(0, 0, 0, .75), 0 -1px 0 rgba(0, 0, 0, .75); }
 .tt-reminder { font-size: 13px; line-height: 1.5; }
+/* Token am Ende des Tooltips (`TTTokenSektion`): Marke und Name, Bild, Werte, Effekt */
+.tt-token { padding: 9px 11px 11px; }
+.tt-token-kopf { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.tt-token-marke { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text2); text-shadow: 1px 1px 0 #000; }
+.tt-token-name { font-size: 16px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
+.tt-token-bild { display: block; width: 62%; aspect-ratio: 750 / 1050; object-fit: cover; margin: 0 auto 10px; box-shadow: 0 0 0 2px var(--pp-kontur, #05040a), 0 3px 0 rgba(0, 0, 0, .5); }
+.tt-token .tt-stat { margin-bottom: 9px; }
 .tt-callout-titel { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
 .tt-textbox { padding: 9px 11px 10px; }
 /* Nummernmarke der Faehigkeitsstufen */

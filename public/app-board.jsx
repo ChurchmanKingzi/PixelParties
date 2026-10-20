@@ -53583,6 +53583,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </span>
                 )}
               </div>
+              {/* Genannte Tokens (Bild + Effekt) ganz unten, wie in jedem Karten-Tooltip (Als Vorgabe 20.10.) */}
+              {window.TTTokenSektion && <div className="tt-body" style={{ padding: '14px 0 4px' }}><window.TTTokenSektion card={card} /></div>}
             </div>
           </div>
         );
@@ -53590,21 +53592,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Board card hover tooltip (shared single instance) */}
       {tooltipCard && !hoveredPileCard && (() => {
-        // Token mapping — cards that create tokens show the token tooltip alongside
-        const CARD_TOKEN_MAP = {
-          'Pyroblast': ['Pollution Token'],
-          'Mummy Maker Machine': ['Mummy Token'],
-        };
-        const relatedTokens = [...(CARD_TOKEN_MAP[tooltipCard.name] || [])];
-        // Generic: any card whose effect text mentions "Pollution Token"
-        // surfaces the Pollution Token's tooltip alongside (same treatment
-        // Pyroblast already got hard-coded). Skip if the hovered card IS
-        // the Pollution Token so we don't duplicate it.
-        if (tooltipCard.name !== 'Pollution Token'
-            && /Pollution Token/i.test(tooltipCard.effect || '')
-            && !relatedTokens.includes('Pollution Token')) {
-          relatedTokens.push('Pollution Token');
-        }
+        // Tokens, die eine Karte nennt (Pollution, Mummy …), stehen seit 20.10. IM Tooltip der Karte ganz unten (`TTTokenSektion`, app-shared) —
+        // in jedem Menue und Modus, nicht mehr als zweiter, angeschnittener Tooltip daneben. Hier bleibt nur die ANGESAGTE Karte von Luck.
+        const relatedTokens = [];
         // Luck declared target — show the declared card alongside ONLY for the specific hovered Luck
         if (tooltipCard.name === 'Luck' && _activeLuckTooltipTarget) {
           if (!relatedTokens.includes(_activeLuckTooltipTarget)) relatedTokens.push(_activeLuckTooltipTarget);
