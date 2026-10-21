@@ -5121,7 +5121,9 @@ class GameEngine {
             // adding their key here.
             const isHeroTagged = (h) =>
               !!h?.statuses?.untargetable || !!h?.statuses?.invisible;
-            const targetable = group.filter(t =>
+            // ★ W41a (Al, 22.10.2026, Punkt 4): „solange der gegebene Effekt noch einen ANDEREN Helden wählen KANN" — ein Held, den der konkrete Effekt ausdrücklich ausschließt
+            // (`condition` mit `dimUnmetCondition`: ausgegraut statt weg) ist kein mögliches Ziel und hält den Schutz eines Cloud-Helden nicht aufrecht.
+            const targetable = group.filter(t => !t.ineligible &&
               !isHeroTagged(gs.players[t.owner]?.heroes?.[t.heroIdx]));
             if (targetable.length > 0) {
               // Has non-tagged heroes — mark tagged ones for removal
@@ -5723,7 +5725,9 @@ class GameEngine {
             if (chuckActive) continue;
             const isHeroTagged = (h) =>
               !!h?.statuses?.untargetable || !!h?.statuses?.invisible;
-            const targetable = group.filter(t =>
+            // ★ W41a (Al, 22.10.2026, Punkt 4): „solange der gegebene Effekt noch einen ANDEREN Helden wählen KANN" — ein Held, den der konkrete Effekt ausdrücklich ausschließt
+            // (`condition` mit `dimUnmetCondition`: ausgegraut statt weg) ist kein mögliches Ziel und hält den Schutz eines Cloud-Helden nicht aufrecht.
+            const targetable = group.filter(t => !t.ineligible &&
               !isHeroTagged(gs.players[t.owner]?.heroes?.[t.heroIdx]));
             if (targetable.length > 0) {
               for (const t of group) {
@@ -40669,10 +40673,14 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   heroStatusSchutzFilter(targets, casterPi, angreifer, cardName) {
     const liste = (angreifer && angreifer.length) ? angreifer : [null];
+    // ★ W41a (Al, 22.10.2026, Punkt 4): „andere mögliche Ziele" = die Ziele, die der konkrete Effekt wählen KANN — bereits ausgeschlossene (`ineligible`) Helden zählen nicht mit.
+    // Markiert wird erst NACH der Schleife (sonst hinge das Ergebnis von der Reihenfolge ab: ein eben geschützt markierter Held sähe wie ein Effekt-Ausschluss aus).
+    const geschuetzt = [];
     for (const t of targets || []) {
       if (!t || t.type !== 'hero' || t.ineligible) continue;
-      if (liste.every(a => this.heroStatusGeschuetztGegen(targets, t, casterPi, a, cardName))) t.ineligible = true;
+      if (liste.every(a => this.heroStatusGeschuetztGegen(targets, t, casterPi, a, cardName))) geschuetzt.push(t);
     }
+    for (const t of geschuetzt) t.ineligible = true;
   }
 
   /** Ist der Gegnerheld `t` gegen den Angreifer-Helden `a` (Ziel-ID wie in der Zielliste; `null` = unbekannt) durch einen Hero-Status (`untargetable`/`invisible`) geschützt? Siehe `heroStatusSchutzFilter`. */
@@ -40693,7 +40701,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.heroScript(h)?.ignoresOppUntargetable) return false;
     }
     // sind ALLE wählbaren Helden dieser Seite geschützt, fällt der Schutz zusammen
-    const gruppe = (targets || []).filter(x => x && x.type === 'hero' && this.zielSeite(x, x.owner) === seite);
+    const gruppe = (targets || []).filter(x => x && x.type === 'hero' && !x.ineligible && this.zielSeite(x, x.owner) === seite);   // W41a: vom Effekt Ausgeschlossene sind keine möglichen Ziele
     if (gruppe.every(getaggt)) return false;
     return true;
   }
