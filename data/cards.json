@@ -4804,7 +4804,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "If the target is afflicted by at least 1 status effect and does not have a Spell attached to it, this counts as an additional Action. \nWhile this card is attached to a Hero, its Attack stat is always 0. This is treated as a status effect.",
+    "effect": "If the target is afflicted by at least 1 status effect and does not have a Spell attached to it, this counts as an additional Action. \nWhile this card is attached to a Hero, its Attack stat is always 0. This is treated as a negative status effect.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",
