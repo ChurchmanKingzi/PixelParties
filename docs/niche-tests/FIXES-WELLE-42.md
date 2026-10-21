@@ -14,8 +14,6 @@ Al hat die fünf Rückfragen aus [FIXES-WELLE-41.md](FIXES-WELLE-41.md) beantwor
 
 Umgestellte alte Repros: `W41/a-02` (Dagger, Bamboo Staff, Kohta: Wiederholung ohne Zusatzkosten, Ablehnen am Zielfenster), `W40/a-03` (zurück in die W40a-Form, ohne die W41a-Ergänzungen für Opfer/Ablagekarten/Zusatzaktionen). Alle anderen Repros unverändert.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Taunt und Kartenart:** Der Kartentext sagt „all Attacks and Spells"; die Engine bindet seit jeher jede Zielwahl des Gegners (auch Kreatur-, Artefakt-, Fähigkeits- und Surprise-Effekte) und tut es jetzt auch in `promptEffectTarget` – soll das so bleiben oder nur für echte Attacks/Spells gelten?
-2. **Chain Lightning, Bottled Lightning, Cardinal Beast Qinglong:** Dort wählt das Opfer selbst die Ziele; soll ein Hardy Slime des Opfers trotzdem in die Kette gezwungen werden (heute nein)?
-3. **Alluring Light × Kunagi × Hardy Slime:** Muss der Kunagi-Besitzer bei der Neuwahl den Slime des Light-Spielers wählen (jetzt ja, vorher frei)?
+Alle drei sind beantwortet und in [FIXES-WELLE-43.md](FIXES-WELLE-43.md) umgesetzt (dort stehen die neuen Rückfragen).
