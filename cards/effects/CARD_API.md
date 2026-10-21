@@ -22375,3 +22375,74 @@ Repros: `a-02` (Duel × alle Pfeile × „next Attack"-Boni × Warhorse-Gegenpro
 4. **Alluring Light × Butterfly Cloud:** bleibt der geschützte Held auch dann unwählbar (Karte unspielbar), wenn die übrigen Helden nur deshalb nicht angreifen können, weil sie eingefroren/betäubt sind? (jetzt so — sie sind für andere Spells „Heroes that can be chosen")
 5. **Duel × Pfeile:** gehört der Pfeil-Bonus dem DUELLANTEN (auch wenn ein anderer Held das Duel spielt)? (jetzt so)
 6. **Kunagi-Wiederholung eines Effekts** zählt als eigene Attack für die Attack-Zähler (Berserk, Rioting Village, Mirjam), die Wiederholung einer Attack-KARTE nicht (bestehender Weg, nicht angefasst) — soll beides gleich zählen?
+
+
+## ★ Welle 41 / W41a — Antworten von Al zu den W40a-Rückfragen: Hardy Slime deckt keine Nur-Helden-Effekte, Kunagi-Wiederholung zahlt die Kosten erneut (ablehnbar), Schutz-Effekte rechnen gegen die Zielmenge des Effekts, Kunagi-Wiederholung = eigene Attack-Instanz (Entscheidung Welle 41, 22.10.2026)
+
+Sechs Antworten von Al (Wortlaut je Punkt). Neue Repros: `docs/niche-tests/repro/W41/a-01` … `a-05` (Exit 0 = korrekt; auf der Basis 4c730b99 Exit 1 bei a-02, a-03, a-04; a-01 und a-05 sichern den Ist-Zustand ab). **Umgestellt** wurden `W40/a-03` (Kunagi × Dagger/Bamboo/Kohta mit Kosten) und `W40/a-04` (Alluring Light: Cloud-Held bei Frozen/Stunned-Rest); `W39/a-*` laufen unverändert grün.
+
+### 1 · Hardy Slime (Taunt) deckt keine Effekte, die nur Helden treffen können (Punkt 1)
+**Al: „Der Taunt greift in beiden Fällen NICHT; das einzige Gegner-Ziel, das Alluring Light wählt, muss ein Hero sein, Effekte, die nur Heroes treffen können, werden von Hardy Slime nicht abgedeckt (das ‚if possible' in seinem Text), also passt das."**
+* Ist-Zustand bleibt. Die Engine setzt das „if possible" **überall** gleich um: `_applyForcesTargetingFilter` filtert nur, wenn der Spötter (der Slime) selbst in der angebotenen Zielliste steht; Aufrufer: `promptDamageTarget`, `promptMultiTarget` und `normalizeValidTargets`/`applyForcedTargetingFilter` (Ziel-Tränke/-Artefakte). Ein Effekt, dessen Liste nur Helden enthält (Alluring Light: Angreifer-Wahl, Memory Wipe, Whirlwind Strike …), hat den Slime nicht in der Menge → kein Filter; ein Effekt, der Kreaturen treffen kann (Attack, Fireball), muss den Slime wählen.
+* Beobachtung (nicht geändert, kein Auftrag): Karten, die eine **gemischte** Liste (Helden + Kreaturen) selbst bauen und direkt an `promptEffectTarget` reichen, laufen am Taunt vorbei (der Filter sitzt nicht im Flaschenhals `promptEffectTarget`).
+* Repro `W41/a-01` (Attack/Fireball zwingen auf den Slime; Memory Wipe/Whirlwind Strike/Alluring Light unbeeinflusst; Gegenproben ohne Slime).
+
+### 2 · Kunagi-Wiederholung zahlt die Kosten erneut — und ist ablehnbar (Punkt 2)
+**Al: „Nein, in jedem Fall müssen die Kosten wiederholt werden! Natürlich darf der Spieler das auch ablehnen, dann triggert Kunagi nicht und seine Ladung wird nicht verbraucht (gilt generell)."**
+* **Regel:** bei jeder Kunagi-Wiederholung fallen die **Kosten bzw. der Auslöser des wiederholten Effekts** erneut an. „Kosten" = alles, was der Effekt beim Wirken bezahlt (Opfer, abgeworfenes Equip, ausgegebene Aktion) **und** der Auslöser, an dem der Effekt hängt („when you sacrifice …", „when a card is added from your discard pile …"). **Nicht** erneut bezahlt wird das **Ausspielen der Karte** selbst (Javelin Throw, Sword in a Bottle, Alluring Light: die Karte ist gespielt; vgl. Als Javelin-Throw-Beispiel „ein weiteres Equip", nicht „eine weitere Karte") und Einmal-Stempel/Limits (es ist „that Attack again", keine neue Aktivierung).
+* **Ablehnen:** das Angebot ist kein eigenes Ja/Nein-Fenster, sondern **die erste Abfrage der Wiederholung** (Kosten- bzw. Zielwahl, jeweils mit Abbrechen) — Abbruch = keine Wiederholung, nichts bezahlt, nichts verbraucht (Einmal-Stempel, Weich-Einmal-pro-Zug, Aktion unberührt); die gerade auflösende Karte gilt dadurch nicht als abgebrochen (Kunagi sichert/rekonstruiert `gs._spellCancelled`). Bezahlt wird erst **nach** der Zielwahl (`onTargetChosen`), sodass ein Abbruch der Zielwahl nichts kostet. Fehlen die Kosten, kommt gar kein Angebot. Allgemein gilt wie bisher (Ruling „abgelehnte Angebote verbrauchen nie Einmal-Stempel"): ein abgelehnter optionaler Trigger verbraucht nie Stempel oder Ladung.
+* **Pro Quelle:**
+
+| Quelle | Kosten bei Wiederholung | ablehnbar | nicht zahlbar |
+|---|---|---|---|
+| Sacrificial Dagger | **neu (W41a):** ein WEITERES Opfer (Kreatur des Kontrolleurs, noch opferbar, nicht schon in dieser Kette geopfert — das Opfer des ersten Schlags liegt erst nach dessen Schlag in der Ablage); Opferwahl, dann Zielwahl, geopfert wird danach (`opfereKreatur`: löst `onCreatureSacrificed` für andere Zuhörer aus; der Wiederholungs-Merker ruht dabei, ein anderer Dolch schlägt eigenständig) | Abbruch der Opferwahl oder der Zielwahl: nichts geopfert, Dolch-Stempel unberührt | keine weitere opferbare Kreatur → kein Angebot |
+| Bamboo Staff | **neu:** ERNEUT eine Karte aus der Ablage auf die Hand (Galerie über die eigene Ablage, danach Zielwahl, dann `addCardFromDiscardToHand`; Ablage-Sperren der Engine gelten) | Abbruch der Kartenwahl oder der Zielwahl: nichts bewegt, Weich-Einmal-pro-Zug unberührt | leere/gesperrte Ablage → kein Angebot |
+| Kohta, Master of Super-Killing | **neu:** ERNEUT „spend your Action": eine **Zusatz-Aktion** (Anbieter für `ability_activation`); die Hauptaktion ist mit dem ersten Schlag verbraucht; die harte Sperre „einmal aktivieren" bleibt einmal gesetzt | Abbruch der Zielwahl: keine Aktion verbraucht | keine Zusatzaktion → kein Angebot |
+| Brackle | ein WEITERES Opfer (W40a, unverändert) | Abbruch der Opfer-/Zielwahl | kein Opfer → kein Angebot |
+| Infected Greatmaw | ein WEITERES Opfer (W40a) | Abbruch | kein Opfer → kein Angebot |
+| Javelin Throw | ein WEITERES ausgerüstetes Artefakt in die Ablage (W40a; Kunagi selbst wird mit angeboten) | Abbruch der Equip-/Zielwahl | kein weiteres Equip → kein Angebot |
+| Broghan, Arthor, Heragas | keine (der Effekt hat keine Kosten; nur Einmal-Stempel, die nicht doppelt verbraucht werden) | Abbruch der Zielwahl | – |
+| Sword in a Bottle, Alluring Light | keine über den Schlag hinaus (die Karte ist gespielt) | Abbruch der Zielwahl (bei Light wählt der Kunagi-Besitzer) | – |
+| Crusader's ×4 | keine (80 Schaden samt eigener Klausel; Einmal-pro-Zug an der Instanz bleibt gesetzt) | Abbruch der Zielwahl | – |
+| Duel | – (trifft nur Helden: „defeats exactly 1 Creature" tritt nie ein) | – | – |
+
+* Repros `W41/a-02` (Dagger 0/1/2 weitere Opfer, Ablehnen an Opfer-/Zielwahl, Stempel; Bamboo 0/1/2 weitere Ablagekarten, Ablehnen an Karten-/Zielwahl, Weich-Stempel; Kohta mit 0/1/2 Zusatzaktionen; Kartenbilanz/Audit) und `W40/a-03` (umgestellt: Dagger, Bamboo, Kohta bekommen die nötigen Opfer/Ablagekarten/Zusatzaktionen).
+
+### 3 · Kunagi × Alluring Light (Punkt 3)
+**Al: „Ja"** → Ist-Zustand bleibt: der Kunagi-Besitzer (Kontrolleur des gezwungenen Helden) wählt das neue Opfer unter den Zielen des Light-Spielers (das vorige ausgenommen); Abbruch = keine Wiederholung, die Karte bleibt gespielt. Repro `W41/a-05` (Teil A: Wer wählt wann, Ziele nur des Light-Spielers, Ablehnen, Gegenprobe ohne Kunagi).
+
+### 4 · Schutz-Effekte rechnen gegen die Zielmenge des konkreten Effekts (Punkt 4)
+**Al: „Butterfly Cloud und ähnliche Schutz-Effekte sollten keinen Overlap mit Frozen/Stunned haben? Der Clouded-Hero ist solange geschützt, wie sein Beherrscher andere Heroes als mögliche Ziele kontrolliert. Nur, weil ein anderer Hero Frozen ist, ist er trotzdem ein legales Ziel für fast alle Karten. Falls deine Frage sich auf Effekte wie Icy Slime bezieht, die explizit Frozen targets nicht wählen können, DANN hast du recht; es geht nur darum, dass ein gegebener Effekt noch andere Heroes des Cloud-Spielers wählen kann – DANN gilt Cloud, sonst nicht."**
+* **Regel:** der Schutz eines Helden (Butterfly Cloud/`untargetable`, Invisibility/`invisible`, die `blocksTargeting`-Verträge „solange es andere mögliche Ziele gibt": Stealth, Dive Down, Alliance, Stealthy Pursuit) gilt nur, solange der **konkrete Effekt** noch einen **anderen** Helden desselben Spielers wählen KANN. Frozen/Stunned macht einen anderen Helden nicht zum unmöglichen Ziel (gewöhnliche Spells/Attacks: Cloud schützt weiter); nur ein vom **Effekt selbst** ausdrücklich ausgeschlossener Held (Icy Slime: keine Frozen-Ziele; Warlord's Bite: nicht Poisoned; Frost Breaker: nur Frozen; Alluring Light: der Angreifer muss angreifen können, W34a) zählt nicht mit. Sind alle übrigen wegen des Effekts nicht wählbar, bricht der Schutz zusammen und der Clouded-Held ist wählbar (sofern er selbst als Ziel des Effekts taugt).
+* **Korrektur gegenüber W40a (Rückfrage 4):** Alluring Light rechnete die Schutzrechnung über ALLE lebenden Gegnerhelden und filterte erst danach auf angriffsfähige — ein Cloud-Held, dessen Mit-Helden nur eingefroren/betäubt waren, blieb unwählbar (Karte unspielbar). Jetzt (`waehlbareAngreifer` in `alluring-light.js`): erst die angriffsfähigen Helden als effektspezifische Menge, dann die Schutzrechnung darüber. Cloud-Held einziger Angriffsfähiger → wählbar und spielbar; ein weiterer angriffsfähiger Held → Cloud-Held bleibt unwählbar.
+* **Audit** (wie die „andere mögliche Ziele"-Rechnung lief):
+
+| Effekt / Schutzstelle | vorher | nachher |
+|---|---|---|
+| `promptDamageTarget` (Untargetable-Pool) — Icy Slime-, Warlord's-Bite-, Frost-Breaker-Muster (`condition` lässt Ausgeschlossene weg) | rechnet über die vom Effekt gebaute Liste `targets` (Ausgeschlossene fehlen) | unverändert (korrekt) |
+| `promptDamageTarget` / `promptMultiTarget` mit `dimUnmetCondition` (Ausgeschlossene bleiben ausgegraut in der Liste: Petrifier, Capture) | ausgegraute Helden zählten als „anderes mögliches Ziel" → Cloud-Held blieb geschützt | `ineligible`-Einträge zählen nicht mit (`targetable` ohne sie) |
+| `promptEffectTarget` / `_untargetableHeroIds` (selbstgebaute Listen: Mischief Invasion …) | Liste des Aufrufers, `ineligible` übersprungen | unverändert (korrekt) |
+| `heroStatusSchutzFilter` / `heroStatusGeschuetztGegen` (Sword in a Bottle über `normalizeValidTargets`) | Gruppe inkl. `ineligible`-Einträgen; markiert wurde in der Schleife (reihenfolgeabhängig) | `ineligible` zählt nicht mit; Markierung erst nach der Schleife |
+| `blocksTargeting` (Stealth, Dive Down, Alliance, Stealthy Pursuit, Jetpack) | `info.allTargets` (Liste des Effekts) ohne `ineligible` | unverändert (korrekt) |
+| Alluring Light (Angreifer-Wahl, `spellPlayCondition`) | alle lebenden Gegnerhelden, danach auf angriffsfähige gefiltert | angriffsfähige Helden = Zielmenge, Schutz darüber |
+| gewöhnliche Spells/Attacks (Attack, Fireball …) | Frozen/Stunned-Helden sind mögliche Ziele | unverändert (Cloud schützt weiter) |
+
+* Repros `W41/a-04` (Alluring Light × Cloud/Invisibility × Frozen/Stunned × beide Sitze, Randfälle; Attack/Fireball; Icy Slime, Warlord's Bite, Frost Breaker; `dimUnmetCondition`; `heroStatusSchutzFilter`; Gegenproben ohne Cloud) und `W40/a-04` (umgestellt).
+
+### 5 · Duel-Pfeile (Punkt 5)
+**Al: „Ja, der Pfeil-Bonus geht in jedem Fall an den ‚Schaden, der ausgeführt wird'."** Ist-Zustand (W40a) bleibt: der Pfeil-Bonus gehört dem Duellanten (dem schlagenden Helden), auch wenn ein anderer Held die Karte spielt; nur der erste Schlag trägt ihn. Repro `W41/a-05` (Teil B: Held 1 spielt Duel + Held 0 duelliert → +60 auf Schlag 1 von Held 0, Held 1 ohne Bonus/ohne scharfe Pfeile; Gegenprobe Held 0 spielt selbst).
+
+### 6 · Jede Kunagi-Wiederholung ist eine eigene Attack-Instanz (Punkt 6)
+**Al: „Ja, das sollen in jedem Fall eigene Attacken-Instanzen sein!"** und (Bestätigung der Folgerung): unterliegt die Wiederholung einem Attack-Limit (Mirjam, Berserk, Rioting Village, Knife Throw), **kann Kunagi für diesen Helden schlicht nicht triggern — kein Angebot, nichts bezahlt, nichts verbraucht** (bestätigte Entscheidung, keine offene Frage).
+* **Umsetzung:** (a) Effekt-Wiederholungen liefen schon durch `alsAttackKette` (zählt); (b) die Wiederholung einer Attack-**Karte** (`repeatAttack`) zählte bisher nicht — jetzt `engine.zaehleAlsArt('attack', { …, karte: true })` je Wiederholung (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`, `onEffectCountedAsArt` → Berserk, Rioting Village, Mirjam, Knife Throw, Quick Attack …); (c) vor jeder Wiederholung prüft Kunagi `engine.heroKannAngreifen(…, { name })` (Attack-Limits/Sperren) — Karte und Effekt; (d) die ORIGINAL-Attack-Karte wird vor der ersten Wiederholung nachgezählt (der Server zählt sie erst NACH `afterSpellResolved`); die Vormerkung `gs._attackVorgezaehlt` macht den späteren regulären Zählschritt dieser Karte zum No-op (`zaehleAlsArt`) — genau ein Zählschritt je Schlag.
+* Repro `W41/a-03` (Zähler für Karte/Broghan/Arthor/Sword in a Bottle/Dagger; Berserk: 2 Schläge; Mirjam: 1 Schlag; Rioting Village: 1; „only Attack"-Stempel (Knife Throw): 1; keine Zielwahl über das Limit hinaus; Dagger unter Mirjam-Limit: kein weiteres Opfer).
+
+### Verträge für neue Karten
+* Ein Effekt, der als Attack zählt und `wiederhole` übergibt, schuldet bei der Wiederholung seine **Kosten und Auslöser** erneut: Zahlbarkeit **vor** dem Bezahlen prüfen (kein Angebot ohne Kosten), Bezahlen erst **nach** der Zielwahl (`onTargetChosen`), Abbruch = nichts bezahlt; während des Bezahlens `gs._kunagiWdh`/`gs._spellExcludeTargets` ruhen lassen (Nebeneffekte des Bezahlens sind eigenständige Schläge).
+* Eine Zielwahl, die mit `condition` Ziele ausschließt, muss sie weglassen oder mit `dimUnmetCondition` ausgrauen — beides hebt den Schutz anderer Helden auf („solange der Effekt noch einen anderen wählen kann").
+
+### Fragen an Al (Ja/Nein)
+1. **Kohta × Kunagi:** Soll „spend your Action" bei der Kunagi-Wiederholung eine **Zusatz-Aktion** verbrauchen (jetzt so; ohne Zusatzaktion kein Angebot), oder gilt für Kohta die eine Aktion des ersten Schlags auch für die Wiederholung?
+2. **Sword in a Bottle / Alluring Light / Javelin Throw (Kartenspiel):** Bleibt das Ausspielen der KARTE (Gold-Kosten, Handkarte, Aktion) bei der Wiederholung ausdrücklich unbezahlt (jetzt so; nur in-Effekt-Kosten wie das Equip bei Javelin Throw fallen erneut an)?
+3. **Dagger-Wiederholung — Opfer:** Reicht für das erneute Opfer eine **Kreatur** (jetzt so), oder darf/soll auch ein eigener **Held** geopfert werden können („a target you control")?
+4. **Kunagi-Angebot:** Genügt das Abbrechen der Kosten-/Zielwahl als „Ablehnen" (jetzt so), oder soll vor jeder Wiederholung ein eigenes Ja/Nein-Fenster erscheinen?
