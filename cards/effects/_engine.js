@@ -2859,7 +2859,8 @@ class GameEngine {
     // spaeter gezogen, aufgedeckt), blieb der Stempel aus.
     if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
       const sp = this.gs.players[hookCtx.casterIdx];
-      if (sp && !hookCtx._alsEffekt) sp._spellResolvedTurn = this.gs.turn;   // W39a: ein Effekt, der als ATTACK zählt (`alsAttackKette`), ist kein gewirkter Spell (Eraser Beam: nur Spells)
+      // W40a (Al, 22.10.2026): NUR Spells stempeln — gespielte Attack-Karten gar nicht (Eraser Beam: „only Spell“); Effekte, die als Spell zählen (Alice: `cardType 'Spell'`), stempeln auch ohne Karte.
+      if (sp && !hookCtx._alsEffekt && hookCtx.spellCardData?.cardType !== 'Attack') sp._spellResolvedTurn = this.gs.turn;   // W39a: ein Effekt, der als ATTACK zählt (`alsAttackKette`), ist kein gewirkter Spell (Eraser Beam: nur Spells)
       // N3-11 (W24): laufende Nummer JEDES Aufloesungs-Durchgangs — Lauscher, die „einmal je gewirktem Zauber" (nicht je Kopie auf der Hand) antworten
       // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
       hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
