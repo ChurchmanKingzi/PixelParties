@@ -26,11 +26,6 @@ Al hat die sieben Rückfragen aus [FIXES-WELLE-46.md](FIXES-WELLE-46.md) beantwo
 * Löst eine Surprise aus der Auflösung einer Kette aus (z. B. durch die Kreaturenwahl von Racket Arrow), öffnet sie kein eigenes Fenster „performs" und zählt nur (Frage 5).
 * Seit v1154 blockt `_canHeroActivateSurprise` über `canPlayCard` (Mirjam, Idej Sword Muras/Kogarasu) die Aktivierung einer Attack-/Spell-Surprise, wenn der Held sein Limit schon erreicht hat (Frage 1).
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Limits und Surprise-Aktivierung:** Soll das Attack-/Spell-Limit eines Helden (Mirjam „1 Attack", Idej Sword Muras/Kogarasu) die Aktivierung einer Attack-/Spell-Surprise dieses Helden weiter blockieren (Ist-Zustand, ja)? Oder darf kein Limit eine reaktive Surprise-Aktivierung verhindern (dann nur zählen)?
-2. **Spike-Trap-Rückschlag:** Soll er für die Surprises des Angreifers ein Surprise-Fenster öffnen (jetzt ja, folgt aus dem Spell-Typ)? Oder soll der Rückschlag Reaktionen und Surprises ausnehmen?
-3. **Silence-Bonus-Spell:** Soll eine aktivierte Spell-Surprise ihn verbrauchen (jetzt ja)? Nein hieße: Surprises zählen, brauchen den Bonus aber nicht.
-4. **Güldefaber (+10 Gold) und The Brewer's Blade (Potion ziehen):** Sollen sie auf eine Attack-/Spell-Surprise ihres Trägers reagieren (jetzt ja, weil sie „performs" über `onEffectCountedAsArt` lesen)?
-5. **Surprise aus der Auflösung einer Kette:** Soll sie ein eigenes Fenster „performs" öffnen (jetzt nein, nur zählen)?
-6. **Creature-Surprise im Kettenfenster:** Soll sie „Creature effect"-Leser in einem Kettenfenster ansprechen, z. B. Idej Projector (jetzt nein; heute gibt es für sie nur die Beschwörungs-Kette (Off Duty & Co.) und die Zielschutz-/Surprise-Fenster aus W46a)?
+Alle sechs sind beantwortet und in [FIXES-WELLE-48.md](FIXES-WELLE-48.md) umgesetzt bzw. bestätigt (dort stehen die neuen Rückfragen).
