@@ -7978,7 +7978,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a target you control and Poison it for the rest of the game. If the target is already Poisoned, increase the Poison's damage by 30 instead. All Poison damage the target would receive is applied as healing instead, and any effects that would reduce its max HP increase its max HP instead.",
+    "effect": "Choose a target you control and inflict 1 Stack of Poison to it. All Poison damage the target would receive for the rest of the game is applied as healing instead, and any Poison that would reduce its max HP increase its max HP instead.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
