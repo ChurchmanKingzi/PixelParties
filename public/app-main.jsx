@@ -21,6 +21,12 @@ let _pendingGameState = null;
 //  server via `cube_draft_pick`; once your pick lands the pack grays
 //  out and you wait for the rest of the table.
 // ═══════════════════════════════════════════
+/** Laufende Nummer des Picks im ganzen Draft (1…totalPicks). `pickInRound` zaehlt nur innerhalb des Packs (0…15). */
+function cubeDraftOverallPick(draft) {
+  const perRound = draft.totalPicks / Math.max(1, draft.totalRounds);
+  return draft.round * perRound + draft.pickInRound + 1;
+}
+
 function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
   // Eigene Draft-Musik, solange der Screen steht (Deck-Bau danach bekommt wieder die Menümusik).
   const { setBgmMode } = useContext(AppContext);
@@ -90,6 +96,9 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       if (!d.active) {
         if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
         d.active = true;
+        // Waehrend des Ziehens zeigen die Karten unter dem Zeiger KEINEN Tooltip (CardMini.show prueft das, wie im
+        // Deck-Editor) — sonst bliebe nach dem Umsortieren der Tooltip einer Nachbarkarte haengen.
+        window.deckDragState = { section: 'draftPool', fromIdx: d.idx };
         setDragSrc(d.idx);
       }
       d.insert = insertFromPoint(e.clientX, e.clientY);
@@ -99,6 +108,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     const up = () => {
       const d = dragRef.current;
       dragRef.current = null;
+      window.deckDragState = null;
       if (!d) return;
       if (d.active) {
         const from = d.idx, ins = d.insert;
@@ -124,6 +134,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
+      window.deckDragState = null;
     };
   }, []);
 
@@ -184,7 +195,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <div className="top-bar">
           <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT — SPECTATING</h2>
-          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}</span>
+          <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}</span>
           <VolumeControl />
         </div>
         <div className="screen-center" style={{ flexDirection: 'column', gap: 16 }}>
@@ -250,7 +261,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
         <div style={{ flex: 1 }} />
         <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
-          Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}
+          Pack {draft.round + 1}/{draft.totalRounds} · Pick {cubeDraftOverallPick(draft)}/{draft.totalPicks}
         </span>
         {draft.timerDisabled ? (
           <span className="badge" style={{ background: 'rgba(0,240,255,.08)', color: 'var(--text2)', fontSize: 12, padding: '5px 14px', fontWeight: 600 }}>
@@ -365,8 +376,6 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
             gridTemplateColumns: `repeat(${COLS}, ${cardW}px)`,
             gridAutoRows: `${Math.round(cardW * 7 / 5)}px`,
             gap: GAP,
-            opacity: draft.myPicked ? 0.45 : 1,
-            transition: 'opacity .25s',
             visibility: packBox.w ? 'visible' : 'hidden',
           }}>
             {shownPack.map((cardName, idx) => (
@@ -384,7 +393,11 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 }}
                 onMouseEnter={() => setHoveredCard(cardName)}
                 onMouseLeave={() => setHoveredCard(null)}>
-                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                {/* Abdunkeln an der Karte selbst, NICHT am Raster: `opacity` < 1 an einem Vorfahren macht einen eigenen
+                    Stapelkontext auf, und der fixe Tooltip (z-index 9999) landete dann UNTER dem Vorschau-Beschriftungsfeld
+                    der rechten Spalte ("CARD PREVIEW — hover a card"). */}
+                <CardMini card={window.CARDS_BY_NAME?.[cardName]} onClick={() => {}}
+                  style={{ width: '100%', height: '100%', opacity: draft.myPicked ? 0.45 : 1, transition: 'opacity .25s' }} />
               </div>
             ))}
           </div>
@@ -418,14 +431,13 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
                 style={{
                   aspectRatio: '5 / 7', cursor: dragSrc != null ? 'grabbing' : 'grab',
                   userSelect: 'none', touchAction: 'none', position: 'relative',
-                  opacity: dragSrc === idx ? .35 : 1,
                   boxShadow: dragInsert === idx ? '-3px 0 0 0 var(--accent)'
                     : (dragInsert === poolOrder.length && idx === poolOrder.length - 1 ? '3px 0 0 0 var(--accent)' : 'none'),
                   borderRadius: 4,
                 }}>
                 {/* Filter an der Karte selbst, nicht an einem Vorfahren (sonst haengt der fixe Tooltip im gefilterten Kasten). */}
                 <CardMini card={window.CARDS_BY_NAME?.[name]} onClick={() => {}}
-                  style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: gray ? .6 : 1, transition: 'filter .15s, opacity .15s' }} />
+                  style={{ width: '100%', height: '100%', filter: gray ? 'grayscale(1) brightness(.5)' : 'none', opacity: dragSrc === idx ? .35 : (gray ? .6 : 1), transition: 'filter .15s, opacity .15s' }} />
               </div>
             ))}
             {poolOrder.length === 0 && (
