@@ -35,6 +35,8 @@ const FOLGE_MS = 240;    // Hit 2, 3 …: 100 ms Versatz (der Rückprall der Kar
 const HEIM_MS = 440;     // nach dem letzten Hit: die Helden gehen heim (380 ms) + Puffer
 const BILD_MS = 960;     // Lebensdauer der Pixelart-Animation je Hit (Aufprall + Nachglühen); NICHT die Wartezeit der Engine — `playAnimation` räumt sie danach ab
 
+const { clearArmedArrows } = require('./_arrows-shared');
+
 const held = (engine, x) => engine.gs.players[x.side]?.heroes?.[x.heroIdx] || null;
 const lebt = (h) => !!h && !!h.name && (h.hp || 0) > 0;
 
@@ -62,6 +64,17 @@ async function duell(engine, cfg) {
   // meldet `afterSpellResolved` für A selbst); (b) für B (`cfg.meldeAttacken`, nur Duel) zählt und meldet das Duell NACH den Schlägen einmal eine Attack des Helden B (wie der gezwungene Held von Alluring Light).
   if (cfg.meldeAttacken && Array.isArray(gs._spellDamageLog)) gs._spellDamageLog.push({ id: `hero-${b.side}-${b.heroIdx}`, type: 'hero', owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name });
   let bHatGeschlagen = false;
+  // ★ W40a (Al, 22.10.2026): Arrows & Co. werden an den Helden gehängt, der die Karte SPIELT; der Duellant `a` kann ein anderer Held des Spielers sein — der Pfeil-Bonus gehört der ersten Attack
+  // des Duellanten (sonst ginge er an einem Helden verloren, der gar nicht schlägt).
+  {
+    const A0 = held(engine, a);
+    for (const { hero: h } of engine.heroesControlledBy(a.controller)) {
+      if (!A0 || h === A0 || !h?._armedArrows?.length) continue;
+      A0._armedArrows = [...(A0._armedArrows || []), ...h._armedArrows];
+      if (h._arrowsChainedCount != null) A0._arrowsChainedCount = h._arrowsChainedCount;
+      delete h._armedArrows; delete h._arrowsChainedCount;
+    }
+  }
   const clashEvent = (phase, extra = {}) => ({
     a: { owner: a.side, heroIdx: a.heroIdx, cardName: held(engine, a)?.name }, b: { owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name }, phase, ...extra,
   });
@@ -100,6 +113,10 @@ async function duell(engine, cfg) {
       } finally {
         await engine.endMultiHit();
       }
+      // ★ W40a (Al, 22.10.2026, Punkt 2: „Jeder Schlag gilt als eigene Attack, ja. Aber Arrows boosten nur EINE Attack, also würde ein Pfeil-Bonus nur den ersten Schlag buffen und dann enden."):
+      // ein aktiver Pfeil-Bonus (Arrows, Magic Topaz, Bow Sniper Darge: „that Attack") gilt nur für die ERSTE Attack — nach dem ersten Schlag ist er verbraucht (Golden Arrow zahlt jetzt aus, Brand/Gift
+      // sind am ersten Ziel angekommen); die weiteren Schläge bekommen ihn nicht. Idempotent; der Abschluss der Karte räumt nichts mehr ab.
+      if (r === 1) await clearArmedArrows(engine, a.controller);
 
       const A2 = held(engine, a), B2 = held(engine, b);
       engine.log('duel_round', {
