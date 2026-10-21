@@ -4,7 +4,8 @@ zwei Heldentrupps, die aufeinander losgehen.
 
     python3 scripts/social-posts/make-banner.py
 
-Ergebnis in scripts/social-posts/out/branding/: banner-youtube.png und banner-youtube-sicherer-bereich.png (Kontrollbild, nicht hochladen).
+Ergebnis in scripts/social-posts/out/branding/: banner-youtube.png (Rahmen über allen Heroes), banner-youtube-rahmen-hinten.png (Variante, in der Bakhm
+und Chaos-Diamond über den Rahmen ragen) und banner-youtube-sicherer-bereich.png (Kontrollbild, nicht hochladen).
 
 YouTube zeigt je nach Gerät unterschiedliche Ausschnitte; auf dem Handy bleibt nur die Mitte (1235 × 338 px, x 406…1641, y 407…745)
 sichtbar. Dort steht nur der Schriftzug (Logo-Pixel = 4 px); der Rest ist Zugabe für Tablet, Desktop und Fernseher.
@@ -337,7 +338,7 @@ def glints(cv, spots):
         ml.put(cv, st, x, y, an)
 
 
-def banner(frame_front=False):
+def banner(frame_front=True):
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
     cv.alpha_composite(ground())
@@ -405,10 +406,10 @@ def banner(frame_front=False):
 
     def at_chaos(sx, sy):
         return (left_c + padc + (sx + 0.5) * 14, top_c + padc + (sy + 0.5) * 14)
-    palm_l, palm_r = (6, 8), (42, 17)                                                 # Handflächen (Mitte der Kristallklauen), nicht die Fingerspitzen
-    hands = [at_chaos(*palm_l), at_chaos(*palm_r)]
+    palm_l = (6, 8)                                                                   # linke Handfläche (Mitte der Kristallklaue), nicht die Fingerspitzen
+    hands = [at_chaos(*palm_l)]
     lines = []
-    for (sx, sy), dst, sd in ((palm_l, (1110, 425), 2), (palm_l, (1650, 40), 11), (palm_l, (1780, 25), 5), (palm_r, (1880, 40), 4), (palm_r, (2010, 150), 8)):
+    for (sx, sy), dst, sd in ((palm_l, (1110, 425), 2), (palm_l, (1650, 40), 11), (palm_l, (1780, 25), 5)):
         lines += bolt_lines(at_chaos(sx, sy), dst, seed=sd)
     cv = red_light(cv, lines, hands)                                               # rotes Licht auf Sprites und Hintergrund ringsum
     cv.alpha_composite(bolt(lines))
@@ -419,7 +420,7 @@ def banner(frame_front=False):
     mx, my = rf_left + padr + 29.5 * 8, rf_top + padr + 15.5 * 8                     # Ende des Laufs im Frame 6 (Sprite-Pixel 29,5 | 15,5); das Mündungsfeuer zeichnet das Sheet selbst
     for dy_ in (-8, 8):
         cv.alpha_composite(beam((mx, my + dy_), (mx - 90, my + dy_), 8, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))   # Schüsse nach links
-    if frame_front:                                                                # Variante: der Rahmen liegt über allen Heroes
+    if frame_front:                                                                # der Rahmen liegt über allen Heroes, auch über Bakhm und Chaos-Diamond
         cv.alpha_composite(frame_layers())
     return cv
 
@@ -435,7 +436,7 @@ def main():
     cv = banner()
     cv.convert('RGB').save(OUT / 'banner-youtube.png', optimize=True)
     safe_overlay(cv).convert('RGB').save(OUT / 'banner-youtube-sicherer-bereich.png')
-    banner(frame_front=True).convert('RGB').save(OUT / 'banner-youtube-rahmen-vorn.png', optimize=True)      # Variante: Rahmen über allen Heroes
+    banner(frame_front=False).convert('RGB').save(OUT / 'banner-youtube-rahmen-hinten.png', optimize=True)      # Variante: Bakhm und Chaos-Diamond ragen über den Rahmen
     print('fertig:', OUT / 'banner-youtube.png', (OUT / 'banner-youtube.png').stat().st_size // 1024, 'KB')
 
 
