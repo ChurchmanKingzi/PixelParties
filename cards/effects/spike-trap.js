@@ -7,6 +7,15 @@
 //  or Spell. Negate that Attack/Spell and inflict
 //  200 damage to the attacker. Opponent may
 //  discard 2 cards to negate this Surprise.
+//
+//  ★ W47a (Al, 22.10.2026: „Ja, soll Spell-Schaden sein"): der
+//  Rückschlag ist SPELL-Schaden (Schadenstyp `decay_spell` — Schule
+//  der Karte, wie Zombified Assault/Forbidden Zone), nicht mehr
+//  `'other'`. Alles Weitere ergibt sich aus dem Typ: Spell-Immunität
+//  und Zielschutz-Regeln, Anti Magic, Spell-Leser (Fireshield, Escape,
+//  Corpse Explosion …) und die Schadensfenster sehen ihn wie jeden
+//  Spell-Treffer; die alte Immunität gegen `'other'`-Schaden gilt
+//  nicht mehr.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Spike Trap';
@@ -133,7 +142,7 @@ module.exports = {
       });
       await engine._delay(400);
       const source = { name: CARD_NAME, owner: ownerPi, heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner };
-      await engine.actionDealDamage(source, attacker, SPIKE_DAMAGE, 'other', {
+      await engine.actionDealDamage(source, attacker, SPIKE_DAMAGE, 'decay_spell', {   // W47a: Spell-Schaden (vorher 'other')
         _skipReactionCheck: true,
         festesZiel: true,   // Vergeltung trifft immer den Angreifer (Als Ruling 9.10.)
       });

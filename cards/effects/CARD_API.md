@@ -22735,3 +22735,66 @@ Die Matrix war im Test identisch zu den Kontrollen ohne Surprise (Fireball = Spe
 5. **Spike Trap-Rückstoß** (200 Schaden, Typ `'other'`, ohne Reaktionsfenster): soll er als Spell-Schaden gelten, auf den Fireshield, Escape, Corpse Explosion usw. reagieren (ja), oder bleibt Rückstoß ausgenommen (nein, so jetzt)?
 6. **Zähler:** Soll eine aufgedeckte Spell-/Attack-Surprise in „Spells/Attacks diesen Zug"-Zählern zählen (ja) oder bleibt es dabei, dass Surprises dort nicht zählen (nein, so jetzt)?
 7. **Surprise-Fenster für gewählte Kreaturen** (Mountain Tear River): soll `promptEffectTarget` das Fenster auch für gewählte Kreaturen öffnen — für **alle** Quellen (ja), oder bleibt es bei Helden (nein, so jetzt)?
+
+## ★ Welle 47 / W47a — Antworten von Al zu den W46a-Rückfragen: Kettenfenster „Hero performs" bei aktivierten Attack-/Spell-Surprises, Spike Trap = Spell-Schaden, aktivierte Surprises zählen, Mountain Tear River liest Kreaturen im Support des River-Helden (Entscheidung Welle 47, 22.10.2026)
+
+Neue Repros: `docs/niche-tests/repro/W47/a-01` (Kettenfenster, Matrix Quelle × Leser × beide Sitze; auf der Basis 70453312 Exit 1, 52 ✗), `a-02` (Zähler; Exit 1, 38 ✗), `a-03` (Spike Trap; Exit 1, 8 ✗), `a-04` (Mountain Tear River; Exit 1, 6 ✗), `a-05` (Absicherung Punkte 1–3; auf der Basis UND auf dem Branch Exit 0); gemeinsame Bausteine `W47/_w47.js` (kein Test). **Keine alten Repros umgestellt** — alle 1214 bestehenden laufen unverändert grün.
+
+### Punkte 1–3 · Ist-Zustand bestätigt (Al: „Ja, das ist in Ordnung." / „Passt" / „Passt.")
+Creature-Surprise als Angreifer löst Booby Trap, Frost Rune, Firewall, Toxic Trap, Mountain Tear River, Fireshield nicht aus; Rolling Boulder legt eine Creature-Surprise ohne Tod-Trigger in die Ablage; Shield of Wisdom leitet nur auf Ziele um, die der Effekt wählen konnte (Water Golem/Cybug ANTS: Schild bleibt zu). Nur abgesichert (`a-05`; zusätzlich: eine Creature-Surprise öffnet kein Kettenfenster „performs" und zählt nicht).
+
+### Punkt 4 · Kettenfenster „Hero performs" bei der Aktivierung einer Attack-/Spell-Surprise
+**Al: „Ja!"** — Zentral in `engine._activateSurprise` (eine Stelle für jede Aktivierung: Surprise-Fenster, Hook-Trigger, Telekinesis, Ablage-/Deck-Aktivierung wie Cute Spider/Sabrina). Nach dem Hook `onSurpriseActivated` (Boots of Hermes & Co.) und **vor** dem Einmal-Stempel/dem Effekt öffnet `executeCardWithChain` ein Fenster mit einem Anfangsglied nach dem cardType der Surprise (`Attack` → Attack, `Spell` → Spell; Besitzer = Steuerer, `heroIdx`/`casterOwner` = Wirt-Held in der Zone, Herkunft Brett [`fromBoard`], `casterCheck: false`, `resolve: null` — wie `doPlaySpell`, der Effekt läuft danach). Es kostet **keine Aktion und keine Zusatzaktion**.
+* **Negation in der Kette = negierte Surprise** (wie Boots of Hermes): Karte in die Ablage, kein Effekt, Einmal-Grenze unverbraucht (Z7c), `onEffectNegated`, Zähler zählt trotzdem (wie jede gespielte, negierte Karte).
+* **Pfeile**: das Attack-Fenster bewaffnet den Wirt (`_armedArrows`); `clearArmedArrows` räumt nach der Auflösung ab (Bluff macht keinen Schaden — die Boni verpuffen, wie bei jedem schadenlosen Attack).
+* **Kein zweites Fenster / Rekursion:** mitten in einem offenen Fenster (`_inReactionCheck`: die Surprise löst aus der Auflösung einer Kette aus) und im MCTS-Rollout öffnet sich keins (Konvention von `alsAttackKette`); Per-Hero-Sperre `_activeSurpriseHeroes` und Tiefenkappe 10 unverändert. Jede Reaktion genau einmal je Aktivierung (`a-01`: Booby Trap gegen Booby Trap, Jumpscare gegen Jumpscare).
+* **Creature-Surprises** führen nichts „aus": kein neues Fenster. Es bleibt bei der Beschwörungs-Kette (Off Duty & Co., `_placementReactorHeld`) und den Zielschutz-/Surprise-Fenstern aus W46a (dort gelten sie als Creature effect). Surprises vom Typ Artifact (Shield of Wisdom) ebenso.
+* **Lunar Eclipse** (Surprise, die selbst als Kettenglied reagiert) braucht kein Fenster (sie IST ein Glied), zählt aber (Punkt 6).
+
+| Leser-Karte | reagiert auf die Aktivierung einer Surprise vorher | nachher |
+|---|---|---|
+| Stealthy Pursuit | nein | **ja** — Attack- und Spell-Surprises des eigenen Helden (Wirt-Held als Wirker/Geschützter; Creature: nein) |
+| Angelfeather, Bomb, Flame, Golden, Hydra Blood, Poisoned, Racket, Rainbow's Arrow | nein | **ja** — nur Attack-Surprises (Bluff); Spell/Creature: nein |
+| Magic Topaz | nein | **ja** — nur Attack-Surprises |
+| Bow of the Hunt Goddess (Ausrüstung am Wirt) | nein | **ja** — nur Attack-Surprises |
+| Arrow Slit | nein | indirekt (reagiert auf die Aktivierung eines Arrows in dieser Kette) |
+| Silence (Gegner) | nein | **ja** — Spell-Surprises des Gegners (negiert die Aktivierung; der Spieler darf einen weiteren Spell nachlegen, Spell-Sperre) |
+| Shamanic Curse (Gegner) | nein | **ja** — Spell-Surprises (Level +1; nicht mehr wirkbar → negiert, Zusatzaktion) |
+| Idej Projector (Gegner) | nein | **ja** laut Code (`lastLink.cardType` Attack/Spell des Gegners; nicht gemessen — braucht Idej-Held und Projection) |
+| The Master's Plan, Lunar Eclipse, Off Duty, Drowned Remains (Lv 4+) | nein | nein (Hand-Spiel/Beschwörung bzw. kein Surprise ab Lv 4; `fromBoard`) |
+
+### Punkt 5 · Spike Trap = Spell-Schaden
+**Al: „Ja, soll Spell-Schaden sein"** — `spike-trap.js`: der 200-Schaden-Rückschlag läuft mit Schadenstyp `decay_spell` (Schule der Karte, Konvention `<school>_spell` wie Zombified Assault/Forbidden Zone; Fireshield/Escape buchen ihren Rückstoß weiter unter `'other'`, lesen den Schaden aber über die Quelle). `_skipReactionCheck` blieb stehen; der Heldenpfad der Engine liest es ohnehin nicht — das „ohne Reaktionsfenster" des Rückstoß-Rulings hing allein am Typ `'other'` (`SURPRISE_SKIP_TYPES`) und fällt damit zwingend weg. Folgen, die sich aus dem Typ ergeben: Corpse Explosion reagiert auf das Besiegen des Angreifers; die Surprises des Angreifers („hit by a Spell": Booby Trap …) öffnen auf den Rückschlag (Rekursion: Per-Hero-Sperre/Tiefenkappe); Spell-Schadens-Leser der Helden (z. B. Zsos'Ssar-Bonus, wenn er Wirt ist). Unverändert: Anti Magic blockt (liest den Kartennamen), Dark Ocean (nur Kreaturen), Konter durch Abwurf, Negation des Angriffs. Die Hand-Reaktionen Fireshield/Escape/Emergency Spell Armor/Weapon Absorption/Bamboo Shield/Spectral Armor sahen den Rückschlag schon vorher (gemessen auf der Basis). Repro `a-03`.
+
+### Punkt 6 · Aktivierte Surprises zählen
+**Al: „Eine aktivierte, ja"** — `_activateSurprise` ruft **einmal** `engine.zaehleAlsArt(art, { pi: Steuerer, heroIdx, heroOwner: Zonenseite, name, schule })` (Spell → `spell`, Attack → `attack`, ohne `karte`) — vor dem Kettenfenster, auch bei späterer Negation. Zusätzlich die Kettenaktivierung aus der Surprise Zone (`_promptReactionsForChain`, Lunar Eclipse). Eine nur gesetzte Surprise und jede Creature-Surprise zählen nie; kein Doppelzählen mit `alsSpellKette`/`doPlaySpell` (die Surprise läuft nicht darüber). `zaehleAlsArt` bekam den optionalen Parameter `schule` (Log `effect_counted_as_spell` für Fire Bolts).
+
+| Zähler / Karte | zählt aktivierte Surprise vorher | nachher |
+|---|---|---|
+| `spellsPlayedThisTurn` | nein | **ja** (Spell-Surprise) |
+| `attacksPlayedThisTurn`, `heroesAttackedThisTurn` (Wirt), `hero._attacksThisTurn` | nein | **ja** (Attack-Surprise: Bluff) |
+| Mirjam („1 Attack", `onEffectCountedAsArt`) | nein | **ja** |
+| Güldefaber (+10 Gold einmal/Zug), The Brewer's Blade (Potion ziehen) | nein | **ja** (beide lesen `onEffectCountedAsArt` ohne `karte`) |
+| Ghuanjun („gleiche Attack nur 1×", braucht `karte`+Attackname) | nein | nein (Ist-Zustand; Surprises sind für ihn keine Karte im Sinn der Zählung) |
+| Teleportal („first Spell") | nein | **ja** (Spell-Surprise verbraucht „first") |
+| Fire Bolts („first Destruction Magic Spell") | nein | **ja** — nur Destruction-Magic-Surprises (Booby Trap, Firewall, Mountain Tear River …); Decay-Surprises (Gold Trap, Jumpscare …) nicht |
+| Silence-Bonus-Spell | nein | **ja** (verbraucht — siehe Frage 3) |
+| Eraser Beam („only Spell") | ja (Spell-Surprise stempelte schon über `afterSpellResolved`, wenn nicht negiert) | ja; Attack-Surprise stempelt nie, negierte Surprise nicht |
+| Berserk (2 Attacks), Rioting Village (1 Attack je Spieler), Quick Attack, Amazing Finding, Knife Throw, Trials, Blow of the Venom Snake/Ferocious Tiger Kick/Strong Ox Headbutt („Attack Nr. n"), Idej Sword - Muras („only Attack"), Muscle Training, Punch in the Box | nein | **ja** (Attack-Surprise über die Zähler) |
+
+**Zählen ≠ blockiert werden:** die Aktivierung wird durch ein erreichtes Limit nie neu verhindert (Rioting Village mit erreichtem Limit: Bluff aktiviert trotzdem, zählt dann 2; `a-02`); das Limit sperrt die NÄCHSTEN Attacks/Spells (Berserk 2, Rioting Village 1, Mirjam 1). Unverändert bleibt (seit v1154) `_canHeroActivateSurprise`: dort blockt `heroScript.canPlayCard` (Mirjam) bzw. `canPlayCard` der Ausrüstung (Idej Sword - Muras/Kogarasu) die Aktivierung einer Attack-/Spell-Surprise, wenn der Held sein Limit schon erreicht hat — siehe Frage 1.
+
+### Punkt 7 · Mountain Tear River: Kreaturen im Support des River-Helden
+**Al: „Ja, aber nur spezifisch die Creatures in den Support Zones des River-Heroes."** — Wege, die Kreaturenwahlen melden (Audit): `promptDamageTarget` und `promptMultiTarget` (seit v703, `_checkSurpriseWindow` mit `surpriseFiresOnSupportCreature`); **neu** `promptEffectTarget` und damit `ctx.promptTarget` (`_zielwahlAbschliessen`: eigener Aufruf `_checkSurpriseWindow` für gewählte Kreaturen in Zone `support`, getrennt vom Helden-Aufruf; das Fenster öffnet für den Held, in dessen Support die Kreatur steht — Kreaturen anderer Helden öffnen nichts; nur Skripte mit `surpriseFiresOnSupportCreature` reagieren = nur Mountain Tear River, alle anderen Surprises und die Heldenwahl unverändert). Quelle des Fensters: die auflösende Surprise (Gold Trap, W46a), sonst die gerade wirkende Karte (`_umgebungsQuelle`, falls mit Held — Aligning Goals mit nur `title`), bei einem aktiven Kreatureneffekt die wirkende Kreatur (`_activeCreatureEffect`, Lovely Teddy — sie brennt, „burn the attacker"). Nicht betroffen/nicht geändert: Tränke/Artefakte über `doConfirmPotion`/`normalizeValidTargets` (keine Attack/Spell/Creature-Quellen für die River), Flächenwirkung (`actionAoeHit`) wählt nichts, Wahlen über freie `promptGeneric`-Galerien/Zonenpicker. Repro `a-04` (5 Quellen × Kreatur des River-Helden / eines anderen Helden × beide Sitze; Held gewählt wie bisher; 13 andere Surprises bleiben bei einer Kreaturenwahl zu; Creature-Surprise als Angreifer löst nicht aus).
+
+### Beobachtungen (nicht geändert)
+* Ein Spell, der den Dispatcher nur mit `title` ruft (Aligning Goals …), gibt dem **Helden-Fenster** weiter die Quelle `heroIdx -1`: Surprises, die den Angreifer brauchen (Spike Trap, Mountain Tear River bei einer Heldenwahl), lösen dort nicht aus. Nur der neue Kreaturenzweig nutzt die Umgebungsquelle.
+* Eine Surprise, die aus der Auflösung einer Kette heraus auslöst (`_inReactionCheck`, z. B. durch Racket Arrows Kreaturenwahl) öffnet kein eigenes Kettenfenster „performs" und zählt nur.
+* Ein Held mit Surprise-Fenster in `_inSurpriseResolution` (Surprise löst Surprise aus): das Zielschutz-/Surprise-Fenster bleibt für fremde Quellen geschlossen (unverändert, W46a).
+
+### Fragen an Al (Ja/Nein)
+1. Soll das Attack-/Spell-Limit eines Helden (Mirjam „1 Attack", Idej Sword - Muras/Kogarasu) die Aktivierung einer Attack-/Spell-Surprise dieses Helden **weiter blockieren** (Ist-Zustand seit v1154; ja) oder darf kein Limit eine reaktive Surprise-Aktivierung verhindern (nein; nur zählen)?
+2. Soll der Rückschlag von Spike Trap für die Surprises des Angreifers („hit by a Spell") ein Surprise-Fenster öffnen (jetzt ja, folgt aus dem Spell-Typ) oder soll der Rückschlag Reaktionen/Surprises ausnehmen (nein)?
+3. Soll eine aktivierte Spell-Surprise den **Silence-Bonus-Spell** verbrauchen (jetzt ja, wie jeder gezählte Spell)? Nein hieße: Surprises zählen, brauchen den Bonus aber nicht.
+4. Sollen Güldefaber (+10 Gold) und The Brewer's Blade (Potion ziehen) auf eine Attack-/Spell-Surprise ihres Trägers reagieren (jetzt ja, weil sie „performs an Attack/Spell" über `onEffectCountedAsArt` lesen)?
+5. Soll eine Surprise, die aus der Auflösung einer Kette auslöst, ein eigenes Fenster „performs" öffnen (jetzt nein: nur zählen)?
