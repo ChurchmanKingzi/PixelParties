@@ -27,6 +27,10 @@
 //    Der Client zeigt Einladungen nur im Hauptmenü und hebt sie sonst auf; vor dem
 //    Anzeigen fragt er mit `room_invite_check` nach, ob sie noch gilt.
 //
+//  • Zuschauen: Klick auf einen Spieler mit rotem Lämpchen (laufendes Duell) fragt im Client „Spectate … duel? Yes/No“. Der Raum kommt von
+//    server.js (`spectate_lookup`); bei „Yes“ tritt der Client mit `join_room` (asSpectator) bei — gleiche Wege und Zuschauer-Passwort wie über die
+//    Raumliste. Nur im Hauptmenü und auf dem Play-Bildschirm (nicht in Lobbys, dort bleibt der Klick Einladen/Chat).
+//
 //  Spielstart bei „Accept“ gehört dem Server (server.js) und wird als
 //  `startChallengeGame` hereingereicht.
 // ═══════════════════════════════════════════════════════════════════

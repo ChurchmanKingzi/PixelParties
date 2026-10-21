@@ -7,6 +7,7 @@
 //                                    Benachrichtigungston — in jedem Menü, nur nicht
 //                                    im laufenden Duell.
 //    • <WhosOnlineList />            Liste im Hauptmenü (Tab neben „Top Players“)
+//                                    mit `onSpectate`: Klick auf einen Spieler im Duell fragt „Spectate? Yes/No“ (server.js `spectate_lookup`)
 //    • <DmChatWindow />              privates Chatfenster mit Challenge-Buttons
 //    • <SocialSidePanel room isHost/> dieselbe Liste als Kasten links in Online-Lobbys; der Raumbesitzer
 //                                    lädt per Klick → „Invite“ Spieler in seinen (offenen, nicht vollen) Raum ein
@@ -282,11 +283,12 @@ function SocialLamp({ status }) {
  *   { roomId, members: [Namen im Raum] } — ein Klick auf eine Zeile klappt dann „Invite / Chat“ auf,
  *   statt sofort den Chat zu öffnen.
  */
-function WhosOnlineList({ meId, onOpen, invite }) {
+function WhosOnlineList({ meId, onOpen, invite, onSpectate }) {
   useSocial();
   const [openId, setOpenId] = useState(null);      // aufgeklappte Zeile (nur im Einladungs-Modus)
   const [busyId, setBusyId] = useState(null);
   const [err, setErr] = useState('');
+  const [spec, setSpec] = useState(null);          // Zuschauen-Abfrage: { row, info?, error? } (nur mit `onSpectate`)
   const roomId = invite ? invite.roomId : null;
   useEffect(() => { setOpenId(null); setErr(''); }, [roomId]);
   const rows = socialBuildRows(meId);
@@ -305,14 +307,64 @@ function WhosOnlineList({ meId, onOpen, invite }) {
     });
   };
 
+  const askSpectate = (r) => {
+    setSpec({ row: r, checking: true });
+    socket.emit('spectate_lookup', { userId: r.id }, (res) => {
+      if (res && res.ok) setSpec({ row: r, info: res });
+      else {
+        if (window.playSFX) window.playSFX('ui_error');
+        setSpec({ row: r, error: (res && res.error) || 'Could not find that duel.' });
+      }
+    });
+  };
+  const confirmSpectate = () => {
+    const cur = spec; setSpec(null);
+    if (cur && cur.info && onSpectate) onSpectate({ roomId: cur.info.roomId, hasSpecPw: !!cur.info.hasSpecPw, name: cur.row.name });
+  };
+
   return (
+    <>
+    {spec && (
+      <div className="modal-overlay social-invite-overlay" role="dialog" aria-modal="true" aria-label="Spectate duel"
+           onClick={(e) => { if (e.target === e.currentTarget) setSpec(null); }}>
+        <div className="modal animate-in social-invite">
+          <div className="social-invite-icon">👁</div>
+          {spec.checking ? (
+            <div className="social-invite-title">Looking for the duel…</div>
+          ) : spec.error ? (
+            <>
+              <div className="social-invite-title">{spec.error}</div>
+              <div className="social-invite-btns">
+                <button className="btn social-decline" autoFocus onClick={() => setSpec(null)}>OK</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="social-invite-title">
+                Spectate <span style={{ color: spec.row.color || 'var(--accent)' }}>{spec.row.name}</span>'s duel?
+              </div>
+              {spec.info.hasSpecPw && <div className="social-invite-more">A spectator password is required.</div>}
+              <div className="social-invite-btns">
+                <button className="btn social-accept" autoFocus onClick={confirmSpectate}>YES</button>
+                <button className="btn social-decline" onClick={() => setSpec(null)}>NO</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
     <ul className="social-list">
       {rows.map(r => {
         const inRoom = !!invite && invite.members.includes(r.name);
         const sent = invite && !inRoom ? socialSentInviteState(roomId, r.id) : null;   // 'pending' | 'declined' | null
         const canInviteRow = !!invite && !inRoom && sent !== 'declined' && (r.status === 'online' || r.status === 'afk');
         const open = !!invite && openId === r.id;
-        const click = () => { if (invite) { setErr(''); setOpenId(open ? null : r.id); } else onOpen(r); };
+        const click = () => {
+          if (invite) { setErr(''); setOpenId(open ? null : r.id); return; }
+          // Wer gerade in einem Duell steckt: Zuschauen anbieten (Yes/No) statt den Chat zu öffnen.
+          if (onSpectate && r.status === 'ingame') { askSpectate(r); return; }
+          onOpen(r);
+        };
         return (
           <li key={r.id} className={'social-row-wrap' + (open ? ' is-open' : '')}>
             <div className={'social-row' + ((r.unread > 0 || r.challenge) ? ' has-news' : '')}
@@ -345,6 +397,7 @@ function WhosOnlineList({ meId, onOpen, invite }) {
         );
       })}
     </ul>
+    </>
   );
 }
 
@@ -520,7 +573,7 @@ function SocialChatWindow({ meId }) {
 
 /** Eigenständiger Kasten (Online-Lobby): dieselbe Liste und dieselben Chats wie im Hauptmenü.
  *  Das Chatfenster deckt den Kasten in voller Höhe und Breite ab. */
-function SocialSidePanel({ meId, room, isHost }) {
+function SocialSidePanel({ meId, room, isHost, onSpectate }) {
   const counts = socialTabCounts(meId);
   useSocial();
   // Einladen darf nur der Besitzer, solange der Raum noch offen (Lobby) und nicht voll ist.
@@ -540,7 +593,7 @@ function SocialSidePanel({ meId, room, isHost }) {
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
-        <WhosOnlineList meId={meId} onOpen={socialOpenChat} invite={invite} />
+        <WhosOnlineList meId={meId} onOpen={socialOpenChat} invite={invite} onSpectate={room ? undefined : onSpectate} />
       </div>
       <SocialChatWindow meId={meId} />
     </div>

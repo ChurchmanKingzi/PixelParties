@@ -1549,6 +1549,17 @@ function PlayScreen() {
     joinRoom({ id: inv.roomId, hasPlayerPw: false, skillTest: inv.kind === 'skilltest' ? {} : null, cubeDraft: inv.kind === 'draft' ? {} : null }, false);
   }, [currentDeckObj]);
 
+  // ── Zuschauen aus der Who's-Online-Liste (Hauptmenü): `window._ppPendingSpectate` = { roomId, hasSpecPw, name } ──
+  // Das Hauptmenü wechselt hierher und hinterlässt die Angabe; der Beitritt als Zuschauer läuft wie über die Raumliste
+  // (Zuschauer-Passwort wird bei Bedarf abgefragt).
+  useEffect(() => {
+    const sp = window._ppPendingSpectate;
+    if (!sp) return;
+    window._ppPendingSpectate = null;
+    joinRoom({ id: sp.roomId, hasSpecPw: sp.hasSpecPw }, true);
+  }, []);
+  const spectateFromList = (info) => joinRoom({ id: info.roomId, hasSpecPw: info.hasSpecPw }, true);
+
   const leaveRoom = () => {
     if (lobby) socket.emit('leave_room', { roomId: lobby.id });
     setLobby(null);
@@ -1901,7 +1912,7 @@ function PlayScreen() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
         {/* Who's Online + Chats + Herausforderungen — dasselbe Interface wie im Hauptmenü (app-social.jsx) */}
-        {user && !user.isGuest && <SocialSidePanel meId={user.id} />}
+        {user && !user.isGuest && <SocialSidePanel meId={user.id} onSpectate={spectateFromList} />}
 
         {/* Open Games */}
         <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

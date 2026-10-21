@@ -14806,6 +14806,32 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Who's Online: Klick auf einen Spieler in einem laufenden Duell -> Zuschauen anbieten.
+  // Der Client fragt hier nach dem Raum des Spielers, zeigt „Spectate? Yes/No“ und tritt bei „Yes“ mit `join_room` (asSpectator) bei,
+  // inklusive Zuschauer-Passwort-Abfrage. Hier wird nichts betreten.
+  socket.on('spectate_lookup', (data, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    if (!currentUser) return reply({ error: 'Log in to spectate.' });
+    const targetId = String(data?.userId ?? '');
+    if (!targetId) return reply({ error: 'Unknown player.' });
+    if (targetId === String(currentUser.userId)) return reply({ error: "That's you." });
+    let room = null;
+    for (const r of rooms.values()) {
+      if (r.parentCubeRoomId) continue;                                   // Turnierpartien werden im Turnierbildschirm verfolgt
+      if (r.type !== 'ranked' && r.type !== 'unranked') continue;         // keine CPU-/Puzzle-Räume
+      if (r.status !== 'playing' || !r.gameState || r.gameState.result) continue;
+      if (r.players.some(pl => !pl.isBot && String(pl.userId) === targetId)) { room = r; break; }
+    }
+    if (!room) return reply({ error: 'That player is not in a running duel any more.' });
+    const alreadyIn = room.players.some(pl => pl.userId === currentUser.userId) || room.spectators.some(sp => sp.userId === currentUser.userId);
+    if (!alreadyIn) {
+      const busy = busyInRoom(currentUser.userId);
+      if (busy) return reply({ error: 'You are ' + busy + ' right now.' });
+      if (activeGames.has(currentUser.userId)) return reply({ error: 'You are in a game right now.' });
+    }
+    reply({ ok: true, roomId: room.id, hasSpecPw: !!room.specPw, type: room.type, label: room.skillTest ? 'Skill Test' : 'Duel' });
+  });
+
   socket.on('swap_to_spectator', ({ roomId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId); if (!room) return;

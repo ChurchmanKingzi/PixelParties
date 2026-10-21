@@ -1138,7 +1138,7 @@ function MenuCardThumb({ name, skin, w = 42, onClick }) {
 
 // ── Left: live leaderboard ──
 function MenuLeaderboardPanel({ top, height }) {
-  const { user } = useContext(AppContext);
+  const { user, setScreen } = useContext(AppContext);
   const [players, setPlayers] = useState(null);
   const [live, setLive] = useState(null);
   // Der Kasten teilt sich zwei Ansichten: Top Players und Who's Online (social.js / app-social.jsx).
@@ -1182,7 +1182,8 @@ function MenuLeaderboardPanel({ top, height }) {
         </div>
         {tab === 'online' ? (
           <div className="menu-side-scroll">
-            <WhosOnlineList meId={user.id} onOpen={socialOpenChat} />
+            <WhosOnlineList meId={user.id} onOpen={socialOpenChat}
+                            onSpectate={(info) => { window._ppPendingSpectate = info; setScreen('play'); }} />
           </div>
         ) : (
         <div className="menu-side-scroll">
