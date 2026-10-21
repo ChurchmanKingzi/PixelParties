@@ -40732,6 +40732,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!ps || (art !== 'attack' && art !== 'spell')) return;
     const seite = Number.isInteger(heroOwner) ? heroOwner : pi;
     const hero = Number.isInteger(heroIdx) && heroIdx >= 0 ? gs.players[seite]?.heroes?.[heroIdx] : null;
+    // ★ W41a (Al, 22.10.2026, Punkt 6): Idej Sword - Kunagi zählt die ORIGINAL-Attack-Karte schon VOR ihrer Wiederholung (die Wiederholung ist eine eigene Attack und unterliegt den Attack-Limits),
+    // `doPlaySpell`/Sofort-Guss zählen sie sonst erst NACH `afterSpellResolved`: die Vormerkung (`gs._attackVorgezaehlt`) macht den späteren regulären Zählschritt dieser Karte zum No-op (kein Doppelzählen).
+    if (art === 'attack' && karte && gs._attackVorgezaehlt && gs._attackVorgezaehlt.pi === pi && gs._attackVorgezaehlt.heroIdx === heroIdx && gs._attackVorgezaehlt.name === name) {
+      delete gs._attackVorgezaehlt;
+      return;
+    }
     if (art === 'attack') {
       ps.attacksPlayedThisTurn = (ps.attacksPlayedThisTurn || 0) + 1;
       if (hero) {
