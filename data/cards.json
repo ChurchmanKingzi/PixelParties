@@ -23508,7 +23508,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Attach this card to a Hero your opponent controls. While this card is attached to a Hero, your opponent may perform Actions with it as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell. This is treated as a status effect.",
+    "effect": "Attach this card to a Hero your opponent controls. While this card is attached to a Hero, your opponent may perform Actions with it as if they controlled it, but they cannot make it choose itself as a target for an Attack or Spell. This is treated as a negative status effect.",
     "archetype": "",
     "setID": "PP SOD",
     "banned": "",
