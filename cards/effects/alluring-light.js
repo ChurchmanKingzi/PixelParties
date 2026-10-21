@@ -61,6 +61,31 @@ function kontrollierteHeldenZiele(engine, pi) {
     }));
 }
 
+/**
+ * ★ W40a (Al, 22.10.2026, Punkt 5): „Alluring Light wählt ein gegnerisches UND ein eigenes Ziel. Beim eigenen Ziel greift kein Schutz vor Targeting wie Butterfly Cloud — aber beim
+ * gegnerischen schon. Ein per Butterfly Cloud untargetable Hero kann NICHT als der Angreifer für Alluring Light gewählt werden!"
+ * Die ANGREIFER-Wahl ist eine normale Zielwahl des Spielers gegen den Gegner: jeder Schutz vor Targeting gilt (Butterfly Cloud/`untargetable`, Invisibility/`invisible`, Stealth/Jetpack
+ * & Co. über `blocksTargeting`; Chuck und das Truth-Seeing Eye des Wirkers heben es auf). Die Schutzrechnung läuft über ALLE lebenden Gegnerhelden („solange … andere Heroes, die gewählt
+ * werden können"); erst danach fallen Helden heraus, die nicht angreifen können (W34a). Ist keiner wählbar, ist die Karte unspielbar. Die Wahl des EIGENEN Opfers prüft keinen Schutz
+ * (der Wählende wählt sein eigenes Ziel; die Schutz-Marken richten sich nur gegen den Gegner).
+ * @returns {object[]} Zielobjekte (`hero-<seite>-<idx>`) der wählbaren Angreifer
+ */
+function waehlbareAngreifer(engine, pi, oppIdx, opts = {}) {
+  const alle = kontrollierteHeldenZiele(engine, oppIdx);
+  const geschuetzt = new Set();
+  if (!opts.ohneSchutz) {
+    for (const id of engine._untargetableHeroIds(alle, pi)) geschuetzt.add(id);
+    const quelle = engine._getCardDB()[CARD_NAME];
+    for (const t of alle) {
+      if (geschuetzt.has(t.id)) continue;
+      if (engine.heroBlocksTargeting(t.owner, t.heroIdx, {
+        sourceData: quelle, cardName: CARD_NAME, chooserIdx: pi, chooserHeroIdx: opts.chooserHeroIdx ?? -1, allTargets: alle,
+      })) geschuetzt.add(t.id);
+    }
+  }
+  return alle.filter(z => !geschuetzt.has(z.id) && engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -77,7 +102,10 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.)
     // ★ W34a (Al, 22.10.2026, Punkt 1: „Ja, ist korrekt"): der gezwungene Held ist geblockt, wenn er nicht angreifen kann (Frozen, Stunned, Webbed, Bound, harte Negierung,
     // Attack-Sperren/-Zähler: `heroKannAngreifen`) — ohne einen angriffsfähigen Gegnerheld ist die Karte nicht spielbar.
-    const hatHelden = engine.heroesControlledBy(oppIdx).some(({ physOwner, heroIdx: hi, hero: h }) => h?.name && h.hp > 0 && engine.heroKannAngreifen(physOwner, hi, oppIdx, { name: h.name }));
+    // ★ W40a (Al, 22.10.2026, Punkt 5): zusätzlich muss mindestens ein Gegnerheld als Angreifer WÄHLBAR sein (Schutz vor Targeting: Butterfly Cloud, Invisibility, Stealth …).
+    // Hat einer der eigenen Helden ein Truth-Seeing Eye (der Wirker steht erst beim Spielen fest), bleibt die Prüfung großzügig (der Schutz wird erst in `onPlay` gerechnet).
+    const mitAuge = engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi }) => engine._sourceHasTruthSeeingEye({ name: CARD_NAME, owner: pi, controller: pi, heroIdx: hi, heroOwner: physOwner }));
+    const hatHelden = waehlbareAngreifer(engine, pi, oppIdx, { ohneSchutz: mitAuge }).length > 0;
     if (!hatHelden) return false;
     try { return kontrollierteHeldenZiele(engine, pi).length + engine.getCreatureTargets(pi).length > 0; }
     catch { return false; }
@@ -92,8 +120,12 @@ module.exports = {
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
       // W34a: nur Helden, die ANGREIFEN können (`heroKannAngreifen`, Kontrolleur = Gegner) sind als Angreifer wählbar.
-      const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx).filter(z => engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));   // Kontrolle statt Seite (Styx 28.9.)
+      // W40a (Al, 22.10.2026, Punkt 5): die Wahl des gegnerischen Angreifers achtet jeden Schutz vor Targeting (`waehlbareAngreifer`); das Truth-Seeing Eye des Wirkers hebt ihn auf.
+      const mitAuge = engine._sourceIgnoresTargetingRestrictions(ctx.card);
+      const gegnerZiele = waehlbareAngreifer(engine, pi, oppIdx, { ohneSchutz: mitAuge, chooserHeroIdx: ctx.cardHeroIdx });   // Kontrolle statt Seite (Styx 28.9.)
       const heldWahl = await engine.promptEffectTarget(pi, gegnerZiele, {
+        ...(mitAuge ? { ignoreUntargetable: true, _truthSeeingEye: true } : {}),
+        chooserHeroIdx: ctx.cardHeroIdx,
         title: CARD_NAME,
         description: "Choose an opponent's Hero — it will be lured into attacking.",
         confirmLabel: '✨ Lure!',
