@@ -13,14 +13,18 @@ const CARDS = [
   { name: 'Zeta Banned', cardType: 'Spell', banned: 'Banned' }, { name: 'Eta Ascended', cardType: 'Ascended Hero' },
 ];
 
-test('Berliner Tag und Auswahl: stabil je Datum, ohne Tokens, gebannte Karten und Ascended Heroes', () => {
+test('Berliner Tag und Auswahl: stabil je Datum; nur Tokens sowie Karten ohne Skript/Bild sind draußen (gebannte und Ascended Heroes nicht)', () => {
   assert.equal(berlinDate(new Date('2026-10-20T21:59:00Z')), '2026-10-20');   // 23:59 MESZ
   assert.equal(berlinDate(new Date('2026-10-20T22:00:00Z')), '2026-10-21');   // 00:00 MESZ
   assert.equal(berlinDate(new Date('2026-12-31T23:30:00Z')), '2027-01-01');   // MEZ
-  assert.deepEqual(cardOfDayPool(CARDS).map(c => c.name), ['Alpha Spell', 'Beta Hero', 'Gamma Creature']);
+  const ALL = ['Alpha Spell', 'Beta Hero', 'Eta Ascended', 'Gamma Creature', 'Zeta Banned'];
+  assert.deepEqual(cardOfDayPool(CARDS).map(c => c.name), ALL, 'gebannte Karten und Ascended Heroes gehören dazu');
+  assert.deepEqual(cardOfDayPool(CARDS, { isImplemented: n => n !== 'Beta Hero' }).map(c => c.name), ALL.filter(n => n !== 'Beta Hero'), 'ohne Implementierung raus');
+  assert.deepEqual(cardOfDayPool(CARDS, { hasImage: n => n !== 'Zeta Banned' && n !== 'Delta Token' }).map(c => c.name), ALL.filter(n => n !== 'Zeta Banned'), 'ohne Bild raus; Token bleibt raus');
   assert.equal(cardOfDay('2026-10-21', CARDS).name, cardOfDay('2026-10-21', [...CARDS].reverse()).name, 'Reihenfolge der Eingabe egal');
   const seen = new Set(); for (let d = 1; d <= 28; d++) seen.add(cardOfDay(`2026-11-${String(d).padStart(2, '0')}`, CARDS).name);
-  assert.ok(seen.size > 1 && [...seen].every(n => ['Alpha Spell', 'Beta Hero', 'Gamma Creature'].includes(n)));
+  assert.ok(seen.size > 1 && [...seen].every(n => ALL.includes(n)));
+  assert.equal(cardOfDay('2026-10-21', CARDS, { isImplemented: () => false }), null, 'leerer Pool → keine Karte');
   assert.equal(cardOfDay('2026-10-21', []), null);
 });
 
