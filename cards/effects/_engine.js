@@ -30877,17 +30877,39 @@ this._deathWatch = (this._deathWatchStack || []).length
         || config.source || config.previewCardName || config.title || _spFenster?.name || null;
       const _ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const _helden = (validTargets || []).filter(t => t?.type === 'hero' && _ids.has(t.id));
-      if (_qName && _helden.length > 0) {
+      // ★ W47a (Al, 22.10.2026, Punkt 7: Mountain Tear River — „nur spezifisch die Creatures in den Support Zones des River-Heroes"): auch eine über diesen Dispatcher GEWÄHLTE KREATUR geht ins Surprise-Fenster
+      // (wie bei `promptDamageTarget`/`promptMultiTarget`, v703). Das Fenster öffnet für den Held, in dessen Support Zones die Kreatur steht (`target.heroIdx`), und nur Skripte mit `surpriseFiresOnSupportCreature`
+      // (Mountain Tear River) reagieren darauf — Kreaturen anderer Helden desselben Spielers, alle übrigen Surprises und die Heldenwahl bleiben unverändert (eigener Aufruf, getrennt vom Helden-Fenster oben).
+      const _kreatSr = (validTargets || []).filter(t => t?.type === 'equip' && t.cardInstance && t.heroIdx >= 0 && _ids.has(t.id)
+        && t.cardInstance.zone === ZONES.SUPPORT && this._istKreaturenInstanz?.(t.cardInstance));
+      if (_qName && (_helden.length > 0 || _kreatSr.length > 0)) {
         const _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
           ? config.sourceCard
           : { name: _qName, owner: playerIdx, controller: playerIdx,
               heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
-        const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
-          damageType: config.damageType,
-        });
-        if (_sr?.effectNegated) {
-          await this.negationsBilder(_quelle, _helden, _sr);   // v1179/v1180
-          return [];
+        if (_helden.length > 0) {
+          const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
+            damageType: config.damageType,
+          });
+          if (_sr?.effectNegated) {
+            await this.negationsBilder(_quelle, _helden, _sr);   // v1179/v1180
+            return [];
+          }
+        }
+        if (_kreatSr.length > 0) {
+          // Mountain Tear River brennt „den Angreifer": die Quelle braucht den wirkenden Helden. Fehlt er in der Konfiguration (nur `title`), gilt wie im Post-Target-Fenster die gerade wirkende Karte (`_umgebungsQuelle`).
+          // Bei einem aktiven Kreatureneffekt ist die wirkende Kreatur selbst der Angreifer (`_activeCreatureEffect`).
+          const _umgK = (_spFenster || (typeof config.sourceCard === 'object' && config.sourceCard)) ? null : (config._redirectSource || this._umgebungsQuelle(playerIdx, config));
+          const _akt = this._activeCreatureEffect;
+          const _aktInst = (!_spFenster && _akt && _akt.owner === playerIdx) ? this.cardInstances.find(c => c.id === _akt.instId && c.zone === ZONES.SUPPORT) : null;
+          const _quelleK = (_umgK && _umgK.heroIdx >= 0) ? _umgK : (_aktInst || _quelle);
+          const _srK = await this._checkSurpriseWindow(_kreatSr, _quelleK, {
+            damageType: config.damageType,
+          });
+          if (_srK?.effectNegated) {
+            await this.negationsBilder(_quelleK, _kreatSr, _srK);
+            return [];
+          }
         }
       }
     }
