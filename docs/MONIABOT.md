@@ -245,7 +245,7 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
   wenn die Erkennung sie nicht fand oder sie wegen einer gleichzeitigen Textänderung als Balancing galt. Ohne Note erscheint die Karte ohne Erklärung.
 * **Rangliste:** `LEADERBOARD_CHANNEL_ID` → eine Nachricht, die alle 10 Minuten aktualisiert wird.
 * **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit, mit dem Hinweis „Win a game using **X** today to earn **30 SC**!“.
-  Die Karte wählt das **Spiel** (`card-of-day.js`, nur vom Berliner Datum abhängig; nicht im Pool: Tokens, gebannte Karten, Ascended Heroes) — der Bot fragt sie über die Bot-Schnittstelle ab
+  Die Karte wählt das **Spiel** (`card-of-day.js`, abhängig vom Berliner Datum; im Pool ist jede Karte außer Tokens und Karten ohne Effekt-Skript oder ohne Bild — gebannte Karten und Ascended Heroes gehören dazu). Die Wahl des Tages wird in der Spiel-Datenbank (`card_of_day`) festgehalten, damit ein Deploy mittags sie nicht ändert — der Bot fragt sie über die Bot-Schnittstelle ab
   (`GET /api/bot/cotd`), deshalb ist sie im Discord und für den Bonus immer dieselbe. Der **Bonus „Card of the Day!“ (30 SC)** wird im Spiel gezahlt, für einen **Sieg** in einem Spiel,
   in dem man die Karte **benutzt** hat — von der Hand, per Effekt aus Deck/Ablage, als Startheld oder Startfähigkeit, als Aszendierung (auch eine negierte Karte gilt als gespielt; nur gezogen/abgeworfen/gemillt
   zählt nicht). **Einmal je Berliner Tag und Spieler**; es gelten dieselben Anti-Farm-Regeln wie bei den anderen SC-Boni (Mindestdauer, Mindestzüge, Siege durch Verbindungsabbruch zählen nicht).
