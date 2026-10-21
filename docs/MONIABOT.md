@@ -244,7 +244,12 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
   (steht auch in `CLAUDE.md`, damit Agenten es tun). Der Bot zeigt den Text unter der Karte; bei breiten Bausteinen hinter dem Namen. Eine Karte mit `Bugfix-Note` erscheint auch dann,
   wenn die Erkennung sie nicht fand oder sie wegen einer gleichzeitigen Textänderung als Balancing galt. Ohne Note erscheint die Karte ohne Erklärung.
 * **Rangliste:** `LEADERBOARD_CHANNEL_ID` → eine Nachricht, die alle 10 Minuten aktualisiert wird.
-* **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit.
+* **Karte des Tages:** `CARD_OF_DAY_CHANNEL_ID` → täglich ab 12:00 Berliner Zeit, mit dem Hinweis „Win a game using **X** today to earn **30 SC**!“.
+  Die Karte wählt das **Spiel** (`card-of-day.js`, nur vom Berliner Datum abhängig; nicht im Pool: Tokens, gebannte Karten, Ascended Heroes) — der Bot fragt sie über die Bot-Schnittstelle ab
+  (`GET /api/bot/cotd`), deshalb ist sie im Discord und für den Bonus immer dieselbe. Der **Bonus „Card of the Day!“ (30 SC)** wird im Spiel gezahlt, für einen **Sieg** in einem Spiel,
+  in dem man die Karte **benutzt** hat — von der Hand, per Effekt aus Deck/Ablage, als Startheld oder Startfähigkeit, als Aszendierung (auch eine negierte Karte gilt als gespielt; nur gezogen/abgeworfen/gemillt
+  zählt nicht). **Einmal je Berliner Tag und Spieler**; es gelten dieselben Anti-Farm-Regeln wie bei den anderen SC-Boni (Mindestdauer, Mindestzüge, Siege durch Verbindungsabbruch zählen nicht).
+  Der Betrag steht in `data/sc-rewards.json` (`card_of_the_day`). Das Spiel zeigt „Card of the Day! — Daily!“ im Ergebnisbildschirm.
 * `!duel` — offene Herausforderung; wer „Accept“ klickt, bekommt den Gegner genannt (verabredet wird im Spiel unter *Who’s Online*).
 * **Turniere (K.-o.)** 🔒: `!tournament create <Name>` → Spieler klicken **Join** → `!tournament start` (Auslosung, Freilose) →
   `!tournament win @Sieger` pro Spiel → Bracket und nächste Paarungen werden automatisch gepostet. Außerdem `dq @Nutzer`, `bracket`, `cancel`.

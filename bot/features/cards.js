@@ -117,31 +117,30 @@ module.exports = function register(ctx) {
   });
 
   // ── Karte des Tages ──
+  // Welche Karte es ist, bestimmt das SPIEL (card-of-day.js, Berliner Tag): derselbe Wert löst dort den SC-Bonus „Card of the Day!" aus.
   const berlinDate = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
   const berlinHour = (d = new Date()) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(d));
-  function cardOfDay(dateStr) {
-    // Deterministisch je Datum: alle sehen dieselbe Karte, auch nach einem Neustart.
-    const pool = renderer.allCards().filter(c => renderer.canRender(c.name) && !/token/i.test(c.cardType)).sort((a, b) => a.name.localeCompare(b.name));
-    let h = 2166136261;
-    for (const ch of dateStr) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-    return pool[(h >>> 0) % pool.length];
-  }
   async function cotdMessage() {
     await renderer.init();
-    const c = cardOfDay(berlinDate());
-    const buf = c && await png(c.name);
-    return buf ? { content: `🃏 **Card of the day:** ${c.name}`, files: [attach(buf, c.name)], allowedMentions: { parse: [] } } : null;
+    let info;
+    try { info = await ctx.game.cotd(); } catch (err) { console.error('[cotd] Spielserver:', err.message); return null; }
+    if (!info || !info.card) return null;
+    const content = `🃏 **Card of the day:** ${info.card}` + (info.amount > 0 ? `\nWin a game using **${info.card}** today to earn **${info.amount} SC**!` : '');
+    const buf = await png(info.card);
+    if (buf) return { content, files: [attach(buf, info.card)], allowedMentions: { parse: [] } };
+    const card = renderer.allCards().find(c => c.name === info.card);
+    return { content, embeds: card ? [textEmbed(card)] : [], allowedMentions: { parse: [] } };   // keine Kunst → Text
   }
-  ctx.command('cotd', { help: '`!cotd` — card of the day' }, async (msg) => {
+  ctx.command('cotd', { help: '`!cotd` — card of the day (win a game with it for bonus SC)' }, async (msg) => {
     if (cooling(msg.author.id)) return;
     const m = await cotdMessage();
     return msg.reply(m || 'No card of the day available.');
   });
 
-  async function postCotdIfDue() {
+  async function postCotdIfDue(now = new Date()) {
     const id = config.channels.cardOfDay;
-    if (!id || berlinHour() < 12) return;                       // wie die Daily Challenge: ab 12:00 Berliner Zeit
-    const today = berlinDate();
+    if (!id || berlinHour(now) < 12) return;                    // wie die Daily Challenge: ab 12:00 Berliner Zeit
+    const today = berlinDate(now);
     if ((await db.kvGet('cotd_last')) === today) return;
     const guild = client.guilds.cache.get(config.guildId);
     const ch = guild && (guild.channels.cache.get(id) || await guild.channels.fetch(id).catch(() => null));
@@ -151,6 +150,7 @@ module.exports = function register(ctx) {
     await ch.send(m);
     await db.kvSet('cotd_last', today);
   }
+  ctx._cotd = { postCotdIfDue, cotdMessage };
   ctx.onReady.push(() => {
     const t = setInterval(() => postCotdIfDue().catch(e => console.error('[cotd]', e.message)), 5 * 60 * 1000);
     t.unref && t.unref();
