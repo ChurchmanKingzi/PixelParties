@@ -167,6 +167,9 @@ module.exports = {
         maxTotal: 1,
         minRequired: 1,
         greenSelect: true,
+        // W45a (Al, 22.10.2026): die Umleitungs-Zielwahl ist ein CREATURE effect (der umgeleitete Effekt behält seinen Typ): Quelle für den Taunt (Hardy Slime, Deepsea Horror Clown)
+        // ist die umgeleitete Kreatur, nicht die Karte Shield of Wisdom (Artifact). Der Taunt greift nur, wenn der Spötter selbst im Pool liegt (`pool` ohne den Angreifer).
+        _tauntQuelle: sourceCard,
       });
       const id = Array.isArray(picked) ? picked[0] : null;
       redirectTarget = pool.find(t => t.id === id) || pool[0];

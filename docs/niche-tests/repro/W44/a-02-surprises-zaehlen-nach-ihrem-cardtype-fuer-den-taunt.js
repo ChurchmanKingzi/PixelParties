@@ -54,9 +54,12 @@ async function szene(me, op, hand, o = {}) {
       }
       R.note('A Surprise-Karten in der Datenbank', { gesamt: surprises.length, ja, nein });
       R.check('A Bluff ist Attack (nicht Spell) → Taunt JA', e.tauntGiltFuerQuelle({ name: 'Bluff', zone: 'surprise' }) === true && db.find(c => c.name === 'Bluff').cardType === 'Attack');
+      // W45a: die Karte Shield of Wisdom als Quelle bleibt Artifact; ihre echte Umleitungswahl trägt die umgeleitete Kreatur als Quelle und bindet den Taunt (W45/a-01).
       R.check('A Shield of Wisdom (Artifact/Surprise) → kein Attack/Spell/Creature → Taunt NEIN', e.tauntGiltFuerQuelle({ name: 'Shield of Wisdom', zone: 'surprise' }) === false);
-      // sourceEffectKind bleibt unverändert (Challenge/Martyry/Anti-Magnet/Alleria/Empty Armor lesen ihn): 'surprise' bleibt 'surprise'
-      R.check('A sourceEffectKind unverändert: Gold Trap (zone surprise) → \'surprise\'', e.sourceEffectKind({ name: 'Gold Trap', zone: 'surprise' }) === 'surprise');
+      // W45a (Al, 22.10.2026, Punkt 2) umgestellt: `sourceEffectKind` liefert für eine auflösende Surprise den Typ nach cardType (vorher immer 'surprise'; Challenge/Martyry/Anti-Magnet/Alleria/Empty Armor lesen ihn).
+      // Ein anderer Kartentyp (Shield of Wisdom: Artifact) bleibt 'surprise' — seine Umleitungswahl trägt die umgeleitete Kreatur als Quelle (W45/a-01).
+      R.check('A sourceEffectKind nach cardType (W45a): Gold Trap → spell, Bluff → attack, Water Golem → creature, Shield of Wisdom → surprise', e.sourceEffectKind({ name: 'Gold Trap', zone: 'surprise' }) === 'spell' && e.sourceEffectKind({ name: 'Bluff', zone: 'surprise' }) === 'attack'
+        && e.sourceEffectKind({ name: 'Water Golem', zone: 'surprise' }) === 'creature' && e.sourceEffectKind({ name: 'Shield of Wisdom', zone: 'surprise' }) === 'surprise');
       // andere Quellen unverändert
       R.check('A Gegenproben: Book of Doom NEIN, Poison Vial NEIN, Fireball JA, Skeleton Archer JA', e.tauntGiltFuerQuelle({ name: 'Book of Doom', zone: 'hand' }) === false && e.tauntGiltFuerQuelle({ name: 'Poison Vial', zone: 'hand' }) === false
         && e.tauntGiltFuerQuelle({ name: 'Fireball', zone: 'hand' }) === true && e.tauntGiltFuerQuelle({ name: 'Skeleton Archer', zone: 'support' }) === true);

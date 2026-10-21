@@ -7342,7 +7342,8 @@ class GameEngine {
     let art = this.sourceEffectKind(obj);
     // ★ W44a (Al, 22.10.2026): „Eine Surprise, die Ziele wählt oder irgendwie affected, gilt als Attack, Spell oder Creature (eben je nach cardType)." → die auflösende Surprise zählt nach
     // ihrem Kartentyp aus der Datenbank: Attack → Attack (Bluff), Spell → Spell (Gold Trap, Jumpscare, Booby Trap …), Creature → Creature effect (Water Golem, Afflicted Vermin …).
-    // Eine Surprise mit anderem Kartentyp (Shield of Wisdom: Artifact) bleibt 'surprise' → kein Taunt.
+    // Eine Surprise mit anderem Kartentyp (Shield of Wisdom: Artifact) bleibt 'surprise' → kein Taunt. (W45a: `sourceEffectKind` liefert für eine Surprise der Zone 'surprise' schon den Typ nach cardType;
+    // dieser Zweig fängt nur noch Aufrufe ab, die ein Surprise-Objekt ohne Zonenangabe übergeben. Die Umleitungswahl von Shield of Wisdom trägt die umgeleitete Kreatur als Quelle: `config._tauntQuelle`.)
     if (art === 'surprise') {
       if (cd && hasCardType(cd, 'Attack')) art = 'attack';
       else if (cd && hasCardType(cd, 'Spell')) art = 'spell';
@@ -7384,10 +7385,12 @@ class GameEngine {
    * (`_umgebungsQuelle`). Nichts davon erkennbar → `null` (unbekannt: der Taunt gilt wie bisher).
    */
   _tauntQuelleFuer(playerIdx, config = {}) {
+    // ★ W45a (Al, 22.10.2026, Punkt 1): die Umleitungs-Zielwahl von Shield of Wisdom ist ein Creature effect — Quelle ist die umgeleitete Kreatur (`config._tauntQuelle`), nicht die Surprise (Artifact).
+    if (config._tauntQuelle) return config._tauntQuelle;
     const ausdruecklich = this._redirectSourceFor(playerIdx, config);
     if (ausdruecklich) return ausdruecklich;
-    const sp = this._surpriseLauf;
-    if (sp?.inst && sp.steuerer === playerIdx && this._currentEffectSource === sp.cur && this._activationSource === sp.act) return sp.inst;
+    const sp = this._surpriseQuelleFuer(playerIdx);
+    if (sp) return sp;
     const umgebung = this._umgebungsQuelle(playerIdx, config) || null;
     const db = this._getCardDB();
     for (const roh of [config.sourceCardName, config.title, config.previewCardName]) {
@@ -7398,6 +7401,17 @@ class GameEngine {
       return { name, owner: playerIdx, controller: playerIdx, heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
     }
     return umgebung;
+  }
+
+  /**
+   * ★ W45a: die gerade AUFLÖSENDE Surprise als Quelle der Zielwahl des Steuerers `playerIdx` (`_surpriseLauf`, gesetzt um `onSurpriseActivate` und um die aufgeschobenen Surprises),
+   * solange kein innerer Effekt begonnen hat (`_currentEffectSource`/`_activationSource` unverändert). Sonst `null`. Genutzt vom Taunt (`_tauntQuelleFuer`) und vom Umleitungsfenster
+   * (`promptEffectTarget`): die Zielwahl einer Surprise zählt nach ihrem cardType (`sourceEffectKind`) als Attack/Spell/Creature effect.
+   */
+  _surpriseQuelleFuer(playerIdx) {
+    const sp = this._surpriseLauf;
+    if (sp?.inst && sp.steuerer === playerIdx && this._currentEffectSource === sp.cur && this._activationSource === sp.act) return sp.inst;
+    return null;
   }
 
   _isHeroDamageUnstoppable(target) {
@@ -30871,9 +30885,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   oeffnet je gewaehltem Ziel EINZELN — die Schleife steht in
     //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
     //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
+    // W45a (Al, 22.10.2026): die Zielwahl einer auflösenden Surprise (Gold Trap, Jumpscare …) ohne eigene Quelle in der Konfiguration nennt die Surprise als Quelle — vor der Umgebungsquelle.
     return await this.applyRedirectWindows(
       _pickedIds, validTargets, config,
-      this._redirectSourceFor(playerIdx, config) || _umgebung
+      this._redirectSourceFor(playerIdx, config) || this._surpriseQuelleFuer(playerIdx) || _umgebung
     );
   }
 
@@ -31523,7 +31538,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (_zaehlt) return _zaehlt;
     const zone = sourceCard.zone;
     if (zone === 'hero') return 'hero';
-    if (zone === 'surprise') return 'surprise';
+    if (zone === 'surprise') {
+      // ★ W45a (Al, 22.10.2026, Punkt 2): „Surprise zählt nach cardType" — die auflösende Surprise ist ein Attack (Bluff), ein Spell (Gold Trap, Jumpscare, Booby Trap, Mountain Tear River …) oder ein
+      // Creature effect (Water Golem …); so lesen sie Challenge, Martyry, Anti-Magnet, Alleria, Empty Armor (und der Taunt). Ein anderer Kartentyp (Shield of Wisdom: Artifact) bleibt 'surprise':
+      // dessen Umleitungs-Zielwahl trägt die umgeleitete KREATUR als Quelle (Punkt 1: `_tauntQuelle`, `sourceCard` des Umleitungsfensters), nicht die Surprise.
+      const sd = sourceCard.name ? this._getCardDB()[sourceCard.name] : null;
+      if (sd && hasCardType(sd, 'Attack')) return 'attack';
+      if (sd && hasCardType(sd, 'Spell')) return 'spell';
+      if (sd && hasCardType(sd, 'Creature')) return 'creature';
+      return 'surprise';
+    }
     const cd = sourceCard.name ? this._getCardDB()[sourceCard.name] : null;
     if (!cd) return null;
     if (zone === 'support' && hasCardType(cd, 'Creature')) return 'creature';
