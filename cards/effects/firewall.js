@@ -26,7 +26,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
-const { hasCardType, isAttackSpellOrCreatureSource } = require('./_hooks');
+const { hasCardType, isAttackSpellOrCreatureSource, istUngelegteCreatureSurprise } = require('./_hooks');
 
 const CARD_NAME = 'Firewall';
 const DAMAGE    = 100;
@@ -98,6 +98,7 @@ module.exports = {
     // effect" — Quellenart selbst pruefen, das Engine-Fenster oeffnet
     // fuer jede Zielwahl (Molindas Heldeneffekt). Gemeinsamer Helfer.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+    if (istUngelegteCreatureSurprise(engine, sourceInfo)) return false;   // W46a: Creature-Surprise noch nicht auf dem Brett: kein Angreifer da (nicht ersatzweise ihr Träger-Held)
 
     if (srcInst?.zone === 'support') {
       // Creature attacker — alive?

@@ -7409,9 +7409,26 @@ class GameEngine {
    * (`promptEffectTarget`): die Zielwahl einer Surprise zählt nach ihrem cardType (`sourceEffectKind`) als Attack/Spell/Creature effect.
    */
   _surpriseQuelleFuer(playerIdx) {
+    const sp = this._surpriseLaufAktiv();
+    return (sp && sp.steuerer === playerIdx) ? sp.inst : null;
+  }
+
+  /** W46a: der laufende `_surpriseLauf`, solange KEIN innerer Effekt begonnen hat (sonst `null`) — unabhängig vom Steuerer (Dark Ocean fragt nach der Quelle, nicht nach dem Wähler). */
+  _surpriseLaufAktiv() {
     const sp = this._surpriseLauf;
-    if (sp?.inst && sp.steuerer === playerIdx && this._currentEffectSource === sp.cur && this._activationSource === sp.act) return sp.inst;
+    if (!sp?.inst) return null;
+    if (this._currentEffectSource === sp.cur && this._activationSource === sp.act) return sp;
+    // W46a: Hook `onSurpriseCreaturePlaced` der soeben platzierten Creature-Surprise (Water Golem wählt NACH der Platzierung): der Hook-Verteiler setzt `_currentEffectSource` auf die Karte selbst
+    // (`instId`) — das ist weiter ihr eigener Effekt, keine fremde innere Karte.
+    if (sp.platziert && this._activationSource === sp.act && this._currentEffectSource?.instId === sp.inst.id) return sp;
     return null;
+  }
+
+  /** W46a: `onSurpriseCreaturePlaced` mit der soeben platzierten Creature-Surprise als auflösender Quelle (`_surpriseLauf`, `platziert`) — Water Golem wählt hier sein Ziel. */
+  async _surpriseHakenMitLauf(inst, steuerer, hookName, payload) {
+    const vorher = this._surpriseLauf;
+    this._surpriseLauf = { inst, steuerer, cur: this._currentEffectSource, act: this._activationSource, platziert: true };
+    try { await this.runHooks(hookName, payload); } finally { this._surpriseLauf = vorher; }
   }
 
   _isHeroDamageUnstoppable(target) {
@@ -30788,9 +30805,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   Gegner-Beschraenkung (Al: steht im Text der Reaktionskarte „opponent's", gilt der Gegner-Lock –
     //   den prueft die Karte selbst, z. B. Castling/Cloak `sourceOwner === pi`; sonst reagiert sie auch auf
     //   eigene Effekte).
-    const _ausdruecklich = config.sourceCard || config.source || null;
-    const _umgebung = (!_ausdruecklich && !config._redirectSource && !config._callerHandlesSurprise)
-      ? this._umgebungsQuelle(playerIdx, config) : null;
+    // ★ W46a (Al, 22.10.2026, Punkt 2): „auch für Reactions gelten die Effekte von Surprises jeweils als Attacks/Spells (Creature effects)!" — die Zielwahl einer AUFLÖSENDEN Surprise (Gold Trap, Jumpscare,
+    // Water Golem, Afflicted Vermin … ohne eigene Quelle in der Konfiguration, oder nur mit dem Kartennamen als `source`) nennt die Surprise als Quelle für ALLE Fenster hier (Zielschutz-Reaktionen der Hand,
+    // Brett-Reaktionen, Surprise-Fenster, Umleitungsfenster), nicht erst für die Umleiter (W45a). Typ nach cardType (`sourceEffectKind`): die Leser der Quelle lesen Kartentyp bzw. Schadenstyp ohnehin so.
+    const _spQ = this._surpriseQuelleFuer(playerIdx);
+    let _ausdruecklich = config.sourceCard || config.source || null;
+    if (_spQ && typeof _ausdruecklich === 'string' && _ausdruecklich === _spQ.name) _ausdruecklich = _spQ;
+    const _ersatzErlaubt = !_ausdruecklich && !config._redirectSource && !config._callerHandlesSurprise;
+    const _umgebung = _ersatzErlaubt ? (_spQ || this._umgebungsQuelle(playerIdx, config)) : null;
     const _ersatzQuelle = _ausdruecklich ? null : (config._redirectSource || _umgebung || null);
     if (!config._skipPostTargetReactions && !this._inPostTargetWindow) {
       const quelle = _ausdruecklich || _ersatzQuelle || null;
@@ -30846,15 +30868,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // beim Reaktionsfenster darueber: nur HELDEN, nur mit echter Quelle,
     // Rekursionssperre. `_callerHandlesSurprise` setzen die beiden
     // Picker, die es selbst oeffnen.
+    // W46a: ist die Quelle die auflösende Surprise selbst (`_spQ`), bleibt das Fenster auch während der Auflösung offen (Per-Hero-Sperre `_activeSurpriseHeroes` und Tiefenkappe bleiben).
+    const _spFenster = (_ersatzErlaubt && _spQ && _umgebung === _spQ) ? _spQ : (_ausdruecklich && _ausdruecklich === _spQ ? _spQ : null);
     if (!config._callerHandlesSurprise && !config._skipSurpriseCheck
-        && !this._inSurpriseResolution && !this._inPostTargetWindow) {
+        && (!this._inSurpriseResolution || _spFenster) && !this._inPostTargetWindow) {
       const _qName = config.sourceCardName
         || (typeof config.sourceCard === 'string' ? config.sourceCard : config.sourceCard?.name)
-        || config.source || config.previewCardName || config.title || null;
+        || config.source || config.previewCardName || config.title || _spFenster?.name || null;
       const _ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
       const _helden = (validTargets || []).filter(t => t?.type === 'hero' && _ids.has(t.id));
       if (_qName && _helden.length > 0) {
-        const _quelle = (typeof config.sourceCard === 'object' && config.sourceCard)
+        const _quelle = _spFenster ? _spFenster : (typeof config.sourceCard === 'object' && config.sourceCard)
           ? config.sourceCard
           : { name: _qName, owner: playerIdx, controller: playerIdx,
               heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
@@ -31756,6 +31780,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const roh = config._redirectSource || config.sourceCard || config.source || null;
     if (!roh) return null;
     if (typeof roh === 'string') {
+      // W46a: nennt eine auflösende Surprise sich selbst als `source` (Cybug LADYBUG), ist DIE Quelle die echte Surprise (Zone 'surprise', cardType), nicht ein Namensobjekt der Zone 'hand'.
+      const sp = this._surpriseQuelleFuer(playerIdx);
+      if (sp && sp.name === roh) return sp;
       return { name: roh, owner: playerIdx, controller: playerIdx, heroIdx: -1, zone: 'hand' };
     }
     if (roh.owner == null && roh.controller == null) {
@@ -33429,7 +33456,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.isDarkOceanActive()) return false;
     // Bevorzugt das oberste Kettenglied. Ist die Kette leer (hook-
     // getriebenes Fenster), zaehlt die gerade aufloesende Karte.
-    const top = chain?.[chain.length - 1] || this._currentEffectSource;
+    let top = chain?.[chain.length - 1] || this._currentEffectSource;
+    // W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): ohne Kettenglied zählt die gerade AUFLÖSENDE Creature-Surprise (Zone 'surprise', cardType Creature)
+    // als Creature-Quelle ihres Steuerers — unter Dark Ocean darf der Gegner auf ihre Zielwahl/Wirkung nicht reagieren.
+    if (!chain?.length) {
+      const sp = this._surpriseLaufAktiv();
+      if (sp && hasCardType(this._getCardDB()[sp.inst.name], 'Creature')) top = { cardName: sp.inst.name, owner: sp.steuerer, cardType: 'Creature' };
+    }
     if (!top) return false;
     if (top.owner === pi) return false;          // eigene Creature: erlaubt
     return this._isCreatureSourcedLink(top);
@@ -34684,7 +34717,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this.gs._spellNegatedByEffect) continue; // Skip if effect was negated
       // W43a: die aufgeschobene Surprise (Jumpscare) ist die Quelle ihrer Zielwahl (`_tauntQuelleFuer`): W44a: sie zählt nach ihrem cardType als Attack/Spell/Creature effect.
       const _spVorher = this._surpriseLauf;
-      if (entry.name && entry.ownerIdx != null) this._surpriseLauf = { inst: { name: entry.name, owner: entry.ownerIdx, controller: entry.ownerIdx, heroIdx: -1, zone: 'surprise' }, steuerer: entry.ownerIdx, cur: this._currentEffectSource, act: this._activationSource };
+      // W46a: der Träger-Held der Surprise (`entry.heroIdx`/`heroOwner`, falls der Eintrag ihn nennt) ist „der Angreifer" der Surprise-Zielwahl — Retourkutschen-Surprises (Spike Trap, Booby Trap …) brauchen ihn.
+      if (entry.name && entry.ownerIdx != null) this._surpriseLauf = { inst: { name: entry.name, owner: entry.ownerIdx, controller: entry.ownerIdx, heroIdx: entry.heroIdx ?? -1, ...(entry.heroOwner != null ? { heroOwner: entry.heroOwner } : {}), zone: 'surprise' }, steuerer: entry.ownerIdx, cur: this._currentEffectSource, act: this._activationSource };
       try {
         await entry.execute(this);
       } catch (err) {
@@ -40333,7 +40367,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
         });
-        await this.runHooks('onSurpriseCreaturePlaced', {
+        await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
           zoneSlot: bakhmZoneSlot, cardInstance: inst,
         });
@@ -40362,7 +40396,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Herkunft Surprise Zone = nicht Hand → `fromBoard`). Die Karte
     // liegt dabei noch OFFEN in ihrer Surprise Zone (erst danach Splice).
     let _beschwoerungNegiert = null;
-    if (!surpriseNegated && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
+    if (!surpriseNegated && !inst?._besiegtVorPlatzierung && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
         && this._placementReactorHeld(steuerer ?? playerIdx)) {
       const _aeussere = this._inReactionCheck;
       try {
@@ -40397,7 +40431,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._negatedPlacementRoute(cardName, _besitzer, fromDeck ? 'none' : 'surprise', {
         zoneOwner: playerIdx, hostHeroIdx, instId: inst?.id,
       }, _beschwoerungNegiert);
-    } else if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
+    } else if (!surpriseNegated && !inst?._besiegtVorPlatzierung && hasCardType(cardData, 'Creature')) {   // W46a: Rolling Boulder hat die Creature-Surprise vor der Platzierung besiegt → Ablage-Zweig unten
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
       if (placed && inst) {
@@ -40463,7 +40497,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
         });
         // Fire hook for Bakhm's 80-damage chain
-        await this.runHooks('onSurpriseCreaturePlaced', {
+        await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
           surpriseController: steuerer,   // 29.9.
           zoneSlot: placed.actualSlot, cardInstance: inst,

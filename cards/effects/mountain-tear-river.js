@@ -49,7 +49,7 @@
 //    the player's pick on a no-op.
 // ═══════════════════════════════════════════
 
-const { isAttackSpellOrCreatureSource } = require('./_hooks');
+const { isAttackSpellOrCreatureSource, istUngelegteCreatureSurprise } = require('./_hooks');
 
 const CARD_NAME = 'Mountain Tear River';
 const REQUIRED_DM_LEVEL = 3;
@@ -129,6 +129,7 @@ module.exports = {
     // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
     // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+    if (istUngelegteCreatureSurprise(engine, sourceInfo)) return false;   // W46a: Creature-Surprise noch nicht auf dem Brett: kein Angreifer da (nicht ersatzweise ihr Träger-Held)
 
     // Source must be alive — burning a corpse is meaningless.
     const srcInst = sourceInfo.cardInstance;

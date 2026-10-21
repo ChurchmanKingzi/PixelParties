@@ -137,6 +137,11 @@ module.exports = {
     if (sourceCard && sourceCard.zone === 'support' && !sourceCard._deathResolved) {
       await engine.actionDestroyCard({ name: CARD_NAME, owner: pi }, sourceCard);
     }
+    // W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): die auflösende Creature-Surprise (Zone 'surprise', noch nicht auf dem Brett) wird besiegt, bevor sie
+    // das Brett erreicht — `_activateSurprise` legt sie dann in die Ablage statt in eine Support Zone (Merker `_besiegtVorPlatzierung`).
+    else if (sourceCard && sourceCard.zone === 'surprise' && engine.sourceEffectKind(sourceCard) === 'creature') {
+      sourceCard._besiegtVorPlatzierung = true;
+    }
 
     engine.log('rolling_boulder', {
       player: engine.gs.players[pi]?.username,

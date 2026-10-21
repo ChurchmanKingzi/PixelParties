@@ -42,6 +42,7 @@ module.exports = {
     gs._deferredSurprises.push({
       name: 'Jumpscare',
       ownerIdx: pi,
+      heroIdx: ctx.cardHeroIdx, heroOwner: ctx.cardHeroOwner,   // W46a: Träger-Held = „der Angreifer" der Stun-Wahl (Fenster/Reaktionen sehen ihn)
       execute: async (eng) => {
         // Prompt the owner to choose any target to Stun
         // Create a temporary target picker context
@@ -92,7 +93,12 @@ module.exports = {
         // Apply Stun (respects immunities). Duration 2 = ticks down at the
         // end of each of the target's turns, expiring at the end of their
         // NEXT turn — matches Baihu's "lasts through next turn" pattern.
-        await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 2, appliedBy: pi });
+        // W46a (Al, 22.10.2026: die Wirkung einer Surprise gilt nach cardType — Jumpscare ist ein SPELL): die aufgeschobene Betäubung läuft NACH `_activateSurprise` (Spell-Stapel schon abgeräumt) —
+        // Spell-Immunitäten (Anti Magic, Energy Aura) lesen den Stapel, also steht Jumpscare für die Betäubung des Helden wieder darauf.
+        eng._pushResolvingSpell('Jumpscare');
+        try {
+          await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 2, appliedBy: pi });
+        } finally { eng._popResolvingSpell(); }
 
         eng.log('jumpscare_stun', {
           player: eng.gs.players[pi]?.username,

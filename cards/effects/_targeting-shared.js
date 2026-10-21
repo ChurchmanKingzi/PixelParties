@@ -20,7 +20,9 @@ function isOppCreatureEffect(engine, pi, sourceCard) {
   if (!sourceCard) return false;
   const srcOwner = sourceCard.controller ?? sourceCard.owner ?? -1;
   if (srcOwner < 0 || srcOwner === pi) return false;          // nur Gegner
-  if (sourceCard.zone !== 'support') return false;            // Brett-Creature
+  // W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): neben der Brett-Creature (Zone 'support') zählt die AUFLÖSENDE Creature-Surprise
+  // (Zone 'surprise', cardType Creature: Afflicted Vermin, Cactus Creature, Cybugs, Noble Mummy Guards …) — ihre Zielwahl läuft, bevor sie auf dem Brett steht.
+  if (sourceCard.zone !== 'support' && sourceCard.zone !== 'surprise') return false;
   const cd = (engine.getEffectiveCardData ? engine.getEffectiveCardData(sourceCard) : null)
     || (sourceCard.name ? engine._getCardDB()[sourceCard.name] : null);
   return !!(cd && hasCardType(cd, 'Creature'));

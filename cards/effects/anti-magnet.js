@@ -170,7 +170,7 @@ module.exports = {
     // ── Chain visualization (mirrors Challenge / Martyry) ──
     const attackerName = config.title || sourceCard?.name || 'Effect';
     const srcOwner = sourceCard?.controller ?? sourceCard?.owner ?? oppIdx;
-    const srcIsCreature = sourceCard?.zone === 'support';
+    const srcIsCreature = sourceCard?.zone === 'support' || engine.sourceEffectKind?.(sourceCard) === 'creature';   // W46a: auch die auflösende Creature-Surprise (Anzeige der Kette)
     const srcCardType = srcIsCreature
       ? 'Creature'
       : (config.damageType === 'attack' ? 'Attack' : 'Spell');
