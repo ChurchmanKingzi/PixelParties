@@ -43,8 +43,8 @@ HORIZON = 905                                       # Fußlinie der hinteren Rei
 ACTORS = [
     ('cute-nerd-magenta', 10, 1275, 195, False, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
-    ('brackle-the-catapulting-turtle', BRACKLE_PX, 560, 1110, True, 'f'),
-    ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
+    ('brackle-the-catapulting-turtle', BRACKLE_PX, 625, 1110, True, 'f'),
+    ('future-tech-gunslinger-riffel', 8, 1345, 1075, False, 'f'),
     ('bakhm-the-desert-digger', 14, 180, 1000, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
 ]
@@ -338,6 +338,41 @@ def glints(cv, spots):
         ml.put(cv, st, x, y, an)
 
 
+TRAIL_PALETTE = [(255, 222, 90), (255, 160, 48), (226, 84, 44), (140, 60, 70), (96, 84, 110)]      # Gelb, Orange, Rot, Dunkelrot, Rauch
+TRAIL_RIM = (84, 28, 40)
+
+
+def fire_trail(bez, t_end):
+    """Feuerspur der Schädel-Bombe als echtes Pixelbild: nur fünf Farben, die per Ordered Dithering (Bayer, wie der Hintergrund) ineinander
+    übergehen; der Verlauf läuft nach Weglänge vom Schädel (Gelb) nach hinten (Rauch), ein dunkler Rand umschließt die Spur."""
+    cw, ch = W // CELL, H // CELL
+    ts = np.linspace(t_end, 0, 1200)
+    pts = np.array([bez(t) for t in ts])
+    cum = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
+    total = cum[-1]
+    ys, xs = np.mgrid[0:ch, 0:cw]
+    dist = np.full((ch, cw), np.nan)
+    for d_ in np.arange(total, 0, -8):                                   # von hinten nach vorn: die Puffs beim Schädel überschreiben die älteren
+        x, y = pts[int(np.searchsorted(cum, d_))]
+        r = 8.5 * (1 - d_ / total) ** 0.8 + 1.4
+        inside = (xs + 0.5 - x / CELL) ** 2 + (ys + 0.5 - y / CELL) ** 2 <= r * r
+        dist[inside] = d_
+    mask = ~np.isnan(dist)
+    pad = np.pad(mask, 1)
+    near = np.zeros_like(mask)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            near |= pad[1 + dy:1 + dy + ch, 1 + dx:1 + dx + cw]
+    u = np.interp(np.nan_to_num(dist), [0, 90, 200, 330, 520], [0, 1, 2, 3, 4])
+    th = np.tile(bp.BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw]
+    q = np.clip(np.floor(u + th), 0, len(TRAIL_PALETTE) - 1).astype(int)
+    img = np.zeros((ch, cw, 4), np.uint8)
+    img[near] = TRAIL_RIM + (255,)
+    img[mask, :3] = np.array(TRAIL_PALETTE, dtype=np.uint8)[q[mask]]
+    img[mask, 3] = 255
+    return Image.fromarray(img, 'RGBA').resize((W, H), Image.NEAREST)
+
+
 def banner(frame_front=True):
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
@@ -367,34 +402,10 @@ def banner(frame_front=True):
     skull_im = brackle_fx(BRACKLE_PX, True)[0]
     _, bl_left, bl_top, bl_bb, _ = placed['brackle-the-catapulting-turtle']
     p0 = (bl_left + bl_bb[0] + 0.1 * (bl_bb[2] - bl_bb[0]), bl_top + bl_bb[1] + 0.04 * (bl_bb[3] - bl_bb[1]))      # Spitze des Katapultarms
-    p1, p2 = (650, 60), (1300, 915)                                                                                # hoher Bogen: Scheitel über dem Band, Ziel Riffel
+    p1, p2 = (680, 60), (1335, 915)                                                                                # hoher Bogen: Scheitel über dem Band, Ziel Riffel
     bez = lambda t: ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
 
-    KEYS = ((0, (255, 222, 90)), (70, (255, 176, 52)), (150, (240, 110, 40)), (260, (210, 62, 46)), (420, (150, 56, 70)), (700, (110, 84, 110)))   # Abstand zum Schädel in px: Gelb → Orange → Rot → Rauch
-
-    def grad(dist):
-        for (d0, c0), (d1, c1) in zip(KEYS, KEYS[1:]):
-            if dist <= d1:
-                u = (dist - d0) / (d1 - d0)
-                return tuple(int(round(c0[k] + (c1[k] - c0[k]) * u)) for k in range(3))
-        return KEYS[-1][1]
-
-    def arc(d):
-        ts = np.linspace(T_SKULL, 0, 1200)                              # Bahn vom Schädel rückwärts, nach Weglänge in px abgetastet
-        pts = np.array([bez(t) for t in ts])
-        seg = np.hypot(*np.diff(pts, axis=0).T)
-        cum = np.concatenate([[0], np.cumsum(seg)])
-        total = cum[-1]
-        puffs = []
-        for dist in np.arange(0, total, 8):
-            x, y = pts[int(np.searchsorted(cum, dist))]
-            r = 8.5 * (1 - dist / total) ** 0.8 + 1.4                    # hinten dünn, beim Schädel dick
-            puffs.append((x / CELL, y / CELL, r, grad(dist)))
-        for x, y, r, col in reversed(puffs):                            # dunkler Rand, folgt dem Verlauf (etwas dunkler als die Füllung)
-            d.ellipse([x - r - 1.2, y - r - 1.2, x + r + 1.2, y + r + 1.2], fill=tuple(int(c * 0.42) for c in col))
-        for x, y, r, col in reversed(puffs):                            # Füllung von hinten nach vorn: die dicken, hellen Puffs beim Schädel liegen oben
-            d.ellipse([x - r, y - r, x + r, y + r], fill=col)
-    cv.alpha_composite(lowres(arc))
+    cv.alpha_composite(fire_trail(bez, T_SKULL))
     sx_, sy_ = bez(T_SKULL)
     cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
