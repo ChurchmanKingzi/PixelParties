@@ -22508,3 +22508,60 @@ Bei keiner Quelle blieb ein Zweifel über Preis oder Bedingung. **Kunagi (Code):
 1. **Taunt und Kartenart:** Der Kartentext sagt „all Attacks and Spells"; die Engine bindet seit jeher **jede** Zielwahl des Gegners (auch Kreatur-, Artefakt-, Fähigkeits- und Surprise-Effekte) und tut es jetzt auch in `promptEffectTarget` — soll das so bleiben (ja) oder nur für echte Attacks/Spells gelten (nein)?
 2. **Chain Lightning, Bottled Lightning, Cardinal Beast Qinglong:** Dort wählt das Opfer selbst die Ziele; soll ein Hardy Slime des Opfers trotzdem in die Kette gezwungen werden (heute nein)?
 3. **Alluring Light × Kunagi × Hardy Slime:** Der Kunagi-Besitzer wählt bei der Wiederholung das neue Opfer unter den Zielen des Light-Spielers; hat der Light-Spieler einen Hardy Slime mit Taunt gegen ihn, muss er jetzt den Slime wählen (vorher frei) — richtig so (ja) oder soll die Neuwahl frei bleiben (nein)?
+
+## ★ Welle 43 / W43a — Hardy Slime: der Taunt gilt nur für Attacks, Spells und Creature effects; Ketten-Zielwahl bleibt frei; Alluring Light × Kunagi bleibt (Entscheidung Welle 43, 22.10.2026)
+
+Drei Antworten von Al zu den Rückfragen aus Welle 42. Neue Repros: `docs/niche-tests/repro/W43/a-01` (Quellenart-Matrix; auf der Basis 032abddf Exit 1) und `a-02` (Absicherung der Punkte 2 und 3 — Ist-Zustand, auf der Basis grün —, plus die Reopen-Zielwahl mit Book of Doom: dort auf der Basis Exit 1). Alte Repros wurden **nicht** umgestellt: `W41/a-01`, `W42/a-01`, `W42/a-02`, `W39/a-*` laufen unverändert grün (sie prüfen Attacks, Spells, Kreatureneffekte und Listen ohne erkennbare Quelle — alles Quellen, die weiter binden).
+
+### 1 · Taunt nur für Attacks, Spells und Creature effects (Punkt 1)
+**Al: „NUR Attacks, Spells und Creature effects, mit der Einschränkung, dass sie Hardy Slime selbst treffen können sollen. Den Effekttext ändern wie accordingly zu ‚all Attacks, Spells and Creature effects, if possible.'"**
+* **Kartentext** (`data/cards.json`, Hardy Slime): „…your opponent has to choose it with all Attacks, Spells and Creature effects they use until your next turn, if possible." (sonst unverändert; kein `check-*`-Skript prüft den Text).
+* **Zentrale Prüfung:** `engine.tauntGiltFuerQuelle(quelle)` (neben `markiereTauntGesperrte`) — EINE Stelle für alle Taunt-Wege. Die Art der Quelle kommt aus `sourceEffectKind` (dieselbe Auslegung wie die Umleiter Challenge/Martyry/Anti-Magnet/Alleria: „by an Attack, Spell or Creature effect"), mit zwei Zusätzen: eine **Creature-Surprise** (Zone `surprise`, Kartentyp Creature) zählt als Creature effect; eine Attack-/Spell-**Karte, die schon dauerhaft auf dem Brett liegt** (Zone `area`/`permanent`, Anhang in der Support Zone), ist kein Wirken der Karte → kein Taunt (außer sie zählt über `_zaehltAlsArt` als Attack/Spell). **JA** (Taunt bindet): Attack-/Spell-Karte; Effekt, der als Attack/Spell ZÄHLT (`_zaehltAlsArt`: Broghan, Brackle, Arthor, Heragas, Kohta, Alice, Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light/Kunagi-Wiederholung); Effekt einer Kreaturen-Karte (aktiviert, On-Summon/Spielen/Kosten, Tod-/Hook-Trigger, Creature-Surprise); **NEIN**: Artefakt, Trank, Ability, Heldeneffekt ohne Attack-/Spell-Wertung, Equip-Effekt, Surprise, die keine Kreatur ist, Reaktions-Artefakt, Area/Anhang auf dem Brett. **Unbekannte Quelle** (kein Name/Name nicht in der Kartendatenbank/gar keine Quelle) → JA (Ist-Zustand).
+* **Wer ist betroffen:** nur Spötter, deren Skript `tauntNurAttackSpellKreatur: true` deklariert — bisher **nur Hardy Slime** (`hardy-slime.js`, gelesen über `loadCardEffect(inst.name)` in `_applyForcesTargetingFilter`; die Stempel `forcesTargeting*` auf der Instanz bleiben unverändert, auch von Hand gesetzte Slimes in Repros greifen). Deepsea Horror Clown (derselbe Wortlaut „all Attacks and Spells they play") und Doomed Town Guard („can't choose other Creatures", v849 Book of Doom) bleiben **unverändert** — Frage 4. Puzzle-Taunts ohne Deklaration binden jede Quelle. Die Einschränkung „wenn Hardy Slime selbst ein mögliches Ziel ist" (W41a/W42a) gilt weiter und ist unabhängig davon.
+* **Quelle je Weg** (`_applyForcesTargetingFilter(engine, targets, casterPi, quelle)`; ein Aufrufer ohne Quelle = `undefined` → unverändert „alles"):
+
+| Weg | Quelle |
+|---|---|
+| `promptDamageTarget`, `promptMultiTarget` (Engine-Picker) | `config.attackerSourceOverride || cardInstance` (Heldeneffekte/Gegenstandseffekte nennen den schlagenden Helden mit Stempel `treatedAsAttack`; sonst die Karte des Kontexts) |
+| `promptEffectTarget` direkt und `ctx.promptTarget` | `engine._tauntQuelleFuer(playerIdx, config)`: 1. ausdrückliche Quelle (`_redirectSource` aus `ctx.promptTarget`, `sourceCard`, `source`); 2. die auflösende Surprise (`engine._surpriseLauf`, gesetzt um `onSurpriseActivate` in `_activateSurprise` und um die aufgeschobenen Surprises in `_executeDeferredSurprises` [Jumpscare], solange kein innerer Effekt begonnen hat); 3. die Karte, die der Titel nennt (`sourceCardName`/`title`/`previewCardName`, auch „Name — Zusatz"), wenn sie von der wirkenden Karte abweicht (Reaktions-`resolve` von Bomb/Racket Arrow läuft im Fenster des auslösenden Attacks und nennt sich nur im Titel); 4. die gerade wirkende Karte (`_umgebungsQuelle`); sonst unbekannt |
+| `normalizeValidTargets` (server.js; Ziel-Tränke/-Artefakte) | die Karte der Sitzung (`cardName`, Zone `hand`) |
+| Reopen-Zielwahl in `doConfirmPotion` | `potionName` (Zone `hand`) |
+| `promptChainTargets` | kein Taunt (Punkt 2) |
+
+* **Einordnung der Quellen** (Repro `W43/a-01` Teil A, B, C; „vorher" = Welle 42, jede Zielwahl des Gegners):
+
+| Weg / Karte | Quelltyp | Taunt jetzt | vorher |
+|---|---|---|---|
+| Attack-Karte (Attack, Amazing Finding …); Spell-Karte (Fireball, Sun Beam, The White Army) | Attack / Spell | **ja** | ja |
+| Cure (Spell/Reaction, aus der Hand) | Spell | **ja** | ja |
+| Broghan, Brackle, Arthor, Heragas, Kohta (Heldeneffekte); Alice | zählt als Attack / als Spell | **ja** | ja |
+| Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger | zählt als Attack | **ja** | ja |
+| Infected Greatmaw (Treffer); Alluring Light × Kunagi-Wiederholung | zählt als Attack (Greatmaw: auch Creature effect) | **ja** | ja |
+| Skeleton Archer, Cardinal Beast Baihu/Zhuque/Qinglong-Wahl, Bomblebee, Dive Bomblebee, Cheeky Monkee, Lovely Teddy, Mischief Militia - Heli Troopers, Spirit of the Forbidden Grimoire, 500 Piranhas in a Monster Suit (aktiviert, Trigger, Spielen) | Creature effect | **ja** (Qinglong: Punkt 2) | ja |
+| Water Golem, Afflicted Vermin (aufgedeckte Creature-Surprise) | Creature effect | **ja** | ja |
+| Debt-O-Tron Model Missing Parts (Artifact/Creature auf dem Brett) | Creature effect (Kartentyp Artefakt, Subtyp Creature) | **ja** — Frage 2 | ja |
+| Book of Doom, Ushabti of the Great Pharaoh | Artefakt | **nein** | ja |
+| Poison Vial, Acid Vial, jeder Ziel-Trank (außer Sword in a Bottle) | Trank | **nein** | ja |
+| Pocket Catapult, Future Tech Bazooka, jede Ausrüstung | Equip-Effekt | **nein** | ja |
+| Occultism, Diplomacy, Singing, Charme … | Ability | **nein** | ja |
+| Siphem, Locke, gewöhnliche Heldeneffekte; Pes'zet; Swampborne/Deep-Drowned Waflav (Ascended Hero) | Heldeneffekt ohne Attack-/Spell-Wertung | **nein** | ja |
+| Gold Trap, Jumpscare, Bluff … (Spell/Attack mit Subtyp Surprise) | Surprise, die keine Kreatur ist | **nein** — Frage 1 | ja |
+| Bomb Arrow, Racket Arrow | Reaktions-Artefakt | **nein** — Frage 5 | ja |
+| schon im Spiel liegende Area-/Anhang-Karte (Acid Rain, Anti Magic Enchantment …) | kein Wirken der Karte | **nein** — Frage 6 | ja |
+| Quelle unbekannt (kein Name, Name nicht in der Datenbank) | – | **ja** | ja |
+| Held-only-Liste (Memory Wipe, Whirlwind Strike, Alluring Light Angreifer-Wahl) | beliebig | **nein** (Slime nicht in der Liste, W41a) | nein |
+| Slime selbst nicht wählbar (Immunität, `untargetable_all`, Erst-Runden-Schutz) | beliebig | **nein** (W42a) | nein |
+
+### 2 · Chain Lightning, Bottled Lightning, Cardinal Beast Qinglong (Punkt 2)
+**Al: „Nein, Taunt-Effekte wirken hier nicht (also korrekt as-is)."** Ist-Zustand bleibt: `promptChainTargets` kennt keinen Taunt, das Opfer wählt unter seinen eigenen Zielen (Wählender = Slime-Besitzer). Repro `W43/a-02` (alle drei Karten: die Kettenwahl bietet alle Ziele, auch den eigenen Slime, an).
+
+### 3 · Alluring Light × Kunagi × Hardy Slime (Punkt 3)
+**Al: „Ja"** → Ist-Zustand (W42a) bleibt: der Kunagi-Besitzer muss bei der Neuwahl den Slime des Light-Spielers wählen (die Wiederholung ist ein Attack des gezwungenen Helden, der Slime ein mögliches Ziel). Die erste Opferwahl des Light-Spielers (eigene Ziele) unterliegt keinem Taunt. Repro `W43/a-02` (beide Sitze, mit Gegenprobe ohne Taunt; dazu die Reopen-Zielwahl: Sword in a Bottle → Taunt, Book of Doom → keiner).
+
+### Fragen an Al (Ja/Nein)
+1. **Surprise-Spells:** Gold Trap, Jumpscare & Co. haben den Kartentyp „Spell" (Subtyp Surprise); umgesetzt ist deine Liste wörtlich („Surprises, die keine Kreatur sind" → kein Taunt) — sollen sie stattdessen als Spell zählen und den Taunt binden (ja) oder soll er bei ihnen entfallen (nein, so jetzt)?
+2. **Artefakt mit Subtyp Creature** (Debt-O-Tron Model Missing Parts/Scrap Plow, Powder Keg, Pollution Spewer): zählt ihr Effekt als Creature effect (ja, so jetzt) oder als Artefakt-Effekt (nein)?
+3. **Fremde Kreatureneffekte über Abilities/Helden** (Singing, Lovely Teddy, Spirit of the Forbidden Grimoire: „use the active effects of …"): die Quelle bleibt die Kreatur, deren Skript wählt (Taunt ja, so jetzt) — oder zählt die benutzende Ability/Karte (Ability → nein)?
+4. **Deepsea Horror Clown** hat denselben Wortlaut („all Attacks and Spells they play"): soll er dieselbe Einschränkung (nur Attacks, Spells, Creature effects) bekommen (ja) oder jede Zielwahl binden wie bisher (nein, so jetzt)?
+5. **Bomb Arrow / Racket Arrow:** ihre Kreaturenwahl („Additionally, you may choose a Creature …") ist ein Effekt eines Reaktions-Artefakts, kein Attack → kein Taunt (so jetzt); oder gehört sie zum Attack, auf den sie reagiert (Taunt ja)?
+6. **Area-/Anhang-Karten auf dem Brett** (Spell/Area, Spell/Attachment, z. B. The Seventh Circle of Hell, Overheal Shock): ihr Dauer-/Trigger-Effekt zählt nicht als Spell (kein Taunt, so jetzt); beim Ausspielen aus der Hand sind sie ein Spell (Taunt ja) — richtig so?

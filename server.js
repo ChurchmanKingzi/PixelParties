@@ -11625,7 +11625,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         : 99;
     }
     // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): die neu aufgebaute Liste der erneut geöffneten Zielwahl läuft sonst am Taunt vorbei (`normalizeValidTargets` wurde hier nie gerufen).
-    if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi);
+    if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi, { name: potionName, owner: pi, controller: pi, heroIdx: -1, zone: 'hand' });   // W43a: Quelle = die Karte der Zielwahl (Taunt nur für Attack/Spell/Creature effect)
     gs.potionTargeting = {
       potionName, handIndex,
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den
@@ -12062,7 +12062,7 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
   // wie im Engine-Trichter.
   if (engine && typeof casterPi === 'number' && !config?._truthSeeingEye
       && typeof engine.applyForcedTargetingFilter === 'function') {
-    engine.applyForcedTargetingFilter(validTargets, casterPi);
+    engine.applyForcedTargetingFilter(validTargets, casterPi, cardName ? { name: cardName, owner: casterPi, controller: casterPi, heroIdx: -1, zone: 'hand' } : undefined);   // W43a: Quelle = die Karte der Zielwahl (Taunt nur für Attack/Spell/Creature effect)
   }
   // ★ W27a (Al, 21.10.2026: als Attack geltende Gegenstandseffekte sind Level 0): Ziel-Traenke/-Artefakte laufen nicht durch die Engine-Picker und kannten
   // den Zielschutz `blocksTargeting` (Stealth, Future Tech Jetpack) bisher nicht. Nur fuer Karten, die als Attack gelten (`treatedAsAttack`, z. B. Sword in a Bottle) —

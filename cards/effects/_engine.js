@@ -291,7 +291,7 @@ const DECK_TO_DELETED_FLIGHT_MS = 500;
 //
 //  Used by Deepsea Horror Clown; usable by any future taunt-style card.
 // ═══════════════════════════════════════════
-function _applyForcesTargetingFilter(engine, targets, casterPi) {
+function _applyForcesTargetingFilter(engine, targets, casterPi, quelle) {
   if (!targets || targets.length === 0) return;
   const gs = engine.gs;
   const turn = gs.turn || 0;
@@ -321,6 +321,9 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
     if (engine.isCardPassiveDormant(inst)) return false;
     const side = inst.controller ?? inst.owner;
     if (side === casterPi) return false;
+    // ★ W43a (Al, 22.10.2026): ein Spötter, dessen Skript `tauntNurAttackSpellKreatur` deklariert (Hardy Slime: „…with all Attacks, Spells and Creature effects they use, if possible"),
+    // bindet nur Zielwahlen, die von einem Attack, Spell oder Creature effect stammen (`tauntGiltFuerQuelle`, EINE Stelle). Ohne Quelle (unbekannt) gilt der Taunt wie bisher.
+    if (quelle !== undefined && loadCardEffect(inst.name)?.tauntNurAttackSpellKreatur && !engine.tauntGiltFuerQuelle(quelle)) return false;
     return tauntDirectedAtCaster(c.forcesTargeting_pi, c.forcesTargeting_untilTurn);
   });
 
@@ -5316,7 +5319,7 @@ class GameEngine {
         // lockout, Bartas second-cast) — both "prevent a target from
         // being chosen", which the Eye negates for its Hero's casts.
         if (!config._truthSeeingEye) {
-          _applyForcesTargetingFilter(engine, targets, pi);
+          _applyForcesTargetingFilter(engine, targets, pi, config.attackerSourceOverride || cardInstance);   // W43a: Quelle = Attack/Spell/Kreatur?
           if (targets.length === 0) return null;
         }
 
@@ -5880,7 +5883,7 @@ class GameEngine {
         // full documentation. Truth-Seeing Eye negates it for its
         // Hero's Attacks / Spells (same as the single-target path).
         if (!config._truthSeeingEye) {
-          _applyForcesTargetingFilter(engine, targets, pi);
+          _applyForcesTargetingFilter(engine, targets, pi, config.attackerSourceOverride || cardInstance);   // W43a: Quelle = Attack/Spell/Kreatur?
           if (targets.length === 0) return [];
         }
 
@@ -7313,10 +7316,41 @@ class GameEngine {
    * Bewusst KEIN eigener Filter dort: die Auslegung von Taunt gibt es
    * genau einmal, hier.
    */
-  applyForcedTargetingFilter(targets, casterPi) {
+  applyForcedTargetingFilter(targets, casterPi, quelle) {   // W43a: optional die Quelle (Karte/Name) der Zielwahl — für Spötter mit `tauntNurAttackSpellKreatur`
     if (!Array.isArray(targets) || typeof casterPi !== 'number') return targets;
-    _applyForcesTargetingFilter(this, targets, casterPi);
+    _applyForcesTargetingFilter(this, targets, casterPi, quelle);
     return targets;
+  }
+
+  /**
+   * ★ W43a (Al, 22.10.2026, Hardy Slime): „…has to choose it with all Attacks, Spells and Creature effects they use, if possible." — ZENTRALE Typ-Prüfung der Quelle für alle Taunt-Wege
+   * (`promptDamageTarget`, `promptMultiTarget`, `promptEffectTarget`/`ctx.promptTarget`, `normalizeValidTargets`, `doConfirmPotion`-Reopen). Gilt der Taunt eines Spötters mit
+   * `tauntNurAttackSpellKreatur` für die Zielwahl dieser Quelle? JA, wenn die Quelle ein Attack, ein Spell oder ein Creature effect ist: Attack-/Spell-KARTE, Effekt, der als Attack/Spell
+   * ZÄHLT (`_zaehltAlsArt`: Broghan, Brackle, Arthor, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Crusader's, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light,
+   * Duel; Alice), Effekt einer KREATUREN-Karte (aktiviert, On-Summon, Trigger, Kreatur-Surprise). NEIN bei Artefakt-/Trank-/Ability-/Helden-Effekten (ohne Attack-/Spell-Wertung),
+   * Surprises, die keine Kreatur sind, und bei Attack/Spell-Karten, die schon auf dem Brett liegen (Area/Anhang: kein Wirken der Karte, sondern deren Dauerwirkung).
+   * Art über `sourceEffectKind` (dieselbe Auslegung wie die Umleiter Challenge/Alleria/Anti-Magnet). UNBEKANNTE Quelle (kein Name, keine Karte) → JA (Ist-Zustand: der Taunt bindet).
+   */
+  tauntGiltFuerQuelle(quelle) {
+    if (!quelle) return true;
+    let obj = typeof quelle === 'string' ? { name: quelle } : quelle;
+    const name = obj.name || obj.cardName || obj.cardInstance?.name || null;
+    if (!name) return true;
+    if (!obj.name) obj = { ...obj, name };
+    const cd = this._getCardDB()[name] || null;
+    const istKreatur = !!cd && hasCardType(cd, 'Creature');
+    let art = this.sourceEffectKind(obj);
+    if (art === 'surprise' && istKreatur) art = 'creature';   // Kreatur-Surprise (Water Golem, Afflicted Vermin …): ein Creature effect
+    if (art === 'attack' || art === 'spell') {
+      // Karte liegt schon dauerhaft auf dem Brett (Area-Zone, Anhang in der Support Zone): kein Wirken der Karte, sondern ein Dauer-/Trigger-Effekt (Al: Anhängen/Areas zählen nicht).
+      // Ein Effekt, der nur als Attack/Spell ZÄHLT (`_zaehltAlsArt`), ist keine solche Karte.
+      const zaehlt = this._zaehltAlsArt(obj);
+      if (!zaehlt && cd && !istKreatur && (obj.zone === 'area' || obj.zone === 'permanent' || obj.zone === 'support')) return false;
+      return true;
+    }
+    if (art === 'creature') return true;
+    if (art === null) return true;   // Art unbekannt (Name nicht in der Kartendatenbank): Ist-Zustand
+    return false;   // hero | artifact | potion | ability | surprise
   }
 
   /**
@@ -7324,15 +7358,39 @@ class GameEngine {
    * vom Taunt ausgeschlossene Ziele werden `ineligible` markiert (ausgegraut). Gerechnet wird nur über die noch WÄHLBAREN Ziele („if possible": ein Spötter, der selbst
    * `ineligible` ist, ist kein mögliches Ziel → kein Taunt).
    */
-  markiereTauntGesperrte(targets, casterPi) {
+  markiereTauntGesperrte(targets, casterPi, quelle) {   // W43a: optional die Quelle der Zielwahl (s. `tauntGiltFuerQuelle`)
     if (!Array.isArray(targets) || typeof casterPi !== 'number') return targets;
     const frei = targets.filter(t => t && !t.ineligible);
     const rest = frei.slice();
-    _applyForcesTargetingFilter(this, rest, casterPi);
+    _applyForcesTargetingFilter(this, rest, casterPi, quelle);
     if (rest.length === frei.length) return targets;
     const bleibt = new Set(rest);
     for (const t of frei) if (!bleibt.has(t)) t.ineligible = true;
     return targets;
+  }
+
+  /**
+   * ★ W43a: Quelle einer Zielwahl für den Taunt (`tauntGiltFuerQuelle`), wenn der Aufrufer sie nicht über einen Engine-Picker (Karteninstanz) mitliefert — `promptEffectTarget`.
+   * Rangfolge, von sicher nach weich: 1. ausdrückliche Quelle der Konfiguration (`_redirectSource` aus `ctx.promptTarget`, `sourceCard`, `source`); 2. die gerade auflösende Surprise (`_surpriseLauf`,
+   * solange kein innerer Effekt begonnen hat — ihre Zielwahlen tragen meist nur den Titel); 3. eine Karte, die der Titel (bzw. `sourceCardName`/`previewCardName`, auch „Name — Zusatz") nennt, wenn sie
+   * von der wirkenden Karte (4.) abweicht — Reaktions-`resolve`-Funktionen (Bomb/Racket Arrow) laufen im Fenster des auslösenden Attacks und nennen sich nur im Titel; 4. die gerade wirkende Karte
+   * (`_umgebungsQuelle`). Nichts davon erkennbar → `null` (unbekannt: der Taunt gilt wie bisher).
+   */
+  _tauntQuelleFuer(playerIdx, config = {}) {
+    const ausdruecklich = this._redirectSourceFor(playerIdx, config);
+    if (ausdruecklich) return ausdruecklich;
+    const sp = this._surpriseLauf;
+    if (sp?.inst && sp.steuerer === playerIdx && this._currentEffectSource === sp.cur && this._activationSource === sp.act) return sp.inst;
+    const umgebung = this._umgebungsQuelle(playerIdx, config) || null;
+    const db = this._getCardDB();
+    for (const roh of [config.sourceCardName, config.title, config.previewCardName]) {
+      if (typeof roh !== 'string' || !roh) continue;
+      const name = db[roh] ? roh : (db[roh.split(' — ')[0]] ? roh.split(' — ')[0] : null);
+      if (!name) continue;
+      if (umgebung && umgebung.name === name) return umgebung;
+      return { name, owner: playerIdx, controller: playerIdx, heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
+    }
+    return umgebung;
   }
 
   _isHeroDamageUnstoppable(target) {
@@ -30437,7 +30495,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // dieses Effekts (Held-only-Liste, Immunität/Status/Schutz → `ineligible`), greift der Taunt nicht. Die beiden Engine-Picker wenden ihn schon an (`_tauntAngewandt`); Truth-Seeing Eye hebt ihn auf;
     // in den inneren Fenstern (Umleitung, Post-Target-Reaktion) ist das Ziel des Effekts längst gewählt.
     if (!config._tauntAngewandt && !config._truthSeeingEye && !this._inRedirectWindow && !this._inPostTargetWindow) {
-      this.markiereTauntGesperrte(validTargets, playerIdx);
+      // ★ W43a (Al, 22.10.2026): Quelle der Zielwahl (`_tauntQuelleFuer`: ausdrückliche Quelle wie für die Umleitfenster, auflösende Surprise, Titelkarte, wirkende Karte) — der Taunt von
+      // Hardy Slime gilt nur für Attack/Spell/Creature effect (`tauntGiltFuerQuelle`); ohne erkennbare Quelle bleibt er wie bisher.
+      this.markiereTauntGesperrte(validTargets, playerIdx, this._tauntQuelleFuer(playerIdx, config));
     }
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
@@ -34591,11 +34651,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete this.gs._deferredSurprises;
     for (const entry of deferred) {
       if (this.gs._spellNegatedByEffect) continue; // Skip if effect was negated
+      // W43a: die aufgeschobene Surprise (Jumpscare) ist die Quelle ihrer Zielwahl (`_tauntQuelleFuer`): eine Surprise, die keine Kreatur ist, ist kein Attack/Spell/Creature effect.
+      const _spVorher = this._surpriseLauf;
+      if (entry.name && entry.ownerIdx != null) this._surpriseLauf = { inst: { name: entry.name, owner: entry.ownerIdx, controller: entry.ownerIdx, heroIdx: -1, zone: 'surprise' }, steuerer: entry.ownerIdx, cur: this._currentEffectSource, act: this._activationSource };
       try {
         await entry.execute(this);
       } catch (err) {
         console.error('[Engine] deferred surprise error:', err.message);
-      }
+      } finally { this._surpriseLauf = _spVorher; }
     }
   }
 
@@ -40108,7 +40171,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     let result = null;
     if (!surpriseNegated && script.onSurpriseActivate && inst) {
       const ctx = this._createContext(inst, { sourceInfo });
-      result = await script.onSurpriseActivate(ctx, sourceInfo);
+      // W43a: die aufloesende Surprise ist die Quelle ihrer eigenen Zielwahlen (Taunt von Hardy Slime: nur Creature-Surprises sind ein Creature effect — `_tauntQuelleFuer`).
+      const _spVorher = this._surpriseLauf;
+      this._surpriseLauf = { inst, steuerer, cur: this._currentEffectSource, act: this._activationSource };
+      try { result = await script.onSurpriseActivate(ctx, sourceInfo); } finally { this._surpriseLauf = _spVorher; }
       this._merkeGanzeNegation(script, result);   // Z7b
     }
 

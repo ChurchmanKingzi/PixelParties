@@ -11133,7 +11133,7 @@
     "hp": 30,
     "atk": null,
     "cost": null,
-    "effect": "When you summon this Creature, your opponent has to choose it with all Attacks and Spells they use until your next turn, if possible. At the beginning of each of your turns, you may increase this Creature's level on your side of the board by 1.",
+    "effect": "When you summon this Creature, your opponent has to choose it with all Attacks, Spells and Creature effects they use until your next turn, if possible. At the beginning of each of your turns, you may increase this Creature's level on your side of the board by 1.",
     "archetype": "Slimes",
     "setID": "PP CROSS",
     "banned": "",
