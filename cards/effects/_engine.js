@@ -14168,7 +14168,7 @@ class GameEngine {
     // v704 (Puppets): Zielspalte mit gesperrten Support Zones.
     if (toZone === ZONES.SUPPORT && !(cardInstance.zone === ZONES.SUPPORT && toHeroIdx === cardInstance.heroIdx)
         && this.isSupportZoneLocked(opts.newOwner ?? (cardInstance.controller ?? cardInstance.owner), toHeroIdx,
-                                    { source: opts.source, cardName: cardInstance.name, via: 'move' })) {
+                                    { source: opts.source, cardName: cardInstance.name, via: 'move', instId: cardInstance.id })) {
       this.log('move_blocked', { card: cardInstance.name, reason: 'support_zones_locked', toHeroIdx });
       return;
     }
@@ -28476,6 +28476,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     for (const inst of this.cardInstances) {
       if (!inst || inst.zone !== 'support') continue;
       if (inst.heroIdx !== heroIdx) continue;
+      if (opts.instId != null && inst.id === opts.instId) continue;   // die gefragte Karte selbst sperrt ihre eigene Spalte nie (sonst sperrt sich z. B. ein Bonded Companion beim Eintritt selbst aus)
       if ((inst.controller ?? inst.owner) !== playerIdx) continue;
       const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
       if (typeof sc?.supportZonesLocked !== 'function') continue;
@@ -49203,7 +49204,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst || inst.zone !== ZONES.SUPPORT || inst._zoneLockReverting) return false;
     const zoneOwner = inst.controller ?? inst.owner;
     if (zoneOwner == null || zoneOwner < 0 || !(inst.heroIdx >= 0)) return false;
-    if (!this.isSupportZoneLocked(zoneOwner, inst.heroIdx, { cardName: inst.name, via: 'enter' })) return false;
+    if (!this.isSupportZoneLocked(zoneOwner, inst.heroIdx, { cardName: inst.name, via: 'enter', instId: inst.id })) return false;   // instId: die eintretende Karte sperrt sich nicht selbst (Bonded Companion wurde sonst sofort auf die Hand zurückgeschickt)
     const cd = this._getCardDB()[inst.name];
     const isToken = !!(cd && hasCardType(cd, 'Token'));
     inst._zoneLockReverting = true;
