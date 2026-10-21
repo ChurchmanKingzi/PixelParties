@@ -40237,7 +40237,42 @@ this._deathWatch = (this._deathWatchStack || []).length
       sourceInfo, _skipReactionCheck: true,
     };
     await this.runHooks('onSurpriseActivated', surpriseHookCtx);
-    const surpriseNegated = !!surpriseHookCtx._surpriseNegated;
+    let surpriseNegated = !!surpriseHookCtx._surpriseNegated;
+
+    // ★ W47a (Al, 22.10.2026, Punkte 4 und 6): die AKTIVIERUNG einer Attack-/Spell-Surprise ist „ein Held führt eine Attack/einen Spell aus" (nach cardType: Attack → Attack, Spell → Spell).
+    //   (6) Sie zählt EINMAL in den Attack-/Spell-Zählern (`spellsPlayedThisTurn`, `attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`, `onEffectCountedAsArt` → Mirjam,
+    //   Güldefaber, Brewer's Blade …; Log `effect_counted_as_spell` für Fire Bolts; Silence-Bonus) — auch wenn sie danach negiert wird (wie jede gespielte Karte). Gezählt, nicht gesperrt: eine
+    //   Surprise löst reaktiv aus (kein Spielzug) — ein Attack-/Spell-Limit hindert die Aktivierung nie, wohl aber die nächsten Attacks/Spells (W47a). Eine nur GESETZTE Surprise zählt nie.
+    //   (4) Danach öffnet sich das Kettenfenster „performs" (`executeCardWithChain`, Herkunft Brett, KEINE Aktion/kein Zusatzaktions-Verbrauch): Stealthy Pursuit, die Arrows, Magic Topaz, Bow of the
+    //   Hunt Goddess, Silence, Shamanic Curse, Idej Projector … lesen das Glied wie eine gespielte Attack/einen gespielten Spell des Hero-Wirts (`heroIdx`/`casterOwner` = Wirt-Zone). Eine Negation in der
+    //   Kette = negierte Surprise (wie Boots of Hermes: Karte in die Ablage, kein Effekt, Einmal-Grenze unverbraucht). Mitten in einem offenen Fenster (`_inReactionCheck`: die Surprise löst aus der Auflösung
+    //   einer Kette aus) und im MCTS-Rollout öffnet sich kein zweites Fenster (Konvention von `alsAttackKette`); Rekursion bleibt durch Per-Hero-Sperre und Tiefenkappe 10 begrenzt. Creature-Surprises
+    //   führen nichts „aus" — für sie bleibt es bei der Beschwörungs-Kette (Off Duty & Co.).
+    const _performsArt = (!isBakhmSlot && cardDataForCost?.cardType === 'Attack') ? 'attack'
+      : (!isBakhmSlot && cardDataForCost?.cardType === 'Spell') ? 'spell' : null;
+    if (_performsArt) {
+      await this.zaehleAlsArt(_performsArt, {
+        pi: steuerer, heroIdx, heroOwner: playerIdx, name: cardName,
+        schule: _performsArt === 'spell' ? ([cardDataForCost.spellSchool1, cardDataForCost.spellSchool2].includes('Destruction Magic') ? 'Destruction Magic' : (cardDataForCost.spellSchool1 || cardDataForCost.spellSchool2 || null)) : null,
+      });
+      if (!surpriseNegated && !this._inReactionCheck && !this._inMctsSim && !this.gs.result) {
+        const _aeussereK = this._inReactionCheck;
+        let _kette = null;
+        try {
+          _kette = await this.executeCardWithChain({
+            cardName, owner: steuerer, cardType: cardDataForCost.cardType, goldCost: 0, heroIdx,
+            casterOwner: playerIdx, casterCheck: false, resolve: null, fromBoard: true,
+          });
+        } finally {
+          this._inReactionCheck = _aeussereK;
+        }
+        if (_kette?.negated) {
+          surpriseNegated = true;
+          surpriseHookCtx._surpriseNegated = true;
+          surpriseHookCtx._surpriseNegatedBy = 'a chain reaction';
+        }
+      }
+    }
 
     // ★ Z7c (Als Entscheidung, Welle 3): „once per game" bei Surprises (Tharxian Horse) verbraucht erst die
     // AKTIVIERUNG — ab dem Moment, in dem sie auflösen darf (nicht von Boots of Hermes & Co. negiert).
@@ -40264,6 +40299,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       try { result = await script.onSurpriseActivate(ctx, sourceInfo); } finally { this._surpriseLauf = _spVorher; }
       this._merkeGanzeNegation(script, result);   // Z7b
     }
+    // W47a: Pfeile/Magic Topaz, die das Kettenfenster „performs" einer Attack-Surprise (Bluff) bewaffnet hat, fallen nach der Auflösung (idempotent, wie `alsAttackKette`).
+    if (_performsArt === 'attack') await require('./_arrows-shared').clearArmedArrows(this, steuerer);
 
     if (surpriseNegated) {
       await this.runHooks(HOOKS.ON_EFFECT_NEGATED, {
@@ -40913,7 +40950,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {'attack'|'spell'} art
    * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string, karte?:boolean }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
    */
-  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte }) {
+  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte, schule }) {   // W47a: `schule` = Zauberschule einer aktivierten Spell-Surprise (Log für Fire Bolts)
     const gs = this.gs;
     const ps = gs?.players?.[pi];
     if (!ps || (art !== 'attack' && art !== 'spell')) return;
@@ -40936,7 +40973,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
       if (!karte && ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`); Karten: schon bei der Pruefung (doPlaySpell) bzw. am Anfang des Sofort-Gusses
       // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
-      if (!this._inMctsSim && !karte) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: loadCardEffect(name)?.treatedAsSpell?.school || null });
+      if (!this._inMctsSim && !karte) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: schule || loadCardEffect(name)?.treatedAsSpell?.school || null });
     }
     if (this._inMctsSim && !karte) return;   // W35a: gespielte Attack-KARTEN melden auch im Rollout (vorher feuerte dort `onActionUsed` fuer Mirjam)
     try {
@@ -41635,6 +41672,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Karte (der Trainings-Recorder zählt nur diese), aus der Hand
         // ist es ein normaler Cast, den der Recorder schon als Play führt.
         this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'surprise' });
+        // ★ W47a (Al, 22.10.2026, Punkt 6): auch eine als REAKTION in der Kette aktivierte Spell-/Attack-Surprise (Lunar Eclipse) ist eine aktivierte Surprise und zählt einmal (ihr Glied steht selbst in der Kette — kein zweites Kettenfenster).
+        {
+          const _sd = this._getCardDB()[chosenName];
+          const _art = _sd?.cardType === 'Attack' ? 'attack' : _sd?.cardType === 'Spell' ? 'spell' : null;
+          if (_art) await this.zaehleAlsArt(_art, { pi, heroIdx: sHeroIdx, heroOwner: sSeite, name: chosenName, schule: _art === 'spell' ? ([_sd.spellSchool1, _sd.spellSchool2].includes('Destruction Magic') ? 'Destruction Magic' : (_sd.spellSchool1 || _sd.spellSchool2 || null)) : null });
+        }
         if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
         // Als Vorgabe 29.9.: `pi` = Brettseite der Zone, `ablage` = Kartenbesitzer.
         this._pendingSurpriseReactionCleanup.push({
