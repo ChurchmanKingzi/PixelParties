@@ -31,35 +31,20 @@ CREAM, CREAM2, CREAM3 = (255, 224, 184), (255, 232, 198), (255, 241, 214)       
 RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255, 243, 176)
 
 PX = 8                                             # ein Maßstab für alle Sprites (= 2 Logo-Pixel), damit die Pixel überall gleich groß sind
-# (Sprite, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame); Reihenfolge der Anordnung: von hinten nach vorn
+# Je Seite drei Heroes: ein Flieger oben, ein Großer in der Mitte, ein normaler unten, alle schräg gegeneinander.
+# (Sprite, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame); „gespiegelt“ gleicht die Blickrichtung des Sheets aus
+# (links soll alles nach rechts blicken, rechts nach links).
 LEFT = [
-    ('mary-crestmas', 170, 380, False, 0),
-    ('kasperov-the-king-of-kings-b', 900, 320, False, 0),
-    ('cute-angel-molinda', 700, 170, False, 0),
-    ('alleria-the-queen-of-spiders', 175, 690, False, 0),
-    ('mega-priestess-johanna', 440, 790, False, 0),
-    ('nao-the-barrier-priestess', 150, 1010, False, 0),
-    ('bomb-berserker-bartas', 340, 1000, False, 0),
-    ('archibald-the-archmage', 520, 985, False, 0),
-    ('luna-pele-the-flame-dancer', 690, 1000, False, 0),
-    ('beato-the-butterfly-witch', 840, 1030, False, 0),
+    ('bakhm-the-desert-digger', 275, 640, True, 0),
+    ('darion-the-blood-crazy-groundskeeper', 600, 960, False, 0),
 ]
 RIGHT = [
-    ('sol-rym-the-thunder-djinn', 1290, 170, True, 0),
-    ('overlord-baaliel', 1700, 230, True, 0),
-    ('champion-the-stormbringer', 1900, 340, True, 0),
-    ('mad-scientist-heinz', 1540, 340, True, 0),
-    ('baaliel-the-demon-general', 1900, 700, True, 0),
-    ('nieht-the-blitz-blade', 1600, 800, True, 0),
-    ('gon-the-frostbringer', 1480, 960, True, 0),
-    ('ida-the-adept-of-destruction', 1290, 1000, True, 0),
-    ('zsos-ssar-the-serpent-warlord', 1690, 990, True, 0),
-    ('arthor-the-king-of-blackport', 1880, 1020, True, 0),
-    ('dajan-conqueror-of-the-treasure-cave', 1990, 840, True, 0),
+    ('berserking-null', 1790, 640, False, 0),
+    ('delusional-monia', 1760, 215, True, 0),
+    ('future-tech-gunslinger-riffel', 1450, 960, False, 0),
 ]
-CENTER = [
-    ('bakhm-the-desert-digger', 1024, 900, False, 0),
-]
+CENTER = []
+MONIA = (290, 215)
 
 
 def sticker(slug, px, frame=0, flip=False):
@@ -163,15 +148,12 @@ def glints(cv, spots):
 def banner():
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2, 560, 420))
-    # Zauber und Strahlen der Heroes treffen sich hinter dem Schriftzug
+    # Schüsse und Zauber der Heroes treffen sich hinter dem Schriftzug
     for src, dst, w, cols in (
-            ((1290, 170), (1120, 520), 44, [(200, 150, 20), (255, 210, 60), (255, 250, 200)]),   # Sol Rym: Blitz
-            ((1290, 1000), (1090, 640), 36, [(214, 70, 30), (255, 150, 50), GOLD_LT]),            # Ida: Feuer
-            ((1480, 960), (1150, 650), 32, [(60, 130, 200), (150, 210, 245), (255, 255, 255)]),   # Gon: Eis
-            ((1900, 700), (1220, 590), 34, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),     # Baaliel: Dämonenmagie
-            ((700, 170), (960, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Molinda: Lichtstrahl
-            ((520, 985), (930, 640), 34, [(90, 40, 160), (170, 110, 230), (245, 225, 255)]),     # Archibald: Zauber
-            ((150, 1010), (860, 620), 32, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):   # Nao: heiliges Licht
+            ((340, 215), (900, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Monia: Jetpack-Funken
+            ((1700, 215), (1150, 520), 40, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),    # Delusional Monia
+            ((660, 960), (960, 700), 30, [(176, 52, 70), (226, 84, 84), (255, 200, 150)]),        # Darion: Kettensäge
+            ((1340, 950), (1090, 700), 26, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):  # Riffel: Schuss
         cv.alpha_composite(beam(src, dst, w, cols))
 
     items = []
@@ -182,7 +164,7 @@ def banner():
     # Monia (Wink-Pose mit weißem Plus) fliegt links oben
     m_im, _ = ml.monia(PX)
     bb = m_im.getbbox()
-    items.append((230 + (bb[3] - bb[1]) / 2, m_im, bb, 330, 230))
+    items.append((MONIA[1] + (bb[3] - bb[1]) / 2, m_im, bb, MONIA[0], MONIA[1]))
     for _, im, bb, x, y in sorted(items, key=lambda t: t[0]):
         cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
 
