@@ -11612,6 +11612,8 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
         ? (budget === Infinity ? 99 : Math.floor(budget / goldCost))
         : 99;
     }
+    // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): die neu aufgebaute Liste der erneut geöffneten Zielwahl läuft sonst am Taunt vorbei (`normalizeValidTargets` wurde hier nie gerufen).
+    if (Array.isArray(freshTargets) && !config?._truthSeeingEye && typeof room.engine.applyForcedTargetingFilter === 'function') room.engine.applyForcedTargetingFilter(freshTargets, pi);
     gs.potionTargeting = {
       potionName, handIndex,
       // ★ 28.8.: Herkunft mitfuehren — `doConfirmPotion` loest den

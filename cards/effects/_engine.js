@@ -5337,6 +5337,7 @@ class GameEngine {
           // (Stealth, Jetpack …) markierte Helden sonst trotz der Ausnahme wieder als unwaehlbar.
           ignoreUntargetable: config.ignoreUntargetable,
           _truthSeeingEye: config._truthSeeingEye,
+          _tauntAngewandt: true,   // W42a: der Taunt-Filter lief oben schon (`_applyForcesTargetingFilter`)
           // General rule: a prompt that asks the player to activate an
           // effect / aim it / cancel shows the source card's image, so
           // they always see WHICH card is prompting. Defaults to this
@@ -5937,6 +5938,7 @@ class GameEngine {
           // siehe `promptDamageTarget`: Ausnahmen bis ins `blocksTargeting`-Backstop durchreichen
           ignoreUntargetable: config.ignoreUntargetable,
           _truthSeeingEye: config._truthSeeingEye,
+          _tauntAngewandt: true,   // W42a: der Taunt-Filter lief oben schon (`_applyForcesTargetingFilter`)
           // General rule: show the source card's image in the picker.
           previewCardName: config.previewCardName || cardInstance.name,
           // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
@@ -7314,6 +7316,22 @@ class GameEngine {
   applyForcedTargetingFilter(targets, casterPi) {
     if (!Array.isArray(targets) || typeof casterPi !== 'number') return targets;
     _applyForcesTargetingFilter(this, targets, casterPi);
+    return targets;
+  }
+
+  /**
+   * ★ W42a (Al, 22.10.2026, Punkt 5): Taunt für `promptEffectTarget` — dieselbe Auslegung wie `_applyForcesTargetingFilter`, aber die Liste bleibt vollständig:
+   * vom Taunt ausgeschlossene Ziele werden `ineligible` markiert (ausgegraut). Gerechnet wird nur über die noch WÄHLBAREN Ziele („if possible": ein Spötter, der selbst
+   * `ineligible` ist, ist kein mögliches Ziel → kein Taunt).
+   */
+  markiereTauntGesperrte(targets, casterPi) {
+    if (!Array.isArray(targets) || typeof casterPi !== 'number') return targets;
+    const frei = targets.filter(t => t && !t.ineligible);
+    const rest = frei.slice();
+    _applyForcesTargetingFilter(this, rest, casterPi);
+    if (rest.length === frei.length) return targets;
+    const bleibt = new Set(rest);
+    for (const t of frei) if (!bleibt.has(t)) t.ineligible = true;
     return targets;
   }
 
@@ -30413,6 +30431,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // werden — und ein manipulierter Client haette dasselbe gekonnt.
     // `_waehlbar` ist die Liste fuer JEDE Entscheidung; `validTargets`
     // bleibt die Liste, die der Client zum ANZEIGEN bekommt.
+    // ★ W42a (Al, 22.10.2026, Punkt 5 — Hardy Slime): der Taunt („has to choose it with all Attacks and Spells … if possible") sitzt auch am Flaschenhals: Karten, die eine gemischte
+    // Helden-und-Kreaturen-Liste SELBST bauen und direkt hierher reichen, liefen am Filter von `promptDamageTarget`/`promptMultiTarget` vorbei. Dieselbe Auslegung wie dort
+    // (`_applyForcesTargetingFilter`), aber MARKIEREN statt entfernen (v1294: ausgegraut). „If possible": nur wählbare (nicht `ineligible`) Ziele zählen — ist der Spötter selbst kein mögliches Ziel
+    // dieses Effekts (Held-only-Liste, Immunität/Status/Schutz → `ineligible`), greift der Taunt nicht. Die beiden Engine-Picker wenden ihn schon an (`_tauntAngewandt`); Truth-Seeing Eye hebt ihn auf;
+    // in den inneren Fenstern (Umleitung, Post-Target-Reaktion) ist das Ziel des Effekts längst gewählt.
+    if (!config._tauntAngewandt && !config._truthSeeingEye && !this._inRedirectWindow && !this._inPostTargetWindow) {
+      this.markiereTauntGesperrte(validTargets, playerIdx);
+    }
     const _waehlbar = validTargets.filter(t => !t.ineligible);
     if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
 
