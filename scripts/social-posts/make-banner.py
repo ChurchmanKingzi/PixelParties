@@ -38,7 +38,7 @@ RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
 ACTORS = [
-    ('cute-nerd-magenta', 8, 1290, 195, True, 'c'),
+    ('cute-nerd-magenta', 8, 1290, 195, False, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
     ('brackle-the-catapulting-turtle', 9, 690, 1080, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
@@ -313,7 +313,7 @@ def glints(cv, spots):
         ml.put(cv, st, x, y, an)
 
 
-def banner():
+def banner(frame_front=False):
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
     cv.alpha_composite(ground())
@@ -335,12 +335,13 @@ def banner():
                 shadow(cv, left + (bb[0] + bb[2]) / 2, top + bb[3], (bb[2] - bb[0]) * 0.8)
             cv.paste(im, (left, top), im)
 
-    cv.alpha_composite(frame_layers())
+    if not frame_front:
+        cv.alpha_composite(frame_layers())
     ribbon_ornaments(cv)
     paste([k for k in placed if k not in FRONT])
 
-    # Brackles eigenes Geschoss (Schädel-Bombe): Bogen vom Katapult auf Riffel zu; die Flammen seines Einschlags brennen vor Riffels Füßen
-    skull_im, fire_im = brackle_fx(12, True)[0], brackle_fx(10, True)[1]
+    # Brackles eigenes Geschoss (Schädel-Bombe): Bogen vom Katapult auf Riffel zu
+    skull_im = brackle_fx(12, True)[0]
     _, bl_left, bl_top, bl_bb, _ = placed['brackle-the-catapulting-turtle']
     p0 = (bl_left + bl_bb[0] + 0.1 * (bl_bb[2] - bl_bb[0]), bl_top + bl_bb[1] + 0.04 * (bl_bb[3] - bl_bb[1]))      # Spitze des Katapultarms
     p1, p2 = (860, 560), (1300, 915)
@@ -355,7 +356,6 @@ def banner():
     cv.alpha_composite(lowres(arc))
     sx_, sy_ = bez(0.78)
     cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
-    cv.alpha_composite(fire_im, (int(1235 - fire_im.width / 2), 1045 - fire_im.height))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
     paste([k for k in placed if k in FRONT])
@@ -372,6 +372,8 @@ def banner():
         o = at_chaos(sx, sy)
         cv.alpha_composite(star(o[0], o[1], 46, seed=3, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
     cv.alpha_composite(star(1185, 985, 38, seed=9, spikes=7))                      # Mündungsfeuer
+    if frame_front:                                                                # Variante: der Rahmen liegt über allen Heroes
+        cv.alpha_composite(frame_layers())
     return cv
 
 
@@ -386,6 +388,7 @@ def main():
     cv = banner()
     cv.convert('RGB').save(OUT / 'banner-youtube.png', optimize=True)
     safe_overlay(cv).convert('RGB').save(OUT / 'banner-youtube-sicherer-bereich.png')
+    banner(frame_front=True).convert('RGB').save(OUT / 'banner-youtube-rahmen-vorn.png', optimize=True)      # Variante: Rahmen über allen Heroes
     print('fertig:', OUT / 'banner-youtube.png', (OUT / 'banner-youtube.png').stat().st_size // 1024, 'KB')
 
 
