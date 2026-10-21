@@ -32,7 +32,7 @@
 //     against without a real targeting event.
 // ═══════════════════════════════════════════
 
-const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
+const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource, istUngelegteCreatureSurprise } = require('./_hooks');
 
 const CARD_NAME = 'Jumper Spider';
 const DRAW_COUNT = 2;
@@ -83,6 +83,9 @@ module.exports = {
     // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
     // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
     if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+    // W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): die AUFLÖSENDE Creature-Surprise (Cybug ANTS, Afflicted Vermin … noch in der Surprise Zone) ist ein
+    // Creature effect, auch wenn ihre Kreatur noch nicht auf dem Brett steht — Jumper Spider braucht keinen Angreifer (Ziehen + Platzieren), die „lebende Quelle" entfällt hier.
+    if (istUngelegteCreatureSurprise(engine, sourceInfo)) return true;
     if (isCreatureSource(engine, sourceInfo)) {
       return !!resolveSourceCreature(engine, sourceInfo);
     }

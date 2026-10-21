@@ -75,7 +75,7 @@ module.exports = {
     if (!srcData) return false;
     const isAttack = hasCardType(srcData, 'Attack');
     const isSpell = hasCardType(srcData, 'Spell');
-    const isCreatureEffect = hasCardType(srcData, 'Creature') && sourceCard?.zone === 'support';
+    const isCreatureEffect = hasCardType(srcData, 'Creature') && (sourceCard?.zone === 'support' || sourceCard?.zone === 'surprise');   // W46a: auch die auflösende Creature-Surprise (Zone 'surprise') ist ein Creature effect
     const dmgType = opts?.damageType;
     const dmgTypeMatches = dmgType === 'attack'
       || /_spell$/.test(dmgType || '')

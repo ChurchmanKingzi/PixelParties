@@ -814,6 +814,20 @@ function isCreatureSource(engine, source) {
 
 
 /**
+ * ★ W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): Ist die Quelle eine auflösende CREATURE-SURPRISE, die noch in ihrer Surprise Zone liegt
+ * (Cybug ANTS, Afflicted Vermin … wirken, BEVOR sie das Brett erreichen)? Dann gibt es keinen „Angreifer" auf dem Brett, den eine Retourkutsche (Firewall, Toxic Trap, Mountain Tear River …)
+ * treffen könnte — sie dürfen NICHT auf den Träger-Helden der Surprise ausweichen (der kein Angreifer ist). Booby Trap/Fireshield/Frost Rune lesen das schon über `isCreatureSource` +
+ * `resolveSourceCreature`; die Zonen-Leser rufen diesen Helfer.
+ */
+function istUngelegteCreatureSurprise(engine, source) {
+  if (!source || !engine) return false;
+  const inst = source.cardInstance || source;
+  if (inst?.zone !== 'surprise') return false;
+  const cd = inst.name ? engine._getCardDB()[inst.name] : null;
+  return !!cd && hasCardType(cd, 'Creature');
+}
+
+/**
  * v666 (Als Sweep 30.8.): Ist die Quelle eines Zielwahl-/Treffer-
  * Fensters ein Attack, ein Spell oder ein Kreatureneffekt?
  *
@@ -1130,6 +1144,6 @@ module.exports = {
   KONTROLL_RECHTE,
   isOwnSideSummonableCreature,
   isSummonablePileCreature,
-  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource, zaehltAlsAttackOderSpell, quelleIstAttackOderSpell,
+  resolveSourceCreature, isCreatureSource, istUngelegteCreatureSurprise, isAttackSpellOrCreatureSource, zaehltAlsAttackOderSpell, quelleIstAttackOderSpell,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

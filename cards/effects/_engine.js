@@ -33456,7 +33456,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!this.isDarkOceanActive()) return false;
     // Bevorzugt das oberste Kettenglied. Ist die Kette leer (hook-
     // getriebenes Fenster), zaehlt die gerade aufloesende Karte.
-    const top = chain?.[chain.length - 1] || this._currentEffectSource;
+    let top = chain?.[chain.length - 1] || this._currentEffectSource;
+    // W46a (Al, 22.10.2026: „Surprise Creature-Effekte sind immer noch Creature-Effekte"): ohne Kettenglied zählt die gerade AUFLÖSENDE Creature-Surprise (Zone 'surprise', cardType Creature)
+    // als Creature-Quelle ihres Steuerers — unter Dark Ocean darf der Gegner auf ihre Zielwahl/Wirkung nicht reagieren.
+    if (!chain?.length) {
+      const sp = this._surpriseLaufAktiv();
+      if (sp && hasCardType(this._getCardDB()[sp.inst.name], 'Creature')) top = { cardName: sp.inst.name, owner: sp.steuerer, cardType: 'Creature' };
+    }
     if (!top) return false;
     if (top.owner === pi) return false;          // eigene Creature: erlaubt
     return this._isCreatureSourcedLink(top);
@@ -40390,7 +40396,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // (Herkunft Surprise Zone = nicht Hand → `fromBoard`). Die Karte
     // liegt dabei noch OFFEN in ihrer Surprise Zone (erst danach Splice).
     let _beschwoerungNegiert = null;
-    if (!surpriseNegated && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
+    if (!surpriseNegated && !inst?._besiegtVorPlatzierung && hasCardType(cardData, 'Creature') && !isBakhmSlot && !this._inMctsSim
         && this._placementReactorHeld(steuerer ?? playerIdx)) {
       const _aeussere = this._inReactionCheck;
       try {
@@ -40425,7 +40431,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._negatedPlacementRoute(cardName, _besitzer, fromDeck ? 'none' : 'surprise', {
         zoneOwner: playerIdx, hostHeroIdx, instId: inst?.id,
       }, _beschwoerungNegiert);
-    } else if (!surpriseNegated && hasCardType(cardData, 'Creature')) {
+    } else if (!surpriseNegated && !inst?._besiegtVorPlatzierung && hasCardType(cardData, 'Creature')) {   // W46a: Rolling Boulder hat die Creature-Surprise vor der Platzierung besiegt → Ablage-Zweig unten
       // Place face-up as permanent creature in first free support zone
       const placed = this.safePlaceInSupport(cardName, playerIdx, heroIdx, -1);
       if (placed && inst) {
