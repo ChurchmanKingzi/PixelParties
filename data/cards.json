@@ -5869,7 +5869,7 @@
     "hp": 20,
     "atk": null,
     "cost": null,
-    "effect": "You may add a \"Deepsea\" Creature that was not summoned this turn from one of your Heroes' Support Zones to your hand to place this Creature into the same Support Zone. When you summon this Creature, your opponent must choose it as the target of all Attacks and Spells they play during their next turn, if possible.\nYou can only summon 1 \"Deepsea Horror Clown\" per turn.",
+    "effect": "You may add a \"Deepsea\" Creature that was not summoned this turn from one of your Heroes' Support Zones to your hand to place this Creature into the same Support Zone. When you summon this Creature, your opponent must choose it as the target of all Attacks, Spells and Creature effects they use during their next turn, if possible.\nYou can only summon 1 \"Deepsea Horror Clown\" per turn.",
     "archetype": "Deepsea",
     "setID": "PP DD",
     "banned": "",

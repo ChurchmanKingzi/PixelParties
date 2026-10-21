@@ -22511,7 +22511,7 @@ Bei keiner Quelle blieb ein Zweifel über Preis oder Bedingung. **Kunagi (Code):
 
 ## ★ Welle 43 / W43a — Hardy Slime: der Taunt gilt nur für Attacks, Spells und Creature effects; Ketten-Zielwahl bleibt frei; Alluring Light × Kunagi bleibt (Entscheidung Welle 43, 22.10.2026)
 
-Drei Antworten von Al zu den Rückfragen aus Welle 42. Neue Repros: `docs/niche-tests/repro/W43/a-01` (Quellenart-Matrix; auf der Basis 032abddf Exit 1) und `a-02` (Absicherung der Punkte 2 und 3 — Ist-Zustand, auf der Basis grün —, plus die Reopen-Zielwahl mit Book of Doom: dort auf der Basis Exit 1). Alte Repros wurden **nicht** umgestellt: `W41/a-01`, `W42/a-01`, `W42/a-02`, `W39/a-*` laufen unverändert grün (sie prüfen Attacks, Spells, Kreatureneffekte und Listen ohne erkennbare Quelle — alles Quellen, die weiter binden).
+Drei Antworten von Al zu den Rückfragen aus Welle 42. ★ Die sechs Fragen am Ende dieses Abschnitts hat Al in Welle 44 beantwortet (Surprises zählen nach cardType, Deepsea Horror Clown bekommt die Einschränkung; Rest bleibt) — siehe „Welle 44 / W44a" am Ende der Datei. Neue Repros: `docs/niche-tests/repro/W43/a-01` (Quellenart-Matrix; auf der Basis 032abddf Exit 1) und `a-02` (Absicherung der Punkte 2 und 3 — Ist-Zustand, auf der Basis grün —, plus die Reopen-Zielwahl mit Book of Doom: dort auf der Basis Exit 1). Alte Repros wurden **nicht** umgestellt: `W41/a-01`, `W42/a-01`, `W42/a-02`, `W39/a-*` laufen unverändert grün (sie prüfen Attacks, Spells, Kreatureneffekte und Listen ohne erkennbare Quelle — alles Quellen, die weiter binden).
 
 ### 1 · Taunt nur für Attacks, Spells und Creature effects (Punkt 1)
 **Al: „NUR Attacks, Spells und Creature effects, mit der Einschränkung, dass sie Hardy Slime selbst treffen können sollen. Den Effekttext ändern wie accordingly zu ‚all Attacks, Spells and Creature effects, if possible.'"**
@@ -22565,3 +22565,51 @@ Drei Antworten von Al zu den Rückfragen aus Welle 42. Neue Repros: `docs/niche-
 4. **Deepsea Horror Clown** hat denselben Wortlaut („all Attacks and Spells they play"): soll er dieselbe Einschränkung (nur Attacks, Spells, Creature effects) bekommen (ja) oder jede Zielwahl binden wie bisher (nein, so jetzt)?
 5. **Bomb Arrow / Racket Arrow:** ihre Kreaturenwahl („Additionally, you may choose a Creature …") ist ein Effekt eines Reaktions-Artefakts, kein Attack → kein Taunt (so jetzt); oder gehört sie zum Attack, auf den sie reagiert (Taunt ja)?
 6. **Area-/Anhang-Karten auf dem Brett** (Spell/Area, Spell/Attachment, z. B. The Seventh Circle of Hell, Overheal Shock): ihr Dauer-/Trigger-Effekt zählt nicht als Spell (kein Taunt, so jetzt); beim Ausspielen aus der Hand sind sie ein Spell (Taunt ja) — richtig so?
+
+## ★ Welle 44 / W44a — Taunt: Surprises zählen nach ihrem cardType; Deepsea Horror Clown wie Hardy Slime; Ist-Zustand zu Artefakt-Kreaturen, Fremd-Effekten, Pfeilen und Areas bestätigt (Entscheidung Welle 44, 22.10.2026)
+
+Antworten von Al auf die sechs Fragen aus Welle 43. Neue Repros: `docs/niche-tests/repro/W44/a-01` (Booby Trap × Lovely Teddy/Singing/Spirit of the Forbidden Grimoire — Ist-Zustand, auf der Basis 0e81006a grün), `a-02` (Surprise-Matrix nach cardType; auf der Basis Exit 1) und `a-03` (Absicherung Punkte 2, 5, 6; Deepsea Horror Clown: Punkt 4, auf der Basis Exit 1). Umgestellt: `W43/a-01` (siehe unten).
+
+### 1 · Surprises zählen nach ihrem cardType (Punkt 1)
+**Al: „Bluff müsste eine Attack sein, kein Spell. Aber ja, generell gilt: Eine Surprise, die Ziele wählt oder irgendwie affected, gilt als Attack, Spell oder Creature (eben je nach cardType)."**
+* `engine.tauntGiltFuerQuelle` (W43a) ordnet eine Quelle der Zone `surprise` jetzt nach dem Kartentyp aus `data/cards.json` ein: **Attack** → Attack (Bluff, Assault for Teocuilatl), **Spell** → Spell (Gold Trap, Jumpscare, Booby Trap, Firewall …), **Creature** → Creature effect (Water Golem, Afflicted Vermin, Cybugs …) — alle drei binden den Taunt. Ein anderer Kartentyp (Shield of Wisdom: **Artifact**) bleibt außerhalb. Die auflösende Surprise ist als Quelle schon über `_surpriseLauf` (`_tauntQuelleFuer`, `_executeDeferredSurprises`) verdrahtet — nur die Einordnung wurde geändert.
+* **`sourceEffectKind` bleibt unverändert** (liefert für Zone `surprise` weiter `'surprise'`); die Umleiter lesen es (siehe „Fundstellen" unten).
+* Betroffen ist nur, wer `tauntNurAttackSpellKreatur` deklariert: Hardy Slime und (Punkt 4) Deepsea Horror Clown; Puzzle-Taunts ohne Deklaration und Doomed Town Guard binden ohnehin jede Quelle.
+
+| Surprise | cardType | Wahl / Wirkung | Taunt jetzt | vorher |
+|---|---|---|---|---|
+| Gold Trap | Spell | Kreatur auf dem Brett wählen und auf die Hand nehmen | **ja** | nein |
+| Jumpscare | Spell | Stun-Ziel nach dem Angriff (aufgeschoben) | **ja** | nein |
+| Booby Trap, Firewall, Toxic Trap | Spell | Normalweg: fester Angreifer (keine Wahl); mit Telekinesis freie Zielwahl | **ja** (Telekinesis-Wahl) | nein |
+| Mountain Tear River | Spell | Brand auf den Angreifer; mit Destruction Magic 3 bis zu 2 Zusatz-Brände (Wahl) | **ja** | nein |
+| Aquatic Spear, Aquatic Arrows | Spell | Ablage-Trigger (`onBoardSentToDiscard`, nicht über `_surpriseLauf`): Schaden/Besiegen auf ein gewähltes Ziel; Quelle = Titelkarte | **ja** (Spell) | nicht gesondert gemessen |
+| Bluff | Attack | zieht Karten, keine Zielwahl | **ja** (Einordnung) | nein |
+| Anti Grav Trap, Assault for Teocuilatl, Bounce Trap, Creepy Clown in the Box, Man-Eater Birds, Reflection, Reverse Trap | Spell / Attack / Creature | kein Skript (nicht Teil des Projekts) | – | – |
+| Crimson Web, Defending the Gate, Flooding, Frost Rune, Glass Wall, Lunar Eclipse, Magic Mirror, Rolling Boulder, Skull Carpet Bombing, Spider Avalanche, Spider Silk Bridge, Spike Trap, Tharxian Horse, Aquatic Shield | Spell | wirken auf feste Ziele (Angreifer/Held/alle Gegnerziele), keine Spielerwahl | **ja** (Einordnung) | nein |
+| Shield of Wisdom | **Artifact** | Umleitungsziel wählen | **nein** (Frage 1) | nein |
+| Afflicted Pests, Afflicted Vermin, Cactus Creature, Cybug ANTS, Cybug LADYBUG, Mummy Maker Machine, Noble Mummy Guards, Water Golem | Creature | Zielwahl | **ja** | ja |
+| Cybug BEE/CENTIPEDE/LOCUST/RHINOCEROS/SCARAB, Jumper Spider, Mischief Militia - Banner Bearer, Pure Advantage Camel | Creature | feste Ziele | **ja** (Einordnung) | ja |
+
+Repro `W44/a-02`: Teil A prüft **alle 47** Surprise-Karten der Datenbank nach cardType, Teil B die echten Wege (Gold Trap, Jumpscare, Telekinesis → Booby Trap/Firewall/Toxic Trap, Mountain Tear River mit DM3), Teil C jede Surprise als Quelle einer gemischten Liste, Teil D Gegenproben (ohne Taunt, Slime nicht wählbar, Clown). `W43/a-01` umgestellt: Zellen Gold Trap/Jumpscare/Bluff (A, C, D) von „kein Taunt" auf „Taunt".
+
+**Fundstellen mit demselben Fehlschluss „Surprise ≠ Attack/Spell/Creature" (nicht geändert, an Al gemeldet):** `engine.sourceEffectKind` liefert für eine auflösende Surprise `'surprise'`; die fünf Leser `challenge.js` (`canRedirect`), `martyry.js`, `anti-magnet.js`, `alleria-the-queen-of-spiders.js` (`canHeroRedirect`) und `empty-armor.js` (`canBoardRedirect`) lassen nur `attack|spell|creature` zu, leiten also die Zielwahl einer Surprise (z. B. Gold Trap, Jumpscare, Mountain Tear River) nicht um. `isAttackSpellOrCreatureSource` (`_hooks.js`, Leser der Surprises/Schutzkarten) liest dagegen schon den Kartentyp aus der Datenbank und zählt Surprise-Spells als Spell.
+
+### 2 · Artefakte mit Subtyp Creature (Punkt 2)
+**Al: „Ja, die gelten, solange sie auf dem Board sind, als Creatures mit Creature-Effekten."** Ist-Zustand (W43a: Creature effect) bleibt: Debt-O-Tron-Modelle, Scrap Plow, Powder Keg, Pollution Spewer binden den Taunt. Repro `W44/a-03` (Klassifikation und echter Weg mit Debt-O-Tron Missing Parts).
+
+### 3 · Singing, Lovely Teddy, Spirit of the Forbidden Grimoire (Punkt 3)
+**Al: „Ja, da gelten jeweils die Creatures, die ihre Effekte ‚aktiviert bekommen' als die Verursacher; das heißt, man könnte z. B. per Booby Trap eine eigene, per Lovely Teddy besessene Creature treffen."** Ist-Zustand: die Kreatur, deren Skript wählt/wirkt, ist die Quelle (Taunt ja) und der „attacker" der Reaktionen. Repro `W44/a-01`: Der Teddy-Nutzer lässt die geborgte gegnerische Skeleton Archer auf den Booby-Trap-Helden des Gegners schießen → Booby Trap trifft den **Archer** (100 Schaden, besiegt, in der Ablage seines Besitzers), der Effekt wird negiert, der Held bleibt unversehrt; gleich für Singing (gewählte Kreatur) und den Geist (genutzte Kreatur, nicht der Geist selbst). Es war keine Änderung nötig.
+
+### 4 · Deepsea Horror Clown (Punkt 4)
+**Al: „Ja, und füge beiden auch ‚Creature effects' hinzu, genau wie beim Slime."** `deepsea-horror-clown.js` deklariert `tauntNurAttackSpellKreatur: true`. **Kartentext** (`data/cards.json`): „…your opponent must choose it as the target of all Attacks, Spells and Creature effects they use during their next turn, if possible." (vorher „…all Attacks and Spells they play…"). Balancing-Änderung. Doomed Town Guard bleibt unverändert (anderer Wortlaut). Repro `W44/a-03` Teil 4 (Klassifikation, Text, Skript, echte Wege Trank → kein Taunt, Attack → Taunt).
+
+### 5 · Bomb Arrow, Racket Arrow (Punkt 5)
+**Al: „Nein, die gehören NICHT zum Attack, das sind eigene separate Artifact-Effekte und umgehen damit den Taunt."** Ist-Zustand bleibt. Repro `W44/a-03` Teil 5 mit Gegenprobe (derselbe Spielzug: der Attack bindet, die Kreaturenwahl des Pfeils nicht).
+
+### 6 · Spell/Area und Spell/Attachment auf dem Brett (Punkt 6)
+**Al: „Korrekt, ja."** Ist-Zustand bleibt: Dauer-/Trigger-Effekt einer schon liegenden Area/eines Anhangs (Seventh Circle of Hell, Acid Rain, Overheal Shock, Anti Magic Enchantment) bindet nicht; beim Ausspielen aus der Hand als Spell schon. Repro `W44/a-03` Teil 6.
+
+### Fragen an Al (Ja/Nein)
+1. **Shield of Wisdom** hat den cardType „Artifact" (Subtyp Surprise): Seine Umleitungs-Zielwahl zählt damit weder als Attack, Spell noch Creature → kein Taunt. Passt das (ja), oder soll auch sie als Surprise-Effekt binden (nein)?
+2. **Umleiter** (Challenge, Martyry, Anti-Magnet, Alleria, Empty Armor): Sie leiten bisher nur Zielwahlen von Attack, Spell oder Creature effect um, eine auflösende **Surprise** (Gold Trap, Jumpscare, Mountain Tear River …) nicht. Soll sie nach demselben Grundsatz (Surprise zählt nach cardType) ebenfalls umgeleitet werden (ja) oder bleibt es dort bei „nein"?
+3. **Doomed Town Guard:** Meintest du mit „beiden" Hardy Slime + Deepsea Horror Clown (so umgesetzt) — oder auch den Doomed Town Guard (dessen Text „Your opponent can't choose other Creatures you control" hat keinen „Attacks and Spells"-Wortlaut)?

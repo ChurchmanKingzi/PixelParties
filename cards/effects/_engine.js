@@ -7327,8 +7327,8 @@ class GameEngine {
    * (`promptDamageTarget`, `promptMultiTarget`, `promptEffectTarget`/`ctx.promptTarget`, `normalizeValidTargets`, `doConfirmPotion`-Reopen). Gilt der Taunt eines Spötters mit
    * `tauntNurAttackSpellKreatur` für die Zielwahl dieser Quelle? JA, wenn die Quelle ein Attack, ein Spell oder ein Creature effect ist: Attack-/Spell-KARTE, Effekt, der als Attack/Spell
    * ZÄHLT (`_zaehltAlsArt`: Broghan, Brackle, Arthor, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Crusader's, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light,
-   * Duel; Alice), Effekt einer KREATUREN-Karte (aktiviert, On-Summon, Trigger, Kreatur-Surprise). NEIN bei Artefakt-/Trank-/Ability-/Helden-Effekten (ohne Attack-/Spell-Wertung),
-   * Surprises, die keine Kreatur sind, und bei Attack/Spell-Karten, die schon auf dem Brett liegen (Area/Anhang: kein Wirken der Karte, sondern deren Dauerwirkung).
+   * Duel; Alice), Effekt einer KREATUREN-Karte (aktiviert, On-Summon, Trigger), auflösende Surprise (W44a: nach ihrem cardType — Attack/Spell/Creature). NEIN bei Artefakt-/Trank-/Ability-/Helden-Effekten
+   * (ohne Attack-/Spell-Wertung), einer Surprise mit anderem Kartentyp (Shield of Wisdom: Artifact) und bei Attack/Spell-Karten, die schon auf dem Brett liegen (Area/Anhang: kein Wirken der Karte, sondern deren Dauerwirkung).
    * Art über `sourceEffectKind` (dieselbe Auslegung wie die Umleiter Challenge/Alleria/Anti-Magnet). UNBEKANNTE Quelle (kein Name, keine Karte) → JA (Ist-Zustand: der Taunt bindet).
    */
   tauntGiltFuerQuelle(quelle) {
@@ -7340,7 +7340,14 @@ class GameEngine {
     const cd = this._getCardDB()[name] || null;
     const istKreatur = !!cd && hasCardType(cd, 'Creature');
     let art = this.sourceEffectKind(obj);
-    if (art === 'surprise' && istKreatur) art = 'creature';   // Kreatur-Surprise (Water Golem, Afflicted Vermin …): ein Creature effect
+    // ★ W44a (Al, 22.10.2026): „Eine Surprise, die Ziele wählt oder irgendwie affected, gilt als Attack, Spell oder Creature (eben je nach cardType)." → die auflösende Surprise zählt nach
+    // ihrem Kartentyp aus der Datenbank: Attack → Attack (Bluff), Spell → Spell (Gold Trap, Jumpscare, Booby Trap …), Creature → Creature effect (Water Golem, Afflicted Vermin …).
+    // Eine Surprise mit anderem Kartentyp (Shield of Wisdom: Artifact) bleibt 'surprise' → kein Taunt.
+    if (art === 'surprise') {
+      if (cd && hasCardType(cd, 'Attack')) art = 'attack';
+      else if (cd && hasCardType(cd, 'Spell')) art = 'spell';
+      else if (istKreatur) art = 'creature';
+    }
     if (art === 'attack' || art === 'spell') {
       // Karte liegt schon dauerhaft auf dem Brett (Area-Zone, Anhang in der Support Zone): kein Wirken der Karte, sondern ein Dauer-/Trigger-Effekt (Al: Anhängen/Areas zählen nicht).
       // Ein Effekt, der nur als Attack/Spell ZÄHLT (`_zaehltAlsArt`), ist keine solche Karte.
@@ -34651,7 +34658,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     delete this.gs._deferredSurprises;
     for (const entry of deferred) {
       if (this.gs._spellNegatedByEffect) continue; // Skip if effect was negated
-      // W43a: die aufgeschobene Surprise (Jumpscare) ist die Quelle ihrer Zielwahl (`_tauntQuelleFuer`): eine Surprise, die keine Kreatur ist, ist kein Attack/Spell/Creature effect.
+      // W43a: die aufgeschobene Surprise (Jumpscare) ist die Quelle ihrer Zielwahl (`_tauntQuelleFuer`): W44a: sie zählt nach ihrem cardType als Attack/Spell/Creature effect.
       const _spVorher = this._surpriseLauf;
       if (entry.name && entry.ownerIdx != null) this._surpriseLauf = { inst: { name: entry.name, owner: entry.ownerIdx, controller: entry.ownerIdx, heroIdx: -1, zone: 'surprise' }, steuerer: entry.ownerIdx, cur: this._currentEffectSource, act: this._activationSource };
       try {
@@ -40171,7 +40178,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     let result = null;
     if (!surpriseNegated && script.onSurpriseActivate && inst) {
       const ctx = this._createContext(inst, { sourceInfo });
-      // W43a: die aufloesende Surprise ist die Quelle ihrer eigenen Zielwahlen (Taunt von Hardy Slime: nur Creature-Surprises sind ein Creature effect — `_tauntQuelleFuer`).
+      // W43a: die aufloesende Surprise ist die Quelle ihrer eigenen Zielwahlen (Taunt von Hardy Slime/Horror Clown: die Surprise zählt nach ihrem cardType als Attack/Spell/Creature effect — `_tauntQuelleFuer`).
       const _spVorher = this._surpriseLauf;
       this._surpriseLauf = { inst, steuerer, cur: this._currentEffectSource, act: this._activationSource };
       try { result = await script.onSurpriseActivate(ctx, sourceInfo); } finally { this._surpriseLauf = _spVorher; }

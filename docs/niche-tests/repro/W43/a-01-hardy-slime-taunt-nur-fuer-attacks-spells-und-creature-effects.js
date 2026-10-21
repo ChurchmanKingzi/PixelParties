@@ -4,7 +4,8 @@
 // Kartentext Hardy Slime: „When you summon this Creature, your opponent has to choose it with all Attacks, Spells and Creature effects they use until your next turn, if possible."
 // Regel: der Taunt (Skript-Deklaration `tauntNurAttackSpellKreatur`) gilt NUR, wenn die Zielwahl von einem Attack, einem Spell oder einem Creature effect stammt (`engine.tauntGiltFuerQuelle`, EINE Stelle für
 //  alle Wege). Als Attack/Spell zählen auch Effekte, die als Attack/Spell ZÄHLEN (Heldeneffekte Broghan & Co., Alice, Gegenstandseffekte, Greatmaw-Treffer). KEIN Taunt bei Artefakt-, Trank-, Ability-,
-//  Helden- (ohne Attack/Spell-Wertung), Equip-Effekten, Surprises/Reaktions-Artefakten, die keine Kreatur sind. Die Einschränkung „wenn Hardy Slime selbst ein mögliches Ziel ist" (W41a/W42a) bleibt.
+//  Helden- (ohne Attack/Spell-Wertung), Equip-Effekten, Reaktions-Artefakten. ★ W44a (Al): Surprises zählen NACH IHREM cardType (Attack/Spell/Creature) — Gold Trap, Jumpscare, Bluff binden den Taunt jetzt (umgestellte
+//  Zellen: A, C, D „Gold Trap/Jumpscare/Bluff"); der Deepsea Horror Clown hat dieselbe Einschränkung wie der Slime (umgestellt: E1). Die Einschränkung „wenn Hardy Slime selbst ein mögliches Ziel ist" (W41a/W42a) bleibt.
 // (A) Klassifikation `tauntGiltFuerQuelle` für alle Quellenarten (Tabelle)  (B) JA-Quellen über die echten Spielwege: alle Attack-zählenden Effekte (W39-Treiber), Attack, Spell, Kreatureneffekt (aktiviert,
 //     Tod-Trigger, Spielen), Kreatur-Surprises  (C) NEIN-Quellen über die echten Spielwege: Trank, Artefakt, Equip, Ability, Heldeneffekt, Surprise (Spell), Reaktions-Artefakt — jeweils mit gemischter Liste,
 //     in der der Slime ein mögliches Ziel ist (Beweis: es liegt an der Quelle, nicht an der Liste)  (D) Gegenproben: ohne Taunt, Slime nicht wählbar, Held-only  (E) andere Spötter unverändert
@@ -66,6 +67,9 @@ async function szene(me, op, hand, o = {}) {
         'Kreatur (W42a-Liste): Spirit of the Forbidden Grimoire': { name: 'Spirit of the Forbidden Grimoire', zone: 'support' },
         'Spell (W42a-Liste): The White Army': { name: 'The White Army', zone: 'hand' },
         'Spell (W42a-Liste): Sun Beam': { name: 'Sun Beam', zone: 'hand' },
+        'Surprise (Spell, verdeckt/aufgedeckt): Gold Trap': { name: 'Gold Trap', zone: 'surprise' },   // W44a (Al): Surprise zählt nach cardType — vorher NEIN
+        'Surprise (Spell): Jumpscare': { name: 'Jumpscare', zone: 'surprise' },   // W44a: vorher NEIN
+        'Surprise (Attack): Bluff': { name: 'Bluff', zone: 'surprise' },   // W44a: vorher NEIN
         'Kreatur-Surprise (aufgedeckt): Water Golem': { name: 'Water Golem', zone: 'surprise' },
         'Kreatur-Surprise (aufgedeckt): Afflicted Vermin': { name: 'Afflicted Vermin', zone: 'surprise' },
         'Artefakt-Kreatur auf dem Brett: Debt-O-Tron Model Missing Parts': { name: 'Debt-O-Tron Model Missing Parts', zone: 'support' },
@@ -97,9 +101,6 @@ async function szene(me, op, hand, o = {}) {
         'Hero-Passiv: Pes\'zet': { name: 'Pes\'zet, the Plague Bringer', zone: 'hero' },
         'Ascended Hero: Swampborne Waflav': { name: 'Swampborne Waflav', zone: 'hero' },
         'Ascended Hero: Deep-Drowned Waflav': { name: 'Deep-Drowned Waflav', zone: 'hero' },
-        'Surprise (Spell, verdeckt/aufgedeckt): Gold Trap': { name: 'Gold Trap', zone: 'surprise' },
-        'Surprise (Spell): Jumpscare': { name: 'Jumpscare', zone: 'surprise' },
-        'Surprise (Attack): Bluff': { name: 'Bluff', zone: 'surprise' },
         'Reaktions-Artefakt: Bomb Arrow': { name: 'Bomb Arrow', zone: 'hand' },
         'Reaktions-Artefakt: Racket Arrow': { name: 'Racket Arrow', zone: 'hand' },
         'Area-Spell, der schon im Spiel liegt: Acid Rain': { name: 'Acid Rain', zone: 'area' },
@@ -186,14 +187,14 @@ async function szene(me, op, hand, o = {}) {
       R.check('C gewöhnlicher Heldeneffekt Siphem: KEIN Taunt (Slime und weitere Gegnerziele wählbar)', gemischt(sip.t, op, slimeId, me), gegnerListen(sip.t, op, me));
       R.check('C Siphem: sauber', sauber(sip.t), { errors: sip.t.errors, audit: sip.t.audit() });
     }
-    {   // Surprise, die keine Kreatur ist: Gold Trap („You gain that Gold instead. Then, you may choose any Creature on the board and add it to your hand")
+    {   // Surprise (Spell): Gold Trap („You gain that Gold instead. Then, you may choose any Creature on the board and add it to your hand") — W44a (Al): zählt nach cardType als Spell → Taunt
       const { t } = await szene(me, op, []);
       t.putSurprise(me, 0, 'Gold Trap'); t.grantFor(me, 0, 'Gold Trap');
       await t.run(() => t.engine.actionGainGold(op, 30, { name: 'x', owner: op }));
-      R.check('C Surprise Gold Trap (Spell/Surprise): KEIN Taunt (Slime und weitere Kreaturen wählbar)', gemischt(t, op, slimeId, me), gegnerListen(t, op, me));
+      R.check('C Surprise Gold Trap (Spell/Surprise): Taunt JA (W44a; nur der Slime wählbar)', nurSlime(t, op, slimeId, me), gegnerListen(t, op, me));
       R.check('C Gold Trap: sauber', sauber(t), { errors: t.errors, audit: t.audit() });
     }
-    {   // Surprise, die keine Kreatur ist: Jumpscare (aufgeschobene Zielwahl nach dem Angriff des Gegners)
+    {   // Surprise (Spell): Jumpscare (aufgeschobene Zielwahl nach dem Angriff des Gegners) — W44a (Al): zählt nach cardType als Spell → Taunt
       const t = await H.fresh({ hand: me === 0 ? [[], ['Attack']] : [['Attack'], []], hp: 800, deckSize: 20, active: op, gold: 200 });
       const andere = t.put(op, 1, 0, H.INERT.creature); andere.turnPlayed = 1;
       stempel(t, t.put(op, 2, 2, 'Hardy Slime'), me);
@@ -202,7 +203,7 @@ async function szene(me, op, hand, o = {}) {
       t.targetFn = (v) => { const h = v.find(x => x.type === 'hero' && x.owner === me && x.heroIdx === 0); return [(h || v[0]).id]; };
       await t.play(op, 'Attack', { hero: 0 });
       const js = t.targets.filter(x => x.config && x.config.title === 'Jumpscare');
-      R.check('C Surprise Jumpscare (Spell/Surprise): KEIN Taunt (Slime und weitere Ziele wählbar)', js.length === 1 && js[0].who === me && js[0].valid.some(v => v.id === slimeId) && js[0].valid.filter(v => v.owner === op).length >= 3, t.targets.map(x => (x.config && x.config.title) + ':' + x.valid.map(v => v.id).join('+')));
+      R.check('C Surprise Jumpscare (Spell/Surprise): Taunt JA (W44a; auf der Gegnerseite nur der Slime wählbar)', js.length === 1 && js[0].who === me && js[0].valid.filter(v => v.owner === op).map(v => v.id).join(',') === slimeId, t.targets.map(x => (x.config && x.config.title) + ':' + x.valid.map(v => v.id).join('+')));
     }
     {   // Reaktions-Artefakt: Racket Arrow („Choose a Creature your opponent controls and return it …") in der Antwort auf den eigenen Attack
       const { t } = await szene(me, op, ['Attack', 'Racket Arrow']);
@@ -237,7 +238,7 @@ async function szene(me, op, hand, o = {}) {
       R.check('D Held-only-Liste mit Attack-Quelle: der Slime ist kein mögliches Ziel → alle drei Helden wählbar', angebot === [0, 1, 2].map(i => `hero-${op}-${i}`).join(','), angebot);
     }
     {   // direkte Zielwahl mit ausdrücklicher Quelle: dieselbe gemischte Liste, nur die Quelle wechselt
-      const quellen = { 'Attack': true, 'Fireball': true, 'Skeleton Archer': true, 'Book of Doom': false, 'Poison Vial': false, 'Occultism': false, 'Gold Trap': false, 'Bomb Arrow': false };
+      const quellen = { 'Attack': true, 'Fireball': true, 'Skeleton Archer': true, 'Book of Doom': false, 'Poison Vial': false, 'Occultism': false, 'Gold Trap': true, 'Bomb Arrow': false };   // W44a: Gold Trap (Spell-Surprise) → Taunt
       for (const [name, taunt] of Object.entries(quellen)) {
         const { t } = await szene(me, op, []);
         const l = [0, 1, 2].map(i => ({ id: `hero-${op}-${i}`, type: 'hero', owner: op, heroIdx: i, cardName: 'x' }));
@@ -251,12 +252,12 @@ async function szene(me, op, hand, o = {}) {
     }
 
     // ── (E) andere Spötter bleiben unverändert (nur Hardy Slime deklariert die Einschränkung) ──
-    {   // Deepsea Horror Clown (Kartentext: „…all Attacks and Spells they play"): Ist-Zustand — der Taunt bindet jede Zielwahl (auch einen Trank)
+    {   // Deepsea Horror Clown: W44a (Al): gleiche Einschränkung wie Hardy Slime („all Attacks, Spells and Creature effects they use") — ein Trank muss ihn NICHT wählen (Repro W44/a-03)
       const t = await H.fresh({ hand: me === 0 ? [['Poison Vial'], []] : [[], ['Poison Vial']], hp: 800, deckSize: 20, active: me, gold: 200 });
       const andere = t.put(op, 1, 0, H.INERT.creature); andere.turnPlayed = 1;
       stempel(t, t.put(op, 2, 2, 'Deepsea Horror Clown'), me);
       await t.play(me, 'Poison Vial');
-      R.check('E1 Deepsea Horror Clown (Ist-Zustand, Frage an Al): auch ein Trank muss ihn wählen', nurSlime(t, op, slimeId, me), gegnerListen(t, op, me));
+      R.check('E1 Deepsea Horror Clown (W44a): ein Trank muss ihn nicht wählen (Clown und weitere Gegnerziele wählbar)', gemischt(t, op, slimeId, me), gegnerListen(t, op, me));
     }
     {   // Doomed Town Guard („Your opponent can't choose other Creatures you control", v849 Book of Doom): bleibt für Artefakte
       const t = await H.fresh({ hand: me === 0 ? [['Book of Doom'], []] : [[], ['Book of Doom']], hp: 800, deckSize: 20, active: me, gold: 200 });
