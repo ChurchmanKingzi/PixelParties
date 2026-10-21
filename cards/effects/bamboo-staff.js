@@ -102,7 +102,8 @@ module.exports = {
     },
 
     // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Schlag, neues Ziel; das Weich-Einmal-pro-Zug (`_bambooFiredOnTurn`)
-    // wird weder geprüft noch neu gesetzt. W41a (Al, Punkt 2): der Auslöser — eine Karte aus der Ablage auf die Hand — fällt bei der Wiederholung ERNEUT an (siehe unten).
+    // wird weder geprüft noch neu gesetzt (der Auslöser — eine Karte aus der Ablage auf die Hand — ist keine Kosten des Schlags).
+    // ★ W42a (Al, 22.10.2026, Punkt 3): „when a card is added from your discard pile to your hand" ist die AKTIVIERUNGSBEDINGUNG, kein Preis — die Kunagi-Wiederholung verlangt KEINE weitere Ablagekarte (W41a zurückgenommen).
     onCardAddedFromDiscardToHand: async (ctx, wdh) => {
       // Only react when the recovered card landed in OUR controller's
       // hand — opponents recovering their own cards must not fire our
@@ -139,27 +140,6 @@ module.exports = {
       // fulfill).
       if (!anyValidTarget(gs)) return;
 
-      // ★ W41a (Al, 22.10.2026, Punkt 2: „in jedem Fall müssen die Kosten wiederholt werden!"): bei jeder Wiederholung durch Idej Sword - Kunagi muss ERNEUT eine Karte aus der Ablage auf die
-      // Hand kommen (der Auslöser des Stabs). Liegt keine (zugängliche) Karte in der Ablage, kommt kein Angebot. Der Spieler darf ablehnen (Abbruch der Kartenwahl oder der Zielwahl): dann wird
-      // nichts bewegt und nichts verbraucht. Bezahlt wird erst NACH der Zielwahl (`onTargetChosen`).
-      let kosten = null;
-      if (wdh) {
-        const ablage = ps.discardPile || [];
-        if (ablage.length === 0 || ps._discardLockedTurn === gs.turn
-            || !engine.pileOutAllowed(pi, 'discard', {}) || engine._isSearchBlocked(pi, {}, 'discard')) return;   // gesperrt/leer: kein Angebot
-        const zaehler = new Map();
-        for (const n of ablage) zaehler.set(n, (zaehler.get(n) || 0) + 1);
-        const gewaehlt = await engine.promptGeneric(pi, {
-          type: 'cardGallery', searchToHand: true, searchPile: 'discard',
-          cards: [...zaehler.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, source: 'discard', count })),
-          title: CARD_NAME,
-          description: 'Idej Sword - Kunagi: add another card from your discard pile to your hand to repeat the strike (Cancel = decline).',
-          cancellable: true,
-        });
-        if (!gewaehlt || gewaehlt.cancelled || !gewaehlt.cardName || !ablage.includes(gewaehlt.cardName)) return;   // abgelehnt: nichts bezahlt
-        kosten = gewaehlt.cardName;
-      }
-
       // Stamp BEFORE awaiting any prompt so a long-running player
       // pick can't get re-entered by a sibling
       // onCardAddedFromDiscardToHand fire (Xiong tutoring multiple
@@ -175,22 +155,7 @@ module.exports = {
       // pattern Loyal Terrier's follow-up uses.
       // ★ W39a: die Quelle des Schlags ist der Held (nicht die Bamboo-Staff-Instanz in der Support Zone, die Leser für eine Kreatur-Quelle halten: Firewall/Toxic Trap/Mountain Tear River).
       const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
-      let bezahlt = false;
       const target = await ctx.promptDamageTarget({
-        ...(wdh ? {
-          noSpellCancel: true,
-          // Kosten der Wiederholung erst nach der Zielwahl; während des Rückholens ruht der Merker von Kunagi (ein ANDERER Stab, der auf diese Rückholung auslöst, ist ein eigener Schlag).
-          onTargetChosen: async () => {
-            if (bezahlt) return true;
-            const merker = gs._kunagiWdh, ausschluss = gs._spellExcludeTargets;
-            delete gs._kunagiWdh; delete gs._spellExcludeTargets;
-            let inst = null;
-            try { inst = await engine.addCardFromDiscardToHand(pi, kosten, pi, { source: CARD_NAME }); }
-            finally { if (merker) gs._kunagiWdh = merker; if (ausschluss !== undefined) gs._spellExcludeTargets = ausschluss; }
-            bezahlt = !!inst;
-            return bezahlt;
-          },
-        } : {}),
         attackerSourceOverride: dmgSource,
         side: 'any',
         types: ['hero', 'creature'],

@@ -40,6 +40,11 @@
 //      `gs._attackVorgezaehlt` macht den späteren regulären Zählschritt dieser Karte zum No-op (`engine.zaehleAlsArt`).
 //    • Die Wiederholung ist ein ANGEBOT ("may"): das Abbrechen der ersten Abfrage der Wiederholung (Kostenwahl bzw. Zielwahl) lehnt sie ab — es wird nichts bezahlt, kein Stempel/keine Marke
 //      verbraucht, Kunagi triggert nicht. Fehlen die Kosten (kein weiteres Opfer, keine Karte in der Ablage, kein weiteres Equip …), kommt gar kein Angebot (Kosten-Tabelle: CARD_API.md, „Welle 41 / W41a").
+//
+//  ★ W42a (Al, 22.10.2026, Punkte 1, 3 und 4) — Präzisierung der W41a-Kostenregel: erneut bezahlt wird nur, was der Effekt als PREIS verlangt (Brackle, Infected Greatmaw: das Opfer; Javelin Throw: das weitere Equip).
+//    NICHT erneut bezahlt wird (a) das Ausspielen/die Aktion (Handkarte, Gold, Aktion: Kohta „spend your Action", Sword in a Bottle, Alluring Light, Javelin Throw als Karte) und (b) eine bloße
+//    AKTIVIERUNGSBEDINGUNG bzw. ein Auslöser (Sacrificial Dagger „when you sacrifice a target", Bamboo Staff „when a card is added from your discard pile"): deren Wiederholung kostet NICHTS extra.
+//    Das Abbrechen der Zielwahl/Kostenwahl der Wiederholung genügt als Ablehnen (kein eigenes Ja/Nein-Fenster).
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
