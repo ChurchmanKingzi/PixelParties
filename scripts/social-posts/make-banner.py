@@ -38,13 +38,14 @@ RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
 ACTORS = [
-    ('luna-the-flame-fairy', 10, 1290, 205, False, 'c'),
+    ('cute-nerd-magenta', 8, 1290, 195, True, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
-    ('brackle-the-catapulting-turtle', 8, 700, 1075, True, 'f'),
+    ('brackle-the-catapulting-turtle', 9, 690, 1080, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
     ('bakhm-the-desert-digger', 14, 180, 1000, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
 ]
+FRAMES = {'cute-nerd-magenta': 6}                        # Frame mit schräg angewinkelten Flügeln
 FRONT = {'chaos-diamond-the-cracked-keeper'}                                # vor dem Schriftband (Bakhms Kiefer verschwindet knapp dahinter)
 ACC = (240, 190, 72)                                # Gold des Rahmens
 
@@ -265,9 +266,12 @@ def bolt(p0, p1, seed=1, amp=34, branch=True):
         lines.append([pts[k]] + jagged(pts[k], (pts[k][0] + (p1[0] - p0[0]) * 0.25 + 40, pts[k][1] + (p1[1] - p0[1]) * 0.25 - 60), 50, 20, seed + 5)[1:])
 
     def draw(d):
-        for col, w in (((90, 8, 30), 8), ((226, 36, 60), 5), ((255, 215, 222), 2)):
+        for col, w in (((90, 8, 30), 12), ((226, 36, 60), 8), ((255, 215, 222), 3)):
             for ln in lines:
-                d.line([(x / CELL, y / CELL) for x, y in ln], fill=col, width=w)
+                n = len(ln) - 1
+                for i in range(n):                                  # je Abschnitt dünner: der Blitz läuft zur Spitze hin aus
+                    k = max(1, round(w * (1 - 0.9 * (i / max(1, n - 1)) ** 1.3)))
+                    d.line([(ln[i][0] / CELL, ln[i][1] / CELL), (ln[i + 1][0] / CELL, ln[i + 1][1] / CELL)], fill=col, width=k)
     return lowres(draw)
 
 
@@ -318,7 +322,7 @@ def banner():
 
     placed = {}
     for slug, px, x, y, flip, mode in ACTORS:
-        im = ml.monia(px)[0] if slug == 'monia' else sticker(slug, px, 0, flip)
+        im = ml.monia(px)[0] if slug == 'monia' else sticker(slug, px, FRAMES.get(slug, 0), flip)
         bb = im.getbbox()
         left = int(x - (bb[0] + bb[2]) / 2)
         top = int(y - bb[3]) if mode == 'f' else int(y - (bb[1] + bb[3]) / 2)
@@ -336,8 +340,10 @@ def banner():
     paste([k for k in placed if k not in FRONT])
 
     # Brackles eigenes Geschoss (Schädel-Bombe): Bogen vom Katapult auf Riffel zu; die Flammen seines Einschlags brennen vor Riffels Füßen
-    skull_im, fire_im = brackle_fx(8, True)
-    p0, p1, p2 = (575, 725), (850, 560), (1300, 915)
+    skull_im, fire_im = brackle_fx(12, True)[0], brackle_fx(10, True)[1]
+    _, bl_left, bl_top, bl_bb, _ = placed['brackle-the-catapulting-turtle']
+    p0 = (bl_left + bl_bb[0] + 0.1 * (bl_bb[2] - bl_bb[0]), bl_top + bl_bb[1] + 0.04 * (bl_bb[3] - bl_bb[1]))      # Spitze des Katapultarms
+    p1, p2 = (860, 560), (1300, 915)
     bez = lambda t: ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
 
     def arc(d):
@@ -359,10 +365,12 @@ def banner():
 
     def at_chaos(sx, sy):
         return (left_c + padc + (sx + 0.5) * 14, top_c + padc + (sy + 0.5) * 14)
-    for (sx, sy), dst, sd in (((4, 33), (1170, 800), 7), ((3, 4), (1110, 425), 2), ((45, 15), (1860, 40), 4)):
+    for (sx, sy), dst, sd in (((3, 4), (1110, 425), 2), ((3, 4), (1545, 55), 11), ((3, 4), (1700, 25), 5), ((45, 15), (1880, 40), 4), ((45, 15), (2010, 150), 8)):
         o = at_chaos(sx, sy)
         cv.alpha_composite(bolt(o, dst, seed=sd, branch=False))
-        cv.alpha_composite(star(o[0], o[1], 46, seed=sd, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
+    for sx, sy in ((3, 4), (45, 15)):
+        o = at_chaos(sx, sy)
+        cv.alpha_composite(star(o[0], o[1], 46, seed=3, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
     cv.alpha_composite(star(1185, 985, 38, seed=9, spikes=7))                      # Mündungsfeuer
     return cv
 
