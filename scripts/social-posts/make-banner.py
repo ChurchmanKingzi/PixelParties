@@ -37,19 +37,15 @@ RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255
 # „gespiegelt“ gleicht die Blickrichtung des Sheets aus (links soll alles nach rechts blicken, rechts nach links).
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
-# 'h': Kopf (x, y) des Sprites steht auf dem Punkt (x, y); dabei dürfen Flügel und Körper aus dem Bild ragen (ohne Rahmen-Beschnitt)
 ACTORS = [
-    ('quetzahuitl-receiver-of-sacrifices', 10, 1240, 260, True, 'h'),
+    ('luna-the-flame-fairy', 10, 1290, 205, False, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
     ('brackle-the-catapulting-turtle', 8, 700, 1075, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
-    ('bakhm-the-desert-digger', 14, 100, 1135, True, 'f'),
+    ('bakhm-the-desert-digger', 14, 180, 1000, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
 ]
-UNDER = {'quetzahuitl-receiver-of-sacrifices'}                                # hinter allem anderen
 FRONT = {'chaos-diamond-the-cracked-keeper'}                                # vor dem Schriftband (Bakhms Kiefer verschwindet knapp dahinter)
-QUETZ_TURN = 38                                     # Grad im Uhrzeigersinn: das Gesicht zeigt dadurch mehr nach links zu Monia
-QUETZ_HEAD = (55, 85)                               # Kopf im gespiegelten Frame (Sprite-Pixel), Drehpunkt und Ankerpunkt
 ACC = (240, 190, 72)                                # Gold des Rahmens
 
 
@@ -64,26 +60,6 @@ def sticker(slug, px, frame=0, flip=False):
     if flip:
         im = im.transpose(Image.FLIP_LEFT_RIGHT)
     return im
-
-
-def sticker_turned(slug, px, turn_cw, head, flip=True):
-    """Wie sticker(), aber der Frame wird vorher im Sprite-Raster (NEAREST) gespiegelt und um `turn_cw` Grad im Uhrzeigersinn
-    gedreht, damit die Pixel gleich groß bleiben. Gibt außerdem die Lage des Kopf-Punkts `head` (Sprite-Pixel des gespiegelten Frames)
-    im fertigen Bild zurück."""
-    spr = bp.Sprite(slug)
-    fr = spr.sheet.crop((0, 0, spr.fw, spr.fh))
-    if flip:
-        fr = fr.transpose(Image.FLIP_LEFT_RIGHT)
-    rot = fr.rotate(-turn_cw, resample=Image.NEAREST, expand=True)
-    th = math.radians(turn_cw)
-    dx, dy = head[0] - fr.width / 2, head[1] - fr.height / 2
-    hx, hy = rot.width / 2 + dx * math.cos(th) - dy * math.sin(th), rot.height / 2 + dx * math.sin(th) + dy * math.cos(th)
-    spr.sheet, spr.fw, spr.fh, spr.n, spr.px = rot, rot.width, rot.height, 1, px
-    od, ol, sp, pad = spr.layers(0, ml.WHITE, ml.INK)
-    im = Image.new('RGBA', sp.size, (0, 0, 0, 0))
-    for layer in (od, ol, sp):
-        im.alpha_composite(layer)
-    return im, (pad + hx * px, pad + hy * px)
 
 
 LEFT_RAMP = [(250, 238, 224), (232, 224, 246), (208, 200, 240), (178, 168, 230), (146, 134, 216)]        # kühl: die Helden
@@ -342,19 +318,10 @@ def banner():
 
     placed = {}
     for slug, px, x, y, flip, mode in ACTORS:
-        pivot = None
-        if slug == 'monia':
-            im = ml.monia(px)[0]
-        elif mode == 'h':
-            im, pivot = sticker_turned(slug, px, QUETZ_TURN, QUETZ_HEAD, flip)
-        else:
-            im = sticker(slug, px, 0, flip)
+        im = ml.monia(px)[0] if slug == 'monia' else sticker(slug, px, 0, flip)
         bb = im.getbbox()
-        if mode == 'h':
-            left, top = int(x - pivot[0]), int(y - pivot[1])
-        else:
-            left = int(x - (bb[0] + bb[2]) / 2)
-            top = int(y - bb[3]) if mode == 'f' else int(y - (bb[1] + bb[3]) / 2)
+        left = int(x - (bb[0] + bb[2]) / 2)
+        top = int(y - bb[3]) if mode == 'f' else int(y - (bb[1] + bb[3]) / 2)
         placed[slug] = (im, left, top, bb, mode)
 
     def paste(slugs):
@@ -365,9 +332,8 @@ def banner():
             cv.paste(im, (left, top), im)
 
     cv.alpha_composite(frame_layers())
-    paste(UNDER)
     ribbon_ornaments(cv)
-    paste([k for k in placed if k not in UNDER and k not in FRONT])
+    paste([k for k in placed if k not in FRONT])
 
     # Brackles eigenes Geschoss (Schädel-Bombe): Bogen vom Katapult auf Riffel zu; die Flammen seines Einschlags brennen vor Riffels Füßen
     skull_im, fire_im = brackle_fx(8, True)
@@ -393,7 +359,7 @@ def banner():
 
     def at_chaos(sx, sy):
         return (left_c + padc + (sx + 0.5) * 14, top_c + padc + (sy + 0.5) * 14)
-    for (sx, sy), dst, sd in (((4, 33), (1170, 800), 7), ((3, 4), (1250, 110), 2), ((45, 15), (1860, 40), 4)):
+    for (sx, sy), dst, sd in (((4, 33), (1170, 800), 7), ((3, 4), (1110, 425), 2), ((45, 15), (1860, 40), 4)):
         o = at_chaos(sx, sy)
         cv.alpha_composite(bolt(o, dst, seed=sd, branch=False))
         cv.alpha_composite(star(o[0], o[1], 46, seed=sd, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
