@@ -39,14 +39,14 @@ BRACKLE_PX = 12                                     # Brackle und sein Schädel 
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
 ACTORS = [
-    ('cute-nerd-magenta', 8, 1290, 195, False, 'c'),
+    ('cute-nerd-magenta', 10, 1275, 195, False, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
     ('brackle-the-catapulting-turtle', BRACKLE_PX, 560, 1110, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
     ('bakhm-the-desert-digger', 14, 180, 1000, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
 ]
-FRAMES = {'cute-nerd-magenta': 6}                        # Frame mit schräg angewinkelten Flügeln
+FRAMES = {'cute-nerd-magenta': 6, 'future-tech-gunslinger-riffel': 6}                        # Magenta: Frame mit schräg angewinkelten Flügeln; Riffel: Frame mit Mündungsfeuer am Lauf, ohne Projektil davor
 FRONT = {'chaos-diamond-the-cracked-keeper'}                                # vor dem Schriftband (Bakhms Kiefer verschwindet knapp dahinter)
 ACC = (240, 190, 72)                                # Gold des Rahmens
 
@@ -258,22 +258,44 @@ def jagged(p0, p1, seg=60, amp=34, seed=1):
     return pts + [p1]
 
 
-def bolt(p0, p1, seed=1, amp=34, branch=True):
-    """Roter Lichtblitz (wie der Blitz von Chaos-Diamond im Spiel): dunkler Rand, rote Mitte, helle Seele, optional mit Ast."""
+def bolt_lines(p0, p1, seed=1, amp=34, branch=False):
     pts = jagged(p0, p1, 44, amp * 1.1, seed)
     lines = [pts]
     if branch and len(pts) > 3:
         k = len(pts) // 2
         lines.append([pts[k]] + jagged(pts[k], (pts[k][0] + (p1[0] - p0[0]) * 0.25 + 40, pts[k][1] + (p1[1] - p0[1]) * 0.25 - 60), 50, 20, seed + 5)[1:])
+    return lines
 
+
+def bolt(lines):
+    """Roter Lichtblitz (wie der Blitz von Chaos-Diamond im Spiel): dunkler Rand, rote Mitte, helle Seele; läuft zur Spitze hin aus."""
     def draw(d):
         for col, w in (((90, 8, 30), 12), ((226, 36, 60), 8), ((255, 215, 222), 3)):
             for ln in lines:
                 n = len(ln) - 1
-                for i in range(n):                                  # je Abschnitt dünner: der Blitz läuft zur Spitze hin aus
+                for i in range(n):
                     k = max(1, round(w * (1 - 0.9 * (i / max(1, n - 1)) ** 1.3)))
                     d.line([(ln[i][0] / CELL, ln[i][1] / CELL), (ln[i + 1][0] / CELL, ln[i + 1][1] / CELL)], fill=col, width=k)
     return lowres(draw)
+
+
+def red_light(cv, lines, hands):
+    """Rotes Licht der Blitze: weicher Schein entlang der Blitze und um die Hände, per „Negativ multiplizieren“ (Screen) auf alles darunter
+    gelegt, damit Sprites, Rahmen und Hintergrund in der Nähe rötlich aufleuchten."""
+    from PIL import ImageFilter
+    mask = Image.new('L', (W, H), 0)
+    d = ImageDraw.Draw(mask)
+    for ln in lines:
+        n = len(ln) - 1
+        for i in range(n):
+            d.line([ln[i], ln[i + 1]], fill=255, width=int(46 - 30 * i / max(1, n)))
+    for (x, y) in hands:
+        d.ellipse([x - 90, y - 90, x + 90, y + 90], fill=255)
+    glow = np.asarray(mask.filter(ImageFilter.GaussianBlur(52)), dtype=np.float32) / 255.0 * 0.85
+    base = np.asarray(cv.convert('RGB'), dtype=np.float32)
+    add = np.array([255, 52, 70], dtype=np.float32)[None, None, :] * glow[..., None]
+    out = 255 - (255 - base) * (255 - add) / 255
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8), 'RGB').convert('RGBA')
 
 
 def star(cx, cy, r, seed=3, spikes=9, cols=((60, 20, 40), (255, 120, 50), (255, 224, 120), (255, 252, 230))):
@@ -347,14 +369,20 @@ def banner(frame_front=False):
     bez = lambda t: ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
 
     def arc(d):
-        n = 70
+        n = 46
+        puffs = []
         for i in range(n):
-            t = 0.9 * i / n
-            x, y = bez(t)
-            r = 3 + 4 * (i / n)                                    # Feuerspur wird zum Schädel hin breiter
-            d.ellipse([x / CELL - r, y / CELL - r, x / CELL + r, y / CELL + r], fill=(255, 130 + int(110 * i / n), 40 + int(110 * i / n)))
+            f = i / (n - 1)
+            x, y = bez(0.96 - 0.96 * f)
+            r = 8.5 * (1 - f) ** 0.7 + 1.5                              # hinten dünn, beim Schädel dick
+            col = ((255, 214, 70) if f < 0.2 else (255, 150, 40) if f < 0.45 else (226, 70, 44) if f < 0.7 else (140, 80, 90))
+            puffs.append((x / CELL, y / CELL, r, col))
+        for x, y, r, _ in reversed(puffs):                              # erst alle Ränder (dunkelrot), damit die Spur auch vor dem gelben Grund steht
+            d.ellipse([x - r - 1.2, y - r - 1.2, x + r + 1.2, y + r + 1.2], fill=(120, 34, 40))
+        for x, y, r, col in reversed(puffs):                            # dann von hinten nach vorn die Füllung: die dicken, hellen Puffs beim Schädel liegen oben
+            d.ellipse([x - r, y - r, x + r, y + r], fill=col)
     cv.alpha_composite(lowres(arc))
-    sx_, sy_ = bez(0.9)
+    sx_, sy_ = bez(0.96)
     cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
@@ -365,18 +393,19 @@ def banner(frame_front=False):
 
     def at_chaos(sx, sy):
         return (left_c + padc + (sx + 0.5) * 14, top_c + padc + (sy + 0.5) * 14)
-    for (sx, sy), dst, sd in (((3, 4), (1110, 425), 2), ((3, 4), (1545, 55), 11), ((3, 4), (1700, 25), 5), ((45, 15), (1880, 40), 4), ((45, 15), (2010, 150), 8)):
-        o = at_chaos(sx, sy)
-        cv.alpha_composite(bolt(o, dst, seed=sd, branch=False))
-    for sx, sy in ((3, 4), (45, 15)):
-        o = at_chaos(sx, sy)
+    hands = [at_chaos(3, 4), at_chaos(45, 15)]
+    lines = []
+    for (sx, sy), dst, sd in (((3, 4), (1110, 425), 2), ((3, 4), (1650, 40), 11), ((3, 4), (1780, 25), 5), ((45, 15), (1880, 40), 4), ((45, 15), (2010, 150), 8)):
+        lines += bolt_lines(at_chaos(sx, sy), dst, seed=sd)
+    cv = red_light(cv, lines, hands)                                               # rotes Licht auf Sprites und Hintergrund ringsum
+    cv.alpha_composite(bolt(lines))
+    for o in hands:
         cv.alpha_composite(star(o[0], o[1], 46, seed=3, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
     _, rf_left, rf_top, _, _ = placed['future-tech-gunslinger-riffel']
     padr = max(3, -(-2 * 7 * 2 // 8) + 1) * 8
-    mx, my = rf_left + padr + 31.5 * 8, rf_top + padr + 15.5 * 8                     # Mündung des unteren Laufs (Sprite-Pixel 31,5 | 15,5)
+    mx, my = rf_left + padr + 29.5 * 8, rf_top + padr + 15.5 * 8                     # Ende des Laufs im Frame 6 (Sprite-Pixel 29,5 | 15,5); das Mündungsfeuer zeichnet das Sheet selbst
     for dy_ in (-8, 8):
-        cv.alpha_composite(beam((mx - 20, my + dy_), (mx - 110, my + dy_), 8, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))   # Schüsse nach links
-    cv.alpha_composite(star(mx, my, 34, seed=9, spikes=7))                           # Mündungsfeuer
+        cv.alpha_composite(beam((mx, my + dy_), (mx - 90, my + dy_), 8, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))   # Schüsse nach links
     if frame_front:                                                                # Variante: der Rahmen liegt über allen Heroes
         cv.alpha_composite(frame_layers())
     return cv
