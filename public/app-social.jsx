@@ -7,7 +7,7 @@
 //                                    Benachrichtigungston — in jedem Menü, nur nicht
 //                                    im laufenden Duell.
 //    • <WhosOnlineList />            Liste im Hauptmenü (Tab neben „Top Players“)
-//                                    mit `onSpectate`: Klick auf einen Spieler im Duell fragt „Spectate? Yes/No“ (server.js `spectate_lookup`)
+//                                    mit `onSpectate`: Klick auf einen Spieler im Spiel fragt „Spectate? Yes/No“ (server.js `spectate_lookup`)
 //    • <DmChatWindow />              privates Chatfenster mit Challenge-Buttons
 //    • <SocialSidePanel room isHost/> dieselbe Liste als Kasten links in Online-Lobbys; der Raumbesitzer
 //                                    lädt per Klick → „Invite“ Spieler in seinen (offenen, nicht vollen) Raum ein
@@ -325,7 +325,7 @@ function WhosOnlineList({ meId, onOpen, invite, onSpectate }) {
   return (
     <>
     {spec && (
-      <div className="modal-overlay social-invite-overlay" role="dialog" aria-modal="true" aria-label="Spectate duel"
+      <div className="modal-overlay social-invite-overlay" role="dialog" aria-modal="true" aria-label="Spectate game"
            onClick={(e) => { if (e.target === e.currentTarget) setSpec(null); }}>
         <div className="modal animate-in social-invite">
           <div className="social-invite-icon">👁</div>
@@ -341,7 +341,7 @@ function WhosOnlineList({ meId, onOpen, invite, onSpectate }) {
           ) : (
             <>
               <div className="social-invite-title">
-                Spectate <span style={{ color: spec.row.color || 'var(--accent)' }}>{spec.row.name}</span>'s duel?
+                Spectate <span style={{ color: spec.row.color || 'var(--accent)' }}>{spec.row.name}</span>'s game?
               </div>
               {spec.info.hasSpecPw && <div className="social-invite-more">A spectator password is required.</div>}
               <div className="social-invite-btns">

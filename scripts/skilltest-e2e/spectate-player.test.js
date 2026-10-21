@@ -35,7 +35,7 @@ async function login(name, pw) {
 
     console.log('Kein Duell');
     let r = await C.ask('spectate_lookup', { userId: A.user.id });
-    check('Spieler ohne Duell: Fehlermeldung', r && r.error && /not in a running duel/i.test(r.error), r);
+    check('Spieler ohne Duell: Fehlermeldung', r && r.error && /not in a running game/i.test(r.error), r);
     r = await C.ask('spectate_lookup', { userId: C.user.id });
     check('Auf sich selbst: Fehlermeldung', r && !!r.error, r);
     r = await C.ask('spectate_lookup', {});

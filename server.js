@@ -14822,14 +14822,14 @@ io.on('connection', (socket) => {
       if (r.status !== 'playing' || !r.gameState || r.gameState.result) continue;
       if (r.players.some(pl => !pl.isBot && String(pl.userId) === targetId)) { room = r; break; }
     }
-    if (!room) return reply({ error: 'That player is not in a running duel any more.' });
+    if (!room) return reply({ error: 'That player is not in a running game any more.' });
     const alreadyIn = room.players.some(pl => pl.userId === currentUser.userId) || room.spectators.some(sp => sp.userId === currentUser.userId);
     if (!alreadyIn) {
       const busy = busyInRoom(currentUser.userId);
       if (busy) return reply({ error: 'You are ' + busy + ' right now.' });
       if (activeGames.has(currentUser.userId)) return reply({ error: 'You are in a game right now.' });
     }
-    reply({ ok: true, roomId: room.id, hasSpecPw: !!room.specPw, type: room.type, label: room.skillTest ? 'Skill Test' : 'Duel' });
+    reply({ ok: true, roomId: room.id, hasSpecPw: !!room.specPw, type: room.type, label: room.skillTest ? 'Skill Test' : 'Game' });
   });
 
   socket.on('swap_to_spectator', ({ roomId }) => {

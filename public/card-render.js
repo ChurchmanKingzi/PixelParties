@@ -811,8 +811,8 @@
       text: c.effect || '',
       soft: !!meta.soft,
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
-      skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '') : asc ? [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n') : '',
-      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '') : ''),
+      skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '/') : asc ? [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n') : '',
+      skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
       // Artifacts: die Kosten stehen im Wertefeld der Mitte. Variable Kosten tragen `costLabel` („4X", „5X", „X") — es wird gedruckt
       // statt der Zahl in `cost` (die der Server weiter rechnet).
       hp: c.hp, atk: type === 'artifact' || type === 'artifactCreature' ? (c.costLabel || c.cost) : c.atk,
