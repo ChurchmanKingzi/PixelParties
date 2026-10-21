@@ -266,7 +266,9 @@ function makeCrusaderArtifact(spec) {
     // Die Engine wertet den Rueckgabewert aus: `false` heisst
     // „abgebrochen" und gibt das reservierte Einmal-pro-Zug wieder frei
     // (server.js `doActivateEquipEffect`, `releaseHopt`).
-    async onEquipEffect(ctx) {
+    // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Schlag (80 Schaden samt eigener Klausel), neues Ziel; der
+    // Einmal-pro-Zug-Stempel (an der Instanz) gehört dem Engine-Weg und bleibt unberührt. Kosten hat der Schlag keine.
+    async onEquipEffect(ctx, wdh) {
       const engine = ctx._engine;
       const gs = engine.gs;
       const inst = ctx.card;
@@ -310,7 +312,7 @@ function makeCrusaderArtifact(spec) {
 
       // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette;
       // negiert eine Reaktion den Schlag, hat auch die eigene Klausel (Schaden/Besiegen) keinen Anlass.
-      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, ziele: [target], resolve: async () => {
+      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => require('./_loader').loadCardEffect(cardName).onEquipEffect(ctx, true), resolve: async () => {
       if (attackAnim) {
         await attackAnim(ctx, {
           engine, pi, feld, heroIdx, target,

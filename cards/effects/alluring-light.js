@@ -206,7 +206,42 @@ module.exports = {
 
         // W32a: der provozierte Angriff gehört dem GEGNER (Held des Angriffs) — Attack-Reaktionen (Magic Topaz, Arrows …) seiner Seite über die virtuelle Attack-Kette;
         // der gezwungene Held muss dafür nicht angriffsfähig sein (er wird gelockt, nicht aktiv: `casterCheck: false`).
-        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer], wirkName: angreifer.name, resolve: async () => {
+        // ★ W40a (Al, 22.10.2026, Punkt 3): Idej Sword - Kunagi („perform that Attack again against a different target your opponent controls") — trägt der gezwungene Held Kunagi und besiegt
+        // genau 1 Kreatur, schlägt ER erneut zu: sein Kontrolleur wählt (Kunagi-Besitzer = `oppIdx`) ein anderes Ziel unter denen, die der Spieler der Karte kontrolliert (normale Schutzregeln für
+        // diese Wahl: es ist eine Wahl des Gegners). Kosten: keine über den Schlag hinaus (die Karte ist gespielt, die Wahl des Helden bleibt) — der Held muss weiter angreifen können.
+        const wiederhole = async () => {
+          const h2 = gs.players[angreiferZiel.owner]?.heroes?.[angreiferZiel.heroIdx];
+          if (!h2?.name || h2.hp <= 0 || !engine.heroKannAngreifen(angreiferZiel.owner, angreiferZiel.heroIdx, oppIdx, { name: h2.name })) return false;
+          const ausser = (gs._kunagiWdh && gs._kunagiWdh.ausser) || [];
+          const liste2 = [...kontrollierteHeldenZiele(engine, pi), ...engine.getCreatureTargets(pi)].filter(z => !ausser.includes(z.id));
+          if (liste2.length === 0) return false;
+          const wahl2 = await engine.promptEffectTarget(oppIdx, liste2, {
+            title: CARD_NAME, description: `${h2.name} attacks again — choose a different target your opponent controls.`,
+            confirmLabel: '💥 Strike again!', maxSelect: 1, maxTotal: 1, cancellable: true, sourceCard: attackSource,
+          });
+          const opfer2 = zielVonAntwort(wahl2, liste2);
+          if (!opfer2) return false;
+          const slot2 = opfer2.type === 'hero' ? -1 : opfer2.slotIdx;
+          const atk2 = h2.atk || 0;
+          engine._broadcastEvent('play_zone_animation', { type: 'lure_beacon', owner: opfer2.owner, heroIdx: opfer2.heroIdx, zoneSlot: slot2, duration: 1200 });
+          await engine._delay(700);
+          await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer2], wirkName: h2.name, resolve: async () => {
+            const dmg2 = await engine._fireAttackDeclare(attackSource, opfer2, atk2);
+            engine._broadcastEvent('play_ram_animation', { sourceOwner: angreiferZiel.owner, sourceHeroIdx: angreiferZiel.heroIdx, targetOwner: opfer2.owner, targetHeroIdx: opfer2.heroIdx, targetZoneSlot: slot2, cardName: h2.name, duration: 1100 });
+            await engine._delay(620);
+            if (opfer2.type === 'hero') {
+              const hh = gs.players[opfer2.owner]?.heroes?.[opfer2.heroIdx];
+              if (hh && hh.hp > 0) await engine.actionDealDamage(attackSource, hh, dmg2, 'attack');
+            } else {
+              const inst2 = opfer2.cardInstance || engine.cardInstances.find(c => c.owner === opfer2.owner && c.zone === 'support' && c.heroIdx === opfer2.heroIdx && c.zoneSlot === opfer2.slotIdx);
+              if (inst2 && inst2.zone === 'support') await engine.actionDealCreatureDamage(attackSource, inst2, dmg2, 'attack', { sourceOwner: oppIdx, canBeNegated: true });
+            }
+            return true;
+          } });
+          engine.sync();
+          return true;
+        };
+        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer], wirkName: angreifer.name, wiederhole, resolve: async () => {
         const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
         // ── Animation ② der angelockte Held rammt hinein ──────────────

@@ -95,7 +95,9 @@ module.exports = {
     return engine.canSatisfySacrifice(pi, spec, ctx.card?.id);
   },
 
-  async onCreatureEffect(ctx) {
+  // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again") — derselbe Held schlägt erneut; die KOSTEN fallen erneut an (ein weiteres Opfer:
+  // ohne zahlbares Opfer findet die Wiederholung nicht statt und kostet nichts); der Einmal-pro-Zug-Stempel der Engine bleibt unberührt.
+  async onCreatureEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -107,7 +109,10 @@ module.exports = {
     if (heroes.length === 0) return false;
 
     let attacker;
-    if (heroes.length === 1) {
+    if (wdh) {
+      attacker = heroes.find(h => h.physOwner === wdh.physOwner && h.heroIdx === wdh.heroIdx);
+      if (!attacker) return false;
+    } else if (heroes.length === 1) {
       attacker = heroes[0];
     } else {
       const targets = heroes.map(h => ({
@@ -144,6 +149,7 @@ module.exports = {
     // picked, BEFORE the reaction windows. `attackerSourceOverride`
     // makes redirect / surprise / post-target reactions (and the
     // retaliation they drive) see the chosen Hero as the attacker.
+    if (wdh && !engine.canSatisfySacrifice(pi, spec, ctx.card?.id)) return false;   // W40a: kein weiteres Opfer → keine Wiederholung, nichts bezahlt
     let paid = false;
     const atkPreview = Math.max(0, attacker.hero.atk || 0);
     const target = await ctx.promptDamageTarget({
@@ -236,7 +242,7 @@ module.exports = {
 
     // Damage, dealt as that Hero's Attack.
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, ziele: [target], resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: attackerHeroIdx, heroOwner: attackerOwner, ziele: [target], wiederhole: () => module.exports.onCreatureEffect(ctx, { physOwner: attackerOwner, heroIdx: attackerHeroIdx }), resolve: async () => {
     if (tHero) {
       await engine.actionDealDamage(source, tHero, damage, 'attack');
     } else if (tInst) {

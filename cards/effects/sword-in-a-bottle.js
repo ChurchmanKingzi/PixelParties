@@ -339,8 +339,49 @@ module.exports = {
     });
     await engine._delay(180);
 
+    // ★ W40a (Al, 22.10.2026, Punkt 3): Idej Sword - Kunagi („perform that Attack again") — derselbe Held schlägt erneut, das Ziel wird neu gewählt („a different target your opponent controls":
+    // `promptDamageTarget`, nur Gegnerziele, inkl. Umleitung/Surprise-/Post-Target-Fenstern). Kosten: keine über den Schlag hinaus — der Trank ist mit dem Spielen verbraucht und wird nicht
+    // erneut gespielt; die Einmal-pro-Zug-Sperre bleibt unberührt. Kann der Held nicht mehr angreifen oder wird die Wahl abgebrochen/negiert, findet keine Wiederholung statt.
+    const wiederhole = async () => {
+      const h = gs.players[held.owner]?.heroes?.[held.heroIdx];
+      if (!h?.name || h.hp <= 0 || !engine.heroKannAngreifen(held.owner, held.heroIdx, pi)) return false;
+      const dmg2 = angriffswert(engine, held.owner, held.heroIdx);
+      if (!(dmg2 > 0)) return false;
+      const vorhanden = engine.cardInstances.find(c => c.zone === 'hand' && c.owner === pi && c.name === CARD_NAME);
+      const handInst = vorhanden || engine._trackCard(CARD_NAME, pi, 'hand');
+      const c2 = engine._createContext(handInst, {});
+      delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+      let ziel2;
+      try {
+        ziel2 = await c2.promptDamageTarget({
+          side: 'enemy', types: ['hero', 'creature'], damageType: 'attack', baseDamage: dmg2, attackerSourceOverride: quelle,
+          title: CARD_NAME, description: `${h.name} strikes again! Choose a different target your opponent controls — ${dmg2} damage (treated as an Attack).`,
+          confirmLabel: `🗡️ ${dmg2} Damage!`, confirmClass: 'btn-danger', cancellable: true,
+        });
+      } finally { if (!vorhanden) engine._untrackCard(handInst.id); }   // (Hilfsinstanz nur für den Zielwahl-Kontext — kein Geisterzustand)
+      delete gs._spellNegatedByEffect; delete gs._zielNegiertDurchSchutz;
+      if (!ziel2) return false;
+      const slot2 = ziel2.type === 'hero' ? -1 : ziel2.slotIdx;
+      engine._broadcastEvent('play_ram_animation', { sourceOwner: held.owner, sourceHeroIdx: held.heroIdx, targetOwner: ziel2.owner, targetHeroIdx: ziel2.heroIdx, targetZoneSlot: slot2, cardName: h.name, duration: 1000 });
+      await engine._delay(150);
+      engine._broadcastEvent('play_zone_animation', { type: 'quick_slash', owner: ziel2.owner, heroIdx: ziel2.heroIdx, zoneSlot: slot2 });
+      await engine._delay(180);
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [ziel2], resolve: async () => {
+        if (ziel2.type === 'hero') {
+          const z = gs.players[ziel2.owner]?.heroes?.[ziel2.heroIdx];
+          if (z?.name && z.hp > 0) await engine.actionDealDamage(quelle, z, dmg2, 'attack');
+        } else {
+          const inst2 = ziel2.cardInstance || engine.findCards({ controller: ziel2.owner, zone: 'support', heroIdx: ziel2.heroIdx }).find(c => c.zoneSlot === ziel2.slotIdx);
+          if (inst2) await engine.actionDealCreatureDamage(quelle, inst2, dmg2, 'attack', { sourceOwner: pi });
+        }
+        return true;
+      } });
+      engine.log('sword_in_a_bottle', { player: gs.players[pi]?.username, attacker: h.name, target: ziel2.cardName, damage: dmg2, repeat: true });
+      engine.sync();
+      return true;
+    };
     // W32a (Al, 22.10.2026): der Schlag zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [opferZ], resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [opferZ], wiederhole, resolve: async () => {
     if (opferZ.type === 'hero') {
       const ziel = gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx];
       if (ziel?.name && ziel.hp > 0) {

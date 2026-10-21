@@ -21,10 +21,21 @@
 //    triggers the next, and so on (bounded by the opponent's Creatures).
 //  • Draws happen the instant a Creature is defeated — one individual
 //    draw per kill, never a batch, interleaved with the repeats.
+//
+//  ★ W40a (Al, 22.10.2026, Punkt 3: „Kunagi soll auch Effekte wie Broghan wiederholen können. Im Fall von Brackle wäre dafür ein zweites Opfer
+//    nötig, im Fall von Effekten wie Javelin Throw müsste ein weiteres Equip entfernt werden."): auch ein Effekt, der als Attack ZÄHLT (Broghan,
+//    Brackle, Arthor, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw,
+//    Alluring Light …), wird wiederholt. Der Effekt hängt seine Wiederholung selbst an das Ereignis (`ctx._wiederhole`, siehe
+//    `engine.alsAttackKette({ wiederhole })`); sie führt den Schlag des Effekts mit seinen KOSTEN erneut aus (zweites Opfer, weiteres Equip …),
+//    lässt aber Einmal-Stempel, Limits und die Aktion unberührt (es ist „that Attack again", keine neue Aktivierung) und wählt das Ziel neu
+//    („a different target your opponent controls": `gs._kunagiWdh` → nur Gegnerziele, das vorige ausgenommen). Ist die Wiederholung nicht möglich
+//    (Kosten fehlen) oder wird sie abgebrochen/negiert, findet sie nicht statt bzw. endet die Kette — ohne Kosten, ohne Stempel.
+//    Der Pfeil-Bonus (Arrows: „that Attack") ist mit der ersten Attack verbraucht (`clearArmedArrows` vor jeder Wiederholung).
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
 const { canEquipToIdejHero, heroHasIdejSword } = require('./_idej-shared');
+const { clearArmedArrows } = require('./_arrows-shared');
 
 const CARD_NAME = 'Idej Sword - Kunagi';
 const LOOP_CAP = 30; // safety only — the chain ends when an Attack stops
@@ -46,6 +57,7 @@ module.exports = {
       // Styx 28.9.: gleicher Index reicht nicht — gleiche Brettseite (geliehener Held).
       if ((ctx.heroOwner ?? ctx.casterIdx) !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
       if (ctx.isSecondCast) return; // a repeat itself — don't recurse
+      if (ctx._wiederholung || ctx._engine.gs._kunagiWdh) return;   // W40a: die Wiederholung eines Effekts selbst — keine Verschachtelung
 
       const engine = ctx._engine;
       const gs = engine.gs;
@@ -92,6 +104,7 @@ module.exports = {
       // `_spellExcludeTargets` forces "a different target";
       // `_bartasSecondCast` skips its cost and marks it a second cast.
       const repeatAttack = async (excludeId) => {
+        await clearArmedArrows(engine, pi);   // W40a (Al): ein Pfeil-Bonus („that Attack") gilt nur für die ERSTE Attack — verbraucht, bevor die Wiederholung schlägt
         const prevCancelled = gs._spellCancelled;
         gs._spellDamageLog = [];
         gs._spellExcludeTargets = excludeId ? [excludeId] : [];
@@ -119,6 +132,33 @@ module.exports = {
 
       // The original Attack's kills — draw for them immediately.
       await drawPerKill(countDefeated(ctx.damageTargets));
+
+      // ── W40a: Effekt, der als Attack zählt (Broghan, Javelin Throw, Alluring Light …) ──
+      // Die Wiederholung kommt vom Effekt selbst (`ctx._wiederhole`); ohne sie (Duel: trifft nur Helden …) bleibt es bei den Karten für besiegte Kreaturen.
+      if (ctx._alsEffekt) {
+        let letzte = ctx.damageTargets || [];
+        let wache = 0;
+        const wiederhole = ctx._wiederhole;
+        while (typeof wiederhole === 'function' && countDefeated(letzte) === 1 && heroReady()
+               && ctx.card?.zone === 'support' && wache++ < LOOP_CAP) {
+          await clearArmedArrows(engine, pi);   // der Pfeil-Bonus der vorigen Attack ist verbraucht
+          const wdh = gs._kunagiWdh = { pi, ausser: [letzte[0]?.id].filter(Boolean), ausgefuehrt: false, ziele: [] };
+          const vorherAusschluss = gs._spellExcludeTargets;
+          gs._spellExcludeTargets = wdh.ausser;
+          try { await wiederhole({ ausser: wdh.ausser }); }
+          catch (err) { console.error(`[${CARD_NAME}] repeat-effect error for "${attackName}":`, err.message); }
+          finally {
+            delete gs._kunagiWdh;
+            if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
+          }
+          if (!wdh.ausgefuehrt) break;   // Kosten nicht zahlbar / abgebrochen / negiert: keine (weitere) Wiederholung
+          await drawPerKill(countDefeated(wdh.ziele));
+          engine.log('idej_kunagi_repeat', { player: gs.players[pi]?.username, attack: attackName, effect: true });
+          letzte = wdh.ziele;
+        }
+        engine.sync();
+        return;
+      }
 
       // ── Chain ── each Attack that defeats EXACTLY 1 Creature
       // repeats automatically; the repeat's kills draw the instant

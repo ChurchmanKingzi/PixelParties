@@ -101,7 +101,9 @@ module.exports = {
       delete ctx.card.counters._bambooFiredOnTurn;
     },
 
-    onCardAddedFromDiscardToHand: async (ctx) => {
+    // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi („perform that Attack again"): derselbe Schlag, neues Ziel; das Weich-Einmal-pro-Zug (`_bambooFiredOnTurn`)
+    // wird weder geprüft noch neu gesetzt (der Auslöser — eine Karte aus der Ablage auf die Hand — ist keine Kosten des Schlags).
+    onCardAddedFromDiscardToHand: async (ctx, wdh) => {
       // Only react when the recovered card landed in OUR controller's
       // hand — opponents recovering their own cards must not fire our
       // Staff. (`cardOwner` already accounts for charm/steal.)
@@ -122,7 +124,7 @@ module.exports = {
       if (!engine.heroKannAngreifen(feld, heroIdx, pi)) return;
 
       // Per-instance soft-HOPT.
-      if (ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
+      if (!wdh && ctx.card.counters._bambooFiredOnTurn === gs.turn) return;
 
       // Damage scales off the Hero's BASE Attack — printed-stat value,
       // unaffected by Vampiric Sword / Fighting / any buff or debuff.
@@ -141,7 +143,7 @@ module.exports = {
       // pick can't get re-entered by a sibling
       // onCardAddedFromDiscardToHand fire (Xiong tutoring multiple
       // cards in a single AoE wipe, for instance).
-      ctx.card.counters._bambooFiredOnTurn = gs.turn;
+      if (!wdh) ctx.card.counters._bambooFiredOnTurn = gs.turn;
 
       // Track damage targets via the spell-damage log so the fake
       // afterSpellResolved fire has accurate `damageTargets`.
@@ -165,7 +167,7 @@ module.exports = {
         cancellable: true,
       });
       if (!target) {
-        delete ctx.card.counters._bambooFiredOnTurn;
+        if (!wdh) delete ctx.card.counters._bambooFiredOnTurn;
         delete gs._spellDamageLog;
         return;
       }
@@ -192,7 +194,7 @@ module.exports = {
 
       // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
       // W39a: dieselbe Kette meldet auch `afterSpellResolved` als Attack (vorher feuerte der Staff es selbst, ohne `heroOwner`).
-      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], resolve: async () => {
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => module.exports.hooks.onCardAddedFromDiscardToHand(ctx, true), resolve: async () => {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {

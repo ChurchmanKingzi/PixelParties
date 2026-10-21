@@ -92,7 +92,8 @@ module.exports = {
     return eligibleCreatures(ctx._engine, ctx.cardOwner).length > 0;
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel, ohne Einmal-Stempel.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -145,7 +146,7 @@ module.exports = {
 
     const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [{ id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst }], resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [{ id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst }], wiederhole: () => module.exports.onHeroEffect(ctx, true), resolve: async () => {
       await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
         { sourceOwner: pi, canBeNegated: true });
       return true;

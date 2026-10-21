@@ -4923,6 +4923,8 @@ class GameEngine {
         let side = config.side || 'any';
         if (side === 'own') side = 'my';
         if (side === 'both') side = 'any';
+        // W40a (Al, 22.10.2026): Idej Sword - Kunagi — die Wiederholung der Attack geht „against a different target your opponent controls": nur Ziele des Gegners (`gs._kunagiWdh`).
+        if (engine.gs._kunagiWdh && engine.gs._kunagiWdh.pi === pi) side = 'enemy';
         const types = config.types || ['hero', 'creature'];
 
         // ── Truth-Seeing Eye ──
@@ -40561,7 +40563,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
    * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
    */
-  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck, ziele, wirkName }) {
+  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck, ziele, wirkName, wiederhole }) {
     // ★ W34a (Al, 22.10.2026, Punkt 3): EIN Treffer-Ereignis = EIN Zählschritt der Attack-Zähler (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`):
     // Quick Attack („first Attack"), Berserk (2), Knife Throw, Rioting Village (1), Blow of the Venom Snake & Co. — wie eine gespielte Attack-Karte (`doPlaySpell`, auch wenn die Kette
     // sie negiert). Die Sperren prüfen die Aufrufer VOR dem Treffer über `heroKannAngreifen`. Hier und nirgends sonst gezählt (kein Doppelzählen mit der Kette).
@@ -40594,7 +40596,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
       }
       if (hatZiele && res && !res.negated && !res.fizzled) {
-        await this.meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele: gs._spellDamageLog });
+        await this.meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele: gs._spellDamageLog, wiederhole });
       }
     } finally {
       if (hatZiele) { if (logVorher === undefined) delete gs._spellDamageLog; else gs._spellDamageLog = logVorher; }
@@ -40606,16 +40608,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * ★ W39a: `afterSpellResolved` als ATTACK für einen Effekt, der als Attack eines Helden zählt (siehe `alsAttackKette`): Attack-Kartendaten mit der Stufe = Fighting-Level des Helden,
    * `_alsEffekt: true` (kein gewirkter Spell: Eraser Beam; Leser, die „diese Attack wiederholen", schließen Effekte ohne Karte aus), `damageTargets` = die getroffenen Ziele.
    */
-  async meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele }) {
+  async meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele, wiederhole }) {
     const seite = Number.isInteger(heroOwner) ? heroOwner : pi;
     const einzig = [], gesehen = new Set();
     for (const z of (ziele || [])) { if (z && !gesehen.has(z.id)) { gesehen.add(z.id); einzig.push(z); } }
+    // ★ W40a (Al, 22.10.2026, Punkt 3): Idej Sword - Kunagi („perform that Attack again") wiederholt auch Effekte, die als Attack zählen. `wiederhole` = die Wiederholung des Effekts
+    // (Kosten fallen erneut an; Einmal-Stempel/Aktion bleiben unberührt — der Aufrufer ruft seine Wirkung ohne Stempel erneut auf); sie liegt als `_wiederhole` am Ereignis. Läuft gerade
+    // eine solche Wiederholung (`gs._kunagiWdh`), merkt sie sich hier Ziele und „wurde ausgeführt" (negiert/abgebrochen meldet nichts) und bietet sich selbst nicht erneut an.
+    const wdh = this.gs._kunagiWdh;
+    if (wdh) { wdh.ausgefuehrt = true; wdh.ziele = einzig; }
     try {
       await this.runHooks('afterSpellResolved', {
         spellName: wirkName || name,
         spellCardData: { name: wirkName || name, cardType: 'Attack', subtype: 'Normal', level: this.heldenAngriffStempel(seite, heroIdx).level, zaehltAlsArt: 'attack' },
         heroIdx, heroOwner: seite, casterIdx: pi,
         damageTargets: einzig, isSecondCast: false, _alsEffekt: true,
+        ...(wdh ? { _wiederholung: true } : (typeof wiederhole === 'function' ? { _wiederhole: wiederhole } : {})),
         _skipReactionCheck: true,
       });
     } catch (err) { console.error('[meldeAttackAufgeloest]', err.message); }
