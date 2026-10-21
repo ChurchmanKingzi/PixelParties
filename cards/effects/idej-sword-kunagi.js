@@ -31,6 +31,15 @@
 //    („a different target your opponent controls": `gs._kunagiWdh` → nur Gegnerziele, das vorige ausgenommen). Ist die Wiederholung nicht möglich
 //    (Kosten fehlen) oder wird sie abgebrochen/negiert, findet sie nicht statt bzw. endet die Kette — ohne Kosten, ohne Stempel.
 //    Der Pfeil-Bonus (Arrows: „that Attack") ist mit der ersten Attack verbraucht (`clearArmedArrows` vor jeder Wiederholung).
+//
+//  ★ W41a (Al, 22.10.2026, Punkte 2 und 6):
+//    • JEDE Wiederholung (Attack-KARTE wie Effekt) ist eine EIGENE Attack-Instanz: sie zählt für alle Attack-Zähler (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`,
+//      `hero._attacksThisTurn`, `onEffectCountedAsArt` → Berserk, Rioting Village, Mirjam, Knife Throw …) und unterliegt den Attack-Limits/Sperren (`heroKannAngreifen`): ist die Wiederholung
+//      dadurch gesperrt (Mirjam hat ihre eine Attack schon gehabt, Berserk-Limit, Rioting Village, Knife Throw …), triggert Kunagi für diesen Helden nicht — kein Angebot, nichts bezahlt,
+//      nichts verbraucht. Die ORIGINAL-Attack-KARTE wird dafür schon vor der ersten Wiederholung gezählt (sonst zählt sie der Server erst NACH `afterSpellResolved`); die Vormerkung
+//      `gs._attackVorgezaehlt` macht den späteren regulären Zählschritt dieser Karte zum No-op (`engine.zaehleAlsArt`).
+//    • Die Wiederholung ist ein ANGEBOT ("may"): das Abbrechen der ersten Abfrage der Wiederholung (Kostenwahl bzw. Zielwahl) lehnt sie ab — es wird nichts bezahlt, kein Stempel/keine Marke
+//      verbraucht, Kunagi triggert nicht. Fehlen die Kosten (kein weiteres Opfer, keine Karte in der Ablage, kein weiteres Equip …), kommt gar kein Angebot (Kosten-Tabelle: CARD_API.md, „Welle 41 / W41a").
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -85,7 +94,16 @@ module.exports = {
       const heroReady = () => {
         const h = gs.players[feld]?.heroes?.[heroIdx];
         return !!h?.name && h.hp > 0
-          && !h.statuses?.frozen && !h.statuses?.stunned && !h.statuses?.negated;
+          && !h.statuses?.frozen && !h.statuses?.stunned && !h.statuses?.negated
+          // W41a (Al, 22.10.2026, Punkt 6): die Wiederholung ist eine eigene Attack — Attack-Limits/Sperren (Mirjam, Berserk, Rioting Village, Knife Throw …) gelten: gesperrt = kein Angebot
+          && engine.heroKannAngreifen(feld, heroIdx, pi, { name: attackName });
+      };
+      // W41a: die ORIGINAL-Attack-KARTE ist beim Eintreffen dieses Hooks noch NICHT gezählt (der Server zählt nach `afterSpellResolved`) — vor der ersten Wiederholung nachholen
+      let originalGezaehlt = false;
+      const zaehleOriginal = async () => {
+        if (originalGezaehlt || ctx._alsEffekt) return;
+        originalGezaehlt = true;
+        await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: attackName, karte: true });
       };
 
       // "For every Creature the equipped Hero defeats, draw 1 card."
@@ -144,10 +162,12 @@ module.exports = {
           await clearArmedArrows(engine, pi);   // der Pfeil-Bonus der vorigen Attack ist verbraucht
           const wdh = gs._kunagiWdh = { pi, ausser: [letzte[0]?.id].filter(Boolean), ausgefuehrt: false, ziele: [] };
           const vorherAusschluss = gs._spellExcludeTargets;
+          const vorherAbbruch = gs._spellCancelled;   // W41a: ein abgelehntes Angebot (Abbruch der Wiederholung) darf die gerade auflösende Karte nicht als abgebrochen markieren
           gs._spellExcludeTargets = wdh.ausser;
           try { await wiederhole({ ausser: wdh.ausser }); }
           catch (err) { console.error(`[${CARD_NAME}] repeat-effect error for "${attackName}":`, err.message); }
           finally {
+            gs._spellCancelled = vorherAbbruch;
             delete gs._kunagiWdh;
             if (vorherAusschluss === undefined) delete gs._spellExcludeTargets; else gs._spellExcludeTargets = vorherAusschluss;
           }
@@ -165,6 +185,8 @@ module.exports = {
       // they land, and the repeat itself can chain the next one.
       let lastTargets = ctx.damageTargets || [];
       let guard = 0;
+      // W41a: Wiederholung = eigene Attack → die Original-Karte zuerst zählen, DANN die Limits prüfen (`heroReady` im Schleifenkopf)
+      if (attackScript?.hooks?.onPlay && countDefeated(lastTargets) === 1) await zaehleOriginal();
       while (
         attackScript?.hooks?.onPlay
         && countDefeated(lastTargets) === 1
@@ -172,6 +194,10 @@ module.exports = {
         && guard++ < LOOP_CAP
       ) {
         const repeatTargets = await repeatAttack(lastTargets[0]?.id || null);
+        if (repeatTargets.length > 0) {
+          // W41a (Al, 22.10.2026, Punkt 6): auch die Wiederholung einer Attack-KARTE ist eine eigene Attack-Instanz (Zähler, Mirjam, Berserk, Rioting Village …)
+          await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: feld, name: attackName, karte: true });
+        }
         await drawPerKill(countDefeated(repeatTargets));
         if (repeatTargets.length > 0) {
           engine.log('idej_kunagi_repeat', {
@@ -181,6 +207,8 @@ module.exports = {
         lastTargets = repeatTargets; // empty (cancelled) / non-lethal ends the loop
       }
 
+      // W41a: der Server zählt die Original-Karte nach diesem Hook — nicht ein zweites Mal (siehe `zaehleAlsArt`)
+      if (originalGezaehlt) gs._attackVorgezaehlt = { pi, heroIdx, name: attackName };
       engine.sync();
     },
   },

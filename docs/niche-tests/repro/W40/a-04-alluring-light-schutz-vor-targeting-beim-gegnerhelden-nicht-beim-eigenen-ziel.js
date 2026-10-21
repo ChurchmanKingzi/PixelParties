@@ -4,7 +4,8 @@
 // Kartentext: „Choose a Hero your opponent controls and a target you control. Your chosen target takes damage equal to the chosen Hero's Attack stat. This is treated as the chosen Hero attacking your chosen target."
 // Regel: Die Wahl des gegnerischen Helden (des gezwungenen Angreifers) ist eine normale Zielwahl gegen den Gegner — Butterfly Cloud (`untargetable`), Invisibility (`invisible`), Stealth (Stufe 1 der Karte), Alliance …
 //  gelten; ein Truth-Seeing Eye des Wirkers hebt sie auf. Die Schutzrechnung läuft über ALLE lebenden Gegnerhelden („solange andere Heroes gewählt werden können" — sind alle geschützt, bricht der Schutz zusammen);
-//  danach fallen Helden heraus, die nicht angreifen können (W34a). Ist keiner wählbar, ist die Karte unspielbar. Das EIGENE Ziel (Opfer) prüft keinen Schutz vor Targeting. Der Angriff ist ein Attack des gezwungenen
+//  danach fallen Helden heraus, die nicht angreifen können (W34a). Ist keiner wählbar, ist die Karte unspielbar.
+//  [W41a: KORREKTUR - die Schutzrechnung läuft über die Menge der Helden, die der Effekt wählen KANN (angriffsfähige); ist der geschützte Held der einzige, ist er wählbar (siehe W41/a-04).] Das EIGENE Ziel (Opfer) prüft keinen Schutz vor Targeting. Der Angriff ist ein Attack des gezwungenen
 //  Helden (W32a/W34a unverändert). Hardy Slime (Taunt): die Karte lässt den Gegner nichts „choosen" — kein Zwang (Ja/Nein-Frage an Al).
 // Exit 1 auf der Basis (der Schutz zählte nur gegen die Liste der angriffsfähigen Helden, Karte spielbar mit dem einzigen angriffsfähigen Helden, Truth-Seeing Eye ohne Wirkung), Exit 0 auf dem Branch.
 // Aufruf: node docs/niche-tests/repro/W40/a-04-alluring-light-schutz-vor-targeting-beim-gegnerhelden-nicht-beim-eigenen-ziel.js   (Exit 0 = korrekt)
@@ -66,15 +67,20 @@ async function licht(me, op, aufbau, o = {}) {
       R.check('alle drei Gegnerhelden untargetable: Schutz bricht zusammen, alle wählbar (wie bei jeder anderen Zielwahl)', x.r === true && x.angebot.angreifer && x.angebot.angreifer.waehlbar === [hero(0), hero(1), hero(2)].sort().join(','), x.angebot.angreifer);
     }
 
-    // ── Einziger angriffsfähiger Held ist geschützt, die anderen sind eingefroren: kein wählbarer Angreifer → Karte unspielbar ──
+    // ── W41a (Al, 22.10.2026, Punkt 4 - Korrektur gegenueber W40a): Schutz gilt nur, solange der EFFEKT noch einen ANDEREN Helden waehlen KANN. Fuer Alluring Light sind nur Helden moegliche Ziele, die angreifen
+    //    koennen; ist der geschuetzte Held der einzige angriffsfaehige (die anderen eingefroren/betaeubt), bricht der Schutz zusammen: er ist waehlbar und die Karte spielbar. (Vorher: unspielbar.) Ausfuehrliche Pruefung: W41/a-04. ──
     {
-      const x = await licht(me, op, async (t) => { t.heroStatus(op, 0, 'untargetable'); t.heroStatus(op, 1, 'frozen'); t.heroStatus(op, 2, 'frozen'); });
-      R.check('Held 0 untargetable, Helden 1 und 2 eingefroren: Alluring Light ist unspielbar (kein wählbarer Angreifer)', x.r === false && !x.angebot.angreifer && x.hpNachher.every((h, i) => h === x.hpVorher[i]), { r: x.r, angebot: x.angebot.angreifer });
-      R.check('  die Karte bleibt auf der Hand', x.t.gs.players[me].hand.includes('Alluring Light'), x.t.gs.players[me].hand);
+      const x = await licht(me, op, async (t) => { t.heroStatus(op, 0, 'untargetable'); t.heroStatus(op, 1, 'frozen'); t.heroStatus(op, 2, 'frozen'); }, { angreifer: 0 });
+      R.check('W41a: Held 0 untargetable, Helden 1 und 2 eingefroren: der geschuetzte Held ist der einzige moegliche Angreifer - wahlbar, Karte spielbar', x.r === true && x.angebot.angreifer && x.angebot.angreifer.waehlbar === hero(0), { r: x.r, angebot: x.angebot.angreifer });
+      R.check('W41a:   er schlaegt (der eigene Held 0 verliert 100 HP)', x.hpNachher[0] === x.hpVorher[0] - 100, { vorher: x.hpVorher, nachher: x.hpNachher });
     }
     {
-      const x = await licht(me, op, async (t) => { t.heroStatus(op, 0, 'invisible'); t.heroStatus(op, 1, 'stunned'); t.heroStatus(op, 2, 'stunned'); });
-      R.check('Held 0 invisible, Helden 1 und 2 betäubt: unspielbar', x.r === false, { r: x.r });
+      const x = await licht(me, op, async (t) => { t.heroStatus(op, 0, 'invisible'); t.heroStatus(op, 1, 'stunned'); t.heroStatus(op, 2, 'stunned'); }, { angreifer: 0 });
+      R.check('W41a: Held 0 invisible, Helden 1 und 2 betaeubt: einziger moeglicher Angreifer - waehlbar', x.r === true && x.angebot.angreifer && x.angebot.angreifer.waehlbar === hero(0), { r: x.r, angebot: x.angebot.angreifer });
+    }
+    {   // ist der geschuetzte Held selbst nicht angriffsfaehig und sind es die anderen auch nicht: keiner waehlbar -> unspielbar
+      const x = await licht(me, op, async (t) => { t.heroStatus(op, 0, 'untargetable'); t.heroStatus(op, 0, 'frozen'); t.heroStatus(op, 1, 'frozen'); t.heroStatus(op, 2, 'frozen'); });
+      R.check('Alle drei Gegnerhelden eingefroren (Held 0 zusaetzlich untargetable): kein moeglicher Angreifer -> unspielbar, Karte bleibt auf der Hand', x.r === false && x.t.gs.players[me].hand.includes('Alluring Light'), { r: x.r });
     }
 
     // ── Stealth Lv 1 (Gegner-Held 0): Alluring Light ist ein Spell Lv 1 → der Held ist als Angreifer nicht wählbar ──

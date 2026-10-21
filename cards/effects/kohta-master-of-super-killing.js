@@ -133,7 +133,7 @@ module.exports = {
     return [bestes.id];
   },
 
-  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel; weder die harte Sperre noch die Aktion werden erneut verbraucht oder geprüft.
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel; die harte Sperre wird weder erneut verbraucht noch geprüft (W41a: die Aktion dagegen wird erneut bezahlt, s. u.).
   async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
@@ -143,6 +143,20 @@ module.exports = {
     // Erst PRUEFEN, nicht beanspruchen. Wer hier ankommt, ohne dass der
     // Engine-Weg gelaufen ist (Sleeping Beauty & Co.), faellt hier raus.
     if (!wdh && hartGesperrt(engine, pi)) return false;
+
+    // ★ W41a (Al, 22.10.2026, Punkt 2: „in jedem Fall müssen die Kosten wiederholt werden!"): „spend your Action" ist die Zahlung des Effekts — bei jeder Wiederholung durch Idej Sword - Kunagi
+    // fällt sie erneut an. Die Hauptaktion des Zuges ist mit dem ersten Schlag verbraucht; die Wiederholung braucht also eine ZUSATZ-Aktion (Anbieter für „ability_activation"). Ohne sie kommt
+    // kein Angebot. Bezahlt wird nach der Zielwahl (Abbruch = abgelehnt, nichts verbraucht); die harte Sperre „einmal aktivieren" bleibt einmal gesetzt (es ist keine neue Aktivierung).
+    const feldWdh = ctx.cardHeroOwner ?? pi;
+    let aktionTyp = null;
+    if (wdh) {
+      aktionTyp = engine.findAdditionalActionForCategory(pi, 'ability_activation', heroIdx, feldWdh);
+      if (!aktionTyp) return false;
+    }
+    const zahleAktion = () => {
+      if (!wdh) return true;
+      return !!engine.consumeAdditionalAction(pi, aktionTyp);
+    };
 
     // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
     const { target: ziel, negiert } = await engine.heldenEffektZielwahl(ctx, {
@@ -169,6 +183,7 @@ module.exports = {
     if (negiert) {
       // Negiert: der Effekt ist verbraucht (harte Sperre gesetzt) und zählt als Attack dieses Helden.
       if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
+      if (!zahleAktion()) return false;   // W41a: die Zusatzaktion der Wiederholung ist mit dem negierten Treffer verbraucht
       await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
       engine.sync();
       return true;
@@ -177,6 +192,7 @@ module.exports = {
 
     // ── Punkt ohne Rueckkehr: jetzt die harte Sperre beanspruchen ────
     if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
+    if (!zahleAktion()) return false;   // W41a: erneut „spend your Action" (Zusatzaktion) — siehe oben
 
     // Styx 28.9.: „this Hero" steht auf der Brettseite `feld` — Quelle
     // traegt sie als `heroOwner`, der Held kommt als Objekt.

@@ -71,7 +71,12 @@ function kontrollierteHeldenZiele(engine, pi) {
  * @returns {object[]} Zielobjekte (`hero-<seite>-<idx>`) der wählbaren Angreifer
  */
 function waehlbareAngreifer(engine, pi, oppIdx, opts = {}) {
-  const alle = kontrollierteHeldenZiele(engine, oppIdx);
+  // ★ W41a (Al, 22.10.2026, Punkt 4 — Korrektur gegenüber W40a): „Der Clouded-Hero ist solange geschützt, wie sein Beherrscher andere Heroes als mögliche Ziele kontrolliert … es geht nur darum, dass
+  // ein gegebener Effekt noch andere Heroes des Cloud-Spielers wählen KANN — DANN gilt Cloud, sonst nicht." Mögliche Ziele dieses Effekts sind nur Helden, die ANGREIFEN können (W34a: ein eingefrorener/
+  // betäubter/… Held ist für Alluring Light kein Ziel). Die Schutzrechnung läuft deshalb über DIESE Menge (nicht mehr über alle lebenden Gegnerhelden): ist der geschützte Held der einzige, der
+  // angreifen kann, bricht der Schutz zusammen und er ist wählbar; gibt es noch einen anderen angriffsfähigen, bleibt er unwählbar. Für gewöhnliche Effekte bleibt ein Frozen/Stunned-Held ein
+  // mögliches Ziel (dort schützt Cloud weiter) — dafür sorgen die Engine-Picker, die gegen die vom Effekt angebotene Liste rechnen.
+  const alle = kontrollierteHeldenZiele(engine, oppIdx).filter(z => engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));
   const geschuetzt = new Set();
   if (!opts.ohneSchutz) {
     for (const id of engine._untargetableHeroIds(alle, pi)) geschuetzt.add(id);
@@ -83,7 +88,7 @@ function waehlbareAngreifer(engine, pi, oppIdx, opts = {}) {
       })) geschuetzt.add(t.id);
     }
   }
-  return alle.filter(z => !geschuetzt.has(z.id) && engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));
+  return alle.filter(z => !geschuetzt.has(z.id));
 }
 
 module.exports = {
