@@ -7085,6 +7085,20 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       setTT(false);
     }
   };
+  // Sicherheitsnetz fuer den Inline-Tooltip (Maus): kommt `mouseleave` nie an — etwa weil React die Karte beim
+  // Umsortieren (Draft-Sammlung per Drag) im DOM versetzt, waehrend der Zeiger darauf steht —, bliebe er
+  // haengen, bis man genau diese Karte erneut betritt und verlaesst. Solange er offen ist, schliesst ihn die
+  // naechste Zeigerbewegung ausserhalb der Karte.
+  const cardElRef = useRef(null);
+  useEffect(() => {
+    if (!tt || useSharedTooltip || window._isTouchDevice) return;
+    const onMove = (e) => {
+      const el = cardElRef.current;
+      if (el && !el.contains(e.target)) setTT(false);
+    };
+    document.addEventListener('pointermove', onMove, true);
+    return () => document.removeEventListener('pointermove', onMove, true);
+  }, [tt, useSharedTooltip]);
   // Touch: long-press to show tooltip, quick tap for action
   const handleClick = (e) => {
     if (window._isTouchDevice && window._longPressFired) {
@@ -7138,7 +7152,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   const onDragEnd = () => { window.activeDragData = null; };
   return (
     <>
-      <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
+      <div ref={cardElRef} className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
         style={style}
         draggable={!!dragData}
         onDragStart={onDragStart}
