@@ -22446,3 +22446,65 @@ Sechs Antworten von Al (Wortlaut je Punkt). Neue Repros: `docs/niche-tests/repro
 2. **Sword in a Bottle / Alluring Light / Javelin Throw (Kartenspiel):** Bleibt das Ausspielen der KARTE (Gold-Kosten, Handkarte, Aktion) bei der Wiederholung ausdrücklich unbezahlt (jetzt so; nur in-Effekt-Kosten wie das Equip bei Javelin Throw fallen erneut an)?
 3. **Dagger-Wiederholung — Opfer:** Reicht für das erneute Opfer eine **Kreatur** (jetzt so), oder darf/soll auch ein eigener **Held** geopfert werden können („a target you control")?
 4. **Kunagi-Angebot:** Genügt das Abbrechen der Kosten-/Zielwahl als „Ablehnen" (jetzt so), oder soll vor jeder Wiederholung ein eigenes Ja/Nein-Fenster erscheinen?
+
+## ★ Welle 42 / W42a — Antworten von Al zu den W41a-Rückfragen: Kunagi zahlt nur den Preis des Effekts (nicht Aktion, nicht Auslöser), Hardy Slime deckt auch selbstgebaute gemischte Listen (Entscheidung Welle 42, 22.10.2026)
+
+Fünf Antworten von Al (Wortlaut je Punkt). Neue Repros: `docs/niche-tests/repro/W42/a-01` (Taunt am Flaschenhals; auf der Basis 9f6cb59e Exit 1) und `a-02` (Absicherung Punkte 2 und 4; Ist-Zustand, Exit 0 auch auf der Basis). **Umgestellt** wurde `W41/a-02` (Dagger, Bamboo Staff, Kohta: jetzt ohne Zusatzkosten); `W40/a-03` ist wieder in seiner W40a-Form (die W41a-Ergänzungen für Opfer/Ablagekarten/Zusatzaktionen entfallen); `W41/a-01`, `W41/a-03`–`a-05`, `W39/a-*` unverändert grün.
+
+### 1 · Kohta × Kunagi: die Aktion des ersten Schlags reicht (Punkt 1)
+**Al: „Nein, verbraucht es nicht, ebenso wenig, wie normale Attacks mit Karten Zusatzaktionen mit Kunagi kosten. Die Aktion des ersten Schlags reicht."** → W41a zurückgenommen: die Kunagi-Wiederholung von Kohta, Master of Super-Killing verbraucht **keine** (Zusatz-)Aktion; die harte „einmal aktivieren"-Sperre bleibt einmal gesetzt. **Allgemeines Prinzip:** die Aktion bzw. das Ausspielen (Gold, Handkarte, Aktion) wird bei der Wiederholung nie erneut bezahlt.
+
+### 2 · Sword in a Bottle, Alluring Light, Javelin Throw (Punkt 2)
+**Al: „Korrekt, man muss keine extra Handkarten abwerfen und auch Gold nicht mehrfach zahlen."** Ist-Zustand bleibt: das Ausspielen der Karte wird nicht erneut bezahlt; nur die In-Effekt-Kosten fallen erneut an (Javelin Throw: ein weiteres ausgerüstetes Artefakt in die Ablage). Repro `W42/a-02` (Gold, Ablage, Handkarten wie ohne Kunagi; keine zusätzliche Rückfrage).
+
+### 3 · Sacrificial Dagger — und die Prüfung aller wiederholbaren Quellen (Punkt 3)
+**Al: „Stopp – Sacrificial Dagger hatte ich falsch im Kopf. Der hat gar keine Kosten, ‚when you sacrifice a target' ist lediglich seine Aktivierungsbedingung. Heißt, die zweite Aktivierung kostet NICHTS extra!"** → W41a zurückgenommen: die Kunagi-Wiederholung des Dolchs verlangt **kein** weiteres Opfer (keine Opferwahl); der Dolch-Stempel bleibt einmal gesetzt. Das widerruft Als frühere Aussage („in jedem Fall müssen die Kosten wiederholt werden") nur für den Dolch.
+
+**Regel (präzisiert):** erneut bezahlt wird nur, was der Effekt als **Preis** nennt („sacrifice … to …", ein in den Effekt eingebautes Ablegen). **Nicht** erneut bezahlt werden das Ausspielen/die Aktion (Punkte 1/2) und eine bloße **Aktivierungsbedingung bzw. ein Auslöser** („when …").
+
+| Quelle | Kartentext (Auszug) | Preis oder Bedingung? | Kosten bei Wiederholung |
+|---|---|---|---|
+| Sacrificial Dagger | „Once per turn, **when you sacrifice** a target you control, you may choose a target and deal damage …" | Bedingung (Auslöser) | **keine** (W41a zurückgenommen) |
+| Bamboo Staff | „Once per turn, **when a card is added from your discard pile to your hand**, you may choose a target and deal damage …" | Bedingung (Auslöser) | **keine** (W41a zurückgenommen) |
+| Kohta, Master of Super-Killing | „You may once per turn **spend your Action** to choose any target … and defeat it." | Aktion (= Ausspielen) | **keine** — die Aktion des ersten Schlags reicht (W41a zurückgenommen) |
+| Brackle | „You may once per turn **sacrifice** a Creature you control … **to** choose a target and deal damage …" | Preis | ein weiteres Opfer (W40a, unverändert) |
+| Infected Greatmaw | „You may once per turn **sacrifice** another Creature … **to** choose a target and deal damage …" | Preis | ein weiteres Opfer (W40a, unverändert) |
+| Javelin Throw | „Choose an Artifact equipped to that Hero and **send it to the discard pile**. Then, choose a target …" | Preis, im Effekt | ein weiteres Equip (Al, W40a/W42a); die Karte selbst nicht |
+| Sword in a Bottle | Karte: „Choose a Hero you control and a target your opponent controls …" | Ausspielen | keine |
+| Alluring Light | Karte: „Choose a Hero your opponent controls and a target you control …" | Ausspielen | keine |
+| Broghan, Arthor, Heragas | „You may once per turn choose a target and deal …" (Heragas: Zielbedingung „summoned before the end of your last turn") | kein Preis | keine |
+| Crusader's ×4 | „You may once per turn deal 80 damage to a target." | kein Preis | keine |
+| Duel | Karte; trifft nur Helden („defeats exactly 1 Creature" tritt nie ein) | – | – |
+
+Bei keiner Quelle blieb ein Zweifel über Preis oder Bedingung. **Kunagi (Code):** unverändert; `sacrificial-dagger.js`, `bamboo-staff.js` und `kohta-master-of-super-killing.js` sind auf den Stand W40a zurückgesetzt (W41a-Hunks für Wiederholungskosten entfernt; Abbruch der Zielwahl bleibt Ablehnen, Kunagi sichert `gs._spellCancelled`). Verträge: ein Effekt mit `wiederhole` schuldet bei der Wiederholung nur seinen **Preis** (Zahlbarkeit vor dem Bezahlen prüfen, bezahlen erst nach der Zielwahl, Abbruch = nichts bezahlt) — **nicht** seinen Auslöser und nicht Aktion/Ausspielen.
+
+### 4 · Kunagi-Angebot (Punkt 4)
+**Al: „Ja, das genügt"** → Ist-Zustand: Abbrechen der Kosten-/Zielwahl der Wiederholung gilt als Ablehnen; kein eigenes Ja/Nein-Fenster. Repro `W42/a-02` (Abbruch bei Broghan, Kohta, Dagger, Bamboo Staff: nur der erste Schlag, keine zusätzliche Rückfrage).
+
+### 5 · Hardy Slime: der Taunt gilt auch für selbstgebaute gemischte Listen (Punkt 5)
+**Al: „Ja, die sollen abgedeckt sein. Nur, wenn *Hardy Slime selbst* kein mögliches Ziel ist, greift der Taunt nicht."** Kartentext: „When you summon this Creature, your opponent has to choose it with all Attacks and Spells they use until your next turn, if possible."
+* **Umsetzung:** `promptEffectTarget` (der Flaschenhals, durch den auch `ctx.promptTarget` läuft) wendet den Taunt jetzt selbst an (`engine.markiereTauntGesperrte` → dieselbe Auslegung wie `_applyForcesTargetingFilter`: Reichweite „Seite des Spötters", Dauer `forcesTargeting_untilTurn`, Ruhen bei Frost/Betäubung/Negation, `forcesTargeting_creaturesOnly`). Unterschied zu den drei älteren Wegen: die Liste wird **nicht beschnitten, sondern ausgegraut** (`ineligible`, v1294), und gerechnet wird nur über die **wählbaren** Ziele — „if possible": steht der Slime nicht in der Liste oder ist er selbst ausgegraut (Immunität, `untargetable_all`, Erst-Runden-Schutz, Status/Schutz), greift der Taunt nicht; bietet der Effekt nur Helden an, auch nicht. Eigene Ziele des Wählenden bleiben wählbar.
+* **Nicht doppelt:** `promptDamageTarget`/`promptMultiTarget` wenden den Taunt weiter selbst an und reichen `_tauntAngewandt: true` an `promptEffectTarget`; Truth-Seeing Eye (`_truthSeeingEye`) hebt ihn auf; in den inneren Fenstern (Umleitung `_inRedirectWindow`, Post-Target-Reaktion `_inPostTargetWindow`) greift er nicht (das Ziel des Effekts ist dort längst gewählt). Der Wählende ist der `playerIdx` — wählt der Slime-Besitzer selbst (Chain Lightning & Co.: der Gegner wählt unter seinen eigenen Zielen), gibt es keinen Taunt.
+* **Weiterer Weg:** `server.js` `doConfirmPotion` baute die Liste einer **erneut geöffneten** Zielwahl (nach `aborted`) mit `script.getValidTargets` neu auf, ohne `normalizeValidTargets` — dort wird der Taunt jetzt ebenfalls angewandt.
+* **Taunt-Umgehungen (Inventur):**
+
+| Weg / Karte | vorher | nachher |
+|---|---|---|
+| `promptDamageTarget` (Attack, Fireball, Greatmaw, Hero-/Creature-Effekte mit Schaden) | Taunt | unverändert |
+| `promptMultiTarget` | Taunt | unverändert |
+| `normalizeValidTargets` (Ziel-Tränke/-Artefakte: Book of Doom, Sword in a Bottle …) | Taunt | unverändert |
+| `promptEffectTarget` direkt (selbstgebaute Listen mit Gegner-Helden **und** -Kreaturen): u. a. Skeleton Archer, Cardinal Beast Baihu/Zhuque, Bomblebee, Dive Bomblebee, Debt-O-Tron Model Missing Parts, Cheeky Monkee, Lovely Teddy, Mischief Militia - Heli Troopers, Swampborne/Deep-Drowned Waflav, The White Army, Pes'zet, Cure, Sun Beam, Gold Trap, Jumpscare, Bomb Arrow, Racket Arrow, Future Tech Bazooka, Water Golem, Afflicted Vermin, Ushabti, Spirit of the Forbidden Grimoire, 500 Piranhas in a Monster Suit | **umging den Taunt** | **Taunt** (nur der Slime von der Slime-Seite wählbar; Liste ausgegraut) |
+| `ctx.promptTarget` | umging (läuft in `promptEffectTarget`) | Taunt |
+| Alluring Light × Kunagi (Neuwahl des Opfers durch den Kunagi-Besitzer unter den Zielen des Light-Spielers) | umging | Taunt, wenn der Light-Spieler einen Slime mit Taunt gegen den Kunagi-Besitzer hat (der Kunagi-Besitzer wählt einen Angriff; der Slime ist ein mögliches Ziel). Die erste Opferwahl des Light-Spielers (eigene Ziele) unterliegt keinem Taunt. |
+| Reopen-Zielwahl in `doConfirmPotion` (nach `aborted`) | umging | Taunt |
+| `promptChainTargets` (Chain Lightning, Bottled Lightning, Cardinal Beast Qinglong) | kein Taunt | **unverändert, bewusst:** das Opfer wählt unter seinen eigenen Zielen (Wählender = Slime-Besitzer); siehe Frage 2 |
+| Held-only-Effekte (Memory Wipe, Whirlwind Strike, Alluring Light Angreifer-Wahl …) | kein Taunt | unverändert (Slime nicht in der Liste) |
+| `ctx.chooseTarget`/`promptChooseTarget` | kein Taunt | ohne Aufrufer, unverändert |
+
+* **Zielschutz-Wechselwirkung:** Schutz-/Redirect-Fenster laufen unverändert danach (`_zielwahlAbschliessen`); ein geschützter (Butterfly Cloud) Held der Slime-Seite war schon ausgegraut und bleibt es; Mehrfachziel-Listen (`maxTotal` > 1): nur der Slime ist von der Slime-Seite wählbar (Repro B1).
+* Repro `W42/a-01` (beide Sitze): gemischte Liste → nur der Slime; Held-only → kein Taunt; Slime ausgegraut/nicht in der Liste → kein Taunt; ohne Slime; abgelaufener Taunt; Slime-Besitzer wählt selbst; Truth-Seeing Eye; Mehrfachwahl; Cloud-Held, `untargetable_all`, Erst-Runden-Schutz; Skeleton Archer und Cardinal Beast Baihu als echte Karten; Attack (Engine-Picker) weiter unverändert.
+
+### Fragen an Al (Ja/Nein)
+1. **Taunt und Kartenart:** Der Kartentext sagt „all Attacks and Spells"; die Engine bindet seit jeher **jede** Zielwahl des Gegners (auch Kreatur-, Artefakt-, Fähigkeits- und Surprise-Effekte) und tut es jetzt auch in `promptEffectTarget` — soll das so bleiben (ja) oder nur für echte Attacks/Spells gelten (nein)?
+2. **Chain Lightning, Bottled Lightning, Cardinal Beast Qinglong:** Dort wählt das Opfer selbst die Ziele; soll ein Hardy Slime des Opfers trotzdem in die Kette gezwungen werden (heute nein)?
+3. **Alluring Light × Kunagi × Hardy Slime:** Der Kunagi-Besitzer wählt bei der Wiederholung das neue Opfer unter den Zielen des Light-Spielers; hat der Light-Spieler einen Hardy Slime mit Taunt gegen ihn, muss er jetzt den Slime wählen (vorher frei) — richtig so (ja) oder soll die Neuwahl frei bleiben (nein)?
