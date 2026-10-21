@@ -60,8 +60,9 @@ async function ensureSchema(db) {
  * @param {Function} o.nextNoonCETAfter
  * @param {Function} o.mostRecentNoonCETSec
  * @param {Function} o.uuidv4
+ * @param {Function} [o.getCardOfDay]   (nowMs?) → { date, card, amount } | null — die Karte des Tages samt Bonus (card-of-day.js)
  */
-function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 }) {
+function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4, getCardOfDay }) {
   const secret = process.env.BOT_SECRET || '';
   /** code → { userId, expires } */
   const codes = new Map();
@@ -183,6 +184,15 @@ function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextN
       for (const u of rows) users.push({ ...(await publicView(u, { withAvatar: false })), leaderboardRank: rankOf.get(u.id) || null });
       res.json({ users });
     } catch (err) { console.error('[bot/linked]', err.message); res.status(500).json({ error: 'failed' }); }
+  });
+
+  /** Karte des Tages (Berliner Tag) und der SC-Bonus für einen Sieg mit ihr — die Quelle der Wahrheit ist das Spiel, der Bot zeigt nur an. */
+  app.get(bot('/cotd'), botAuth, (req, res) => {
+    try {
+      const info = getCardOfDay ? getCardOfDay() : null;
+      if (!info) return res.status(404).json({ error: 'no_card_of_day' });
+      res.json(info);
+    } catch (err) { console.error('[bot/cotd]', err.message); res.status(500).json({ error: 'failed' }); }
   });
 
   /** Daily Challenge des verknüpften Spielers (nur lesen — gestartet wird im Spiel). */

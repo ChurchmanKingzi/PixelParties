@@ -2200,6 +2200,7 @@ class GameEngine {
     if (!this.gs._scTracking) {
       this.gs._scTracking = [ScTracking.neu(), ScTracking.neu()];
       ScTracking.startHp(this.gs._scTracking, this.gs.players);   // v1383: Overhealed
+      ScTracking.startKarten(this.gs._scTracking, this.gs.players);   // Card of the Day!: Startkarten (Helden, Fähigkeiten)
     }
 
     for (let pi = 0; pi < this.playerCount(); pi++) {
@@ -38846,6 +38847,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   async routeNegatedInitialCard(ownerIdx, cardName, chainResult, fromHandIdx, opts = {}) {
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
+    ScTracking.kartenName(this.gs._scTracking?.[ownerIdx], cardName);   // Card of the Day!: eine negierte Karte wurde trotzdem gespielt
     // v691: gestohlen (Key) — in die Hand des Diebes, mit Flug von der
     // Hand des Spielers zur Hand des Diebes (Handplatz-Ziel wie beim
     // Kadaver-Anspruch, sonst landet der Flug in der Handmitte).
@@ -49496,7 +49498,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // SC (v1382, Ascended): ein echter Aufstieg — keine nur gelegte Form.
     if (!opts.notAnAscension) {
       const t = this.gs._scTracking?.[pi];
-      if (t) t.ascended = true;
+      if (t) { t.ascended = true; ScTracking.kartenName(t, cardName); }   // Card of the Day!: die aszendierte Form
     }
     return { success: true, skipEndPhase };
   }

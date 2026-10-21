@@ -520,5 +520,16 @@
     "amount": 5,
     "limit": "daily",
     "requires": "lose_ranked_underdog"
+  },
+  {
+    "id": "card_of_the_day",
+    "title": "Card of the Day!",
+    "description": "Win a game using today's Card of the Day: {card}",
+    "amount": 30,
+    "limit": "daily_key",
+    "requires": "win_card_of_day",
+    "defaults": {
+      "card": "the Card of the Day"
+    }
   }
 ]

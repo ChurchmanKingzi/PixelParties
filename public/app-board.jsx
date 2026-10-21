@@ -30911,7 +30911,7 @@ function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloCh
                 {/* ★ v1471 (Als Befund 28.9.: „‚Play a Game (Daily)' zweimal bekommen … die Badge sagt nur ‚Daily'
                     — verwirrend"): „Daily!" nur noch für echte Tageslimits. Was je Gegner und Tag zählt
                     (`daily_per_opponent`, jede CPU ist ein eigener Gegner), nennt den Gegner: „Daily vs Siphem!". */}
-                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!'}</div>}
+                {bonusArt(r) && <div className="pp-cer-band">{bonusArt(r) === 'daily' ? (r.limit === 'daily' || r.limit === 'daily_key' ? 'Daily!' : (oppName ? `Daily vs ${oppName}!` : 'Daily per Foe!')) : 'Once!'}</div>}
                 {stufe > i && !phone && (
                   <div className="pp-cer-burst" aria-hidden="true">
                     {Array.from({ length: ppFxN(12) }).map((_, k) => (

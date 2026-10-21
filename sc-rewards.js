@@ -67,6 +67,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { berlinDate, cardOfDay } = require('./card-of-day');
 
 const CATALOG_PATH = path.join(__dirname, 'data', 'sc-rewards.json');
 
@@ -471,6 +472,14 @@ const CONDITIONS = {
   lose_ranked_underdog: async (c) => !c.isWinner && c.isRanked && isAccountPlayer(c.opp)
     && (await eloAbstand(c)) >= 100,
 
+  // Card of the Day!: Sieg in einem Spiel, in dem man die Karte des Tages benutzt hat (Hand, Deck, Effekt, Startkarte …).
+  // Gebucht je Berliner Tag (Schlüssel = Datum, nicht im Titel), Limit `daily_key` — Berliner Tag ≠ UTC-Tag der anderen Limits.
+  win_card_of_day: (c) => {
+    if (!c.isWinner || !c.cardOfDay?.card) return false;
+    if (!(c.t.cardsUsed || []).includes(c.cardOfDay.card)) return false;
+    return { key: c.cardOfDay.date, keyInTitle: false, vars: { card: c.cardOfDay.card } };
+  },
+
   good_game: (c) => c.turn >= 7
     && c.durationMs >= 5 * 60 * 1000
     && (c.tracking[0]?.totalHpLost || 0) >= 400
@@ -506,6 +515,13 @@ const LIMITS = {
     const prev = await c.db.get(
       `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ? AND opponent_ip = ?`,
       [c.ps.userId, reward.id, c.oppKey]);
+    return (prev?.cnt || 0) === 0;
+  },
+  // Einmal je Schlüssel (z. B. je Berliner Tag): gebucht unter `<id>:<key>`, daher genügt die Suche nach dieser Kennung.
+  daily_key: async (c, reward) => {
+    const prev = await c.db.get(
+      `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ?`,
+      [c.ps.userId, reward.id]);
     return (prev?.cnt || 0) === 0;
   },
   unlimited: () => true,
@@ -626,7 +642,7 @@ function loadCatalog(file = CATALOG_PATH) {
 // ═══════════════════════════════════════════════════════════════
 //  FABRIK
 // ═══════════════════════════════════════════════════════════════
-function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, catalog = loadCatalog(), now = () => Date.now() }) {
+function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, getCardOfDay, catalog = loadCatalog(), now = () => Date.now() }) {
   // Karten nach Name (Archetypal). Vom Server gereicht, sonst selbst geladen.
   let eigeneDB = null;
   const kartenDB = () => {
@@ -636,6 +652,14 @@ function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, catalog = load
       for (const k of JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'cards.json'), 'utf-8'))) eigeneDB[k.name] = k;
     }
     return eigeneDB;
+  };
+
+  // Karte des Tages (Berliner Tag). Vom Server gereicht (zum Testen austauschbar), sonst aus cards.json.
+  const karteDesTages = (nowMs) => {
+    if (getCardOfDay) return getCardOfDay(nowMs);
+    const date = berlinDate(new Date(nowMs));
+    const card = cardOfDay(date, Object.values(kartenDB()));
+    return card ? { date, card: card.name } : null;
   };
 
   /**
@@ -670,6 +694,8 @@ function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, catalog = load
     const tracking = gs._scTracking || [{}, {}];
     const isDisconnectWin = reason === 'disconnect_timeout';
     const results = {};
+    let tagesKarte = null;
+    try { tagesKarte = karteDesTages(nowMs); } catch (err) { console.error('[SC] Card of the Day:', err.message); }
 
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
@@ -689,6 +715,7 @@ function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, catalog = load
         siegeHeute: serien[pi]?.siegeHeute || 0,
         niederlagenHeute: serien[pi]?.niederlagenHeute || 0,
         cardDB: kartenDB(),
+        cardOfDay: tagesKarte,
       };
 
       const earned = [];
@@ -717,7 +744,8 @@ function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, catalog = load
           : (erg && typeof erg === 'object' && Number.isInteger(erg.amount)) ? erg.amount
           : reward.amount;
         if (!(betrag > 0)) continue;
-        const gebucht = key ? { ...reward, id: `${reward.id}:${key}`, title: `${reward.title} (${key})` } : reward;
+        const keyImTitel = !(erg && typeof erg === 'object' && erg.keyInTitle === false);
+        const gebucht = key ? { ...reward, id: `${reward.id}:${key}`, title: keyImTitel ? `${reward.title} (${key})` : reward.title } : reward;
         if (!(await limit(c, gebucht))) continue;
         const vars = (erg && typeof erg === 'object' && erg.vars) || {};
         earned.push({
