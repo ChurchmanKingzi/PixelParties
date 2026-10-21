@@ -24,7 +24,6 @@ Umgestellter alter Repro: `W44/a-02` (eine Zeile: „Gold Trap → spell, Bluff 
 * Dauerfeuer: 13 Karten × 2 Seiten + 6 Läufe mit Taunt-Stempel, 0 Unterschiede.
 * `Bugfix-Note` für Shield of Wisdom im Commit.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Shield of Wisdom** prüft heute nur Kreaturen auf dem Brett (Zone Support). Soll es auch die Zielwahl einer aufgelösten Creature-Surprise (Water Golem, Afflicted Vermin …) als „opponent's Creature effect" umleiten können?
-2. **Zielschutz-Reaktionen aus der Hand** (Cloak, Castling, Escape Device …) und **Surprise-Fenster** (Spike Trap …): Sollen sie die Wahl von Gold Trap und Jumpscare nach cardType ebenfalls als Attack/Spell/Creature effect sehen? Heute öffnen sich dort nur die fünf Umleiter und die übrigen Umleitungsfenster.
+Beide sind beantwortet und in [FIXES-WELLE-46.md](FIXES-WELLE-46.md) umgesetzt (dort stehen die neuen Rückfragen).
