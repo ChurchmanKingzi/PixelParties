@@ -5,7 +5,7 @@
 //  You may once per turn choose a target your opponent controls.
 //  That target cannot perform an Action, or, if it is a Creature,
 //  its effects are negated until the end of your opponent's next
-//  turn. This counts as a status effect.
+//  turn. This counts as a negative status effect.
 //
 //  Flavor: presented to the player as a "Silence" — the confirm
 //  label, the badge tooltip, and the dark-green diagonal-cut
@@ -158,7 +158,7 @@ module.exports = {
           gwSourceOwner: pi,   // W17b: eigene Kosten – Golden Wings schützt nur gegen den Gegner
           expiresAtTurn: gs.turn + 2,
           expiresForPlayer: pi,
-          cleansable: true,   // „This counts as a status effect."
+          cleansable: true,   // „This counts as a negative status effect."
         });
         // Stamp the "Silenced" cosmetic marker. The StatusBadges
         // renderer checks for `c._dkSilenced` and renders the

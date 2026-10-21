@@ -39716,6 +39716,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Schaden zurücknehmen: `currentHp` ist der laufende Wert; ohne ihn
     // fällt die Karte auf ihre Basis-HP zurück.
     delete inst.counters.currentHp;
+    // HP-Boni der letzten Beschwörung gehören ebenfalls nicht zur frischen Karte: Obergrenze (`maxHp`) und die Einmal-Marken der Beschwörungs-
+    // Boni (Layn, Summoning Circle). Sonst blieb der Max-Boost stehen, die Marke verhinderte die neue Vergabe — und die Karte kam mit Basis-HP
+    // zurück (z. B. 80/180, Meldung von Al). Beim nächsten Antreten feuert der Beschwörungs-Haken wieder.
+    delete inst.counters.maxHp;
+    delete inst.counters._laynBonus;
+    delete inst.counters._circleBonus;
     if (cleared.length) {
       this.log('surprise_reset_cleared', { card: inst.name, statuses: cleared });
     }

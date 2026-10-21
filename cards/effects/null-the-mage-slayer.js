@@ -3,7 +3,7 @@
 //  Hero (450 HP, 100 ATK, Start-Abilities: Fighting + Interference)
 //
 //  „Negate the effects of any targets hit by this Hero's Attacks for
-//   2 turns. This counts as a status effect."
+//   2 turns. This counts as a negative status effect."
 //
 //  BAUART
 //  ──────

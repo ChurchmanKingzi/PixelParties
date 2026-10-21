@@ -51313,7 +51313,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           ? ((gameState.players?.[pi]?.heroes) || [])[i] : null;
                         const curHp = _poolHeld
                           ? _poolHeld.hp
-                          : (cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp);
+                          : (cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp);   // wie `engine.creatureCurrentHp`: ohne Schaden gilt die (erhöhte) Obergrenze
                         const mHp = _poolHeld
                           ? _poolHeld.maxHp
                           : (cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp);
@@ -51435,7 +51435,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       })()
                     ) : (
                       <div className="board-stack">
-                        {(() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
+                        {(() => { const curHp = cc?.currentHp ?? cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
                     {/* ── Geteilte Zone: Stueckzahl + Nachschlagen ──
