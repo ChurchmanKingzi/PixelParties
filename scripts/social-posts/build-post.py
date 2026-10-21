@@ -457,6 +457,23 @@ def pick_music_start(path, window, lo=2.0, hi=75.0):
     return best
 
 
+def snap_to_onset(path, start, back=1.5, fwd=3.5):
+    """Verschiebt den Musikstart auf den kräftigsten Einsatz (Schlag) in [start − back, start + fwd], damit gleich in der ersten
+    Bildsekunde ein Schlag sitzt statt eines Auftakts."""
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(path), '-ac', '1', '-ar', '8000', '-f', 's16le', '-'],
+                         capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+    step = 160                                                   # 20-ms-Blöcke
+    n = len(x) // step
+    rms = np.sqrt((x[:n * step].reshape(n, step) ** 2).mean(axis=1))
+    best, best_v = start, -1.0
+    for i in range(max(6, int((start - back) / 0.02)), min(n - 1, int((start + fwd) / 0.02))):
+        v = rms[i] - rms[i - 6:i].mean()                         # Anstieg gegenüber den letzten 120 ms
+        if v > best_v:
+            best, best_v = i * 0.02, v
+    return max(0.0, best - 0.02)
+
+
 def music_path(card_name, override):
     """Musik: ausdrückliche Datei, sonst wie im Spiel (server.js `bgmSlugForHero`): längste zusammenhängende Wortfolge des
     Namens, für die `public/music/bgm_<slug>.ogg` existiert (so findet „Luna Pele“ `bgm_lunapele.ogg`)."""
@@ -488,10 +505,13 @@ def main():
     ap.add_argument('--clean', action='store_true', help='Einzelbilder nach dem Kodieren löschen (spart Platz)')
     ap.add_argument('--intro', choices=['on', 'off'], default=None, help='Einblenden am Anfang (Standard: Reel an, Post aus)')
     ap.add_argument('--feet', type=int, default=None, help='Standlinie des Sprites, px ab Kartenoberkante')
+    ap.add_argument('--punch', action='store_true', help='Kraftvoller Start: die erste halbe Sekunde mit Bildschirmwackeln, Druckwelle und Blitz, Musik ohne Einblenden und auf einen Schlag der Musik geschnitten')
     args = ap.parse_args()
     reel = args.format == 'reel'
     tag = args.format
     intro_on = (args.intro == 'on') if args.intro else reel
+    punch_on = args.punch
+    first_on = intro_on or punch_on        # die erste Schleife wird gesondert gerendert (Einblenden und/oder Start-Effekt)
     duration = args.duration if args.duration else (15.0 if reel else 30.0)
     oy = 180 if reel else 0                  # Reel: Inhalt höher, unten bleibt Platz für die Oberfläche (Beschreibung, Knöpfe)
 
@@ -603,7 +623,36 @@ def main():
         return out_l
     T_A, T_B, T_SPR, T_FLASH = (0.15, 0.75), (0.5, 1.0), 0.75, 0.14       # Sekunden
 
-    def render(f, intro):
+    T_PUNCH = 0.55                                                           # Sekunden
+
+    def punch_fx(img, f):
+        """Kraftvoller Start: Druckwelle (Pixelring, gedithert), kurzer Blitz und Bildschirmwackeln im Raster U, alles in der ersten halben Sekunde."""
+        ts = f / float(fps)
+        if ts >= T_PUNCH:
+            return img
+        k = 1.0 - ts / T_PUNCH                                               # 1 → 0
+        cw, ch = -(-W // U), -(-H // U)
+        ys, xs = np.mgrid[0:ch, 0:cw]
+        cx, cy = (card_x + CARD_W / 2) / U, (card_y + CARD_H * 0.45) / U
+        r = (14 + 150 * (ts / T_PUNCH) ** 0.55)                              # Radius in Zellen
+        ring = np.abs(np.hypot(xs + 0.5 - cx, ys + 0.5 - cy) - r) < 2.2
+        vis = ring & (k > np.tile(BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw])
+        m = np.repeat(np.repeat(vis.astype(np.uint8) * 255, U, axis=0), U, axis=1)[:H, :W]
+        img = img.copy()
+        img.paste(Image.new('RGB', (W, H), (255, 244, 204)), (0, 0), Image.fromarray(m, 'L'))
+        a = 0.42 * max(0.0, 1.0 - ts / 0.2) ** 1.5                           # Blitz: das Bild bleibt erkennbar
+        if a > 0:
+            img = Image.blend(img, Image.new('RGB', (W, H), WHITE), a)
+        amp = int(round(3 * k ** 1.5))                                       # Wackeln in Rasterzellen, klingt ab
+        if amp:
+            rng = np.random.default_rng(100 + f)
+            dx, dy = int(rng.integers(-amp, amp + 1)) * U, int(rng.integers(-amp, amp + 1)) * U
+            out = img.copy()
+            out.paste(img, (dx, dy))
+            img = out
+        return img
+
+    def render(f, intro, punch=False):
         ts = f / float(fps)
         canvas = bg.frame(f / loop)
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -652,7 +701,8 @@ def main():
             l2 = dissolve(logo_layer, (ts - T_A[0]) / (T_A[1] - T_A[0]) if intro else 1.0)
             if l2 is not None:
                 canvas.alpha_composite(l2)
-        return canvas.convert('RGB')
+        out_img = canvas.convert('RGB')
+        return punch_fx(out_img, f) if punch else out_img
 
     if args.cover_only is not None:
         prev = OUT / f'preview-{args.slug}-{tag}.png'
@@ -661,9 +711,9 @@ def main():
         return
     for f in range(loop):
         render(f, False).save(fdir / f'f{f:03d}.png')
-    if intro_on:
+    if first_on:
         for f in range(loop):
-            render(f, True).save(fdir / f'i{f:03d}.png')
+            render(f, intro_on, punch_on).save(fdir / f'i{f:03d}.png')
     cover = Image.open(fdir / ('f%03d.png' % (min(loop - 1, per * 3))) if reel else fdir / 'f000.png')
     cover_path = out / ('reel-cover.png' if reel else 'post.png')
     cover.save(cover_path)
@@ -676,14 +726,14 @@ def main():
     loops = max(1, math.ceil(duration / loop_s))
     dur = loop_s * loops
     cmd = ['ffmpeg', '-y', '-loglevel', 'error']
-    if intro_on and loops >= 2:
+    if first_on and loops >= 2:
         cmd += ['-framerate', str(fps), '-i', str(fdir / 'i%03d.png'),
                 '-framerate', str(fps), '-stream_loop', str(loops - 2), '-i', str(fdir / 'f%03d.png')]
         vfilter = ['-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]']
         n_in = 2
     else:
-        first = 'i%03d.png' if intro_on else 'f%03d.png'
-        cmd += ['-framerate', str(fps), '-stream_loop', str(loops - 1), '-i', str(fdir / first)] if not intro_on else \
+        first = 'i%03d.png' if first_on else 'f%03d.png'
+        cmd += ['-framerate', str(fps), '-stream_loop', str(loops - 1), '-i', str(fdir / first)] if not first_on else \
                ['-framerate', str(fps), '-i', str(fdir / first)]
         vfilter, n_in = [], 1
     if music:
@@ -691,8 +741,12 @@ def main():
         if m_start is None:
             m_start = pick_music_start(music, dur)
             print(f'Musik: energiereichstes Fenster ab {m_start:.1f} s')
+        if punch_on and args.music_start is None:
+            m_start = snap_to_onset(music, m_start)
+            print(f'Musik: Start auf den Schlag bei {m_start:.2f} s')
         cmd += ['-ss', str(m_start), '-i', str(music)]
-        amap = ['-map', f'{n_in}:a', '-af', f'afade=t=in:st=0:d=0.4,afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
+        fade_in = '' if punch_on else 'afade=t=in:st=0:d=0.4,'
+        amap = ['-map', f'{n_in}:a', '-af', f'{fade_in}afade=t=out:st={dur - 1.2:.2f}:d=1.2,loudnorm=I=-14:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k']
         if not vfilter:
             vfilter = ['-map', '0:v']
     else:

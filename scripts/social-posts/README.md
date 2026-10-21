@@ -18,6 +18,7 @@ und `post.mp4` (mindestens 30 s, der Loop wird wiederholt). Mit `--format reel`:
 |---|---|
 | `--format post\|reel` | Feed (Standard) oder Reel |
 | `--intro on\|off` | Einblenden am Anfang (Standard: Reel an, Post aus) |
+| `--punch` | Kraftvoller Start: erste halbe Sekunde mit Druckwelle, Blitz und Wackeln, Musik ohne Einblenden und auf einen Schlag geschnitten. Meist zusammen mit `--intro off` |
 | `--duration S` | Mindestlänge des Videos in Sekunden (Post 30, Reel 15) |
 | `--music DATEI` / `--music-start S` | Musik aus `public/music/` und Startzeit; Standard `bgm_<erstes Wort>.ogg` |
 | `--themes poison,fire,…` | Partikel-Themen erzwingen (`poison`, `fire`, `explosion`, `heal`, `holy`, `arcane`, `fight`, `ice`, `stars`); sonst aus `hero-themes.json`, danach automatisch aus Effekttext und Start-Fähigkeiten |
