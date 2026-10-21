@@ -52,13 +52,8 @@ const gegner = (v, op) => (v.find(x => x.type === 'equip' && x.owner === op) || 
     R.section('Sitz ' + me);
 
     // ── Heldeneffekte ohne Zusatzkosten: Broghan, Arthor, Heragas, Kohta (Stempel einmal, Wiederholung bis kein Ziel mehr genau 1 Kreatur besiegt) ──
-    // W41a (Al, 22.10.2026, Punkt 2): Kohta verlangt bei der Wiederholung erneut 'spend your Action' (Zusatzaktion) - hier mit genug Zusatzaktionen; Kosten-Pruefung selbst: W41/a-02.
     for (const n of ['Broghan', 'Arthor', 'Heragas', 'Kohta']) {
-      const e = await lauf(n, me, op, n !== 'Kohta' ? {} : { vorbereiten: async (t) => {   // W41a: Kohta braucht je Wiederholung eine Zusatzaktion
-        const traeger = t.put(me, 2, 2, H.INERT.artifact);
-        t.engine.registerAdditionalActionType('ZZ-aa', { label: 'ZZ', allowedCategories: ['ability_activation'], sourceLabel: 'ZZ' });
-        traeger.counters.aaGrants = { 'ZZ-aa': 5 }; t.engine._syncAAMirror(traeger);
-      } });
+      const e = await lauf(n, me, op);
       R.check(`${n}: alle 4 Kreaturen besiegt (Original + Wiederholungen)`, e.besiegt === 4, { besiegt: e.besiegt });
       R.check(`${n}: ≥ 3 Wiederholungen, Kunagi zieht je besiegter Kreatur 1 Karte`, e.wiederholt >= 3 && e.gezogen === 4, { wiederholt: e.wiederholt, gezogen: e.gezogen });
       // Einmal-Stempel nur einmal verbraucht: der zweite Versuch im selben Zug schlägt nicht (Ziele bleiben unversehrt)
@@ -121,9 +116,9 @@ const gegner = (v, op) => (v.find(x => x.type === 'equip' && x.owner === op) || 
       ok(R, n, e.t);
     }
 
-    // ── Bamboo Staff: W41a (Al, 22.10.2026, Punkt 2): der Ausloeser 'Karte aus der Ablage auf die Hand' faellt bei jeder Wiederholung erneut an (vorher: keine Zusatzkosten) - hier mit genug Ablagekarten ──
+    // ── Bamboo Staff: keine eigenen Kosten (der Auslöser „Karte aus der Ablage auf die Hand" ist keine Zahlung) ──
     {
-      const e = await lauf('Bamboo Staff', me, op, { szene: { discard: { [me]: Array(5).fill('ZZ Filler') } }, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => ({ cardName: 'ZZ Filler' }) }); } });
+      const e = await lauf('Bamboo Staff', me, op);
       R.check('Bamboo Staff: Original + Wiederholungen besiegen alle 4 Kreaturen, Kunagi zieht je Kreatur', e.besiegt === 4 && e.gezogen === 4 && e.wiederholt >= 3, { besiegt: e.besiegt, gezogen: e.gezogen, wiederholt: e.wiederholt });
       const vor = e.t.treffer.length;
       await e.t.run(() => e.t.engine.addCardFromDiscardToHand(me, 'ZZ Filler', me, { source: 'W40a' }));
@@ -131,9 +126,9 @@ const gegner = (v, op) => (v.find(x => x.type === 'equip' && x.owner === op) || 
       ok(R, 'Bamboo Staff', e.t);
     }
 
-    // ── Sacrificial Dagger: W41a (Al, 22.10.2026, Punkt 2): jede Wiederholung verlangt ein weiteres Opfer (vorher: keine Zusatzkosten) - hier mit genug Opfer-Kreaturen ──
+    // ── Sacrificial Dagger: keine eigenen Kosten (das Opfer ist der Auslöser, nicht die Zahlung des Schlags) ──
     {
-      const e = await lauf('Sacrificial Dagger', me, op, { wrap: (v) => (v.length && v.every(x => x.owner === me)) ? [v[0].id] : 'orig', vorbereiten: async (t) => { for (let i = 0; i < 4; i++) t.put(me, 2, i % 3, H.INERT.creature); } });
+      const e = await lauf('Sacrificial Dagger', me, op);
       R.check('Sacrificial Dagger: Original + Wiederholungen besiegen alle 4 Kreaturen, Kunagi zieht je Kreatur', e.besiegt === 4 && e.gezogen === 4 && e.wiederholt >= 3, { besiegt: e.besiegt, gezogen: e.gezogen, wiederholt: e.wiederholt });
       ok(R, 'Sacrificial Dagger', e.t);
     }

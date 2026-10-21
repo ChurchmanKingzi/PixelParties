@@ -1,10 +1,10 @@
 'use strict';
 // W41a · Punkt 2 · Al, 22.10.2026 (Antwort auf W40a-Rückfrage 2): „Nein, in jedem Fall müssen die Kosten wiederholt werden! Natürlich darf der Spieler das auch ablehnen, dann triggert Kunagi nicht und seine
-//  Ladung wird nicht verbraucht (gilt generell)."
-// Regel: bei jeder Wiederholung durch Idej Sword - Kunagi („perform that Attack again") fallen die Kosten/der Auslöser des wiederholten Effekts erneut an:
-//   Sacrificial Dagger → ein WEITERES Opfer, Bamboo Staff → ERNEUT eine Karte aus der Ablage auf die Hand, Kohta, Master of Super-Killing → ERNEUT „spend your Action" (Zusatzaktion),
-//   (Brackle, Infected Greatmaw: weiteres Opfer; Javelin Throw: weiteres Equip — schon W40a, `W40/a-03`). Ohne zahlbare Kosten kommt kein Angebot; Ablehnen (Abbruch der Opfer-/Karten-/Zielwahl)
-//   = nichts bezahlt, nichts verbraucht (Einmal-Stempel/Weich-Einmal-pro-Zug unberührt).
+//  Ladung wird nicht verbraucht (gilt generell)." — W42a · Punkt 1 und 3 · Al, 22.10.2026 präzisiert: Preis (Opfer von Brackle/Greatmaw, weiteres Equip bei Javelin Throw) wird erneut bezahlt; eine
+//  AKTIVIERUNGSBEDINGUNG/ein Auslöser (Sacrificial Dagger „when you sacrifice a target", Bamboo Staff „when a card is added from your discard pile") und das Ausspielen/die Aktion (Kohta „spend your Action")
+//  werden bei der Wiederholung NICHT erneut bezahlt: „Die zweite Aktivierung kostet NICHTS extra!"; „Die Aktion des ersten Schlags reicht."
+// Dieses Repro prüft die Wiederholung von Dagger (kein weiteres Opfer), Bamboo Staff (keine weitere Ablagekarte) und Kohta (keine weitere Zusatzaktion), Ablehnen (Abbruch der Zielwahl) = nichts verbraucht.
+//   (Brackle, Infected Greatmaw: weiteres Opfer; Javelin Throw: weiteres Equip — W40a, `W40/a-03`.)
 // Aufbau wie `W40/a-03`: der Schlagende trägt Kunagi, der Gegner hat 4 Kreaturen mit je 10 HP (jeder Schlag besiegt genau 1).
 // Aufruf: node docs/niche-tests/repro/W41/a-02-kunagi-wiederholung-zahlt-die-kosten-erneut-ablehnbar.js   (Exit 0 = korrekt)
 const L = require('../W39/_helfer.js');
@@ -44,31 +44,25 @@ const eigeneLebend = (t, me, namen) => t.engine.cardInstances.filter(c => c.zone
   for (const [me, op] of [[0, 1], [1, 0]]) {
     R.section('Sitz ' + me);
 
-    // ── Sacrificial Dagger: jede Wiederholung = ein weiteres Opfer ──
+    // ── Sacrificial Dagger (W42a): „when you sacrifice a target" ist die AKTIVIERUNGSBEDINGUNG, kein Preis → die Wiederholung kostet NICHTS (kein weiteres Opfer, keine Opferwahl) ──
     for (const futter of [0, 1, 2]) {
-      const wrap = (v) => (v.length && v.every(x => x.owner === me)) ? [v[0].id] : 'orig';   // Opferwahl: erste Kreatur
+      let opferWahlen = 0;
+      const wrap = (v) => { if (v.length && v.every(x => x.owner === me)) { opferWahlen++; return [v[0].id]; } return 'orig'; };   // jede Wahl unter EIGENEN Zielen wäre eine Opferwahl
       const e = await lauf('Sacrificial Dagger', me, op, { wrap, vorbereiten: async (t) => { for (let i = 0; i < futter; i++) t.put(me, 2, i, H.INERT.creature); } });
-      R.check(`Dagger mit ${futter} weiterer Opfer-Kreatur(en): ${futter + 1} Schlag/Schläge (je Wiederholung ein weiteres Opfer)`, e.besiegt === futter + 1, { besiegt: e.besiegt });
-      R.check(`Dagger mit ${futter} weiterer(n): ${futter} Wiederholung(en), keine eigene Kreatur übrig (jedes Opfer genau einmal)`, e.wiederholt === futter && eigeneLebend(e.t, me, [H.INERT.creature]) === 0, { wiederholt: e.wiederholt, uebrig: eigeneLebend(e.t, me, [H.INERT.creature]) });
-      R.check(`Dagger mit ${futter} weiterer(n): Kunagi zieht je besiegter Kreatur`, e.gezogen === futter + 1, { gezogen: e.gezogen });
+      R.check(`Dagger mit ${futter} weiterer(n) eigener Kreatur(en): alle 4 Gegner-Kreaturen besiegt (Wiederholungen kostenlos, auch ohne weiteres Opfer)`, e.besiegt === 4, { besiegt: e.besiegt });
+      R.check(`Dagger mit ${futter} weiterer(n): 3 Wiederholungen, keine Opferwahl, alle ${futter} weiteren Kreaturen leben noch`, e.wiederholt >= 3 && opferWahlen === 0 && eigeneLebend(e.t, me, [H.INERT.creature]) === futter, { wiederholt: e.wiederholt, opferWahlen, uebrig: eigeneLebend(e.t, me, [H.INERT.creature]) });
+      R.check(`Dagger mit ${futter} weiterer(n): Kunagi zieht je besiegter Kreatur`, e.gezogen === 4, { gezogen: e.gezogen });
       ok(R, `Dagger ${futter}`, e.t);
     }
-    {   // Ablehnen an der Opferwahl: nichts geopfert, nur der erste Schlag
-      const wrap = (v) => (v.length && v.every(x => x.owner === me)) ? null : 'orig';
-      const e = await lauf('Sacrificial Dagger', me, op, { wrap, vorbereiten: async (t) => { t.put(me, 2, 0, H.INERT.creature); } });
-      R.check('Dagger: Opferwahl der Wiederholung abgelehnt → keine Wiederholung, das weitere Opfer lebt', e.besiegt === 1 && e.wiederholt === 0 && eigeneLebend(e.t, me, [H.INERT.creature]) === 1, { besiegt: e.besiegt, wiederholt: e.wiederholt });
-      ok(R, 'Dagger abgelehnt (Opfer)', e.t);
-    }
-    {   // Ablehnen an der Zielwahl der Wiederholung: bis dahin nichts bezahlt
+    {   // Ablehnen an der Zielwahl der Wiederholung: nichts passiert, keine Kosten
       let nGegnerWahl = 0;
-      const wrap = (v) => { if (v.length && v.every(x => x.owner === me)) return [v[0].id]; if (v.some(x => x.owner === op)) { nGegnerWahl++; return nGegnerWahl === 1 ? 'orig' : null; } return 'orig'; };
+      const wrap = (v) => { if (v.some(x => x.owner === op)) { nGegnerWahl++; return nGegnerWahl === 1 ? 'orig' : null; } return 'orig'; };
       const e = await lauf('Sacrificial Dagger', me, op, { wrap, vorbereiten: async (t) => { t.put(me, 2, 0, H.INERT.creature); } });
-      R.check('Dagger: Zielwahl der Wiederholung abgelehnt → das weitere Opfer wurde NICHT geopfert, keine Wiederholung', e.besiegt === 1 && e.wiederholt === 0 && eigeneLebend(e.t, me, [H.INERT.creature]) === 1, { besiegt: e.besiegt, uebrig: eigeneLebend(e.t, me, [H.INERT.creature]) });
+      R.check('Dagger: Zielwahl der Wiederholung abgelehnt → keine Wiederholung, die weitere eigene Kreatur lebt', e.besiegt === 1 && e.wiederholt === 0 && eigeneLebend(e.t, me, [H.INERT.creature]) === 1, { besiegt: e.besiegt, uebrig: eigeneLebend(e.t, me, [H.INERT.creature]) });
       ok(R, 'Dagger abgelehnt (Ziel)', e.t);
     }
     {   // Einmal-pro-Zug des Dolchs bleibt einmal gesetzt: ein zweites Opfer im selben Zug löst ihn nicht neu aus
-      const wrap = (v) => (v.length && v.every(x => x.owner === me)) ? [v[0].id] : 'orig';
-      const e = await lauf('Sacrificial Dagger', me, op, { wrap, vorbereiten: async (t) => { t.put(me, 2, 0, H.INERT.creature); } });
+      const e = await lauf('Sacrificial Dagger', me, op, { vorbereiten: async (t) => { t.put(me, 2, 0, H.INERT.creature); } });
       const treffer0 = e.t.treffer.length;
       const c = e.t.put(me, 2, 1, H.INERT.creature);
       await e.t.run(() => e.t.engine.opfereKreatur(c, { name: 'Test', owner: me }));
@@ -79,39 +73,34 @@ const eigeneLebend = (t, me, namen) => t.engine.cardInstances.filter(c => c.zone
       R.check('Dagger ohne Kunagi: genau 1 Schlag', e.besiegt === 1 && e.wiederholt === 0, { besiegt: e.besiegt });
     }
 
-    // ── Bamboo Staff: jede Wiederholung = erneut eine Karte aus der Ablage auf die Hand ──
+    // ── Bamboo Staff (W42a): „when a card is added from your discard pile to your hand" ist die AKTIVIERUNGSBEDINGUNG → die Wiederholung braucht keine weitere Karte aus der Ablage ──
     for (const extra of [0, 1, 2]) {
       const szene = { discard: { [me]: Array(extra).fill('ZZ Filler') } };   // plus die eine Karte des Treibers für den ersten Auslöser
-      const e = await lauf('Bamboo Staff', me, op, { szene, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => ({ cardName: 'ZZ Filler' }) }); } });
+      let galerien = 0;
+      const e = await lauf('Bamboo Staff', me, op, { szene, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => { galerien++; return { cardName: 'ZZ Filler' }; } }); } });
       const ablage = e.t.pile(me, 'discardPile').filter(n => n === 'ZZ Filler').length;
       const hand = e.t.pile(me, 'hand').filter(n => n === 'ZZ Filler').length;
-      R.check(`Bamboo Staff mit ${extra} weiterer(n) Ablagekarte(n): ${extra + 1} Schlag/Schläge, jede Wiederholung holt eine Karte`, e.besiegt === extra + 1 && ablage === 0 && hand === extra + 1, { besiegt: e.besiegt, ablage, hand });
-      R.check(`Bamboo Staff mit ${extra}: ${extra} Wiederholung(en), Kunagi zieht je besiegter Kreatur`, e.wiederholt === extra && e.gezogen === extra + 1, { wiederholt: e.wiederholt, gezogen: e.gezogen });
+      R.check(`Bamboo Staff mit ${extra} weiterer(n) Ablagekarte(n): alle 4 Kreaturen besiegt, keine Kartenwahl, die Ablage bleibt unangetastet`, e.besiegt === 4 && galerien === 0 && ablage === extra && hand === 1, { besiegt: e.besiegt, galerien, ablage, hand });
+      R.check(`Bamboo Staff mit ${extra}: 3 Wiederholungen, Kunagi zieht je besiegter Kreatur`, e.wiederholt >= 3 && e.gezogen === 4, { wiederholt: e.wiederholt, gezogen: e.gezogen });
       ok(R, `Bamboo ${extra}`, e.t);
     }
-    {   // Ablehnen an der Kartenwahl
-      const e = await lauf('Bamboo Staff', me, op, { szene: { discard: { [me]: ['ZZ Filler'] } }, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => null }); } });
-      const ablage = e.t.pile(me, 'discardPile').filter(n => n === 'ZZ Filler').length;
-      R.check('Bamboo Staff: Kartenwahl der Wiederholung abgelehnt → keine Wiederholung, die Karte liegt weiter in der Ablage', e.besiegt === 1 && e.wiederholt === 0 && ablage === 1, { besiegt: e.besiegt, ablage });
-      ok(R, 'Bamboo abgelehnt (Karte)', e.t);
-    }
-    {   // Ablehnen an der Zielwahl: bis dahin nichts bewegt
+    {   // Ablehnen an der Zielwahl: nichts bewegt
       let n = 0;
       const wrap = (v) => { if (v.some(x => x.owner === op)) { n++; return n === 1 ? 'orig' : null; } return 'orig'; };
       const e = await lauf('Bamboo Staff', me, op, { wrap, szene: { discard: { [me]: ['ZZ Filler'] } }, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => ({ cardName: 'ZZ Filler' }) }); } });
       const ablage = e.t.pile(me, 'discardPile').filter(x => x === 'ZZ Filler').length;
-      R.check('Bamboo Staff: Zielwahl der Wiederholung abgelehnt → die Karte wurde NICHT zurückgeholt, keine Wiederholung', e.besiegt === 1 && e.wiederholt === 0 && ablage === 1, { besiegt: e.besiegt, ablage });
+      R.check('Bamboo Staff: Zielwahl der Wiederholung abgelehnt → keine Wiederholung, die Ablage bleibt unangetastet', e.besiegt === 1 && e.wiederholt === 0 && ablage === 1, { besiegt: e.besiegt, ablage });
       ok(R, 'Bamboo abgelehnt (Ziel)', e.t);
     }
     {   // Weich-Einmal-pro-Zug des Staffs bleibt gesetzt (kein zweiter eigener Auslöser im selben Zug)
       const e = await lauf('Bamboo Staff', me, op, { szene: { discard: { [me]: ['ZZ Filler'] } }, vorbereiten: async (t) => { t.script.push({ match: d => d.type === 'cardGallery' && d.title === 'Bamboo Staff', answer: () => ({ cardName: 'ZZ Filler' }) }); } });
       const vor = e.t.treffer.length;
       e.t.setDiscard(me, ['ZZ Filler']);
-      await e.t.run(() => e.t.engine.addCardFromDiscardToHand(me, 'ZZ Filler', me, { source: 'W41a' }));
+      await e.t.run(() => e.t.engine.addCardFromDiscardToHand(me, 'ZZ Filler', me, { source: 'W42a' }));
       R.check('Bamboo Staff: Weich-Einmal-pro-Zug weiter verbraucht (der nächste Auslöser im selben Zug schlägt nicht)', e.t.treffer.length === vor, { vor, nach: e.t.treffer.length });
     }
 
-    // ── Kohta: „spend your Action" erneut — die Wiederholung braucht eine Zusatzaktion ──
+    // ── Kohta (W42a, Al: „Nein, verbraucht es nicht, ebenso wenig, wie normale Attacks mit Karten Zusatzaktionen mit Kunagi kosten. Die Aktion des ersten Schlags reicht.") ──
     for (const zusatz of [0, 1, 2]) {
       const e = await lauf('Kohta', me, op, { vorbereiten: async (t, k) => {
         if (!zusatz) return;
@@ -119,14 +108,17 @@ const eigeneLebend = (t, me, namen) => t.engine.cardInstances.filter(c => c.zone
         t.engine.registerAdditionalActionType('ZZ-aa', { label: 'ZZ', allowedCategories: ['ability_activation'], sourceLabel: 'ZZ' });
         traeger.counters.aaGrants = { 'ZZ-aa': zusatz }; t.engine._syncAAMirror(traeger);
       } });
-      R.check(`Kohta mit ${zusatz} Zusatzaktion(en): ${zusatz + 1} Schlag/Schläge (jede Wiederholung verbraucht eine Aktion)`, e.besiegt === zusatz + 1 && e.wiederholt === zusatz, { besiegt: e.besiegt, wiederholt: e.wiederholt });
+      R.check(`Kohta mit ${zusatz} Zusatzaktion(en): alle 4 Kreaturen besiegt (3 Wiederholungen ohne weitere Aktion)`, e.besiegt === 4 && e.wiederholt >= 3, { besiegt: e.besiegt, wiederholt: e.wiederholt });
       const rest = e.t.engine.cardInstances.filter(c => c.name === H.INERT.artifact).reduce((a, c) => a + (c.counters?.aaGrants?.['ZZ-aa'] || 0), 0);
-      R.check(`Kohta mit ${zusatz}: alle Zusatzaktionen verbraucht, keine übrig`, rest === 0, { rest });
+      R.check(`Kohta mit ${zusatz}: keine Zusatzaktion verbraucht`, rest === zusatz, { rest });
       ok(R, `Kohta ${zusatz}`, e.t);
     }
-    {   // Kohta ohne Zusatzaktion: kein Angebot, kein Fehler; die harte Sperre bleibt einmal gesetzt
-      const e = await lauf('Kohta', me, op);
-      R.check('Kohta ohne Zusatzaktion: keine Wiederholung, nichts bezahlt', e.besiegt === 1 && e.wiederholt === 0, { besiegt: e.besiegt });
+    {   // Ablehnen an der Zielwahl: nichts verbraucht, die harte Sperre bleibt einmal gesetzt
+      let n = 0;
+      const wrap = (v) => { if (v.some(x => x.owner === op)) { n++; return n === 1 ? 'orig' : null; } return 'orig'; };
+      const e = await lauf('Kohta', me, op, { wrap });
+      R.check('Kohta: Zielwahl der Wiederholung abgelehnt → nur der erste Schlag', e.besiegt === 1 && e.wiederholt === 0, { besiegt: e.besiegt, wiederholt: e.wiederholt });
+      ok(R, 'Kohta abgelehnt', e.t);
     }
   }
   R.finish();
