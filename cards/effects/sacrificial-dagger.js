@@ -30,7 +30,7 @@ const CARD_NAME = 'Sacrificial Dagger';
 /**
  * Der Schlag selbst (Kreaturen- UND Helden-Opfer). `pi` = Kontrolleur des Daggers (= Opferer), Träger muss leben.
  */
-async function dolchSchlag(ctx, pi) {
+async function dolchSchlag(ctx, pi, wdh) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const hero = ctx.attachedHero;
@@ -42,7 +42,7 @@ async function dolchSchlag(ctx, pi) {
   // declined "may" stays usable on a later sacrifice this turn.
   // (claimHOPT stores under `${key}:${pi}` — peek the suffixed key.)
   const hoptKey = `sacrificial_dagger:${ctx.card.id}`;
-  if (gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;
+  if (!wdh && gs.hoptUsed?.[`${hoptKey}:${pi}`] === gs.turn) return;   // W40a: `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again") — Stempel weder prüfen noch erneut setzen
 
   const atk = Math.max(0, hero.atk || 0);
 
@@ -73,7 +73,7 @@ async function dolchSchlag(ctx, pi) {
   await engine.announceHookActivation('Sacrificial Dagger', pi);
 
   // Committed — claim the once-per-turn.
-  engine.claimHOPT(hoptKey, pi);
+  if (!wdh) engine.claimHOPT(hoptKey, pi);
 
   // Re-resolve the live target (a reaction could have moved/killed it).
   let tHero = null, tInst = null;
@@ -105,7 +105,7 @@ async function dolchSchlag(ctx, pi) {
   const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
 
   // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], resolve: async () => {
+  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => dolchSchlag(ctx, pi, true), resolve: async () => {
   if (tHero) {
     await engine.actionDealDamage(source, tHero, damage, 'attack');
   } else if (tInst) {

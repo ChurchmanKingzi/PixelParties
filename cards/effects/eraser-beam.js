@@ -33,6 +33,12 @@
 //      flag `ps._spellLockTurn = gs.turn`. The engine
 //      blocks any further Spell plays until turn end.
 //
+//  ★ W40a (Al, 22.10.2026): „Attacks sollen den Stempel GAR NICHT setzen, sondern nur Spells! … auch solche ohne Karte (etwa Alices Effekt)
+//    setzen den Stempel und verbieten Eraser Beam." Gelesen wie der Kartentext: „the only SPELL you play this turn" — nur Spell-Karten
+//    (auch Sofort-Güsse) und Effekte, die als Spell zählen (Alice, `treatedAsSpell`), stempeln; gespielte Attack-Karten und Effekte, die als
+//    Attack zählen (Broghan, Javelin Throw, Duel …), nie. Zentral in `Engine.runHooks('afterSpellResolved')` (`_spellResolvedTurn`) und im
+//    Hook unten (`_eraserBeamPriorSpellTurn`) über die Kartendaten (`spellCardData.cardType`).
+//
 //  Animation: blood-red beam from caster to target with
 //  crackling lightning arcs — one of the deadliest Spells
 //  in the game and looks the part.
@@ -90,6 +96,8 @@ module.exports = {
       const engine = ctx._engine;
       const gs = engine.gs;
       if (!ctx.spellName || ctx.spellName === CARD_NAME) return;
+      // W40a (Al, 22.10.2026): nur Spells stempeln — eine gespielte Attack-Karte (und ein als Attack zählender Effekt) gar nicht.
+      if (ctx.spellCardData?.cardType === 'Attack' || ctx._alsEffekt) return;
       // casterIdx identifies whose spell just resolved. Only stamp that
       // player's tracker — Eraser Beam in the opponent's deck doesn't care.
       const casterIdx = ctx.casterIdx;

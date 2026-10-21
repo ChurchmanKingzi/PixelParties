@@ -61,6 +61,31 @@ function kontrollierteHeldenZiele(engine, pi) {
     }));
 }
 
+/**
+ * ★ W40a (Al, 22.10.2026, Punkt 5): „Alluring Light wählt ein gegnerisches UND ein eigenes Ziel. Beim eigenen Ziel greift kein Schutz vor Targeting wie Butterfly Cloud — aber beim
+ * gegnerischen schon. Ein per Butterfly Cloud untargetable Hero kann NICHT als der Angreifer für Alluring Light gewählt werden!"
+ * Die ANGREIFER-Wahl ist eine normale Zielwahl des Spielers gegen den Gegner: jeder Schutz vor Targeting gilt (Butterfly Cloud/`untargetable`, Invisibility/`invisible`, Stealth/Jetpack
+ * & Co. über `blocksTargeting`; Chuck und das Truth-Seeing Eye des Wirkers heben es auf). Die Schutzrechnung läuft über ALLE lebenden Gegnerhelden („solange … andere Heroes, die gewählt
+ * werden können"); erst danach fallen Helden heraus, die nicht angreifen können (W34a). Ist keiner wählbar, ist die Karte unspielbar. Die Wahl des EIGENEN Opfers prüft keinen Schutz
+ * (der Wählende wählt sein eigenes Ziel; die Schutz-Marken richten sich nur gegen den Gegner).
+ * @returns {object[]} Zielobjekte (`hero-<seite>-<idx>`) der wählbaren Angreifer
+ */
+function waehlbareAngreifer(engine, pi, oppIdx, opts = {}) {
+  const alle = kontrollierteHeldenZiele(engine, oppIdx);
+  const geschuetzt = new Set();
+  if (!opts.ohneSchutz) {
+    for (const id of engine._untargetableHeroIds(alle, pi)) geschuetzt.add(id);
+    const quelle = engine._getCardDB()[CARD_NAME];
+    for (const t of alle) {
+      if (geschuetzt.has(t.id)) continue;
+      if (engine.heroBlocksTargeting(t.owner, t.heroIdx, {
+        sourceData: quelle, cardName: CARD_NAME, chooserIdx: pi, chooserHeroIdx: opts.chooserHeroIdx ?? -1, allTargets: alle,
+      })) geschuetzt.add(t.id);
+    }
+  }
+  return alle.filter(z => !geschuetzt.has(z.id) && engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));
+}
+
 module.exports = {
   // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
@@ -77,7 +102,10 @@ module.exports = {
     // Kontrolle statt Seite (Styx 28.9.)
     // ★ W34a (Al, 22.10.2026, Punkt 1: „Ja, ist korrekt"): der gezwungene Held ist geblockt, wenn er nicht angreifen kann (Frozen, Stunned, Webbed, Bound, harte Negierung,
     // Attack-Sperren/-Zähler: `heroKannAngreifen`) — ohne einen angriffsfähigen Gegnerheld ist die Karte nicht spielbar.
-    const hatHelden = engine.heroesControlledBy(oppIdx).some(({ physOwner, heroIdx: hi, hero: h }) => h?.name && h.hp > 0 && engine.heroKannAngreifen(physOwner, hi, oppIdx, { name: h.name }));
+    // ★ W40a (Al, 22.10.2026, Punkt 5): zusätzlich muss mindestens ein Gegnerheld als Angreifer WÄHLBAR sein (Schutz vor Targeting: Butterfly Cloud, Invisibility, Stealth …).
+    // Hat einer der eigenen Helden ein Truth-Seeing Eye (der Wirker steht erst beim Spielen fest), bleibt die Prüfung großzügig (der Schutz wird erst in `onPlay` gerechnet).
+    const mitAuge = engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi }) => engine._sourceHasTruthSeeingEye({ name: CARD_NAME, owner: pi, controller: pi, heroIdx: hi, heroOwner: physOwner }));
+    const hatHelden = waehlbareAngreifer(engine, pi, oppIdx, { ohneSchutz: mitAuge }).length > 0;
     if (!hatHelden) return false;
     try { return kontrollierteHeldenZiele(engine, pi).length + engine.getCreatureTargets(pi).length > 0; }
     catch { return false; }
@@ -92,8 +120,12 @@ module.exports = {
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
       // W34a: nur Helden, die ANGREIFEN können (`heroKannAngreifen`, Kontrolleur = Gegner) sind als Angreifer wählbar.
-      const gegnerZiele = kontrollierteHeldenZiele(engine, oppIdx).filter(z => engine.heroKannAngreifen(z.owner, z.heroIdx, oppIdx, { name: z.cardName }));   // Kontrolle statt Seite (Styx 28.9.)
+      // W40a (Al, 22.10.2026, Punkt 5): die Wahl des gegnerischen Angreifers achtet jeden Schutz vor Targeting (`waehlbareAngreifer`); das Truth-Seeing Eye des Wirkers hebt ihn auf.
+      const mitAuge = engine._sourceIgnoresTargetingRestrictions(ctx.card);
+      const gegnerZiele = waehlbareAngreifer(engine, pi, oppIdx, { ohneSchutz: mitAuge, chooserHeroIdx: ctx.cardHeroIdx });   // Kontrolle statt Seite (Styx 28.9.)
       const heldWahl = await engine.promptEffectTarget(pi, gegnerZiele, {
+        ...(mitAuge ? { ignoreUntargetable: true, _truthSeeingEye: true } : {}),
+        chooserHeroIdx: ctx.cardHeroIdx,
         title: CARD_NAME,
         description: "Choose an opponent's Hero — it will be lured into attacking.",
         confirmLabel: '✨ Lure!',
@@ -174,7 +206,42 @@ module.exports = {
 
         // W32a: der provozierte Angriff gehört dem GEGNER (Held des Angriffs) — Attack-Reaktionen (Magic Topaz, Arrows …) seiner Seite über die virtuelle Attack-Kette;
         // der gezwungene Held muss dafür nicht angriffsfähig sein (er wird gelockt, nicht aktiv: `casterCheck: false`).
-        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer], wirkName: angreifer.name, resolve: async () => {
+        // ★ W40a (Al, 22.10.2026, Punkt 3): Idej Sword - Kunagi („perform that Attack again against a different target your opponent controls") — trägt der gezwungene Held Kunagi und besiegt
+        // genau 1 Kreatur, schlägt ER erneut zu: sein Kontrolleur wählt (Kunagi-Besitzer = `oppIdx`) ein anderes Ziel unter denen, die der Spieler der Karte kontrolliert (normale Schutzregeln für
+        // diese Wahl: es ist eine Wahl des Gegners). Kosten: keine über den Schlag hinaus (die Karte ist gespielt, die Wahl des Helden bleibt) — der Held muss weiter angreifen können.
+        const wiederhole = async () => {
+          const h2 = gs.players[angreiferZiel.owner]?.heroes?.[angreiferZiel.heroIdx];
+          if (!h2?.name || h2.hp <= 0 || !engine.heroKannAngreifen(angreiferZiel.owner, angreiferZiel.heroIdx, oppIdx, { name: h2.name })) return false;
+          const ausser = (gs._kunagiWdh && gs._kunagiWdh.ausser) || [];
+          const liste2 = [...kontrollierteHeldenZiele(engine, pi), ...engine.getCreatureTargets(pi)].filter(z => !ausser.includes(z.id));
+          if (liste2.length === 0) return false;
+          const wahl2 = await engine.promptEffectTarget(oppIdx, liste2, {
+            title: CARD_NAME, description: `${h2.name} attacks again — choose a different target your opponent controls.`,
+            confirmLabel: '💥 Strike again!', maxSelect: 1, maxTotal: 1, cancellable: true, sourceCard: attackSource,
+          });
+          const opfer2 = zielVonAntwort(wahl2, liste2);
+          if (!opfer2) return false;
+          const slot2 = opfer2.type === 'hero' ? -1 : opfer2.slotIdx;
+          const atk2 = h2.atk || 0;
+          engine._broadcastEvent('play_zone_animation', { type: 'lure_beacon', owner: opfer2.owner, heroIdx: opfer2.heroIdx, zoneSlot: slot2, duration: 1200 });
+          await engine._delay(700);
+          await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer2], wirkName: h2.name, resolve: async () => {
+            const dmg2 = await engine._fireAttackDeclare(attackSource, opfer2, atk2);
+            engine._broadcastEvent('play_ram_animation', { sourceOwner: angreiferZiel.owner, sourceHeroIdx: angreiferZiel.heroIdx, targetOwner: opfer2.owner, targetHeroIdx: opfer2.heroIdx, targetZoneSlot: slot2, cardName: h2.name, duration: 1100 });
+            await engine._delay(620);
+            if (opfer2.type === 'hero') {
+              const hh = gs.players[opfer2.owner]?.heroes?.[opfer2.heroIdx];
+              if (hh && hh.hp > 0) await engine.actionDealDamage(attackSource, hh, dmg2, 'attack');
+            } else {
+              const inst2 = opfer2.cardInstance || engine.cardInstances.find(c => c.owner === opfer2.owner && c.zone === 'support' && c.heroIdx === opfer2.heroIdx && c.zoneSlot === opfer2.slotIdx);
+              if (inst2 && inst2.zone === 'support') await engine.actionDealCreatureDamage(attackSource, inst2, dmg2, 'attack', { sourceOwner: oppIdx, canBeNegated: true });
+            }
+            return true;
+          } });
+          engine.sync();
+          return true;
+        };
+        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer], wirkName: angreifer.name, wiederhole, resolve: async () => {
         const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
         // ── Animation ② der angelockte Held rammt hinein ──────────────

@@ -178,6 +178,10 @@ module.exports = {
 
       engine.takeFromPileSync(ps, 'hand', handIdx);
 
+      // W40a (Al, 22.10.2026: „Arrows boosten nur EINE Attack"): die Bonus-Attack ist eine EIGENE Attack — der Pfeil-Bonus der ersten ist verbraucht (sonst bliebe er bis zum Ende der
+      // äußeren Karte scharf und träfe auch die Bonus-Attack).
+      await require('./_arrows-shared').clearArmedArrows(engine, pi);
+
       // Reveal the bonus Attack to the opponent.
       const oppSid = gs.players[oppIdx]?.socketId;
       if (oppSid && engine.io) {

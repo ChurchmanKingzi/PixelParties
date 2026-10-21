@@ -112,10 +112,10 @@ const ANIM_TOTAL_MS  = DESTROY_AT_MS + DISCARD_MS;
 
 /** Sacrifice candidates: engine pool intersected with the per-turn
  *  summoning-sickness filter. Pure read, side-effect-free. */
-function _eligibleSacrificeCandidates(engine, pi) {
+function _eligibleSacrificeCandidates(engine, pi, ausser) {
   const turn = engine.gs.turn || 0;
   return engine.getSacrificableCreatures(pi).filter(c =>
-    c.inst.turnPlayed !== turn,
+    c.inst.turnPlayed !== turn && !(ausser && ausser.includes(c.inst.id)),
   );
 }
 
@@ -176,7 +176,9 @@ module.exports = {
     return [sorted[0].id];
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026, Punkt 3): `wdh` = Wiederholung durch Idej Sword - Kunagi — „Im Fall von Brackle wäre dafür ein zweites Opfer nötig": die Wiederholung verlangt ein WEITERES Opfer
+  // (`wdh.ausser` = das Opfer des ersten Schlags, das erst NACH dem Schlag abgelegt wird, ist nicht noch einmal wählbar); gibt es keins, findet sie nicht statt und kostet nichts.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -194,7 +196,7 @@ module.exports = {
     let target;
     let negiert = false;
     while (true) {
-      const candidates = _eligibleSacrificeCandidates(engine, pi);
+      const candidates = _eligibleSacrificeCandidates(engine, pi, wdh && wdh.ausser);
       if (candidates.length === 0) return false;
 
       const sacTargets = candidates.map(c => ({
@@ -322,7 +324,7 @@ module.exports = {
     const source = { name: CARD_NAME, owner: pi, heroIdx: brackleHeroIdx,
       ...((ctx.cardHeroOwner ?? pi) !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette; das Opfer (Kosten) bleibt bezahlt, auch wenn sie den Treffer negiert.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: brackleHeroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], wiederhole: () => module.exports.onHeroEffect(ctx, { ausser: [...((wdh && wdh.ausser) || []), creatureInst.id] }), resolve: async () => {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {

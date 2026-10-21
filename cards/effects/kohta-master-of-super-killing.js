@@ -133,7 +133,8 @@ module.exports = {
     return [bestes.id];
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel; weder die harte Sperre noch die Aktion werden erneut verbraucht oder geprüft.
+  async onHeroEffect(ctx, wdh) {
     const engine = ctx._engine;
     const gs = engine.gs;
     const pi = ctx.cardOwner;
@@ -141,7 +142,7 @@ module.exports = {
 
     // Erst PRUEFEN, nicht beanspruchen. Wer hier ankommt, ohne dass der
     // Engine-Weg gelaufen ist (Sleeping Beauty & Co.), faellt hier raus.
-    if (hartGesperrt(engine, pi)) return false;
+    if (!wdh && hartGesperrt(engine, pi)) return false;
 
     // ★ W36a (Al, 22.10.2026): „Negierter Treffer: ja, definitiv" — wird der Treffer im Zielfenster NEGIERT (Invisibility Cloak, Schutzkarten …), ist der Effekt für die Runde verbraucht (Einmal-Stempel bleibt, Rückgabe `true`) und zählt als gespielte Attack (Muster Alice); ein Abbruch des Spielers bleibt ein Abbruch.
     const { target: ziel, negiert } = await engine.heldenEffektZielwahl(ctx, {
@@ -167,7 +168,7 @@ module.exports = {
     });
     if (negiert) {
       // Negiert: der Effekt ist verbraucht (harte Sperre gesetzt) und zählt als Attack dieses Helden.
-      if (!engine.claimHOPT(HOPT_KEY, pi)) return false;
+      if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
       await engine.zaehleAlsArt('attack', { pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, name: CARD_NAME });
       engine.sync();
       return true;
@@ -175,7 +176,7 @@ module.exports = {
     if (!ziel) return false;
 
     // ── Punkt ohne Rueckkehr: jetzt die harte Sperre beanspruchen ────
-    if (!engine.claimHOPT(HOPT_KEY, pi)) return false;
+    if (!wdh && !engine.claimHOPT(HOPT_KEY, pi)) return false;
 
     // Styx 28.9.: „this Hero" steht auf der Brettseite `feld` — Quelle
     // traegt sie als `heroOwner`, der Held kommt als Objekt.
@@ -192,7 +193,7 @@ module.exports = {
     // nur: kein Kill, aber Aktion und Sperre bleiben verbraucht.
     const basis = Math.max(1, held?.atk || 1);
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette um Angriffsfenster und Kill.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [ziel], resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [ziel], wiederhole: () => module.exports.onHeroEffect(ctx, true), resolve: async () => {
     const nachFenster = await engine._fireAttackDeclare(quelle, ziel, basis);
     if (!(nachFenster > 0)) {
       engine.log('kohta_super_kill_negated', {

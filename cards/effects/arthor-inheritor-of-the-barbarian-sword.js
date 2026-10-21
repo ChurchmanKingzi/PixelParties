@@ -51,7 +51,8 @@ module.exports = {
     return true; // HOPT handled by engine; hero must be alive (engine checks)
   },
 
-  async onHeroEffect(ctx) {
+  // W40a (Al, 22.10.2026): `wdh` = Wiederholung durch Idej Sword - Kunagi ("perform that Attack again"): derselbe Schlag, neues Ziel, ohne Einmal-Stempel.
+  async onHeroEffect(ctx, wdh) {
     const engine  = ctx._engine;
     const gs      = engine.gs;
     const pi      = ctx.cardOwner;
@@ -159,7 +160,7 @@ module.exports = {
     // Fire afterSpellResolved as an Attack so reactive equips trigger
     // (Vampiric Sword's lifesteal, Legendary Sword's summon grant, …).
     // W39a: derselbe Abschluss wie bei allen Effekten, die als Attack zählen (`alsAttackKette`): Stufe = Fighting-Level, `_alsEffekt` (kein gewirkter Spell), `heroOwner` = Brettseite.
-    if (!attackResult?.negated && !attackResult?.fizzled) await engine.meldeAttackAufgeloest({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: uniqueTargets });
+    if (!attackResult?.negated && !attackResult?.fizzled) await engine.meldeAttackAufgeloest({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: uniqueTargets, wiederhole: () => module.exports.onHeroEffect(ctx, true) });
 
     // Drop any arrows armed for this attack — server.js auto-clears
     // for normal Spell/Attack plays via doPlaySpell, but the hero-
