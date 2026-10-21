@@ -24,10 +24,6 @@ Umgestellte alte Repros: `W40/a-03` (Dagger, Bamboo, Kohta bekommen die nötigen
 * Skilltest-E2E: wie im Ausgangsstand; mit `NODE_PATH` grün: cards, draw-cards, sacrifice, keepmodel.
 * Dauerfeuer: 14 Karten × 2 Seiten, Fingerabdrücke identisch zur Basis, 0 Fehler.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Kohta:** Soll „spend your Action" bei der Kunagi-Wiederholung eine Zusatzaktion verbrauchen (jetzt so; ohne Zusatzaktion kein Angebot), oder reicht die Aktion des ersten Schlags?
-2. **Sword in a Bottle, Alluring Light, Javelin Throw:** Bleibt das Ausspielen der Karte (Gold, Handkarte, Aktion) bei der Wiederholung unbezahlt (jetzt so), mit nur den In-Effekt-Kosten (z. B. dem Equip bei Javelin Throw)?
-3. **Sacrificial Dagger:** Reicht als erneutes Opfer eine Kreatur (jetzt so), oder soll auch ein eigener Held opferbar sein („a target you control")?
-4. **Kunagi-Angebot:** Genügt das Abbrechen der Kosten- oder Zielwahl als „Ablehnen" (jetzt so), oder soll vor jeder Wiederholung ein eigenes Ja/Nein-Fenster erscheinen?
-5. **Hardy Slime (Beobachtung):** Soll der Taunt auch Karten erfassen, die eine gemischte Helden-und-Kreaturen-Liste selbst bauen und direkt an `promptEffectTarget` reichen?
+Alle fünf sind beantwortet und in [FIXES-WELLE-42.md](FIXES-WELLE-42.md) umgesetzt (dort stehen die neuen Rückfragen).
