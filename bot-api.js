@@ -60,7 +60,7 @@ async function ensureSchema(db) {
  * @param {Function} o.nextNoonCETAfter
  * @param {Function} o.mostRecentNoonCETSec
  * @param {Function} o.uuidv4
- * @param {Function} [o.getCardOfDay]   (nowMs?) → { date, card, amount } | null — die Karte des Tages samt Bonus (card-of-day.js)
+ * @param {Function} [o.getCardOfDay]   (nowMs?) → Promise<{ date, card, amount } | null> — die Karte des Tages samt Bonus (card-of-day.js)
  */
 function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4, getCardOfDay }) {
   const secret = process.env.BOT_SECRET || '';
@@ -187,9 +187,9 @@ function mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextN
   });
 
   /** Karte des Tages (Berliner Tag) und der SC-Bonus für einen Sieg mit ihr — die Quelle der Wahrheit ist das Spiel, der Bot zeigt nur an. */
-  app.get(bot('/cotd'), botAuth, (req, res) => {
+  app.get(bot('/cotd'), botAuth, async (req, res) => {
     try {
-      const info = getCardOfDay ? getCardOfDay() : null;
+      const info = getCardOfDay ? await getCardOfDay() : null;
       if (!info) return res.status(404).json({ error: 'no_card_of_day' });
       res.json(info);
     } catch (err) { console.error('[bot/cotd]', err.message); res.status(500).json({ error: 'failed' }); }

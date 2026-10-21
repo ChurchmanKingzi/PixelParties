@@ -54,7 +54,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
-const { loadCardEffect } = require('./cards/effects/_loader');
+const { loadCardEffect, hasCardEffect } = require('./cards/effects/_loader');
 // ★ v1186: „This Hero gains the effects of X" — dieselbe Aufloesung wie
 // in der Engine, ohne Engine-Referenz (siehe _gained-effects-shared).
 const { heroScriptOf, eigenesHeldenSkript } = require('./cards/effects/_gained-effects-shared');   // v1286
@@ -1112,6 +1112,7 @@ async function initDatabase() {
   // v1289: deck_id/deck_name fuer die Top-Decks im Spielerprofil.
   await playerProfile.ensurePlayerProfileSchema(db);
   await scRewardsModul.ensureScSchema(db);   // v1382: Hot-Streak-Tabelle
+  await db.execute('CREATE TABLE IF NOT EXISTS card_of_day (date TEXT PRIMARY KEY, card TEXT NOT NULL)');   // Karte des Tages je Berliner Tag (card-of-day.js)
 
   // Per-opponent win/loss for singleplayer CPU battles. Keyed by the
   // deckId the player faced — sample decks (`sample-<filename>`) and
@@ -4324,13 +4325,24 @@ const { createScRewards, isCpuUserId, cpuOpponentKey } = scRewardsModul;
 const scRewards = createScRewards({ db, uuidv4, getActiveDaily, getCardDB, getCardOfDay: (nowMs) => getCardOfDayInfo(nowMs) });
 
 // ── Karte des Tages (Berliner Tag) — Bonus „Card of the Day!" in sc-rewards.js, Veröffentlichung durch MoniaBot (bot-api.js) ──
-/** @returns {{date:string, card:string, amount:number}|null} */
-function getCardOfDayInfo(nowMs = Date.now()) {
+/**
+ * Die Wahl des Tages steht in `card_of_day` (erste Anfrage des Tages legt sie fest): neue Skripte/Bilder durch einen Deploy
+ * mittags ändern den Pool, sollen aber nicht die Karte des Tages austauschen — Discord-Post und Bonus müssen übereinstimmen.
+ * @returns {Promise<{date:string, card:string, amount:number}|null>}
+ */
+async function getCardOfDayInfo(nowMs = Date.now()) {
   const date = berlinDate(new Date(nowMs));
-  const card = cardOfDay(date, getCardArray());
-  if (!card) return null;
+  let row = await db.get('SELECT card FROM card_of_day WHERE date = ?', [date]);
+  if (!row) {
+    const arr = getCardArray();
+    const bilder = require('./card-images').cardNamesWithImage(arr);   // null = nicht lesbar → kein Bildfilter
+    const card = cardOfDay(date, arr, { isImplemented: hasCardEffect, hasImage: bilder ? (n => bilder.has(n)) : undefined });
+    if (!card) return null;
+    await db.run('INSERT OR IGNORE INTO card_of_day (date, card) VALUES (?, ?)', [date, card.name]);   // zwei gleichzeitige Anfragen: die erste gewinnt
+    row = await db.get('SELECT card FROM card_of_day WHERE date = ?', [date]);
+  }
   const eintrag = scRewards.catalog.find(r => r.id === 'card_of_the_day');
-  return { date, card: card.name, amount: eintrag ? eintrag.amount : 0 };
+  return { date, card: row.card, amount: eintrag ? eintrag.amount : 0 };
 }
 
 function getSocketIP(socket) {

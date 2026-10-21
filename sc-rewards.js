@@ -695,7 +695,7 @@ function createScRewards({ db, uuidv4, getActiveDaily, getCardDB, getCardOfDay, 
     const isDisconnectWin = reason === 'disconnect_timeout';
     const results = {};
     let tagesKarte = null;
-    try { tagesKarte = karteDesTages(nowMs); } catch (err) { console.error('[SC] Card of the Day:', err.message); }
+    try { tagesKarte = await karteDesTages(nowMs); } catch (err) { console.error('[SC] Card of the Day:', err.message); }
 
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
