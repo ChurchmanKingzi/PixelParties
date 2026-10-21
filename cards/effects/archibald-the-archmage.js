@@ -260,7 +260,7 @@ async function resolveTrigger(ctx, candidateNames) {
   if (eligible.length === 1) {
     // Single-target — yes/no confirm prompt.
     const { name, ev } = eligible[0];
-    const confirmed = await engine.promptGeneric(ctx.cardOwner, {
+    const confirmed = await engine.promptSpellAuswahl(ctx.cardOwner, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       type: 'confirm',
       title: CARD_NAME,
       message: `${name} was just discarded — cast it as an additional Action with ${hero.name}? (Level becomes ${ev.boostedLevel}.)`,
@@ -279,7 +279,7 @@ async function resolveTrigger(ctx, candidateNames) {
       // ignores unknown keys but cost / level / count are honoured.
       level: ev.boostedLevel,
     }));
-    const result = await engine.promptGeneric(ctx.cardOwner, {
+    const result = await engine.promptSpellAuswahl(ctx.cardOwner, {   // W48a: Zeitfenster der Spell-Auswahl
       type: 'cardGallery',
       cards,
       title: CARD_NAME,

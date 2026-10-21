@@ -110,7 +110,7 @@ async function loeschenUndSpielen(engine, pi, name, opts = {}) {
   if (wirker.length === 0) return false;                             // kein Wirker → Angebot entfaellt still
 
   await engine.showTriggeredEffect?.(name, { playerIdx: pi });
-  const antwort = await engine.promptGeneric(pi, {
+  const antwort = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
     type: 'confirm',
     title: name,
     message: `"${name}" was deleted! Delete all Areas you control and play it as an additional Action?`,

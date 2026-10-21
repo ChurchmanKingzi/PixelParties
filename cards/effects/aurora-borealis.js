@@ -191,7 +191,7 @@ module.exports = {
       });
       if (wirkbar.length === 0) return;
 
-      const ja = await engine.promptGeneric(pi, {
+      const ja = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         type: 'confirm',
         title: CARD_NAME,
         message: 'Delete 2 of the chosen Spells to perform the third one immediately?',
@@ -204,7 +204,7 @@ module.exports = {
         ? engine._confirmSaidYes(ja) : !!(ja && !ja.cancelled);
       if (!bestaetigt) return;
 
-      const pick = await engine.promptGeneric(pi, {
+      const pick = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl
         type: 'cardGallery',
         cards: wirkbar.map(n => ({ name: n, source: 'hand' })),
         title: CARD_NAME,

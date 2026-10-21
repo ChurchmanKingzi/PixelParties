@@ -193,13 +193,13 @@ module.exports = {
     if (kandidaten.length === 0) return false;
 
     // Die Galerie haengt am ctx (`_createContext`), nicht an der Engine.
-    const wahl = await ctx.promptCardGallery(kandidaten, {
+    const wahl = await engine._mitSpellAuswahl(() => ctx.promptCardGallery(kandidaten, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       title: CARD_NAME,
       source: CARD_NAME,
       description: 'Choose an Attack or Spell from your deck to use with this Hero.',
       confirmLabel: '⚔️ Use it!',
       cancellable: true,
-    });
+    }));
     const name = wahl?.cardName || (typeof wahl === 'string' ? wahl : null);
     if (!name || !kandidaten.some(k => k.name === name)) return false;
 
