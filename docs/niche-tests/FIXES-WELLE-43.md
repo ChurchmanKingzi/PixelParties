@@ -23,11 +23,6 @@ Al hat die drei Rückfragen aus [FIXES-WELLE-42.md](FIXES-WELLE-42.md) beantwort
 * Dauerfeuer: 44 Läufe über 20 Karten, beide Seiten, 0 Unterschiede.
 * Keine `Bugfix-Note` (Balancing-Änderung des Kartentexts, kein Fehler).
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Gold Trap, Jumpscare, Bluff & Co.** haben den Kartentyp „Spell" (Subtyp Surprise). Umgesetzt ist deine Liste wörtlich („Surprises, die keine Kreatur sind" → kein Taunt). Sollen sie stattdessen als Spell zählen und den Taunt binden?
-2. **Artefakte mit Subtyp Creature** (Debt-O-Tron Model Missing Parts, Scrap Plow, Powder Keg, Pollution Spewer): Zählt ihr Effekt als Creature effect (so jetzt) oder als Artefakt-Effekt?
-3. **Singing, Lovely Teddy, Spirit of the Forbidden Grimoire** führen die aktiven Effekte fremder Kreaturen aus: Zählt die Kreatur, deren Skript wählt, als Quelle (so jetzt), oder die benutzende Ability bzw. Karte (dann löst eine Ability keinen Taunt aus)?
-4. **Deepsea Horror Clown** hat denselben Wortlaut („all Attacks and Spells they play"): Soll er dieselbe Einschränkung bekommen, oder weiter jede Zielwahl binden (so jetzt)?
-5. **Bomb Arrow, Racket Arrow:** Ihre Kreaturenwahl („Additionally, you may choose a Creature …") ist ein Reaktions-Artefakt und löst keinen Taunt aus (so jetzt). Oder gehört sie zum Attack, auf den sie reagieren, und bindet den Taunt?
-6. **Spell/Area- und Spell/Attachment-Karten auf dem Brett** (Seventh Circle of Hell, Overheal Shock): Ihr Dauer-/Trigger-Effekt löst keinen Taunt aus, beim Ausspielen aus der Hand sind sie ein Spell mit Taunt. Richtig so?
+Alle sechs sind beantwortet und in [FIXES-WELLE-44.md](FIXES-WELLE-44.md) umgesetzt (dort stehen die neuen Rückfragen).
