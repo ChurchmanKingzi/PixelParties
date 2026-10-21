@@ -129,7 +129,7 @@ module.exports = {
     // ★ W34a (Al, 22.10.2026, Punkt 2/3): „Treated as a Destruction Magic Spell" — der Treffer zählt als Spell (Spell-Zähler) und öffnet ein Reaktionsfenster wie ein Spell
     // (virtuelle Spell-Kette `alsSpellKette`, NACH der Zielwahl, VOR dem Treffer): Silence negiert ihn; Shamanic Curse reagiert nicht (kein Kartenspiel); MOE Shield (Nach-Zielwahl-
     // Fenster der Zielwahl) und Magic Mirror (Treffer-Fenster) lesen die Quelle über `_zaehltAlsArt`.
-    const spellErgebnis = await engine.alsSpellKette({ name: 'Alice, the Puppeteer Girl', pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
+    const spellErgebnis = await engine.alsSpellKette({ name: 'Alice, the Puppeteer Girl', pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], resolve: async () => {
     // Play laser beam animation from Alice to target
     const targetZoneSlot = target.type === 'equip' ? target.slotIdx : -1;
     engine._broadcastEvent('play_beam_animation', {

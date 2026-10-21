@@ -114,10 +114,10 @@ module.exports = {
       const t = traeger(engine, ctx.card);
       if (!t || ctx.target !== t.hero) return;
       // Welle 12 (Q99): tödliche Attack eines Helden → jetzt vergelten (nach dem Tod liegt das Heart in der Ablage); nicht tödliche laufen über ②.
-      if (ctx.amount > 0 && ctx.type === 'attack' && t.hero.hp <= 0) {
+      if ((ctx.amount > 0 || ctx.ohneSchaden) && ctx.type === 'attack' && t.hero.hp <= 0) {   // W39a: `ohneSchaden` = Kohta (Treffer ohne Schaden, das Ziel wird besiegt)
         const aq = ctx.source;
         const acd = aq?.name ? engine._getCardDB()[aq.name] : null;
-        if (!acd || !hasCardType(acd, 'Attack')) return;
+        if ((!acd || !hasCardType(acd, 'Attack')) && engine._zaehltAlsArt(aq) !== 'attack') return;   // W39a: auch ein Effekt, der als Attack zählt (Broghan, Javelin Throw, Bamboo Staff …)
         const aPi = aq.heroOwner ?? aq.owner;
         const angreifer = engine.gs.players[aPi]?.heroes?.[aq.heroIdx];
         if (!angreifer?.name || angreifer.hp <= 0 || angreifer === t.hero) return;

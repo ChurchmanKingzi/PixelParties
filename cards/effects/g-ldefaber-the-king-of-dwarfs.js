@@ -82,6 +82,12 @@ module.exports = {
     // the trigger Reaction-Spell coverage too, since reactions skip
     // `onActionUsed` (server.js:3486 isReactionSubtype filter) but
     // still flow through this hook.
+    // ★ W39a (Al, 22.10.2026): „when this Hero performs an Attack or Spell" — auch ein Effekt, der als Attack/Spell dieses Helden zählt (Javelin Throw, Bamboo Staff, Alice …).
+    onEffectCountedAsArt: async (ctx) => {
+      if (ctx.karte) return;   // gespielte Karten laufen über `onAnyActionResolved`
+      await module.exports.hooks.onAnyActionResolved({ ...ctx, actionType: ctx.art });
+    },
+
     onAnyActionResolved: async (ctx) => {
       // Actor must be Güldefaber on Güldefaber's owning player.
       if (ctx.playerIdx !== ctx.cardOwner) return;

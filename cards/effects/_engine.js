@@ -2859,7 +2859,7 @@ class GameEngine {
     // spaeter gezogen, aufgedeckt), blieb der Stempel aus.
     if (hookName === 'afterSpellResolved' && hookCtx && hookCtx.spellName && hookCtx.spellName !== 'Eraser Beam') {
       const sp = this.gs.players[hookCtx.casterIdx];
-      if (sp) sp._spellResolvedTurn = this.gs.turn;
+      if (sp && !hookCtx._alsEffekt) sp._spellResolvedTurn = this.gs.turn;   // W39a: ein Effekt, der als ATTACK zählt (`alsAttackKette`), ist kein gewirkter Spell (Eraser Beam: nur Spells)
       // N3-11 (W24): laufende Nummer JEDES Aufloesungs-Durchgangs — Lauscher, die „einmal je gewirktem Zauber" (nicht je Kopie auf der Hand) antworten
       // wollen (Ellie), entprellen darueber statt ueber den Kartennamen/-daten.
       hookCtx._spellRound = this._spellRoundSeq = (this._spellRoundSeq || 0) + 1;
@@ -4324,14 +4324,14 @@ class GameEngine {
       // ── Player input (async — pauses until client responds) ──
       async promptTarget(validTargets, config) {
         // ── Truth-Seeing Eye ── (see _sourceHasTruthSeeingEye)
-        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+        if (engine._sourceIgnoresTargetingRestrictions(config?.attackerSourceOverride || cardInstance)) {   // W39a: Gegenstandseffekte, die als Attack zählen, nennen ihren Helden als Quelle (Javelin Throw, Bamboo Staff, Crusader's)
           // v616: Truth-Seeing Eye ODER ein Skript mit
           // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
           // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
           // choose any target" verbietet keine Umlenkung.
           config = {
             ...config, ignoreUntargetable: true, _truthSeeingEye: true,
-            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(config?.attackerSourceOverride || cardInstance),
           };
         }
         // Auto-filter: remove non-Creature support zone targets unless explicitly allowed
@@ -4938,14 +4938,14 @@ class GameEngine {
         // Martyry / Anti-Magnet). Post-target NEGATION reactions
         // (Invisibility Cloak / Storm Ring) are deliberately NOT
         // suppressed — they still resolve normally.
-        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+        if (engine._sourceIgnoresTargetingRestrictions(config?.attackerSourceOverride || cardInstance)) {   // W39a: Gegenstandseffekte, die als Attack zählen, nennen ihren Helden als Quelle (Javelin Throw, Bamboo Staff, Crusader's)
           // v616: Truth-Seeing Eye ODER ein Skript mit
           // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
           // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
           // choose any target" verbietet keine Umlenkung.
           config = {
             ...config, ignoreUntargetable: true, _truthSeeingEye: true,
-            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(config?.attackerSourceOverride || cardInstance),
           };
         }
 
@@ -5585,14 +5585,14 @@ class GameEngine {
         const types = config.types || ['hero', 'creature'];
 
         // ── Truth-Seeing Eye ── (see promptDamageTarget for rationale)
-        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+        if (engine._sourceIgnoresTargetingRestrictions(config?.attackerSourceOverride || cardInstance)) {   // W39a: Gegenstandseffekte, die als Attack zählen, nennen ihren Helden als Quelle (Javelin Throw, Bamboo Staff, Crusader's)
           // v616: Truth-Seeing Eye ODER ein Skript mit
           // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
           // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
           // choose any target" verbietet keine Umlenkung.
           config = {
             ...config, ignoreUntargetable: true, _truthSeeingEye: true,
-            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(config?.attackerSourceOverride || cardInstance),
           };
         }
 
@@ -10337,11 +10337,13 @@ class GameEngine {
     target.diedOnTurn = this.gs.turn;
     this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat' });
 
+    // W39a: Treffer ohne Schaden (Kohta: „treated as hitting the target with an Attack") — wie beim Schaden VOR den KO-Hooks und dem Todesablauf (Heart of Ice sieht seinen Träger noch).
+    if (opts.meldeTreffer && opts.type === 'attack' && source) await this.meldeAttackTrefferOhneSchaden(source, target);
     this.gs._heroKOContext = {
       hero: target, source, heroOwner: targetOwner,
       killerOwner: source?.owner ?? source?.controller ?? -1,
     };
-    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, isSacrifice: !!opts.isSacrifice, hpKosten: !!opts.hpKosten, _bypassDeadHeroFilter: true });
+    await this.runHooks(HOOKS.ON_HERO_KO, { hero: target, source, isSacrifice: !!opts.isSacrifice, hpKosten: !!opts.hpKosten, ...(opts.type !== undefined ? { type: opts.type } : {}), _bypassDeadHeroFilter: true });   // W39a: `type: 'attack'` = „besiegt mit einer Attack" (Kohta; Future Tech Bazooka liest es)
     delete this.gs._heroKOContext;
 
     // Ein Hook (Guardian Angel) hat den Tod verhindert — dann gilt der
@@ -31472,7 +31474,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // fall back to the static DB by name).
     const cd = (this.getEffectiveCardData ? this.getEffectiveCardData(sourceCard) : null)
       || (sourceCard.name ? this._getCardDB()[sourceCard.name] : null);
-    if (!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) return false;
+    // W39a (Al, 22.10.2026): auch ein Effekt, der als Attack/Spell des Helden ZÄHLT (Broghan, Javelin Throw, Bamboo Staff, Crusader's …), ist „its Attack or Spell".
+    if ((!cd || !(hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell'))) && !this._zaehltAlsArt(sourceCard)) return false;
     // The casting Hero must have a live Truth-Seeing Eye equipped.
     for (const inst of this.cardInstances) {
       if (inst.name !== 'Truth-Seeing Eye') continue;
@@ -37594,7 +37597,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Phalanx Pike: equipped hero's Attacks do not trigger Surprises.
     // Gated on damageType === 'attack' so the same hero's Spells, Hero
     // effects, Creature activations etc. still open the window normally.
-    if (opts.damageType === 'attack' && sourceCard) {
+    if ((opts.damageType === 'attack' || (!opts.damageType && sourceCard && this._zaehltAlsArt(sourceCard) === 'attack')) && sourceCard) {   // W39a: auch die Opferwahl von Alluring Light (ohne Schadenstyp, Quelle = gezwungener Held mit Stempel)
       const srcOwner = sourceCard.controller ?? sourceCard.owner ?? -1;
       const srcHeroIdx = sourceCard.heroIdx ?? -1;
       if (srcOwner >= 0 && srcHeroIdx >= 0) {
@@ -40557,28 +40560,64 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`clearArmedArrows`, idempotent). Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) öffnet kein neues Fenster: der Treffer läuft direkt (Konvention von `runHooks`).
    * Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`); `resolve` lief genau dann, wenn weder noch.
    */
-  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+  async alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck, ziele, wirkName }) {
     // ★ W34a (Al, 22.10.2026, Punkt 3): EIN Treffer-Ereignis = EIN Zählschritt der Attack-Zähler (`attacksPlayedThisTurn`, `heroesAttackedThisTurn`, `hero._attacksThisTurn`):
     // Quick Attack („first Attack"), Berserk (2), Knife Throw, Rioting Village (1), Blow of the Venom Snake & Co. — wie eine gespielte Attack-Karte (`doPlaySpell`, auch wenn die Kette
     // sie negiert). Die Sperren prüfen die Aufrufer VOR dem Treffer über `heroKannAngreifen`. Hier und nirgends sonst gezählt (kein Doppelzählen mit der Kette).
     await this.zaehleAlsArt('attack', { pi, heroIdx, heroOwner, name });
-    if (this._inReactionCheck || this._inMctsSim) {
-      const r = resolve ? await resolve() : null;
-      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
-    }
-    const { clearArmedArrows } = require('./_arrows-shared');
+    // ★ W39a (Al, 22.10.2026: „Reagieren die ALLE schon auf Broghan und co?"): Leser, die eine Attack ÜBER DAS SCHADENSPROTOKOLL / `afterSpellResolved` lesen (Frostbringer, Warhorse,
+    // Master's Sword, Legendary Sword, Nieht, Reiza, Santa Klaus, Vinepire, Zsos'Ssar, Earth-Shattering Hammer, Idej-Schwerter …), sehen einen Effekt, der als Attack zählt, nur, wenn
+    // dieselben Spuren entstehen wie bei einer gespielten Attack-Karte: `ziele` (die gewählten Ziele, Form wie `promptDamageTarget`) liegen während der Auflösung im Schadensprotokoll
+    // `gs._spellDamageLog`, und NACH der Auflösung feuert `afterSpellResolved` mit Attack-Kartendaten (`_alsEffekt: true`; Stufe = Fighting-Level des Helden; kein „perform that Attack
+    // again" — der Effekt ist keine Karte). Negiert/verpufft der Treffer, feuert nichts. Ohne `ziele` bleibt alles wie bisher (Arthor/Bamboo melden selbst).
+    const gs = this.gs;
+    const hatZiele = Array.isArray(ziele);
+    const logVorher = gs._spellDamageLog;
+    if (hatZiele) gs._spellDamageLog = ziele.filter(Boolean).map(z => ({ ...z }));
     let res;
     try {
-      res = await this.executeCardWithChain({
-        cardName: name, owner: pi, cardType: 'Attack', heroIdx,
-        casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
-        fromBoard: true, resolve, zaehltAlsArt: 'attack',
-        ...(casterCheck === false ? { casterCheck: false } : {}),
-      });
+      if (this._inReactionCheck || this._inMctsSim) {
+        const r = resolve ? await resolve() : null;
+        res = { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+      } else {
+        const { clearArmedArrows } = require('./_arrows-shared');
+        try {
+          res = await this.executeCardWithChain({
+            cardName: name, owner: pi, cardType: 'Attack', heroIdx,
+            casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+            fromBoard: true, resolve, zaehltAlsArt: 'attack',
+            ...(casterCheck === false ? { casterCheck: false } : {}),
+          });
+        } finally {
+          await clearArmedArrows(this, pi);
+        }
+      }
+      if (hatZiele && res && !res.negated && !res.fizzled) {
+        await this.meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele: gs._spellDamageLog });
+      }
     } finally {
-      await clearArmedArrows(this, pi);
+      if (hatZiele) { if (logVorher === undefined) delete gs._spellDamageLog; else gs._spellDamageLog = logVorher; }
     }
     return res;
+  }
+
+  /**
+   * ★ W39a: `afterSpellResolved` als ATTACK für einen Effekt, der als Attack eines Helden zählt (siehe `alsAttackKette`): Attack-Kartendaten mit der Stufe = Fighting-Level des Helden,
+   * `_alsEffekt: true` (kein gewirkter Spell: Eraser Beam; Leser, die „diese Attack wiederholen", schließen Effekte ohne Karte aus), `damageTargets` = die getroffenen Ziele.
+   */
+  async meldeAttackAufgeloest({ name, wirkName, pi, heroIdx, heroOwner, ziele }) {
+    const seite = Number.isInteger(heroOwner) ? heroOwner : pi;
+    const einzig = [], gesehen = new Set();
+    for (const z of (ziele || [])) { if (z && !gesehen.has(z.id)) { gesehen.add(z.id); einzig.push(z); } }
+    try {
+      await this.runHooks('afterSpellResolved', {
+        spellName: wirkName || name,
+        spellCardData: { name: wirkName || name, cardType: 'Attack', subtype: 'Normal', level: this.heldenAngriffStempel(seite, heroIdx).level, zaehltAlsArt: 'attack' },
+        heroIdx, heroOwner: seite, casterIdx: pi,
+        damageTargets: einzig, isSecondCast: false, _alsEffekt: true,
+        _skipReactionCheck: true,
+      });
+    } catch (err) { console.error('[meldeAttackAufgeloest]', err.message); }
   }
 
   /**
@@ -40588,18 +40627,83 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Spell. Shamanic Curse schließt das Glied aus (der Spell müsste in den Ablagestapel gehen), The Master's Plan/Lunar Eclipse lesen `fromBoard` (kein Handspiel).
    * Mitten in einem offenen Reaktionsfenster (`_inReactionCheck`) bzw. im MCTS-Rollout läuft der Treffer direkt. Ergebnis wie `executeCardWithChain` (`negated`/`fizzled`).
    */
-  async alsSpellKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck }) {
+  async alsSpellKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck, ziele }) {
     await this.zaehleAlsArt('spell', { pi, heroIdx, heroOwner, name });
-    if (this._inReactionCheck || this._inMctsSim) {
-      const r = resolve ? await resolve() : null;
-      return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+    // ★ W39a: wie bei `alsAttackKette` liegen die gewählten Ziele (`ziele`) während der Auflösung im Schadensprotokoll `gs._spellDamageLog` (Leser „deals damage … to a single target":
+    // Vinepire, Zsos'Ssar …); den Abschluss (`afterSpellResolved`) meldet der Aufrufer selbst (Alice).
+    const gs = this.gs;
+    const hatZiele = Array.isArray(ziele);
+    const logVorher = gs._spellDamageLog;
+    if (hatZiele) gs._spellDamageLog = ziele.filter(Boolean).map(z => ({ ...z }));
+    try {
+      if (this._inReactionCheck || this._inMctsSim) {
+        const r = resolve ? await resolve() : null;
+        return { negated: false, fizzled: false, chainFormed: false, resolveResult: r };
+      }
+      return await this.executeCardWithChain({
+        cardName: name, owner: pi, cardType: 'Spell', heroIdx,
+        casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
+        fromBoard: true, resolve, zaehltAlsArt: 'spell',
+        ...(casterCheck === false ? { casterCheck: false } : {}),
+      });
+    } finally {
+      if (hatZiele) { if (logVorher === undefined) delete gs._spellDamageLog; else gs._spellDamageLog = logVorher; }
     }
-    return this.executeCardWithChain({
-      cardName: name, owner: pi, cardType: 'Spell', heroIdx,
-      casterOwner: Number.isInteger(heroOwner) ? heroOwner : pi,
-      fromBoard: true, resolve, zaehltAlsArt: 'spell',
-      ...(casterCheck === false ? { casterCheck: false } : {}),
-    });
+  }
+
+  /**
+   * ★ W39a (Al, 22.10.2026): Hero-Zielschutz-Status für Ziel-Gegenstände/-Tränke, die als Attack zählen (Sword in a Bottle) — sie bauen ihre Zielliste selbst und laufen nicht durch
+   * die Engine-Picker, die diesen Filter kennen (`promptDamageTarget`/`promptMultiTarget`). `untargetable` (Butterfly Cloud, Perfect Disguise) und `invisible` (Invisibility): ein
+   * so geschützter Gegnerheld ist nicht wählbar, solange auf seiner Seite ein anderer Held wählbar ist (sind ALLE geschützt, fällt der Schutz zusammen); Chuck, the Crazy Veteran hebt
+   * ihn für die Helden seines Kontrolleurs auf. Markiert (`ineligible`) statt zu entfernen — wie die Picker.
+   */
+  heroStatusSchutzFilter(targets, casterPi, angreifer, cardName) {
+    const liste = (angreifer && angreifer.length) ? angreifer : [null];
+    for (const t of targets || []) {
+      if (!t || t.type !== 'hero' || t.ineligible) continue;
+      if (liste.every(a => this.heroStatusGeschuetztGegen(targets, t, casterPi, a, cardName))) t.ineligible = true;
+    }
+  }
+
+  /** Ist der Gegnerheld `t` gegen den Angreifer-Helden `a` (Ziel-ID wie in der Zielliste; `null` = unbekannt) durch einen Hero-Status (`untargetable`/`invisible`) geschützt? Siehe `heroStatusSchutzFilter`. */
+  heroStatusGeschuetztGegen(targets, t, casterPi, a, cardName) {
+    const gs = this.gs;
+    if (!t || t.type !== 'hero') return false;
+    const seite = this.zielSeite(t, t.owner);
+    if (seite === casterPi) return false;
+    const getaggt = (x) => { const h = gs.players[x.owner]?.heroes?.[x.heroIdx]; return !!(h?.statuses?.untargetable || h?.statuses?.invisible); };
+    if (!getaggt(t)) return false;
+    // Truth-Seeing Eye des Angreifers hebt das Verbot auf („can choose any target")
+    if (a && this._sourceHasTruthSeeingEye({ name: cardName, owner: casterPi, controller: casterPi, heroIdx: a.heroIdx, heroOwner: a.owner })) return false;
+    // Chuck, the Crazy Veteran: gilt für die Helden seines Kontrolleurs
+    for (const { hero: h, physOwner, heroIdx: hi } of this.heroesControlledBy(seite)) {
+      if (!h?.name || h.hp <= 0) continue;
+      if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.webbed || h.statuses?.negated) continue;
+      if (this._isHeroMummified?.(physOwner, hi)) continue;
+      if (this.heroScript(h)?.ignoresOppUntargetable) return false;
+    }
+    // sind ALLE wählbaren Helden dieser Seite geschützt, fällt der Schutz zusammen
+    const gruppe = (targets || []).filter(x => x && x.type === 'hero' && this.zielSeite(x, x.owner) === seite);
+    if (gruppe.every(getaggt)) return false;
+    return true;
+  }
+
+  /**
+   * ★ W39a (Al, 22.10.2026): „Treffer ohne Schaden" eines Effekts, der als Attack zählt, aber das Ziel BESIEGT statt zu verletzen (Kohta: „This is treated as this Hero hitting the target
+   * with an Attack"). Die Schadens-Leser (Held: `afterDamage`, Kreatur: `afterCreatureDamageBatch`) bekommen den Treffer mit Betrag 0, Typ `attack` und dem besiegten Ziel gemeldet — so
+   * sehen auch die Leser von „defeats a target with an Attack" (Explosivo's Sword, Skullmael's Greatsword, Wavilion, Don Quisto, Xiong, The Hands of Big Gwen …) den Kill. Der Aufrufer ruft
+   * es NACH dem Besiegen auf; `ziel` ist das Heldenobjekt bzw. die Kreaturen-Instanz (ihre Rest-HP stehen dann auf 0).
+   */
+  async meldeAttackTrefferOhneSchaden(quelle, ziel, sourceOwner) {
+    if (!quelle || !ziel) return;
+    try {
+      if (ziel.hp !== undefined && ziel.statuses) {
+        await this.runHooks(HOOKS.AFTER_DAMAGE, { source: quelle, target: ziel, amount: 0, realDealt: 0, type: 'attack', ohneSchaden: true, sourceHeroIdx: quelle.heroIdx ?? -1 });
+      } else if (ziel.counters) {
+        if ((ziel.counters.currentHp ?? 1) > 0) ziel.counters.currentHp = 0;
+        await this.runHooks(HOOKS.AFTER_CREATURE_DAMAGE_BATCH, { entries: [{ inst: ziel, amount: 0, realDealt: 0, type: 'attack', source: quelle, sourceOwner: sourceOwner ?? (quelle.controller ?? quelle.owner ?? -1), canBeNegated: true, cancelled: false }], _skipReactionCheck: true });
+      }
+    } catch (err) { console.error('[meldeAttackTrefferOhneSchaden]', err.message); }
   }
 
   /**

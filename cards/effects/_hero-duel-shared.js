@@ -57,6 +57,11 @@ async function duell(engine, cfg) {
   const heimMs = cfg.heimMs ?? HEIM_MS;
   let runden = 0;
   let geramm = false;                          // `play_hero_clash` lief → am Ende `ende` senden
+  // ★ W39a (Al, 22.10.2026: alle Attack-Leser): jeder Duellant „performs a normal Attack" und trifft GENAU EIN Ziel — den Gegner-Duellanten. Für die Leser, die eine Attack über das Schadensprotokoll /
+  // `afterSpellResolved` lesen (Frostbringer, Warhorse, Master's Sword, Nieht, Reiza, Vinepire, Zsos'Ssar …): (a) der Gegner von A steht vor den Schlägen im Schadensprotokoll der Karte (die Karte
+  // meldet `afterSpellResolved` für A selbst); (b) für B (`cfg.meldeAttacken`, nur Duel) zählt und meldet das Duell NACH den Schlägen einmal eine Attack des Helden B (wie der gezwungene Held von Alluring Light).
+  if (cfg.meldeAttacken && Array.isArray(gs._spellDamageLog)) gs._spellDamageLog.push({ id: `hero-${b.side}-${b.heroIdx}`, type: 'hero', owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name });
+  let bHatGeschlagen = false;
   const clashEvent = (phase, extra = {}) => ({
     a: { owner: a.side, heroIdx: a.heroIdx, cardName: held(engine, a)?.name }, b: { owner: b.side, heroIdx: b.heroIdx, cardName: held(engine, b)?.name }, phase, ...extra,
   });
@@ -91,7 +96,7 @@ async function duell(engine, cfg) {
       try {
         const opts = { damageType: 'attack', sourceName: name, hitDelay: 0 };
         if (lebt(held(engine, b))) await engine.dealDamageToTargets(quelleA, [zielA], { ...opts, damage: atkA });
-        if (lebt(held(engine, a))) await engine.dealDamageToTargets(quelleB, [zielB], { ...opts, damage: atkB });
+        if (lebt(held(engine, a))) { await engine.dealDamageToTargets(quelleB, [zielB], { ...opts, damage: atkB }); bHatGeschlagen = true; }
       } finally {
         await engine.endMultiHit();
       }
@@ -111,6 +116,13 @@ async function duell(engine, cfg) {
       engine._broadcastEvent('play_hero_clash', clashEvent('ende'));
       await engine._delay(heimMs);
     }
+  }
+
+  if (cfg.meldeAttacken && bHatGeschlagen) {
+    const Bh = held(engine, b), Ah = held(engine, a);
+    await engine.zaehleAlsArt('attack', { pi: b.controller, heroIdx: b.heroIdx, heroOwner: b.side, name: Bh?.name });
+    await engine.meldeAttackAufgeloest({ name, wirkName: Bh?.name || name, pi: b.controller, heroIdx: b.heroIdx, heroOwner: b.side,
+      ziele: Ah ? [{ id: `hero-${a.side}-${a.heroIdx}`, type: 'hero', owner: a.side, heroIdx: a.heroIdx, cardName: Ah.name }] : [] });
   }
 
   const A = held(engine, a), B = held(engine, b);

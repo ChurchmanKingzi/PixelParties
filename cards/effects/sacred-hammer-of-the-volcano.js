@@ -74,5 +74,21 @@ module.exports = {
         hero: hero.name, baseAtk: atk, target: target.name || 'target',
       });
     },
+
+    // ★ W39a (Al, 22.10.2026: alle Attack-Leser): „hits a Burned target with an Attack" gilt auch für eine brennende KREATUR als Ziel (bisher nur der Heldenpfad `beforeDamage`).
+    beforeCreatureDamageBatch: (ctx) => {
+      const hero = ctx.attachedHero;
+      if (!hero?.name || hero.hp <= 0) return;
+      const atk = hero.atk || 0;
+      if (atk <= 0) return;
+      for (const e of (ctx.entries || [])) {
+        if (e.cancelled || e.isStatusDamage || e.type !== 'attack') continue;
+        if (e.source?.heroIdx !== ctx.cardHeroIdx) continue;
+        if (!ctx._engine.quelleIstHeld(e.source, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx)) continue;
+        if (!e.inst?.counters?.burned) continue;
+        e.modifyAmount(atk);
+        ctx._engine.log('sacred_hammer_bonus', { hero: hero.name, baseAtk: atk, target: e.inst.name });
+      }
+    },
   },
 };

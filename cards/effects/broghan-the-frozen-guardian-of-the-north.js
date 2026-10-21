@@ -123,7 +123,7 @@ module.exports = {
       ...(ctx.cardHeroOwner != null && ctx.cardHeroOwner !== pi ? { heroOwner: ctx.cardHeroOwner } : {}) };   // Styx 28.9.: Brettseite des Angreifers
 
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Reaktionen auf Attacks (Magic Topaz, Arrows …) greifen über die virtuelle Attack-Kette (Muster Arthor).
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: ctx.cardHeroOwner ?? pi, ziele: [target], resolve: async () => {
     if (target.type === 'hero') {
       const targetHero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (targetHero && targetHero.hp > 0) {

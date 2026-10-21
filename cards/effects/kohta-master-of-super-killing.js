@@ -192,7 +192,7 @@ module.exports = {
     // nur: kein Kill, aber Aktion und Sperre bleiben verbraucht.
     const basis = Math.max(1, held?.atk || 1);
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette um Angriffsfenster und Kill.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [ziel], resolve: async () => {
     const nachFenster = await engine._fireAttackDeclare(quelle, ziel, basis);
     if (!(nachFenster > 0)) {
       engine.log('kohta_super_kill_negated', {
@@ -211,13 +211,16 @@ module.exports = {
     if (ziel.type === 'hero') {
       const opfer = engine?.gs?.players?.[ziel.owner]?.heroes?.[ziel.heroIdx];
       if (!opfer?.name || opfer.hp <= 0) { engine.sync(); return true; }
-      await engine.actionDefeatHero(quelle, opfer, { sourceName: CARD_NAME });
+      // W39a: „besiegt mit einer Attack" (Death-Leser: Future Tech Bazooka) und Treffer ohne Schaden an die Schadens-Leser (Explosivo's Sword, Don Quisto, Wavilion, Skullmael's Greatsword,
+      // Heart of Ice …) — `meldeTreffer` feuert ihn NACH hp = 0, VOR den KO-Hooks (wie der Schadenspfad).
+      await engine.actionDefeatHero(quelle, opfer, { sourceName: CARD_NAME, type: 'attack', meldeTreffer: true });
     } else {
       const opfer = ziel.cardInstance
         || engine.findCards({ controller: ziel.owner, zone: 'support', heroIdx: ziel.heroIdx })
              .find(c => c.zoneSlot === ziel.slotIdx);
       if (!opfer) { engine.sync(); return true; }
-      await engine.actionDestroyCard(quelle, opfer, { sourceName: CARD_NAME });
+      await engine.actionDestroyCard(quelle, opfer, { sourceName: CARD_NAME, heldQuelle: quelle });   // W39a: der Held besiegt das Ziel mit einer Attack (Death-Leser: Skullmael's Greatsword, Wanted Poster, Future Tech Bazooka, Xiong)
+      await engine.meldeAttackTrefferOhneSchaden(quelle, opfer, pi);
     }
 
     engine.log('kohta_super_kill', {

@@ -22085,3 +22085,216 @@ Ergebnis des Audits: **keine Lücke bei den Reaktionswegen** — die Allgemeinre
 * **Heldeneffekt, der als Attack/Spell zählt und ein Ziel wählt:** `const { target, negiert } = await engine.heldenEffektZielwahl(ctx, config)` statt `ctx.promptDamageTarget`; bei `negiert` zählen (`zaehleAlsArt`), Einmal-Stempel behalten und `true` zurückgeben; bei `!target && !negiert` ist es ein Abbruch (`false`).
 * **Folgeaktionen nach einer Negierung** (Karten wie The Master's Plan): `performImmediateActionAnyHero(opfer, { …, mitUebernommenenAktionen: true })`, wenn der Text „a different/an additional Action" (mit jedem Helden) sagt; Karten mit Typ-/Namensfilter lassen das Flag weg.
 * **Log-Einträge, die Kartenleser nach Spieler filtern** (`immediate_action`, `spell_played`): immer mit `player`.
+
+## ★ Welle 39 / W39a — Lückenlose Prüfung aller Attack-Leser (und Spell-Leser): Effekte, die als Attack zählen, lösen JEDEN Attack-Leser wie eine echte Attack aus (Entscheidung Welle 39, 22.10.2026)
+
+**Auftrag (Al):** „Es gibt viele Karten, die triggern, wenn eine Attack ausgeführt wird … Reagieren die auch ALLE schon auf Broghan und co?" — Regel (W32a/W34a/W35a): Effekte, die als Attack eines Helden zählen (Broghan, Brackle, Arthor, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel), müssen jeden Attack-Leser genauso auslösen wie die echte Attack-Karte; Alice (zählt als Spell) jeden Spell-Leser wie ein echter Spell.
+
+### 1 · Vorgehen
+Inventar über alle `cards/effects/*.js` und `server.js` (Hooks `beforeDamage`/`afterDamage`/Kreaturen-Stapel mit `ctx.type === 'attack'`/`quelleIstHeld`, `onAttackDeclare`, `afterSpellResolved` mit `cardType 'Attack'`, `onAnyActionResolved`, `onEffectCountedAsArt`, Todes-Hooks, Reaktionsketten, Surprise-Fenster, Umleitungs-/Zielwahl-/Post-Target-Fenster, Hero-Status-Schutz, Truth-Seeing Eye) → **96 Leser** in `docs/niche-tests/repro/W39/_leser.js` mit je einer Sonde → Matrix **Leser × 17 Quellen (+ Referenz „Echte Attack") × beide Sitze × Heldenziel/Kreaturenziel** (`_matrix.js`, `_pruefe.js`; Gegenproben: Siphem darf keinen Attack-Leser auslösen, Alice nur Leser, die auch Spells lesen). Ist die Referenz „Echte Attack" in einer Zelle nicht grün, misst die Sonde falsch (diese Zellen wurden korrigiert, bis die Referenz überall grün war).
+
+**Ergebnis der Matrix (3936 Zellen, ohne gewöhnlichen Heldeneffekt/Alice/Spell):** Basis `72ed5383` **828 Zellen ohne Auslöser** → Zweig **60** — alle 60 bewusst (siehe „bewusst nicht" unten). Gegenproben unverändert (Siphem löst nur die 4 allgemeinen Zielschutz-Zellen aus — die gelten für jede Zielwahl; Alice/Echter Spell lösen genau die Spell-Leser aus).
+
+### 2 · Ursachen (alle an der Wurzel behoben)
+1. **Effekte meldeten ihre „Attack" nicht** (größte Gruppe): `alsAttackKette` löste den Effekt, aber `afterSpellResolved`-Leser (Frostbringer, Earth-Shattering Hammer, Legendary Sword, Heart-Shaped Bow, Idej Kunagi/Onima, Nieht, Reiza, Santa Klaus, Taio …) bekamen nie das Ereignis, und die Ein-Ziel-Leser (Warhorse, Master's Sword, Vinepire, Zsos'Ssar) sahen kein Schadensprotokoll. Jetzt legt jede Karte ihr Ziel über `alsAttackKette({ …, ziele })` in `gs._spellDamageLog`, und die Engine meldet danach EINMAL `meldeAttackAufgeloest` (virtuelle Attack-Karte, `_alsEffekt`, `spellCardData.level` = Fighting-Level). Broghan, Brackle, Heragas, Infected Greatmaw, Javelin Throw, Sacrificial Dagger, Sword in a Bottle, Alluring Light, Arthor, Alice (Spell) und Duel nutzen es.
+2. **Ausrüstungs-Effekte hatten den Gegenstand als Quelle** (Crusader's ×4, Bamboo Staff): Schadens-Hooks und Truth-Seeing Eye sahen keinen Helden. Jetzt `attackerSourceOverride`/Schlagquelle = Träger (`_crusader-shared`, `bamboo-staff`); `_sourceHasTruthSeeingEye` und die Pike-Prüfung des Surprise-Fensters kennen gestempelte Quellen.
+3. **Kohta besiegt ohne Schaden**: keine „defeats with an Attack"-Leser (Hands of Big Gwen, Skullmael's Greatsword, Future Tech Bazooka, Explosivo's Sword, Wavilion …). `actionDefeatHero` bekommt `type`/`meldeTreffer` (neu: `meldeAttackTrefferOhneSchaden`) und Kohta setzt `heldQuelle`.
+4. **Alluring Light**: die Quelle des erzwungenen Treffers war nicht der gezwungene Held (Schutz-/Reaktionsfenster, Ziel-Protokoll). Quelle früher gesetzt, `ziele:[opfer]`.
+5. **Duel**: beide Duellanten lesen und melden (`meldeAttacken:true`, Schadensprotokoll in `_hero-duel-shared`).
+6. **Zähl-Leser**: Güldefaber und The Brewer's Blade zählten nur Karten; jetzt `onEffectCountedAsArt`.
+7. **Zielschutz bei Trank-/Artefakt-Zielwahl** (`untargetable` Butterfly Cloud, `invisible`): `server.js normalizeValidTargets` kannte den Hero-Status-Schutz nicht → neu `engine.heroStatusSchutzFilter`; Sword in a Bottle prüft ihn auch in `validateSelection`.
+8. **Truth-Seeing Eye / Jumpscare**: gestempelte Quellen ohne Karte; aufgeschobene Surprises (Jumpscare) liefen nach Trank-Zielwahl nicht (`doConfirmPotion` führt `_executeDeferredSurprises` aus).
+9. **Kreaturenziele**: Sacred Hammer of the Volcano und Zsos'Ssar lasen nur Heldenschaden (`beforeCreatureDamageBatch` ergänzt).
+10. **Einzelfälle**: Heart of Ice (Träger stirbt durch Attack-Effekt; `_zaehltAlsArt`), Invisibility Cloak (`zaehltAlsArt`), Future Tech Bazooka (`heldQuelle`), Vinepire (Puffer wurde vom Duel-Ereignis des Gegners verbraucht → Wirker-/Helden-Prüfung vor dem Löschen).
+
+### 3 · Zentrale Lösung
+Eine Stelle, die einen als Attack zählenden Effekt meldet: `engine.alsAttackKette({ …, ziele })` → `meldeAttackAufgeloest` (Zählung über `zaehleAlsArt`, Schadensprotokoll aus `ziele`, danach EIN virtuelles `afterSpellResolved` mit `cardType 'Attack'`, `_alsEffekt`, ohne Spell-Stempel `_spellResolvedTurn`); die Schadenspfade lesen die Quelle über `_zaehltAlsArt`/`quelleIstAttackOderSpell`/`heldenAngriffStempel` (Stufe = Fighting-Level). Nur wo ein Leser eine eigene Lücke hatte (Punkte 2–10), wurde der Leser bzw. die Quelle lokal ergänzt; keine Umbenennungen, keine Kartentext-/Datenänderungen.
+
+### 4 · Attack-Leser (alle 96; Matrix `W39/a-11 … a-13`, Einzelrepros `a-01 … a-10`)
+Spalten: Karte | Art des Lesers (Hook/Gate) | reagiert auf echte Attack | VORHER (Basis `72ed5383`): keine Reaktion bei … | NACHHER | Status. „alle Quellen" = alle 17 Quellen × beide Sitze × Held-/Kreaturenziel, soweit sinnvoll. „bewusst nicht"-Gründe: **MOOT** (Kohta besiegt das Ziel; Leser, die am lebenden Ziel wirken, haben nichts zu tun), **WAHL** (Duel wählt keine Ziele: die „is chosen"-Fenster öffnen nicht; Alluring Light: das Opfer wählt der Besitzer des Ziels selbst, Schutz gegen das Wählen durch den Gegner greift nicht).
+
+| Karte | Leser (Hook/Gate) | echte Attack | VORHER: kein Auslöser bei | NACHHER | Status |
+|---|---|---|---|---|---|
+| Club of Gobbo | beforeDamage / Stapel (lockReduction) | ja | – | alle Quellen | schon korrekt |
+| Idej Sword - Kunagi | afterSpellResolved (Attack, Kreatur besiegt) | ja | Broghan, Brackle, Heragas, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Idej Sword - Onima | afterSpellResolved (Attack, 1 Held) | ja | Broghan, Brackle, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Bow of the Hunt Goddess | Ausrüstungs-Reaktion der Kette | ja | – | alle Quellen | schon korrekt |
+| Future Tech Doomsday Bomb | onAttackDeclare | ja | – | alle Quellen | schon korrekt |
+| Truth-Seeing Eye | Quellenprüfung in den Zielwahl-Fenstern (`_sourceHasTruthSeeingEye`) | ja | Broghan, Brackle, Arthor, Javelin Throw, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Crusader's ×4 | alle Quellen | geändert |
+| Elixir of Strength (Buff) | Buff `empowered_strike` (Schadenspfad) | ja | – | alle Quellen | schon korrekt |
+| Guardian Beast Niu (Buff) | Buff `niu_enhanced` (Schadenspfad) | ja | – | alle Quellen | schon korrekt |
+| Elixir of Cold (Buff) | Buff `cold_strike` (Schadenspfad) | ja | – | alle Quellen | schon korrekt |
+| Wavilion | afterDamage / Stapel (Besiegen) | ja | Kohta, Crusader's ×4 | alle Quellen | geändert |
+| Vinepire | afterDamage / Stapel + afterSpellResolved | ja | Broghan, Brackle, Heragas, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel, Crusader's ×4 | alle Quellen | geändert |
+| Gigantisaur Stegon (Opfer) | Kreaturen-Stapel (Schaden an der Kreatur) | ja | – | alle Quellen | schon korrekt |
+| Hardy Slime (erzwungene Zielwahl) | Zielwahl-Filter (Taunt) | ja | Alluring Light, Duel | bewusst nicht: Alluring Light, Duel | geändert |
+| Empty Armor (Umleitung) | Board-Umleitung (`sourceEffectKind`) | ja | Alluring Light, Duel | bewusst nicht: Duel | geändert |
+| Ghoul Guard (Opfer) |  | ja | – | alle Quellen | schon korrekt |
+| Rioting Village (Rückstoß) | afterDamage / Stapel (Rückstoß) | ja | – | alle Quellen | schon korrekt |
+| Dark Ocean (Kreaturenschaden) | Schadenspfad der Kreatur | ja | – | alle Quellen | schon korrekt |
+| Schutz: untargetable (Butterfly Cloud) | Hero-Status `untargetable` in den Zielwahl-Fenstern / Zielliste | ja | Sword in a Bottle, Alluring Light, Duel | bewusst nicht: Alluring Light, Duel | geändert |
+| Schutz: invisible (Invisibility) | Hero-Status `invisible` in den Zielwahl-Fenstern / Zielliste | ja | Sword in a Bottle, Alluring Light, Duel | bewusst nicht: Alluring Light, Duel | geändert |
+| Future Tech Jetpack (Träger, 0 Kopien) | `blocksTargeting` (Stufe der Quelle) | ja | – | alle Quellen | schon korrekt |
+| Stealth (Ability Lv 1, Angriff Stufe 1) | `blocksTargeting` (Stufe der Quelle) | ja | – | alle Quellen | schon korrekt |
+| Angelfeather Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Magic Topaz | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Bomb Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Flame Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Poisoned Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Rainbow's Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Golden Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Hydra Blood Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Racket Arrow | Reaktion der Kette (Attack) | ja | – | alle Quellen | schon korrekt |
+| Arrow Slit | Reaktion auf Pfeil-Aktivierung | ja | – | alle Quellen | schon korrekt |
+| Stealthy Pursuit | Reaktion der Kette (Attack/Spell) | ja | – | alle Quellen | schon korrekt |
+| Anti-Magnet | Umleitung (Attack/Spell/Creature) | ja | Duel | bewusst nicht: Duel | geändert |
+| Challenge | Umleitung (`sourceEffectKind`) | ja | Duel | bewusst nicht: Duel | geändert |
+| Martyry | Umleitung (`sourceEffectKind`) | ja | Duel | bewusst nicht: Duel | geändert |
+| Invisibility Cloak | Post-Target (Attack/Spell) | ja | Alluring Light | alle Quellen | geändert |
+| Fireshield | Nach-Schaden (Attack/Spell/Creature) | ja | – | alle Quellen | schon korrekt |
+| Spiky Armor | Nach-Schaden (Typ attack) | ja | – | alle Quellen | schon korrekt |
+| Escape | Vor-Schaden (`quelleIstAttackOderSpell`) | ja | – | alle Quellen | schon korrekt |
+| Zombified Assault | Besiegen-Fenster | ja | – | alle Quellen | schon korrekt |
+| Corpse Explosion | Besiegen-Fenster | ja | – | alle Quellen | schon korrekt |
+| Future Tech Escape Device | Post-Target (Stufe der Quelle) | ja | Duel | bewusst nicht: Duel | geändert |
+| Test Flight | Post-Target (Stufe der Quelle) | ja | Duel | bewusst nicht: Duel | geändert |
+| Chaorc Interception | Zielwahl-Fenster (Attack/Spell/Creature) | ja | Alluring Light | alle Quellen | geändert |
+| Bluff | Surprise (gewählt) | ja | – | alle Quellen | schon korrekt |
+| Booby Trap | Surprise (getroffen) | ja | Alluring Light | alle Quellen | geändert |
+| Crimson Web | Surprise (gewählt) | ja | Duel | bewusst nicht: Duel | geändert |
+| Firewall | Surprise (getroffen) | ja | Bamboo Staff, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Flooding | Surprise (gewählt) | ja | Duel | bewusst nicht: Duel | geändert |
+| Frost Rune | Surprise (gewählt) | ja | Alluring Light, Duel | bewusst nicht: Duel | geändert |
+| Glass Wall | Surprise (gewählt, Stufe der Quelle) | ja | Duel | bewusst nicht: Duel | geändert |
+| Jumper Spider | Surprise (getroffen) | ja | – | alle Quellen | schon korrekt |
+| Mountain Tear River | Surprise (gewählt) | ja | Bamboo Staff, Alluring Light, Duel, Crusader's ×4 | bewusst nicht: Duel | geändert |
+| Spike Trap | Surprise (gewählt) | ja | Duel | bewusst nicht: Duel | geändert |
+| Tharxian Horse | Surprise (gewählt) | ja | Duel | bewusst nicht: Duel | geändert |
+| Toxic Trap | Surprise (getroffen) | ja | Bamboo Staff, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Spider Avalanche | Surprise (getroffen) | ja | – | alle Quellen | schon korrekt |
+| Jumpscare | Surprise (gewählt) + aufgeschobener Effekt | ja | Javelin Throw, Sword in a Bottle, Duel | bewusst nicht: Duel | geändert |
+| Earth-Shattering Hammer, Relic of Deri | afterSpellResolved (Attack, 1 Held) | ja | Broghan, Brackle, Javelin Throw, Sword in a Bottle, Crusader's Arm-Cannon, Crusader's Cutlass, Crusader's Hookshot, Sacrificial Dagger, Infected Greatmaw, Alluring Light | alle Quellen | geändert |
+| The Hands of Big Gwen | afterDamage / Stapel | ja | Kohta, Crusader's ×4 | alle Quellen | geändert |
+| Skullmael's Greatsword | afterDamage / Stapel / onCreatureDeath (heldQuelle) | ja | Kohta, Crusader's ×4 | alle Quellen | geändert |
+| Future Tech Bazooka | Todes-Hooks (Typ attack / heldQuelle) | ja | Kohta, Crusader's ×4 | alle Quellen | geändert |
+| Legendary Sword of a Barbarian King | afterSpellResolved (Attack) | ja | Broghan, Brackle, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Heart-Shaped Bow, the Final Proof of Cuteness | afterSpellResolved (Attack) | ja | Broghan, Brackle, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| The Brewer's Blade | onAnyActionResolved (+ onEffectCountedAsArt neu) | ja | Broghan, Brackle, Arthor, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Shattered Trident, Treasure of the Deepsea | onAttackDeclare + afterSpellResolved/onAnyActionResolved | ja | – | alle Quellen | schon korrekt |
+| Phalanx Pike | Hero-Flag im Surprise-Fenster | ja | Alluring Light | alle Quellen | geändert |
+| Heart of Ice (Träger wird getroffen) | afterSpellResolved (Attack) | ja | Broghan, Brackle, Kohta, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel, Crusader's ×4 | alle Quellen | geändert |
+| Heart of Ice (Träger stirbt) | afterDamage (tödlicher Treffer) | ja | Broghan, Brackle, Arthor, Kohta, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Nieht, the Blitz Blade | afterSpellResolved (Attack, genau 1 Ziel) | ja | Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel | alle Quellen | geändert |
+| Reiza, the Chief Tormentor | afterSpellResolved (Attack, genau 1 Ziel) | ja | Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel | alle Quellen | geändert |
+| Xiong, the Bamboo Guardian | afterDamage / onCreatureDeath | ja | – | alle Quellen | schon korrekt |
+| Devlin, the Masked Butcher | beforeDamage / afterDamage / Stapel | ja | – | alle Quellen | schon korrekt |
+| Null, the Mage Slayer | afterDamage / Stapel | ja | – | alle Quellen | schon korrekt |
+| Don Quisto, the Gold Seeker | onAttackDeclare + afterDamage / Stapel | ja | – | alle Quellen | schon korrekt |
+| Bow Sniper Darge | beforeDamage / Stapel (Pfeile der Kette) | ja | – | alle Quellen | schon korrekt |
+| Cute Angel Molinda | Kreaturen-Stapel (Attack/Spell) | ja | – | alle Quellen | schon korrekt |
+| Great Detective Doq | onAttackDeclare | ja | – | alle Quellen | schon korrekt |
+| Güldefaber, the King of Dwarfs | onAnyActionResolved (+ onEffectCountedAsArt neu) | ja | Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light | alle Quellen | geändert |
+| Thorad, Strength of Coolness | beforeDamage / Stapel | ja | – | alle Quellen | schon korrekt |
+| Zsos'Ssar, the Serpent Warlord | beforeDamage (+ Kreaturen-Stapel neu), Schadensprotokoll | ja | Echte Attack, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel | alle Quellen | geändert |
+| Taio, the Sun Fencer (Kill-Marke) | afterSpellResolved / Kill-Marke | ja | – | alle Quellen | schon korrekt |
+| Santa Klaus | afterSpellResolved (Attack/Spell) | ja | Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light | alle Quellen | geändert |
+| Ghuanjun, the Undead Martial Artist | beforeDamage / Stapel (HP-Boden) | ja | – | alle Quellen | schon korrekt |
+| Sorin, the Warden of Blood Rock | beforeDamage / Stapel (Attack-Verbot) | ja | – | alle Quellen | schon korrekt |
+| Taio, Absorber of the Mountain's Heart (Nachguss) | afterSpellResolved (Attack / DM-Spell) | ja | Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light | bewusst nicht: Alluring Light | geändert |
+| Blade of the Frostbringer | afterSpellResolved (Attack, genau 1 Ziel) | ja | Broghan, Brackle, Heragas, Kohta, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel, Crusader's ×4 | bewusst nicht: Kohta | geändert |
+| Blade of the Swamp Witch | afterDamage / Kreaturen-Stapel (Typ attack) | ja | Kohta | bewusst nicht: Kohta | geändert |
+| The Sun Sword | afterDamage / Kreaturen-Stapel | ja | Kohta | bewusst nicht: Kohta | geändert |
+| Explosivo's Sword | afterDamage / Stapel (Besiegen) | ja | Kohta, Crusader's ×4 | alle Quellen | geändert |
+| Vampiric Sword | afterDamage / Stapel | ja | Kohta | bewusst nicht: Kohta | geändert |
+| Warhorse | beforeDamage / Stapel + Schadensprotokoll (genau 1 Ziel) | ja | Broghan, Brackle, Heragas, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel, Crusader's ×4 | alle Quellen | geändert |
+| The Master's Sword | beforeDamage / Stapel + Schadensprotokoll | ja | Broghan, Brackle, Heragas, Javelin Throw, Sword in a Bottle, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Duel, Crusader's ×4 | alle Quellen | geändert |
+| Glass Sword | onAttackDeclare | ja | – | alle Quellen | schon korrekt |
+| Sacred Hammer of the Volcano | beforeDamage (+ Kreaturen-Stapel neu) | ja | Echte Attack, Broghan, Brackle, Arthor, Heragas, Javelin Throw, Sword in a Bottle, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light, Crusader's ×4 | alle Quellen | geändert |
+| Super-Killing Knife, the Tool of Liquidation | Kreaturen-Stapel | ja | – | alle Quellen | schon korrekt |
+
+**Leser, die nicht in der Matrix stehen (Begründung):**
+
+| Karte | Leser | Befund |
+|---|---|---|
+| Alliance, Dive Down | Zielverbot gegen Attacks/Spells (`info.treatedAsLevel`) | **schon korrekt** — W29a, Repro `W29/a-02` (läuft grün) |
+| Alleria, the Queen of Spiders | Umleitung über `engine.sourceEffectKind` | gleiche Klassifikation wie Empty Armor/Challenge/Martyry (Matrix, dort wie oben) — nicht einzeln in der Matrix |
+| Andras, the Human Weapon | „normal Attack whose original level is lower than … Fighting level" | **bewusst nicht**: Effekt-Stufe = Fighting-Level, die Bedingung „niedriger" ist nie erfüllt (und kein Untertyp „Normal") |
+| Pharaoh, the Lone Living Being, Club of Gobbo (Stufenbedingung) | stufen-/kartengebunden | **bewusst nicht** (Effekt-Stufe = Fighting-Level); Gobbo-Sperre in der Matrix grün |
+| Swellpnir (Aktionsökonomie) | zählt Aktionen, nicht Attacks | **bewusst nicht**: Zusatzaktions-Wege unverändert (W35a) |
+| Cool Cheese, Rain Viola, Shard of Chaos, Weathercock | Kartentyp-/Ein-Ziel-Leser, kein Attack-Bezug | entfällt |
+| Deepsea Encounter, Idej Projector, Deepsea Horror Clown | Reaktion bzw. Kreaturen-Text auf „Attack, Spell or Creature effect" | **nicht in der Matrix geprüft** (hängen an Ketten-Link-/`damageType`-Weg; siehe Fragen/Nebenfunde) |
+| Eraser Beam, Counter/Sperren (W34/W35) | Zähler `attacksPlayedThisTurn` | schon korrekt (W34a/W35a, Repros `W34`/`W35` laufen grün) |
+
+### 5 · Spell-Leser (knapp; Matrix `W39/a-14`, Quelle: Alice als Spell-Effekt vs. echter Spell Fireball)
+Alle Spell-Leser lesen über `quelleIstAttackOderSpell`/`sourceEffectKind` bzw. den Schadenspfad. **Gefunden und behoben:** Alice legte ihr Ziel nicht ins Schadensprotokoll (`alsSpellKette` ohne `ziele`) → **Vinepire** sah ihren Treffer nicht; **Zsos'Ssar** las weder bei Alice noch bei echten Spells auf Kreaturenziele (jetzt `beforeCreatureDamageBatch`). Alle anderen Spell-Leser waren schon korrekt. Leser, die nur Spells lesen (Archibald, Beato, Card Game Player Inya, Ethan, The White Eye, Learning, Rafflesia), prüfen `cardType === 'Spell'` — Alice als Effekt ohne Karte löst sie bewusst nicht aus (kein gespielter Spell).
+
+| Karte | Leser | Alice VORHER | Echter Spell VORHER | Alice NACHHER | Echter Spell NACHHER | Status |
+|---|---|---|---|---|---|---|
+| Truth-Seeing Eye | Quellenprüfung in den Zielwahl-Fenstern (`_sourceHasTruthSeeingEye`) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Elixir of Cold (Buff) | Buff `cold_strike` (Schadenspfad) | ja | ja | ja | ja | schon korrekt |
+| Vinepire | afterDamage / Stapel + afterSpellResolved | nein | ja | ja | ja | geändert |
+| Gigantisaur Stegon (Opfer) | Kreaturen-Stapel (Schaden an der Kreatur) | ja | ja | ja | ja | schon korrekt |
+| Hardy Slime (erzwungene Zielwahl) | Zielwahl-Filter (Taunt) | ja | ja | ja | ja | schon korrekt |
+| Empty Armor (Umleitung) | Board-Umleitung (`sourceEffectKind`) | ja | ja | ja | ja | schon korrekt |
+| Ghoul Guard (Opfer) |  | ja | ja | ja | ja | schon korrekt |
+| Dark Ocean (Kreaturenschaden) | Schadenspfad der Kreatur | ja | ja | ja | ja | schon korrekt |
+| Stealthy Pursuit | Reaktion der Kette (Attack/Spell) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Anti-Magnet | Umleitung (Attack/Spell/Creature) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Challenge | Umleitung (`sourceEffectKind`) | ja | ja | ja | ja | schon korrekt |
+| Martyry | Umleitung (`sourceEffectKind`) | ja | ja | ja | ja | schon korrekt |
+| Invisibility Cloak | Post-Target (Attack/Spell) | ja | ja | ja | ja | schon korrekt |
+| Fireshield | Nach-Schaden (Attack/Spell/Creature) | ja | ja | ja | ja | schon korrekt |
+| Escape | Vor-Schaden (`quelleIstAttackOderSpell`) | ja | ja | ja | ja | schon korrekt |
+| Zombified Assault | Besiegen-Fenster | ja | ja | ja | ja | schon korrekt |
+| Corpse Explosion | Besiegen-Fenster | ja | ja | ja | ja | schon korrekt |
+| Future Tech Escape Device | Post-Target (Stufe der Quelle) | – | – | – | – | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Test Flight | Post-Target (Stufe der Quelle) | ja | ja | ja | ja | schon korrekt |
+| Chaorc Interception | Zielwahl-Fenster (Attack/Spell/Creature) | ja | ja | ja | ja | schon korrekt |
+| Bluff | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Booby Trap | Surprise (getroffen) | ja | ja | ja | ja | schon korrekt |
+| Crimson Web | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Firewall | Surprise (getroffen) | ja | ja | ja | ja | schon korrekt |
+| Flooding | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Frost Rune | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Glass Wall | Surprise (gewählt, Stufe der Quelle) | ja | – | ja | – | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Jumper Spider | Surprise (getroffen) | ja | ja | ja | ja | schon korrekt |
+| Mountain Tear River | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Spike Trap | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Tharxian Horse | Surprise (gewählt) | ja | ja | ja | ja | schon korrekt |
+| Toxic Trap | Surprise (getroffen) | ja | ja | ja | ja | schon korrekt |
+| Spider Avalanche | Surprise (getroffen) | ja | ja | ja | ja | schon korrekt |
+| Jumpscare | Surprise (gewählt) + aufgeschobener Effekt | ja | ja | ja | ja | schon korrekt |
+| Cute Angel Molinda | Kreaturen-Stapel (Attack/Spell) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Güldefaber, the King of Dwarfs | onAnyActionResolved (+ onEffectCountedAsArt neu) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Thorad, Strength of Coolness | beforeDamage / Stapel | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Zsos'Ssar, the Serpent Warlord | beforeDamage (+ Kreaturen-Stapel neu), Schadensprotokoll | – | nein | – | ja | geändert |
+| Taio, the Sun Fencer (Kill-Marke) | afterSpellResolved / Kill-Marke | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Santa Klaus | afterSpellResolved (Attack/Spell) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+| Taio, Absorber of the Mountain's Heart (Nachguss) | afterSpellResolved (Attack / DM-Spell) | – | ja | – | ja | schon korrekt (– = Kombination unsinnig/Quelle nicht anwendbar) |
+
+### 6 · Reproduktionen (`docs/niche-tests/repro/W39/`, Aufruf `node docs/niche-tests/repro/W39/<datei>.js`, Exit 0 = korrekt)
+`a-01`/`a-02` afterSpellResolved-Leser · `a-03` Ausrüstungs-Effekte (Quelle = Träger) · `a-04` Kohta · `a-05` Alluring Light · `a-06` Duel · `a-07` Zähl-Hooks · `a-08` Zielschutz/Truth-Seeing Eye/Jumpscare · `a-09` Kreaturenziele · `a-10` Heart of Ice · `a-11`…`a-13` Gesamtmatrizen (Ausrüstung / Helden-Kreaturen-Brett / Reaktionen-Surprises) · `a-14` Spell-Leser (Alice vs. Echter Spell) · `a-15` Klassifikation. Auf der Basis `72ed5383` Exit 1 (a-01…a-14; a-15 ebenfalls), auf dem Zweig Exit 0. Hilfen: `_helfer.js`, `_matrix.js`, `_leser.js`, `_pruefe.js` (Verzeichnisse mit `_` laufen nicht als Repro).
+
+### Verträge für neue Karten
+* **Heldeneffekt/Item-Effekt, der als Attack zählt und Schaden macht:** über `engine.alsAttackKette({ name, pi, heroIdx, heroOwner, resolve, casterCheck, ziele, wirkName })` auflösen und die getroffenen Ziele als `ziele` übergeben (Objekte wie im Schadensprotokoll: `{ id, type, owner, heroIdx|… }`) — nie eigene `afterSpellResolved`-Hooks feuern. Ohne `ziele` sehen Ein-Ziel-Leser (Warhorse, Frostbringer, Vinepire …) den Treffer nicht.
+* **Gegenstandseffekt:** die Quelle des Schadens ist der TRÄGER (`attackerSourceOverride`), nie die Gegenstandskarte.
+* **Effekt, der besiegt, ohne Schaden zu machen (Kohta):** `actionDefeatHero(…, { type: 'attack', meldeTreffer: true })` + `heldQuelle`; die Engine meldet den Treffer (`meldeAttackTrefferOhneSchaden`) vor den KO-Hooks.
+* **Zielwahl über Trank/Artefakt:** Hero-Status-Schutz (untargetable/invisible) über `engine.heroStatusSchutzFilter` (Server) bzw. `validateSelection` prüfen.
+* **Neuer Attack-Leser:** gate über `quelleIstAttackOderSpell`/`_zaehltAlsArt`, nicht über `cardType === 'Attack'` allein; für Zähl-Leser `onEffectCountedAsArt`.
+
+### Fragen an Al (Ja/Nein)
+1. Sollen bei **Duel** die „is chosen"-Reaktionen/-Schutzeffekte (Butterfly Cloud, Invisibility, Taunt, Umleitungen, Gewählt-Surprises) bewusst NICHT greifen, weil Duel keine Ziele wählt?
+2. Soll **Duel** den B-Zähler (Gegen-Attack) und den Pfeil-Bonus je Schlag zählen (so jetzt umgesetzt)?
+3. Soll **Kunagi** („repeat that Attack") bei Effekten ohne Karte NICHT wiederholen (jetzt so)?
+4. Sollen gespielte Attack-Karten den **Eraser Beam**-Stempel setzen, Attack-Effekte ohne Karte aber nicht?
+5. Soll bei **Alluring Light** der Schutz gegen das Wählen durch den Gegner (Butterfly Cloud, Invisibility, Taunt) nicht greifen, weil der Besitzer sein eigenes Ziel wählt?
+
+### Nebenfunde
+* **Deepsea Encounter, Idej Projector, Deepsea Horror Clown** reagieren auf „Attack, Spell or Creature effect" über Ketten-Link-Typ bzw. `damageType`; nicht in der Matrix geprüft.
+* Der Zielschutz `untargetable`/`invisible` fehlte bei Trank-/Artefakt-Zielwahl bisher überall (nicht nur für Attack-Effekte); jetzt in `normalizeValidTargets`.
+
+### 7 · Regressionsschutz (Zweig vs. Basis `72ed5383`)
+* **Alle Repros** (`docs/niche-tests/repro/*`, 3 parallel): **1194 Dateien, alle Exit 0** (davon 15 neu unter `W39/`); die 15 neuen: Basis Exit 1, Zweig Exit 0.
+* **`scripts/check-*.js`:** 34 Skripte, alle Exit 0 außer `check-scope.js` (wie auf der Basis).
+* **Skilltest-E2E** (`scripts/skilltest-e2e/*.test.js`, 31 Dateien, Zweig und Basis nebeneinander): identische Ergebnisse; rot in beiden: battle, lobby, prep, seats, spectate-player, target. `cards.test.js` war im Parallellauf auf dem Zweig einmal rot (Last), einzeln wiederholt grün (Exit 0).
+* **Dauerfeuer** (`docs/niche-tests/lib/barrage.js`): 27 betroffene Karten (Vinepire, Kohta, Sacred Hammer, Güldefaber, Brewer's Blade, Zsos'Ssar, Heart of Ice, Invisibility Cloak, Future Tech Bazooka, Alluring Light, Duel, Bamboo Staff, Arthor, Broghan, Sword in a Bottle, Javelin Throw, Alice, Heragas, Brackle, Sacrificial Dagger, Infected Greatmaw, Crusader's Cutlass, Truth-Seeing Eye, Jumpscare, Toxic Trap, Firewall, Warhorse) × beide Seiten = 54 Läufe: keine Engine-Fehler, Wurf-Ausnahmen, Hänger oder Audit-Fehler; die Zustands-Fingerabdrücke von Zweig und Basis sind in allen 54 Läufen identisch (die einzige Bilanzzeile „Fireball: +1" ist der Treiber und steht auf beiden Ständen gleich).

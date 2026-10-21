@@ -11781,6 +11781,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     cardName: potionName, playedCardName: potionName, heroIdx: -1,
     _skipReactionCheck: true,
   });
+  // ★ W39a (Al, 22.10.2026): aufgeschobene Surprises (Jumpscare: „After the Attack, Spell or effect resolves") — ein zielender Artefakt-/Trank-Effekt, der als Attack zählt (Javelin Throw,
+  // Sword in a Bottle), löste sie bisher erst am Zugende ein (andere Aktionspfade tun es am Ende der Aktion).
+  await room.engine._flushSurpriseDrawChecks();
+  await room.engine._executeDeferredSurprises();
   for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
@@ -12046,6 +12050,7 @@ function normalizeValidTargets(validTargets, casterPi, engine, config, cardName)
     // `validateSelection` des Tranks ab.
     const opferListe = validTargets.filter(t => t && engine.zielSeite(t) !== casterPi);
     const angreiferListe = validTargets.filter(t => t && t.type === 'hero' && !t.ineligible && engine.zielSeite(t) === casterPi);
+    if (typeof engine.heroStatusSchutzFilter === 'function') engine.heroStatusSchutzFilter(validTargets, casterPi, angreiferListe, cardName);   // W39a: `untargetable` (Butterfly Cloud) / `invisible` (Invisibility) gelten auch gegen Sword in a Bottle (Truth-Seeing Eye des Angreifers hebt sie auf)
     for (const t of validTargets) {
       if (!t || t.type !== 'hero' || t.ineligible || engine.zielSeite(t) === casterPi) continue;
       const basis = { sourceData: getCardDB()[cardName], cardName, damageType: config.damageType, chooserIdx: casterPi, allTargets: opferListe };

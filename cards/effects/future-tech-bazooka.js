@@ -57,7 +57,8 @@ function vomHeldenPerAngriff(ctx) {
   // deshalb nie). `ON_CREATURE_DEATH` reicht es aus dem Stapel-Pfad
   // durch, `ON_HERO_KO` seit v557 ebenfalls.
   const typ = ctx.type || ctx.damageType || null;
-  return typ === 'attack';
+  // W39a: Zerstörung, die als „der Held besiegt das Ziel mit einer Attack" zählt (Kohta, Super-Killing Knife), nennt die Angriffs-Quelle in `heldQuelle`.
+  return typ === 'attack' || !!ctx.heldQuelle;
 }
 
 /**
