@@ -23,8 +23,6 @@ Umgestellter alter Repro: `W43/a-01` (nur die Zellen Gold Trap, Jumpscare, Bluff
 * Dauerfeuer: 13 Karten × 2 Seiten (Taunt-Variante bei Hardy Slime und Clown), 0 Unterschiede.
 * `Bugfix-Note` im Commit: Gold Trap und Jumpscare müssen jetzt den Hardy Slime wählen, wenn er ein mögliches Ziel ist.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Shield of Wisdom** hat den cardType Artifact (Subtyp Surprise), daher bindet seine Umleitungs-Zielwahl den Taunt nicht. Passt das, oder soll auch sie binden?
-2. **Challenge, Martyry, Anti-Magnet, Alleria und Empty Armor** leiten die Zielwahl einer Surprise (Gold Trap, Jumpscare, Mountain Tear River …) heute nicht um, weil `sourceEffectKind` für eine auflösende Surprise `'surprise'` liefert. Sollen sie nach demselben Grundsatz „Surprise zählt nach cardType" auch Surprise-Zielwahlen umleiten?
-3. **Doomed Town Guard:** Meintest du mit „beiden" Hardy Slime und Deepsea Horror Clown (so umgesetzt), oder auch ihn? Sein Text „Your opponent can't choose other Creatures you control" hat keinen „Attacks and Spells"-Wortlaut.
+Alle drei sind beantwortet und in [FIXES-WELLE-45.md](FIXES-WELLE-45.md) umgesetzt (dort stehen die neuen Rückfragen).
