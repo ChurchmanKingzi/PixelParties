@@ -35,12 +35,13 @@ RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255
 # Sprite-Pixel), die anderen kleiner; Quetzahuitl ist als Sprite so riesig, dass er nur mit 4 px je Sprite-Pixel auf das Banner passt.
 # (Sprite, Maßstab, x, y, gespiegelt?, Bezug: 'c' = y ist die Mitte des Umrisses, 'f' = y ist die Fußlinie auf dem Boden)
 # „gespiegelt“ gleicht die Blickrichtung des Sheets aus (links soll alles nach rechts blicken, rechts nach links).
+BRACKLE_PX = 12                                     # Brackle und sein Schädel haben denselben Maßstab (so zeichnet sie das Sheet)
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
 ACTORS = [
     ('cute-nerd-magenta', 8, 1290, 195, False, 'c'),
     ('monia', 10, 770, 195, False, 'c'),
-    ('brackle-the-catapulting-turtle', 9, 690, 1080, True, 'f'),
+    ('brackle-the-catapulting-turtle', BRACKLE_PX, 560, 1110, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
     ('bakhm-the-desert-digger', 14, 180, 1000, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
@@ -317,8 +318,6 @@ def banner(frame_front=False):
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
     cv.alpha_composite(ground())
-    for k, (a, b) in enumerate((((1185, 985), (1105, 835)), ((1150, 990), (1085, 850)))):        # Riffels Schüsse nach links
-        cv.alpha_composite(beam(a, b, 10 + 3 * k, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))
 
     placed = {}
     for slug, px, x, y, flip, mode in ACTORS:
@@ -341,20 +340,21 @@ def banner(frame_front=False):
     paste([k for k in placed if k not in FRONT])
 
     # Brackles eigenes Geschoss (Schädel-Bombe): Bogen vom Katapult auf Riffel zu
-    skull_im = brackle_fx(12, True)[0]
+    skull_im = brackle_fx(BRACKLE_PX, True)[0]
     _, bl_left, bl_top, bl_bb, _ = placed['brackle-the-catapulting-turtle']
     p0 = (bl_left + bl_bb[0] + 0.1 * (bl_bb[2] - bl_bb[0]), bl_top + bl_bb[1] + 0.04 * (bl_bb[3] - bl_bb[1]))      # Spitze des Katapultarms
-    p1, p2 = (860, 560), (1300, 915)
+    p1, p2 = (650, 60), (1300, 915)                                                                                # hoher Bogen: Scheitel über dem Band, Ziel Riffel
     bez = lambda t: ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
 
     def arc(d):
-        for i in range(0, 38):
-            t = i / 50
+        n = 70
+        for i in range(n):
+            t = 0.9 * i / n
             x, y = bez(t)
-            r = 1 + i * 0.07
-            d.ellipse([x / CELL - r, y / CELL - r, x / CELL + r, y / CELL + r], fill=(255, 150 + i * 2, 50 + i * 3))
+            r = 3 + 4 * (i / n)                                    # Feuerspur wird zum Schädel hin breiter
+            d.ellipse([x / CELL - r, y / CELL - r, x / CELL + r, y / CELL + r], fill=(255, 130 + int(110 * i / n), 40 + int(110 * i / n)))
     cv.alpha_composite(lowres(arc))
-    sx_, sy_ = bez(0.78)
+    sx_, sy_ = bez(0.9)
     cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
@@ -371,7 +371,12 @@ def banner(frame_front=False):
     for sx, sy in ((3, 4), (45, 15)):
         o = at_chaos(sx, sy)
         cv.alpha_composite(star(o[0], o[1], 46, seed=3, cols=((90, 8, 30), (226, 36, 60), (255, 140, 160), (255, 240, 245))))     # Funkenkranz an der Hand
-    cv.alpha_composite(star(1185, 985, 38, seed=9, spikes=7))                      # Mündungsfeuer
+    _, rf_left, rf_top, _, _ = placed['future-tech-gunslinger-riffel']
+    padr = max(3, -(-2 * 7 * 2 // 8) + 1) * 8
+    mx, my = rf_left + padr + 31.5 * 8, rf_top + padr + 15.5 * 8                     # Mündung des unteren Laufs (Sprite-Pixel 31,5 | 15,5)
+    for dy_ in (-8, 8):
+        cv.alpha_composite(beam((mx - 20, my + dy_), (mx - 110, my + dy_), 8, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))   # Schüsse nach links
+    cv.alpha_composite(star(mx, my, 34, seed=9, spikes=7))                           # Mündungsfeuer
     if frame_front:                                                                # Variante: der Rahmen liegt über allen Heroes
         cv.alpha_composite(frame_layers())
     return cv
