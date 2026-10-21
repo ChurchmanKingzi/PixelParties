@@ -31,22 +31,20 @@ CELL = 4                                           # Raster des Banners (= ein L
 CREAM, CREAM2, CREAM3 = (255, 224, 184), (255, 232, 198), (255, 241, 214)       # Farben aus title.png
 RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255, 243, 176)
 
-PX = 10                                            # ein Maßstab für alle Sprites, damit die Pixel überall gleich groß sind
-# Je Seite drei Heroes: ein Flieger oben, ein Großer in der Mitte, ein normaler unten, alle schräg gegeneinander.
-# (Sprite, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame); „gespiegelt“ gleicht die Blickrichtung des Sheets aus
-# (links soll alles nach rechts blicken, rechts nach links).
-LEFT = [
-    ('bakhm-the-desert-digger', 285, 530, True, 0),
-    ('nao-the-barrier-priestess', 720, 990, False, 0),
+# Je Seite drei Heroes: ein Flieger oben, ein Großer am Boden in der Mitte, ein normaler vorn. Die Großen sind groß gezeichnet (12 px je
+# Sprite-Pixel), die anderen kleiner; Quetzahuitl ist als Sprite so riesig, dass er nur mit 4 px je Sprite-Pixel auf das Banner passt.
+# (Sprite, Maßstab, x, y, gespiegelt?, Bezug: 'c' = y ist die Mitte des Umrisses, 'f' = y ist die Fußlinie auf dem Boden)
+# „gespiegelt“ gleicht die Blickrichtung des Sheets aus (links soll alles nach rechts blicken, rechts nach links).
+HORIZON = 905                                       # Fußlinie der Großen (hintere Reihe); die vordere Reihe steht weiter unten
+ACTORS = [
+    ('bakhm-the-desert-digger', 12, 305, HORIZON, True, 'f'),
+    ('monia', 10, 820, 195, False, 'c'),
+    ('brackle-the-catapulting-turtle', 8, 700, 1075, True, 'f'),
+    ('quetzahuitl-receiver-of-sacrifices', 4, 1610, 240, True, 'c'),
+    ('chaos-diamond-the-cracked-keeper', 12, 1850, HORIZON, False, 'f'),
+    ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
 ]
-RIGHT = [
-    ('null-the-mage-slayer', 1770, 700, False, 0),
-    ('cute-meanie-melissa', 1760, 205, False, 0),
-    ('future-tech-gunslinger-riffel', 1440, 985, False, 0),
-]
-CENTER = []
-MONIA = (185, 185)
-FRONT = {'bakhm-the-desert-digger', 'null-the-mage-slayer'}      # die Großen liegen vor dem Schriftband, nicht dahinter
+FRONT = {'bakhm-the-desert-digger', 'chaos-diamond-the-cracked-keeper', 'quetzahuitl-receiver-of-sacrifices'}   # liegen vor dem Schriftband, nicht dahinter
 ACC = (240, 190, 72)                                # Gold des Rahmens
 
 
@@ -166,6 +164,47 @@ def ribbon_ornaments(cv):
     cv.alpha_composite(layer)
 
 
+GROUND_L = [(156, 144, 226), (134, 122, 210), (110, 100, 190)]            # Boden links: kühl
+GROUND_R = [(240, 134, 124), (218, 108, 106), (190, 86, 96)]               # Boden rechts: warm
+
+
+def ground():
+    """Kampfboden ab dem Horizont: Dithering nach unten dunkler, Fluchtlinien auf die Mitte zu, helle Kante am Horizont."""
+    cw, ch = W // CELL, H // CELL
+    y0 = HORIZON // CELL - 12
+    ys, xs = np.mgrid[0:ch, 0:cw]
+    zig = (np.sin(ys * 0.21) * 7 + np.sin(ys * 0.07 + 1.3) * 12).astype(int)
+    left = xs < cw / 2 + zig
+    t = np.clip((ys - y0) / (ch - y0), 0, 1)
+    th = np.tile(bp.BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw]
+    q = np.clip(np.floor(t * 2 + th - 0.1), 0, 2).astype(int)
+    lo = np.where(left[..., None], np.array(GROUND_L, dtype=np.uint8)[q], np.array(GROUND_R, dtype=np.uint8)[q])
+    im = Image.fromarray(lo, 'RGB')
+    d = ImageDraw.Draw(im)
+    vx, vy = cw / 2, ch * 0.32
+    for k in range(-14, 15):                                            # Fluchtlinien (Fugen der Bodenplatten)
+        bx = cw / 2 + k * cw * 0.11
+        x0 = vx + (bx - vx) * (y0 - vy) / (ch - vy)
+        col = (255, 246, 232) if (k % 2 == 0) else (200, 190, 230)
+        d.line([(x0, y0), (bx, ch)], fill=col if abs(k) > 1 else col, width=1)
+    for r in range(1, 6):                                               # Querfugen, nach unten weiter auseinander
+        y = y0 + int((ch - y0) * (r / 5.5) ** 1.7)
+        d.line([(0, y), (cw, y)], fill=(255, 246, 232), width=1)
+    d.line([(0, y0), (cw, y0)], fill=(255, 250, 240), width=2)
+    d.line([(0, y0 + 2), (cw, y0 + 2)], fill=(60, 40, 90), width=1)
+    mask = Image.new('L', (cw, ch), 0)
+    ImageDraw.Draw(mask).rectangle([0, y0, cw, ch], fill=255)
+    out = Image.new('RGBA', (cw, ch), (0, 0, 0, 0))
+    out.paste(im.convert('RGBA'), (0, 0), mask)
+    return out.resize((W, H), Image.NEAREST)
+
+
+def shadow(cv, cx, foot, w):
+    sh = Image.new('RGBA', (int(w), 44), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).ellipse([0, 0, sh.width - 1, sh.height - 1], fill=(30, 18, 50, 120))
+    cv.alpha_composite(sh, (int(cx - sh.width / 2), int(foot - 26)))
+
+
 def lowres(draw_fn):
     """Zeichnet auf einem Viertel-Raster und vergrößert auf das 4-px-Raster des Banners."""
     lo = Image.new('RGBA', (W // CELL, H // CELL), (0, 0, 0, 0))
@@ -210,31 +249,33 @@ def glints(cv, spots):
 
 def banner():
     cv = background()
-    cv.alpha_composite(burst(W // 2, H // 2, 560, 420))
+    cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
+    cv.alpha_composite(ground())
     # Schüsse und Zauber der Heroes treffen sich hinter dem Schriftzug
     for src, dst, w, cols in (
-            ((260, 190), (900, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Monia: Jetpack-Funken
-            ((1700, 205), (1150, 520), 40, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),    # Melissa: dunkle Magie
-            ((720, 960), (960, 700), 28, [(205, 150, 40), (255, 214, 90), (255, 250, 210)]),     # Nao: heiliges Licht
-            ((1300, 960), (1090, 700), 26, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):  # Riffel: Schuss
+            ((880, 215), (1000, 500), 36, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),    # Monia: Jetpack-Funken
+            ((1480, 250), (1130, 500), 40, [(40, 110, 60), (90, 190, 110), (230, 255, 200)]),    # Quetzahuitl: Smaragdstrahl
+            ((840, 980), (1000, 700), 28, [(205, 150, 40), (255, 214, 90), (255, 250, 210)]),    # Brackle: Katapultschuss
+            ((1250, 1000), (1090, 700), 26, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])): # Riffel: Schuss
         cv.alpha_composite(beam(src, dst, w, cols))
 
     cv.alpha_composite(frame_layers())
     ribbon_ornaments(cv)
-    items, front = [], []
-    for slug, x, y, flip, fr in LEFT + RIGHT + CENTER:
-        im = sticker(slug, PX, fr, flip)
+    back, front = [], []
+    for slug, px, x, y, flip, mode in ACTORS:
+        im = ml.monia(px)[0] if slug == 'monia' else sticker(slug, px, 0, flip)
         bb = im.getbbox()
-        (front if slug in FRONT else items).append((y + (bb[3] - bb[1]) / 2, im, bb, x, y))
-    # Monia (Wink-Pose mit weißem Plus) fliegt links oben
-    m_im, _ = ml.monia(PX)
-    bb = m_im.getbbox()
-    items.append((MONIA[1] + (bb[3] - bb[1]) / 2, m_im, bb, MONIA[0], MONIA[1]))
+        left = int(x - (bb[0] + bb[2]) / 2)
+        top = int(y - (bb[3] - 0) if mode == 'f' else y - (bb[1] + bb[3]) / 2)
+        foot = top + bb[3]
+        (front if slug in FRONT else back).append((foot, im, left, top, mode, slug, bb))
 
     def paste(lst):
-        for _, im, bb, x, y in sorted(lst, key=lambda t: t[0]):
-            cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
-    paste(items)
+        for foot, im, left, top, mode, slug, bb in sorted(lst, key=lambda t: (t[4] == 'c', t[0])):   # Flieger zuletzt
+            if mode == 'f':
+                shadow(cv, left + (bb[0] + bb[2]) / 2, foot, (bb[2] - bb[0]) * 0.8)
+            cv.alpha_composite(im, (left, top)) if left >= 0 and top >= 0 else cv.paste(im, (left, top), im)
+    paste(back)
 
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (960, 880, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
