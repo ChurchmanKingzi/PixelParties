@@ -30,27 +30,35 @@ CELL = 4                                           # Raster des Banners (= ein L
 CREAM, CREAM2, CREAM3 = (255, 224, 184), (255, 232, 198), (255, 241, 214)       # Farben aus title.png
 RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255, 243, 176)
 
-# (Sprite, Maßstab, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame)
-# Links blickt alles nach rechts, rechts nach links; „gespiegelt“ gleicht die Blickrichtung des Sheets aus.
+PX = 8                                             # ein Maßstab für alle Sprites (= 2 Logo-Pixel), damit die Pixel überall gleich groß sind
+# (Sprite, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame); Reihenfolge der Anordnung: von hinten nach vorn
 LEFT = [
-    ('alleria-the-queen-of-spiders', 10, 215, 700, False, 0),
-    ('nao-the-barrier-priestess', 10, 190, 975, False, 0),
-    ('bomb-berserker-bartas', 10, 410, 960, False, 0),
-    ('archibald-the-archmage', 10, 640, 930, False, 0),
-    ('cute-angel-molinda', 8, 700, 190, False, 0),
-    ('mary-crestmas', 8, 150, 420, False, 0),
+    ('mary-crestmas', 170, 380, False, 0),
+    ('kasperov-the-king-of-kings-b', 900, 320, False, 0),
+    ('cute-angel-molinda', 700, 170, False, 0),
+    ('alleria-the-queen-of-spiders', 175, 690, False, 0),
+    ('mega-priestess-johanna', 440, 790, False, 0),
+    ('nao-the-barrier-priestess', 150, 1010, False, 0),
+    ('bomb-berserker-bartas', 340, 1000, False, 0),
+    ('archibald-the-archmage', 520, 985, False, 0),
+    ('luna-pele-the-flame-dancer', 690, 1000, False, 0),
+    ('beato-the-butterfly-witch', 840, 1030, False, 0),
 ]
 RIGHT = [
-    ('argos-the-eye-of-the-cosmos', 4, 1810, 330, True, 0),
-    ('baaliel-the-demon-general', 10, 1880, 740, True, 0),
-    ('gon-the-frostbringer', 10, 1560, 880, True, 0),
-    ('zsos-ssar-the-serpent-warlord', 10, 1720, 940, True, 0),
-    ('arthor-the-king-of-blackport', 12, 1935, 990, True, 0),
-    ('ida-the-adept-of-destruction', 10, 1380, 960, True, 0),
-    ('grisgar-emissary-of-the-demon-lord', 4, 1300, 150, True, 0),
+    ('sol-rym-the-thunder-djinn', 1290, 170, True, 0),
+    ('overlord-baaliel', 1700, 230, True, 0),
+    ('champion-the-stormbringer', 1900, 340, True, 0),
+    ('mad-scientist-heinz', 1540, 340, True, 0),
+    ('baaliel-the-demon-general', 1900, 700, True, 0),
+    ('nieht-the-blitz-blade', 1600, 800, True, 0),
+    ('gon-the-frostbringer', 1480, 960, True, 0),
+    ('ida-the-adept-of-destruction', 1290, 1000, True, 0),
+    ('zsos-ssar-the-serpent-warlord', 1690, 990, True, 0),
+    ('arthor-the-king-of-blackport', 1880, 1020, True, 0),
+    ('dajan-conqueror-of-the-treasure-cave', 1990, 840, True, 0),
 ]
 CENTER = [
-    ('bubbles-the-bouncy-bunny', 4, 1024, 985, False, 0),
+    ('bakhm-the-desert-digger', 1024, 900, False, 0),
 ]
 
 
@@ -67,19 +75,47 @@ def sticker(slug, px, frame=0, flip=False):
     return im
 
 
+LEFT_RAMP = [(250, 238, 224), (232, 224, 246), (208, 200, 240), (178, 168, 230), (146, 134, 216)]        # kühl: die Helden
+RIGHT_RAMP = [(255, 240, 214), (255, 222, 184), (255, 196, 160), (244, 156, 132), (222, 112, 112)]         # warm: die Gegner
+
+
 def background():
-    """Warmer Grund mit Dithering-Verlauf zur Mitte (wie title.png), Strahlen vom Sprengstern."""
+    """Zweigeteilter Grund wie im Titelbild (links kühl, rechts warm): Strahlen vom Sprengstern, Halbtonpunkte, Tempolinien, Dithering."""
     cw, ch = W // CELL, H // CELL
     ys, xs = np.mgrid[0:ch, 0:cw]
-    dx, dy = (xs - cw / 2) / (cw * 0.5), (ys - ch / 2) / (ch * 0.5)
+    dx, dy = (xs - cw / 2 + 0.5) / (cw * 0.5), (ys - ch / 2 + 0.5) / (ch * 0.5)
+    dist = np.hypot(dx, dy)
     ang = np.arctan2(dy, dx)
-    rays = 0.5 + 0.5 * np.sin(ang * 14 + 0.6)                     # 14 Strahlen
-    v = np.clip(1.0 - np.hypot(dx, dy) * 0.55, 0, 1) * 0.75 + rays * 0.25 * (np.hypot(dx, dy) > 0.35)
+    # Trennlinie: gezackt durch die Mitte (Blitz), je Zeile leicht versetzt
+    zig = (np.sin(ys * 0.21) * 7 + np.sin(ys * 0.07 + 1.3) * 12).astype(int)
+    left = xs < cw / 2 + zig
+    rays = (np.sin(ang * 11 + 0.4) > 0.15).astype(float)
+    t = np.clip(dist * 1.15 - 0.15, 0, 1) * 0.78 + rays * 0.22 * (dist > 0.3)
     th = np.tile(bp.BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw]
-    ramp = np.array([CREAM, CREAM2, CREAM3], dtype=np.uint8)
-    q = np.clip(np.floor(np.clip(v, 0, 1) * 2 + th - 0.2), 0, 2).astype(int)
-    img = np.repeat(np.repeat(ramp[q], CELL, axis=0), CELL, axis=1)
-    return Image.fromarray(img, 'RGB').convert('RGBA')
+    n = len(LEFT_RAMP) - 1
+    q = np.clip(np.floor(np.clip(t, 0, 1) * n + th - 0.15), 0, n).astype(int)
+    lo = np.where(left[..., None], np.array(LEFT_RAMP, dtype=np.uint8)[q], np.array(RIGHT_RAMP, dtype=np.uint8)[q])
+    # Halbtonpunkte (wie im Comic): Raster 10 Zellen, Radius wächst nach außen, eine Stufe dunkler als der Grund
+    sp = 10
+    gx, gy = xs % sp - sp / 2 + 0.5, ys % sp - sp / 2 + 0.5
+    rad = np.clip((dist - 0.42) * 7.0, 0, 3.6)
+    dots = (np.hypot(gx, gy) < rad) & (dist > 0.42)
+    q2 = np.clip(q + 1, 0, n)
+    lo = np.where(dots[..., None], np.where(left[..., None], np.array(LEFT_RAMP, dtype=np.uint8)[q2], np.array(RIGHT_RAMP, dtype=np.uint8)[q2]), lo)
+    im = Image.fromarray(lo, 'RGB')
+    d = ImageDraw.Draw(im)
+    rnd = random.Random(11)
+    for _ in range(46):                                           # Tempolinien: helle, lange Striche, strahlenförmig von der Mitte
+        a = rnd.uniform(0, 2 * math.pi)
+        r0, r1 = rnd.uniform(0.55, 0.8), rnd.uniform(0.9, 1.3)
+        x0, y0 = cw / 2 + math.cos(a) * r0 * cw * 0.5, ch / 2 + math.sin(a) * r0 * ch * 0.5
+        x1, y1 = cw / 2 + math.cos(a) * r1 * cw * 0.5, ch / 2 + math.sin(a) * r1 * ch * 0.5
+        d.line([(x0, y0), (x1, y1)], fill=(255, 250, 238), width=rnd.choice((1, 1, 2)))
+    for _ in range(40):                                           # Funken und Konfetti in den Farben der beiden Seiten
+        x, y = rnd.randrange(cw), rnd.randrange(ch)
+        col = (255, 255, 255) if rnd.random() < 0.5 else ((120, 110, 220) if x < cw / 2 else (230, 90, 90))
+        d.rectangle([x, y, x + rnd.choice((0, 1, 1, 2)), y + rnd.choice((0, 1, 1, 2))], fill=col)
+    return im.resize((W, H), Image.NEAREST).convert('RGBA')
 
 
 def lowres(draw_fn):
@@ -129,24 +165,24 @@ def banner():
     cv.alpha_composite(burst(W // 2, H // 2, 560, 420))
     # Zauber und Strahlen der Heroes treffen sich hinter dem Schriftzug
     for src, dst, w, cols in (
-            ((1810, 330), (1100, 540), 44, [RED_DK, (255, 130, 70), GOLD_LT]),                  # Argos: Augenstrahl
-            ((1380, 960), (1090, 640), 36, [(214, 70, 30), (255, 150, 50), GOLD_LT]),            # Ida: Feuer
-            ((1560, 880), (1150, 650), 32, [(60, 130, 200), (150, 210, 245), (255, 255, 255)]),   # Gon: Eis
-            ((1880, 740), (1220, 590), 34, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),     # Baaliel: Dämonenmagie
-            ((700, 190), (960, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Molinda: Lichtstrahl
-            ((640, 930), (930, 640), 34, [(90, 40, 160), (170, 110, 230), (245, 225, 255)]),     # Archibald: Zauber
-            ((190, 975), (860, 620), 32, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):   # Nao: heiliges Licht
+            ((1290, 170), (1120, 520), 44, [(200, 150, 20), (255, 210, 60), (255, 250, 200)]),   # Sol Rym: Blitz
+            ((1290, 1000), (1090, 640), 36, [(214, 70, 30), (255, 150, 50), GOLD_LT]),            # Ida: Feuer
+            ((1480, 960), (1150, 650), 32, [(60, 130, 200), (150, 210, 245), (255, 255, 255)]),   # Gon: Eis
+            ((1900, 700), (1220, 590), 34, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),     # Baaliel: Dämonenmagie
+            ((700, 170), (960, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Molinda: Lichtstrahl
+            ((520, 985), (930, 640), 34, [(90, 40, 160), (170, 110, 230), (245, 225, 255)]),     # Archibald: Zauber
+            ((150, 1010), (860, 620), 32, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):   # Nao: heiliges Licht
         cv.alpha_composite(beam(src, dst, w, cols))
 
     items = []
-    for slug, px, x, y, flip, fr in LEFT + RIGHT + CENTER:
-        im = sticker(slug, px, fr, flip)
+    for slug, x, y, flip, fr in LEFT + RIGHT + CENTER:
+        im = sticker(slug, PX, fr, flip)
         bb = im.getbbox()
         items.append((y + (bb[3] - bb[1]) / 2, im, bb, x, y))
     # Monia (Wink-Pose mit weißem Plus) fliegt links oben
-    m_im, _ = ml.monia(10)
+    m_im, _ = ml.monia(PX)
     bb = m_im.getbbox()
-    items.append((250 + (bb[3] - bb[1]) / 2, m_im, bb, 330, 250))
+    items.append((230 + (bb[3] - bb[1]) / 2, m_im, bb, 330, 230))
     for _, im, bb, x, y in sorted(items, key=lambda t: t[0]):
         cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
 
