@@ -19,14 +19,8 @@ Al hat die zwei Rückfragen aus [FIXES-WELLE-45.md](FIXES-WELLE-45.md) beantwort
 * Dauerfeuer: 25 Karten × 2 Seiten, 0 Unterschiede.
 * `Bugfix-Note`-Zeilen in den Commits.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Offene Rückfragen an Al
 
-1. **Creature-Surprise als Angreifer:** Booby Trap, Frost Rune, Firewall, Toxic Trap, Mountain Tear River und Fireshield brauchen einen Angreifer auf dem Brett. Eine Creature-Surprise liegt beim Wirken noch in der Surprise Zone, also lösen sie nicht aus (früher trafen Firewall, Toxic Trap und Mountain Tear River den Träger-Helden). Soll das so bleiben?
-2. **Rolling Boulder gegen eine Creature-Surprise:** Die Creature geht in die Ablage, ohne je auf dem Brett gestanden zu haben (kein Tod-Trigger). Passt das?
-3. **Shield of Wisdom:** Es leitet nur auf Ziele um, die der Effekt auch wählen konnte (Afflicted Vermin: nur Kreaturen; Water Golem und Cybug ANTS: kein legales Ziel, der Schild bleibt zu). Passt das? Bei „nein" müsste das Umleitungsziel unabhängig von der Zielliste des Effekts erlaubt werden.
-4. **Kettenfenster „Hero performs":** Soll die Aktivierung einer Attack-/Spell-Surprise ein Kettenfenster öffnen (Stealthy Pursuit, Arrows, Magic Topaz)? Ist-Zustand: nein.
-5. **Spike Trap:** Er schlägt mit Schadenstyp `other` und ohne Reaktionsfenster zurück (Rückstoß-Ruling). Soll dieser Schaden als Spell-Schaden gelten (wie bei Fireshield, Escape, Corpse Explosion)?
-6. **Zähler:** Soll eine aufgedeckte Spell-/Attack-Surprise in den „Spells/Attacks diesen Zug"-Zählern zählen? Ist-Zustand: nein.
-7. **Mountain Tear River:** Soll `promptEffectTarget` das Surprise-Fenster auch für gewählte Kreaturen öffnen, für alle Quellen? Ist-Zustand: nur Helden.
+Alle sieben sind beantwortet und in [FIXES-WELLE-47.md](FIXES-WELLE-47.md) umgesetzt bzw. bestätigt (dort stehen die neuen Rückfragen).
 
 **Beobachtungen** (in `CARD_API.md`): Castling wertet auch eine gewählte Kreatur in der Support Zone des Wirts als Wahl des Helden (bestehende Eigenheit); Hand-Reaktionen sehen gewählte Kreaturen aus `promptEffectTarget` nur über `postTargetKreaturWahl` (Dream Dust).
