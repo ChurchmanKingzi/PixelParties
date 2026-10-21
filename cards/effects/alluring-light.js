@@ -118,6 +118,24 @@ module.exports = {
       const angriffStempel = engine.heldenAngriffStempel(angreiferZiel.owner, angreiferZiel.heroIdx);
       ctx.card.treatedAsAttack = angriffStempel;
       try {
+        // ★ „treated as the chosen Hero attacking" — die Quelle ist der
+        // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
+        // der Angriff ihm, samt allem, was daran haengt.
+        // ★ W32a (Al, 22.10.2026): „Alluring Light selbst zählt als Lv-1-Spell. Der von Alluring Light provozierte Angriff zählt NICHT als Spell, sondern als Attack mit dem
+        // Fighting-Level des von Light zum Angriff gezwungenen Heroes." Die Quelle des Treffers ist deshalb der gezwungene HELD (Name = Heldenkarte, Schadenstyp `attack`),
+        // NICHT die Spell-Karte „Alluring Light": Anti Magic Shield / Magic Mirror / Anti Magic (Spell-Leser) sehen keinen Spell, Attack-Reaktionen (Escape, Magic Topaz,
+        // Arrows, Bluff …) sehen den Angriff. Die Karte selbst (die Wahl) bleibt ein Spell der Stufe 1 (Instanz `ctx.card`).
+        const attackSource = {
+          name: angreifer.name,
+          owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
+          usesHeroAtk: true,
+          // W30a (Al, 21.10.2026): „treated as the chosen Hero attacking" → die Quellstufe ist das FIGHTING-LEVEL des gewählten (gegnerischen) Helden,
+          // NICHT die gedruckte Stufe 1 der Karte (Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …: `engine._heldenEffektStufe`).
+          treatedAsAttack: angriffStempel,
+        };
+        // ★ W39a (Al, 22.10.2026): die Fenster der Opferwahl (Surprises, Hand-Reaktionen) sehen als Quelle den GEZWUNGENEN Helden (Quellobjekt `attackSource`), nicht die Karteninstanz
+        // des Spielers: sonst war „der Angreifer" für Booby Trap, Firewall, Toxic Trap, Mountain Tear River, Frost Rune, Spike Trap, Tharxian Horse, Crimson Web & Co. der EIGENE Held,
+        // der Light spielt (er bekam Schaden/Brand/Frost; der gezwungene Held blieb verschont).
         // ── ② Das OPFER waehlen: ein Ziel auf der EIGENEN Seite ───────
         const eigene = [
           ...kontrollierteHeldenZiele(engine, pi),
@@ -130,7 +148,7 @@ module.exports = {
           confirmLabel: '💥 Take the hit!',
           maxSelect: 1, maxTotal: 1,
           cancellable: true,
-          sourceCard: ctx.card,   // W30a: die Fenster der Opferwahl sehen die Karteninstanz mit dem Stempel (Fighting-Level des Angreifers)
+          sourceCard: attackSource,   // W30a: die Fenster der Opferwahl sehen den Stempel (Fighting-Level des Angreifers); W39a: Quelle = der gezwungene Held
         });
         const opfer = zielVonAntwort(opferWahl, eigene);
         if (!opfer) { gs._spellCancelled = true; return; }
@@ -154,24 +172,9 @@ module.exports = {
         });
         await engine._delay(1300);
 
-        // ★ „treated as the chosen Hero attacking" — die Quelle ist der
-        // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt
-        // der Angriff ihm, samt allem, was daran haengt.
-        // ★ W32a (Al, 22.10.2026): „Alluring Light selbst zählt als Lv-1-Spell. Der von Alluring Light provozierte Angriff zählt NICHT als Spell, sondern als Attack mit dem
-        // Fighting-Level des von Light zum Angriff gezwungenen Heroes." Die Quelle des Treffers ist deshalb der gezwungene HELD (Name = Heldenkarte, Schadenstyp `attack`),
-        // NICHT die Spell-Karte „Alluring Light": Anti Magic Shield / Magic Mirror / Anti Magic (Spell-Leser) sehen keinen Spell, Attack-Reaktionen (Escape, Magic Topaz,
-        // Arrows, Bluff …) sehen den Angriff. Die Karte selbst (die Wahl) bleibt ein Spell der Stufe 1 (Instanz `ctx.card`).
-        const attackSource = {
-          name: angreifer.name,
-          owner: angreiferZiel.owner, controller: oppIdx, heroIdx: angreiferZiel.heroIdx,
-          usesHeroAtk: true,
-          // W30a (Al, 21.10.2026): „treated as the chosen Hero attacking" → die Quellstufe ist das FIGHTING-LEVEL des gewählten (gegnerischen) Helden,
-          // NICHT die gedruckte Stufe 1 der Karte (Stealth, Jetpack, Glass Wall, Test Flight, Escape Device …: `engine._heldenEffektStufe`).
-          treatedAsAttack: angriffStempel,
-        };
         // W32a: der provozierte Angriff gehört dem GEGNER (Held des Angriffs) — Attack-Reaktionen (Magic Topaz, Arrows …) seiner Seite über die virtuelle Attack-Kette;
         // der gezwungene Held muss dafür nicht angriffsfähig sein (er wird gelockt, nicht aktiv: `casterCheck: false`).
-        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, resolve: async () => {
+        await engine.alsAttackKette({ name: CARD_NAME, pi: oppIdx, heroIdx: angreiferZiel.heroIdx, heroOwner: angreiferZiel.owner, casterCheck: false, ziele: [opfer], wirkName: angreifer.name, resolve: async () => {
         const finalDmg = await engine._fireAttackDeclare(attackSource, opfer, atk);
 
         // ── Animation ② der angelockte Held rammt hinein ──────────────

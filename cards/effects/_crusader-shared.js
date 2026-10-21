@@ -278,7 +278,11 @@ function makeCrusaderArtifact(spec) {
       const heroIdx = inst.heroIdx;
       const oppIdx = engine.opponentOf(pi);
 
+      // ★ W39a: die Quelle des Schlags ist der TRÄGER (Held), nicht die Ausrüstungs-Instanz in der Support Zone — sonst hält jeder Leser den Treffer für eine Kreatur-Quelle
+      // (Firewall/Toxic Trap/Mountain Tear River trafen „Crusader's …" statt Cecilia; Explosivo's Sword, Big Gwen, Skullmael, Bazooka, Wavilion übersahen den Heldentreffer).
+      const schlagQuelle = { name: cardName, owner: pi, controller: pi, heroOwner: feld, heroIdx };
       const target = await ctx.promptDamageTarget({
+        attackerSourceOverride: schlagQuelle,
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -306,7 +310,7 @@ function makeCrusaderArtifact(spec) {
 
       // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette;
       // negiert eine Reaktion den Schlag, hat auch die eigene Klausel (Schaden/Besiegen) keinen Anlass.
-      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, resolve: async () => {
+      await engine.alsAttackKette({ name: cardName, pi, heroIdx, heroOwner: feld, ziele: [target], resolve: async () => {
       if (attackAnim) {
         await attackAnim(ctx, {
           engine, pi, feld, heroIdx, target,
@@ -316,11 +320,11 @@ function makeCrusaderArtifact(spec) {
 
       if (target.type === 'hero') {
         if (hero && hero.hp > 0) {
-          await ctx.dealDamage(hero, ATTACK_DAMAGE, 'attack');
+          await engine.actionDealDamage(schlagQuelle, hero, ATTACK_DAMAGE, 'attack');
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          { name: cardName, owner: pi, heroOwner: feld, heroIdx },
+          schlagQuelle,
           target.cardInstance, ATTACK_DAMAGE, 'attack',
           { sourceOwner: pi, canBeNegated: true },
         );

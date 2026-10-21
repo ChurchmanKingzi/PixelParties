@@ -220,7 +220,7 @@ module.exports = {
     // Typ 'attack', Quelle mit heroIdx → Attack-Declare-Lauscher,
     // Angriffsmodifikatoren.
     // W32a (Al, 22.10.2026): der Wurf zählt als Attack des Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: hi, heroOwner, resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: hi, heroOwner, ziele: [target], resolve: async () => {
     if (target.type === 'hero') {
       const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tgtHero && tgtHero.hp > 0) await engine.actionDealDamage(attackSource, tgtHero, damage, 'attack');

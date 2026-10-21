@@ -150,7 +150,10 @@ module.exports = {
       // No "Activate?" confirmation step — the target picker IS the
       // opt-in path. Cancelling it is how the player declines, same
       // pattern Loyal Terrier's follow-up uses.
+      // ★ W39a: die Quelle des Schlags ist der Held (nicht die Bamboo-Staff-Instanz in der Support Zone, die Leser für eine Kreatur-Quelle halten: Firewall/Toxic Trap/Mountain Tear River).
+      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
       const target = await ctx.promptDamageTarget({
+        attackerSourceOverride: dmgSource,
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'attack',
@@ -187,9 +190,9 @@ module.exports = {
       });
       await engine._delay(380);
 
-      const dmgSource = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
       // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
+      // W39a: dieselbe Kette meldet auch `afterSpellResolved` als Attack (vorher feuerte der Staff es selbst, ohne `heroOwner`).
+      await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], resolve: async () => {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
@@ -204,27 +207,7 @@ module.exports = {
       return true;
       } });
 
-      // Collect unique struck targets from the damage log (matches
-      // Arthor's "treat as Attack" pattern), then fire afterSpellResolved
-      // with fake Attack data so anything that listens for "this Hero
-      // attacked" (Reiza poison+stun, Vampiric Sword heal redundancy,
-      // arrow rider clearing in server.js, …) chains naturally.
-      const uniqueTargets = [];
-      const seenIds = new Set();
-      for (const t of (gs._spellDamageLog || [])) {
-        if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-      }
-      delete gs._spellDamageLog;
-
-      await engine.runHooks('afterSpellResolved', {
-        spellName: CARD_NAME,
-        spellCardData: FAKE_ATTACK_DATA,
-        heroIdx,
-        casterIdx: pi,
-        damageTargets: uniqueTargets,
-        isSecondCast: false,
-        _skipReactionCheck: true,
-      });
+      delete gs._spellDamageLog;   // W39a: `afterSpellResolved` (Attack) feuert die Kette `alsAttackKette` (oben), nicht mehr der Staff selbst
 
       engine.log('bamboo_staff_strike', {
         player: ps.username, hero: hero.name,

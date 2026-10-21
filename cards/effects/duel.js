@@ -149,7 +149,7 @@ module.exports = {
       let ergebnis;
       try {
         // ★ W32a (Al, 22.10.2026: „Duel auch Fighting-Level!"): „perform a normal Attack" → jeder Schlag zählt mit dem FIGHTING-LEVEL des schlagenden Helden (Stempel), nicht mit der gedruckten Stufe 3.
-        ergebnis = await duell(engine, { name: CARD_NAME, a, b, maxRunden: MAX_RUNDEN, animation: 'duel_clash', alsHeldenAngriff: true });
+        ergebnis = await duell(engine, { name: CARD_NAME, a, b, maxRunden: MAX_RUNDEN, animation: 'duel_clash', alsHeldenAngriff: true, meldeAttacken: true });
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);
       }

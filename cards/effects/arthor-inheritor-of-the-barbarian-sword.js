@@ -158,16 +158,8 @@ module.exports = {
 
     // Fire afterSpellResolved as an Attack so reactive equips trigger
     // (Vampiric Sword's lifesteal, Legendary Sword's summon grant, …).
-    await engine.runHooks('afterSpellResolved', {
-      spellName: CARD_NAME,
-      spellCardData: FAKE_ATTACK_DATA,
-      heroIdx,
-      heroOwner: feld,   // Styx 28.9.: Brettseite (wie der Server)
-      casterIdx: pi,
-      damageTargets: uniqueTargets,
-      isSecondCast: false,
-      _skipReactionCheck: true,
-    });
+    // W39a: derselbe Abschluss wie bei allen Effekten, die als Attack zählen (`alsAttackKette`): Stufe = Fighting-Level, `_alsEffekt` (kein gewirkter Spell), `heroOwner` = Brettseite.
+    if (!attackResult?.negated && !attackResult?.fizzled) await engine.meldeAttackAufgeloest({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: uniqueTargets });
 
     // Drop any arrows armed for this attack — server.js auto-clears
     // for normal Spell/Attack plays via doPlaySpell, but the hero-

@@ -62,5 +62,11 @@ module.exports = {
       passt: istAttack,
       anlass: 'Attack',
     }),
+    // ★ W39a (Al, 22.10.2026): ein Effekt, der als Attack des Trägers zählt (Broghan, Brackle, Javelin Throw, Bamboo Staff …), ist „performs an Attack" — `onEffectCountedAsArt`
+    // (Effekte ohne Karte; gespielte Attack-KARTEN laufen über die Aktions-Hooks oben).
+    onEffectCountedAsArt: async (ctx) => {
+      if (ctx.art !== 'attack' || ctx.karte) return;
+      await module.exports.hooks.onAnyActionResolved({ ...ctx, actionType: 'attack', playerIdx: ctx.heroOwner ?? ctx.playerIdx, heroIdx: ctx.heroIdx });
+    },
   },
 };

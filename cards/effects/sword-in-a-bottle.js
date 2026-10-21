@@ -194,6 +194,9 @@ module.exports = {
     if (engine && typeof pi === 'number' && !engine.heroKannAngreifen(eigenes.owner, eigenes.heroIdx, pi)) return false;   // W32a: der Angreifer muss angreifen koennen
     // W29a: Paarregel (Alliance) – `engine`/`pi` liefert der Server (`doConfirmPotion`); ohne sie (alte Aufrufer) entfaellt die Pruefung.
     if (engine && typeof pi === 'number' && paarGesperrt(engine, pi, eigenes, gewaehlt.find(o => o !== eigenes), validTargets)) return false;
+    // W39a: Hero-Zielschutz (Butterfly Cloud, Invisibility) gilt für dieses Paar, außer der Angreifer trägt das Truth-Seeing Eye
+    if (engine && typeof pi === 'number' && typeof engine.heroStatusGeschuetztGegen === 'function'
+        && engine.heroStatusGeschuetztGegen(validTargets, gewaehlt.find(o => o !== eigenes), pi, eigenes, CARD_NAME)) return false;
     return true;
   },
 
@@ -337,7 +340,7 @@ module.exports = {
     await engine._delay(180);
 
     // W32a (Al, 22.10.2026): der Schlag zählt als Attack des gewählten Helden — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx: held.heroIdx, heroOwner: held.owner, ziele: [opferZ], resolve: async () => {
     if (opferZ.type === 'hero') {
       const ziel = gs.players[opferZ.owner]?.heroes?.[opferZ.heroIdx];
       if (ziel?.name && ziel.hp > 0) {

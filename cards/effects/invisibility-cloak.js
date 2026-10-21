@@ -74,8 +74,10 @@ module.exports = {
     //   `dmgTypeMatches` bleibt fuer Heldeneffekte, die ausdruecklich
     //   „als Attack gelten" (Infected Greatmaw): dort ist `srcData` die
     //   HELDENkarte, der Typ passt nicht, der Schadenstyp schon.
+    // W39a: ein Effekt, der als Attack/Spell ZÄHLT (Alluring Light: Quelle = der gezwungene Held, Opferwahl ohne Schadenstyp), ist „an Attack or Spell".
+    const zaehltAlsArt = !!engine._zaehltAlsArt?.(sourceCard);
     if (!srcData) return false;
-    if (!isAttackOrSpell && !dmgTypeMatches) return false;
+    if (!isAttackOrSpell && !dmgTypeMatches && !zaehltAlsArt) return false;
 
     // Exactly 1 target, belonging to the IC owner
     if (targetedHeroes.length !== 1) return false;

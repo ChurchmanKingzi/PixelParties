@@ -145,7 +145,7 @@ module.exports = {
 
     const source = { name: CARD_NAME, owner: pi, heroIdx, ...(feld !== pi ? { heroOwner: feld } : {}) };
     // W32a (Al, 22.10.2026): der Treffer zählt als Attack — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, resolve: async () => {
+    await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [{ id: `equip-${engine.physicalSide(inst)}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip', owner: engine.physicalSide(inst), heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst }], resolve: async () => {
       await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',
         { sourceOwner: pi, canBeNegated: true });
       return true;
