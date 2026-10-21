@@ -82,7 +82,7 @@ module.exports = {
     const spells = wirkbar(engine, pi, hi, feld);
     if (spells.length === 0) return false;
 
-    const wahl = await engine.promptGeneric(pi, {
+    const wahl = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       type: 'cardGallery', title: CARD_NAME, source: CARD_NAME,
       description: `Choose a level 1 or 2 Spell for ${gs.players[feld].heroes[hi].name} to perform as an additional Action.`,
       cards: spells.map(name => ({ name, source: 'hand' })),

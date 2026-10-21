@@ -23189,7 +23189,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         && activatableHeroEffects.length === 0) return { played: false };
 
     // Show hero-action prompt
-    const actionResult = await this.promptGeneric(playerIdx, {
+    const actionResult = await this.promptSpellAuswahl(playerIdx, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       type: 'heroAction',
       heroIdx,
       ...(hs !== playerIdx ? { heroOwner: hs } : {}),   // Als Vorgabe 29.9.: geliehener Held
@@ -24099,7 +24099,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         && activatableHeroEffects.length === 0) return { played: false };
 
     // Show heroAction prompt with no specific hero — player can use any
-    const actionResult = await this.promptGeneric(playerIdx, {
+    const actionResult = await this.promptSpellAuswahl(playerIdx, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
       type: 'heroAction',
       // heroIdx intentionally omitted — allows all heroes
       eligibleCards: eligible,
@@ -33965,11 +33965,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Surprises duerfen waehrend der Aufloesung einer anderen Surprise
    * ausloesen (Ruling 3.10.: Camel gegen Camel, Surprise-Beschwoerungen,
    * Zuege/Schaden/Status aus Surprise-Effekten). Gesperrt ist nur
-   * Selbst-Rekursion je Held (`_activeSurpriseHeroes`) und ein hartes
-   * Tiefenlimit gegen Endlosketten.
+   * Selbst-Rekursion je Held (`_activeSurpriseHeroes`).
+   * ★ W48a (Al, 22.10.2026, Punkt 5: „die Verschachtelungstiefe soll theoretisch beliebig tief gehen können"): KEINE Tiefenkappe mehr. Endlosschleifen sind von selbst
+   * ausgeschlossen: jede Surprise löst nur einmal aus (danach liegt sie nicht mehr verdeckt), es gibt höchstens so viele Stufen, wie Surprises liegen.
    */
   _surpriseNestingBlocked() {
-    return (this._surpriseResolutionDepth || 0) >= 10;
+    return false;
+  }
+
+  /**
+   * ★ W48a (Al, 22.10.2026, Punkt 3b: „In diesem Timeframe von ‚Choose a Spell to activate' sollte überhaupt keine Surprise aktivierbar sein!"):
+   * ZEITFENSTER DER SPELL-AUSWAHL. Solange ein Spieler einen Sofort-/Zusatz-Spell wählt (Silence-Bonus-Spell, Victory Phoenix Cannon, `performImmediateAction(AnyHero)`,
+   * Yukana, Friedhelm, Call for Help, Chaos Diamond, Difficulty Lever, Aurora Borealis, Circles of Hell, Learning …), ist die Aktivierung JEDER Surprise gesperrt:
+   * `_canHeroActivateSurprise` (alle Surprise-Fenster, Zielschutz-/Schadens-/Draw-Fenster, Hand-Listen) und `_activateSurprise` (direkte Aufrufer) prüfen den Zähler.
+   * Das Fenster reicht vom Öffnen der Auswahl bis zur Wahl bzw. zum Abbruch; was der gewählte Spell danach regulär auslöst (Zielwahl, Treffer), liegt hinter dem Fenster.
+   * Hand-Reaktionen (`spellInHand`) sind keine Surprises und bleiben unberührt. Zentral: Karten rufen `engine.promptSpellAuswahl(pi, config)` statt `promptGeneric`.
+   */
+  spellAuswahlOffen() { return (this._spellAuswahlTiefe || 0) > 0; }
+  async _mitSpellAuswahl(fn) {
+    this._spellAuswahlTiefe = (this._spellAuswahlTiefe || 0) + 1;
+    try { return await fn(); }
+    finally { this._spellAuswahlTiefe = Math.max(0, (this._spellAuswahlTiefe || 1) - 1); }
+  }
+  async promptSpellAuswahl(playerIdx, promptData) {
+    return this._mitSpellAuswahl(() => this.promptGeneric(playerIdx, promptData));
   }
 
   /**
@@ -39712,6 +39731,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * (`surpriseKontrolleur`). Ohne `reaktor` gilt die Brettseite.
    */
   _canHeroActivateSurprise(playerIdx, heroIdx, cardName, opts = {}) {
+    if (!opts.spellInHand && this.spellAuswahlOffen()) return false;   // W48a: im Zeitfenster der Spell-Auswahl ist keine Surprise aktivierbar (Hand-Reaktionen ausgenommen)
     const reaktor = opts.reaktor ?? playerIdx;
     if (this._reaktionGesperrt(reaktor)) return false;   // v1293 Reaktionssperre
     // W25a (N1-12, Al 21.10.2026: „Ocean verhindert Surprises (cannot react to)"): unter Dark Ocean oeffnet KEIN Surprise-Fenster gegen den Effekt einer
@@ -40035,6 +40055,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   async _activateSurprise(playerIdx, heroIdx, cardName, sourceInfo, script, opts = {}) {
+    if (this.spellAuswahlOffen()) {   // W48a: Zeitfenster der Spell-Auswahl (siehe `spellAuswahlOffen`) — die Surprise bleibt verdeckt liegen
+      this.log('surprise_blocked_spell_selection', { card: cardName });
+      return null;
+    }
     this._surpriseResolutionDepth = (this._surpriseResolutionDepth || 0) + 1;
     this._inSurpriseResolution = true;
     // Per-hero re-entry guard (see _checkSurpriseWindow). Identifies the
@@ -40245,17 +40269,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     //   Surprise löst reaktiv aus (kein Spielzug) — ein Attack-/Spell-Limit hindert die Aktivierung nie, wohl aber die nächsten Attacks/Spells (W47a). Eine nur GESETZTE Surprise zählt nie.
     //   (4) Danach öffnet sich das Kettenfenster „performs" (`executeCardWithChain`, Herkunft Brett, KEINE Aktion/kein Zusatzaktions-Verbrauch): Stealthy Pursuit, die Arrows, Magic Topaz, Bow of the
     //   Hunt Goddess, Silence, Shamanic Curse, Idej Projector … lesen das Glied wie eine gespielte Attack/einen gespielten Spell des Hero-Wirts (`heroIdx`/`casterOwner` = Wirt-Zone). Eine Negation in der
-    //   Kette = negierte Surprise (wie Boots of Hermes: Karte in die Ablage, kein Effekt, Einmal-Grenze unverbraucht). Mitten in einem offenen Fenster (`_inReactionCheck`: die Surprise löst aus der Auflösung
-    //   einer Kette aus) und im MCTS-Rollout öffnet sich kein zweites Fenster (Konvention von `alsAttackKette`); Rekursion bleibt durch Per-Hero-Sperre und Tiefenkappe 10 begrenzt. Creature-Surprises
+    //   Kette = negierte Surprise (wie Boots of Hermes: Karte in die Ablage, kein Effekt, Einmal-Grenze unverbraucht). Im MCTS-Rollout öffnet sich kein Fenster. ★ W48a (Al, Punkt 5): auch mitten in einer offenen Kette (`_inReactionCheck`) / aus einer anderen Surprise heraus öffnet sich das eigene Fenster (beliebig tief;
+    //   keine Tiefenkappe — jede Surprise löst nur einmal aus); Re-Entrancy desselben Helden-Slots verhindert die Per-Hero-Sperre `_activeSurpriseHeroes`. Creature-Surprises
     //   führen nichts „aus" — für sie bleibt es bei der Beschwörungs-Kette (Off Duty & Co.).
     const _performsArt = (!isBakhmSlot && cardDataForCost?.cardType === 'Attack') ? 'attack'
       : (!isBakhmSlot && cardDataForCost?.cardType === 'Spell') ? 'spell' : null;
     if (_performsArt) {
       await this.zaehleAlsArt(_performsArt, {
-        pi: steuerer, heroIdx, heroOwner: playerIdx, name: cardName,
+        pi: steuerer, heroIdx, heroOwner: playerIdx, name: cardName, surprise: true,   // W48a: verbraucht den Silence-Bonus-Spell nicht
         schule: _performsArt === 'spell' ? ([cardDataForCost.spellSchool1, cardDataForCost.spellSchool2].includes('Destruction Magic') ? 'Destruction Magic' : (cardDataForCost.spellSchool1 || cardDataForCost.spellSchool2 || null)) : null,
       });
-      if (!surpriseNegated && !this._inReactionCheck && !this._inMctsSim && !this.gs.result) {
+      // ★ W48a (Al, Punkt 5): auch eine Surprise, die mitten in einer offenen Kette / aus einer anderen Surprise heraus auslöst, öffnet ihr eigenes „performs"-Fenster (beliebig tief verschachtelbar).
+      if (!surpriseNegated && !this._inMctsSim && !this.gs.result) {
         const _aeussereK = this._inReactionCheck;
         let _kette = null;
         try {
@@ -40950,7 +40975,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {'attack'|'spell'} art
    * @param {{ pi:number, heroIdx:number, heroOwner?:number, name?:string, karte?:boolean }} q  `pi` = Kontrolleur/Spieler, `heroOwner` = Brettseite des Helden
    */
-  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte, schule }) {   // W47a: `schule` = Zauberschule einer aktivierten Spell-Surprise (Log für Fire Bolts)
+  async zaehleAlsArt(art, { pi, heroIdx, heroOwner, name, karte, schule, surprise }) {   // W47a: `schule` = Zauberschule einer aktivierten Spell-Surprise (Log für Fire Bolts)
     const gs = this.gs;
     const ps = gs?.players?.[pi];
     if (!ps || (art !== 'attack' && art !== 'spell')) return;
@@ -40971,7 +40996,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     } else {
       ps.spellsPlayedThisTurn = (ps.spellsPlayedThisTurn || 0) + 1;
-      if (!karte && ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`); Karten: schon bei der Pruefung (doPlaySpell) bzw. am Anfang des Sofort-Gusses
+      if (!karte && !surprise && ps._spellLockTurn === gs.turn && ps._silenceBonusSpell === gs.turn) ps._silenceBonusSpell = -1;   // W48a (Al, 22.10.2026, Punkt 3a): eine aktivierte Spell-SURPRISE (`surprise: true`) verbraucht den Silence-Bonus-Spell NICHT   // der Silence-Bonus-Spell ist verbraucht (`doPlaySpell`); Karten: schon bei der Pruefung (doPlaySpell) bzw. am Anfang des Sofort-Gusses
       // Log-Eintrag für Leser des Aktionsprotokolls (Fire Bolts: „first Destruction Magic Spell you use this turn"); `school` aus der Deklaration `treatedAsSpell`.
       if (!this._inMctsSim && !karte) this.log('effect_counted_as_spell', { player: ps.username, card: name || null, school: schule || loadCardEffect(name)?.treatedAsSpell?.school || null });
     }
@@ -41676,7 +41701,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         {
           const _sd = this._getCardDB()[chosenName];
           const _art = _sd?.cardType === 'Attack' ? 'attack' : _sd?.cardType === 'Spell' ? 'spell' : null;
-          if (_art) await this.zaehleAlsArt(_art, { pi, heroIdx: sHeroIdx, heroOwner: sSeite, name: chosenName, schule: _art === 'spell' ? ([_sd.spellSchool1, _sd.spellSchool2].includes('Destruction Magic') ? 'Destruction Magic' : (_sd.spellSchool1 || _sd.spellSchool2 || null)) : null });
+          if (_art) await this.zaehleAlsArt(_art, { pi, heroIdx: sHeroIdx, heroOwner: sSeite, name: chosenName, surprise: true, schule: _art === 'spell' ? ([_sd.spellSchool1, _sd.spellSchool2].includes('Destruction Magic') ? 'Destruction Magic' : (_sd.spellSchool1 || _sd.spellSchool2 || null)) : null });
         }
         if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
         // Als Vorgabe 29.9.: `pi` = Brettseite der Zone, `ablage` = Kartenbesitzer.

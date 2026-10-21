@@ -168,14 +168,14 @@ module.exports = {
       if (eligibleSpells.length === 0) return;
 
       // Prompt: "Cast another Spell with [Hero Name] (200 recoil)?"
-      const confirmed = await ctx.promptConfirmEffect({
+      const confirmed = await engine._mitSpellAuswahl(() => ctx.promptConfirmEffect({   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         title: 'Victory Phoenix Cannon',
         message: `Cast another Spell with ${hero.name} (200 recoil)?`,
-      });
+      }));
       if (!confirmed) return;
 
       // Player picks a spell from hand
-      const selected = await engine.promptGeneric(pi, {
+      const selected = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl
         type: 'cardGallery',
         cards: eligibleSpells,
         title: 'Victory Phoenix Cannon',

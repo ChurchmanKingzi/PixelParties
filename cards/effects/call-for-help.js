@@ -81,7 +81,7 @@ module.exports = {
       if (cards.length === 0) { engine.log('call_for_help_none', { player: ps.username }); return; }
       cards.sort((a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
 
-      const picked = await engine.promptGeneric(pi, {
+      const picked = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         type: 'cardGallery', cards, title: CARD_NAME,
         description: `Choose a level ${MAX_LEVEL} or lower Spell from your hand or deck and play it immediately as an additional Action, regardless of its level.`,
         confirmLabel: '📣 Call it!', confirmClass: 'btn-success', cancellable: false,

@@ -22798,3 +22798,71 @@ Creature-Surprise als Angreifer löst Booby Trap, Frost Rune, Firewall, Toxic Tr
 3. Soll eine aktivierte Spell-Surprise den **Silence-Bonus-Spell** verbrauchen (jetzt ja, wie jeder gezählte Spell)? Nein hieße: Surprises zählen, brauchen den Bonus aber nicht.
 4. Sollen Güldefaber (+10 Gold) und The Brewer's Blade (Potion ziehen) auf eine Attack-/Spell-Surprise ihres Trägers reagieren (jetzt ja, weil sie „performs an Attack/Spell" über `onEffectCountedAsArt` lesen)?
 5. Soll eine Surprise, die aus der Auflösung einer Kette auslöst, ein eigenes Fenster „performs" öffnen (jetzt nein: nur zählen)?
+
+## ★ Welle 48 / W48a — Antworten von Al zu den W47a-Rückfragen: Silence-Bonus-Spell sofort, keine Surprise im Zeitfenster der Spell-Auswahl, Surprise auf Surprise öffnet beliebig tief ein „performs"-Fenster, Creature-Surprise-Aktivierung ist kein Creature effect, Pfeile nur für eigene Angriffe (Entscheidung Welle 48, 22.10.2026)
+
+Neue Repros: `docs/niche-tests/repro/W48/a-01` (Silence: Bonus-Spell sofort, Fenster, Punkt 3a; Basis 581e4ca6: Exit 2), `a-02` (Zeitfenster der Spell-Auswahl: VPC, `performImmediateAction(AnyHero)`, Call for Help, Quelltext-Inventar; Exit 2), `a-03` (Creature-Surprise-Matrix, Punkt 6; auf Basis UND Branch Exit 0), `a-04` (Absicherung Punkte 1, 2, 4; Basis UND Branch Exit 0), `a-05` (Surprise auf Surprise, Punkt 5; Basis Exit 1), `a-06` (Pfeile nur für eigene Angriffe, Zusatz B; Basis UND Branch Exit 0). **Umgestellt wurde ein altes Repro:** `W47/a-02` (Zeile „Silence-Bonus-Spell verbraucht" → „bleibt stehen", Punkt 3a). Alle übrigen alten Repros laufen unverändert grün.
+
+### Punkt 1 · Limits und Surprise-Aktivierung — Ist-Zustand bestätigt (Al: „Ja, das ist korrekt so.")
+Mirjam („can never use more than 1 Attack per turn"), Idej Sword - Muras („must be the only Attack"), Idej Sword - Kogarasu („only 1 Spell per turn") sperren über `canPlayCard` (`_canHeroActivateSurprise`) die Aktivierung einer Attack-/Spell-Surprise ihres Helden, wenn das Limit erreicht ist; Surprise der anderen Art und andere Helden bleiben frei. Nur abgesichert (`a-04`).
+
+### Punkt 2 · Spike Trap — Ist-Zustand bestätigt (Al: „Korrekt, Spike Traps Schaden gilt als Spell und kann entsprechend drauf reagiert werden.")
+Rückstoß = `decay_spell`, Reaktionen/Surprises des Angreifers dürfen reagieren (W47a, `W47/a-03`; Kurzprobe in `a-04`).
+
+### Punkt 3 · Silence-Bonus-Spell sofort; keine Surprise im Zeitfenster der Spell-Auswahl (Al: „Nein – und das dürfte eigentlich überhaupt nicht möglich sein. Silence soll den Gegner SOFORT einen zusätzlichen Spell ausführen lassen, wie beispielsweise Victory Phoenix Cannon. In diesem Timeframe von ‚Choose a Spell to activate' sollte überhaupt keine Surprise aktivierbar sein!")
+
+**Befund vorher:** Silence gewährte den Bonus-Spell nicht sofort, sondern als Token `ps._silenceBonusSpell = gs.turn` für den REST DES ZUGES (ein Spell durfte später ganz normal per Handkarte über die Sperre `_spellLockTurn` gespielt werden). Damit gab es kein „Zeitfenster der Spell-Auswahl", und ein in der Zwischenzeit aktivierter Spell-Surprise konnte den Token (W47a: „zählt als gewirkter Spell") verbrauchen.
+
+**a) Aktivierte Surprise verbraucht den Bonus nicht:** `engine.zaehleAlsArt` bekam `surprise: true` (gesetzt von `_activateSurprise` und der Kettenaktivierung aus der Surprise Zone, `_promptReactionsForChain`); der Silence-Token wird in diesem Fall nicht angefasst. Weiter verbrauchen ihn gewirkte Karten (am Anfang des Sofort-Gusses/`doPlaySpell`) und Effekte, die als Spell zählen (Alice, ohne `surprise`). Die Surprise zählt weiter in den Spell-Zählern (Teleportal, Fire Bolts, Eraser Beam … wie W47a).
+
+**b) Silence = Sofort-Fenster:** `silence.js` stellt nach der negierten Kette (`engine.queuePostChainAction`, wie The Master's Plan/Shamanic Curse; die Spielhandler leeren die Warteschlange in `.finally`) dem Gegner `performImmediateActionAnyHero(opp, { allowedCardTypes: ['Spell'], cancellable: true })` an. Der Token gilt nur noch für dieses Fenster (danach — gewählt oder abgebrochen — wird er geleert); der Bonus-Spell läuft wie bisher als Zusatzaktion mit jedem Helden des Opfers, die Spell-Sperre (`_spellLockTurn`) gilt danach absolut. **Ein nicht sofort gewählter Bonus-Spell verfällt** (vorher: der ganze restliche Zug).
+
+**c) Zeitfenster der Spell-Auswahl, zentral:** `engine.spellAuswahlOffen()` (Zähler `_spellAuswahlTiefe`), geöffnet von `engine.promptSpellAuswahl(pi, config)` (= `promptGeneric`) bzw. `engine._mitSpellAuswahl(fn)` — vom Öffnen der Auswahl bis zur Wahl/zum Abbruch. Solange es offen ist, liefert `_canHeroActivateSurprise` (das Tor aller Surprise-Fenster: Zielschutz-, Schadens-, Hook-, Draw-Fenster, Hand-Listen) `false`, und `_activateSurprise` (direkte Aufrufer: Telekinesis, Sabrina, Cute Spider …) bricht mit `null` ab und legt die Surprise verdeckt liegen (Log `surprise_blocked_spell_selection`). Ausgenommen sind Hand-Reaktionen (`spellInHand`) — sie sind keine Surprises. Was der gewählte Spell danach regulär auslöst (Zielwahl, Treffer), liegt hinter dem Fenster und bleibt unverändert.
+
+| Karte / Weg | Auswahlfenster | Surprise-Sperre vorher | nachher |
+|---|---|---|---|
+| Silence (Bonus-Spell) | heroAction-Prompt nach der Kette (neu; vorher kein Fenster, Token für den Zugrest) | keine; Surprise konnte den Token verbrauchen | gesperrt; Surprise verbraucht den Bonus nie |
+| `performImmediateAction` (Coffee, Elixir of Rage, Junshi, Mana Beacon, Overflowing Chalice, Friendship …) | heroAction-Prompt eines Helden | keine | gesperrt |
+| `performImmediateActionAnyHero` (Guardian Beast Hu, The Master's Plan, Lunar Eclipse, Off Duty, Dream Dust, Shamanic Curse …) | heroAction-Prompt (alle Helden) | keine | gesperrt |
+| Victory Phoenix Cannon | Bestätigung „Cast another Spell?" + Galerie „Choose a … Spell" | keine | gesperrt (beide Prompts) |
+| Yukana, the Scholar on the Run | Galerie Lv-1/2-Spell | keine | gesperrt |
+| Friedhelm, the Misled Avenger | Galerie Attack/Spell aus dem Deck (`ctx.promptCardGallery`) | keine | gesperrt (`_mitSpellAuswahl`) |
+| Call for Help | Galerie Spell aus Hand/Deck | keine | gesperrt |
+| Difficulty Lever | Galerie Spell ohne Schule | keine | gesperrt |
+| Aurora Borealis | Bestätigung „Delete 2 … perform the third?" + Galerie | keine | gesperrt (beide Prompts) |
+| Circles of Hell (`_hell-circles-shared`) | Bestätigung „Play it as an additional Action?" (Wirkerwahl danach = Zielwahl, nicht Teil des Fensters) | keine | gesperrt |
+| Learning | `pickHandCard` „Choose a Spell … additional Action" | keine | gesperrt |
+| Archibald, the Archmage | Bestätigung/Galerie „cast it as an additional Action" | keine | gesperrt |
+| Chaos Diamond, Alice, Love Shot, Taio u. ä. | keine Auswahl des Spielers (automatischer Guss / Zielwahl) | – | – (kein Fenster) |
+
+Repros `a-01`/`a-02`: im offenen Auswahl-Prompt löst die Antwortfunktion einen Gold-Gewinn des Wählenden aus (Auslöser der Surprise Gold Trap des Gegners bzw. des Silenced-Spielers) — im Fenster aktiviert sie nicht; Gegenprobe vor/nach dem Fenster aktiviert sie; auf der Basis aktivierte sie im Fenster (gemessen). Beide Sitze.
+
+### Punkt 4 · Güldefaber und The Brewer's Blade — Ist-Zustand bestätigt (Al: „Ja, das funktioniert beides.")
+Beide lesen `onEffectCountedAsArt` ohne `karte` und reagieren auf die aktivierte Attack-/Spell-Surprise ihres Trägers (W47a, `W47/a-02`; Kurzprobe in `a-04`).
+
+### Punkt 5 · Surprise auf Surprise öffnet ein eigenes „performs"-Fenster, beliebig tief (Al: „Ja, auch wenn eine Surprise auf eine Surprise reagiert, soll die ein Fenster öffnen, die Verschachtelungstiefe soll theoretisch beliebig tief gehen können.")
+* `_activateSurprise`: die Bedingung `!this._inReactionCheck` für das Kettenfenster „performs" entfällt — auch eine Surprise, die mitten aus der Auflösung einer Kette (z. B. Mountain Tear River durch die Kreaturenwahl von Racket Arrow) oder aus einer anderen Surprise heraus auslöst, öffnet ihr eigenes Fenster (nach cardType) und zählt genau einmal. `_inReactionCheck` wird um das Fenster gesichert/wiederhergestellt (wie bisher).
+* `_surpriseNestingBlocked` (Tiefenkappe 10) liefert immer `false`. Endlosketten schließt die Natur der Sache aus (jede Surprise löst nur einmal aus, danach liegt sie nicht mehr verdeckt; je Held eine Surprise Zone → höchstens 6 Stufen im Normalspiel). Bleibt: die Per-Hero-Sperre `_activeSurpriseHeroes` (Re-Entrancy desselben Helden-Slots) und der Einmal-je-Ziel-Schutz der Fenster.
+* Repro `a-05`: sechs Gold Traps im Wechsel (A@me0 → B@op0 → C@me1 → D@op1 → E@me2 → F@op2), auf jeder Stufe öffnet sich das Fenster (Stealthy Pursuit als Leser, je Seite genau 3 Angebote), jede Stufe zählt einmal, auch mitten in einer offenen Kette (`_inReactionCheck`), beide Sitze; echter Weg: Racket Arrow → Mountain Tear River. Auf der Basis fehlten die Fenster mitten in der Kette (0 statt 3 Angebote).
+
+### Punkt 6 · Creature-Surprise: die bloße Aktivierung ist kein Creature effect, nur ihre Zielwahl/Wirkung (Al: „Das Aktivieren einer Creature-Surprise an sich soll NICHT ‚on creature effect' feuern. Nur, wenn diese Creature-Surprise dann selbst einen Effekt auslöst, der ein Ziel anvisiert/trifft …")
+**Befund: Ist-Zustand war schon korrekt, kein Code geändert.** Matrix (`a-03`, beide Sitze; 5 Creature-Surprises × 11 Leser [Surprises Booby Trap, Jumpscare, Mountain Tear River, Jumper Spider, Spider Avalanche, Firewall; Hand-Reaktionen Chaorc Interception, Barrier of Faith, Divine Gift of Rain; Shield of Wisdom, Rolling Boulder]); Zeitpunkt = erster Aufruf der Zielwahl der Creature-Surprise:
+
+| Creature-Surprise | vor der Zielwahl (bloße Aktivierung) | bei der Zielwahl/Wirkung |
+|---|---|---|
+| Pure Advantage Camel („draw a card and place", keine Zielwahl) | kein Leser angeboten/aktiviert, kein Zähler | – (nichts feuert) |
+| Water Golem (Zielwahl nach der Platzierung) | keiner | alle Leser feuern (Held-Zielwahl); Camel/Golem zählen nie als Attack/Spell |
+| Cybug ANTS (Schaden, Kreatur noch in der Surprise Zone) | keiner | Jumpscare, Jumper Spider, Spider Avalanche und die Hand-Reaktionen feuern; Booby Trap/Firewall/Mountain Tear River (brauchen einen Angreifer auf dem Brett) bewusst nicht (W46a/W47a bestätigt) |
+| Afflicted Vermin (wählt eine Kreatur) | keiner | Shield of Wisdom und Rolling Boulder (Kreaturenwahl) feuern bei der Wahl |
+| Cactus Creature | keiner | – (kein Leser der Matrix trifft) |
+
+Weiter geprüft: unter Dark Ocean blockt die Sperre die Reaktionen auf die Zielwahl (W46a) und auch auf die Platzierung der Creature-Surprise (Off Duty reagiert auf die Beschwörung; die Platzierung ist Teil des Surprise-Effekts) — siehe Frage 2.
+
+### Zusatz B · Pfeile (Angelfeather, Bomb, Flame, Golden, Hydra Blood, Poisoned, Rainbow's, Racket) und Magic Topaz / Bow of the Hunt Goddess nur für Angriffe EIGENER Helden
+**Befund: kein Weg ließ einen Pfeil an einen gegnerischen Angriff ketten; kein Code geändert.** Zentrale Prüfung `_arrows-shared.arrowTriggerCondition` (Pfeile, Magic Topaz) bzw. `bow-of-the-hunt-goddess.equipReactionCondition`: `initial.owner === pi` — das Anfangsglied trägt den Spieler, der den Angriff ausführt (= Kontrolleur des angreifenden Helden). Alle Kettenaufrufer setzen `owner` auf diesen Spieler (Code-Durchsicht: `doPlaySpell`, `alsAttackKette` aller 14 Aufrufer, Arthor, Jump in the River, `_activateSurprise` [Steuerer], Alluring Light [der gezwungene Gegner-Held ist der Angreifer: `pi: oppIdx`]); Kunagis Wiederholung und Quick Attack/Nieht-Bonus-Attack laufen über normale Kartenwege, Kreaturen-Attacks über Kreaturen-Ketten (`CreatureEffect`, kein Attack-Anfangsglied). Matrix (`a-06`, beide Sitze): 17 Quellen (Echte Attack; Broghan, Brackle, Arthor, Heragas, Kohta; Javelin Throw, Sword in a Bottle, Crusader's ×4, Bamboo Staff, Sacrificial Dagger, Infected Greatmaw, Alluring Light; Duel nur auf Fehlerfreiheit, weil beide Duellanten abwechselnd angreifen) × 9 Pfeil-Karten: Pfeile des Verteidigers werden nie angeboten, Gegenprobe: die des Angreifers werden angeboten; Bluff-Aktivierung (W47a): nur der Steuerer; Kontrollwechsel (Charme): der Kontrolleur wird angeboten, der Besitzer nicht.
+
+### Beobachtungen (nicht geändert) und Fragen an Al (Ja/Nein)
+* `_runPostChainActions` läuft nur in den Spielhandlern/CPU-Dispatcher (`.finally`); ein Silence, das auf einem Weg ohne diese Handler ausgelöst wird (z. B. Alice über einen Heldeneffekt im Testharness), öffnet das Fenster erst beim nächsten Drain und lässt bis dahin den Token stehen.
+1. **Silence-Bonus-Spell:** Er wird jetzt SOFORT nach der Kette angeboten und verfällt, wenn man ihn dort nicht wählt (vorher: ein Spell später im selben Zug möglich). Ist das so gewollt (ja)?
+2. **Dark Ocean × Platzierung einer Creature-Surprise:** Unter Dark Ocean kann der Gegner auf die Platzierung/Beschwörung einer Creature-Surprise (z. B. Pure Advantage Camel) nicht reagieren (Off Duty o. ä.), weil die Platzierung Teil des Surprise-Effekts ist. Soll Dark Ocean die Reaktion auf die bloße Platzierung doch zulassen (nein, so ist es jetzt)?
+3. **Hand-Reaktionen im Zeitfenster der Spell-Auswahl** (Silence-Bonus, VPC …) bleiben weiter möglich (z. B. Reaktionen auf den dann gewählten Spell, wie bei jedem Spell); gesperrt sind nur Surprises. Passt das (ja)?

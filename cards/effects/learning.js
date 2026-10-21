@@ -566,7 +566,7 @@ module.exports = {
       // and clickable; everything else is dimmed. Cancel button is the
       // opt-out. No modal gallery / single-Spell confirm — the player
       // picks straight from their actual hand.
-      const result = await engine.promptGeneric(pi, {
+      const result = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
         type: 'pickHandCard',
         title: CARD_NAME,
         description: `Choose a Spell from your hand to cast as an additional Action with ${hero.name}.`,

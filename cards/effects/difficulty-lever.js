@@ -195,7 +195,7 @@ module.exports = {
 
     while (true) {
       if (schritt === 'spell') {
-        const wahl = await engine.promptGeneric(pi, {
+        const wahl = await engine.promptSpellAuswahl(pi, {   // W48a: Zeitfenster der Spell-Auswahl (keine Surprise aktivierbar)
           type: 'cardGallery',
           cards: kandidaten.map(k => ({ name: k.name, source: 'hand', level: k.level })),
           title: CARD_NAME,

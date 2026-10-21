@@ -29,6 +29,8 @@
 //      first successful validation — from that
 //      point the lock is absolute.
 //    • Once per game.
+//
+//  ★ W48a: der Bonus-Spell wird SOFORT angeboten (Post-Chain-Fenster, siehe `resolve`), nicht mehr für den Rest des Zuges bereitgehalten.
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -94,6 +96,23 @@ module.exports = {
     if (oppPs) {
       oppPs._spellLockTurn = gs.turn;
       oppPs._silenceBonusSpell = gs.turn;
+      // ★ W48a (Al, 22.10.2026, Punkt 3: „Silence soll den Gegner SOFORT einen zusätzlichen Spell ausführen lassen, wie beispielsweise Victory Phoenix Cannon"):
+      // der Bonus-Spell ist ein SOFORT-Fenster (wie The Master's Plan / Shamanic Curse nach der ganzen Kette angeboten, abbrechbar), kein Zeitstempel für den Rest
+      // des Zuges: wird er nicht gewählt, ist er verfallen (Token wird nach dem Fenster geleert). Im Fenster der Spell-Auswahl ist keine Surprise aktivierbar
+      // (`promptSpellAuswahl`), und eine aktivierte Spell-Surprise verbraucht den Bonus nie (`zaehleAlsArt` mit `surprise: true`).
+      engine.queuePostChainAction(async () => {
+        try {
+          await engine.performImmediateActionAnyHero(oppIdx, {
+            title: 'Silence',
+            allowedCardTypes: ['Spell'],
+            description: 'Your Spell was negated by Silence. You may immediately use another Spell as an additional Action — or skip.',
+            cancellable: true,
+          });
+        } finally {
+          if (oppPs._silenceBonusSpell === gs.turn) oppPs._silenceBonusSpell = -1;   // verfallen (gewirkt: schon am Anfang des Sofort-Gusses verbraucht)
+        }
+        engine.sync();
+      });
     }
 
     engine.log('silence_negate', {

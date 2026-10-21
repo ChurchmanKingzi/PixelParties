@@ -113,7 +113,7 @@ const phase2 = (t) => { t.gs.currentPhase = 2; };
       ps._spellLockTurn = -1; ps._silenceBonusSpell = -1; n.eraser = eraser();
       R.check(`${name} (${art}${schule ? ', ' + schule : ''}): Teleportal „first Spell" ${art === 'Spell' ? 'nicht mehr' : 'weiter'} eine Zusatzaktion`, v.tele === true && n.tele === (art !== 'Spell'), { v, n });
       R.check(`${name}: Fire Bolts „first Destruction Magic Spell" ${schule === 'Destruction Magic' ? 'verbraucht' : 'weiter erfüllt'} (nur Destruction Magic zählt)`, v.bolts === true && n.bolts === (schule !== 'Destruction Magic'), { v, n });
-      R.check(`${name}: Silence-Bonus-Spell ${art === 'Spell' ? 'verbraucht (zählte als gewirkter Spell)' : 'bleibt stehen'}`, n.bonus === (art !== 'Spell'), { n });
+      R.check(`${name}: Silence-Bonus-Spell bleibt stehen (W48a, Al: eine aktivierte Surprise verbraucht den Bonus NICHT — umgestellt)`, n.bonus === true, { n });
       R.check(`${name}: Eraser Beam „only Spell this turn" ${art === 'Spell' ? 'gesperrt (stempelt)' : 'weiter spielbar'}`, n.eraser === (art !== 'Spell'), { v, n });
     }
     R.section(`Sitz ${me}: Quick Attack / Amazing Finding („first Attack"), Muscle Training („hero has not attacked yet")`);
