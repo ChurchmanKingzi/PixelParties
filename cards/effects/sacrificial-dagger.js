@@ -28,9 +28,18 @@
 const CARD_NAME = 'Sacrificial Dagger';
 
 /**
+ * ★ W41a (Al, 22.10.2026, Punkt 2: „in jedem Fall müssen die Kosten wiederholt werden!"): Kosten der Wiederholung durch Idej Sword - Kunagi = ein WEITERES Opfer („when you sacrifice a target you
+ * control" ist der Auslöser des Dolchs). Kreaturen des Kontrolleurs, die noch opferbar sind und nicht schon in dieser Kette geopfert wurden (`ausser`: das Opfer des ersten Schlags liegt erst
+ * NACH dessen Schlag in der Ablage).
+ */
+function opferKandidaten(engine, pi, ausser) {
+  return engine.getSacrificableCreatures(pi).filter(c => !(ausser && ausser.includes(c.inst.id)));
+}
+
+/**
  * Der Schlag selbst (Kreaturen- UND Helden-Opfer). `pi` = Kontrolleur des Daggers (= Opferer), Träger muss leben.
  */
-async function dolchSchlag(ctx, pi, wdh) {
+async function dolchSchlag(ctx, pi, wdh, ersterOpfer) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const hero = ctx.attachedHero;
@@ -46,8 +55,45 @@ async function dolchSchlag(ctx, pi, wdh) {
 
   const atk = Math.max(0, hero.atk || 0);
 
+  // ★ W41a (Al, 22.10.2026, Punkt 2): bei jeder Wiederholung (Idej Sword - Kunagi) fällt das Opfer erneut an. Ohne weiteres opferbares Ziel kommt kein Angebot; der Spieler darf die Wiederholung
+  // ablehnen (Abbruch der Opferwahl oder der Zielwahl): dann wird nichts geopfert und nichts verbraucht. Bezahlt wird erst NACH der Zielwahl (`onTargetChosen`).
+  const bisherOpfer = wdh ? (wdh.ausser || []) : (ersterOpfer ? [ersterOpfer] : []);
+  let opferInst = null, bezahlt = false;
+  if (wdh) {
+    const kand = opferKandidaten(engine, pi, bisherOpfer);
+    if (kand.length === 0) return;
+    const sacTargets = kand.map(c => ({
+      id: `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`, type: 'equip',
+      owner: c.inst.owner, heroIdx: c.inst.heroIdx, slotIdx: c.inst.zoneSlot, cardName: c.cardName, cardInstance: c.inst,
+    }));
+    const pick = await engine.promptEffectTarget(pi, sacTargets, {
+      title: CARD_NAME,
+      description: 'Idej Sword - Kunagi: sacrifice another Creature you control to repeat the strike (Cancel = decline).',
+      confirmLabel: '🗡️ Sacrifice!', confirmClass: 'btn-warning', cancellable: true,
+      exclusiveTypes: true, maxPerType: { equip: 1 }, maxTotal: 1, minRequired: 1, autoConfirm: true, redSelect: true,
+    });
+    if (!pick || pick.length === 0) return;   // abgelehnt: nichts bezahlt
+    opferInst = (sacTargets.find(t => t.id === pick[0]) || {}).cardInstance;
+    if (!opferInst || opferInst.zone !== 'support') return;
+  }
+
   // "you may choose a target" — optional; cancel = decline.
   const target = await ctx.promptDamageTarget({
+    ...(wdh ? {
+      // Das Opfer wird erst nach der Zielwahl gebracht (abbrechbar, bis hierher nichts bezahlt). Während des Opferns ruht der Wiederholungs-Merker von Kunagi: ein ANDERER Dolch, der auf
+      // dieses Opfer auslöst, ist ein eigener Schlag und darf Ziele/„ausgeführt" der Wiederholung nicht überschreiben.
+      noSpellCancel: true,
+      onTargetChosen: async () => {
+        if (bezahlt) return true;
+        const merker = gs._kunagiWdh, ausschluss = gs._spellExcludeTargets;
+        delete gs._kunagiWdh; delete gs._spellExcludeTargets;
+        let weg = false;
+        try { weg = await engine.opfereKreatur(opferInst, { name: CARD_NAME, owner: pi, heroIdx }); }
+        finally { if (merker) gs._kunagiWdh = merker; if (ausschluss !== undefined) gs._spellExcludeTargets = ausschluss; }
+        bezahlt = true;   // geopfert (oder das Opfer wurde gerettet: dann ist es verbraucht und der Schlag verpufft)
+        return weg;
+      },
+    } : {}),
     side: 'any',
     types: ['hero', 'creature'],
     damageType: 'attack',
@@ -65,7 +111,7 @@ async function dolchSchlag(ctx, pi, wdh) {
       treatedAsAttack: engine.heldenAngriffStempel(ctx.cardHeroOwner ?? pi, heroIdx),   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
     },
   });
-  if (!target) return; // declined — HOPT untouched
+  if (!target) return; // declined — HOPT untouched (Wiederholung: bis zur Zielwahl nichts bezahlt)
 
   // Auftritt links am Feld (Als Regel 21.8.: beim Opfern). Erst
   // hier, nach der verbindlichen Zusage — ein abgelehntes „may"
@@ -105,7 +151,7 @@ async function dolchSchlag(ctx, pi, wdh) {
   const source = { name: hero.name, owner: pi, heroOwner: feld, heroIdx, treatedAsAttack: engine.heldenAngriffStempel(feld, heroIdx) };   // W30a: Stufe = Fighting-Level des Helden (war W27a: 0)
 
   // W32a (Al, 22.10.2026): der Schlag zählt als Attack des Trägers — Attack-Reaktionen (Magic Topaz, Arrows …) über die virtuelle Attack-Kette.
-  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => dolchSchlag(ctx, pi, true), resolve: async () => {
+  await engine.alsAttackKette({ name: CARD_NAME, pi, heroIdx, heroOwner: feld, ziele: [target], wiederhole: () => dolchSchlag(ctx, pi, { ausser: bisherOpfer }), resolve: async () => {
   if (tHero) {
     await engine.actionDealDamage(source, tHero, damage, 'attack');
   } else if (tInst) {
@@ -157,7 +203,7 @@ module.exports = {
       const srcOwner = ctx.source?.owner ?? ctx.source?.controller;
       if (srcOwner != null && srcOwner !== pi) return;
 
-      await dolchSchlag(ctx, pi);
+      await dolchSchlag(ctx, pi, undefined, sacrificed.id);
     },
 
     // Welle 12 (Q98, Al: „Auch Heroes"): auch ein geopferter HELD (Divine Gift of Sacrifice, Teocuilatl, Pharaoh …) ist „a target you
