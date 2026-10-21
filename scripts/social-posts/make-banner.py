@@ -338,13 +338,12 @@ def glints(cv, spots):
         ml.put(cv, st, x, y, an)
 
 
-TRAIL_PALETTE = [(255, 222, 90), (255, 160, 48), (226, 84, 44), (140, 60, 70), (96, 84, 110)]      # Gelb, Orange, Rot, Dunkelrot, Rauch
-TRAIL_RIM = (84, 28, 40)
+TRAIL_PALETTE = [(255, 222, 90), (255, 160, 48), (226, 84, 44), (140, 60, 70), (96, 84, 110), (72, 62, 92), (52, 44, 72)]      # Gelb, Orange, Rot, Dunkelrot, Rauch, dunkler Rauch, Schatten
 
 
 def fire_trail(bez, t_end):
     """Feuerspur der Schädel-Bombe als echtes Pixelbild: nur fünf Farben, die per Ordered Dithering (Bayer, wie der Hintergrund) ineinander
-    übergehen; der Verlauf läuft nach Weglänge vom Schädel (Gelb) nach hinten (Rauch), ein dunkler Rand umschließt die Spur."""
+    übergehen; der Verlauf läuft nach Weglänge vom Schädel (Gelb) nach hinten (Rauch, zuletzt Schatten); die Spur hat keine Kontur."""
     cw, ch = W // CELL, H // CELL
     ts = np.linspace(t_end, 0, 1200)
     pts = np.array([bez(t) for t in ts])
@@ -358,16 +357,10 @@ def fire_trail(bez, t_end):
         inside = (xs + 0.5 - x / CELL) ** 2 + (ys + 0.5 - y / CELL) ** 2 <= r * r
         dist[inside] = d_
     mask = ~np.isnan(dist)
-    pad = np.pad(mask, 1)
-    near = np.zeros_like(mask)
-    for dy in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            near |= pad[1 + dy:1 + dy + ch, 1 + dx:1 + dx + cw]
-    u = np.interp(np.nan_to_num(dist), [0, 90, 200, 330, 520], [0, 1, 2, 3, 4])
+    u = np.interp(np.nan_to_num(dist), [0, 90, 200, 330, 520, 760, 1050], [0, 1, 2, 3, 4, 5, 6])
     th = np.tile(bp.BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw]
     q = np.clip(np.floor(u + th), 0, len(TRAIL_PALETTE) - 1).astype(int)
     img = np.zeros((ch, cw, 4), np.uint8)
-    img[near] = TRAIL_RIM + (255,)
     img[mask, :3] = np.array(TRAIL_PALETTE, dtype=np.uint8)[q[mask]]
     img[mask, 3] = 255
     return Image.fromarray(img, 'RGBA').resize((W, H), Image.NEAREST)
@@ -407,7 +400,7 @@ def banner(frame_front=True):
 
     cv.alpha_composite(fire_trail(bez, T_SKULL))
     sx_, sy_ = bez(T_SKULL)
-    cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
+    cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - 0.68 * skull_im.height)))      # der Schädel (ohne Lunte, 68 % von oben) liegt auf dem Ende der Spur und deckt es ab
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
     paste([k for k in placed if k in FRONT])
