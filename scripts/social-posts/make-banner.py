@@ -39,15 +39,15 @@ HORIZON = 905                                       # Fußlinie der hinteren Rei
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
 # 'h': Kopf (x, y) des Sprites steht auf dem Punkt (x, y); dabei dürfen Flügel und Körper aus dem Bild ragen (ohne Rahmen-Beschnitt)
 ACTORS = [
-    ('quetzahuitl-receiver-of-sacrifices', 8, 1010, 255, True, 'h'),
-    ('monia', 10, 700, 195, False, 'c'),
+    ('quetzahuitl-receiver-of-sacrifices', 8, 1220, 255, True, 'h'),
+    ('monia', 10, 770, 195, False, 'c'),
     ('brackle-the-catapulting-turtle', 8, 700, 1075, True, 'f'),
     ('future-tech-gunslinger-riffel', 8, 1310, 1075, False, 'f'),
-    ('bakhm-the-desert-digger', 14, 60, 1135, True, 'f'),
+    ('bakhm-the-desert-digger', 14, 100, 1135, True, 'f'),
     ('chaos-diamond-the-cracked-keeper', 14, 1860, 1075, False, 'f'),
 ]
 UNDER = {'quetzahuitl-receiver-of-sacrifices'}                                # hinter allem anderen
-FRONT = {'bakhm-the-desert-digger', 'chaos-diamond-the-cracked-keeper'}      # vor dem Schriftband, nicht dahinter
+FRONT = {'chaos-diamond-the-cracked-keeper'}                                # vor dem Schriftband (Bakhms Kiefer verschwindet knapp dahinter)
 HEAD = (0.32, 0.79)                                 # Lage des Kopfes im Umriss von Quetzahuitl (gespiegelt), Anteile von Breite und Höhe
 ACC = (240, 190, 72)                                # Gold des Rahmens
 
@@ -288,38 +288,18 @@ def star(cx, cy, r, seed=3, spikes=9, cols=((60, 20, 40), (255, 120, 50), (255, 
     return lowres(draw)
 
 
-SKULL = ['...#####...',
-         '..#######..',
-         '.#########.',
-         '.##oo#oo##.',
-         '.#ooo#ooo#.',
-         '.#ooo#ooo#.',
-         '.####n####.',
-         '..#######..',
-         '..##t#t##..',
-         '...#####...',
-         '...#.#.#...']
+def brackle_fx(px=8, flip=True):
+    """Brackles eigenes Geschoss (Totenschädel-Bombe mit brennender Lunte, Frame 21) und die Flammen seines Einschlags (Frame 27),
+    direkt aus dem Sprite-Sheet geschnitten (data/hero-animations/brackle-the-catapulting-turtle.png)."""
+    sheet = Image.open(ml.ROOT / 'data' / 'hero-animations' / 'brackle-the-catapulting-turtle.png').convert('RGBA')
+    fw = 82
 
-
-def skull(cx, cy, cell=8, tilt=0):
-    """Totenschädel-Geschoss (Brackles Katapult) mit dunklem Rand, Licht oben links und Schatten unten rechts."""
-    h, w = len(SKULL), len(SKULL[0])
-    im = Image.new('RGBA', ((w + 2) * cell, (h + 2) * cell), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    bone, shade, light, dark = (238, 232, 214), (186, 176, 156), (255, 252, 240), (44, 28, 52)
-    cells = {(x, y): c for y, row in enumerate(SKULL) for x, c in enumerate(row) if c != '.'}
-    for (x, y) in list(cells):
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
-                n = (x + dx, y + dy)
-                if n not in cells and 0 <= n[0] < w and 0 <= n[1] < h or (n not in cells and not (0 <= n[0] < w and 0 <= n[1] < h)):
-                    d.rectangle([(n[0] + 1) * cell, (n[1] + 1) * cell, (n[0] + 2) * cell - 1, (n[1] + 2) * cell - 1], fill=dark + (255,))
-    for (x, y), c in cells.items():
-        col = dark if c in 'onx' else (dark if c == 't' else (light if (x + y) <= 3 else (shade if (x >= w - 3 or y >= h - 3) else bone)))
-        d.rectangle([(x + 1) * cell, (y + 1) * cell, (x + 2) * cell - 1, (y + 2) * cell - 1], fill=col + (255,))
-    if tilt:
-        im = im.rotate(tilt, resample=Image.NEAREST, expand=True)
-    return im
+    def part(frame, box):
+        im = sheet.crop((frame * fw + box[0], box[1], frame * fw + box[2], box[3]))
+        bb = im.getbbox()
+        im = im.crop(bb).resize(((bb[2] - bb[0]) * px, (bb[3] - bb[1]) * px), Image.NEAREST)
+        return im.transpose(Image.FLIP_LEFT_RIGHT) if flip else im
+    return part(21, (0, 15, 48, 32)), part(27, (0, 36, 30, 62))
 
 
 def trail(src, dst, w0, colors):
@@ -336,10 +316,9 @@ def banner():
     cv = background()
     cv.alpha_composite(burst(W // 2, H // 2 - 40, 560, 400))
     cv.alpha_composite(ground())
-    # Rote Blitze von Chaos-Diamond, Smaragd- und Jetpack-Strahl zwischen Quetzahuitl und Monia, Schüsse über dem Boden
-    for k, (a, b) in enumerate((((1180, 975), (1030, 935)), ((1130, 985), (1010, 950)))):          # Riffels Schüsse nach links
+    for k, (a, b) in enumerate((((1185, 985), (1020, 1000)), ((1135, 995), (1010, 1010)))):        # Riffels Schüsse nach links
         cv.alpha_composite(beam(a, b, 10 + 3 * k, [(205, 150, 40), (255, 230, 120), (255, 255, 235)]))
-    cv.alpha_composite(beam((620, 760), (930, 840), 24, [(150, 60, 20), (255, 140, 40), (255, 230, 120)]))   # Flugbahn des Schädels
+    cv.alpha_composite(beam((590, 735), (900, 855), 22, [(150, 60, 20), (255, 140, 40), (255, 230, 120)]))   # Flugbahn des Schädels
 
     placed = {}
     for slug, px, x, y, flip, mode in ACTORS:
@@ -362,18 +341,24 @@ def banner():
 
     cv.alpha_composite(frame_layers())
     paste(UNDER)
-    # Rote Blitze von Chaos-Diamond; Smaragd- und Jetpack-Strahl zwischen Quetzahuitl und Monia
-    for p0, p1, sd in (((1720, 420), (1330, 190), 2), ((1700, 600), (1370, 800), 7), ((1790, 330), (1600, 70), 4)):
-        cv.alpha_composite(bolt(p0, p1, seed=sd))
-    cv.alpha_composite(beam((985, 270), (850, 215), 34, [(40, 110, 60), (90, 190, 110), (230, 255, 200)]))
-    cv.alpha_composite(beam((830, 215), (975, 262), 28, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]))
+    # Rote Blitze gehen von den Kristallklauen und -spitzen von Chaos-Diamond aus (Sprite-Koordinaten × Maßstab + Lage des Bildes)
+    _, left_c, top_c, _, _ = placed['chaos-diamond-the-cracked-keeper']
+    padc = max(3, -(-2 * 7 * 2 // 14) + 1) * 14
+
+    def at_chaos(sx, sy):
+        return (left_c + padc + sx * 14, top_c + padc + sy * 14)
+    for (sx, sy), dst, sd in (((6, 35), (1390, 830), 7), ((6, 6), (1340, 200), 2), ((42, 16), (1900, 50), 4)):
+        cv.alpha_composite(bolt(at_chaos(sx, sy), dst, seed=sd))
+    cv.alpha_composite(beam((1190, 268), (1070, 245), 34, [(40, 110, 60), (90, 190, 110), (230, 255, 200)]))    # Quetzahuitl: Smaragdstrahl
+    cv.alpha_composite(beam((860, 215), (1050, 242), 28, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]))   # Monia: Jetpack-Strahl
+    cv.alpha_composite(star(1060, 243, 42, seed=4, spikes=8))                                                   # …beide treffen sich
     ribbon_ornaments(cv)
     paste([k for k in placed if k not in UNDER and k not in FRONT])
 
-    # Schädel-Geschoss und Einschläge in der Luft: Schädel fliegt von Brackle nach rechts, Riffels Schüsse treffen ihn
-    sk = skull(0, 0, 8, tilt=-18)
-    cv.alpha_composite(star(985, 915, 80, seed=5), (0, 0))
-    cv.alpha_composite(sk, (int(905 - sk.width / 2), int(840 - sk.height / 2)))
+    # Brackles eigenes Geschoss (Schädel-Bombe) fliegt nach rechts und schlägt vor Riffel mit seinen Flammen ein
+    skull_im, fire_im = brackle_fx(8, True)
+    cv.alpha_composite(skull_im, (int(925 - skull_im.width / 2), int(870 - skull_im.height / 2)))
+    cv.alpha_composite(fire_im, (int(1005 - fire_im.width / 2), 1040 - fire_im.height))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
     paste([k for k in placed if k in FRONT])
