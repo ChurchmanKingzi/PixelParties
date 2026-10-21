@@ -23,6 +23,7 @@ spec = importlib.util.spec_from_file_location('ml', HERE / 'make-logo.py')
 ml = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ml)
 bp, fx = ml.bp, ml.fx
+import ornaments as orn  # noqa: E402  (liegt neben diesem Skript)
 
 W, H = 2048, 1152
 SAFE = (406, 407, 1641, 745)                       # sicherer Bereich für alle Geräte
@@ -30,21 +31,23 @@ CELL = 4                                           # Raster des Banners (= ein L
 CREAM, CREAM2, CREAM3 = (255, 224, 184), (255, 232, 198), (255, 241, 214)       # Farben aus title.png
 RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255, 243, 176)
 
-PX = 8                                             # ein Maßstab für alle Sprites (= 2 Logo-Pixel), damit die Pixel überall gleich groß sind
+PX = 10                                            # ein Maßstab für alle Sprites, damit die Pixel überall gleich groß sind
 # Je Seite drei Heroes: ein Flieger oben, ein Großer in der Mitte, ein normaler unten, alle schräg gegeneinander.
 # (Sprite, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame); „gespiegelt“ gleicht die Blickrichtung des Sheets aus
 # (links soll alles nach rechts blicken, rechts nach links).
 LEFT = [
-    ('bakhm-the-desert-digger', 275, 640, True, 0),
-    ('darion-the-blood-crazy-groundskeeper', 600, 960, False, 0),
+    ('bakhm-the-desert-digger', 285, 530, True, 0),
+    ('nao-the-barrier-priestess', 720, 990, False, 0),
 ]
 RIGHT = [
-    ('berserking-null', 1790, 640, False, 0),
-    ('delusional-monia', 1760, 215, True, 0),
-    ('future-tech-gunslinger-riffel', 1450, 960, False, 0),
+    ('null-the-mage-slayer', 1770, 700, False, 0),
+    ('cute-meanie-melissa', 1760, 205, False, 0),
+    ('future-tech-gunslinger-riffel', 1440, 985, False, 0),
 ]
 CENTER = []
-MONIA = (290, 215)
+MONIA = (185, 185)
+FRONT = {'bakhm-the-desert-digger', 'null-the-mage-slayer'}      # die Großen liegen vor dem Schriftband, nicht dahinter
+ACC = (240, 190, 72)                                # Gold des Rahmens
 
 
 def sticker(slug, px, frame=0, flip=False):
@@ -103,6 +106,66 @@ def background():
     return im.resize((W, H), Image.NEAREST).convert('RGBA')
 
 
+def frame_layers():
+    """Rahmen mit Schnörkeln im 8-px-Raster (Ornament-Bausteine der Karten): Rille mit Perlen, Eckblöcke mit Edelstein, Mittelstücke,
+    Eck-Voluten und Kronen oben und unten. Die Heroes liegen davor und ragen aus dem Rahmen heraus."""
+    S = 8
+    cw, ch = W // S, H // S
+    layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    light, deep = orn.mix(ACC, orn.WHITE, 0.5), orn.mix(ACC, orn.INK, 0.72)
+    d.rectangle([0, 0, W - 1, H - 1], outline=orn.INK, width=S)
+    d.rectangle([S, S, W - 1 - S, H - 1 - S], outline=ACC, width=S)
+    d.rectangle([2 * S, 2 * S, W - 1 - 2 * S, H - 1 - 2 * S], outline=deep, width=S)
+    d.rectangle([3 * S, 3 * S, W - 1 - 3 * S, H - 1 - 3 * S], outline=orn.INK, width=S)
+    for i in range(6, cw - 6, 3):                                   # Perlenreihe in der Rille
+        for y in (2, ch - 3):
+            d.rectangle([i * S, y * S, i * S + S - 1, y * S + S - 1], fill=light)
+    for j in range(6, ch - 6, 3):
+        for x in (2, cw - 3):
+            d.rectangle([x * S, j * S, x * S + S - 1, j * S + S - 1], fill=light)
+
+    def stamp(cells, gem, ox, oy):
+        im, (x0, y0) = orn.render(cells, ACC, gem, scale=S)
+        layer.paste(im, ((ox + x0) * S, (oy + y0) * S), im)
+
+    block = {(x, y) for x in range(10) for y in range(10) if not (x + y < 3)}
+    gem = orn.gem_cells(5, 5, 3)
+    for fx, fy in ((0, 0), (1, 0), (0, 1), (1, 1)):                  # Eckblöcke
+        cells = {((9 - x) if fx else x, (9 - y) if fy else y) for (x, y) in block}
+        g = {((9 - x) if fx else x, (9 - y) if fy else y) for (x, y) in gem}
+        stamp(cells, g, cw - 10 if fx else 0, ch - 10 if fy else 0)
+    lozenge = {(x, y) for x in range(21) for y in range(5) if abs(x - 10) <= 10 - (1 if y in (0, 4) else 0) * 3}
+    for (ox, oy, trans) in ((cw // 2 - 10, 0, False), (cw // 2 - 10, ch - 5, False), (0, ch // 2 - 10, True), (cw - 5, ch // 2 - 10, True)):
+        cells = {(y, x) for (x, y) in lozenge} if trans else set(lozenge)
+        stamp(cells, orn.gem_cells(2, 10, 1) if trans else orn.gem_cells(10, 2, 1), ox, oy)
+    corner = orn.corner_cells()                                      # Voluten innen an den Ecken (nach innen gespiegelt)
+    for fx, fy, ox, oy in ((-1, -1, 12, 12), (1, -1, cw - 13, 12), (-1, 1, 12, ch - 13), (1, 1, cw - 13, ch - 13)):
+        stamp({(fx * x, fy * y) for (x, y) in corner}, {(fx * x, fy * y) for (x, y) in orn.gem_cells(-1, -1, 2)}, ox, oy)
+    return layer
+
+
+def ribbon_ornaments(cv):
+    """Zierleisten über und unter dem Schriftzug (liegen im sicheren Bereich, also auch auf dem Handy zu sehen)."""
+    S = 8
+    layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+
+    def stamp(cells, gem, ox, oy):
+        im, (x0, y0) = orn.render(cells, ACC, gem, scale=S)
+        layer.paste(im, ((ox + x0) * S, (oy + y0) * S), im)
+
+    cx = W // S // 2
+    top_y, bot_y = 407 // S + 1, 745 // S - 3
+    crest = orn.crest_cells()
+    stamp({(x, -y) for (x, y) in crest}, {(x, -y) for (x, y) in orn.gem_cells(0, 4, 3) | orn.gem_cells(-1, 4, 3)}, cx, top_y + 4)
+    stamp(crest, orn.gem_cells(0, 4, 3) | orn.gem_cells(-1, 4, 3), cx, bot_y - 4)
+    for sgn in (1, -1):
+        for y in (top_y, bot_y):
+            cells, gem = orn.divider(30, ACC, sgn, 2, 2)
+            stamp(cells, gem, cx + sgn * 14, y)
+    cv.alpha_composite(layer)
+
+
 def lowres(draw_fn):
     """Zeichnet auf einem Viertel-Raster und vergrößert auf das 4-px-Raster des Banners."""
     lo = Image.new('RGBA', (W // CELL, H // CELL), (0, 0, 0, 0))
@@ -150,26 +213,32 @@ def banner():
     cv.alpha_composite(burst(W // 2, H // 2, 560, 420))
     # Schüsse und Zauber der Heroes treffen sich hinter dem Schriftzug
     for src, dst, w, cols in (
-            ((340, 215), (900, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Monia: Jetpack-Funken
-            ((1700, 215), (1150, 520), 40, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),    # Delusional Monia
-            ((660, 960), (960, 700), 30, [(176, 52, 70), (226, 84, 84), (255, 200, 150)]),        # Darion: Kettensäge
-            ((1340, 950), (1090, 700), 26, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):  # Riffel: Schuss
+            ((260, 190), (900, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Monia: Jetpack-Funken
+            ((1700, 205), (1150, 520), 40, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),    # Melissa: dunkle Magie
+            ((720, 960), (960, 700), 28, [(205, 150, 40), (255, 214, 90), (255, 250, 210)]),     # Nao: heiliges Licht
+            ((1300, 960), (1090, 700), 26, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):  # Riffel: Schuss
         cv.alpha_composite(beam(src, dst, w, cols))
 
-    items = []
+    cv.alpha_composite(frame_layers())
+    ribbon_ornaments(cv)
+    items, front = [], []
     for slug, x, y, flip, fr in LEFT + RIGHT + CENTER:
         im = sticker(slug, PX, fr, flip)
         bb = im.getbbox()
-        items.append((y + (bb[3] - bb[1]) / 2, im, bb, x, y))
+        (front if slug in FRONT else items).append((y + (bb[3] - bb[1]) / 2, im, bb, x, y))
     # Monia (Wink-Pose mit weißem Plus) fliegt links oben
     m_im, _ = ml.monia(PX)
     bb = m_im.getbbox()
     items.append((MONIA[1] + (bb[3] - bb[1]) / 2, m_im, bb, MONIA[0], MONIA[1]))
-    for _, im, bb, x, y in sorted(items, key=lambda t: t[0]):
-        cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
+
+    def paste(lst):
+        for _, im, bb, x, y in sorted(lst, key=lambda t: t[0]):
+            cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
+    paste(items)
 
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (960, 880, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
+    paste(front)
     return cv
 
 
