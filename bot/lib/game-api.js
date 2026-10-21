@@ -32,6 +32,7 @@ function createGameApi({ baseUrl, secret, timeoutMs = 8000 }) {
     startDaily: discordId => call('POST', '/api/bot/daily/' + encodeURIComponent(discordId) + '/start'),
     decks: discordId => call('GET', '/api/bot/decks/' + encodeURIComponent(discordId)),
     adjustSc: (discordId, delta, adminDiscordId, reason) => call('POST', '/api/bot/sc', { discordId, delta, adminDiscordId, reason }),
+    cotd: () => call('GET', '/api/bot/cotd'),   // { date, card, amount } — die Karte des Tages wählt das Spiel (card-of-day.js)
     leaderboard: () => call('GET', '/api/leaderboard'),   // öffentlich; das Secret schadet nicht
   };
 }

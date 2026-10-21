@@ -2634,7 +2634,8 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
 
 // ===== MONIABOT (Discord) =====
 // Spieler-Routen für die Verknüpfung und die Bot-Routen unter /api/bot (nur mit BOT_SECRET, nur lokal). Siehe bot-api.js.
-botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4 });
+const { berlinDate, cardOfDay } = require('./card-of-day');
+botApi.mount({ app, db, authMiddleware, getActiveDaily, rollDailyHeroes, nextNoonCETAfter, mostRecentNoonCETSec, uuidv4, getCardOfDay: (nowMs) => getCardOfDayInfo(nowMs) });
 
 // ===== AVAILABLE CARDS (based on ./cards folder) =====
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -4320,7 +4321,17 @@ const scRewardsModul = require('./sc-rewards');
 // Puzzle-Schwierigkeiten = Ordner unter data/puzzles/ (Reihenfolge = Anzeige in der Library).
 const PUZZLE_SCHWIERIGKEITEN = ['easy', 'medium', 'hard', 'impossible'];
 const { createScRewards, isCpuUserId, cpuOpponentKey } = scRewardsModul;
-const scRewards = createScRewards({ db, uuidv4, getActiveDaily, getCardDB });
+const scRewards = createScRewards({ db, uuidv4, getActiveDaily, getCardDB, getCardOfDay: (nowMs) => getCardOfDayInfo(nowMs) });
+
+// ── Karte des Tages (Berliner Tag) — Bonus „Card of the Day!" in sc-rewards.js, Veröffentlichung durch MoniaBot (bot-api.js) ──
+/** @returns {{date:string, card:string, amount:number}|null} */
+function getCardOfDayInfo(nowMs = Date.now()) {
+  const date = berlinDate(new Date(nowMs));
+  const card = cardOfDay(date, getCardArray());
+  if (!card) return null;
+  const eintrag = scRewards.catalog.find(r => r.id === 'card_of_the_day');
+  return { date, card: card.name, amount: eintrag ? eintrag.amount : 0 };
+}
 
 function getSocketIP(socket) {
   return socket?.handshake?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
