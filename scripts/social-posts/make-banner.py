@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""YouTube-Kanalbanner (2048×1152, höchstens 6 MB) im Stil der Reels.
+"""YouTube-Kanalbanner (2048×1152, höchstens 6 MB) im Stil des Titelbilds (public/title.png): warmer Grund, Sprengstern in der Mitte,
+zwei Heldentrupps, die aufeinander losgehen.
 
     python3 scripts/social-posts/make-banner.py
 
-Ergebnis: scripts/social-posts/out/branding/banner-youtube.png (plus banner-youtube-sicherer-bereich.png zur Kontrolle).
+Ergebnis in scripts/social-posts/out/branding/: banner-youtube.png und banner-youtube-sicherer-bereich.png (Kontrollbild, nicht hochladen).
 
 YouTube zeigt je nach Gerät unterschiedliche Ausschnitte; auf dem Handy bleibt nur die Mitte (1235 × 338 px, x 406…1641, y 407…745)
-sichtbar. Dort stehen deshalb Schriftzug und Schlagzeile; Monia und die Heroes rechts und links sind Zugabe für Desktop und Fernseher.
+sichtbar. Dort steht nur der Schriftzug (Logo-Pixel = 4 px); der Rest ist Zugabe für Tablet, Desktop und Fernseher.
 """
 import importlib.util
+import math
+import random
 from pathlib import Path
 
 import numpy as np
@@ -23,86 +26,138 @@ bp, fx = ml.bp, ml.fx
 
 W, H = 2048, 1152
 SAFE = (406, 407, 1641, 745)                       # sicherer Bereich für alle Geräte
-FLIP = {'right': 1, 'left': -1}
+CELL = 4                                           # Raster des Banners (= ein Logo-Pixel)
+CREAM, CREAM2, CREAM3 = (255, 224, 184), (255, 232, 198), (255, 241, 214)       # Farben aus title.png
+RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255, 243, 176)
+
+# (Sprite, Maßstab, Mitte x, Mitte y des sichtbaren Umrisses, gespiegelt?, Frame)
+# Links blickt alles nach rechts, rechts nach links; „gespiegelt“ gleicht die Blickrichtung des Sheets aus.
+LEFT = [
+    ('alleria-the-queen-of-spiders', 10, 215, 700, False, 0),
+    ('nao-the-barrier-priestess', 10, 190, 975, False, 0),
+    ('bomb-berserker-bartas', 10, 410, 960, False, 0),
+    ('archibald-the-archmage', 10, 640, 930, False, 0),
+    ('cute-angel-molinda', 8, 700, 190, False, 0),
+    ('mary-crestmas', 8, 150, 420, False, 0),
+]
+RIGHT = [
+    ('argos-the-eye-of-the-cosmos', 4, 1810, 330, True, 0),
+    ('baaliel-the-demon-general', 10, 1880, 740, True, 0),
+    ('gon-the-frostbringer', 10, 1560, 880, True, 0),
+    ('zsos-ssar-the-serpent-warlord', 10, 1720, 940, True, 0),
+    ('arthor-the-king-of-blackport', 12, 1935, 990, True, 0),
+    ('ida-the-adept-of-destruction', 10, 1380, 960, True, 0),
+    ('grisgar-emissary-of-the-demon-lord', 4, 1300, 150, True, 0),
+]
+CENTER = [
+    ('bubbles-the-bouncy-bunny', 4, 1024, 985, False, 0),
+]
 
 
-def stars(cv, seed=7, n=90):
-    rnd = np.random.default_rng(seed)
-    d = ImageDraw.Draw(cv)
-    for _ in range(n):
-        x, y = int(rnd.integers(0, W // 12)) * 12, int(rnd.integers(0, H // 12)) * 12
-        c = (220, 235, 255, 255) if rnd.random() < 0.4 else (110, 170, 240, 255)
-        d.rectangle([x, y, x + 5, y + 5], fill=c)
-
-
-def hero(slug, px, frame=0, flip=False, accent=(244, 244, 240)):
-    """Sprite mit Sticker-Umriss, Rückgabe: Bild und (Mitte x, Fußlinie y) darin."""
+def sticker(slug, px, frame=0, flip=False):
+    """Sprite mit Sticker-Umriss (innen hell, außen dunkel) als RGBA-Bild."""
     spr = bp.Sprite(slug)
     spr.px = px
-    od, ol, sp, pad = spr.layers(frame, accent, ml.INK)
+    od, ol, sp, pad = spr.layers(frame, ml.WHITE, ml.INK)
     im = Image.new('RGBA', sp.size, (0, 0, 0, 0))
     for layer in (od, ol, sp):
         im.alpha_composite(layer)
-    cx, foot = pad + spr.center_x * px, pad + spr.foot * px
     if flip:
         im = im.transpose(Image.FLIP_LEFT_RIGHT)
-        cx = im.width - cx
-    return im, (cx, foot)
+    return im
 
 
-def stand(cv, slug, px, x, y, frame=0, flip=False, shadow=True):
-    im, (cx, foot) = hero(slug, px, frame, flip)
-    if shadow:
-        sh = Image.new('RGBA', (int(im.width * 0.7), 28), (0, 0, 0, 0))
-        ImageDraw.Draw(sh).ellipse([0, 0, sh.width - 1, sh.height - 1], fill=(7, 6, 13, 150))
-        cv.alpha_composite(sh, (int(x - sh.width / 2), int(y - 12)))
-    cv.alpha_composite(im, (int(x - cx), int(y - foot)))
+def background():
+    """Warmer Grund mit Dithering-Verlauf zur Mitte (wie title.png), Strahlen vom Sprengstern."""
+    cw, ch = W // CELL, H // CELL
+    ys, xs = np.mgrid[0:ch, 0:cw]
+    dx, dy = (xs - cw / 2) / (cw * 0.5), (ys - ch / 2) / (ch * 0.5)
+    ang = np.arctan2(dy, dx)
+    rays = 0.5 + 0.5 * np.sin(ang * 14 + 0.6)                     # 14 Strahlen
+    v = np.clip(1.0 - np.hypot(dx, dy) * 0.55, 0, 1) * 0.75 + rays * 0.25 * (np.hypot(dx, dy) > 0.35)
+    th = np.tile(bp.BAYER4, (ch // 4 + 1, cw // 4 + 1))[:ch, :cw]
+    ramp = np.array([CREAM, CREAM2, CREAM3], dtype=np.uint8)
+    q = np.clip(np.floor(np.clip(v, 0, 1) * 2 + th - 0.2), 0, 2).astype(int)
+    img = np.repeat(np.repeat(ramp[q], CELL, axis=0), CELL, axis=1)
+    return Image.fromarray(img, 'RGB').convert('RGBA')
 
 
-def banner(heart_cell=7, wm_scale=3):
-    cv = ml.dark_background((W, H))
-    stars(cv)
+def lowres(draw_fn):
+    """Zeichnet auf einem Viertel-Raster und vergrößert auf das 4-px-Raster des Banners."""
+    lo = Image.new('RGBA', (W // CELL, H // CELL), (0, 0, 0, 0))
+    draw_fn(ImageDraw.Draw(lo))
+    return lo.resize((W, H), Image.NEAREST)
 
-    # Wolkenboden: überlappende Wolken auf einem hellen Streifen
-    cu = 12
-    ImageDraw.Draw(cv).rectangle([0, H - 64, W, H], fill=(226, 238, 255, 255))
-    for i, (x, w, h, sd) in enumerate([(-120, 60, 22, 3), (420, 62, 20, 5), (960, 58, 22, 8), (1500, 62, 20, 2)]):
-        cl = ml.flat_cloud(cu, w, h, sd)
-        cv.alpha_composite(cl, (x, H - cl.height + 56 + (i % 2) * 20))
 
-    # Monia vor ihrem Herz links oben
-    heart = ml.heart_layer(heart_cell)
-    cx, cy = 215, 330
-    cv.alpha_composite(heart, (cx - heart.width // 2, cy - heart.height // 2))
-    m_im, (mfx, mfoot) = ml.monia(10)
-    cv.alpha_composite(m_im, (int(cx - mfx), int(cy - m_im.height * 0.52)))
-    for (dx, dy, fr) in ((-0.72, -0.34, 0), (0.78, -0.42, 1)):
-        st, an = ml.stamp_layer(fx.glyph_stamp('starglint', fr), fx.PAL['glint'], 12, 2)
-        ml.put(cv, st, cx + dx * heart.width, cy + dy * heart.height, an)
+def burst(cx, cy, rx, ry, seed=4, spikes=22):
+    """Sprengstern wie im Titelbild: roter Rand, goldene Füllung, hellere Mitte."""
+    rnd = random.Random(seed)
+    base = []
+    for i in range(spikes * 2):
+        a = i / (spikes * 2) * 2 * math.pi + 0.1
+        r = (rnd.uniform(0.85, 1.12) if i % 2 == 0 else 0.62 * rnd.uniform(0.9, 1.05))
+        base.append(((cx + math.cos(a) * rx * r) / CELL, (cy + math.sin(a) * ry * r) / CELL))
 
-    # Argos schwebt rechts oben
-    im, (acx, afoot) = hero('argos-the-eye-of-the-cosmos', 3)
-    cv.alpha_composite(im, (1830 - im.width // 2, 330 - im.height // 2))
+    def draw(d):
+        for k, col in ((1.0, RED), (0.9, GOLD), (0.55, GOLD_LT)):
+            d.polygon([(cx / CELL + (x - cx / CELL) * k, cy / CELL + (y - cy / CELL) * k) for x, y in base], fill=col)
+    return lowres(draw)
 
-    # Heroes auf den Wolken, blicken zur Mitte
-    ground = H - 150
-    stand(cv, 'beato-the-butterfly-witch', 10, 130, ground + 40)
-    stand(cv, 'bomb-berserker-bartas', 10, 400, ground + 10)
-    stand(cv, 'nao-the-barrier-priestess', 10, 1640, ground + 10, flip=True)
-    stand(cv, 'zsos-ssar-the-serpent-warlord', 10, 1880, ground + 40, flip=True)
 
-    # Schriftzug und Schlagzeile im sicheren Bereich
-    wm = ml.wordmark(wm_scale)
-    ml.put(cv, wm, W // 2, 525)
-    bp.draw_text(cv, 'THE FREE ONLINE TCG', 5, (W // 2, 650), color=ml.WHITE)
-    bp.draw_text(cv, 'PIXELPARTIESTCG.COM', 3, (W // 2, 700), color=ml.ACCENT)
+def beam(src, dst, w0, colors):
+    """Strahl von src nach dst (Breite w0 an der Quelle, spitz zulaufend), je Farbe ein engerer Kern."""
+    (x0, y0), (x1, y1) = [(a / CELL, b / CELL) for a, b in (src, dst)]
+    ang = math.atan2(y1 - y0, x1 - x0)
+    nx, ny = -math.sin(ang), math.cos(ang)
+
+    def draw(d):
+        for k, col in enumerate(colors):
+            w = w0 / CELL * (1.0 - k * 0.3)
+            d.polygon([(x0 + nx * w, y0 + ny * w), (x0 - nx * w, y0 - ny * w), (x1 + nx * w * 0.25, y1 + ny * w * 0.25),
+                       (x1 - nx * w * 0.25, y1 - ny * w * 0.25)], fill=col)
+    return lowres(draw)
+
+
+def glints(cv, spots):
+    for (x, y, fr, z) in spots:
+        st, an = ml.stamp_layer(fx.glyph_stamp('starglint', fr), fx.PAL['glint'], CELL * 2, z)
+        ml.put(cv, st, x, y, an)
+
+
+def banner():
+    cv = background()
+    cv.alpha_composite(burst(W // 2, H // 2, 560, 420))
+    # Zauber und Strahlen der Heroes treffen sich hinter dem Schriftzug
+    for src, dst, w, cols in (
+            ((1810, 330), (1100, 540), 44, [RED_DK, (255, 130, 70), GOLD_LT]),                  # Argos: Augenstrahl
+            ((1380, 960), (1090, 640), 36, [(214, 70, 30), (255, 150, 50), GOLD_LT]),            # Ida: Feuer
+            ((1560, 880), (1150, 650), 32, [(60, 130, 200), (150, 210, 245), (255, 255, 255)]),   # Gon: Eis
+            ((1880, 740), (1220, 590), 34, [(80, 30, 110), (160, 70, 190), (240, 190, 255)]),     # Baaliel: Dämonenmagie
+            ((700, 190), (960, 520), 40, [(70, 80, 200), (140, 165, 255), (255, 255, 255)]),     # Molinda: Lichtstrahl
+            ((640, 930), (930, 640), 34, [(90, 40, 160), (170, 110, 230), (245, 225, 255)]),     # Archibald: Zauber
+            ((190, 975), (860, 620), 32, [(205, 150, 40), (255, 214, 90), (255, 250, 210)])):   # Nao: heiliges Licht
+        cv.alpha_composite(beam(src, dst, w, cols))
+
+    items = []
+    for slug, px, x, y, flip, fr in LEFT + RIGHT + CENTER:
+        im = sticker(slug, px, fr, flip)
+        bb = im.getbbox()
+        items.append((y + (bb[3] - bb[1]) / 2, im, bb, x, y))
+    # Monia (Wink-Pose mit weißem Plus) fliegt links oben
+    m_im, _ = ml.monia(10)
+    bb = m_im.getbbox()
+    items.append((250 + (bb[3] - bb[1]) / 2, m_im, bb, 330, 250))
+    for _, im, bb, x, y in sorted(items, key=lambda t: t[0]):
+        cv.alpha_composite(im, (int(x - (bb[0] + bb[2]) / 2), int(y - (bb[1] + bb[3]) / 2)))
+
+    glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (960, 880, 0, 1), (1480, 760, 1, 1)])
+    ml.put(cv, ml.wordmark(4), W // 2, H // 2)
     return cv
 
 
 def safe_overlay(im):
     ov = im.copy().convert('RGBA')
-    d = ImageDraw.Draw(ov)
-    d.rectangle(SAFE, outline=(255, 60, 60, 255), width=4)
+    ImageDraw.Draw(ov).rectangle(SAFE, outline=(255, 60, 60, 255), width=4)
     return ov
 
 
