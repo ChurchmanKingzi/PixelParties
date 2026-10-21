@@ -35,6 +35,7 @@ RED, RED_DK, GOLD, GOLD_LT = (226, 84, 84), (176, 52, 70), (255, 222, 130), (255
 # Sprite-Pixel), die anderen kleiner; Quetzahuitl ist als Sprite so riesig, dass er nur mit 4 px je Sprite-Pixel auf das Banner passt.
 # (Sprite, Maßstab, x, y, gespiegelt?, Bezug: 'c' = y ist die Mitte des Umrisses, 'f' = y ist die Fußlinie auf dem Boden)
 # „gespiegelt“ gleicht die Blickrichtung des Sheets aus (links soll alles nach rechts blicken, rechts nach links).
+T_SKULL = 0.92                                      # Lage des Schädels auf dem Bogen (1 = Riffel)
 BRACKLE_PX = 12                                     # Brackle und sein Schädel haben denselben Maßstab (so zeichnet sie das Sheet)
 HORIZON = 905                                       # Fußlinie der hinteren Reihe (Boden beginnt knapp darüber)
 # 'f': y = Fußlinie (kann unter dem Bildrand liegen, dann ist der Fuß abgeschnitten); 'c': y = Mitte des Umrisses;
@@ -368,21 +369,32 @@ def banner(frame_front=False):
     p1, p2 = (650, 60), (1300, 915)                                                                                # hoher Bogen: Scheitel über dem Band, Ziel Riffel
     bez = lambda t: ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
 
+    KEYS = ((0, (255, 222, 90)), (70, (255, 176, 52)), (150, (240, 110, 40)), (260, (210, 62, 46)), (420, (150, 56, 70)), (700, (110, 84, 110)))   # Abstand zum Schädel in px: Gelb → Orange → Rot → Rauch
+
+    def grad(dist):
+        for (d0, c0), (d1, c1) in zip(KEYS, KEYS[1:]):
+            if dist <= d1:
+                u = (dist - d0) / (d1 - d0)
+                return tuple(int(round(c0[k] + (c1[k] - c0[k]) * u)) for k in range(3))
+        return KEYS[-1][1]
+
     def arc(d):
-        n = 46
+        ts = np.linspace(T_SKULL, 0, 1200)                              # Bahn vom Schädel rückwärts, nach Weglänge in px abgetastet
+        pts = np.array([bez(t) for t in ts])
+        seg = np.hypot(*np.diff(pts, axis=0).T)
+        cum = np.concatenate([[0], np.cumsum(seg)])
+        total = cum[-1]
         puffs = []
-        for i in range(n):
-            f = i / (n - 1)
-            x, y = bez(0.96 - 0.96 * f)
-            r = 8.5 * (1 - f) ** 0.7 + 1.5                              # hinten dünn, beim Schädel dick
-            col = ((255, 214, 70) if f < 0.2 else (255, 150, 40) if f < 0.45 else (226, 70, 44) if f < 0.7 else (140, 80, 90))
-            puffs.append((x / CELL, y / CELL, r, col))
-        for x, y, r, _ in reversed(puffs):                              # erst alle Ränder (dunkelrot), damit die Spur auch vor dem gelben Grund steht
-            d.ellipse([x - r - 1.2, y - r - 1.2, x + r + 1.2, y + r + 1.2], fill=(120, 34, 40))
-        for x, y, r, col in reversed(puffs):                            # dann von hinten nach vorn die Füllung: die dicken, hellen Puffs beim Schädel liegen oben
+        for dist in np.arange(0, total, 8):
+            x, y = pts[int(np.searchsorted(cum, dist))]
+            r = 8.5 * (1 - dist / total) ** 0.8 + 1.4                    # hinten dünn, beim Schädel dick
+            puffs.append((x / CELL, y / CELL, r, grad(dist)))
+        for x, y, r, col in reversed(puffs):                            # dunkler Rand, folgt dem Verlauf (etwas dunkler als die Füllung)
+            d.ellipse([x - r - 1.2, y - r - 1.2, x + r + 1.2, y + r + 1.2], fill=tuple(int(c * 0.42) for c in col))
+        for x, y, r, col in reversed(puffs):                            # Füllung von hinten nach vorn: die dicken, hellen Puffs beim Schädel liegen oben
             d.ellipse([x - r, y - r, x + r, y + r], fill=col)
     cv.alpha_composite(lowres(arc))
-    sx_, sy_ = bez(0.96)
+    sx_, sy_ = bez(T_SKULL)
     cv.alpha_composite(skull_im, (int(sx_ - skull_im.width / 2), int(sy_ - skull_im.height / 2)))
     glints(cv, [(520, 330, 0, 2), (1560, 250, 1, 2), (1130, 905, 0, 1), (1480, 760, 1, 1)])
     ml.put(cv, ml.wordmark(4), W // 2, H // 2)
@@ -393,9 +405,10 @@ def banner(frame_front=False):
 
     def at_chaos(sx, sy):
         return (left_c + padc + (sx + 0.5) * 14, top_c + padc + (sy + 0.5) * 14)
-    hands = [at_chaos(3, 4), at_chaos(45, 15)]
+    palm_l, palm_r = (6, 8), (42, 17)                                                 # Handflächen (Mitte der Kristallklauen), nicht die Fingerspitzen
+    hands = [at_chaos(*palm_l), at_chaos(*palm_r)]
     lines = []
-    for (sx, sy), dst, sd in (((3, 4), (1110, 425), 2), ((3, 4), (1650, 40), 11), ((3, 4), (1780, 25), 5), ((45, 15), (1880, 40), 4), ((45, 15), (2010, 150), 8)):
+    for (sx, sy), dst, sd in ((palm_l, (1110, 425), 2), (palm_l, (1650, 40), 11), (palm_l, (1780, 25), 5), (palm_r, (1880, 40), 4), (palm_r, (2010, 150), 8)):
         lines += bolt_lines(at_chaos(sx, sy), dst, seed=sd)
     cv = red_light(cv, lines, hands)                                               # rotes Licht auf Sprites und Hintergrund ringsum
     cv.alpha_composite(bolt(lines))
