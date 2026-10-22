@@ -22387,7 +22387,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Reveal the top card of your deck until you reveal a level 3 or lower Creature. Place that Creature into one of the user's free Support Zones, if possible. If the Creature's level is higher than the user's Support Magic level, your opponent draws 2 cards times the difference. Shuffle all other revealed cards back into your deck.",
+    "effect": "Reveal the top card of your deck until you reveal a level 3 or lower Creature. Place that Creature into one of the user's free Support Zones, if possible. If the Creature's level is higher than the user's Support Magic level, your opponent draws 2 cards times the difference. Shuffle all other revealed cards back into your deck. If you reveal 5 cards before you reveal an appropriate Creature, terminate this effect. Immediately end your turn afterwards.",
     "archetype": "",
     "setID": "PP GBT",
     "banned": "Banned",

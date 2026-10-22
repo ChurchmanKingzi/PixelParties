@@ -7157,7 +7157,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   25%  { left: var(--cx); top: var(--cy); transform: scale(2.6) rotate(0deg); }
   35%  { left: var(--cx); top: var(--cy); transform: scale(2.6) rotate(0deg); }
   75%  { left: var(--cx); top: var(--cy); transform: scale(2.6) rotate(0deg); }
-  100% { left: var(--ex); top: var(--ey); transform: scale(var(--es, 1)) rotate(var(--er, 0deg)); }   /* --es/--er: Größe und Fächerwinkel der Zielkarte (Hand), sonst 1 / 0 */
+  100% { left: var(--ex); top: var(--ey); transform: scale(var(--es, 1), var(--esy, var(--es, 1))) rotate(var(--er, 0deg)); }   /* --es/--er: Größe und Fächerwinkel der Zielkarte (Hand), sonst 1 / 0; --esy (W49b): Höhenmaßstab einer Brettzone, sonst wie --es */
 }
 @keyframes kassaran-flip {
   0%   { transform: rotateY(0deg); }
@@ -7218,7 +7218,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 @keyframes kassaran-flight-out {
   0%   { left: var(--cx); top: var(--cy); transform: scale(2) rotate(0deg); }
-  100% { left: var(--ex); top: var(--ey); transform: scale(var(--es, 1)) rotate(var(--er, 0deg)); }
+  100% { left: var(--ex); top: var(--ey); transform: scale(var(--es, 1), var(--esy, var(--es, 1))) rotate(var(--er, 0deg)); }
 }
 
 /* Birthday Present three-card reveal & pick — phased visual:

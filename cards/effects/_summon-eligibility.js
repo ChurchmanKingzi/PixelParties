@@ -228,4 +228,38 @@ function hatOnSummonText(cd) {
   return !!(cd && typeof cd.effect === 'string' && ON_SUMMON_TEXT.test(cd.effect.replace(/\s+/g, ' ')));
 }
 
-module.exports = { hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, heroAbgegeben, beschwoerStufeOk };
+/**
+ * ★ Welle 49 (Al, 22.10.2026, Surprise Party): Kreaturen, die laut ihrem Kartentext „NUR unter bestimmten Voraussetzungen" beschworen/gespielt
+ * werden koennen (Foresta, Blue-Ice Dragon, Guardian Beasts, Spirits …), sind KEINE legalen Ziele eines Effekts, der „eine Creature findet und
+ * platziert" (Surprise Party). Zentrales Praedikat, textgetrieben (Quelle: `cd.effect`), damit neue Karten ohne Nachpflege mitlaufen:
+ *  - „(You) can only summon/play this Creature …", „… can only be summoned/played …" (Opfer, Held mit Ascension/Ausruestung, leere Ablage …)
+ *  - „cannot be summoned …" / „cannot summon|play this Creature …" (Ifrit, Sparkfly Queen, Elven Rider, Rebelliokai Oblivious Oni)
+ *  - Pflichtkosten ohne „may": „Sacrifice … to summon this Creature." (Egg of God), „… defeat it to play this card." (500 Piranhas),
+ *    „You must … to summon this Creature." (Pollution Piranha)
+ *  - reine Gegnerseiten-Karten: „Summon this card into a free Support Zone of a Hero your opponent controls." (Plant Golem, Elusive Hind)
+ * KEIN Treffer: Limits („You can only summon 1 "X" per turn"), Alternativ-Wege mit „may" („You may sacrifice … to summon this Creature as an
+ * additional Action"), Reaktions-Beschwoerungen („Immediately summon this Creature … when …"), Zusatzaktions-Klauseln — die Karte bleibt auch normal
+ * beschwoerbar. Zusaetzlich zaehlen die Skript-Vertraege `summonOnlyFromHand`, `summonOnlyViaOwnEffect`, `placesOnOpponentBoard`; ein Skript kann
+ * das Ergebnis mit `summonOnlyUnderCondition: true|false` ausdruecklich setzen.
+ * @param {object} cd Kartendaten · @param {string} [cardName] fuer die Skript-Flags (Standard `cd.name`)
+ */
+const NUR_UNTER_BEDINGUNG_TEXT = [
+  /\bcan only (?:summon|play|place) this (?:creature|card)\b/i,
+  /\bcan only be (?:summoned|played|placed)\b/i,
+  /\bcannot be (?:summoned|played|placed)\b/i,
+  /\bcannot (?:summon|play) this (?:creature|card)\b/i,
+  /(?:^|[.!?]\s+)(?:Sacrifice|Discard|Delete|Return|Send|Choose)\b[^.]*?\b(?:to|and) (?:summon|play) this (?:creature|card)\b/i,
+  /\bYou must\b[^.]*?\bto (?:summon|play) this (?:creature|card)\b/i,
+  /(?:^|[.!?]\s+)Summon this (?:card|creature) into (?:a|the|any) free Support Zone of (?:a|any) Hero your opponent controls/i,
+];
+function nurUnterBedingungBeschwoerbar(cd, cardName) {
+  if (!cd) return false;
+  let script = null;
+  try { script = require('./_loader').loadCardEffect(cardName || cd.name); } catch { /* ohne Loader nur der Text */ }
+  if (typeof script?.summonOnlyUnderCondition === 'boolean') return script.summonOnlyUnderCondition;
+  if (script?.summonOnlyFromHand || script?.summonOnlyViaOwnEffect || script?.placesOnOpponentBoard) return true;
+  const text = String(cd.effect || '').replace(/\s+/g, ' ');
+  return NUR_UNTER_BEDINGUNG_TEXT.some(r => r.test(text));
+}
+
+module.exports = { nurUnterBedingungBeschwoerbar, hatOnSummonText, canHeroSummon, eligibleSummonZones, heroActionLocked, sofortAusHandBeschwoeren, heroAgiert, heroAbgegeben, beschwoerStufeOk };
