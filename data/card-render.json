@@ -557,7 +557,7 @@
 "Tengu Windstorm": {"r": "uncommon"},
 "Teocuilatl, the Embodiment of Gods": {"r": "rare"},
 "Teppes, the Deepsea Vampire": {"r": "rare"},
-"Thalia, the Fun Fairy": {"r": "rare"},
+"Thalia, the Fun Fairy": {"r": "rare", "glue": ["Support Spell"]},
 "Tharx, the Never-Losing General": {"r": "super rare"},
 "Tharxian Horse": {"r": "super rare"},
 "The Bonegrinder": {"r": "uncommon"},
