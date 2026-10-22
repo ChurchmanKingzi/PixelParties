@@ -115,7 +115,8 @@ function eligibleOwnSlotsFor(engine, pi, cd) {
   if (!engine.gs.players[pi]) return [];
   // Kontrolle statt Seite (Styx 28.9.): „a Hero you control" — auch
   // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  // W62a: + Zone einer GLEICHNAMIGEN Creature (Alice-Teilung) — `beschwoerZonenFuer`.
+  return engine.beschwoerZonenFuer(pi, cd.name, { nachKontrolle: true })
     .filter(z => canHeroSummonCd(engine, z.owner, z.heroIdx, cd))
     .map(z => ({ owner: z.owner, heroIdx: z.heroIdx, slotIdx: z.slotIdx }));
 }

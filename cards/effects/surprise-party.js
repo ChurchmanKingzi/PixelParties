@@ -181,7 +181,9 @@ module.exports = {
       // ist der Kanal dafuer — es fragt genau das `canSummon` der Karte
       // und sonst nichts, also keine Beschwoerungsvoraussetzungen, die
       // beim Platzieren ohnehin nicht gelten.
-      const zonen = engine.getFreeSupportZones(pi).filter(z => z.heroIdx === heroIdx);
+      // W62a: freie Zonen zuerst, danach (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature — `beschwoerZonenFuer`.
+      // Spielbar bleibt die Karte nur mit freier Zone (`spellPlayCondition`): der Name der Creature steht erst nach dem Aufdecken fest.
+      const zonen = engine.beschwoerZonenFuer(pi, gefunden, { heroIdx });
       let platziert = false;
       let bedingungOffen = false;
       const kannHier = zonen.length > 0 && engine.isCreatureSummonable(gefunden, pi, heroIdx);

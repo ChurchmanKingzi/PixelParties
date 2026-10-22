@@ -67,7 +67,7 @@ module.exports = {
       const zones = [];
       for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
         if (!h?.name || h.hp <= 0) continue;
-        for (const z of freeZonesOfHero(engine, physOwner, hi)) zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });
+        for (const z of freeZonesOfHero(engine, physOwner, hi, name, pi)) zones.push({ owner: physOwner, heroIdx: hi, slotIdx: z });   // W62a: + geteilte Zone (Alice)
       }
       if (zones.length === 0) return;
       const place = await engine.promptGeneric(pi, {

@@ -5888,12 +5888,8 @@ function sendGameState(room, playerIdx, extra) {
           if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) ok = false;
           if (!ok) continue;
         }
-        // Check free support zone
-        let hasFreeSlot = false;
-        for (let si = 0; si < 3; si++) {
-          if (((ps2.supportZones[hi] || [])[si] || []).length === 0) { hasFreeSlot = true; break; }
-        }
-        if (!hasFreeSlot) continue;
+        // Check free support zone (W62a: oder, mit Alice-Teilung, die Zone einer GLEICHNAMIGEN Creature)
+        if (!room.engine.hatBeschwoerZone(playerIdx, inst.name, { heroIdx: hi, nurBasis: true })) continue;
         // Check custom summon conditions
         const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
         if (script?.canSummon && !script.canSummon({ _engine: room.engine, cardOwner: playerIdx, cardHeroIdx: hi })) continue;
@@ -15512,11 +15508,9 @@ io.on('connection', (socket) => {
       if (cardData.spellSchool2 && room.engine.countAbilitiesForSchool(cardData.spellSchool2, abZones) < level) return;
     }
 
-    // Find free support zone slot
-    let freeSlot = -1;
-    for (let si = 0; si < 3; si++) {
-      if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) { freeSlot = si; break; }
-    }
+    // Find free support zone slot (W62a: `beschwoerZonenFuer` — freie Zonen zuerst, danach mit Alice-Teilung die Zone einer gleichnamigen Creature)
+    const ushabtiZone = room.engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true })[0];
+    const freeSlot = ushabtiZone ? ushabtiZone.slotIdx : -1;
     if (freeSlot < 0) return;
 
     // Check custom summon conditions
@@ -15528,8 +15522,7 @@ io.on('connection', (socket) => {
     if (szIdx >= 0) sz.splice(szIdx, 1);
 
     // Place in support zone
-    if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    ps.supportZones[heroIdx][freeSlot] = [cardName];
+    room.engine.zoneEintragen(pi, heroIdx, freeSlot, cardName, pi);   // W62a: leere Zone → [name]; gleichnamige (Alice) → dazustapeln
 
     // Update instance
     inst.zone = 'support';

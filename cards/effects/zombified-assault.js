@@ -90,10 +90,13 @@ function kandidaten(engine, pi, defeated) {
   return out;
 }
 
-function zoneFrei(engine, pi, heroIdx, slot) {
+function zoneFrei(engine, pi, heroIdx, slot, name = null, sharer = pi) {
   const z = engine.gs.players[pi]?.supportZones?.[heroIdx]?.[slot];
-  if (!Array.isArray(z) || z.length > 0) return false;
-  return !engine.isSupportZoneLocked(pi, heroIdx, { source: CARD_NAME, via: 'pick' });
+  if (!Array.isArray(z)) return false;
+  if (engine.isSupportZoneLocked(pi, heroIdx, { source: CARD_NAME, via: 'pick' })) return false;
+  if (z.length === 0) return true;
+  // W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature (die alte Zone eines Stapels) als Landeplatz.
+  return !!name && slot < 3 && require('./_alice-shared').canShareInto(engine, sharer, heroIdx, slot, name, pi);
 }
 
 /**
@@ -112,13 +115,12 @@ async function zielZone(engine, pi, d) {
   const altSeite = eigeneSeite ? pi
     : (fremdHeld?.name && engine.heroSideOf(seite, fremdHeld) === pi ? seite : null);
   if (altSeite != null && d.heroIdx != null && d.zoneSlot != null) {
-    if (zoneFrei(engine, altSeite, d.heroIdx, d.zoneSlot)) return { owner: altSeite, heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
-    const gleicherHeld = engine.getFreeSupportZones(altSeite, { namedHeroesOnly: true, source: CARD_NAME })
-      .filter(z => z.heroIdx === d.heroIdx);
+    if (zoneFrei(engine, altSeite, d.heroIdx, d.zoneSlot, d.name, pi)) return { owner: altSeite, heroIdx: d.heroIdx, slotIdx: d.zoneSlot };
+    const gleicherHeld = engine.beschwoerZonenFuer(pi, d.name, { seite: altSeite, heroIdx: d.heroIdx, namedHeroesOnly: true, source: CARD_NAME });   // W62a: + geteilte Zone (Alice)
     if (gleicherHeld.length) return { owner: altSeite, heroIdx: gleicherHeld[0].heroIdx, slotIdx: gleicherHeld[0].slotIdx };
   }
   // Kontrolle statt Seite (Styx 28.9.): Ausweichzonen = alle Helden, die `pi` kontrolliert.
-  const alle = engine.getFreeSupportZones(pi, { nachKontrolle: true, source: CARD_NAME });
+  const alle = engine.beschwoerZonenFuer(pi, d.name, { nachKontrolle: true, source: CARD_NAME });   // W62a: + geteilte Zonen (Alice)
   if (alle.length === 0) return null;
   if (alle.length === 1) return { owner: alle[0].owner, heroIdx: alle[0].heroIdx, slotIdx: alle[0].slotIdx };
   const wahl = await engine.promptGeneric(pi, {

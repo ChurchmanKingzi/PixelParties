@@ -1003,8 +1003,10 @@ async function runActionPhase(engine, helpers) {
       if (cd.cardType === 'Creature') {
         const ps2 = engine.gs.players[cpuIdx];
         const zones = ps2.supportZones?.[heroIdx] || [[], [], []];
+        // W62a: freie Zonen UND (Alice-Teilung) Zonen gleichnamiger Creatures — `beschwoerZonenFuer` (nur Basisplaetze, wie bisher)
+        const _geteilteZ = new Set(engine.beschwoerZonenFuer(cpuIdx, cardName, { heroIdx, nurBasis: true }).filter(zz => zz.shared).map(zz => zz.slotIdx));
         for (let z = 0; z < zones.length; z++) {
-          if ((zones[z] || []).length !== 0) continue;
+          if ((zones[z] || []).length !== 0 && !_geteilteZ.has(z)) continue;
           candidates.push({
             cardName, handIdx, heroIdx, zoneSlot: z, fromCreation: ausVorrat,
             cardType: cd.cardType,
@@ -4313,7 +4315,9 @@ function listEligibleHeroesForActionCard(engine, pi, cardData) {
       for (let z = 0; z < 3; z++) {
         if ((zones[z] || []).length === 0) freeCount++;
       }
-      if (freeCount === 0) {
+      // W62a: Alice-Teilung — die Zone einer GLEICHNAMIGEN Creature zaehlt als Landeplatz (wie beim Hand-Weg).
+      const _geteilt = freeCount === 0 && engine.hatBeschwoerZone(pi, cardData.name, { heroIdx: hi, nurBasis: true });
+      if (freeCount === 0 && !_geteilt) {
         // Bounce-Place-Vertrag: Karten mit canBypassFreeZoneRequirement
         // (Deepsea Bats, Horror Clown …) dürfen laut Engine auch bei
         // VOLLEN Zonen gespielt werden (Swap: Occupant → Hand, Karte in
@@ -4842,6 +4846,9 @@ function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
     swapDiag(engine, 'pick:free-slot');
     return free[Math.floor(Math.random() * free.length)];
   }
+  // W62a: Alice-Teilung — die Zone einer gleichnamigen Creature kostet nichts, ein Bounce schon.
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { heroIdx, nurBasis: true }).filter(z => z.shared);
+  if (geteilt.length) { swapDiag(engine, 'pick:shared-slot'); return geteilt[0].slotIdx; }
   const last = pickBouncePlacementSlot(engine, pi, heroIdx, cardName);
   swapDiag(engine, last >= 0 ? 'pick:bounce-fallback' : 'pick:none');
   return last;
@@ -14385,4 +14392,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS } };
+  _test: { heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };

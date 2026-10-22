@@ -42,10 +42,15 @@ function canHeroSummon(engine, ps, pi, heroIdx, creatureData, source) {
 /**
  * Check if a hero has at least one free base support zone.
  */
-function hasFreeZone(ps, heroIdx) {
+function hasFreeZone(ps, heroIdx, engine = null, pi = null, cardName = null) {
   const supZones = ps.supportZones[heroIdx] || [];
   for (let z = 0; z < 3; z++) {
     if ((supZones[z] || []).length === 0) return true;
+  }
+  // W62a: mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Landeplatz fuer die Kopie)
+  if (engine && cardName && pi != null) {
+    const { canShareInto } = require('./_alice-shared');
+    for (let z = 0; z < 3; z++) if (canShareInto(engine, pi, heroIdx, z, cardName)) return true;
   }
   return false;
 }
@@ -91,7 +96,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
       let canSummon = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         if (engine && !canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
-        if (!hasFreeZone(ps, hi)) continue;
+        if (!hasFreeZone(ps, hi, engine, pi, name)) continue;
         if (engine && !engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
         canSummon = true;
         break;
@@ -161,7 +166,7 @@ module.exports = {
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
             if (!canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
-            if (!hasFreeZone(ps, hi)) continue;
+            if (!hasFreeZone(ps, hi, engine, pi, name)) continue;   // W62a: frei oder geteilt (Alice)
             if (!engine.isCreatureSummonable(name, pi, hi, { _bypassBeforeSummon: true })) continue;
             canSummon = true;
             break;
@@ -211,6 +216,13 @@ module.exports = {
           }
         }
       }
+      // W62a: + Zonen gleichnamiger Creatures (Alice-Teilung), hinter den freien
+      for (const z of engine.beschwoerZonenFuer(pi, creatureName, {})) {
+        if (z.shared && canHeroSummon(engine, ps, pi, z.heroIdx, cd, creatureSource)
+            && engine.isCreatureSummonable(creatureName, pi, z.heroIdx, { _bypassBeforeSummon: true })) {
+          freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
+        }
+      }
 
       if (freeZones.length === 0) return { cancelled: true };
 
@@ -245,8 +257,7 @@ module.exports = {
 
       const hi = zone.heroIdx;
       const si = zone.slotIdx;
-      if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
-      ps.supportZones[hi][si] = [creatureName];
+      engine.zoneEintragen(pi, hi, si, creatureName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
       // Track card instance
       const inst = engine._trackCard(creatureName, pi, 'support', hi, si);

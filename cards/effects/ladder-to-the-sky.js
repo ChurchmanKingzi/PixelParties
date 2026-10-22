@@ -91,11 +91,12 @@ async function doLadderSearch(engine, pi, sacLevel) {
   if (!ps) return;
   const maxLevel = (sacLevel || 0) + 1;
 
-  const gallery = buildLadderGallery(engine, pi, maxLevel);
   // Free Support Zone under any living Hero you control.
   // Kontrolle statt Seite (Styx 28.9.): jede Zone traegt `owner` (physische Seite).
-  const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true, source: CARD_NAME });
-  if (gallery.length === 0 || freeZones.length === 0) return;
+  // W62a: je Karte — mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`).
+  const zonenOpts = { nachKontrolle: true, livingHeroesOnly: true, source: CARD_NAME };
+  const gallery = buildLadderGallery(engine, pi, maxLevel).filter(e => engine.hatBeschwoerZone(pi, e.name, zonenOpts));
+  if (gallery.length === 0) return;
 
   // "you MAY search" — optional.
   const pick = await engine.promptGeneric(pi, {
@@ -111,7 +112,7 @@ async function doLadderSearch(engine, pi, sacLevel) {
   if ((ps.mainDeck || []).indexOf(chosenName) < 0) return;
 
   // Zones where this Creature is actually summonable (per-Hero canSummon).
-  const placeable = freeZones.filter(z => engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx));
+  const placeable = engine.beschwoerZonenFuer(pi, chosenName, zonenOpts).filter(z => engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx));
   if (placeable.length === 0) return;
 
   let dest = placeable[0];

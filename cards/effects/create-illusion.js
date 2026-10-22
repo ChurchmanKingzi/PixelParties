@@ -24,6 +24,18 @@ const { isSummonablePileCreature, hasCardType, heldSeite } = require('./_hooks')
 
 const CARD_NAME = 'Create Illusion';
 
+/** W62a: liegt in einer Zone dieses Helden schon eine GLEICHNAMIGE Kreatur einer Deck-Karte, die sich die Zone (Alice-Teilung) teilen kann? Grobe Vorpruefung; die Wahl prueft `onPlay`. */
+function deckTeiltZone(engine, pi, heroIdx) {
+  if (!engine || !require('./_alice-shared').sharingActive(engine.gs, pi)) return false;
+  const { canShareInto } = require('./_alice-shared');
+  const namen = new Set(engine.gs.players[pi]?.mainDeck || []);
+  for (let z = 0; z < 3; z++) {
+    const nm = ((engine.gs.players[pi]?.supportZones?.[heroIdx] || [])[z] || [])[0];
+    if (nm && namen.has(nm) && canShareInto(engine, pi, heroIdx, z, nm)) return true;
+  }
+  return false;
+}
+
 module.exports = {
   // ★ W14b (Q162, Al: „Ja, soll er ablehnen können"): die Ja/Nein-Frage „your opponent MAY draw …" (Engine `_illusionenZurueck`) geht an den GEGNER.
   // CPU: annehmen, ausser ein Deck-Out droht (weniger Karten im Deck als zu ziehen). Titel der Frage = Kartenname.
@@ -36,21 +48,22 @@ module.exports = {
   cpuMeta: { scalesWithSchool: 'Magic Arts' },
 
   /** W16g (S01-15): der Nutzer selbst braucht eine freie Support Zone („a free Support Zone of the user“). */
-  canPlayWithHero(gs, pi, heroIdx) {
+  canPlayWithHero(gs, pi, heroIdx, cd, engine) {
     const ps = gs.players[pi];
     if (heldSeite(gs, pi, heroIdx) !== pi) return true;   // geliehener Wirker: wie bisher (eigene Helden, s. `onPlay`)
-    return (ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0);
+    return (ps?.supportZones?.[heroIdx] || []).some(slot => (slot || []).length === 0)
+      || deckTeiltZone(engine, pi, heroIdx);   // W62a: oder (Alice-Teilung) eine Deck-Kreatur teilt eine Zone dieses Helden
   },
 
   /** Cannot play without an eligible deck creature and a free support zone. */
-  spellPlayCondition(gs, playerIdx) {
+  spellPlayCondition(gs, playerIdx, engine) {
     const ps = gs.players[playerIdx];
     if (!ps) return false;
     const cardDB = {}; // gs has no direct cardDB ref; check done in onPlay with real cardDB
     // Check for free support zone
     const hasFreeZone = (ps.heroes || []).some((h, hi) =>
       h?.name && h.hp > 0 &&
-      (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
+      ((ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0) || deckTeiltZone(engine, playerIdx, hi)),   // W62a: frei oder geteilt
     );
     return hasFreeZone;
   },
@@ -144,6 +157,14 @@ module.exports = {
           }
         }
       }
+      // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature, freie Zonen zuerst. Spielbar bleibt der Zauber nur mit freier
+      // Zone (`canPlayWithHero`/`spellPlayCondition`: die Creature steht erst nach der Deck-Wahl fest).
+      for (const z of engine.beschwoerZonenFuer(pi, chosenName, { livingHeroesOnly: true })) {
+        if (!z.shared) continue;
+        if (nurNutzer && z.heroIdx !== heroIdx) continue;
+        if (!engine.isCreatureSummonable(chosenName, pi, z.heroIdx, { _bypassBeforeSummon: true })) continue;
+        freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
+      }
 
       if (freeZones.length === 0) {
         gs._spellCancelled = true;
@@ -174,8 +195,7 @@ module.exports = {
       await engine.revealSearchedCards(pi, [chosenName], CARD_NAME);
       engine.shuffleDeck(pi);
 
-      if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-      ps.supportZones[destHeroIdx][destSlot] = [chosenName];
+      engine.zoneEintragen(pi, destHeroIdx, destSlot, chosenName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
       const inst     = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
       inst.turnPlayed = gs.turn; // Summoning sickness

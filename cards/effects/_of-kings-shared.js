@@ -229,10 +229,15 @@ function summonedThisTurn(engine, inst) {
   return inst?.turnPlayed === (engine.gs.turn || 0);
 }
 
-function freeZonesOfHero(engine, pi, heroIdx) {
+function freeZonesOfHero(engine, pi, heroIdx, cardName = null, sharer = pi) {
   const out = [];
   // v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
   for (let z = 0; z < 3; z++) if (!engine.supportSlotBelegt(pi, heroIdx, z)) out.push(z);
+  // ★ W62a: mit `cardName` zaehlt — bei Alice-Teilung des Beschwoerers `sharer` — auch die Zone einer GLEICHNAMIGEN Creature (frei zuerst).
+  if (cardName) {
+    const { canShareInto } = require('./_alice-shared');
+    for (let z = 0; z < 3; z++) if (!out.includes(z) && canShareInto(engine, sharer, heroIdx, z, cardName, pi)) out.push(z);
+  }
   return out;
 }
 
@@ -336,7 +341,7 @@ function summonZonesFor(engine, pi, cd, opts = {}) {
   const heroes = engine.gs.players[seite]?.heroes || [];
   for (let hi = 0; hi < heroes.length; hi++) {
     if (!canHeroSummon(engine, pi, hi, cd, opts)) continue;
-    for (const z of freeZonesOfHero(engine, seite, hi)) {
+    for (const z of freeZonesOfHero(engine, seite, hi, cd?.name, pi)) {   // W62a: + geteilte Zone (Alice)
       out.push(seite !== pi ? { heroIdx: hi, slotIdx: z, owner: seite } : { heroIdx: hi, slotIdx: z });
     }
   }

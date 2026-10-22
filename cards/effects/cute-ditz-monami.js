@@ -54,9 +54,10 @@ function cuteHandCards(engine, pi) {
 }
 
 /** Freie Zonen GENAU des getroffenen Helden — place: ohne Lebens-/Statusfilter. */
-function freieZonenDesHelden(engine, pi, heroIdx, seite = pi) {
+function freieZonenDesHelden(engine, pi, heroIdx, seite = pi, cardName = null) {
   // Kontrolle statt Seite (Styx 28.9.): Zonen tragen `owner` (physische Seite).
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true })
+  // W62a: mit `cardName` zaehlt auch die Zone einer GLEICHNAMIGEN Creature (Alice-Teilung, `beschwoerZonenFuer`).
+  return engine.beschwoerZonenFuer(pi, cardName, { nachKontrolle: true })
     .filter(z => z.owner === seite && z.heroIdx === heroIdx);
 }
 
@@ -81,10 +82,8 @@ module.exports = {
       const quellSeite = q?.controller ?? q?.owner;
       if (quellSeite === undefined || quellSeite === pi) return;   // gegnerische Karte/Effekt
 
-      const karten = cuteHandCards(engine, pi);
+      const karten = cuteHandCards(engine, pi).filter(k => freieZonenDesHelden(engine, pi, heroIdx, seite, k.name).length > 0);   // W62a: Zone je Karte
       if (karten.length === 0) return;
-      const zonen = freieZonenDesHelden(engine, pi, heroIdx, seite);
-      if (zonen.length === 0) return;
       if (ps.summonLocked) return;                                 // normale Place-Regel
 
       const held = ziel;
@@ -100,6 +99,8 @@ module.exports = {
       if ((ps.hand || []).indexOf(cardName) < 0) return;
       await engine.showTriggeredEffect(CARD_NAME);   // Regel: aktivierter Effekt zeigt seine Karte
 
+      const zonen = freieZonenDesHelden(engine, pi, heroIdx, seite, cardName);   // W62a: Zone der gewaehlten Karte (frei oder geteilt)
+      if (zonen.length === 0) return;
       let dest = zonen[0];
       if (zonen.length > 1) {
         const zp = await ctx.promptZonePick(

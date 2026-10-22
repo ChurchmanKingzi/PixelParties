@@ -15809,7 +15809,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // einen besetzten Platz nicht durfte. Der Riegel ist jetzt an
     // beiden Stellen derselbe.
     const { canShareInto } = require('./_alice-shared');
-    const mayShare = (z) => canShareInto(this, playerIdx, heroIdx, z, cardName);
+    // ★ W62a: bei einer seitenfremden Beschwoerung (Styx: `opts.controller` ≠ Brettseite) teilt der KONTROLLEUR, die Zone liegt auf `playerIdx`.
+    const mayShare = (z) => canShareInto(this, opts.controller ?? playerIdx, heroIdx, z, cardName, playerIdx);
 
     // Auto-find first free slot when no specific slot requested
     // ★★ v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
@@ -29193,12 +29194,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // erlaubt (Charme sperrt „its Support Zones").
         const erlaubt = new Set(this.heroesControlledBy(playerIdx)
           .filter(e => e.physOwner === seite && kontrollRechteVon(e.hero).beschwoeren).map(e => e.heroIdx));
-        for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true, _nachKontrolle: true })) {
+        for (const z of this.getFreeSupportZones(seite, { ...opts, nachKontrolle: false, namedHeroesOnly: true, _nachKontrolle: true, sharer: opts.sharer ?? playerIdx })) {
           if (!erlaubt.has(z.heroIdx)) continue;
           out.push({ ...z, owner: seite });
         }
       }
-      return out;
+      // ★ W62a: freie Zonen vor geteilten (ueber alle Seiten hinweg), Reihenfolge sonst unveraendert.
+      return out.some(z => z.shared) ? [...out.filter(z => !z.shared), ...out.filter(z => z.shared)] : out;
     }
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -29218,7 +29220,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Kreaturen. Vorher endete die Schleife bei 3, wodurch Dark Gear,
       // Deepsea Bats, Drill Sergeant & Co. eine freie Inselzone nie als
       // Ziel bekamen.
-      const slotCount = Math.max(3, (ps.supportZones[hi] || []).length);
+      const slotCount = opts.nurBasis ? 3 : Math.max(3, (ps.supportZones[hi] || []).length);   // W62a: `nurBasis` — Basisplaetze 0-2 (Aufrufer, die Inselzonen bisher nie nahmen)
       for (let si = 0; si < slotCount; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) {
@@ -29236,13 +29238,83 @@ this._deathWatch = (this._deathWatchStack || []).length
     // GLEICHEN Namens liegt. Opt-in, damit Aufrufer, die wirklich
     // einen leeren Platz brauchen (Umzug, Ausruestung), unveraendert
     // bleiben. Ohne Alice liefert der Zusatz immer eine leere Liste.
+    //
+    // ★ W62a (Al: „Pintas Effekt erkennt Zonen mit bereits liegenden gleichnamigen Creatures nicht"): die geteilten Zonen
+    // laufen jetzt durch DIESELBEN Filter wie die freien (lebender/benannter Held, Zonenrecht, gesperrte Zonen) und die
+    // Frage „teilt der BESCHWOERER?" stellt `sharer` (Standard `playerIdx`; mit `nachKontrolle` der Kontrolleur, nicht die
+    // Brettseite) — vorher fragte der Aufruf fuer die Brettseite, also falsch fuer uebernommene Helden der Gegenspalte.
     if (opts.shareableFor) {
-      const { shareableSupportZones } = require('./_alice-shared');
-      for (const z of shareableSupportZones(this, playerIdx, opts.shareableFor, { livingHeroesOnly: livingOnly })) {
-        zones.push(z);
+      const { canShareInto } = require('./_alice-shared');
+      const sharer = opts.sharer ?? playerIdx;
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (livingOnly && (!hero?.name || hero.hp <= 0)) continue;
+        if (namedOnly && !hero?.name) continue;
+        if (!opts._nachKontrolle && !this.zonenRechtAmHeld(playerIdx, playerIdx, hi)) continue;
+        if (!opts.includeLocked && this.isSupportZoneLocked(playerIdx, hi, { source: opts.source, via: 'pick' })) continue;
+        // „… of a Hero YOU control": ein Held, den `sharer` nicht kontrolliert (Gegenspalte ohne Uebernahme, abgegebener Held), teilt nicht fuer ihn.
+        if ((hero?.name ? this.heroSideOf(playerIdx, hero) : playerIdx) !== sharer) continue;
+        for (let si = 0; si < 3; si++) {
+          if (!canShareInto(this, sharer, hi, si, opts.shareableFor, playerIdx)) continue;
+          const tiefe = ((ps.supportZones[hi] || [])[si] || []).length;
+          const heroLabel = hero?.name ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name) : `Column ${hi + 1}`;
+          zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1} (×${tiefe})`, isIsland: false, shared: true, stackDepth: tiefe });
+        }
       }
     }
     return zones;
+  }
+
+  /**
+   * ★ W62a — DIE EINE FRAGE: wohin darf `cardName` JETZT beschwoert bzw. platziert werden?
+   *
+   * Freie Support Zonen UND — wenn `playerIdx` „Alice, the Transfer Student" wirken hat (Alice-Teilung, auch bei gefallener
+   * oder negierter Alice) — Zonen, in denen schon nur GLEICHNAMIGE Kreaturen liegen („Creatures with identical names in the
+   * Support Zones of a Hero you control share 1 Support Zone"). Freie Zonen stehen vorn (ein leerer Platz bleibt die
+   * natuerlichere Wahl; dieselbe Reihenfolge wie `safePlaceInSupport`), die geteilten dahinter (`shared: true`, `stackDepth`).
+   * Das ist dieselbe Auslegung wie der Hand-Weg (`validateActionPlay`/`doPlayCreature` + `canShareInto`) — jeder Beschwoerer,
+   * der nach „freien Zonen" fragt, ruft diese Funktion (oder `eligibleSummonZones`, die darauf aufbaut) statt eine eigene
+   * Zonenschleife zu bauen.
+   *
+   * Nicht geprueft wird, ob ein HELD die Karte beschwoeren DARF (Level, Status, Aktionssperre: `canHeroSummon` /
+   * `eligibleSummonZones`) und nichts Kartenspezifisches (`canSummon`, Opferkosten: `isCreatureSummonable`).
+   *
+   * @param {number} playerIdx   Beschwoerer (Kontrolleur)
+   * @param {string} cardName    Name der Karte (Alice-Teilung gilt nur fuer IDENTISCHE Namen)
+   * @param {object} [opts]      wie `getFreeSupportZones`; zusaetzlich `heroIdx` (nur dieser Held der Brettseite `seite`, Standard
+   *                             `playerIdx`) und `nachKontrolle` (Standard `false`: nur die eigene Spalte)
+   */
+  beschwoerZonenFuer(playerIdx, cardName, opts = {}) {
+    const { heroIdx = null, seite = null, ...rest } = opts;
+    const feld = seite ?? playerIdx;
+    const alle = this.getFreeSupportZones(feld, { ...rest, shareableFor: cardName || undefined, sharer: playerIdx });
+    const nachHeld = heroIdx == null ? alle : alle.filter(z => z.heroIdx === heroIdx && (z.owner ?? feld) === feld);
+    return nachHeld.some(z => z.shared) ? [...nachHeld.filter(z => !z.shared), ...nachHeld.filter(z => z.shared)] : nachHeld;
+  }
+
+  /** `true`, wenn `beschwoerZonenFuer` mindestens eine Zone fuer `cardName` liefert. */
+  hatBeschwoerZone(playerIdx, cardName, opts = {}) {
+    return this.beschwoerZonenFuer(playerIdx, cardName, opts).length > 0;
+  }
+
+  /**
+   * ★ W62a — Gegenstueck zu `beschwoerZonenFuer` fuer Karten, die ihre Kreatur selbst ins Zonen-Array legen (statt ueber
+   * `actionPlaceCreature`/`summonCreature`): traegt `cardName` in den Platz ein — liegt dort schon eine GLEICHNAMIGE Kreatur und
+   * teilt `sharer` (Alice), wird DAZUGELEGT statt den Platz zu UEBERSCHREIBEN (dieselbe Entscheidung wie `actionPlaceCreature`).
+   * Ein leerer Platz bekommt wie bisher `[cardName]`. Der Aufrufer legt die Instanz wie gewohnt an (`_trackCard`).
+   * @returns {boolean} `true`, wenn gestapelt (der Platz war belegt)
+   */
+  zoneEintragen(feld, heroIdx, slotIdx, cardName, sharer = feld) {
+    const { canShareInto } = require('./_alice-shared');
+    const fps = this.gs.players[feld];
+    if (!fps.supportZones[heroIdx]) fps.supportZones[heroIdx] = [[], [], []];
+    const belegt = (fps.supportZones[heroIdx][slotIdx] || []).length > 0;
+    if (belegt && canShareInto(this, sharer, heroIdx, slotIdx, cardName, feld)) {
+      fps.supportZones[heroIdx][slotIdx].push(cardName);
+      return true;
+    }
+    fps.supportZones[heroIdx][slotIdx] = [cardName];
+    return false;
   }
 
   /** All own non-face-down creatures eligible as tributes right now. */
@@ -40495,6 +40567,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       let hasFreeSlot = false;
       for (let si = 0; si < 3; si++) {
         if (((ps.supportZones[heroIdx] || [])[si] || []).length === 0) { hasFreeSlot = true; break; }
+      }
+      // W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (`safePlaceInSupport` legt sie dort dazu).
+      if (!hasFreeSlot) {
+        const { canShareInto } = require('./_alice-shared');
+        for (let si = 0; si < 3; si++) {
+          if (canShareInto(this, playerIdx, heroIdx, si, cardName)) { hasFreeSlot = true; break; }
+        }
       }
       if (!hasFreeSlot) return false;
     }

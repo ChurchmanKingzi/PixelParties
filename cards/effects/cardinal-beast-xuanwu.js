@@ -34,13 +34,13 @@ module.exports = {
     // Must have 1+ lv3-or-lower Creature in discard (effective level
     // so Whoolmoth-style reducers / Phatnir's Cool-Stack rebate count;
     // `pileSide: 'discard'` picks up Lethe's per-pile +1 stamps too).
-    const hasEligible = (ps.discardPile || []).some(cn => {
+    const eligibleNames = [...new Set((ps.discardPile || []).filter(cn => {
       if (!engine.darfAusAblageAufsFeld(cn)) return false;   // v1389
       const cd = cardDB[cn];
       return cd && cd.cardType === 'Creature'
           && engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) <= 3;
-    });
-    if (!hasEligible) return false;
+    }))];
+    if (eligibleNames.length === 0) return false;
 
     // Must have 1+ free Support Zone
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -50,7 +50,8 @@ module.exports = {
         if (((ps.supportZones[hi] || [])[zi] || []).length === 0) return true;
       }
     }
-    return false;
+    // W62a: oder (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature fuer eine der Karten
+    return eligibleNames.some(cn => engine.beschwoerZonenFuer(pi, cn, { livingHeroesOnly: true }).some(z => z.shared));
   },
 
   async onCreatureEffect(ctx) {
@@ -108,6 +109,10 @@ module.exports = {
         }
       }
     }
+    // W62a: + Zonen gleichnamiger Creatures (Alice-Teilung), hinter den freien
+    for (const z of engine.beschwoerZonenFuer(pi, chosenName, { livingHeroesOnly: true })) {
+      if (z.shared && engine.isCreatureSummonable(chosenName, pi, z.heroIdx, { _bypassBeforeSummon: true })) freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label });
+    }
     if (freeZones.length === 0) return false;
 
     let destHeroIdx, destSlot;
@@ -132,8 +137,7 @@ module.exports = {
     // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
     const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: 'Cardinal Beast Xuanwu' });
     if (!ab) return false;
-    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
-    ps.supportZones[destHeroIdx][destSlot] = [chosenName];
+    engine.zoneEintragen(pi, destHeroIdx, destSlot, chosenName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
     const inst = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
     inst.turnPlayed = gs.turn; // Summoning sickness
     // Set HP to 1

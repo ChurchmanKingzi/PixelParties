@@ -35,7 +35,9 @@ module.exports = {
     const hasGBInHand = (ps.hand || []).some(isGuardianBeastCreature);
     if (!hasGBInHand) return false;
     // Kontrolle statt Seite (Styx 28.9.) — „any Hero you control".
-    return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true }).length > 0;
+    // W62a: mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Bestie (`beschwoerZonenFuer`, je Karte).
+    return [...new Set(ps.hand.filter(isGuardianBeastCreature))]
+      .some(n => engine.hatBeschwoerZone(pi, n, { nachKontrolle: true, livingHeroesOnly: true }));
   },
 
   hooks: {
@@ -72,7 +74,7 @@ module.exports = {
       // Step 2: pick a free zone on one of the caster's alive heroes.
       // Kontrolle statt Seite (Styx 28.9.) — alle Helden, die der
       // Wirker kontrolliert; jede Zone traegt `owner` (physische Seite).
-      const zones = engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
+      const zones = engine.beschwoerZonenFuer(pi, beastName, { nachKontrolle: true, livingHeroesOnly: true });   // W62a: + geteilte Zonen (Alice)
       if (zones.length === 0) return;
       const promptCtx = engine._createContext(ctx.card, {});
       const slotPick = await promptCtx.promptZonePick(zones, {

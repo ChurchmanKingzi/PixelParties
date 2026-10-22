@@ -110,7 +110,7 @@ function damusPlatzierungOffen(engine, pi) {
     if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
     if (engine._isHeroEffectSilenced(pi, hi)) continue;
     if (gs.hoptUsed?.[engine.heroHoptKey(DAMUS, pi)] === gs.turn) continue;
-    if (engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true }).length > 0) return true;
+    if (engine.hatBeschwoerZone(pi, IFRIT, { nachKontrolle: true, livingHeroesOnly: true })) return true;   // W62a: auch die Zone einer gleichnamigen Ifrit (Alice)
   }
   return false;
 }

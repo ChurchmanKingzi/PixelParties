@@ -80,7 +80,15 @@ module.exports = {
       h?.name && h.hp > 0 &&
       (ps.supportZones?.[hi] || []).some(slot => (slot || []).length === 0),
     );
-    return hasFreeZone;
+    if (hasFreeZone) return true;
+    // W62a: oder (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature fuer eine Karte aus Hand/Deck (grobe Vorpruefung; die Wahl prueft `resolve`)
+    if (!engine || !engine.heroesControlledBy) return false;
+    const { canShareInto } = require('./_alice-shared');
+    const namen = new Set([...(ps.hand || []), ...(ps.mainDeck || [])]);
+    return engine.heroesControlledBy(pi).some(({ physOwner, heroIdx: hi, hero: h }) => h?.name && [0, 1, 2].some(z => {
+      const nm = ((gs.players[physOwner]?.supportZones?.[hi] || [])[z] || [])[0];
+      return !!nm && namen.has(nm) && canShareInto(engine, pi, hi, z, nm, physOwner);
+    }));
   },
 
   async resolve(engine, pi) {
@@ -150,6 +158,12 @@ module.exports = {
         }
       }
     }
+    // ★ W62a: + (Alice-Teilung) die Zone einer GLEICHNAMIGEN Creature, freie Zonen zuerst (`beschwoerZonenFuer`).
+    for (const z of engine.beschwoerZonenFuer(pi, chosenName, { nachKontrolle: true })) {
+      if (!z.shared) continue;
+      if (!engine.isCreatureSummonable(chosenName, z.owner, z.heroIdx, { _bypassBeforeSummon: true })) continue;
+      freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, shared: true, label: z.label });
+    }
     if (freeZones.length === 0) return { aborted: true };
 
     let destHeroIdx, destSlot, destSeite = pi;
@@ -192,8 +206,7 @@ module.exports = {
 
     // Place in support zone
     const dps = gs.players[destSeite];   // W22a: Brettseite der Zone (uebernommener Held der Gegenspalte)
-    if (!dps.supportZones[destHeroIdx]) dps.supportZones[destHeroIdx] = [[], [], []];
-    dps.supportZones[destHeroIdx][destSlot] = [chosenName];
+    engine.zoneEintragen(destSeite, destHeroIdx, destSlot, chosenName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
     const inst     = engine._trackCard(chosenName, destSeite, 'support', destHeroIdx, destSlot);
     if (destSeite !== pi) engine.markiereSeitenfremd(inst, pi);

@@ -70,8 +70,12 @@ module.exports = {
 
       // Any free support zone on any hero we control (living OR dead).
       // Kontrolle statt Seite (Styx 28.9.) — Zonen tragen `owner`.
-      const freeZones = engine.getFreeSupportZones(pi, { nachKontrolle: true });
-      if (freeZones.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
+      // W62a: je Karte — mit Alice-Teilung zaehlt auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`).
+      const zonenOpts = { nachKontrolle: true };
+      for (let i = eligible.length - 1; i >= 0; i--) {
+        if (!engine.hatBeschwoerZone(pi, eligible[i].name, zonenOpts)) eligible.splice(i, 1);
+      }
+      if (eligible.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
       if (!(await promptOptionalOnSummon(ctx, CARD_NAME,
         'Revive a Lv1-or-lower Deepsea Creature from your discard pile (its effects will be negated)?'
@@ -84,6 +88,8 @@ module.exports = {
       });
       if (!picked?.cardName) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });   // W11/R4: wirkt nicht → Blob stumm
 
+      const freeZones = engine.beschwoerZonenFuer(pi, picked.cardName, zonenOpts);
+      if (freeZones.length === 0) return ctx._engine.summonEffektFizzelt(ctx.card, ctx.cardName, { stumm: true });
       const zone = await ctx.promptZonePick(freeZones, {
         title: CARD_NAME,
         description: `Place ${picked.cardName} into which free Support Zone?`,

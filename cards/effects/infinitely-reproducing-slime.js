@@ -82,10 +82,9 @@ const CARD_NAME = 'Infinitely Reproducing Slime';
 function placementZones(engine, pi) {
   // Kontrolle statt Seite (Styx 28.9.): „any Hero you control" — auch
   // uebernommene Helden der Gegenspalte; jede Zone traegt `owner`.
-  return engine.getFreeSupportZones(pi, {
-    shareableFor: CARD_NAME,
-    nachKontrolle: true,
-  });
+  // ★ W62a: die EINE Zonenfrage der Engine (`beschwoerZonenFuer`): freie Zonen, dahinter — mit Alice-Teilung — die Zonen gleichnamiger Slimes;
+  // geteilt wird jetzt auch ueber uebernommene Helden hinweg nach KONTROLLE (vorher fragte der Zusatz fuer die Brettseite).
+  return engine.beschwoerZonenFuer(pi, CARD_NAME, { nachKontrolle: true });
 }
 
 module.exports = {

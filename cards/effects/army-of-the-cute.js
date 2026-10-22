@@ -65,6 +65,19 @@ function freeSlots(ps, heroIdx) {
   return out;
 }
 
+/**
+ * ★ W62a: Plaetze fuer `name` am Held — freie Basisplaetze zuerst, dahinter (Alice-Teilung des Kontrolleurs `pi`) die Plaetze,
+ * auf denen schon nur GLEICHNAMIGE Kreaturen liegen (`canShareInto`). Eine Kopie, die kurz vorher in diesem Zauber gelegt wurde, zaehlt mit.
+ */
+function slotsFor(engine, ps, pi, hs, heroIdx, name) {
+  const out = freeSlots(ps, heroIdx);
+  const { canShareInto } = require('./_alice-shared');
+  for (let s = 0; s < 3; s++) {
+    if (!out.includes(s) && canShareInto(engine, pi, heroIdx, s, name, hs)) out.push(s);
+  }
+  return out;
+}
+
 /** Every Cute-Creature copy in hand then discard → gallery entries.
  *  Budget cost uses `engine.effectiveCardLevel` so reducer hooks
  *  (Whoolmoth-style, etc.) and Lethe per-pile stamps both bite the
@@ -133,7 +146,11 @@ module.exports = {
       }
 
       const free = freeSlots(hps, heroIdx);
-      if (free.length === 0) {
+      // W62a: mit Alice-Teilung des Wirkers zaehlen auch Zonen gleichnamiger Kreaturen — dann begrenzt nicht die Zahl freier Zonen
+      // (gleichnamige Kopien stapeln sich); platziert wird je Wahl in die erste freie oder geteilte Zone, Ueberzaehliges bleibt auf der Hand.
+      const { sharingActive } = require('./_alice-shared');
+      const teilt = sharingActive(gs, pi);
+      if (free.length === 0 && !(teilt && cuteGallery(engine, pi, heroIdx, hs).some(e => slotsFor(engine, hps, pi, hs, heroIdx, e.name).length > 0))) {
         gs._spellCancelled = true;
         engine.log('army_of_the_cute_fizzle', { player: ps.username, reason: 'no_free_zones' });
         return;
@@ -154,7 +171,7 @@ module.exports = {
       const result = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
         cards: gallery,                 // [{ name, level }] — level = budget cost
-        selectCount: Math.min(3, free.length), // can't place more than fits
+        selectCount: teilt ? 3 : Math.min(3, free.length), // can't place more than fits (W62a: mit Alice-Teilung stapeln gleichnamige Kopien)
         minSelect: 1,
         maxBudget: cap,
         costKey: 'level',
@@ -189,7 +206,7 @@ module.exports = {
       const totalLvl = selectedIndices
         ? selectedIndices.reduce((s, i) => s + (gallery[i]?.level || 0), 0)
         : chosen.reduce((s, n) => s + (engine.effectiveCardLevel(cardDB[n], pi) || 0), 0);
-      if (chosen.length === 0 || totalLvl > cap || chosen.length > free.length) {
+      if (chosen.length === 0 || totalLvl > cap || (!teilt && chosen.length > free.length)) {
         engine.log('army_of_the_cute_invalid_pick', {
           player: ps.username, sent: result.selectedCards, accepted: chosen,
           totalLvl, cap, freeZones: free.length,
@@ -222,8 +239,8 @@ module.exports = {
       const gewollteQuellen = _paare.map(p => p.q);
       for (let ci = 0; ci < chosen.length; ci++) {
         const name = chosen[ci];
-        const slots = freeSlots(hps, heroIdx);
-        if (slots.length === 0) break; // ran out of zones (defensive)
+        const slots = slotsFor(engine, hps, pi, hs, heroIdx, name);   // W62a: frei oder geteilt (Alice)
+        if (slots.length === 0) continue; // keine Zone fuer diese Karte (defensive) — sie bleibt auf Hand/Ablage
         const slot = slots[0];
         // W5b-B3: zwei Kopien derselben „only control 1"-Kreatur in einer Wahl – die zweite wird nicht platziert
         // (bleibt in Hand/Ablage; der Riegel steht VOR der Entnahme).
@@ -244,7 +261,7 @@ module.exports = {
 
         if (!hps.supportZones[heroIdx]) hps.supportZones[heroIdx] = [[], [], []];
         if (!hps.supportZones[heroIdx][slot]) hps.supportZones[heroIdx][slot] = [];
-        hps.supportZones[heroIdx][slot].push(name);
+        engine.zoneEintragen(hs, heroIdx, slot, name, pi);   // W62a: leere Zone → [name]; gleichnamige (Alice) → dazustapeln
 
         const inst = engine._trackCard(name, hs, 'support', heroIdx, slot);
         if (hs !== pi) engine.markiereSeitenfremd(inst, pi);

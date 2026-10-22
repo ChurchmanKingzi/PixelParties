@@ -391,8 +391,11 @@ async function reviveCreature(engine, pi, chosen) {
   const canPlaceOn = (hi) =>
     engine.isCreatureSummonable(chosen.name, pi, hi, { _bypassBeforeSummon: true });
 
+  // ★ W62a: mit Alice-Teilung gilt auch die Zone einer GLEICHNAMIGEN Creature als Landeplatz (frei zuerst, dann geteilt) — `engine.zoneEintragen` legt dazu.
+  const { canShareInto } = require('./_alice-shared');
+  const teilbar = (hi, z) => z < 3 && canShareInto(engine, pi, hi, z, chosen.name);
   const origSlot = (ps.supportZones[chosen.heroIdx] || [])[chosen.zoneSlot] || [];
-  if (origSlot.length === 0 && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
+  if ((origSlot.length === 0 || teilbar(chosen.heroIdx, chosen.zoneSlot)) && ps.heroes[chosen.heroIdx]?.hp > 0 && canPlaceOn(chosen.heroIdx)) {
     targetHi = chosen.heroIdx;
     targetSi = chosen.zoneSlot;
   }
@@ -401,6 +404,9 @@ async function reviveCreature(engine, pi, chosen) {
     const supZones = ps.supportZones[chosen.heroIdx] || [];
     for (let z = 0; z < supZones.length; z++) {
       if ((supZones[z] || []).length === 0) { targetHi = chosen.heroIdx; targetSi = z; break; }
+    }
+    if (targetHi < 0) for (let z = 0; z < supZones.length; z++) {
+      if (teilbar(chosen.heroIdx, z)) { targetHi = chosen.heroIdx; targetSi = z; break; }
     }
   }
 
@@ -412,6 +418,9 @@ async function reviveCreature(engine, pi, chosen) {
       const supZones = ps.supportZones[hi] || [];
       for (let z = 0; z < supZones.length; z++) {
         if ((supZones[z] || []).length === 0) { targetHi = hi; targetSi = z; break; }
+      }
+      if (targetHi < 0) for (let z = 0; z < supZones.length; z++) {
+        if (teilbar(hi, z)) { targetHi = hi; targetSi = z; break; }
       }
       if (targetHi >= 0) break;
     }
@@ -436,8 +445,7 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  if (!ps.supportZones[targetHi]) ps.supportZones[targetHi] = [[], [], []];
-  ps.supportZones[targetHi][targetSi] = [chosen.name];
+  engine.zoneEintragen(pi, targetHi, targetSi, chosen.name, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
   // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
   // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.

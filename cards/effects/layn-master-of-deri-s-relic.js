@@ -85,11 +85,12 @@ function hasEligibleCreature(ps, cardDB) {
  * reinforce zones on a fallen Hero's column. Only empty hero slots
  * (no `h.name`) are excluded; those columns don't exist.
  */
-function collectFreeZones(engine, pi) {
+function collectFreeZones(engine, pi, cardName) {
   // W16f (H02-25): „Heroes you control" = nach KONTROLLE (Styx 28.9.), nicht nach Spalte: ein an den Gegner abgegebener eigener Held
   // zählt nicht, ein übernommener Gegnerheld (Paraseed …, `kontrollRechte.beschwoeren`) schon. Zonen tragen `owner` = Brettseite.
+  // W62a: mit `cardName` (Alice-Teilung) zählt auch die Zone einer GLEICHNAMIGEN Creature (`beschwoerZonenFuer`).
   const out = [];
-  for (const z of engine.getFreeSupportZones(pi, { nachKontrolle: true })) {
+  for (const z of engine.beschwoerZonenFuer(pi, cardName, { nachKontrolle: true })) {
     if (z.slotIdx >= 3) continue;                       // Insel-Zonen wie bisher nicht
     const h = engine.gs.players[z.owner]?.heroes?.[z.heroIdx];
     if (!h?.name) continue;
@@ -99,7 +100,7 @@ function collectFreeZones(engine, pi) {
       ownerIdx: z.owner,
       heroIdx: z.heroIdx,
       slotIdx: z.slotIdx,
-      label: `${h.name}${koTag} — Slot ${z.slotIdx + 1}`,
+      label: `${h.name}${koTag} — Slot ${z.slotIdx + 1}${z.shared ? ` (×${z.stackDepth})` : ''}`,
     });
   }
   return out;
@@ -121,8 +122,11 @@ module.exports = {
     if (!ps) return false;
     const cardDB = engine._getCardDB();
     if (!hasEligibleCreature(ps, cardDB)) return false;
-    if (collectFreeZones(engine, pi).length === 0) return false;
-    return true;
+    // W62a: je Karte — die Zone einer gleichnamigen Creature zaehlt mit Alice-Teilung mit.
+    return [...new Set(ps.discardPile)].some(cn => {
+      const cd = cardDB[cn];
+      return cd && isSummonablePileCreature(cd) && (cd.level ?? 0) === TARGET_LEVEL && collectFreeZones(engine, pi, cn).length > 0;
+    });
   },
 
   async onHeroEffect(ctx) {
@@ -175,7 +179,7 @@ module.exports = {
     // ── Step 2: loop placements one zone at a time, up to `cap` ─────────────
     let placedCount = 0;
     while (placedCount < cap) {
-      const freeZones = collectFreeZones(engine, pi);
+      const freeZones = collectFreeZones(engine, pi, chosenName);
       if (freeZones.length === 0) break;
 
       const zonePick = await ctx.promptZonePick(freeZones, {
@@ -202,14 +206,12 @@ module.exports = {
         || freeZones.find(z => z.heroIdx === destHeroIdx && z.slotIdx === destSlot);
       if (!zonenZiel) break;
       const seite = zonenZiel.owner;
-      const fps = gs.players[seite];
 
       // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
       const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: CARD_NAME });
       if (!ab) break;
 
-      if (!fps.supportZones[destHeroIdx]) fps.supportZones[destHeroIdx] = [[], [], []];
-      fps.supportZones[destHeroIdx][destSlot] = [chosenName];
+      engine.zoneEintragen(seite, destHeroIdx, destSlot, chosenName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
       const inst = engine._trackCard(chosenName, seite, 'support', destHeroIdx, destSlot);
       if (seite !== pi) engine.markiereSeitenfremd(inst, pi);   // W16f: Kreatur in der Zone eines übernommenen Helden gehört dem Kontrolleur

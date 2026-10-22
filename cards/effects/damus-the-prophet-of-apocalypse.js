@@ -44,7 +44,8 @@ function freieZonen(engine, pi) {
   // Kontrolle statt Seite (Styx 28.9.) — „any Hero you control": auch
   // uebernommene Helden der Gegenspalte (Zone traegt `owner`), ein
   // abgegebener eigener Held dagegen nicht.
-  return engine.getFreeSupportZones(pi, { nachKontrolle: true, livingHeroesOnly: true });
+  // W62a: + Zone einer GLEICHNAMIGEN Ifrit (Alice-Teilung) — `beschwoerZonenFuer`.
+  return engine.beschwoerZonenFuer(pi, IFRIT, { nachKontrolle: true, livingHeroesOnly: true });
 }
 
 module.exports = {
@@ -159,7 +160,9 @@ module.exports = {
     // Nach der Abfrage neu pruefen.
     const idxJetzt = (ps.hand || []).indexOf(IFRIT);
     if (idxJetzt < 0) return false;
-    if (((engine.gs.players[feld]?.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0) return false;
+    // W62a: eine geteilte Zone (Alice) ist belegt — sie gilt, solange dort weiter nur Ifrits liegen.
+    if (((engine.gs.players[feld]?.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0
+        && !require('./_alice-shared').canShareInto(engine, pi, ziel.heroIdx, ziel.slotIdx, IFRIT, feld)) return false;
 
     engine.takeFromPileSync(ps, 'hand', idxJetzt);
     const res = await engine.summonCreatureWithHooks(

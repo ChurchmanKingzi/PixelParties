@@ -52,6 +52,18 @@ function getFreeZones(ps, heroIdx, owner) {
 }
 
 /**
+ * ★ W62a: freie Zonen des Helden PLUS — mit Alice-Teilung des Kontrolleurs `pi` — die Zonen, in denen schon nur GLEICHNAMIGE
+ * Kreaturen liegen (`engine.beschwoerZonenFuer`, Kontrolle statt Seite). Freie zuerst.
+ */
+function getZonesFor(engine, pi, ps, heroIdx, owner, cardName) {
+  const frei = getFreeZones(ps, heroIdx, owner);
+  if (!cardName || !ps.heroes?.[heroIdx]?.name || ps.heroes[heroIdx].hp <= 0) return frei;
+  const geteilt = engine.beschwoerZonenFuer(pi, cardName, { seite: owner, heroIdx, livingHeroesOnly: true })
+    .filter(z => z.shared).map(z => ({ owner, heroIdx, slotIdx: z.slotIdx, shared: true, label: z.label }));
+  return [...frei, ...geteilt];
+}
+
+/**
  * Get eligible creatures from discard pile for necromancy.
  * Must be a Creature with level ≤ necromancyLevel that
  * the hero can summon (spell school check).
@@ -223,11 +235,11 @@ module.exports = {
       const hostName = hps.heroes?.[heroIdx]?.name;
       if (hostName && lock.heroName && hostName !== lock.heroName) return false;
     }
-    if (getFreeZones(hps, heroIdx, feld).length === 0) return false;
     // Z6 (H02-21): die Beschwoerung ist eine Zusatz-AKTION - Aktionssperren des Helden (Lethe `_actionLockedTurn`, Skill-/Aktionslimit,
     // Kent/Chalice) gelten (Ruling 28.8., `_summon-eligibility.heroActionLocked`).
     if (heroActionLocked(engine, pi, heroIdx, feld)) return false;
-    return getEligibleCreatures(engine, pi, heroIdx, level, feld).length > 0;
+    // W62a: Zone frei ODER (Alice-Teilung) die Zone einer gleichnamigen Creature, je Kandidat
+    return getEligibleCreatures(engine, pi, heroIdx, level, feld).some(c => getZonesFor(engine, pi, hps, heroIdx, feld, c.name).length > 0);
   },
 
   /**
@@ -249,12 +261,12 @@ module.exports = {
     const eligible = getEligibleCreatures(engine, pi, heroIdx, level, feld);
     if (eligible.length === 0) return false;
 
-    // Check free zones
-    const freeZones = getFreeZones(hps, heroIdx, feld);
-    if (freeZones.length === 0) return false;
+    // Check free zones (W62a: je Karte, frei oder geteilt)
+    const eligibleMitZone = eligible.filter(c => getZonesFor(engine, pi, hps, heroIdx, feld, c.name).length > 0);
+    if (eligibleMitZone.length === 0) return false;
 
     // Step 1: Gallery picker — choose a creature from discard
-    const selected = await ctx.promptCardGallery(eligible, {
+    const selected = await ctx.promptCardGallery(eligibleMitZone, {
       title: 'Necromancy',
       description: `Choose a Lv ${level} or lower Creature from your discard pile to summon.`,
       cancellable: true,
@@ -265,7 +277,7 @@ module.exports = {
 
     // Step 2: Zone picker — choose a free support zone (auto-pick if only one)
     let chosenZone;
-    const currentFreeZones = getFreeZones(hps, heroIdx, feld);
+    const currentFreeZones = getZonesFor(engine, pi, hps, heroIdx, feld, creatureName);   // W62a: + geteilte Zone (Alice)
     if (currentFreeZones.length === 0) return false;
     if (currentFreeZones.length === 1) {
       chosenZone = currentFreeZones[0];
@@ -302,8 +314,7 @@ module.exports = {
     // Place into support zone
     const hi = chosenZone.heroIdx;
     const si = chosenZone.slotIdx;
-    if (!hps.supportZones[hi]) hps.supportZones[hi] = [[], [], []];
-    hps.supportZones[hi][si] = [creatureName];
+    engine.zoneEintragen(feld, hi, si, creatureName, pi);   // W62a: gleichnamige Kreatur (Alice) → dazustapeln statt ueberschreiben
 
     // Track card instance — Landung meldet Lethe, Heimkehr, SC, Signal.
     const inst = engine._trackCard(creatureName, feld, 'support', hi, si);

@@ -67,6 +67,23 @@ function _userHasFreeSupportSlot(ps, heroIdx) {
   return sup.some(slot => (slot || []).length === 0);
 }
 
+/**
+ * ★ W62a: Platz des Nutzers fuer `name` — erste FREIE Zone, sonst (Alice-Teilung des Kontrolleurs `pi`) die Zone einer GLEICHNAMIGEN
+ * Creature; -1 = keiner. Ohne `name` nur die freie Zone (Vorpruefung ohne Kartenwahl: `_userHasFreeSupportSlot` oder irgendein Kandidat teilt).
+ */
+function _userSlotFor(engine, ps, pi, hs, heroIdx, name) {
+  const sup = ps?.supportZones?.[heroIdx] || [];
+  const frei = sup.findIndex(sl => (sl || []).length === 0);
+  if (frei >= 0) return frei;
+  if (!name) return -1;
+  const { canShareInto } = require('./_alice-shared');
+  for (let s = 0; s < 3; s++) if (canShareInto(engine, pi, heroIdx, s, name, hs)) return s;
+  return -1;
+}
+function _userHasSlotFor(engine, ps, pi, hs, heroIdx, namen) {
+  return _userHasFreeSupportSlot(ps, heroIdx) || namen.some(n => _userSlotFor(engine, ps, pi, hs, heroIdx, n) >= 0);
+}
+
 module.exports = {
   // Effective max-revivable-level scales with the caster's Fighting
   // count — flag for the CPU's ability-stacking scoring so a deck with
@@ -84,9 +101,10 @@ module.exports = {
     for (const { physOwner, heroIdx: hi, hero: h } of engine.heroesControlledBy(pi)) {
       if (!h?.name || h.hp <= 0) continue;
       const hps = gs.players[physOwner] || ps;
-      if (!_userHasFreeSupportSlot(hps, hi)) continue;
       const lvl = _fightingLevel(engine, hps, hi);
-      if (_eligibleCreatureNames(engine, ps, lvl, pi).length > 0) return true;
+      const namen = _eligibleCreatureNames(engine, ps, lvl, pi).map(c => c.name);
+      if (!_userHasSlotFor(engine, hps, pi, physOwner, hi, namen)) continue;   // W62a: frei oder geteilt (Alice)
+      if (namen.length > 0) return true;
     }
     return false;
   },
@@ -98,9 +116,9 @@ module.exports = {
     if (!ps) return false;
     // Z1 (M01-26): Zonen und Fighting-Stufe des NUTZERS = Brettseite (geliehener Held); Ablage bleibt beim Kontrolleur.
     const hps = gs.players[engine.heldSeiteFuer(pi, heroIdx)] || ps;
-    if (!_userHasFreeSupportSlot(hps, heroIdx)) return false;
     const lvl = _fightingLevel(engine, hps, heroIdx);
-    return _eligibleCreatureNames(engine, ps, lvl, pi).length > 0;
+    const namen = _eligibleCreatureNames(engine, ps, lvl, pi).map(c => c.name);
+    return namen.length > 0 && _userHasSlotFor(engine, hps, pi, engine.heldSeiteFuer(pi, heroIdx), heroIdx, namen);   // W62a: frei oder geteilt (Alice)
   },
 
   hooks: {
@@ -119,9 +137,8 @@ module.exports = {
       }
 
       const lvl = _fightingLevel(engine, hps, heroIdx);   // Als Befund 29.9.: Brettseite des Nutzers
-      const gallery = _eligibleCreatureNames(engine, ps, lvl, pi);
-      if (gallery.length === 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
+      const gallery = _eligibleCreatureNames(engine, ps, lvl, pi).filter(g => _userSlotFor(engine, hps, pi, hs, heroIdx, g.name) >= 0);   // W62a: nur Karten mit Platz (frei oder geteilt)
+      if (gallery.length === 0) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers; W62a: + geteilte Zone (Alice)
 
       // ── Pick a creature from the discard gallery ─────────────────
       const picked = await engine.promptGeneric(pi, {
@@ -148,7 +165,7 @@ module.exports = {
       }
       const dpIdx = (ps.discardPile || []).indexOf(chosenName);
       if (dpIdx < 0) { gs._spellCancelled = true; return; }
-      if (!_userHasFreeSupportSlot(hps, heroIdx)) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers
+      if (_userSlotFor(engine, hps, pi, hs, heroIdx, chosenName) < 0) { gs._spellCancelled = true; return; }   // Als Befund 29.9.: Brettseite des Nutzers; W62a: frei oder geteilt (Alice)
 
       // ── Pop from discard and summon onto the user hero ───────────
       // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
@@ -159,7 +176,7 @@ module.exports = {
       // ist der Schaden am Helden. Dafuer muss der Zielplatz VOR dem
       // Anlauf feststehen; die Kreatur fliegt nicht aus der Ablage heran,
       // sie ERSCHEINT mit dem Aufprall.
-      const freiSlot = (hps.supportZones?.[heroIdx] || []).findIndex(sl => (sl || []).length === 0);   // Als Befund 29.9.: Brettseite des Nutzers
+      const freiSlot = _userSlotFor(engine, hps, pi, hs, heroIdx, chosenName);   // Als Befund 29.9.: Brettseite des Nutzers; W62a: erste freie, sonst geteilte Zone (Alice)
       if (freiSlot < 0) { gs._spellCancelled = true; return; }
       engine._broadcastEvent('play_ram_animation', {
         sourceOwner: hs, sourceHeroIdx: heroIdx,   // Als Befund 29.9.: Brettseite des Nutzers
