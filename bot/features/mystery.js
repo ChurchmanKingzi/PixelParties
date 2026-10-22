@@ -78,7 +78,7 @@ module.exports = function register(ctx) {
   async function puzzleMessage(puzzle, { intro } = {}) {
     const rect = await rectFor(puzzle);
     const png = await ctx.renderQueue(() => renderer.renderArtCrop(puzzle.card, rect));
-    const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join(', ')}` : '';
+    const tried = puzzle.tried.length ? `\nAlready guessed: ${puzzle.tried.slice(-12).map(n => `*${n}*`).join('; ')}` : '';
     return {
       content: `${intro ? intro + '\n\n' : ''}🕵️ **Mystery card** — which card is this?\n` +
         `Guess with \`${config.prefix}guess <card name>\`. ${rewardText(puzzle)}\n` +
