@@ -57,6 +57,18 @@
 //  `ps._teleportedAway` zaehlt entrueckte Helden. Solange der Zaehler
 //  steht, verliert die Seite nicht, auch wenn alle uebrigen Helden
 //  besiegt sind (Engine, `checkGameOver`).
+//
+//  ── ★ W53a (Al, 22.10.2026): „KEINERLEI Hooks … nach dem Auftauchen EXAKT wie vorher" ──
+//  Verschwinden und Wiederauftauchen feuern KEINEN Hook (weder `onCardLeaveZone`/`onCardEnterZone` noch `onEquipLost`/`onEquipGained` noch sonst einen
+//  Leave-/Enter-Hook; einzig die Resistance-Pruefung `beforeHeroEffect` laeuft beim Verschwinden, W13). Dazu wird nichts neu erzeugt, sondern der ZUSTAND
+//  mitgenommen und unveraendert zurueckgestellt:
+//    · der Held ist dasselbe Objekt (kein Klon; HP, Buffs, Status, Aufstiegs-/Gewinn-Marken bleiben, wie sie waren),
+//    · jede mitgehende Karteninstanz (Held, Abilities, Surprises, Ausruestung/Anhaengsel samt unsichtbarer Traeger gewonnener Effekte) kommt mit DERSELBEN
+//      Instanz-Id, denselben Zaehlern/Stempeln (`atkGranted`, `_taioAtkTotal`, `_taioAtkGrantedBy`, HOPT-Schluessel `equip-effect:<id>` …), derselben
+//      Spielzug-Marke (`turnPlayed`) und an derselben Stelle der Instanzliste zurueck (vorher: neue Ids, Zaehler weg — eine Ability wie Fighting verlor
+//      dabei ihre Buchung und der Bonus blieb nach dem Ablegen stehen),
+//    · der Zaehler `_teleportedAway` verschwindet wieder, wenn er 0 erreicht.
+//  Einzige Ausnahme vom Platz: ist die Zone inzwischen fremdbesetzt, weicht die Karte aus (siehe oben).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -90,9 +102,44 @@ function istCreature(engine, inst) {
   return !!cd && hasCardType(cd, 'Creature');
 }
 
-/** Tiefe Kopie eines Heldenobjekts — ohne Verweise auf lebende Objekte. */
-function heldKopieren(hero) {
-  return JSON.parse(JSON.stringify(hero));
+/**
+ * W53a: merkt sich ALLE Karteninstanzen, die mit dem Helden gehen — mit vollem Zustand (Id, Zaehler, Stempel, Status, Spielzug-Marke, Kontrolle …) und ihrem
+ * Platz in der Instanzliste. Das sind der Held selbst, seine Abilities und Surprises, die mitgehenden Support-Karten (Ausruestung/Anhaengsel, nicht Creatures)
+ * und die unsichtbaren Traeger gewonnener Heldeneffekte (`_gainedEffectOnly`). `daten` ist eine flache Kopie ohne die Skript-Zwischenablage; eine am Objekt
+ * gesetzte `isActiveIn`-Ueberschreibung (Initiation Ritual, Traeger gewonnener Effekte: immer `() => true`) wird als Flag gemerkt.
+ */
+function instanzenMerken(engine, oi, hi, auftrag) {
+  const slots = new Set(auftrag.support.map(e => e.slot));
+  const out = [];
+  engine.cardInstances.forEach((c, index) => {
+    let geht = false;
+    if (c.zone === 'hero' || c.zone === 'ability' || c.zone === 'surprise') {
+      geht = c.owner === oi && c.heroIdx === hi;
+    } else if (c.zone === 'support' && c.heroIdx === hi) {
+      if (c.zoneSlot === -1) geht = c.owner === oi && !!c.counters?._gainedEffectOnly;                       // unsichtbarer Traeger eines gewonnenen Heldeneffekts
+      else geht = slots.has(c.zoneSlot) && (engine.physicalSide(c) === oi || c.owner === oi || (c.controller ?? c.owner) === oi);
+    }
+    if (!geht) return;
+    const daten = {};
+    for (const k of Object.keys(c)) if (k !== 'script' && k !== 'isActiveIn') daten[k] = c[k];
+    out.push({ daten, index, aktivUeberschrieben: Object.prototype.hasOwnProperty.call(c, 'isActiveIn') });
+  });
+  return out;
+}
+
+/** W53a: eine gemerkte Instanz mit EXAKT ihrem alten Zustand wieder einsetzen (kein Hook). `zoneSlot` darf abweichen (Ausweichplatz). */
+function instanzEinsetzen(engine, eintrag, zoneSlot) {
+  const d = eintrag.daten;
+  const inst = engine._trackCard(d.name, d.owner, d.zone, d.heroIdx, zoneSlot ?? d.zoneSlot);
+  for (const k of Object.keys(d)) inst[k] = d[k];
+  if (zoneSlot != null) inst.zoneSlot = zoneSlot;
+  inst.script = null;                                                    // wird beim naechsten Zugriff neu geladen
+  if (eintrag.aktivUeberschrieben) inst.isActiveIn = () => true;
+  // an die alte Stelle der Instanzliste (Hook-Reihenfolge wie vorher)
+  const liste = engine.cardInstances;
+  liste.pop();
+  liste.splice(Math.min(eintrag.index, liste.length), 0, inst);
+  return inst;
 }
 
 module.exports = {
@@ -163,7 +210,7 @@ module.exports = {
       heroIdx: hi,
       rueckkehrBei: pi,                 // zu Beginn von DESSEN naechstem Zug
       gesetztInZug: gs.turn,
-      hero: heldKopieren(hero),
+      hero: hero,                       // W53a: dasselbe Objekt (kein Klon) — der Zustand kommt EXAKT zurueck
       abilities: (ops.abilityZones?.[hi] || []).map(slot => (slot || []).slice()),
       surprises: (ops.surpriseZones?.[hi] || []).slice(),
       support: [],                      // { slot, name, counters, faceDown }
@@ -187,6 +234,9 @@ module.exports = {
       });
     }
 
+    // W53a: die Instanzen, die mitgehen, MIT Zustand merken (Id, Zaehler, Stempel, Spielzug-Marke, Platz in der Instanzliste).
+    auftrag.instanzen = instanzenMerken(engine, oi, hi, auftrag);
+
     // ── Vom Brett nehmen ────────────────────────────────────────────
     engine._broadcastEvent('play_zone_animation', {
       type: 'gold_sparkle', owner: oi, heroIdx: hi, zoneSlot: -1,
@@ -200,33 +250,16 @@ module.exports = {
 
     for (const eintrag of auftrag.support) {
       ops.supportZones[hi][eintrag.slot] = [];
-      for (const name of eintrag.namen) {
-        const inst = engine.cardInstances.find(c =>
-          c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === eintrag.slot && c.name === name);
-        if (inst) engine._untrackCard(inst.id);
-      }
     }
-    for (let zi = 0; zi < (ops.abilityZones?.[hi] || []).length; zi++) {
-      for (const name of (ops.abilityZones[hi][zi] || [])) {
-        const inst = engine.cardInstances.find(c =>
-          c.zone === 'ability' && c.owner === oi && c.heroIdx === hi && c.zoneSlot === zi && c.name === name);
-        if (inst) engine._untrackCard(inst.id);
-      }
-      ops.abilityZones[hi][zi] = [];
-    }
-    for (const name of auftrag.surprises) {
-      const inst = engine.cardInstances.find(c =>
-        c.zone === 'surprise' && c.owner === oi && c.heroIdx === hi && c.name === name);
-      if (inst) engine._untrackCard(inst.id);
-    }
+    for (let zi = 0; zi < (ops.abilityZones?.[hi] || []).length; zi++) ops.abilityZones[hi][zi] = [];
     if (ops.surpriseZones?.[hi]) ops.surpriseZones[hi] = [];
 
-    // Heldeninstanz und Heldenobjekt entfernen. Der PLATZ bleibt
-    // bestehen (leerer Name) — die Spalte darf nicht wegrutschen, sonst
-    // zeigen alle Indizes daneben.
-    const heldInst = engine.cardInstances.find(c =>
-      c.zone === 'hero' && c.owner === oi && c.heroIdx === hi);
-    if (heldInst) engine._untrackCard(heldInst.id);
+    // Alle mitgehenden Instanzen aus der Instanzliste nehmen — still (kein Hook).
+    const weg = new Set(auftrag.instanzen.map(e => e.daten.id));
+    engine.cardInstances = engine.cardInstances.filter(c => !weg.has(c.id));
+
+    // Heldenobjekt entfernen. Der PLATZ bleibt bestehen (leerer Name) — die
+    // Spalte darf nicht wegrutschen, sonst zeigen alle Indizes daneben.
     ops.heroes[hi] = { name: '', hp: 0, maxHp: 0, statuses: {}, buffs: {} };
 
     ops._teleportedAway = (ops._teleportedAway || 0) + 1;
@@ -275,18 +308,17 @@ async function zurueckstellen(engine, auftrag) {
   const ps = gs.players[auftrag.besitzer];
   if (!ps) return;
   const hi = auftrag.heroIdx;
+  const neu = Array.isArray(auftrag.instanzen);   // Auftraege aus aelteren Spielstaenden haben keinen gemerkten Instanz-Zustand → alter Weg unten
 
-  // Held zurueck (mit HP, Status, Buffs — der Zustand von vorher).
+  // Held zurueck (dasselbe Objekt: HP, Status, Buffs, Marken — der Zustand von vorher).
   ps.heroes[hi] = auftrag.hero;
-  engine._trackCard(auftrag.hero.name, auftrag.besitzer, 'hero', hi);
+  if (!neu) engine._trackCard(auftrag.hero.name, auftrag.besitzer, 'hero', hi);
 
   // Abilities zurueck in ihre Slots.
   if (!ps.abilityZones[hi]) ps.abilityZones[hi] = [[], [], []];
   for (let zi = 0; zi < auftrag.abilities.length; zi++) {
     ps.abilityZones[hi][zi] = (auftrag.abilities[zi] || []).slice();
-    for (const name of ps.abilityZones[hi][zi]) {
-      engine._trackCard(name, auftrag.besitzer, 'ability', hi, zi);
-    }
+    if (!neu) for (const name of ps.abilityZones[hi][zi]) engine._trackCard(name, auftrag.besitzer, 'ability', hi, zi);
   }
 
   // Support-Karten zurueck. Ist der urspruengliche Platz inzwischen
@@ -294,6 +326,7 @@ async function zurueckstellen(engine, auftrag) {
   // Helden aus; gibt es keinen, bleibt sie draussen (siehe Kopf).
   if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
   const verloren = [];
+  const platz = {};   // alter Platz → tatsaechlicher Platz (nur gesetzt, wo die Karte zurueckkehrt)
   for (const eintrag of auftrag.support) {
     let ziel = eintrag.slot;
     if ((ps.supportZones[hi][ziel] || []).length > 0) {
@@ -304,12 +337,15 @@ async function zurueckstellen(engine, auftrag) {
     }
     if (ziel < 0) { verloren.push(...eintrag.namen); continue; }
     ps.supportZones[hi][ziel] = eintrag.namen.slice();
-    for (const name of eintrag.namen) {
-      const inst = engine._trackCard(name, eintrag.owner, 'support', hi, ziel);
-      if (inst) {
-        inst.counters = JSON.parse(JSON.stringify(eintrag.counters || {}));
-        inst.controller = eintrag.controller;
-        inst.faceDown = !!eintrag.faceDown;
+    platz[eintrag.slot] = ziel;
+    if (!neu) {
+      for (const name of eintrag.namen) {
+        const inst = engine._trackCard(name, eintrag.owner, 'support', hi, ziel);
+        if (inst) {
+          inst.counters = JSON.parse(JSON.stringify(eintrag.counters || {}));
+          inst.controller = eintrag.controller;
+          inst.faceDown = !!eintrag.faceDown;
+        }
       }
     }
   }
@@ -317,13 +353,34 @@ async function zurueckstellen(engine, auftrag) {
   // Surprises zurueck (verdeckt, wie sie lagen).
   if (auftrag.surprises.length > 0) {
     ps.surpriseZones[hi] = auftrag.surprises.slice();
-    for (const name of auftrag.surprises) {
-      const inst = engine._trackCard(name, auftrag.besitzer, 'surprise', hi);
-      if (inst) inst.faceDown = true;
+    if (!neu) {
+      for (const name of auftrag.surprises) {
+        const inst = engine._trackCard(name, auftrag.besitzer, 'surprise', hi);
+        if (inst) inst.faceDown = true;
+      }
     }
   }
 
-  ps._teleportedAway = Math.max(0, (ps._teleportedAway || 0) - 1);
+  // W53a: alle gemerkten Instanzen mit ihrem alten Zustand zurueck (Id, Zaehler, Stempel, Spielzug-Marke, Platz in der Instanzliste) — in alter Reihenfolge.
+  if (neu) {
+    for (const eintrag of auftrag.instanzen.slice().sort((x, y) => x.index - y.index)) {
+      const d = eintrag.daten;
+      if (d.zone === 'support' && d.zoneSlot >= 0) {
+        if (platz[d.zoneSlot] === undefined) {                               // kein Platz mehr: die Karte bleibt draussen …
+          const ag = d.counters?.atkGranted || 0;                            // … und ihr ATK-Bonus bleibt nicht am Helden zurueck (nur beim aktuellen Traeger, W53a)
+          if (ag > 0 && d.counters._atkTraeger) engine._applyHeroAtkDelta(auftrag.hero, auftrag.besitzer, hi, -ag);
+          continue;
+        }
+        instanzEinsetzen(engine, eintrag, platz[d.zoneSlot]);
+      } else {
+        instanzEinsetzen(engine, eintrag, null);
+      }
+    }
+  }
+
+  // Zaehler zurueck auf „nie entrueckt" (nicht auf 0 stehen lassen).
+  const rest = Math.max(0, (ps._teleportedAway || 0) - 1);
+  if (rest > 0) ps._teleportedAway = rest; else delete ps._teleportedAway;
   // W18b (Al 19.10.: „via Teleport Powder zurueckkehrende Heroes bekommen automatisch den Status/Debuff"): laeuft eine Anti Magic Zone,
   // ist der Rueckkehrer gesperrt. Keine Eintritts-Hooks (Regel 11.9.) — nur der Zonen-Status.
   await engine.amzFensterAufHeldAnwenden(auftrag.besitzer, hi);
