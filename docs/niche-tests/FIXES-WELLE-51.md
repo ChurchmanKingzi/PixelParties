@@ -30,7 +30,7 @@ Repros: `W51/b-01` (Taio/Toras), `b-02` (Aufstiegs-Bereitschaft), `b-03` (Hook-V
 
 ## Ergebnis in Zahlen
 
-* Repros: **alle 1243 grün** (vorher 1241; 2 neue, beide auf dem alten Stand rot), 0 Rückschritte.
+* Repros: **alle 1248 grün** (vorher 1241; 7 neue, auf dem alten Stand rot), 0 Rückschritte (nach W51a: 1243).
 * `scripts/check-*.js`: nur `check-scope.js` rot (wie im Ausgangszustand).
 * E2E (mit `NODE_PATH`): cards, draw-cards, sacrifice, artifacts grün.
 * `Bugfix-Note`-Zeilen: Inheritance Ceremony, Slippery Fridge, Anti Magic Enchantment, Cybug LOCUST, Secret Spell Book, Ricochet, Harpyformer Choir, Cloud in a Bottle.
