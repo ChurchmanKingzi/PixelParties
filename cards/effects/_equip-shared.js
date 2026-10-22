@@ -319,6 +319,9 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
       _skipReactionCheck: true,
       _equipLostGemeldet: true,   // W52a: das Umhaengen meldet `onEquipLost` selbst (unten), der Verteiler in `runHooks` bleibt still
     });
+    // W53a (Al: der ATK-Bonus liegt nur beim aktuellen Traeger): blieb eine gestempelte Buchung stehen (der Leave-Haken der Karte hat nicht abgezogen), wird sie jetzt am Stempel-Traeger
+    // abgezogen. Dauerhafte Zuwaechse ohne Stempel (Cloak of Edge) bleiben am Helden; die Karte startet am neuen Traeger frisch.
+    if (inst.counters._atkTraeger) engine.actionRevokeAtkAmTraeger(inst);
     if (inst.counters.atkGranted) inst.counters.atkGranted = 0;   // Neu-Vergabe am neuen Traeger startet frisch
     // W51b: der Abgang fuer ZUSTANDSLAUSCHER (Taio, Toras, Aufstiegs-Bereitschaft …): das echte Leave oben geht nur an die Karte selbst. `onEquipLost` geht an alle
     // (siehe `engine.fireEquipLost`); die Karte steht dabei noch am alten Platz (Leave-Semantik, Lauscher schliessen ihre Id beim Zaehlen aus).

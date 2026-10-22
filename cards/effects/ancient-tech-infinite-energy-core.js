@@ -79,12 +79,9 @@ function recomputeBonus(ctx) {
   if (!inst.counters) inst.counters = {};
   const currentBonus = inst.counters.atkGranted || 0;
   const delta = newBonus - currentBonus;
-  if (delta === 0) return;
-
-  // Engine ATK helper routes through Curse's suppression accumulator
-  // when the host is cursed, otherwise mutates + broadcasts normally.
-  engine._applyHeroAtkDelta(hero, feld, heroIdx, delta);
-  inst.counters.atkGranted = newBonus;
+  // W53a: EIN Baustein fuer Ausruestungs-ATK — bucht auf den Zielwert, nur am aktuellen Traeger, pro Instanz genau einmal (siehe `engine.actionSetAtkGrant`;
+  // Curse-Unterdrueckung und Broadcast laufen dort wie bisher ueber `_applyHeroAtkDelta`).
+  if (!engine.actionSetAtkGrant(inst, newBonus)) return;
 
   engine.log('ancient_tech_atk', {
     hero: hero.name, newBonus, uniqueCount, delta,
@@ -130,10 +127,10 @@ module.exports = {
     // not for unrelated cards passing through onCardLeaveZone.
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      // `fromOwner` ist die Brettseite (Styx 28.9.: bei Uebernahme != cardOwner).
-      if (ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      if (ctx.fromHeroIdx !== ctx.card.heroIdx) return;
-      if (ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      // W53a: Identitaet statt Seitenvergleich. Der strenge Vergleich `fromOwner === cardHeroOwner` scheiterte, sobald sich die Seitenlage seit dem Anlegen geaendert hatte
+      // (Charme am Wirt endet, Kontrolle wechselt): die Karte ging, der Bonus blieb am Ex-Traeger stehen. Abgezogen wird dort, wo die Buchung liegt (Stempel).
+      if (ctx.leavingCard) { if (ctx.leavingCard.id !== ctx.card.id) return; }
+      else if (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
     },
   },

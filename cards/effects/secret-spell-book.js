@@ -184,7 +184,9 @@ async function uebernimm(engine, pi, inst, ergebnis) {
     return;
   }
   const art = artVon(engine, inst);
-  const auswahl = inst.owner === pi ? null : await waehlePlatz(engine, pi, inst, zonenFuer(engine, pi, inst, art));
+  // W53a: Nicht-Kreatur-Tokens (W52a) und Tempelunas angehängte Fee werden nie umgesetzt (`actionTransferAttachment` lehnt sie ab) — die Platzfrage entfällt, die Kontrolle wechselt trotzdem.
+  const festgesetzt = art !== 'creature' && (engine.isTokenCard(inst) || !!inst.counters?._keinEquip);
+  const auswahl = (inst.owner === pi || festgesetzt) ? null : await waehlePlatz(engine, pi, inst, zonenFuer(engine, pi, inst, art));
   if (!istBetroffen(engine, pi, inst)) return;
   if (auswahl) {
     let ok = false;

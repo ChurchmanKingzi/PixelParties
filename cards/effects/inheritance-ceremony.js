@@ -19,7 +19,7 @@
 //  2. „Move any number of cards attached or equipped to the user": Auswahl (beliebig viele, auch keine) unter den Karten in den BASIS-Support-Zonen des Nutzers, die keine
 //     Kreaturen sind (Equips und Attachments, auch vom Gegner angelegte). Obergrenze = die FREIEN Basis-Support-Zonen des Ziels (versiegelte und gesperrte zählen nicht). Sie
 //     landen in den freien Zonen in der Reihenfolge ihrer alten Plätze (Annahme: der Text lässt den Platz offen). Ausgenommen sind nur Karten, die der Zielheld nicht tragen darf
-//     (`canEquipCardToHero`: Crusader's-Familie, Race Boats …), `counters.immovable` und als Equip angelegte Helden.
+//     (`canEquipCardToHero`: Crusader's-Familie, Race Boats …), `counters.immovable`, Tokens (W52a) und Tempelunas angehängte Fee (W53a: bleibt bei Tempeluna).
 //     ★ WIRKUNG WANDERT MIT (Vorgabe 12.10.): Anhängsel, die einen Status/Buff an ihrem Wirt halten, nehmen ihn am alten Helden zurück (`onCardLeaveZone`) und legen ihn am neuen
 //     wieder an — über den Karten-Vertrag `attachmentMovedToHost` (Curse, Berserk, Overheal Shock, Anti Magic, Invisibility, Prophecy of Tempeste, Crimson Web; die
 //     Status-Anhängsel mit `anhaengselStatusHooks` — Decisive Defeat, Forbidden Curse of Aging — binden über ihr eigenes Eintrittsereignis; Equips über `onPlay` mit `_isMove`).
@@ -71,8 +71,9 @@ function verschiebbar(engine, inst) {
   // ★ W52a (Al, 22.10.2026: „Generell sollten Tokens ausgenommen sein!"): Tokens (Puppets: „Cannot be moved to a different Support Zone", Pollution Token …) werden nie umgehängt.
   if (engine.isTokenCard(inst)) return false;
   if (istUmhaengbaresEquip(engine, inst)) return true;
-  // Tempelunas angehängte Fee ist ein ANHÄNGSEL (kein Equip, W52a) und wandert hier als Anhängsel mit; andere als Equip angelegte Helden gingen schon oben durch.
-  if (inst.counters?.treatAsEquip && !inst.counters?._keinEquip) return false;
+  // ★ W53a (Al, 22.10.2026: „Soll Ceremony die Fee überhaupt als Anhängsel mitnehmen?" — „Nein."): Tempelunas angehängte Fee (`_keinEquip`) bleibt bei Tempeluna: weder angeboten noch bewegt.
+  // Alle übrigen als Equip angelegten Helden (Initiation Ritual) gingen schon oben durch `istUmhaengbaresEquip`.
+  if (inst.counters?.treatAsEquip || inst.counters?._keinEquip) return false;
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || hasCardType(cd, 'Creature')) return false;
   return true;

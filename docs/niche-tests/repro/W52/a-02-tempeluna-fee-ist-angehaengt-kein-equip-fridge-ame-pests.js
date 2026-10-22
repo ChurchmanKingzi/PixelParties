@@ -5,7 +5,7 @@
 // Erwartung (beide Sitze):
 //   • Die Fee trägt die Marke `_keinEquip`: `engine.isEquipInZone` false, `istUmhaengbaresEquip` false → Slippery Fridge kann sie nicht umhängen und bietet sie nicht an, Anti Magic
 //     Enchantment wird nicht angeboten, Afflicted Pests öffnet nicht (W50-Entscheidung bleibt), `onEquipLost` meldet sie als `kind: 'attachment'`.
-//   • Sie bleibt ein Anhängsel: Ceremony („attached or equipped") kann sie mitnehmen; Tempeluna verliert dann den Effekt (Ruling ①), der neue Wirt gewinnt ihn nicht (Frage an Al).
+//   • Sie bleibt ein Anhängsel; die Ceremony nimmt sie seit W53a NICHT mit (Al: „Nein.").
 //   • Tempelunas Effekt-Gewinn/-Verlust beim Anhängen/Entfernen funktioniert weiter (zerstört, abgelegt, Wirt besiegt).
 //   • Gegenprobe: ein per Initiation Ritual angelegter Held ist weiter ein Equip (Fridge bietet ihn an, `isEquipInZone` true).
 // Auf dem Stand vor W52a rot (Fridge hängte die Fee um). Exit 0 = korrekt.
@@ -80,15 +80,15 @@ const ameGefragt = (t) => t.prompts.some(p => p.d && p.d.title === AME);
       R.check(`Fee ${wid}: sauber`, t.errors.length === 0, t.errors);
     }
 
-    // ── 5. Ceremony nimmt die Fee als ANHÄNGSEL mit (Verhalten wie bisher, jetzt als Anhängsel statt als Equip) ──
+    // ── 5. Ceremony nimmt die Fee NICHT mit (W53a, Al: „Soll Ceremony die Fee überhaupt als Anhängsel mitnehmen?" — „Nein."); Details und weitere Wege: W53/a-01 ──
     { const { t } = await aufbau(['Inheritance Ceremony']);
       t.reset();
       U.wahl(t, { name: FEE, nach: 1 });
-      const r = await t.play(me, 'Inheritance Ceremony', { hero: 0, active: me });
+      await t.play(me, 'Inheritance Ceremony', { hero: 0, active: me });
       const angeboten = t.targets.flatMap(x => x.valid).filter(v => v.type === 'equip').map(v => v.cardName);
-      R.check('Ceremony bietet die Fee als Anhängsel an', angeboten.includes(FEE), angeboten);
-      R.check('Ceremony: Fee liegt jetzt an Held 1, Tempeluna verliert den Effekt, Held 1 gewinnt ihn nicht (offene Frage an Al)', r === true && U.wo(t, me, FEE).join() === '1' && !(t.hero(me, 0).gainedEffectNames || []).includes(FEE) && !(t.hero(me, 1).gainedEffectNames || []).includes(FEE),
-        { r, fee: U.wo(t, me, FEE), g0: t.hero(me, 0).gainedEffectNames, g1: t.hero(me, 1).gainedEffectNames });
+      R.check('Ceremony bietet die Fee NICHT an', !angeboten.includes(FEE), angeboten);
+      R.check('Ceremony: Fee bleibt bei Tempeluna, Tempeluna behält den Effekt', U.wo(t, me, FEE).join() === '0' && (t.hero(me, 0).gainedEffectNames || []).includes(FEE) && !(t.hero(me, 1).gainedEffectNames || []).includes(FEE),
+        { fee: U.wo(t, me, FEE), g0: t.hero(me, 0).gainedEffectNames, g1: t.hero(me, 1).gainedEffectNames });
       R.check('Ceremony: sauber', t.errors.length === 0, t.errors); }
 
     // ── 6. Gegenprobe: ein per Initiation Ritual angelegter HELD ist weiter ein Equip ──

@@ -4350,16 +4350,17 @@ class GameEngine {
        * @param {number} amount - ATK to add
        */
       grantAtk(amount) {
-        const hero = gs.players[cardInstance.owner]?.heroes?.[cardInstance.heroIdx];
-        if (hero) engine.actionGrantAtk(cardInstance, hero, cardInstance.owner, cardInstance.heroIdx, amount);
+        // W53a (Al, 22.10.2026): der ATK-Bonus einer Ausruestung liegt pro Instanz GENAU EINMAL und NUR am aktuellen Traeger — `actionSetAtkGrant` bucht auf den Zielwert
+        // (zweimal aufgerufen = kein zweiter Bonus; lag die Buchung noch an einem Ex-Traeger, wird sie dort abgezogen).
+        engine.actionSetAtkGrant(cardInstance, amount);
       },
 
       /**
        * Revoke ATK previously granted by this card instance.
        */
       revokeAtk() {
-        const hero = gs.players[cardInstance.owner]?.heroes?.[cardInstance.heroIdx];
-        if (hero) engine.actionRevokeAtk(cardInstance, hero, cardInstance.owner, cardInstance.heroIdx);
+        // W53a: abgezogen wird dort, wo die Buchung LIEGT (Stempel `_atkTraeger`), sonst am aktuellen Traeger.
+        engine.actionRevokeAtkAmTraeger(cardInstance);
       },
 
       // ── Player input (async — pauses until client responds) ──
@@ -14432,6 +14433,13 @@ class GameEngine {
       this.log('move_blocked', { card: cardInstance.name, reason: 'cannot_change_support_zone' });
       return;
     }
+    // W53a (Al): Tempelunas angehängte Fee bleibt bei ihrem Wirt (Zerstören/Ablegen bleiben möglich) — wie `cannotChangeSupportZone`.
+    if (cardInstance.zone === ZONES.SUPPORT && toZone === ZONES.SUPPORT && cardInstance.counters?._keinEquip
+        && (toHeroIdx !== cardInstance.heroIdx || toSlot !== cardInstance.zoneSlot
+            || (opts.newOwner != null && opts.newOwner !== (cardInstance.controller ?? cardInstance.owner)))) {
+      this.log('move_blocked', { card: cardInstance.name, reason: 'attached_fairy' });
+      return;
+    }
     // v704 (Puppets): Zielspalte mit gesperrten Support Zones.
     if (toZone === ZONES.SUPPORT && !(cardInstance.zone === ZONES.SUPPORT && toHeroIdx === cardInstance.heroIdx)
         && this.isSupportZoneLocked(opts.newOwner ?? (cardInstance.controller ?? cardInstance.owner), toHeroIdx,
@@ -17131,6 +17139,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('move_blocked', { card: inst.name, reason: 'token' });
       return { success: false, tokenBlocked: true };
     }
+    // ★ W53a (Al, 22.10.2026: „Soll Ceremony die Fee überhaupt als Anhängsel mitnehmen?" — „Nein."): Tempelunas angehängte Fee (`_keinEquip`) wechselt nie den Wirt
+    // (Ceremony, Secret Spell Book, Cybug LOCUST …); sie verlässt Tempeluna nur durch Zerstören/Ablegen/Wirtstod.
+    if (inst.counters?._keinEquip) {
+      this.log('move_blocked', { card: inst.name, reason: 'attached_fairy' });
+      return { success: false, feeBlocked: true };
+    }
     const fromPlayerIdx = inst.controller ?? inst.owner;
     // 12.10. (Inheritance Ceremony): wessen Support-Feld haelt die Karte PHYSISCH? Normalfall: `owner` (= Seite des Wirts). Ausnahme Crimson Web: `owner` ist der Wirker
     // der Karte, die Zone liegt beim Betroffenen (`controller`) — wie in `_removeCardFromState` zaehlt zuerst die physische Seite.
@@ -17175,6 +17189,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
       _equipLostGemeldet: true,   // W52a: das Umhaengen meldet `onEquipLost` selbst (unten), der Verteiler in `runHooks` bleibt still
     });
+    if (inst.counters?._atkTraeger) this.actionRevokeAtkAmTraeger(inst);   // W53a: eine stehengebliebene ATK-Buchung bleibt nie am Ex-Traeger
     // W51b: der Abgang fuer Zustandslauscher (`onEquipLost`) — das echte Leave oben geht nur an die Karte selbst (siehe `fireEquipLost`).
     await this.fireEquipLost(inst, {
       anleger: opts.anleger ?? toPlayerIdx, fromOwner: quellSeite, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlotIdx,
@@ -20053,6 +20068,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // den alten Stand und der neue Traeger bekam eine Differenz
       // statt des vollen Zuschlags.
       cardInst.counters.atkGranted = 0;
+      delete cardInst.counters._atkTraeger;
       this.log('atk_revoke_suppressed', { hero: hero.name, amount: granted, source: cardInst.name, reason: 'cursed' });
       this.sync();
       return;
@@ -20060,8 +20076,104 @@ this._deathWatch = (this._deathWatchStack || []).length
     // v1087: ueber den kanonischen Trichter (siehe check-atk-funnel).
     this._applyHeroAtkDelta(hero, ownerIdx, heroIdx, -granted);
     cardInst.counters.atkGranted = 0;
+    delete cardInst.counters._atkTraeger;
     this.log('atk_revoke', { hero: hero.name, amount: granted, source: cardInst.name });
     this.sync();
+  }
+
+  /**
+   * ★ W53a (Al, 22.10.2026: „Der ATK-Bonus soll nur exakt der aktuelle Traeger haben, und er soll pro Equip-Instanz exakt einmal hinzugefuegt sein. Das gilt fuer alle ATK-gebenden
+   * Equips."): der EINE Baustein fuer Ausruestungs-ATK. Bucht den Bonus dieser Karteninstanz auf den ZIELWERT `amount` (nicht „addiere `amount`"):
+   *   · Aufruf zweimal / `onPlay` doppelt gefeuert → kein zweiter Bonus (Differenz 0),
+   *   · dynamische Boni (Infinite Energy Core, Future Tech Gun …) rufen es mit dem neu gerechneten Wert → es bucht nur die Differenz,
+   *   · lag die Buchung noch an einem anderen Helden als dem aktuellen Traeger (Stempel `counters._atkTraeger` = { seite, heroIdx }), wird sie dort zuerst abgezogen,
+   *   · `amount` 0 raeumt die Buchung und den Stempel.
+   * Der Traeger ist immer der Held, in dessen Support Zone die Karte JETZT liegt (`physicalSide` + `heroIdx`). Curse-Unterdrueckung, ATK-Auren und Broadcasts laufen wie bei
+   * `actionGrantAtk`/`_applyHeroAtkDelta`. Karten mit DAUERHAFTEM Zuwachs (Cloak of Edge) bleiben bei `actionGrantAtk` (additiv, ohne Stempel).
+   * @returns {boolean} ob sich etwas geaendert hat
+   */
+  actionSetAtkGrant(cardInst, amount) {
+    if (!cardInst) return false;
+    amount = Math.max(0, Math.round(amount || 0));
+    if (!cardInst.counters) cardInst.counters = {};
+    const c = cardInst.counters;
+    const seite = this.physicalSide(cardInst);
+    const heroIdx = cardInst.heroIdx;
+    const hero = cardInst.zone === ZONES.SUPPORT ? this.gs.players[seite]?.heroes?.[heroIdx] : null;
+    const stempel = c._atkTraeger;
+    // Buchung an einem anderen Helden (Ex-Traeger): dort abziehen, dann frisch buchen.
+    if ((c.atkGranted || 0) > 0 && stempel && (stempel.seite !== seite || stempel.heroIdx !== heroIdx)) {
+      this.actionRevokeAtkAmTraeger(cardInst);
+    }
+    if (!hero?.name) {                                    // kein Traeger (Held weg / Karte nicht in einer Support Zone): nichts zu buchen
+      if (amount === 0) delete c._atkTraeger;
+      return false;
+    }
+    const bisher = c.atkGranted || 0;
+    const delta = amount - bisher;
+    if (delta === 0) {
+      if (amount > 0) c._atkTraeger = { seite, heroIdx };
+      else delete c._atkTraeger;
+      return false;
+    }
+    if (delta > 0) {
+      this.actionGrantAtk(cardInst, hero, seite, heroIdx, delta);   // additiv um die Differenz (bucht atkGranted, loggt, laeuft durch den Trichter)
+    } else {
+      this._applyHeroAtkDelta(hero, seite, heroIdx, delta);          // Teil-Abzug (dynamische Boni): Curse-Unterdrueckung/Auren im Trichter
+      c.atkGranted = amount;
+      this.log('atk_revoke', { hero: hero.name, amount: -delta, source: cardInst.name });
+      this.sync();
+    }
+    if ((c.atkGranted || 0) > 0) c._atkTraeger = { seite, heroIdx }; else delete c._atkTraeger;
+    return true;
+  }
+
+  /**
+   * ★ W53a: den Bonus dieser Karteninstanz zuruecknehmen — DORT, wo er liegt (Stempel `_atkTraeger`), sonst am aktuellen Traeger (aeltere Buchungen ohne Stempel).
+   * Idempotent: ohne Buchung ein No-op. Raeumt Buchung und Stempel.
+   */
+  actionRevokeAtkAmTraeger(cardInst) {
+    if (!cardInst) return false;
+    const c = cardInst.counters || (cardInst.counters = {});
+    const st = c._atkTraeger;
+    const seite = st ? st.seite : this.physicalSide(cardInst);
+    const heroIdx = st ? st.heroIdx : cardInst.heroIdx;
+    const hero = this.gs.players[seite]?.heroes?.[heroIdx];
+    delete c._atkTraeger;
+    if ((c.atkGranted || 0) <= 0) return false;
+    if (!hero?.name) { c.atkGranted = 0; return false; }   // der Traeger ist weg (Held entfernt): nichts mehr abzuziehen
+    this.actionRevokeAtk(cardInst, hero, seite, heroIdx);
+    return true;
+  }
+
+  /**
+   * ★ W53a: nach einem Formwechsel (Aufstieg/Abstieg: `hero.atk` wird auf den gedruckten Wert der neuen Form gesetzt) die ATK-Boni der Karten wieder aufschlagen, die weiter an diesem
+   * Helden liegen: Ausruestung mit Stempel `_atkTraeger` an genau diesem Traeger und Abilities mit Buchung (Fighting). Ohne das bliebe die Buchung stehen, waehrend `hero.atk` sie nicht mehr
+   * enthaelt — der spaetere Abgang der Karte zoege Bonus ab, der nicht mehr da ist. Dauerhafte Zuwaechse (Cloak of Edge, Nero Zira …) bleiben beim bisherigen Verhalten (Formwechsel = neuer Grundwert).
+   */
+  _atkBuchungenNachFormwechsel(hero, seite, heroIdx) {
+    if (!hero?.name || this._isHeroAtkSuppressed(hero)) return;
+    let summe = 0;
+    for (const c of this.cardInstances) {
+      const ag = c.counters?.atkGranted || 0;
+      if (ag <= 0 || c.heroIdx !== heroIdx) continue;
+      if (c.zone === ZONES.ABILITY && c.owner === seite) summe += ag;
+      else if (c.zone === ZONES.SUPPORT && c.counters._atkTraeger && c.counters._atkTraeger.seite === seite && c.counters._atkTraeger.heroIdx === heroIdx) summe += ag;
+    }
+    if (summe > 0) this._applyHeroAtkDelta(hero, seite, heroIdx, summe);
+  }
+
+  /**
+   * ★ W53a: Sicherheitsnetz fuer ATK-Buchungen (aus `sync`): eine Karte, die NICHT mehr in einer Support Zone liegt (Ablage, Loeschstapel, Hand, Deck), darf keine gestempelte Buchung
+   * mehr tragen — blieb sie je stehen (ein Abgangsweg ohne Leave-Hook), wird sie am Stempel-Traeger abgezogen. Kostet einen Durchlauf ueber die Instanzen ohne Stempel.
+   */
+  _atkBuchungenAufraeumen() {
+    for (const c of this.cardInstances) {
+      const st = c.counters?._atkTraeger;
+      if (!st) continue;
+      if (c.zone === ZONES.SUPPORT || c.zone === '_umhaengen') continue;
+      this.actionRevokeAtkAmTraeger(c);
+    }
   }
 
   /**
@@ -53651,6 +53763,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
     this._refreshAscensionReadiness();
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
     // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.
@@ -54001,6 +54114,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
     // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
     if (newCardData.atk) hero.baseAtk = newCardData.atk;
+    // ★ W53a: die Boni der Karten, die WEITER an diesem Helden liegen (Ausruestung, Fighting …), gehoeren zu ihnen und werden bei deren Abgang wieder abgezogen — sie muessen auf den
+    // neuen Grundwert wieder aufgeschlagen werden, sonst zieht der Abgang spaeter Bonus ab, der gar nicht mehr da ist (ATK unter dem gedruckten Wert).
+    this._atkBuchungenNachFormwechsel(hero, hs, heroIdx);
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig
@@ -54689,6 +54805,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
     // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
     if (newCardData.atk) hero.baseAtk = newCardData.atk;
+    // ★ W53a: die Boni der Karten, die WEITER an diesem Helden liegen (Ausruestung, Fighting …), gehoeren zu ihnen und werden bei deren Abgang wieder abgezogen — sie muessen auf den
+    // neuen Grundwert wieder aufgeschlagen werden, sonst zieht der Abgang spaeter Bonus ab, der gar nicht mehr da ist (ATK unter dem gedruckten Wert).
+    this._atkBuchungenNachFormwechsel(hero, hs, heroIdx);
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig

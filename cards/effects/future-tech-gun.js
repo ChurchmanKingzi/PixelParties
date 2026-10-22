@@ -60,10 +60,8 @@ function zuschlagNachrechnen(ctx) {
   if (!inst.counters) inst.counters = {};
   const bisher = inst.counters.atkGranted || 0;
   const delta = neuerZuschlag - bisher;
-  if (delta === 0) return;
-
-  engine._applyHeroAtkDelta(hero, feld, heroIdx, delta);
-  inst.counters.atkGranted = neuerZuschlag;
+  // W53a: EIN Baustein fuer Ausruestungs-ATK — bucht auf den Zielwert, nur am aktuellen Traeger, pro Instanz genau einmal (siehe `engine.actionSetAtkGrant`).
+  if (!engine.actionSetAtkGrant(inst, neuerZuschlag)) return;
 
   engine.log('future_tech_gun_atk', {
     hero: hero.name, bonus: neuerZuschlag, copies: kopien, delta,
@@ -100,10 +98,10 @@ module.exports = {
     // dass nur DIESES Exemplar beim Verlassen SEINER Zone abzieht.
     onCardLeaveZone: (ctx) => {
       if (ctx.fromZone !== 'support') return;
-      // `fromOwner` ist die Brettseite (Styx 28.9.: bei Uebernahme != cardOwner).
-      if (ctx.fromOwner !== (ctx.cardHeroOwner ?? ctx.cardOwner)) return;
-      if (ctx.fromHeroIdx !== ctx.card.heroIdx) return;
-      if (ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
+      // W53a: Identitaet statt Seitenvergleich. Der strenge Vergleich `fromOwner === cardHeroOwner` scheiterte, sobald sich die Seitenlage seit dem Anlegen geaendert hatte
+      // (Charme am Wirt endet, Kontrolle wechselt): die Karte ging, der Bonus blieb am Ex-Traeger stehen. Abgezogen wird dort, wo die Buchung liegt (Stempel).
+      if (ctx.leavingCard) { if (ctx.leavingCard.id !== ctx.card.id) return; }
+      else if (ctx.fromHeroIdx !== ctx.card.heroIdx || ctx.fromZoneSlot !== ctx.card.zoneSlot) return;
       ctx.revokeAtk();
     },
   },

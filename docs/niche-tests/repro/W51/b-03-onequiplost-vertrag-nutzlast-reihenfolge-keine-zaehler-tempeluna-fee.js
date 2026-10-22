@@ -6,7 +6,7 @@
 //   (3) (seit W52a) auch das Zerstören meldet onEquipLost (ein Ereignis, kein Umhängen); kein Gained/Lost für Kreaturen/Abilities.
 //   (4) Ruling W51a bleibt: das echte `onCardEnterZone`/`onCardLeaveZone` eines Umhängens geht NUR an die bewegte Karte (`_onlyCard`) — Zähler wie Luck feuern nicht.
 //   (5) Eigen-Bonus des Equips (Club of Gobbo +30 ATK) wandert wie bisher; Taio/Toras daneben stimmen.
-//   (6) Tempeluna: die angelegte Fee verlässt Tempeluna per Fridge → Tempeluna verliert den gewonnenen Effekt (Ruling ①), vorher blieb er stehen.
+//   (6) Tempeluna: die angelegte Fee wird nicht umgehängt (W53a); der Verlust des Effekts beim Zerstören → W52/a-02.
 // Beide Sitze. Exit 0 = korrekt.
 const U = require('../../lib/umhaengen.js');
 process.on('unhandledRejection', (e) => { process.stderr.write('UNHANDLED ' + (e && e.stack || e) + '\n'); process.exit(1); });
@@ -89,8 +89,8 @@ function spion(t) {
       await U.bewege(t, me, 'fridge', { name: CLUB, nach: 1 });
       R.check('Club umgehängt: Quellheld ATK 80 (Club- UND Taio-Bonus weg), Zielheld +30', U.atk(t, me, 0) === 80 && U.atk(t, me, 1) === a1 + 30, { a0: U.atk(t, me, 0), a1: U.atk(t, me, 1), vorher1: a1 }); }
 
-    // ── (6) Tempeluna: angelegte Fee verlässt Tempeluna → Effekt weg (Ruling ① der Karte) ──
-    for (const via of ['ceremony']) {   // W52a: die Fee ist ANGEHÄNGT, kein Equip (`_keinEquip`) — die Fridge nimmt sie nicht mehr (W52/a-02), die Ceremony als Anhängsel schon
+    // ── (6) Tempeluna: die angehängte Fee wird NICHT umgehängt (W53a, Al: „Nein."); verlässt sie Tempeluna anders (zerstört), ist der Effekt weg (Ruling ① der Karte → W52/a-02) ──
+    for (const via of ['ceremony']) {
       const FEE = 'Maya, the Nature Fairy';
       const aufbau = async () => {
         const t = await U.fresh(me, { hand: [], heroes: { [me]: ['Tempeluna, the Convergence Fairy'] } });
@@ -101,9 +101,9 @@ function spion(t) {
       const t = await aufbau();
       R.check(`Tempeluna/${via}: Ausgang — Tempeluna hat den Effekt der Fee gewonnen`, (t.hero(me, 0).gainedEffectNames || []).includes(FEE), t.hero(me, 0).gainedEffectNames);
       t.reset();
-      const r = await U.bewege(t, me, via, { name: FEE, nach: 1 });
-      R.check(`Tempeluna/${via}: Fee wurde umgehängt`, r === true && U.wo(t, me, FEE).join() === '1', { r, w: U.wo(t, me, FEE) });
-      R.check(`Tempeluna/${via}: Tempeluna hat den gewonnenen Effekt NICHT mehr`, !(t.hero(me, 0).gainedEffectNames || []).includes(FEE), t.hero(me, 0).gainedEffectNames);
+      await U.bewege(t, me, via, { name: FEE, nach: 1 });
+      R.check(`Tempeluna/${via}: Fee bleibt bei Tempeluna (W53a)`, U.wo(t, me, FEE).join() === '0', { w: U.wo(t, me, FEE) });
+      R.check(`Tempeluna/${via}: Tempeluna behält den gewonnenen Effekt`, (t.hero(me, 0).gainedEffectNames || []).includes(FEE), t.hero(me, 0).gainedEffectNames);
       R.check(`Tempeluna/${via}: sauber`, U.sauber(t), { e: t.errors, a: t.audit() });
     }
   }
