@@ -10,6 +10,13 @@
 //  it for 1 turn.
 //  You may discard a card from your hand to keep
 //  this card in your hand. Once per turn.
+//  You can only play 1 "Magic Ruby" per turn.
+//
+//  W49a (Al, 22.10.2026): der letzte Satz steht jetzt auch im Kartentext
+//  (wie bei Topaz/Amethyst). Die Sperre selbst gab es schon: `canActivate`
+//  fragt `canPlayMagicGem` (HOPT `Magic Ruby:<Spieler>`), der Stempel wird
+//  erst am Ende des Effekts in `maybeKeepGemInHand` gesetzt (gespielt und
+//  verpufft stempelt, ganz negiert nicht — Z7b).
 // ═══════════════════════════════════════════
 
 const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');

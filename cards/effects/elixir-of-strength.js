@@ -3,7 +3,9 @@
 //  Potion — Choose a Hero you control. The next
 //  time that Hero hits exactly 1 target with an
 //  Attack, that Attack's damage is increased by
-//  100 and cannot be reduced or negated.
+//  150 and cannot be reduced or negated.
+//  (W49a, Al 22.10.2026: 150 statt 100; die Zahl lebt in der
+//  Engine-Konstante `EMPOWERED_STRIKE_BONUS`.)
 //
 //  The "fire on first attack damage" behaviour
 //  itself lives in engine
@@ -32,7 +34,7 @@ module.exports = {
 
   targetingConfig: {
     title: 'Elixir of Strength',
-    description: "Choose one of your Heroes. Their next single-target Attack deals +100 damage that can't be reduced or negated.",
+    description: "Choose one of your Heroes. Their next single-target Attack deals +150 damage that can't be reduced or negated.",
     confirmLabel: '💪 Drink!',
     confirmClass: 'btn-warning',
     cancellable: true,

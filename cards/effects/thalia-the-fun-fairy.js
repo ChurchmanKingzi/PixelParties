@@ -29,6 +29,14 @@
 //  helper (counts stacked copies + Performance
 //  wildcards layered on top).
 //
+//  PASSIVE 3 (W49a, Al 22.10.2026): „You can only activate 1 copy of
+//  each Support Spell per turn." — pro Zug und Support-Magic-Spell
+//  (Kartenname) nur eine Kopie wirkbar, solange Thalia aktiv ist.
+//  Gate: `sperrtSupportKopie` (Engine `thaliaSupportSperre` in
+//  `validateActionPlay`/Spielbarkeitslisten/Reaktions-Wirker), Stempel:
+//  `notiereSupportKopie` (nach dem Abbruch-Tor in `doPlaySpell`, im
+//  Sofort-Guss und bei Hand-Reaktionen).
+//
 //  STATUS GATE: both passives are silenced if
 //  Thalia is dead, Frozen, Stunned, or Negated —
 //  matching the standard hero-effect filter.
@@ -96,8 +104,54 @@ function hasActiveThaliaOnSide(engine, ownerIdx) {
   return false;
 }
 
+/**
+ * ★ W49a (Al, 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
+ * Eine Kopie je Kartenname (Basisname) und Zug, solange ein Thalia-Held auf der Seite von `pi` aktiv ist (lebt, kein Frost/Betäubung/
+ * Negierung — Beschränkungen ruhen wie alle Helden-Passiven, W8: `isHeroPassiveDormant`). Gilt für den Kontrolleur/Spieler `pi`, der
+ * den Spell wirkt (Hand, Sofort-Guss, Zusatzaktion, Support-Reaktion aus der Hand). Der Stempel liegt in `gs.hoptUsed`
+ * (`thalia-support:<Basisname>:<pi>` = Zugnummer), damit die Z7b-Rückgabe bei ganz negiertem Spell ihn mitnimmt. Abbruch stempelt nie;
+ * gespielt und verpufft stempelt (die Stempel-Aufrufer sitzen hinter dem Abbruch-Tor).
+ */
+function aktiveThalia(engine, pi) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps?.heroes) return false;
+  for (let hi = 0; hi < ps.heroes.length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hatEffekt(hero, CARD_NAME) || hero.hp <= 0) continue;
+    const ruht = typeof engine.isHeroPassiveDormant === 'function'
+      ? engine.isHeroPassiveDormant(pi, hi)
+      : !!(hero.statuses?.negated || hero.statuses?.frozen || hero.statuses?.stunned);
+    if (ruht) continue;
+    return true;
+  }
+  return false;
+}
+
+function supportKey(engine, pi, cardName) {   // eslint-disable-line no-unused-vars
+  return `thalia-support:${require('./_hooks').baseCardName(cardName)}:${pi}`;
+}
+
+function istSupportSpell(cardData) {
+  return !!cardData && cardData.cardType === 'Spell' && hasSpellSchool(cardData, 'Support Magic');
+}
+
 module.exports = {
   activeIn: ['hero'],
+
+  /** True = diese Kopie darf nicht gewirkt werden (Thalia aktiv, gleichnamiger Support Spell schon gewirkt). */
+  sperrtSupportKopie(engine, pi, cardData) {
+    if (!istSupportSpell(cardData)) return false;
+    if (engine.gs.hoptUsed?.[supportKey(engine, pi, cardData.name)] !== engine.gs.turn) return false;
+    return aktiveThalia(engine, pi);
+  },
+
+  /** Bucht eine gewirkte Support-Spell-Kopie (nur wenn eine aktive Thalia auf der Seite steht — sonst gibt es nichts zu zählen). */
+  notiereSupportKopie(engine, pi, cardName) {
+    const cd = engine._getCardDB()[cardName];
+    if (!istSupportSpell(cd) || !aktiveThalia(engine, pi)) return;
+    if (!engine.gs.hoptUsed) engine.gs.hoptUsed = {};
+    engine.gs.hoptUsed[supportKey(engine, pi, cardName)] = engine.gs.turn;
+  },
 
   /**
    * Per-side card-level reducer. Engine calls this once per Thalia hero

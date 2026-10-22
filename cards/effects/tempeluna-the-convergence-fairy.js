@@ -409,6 +409,7 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: feeInst, toZone: 'support', toHeroIdx: heroIdx,
       _skipReactionCheck: true,
+      _anhaengselAnleger: pi,   // W49a: „attach a Fairy Hero" ist ein Anlegen in eine Support Zone — oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
     });
 
     if (!gs.hoptUsed) gs.hoptUsed = {};

@@ -8665,6 +8665,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
              && cardData.cardType === 'Spell') {
       await room.engine._meldeZauberVerhindert(pi, cardName, heroIdx, heroOwner);
     }
+    if (!_ganzNegiert && cardData.cardType === 'Spell') room.engine.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug (ganz negiert stempelt nicht, Z7b)
     if (!gs._spellNegatedByEffect) {
       // Per-player, whole-game record of Spell names whose effect has
       // successfully resolved (negated Spells are excluded — we're

@@ -127,7 +127,7 @@ const EQUIPS3 = [
     ok: (r) => r.schadenHeld > 0 },
   { id: 'Elixir of Strength (Buff)', art: 'sonst', liest: 'attack', vergleich: true, ohneTreiber: ['Kohta'],
     vorbereiten: async (t, k, mit) => { if (mit) A(t, k).buffs = { empowered_strike: { stacks: 1 } }; },
-    ok: (r, b, k) => r.dmg === b.dmg + 100 && !A(r.t, k).buffs?.empowered_strike },
+    ok: (r, b, k) => r.dmg === b.dmg + 150 && !A(r.t, k).buffs?.empowered_strike },
   { id: 'Guardian Beast Niu (Buff)', art: 'sonst', liest: 'attack', vergleich: true, ohneTreiber: ['Kohta'],
     vorbereiten: async (t, k, mit) => { if (mit) A(t, k).buffs = { niu_enhanced: { totalDamage: 50, stacks: 1 } }; },
     ok: (r, b, k) => r.dmg === b.dmg + 50 && !A(r.t, k).buffs?.niu_enhanced },

@@ -271,6 +271,7 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: equippedInst, toZone: 'support', toHeroIdx: livingHeroIdx,
       _skipReactionCheck: true,
+      _anhaengselAnleger: pi,   // W49a: „equip it to another Hero" oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
     });
 
     engine.log('initiation_ritual', {

@@ -30,7 +30,7 @@ const gleich = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
       { id: 'Golden Arrow (+10 Gold, einmal)', o: { attHand: ['Golden Arrow'], vorbereiten: grant('Golden Arrow') }, schlaege: [100, 100, 100], pruef: (t) => t.gs.players[me].gold === 110 },
       { id: 'Hydra Blood Arrow (Schlag 1 auf 0, 3 Stacks aus 100)', o: { attHand: ['Hydra Blood Arrow'], vorbereiten: grant('Hydra Blood Arrow') }, schlaege: [0, 100, 100], pruef: (t) => (t.hero(op, 0).statuses.poisoned?.stacks || 0) === 3 },
       { id: 'Bow Sniper Darge + Angelfeather (+60 +50)', o: { attHand: ['Angelfeather Arrow'], vorbereiten: async (t, k) => { t.grantFor(k.as, k.held, 'Angelfeather Arrow'); t.setHero(k.as, 0, 'Bow Sniper Darge', 800); t.hero(k.as, 0).atk = 100; t.hero(k.as, 0).baseAtk = 100; } }, schlaege: [210, 100, 100] },
-      { id: 'Elixir of Strength (+100, nur der erste Treffer)', o: { vorbereiten: async (t, k) => buff(t, k.as, 0, 'empowered_strike', {}) }, schlaege: [200, 100, 100] },
+      { id: 'Elixir of Strength (+150, nur der erste Treffer)', o: { vorbereiten: async (t, k) => buff(t, k.as, 0, 'empowered_strike', {}) }, schlaege: [250, 100, 100] },
       { id: 'Guardian Beast Niu (+100, nur der erste Treffer)', o: { vorbereiten: async (t, k) => buff(t, k.as, 0, 'niu_enhanced', { totalDamage: 100, stacks: 2 }) }, schlaege: [200, 100, 100] },
       { id: 'Glass Sword (+50, nur der erste Treffer)', o: { vorbereiten: async (t, k) => { setzeFrei(t, k.as, 0, 'Glass Sword'); } }, schlaege: [150, 100, 100] },
       { id: 'Shattered Trident (+ATK, nur der erste Treffer)', o: { vorbereiten: async (t, k) => { setzeFrei(t, k.as, 0, 'Shattered Trident, Treasure of the Deepsea'); } }, schlaege: [200, 100, 100] },
