@@ -2851,8 +2851,8 @@ card scripts have to the game engine.
 | `ctx.removeCreatureBuff(inst, buffName, opts)` | `Promise` | Remove a buff from a creature |
 | `ctx.changeLevel(delta, target?)` | `Promise` | Change a card's level. Defaults to this card if no target. |
 | `ctx.negateCreature(inst, source, opts)` | `Promise` | Negate a creature's effects. `opts`: `{ expiresAtTurn, expiresForPlayer }` |
-| `ctx.grantAtk(amount)` | — | Grant ATK to this card's hero (tracked for auto-revocation) |
-| `ctx.revokeAtk()` | — | Revoke ATK previously granted by this card |
+| `ctx.grantAtk(amount)` | — | W53a: set this card's ATK grant to `amount` on its CURRENT hero (a target value, not "add": calling it twice books it once; a booking still on a former carrier is removed there first) — `engine.actionSetAtkGrant`, see "Welle 53 / W53a" |
+| `ctx.revokeAtk()` | — | Revoke ATK previously granted by this card — from the hero that actually holds the booking (stamp `counters._atkTraeger`) |
 | `ctx.gainGold(amount)` | `Promise` | Gain gold for the controller. Plays animation. |
 | `ctx.lockSummons()` | — | Lock summoning for the controller this turn |
 | `ctx.isSummonLocked()` | `bool` | Check if controller has summons locked |
@@ -23257,7 +23257,7 @@ Al (Spieldesigner) hat die Rückfragen aus W51 beantwortet (22.10.2026). Repros:
 * `engine.isEquipInZone(name, inst)` → false (Taio, Disarm, Blind Destruction, Spirit of the Shattered Trident …), `_equip-shared.istUmhaengbaresEquip` → false: **Slippery Fridge** bietet sie nicht an und kann sie nicht umhängen.
 * Anti Magic Enchantment / Afflicted Pests / Cybug LOCUST / RHINOCEROS / Lunatic Hawk sehen kein Equip. Tempeluna öffnet weiterhin KEIN Pests-Fenster (W50-Entscheidung); `onEquipLost`/`onEquipGained` melden die Fee als `kind: 'attachment'`.
 * Effekt-Gewinn/-Verlust funktioniert wie zuvor (Fee zerstört/abgelegt/Wirt besiegt → Effekt weg; jetzt über den allgemeinen `onEquipLost`).
-* **Ceremony** („attached or equipped") nimmt die Fee als **Anhängsel** weiter mit (`verschiebbar`: `_keinEquip` bleibt erlaubt, Weg `actionTransferAttachment`); Folge: Tempeluna verliert den Effekt, der neue Wirt gewinnt ihn nicht, die Fee-Hooks laufen am neuen Wirt weiter (Träger-Marke). **Frage an Al:** soll die Ceremony die Fee überhaupt mitnehmen (Ja/Nein)?
+* **Ceremony** („attached or equipped") nimmt die Fee als **Anhängsel** weiter mit (`verschiebbar`: `_keinEquip` bleibt erlaubt, Weg `actionTransferAttachment`); Folge: Tempeluna verliert den Effekt, der neue Wirt gewinnt ihn nicht, die Fee-Hooks laufen am neuen Wirt weiter (Träger-Marke). **Frage an Al:** soll die Ceremony die Fee überhaupt mitnehmen (Ja/Nein)? — **überholt in W53a: Nein, die Fee wird von keinem Weg bewegt.**
 
 ### Punkt 3 · Tokens werden nie umgehängt
 **Al:** „Ja, [Puppet Tokens] ausnehmen! Generell sollten Tokens ausgenommen sein!" Zentrale Erkennung: `engine.isTokenCard(inst)` (wirksame Kartendaten, auch Biomancy-/Boulder-Token mit `_cardDataOverride`). Genutzt in `istUmhaengbaresEquip` (Fridge, Ceremony-Equip-Teil, Auswahllisten), in `Inheritance Ceremony.verschiebbar` (Anhängsel-Teil) und als Riegel in `engine.actionTransferAttachment` (`{ success: false, tokenBlocked: true }`, kein Hook). Tri Ad / Tri Fecta merken keinen Abgang mehr, weil ihre Tokens bleiben. **Audit anderer Bewegungs-Effekte (nur gemeldet):** `actionMoveCard` blockt Puppets bereits über `cannotChangeSupportZone`; die Creature-Bewegungen (Guard Change, Slippery-Familie, Capture, Dark Gear, Diplomacy, Paraseed Greenhouse …) arbeiten auf Creatures (Creature-Tokens wie Mummy/Biomancy sind Creatures und zählen dort mit — nach Kartentext richtig); ein Pollution Token wird von keinem dieser Effekte als Ziel genommen (kein Creature-Typ). Nichts weiter geändert.
@@ -23278,3 +23278,92 @@ Kartentext 2+: „Whenever you equip an Artifact to a Hero, its controller draws
 
 ### Tests W52a
 Neu: `W52/a-01` (306 Prüfungen: Grund/Nutzlast je Weg, genau ein Ereignis, Gegenproben Kreatur/Token/Luck, Vertrag der sieben Helden, Differenz-Sweep), `a-02` (46: Fee kein Equip, Fridge/AME/Pests, Ceremony als Anhängsel, Gegenprobe Initiation-Held), `a-03` (24: Tokens), `a-04` (72: AME + Matrix + Wirkung), `a-05` (48: Lunatic Hawk). Angepasst: `W51/b-03` (Zerstören meldet jetzt `onEquipLost`; Fee-Probe nur noch Ceremony), `W51/c-01` (Hawk-Zeile: es zieht der Kontrolleur des Zielhelden).
+
+
+## Welle 53 / W53a — Ceremony nimmt die Fee nicht mit · „Was als Artifact zählt, feuert on-artifact-equipped" · ATK-Equips: ein Baustein (`actionSetAtkGrant`) · Teleportation Powder: keine Hooks, danach exakt wie vorher
+
+Al (Spieldesigner, 22.10.2026) hat die offenen Fragen aus W52 beantwortet. Repros: `docs/niche-tests/repro/W53/a-01` … `a-05` (beide Sitze, auf dem Stand vor W53a rot, soweit ein Fehler behoben wurde).
+
+### Punkt 1 · Inheritance Ceremony nimmt Tempelunas Fee NICHT mit (und kein anderer Weg bewegt sie)
+**Al:** „Soll Ceremony die Fee überhaupt als Anhängsel mitnehmen?" — „Nein." Die Fee (Hero-Karte, `counters._keinEquip` + `treatAsEquip` als Träger-Marke) wird von der Ceremony weder angeboten noch bewegt (`Ceremony.verschiebbar`: `treatAsEquip || _keinEquip` → false; analog zur Token-Ausnahme aus W52a).
+**Wegeaudit** (jeder Weg, der eine Karte in der Support Zone auf einen anderen Platz/Wirt bringen kann):
+
+| Weg | Fee bewegbar? | Stand |
+|---|---|---|
+| Inheritance Ceremony, Equip-Teil (`fuehreUmhaengenAus`) / Slippery Fridge | nein | schon W52a (`istUmhaengbaresEquip` false) |
+| Inheritance Ceremony, Anhängsel-Teil | nein | **W53a**: `verschiebbar` |
+| `engine.actionTransferAttachment` (Ceremony-Anhängsel, Cybug LOCUST, Secret Spell Book) | nein | **W53a**: zentraler Riegel `{ success: false, feeBlocked: true }` neben `tokenBlocked` (kein Hook) |
+| `engine.actionMoveCard` Support → Support (anderer Held/andere Seite) | nein | **W53a**: Riegel wie `cannotChangeSupportZone` (Zerstören/Ablegen bleibt möglich) |
+| Cybug LOCUST | nein | `surpriseEquipTrigger`: Fee ist kein Artifact (W52a) + Riegel oben |
+| Secret Spell Book (Kontrolle) | Kontrolle ja, **Umsetzen nein** | **W53a**: für Fee und Nicht-Kreatur-Tokens entfällt die Platzfrage (`kontrolleInPlace`); die Karte bleibt am Wirt |
+| `anhaengselUmziehen` (Status-Anhängsel), Creature-Wege (Guard Change, Slippery-Familie …) | n/a | arbeiten nur auf Status-Anhängseln bzw. Creatures |
+| Heldenplatz-Tausch | n/a | gibt es nicht; die Zonen wandern mit dem Helden |
+Die Fee verlässt Tempeluna nur durch Zerstören / Ablegen / Wirtstod (dann Effekt weg, ein `onEquipLost` als `attachment` — W52, unverändert). Repro `W53/a-01` (48 Prüfungen). Angepasst: `W51/b-03` (6), `W52/a-02` (5).
+
+### Punkt 2 · Ruling: **„Was als Artifact zählt, feuert on-artifact-equipped"**
+**Al** zu Cybug RHINOCEROS beim Anlegen eines Initiation-Helden: „Ja, was als Artifact gezählt wird, feuert on-artifact-equipped." **Allgemeine Regel (gilt für JEDEN Beobachter, jetzt und künftig):** Ein per Initiation Ritual angelegter Held („treated as an equippable Artifact") ist ein Artifact, das angelegt wird, und löst genau dieselben „Artifact equipped"-Beobachter aus wie ein Hand-Equip — beim Anlegen UND beim Umhängen (Fridge, Ceremony-Equip-Teil). Kein Beobachter braucht eine Sonderbehandlung; die Frage „zählt das als Artifact?" beantwortet allein `engine.istEquipArtifact(inst)` (Equipment-Artifact **oder** als Equip angelegter Held; **nicht** Anhängsel, **nicht** Tempelunas Fee `_keinEquip`, **nicht** Token).
+Beobachter, die es gibt (alle über `istEquipArtifact`/`onEquipGained`/`surpriseEquipTrigger`/`_checkSurpriseOnPlacement`): Afflicted Pests, Cybug LOCUST, Cybug RHINOCEROS, Anti Magic Enchantment, Lunatic Hawk (2+). **Keine Code-Änderung nötig** — `W53/a-02` belegt es als Differenz-Test (Initiation-Held == Club of Gobbo, je Beobachter und Weg Hand/Fridge/Ceremony, beide Sitze, 80 Prüfungen) plus Gegenprobe Fee (keiner feuert). **Neue Beobachter für „Artifact equipped" müssen `istEquipArtifact` benutzen** (nicht den Subtyp prüfen).
+*Fund (nicht angefasst):* „Crash Landing" („Play this card immediately when an Artifact is equipped to a Hero. Negate that Artifact …") hat in diesem Stand **kein Skript** — es wäre der sechste Beobachter und müsste dieser Regel folgen.
+
+### Punkt 3 · ATK-gebende Equips: Bonus nur beim aktuellen Träger, pro Instanz GENAU EINMAL
+**Al:** „Der ATK-Bonus soll nur exakt der aktuelle Träger haben, und er soll pro Equip-Instanz exakt einmal hinzugefügt sein. Das gilt für alle ATK-gebenden Equips." Anlass: Future Tech Gun +40 am Riffel-Träger.
+
+**Die ATK-Equips (Vollständigkeit per Kartentext in `cards.json` + Skript-Suche nach `grantAtk`/`_applyHeroAtkDelta`/`atkGranted`) und Befund**
+
+| Karte | Bonus | Befund |
+|---|---|---|
+| Blade of the Frostbringer · Blade of the Swamp Witch · Earth-Shattering Hammer · Explosivo's Sword · Heart-Shaped Bow · Legendary Sword of a Barbarian King · Mana-Consuming Blade · Shattered Trident · Super-Killing Knife · The Hands of Big Gwen · The Master's Sword · Vampiric Sword | +10 | in allen Wegen korrekt (Sweep); Baustein umgestellt (`ctx.grantAtk` = Zielwert) |
+| Phalanx Pike · Sacred Hammer of the Volcano · Club of Gobbo | +30 | dito |
+| The Sun Sword | +20 | dito |
+| Future Tech Laser Cannon · Lunatic Cycle - Full Moon · Modnir, Hammer of Coolness | +100 | dito; Laser Cannon rechnete selbst per Delta → jetzt `actionSetAtkGrant` |
+| **Ancient Tech Infinite Energy Core** | +10 je verschiedenem Namen in der Ablage | **Fehler:** Leave-Handler verglich strikt `fromOwner === cardHeroOwner`; endete ein Charme am Wirt, ging die Karte, der Bonus **blieb** am Helden (im Test Gun +80, Core +20) → Identität statt Seitenvergleich, Abzug am Stempel-Träger |
+| **Future Tech Gun** | +40 je Gun in der Ablage | derselbe Fehler. **+40 am Riffel-Träger ist der Kartentext** („40 times the number of 'Future Tech Gun' cards in your discard pile": die zerstörte Kopie liegt in der Ablage, Riffel legt eine zweite aus dem Deck an) — kein Doppelbuchen; belegt, dass ein direkt so angelegter Held (1 Gun in der Ablage) dieselben +40 hat (`W53/a-03`, Abschnitt C) |
+| Cloak of Edge | +20 DAUERHAFT je Aktivierung | kein Equip-Bonus im engeren Sinn (bleibt auch nach dem Abgang): bleibt bei `actionGrantAtk` (additiv, ohne Stempel); unverändert, getestet |
+| Taio, Toras (Heldenpassive) | +20/+40 je Artifact | W51b/W52a: `equipZustandHooks`, Stempel `_taioAtkGrantedBy`; durch Teleportation bleiben die Zähler jetzt erhalten (Punkt 4) |
+Nicht ATK-Stat: Warhorse, Possessed Blade, Glass Sword, Angelfeather/Bomb Arrow … (Schaden pro Treffer), Future Tech Fists, Bamboo Staff, Javelin Throw (rechnen mit der Basis-ATK).
+
+**Differenz-Test (`W53/a-03`, 21 Equips × beide Sitze):** nach jeder Sequenz hat jeder Held beider Sitze genau den ATK, den ein direkt so ausgerüsteter Held hätte (Grundwert + Boni der Karten, die jetzt an ihm liegen): direkt · Fridge hin und zurück · Ceremony · zerstört + neue Kopie · zurück auf die Hand + an anderem Helden · zwei Kopien (h0/h1, h0/h0) · Wirt besiegt + wiederbelebt · Seitenwechsel (LOCUST-Weg) und zurück · am Gegnerhelden ausgerüstet. Dazu `W53/a-04`: Fluch (vor/nach dem Equip, Fridge unter Fluch, Fluch heilen) · Status am Wirt · Charme · Formwechsel.
+
+**Gefundene Fehler (alle behoben, Bugfix-Note je Karte):**
+1. *Core/Gun unter Charme* (siehe Tabelle) — Bonus blieb nach dem Zerstören am Helden.
+2. *Aufstieg/Abstieg verlor die Boni der liegenden Karten* (`performAscension`/`performDescend` setzen `hero.atk` auf den gedruckten Wert der neuen Form, die Buchungen der Equips und Abilities blieben aber stehen): Riffel (90) + Club + Fighting → nach Aufstieg 100, Club zerstört 70, Fighting abgelegt **50** (unter dem gedruckten Wert). Jetzt schlägt `engine._atkBuchungenNachFormwechsel` die Boni der Karten, die weiter am Helden liegen (Ausrüstung mit Stempel, Abilities mit Buchung), auf den neuen Grundwert wieder auf. Dauerhafte Zuwächse ohne Karte (Cloak, Nero Zira, Rakah, Mirjam …) bleiben beim bisherigen „Formwechsel = neuer Grundwert" (Frage 1 an Al).
+3. *Teleportation Powder verlor die Buchungen der Abilities* (Fighting) — Punkt 4.
+4. *Doppeltes `onPlay`* (jeder Weg, der `onPlay` für eine schon liegende Karte erneut feuert) buchte den Bonus ein zweites Mal (`+=`): für alle 19 Festbonus-Equips möglich, jetzt Zielwert.
+
+**Entscheidung: gebuchter Bonus je Instanz (Variante B) statt „abgeleiteter Wert" (Variante A).**
+
+| Variante | Wirkung | Entscheidung |
+|---|---|---|
+| A · `hero.atk` immer aus Grundwert + ausgerüsteten Instanzen neu rechnen | wäre die sauberste Lösung — aber ATK ist in dieser Engine ein **gemuteter Wert**, in den ein Dutzend Quellen einzahlen: Fighting, Fluch-Unterdrückung (`_cursedAtkSuppressed`), ATK-Auren (`_atkAuraGrant`, Rioting Village), Cloak of Edge/Nero/Rakah/Mirjam/Chaorc (dauerhaft, ohne Karte), Taio/Toras, `grantTempHeroAtk`, Quick Attack … ; alle müssten umgeschrieben werden, jede vergessene Quelle wäre ein stiller ATK-Verlust | **verworfen** |
+| B · Buchung je Instanz auf den **Zielwert** stellen und an den Träger **stempeln** | kein anderer Einzahler ändert sich; Fluch/Auren/Broadcasts laufen weiter durch `_applyHeroAtkDelta`; Differenz-Test deckt jede Sequenz | **gewählt** |
+
+**Der Baustein** (`_engine.js`):
+* `engine.actionSetAtkGrant(inst, amount)` — setzt die Buchung der Instanz auf `amount` am Helden, in dessen Support Zone sie JETZT liegt (`physicalSide` + `heroIdx`). Zweimal aufgerufen = einmal gebucht (Differenz 0); dynamische Boni rufen es mit dem neu gerechneten Wert; lag die Buchung an einem anderen Helden (Stempel `counters._atkTraeger = { seite, heroIdx }`), wird sie dort **zuerst abgezogen**; `amount` 0 räumt Buchung und Stempel.
+* `engine.actionRevokeAtkAmTraeger(inst)` — zieht dort ab, wo die Buchung **liegt** (Stempel), sonst am aktuellen Träger. `ctx.grantAtk(amount)` ist jetzt `actionSetAtkGrant` (Zielwert!), `ctx.revokeAtk()` ist `actionRevokeAtkAmTraeger`. **Vertrag für Autorinnen/Autoren:** ein Equip bucht seinen Bonus mit `ctx.grantAtk(KONSTANTE)` in `onPlay` (und `onGameStart`), zieht ihn mit `ctx.revokeAtk()` in `onCardLeaveZone` ab (Identität `ctx.leavingCard.id === ctx.card.id`, **nicht** Seitenvergleich); dynamische Boni: `engine.actionSetAtkGrant(inst, neuerWert)` (Vorbild Core/Gun/Laser Cannon). *Dauerhafte* Zuwächse (Cloak of Edge) bleiben `actionGrantAtk` (additiv, ohne Stempel) bzw. `_applyHeroAtkDelta`.
+* Sicherheitsnetze: `sync()` räumt gestempelte Buchungen von Karten, die nicht mehr auf dem Brett liegen (`_atkBuchungenAufraeumen`); `fuehreUmhaengenAus` und `actionTransferAttachment` ziehen nach dem Leave-Haken eine stehengebliebene gestempelte Buchung am Ex-Träger ab; `performAscension`/`performDescend` schlagen die Boni neu auf (s. o.).
+
+### Punkt 4 · Teleportation Powder: keinerlei Hooks, danach EXAKT wie vorher
+**Al:** „Nein, das Verschwinden und Wiederauftauchen via Teleportation Powder soll keinerlei Hooks feuern (weder onEquipLost noch onEquipGained noch sonstige Leave/Enter-Hooks), nach dem Auftauchen soll alles *exakt* so sein wie vor dem Verschwinden." Der Kartentext (Held samt Abilities und aller ausgerüsteten/angehängten Karten „from the game completely", Rückkehr „to the Zones they were removed from" zu Beginn des nächsten eigenen Zuges) bestimmt nur Platz und Zeitpunkt; Ausnahmen bleiben wie bisher (Creatures bleiben stehen; ist eine Zone inzwischen fremdbesetzt, weicht die Karte auf den nächsten freien Platz desselben Helden aus; ohne freien Platz bleibt sie draußen; Anti Magic Zone sperrt den Rückkehrer, W18b).
+**Hooks:** schon vorher feuerte weder `resolve` noch die Rückkehr einen Leave-/Enter-/Equip-Hook (`_untrackCard`/`_trackCard` sind still). Hook-Wächter in `W53/a-05` (alle `runHooks`-Namen **und** die Fenster-Verteiler `_checkSurpriseOn*`, `_scanSurprisesAgainst`, `fireEquipGained/Lost`, Reaktionsfenster) bestätigen das für beide Richtungen; einzige Ausnahme beim Verschwinden: die Resistance-Prüfung `beforeHeroEffect` (W13, „Resistance blockt jeden Nicht-Schaden-Effekt").
+**Zustand — die Abweichungen (Schnappschuss-Differenz vorher/nachher, 4 Szenen × 2 Sitze), alle behoben:**
+
+| Vorher (Fehler) | Nachher |
+|---|---|
+| jede Karteninstanz kam mit **neuer Id** zurück (Stempel, die auf Instanz-Ids zeigen — `_taioAtkGrantedBy`, HOPT-Schlüssel `equip-effect:<id>`, `_gwenHandsOffered_<id>` — liefen ins Leere) | dieselbe Id |
+| Zähler von Abilities, Held-Instanz und Surprises gingen verloren: **Fighting-Buchung** (Bonus blieb nach dem Ablegen stehen), Taios `_taioAtkTotal`, Toras' `torasAtkBonus` | alle Zähler/Stempel/Status der Instanzen bleiben |
+| `turnPlayed` neu gesetzt | alter Wert |
+| Reihenfolge in der Instanzliste (= Hook-Reihenfolge) neu | alte relative Reihenfolge |
+| Heldenobjekt als JSON-Klon | **dasselbe Objekt** (HP, Buffs, Status, `ascensionReady`, `gainedEffectNames` …) |
+| unsichtbare Träger gewonnener Effekte (`_gainedEffectOnly`, Tempelunas Grundfeen, Dangerous Knowledge) blieben am abwesenden Helden hängen | gehen mit, kommen zurück |
+| `isActiveIn`-Überschreibung (Initiation-Held, Träger) ging verloren | wird wiederhergestellt |
+| `ps._teleportedAway: 0` blieb stehen | Eigenschaft wird entfernt |
+Umsetzung (`teleportation-powder.js`): `instanzenMerken` hält beim Verschwinden jede mitgehende Instanz als flache Datenkopie (Id, Zähler, Stempel, Status, Kontrolle, Platz, Position in `engine.cardInstances`) im Auftrag (`gs._teleportPending[].instanzen`, serialisierbar → Rewind/MCTS-Snapshot), `instanzEinsetzen` stellt sie bei der Rückkehr still wieder her. Aufträge aus älteren Spielständen (ohne `instanzen`) laufen über den alten Weg. **Nicht zurückkehrende Karte** (keine freie Zone): bleibt draußen; ihr gestempelter ATK-Bonus wird vom Helden abgezogen (nur beim aktuellen Träger); Zustandsboni wie Taios Artifact-Zähler rechnen dabei **nicht** neu (kein Hook) — Frage 2 an Al.
+
+### Tests W53a
+Neu: `W53/a-01` (48: Ceremony/Fee + alle Wege + Secret Spell Book), `a-02` (82: „Artifact equipped"-Beobachter × Weg), `a-03` (54: 21 ATK-Equips × 10 Sequenzen × 2 Sitze, Gun/Riffel), `a-04` (40: Baustein, Stempel, Sicherheitsnetze, Fluch/Status/Charme, Formwechsel, Cloak), `a-05` (112: Teleportation — 4 Szenen, Hook-Wächter, Schnappschuss-Differenz, Ausweichplatz, alter Auftrag). Angepasst: `W51/b-03`, `W52/a-02`.
+
+### Rückfragen an Al (Ja/Nein)
+1. **Aufstieg/Abstieg und ATK:** die Boni der Karten, die weiter am Helden liegen (Ausrüstung, Fighting), bleiben jetzt über den Formwechsel erhalten. *Dauerhafte* Zuwächse ohne Karte (Cloak of Edge, Nero Zira, Rakah, Mirjam, Chaorc Pyre Grill Master) werden beim Formwechsel weiter auf den gedruckten Wert zurückgesetzt („Formwechsel = neuer Grundwert", v1087). So lassen (ja) — oder sollen dauerhafte Zuwächse einen Aufstieg überleben (nein)?
+2. **Teleportation, Karte kann nicht zurück** (ihre Zone wurde fremdbesetzt und es gibt keinen freien Platz): die Karte bleibt draußen, ihr ATK-Bonus verschwindet vom Helden, aber Zustandsboni (Taio/Toras zählen „je Artifact") rechnen nicht neu, weil kein Hook feuert. Soll so eine Karte wie ein normaler Abgang behandelt werden (`onEquipLost`, Grund `hostRemoved`) — ja/nein?
+3. **Resistance beim Verschwinden:** die Prüfung `beforeHeroEffect` (W13) läuft beim Verschwinden weiter (sie ist kein Leave/Enter-Hook, sondern der Schutzcheck „Resistance blockt jeden Nicht-Schaden-Effekt"). So lassen (ja)?
+4. **Crash Landing** („Play this card immediately when an Artifact is equipped to a Hero. Negate that Artifact and send it to the discard pile.") hat kein Skript. Soll es als sechster „Artifact equipped"-Beobachter umgesetzt werden (ja)?
