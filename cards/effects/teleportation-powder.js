@@ -69,6 +69,11 @@
 //      dabei ihre Buchung und der Bonus blieb nach dem Ablegen stehen),
 //    · der Zaehler `_teleportedAway` verschwindet wieder, wenn er 0 erreicht.
 //  Einzige Ausnahme vom Platz: ist die Zone inzwischen fremdbesetzt, weicht die Karte aus (siehe oben).
+//
+//  ── ★ W54a (Al, 22.10.2026): Karte kann nicht zurueck = NORMALER ABGANG ──────────────────────
+//  Findet eine mitgenommene Karte beim Wiederauftauchen keinen Platz (ihre Zone ist fremdbesetzt UND der Held hat keinen freien Platz), bleibt sie draussen und verlaesst den Helden
+//  wie bei jedem anderen Abgang: `onEquipLost` (Grund `teleportLost`) an alle Zustandslauscher (Taio, Toras, Aufstiegs-Bereitschaft, Tempeluna …), die Karte raeumt sich selbst auf
+//  (`abgangMelden`). Nur dieser Fall feuert Hooks; Verschwinden und normales Auftauchen bleiben hook-frei.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -142,8 +147,33 @@ function instanzEinsetzen(engine, eintrag, zoneSlot) {
   return inst;
 }
 
+/**
+ * ★ W54a: eine Karte, die nicht zum Helden zurueckkehren kann, VERLAESST ihn — wie bei jedem normalen Abgang: sie steht fuer den Moment der Meldung noch an ihrem alten Platz in der
+ * Instanzliste (Leave-Semantik; Zaehl-Lauscher schliessen `leavingCard.id` aus), `onCardLeaveZone` geht nur an die Karte selbst (ihre Aufraeum-Haken: ATK-Bonus zurueck, Curse
+ * loest sich, Tempelunas Fee nimmt ihren Effekt mit) und der zentrale Verteiler meldet danach `onEquipLost` (Grund `teleportLost`) an alle Zustandslauscher. Danach ist die Instanz
+ * weg („nie dort gelegen"); ihre gestempelte ATK-Buchung wird in jedem Fall abgezogen (Sicherheitsnetz, idempotent).
+ */
+async function abgangMelden(engine, auftrag, eintrag) {
+  const d = eintrag.daten;
+  const phantom = instanzEinsetzen(engine, eintrag, d.zoneSlot);
+  try {
+    await engine.runHooks('onCardLeaveZone', {
+      _onlyCard: phantom, card: phantom, leavingCard: phantom,
+      fromZone: 'support', fromOwner: auftrag.besitzer, fromHeroIdx: auftrag.heroIdx, fromZoneSlot: d.zoneSlot,
+      _equipGrund: 'teleportLost', source: CARD_NAME, _skipReactionCheck: true,
+    });
+    engine.actionRevokeAtkAmTraeger(phantom);
+  } finally {
+    engine.cardInstances = engine.cardInstances.filter(c => c !== phantom);
+  }
+}
+
 module.exports = {
   isPotion: true,
+  // ★ W54a: SCHALTER fuer die Resistance-Pruefung beim Verschwinden (`beforeHeroEffect`, W13/Q144: „Resistance blockt jeden Nicht-Schaden-Effekt"; Kartentext Resistance Lv3: „unaffected by all
+  // cards and effects, except damage"). Al hat in W53 auf „Resistance beim Verschwinden weiter laufen lassen?" mit „Nein" geantwortet — das widerspricht dem dokumentierten Ruling Q144/M02-11
+  // (Teleportation Powder ist dort ausdruecklich genannt) und dem Resistance-Kartentext; deshalb NICHT umgesetzt, Rueckfrage an Al. Auf `false` gestellt feuert das Verschwinden keinen einzigen Hook.
+  resistancePruefung: true,
   // Hooks aus dem LOESCHSTAPEL heraus (siehe Kopfkommentar).
   activeIn: ['deleted'],
   oncePerGame: true,
@@ -196,7 +226,7 @@ module.exports = {
     // W13 (Q144, Al: Resistance blockt JEDEN Nicht-Schaden-Effekt): „remove it … from the game" ist
     // ein Nicht-Schaden-Effekt auf den Helden. Animation zuerst, dann der zentrale Pruefer; bei
     // Block ist die Potion verbraucht (Einmal-Stempel gesetzt), der Held bleibt unberuehrt.
-    if (await engine.heroNonDamageEffectBlocked(oi, hi, 'remove_from_game', { sourceOwner: pi, source: CARD_NAME })) {
+    if (module.exports.resistancePruefung !== false && await engine.heroNonDamageEffectBlocked(oi, hi, 'remove_from_game', { sourceOwner: pi, source: CARD_NAME })) {
       engine._broadcastEvent('play_zone_animation', {   // Animation trotzdem (Regel: Immunitaeten blocken Effekte, nie Animationen)
         type: 'gold_sparkle', owner: oi, heroIdx: hi, zoneSlot: -1,
       });
@@ -362,15 +392,12 @@ async function zurueckstellen(engine, auftrag) {
   }
 
   // W53a: alle gemerkten Instanzen mit ihrem alten Zustand zurueck (Id, Zaehler, Stempel, Spielzug-Marke, Platz in der Instanzliste) — in alter Reihenfolge.
+  const nichtZurueck = [];   // W54a: Karten, die nicht zurueckkehren koennen (kein freier Platz) — sie gehen als normaler Abgang vom Helden ab (s. u.)
   if (neu) {
     for (const eintrag of auftrag.instanzen.slice().sort((x, y) => x.index - y.index)) {
       const d = eintrag.daten;
       if (d.zone === 'support' && d.zoneSlot >= 0) {
-        if (platz[d.zoneSlot] === undefined) {                               // kein Platz mehr: die Karte bleibt draussen …
-          const ag = d.counters?.atkGranted || 0;                            // … und ihr ATK-Bonus bleibt nicht am Helden zurueck (nur beim aktuellen Traeger, W53a)
-          if (ag > 0 && d.counters._atkTraeger) engine._applyHeroAtkDelta(auftrag.hero, auftrag.besitzer, hi, -ag);
-          continue;
-        }
+        if (platz[d.zoneSlot] === undefined) { nichtZurueck.push(eintrag); continue; }   // kein Platz mehr: die Karte bleibt draussen
         instanzEinsetzen(engine, eintrag, platz[d.zoneSlot]);
       } else {
         instanzEinsetzen(engine, eintrag, null);
@@ -381,6 +408,12 @@ async function zurueckstellen(engine, auftrag) {
   // Zaehler zurueck auf „nie entrueckt" (nicht auf 0 stehen lassen).
   const rest = Math.max(0, (ps._teleportedAway || 0) - 1);
   if (rest > 0) ps._teleportedAway = rest; else delete ps._teleportedAway;
+  // ★ W54a (Al, 22.10.2026: „Ja" — eine Karte, die nicht zurueckkehren kann, soll wie ein NORMALER ABGANG behandelt werden): der Held ist wieder da, die Karte bleibt draussen und
+  // verlaesst ihn damit. Der Abgang laeuft wie jeder andere (`abgangMelden`): Grund `teleportLost`, `onEquipLost` an alle Zustandslauscher (Taio, Toras, Aufstiegs-Bereitschaft …),
+  // die Karte raeumt sich selbst auf (ATK-Bonus zurueck, Fluch loest sich, Tempelunas Fee nimmt ihren Effekt mit). Danach ist der Zustand „nie dort gelegen".
+  // Alle anderen Faelle (Verschwinden, normales Auftauchen) bleiben hook-frei (W53a).
+  for (const eintrag of nichtZurueck) await abgangMelden(engine, auftrag, eintrag);
+
   // W18b (Al 19.10.: „via Teleport Powder zurueckkehrende Heroes bekommen automatisch den Status/Debuff"): laeuft eine Anti Magic Zone,
   // ist der Rueckkehrer gesperrt. Keine Eintritts-Hooks (Regel 11.9.) — nur der Zonen-Status.
   await engine.amzFensterAufHeldAnwenden(auftrag.besitzer, hi);

@@ -193,7 +193,7 @@ const SZENEN = {
       await t.play(me, TP, { hero: 0, active: me });
       for (let z = 0; z < 3; z++) t.put(op, 0, z, 'ZZ Dummy Big');
       await t.endTurn(); await t.endTurn();
-      R.check('(D) keine freie Zone: der Held kehrt zurück, der Club bleibt draußen (kein Stapel, keine Instanz) und sein ATK-Bonus (30) liegt nicht mehr am Helden', t.gs.players[op].heroes[0].name === TAIO && t.inst(c => c.name === CLUB && c.zone === 'support').length === 0 && t.hero(op, 0).atk === atkVorher - 30 && t.errors.length === 0, { atk: t.hero(op, 0).atk, atkVorher, club: t.inst(c => c.name === CLUB && c.zone === 'support').length, e: t.errors }); }
+      R.check('(D) keine freie Zone: der Held kehrt zurück, der Club bleibt draußen (kein Stapel, keine Instanz) und sein ATK-Bonus (30) liegt nicht mehr am Helden — W54a (Al: „wie ein normaler Abgang"): auch Taios Bonus für dieses Artifact (20) rechnet neu', t.gs.players[op].heroes[0].name === TAIO && t.inst(c => c.name === CLUB && c.zone === 'support').length === 0 && t.hero(op, 0).atk === atkVorher - 30 - 20 && t.errors.length === 0, { atk: t.hero(op, 0).atk, atkVorher, club: t.inst(c => c.name === CLUB && c.zone === 'support').length, e: t.errors }); }
 
     // ═══ (E) Abwärtskompatibilität: Auftrag ohne gemerkte Instanzen ═══
     { const t = await SZENEN.taio(me, op);
