@@ -109,7 +109,10 @@ async function equipArtifactToHero(engine, pi, cardName, ownerOfHero, heroIdx, s
   await engine.runHooks('onPlay', {
     _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: slotIdx,
   });
-  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true });   // W16e (F03-21): per Effekt angelegt
+  // W51c (Al): AUSRUESTENDER ist `pi` (wer die Karte aus Hand/Deck/Ablage ausspielt), NICHT der Kontrolleur der Zone: liegt die Karte bei einem fremden Helden (Orchester: „Heroes on the
+  // board"), ist `inst.controller` der Gastgeber — ohne `_equipAnleger` galt dann dieser als Anlegender (Afflicted Pests/LOCUST des Orchester-Spielers feuerten auf die EIGENE Aktion,
+  // die des Gegners nicht).
+  await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isEffectEquip: true, _equipAnleger: pi });   // W16e (F03-21): per Effekt angelegt
   engine.sync();
   return inst;
 }

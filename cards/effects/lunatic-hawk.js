@@ -274,7 +274,7 @@ module.exports = {
       if (n >= 2
         && cd.cardType === 'Artifact'
         && (cd.subtype || '').toLowerCase() === 'equipment'
-        && ausruester(engine, entering) === pi
+        && (ctx._equipAnleger ?? ausruester(engine, entering)) === pi   // W51c: ausdruecklich genannter Ausruestender (Effekt-Equips wie das Orchester) vor der Ableitung aus der Zone
         && !ctx._isMove) {
         await engine.actionDrawCards(pi, 1);
         engine.log('lunatic_hawk_equip_draw', {
