@@ -3666,7 +3666,8 @@ class GameEngine {
           // (Control Device, Powder Keg) ist das der urspruengliche Besitzer, nicht der Gastgeber (gleiche Regel wie das Platzierungs-Fenster unten).
           // W50a: Umhaengen (Slippery Fridge, Inheritance Ceremony): ANLEGER = der Spieler, der den Effekt ausfuehrt (`_equipAnleger`), nicht der Brettbesitzer —
           // sonst oeffnete das Fenster beim Umhaengen GEGNERISCHER Ausruestung fuer den Falschen.
-          await this._checkSurpriseOnEquip(hookCtx._equipAnleger ?? this._anlegerEinerSupportKarte(enteringCard), enteringCard.heroIdx, enteringCard);
+          // W51a: EIN Fenster „Equip/Attachment gained" (`fireEquipGained`): Hook `onEquipGained`, danach das Surprise-Fenster (`surpriseEquipTrigger`).
+          await this.fireEquipGained(enteringCard, { anleger: hookCtx._equipAnleger ?? hookCtx._anhaengselAnleger, isMove: !!hookCtx._isMove, fromOwner: hookCtx._fromOwner, fromHeroIdx: hookCtx._fromHeroIdx, source: hookCtx._equipQuelle });
         }
         if (cd && hasCardType(cd, 'Creature')) {
           await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
@@ -3736,10 +3737,11 @@ class GameEngine {
     // Equip-Fenster (Afflicted Pests, Cybug LOCUST). Sie feuern `onCardEnterZone` mit `_skipReactionCheck` (die Hand-Reaktionskette des
     // Zaubers lief schon) — deshalb öffnet NUR das Equip-Fenster hier, nicht Beschwörungs-/Platzierungs-Fenster. Der ANLEGER ist der Wirker
     // (`_anhaengselAnleger`), nicht die Seite des Wirts (Curse auf einen Gegner-Helden liegt auf dessen Seite).
-    if (hookName === 'onCardEnterZone' && hookCtx._skipReactionCheck && hookCtx._anhaengselAnleger != null
+    // W51a: dasselbe Fenster wie beim Ausruesten (`fireEquipGained`), Anleger = `_equipAnleger` (kanonisch) bzw. `_anhaengselAnleger` (Alias, aeltere Skripte).
+    if (hookName === 'onCardEnterZone' && hookCtx._skipReactionCheck && (hookCtx._equipAnleger ?? hookCtx._anhaengselAnleger) != null
         && hookCtx.toZone === 'support' && hookCtx.enteringCard && !this._surpriseNestingBlocked()) {
       const _anh = hookCtx.enteringCard;
-      if (_anh.zone === 'support') await this._checkSurpriseOnEquip(hookCtx._anhaengselAnleger, _anh.heroIdx, _anh);
+      if (_anh.zone === 'support') await this.fireEquipGained(_anh, { anleger: hookCtx._equipAnleger ?? hookCtx._anhaengselAnleger, isMove: !!hookCtx._isMove, fromOwner: hookCtx._fromOwner, fromHeroIdx: hookCtx._fromHeroIdx, source: hookCtx._equipQuelle });
     }
 
     // ── Eintritts-Fenster „Creature betritt eine Support Zone" (v699).
@@ -6575,6 +6577,21 @@ class GameEngine {
     return Math.max(0, Math.ceil(hookCtx._kBase * (hookCtx._kMul ?? 1)) + (hookCtx._kFlat || 0));
   }
 
+  /**
+   * W51a (Al, 22.10.2026): ein fester Abzug NACH dem Haltepunkt (Einmal-Schild „reduce the next damage by X": Aquatic Shield-Rider) ist eine SENKUNG des
+   * Treffers selbst und kuerzt den Kettenbetrag um denselben Betrag (nicht unter 0; auf 0 gekuerzt = alle Folgetreffer 0).
+   */
+  _kettenAbzug(vollOut, n) {
+    if (!vollOut || !(n > 0) || typeof vollOut.wert !== 'number') return;
+    vollOut.wert = Math.max(0, vollOut.wert - n);
+  }
+
+  /** W51a (Al): „Halve that damage (rounded up)" NACH dem Haltepunkt (Cloud in a Bottle): der Kettenbetrag wird aufgerundet halbiert. */
+  _kettenHalbiert(vollOut) {
+    if (!vollOut || typeof vollOut.wert !== 'number' || !(vollOut.wert > 0)) return;
+    vollOut.wert = Math.ceil(vollOut.wert / 2);
+  }
+
   /** W50a: eine Senkung NACH dem Kettenbetrag-Haltepunkt (Halbierungs-Reaktion, Interference): Kettenbetrag im selben Verhaeltnis kuerzen; auf 0 = Negation -> 0. */
   _kettenSenkung(vollOut, vorher, nachher) {
     if (!vollOut) return;
@@ -9337,6 +9354,7 @@ class GameEngine {
     if (hookCtx.amount > 0 && !hookCtx.cannotBeReduced
         && target?._oneShotDmgShields?.length) {
       const _tOwnerS = this._findHeroOwner(target);
+      const _osOut = {};
       hookCtx.amount = this._consumeOneShotDamageShields(
         target._oneShotDmgShields, hookCtx.amount,
         _tOwnerS >= 0 ? {
@@ -9344,7 +9362,9 @@ class GameEngine {
           heroIdx: (this.gs.players[_tOwnerS]?.heroes || []).indexOf(target),
           zoneSlot: -1,
         } : null,
+        _osOut,
       );
+      this._kettenAbzug(opts?.vollOut, _osOut.summe);   // W51a (Al): Einmal-Schild (Aquatic Shield) „reduces the damage by X" = Senkung -> auch der Kettenbetrag sinkt
     }
 
     // Shielded heroes (first-turn protection) are immune to ALL damage
@@ -9654,7 +9674,7 @@ class GameEngine {
     if (!_isStatusTickSource) {
       this.log('damage', { source: source?.name, target: this._heroLabel(target), amount: actualAmount, damageType: type });
     }
-    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1 });
+    await this.runHooks(HOOKS.AFTER_DAMAGE, { source, target, amount: actualAmount, realDealt, type, sourceHeroIdx: source?.heroIdx ?? -1, vollOut: opts?.vollOut });   // W51a: vollOut -> Cloud in a Bottle kuerzt den Ricochet-Kettenbetrag
 
     // ── Elixir of Cold rider ──
     // When the source Hero carries the `cold_strike` buff and the
@@ -9695,7 +9715,7 @@ class GameEngine {
     if (realDealt > 0 && target && target.hp !== undefined) {
       // ★ Welle 14 (Al, Q10): `fullAmount`/`hpBefore` für Karten, die den vollen (ungedeckelten) Treffer brauchen (Cloud in a Bottle halbiert auch einen tödlichen).
       await this._checkAfterDamageHandReactions(
-        target, source, realDealt, type, { defeated: target.hp <= 0, fullAmount: actualAmount, hpBefore },
+        target, source, realDealt, type, { defeated: target.hp <= 0, fullAmount: actualAmount, hpBefore, vollOut: opts?.vollOut },
       );
       // ── Nach-Schaden-Surprise-Fenster (Cybug ANTS) ──
       // Zwilling der Zeile darueber, gleicher `realDealt`. Der
@@ -13484,7 +13504,11 @@ class GameEngine {
       for (const s of live.slice()) {
         const e = (entries || []).find(x => x && !x.cancelled && x.inst && (x.inst.controller ?? x.inst.owner) === p);
         if (!e) break;
-        e.modifyAmount(-Math.min(s.reduce, e.amount), { schild: true });   // flat (Punkt vor Strich); W50a: vergebenes Schild -> senkt den Treffer, nicht den Kettenbetrag
+        // flat (Punkt vor Strich). W51a (Al): „the next damage … is reduced by 100" (Harpyformer Choir) verringert den Treffer selbst = SENKUNG und kuerzt
+        // den Ricochet-Kettenbetrag mit (vorher als `schild` ausgenommen). Reicht der Treffer nicht an `reduce` heran, zaehlt fuer den Kettenbetrag der volle Abzug.
+        const _abzug = Math.min(s.reduce, e.amount);
+        e.modifyAmount(-_abzug);
+        if (!e.cannotBeReduced && e._kFlat !== undefined && s.reduce > _abzug) e._kFlat -= (s.reduce - _abzug);
         ps._kreaturenSchild = ps._kreaturenSchild.filter(x => x !== s);
         if (!ps._kreaturenSchild.length) delete ps._kreaturenSchild;
         this.log('creature_shield_used', { player: ps.username, by: s.by, protected: e.inst.name, reduced: s.reduce });
@@ -14328,12 +14352,13 @@ class GameEngine {
 
   /** Verbraucht alle Einmal-Schilde des Ziels gegen `amount`; gibt den
    *  reduzierten Betrag zurueck. Broadcast + Log uebernimmt der Helfer. */
-  _consumeOneShotDamageShields(list, amount, anim) {
+  _consumeOneShotDamageShields(list, amount, anim, out) {
     if (!Array.isArray(list) || list.length === 0 || !(amount > 0)) return amount;
     let summe = 0;
     for (const sch of list) summe += sch.amount || 0;
     list.length = 0;
     if (summe <= 0) return amount;
+    if (out) out.summe = summe;   // W51a: „reduce the next damage by X" ist eine SENKUNG -> der Aufrufer kuerzt damit den Ricochet-Kettenbetrag
     const reduziert = Math.max(0, amount - summe);
     this.log('one_shot_shield', { absorbed: amount - reduziert, remaining: reduziert });
     if (anim) this._broadcastEvent('play_zone_animation', anim);
@@ -16989,7 +17014,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {number} toPlayerIdx - Zielseite
    * @param {number} destHeroIdx - Zielheld
    * @param {number} destSlotIdx - freier Support-Slot dort
-   * @param {object} [opts] - { animDuration, skipAnimation, sourceName, quiet (nur die Karte selbst sieht den Eintritt), ignoreEquipRestriction }
+   * @param {object} [opts] - { animDuration, skipAnimation, sourceName, quiet (nur die Karte selbst sieht `onCardEnterZone`; das Fenster `onEquipGained` bleibt offen), ignoreEquipRestriction, anleger (W51a: Ausfuehrender = „Ausruestender" des Fensters) }
    *   Karten-Vertrag `attachmentMovedToHost(engine, inst, { fromOwner, fromHeroIdx, toOwner, toHeroIdx })`: legt die Wirkung am neuen Wirt wieder an (s. u.).
    * @returns {{ success: boolean }}
    */
@@ -17137,6 +17162,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
       _skipReactionCheck: true,
       _isMove: true,
+      // W51a (Al): Umhaengen oeffnet das Fenster „Equip/Attachment gained" (Hook `onEquipGained` + Afflicted Pests/LOCUST) wie das Anlegen. Ausruestender =
+      // der AUSFUEHRENDE (`opts.anleger`, Standard: der neue Kontrolleur); auch `quiet` (nur die Karte selbst sieht `onCardEnterZone`) laesst das Fenster offen.
+      _equipAnleger: opts.anleger ?? toPlayerIdx, _fromOwner: quellSeite, _fromHeroIdx: srcHeroIdx, _equipQuelle: opts.sourceName || null,
     });
 
     // ── Anlege-Effekt auf dem NEUEN Traeger (Als Befund 19.8.) ──
@@ -33955,6 +33983,35 @@ this._deathWatch = (this._deathWatchStack || []).length
     return anleger;
   }
 
+  /**
+   * ★ W51a (Al, 22.10.2026) — DAS EINE FENSTER „Equip/Attachment gained".
+   *
+   * Eine Nicht-Kreatur `inst` liegt NEU in einer Support Zone eines Helden (ausgeruestet, angehaengt oder UMGEHAENGT). Wer so etwas tut — und nicht ueber den
+   * Standard-Eintritt (`runHooks('onCardEnterZone', …)`) laeuft, der das Fenster selbst oeffnet — ruft diese Methode. Ablauf:
+   *   1. Hook `onEquipGained` (HOOKS.ON_EQUIP_GAINED) an alle Lauscher (Passive auf dem Brett, Hand-Reaktionen mit `activeIn: ['hand']` wie Anti Magic Enchantment, …).
+   *   2. Surprise-Fenster `surpriseEquipTrigger` (Afflicted Pests, Cybug LOCUST) ueber `_checkSurpriseOnEquip`.
+   * `opts.anleger` = der Spieler, der ausruestet/anhaengt/umhaengt („Ausruestender" — beim Umhaengen der AUSFUEHRENDE von Fridge/Ceremony, nicht der Brettbesitzer);
+   * ohne Angabe: `_anlegerEinerSupportKarte` (Kontrolleur, Cross-Side-Karten: ihr urspruenglicher Besitzer). `opts.isMove` = Umhaengen (`fromOwner`/`fromHeroIdx` = alter Platz),
+   * `opts.source` = Name der bewegenden Karte/des Effekts. Kontext des Hooks: { equipCard, equipName, equipOwner, equipHeroIdx, hostSide, heroController,
+   * kind: 'equip'|'attachment', isMove, fromOwner, fromHeroIdx, source }. Gibt das Ergebnis des Surprise-Fensters zurueck.
+   */
+  async fireEquipGained(inst, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.heroIdx < 0) return null;
+    const cd = this._getCardDB()[inst.name];
+    if (!cd || hasCardType(cd, 'Creature')) return null;
+    const anleger = opts.anleger ?? this._anlegerEinerSupportKarte(inst);
+    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack')) ? 'attachment' : 'equip';
+    const hostSide = this.physicalSide(inst);
+    const heroController = this.surpriseKontrolleur(hostSide, inst.heroIdx);
+    await this.runHooks(HOOKS.ON_EQUIP_GAINED, {
+      equipCard: inst, equipName: inst.name, equipOwner: anleger, equipHeroIdx: inst.heroIdx, hostSide, heroController,
+      kind, isMove: !!opts.isMove, fromOwner: opts.fromOwner, fromHeroIdx: opts.fromHeroIdx, source: opts.source,
+      _skipReactionCheck: true,
+    });
+    if (inst.zone !== ZONES.SUPPORT) return null;   // ein Lauscher hat die Karte inzwischen entfernt
+    return this._checkSurpriseOnEquip(anleger, inst.heroIdx, inst);
+  }
+
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
     if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = this.opponentOf(equipOwnerIdx);
@@ -36928,7 +36985,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         this._inAfterCreatureDamageReaction = true;
         try {
           if (script.afterCreatureDamageResolve) {
-            await script.afterCreatureDamageResolve(this, ownerIdx, creatureInst, source, amount, type);
+            await script.afterCreatureDamageResolve(this, ownerIdx, creatureInst, source, amount, type, opts);
           }
         } catch (err) {
           console.error(`[AfterCreatureDamageReaction] ${cardName} threw:`, err.message);
@@ -40780,7 +40837,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
+    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
@@ -51036,15 +51093,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       // wie im Heldenpfad (flat nach Multiplikatoren; cannotBeReduced
       // laesst sie unverbraucht). VOR dem Null-Floater, damit eine
       // Vollabsorption die 0 zeigt.
+      let _eShieldSumme = 0;
       if (e.amount > 0 && !e.cannotBeReduced
           && e.inst.counters?._oneShotDmgShields?.length) {
+        const _osOut = {};
         e.amount = this._consumeOneShotDamageShields(
           e.inst.counters._oneShotDmgShields, e.amount,
           {
             type: 'shield_block', owner: e.inst.controller ?? e.inst.owner,
             heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
           },
+          _osOut,
         );
+        _eShieldSumme = _osOut.summe || 0;   // W51a: Einmal-Schild = Senkung (Kettenbetrag sinkt mit)
       }
       // Fully-absorbed creature hit → red "0" floater so the player
       // can see the block. Same rationale as the hero path above.
@@ -51073,7 +51134,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `e._flatBonus = 50 * arrowCount` on matching entries; we add
       // it AFTER the multiplier so halving / doubling can't touch it.
       if (e._flatBonus && !e.kettenFolge) e.amount += e._flatBonus;
-      if (e.vollOut) e.vollOut.wert = (_eNachSenkung <= 0 && !e._flatBonus) ? 0 : _eRef + (e.kettenFolge ? 0 : (e._flatBonus || 0));
+      if (e.vollOut) e.vollOut.wert = (_eNachSenkung <= 0 && !e._flatBonus) ? 0 : Math.max(0, _eRef - _eShieldSumme) + (e.kettenFolge ? 0 : (e._flatBonus || 0));
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
         // ★ W15b (Al, C3/S02-05): nach aktuellem KONTROLLEUR (gestohlene Kreatur = Gegnerziel; meine Kreatur auf der Gegnerseite nicht).
         if (this.kontrolleurVon(e.inst) !== e.sourceOwner) {
@@ -51489,7 +51550,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // routing (the recoil hits the ATTACKER, not the dead inst).
         const defeated = (e.inst.counters?.currentHp ?? 0) <= 0;
         await this._checkAfterCreatureDamageHandReactions(
-          e.inst, e.source, e.realDealt, e.type, { defeated },
+          e.inst, e.source, e.realDealt, e.type, { defeated, vollOut: e.vollOut },   // W51a: Cloud in a Bottle (Kreatur) kuerzt den Ricochet-Kettenbetrag
         );
       }
     }

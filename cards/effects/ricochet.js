@@ -45,8 +45,11 @@
 //  nicht noch einmal obendrauf (`kettenFolge`): der Betrag steht fest.
 //  W50a (Al 22.10.2026, Antwort auf die Rueckfrage): SENKUNGEN des
 //  Vorgaengers (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzuege)
-//  geben sich weiter, SCHILDE/BLOCKS/Negation nicht (Basis = Schaden
-//  vor dem Schildabzug, nach den Senkungen). Tabelle in CARD_API.
+//  geben sich weiter, HP-Deckel/Boeden/Zusatz-HP und Negation nicht
+//  (Basis = Schaden nach den Senkungen). W51a (Al): auch jeder Effekt,
+//  der den Schaden selbst verringert, ist eine Senkung — Aquatic Shield
+//  (Surprise UND Rider), Harpyformer Choir, Cloud in a Bottle (Held und
+//  Kreatur), Dichotomy, Johanna. Tabelle in CARD_API „Welle 51 / W51a".
 //  Engine: `opts.vollOut` / `opts.kettenFolge`.
 //
 //  ── ANIMATION ────────────────────────────────────────────────────

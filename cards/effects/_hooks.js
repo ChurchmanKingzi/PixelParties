@@ -78,6 +78,13 @@ const HOOKS = {
   ON_DELETE:        'onDelete',
   ON_CARD_ENTER_ZONE: 'onCardEnterZone',
   ON_CARD_LEAVE_ZONE: 'onCardLeaveZone',
+  // W51a (Al, 22.10.2026): EIN Fenster „Equip/Attachment gained" — eine Nicht-Kreatur liegt NEU in einer Support Zone eines Helden, weil sie ausgeruestet,
+  // angehaengt oder UMGEHAENGT wurde (Slippery Fridge, Inheritance Ceremony, Cybug LOCUST, Secret Spell Book …). Gefeuert von `engine.fireEquipGained`
+  // (EINE Stelle; Verteiler in `runHooks` fuer Standard-Eintritte, `actionTransferAttachment`, `fuehreUmhaengenAus`), danach das Surprise-Fenster
+  // `surpriseEquipTrigger` (Afflicted Pests, Cybug LOCUST). Kontext: { equipCard, equipName, equipOwner (Ausruestender), equipHeroIdx, hostSide,
+  // heroController, kind: 'equip'|'attachment', isMove, fromOwner?, fromHeroIdx?, source? }. `cardName` im Kontext ist der LAUSCHER, nicht die Karte.
+  // BEWUSST nicht in HOOK_DESCRIPTIONS: kein generisches Hand-Reaktionsfenster (Reaktionen auf der Hand lauschen wie Anti Magic Enchantment per `hooks.onEquipGained`, `activeIn: ['hand']`).
+  ON_EQUIP_GAINED: 'onEquipGained',
 
   // ── Combat ──
   ON_ATTACK_DECLARE: 'onAttackDeclare',

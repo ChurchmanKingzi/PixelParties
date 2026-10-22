@@ -347,7 +347,7 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
     await engine.runHooks('onCardEnterZone', {
       _onlyCard: inst, enteringCard: inst,
       toZone: 'support', toHeroIdx: destHeroIdx,
-      _isMove: true, _equipAnleger: anleger,
+      _isMove: true, _equipAnleger: anleger, _fromOwner: equipOwner, _fromHeroIdx: srcHeroIdx, _equipQuelle: opts.quelle || null,   // W51a: Fenster `onEquipGained` (siehe `engine.fireEquipGained`)
     });
     // Dauerwirkung am neuen Traeger (ATK-Boni, Inselzonen …); `_isMove` laesst Einmal-Wirkungen beim Anlegen aus (Summoning Instructions).
     await engine.runHooks('onPlay', {

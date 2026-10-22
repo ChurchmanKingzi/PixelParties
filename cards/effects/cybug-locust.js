@@ -138,7 +138,7 @@ module.exports = {
     if (!bezahlt) return null;
 
     const ergebnis = await engine.actionTransferAttachment(
-      inst, traegerSeite, traegerHeroIdx, frei[0], { sourceName: CARD_NAME },
+      inst, traegerSeite, traegerHeroIdx, frei[0], { sourceName: CARD_NAME, anleger: pi },
     );
     if (!ergebnis?.success) { engine.sync(); return null; }
 

@@ -24,9 +24,11 @@
 //    the Artifact must already be sitting in the
 //    Support Zone for the enchantment to attach.
 //
-//  • Instead, AME listens on `onCardEnterZone` while
-//    still in hand. When the Artifact actually lands
-//    in a Support Zone, the hook offers AME's holder
+//  • Instead, AME listens on `onEquipGained` (W51a: der EINE
+//    generische Hook „Equip/Attachment gained", gefeuert von
+//    `engine.fireEquipGained` — auch beim UMHAENGEN durch Slippery
+//    Fridge / Inheritance Ceremony) while still in hand. When the
+//    Artifact actually lands in a Support Zone, the hook offers AME's holder
 //    the opportunity to play it. On accept: pay a
 //    Pollution Token, stamp `counters.antiMagicEnchanted`
 //    onto the Artifact, add the `anti_magic_enchanted`
@@ -64,12 +66,12 @@ module.exports = {
   // played via the post-land prompt.
   neverPlayable: true,
 
-  // Must stay live while in hand (so the `onCardEnterZone` hook fires there).
+  // Must stay live while in hand (so the `onEquipGained` hook fires there).
   activeIn: ['hand'],
 
   hooks: {
     /**
-     * Fires for every zone entry event. We only care when an Equipment
+     * Fires for every equip/attach event (`onEquipGained`). We only care when an Equipment
      * Artifact lands in a Support Zone — auf JEDER Seite, von jedem angelegt
      * (Welle 11, Al R6). Die Negier-Fähigkeit gehört dem Kontrolleur des
      * Artefakts („controlling player").
@@ -78,7 +80,7 @@ module.exports = {
      * only one prompts per event. Self-dedupes via engine.sync after the
      * card leaves hand.
      */
-    onCardEnterZone: async (ctx) => {
+    onEquipGained: async (ctx) => {
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const inst = ctx.card;
@@ -90,8 +92,8 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps || !ps.hand.includes('Anti Magic Enchantment')) return;
 
-      const entering = ctx.enteringCard;
-      if (!entering || ctx.toZone !== 'support') return;
+      const entering = ctx.equipCard;
+      if (!entering || entering.zone !== 'support') return;
 
       const cardDB = engine._getCardDB();
       const cd = cardDB[entering.name];

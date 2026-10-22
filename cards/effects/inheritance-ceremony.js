@@ -180,7 +180,7 @@ module.exports = {
       if (equips.length) {
         const plan = equips.map(({ inst, platz }) => ({ inst, owner: ziel.seite, srcHeroIdx: inst.heroIdx, srcSlot: inst.zoneSlot, destHeroIdx: ziel.heroIdx, destSlot: platz }));
         const namen = equips.map(z => z.inst.name);
-        await fuehreUmhaengenAus(engine, plan, { anleger: pi });
+        await fuehreUmhaengenAus(engine, plan, { anleger: pi, quelle: CARD_NAME });
         for (const name of namen) {
           bewegt++;
           engine.log('inheritance_move', { player: ps.username, from: nutzer.hero.name, to: ziel.hero.name, card: name });
@@ -189,7 +189,7 @@ module.exports = {
       for (const { inst, platz } of zuteilung) {
         if (istUmhaengbaresEquip(engine, inst) && inst.heroIdx === ziel.heroIdx) continue;   // schon (als Equip) umgehängt
         const name = inst.name;
-        const r = await engine.actionTransferAttachment(inst, ziel.seite, ziel.heroIdx, platz, { sourceName: CARD_NAME, quiet: true });
+        const r = await engine.actionTransferAttachment(inst, ziel.seite, ziel.heroIdx, platz, { sourceName: CARD_NAME, quiet: true, anleger: pi });
         if (r?.success) {
           bewegt++;
           engine.log('inheritance_move', { player: ps.username, from: nutzer.hero.name, to: ziel.hero.name, card: name });

@@ -195,7 +195,7 @@ async function uebernimm(engine, pi, inst, ergebnis) {
         ok = !!r?.success;
       }
     } else if (!engine.supportSlotBelegt(auswahl.owner, auswahl.heroIdx, auswahl.slotIdx)) {
-      const r = await engine.actionTransferAttachment(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME });
+      const r = await engine.actionTransferAttachment(inst, auswahl.owner, auswahl.heroIdx, auswahl.slotIdx, { sourceName: CARD_NAME, anleger: pi });
       ok = !!r?.success;
     }
     if (ok) { ergebnis.uebernommen.push(name); ergebnis.umgesetzt.push(name); return; }

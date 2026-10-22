@@ -313,7 +313,7 @@ module.exports = {
     if (plan.length === 0) return true; // Fizzle
 
     // ── Step 4: Execute — ALLE gleichzeitig (gemeinsamer Baustein mit Inheritance Ceremony) ──
-    await fuehreUmhaengenAus(engine, plan, { anleger: pi, logType: 'slippery_fridge_move' });
+    await fuehreUmhaengenAus(engine, plan, { anleger: pi, logType: 'slippery_fridge_move', quelle: 'Slippery Fridge' });
 
     engine.sync();
     return true;

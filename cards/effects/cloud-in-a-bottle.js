@@ -134,6 +134,8 @@ module.exports = {
     const hpVor = Number.isFinite(info?.hpBefore) ? info.hpBefore : (target.hp + amount);
     const halfDmg = Math.ceil(voll / 2);
     const neuHp = hpVor - halfDmg;
+    // W51a (Al, 22.10.2026): Cloud in a Bottle HALBIERT den Schaden = SENKUNG -> Ricochet gibt nur die Haelfte weiter (auch wenn der Held trotzdem faellt).
+    engine._kettenHalbiert(info?.vollOut);
     if (neuHp <= 0) {
       // Auch halbiert noch tödlich: der Held bleibt besiegt (die Karte war trotzdem gespielt).
       target.hp = 0;
@@ -195,9 +197,10 @@ module.exports = {
     return true;
   },
 
-  async afterCreatureDamageResolve(engine, pi, inst, _source, amount /*, type */) {
+  async afterCreatureDamageResolve(engine, pi, inst, _source, amount, _type, info) {
     _markPrompted(engine.gs, pi);
     const gs = engine.gs;
+    engine._kettenHalbiert(info?.vollOut);   // W51a (Al): Halbierung = Senkung -> Ricochet-Kettenbetrag
     const restoreAmount = amount - Math.ceil(amount / 2);   // = floor(amount / 2)
     if (restoreAmount > 0 && (inst.counters.currentHp ?? 0) > 0) {
       const maxHp = inst.counters.maxHp ?? Infinity;
@@ -290,6 +293,7 @@ module.exports = {
 
       // Welle 14 (Q10): auch ein tödlicher Treffer wird halbiert (voller Betrag inkl. Overkill; `realDealt` ist auf die Vor-Treffer-HP gedeckelt).
       const halfDmg = Math.ceil(actualAmount / 2);
+      engine._kettenHalbiert(ctx.vollOut);   // W51a (Al): Halbierung = Senkung -> Ricochet-Kettenbetrag (engine.js reicht `vollOut` im afterDamage-Kontext durch)
       const hpVor = target.hp + (Number.isFinite(ctx.realDealt) ? ctx.realDealt : actualAmount);
       const neuHp = hpVor - halfDmg;
       if (neuHp <= 0) {
