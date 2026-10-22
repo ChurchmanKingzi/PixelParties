@@ -23624,3 +23624,26 @@ Neu: `W59/a-01` (74, beide Sitze): (N1) Helm kommt bei liegendem Dorf · (N2) Do
 1. **Spieler-Limit:** „no player can use more than 1 Attack per turn" ist eine Sperre für den *Spieler*; die Attack eines Helden mit Diver Helmet zählt weiter für das Limit des Spielers (und die zweite Attack ist gesperrt). Soll der Helm den Helden auch davon befreien (seine Attacks zählen nicht / sind nicht gesperrt) — ja/nein? (Ich habe „beide Komponenten" als ATK-Verdopplung und Rückstoß gelesen.)
 2. **Shared Blood Tanks:** der Kettenschaden („all other Bleeding targets its owner controls also take Bleed damage") trifft heute auch Helden und Kreaturen mit Diver Helmet. Ausnehmen — ja/nein?
 3. **Acid Rain:** der Pollution Token kann heute in die freie Support Zone eines Helden mit Diver Helmet gelegt werden (Spielerwahl). Diese Helden als Ziel ausnehmen — ja/nein?
+
+
+## Welle 60 / W60a — Shared Blood Tanks nimmt Diver Helmet aus (Ketten-Bleed) · `engine.karteIstVonAreasAusgenommen`
+
+Folgearbeit zu W59a (Rückfrage 2, Pflichtregel „Areas — respect Diver Helmet"). Repro: `docs/niche-tests/repro/W60/a-01` (42 Prüfungen, beide Sitze; auf dem Stand vor W60a **32 ✗**, danach alle grün).
+
+### Befund
+Shared Blood Tanks (*„… Whenever a target takes Bleed damage, except from this effect, all other Bleeding targets its owner controls also take Bleed damage."*) ließ den Ketten-Bleed-Schaden (`kettenTick`) auch Helden mit Diver Helmet und Kreaturen/Karten in deren Support Zones treffen — die Zielliste (`collectPlayerTargets`) kannte keinen Helm. Verstoß gegen „The equipped Hero and all cards in its Support Zones are unaffected by Areas."
+
+### Lösung
+* **`engine.karteIstVonAreasAusgenommen(inst)`** (neu, neben `heldIstVonAreasAusgenommen`): Karte in einer Support Zone ist ausgenommen, wenn der Held, in dessen Zonen sie **physisch** liegt (`inst.owner` + `inst.heroIdx`, nicht der Kontrolleur), von Areas ausgenommen ist. Karten außerhalb der Support Zones (Hand, Ablage, Area) nie. Reihenfolge der Quellen für „unaffected by Areas" bleibt EINE Stelle (`heldIstVonAreasAusgenommen`).
+* **Faustregel für Area-Skripte:** Held → `engine.heldIstVonAreasAusgenommen(Brettseite, Index)`; Karte/Kreatur/Token in einer Support Zone → `engine.karteIstVonAreasAusgenommen(inst)`. Keine eigene Helm-Suche im Skript.
+* **`shared-blood-tanks.js`:** (a) der Kettenschlag überspringt ausgenommene Ziele — die Frage wird **bei jedem Schlag neu** gestellt, nicht in der vorab gebildeten Zielliste (Helm kann mitten in der Kette kommen oder gehen); (b) ein ausgenommenes Ziel **löst die Kette nicht aus** (Auslegung wie Rioting Village: die Area wirkt auf diese Ziele nicht, auch nicht als Quelle); der EIGENE Tick des Ziels (Engine, nach seiner Handlung) bleibt unverändert, denn den teilt die Engine aus, nicht die Area.
+* Die Kartenkarte (`showTriggeredEffect`) erscheint nur, wenn die Kette überhaupt jemanden treffen würde.
+
+### Auslegung „Auslöser" (offen, Ja/Nein an Al)
+Der Kartentext trennt „takes Bleed damage" (Auslöser) und „all other Bleeding targets … take Bleed damage" (Wirkung). Entschieden wurde die **symmetrische** Lesart: ein ausgenommenes Ziel ist für die Area nicht vorhanden → weder Opfer noch Auslöser. Die engere Lesart (Helm schützt nur vor dem Schaden, Auslöser bleibt normal) ist im Skript eine einzige Zeile (`istAusgenommen(...)` am Beginn von `afterBleedDamage`). Vergleichsfall Tarleinn's Floating Island (Heilung eines Helm-Ziels erlaubt dem *Spieler* zu ziehen): wirkt auf den Spieler, nicht auf das Ziel, bleibt unverändert.
+
+### Audit der übrigen Areas (erneut)
+Die 13 Area-Skripte ohne Helm-Bezug durchgesehen: **Acid Rain** (Pollution Token in freie Support Zone — offene Frage an Al, **Ist-Zustand bleibt**), Shared Blood Tanks (jetzt behoben). Übrige wirken nur auf Spieler, Hände, Stapel, Gold, Levels, Regeln oder Optionen des Spielers (Board of Kings, Crystal Well, Spider Hive, Temple of Sacrifice, The Bonegrinder, The Cosmic Depths, The First Circle of Hell, War Council Gathering Place, Wowhalla, Tarleinn's Floating Island) oder sind bereits geschützt (Stinky Stables über die Engine, 20 Skripte mit Helm-Bezug). Keine weitere Fundstelle. Das Spielerlimit von Rioting Village bleibt unverändert.
+
+### Tests W60a
+Neu: `W60/a-01` (42, beide Sitze): (A) Gegenprobe ohne Helm · (B) Helm-Held als Opfer (Helm an Held 1 / an 1 und 2) · (C) Helm-Held als Auslöser, Gegenprobe · (D) Kreaturen in den Zonen des Helm-Helden: als Opfer, als Auslöser, am eigenen Tick gestorben, nicht blutende · (E) Helm am anderen Helden / am Gegnerhelden schützt nicht · (F) Helm kommt nach Schlag 1 / wird nach Schlag 1 zerstört / zwischen zwei Ticks · (G) Gegnerseite, Area beim Gegner · (H) zwei Kopien · (I) nicht blutender Held.

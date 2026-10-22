@@ -30131,6 +30131,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     return require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx);
   }
 
+  /**
+   * ★ W60a: Gegenstueck fuer KARTEN — „all cards in its Support Zones are unaffected by Areas" (Diver Helmet). `inst`: eine Instanz in einer Support Zone (Kreatur, Ausruestung,
+   * Token …); sie ist ausgenommen, wenn der Held, in dessen Support Zones sie PHYSISCH liegt (`inst.owner` + `inst.heroIdx`, nicht der Kontrolleur — auch eine uebernommene Kreatur
+   * sitzt in der Zone ihres Besitzers), von Areas ausgenommen ist (`heldIstVonAreasAusgenommen`). Karten ausserhalb der Support Zones (Hand, Ablage, Area …) sind nie ausgenommen.
+   * Area-Skripte fragen fuer Helden `heldIstVonAreasAusgenommen`, fuer Karten HIER — nie die Helm-Pruefung selbst.
+   */
+  karteIstVonAreasAusgenommen(inst) {
+    if (!inst || inst.zone !== 'support') return false;
+    if (inst.heroIdx == null || inst.heroIdx < 0) return false;
+    return this.heldIstVonAreasAusgenommen(inst.owner, inst.heroIdx);
+  }
+
   _isDiverHelmetProtectedTarget(target) {
     if (!target) return false;
     const dh = require('./_diver-helmet-shared');

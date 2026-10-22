@@ -41,6 +41,18 @@
 //    Spieler eine Kopie kontrollieren: der urspruengliche Tick loest
 //    beide aus, die Ketten selbst loesen nichts mehr aus.
 //
+//  • ★ W60a — DIVER HELMET (CARD_API „Areas — respect Diver Helmet"):
+//    „The equipped Hero and all cards in its Support Zones are unaffected
+//    by Areas." Ein Held mit Helm und alle Karten in seinen Support Zones
+//    sind fuer diese Area nicht vorhanden: (a) der Kettenschaden trifft sie
+//    NICHT (Pruefung bei jedem Schlag neu — der Helm kann mitten in der
+//    Kette kommen oder gehen), (b) sie loesen die Kette auch NICHT aus
+//    (Auslegung wie Rioting Village; offene Ja/Nein-Frage an Al). Ihr
+//    EIGENER Tick nach der Handlung bleibt unveraendert — den teilt die
+//    Engine aus, nicht die Area. Zentrale Fragen: `engine.heldIstVon-
+//    AreasAusgenommen(Seite, Held)` und `engine.karteIstVonAreasAus-
+//    genommen(inst)` (Karte in den Support Zones eines Helm-Helden).
+//
 //  • Der Kettenschaden ist echter Bleed-Schaden: Betrag ueber
 //    `engine._bleedDamageAmount` (also inklusive `beforeBleedDamage`-
 //    Aenderungen fremder Karten), Typ `status`, ohne Zielwahl- und
@@ -58,6 +70,17 @@ function istDasselbe(ziel, getroffen) {
     return ziel.type === 'hero' && ziel.owner === getroffen.owner && ziel.heroIdx === getroffen.heroIdx;
   }
   return ziel.type !== 'hero' && ziel.cardInstance?.id === getroffen.inst?.id;
+}
+
+/**
+ * ★ W60a — Diver Helmet: „The equipped Hero and all cards in its Support Zones are unaffected by Areas." (CARD_API „Areas — respect Diver Helmet")
+ * Ist dieses Ziel (Picker-Objekt aus `collectPlayerTargets`) von Areas ausgenommen? Held → `heldIstVonAreasAusgenommen(Brettseite, Index)`, Karte in einer Support Zone
+ * (Kreatur, Puppet …) → `karteIstVonAreasAusgenommen(inst)`. Die Frage wird bei JEDEM Schlag neu gestellt (der Helm kann mitten in der Kette kommen/gehen).
+ */
+function istAusgenommen(engine, ziel) {
+  if (!ziel) return false;
+  if (ziel.type === 'hero') return engine.heldIstVonAreasAusgenommen(ziel.owner, ziel.heroIdx);
+  return engine.karteIstVonAreasAusgenommen(ziel.cardInstance || ziel.inst);
 }
 
 /** Einen Bleed-Tick an ein Ziel austeilen — ohne das Fenster erneut zu oeffnen. */
@@ -134,10 +157,15 @@ module.exports = {
       const besitzer = getroffen.owner;
       if (besitzer == null) return;
 
-      // Alle ANDEREN blutenden Ziele derselben Seite.
+      // ★ W60a (Diver Helmet): ein von Areas ausgenommenes Ziel (Held mit Helm / Karte in dessen Support Zones) ist fuer diese Area nicht vorhanden — es loest die Kette
+      // nicht aus (Auslegung wie Rioting Village: die Area wirkt auf diese Ziele nicht, auch nicht als Quelle; Frage 1 an Al) ...
+      if (istAusgenommen(engine, { type: getroffen.kind === 'hero' ? 'hero' : 'equip', owner: getroffen.owner, heroIdx: getroffen.heroIdx, cardInstance: getroffen.inst })) return;
+
+      // Alle ANDEREN blutenden Ziele derselben Seite. ... und ausgenommene Ziele werden von der Kette nicht getroffen — aber erst BEIM Schlag geprueft (unten): der Helm kann
+      // zwischen zwei Schlaegen kommen UND gehen, die Zielliste darf ihn nicht vorab festschreiben. Hier nur: gibt es ueberhaupt jemanden, den die Kette jetzt treffen wuerde?
       const ziele = collectPlayerTargets(engine, besitzer)
         .filter(t => isTargetBleeding(engine, t) && !istDasselbe(t, getroffen));
-      if (ziele.length === 0) return;
+      if (!ziele.some(t => !istAusgenommen(engine, t))) return;
 
       // ★ Grundregel (CARD_API): ein Effekt, der aus einem HOOK heraus
       // feuert, streamt seine Karte an BEIDE Spieler. `source` entprellt
@@ -152,6 +180,7 @@ module.exports = {
         // Zwischen zwei Ticks kann sich das Brett aendern (ein Ziel
         // stirbt am vorigen Tick) — vor jedem Schlag neu pruefen.
         if (!isTargetBleeding(engine, ziel)) continue;
+        if (istAusgenommen(engine, ziel)) continue;     // ★ W60a: Helm kam mitten in der Kette
         const betrag = await kettenTick(engine, ziel);
         if (betrag > 0) getroffenZahl++;
       }
