@@ -1827,7 +1827,7 @@ class GameEngine {
     }
 
     // ── Card-specific handler (extensible per-card CPU logic) ──
-    const cardName = promptData.title || promptData.source;
+    const cardName = promptData.cpuDispatch || promptData.title || promptData.source;   // W58a: `cpuDispatch` nennt die Karte bei dekoriertem Titel (Cool Rescuer Monia)
     if (cardName) {
       const script = loadCardEffect(cardName);
       if (script?.cpuResponse) {
@@ -8661,21 +8661,30 @@ class GameEngine {
     if (this.gs?._effectImmunities?.length) this.gs._effectImmunities.length = 0;
     // W16f (H01-08): Monias Schild („negate any effects that card or effect has") gilt nur für DIESE Auflösung — er endet mit ihr,
     // auch wenn Monia selbst nie wieder am Zug ist (tot/gefroren: ihr `onTurnStart` räumt dann nicht mehr).
-    if (this.gs && this.gs._moniaShieldActive != null) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; }
+    if (this.gs && (this.gs._moniaShieldActive != null || this.gs._moniaAngebote)) { delete this.gs._moniaShieldActive; delete this.gs._moniaShieldSource; delete this.gs._moniaAngebote; }   // W58a: auch die Angebote der Aufloesung
     // W16f (H03-10): Monia Bots True-Damage-Stempel gilt für Schaden AUS dem umgeleiteten Effekt — er endet mit dessen Auflösung (macht der Effekt keinen Schaden, verfällt er).
     if (this.gs && this.gs._redirectedTrueDamage) delete this.gs._redirectedTrueDamage;
   }
 
   /**
-   * W16f (H01-08): blockt Monias Schild (`gs._moniaShieldActive` = geschützte Seite) einen Effekt auf `inst`? Der Schild gehört zu der
-   * Karte/dem Effekt, die ihn ausgelöst hat (`gs._moniaShieldSource.name`): eine ANDERE benannte Quelle (unabhängiger Effekt im selben
-   * Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle auf einer der beiden Seiten gilt der Schild wie bisher.
+   * W16f (H01-08): blockt Monias Schild einen Effekt auf `inst`? Der Schild gehört zu der Karte/dem Effekt, die ihn ausgelöst hat: eine ANDERE benannte
+   * Quelle (unabhängiger Effekt im selben Zug, z. B. eine Reaktion) wird nicht geblockt; ohne bekannte Quelle auf einer der beiden Seiten gilt der Schild wie bisher.
+   * ★ W58a: ohne Einmal-pro-Zug-Sperre kann eine Auflösung mehrere angenommene Angebote tragen (`gs._moniaAngebote`: { key = Name der Karte/des Effekts, pi, seite }) —
+   * jedes schützt SEINE Seite vor SEINER Quelle; die einzelne Marke `_moniaShieldActive`/`_moniaShieldSource` bleibt als Spiegel des zuletzt angenommenen Angebots.
+   * `seite` = die Seite, unter der `inst` zählt (Aufrufer: Besitzer oder Kontrolleur; Standard Kontrolleur).
    */
-  moniaSchildBlockt(inst, source) {
-    const seite = this.gs?._moniaShieldActive;
-    if (seite == null || !inst) return false;
-    const schildQuelle = this.gs._moniaShieldSource?.name;
+  moniaSchildBlockt(inst, source, seite) {
+    if (!inst) return false;
+    if (seite == null) seite = inst.controller ?? inst.owner;
     const q = typeof source === 'string' ? source : (source?.name || source?.cardName);
+    for (const a of (this.gs?._moniaAngebote || [])) {
+      if (a.seite == null || a.seite !== seite) continue;
+      if (a.key && q && a.key !== q) continue;
+      return true;
+    }
+    const marke = this.gs?._moniaShieldActive;
+    if (marke == null || marke !== seite) return false;
+    const schildQuelle = this.gs._moniaShieldSource?.name;
     if (schildQuelle && q && q !== schildQuelle) return false;
     return true;
   }
@@ -20448,7 +20457,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (this._lightBallProtects(ownerIdx, 'creature')) return false;
     }
     // Monia-style creature protection (synchronous check via _moniaShieldActive)
-    if (this.gs._moniaShieldActive != null && inst.owner === this.gs._moniaShieldActive && this.moniaSchildBlockt(inst, source)) return false;
+    if (this.moniaSchildBlockt(inst, source, inst.owner)) return false;
     return true;
   }
 
@@ -21503,7 +21512,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const statusDef = STATUS_EFFECTS[statusName];
     const immuneKey = statusDef?.immuneKey || (statusName + '_immune');
     if (inst.counters[immuneKey]) return false;
-    if (this.gs._moniaShieldActive != null && (inst.controller ?? inst.owner) === this.gs._moniaShieldActive && this.moniaSchildBlockt(inst, opts.source)) return false;
+    if (this.moniaSchildBlockt(inst, opts.source, inst.controller ?? inst.owner)) return false;
     return true;
   }
 

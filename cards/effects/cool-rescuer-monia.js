@@ -2,18 +2,56 @@
 //  CARD EFFECT: "Cool Rescuer Monia"
 //  Hero (400 HP, 40 ATK, Charme + Fighting)
 //
-//  Once per turn: when creatures would be
-//  affected by a card/effect, Monia's player
-//  may discard 1 card to negate all creature
-//  effects from that card/effect.
+//  "Whenever 1 or more Creatures either player controls would be
+//   affected by a card or effect, you may discard 1 card to negate any
+//   effects that card or effect has on all Creatures."
 //
-//  Hooks into beforeCreatureDamageBatch to
-//  intercept creature damage. Future: also
-//  intercept status, healing, control changes.
+//  ★ W58a (Al, 22.10.2026): die Einmal-pro-Zug-Klausel ist gestrichen
+//  („Whenever" statt „Once per turn, when"). JEDE Karte / JEDER Effekt,
+//  der mindestens eine Kreatur betreffen wuerde, oeffnet das Angebot
+//  erneut; jede Annahme kostet erneut 1 Karte. Pro Karte/Effekt aber
+//  nur EIN Angebot je Kontrolleur — nicht mehrfach, weil der Effekt
+//  mehrere Kreaturen trifft oder in mehreren Schadensstapeln ablaeuft
+//  (Buchfuehrung `gs._moniaAngebote`, siehe `_monia-shared.js`; sie
+//  endet mit der Aufloesung, die naechste Aktion fragt wieder).
+//  Die alte Sperre (`monia-protect` ueber `_hero-hopt-shared`) entfaellt.
+//
+//  Hooks into beforeCreatureDamageBatch (Schaden) und
+//  beforeCreatureAffected (Zerstoeren, Status, Bewegen, Heilen,
+//  Kontrolle).
+//
+//  CPU (`cpuResponse`): nimmt das Angebot nur an, wenn die eigenen
+//  Kreaturen vom GEGNER bedroht sind (nie fuer die Kreaturen des Gegners,
+//  nie gegen den eigenen Effekt, nie gegen Heilung) und der Wert der
+//  bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar
+//  uebersteigt — sonst wuerde sie ohne Zugsperre in jedem Fenster Karten
+//  wegwerfen.
 // ═══════════════════════════════════════════
 
-const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
-const { JETPACK_NAME, hasEquipped, checkMoniaAscension } = require('./_monia-shared');
+const { JETPACK_NAME, hasEquipped, checkMoniaAscension, quellName, angenommenesAngebot, angebotAbgelehnt, angebotMerken, angeboteBeenden } = require('./_monia-shared');
+const CARD_NAME = 'Cool Rescuer Monia';
+
+/**
+ * CPU-Angaben fuer den Prompt: wer bedroht welche Kreaturen womit. `liste` = [{ inst, amount, nichtSchaden }].
+ * Nur Zahlen/Namen — der Prompt geht auch an den Client.
+ */
+function cpuInfo(engine, pi, liste, quelleOwner, effektTyp) {
+  const schutz = {};
+  const cardDB = engine._getCardDB();
+  for (const { inst, amount, nichtSchaden } of liste) {
+    const seite = inst.controller ?? inst.owner;
+    const cd = engine.getEffectiveCardData?.(inst) || cardDB[inst.name] || {};
+    const lvl = (() => { try { return engine.kreaturLevelJetzt?.(inst); } catch { return undefined; } })();
+    (schutz[seite] = schutz[seite] || []).push({
+      name: inst.name,
+      hp: inst.counters?.currentHp ?? cd.hp ?? 0,
+      level: Number.isFinite(lvl) ? lvl : (cd.level || 0),
+      amount: amount || 0,
+      nichtSchaden: !!nichtSchaden,
+    });
+  }
+  return { pi, quelleOwner: Number.isInteger(quelleOwner) ? quelleOwner : -1, effektTyp: effektTyp || null, schutz };
+}
 
 module.exports = {
   heroEffect: true,
@@ -45,6 +83,43 @@ module.exports = {
     return { optionId: `save-${gerryOwnerPi}` };
   },
 
+  /**
+   * CPU-Entscheidung zum Angebot „Cool Rescue!" (`promptData._moniaInfo`, siehe `cpuInfo`). Ohne Zugsperre wuerde die generische CPU-Wahl
+   * („letzte Option") in JEDEM Fenster eine Karte opfern — und dabei sogar die Kreaturen des Gegners retten. Hier: annehmen NUR wenn
+   *   · die Option fuer die EIGENEN Kreaturen angeboten wird (`save-<eigener Sitz>`),
+   *   · der Effekt nicht von der eigenen Seite kommt (kein Selbstschutz gegen den eigenen Plan) und keine Heilung ist,
+   *   · der Wert der bedrohten Kreaturen die Kosten der schwaechsten Handkarte klar uebersteigt.
+   * Wert einer Kreatur: 20 + 15 × Level + min(40, HP/10); voll bei toedlichem Schaden oder Zerstoeren, ×0,8 Bewegen, ×0,6 Status/Sonstiges, sonst anteilig am Schaden (×0,7).
+   * Kosten: Handwert der schwaechsten Karte (`engine._cpuEstimateHandValue`, sonst 20) + 10; bei nur 1 Handkarte muss der Wert hoch sein (≥ 80).
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'optionPicker' || !promptData._moniaInfo) return undefined;
+    const info = promptData._moniaInfo, pi = info.pi;
+    const eigene = `save-${pi}`;
+    if (!(promptData.options || []).some(o => o.id === eigene)) return null;     // nie die Kreaturen des Gegners retten
+    if (info.quelleOwner === pi) return null;                                    // eigener Effekt
+    if (info.effektTyp === 'heal') return null;                                  // Heilung muss man nicht verhindern
+    const liste = info.schutz?.[pi] || [];
+    if (!liste.length) return null;
+    const hand = engine.gs.players[pi]?.hand || [];
+    if (!hand.length) return null;
+    let wert = 0;
+    for (const c of liste) {
+      const voll = 20 + 15 * (c.level || 0) + Math.min(40, Math.round((c.hp || 0) / 10));
+      const nsGewicht = info.effektTyp === 'destroy' ? 1 : (info.effektTyp === 'move' ? 0.8 : 0.6);   // Zerstoeren trifft am haertesten, Status/Sonstiges weniger
+      const anteil = c.nichtSchaden ? nsGewicht : (c.hp > 0 && c.amount >= c.hp ? 1 : Math.min(1, (c.amount || 0) / Math.max(1, c.hp || 1)) * 0.7);
+      wert += voll * anteil;
+    }
+    let guenstigste = 20;
+    if (typeof engine._cpuEstimateHandValue === 'function') {
+      try { guenstigste = Math.min(...hand.map(n => engine._cpuEstimateHandValue(pi, n))); } catch { guenstigste = 20; }
+      if (!Number.isFinite(guenstigste)) guenstigste = 20;
+    }
+    const kosten = guenstigste + 10;
+    if (hand.length === 1 && wert < 80) return null;
+    return wert >= kosten * 1.25 ? { optionId: eigene } : null;
+  },
+
   hooks: {
     onGameStart: async (ctx) => {
       const engine = ctx._engine;
@@ -57,14 +132,9 @@ module.exports = {
     },
 
     onTurnStart: async (ctx) => {
-      // Reset once-per-turn at the start of EVERY turn (not just Monia's)
-      const engine = ctx._engine;
-      const gs = engine.gs;
-      const heroIdx = ctx.cardHeroIdx;
-      const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;
-      // (v1275: die Einmal-Sperre ist ein Zugstempel am Spieler — kein Zuruecksetzen noetig.)
-      // Clear stale shield flag (afterSpellResolved never fires in engine)
-      delete gs._moniaShieldActive;
+      // Clear stale shield flag + offers (afterSpellResolved never fires for non-spells; the engine ends the resolution at onAnyActionResolved).
+      // (W58a: es gibt keine Einmal-pro-Zug-Sperre mehr — nichts zurueckzusetzen ausser der Aufloesung.)
+      angeboteBeenden(ctx._engine.gs);
     },
 
     /**
@@ -88,18 +158,29 @@ module.exports = {
       const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;
       const flags = gs.heroFlags?.[flagKey];
       if (!flags?.moniaProtection) return;
-      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOwner)) return;   // v1275: pro Spieler (Ruling 22.9.); Styx 28.9.: Kontrolleur
 
-      // If shield is already active from an earlier batch in the same resolution, auto-apply
-      if (gs._moniaShieldActive != null) {
+      // v1443 (Als Befund 26.9.): WORAUF reagiert Monia? Die ausloesende
+      // Karte steht links im Panel (`triggerCardName`), rechts bleibt
+      // Monia selbst (automatisches `showCard`). Quelle: `runHooks` haelt
+      // sie VOR der Zuhoerer-Runde fest; sonst die Schadensquelle.
+      const trigger = ctx.ausloeserName || (() => {
         for (const e of entries) {
-          if (!e.cancelled && !e.isStatusDamage && e.canBeNegated !== false
-              && (e.inst.controller ?? e.inst.owner) === gs._moniaShieldActive) {
-            e.cancelled = true;
-          }
+          const n = quellName(e.source);
+          if (n) return n;
         }
-        return;
+        return null;
+      })();
+      const key = trigger || '';
+
+      // Steht fuer DIESE Karte/diesen Effekt schon ein Schild (angenommenes Angebot, ein frueherer Stapel desselben Effekts), gilt er ohne neue Frage:
+      // die Eintraege der geschuetzten Seite fallen weg. Gleiches gilt fuer Angebote anderer Kontrolleure derselben Aufloesung.
+      for (const e of entries) {
+        if (e.cancelled || e.isStatusDamage || e.canBeNegated === false || !e.inst) continue;
+        if (engine.moniaSchildBlockt(e.inst, e.source, e.inst.controller ?? e.inst.owner)) e.cancelled = true;
       }
+      // Pro Karte/Effekt nur EIN Angebot: angenommen (egal von wem) oder von mir abgelehnt → keine neue Frage.
+      if (angenommenesAngebot(gs, key)) return;
+      if (angebotAbgelehnt(gs, key, pi)) return;
 
       // Must have 1+ cards in controller's hand
       const ps = gs.players[pi];
@@ -134,18 +215,8 @@ module.exports = {
         ];
       }
 
-      // v1443 (Als Befund 26.9.): WORAUF reagiert Monia? Die ausloesende
-      // Karte steht links im Panel (`triggerCardName`), rechts bleibt
-      // Monia selbst (automatisches `showCard`). Quelle: `runHooks` haelt
-      // sie VOR der Zuhoerer-Runde fest; sonst die Schadensquelle.
-      const trigger = ctx.ausloeserName || (() => {
-        for (const e of promptable) {
-          const q = e.source;
-          const n = typeof q === 'string' ? q : (q?.cardName || q?.name);
-          if (n) return n;
-        }
-        return null;
-      })();
+      const srcEntry = promptable.find(e => e.source) || promptable[0];
+      const quelleOwner = srcEntry ? (srcEntry.sourceOwner ?? srcEntry.source?.owner ?? srcEntry.source?.controller) : undefined;
 
       // Show prompt to Monia's player
       const result = await engine.promptGeneric(pi, {
@@ -162,19 +233,21 @@ module.exports = {
         // Single-option branches are auto-skipped by the engine's
         // gerry gate (options.length >= 2 required).
         gerrymanderEligible: true,
+        cpuDispatch: CARD_NAME,   // W58a: die CPU fragt `cpuResponse` dieser Karte (Titel traegt den Heldennamen/Zusatz)
+        _moniaInfo: cpuInfo(engine, pi, promptable.map(e => ({ inst: e.inst, amount: e.amount })), quelleOwner, 'damage'),
       });
 
-      if (!result || !result.optionId || result.cancelled) return;
+      // Abgelehnt: fuer diese Karte/diesen Effekt nicht noch einmal fragen (mehrere Stapel, Folgetreffer).
+      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null); return; }
 
       // Determine which owner to protect
       const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) return;
+      if (!match) { angebotMerken(gs, key, pi, null); return; }
       const protectOwner = parseInt(match[1]);
 
-      // Mark as used this turn
-      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOwner);   // v1275; Styx 28.9.: Kontrolleur
+      angebotMerken(gs, key, pi, protectOwner);
 
-      // Set shield active for subsequent batches in this resolution
+      // Set shield active for subsequent batches / status checks of this resolution
       gs._moniaShieldActive = protectOwner;
       gs._moniaShieldSource = trigger ? { name: trigger } : null;   // W16f (H01-08): der Schild gehört zu dieser Karte/diesem Effekt
 
@@ -260,19 +333,19 @@ module.exports = {
       const flagKey = `${ctx.cardOriginalOwner}-${heroIdx}`;
       const flags = gs.heroFlags?.[flagKey];
       if (!flags?.moniaProtection) return;
-      if (!heldenSperreFrei(gs, 'monia-protect', ctx.cardOwner)) return;   // v1275: pro Spieler (Ruling 22.9.); Styx 28.9.: Kontrolleur
 
       // Side attribution uses CONTROLLER — a cross-side-placed
       // Creature counts under the side that currently controls it.
       const creatureSide = creature.controller ?? creature.owner;
 
-      // If shield is already active, auto-apply
-      if (gs._moniaShieldActive != null) {
-        if (creatureSide === gs._moniaShieldActive) {
-          ctx.cancelled = true;
-        }
-        return;
-      }
+      // Karte/Effekt (Name wie im Schadenshook: Quelle des Effekts, sonst die laufende Wirkung)
+      const key = quellName(ctx.source) || engine._effectSourceName() || '';
+
+      // Steht fuer DIESE Karte/diesen Effekt schon ein Schild (angenommenes Angebot, Kreatur davor), gilt er ohne neue Frage.
+      if (engine.moniaSchildBlockt(creature, ctx.source, creatureSide)) { ctx.cancelled = true; return; }
+      // Pro Karte/Effekt nur EIN Angebot: angenommen (auch fuer die andere Seite) oder von mir abgelehnt → keine neue Frage.
+      if (angenommenesAngebot(gs, key)) return;
+      if (angebotAbgelehnt(gs, key, pi)) return;
 
       const ps = gs.players[pi];
       if (!ps || (ps.hand || []).length === 0) return;
@@ -284,25 +357,27 @@ module.exports = {
         { id: `save-${creatureSide}`, label: `🛡️ Protect ${creatureName} (discard 1)` },
       ];
 
+      const quelleOwner = ctx.source && typeof ctx.source === 'object' ? (ctx.source.owner ?? ctx.source.controller) : undefined;
       const result = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: `${hero.name} — Cool Rescue!`,
         description: `${ownerLabel.charAt(0).toUpperCase() + ownerLabel.slice(1)} ${creatureName} is in danger!`,
         options,
         cancellable: true,
+        cpuDispatch: CARD_NAME,
+        _moniaInfo: cpuInfo(engine, pi, [{ inst: creature, amount: 0, nichtSchaden: true }], quelleOwner, ctx.effectType),
       });
 
-      if (!result || !result.optionId || result.cancelled) return;
+      if (!result || !result.optionId || result.cancelled) { angebotMerken(gs, key, pi, null); return; }
 
       const match = result.optionId.match(/^save-(\d+)$/);
-      if (!match) return;
+      if (!match) { angebotMerken(gs, key, pi, null); return; }
       const protectOwner = parseInt(match[1]);
 
-      heldenSperreSetzen(gs, 'monia-protect', ctx.cardOwner);   // v1275; Styx 28.9.: Kontrolleur
+      angebotMerken(gs, key, pi, protectOwner);
       gs._moniaShieldActive = protectOwner;
       {   // W16f (H01-08): Quelle des geschützten Effekts merken (Schild gilt nur für sie)
-        const q = ctx.source;
-        const qn = typeof q === 'string' ? q : (q?.name || q?.cardName);
+        const qn = quellName(ctx.source);
         gs._moniaShieldSource = qn ? { name: qn } : null;
       }
       ctx.cancelled = true;
@@ -326,18 +401,15 @@ module.exports = {
 
       // Discard 1 card (player chooses)
       if (ps.hand.length > 0) {
-        await engine.actionPromptForceDiscard(pi, 1, { title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
+        await engine.actionPromptForceDiscard(pi, 1, { costFor: 'Cool Rescuer Monia', costKind: 'protect', title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
       }
     },
 
     /**
-     * After spell resolves: clear the shield-active flag.
+     * After spell resolves: clear the shield-active flag and the offers of this resolution.
      */
     afterSpellResolved: async (ctx) => {
-      const gs = ctx._engine.gs;
-      if (gs._moniaShieldActive != null) {
-        delete gs._moniaShieldActive;
-      }
+      angeboteBeenden(ctx._engine.gs);
     },
   },
 };

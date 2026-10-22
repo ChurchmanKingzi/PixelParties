@@ -7727,7 +7727,8 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
   // responds to prompts their card raises (Barker hero-ability, etc.).
-  const cardName = promptData._gerryOriginalTitle || promptData.title || promptData.source;
+  // W58a: `cpuDispatch` nennt die Karte, deren `cpuResponse` antworten soll, wenn der Prompt-Titel dekoriert ist (Cool Rescuer Monia: "<Heldenname> — Cool Rescue!").
+  const cardName = promptData.cpuDispatch || promptData._gerryOriginalTitle || promptData.title || promptData.source;
   if (cardName) {
     const script = loadCardEffect(cardName);
     if (script?.cpuResponse) {

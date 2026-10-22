@@ -1,8 +1,9 @@
 'use strict';
 // H01-heroes-08 · Cool Rescuer Monia: die Schildmarke `gs._moniaShieldActive` bleibt nach dem geschützten Effekt stehen
 //
-// Kartentext: „Once per turn, when 1 or more Creatures either player controls would be affected by a card or effect, you may discard
-//   1 card to negate any effects that card or effect has on all Creatures."
+// Kartentext (bis W58a): „Once per turn, when 1 or more Creatures either player controls would be affected by a card or effect, you may discard
+//   1 card to negate any effects that card or effect has on all Creatures." — seit W58a (Al): „Whenever …" ohne Einmal-pro-Zug-Sperre. Der unabhängige zweite Effekt öffnet deshalb ein EIGENES
+//   Angebot (hier abgelehnt → er wirkt normal; die Schildmarke des ersten Effekts leckt nicht auf ihn über).
 // Erwartung: Die Negation gilt nur für DIESE eine Karte / diesen einen Effekt. Ein späterer, unabhängiger Effekt des Gegners (hier Gift auf
 //   eine andere Kreatur) wirkt normal, und die Marke ist nach dem Effekt weg.
 // Beobachtet: `beforeCreatureDamageBatch` setzt `gs._moniaShieldActive = protectOwner` und räumt sie nur im `afterSpellResolved` (feuert nur bei
@@ -31,8 +32,11 @@ const D = H.INERT.creature;
   const { t, a, b } = await aufbau();
   R.check('Vorprobe: a bleibt bei 200 HP, 1 Handkarte abgeworfen', a.counters.currentHp === 200 && t.pile(0, 'hand').length === 2, [a.counters.currentHp, t.pile(0, 'hand').length]);
   R.check('Schildmarke ist nach dem Effekt wieder weg', t.gs._moniaShieldActive == null, t.gs._moniaShieldActive);
+  const angebote = () => t.prompts.filter(p => p.d.type === 'optionPicker' && /Cool Rescue/.test(p.d.title || '')).length;
+  const vorher = angebote();
+  t.script.push({ match: d => d.type === 'optionPicker' && /Cool Rescue/.test(d.title || ''), answer: () => null, once: true });   // W58a: das zweite Angebot wird abgelehnt
   await t.run(() => t.engine.applyCreatureStatus(b, 'poisoned', { sourceOwner: 1 }));
-  R.check('anderer, unabhängiger Effekt (Gift auf Kreatur b) wirkt normal', !!b.counters.poisoned, JSON.stringify(b.counters));
+  R.check('anderer, unabhängiger Effekt (Gift auf Kreatur b) öffnet ein eigenes Angebot (W58a: keine Zugsperre mehr) und wirkt nach Ablehnung normal', angebote() === vorher + 1 && !!b.counters.poisoned, { vorher, nachher: angebote(), c: JSON.stringify(b.counters) });
 
   R.section('Monia fällt danach, mehrere Zugwechsel');
   const x = await aufbau();
