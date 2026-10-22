@@ -24,8 +24,10 @@ Umgestellter alter Repro: `W47/a-02` („Silence-Bonus-Spell verbraucht" → „
 * Dauerfeuer: 16 Karten × 2 Seiten, 0 Unterschiede.
 * `Bugfix-Note`-Zeilen (Silence, Victory Phoenix Cannon u. a., `_hell-circles-shared`) im Commit.
 
-## Offene Rückfragen an Al (Ja/Nein)
+## Nachtrag (22.10.2026): Silence-Fenster nach Heldeneffekten
 
-1. **Silence-Bonus-Spell:** Er wird jetzt sofort nach der Kette angeboten und verfällt, wenn man ihn dort nicht wählt (vorher: ein Spell später im selben Zug möglich). Ist das so gewollt? (entspricht deiner Aussage „SOFORT")
-2. **Dark Ocean und Creature-Surprise-Platzierung:** Unter Dark Ocean kann der Gegner nicht auf die Platzierung einer Creature-Surprise reagieren (z. B. Off Duty auf Pure Advantage Camel), weil die Platzierung Teil des Surprise-Effekts ist. Soll Dark Ocean die Reaktion auf die bloße Platzierung doch zulassen? Heute nein.
-3. **Hand-Reaktionen im Spell-Auswahl-Zeitfenster:** Sie bleiben möglich, gesperrt sind nur Surprises. Passt das?
+Auf die Beobachtung „Silence auf einem Weg ohne Spielhandler öffnet sein Fenster erst beim nächsten Drain" hat Al nachgefragt, ob das im echten Spiel für Alice funktioniert. **Antwort: nein, das war ein echter Fehler.** `engine._runPostChainActions()` (Folgeaktionen nach der Kette: Silence-Sofort-Spell, Master's Plan, Shamanic Curse, Lunar Eclipse, Circles of Hell …) wurde nur in `play_spell`, `play_creature`, `play_artifact`, `use_potion`, `use_artifact_effect`, `activate_ability` und `activate_discard_effect` geleert – **nicht** in `activate_hero_effect` (Alice!), `activate_creature_effect`, `activate_equip_effect`, `activate_free_ability`, `activate_area_effect`, `activate_permanent` und `play_from_coolness_stack`. Wurde Alices Heldeneffekt (zählt als Spell) von Silence negiert, blieb das Sofort-Fenster liegen, bis ein anderer Handler es später leerte. Behoben in `server.js` (Drain in allen genannten Handlern); neuer Wächter `scripts/check-post-chain-drain.js` (18 Spielzug-Handler, Ausnahmen nur play_ability, play_surprise, trigger_treacherous_crystal, activate_hand_card).
+
+## Offene Rückfragen an Al
+
+Alle drei beantwortet (Al, 22.10.2026): 1. Ja (Kartentext „immediately"), 2. Dark Ocean bleibt wie es ist, 3. Hand-Reaktionen im Auswahlfenster bleiben möglich. Keine offenen Rückfragen.
