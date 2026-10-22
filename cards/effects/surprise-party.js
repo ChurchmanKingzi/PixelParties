@@ -7,7 +7,27 @@
 //   Support Zones, if possible. If the Creature's level is higher than
 //   the user's Support Magic level, your opponent draws 2 cards times
 //   the difference. Shuffle all other revealed cards back into your
-//   deck."
+//   deck. If you reveal 5 cards before you reveal an appropriate
+//   Creature, terminate this effect. Immediately end your turn
+//   afterwards."
+//
+//  ── WELLE 49 (Al, 22.10.2026): NEUER TEXT ────────────────────────
+//  · HOECHSTENS 5 KARTEN: sind 5 Karten aufgedeckt, ohne dass eine
+//    passende Creature dabei war, ENDET der Effekt (nichts platziert,
+//    kein Gegner-Ziehen; die 5 Karten gehen zurueck ins Deck).
+//  · „APPROPRIATE Creature" = Stufe <= 3 UND keine Creature, die nur
+//    unter bestimmten Voraussetzungen beschworen werden kann (Foresta,
+//    Blue-Ice Dragon, Guardian Beasts, Spirits, Elven Rider, Ifrit …):
+//    `nurUnterBedingungBeschwoerbar` (_summon-eligibility.js). Solche
+//    Karten werden aufgedeckt und zaehlen fuer die 5er-Grenze, sind aber
+//    „andere aufgedeckte Karten" und gehen zurueck ins Deck.
+//  · „IMMEDIATELY END YOUR TURN": IMMER nach der Aufloesung — Erfolg,
+//    5-Karten-Grenze, leeres/gesperrtes Deck, nicht platzierbar. Wird
+//    die Karte vorher negiert/abgebrochen, laeuft der onPlay nie, also
+//    endet auch der Zug nicht. Hebel: `_terrorForceEndTurn` (wie
+//    Armageddon / End of the Future): wartet Ketten/Prompts ab, kennt
+//    Blackstache/Tuscan Prisoner und laeuft auch beim Sofort-Guss.
+//    Nur der Zug des WIRKERS endet (bei einem Guss im Gegnerzug: nichts).
 //
 //  ── „PLACE" (MANDATORY, Als Ruling 18.8.) ─────────────────────────
 //  Der Kartentext sagt PLACE, nicht summon. Damit ist der Zustand des
@@ -30,8 +50,9 @@
 //  Stufe kommen beide von ihm.
 //
 //  ── ABLAUF ────────────────────────────────────────────────────────
-//  1) Karten einzeln aufdecken, bis eine Creature mit Level ≤ 3 kommt
-//     oder das Deck leer ist.
+//  1) Karten einzeln aufdecken, bis eine passende Creature (Level ≤ 3,
+//     nicht „nur unter Voraussetzung beschwoerbar") kommt, 5 Karten
+//     aufgedeckt sind oder das Deck leer ist.
 //  2) Diese Creature platzieren. „IF POSSIBLE" meint dabei die
 //     BEDINGUNGEN DER CREATURE SELBST (Als Klarstellung 11.9.):
 //     Blue-Ice Dragon etwa verlangt zwei andere Creatures als Opfer.
@@ -43,12 +64,15 @@
 //  3) Liegt ihr Level ueber der Support-Magic-Stufe des Wirkers, zieht
 //     der GEGNER 2 Karten je Stufe Unterschied. Nur nach oben.
 //  4) Alle uebrigen aufgedeckten Karten zurueck ins Deck, dann mischen.
+//  5) Zug beenden (immer, siehe Welle 49 oben).
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { nurUnterBedingungBeschwoerbar } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Surprise Party';
 const MAX_LEVEL = 3;
+const MAX_AUFGEDECKT = 5;   // „If you reveal 5 cards before you reveal an appropriate Creature, terminate this effect."
 const REVEAL_MS = 900;      // Laufzeit einer Aufdeckung (Deck → Mitte → Ziel)
 const PRO_STUFE = 2;
 
@@ -83,6 +107,10 @@ module.exports = {
       const ps = gs.players[pi];
       const cardDB = engine._getCardDB();
 
+      // ── 5) „Immediately end your turn afterwards." ───────────────
+      // IMMER nach der Wirkung (try/finally: auch bei Abbruch durch
+      // Deck-Sperre, 5er-Grenze, nicht platzierbar oder einem Fehler).
+      try {
       // ── 1) Aufdecken bis zur Creature ────────────────────────────
       // Gezeigt wird ueber das vorhandene AUFDECK-SYSTEM (Deck → Mitte,
       // umdrehen, weiterfliegen) — dasselbe, das Chaos Magic und die
@@ -93,12 +121,15 @@ module.exports = {
       // endlos.
       const zurueck = [];                        // alles NICHT Passende
       let gefunden = null;
+      let aufgedeckt = 0;
       let wache = 0;
-      while ((ps.mainDeck || []).length > 0 && wache++ < 200) {
+      while ((ps.mainDeck || []).length > 0 && aufgedeckt < MAX_AUFGEDECKT && wache++ < 200) {
         const name = ps.mainDeck[0];
         const cd = cardDB[name];
         const lvl = (cd && typeof cd.level === 'number') ? cd.level : 99;
-        const passt = !!cd && hasCardType(cd, 'Creature') && lvl <= MAX_LEVEL;
+        // W49: „appropriate" = Level ≤ 3 und NICHT nur unter Voraussetzung beschwoerbar (Foresta & Co.).
+        const nurBedingt = !!cd && nurUnterBedingungBeschwoerbar(cd, name);
+        const passt = !!cd && hasCardType(cd, 'Creature') && lvl <= MAX_LEVEL && !nurBedingt;
 
         // Erst aus dem Deck nehmen, dann zeigen: waehrend des Fluges
         // soll der Deckzaehler schon stimmen.
@@ -114,8 +145,10 @@ module.exports = {
           });
           await engine._delay(REVEAL_MS);
         }
+        aufgedeckt++;
         engine.log('surprise_party_reveal', {
-          player: ps.username, card: name, n: zurueck.length + 1, qualifies: passt,
+          player: ps.username, card: name, n: aufgedeckt, qualifies: passt,
+          ...(nurBedingt && hasCardType(cd, 'Creature') && lvl <= MAX_LEVEL ? { restricted: true } : {}),
         });
 
         if (passt) { gefunden = name; break; }
@@ -136,6 +169,7 @@ module.exports = {
         zurueckMischen();
         engine.log('surprise_party', {
           player: ps.username, creature: null, placed: false, shuffledBack: zurueck.length,
+          revealed: aufgedeckt, terminated: aufgedeckt >= MAX_AUFGEDECKT,
         });
         engine.sync();
         return;
@@ -201,9 +235,18 @@ module.exports = {
       zurueckMischen();
       engine.log('surprise_party', {
         player: ps.username, creature: gefunden,
-        placed: platziert, shuffledBack: zurueck.length,
+        placed: platziert, shuffledBack: zurueck.length, revealed: aufgedeckt,
       });
       engine.sync();
+      } finally {
+        // Nur der Zug des Wirkers; bei entschiedenem Spiel nichts mehr (End-of-the-Future-Muster).
+        if (!gs.result && gs.activePlayer === pi) {
+          gs._terrorForceEndTurn = pi;
+          gs._terrorForceEndSource = { name: CARD_NAME, owner: pi };
+          engine.log('surprise_party_end_turn', { player: ps.username });
+          engine.sync();
+        }
+      }
     },
   },
 };

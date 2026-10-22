@@ -952,7 +952,7 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 // just sets the start / center / end CSS vars and the cardback / face-up
 // images. Auto-removed by the scheduler that mounted it after the
 // keyframes complete.
-function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, endScale, endRot, cardName, cardbackUrl, durationMs, dest, phase }) {
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, endScale, endScaleY, endRot, cardName, cardbackUrl, durationMs, dest, phase }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   // ★ v1259 (Als Befund 20.9.): die Deck-oben-Umdreh-Animation (Chaos
@@ -994,6 +994,7 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, endSca
         '--cx': centerX + 'px', '--cy': centerY + 'px',
         '--ex': endX + 'px', '--ey': endY + 'px',
         ...(endScale && endScale !== 1 ? { '--es': endScale } : {}),   // Endmaßstab (Hand: Größe der echten Karte)
+        ...(endScaleY ? { '--esy': endScaleY } : {}),                   // W49b: Endmaßstab in der Höhe (Brettzone: geneigte Ebene staucht die Höhe)
         ...(endRot ? { '--er': endRot + 'deg' } : {}),                  // Endwinkel (Hand: Fächerwinkel der echten Karte)
         // Optional faster reveals (mill_center_reveal) — the CSS
         // animations read `var(--kfDur, 2000ms)`, so existing users
@@ -44214,10 +44215,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // alles wie bisher.
     // ★ Endpunkt eines Aufdeck-Flugs (Stapel, Hand-Platz, Brett-Zone) — einmal ausgeschrieben, damit der Flug MIT Zwischenhalt (`hold` → `release`) dieselbe
     // Rechnung nutzt wie der durchgehende Flug.
+    // ★ W49b: Landepunkt + Endmaßstab einer Flugkopie (64×90 px, skaliert um die Mitte) in einer Brettzone: Mitte der Zone bzw. der Karte darin,
+    // Breite = Karte in der Zone (`es`), Höhe = ihre Höhe am Bildschirm (`esy`). Die Brettebene ist geneigt: die Karte erscheint breiter als hoch gegenüber
+    // 64×90 (Perspektive staucht die Höhe) — mit einem einzigen Maßstab wäre die gelandete Kopie zu hoch und ragte aus der Zone.
+    const aufdeckZonenZiel = (zoneEl) => {
+      const zr = zoneEl.getBoundingClientRect();
+      const m = kartenMassInZone(zoneEl);
+      const karte = zoneEl.querySelector('.board-card');
+      const kr = karte ? karte.getBoundingClientRect() : null;
+      const hatKarte = !!(kr && kr.width > 4);
+      const mitte = hatKarte ? kr : zr;
+      const hoehe = hatKarte ? kr.height : zr.height * ZONE_ZU_KARTE;
+      return {
+        ex: mitte.left + mitte.width / 2 - 32,
+        ey: mitte.top + mitte.height / 2 - 45,
+        es: Math.max(0.5, Math.min(4, m.b / 64)),
+        esy: Math.max(0.5, Math.min(4, hoehe / 90)),
+      };
+    };
     const aufdeckEndpunkt = (ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, wantIdx) => {
       // End point = the destination pile; centre-fade fallback if the
       // pile element isn't mounted (mirrors onChaosMagicReveal).
-      let ex = cx, ey = cy, es = 1, er = 0;      // `es` = Endmaßstab der Flugkopie (Karte 64 px × es = Größe der Zielkarte), `er` = Endwinkel in Grad (Handfächer)
+      let ex = cx, ey = cy, es = 1, esy, er = 0;  // `esy` = Endmaßstab in der Höhe (nur Brettzonen, sonst wie `es`) · `es` = Endmaßstab der Flugkopie (Karte 64 px × es = Größe der Zielkarte), `er` = Endwinkel in Grad (Handfächer)
       if (ziel === 'hand') {
         // ★ Landepunkt UND Größe = die NEUE Karte in der Hand, gemessen am ECHTEN Layout (Als Befund 12.10., Amazing Finding: „sichtbarer Übergang
         // zwischen ‚die Karte fliegt auf die Hand' und ‚die Karte landet an ihrer Zielposition'"). Zwei Fehler steckten in der alten Rechnung:
@@ -44288,9 +44307,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const zoneEl = document.querySelector(
           `[data-ability-zone][data-ability-owner="${ow}"][data-ability-hero="${destHeroIdx}"][data-ability-slot="${destSlotIdx}"]`);
         if (zoneEl) {
-          const zr = zoneEl.getBoundingClientRect();
-          ex = zr.left;
-          ey = zr.top;
+          // ★ W49b: wie bei der Support Zone unten — Mitte der Zone, Größe der Karte in der Zone (`aufdeckZonenZiel`).
+          ({ ex, ey, es, esy } = aufdeckZonenZiel(zoneEl));
         }
       } else if (ziel === 'support' && destHeroIdx != null && destSlotIdx != null) {
         // v896 (Surprise Party): Ziel ist eine SUPPORT ZONE. Die
@@ -44302,9 +44320,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const zoneEl = document.querySelector(
           `[data-support-zone][data-support-owner="${ow}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destSlotIdx}"]`);
         if (zoneEl) {
-          const zr = zoneEl.getBoundingClientRect();
-          ex = zr.left;
-          ey = zr.top;
+          // ★ W49b (Al, 22.10.2026, Surprise Party: „Wenn eine Creature ‚gefunden' wird und in eine Support Zone fliegt, ist sie noch für kurze Zeit
+          // deutlich kleiner als die Zone"): die Flugkopie ist 64×90 px FLACH; die Karte in der Zone steht auf der geneigten, gezoomten Brettebene und
+          // erscheint am Bildschirm größer (Perspektive, Kamera-Zoom, `--board-scale`). Bisher landete die Kopie mit Maßstab 1 an der OBEREN LINKEN
+          // Ecke der Zone — kleiner als die Karte, die dann dort steht, und nicht mittig. Jetzt wie beim Pile-Flug (v1355): Mitte der Zone und
+          // Endmaßstab = Größe der Karte in der Zone (`kartenMassInZone`).
+          ({ ex, ey, es, esy } = aufdeckZonenZiel(zoneEl));
         }
       } else {
         const selMap = {
@@ -44320,7 +44341,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ey = pr.top;
         }
       }
-      return { ex, ey, es, er };
+      return { ex, ey, es, esy, er };
     };
     const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode, dest, startDelayMs, destHeroIdx, destSlotIdx, destSide, destHandIdx, from, hold, holdKey }) => {
       if (!Array.isArray(cardNames) || cardNames.length === 0) return;
@@ -44379,7 +44400,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const cardbackUrl = isMe ? me.cardback : opp.cardback;
       cardNames.forEach((cardName, i) => {
         // Endpunkt JE KARTE: bei der Hand hat jede ihren eigenen künftigen Platz (`destHandIdx` + i).
-        const { ex, ey, es, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, Number.isInteger(destHandIdx) ? destHandIdx + i : undefined);
+        const { ex, ey, es, esy, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, Number.isInteger(destHandIdx) ? destHandIdx + i : undefined);
         const id = Date.now() + Math.random();
         setTimeout(() => {
           // Woosh je Karte (Als Vorgabe 21.8.). Einen eigenen
@@ -44391,7 +44412,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           setKassaranFlips(prev => [...prev, {
             id, startX: sx, startY: sy, centerX: cx, centerY: cy,
-            endX: ex, endY: ey, endScale: es, endRot: er, cardName, cardbackUrl,
+            endX: ex, endY: ey, endScale: es, endScaleY: esy, endRot: er, cardName, cardbackUrl,
             durationMs: perCard, dest: ziel,
           }]);
           // ★ Landet die Karte auf einem BRETTPLATZ, bleibt die Kopie noch kurz am Ziel liegen
@@ -44418,11 +44439,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pending[ziel]) pending[ziel].push(cardName);
       }
       if (ziel === 'hand' && isMe) stealSkipDrawRef.current += 1;
-      const { ex, ey, es, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, destHandIdx);
+      const { ex, ey, es, esy, er } = aufdeckEndpunkt(ziel, isMe, destHeroIdx, destSlotIdx, cx, cy, destSide, destHandIdx);
       const id = 'rel-' + holdKey + '-' + Date.now();
       const halteMs = (ziel === 'support' || ziel === 'ability' || (ziel === 'hand' && isMe)) ? MILL_REVEAL_HALTE_AM_PLATZ_MS : 0;
       setKassaranFlips(prev => [...prev.filter(a => a.holdKey !== holdKey), {
-        id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey, endScale: es, endRot: er,
+        id, phase: 'out', startX: cx, startY: cy, centerX: cx, centerY: cy, endX: ex, endY: ey, endScale: es, endScaleY: esy, endRot: er,
         cardName: cardName || (prev.find(a => a.holdKey === holdKey) || {}).cardName, cardbackUrl: isMe ? me.cardback : opp.cardback, durationMs: dur, dest: ziel,
       }]);
       setTimeout(() => setKassaranFlips(prev => prev.filter(a => a.id !== id)), dur + halteMs);
@@ -53086,7 +53107,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <KassaranFlipCard key={anim.id}
           startX={anim.startX} startY={anim.startY}
           centerX={anim.centerX} centerY={anim.centerY}
-          endX={anim.endX} endY={anim.endY} endScale={anim.endScale} endRot={anim.endRot}
+          endX={anim.endX} endY={anim.endY} endScale={anim.endScale} endScaleY={anim.endScaleY} endRot={anim.endRot}
           cardName={anim.cardName} cardbackUrl={anim.cardbackUrl}
           durationMs={anim.durationMs} dest={anim.dest} phase={anim.phase} />
       ))}
