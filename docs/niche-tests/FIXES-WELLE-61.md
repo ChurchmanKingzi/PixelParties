@@ -11,6 +11,7 @@ Umgesetzt vom Agenten **W61a** (Zweig `wave61/W61a`), Folgearbeit zu W59a/W60a m
 * **Nicht angefasst:** Kartentexte in `data/cards.json`, Rioting Village, andere Pollution-Karten (nutzen `excludeHero` nicht).
 * `Bugfix-Note`: Shared Blood Tanks (Heroes with Diver Helmet and their Support Zone cards trigger the Bleed chain again when they take Bleed damage themselves); Acid Rain (Pollution Token can no longer be placed in a Diver Helmet Hero's free Support Zones).
 
-## Offene Rückfragen an Al
+## Rückfragen an Al
 
 1. **Acid Rain, Helm kommt nach der Wahl:** Nimmt ein Helm nach der Wahl „Pollution Token" die letzte wählbare Zone weg, fällt die Strafe auf „2 Karten löschen" zurück (falls möglich), sonst verpufft sie. Okay so – ja/nein?
+   **Entschieden (Al):** Ja – betritt der Helm physisch die letzte freie Zone, während Acid Rain gerade auslöst, ist es korrekt, auf „Discard 2“ zurückzufallen.
