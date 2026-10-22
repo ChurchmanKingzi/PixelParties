@@ -3644,6 +3644,22 @@ class GameEngine {
       }
     }
 
+    // ★ W52a (Al, 22.10.2026): EIN Hook `onEquipLost` fuer JEDES Verlassen einer Ausruestung / eines Anhaengsels von ihrem Wirt. Verteiler an der einen Stelle, durch die
+    // jeder Abgang laeuft (jedes `onCardLeaveZone` aus einer Support Zone — Zerstoeren, Ablegen, Loeschen, zurueck auf die Hand/ins Deck, Heldentod-Aufraeumen, `deleteHero`):
+    // nach der Zuhoerer-Runde meldet `fireEquipLost` den Abgang an die Zustandslauscher (`equipZustandHooks`). Kein Doppelfeuern: die Umhaeng-Wege rufen `fireEquipLost` selbst
+    // und markieren ihr Leave mit `_equipLostGemeldet`; ein Beobachter-Rundruf (`_onlyCard` ≠ abgehende Karte, z. B. `seesEquipLeaveOnHeroDeath`) ist KEIN Abgang.
+    if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx && hookCtx.fromZone === ZONES.SUPPORT && !hookCtx._equipLostGemeldet && !hookCtx.isTransfer) {
+      const _verlassend = hookCtx.leavingCard || hookCtx.card;
+      if (_verlassend && _verlassend.id != null && (!hookCtx._onlyCard || hookCtx._onlyCard === _verlassend)) {
+        await this.fireEquipLost(_verlassend, {
+          fromOwner: hookCtx.fromOwner, fromHeroIdx: hookCtx.fromHeroIdx, fromZoneSlot: hookCtx.fromZoneSlot,
+          toZone: hookCtx.toZone, reason: this._equipLostGrund(hookCtx),
+          anleger: hookCtx.entferntVon, source: (typeof hookCtx.source === 'string' ? hookCtx.source : hookCtx.source?.name) ?? hookCtx.sourceName ?? null,
+          bypassDeadHeroFilter: !!hookCtx._bypassDeadHeroFilter,
+        });
+      }
+    }
+
     // After hooks resolve, check for reaction cards (unless suppressed)
     // Ausnahme `onCreatureSummoned` (Ruling 3.10.): eine NEUE Beschwoerung
     // mitten in einer laufenden Kette oeffnet trotzdem ihr eigenes
@@ -9566,6 +9582,8 @@ class GameEngine {
               if (typeof res.newAmount === 'number') hookCtx.amount = res.newAmount;
               if (res.consumeSelf) {
                 const ps = this.gs.players[targetOwner];
+                // W52a: dieser Weg nimmt die Ausruestung OHNE `onCardLeaveZone` aus der Zone (Smug Coin) — der Equip-Verlust wird trotzdem gemeldet (`onEquipLost`).
+                await this.fireEquipLost(inst, { reason: 'deleted', toZone: ZONES.DELETED, fromOwner: this.physicalSide(inst), fromHeroIdx: heroIdx, fromZoneSlot: inst.zoneSlot, source: inst.name });
                 if (ps.supportZones[heroIdx]?.[inst.zoneSlot]) {
                   ps.supportZones[heroIdx][inst.zoneSlot] = [];
                 }
@@ -13455,6 +13473,7 @@ class GameEngine {
     await this.actionMoveCard(targetCard, ZONES.DISCARD, undefined, undefined, {
       fireCreatureDeath: isCreatureTarget,
       deathSource: source,
+      _equipGrund: 'destroyed',   // W52a: Grund fuer `onEquipLost`
       deathHeldQuelle: opts.heldQuelle || null,   // Welle 12 (Q101): „zählt als: der Held besiegt das Ziel" (Super-Killing Knife)
       unaufhaltsam: _u,   // v1293
       // Das CD-Bewegungsfenster hat actionDestroyCard oben bereits
@@ -14549,6 +14568,7 @@ class GameEngine {
       // v1363: die Quelle der Bewegung (fuer `entferntVon`, siehe runHooks).
       source: opts.deathSource || opts.source || null,
       ...(typeof opts.sourceOwner === 'number' ? { sourceOwner: opts.sourceOwner } : {}),
+      ...(opts._equipGrund ? { _equipGrund: opts._equipGrund } : {}),   // W52a: Grund fuer `onEquipLost` (`_equipLostGrund`): 'destroyed' | 'hostRemoved' | …
       // v1490 (Surprising Opportunity): im Todesfenster liegen die Ausruestungen noch an einem Helden mit 0 HP — ihre
       // Austritts-Haken (ATK-Bonus zurueck, Inselzonen, …) muessen trotzdem laufen, wie im Todes-Aufraeumen.
       ...(opts._bypassDeadHeroFilter ? { _bypassDeadHeroFilter: true } : {}),
@@ -17106,6 +17126,11 @@ this._deathWatch = (this._deathWatchStack || []).length
   async actionTransferAttachment(inst, toPlayerIdx, destHeroIdx, destSlotIdx, opts = {}) {
     const gs = this.gs;
     if (!inst || inst.zone !== ZONES.SUPPORT) return { success: false };
+    // ★ W52a (Al, 22.10.2026: „Generell sollten Tokens ausgenommen sein!"): ein Token wird nie umgehaengt (Puppets: „Cannot be moved to a different Support Zone"; Pollution Token …).
+    if (this.isTokenCard(inst)) {
+      this.log('move_blocked', { card: inst.name, reason: 'token' });
+      return { success: false, tokenBlocked: true };
+    }
     const fromPlayerIdx = inst.controller ?? inst.owner;
     // 12.10. (Inheritance Ceremony): wessen Support-Feld haelt die Karte PHYSISCH? Normalfall: `owner` (= Seite des Wirts). Ausnahme Crimson Web: `owner` ist der Wirker
     // der Karte, die Zone liegt beim Betroffenen (`controller`) — wie in `_removeCardFromState` zaehlt zuerst die physische Seite.
@@ -17148,11 +17173,13 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromZone: 'support', fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlotIdx,
       fromOwner: inst.owner, toZone: 'support',
       _skipReactionCheck: true,
+      _equipLostGemeldet: true,   // W52a: das Umhaengen meldet `onEquipLost` selbst (unten), der Verteiler in `runHooks` bleibt still
     });
     // W51b: der Abgang fuer Zustandslauscher (`onEquipLost`) — das echte Leave oben geht nur an die Karte selbst (siehe `fireEquipLost`).
     await this.fireEquipLost(inst, {
       anleger: opts.anleger ?? toPlayerIdx, fromOwner: quellSeite, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlotIdx,
       toOwner: toPlayerIdx, toHeroIdx: destHeroIdx, toZoneSlot: destSlotIdx, source: opts.sourceName || null,
+      isMove: true, reason: toPlayerIdx !== quellSeite ? 'transferred' : 'moved',   // W52a
     });
 
     if (!opts.skipAnimation) {
@@ -27924,7 +27951,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         c.zone === zone && c.owner === playerIdx
         && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
       if (inst) {
-        await this.actionMoveCard(inst, ziel, -1, -1, { sourceName });
+        await this.actionMoveCard(inst, ziel, -1, -1, { sourceName, _equipGrund: 'hostRemoved' });   // W52a: Grund fuer `onEquipLost`
       } else {
         const liste = zoneKey === 'ability'
           ? ps.abilityZones[heroIdx][zi] : ps.supportZones[heroIdx][zi];
@@ -34024,7 +34051,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const cd = this._getCardDB()[inst.name];
     if (!cd || hasCardType(cd, 'Creature')) return null;
     const anleger = opts.anleger ?? this._anlegerEinerSupportKarte(inst);
-    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack')) ? 'attachment' : 'equip';
+    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack') || inst.counters?._keinEquip) ? 'attachment' : 'equip';   // W52a: Tempelunas Fee ist angehaengt, nicht ausgeruestet
     const hostSide = this.physicalSide(inst);
     const heroController = this.surpriseKontrolleur(hostSide, inst.heroIdx);
     await this.runHooks(HOOKS.ON_EQUIP_GAINED, {
@@ -34037,31 +34064,64 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W51b (Al, 22.10.2026) — GEGENSTUECK ZU `fireEquipGained` FUER DAS UMHAENGEN: Hook `onEquipLost` (HOOKS.ON_EQUIP_LOST).
+   * ★ W52a (Al, 22.10.2026: „Gibt es einen Grund, nicht einen allgemeinen Hook für *alle* Equip-Verluste zu haben? Wenn nicht, so ändern!") —
+   * GEGENSTUECK ZU `fireEquipGained`: Hook `onEquipLost` (HOOKS.ON_EQUIP_LOST) bei JEDEM Verlassen einer Ausruestung / eines Anhaengsels von seinem Wirt.
    *
-   * Das echte `onCardLeaveZone` eines Umhaengens (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) geht per `_onlyCard` NUR an die bewegte Karte selbst
-   * (ein Umhaengen ist kein Spielen/Anlegen — Zaehl-Lauscher wie Luck duerfen nicht feuern). Heldenpassive und Auren, die Boni/Marken an den Equip-ZUSTAND haengen
-   * (Taio „+20 je Artifact", Toras „+40 je Artifact mit anderem Namen", Aufstiegs-Bereitschaft von Riffel/Kohta/Lolek/Fiona, Tempelunas Fee …), sahen den Abgang deshalb nie:
-   * der Bonus blieb am Quellhelden stehen. Diese Methode meldet ihn an ALLE Lauscher — mit demselben Kontext-Zuschnitt wie ein echtes Leave-Ereignis (`leavingCard`,
-   * `fromZone`, `fromOwner` = Brettseite des alten Wirts, `fromHeroIdx`, `fromZoneSlot`), damit ein Zustandslauscher denselben Handler fuer beides nehmen kann
-   * (`equipZustandHooks` in `_hooks.js`). Nur fuer Umhaengen; normale Abgaenge melden weiter nur `onCardLeaveZone`. Die Karte steht beim Aufruf noch am alten Platz
-   * (Leave-Semantik: Lauscher schliessen `leavingCard.id` beim Zaehlen aus).
-   * opts: { anleger (Ausfuehrender), fromOwner, fromHeroIdx, fromZoneSlot, toOwner, toHeroIdx, toZoneSlot, source }.
+   * W51b hatte den Hook nur fuer das UMHAENGEN (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) gebaut, weil dessen Leave-Ereignis per `_onlyCard` nur die
+   * bewegte Karte erreicht. W52a verallgemeinert ihn: ZENTRAL gefeuert vom Verteiler in `runHooks` — jedes `onCardLeaveZone` mit `fromZone: 'support'` einer Nicht-Kreatur
+   * (nicht Token/Ability) meldet nach der Zuhoerer-Runde zusaetzlich `onEquipLost`: Zerstoeren, Ablegen, Loeschen, zurueck auf die Hand/ins Deck, Wirtsheld besiegt / entfernt,
+   * Umhaengen. Die Umhaeng-Wege rufen diese Methode direkt (ihr Leave geht per `_onlyCard` nur an die Karte; sie markieren es mit `_equipLostGemeldet`, damit der Verteiler nicht
+   * doppelt feuert). Das rohe `onCardLeaveZone` aendert sich NICHT (die 175+ Zaehl-/Aufraeum-Lauscher bleiben, wie sie sind; Zaehler wie „gespielt/verlassen" gehoeren dorthin).
+   *
+   * Kontext des Hooks (Zuschnitt wie ein echtes Leave-Ereignis, damit `equipZustandHooks` denselben Handler fuer beides nehmen kann): `leavingCard` (= `lostCard`), `lostName`,
+   * `fromZone` ('support'), `fromOwner` (BRETTSEITE des alten Wirts), `fromHeroIdx`, `fromZoneSlot`, `toZone` (Ziel: 'support' beim Umhaengen, sonst 'discard' | 'deleted' |
+   * 'hand' | 'deck' | …), `toOwner`/`toHeroIdx`/`toZoneSlot` (nur Umhaengen), `equipOwner` (Umhaengen: der Ausfuehrende; sonst der Verursacher, falls bekannt), `kind`
+   * ('equip' | 'attachment'), `isMove` (true NUR beim Umhaengen auf einen anderen Wirt), `reason` (siehe `_equipLostGrund`), `source`. Die Karte steht beim Ereignis noch am
+   * alten Platz (Leave-Semantik: Zaehl-Lauscher schliessen `leavingCard.id` aus); beim Umhaengen mehrerer Karten stehen bereits gemeldete Mitbewegte „unterwegs"
+   * (`zone` '_umhaengen'). `_bypassDeadHeroFilter` wird vom Leave-Ereignis uebernommen (Heldentod-Aufraeumen: der Wirt ist schon tot, der Hook muss trotzdem laufen).
+   * opts: { anleger, fromOwner, fromHeroIdx, fromZoneSlot, toZone, toOwner, toHeroIdx, toZoneSlot, source, reason, isMove, bypassDeadHeroFilter }.
    */
   async fireEquipLost(inst, opts = {}) {
-    if (!inst || inst.zone !== ZONES.SUPPORT || inst.heroIdx < 0) return;
-    const cd = this._getCardDB()[inst.name];
-    if (!cd || hasCardType(cd, 'Creature')) return;
-    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack')) ? 'attachment' : 'equip';
+    const fromHeroIdx = opts.fromHeroIdx ?? inst?.heroIdx;
+    if (!inst || !(fromHeroIdx >= 0)) return;
+    if (inst.counters?._gainedEffectOnly) return;   // unsichtbarer Traeger eines gewonnenen Heldeneffekts: keine Karte am Wirt
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (!cd || hasCardType(cd, 'Creature') || hasCardType(cd, 'Token') || hasCardType(cd, 'Ability')) return;
+    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack') || inst.counters?._keinEquip) ? 'attachment' : 'equip';
     const fromOwner = opts.fromOwner ?? this.physicalSide(inst);
-    const fromHeroIdx = opts.fromHeroIdx ?? inst.heroIdx;
+    const isMove = !!opts.isMove;
     await this.runHooks(HOOKS.ON_EQUIP_LOST, {
       lostCard: inst, lostName: inst.name, leavingCard: inst,
       fromZone: 'support', fromOwner, fromHeroIdx, fromZoneSlot: opts.fromZoneSlot ?? inst.zoneSlot,
-      toZone: 'support', toOwner: opts.toOwner ?? fromOwner, toHeroIdx: opts.toHeroIdx, toZoneSlot: opts.toZoneSlot,
-      equipOwner: opts.anleger, kind, isMove: true, source: opts.source,
+      toZone: opts.toZone ?? (isMove ? 'support' : undefined), toOwner: opts.toOwner ?? (isMove ? fromOwner : undefined), toHeroIdx: opts.toHeroIdx, toZoneSlot: opts.toZoneSlot,
+      equipOwner: opts.anleger, kind, isMove, reason: opts.reason || (isMove ? 'moved' : 'other'), source: opts.source,
+      ...(opts.bypassDeadHeroFilter ? { _bypassDeadHeroFilter: true } : {}),
       _skipReactionCheck: true,
     });
+  }
+
+  /**
+   * ★ W52a: WARUM verlaesst die Karte ihren Wirt? Ein Wert fuer `ctx.reason` des Hooks `onEquipLost` (fuer Lauscher, die Umhaengen von Abgang unterscheiden muessen).
+   *   'moved'        — umgehaengt auf einen anderen Helden DERSELBEN Brettseite (Slippery Fridge, Inheritance Ceremony, Secret Spell Book …); `isMove` = true
+   *   'transferred'  — auf die Brettseite eines anderen Spielers gewandert (Cybug LOCUST); `isMove` = true
+   *   'destroyed'    — zerstoert (`actionDestroyCard`: Disarm, Fire Bomb, Afflicted Pests …) -> Ablage / Geloescht
+   *   'discarded'    — in die Ablage gelegt ohne Zerstoer-Weg (Kosten, Abwurf, Ersetzen …)
+   *   'deleted'      — geloescht (Geloescht-Stapel)
+   *   'returnedToHand' / 'returnedToDeck' — zurueck auf die Hand / ins Deck (Bounce, Shu'Chaku, The White Eye, Surprising Opportunity …)
+   *   'hostDefeated' — der Wirtsheld wurde besiegt (Heldentod-Aufraeumen)
+   *   'hostRemoved'  — der Wirtsheld wurde vom Brett entfernt (`deleteHero`)
+   *   'other'        — alles uebrige (z. B. ein Skript bewegt die Karte selbst)
+   * Ein Aufrufer kann den Grund ausdruecklich setzen (`_equipGrund` im Leave-Ereignis bzw. `opts._equipGrund` an `actionMoveCard`).
+   */
+  _equipLostGrund(c) {
+    if (c._equipGrund) return c._equipGrund;
+    switch (c.toZone) {
+      case ZONES.DISCARD: return 'discarded';
+      case ZONES.DELETED: return 'deleted';
+      case ZONES.HAND: return 'returnedToHand';
+      case ZONES.DECK: return 'returnedToDeck';
+      default: return 'other';
+    }
   }
 
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
@@ -44255,7 +44315,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {object} [inst] - Optional card instance (for treatAsEquip counter check)
    * @returns {boolean}
    */
+  /**
+   * ★ W52a: Ist `inst` (in einer Support Zone) ein ARTIFACT, das an einem Helden ausgeruestet ist — ein Equipment-Artifact ODER ein als Equip angelegter Held
+   * („treated as an equippable Artifact": Initiation Ritual, angelegte Gestalt des Shapeshifters)? Nicht: Anhaengsel (Spell/Attack), Tempelunas angehaengte Fee (`_keinEquip`),
+   * Tokens, unsichtbare Traegerinstanzen. Gemeinsame Frage fuer Anti Magic Enchantment und Lunatic Hawk.
+   */
+  istEquipArtifact(inst) {
+    if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    if (inst.counters?._keinEquip || inst.counters?._gainedEffectOnly) return false;
+    const cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+    if (!cd) return false;
+    if (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase() === 'equipment') return true;
+    return !!inst.counters?.treatAsEquip && (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero'));
+  }
+
   isEquipInZone(cardName, inst) {
+    if (inst?.counters?._keinEquip) return false;   // W52a (Al): Tempelunas angehaengte Fee ist ANGEHAENGT, kein Equip/Artifact (trotz `treatAsEquip` als Traeger des Heldeneffekts)
     if (inst?.counters?.treatAsEquip) return true;
     const cd = this._getCardDB()[cardName];
     if (cd && (cd.subtype || '').toLowerCase() === 'equipment') return true;
@@ -52208,6 +52283,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks(HOOKS.ON_CARD_LEAVE_ZONE, {
           _onlyCard: inst, card: inst, leavingCard: inst,
           fromZone: 'support', fromHeroIdx: hi, fromOwner: inst.owner, fromZoneSlot: inst.zoneSlot ?? -1,
+          _equipGrund: 'hostDefeated',   // W52a: `onEquipLost` (Verteiler in `runHooks`): Wirt besiegt
           _bypassDeadHeroFilter: true,
         });
         // N3-12 (W24): Beobachter des Abgangs fremder Ausruestung (Skript-Flag `seesEquipLeaveOnHeroDeath`, Spirit of the Shattered Trident:

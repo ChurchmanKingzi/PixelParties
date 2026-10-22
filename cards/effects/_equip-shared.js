@@ -229,10 +229,13 @@ function istEquipKartenname(cardName) {
   return !!script?.isEquip;
 }
 
-/** Liegt `inst` als umhaengbares Equip in einer Support Zone? (nicht `counters.immovable`; `treatAsEquip` = als Equip angelegter Held, Initiation Ritual) */
+/** Liegt `inst` als umhaengbares Equip in einer Support Zone? (nicht `counters.immovable`, kein Token, nicht Tempelunas Fee; `treatAsEquip` = als Equip angelegter Held, Initiation Ritual) */
 function istUmhaengbaresEquip(engine, inst) {
   if (!inst || inst.zone !== 'support') return false;
   if (inst.counters?.immovable) return false;
+  // W52a (Al, 22.10.2026): Tokens werden NIE umgehaengt („Generell sollten Tokens ausgenommen sein!"); Tempelunas angehaengte Fee ist kein Equip (`_keinEquip`).
+  if (engine.isTokenCard(inst)) return false;
+  if (inst.counters?._keinEquip) return false;
   if (inst.counters?.treatAsEquip) return true;
   const script = typeof inst.loadScript === 'function' ? inst.loadScript() : null;
   if (script?.isEquip) return true;
@@ -314,6 +317,7 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
       fromZone: 'support', fromOwner: equipOwner, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlot,
       toZone: 'support',   // reiner Zonenwechsel auf dem Brett (ohne `toZone` deuten Ablage-Zuhoerer es als Ablage, F03-07)
       _skipReactionCheck: true,
+      _equipLostGemeldet: true,   // W52a: das Umhaengen meldet `onEquipLost` selbst (unten), der Verteiler in `runHooks` bleibt still
     });
     if (inst.counters.atkGranted) inst.counters.atkGranted = 0;   // Neu-Vergabe am neuen Traeger startet frisch
     // W51b: der Abgang fuer ZUSTANDSLAUSCHER (Taio, Toras, Aufstiegs-Bereitschaft …): das echte Leave oben geht nur an die Karte selbst. `onEquipLost` geht an alle
@@ -321,6 +325,7 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
     await engine.fireEquipLost(inst, {
       anleger, fromOwner: equipOwner, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlot,
       toOwner: equipOwner, toHeroIdx: m.destHeroIdx, toZoneSlot: m.destSlot, source: opts.quelle || null,
+      isMove: true, reason: 'moved',   // W52a
     });
     const srcArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
     const i = srcArr.indexOf(inst.name);

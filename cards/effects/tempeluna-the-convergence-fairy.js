@@ -389,6 +389,10 @@ module.exports = {
     // dem `heroIdx` des WIRTS. Genau das will der Kartentext.
     feeInst.counters.treatAsEquip = true;
     feeInst.counters._tempelunaAttached = true;
+    // ★ W52a (Al, 22.10.2026: „In ihrem Effekt steht nichts davon, dass die Fee als Equip zählt – das wäre ungewollt!"): die Fee ist ANGEHÄNGT, nicht ausgerüstet.
+    // `treatAsEquip` bleibt nur als TRÄGER-Marke (Hooks aus der Support Zone, Heldeneffekt-Stummschaltung, Aktivierung); `_keinEquip` nimmt ihr die Equip-/Artifact-Identität
+    // (`engine.isEquipInZone` -> false, `istUmhaengbaresEquip` -> false: Fridge kann sie nicht umhängen; Hook-Art `attachment`).
+    feeInst.counters._keinEquip = true;
 
     // DIESE Instanz ist der Traeger des gewonnenen Effekts — keine
     // zusaetzliche unsichtbare (sonst liefen die Hooks doppelt).

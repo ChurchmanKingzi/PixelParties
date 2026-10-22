@@ -68,8 +68,11 @@ function zielHelden(engine, pi, nutzer) {
 function verschiebbar(engine, inst) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
   if (inst.counters?.immovable) return false;
+  // ★ W52a (Al, 22.10.2026: „Generell sollten Tokens ausgenommen sein!"): Tokens (Puppets: „Cannot be moved to a different Support Zone", Pollution Token …) werden nie umgehängt.
+  if (engine.isTokenCard(inst)) return false;
   if (istUmhaengbaresEquip(engine, inst)) return true;
-  if (inst.counters?.treatAsEquip) return false;
+  // Tempelunas angehängte Fee ist ein ANHÄNGSEL (kein Equip, W52a) und wandert hier als Anhängsel mit; andere als Equip angelegte Helden gingen schon oben durch.
+  if (inst.counters?.treatAsEquip && !inst.counters?._keinEquip) return false;
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || hasCardType(cd, 'Creature')) return false;
   return true;

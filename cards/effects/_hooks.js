@@ -85,14 +85,16 @@ const HOOKS = {
   // heroController, kind: 'equip'|'attachment', isMove, fromOwner?, fromHeroIdx?, source? }. `cardName` im Kontext ist der LAUSCHER, nicht die Karte.
   // BEWUSST nicht in HOOK_DESCRIPTIONS: kein generisches Hand-Reaktionsfenster (Reaktionen auf der Hand lauschen wie Anti Magic Enchantment per `hooks.onEquipGained`, `activeIn: ['hand']`).
   ON_EQUIP_GAINED: 'onEquipGained',
-  // W51b (Al, 22.10.2026; Befund Taio/Toras): GEGENSTUECK zu `onEquipGained` fuer das UMHAENGEN. Eine Nicht-Kreatur verlaesst per Slippery Fridge / Inheritance Ceremony /
-  // `actionTransferAttachment` ihren alten Wirtshelden. Das echte `onCardLeaveZone` dieses Wegs geht NUR an die bewegte Karte selbst (`_onlyCard`: ein Umhaengen ist kein
-  // Spielen/Anlegen, Zaehler wie Luck duerfen nicht feuern) — Heldenpassive und Auren, die Boni/Marken an den Equip-ZUSTAND haengen, sahen den Abgang deshalb nie.
-  // Feuert NUR beim Umhaengen (immer `isMove: true`); normale Abgaenge (Ablage, Hand, Zerstoerung …) melden weiter nur `onCardLeaveZone`. Gefeuert von
-  // `engine.fireEquipLost` (eine Stelle). Kontext wie ein echtes Leave-Ereignis (`leavingCard`, `fromZone: 'support'`, `fromOwner` = Brettseite des alten Wirts, `fromHeroIdx`,
-  // `fromZoneSlot`, `toZone: 'support'`) PLUS `lostCard`/`lostName`, `toOwner`/`toHeroIdx`/`toZoneSlot` (neuer Platz), `equipOwner` (Ausfuehrender), `kind`, `isMove`, `source`.
-  // Die bewegte Karte steht beim Ereignis noch am alten Platz (Leave-Semantik); bereits gemeldete Mitbewegte stehen schon 'unterwegs' (`zone` '_umhaengen').
-  // Vertrag fuer Zustandslauscher: `equipZustandHooks` (unten) verdrahtet `onCardEnterZone`/`onCardLeaveZone` + `onEquipGained` (nur `isMove`) + `onEquipLost` in einem Zug.
+  // W51b/W52a (Al, 22.10.2026): GEGENSTUECK zu `onEquipGained` — der Hook fuer JEDES Verlassen einer Ausruestung / eines Anhaengsels von ihrem Wirt: zerstoert, abgelegt,
+  // geloescht, zurueck auf die Hand/ins Deck, Wirtsheld besiegt/entfernt, UMGEHAENGT (Slippery Fridge / Inheritance Ceremony / `actionTransferAttachment`). W51b baute ihn nur
+  // fuers Umhaengen (dessen Leave per `_onlyCard` nur die bewegte Karte erreicht — Taio/Toras-Befund); W52a hat ihn verallgemeinert. Gefeuert von `engine.fireEquipLost` (eine
+  // Methode): zentral vom Verteiler in `runHooks` nach jedem `onCardLeaveZone` mit `fromZone: 'support'` einer Nicht-Kreatur (nicht Token/Ability); die Umhaeng-Wege rufen sie direkt.
+  // Das rohe `onCardLeaveZone` bleibt unveraendert (Zaehler/Aufraeum-Lauscher). Kontext wie ein echtes Leave-Ereignis (`leavingCard`, `fromZone: 'support'`, `fromOwner` = Brettseite
+  // des alten Wirts, `fromHeroIdx`, `fromZoneSlot`, `toZone`) PLUS `lostCard`/`lostName`, `toOwner`/`toHeroIdx`/`toZoneSlot` (nur Umhaengen), `equipOwner` (Umhaengen: der Ausfuehrende;
+  // sonst der Verursacher), `kind` ('equip'|'attachment'), `isMove` (true NUR beim Umhaengen), `reason` ('moved' | 'transferred' | 'destroyed' | 'discarded' | 'deleted' |
+  // 'returnedToHand' | 'returnedToDeck' | 'hostDefeated' | 'hostRemoved' | 'other'; siehe `engine._equipLostGrund`), `source`.
+  // Die Karte steht beim Ereignis noch am alten Platz (Leave-Semantik); beim Umhaengen stehen bereits gemeldete Mitbewegte schon 'unterwegs' (`zone` '_umhaengen').
+  // Vertrag fuer Zustandslauscher: `equipZustandHooks` (unten) verdrahtet `onEquipLost` (= der Leave-Handler, OHNE rohes `onCardLeaveZone`) + `onEquipGained` (nur `isMove`).
   ON_EQUIP_LOST: 'onEquipLost',
 
   // ── Combat ──
@@ -1146,24 +1148,33 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
 }
 
 /**
- * W51b — VERTRAGSSTUECK "WER BONI/ZUSTAND AN DEN EQUIP-ZUSTAND HAENGT".
+ * W51b/W52a — VERTRAGSSTUECK "WER BONI/ZUSTAND AN DEN EQUIP-ZUSTAND HAENGT".
  *
- * Eine Karte, die rechnet "+X je Artifact am Helden", "bereit zum Aufstieg, solange Equip Y liegt", "Effekt weg, wenn die Fee geht" … lauscht auf das Betreten und
- * Verlassen der Support Zones: `onCardEnterZone` / `onCardLeaveZone`. Das UMHAENGEN (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) sendet diese
- * beiden Ereignisse bewusst nur an die bewegte Karte selbst (kein Spielen, keine Zaehler). Zustandslauscher bekommen es stattdessen ueber das Paar
- * `onEquipLost` (Abgang, immer Umhaengen) und `onEquipGained` mit `isMove` (Ankunft) — mit DEMSELBEN Kontext-Zuschnitt wie die echten Ereignisse.
+ * Eine Karte, die rechnet "+X je Artifact am Helden", "bereit zum Aufstieg, solange Equip Y liegt", "Effekt weg, wenn die Fee geht" … hat einen ZUSTAND, der am
+ * Ausgeruestet-/Angehaengt-SEIN einer Karte haengt. Fuer ihn gilt (W52a, Al: „ein allgemeiner Hook fuer *alle* Equip-Verluste"):
  *
- * Statt beide Handler doppelt zu verdrahten: `hooks: equipZustandHooks({ onCardEnterZone, onCardLeaveZone, …uebrige Hooks })`. Ergaenzt wird
- *   `onEquipLost`   = der `onCardLeaveZone`-Handler (gleiche Felder: `leavingCard`, `fromZone`, `fromOwner`, `fromHeroIdx`, `fromZoneSlot`),
- *   `onEquipGained` = der `onCardEnterZone`-Handler, aber NUR bei `ctx.isMove` (normale Ankuenfte laufen schon ueber `onCardEnterZone`; kein doppeltes Buchen),
- *                     mit den Feldern `enteringCard` (= `equipCard`), `toZone` ('support'), `toHeroIdx` (= `equipHeroIdx`) nachgezogen.
- * Vorhandene eigene `onEquipLost`/`onEquipGained` im uebergebenen Objekt gewinnen. Zaehl-/"wurde gespielt"-Lauscher (Luck, Fiona-Aszension …) nutzen das NICHT —
- * fuer sie ist ein Umhaengen kein Ereignis (Ruling W51a).
+ *   • VERLUST — der Hook `onEquipLost` feuert bei JEDEM Verlassen einer Ausruestung / eines Anhaengsels von seinem Wirt (zerstoert, abgelegt, geloescht, zurueck auf die Hand,
+ *     Wirtsheld besiegt/entfernt, UMGEHAENGT; `ctx.reason`/`ctx.isMove` unterscheiden), zentral gefeuert von `engine.fireEquipLost`. Der Handler ist der bisherige
+ *     `onCardLeaveZone`-Handler (gleiche Felder: `leavingCard`, `fromZone`, `fromOwner`, `fromHeroIdx`, `fromZoneSlot`).
+ *   • ANKUNFT — das rohe `onCardEnterZone` fuer normales Anlegen/Anhaengen; das UMHAENGEN (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) sendet Enter nur an
+ *     die bewegte Karte selbst (kein Spielen, keine Zaehler) und kommt ueber `onEquipGained` mit `isMove`.
+ *
+ * `equipZustandHooks(hooks)` verdrahtet beides in einem Zug: aus `{ onCardEnterZone, onCardLeaveZone, …uebrige Hooks }` wird
+ *   `onEquipLost`   = der `onCardLeaveZone`-Handler — und das rohe `onCardLeaveZone` wird ENTFERNT (W52a): derselbe Abgang darf nicht ein zweites Mal ueber das rohe Leave
+ *                     gebucht werden (der Zustandslauscher sah sonst jeden Abgang doppelt);
+ *   `onCardEnterZone` bleibt (normale Ankuenfte) und
+ *   `onEquipGained` = derselbe Enter-Handler, aber NUR bei `ctx.isMove` (Umhaengen; sonst doppelt gebucht), mit den Feldern `enteringCard` (= `equipCard`), `toZone` ('support'),
+ *                     `toHeroIdx` (= `equipHeroIdx`) nachgezogen.
+ * Vorhandene eigene `onEquipLost`/`onEquipGained` im uebergebenen Objekt gewinnen (dann bleibt ein uebergebenes `onCardLeaveZone` unangetastet). Zaehl-/"wurde gespielt"-Lauscher
+ * (Luck, Fiona-Aszension …) nutzen das NICHT — sie bleiben bei `onCardEnterZone`/`onCardLeaveZone`: fuer sie ist ein Umhaengen kein Ereignis (Ruling W51a).
  */
 function equipZustandHooks(hooks) {
   const out = { ...hooks };
   const enter = hooks.onCardEnterZone, leave = hooks.onCardLeaveZone;
-  if (typeof leave === 'function' && !out.onEquipLost) out.onEquipLost = leave;
+  if (typeof leave === 'function' && !out.onEquipLost) {
+    out.onEquipLost = leave;
+    delete out.onCardLeaveZone;   // W52a: genau EINE Buchung je Abgang (jetzt meldet `onEquipLost` jeden Abgang)
+  }
   if (typeof enter === 'function' && !out.onEquipGained) {
     out.onEquipGained = function (ctx, ...rest) {
       if (!ctx || !ctx.isMove) return undefined;

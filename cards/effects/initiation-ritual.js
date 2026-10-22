@@ -271,8 +271,12 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: equippedInst, toZone: 'support', toHeroIdx: livingHeroIdx,
       _skipReactionCheck: true,
-      _anhaengselAnleger: pi,   // W49a: „equip it to another Hero" oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
+      _anhaengselAnleger: pi,   // W49a: „equip it to another Hero" oeffnet das Equip-Fenster (Afflicted Pests, LOCUST, Hook `onEquipGained` -> Anti Magic Enchantment W52a)
     });
+    // ★ W52a (Al, 22.10.2026): der angelegte Held „is treated as an equippable Artifact" — wie jedes Equip beobachten ihn ALLE Equip-Beobachter. Das Equip-Fenster
+    // (Pests, LOCUST, Anti Magic Enchantment) hat der Eintritt oben schon geoeffnet (`_anhaengselAnleger`); das PLATZIERUNGS-Fenster (Cybug RHINOCEROS: „places a card into an
+    // Area or Support Zone") ruft der Handweg nur ohne `_skipReactionCheck` auf — hier explizit, damit der Held nicht daran vorbeigelegt wird.
+    if (equippedInst.zone === 'support') await engine._checkSurpriseOnPlacement(pi, equippedInst, 'support');
 
     engine.log('initiation_ritual', {
       player: ps.username,

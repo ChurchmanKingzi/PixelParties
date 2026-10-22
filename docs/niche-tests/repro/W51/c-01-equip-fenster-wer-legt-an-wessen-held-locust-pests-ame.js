@@ -161,7 +161,7 @@ function wahl(t, seite, nachHeld, name) {
       }
     }
 
-    // ── Lunatic Hawk (2+ Lunatic Cycle): „Whenever YOU equip an Artifact to a Hero, its controller draws 1 card." – gezogen wird nur, wenn der Hawk-Besitzer selbst anlegt ──
+    // ── Lunatic Hawk (2+ Lunatic Cycle): „Whenever YOU equip an Artifact to a Hero, its controller draws 1 card." – Trigger nur, wenn der Hawk-Besitzer selbst anlegt; gezogen wird (W52a) vom Kontrolleur des Zielhelden ──
     {
       const hawk = async (anleger, besitzer, zielSeite) => {
         const hand = [[], []]; hand[anleger].push(ORCH, WALL);
@@ -169,16 +169,16 @@ function wahl(t, seite, nachHeld, name) {
         t.put(besitzer, 2, 0, 'Lunatic Hawk'); t.put(besitzer, 2, 1, 'Lunatic Cycle - Crescent Moon'); t.put(besitzer, 2, 2, 'Lunatic Cycle - Full Moon');
         t.script.push({ match: (d) => d.type === 'cardGalleryMulti', answer: () => ({ selectedIndices: [0] }) });
         t.targetFn = (v) => { const z = v.find(x => x.type === 'equip' && x.owner === zielSeite && x.heroIdx === 0 && x.slotIdx === 0); return z ? [z.id] : undefined; };
-        const vor = t.pile(besitzer, 'hand').length;
+        const vor = t.pile(besitzer, 'hand').length, vorOpp = t.pile(1 - besitzer, 'hand').length;
         t.reset();
         await t.play(anleger, ORCH, { hero: 0, slot: 2 });
         const gelegt = [0, 1, 2].some(i => t.zone(zielSeite, 0, i) === WALL);
-        return { gelegt, handDelta: t.pile(besitzer, 'hand').length - vor, errors: t.errors };
+        return { gelegt, handDelta: t.pile(besitzer, 'hand').length - vor, oppDelta: t.pile(1 - besitzer, 'hand').length - vorOpp, errors: t.errors };
       };
       const g = await hawk(A, S, S);   // der GEGNER legt per Orchester an einen Helden des Hawk-Besitzers
       R.check('Lunatic Hawk des BESITZERS: der Gegner legt per Orchester an (Besitzer-Held) → der Besitzer zieht NICHT (er hat nicht angelegt)', g.gelegt && g.handDelta === 0 && g.errors.length === 0, g);
       const e = await hawk(S, S, A);   // der Besitzer legt per Orchester an einen Gegner-Helden
-      R.check('Lunatic Hawk des BESITZERS: der Besitzer legt selbst per Orchester an (Gegner-Held) → er hat angelegt, Hawk zieht 1 (Hand: −Orchester −Wall +1 = −1)', e.gelegt && e.handDelta === -1 && e.errors.length === 0, e);
+      R.check('Lunatic Hawk des BESITZERS: der Besitzer legt selbst per Orchester an einen Gegner-Helden an → W52a (Al): es zieht der KONTROLLEUR des Helden, an den angelegt wird (Gegner +1), nicht der Hawk-Besitzer (Hand: −Orchester −Wall = −2)', e.gelegt && e.handDelta === -2 && e.oppDelta === 1 && e.errors.length === 0, e);
     }
   }
   R.finish();

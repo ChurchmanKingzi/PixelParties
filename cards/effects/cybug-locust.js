@@ -99,7 +99,8 @@ module.exports = {
     const inst = info.cardInstance;
     if (!inst || inst.zone !== 'support') return false;
     const cd = engine?._getCardDB?.()[info.cardName];
-    if (!cd || !UMLEITBARE_SUBTYPEN.has(cd.subtype)) return false;
+    // W52a (Al, 22.10.2026): ein als Equip angelegter Held („treated as an equippable Artifact", Initiation Ritual) ist ein Artifact und damit umleitbar.
+    if (!cd || (!UMLEITBARE_SUBTYPEN.has(cd.subtype) && !engine?.istEquipArtifact?.(inst))) return false;
     // ★ Ausruest-Beschraenkungen gelten auch beim Stehlen (Al 19.8.):
     // ein „Crusader's"-Artefakt kann NUR auf eine Cecilia wandern.
     // Ohne legalen Traeger ist die Karte kein Ziel — dann wird der

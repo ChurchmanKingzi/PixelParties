@@ -122,6 +122,7 @@ module.exports = {
       await engine.runHooks('onCardLeaveZone', {
         _onlyCard: tInst, card: tInst, leavingCard: tInst,
         fromZone: 'support', fromHeroIdx: tHeroIdx,
+        _equipGrund: 'destroyed',   // W52a: Grund fuer `onEquipLost`
         _skipReactionCheck: true,
       });
     }

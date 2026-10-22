@@ -3,7 +3,7 @@
 //   (1) Nutzlast: Fridge / Ceremony (Equip UND Anhängsel) / `actionTransferAttachment` — Leave-Felder (`leavingCard`, `fromZone`, `fromOwner` = Brettseite, `fromHeroIdx`,
 //       `fromZoneSlot`) + neuer Platz + Ausführender + Quelle; immer `isMove`.
 //   (2) Reihenfolge: erst alle Abgänge (`onEquipLost`), dann alle Ankünfte (`onEquipGained`); bereits gemeldete Mitbewegte stehen beim nächsten Abgang „unterwegs".
-//   (3) Kein Lost bei normalem Abgang (Zerstören) — dafür bleibt `onCardLeaveZone`; kein Gained/Lost für Kreaturen/Abilities.
+//   (3) (seit W52a) auch das Zerstören meldet onEquipLost (ein Ereignis, kein Umhängen); kein Gained/Lost für Kreaturen/Abilities.
 //   (4) Ruling W51a bleibt: das echte `onCardEnterZone`/`onCardLeaveZone` eines Umhängens geht NUR an die bewegte Karte (`_onlyCard`) — Zähler wie Luck feuern nicht.
 //   (5) Eigen-Bonus des Equips (Club of Gobbo +30 ATK) wandert wie bisher; Taio/Toras daneben stimmen.
 //   (6) Tempeluna: die angelegte Fee verlässt Tempeluna per Fridge → Tempeluna verliert den gewonnenen Effekt (Ruling ①), vorher blieb er stehen.
@@ -68,10 +68,10 @@ function spion(t) {
       R.check('Zwei Equips: bei den Ankünften liegen alle wieder in einer Zone (support) am Zielhelden', s.gained.every(g => g.zonen.includes(P1 + ':support:1') && g.zonen.includes(P2 + ':support:1')), s.gained.map(g => g.zonen));
       R.check('Zwei Equips: nach dem Umhängen keine Karte „unterwegs"', t.inst(c => c.zone === '_umhaengen').length === 0, t.inst(c => c.zone === '_umhaengen').map(c => c.name)); }
 
-    // ── (3) Kein Lost bei normalem Abgang; keine Fenster für Kreatur/Ability ──
+    // ── (3) W52a: JEDER Abgang meldet onEquipLost (nicht nur das Umhängen) — Zerstören: ein Ereignis, Grund 'destroyed', kein Umhängen (Details: W52/a-01) ──
     { const t = await U.fresh(me, { hand: [] }); await U.lege(t, me, P1, 0); const s = spion(t);
       await t.run(() => t.engine.actionDestroyCard({ name: 'Test', owner: op }, t.find(P1, 'support'), {}));
-      R.check('Zerstören: KEIN onEquipLost (normale Abgänge melden nur onCardLeaveZone)', s.lost.length === 0 && !U.wo(t, me, P1).length, { l: s.lost, w: U.wo(t, me, P1) }); }
+      R.check('Zerstören: genau ein onEquipLost, kein Umhängen (isMove false)', s.lost.length === 1 && s.lost[0].move === false && !U.wo(t, me, P1).length, { l: s.lost, w: U.wo(t, me, P1) }); }
 
     // ── (4) Zähler-Lauscher bleiben still: Luck (Ability) zählt gespielte Karten über onCardEnterZone — beim Umhängen darf nichts gezählt werden ──
     { const t = await U.fresh(me, { hand: [] }); t.setAbilities(me, 0, [['Luck'], [], []]); t.setAbilities(me, 1, [['Luck'], [], []]);
@@ -90,11 +90,11 @@ function spion(t) {
       R.check('Club umgehängt: Quellheld ATK 80 (Club- UND Taio-Bonus weg), Zielheld +30', U.atk(t, me, 0) === 80 && U.atk(t, me, 1) === a1 + 30, { a0: U.atk(t, me, 0), a1: U.atk(t, me, 1), vorher1: a1 }); }
 
     // ── (6) Tempeluna: angelegte Fee verlässt Tempeluna → Effekt weg (Ruling ① der Karte) ──
-    for (const via of ['fridge', 'ceremony']) {
+    for (const via of ['ceremony']) {   // W52a: die Fee ist ANGEHÄNGT, kein Equip (`_keinEquip`) — die Fridge nimmt sie nicht mehr (W52/a-02), die Ceremony als Anhängsel schon
       const FEE = 'Maya, the Nature Fairy';
       const aufbau = async () => {
         const t = await U.fresh(me, { hand: [], heroes: { [me]: ['Tempeluna, the Convergence Fairy'] } });
-        const inst = t.put(me, 0, 0, FEE, { counters: { treatAsEquip: true, _tempelunaAttached: true } });
+        const inst = t.put(me, 0, 0, FEE, { counters: { treatAsEquip: true, _tempelunaAttached: true, _keinEquip: true } });
         t.engine.grantHeroEffect(me, 0, FEE, { traeger: inst });
         return t;
       };

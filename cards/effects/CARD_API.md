@@ -23218,3 +23218,63 @@ Alle drei auf dem Stand vor der Änderung rot (44 / 34 / 22 Fehlschläge), danac
 3. **Spiegelpartie-Fehler bei Taio** (gleicher Heldenplatz auf beiden Seiten: ein zerstörtes Equip des einen nahm dem anderen den Bonus): mit behoben, weil der neue Weg ihn sonst ausgelöst hätte. Passt das (ja)?
 4. **Puppet Tokens und die Ceremony (Fund, nicht Teil dieses Auftrags):** Die Ceremony hängt Puppet Tokens um, obwohl ihr Text „Cannot be moved to a different Support Zone" sagt (Tri Ad / Tri Fecta merken den Abgang dann nicht). Soll die Ceremony Tokens vom Umhängen ausnehmen (ja)?
 5. **Fiona-Aszension:** Fionas Aufstiegs-Bereitschaft (Grimoire + angelegter Held) ist ein ZUSTANDS-Lauscher, kein Zähler — sie läuft jetzt über `equipZustandHooks` und folgt dem Umhängen (das rohe `onCardEnterZone` bleibt wie bisher nur bei der bewegten Karte). Gemeint war in W51a „Fiona-Aszension feuert nicht" dasselbe wie „Zähler" — passt die Unterscheidung (ja)?
+
+
+## Welle 52 / W52a — `onEquipLost` für JEDEN Equip-Abgang · Tempelunas Fee ist kein Equip · Tokens werden nie umgehängt · Anti Magic Enchantment bei Initiation-Helden · Lunatic Hawk zieht der Held-Kontrolleur
+
+Al (Spieldesigner) hat die Rückfragen aus W51 beantwortet (22.10.2026). Repros: `docs/niche-tests/repro/W52/a-01` … `a-05` (beide Sitze, jeweils auf dem Stand vor W52a rot).
+
+### Punkt 1 · ALLGEMEINER Hook für alle Equip-Verluste (`onEquipLost`)
+**Al:** „Gibt es einen Grund, nicht einen allgemeinen Hook für *alle* Equip-Verluste zu haben? Wenn nicht, so ändern!"
+**Prüfung auf einen guten Grund dagegen — keiner gefunden:**
+* *Doppelfeuern bei `equipZustandHooks`* (das Vertragsstück verdrahtete `onCardLeaveZone` UND `onEquipLost` mit demselben Handler) → gelöst, indem `equipZustandHooks` das rohe `onCardLeaveZone` jetzt **entfernt**: der Zustandslauscher bucht den Abgang nur noch über `onEquipLost`, genau einmal (Test: Hook-Tabelle der sieben Helden, Zähler der Ereignisse, Differenz-Sweep ohne Doppelabzug).
+* *Zähler (Luck …)* bleiben unberührt: sie lauschen auf rohes `onCardEnterZone`/`onCardLeaveZone`, das sich **nicht** ändert; die 175+ übrigen Leave-Lauscher bleiben, wie sie sind.
+* *Kein Wert von `_onlyCard`-Pfaden verloren:* der neue Hook geht an ALLE Lauscher, auch wo das rohe Leave per `_onlyCard` nur die Karte selbst erreichte (Heldentod-Aufräumen, Afflicted Pests, Idej, Umhängen). Ergebnis: Taio/Toras/Aufstiegs-Bereitschaft buchen jetzt auch beim Heldentod/Pests ab (Taio hatte dafür einen Revive-Ausgleich; er bleibt idempotent).
+* *Ankunft bleibt asymmetrisch (bewusst):* `onEquipGained` hängt am Fenster-Verteiler (nur ohne `_skipReactionCheck`, nicht bei Surprise-Verschachtelung) und deckt nicht jeden Eintritt ab. Deshalb bleiben die Zustandslauscher für normale Ankünfte beim rohen `onCardEnterZone` und nehmen `onEquipGained` nur bei `isMove` (Umhängen) — dieselbe Buchung läuft nie zweimal.
+
+**Wo gefeuert (eine Methode, ein Verteiler):** `engine.fireEquipLost(inst, opts)`. Der Verteiler sitzt in `runHooks` direkt nach der Zuhörer-Runde: jedes `onCardLeaveZone` mit `fromZone: 'support'` einer **Nicht-Kreatur** (nicht Token, nicht Ability, kein unsichtbarer Träger `_gainedEffectOnly`) meldet zusätzlich `onEquipLost` (Karte steht dabei noch am alten Platz, `_bypassDeadHeroFilter` wird übernommen). Ausgenommen: Beobachter-Rundrufe (`_onlyCard` ≠ abgehende Karte, z. B. `seesEquipLeaveOnHeroDeath`), `isTransfer` (Kreaturen-Umzug) und Leaves mit `_equipLostGemeldet`. Die Umhäng-Wege (`_equip-shared.fuehreUmhaengenAus`, `actionTransferAttachment`) rufen `fireEquipLost` selbst (Karte vor/nach dem Entnehmen wie bisher) und markieren ihr Leave mit `_equipLostGemeldet: true` → kein Doppelfeuern. Zwei Engine-Wege nehmen eine Karte OHNE jedes `onCardLeaveZone` aus der Zone und rufen `fireEquipLost` deshalb direkt: **Smug Coin** (`lethalProtection`/`consumeSelf`, Grund `deleted`) und **Guardian Angel** (löst sich beim Heldentod selbst auf, Grund `deleted`). Gefunden mit einem Watcher über alle 1248 Repros (jede Nicht-Kreatur, die per `_untrackCard`/`_removeCardFromState` die Zone verlässt, ohne dass `fireEquipLost` lief): nur diese zwei (+ ein Test-Aufräumen).
+
+| Feld | Bedeutung |
+|---|---|
+| `leavingCard` (= `lostCard`), `lostName` | die abgehende Instanz |
+| `fromZone` ('support'), `fromOwner` (Brettseite des alten Wirts), `fromHeroIdx`, `fromZoneSlot` | alter Platz — Zuschnitt wie ein echtes Leave, ein Handler passt für beides |
+| `toZone` | Ziel: `'support'` (Umhängen), sonst `'discard' \| 'deleted' \| 'hand' \| 'deck'` oder `undefined` (z. B. Heldentod-Aufräumen) |
+| `toOwner`, `toHeroIdx`, `toZoneSlot` | neuer Platz (nur Umhängen) |
+| `equipOwner` | Umhängen: der Ausführende; sonst der Verursacher (`entferntVon`) |
+| `kind` | `'equip'` oder `'attachment'` (Spell/Attack-Anhängsel, Tempelunas Fee) |
+| `isMove` | **true NUR beim Umhängen** auf einen anderen Wirt; sonst false |
+| `reason` | siehe unten |
+| `source` | Name der verursachenden Karte, falls bekannt |
+
+**`reason` (definiert in `engine._equipLostGrund`):** `moved` (umgehängt, gleiche Brettseite: Fridge, Ceremony, Secret Spell Book) · `transferred` (auf die Seite eines anderen Spielers gewandert: Cybug LOCUST) · `destroyed` (`actionDestroyCard`, Afflicted Pests) · `discarded` · `deleted` (auch Smug Coin, Guardian Angel) · `returnedToHand` · `returnedToDeck` · `hostDefeated` (Heldentod-Aufräumen) · `hostRemoved` (`deleteHero`) · `other`. Ein Aufrufer kann den Grund setzen (`opts._equipGrund` an `actionMoveCard` / `_equipGrund` im Leave-Ereignis).
+
+**Vertrag (ergänzt):** *Wer einen Bonus / Zustand an das Ausgerüstet-/Angehängt-SEIN einer Karte hängt → `equipZustandHooks` (`_hooks.js`).* Das Vertragsstück macht den Leave-Handler zum `onEquipLost`-Handler und **entfernt das rohe `onCardLeaveZone`** (Handler 1:1 wiederverwendbar; Seite per `fromOwner` prüfen, idempotent buchen); `onCardEnterZone` bleibt für normale Ankünfte, `onEquipGained` bucht nur Umhängen. Zähler („gespielt/angelegt/verlassen": Luck, Fiona-Aszension …) bleiben bei `onCardEnterZone`/`onCardLeaveZone`. Umgestellt waren schon: Taio, Toras, Future Tech Gunslinger Riffel, Kohta, Lolek, Fiona, Tempeluna — jetzt nur noch auf `onEquipLost`.
+
+**Differenz-Sweep (`W52/a-01`, beide Sitze):** für Taio, Toras, Riffel, Kohta, Lolek (je ein Teil verlieren), Fiona (Grimoire + angelegter Held), Tempeluna (Fee) über die Wege zerstören, ablegen, löschen, zurück auf die Hand, umhängen (Fridge), „ersetzen" (zerstören + gleiches Teil neu), Wirt besiegt + Wiederbelebung, Spiegelpartie: Zustand beider Helden und Sitze (ATK, `ascensionReady`, `gainedEffectNames`) == „das Equip hat nie gelegen" bzw. „direkt dort angelegt". 306 Prüfungen, 0 Abweichungen. (Ein echtes „Ersetzen" einer Ausrüstung durch eine andere gibt es als Regel nicht; die Probe ist zerstören + neu anlegen.) Nebenbefund, unverändert: **Future Tech Gun** gibt beim erneuten Anlegen nach Zerstören +40 ATK am Riffel-Träger (auch auf `main`; unabhängig vom Abgang) — Rückfrage.
+
+### Punkt 2 · Tempelunas angehängte Fee ist KEIN Equip
+**Al:** „In ihrem Effekt steht nichts davon, dass die Fee als Equip zählt – das wäre ungewollt!" Die Fee bekommt `counters._keinEquip` (zusätzlich zu `treatAsEquip`, das nur noch die Träger-Rolle trägt: Hooks aus der Support Zone mit dem `heroIdx` des Wirts, Heldeneffekt-Stummschaltung, Aktivierung). Wirkung:
+* `engine.isEquipInZone(name, inst)` → false (Taio, Disarm, Blind Destruction, Spirit of the Shattered Trident …), `_equip-shared.istUmhaengbaresEquip` → false: **Slippery Fridge** bietet sie nicht an und kann sie nicht umhängen.
+* Anti Magic Enchantment / Afflicted Pests / Cybug LOCUST / RHINOCEROS / Lunatic Hawk sehen kein Equip. Tempeluna öffnet weiterhin KEIN Pests-Fenster (W50-Entscheidung); `onEquipLost`/`onEquipGained` melden die Fee als `kind: 'attachment'`.
+* Effekt-Gewinn/-Verlust funktioniert wie zuvor (Fee zerstört/abgelegt/Wirt besiegt → Effekt weg; jetzt über den allgemeinen `onEquipLost`).
+* **Ceremony** („attached or equipped") nimmt die Fee als **Anhängsel** weiter mit (`verschiebbar`: `_keinEquip` bleibt erlaubt, Weg `actionTransferAttachment`); Folge: Tempeluna verliert den Effekt, der neue Wirt gewinnt ihn nicht, die Fee-Hooks laufen am neuen Wirt weiter (Träger-Marke). **Frage an Al:** soll die Ceremony die Fee überhaupt mitnehmen (Ja/Nein)?
+
+### Punkt 3 · Tokens werden nie umgehängt
+**Al:** „Ja, [Puppet Tokens] ausnehmen! Generell sollten Tokens ausgenommen sein!" Zentrale Erkennung: `engine.isTokenCard(inst)` (wirksame Kartendaten, auch Biomancy-/Boulder-Token mit `_cardDataOverride`). Genutzt in `istUmhaengbaresEquip` (Fridge, Ceremony-Equip-Teil, Auswahllisten), in `Inheritance Ceremony.verschiebbar` (Anhängsel-Teil) und als Riegel in `engine.actionTransferAttachment` (`{ success: false, tokenBlocked: true }`, kein Hook). Tri Ad / Tri Fecta merken keinen Abgang mehr, weil ihre Tokens bleiben. **Audit anderer Bewegungs-Effekte (nur gemeldet):** `actionMoveCard` blockt Puppets bereits über `cannotChangeSupportZone`; die Creature-Bewegungen (Guard Change, Slippery-Familie, Capture, Dark Gear, Diplomacy, Paraseed Greenhouse …) arbeiten auf Creatures (Creature-Tokens wie Mummy/Biomancy sind Creatures und zählen dort mit — nach Kartentext richtig); ein Pollution Token wird von keinem dieser Effekte als Ziel genommen (kein Creature-Typ). Nichts weiter geändert.
+
+### Punkt 4 · Anti Magic Enchantment bei Initiation-Ritual-Helden (+ Matrix der Equip-Beobachter)
+**Al:** „Nein, soll angeboten werden!" Neue Frage `engine.istEquipArtifact(inst)`: Equipment-Artifact **oder** als Equip angelegter Held (`treatAsEquip` + Hero-Typ: Initiation Ritual, Shapeshifter-Gestalt); nicht Anhängsel, nicht `_keinEquip`, nicht Token. AME nutzt sie im Hook `onEquipGained`; der Schutz hängt an dem angelegten Helden (die Engine liest `counters.antiMagicEnchanted` an jeder Support-Karte des Wirts; solange er ausgerüstet ist). Matrix (`W52/a-04`):
+
+| Beobachter | Hand-Equip (Artifact) | per Initiation Ritual angelegter Held | Tempelunas Fee |
+|---|---|---|---|
+| Afflicted Pests | ja | ja (seit W50) | nein |
+| Cybug LOCUST | ja | **ja** (W52a: Subtyp-Filter um `istEquipArtifact` erweitert; leitet den Helden um) | nein |
+| Cybug RHINOCEROS (Platzierungs-Fenster) | ja | **ja** (W52a: `initiation-ritual.js` ruft `_checkSurpriseOnPlacement` explizit, der Eintritt trägt `_skipReactionCheck`) | nein |
+| Anti Magic Enchantment | ja | **ja** (W52a) | nein |
+| Lunatic Hawk 2+ | ja | **ja** (W52a, Punkt 6) | nein |
+
+### Punkt 6 · Lunatic Hawk (Al, Zusatz): zieht der Kontrolleur des Helden, an den angelegt wird; Umhängen zählt
+Kartentext 2+: „Whenever you equip an Artifact to a Hero, its controller draws 1 card." Al: „Lunatic Hawk lässt explizit den Spieler, an dessen Hero man anlegt, ziehen. Kontrolliert P1 Hawk und legt selbst ein Equip an einen gegnerischen Hero, zieht P2." Und: „Ja, Fridge feuert on-equip. Damit etwas umzuhängen triggert also Hawk." → `lunatic-hawk.js`: neuer Hook `onEquipGained`; Trigger: `ctx.equipOwner === Hawk-Besitzer` (der Ausrüstende/Ausführende), Stufe 2+ (zwei verschiedene Lunatic Cycles), `engine.istEquipArtifact(ctx.equipCard)`; gezogen wird von `ctx.heroController` (aktueller Kontrolleur des Zielhelden: auch Charme/Übernahme). Fridge und Ceremony (Equip-Teil): der Ausführende ist der Anlegende, **jedes** umgehängte Equip zieht einzeln; Anhängsel (Spells/Attacks, Fee) sind keine Artifacts. Der Gegner legt an → der Hawk triggert nicht. Das alte `onCardEnterZone`-Ziehen ist entfernt (Tier 3/5 unverändert).
+
+### Tests W52a
+Neu: `W52/a-01` (306 Prüfungen: Grund/Nutzlast je Weg, genau ein Ereignis, Gegenproben Kreatur/Token/Luck, Vertrag der sieben Helden, Differenz-Sweep), `a-02` (46: Fee kein Equip, Fridge/AME/Pests, Ceremony als Anhängsel, Gegenprobe Initiation-Held), `a-03` (24: Tokens), `a-04` (72: AME + Matrix + Wirkung), `a-05` (48: Lunatic Hawk). Angepasst: `W51/b-03` (Zerstören meldet jetzt `onEquipLost`; Fee-Probe nur noch Ceremony), `W51/c-01` (Hawk-Zeile: es zieht der Kontrolleur des Zielhelden).
