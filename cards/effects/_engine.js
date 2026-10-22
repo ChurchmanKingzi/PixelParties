@@ -6586,7 +6586,7 @@ class GameEngine {
     vollOut.wert = Math.max(0, vollOut.wert - n);
   }
 
-  /** W51a (Al): „Halve that damage (rounded up)" NACH dem Haltepunkt (Cloud in a Bottle): der Kettenbetrag wird aufgerundet halbiert. */
+  /** W51a (Al): „Halve that damage (rounded up)" NACH dem Haltepunkt: der Kettenbetrag wird aufgerundet halbiert. (Seit W51c ruft Cloud in a Bottle das nicht mehr: es legt VOR dem Treffer einen Multiplikator-Buff auf, der Betrag und Kettenbetrag ohnehin senkt; Hilfsfunktion bleibt fuer kuenftige Nach-Haltepunkt-Halbierungen.) */
   _kettenHalbiert(vollOut) {
     if (!vollOut || typeof vollOut.wert !== 'number' || !(vollOut.wert > 0)) return;
     vollOut.wert = Math.ceil(vollOut.wert / 2);
@@ -9270,6 +9270,24 @@ class GameEngine {
     const { applyArrowsBeforeDamage } = require('./_arrows-shared');
     applyArrowsBeforeDamage(this, source, target, hookCtx);
 
+    // ── W51c (Al, 22.10.2026): FRUEHES Hand-Reaktionsfenster „Schaden senken" ──────────────────────────────────────────────
+    // Karten, die den Treffer VOR Schilden/Deckeln/HP-Boeden senken (Cloud in a Bottle: „Halve any damage … including that damage"), melden sich mit
+    // `preDamageEarly: true` und werden HIER gefragt — nach Immunitaeten/Negationen und Pfeil-Boni, aber VOR dem Buff-Multiplikatoren-Durchgang unten.
+    // Die Karte legt ihren Multiplikator-Buff (Cloudy) sofort auf; der Durchgang darunter halbiert den Treffer dann wie jede andere Senkung (Kettenbetrag
+    // inklusive). Wurde der Buff verhindert, liefert die Karte `multiplier` zurueck, den die Engine direkt in `_mul` rechnet. Nicht anbieten, wenn der Treffer
+    // nicht senkbar ist (`cannotBeReduced`/`cannotBeNegated` lassen den Multiplikator-Durchgang ohnehin aus).
+    if (target && target.hp !== undefined && target.hp > 0 && !hookCtx.cancelled
+        && !hookCtx.cannotBeReduced && !hookCtx.cannotBeNegated) {
+      const _fruehBetrag = this._projectedAmount(hookCtx);
+      if (_fruehBetrag > 0) {
+        const _fr = await this._checkPreDamageHandReactions(target, source, _fruehBetrag, type, { early: true });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+          hookCtx._mul = (hookCtx._mul ?? 1) * _fr.multiplier;
+          hookCtx._kMul = (hookCtx._kMul ?? 1) * _fr.multiplier;
+        }
+      }
+    }
+
     // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible damage (Ida).
     // Also skipped for reduce-only multipliers when `cannotBeReduced` is
     // set: a card declared "this damage cannot be further reduced" so
@@ -9706,8 +9724,9 @@ class GameEngine {
     // Fires on any hit that actually removed HP. SURVIVOR case: every
     // after-damage reaction is eligible (unchanged). LETHAL case: only
     // cards that opt in via `firesOnLethalDamage` are offered — the hub
-    // skips the rest, so Fireshield / Cloud in a Bottle / Punch in the
-    // Box stay survival-only (their text requires the target to live).
+    // skips the rest, so Fireshield / Punch in the Box stay survival-only
+    // (their text requires the target to live). (Cloud in a Bottle sitzt seit
+    // W51c nicht mehr hier, sondern im FRUEHEN Vor-Schaden-Fenster.)
     // `realDealt` (HP actually lost, capped at pre-hit HP) is passed so
     // a "deal the same amount as recoil" card uses the true HP loss,
     // never overkill; it equals `actualAmount` whenever the target
@@ -35040,6 +35059,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const script = loadCardEffect(cardName);
       if (!script?.isPreDamageReaction) continue;
+      // W51c: zwei Stufen — das FRUEHE Fenster (vor dem Multiplikatoren-Durchgang; `opts.early`) fragt nur Karten mit `preDamageEarly`, das SPAETE alle uebrigen.
+      if (!!script.preDamageEarly !== !!opts.early) continue;
       // ── INSTA-KILLS (v718, Als Befund 4.9.) ────────────────────────
       // Eraser Beam und Hand of Death toeten ohne Schaden. Dieses
       // Fenster steht ihnen jetzt offen (`actionDefeatHero` ruft es),
@@ -35239,6 +35260,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       let negated = false;
       let amountOverride;
+      let multiplier;
       this._inPreDamageReaction = true;
       try {
         if (script.preDamageResolve) {
@@ -35247,6 +35269,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (result && typeof result.amountOverride === 'number') {
             amountOverride = Math.max(0, result.amountOverride);
           }
+          if (result && typeof result.multiplier === 'number') multiplier = result.multiplier;   // W51c (nur FRUEHES Fenster)
         }
       } catch (err) {
         console.error(`[PreDamageReaction] ${cardName} threw:`, err.message);
@@ -35259,7 +35282,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
       this.sync();
-      return { negated, amountOverride };
+      return { negated, amountOverride, multiplier };
     }
     return NULL_RESULT;
     } finally {
@@ -35466,7 +35489,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * loss, no death cleanup) or `{ amountOverride: N }` to pin the
    * dealt amount; mirrors the hero pre-damage contract.
    */
-  async _checkCreaturePreDamageHandReactions(creatureInst, source, amount, type) {
+  async _checkCreaturePreDamageHandReactions(creatureInst, source, amount, type, opts = {}) {
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
@@ -35493,6 +35516,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const script = loadCardEffect(cardName);
       if (!script?.isCreaturePreDamageReaction) continue;
+      // W51c: FRUEHES Fenster (`opts.early`, vor dem Multiplikatoren-Durchgang) nur fuer `preDamageEarly`-Karten, das SPAETE fuer alle uebrigen.
+      if (!!script.preDamageEarly !== !!opts.early) continue;
 
       const cardData = allCards[cardName];
       if (cardData?.cardType === 'Artifact'
@@ -35582,12 +35607,14 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       let negated = false;
       let amountOverride = undefined;
+      let multiplier;
       this._inCreaturePreDamageReaction = true;
       try {
         if (script.creaturePreDamageResolve) {
           const result = await script.creaturePreDamageResolve(this, ownerIdx, creatureInst, source, amount, type);
           if (result?.negated) negated = true;
           if (typeof result?.amountOverride === 'number') amountOverride = result.amountOverride;
+          if (typeof result?.multiplier === 'number') multiplier = result.multiplier;   // W51c (nur FRUEHES Fenster)
         }
       } catch (err) {
         console.error(`[CreaturePreDamageReaction] ${cardName} threw:`, err.message);
@@ -35600,7 +35627,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (Card was already routed to its destination pile alongside
       // the hand splice above.)
       this.sync();
-      return { negated, amountOverride };
+      return { negated, amountOverride, multiplier };
     }
     return NULL_RESULT;
   }
@@ -51074,6 +51101,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       // (e.g. Dichotomy of Luna and Tempeste) declared "this entry's
       // damage cannot be reduced further", so any multiplier below 1
       // is a no-op. Multipliers ≥ 1 still apply.
+      // ── W51c: FRUEHES Hand-Reaktionsfenster „Schaden senken" (Cloud in a Bottle), Zwilling des Heldenpfads: VOR dem Multiplikatoren-Durchgang, damit die
+      // Halbierung vor Einmal-Schilden/Flat-Boni/HP-Boeden greift. Die Karte legt „Cloudy" auf; der Durchgang darunter halbiert dann. Nicht senkbarer Schaden
+      // (`cannotBeReduced`, `canBeNegated === false`) bekommt kein Angebot; Zerstoeren/Opfer sind kein Schaden.
+      if (e.inst && !e._immuneCreature && e.canBeNegated !== false && !e.cannotBeReduced && e.amount > 0
+          && e.type !== 'destroy' && e.inst.zone === 'support' && (e.inst.counters?.currentHp || 0) > 0) {
+        const _fr = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, e.amount, e.type, { early: true });
+        if (_fr && typeof _fr.multiplier === 'number' && _fr.multiplier < 1) {
+          if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * _fr.multiplier; e._kMul = (e._kMul ?? 1) * _fr.multiplier; }
+          else e.amount = Math.ceil(e.amount * _fr.multiplier);
+        }
+      }
       const _eAmountBeforeBuffMul = e.amount;
       if (e.canBeNegated !== false && e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {

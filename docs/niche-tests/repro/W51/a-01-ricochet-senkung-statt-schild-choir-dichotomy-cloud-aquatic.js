@@ -84,7 +84,8 @@ const kreatur = (t, s, hi, name) => { t.put(s, hi, 0, name); return t.inst(x => 
       R.check('Cloud in a Bottle an einer Kreatur, die trotzdem fällt (10 HP): Folgetreffer 25/13/7/4/2/1', !r.kInst(op) && gleich(r.dmg, [25, 13, 7, 4, 2, 1]), { d: r.dmg, da: !!r.kInst(op) }); fehler(r, 'CiB Kreatur tödlich'); }
     { const r = await lauf(me, op, { vorher: async (t) => { t.addHand(me, 'Cloud in a Bottle'); } });
       // Position 2 ist der eigene Angreifer (me, Held 0): 50 → 25; Pos. 3 = 13 …
-      R.check('Cloud in a Bottle des Angreifers an Position 2 (50 → 25): 100/50/13/7/4/2', gleich(r.dmg, [100, 50, 13, 7, 4, 2]), r.dmg); fehler(r, 'CiB eigene Seite'); }
+      // W51c: Cloud in a Bottle halbiert jetzt VOR dem Anwenden (kein Wiederherstellen mehr) – das Schadens-Log zeigt den ECHTEN Treffer 25 (vorher den vollen Betrag 50).
+      R.check('Cloud in a Bottle des Angreifers an Position 2 (50 → 25): 100/25/13/7/4/2', gleich(r.dmg, [100, 25, 13, 7, 4, 2]), r.dmg); fehler(r, 'CiB eigene Seite'); }
     { const r = await lauf(me, op, {});
       R.check('Gegenprobe ohne Cloud in a Bottle: 100/50/25/13/7/4', gleich(r.dmg, kette(100, 6)), r.dmg); }
 
