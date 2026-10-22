@@ -20,11 +20,17 @@
 //   • Das Nachrechnen ist idempotent: ändert sich nichts, passiert
 //     nichts. Deshalb ist es unbedenklich, es an jeden plausiblen
 //     Hook zu hängen.
-//   • Der Zuschlag geht über `engine._applyHeroAtkDelta`, nicht über
-//     `ctx.grantAtk` — nur so wird die Differenz sauber verrechnet und
-//     Curse-Unterdrückung berücksichtigt. `counters.atkGranted` bleibt
-//     der Stand, den `ctx.revokeAtk()` beim Verlassen der Zone wieder
-//     abzieht.
+//   • W58a: Das Skript liefert nur die RECHNUNG (`atkZiel`); gebucht
+//     wird über `engine.dynamischeAtkBuchen` → `actionSetAtkGrant`
+//     (Zielwert, nur am aktuellen Träger, pro Instanz genau einmal;
+//     Curse-Unterdrückung und Auren laufen über den Trichter).
+//     Zusätzlich gleicht die Engine die Karte bei jedem `sync()` und
+//     jedem `runHooks()` gegen die Ist-Ablage ab
+//     (`_dynamischeAtkNachrechnen`) — auch nach Wegen, die die Ablage
+//     OHNE Hook ändern (Todes-Aufräumen, Direktzugriffe). Beim Verlassen
+//     der Zone zieht `ctx.revokeAtk()` exakt den gebuchten Betrag am
+//     Stempel-Träger ab: der Held hat danach die ATK ohne je angelegte
+//     Gun.
 //   • Kein Treibstoff-Sonderweg: dass Cybug ANTS diese Karte löscht,
 //     ist Sache von ANTS. Diese Karte weiß davon nichts.
 // ═══════════════════════════════════════════
@@ -35,41 +41,27 @@ const CARD_NAME = 'Future Tech Gun';
 const BONUS_PER_COPY = 40;
 
 /**
- * Zuschlag neu berechnen und nur die Differenz anwenden. Idempotent —
- * ohne Änderung ein No-op, deshalb an jedem plausiblen Hook sicher.
+ * W58a: die RECHNUNG (ohne Buchung). Die Engine bucht (`engine.dynamischeAtkBuchen` → `actionSetAtkGrant`) und gleicht diese Karte bei jedem `sync`/`runHooks` gegen die
+ * Ist-Ablage ab — auch nach Wegen, die die Ablage ohne Hook veraendern (Todes-Aufraeumung, Direktzugriffe).
+ * Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur (`seiten.owner`).
+ * Ueber das gemeinsame Zaehlwerk statt per eigenem `filter` (v536): nur so sieht die Karte kuenftige Namens-Aliasse (Prototypes, Copy Device).
  */
+function atkZiel(engine, inst, seiten /* , hero */) {
+  const kopien = zaehleInAblage(engine.gs, seiten.owner, CARD_NAME);
+  const neuerZuschlag = kopien * BONUS_PER_COPY;
+  return { betrag: neuerZuschlag, log: { typ: 'future_tech_gun_atk', daten: { bonus: neuerZuschlag, copies: kopien } } };
+}
+
+/** Haken-Einstieg: Zuschlag neu rechnen und buchen (idempotent — ohne Aenderung ein No-op). */
 function zuschlagNachrechnen(ctx) {
-  const engine = ctx._engine;
   const inst = ctx.card;
   if (!inst || inst.zone !== 'support') return;
-
-  // Kontrolle statt Seite (Styx 28.9.): „your discard pile" = Kontrolleur
-  // (`cardOwner`), der Held steht auf seiner Brettseite (`cardHeroOwner`).
-  const owner = ctx.cardOwner;
-  const feld = ctx.cardHeroOwner ?? owner;
-  const heroIdx = ctx.cardHeroIdx;
-  const hero = ctx.attachedHero;
-  if (!hero?.name) return;
-
-  // Ueber das gemeinsame Zaehlwerk statt per eigenem `filter` (v536):
-  // nur so sieht die Karte kuenftige Namens-Aliasse (Prototypes,
-  // Copy Device). Verhalten heute identisch.
-  const kopien = zaehleInAblage(engine.gs, owner, CARD_NAME);
-  const neuerZuschlag = kopien * BONUS_PER_COPY;
-
-  if (!inst.counters) inst.counters = {};
-  const bisher = inst.counters.atkGranted || 0;
-  const delta = neuerZuschlag - bisher;
-  // W53a: EIN Baustein fuer Ausruestungs-ATK — bucht auf den Zielwert, nur am aktuellen Traeger, pro Instanz genau einmal (siehe `engine.actionSetAtkGrant`).
-  if (!engine.actionSetAtkGrant(inst, neuerZuschlag)) return;
-
-  engine.log('future_tech_gun_atk', {
-    hero: hero.name, bonus: neuerZuschlag, copies: kopien, delta,
-  });
-  engine.sync();
+  ctx._engine.dynamischeAtkBuchen(inst);
 }
 
 module.exports = {
+
+  atkZiel,   // W58a: Rechnung fuer `engine.dynamischeAtkBuchen` / den Abgleich der Engine
 
   /**
    * „Equip this card to a Hero you control." — Seitenbindung, siehe

@@ -46,6 +46,7 @@ const COOLNESS_LANDE_MS = 560;
 const COOLNESS_LUECKE_MS = 90;
 const MAX_CARD_INSTANCES = 2000;
 
+
 // Aura-Quellen (Skript-Flag `negatesOtherCreatureEffects`, The Creepy Clown
 // of Heaven) — je Skriptname einmal ermittelt: die Aura-Pruefung steckt im
 // Kreatur-Praedikat und laeuft bei JEDER Hook-Zustellung.
@@ -2858,6 +2859,8 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
+    this._dynamischeAtkNachrechnen();
     // Zentrale Buchfuehrung „welcher Spell wurde diesen Zug schon gewirkt"
     // (Eraser Beam: „only Spell this turn"). Frueher stempelte nur ein Hook
     // der Eraser-Beam-INSTANZ — fehlte sie in dem Moment (Karte im Deck,
@@ -20110,6 +20113,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Buchung an einem anderen Helden (Ex-Traeger): dort abziehen, dann frisch buchen.
     if ((c.atkGranted || 0) > 0 && stempel && (stempel.seite !== seite || stempel.heroIdx !== heroIdx)) {
       this.actionRevokeAtkAmTraeger(cardInst);
+      delete c._atkWeg;                                   // W58a: Traegerwechsel — die Karte bucht gleich am neuen Traeger
     }
     if (!hero?.name) {                                    // kein Traeger (Held weg / Karte nicht in einer Support Zone): nichts zu buchen
       if (amount === 0) delete c._atkTraeger;
@@ -20146,10 +20150,68 @@ this._deathWatch = (this._deathWatchStack || []).length
     const heroIdx = st ? st.heroIdx : cardInst.heroIdx;
     const hero = this.gs.players[seite]?.heroes?.[heroIdx];
     delete c._atkTraeger;
+    if (c._atkDyn) c._atkWeg = true;   // W58a: zurueckgenommen — der Abgleich (`_dynamischeAtkNachrechnen`) bucht nicht wieder, bis ein Haken der Karte selbst es tut
     if ((c.atkGranted || 0) <= 0) return false;
     if (!hero?.name) { c.atkGranted = 0; return false; }   // der Traeger ist weg (Held entfernt): nichts mehr abzuziehen
     this.actionRevokeAtk(cardInst, hero, seite, heroIdx);
     return true;
+  }
+
+  /**
+   * ★ W58a (Al, 22.10.2026: „Wird Energy Core oder Gun entfernt, sollen die ATK des Heroes danach exakt so hoch sein, wie sie wären, wäre nie ein Energy Core oder eine Gun an sie angelegt gewesen"):
+   * der EINE Weg, den ATK-Bonus einer Ausruestung zu buchen, deren Hoehe vom Zustand der ABLAGE abhaengt (Ancient Tech Infinite Energy Core, Future Tech Gun). Das Kartenskript liefert nur die
+   * Rechnung (`atkZiel(engine, inst, seiten, hero)` → `{ betrag, log: { typ, daten } }`), die Buchung (Zielwert, nur am aktuellen Traeger, pro Instanz genau einmal, Stempel) macht
+   * `actionSetAtkGrant`. Die Haken der Karte rufen diese Methode; zusaetzlich gleicht `_dynamischeAtkNachrechnen` ALLE markierten Instanzen bei jedem `sync` und jedem `runHooks` ab.
+   * @param {object} opts.abgleich  true = Aufruf aus dem Abgleich (strenger: Karte muss wirklich in ihrer Zone liegen, Held lebt, Karte nicht gerade zurueckgenommen)
+   */
+  dynamischeAtkBuchen(inst, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || !(inst.heroIdx >= 0)) return false;
+    if (!inst.counters) inst.counters = {};
+    const script = loadCardEffect(inst.counters._effectOverride || inst.name);   // geliehene Identitaet (Copy Device als Gun) zaehlt
+    if (typeof script?.atkZiel !== 'function') return false;
+    const seiten = this.effektiveSeiten(inst);
+    const hero = this.gs.players[seiten.heroOwner]?.heroes?.[inst.heroIdx];
+    if (!hero?.name) return false;
+    if (opts.abgleich) {
+      if (inst.counters._atkWeg) return false;                                       // gerade zurueckgenommen (Abgang laeuft)
+      if (!(hero.hp > 0)) return false;                                              // Hooks einer Karte an einem Besiegten feuern nie
+      const slot = this.gs.players[this.physicalSide(inst)]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
+      if (!Array.isArray(slot) || !slot.includes(inst.name)) return false;           // Karte steht nicht (mehr) in ihrer Zone (Umhaengen/Abgang unterwegs)
+      if (this.isCreatureEffectSuppressed(inst)) return false;
+    } else {
+      delete inst.counters._atkWeg;                                                  // die Karte selbst bucht wieder (Anlegen, eigener Haken)
+    }
+    inst.counters._atkDyn = true;                                                    // Marke: ab jetzt rechnet der Abgleich diese Instanz nach
+    const z = script.atkZiel(this, inst, seiten, hero);
+    if (!z || !Number.isFinite(z.betrag)) return false;
+    const bisher = inst.counters.atkGranted || 0;
+    if (!this.actionSetAtkGrant(inst, z.betrag)) return false;
+    if (z.log?.typ) this.log(z.log.typ, { hero: hero.name, ...(z.log.daten || {}), delta: z.betrag - bisher });
+    if (!opts.abgleich) this.sync();   // im Abgleich laeuft der Aufrufer (`sync`/`runHooks`) selbst weiter; die Anzeige folgt dem naechsten Abgleich
+    return true;
+  }
+
+  /**
+   * ★ W58a: alle dynamischen ATK-Boni gegen den Ist-Zustand abgleichen (idempotent; ohne Aenderung ein No-op, keine Hooks, keine Reaktionsfenster). Aufrufer: `sync()` und `runHooks()`
+   * sowie die Todes-Aufraeumung ueber ihr `sync()`. Lauf-Schloss gegen Selbstaufruf (die Buchung ruft `sync`/`runHooks`).
+   */
+  _dynamischeAtkNachrechnen() {
+    if (this._dynAtkLaeuft) return;
+    let ersterTreffer = null;
+    for (const c of this.cardInstances) {
+      if (c.zone === ZONES.SUPPORT && c.counters?._atkDyn) { ersterTreffer = c; break; }
+    }
+    if (!ersterTreffer) return;
+    this._dynAtkLaeuft = true;
+    try {
+      for (const c of [...this.cardInstances]) {
+        if (c.zone === ZONES.SUPPORT && c.counters?._atkDyn) this.dynamischeAtkBuchen(c, { abgleich: true });
+      }
+    } catch (err) {
+      console.error('[dynamischeAtk]', err && err.message);
+    } finally {
+      this._dynAtkLaeuft = false;
+    }
   }
 
   /**
@@ -53871,6 +53933,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
+    this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
     // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.
