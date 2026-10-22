@@ -15595,7 +15595,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doActivateFreeAbility(room, pi, params).catch(err => console.error('[activate_free_ability] error:', err.message));
+    doActivateFreeAbility(room, pi, params).catch(err => console.error('[activate_free_ability] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Activate a hero's active effect (Main Phase, no action cost)
@@ -15645,7 +15645,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    stAct(room, pi, 'activate_hero_effect', params, () => doActivateHeroEffect(room, pi, params)).catch(err => console.error('[activate_hero_effect]', err.message));
+    stAct(room, pi, 'activate_hero_effect', params, () => doActivateHeroEffect(room, pi, params)).catch(err => console.error('[activate_hero_effect]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // ── ACTIVE CREATURE EFFECTS ──
@@ -15658,7 +15658,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doActivateAreaEffect(room, pi, params).catch(err => console.error('[activate_area_effect]', err.message));
+    doActivateAreaEffect(room, pi, params).catch(err => console.error('[activate_area_effect]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   socket.on('activate_creature_effect', (params) => {
@@ -15671,7 +15671,7 @@ io.on('connection', (socket) => {
     // gesperrt (Als Befund 5.8., Spam-Klick).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    stAct(room, pi, 'activate_creature_effect', params, () => doActivateCreatureEffect(room, pi, params)).catch(err => console.error('[activate_creature_effect] error:', err.message));
+    stAct(room, pi, 'activate_creature_effect', params, () => doActivateCreatureEffect(room, pi, params)).catch(err => console.error('[activate_creature_effect] error:', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Treacherous Crystal — explicit trigger emitted when the player
@@ -15712,7 +15712,7 @@ io.on('connection', (socket) => {
     // Waflav liess sich waehrend Ambush noch aktivieren).
     if (room.gameState._chainResolvingLock
         || room.gameState._forceDiscardLock === pi) return;
-    doActivateEquipEffect(room, pi, params).catch(err => console.error('[activate_equip_effect]', err.message));
+    doActivateEquipEffect(room, pi, params).catch(err => console.error('[activate_equip_effect]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Activate a permanent card's effect
@@ -15722,7 +15722,7 @@ io.on('connection', (socket) => {
     if (!room?.gameState) return;
     const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
     if (pi < 0) return;
-    doActivatePermanent(room, pi, params).catch(err => console.error('[activate_permanent]', err.message));
+    doActivatePermanent(room, pi, params).catch(err => console.error('[activate_permanent]', err.message)).finally(() => room.engine?._runPostChainActions?.());
   });
 
   // Play the top of the player's Coolness Stack (Bifab, Modnir,
@@ -15739,6 +15739,7 @@ io.on('connection', (socket) => {
       } catch (err) {
         console.error('[play_from_coolness_stack]', err.message);
       }
+      try { await room.engine._runPostChainActions?.(); } catch (err) { console.error('[play_from_coolness_stack] Nach-Ketten-Aktionen:', err.message); }
       for (let i = 0; i < roomPlayerCount(room); i++) sendGameState(room, i);
       sendSpectatorGameState(room);
     })();
