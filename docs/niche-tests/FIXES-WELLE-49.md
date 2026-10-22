@@ -29,8 +29,10 @@ Al hat am 22.10.2026 eine Liste kleiner Änderungen gegeben. Umsetzung durch dre
 
 ## Offene Rückfragen an Al
 
+Beantwortet und umgesetzt in [FIXES-WELLE-50.md](FIXES-WELLE-50.md).
+
 1. **Ricochet:** Sollen Senkungen/Schilde des Vorgängerziels mitgegeben werden? Aktuell nur Erhöhungen. Und dürfen dauerhafte Pfeil-Boni beim Folgetreffer erneut wirken? Aktuell nein.
 2. **Slippery Fridge vs. Inheritance Ceremony:** Unterscheidung der Anlegefenster so gewollt?
 3. **Tempeluna / Initiation Ritual** öffnen jetzt das Pests-Fenster – so gewollt?
 4. **Thalia** zählt auch Support-Reaktionen und Zweitwürfe, und nur solange sie aktiv ist – korrekt?
-5. **Surprise Party:** Plant Golem/Elusive Hind sind keine legalen Ziele (werden in die Zonen des Nutzers gelegt), Ifrit ausgeschlossen; Kreaturen mit alternativer Beschwörung (Archer, Spiders …) bleiben legale Ziele – so gewollt?
+5. **Surprise Party:** Plant Golem/Elusive Hind sind keine legalen Ziele (werden übersprungen und zurück ins Deck gemischt; Korrektur in [FIXES-WELLE-50.md](FIXES-WELLE-50.md)), Ifrit ausgeschlossen; Kreaturen mit alternativer Beschwörung (Archer, Spiders …) bleiben legale Ziele – so gewollt?
