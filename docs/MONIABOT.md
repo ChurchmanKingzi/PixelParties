@@ -236,7 +236,7 @@ Nur im Minigames-Kanal (fest eingestellt auf `1561796630762623036`; andere Kanä
 * **Bugfixes:** Nach jedem Deploy (Bot erkennt einen neuen Git-Stand) postet der Bot die Karten, deren **Effekt-Skript** (`cards/effects/<karte>.js`) **geändert** wurde, als Bilder
   in den Bugfix-Kanal (Standard `1562197315437989889`, überschreibbar mit `BUGFIXES_CHANNEL_ID` — in `bot/.env` musst du nichts eintragen).
   Zählt nur, wenn sich echter Code geändert hat (Kommentare/Leerraum ignoriert); neu hinzugekommene oder gelöschte Skripte gelten nicht als Bugfix.
-  Wird ein gemeinsamer Baustein (`cards/effects/_*.js`) geändert, erscheinen die Karten, die ihn nutzen („fixed via shared logic“). Betrifft er mehr als
+  Wird ein gemeinsamer Baustein (`cards/effects/_*.js`) geändert, erscheinen die Karten, die ihn nutzen . Betrifft er mehr als
   `BUGFIX_MAX_SHARED` Karten (Standard 12), gibt es nur eine Textzeile mit Baustein und Kartenanzahl, keine Bilder. Commit-Texte erscheinen nie; niemand wird gepingt.
   Der allererste Lauf merkt sich nur den Stand.
   **Balancing ist kein Bugfix:** Hat sich der Eintrag einer Karte in `data/cards.json` geändert (Effekttext, HP, Kosten …), erscheint sie nur in den Patchnotes — auch wenn das Skript mitgeändert wurde.

@@ -140,9 +140,9 @@ test('Feed: Kartenbilder im Bugfix-Kanal (direkte Korrekturen, schmale Bausteine
     assert.equal(sent.length, 1);
     const m = sent[0];
     assert.match(m.content, /Bug fixes\*\* — 4 cards/);
-    assert.match(m.content, /\*\*Acid Rain\*\* — fixed: card script updated/);
-    assert.match(m.content, /\*\*Alice, the Puppeteer Girl\*\* — fixed via shared logic \(`_alice-shared`\)/);
-    assert.match(m.content, /\*\*Anti Grav Trap\*\* — fixed via shared logic \(`_alice-shared`\)/, 'über einen weiteren Baustein eingebunden');
+    assert.match(m.content, /\*\*Acid Rain\*\*(?! —)/);
+    assert.match(m.content, /\*\*Alice, the Puppeteer Girl\*\*(?! —)/);
+    assert.match(m.content, /\*\*Anti Grav Trap\*\*(?! —)/, 'über einen weiteren Baustein eingebunden');
     assert.ok(m.files.length >= 3 && m.files.length <= 4, 'Bilder für alle Karten mit Kunst (in der Test-Umgebung fehlt ein Bild)');
     assert.ok(m.files.every(f => f.attachment.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))), 'Kartenbilder');
     assert.deepEqual(m.allowedMentions, { parse: [] });
@@ -204,7 +204,7 @@ test('Balancing-Änderung (cards.json) ist kein Bugfix; Bugfix-Note beschreibt d
     await ctx._feeds.pollBugfixes();
     assert.equal(sent.length, 1);
     assert.match(sent[0].content, /Bug fixes\*\* — 1 card\n/);
-    assert.match(sent[0].content, /\*\*Fireball\*\* — fixed: card script updated\n {2}↳ Damage was dealt twice when the target had a shield\./);
+    assert.match(sent[0].content, /\*\*Fireball\*\*\n {2}↳ Damage was dealt twice when the target had a shield\./);
     assert.ok(!/Acid Rain/.test(sent[0].content), 'Balancing-Änderung nicht als Bugfix');
 
     // Gleiche Karte mit Beschreibung → ausdrücklich Bugfix (z. B. fehlerhafter Effekttext korrigiert)
@@ -213,14 +213,14 @@ test('Balancing-Änderung (cards.json) ist kein Bugfix; Bugfix-Note beschreibt d
     r.commit('Textfehler\n\n* Bugfix-Note: acid rain | The card text promised 2 damage but the script dealt 1.');
     await ctx._feeds.pollBugfixes();
     assert.equal(sent.length, 2);
-    assert.match(sent[1].content, /\*\*Acid Rain\*\* — fixed\n {2}↳ The card text promised 2 damage but the script dealt 1\./);
+    assert.match(sent[1].content, /\*\*Acid Rain\*\*\n {2}↳ The card text promised 2 damage but the script dealt 1\./);
 
     // Baustein-Beschreibung: schmal (an den Karten) und breit (in der Zeile)
     r.write(r.E('_alice-shared'), "exports.x = 'z';\n"); r.write(r.E('_big-shared'), "exports.big = 'z';\n");
     r.commit('Bausteine\n\nBugfix-Note: _alice-shared | Summons no longer stay on the board after their owner leaves.\nBugfix-Note: _big-shared | Hooks fired in the wrong order.');
     await ctx._feeds.pollBugfixes();
     assert.equal(sent.length, 4);
-    assert.match(sent[2].content, /Alice, the Puppeteer Girl\*\* — fixed via shared logic \(`_alice-shared`\)\n {2}↳ Summons no longer stay on the board/);
+    assert.match(sent[2].content, /Alice, the Puppeteer Girl\*\*\n {2}↳ Summons no longer stay on the board/);
     assert.match(sent[3].content, /• `_big-shared` \(14 cards\) — Hooks fired in the wrong order\.$/);
     assert.ok(sent.every(m => JSON.stringify(m.allowedMentions) === '{"parse":[]}'));
   } finally { r.clean(); config.repoRoot = path.resolve(__dirname, '..', '..'); }

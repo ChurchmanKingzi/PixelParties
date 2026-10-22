@@ -34,10 +34,10 @@ module.exports = function register(ctx) {
 
   /**
    * Kartenbilder in Päckchen zu je 10 posten (Discord-Grenze), höchstens MAX_CARDS_POSTED; der Rest steht als Namensliste dahinter.
-   * @param {{card:object, note?:string}[]} items  `note` steht hinter dem Namen („changed: HP“)
+   * @param {{card:object, note?:string, detail?:string}[]} items  `note` steht hinter dem Namen („changed: HP“); ist `note` ein leerer String, steht nur der fette Name (Bugfix-Feed), die Beschreibung darunter
    */
   async function postCards(ch, heading, items) {
-    const line = it => `• ${it.note ? `**${it.card.name}**` : it.card.name}${it.note ? ' — ' + it.note : ''}${it.detail ? `\n  ↳ ${it.detail}` : ''}`;
+    const line = it => `• ${it.note != null ? `**${it.card.name}**` : it.card.name}${it.note ? ' — ' + it.note : ''}${it.detail ? `\n  ↳ ${it.detail}` : ''}`;
     const shown = items.slice(0, MAX_CARDS_POSTED);
     // Päckchen: höchstens PER_MESSAGE Bilder und unter dem Textlimit von Discord (2000 Zeichen)
     const batches = [];
@@ -171,23 +171,23 @@ module.exports = function register(ctx) {
     const noteOfCard = c => notes.get(normName(c.name));
     // Karten zusammenführen: direkte Korrekturen zuerst; über schmale Bausteine betroffene Karten mit Hinweis; jede Karte nur einmal
     const items = new Map();
-    for (const d of found.direct) if (!items.has(d.card.name)) items.set(d.card.name, { card: d.card, note: 'fixed: card script updated' });
+    for (const d of found.direct) if (!items.has(d.card.name)) items.set(d.card.name, { card: d.card, note: '', direct: true });
     const via = new Map();
     for (const sh of found.shared.filter(x => !x.broad && x.count)) for (const c of sh.cards) {
-      if (items.has(c.name) && items.get(c.name).note.startsWith('fixed: card script')) continue;
+      if (items.has(c.name) && items.get(c.name).direct) continue;
       if (!via.has(c.name)) via.set(c.name, { card: c, modules: [] });
       via.get(c.name).modules.push(sh.module);
     }
     for (const [name, v] of via) {
       const detail = [...new Set(v.modules.map(m => notes.get(normName(m))).filter(Boolean))].join(' ');
-      items.set(name, { card: v.card, note: `fixed via shared logic (\`${v.modules.join('`, `')}\`)`, detail });
+      items.set(name, { card: v.card, note: '', detail });
     }
     // Beschreibung der Karte selbst; eine Karte mit Beschreibung wird auch gezeigt, wenn die Erkennung sie nicht fand oder sie wegen Balancing
     // ausgenommen war (die Beschreibung ist die ausdrückliche Aussage „das war ein Bugfix“)
     for (const [key, text] of notes) {
       const c = byNorm.get(key);
       if (!c) continue;
-      const it = items.get(c.name) || { card: c, note: 'fixed' };
+      const it = items.get(c.name) || { card: c, note: '' };
       it.detail = [noteOfCard(c), it.detail && it.detail !== text ? it.detail : ''].filter(Boolean).join(' ');
       items.set(c.name, it);
     }
