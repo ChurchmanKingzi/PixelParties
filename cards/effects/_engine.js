@@ -47,6 +47,18 @@ const COOLNESS_LUECKE_MS = 90;
 const MAX_CARD_INSTANCES = 2000;
 
 
+// ★ W58a: ATK-Multiplikator-Auren (Skript-Vertrag `heroAtkMultiplier`, z. B. Rioting Village) — je Skriptname einmal ermittelt; `sync()` fragt es fuer jede Instanz.
+const _atkMultiplikatorMemo = new Map();
+function hatAtkMultiplikator(effectName) {
+  if (!effectName) return false;
+  let r = _atkMultiplikatorMemo.get(effectName);
+  if (r === undefined) {
+    r = !!loadCardEffect(effectName)?.heroAtkMultiplier;
+    _atkMultiplikatorMemo.set(effectName, r);
+  }
+  return r;
+}
+
 // Aura-Quellen (Skript-Flag `negatesOtherCreatureEffects`, The Creepy Clown
 // of Heaven) — je Skriptname einmal ermittelt: die Aura-Pruefung steckt im
 // Kreatur-Praedikat und laeuft bei JEDER Hook-Zustellung.
@@ -19958,6 +19970,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!delta) return;
     hero.atk = ziel;
     this._broadcastEvent('fighting_atk_change', { owner: ownerIdx, heroIdx, amount: delta });
+  }
+
+  /**
+   * ★ W58a (Al, 22.10.2026: Rioting Village — „Beim Sterben soll der ATK-Boost erhalten bleiben, aber verschwindet Village oder wird negiert, wird der Bonus von ALLEN Heroes entfernt,
+   * lebend wie tot … keine Differenzierung"): der Abgleich der Multiplikator-Auren laeuft zusaetzlich bei JEDEM `sync()`. Vorher glichen nur Platzieren/Entfernen der Area und
+   * ATK-Aenderungen ab — ein Held, der den Abgleich verpasste (Teleportation Powder: waehrend der Abwesenheit kam oder ging das Dorf; Quetzahuitl, der in einen freien Heldenplatz
+   * tritt), stand mit falscher Verdopplung da (zurueckgekehrt ohne das Dorf noch verdoppelt, mit Dorf nicht verdoppelt). Billig: ohne Aura-Quelle auf dem Brett werden nur Helden mit
+   * einer Restbuchung (`_atkAuraGrant`) angefasst.
+   */
+  _atkAurenAbgleichen() {
+    let quelle = false;
+    for (const c of this.cardInstances) { if (hatAtkMultiplikator(c.name)) { quelle = true; break; } }
+    for (let pi = 0; pi < this.playerCount(); pi++) {
+      const heroes = this.gs.players?.[pi]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const h = heroes[hi];
+        if (h && h.name && (quelle || h._atkAuraGrant)) this._syncHeroAtkAura(h, pi, hi);
+      }
+    }
   }
 
   /** Alle Helden beider Seiten abgleichen (Aura kommt/geht). */
@@ -53933,6 +53964,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._atkBuchungenAufraeumen();   // W53a: keine ATK-Buchung bleibt an einer Karte stehen, die nicht mehr auf dem Brett liegt
+    this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
