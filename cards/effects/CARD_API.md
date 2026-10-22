@@ -23455,3 +23455,31 @@ Kartentext: „While you control at least 3 different "War Counselor" Creatures,
 
 ### Tests W55a
 Neu: `W55/a-01` (144). Alle bestehenden Cykyran-, Formwechsel-/Ascension- und W54-Repros sowie `scripts/check-*.js` unverändert grün (Details im Bericht der Welle).
+
+---
+
+## Welle 56 / W56a — Formwechsel eines BESIEGTEN Helden (Abstieg `evenIfDefeated`, Chuck/Bloom-Aufstieg aus der Niederlage): ATK-Neuberechnung geprüft — **kein Fehler, keine Code-Änderung**
+
+Al (Spieldesigner, 22.10.2026): (a) „Der Abstieg eines besiegten Helden soll ganz normal wie jeder andere Abstieg laufen, inklusive ATK-Neuberechnung." (b) „Chuck und Bloom sind gewollt! Hier auch ganz normal ATK neu berechnen!" Repro: `docs/niche-tests/repro/W56/a-01` (1176 Prüfungen, beide Sitze).
+
+### Befund
+Beide Wege laufen **bereits über den zentralen Baustein** (`_atkNachFormwechsel`, `_atkBoniNachFormwechsel`, `fireFormChanged`) und haben dort **keine HP-Abfrage**: `performDescend` lässt mit `opts.evenIfDefeated` einen Helden mit `hp <= 0` durch (Throne Robber, Open Invitation), `performAscension` lässt `hp <= 0` nur bei Skripten mit `ascendsFromDefeat: true` durch (Chuck, the Storyteller; „Bloom", the Continent Corruptor). Danach ist die ATK-Neuberechnung dieselbe wie bei einem lebenden Helden. Die Engine-Regel „ein besiegter Held steigt sonst nie auf" (`hp <= 0` → abgewiesen) bleibt unverändert.
+
+**Regel (gilt für lebende wie besiegte Helden):** neue Form ATK = `(Cykyran ? 2 : 1) ×` gedruckter ATK der neuen Form + überlebende Boni (nicht verdoppelt); verfluchter Held: sichtbar 0, Zwischenspeicher `_cursedAtkSuppressed` = Gesamtwert; `onFormChanged` feuert genau einmal je Wechsel.
+
+### Was der Repro belegt (Differenztest gegen einen lebenden Helden mit demselben Bestand)
+Szenen je Sitz: dauerhafter Zuwachs (`actionPermAtk`), Club of Gobbo, Fighting, befristete Gabe (`grantTempHeroAtk`), Cykyran-Verdopplung, Fluch, alle zusammen, alle + Fluch; danach Zugumlauf, weiterer Zuwachs +20, Club zerstört (−30), Fluch geheilt.
+* **(A) Abstieg besiegt** (`performDescend(…, { evenIfDefeated: true })`, auch der Open-Invitation-Weg `noDiscard`/`notADescend`): ATK = `K × 40 + Boni`, Held bleibt besiegt (`hp 0`, nicht wiederbelebt), Max-HP um die gedruckte Differenz gesenkt, Hook einmal (`descend`, 90 → 40, `baseAtkReset: true`).
+* **(B) Chuck, the Storyteller** (echter KO-Pfad: Schaden → `onHeroKO` → Nachfrage → `performAscension`): ATK = `K × 100 + Boni`, Max-HP +120 (300 − 180), „fully heal its HP" (HP = Max-HP), Todesmarken weg, Hook einmal (`ascend`, 20 → 100).
+* **(C) „Bloom", the Continent Corruptor** (Paraseed-Gift): ATK = `K × 80 + Boni`, HP = Max-HP = 500 (Kartentext), Hook einmal (`ascend`, 40 → 80).
+* Mutationsprobe: wird `_atkNachFormwechsel` für `hp <= 0` übersprungen, schlagen 90 Prüfungen an (Repro ist also scharf).
+
+### Zustand VOR dem Wechsel ist maßgeblich (Beobachtungen, keine Änderung)
+* **Abstieg eines besiegten Helden:** der Tod hat Ausrüstung (Club) abgelegt und den Fluch (Status + Karte) beseitigt (`handleHeroDeathCleanup`); dauerhafte Zuwächse (`permAtkDelta`), Fighting, befristete Gaben und die Cykyran-Buchung bleiben. Die Neuberechnung rechnet aus dem, was **liegt** (Club zählt nicht mehr, kein Fluch-Zwischenspeicher).
+* **Chuck/Bloom:** der Aufstieg läuft **innerhalb** von `onHeroKO` — vor dem Todes-Aufräumen. Ausrüstung und Fluch liegen beim Wechsel noch am Helden und überleben ihn; hat der Held danach `hp > 0`, entfällt das Aufräumen. Ergebnis ist identisch zu einem lebenden Helden mit demselben Bestand.
+
+### Randfund (NICHT behoben, Rückfrage)
+`handleHeroDeathCleanup` leert `hero.statuses` **zuerst**; die danach abgelegte ATK-Ausrüstung bucht ihren Abzug auf die sichtbare ATK (0) statt auf `_cursedAtkSuppressed`, und der Abgang der Curse-Karte gibt den alten Gesamtwert zurück. Ein **verfluchter** Held mit ATK-Ausrüstung (Club +30) steht nach dem Tod bei ATK 70 statt 40 (Club liegt in der Ablage). Ein Formwechsel räumt das auf (Neuberechnung aus dem, was liegt); ohne Formwechsel bleibt der Überhang bis zur Wiederbelebung. Betrifft nicht die Formwechsel-Regel, Repro `a-01` (D) hält es als Notiz fest.
+
+### Tests W56a
+Neu: `W56/a-01` (1176). Alle bestehenden W54/W55-, Cykyran-, Chuck-, Bloom-, Throne-Robber-, Open-Invitation- und Ascension-Repros sowie `scripts/check-*.js` unverändert (nur `check-scope.js` wie im Ausgangszustand rot).
