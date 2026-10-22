@@ -23483,3 +23483,46 @@ Szenen je Sitz: dauerhafter Zuwachs (`actionPermAtk`), Club of Gobbo, Fighting, 
 
 ### Tests W56a
 Neu: `W56/a-01` (1176). Alle bestehenden W54/W55-, Cykyran-, Chuck-, Bloom-, Throne-Robber-, Open-Invitation- und Ascension-Repros sowie `scripts/check-*.js` unverändert (nur `check-scope.js` wie im Ausgangszustand rot).
+
+---
+
+## Welle 57 / W57a — Heldentod und Wiederbelebung: ATK-Buchführung des verfluchten Helden (`_fluchAtkAufloesen`) · ATK-Auren folgen auch dem Besiegten
+
+Randfund aus W56a, behoben. Grundsatz seit W53: ATK-Boni pro Equip-Instanz genau einmal, nur beim aktuellen Träger, **Zustand nach jeder Sequenz = Zustand eines direkt so aufgebauten Helden**. Repro: `docs/niche-tests/repro/W57/a-01` (200 Prüfungen, beide Sitze; auf dem Stand vor W57a **94 ✗**, danach alle grün).
+
+### Befund
+**(1) Verfluchter Held stirbt (der gemeldete Fehler).** `handleHeroDeathCleanup` leerte `hero.statuses` ZUERST — der Fluch (`cursed`) fiel weg, der Zwischenspeicher `_cursedAtkSuppressed` (Gesamtwert, den der Fluch verdeckt) blieb aber stehen. Die DANACH abgelegte ATK-Ausrüstung (Club of Gobbo +30) buchte ihren Abzug über den Trichter auf die sichtbare ATK (0, auf ≥ 0 geklemmt → der Abzug verpuffte) statt auf den Zwischenspeicher; der Abgang der Curse-Karte (`curse.js#onCardLeaveZone`, W24a) gab danach den alten Gesamtwert samt Club zurück. Ergebnis: ATK 70 statt 40, **Überhang bis zum nächsten Formwechsel — auch über die Wiederbelebung hinaus** (der Repro bestätigt: wiederbelebter Held steht weiter bei 70). Die Reihenfolge der Instanzen entschied: lag die Curse-Karte VOR der Ausrüstung (Fluch zuerst aufgelegt), kam das richtige Ergebnis heraus; lag sie danach, nicht. Betroffen waren **alle 21 ATK-Equips** (19 Festboni, Laser Cannon, dynamisch Core/Gun), Taio/Toras-Artifact-Boni, Cloak-/Nero-/Rakah-/Mirjam-/Chaorc-/Wavilion-Helden mit Ausrüstung, die Gegnerseite (fremder Träger) und der Extra-Life-Weg (Rückkehr im Todesablauf).
+**(1b) Fluch ohne Karte** (nur Status `cursed`, Puzzle-/künftige Karten): niemand gab den Zwischenspeicher zurück — der Besiegte (und nach der Wiederbelebung der lebende Held) blieb bei **ATK 0**, der Gesamtwert lag tot im Zwischenspeicher (`status`-Variante im Repro, auch für Fighting, Zuwachs, Gabe, Cykyran, Aura).
+**(2) ATK-Aura (Rioting Village) und der Besiegte (zusätzlicher Fund).** `_syncHeroAtkAura` übersprang jeden Helden mit `hp <= 0`. Legte der Tod Ausrüstung ab, zog der Trichter nur den einfachen Betrag ab, die verdoppelte Hälfte blieb (Club + Sun Sword unter Aura: +50 Überhang beim Besiegten **und beim Wiederbelebten**, bis zufällig die nächste ATK-Änderung abglich). Kam oder ging die Area, WÄHREND ein Held tot war, wurde seine Aura-Buchung nie nachgezogen (falsche Verdopplung nach der Wiederbelebung). Tritt auch ohne Fluch auf.
+
+### Lösung (wenige Nebenwirkungen)
+* **`engine._fluchAtkAufloesen(hero, ownerIdx, heroIdx)`** — löst den Fluch-Zustand auf: Status `cursed` weg, Zwischenspeicher über den Trichter `_applyHeroAtkDelta` auf die sichtbare ATK zurück (Auren sehen es), Zwischenspeicher gelöscht. Dieselbe Rückgabe wie `cleanseHeroStatuses` und `curse.js#onCardLeaveZone`; **kein `onStatusRemoved`** (der Tod räumt wie bisher still ab).
+* **`handleHeroDeathCleanup`** ruft sie als ALLERERSTES auf (vor `statuses = {}`, vor dem Ablegen der Ausrüstung). Von da an ist der Held ein normaler, nicht verfluchter Held mit vollem Gesamtwert, und jede abgelegte Ausrüstung zieht ihren Betrag von der sichtbaren ATK ab — genau wie bei jedem nicht verfluchten Helden. Beide Instanz-Reihenfolgen (Curse vor/nach der Ausrüstung) liefern dasselbe. Die Curse-Karte findet beim Abgang weder Status noch Zwischenspeicher vor und tut nichts (ihr W24a-Sicherheitsnetz bleibt für andere Wege bestehen).
+* **`actionReviveHero`**: derselbe Aufruf vor `statuses = {}` als Sicherheitsnetz (greift nur, wenn ein Besiegter noch einen Fluch-Zustand trägt; im Normalfall seit dem Tod-Fix nicht erreichbar).
+* **`_syncHeroAtkAura`**: Ausnahme `hp <= 0` entfällt, es bleibt nur „Platz hat keinen Namen" (verwaiste Plätze) und „Fluch" (ATK 0). Ein Besiegter folgt der Aura wie ein lebender Held.
+* **Unverändert (geprüft, Repro `W56/a-01` + `W53`–`W56`):** Reihenfolge der Todes-Hooks (`onHeroKO` → Niederlage-Fenster → Aufräumen → `onHeroDefeatFinal` → Extra Life), Chuck/Bloom-Aufstieg INNERHALB von `onHeroKO` (Club und Fluch liegen beim Wechsel noch am Helden und überleben ihn), Surprise-Fenster, Leave-Hooks der Ausrüstung samt `_equipGrund: 'hostDefeated'`.
+
+**Verworfene Alternativen:** (a) *Status erst nach dem Ablegen leeren* — die Leave-Hooks (Trident-Geist, Looting …) sähen dann einen verfluchten Helden, anderes Verhalten für alle Hooks, und der Curse-Abgang würde `onStatusRemoved` feuern; (b) *Abzüge unter Fluch trotz leerer Status in den Zwischenspeicher lenken* (Sonderfall im Trichter, „war verflucht"-Marke) — neue Zustandsvariable in jedem ATK-Pfad; (c) *Instanz-Reihenfolge im Aufräumen ändern* (Curse zuerst) — löst (1b) und die Aura nicht und hängt an der Hook-Reihenfolge.
+
+### Audit aller ATK-Buchungswege bei Tod / Wiederbelebung (Differenztest gegen eine Referenzszene, die nur enthält, was den Tod überlebt)
+| Weg | Verhalten beim Tod | Befund |
+|---|---|---|
+| 21 ATK-Equips (19 Festboni inkl. Laser Cannon, Core, Gun) × Fluch {keiner · Karte vor · Karte nach · nur Status} × Tod, Wiederbelebung | Ausrüstung → Ablage, Bonus weg | (1)/(1b) behoben; ohne Fluch und mit „Karte vor" schon vorher korrekt |
+| Fighting (Ability bleibt liegen) | Buchung bleibt | korrekt; unter nur-Status-Fluch stand sie im toten Zwischenspeicher (1b) |
+| `permAtkDelta` (Cloak, Nero, Rakah, Mirjam, Chaorc, Wavilion) | bleibt | korrekt; mit Club + Fluch „nach" (1) behoben. Cloak: die Karte geht, die +20 bleiben |
+| befristete Gaben (`_tempAtkGrants`) | bleiben; Ablauf im Tod oder nach der Wiederbelebung zieht genau ihren Betrag ab | korrekt (± Fluch) |
+| Taio / Toras (je Artifact) | Artifacts gehen, `onEquipLost hostDefeated` zieht den Bonus ab | Fluch „nach"/Status (1)/(1b) behoben; sonst korrekt |
+| Cykyran-Verdopplung | bleibt (Kreaturen bleiben liegen); kommt/geht die Bedingung im Tod, stimmt der Wiederbelebte | korrekt |
+| Auren (Rioting Village) | Ausrüstung weg, Aura-Anteil mit | (2) behoben; Area kommt/geht im Tod: behoben |
+| Core/Gun auf einem ANDEREN Helden | die Karten des Gefallenen landen in der Ablage | korrekt **nach der Aktion** (Wächter rechnen bei `onAnyActionResolved`/Zugbeginn), nicht mitten im Todesablauf — Rückfrage 1 |
+| fremde Seite (Gegnerheld trägt meinen Club) | wie eigene Seite | (1) behoben |
+| Extra Life (Rückkehr im Todesablauf) | Tod läuft vollständig, dann Rückkehr | (1)/(1b) behoben |
+| Fluch heilen NACH Tod/Wiederbelebung | Curse-Karte und Status sind weg → Heilen ist ein No-op | geprüft: ATK ändert sich nicht (nichts doppelt gutgeschrieben); neuer Fluch + Club + Heilen + Club weg danach exakt wie am direkt aufgebauten Helden |
+| zweiter Tod mit neuer Ausrüstung und neuem Fluch | | grün |
+
+### Tests W57a
+Neu: `W57/a-01` (200): (A) 21 Equips × 4 Fluch-Varianten × Tod/Wiederbelebung · (B) Mischszenen ± Aura ± Fluch + weiterer Zuwachs · (C) Einzelquellen · (D) Cloak · (E) Zuwachs-Quellen mit Club · (F) Taio/Toras · (G) fremde Seite · (H) Extra Life · (I) Fluch heilen/neu auflegen · (J) zweiter Tod · (K) Core/Gun anderer Helden · (L) Aura kommt/geht im Tod · (M) Cykyran-Bedingung ändert sich im Tod · (N) Gabe läuft ab/Fighting geht · (O) Sicherheitsnetz Wiederbelebung. Angepasst: `W56/a-01` (D) von Notiz zu Prüfung.
+
+### Rückfragen an Al (Ja/Nein)
+1. **Core/Gun anderer Helden beim Heldentod:** das Todes-Aufräumen legt die Karten des Gefallenen direkt in die Ablage, ohne Hook (bewusst: Hook-Reihenfolge). „Ancient Tech Infinite Energy Core" und „Future Tech Gun" an anderen Helden rechnen deshalb erst am Ende der laufenden Aktion bzw. zu Zugbeginn nach — innerhalb des Todesablaufs (z. B. ein weiterer Treffer derselben Kette) lesen sie noch die alte Ablage. Soll das Aufräumen die Ablage-Wächter (`onDiscard`) sofort benachrichtigen — ja/nein?
+2. **ATK-Aura und Besiegte:** ein besiegter Held folgt jetzt der Aura (seine ATK ist „wie bei einem lebenden Helden", damit die Wiederbelebung nie einen Überhang trägt). So lassen — ja/nein?

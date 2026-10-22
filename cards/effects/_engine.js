@@ -11037,6 +11037,9 @@ class GameEngine {
     const reviveHp = Math.min(hp, maxHp);
     if (!(reviveHp > 0)) return false;
     hero.hp = reviveHp;
+    // ★ W57a: traegt der Besiegte (auf irgendeinem Weg) noch einen Fluch-Zustand, wird der Zwischenspeicher vor dem Leeren der Status zurueckgegeben —
+    // sonst bliebe die sichtbare ATK bei 0 stehen und der Gesamtwert im toten Zwischenspeicher (der Tod loest den Fluch seit W57a selbst auf; das ist das Sicherheitsnetz).
+    this._fluchAtkAufloesen(hero, playerIdx, heroIdx);
     hero.statuses = {};
     delete hero._koProcessed; // Allow death cleanup to fire again if hero dies again
     // ★ Styx (28.9.): eine NEUE Wiederbelebung ist ein neues Leben — ein
@@ -19937,7 +19940,10 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Einen Helden auf „Grundwert × Faktor" bringen. */
   _syncHeroAtkAura(hero, ownerIdx, heroIdx) {
-    if (!hero?.name || hero.hp <= 0) return;
+    // ★ W57a: auch ein BESIEGTER Held (hp 0, Name noch da) wird abgeglichen. Vorher uebersprang der Abgleich ihn: legte der Tod die Ausruestung ab (Abzug nur zum
+    // einfachen Betrag, die verdoppelte Haelfte blieb), stand der Besiegte — und nach der Wiederbelebung der lebende Held — mit einem Ueberhang da, bis zufaellig die naechste ATK-
+    // Aenderung abglich; ebenso blieb die Aura-Buchung stehen, wenn die Area waehrend seines Todes kam oder ging. Verwaiste Plaetze (Name leer) bleiben ausgenommen.
+    if (!hero?.name) return;
     if (this._isHeroAtkSuppressed(hero)) return;      // Fluch: ATK ist 0
     const gewaehrt = hero._atkAuraGrant || 0;
     const basis = Math.max(0, (hero.atk || 0) - gewaehrt);
@@ -52406,8 +52412,40 @@ this._deathWatch = (this._deathWatchStack || []).length
     }, 90);
   }
 
+  /**
+   * ★ W57a (Randfund aus W56a): den Fluch-Zustand eines Helden AUFLOESEN, bevor seine Status geleert werden — Status `cursed` weg und den Zwischenspeicher
+   * `_cursedAtkSuppressed` (der Gesamtwert, den der Fluch gerade verdeckt: Grundwert + Ausruestung + Fighting + Zuwaechse) ueber den Trichter auf die sichtbare ATK
+   * zurueckgeben. Danach stimmen sichtbare ATK und Buchungen wieder ueberein, und jeder spaetere Abzug (Ausruestung, die den Helden verlaesst) trifft die sichtbare ATK
+   * so, wie er sie bei jedem nicht verfluchten Helden trifft.
+   * Vorher leerte der Tod `statuses` ZUERST: die danach abgelegte ATK-Ausruestung (Club of Gobbo +30) buchte ihren Abzug auf die sichtbare ATK (0, geklemmt) statt auf den
+   * Zwischenspeicher, und der Abgang der Curse-Karte gab danach den alten Gesamtwert samt Club zurueck (verfluchter Held +30 ueber dem Soll; bei einem Fluch ohne Karte blieb
+   * der Zwischenspeicher gar stehen und die sichtbare ATK bei 0). Gleiche Rueckgabe wie `cleanseHeroStatuses` / `curse.js#onCardLeaveZone`; kein `onStatusRemoved`
+   * (der Tod raeumt still ab, wie bisher). Liefert den zurueckgegebenen Betrag.
+   */
+  _fluchAtkAufloesen(hero, ownerIdx, heroIdx) {
+    if (!hero) return 0;
+    const verflucht = !!hero.statuses?.cursed;
+    if (!verflucht && hero._cursedAtkSuppressed === undefined) return 0;
+    if (verflucht) delete hero.statuses.cursed;
+    const zurueck = hero._cursedAtkSuppressed || 0;
+    delete hero._cursedAtkSuppressed;
+    // Ein Held, der auf keiner Seite steht, hat keine ATK mehr, die jemand sieht — dort gibt es nichts zurueckzugeben.
+    if (zurueck > 0 && ownerIdx >= 0 && heroIdx >= 0) this._applyHeroAtkDelta(hero, ownerIdx, heroIdx, zurueck);
+    return zurueck;
+  }
+
   async handleHeroDeathCleanup(hero) {
     if (!hero || !hero.name) return;
+
+    // ★ W57a: den Fluch zuerst aufloesen (ATK zurueck auf die sichtbare Stelle), DANN die Status leeren und die Ausruestung ablegen.
+    {
+      let fPi = -1, fHi = -1;
+      for (let pi = 0; pi < this.playerCount() && fPi < 0; pi++) {
+        const hi = (this.gs.players[pi]?.heroes || []).indexOf(hero);
+        if (hi >= 0) { fPi = pi; fHi = hi; }
+      }
+      this._fluchAtkAufloesen(hero, fPi, fHi);
+    }
 
     // Clear ALL statuses from dead hero
     if (hero.statuses) {

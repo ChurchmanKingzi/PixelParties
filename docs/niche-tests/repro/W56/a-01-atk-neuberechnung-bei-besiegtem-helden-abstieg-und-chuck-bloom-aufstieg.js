@@ -207,17 +207,17 @@ async function folge(R, t, me, op, H, e, soll, tag) {
     }
   }
 
-  // ═══ (D) Randbefund (KEINE Prüfung, nur Notiz): Tod eines VERFLUCHTEN Helden mit ATK-Ausrüstung ═══
+  // ═══ (D) Randbefund aus W56a, in W57a behoben (jetzt Prüfung): Tod eines VERFLUCHTEN Helden mit ATK-Ausrüstung ═══
   // `handleHeroDeathCleanup` leert `hero.statuses` zuerst; die danach ablaufende Ausrüstung bucht ihren Abzug dadurch auf die sichtbare ATK (0) statt auf den Fluch-Zwischenspeicher, und die
   // Rückgabe des Zwischenspeichers (Curse-Abgang) stellt den alten Gesamtwert samt Club wieder her. Der besiegte Held trägt dann +30 ATK ohne Club. Ein Formwechsel räumt das auf (Neuberechnung
   // aus dem, was liegt — dieser Repro, (A)); ohne Formwechsel bleibt der Überhang bis zu einer Wiederbelebung stehen.
-  R.section('(D) Randbefund: verfluchter Held mit Club stirbt (nur Notiz)');
+  R.section('(D) Randbefund (W57a behoben): verfluchter Held mit Club stirbt');
   {
     const me = 0;
     const t = await aufbau(me, RIF, [], { club: 1, fluch: 1 });
     await t.run(() => t.engine.actionDefeatHero({ name: 'T', owner: 1, heroIdx: 0 }, t.hero(me, 0), {}));
     const atk = t.hero(me, 0).atk, soll = DB[RIF].atk;
-    R.note(atk === soll ? 'verfluchter Held mit Club: ATK nach dem Tod korrekt (Überhang behoben)' : `verfluchter Held mit Club: nach dem Tod ATK ${atk} statt ${soll} (Club liegt nicht mehr da; Überhang aus dem Fluch-Zwischenspeicher)`, { atk, soll });
+    R.check('verfluchter Held mit Club: ATK nach dem Tod == gedruckter Wert (W57a: Fluch wird VOR dem Ablegen der Ausrüstung aufgelöst, kein Überhang)', atk === soll, { atk, soll });
   }
   R.finish();
 })();
