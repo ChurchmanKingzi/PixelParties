@@ -12,6 +12,7 @@
 //   6) Sofort-Guss (Zusatzaktion): Zugende angefordert; im Zug des Gegners (kein eigener Zug): kein Zugende.
 //   7) Das Prädikat `nurUnterBedingungBeschwoerbar`: genau die inventarisierte Kartenmenge (Gegenprobe: Limits/„may"-Wege/Reaktions-Kreaturen sind KEINE Treffer).
 // Zugende = `gs._terrorForceEndTurn` (Harness hat keinen Socket, der Verbraucher in server.js sendGameState läuft hier nicht — Flagge und Quelle werden geprüft).
+// W50a (Al, 22.10.2026): Plant Golem / Elusive Hind sind KEINE legalen Ziele – Surprise Party überspringt sie, zählt sie als aufgedeckt und mischt sie zurück (so schon umgesetzt; eigene Prüfung W50/a-04).
 // Aufruf: node docs/niche-tests/repro/W49/b-01-surprise-party-neuer-text-5-karten-nur-bedingt-beschwoerbar-zugende.js   (Exit 0 = korrekt)
 const H = require('../../lib/h.js');
 const { nurUnterBedingungBeschwoerbar } = require('../../../../cards/effects/_summon-eligibility');
