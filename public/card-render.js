@@ -41,6 +41,20 @@
   const SPACE_U = 1000;
   // '*' ist in den Karten ein Aufzaehlungszeichen: im Template ein Symbol-Zeichen ohne Bild, belegt keine Breite.
   const ZERO_WIDTH = '*';
+  // Geschuetzter Zwischenraum: so breit wie ein Leerzeichen, aber kein Umbruchpunkt (`wordsOf` trennt nur an ' ') und ohne Zeichen.
+  // Er klebt Wendungen zusammen, die nicht ueber zwei Zeilen reissen sollen (card-render.json `glue`, siehe `glueText`).
+  const NBSP = '\u00A0';
+  /** Wendungen aus card-render.json `glue` (z. B. ["Support Spell"]): die Leerzeichen darin werden geschuetzt, damit „[Symbol] Spell“
+   *  im Umbruch ein Block bleibt. Vor `symbolize` angewendet — dessen Muster (`\s+Spells?`) erkennt den geschuetzten Zwischenraum. */
+  function glueText(t, phrases) {
+    if (!Array.isArray(phrases)) return t;
+    for (const ph of phrases) {
+      if (typeof ph !== 'string' || !/ /.test(ph)) continue;
+      const esc = ph.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ +/g, ' +');
+      t = t.replace(new RegExp(esc, 'g'), m => m.replace(/ +/g, NBSP));
+    }
+    return t;
+  }
 
   // ── Symbole im Kartentext ──
   // Die Symbolschrift des Templates („PixelParties-text-replacements“) ersetzt die Namen der Zauberschulen im Text
@@ -184,7 +198,7 @@
   }
 
   function adv(ch) {
-    if (ch === ' ') return SPACE_U;
+    if (ch === ' ' || ch === NBSP) return SPACE_U;
     if (ZERO_WIDTH.includes(ch)) return 0;
     if (SYM_KEY[ch]) return symAdv(ch);
     const g = GL[ch];
@@ -364,7 +378,7 @@
   // Zeichnet einen Textblock in eine Box (Regeltext, Faehigkeiten, Namensfelder mit Umbruch).
   function drawBlock(ctx, text, o) {
     symSize = o.symSize || 8.5;
-    const paras = paragraphs(symbolize(text), o.soft);
+    const paras = paragraphs(symbolize(glueText(String(text == null ? '' : text), o.glue)), o.soft);
     if (!paras.length || !paras[0].length) return;
     const innerW = o.width - (o.padL || 0) - (o.padR || 0) - OPT.slack;
     const innerH = o.height - (o.padT || 0) - (o.padB || 0);
@@ -735,7 +749,7 @@
       };
       drawBlock(ctx, spec.text, {
         left: 95, top: rule.top, width: 560, height: rule.height, padL: 1, padT: 2, padR: 0, padB: 0,
-        size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: 1, color: ruleColor(spec), main: true, soft: spec.soft,
+        size: 20, min: 7, align: 'justify', vAlign: 'middle', lineHeight: 1, color: ruleColor(spec), main: true, soft: spec.soft, glue: spec.glue,
         light: isArti2(t) || isToken(t),                 // helle Textbox (dunkle Schrift): dunkle Statusfarben
       });
     }
@@ -810,6 +824,7 @@
       name: (over.name != null ? over.name : c.name).replace(/\s*\[(?:B|W)\]$/, ''),
       text: c.effect || '',
       soft: !!meta.soft,
+      glue: Array.isArray(meta.glue) ? meta.glue : null,   // Wendungen, die im Umbruch zusammenbleiben („Support Spell“ -> [Symbol] Spell in einer Zeile)
       abilities: type === 'skill3' ? abilityTexts(c.effect) : null,
       skillBox: meta.sb != null ? meta.sb : hero ? (c.startingAbility1 || '/') : asc ? [c.startingAbility1, c.startingAbility2].filter(Boolean).join('\n') : '',
       skillBox2: meta.sb2 != null ? meta.sb2 : (hero ? (c.startingAbility2 || '/') : ''),   // Helden ohne Start-Abilities (Quetzahuitl): Schrägstrich = „nicht vorhanden“
