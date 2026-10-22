@@ -5118,6 +5118,22 @@ Engine-level Area rules delegate via `this._isDiverHelmetProtectedTarget(target)
 (accepts a Hero object OR a support-zone CardInstance) — see the
 Stinky Stables poison-heal-lock sites in `_engine.js` for the pattern.
 
+**★ W59a — Stat auras of Areas (`heroAtkMultiplier`) are exempted CENTRALLY.**
+A Hero with a Diver Helmet is *unaffected* by an Area's stat change: the
+engine's aura calculation (`_atkAuraFaktor`) skips every Area-sourced
+multiplier for it (ATK = exactly as without the Area), so a script that
+only declares `heroAtkMultiplier` needs **no** guard of its own. For the
+other parts of an Area that act on a Hero (damage, recoil …) ask
+`engine.heldIstVonAreasAusgenommen(boardSide, heroIdx)` — the ONE question
+"is this Hero unaffected by Areas?" (today: Diver Helmet; future sources are
+added there). Equipment does not go dormant with a frozen / stunned /
+negated host (ruling W7a/W27a), so the exemption holds as long as the
+helmet lies face-up in the Hero's Support Zone. Dynamics (helmet equipped,
+destroyed, moved by Slippery Fridge / Inheritance Ceremony, host defeated)
+need no event handling — the aura is re-derived from the actual board on
+every `sync()` and before every hook dispatch (`runHooks`). See
+"Welle 59 / W59a".
+
 ---
 
 ### Targeting / redirect effects — respect "Truth-Seeing Eye" (MANDATORY)
@@ -23571,3 +23587,40 @@ Neu: `W58/a-01` (166: Core/Gun-Entfernen auf allen Wegen × 10 Szenen, Ablage-We
 ### Rückfragen an Al (Ja/Nein)
 1. **Diver Helmet / Rioting Village:** „unaffected by Areas" — ein Held mit Diver Helmet wird heute vom Dorf trotzdem verdoppelt (und erleidet den Rückstoß); CARD_API („Areas — respect Diver Helmet", Pflicht für Stat-Änderungen) verlangt das Gegenteil. Nicht angefasst (nicht Teil des Auftrags). Soll ein Helm-Held von der Verdopplung und dem Rückstoß ausgenommen sein — ja/nein?
 2. **Monia, zwei Seiten:** der Zugspieler-Monia wird zuerst gefragt (Kreaturen *beider* Seiten sind schützbar) — so lassen — ja/nein?
+
+
+## Welle 59 / W59a — Diver Helmet nimmt einen Helden von Rioting Village aus (ATK-Verdopplung UND Rückstoß) · `engine.heldIstVonAreasAusgenommen`
+
+Entscheidung von Al (22.10.2026): **„Diver Helmet soll einen Hero von Village ausnehmen – von BEIDEN Komponenten! Wird Helmet equipped, während Village schon aktiv ist, verschwindet der Village-Buff von ihm."** Repro: `docs/niche-tests/repro/W59/a-01` (74 Prüfungen, beide Sitze; auf dem Stand vor W59a **62 ✗**, danach alle grün).
+
+### Befund (W58a-Rückfrage 1, jetzt entschieden)
+Diver Helmet (*„The equipped Hero and all cards in its Support Zones are unaffected by Areas."*) ist passiv; jede Area, die einen Helden direkt betrifft, muss ihn ausnehmen (CARD_API „Areas — respect Diver Helmet", Pflicht). Rioting Village tat das nicht: die ATK-Aura (`_atkAuraFaktor` → `_syncHeroAtkAura`) verdoppelte jeden Helden mit Namen, und der Rückstoß in `rioting-village.js` (`afterDamage` / `afterCreatureDamageBatch`) traf jeden angreifenden Helden. CARD_API verlangte das Gegenteil (unaffected = nicht betroffen). Eine zentrale „ausgenommen"-Frage gab es nur als Skript-Helfer (`_diver-helmet-shared.js`) und als `_isDiverHelmetProtectedTarget` (Zielobjekt) — keine für „Held an Brettseite/Index".
+
+### Auslegung („beide Komponenten")
+* **(1) ATK-Verdopplung** (die Aura) und **(2) Rückstoß** des Helden entfallen für den Helm-Helden. Das sind die zwei Wirkungen, die den *Helden* betreffen.
+* **Spieler-Limit „no player can use more than 1 Attack per turn"** betrifft den *Spieler* (`blocksCardPlay`, `attacksPlayedThisTurn`), nicht den Helden: **unverändert** — auch die Attack eines Helm-Helden zählt für das Limit, und die zweite Attack desselben Spielers bleibt gesperrt (Repro R5). Ob der Helm den Helden auch davon befreien soll, ist als Ja/Nein-Frage an Al unten gestellt.
+* **Wann ausgenommen:** der Helm liegt offen (`faceDown` nein) in der Support Zone dieses Helden. Ausrüstung ruht nie, weil der Wirt gefroren / betäubt / negiert / gecharmt ist (Ruling W7a/W27a „Anhänge/Ausrüstung sind eigene Karten", `isCardPassiveDormant` nimmt Ausrüstung aus) — der Helm gilt dann weiter (Repro N13). Stirbt der Wirt, legt das Todes-Aufräumen den Helm ab → nicht mehr ausgenommen (die Verdopplung gilt für tote wie lebende Helden, Ruling W58a).
+
+### Lösung (zentral, wenige Nebenwirkungen)
+* **`engine.heldIstVonAreasAusgenommen(boardSide, heroIdx)`** — EINE Frage „ist dieser Held von Areas ausgenommen?" (heute: Diver Helmet über `heroHasDiverHelmet`; weitere Quellen von „unaffected by Areas" werden dort eingehängt). Die bestehende Prüfung wurde wiederverwendet, nicht neu geschrieben.
+* **`_atkAuraFaktor`**: ein Multiplikator, dessen Quelle eine **Area** ist (`inst.zone === 'area'`), zählt für einen ausgenommenen Helden nicht (Faktor 1 → ATK exakt wie ohne Dorf). Nicht-Area-Quellen bleiben unberührt. Damit gilt die Ausnahme für jede künftige Area mit `heroAtkMultiplier` automatisch.
+* **`rioting-village.js#rueckstoss`**: dieselbe Frage; Helm-Held erleidet keinen Rückstoß (Heldenziel wie Kreaturenziel, geliehene Helden über `heroOwner`).
+* **Dynamik ohne Ereignisbehandlung.** Die Aura wird nicht aus Ereignissen („Helm kam/ging") nachgeführt, sondern bei jedem `sync()` (`_atkAurenAbgleichen`, W58a) **und jetzt auch vor jeder Hook-Meldung** (`runHooks` → `_atkAurenAbgleichenWennNoetig`, nur wenn eine Area liegt oder ein Held noch eine Aura-Restbuchung trägt, sonst zwei Feldzugriffe) aus dem Ist-Zustand des Bretts abgeglichen. Der Helm kommt/geht über beliebige Wege (spielen, zerstören, ablegen, löschen, auf die Hand, Slippery Fridge, Inheritance Ceremony, Wirt besiegt, Teleportation Powder, Aufstieg/Abstieg); auf jedem folgt nach dem Zonenwechsel mindestens eine Hook-Meldung (z. B. `onCardEnterZone` der Ablage) oder ein `sync()` — die ATK stimmt, bevor ein Hook sie liest. Ohne den `runHooks`-Abgleich blieb die ATK nach dem Anlegen/Zerstören des Helms bis zum nächsten `sync()` veraltet (Befund beim ersten Entwurf; vgl. `dynamischeAtkBuchen`, W58a).
+* **Ausnahme im `runHooks`-Abgleich:** nicht bei `afterHeroAtkChange`. Die Reset-Meldung des Formwechsels (`_signalHeroAtkReset`) läuft in dem Fenster, in dem Grundwert schon gesetzt und Aura-Buchung verworfen ist, die Buchung aber erst NACH dem Hook frisch angelegt wird; ein Abgleich davor verdoppelte doppelt (Riffel-Aufstieg unter Dorf: 380 statt 200 — vom Differenztest gefunden).
+* **Bestehende Rulings unverändert:** 2^Dörfer-Logik (Helm = 2^0 für diesen Helden, ein Held daneben ×2/×4), Fluch (sichtbar 0, nach dem Heilen der aktuelle Zustand), Tod/Wiederbelebung, Cykyran, Aufstieg/Abstieg, Teleportation Powder (Rückkehr exakt im Zustand der Szene).
+
+### Audit: haben andere Areas dieselbe Lücke?
+Alle 45 Area-Spells durchgesehen (Skript bzw. Engine-Stellen):
+* **Respektieren den Helm bereits:** Blood Rock, Deepsea Castle, Graveyard of Limited Power, Pangaia, Paraseed Greenhouse, Slippery Ice, The Seventh Circle of Hell, Dark Ocean (`_isDiverHelmetProtectedTarget`), Stinky Stables (Engine). **Rioting Village jetzt auch** (beide Komponenten).
+* **Dieselbe Fehlerklasse im zentralen Baustein (Stat-Aura `heroAtkMultiplier`):** nur Rioting Village nutzt den Vertrag → mit `_atkAuraFaktor` zentral behoben, keine weiteren Fundstellen.
+* **Andere Fehlerklasse (Skript-Ebene), NICHT behoben — Ja/Nein-Fragen unten:** **Shared Blood Tanks** (Ketten-Bleed-Schaden trifft auch Helden/Kreaturen mit Helm) und **Acid Rain** (Pollution Token in freie Support Zones — auch die eines Helm-Helden). Beides sind Area-Wirkungen, die Helden/ihre Zonen direkt betreffen; ohne Guard.
+* **Kein Handlungsbedarf:** Doom Clock, Spider Hive, Castle of the Light Brigade, Crystal Well, Board of Kings, The Bonegrinder, Smuggler's Pier, Spatial Crevice, Tarleinn's Floating Island, Temple of Sacrifice, War Council Gathering Place, Wowhalla, The Great Clock Tower, die Circles of Hell 1–6/8 (nur Hände/Stapel/Gold/Level/Regeln), Cottage at the Forest's Edge (belebt nur BESIEGTE Helden — sie tragen keinen Helm mehr).
+* **Ohne Skript (keine Wirkung implementiert):** Barrel Home, Bottomless Sand Hole, Gigalopolis, Gloomy Village, Light Brigade Conference, Pyramid of Schemers, Ritual Chamber, Skulltop Castle, Tearing Mountain, The Golden Gate, Tree of Golden Apples — beim Implementieren gilt die Pflichtregel oben.
+
+### Tests W59a
+Neu: `W59/a-01` (74, beide Sitze): (N1) Helm kommt bei liegendem Dorf · (N2) Dorf kommt bei liegendem Helm (eigener Sitz / Gegner / ×4) · (N3) Helm geht (zerstört, abgelegt, gelöscht, auf die Hand) · (N4) Club-Reihenfolgen mit Zahlen · (N5) Umhängen per Fridge / Ceremony · (N6) Wirt besiegt / wiederbelebt · (N7) Dorf geht / zwei Dörfer · (N8) Helm am Gegnerhelden · (N9) Fluch in allen Reihenfolgen · (N10) Cykyran · (N11) Aufstieg/Abstieg · (N12) Teleportation Powder (Dorf unverändert / geht / kommt) · (N13) Wirt gefroren / betäubt / negiert / gecharmt · (R1–R5) Rückstoß (Helden- und Kreaturenziel, Gegnerseite, Helm kommt/geht, Spieler-Limit) · (F) Differenztest A (mit Dorf-Ereignissen) gegen B (ohne): **Held MIT Helm: A.atk == B.atk, Held ohne Helm: A.atk == 2^Dörfer × B.atk** für alle sechs Helden nach jedem Schritt (90 Folgen × 16 Schritte je Sitz aus Helm anlegen/zerstören/auf die Hand/Fridge/Ceremony an beiden Seiten, Dorf kommt/geht, Club, Fluch, Cykyran, Fighting, Zuwachs, Gabe, Aufstieg/Abstieg, Tod, Wiederbelebung, Zugumlauf, Teleportation Powder). Bestehende Repros mit Village/Diver Helmet/Aura (26) bleiben grün.
+
+### Rückfragen an Al (Ja/Nein)
+1. **Spieler-Limit:** „no player can use more than 1 Attack per turn" ist eine Sperre für den *Spieler*; die Attack eines Helden mit Diver Helmet zählt weiter für das Limit des Spielers (und die zweite Attack ist gesperrt). Soll der Helm den Helden auch davon befreien (seine Attacks zählen nicht / sind nicht gesperrt) — ja/nein? (Ich habe „beide Komponenten" als ATK-Verdopplung und Rückstoß gelesen.)
+2. **Shared Blood Tanks:** der Kettenschaden („all other Bleeding targets its owner controls also take Bleed damage") trifft heute auch Helden und Kreaturen mit Diver Helmet. Ausnehmen — ja/nein?
+3. **Acid Rain:** der Pollution Token kann heute in die freie Support Zone eines Helden mit Diver Helmet gelegt werden (Spielerwahl). Diese Helden als Ziel ausnehmen — ja/nein?
