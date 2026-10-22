@@ -88,6 +88,10 @@ test('falsche Tipps: zählen je Person, doppelte/unbekannte nicht; Gewinn zahlt 
   // zweite Person tippt falsch (anderer Wert), erste gewinnt nach 1 falschem Tipp
   const wrong2 = renderer.allCards().find(c => c.name !== target && c.name !== wrong1 && renderer.hasArt(c.name) && !/token/i.test(c.cardType)).name;
   await w.say('100000000000000002', '!guess ' + wrong2);
+  const m2 = await w.say('100000000000000002', '!mystery');
+  const liste = m2.replies.at(-1).content.match(/Already guessed: (.*)/);
+  assert.ok(liste, 'Liste der bisherigen Tipps wird gezeigt');
+  assert.equal(liste[1], `*${wrong1}*; *${wrong2}*`, 'Semikolon als Trenner, weil Kartennamen oft Kommas enthalten');
   msg = await w.say('100000000000000001', '!guess ' + target);
   assert.match(msg.replies[0].content, new RegExp('🎉 <@100000000000000001> got it'));
   assert.deepEqual(w.pays, [{ uid: '100000000000000001', delta: 18, reason: 'bot:mystery' }]);
