@@ -19,3 +19,11 @@ Al hat die Rückfragen aus [FIXES-WELLE-54.md](FIXES-WELLE-54.md) beantwortet (2
 ## Offene Rückfragen an Al
 
 1. **Besiegte Helden** (`evenIfDefeated`-Aufstieg/Abstieg): Die Verdopplung läuft wie bisher weiter (besiegte Helden behalten ihre ATK samt Verdopplung; jetzt getestet). Passt das?
+
+## Nachtrag Welle 56 (W56a, 22.10.2026): Formwechsel besiegter Helden
+
+Al hat die Rückfrage zu besiegten Helden beantwortet: Der Abstieg eines besiegten Helden (`evenIfDefeated`: ???, the Throne Robber, Open Invitation) läuft „ganz normal wie jeder andere Abstieg, inklusive ATK-Neuberechnung"; Chuck, the Storyteller und Bloom, the Continent Corruptor (`ascendsFromDefeat`) sind gewollte Ausnahmen, auch dort wird die ATK normal neu berechnet. Ein besiegter Held steigt sonst nie auf (Engine weist `hp <= 0` ab; unverändert).
+
+Befund des Agenten **W56a** (Zweig `wave56/W56a`, zusammengeführt): Beides war schon korrekt umgesetzt, keine Engine-Änderung. `_atkNachFormwechsel`/`_atkBoniNachFormwechsel` prüfen die HP nicht; neue ATK = (Cykyran ? 2 : 1) × gedruckter ATK der neuen Form + überlebende Boni; `onFormChanged` feuert genau einmal. Beim Tod legt der Held Ausrüstung ab und verliert den Fluch (`handleHeroDeathCleanup`), Chuck/Bloom steigen innerhalb von `onHeroKO` auf (vor dem Todes-Aufräumen). Repro `W56/a-01` (1176 Prüfungen, beide Sitze: Abstieg besiegt inkl. Open-Invitation-Weg, Chuck über den echten KO-Pfad, Bloom über Paraseed-Gift; Gegenprobe lebender Held). Repros jetzt **alle 1262 grün**.
+
+Randfund (wird behoben, siehe nächste Welle): Ein verfluchter Held mit ATK-Ausrüstung behält beim Tod einen ATK-Überhang (Club +30: ATK 70 statt 40), weil `handleHeroDeathCleanup` `hero.statuses` zuerst leert und der Abzug der danach abgelegten Ausrüstung auf die sichtbare ATK statt auf `_cursedAtkSuppressed` gebucht wird.
