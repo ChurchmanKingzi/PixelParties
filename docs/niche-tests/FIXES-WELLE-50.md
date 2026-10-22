@@ -16,7 +16,7 @@ Umgestellte alte Repros: `W49/a-02` (Cloudy auf Position 2 gibt sich weiter), `W
 
 ## Ergebnis in Zahlen
 
-* Repros: siehe `repro-status.json` / `INDEX.md` (4 neue Repros in W50).
+* Repros: **alle 1241 grün** (vorher 1237; 4 neue), 0 Rückschritte.
 * `scripts/check-*.js`: nur `check-scope.js` rot (wie im Ausgangszustand).
 * `Bugfix-Note`-Zeilen: Ricochet, Inheritance Ceremony, Slippery Fridge, Tempeluna, Petrification Break, Spectral Armor, Johanna.
 
