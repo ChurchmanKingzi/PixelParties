@@ -17130,6 +17130,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromOwner: inst.owner, toZone: 'support',
       _skipReactionCheck: true,
     });
+    // W51b: der Abgang fuer Zustandslauscher (`onEquipLost`) — das echte Leave oben geht nur an die Karte selbst (siehe `fireEquipLost`).
+    await this.fireEquipLost(inst, {
+      anleger: opts.anleger ?? toPlayerIdx, fromOwner: quellSeite, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlotIdx,
+      toOwner: toPlayerIdx, toHeroIdx: destHeroIdx, toZoneSlot: destSlotIdx, source: opts.sourceName || null,
+    });
 
     if (!opts.skipAnimation) {
       const dur = opts.animDuration || 800;
@@ -34012,6 +34017,34 @@ this._deathWatch = (this._deathWatchStack || []).length
     return this._checkSurpriseOnEquip(anleger, inst.heroIdx, inst);
   }
 
+  /**
+   * ★ W51b (Al, 22.10.2026) — GEGENSTUECK ZU `fireEquipGained` FUER DAS UMHAENGEN: Hook `onEquipLost` (HOOKS.ON_EQUIP_LOST).
+   *
+   * Das echte `onCardLeaveZone` eines Umhaengens (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) geht per `_onlyCard` NUR an die bewegte Karte selbst
+   * (ein Umhaengen ist kein Spielen/Anlegen — Zaehl-Lauscher wie Luck duerfen nicht feuern). Heldenpassive und Auren, die Boni/Marken an den Equip-ZUSTAND haengen
+   * (Taio „+20 je Artifact", Toras „+40 je Artifact mit anderem Namen", Aufstiegs-Bereitschaft von Riffel/Kohta/Lolek/Fiona, Tempelunas Fee …), sahen den Abgang deshalb nie:
+   * der Bonus blieb am Quellhelden stehen. Diese Methode meldet ihn an ALLE Lauscher — mit demselben Kontext-Zuschnitt wie ein echtes Leave-Ereignis (`leavingCard`,
+   * `fromZone`, `fromOwner` = Brettseite des alten Wirts, `fromHeroIdx`, `fromZoneSlot`), damit ein Zustandslauscher denselben Handler fuer beides nehmen kann
+   * (`equipZustandHooks` in `_hooks.js`). Nur fuer Umhaengen; normale Abgaenge melden weiter nur `onCardLeaveZone`. Die Karte steht beim Aufruf noch am alten Platz
+   * (Leave-Semantik: Lauscher schliessen `leavingCard.id` beim Zaehlen aus).
+   * opts: { anleger (Ausfuehrender), fromOwner, fromHeroIdx, fromZoneSlot, toOwner, toHeroIdx, toZoneSlot, source }.
+   */
+  async fireEquipLost(inst, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.heroIdx < 0) return;
+    const cd = this._getCardDB()[inst.name];
+    if (!cd || hasCardType(cd, 'Creature')) return;
+    const kind = (hasCardType(cd, 'Spell') || hasCardType(cd, 'Attack')) ? 'attachment' : 'equip';
+    const fromOwner = opts.fromOwner ?? this.physicalSide(inst);
+    const fromHeroIdx = opts.fromHeroIdx ?? inst.heroIdx;
+    await this.runHooks(HOOKS.ON_EQUIP_LOST, {
+      lostCard: inst, lostName: inst.name, leavingCard: inst,
+      fromZone: 'support', fromOwner, fromHeroIdx, fromZoneSlot: opts.fromZoneSlot ?? inst.zoneSlot,
+      toZone: 'support', toOwner: opts.toOwner ?? fromOwner, toHeroIdx: opts.toHeroIdx, toZoneSlot: opts.toZoneSlot,
+      equipOwner: opts.anleger, kind, isMove: true, source: opts.source,
+      _skipReactionCheck: true,
+    });
+  }
+
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
     if (this._surpriseNestingBlocked()) return null;
     const opponentIdx = this.opponentOf(equipOwnerIdx);
@@ -40837,7 +40870,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
+    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',

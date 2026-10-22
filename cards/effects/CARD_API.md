@@ -2732,6 +2732,7 @@ in the `hooks` object. Each receives a `ctx` object (see next section).
 | `onCardEnterZone` | Card enters a zone | `enteringCard`, `toZone`, `toHeroIdx` |
 | `onCardLeaveZone` | Card leaves a zone | `card`, `fromZone`, `fromHeroIdx` |
 | `onEquipGained` | W51a: a non-Creature was equipped / attached / MOVED to a Hero's Support Zone (hand equip, attachment spell, effect equip, Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) — see "Welle 51 / W51a" | `equipCard`, `equipName`, `equipOwner` (the equipping player), `equipHeroIdx`, `hostSide`, `heroController`, `kind` (`'equip'`/`'attachment'`), `isMove`, `fromOwner`, `fromHeroIdx`, `source` |
+| `onEquipLost` | W51b: a non-Creature was MOVED away from a Hero's Support Zone (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) — counterpart of `onEquipGained` for state listeners; fires ONLY for moves (always `isMove: true`), normal departures keep reporting only `onCardLeaveZone` — see "Welle 51 / W51b" | `leavingCard` (= `lostCard`), `lostName`, `fromZone` (`'support'`), `fromOwner` (board side of the old host), `fromHeroIdx`, `fromZoneSlot`, `toZone`, `toOwner`, `toHeroIdx`, `toZoneSlot`, `equipOwner` (the executing player), `kind` (`'equip'`/`'attachment'`), `isMove`, `source` |
 
 ### Combat
 
@@ -23072,3 +23073,73 @@ Repro: `docs/niche-tests/repro/W51/a-01-ricochet-senkung-statt-schild-choir-dich
 1. **Taio / Toras (Fund, siehe oben):** Boni nach „Artifacts am Helden" werden beim Umhängen per Fridge/Ceremony nicht mitgeführt (Bonus bleibt stehen / fehlt). Soll das als eigener Fehler behoben werden (ja)?
 2. **Cybug LOCUST / Secret Spell Book:** Umhängen über `actionTransferAttachment` öffnet jetzt ebenfalls das Equip-Fenster (Ausrüstender = Ausführender, also beim LOCUST dessen Besitzer; die Pests des ursprünglich Ausrüstenden kann damit auf die Umleitung reagieren). Gewollt (ja)?
 3. **Cloud in a Bottle** wirkt weiter per Wiederherstellung nach dem Treffer (nur der Kettenbetrag wird halbiert, nicht der Zeitpunkt). Reicht das (ja), oder soll die Halbierung vor Schaden/Schilden liegen (nein; würde Reihenfolge-Effekte z. B. mit Immortal ändern)?
+
+## Welle 51 / W51b — Umhängen führt Zustands-Boni mit: Hook `onEquipLost` und das Vertragsstück `equipZustandHooks` (Taio, Toras, Aufstiegs-Bereitschaft, Tempelunas Fee)
+
+### Befund (Rückfrage 1 aus W51a) und Ursache
+Taio, the Sun Fencer („+20 ATK je Artifact am Helden") und Toras, Master of all Weapons („+40 ATK je Artifact mit anderem Namen") führten ihre Boni beim Umhängen per Slippery Fridge / Inheritance Ceremony nicht mit: nach dem Wegnehmen blieb der Bonus am Quellhelden stehen (Probelauf Taio +20, Toras +40), am Zielhelden fehlte er nach dem Draufhängen. **Ursache:** `fuehreUmhaengenAus` (und `actionTransferAttachment(quiet)`) senden `onCardLeaveZone` / `onCardEnterZone` mit `_onlyCard` — nur die bewegte Karte selbst sieht sie. Das ist **Absicht** (Ruling W51a: Umhängen ist kein Spielen/Anlegen, Zähler wie Luck, Fiona-Aszension, die 20+ Heldenpassive auf `onCardEnterZone` dürfen nicht feuern) — aber Heldenpassive, die einen **Zustand** an das Ausgerüstet-Sein hängen, sahen deshalb weder Abgang noch Ankunft.
+
+### Lösung: gewählte Variante und warum (Vergleich)
+| Variante | Wirkung | Entscheidung |
+|---|---|---|
+| A · echte `onCardLeaveZone`/`onCardEnterZone` ohne `_onlyCard` (mit `isMove`) an ALLE | jeder Lauscher sieht das Umhängen; ~190 Skripte lauschen auf Enter/Leave, viele zählen „gespielt" (Luck …) und müssten `_isMove` ausfiltern | **verworfen** — verletzt das Ruling W51a, riesige Nebenwirkung |
+| B · **`onEquipLost` (neu) + `onEquipGained` mit `isMove` (besteht)**, nur für Zustandslauscher, die es abonnieren | kein anderer Lauscher ändert sich; Zähler bleiben stumm; ein Umhängen ist für Zustandslauscher „Equip verlassen + Equip erhalten" | **gewählt** |
+Die Lösung ist zentral: `engine.fireEquipLost` (eine Stelle, Gegenstück zu `fireEquipGained`), aufgerufen von `fuehreUmhaengenAus` (Fridge + Ceremony-Equips) und `actionTransferAttachment` (Ceremony-Anhängsel, Cybug LOCUST, Secret Spell Book).
+
+### Der Hook `onEquipLost` (`HOOKS.ON_EQUIP_LOST`)
+Feuert **nur beim Umhängen** (immer `isMove: true`). Normale Abgänge (Ablage, Hand, Zerstörung, Rückkehr …) melden weiter ausschließlich `onCardLeaveZone` — `onEquipLost` ist also **kein** allgemeines „Equip weg" (anders als `onEquipGained`, das für alle Ankünfte feuert). Bewusst nicht in `HOOK_DESCRIPTIONS` (kein Reaktionsfenster); in `REACTION_SKIP_HOOKS`.
+
+| Feld im Hook-Kontext | Bedeutung |
+|---|---|
+| `leavingCard` (= `lostCard`), `lostName` | die bewegte Instanz / ihr Name (Zuschnitt wie ein echtes Leave-Ereignis, **nicht** `ctx.card` — das ist der Lauscher) |
+| `fromZone` (`'support'`), `fromOwner`, `fromHeroIdx`, `fromZoneSlot` | alter Platz; `fromOwner` = **Brettseite** des alten Wirts |
+| `toZone` (`'support'`), `toOwner`, `toHeroIdx`, `toZoneSlot` | neuer Platz |
+| `equipOwner` | der **Ausführende** (wie bei `onEquipGained`) |
+| `kind`, `isMove`, `source` | `'equip'`/`'attachment'`, immer `true`, Name der bewegenden Karte (Slippery Fridge …) |
+
+**Reihenfolge/Zustand:** erst alle Abgänge (`onEquipLost` je Karte), dann alle Ankünfte (`onEquipGained` je Karte). Beim Abgang steht die Karte **noch am alten Platz** (Leave-Semantik — Zähl-Lauscher schließen `leavingCard.id` aus, wie bei jedem echten Leave). Bei **mehreren gleichzeitig bewegten** Karten stehen bereits gemeldete Mitbewegte beim nächsten Abgang schon „unterwegs" (`inst.zone === '_umhaengen'`, dieselbe Konvention wie `darfAn`/Energy Aura) — Lauscher, die den Wirt neu zählen (Toras), sehen so wie bei nacheinander ausgeführten echten Abgängen den richtigen Stand. Bei den Ankünften liegen alle Karten wieder (`zone` `'support'`, neuer Held) — Zählen funktioniert dort ohne Ausschluss.
+
+### Vertragsstück: „Wer Boni / Zustand an den Equip-Zustand hängt, nutzt `equipZustandHooks`"
+```js
+const { equipZustandHooks } = require('./_hooks');
+module.exports = {
+  activeIn: ['hero'],
+  hooks: equipZustandHooks({
+    onCardEnterZone: async (ctx) => { /* ctx.enteringCard, ctx.toZone, ctx.toHeroIdx */ },
+    onCardLeaveZone: async (ctx) => { /* ctx.leavingCard, ctx.fromZone, ctx.fromHeroIdx, ctx.fromZoneSlot */ },
+    // … übrige Hooks
+  }),
+};
+```
+`equipZustandHooks(hooks)` ergänzt, was fehlt: `onEquipLost` = der `onCardLeaveZone`-Handler (gleiche Felder, Handler 1:1 wiederverwendbar), `onEquipGained` = der `onCardEnterZone`-Handler **nur bei `ctx.isMove`** (normale Ankünfte laufen schon über `onCardEnterZone`; sonst würde doppelt gebucht), mit `enteringCard`/`toZone`/`toHeroIdx` aus `equipCard`/`'support'`/`equipHeroIdx` nachgezogen. Eigene `onEquipLost`/`onEquipGained` im übergebenen Objekt gewinnen.
+Regeln für Autorinnen und Autoren:
+* **Zustand/Bonus** („+X je Artifact", „bereit zum Aufstieg, solange Y liegt", „Effekt weg, wenn die Fee geht", Marke am Wirt, Aura-Stempel) → `equipZustandHooks`. Der Handler muss **idempotent** gegen die Lage sein (neu rechnen oder am Stempel der Karte buchen) und die Seite prüfen (`fromOwner`/Stempel — zwei gleiche Helden auf beiden Seiten sehen dasselbe Ereignis).
+* **Zähler / „wurde gespielt / angelegt"** (Luck …; Fionas Aufstiegs-Bereitschaft ist dagegen ein Zustand und nutzt `equipZustandHooks`) → weiter nur `onCardEnterZone`, **kein** `equipZustandHooks`: ein Umhängen ist kein Spielen (Ruling W51a). Zählt etwas *beim Landen auf einem Helden* ausdrücklich auch fürs Umhängen, nimmt es `onEquipGained` mit `isMove`.
+* **Reaktionen/Fenster** („when equipped": Anti Magic Enchantment, Afflicted Pests) → `onEquipGained` bzw. `surpriseEquipTrigger` wie in W51a (Anlegen **und** Umhängen).
+* **Eigener Bonus des Equips** (Club of Gobbo +30 ATK, Blade …) bleibt Sache der Karte selbst: sie bekommt ihr echtes Leave/Enter/`onPlay` (`_onlyCard`) wie bisher.
+
+### Betroffene Karten (systematisch gesucht) und was geändert wurde
+**Methode (Differenz-Sweep, `scratchpad`-Skripte, nicht im Repo):** Für jede Karte, deren Skript auf `onCardEnterZone`/`onCardLeaveZone` lauscht (269 Skripte: Helden, Abilities, Equips, Anhängsel, Kreaturen, Areas, Surprises, Reaktionen), und für jedes Equip (94: alle Equipment-Artifacts und `isEquip`-Skripte) wurde der Zustand beider Sitze verglichen: **A** Equip an Held a legen und per `fuehreUmhaengenAus` auf Held b umhängen, **B** dasselbe Equip direkt an Held b legen (beide Richtungen, Beobachter an Held 0/1; ~100 000 Paarungen). Dazu ein Sweep mit den im Skript (und seinen `_*-shared`-Modulen) namentlich genannten Equip-PAAREN (Aufstiegs-Helden: Riffel, Kohta, Lolek, Arthor, Fiona, Layn, Molinda, Monia, Dajan …) und ein Sweep für Anhängsel über `actionTransferAttachment(quiet)`. Rauschen (zufällige Schlüsselreihenfolge, `buffs: {}`, Instanz-Ids, Stempel `_stormPianoEquipped`) herausgefiltert.
+
+| Karte | Fehler vorher | Änderung |
+|---|---|---|
+| **Taio, the Sun Fencer** | Bonus blieb am Quellhelden, fehlte am Ziel (die Sun-Sword-Prüfung der Aufstiegsbereitschaft hängt an denselben Handlern) | `equipZustandHooks`. **Zusatzfund (nicht umhängen-spezifisch):** in der Spiegelpartie (Taio gegen Taio auf demselben Heldenplatz) sah JEDER Taio jeden Abgang und der falsche buchte seinen Bonus ab (z. B. zerstörtes Equip bei Sitz 0 nahm Sitz 1 20 ATK) — jetzt Seitenprüfung (`fromOwner`) und Stempel `_taioAtkGrantedBy` |
+| **Toras, Master of all Weapons** | wie Taio (zählt jetzt neu, gleiche Namen einmal) | `equipZustandHooks`, `leavingCard` statt Platzsuche |
+| **Future Tech Gunslinger Riffel**, **Kohta, the Silent Observer**, **Lolek, the Shard Knight** | `ascensionReady` blieb am Quellhelden stehen (Aufstieg angeboten ohne das Equip) und kam am Zielhelden nicht | `equipZustandHooks` |
+| **Fiona, the Princess of Blackport** | dito (Grimoire / angelegter Held umgehängt) | `equipZustandHooks` |
+| **Tempeluna, the Convergence Fairy** | die angelegte Fee (Hero-Karte mit `treatAsEquip`) ist umhängbar; ging sie per Fridge/Ceremony, blieb der gewonnene Effekt an Tempeluna (Ruling ① verlangt: Fee weg → Effekt weg) | `equipZustandHooks` (Leave-Handler hört auf `onEquipLost`) |
+Ohne Befund (Sweep, kein Unterschied zwischen „umgehängt" und „direkt angelegt"): Arthor (beide Equips melden sich selbst), Layn, Dajan, Molinda, Monia, Luna/Tempeste (Bereitschaft sync-getrieben bzw. Gold-/Zählerbedingung), alle Zähl-Lauscher (sollen stumm bleiben), alle Equip-eigenen Boni (Club, Blades, Hammer …), alle Anhängsel-Status (`attachmentMovedToHost`). Bewusst unverändert: Storm Piano lässt `_stormPianoEquipped` am Quellhelden (Text: „A Hero can only be equipped with 1 Storm Piano per game").
+**Eigener Fund, NICHT angefasst:** Die Inheritance Ceremony bietet Puppet Tokens (cardType `Token`, Text „Cannot be moved to a different Support Zone") zum Umhängen an und hängt sie um; `verschiebbar` schließt nur Kreaturen aus. Tri Ad / Tri Fecta („keine Tokens mehr → besiegt", `onCardLeaveZone`) sehen diesen Abgang nicht. Das ist ein anderer Fehler (Kartentext verletzt), kein Zustandslauscher-Problem — siehe Rückfrage 4.
+
+### Repros
+`docs/niche-tests/repro/W51/b-01-umhaengen-fuehrt-taio-und-toras-boni-mit-fridge-ceremony.js` (188 Prüfungen, beide Sitze: Fridge UND Ceremony; Bonus am Quellhelden weg / am Zielhelden da; zwei Equips; hin und zurück; Toras zählt gleiche Namen einmal; Gegner-Fridge; Spiegelpartie; Gegenprobe normales Anlegen/Zerstören),
+`…/b-02-umhaengen-aufstiegsbereitschaft-riffel-kohta-lolek-fiona-arthor.js` (180 Prüfungen: Quelle verliert / Ziel erhält die Bereitschaft, Fridge und Ceremony, Gegenprobe Zerstören, Riffel gegen Riffel),
+`…/b-03-onequiplost-vertrag-nutzlast-reihenfolge-keine-zaehler-tempeluna-fee.js` (54 Prüfungen: Nutzlast Fridge/Ceremony/`actionTransferAttachment`, Reihenfolge und „unterwegs", kein Lost beim Zerstören, rohe Enter/Leave nur an die Karte, Luck bleibt still, Club+Taio, Tempeluna-Fee).
+Alle drei auf dem Stand vor der Änderung rot (44 / 34 / 22 Fehlschläge), danach grün. Hilfsbibliothek `docs/niche-tests/lib/umhaengen.js` (nicht im Sammellauf).
+
+### Rückfragen an Al (Ja/Nein)
+1. **`onEquipLost` nur fürs Umhängen:** Der Hook feuert bewusst nur bei Fridge/Ceremony/`actionTransferAttachment` (alle anderen Abgänge laufen unverändert über `onCardLeaveZone`). So lassen (ja), oder soll er für JEDEN Equip-Abgang feuern (nein; dann müssten ~175 Leave-Lauscher einzeln geprüft werden)?
+2. **Tempelunas Fee ist umhängbar** (Hero-Karte mit `treatAsEquip`, daher Fridge/Ceremony-tauglich). Nach dem Umhängen verliert Tempeluna den Effekt; der NEUE Wirt gewinnt ihn nicht (nur die Hooks der liegenden Hero-Karte, wie bei Initiation Ritual). So gewollt (ja), oder soll eine angelegte Fee gar nicht umhängbar sein (nein)?
+3. **Spiegelpartie-Fehler bei Taio** (gleicher Heldenplatz auf beiden Seiten: ein zerstörtes Equip des einen nahm dem anderen den Bonus): mit behoben, weil der neue Weg ihn sonst ausgelöst hätte. Passt das (ja)?
+4. **Puppet Tokens und die Ceremony (Fund, nicht Teil dieses Auftrags):** Die Ceremony hängt Puppet Tokens um, obwohl ihr Text „Cannot be moved to a different Support Zone" sagt (Tri Ad / Tri Fecta merken den Abgang dann nicht). Soll die Ceremony Tokens vom Umhängen ausnehmen (ja)?
+5. **Fiona-Aszension:** Fionas Aufstiegs-Bereitschaft (Grimoire + angelegter Held) ist ein ZUSTANDS-Lauscher, kein Zähler — sie läuft jetzt über `equipZustandHooks` und folgt dem Umhängen (das rohe `onCardEnterZone` bleibt wie bisher nur bei der bewegten Karte). Gemeint war in W51a „Fiona-Aszension feuert nicht" dasselbe wie „Zähler" — passt die Unterscheidung (ja)?

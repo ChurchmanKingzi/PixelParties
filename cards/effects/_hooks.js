@@ -85,6 +85,15 @@ const HOOKS = {
   // heroController, kind: 'equip'|'attachment', isMove, fromOwner?, fromHeroIdx?, source? }. `cardName` im Kontext ist der LAUSCHER, nicht die Karte.
   // BEWUSST nicht in HOOK_DESCRIPTIONS: kein generisches Hand-Reaktionsfenster (Reaktionen auf der Hand lauschen wie Anti Magic Enchantment per `hooks.onEquipGained`, `activeIn: ['hand']`).
   ON_EQUIP_GAINED: 'onEquipGained',
+  // W51b (Al, 22.10.2026; Befund Taio/Toras): GEGENSTUECK zu `onEquipGained` fuer das UMHAENGEN. Eine Nicht-Kreatur verlaesst per Slippery Fridge / Inheritance Ceremony /
+  // `actionTransferAttachment` ihren alten Wirtshelden. Das echte `onCardLeaveZone` dieses Wegs geht NUR an die bewegte Karte selbst (`_onlyCard`: ein Umhaengen ist kein
+  // Spielen/Anlegen, Zaehler wie Luck duerfen nicht feuern) — Heldenpassive und Auren, die Boni/Marken an den Equip-ZUSTAND haengen, sahen den Abgang deshalb nie.
+  // Feuert NUR beim Umhaengen (immer `isMove: true`); normale Abgaenge (Ablage, Hand, Zerstoerung …) melden weiter nur `onCardLeaveZone`. Gefeuert von
+  // `engine.fireEquipLost` (eine Stelle). Kontext wie ein echtes Leave-Ereignis (`leavingCard`, `fromZone: 'support'`, `fromOwner` = Brettseite des alten Wirts, `fromHeroIdx`,
+  // `fromZoneSlot`, `toZone: 'support'`) PLUS `lostCard`/`lostName`, `toOwner`/`toHeroIdx`/`toZoneSlot` (neuer Platz), `equipOwner` (Ausfuehrender), `kind`, `isMove`, `source`.
+  // Die bewegte Karte steht beim Ereignis noch am alten Platz (Leave-Semantik); bereits gemeldete Mitbewegte stehen schon 'unterwegs' (`zone` '_umhaengen').
+  // Vertrag fuer Zustandslauscher: `equipZustandHooks` (unten) verdrahtet `onCardEnterZone`/`onCardLeaveZone` + `onEquipGained` (nur `isMove`) + `onEquipLost` in einem Zug.
+  ON_EQUIP_LOST: 'onEquipLost',
 
   // ── Combat ──
   ON_ATTACK_DECLARE: 'onAttackDeclare',
@@ -1136,7 +1145,39 @@ function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
   return kopien.map(c => c.id).sort()[0] === inst.id;
 }
 
+/**
+ * W51b — VERTRAGSSTUECK "WER BONI/ZUSTAND AN DEN EQUIP-ZUSTAND HAENGT".
+ *
+ * Eine Karte, die rechnet "+X je Artifact am Helden", "bereit zum Aufstieg, solange Equip Y liegt", "Effekt weg, wenn die Fee geht" … lauscht auf das Betreten und
+ * Verlassen der Support Zones: `onCardEnterZone` / `onCardLeaveZone`. Das UMHAENGEN (Slippery Fridge, Inheritance Ceremony, `actionTransferAttachment`) sendet diese
+ * beiden Ereignisse bewusst nur an die bewegte Karte selbst (kein Spielen, keine Zaehler). Zustandslauscher bekommen es stattdessen ueber das Paar
+ * `onEquipLost` (Abgang, immer Umhaengen) und `onEquipGained` mit `isMove` (Ankunft) — mit DEMSELBEN Kontext-Zuschnitt wie die echten Ereignisse.
+ *
+ * Statt beide Handler doppelt zu verdrahten: `hooks: equipZustandHooks({ onCardEnterZone, onCardLeaveZone, …uebrige Hooks })`. Ergaenzt wird
+ *   `onEquipLost`   = der `onCardLeaveZone`-Handler (gleiche Felder: `leavingCard`, `fromZone`, `fromOwner`, `fromHeroIdx`, `fromZoneSlot`),
+ *   `onEquipGained` = der `onCardEnterZone`-Handler, aber NUR bei `ctx.isMove` (normale Ankuenfte laufen schon ueber `onCardEnterZone`; kein doppeltes Buchen),
+ *                     mit den Feldern `enteringCard` (= `equipCard`), `toZone` ('support'), `toHeroIdx` (= `equipHeroIdx`) nachgezogen.
+ * Vorhandene eigene `onEquipLost`/`onEquipGained` im uebergebenen Objekt gewinnen. Zaehl-/"wurde gespielt"-Lauscher (Luck, Fiona-Aszension …) nutzen das NICHT —
+ * fuer sie ist ein Umhaengen kein Ereignis (Ruling W51a).
+ */
+function equipZustandHooks(hooks) {
+  const out = { ...hooks };
+  const enter = hooks.onCardEnterZone, leave = hooks.onCardLeaveZone;
+  if (typeof leave === 'function' && !out.onEquipLost) out.onEquipLost = leave;
+  if (typeof enter === 'function' && !out.onEquipGained) {
+    out.onEquipGained = function (ctx, ...rest) {
+      if (!ctx || !ctx.isMove) return undefined;
+      if (ctx.enteringCard == null) ctx.enteringCard = ctx.equipCard;
+      if (ctx.toZone == null) ctx.toZone = 'support';
+      if (ctx.toHeroIdx == null) ctx.toHeroIdx = ctx.equipHeroIdx;
+      return enter.call(this, ctx, ...rest);
+    };
+  }
+  return out;
+}
+
 module.exports = {
+  equipZustandHooks,
   heldSeite,
   selbstsenkungZaehlt,
   BLIND_STATUSES,

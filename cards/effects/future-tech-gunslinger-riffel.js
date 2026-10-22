@@ -37,7 +37,7 @@
 //  kein freier Slot.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, equipZustandHooks } = require('./_hooks');
 const { waehleAusNamen } = require('./_future-tech-shared');
 const { ASCENSION_ITEMS, hasEquipped, checkRiffelAscension } = require('./_riffel-shared');
 const { istAusruestTraeger, freieBasisZonen, ruesteAusStapelAus } = require('./_equip-shared');
@@ -111,7 +111,9 @@ module.exports = {
     return n / ASCENSION_ITEMS.length;
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Styx 28.9.: Pruefung auf der Brettseite des Helden (`cardHeroOwner`).
     onGameStart: (ctx) => {
       checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, null);
@@ -129,7 +131,7 @@ module.exports = {
       // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
       checkRiffelAscension(ctx._engine, ctx.cardHeroOwner ?? ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
     },
-  },
+  }),
 
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
