@@ -1,7 +1,8 @@
 'use strict';
 // W50a · Punkt 1 · Al, 22.10.2026 (Antwort auf die Rückfragen aus Welle 49): Ricochet – „Every subsequent target takes half as much damage as the previous one (rounded up)."
 // Regel: Folgetreffer = aufgerundete Hälfte des ECHTEN Schadens des Vorgängers = Schaden nach allen SENKUNGEN (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzüge, Halbieren)
-// und inkl. aller ERHÖHUNGEN des Kopfes (Elixir/Pfeile/Topaz), aber VOR Schilden (Einmal-Schild, HP-Deckel wie Immortal). Wird der Schaden irgendwo auf 0 gebracht
+// und inkl. aller ERHÖHUNGEN des Kopfes (Elixir/Pfeile/Topaz), aber VOR HP-Deckeln/Böden (Immortal, Zusatz-HP wie Nao).
+// W51a (Al, 22.10.2026) umgestellt: der Einmal-Schild (Aquatic Shield "reduce the next damage by X", Harpyformer Choir) VERRINGERT den Schaden = SENKUNG, auch Folgetreffer werden schwächer. Wird der Schaden irgendwo auf 0 gebracht
 // (Negation/Immunität/Block), sind ALLE Folgetreffer 0 – sie TREFFEN aber weiter (On-Hit-Effekte wie Flame Arrow/Burn bleiben). On-Hit-Status trifft ALLE Ketten-Ziele.
 // Beide Sitze, Helden- und Kreaturenziele. Exit 0 = korrekt.
 const H = require('../../lib/h.js');
@@ -66,17 +67,17 @@ async function lauf(me, op, opt) {
       R.check('Folgetreffer auf Kreatur mit Cloudy: Kreatur −25, danach Helden 100/13/7/4/2', 1000 - r.kHp(me) === 25 && gleich(r.dmg, [100, 13, 7, 4, 2]), { k: 1000 - r.kHp(me), dmg: r.dmg });
       fehler(r, 'Kreatur-Cloudy'); }
 
-    // ── SCHILDE geben sich NICHT weiter ──
+    // ── Einmal-Schild = SENKUNG (W51a); HP-Deckel/Böden geben sich NICHT weiter ──
     { const r = await lauf(me, op, { vorher: async (t) => { t.hero(op, 0)._oneShotDmgShields = [{ amount: 60, source: 'Aquatic Shield', ownerIdx: op }]; } });
-      R.check('Einmal-Schild (−60) auf dem Kopf: Kopf nimmt 40, Folgetreffer rechnen vom Schaden VOR dem Schild: 40/50/25/13/7/4', gleich(r.dmg, [40, 50, 25, 13, 7, 4]), r.dmg); fehler(r, 'Einmal-Schild'); }
+      R.check('Einmal-Schild (−60, Aquatic Shield) auf dem Kopf ist eine SENKUNG: Kopf nimmt 40, Folgetreffer 20/10/5/3/2', gleich(r.dmg, [40, 20, 10, 5, 3, 2]), r.dmg); fehler(r, 'Einmal-Schild'); }
 
     { const r = await lauf(me, op, { vorher: async (t) => { t.hero(op, 0).hp = 1; t.hero(op, 0).buffs = { immortal: { stacks: 1 } }; } });
       R.check('HP-Deckel (Immortal) auf dem Kopf: Kopf nimmt 0, Folgetreffer trotzdem 50/25/13/7/4', gleich(r.dmg, [0, 50, 25, 13, 7, 4]), r.dmg); fehler(r, 'Immortal'); }
 
     { const r = await lauf(me, op, { reihe: [[op, 0], [me, 'c'], [op, 1], [me, 0], [op, 2], [me, 1]],
         vorher: async (t) => { t.put(me, 0, 0, H.INERT.big); const c = t.inst(x => x.zone === 'support' && x.owner === me && x.heroIdx === 0 && x.zoneSlot === 0)[0]; c.counters._oneShotDmgShields = [{ amount: 40, source: 'Aquatic Shield', ownerIdx: me }]; } });
-      // Folgetreffer 2 (Kreatur): 50 − 40 Schild = 10; Treffer 3 rechnet von 50: 25 (nicht von 10).
-      R.check('Einmal-Schild auf einer Kreatur (Pos. 2): Kreatur −10, Pos. 3 weiter von 50 → 25/13/7/4', 1000 - r.kHp(me) === 10 && gleich(r.dmg, [100, 25, 13, 7, 4]), { k: 1000 - r.kHp(me), dmg: r.dmg }); fehler(r, 'Kreatur-Schild'); }
+      // Folgetreffer 2 (Kreatur): 50 − 40 Schild = 10; Treffer 3 rechnet von 10 (Senkung, W51a).
+      R.check('Einmal-Schild (Senkung) auf einer Kreatur (Pos. 2): Kreatur −10, Pos. 3 rechnet von 10 → 5/3/2/1', 1000 - r.kHp(me) === 10 && gleich(r.dmg, [100, 5, 3, 2, 1]), { k: 1000 - r.kHp(me), dmg: r.dmg }); fehler(r, 'Kreatur-Schild'); }
 
     // ── NEGATION / IMMUNITÄT: alles danach 0, aber die Treffer finden statt ──
     { const r = await lauf(me, op, { vorher: async (t) => { t.gs.players[me].damageLocked = true; } });

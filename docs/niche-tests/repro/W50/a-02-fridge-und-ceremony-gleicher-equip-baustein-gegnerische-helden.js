@@ -3,7 +3,8 @@
 // Dazu (Ergänzung): Fridge ("… equip them to a different Hero the same player controls") bewegt Artifacts zwischen zwei Heroes EINES BELIEBIGEN Spielers (auch des Gegners);
 // Ceremony nur zwischen zwei eigenen Heroes.
 // Gemeinsamer Baustein: cards/effects/_equip-shared.js (istUmhaengbaresEquip, umhaengZielHelden, fuehreUmhaengenAus).
-// Geprüft (beide Sitze): (1) Ceremony-Equip öffnet das Equip-Fenster (Afflicted Pests) wie Fridge; Ceremony-ANHÄNGSEL (Energy Aura) bleibt still (unverändert);
+// W51a (Al, 22.10.2026) umgestellt: auch das Umhängen eines ANHÄNGSELS (Energy Aura) öffnet das Equip-Fenster (Afflicted Pests) - vorher "bleibt still".
+// Geprüft (beide Sitze): (1) Ceremony-Equip UND Ceremony-ANHÄNGSEL (Energy Aura) öffnen das Equip-Fenster (Afflicted Pests) wie Fridge;
 // (2) Boni wandern mit, nichts wird bezahlt, Fridge/Ceremony liefern dasselbe Endbild; (3) Crusader's-Einschränkung und "1 X je Held"-Grenze gelten gleich;
 // (4) immovable-Equip bleibt liegen; (5) Zonensperre/versiegelte Zone zählt nicht als frei (beide); (6) Equip-Hooks: Leave/Enter/On-Play mit _isMove;
 // (7) Fridge auf GEGNERISCHE Helden: Equips des Gegners wandern zwischen den Gegner-Helden, Pests-Fenster mit dem Ausführenden als Ausrüstendem;
@@ -57,7 +58,7 @@ const wo = (t, s, n) => [0, 1, 2].filter(hi => stuetz(t, s, hi).includes(n));
       R.check(name + ': sauber', sauber(t), { e: t.errors, a: t.audit() });
       void vorher;
     }
-    // Gegenprobe: Ceremony-ANHÄNGSEL bleibt still (unverändert, Vorgabe 12.10.)
+    // Ceremony-ANHÄNGSEL (Energy Aura) öffnet das Equip-Fenster ebenfalls (W51a, Al: Umhängen = auch Attachment gained)
     { const t = await aufbauEigen([], ['Energy Aura', C]);
       t.script.push({ match: d => d.type === 'confirm' && !/Afflicted Pests/.test(JSON.stringify(d)), answer: () => ({ confirmed: true }) });
       t.targetFn = (v) => [v.find(x => x.type === 'hero' && x.owner === me && x.heroIdx === 0).id];
@@ -66,7 +67,7 @@ const wo = (t, s, n) => [0, 1, 2].filter(hi => stuetz(t, s, hi).includes(n));
       wahlFuer(t, 'Energy Aura', 1);
       const r = await t.play(me, C, { hero: 0 });
       R.check('Ceremony-Anhängsel (Energy Aura) wird umgehängt', r === true && wo(t, me, 'Energy Aura').join() === '1', { r, w: wo(t, me, 'Energy Aura') });
-      R.check('Ceremony-Anhängsel: Pests öffnet NICHT (Anhängsel-Teil unverändert)', !pestsAktiv(t), t.prompts.map(p => p.d.type)); }
+      R.check('Ceremony-Anhängsel: Pests des Gegners öffnet (W51a)', pestsAktiv(t), t.prompts.map(p => p.d.type)); }
     // Gemischt: Equip + Anhängsel in einem Zug – Equip öffnet das Fenster, beides landet am Zielhelden
     { const t = await aufbauEigen([['Club of Gobbo', 0, 0]], ['Energy Aura', C]);
       t.script.push({ match: d => d.type === 'confirm' && !/Afflicted Pests/.test(JSON.stringify(d)), answer: () => ({ confirmed: true }) });

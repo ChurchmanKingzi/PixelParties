@@ -4,7 +4,7 @@
 // Kartentext: „The first target takes damage equal to the attacker's Attack stat. Every subsequent target takes half as much damage as the previous one (rounded up)."
 // Regel (W49a): Folgetreffer = aufgerundete Hälfte des VOLLEN Schadens des Vorgängers inkl. aller Erhöhungen (Elixir of Strength +150, Pfeile/Magic Topaz,
 // Niu, erhöhende Hook-Boni); die Quellen-Boni kommen beim Folgetreffer nicht noch einmal obendrauf. Reduktionen/Schilde des Vorgängers gaben sich NICHT weiter
-// (Ist-Zustand W49a; seit W50a anders: Senkungen geben sich weiter, Schilde nicht – s. W50/a-01). Beide Sitze. Exit 0 = korrekt (Exit 1 auf der Basis: Folgetreffer = Hälfte des Nennwerts).
+// (Ist-Zustand W49a; seit W50a anders: Senkungen geben sich weiter, HP-Deckel/Böden nicht – s. W50/a-01; seit W51a zählt auch jeder Einmal-Schild "reduced by X" und Cloud in a Bottle als Senkung – s. W51/a-01). Beide Sitze. Exit 0 = korrekt (Exit 1 auf der Basis: Folgetreffer = Hälfte des Nennwerts).
 const H = require('../../lib/h.js');
 process.on('unhandledRejection', (e) => { process.stderr.write('UNHANDLED ' + (e && e.stack || e) + '\n'); process.exit(1); });
 const gleich = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
