@@ -2763,6 +2763,12 @@ in the `hooks` object. Each receives a `ctx` object (see next section).
 | `onStatusApplied` | Status effect applied | `statusName`, `target` |
 | `onStatusRemoved` | Status effect removed | `statusName`, `target` |
 
+### Hero Form Changes
+
+| Hook | Fires when... | Notable ctx fields |
+|------|---------------|-------------------|
+| `onFormChanged` | W55a: a Hero changed form — **every** Ascension (`performAscension`) and Descend (`performDescend`), incl. forced / `notAnAscension` / borrowed-Hero paths. State notification, no reaction window (`REACTION_SKIP_HOOKS`). Fires right AFTER the state transfer (name, HP, ATK rebuild `_atkNachFormwechsel`, hero instance re-pointed, `onAscendSetup`) and BEFORE the morph animation, Ascension Bonus and hand reactions; no `await` in between — see "Welle 55 / W55a" | `kind` (`'ascend'`/`'descend'`), `hero`, `heroOwner` (board side), `controllerIdx` (current controller), `playerIdx` (who performs it), `heroIdx`, `oldHeroName`, `newHeroName`, `oldBaseAtk` / `newBaseAtk` (**printed** ATK of the old / new form; new form without ATK entry = unchanged), `baseAtkReset` (`true`: the engine rebuilt `hero.baseAtk`/`hero.atk` = printed value + surviving bookings, so everything tied to the old base value is gone and must be re-booked) |
+
 ### Chain & Reactions
 
 | Hook | Fires when... | Notable ctx fields |
@@ -23420,3 +23426,32 @@ Neu: `W54/a-01` (146: sechs Quellen × Zuwachs → Aufstieg → Abstieg → zwei
 ### Rückfragen an Al (Ja/Nein)
 1. **Teleportation Powder und Resistance:** Soll Resistance (Lv1: erste Karte/Zug, Lv3: alles außer Schaden) gegen Teleportation Powder **wirkungslos** sein, obwohl W13/Q144 genau diesen Block verlangt hat (Schalter `resistancePruefung = false`)? Nein = bleibt wie W13.
 2. **Cykyran War Counselor:** „Your Heroes' Base Attack stats are doubled" — nach einem Aufstieg/Abstieg ist der Held bei der gedruckten ATK der neuen Form **ohne Verdopplung** (die Kreatur liegt weiter da; die Buchung `_cykyranBonus` gehört noch zur alten Form, spätere Abgleiche rechnen falsch: im Test 40 → 80 verdoppelt, nach Aufstieg 90 statt 180, nach Zugbeginn 100). Soll die Verdopplung beim Formwechsel auf den **neuen** Grundwert neu gerechnet werden (neuer Hook `onFormChanged`, Cykyran lauscht darauf) — ja/nein?
+
+---
+
+## Welle 55 / W55a — Formwechsel: Hook `onFormChanged` · Cykyran War Counselor: die Verdopplung wird nach Aufstieg/Abstieg neu berechnet · Ruling: Resistance schützt vor Teleportation Powder
+
+Al (Spieldesigner) hat die beiden Rückfragen aus W54a beantwortet. Repro: `docs/niche-tests/repro/W55/a-01` (144 Prüfungen, beide Sitze, auf dem Stand vor W55a rot: 84 ✗).
+
+### Punkt 1 · Cykyran War Counselor: „Die Verdopplung muss neu berechnet werden!"
+Kartentext: „While you control at least 3 different "War Counselor" Creatures, your Heroes' Base Attack stats are doubled."
+
+**Ursache.** Die Verdopplung ist eine Buchung am Helden (`hero._cykyranBonus` = der natürliche Basiswert, `_cykyranBy` = Kontrolleur; `resync` legt nur die Differenz an `hero.baseAtk` **und** `hero.atk`). `performAscension`/`performDescend` setzen `hero.baseAtk` über `_atkNachFormwechsel` auf den **gedruckten** Wert der neuen Form zurück (W54a) — die Verdopplung steckte im alten Wert und war damit erloschen, aber `_cykyranBonus` blieb mit dem alten Betrag stehen. Folge: der Held stand ohne Verdopplung da (40 → 80, nach dem Aufstieg 90 statt 180), und der nächste Abgleich rechnete `natürlich = baseAtk − altem Bonus` falsch (100 statt 180).
+
+**Regel (Al).** Nach einem Formwechsel gilt, solange die Bedingung („mindestens 3 verschiedene War Counselor Creatures unter deiner Kontrolle", Cykyran wirkt) erfüllt ist: **ATK = 2 × gedruckter ATK der neuen Form + überlebende Boni.** Verdoppelt wird nur der Basiswert; Ausrüstung, Fighting, dauerhafte Zuwächse (`permAtkDelta`: Rakah, Nero …) und befristete Gaben werden **nicht** verdoppelt (die W54a-Zuwachs-Semantik bleibt unberührt: `actionPermAtk` ändert nur `hero.atk`, nie `baseAtk`).
+
+**Lösung (zwei Schichten, minimal-invasiv).**
+1. **Neuer Hook `onFormChanged`** (`HOOKS.ON_FORM_CHANGED`, `_hooks.js`), gefeuert von `engine.fireFormChanged(hero, {…})` aus `performAscension` **und** `performDescend` direkt nach der Zustandsübertragung (nach `_atkNachFormwechsel`, `_signalHeroAtkReset`, Umhängen der Heldeninstanz und `onAscendSetup`, noch vor Animation/Bonus/Reaktionen; dazwischen kein `await`, kein Lauscher sieht einen Zwischenstand). Zustandsmeldung, kein Reaktionsfenster (`REACTION_SKIP_HOOKS`, nicht in `HOOK_DESCRIPTIONS`). Nutzlast siehe Hooks-Tabelle „Hero Form Changes". Cykyran hängt sich über `hooks.onFormChanged` an (→ `resync`); künftige Karten, deren Wirkung am Grundwert des Helden hängt, tun dasselbe.
+2. **Formwechsel-Zähler `hero._formGen`** (`_atkNachFormwechsel` erhöht ihn, wenn er `baseAtk` zurücksetzt). Cykyran stempelt seine Buchung mit dem Zähler (`_cykyranGen`); weicht er ab, ist die Buchung **verwaist** und zählt als 0 (es gibt nichts zurückzunehmen — die Verdopplung ist mit der Basis schon weg). Das macht den Abgleich unabhängig davon, *über welchen* Hook er läuft (Zugbeginn, Wiederbelebung, Statuswechsel …) und schützt vor jedem Zwischenfenster. Ältere Spielstände ohne Stempel gelten als frisch.
+
+**Warum diese Lösung** (Alternativen verworfen): (a) *nur Cykyran-Sonderfall in `_atkNachFormwechsel`* (Feld löschen) — Engine kennt dann ein Kartenfeld; (b) *abgeleiteter Wert statt Buchung* — Cykyran, `baseAtk`-Leser (Quick Attack, Javelin Throw …) und die Curse-Regel hängen an der Buchung über `_applyHeroAtkDelta`, ein Umbau hätte viele Nebenwirkungen; (c) *Differenz „neu − alt" über `onFormChanged` selbst rechnen* — fehleranfällig bei Fluch/Aura. Die gewählte Lösung ändert keinen bestehenden Pfad außer dem Zähler und dem Rebuild-Aufruf; `resync` bleibt die einzige Rechenstelle (Fluch, ATK-Auren, Anzeige laufen weiter über den Trichter `_applyHeroAtkDelta`).
+
+**Geprüft (Repro `W55/a-01`, beide Sitze).** A Aufstieg → Zugumlauf → Abstieg → zweiter Aufstieg (2 × neue Basis, Hook-Nutzlast, genau ein Hook je Wechsel) · B Boni nicht verdoppelt und überlebend (Club, Fighting, `permAtkDelta`, befristete Gabe, spätere Abgänge/Ablauf) · C Bedingung fällt weg / kommt dazu vor und nach dem Wechsel, Cykyran selbst geht, Gegenprobe nur 2 verschiedene (auch zwei Kopien desselben), Cykyran eingefroren/aufgetaut · D Fluch vor/nach dem Wechsel (sichtbar 0, Zwischenspeicher = 2 × Basis) · E mehrere Helden · F besiegt/wiederbelebt, Abstieg eines besiegten Helden (`evenIfDefeated`) · G Teleportation Powder: Rückkehr = Zustand exakt wie vorher (inkl. Stempel), Bedingung während der Abwesenheit weggefallen · H Gegner-Seite (Cykyran gehört dem Besitzer; „your Heroes" = aktuelle Kontrolle: übernommener Held `permaControlBy` wird verdoppelt, steigt auf, Kontrollverlust nimmt die Verdopplung) · I Form ohne ATK-Angabe (Styx: `baseAtkReset: false`, Wert unverändert, nichts doppelt) · J ohne Hook-Lauscher heilt der Stempel beim nächsten Abgleich (180, nicht 100).
+
+**Vertrag (neu).** *Wer eine Buchung führt, die am GRUNDWERT (`hero.baseAtk`) der Form hängt, hört auf `onFormChanged` und/oder stempelt mit `hero._formGen`.* Boni, die an die Form gebunden sind (Taio, Toras, Lizbeth-Fighting), bleiben wie in W54a mit der alten Form weg.
+
+### Punkt 2 · Ruling: Resistance schützt vor Teleportation Powder — **keine Änderung**
+**Al:** „Nein, Resistance schützt vor Powder." (Antwort auf die W54a-Rückfrage 1.) Der Ist-Zustand bleibt: die Resistance-Prüfung `beforeHeroEffect` beim Verschwinden (W13/Q144: „Es soll *jeden* Nicht-Schaden-Effekt blocken!"; Resistance Lv3: „unaffected by all cards and effects, except damage", Lv1: erste Karte/Zug) läuft weiter, der Schalter `resistancePruefung` in `teleportation-powder.js` bleibt **`true`**, `W13/b-q144`, `M02/11` und die Ausnahme „einzig `beforeHeroEffect` beim Verschwinden" in `W53/a-05` gelten unverändert. Die Frage ist **entschieden** und soll nicht wieder auftauchen. (Der Schalter und der Test `W54/a-02` (D) bleiben als reine Mechanik-Prüfung bestehen.)
+
+### Tests W55a
+Neu: `W55/a-01` (144). Alle bestehenden Cykyran-, Formwechsel-/Ascension- und W54-Repros sowie `scripts/check-*.js` unverändert grün (Details im Bericht der Welle).

@@ -7,7 +7,7 @@
 //   (A) Schnappschuss-Differenz: Zustand des Helden und seiner Zonen VOR dem Verschwinden == NACH dem Wiederauftauchen — Heldenobjekt (HP, maxHP, ATK/Boni, Buffs, Status, Marken wie `ascensionReady`/`gainedEffectNames`),
 //       jede Karteninstanz (Held, Abilities, Surprise, Ausrüstung/Anhängsel samt unsichtbarer Träger gewonnener Effekte) mit DERSELBEN Instanz-Id, allen Zählern/Stempeln (`atkGranted`, `_atkTraeger`,
 //       `_taioAtkTotal`, HOPT-Schlüssel …), Spielzug-Marke, Kontrolle, Platz und relativer Reihenfolge in der Instanzliste; die Zonen-Arrays; Hand/Deck/Ablage unberührt; `_teleportedAway` weg.
-//   (B) KEIN Hook beim Verschwinden (außer der Resistance-Prüfung `beforeHeroEffect`, W13) und KEIN Hook bei der Rückkehr: Hook-Wächter über alle Hook-Namen (onCardLeaveZone, onCardEnterZone, onEquipLost,
+//   (B) KEIN Hook beim Verschwinden (außer der Resistance-Prüfung `beforeHeroEffect`, W13 — W55: von Al entschieden, „Resistance schützt vor Powder", bleibt so) und KEIN Hook bei der Rückkehr: Hook-Wächter über alle Hook-Namen (onCardLeaveZone, onCardEnterZone, onEquipLost,
 //       onEquipGained, onPlay, Surprise-/Reaktionsfenster …) während `resolve` und während der Rückkehr-Routine (`onTurnStartEarly`-Handler).
 //   (C) Folgeverhalten: ATK-Boni arbeiten nach der Rückkehr normal weiter (Equip zerstört → Bonus weg; Fighting abgelegt → Bonus weg — vorher blieb er stehen, weil die Ability-Zähler verloren gingen).
 //   (D) Ausweichplatz: ist eine Support Zone inzwischen fremdbesetzt, weicht die Karte auf den nächsten freien Platz desselben Helden aus (Id und Zähler bleiben); ohne freien Platz bleibt sie draußen.

@@ -133,7 +133,7 @@ async function teleportiere(t, me, op, w, { blockiere = [0, 1, 2], vorAbwesenhei
       R.check('(C) Platz da: keine Hooks bei der Rückkehr, keine Abgangsmeldung', d.beiRueckkehr.filter(n => n !== 'onTurnStartEarly').length === 0 && d.verlust.length === 0 && d.leave.length === 0, { b: d.beiRueckkehr, v: d.verlust });
       R.check('(C) Platz da: Club liegt wieder, ATK wie vorher (Grundwert + 30 + 20)', !!t.find(CLUB, 'support') && t.hero(op, 0).atk === t.DB[TAIO].atk + 50, t.hero(op, 0).atk); }
 
-    // ═══ (D) Resistance-Schalter: ohne Prüfung feuert das Verschwinden keinen einzigen Hook (und Resistance-Helden werden dann teleportiert) ═══
+    // ═══ (D) Resistance-Schalter: ohne Prüfung feuert das Verschwinden keinen einzigen Hook (und Resistance-Helden werden dann teleportiert) — W55: Al hat entschieden, Resistance schützt vor Powder; der Schalter bleibt `true`, dieser Test belegt nur die Mechanik ═══
     for (const schalter of [true, false]) {
       const sk = U.H.loadCardEffect(TP); const alt = sk.resistancePruefung;
       try {
