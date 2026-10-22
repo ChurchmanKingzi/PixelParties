@@ -6,6 +6,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, hasNumericCreatureLevel, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses, kontrollRechteVon, KONTROLL_RECHTE, heroCanBeEquipped } = require('./_hooks');
+const EMPOWERED_STRIKE_BONUS = 150;   // W49a (Al, 22.10.2026): Elixir of Strength gewaehrt +150 (frueher +100); Kartentext/Tooltip/Skript-Kopf nachgezogen
 // v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
 // (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
 // sie reagieren.
@@ -3951,7 +3952,7 @@ class GameEngine {
       // Listener sieht, was die Vorgaenger derselben Runde gesammelt
       // haben. Direkte Zuweisung wirkt wie setAmount.
       get amount() { return engine._projectedAmount(hookCtx); },
-      set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; },
+      set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; hookCtx._offFlat = 0; hookCtx._offMul = 1; },
 
       // ── Card-specific info (always refers to the card whose hook is firing) ──
       card: cardInstance,
@@ -4020,6 +4021,7 @@ class GameEngine {
         // Zaehler) fuer einen Bonus, der nie ankommt.
         if (hookCtx.cannotBeIncreased && delta > 0) return;
         hookCtx._flat = (hookCtx._flat || 0) + delta;
+        if (delta > 0) hookCtx._offFlat = (hookCtx._offFlat || 0) + delta;   // W49a: nur ERHOEHUNGEN fuer den „vollen Schaden" (Ricochet)
         // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
         // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
         if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
@@ -4033,6 +4035,7 @@ class GameEngine {
         // flat Boni. Ein zweiter Verdoppler laeuft damit ins Leere.
         if (hookCtx.cannotBeIncreased && factor > 1) return;
         hookCtx._mul = (hookCtx._mul ?? 1) * factor;
+        if (factor > 1) hookCtx._offMul = (hookCtx._offMul ?? 1) * factor;   // W49a (s. modifyAmount)
       },
       /**
        * „…, but cannot be increased by other effects" (v742).
@@ -4063,6 +4066,7 @@ class GameEngine {
         hookCtx.amount = val;
         hookCtx._flat = 0;
         hookCtx._mul = 1;
+        hookCtx._offFlat = 0; hookCtx._offMul = 1;   // W49a
       },
       /**
        * Lock the current damage amount as a floor — no further effect
@@ -6502,16 +6506,18 @@ class GameEngine {
     Object.defineProperty(e, 'amount', {
       configurable: true, enumerable: true,
       get() { return Math.max(0, Math.ceil(e._base * (e._mul ?? 1)) + (e._flat || 0)); },
-      set(v) { e._base = Math.max(0, v || 0); e._flat = 0; e._mul = 1; },
+      set(v) { e._base = Math.max(0, v || 0); e._flat = 0; e._mul = 1; e._offFlat = 0; e._offMul = 1; },
     });
     e.modifyAmount = (delta) => {
       if (e.cannotBeReduced && delta < 0) return;
       e._flat += delta;
+      if (delta > 0) e._offFlat = (e._offFlat || 0) + delta;   // W49a: nur ERHOEHUNGEN fuer den „vollen Schaden" (Ricochet)
     };
     e.multiplyAmount = (factor) => {
       if (!(factor >= 0)) return;
       if (e.cannotBeReduced && factor < 1) return;
       e._mul *= factor;
+      if (factor > 1) e._offMul = (e._offMul ?? 1) * factor;   // W49a
     };
     e.setAmount = (v) => {
       if (e.cannotBeReduced && v < e.amount) return;
@@ -6530,7 +6536,7 @@ class GameEngine {
     const endwert = e.amount;
     delete e.amount;                 // Accessor entfernen …
     e.amount = endwert;              // … und als Datenfeld neu setzen
-    delete e._base; delete e._flat; delete e._mul;
+    delete e._base; delete e._flat; delete e._mul; delete e._offFlat; delete e._offMul;
     delete e.modifyAmount; delete e.multiplyAmount; delete e.setAmount; delete e.lockReduction;
   }
 
@@ -8946,12 +8952,18 @@ class GameEngine {
     // not `atk`), and "when this Hero attacks" should still fire.
     const _srcHeroIdx = source?.heroIdx;
     const _srcOwner = source?.owner ?? source?.controller;
+    const _kettenBetrag = opts?.kettenFolge ? amount : null;   // W49a (Ricochet): Folgetreffer = Haelfte des vollen Vorgaengers, keine Quellen-Boni nochmal
     if (type === 'attack' && Number.isInteger(_srcHeroIdx) && _srcHeroIdx >= 0 && Number.isInteger(_srcOwner)) {
       amount = await this._fireAttackDeclare(source, target, amount);
     }
 
     const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false,
       festesZiel: this.istEinzelzielTreffer(type, opts) };   // Einzelziel/Rueckstoss — Spiegelungen der Immunitaet lesen es
+    // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — quellenseitige Erhoehungen (Hook-Boni, Pfeile,
+    // Darge) sind im Betrag des Vorgaengers schon enthalten und kommen NICHT noch einmal drauf; Verteidigung des Ziels wirkt normal.
+    if (_kettenBetrag != null) {
+      hookCtx.amount = _kettenBetrag; hookCtx.cannotBeIncreased = true; hookCtx._noIncreaseFrom = _kettenBetrag; hookCtx._kettenFolge = true;
+    }
     // Eingangsbetrag fuer den Null-Floater am Ende (Al 1.9.: wird
     // Schaden auf 0 reduziert, IMMER eine 0 zeigen — egal wodurch).
     const _eingangsBetrag = amount;
@@ -9162,7 +9174,7 @@ class GameEngine {
       return { dealt: 0, cancelled: true };
     }
 
-    // Elixir of Strength rider — primed +100 unstoppable damage on the
+    // Elixir of Strength rider — primed +150 unstoppable damage on the
     // buffed Hero's next single-target Attack hit (Welle 13, Q138: Mehrziel-
     // Flaechenschlaege mit 2+ Zielen in der Klammer feuern nicht, siehe
     // `_applyEmpoweredStrikeIfApplicable`).
@@ -9200,6 +9212,8 @@ class GameEngine {
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
     const _amountBeforeBuffMul = this._projectedAmount(hookCtx);
+    // W49a (Ricochet): „voller Schaden" des Treffers = Basis (inkl. Elixir/Pfeile) mit allen ERHOEHENDEN Hook-Modifikatoren, vor jeder Verteidigung des Ziels.
+    const _vollVorVerteidigung = Math.max(0, Math.ceil(hookCtx.amount * (hookCtx._offMul ?? 1)) + (hookCtx._offFlat || 0));
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
@@ -9255,7 +9269,8 @@ class GameEngine {
     // Flat bonus that bypasses buff multipliers (Bow Sniper Darge's
     // per-arrow Attack bonus). Added AFTER the multiplier pass so
     // halving / doubling effects can't touch it.
-    if (hookCtx._flatBonus) hookCtx.amount += hookCtx._flatBonus;
+    if (hookCtx._flatBonus && !hookCtx._kettenFolge) hookCtx.amount += hookCtx._flatBonus;
+    if (opts?.vollOut) opts.vollOut.wert = _vollVorVerteidigung + (hookCtx._kettenFolge ? 0 : (hookCtx._flatBonus || 0));
 
     // ── Einmal-Schadensschilde (v697) — flat, nach allen Multiplikatoren.
     // `cannotBeReduced` laesst sie wirkungslos und UNVERBRAUCHT.
@@ -21494,6 +21509,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // bewusst nur der Spielweg: die Circles löschen ihre Areas erst NACH der Wirkerwahl.
       if (cd.cardType === 'Spell' && this.gs.players[playerIdx]._spellLockTurn === this.gs.turn
           && this.gs.players[playerIdx]._silenceBonusSpell !== this.gs.turn) continue;
+      if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
       if ((cd.subtype || '').toLowerCase() === 'area' && this.gs.players[playerIdx]._cantPlayAreaThisTurn === this.gs.turn) continue;
       // Per-Hero-Gate der KARTE (Lesson in the Arts, Living Illusion) gilt auch fuer geschenkte Zusatzaktionen.
       if (script?.canPlayWithHero && !this._mitWirker(playerIdx, heroIdx, fremd ? hs : null,
@@ -21840,6 +21856,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (cd.cardType === 'Spell'
             && ps._spellLockTurn === gs.turn
             && ps._silenceBonusSpell !== gs.turn) continue;
+        if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
         // Area cards (any type with subtype 'Area') can only be cast while
         // the caster still has room AND doesn't already control a copy.
         // Grundwert 1; „Spatial Crevice" hebt das Limit ueber den
@@ -22039,6 +22056,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           if (cd.cardType === 'Spell'
               && ps._spellLockTurn === gs.turn
               && ps._silenceBonusSpell !== gs.turn) continue;
+          if (cd.cardType === 'Spell' && this.thaliaSupportSperre(playerIdx, cd)) continue;   // W49a (Thalia)
           // Level/school check uses opponent's ability zones (where the
           // charmed hero lives).
           //
@@ -22712,6 +22730,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cardData.cardType === 'Spell'
         && ps._spellLockTurn === gs.turn
         && ps._silenceBonusSpell !== gs.turn) return null;
+    // W49a (Thalia, Al 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
+    if (cardData.cardType === 'Spell' && this.thaliaSupportSperre(pi, cardData)) return null;
 
     // Area-play lock (Reality Crack): once set, no further Area Spells
     // may be cast this turn by this player. Flag is cleared at turn end.
@@ -23806,6 +23826,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // „Only 1 per game" (Hymn of Rebirth, Divine Gift …): auch der Sofort-Guss
     // verbraucht das Einmal-Limit — der regulaere Weg stempelt in server.js.
     if (!abgebrochen && !_ganzNegiert && cardData.cardType === 'Spell') {
+      this.thaliaNotiereSupportZauber(playerIdx, cardName);   // W49a (Thalia): 1 Kopie je Support Spell pro Zug
       const _opgScript = loadCardEffect(cardName);
       if (_opgScript?.oncePerGame || _opgScript?.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -28688,6 +28709,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         isStatusDamage: !!e.isStatusDamage,
         canBeNegated: e.canBeNegated !== false,
         cannotBeIncreased: !!e.cannotBeIncreased,
+        kettenFolge: !!e.kettenFolge, vollOut: e.vollOut || null,   // W49a (Ricochet)
         _pooledFromToken: inst,
       });
       e.amount = res?.dealt || 0;
@@ -33566,6 +33588,23 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (ps?._oncePerGameUsed) for (const k of [...ps._oncePerGameUsed]) if (!abzug.opg.has(k) && !this._surpriseStempel?.has(`${abzug.pi}|${k}`)) ps._oncePerGameUsed.delete(k);
   }
 
+  /**
+   * ★ W49a (Thalia, the Fun Fairy; Al 22.10.2026): „You can only activate 1 copy of each Support Spell per turn."
+   * Gesperrt ist ein Support-Magic-SPELL (Name), von dem `pi` diesen Zug schon eine Kopie gewirkt hat, solange ein aktiver
+   * (nicht ruhender) Thalia-Held auf `pi`s Seite steht. Stempel in `gs.hoptUsed` (`thalia-support:<Basisname>:<pi>`), damit die
+   * Z7b-Rueckgabe (`_stempelAbzug`/`_stempelZurueck`, ganz negierter Zauber) ihn mitnimmt. Logik im Heldenskript.
+   */
+  thaliaSupportSperre(pi, cardData) {
+    const th = loadCardEffect('Thalia, the Fun Fairy');
+    return !!(th && typeof th.sperrtSupportKopie === 'function' && th.sperrtSupportKopie(this, pi, cardData));
+  }
+
+  /** ★ W49a: bucht eine gewirkte Support-Spell-Kopie fuer Thalias Regel (nur wenn eine aktive Thalia dort steht). */
+  thaliaNotiereSupportZauber(pi, cardName) {
+    const th = loadCardEffect('Thalia, the Fun Fairy');
+    if (th && typeof th.notiereSupportKopie === 'function') th.notiereSupportKopie(this, pi, cardName);
+  }
+
   claimHOPT(key, playerIdx) {
     if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
     const hoptKey = `${key}:${playerIdx}`;
@@ -38418,7 +38457,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Elixir of Strength rider — runs at BEFORE_DAMAGE for hero damage and
    * mirrored for creature damage entries. If the source is a Hero
    * carrying the `empowered_strike` buff and the damage is an Attack:
-   *   • Add 100 to amount.
+   *   • Add 150 to amount (`EMPOWERED_STRIKE_BONUS`, W49a).
    *   • Set cannotBeReduced + cannotBeNegated so the whole hit ignores
    *     Cloudy / shields / Anti Magic / etc.
    *   • Strip the buff so it only fires once.
@@ -38448,7 +38487,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const _mh = this._multiHitScope;
     if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
 
-    hookCtx.amount = (hookCtx.amount || 0) + 100;
+    hookCtx.amount = (hookCtx.amount || 0) + EMPOWERED_STRIKE_BONUS;   // W49a (Al, 22.10.2026): 150 statt 100
     hookCtx.cannotBeReduced = true;
     hookCtx.cannotBeNegated = true;
 
@@ -39376,6 +39415,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (typeof casterIdx !== 'number' || casterIdx < 0) return;
     const cd = this._getCardDB()[cardName];
     const typ = cd?.cardType;
+    if (typ === 'Spell') this.thaliaNotiereSupportZauber(pi, cardName);   // W49a (Thalia): gewirkte Support-Reaktion zaehlt als Kopie des Zugs
     // Als Vorgabe 29.9.: `opts.heroOwner` = Brettseite des Wirkers (geliehener Held).
     const heroOwner = Number.isInteger(opts.heroOwner) ? opts.heroOwner : pi;
     try {
@@ -39514,6 +39554,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!cd) return [];
     const needsHero = hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature');
     if (!needsHero) return null;
+    if (cd.cardType === 'Spell' && this.thaliaSupportSperre(pi, cd)) return [];   // W49a (Thalia): auch Support-Reaktionen aus der Hand
     const heroes = ps.heroes || [];
     // Styx 28.9.: der getroffene Held steht nicht in der Spalte des
     // Reagierenden (geliehen) — eine „casterIsTarget"-Karte hat dann
@@ -50852,11 +50893,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // `e.amount = …` waere absolut und backte die gesammelten flat
         // Modifikatoren in die Basis (Punkt vor Strich kaputt).
         const armiert = typeof e.multiplyAmount === 'function';
-        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false };
+        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {
           e._base = Math.max(0, proxy.amount || 0);
-          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; }   // Hydra Blood: absolut
+          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; e._offFlat = 0; e._offMul = 1; }   // Hydra Blood: absolut
         } else e.amount = proxy.amount;
       }
     }
@@ -50906,6 +50947,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // damage cannot be reduced further", so any multiplier below 1
       // is a no-op. Multipliers ≥ 1 still apply.
       const _eAmountBeforeBuffMul = e.amount;
+      // W49a (Ricochet): „voller Schaden" = Basis (inkl. Elixir/Pfeile) mit allen ERHOEHENDEN Modifikatoren, vor jeder Verteidigung (s. Heldenpfad).
+      const _eVoll = (typeof e.multiplyAmount === 'function')
+        ? Math.max(0, Math.ceil(e._base * (e._offMul ?? 1)) + (e._offFlat || 0)) : e.amount;
       if (e.canBeNegated !== false && e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
@@ -50957,7 +51001,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // damage path). Darge's beforeCreatureDamageBatch hook stamps
       // `e._flatBonus = 50 * arrowCount` on matching entries; we add
       // it AFTER the multiplier so halving / doubling can't touch it.
-      if (e._flatBonus) e.amount += e._flatBonus;
+      if (e._flatBonus && !e.kettenFolge) e.amount += e._flatBonus;
+      if (e.vollOut) e.vollOut.wert = _eVoll + (e.kettenFolge ? 0 : (e._flatBonus || 0));
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
         // ★ W15b (Al, C3/S02-05): nach aktuellem KONTROLLEUR (gestohlene Kreatur = Gegnerziel; meine Kreatur auf der Gegnerseite nicht).
         if (this.kontrolleurVon(e.inst) !== e.sourceOwner) {
@@ -51642,7 +51687,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       animType: opts.animType || null,
       // „This damage cannot be increased" — Gegenstueck zur Klammer im
       // Heldenpfad (`opts.cannotBeIncreased`).
-      cannotBeIncreased: !!opts.cannotBeIncreased,
+      cannotBeIncreased: !!opts.cannotBeIncreased || !!opts.kettenFolge,
+      // W49a (Ricochet): Folgetreffer (Betrag steht fest, keine Quellen-Boni nochmal) bzw. Rueckmeldung des vollen Schadens (`vollOut.wert`).
+      kettenFolge: !!opts.kettenFolge,
+      vollOut: opts.vollOut || null,
     };
     await this.processCreatureDamageBatch([entry]);
     // Propagate per-entry cancellation so callers can mirror the

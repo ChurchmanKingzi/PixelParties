@@ -311,6 +311,7 @@ module.exports = {
         await engine.runHooks('onCardEnterZone', {
           enteringCard: placed.inst, toZone: 'support',
           toHeroIdx: heroIdx, _skipReactionCheck: true,
+          _anhaengselAnleger: pi,   // W49a: das Ausruesten des Nachfolgers oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
         });
 
         const neuScript = loadCardEffect(neuName);

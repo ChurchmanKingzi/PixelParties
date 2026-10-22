@@ -326,6 +326,7 @@ module.exports = {
         await engine.runHooks('onCardEnterZone', {
           enteringCard: placed.inst, toZone: 'support',
           toHeroIdx: heroIdx, _skipReactionCheck: true,
+          _anhaengselAnleger: pi,   // W49a: das Direkt-Ausruesten ist „equips a card into a Hero's Support Zone" — oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
         });
 
         const equipScript = loadCardEffect(pickedName);

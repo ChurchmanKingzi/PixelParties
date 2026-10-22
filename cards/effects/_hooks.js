@@ -476,9 +476,9 @@ const BUFF_EFFECTS = {
   // Elixir of Cold — for the rest of this turn, anything this Hero hits
   // with an Attack or Spell becomes Frozen for 1 turn.
   cold_strike: { label: 'Cold Strike', icon: '❄️', tooltip: "This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." },
-  // Elixir of Strength — primed +100 unstoppable damage on the Hero's
+  // Elixir of Strength — primed +150 unstoppable damage on the Hero's
   // next single-target Attack. Persists across turns until consumed.
-  empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." },
+  empowered_strike: { label: 'Empowered Strike', icon: '💪', tooltip: "The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 150 and cannot be reduced or negated." },
   // String of Fine — target takes 0 damage from any source for the
   // duration of the buff. `damageMultiplier: 0` is read by the
   // engine's standard buff-multiplier pass on hero & creature damage,

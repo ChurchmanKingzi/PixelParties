@@ -37,6 +37,15 @@
 //  geklammert — „Interference" schuetzt dagegen. Bei genau EINEM Ziel
 //  bleibt es ein Einzeltreffer und der Schutz greift korrekt nicht.
 //
+//  ── SCHADEN DER FOLGETREFFER (W49a, Al 22.10.2026) ────────────────
+//  „half as much damage as the previous one": die aufgerundete Haelfte
+//  des VOLLEN Schadens des Vorgaengers, also inklusive aller Erhoehungen
+//  des Kopftreffers (Elixir of Strength +150, Pfeile/Magic Topaz, Niu,
+//  erhoehende Hook-Boni). Die Quellen-Boni kommen bei Folgetreffern
+//  nicht noch einmal obendrauf (`kettenFolge`): der Betrag steht fest.
+//  Reduktionen/Schilde des Vorgaengers geben sich nicht weiter (Ist-
+//  Zustand, Frage an Al). Engine: `opts.vollOut` / `opts.kettenFolge`.
+//
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: das Projektil von „Crusader's Flintlock", das von Ziel zu
 //  Ziel springt, „mit einem Sound jedes Mal". Der Klang kommt von
@@ -188,6 +197,12 @@ module.exports = {
       let vonHeroIdx = heroIdx;
       let vonSlot = -1;
       let schaden = atk;
+      // ★ W49a (Al, 22.10.2026): „takes half as much damage as the PREVIOUS one" — die Haelfte des VOLLEN Schadens des Vorgaengers, also
+      // inklusive aller Erhoehungen (Elixir of Strength, Pfeile/Magic Topaz, Niu, erhoehende Hook-Boni). `voll` = voller Schaden des
+      // letzten Treffers VOR der Verteidigung des Ziels (Engine meldet ihn ueber `opts.vollOut`); null = noch kein Treffer hat die
+      // Schadensrechnung erreicht (Kopf der Kette, rechnet mit dem Nennwert wie bisher). Reduktionen/Schilde des Vorgaengers geben
+      // sich NICHT weiter (Ist-Zustand, Frage an Al); der Folgetreffer bekommt die Quellen-Boni nicht noch einmal (`kettenFolge`).
+      let voll = null;
 
       // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen der Kette an
       // das Anti-AoE-Fenster (Deepsea Idol).
@@ -220,10 +235,14 @@ module.exports = {
             type: 'arrow_impact', owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: zielSlot,
           });
 
+          const folge = voll !== null;
+          if (folge) schaden = Math.ceil(voll / 2);
+          const vollOut = {};
+          const trefferOpts = { kettenFolge: folge, vollOut };
           if (ziel.type === 'hero') {
             const h = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
             if (h && h.hp > 0) {
-              await engine.actionDealDamage(attackSource, h, schaden, 'attack');
+              await engine.actionDealDamage(attackSource, h, schaden, 'attack', trefferOpts);
             }
           } else {
             const inst = ziel.cardInstance || engine.cardInstances.find(c =>
@@ -232,17 +251,23 @@ module.exports = {
             if (inst && inst.zone === 'support') {
               await engine.actionDealCreatureDamage(
                 attackSource, inst, schaden, 'attack',
-                { sourceOwner: pi, canBeNegated: true },
+                { sourceOwner: pi, canBeNegated: true, ...trefferOpts },
               );
             }
           }
+          // Kopf der Kette: der gemeldete volle Schaden (inkl. Boni) ist die Rechengrundlage fuer alle Folgetreffer.
+          if (!folge && typeof vollOut.wert === 'number') voll = vollOut.wert;
+          else if (folge) voll = schaden;
 
           // Der Einschlag ist der Ausgangspunkt des naechsten Sprungs.
           vonOwner = ziel.owner;
           vonHeroIdx = ziel.heroIdx;
           vonSlot = zielSlot;
           // „half as much as the PREVIOUS one (rounded up)" — an die
-          // Position gebunden, nicht an den Erfolg des Vorgaengers.
+          // Position gebunden, nicht an den Erfolg des Vorgaengers. Ab dem
+          // Kopf rechnet der naechste Treffer vom VOLLEN Schaden (`voll`,
+          // s. oben); dieser Nennwert greift nur, solange noch kein Treffer
+          // die Schadensrechnung erreicht hat (Ziel verschwunden/abgebrochen).
           schaden = Math.ceil(schaden / 2);
         }
       } finally {

@@ -4,7 +4,17 @@
 //
 //  "While this card is in your discard pile, you may once per turn
 //   change its name to that of any other card until the end of this
-//   turn."
+//   turn. You can only copy any card's name with 1 "Future Tech
+//   Prototypes" per turn."
+//
+//  ★ W49a (Al, 22.10.2026): der zweite Satz ist neu. Auslegung von Al:
+//  „Man darf trotzdem beliebig viele Prototypes aktivieren – nur eben
+//  maximal einen pro Kartennamen." Jede Kopie darf weiterhin einmal pro
+//  Zug umbenennen (erster Satz), aber pro Zug und Spieler darf jeder
+//  Kartenname nur von EINEM Prototypes kopiert werden. Stempel
+//  `ft-prototypes-name:<Spieler>:<Name>` (`nameStempel`); der Namenswaehler
+//  bietet bereits kopierte Namen nicht mehr an. Ein abgebrochener oder
+//  abgelehnter Namenswunsch verbraucht nichts (Stempel erst nach der Zusage).
 //
 //  ── Die letzte Karte des Archetyps, und die einzige mit einem
 //     wirklich fehlenden Mechanismus ──────────────────────────────────
@@ -60,11 +70,18 @@ function schluessel(inst) {
   return `ft-prototypes:${inst.id}`;
 }
 
-/** Alle Namen, auf die umbenannt werden darf. */
-function waehlbareNamen(engine) {
+/** W49a: Stempel „dieser Name wurde diesen Zug von einem Prototypes kopiert" (je Spieler und Name). */
+function nameStempel(pi, name) {
+  return `ft-prototypes-name:${pi}:${name}`;
+}
+
+/** Alle Namen, auf die umbenannt werden darf (ohne die diesen Zug schon kopierten, W49a). */
+function waehlbareNamen(engine, pi) {
   const cardDB = engine._getCardDB();
+  const hopt = engine.gs.hoptUsed || {};
   return Object.keys(cardDB).filter((n) => {
     if (n === CARD_NAME) return false;              // „any OTHER card"
+    if (hopt[nameStempel(pi, n)] === engine.gs.turn) return false;   // W49a: pro Zug und Name nur ein Prototypes
     const cd = cardDB[n];
     if (!cd) return false;
     // Tokens werden von Effekten erzeugt und existieren als Karte
@@ -126,17 +143,20 @@ module.exports = {
       type: 'cardNamePicker',
       title: CARD_NAME,
       description: 'Name any other card. This card counts as that card until the end of the turn.',
-      cardNames: waehlbareNamen(engine),
+      cardNames: waehlbareNamen(engine, pi),
       cancellable: true,
       showCard: CARD_NAME,
     });
     if (!wahl || wahl.cancelled || !wahl.cardName) return false;
     const name = wahl.cardName;
+    // W49a: „You can only copy any card's name with 1 Prototypes per turn" — der Wunsch auf einen schon kopierten Namen verpufft ohne Kosten.
+    if (gs.hoptUsed?.[nameStempel(pi, name)] === gs.turn) return false;
 
     // Erst NACH der Zusage verbuchen — ein Abbruch kostet nichts
     // (Konvention aus CARD_API, „Verbuchen erst nach der Zusage").
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[schluessel(inst)] = gs.turn;
+    gs.hoptUsed[nameStempel(pi, name)] = gs.turn;   // W49a
 
     // ★ `basisOffset: -1` — die Trägerkarte liegt schon in der Ablage,
     //   der Alias soll also SOFORT zählen und nicht erst, wenn eine
