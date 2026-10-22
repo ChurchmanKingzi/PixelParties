@@ -84,12 +84,17 @@
   // Fighting („Allows the use of Attacks up to Level 1 …“, in jeder Stufe) steht das Symbol vor „Attacks“.
   const SYM_FIGHT_RE = /\bFighting(?=\s+Attacks?\b)/g;
   const SYM_FIGHT_USE_RE = /(Allows the use of )(?=Attacks?\b)/g;
+  // Allgemein (Al, 22.10.2026): Ein Schul-Symbol (auch eine Aufzaehlung „[A] or [B]“) bleibt im Umbruch mit „Spell(s)“ EIN Block, damit das Symbol
+  // nie allein am Zeilenende steht („Support Spell“, „Decay or Support Spells“). Laeuft NACH dem Ersetzen der Namen durch Symbolzeichen,
+  // damit mehrteilige Namen („Support Magic“) vorher noch normal erkannt werden.
+  const GLUE_SYM_RE = /[\uE000-\uE0FF](?:(?:\s*,\s*|\s+(?:or|and)\s+)[\uE000-\uE0FF])*\s+Spells?\b/g;
   const symbolize = t => {
     t = String(t == null ? '' : t);
     if (OPT.symMode === 'none') return t;
     t = t.replace(OPT.symMode === 'all' ? SYM_RE_ALL : SYM_RE, m => SYM_CH[m]);
     if (OPT.symMode === 'all') return t;
-    return t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
+    t = t.replace(SYM_FIGHT_RE, SYM_CH['Fighting']).replace(SYM_FIGHT_USE_RE, '$1' + SYM_CH['Fighting'] + ' ');
+    return t.replace(GLUE_SYM_RE, m => m.replace(/\s+/g, NBSP));
   };
   // ── Statuseffekte im Regeltext (Als Vorgabe 20.10.) ──
   // Poison lila, Burn orange, Stun gelb, Negate grau, Bleed rot, Freeze eisblau, Blind mint: fett und farbig — aber NUR im Effekttext
