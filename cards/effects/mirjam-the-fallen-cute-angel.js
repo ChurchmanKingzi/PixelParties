@@ -157,10 +157,9 @@ module.exports = {
       // died from this hit; this is just a defensive double-check.
       if (target.hp <= 0) return;
 
-      target.atk = (target.atk || 0) + amount;
-      engine._broadcastEvent('fighting_atk_change', {
-        owner: tgtPi, heroIdx: tgtHi, amount,
-      });
+      // W54a: DAUERHAFTER Zuwachs ueber den Baustein (Trichter: Fluch-Zwischenspeicher, ATK-Auren, Anzeige; Buchfuehrung hero.permAtkDelta ueberlebt Aufstieg/Abstieg).
+      // Vorher direkt `target.atk += amount` — am Trichter vorbei (unter Fluch wuchs die sichtbare ATK trotz „always 0").
+      engine.actionPermAtk(target, tgtPi, tgtHi, amount, CARD_NAME);
       engine.log('mirjam_atk_gain', {
         hero: target.name, amount, newAtk: target.atk,
       });

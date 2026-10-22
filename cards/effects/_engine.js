@@ -20089,7 +20089,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   · lag die Buchung noch an einem anderen Helden als dem aktuellen Traeger (Stempel `counters._atkTraeger` = { seite, heroIdx }), wird sie dort zuerst abgezogen,
    *   · `amount` 0 raeumt die Buchung und den Stempel.
    * Der Traeger ist immer der Held, in dessen Support Zone die Karte JETZT liegt (`physicalSide` + `heroIdx`). Curse-Unterdrueckung, ATK-Auren und Broadcasts laufen wie bei
-   * `actionGrantAtk`/`_applyHeroAtkDelta`. Karten mit DAUERHAFTEM Zuwachs (Cloak of Edge) bleiben bei `actionGrantAtk` (additiv, ohne Stempel).
+   * `actionGrantAtk`/`_applyHeroAtkDelta`. DAUERHAFTE Zuwaechse ohne Karte (Cloak of Edge, Nero Zira …) laufen NICHT hierueber, sondern ueber `actionPermAtk` (W54a: Buchfuehrung `hero.permAtkDelta`, ueberlebt den Formwechsel).
    * @returns {boolean} ob sich etwas geaendert hat
    */
   actionSetAtkGrant(cardInst, amount) {
@@ -20147,12 +20147,31 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W53a: nach einem Formwechsel (Aufstieg/Abstieg: `hero.atk` wird auf den gedruckten Wert der neuen Form gesetzt) die ATK-Boni der Karten wieder aufschlagen, die weiter an diesem
-   * Helden liegen: Ausruestung mit Stempel `_atkTraeger` an genau diesem Traeger und Abilities mit Buchung (Fighting). Ohne das bliebe die Buchung stehen, waehrend `hero.atk` sie nicht mehr
-   * enthaelt — der spaetere Abgang der Karte zoege Bonus ab, der nicht mehr da ist. Dauerhafte Zuwaechse (Cloak of Edge, Nero Zira …) bleiben beim bisherigen Verhalten (Formwechsel = neuer Grundwert).
+   * ★ W54a (Al, 22.10.2026: „Nein, auch PERMANENTE Aenderungen sollen [den Formwechsel] ueberleben."): DAUERHAFTE ATK-Aenderung OHNE Karte — der EINE Weg fuer „permanently increase/decrease
+   * this Hero's Attack stat" (Nero Zira, Rakah, Mirjam, Chaorc Pyre Grill Master, Wavilion, Cloak of Edge, kuenftige Karten). Sie laeuft wie bisher durch den Trichter `_applyHeroAtkDelta`
+   * (Fluch-Zwischenspeicher, ATK-Auren, Anzeige) und BUCHT die Aenderung zusaetzlich in `hero.permAtkDelta`. Dort liest `_atkNachFormwechsel` sie beim Aufstieg/Abstieg wieder aus:
+   * neuer ATK = neuer gedruckter Grundwert + alle fortbestehenden Buchungen — nicht der alte Stand kopiert.
+   *   · KEINE Karteninstanz traegt die Buchung (der Zuwachs bleibt, auch wenn die Karte laengst weg ist); kartengebundene Boni (Ausruestung, Fighting) laufen weiter ueber `actionSetAtkGrant`/`atkGranted`.
+   *   · Negative Betraege (dauerhafter Abzug) sind erlaubt.
+   * @returns {boolean} ob etwas gebucht wurde
    */
-  _atkBuchungenNachFormwechsel(hero, seite, heroIdx) {
-    if (!hero?.name || this._isHeroAtkSuppressed(hero)) return;
+  actionPermAtk(hero, ownerIdx, heroIdx, amount, source) {
+    amount = Math.round(amount || 0);
+    if (!hero?.name || !amount) return false;
+    hero.permAtkDelta = (hero.permAtkDelta || 0) + amount;
+    if (!hero.permAtkDelta) delete hero.permAtkDelta;
+    this._applyHeroAtkDelta(hero, ownerIdx, heroIdx, amount);   // `source` nur zur Lesbarkeit der Aufrufer; protokolliert wird dort (jede Karte hat ihren eigenen Log-Eintrag)
+    return true;
+  }
+
+  /**
+   * ★ W54a: die Summe aller ATK-Boni, die einen Formwechsel UEBERLEBEN (in Grundwert-Einheiten, vor einer ATK-Aura):
+   *   · Karten, die weiter an diesem Helden liegen: Ausruestung mit Stempel `_atkTraeger` an genau diesem Traeger und Abilities mit Buchung (Fighting) — W53a,
+   *   · dauerhafte Zuwaechse/Abzuege ohne Karte: `hero.permAtkDelta` (`actionPermAtk`),
+   *   · befristete Gaben (`hero._tempAtkGrants`: Greatmaw Shark …) — sie laufen spaeter mit `-amount` ab und duerfen dann nicht unter dem Rest landen.
+   * NICHT dabei: Boni, die an die ALTE Form gebunden sind (Taio/Toras „je Artifact", Lizbeth-Fighting, der Cykyran-Anteil) und der Aura-Anteil (`_atkAuraGrant`, wird neu gerechnet).
+   */
+  _atkBoniNachFormwechsel(hero, seite, heroIdx) {
     let summe = 0;
     for (const c of this.cardInstances) {
       const ag = c.counters?.atkGranted || 0;
@@ -20160,7 +20179,31 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (c.zone === ZONES.ABILITY && c.owner === seite) summe += ag;
       else if (c.zone === ZONES.SUPPORT && c.counters._atkTraeger && c.counters._atkTraeger.seite === seite && c.counters._atkTraeger.heroIdx === heroIdx) summe += ag;
     }
-    if (summe > 0) this._applyHeroAtkDelta(hero, seite, heroIdx, summe);
+    summe += hero.permAtkDelta || 0;
+    for (const g of (Array.isArray(hero._tempAtkGrants) ? hero._tempAtkGrants : [])) summe += g?.amount || 0;
+    return summe;
+  }
+
+  /**
+   * ★ W54a: ATK nach einem Formwechsel (Aufstieg `performAscension`, Abstieg `performDescend`): neuer ATK = gedruckter Wert der neuen Form + alle fortbestehenden Buchungen
+   * (`_atkBoniNachFormwechsel`). Ersetzt W53a (`_atkBuchungenNachFormwechsel`, nur Karten-Boni) — dauerhafte Zuwaechse ohne Karte fielen dort noch weg.
+   *   · Hat die neue Form KEINE ATK-Angabe (Styx, the Opened Gate: „stats are equal to its base Hero's stats"), bleibt ATK samt allen Boni unangetastet.
+   *   · Verfluchter Held: sichtbare ATK bleibt 0 („Attack stat is always 0"), der Zwischenspeicher bekommt den neuen Gesamtwert (vorher: sichtbarer Grundwert + alter Speicher → beim Heilen doppelt).
+   *   · Die Aura-Buchfuehrung (`_atkAuraGrant`) gilt dem alten Grundwert: sie wird hier verworfen; `_signalHeroAtkReset` (Aufrufer) legt sie auf dem neuen Grundwert frisch an.
+   * Der Aufrufer ruft danach `_signalHeroAtkReset(hero, heroIdx)`.
+   */
+  _atkNachFormwechsel(hero, seite, heroIdx, newCardData) {
+    if (!hero?.name || typeof newCardData?.atk !== 'number') return;
+    const neuerBasis = newCardData.atk;
+    const formwechselZiel = Math.max(0, neuerBasis + this._atkBoniNachFormwechsel(hero, seite, heroIdx));
+    hero.baseAtk = neuerBasis;
+    delete hero._atkAuraGrant;
+    if (this._isHeroAtkSuppressed(hero)) {
+      hero._cursedAtkSuppressed = formwechselZiel;
+      hero.atk = 0;
+    } else {
+      hero.atk = formwechselZiel;
+    }
   }
 
   /**
@@ -34222,6 +34265,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   'returnedToHand' / 'returnedToDeck' — zurueck auf die Hand / ins Deck (Bounce, Shu'Chaku, The White Eye, Surprising Opportunity …)
    *   'hostDefeated' — der Wirtsheld wurde besiegt (Heldentod-Aufraeumen)
    *   'hostRemoved'  — der Wirtsheld wurde vom Brett entfernt (`deleteHero`)
+   *   'teleportLost' — W54a: nach Teleportation Powder konnte die Karte nicht zum Helden zurueck (Zone fremdbesetzt, kein freier Platz) und bleibt draussen
    *   'other'        — alles uebrige (z. B. ein Skript bewegt die Karte selbst)
    * Ein Aufrufer kann den Grund ausdruecklich setzen (`_equipGrund` im Leave-Ereignis bzw. `opts._equipGrund` an `actionMoveCard`).
    */
@@ -54108,15 +54152,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     hero.name = cardName;
     hero.hp = newHp;
     hero.maxHp = newMaxHp;
-    hero.atk = newCardData.atk || hero.atk;
     // `baseAtk` ist der GEDRUCKTE Angriff der aktuellen Form (Quick Attack,
     // Javelin Throw, Future Tech Fists … rechnen damit). Er gehoert zur
     // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
     // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
-    if (newCardData.atk) hero.baseAtk = newCardData.atk;
-    // ★ W53a: die Boni der Karten, die WEITER an diesem Helden liegen (Ausruestung, Fighting …), gehoeren zu ihnen und werden bei deren Abgang wieder abgezogen — sie muessen auf den
-    // neuen Grundwert wieder aufgeschlagen werden, sonst zieht der Abgang spaeter Bonus ab, der gar nicht mehr da ist (ATK unter dem gedruckten Wert).
-    this._atkBuchungenNachFormwechsel(hero, hs, heroIdx);
+    // ★ W53a/W54a: neuer ATK = gedruckter Wert der neuen Form + ALLE fortbestehenden Buchungen — die Boni der Karten, die weiter am Helden liegen (Ausruestung, Fighting …),
+    // die dauerhaften Zuwaechse ohne Karte (`hero.permAtkDelta`: Cloak of Edge, Nero Zira, Rakah, Mirjam, Chaorc, Wavilion …) und befristete Gaben. Sonst zoege ihr spaeterer Abgang
+    // Bonus ab, der nicht mehr da ist (ATK unter dem gedruckten Wert), und dauerhafte Zuwaechse waeren verloren (Al, W54a: „auch Permanente Aenderungen sollen ueberleben").
+    this._atkNachFormwechsel(hero, hs, heroIdx, newCardData);
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig
@@ -54799,15 +54842,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       hero.hp = Math.min(rohHp, Math.max(hero.maxHp, alteHp));
     }
     hero.name = newName;
-    hero.atk = newCardData.atk || hero.atk;
     // `baseAtk` ist der GEDRUCKTE Angriff der aktuellen Form (Quick Attack,
     // Javelin Throw, Future Tech Fists … rechnen damit). Er gehoert zur
     // Identitaet und muss beim Formwechsel mitwandern — sonst rechnen
     // aufgestiegene/abgestiegene Helden mit dem Wert der alten Form.
-    if (newCardData.atk) hero.baseAtk = newCardData.atk;
-    // ★ W53a: die Boni der Karten, die WEITER an diesem Helden liegen (Ausruestung, Fighting …), gehoeren zu ihnen und werden bei deren Abgang wieder abgezogen — sie muessen auf den
-    // neuen Grundwert wieder aufgeschlagen werden, sonst zieht der Abgang spaeter Bonus ab, der gar nicht mehr da ist (ATK unter dem gedruckten Wert).
-    this._atkBuchungenNachFormwechsel(hero, hs, heroIdx);
+    // ★ W53a/W54a: neuer ATK = gedruckter Wert der neuen Form + ALLE fortbestehenden Buchungen — die Boni der Karten, die weiter am Helden liegen (Ausruestung, Fighting …),
+    // die dauerhaften Zuwaechse ohne Karte (`hero.permAtkDelta`: Cloak of Edge, Nero Zira, Rakah, Mirjam, Chaorc, Wavilion …) und befristete Gaben. Sonst zoege ihr spaeterer Abgang
+    // Bonus ab, der nicht mehr da ist (ATK unter dem gedruckten Wert), und dauerhafte Zuwaechse waeren verloren (Al, W54a: „auch Permanente Aenderungen sollen ueberleben").
+    this._atkNachFormwechsel(hero, hs, heroIdx, newCardData);
     // ★ v1087: IDENTITAETSWECHSEL ist kein Delta, sondern ein neuer
     // Grundwert — der Trichter passt hier nicht. ATK-Auren muessen aber
     // erfahren, dass ihre Buchfuehrung fuer diesen Helden ungueltig

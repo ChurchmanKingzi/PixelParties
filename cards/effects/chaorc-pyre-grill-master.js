@@ -84,7 +84,7 @@ module.exports = {
         // ★ Welle 15 (Al, R1: ATK-Gewinne prallen NICHT an Resistance ab — „Nein, sollen sie nicht."): der +40-ATK-Zweig fragt den Prüfer nicht mehr (wie Nero, Toras, Taio).
         if (mode !== 'atk' && await engine.heroNonDamageEffectBlocked(p, hi, 'max_hp', { sourceOwner: pi, source: CARD_NAME, amount: 80 })) continue;
         if (mode === 'atk') {
-          engine._applyHeroAtkDelta(hero, p, hi, 40);
+          engine.actionPermAtk(hero, p, hi, 40, CARD_NAME);   // W54a: DAUERHAFT — gebucht in hero.permAtkDelta, ueberlebt Aufstieg/Abstieg
         } else {
           engine.increaseMaxHp(hero, 80, { alsoHealCurrent: true });
         }

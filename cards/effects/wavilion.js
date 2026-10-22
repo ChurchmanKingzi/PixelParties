@@ -14,7 +14,7 @@
 //
 //  • ★ DAUERHAFT heisst hier WIRKLICH dauerhaft (Als Vorgabe 12.9.):
 //    der Zuwachs bleibt, auch wenn Wavilion das Brett verlaesst.
-//    Deshalb `engine._applyHeroAtkDelta(...)` und NICHT `ctx.grantAtk`:
+//    Deshalb `engine.actionPermAtk(...)` (W54a; laeuft durch `_applyHeroAtkDelta` und bucht in `hero.permAtkDelta`, ueberlebt Aufstieg/Abstieg) und NICHT `ctx.grantAtk`:
 //    letzteres schreibt `counters.atkGranted` auf die Karteninstanz mit
 //    und ist der Weg fuer Ausruestung, die ihren Bonus beim Verlassen
 //    der Zone per `revokeAtk` wieder einkassiert. `_applyHeroAtkDelta`
@@ -113,7 +113,7 @@ async function gibZuwachs(ctx, quelle) {
   });
   await engine._delay(620);
 
-  engine._applyHeroAtkDelta(hero, pi, ich.heroIdx, ATK_BONUS);
+  engine.actionPermAtk(hero, pi, ich.heroIdx, ATK_BONUS, CARD_NAME);   // W54a: DAUERHAFT — gebucht in hero.permAtkDelta, ueberlebt Aufstieg/Abstieg
   engine.log('atk_grant', { hero: hero.name, amount: ATK_BONUS, source: CARD_NAME });
   engine.sync();
 }
