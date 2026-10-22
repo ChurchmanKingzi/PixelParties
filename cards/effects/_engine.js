@@ -2873,6 +2873,9 @@ class GameEngine {
   async runHooks(hookName, hookCtx = {}) {
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
+    // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)
+    // laeuft in dem Fenster, in dem `_signalHeroAtkReset` die Aura-Buchung selbst frisch anlegt (Grundwert schon gesetzt, Buchung verworfen) — ein Abgleich davor verdoppelte doppelt.
+    if (hookName !== 'afterHeroAtkChange') this._atkAurenAbgleichenWennNoetig();
     // Zentrale Buchfuehrung „welcher Spell wurde diesen Zug schon gewirkt"
     // (Eraser Beam: „only Spell this turn"). Frueher stempelte nur ein Hook
     // der Eraser-Beam-INSTANZ — fehlte sie in dem Moment (Karte im Deck,
@@ -19947,12 +19950,19 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _atkAuraFaktor(ownerIdx, heroIdx) {
     let faktor = 1;
+    let ausgenommen = null;   // ★ W59a: Diver Helmet — pro Held hoechstens einmal gefragt, und nur wenn eine AREA ueberhaupt eine Aura fuehrt
     for (const inst of this.cardInstances) {
       if (inst.faceDown) continue;
       if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn(inst.zone)) continue;
       const script = loadCardEffect(inst.name);
       const m = script?.heroAtkMultiplier;
       if (!m) continue;
+      // ★ W59a (Al, 22.10.2026, Diver Helmet vs. Rioting Village): „The equipped Hero … [is] unaffected by Areas" — die Verdopplung einer AREA gilt fuer einen Helden mit Helm nicht
+      // (Faktor 1 = ATK wie ohne Dorf). Andere Quellen (kein Area) bleiben unberuehrt.
+      if (inst.zone === ZONES.AREA) {
+        if (ausgenommen === null) ausgenommen = this.heldIstVonAreasAusgenommen(ownerIdx, heroIdx);
+        if (ausgenommen) continue;
+      }
       let wert = 0;
       try {
         wert = typeof m === 'function' ? m(this.gs, ownerIdx, heroIdx, this, inst) : m;
@@ -19998,6 +20008,22 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (h && h.name && (quelle || h._atkAuraGrant)) this._syncHeroAtkAura(h, pi, hi);
       }
     }
+  }
+
+  /**
+   * ★ W59a: billige Vorpruefung fuer den Abgleich vor jeder Hook-Meldung (`runHooks`): nur wenn eine Area liegt oder ein Held noch eine Aura-Restbuchung traegt, kann sich
+   * etwas geaendert haben (Diver Helmet angelegt/abgelegt/umgehaengt, Area kam/ging). Sonst No-op (zwei Feldzugriffe).
+   */
+  _atkAurenAbgleichenWennNoetig() {
+    let noetig = false;
+    for (const z of (this.gs?.areaZones || [])) { if (z && z.length) { noetig = true; break; } }
+    if (!noetig) {
+      for (const ps of (this.gs?.players || [])) {
+        for (const h of (ps?.heroes || [])) { if (h && h._atkAuraGrant) { noetig = true; break; } }
+        if (noetig) break;
+      }
+    }
+    if (noetig) this._atkAurenAbgleichen();
   }
 
   /** Alle Helden beider Seiten abgleichen (Aura kommt/geht). */
@@ -30095,6 +30121,16 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Area rules (Stinky Stables poison-heal lock, future ones) skip it.
    * Card-script Areas use `_diver-helmet-shared.js` directly.
    */
+  /**
+   * ★ W59a: EINE Frage fuer „ist dieser Held von Areas ausgenommen?" (Diver Helmet: „The equipped Hero and all cards in its Support Zones are unaffected by Areas").
+   * Brettseite + Heldenindex (nicht der Kontrolleur). Quellen von „unaffected by Areas" werden hier gesammelt — heute nur der Diver Helmet (die Ausruestung ruht nie
+   * mit dem Traeger, Ruling W7a/W27a; sie wirkt, solange sie offen in der Support Zone des Helden liegt). Engine-Stellen fuer Areas (ATK-Aura) und Area-Skripte
+   * (Rioting-Village-Rueckstoss) fragen NUR hier.
+   */
+  heldIstVonAreasAusgenommen(ownerIdx, heroIdx) {
+    return require('./_diver-helmet-shared').heroHasDiverHelmet(this, ownerIdx, heroIdx);
+  }
+
   _isDiverHelmetProtectedTarget(target) {
     if (!target) return false;
     const dh = require('./_diver-helmet-shared');

@@ -12,6 +12,13 @@
 //  „all Heroes" / „no player" — die Karte kennt keine Seiten. Wer sie
 //  legt, legt sie auch gegen sich selbst.
 //
+//  ★ W59a (Al, 22.10.2026): DIVER HELMET nimmt einen Helden von Village
+//  aus — von BEIDEN Heldenwirkungen: ① keine Verdopplung (zentral:
+//  `engine._atkAuraFaktor` ueberspringt Area-Multiplikatoren fuer
+//  `engine.heldIstVonAreasAusgenommen`) und ③ kein Rueckstoss (unten).
+//  ② „no more than 1 Attack per turn" betrifft den SPIELER und bleibt:
+//  auch die Attack eines Helm-Helden zaehlt.
+//
 //  ── ① VERDOPPLUNG: WARUM DAS NICHT DIE UEBLICHE AURA IST ──────────
 //  ATK ist im Motor ein MUTIERTER Wert, keine Rechnung. Jede vorhandene
 //  Aura gibt einmal beim Eintritt und nimmt einmal beim Abgang (Bauform
@@ -89,6 +96,8 @@ async function rueckstoss(engine, inst, src, gefallen) {
   if (typeof pi !== 'number' || typeof hi !== 'number' || hi < 0) return;
   const angreifer = engine.gs.players[pi]?.heroes?.[hi];
   if (!angreifer?.name || angreifer.hp <= 0) return;
+  // ★ W59a (Al, 22.10.2026): ein Held mit Diver Helmet ist von Areas ausgenommen — kein Rueckstoss (und keine Verdopplung, s. `_atkAuraFaktor`).
+  if (engine.heldIstVonAreasAusgenommen(pi, hi)) return;
 
   const rueckstoss = Math.ceil(gefallen / 2);
   engine._rvRecoilTiefe = 1;
