@@ -291,7 +291,7 @@ module.exports = {
 
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
-        e.amount -= redirected;
+        if (typeof e.setAmount === 'function') e.setAmount(e.amount - redirected, { kette: { flat: -redirected } }); else e.amount -= redirected;   // W50a: Umleitung der Haelfte = Senkung am Ursprungsziel (Ricochet-Kettenbetrag)
         await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot,
           engine.physicalSide(e.inst));   // Styx 28.9.: Zeichen-Seite, nicht Kontrolleur
 

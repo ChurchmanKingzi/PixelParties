@@ -272,7 +272,7 @@ module.exports = {
       // built via `{ ...hookCtx }`, a shallow copy, in
       // `_engine.js#_createContext`). `setAmount` writes to hookCtx
       // through its closure and also honours `cannotBeReduced`.
-      ctx.setAmount(halved);
+      ctx.setAmount(halved, { kette: { mul: 0.5 } });   // W50a: Halbieren ist eine Senkung (Ricochet-Kettenbetrag)
     },
 
     /**

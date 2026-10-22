@@ -3664,7 +3664,9 @@ class GameEngine {
           // Helden handelt die Ausruestung fuer den Uebernehmer).
           // Welle 10 (Al, R6): „opponent equips …“ wertet den ANLEGER (Spielende), nicht die Zone — bei einer Cross-Side-Ausruestung
           // (Control Device, Powder Keg) ist das der urspruengliche Besitzer, nicht der Gastgeber (gleiche Regel wie das Platzierungs-Fenster unten).
-          await this._checkSurpriseOnEquip(this._anlegerEinerSupportKarte(enteringCard), enteringCard.heroIdx, enteringCard);
+          // W50a: Umhaengen (Slippery Fridge, Inheritance Ceremony): ANLEGER = der Spieler, der den Effekt ausfuehrt (`_equipAnleger`), nicht der Brettbesitzer —
+          // sonst oeffnete das Fenster beim Umhaengen GEGNERISCHER Ausruestung fuer den Falschen.
+          await this._checkSurpriseOnEquip(hookCtx._equipAnleger ?? this._anlegerEinerSupportKarte(enteringCard), enteringCard.heroIdx, enteringCard);
         }
         if (cd && hasCardType(cd, 'Creature')) {
           await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
@@ -3717,7 +3719,7 @@ class GameEngine {
         // wessen Zone. Eine Cross-Side-Ausruestung (Control Device, Powder Keg:
         // `placesOnOpponentBoard`) liegt auf der Gastgeberseite (`controller`/
         // `owner` = Gastgeber), angelegt hat sie ihr urspruenglicher Besitzer.
-        const _platzierer = this._anlegerEinerSupportKarte(enteringCard);
+        const _platzierer = hookCtx._equipAnleger ?? this._anlegerEinerSupportKarte(enteringCard);   // W50a: Umhaengen -> der Ausfuehrende
         await this._checkSurpriseOnPlacement(_platzierer, enteringCard, 'support');
       }
       if (enteringCard && toZone === 'ability') {
@@ -3952,7 +3954,7 @@ class GameEngine {
       // Listener sieht, was die Vorgaenger derselben Runde gesammelt
       // haben. Direkte Zuweisung wirkt wie setAmount.
       get amount() { return engine._projectedAmount(hookCtx); },
-      set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; hookCtx._offFlat = 0; hookCtx._offMul = 1; },
+      set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; },   // absolut (wie setAmount): zaehlt NICHT als Senkung fuer den Kettenbetrag (W50a)
 
       // ── Card-specific info (always refers to the card whose hook is firing) ──
       card: cardInstance,
@@ -4012,7 +4014,7 @@ class GameEngine {
       // gesammelten relativen Aenderungen — wie heute, wo ein spaeteres
       // setAmount(0) fruehere Boni ueberschrieb. `ctx.amount` liest den
       // PROJIZIERTEN Betrag (siehe Getter unten), nicht die Basis.
-      modifyAmount(delta) {
+      modifyAmount(delta, opt) {
         if (hookCtx.amount === undefined) return;
         if (hookCtx.cannotBeReduced && delta < 0) return;
         // v743: Steht die Klammer bereits, prallt JEDE Erhoehung sofort
@@ -4021,7 +4023,9 @@ class GameEngine {
         // Zaehler) fuer einen Bonus, der nie ankommt.
         if (hookCtx.cannotBeIncreased && delta > 0) return;
         hookCtx._flat = (hookCtx._flat || 0) + delta;
-        if (delta > 0) hookCtx._offFlat = (hookCtx._offFlat || 0) + delta;   // W49a: nur ERHOEHUNGEN fuer den „vollen Schaden" (Ricochet)
+        // W50a (Ricochet): Kettenbetrag = Schaden nach REDUKTIONEN, vor Schilden. `opt.schild` markiert einen Abzug, der ein Schild ist
+        // (verbrauchbarer Einmal-Schutz): er senkt den Treffer, aber nicht den Kettenbetrag.
+        if (!(opt && opt.schild)) hookCtx._kFlat = (hookCtx._kFlat || 0) + delta;
         // Welle 11 (Al, Q76): Zuschläge zum automatischen Rundeneinkommen (Wealth, Treasure Huntress Semi …) sind eigene EFFEKTE — je Quelle merken,
         // damit Golden Vermin sie einzeln ersetzen darf (`actionGainGold`), das Grund-Einkommen aber unberührt bleibt.
         if (hookCtx._isResourceGain && delta > 0) (hookCtx._einkommensBoni || (hookCtx._einkommensBoni = [])).push({ card: cardInstance, delta });
@@ -4035,7 +4039,7 @@ class GameEngine {
         // flat Boni. Ein zweiter Verdoppler laeuft damit ins Leere.
         if (hookCtx.cannotBeIncreased && factor > 1) return;
         hookCtx._mul = (hookCtx._mul ?? 1) * factor;
-        if (factor > 1) hookCtx._offMul = (hookCtx._offMul ?? 1) * factor;   // W49a (s. modifyAmount)
+        hookCtx._kMul = (hookCtx._kMul ?? 1) * factor;   // W50a (s. modifyAmount)
       },
       /**
        * „…, but cannot be increased by other effects" (v742).
@@ -4059,14 +4063,23 @@ class GameEngine {
         const jetzt = engine._projectedAmount(hookCtx);
         hookCtx._noIncreaseFrom = (hookCtx._noIncreaseFrom != null)
           ? Math.min(hookCtx._noIncreaseFrom, jetzt) : jetzt;
+        const kJetzt = engine._kettenProjektion(hookCtx);   // W50a: dieselbe Klammer fuer den Kettenbetrag
+        if (kJetzt != null) hookCtx._noIncreaseRef = (hookCtx._noIncreaseRef != null) ? Math.min(hookCtx._noIncreaseRef, kJetzt) : kJetzt;
       },
-      setAmount(val) {
+      /**
+       * Absolutes Setzen (Deckel, Nullsetzen). Fuer den Kettenbetrag (Ricochet, W50a) gilt es als SCHILD/NEGATION und wird nicht weitergegeben,
+       * ausser `opt.kette` benennt es als Senkung: `{ kette: { mul: 0.5 } }` (Halbieren) bzw. `{ kette: { flat: -n } }` (Abzug um n).
+       */
+      setAmount(val, opt) {
         if (hookCtx.amount === undefined) return;
         if (hookCtx.cannotBeReduced && val < engine._projectedAmount(hookCtx)) return;
         hookCtx.amount = val;
         hookCtx._flat = 0;
         hookCtx._mul = 1;
-        hookCtx._offFlat = 0; hookCtx._offMul = 1;   // W49a
+        if (opt && opt.kette) {
+          if (opt.kette.mul != null) hookCtx._kMul = (hookCtx._kMul ?? 1) * opt.kette.mul;
+          if (opt.kette.flat != null) hookCtx._kFlat = (hookCtx._kFlat || 0) + opt.kette.flat;
+        }
       },
       /**
        * Lock the current damage amount as a floor — no further effect
@@ -4083,6 +4096,7 @@ class GameEngine {
         // eine „weitere" Reduktion und faellt mit der Sperre weg. Die
         // Reihenfolge der Listener darf das Ergebnis nicht bestimmen.
         if ((hookCtx._flat || 0) < 0) hookCtx._flat = 0;
+        if ((hookCtx._kFlat || 0) < 0) hookCtx._kFlat = 0;
       },
       negate() { hookCtx.negated = true; },
       /** Set a flag on the hookCtx (survives through all hooks → read by engine after) */
@@ -6454,7 +6468,11 @@ class GameEngine {
       throw err;
     }
     try {
-      return await this._actionDealDamageImpl(source, target, amount, type, opts);
+      const _res = await this._actionDealDamageImpl(source, target, amount, type, opts);
+      // W50a (Ricochet, Al 22.10.2026): ein abgebrochener/negierter/immuner Treffer hat Kettenbetrag 0 — alle Folgetreffer sind dann 0
+      // (treffen aber weiter, On-Hit-Effekte bleiben).
+      if (opts?.vollOut && _res?.cancelled) opts.vollOut.wert = 0;
+      return _res;
     } finally {
       this._actionRecursionDepth--;
       this._actionRecursionTrace.pop();
@@ -6503,29 +6521,36 @@ class GameEngine {
     e._base = Math.max(0, e.amount || 0);
     e._flat = 0;
     e._mul = 1;
+    // W50a (Ricochet): Kettenbetrag = Schaden nach REDUKTIONEN, vor Schilden/Negation (parallele Sammler; s. CARD_API „Welle 50 / W50a").
+    e._kBase = e._base; e._kFlat = 0; e._kMul = 1;
     Object.defineProperty(e, 'amount', {
       configurable: true, enumerable: true,
       get() { return Math.max(0, Math.ceil(e._base * (e._mul ?? 1)) + (e._flat || 0)); },
-      set(v) { e._base = Math.max(0, v || 0); e._flat = 0; e._mul = 1; e._offFlat = 0; e._offMul = 1; },
+      set(v) { e._base = Math.max(0, v || 0); e._flat = 0; e._mul = 1; },   // absolut: fuer den Kettenbetrag Schild/Negation (ausser `setAmount(v, { kette })`)
     });
-    e.modifyAmount = (delta) => {
+    e.modifyAmount = (delta, opt) => {
       if (e.cannotBeReduced && delta < 0) return;
       e._flat += delta;
-      if (delta > 0) e._offFlat = (e._offFlat || 0) + delta;   // W49a: nur ERHOEHUNGEN fuer den „vollen Schaden" (Ricochet)
+      if (!(opt && opt.schild)) e._kFlat += delta;   // `schild`: verbrauchbarer Einmal-Schutz, senkt den Treffer, nicht den Kettenbetrag
     };
     e.multiplyAmount = (factor) => {
       if (!(factor >= 0)) return;
       if (e.cannotBeReduced && factor < 1) return;
       e._mul *= factor;
-      if (factor > 1) e._offMul = (e._offMul ?? 1) * factor;   // W49a
+      e._kMul *= factor;
     };
-    e.setAmount = (v) => {
+    e.setAmount = (v, opt) => {
       if (e.cannotBeReduced && v < e.amount) return;
       e.amount = v;
+      if (opt && opt.kette) {   // Senkung per absolutem Setzen (Halbieren / Abzug): zaehlt fuer den Kettenbetrag
+        if (opt.kette.mul != null) e._kMul *= opt.kette.mul;
+        if (opt.kette.flat != null) e._kFlat += opt.kette.flat;
+      }
     };
     e.lockReduction = () => {
       e.cannotBeReduced = true;
       if (e._flat < 0) e._flat = 0;   // gesammelte Abzuege waeren „weitere" Reduktion
+      if (e._kFlat < 0) e._kFlat = 0;
     };
     void engine;
   }
@@ -6536,8 +6561,27 @@ class GameEngine {
     const endwert = e.amount;
     delete e.amount;                 // Accessor entfernen …
     e.amount = endwert;              // … und als Datenfeld neu setzen
-    delete e._base; delete e._flat; delete e._mul; delete e._offFlat; delete e._offMul;
+    delete e._base; delete e._flat; delete e._mul; delete e._kBase; delete e._kFlat; delete e._kMul;
     delete e.modifyAmount; delete e.multiplyAmount; delete e.setAmount; delete e.lockReduction;
+  }
+
+  /**
+   * W50a (Ricochet): „Kettenbetrag" eines Treffers = Schaden NACH allen Senkungen, VOR Schilden/Blocks/Negation/Deckeln. Paralleler Sammler zu
+   * `_flat/_mul` (`_kBase/_kMul/_kFlat`); Hook-Senkungen (`modifyAmount(<0)`, `multiplyAmount(<1)`, Buff-Multiplikatoren wie Cloudy) zaehlen,
+   * absolutes `setAmount` (Nullsetzen, Deckel) und `modifyAmount(.., { schild: true })` nicht.
+   */
+  _kettenProjektion(hookCtx) {
+    if (hookCtx?._kBase === undefined) return null;
+    return Math.max(0, Math.ceil(hookCtx._kBase * (hookCtx._kMul ?? 1)) + (hookCtx._kFlat || 0));
+  }
+
+  /** W50a: eine Senkung NACH dem Kettenbetrag-Haltepunkt (Halbierungs-Reaktion, Interference): Kettenbetrag im selben Verhaeltnis kuerzen; auf 0 = Negation -> 0. */
+  _kettenSenkung(vollOut, vorher, nachher) {
+    if (!vollOut) return;
+    if (!(vorher > 0) || nachher >= vorher) return;   // unveraendert/mehr = keine Senkung
+    if (nachher <= 0) { vollOut.wert = 0; return; }   // Negation (Override 0: Bamboo/Strong Shield …): Kettenbetrag 0
+    if (typeof vollOut.wert !== 'number') return;
+    vollOut.wert = Math.ceil(vollOut.wert * nachher / vorher);
   }
 
   /** Projizierter Schadensbetrag einer laufenden Hook-Runde: Basis × Produkt + Summe. */
@@ -8930,6 +8974,7 @@ class GameEngine {
           if (dmgSurprise?.damageReduced) {
             amount = Math.max(0, amount - dmgSurprise.damageReduced);
             if (amount === 0) {
+              if (opts?.vollOut) opts.vollOut.wert = 0;   // W50a: „Reduce that damage by X" ist eine Senkung -> Kettenbetrag 0
               return { dealt: 0, cancelled: true, surpriseReduced: true };
             }
           }
@@ -8963,7 +9008,10 @@ class GameEngine {
     // Darge) sind im Betrag des Vorgaengers schon enthalten und kommen NICHT noch einmal drauf; Verteidigung des Ziels wirkt normal.
     if (_kettenBetrag != null) {
       hookCtx.amount = _kettenBetrag; hookCtx.cannotBeIncreased = true; hookCtx._noIncreaseFrom = _kettenBetrag; hookCtx._kettenFolge = true;
+      hookCtx._noIncreaseRef = _kettenBetrag;
     }
+    // W50a (Ricochet): paralleler Sammler fuer den Kettenbetrag (Schaden nach Senkungen, vor Schilden), s. `_kettenProjektion`.
+    hookCtx._kBase = hookCtx.amount; hookCtx._kMul = 1; hookCtx._kFlat = 0;
     // Eingangsbetrag fuer den Null-Floater am Ende (Al 1.9.: wird
     // Schaden auf 0 reduziert, IMMER eine 0 zeigen — egal wodurch).
     const _eingangsBetrag = amount;
@@ -9212,13 +9260,12 @@ class GameEngine {
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
     const _amountBeforeBuffMul = this._projectedAmount(hookCtx);
-    // W49a (Ricochet): „voller Schaden" des Treffers = Basis (inkl. Elixir/Pfeile) mit allen ERHOEHENDEN Hook-Modifikatoren, vor jeder Verteidigung des Ziels.
-    const _vollVorVerteidigung = Math.max(0, Math.ceil(hookCtx.amount * (hookCtx._offMul ?? 1)) + (hookCtx._offFlat || 0));
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
           hookCtx._mul = (hookCtx._mul ?? 1) * buffData.damageMultiplier;
+          hookCtx._kMul = (hookCtx._kMul ?? 1) * buffData.damageMultiplier;   // W50a: Buff-Senkung (Cloudy …) zaehlt fuer den Kettenbetrag
         }
       }
     }
@@ -9242,6 +9289,13 @@ class GameEngine {
         from: hookCtx.amount, to: hookCtx._noIncreaseFrom,
       });
       hookCtx.amount = hookCtx._noIncreaseFrom;
+    }
+    // W50a: dieselbe einseitige Klammer fuer den Kettenbetrag (Ricochet-Folgetreffer: Betrag steht fest).
+    {
+      const _kp = this._kettenProjektion(hookCtx);
+      if (_kp != null && hookCtx._noIncreaseRef != null && _kp > hookCtx._noIncreaseRef) {
+        hookCtx._kBase = hookCtx._noIncreaseRef; hookCtx._kMul = 1; hookCtx._kFlat = 0;
+      }
     }
     // (Der Null-Floater sitzt seit v690 EINMAL am Ende des Pfads —
     // gegen den Eingangsbetrag, damit auch flat Reduktionen (Tempeste)
@@ -9270,7 +9324,13 @@ class GameEngine {
     // per-arrow Attack bonus). Added AFTER the multiplier pass so
     // halving / doubling effects can't touch it.
     if (hookCtx._flatBonus && !hookCtx._kettenFolge) hookCtx.amount += hookCtx._flatBonus;
-    if (opts?.vollOut) opts.vollOut.wert = _vollVorVerteidigung + (hookCtx._kettenFolge ? 0 : (hookCtx._flatBonus || 0));
+    // W50a (Ricochet, Al 22.10.2026): Kettenbetrag = Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation/Deckeln (Haltepunkt HIER; die
+    // Schilde folgen unten). Senkungen NACH dem Haltepunkt (Interference-Halbierung, Halbierungs-Reaktionen) kuerzen ihn per `_kettenSenkung`.
+    if (opts?.vollOut) {
+      // Per Hook auf 0 gesetzt (Chuck, Tazune, Priest of Tempeste … `setAmount(0)`) = Negation -> Kettenbetrag 0 (Al: Folgetreffer dann auch 0).
+      opts.vollOut.wert = (hookCtx.amount <= 0 && _eingangsBetrag > 0) ? 0
+        : (this._kettenProjektion(hookCtx) ?? 0) + (hookCtx._kettenFolge ? 0 : (hookCtx._flatBonus || 0));
+    }
 
     // ── Einmal-Schadensschilde (v697) — flat, nach allen Multiplikatoren.
     // `cannotBeReduced` laesst sie wirkungslos und UNVERBRAUCHT.
@@ -9379,6 +9439,7 @@ class GameEngine {
       }
       if (targetOwner >= 0 && this.kontrolleurVonHeld(targetOwner, targetHeroIdx) !== srcOwner) {
         hookCtx.amount = 0;
+        if (opts?.vollOut) opts.vollOut.wert = 0;   // W50a
       }
     }
 
@@ -9396,9 +9457,11 @@ class GameEngine {
         if (anteil >= 1) {
           this.log('interference_block', { target: this._heroLabel(target) });
           hookCtx.amount = 0;
+          if (opts?.vollOut) opts.vollOut.wert = 0;   // W50a: voller Schutz = Negation
         } else if (anteil > 0) {
           const vorher = hookCtx.amount;
           hookCtx.amount = Math.ceil(vorher * (1 - anteil));   // „half … rounded up"
+          this._kettenSenkung(opts?.vollOut, vorher, hookCtx.amount);   // W50a: Halbierung ist eine Senkung (voller Schutz = Negation, zaehlt nicht)
           this.log('interference_halved', {
             target: this._heroLabel(target), from: vorher, to: hookCtx.amount,
           });
@@ -9521,6 +9584,7 @@ class GameEngine {
             target: this._heroLabel(target), type,
             original: hookCtx.amount, override: reactRes.amountOverride,
           });
+          this._kettenSenkung(opts?.vollOut, hookCtx.amount, reactRes.amountOverride);   // W50a: Halbieren (Spectral Armor) zaehlt, Override 0 (Bamboo/Strong Shield) nicht
           hookCtx.amount = reactRes.amountOverride;
         }
       }
@@ -9546,6 +9610,7 @@ class GameEngine {
             target: this._heroLabel(target), type,
             original: hookCtx.amount, override: oppReactRes.amountOverride,
           });
+          this._kettenSenkung(opts?.vollOut, hookCtx.amount, oppReactRes.amountOverride);   // W50a
           hookCtx.amount = oppReactRes.amountOverride;
         }
       }
@@ -13419,7 +13484,7 @@ class GameEngine {
       for (const s of live.slice()) {
         const e = (entries || []).find(x => x && !x.cancelled && x.inst && (x.inst.controller ?? x.inst.owner) === p);
         if (!e) break;
-        e.modifyAmount(-Math.min(s.reduce, e.amount));   // flat (Punkt vor Strich)
+        e.modifyAmount(-Math.min(s.reduce, e.amount), { schild: true });   // flat (Punkt vor Strich); W50a: vergebenes Schild -> senkt den Treffer, nicht den Kettenbetrag
         ps._kreaturenSchild = ps._kreaturenSchild.filter(x => x !== s);
         if (!ps._kreaturenSchild.length) delete ps._kreaturenSchild;
         this.log('creature_shield_used', { player: ps.username, by: s.by, protected: e.inst.name, reduced: s.reduce });
@@ -38488,6 +38553,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if ((_mh?.total || 0) >= 2 && !_mh.ersterTrefferEinzel) return;
 
     hookCtx.amount = (hookCtx.amount || 0) + EMPOWERED_STRIKE_BONUS;   // W49a (Al, 22.10.2026): 150 statt 100
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += EMPOWERED_STRIKE_BONUS;   // W50a: Heldenpfad; der Kreaturenpfad (Proxy) rechnet den Zuwachs selbst nach
     hookCtx.cannotBeReduced = true;
     hookCtx.cannotBeNegated = true;
 
@@ -50779,7 +50845,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       if (dmgSurprise.damageReduced) {
         e.amount = Math.max(0, e.amount - dmgSurprise.damageReduced);
-        if (e.amount === 0) e.cancelled = true;
+        if (e.amount === 0) { e.cancelled = true; if (e.vollOut) e.vollOut.wert = 0; }   // W50a: Senkung auf 0 -> Kettenbetrag 0
       }
     }
 
@@ -50876,6 +50942,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         });
         e.amount = grenze;
       }
+      // W50a: dieselbe einseitige Klammer fuer den Kettenbetrag.
+      if (e._kBase !== undefined && Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) > grenze) { e._kBase = grenze; e._kMul = 1; e._kFlat = 0; }
     }
 
     // Armed-arrow attack modifiers (flat damage + Hydra Blood zero).
@@ -50894,10 +50962,12 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Modifikatoren in die Basis (Punkt vor Strich kaputt).
         const armiert = typeof e.multiplyAmount === 'function';
         const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false, _kettenFolge: !!e.kettenFolge };   // W49a: Ricochet-Folgetreffer ohne Pfeil-Bonus
+        const _pfeilVor = proxy.amount;
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
         if (armiert) {
           e._base = Math.max(0, proxy.amount || 0);
-          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; e._offFlat = 0; e._offMul = 1; }   // Hydra Blood: absolut
+          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; }   // Hydra Blood: absolut (fuer den Kettenbetrag Negation: bleibt unberuehrt)
+          else if (e._kBase !== undefined) e._kBase += e._base - _pfeilVor;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags
         } else e.amount = proxy.amount;
       }
     }
@@ -50910,8 +50980,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (e.cancelled || e._immuneCreature) continue;
       const armiert = typeof e.multiplyAmount === 'function';
       const proxy = { source: e.source, target: e.inst, type: e.type, amount: armiert ? e._base : e.amount };
+      const _elixirVor = proxy.amount;
       this._applyEmpoweredStrikeIfApplicable(proxy);
-      if (armiert) e._base = Math.max(0, proxy.amount || 0); else e.amount = proxy.amount;   // Basis, s.o.
+      if (armiert) { e._base = Math.max(0, proxy.amount || 0); if (e._kBase !== undefined) e._kBase += e._base - _elixirVor; } else e.amount = proxy.amount;   // Basis, s.o. (W50a: Zuwachs auch in den Kettenbetrag)
       if (proxy.cannotBeReduced) e.cannotBeReduced = true;
       if (proxy.cannotBeNegated) e.cannotBeNegated = true;
     }
@@ -50939,7 +51010,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Flame Avalanche lock: if source player's damageLocked is true,
     // ALL damage to opponent's creatures becomes 0 (ABSOLUTE — overrides everything)
     for (const e of entries) {
-      if (e.cancelled) { this._settleCreatureEntry(e); continue; }   // auch abgebrochene flachlegen
+      if (e.cancelled) { if (e.vollOut) e.vollOut.wert = 0; this._settleCreatureEntry(e); continue; }   // auch abgebrochene flachlegen (W50a: abgebrochen/negiert = Kettenbetrag 0)
       // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible
       // damage. Also skipped for reduce-only multipliers when the entry
       // carries `cannotBeReduced`: a beforeCreatureDamageBatch listener
@@ -50947,20 +51018,20 @@ this._deathWatch = (this._deathWatchStack || []).length
       // damage cannot be reduced further", so any multiplier below 1
       // is a no-op. Multipliers ≥ 1 still apply.
       const _eAmountBeforeBuffMul = e.amount;
-      // W49a (Ricochet): „voller Schaden" = Basis (inkl. Elixir/Pfeile) mit allen ERHOEHENDEN Modifikatoren, vor jeder Verteidigung (s. Heldenpfad).
-      const _eVoll = (typeof e.multiplyAmount === 'function')
-        ? Math.max(0, Math.ceil(e._base * (e._offMul ?? 1)) + (e._offFlat || 0)) : e.amount;
       if (e.canBeNegated !== false && e.inst.counters?.buffs) {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
             if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
-            if (typeof e.multiplyAmount === 'function') e._mul = (e._mul ?? 1) * bd.damageMultiplier;
+            if (typeof e.multiplyAmount === 'function') { e._mul = (e._mul ?? 1) * bd.damageMultiplier; e._kMul = (e._kMul ?? 1) * bd.damageMultiplier; }   // W50a: Buff-Senkung zaehlt
             else e.amount = Math.ceil(e.amount * bd.damageMultiplier);
           }
         }
       }
+      // W50a (Ricochet): Kettenbetrag = Schaden nach allen SENKUNGEN, vor Schilden/Negation (Haltepunkt, s. Heldenpfad).
+      const _eRef = (e._kBase !== undefined) ? Math.max(0, Math.ceil(e._kBase * (e._kMul ?? 1)) + (e._kFlat || 0)) : e.amount;
       // PUNKT VOR STRICH: jetzt einmal verrechnen, Eintrag wieder flach.
       this._settleCreatureEntry(e);
+      const _eNachSenkung = e.amount;   // W50a: Betrag nach Senkungen/Negations-Hooks, VOR den Einmal-Schilden
       // ── Einmal-Schadensschilde (v697) — Kreaturenziel, gleiche Regeln
       // wie im Heldenpfad (flat nach Multiplikatoren; cannotBeReduced
       // laesst sie unverbraucht). VOR dem Null-Floater, damit eine
@@ -51002,7 +51073,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // `e._flatBonus = 50 * arrowCount` on matching entries; we add
       // it AFTER the multiplier so halving / doubling can't touch it.
       if (e._flatBonus && !e.kettenFolge) e.amount += e._flatBonus;
-      if (e.vollOut) e.vollOut.wert = _eVoll + (e.kettenFolge ? 0 : (e._flatBonus || 0));
+      if (e.vollOut) e.vollOut.wert = (_eNachSenkung <= 0 && !e._flatBonus) ? 0 : _eRef + (e.kettenFolge ? 0 : (e._flatBonus || 0));
       if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]?.damageLocked) {
         // ★ W15b (Al, C3/S02-05): nach aktuellem KONTROLLEUR (gestohlene Kreatur = Gegnerziel; meine Kreatur auf der Gegnerseite nicht).
         if (this.kontrolleurVon(e.inst) !== e.sourceOwner) {
@@ -51128,6 +51199,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // the animation already showed. Log explicitly so the fizzle is
       // visible in the action log alongside the would-be damage source.
       if (e._immuneCreature) {
+        if (e.vollOut) e.vollOut.wert = 0;   // W50a: Immunitaet = Negation
         this.log('creature_immune_block', {
           card: e.inst?.name, by: e.source?.name || '?',
           amount: e.amount, damageType: e.type,
@@ -51148,6 +51220,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (actualAmount > 0 && (e.inst.counters.currentHp || 0) > 0) {
         const preDamageRes = await this._checkCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type);
         if (preDamageRes?.negated) {
+          if (e.vollOut) e.vollOut.wert = 0;   // W50a
           if (e.inst.counters._dyingThisBatch) delete e.inst.counters._dyingThisBatch;
           this.log('creature_pre_damage_save', {
             card: e.inst.name, by: e.source?.name || e.type, savedAmount: actualAmount,
@@ -51156,6 +51229,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           continue; // Skip HP application + downstream death branch entirely.
         }
         if (typeof preDamageRes?.amountOverride === 'number') {
+          this._kettenSenkung(e.vollOut, actualAmount, Math.max(0, preDamageRes.amountOverride));   // W50a
           actualAmount = Math.max(0, preDamageRes.amountOverride);
           if (actualAmount < (e.inst.counters.currentHp || 0)
               && e.inst.counters._dyingThisBatch) {
@@ -51172,6 +51246,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (actualAmount > 0 && (e.inst.counters.currentHp || 0) > 0) {
         const oppPreRes = await this._checkOppCreaturePreDamageHandReactions(e.inst, e.source, actualAmount, e.type);
         if (oppPreRes?.negated) {
+          if (e.vollOut) e.vollOut.wert = 0;   // W50a
           if (e.inst.counters._dyingThisBatch) delete e.inst.counters._dyingThisBatch;
           this.log('opp_creature_pre_damage_redirect', {
             card: e.inst.name, by: e.source?.name || e.type, savedAmount: actualAmount,
@@ -51179,6 +51254,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           continue;
         }
         if (typeof oppPreRes?.amountOverride === 'number') {
+          this._kettenSenkung(e.vollOut, actualAmount, Math.max(0, oppPreRes.amountOverride));   // W50a
           actualAmount = Math.max(0, oppPreRes.amountOverride);
           if (actualAmount < (e.inst.counters.currentHp || 0)
               && e.inst.counters._dyingThisBatch) {
@@ -51291,6 +51367,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           const saved = await this._checkCreaturePreDefeatHandReactions(e.inst, e.source, actualAmount, e.type, _pdInfo);
           if (!saved && Number.isFinite(_pdInfo.amountOverride) && _pdInfo.amountOverride >= 0 && _pdInfo.amountOverride < actualAmount) {
             this.log('creature_pre_defeat_amount_override', { creature: e.inst.name, original: actualAmount, override: _pdInfo.amountOverride });
+            this._kettenSenkung(e.vollOut, actualAmount, _pdInfo.amountOverride);   // W50a: Cloud in a Bottle halbiert
             actualAmount = _pdInfo.amountOverride;
           }
           if (saved) {

@@ -224,7 +224,10 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
   }
 
   // W49a (Ricochet, Folgetreffer): der Betrag steht fest („half as much as the previous one") — der Pfeil-Bonus steckt schon im Vorgaenger.
-  if (flat && !hookCtx._kettenFolge) hookCtx.amount = Math.max(0, hookCtx.amount + flat);
+  if (flat && !hookCtx._kettenFolge) {
+    hookCtx.amount = Math.max(0, hookCtx.amount + flat);
+    if (hookCtx._kBase !== undefined) hookCtx._kBase += flat;   // W50a: Pfeil-Bonus gehoert zur Basis des Kettenbetrags (Ricochet-Kopf)
+  }
   const preZero = hookCtx.amount + (hookCtx._flatBonus || 0);
   if (zero) {
     hookCtx.amount = 0;
@@ -238,7 +241,6 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
     // Modifikatoren der Hook-Runde fallen — die Null ist absolut.
     hookCtx._flat = 0;
     hookCtx._mul = 1;
-    hookCtx._offFlat = 0; hookCtx._offMul = 1;   // W49a
     hookCtx._zeroedByArrow = true;
   }
 

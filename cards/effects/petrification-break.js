@@ -141,7 +141,7 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host || ctx.target !== host) return;
       if (!(ctx.amount > 0)) return;
-      ctx.setAmount(Math.ceil(ctx.amount / 2));
+      ctx.setAmount(Math.ceil(ctx.amount / 2), { kette: { mul: 0.5 } });   // W50a: Halbieren = Senkung (Ricochet-Kettenbetrag)
     },
   },
 };

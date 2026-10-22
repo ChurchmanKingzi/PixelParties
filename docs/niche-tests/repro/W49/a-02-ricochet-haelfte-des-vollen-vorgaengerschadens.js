@@ -3,8 +3,8 @@
 // vollen angerichteten Schadens: Elixir of Strength oder die Arrows stärken den ersten Treffer von 150 auf 300, aber der zweite Treffer ist dann trotzdem nur 75."
 // Kartentext: „The first target takes damage equal to the attacker's Attack stat. Every subsequent target takes half as much damage as the previous one (rounded up)."
 // Regel (W49a): Folgetreffer = aufgerundete Hälfte des VOLLEN Schadens des Vorgängers inkl. aller Erhöhungen (Elixir of Strength +150, Pfeile/Magic Topaz,
-// Niu, erhöhende Hook-Boni); die Quellen-Boni kommen beim Folgetreffer nicht noch einmal obendrauf. Reduktionen/Schilde des Vorgängers geben sich NICHT weiter
-// (Ist-Zustand, Ja/Nein-Frage an Al im Abschlussbericht). Beide Sitze. Exit 0 = korrekt (Exit 1 auf der Basis: Folgetreffer = Hälfte des Nennwerts).
+// Niu, erhöhende Hook-Boni); die Quellen-Boni kommen beim Folgetreffer nicht noch einmal obendrauf. Reduktionen/Schilde des Vorgängers gaben sich NICHT weiter
+// (Ist-Zustand W49a; seit W50a anders: Senkungen geben sich weiter, Schilde nicht – s. W50/a-01). Beide Sitze. Exit 0 = korrekt (Exit 1 auf der Basis: Folgetreffer = Hälfte des Nennwerts).
 const H = require('../../lib/h.js');
 process.on('unhandledRejection', (e) => { process.stderr.write('UNHANDLED ' + (e && e.stack || e) + '\n'); process.exit(1); });
 const gleich = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -50,14 +50,14 @@ async function lauf(me, op, opt) {
     { const r = await lauf(me, op, { vorher: async (t) => { t.hero(me, 0).buffs = { empowered_strike: { stacks: 1 } }; t.hero(me, 0)._armedArrows = [{ flatDamage: 60, sourceCard: 'Angelfeather Arrow' }]; } });
       R.check('Elixir + Pfeil kombiniert: 310/155/78/39/20/10', gleich(r.dmg, kette(310, 6)), r.dmg); fehler(r, 'Elixir+Pfeil'); }
 
-    // Gegenprobe Reduktion: Cloudy (halber Schaden) auf dem 2. Ziel halbiert nur DIESEN Treffer, die Kette läuft vom Nennwert weiter.
+    // W50a (Al 22.10.2026, umgestellt): Senkungen des Vorgängers geben sich WEITER – Cloudy (halber Schaden) auf dem 2. Ziel: 125 → 63, danach ceil(63/2) = 32 …
     { const r = await lauf(me, op, { vorher: async (t) => { t.hero(me, 0).buffs = { empowered_strike: { stacks: 1 } }; t.hero(me, 0).buffs.cloudy = { damageMultiplier: 0.5 }; } });
       // Position 2 ist der eigene Held 0 (Angreifer, trägt Cloudy): 125 -> 63; Position 3 weiter von 125: 63.
-      R.check('Reduktion des Vorgängers gibt sich nicht weiter (Cloudy auf Treffer 2: 63, Treffer 3 bleibt 63)', gleich(r.dmg, kette(250, 6, { 1: 63 })), r.dmg); fehler(r, 'Cloudy'); }
+      R.check('W50a: Senkung des Vorgängers gibt sich weiter (Cloudy auf Treffer 2: 63, Treffer 3 = 32, dann 16/8/4)', gleich(r.dmg, [250, 63, 32, 16, 8, 4]), r.dmg); fehler(r, 'Cloudy'); }
 
-    // Kopf-Ziel mit Cloudy: der Kopf nimmt weniger, die Kette rechnet vom vollen Kopfschaden.
+    // Kopf-Ziel mit Cloudy: W50a – der Kopf nimmt weniger (80), die Kette rechnet vom tatsächlich verursachten Schaden (80 → 40 …).
     { const r = await lauf(me, op, { vorher: async (t) => { t.hero(op, 0).buffs = { cloudy: { damageMultiplier: 0.5 } }; t.hero(me, 0)._armedArrows = [{ flatDamage: 60, sourceCard: 'Magic Topaz' }]; } });
-      R.check('Kopf mit Cloudy: Kopf 80 (halb von 160), Treffer 2 = 80 (halbe 160), dann 40/20/10/5', gleich(r.dmg, kette(160, 6, { 0: 80 })), r.dmg); fehler(r, 'Kopf-Cloudy'); }
+      R.check('W50a: Kopf mit Cloudy: Kopf 80 (halb von 160), Treffer 2 = 40 (Hälfte der 80), dann 20/10/5/3', gleich(r.dmg, [80, 40, 20, 10, 5, 3]), r.dmg); fehler(r, 'Kopf-Cloudy'); }
 
     // Kopf ist eine Kreatur (Kreaturenpfad): Boni zählen ebenfalls.
     { const r = await lauf(me, op, { reihe: [[op, 'c'], [me, 0], [op, 0], [me, 1], [op, 1], [me, 2]],

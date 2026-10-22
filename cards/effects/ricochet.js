@@ -43,8 +43,11 @@
 //  des Kopftreffers (Elixir of Strength +150, Pfeile/Magic Topaz, Niu,
 //  erhoehende Hook-Boni). Die Quellen-Boni kommen bei Folgetreffern
 //  nicht noch einmal obendrauf (`kettenFolge`): der Betrag steht fest.
-//  Reduktionen/Schilde des Vorgaengers geben sich nicht weiter (Ist-
-//  Zustand, Frage an Al). Engine: `opts.vollOut` / `opts.kettenFolge`.
+//  W50a (Al 22.10.2026, Antwort auf die Rueckfrage): SENKUNGEN des
+//  Vorgaengers (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzuege)
+//  geben sich weiter, SCHILDE/BLOCKS/Negation nicht (Basis = Schaden
+//  vor dem Schildabzug, nach den Senkungen). Tabelle in CARD_API.
+//  Engine: `opts.vollOut` / `opts.kettenFolge`.
 //
 //  ── ANIMATION ────────────────────────────────────────────────────
 //  Al 14.9.: das Projektil von „Crusader's Flintlock", das von Ziel zu
@@ -197,11 +200,12 @@ module.exports = {
       let vonHeroIdx = heroIdx;
       let vonSlot = -1;
       let schaden = atk;
-      // ★ W49a (Al, 22.10.2026): „takes half as much damage as the PREVIOUS one" — die Haelfte des VOLLEN Schadens des Vorgaengers, also
-      // inklusive aller Erhoehungen (Elixir of Strength, Pfeile/Magic Topaz, Niu, erhoehende Hook-Boni). `voll` = voller Schaden des
-      // letzten Treffers VOR der Verteidigung des Ziels (Engine meldet ihn ueber `opts.vollOut`); null = noch kein Treffer hat die
-      // Schadensrechnung erreicht (Kopf der Kette, rechnet mit dem Nennwert wie bisher). Reduktionen/Schilde des Vorgaengers geben
-      // sich NICHT weiter (Ist-Zustand, Frage an Al); der Folgetreffer bekommt die Quellen-Boni nicht noch einmal (`kettenFolge`).
+      // ★ W49a/W50a (Al, 22.10.2026): „takes half as much damage as the PREVIOUS one" — die aufgerundete Haelfte des ECHTEN Schadens des
+      // Vorgaengers: inklusive aller Erhoehungen (Elixir of Strength, Pfeile/Magic Topaz, Niu, erhoehende Hook-Boni) und NACH allen
+      // SENKUNGEN (Cloudy, Reduktions-Hooks, Prozent-/Flat-Abzuege), aber VOR Schilden/Blocks/Negation/Deckeln. `voll` = dieser
+      // „Kettenbetrag" des letzten Treffers (die Engine meldet ihn ueber `opts.vollOut`); null = noch kein Treffer hat die
+      // Schadensrechnung erreicht (Kopf der Kette, rechnet mit dem Nennwert). Der Folgetreffer bekommt die Quellen-Boni nicht noch
+      // einmal (`kettenFolge`). Zuordnung Senkung/Schild: CARD_API „Welle 50 / W50a".
       let voll = null;
 
       // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen der Kette an
@@ -255,8 +259,10 @@ module.exports = {
               );
             }
           }
-          // Kopf der Kette: der gemeldete volle Schaden (inkl. Boni) ist die Rechengrundlage fuer alle Folgetreffer.
-          if (!folge && typeof vollOut.wert === 'number') voll = vollOut.wert;
+          // W50a (Al 22.10.2026): JEDER Treffer meldet seinen Kettenbetrag (Schaden nach allen SENKUNGEN, vor Schilden/Blocks/Negation) — der
+          // naechste Treffer ist dessen aufgerundete Haelfte. Meldet ein Treffer nichts (Ziel weg, vor dem Haltepunkt negiert), laeuft die
+          // Kette mit dem Betrag weiter, der an diesem Treffer ankam (Ist-Zustand, offene Frage an Al).
+          if (typeof vollOut.wert === 'number') voll = vollOut.wert;
           else if (folge) voll = schaden;
 
           // Der Einschlag ist der Ausgangspunkt des naechsten Sprungs.
