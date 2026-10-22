@@ -299,6 +299,8 @@ function umhaengZielHelden(engine, inst, opts = {}) {
  * `onPlay` fuer die Dauerwirkung am neuen Traeger). Nichts wird bezahlt. `plan` = [{ inst, owner (Brettseite), srcHeroIdx, srcSlot, destHeroIdx, destSlot }].
  * `anleger` = der Spieler, der den Effekt ausfuehrt: er ist „der, der ausruestet" fuer das Equip-Fenster (Afflicted Pests, Cybug LOCUST). Das Fenster
  * oeffnet fuer jede bewegte Karte; `opts.logType` = Logzeile je Karte.
+ * W51b: Zustandslauscher (Taio, Toras, Aufstiegs-Bereitschaft …) sehen den Abgang ueber `onEquipLost` (je Karte direkt nach dem eigenen Leave, Karte noch am alten Platz;
+ * schon gemeldete Mitbewegte stehen 'unterwegs', `zone` '_umhaengen') und die Ankunft ueber `onEquipGained` (`isMove`) — nicht ueber das rohe Enter/Leave (`_onlyCard`).
  */
 async function fuehreUmhaengenAus(engine, plan, opts = {}) {
   const gs = engine.gs;
@@ -314,9 +316,18 @@ async function fuehreUmhaengenAus(engine, plan, opts = {}) {
       _skipReactionCheck: true,
     });
     if (inst.counters.atkGranted) inst.counters.atkGranted = 0;   // Neu-Vergabe am neuen Traeger startet frisch
+    // W51b: der Abgang fuer ZUSTANDSLAUSCHER (Taio, Toras, Aufstiegs-Bereitschaft …): das echte Leave oben geht nur an die Karte selbst. `onEquipLost` geht an alle
+    // (siehe `engine.fireEquipLost`); die Karte steht dabei noch am alten Platz (Leave-Semantik, Lauscher schliessen ihre Id beim Zaehlen aus).
+    await engine.fireEquipLost(inst, {
+      anleger, fromOwner: equipOwner, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlot,
+      toOwner: equipOwner, toHeroIdx: m.destHeroIdx, toZoneSlot: m.destSlot, source: opts.quelle || null,
+    });
     const srcArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
     const i = srcArr.indexOf(inst.name);
     if (i >= 0) srcArr.splice(i, 1);
+    // Ab hier „unterwegs": bei mehreren gleichzeitig bewegten Karten sehen die Lauscher der NAECHSTEN Meldung die schon gemeldeten nicht mehr am alten Wirt
+    // (wie nacheinander ausgefuehrte echte Abgaenge). Die Ankunft unten setzt `zone` wieder auf 'support' (Konvention '_umhaengen' wie bei `darfAn`).
+    inst.zone = '_umhaengen';
   }
   // Fluege (alle zugleich gestartet).
   for (const m of plan) {

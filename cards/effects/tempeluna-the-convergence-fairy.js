@@ -43,6 +43,7 @@
 //  angelegte Feen traegt ihre eigene Karte in der Support Zone.
 // ═══════════════════════════════════════════
 
+const { equipZustandHooks } = require('./_hooks');   // W51b: Umhaengen (Fridge/Ceremony) als Verlassen+Betreten sehen
 const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { loadCardEffect } = require('./_loader');
 const { gainedNames } = require('./_gained-effects-shared');
@@ -422,7 +423,9 @@ module.exports = {
     return false;   // eigener HOPT-Schluessel gesetzt (siehe CARD_API)
   },
 
-  hooks: {
+  hooks: equipZustandHooks({
+    // W51b: `equipZustandHooks` — Umhaengen (Slippery Fridge / Inheritance Ceremony) sendet Enter/Leave nur an die bewegte Karte; dieser Zustandslauscher bekommt es ueber
+    // `onEquipLost` / `onEquipGained` (isMove) mit denselben Handlern (siehe _hooks.js).
     // Anfangsroutinen der beiden Grundfeen nachholen — `onAscendSetup`
     // ist synchron und kann das nicht.
     onAscension: async (ctx) => {
@@ -457,7 +460,7 @@ module.exports = {
       await engine.revokeHeroEffect(pi, heroIdx, weg.name, 'attachmentLeft');
       engine.sync();
     },
-  },
+  }),
 
   // Die CPU beantwortet ihre eigenen Galerien und das Menue — sonst
   // bricht die Engine jeden abbrechbaren Prompt fuer sie ab (v828).
