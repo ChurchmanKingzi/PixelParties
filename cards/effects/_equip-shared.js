@@ -37,7 +37,9 @@ const { isSeat } = require('./_opp');   // N-Spieler: gültiger Sitzindex
 //       etwas bezahlt.
 // ═══════════════════════════════════════════
 
-const { heroCanBeEquipped } = require('./_hooks');
+const { heroCanBeEquipped, hasCardType } = require('./_hooks');
+const { loadCardEffect } = require('./_loader');
+const { getCardDB: _getCardDB } = require('./_card-db');
 
 /**
  * Freie Basis-Support-Zonen (0–2) dieses Helden.
@@ -206,8 +208,174 @@ async function ruesteAusStapelAus(engine, pi, stapel, cardName, heroIdx, slot, o
   return inst;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  W50a · UMHAENGEN LIEGENDER AUSRUESTUNGEN — EIN Baustein fuer Slippery Fridge UND Inheritance Ceremony
+//  (Al, 22.10.2026: „Der Equip-Artifact-Teil sollte bei Ceremony genauso funktionieren wie bei Fridge.")
+//
+//  Fridge: „… equip them to a different Hero the same player controls (without paying their Cost again)" — Quell- und Zielheld gehoeren demselben
+//  Spieler (auch dem GEGNER). Ceremony: dieselbe Ausruestungs-Mechanik, aber nur zwischen zwei EIGENEN Helden (Nutzer -> Zielheld).
+//  Gemeinsam ist hier: was ein Equip ist, wer Ziel sein darf, welche Zonen frei sind, und das Verschieben selbst (erst alle Abgaenge, dann alle
+//  Ankuenfte; Leave-/Enter-/On-Play-Haken; Equip-Fenster fuer Afflicted Pests mit dem ANLEGER = der Spieler, der den Effekt ausfuehrt).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Ist diese Karte (nach Namen) ein Equip im Sinne der Fridge? Karten-Subtyp Equipment, Helden (Initiation Ritual) oder Skript `isEquip`. */
+function istEquipKartenname(cardName) {
+  const cd = _getCardDB()[cardName];
+  if (!cd) return false;
+  if ((cd.subtype || '').toLowerCase() === 'equipment') return true;
+  if (hasCardType(cd, 'Hero') || hasCardType(cd, 'Ascended Hero')) return true;
+  let script = null;
+  try { script = loadCardEffect(cardName); } catch { script = null; }
+  return !!script?.isEquip;
+}
+
+/** Liegt `inst` als umhaengbares Equip in einer Support Zone? (nicht `counters.immovable`; `treatAsEquip` = als Equip angelegter Held, Initiation Ritual) */
+function istUmhaengbaresEquip(engine, inst) {
+  if (!inst || inst.zone !== 'support') return false;
+  if (inst.counters?.immovable) return false;
+  if (inst.counters?.treatAsEquip) return true;
+  const script = typeof inst.loadScript === 'function' ? inst.loadScript() : null;
+  if (script?.isEquip) return true;
+  const cd = _getCardDB()[inst.name];
+  return !!(cd && (cd.subtype || '').toLowerCase() === 'equipment');
+}
+
+/**
+ * W16e (F03-08): darf `inst` an Held `hi` (Brettseite `seite`)? Die Karte, die umgehaengt wird, zaehlt dabei nicht mit — Grenzen wie
+ * "You can only have 1 X equipped to your Heroes" duerfen das Verschieben der einzigen Kopie nicht verbieten ("nur eine ANLEGE-Sperre").
+ */
+function darfAn(engine, inst, seite, hi) {
+  const zone = inst.zone;
+  inst.zone = '_umhaengen';
+  try { return engine.canEquipCardToHero(inst.name, seite, hi, engine.ausruestOpts(inst)); }
+  finally { inst.zone = zone; }
+}
+
+/**
+ * Freie Basis-Zonen eines Zielhelden fuer das Umhaengen: leer UND nicht versiegelt (Madame Guillotine), dazu nicht durch eine Zonensperre (Puppets) gesperrt.
+ * `wirdFrei(seite, hi, si)` = Platz, den ein ebenfalls gewaehltes Equip gleichzeitig raeumt (Tausch); `reserviert` = Set `seite:hi:si` bereits vergebener Ziele.
+ */
+function umhaengFreieZonen(engine, seite, hi, opts = {}) {
+  const ps = engine.gs.players[seite];
+  const out = [];
+  if (engine.isSupportZoneLocked?.(seite, hi, { cardName: opts.cardName, via: 'move', instId: opts.instId })) return out;
+  for (let si = 0; si < 3; si++) {
+    if (opts.reserviert && opts.reserviert.has(`${seite}:${hi}:${si}`)) continue;
+    const roh = (((ps?.supportZones?.[hi] || [])[si]) || []).length === 0;
+    const frei = roh ? !engine.supportSlotBelegt(seite, hi, si) : !!(opts.wirdFrei && opts.wirdFrei(seite, hi, si));
+    if (frei) out.push(si);
+  }
+  return out;
+}
+
+/**
+ * Legale Zielhelden fuer das Umhaengen von `inst`: ein ANDERER lebender Held DERSELBEN Brettseite, den derselbe Spieler kontrolliert wie den Quellhelden
+ * („a different Hero the same player controls"), ausruestbar (`heroCanBeEquipped`: nicht eingefroren, Uebernahme erlaubt Ausruesten) und von den
+ * Skript-Grenzen der Karte erlaubt (`darfAn`), mit mindestens einer freien Zone. -> [{ heroIdx, hero, freie: [slots] }]
+ */
+function umhaengZielHelden(engine, inst, opts = {}) {
+  const seite = engine.physicalSide(inst);
+  const ps = engine.gs.players[seite];
+  const out = [];
+  if (!ps) return out;
+  const kontrolle = engine.kontrolleurVonHeld(seite, inst.heroIdx);
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    if (hi === inst.heroIdx) continue;
+    const hero = ps.heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (opts.nurKontrolleur != null && engine.kontrolleurVonHeld(seite, hi) !== opts.nurKontrolleur) continue;
+    if (engine.kontrolleurVonHeld(seite, hi) !== kontrolle) continue;
+    if (!heroCanBeEquipped(hero)) continue;
+    if (!darfAn(engine, inst, seite, hi)) continue;
+    const freie = umhaengFreieZonen(engine, seite, hi, { cardName: inst.name, instId: inst.id, wirdFrei: opts.wirdFrei, reserviert: opts.reserviert });
+    if (freie.length === 0) continue;
+    out.push({ heroIdx: hi, hero, freie });
+  }
+  return out;
+}
+
+/**
+ * Das Verschieben selbst — ALLE gleichzeitig: erst alle Abgaenge (`onCardLeaveZone` nur fuer die bewegte Karte), dann alle Ankuenfte (`onCardEnterZone`,
+ * `onPlay` fuer die Dauerwirkung am neuen Traeger). Nichts wird bezahlt. `plan` = [{ inst, owner (Brettseite), srcHeroIdx, srcSlot, destHeroIdx, destSlot }].
+ * `anleger` = der Spieler, der den Effekt ausfuehrt: er ist „der, der ausruestet" fuer das Equip-Fenster (Afflicted Pests, Cybug LOCUST). Das Fenster
+ * oeffnet fuer jede bewegte Karte; `opts.logType` = Logzeile je Karte.
+ */
+async function fuehreUmhaengenAus(engine, plan, opts = {}) {
+  const gs = engine.gs;
+  const anleger = opts.anleger;
+  // Abgaenge. Equip-Skripte (Legendary Sword, Vampiric Sword, Hammers, Blades …) pruefen `fromOwner/fromHeroIdx/fromZoneSlot` — die volle Nutzlast ist Pflicht.
+  for (const m of plan) {
+    const { inst, owner: equipOwner, srcHeroIdx, srcSlot } = m;
+    const ps = gs.players[equipOwner];
+    await engine.runHooks('onCardLeaveZone', {
+      _onlyCard: inst, card: inst, leavingCard: inst,
+      fromZone: 'support', fromOwner: equipOwner, fromHeroIdx: srcHeroIdx, fromZoneSlot: srcSlot,
+      toZone: 'support',   // reiner Zonenwechsel auf dem Brett (ohne `toZone` deuten Ablage-Zuhoerer es als Ablage, F03-07)
+      _skipReactionCheck: true,
+    });
+    if (inst.counters.atkGranted) inst.counters.atkGranted = 0;   // Neu-Vergabe am neuen Traeger startet frisch
+    const srcArr = (ps.supportZones[srcHeroIdx] || [])[srcSlot] || [];
+    const i = srcArr.indexOf(inst.name);
+    if (i >= 0) srcArr.splice(i, 1);
+  }
+  // Fluege (alle zugleich gestartet).
+  for (const m of plan) {
+    engine._broadcastEvent('play_card_transfer', {
+      sourceOwner: m.owner, sourceHeroIdx: m.srcHeroIdx, sourceZoneSlot: m.srcSlot,
+      targetOwner: m.owner, targetHeroIdx: m.destHeroIdx, targetZoneSlot: m.destSlot,
+      cardName: m.inst.name, duration: 600, particles: null,
+    });
+  }
+  engine.sync();
+  await engine._delay(500);
+  // Ankuenfte: in die Zielzonen legen.
+  for (const m of plan) {
+    const { inst, owner: equipOwner, destHeroIdx, destSlot } = m;
+    const ps = gs.players[equipOwner];
+    if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
+    if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
+    ps.supportZones[destHeroIdx][destSlot].push(inst.name);
+    inst.zone = 'support';
+    inst.heroIdx = destHeroIdx;
+    inst.zoneSlot = destSlot;
+  }
+  engine.sync();
+  for (const m of plan) {
+    const { inst, owner: equipOwner, srcHeroIdx, destHeroIdx, destSlot } = m;
+    const ps = gs.players[equipOwner];
+    // Eintritt nur fuer die bewegte Karte; `_equipAnleger` = wer ausruestet (Equip-Fenster), `_isMove`: kein frisches Spielen/Beschwoeren.
+    await engine.runHooks('onCardEnterZone', {
+      _onlyCard: inst, enteringCard: inst,
+      toZone: 'support', toHeroIdx: destHeroIdx,
+      _isMove: true, _equipAnleger: anleger,
+    });
+    // Dauerwirkung am neuen Traeger (ATK-Boni, Inselzonen …); `_isMove` laesst Einmal-Wirkungen beim Anlegen aus (Summoning Instructions).
+    await engine.runHooks('onPlay', {
+      _onlyCard: inst, playedCard: inst,
+      cardName: inst.name, zone: 'support',
+      heroIdx: destHeroIdx, zoneSlot: destSlot,
+      _isMove: true,
+    });
+    if (opts.logType) {
+      engine.log(opts.logType, {
+        card: inst.name,
+        fromHero: ps.heroes[srcHeroIdx]?.name || '?',
+        toHero: ps.heroes[destHeroIdx]?.name || '?',
+        player: ps.username,
+      });
+    }
+  }
+  engine.sync();
+}
+
 module.exports = {
   freieBasisZonen,
+  istEquipKartenname,
+  istUmhaengbaresEquip,
+  darfAn,
+  umhaengFreieZonen,
+  umhaengZielHelden,
+  fuehreUmhaengenAus,
   istAusruestTraeger,
   ausruestTraeger,
   ausruestTraegerMitSeite,

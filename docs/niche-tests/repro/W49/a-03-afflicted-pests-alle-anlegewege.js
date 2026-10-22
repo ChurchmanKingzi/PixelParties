@@ -5,7 +5,8 @@
 // Matrix (beide Sitze; Pests liegt beim Gegner des Anlegers): JEDER Weg, auf dem der Gegner eine Karte an einen Helden anlegt/ausrüstet, öffnet das Fenster:
 //   (a) alle Ausrüstungen (Equipment) von der Hand, (b) alle Spell-/Attack-Anhängsel (inkl. Divine Gift of Coolness), (c) Ausrüsten PER EFFEKT (Cool Repair, Treasure Hunter's Backpack,
 //   Gate to the Armory, Overcharge, Initiation Ritual, Looting), (d) Coolness-Stack-Ausrüstung (Modnir). Gegenproben: das EIGENE Anlegen löst die eigene Pests nicht aus; UMHÄNGEN
-//   (Slippery Fridge, Inheritance Ceremony) ist kein Anlegen (Vorgabe 12.10./CARD_API) und löst nicht aus; Abilities lösen nicht aus (Q59).
+//   von ANHÄNGSELN (Inheritance Ceremony, Vorgabe 12.10./CARD_API) ist kein Anlegen und löst nicht aus; Abilities lösen nicht aus (Q59).
+//   W50a (Al, 22.10.2026) umgestellt: der EQUIP-Teil der Ceremony verhält sich wie Slippery Fridge (öffnet das Fenster, siehe W50/a-02); Tempeluna öffnet es NICHT (W50/a-03).
 // Divine Gift of Coolness: Pests öffnet auch bei ihm; die frisch angelegte Karte steht zur Wahl, aber nicht die unverrückbare Divine Gift selbst („cannot be removed … in any way").
 // Exit 0 = korrekt.
 const H = require('../../lib/h.js');
@@ -155,7 +156,7 @@ const LUN = { 'Lunatic Cycle - Crescent Moon': 'Lunatic Cycle - New Moon', 'Luna
       await t.play(me, ab, { hero: 0 });
       R.check(ab + ' (Ability) angelegt: Pests löst nicht aus', !pestsAktiv(t), t.prompts.map(p => p.d.type));
     }
-    { // Umhängen per Inheritance Ceremony ist kein Anlegen (Vorgabe 12.10.: Beobachter bleiben stumm)
+    { // Umhängen eines ANHÄNGSELS per Inheritance Ceremony ist kein Anlegen (Vorgabe 12.10.: Beobachter bleiben stumm; W50a: gilt nur für Anhängsel, nicht für Equips)
       const t = await H.fresh({ hand: [0, 1].map(i => i === me ? ['Energy Aura', 'Inheritance Ceremony'] : []), deckSize: 30 });
       t.script.push({ match: d => d.type === 'confirm' && !/Afflicted Pests/.test(JSON.stringify(d)), answer: () => ({ confirmed: true }) });
       t.targetFn = (v) => [v.find(x => x.type === 'hero' && x.owner === me && x.heroIdx === 0).id];
@@ -168,7 +169,7 @@ const LUN = { 'Lunatic Cycle - Crescent Moon': 'Lunatic Cycle - New Moon', 'Luna
       };
       const r = await t.play(me, 'Inheritance Ceremony', { hero: 0 });
       R.check('Inheritance Ceremony: Aura wurde auf Held 1 umgehängt', r === true && stuetz(t, me, 1).includes('Energy Aura') && !stuetz(t, me, 0).includes('Energy Aura'), { r, h0: stuetz(t, me, 0), h1: stuetz(t, me, 1) });
-      R.check('Umhängen (Inheritance Ceremony) ist kein Anlegen: Pests löst nicht aus', !pestsAktiv(t), t.prompts.map(p => p.d.type)); }
+      R.check('Umhängen eines Anhängsels (Inheritance Ceremony, Energy Aura) ist kein Anlegen: Pests löst nicht aus', !pestsAktiv(t), t.prompts.map(p => p.d.type)); }
     { // Slippery Fridge: Text „equip them to a different Hero" — das Umlegen öffnet (wie bisher) das Equip-Fenster
       const F = 'Slippery Fridge';
       const t = await H.fresh({ hand: me === 0 ? [['Club of Gobbo', F], []] : [[], ['Club of Gobbo', F]], gold: 500, ...(me ? { active: 1 } : {}) });

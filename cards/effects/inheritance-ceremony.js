@@ -37,7 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, heroCanBeEquipped } = require('./_hooks');
-const { freieBasisZonen } = require('./_equip-shared');
+const { freieBasisZonen, istUmhaengbaresEquip, darfAn, fuehreUmhaengenAus } = require('./_equip-shared');
 
 const CARD_NAME = 'Inheritance Ceremony';
 const HOPT_KEY = 'inheritance-ceremony';
@@ -59,10 +59,17 @@ function zielHelden(engine, pi, nutzer) {
     .map(({ physOwner, heroIdx, hero }) => ({ seite: physOwner, heroIdx, hero }));
 }
 
-/** Darf diese Karte überhaupt umgehängt werden? (Nicht-Kreatur, nicht festgesetzt; ihre Wirkung zieht über `attachmentMovedToHost` / ihre Eintrittshaken mit) */
+/**
+ * Darf diese Karte überhaupt umgehängt werden? (Nicht-Kreatur, nicht festgesetzt; ihre Wirkung zieht über `attachmentMovedToHost` / ihre Eintrittshaken mit)
+ * ★ W50a (Al, 22.10.2026): EQUIPS (Equipment-Artifacts, `isEquip`, als Equip angelegte Helden/Initiation Ritual) sind der Fridge-Teil und laufen über den
+ * gemeinsamen Baustein `_equip-shared.js` (`istUmhaengbaresEquip`) — genau wie bei Slippery Fridge. Alles andere (angehängte Spells/Attacks, Abilities …) ist der
+ * Ceremony-eigene Anhängsel-Teil und bleibt wie er war.
+ */
 function verschiebbar(engine, inst) {
   if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
-  if (inst.counters?.immovable || inst.counters?.treatAsEquip) return false;
+  if (inst.counters?.immovable) return false;
+  if (istUmhaengbaresEquip(engine, inst)) return true;
+  if (inst.counters?.treatAsEquip) return false;
   const cd = engine.getEffectiveCardData(inst) || engine._getCardDB()[inst.name];
   if (!cd || hasCardType(cd, 'Creature')) return false;
   return true;
@@ -75,7 +82,9 @@ function bewegbareKarten(engine, pi, nutzer, ziel) {
   if (engine.isSupportZoneLocked?.(ziel.seite, ziel.heroIdx, { cardName: CARD_NAME, via: 'move' })) return [];
   return engine.cardInstances
     .filter(c => c.zone === 'support' && engine.physicalSide(c) === nutzer.seite && c.heroIdx === nutzer.heroIdx && c.zoneSlot >= 0 && c.zoneSlot <= 2)
-    .filter(c => verschiebbar(engine, c) && engine.canEquipCardToHero(c.name, ziel.seite, ziel.heroIdx, engine.ausruestOpts(c)))   // W14b (Q153)
+    .filter(c => verschiebbar(engine, c) && (istUmhaengbaresEquip(engine, c)
+      ? darfAn(engine, c, ziel.seite, ziel.heroIdx)                                                                          // W50a: Equips wie bei der Fridge (die bewegte Karte zählt bei „1 X je Held" nicht mit)
+      : engine.canEquipCardToHero(c.name, ziel.seite, ziel.heroIdx, engine.ausruestOpts(c))))                               // W14b (Q153)
     .sort((a, b) => a.zoneSlot - b.zoneSlot);
 }
 
@@ -161,10 +170,24 @@ module.exports = {
       engine.claimHOPT(HOPT_KEY, pi);
 
       // ── 2b. Umhängen: still, ohne Kosten und ohne „On Play" ──
+      // ★ W50a: die Zonen werden vorab in der Reihenfolge der alten Plätze vergeben. EQUIPS (Fridge-Teil) wechseln dann ALLE gleichzeitig über den gemeinsamen
+      // Baustein (`fuehreUmhaengenAus`: Leave/Enter/On-Play-Haken, `_isMove`, Equip-Fenster für Afflicted Pests mit dem Wirker als Ausrüstendem); die ANHÄNGSEL
+      // (Spells/Attacks u. ä.) wandern danach wie bisher still über `actionTransferAttachment`.
       let bewegt = 0;
-      for (const inst of gewaehlt) {
-        const platz = freieBasisZonen(zps, ziel.heroIdx, engine, ziel.seite)[0];
-        if (platz == null) break;
+      const freiListe = freieBasisZonen(zps, ziel.heroIdx, engine, ziel.seite);
+      const zuteilung = gewaehlt.slice(0, freiListe.length).map((inst, i) => ({ inst, platz: freiListe[i] }));
+      const equips = zuteilung.filter(z => istUmhaengbaresEquip(engine, z.inst));
+      if (equips.length) {
+        const plan = equips.map(({ inst, platz }) => ({ inst, owner: ziel.seite, srcHeroIdx: inst.heroIdx, srcSlot: inst.zoneSlot, destHeroIdx: ziel.heroIdx, destSlot: platz }));
+        const namen = equips.map(z => z.inst.name);
+        await fuehreUmhaengenAus(engine, plan, { anleger: pi });
+        for (const name of namen) {
+          bewegt++;
+          engine.log('inheritance_move', { player: ps.username, from: nutzer.hero.name, to: ziel.hero.name, card: name });
+        }
+      }
+      for (const { inst, platz } of zuteilung) {
+        if (istUmhaengbaresEquip(engine, inst) && inst.heroIdx === ziel.heroIdx) continue;   // schon (als Equip) umgehängt
         const name = inst.name;
         const r = await engine.actionTransferAttachment(inst, ziel.seite, ziel.heroIdx, platz, { sourceName: CARD_NAME, quiet: true });
         if (r?.success) {
