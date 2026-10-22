@@ -20197,6 +20197,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     const neuerBasis = newCardData.atk;
     const formwechselZiel = Math.max(0, neuerBasis + this._atkBoniNachFormwechsel(hero, seite, heroIdx));
     hero.baseAtk = neuerBasis;
+    // W55a: Formwechsel-Zaehler. `baseAtk` ist ab hier der GEDRUCKTE Wert der neuen Form — jede Buchung, die am alten Grundwert hing (Cykyran: Base-ATK x2 in `_cykyranBonus`), ist damit
+    // erloschen. Wer so etwas fuehrt, stempelt seine Buchung mit diesem Zaehler und erkennt daran die verwaiste (siehe `cykyran-war-counselor.js`); `onFormChanged` meldet den Wechsel.
+    hero._formGen = (hero._formGen || 0) + 1;
     delete hero._atkAuraGrant;
     if (this._isHeroAtkSuppressed(hero)) {
       hero._cursedAtkSuppressed = formwechselZiel;
@@ -20204,6 +20207,28 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
       hero.atk = formwechselZiel;
     }
+  }
+
+  /**
+   * ★ W55a: Hook `onFormChanged` (HOOKS.ON_FORM_CHANGED) — die EINE Meldung fuer jeden Formwechsel (Aufstieg/Abstieg). Aufrufer: `performAscension`/`performDescend`, direkt NACH der
+   * Zustandsuebertragung (Name, HP, `_atkNachFormwechsel`, Instanz umgehaengt, `onAscendSetup`) und VOR Animation, Aufstiegsbonus und Reaktionen — es gibt dazwischen kein `await`, in dem ein
+   * anderer Lauscher einen Zwischenstand sehen koennte. Zustandsmeldung: kein Reaktionsfenster (`REACTION_SKIP_HOOKS`). Karten, deren Wirkung am GRUNDWERT des Helden haengt
+   * (Cykyran War Counselor: „Base Attack stats are doubled"), buchen hier auf die neue Form um.
+   * `oldBaseAtk`/`newBaseAtk` sind die GEDRUCKTEN Werte (nicht `hero.baseAtk`, das fremde Verdopplungen enthalten kann); hat die neue Form keine ATK-Angabe (Styx), bleibt der Grundwert
+   * unangetastet (`baseAtkReset: false`, `newBaseAtk === oldBaseAtk`).
+   */
+  async fireFormChanged(hero, { kind, heroOwner, playerIdx, heroIdx, oldHeroName, newHeroName, newCardData }) {
+    const cardDB = this._getCardDB();
+    const oldBaseAtk = typeof cardDB[oldHeroName]?.atk === 'number' ? cardDB[oldHeroName].atk : null;
+    const baseAtkReset = typeof newCardData?.atk === 'number';
+    await this.runHooks(HOOKS.ON_FORM_CHANGED, {
+      kind, hero, heroOwner, heroIdx, playerIdx,
+      controllerIdx: this.heroSideOf(heroOwner, hero),
+      oldHeroName, newHeroName,
+      oldBaseAtk, newBaseAtk: baseAtkReset ? newCardData.atk : oldBaseAtk,
+      baseAtkReset,
+      _skipReactionCheck: true,
+    });
   }
 
   /**
@@ -41113,7 +41138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   /** Hooks that should NOT trigger reaction checks */
   static REACTION_SKIP_HOOKS = new Set([
-    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
+    'onPlay', 'onCardEnterZone', 'onEquipGained', 'onEquipLost', 'onFormChanged', 'onPhaseStart', 'onGameStart', 'onBeforeHandDraw',
     'onChainStart', 'onChainResolve', 'onEffectNegated', 'onNegationDealt', 'onResourceDrawReplace',
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
@@ -54196,6 +54221,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (ascendedScript?.onAscendSetup) {
       ascendedScript.onAscendSetup(gs, hs, heroIdx, this);
     }
+    // ★ W55a: Formwechsel melden (Cykyran War Counselor u. a. buchen auf den neuen Grundwert um) — direkt hinter der Zustandsuebertragung, vor Animation/Bonus.
+    await this.fireFormChanged(hero, { kind: 'ascend', heroOwner: hs, playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: cardName, newCardData });
 
     // Der Broadcast bleibt in beiden Faellen `hero_ascension` — er ist
     // die ANZEIGE des Formwechsels, kein Regelbegriff. Der LOG-Eintrag
@@ -54871,6 +54898,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Let the form we land on re-install its passive (bypassLevelReq etc.).
     const newScript = loadCardEffect(newName);
     if (newScript?.onAscendSetup) newScript.onAscendSetup(gs, hs, heroIdx, this);
+    // ★ W55a: Formwechsel melden (siehe performAscension).
+    await this.fireFormChanged(hero, { kind: 'descend', heroOwner: hs, playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: newName, newCardData });
 
     // ★ `opts.notADescend` (v673, Als Ruling zu Open Invitation: „Den
     //   Ascended ins Deck zu shuffeln gilt auch nicht als Descending").

@@ -216,6 +216,12 @@ const HOOKS = {
 
   // ── Ascension ──
   ON_ASCENSION: 'onAscension',  // Fires when a Hero ascends into an Ascended Hero (reaction window)
+  // W55a: JEDER Formwechsel (Aufstieg `performAscension`, Abstieg `performDescend`, auch Open-Invitation-/Throne-Robber-Wege und `notAnAscension`) — Zustandsmeldung, kein Reaktionsfenster.
+  // Feuert NACH der Zustandsuebertragung (Name, HP, ATK-Neuaufbau `_atkNachFormwechsel`, Instanz umgehaengt, `onAscendSetup`), VOR Animation und Aufstiegsbonus.
+  // Ctx: { kind: 'ascend'|'descend', hero, heroOwner (Brettseite), controllerIdx (Kontrolleur), playerIdx (wer den Wechsel ausfuehrt), heroIdx, oldHeroName, newHeroName,
+  //        oldBaseAtk / newBaseAtk (GEDRUCKTER ATK der alten / neuen Form; ohne ATK-Angabe der neuen Form = unveraendert), baseAtkReset (true: die Engine hat `hero.baseAtk`/`hero.atk` auf den
+  //        gedruckten Wert + fortbestehende Buchungen NEU aufgebaut — alles, was am alten Grundwert hing (Cykyran: Base-ATK x2), ist weg und muss neu gebucht werden) }
+  ON_FORM_CHANGED: 'onFormChanged',
 
   // ── Control changes ──
   ON_TAKE_CONTROL: 'onTakeControl',  // Fires when a player gains control of an opponent's target (Hero or Creature). Covers permanent transfers (Dark Gear, Diplomacy), temporary creature steals (Aligning Goals, Treacherous Crystal, Deepsea Succubus), Charme Lv3 hero steals, and Controlled Attack's hero-control mark. Context: { controllerPi, originalOwnerPi, targetType: 'hero'|'creature', targetName, targetInst?, targetHero?, heroIdx, kind: 'steal'|'transfer'|'charm'|'controlled' }
