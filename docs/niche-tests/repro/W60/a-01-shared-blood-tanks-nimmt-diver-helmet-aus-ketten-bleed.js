@@ -2,11 +2,11 @@
 // W60a: Shared Blood Tanks vs. Diver Helmet.
 //   Diver Helmet: „The equipped Hero and all cards in its Support Zones are unaffected by Areas." (CARD_API „Areas — respect Diver Helmet", Pflichtregel)
 //   Shared Blood Tanks: „… Whenever a target takes Bleed damage, except from this effect, all other Bleeding targets its owner controls also take Bleed damage."
-//   Auslegung (wie Rioting Village, W59a): die Area wirkt auf einen Helden mit Helm und auf alle Karten in dessen Support Zones NICHT —
-//     (a) der Ketten-Bleed-Schaden trifft sie nicht, (b) sie lösen die Kette auch nicht aus (für diese Area sind sie nicht vorhanden).
-//     Ihr EIGENER Bleed-Tick (Engine, nach der Handlung) bleibt unverändert: er ist keine Wirkung der Area.
-//   Vor W60a: Held/Kreaturen mit Helm wurden von der Kette getroffen und lösten sie aus (auf dem alten Stand rot).
-// (A) Gegenprobe ohne Helm  (B) Helm-Held als Opfer  (C) Helm-Held als Auslöser  (D) Kreaturen des Helm-Helden (Opfer / Auslöser / stirbt am Tick)
+//   Entscheidung von Al (W61a, ersetzt die symmetrische Auslegung von W60a): der Helm schützt vor der WIRKUNG der Area, nicht davor, AUSLÖSER zu sein —
+//     (a) der Ketten-Bleed-Schaden trifft einen Helm-Helden / Karten in dessen Support Zones NICHT,
+//     (b) nimmt ein solches Ziel selbst Bleed-Schaden aus anderer Quelle (eigener Tick, Engine, nach der Handlung), LÖST es die Kette AUS (die anderen, nicht-Helm-Ziele nehmen Kettenschaden).
+//   Vor W60a: Helm-Ziele wurden getroffen. Zwischen W60a und W61a: sie lösten die Kette nicht aus (Abschnitte C/D/G/J hier verlangen jetzt das Gegenteil; auf dem W60a-Stand rot).
+// (A) Gegenprobe ohne Helm  (B) Helm-Held als Opfer  (C) Helm-Held als Auslöser (löst die Kette aus)  (D) Kreaturen des Helm-Helden (Opfer / Auslöser / stirbt am Tick)  (J) Helm-Auslöser + Helm-Opfer gemischt
 // (E) Helm am anderen Helden / am Gegner schützt nicht  (F) Helm kommt / geht MITTEN in der Kette  (G) Gegnerseite (Auslöser dort, Area bei mir / beim Gegner)
 // (H) zwei Kopien der Area  (I) Zustand sauber
 // beide Sitze. Exit 0 = korrekt.
@@ -79,12 +79,12 @@ const HP = 800, TICK = 50;
     }
 
     // ═══ (C) Helm-Held als Auslöser ═══
-    R.section(`Sitz ${me} · (C) Held mit Helm löst die Kette nicht aus (sein eigener Tick bleibt)`);
+    R.section(`Sitz ${me} · (C) Held mit Helm LÖST die Kette aus (Al, W61a); er selbst nimmt keinen fremden Kettenschaden`);
     {
       const t = await mk(); helm(t, me, 1);
       await heldenTick(t, me, 1);
-      const f = erwarte(t, [[me, 0, HP], [me, 1, HP - TICK], [me, 2, HP]]);
-      R.check('Held 1 (Helm) tickt: er verliert seine 50, Held 0 und 2 bleiben bei 800 (keine Kette)', f.length === 0 && sauber(t), f);
+      const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP - TICK], [me, 2, HP - TICK], [op, 0, HP], [op, 1, HP], [op, 2, HP]]);
+      R.check('Held 1 (Helm) tickt: er verliert seine 50 (nur den eigenen Tick, kein Kettenschlag obendrauf), Held 0 und 2 −50 (Kette), Gegnerseite unberührt', f.length === 0 && sauber(t), f);
     }
     {
       const t = await mk(); helm(t, me, 1);
@@ -109,9 +109,9 @@ const HP = 800, TICK = 50;
       const t = await mk(); helm(t, me, 1);
       const imHelm = kreatur(t, me, 1, 0);
       await kreaturTick(t, imHelm);
-      const f = erwarte(t, [[me, 0, HP], [me, 1, HP], [me, 2, HP]]);
+      const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP], [me, 2, HP - TICK]]);
       if (kh(imHelm) !== DB[DUMMY].hp - TICK) f.push(`eigener Tick der Kreatur ${kh(imHelm)}`);
-      R.check('Kreatur eines Helm-Helden tickt: sie verliert ihre 50, aber keine Kette auf die Helden', f.length === 0 && sauber(t), f);
+      R.check('Kreatur eines Helm-Helden tickt: sie verliert ihre 50 und LÖST die Kette aus (Held 0 und 2 −50; Helm-Held 1 verschont)', f.length === 0 && sauber(t), f);
     }
     {
       const t = await mk(); helm(t, me, 1);
@@ -125,9 +125,9 @@ const HP = 800, TICK = 50;
       const t = await mk(); helm(t, me, 1);
       const sterbend = kreatur(t, me, 1, 0, FRAIL);   // 10 HP: stirbt am eigenen Tick
       await kreaturTick(t, sterbend);
-      const f = erwarte(t, [[me, 0, HP], [me, 1, HP], [me, 2, HP]]);
+      const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP], [me, 2, HP - TICK]]);
       if (sterbend.zone === 'support' && kh(sterbend) > 0) f.push('Kreatur lebt noch');
-      R.check('Kreatur des Helm-Helden stirbt am eigenen Tick: trotzdem keine Kette', f.length === 0 && sauber(t), f);
+      R.check('Kreatur des Helm-Helden stirbt am eigenen Tick: die Kette läuft trotzdem (Held 0 und 2 −50, Helm-Held 1 verschont)', f.length === 0 && sauber(t), f);
     }
     {
       const t = await mk(); helm(t, me, 1);
@@ -218,8 +218,8 @@ const HP = 800, TICK = 50;
     {
       const t = await mk({ areaSeiten: [op] }); helm(t, op, 1);   // Area liegt beim Gegner: wirkt trotzdem beidseitig
       await heldenTick(t, op, 1);
-      const f = erwarte(t, [[op, 0, HP], [op, 1, HP - TICK], [op, 2, HP]]);
-      R.check('Area beim Gegner, Gegnerheld 1 (Helm) tickt: keine Kette', f.length === 0 && sauber(t), f);
+      const f = erwarte(t, [[op, 0, HP - TICK], [op, 1, HP - TICK], [op, 2, HP - TICK], [me, 0, HP], [me, 1, HP], [me, 2, HP]]);
+      R.check('Area beim Gegner, Gegnerheld 1 (Helm) tickt: er löst die Kette aus → Gegnerhelden 0 und 2 −50', f.length === 0 && sauber(t), f);
     }
     {
       const t = await mk({ areaSeiten: [op] }); helm(t, me, 1);
@@ -237,6 +237,38 @@ const HP = 800, TICK = 50;
       const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP], [me, 2, HP - 2 * TICK]]);
       if (kh(k1) !== DB[DUMMY].hp) f.push(`Kreatur am Helm-Held ${kh(k1)}`);
       R.check('zwei Kopien: Helm-Held/-Kreatur bleiben verschont, Held 2 trägt zwei Kettenschläge', f.length === 0 && sauber(t), f);
+    }
+
+    // ═══ (J) Helm-Auslöser und Helm-Opfer gemischt (W61a) ═══
+    R.section(`Sitz ${me} · (J) Helm-Held löst aus, ein weiteres Helm-Ziel unter den „anderen blutenden Zielen“ bleibt verschont`);
+    {
+      const t = await mk(); helm(t, me, 1); helm(t, me, 2);
+      await heldenTick(t, me, 1);
+      const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP - TICK], [me, 2, HP]]);
+      R.check('Helm an Held 1 (Auslöser) und Held 2: Held 0 −50 (Kette), Held 2 (Helm) unberührt', f.length === 0 && sauber(t), f);
+    }
+    {
+      const t = await mk(); helm(t, me, 1); helm(t, me, 2);
+      const k2 = kreatur(t, me, 2, 0), k0 = kreatur(t, me, 0, 0), voll = DB[DUMMY].hp;
+      await heldenTick(t, me, 1);
+      const f = erwarte(t, [[me, 0, HP - TICK], [me, 1, HP - TICK], [me, 2, HP]]);
+      if (kh(k2) !== voll) f.push(`Kreatur am Helm-Held 2 ${kh(k2)} != ${voll}`);
+      if (kh(k0) !== voll - TICK) f.push(`Kreatur an Held 0 ${kh(k0)} != ${voll - TICK}`);
+      R.check('Helm-Held 1 löst aus: Kreatur an Held 0 −50, Kreatur im Helm-Held 2 unberührt', f.length === 0 && sauber(t), f);
+    }
+    {
+      const t = await mk(); helm(t, me, 0); helm(t, me, 1); helm(t, me, 2);
+      await heldenTick(t, me, 1);
+      const f = erwarte(t, [[me, 0, HP], [me, 1, HP - TICK], [me, 2, HP]]);
+      R.check('alle drei Helden mit Helm: nur der eigene Tick des Auslösers, kein Kettenschaden', f.length === 0 && sauber(t), f);
+    }
+    {
+      const t = await mk(); const h1 = helm(t, me, 1);
+      await heldenTick(t, me, 1);                                           // Helm-Held löst aus: Kette läuft
+      await t.run(() => t.engine.actionDestroyCard({ name: 'T', owner: op }, h1, {}));
+      await heldenTick(t, me, 1);                                           // Helm weg: er löst weiter aus
+      const f = erwarte(t, [[me, 0, HP - 2 * TICK], [me, 1, HP - 2 * TICK], [me, 2, HP - 2 * TICK]]);
+      R.check('Helm-Held löst aus, Helm wird zerstört, er löst erneut aus: Held 0 und 2 je −100', f.length === 0 && sauber(t), f);
     }
 
     // ═══ (I) Unbeteiligte Zustände ═══

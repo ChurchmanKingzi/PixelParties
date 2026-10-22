@@ -41,17 +41,19 @@
 //    Spieler eine Kopie kontrollieren: der urspruengliche Tick loest
 //    beide aus, die Ketten selbst loesen nichts mehr aus.
 //
-//  • ★ W60a — DIVER HELMET (CARD_API „Areas — respect Diver Helmet"):
-//    „The equipped Hero and all cards in its Support Zones are unaffected
-//    by Areas." Ein Held mit Helm und alle Karten in seinen Support Zones
-//    sind fuer diese Area nicht vorhanden: (a) der Kettenschaden trifft sie
-//    NICHT (Pruefung bei jedem Schlag neu — der Helm kann mitten in der
-//    Kette kommen oder gehen), (b) sie loesen die Kette auch NICHT aus
-//    (Auslegung wie Rioting Village; offene Ja/Nein-Frage an Al). Ihr
-//    EIGENER Tick nach der Handlung bleibt unveraendert — den teilt die
-//    Engine aus, nicht die Area. Zentrale Fragen: `engine.heldIstVon-
-//    AreasAusgenommen(Seite, Held)` und `engine.karteIstVonAreasAus-
-//    genommen(inst)` (Karte in den Support Zones eines Helm-Helden).
+//  • ★ W60a/W61a — DIVER HELMET (CARD_API „Areas — respect Diver Helmet"):
+//    „The equipped Hero and all cards in its Support Zones are unaffected by
+//    Areas." Entscheidung von Al (W61a): der Helm schuetzt vor der WIRKUNG der
+//    Area, nicht davor, AUSLOESER zu sein. Also: (a) der Kettenschaden trifft
+//    einen Helm-Helden und die Karten/Kreaturen in dessen Support Zones NICHT
+//    (Pruefung bei jedem Schlag neu — der Helm kann mitten in der Kette
+//    kommen oder gehen), (b) nimmt ein solches Ziel selbst Bleed-Schaden aus
+//    anderer Quelle (eigener Tick), LOEST es die Kette aus und die anderen
+//    blutenden Ziele nehmen Kettenschaden. (W60a hatte Ausloeser und Opfer
+//    symmetrisch ausgenommen; der Ausloeser-Teil ist mit W61a zurueckgenommen.)
+//    Zentrale Fragen: `engine.heldIstVonAreasAusgenommen(Seite, Held)` und
+//    `engine.karteIstVonAreasAusgenommen(inst)` (Karte in den Support Zones
+//    eines Helm-Helden).
 //
 //  • Der Kettenschaden ist echter Bleed-Schaden: Betrag ueber
 //    `engine._bleedDamageAmount` (also inklusive `beforeBleedDamage`-
@@ -157,11 +159,10 @@ module.exports = {
       const besitzer = getroffen.owner;
       if (besitzer == null) return;
 
-      // ★ W60a (Diver Helmet): ein von Areas ausgenommenes Ziel (Held mit Helm / Karte in dessen Support Zones) ist fuer diese Area nicht vorhanden — es loest die Kette
-      // nicht aus (Auslegung wie Rioting Village: die Area wirkt auf diese Ziele nicht, auch nicht als Quelle; Frage 1 an Al) ...
-      if (istAusgenommen(engine, { type: getroffen.kind === 'hero' ? 'hero' : 'equip', owner: getroffen.owner, heroIdx: getroffen.heroIdx, cardInstance: getroffen.inst })) return;
+      // ★ W61a (Al): ein Helm-Ziel (Held mit Helm / Karte in dessen Support Zones) DARF die Kette ausloesen — der Helm schuetzt nur vor der Wirkung der Area (Kettenschaden), nicht
+      // davor, Ausloeser zu sein. Hier also bewusst KEINE Ausnahme fuer `getroffen`; ausgenommen werden nur die OPFER (unten).
 
-      // Alle ANDEREN blutenden Ziele derselben Seite. ... und ausgenommene Ziele werden von der Kette nicht getroffen — aber erst BEIM Schlag geprueft (unten): der Helm kann
+      // Alle ANDEREN blutenden Ziele derselben Seite. Ausgenommene Ziele (Helm) werden von der Kette nicht getroffen — aber erst BEIM Schlag geprueft (unten): der Helm kann
       // zwischen zwei Schlaegen kommen UND gehen, die Zielliste darf ihn nicht vorab festschreiben. Hier nur: gibt es ueberhaupt jemanden, den die Kette jetzt treffen wuerde?
       const ziele = collectPlayerTargets(engine, besitzer)
         .filter(t => isTargetBleeding(engine, t) && !istDasselbe(t, getroffen));
@@ -180,7 +181,7 @@ module.exports = {
         // Zwischen zwei Ticks kann sich das Brett aendern (ein Ziel
         // stirbt am vorigen Tick) — vor jedem Schlag neu pruefen.
         if (!isTargetBleeding(engine, ziel)) continue;
-        if (istAusgenommen(engine, ziel)) continue;     // ★ W60a: Helm kam mitten in der Kette
+        if (istAusgenommen(engine, ziel)) continue;     // ★ W60a: Opfer-Ausnahme, Helm kam ggf. mitten in der Kette
         const betrag = await kettenTick(engine, ziel);
         if (betrag > 0) getroffenZahl++;
       }

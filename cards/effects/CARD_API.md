@@ -23647,3 +23647,28 @@ Die 13 Area-Skripte ohne Helm-Bezug durchgesehen: **Acid Rain** (Pollution Token
 
 ### Tests W60a
 Neu: `W60/a-01` (42, beide Sitze): (A) Gegenprobe ohne Helm · (B) Helm-Held als Opfer (Helm an Held 1 / an 1 und 2) · (C) Helm-Held als Auslöser, Gegenprobe · (D) Kreaturen in den Zonen des Helm-Helden: als Opfer, als Auslöser, am eigenen Tick gestorben, nicht blutende · (E) Helm am anderen Helden / am Gegnerhelden schützt nicht · (F) Helm kommt nach Schlag 1 / wird nach Schlag 1 zerstört / zwischen zwei Ticks · (G) Gegnerseite, Area beim Gegner · (H) zwei Kopien · (I) nicht blutender Held.
+
+
+## Welle 61 / W61a — Shared Blood Tanks: Helm-Ziel darf auslösen · Acid Rain: Pollution Token nicht in Zonen eines Helm-Helden
+
+Folgearbeit zu W59a/W60a; Entscheidungen von Al (Spieldesigner) zu den offenen Rückfragen. Repros: `docs/niche-tests/repro/W61/a-01` (44 Prüfungen, beide Sitze; auf dem Stand vor W61a **30 ✗**) und `docs/niche-tests/repro/W60/a-01` (angepasst, 50 Prüfungen; auf dem W60a-Stand **14 ✗**).
+
+### 1) Shared Blood Tanks — der Helm schützt vor der WIRKUNG, nicht vorm Auslösen
+Al: „Ja, auslösen schon, aber NICHT durch einen anderen Auslöser den Bleed-Schaden nehmen." Die symmetrische Auslegung von W60a (Helm-Ziel ist weder Opfer noch Auslöser) ist damit **zurückgenommen**, die Opfer-Ausnahme bleibt:
+* **Auslöser:** nimmt ein Held mit Diver Helmet (oder eine Karte/Kreatur in dessen Support Zones) selbst Bleed-Schaden aus anderer Quelle (eigener Tick), **löst er die Kette aus** — die anderen blutenden Ziele seines Besitzers nehmen Kettenschaden. Der Helm schützt nur vor der Wirkung der Area, nicht davor, Auslöser zu sein.
+* **Opfer:** Helm-Helden und Karten in deren Support Zones nehmen den Kettenschaden eines ANDEREN Auslösers nicht (`istAusgenommen` vor jedem Schlag, der Helm kann mitten in der Kette kommen/gehen). Ihr eigener Tick bleibt (er kommt von der Engine).
+* `shared-blood-tanks.js`: der `istAusgenommen(...)`-Aufruf am Anfang von `afterBleedDamage` entfällt. Vor dem Streamen der Karte bleibt die Vorprüfung „trifft die Kette jetzt überhaupt jemanden?" (ohne Opfer: keine Kartenanzeige, kein Schaden).
+* **Faustregel für künftige Area-Skripte mit „whenever X …"-Auslöser:** der Auslöser-Teil des Kartentexts wirkt nicht „auf" das Ziel; nur die Wirkung der Area (Schaden, Marker, Platzierung …) wird für Helm-Ziele ausgelassen — es sei denn, der Text sagt ausdrücklich etwas anderes.
+
+### 2) Acid Rain — Pollution Token nie in Zonen eines Helm-Helden
+Al („Doch!"): Acid Rain ist eine Area; die freien Support Zones eines Helden mit Diver Helmet sind für den Pollution Token **nicht wählbar**.
+* **`_pollution-shared.js`:** `countFreeZones` / `getFreeZones` / `placePollutionTokens` kennen die neue Option `excludeHero(heroIdx) → bool`. Acid Rain übergibt `engine.heldIstVonAreasAusgenommen(turnPlayer, hi)` (die zentrale Frage, keine eigene Helm-Suche). Andere Pollution-Karten sind nicht betroffen (sie übergeben die Option nicht).
+* **Token-Option:** zählt nur freie Zonen lebender Helden **ohne** Helm. Gibt es keine, entfällt die Option: kein `optionPicker`, es bleibt „2 Karten löschen" (wie schon bisher bei „keine freie Zone"); mit weniger als 2 weiteren Handkarten verpufft Acid Rain (`acid_rain_fizzle`, bestehendes Ruling unverändert). CPU/Prompts folgen derselben Logik (die Zonenliste im `zonePick` enthält keine Helm-Zonen; die Gerrymander-Antwort `delete` bleibt).
+* **Helm kommt/geht:** die Zonenliste wird bei jeder Platzierung frisch gebildet. Meldet der Client trotzdem eine Helm-Zone, oder kommt der Helm während des Zonen-Prompts, wird die Zone beim Platzieren erneut geprüft und auf die erste gültige Zone zurückgefallen. Kommt der Helm nach der Wahl „Token" und nimmt die letzte Zone weg, fällt die Strafe auf „2 Karten löschen" zurück (falls möglich), sonst verpufft sie. Geht der Helm nach der Optionswahl, ist der Held in der Zonenliste wieder dabei.
+* Gilt für den Zugspieler (nicht den Besitzer der Area) und für beide Sitze; besiegte Helden bleiben nicht wählbar (bestehendes Ruling `aliveOnly`).
+
+### 3) Rioting Village — Spieler-Limit unverändert (Al: „Nein.")
+„No player can use more than 1 Attack per turn" bleibt eine Sperre für den *Spieler*; der Helm befreit den Helden **nicht** davon (die Attack eines Helm-Helden zählt weiter, die zweite ist gesperrt). Keine Code-Änderung; Ruling hier festgehalten (vgl. W59a Repro R5).
+
+### Tests W61a
+Neu `W61/a-01` (44, beide Sitze): (A) Gegenprobe ohne Helm · (B) Helm-Held, Zonenliste, gemeldete Helm-Zone wird nicht übernommen · (C) zwei Helm-Helden · (D) alle Helden mit Helm → nur Löschen / Fizzle, Gegenprobe „alle Zonen belegt" · (E) freie Zonen nur beim Helm-Helden, genau eine Zone ohne Helm · (F) Helm kommt nach der Optionswahl (Rückfall auf Löschen) · (G) Helm kommt während der Zonenwahl · (H) Helm geht (vor dem Zauber / nach der Optionswahl) · (I) Gegenproben: Helme nur am Gegner, besiegter Held, Area auf eigener Seite, Gegner als Zugspieler. `W60/a-01` angepasst (C/D/G auf „Helm-Ziel löst aus", neuer Abschnitt J: Helm-Auslöser + Helm-Opfer gemischt).

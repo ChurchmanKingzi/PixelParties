@@ -34,6 +34,8 @@ const POLLUTION_TOKEN = 'Pollution Token';
  * Zones" and do not restrict them to living Heroes (Als Befund 8.10., Pyroblast
  * mit nur toten Heroes ohne freie Zone). Acid Rain ("one of their Heroes' free
  * Support Zones") bleibt bei den lebenden Heroes: `opts.aliveOnly`.
+ * ★ W61a: `opts.excludeHero(heroIdx) → bool` nimmt Helden aus der Zonenliste (Acid Rain ist eine Area: Diver Helmet —
+ * „The equipped Hero and all cards in its Support Zones are unaffected by Areas" — Zonen eines Helm-Helden sind nicht wählbar).
  * @param {object} gs - Game state
  * @param {number} playerIdx
  * @returns {number}
@@ -45,6 +47,7 @@ function countFreeZones(gs, playerIdx, opts = {}) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || (opts.aliveOnly && hero.hp <= 0)) continue;
+    if (opts.excludeHero && opts.excludeHero(hi)) continue;
     for (let si = 0; si < 3; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) count++;
@@ -77,6 +80,7 @@ function getFreeZones(gs, playerIdx, opts = {}) {
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
     const hero = ps.heroes[hi];
     if (!hero?.name || (opts.aliveOnly && hero.hp <= 0)) continue;
+    if (opts.excludeHero && opts.excludeHero(hi)) continue;
     for (let si = 0; si < 3; si++) {
       const slot = (ps.supportZones[hi] || [])[si] || [];
       if (slot.length === 0) {
@@ -112,6 +116,8 @@ function getFreeZones(gs, playerIdx, opts = {}) {
  * @param {string} sourceName - Source card name for logging (e.g. 'Pyroblast')
  * @param {object} [opts]
  * @param {boolean} [opts.aliveOnly] - only zones of living Heroes (Acid Rain)
+ * @param {function} [opts.excludeHero] - (heroIdx) → bool; Zonen dieses Helden sind nicht wählbar (Acid Rain: Diver Helmet, W61a).
+ *   Wird bei JEDER Platzierung und nach dem Zonen-Prompt neu ausgewertet (der Helm kann dazwischen kommen/gehen).
  * @param {object} [opts.promptCtx] - ctx for prompting (pass the ctx from the
  *   firing card; required for promptZonePick to route correctly)
  * @returns {Promise<{ placed: number, insts: CardInstance[] }>}
@@ -130,7 +136,7 @@ async function placePollutionTokens(engine, playerIdx, count, sourceName, opts =
   // auto-place each token in the first available slot. No choice would be
   // meaningful — placement order is the only degree of freedom, and forcing
   // N manual picks just to fill every slot is pure busywork.
-  const zoneOpts = { aliveOnly: !!opts.aliveOnly };
+  const zoneOpts = { aliveOnly: !!opts.aliveOnly, excludeHero: opts.excludeHero };
   const initialFreeCount = getFreeZones(gs, playerIdx, zoneOpts).length;
   const autoFillAll = count >= initialFreeCount;
 
@@ -148,6 +154,14 @@ async function placePollutionTokens(engine, playerIdx, count, sourceName, opts =
         cancellable: false,
       });
       chosenZone = (picked && freeZones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx)) || freeZones[0];
+      // ★ W61a: Zone beim Platzieren erneut prüfen — während des Prompts kann ein Helm kommen (Held ausgenommen) oder die Zone belegt werden.
+      if (opts.excludeHero) {
+        const jetzt = getFreeZones(gs, playerIdx, zoneOpts);
+        if (!jetzt.some(z => z.heroIdx === chosenZone.heroIdx && z.slotIdx === chosenZone.slotIdx)) {
+          if (jetzt.length === 0) break;
+          chosenZone = jetzt[0];
+        }
+      }
     } else {
       // No prompt context — fall back to first free zone. This path is for
       // non-interactive callers (e.g. Area card auto-placements). Callers
