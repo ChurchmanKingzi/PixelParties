@@ -32816,6 +32816,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // bounceReturnHidden to achieve the visual crossing of Deepsea/Castle
   // swaps — old creature flies out while new creature flies in.
   const [bounceOutgoingHidden, setBounceOutgoingHidden] = useState(new Set());
+  // ★ W62a (Al: „Slime-Beschwörung in eine geteilte Zone macht die Zone für die Dauer der Beschwörung visuell leer"):
+  // Fliegt eine Karte in eine Support Zone, die schon GLEICHNAMIGE Karten trägt (Alice, the Transfer Student: geteilte Zone),
+  // bleiben diese Karten sichtbar; verborgen wird nur die NEUE Kopie bis zur Landung. Schlüssel wie oben
+  // (`${owner}-${heroIdx}-${slotIdx}`), Wert = Zahl der Karten, die schon VOR dem Flug dort lagen (= so viele bleiben sichtbar).
+  const [bounceBehalten, setBounceBehalten] = useState({});
+  // Der Socket-Hörer unten hängt mit `[]` am ERSTEN Render: der aktuelle Brettzustand kommt über diese Referenz.
+  const spielerLiveRef = useRef(gameState.players);
+  spielerLiveRef.current = gameState.players;
   // ★ v1366: Surprise-Abflug-Schluessel (`sp-<owner>-<hero>`) fallen weg,
   // sobald der Zustand die Zone geleert hat — eine danach neu gesetzte
   // Surprise darf nicht mitverborgen werden.
@@ -43370,19 +43378,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // hand while new flies to support at the same time.
       if (to === 'support' && toHeroIdx != null && toSlotIdx != null) {
         const hideKey = `${tgtOwner}-${toHeroIdx}-${toSlotIdx}`;
-        setBounceOutgoingHidden(prev => {
-          const next = new Set(prev);
-          next.add(hideKey);
-          return next;
-        });
-        setTimeout(() => {
+        // ★ W62a: liegt dort schon mindestens eine Karte GLEICHEN Namens (geteilte Zone, Alice) und ist der Flug kein Umzug
+        // innerhalb derselben Zone, bleiben die vorhandenen Karten sichtbar — nur die neue Kopie wird bis zur Landung verborgen.
+        // Der Zustand kommt VOR dem Eintreffen des Flugs an (Engine: Flug, dann Zustand) oder knapp danach; gilt `vorhanden`
+        // schon die neue Kopie mit, bleibt sie eben sichtbar — leer wird die Zone in keinem Fall.
+        const vorhanden = ((spielerLiveRef.current?.[tgtOwner]?.supportZones?.[toHeroIdx] || [])[toSlotIdx]) || [];
+        const teiltZone = !!cardName && vorhanden.length > 0 && vorhanden.every(n => n === cardName)
+          && !(from === 'support' && (fromOwner ?? owner) === tgtOwner && fromHeroIdx === toHeroIdx && fromSlotIdx === toSlotIdx);
+        if (teiltZone) {
+          setBounceBehalten(prev => ({ ...prev, [hideKey]: vorhanden.length }));
+          setTimeout(() => {
+            setBounceBehalten(prev => {
+              if (!(hideKey in prev)) return prev;
+              const next = { ...prev }; delete next[hideKey]; return next;
+            });
+          }, 720);
+        } else {
           setBounceOutgoingHidden(prev => {
-            if (!prev.has(hideKey)) return prev;
             const next = new Set(prev);
-            next.delete(hideKey);
+            next.add(hideKey);
             return next;
           });
-        }, 720);
+          setTimeout(() => {
+            setBounceOutgoingHidden(prev => {
+              if (!prev.has(hideKey)) return prev;
+              const next = new Set(prev);
+              next.delete(hideKey);
+              return next;
+            });
+          }, 720);
+        }
       }
 
       // Source-slot hide for support → anywhere transitions. Same
@@ -50561,7 +50586,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (slot.isSpacer) return <div key={'sp-'+renderIdx} className="board-zone-spacer" />;
               const z = slot.z;
               const isIsland = slot.isIsland;
-              const cards = (supZones[i]||[])[z]||[];
+              const cardsVoll = (supZones[i]||[])[z]||[];
+              // ★ W62a: Landet gerade eine weitere Kopie in dieser geteilten Zone (Flug unterwegs), zeigt die Zone weiter die
+              // schon vorhandenen Karten — nur die neue ist bis zur Landung verborgen (`bounceBehalten`, siehe `onPileTransfer`).
+              const _behalten = bounceBehalten[`${isOpp ? oppIdx : myIdx}-${i}-${z}`];
+              const cards = (_behalten != null && cardsVoll.length > _behalten && _behalten > 0
+                && cardsVoll.every(n => n === cardsVoll[0])) ? cardsVoll.slice(0, _behalten) : cardsVoll;
               // Cross-side equip drag (Powder Keg etc.) drops onto OPP's
               // row instead of own — flip the side gate to `isOpp` when
               // the drag is flagged cross-side.
@@ -51158,11 +51188,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   } : undefined}
                   onMouseLeave={(cards || []).includes('Alliance') ? () => setAllianzHover(null) : undefined}>
                   {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
-                  {(isPlayTarget || isAutoTarget) && playDrag.card ? (
+                  {/* ★ W62a: Die Vorschau der noch nicht gelandeten Karte (Ziehen, Zusatzaktions-Wahl, Gegner setzt) ERSETZT den Platz
+                      nur, wenn dort keine gleichnamige Kopie liegt. In einer geteilten Zone (Alice) bliebe sonst der vorhandene Stapel
+                      fuer die Dauer der Vorschau unsichtbar — die Zone wirkte leer; dort bleibt der Stapel stehen, die neue Kopie kommt
+                      erst mit der Landung dazu. */}
+                  {(isPlayTarget || isAutoTarget) && playDrag.card && !(cards.length > 0 && cards.every(n => n === playDrag.cardName)) ? (
                     <BoardCard cardName={playDrag.cardName} hp={playDrag.card.hp} maxHp={playDrag.card.hp} hpPosition="creature" style={{ opacity: 0.5 }} />
-                  ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z) ? (
+                  ) : (!isOpp && pendingAdditionalPlay && pendingAdditionalPlay.heroIdx === i && pendingAdditionalPlay.zoneSlot === z
+                      && !(cards.length > 0 && cards.every(n => n === pendingAdditionalPlay.cardName))) ? (
                     <BoardCard cardName={pendingAdditionalPlay.cardName} hp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} maxHp={CARDS_BY_NAME[pendingAdditionalPlay.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
-                  ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z) ? (
+                  ) : (isOpp && oppPendingPlacement && oppPendingPlacement.heroIdx === i && oppPendingPlacement.zoneSlot === z
+                      && !(cards.length > 0 && cards.every(n => n === oppPendingPlacement.cardName))) ? (
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
@@ -51468,7 +51504,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         `stopPropagation`, damit der Klick nicht als
                         Zielwahl oder Aktivierung durchschlaegt. */}
                     {(() => {
-                      const stack = (gameState.supportStacks || {})[cKey];
+                      const stackVoll = (gameState.supportStacks || {})[cKey];
+                      // W62a: waehrend eine neue Kopie noch fliegt, zaehlt das Abzeichen nur die schon liegenden.
+                      const stack = (stackVoll && cards.length < cardsVoll.length) ? stackVoll.slice(0, cards.length) : stackVoll;
                       if (!stack || stack.length < 2) return null;
                       return (
                         <div className="head-counter-badge"
