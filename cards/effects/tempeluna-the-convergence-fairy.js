@@ -409,7 +409,8 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: feeInst, toZone: 'support', toHeroIdx: heroIdx,
       _skipReactionCheck: true,
-      _anhaengselAnleger: pi,   // W49a: „attach a Fairy Hero" ist ein Anlegen in eine Support Zone — oeffnet das Equip-Fenster (Afflicted Pests, LOCUST)
+      // W50a (Al, 22.10.2026: Tempeluna nicht): das Anhaengen der Fee ist KEIN Anlegen im Sinne von Afflicted Pests / Cybug LOCUST - bewusst OHNE
+      // `_anhaengselAnleger` (W49a hatte es gesetzt). Initiation Ritual behaelt das Fenster (dort wird der Held als Equip-Artifact behandelt).
     });
 
     if (!gs.hoptUsed) gs.hoptUsed = {};
