@@ -46433,10 +46433,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         stealIndices.forEach(idx => {
           const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-          if (el) {
-            el.style.outline = '3px solid rgba(255,155,58,.95)';
-            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,155,58,.7))';
-          }
+          if (el) el.classList.add('blind-pick-selected');   // dieselbe Markierung wie bei der Wahl (volle Kartenbreite, harter Rahmen)
         });
       }
 
@@ -46458,7 +46455,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           stealExpectedOppCountRef.current = count > 0 ? document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card').length : -1;
           stealIndices.forEach(idx => {
             const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-            if (el) { el.style.outline = ''; el.style.filter = ''; }
+            if (el) el.classList.remove('blind-pick-selected');
           });
         }
 
