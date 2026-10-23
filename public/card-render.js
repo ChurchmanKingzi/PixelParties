@@ -226,7 +226,7 @@
   // ── Farben (Style-Skript des Templates) ──
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
-    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(255,221,0)',
+    sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(250,213,74)',
     supArti: 'rgb(255,125,0)', rare: 'rgb(173,97,0)',
   };
 
@@ -490,6 +490,14 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  /** Münzen-Gold in vier harten Bändern (hell / Gold / Orange / Dunkelorange), Kanten ohne Übergang — dieselben Farben wie die Goldzahlen im Duell. */
+  function muenzGoldFill(ctx, top, height) {
+    // Verlauf über die Tintenhöhe der Schrift (Oberkante der Großbuchstaben bis Unterkante), nicht über die ganze Zeile
+    const g = ctx.createLinearGradient(0, top + height * 0.14, 0, top + height * 0.86);
+    const stufen = [[0, '#f7f7ad'], [0.3, '#fad54a'], [0.62, '#f29a3e']];
+    stufen.forEach(([p, c], i) => { g.addColorStop(p, c); g.addColorStop(i + 1 < stufen.length ? stufen[i + 1][0] - 0.001 : 1, c); });
+    return g;
+  }
   // Goldener Verlauf fuer Skin-Namen (oben hell, unten tief; harte Kante in der Mitte wie bei gebuerstetem Gold)
   function goldFill(ctx, top, height) {
     const g = ctx.createLinearGradient(0, top + height * 0.12, 0, top + height * 0.88);
@@ -695,10 +703,12 @@
 
     // 3) Namenszeile (z 2) — Superhelden: breiter
     const sup = isSuperhero(t);
+    // Super Rares (außer Artifacts): Name in den Münzen-Goldtönen (data/palette-fest.json), in vier harten Bändern wie die Goldzahlen, Kontur in Münzen-Rotbraun
+    const supGold = spec.rarity === 'super rare' && !isArti2(t) && !isSuperhero(t) && t !== 'boss' && !isToken(t);
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : nameColor(spec),
-      outline: OPT.nameOutline && !isArti2(t) ? nameOutlineColor(ctx, sup) : null, outlineFactor: 0.5,   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
+      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : supGold ? muenzGoldFill(ctx, 48, 55) : nameColor(spec),
+      outline: OPT.nameOutline && !isArti2(t) ? (supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null, outlineFactor: 0.5,   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
     });
 
     // 4) Faehigkeiten-Felder der Helden
