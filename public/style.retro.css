@@ -3452,6 +3452,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 .hand-card-dimmed .board-card::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%2308060c'/%3E%3C/svg%3E") 0 0 / 4px 4px; z-index: 3; pointer-events: none; }
 .hand-card-dimmed .board-card { cursor: inherit; }
 .hand-card-dimmed .board-card-hp { opacity: .3; }
+/* Gegnerhand: dort trägt die Karte die Klasse SELBST (es gibt keinen Platz darum) — die Abdunklung von oben fände sonst keine Kind-Karte (Live Show: die eben
+   verschenkten Karten sollen als „keine Wahl" ausgegraut sein). */
+.board-card.hand-card.hand-card-dimmed::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='2' y='0' width='2' height='2' fill='%2308060c'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%2308060c'/%3E%3C/svg%3E") 0 0 / 4px 4px; z-index: 3; pointer-events: none; }
+.board-card.hand-card.hand-card-dimmed { cursor: inherit; }
 
 /* Hand-lock blocked indicator (Kazena draw lock) */
 .hand-lock-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; color: #e92f38; z-index: 5; pointer-events: none; text-shadow: 1px 1px 0 #55011a; filter: drop-shadow(0 2px 0 #000000); line-height: 1; }
@@ -5164,6 +5168,27 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * { cursor: url("/cursor
 .hand-pick-eligible > .board-card { outline: 2px dashed #58238c; outline-offset: 2px; }
 .hand-pick-selected { transform: translateY(-6px); transition: transform .15s steps(4, end),filter .15s steps(4, end); }
 .hand-pick-selected > .board-card { outline: 3px solid #ba74ff !important; outline-offset: 2px; filter: brightness(1.3) drop-shadow(1px 0 0 #58238c) drop-shadow(-1px 0 0 #58238c) drop-shadow(0 1px 0 #58238c) drop-shadow(0 -1px 0 #58238c); }
+
+/* ── DEUTLICHE AUSWAHL (`highlightStyle: 'strong'`, Live Show) ─────────
+   Wählbare Karten blinken in zwei Farben mit dickem Doppelrahmen und stehen leicht erhöht, die GEWÄHLTEN tragen einen ruhigen goldenen Rahmen und stehen
+   deutlich höher — Auswahl und Wahlmöglichkeit sind auf einen Blick zu unterscheiden. Nicht wählbare Karten bekommen `hand-card-dimmed`.
+   Eigene Hand: Klasse am Platz, Rahmen an der Karte darin. Gegnerhand (`blind-pick-stark`): Klasse an der Karte selbst. */
+.hand-pick-stark.hand-pick-eligible > .board-card,
+.board-card.blind-pick-stark.blind-pick-eligible { outline: 4px solid #ba74ff !important; outline-offset: 2px; box-shadow: 0 0 0 7px #58238c !important; animation: pickStarkBlink .8s steps(1, end) infinite !important; }
+.board-card.blind-pick-stark.blind-pick-eligible { outline-color: #f29a3e !important; box-shadow: 0 0 0 7px #7d3911 !important; animation-name: pickStarkBlinkOrange !important; }
+.hand-pick-stark.hand-pick-eligible { transform: translateY(-5px); }
+.hand-pick-stark.hand-pick-selected > .board-card,
+.board-card.blind-pick-stark.blind-pick-selected { outline: 4px solid #fad54a !important; outline-offset: 2px; box-shadow: 0 0 0 7px #a87c00 !important; animation: none !important; filter: brightness(1.2); }
+.hand-pick-stark.hand-pick-selected { transform: translateY(-12px); }
+.board-card.blind-pick-stark.blind-pick-selected { transform: translateY(-12px); }
+@keyframes pickStarkBlink {
+  0%, 49%  { outline-color: #ba74ff; }
+  50%, 100% { outline-color: #e5edfa; }
+}
+@keyframes pickStarkBlinkOrange {
+  0%, 49%  { outline-color: #f29a3e; }
+  50%, 100% { outline-color: #e0c085; }
+}
 
 /* Urgent pick variant — Saint Nicolas's mandatory Potion-give pick
    demands more attention than the standard purple-dashed eligible
@@ -7355,7 +7380,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 .pz-lv-btn, .pz-lv-reset { background: var(--bg3); color: var(--text); border: 2px solid var(--accent); font: inherit; line-height: 1; cursor: pointer; }
 .pz-lv-btn { width: 18px; height: 18px; padding: 0; }
 .pz-lv-reset { padding: 2px 5px; color: var(--text2); border-color: var(--text2); }
-.pz-lv-btn:hover, .pz-lv-reset:hover { background: var(--accent); color: var(--bg); }
+.pz-lv-btn:hover, .pz-lv-reset:not(:disabled):hover { background: var(--accent); color: var(--bg); }
+.pz-lv-reset:disabled { color: var(--bg4); border-color: var(--bg4); cursor: default; }
 .pz-lv-wert { min-width: 34px; text-align: center; color: var(--text); }
 .pz-lv-tiefer { color: var(--success); }
 .pz-lv-hoeher { color: var(--danger); }

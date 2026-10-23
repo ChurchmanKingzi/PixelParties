@@ -28631,6 +28631,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromOwner: fromPi, toOwner: toPi, cardName,
       from: 'hand', to: 'hand',
       fromHandIdx: handIdx, toHandIdx,
+      // `opts.finalHandSize` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand — jede wird gegen die Endgröße der Hand projiziert.
+      ...(opts.finalHandSize ? { finalHandSize: opts.finalHandSize, zielLayout: true } : null),
     });
 
     await this.runHooks(HOOKS.ON_CARD_TRANSFERRED_TO_OPP_HAND, {
