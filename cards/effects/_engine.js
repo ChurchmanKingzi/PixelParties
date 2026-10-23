@@ -2998,6 +2998,11 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // 23.10. (Tearing Mountain): das Schutzfenster „would be affected by a card or effect" (Cool Rescuer Monia, Elusive Hind, Warrior of Teocuilatl, Winged Skeleton,
+    // Vinny …) NEGIERT den Effekt. Gilt für den gesetzten Status der Schutz als aufgehoben (`statusSchutzAufgehoben`), öffnet das Fenster gar nicht erst — auch nicht
+    // für Karten, die es selbst um ihren Status-Effekt herum öffnen (Burning Skeleton, Grunge Harpyformer …; sie geben `statusName` mit).
+    if (hookName === 'beforeCreatureAffected' && hookCtx?.effectType === 'status' && hookCtx.statusName && hookCtx.creature
+        && this.statusSchutzAufgehoben(hookCtx.statusName, hookCtx.creature)) return;
     // 23.10.: vorgemerkte Hand-Play-Signale (s. `_broadcastEvent`) zuerst abarbeiten.
     if (this._playSignale?.length && !this._playSignaleLaeuft && hookName !== 'onHandPlaySignal') {
       this._playSignaleLaeuft = true;
@@ -12065,7 +12070,7 @@ class GameEngine {
 
     const hookCtx = {
       creature: inst,
-      effectType: 'status',
+      effectType: 'status', statusName: 'poisoned',
       source,
       cancelled: false,
       _skipReactionCheck: true,
@@ -19563,7 +19568,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!schutzAus && !opts._skipAffectedWindow && inst.zone === ZONES.SUPPORT && !inst.faceDown
         && (sourceObj || typeof opts.sourceOwner === 'number')) {
       const _fenster = {
-        creature: inst, effectType: 'status',
+        creature: inst, effectType: 'status', statusName,
         source: sourceObj || { owner: opts.sourceOwner },
         cancelled: false, _skipReactionCheck: true,
       };
@@ -19576,7 +19581,9 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // W16d (A08-13): Status-Umleitungs-Surprise (Cactus Creature) gilt für „a target you control" – auch für Kreaturen.
     // Nur negative Status, nicht bei „negate its effects" (keinStatus), nicht innerhalb einer Surprise-Auflösung.
-    if (!schutzAus && STATUS_EFFECTS[statusName]?.negative && !opts.keinStatus && !opts._fromSurpriseRedirect
+    // 23.10. (Tearing Mountain, Al): eine UMLEITUNG verhindert den Status nicht, sie verlegt ihn nur — sie bleibt auch unter `statusSchutzAufgehoben` wirksam
+    // (der umgeleitete Status trifft das neue Ziel dann ebenfalls ungeschützt).
+    if (STATUS_EFFECTS[statusName]?.negative && !opts.keinStatus && !opts._fromSurpriseRedirect
         && !this._inSurpriseResolution && !this._inMctsSim && inst.zone === ZONES.SUPPORT && !inst.faceDown) {
       const redirect = await this._checkSurpriseOnCreatureStatus(inst, statusName, opts);
       if (redirect) {
@@ -20203,7 +20210,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // unverhinderbare Negationen (`unpreventable`); Aufrufer mit eigenem Fenster (Unwanted Audience) setzen `_skipAffectedWindow`.
     if (!opts._skipAffectedWindow && !opts.selfInflicted && !hart && inst.zone === 'support') {
       const _fenster = {
-        creature: inst, effectType: 'status',
+        creature: inst, effectType: 'status', statusName: 'negated',
         source: typeof source === 'string' ? { name: source, ...(typeof opts.sourceOwner === 'number' ? { owner: opts.sourceOwner } : {}) } : (source || { name: 'effect' }),
         cancelled: false, _skipReactionCheck: true,
       };
@@ -50439,7 +50446,8 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Check for status-redirect surprises (Cactus Creature) — only for negative statuses
     const statusDef = STATUS_EFFECTS[statusName];
-    if (!schutzAus && statusDef?.negative && !opts._fromSurpriseRedirect && !this._inSurpriseResolution) {
+    // 23.10. (Tearing Mountain, Al): Umleitungen (Cactus Creature, Reflection …) verhindern den Status nicht, sie verlegen ihn — sie bleiben wirksam.
+    if (statusDef?.negative && !opts._fromSurpriseRedirect && !this._inSurpriseResolution) {
       const redirect = await this._checkSurpriseOnStatus(playerIdx, heroIdx, statusName, opts);
       if (redirect) {
         if (redirect.type === 'hero') {

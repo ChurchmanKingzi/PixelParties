@@ -114,7 +114,7 @@ module.exports = {
         // W16c (A05-20): Schutzkarten ("when a Creature is chosen by an opponent's card" - Winged Skeleton) lesen `beforeCreatureAffected`;
         // gleiche Bauform wie Grunge Harpyformer / Unwanted Audience.
         const hookCtx = {
-          creature: inst, effectType: 'status',
+          creature: inst, effectType: 'status', statusName: 'burned',
           source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
           cancelled: false, _skipReactionCheck: true,
         };

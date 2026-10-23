@@ -8,12 +8,22 @@
 //
 //  ── TEIL 1: JEDER BURN GEHT DURCH ───────────────────────────────────────
 //  Reiner Engine-Vertrag, kein Kartencode: `negatesStatusPrevention: ['burned']` meldet die Area bei der Engine an. Solange sie in einer Area-Zone liegt (jedem Spieler,
-//  egal wer sie gespielt hat), beantwortet `engine.statusSchutzAufgehoben('burned', ziel)` „ja" — und alle Schutztore der Statusvergabe (`addHeroStatus`,
-//  `actionAddStatus`, `applyCreatureStatus`, `canApplyCreatureStatus`, `canTargetForStatus`, `heroBlocksStatusNow`) lassen den Burn durch: Statusschutz (Divine Gift of
-//  Coolness, Johanna, Light Ball …), Immunitäten (Effekt-Immunität, Resistance, Spell-Immunität des Black-Thorn Dragon, Anti Magic, Charme, Defending the Gate,
-//  Kreatur-Immunitäten …) und Umleitungen (Surprise-Umleiter). Resistance & Co. sehen den Burn als „nicht verhindert" (`schutzAufgehoben` im Hook).
-//  NICHT berührt: SCHADEN durch Burn. Er kann weiter reduziert (Tempeste) oder negiert (Chuck) werden — das ist Schadensschutz, kein Schutz vor dem Status. Ebenso bleibt
-//  die Erste-Runden-Immunität des Nicht-Zugspielers und Diver Helmet („unaffected by Areas") bestehen.
+//  egal wer sie gespielt hat), beantwortet `engine.statusSchutzAufgehoben('burned', ziel)` „ja" — und JEDES Tor, das einen Burn VERHINDERN würde, lässt ihn durch
+//  (`addHeroStatus`, `actionAddStatus`, `applyCreatureStatus`, `canApplyCreatureStatus`, `canTargetForStatus`, `heroBlocksStatusNow`, dazu das Schutzfenster
+//  `beforeCreatureAffected` für Status in `runHooks`). Alles, was einen Burn verhindert oder negiert, ist aufgehoben:
+//    Held:     Statusschutz (Divine Gift of Coolness, Fern, Lunatic Cycle, Petrification Break, Light Ball, Johanna, `burn_immune`), Effekt-Immunität (Barrier of Faith,
+//              Castling, Divine Gift of Rain, Future Tech Escape Device/Weathercock, Glass Wall, Test Flight), Resistance, Anti Magic, Anti Magic Enchantment,
+//              Energy Aura, Spell-Immunität (Black-Thorn Dragon), Charme, Submerged.
+//    Kreatur:  `burn_immune`, Lunatic Golem, Spell-/Omni-Immunität (Black-Thorn Dragon, Cardinal Beasts), Golden Wings, Board-Wächter (Sparkfly, „of Kings", Puppets/Vinny),
+//              Defending the Gate, Light Ball, Effekt-Immunität — und die Schutzfenster „would be affected": Cool Rescuer Monia, Elusive Hind, Warrior of Teocuilatl,
+//              Winged Skeleton (das Fenster öffnet unter der Area gar nicht erst, es wird also auch keine Karte als Preis bezahlt).
+//  NICHT aufgehoben (bewusst):
+//    • UMLEITUNGEN (Cactus Creature, Reflection, Monia Bot, Alleria …): sie verhindern den Burn nicht, sie verlegen ihn — sie wirken weiter; der Burn trifft dann das neue
+//      Ziel, ebenfalls ungeschützt.
+//    • SCHADEN durch Burn: er kann weiter reduziert (Tempeste) oder negiert (Chuck) werden — das ist Schadensschutz, kein Schutz vor dem Status.
+//    • die Erste-Runden-Regel des Nicht-Zugspielers (`shielded`: Spielregel, kein Effekt) und Diver Helmet („unaffected by Areas").
+//    • Karten, die die GANZE Karte/den ganzen Effekt negieren (Gegenzauber wie Glass Wall) — sie verhindern nicht das Verbrennen eines Ziels, der Effekt kommt gar nicht erst.
+//  Resistance & Co. sehen den Burn als „nicht verhindert" (`schutzAufgehoben` im Hook).
 //
 //  ── TEIL 2: ZWANGSBRAND AM ZUGSTART ─────────────────────────────────────
 //  `onTurnStart`: der Zugspieler MUSS ein Ziel, das er kontrolliert, wählen (Held oder Kreatur) — nicht abbrechbar — und es dauerhaft („for the rest of the game")
@@ -22,7 +32,7 @@
 //
 //  ── ANNAHMEN (Rulings der Umsetzung) ──────────────────────────────────
 //  • Wählbar: lebende Helden, die der Zugspieler KONTROLLIERT (übernommene zählen, abgegebene nicht), und Kreaturen unter seiner Kontrolle (Support Zones, aufgedeckt,
-//    wählbar als Kreatur). Wer schon dauerhaft brennt, ist kein Ziel mehr (Wahl wäre verschenkt); ein befristeter Burn wird zum dauerhaften aufgewertet.
+//    wählbar als Kreatur). Wer schon BRENNT (egal ob dauerhaft oder befristet), ist kein Ziel — Vorgabe Al, 23.10.
 //  • Helden mit Diver Helmet und ihre Support-Zonen-Karten sind „unaffected by Areas" — nie Ziel der Area (weder Wahl noch Burn).
 //  • Gibt es kein wählbares Ziel mehr, passiert nichts.
 //  • Harte Unwählbarkeit (Thicket) gilt weiter: die Wahl wählt, der Burn-Schutz ist aufgehoben, aber „cannot be chosen" ist kein Burn-Schutz.
@@ -34,18 +44,10 @@
 const CARD_NAME = 'Tearing Mountain';
 const BURN_ANIM = 'flame_strike';
 
-/** Brennt das Ziel schon dauerhaft („for the rest of the game")? */
-function brenntDauerhaft(eintrag) {
-  if (!eintrag) return false;
-  if (eintrag.hero) {
-    const b = eintrag.hero.statuses?.burned;
-    return !!b && (b === true || b.permanent === true || b.duration == null);
-  }
-  const b = eintrag.inst?.counters?.burned;
-  if (!b) return false;
-  if (b === true) return true;
-  if (typeof b === 'object') return b.duration == null && b.turnsLeft == null && b.expiresOnTurn == null;
-  return true;
+/** Brennt das Ziel schon (egal wie lange)? Bereits Verbrannte sind für den Zwangsbrand KEIN Ziel (Al, 23.10.). */
+function brenntSchon(eintrag) {
+  if (eintrag.hero) return !!eintrag.hero.statuses?.burned;
+  return !!eintrag.inst?.counters?.burned;
 }
 
 /** Alle Ziele, die `pi` kontrolliert und die die Area brennen lassen darf. */
@@ -55,7 +57,7 @@ function ziele(engine, pi) {
     const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
     if (!hero?.name || hero.hp <= 0) continue;
     if (engine.heldIstVonAreasAusgenommen(t.owner, t.heroIdx)) continue;   // Diver Helmet: unaffected by Areas
-    if (brenntDauerhaft({ hero })) continue;
+    if (brenntSchon({ hero })) continue;
     out.push(t);
   }
   for (const t of engine.getCreatureTargets(pi)) {
@@ -63,7 +65,7 @@ function ziele(engine, pi) {
     if (!inst || inst.faceDown || inst.zone !== 'support') continue;
     if (!engine._istKreaturenInstanz(inst)) continue;
     if (engine.karteIstVonAreasAusgenommen(inst)) continue;
-    if (brenntDauerhaft({ inst })) continue;
+    if (brenntSchon({ inst })) continue;
     out.push(t);
   }
   return out;
