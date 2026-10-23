@@ -13702,6 +13702,28 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   .zone-ability-activatable::after, .zone-ability-free-activatable::after, .zone-creature-activatable::after, .zone-equip-activatable::after, .zone-hero-effect-active::after, .zone-permanent-activatable::after, .zone-friendship-bonus::after { animation: none; }
 }
 
+/* ═══ Rahmen-Funkeln der Foil-Karten (Al, 23.10.) ═══
+   Pixel-Glitzerkreuze auf dem 1-Zellen-Rahmen (Karte = 75 × 105 Zellen): ein Funke geht an (nur die Mitte), blüht zum vollen Kreuz auf, schrumpft wieder
+   und erlischt — in harten Schritten (`steps`), jedes Kreuz mit eigener Dauer und Verzögerung. Farben wie der Rahmenglanz (--rim-rgb / --rim-hi). */
+.skin-holo-rim-funken { position: absolute; inset: 0; pointer-events: none; }
+.skin-holo-rim-funken b { position: absolute; display: block; opacity: 0; left: calc(var(--fx) * 1.33333%); top: calc(var(--fy) * 0.952381%); width: calc(var(--k) * 1.33333%); height: calc(var(--k) * 0.952381%); transform: translate(-50%, -50%); background: linear-gradient(#ffffff 0 0) center / calc(300% / var(--k)) calc(100% / var(--k)) no-repeat,
+    linear-gradient(#ffffff 0 0) center / calc(100% / var(--k)) calc(300% / var(--k)) no-repeat,
+    linear-gradient(rgb(var(--rim-hi)) 0 0) center / calc(100% / var(--k)) 100% no-repeat,
+    linear-gradient(rgb(var(--rim-hi)) 0 0) center / 100% calc(100% / var(--k)) no-repeat; animation: ppRimFunke var(--fp) steps(1, end) infinite; animation-delay: calc(var(--sh-phase, 0s) + var(--fd)); }
+@keyframes ppRimFunke {            /* aufblühen in drei Stufen (Punkt, kleines Kreuz, volles Kreuz), stehen, schrumpfen */
+  0%, 36% { opacity: 0; }
+  38%     { opacity: 1; clip-path: inset(calc(50% - 50% / var(--k))); }
+  44%     { opacity: 1; clip-path: inset(calc(50% - 150% / var(--k))); }
+  50%     { opacity: 1; clip-path: none; }
+  72%     { opacity: 1; clip-path: none; }
+  78%     { opacity: 1; clip-path: inset(calc(50% - 150% / var(--k))); }
+  84%     { opacity: 1; clip-path: inset(calc(50% - 50% / var(--k))); }
+  90%, 100% { opacity: 0; }
+}
+@container (max-width: 160px) { .skin-holo-rim-funken b:nth-child(n+7) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .skin-holo-rim-funken b { animation: none; opacity: 0; } }
+@media (pointer: coarse) and (max-height: 600px) { .skin-holo-rim-funken { display: none; } }
+
 
 /* ── RETRO-ZUSATZ (scripts/retro/retro-extra.css) ── */
 /* ════════════════════════════════════════════════════════════════════════════
