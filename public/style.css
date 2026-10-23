@@ -10611,9 +10611,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   }
   100% { filter: none; }
 }
-.blind-pick-active {
-  overflow: visible !important;
-}
+/* `.blind-pick-active` (Handreihe während einer Kartenwahl) darf die Reihe NICHT auf `overflow: visible` stellen: ein Flex-Element mit sichtbarem Überlauf hat als Mindestbreite seinen
+   Inhalt, die Reihe sprengte bei voller Hand ihre Zone und die zusammengeschobenen Karten fächerten sich in voller Breite auf. Das Polster der Reihe (`--fan-pad-x`, oben
+   0,8 Kartenhöhen) fasst Rahmen und Hub der markierten Karten ohnehin. */
 .blind-pick-eligible {
   outline: 2px dashed rgba(255,155,58,.6);
   outline-offset: 2px;
