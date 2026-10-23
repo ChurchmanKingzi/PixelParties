@@ -570,7 +570,7 @@ der Gegner sieht vor dem Commit nur „Opponent is choosing …" (Typ der Frage,
   schreibe sie aber nie NACH dem `delete gs._pendingCardReveal`, und nie mit dem Kartennamen in Zeilen, die vor jeder Vormerkung entstehen (Server-Sitzungsebene).
 * **Fragen, die zuerst der GEGNER beantwortet** (Bottled Flame, Overflowing Chalice, Duel): der Auftritt kommt vor seiner Frage — das ist Absicht (die Karte ist dann verbindlich gespielt). Spätere „abbrechbare"
   Fragen des Spielers (Abwurf annehmen?) geben die Karte nicht mehr zurück und sind keine Abbruchstellen im Sinne dieser Regel.
-* **Kreaturen:** der Auftritt einer Kreatur ist die Landung (Flug + `summon_effect`). Beschwörungskosten (Opfer, Schaden, Bleed) laufen davor — Entscheidung offen (Rückfrage an Al, W64b).
+* **Kreaturen:** der Auftritt einer Kreatur ist die Landung (Flug + `summon_effect`). Beschwörungskosten (Opfer, Schaden, Bleed) laufen davor — **Al (23.10.2026): „Nein, die Reihenfolge dort ist aktuell richtig"**; bezahlt wird erst hinter der letzten Abbruchstelle der Kostenwahl (Abschnitt „KOSTEN UND LIMITS ERST NACH DEM COMMIT").
 * **Verdeckt gelegte Karten** (Surprise face-down) verraten ihren Namen auch nicht auf der Leitung: `broadcastHandToBoard` lässt `cardName` bei `faceDown: true` weg.
 
 ### Prüfliste für neue Karten (W64b)
@@ -587,6 +587,51 @@ der Gegner sieht vor dem Commit nur „Opponent is choosing …" (Typ der Frage,
 `W.durchlauf(mk, seat, name, o)` + `W.pruefeDurchlauf(R, label, d, o)`: ein Durchlauf und je ein Abbruch ab JEDER abbrechbaren Stelle — „nichts vor der letzten echten Abbruchstelle, danach der Auftritt; Abbruch → nichts
 (Ereignis, Zeile, Zustand), Karte noch auf der Hand"; seit W64b zusätzlich „der Auftritt kommt je Empfänger vor dem ersten Effekt-Ereignis, der ersten Effekt-Protokollzeile und dem ersten Zustandswechsel" (`r.pro`, Option
 `ohneEffektOrdnung` für Kreaturen mit Beschwörungskosten). Der Sweep `docs/niche-tests/repro/W63/d-07-…` spielt ALLE Handkarten mit möglicher Abbruchfrage durch und ist der Wächter gegen neue Verstöße.
+
+## ★ KOSTEN UND LIMITS ERST NACH DEM COMMIT (Als Regel, 23.10.2026 — MANDATORY, Prüfung zentral in `W.pruefeDurchlauf` + Sweeps)
+
+> Al (23.10.2026, Skullmael's Greatsword / Call of the Deepsea / Guardian Beast Hu): „Wird einer der Effekte abgebrochen, werden dadurch alle Limits nicht verbraucht. Außerdem werden eventuelle Kosten wie Opfer oder Gold
+> **generell** immer erst bezahlt, wenn committed ist und nicht mehr abgebrochen werden kann!"
+
+**Die Regel in einem Satz: Kosten UND Limits werden erst bezahlt bzw. gestempelt, wenn die Karte / der Effekt committed ist (= hinter der letzten abbrechbaren Stelle, dort, wo auch der Auftritt kommt) — ein Abbruch an JEDER
+abbrechbaren Stelle (Zielwahl, Kostenwahl, Galerie, Zonenwahl, Bestätigung) lässt den Spielzustand EXAKT wie vor dem Beginn.**
+*Kosten* = Opfer, Gold, Karten abwerfen/löschen, Pollution Tokens platzieren, Bounce-Kosten, Selbstschaden. *Limits* = HOPT/HOPG/`oncePerTurn`/`oncePerGame`/`_oncePerGameUsed`, Spell-/Attack-Zähler (`spellsPlayedThisTurn`,
+`attacksPlayedThisTurn`), Limit-Stempel, Aktions-/Zugzähler, Sperren-Marken, Terror-Zähler (`_terrorTracking`). „Exakt wie vorher" heißt: Gold, Hand, Ablage, Deck IN SEINER REIHENFOLGE (ein Mischen vor dem Commit ist selbst ein
+Verstoß), Löschstapel, Potion Deck, Brett, alle Marken/Stempel/Zähler, Aktionspunkte, Helden-/Kreaturzustände, Pollution Tokens, Hook-Zustände.
+**Ausnahmen** nur, wo der Kartentext Kosten ausdrücklich schon bei der Aktivierung verlangt UND das Spielen später negiert werden kann (Eraser Beam „Place 3 Pollution Tokens … to use this Spell" — Aktivierungskosten, auch bei
+späterer Negation bezahlt; Z7b „eine ganz negierte Karte stempelt nicht"): sie gelten ab dem Commit-Punkt (nach der Abbruchstelle) und bleiben.
+
+### Wie die Engine / die Karten es umsetzen
+1. **Reihenfolge:** Fragen (abbrechbar) → Commit (Auftritt, siehe Abschnitt oben) → Kosten bezahlen / Limits stempeln → Effekt. Die letzte abbrechbare Frage der Karte ist der Commit-Punkt; steht eine Kostenwahl der beschworenen
+   Kreatur (Opfer-/Tribut-Wahl) dahinter, ist SIE die letzte Abbruchstelle des Auslösers.
+2. **Werkzeug `engine.beiCommit(fn)` / `ctx.beiCommit(fn)` (W66b):** merkt `fn` (synchron, idempotent) im Auftritts-Vormerk-Eintrag (`gs._pendingCardReveal.beiCommit`) vor; es läuft beim Commit (`_firePendingCardReveal`: nach Auftritt und
+   Karten-Zeile, vor dem ersten Effektschritt), ein Abbruch löscht den Eintrag samt `fn` — nichts ist passiert. Ohne offene Vormerkung (Auslöser/Hooks, CPU/MCTS) läuft `fn` sofort: dann gehört der Aufruf HINTER die letzte
+   abbrechbare Frage. Vorbild: der Terror-Zähler (`doPlayCreature`, `doConfirmPotion`). Verwandte, ältere Werkzeuge: `itemLockVormerken` (Item-Lock-Kosten, Welle 12), `zusageAuftritt: fn` (Zusatzaktionen, v1302/v1306),
+   `payActivationCost`/`payArtifactCost`/`paySummonCost` (Kosten vor dem Reaktionsfenster, W4b).
+3. **Auslöser, die eine Kreatur beschwören (Skullmael's Greatsword, Call of the Deepsea, …):** `engine.summonFromPile(pi, pile, name, hi, si, { nachKostenAnim: async (ab) => { … } })` fragt ZUERST die Kosten der Kreatur
+   (`_beschwoerungKostenVorAuftritt`; Abbruch = Karte an ihren Platz zurück, `nachKostenAnim` läuft nie) und ruft `nachKostenAnim` erst dahinter: dort `claimHOPT`, Banner (`showTriggeredEffect`), Animation und Löschen/
+   Bezahlen der eigenen Kosten (Call of the Deepsea: „delete it"). Liefert `nachKostenAnim` `false`, sagt die Karte nach dem Commit ab (Karte zurück; der Aufrufer gibt seinen Stempel selbst frei). Karten, die sich in
+   `beforeSummon` SELBST legen (500 Piranhas, Dark Deepsea God, Tausch-Tribute, `ps._placementConsumedByCard`), gelten dabei als beschworen (`kernOpts._selbstGelegt`) — nicht als Abbruch (vorher: Karte doppelt, Sperre offen).
+4. **Eigener Stempel vor der Frage ist nur erlaubt als Schutz gegen Verschachtelung — dann mit Rückgabe bei JEDEM Abbruchweg** (`delete gs.hoptUsed[…]`, `heldenSperreFreigeben`, Merker wie `_taioNachguss`), und ohne dass der
+   Gegner etwas sieht. Besser: erst NACH der Frage stempeln (`engine.claimHOPT` hinter der Zielwahl; Locke, Skullmael, Call of the Deepsea). Wurde der Effekt in der Zielwahl NEGIERT/abgeblockt (`gs._spellNegatedByEffect`,
+   `_zielNegiertDurchSchutz`), ist er verbraucht — kein Abbruch (Muster Alice, Locke).
+5. **Reservierung statt Zahlung, wenn die Folgestufe es braucht (Ausnahme mit Auflagen):** manche Karten müssen etwas aus einem Stapel nehmen, damit die Folgestufe es sieht (Guardian Beast Hu: die 5 Löschkarten leeren die Ablage,
+   ohne die ein Guardian Beast gar nicht spielbar wäre; Monster Nest sinkt logisch, damit es nicht sein eigenes Opfer wird; die gespielte Kreatur wird aus Hand/Deck/Ablage genommen, damit sie nicht ihr eigenes Opfer ist).
+   Das ist erlaubt, wenn (a) es im **Kosten-Vorlauf** läuft — `engine.imKostenVorlauf(fn)` bzw. `engine._auftrittSchrittAus`: nichts davon committet den Auftritt, Ereignisse und Zeilen warten im Auftritts-Puffer und verfallen bei
+   Abbruch; (b) die Rückgabe EXAKT ist (`returnToPile` mit Index, `deckRueckgabe`, `ruecklegenGeloeschteAblagekarten`; **das Deck wird nie gemischt, bevor committed ist** — `summonFromDeck` mischt erst hinter der letzten
+   Abbruchstelle); (c) der Sweep (unten) die Karte in der Ausnahmeliste führt. Eigentlich BEZAHLT (Opfer entfernt, Gold weg, Schaden zugefügt) wird nie vor der letzten Abbruchstelle.
+6. **Keine Merker zurücklassen:** Absichts-Marken des Spielwegs (`_requestedNormalSummonSlot`/`_requestedBouncePlaceSlot` in `doPlayCreature`) räumt der Spielweg in einem `finally` ab; Vormerkungen (`_pendingCardReveal`, `_pendingPlayLog`)
+   verfallen mit dem Abbruch.
+
+### Prüfliste für neue Karten (W66b)
+1. Steht ein Stempel/Zähler/Kosten-Aufruf (`claimHOPT`, `hoptUsed[…] =`, `_oncePerGameUsed.add`, `actionPayGold`, `resolveSacrificeCost`, `actionDiscard…`, `deleteFromPile`, Pollution Tokens, `++` auf `ps.*`) VOR einer abbrechbaren Frage
+   (`cancellable: true`, `promptDamageTarget`/`promptMultiTarget`/`promptConfirmEffect` — die ctx-Helfer sind STANDARDMÄSSIG abbrechbar)? Dann hinter die Frage schieben (oder `ctx.beiCommit`).
+2. Kosten einer **beschworenen** Kreatur sind eine eigene Abbruchstelle deiner Karte: Pile-Wege (`summonFromPile/-Discard/-Deck`) mit `nachKostenAnim` für alles, was erst nach der Kostenwahl passieren darf.
+3. Jeder Abbruchzweig stellt EXAKT her: Karte an ihren Platz (Index!), Deck nicht gemischt, Stempel frei, kein Merker, kein Zähler — und zeigt dem Gegner nichts.
+4. Repro mit `W.durchlauf` + `W.pruefeDurchlauf(R, label, d, { seat, … })` (beide Sitze): prüft jetzt zusätzlich „Zustandsdifferenz nach Abbruch = 0" an jeder echten Abbruchstelle (Aktivierungen/Auslöser: `prepFn` für den Szenenaufbau,
+   `callFn` für den Anstoß, `aktivierung: true`) und „an den Abbruchstellen ist nichts bezahlt". Der Wächter über alle Karten: `W66/b-08` … `b-13` (Handkarten, Aktivierungen; Sitz 0 und 1), Methode `lib/zustands-sweep.js`.
+5. Entdeckungswerkzeug für Hooks/Fenster (Trigger, Reaktionen): `PP_ABBRUCH_WAECHTER=<datei.jsonl> node <repro.js>` meldet Hooks, die vor einer abbrechbaren Frage den Zustand verändert haben; mit `PP_ABBRUCH_MODUS=abbrechen`
+   werden die abbrechbaren Fragen innerhalb der Hooks abgebrochen und am Hook-Ende die Zustandsdifferenz gemeldet (`lib/abbruch-waechter.js`).
 
 ## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
@@ -26644,3 +26689,83 @@ Kosten-Szene (Ablage/Deck/Hand/Potion Deck mit 500 Piranhas, Archer/Warrior/Guar
 - **Bild und Klang:** `kidnap_sack` (Pixelart, `ppSalve`, Brett-Animation mit `targets: [{ owner: Brettseite, heroIdx, zoneSlot }]`, ~1350 ms): ein Jutesack (Webmuster, Flicken, Strick) fällt auf die Kreatur, staucht sich mit Staubwolke, wird zugebunden, zappelt (Beulen abwechselnd links/rechts, Stossstriche) und löst sich gedithert mit Funken auf; ab ~1150 ms fliegt die Kreatur auf die Hand. Klänge in `ZONE_ANIM_SFX`. Logs `kidnapping`, `kidnapping_blocked`, `kidnapping_fizzle`.
 - **CPU:** `cpuResponse` (`effectTarget`, Titel = Kartenname) nimmt die wertvollste wählbare Kreatur (Stufe, HP, ATK); `cpuMeta.optionalInherent` (auch als normale Aktion spielbar).
 - **Annahmen:** „your opponent" = `opponentOf(pi)` (Skill Test: Fokus-Gegner, wie Capture Net); Token zählen als Kreaturen; Boris (Vorgabe Al, 23.10.): die Sperre gilt nur gegen den Boris-Spieler, nicht allgemein — im Zwei-Spieler-Spiel heißt das: Karte gesperrt (es gibt nur diesen Gegner); im Skill Test mit mehr als zwei Spielern ist sie nur gesperrt, solange der Fokus-Gegner Boris hat (Test: 3 Spieler, Boris bei Spieler 1: Fokus 2 → spielbar und wählt nur Kreaturen von Spieler 2; Fokus 1 → gesperrt, Held im Sperrkanal `getBorisBlocked`).
+
+
+---
+
+## Welle 66 / W66b — Kosten und Limits erst nach dem Commit · Zustands-Differenz-Sweep · Fantasy Buddys teilen EINE Zone
+
+Entscheidungen von Al (Spieldesigner, 23.10.2026):
+1. **Abbruch verbraucht keine Limits; Kosten generell erst NACH dem Commit.** „Wird einer der Effekte abgebrochen, werden dadurch alle Limits nicht verbraucht. Außerdem werden eventuelle Kosten wie Opfer oder Gold **generell** immer erst
+   bezahlt, wenn committed ist und nicht mehr abgebrochen werden kann!" (auf die Fragen zu Skullmael's Greatsword, Call of the Deepsea, Guardian Beast Hu aus W65a/W64b: JA). Verbindlicher Vertragsabsatz mit Prüfliste:
+   Abschnitt „★ KOSTEN UND LIMITS ERST NACH DEM COMMIT" oben.
+2. **Kosten bei Kreaturen** (Opfer, Schaden, Bleed): „Nein, die Reihenfolge dort ist aktuell richtig" — die Kosten laufen vor der Landung; unverändert. Bestätigt durch den Sweep: bezahlt wird nie vor der letzten Abbruchstelle der Kostenwahl.
+3. **Fantasy Buddys teilen eine Zone mit ALLEN Fantasy Buddys**, unabhängig vom Spell-Namen („Creatures with identical names … share 1 Support Zone": für die Teilung gilt der Token als „Fantasy Buddy Token").
+
+### 1) Methode: Zustands-Differenz-Sweep
+`docs/niche-tests/lib/zustand.js` serialisiert den KOMPLETTEN Spielzustand (`gs` rekursiv + alle `cardInstances`, Listen wie Hand/Ablage/Deck/Löschstapel mit Reihenfolge; ignoriert nur Anzeige-/Protokoll-/Zeitfelder und
+Auflösungs-Buchführung) und vergleicht ihn (`zustandDiff`). `wire.js`: `W.spiele` nimmt den Schnappschuss unmittelbar vor dem Spielweg (`vorAufruf`/`snap`), `out.zustandsDiff` nach dem Lauf, `out.promptRoh[k]` beim Öffnen der k-ten
+abbrechbaren Frage; `W.durchlauf(..., { prepFn, callFn })` trennt Szenenaufbau (`prepFn`) vom Anstoß; **`W.pruefeDurchlauf` prüft jetzt zusätzlich „Zustandsdifferenz nach Abbruch = 0"** an jeder echten Abbruchstelle und „an den
+Abbruchstellen ist noch nichts bezahlt" (Gold, Ablage/Löschstapel, Helden-HP/-Status, Brett; Reservierungen wie Einmal-Stempel, Aktionszähler und die Entnahme der gespielten Karte sind erlaubt, `o.bezahltAusnahme` für Ausnahmen).
+`lib/zustands-sweep.js` fährt das über alle Karten: **1184 Handkarten** (854 in der Standardszene spielbar, 189 mit Abbruchfrage, 241 Abbruch-Läufe, davon 180 echte Abbruchstellen; 330 nicht spielbar → Fehlversuch darf nichts hinterlassen) und
+**257 Aktivierungen** (Held 50, Area 7, Kreatur 167, Ausrüstung 11, freie Ability 18, Aktions-Ability 1, Permanent 1, Ablage-Effekt 2; 128 mit Auftritt, 107 mit Abbruchfrage, 131 echte Abbruchstellen), beide Sitze.
+Entdeckungswerkzeug für Hooks/Fenster, die der Sweep nicht erreicht (Trigger, Reaktionen): `lib/abbruch-waechter.js` (`PP_ABBRUCH_WAECHTER=<datei.jsonl>`, optional `PP_ABBRUCH_MODUS=abbrechen`) — lief über alle 1325 Repros.
+
+### 2) Verstoß-Tabelle (Ausgangszustand → Befund)
+| Karte / Baustein | Was vor dem Commit verändert/verbraucht wurde | Umsetzung |
+|---|---|---|
+| **Skullmael's Greatsword** | Einmal-Sperre (HOPT), Banner (`showTriggeredEffect`) und Animation (`undead_revival`) VOR der Opfer-/Tributwahl der beschworenen Kreatur; ein Abbruch dort ließ die Sperre verbraucht und dem Gegner Banner + Animation gezeigt | `summonFromPile(…, { nachKostenAnim })`: Kostenwahl zuerst (letzte Abbruchstelle), dahinter HOPT → Banner → Animation → Landung |
+| **Call of the Deepsea** | HOPT, Banner, Strudel UND „delete it" (die besiegte Karte wurde GELÖSCHT) vor der Kostenwahl; ein Abbruch ließ Sperre verbraucht und Karte gelöscht | wie Skullmael; „delete it" in `nachKostenAnim` (`false` = nach dem Commit abgesagt) |
+| **Guardian Beast Hu** | Aktivierung (`performImmediateActionAnyHero` war Schritt-Primitiv) und die 5 Löschungen samt Animation/Zeilen gingen beim Öffnen der Aktionswahl an den Gegner; ein Abbruch erstattete sichtbar | Primitiv aus der Schritt-Liste; Löschkosten im Kosten-Vorlauf (`engine.imKostenVorlauf`, `vorlauf: true`): unsichtbar, exakte Rückgabe |
+| **Terror-Zähler** (`_trackTerrorResolvedEffect`; 14 Handkarten im Sweep: Archer/Warrior/Guardian of Teocuilatl, Steam Dwarf Dragon Pilot, Blue-Ice Dragon, Doctor Fester, Knight of Kings [W], 500 Piranhas, The Egg of God, Foresta, Treasure Hunter's Backpack, Blood-Soaked Coin, The Yeeting, The Eye of Ren; dazu Aktivierungen wie Guardian Beast Hu) | Zähler am ANFANG des Spielwegs (`doPlayCreature`, `doConfirmPotion`): ein Abbruch zählte mit und konnte Terror („nach 5/6/7 verschiedenen Effekten endet der Zug") auslösen | `engine.beiCommit(fn)` (neu): läuft beim Commit, Abbruch verwirft |
+| **Absichts-Marken** `_requestedNormalSummonSlot` / `_requestedBouncePlaceSlot` (alle Kreaturen mit Kostenwahl) | blieben nach Abbruch der Kostenwahl stehen (nur der Zugbeginn räumte sie ab) | `finally` in `doPlayCreature` |
+| **Monster Nest** | gewählte Karte wurde beim Abbruch der Kostenwahl MIT Mischen ins Deck zurückgelegt (Reihenfolge verändert) | Rückgabe an den exakten Index |
+| **`summonFromDeck` / `summonFromPile('deck')`** (Baustein) | Mischen schon in der Entnahme (vor der Kostenwahl) UND beim Abbruch erneut | Entnahme ohne Mischen, `deckRueckgabe` an den Index, Mischen erst hinter der letzten Abbruchstelle |
+| **Locke, the Unseen Saboteur** | `claimHOPT` VOR der abbrechbaren Zielwahl | Stempel nach der bestätigten Zielwahl; negiert/abgeblockt = verbraucht (Muster Alice) |
+| **Pile-Wege × sich selbst legende Kreaturen** (500 Piranhas in a Monster Suit; Baustein `_engine`) | die Pile-Wege hielten „`beforeSummon` liefert false" immer für einen Abbruch und legten die Karte in Ablage/Deck zurück, obwohl sie sich schon selbst gelegt hatte → Karte doppelt, bei Skullmael/Forceful Revival Sperre offen; 500 Piranhas nahm bei Pile-Beschwörung eine ANDERE Kopie von der Hand | `kernOpts._selbstGelegt` (gilt als beschworen); Piranhas nimmt nur bei Beschwörung von der Hand eine Handkarte |
+| Rest (Sweep ohne Befund, Reservierungen dokumentiert) | Guardian Beast Hu (Löschkarten), Monster Nest (sinkt logisch), Beschwörungs-Wege (gespielte Karte aus Hand/Deck/Ablage genommen) reservieren vor der Kostenwahl, geben exakt zurück | Ausnahmeliste in `W66/b-12/13`; Vertragsabsatz Punkt 5 |
+
+Nicht beanstandet (Sweep: Differenz 0): alle Handkarten und Aktivierungen der Standardszene auf beiden Sitzen, 26 Surprise-/Reaktionskarten im Ablehnen-Fenster (`W66/b-14`). Bekannte Besonderheiten, bewusst belassen: Aktivierungswege stempeln HOPT als
+Schutz gegen Verschachtelung am Anfang und geben ihn bei JEDEM Abbruch zurück (W13-Muster, Differenz 0); Hell Fox mischt nach einer abgelehnten Deck-Suche (der Tod-Effekt davor ist committed); Angebots-Merker einer Auflösung
+(`_cibPromptedFor`, `_bsPromptedFor`, `_saPromptedFor`) räumen `onChainResolve`/`onAnyActionResolved` ab.
+
+### 3) Neue Engine-Bausteine
+* `engine.beiCommit(fn)` / `ctx.beiCommit(fn)` — Kosten/Zähler/Stempel am Commit (`_firePendingCardReveal` → `_fuehreCommitAktionenAus`); ohne Vormerkung sofort.
+* `engine.imKostenVorlauf(fn)` — Reservierung im Kosten-Vorlauf (committet den Auftritt nicht; Ereignisse warten im Puffer).
+* `summonFromPile/-Discard/-Deck`: Option `nachKostenAnim` (jetzt auch von `summonFromPile` durchgereicht und für Hand/Potion Deck), Rückgabe `false` = nach dem Commit abgesagt; `_beschwoerungKostenVorAuftritt` meldet sich selbst legende Karten (`_selbstGelegt`).
+* `performImmediateAction`/`performImmediateActionAnyHero` stehen nicht mehr in `AUFTRITT_SCHRITT_PRIMITIVE` (ihre Aktionswahl ist bei `cancellable` eine Abbruchstelle; eine Pflicht-Aktionswahl committet über die Pflichtfrage-Regel).
+* Server: `doActivatePermanent`/`doActivateDiscardEffect` für die Harness exportiert (`skillTestHandlers`).
+
+### 4) Fantasy Buddys (Entscheidung 3)
+`_alice-shared.js`: `FANTASY_BUDDY_TEILNAME = 'Fantasy Buddy Token'`, `teilName(x)` (Instanz mit `counters._fantasyBuddyToken` → dieser Name, sonst `name`); `canShareInto` akzeptiert Namen ODER Instanz und vergleicht `teilName` (Rückwärtsverständnis:
+der Zaubername des vorhandenen Buddys trifft weiter dessen Zone). Inya übergibt den Teil-Namen (`safePlaceInSupport(…, { teilName })`, `teilbareSlots(…)`); beim Bewegen bestehender Karten (Guard Change, Slippery Skates/-Shared, Paraseed Greenhouse)
+wird die Instanz übergeben. Folgen: zentrale Zonenfrage (`canShareInto`, `beschwoerZonenFuer`, `teilbareSlots`, `safePlaceInSupport`) liefert für Buddys verschiedener Zauber dieselbe geteilte Zone („erst die geteilte Zone, DANN die erste leere");
+Treffer/Tod einzelner Buddy-Instanzen funktionieren unverändert (`stackAt` zählt Creature-Tokens; der Todespfad räumt den Namen des Gefallenen aus der Zone; Inyas Schutz zählt lebende Buddy-Instanzen). **Client unverändert** (`public/app-board.jsx`):
+die Zone zeigt die zuletzt gelegte Karte (`cards[cards.length-1]`) mit den Zählern derselben Kopie (`creatureCounters`: die zuletzt getrackte Instanz gewinnt — deckungsgleich), das Abzeichen „🧬 ×N" kommt aus `supportStacks`, ein Klick listet jede Kopie mit eigenem Zaubernamen/Bild, HP, Countern.
+
+### 5) Tests W66b
+| Datei | Inhalt | Prüfungen | alter Stand |
+|---|---|---|---|
+| `W66/b-01-fantasy-buddys-teilen-eine-zone-unabhaengig-vom-zauber.js` | Buddys verschiedener Zauber × beide Sitze × mit/ohne Alice: echtes Spielen über Inya, Reihenfolge, Zonenfrage, Anzeige-Daten (Server-Zustand), Treffer/Tod/Schutz | 60 | rot (28 ✗) |
+| `W66/b-02-terror-zaehler-zaehlt-nur-committete-karten.js` | Terror Lv3 (Schwelle 5) × 8 Karten × 2 Sitze: Abbruch zählt nicht, Commit zählt und löst aus | 84 | rot (36 ✗) |
+| `W66/b-03-skullmaels-greatsword-abbruch-gibt-einmal-sperre-zurueck.js` | Skullmael × 5 Kosten-Kreaturen × 2 Sitze: Abbruch an jeder Stelle (Galerie, Zonenwahl, Kostenwahl) | 162 | rot (6 ✗) |
+| `W66/b-04-call-of-the-deepsea-abbruch-gibt-einmal-sperre-zurueck-loescht-erst-danach.js` | Call of the Deepsea × 3 Quellen × 2 Sitze | 72 | rot (4 ✗) |
+| `W66/b-05-guardian-beast-hu-loeschkosten-erst-mit-der-aktion-abbruch-unsichtbar.js` | Hu × 2 Aktionen × 2 Sitze: Abbruch an jeder Stelle, Gegner sieht nichts, Löschung erst nach dem Commit der Aktion sichtbar | 56 | rot (16 ✗) |
+| `W66/b-06-deck-suche-abbruch-laesst-das-deck-unveraendert.js` | `summonFromDeck`, Monster Nest, `summonFromPile('deck')`: Deck exakt, kein Mischen-Ereignis | 46 | rot |
+| `W66/b-07-trigger-locke-abbruch-der-zielwahl-verbraucht-die-einmal-sperre-nicht.js` | Locke | 8 | rot (6 ✗) |
+| `W66/b-08…b-11` | Sweep aller 1184 Handkarten (Sitz 0/1, je zwei Hälften) | je 5 | rot |
+| `W66/b-12`, `b-13` | Sweep aller 257 Aktivierungen (Sitz 0/1) | je 4 | rot |
+| `W66/b-14-surprise-und-hand-reaktionen-ablehnen-laesst-alles-unveraendert.js` | Surprise-/Hand-Reaktionsfenster ablehnen (26 Karten, 5 Auslöser) | 10 | grün (Wächter) |
+
+### 6) Rückfragen an Al (Ja/Nein)
+1. **Guardian Beast Hu:** die 5 Löschkarten verlassen die Ablage logisch schon bei der Aktionswahl (unsichtbar im Kosten-Vorlauf, bei Abbruch exakt zurück) — nötig, weil sonst ein Guardian Beast (verlangt leere eigene Ablage) nicht wählbar wäre. Für den Spieler ist das nicht
+   erkennbar (Gegner sieht nichts vor dem Commit der Aktion, Abbruch = alles wie vorher). Ist das so in Ordnung — ja/nein? (Wörtlich „erst nach dem Commit" würde Guardian Beasts als Hu-Aktion ausschließen.)
+2. **Reservierung allgemein:** Die Aktivierungswege stempeln die Einmal-Sperre schon am Anfang und geben sie bei jedem Abbruch exakt zurück; Kreaturen werden vor der Kostenwahl aus Hand/Deck/Ablage genommen (damit sie nicht ihr eigenes Opfer werden) und exakt zurückgelegt. Ist „unsichtbar + exakt zurück" für diese
+   Fälle genug — ja/nein?
+3. **Letter of Misinformations** (Trigger, nicht abgebrochene Karte): die Einmal-Sperre wird beim Öffnen der Auswahl gesetzt, auch bei „Take none" (Hand wurde dann schon aufgedeckt und anschließend gemischt). Soll „Take none" die Sperre stattdessen
+   zurückgeben (dann ohne Aufdecken/Mischen)? — ja/nein. (Unverändert belassen.)
+
+### 7) Testergebnisse W66b
+* Alle 1339 Repros (inkl. der 14 neuen W66-Dateien, beide Sitze): „tritt NICHT auf" 1339/1339 (vorher 1325 grün).
+* `node scripts/check-*.js`: grün, außer `check-scope.js` (Ausgangsbefund: 63 Stellen, unverändert). `node --test test/*.test.js`: 7/7.
+* E2E: cards, draw-cards, sacrifice, artifacts, prompts, target-informed, second-action, ui-shared-zone-summon: grün. Client unverändert (`public/`), kein Build nötig.

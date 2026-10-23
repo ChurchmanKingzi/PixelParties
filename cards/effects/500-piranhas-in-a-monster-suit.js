@@ -216,7 +216,7 @@ module.exports = {
         engine.log('piranhas_ersatzzone', { player: ps.username, target: victimName, slot: ersatz.slotIdx });
         destSlot = ersatz.slotIdx;
       } else {
-        const handIdx0 = (ps.hand || []).indexOf(FULL_NAME);
+        const handIdx0 = ctx._summonedFromPile ? -1 : (ps.hand || []).indexOf(FULL_NAME);   // W66b: aus Ablage/Deck beschworen (Skullmael, Forceful Revival …) kommt sie NICHT von der Hand — keine andere Kopie von dort nehmen
         if (handIdx0 >= 0) {
           engine.takeFromPileSync(ps, 'hand', handIdx0);
           engine.notePlayedFromHand(pi);
@@ -256,7 +256,7 @@ module.exports = {
     // via `_placementConsumedByCard` below). Splice the FIRST
     // matching name; the server's `_resolvingCard` flag pins
     // which copy is the in-flight one.
-    const handIdx = (ps.hand || []).indexOf(FULL_NAME);
+    const handIdx = ctx._summonedFromPile ? -1 : (ps.hand || []).indexOf(FULL_NAME);   // W66b (siehe oben)
     if (handIdx >= 0) {
       engine.takeFromPileSync(ps, 'hand', handIdx);
       engine.notePlayedFromHand(pi);

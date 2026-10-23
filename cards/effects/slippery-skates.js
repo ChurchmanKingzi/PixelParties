@@ -281,7 +281,7 @@ module.exports = {
 
     // Verify destination is still free (W63a: oder von einer GLEICHNAMIGEN Creature belegt und per Alice-Teilung geteilt)
     if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0
-        && !require('./_alice-shared').canShareInto(engine, kontrolleur, destHeroIdx, destSlot, inst.name, pi)) return false;
+        && !require('./_alice-shared').canShareInto(engine, kontrolleur, destHeroIdx, destSlot, inst, pi)) return false;
 
     // Fire the card reveal now
     if (savedReveal) {

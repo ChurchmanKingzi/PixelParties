@@ -206,26 +206,26 @@ async function bieteBeschwoerungAn(ctx, quelle) {
   }
   const wahl = { cardName: gewaehlt };
 
-  // ── Ab hier ist es verbindlich: Anspruch und Auftritt ─────────────
-  if (!engine.claimHOPT(hoptKey, pi)) return;
-  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
-
-  // Animation (v954, Als Vorgabe): schwarze Magie und Nekromantie auf
-  // der Zielzone — Runenkreis, nekrotische Flammen, aufsteigende
-  // Knochen, dann der dunkle Blitz, mit dem die Kreatur steht. Eigener
-  // Typ `undead_revival` (nicht `necromancy_summon` der Ability: der
-  // Klang haengt am Typ). Der Vorlauf laesst das Ritual laufen, bevor
-  // die Karte aus der Ablage einfliegt.
-  engine._broadcastEvent('play_zone_animation', {
-    type: 'undead_revival', owner: feld,
-    heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
-    duration: 1400,
-  });
-  await engine._delay(760);
-
+  // ── ★ W66b (Al, 23.10.2026): „Wird einer der Effekte abgebrochen, werden dadurch alle Limits nicht verbraucht." ──
+  // Die Kosten-/Opfer-/Tribut-Wahl der beschworenen Kreatur (`beforeSummon`) ist die LETZTE Abbruchstelle: `summonFromPile` fragt sie zuerst, ein Abbruch dort gibt die Karte
+  // an ihren Platz in der Ablage zurück — Einmal-Sperre unberührt, Banner und Animation nie gezeigt. ERST danach (`nachKostenAnim`, hinter der letzten Abbruchstelle):
+  // Anspruch (HOPT), Auftritt (Banner), Animation; dann Flug und Landung.
+  // Animation (v954, Als Vorgabe): schwarze Magie und Nekromantie auf der Zielzone — Runenkreis, nekrotische Flammen, aufsteigende Knochen, dann der dunkle Blitz, mit dem die
+  // Kreatur steht. Eigener Typ `undead_revival` (nicht `necromancy_summon` der Ability: der Klang haengt am Typ). Der Vorlauf laesst das Ritual laufen, bevor die Karte aus
+  // der Ablage einfliegt.
   const inst = await engine.summonFromPile(pi, 'discard', wahl.cardName, ziel.heroIdx, ziel.slotIdx, {
     source: CARD_NAME,
     ...(feld !== pi ? { heldSeite: feld } : {}),   // Styx 28.9.
+    nachKostenAnim: async () => {
+      engine.claimHOPT(hoptKey, pi);
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'undead_revival', owner: feld,
+        heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+        duration: 1400,
+      });
+      await engine._delay(760);
+    },
   });
   if (!inst) return;
 

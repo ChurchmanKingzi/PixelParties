@@ -264,20 +264,24 @@ async function deleteSelectedDiscardCards(engine, picks, sourceName) {
 function ruecklegenGeloeschteAblagekarten(engine, geloescht) {
   const herkunft = geloescht && geloescht.herkunft;
   if (!engine || !Array.isArray(herkunft) || herkunft.length === 0) return 0;
-  let n = 0;
-  const sortiert = herkunft.slice().sort((a, b) => a.idx - b.idx);
-  for (const h of sortiert) {
-    if (!engine.gs?.players?.[h.owner]) continue;
-    // Stapel-Schicht statt eigener Splice: die Karte verlaesst den Geloescht-Stapel (Rueckabwicklung, keine Verwahrungs-Sperre)
-    // und kehrt mit `returnToPile` an ihren alten Platz zurueck.
-    const k = engine.takeFromPileSync(h.owner, 'deleted', h.cardName, { last: true, _verwahrungFreigabe: true, source: 'cost_refund' });
-    if (!k) continue;
-    engine.returnToPile(h.owner, 'discard', h.cardName, Math.min(h.idx, (engine.gs.players[h.owner].discardPile || []).length));
-    engine.log('card_restored_to_discard', { card: h.cardName, player: engine.gs.players[h.owner].username, reason: 'cost_refunded' });
-    n++;
-  }
-  if (n > 0) engine.sync();
-  return n;
+  // W66b: die Rückabwicklung ist Buchführung im Kosten-Vorlauf (committet den Auftritt nicht, Ereignisse verfallen mit dem Puffer)
+  engine._auftrittSchrittAus = (engine._auftrittSchrittAus || 0) + 1;
+  try {
+    let n = 0;
+    const sortiert = herkunft.slice().sort((a, b) => a.idx - b.idx);
+    for (const h of sortiert) {
+      if (!engine.gs?.players?.[h.owner]) continue;
+      // Stapel-Schicht statt eigener Splice: die Karte verlaesst den Geloescht-Stapel (Rueckabwicklung, keine Verwahrungs-Sperre)
+      // und kehrt mit `returnToPile` an ihren alten Platz zurueck.
+      const k = engine.takeFromPileSync(h.owner, 'deleted', h.cardName, { last: true, _verwahrungFreigabe: true, source: 'cost_refund' });
+      if (!k) continue;
+      engine.returnToPile(h.owner, 'discard', h.cardName, Math.min(h.idx, (engine.gs.players[h.owner].discardPile || []).length));
+      engine.log('card_restored_to_discard', { card: h.cardName, player: engine.gs.players[h.owner].username, reason: 'cost_refunded' });
+      n++;
+    }
+    if (n > 0) engine.sync();
+    return n;
+  } finally { engine._auftrittSchrittAus = Math.max(0, (engine._auftrittSchrittAus || 1) - 1); }
 }
 
 /**
@@ -403,6 +407,11 @@ async function promptAndDeleteFromBothDiscards(ctx, opts = {}) {
     }
   }
 
+  // ★ W66b (Al, 23.10.2026): `opts.vorlauf` — die Löschkosten werden vor einer späteren ABBRECHBAREN Stufe bezahlt (Guardian Beast Hu: Aktionswahl). Sie laufen im Kosten-Vorlauf der Engine:
+  // nichts davon committet den Auftritt der Karte, der Gegner sieht erst etwas, wenn die Folgestufe committed ist; bei einem Abbruch verfällt alles (`ruecklegenGeloeschteAblagekarten`).
+  if (opts.vorlauf && typeof engine.imKostenVorlauf === 'function') {
+    return engine.imKostenVorlauf(() => deleteSelectedDiscardCards(engine, picks, opts.sourceName || ARCHETYPE));
+  }
   return deleteSelectedDiscardCards(engine, picks, opts.sourceName || ARCHETYPE);
 }
 

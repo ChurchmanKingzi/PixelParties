@@ -144,7 +144,7 @@ module.exports = {
     // schon, und ein Abbruch hatte Aktivierung und Karte verraten. Das Nest sinkt (rein logisch, ohne Anzeige) schon vor der Kostenfrage: es kann so nicht selbst
     // als Opfer angeboten werden. Abbruch/Sperre → Nest wieder oben, Karte zurueck ins Deck, nichts gezeigt.
     if (nest.sink(engine, inst) < 0) {
-      engine.returnToPile(ps, 'deck', chosen, null, { _kostenVorlauf: true });   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b (Al): Abbruch = Deck EXAKT wie vorher (an seiner Stelle, nicht gemischt)
       return false;
     }
     const kernOpts = {
@@ -159,7 +159,7 @@ module.exports = {
     const feld = engine.physicalSide(inst);
     if (!(await engine._beschwoerungKostenVorAuftritt(chosen, feld, heroIdx, zoneSlot, kernOpts))) {
       nest.surface(engine, inst, { by: 'summon_failed', skipSync: true });
-      engine.returnToPile(ps, 'deck', chosen, null, { _kostenVorlauf: true });   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b (Al): Abbruch = Deck EXAKT wie vorher (an seiner Stelle, nicht gemischt)
       engine.sync();
       return false;
     }
@@ -187,7 +187,7 @@ module.exports = {
     // Das Nest sinkt LOGISCH unter die Karte, die gleich kommt — sein
     // Name bleibt dabei im Platz stehen (siehe `_nest-shared.sink`).
     if (nest.sink(engine, inst) < 0) {
-      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b: exakt an seine Stelle zurück
       return false;
     }
     const res = await engine.summonCreatureWithHooks(chosen, feld, heroIdx, zoneSlot, kernOpts);
@@ -197,7 +197,7 @@ module.exports = {
       // gesperrte Zone …) — vollstaendig zuruecknehmen: Karte zurueck
       // ins Deck, Nest wieder hoch. Der Effekt gilt als nicht benutzt.
       nest.surface(engine, inst, { by: 'summon_failed' });
-      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
+      engine.returnToPile(ps, 'deck', chosen, deckIdx);   // W66b: exakt an seine Stelle zurück
       engine.sync();
       return false;
     }

@@ -147,7 +147,8 @@ module.exports = {
         if ((supZones[z] || []).length === 0) { hasFree = true; break; }
       }
       // W64a (Al, 23.10.2026: Creature-Tokens teilen bei aktiver Alice): auch die Zone eines Buddys GLEICHEN Namens (derselbe Zauber) zaehlt als frei.
-      if (!hasFree) hasFree = require('./_biomancy-shared').teilbareSlots(engine, pi, feld, heroIdx, spellName).length > 0;
+      // W66b (Al, 23.10.2026): ALLE Fantasy Buddys teilen eine Zone, unabhaengig vom Zaubernamen (Teil-Name Fantasy Buddy Token).
+      if (!hasFree) hasFree = require('./_biomancy-shared').teilbareSlots(engine, pi, feld, heroIdx, require('./_alice-shared').FANTASY_BUDDY_TEILNAME).length > 0;
       if (!hasFree) return;
 
       // Player prompt — "you may" effect.
@@ -169,7 +170,7 @@ module.exports = {
       // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden,
       // Kontrolle beim Spieler, der Inya gerade fuehrt.
       const placeResult = engine.safePlaceInSupport(spellName, feld, heroIdx, -1,
-        feld !== pi ? { controller: pi } : {});
+        { teilName: require('./_alice-shared').FANTASY_BUDDY_TEILNAME, ...(feld !== pi ? { controller: pi } : {}) });   // W66b: Teil-Name aller Buddys
       if (!placeResult) return; // Race: zone filled mid-prompt.
 
       const { inst, actualSlot } = placeResult;

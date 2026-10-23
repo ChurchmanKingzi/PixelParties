@@ -43,6 +43,22 @@
 const ALICE_NAME = 'Alice, the Transfer Student';
 
 /**
+ * ★ W66b (Al, 23.10.2026: „Die Fantasy-Buddies sollten eine Zone mit ALLEN Fantasy Buddies teilen, unabhängig vom Spell-Namen."):
+ * Inyas Fantasy Buddy Token trägt je nach Zauber Anzeige-Name und -Bild (`inst.name` = Zaubername), ist aber IMMER ein „Fantasy Buddy Token".
+ * Für die Alice-Teilung („Creatures with identical names … share 1 Support Zone") zählen alle Buddys als gleichnamig: ihr Teil-Name ist dieser Name.
+ */
+const FANTASY_BUDDY_TEILNAME = 'Fantasy Buddy Token';
+
+/**
+ * Der Name, unter dem eine Kreatur / ein Token Zonen teilt: Instanz mit `counters._fantasyBuddyToken` → „Fantasy Buddy Token", sonst ihr Name.
+ * Akzeptiert eine Instanz (bevorzugt — auch fürs Bewegen bestehender Karten) oder einen Namen (dann unverändert).
+ */
+function teilName(x) {
+  if (x && typeof x === 'object') return x.counters && x.counters._fantasyBuddyToken ? FANTASY_BUDDY_TEILNAME : x.name;
+  return x;
+}
+
+/**
  * Teilt `pi` seine Support-Zonen?
  *
  * ★ 18.8., Als Testbefund: „Transfer-Alices Effekt persistiert noch
@@ -142,12 +158,13 @@ function isStacked(engine, pi, heroIdx, slotIdx) {
  * und dort bereits mindestens eine Kreatur GLEICHEN Namens liegt.
  */
 function canShareInto(engine, pi, heroIdx, slotIdx, cardName, feld = pi) {
-  if (!cardName) return false;
+  const name = teilName(cardName);   // W66b: `cardName` darf auch eine Instanz sein (Fantasy Buddys zaehlen alle als Fantasy Buddy Token)
+  if (!name) return false;
   if (!sharingActive(engine.gs, pi)) return false;
   // `feld` (Styx 28.9.): physische Seite des Platzes, `pi` der Beschwoerer.
   const stack = stackAt(engine, pi, heroIdx, slotIdx, feld);
   if (stack.length === 0) return false;
-  return stack.every(i => i.name === cardName);
+  return stack.every(i => teilName(i) === name || i.name === name);   // `i.name === name`: Rueckwaertsverstaendnis — wer den Zaubernamen eines Buddys uebergibt, trifft weiter seine eigene Zone
 }
 
 /**
@@ -270,6 +287,8 @@ function ersterPlatzAufHeld(engine, feld, heroIdx, cardName, sharer = feld) {
 
 module.exports = {
   ALICE_NAME,
+  FANTASY_BUDDY_TEILNAME,
+  teilName,
   ersterPlatzAufHeld,
   sharingActive,
   armSharing,
