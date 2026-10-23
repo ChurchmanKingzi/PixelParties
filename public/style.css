@@ -15400,7 +15400,8 @@ body:has(.modal-overlay) { --pz-tooltip-z: 10086; }
 }
 .pz-lv-btn { width: 18px; height: 18px; padding: 0; }
 .pz-lv-reset { padding: 2px 5px; color: var(--text2); border-color: var(--text2); }
-.pz-lv-btn:hover, .pz-lv-reset:hover { background: var(--accent); color: var(--bg); }
+.pz-lv-btn:hover, .pz-lv-reset:not(:disabled):hover { background: var(--accent); color: var(--bg); }
+.pz-lv-reset:disabled { color: var(--bg4); border-color: var(--bg4); cursor: default; }
 .pz-lv-wert { min-width: 34px; text-align: center; color: var(--text); }
 .pz-lv-tiefer { color: var(--success); }
 .pz-lv-hoeher { color: var(--danger); }
