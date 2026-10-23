@@ -42,8 +42,7 @@ module.exports = {
 
     // Stream Pillage's card image to both players before the mill,
     // then clear the pending reveal so the server doesn't fire it again after resolution.
-    engine._broadcastEvent('card_reveal', { cardName: 'Pillage' });
-    delete engine.gs._pendingCardReveal;
+    engine.commitAppearance();   // W64b: zentral (nicht zusätzlich ein eigenes card_reveal — das zeigte die Karte doppelt)
     await engine._delay(400);
 
     await ctx.millCards(oppIdx, count, { source: 'Pillage' });

@@ -2915,6 +2915,16 @@ const ZONE_ANIM_SFX = {
     { name: 'ping',   opts: { rate: 3.1, volume: 0.25, delay: 900, category: null, dedupe: 0 } },
     { name: 'reveal', opts: { rate: 1.3, volume: 0.45, delay: 1000, category: null, dedupe: 0 } },
   ],
+  // Kidnapping (23.10.) — der Sack faellt (Zieh-Ton, 0 ms), klatscht auf die Karte (tiefer Platzierungston, ~380 ms), der Strick zieht sich zu (Zieh-Ton hoch, ~560 ms), zwei dumpfe Stoesse
+  // beim Zappeln (~800 / ~940 ms), der Sack loest sich auf (Aufdeck-Ton, ~1120 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
+  kidnap_sack: [
+    { name: 'draw',          opts: { rate: 0.7, volume: 0.4 } },
+    { name: 'placement',     opts: { rate: 0.5, volume: 0.55, delay: 380, category: null, dedupe: 0 } },
+    { name: 'draw',          opts: { rate: 1.5, volume: 0.35, delay: 560, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.5, volume: 0.25, delay: 800, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',  opts: { rate: 1.3, volume: 0.25, delay: 940, category: null, dedupe: 0 } },
+    { name: 'reveal',        opts: { rate: 1.6, volume: 0.4,  delay: 1120, category: null, dedupe: 0 } },
+  ],
   // Gather Intel (12.10.) — die Lupe huscht los (Zieh-Ton, 0 ms), tastet die Hand ab (leise Pings im Takt der Funkelkreuze, ~460 / ~620 / ~780 ms), der Blick sitzt (Aufdeck-Ton,
   // ~1000 ms). Nur der erste Teil uebernimmt die Sammelkategorie 'effect'.
   intel_peek: [
@@ -8613,7 +8623,18 @@ function ascensionBonusText(card) {
 // Hovern nicht neu zeichnet.
 const _ttHpKarten = new Map();   // "Name|Skin|HP" -> blob:-URL (LRU, klein)
 const TT_HP_KARTEN_MAX = 24;
-function TooltipCardImage({ card, src, hp, stufe, style }) {
+function TooltipCardImage(props) {
+  // Ability auf dem Brett (nur Stufe, ohne HP-Aufdruck): dieselbe Variante `?stufe=N` wie das Bild auf dem Brett — der Bild-Shim hat sie
+  // dort schon gezeichnet (und die anderen Stufen vorgewaermt), der Tooltip zeigt sie also SOFORT. Vorher kam zuerst die Karte ohne
+  // Hervorhebung und erst nach einer eigenen Zeichnung die richtige Stufe (Als Befund 23.10.). Eigene Komponente je Fall, damit die Hooks
+  // der HP-Fassung nie bedingt aufgerufen werden.
+  const { src, hp, stufe, style } = props;
+  if (stufe != null && hp == null && typeof src === 'string' && src) {
+    return <img src={src + (src.includes('?') ? '&' : '?') + 'stufe=' + stufe} style={style} />;
+  }
+  return <TooltipCardImageHp {...props} />;
+}
+function TooltipCardImageHp({ card, src, hp, stufe, style }) {
   const skin = skinOfUrl(src);
   // `hp`: aktuelle max. HP; `stufe`: aktuelle Stufe einer Ability auf dem Brett (ihre Box ist hervorgehoben, die anderen grau)
   const key = (hp != null || stufe != null) ? `${card.name}|${skin || ''}|${hp ?? ''}|${stufe ?? ''}` : null;

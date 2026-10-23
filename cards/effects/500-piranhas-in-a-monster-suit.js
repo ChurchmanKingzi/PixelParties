@@ -77,6 +77,9 @@ function _validVictims(engine, pi) {
     if (inst.counters?._damageDestroyImmune) continue; // Time Bomblebee armed
     if (inst.counters?.immovable) continue;
     if (inst.counters?._stealImmortal) continue;      // Stolen-and-immortal
+    // ★ W64a (Al, 23.10.2026): „Creatures in einer geteilten Zone sind für diese Effekte schlicht keine legalen Ziele" — die Piranhas nimmt den Platz des
+    // Besiegten ein; liegt dort noch eine Karte (Alice-Stapel), wäre die Zone danach nicht frei. Nur Zonen mit genau EINER Karte.
+    if (!engine.zoneFreiNachKostenzahlung(engine.physicalSide(inst), inst.heroIdx, inst.zoneSlot, inst)) continue;
     out.push(engine.kreaturZiel(inst));   // Z1: ID/owner = Brettseite
   }
   return out;

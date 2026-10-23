@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Pixel Parties – Leitungs-Harness (W63d): „WAS sieht der Gegner/Zuschauer WANN?"
 //
-//  Baut auf lib/h.js auf, ergänzt es aber um zwei Dinge, die h.js bewusst nicht hat:
+//  Baut auf lib/h.js auf, ergänzt es aber um drei Dinge, die h.js bewusst nicht hat:
 //
 //   1. Eine ZEITLEISTE (t.tl) aus allen Socket-Nachrichten, die an den Gegner-Sitz und an einen Zuschauer gehen
 //      (server.js `io.to(sid).emit` UND `engine.io.to(sid).emit`), verschränkt mit den Fragen, die die Karte
@@ -11,7 +11,8 @@
 //      (`promptGeneric` wartet auf `resolveGenericPrompt`, `promptEffectTarget` auf `resolveEffectPrompt`/`doConfirmPotion`) —
 //      genau so, wie der Server die Socket-Antworten (`effect_prompt_response`, `confirm_potion`, `cancel_potion`) verarbeitet.
 //      Ein „Mensch-Antworter" (Pumpe) beantwortet jede offene Frage nach einer Politik oder bricht an der k-ten abbrechbaren Stelle ab.
-//      Dadurch greift auch der zurückgehaltene Auftritt (`gs._pendingCardReveal`, feuert erst bei einer BESTÄTIGTEN Antwort) wie im Spiel.
+//      Dadurch greift auch der zurückgehaltene Auftritt (`gs._pendingCardReveal`: committet NACH der letzten abbrechbaren Frage, VOR dem ersten Effektschritt — W64b) und der Zustandspuffer wie im Spiel.
+//   3. (W64b) Pro Empfänger (Gegner-Sitze, Zuschauer) die Reihenfolge „Auftritt → erster Effekt": `r.pro[sid] = { R, wechsel, ereignis, effektLog, ersterEffekt, vorEffekt }`, geprüft von `W.pruefeDurchlauf`.
 //
 //  Benutzung:
 //      const W = require('../../../lib/wire.js');
@@ -102,6 +103,8 @@ function ziele(valid, config) {
 async function spiele(t, seat, name, o = {}) {
   const { engine, gs, host, room } = t;
   const startIdx = t.tl.length;
+  // W64b: Ausgangszustand von Gegner(n) und Zuschauer EXPLIZIT in die Zeitleiste schreiben (Dedupe-Cache umgangen) — Bezugspunkt für „erster Zustandswechsel".
+  if (host.sendGameStateErzwungen) { for (let i = 0; i < gs.players.length; i++) if (i !== seat) host.sendGameStateErzwungen(room, i); host.sendSpectatorGameState && host.sendSpectatorGameState(room); }
   const handVorher = gs.players[seat].hand.filter(x => x === name).length;
   let cancellableSeen = 0, cancelled = false, done = false;
   const nr = { n: 0 };
@@ -206,6 +209,25 @@ function analyse(t, seat, name, tl, extra) {
     if (o.effectPrompt && s(o.effectPrompt).includes(nm)) return true;
     return (o.players || []).some(p => p && p.resolvingCard && s(p.resolvingCard).includes(nm));
   });
+  // ── W64b: Auftritt VOR dem ersten Effekt (Al, 23.10.2026) ─────────────────────────────────────────────
+  // Je Empfänger (Gegner-Sitze und Zuschauer): Index des ersten Auftritts (R) und des ersten EFFEKTS — a) ein Zustand (game_state), dessen Brett-/Hand-/Stapel-/Gold-/Statusstand vom Ausgangszustand abweicht,
+  // b) ein Ereignis, das keine Ankündigung ist (alles außer card_reveal, hand_to_board_fly, ability_activated, potion_resolved und Protokollzeilen der Karte selbst), c) eine Effekt-Protokollzeile.
+  const ANKUENDIGUNG = new Set(['card_reveal', 'hand_to_board_fly', 'ability_activated', 'potion_resolved', 'action_log', 'summon_effect', 'effect_source_glow']);
+  const ANKUENDIGUNGS_LOG = /(_activated|_played|_summoned|_placed|_fizzle|_cancelled|_blocked)$/;
+  const digestJ = (j) => { let o; try { o = JSON.parse(j); } catch { return null; }
+    return JSON.stringify([(o.players || []).map(p => [(p.heroes || []).map(h => h && [h.hp, h.atk, JSON.stringify(h.statuses || {}), JSON.stringify(h.buffs || {})]), p.supportZones, p.hand ? p.hand.length : p.handCount, p.deckCount, p.potionDeckCount, p.discardPile && p.discardPile.length, p.deletedPile && p.deletedPile.length, p.gold, p.abilityZones, p.permanents && p.permanents.length, p.drawLocked, p.handLocked]), o.areaZones, o.doomCounters, o.turn]); };
+  const pro = {};
+  for (const sid of fr) {
+    const mine = tl.map((e, i) => [e, i]).filter(([e]) => e.k === 'wire' && e.sid === sid);
+    const stateJ = mine.filter(([e]) => (e.ev === 'game_state' || e.ev === 'spectator_state') && e.json);
+    const base = stateJ.length ? digestJ(stateJ[0][0].json) : null;     // der erzwungene Ausgangszustand steht am Anfang der Zeitleiste
+    const R = (() => { const a = mine.find(([e]) => e.ev !== 'game_state' && e.ev !== 'spectator_state' && hat(e)); return a ? a[1] : -1; })();
+    const wechsel = base == null ? -1 : (() => { const a = stateJ.slice(1).find(([e]) => digestJ(e.json) !== base); return a ? a[1] : -1; })();
+    const ereignis = (() => { const a = mine.find(([e]) => e.ev !== 'game_state' && e.ev !== 'spectator_state' && e.ev !== 'opponent_targeting' && !ANKUENDIGUNG.has(e.ev)); return a ? a[1] : -1; })();
+    const effektLog = (() => { const a = mine.find(([e]) => e.ev === 'action_log' && e.data && !hat(e) && !ANKUENDIGUNGS_LOG.test(String(e.data.type || '')) && e.data.type !== 'phase_start'); return a ? a[1] : -1; })();
+    const erste = [wechsel, ereignis, effektLog].filter(x => x >= 0).sort((a, b) => a - b)[0];
+    pro[sid] = { R, wechsel, ereignis, effektLog, ersterEffekt: erste ?? -1, vorEffekt: R >= 0 && (erste == null || R < erste) };
+  }
   const cancellablePrompts = idxOf(e => e.k === 'answer-begin' && e.cancellable);
   const cancelIdx = idxOf(e => e.k === 'cancel');
   const lastCancellableIdx = cancellablePrompts.length ? cancellablePrompts[cancellablePrompts.length - 1] : -1;
@@ -216,7 +238,7 @@ function analyse(t, seat, name, tl, extra) {
   const sehen = (e) => ({ sid: e.sid, ev: e.ev, d: (() => { try { return JSON.stringify(e.data).slice(0, 80); } catch { return '?'; } })() });
   return {
     result: extra.result, cancelled: extra.cancelled, cancellableSeen: extra.cancellableSeen,
-    tl, appearances, stateLeaks, kanalLeaks, leaks, grenze, lastCancellableIdx,
+    tl, appearances, stateLeaks, kanalLeaks, leaks, grenze, lastCancellableIdx, pro,
     leakEvents: leaks.map(i => sehen(tl[i])),
     // Nachrichten an Gegner/Zuschauer, die NICHT den Namen enthalten (Animationen etc.), mit Position relativ zur Grenze
     fremdVorGrenze: wireOpp.filter(e => tl.indexOf(e) < grenze).map(sehen),
@@ -284,6 +306,13 @@ function pruefeDurchlauf(R, label, d, o = {}) {
   if (!o.keinAuftritt) {
     R.check(`${label}: nach dem Commit sieht der Gegner die Karte`, c.appearances.some(i => i > grenze && c.tl[i].sid !== 'SPEC' && c.tl[i].sid !== 'S' + seat), c.appearances.length);
     R.check(`${label}: nach dem Commit sieht der Zuschauer die Karte`, c.appearances.some(i => i > grenze && c.tl[i].sid === 'SPEC'), c.appearances.length);
+  }
+  // W64b (Al, 23.10.2026): „Auftritte VOR BEGINN der Effekte streamen (aber nach dem Confirm)": je Empfänger kommt der Auftritt vor dem ersten Effekt-Ereignis, Effekt-Protokollzeile und Zustandswechsel.
+  if (!o.keinAuftritt && !o.ohneEffektOrdnung) {
+    for (const [sid, p] of Object.entries(c.pro || {})) {
+      if (p.R < 0) continue;       // sieht die Karte gar nicht (oben geprüft)
+      R.check(`${label}: ${sid} — Auftritt VOR dem ersten Effekt (Ereignis ${p.ereignis}, Zeile ${p.effektLog}, Zustandswechsel ${p.wechsel}; Auftritt ${p.R})`, p.vorEffekt, p);
+    }
   }
   for (const { k, r, t } of d.cancels) {
     R.check(`${label}: Abbruch an Stelle ${k} — abgebrochen`, r.cancelled, r.cancellableSeen);

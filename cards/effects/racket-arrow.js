@@ -80,7 +80,8 @@ module.exports = {
     const target = targets.find(t => t.id === picked[0]);
     if (!target?.cardInstance) return false;
 
-    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME, { sourceOwner: pi });
+    // W64c: Kartentext "original OWNER's hand" - ausdruecklich die Hand des Besitzers (der allgemeine Bounce geht seit Al 23.10.2026 an den Kontrolleur).
+    await returnSupportCreatureToHand(engine, target.cardInstance, CARD_NAME, { sourceOwner: pi, toPlayer: engine.kartenBesitzerVon(target.cardInstance) });
     engine.log('racket_arrow_bounce', {
       player: engine.gs.players[pi]?.username, target: target.cardName,
     });

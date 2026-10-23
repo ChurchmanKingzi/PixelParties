@@ -85,8 +85,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
   }
 
   // Reveal Hive's Crown to both sides now that the player has committed.
-  engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
-  delete engine.gs._pendingCardReveal;
+  engine.commitAppearance();
   await engine._delay(300);
 
   // ── Sacrifice the chosen Sparkfly creature. ──
@@ -127,7 +126,7 @@ async function zahleOpfer(engine, pi, selectedIds, validTargets) {
 
 module.exports = {
   isTargetingArtifact: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()`).
 
   /**
    * CPU helpers — Hive's Crown surfaces two prompts:

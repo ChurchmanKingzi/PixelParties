@@ -81,7 +81,7 @@ function heldFolgtAbgang(ctx) {
   const held = inst.counters?.attachedHero;
   if (!held) return;
   const engine = ctx._engine;
-  const ps = engine.gs.players[inst.originalOwner ?? inst.owner];
+  const ps = engine.gs.players[inst.counters.attachedHeroOwner] || engine.gs.players[inst.originalOwner ?? inst.owner];   // W64c: Besitzer der Helden-Karte
   if (!ps) return;
   if (!ps.discardPile) ps.discardPile = [];
   ps.discardPile.push(held);

@@ -48,7 +48,7 @@ async function loeseAusstehende(ctx) {
 
 module.exports = {
   isPotion: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (`commitAppearance()` im resolve).
   activeIn: ['permanent'],
   // Engine-level opt-in honoured by `checkAllHeroesDead()`. While this
   // permanent is on the owner's side, an all-heroes-dead state does
@@ -86,11 +86,7 @@ module.exports = {
     if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
     ps._oncePerGameUsed.add('elixirOfImmortality');
 
-    const oi = engine.opponentOf(pi);
-    const oppSid = engine.gs.players[oi]?.socketId;
-    if (oppSid && engine.io) {
-      engine.io.to(oppSid).emit('card_reveal', { cardName: 'Elixir of Immortality' });
-    }
+    engine.commitAppearance();   // W64b: zentral (Gegner + Zuschauer)
     await engine._delay(100);
 
     if (!ps.permanents) ps.permanents = [];

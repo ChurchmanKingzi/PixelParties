@@ -2463,6 +2463,10 @@
 "id": "Key_the_Cursed_Thief",
 "kind": "a"
 },
+"Kidnapping": {
+"id": "Kidnapping",
+"kind": "a"
+},
 "Kirin Firebreath": {
 "id": "Kirin_Firebreath",
 "kind": "a"

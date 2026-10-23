@@ -262,8 +262,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
       for (let zi = 0; zi < abZones.length; zi++) {
         const slot = abZones[zi] || [];
         for (const name of slot) {
-          if (!ps.deletedPile) ps.deletedPile = [];
-          ps.deletedPile.push(name);
+          // W64c: Loeschstapel des permanenten BESITZERS der Karte (eine uebernommene Kreatur / fremde Ausruestung in der Zone gehoert nicht dem Nutzer)
+          const _inst = heroInsts.find(c => c.zone === 'ability' && c.zoneSlot === zi && c.name === name);
+          const _loeschPs = (_inst ? engine.gs.players[engine.kartenBesitzerVon(_inst)] : null) || ps;
+          if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+          _loeschPs.deletedPile.push(name);
         }
         abZones[zi] = [];
       }
@@ -272,8 +275,11 @@ async function performDescent(engine, pi, dyingHero, handInst) {
       for (let zi = 0; zi < supZones.length; zi++) {
         const slot = supZones[zi] || [];
         for (const name of slot) {
-          if (!ps.deletedPile) ps.deletedPile = [];
-          ps.deletedPile.push(name);
+          // W64c: Loeschstapel des permanenten BESITZERS der Karte (eine uebernommene Kreatur / fremde Ausruestung in der Zone gehoert nicht dem Nutzer)
+          const _inst = heroInsts.find(c => c.zone === 'support' && c.zoneSlot === zi && c.name === name);
+          const _loeschPs = (_inst ? engine.gs.players[engine.kartenBesitzerVon(_inst)] : null) || ps;
+          if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+          _loeschPs.deletedPile.push(name);
         }
         supZones[zi] = [];
       }

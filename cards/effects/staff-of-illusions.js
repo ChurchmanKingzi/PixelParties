@@ -53,7 +53,7 @@ function buildCreatureGallery(ps, cardDB, engine, pi) {
 module.exports = {
   isTargetingArtifact: true,
   manualGoldCost: true,
-  deferBroadcast: true,
+  // W64b: kein `deferBroadcast` mehr — der Auftritt kommt zentral (Auftritts-Puffer); `engine.commitAppearance()` markiert die Stelle, ab der es keinen Abbruch mehr gibt.
   activeIn: ['support', 'ability', 'hero', 'hand', 'discard'],
 
   canActivate(gs, pi, engine) {
@@ -95,19 +95,16 @@ module.exports = {
     const gs  = engine.gs;
     const ps  = gs.players[pi];
     const cardDB = engine._getCardDB();
+    const oppIdx = engine.opponentOf(pi);   // (unten: Rückkehr am Ende SEINES nächsten Zugs)
 
-    // Reveal the card to the opponent now
-    const oppIdx = engine.opponentOf(pi);
-    const oppSid = gs.players[oppIdx]?.socketId;
-    if (oppSid) engine.io.to(oppSid).emit('card_reveal', { cardName: CARD_NAME });
-    await engine._delay(100);
+    // (W64b: der Auftritt wird NICHT mehr hier gezeigt — die Galerie unten ist abbrechbar; er kommt mit `engine.commitAppearance()` hinter der letzten Wahl.)
 
     // ── Step 1: pick a Creature from deck or hand ────────────────────────
 
     let gallery = buildCreatureGallery(ps, cardDB, engine, pi);
     // G1 (A09-11): Goldsperre - nur Auswahlen mit Gesamtkosten 0 (Stufe 0) sind waehlbar
     if (ps.goldLocked) gallery = gallery.filter(e => e.level === 0);
-    if (gallery.length === 0) return { aborted: true };
+    if (gallery.length === 0) return { cancelled: true };
 
     const creaturePick = await engine.promptGeneric(pi, {
       type: 'cardGallery',
@@ -118,7 +115,7 @@ module.exports = {
       confirmClass: 'btn-info',
       cancellable: true,
     });
-    if (!creaturePick || creaturePick.cancelled || !creaturePick.cardName) return { aborted: true };
+    if (!creaturePick || creaturePick.cancelled || !creaturePick.cardName) return { cancelled: true };
 
     const chosenName = creaturePick.cardName;
     const chosenCd   = cardDB[chosenName];
@@ -128,7 +125,7 @@ module.exports = {
     const goldCost   = level * COST_PER_LEVEL;
 
     // Verify the player can afford it
-    if ((ps.gold || 0) < goldCost || (goldCost > 0 && ps.goldLocked)) return { aborted: true };   // G1 (A09-11): Goldsperre
+    if ((ps.gold || 0) < goldCost || (goldCost > 0 && ps.goldLocked)) return { cancelled: true };   // G1 (A09-11): Goldsperre
 
     // ── Step 2: pick a free support zone ────────────────────────────────
     // Place can target ANY of the player's Heroes' Support Zones —
@@ -165,7 +162,11 @@ module.exports = {
       freeZones.push({ heroIdx: z.heroIdx, slotIdx: z.slotIdx, owner: z.owner, shared: true, label: z.label });
     }
     freeZones = require('./_alice-shared').geteiltZuerst(freeZones);   // W63a (Al, 22.10.2026): erst die geteilte Zone, DANN die erste leere
-    if (freeZones.length === 0) return { aborted: true };
+    if (freeZones.length === 0) return { cancelled: true };
+
+    // W64b: Kreatur gewählt, bezahlbar, Zone vorhanden — ab hier gibt es keinen Abbruch mehr (die Zonenwahl unten ist Pflicht): der Auftritt kommt VOR dem Platzieren.
+    engine.commitAppearance();
+    await engine._delay(100);
 
     let destHeroIdx, destSlot, destSeite = pi;
     if (freeZones.length === 1) {
@@ -183,10 +184,10 @@ module.exports = {
         confirmLabel: '📍 Place here',
         cancellable: false,
       });
-      if (!zonePick) return { aborted: true };
+      if (!zonePick) return { cancelled: true };
       const zone = freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx && z.owner === (zonePick.owner ?? pi))
         || (zonePick.owner == null ? freeZones.find(z => z.heroIdx === zonePick.heroIdx && z.slotIdx === zonePick.slotIdx) : null);
-      if (!zone) return { aborted: true };
+      if (!zone) return { cancelled: true };
       destHeroIdx = zone.heroIdx;
       destSlot    = zone.slotIdx;
       destSeite   = zone.owner;

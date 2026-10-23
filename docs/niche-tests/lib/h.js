@@ -209,6 +209,7 @@ async function fresh(o = {}) {
   engine._fastMode = false; engine._delay = async () => {};
   attachHelpers(t);
   t._capture();   // ab jetzt landen Engine-Fehler (console.error) in t.errors; gedruckt wird über R.check/R.note/t.say
+  if (process.env.PP_OWNER_GUARD) require('./besitzer.js').waechter(t);   // W64c: generischer Besitzer-Wächter (nur per Env-Variable)
   return t;
 }
 

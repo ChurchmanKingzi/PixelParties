@@ -55,7 +55,7 @@
 
 const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const {
-  tokenStatsForLevel, biomancyLevelOf, freeSupportSlots,
+  tokenStatsForLevel, biomancyLevelOf, freeSupportSlots, teilbareSlots, tokenZonePossible,
   isPotionCardName, placeBiomancyToken,
 } = require('./_biomancy-shared');
 
@@ -128,14 +128,17 @@ async function resolveKyli(ctx) {
   if (level <= 0) return;
 
   const frei = freeSupportSlots(engine, feld, heroIdx);
-  if (frei.length === 0) return;
 
   const kandidaten = deletedPotionEntries(engine, pi);
   if (kandidaten.length === 0) return;
 
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung stoesst ein Token zur Zone eines Tokens GLEICHEN Namens dazu — diese Zone zaehlt als frei.
+  const kannTeilen = kandidaten.some(k => teilbareSlots(engine, pi, feld, heroIdx, k.name).length > 0);
+  if (frei.length === 0 && !kannTeilen) return;
+
   // „up to 3" UND „into this Hero's free Support Zones" — beides
-  // begrenzt, die kleinere Zahl gewinnt.
-  const maxPicks = Math.min(MAX_PICKS, frei.length, kandidaten.length);
+  // begrenzt, die kleinere Zahl gewinnt (eine geteilte Zone nimmt beliebig viele gleichnamige Tokens auf).
+  const maxPicks = Math.min(MAX_PICKS, kandidaten.length, kannTeilen ? kandidaten.length : frei.length);
   const stats = tokenStatsForLevel(level);
 
   const auswahl = await engine.promptGeneric(pi, {
@@ -185,7 +188,7 @@ async function resolveKyli(ctx) {
   for (const pick of picks) {
     // Jede Platzierung prueft die Zone NEU — zwischen zwei Tokens kann
     // ein Eintritts-Hook (Pes'zet & Co.) das Brett veraendert haben.
-    if (freeSupportSlots(engine, feld, heroIdx).length === 0) break;
+    if (!tokenZonePossible(engine, pi, feld, heroIdx, pick.name)) continue;
 
     // Erst JETZT aus dem Loeschstapel nehmen: bricht die Platzierung ab,
     // bleibt die Potion geloescht statt spurlos zu verschwinden.

@@ -87,7 +87,7 @@ async function detachCrimsonWeb(engine, inst, reason) {
     // is preserved on inst.owner from the attach step; controller
     // points at the locked player so the card renders on their side
     // until detached.
-    const sourceOwner = inst.owner;
+    const sourceOwner = engine.kartenBesitzerVon(inst);   // W64c: permanenter Besitzer (eine gestohlene Handkarte gehoert nicht dem Leger)
     engine._broadcastEvent('play_pile_transfer', {
       owner: sourceOwner, cardName: CARD_NAME,
       fromOwner: lockedOwner, toOwner: sourceOwner,

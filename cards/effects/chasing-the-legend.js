@@ -50,7 +50,9 @@ async function rettung(engine, pi, inst, source, amount) {
   });
   await engine._delay(750);
 
-  await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME });
+  // W64c: Kartentext "its OWNER's hand" (Ruling 29.8.: der urspruengliche Besitzer) - ausdruecklich dessen Hand, auch wenn der Kontrolleur ein anderer ist
+  // (der allgemeine Bounce geht seit Al 23.10.2026 an den Kontrolleur; nur ein Text mit "owner's hand" nennt den Besitzer).
+  await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, toPlayer: engine.kartenBesitzerVon(inst) });
 
   engine.log('chasing_the_legend', {
     player: gs.players[pi]?.username, creature: name,

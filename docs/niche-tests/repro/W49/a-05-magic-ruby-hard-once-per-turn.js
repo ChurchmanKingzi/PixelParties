@@ -13,7 +13,7 @@ process.on('unhandledRejection', (e) => { process.stderr.write('UNHANDLED ' + (e
   const karten = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'data', 'cards.json'), 'utf8'));
   const liste = Array.isArray(karten) ? karten : (karten.cards || Object.values(karten));
   const ruby = liste.find(c => c.name === 'Magic Ruby');
-  R.check('Kartentext wörtlich', ruby && ruby.effect === 'Choose a Hero your opponent controls and Stun it for 1 turn. \nYou may discard a card from your hand to keep this card in your hand instead of putting it into your discard pile after playing it.\nYou can only play 1 "Magic Ruby" per turn.', ruby && ruby.effect);
+  R.check('Kartentext wörtlich', ruby && ruby.effect === 'Choose a Hero your opponent controls and Stun it for 1 turn. \nYou may discard a card from your hand to keep this card in your hand instead of putting it into your discard pile after playing it. You can only play 1 "Magic Ruby" per turn.', ruby && ruby.effect);
   const topaz = liste.find(c => c.name === 'Magic Topaz'), ame = liste.find(c => c.name === 'Magic Amethyst');
   R.check('Gegenprobe: Topaz/Amethyst enden auf demselben Satzbau', /You can only play 1 "Magic Topaz" per turn\.$/.test(topaz.effect) && /You can only play 1 "Magic Amethyst" per turn\.$/.test(ame.effect));
 

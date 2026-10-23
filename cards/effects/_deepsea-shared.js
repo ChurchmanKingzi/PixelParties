@@ -292,12 +292,12 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // `inst.owner`, gehoert aber ihrem Beschwoerer (`crossSideControlled`)
   // — die Hand ist seine, das Brett bleibt `seite`. Ohne Marke wie bisher.
   const seite = inst.owner;
-  // W5a (Al 14.10.2026): `opts.toPlayer` = Karten mit „… to YOUR hand" (Dark Deepsea God Tribut, Moonlight Butterfly „add this
-  // Creature you control back to your hand"): eine geliehene Kreatur geht dann auf die Hand des KONTROLLEURS (und bleibt Eigentum
-  // ihres Besitzers — Ablage/Deck spaeter dort, siehe `_tagHandCardOrigin` unten). Sonst wie bisher: Hand des Besitzers.
-  // W63c: der BESITZER (`originalOwner`) — auch fuer gestohlene/uebernommene Karten (Charme Lv 2, Hunting …), deren `owner` der Dieb ist.
-  const ownerIdx = Number.isInteger(opts.toPlayer) ? opts.toPlayer
-    : (engine.kartenBesitzerVon(inst) ?? inst.counters?.crossSideControlled ?? inst.owner); // Hand-return ALWAYS goes to original owner.
+  // W64c (Al 23.10.2026: „Bounce geht an den AKTUELLEN KONTROLLEUR"): eine Kreatur, die vom Brett auf die Hand zurückgeht, landet in der HAND ihres
+  // Kontrolleurs (`kontrolleurVon`) — auch eine gestohlene/übernommene (Charme, Hunting, Dark Gear, Diplomacy …). Die HERKUNFT bleibt: die Karte trägt
+  // weiter ihren permanenten Besitzer (Platzmarke, unten `originalOwner`), ihr späterer Austritt aus der Hand (Abwerfen, Löschen, Spielen, Mischen,
+  // Mulligan) geht in die STAPEL des Besitzers. `opts.toPlayer` bleibt für Texte mit ausdrücklichem Empfänger („… to YOUR hand" an einen anderen Spieler).
+  // (W63c hatte hier „Hand des Besitzers" eingeführt — durch die Entscheidung vom 23.10. zurückgenommen.)
+  const ownerIdx = Number.isInteger(opts.toPlayer) ? opts.toPlayer : engine.kontrolleurVon(inst);
   const ps = gs.players[ownerIdx];
   if (!ps) return { returned: false };
   const bps = gs.players[seite] || ps;
@@ -358,9 +358,9 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
   // Add to hand.
   if (!ps.hand) ps.hand = [];
   if (!engine.tokenAbgang(inst)) {   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
-    engine.handZugangSync(ps, cardName, { ohneInstanz: true, vonInst: inst });   // Welle 12: Handindex-Sperren (Lawn Gnome) wandern mit
     const _besitzer = engine.kartenBesitzerVon(inst);
-    if (Number.isInteger(opts.toPlayer) && _besitzer !== ownerIdx) engine._tagHandCardOrigin(ownerIdx, cardName, _besitzer);   // W3: bleibt Eigentum des Besitzers
+    // Welle 12: Handindex-Sperren (Lawn Gnome) wandern mit · W64c: bleibt Eigentum des Besitzers (Platzmarke), auch wenn der Kontrolleur nicht der Besitzer ist
+    engine.handZugangSync(ps, cardName, { ohneInstanz: true, vonInst: inst, ...(_besitzer !== ownerIdx ? { originalOwner: _besitzer } : {}) });
   }
 
   engine.log('deepsea_return_to_hand', {
@@ -683,7 +683,7 @@ async function tryBouncePlace(ctx) {
   // (D) Push the bounced Creature's NAME onto the hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfer animations BEFORE the first sync
   //     so the client sees the "flying cards" events and the new state
@@ -874,7 +874,7 @@ async function payBouncePlace(ctx) {
   }
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: bouncedName, from: 'support', to: 'hand',
     ...(seite !== pi ? { fromOwner: seite, toOwner: pi } : {}),
@@ -1307,7 +1307,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   // (D) Push the bounced creature to hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst });   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
+  if (!engine.tokenAbgang(bouncedInst)) engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true, vonInst: bouncedInst, ...(engine.kartenBesitzerVon(bouncedInst) !== pi ? { originalOwner: engine.kartenBesitzerVon(bouncedInst) } : {}) });   // W64c: Hand des Kontrolleurs, Herkunft (Besitzer) bleibt   // W5a: Token verschwindet (echte Karte darunter wird gelöscht), kommt nie auf die Hand
 
   // (E) Broadcast BOTH pile-transfers so the two creatures visually
   //     cross mid-flight — bounced support→hand, new hand→support.

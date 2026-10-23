@@ -137,15 +137,42 @@ module.exports = {
     const heroIdx = inst.heroIdx;
     const zoneSlot = inst.zoneSlot;
 
-    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME, _kostenVorlauf: true }))) return false;   // v820: Stapel-Schicht
+
+    // ★ W65a (Al, 23.10.2026: „der Gegner sieht NICHTS, solange der Spieler die Opfer-/Tribut-Wahl noch abbrechen kann"): die Beschwoerungskosten der gewaehlten
+    // Kreatur (Opfer-/Tribut-Wahl, abbrechbar: Archer, Warrior/Guardian of Teocuilatl, 500 Piranhas …) werden VOR dem sichtbaren Flug gefragt — frueher flog die Karte
+    // schon, und ein Abbruch hatte Aktivierung und Karte verraten. Das Nest sinkt (rein logisch, ohne Anzeige) schon vor der Kostenfrage: es kann so nicht selbst
+    // als Opfer angeboten werden. Abbruch/Sperre → Nest wieder oben, Karte zurueck ins Deck, nichts gezeigt.
+    if (nest.sink(engine, inst) < 0) {
+      engine.returnToPile(ps, 'deck', chosen, null, { _kostenVorlauf: true });   // v1393 (mischt)
+      return false;
+    }
+    const kernOpts = {
+      source: CARD_NAME,
+      controller: pi,
+      // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
+      coverNested: true,
+      hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
+    };
+    // Die Kreatur liegt auf der BRETTSEITE des Nests (bei einem geliehenen Nest die des Besitzers), gehört aber dem
+    // Aktivierenden (`controller`) — sie kam aus dessen Deck (C03-04).
+    const feld = engine.physicalSide(inst);
+    if (!(await engine._beschwoerungKostenVorAuftritt(chosen, feld, heroIdx, zoneSlot, kernOpts))) {
+      nest.surface(engine, inst, { by: 'summon_failed', skipSync: true });
+      engine.returnToPile(ps, 'deck', chosen, null, { _kostenVorlauf: true });   // v1393 (mischt)
+      engine.sync();
+      return false;
+    }
+    kernOpts._sperrenGeprueft = true; kernOpts._kostenGezahlt = true;
+    inst.zone = ZONES.SUPPORT;   // Kosten bezahlt: fuer den Flug ist das Nest wieder eine ganz normale Karte im Platz (v776), unten sinkt es erneut
 
     // ── SICHTBARE WANDERUNG VOM DECK IN DIE ZONE (v776) ─────────────
     // Als Vorgabe 5.9.: die Kreatur soll vom Deckstapel in die Support
     // Zone fliegen, WAEHREND das Nest dort liegen bleibt. Deshalb laeuft
-    // der Flug VOR `sink` und vor der Beschwoerung — in dieser Zeit ist
-    // das Nest noch eine ganz normale Karte im Platz (samt richtiger
-    // HP-Anzeige), und die Kreatur wandert sichtbar darauf zu.
-    // `play_card_transfer` bringt seinen Klang mit; es entsteht KEINE
+    // der Flug VOR dem endgueltigen `sink` und vor der Beschwoerung — in
+    // dieser Zeit ist das Nest noch eine ganz normale Karte im Platz
+    // (samt richtiger HP-Anzeige), und die Kreatur wandert sichtbar darauf
+    // zu. `play_card_transfer` bringt seinen Klang mit; es entsteht KEINE
     // neue Animation.
     const FLUG_MS = 700;
     engine._broadcastEvent('play_card_transfer', {
@@ -163,16 +190,7 @@ module.exports = {
       engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
       return false;
     }
-
-    // Die Kreatur liegt auf der BRETTSEITE des Nests (bei einem geliehenen Nest die des Besitzers), gehört aber dem
-    // Aktivierenden (`controller`) — sie kam aus dessen Deck (C03-04).
-    const res = await engine.summonCreatureWithHooks(chosen, engine.physicalSide(inst), heroIdx, zoneSlot, {
-      source: CARD_NAME,
-      controller: pi,
-      // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
-      coverNested: true,
-      hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
-    });
+    const res = await engine.summonCreatureWithHooks(chosen, feld, heroIdx, zoneSlot, kernOpts);
 
     if (!res?.inst) {
       // Beschwoerung abgelehnt (eigene Bedingung, unbezahlbarer Tribut,

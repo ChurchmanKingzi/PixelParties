@@ -141,13 +141,14 @@ module.exports = {
       // Must have a free base support zone on Inya.
       // Kontrolle statt Seite (Styx 28.9.): physische Seite des Helden
       const supZones = gs.players[feld]?.supportZones?.[heroIdx] || [];
+      const spellName = ctx.spellName;
       let hasFree = false;
       for (let z = 0; z < 3; z++) {
         if ((supZones[z] || []).length === 0) { hasFree = true; break; }
       }
+      // W64a (Al, 23.10.2026: Creature-Tokens teilen bei aktiver Alice): auch die Zone eines Buddys GLEICHEN Namens (derselbe Zauber) zaehlt als frei.
+      if (!hasFree) hasFree = require('./_biomancy-shared').teilbareSlots(engine, pi, feld, heroIdx, spellName).length > 0;
       if (!hasFree) return;
-
-      const spellName = ctx.spellName;
 
       // Player prompt — "you may" effect.
       const confirmed = await engine.promptGeneric(pi, {
@@ -172,6 +173,11 @@ module.exports = {
       if (!placeResult) return; // Race: zone filled mid-prompt.
 
       const { inst, actualSlot } = placeResult;
+
+      // W64a (Al, 23.10.2026: „der Spell wandert in den Discard Pile"; Besitzer-Regel: Karten gehen IMMER in die Stapel ihres permanenten Besitzers):
+      // gehört der gespielte Zauber einem anderen als dem Wirker (gestohlen/geschenkt), gehört die Karte unter dem Buddy weiter ihrem Besitzer.
+      const _gespielt = engine.findCards({ owner: pi, zone: 'hand', name: spellName })[0];
+      if (Number.isInteger(_gespielt?.originalOwner) && _gespielt.originalOwner !== inst.originalOwner) inst.originalOwner = _gespielt.originalOwner;
 
       // Mark + override card data so the engine + UI treat this as a
       // Creature/Token. The card image stays as the original spell.

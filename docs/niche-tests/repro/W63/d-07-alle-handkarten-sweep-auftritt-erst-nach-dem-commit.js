@@ -9,7 +9,7 @@
 // Exit 0 = korrekt.
 const fs = require('fs'), path = require('path');
 const W = require('../../lib/wire.js');
-const AUSNAHMEN = new Set(['Forceful Revival']);
+const AUSNAHMEN = new Set([]);   // W64a: Forceful Revival fragt die Kosten der wiederbelebten Karte jetzt VOR der Animation (keine Ausnahme mehr)
 const kinds = new Set(['Spell', 'Attack', 'Creature', 'Artifact', 'Potion', 'Ability']);
 const DIR = path.resolve(__dirname, '../../../../cards/effects');
 const kannAbbrechen = (name) => {

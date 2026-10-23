@@ -196,8 +196,10 @@ module.exports = {
           const nameIdx = slotArr.indexOf(inst.name);
           if (nameIdx >= 0) slotArr.splice(nameIdx, 1);
         }
-        if (!ps.deletedPile) ps.deletedPile = [];
-        ps.deletedPile.push(inst.name);
+        // W64c: Loeschstapel des permanenten BESITZERS der Ability-Karte (z. B. eine zeitweise angelegte Ability des Gegners), nicht der Brettseite
+        const loeschPs = gs.players[engine.kartenBesitzerVon(inst)] || ps;
+        if (!loeschPs.deletedPile) loeschPs.deletedPile = [];
+        loeschPs.deletedPile.push(inst.name);
         inst.zone = 'deleted';
         engine.log('ability_deleted', {
           player: ps.username, ability: inst.name,
