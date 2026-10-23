@@ -10,20 +10,22 @@
 //  Fenster, gleiche Liste der Ereignisse („plays a card" — siehe
 //  `_card-played-shared.js`) — statt zu ziehen sucht der Trank.
 //
-//  ── WO LEBT DER EFFEKT? ──────────────────────────────────────────
-//  Ein Trank hat kein Brett, aber ein Dauereffekt braucht einen Zuhörer
-//  für die Hooks. Wie „Elixir of Immortality" legt sich der Trank deshalb
-//  OFFEN vor den Spieler (`ps.permanents` + Instanz in der Zone
-//  'permanent', `resolve` meldet `{ placed: true }` — der Server löscht
-//  ihn dann NICHT). Der Eintrag trägt den deklarierten Namen (`declared`),
-//  damit der Client ihn zeigen kann: die Deklaration ist öffentlich.
+//  ── LINGERING EFFECT, KEIN PERMANENT ────────────────────────────
+//  Liquid Luck ist eine ganz normale Normal Potion (Al 23.10.): sie wird
+//  gespielt und danach wie jeder Trank gelöscht (Gelöscht-Stapel des
+//  Besitzers, Server-Weg). Der Effekt lingert weiter: wie bei Trial of
+//  Knowledge legt `resolve` eine EIGENE Marker-Instanz in die Zone
+//  'deleted' an (der Server kennt sie nicht und räumt sie nicht weg);
+//  sie ist der Zuhörer für die „plays a card"-Hooks. Auf dem Brett
+//  bleibt NICHTS liegen. Damit der Gegner trotzdem weiß, worauf er
+//  achten muss, wird das Bild der deklarierten Karte an ihn gestreamt
+//  (`card_reveal`) — die Deklaration ist öffentlich.
 //
 //  ── „UNTIL THE BEGINNING OF YOUR NEXT TURN" ──────────────────────
-//  Der `onTurnStart` des DEKLARIERENDEN löscht den Trank (Bauform Luck:
-//  nicht über einen Zähler, sondern „wessen Zug beginnt"). Bis dahin
-//  zählen alle Karten, die der Gegner spielt, auch die, die er in MEINEM
-//  Zug als Reaktion spielt — und der Trank ist selbst nach dem Ablauf
-//  verbraucht: er landet im Gelöscht-Stapel (wie jeder andere Trank).
+//  Der `onTurnStart` des DEKLARIERENDEN räumt den Marker weg (Bauform
+//  Luck: nicht über einen Zähler, sondern „wessen Zug beginnt"). Bis
+//  dahin zählen alle Karten, die der Gegner spielt, auch die, die er in
+//  MEINEM Zug als Reaktion spielt.
 //
 //  ── DIE SUCHE ───────────────────────────────────────────────────
 //  Pflicht („search"), nicht abbrechbar — die Wahl ist bezahlt (Muster
@@ -44,7 +46,6 @@
 const { baseCardName } = require('./_hooks');
 const { kartenSpielBeobachter } = require('./_card-played-shared');
 const { skipIfSearchBlocked, suchAbfrage } = require('./_search-shared');
-const { getResolvingHandIndex } = require('./_hand-resolve');
 
 const CARD_NAME = 'Liquid Luck';
 
@@ -57,12 +58,6 @@ function deklarierbareNamen(engine) {
     if (cd.cardType === 'Token') return false;
     return true;
   }).sort((a, b) => a.localeCompare(b));
-}
-
-/** Der Permanent-Eintrag dieser Instanz (oder undefined). */
-function eintragVon(engine, pi, inst) {
-  const permId = inst?.counters?.permId;
-  return (engine.gs.players[pi]?.permanents || []).find(p => p.id === permId);
 }
 
 /** „Search your deck for any card, reveal it and add it to your hand." */
@@ -87,25 +82,27 @@ async function sucheBeliebigeKarte(engine, pi) {
   return engine.searchDeckForNamedCard(pi, name, CARD_NAME);
 }
 
-/** Der Trank verfällt: Permanent und Instanz weg, die Karte in den Gelöscht-Stapel. */
-async function laufeAb(engine, pi, inst) {
-  const ps = engine.gs.players[pi];
-  const permId = inst.counters?.permId;
-  const idx = (ps.permanents || []).findIndex(p => p.id === permId);
-  engine._broadcastEvent('play_pile_transfer', {
-    owner: pi, cardName: CARD_NAME, from: 'permanent', to: 'deleted', fromPermId: inst.id,
-  });
-  if (idx >= 0) ps.permanents.splice(idx, 1);
-  (inst.counters?.liquidLuckBesitzer != null ? engine.gs.players[inst.counters.liquidLuckBesitzer] : ps).deletedPile.push(CARD_NAME);
+/** Die Deklaration verfällt: nur der Marker geht — der Trank selbst liegt längst im Gelöscht-Stapel seines Besitzers. */
+function laufeAb(engine, inst) {
   engine._untrackCard(inst.id);
-  engine.log('permanent_removed', { card: CARD_NAME, player: ps.username });
-  engine.sync();
+}
+
+/** Erster lebender Held des Spielers: Anker der Regenbogen-Animation (der Trank selbst hat keinen Platz auf dem Brett). */
+function ankerHeld(engine, pi) {
+  const heroes = engine.gs.players[pi]?.heroes || [];
+  const hi = heroes.findIndex(h => h?.name && h.hp > 0);
+  return hi >= 0 ? hi : 0;
+}
+
+/** Das Bild der deklarierten Karte geht an den Gegner (`card_reveal`, derselbe Auftritt wie bei einer gespielten Karte) — nur an ihn, der Deklarierende weiß es ja. */
+function streameDeklaration(engine, pi, name) {
+  engine._broadcastEvent('card_reveal', { cardName: name, sfx: 'ability_activate', playerIdx: pi }, { toPlayers: [engine.opponentOf(pi)] });
 }
 
 /** Ein Gegner hat `gespielt` gespielt — passt er zum deklarierten Namen? Dann suchen. */
 async function trigger(ctx, gespielt, spieler) {
   const inst = ctx.card;
-  if (inst?.zone !== 'permanent') return;
+  if (inst?.zone !== 'deleted') return;
   const ziel = inst.counters?.liquidLuckZiel;
   const pi = inst.counters?.liquidLuckSpieler;
   if (!ziel || pi == null) return;
@@ -113,14 +110,16 @@ async function trigger(ctx, gespielt, spieler) {
   if (baseCardName(gespielt) !== baseCardName(ziel)) return;
   const engine = ctx._engine;
   engine.log('liquid_luck_trigger', { player: engine.gs.players[pi]?.username, card: ziel });
-  engine._broadcastEvent('play_permanent_animation', { owner: pi, permId: inst.counters.permId, type: 'liquid_rainbow' });
+  // Grundregel (CARD_API): ein passiver Effekt, der per Trigger feuert, wird an BEIDE Spieler gestreamt.
+  await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: inst.id + ':' + gespielt + ':' + (engine.gs.turn || 0) });
+  engine._broadcastEvent('play_zone_animation', { type: 'liquid_rainbow', owner: pi, heroIdx: ankerHeld(engine, pi), zoneSlot: -1 });
   await sucheBeliebigeKarte(engine, pi);
   engine.sync();
 }
 
 module.exports = {
   isPotion: true,
-  activeIn: ['permanent'],
+  activeIn: ['deleted'],
 
   // Wie Luck / Elixir of Immortality: der Nutzen liegt in der Zukunft und ist für die Zugbewertung der CPU unsichtbar.
   // `alwaysCommit` als Funktion: nur spielen, solange das Deck etwas zum Suchen hergibt (sonst verpufft der Trank beim Auslösen).
@@ -141,26 +140,18 @@ module.exports = {
     const deklariert = wahl && !wahl.cancelled ? wahl.cardName : null;
     if (!deklariert || !engine._getCardDB()[deklariert]) return { cancelled: true };     // Abbruch: nichts ist passiert
 
-    // Offen vor den Spieler legen (Bauform Elixir of Immortality).
-    if (!ps.permanents) ps.permanents = [];
-    const permId = 'perm-' + Date.now() + '-' + Math.random();
-    ps.permanents.push({ name: CARD_NAME, id: permId, declared: deklariert });
-    const inst = engine._trackCard(CARD_NAME, pi, 'permanent', -1, -1);
-    inst.counters.permId = permId;
-    inst.counters.liquidLuckZiel = deklariert;
-    inst.counters.liquidLuckSpieler = pi;
-    // Ein fremder Trank (Magic Lamp & Co.) gehört seinem Besitzer: beim Ablauf wandert er in DESSEN Gelöscht-Stapel.
-    const handIdx = getResolvingHandIndex(ps);
-    const herkunft = handIdx >= 0 ? engine._handOriginAt(ps, handIdx) : null;
-    if (Number.isInteger(herkunft) && herkunft !== pi) inst.counters.liquidLuckBesitzer = herkunft;
+    // Lingering Effect: eine Marker-Instanz im Gelöscht-Stapel hört auf die Karten des Gegners (Bauform Trial of Knowledge). Der Trank selbst
+    // wird vom Server wie jede Normal Potion gelöscht — ein fremder Trank (Magic Lamp & Co.) wandert dort in den Stapel seines Besitzers.
+    const marker = engine._trackCard(CARD_NAME, pi, 'deleted', -1, -1);
+    marker.counters.liquidLuckZiel = deklariert;
+    marker.counters.liquidLuckSpieler = pi;
 
     engine.log('liquid_luck_declare', { player: ps.username, card: deklariert });
-    engine.log('permanent_placed', { card: CARD_NAME, player: ps.username });
+    streameDeklaration(engine, pi, deklariert);
+    engine._broadcastEvent('play_zone_animation', { type: 'liquid_rainbow', owner: pi, heroIdx: ankerHeld(engine, pi), zoneSlot: -1 });
     engine.sync();
-    await engine._delay(60);
-    engine._broadcastEvent('play_permanent_animation', { owner: pi, permId, type: 'liquid_rainbow' });
-    await engine._delay(240);
-    return { placed: true };
+    await engine._delay(600);
+    return true;
   },
 
   hooks: {
@@ -169,10 +160,10 @@ module.exports = {
     /** „… until the beginning of YOUR next turn": der Zug des Deklarierenden beendet den Effekt. */
     onTurnStart: async (ctx) => {
       const inst = ctx.card;
-      if (inst?.zone !== 'permanent') return;
+      if (inst?.zone !== 'deleted') return;
       const pi = inst.counters?.liquidLuckSpieler;
       if (pi == null || ctx.activePlayer !== pi) return;
-      await laufeAb(ctx._engine, pi, inst);
+      laufeAb(ctx._engine, inst);
     },
   },
 };

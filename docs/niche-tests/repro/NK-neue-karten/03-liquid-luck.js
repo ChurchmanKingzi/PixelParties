@@ -7,6 +7,8 @@ const H = require('../../lib/h.js');
 (async () => {
   const R = H.runner();
   const LL = 'Liquid Luck';
+  // Lingering Effect (Al 23.10.): nichts liegt auf dem Brett; der Zuhörer ist eine Marker-Instanz in der Zone 'deleted'.
+  const marker = (t, seat) => t.engine.cardInstances.filter(c => c.name === LL && c.zone === 'deleted' && c.owner === seat);
   // Deck von Sitz 0: Fireball + Füllung; die Galerie-Antwort wählt "Fireball" (Antwortform: { cardName }).
   const deck0 = ['Fireball', 'Healing Potion', 'Treasure Chest', ...Array(9).fill('ZZ Dummy')];
   async function szene(deklariere, hand1 = [deklariere], extra = {}) {
@@ -17,16 +19,20 @@ const H = require('../../lib/h.js');
   }
   const gespielt = async (t) => { const r = await t.play(0, LL); return r; };
 
-  R.section('A · Deklarieren und Ablegen');
+  R.section('A · Deklarieren und Löschen (Lingering Effect)');
   {
     const t = await szene('Fireball');
+    const reveals = [];
+    const urspr = t.engine._broadcastEvent.bind(t.engine);
+    t.engine._broadcastEvent = (ev, data, opts) => { if (ev === 'card_reveal' && data.cardName === 'Fireball') reveals.push({ data, toPlayers: opts && opts.toPlayers }); return urspr(ev, data, opts); };
     const r = await gespielt(t);
     const ps = t.gs.players[0];
     R.check('Trank gespielt (doUsePotion → true)', r === true, r);
-    R.check('Trank liegt offen vor dem Spieler (permanents), mit deklariertem Namen', ps.permanents.length === 1 && ps.permanents[0].name === LL && ps.permanents[0].declared === 'Fireball', ps.permanents);
+    R.check('nichts liegt auf dem Brett (keine permanents), aber ein Marker mit dem deklarierten Namen hört zu', ps.permanents.length === 0 && marker(t, 0).length === 1 && marker(t, 0)[0].counters.liquidLuckZiel === 'Fireball', { perm: ps.permanents, marker: marker(t, 0).length });
     R.check('Trank nicht mehr in der Hand', !ps.hand.includes(LL), ps.hand);
-    R.check('… und NICHT im Gelöscht-Stapel (er ist noch aktiv)', !ps.deletedPile.includes(LL), ps.deletedPile);
-    R.check('Instanz in der Zone permanent mit Ziel/Spieler', (() => { const i = t.find(LL, 'permanent'); return i && i.counters.liquidLuckZiel === 'Fireball' && i.counters.liquidLuckSpieler === 0; })(), t.find(LL)?.counters);
+    R.check('… der Trank selbst liegt wie jede Normal Potion im Gelöscht-Stapel (genau 1×), nicht in der Ablage', ps.deletedPile.filter(n => n === LL).length === 1 && !ps.discardPile.includes(LL), { del: ps.deletedPile, disc: ps.discardPile });
+    R.check('Marker trägt Ziel und Spieler', (() => { const i = marker(t, 0)[0]; return i && i.counters.liquidLuckZiel === 'Fireball' && i.counters.liquidLuckSpieler === 0; })(), marker(t, 0)[0]?.counters);
+    R.check('das Bild der deklarierten Karte wird an den Gegner gestreamt (card_reveal nur an Sitz 1, einmal)', reveals.length === 1 && reveals[0].data.cardName === 'Fireball' && JSON.stringify(reveals[0].toPlayers) === '[1]', reveals);
     R.check('Log liquid_luck_declare', t.lg('liquid_luck_declare').length === 1 && t.lg('liquid_luck_declare')[0].card === 'Fireball', t.lg('liquid_luck_declare'));
     const pn = t.prompts.find(p => p.d.type === 'cardNamePicker')?.d;
     R.check('Wähler bietet Kartennamen an (auch Reactions und Surprises, Al 23.10.), aber keine Tokens', pn && pn.cardNames.includes('Fireball') && pn.cardNames.includes('Gold Trap') && pn.cardNames.includes('Anti-Magnet') && !pn.cardNames.some(n => H.DB[n].cardType === 'Token'), pn && pn.cardNames.length);
@@ -39,15 +45,15 @@ const H = require('../../lib/h.js');
     t.script.push({ match: d => d.type === 'cardNamePicker', answer: () => ({ cancelled: true }) });
     const r = await t.play(0, LL);
     const ps = t.gs.players[0];
-    R.check('Abbruch: Trank bleibt in der Hand', ps.hand.includes(LL) && ps.permanents.length === 0, { hand: ps.hand, perm: ps.permanents });
-    R.check('Abbruch: nicht gelöscht, kein Permanent, keine Instanz', !ps.deletedPile.includes(LL) && !t.find(LL, 'permanent'), { del: ps.deletedPile });
+    R.check('Abbruch: Trank bleibt in der Hand', ps.hand.includes(LL) && marker(t, 0).length === 0, { hand: ps.hand, marker: marker(t, 0).length });
+    R.check('Abbruch: nicht gelöscht, kein Permanent, keine Instanz', !ps.deletedPile.includes(LL) && marker(t, 0).length === 0, { del: ps.deletedPile });
     R.check('Abbruch: kein Log, kein Kartenbild für den Gegner', t.lg('liquid_luck_declare').length === 0 && t.evs('card_reveal').length === 0, { logs: t.lg('liquid_luck_declare'), rev: t.evs('card_reveal') });
     R.check('Abbruch: keine Engine-Fehler', t.errors.length === 0, t.errors);
     // danach erneut spielbar
     t.script.length = 0;
     t.script.push({ match: d => d.type === 'cardNamePicker', answer: () => ({ cardName: 'Fireball' }) });
     const r2 = await t.play(0, LL);
-    R.check('nach dem Abbruch erneut spielbar', r2 === true && ps.permanents.length === 1, { r2, perm: ps.permanents });
+    R.check('nach dem Abbruch erneut spielbar', r2 === true && marker(t, 0).length === 1, { r2, marker: marker(t, 0).length });
   }
   {
     // unbekannter / leerer Name (manipulierter Client): kein Permanent
@@ -56,7 +62,7 @@ const H = require('../../lib/h.js');
       t.script.push({ match: d => d.type === 'cardNamePicker', answer: () => antwort });
       await t.play(0, LL);
       const ps = t.gs.players[0];
-      R.check(`ungültige Antwort ${JSON.stringify(antwort)}: kein Permanent, Trank in der Hand`, ps.permanents.length === 0 && ps.hand.includes(LL), { perm: ps.permanents, hand: ps.hand });
+      R.check(`ungültige Antwort ${JSON.stringify(antwort)}: kein Marker, Trank in der Hand`, marker(t, 0).length === 0 && ps.hand.includes(LL), { marker: marker(t, 0).length, hand: ps.hand });
     }
   }
 
@@ -130,12 +136,11 @@ const H = require('../../lib/h.js');
     const t = await szene('Fireball');
     await gespielt(t);
     await t.endTurn();                         // Sitz 1 am Zug
-    R.check('im Zug des Gegners: Trank liegt noch', t.gs.players[0].permanents.length === 1, t.gs.players[0].permanents);
+    R.check('im Zug des Gegners: Marker besteht noch', marker(t, 0).length === 1, marker(t, 0).length);
     await t.endTurn();                         // Sitz 0 beginnt seinen nächsten Zug → Ablauf
     const ps = t.gs.players[0];
-    R.check('zu Beginn des eigenen nächsten Zuges: Permanent weg', ps.permanents.length === 0 && !t.find(LL, 'permanent'), { perm: ps.permanents, inst: !!t.find(LL, 'permanent') });
+    R.check('zu Beginn des eigenen nächsten Zuges: Marker weg', marker(t, 0).length === 0, marker(t, 0).length);
     R.check('Trank im Gelöscht-Stapel (genau 1×)', ps.deletedPile.filter(n => n === LL).length === 1 && !ps.discardPile.includes(LL), { del: ps.deletedPile, disc: ps.discardPile });
-    R.check('Log permanent_removed', t.lg('permanent_removed').some(l => l.card === LL), t.lg('permanent_removed'));
     // Nach Ablauf spielt der Gegner die Karte in SEINEM nächsten Zug: nichts
     await t.endTurn();                         // Sitz 1 am Zug
     t.targetFn = (valid) => { const v = valid.find(x => x.owner === 0) || valid[0]; return v ? [v.id] : null; };
@@ -232,7 +237,7 @@ const H = require('../../lib/h.js');
     t.script.push({ match: d => d.type === 'cardGallery' && d.title === LL, answer: () => ({ cardName: 'Treasure Chest' }) });
     await t.play(0, LL);
     await t.play(0, LL, { keepActions: true });
-    R.check('zwei Tränke liegen vor dem Spieler', t.gs.players[0].permanents.length === 2 && t.gs.players[0].permanents.map(p => p.declared).join() === 'Fireball,Elixir of Quickness', t.gs.players[0].permanents);
+    R.check('zwei Marker (je Trank einer) mit den beiden Namen', marker(t, 0).length === 2 && marker(t, 0).map(m => m.counters.liquidLuckZiel).join() === 'Fireball,Elixir of Quickness', marker(t, 0).map(m => m.counters.liquidLuckZiel));
     await t.endTurn();
     t.targetFn = (valid) => { const v = valid.find(x => x.owner === 0) || valid[0]; return v ? [v.id] : null; };
     const vor = t.pile(0, 'hand').length;
@@ -241,7 +246,7 @@ const H = require('../../lib/h.js');
     await t.play(1, 'Fireball', { hero: 0 });
     R.check('„Fireball" löst den ersten aus (insgesamt +2)', t.pile(0, 'hand').length === vor + 2, { d: t.pile(0, 'hand').length - vor });
     await t.endTurn();
-    R.check('beide laufen zu Beginn von Sitz 0 ab', t.gs.players[0].permanents.length === 0 && t.gs.players[0].deletedPile.filter(x => x === LL).length === 2, { perm: t.gs.players[0].permanents, del: t.gs.players[0].deletedPile });
+    R.check('beide Marker laufen zu Beginn von Sitz 0 ab, beide Tränke bleiben gelöscht', marker(t, 0).length === 0 && t.gs.players[0].deletedPile.filter(x => x === LL).length === 2, { marker: marker(t, 0).length, del: t.gs.players[0].deletedPile });
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
   {
@@ -281,7 +286,7 @@ const H = require('../../lib/h.js');
     t.gs.players[0].potionLocked = true;
     t.script.push({ match: d => d.type === 'cardNamePicker', answer: () => ({ cardName: 'Fireball' }) });
     const r = await t.play(0, LL);
-    R.check('Trank-Sperre: nicht spielbar (Server lehnt ab)', r === false && t.gs.players[0].permanents.length === 0, { r });
+    R.check('Trank-Sperre: nicht spielbar (Server lehnt ab)', r === false && marker(t, 0).length === 0, { r });
   }
   {
     // Negation des Tranks (Ambush the Scout? / Anti Magic): nichts liegt, Karte verbraucht — hier: Chain-Negation über engine-Wahl nicht trivial → Pfad: executeCardWithChain negated simulieren
@@ -290,14 +295,14 @@ const H = require('../../lib/h.js');
     const orig = t.engine.executeCardWithChain.bind(t.engine);
     t.engine.executeCardWithChain = async (opts) => { if (opts.cardName === LL) return { negated: true, chainFormed: true }; return orig(opts); };
     const r = await t.play(0, LL);
-    R.check('negierter Trank: kein Permanent, kein Dialog', t.gs.players[0].permanents.length === 0 && !t.prompts.some(p => p.d.type === 'cardNamePicker'), { perm: t.gs.players[0].permanents, prompts: t.prompts.length });
+    R.check('negierter Trank: kein Marker, kein Dialog', marker(t, 0).length === 0 && !t.prompts.some(p => p.d.type === 'cardNamePicker'), { marker: marker(t, 0).length, prompts: t.prompts.length });
     R.check('negierter Trank: Karte nicht doppelt/verloren (Hand+Ablage+Gelöscht = 1)', [t.pile(0, 'hand'), t.pile(0, 'discardPile'), t.pile(0, 'deletedPile')].flat().filter(n => n === LL).length === 1, { hand: t.pile(0, 'hand'), disc: t.pile(0, 'discardPile'), del: t.pile(0, 'deletedPile') });
     R.check('negierter Trank: keine Engine-Fehler', t.errors.length === 0, t.errors);
   }
 
   R.section('I · Weitere Wechselwirkungen');
   {
-    // Elixir of Immortality (legt sich offen hin, eigener `placed`-Weg) wird vom Beobachter gesehen
+    // Elixir of Immortality (legt sich offen hin, eigener `placed`-Weg) wird vom Beobachter gesehen (der Trank selbst von Sitz 0 liegt nicht mehr auf dem Brett)
     const t = await szene('Elixir of Immortality', ['Elixir of Immortality']);
     await gespielt(t); await t.endTurn();
     const vor = t.pile(0, 'hand').length;
@@ -315,12 +320,12 @@ const H = require('../../lib/h.js');
     const vor = t.pile(0, 'hand').length;
     const r = await t.play(1, LL);
     R.check('Gegner spielt Liquid Luck, ich habe „Liquid Luck" deklariert → ich suche', r === true && t.pile(0, 'hand').includes('Treasure Chest') && t.pile(0, 'hand').length === vor + 1, { r, d: t.pile(0, 'hand').length - vor });
-    R.check('beide Tränke liegen offen (je einer pro Spieler)', t.gs.players[0].permanents.length === 1 && t.gs.players[1].permanents.length === 1, [t.gs.players[0].permanents, t.gs.players[1].permanents]);
+    R.check('je Spieler ein Marker', marker(t, 0).length === 1 && marker(t, 1).length === 1, [marker(t, 0).length, marker(t, 1).length]);
     // Sitz 1 beendet; Sitz 0 beginnt → nur der Trank von Sitz 0 läuft ab
     await t.endTurn();
-    R.check('Zugbeginn von Sitz 0: sein Trank weg, der des Gegners bleibt', t.gs.players[0].permanents.length === 0 && t.gs.players[1].permanents.length === 1, [t.gs.players[0].permanents.length, t.gs.players[1].permanents.length]);
+    R.check('Zugbeginn von Sitz 0: sein Marker weg, der des Gegners bleibt', marker(t, 0).length === 0 && marker(t, 1).length === 1, [marker(t, 0).length, marker(t, 1).length]);
     await t.endTurn();
-    R.check('Zugbeginn von Sitz 1: sein Trank weg', t.gs.players[1].permanents.length === 0 && t.gs.players[1].deletedPile.includes(LL), t.gs.players[1].permanents);
+    R.check('Zugbeginn von Sitz 1: sein Marker weg, sein Trank bleibt gelöscht', marker(t, 1).length === 0 && t.gs.players[1].deletedPile.includes(LL), marker(t, 1).length);
     R.check('keine Engine-Fehler / sauberer Zustand', t.errors.length === 0 && t.audit().length === 0, { e: t.errors, a: t.audit() });
   }
   {
@@ -346,11 +351,11 @@ const H = require('../../lib/h.js');
     // Trank in Main 2 (Phase 4) spielbar; Deklaration wirkt bis zum nächsten Zug
     const t = await szene('Fireball');
     const r = await t.play(0, LL, { phase: 4 });
-    R.check('in Main Phase 2 spielbar', r === true && t.gs.players[0].permanents.length === 1, { r });
+    R.check('in Main Phase 2 spielbar', r === true && marker(t, 0).length === 1, { r });
     // In Aktionsphase nicht spielbar (Server: nur Main-Phasen)
     const t2 = await szene('Fireball');
     const r2 = await t2.play(0, LL, { phase: 3 });
-    R.check('in der Aktionsphase nicht spielbar', r2 === false && t2.gs.players[0].permanents.length === 0, { r2 });
+    R.check('in der Aktionsphase nicht spielbar', r2 === false && marker(t2, 0).length === 0, { r2 });
   }
   {
     // Spiel endet während des Effekts / Spieler hat keinen Held mehr — nur Absturzprobe: letzter Held des Besitzers stirbt, danach Zugwechsel
@@ -368,8 +373,9 @@ const H = require('../../lib/h.js');
     if (hinst) hinst.originalOwner = 1;
     t.gs.players[0]._handOriginals = { 0: { n: LL, o: 1 } };
     await t.play(0, LL, { handIndex: 0 });
+    R.check('fremder Trank landet sofort im Gelöscht-Stapel seines BESITZERS (Sitz 1), nicht des Spielers; der Marker gehört dem Spieler', t.gs.players[1].deletedPile.includes(LL) && !t.gs.players[0].deletedPile.includes(LL) && marker(t, 0).length === 1, { p0: t.gs.players[0].deletedPile, p1: t.gs.players[1].deletedPile, errors: t.errors.slice(0, 2) });
     await t.endTurn(); await t.endTurn();
-    R.check('fremder Trank landet nach dem Ablauf im Gelöscht-Stapel seines BESITZERS (Sitz 1), nicht des Spielers', t.gs.players[1].deletedPile.includes(LL) && !t.gs.players[0].deletedPile.includes(LL), { p0: t.gs.players[0].deletedPile, p1: t.gs.players[1].deletedPile, errors: t.errors.slice(0, 2) });
+    R.check('nach dem Ablauf: Marker weg, der Trank bleibt im Stapel seines Besitzers', marker(t, 0).length === 0 && t.gs.players[1].deletedPile.includes(LL), { p1: t.gs.players[1].deletedPile });
   }
   R.finish();
 })();

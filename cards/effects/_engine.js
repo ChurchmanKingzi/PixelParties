@@ -29880,7 +29880,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /** All own non-face-down creatures eligible as tributes right now. */
-  getSacrificableCreatures(playerIdx) {
+  getSacrificableCreatures(playerIdx, opts = {}) {
     const gs = this.gs;
     const cardDB = this._getCardDB();
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
@@ -29889,7 +29889,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Kontrolle statt Seite (Styx 28.9.): „a Creature you control" —
       // auch eine ueber einen uebernommenen Helden beschworene Kreatur auf
       // der Gegenspalte, nicht aber eine vom Gegner kontrollierte eigene.
-      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      // 23.10. (Black-Thorn Dragon, Al: „bei seinem 2-Opfer-Weg ausdrücklich auch gegnerische Drago-Creatures"): `opts.auchGegner` nimmt Kreaturen anderer Sitze
+      // dazu (Spec-Schalter `auchGegner`, Text OHNE „you control"); sie tragen `fremd: true` und müssen den Schutz-Vorfilter in `_collectSacrificeCandidates` bestehen.
+      const fremd = (inst.controller ?? inst.owner) !== playerIdx;
+      if (fremd && !opts.auchGegner) continue;
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       // No summoning-sickness gate: sacrifice is intentional self-removal,
@@ -29941,9 +29944,22 @@ this._deathWatch = (this._deathWatchStack || []).length
       const level = cd.level || 0;
       // `hasLevel`: Artifact Creatures haben KEIN Level (Als Ruling 9.10.) — `level` bleibt 0 fuer
       // die Rechnerei, aber jeder Effekt, der ein Level verlangt, fragt `hasLevel` zuerst.
-      results.push({ inst, maxHp, level, hasLevel: hasNumericCreatureLevel(cd), cardName: inst.name });
+      results.push({ inst, maxHp, level, hasLevel: hasNumericCreatureLevel(cd), cardName: inst.name, ...(fremd ? { fremd: true } : {}) });
     }
     return results;
+  }
+
+  /**
+   * 23.10.: darf `pi` diese FREMDE Kreatur als Opfer wählen? Nein, wenn ein Schutz gegen den Zugriff eines fremden Sitzes sie ohnehin vor dem Tod bewahrte — sonst
+   * zählte der Preis als bezahlt, ohne bezahlt zu sein (die Kreatur bliebe stehen). Geprüft werden dieselben Sperren wie bei einer fremden Zerstörung.
+   */
+  _fremdOpferGeschuetzt(inst, pi) {
+    const quelle = { owner: pi, controller: pi };
+    try {
+      if (this.kreaturGegnerEffektImmun(inst, quelle, { sourceOwner: pi, isSacrifice: true })) return true;
+      if (this.isOppEffectImmuneFrom(inst, quelle)) return true;
+    } catch { /* ein Prüffehler sperrt nichts */ }
+    return false;
   }
 
   /**
@@ -30004,7 +30020,8 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   _collectSacrificeCandidates(playerIdx, spec, selfId) {
-    let board = this.getSacrificableCreatures(playerIdx);
+    let board = this.getSacrificableCreatures(playerIdx, { auchGegner: !!spec?.auchGegner });
+    if (spec?.auchGegner) board = board.filter(c => !c.fremd || !this._fremdOpferGeschuetzt(c.inst, playerIdx));
     // ★ W16b (A02-deepsea-34): ein Opfer ist ein BESIEGEN — eine per Succubus geliehene Kreatur „cannot be defeated while you control it"
     // (`actionDestroyCard` bricht bei `_stealImmortal` ab): kein Opferkandidat, sonst gälte der Preis als gezahlt, ohne gezahlt zu sein.
     // Nur hier (generische Opferkosten), NICHT in `getSacrificableCreatures`; Specs mit `returnsToHand` (Dark Deepsea God gibt die Kreatur nur
@@ -30418,7 +30435,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // don't. Used by Dragon Pilot on the inherent path (≤Lv1 only).
     if (spec.showFilteredAsIneligible && spec.filter) {
       const shownIds = new Set(targets.map(t => t.id));
-      let allSac = this.getSacrificableCreatures(pi);
+      let allSac = this.getSacrificableCreatures(pi, { auchGegner: !!spec.auchGegner });
       if (selfId != null) allSac = allSac.filter(c => c.inst.id !== selfId);
       for (const c of allSac) {
         const id = `equip-${c.inst.owner}-${c.inst.heroIdx}-${c.inst.zoneSlot}`;
@@ -30689,6 +30706,12 @@ this._deathWatch = (this._deathWatchStack || []).length
       } catch (err) {
         console.error(`[${ctx.cardName}] sacrifice destroy failed:`, err.message);
       }
+    }
+
+    // 23.10.: eine FREMDE Kreatur, die trotz Opfer noch steht (ein Schutz hat die Zerstörung abgewehrt), heißt: Preis nicht bezahlt — wie ein gerettetes Opfer.
+    if (spec.auchGegner && picked.some(t => t.cardInstance && (t.cardInstance.controller ?? t.cardInstance.owner) !== pi
+        && t.cardInstance.zone === 'support' && !t.cardInstance._deathResolved && this.cardInstances.includes(t.cardInstance))) {
+      this.gs._opferFizzle = true;
     }
 
     // ★ v1313: wurde ein Opfer GERETTET (Barrier of Undying), ist der

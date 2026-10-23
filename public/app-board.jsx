@@ -41675,8 +41675,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
       // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
       // wie in der Zone, der leise Auftakt bleibt als Fallback.
-      if (type === 'liquid_rainbow' && window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, {});   // 23.10.: eigener Klang (ZONE_ANIM_SFX)
-      else if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
+      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
       const ownerLabel = ownerLbl(owner, myIdx);
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
