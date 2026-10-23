@@ -8697,6 +8697,61 @@ const MindControlHexEffect = (() => {
   return ppPunktBild(malen, ENDE + 40, 200, 260, vorbereiten);
 })();
 
+// ═════════════════════════════════════════════════════════════════
+//  Spy in the Enemy's Camp: Spähauge (`spy_mark`) — PIXELART, Hülle `ppPunktBild`; läuft auf der markierten Kreatur
+//
+//  Ein Auge senkt sich in vier ganzen Schritten über die Karte, öffnet sich, blinzelt einmal und lässt die Iris nach links und rechts wandern; Sucherecken (Fadenkreuz-Winkel)
+//  schnappen um die Karte zu. Ab ~1000 ms dithert alles weg, bei 1300 ms ist es fort. Feste Palette, kein Leuchten, Karte bleibt lesbar (nur Augenfläche und Winkel).
+// ═════════════════════════════════════════════════════════════════
+const SpyMarkEffect = (() => {
+  const KONTUR = ppHex('#1a1a2e'), WEISS = ppHex('#ffffff'), LIDER = ppHex('#d2d2db');
+  const IRIS = ['#77c8ee', '#4e82cb', '#0351c9'].map(ppHex), SUCHER = ['#ffffff', '#77c8ee'].map(ppHex);
+  const ENDE = 1300, FADE_AB = 1000, BLINZELN = [560, 700];
+  const malen = (g, t, sz) => {
+    const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+    if (aus <= 0) return;
+    const cx = Math.round(sz.cx), cy = Math.round(sz.cy);
+    // Sucherecken: schnappen von aussen heran (4 Schritte), blinken zweimal (steps)
+    const ein = Math.min(4, Math.floor(t / 60)), ecke = Math.round(sz.hw * 1.05 + (4 - ein) * 3), eckeH = Math.round(sz.hh * 1.02 + (4 - ein) * 3), arm = 5;
+    if (t > 40 && !(t > 760 && t < 860)) {
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const ex = cx + sx * ecke, ey = cy + sy * eckeH;
+        for (let i = 0; i < arm; i++) {
+          g.put(ex - sx * i, ey, SUCHER[0], aus); g.put(ex, ey - sy * i, SUCHER[0], aus);
+          g.put(ex - sx * i, ey - sy, SUCHER[1], aus); g.put(ex - sx, ey - sy * i, SUCHER[1], aus);
+        }
+      }
+    }
+    // Auge: fällt in vier Schritten von oben auf die Kartenmitte
+    const fall = Math.min(4, Math.floor(t / 70)), ey0 = Math.round(cy - sz.hh * 0.9 + fall * (sz.hh * 0.9) / 4);
+    if (t < 60) return;
+    const zu = t > BLINZELN[0] && t < BLINZELN[1];
+    const W = 5, H = zu ? 0 : 3;
+    for (let x = -W; x <= W; x++) {
+      const hh = zu ? 0 : Math.round(H * Math.sqrt(Math.max(0, 1 - (x / (W + 0.6)) ** 2)) + 0.4);
+      for (let y = -hh - 1; y <= hh + 1; y++) {
+        const rand = Math.abs(y) > hh;
+        if (zu && y !== 0) continue;
+        g.put(cx + x * 2, ey0 + y * 2, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2 + 1, ey0 + y * 2, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2, ey0 + y * 2 + 1, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+        g.put(cx + x * 2 + 1, ey0 + y * 2 + 1, rand ? KONTUR : (Math.abs(y) === hh ? LIDER : WEISS), aus);
+      }
+    }
+    if (!zu && t > 280) {                                                              // Iris wandert links – Mitte – rechts – Mitte
+      const gang = [0, -2, -2, 0, 2, 2, 0][Math.min(6, Math.floor(Math.max(0, t - 280) / 110))];
+      const ix = cx + gang * 2;
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+        const r2 = x * x + y * y; if (r2 > 5) continue;
+        g.block(ix + x * 2, ey0 + y * 2, 2, 2, r2 > 3 ? IRIS[2] : IRIS[1], aus);
+      }
+      g.block(ix - 1, ey0 - 1, 4, 4, KONTUR, aus);   // Pupille 4×4, mittig in der Iris
+      g.put(ix - 2, ey0 - 2, WEISS, aus); g.put(ix - 1, ey0 - 2, WEISS, aus);                                                                                       // Glanzpunkt
+    }
+  };
+  return ppPunktBild(malen, ENDE + 40, 200, 260);
+})();
+
 // ═══════════════════════════════════════════════════════════════════
 //  Glass Wall (12.10.) — PIXELART, Held-Animation (`glass_wall_up`, `glass_wall_shatter`; Ursprung = die Heldenzone, `x`/`y` Mitte, `w`/`h` Kartengrösse)
 //
@@ -17470,6 +17525,7 @@ const ANIM_REGISTRY = {
   liquid_rainbow: LiquidRainbowEffect,
   hand_level_down: HandLevelDownEffect,
   mind_control_hex: MindControlHexEffect,
+  spy_mark: SpyMarkEffect,
   // ── Circles of Hell (Animationen) ──────────────────────────────────
   // Farben aus den Pixelart-Hintergruenden der Kreise (Flammen #f8f8bd … #520a0c).
   // ★ The Sixth Circle: Hoellen-Charme — blutrote Siegelringe, aufsteigende Schlieren, dunkler Blitz.
@@ -32095,6 +32151,47 @@ function TutorialFinaleFeuerwerk() {
 }
 
 /**
+ * Wie `handPlatzProjektion`, aber für eine LEERE Hand (z. B. nach dem Verschenken aller Karten): es gibt keine Plätze zum Messen. Die Reihe ist leer, also kann man ihr — ohne etwas zu
+ * stören, noch vor dem nächsten Bild — `finalHandSize` unsichtbare Probe-Plätze einsetzen, den Browser das echte Layout rechnen lassen (Mitte, Abstand, Fächerbogen, senkrechte Lage der
+ * Reihe), den Zielplatz messen und die Proben wieder entfernen.
+ */
+function handPlatzProjektionLeer(isMe, handIdx, finalHandSize) {
+  const reihe = document.querySelector(`${isMe ? '.game-hand-me' : '.game-hand-opp'} .game-hand-cards`);
+  if (!reihe) return null;
+  const seite = isMe ? 'me' : 'opp';
+  const finalCount = Math.max(finalHandSize || 0, handIdx + 1);
+  const altMaxLift = reihe.style.getPropertyValue('--hand-max-lift');
+  const proben = [];
+  try {
+    // Die Reihe senkt sich um den Überstand des Fächers (`--hand-max-lift` hängt an der Handgröße, siehe JSX): Wert der Endgröße einsetzen.
+    reihe.style.setProperty('--hand-max-lift', String((window.handFanMaxLift ? window.handFanMaxLift(finalCount, isMe ? undefined : { seite }) : 0) ?? 0));
+    for (let i = 0; i < finalCount; i++) {
+      const p = document.createElement('div');
+      if (isMe) {
+        p.className = 'hand-slot';
+        const k = document.createElement('div');
+        k.className = 'board-card';
+        p.appendChild(k);
+      } else {
+        p.className = 'board-card hand-card face-down';
+      }
+      const st = window.handFanStyle ? window.handFanStyle(i, finalCount, { seite }) : null;
+      if (st) Object.keys(st).forEach(k => p.style.setProperty(k, st[k]));
+      p.style.visibility = 'hidden';
+      p.style.transition = 'none';
+      reihe.appendChild(p);
+      proben.push(p);
+    }
+    const el = proben[handIdx];
+    const box = (window.handFanCardBox && window.handFanCardBox(el)) || el.getBoundingClientRect();
+    return { left: box.left, top: box.top, width: box.width, height: box.height, right: box.left + box.width, bottom: box.top + box.height };
+  } finally {
+    proben.forEach(p => p.remove());
+    if (altMaxLift) reihe.style.setProperty('--hand-max-lift', altMaxLift); else reihe.style.removeProperty('--hand-max-lift');
+  }
+}
+
+/**
  * Wo wird der Handplatz `handIdx` stehen, wenn die Hand `finalHandSize` Karten hat? Rechnet gegen die Karten, die JETZT im DOM stehen (Zustand und DOM laufen um einen Takt
  * auseinander; `finalHandSize` fehlt → eine Karte mehr als jetzt). Liefert ein Rechteck oder `null`, wenn die Hand leer ist.
  * Gemeinsame Stelle für `play_pile_transfer` (elementFor) und den Hand-Diebstahl (`play_hand_steal`).
@@ -32102,9 +32199,11 @@ function TutorialFinaleFeuerwerk() {
 function handPlatzProjektion(isMe, handIdx, finalHandSize) {
   const base = isMe ? '.game-hand-me' : '.game-hand-opp';
   // Eigene Hand: die PLÄTZE zählen (die Karte darin trägt keinen eigenen Platz); Gegnerhand: die Karten selbst.
-  let slots = document.querySelectorAll(`${base} .game-hand-cards > .hand-slot`);
-  if (slots.length === 0) slots = document.querySelectorAll(`${base} .game-hand-cards > [data-hand-idx]`);
-  if (slots.length === 0) return null;
+  // (Ankunftsplätze, die noch nicht Raum einnehmen, zählen nicht mit: `display: none`.)
+  const sichtbar = (liste) => Array.from(liste).filter(e => e.getClientRects().length > 0);
+  let slots = sichtbar(document.querySelectorAll(`${base} .game-hand-cards > .hand-slot`));
+  if (slots.length === 0) slots = sichtbar(document.querySelectorAll(`${base} .game-hand-cards > [data-hand-idx]`));
+  if (slots.length === 0) return handPlatzProjektionLeer(isMe, handIdx, finalHandSize);
   // ★ v1233: über `handFanCardBox` messen, nicht roh. In der Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr Hüllkasten ist also breiter als die Karte.
   const lastRect = window.handFanCardBox?.(slots[slots.length - 1]) || slots[slots.length - 1].getBoundingClientRect();
   const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
@@ -33540,6 +33639,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // slightly AFTER the 700ms keyframe so the reveal aligns with the
   // landing moment.
   const [bounceReturnHidden, setBounceReturnHidden] = useState(new Set());
+  // Ankunftsplätze (Live Show: Karten fliegen nacheinander in eine Hand): der Platz nimmt im Layout erst Raum ein, wenn seine Karte LANDET — die Hand rückt je Karte beim Eintreffen
+  // zusammen, nicht schon beim Abflug. Schlüssel `${besitzer}-${platz}` wie bei `bounceReturnHidden`.
+  const [ankunftLeer, setAnkunftLeer] = useState(new Set());
+  // Der letzte SICHTBARE Platz einer Hand behält die volle Kartenbreite (`:last-child` trifft sonst einen unsichtbaren Ankunftsplatz).
+  const letzterSichtbarerPlatz = (owner, anzahl) => {
+    for (let k = anzahl - 1; k >= 0; k--) if (!ankunftLeer.has(`${owner}-${k}`)) return k;
+    return -1;
+  };
   // Bounce-outgoing animation tracking — keys are `${owner}-${heroIdx}-${slotIdx}`.
   // Support-slot card matching this key stays invisible while the flying
   // card is inbound from hand (hand→support pile-transfer). Paired with
@@ -44094,6 +44201,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return next;
           });
         }, 720); // Animation is 700ms; +20ms to avoid a visible flicker.
+        if (zielLayout) {
+          setAnkunftLeer(prev => { const next = new Set(prev); next.add(hideKey); return next; });
+          setTimeout(() => setAnkunftLeer(prev => { if (!prev.has(hideKey)) return prev; const next = new Set(prev); next.delete(hideKey); return next; }), 720);
+        }
       }
 
       // Mirror for hand → support: hide the destination support-slot's
@@ -46638,10 +46749,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else {
         stealIndices.forEach(idx => {
           const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-          if (el) {
-            el.style.outline = '3px solid rgba(255,155,58,.95)';
-            el.style.filter = 'brightness(1.4) drop-shadow(0 0 10px rgba(255,155,58,.7))';
-          }
+          if (el) el.classList.add('blind-pick-selected');   // dieselbe Markierung wie bei der Wahl (volle Kartenbreite, harter Rahmen)
         });
       }
 
@@ -46663,7 +46771,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           stealExpectedOppCountRef.current = count > 0 ? document.querySelectorAll('.game-hand-opp .game-hand-cards .hand-card').length : -1;
           stealIndices.forEach(idx => {
             const el = document.querySelector(`.game-hand-opp [data-hand-idx="${idx}"]`);
-            if (el) { el.style.outline = ''; el.style.filter = ''; }
+            if (el) el.classList.remove('blind-pick-selected');
           });
         }
 
@@ -46687,8 +46795,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           sourceRects.forEach((r, k) => { if (r) sourceRects[k] = { left: r.left, top: r.top, width: volleGroesse.width, height: volleGroesse.height }; });
         }
 
-        // Zielplätze: die Karten werden in Reihenfolge ABSTEIGENDER Quellplätze ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), landen also an
-        // `destCount + (Anzahl − 1 − k)`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".
+        // Zielplätze: die Karten werden in Reihenfolge der QUELLPLÄTZE ans Ende der Zielhand gehängt (Engine: `actionStealFromHand`), die k-te landet also an
+        // `basisAnzahl + k`. Gerechnet wird gegen die Endgröße der Hand, nicht „rechts neben die letzte Karte".
         const destIsMe = toLabel === 'me';
         const destBase = `.game-hand-${toLabel} .game-hand-cards`;
         const destCount = document.querySelectorAll(`${destBase} > .hand-slot, ${destBase} > .hand-card`).length;
@@ -46709,7 +46817,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const sr = sourceRects[i];
           if (!sr) return;
           const name = names[i] || '';
-          const ziel = destCount > 0 ? handPlatzProjektion(destIsMe, basisAnzahl + (stealIndices.length - 1 - i), endGroesse) : null;
+          const ziel = handPlatzProjektion(destIsMe, basisAnzahl + i, endGroesse);
           const targetX = ziel
             ? ziel.left
             : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW0 / 2 + i * (cardW0 * 0.6)) : sr.left);
@@ -52667,6 +52775,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     + (isBlindPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' blind-pick-stark' : '')
                     + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '')
                     + (isFull ? ' hand-card-dimmed' : '')
+                    + (ankunftLeer.size > 0 && i === letzterSichtbarerPlatz(oppIdx, opp.handCount || 0) ? ' hand-letzter' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
                     + (isPickFromOppHand && !pickEligible ? ' hand-card-dimmed' : '')}
                   data-hand-idx={i} style={{
@@ -52676,6 +52785,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
                     ...((oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
                     || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : (((isBlindPick && !blindGesperrt) || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
+                    ...(ankunftLeer.has(`${oppIdx}-${i}`) ? { display: 'none' } : null),
                   }}
                   onClick={isBlindPick ? () => {
                     if (blindGesperrt) return;
@@ -53836,7 +53946,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!isHandPickEligible ? ' hand-card-dimmed' : '') : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (ankunftLeer.size > 0 && item.origIdx === letzterSichtbarerPlatz(myIdx, hand.length) ? ' hand-letzter' : '') + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!isHandPickEligible ? ' hand-card-dimmed' : '') : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
@@ -53852,6 +53962,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1262: namensgebundene Verdeckung (siehe onPileTransfer)
                         || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}@${item.card || ''}`)
                       ) ? { visibility: 'hidden' } : null),
+                      ...(ankunftLeer.has(`${myIdx}-${item.origIdx}`) ? { display: 'none' } : null),
                     }}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}

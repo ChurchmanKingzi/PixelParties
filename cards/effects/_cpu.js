@@ -2428,10 +2428,20 @@ async function activateCreatureEffects(engine, helpers) {
       }
       if (pick) break;
     }
+    // Spy in the Enemy's Camp: Kreaturen des Gegners mit MEINER Spionage-Marke (derselbe Sammler wie beim Menschen; „as if you control it" regelt `doActivateCreatureEffect`).
+    if (!pick) {
+      for (const e of (engine.getActivatableCreatures(cpuIdx) || [])) {
+        if (!e.spy || !e.canActivate) continue;
+        const key = `spy|${e.cardName}|${e.instId}`;
+        if (tried.has(key)) continue;
+        pick = { heroIdx: e.heroIdx, zoneSlot: e.zoneSlot, cardName: e.cardName, instId: e.instId, key, charmedOwner: e.charmedOwner };
+        break;
+      }
+    }
     if (!pick) return;
 
     const hoptKey = `creature-effect:${pick.instId}`;
-    cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
+    cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}${pick.charmedOwner != null ? ' (Spy)' : ''}`);
     const pickScript = loadCardEffect(pick.cardName);
     // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
     const pickAlwaysCommit = (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
@@ -2439,7 +2449,7 @@ async function activateCreatureEffects(engine, helpers) {
       : !!pickScript?.cpuMeta?.alwaysCommit);
     const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
-      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
+      () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot, ...(pick.charmedOwner != null ? { charmedOwner: pick.charmedOwner, instId: pick.instId } : {}) }),
       { alwaysCommit: pickAlwaysCommit, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
     // Hat sie GEFEUERT? Das meldet der Server jetzt direkt, statt dass
     // wir es aus der Sperre ableiten. Karten mit mehreren Nutzungen pro
@@ -14434,4 +14444,4 @@ async function measureAreaValues(engine, helpers, cpuIdx) {
 // Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
 // garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
 module.exports = { CPU_META_HELPERS, runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy,
-  _test: { cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };
+  _test: { activateCreatureEffects, cpuGenericChoice, heroCheatBonusByName, heroEffectGateCheatBonus, candidateCheatBonus, heuristicCandidateCmp, ACTION_CHEAT_BONUS, pickCreatureZoneSlot, listEligibleHeroesForActionCard } };
