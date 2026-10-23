@@ -5314,5 +5314,25 @@
 "Great Vanguard Demon": {
 "id": "Great_Vanguard_Demon",
 "kind": "a"
+},
+"Mind Control": {
+"id": "Mind_Control",
+"kind": "a"
+},
+"Mine! Mine! Mine!": {
+"id": "Mine_Mine_Mine",
+"kind": "a"
+},
+"Secret Entrance": {
+"id": "Secret_Entrance",
+"kind": "a"
+},
+"See through the Ruse": {
+"id": "See_through_the_Ruse",
+"kind": "a"
+},
+"Spy in the Enemy's Camp": {
+"id": "Spy_in_the_Enemys_Camp",
+"kind": "a"
 }
 }
