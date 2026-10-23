@@ -1200,7 +1200,7 @@ function MenuLeaderboardPanel({ top, height }) {
                     + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
                     + (p.username === user.username ? ' is-me' : '')}>
                   <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
-                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#1aedff') }}>{p.username}</span>
+                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#66b6ff') }}>{p.username}</span>
                   <span className="menu-lb-elo">{p.elo}</span>
                 </li>
               ))}
@@ -1408,7 +1408,7 @@ function PixelParticles({
         // Ueberwiegend Spielerfarbe, ein Drittel weiss fuer den Funkeleffekt.
         color: farben
           ? farben[Math.floor(Math.random() * farben.length)]
-          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #1aedff)'),
+          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #66b6ff)'),
       });
     }
     return arr;
@@ -1972,10 +1972,10 @@ function MainMenu() {
            // The player's own colour, exposed as a custom property so the
            // ornate frames on the menu strip + side panels can all pick it
            // up via inheritance.
-           '--player-color': user.color || '#1aedff',
+           '--player-color': user.color || '#66b6ff',
            // Konturfarbe fuer Spielername und Logo-Aussenkante: schwarz,
            // bei sehr dunkler Spielerfarbe weiss (ppUmrissFarbe).
-           '--pp-umriss': ppUmrissFarbe(user.color || '#1aedff'),
+           '--pp-umriss': ppUmrissFarbe(user.color || '#66b6ff'),
            // Once the collapsed-state top is captured, anchor it via
            // `padding-top` + `flex-start` so submenu toggles only
            // grow the menu downward.
@@ -2028,7 +2028,7 @@ function MainMenu() {
               Beschriftung, Glanz und Schlagschatten (CSS .menu-stat-badge). */}
           {/* v1264 (Al 22.9.): dieselben inneren Pixel-Ecken wie die grossen
               Menuekaesten (`pp-eckzier`, eine Definition fuer beide). */}
-          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #1aedff) 14%, var(--menu-surface))', color: 'var(--player-color, #1aedff)' }}>
+          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #66b6ff) 14%, var(--menu-surface))', color: 'var(--player-color, #66b6ff)' }}>
             <span className="menu-stat-label">⚔ ELO</span><span className="menu-stat-value">{user.elo}</span>
           </span>
           <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #ffd61a 12%, var(--menu-surface))', color: '#ffd61a' }}>
@@ -2295,6 +2295,18 @@ function getRank(elo) {
 // v1464: Schalter in der Optik von „Play Animations" (Pille mit Knopf),
 // für alle Einstellungen im Profil. `gesperrt`: ausgegraut, nicht bedienbar
 // (Dynamic Heroes ohne Display Heroes). Erklärung als Hover-Tooltip.
+// Pixelart-Schalter: eingekerbter Block mit eckigem Knopf, der in ganzen Schritten springt; ON/OFF steht als Pixelschrift auf der freien Seite.
+function PixelSchalter({ an }) {
+  return (
+    <span className={'pp-schalter' + (an ? ' pp-schalter-an' : '')} aria-hidden="true">
+      <span className="pp-schalter-bahn">
+        <span className="pp-schalter-text">{an ? 'ON' : 'OFF'}</span>
+        <span className="pp-schalter-knopf" />
+      </span>
+    </span>
+  );
+}
+
 function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, versteckeTipp }) {
   const klick = () => { if (!gesperrt) onToggle(); };
   return (
@@ -2302,16 +2314,7 @@ function ProfilSchalter({ an, gesperrt, onToggle, label, tipp, zeigeTipp, verste
       onMouseEnter={e => tipp && zeigeTipp && zeigeTipp(e, tipp)}
       onMouseLeave={() => versteckeTipp && versteckeTipp()}
       onClick={klick} role="switch" aria-checked={!!an} aria-disabled={!!gesperrt}>
-      <div style={{
-        width: 40, height: 22, borderRadius: 11, background: an ? 'var(--accent)' : 'var(--bg4)',
-        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-      }}>
-        <div style={{
-          width: 18, height: 18, borderRadius: '50%', background: '#fff',
-          position: 'absolute', top: 2, left: an ? 20 : 2,
-          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,.4)',
-        }} />
-      </div>
+      <PixelSchalter an={!!an} />
       <span>{label}</span>
     </div>
   );
@@ -2607,7 +2610,7 @@ function DiscordLinkRow({ isGuest }) {
 
 function ProfileScreen() {
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
-  const [color, setColor] = useState(user.color || '#1aedff');
+  const [color, setColor] = useState(user.color || '#66b6ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
   const [victoryMsg, setVictoryMsg] = useState(user.victoryMsg || '');
@@ -2744,7 +2747,7 @@ function ProfileScreen() {
     (user.display_heroes == null ? true : !!user.display_heroes) && (user.dynamic_heroes == null ? true : !!user.dynamic_heroes));
 
   // Dirty tracking — compare against original user values
-  const isDirty = color !== (user.color || '#1aedff')
+  const isDirty = color !== (user.color || '#66b6ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
     || victoryMsg !== (user.victoryMsg || '')
@@ -2924,7 +2927,7 @@ function ProfileScreen() {
     setShowAvatarGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2936,7 +2939,7 @@ function ProfileScreen() {
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -2947,7 +2950,7 @@ function ProfileScreen() {
     setShowBoardGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -3307,8 +3310,8 @@ function ProfileScreen() {
               return (
               <div key={id || 'default'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
                 border: '1px solid ' + (playing ? 'var(--accent)' : (sel === id ? 'var(--text2)' : 'var(--bg4)')), borderRadius: 4,
-                background: playing ? 'rgba(26,237,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
-                boxShadow: playing ? '0 0 12px rgba(26,237,255,.45), inset 3px 0 0 var(--accent)' : 'none',
+                background: playing ? 'rgba(102,182,255,.16)' : (sel === id ? 'rgba(255,255,255,.05)' : 'transparent'),
+                boxShadow: playing ? '0 0 12px rgba(102,182,255,.45), inset 3px 0 0 var(--accent)' : 'none',
                 opacity: locked ? 0.75 : 1, transition: 'background .15s, box-shadow .15s' }}>
                 <button className="btn" style={{ padding: '4px 10px', fontSize: 11, minWidth: 34 }}
                   title={playing ? 'Stop preview' : 'Preview'}
@@ -3901,7 +3904,7 @@ function ShopScreen() {
     else return;
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar, cardback, bio: user.bio || '', board,
+        color: user.color || '#66b6ff', avatar, cardback, bio: user.bio || '', board,
       })});
       setUser(data.user);
       if (window.playSFX) window.playSFX('ui_click');

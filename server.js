@@ -930,7 +930,7 @@ async function initDatabase() {
     username TEXT UNIQUE NOT NULL COLLATE NOCASE,
     password_hash TEXT NOT NULL,
     elo INTEGER DEFAULT 1000,
-    color TEXT DEFAULT '#00f0ff',
+    color TEXT DEFAULT '#66b6ff',
     avatar TEXT DEFAULT NULL,
     cardback TEXT DEFAULT NULL,
     created_at INTEGER DEFAULT (unixepoch())
@@ -1289,6 +1289,11 @@ async function initDatabase() {
     for (const u of farben) { const neu = snapHex(u.color); if (neu && neu !== u.color) { await db.run('UPDATE users SET color = ? WHERE id = ?', [neu, u.id]); geaendert++; } }
     if (geaendert) console.log('[Palette] ' + geaendert + ' Spielerfarben auf die Palette gesetzt.');
   } catch (err) { console.error('[Palette] Spielerfarben:', err.message); }
+  // Standardfarbe (23.10.): Gäste hatten fest das Neon-Türkis — sie bekommen die neue Standardfarbe (nur Gäste; gewählte Farben bleiben unangetastet).
+  try {
+    const r = await db.run('UPDATE users SET color = ? WHERE is_guest = 1 AND color IN (?, ?, ?)', [STANDARD_FARBE, '#00f0ff', snapHex('#00f0ff'), '#1aedff']);
+    if (r && r.changes) console.log('[Farbe] ' + r.changes + ' Gäste auf die Standardfarbe gesetzt.');
+  } catch (err) { console.error('[Farbe] Gäste:', err.message); }
 
   // Puzzle completions table
   await db.execute(`CREATE TABLE IF NOT EXISTS puzzle_completions (
@@ -1326,13 +1331,14 @@ function getRandomDefaultAvatar() {
 }
 
 /** Pick a random vivid hex color for a brand-new player. The schema's
- *  static `'#00f0ff'` default made every fresh account share the same
+ *  static `#00f0ff` default made every fresh account share the same
  *  cyan in lobby lists / chat / hero accents — this hand-tuned palette
  *  spreads new signups across distinguishable hues that all read
  *  cleanly on the dark UI. The user can still recolour from Profile. */
 const { snapHex } = require('./palette');
+// Standardfarbe des Spiels: Login-Akzent, Gäste und alles ohne gewählte Farbe (Al 23.10.: das Neon-Türkis war „unschön"). Muss mit `--accent` in style.css übereinstimmen.
+const STANDARD_FARBE = snapHex('#66b6ff');
 const DEFAULT_PLAYER_COLORS = [
-  '#00f0ff', // cyan (legacy default — keep in the pool)
   '#ff5060', // crimson
   '#ffaa33', // amber
   '#ffd84d', // gold
@@ -1971,10 +1977,10 @@ app.post('/api/auth/guest', async (req, res) => {
     const username = 'Guest-' + id.slice(0, 8);
     const passwordHash = bcrypt.hashSync(uuidv4(), 10); // random; guests can't log in by password
     await db.run(
-      // Fixed teal (the login-screen accent) so the guest UI doesn't flicker a
+      // Fixed default blue (the login-screen accent, `--accent` in style.css) so the guest UI doesn't flicker a
       // new random colour every session.
       'INSERT INTO users (id, username, password_hash, avatar, color, is_guest) VALUES (?, ?, ?, ?, ?, 1)',
-      [id, username, passwordHash, getRandomDefaultAvatar(), '#00f0ff']
+      [id, username, passwordHash, getRandomDefaultAvatar(), STANDARD_FARBE]
     );
     try { await seedInitialOpponents(id); } catch (err) { console.error('[guest] seedInitialOpponents failed:', err.message); }
     // Pin a random Starter Deck as the guest's default so a deck is preselected.
@@ -2143,7 +2149,7 @@ app.put('/api/profile', authMiddleware, async (req, res) => {
   const sets = [];
   const vals = [];
   if (b.username !== undefined)   { sets.push('username = ?');     vals.push(newUsername); }
-  if (b.color !== undefined)      { sets.push('color = ?');       vals.push(snapHex(b.color || '#00f0ff')); }
+  if (b.color !== undefined)      { sets.push('color = ?');       vals.push(snapHex(b.color || STANDARD_FARBE)); }
   if (b.avatar !== undefined)     { sets.push('avatar = ?');      vals.push(b.avatar || null); }
   if (b.cardback !== undefined)   { sets.push('cardback = ?');    vals.push(b.cardback || null); }
   if (b.bio !== undefined)        { sets.push('bio = ?');         vals.push((b.bio || '').slice(0, 200)); }
@@ -2371,7 +2377,7 @@ app.post('/api/profile/import', authMiddleware, express.text({ limit: '20mb' }),
 
   // Restore user fields
   await db.run('UPDATE users SET elo = ?, color = ?, bio = ?, wins = ?, losses = ?, cardback = ? WHERE id = ?',
-    [data.elo || 1000, snapHex(data.color || '#00f0ff'), (data.bio || '').slice(0, 200), data.wins || 0, data.losses || 0, data.cardback || null, req.user.userId]);
+    [data.elo || 1000, snapHex(data.color || STANDARD_FARBE), (data.bio || '').slice(0, 200), data.wins || 0, data.losses || 0, data.cardback || null, req.user.userId]);
 
   // Restore avatar (may be data URL or old-format base64 object)
   if (data.avatar) {
@@ -2511,7 +2517,7 @@ app.get('/api/leaderboard', async (req, res) => {
         rank: i + 1,
         username: r.username,
         elo: r.elo,
-        color: r.color || '#00f0ff',
+        color: r.color || STANDARD_FARBE,
       })),
     });
   } catch (err) {
@@ -14411,7 +14417,7 @@ async function setupGameState(room) {
     // Divine Gift of Edge consume names directly from this list.
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
-      color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:liveShopRef(usr?.avatar,'avatars'), cardback:liveShopRef(usr?.cardback,'sleeves'), board:usr?.board||null,
+      color:usr ? (usr.color||STANDARD_FARBE) : NICHT_MENSCH_FARBE, avatar:liveShopRef(usr?.avatar,'avatars'), cardback:liveShopRef(usr?.cardback,'sleeves'), board:usr?.board||null,
       // Gewählter Battle-Track (geprüft: nur Freigeschaltetes); der GEGNER hört ihn.
       battleTrack: usr ? await battleTracks.resolveForBattle(p.userId, usr.battle_track) : null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
@@ -16035,7 +16041,7 @@ io.on('connection', (socket) => {
     if (!isPlayer && !isSpec) return;
     // Look up player's in-game color from gameState
     const gsPlayer = room.gameState?.players?.find(ps => ps.userId === currentUser.userId);
-    const playerColor = gsPlayer?.color || currentUser.color || '#00f0ff';
+    const playerColor = gsPlayer?.color || currentUser.color || STANDARD_FARBE;
     const entry = {
       id: Date.now() + Math.random(),
       username: currentUser.username,
@@ -16061,7 +16067,7 @@ io.on('connection', (socket) => {
     while ((match = pingRegex.exec(msg)) !== null) {
       const target = match[1].toLowerCase();
       // Find target user in room
-      let targetSid = null, targetColor = currentUser.color || '#00f0ff';
+      let targetSid = null, targetColor = currentUser.color || STANDARD_FARBE;
       for (const p of room.players) { if (p.username.toLowerCase() === target && p.socketId) { targetSid = p.socketId; break; } }
       if (!targetSid && room.gameState) {
         for (const ps of room.gameState.players) { if (ps.username?.toLowerCase() === target && ps.socketId) { targetSid = ps.socketId; break; } }
@@ -16070,7 +16076,7 @@ io.on('connection', (socket) => {
         for (const s of (room.spectators || [])) { if (s.username.toLowerCase() === target && s.socketId) { targetSid = s.socketId; break; } }
       }
       if (targetSid) {
-        io.to(targetSid).emit('chat_ping', { from: currentUser.username, color: isSpec ? '#aaaaaa' : (currentUser.color || '#00f0ff') });
+        io.to(targetSid).emit('chat_ping', { from: currentUser.username, color: isSpec ? '#aaaaaa' : (currentUser.color || STANDARD_FARBE) });
       }
     }
   });
@@ -16085,7 +16091,7 @@ io.on('connection', (socket) => {
       id: Date.now() + Math.random(),
       from: currentUser.username,
       to: targetUsername,
-      color: currentUser.color || '#00f0ff',
+      color: currentUser.color || STANDARD_FARBE,
       avatar: bildRef(currentUser.avatar) || null,   // v1374
       isSpectator: room.spectators.some(s => s.userId === currentUser.userId),
       text: msg,
@@ -16768,7 +16774,7 @@ io.on('connection', (socket) => {
     const p0 = buildPlayerState(puzzleData.players[0], currentUser.userId, currentUser.username, socket.id, puzzleData.hand || []);
     const p1 = buildPlayerState(puzzleData.players[1], 'cpu-puzzle', 'CPU', null, puzzleData.oppHand || []);
     if (usr) {
-      p0.color = usr.color || '#00f0ff'; p0.avatar = liveShopRef(usr.avatar, 'avatars');
+      p0.color = usr.color || STANDARD_FARBE; p0.avatar = liveShopRef(usr.avatar, 'avatars');
       p0.cardback = liveShopRef(usr.cardback, 'sleeves'); p0.board = usr.board;
       // Apply the player's chosen board skin to the CPU side too so the
       // whole puzzle playfield — including the opponent's Area Zone —

@@ -44,7 +44,7 @@ function PzAmbiance({ variant }) {
         dy: -((isHand ? 20 : 40) + Math.random() * (isHand ? 60 : 130)),
         max: (isHand ? 0.22 : 0.14) + Math.random() * 0.22,
         color: Math.random() < 0.25 ? '#ffffff'
-             : (Math.random() < 0.5 ? '#1aedff' : '#ec2d62'),
+             : (Math.random() < 0.5 ? '#66b6ff' : '#ec2d62'),
       });
     }
     return arr;
@@ -2178,7 +2178,7 @@ function PuzzleCreator() {
     // `transform` (nur Compositor, kein Layout) statt per `left`/`top`.
     // `will-change` legt sie auf eine eigene Ebene, damit der Schatten
     // nicht bei jeder Bewegung neu gemalt wird.
-    ghost.style.cssText = `position:fixed;left:0;top:0;transform:translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px);will-change:transform;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#1aedff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
+    ghost.style.cssText = `position:fixed;left:0;top:0;transform:translate(${Math.round(e.clientX - hx)}px,${Math.round(e.clientY - hy)}px);will-change:transform;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#66b6ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;pointer-events:none;z-index:100000;box-sizing:border-box;box-shadow:0 4px 14px rgba(0,0,0,.55);`;
     const url = cardImageUrl(cardName);
     // ★ Ziehbild OHNE Nachladen: das Browser-Ziehbild wird im Moment von
     // `setDragImage` aufgenommen. Ein frisch erzeugtes <img> ist dann noch
@@ -3724,7 +3724,7 @@ function PuzzleCreator() {
   // DOM (siehe `setDragOverZone`) — die Magnetsuche liefert ohnehin nur
   // Zonen, die die Karte annehmen. Hier bleibt die Antipp-Markierung.
   const hl = (zt, si, hi, slot) => {
-    if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(26,237,255,.3)', borderColor: 'var(--accent)' };
+    if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) return { boxShadow: '0 0 10px rgba(102,182,255,.3)', borderColor: 'var(--accent)' };
     return undefined;
   };
 

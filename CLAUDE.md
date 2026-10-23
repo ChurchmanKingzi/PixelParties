@@ -18,6 +18,7 @@ Bugfix-Note: _alice-shared | Summons no longer stay on the board after their own
 
 * Schreibe es so, dass Spielerinnen und Spieler es verstehen (Auswirkung im Spiel, keine Code-Details); höchstens ca. 220 Zeichen.
 * Bei einem Pull-Request mit mehreren Commits oder Squash-Merge müssen die Zeilen in der Nachricht stehen, die auf `main` landet.
+* **Neue Karten, die noch nicht live sind:** Wer eine komplett neue Karte umsetzt und danach nachbessert (Troubleshooting vor dem Livegang), schreibt dafür **keine** `Bugfix-Note` – der Bot zeigt die Karte im Neue-Karten-Feed, nicht im Bugfix-Kanal (er ignoriert Karten, die seit dem zuletzt gemeldeten Stand neu in `data/cards.json` stehen, auch mit Note). Eine `Bugfix-Note` gehört nur zu Karten, die bereits live sind.
 * **Balancing ist kein Bugfix:** Ändert sich der Eintrag einer Karte in `data/cards.json` (Effekttext, HP, Kosten …), zählt das als Balancing-Änderung
   und erscheint nur in den Patchnotes – auch wenn dabei das Skript angepasst wurde. Wurde dabei zusätzlich ein echter Fehler behoben
   (z. B. Skript passte nicht zum Kartentext), schreibe eine `Bugfix-Note` für diese Karte; dann erscheint sie auch im Bugfix-Kanal.

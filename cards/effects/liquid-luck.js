@@ -19,7 +19,7 @@
 //  sie ist der Zuhörer für die „plays a card"-Hooks. Auf dem Brett
 //  bleibt NICHTS liegen. Damit der Gegner trotzdem weiß, worauf er
 //  achten muss, wird das Bild der deklarierten Karte an ihn gestreamt
-//  (`card_reveal`) — die Deklaration ist öffentlich.
+//  (`card_reveal`, auch an den Deklarierenden selbst als Bestätigung) — die Deklaration ist öffentlich.
 //
 //  ── „UNTIL THE BEGINNING OF YOUR NEXT TURN" ──────────────────────
 //  Der `onTurnStart` des DEKLARIERENDEN räumt den Marker weg (Bauform
@@ -94,9 +94,13 @@ function ankerHeld(engine, pi) {
   return hi >= 0 ? hi : 0;
 }
 
-/** Das Bild der deklarierten Karte geht an den Gegner (`card_reveal`, derselbe Auftritt wie bei einer gespielten Karte) — nur an ihn, der Deklarierende weiß es ja. */
+/**
+ * Das Bild der deklarierten Karte wird gestreamt (`card_reveal`, derselbe Auftritt wie bei einer gespielten Karte): an den GEGNER (und die Zuschauer) —
+ * er muss wissen, worauf er achten muss — und, damit der Spieler die Deklaration bestätigt sieht, auch an den Deklarierenden selbst (Al 23.10.: „ich als
+ * Liquid-Luck-Spieler sehe es nicht"). Beim Gegner läuft der Auftritt hinter dem des Tranks selbst (Auftritts-Puffer).
+ */
 function streameDeklaration(engine, pi, name) {
-  engine._broadcastEvent('card_reveal', { cardName: name, sfx: 'ability_activate', playerIdx: pi }, { toPlayers: [engine.opponentOf(pi)] });
+  engine._broadcastEvent('card_reveal', { cardName: name, sfx: 'ability_activate', playerIdx: pi });
 }
 
 /** Ein Gegner hat `gespielt` gespielt — passt er zum deklarierten Namen? Dann suchen. */
