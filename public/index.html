@@ -42,6 +42,9 @@
        right font on first render instead of a fallback that <input>s keep
        until focused. -->
   <link rel="preload" href="/data/Pixel%20Intv.otf" as="font" type="font/otf" crossorigin>
+  <!-- Pixel-Emoji-Schrift: schon beim Seitenaufruf holen UND (Skript unten) fuer die Spiel-Schriften laden, damit das erste Emoji nicht
+       einen Moment als weiches System-Emoji aufblitzt, bevor die Pixel-Fassung da ist (siehe scripts/pixel-emoji/README.md). -->
+  <link rel="preload" href="/fonts/pp-pixel-emoji.woff2" as="font" type="font/woff2" crossorigin>
 
   <!-- Strukturierte Daten. Sagt Google, WAS diese Seite ist, statt es
        aus einem Ladebildschirm erraten zu lassen. Die Basis-URL wird
@@ -155,6 +158,17 @@
   <script defer src="/skilltest-art.js"></script>
   <script defer src="/dist/app-skilltest.js"></script>
   <script defer src="/dist/app-main.js"></script>
+  <script>
+    // Pixel-Emoji-Schrift sofort anfordern (unicode-range-Schriften laden sonst erst beim ersten Zeichen im Text). Die Zeichen sind Stichproben aus
+    // den Bereichen der Schrift (Emoji, Pfeile, Symbole); `document.fonts.load` holt jede Schrift, die eines davon abdeckt.
+    (function () {
+      if (!document.fonts || !document.fonts.load) return;
+      var familien = ['PP Pixel Emoji', 'Pixel Intv', 'Press Start 2P'];
+      var probe = '\uD83D\uDD25\u2605\u2192\u2694\u2728';
+      function los() { familien.forEach(function (f) { try { document.fonts.load("16px '" + f + "'", probe).catch(function () {}); } catch (e) {} }); }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', los); else los();
+    })();
+  </script>
 </head>
 <body>
   <div id="root">

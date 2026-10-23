@@ -141,6 +141,9 @@ module.exports = {
      */
     afterSpellResolved: async (ctx) => {
       if (ctx._engine.gs._spellNegatedByEffect) return;
+      // Ein Effekt, der nur als Attack/Spell ZÄHLT (`alsAttackKette`: Sword in a Bottle, Heldeneffekte), ist kein gespieltes Spell-Exemplar — die Karte
+      // meldet sich selbst (Trank: `afterPotionUsed`); sonst zählte Luck sie doppelt.
+      if (ctx._alsEffekt) return;
       await module.exports.hooks._triggerLuck(ctx, ctx.spellName, ctx.casterIdx);
     },
 
@@ -158,10 +161,10 @@ module.exports = {
       // ebenso eine ueber Styx an einen uebernommenen Helden angelegte
       // Ability (owner = Brettseite, Kontrolle ueber den Charme).
       const spieler = ctx._engine.effektiveSeiten(entering).controller ?? entering.owner;
-      // M02-13: Ein Area-/Attachment-ZAUBER erzeugt beide Ereignisse (Eintritt in die Zone UND
+      // M02-13: Ein Area-/Attachment-ZAUBER (oder -ANGRIFF: Alliance, Blood Rock) erzeugt beide Ereignisse (Eintritt in die Zone UND
       // `afterSpellResolved`) — gezählt wird einmal, über `afterSpellResolved`. Tritt die Karte
       // während der Auflösung GENAU dieses Zaubers ein, ist das derselbe Spielvorgang.
-      if (entering.name === ctx._engine._currentResolvingSpellName()) return;
+      if (entering.name === ctx._engine._currentResolvingPlayName()) return;
       await module.exports.hooks._triggerLuck(ctx, entering.name, spieler);
     },
 

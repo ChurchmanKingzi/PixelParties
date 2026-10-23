@@ -22,3 +22,12 @@ Bugfix-Note: _alice-shared | Summons no longer stay on the board after their own
   und erscheint nur in den Patchnotes – auch wenn dabei das Skript angepasst wurde. Wurde dabei zusätzlich ein echter Fehler behoben
   (z. B. Skript passte nicht zum Kartentext), schreibe eine `Bugfix-Note` für diese Karte; dann erscheint sie auch im Bugfix-Kanal.
 * Ohne `Bugfix-Note` erscheint die Karte trotzdem (erkannt am geänderten Skript), nur ohne Erklärung.
+
+## Grafik-Regel: Jede Animation und jedes Highlight ist Pixelart
+
+Alles, was neu gezeichnet oder animiert wird (Karten-Flüge, Effekte, Zielmarkierungen, Highlights, Symbole), muss **Pixelart** sein – kein weicher Look:
+
+* **Emojis und Text-Symbole** (🔥 ✓ ★ → …) kommen aus der Pixel-Emoji-Schrift (`public/fonts/pp-pixel-emoji.woff2`), nicht aus der System-Schrift. Wer ein **neues** Emoji in Text, Titel, Beschriftung oder Kartenskript verwendet, baut sie neu: `node scripts/pixel-emoji/scan.js && node scripts/pixel-emoji/extract.js && python3 scripts/pixel-emoji/build_font.py` (Details: `scripts/pixel-emoji/README.md`). `npm test` schlägt fehl, solange ein Zeichen fehlt.
+* **Keine** Weichzeichner-Schatten und -Scheine (`box-shadow`/`drop-shadow` mit Unschärfe), **keine** Drehungen oder stufenlosen Skalierungen von Kartenbildern, **keine** Glyphen/Emojis als Symbole, **keine** weichen Verläufe oder Alpha-Überblendungen.
+* Stattdessen: harte Rahmen aus gestapelten `box-shadow: 0 0 0 Npx …`-Ringen, feste Farbpalette, Dithering (2×2-/Bayer-Raster) statt Alpha, Symbole als kleine Sprites (SVG mit `shape-rendering: crispEdges` bzw. Canvas, `image-rendering: pixelated`, ganzzahlig vergrößert), Bewegung in ganzen Pixeln im Bildtakt (~30 Bilder/s, `steps()`), Blinken per `steps(1)` statt weichem Pulsieren.
+* Vorlagen: `BrackleCatapultCard` und `.potion-target-marked-red` (Brackle), die `sky_dig`-/`ppSalve`-Animationen in `public/app-board.jsx`, der Pixelierer in `public/app-shared.jsx` (`data-pp-px="aus"` für Grafik, die schon Pixelart ist).

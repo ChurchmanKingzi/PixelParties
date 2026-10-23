@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Infiltration';
+const { takeTopFromOpponentDeck, flugDeckZuHand } = require('./_opponent-deck-shared');
 
 module.exports = {
   // BORIS-SPERRE (Klausel 1): nimmt die oberste Karte des Gegnerdecks auf die eigene Hand.
@@ -67,7 +68,6 @@ module.exports = {
   },
 };
 
-const { takeTopFromOpponentDeck } = require('./_opponent-deck-shared');
 
 // ═══════════════════════════════════════════
 //  LEVEL 1: take top card of opp's deck
@@ -124,7 +124,7 @@ async function _activateLv2or3(engine, gs, pi, oi, ps, ops, level) {
   // FIRST — same rationale as Lv1. Without it, any chained Lilly
   // draw lumps with the steal under the diff-detector and both
   // cards animate from our deck.
-  engine._broadcastEvent('play_pile_transfer', {
+  flugDeckZuHand(engine, pi, {
     fromOwner: oi, toOwner: pi, cardName: pickedName, from: 'deck', to: 'hand',
     // Target slot the new card will land in — see Lv1 for the same
     // rationale (broadcast precedes the push, so the slot at this

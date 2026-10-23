@@ -1249,33 +1249,90 @@ function BirthdayPresentReveal({ state, interactive, onPick }) {
   );
 }
 
-// Brackle catapult — single five-phase flying card. THREE chained CSS
-// animations (load → fire → discard-fly) with `forwards` fills cover
-// the visible flow. The implicit gaps between animations are the
-// HOLD (creature parked on Brackle) and IMPACT (creature parked at
-// target while the explosion plays) phases — no extra animations
-// needed since `forwards` fill keeps the card visibly pinned in
-// place across each gap.
+// Brackle catapult — single five-phase flying card, PIXELART (Als Vorgabe 23.10.: „Jede Animation und jedes Highlight soll Pixelart sein!").
+// Statt weich interpolierter CSS-Animationen (Rotation, Skalierung, Weichzeichner-Schatten) treibt ein Bildtakt (~30 Bilder/s, wie die übrigen
+// Pixelart-Animationen) die Karte: Position in GANZEN 2-px-Schritten, keine Drehung, Grösse nur in ganzzahligen Stufen, harter Versatzschatten,
+// `image-rendering: pixelated`. Beim Abschuss bleiben eckige Pixelfunken (feste Palette, kein Alpha) hinter der Karte zurück. Die Phasen sind die
+// des Servers: Laden (Slot → Brackle) → Halten (Karte zittert auf Brackle) → Abschuss (Brackle → Ziel) → Einschlag (Karte sitzt am Ziel, zittert,
+// während die Explosion läuft) → Ablage (Ziel → Ablagestapel, schrumpft in Stufen).
+const BRACKLE_TAKT_MS = 33;
+const BRACKLE_FUNKEN = ['#fff3a8', '#ffd23a', '#ff7a14', '#ffffff'];
 function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs, holdMs, fireMs, impactMs, discardMs }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
-  // Each chained animation's `animation-delay` is the cumulative
-  // start-time across previous phases. CSS doesn't compute these
-  // for us, so we precompute and pass each as a variable.
-  const fireDelay    = (loadMs || 0) + (holdMs || 0);
-  const discardDelay = fireDelay + (fireMs || 0) + (impactMs || 0);
+  const wurzel = useRef(null);
+  useEffect(() => {
+    const el = wurzel.current;
+    if (!el) return;
+    const L = loadMs || 0, Hh = holdMs || 0, F = fireMs || 0, I = impactMs || 0, D = discardMs || 0;
+    const T1 = L, T2 = L + Hh, T3 = T2 + F, T4 = T3 + I, T5 = T4 + D;
+    const CW = 64, CH = 90;
+    const klemme = (v) => Math.max(0, Math.min(1, v));
+    const raus = (v) => 2 * Math.round(v / 2);                         // ganze 2-px-Schritte: die Karte rastet auf dem Pixelraster ein
+    const sanftAus = (k) => 1 - Math.pow(1 - k, 3);                    // Laden: schwungvoll anfahren, weich ankommen
+    const hartEin = (k) => Math.pow(k, 2.2);                           // Abschuss: beschleunigt hart, kein Nachschwingen
+    const sanft = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    const funken = [];
+    let letzterTakt = -1, raf = 0;
+    const t0 = performance.now();
+    const setze = (x, y, b, h) => {
+      el.style.left = raus(x + (CW - b) / 2) + 'px';
+      el.style.top = raus(y + (CH - h) / 2) + 'px';
+      el.style.width = b + 'px'; el.style.height = h + 'px';
+    };
+    const funke = (x, y) => {
+      const f = document.createElement('i');
+      const g = Math.random() < 0.5 ? 4 : 6;
+      f.style.cssText = [
+        'position:fixed', 'display:block', 'pointer-events:none', 'z-index:10099', 'border-radius:0',
+        `left:${raus(x + CW / 2 + (Math.random() - 0.5) * 40)}px`, `top:${raus(y + CH / 2 + (Math.random() - 0.5) * 60)}px`,
+        `width:${g}px`, `height:${g}px`, `background:${BRACKLE_FUNKEN[Math.floor(Math.random() * BRACKLE_FUNKEN.length)]}`,
+      ].join(';');
+      f.setAttribute('data-pp-px', 'aus');
+      document.body.appendChild(f);
+      const eintrag = { f, ende: performance.now() + 160 + Math.random() * 140 };
+      funken.push(eintrag);
+    };
+    const bild = () => {
+      const t = performance.now() - t0;
+      const takt = Math.floor(t / BRACKLE_TAKT_MS);
+      if (takt !== letzterTakt) {
+        letzterTakt = takt;
+        const tq = takt * BRACKLE_TAKT_MS;
+        const wackel = (takt % 2 === 0) ? 2 : -2;
+        if (tq < T1) {
+          const k = sanftAus(klemme(tq / (L || 1)));
+          setze(sx + (mx - sx) * k, sy + (my - sy) * k, CW, CH);
+        } else if (tq < T2) {
+          setze(mx + wackel, my, CW, CH);                              // Aufladen: zittert auf Brackle
+        } else if (tq < T3) {
+          const k = hartEin(klemme((tq - T2) / (F || 1)));
+          const x = mx + (ex - mx) * k, y = my + (ey - my) * k;
+          setze(x, y, CW, CH);
+          funke(x, y); funke(x, y);
+        } else if (tq < T4) {
+          setze(ex + wackel, ey + (takt % 3 === 0 ? 2 : 0), CW, CH);  // Einschlag: Treffer-Zittern
+        } else if (tq < T5) {
+          const k = sanft(klemme((tq - T4) / (D || 1)));
+          const stufe = Math.min(3, Math.floor(k * 4));                // 100 % → 85 % → 70 % → 55 %: ganzzahlige Pixelgrössen, kein weiches Skalieren
+          const m = [1, 0.85, 0.7, 0.55][stufe];
+          setze(ex + (dx - ex) * k, ey + (dy - ey) * k, 2 * Math.round(CW * m / 2), 2 * Math.round(CH * m / 2));
+        } else {
+          el.style.visibility = 'hidden';
+        }
+      }
+      const jetzt = performance.now();
+      for (let i = funken.length - 1; i >= 0; i--) {
+        if (jetzt >= funken[i].ende) { funken[i].f.remove(); funken.splice(i, 1); }
+      }
+      raf = requestAnimationFrame(bild);
+    };
+    setze(sx, sy, CW, CH);
+    raf = requestAnimationFrame(bild);
+    return () => { cancelAnimationFrame(raf); for (const e of funken) e.f.remove(); };
+  }, []);
   return (
-    <div className="brackle-catapult-card" style={{
-      '--sx': sx + 'px', '--sy': sy + 'px',
-      '--mx': mx + 'px', '--my': my + 'px',
-      '--ex': ex + 'px', '--ey': ey + 'px',
-      '--dx': dx + 'px', '--dy': dy + 'px',
-      '--load-ms':     loadMs    + 'ms',
-      '--fire-ms':     fireMs    + 'ms',
-      '--discard-ms':  discardMs + 'ms',
-      '--fire-delay':    fireDelay    + 'ms',
-      '--discard-delay': discardDelay + 'ms',
-    }}>
+    <div ref={wurzel} className="brackle-catapult-card" data-pp-px="aus" style={{ left: sx + 'px', top: sy + 'px' }}>
       {imgUrl ? <img src={imgUrl} draggable={false} alt="" />
         : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text)', padding: 4, textAlign: 'center' }}>{cardName}</div>}
     </div>
@@ -29873,17 +29930,13 @@ function OptionPickerSlider({ ep, respondToPrompt }) {
         <input
           type="range" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(klemmen(e.target.value))}
-          style={{ flex: 1, accentColor: 'var(--accent)' }}
+          style={{ flex: 1, '--p': max > min ? (wert - min) / (max - min) : 1 }}
         />
         <input
+          className="effect-slider-zahl"
           type="number" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(e.target.value === '' ? min : klemmen(e.target.value))}
           onBlur={e => setWert(klemmen(e.target.value))}
-          style={{
-            width: 78, padding: '6px 8px', fontSize: 13, textAlign: 'right',
-            background: 'var(--bg2)', color: 'var(--accent)',
-            border: '1px solid var(--accent)', borderRadius: 6,
-          }}
         />
         {einheit && <span style={{ fontSize: 12, color: 'var(--text2)' }}>{einheit}</span>}
       </div>
@@ -33839,7 +33892,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     // v1261: dasselbe fuer den gegnerischen Loeschstapel (Pollution & Co.).
     if (deletedGrew && window.playSFX) {
-      const addedCount = newDeletedLen - prevDeletedLen;
+      let addedCount = newDeletedLen - prevDeletedLen;
+      const vorgemerkt = Math.min(addedCount, pileSoundSuppressRef.current.oppDeleted || 0);   // Deck→Loeschstapel-Flug (klang beim Abflug)
+      pileSoundSuppressRef.current.oppDeleted = (pileSoundSuppressRef.current.oppDeleted || 0) - vorgemerkt;
+      addedCount -= vorgemerkt;
       for (let k = 0; k < addedCount; k++) {
         setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
       }
@@ -46365,15 +46421,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         cardName, startX, startY, endX, endY, dest: 'deleted',
         delay: i * 150,
       }));
+      // Der Abflug-Klang (unten) ersetzt den Wachstums-Klang des Loeschstapels:
+      // je Karte einen Klang vormerken, den der Stapel-Zuwachs beim Landen schluckt.
+      const _sk = owner === myIdx ? 'deleted' : 'oppDeleted';
+      pileSoundSuppressRef.current[_sk] = (pileSoundSuppressRef.current[_sk] || 0) + newAnims.length;
+      for (const anim of newAnims) {
+        setTimeout(() => {
+          pileSoundSuppressRef.current[_sk] = Math.max(0, (pileSoundSuppressRef.current[_sk] || 1) - 1);
+        }, anim.delay + 2500);
+      }
       // Stagger the animations
       for (const anim of newAnims) {
         setTimeout(() => {
           setDiscardAnims(prev => [...prev, (anim.t0 == null ? { ...anim, t0: ppJetzt() } : anim)]);
           // v337 (Als Befund): der Flug in den Deleted Pile war stumm —
           // Trade schickte fuenf Karten lautlos weg. Derselbe Klang wie
-          // beim Abwurf, je Karte und im Takt ihres Fluges; ein eigener
-          // Delete-Klang existiert nicht. Gilt fuer JEDEN Sender von
-          // `deck_to_deleted`, also auch Nerdy Cheese.
+          // beim Abwurf, je Karte und im Moment, in dem sie das Deck
+          // VERLAESST (Als Vorgabe); ein eigener Delete-Klang existiert
+          // nicht. Gilt fuer JEDEN Sender von `deck_to_deleted`, also auch
+          // Nerdy Cheese. Das Wachstum des Loeschstapels klingt nicht noch
+          // einmal: dessen Klaenge sind oben vorgemerkt (sonst 7-8 statt 5).
           if (window.playSFX) window.playSFX('discard', { dedupe: 40 });
           setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
         }, anim.delay);
@@ -49398,6 +49465,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // (`t.ineligible` → `ineligibleTargetIds`), er war aber nur
           // fuer Support-Zonen verdrahtet, nicht fuer Helden.
           const isIneligibleHeroTarget = isTargeting && ineligibleTargetIds.has(heroTargetId);
+          const isRedMarkedHeroTarget = isTargeting && (pt?.validTargets || []).some(t => t.markRed && t.id === heroTargetId);
           const isSelectedHeroTarget = selectedSet.has(heroTargetId);
           const isFrozen = hero?.statuses?.frozen;
           const isStunned = (hero?.statuses?.stunned || hero?.statuses?.webbed);
@@ -49635,7 +49703,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isRedMarkedHeroTarget ? ' potion-target-marked-red' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (zielMarkeLeuchtet ? ' prompt-marked' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (stReadyGlow && !stBonus ? ' st-actor-ready' : '') + (stBonus && !stActing ? ' st-actor-bonus' : '') + (stActing ? ' st-actor-acting' : '') + (stExhausted && !stBonus && !stActing && hero?.hp > 0 ? ' st-actor-exhausted' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -50638,6 +50706,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const equipTargetIds = (pt?.validTargets || []).filter(t => t.type === 'equip' && t.owner === pi && t.heroIdx === i && t.slotIdx === z).map(t => t.id);
               const isValidEquipTarget = isTargeting && equipTargetIds.some(id => validTargetIds.has(id));
               const isIneligibleEquipTarget = isTargeting && !isValidEquipTarget && equipTargetIds.some(id => ineligibleTargetIds.has(id));
+              // Brackle: das designierte Opfer bleibt gesperrt ROT markiert (`t.markRed`, gesetzt von `markUnmetRed`).
+              const isRedMarkedEquipTarget = isTargeting && (pt?.validTargets || []).some(t => t.markRed && t.type === 'equip' && t.owner === pi && t.heroIdx === i && t.slotIdx === z);
               const isSelectedEquipTarget = equipTargetIds.some(id => selectedSet.has(id));
               const isEquipExploding = equipTargetIds.some(id => explosions.includes(id));
               const isSummonGlow = summonGlow && summonGlow.owner === pi && summonGlow.heroIdx === i && summonGlow.zoneSlot === z;
@@ -51031,7 +51101,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + ((gameState.creatureCounters || {})[`${pi}-${i}-${z}`]?._zoneAura === 'necro_flicker' ? ' board-zone-aura' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isRedMarkedEquipTarget ? ' potion-target-marked-red' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot || isSummonPickZone) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + ((isHeroActionZoneDimmed && !isCsppEmptySlot) ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '') + stCreatureCls(pi, i, z)}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {

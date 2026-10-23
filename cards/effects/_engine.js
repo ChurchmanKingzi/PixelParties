@@ -1476,6 +1476,8 @@ class GameEngine {
       gs: gsSnap,
       _deferredSurprisesSnap: deferredSnap,
       cardInstances: instSnaps,
+      // Laenge der Nach-Ketten-Warteschlange: was danach eingereiht wird, gehoert zur Simulation (siehe restore).
+      postChainLen: (this._postChainActions || []).length,
       eventId: this.eventId,
       chain: _clone(this.chain),
       chainDepth: this.chainDepth,
@@ -1652,6 +1654,13 @@ class GameEngine {
       delete this.gs._deferredSurprises;
     }
     // Rebuild cardInstances as real CardInstance objects so methods work.
+    // Nach-Ketten-Aktionen (Gate to the Armory: Zug beenden; Master's Plan, Silence, Lunar Eclipse: Ersatzaktion) sind
+    // Closures und stecken nicht im Schnappschuss. Reihte ein Rollout eine ein, blieb sie nach dem Zurueckspulen in der
+    // LIVE-Warteschlange und lief beim naechsten Entleeren im echten Spiel - mit Wirkung auf den falschen Zug.
+    if (Array.isArray(this._postChainActions) && Number.isInteger(snap.postChainLen)
+        && this._postChainActions.length > snap.postChainLen) {
+      this._postChainActions.length = snap.postChainLen;
+    }
     this.cardInstances = snap.cardInstances.map(data => {
       const inst = new CardInstance(data.name, data.owner, data.zone, data.heroIdx ?? -1, data.zoneSlot ?? -1);
       for (const key of Object.keys(data)) {
@@ -5147,6 +5156,8 @@ class GameEngine {
         // sie gibt, aber nicht waehlen kann (Petrifier: „except the user").
         // Ohne die Flagge bleibt es beim Weglassen. CPU, Auto-Wahl und
         // Antwortpruefung ueberspringen `ineligible` ohnehin.
+        // `config.markUnmetRed` (Brackle): die ausgegrauten Ziele tragen `markRed` und werden
+        // im Client ROT hervorgehoben — das designierte Opfer soll nicht wie ein beliebiges Ziel aussehen.
         const addHeroes = (playerIdx) => {
           const ps2 = gs.players[playerIdx];
           for (let hi = 0; hi < (ps2.heroes || []).length; hi++) {
@@ -5160,7 +5171,7 @@ class GameEngine {
             const t = { id: `hero-${playerIdx}-${hi}`, type: 'hero', owner: playerIdx, heroIdx: hi, cardName: hero.name };
             if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
             targets.push(t);
           }
@@ -5191,7 +5202,7 @@ class GameEngine {
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
               targets.push(t);
             }
@@ -5210,7 +5221,7 @@ class GameEngine {
               const t = { id: `hero-${oppIdx}-${hi}`, type: 'hero', owner: oppIdx, heroIdx: hi, cardName: h.name };
               if (config.condition && !config.condition(t, engine)) {
               if (!config.dimUnmetCondition) continue;
-              t.ineligible = true;   // ausgegraut statt weg (s. dimUnmetCondition)
+              t.ineligible = true; if (config.markUnmetRed) t.markRed = true;   // ausgegraut statt weg (s. dimUnmetCondition); `markUnmetRed` zeichnet sie zusaetzlich ROT
             }
               if (!targets.some(x => x.id === t.id)) targets.push(t);
             }
@@ -8088,6 +8099,26 @@ class GameEngine {
   _currentResolvingSpellName() {
     const stack = this.gs?._resolvingSpellStack;
     return (Array.isArray(stack) && stack.length > 0) ? stack[stack.length - 1] : null;
+  }
+
+  /**
+   * Top of the resolving-PLAY stack: wie `_currentResolvingSpellName()`, aber auch für ATTACK-Karten (die Anti Magic nicht sperrt und deshalb
+   * nicht auf dem Spell-Stapel liegen). Für Zuhörer, die „diese Karte wird gerade gespielt" von „diese Karte betritt eine Zone" trennen müssen
+   * (Luck: ein Area-/Attachment-Angriff erzeugt Zonen-Eintritt UND `afterSpellResolved` — gezählt wird einmal).
+   */
+  _currentResolvingPlayName() {
+    const stack = this.gs?._resolvingPlayStack;
+    return (Array.isArray(stack) && stack.length > 0) ? stack[stack.length - 1] : null;
+  }
+
+  _pushResolvingPlay(cardName) {
+    if (!this.gs._resolvingPlayStack) this.gs._resolvingPlayStack = [];
+    this.gs._resolvingPlayStack.push(cardName);
+  }
+
+  _popResolvingPlay() {
+    const stack = this.gs._resolvingPlayStack;
+    if (Array.isArray(stack) && stack.length > 0) stack.pop();
   }
 
   /** Push a Spell name onto the resolving-Spell stack. Paired with
@@ -24445,6 +24476,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
     if (wirkerSeite !== playerIdx) inst.heroOwner = wirkerSeite;   // Als Vorgabe 29.9.
     const _cancelVorher = this.gs._spellCancelled;
+    const _zugendeVorher = this.gs._spellEndsTurn;   // Zugende-Reiter: nur einen NEU gesetzten Stand selbst einloesen/raeumen
     this.gs._spellCancelled = false;
     // ★ v1316 (Als Befund 23.9., Yukana): die Wisdom-Kosten werden jetzt
     // wie im regulaeren Zauber-Weg ERST NACH der Aufloesung bezahlt (unten).
@@ -24472,6 +24504,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if ((this.gs._spellResolutionDepth || 0) === 0) { delete this.gs._spellNegatedByEffect; delete this.gs._negationWhole; this._visLog = []; }
     this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
     if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
+    if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') this._pushResolvingPlay(cardName);
     // ★ v1303 (Als Vorgabe 23.9.): der Auftritt der schenkenden Karte
     // (Junshi) kommt in dem Moment, in dem der Spell ANFAENGT aufzuloesen
     // — nach Wahl und Wisdom-Kosten, vor seinem Effekt. Vorher lief er
@@ -24575,6 +24608,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       else delete this.gs._spellPlacedOnBoard;
       this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
       if (cardData.cardType === 'Spell') this._popResolvingSpell();
+      if (cardData.cardType === 'Spell' || cardData.cardType === 'Attack') this._popResolvingPlay();
     }
     // ★ v1003: Nachtraeglich verbrauchte Aktion — dieselbe Marke, die
     // `doPlaySpell` nach seiner Aufloesung abarbeitet. Hier steht sie,
@@ -24611,6 +24645,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         pool.splice(_retIdx, 0, cardName);
       }
       delete this.gs._spellKeepInstance;   // W63b: ein abgebrochener Guss hält keine Instanz fest
+      if (!_zugendeVorher) delete this.gs._spellEndsTurn;   // abgebrochen = nie aufgeloest: kein Zugende (der Reiter bliebe sonst fuer die naechste Aktion stehen)
       this._untrackCard(inst.id);
       this.gussAuftrittBeenden(_auftritt, { abgebrochen: true });   // v1338/v1339
       delete this.gs._pendingPlayLog;
@@ -24722,6 +24757,22 @@ this._deathWatch = (this._deathWatchStack || []).length
     // zaehlte die Aktion doppelt (`_actionsPlayedThisTurn`).
     if (opts.alsZusatzaktion && !this.gs.result) {
       await this.meldeGussAlsAktion(playerIdx, heroIdx, cardName, wirkerSeite !== playerIdx ? { heroOwner: wirkerSeite } : {});
+    }
+    // ── Immediately end your turn afterwards: auch beim Sofort-Guss ──
+    // Lesson in the Arts, Tanuki Escape, Great Offensive, Spontaneous
+    // Reappearance ... setzen `gs._spellEndsTurn`; eingeloest wurde der Reiter
+    // bisher nur von doPlaySpell & Co. Ein Guss ueber diese Bruecke (Zusatz-
+    // aktion, Master's Plan, Silence-Bonus-Spell ...) liess ihn stehen - die
+    // naechste beliebige Aktion beendete dann einen fremden Zug. Laeuft der
+    // Guss INNERHALB einer anderen Aufloesung (Tiefe > 0), loest der aeussere
+    // Weg den Reiter ein (advanceToPhase weist dort ohnehin ab).
+    if (!_zugendeVorher && this.gs._spellEndsTurn && (this.gs._spellResolutionDepth || 0) === 0) {
+      const grundmechanik = this.gs._spellEndsTurn === 'baseMechanic';
+      delete this.gs._spellEndsTurn;
+      const cur = this.gs.currentPhase;
+      if (!this.gs.result && (cur === 2 || cur === 3 || cur === 4)) {
+        await this.advanceToPhase(playerIdx, 5, grundmechanik ? { baseMechanic: true } : undefined);
+      }
     }
     return { cancelled: false };
   }
@@ -25242,6 +25293,19 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
 
     delete this.gs._preventPhaseAdvance;
+
+    // ── Einmal-Marker „Zug beenden / Aktion nachtragen" räumen ──
+    // `gs._spellEndsTurn` und `gs._pendingActionBurn` sind Reiter, die ein
+    // Zauber/eine Ability setzt und die NUR der Server-Pfad der setzenden
+    // Aktion einlöst (doPlaySpell, doActivateAbility, doActivateFreeAbility,
+    // doUseArtifactEffect). Blieb einer stehen (Aktion auf einem Weg ohne
+    // Einlöser, Abbruch nach dem Setzen), löste ihn die NÄCHSTE beliebige
+    // Aktion irgendeines Spielers ein — bei `_spellEndsTurn` also ein
+    // fremdes Zugende (Bugreport: Zug endete direkt nach Pillage). Ein
+    // Reiter gilt höchstens für den Zug, in dem er entstand.
+    delete this.gs._spellEndsTurn;
+    delete this.gs._pendingActionBurn;
+    delete this.gs._spreadingRumorFumbled;   // gleicher Reiter-Vertrag (nur doPlaySpell loest ihn ein)
 
     // ── Revert charmed heroes (Charme Lv3) ──
     for (const ps of this.gs.players) {
@@ -41222,7 +41286,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // misclassify.
     const _surpriseCardData = this._getCardDB()[cardName];
     const _surpriseIsSpell = _surpriseCardData?.cardType === 'Spell';
-    if (_surpriseIsSpell) this._pushResolvingSpell(cardName);
+    if (_surpriseIsSpell) { this._pushResolvingSpell(cardName); this._pushResolvingPlay(cardName); }
     let _steuerInst = null, _steuerVorher;   // 29.9.: Ausloeser als controller (s.u.)
     try {
     const ps = this.gs.players[playerIdx];
@@ -41779,7 +41843,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._surpriseResolutionDepth = Math.max(0, (this._surpriseResolutionDepth || 1) - 1);
       if (this._surpriseResolutionDepth === 0) this._inSurpriseResolution = false;
       this._activeSurpriseHeroes?.delete(heroKey);
-      if (_surpriseIsSpell) this._popResolvingSpell();
+      if (_surpriseIsSpell) { this._popResolvingSpell(); this._popResolvingPlay(); }
       // 29.9.: liegt die Instanz noch in der Surprise Zone (staysFaceUp),
       // bestimmt wieder `effektiveSeiten` den Kontrolleur.
       if (_steuerInst && _steuerInst.zone === ZONES.SURPRISE && _steuerInst.controller !== _steuerVorher) {
@@ -43694,7 +43758,12 @@ this._deathWatch = (this._deathWatchStack || []).length
    * so the player can't actually act on it.
    */
   queuePostChainAction(fn) {
-    if (typeof fn === 'function') this._postChainActions.push(fn);
+    if (typeof fn !== 'function') return;
+    // In einem CPU-Rollout (`_inMctsSim`) eingereiht = gehoert zur Simulation. Der Rollout spielt auch den Zug des
+    // MENSCHEN nach (z. B. Gate to the Armory: Closure `advanceToPhase(pi, 5)`); im echten Spiel darf sie nie laufen
+    // (`_runPostChainActions` verwirft markierte Eintraege). `restore()` kappt zusaetzlich die Warteschlange.
+    if (this._inMctsSim) fn._ausSimulation = true;
+    this._postChainActions.push(fn);
   }
 
   /** Drain the post-chain action queue (sequentially). Snapshots +
@@ -43724,7 +43793,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // NOT re-looped here — that's picked up at the next legitimate
       // drain point (next play socket `.finally` / CPU dispatcher).
       // An unbounded `while` risked an infinite re-queue hang.
-      const batch = this._postChainActions;
+      const batch = this._inMctsSim
+        ? this._postChainActions
+        : this._postChainActions.filter(fn => !fn._ausSimulation);   // Rollout-Reste nie im echten Spiel ausfuehren
       this._postChainActions = [];
       for (const fn of batch) {
         try { await fn(); }

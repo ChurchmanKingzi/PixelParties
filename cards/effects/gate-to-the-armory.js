@@ -369,8 +369,10 @@ module.exports = {
       // replacement-Action prompt.
       if (wasInherent) {
         engine.log('gate_to_armory_end_turn', { player: ps.username });
+        const zugDerKarte = gs.turn;
         engine.queuePostChainAction(async () => {
           if (gs.result) return; // game already over
+          if (gs.turn !== zugDerKarte || gs.activePlayer !== pi) return;   // veraltet: gilt nur dem Zug, in dem Gate gespielt wurde
           const cur = gs.currentPhase;
           if (cur >= 2 && cur <= 4) {
             await engine.advanceToPhase(pi, 5);
