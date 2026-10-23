@@ -141,7 +141,7 @@ const zugEnde = (t, me) => t.gs._terrorForceEndTurn === me && t.gs._terrorForceE
   {
     const DB = require('../../../../cards/effects/_card-db').getCardDB();
     const erwartet = [
-      '500 Piranhas in a Monster Suit', 'Blue-Ice Dragon', 'Dark Deepsea God', 'Disgruntled Forest Warden', 'Elusive Hind', 'Elven Rider', 'Foresta, the Guard',
+      '500 Piranhas in a Monster Suit', 'Black-Thorn Dragon', 'Blue-Ice Dragon', 'Dark Deepsea God', 'Disgruntled Forest Warden', 'Elusive Hind', 'Elven Rider', 'Foresta, the Guard',
       'Gigantisaur Chimera', 'Gigantisaur King Trex', 'Guardian Beast Gou', 'Guardian Beast Hou', 'Guardian Beast Hu', 'Guardian Beast Ji', 'Guardian Beast Long', 'Guardian Beast Ma',
       'Guardian Beast Niu', 'Guardian Beast She', 'Guardian Beast Shu', 'Guardian Beast Tu', 'Guardian Beast Yang', 'Guardian Beast Zhu', 'Hot Skull Potato', 'Ifrit',
       'Invader from the Cosmic Depths', 'Piggyfied Hero', 'Plant Golem', 'Pollution Piranha', 'Rebelliokai Oblivious Oni', 'Sparkfly Queen', 'Spirit of the Barbarian Sword',
@@ -149,7 +149,7 @@ const zugEnde = (t, me) => t.gs._terrorForceEndTurn === me && t.gs._terrorForceE
       'Spirit of the Ultimate Gun', 'Steam Dwarf Dragon Pilot', 'The Egg of God', 'Trident Spirit - Hammer Absorbed',
     ];
     const treffer = Object.values(DB).filter(cd => /Creature/.test(cd.cardType || '') && nurUnterBedingungBeschwoerbar(cd, cd.name)).map(cd => cd.name);
-    R.check('Treffermenge = inventarisierte Liste (39 Karten)', sortiert(treffer).join('|') === sortiert(erwartet).join('|'), { zuViel: treffer.filter(n => !erwartet.includes(n)), fehlt: erwartet.filter(n => !treffer.includes(n)) });
+    R.check('Treffermenge = inventarisierte Liste (40 Karten, seit 23.10. mit Black-Thorn Dragon)', sortiert(treffer).join('|') === sortiert(erwartet).join('|'), { zuViel: treffer.filter(n => !erwartet.includes(n)), fehlt: erwartet.filter(n => !treffer.includes(n)) });
     const kein = ['Archer', 'Archer of Teocuilatl', 'Black Marketeer', 'Nimble Monkee', 'Front Soldier', 'Doomed Town Guard', 'Deepsea Bats', 'Eager Oarsman', 'Mischief Militia - Chilly Wizard', 'Stowaway', 'Water Golem',
       'Gigantisaur Triceras', 'Queen of Kings [W]', 'Cannon Tower', H.INERT.creature, 'Rook of Kings [W]', 'Rook of Kings [B]', 'Soul Shard Ba', 'Elven Archer', 'Slave Trader', 'Pet Snake', 'Ash Worms'];
     R.check('Gegenprobe: Limits, „may"-Alternativwege, Reaktions-Kreaturen und Normalkarten sind KEINE Treffer', kein.every(n => !nurUnterBedingungBeschwoerbar(DB[n], n)), kein.filter(n => nurUnterBedingungBeschwoerbar(DB[n], n)));

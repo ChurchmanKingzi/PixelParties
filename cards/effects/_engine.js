@@ -2975,6 +2975,16 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // 23.10.: vorgemerkte Hand-Play-Signale (s. `_broadcastEvent`) zuerst abarbeiten.
+    if (this._playSignale?.length && !this._playSignaleLaeuft && hookName !== 'onHandPlaySignal') {
+      this._playSignaleLaeuft = true;
+      try {
+        while (this._playSignale.length) {
+          const sig = this._playSignale.shift();
+          await this.runHooks('onHandPlaySignal', { playedCardName: sig.name, playedByOwner: sig.owner, _skipReactionCheck: true });
+        }
+      } finally { this._playSignaleLaeuft = false; }
+    }
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
     // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)
@@ -7947,6 +7957,21 @@ class GameEngine {
       if (opts.piercing) return false;
       if (!target || target.hp === undefined) return false;
       if (!sourceCardName) return false;
+
+      // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon, Skript-Flag `heroUnaffectedBySpells`) — dauerhaft, ohne Verbrauch, ohne Stufenschranke, gleiche fünf
+      // Wege wie der Schild (Schaden, Heilung, Buff, Status, Niederlage). Ein Effekt, der nur als Spell ZÄHLT (Alice), gehört dazu; der Schild unten kennt nur echte Spells.
+      {
+        let o = -1, hi = -1;
+        for (let pi = 0; pi < this.playerCount(); pi++) {
+          const i = (this.gs.players[pi]?.heroes || []).indexOf(target);
+          if (i >= 0) { o = pi; hi = i; break; }
+        }
+        if (o >= 0 && this._spellLevelAlsQuelle(sourceCardName) != null && this.heroHasSpellImmunity(o, hi)) {
+          this.log('spell_immunity_block', { hero: this._heroLabel(target), spell: sourceCardName });
+          return true;
+        }
+      }
+
       if (this._getCardDB()[sourceCardName]?.cardType !== 'Spell') return false;
 
       let owner = -1, heroIdx = -1;
@@ -11116,6 +11141,10 @@ class GameEngine {
   async actionHealCreature(source, target, amount) {
     if (!target || !target.counters) return;
     if (target.faceDown) return; // Face-down surprises cannot be healed
+    if (this.kreaturSpellImmun(target, source)) {   // 23.10.: „unaffected by all Spells" gilt auch für heilende
+      this.log('heal_blocked', { target: target.name, source: source?.name, reason: 'spell_immunity' });
+      return;
+    }
     // v704 (Puppets): Shared HP pool — Heilung eines Puppet-Tokens heilt
     // den Helden der Spalte.
     if (loadCardEffect(target.counters?._effectOverride || target.name)?.sharesHpWithHero && !this.isCardPassiveDormant(target)) {   // W8: der Pool ruht bei Frost/Betäubung/Negation
@@ -11561,6 +11590,11 @@ class GameEngine {
   async heroNonDamageEffectBlocked(heroOwner, heroIdx, effectType, opts = {}) {
     const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
+    // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — auch die Wege ohne Status/Heilung/Buff (Max-HP, Entfernen, Abwurf, Kontrolle …).
+    if (!opts.piercing && this.heroHasSpellImmunity(heroOwner, heroIdx) && this.quelleIstSpell(opts.source ?? null, opts)) {
+      this.log('hero_effect_blocked', { hero: this._heroLabel(hero), effectType, source: opts.source?.name || opts.source || this._currentResolvingSpellName(), reason: 'spell_immunity' });
+      return true;
+    }
     const ctx = {
       playerIdx: heroOwner, heroIdx, hero, effectType, cancelled: false, _skipReactionCheck: true,
       ...(opts.sourceOwner != null ? { sourceOwner: opts.sourceOwner } : {}),
@@ -11598,6 +11632,7 @@ class GameEngine {
     // Both currentHp and maxHp are always increased by the full amount —
     // this correctly handles Nao-style overheal (currentHp can exceed maxHp).
     if (target.counters !== undefined) {
+      if (this.kreaturSpellImmun(target, opts.source ?? null, opts)) return 0;   // 23.10.: „unaffected by all Spells"
       const cd        = this._getCardDB()[target.name];
       const baseHp    = target.counters.maxHp    ?? cd?.hp ?? 0;
       const currentHp = target.counters.currentHp ?? baseHp;
@@ -14703,6 +14738,14 @@ class GameEngine {
       return;
     }
     if (!_u && cardInstance.counters?._cardinalImmune && toZone !== cardInstance.zone) return; // Cardinal Beast immunity
+    // 23.10. („unaffected by all Spells", Black-Thorn Dragon): auch das VERSCHIEBEN innerhalb der Support Zones (Guard Change, Slippery Ice …) ist ein Zugriff.
+    if (!_u && cardInstance.zone === ZONES.SUPPORT && toZone === ZONES.SUPPORT
+        && (toHeroIdx !== cardInstance.heroIdx || toSlot !== cardInstance.zoneSlot
+            || (opts.newOwner != null && opts.newOwner !== (cardInstance.controller ?? cardInstance.owner)))
+        && this.kreaturSpellImmun(cardInstance, opts.source, opts)) {
+      this.log('move_blocked', { card: cardInstance.name, reason: 'spell_immunity' });
+      return;
+    }
     if (!_u && toZone !== cardInstance.zone && this.kreaturGegnerEffektImmun(cardInstance, opts.deathSource || opts.source, opts)) return;   // W17b: Golden Wings – nur gegen gegnerische Quellen
     // `_oppEffectImmune` (Sparkfly Attendant gift) is source-AWARE and
     // therefore checked at call sites that pass source — actionDestroyCard,
@@ -20761,6 +20804,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // creatures appear in the picker; this helper stays as the
     // authoritative "would the status actually stick" gate.
     if (this.isOmniImmune(inst, typeof opts.gwSourceOwner === 'number' ? opts.gwSourceOwner : source)) return false;   // W17b: Golden Wings – nur gegnerische Status
+    if (this.kreaturSpellImmun(inst, source, opts)) return false;   // 23.10.: Spell-Immunität — `isOmniImmune` oben bekommt nur den Besitzer-Index, nicht die Quelle
     // Source-aware opp-effect immunity (Sparkfly Attendant gift, etc.):
     // status applications from the opp fizzle, own-side ones land.
     if (this.isOppEffectImmuneFrom(inst, source)) return false;
@@ -20863,6 +20907,70 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
+   * ★ 23.10.2026 (Black-Thorn Dragon: „This Creature and the corresponding Hero are unaffected by all Spells."):
+   * EINE Auslegung von „ist diese Quelle ein Spell?" für die Immunitäten gegen Spells.
+   *
+   * Spell = Kartentyp 'Spell' (auch Areas, Anhänge, Surprise-Spells: sie zählen nach cardType, Als Ruling W45a) oder ein Effekt, der als Spell ZÄHLT
+   * (`treatedAsSpell`, Alice — W32a). Attacks sind keine Spells. Den Namen liefert die Quelle (Objekt, String, `opts.source`/`opts.sourceName`); nennt der
+   * Aufrufer keine (viele Status-/Heil-/Buff-Wege reichen sie nicht mit), gilt der gerade auflösende Spell — dieselbe Konvention wie bei den Heldenwegen
+   * (`addHeroStatus`, `actionHealHero`: `_currentResolvingSpellName()`). Eine reine Zahl (Besitzer-Index) nennt keinen Namen.
+   * @param {object|string|number|null} quelle
+   * @param {object} [opts]  { source, sourceName, damageType | type }
+   */
+  quelleIstSpell(quelle, opts = {}) {
+    const obj = (quelle && typeof quelle === 'object') ? quelle
+      : (opts?.source && typeof opts.source === 'object') ? opts.source : null;
+    const name = (typeof quelle === 'string' ? quelle : (quelle && typeof quelle === 'object' ? (quelle.name || quelle.cardName) : null))
+      || (typeof opts?.source === 'string' ? opts.source : opts?.source?.name)
+      || opts?.sourceName
+      || this._currentResolvingSpellName();
+    if (!name) return false;
+    return this._spellLevelAlsQuelle(name, opts?.damageType ?? opts?.type, obj) != null;
+  }
+
+  /**
+   * „This Creature is unaffected by all Spells": Skript-Flag `unaffectedBySpells: true` an der Kreatur. Ein laufender Schutz — er ruht, solange die Kreatur
+   * negiert/gefroren/betäubt ist (W7a). Piercing (Ida: „ignore any effects that make a target unaffected by them", `opts.piercing`) geht durch.
+   * Gelesen von `kreaturGegnerEffektImmun` (Schaden, Zerstörung, Bewegung, Buffs, Negierung, Diebstahl, Status) und den Heil-/Max-HP-Wegen.
+   */
+  kreaturSpellImmun(inst, quelle = null, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst.faceDown) return false;
+    if (opts?.piercing) return false;
+    if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.unaffectedBySpells) return false;
+    // Das eigene Opfer des Kontrolleurs (Kosten einer Karte: „Sacrifice a Creature you control to play this card") ist kein Zugriff des Spells — wie bei
+    // Golden Wings („Eigene Karten/Effekte/Kosten wirken normal") und den Schutzkarten (`ctx.isSacrifice`, Ruling 1.8.). Opfert dagegen der GEGNER die Kreatur
+    // per Spell, bleibt sie unberührt.
+    // Der Tod selbst (`fireCreatureDeath`: der Weg einer Zerstörung/eines Opfers, die oben schon geprüft wurden) wird nicht ein zweites Mal gesperrt — sonst bliebe
+    // eine erlaubt geopferte Kreatur liegen.
+    if (opts?.fireCreatureDeath && opts?._equipGrund === 'destroyed') return false;
+    if (opts?.isSacrifice) {
+      const ursprung = (typeof opts.sourceOwner === 'number') ? opts.sourceOwner
+        : (quelle && typeof quelle === 'object') ? (quelle.controller ?? quelle.owner)
+        : (opts.source && typeof opts.source === 'object') ? (opts.source.controller ?? opts.source.owner) : null;
+      if (ursprung != null && ursprung === (inst.controller ?? inst.owner)) return false;
+    }
+    if (this.isCardPassiveDormant(inst)) return false;
+    return this.quelleIstSpell(quelle, opts);
+  }
+
+  /**
+   * „… and the corresponding Hero are unaffected by all Spells": steht in einer Support Zone des Helden (Brettseite `heroOwner`) eine wirksame Karte mit
+   * dem Skript-Flag `heroUnaffectedBySpells: true`? Der Held muss leben; die Karte ruht wie jeder laufende Schutz bei Negierung/Frost/Betäubung.
+   */
+  heroHasSpellImmunity(heroOwner, heroIdx) {
+    const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || !(hero.hp > 0)) return false;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT || inst.faceDown || inst.heroIdx !== heroIdx) continue;
+      if (this.physicalSide(inst) !== heroOwner) continue;
+      if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.heroUnaffectedBySpells) continue;
+      if (this.isCardPassiveDormant(inst)) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * ★ W17b (A01-25, Al: „die restlichen Fälle"): Golden Wings — „unaffected by your OPPONENT'S cards and
    * effects until the end of this turn". Eigene Marke `counters._gwImmune` (nicht mehr `_cardinalImmune`, das
    * quellenblind ALLES sperrt und den Cardinal Beasts / Stowaway / Cute Conversion bleibt): sie schützt NUR gegen
@@ -20875,6 +20983,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Wer mit Quelle prüft, übergibt sie; Pfade ohne Quelle fragen ohne Argument (= geschützt).
    */
   kreaturGegnerEffektImmun(inst, quelle, opts = {}) {
+    if (this.kreaturSpellImmun(inst, quelle, opts)) return true;   // 23.10.: „unaffected by all Spells" (Black-Thorn Dragon) — dieselben Sperrstellen
     if (!inst?.counters?._gwImmune) return false;
     let q;
     if (typeof opts?.gwSourceOwner === 'number') q = opts.gwSourceOwner;   // ausdrücklicher Hinweis des Aufrufers (String-Quellen ohne Besitzer)
@@ -28968,7 +29077,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // caller's pre-steal animation already played, but the Creature
     // stays put on its original side. Matches `actionTransferCreature`
     // and the damage/status fizzle contract.
-    if (this.isOmniImmune(inst, stealerPi)) {   // W17b: Golden Wings – Quelle = Dieb
+    if (this.isOmniImmune(inst, stealerPi, opts)) {   // W17b: Golden Wings – Quelle = Dieb (23.10.: `opts.sourceName` für die Spell-Immunität)
       this.log('steal_fizzle', {
         creature: inst.name, reason: 'omni_immune',
         by: opts.sourceName || 'Steal',
@@ -33038,6 +33147,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const removeIdx = ps.hand.indexOf(cardName);
       if (removeIdx >= 0) {
         ps.hand.splice(removeIdx, 1);
+        this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
         // Untrack hand instance
         const inst = this.cardInstances.find(c =>
@@ -41660,6 +41770,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
+          _vonSurpriseAktivierung: true,   // 23.10.: „gespielt"-Zähler (Luck, Liquid Luck) zählen die Aktivierung schon über `onSurpriseActivated`
         });
         await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
@@ -41789,6 +41900,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
+          _vonSurpriseAktivierung: true,   // 23.10.: „gespielt"-Zähler (Luck, Liquid Luck) zählen die Aktivierung schon über `onSurpriseActivated`
         });
         // Fire hook for Bakhm's 80-damage chain
         await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
@@ -41888,7 +42000,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
     'onActionUsed', 'onAdditionalActionUsed', 'onReactionResolved',
-    'onHeroTargeted', 'onSurpriseActivated',
+    'onHeroTargeted', 'onSurpriseActivated', 'onHandPlaySignal',
   ]);
 
   /**
@@ -51738,7 +51850,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           || inst?.counters?._baihuPetrify
           || isCardinalBeastByName(inst?.name)) {
         e._immuneCreature = true;
-      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner })) {
+      } else if (this.kreaturGegnerEffektImmun(inst, e.source, { sourceOwner: e.sourceOwner, damageType: e.type, piercing: e.canBeNegated === false })) {
         // ★ W17b (A01-25): Golden Wings – „unaffected by your opponent's cards and effects": nur Schaden mit
         // gegnerischer Quelle prallt ab; eigener Schaden trifft. Unbekannte Quelle (-1, Status-Tick) = geschützt.
         e._immuneCreature = true;
@@ -52130,6 +52242,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       _skipReactionCheck: true,
     });
     this._kreaturenSchadenSchilde(entries);   // W7a (A07-29): vergebene Schilde (Harpyformer Choir) hängen am Spieler, nicht an der Karte
+    // 23.10. (Black-Thorn Dragon, Ida: „ignore any effects that make a target unaffected by them"): Idas Hook stempelt `canBeNegated = false` erst
+    // in der Hook-Runde oben — die Markierung der Immunitäten lief davor. Ein Piercing-Eintrag bei einer Spell-immunen Kreatur wird deshalb neu bewertet.
+    for (const e of entries) {
+      if (!e?._immuneCreature || e.canBeNegated !== false || !e.inst) continue;
+      if (!loadCardEffect(e.inst.counters?._effectOverride || e.inst.name)?.unaffectedBySpells) continue;
+      e._immuneCreature = false;
+      this._markCreatureDamageImmunity([e]);
+    }
 
     // ── `cannotBeIncreased`, Kreaturenseite (v579) ───────────────────
     // Gegenstueck zur Klammer im Heldenpfad. Ohne sie waere die Regel
@@ -54521,11 +54641,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return null;
   }
 
+  /** Merkt einen Hand-Play (Reaction, selbstspielende Karte) für den Hook `onHandPlaySignal` vor (Luck, Liquid Luck). */
+  _meldeHandPlay(name, owner) {
+    (this._playSignale || (this._playSignale = [])).push({ name, owner });
+  }
+
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
     // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
     if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
+    // 23.10. (Luck, Liquid Luck — „Whenever your opponent plays a card"): die Reaktionsfenster und selbstspielenden Reaction-Karten melden ihren Play nur als Flug mit
+    // `asPlay` (derselbe Marker wie beim Trainings-Recorder). Spells/Attacks zählen über `afterSpellResolved` (`asPlay: 'sole'` = einziges Signal); der Hook
+    // `onHandPlaySignal` läuft beim nächsten `runHooks` (Warteschlange, damit der Aufrufer nicht mitten im Flug unterbrochen wird).
+    if (event === 'play_pile_transfer' && data && data.asPlay && data.from === 'hand' && data.cardName && Number.isInteger(data.owner)) {
+      const cd = this._getCardDB()[data.cardName];
+      if (data.asPlay === 'sole' || !cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) {
+        this._meldeHandPlay(data.cardName, data.owner);
+      }
+    }
     // Animation broadcasts count as progress for the runHooks timeout
     // watcher — a hook that's spacing itself with delay+broadcast (Chain
     // Lightning's per-bolt animation, Wheels' staggered draw, Cosmic

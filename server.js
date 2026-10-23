@@ -12322,6 +12322,13 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
         // mittig im Handcontainer statt an ihrer echten Position.
         await room.engine.routeNegatedInitialCard(pileOwner, cardName, chainResult, currentIdx);
       } else if (chainResult.resolveResult?.placed) {
+        // 23.10. (Liquid Luck): auch ein Trank, der sich offen vor den Spieler legt (Elixir of Immortality, Liquid Luck), WURDE gespielt — Beobachter
+        // („Whenever your opponent plays a card …": Luck, Liquid Luck) müssen ihn sehen. `placed: true` lässt die Listener, die verbrauchte Tränke
+        // übernehmen (Saint Nicolas, Biomancy, Lizbeth), still aussteigen.
+        await room.engine.runHooks('afterPotionUsed', {
+          potionName: cardName, potionOwner: pi, fromHandIndex: currentIdx,
+          placed: true, _skipReactionCheck: true,
+        });
         checkPotionLock(ps, gs, pi);
       } else {
         // `fromHandIndex` carries the pre-splice hand slot the Potion
