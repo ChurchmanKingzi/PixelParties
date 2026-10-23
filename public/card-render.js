@@ -224,6 +224,7 @@
   }
 
   // ── Farben (Style-Skript des Templates) ──
+  const LEVEL_BOX = { left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle' };   // Stufenzahl (Zauber, Kreaturen)
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
     sapphire: 'rgb(8,211,239)', diamond: 'rgb(145,230,230)', diamondLight: 'rgb(178,238,238)', diamondMuted: 'rgb(116,184,184)', diamondDark: 'rgb(102,161,161)', artifact: 'rgb(182,38,0)', sup: 'rgb(250,213,74)',
@@ -705,10 +706,15 @@
     const sup = isSuperhero(t);
     // Super Rares (außer Artifacts): Name in den Münzen-Goldtönen (data/palette-fest.json), in vier harten Bändern wie die Goldzahlen, Kontur in Münzen-Rotbraun
     const supGold = spec.rarity === 'super rare' && !isArti2(t) && !isSuperhero(t) && t !== 'boss' && !isToken(t);
+    // Dieselbe Behandlung (Farbe, Münzen-Gold-Bänder, Kontur) bekommen Stufe und Kosten — nur die Höhe des Verlaufs richtet sich nach der jeweiligen Zeile.
+    const fillFor = (top, height) => spec.nameGold ? goldFill(ctx, top, height) : supGold ? muenzGoldFill(ctx, top, height) : nameColor(spec);
+    // Artifacts: dunkle Schrift auf heller Platte — dort keine Kontur; nur die goldene Schrift der Super-Rare-Artifacts (Orange auf Hellgelb) bekommt eine deutliche, dunkle Kontur
+    const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
+    const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
+    const nameOutF = supArtiGold ? 0.7 : 0.5;
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: spec.nameGold ? goldFill(ctx, 48, 55) : supGold ? muenzGoldFill(ctx, 48, 55) : nameColor(spec),
-      outline: OPT.nameOutline && !isArti2(t) ? (supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null, outlineFactor: 0.5,   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
+      align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: nameOutF,
     });
 
     // 4) Faehigkeiten-Felder der Helden
@@ -725,11 +731,13 @@
     // 5) Zauberschule (links) und Stufe (rechts) — Zauber und Kreaturen
     if (t === 'spell' || t === 'summon') {
       if (spec.school && !textOnly) sprite(ctx, 'school.' + spec.school, 0, 550, 110, 110);
-      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur
-      if (spec.level != null || spec.lvOver != null) drawLine(ctx, String(spec.lvOver != null ? spec.lvOver : spec.level), {
-        left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle',
-        color: spec.lvOver != null ? spec.lvColor : levelColor(spec), outline: spec.lvOver != null ? OVER_OUTLINE : null,
-      });
+      // `lvOver`: aktuelle Stufe (Hand: Rabatt gruen, Zuschlag rot), mit dunkler Kontur. Sonst wie der Name; der Glanz (Foil) liegt in der Namensmaske.
+      if (!textOnly && (spec.level != null || spec.lvOver != null)) {
+        const ueber = spec.lvOver != null;
+        drawLine(ctx, String(ueber ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, {
+          color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : nameOutF,
+        }));
+      }
     }
     // Kartenart-Symbol unten links (Falle, Reaktion, Flaeche, Anhang)
     if (!textOnly && spec.kind && (t === 'spell' || t === 'summon' || t === 'potion' || t === 'artifact')) {
@@ -757,10 +765,11 @@
       const heroBox = (isHero3(t) || sup) && t !== 'boss';
       // `costOver`: aktuelle Kosten eines Artifacts (sitzen im Wertefeld der Mitte), gruen/rot mit dunkler Kontur
       const kostet = isArti2(t) && spec.costOver != null;
-      if (!spec.noAtk && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
+      // Kosten eines Artifacts: wie der Name (Farbe, Kontur); Glanz über die Namensmaske — deshalb nicht noch einmal in der Textmaske
+      if (!spec.noAtk && !(isArti2(t) && textOnly) && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
-        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : stat, ink: heroBox,
-        outline: kostet ? OVER_OUTLINE : null, costX: isArti2(t),
+        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : isArti2(t) ? fillFor(984, 60) : stat, ink: heroBox,
+        outline: kostet ? OVER_OUTLINE : isArti2(t) ? nameOut : null, outlineFactor: nameOutF, costX: isArti2(t),
       });
     }
 
@@ -1061,14 +1070,32 @@
     return c;
   }
 
-  /** Umriss der Namensbuchstaben: nur der Name, weiss, in einem Streifen ueber die ganze Kartenbreite (Hoehe 110 ab y = 20) */
-  const NAME_STRIP = { x: 0, y: 20, w: W, h: 110 };
+  /** Umriss von Name, Stufe und Kosten: weiss, in voller Kartengroesse (750 x 1050) — Name, Stufenzahl und Artifact-Kosten bekommen denselben Glanz. */
+  const NAME_STRIP = { x: 0, y: 0, w: W, h: H };
   function nameMaskCanvas(spec, geo) {
     const c = document.createElement('canvas'); c.width = NAME_STRIP.w; c.height = NAME_STRIP.h;
-    drawLine(c.getContext('2d'), spec.name, {
-      left: geo.nameBox.left, top: geo.nameBox.top - NAME_STRIP.y, width: geo.nameBox.width, height: geo.nameBox.height,
+    const g = c.getContext('2d');
+    drawLine(g, spec.name, {
+      left: geo.nameBox.left, top: geo.nameBox.top, width: geo.nameBox.width, height: geo.nameBox.height,
       size: 50, min: 48, align: 'center', color: '#fff',
     });
+    if (spec.level != null || spec.lvOver != null) drawLine(g, String(spec.lvOver != null ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, { color: '#fff' }));
+    if (isArti2(spec.type) && !spec.noAtk && (spec.atk != null || spec.costOver != null)) {
+      drawLine(g, spec.costOver != null ? String(spec.costOver) : String(spec.atk), {
+        left: spec.type === 'artifact' ? 296 : 504, top: 984, width: 150, height: 60, size: 38, min: 1, align: 'center', color: '#fff', costX: true,
+      });
+    }
+    // Seltenheits-Stempel unten rechts (Stern / Diamant / Saphir) der Foil-Karten: gleicher Glanz wie der Name
+    if (spec.rarity === 'super rare' || spec.rarity === 'diamond' || spec.rarity === 'sapphire') {
+      const stamp = STAMP[spec.rarity];
+      const t2 = document.createElement('canvas'); t2.width = 45; t2.height = 45;
+      const g2 = t2.getContext('2d');
+      const white = isArti2(spec.type) && (stamp !== 'diamond' && stamp !== 'sapphire');
+      if (sprite(g2, (white ? 'cornerW.' : 'corner.') + stamp, 0, 0, 45, 45)) {
+        g2.globalCompositeOperation = 'source-in'; g2.fillStyle = '#fff'; g2.fillRect(0, 0, 45, 45);
+        g.drawImage(t2, 689, 989);
+      }
+    }
     return c;
   }
 
