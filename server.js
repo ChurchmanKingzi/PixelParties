@@ -10093,6 +10093,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot, heroOwner };
   }
 
+  // ★ W66b (Al, 23.10.2026: „Abbruch lässt den Spielzustand EXAKT wie vor dem Beginn"): die Absichts-Marken oben (`_requestedNormalSummonSlot` / `_requestedBouncePlaceSlot`) bleiben nach einem Abbruch
+  // der Kostenwahl sonst stehen (nur Zugbeginn räumte sie ab) — das `finally` am Ende räumt genau die Marken ab, die DIESER Aufruf gesetzt hat.
+  const _meinNormalSlot = ps._requestedNormalSummonSlot, _meinBounceSlot = ps._requestedBouncePlaceSlot;
   let additionalConsumed = false;
   let consumedInst = null;
   if (usingAdditional) {
@@ -10138,7 +10141,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     }
   }
 
-  room.engine._trackTerrorResolvedEffect(pi, cardName);
+  // ★ W66b: der Terror-Zähler zählt erst die COMMITTETE Karte (`engine.beiCommit`, siehe unten, direkt nach der Vormerkung) — ein Abbruch der Kostenwahl zählte sonst mit.
 
   const commitHandRemoval = () => {
     const idx = getResolvingHandIndex(ps);
@@ -10188,6 +10191,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // wird als STUMME Vormerkung (`stumm`: kein `card_reveal`, nur der Puffer) gehalten und beim Landen freigegeben; jeder Abbruchzweig löscht sie samt Puffer.
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     gs._pendingCardReveal = { cardName, ownerIdx: pi, stumm: true };
+    room.engine.beiCommit(() => room.engine._trackTerrorResolvedEffect(pi, cardName));   // W66b: Terror-Zähler erst beim Commit (Abbruch zählt nicht)
     // ★ W4b (Al, Welle 4): Tribut-/Opferkosten der Beschwörung („… to play this card") werden VOR dem Reaktionsfenster
     // bezahlt (`paySummonCost` der Kreatur, Engine `_payCreatureSummonCost`); wird die Beschwörung danach komplett
     // negiert (Off Duty …), bleiben die Opfer tot. Bricht der Spieler die Kostenwahl ab (`false`), ist nichts bezahlt:
@@ -10542,6 +10546,8 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   } catch (err) {
     console.error('[Engine] doPlayCreature error:', err.message);
   } finally {
+    if (_meinNormalSlot && ps._requestedNormalSummonSlot === _meinNormalSlot) delete ps._requestedNormalSummonSlot;   // W66b
+    if (_meinBounceSlot && ps._requestedBouncePlaceSlot === _meinBounceSlot) delete ps._requestedBouncePlaceSlot;     // W66b
     if (gs._pendingCardReveal && gs._pendingCardReveal.stumm && gs._pendingCardReveal.cardName === cardName) delete gs._pendingCardReveal;   // W63d: Sicherheitsnetz (unerwarteter Ausgang)
     // Safety net: if neither commit nor refund ran (unexpected exit),
     // refund so a marked Potion isn't stranded with stale escrow.
@@ -11576,7 +11582,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       console.error('[Engine] targeting-session redirect error:', err.message);
     }
   }
-  room.engine._trackTerrorResolvedEffect(pi, potionName);
+  // ★ W66b: der Terror-Zähler zählt erst die COMMITTETE Karte (`engine.beiCommit` direkt nach der Vormerkung unten).
 
   // Herkunft aus der Zielsitzung — siehe dort.
   beginHandResolve(ps, potionName, handIndex, fromCreation);
@@ -11604,6 +11610,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // ★ W63d (Al, 22.10.2026, Treasure Hunter's Backpack): der Auftritt kommt IMMER erst nach dem Commit — für JEDE Ziel-Karte, nicht nur für `deferReveal`/`deferBroadcast`.
   // Bis dahin hält der Auftritts-Puffer der Engine alles zurück, was an Gegner/Zuschauer gehen würde (Bild, Protokollzeile, Flug, Animation); ein Abbruch löscht ihn mit.
   gs._pendingCardReveal = { cardName: potionName, ownerIdx: pi };
+  room.engine.beiCommit(() => room.engine._trackTerrorResolvedEffect(pi, potionName));   // W66b: Terror-Zähler erst beim Commit (Abbruch zählt nicht)
   room.engine._setPendingPlayLog('card_played', {
     player: ps.username, card: potionName, cardType, cost: goldCost || 0,
   });
@@ -22189,4 +22196,4 @@ initDatabase().then(async () => {
 });
 
 // Für die Headless-Simulation des Skill-Test-Modus (skilltest/sim-bridge.js; PP_ST_SIM=1).
-module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, setupGameState, effectPromptFuer, sendGameState, sendGameStateErzwungen, sendSpectatorGameState } };
+module.exports = { skillTestHandlers: { doPlaySpell, doPlayCreature, doPlayArtifact, doUseArtifactEffect, doPlaySurprise, doActivateCreatureEffect, doActivateHeroEffect, doActivateEquipEffect, doUsePotion, doConfirmPotion, doPlayAbility, doActivateAbility, doActivateFreeAbility, doActivatePermanent, doActivateDiscardEffect, setupGameState, effectPromptFuer, sendGameState, sendGameStateErzwungen, sendSpectatorGameState } };

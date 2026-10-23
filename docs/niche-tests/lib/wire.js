@@ -125,6 +125,7 @@ async function spiele(t, seat, name, o = {}) {
       const cancellable = (en.pi === seat) && (en.kind === 'generic' ? !!en.d.cancellable : !!en.config.cancellable);   // nur Fragen AN DEN SPIELER zählen als Abbruchstellen
       const entry = { ...en, nr: nr.n++, cancellable };
       t.tl.push({ k: 'answer-begin', nr: entry.nr, kind: en.kind, cancellable, type: en.d && en.d.type, pi: en.pi });
+      if (cancellable && vorher) { try { const jetzt = zustand(t); promptDiffs.push(zustandDiff(vorher, jetzt)); promptRoh.push(zustandDiffRoh(vorher, jetzt)); } catch { promptDiffs.push(['<Schnappschuss fehlgeschlagen>']); promptRoh.push([]); } }   // W66b: Zustand beim Öffnen der k-ten abbrechbaren Frage (gegen den Ausgangszustand)
       if (cancellable && o.cancelAt != null && (o.persist ? cancellableSeen >= o.cancelAt : cancellableSeen === o.cancelAt)) {
         cancellableSeen++; cancelled = true;
         t.tl.push({ k: 'cancel', nr: entry.nr });
@@ -146,11 +147,12 @@ async function spiele(t, seat, name, o = {}) {
       }
     }
   };
+  let vorher = null; const promptDiffs = [], promptRoh = []; const snap = () => { if (!vorher) vorher = zustand(t); };   // W66b: Zustand unmittelbar vor dem Spielweg
   const pumpP = pump();
   // Der Anstoß selbst (ein echter do*-Handler). Danach evtl. offene Ziel-Session (Spielweg „potionTargeting") ebenfalls menschlich beantworten.
   let result;
   try {
-    result = o.call ? await t.run(o.call, o) : await t.play(seat, name, { ...o, noAutoConfirm: true });   // o.call: eigener Anstoß (Aktivierungswege: Kreatur-/Helden-/Ausrüstungs-Effekt, Fähigkeit …)
+    result = o.call ? await t.run(() => { snap(); return o.call(); }, o) : await t.play(seat, name, { ...o, noAutoConfirm: true, vorAufruf: snap });   // o.call: eigener Anstoß (Aktivierungswege: Kreatur-/Helden-/Ausrüstungs-Effekt, Fähigkeit …)
     let guard = 0;
     while (gs.potionTargeting && gs.potionTargeting.ownerIdx === seat && !gs.potionTargeting.isEffectPrompt && guard++ < 6) {
       const pt = gs.potionTargeting;
@@ -159,6 +161,7 @@ async function spiele(t, seat, name, o = {}) {
       const entry = { kind: 'session', pi: seat, valid, config: pt.config || {}, d: { type: 'target', title: pt.potionName }, nr: nr.n++, cancellable };
       t.tl.push({ k: 'prompt', pi: seat, kind: 'session', d: entry.d, cancellable });
       t.tl.push({ k: 'answer-begin', nr: entry.nr, kind: 'session', cancellable, type: 'target' });
+      if (cancellable && vorher) { try { const jetzt = zustand(t); promptDiffs.push(zustandDiff(vorher, jetzt)); promptRoh.push(zustandDiffRoh(vorher, jetzt)); } catch { promptDiffs.push(['<Schnappschuss fehlgeschlagen>']); promptRoh.push([]); } }   // W66b
       if (cancellable && o.cancelAt != null && (o.persist ? cancellableSeen >= o.cancelAt : cancellableSeen === o.cancelAt)) {
         cancellableSeen++; cancelled = true; t.tl.push({ k: 'cancel', nr: entry.nr });
         gs.potionTargeting = null;     // Server `cancel_potion`: Ziel-Session schließen
@@ -177,6 +180,8 @@ async function spiele(t, seat, name, o = {}) {
   const handNachher = gs.players[seat].hand.filter(x => x === name).length;
   const out = analyse(t, seat, name, tl, { result, cancelled, cancellableSeen });
   out.handVorher = handVorher; out.handNachher = handNachher;
+  out.promptDiffs = promptDiffs; out.promptRoh = promptRoh;
+  out.zustandsDiff = vorher ? zustandDiff(vorher, zustand(t)) : null;   // W66b: Unterschiede Vorher/Nachher (nur aussagekräftig nach einem Abbruch)
   out.undone = cancelled && (o.undoneFn ? !!o.undoneFn(t) : (handNachher >= handVorher && handVorher > 0));   // Karte liegt nach dem Abbruch noch auf der Hand = nie gespielt (Aktivierungen: o.undoneFn, z. B. Rundensperre nicht verbraucht)
   return out;
 }
@@ -266,12 +271,12 @@ function drucke(r, say = console.log) {
  * Rückgabe { clean, cancels: [{k, r}] } — `r` wie bei `spiele`.
  */
 async function durchlauf(mk, seat, name, o = {}) {
-  const lauf = async (extra) => { const t = await mk(); const r = await spiele(t, seat, name, { ...o, ...(o.callFn ? { call: () => o.callFn(t) } : {}), ...extra }); return { t, r }; };
+  const lauf = async (extra) => { const t = await mk(); if (o.prepFn) await o.prepFn(t); const r = await spiele(t, seat, name, { ...o, ...(o.callFn ? { call: () => o.callFn(t) } : {}), ...extra }); return { t, r }; };   // W66b: `prepFn(t)` = Szenenaufbau VOR dem Zustands-Schnappschuss (nur der Anstoß `callFn` gehört zum Spielweg)
   const clean = await lauf({});
   const nCanc = clean.r.tl.filter(e => e.k === 'answer-begin' && e.cancellable).length;
   const cancels = [];
   for (let k = 0; k < Math.min(nCanc, o.maxCancel ?? 8); k++) cancels.push({ k, ...(await lauf({ cancelAt: k, persist: true })) });
-  return { clean, cancels, nCanc };
+  return { clean, cancels, nCanc, zustandsdiffPruefbar: !o.callFn || !!o.prepFn };
 }
 
 /**
@@ -314,9 +319,24 @@ function pruefeDurchlauf(R, label, d, o = {}) {
       R.check(`${label}: ${sid} — Auftritt VOR dem ersten Effekt (Ereignis ${p.ereignis}, Zeile ${p.effektLog}, Zustandswechsel ${p.wechsel}; Auftritt ${p.R})`, p.vorEffekt, p);
     }
   }
+  // ★ W66b: bis einschließlich der letzten echten Abbruchstelle ist noch nichts BEZAHLT (Gold, Ablage/Löschstapel, Helden-HP/-Status, Brett [Opfer, Pollution Tokens …]) — Kosten erst NACH dem Commit.
+  // Reservierungen (Einmal-Stempel als Schutz gegen Verschachtelung, Aktionszähler, Entnahme der gespielten Karte aus Hand/Deck/Ablage) sind erlaubt, solange der Abbruch sie exakt zurückgibt
+  // (Zustandsdifferenz nach Abbruch = 0, unten) und der Gegner nichts sieht. Ausnahmen je Aufruf: `o.bezahltAusnahme` (z. B. Guardian Beast Hu: Löschkosten im Kosten-Vorlauf).
+  if (d.zustandsdiffPruefbar !== false && o.zustandsdiff !== false && c.promptRoh && !o.bezahltAusnahme) {
+    for (let k = 0; k <= kMax && k < c.promptRoh.length; k++) {
+      const bez = c.promptRoh[k].filter(istBezahlt);
+      R.check(`${label}: an der Abbruchstelle ${k} sind noch keine Kosten bezahlt`, bez.length === 0, bez.slice(0, 4).map(x => x.pfad + ': ' + JSON.stringify(x.vorher).slice(0, 50) + ' → ' + JSON.stringify(x.nachher).slice(0, 50)));
+    }
+  }
   for (const { k, r, t } of d.cancels) {
     R.check(`${label}: Abbruch an Stelle ${k} — abgebrochen`, r.cancelled, r.cancellableSeen);
     R.check(`${label}: Abbruch an Stelle ${k} — keine Engine-Fehler`, t.errors.length === 0, t.errors);
+    // ★ W66b (Al, 23.10.2026): „Kosten UND Limits erst nach dem Commit" — ein Abbruch an einer echten Abbruchstelle lässt den Spielzustand EXAKT wie vor dem Beginn
+    // (Gold, Hand/Ablage/Deck/Löschstapel [Reihenfolge], Marken/Stempel, Zähler, Aktionen, Helden-/Kreaturzustände, Hook-Zustände): Zustandsdifferenz nach Abbruch = 0.
+    // Aktivierungen (`callFn`) prüft die Differenz nur mit `prepFn` (sonst läge der Szenenaufbau im Anstoß).
+    if (d.zustandsdiffPruefbar !== false && o.zustandsdiff !== false && (r.undone || (o.aktivierung && r.appearances.length === 0)) && r.zustandsDiff) {
+      R.check(`${label}: Abbruch an Stelle ${k} — Zustandsdifferenz nach Abbruch = 0`, r.zustandsDiff.length === 0, r.zustandsDiff.slice(0, 8));
+    }
     if (!r.undone) continue;     // keine echte Abbruchstelle: die Karte war da schon verbraucht
     R.check(`${label}: Abbruch an Stelle ${k} — Gegner/Zuschauer haben NICHTS über die Karte erhalten`, r.appearances.length === 0, r.leakEvents.length ? r.leakEvents : r.appearances.map(i => r.tl[i].ev));
     R.check(`${label}: Abbruch an Stelle ${k} — kein Kartenname im Zustand`, _sl(r).length === 0, _sl(r).length);
@@ -354,4 +374,9 @@ async function reicheSzene(o = {}) {
   return t;
 }
 
-module.exports = Object.assign({}, H, { fresh, spiele, drucke, CANCEL, TAP, analyse, fremd, durchlauf, pruefeDurchlauf, reicheSzene, REICH });
+
+// W66b: Zustands-Schnappschuss und -Differenz liegen in lib/zustand.js (auch vom Abbruch-Wächter genutzt)
+const { zustand: _zustandRoh, zustandDiff, zustandDiffRoh, istBezahlt } = require('./zustand.js');
+const zustand = (t) => _zustandRoh(t.gs, t.engine);
+
+module.exports = Object.assign({}, H, { zustand, zustandDiff, fresh, spiele, drucke, CANCEL, TAP, analyse, fremd, durchlauf, pruefeDurchlauf, reicheSzene, REICH });

@@ -176,7 +176,7 @@ async function moveCreature(engine, pi, inst, destOwner, destHeroIdx, destSlot) 
   const sIdx = sArr.indexOf(inst.name);
   if (sIdx < 0) return false;
   if (((dps.supportZones?.[destHeroIdx] || [])[destSlot] || []).length > 0
-      && !require('./_alice-shared').canShareInto(engine, engine.kontrolleurVon(inst), destHeroIdx, destSlot, inst.name, destOwner)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
+      && !require('./_alice-shared').canShareInto(engine, engine.kontrolleurVon(inst), destHeroIdx, destSlot, inst, destOwner)) return false;   // W63a: belegt nur ok, wenn geteilt (Alice)
 
   engine._broadcastEvent('creature_zone_move', { owner: aSeite, heroIdx: sH, zoneSlot: sS });
   sArr.splice(sIdx, 1);

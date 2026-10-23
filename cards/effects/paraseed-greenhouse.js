@@ -103,7 +103,7 @@ function umzugsZiele(engine, ausserHost, inst = null) {
       // (bei der Landung wird er Kontrolleur) auch die Zone einer GLEICHNAMIGEN Paraseed — geteilte Zonen stehen vorn.
       if (inst) {
         for (let si = 0; si < 3; si++) {
-          if (!canShareInto(engine, pi, hi, si, inst.name, pi)) continue;
+          if (!canShareInto(engine, pi, hi, si, inst, pi)) continue;
           const tiefe = (ps.supportZones[hi][si] || []).length;
           ziele.unshift({
             owner: pi, heroIdx: hi, slotIdx: si, shared: true, stackDepth: tiefe,

@@ -35,6 +35,7 @@ fs.readFileSync = function (p, ...rest) {
 
 const { runGame, skeletonPlayer, mulberry32 } = require(ROOT + '/skilltest/sim');
 const { GameEngine } = require(ROOT + '/cards/effects/_engine');
+if (process.env.PP_ABBRUCH_WAECHTER) require('./abbruch-waechter.js').installieren(ROOT, process.env.PP_ABBRUCH_WAECHTER);   // W66b: Entdeckungswerkzeug (siehe lib/abbruch-waechter.js)
 const { handlers: simHandlers } = require(ROOT + '/skilltest/sim-bridge');
 const { loadCardEffect } = require(ROOT + '/cards/effects/_loader');
 const DB = require(ROOT + '/cards/effects/_card-db').getCardDB();
@@ -350,6 +351,7 @@ function attachHelpers(t) {
     else if (cd.cardType === 'Ability') { t.phase(o.phase ?? PHASES.MAIN1); call = () => host.doPlayAbility(room, seat, { cardName: name, handIndex: hand, heroIdx: hi, zoneSlot: o.zoneSlot ?? 0 }); }
     else throw new Error('play(): Kartentyp nicht unterstützt: ' + cd.cardType);
     if (sub === 'surprise') { t.phase(o.phase ?? PHASES.MAIN1); call = () => host.doPlaySurprise(room, seat, { cardName: name, handIndex: hand, heroIdx: hi }); }
+    if (typeof o.vorAufruf === 'function') o.vorAufruf();   // W66b: Schnappschuss des Spielzustands unmittelbar vor dem Spielweg (Zustandsdifferenz nach Abbruch)
     const ergebnis = await t.run(call, o);
     // Ziel-Tränke/-Artefakte: der Server öffnet `gs.potionTargeting` und wartet auf `doConfirmPotion` bzw. den Abbruch-Knopf – das löst die Harness wie die Zielwahl (t.targetFn / policy.cancelTargets) auf.
     if (!o.noAutoConfirm && gs.potionTargeting && gs.potionTargeting.ownerIdx === seat) await t.resolveTargeting(seat);

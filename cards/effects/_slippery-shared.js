@@ -94,7 +94,7 @@ function teilbarZiel(engine, inst, hi, zi) {
   if (!inst?.name) return false;
   const seite = engine.physicalSide ? engine.physicalSide(inst) : (inst.owner ?? 0);
   const ktrl = engine.kontrolleurVon ? engine.kontrolleurVon(inst) : (inst.controller ?? inst.owner);
-  return require('./_alice-shared').canShareInto(engine, ktrl, hi, zi, inst.name, seite);
+  return require('./_alice-shared').canShareInto(engine, ktrl, hi, zi, inst, seite);
 }
 
 /**
