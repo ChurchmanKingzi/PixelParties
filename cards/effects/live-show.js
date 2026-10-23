@@ -45,6 +45,8 @@ const CARD_NAME = 'Live Show';
 const SHOW_MS = 1300;            // Länge der Animation (deckt sich mit `live_show_spot` im Client)
 const SHOW_VOR_MS = 1450;        // die Animation läuft VOLLSTÄNDIG ab (Länge + 100 ms Einbau-Versatz + Puffer), bevor die Hand aufgedeckt wird (wie bei Gather Intel)
 const GEBEN_ABSTAND_MS = 320;    // zwischen den einzelnen Flügen der verschenkten Karten
+const WEG_VOR_MS = 150;          // Live Show fliegt kurz VOR der ersten verschenkten Karte in die Ablage
+const NEHMEN_VOR_MS = 120;       // zwischen „Karten gewählt“ und Abflug der genommenen Karten (die Wahl ist schon markiert)
 const UEBERSCHUSS = 2;           // Zusatzaktion: mindestens so viele Karten MEHR verschenken als nehmen
 const MINDEST_ZUSATZ = 2;        // ... also mindestens so viele weitere Karten müssen auf der Hand liegen
 
@@ -196,6 +198,15 @@ module.exports = {
         for (const i of kandidaten) { if (gewaehlt.length >= minSel) break; if (!gewaehlt.includes(i)) gewaehlt.push(i); }
       }
 
+      // Live Show verlässt JETZT die Hand in die Ablage (Bauform Shooting Star): sie fliegt, während die Karten zur Gegnerhand fliegen, und die Hand richtet sich schon so aus,
+      // als wäre sie weg — später würde sie genau im Moment des Eintreffens der genommenen Karten aus der Hand verschwinden und deren Landeplätze verschieben. Die gewählten
+      // Handplätze rücken mit (Plätze hinter der Live Show rutschen um eins).
+      const weg = await engine.aufloesenderSpellInDieAblage(pi);
+      if (weg) {
+        gewaehlt = gewaehlt.map(i => (i > weg.idx ? i - 1 : i));
+        await engine._delay(WEG_VOR_MS);       // der Client richtet die Hand neu aus, bevor die Flugquellen (Handplätze) gelten
+      }
+
       // Geben: EIN Fenster (`insert`) für das ganze Geben, die Karten fliegen dann von hinten nach vorn (stabile Indizes), je Karte mit eigenem Flug.
       let gegeben = 0;
       if (gewaehlt.length > 0 && !(await engine.checkHandInteractionReaction(oi, 'insert',
@@ -232,7 +243,7 @@ module.exports = {
         const roh = Array.isArray(wahl?.selectedIndices) ? wahl.selectedIndices : [];
         const sel = [...new Set(roh.filter(i => Number.isInteger(i) && nehmbar.includes(i)))].slice(0, obergrenze);
         if (sel.length > 0) {
-          const r = await engine.actionStealFromHand(pi, { count: sel.length, preselectedIndices: sel, sourceName: CARD_NAME });
+          const r = await engine.actionStealFromHand(pi, { count: sel.length, preselectedIndices: sel, sourceName: CARD_NAME, highlightMs: NEHMEN_VOR_MS });
           genommen = (r?.stolen || []).length;
         }
       }
