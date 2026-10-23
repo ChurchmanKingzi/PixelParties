@@ -7372,64 +7372,25 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   100% { transform: scale(2.6);  opacity: 0;   filter: brightness(1.7); }
 }
 
-/* Brackle's catapult — five-phase flying Creature card. THREE chained
-   CSS animations cover the full visual; the implicit `forwards`-filled
-   gaps between them are the HOLD (creature parked on Brackle) and
-   IMPACT (creature parked at target while the explosion plays) phases:
-     1. `brackle-catapult-load` (duration `--load-ms`) interpolates
-        source slot (--sx,--sy) → Brackle's hero zone (--mx,--my).
-        `forwards` fill parks the card on Brackle.
-     2. `brackle-catapult-fire` (duration `--fire-ms`, delay
-        `--fire-delay` = load + hold) interpolates Brackle → target
-        (--ex,--ey). `forwards` fill parks the card on the target for
-        the IMPACT phase.
-     3. `brackle-catapult-discard` (duration `--discard-ms`, delay
-        `--discard-delay` = load + hold + fire + impact) interpolates
-        target → the discard pile (--dx,--dy). The corpse's actual
-        flight to discard — replaces the diff-detector's auto-flight
-        (which is pre-suppressed client-side so it doesn't double-fire).
-   `pointer-events: none` + `z-index: 10100` match the other flying-
-   card animations (Kassaran, Colored Snow, Birthday Present). */
+/* Brackle's catapult — fliegende Creature-Karte, PIXELART. Bewegung, Phasen und Funkenspur kommen aus `BrackleCatapultCard` (app-board.jsx, Bildtakt
+   ~30/s, ganze 2-px-Schritte, keine Drehung); hier nur das Aussehen: eckig, harter Versatzschatten statt Weichzeichner, Nearest-Neighbor.
+   `pointer-events: none` + `z-index: 10100` wie die anderen fliegenden Karten (Kassaran, Colored Snow, Birthday Present). */
 .brackle-catapult-card {
   position: fixed;
   width: 64px;
   height: 90px;
   pointer-events: none;
   z-index: 10100;
-  left: var(--sx);
-  top:  var(--sy);
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .65);
-  animation:
-    brackle-catapult-load    var(--load-ms,    1100ms) cubic-bezier(.2, .65, .35, 1) forwards,
-    /* Fire phase intentionally snappy: steep cubic-bezier accelerates
-       hard off Brackle, fast tail-end, no settling — the projectile
-       just leaves. Default fire-ms matches the JS constant (300ms). */
-    brackle-catapult-fire    var(--fire-ms,    300ms)  cubic-bezier(.7, 0, .85, .35) var(--fire-delay,    1500ms) forwards,
-    /* Discard phase — the corpse curves down to the discard pile,
-       shrinking and tumbling. Slower / softer easing than fire so it
-       reads as "thrown away" rather than "second catapult". */
-    brackle-catapult-discard var(--discard-ms, 500ms)  cubic-bezier(.4, 0, .3, 1)    var(--discard-delay, 2100ms) forwards;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, .6);
 }
 .brackle-catapult-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-}
-@keyframes brackle-catapult-load {
-  0%   { left: var(--sx); top: var(--sy); transform: scale(1)    rotate(0deg); }
-  100% { left: var(--mx); top: var(--my); transform: scale(1.15) rotate(-4deg); }
-}
-@keyframes brackle-catapult-fire {
-  0%   { left: var(--mx); top: var(--my); transform: scale(1.15) rotate(-4deg); opacity: 1; }
-  20%  {                                  transform: scale(1.22) rotate(-2deg); }
-  100% { left: var(--ex); top: var(--ey); transform: scale(0.95) rotate(8deg);  opacity: 1; }
-}
-@keyframes brackle-catapult-discard {
-  0%   { left: var(--ex); top: var(--ey); transform: scale(0.95) rotate(8deg);   opacity: 1; }
-  100% { left: var(--dx); top: var(--dy); transform: scale(0.45) rotate(180deg); opacity: 0.2; }
+  image-rendering: pixelated;
 }
 
 /* Colored Snow's Potion reveal — two-phase animation. Phase 1 flies
@@ -9718,40 +9679,36 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   opacity: 0.65;
   pointer-events: none;
 }
-/* Gesperrt UND rot markiert (`t.markRed`, Config `markUnmetRed` — Brackle): das designierte Opfer. Bleibt unwaehlbar, wird aber nicht ausgegraut,
-   sondern pulsiert rot mit einem ✖ — es soll als „das wird geopfert" lesbar sein, nicht wie ein beliebiges verbotenes Ziel. */
+/* Gesperrt UND rot markiert (`t.markRed`, Config `markUnmetRed` — Brackle): das designierte Opfer. PIXELART (Als Vorgabe 23.10.): bleibt unwaehlbar, wird nicht
+   ausgegraut, sondern bekommt einen harten dreistufigen Pixelrahmen (weiss / rot / dunkelrot, KEIN Weichzeichner-Schein), der im Takt von ~4 Hz zwischen zwei
+   Rottoenen springt (`steps(1)` statt weichem Pulsieren), einen 2x2-Dither-Schleier und ein Pixel-✖ (11x11, vierfach vergroessert, `image-rendering: pixelated`). */
 .potion-target-ineligible.potion-target-marked-red {
   filter: none;
   opacity: 1;
   position: relative;
   z-index: 4;
-  border-color: #ff3b30 !important;
+  border-radius: 0 !important;
+  border-color: #3a0000 !important;
   box-shadow:
-    0 0 0 2px rgba(255,235,235,.9),
-    0 0 0 5px rgba(255,50,50,.95),
-    0 0 26px rgba(255,60,60,1),
-    0 0 52px rgba(220,0,0,.65),
-    inset 0 0 16px rgba(255,60,60,.45) !important;
-  animation: sacrificeMarkPulse 1.1s ease-in-out infinite !important;
+    0 0 0 2px #ffffff,
+    0 0 0 6px #ff3b30,
+    0 0 0 8px #3a0000 !important;
+  animation: sacrificeMarkBlink .8s steps(1, end) infinite !important;
 }
 .potion-target-ineligible.potion-target-marked-red::after {
-  content: '✖';
+  content: '';
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 34px;
-  font-weight: 700;
-  color: rgba(255,255,255,.95);
-  text-shadow: 0 0 10px rgba(255,0,0,1), 0 2px 4px rgba(0,0,0,.9);
-  background: rgba(180,0,0,.3);
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='11'%20height='11'%20shape-rendering='crispEdges'%3E%3Crect%20x='0'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='2'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='3'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='7'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='8'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='0'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='3'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='4'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='6'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='7'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='1'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='2'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='4'%20y='2'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='5'%20y='2'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='6'%20y='2'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='2'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='3'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='3'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='5'%20y='3'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='3'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='3'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='4'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='2'%20y='4'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='8'%20y='4'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='4'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='2'%20y='5'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='3'%20y='5'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='7'%20y='5'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='8'%20y='5'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='6'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='2'%20y='6'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='8'%20y='6'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='6'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='7'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='7'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='5'%20y='7'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='7'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='7'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='8'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='4'%20y='8'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='5'%20y='8'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='6'%20y='8'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='8'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='3'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='4'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='6'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='7'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='9'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='0'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='2'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='3'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='7'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='8'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='9'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='10'%20y='10'%20width='1'%20height='1'%20fill='%233a0000'/%3E%3Crect%20x='1'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='2'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='8'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='9'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='1'%20y='2'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='2'%20y='2'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='3'%20y='2'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='7'%20y='2'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='8'%20y='2'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='9'%20y='2'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='2'%20y='3'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='3'%20y='3'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='4'%20y='3'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='6'%20y='3'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='7'%20y='3'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='8'%20y='3'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='3'%20y='4'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='4'%20y='4'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='5'%20y='4'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='6'%20y='4'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='7'%20y='4'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='4'%20y='5'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='5'%20y='5'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='6'%20y='5'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='3'%20y='6'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='4'%20y='6'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='5'%20y='6'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='6'%20y='6'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='7'%20y='6'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='2'%20y='7'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='3'%20y='7'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='4'%20y='7'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='6'%20y='7'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='7'%20y='7'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='8'%20y='7'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='1'%20y='8'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='2'%20y='8'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='3'%20y='8'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='7'%20y='8'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='8'%20y='8'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='9'%20y='8'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='1'%20y='9'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='2'%20y='9'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3Crect%20x='8'%20y='9'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='9'%20y='9'%20width='1'%20height='1'%20fill='%23ffc9c9'/%3E%3C/svg%3E") center / 44px 44px no-repeat,
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='2'%20height='2'%20shape-rendering='crispEdges'%3E%3Crect%20width='1'%20height='1'%20fill='%23d01010'%20fill-opacity='.55'/%3E%3Crect%20x='1'%20y='1'%20width='1'%20height='1'%20fill='%23d01010'%20fill-opacity='.55'/%3E%3C/svg%3E") 0 0 / 4px 4px;
+  image-rendering: pixelated;
   pointer-events: none;
   z-index: 6;
 }
-@keyframes sacrificeMarkPulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(255,235,235,.9), 0 0 0 5px rgba(255,50,50,.95), 0 0 26px rgba(255,60,60,1), 0 0 52px rgba(220,0,0,.65), inset 0 0 16px rgba(255,60,60,.45); }
-  50%      { box-shadow: 0 0 0 2px rgba(255,245,245,1), 0 0 0 6px rgba(255,80,80,1), 0 0 38px rgba(255,90,90,1), 0 0 74px rgba(240,20,20,.8), inset 0 0 24px rgba(255,80,80,.65); }
+@keyframes sacrificeMarkBlink {
+  0%   { box-shadow: 0 0 0 2px #ffffff, 0 0 0 6px #ff3b30, 0 0 0 8px #3a0000; }
+  50%  { box-shadow: 0 0 0 2px #ffd0d0, 0 0 0 6px #b01010, 0 0 0 8px #3a0000; }
 }
 /* ★★ v1143b — Ziel-Akzent gruen (`t.accent === 'green'`): ein waehlbares
    Ziel mit Sonderwirkung, z.B. „Forbidden Curse of Aging" als

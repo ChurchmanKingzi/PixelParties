@@ -87,13 +87,13 @@ const MAX_DAMAGE = 300;
 // overlay — and the client-side diff-detector that would otherwise
 // animate the destroy's discard-flight from the source slot is
 // pre-suppressed so it doesn't double-up.
-const LOAD_MS    = 1100;        // Creature slot → Brackle (slow, weighty).
-const HOLD_MS    =  400;        // Creature visibly parked on Brackle.
-const FIRE_MS    =  300;        // Brackle → target (snappy release).
-const IMPACT_MS  =  300;        // Creature parked at target while the
+const LOAD_MS    =  650;        // Creature slot → Brackle (zügig, aber mit Gewicht).
+const HOLD_MS    =  200;        // Creature visibly parked on Brackle.
+const FIRE_MS    =  200;        // Brackle → target (snappy release).
+const IMPACT_MS  =  200;        // Creature parked at target while the
                                 // explosion plays — sells the hit
                                 // before the body flies to discard.
-const DISCARD_MS =  500;        // Target → discard pile.
+const DISCARD_MS =  350;        // Target → discard pile.
 
 // Damage lands ~70% through the fire phase — early enough that the
 // impact reads as "the catapulted Creature hit the target" before
