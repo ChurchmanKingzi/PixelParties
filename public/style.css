@@ -26412,7 +26412,7 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
   --g-hell: #f7f7ad; --g-1: #fad54a; --g-2: #f29a3e; --g-3: #ee6428; --g-kontur: #b62600;
   color: var(--g-1);
   background:
-    linear-gradient(105deg, transparent 0 40%, #ffffff 40% 50%, transparent 50% 100%) 100% 0 / 300% 100% no-repeat,
+    linear-gradient(105deg, transparent 0 42%, #ffffff 42% 46%, #f7f7ad 46% 48%, transparent 48% 100%) 100% 0 / 300% 100% no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3C/svg%3E") 0 30% / 4px 2px repeat-x,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3C/svg%3E") 0 76% / 4px 2px repeat-x,
     linear-gradient(180deg, var(--g-hell) 0 28%, var(--g-1) 28% 52%, var(--g-2) 52% 76%, var(--g-3) 76%);
@@ -26471,3 +26471,19 @@ input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outlin
 
 .pz-gold-feld > .pz-gold-zahl { font-size: 26px; flex-shrink: 1; }
 @media (max-height: 600px) { .pz-gold-feld > .pz-gold-zahl, .pz-gold-feld input { font-size: 18px; } }
+
+/* Schiller auf der Gold-Münze: dasselbe Lichtband wie auf den Gold-Zahlen (gleiche Dauer und Stufung → läuft im Gleichtakt), nur auf den Pixeln der Münze */
+.game-gold-icon { position: relative; }
+.game-gold-icon::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 0 42%, #ffffff 42% 46%, #f7f7ad 46% 48%, transparent 48% 100%) 100% 0 / 300% 100% no-repeat;
+  -webkit-mask: url('/gold-muenze.png') center / 100% 100% no-repeat; mask: url('/gold-muenze.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  animation: ppGoldSchillerIcon 3.6s steps(18) infinite;
+}
+@keyframes ppGoldSchillerIcon {
+  0%   { background-position: 100% 0; }
+  32%  { background-position: 0% 0; }
+  100% { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) { .game-gold-icon::after { animation: none; } }
