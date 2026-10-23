@@ -10545,6 +10545,20 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   box-shadow: 0 0 0 7px #c68206;
   filter: brightness(1.2);
 }
+/* Dasselbe für die Hover-Markierung: die gehoverte Gegnerkarte einer vollen Hand zeigt sich als GANZE Karte (Bild in Kartenbreite, Rahmen am Bild), nicht als schmaler Ausschnitt. */
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card:hover {
+  overflow: visible !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card:hover > img {
+  width: var(--hand-card-w) !important;
+  max-width: none !important;
+  height: 100% !important;
+  object-fit: cover;
+  outline: 3px solid var(--player-color);
+  outline-offset: 0;
+}
 @keyframes pickStarkBlink {
   0%, 49%  { outline-color: #ba74ff; }
   50%, 100% { outline-color: #f1e5fa; }
