@@ -28164,6 +28164,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         title: opts.title || 'Steal Cards',
         description: opts.description || defaultDesc,
         maxSelect: effectiveCount,
+        // 23.10. (Secret Entrance, „up to 1/2/3"): Untergrenze der blinden Wahl; ohne Angabe müssen es genau `maxSelect` sein (Loot the Leftovers).
+        ...(Number.isInteger(opts.minSelect) ? { minSelect: Math.min(opts.minSelect, effectiveCount) } : {}),
         confirmLabel: opts.confirmLabel || '🫳 Steal!',
         oppHandCount: (oppPs.hand || []).length,
         blockedIndices: oppGesperrt,
@@ -28729,6 +28731,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromOwner: fromPi, toOwner: toPi, cardName,
       from: 'hand', to: 'hand',
       fromHandIdx: handIdx, toHandIdx,
+      // `opts.finalHandSize` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand — jede wird gegen die Endgröße der Hand projiziert.
+      ...(opts.finalHandSize ? { finalHandSize: opts.finalHandSize, zielLayout: true } : null),
     });
 
     await this.runHooks(HOOKS.ON_CARD_TRANSFERRED_TO_OPP_HAND, {

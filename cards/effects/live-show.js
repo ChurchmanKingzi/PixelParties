@@ -44,7 +44,7 @@
 const CARD_NAME = 'Live Show';
 const SHOW_MS = 1300;            // Länge der Animation (deckt sich mit `live_show_spot` im Client)
 const SHOW_VOR_MS = 1450;        // die Animation läuft VOLLSTÄNDIG ab (Länge + 100 ms Einbau-Versatz + Puffer), bevor die Hand aufgedeckt wird (wie bei Gather Intel)
-const GEBEN_ABSTAND_MS = 160;    // zwischen den einzelnen Flügen der verschenkten Karten
+const GEBEN_ABSTAND_MS = 320;    // zwischen den einzelnen Flügen der verschenkten Karten
 const UEBERSCHUSS = 2;           // Zusatzaktion: mindestens so viele Karten MEHR verschenken als nehmen
 const MINDEST_ZUSATZ = 2;        // ... also mindestens so viele weitere Karten müssen auf der Hand liegen
 
@@ -183,6 +183,7 @@ module.exports = {
             ? `Choose at least ${minSel} card${minSel === 1 ? '' : 's'} from your hand to add to ${ops.username}'s hand. You may then take up to that many minus ${UEBERSCHUSS} cards from theirs.`
             : `Choose any number of cards from your hand to add to ${ops.username}'s hand. You may then take up to that many cards from theirs.`,
           eligibleIndices: kandidaten,
+          highlightStyle: 'strong',       // deutliche Hervorhebung der wählbaren/gewählten Karten (Client: `hand-pick-stark`)
           minSelect: minSel,
           maxSelect: kandidaten.length,
           confirmLabel: '🎭 Give!',
@@ -199,8 +200,10 @@ module.exports = {
       let gegeben = 0;
       if (gewaehlt.length > 0 && !(await engine.checkHandInteractionReaction(oi, 'insert',
             { byPi: pi, count: gewaehlt.length, sourceName: CARD_NAME }))) {
+        // Jede Karte fliegt an IHREN neuen Platz am Ende der Gegnerhand: der Flug rechnet gegen die Endgröße, nicht gegen die Hand im Moment des Abflugs.
+        const endgroesse = (ops.hand || []).length + gewaehlt.length;
         for (const idx of [...gewaehlt].sort((a, b) => b - a)) {
-          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true })) gegeben++;
+          if (await engine.actionTransferCardToOppHand(pi, idx, { source: CARD_NAME, windowChecked: true, finalHandSize: endgroesse })) gegeben++;
           if (gegeben < gewaehlt.length) await engine._delay(GEBEN_ABSTAND_MS);
         }
       }
@@ -220,6 +223,7 @@ module.exports = {
           maxSelect: obergrenze,
           minSelect: 0,
           eligibleIndices: nehmbar,
+          highlightStyle: 'strong',       // wählbare/gewählte Karten deutlich markiert (Client: `blind-pick-stark`), die verschenkten liegen ausgegraut daneben
           confirmLabel: '🫳 Take!',
           oppHandCount: (ops.hand || []).length,
           // pflichtwahl: das Geben ist schon geschehen; 0 gewählte Karten (Bestätigen ohne Auswahl) sind erlaubt

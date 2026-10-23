@@ -27959,6 +27959,78 @@ const ANIM_REGISTRY = {
     return ppSalve(malen, ENDE + 40, vorbereiten, { extra: 40 });
   })(),
   // ═══════════════════════════════════════════════════════════════════
+  //  See through the Ruse (23.10.) — PIXELART, Brett-Animation auf JEDER aufgedeckten Surprise (`targets`: Surprise Zone oder Support Zone)
+  //
+  //  Ein Auge oeffnet sich ueber der Zone (weisser Augapfel, goldene Iris, dunkle Pupille, rote Lider mit Wimpern), die Iris tastet von links nach rechts; zugleich
+  //  faehrt eine weisse Abtastzeile mit goldenem Schweif von oben nach unten ueber die verdeckte Karte (rotes Dither-Glas, das sie hinter sich lichtet). Zum Schluss
+  //  schliesst sich das Auge, ein Kreuzfunkel bleibt. Die Karten selbst bleiben verdeckt liegen — nur der Zustandsversand zeigt sie nun dem Wirker.
+  // ═══════════════════════════════════════════════════════════════════
+  ruse_peek: (() => {
+    const ROT = ['#f0bfbc', '#e94e53', '#b21a29', '#710122'].map(ppHex);
+    const GOLD = ['#f7f7ad', '#fad54a', '#f29a3e'].map(ppHex);
+    const WEISS = ppHex('#ffffff');
+    const ENDE = 1100, AUF = 220, ZU = 800, FADE_AB = 960;
+    const klemme = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const AUGE_B = 7;                                   // halbe Breite des Auges (Rasterpixel)
+    const malen = (g, t, sz) => {
+      const aus = t > FADE_AB ? Math.max(0, 1 - (t - FADE_AB) / (ENDE - FADE_AB)) : 1;
+      if (aus <= 0) return;
+      sz.ziele.forEach((z, zi) => {
+        const CX = Math.round(z.x), CY = Math.round(z.y);
+        const hw = Math.floor(z.w / 2), hh = Math.floor(z.h / 2);
+        // Lidoeffnung: 0 → 1 (oeffnen), 1 → 0 (schliessen)
+        const off = t < AUF ? klemme(t / AUF, 0, 1) : (t > ZU ? klemme(1 - (t - ZU) / 140, 0, 1) : 1);
+        // ── Abtastzeile mit rotem Dither-Glas dahinter ──
+        const T0 = 260, T1 = 760;
+        if (t > T0 && t < ZU + 60) {
+          const k = klemme((t - T0) / (T1 - T0), 0, 1);
+          const zeile = -hh + Math.round(k * 2 * hh);
+          for (let y = -hh; y <= hh; y++) for (let x = -hw; x <= hw; x++) {
+            if (y > zeile && ppBayer(CX + x, CY + y) < 0.28) g.put(CX + x, CY + y, ROT[1], 0.9);
+          }
+          if (k < 1) {
+            for (let x = -hw; x <= hw; x++) {
+              g.put(CX + x, CY + zeile, WEISS, aus);
+              g.put(CX + x, CY + zeile - 1, GOLD[0], aus * 0.85);
+              g.put(CX + x, CY + zeile - 2, GOLD[1], aus * 0.55);
+              g.put(CX + x, CY + zeile - 3, GOLD[2], aus * 0.3);
+            }
+          }
+        }
+        // ── das Auge ──
+        if (off > 0) {
+          const hoehe = 3.4 * off;
+          const irisX = Math.round(Math.sin(klemme((t - 240) / 520, 0, 1) * Math.PI * 2 - Math.PI / 2) * 3.2);
+          for (let x = -AUGE_B; x <= AUGE_B; x++) {
+            const f = Math.sqrt(Math.max(0, 1 - (x * x) / ((AUGE_B + 0.5) * (AUGE_B + 0.5))));
+            const h = Math.round(hoehe * f);
+            if (h <= 0) { g.put(CX + x, CY, ROT[3], aus); continue; }
+            for (let y = -h; y <= h; y++) g.put(CX + x, CY + y, WEISS, aus);
+            g.put(CX + x, CY - h - 1, ROT[2], aus);
+            g.put(CX + x, CY + h + 1, ROT[2], aus);
+            if (Math.abs(x) % 3 === 0 && off > 0.8) g.put(CX + x, CY - h - 2, ROT[3], aus);         // Wimpern
+          }
+          const ir = off > 0.5 ? 2 : 1;
+          for (let j = -ir; j <= ir; j++) for (let i = -ir; i <= ir; i++) {
+            if (i * i + j * j <= ir * ir + 1) g.put(CX + irisX + i, CY + j, GOLD[1], aus);
+          }
+          g.put(CX + irisX, CY, ROT[3], aus);
+          g.put(CX + irisX - 1, CY - 1, WEISS, aus);
+        }
+        // ── Kreuzfunkel beim Schliessen ──
+        if (t > ZU - 40 && t < ZU + 240) {
+          const k = (t - (ZU - 40)) / 280, arm = Math.max(1, Math.round((1 - Math.abs(k - 0.4) / 0.6) * 5));
+          for (let i = 1; i <= arm; i++) {
+            g.put(CX + AUGE_B + 3 + i, CY, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3 - i, CY, i === arm ? GOLD[2] : GOLD[0], aus);
+            g.put(CX + AUGE_B + 3, CY - i, i === arm ? GOLD[2] : GOLD[0], aus); g.put(CX + AUGE_B + 3, CY + i, i === arm ? GOLD[2] : GOLD[0], aus);
+          }
+          g.put(CX + AUGE_B + 3, CY, WEISS, aus);
+        }
+      });
+    };
+    return ppSalve(malen, ENDE + 40, null, { extra: 24 });
+  })(),
+  // ═══════════════════════════════════════════════════════════════════
   //  Amazing Finding (11.10.) — PIXELART, Brett-Animation auf dem DECK des Spielers (`originDeck`, Ziel `{ deck: true }`)
   //
   //  Ein weisses Fragezeichen (violette Kontur) steigt ueber dem Deck auf und pulsiert, bei ~520 ms platzt es in einen achtstrahligen Funkelstern; rosa und
@@ -43460,7 +43532,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown, sfx, landSfx }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, zielLayout, flightStyle, faceDown, sfx, landSfx }) => {
       // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
       // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
       // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
@@ -43641,7 +43713,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const specific =
               document.querySelector(`${base} .hand-slot[data-hand-idx="${extras.handIdx}"]`) ||
               document.querySelector(`${base} [data-hand-idx="${extras.handIdx}"]`);
-            if (specific) return specific;
+            // `zielLayout` (Live Show): mehrere Karten fliegen nacheinander in dieselbe Hand, jede Landung verschiebt die zentrierte Reihe. Der Aufrufer nennt
+            // deshalb die ENDGRÖSSE, und auch ein schon vorhandener Platz wird gegen das Endlayout gerechnet statt gegen die Momentaufnahme.
+            if (specific && !(extras.zielLayout && extras.finalHandSize)) return specific;
             // Slot doesn't exist yet — the broadcast fires before the
             // state mutation, so the new slot won't render until the
             // next sync. Project a synthetic rect for where the new
@@ -43665,6 +43739,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Handplatz ohnehin unverändert den seinen).
               const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
                 || slots[slots.length - 1].getBoundingClientRect();
+              const firstRect = window.handFanCardBox?.(slots[0]) || slots[0].getBoundingClientRect();
               const cardW = lastRect.width;
               const oldCount = slots.length;
               // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1`
@@ -43680,11 +43755,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const finalCount = extras.finalHandSize
                 ? Math.max(extras.finalHandSize, extras.handIdx + 1)
                 : Math.max(extras.handIdx + 1, oldCount + 1);
-              // Old hand spans [C - oldCount*cardW/2, C + oldCount*cardW/2];
-              // the old last slot's right edge gives the centre C. The
-              // final slot `handIdx` then sits at the centred offset.
-              const C = (lastRect.left + lastRect.width) - (oldCount * cardW) / 2;
-              const projLeft = C - (finalCount * cardW) / 2 + extras.handIdx * cardW;
+              // Die Reihe ist zentriert: ihre Mitte liegt zwischen linker Kante des ersten und rechter Kante des letzten Platzes. Der Abstand von Platz zu Platz ist
+              // die Flex-Basis, solange die Hand hineinpasst — ab dann schrumpfen die Plätze gleichmäßig (`.game-hand-cards .hand-slot`, `min-width`), der letzte behält
+              // die volle Kartenbreite. Mit fester Kartenbreite als Abstand landete jede Karte einer vollen Hand weit rechts außerhalb der Reihe.
+              const C = (firstRect.left + lastRect.left + lastRect.width) / 2;
+              const reihe = slots[0].parentElement;
+              const cs0 = window.getComputedStyle(slots[0]);
+              // CSS-Maße sind Layout-Einheiten, die Rechtecke Bildschirmeinheiten (`zoom`): der Faktor gleicht beides an.
+              const faktor = reihe && reihe.offsetWidth ? reihe.getBoundingClientRect().width / reihe.offsetWidth : 1;
+              const basis = parseFloat(cs0.flexBasis) * faktor;
+              const minW = (parseFloat(cs0.minWidth) || 0) * faktor;
+              const jetztSchritt = oldCount > 1 ? (lastRect.left - firstRect.left) / (oldCount - 1) : cardW;
+              const grundSchritt = basis > 0 ? basis : Math.max(jetztSchritt, cardW * 0.906);
+              let schritt = grundSchritt;
+              if (reihe && finalCount > 1) {
+                const rcs = window.getComputedStyle(reihe);
+                const innen = (reihe.clientWidth - (parseFloat(rcs.paddingLeft) || 0) - (parseFloat(rcs.paddingRight) || 0)) * faktor;
+                if (innen > cardW) schritt = Math.min(grundSchritt, Math.max(minW, (innen - cardW) / (finalCount - 1)));
+              }
+              const spanne = (finalCount - 1) * schritt + cardW;
+              const projLeft = C - spanne / 2 + extras.handIdx * schritt;
               const projected = {
                 left:  projLeft,
                 top:   lastRect.top,
@@ -43737,7 +43827,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
-      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
+      const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, zielLayout, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
 
       // Hide the landing hand slot until the flying card arrives so both
@@ -52290,6 +52380,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     + (isPermaRevealed ? ' hand-card-perma-revealed' : '')
                     + (isTreacherousClickable ? ' hand-card-treacherous-click' : '')
                     + (isSelected ? ' blind-pick-selected' : '')
+                    + (isBlindPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' blind-pick-stark' : '')
                     + (isBlindPick && !isSelected && !isFull ? ' blind-pick-eligible' : '')
                     + (isFull ? ' hand-card-dimmed' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
@@ -53459,7 +53550,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPick && gameState.effectPrompt.highlightStyle === 'strong' ? ' hand-pick-stark' + (!isHandPickEligible ? ' hand-card-dimmed' : '') : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + ((spellHeroPick && item.origIdx !== spellHeroPick.handIndex) ? ' hand-card-dimmed' : '') + ((crossSidePlayPick && item.origIdx !== crossSidePlayPick.handIndex) ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={{
                       // ★ v1233: Der Faecher haengt am PLATZ, nicht an
                       // der Karte — siehe „HANDFAECHER" in style.css.
