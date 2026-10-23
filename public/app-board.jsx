@@ -33839,7 +33839,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     // v1261: dasselbe fuer den gegnerischen Loeschstapel (Pollution & Co.).
     if (deletedGrew && window.playSFX) {
-      const addedCount = newDeletedLen - prevDeletedLen;
+      let addedCount = newDeletedLen - prevDeletedLen;
+      const vorgemerkt = Math.min(addedCount, pileSoundSuppressRef.current.oppDeleted || 0);   // Deck→Loeschstapel-Flug (klang beim Abflug)
+      pileSoundSuppressRef.current.oppDeleted = (pileSoundSuppressRef.current.oppDeleted || 0) - vorgemerkt;
+      addedCount -= vorgemerkt;
       for (let k = 0; k < addedCount; k++) {
         setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
       }
@@ -46355,16 +46358,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         cardName, startX, startY, endX, endY, dest: 'deleted',
         delay: i * 150,
       }));
+      // Der Abflug-Klang (unten) ersetzt den Wachstums-Klang des Loeschstapels:
+      // je Karte einen Klang vormerken, den der Stapel-Zuwachs beim Landen schluckt.
+      const _sk = owner === myIdx ? 'deleted' : 'oppDeleted';
+      pileSoundSuppressRef.current[_sk] = (pileSoundSuppressRef.current[_sk] || 0) + newAnims.length;
+      for (const anim of newAnims) {
+        setTimeout(() => {
+          pileSoundSuppressRef.current[_sk] = Math.max(0, (pileSoundSuppressRef.current[_sk] || 1) - 1);
+        }, anim.delay + 2500);
+      }
       // Stagger the animations
       for (const anim of newAnims) {
         setTimeout(() => {
           setDiscardAnims(prev => [...prev, (anim.t0 == null ? { ...anim, t0: ppJetzt() } : anim)]);
-          // KEIN Klang hier. v337 hatte an dieser Stelle je Karte einen
-          // Abwurf-Klang gesetzt (Trade war stumm); seit v1261 klingt aber
-          // schon das WACHSTUM des Loeschstapels (je Karte beim Landen,
-          // die Engine bucht sie im Takt ihres Fluges ein). Beides zusammen
-          // spielte Trade mit 5 Karten als 7-8 Klaenge ab. Der Landeklang
-          // deckt JEDEN Sender von `deck_to_deleted` ab (auch Nerdy Cheese).
+          // v337 (Als Befund): der Flug in den Deleted Pile war stumm —
+          // Trade schickte fuenf Karten lautlos weg. Derselbe Klang wie
+          // beim Abwurf, je Karte und im Moment, in dem sie das Deck
+          // VERLAESST (Als Vorgabe); ein eigener Delete-Klang existiert
+          // nicht. Gilt fuer JEDEN Sender von `deck_to_deleted`, also auch
+          // Nerdy Cheese. Das Wachstum des Loeschstapels klingt nicht noch
+          // einmal: dessen Klaenge sind oben vorgemerkt (sonst 7-8 statt 5).
+          if (window.playSFX) window.playSFX('discard', { dedupe: 40 });
           setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
         }, anim.delay);
       }
