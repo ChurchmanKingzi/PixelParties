@@ -66,6 +66,7 @@ HERO_TITLES = {
     'monia': ('Cool Rescuer Monia', 'Jetpack Grin'),
     'elana': ('Elana, the Rocky Rebel', 'Loud for You'),
     'mary': ('Cute Princess Mary', 'Sovereign Skies'),
+    'key': ('Key, the Cursed Thief', 'Wrong Place, Wrong Curse'),
 }
 
 # Skill Test (bis zu 8 Spieler, zufällige Layouts): fünf gleichwertige Kampfmusiken `bgm_skilltest1…5.ogg`,
