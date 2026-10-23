@@ -136,10 +136,6 @@
    "kern": false
   },
   {
-   "hex": "#e63e33",
-   "kern": false
-  },
-  {
    "hex": "#f03232",
    "kern": true
   },
@@ -204,7 +200,15 @@
    "kern": false
   },
   {
+   "hex": "#bd440f",
+   "kern": false
+  },
+  {
    "hex": "#b06746",
+   "kern": true
+  },
+  {
+   "hex": "#ee6428",
    "kern": true
   },
   {
@@ -312,6 +316,10 @@
    "kern": true
   },
   {
+   "hex": "#f29a3e",
+   "kern": true
+  },
+  {
    "hex": "#ff9b3a",
    "kern": true
   },
@@ -352,15 +360,11 @@
    "kern": true
   },
   {
-   "hex": "#cc8e00",
+   "hex": "#c68206",
    "kern": false
   },
   {
    "hex": "#c79e05",
-   "kern": false
-  },
-  {
-   "hex": "#c68206",
    "kern": false
   },
   {
@@ -849,10 +853,6 @@
   },
   {
    "hex": "#6e00cc",
-   "kern": false
-  },
-  {
-   "hex": "#663597",
    "kern": false
   },
   {

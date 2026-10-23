@@ -881,7 +881,7 @@ const PP_PX_ABZEICHEN_SPRITES = {
     'KNSWKSSWKSNKKRDK', 'KNSKKSSKKSNK.KDK', 'KNTTTTTTTTNK..KK', 'KHNNNNNNNNNK....',
     'KHNNNNNNNNNK....', '.KNNNNNNNNK.....', '.KKNNNNNNKK.....', '...KKKKKK.......',
   ] },
-  haende: { pal: { K: '#141414', B: '#4580f6', N: '#02398c', R: '#e63e33', D: '#8b0d0d', S: '#e0c085', T: '#ca874e', L: '#f7e0b5' }, z: [
+  haende: { pal: { K: '#141414', B: '#4580f6', N: '#02398c', R: '#e92f38', D: '#8b0d0d', S: '#e0c085', T: '#ca874e', L: '#f7e0b5' }, z: [
     '................', '................', '.....KKK........', '....KLLSK.KKKKKK',
     'KKKKLSSSKKLLLRRK', 'KBBBSSSKLLSSSRRK', 'KBBBSSKSSSSSTRRK', 'KBBBSKKKKKKSTRRK',
     'KNNNKLLLLLTKTDDK', 'KNNNKSSSSSTKTDDK', 'KNNNKKKKKKKSTKKK', 'KKKKKLLLLLTTK...',
@@ -4312,7 +4312,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && wi
 
 // Handle session superseded by another tab
 socket.on('superseded', ({ reason }) => {
-  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#e63e33">⚠️ Session Taken Over</h2><p style="color:#a8a8a8;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4580f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#e92f38">⚠️ Session Taken Over</h2><p style="color:#a8a8a8;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4580f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
 });
 
 // ===== CARD DB =====
