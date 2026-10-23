@@ -10582,7 +10582,7 @@
     "hp": 200,
     "atk": null,
     "cost": null,
-    "effect": "Reveal this card while it is in your hand. Whenever you play a Reaction Attack or Spell, reduce this card's level in your hand by 1. When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to 50 times the combined number of Demon Counters on all cards on the board to it.",
+    "effect": "Reveal this card while it is in your hand. Whenever you play a Reaction Attack, Spell or Creature, reduce this card's level in your hand by 1. When you summon this Creature, place a Demon Counter on all Creatures you control. You may once per turn choose a target and deal damage equal to 50 times the combined number of Demon Counters on all cards on the board to it.",
     "archetype": "",
     "setID": "PP MSHW",
     "banned": "",

@@ -2567,6 +2567,29 @@ class GameEngine {
   }
 
   /**
+   * 23.10. (Great Vanguard Demon, Al: „Das Revealen passiert immer, wenn die Karte auf die Hand kommt, egal wie und von wo"): Skript-Flag `revealAlwaysInHand: true`.
+   * `revealOnEnterHand` stempelt nur an den kanonischen Zugangswegen (Ziehen, Suchen, Transfer); wer die Hand direkt beschreibt (`ps.hand.push`, Puzzle-Aufbau, Wiedereinsetzen
+   * eines Handarrays), umging die Aufdeckung. Dieser Abgleich (in `sync`, vor jedem Zustandsversand) deckt JEDE Handkopie eines so gekennzeichneten Skripts auf, die es noch
+   * nicht ist — die Marke ist ein Handindex-Feld und fällt mit der Kopie aus der Hand.
+   */
+  _aufdeckenInHandAbgleichen() {
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
+      const ps = this.gs.players[pi];
+      const hand = ps?.hand;
+      if (!hand || hand.length === 0) continue;
+      for (let i = 0; i < hand.length; i++) {
+        const name = hand[i];
+        if (!name || ps._permanentlyRevealedHandIndices?.[i]) continue;
+        let script = null;
+        try { script = loadCardEffect(name); } catch { continue; }
+        if (!script?.revealAlwaysInHand) continue;
+        if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
+        ps._permanentlyRevealedHandIndices[i] = true;
+      }
+    }
+  }
+
+  /**
    * Thin shim: the full Weakening Crystal hand-passive lives in
    * `_crystals-shared.js`. Called from `sync()` so every state push
    * is consistent.
@@ -55003,6 +55026,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     this._atkAurenAbgleichen();   // W58a: Rioting Village & Co. gelten fuer ALLE Helden (lebend, tot, frisch eingesetzt, aus der Abwesenheit zurueck)
     this._dynamischeAtkNachrechnen();   // W58a: Core/Gun folgen dem Ist-Zustand der Ablage (auch nach dem Todes-Aufraeumen und Direktzugriffen auf die Ablage)
     this._refreshAscensionReadiness();
+    this._aufdeckenInHandAbgleichen();   // 23.10.: `revealAlwaysInHand` (Great Vanguard Demon) — aufgedeckt, sobald und solange die Karte auf der Hand liegt, egal wie sie dorthin kam
     // W18a (S01-04): die Sperre von Divine Gift of Skill hängt an der Magic-Arts-Stufe des NUTZERS (nicht des gesperrten Helden) und kann
     // sich ändern, ohne dass der gesperrte Held etwas tut (Nutzer legt Magic Arts an) — die Anzeigemarke bei jedem Abgleich nachziehen.
     for (const _bps of (this.gs.players || [])) {
