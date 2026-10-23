@@ -28,7 +28,8 @@ function startServer() {
 }
 
 // ── laeuft IM BROWSER ────────────────────────────────────────────────────────────────────────────────────────
-function imBrowser(zeichen) {
+function imBrowser(zeichen, opt) {
+  opt = opt || {};
   const NF = 16, NS = 14;                     // Raster: farbige Emojis / einfarbige Symbole
   const SCHRIFT = '"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji","DejaVu Sans",sans-serif';
   const hex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
@@ -49,6 +50,10 @@ function imBrowser(zeichen) {
     return x.getImageData(0, 0, GR, GR);
   };
   const tofu = rendern('\u{10FFFF}').data;
+  const tofu2 = rendern('\u{1FAFF}').data;
+  // Ein unbekanntes Emoji zeichnet die Schrift als Kaestchen MIT dem Codepunkt darin: gleicher Umriss (Umschlagrechteck) und fast gleiche Pixelzahl, aber nicht pixelgleich.
+  const kaesten = (() => { const b = (dd) => { let x0 = GR, y0 = GR, x1 = -1, y1 = -1, n = 0; for (let y = 0; y < GR; y++) for (let x = 0; x < GR; x++) if (dd[(y * GR + x) * 4 + 3] > 40) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return { x0, y0, x1, y1, n }; }; return b(tofu2); })();
+  const istKaestchen = (dd) => { let x0 = GR, y0 = GR, x1 = -1, y1 = -1, n = 0; for (let y = 0; y < GR; y++) for (let x = 0; x < GR; x++) if (dd[(y * GR + x) * 4 + 3] > 40) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x0 === kaesten.x0 && y0 === kaesten.y0 && x1 === kaesten.x1 && y1 === kaesten.y1 && Math.abs(n - kaesten.n) < 400; };          // noch nicht vergebener Emoji-Codepunkt: so sieht ein UNBEKANNTES Emoji dieser Schrift aus (Kaestchen)
   const gleich = (a, b) => { for (let i = 3; i < a.length; i += 4) if ((a[i] > 128) !== (b[i] > 128)) return false; return true; };
   const hatFarbe = (d) => { for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2])) > 30) return true; return false; };
   const bbox = (d) => {
@@ -56,24 +61,31 @@ function imBrowser(zeichen) {
     for (let y = 0; y < GR; y++) for (let x = 0; x < GR; x++) if (d[(y * GR + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     return x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 };
   };
+  // Median-Cut ueber EINDEUTIGE Farben (auf 4 Bit je Kanal gerundet), gewichtet mit der WURZEL der Haeufigkeit: grosse Flaechen (Gesicht) schlucken nicht die ganze Palette,
+  // kleine, kontrastreiche Merkmale (Augen, Mund) bekommen eine eigene Farbe.
   const medianCut = (farben, k) => {
-    let kisten = [farben.slice()];
+    const m = new Map();
+    for (const c of farben) { const q = c.map(v => Math.round(v / 17) * 17); const key = q.join(','); const e = m.get(key) || { c: q, n: 0 }; e.n++; m.set(key, e); }
+    const punkte = [...m.values()].map(e => ({ c: e.c, w: Math.sqrt(e.n) }));
+    let kisten = [punkte];
+    const bereich = (kk) => { let best = 0, kan = 0; for (let ch = 0; ch < 3; ch++) { const v = kk.map(p => p.c[ch]); const sp = Math.max(...v) - Math.min(...v); if (sp > best) { best = sp; kan = ch; } } return { best, kan }; };
     while (kisten.length < k) {
       let bi = -1, bs = 0;
-      kisten.forEach((kk, i) => { if (kk.length < 2) return; for (let ch = 0; ch < 3; ch++) { const v = kk.map(c => c[ch]); const sp = Math.max(...v) - Math.min(...v); if (sp * kk.length > bs) { bs = sp * kk.length; bi = i; } } });
+      kisten.forEach((kk, i) => { if (kk.length < 2) return; const r = bereich(kk); const sc = r.best * kk.reduce((s, p) => s + p.w, 0); if (sc > bs) { bs = sc; bi = i; } });
       if (bi < 0) break;
-      const kk = kisten[bi]; let kanal = 0, bsp = -1;
-      for (let ch = 0; ch < 3; ch++) { const v = kk.map(c => c[ch]); const sp = Math.max(...v) - Math.min(...v); if (sp > bsp) { bsp = sp; kanal = ch; } }
-      kk.sort((a, b) => a[kanal] - b[kanal]);
-      const m = kk.length >> 1; kisten.splice(bi, 1, kk.slice(0, m), kk.slice(m));
+      const kk = kisten[bi]; const { kan } = bereich(kk);
+      kk.sort((a, b) => a.c[kan] - b.c[kan]);
+      const total = kk.reduce((s, p) => s + p.w, 0); let acc = 0, cut = 1;
+      for (let i = 0; i < kk.length; i++) { acc += kk[i].w; if (acc >= total / 2) { cut = Math.max(1, Math.min(kk.length - 1, i + 1)); break; } }
+      kisten.splice(bi, 1, kk.slice(0, cut), kk.slice(cut));
     }
-    return kisten.map(kk => [0, 1, 2].map(ch => kk.reduce((s, c) => s + c[ch], 0) / kk.length));
+    return kisten.map(kk => { const tw = kk.reduce((s, p) => s + p.w, 0); return [0, 1, 2].map(ch => kk.reduce((s, p) => s + p.c[ch] * p.w, 0) / tw); });
   };
   const buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const ergebnis = {};
   const protokoll = { sprite: [], farbe: [], mono: [], leer: [] };
   for (const z of zeichen) {
-    const sp = spriteFuer(z);
+    const sp = opt.ohneSprites ? null : spriteFuer(z);
     const alsSprite = () => {
       ergebnis[z] = sp.mono ? { mono: true, z: sp.z.map(r => r.replace(/\+/g, '#').replace(/[^#]/g, '.')) } : { pal: sp.pal, z: sp.z.slice() };
       protokoll.sprite.push(z);
@@ -83,7 +95,14 @@ function imBrowser(zeichen) {
     if (sp && sp.mono) { alsSprite(); continue; }
     const roh = rendern(z);
     const d = roh.data;
-    if (gleich(d, tofu) || !bbox(d)) { if (sp) alsSprite(); else protokoll.leer.push(z); continue; }
+    if (gleich(d, tofu) || istKaestchen(d) || !bbox(d)) { if (sp) alsSprite(); else protokoll.leer.push(z); continue; }
+    if (opt.folgen && [...z.replace(/\uFE0F/g, '')].length > 1) {                                   // Folgen (Hautfarben, ZWJ, Flaggen): zeichnet die Schrift die Bestandteile NEBENEINANDER, kennt sie die Folge nicht
+      const b0 = bbox(d); const ratio = (b0.x1 - b0.x0) / (b0.y1 - b0.y0);
+      // Hautfarben-Folgen breiter Emojis (👐 🕴) sind schon allein breit: gegen die Grundfigur vergleichen statt gegen eine feste Grenze
+      let grenze = 1.75;
+      if (/[\u{1F3FB}-\u{1F3FF}]/u.test(z) && !z.includes('\u200D')) { const bd = rendern([...z][0]).data; const bb0 = bbox(bd); if (bb0) grenze = Math.max(grenze, 1.3 * (bb0.x1 - bb0.x0) / (bb0.y1 - bb0.y0)); }
+      if (ratio > grenze || ratio < 0.4) { protokoll.leer.push(z); continue; }
+    }
     const bunt = hatFarbe(d) || /️/.test(z) || /^\p{Emoji_Presentation}/u.test(z);
     if (sp && !bunt) { alsSprite(); continue; }
     const bb = bbox(d);
@@ -101,12 +120,24 @@ function imBrowser(zeichen) {
     const zellen = [];
     for (let cy = 0; cy < N; cy++) for (let cx = 0; cx < N; cx++) {
       const sx0 = (cx - ox) / f, sx1 = (cx + 1 - ox) / f, sy0 = (cy - oy) / f, sy1 = (cy + 1 - oy) / f;
-      let a = 0, r = 0, g = 0, b = 0, n = 0;
+      let a = 0, r = 0, g = 0, b = 0, n = 0; const px = [];
       for (let y = Math.max(0, Math.floor(sy0)); y < Math.min(GR, Math.ceil(sy1)); y++) for (let x = Math.max(0, Math.floor(sx0)); x < Math.min(GR, Math.ceil(sx1)); x++) {
         const i = (y * GR + x) * 4; const al = d[i + 3] / 255; a += al; r += d[i] * al; g += d[i + 1] * al; b += d[i + 2] * al; n++;
+        if (d[i + 3] > 200) px.push([d[i], d[i + 1], d[i + 2]]);
       }
       const dk = n ? a / n : 0;
-      zellen.push({ cx, cy, dk, farbe: a > 0 ? [r / a, g / a, b / a] : [0, 0, 0] });
+      let farbe = a > 0 ? [r / a, g / a, b / a] : [0, 0, 0];
+      // MERKMAL STATT MITTELWERT: steckt in der Zelle ein deutlich anderer Farbanteil (Auge, Mund, Muster) von mindestens ~22 %, bekommt die Zelle DEREN Farbe —
+      // der Mittelwert wuerde sie zu einem matten Zwischenton verwaschen und das Merkmal ginge bei 16x16 verloren (Gesichter!).
+      if (bunt && px.length >= 8) {
+        const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+        let fern = px[0], fd = 0; for (const p of px) { const dd = dist(p, farbe); if (dd > fd) { fd = dd; fern = p; } }
+        if (fd > 70) {
+          const mind = px.filter(p => dist(p, fern) < dist(p, farbe));
+          if (mind.length >= px.length * 0.22 && mind.length <= px.length * 0.7) farbe = [0, 1, 2].map(ch => mind.reduce((s, p) => s + p[ch], 0) / mind.length);
+        }
+      }
+      zellen.push({ cx, cy, dk, farbe });
     }
     if (!bunt) {
       const raster = Array.from({ length: N }, () => Array(N).fill('.'));
@@ -116,9 +147,21 @@ function imBrowser(zeichen) {
       ergebnis[z] = { mono: true, z: raster.map(r => r.join('')) };
       protokoll.mono.push(z); continue;
     }
+    // Kleine Merkmale (Augen, Mund) mischen sich beim Flaechenmittel mit der Umgebung: lokal schaerfen (Unsharp-Maske auf die Zellfarben), damit sie dunkel genug fuer eine eigene Palettenfarbe bleiben
+    {
+      const gitter = new Map(zellen.map(c => [c.cx + ',' + c.cy, c]));
+      const neuF = new Map();
+      for (const c of zellen) {
+        if (c.dk < 0.45) continue;
+        let sum = [0, 0, 0], n = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const nb = gitter.get((c.cx + dx) + ',' + (c.cy + dy)); if (nb && nb.dk >= 0.45) { sum = sum.map((v, i) => v + nb.farbe[i]); n++; } }
+        neuF.set(c, n >= 3 ? c.farbe.map((v, i) => Math.max(0, Math.min(255, v + 0.35 * (v - sum[i] / n)))) : c.farbe);
+      }
+      for (const [c, f] of neuF) c.farbe = f;
+    }
     const gedeckt = zellen.filter(c => c.dk >= 0.45);
     if (!gedeckt.length) { protokoll.leer.push(z); continue; }
-    const pal = medianCut(gedeckt.map(c => c.farbe), 6);
+    const pal = medianCut(gedeckt.map(c => c.farbe), 7);
     const naechste = (fa) => { let bi = 0, bd = 1e9; pal.forEach((p, i) => { const dd = (p[0] - fa[0]) ** 2 + (p[1] - fa[1]) ** 2 + (p[2] - fa[2]) ** 2; if (dd < bd) { bd = dd; bi = i; } }); return bi; };
     const raster = Array.from({ length: N }, () => Array(N).fill('.'));
     for (const c of gedeckt) raster[c.cy][c.cx] = buchstaben[naechste(c.farbe)];
@@ -132,6 +175,43 @@ function imBrowser(zeichen) {
     protokoll.farbe.push(z);
   }
   return { ergebnis, protokoll };
+}
+
+// ── PE_ALLE=1: ALLE Unicode-Emojis (alle-emoji.json, erzeugt von emoji-liste.py) → glyphen-alle.json ───────────────────────────────────────────────
+// Ausgelassen: Zeichen, die schon in glyphen.json (dem Spiel-Kern) stehen, und Tastenkappen (beginnen mit einer Ziffer/#/*: die liegen im Latin-Bereich der UI-Schrift).
+async function alle(page, stilisiere) {
+  const kern = JSON.parse(fs.readFileSync(path.join(__dirname, 'glyphen.json'), 'utf8'));
+  const liste = JSON.parse(fs.readFileSync(path.join(__dirname, 'alle-emoji.json'), 'utf8'));
+  const ziel = liste.filter(e => e.s.codePointAt(0) > 0x7F && !(e.s.replace(/\uFE0F/g, '').length === e.s.replace(/\uFE0F/g, '').length && !e.s.includes('\u200D') && [...e.s.replace(/\uFE0F/g, '')].length === 1 && kern[e.s.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')]));
+  // Bausteine, die nur INNERHALB von Folgen vorkommen (Flaggen = zwei Regionalindikatoren) und nicht als eigener Eintrag in der Liste stehen
+  for (let cp = 0x1F1E6; cp <= 0x1F1FF; cp++) { const z = String.fromCodePoint(cp), k = cp.toString(16).toUpperCase(); if (!ziel.some(e => e.k === k)) ziel.push({ k, s: z, a: [] }); }
+  if (process.env.PE_NUR) { const nur = new Set(process.env.PE_NUR.split(',')); for (let i = ziel.length - 1; i >= 0; i--) if (!nur.has(ziel[i].k)) ziel.splice(i, 1); }   // PE_NUR=1F600,1F60E: nur diese (zum Ausprobieren; schreibt NICHT glyphen-alle.json)
+  console.log(`${liste.length} Emojis in der Liste, ${ziel.length} noch nicht im Kern (inkl. Regionalindikatoren)`);
+  const ergebnis = {}; const leer = [];
+  for (let i = 0; i < ziel.length; i += 300) {
+    const teil = ziel.slice(i, i + 300);
+    const r = await page.evaluate(`(${imBrowser.toString()})(${JSON.stringify(teil.map(e => e.s))}, { ohneSprites: true, folgen: true })`);
+    for (const e of teil) {
+      const g = r.ergebnis[e.s];
+      if (!g) { leer.push(e.s); continue; }
+      ergebnis[e.k] = g.mono ? g : Object.assign(g, stilisiere(g));
+      delete ergebnis[e.k].stil;
+    }
+    process.stdout.write(`\r${Math.min(i + 300, ziel.length)}/${ziel.length}`);
+  }
+  console.log('');
+  // Folgen mit gemischten Hautfarben (z. B. 👨🏿‍🐰‍👨🏻), die das System-Emoji nicht kennt, zeichnet die Schrift als Platzhalterkaestchen mit Piktogramm — alle Varianten sehen GLEICH aus.
+  // Gleiches Raster bei mehr als 3 verschiedenen ZWJ+Hautfarben-Folgen = Platzhalter: entfernen (bleiben System-Emoji).
+  {
+    const gruppen = new Map();
+    for (const k of Object.keys(ergebnis)) { const cps = k.split('-'); if (!cps.includes('200D') || !cps.some(c => parseInt(c, 16) >= 0x1F3FB && parseInt(c, 16) <= 0x1F3FF)) continue; const sig = JSON.stringify(ergebnis[k].z); (gruppen.get(sig) || gruppen.set(sig, []).get(sig)).push(k); }
+    for (const ks of gruppen.values()) if (ks.length > 3) for (const k of ks) { delete ergebnis[k]; leer.push(k); }
+  }
+  const aliase = {};
+  for (const e of ziel) if (ergebnis[e.k]) for (const a of e.a) aliase[[...a].map(c => c.codePointAt(0).toString(16).toUpperCase()).join('-')] = e.k;
+  fs.writeFileSync(path.join(__dirname, process.env.PE_NUR ? 'glyphen-probe.json' : 'glyphen-alle.json'), JSON.stringify({ glyphen: ergebnis, aliase }) + '\n', 'utf8');
+  console.log(`${Object.keys(ergebnis).length} Glyphen, ${Object.keys(aliase).length} Aliase → glyphen-alle.json; nicht darstellbar (bleiben System-Emoji): ${leer.length}`);
+  if (leer.length) fs.writeFileSync(path.join(__dirname, 'nicht-darstellbar.json'), JSON.stringify(leer) + '\n', 'utf8');
 }
 
 (async () => {
@@ -150,6 +230,7 @@ function imBrowser(zeichen) {
     const page = await ctx.newPage();
     await page.goto(BASE + '/');
     await page.waitForFunction(() => typeof PP_PX_SPRITES !== 'undefined' && typeof PP_PX_ICONS !== 'undefined', null, { timeout: 30000 });
+    if (process.env.PE_ALLE) { await alle(page, require('./stil').stilisiere); return; }
     const { ergebnis, protokoll } = await page.evaluate(`(${imBrowser.toString()})(${JSON.stringify(zeichen)})`);
     // Zeichen mit und ohne Variantenselektor teilen sich EIN Glyph (gleicher Codepunkt): Farbfassung vor Einfarbfassung.
     // Handzeichner-Stil (stil.js): FORM aus dem System-Emoji, Schattierung/Licht/Dithering wie beim handgezeichneten Sprite. Standard: ALLE Farb-Emojis;

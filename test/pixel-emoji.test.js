@@ -15,5 +15,16 @@ test('alle Emojis/Symbole im Quelltext haben ein Pixel-Glyph', () => {
 test('die Schrift und ihr CSS-Block sind vorhanden', () => {
   assert.ok(fs.statSync(path.join(__dirname, '..', 'public', 'fonts', 'pp-pixel-emoji.woff2')).size > 10000);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
-  assert.match(css, /PIXEL-EMOJI:BEGIN[\s\S]*font-family: 'Pixel Intv'; src: url\('\/fonts\/pp-pixel-emoji\.woff2'\)[\s\S]*PIXEL-EMOJI:END/);
+  assert.match(css, /PIXEL-EMOJI:BEGIN[\s\S]*font-family: 'Pixel Intv'; src: url\('\/fonts\/pp-pixel-emoji\.woff2\?v=[0-9a-f]+'\)[\s\S]*PIXEL-EMOJI:END/);
+});
+
+test('die Schrift deckt alle Unicode-Emojis ab (Einzelzeichen, Hautfarben, ZWJ-Folgen, Flaggen)', () => {
+  const alle = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'scripts', 'pixel-emoji', 'glyphen-alle.json'), 'utf8'));
+  const keys = Object.keys(alle.glyphen);
+  assert.ok(keys.length >= 3400, 'zu wenige Glyphen: ' + keys.length);
+  const hat = (...cps) => keys.includes(cps.map(c => c.toString(16).toUpperCase()).join('-'));
+  assert.ok(hat(0x1F1E9, 0x1F1EA), 'Flagge DE fehlt');
+  assert.ok(hat(0x1F44D, 0x1F3FD), 'Hautfarben-Variante fehlt');
+  assert.ok(keys.some(k => k.includes('200D')), 'keine ZWJ-Folge');
+  assert.ok(Object.keys(alle.aliase).length > 500, 'keine Aliase (weniger qualifizierte Schreibweisen)');
 });

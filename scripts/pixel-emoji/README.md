@@ -5,6 +5,12 @@ Familie `PP Pixel Emoji`), nicht aus der Emoji-Schrift des Betriebssystems. Sie 
 (`Pixel Intv`, `Press Start 2P`, `Orbitron`, `Rajdhani`, `Roboto`, `Orbit`) und fuer Bedienelemente ohne eigene Schrift; der Block steht in `public/style.css`
 zwischen `PIXEL-EMOJI:BEGIN` und `PIXEL-EMOJI:END` und wird vom Bau-Skript geschrieben.
 
+**Umfang:** ALLE Unicode-Emojis (rund 3.600 Glyphen: Einzelzeichen, Hautfarben-Varianten, ZWJ-Folgen wie 👨‍👩‍👧, Flaggen, Tag-Flaggen wie 🏴󠁧󠁢󠁥󠁮󠁧󠁿) plus die Text-Symbole des Spiels. Folgen sind OpenType-Ligaturen
+(`ccmp`), die weniger qualifizierten Schreibweisen (ohne `FE0F`) ebenfalls. Nicht enthalten: Tastenkappen (`1️⃣` — sie beginnen mit einer Ziffer, die zur UI-Schrift gehoert) und Emojis, die die
+System-Schrift des Build-Rechners noch nicht kennt (aktuell 51, v. a. die neuesten Unicode-Versionen 15.1 und 16) — die bleiben System-Emoji. Die Datei ist ~1,3 MB gross und wird mit Inhalts-Hash (`?v=…`) ein Jahr gecacht (`/fonts` in `server.js`).
+
+**Neue Unicode-Version / neues System-Emoji-Set** (selten): `pip install emoji && python3 scripts/pixel-emoji/emoji-liste.py` (Liste), dann `PE_ALLE=1 node scripts/pixel-emoji/extract.js` (rastert alle → `glyphen-alle.json`), dann `build_font.py`.
+
 Wer ein **neues** Emoji in Text, Titel, Beschriftung oder Kartenskript einbaut, muss die Schrift neu bauen:
 
     node scripts/pixel-emoji/scan.js          # sammelt alle Zeichen aus dem Quelltext (Kommentare ausgenommen) → zeichen.json
