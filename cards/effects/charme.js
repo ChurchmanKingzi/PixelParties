@@ -523,17 +523,21 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
 
     // Now apply the state mutation — clone has landed; the sync
     // that follows just swaps the clone for the real card.
+    // W63c: der BESITZER der Karte, nicht automatisch der Gegner — war sie selbst gestohlen (Charme in die Gegenrichtung, Diebstahl,
+    // Geschenk), bleibt ihr Besitzer derselbe; kommt sie zu ihm zurueck, ist sie wieder eine ganz normale Handkarte.
+    const _besitzer = engine._handCardPileOwner(oi, cardName, stealHandIdx);
+    const _instVor = engine._findHandInstanceAt(oi, stealHandIdx);
     engine.takeFromPileSync(ops, 'hand', stealHandIdx);
     engine.handZugangSync(gs.players[pi], cardName, { ohneInstanz: true });
     // Instanz mitziehen (siehe _moveHandInstanceOwner): `owner` folgt
     // dem physischen Besitz, `originalOwner` bleibt — damit geht die
     // Karte beim Abwerfen/Löschen zurück in die richtige Ablage.
-    const _gestInst = engine._moveHandInstanceOwner(oi, pi, cardName);
+    const _gestInst = engine._moveHandInstanceOwner(oi, pi, cardName, _instVor);
     // Herkunft markieren (Regel v692/v693, wie Infiltration): beim Abwerfen/Spielen/Rückmischen
     // kehrt die Karte zum Besitzer zurück. `originalOwner` kurz auf den Halter, damit
     // `_tagHandCardOrigin` DIESE Instanz markiert statt eine zweite anzulegen.
     if (_gestInst) _gestInst.originalOwner = pi;
-    engine._tagHandCardOrigin(pi, cardName, oi, (gs.players[pi].hand.length || 1) - 1);
+    if (_besitzer !== pi) engine._tagHandCardOrigin(pi, cardName, _besitzer, (gs.players[pi].hand.length || 1) - 1);
     const charmerSid = gs.players[pi]?.socketId;
     if (charmerSid && engine.io) {
       engine.io.to(charmerSid).emit('card_reveal', { cardName });
