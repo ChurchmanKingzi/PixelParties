@@ -35,9 +35,10 @@
 //  nichts.
 //
 //  ── DER WÄHLER ───────────────────────────────────────────────────
-//  Dieselbe Liste wie bei Luck: ohne Token, Reaction und Surprise
-//  (Reactions feuern im Kettenfenster, Surprises liegen verdeckt —
-//  deklariert „so gut wie nie sinnvoll", Als Vorgabe zu Luck).
+//  Dieselbe Liste wie bei Luck: jeder Kartenname außer Tokens, auch
+//  Reactions und Surprises (Al 23.10.). Surprises zählen bei der
+//  Aktivierung, nicht beim verdeckten Setzen; wiederbelebte Creatures
+//  zählen, wiederbelebte Helden nicht.
 // ═══════════════════════════════════════════
 
 const { baseCardName } = require('./_hooks');
@@ -47,15 +48,13 @@ const { getResolvingHandIndex } = require('./_hand-resolve');
 
 const CARD_NAME = 'Liquid Luck';
 
-/** Alle deklarierbaren Kartennamen (Liste wie bei Luck). */
+/** Alle deklarierbaren Kartennamen (wie bei Luck: alles außer Tokens, auch Reactions und Surprises). */
 function deklarierbareNamen(engine) {
   const cardDB = engine._getCardDB();
   return Object.keys(cardDB).filter(n => {
     const cd = cardDB[n];
     if (!cd) return false;
     if (cd.cardType === 'Token') return false;
-    const sub = (cd.subtype || '').toLowerCase();
-    if (sub === 'reaction' || sub === 'surprise') return false;
     return true;
   }).sort((a, b) => a.localeCompare(b));
 }

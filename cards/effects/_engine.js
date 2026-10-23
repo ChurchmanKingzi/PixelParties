@@ -2975,6 +2975,16 @@ class GameEngine {
   }
 
   async runHooks(hookName, hookCtx = {}) {
+    // 23.10.: vorgemerkte Hand-Play-Signale (s. `_broadcastEvent`) zuerst abarbeiten.
+    if (this._playSignale?.length && !this._playSignaleLaeuft && hookName !== 'onHandPlaySignal') {
+      this._playSignaleLaeuft = true;
+      try {
+        while (this._playSignale.length) {
+          const sig = this._playSignale.shift();
+          await this.runHooks('onHandPlaySignal', { playedCardName: sig.name, playedByOwner: sig.owner, _skipReactionCheck: true });
+        }
+      } finally { this._playSignaleLaeuft = false; }
+    }
     // ★ W58a: dynamische ATK-Boni (Core/Gun) vor JEDER Meldung gegen den Ist-Zustand der Ablage abgleichen — ein Hook, der ATK liest, sieht nie einen veralteten Wert.
     this._dynamischeAtkNachrechnen();
     // ★ W59a: Area-Aura gegen den Ist-Zustand (Diver Helmet kam/ging) — jede Meldung sieht die richtige ATK. NICHT bei `afterHeroAtkChange`: dessen Reset-Meldung (Formwechsel)
@@ -32958,6 +32968,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       const removeIdx = ps.hand.indexOf(cardName);
       if (removeIdx >= 0) {
         ps.hand.splice(removeIdx, 1);
+        this._meldeHandPlay(cardName, targetOwnerIdx);   // 23.10.: Umleiter (Challenge, Martyry, Anti-Magnet …) melden sonst keinen Play (Luck, Liquid Luck)
         this.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);
         // Untrack hand instance
         const inst = this.cardInstances.find(c =>
@@ -41557,6 +41568,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
+          _vonSurpriseAktivierung: true,   // 23.10.: „gespielt"-Zähler (Luck, Liquid Luck) zählen die Aktivierung schon über `onSurpriseActivated`
         });
         await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
@@ -41686,6 +41698,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         await this.runHooks('onCardEnterZone', {
           enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
           _skipReactionCheck: false,   // Surprise-Beschwoerung = Beschwoerung (Ruling 3.10.)
+          _vonSurpriseAktivierung: true,   // 23.10.: „gespielt"-Zähler (Luck, Liquid Luck) zählen die Aktivierung schon über `onSurpriseActivated`
         });
         // Fire hook for Bakhm's 80-damage chain
         await this._surpriseHakenMitLauf(inst, steuerer, 'onSurpriseCreaturePlaced', {
@@ -41785,7 +41798,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     'beforeDamage', 'afterDamage', 'beforeLevelChange',
     'onResourceSpend', 'onReactionActivated', 'onCardActivation',
     'onActionUsed', 'onAdditionalActionUsed', 'onReactionResolved',
-    'onHeroTargeted', 'onSurpriseActivated',
+    'onHeroTargeted', 'onSurpriseActivated', 'onHandPlaySignal',
   ]);
 
   /**
@@ -54388,11 +54401,25 @@ this._deathWatch = (this._deathWatchStack || []).length
     return null;
   }
 
+  /** Merkt einen Hand-Play (Reaction, selbstspielende Karte) für den Hook `onHandPlaySignal` vor (Luck, Liquid Luck). */
+  _meldeHandPlay(name, owner) {
+    (this._playSignale || (this._playSignale = [])).push({ name, owner });
+  }
+
   _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
     // W6: Tokens fliegen nicht zu einem Stapel, sie zerfallen (`token_disintegrate`, siehe `_tokenZerfallSenden`).
     if (event === 'play_pile_transfer') { data = this._tokenStapelFlug(data); if (!data) return; }
+    // 23.10. (Luck, Liquid Luck — „Whenever your opponent plays a card"): die Reaktionsfenster und selbstspielenden Reaction-Karten melden ihren Play nur als Flug mit
+    // `asPlay` (derselbe Marker wie beim Trainings-Recorder). Spells/Attacks zählen über `afterSpellResolved` (`asPlay: 'sole'` = einziges Signal); der Hook
+    // `onHandPlaySignal` läuft beim nächsten `runHooks` (Warteschlange, damit der Aufrufer nicht mitten im Flug unterbrochen wird).
+    if (event === 'play_pile_transfer' && data && data.asPlay && data.from === 'hand' && data.cardName && Number.isInteger(data.owner)) {
+      const cd = this._getCardDB()[data.cardName];
+      if (data.asPlay === 'sole' || !cd || (cd.cardType !== 'Spell' && cd.cardType !== 'Attack')) {
+        this._meldeHandPlay(data.cardName, data.owner);
+      }
+    }
     // Animation broadcasts count as progress for the runHooks timeout
     // watcher — a hook that's spacing itself with delay+broadcast (Chain
     // Lightning's per-bolt animation, Wheels' staggered draw, Cosmic

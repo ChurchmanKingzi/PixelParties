@@ -9,6 +9,7 @@
 
 // v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
 const { baseCardName } = require('./_hooks');
+const { kartenSpielBeobachter } = require('./_card-played-shared');
 
 module.exports = {
   activeIn: ['ability'],
@@ -52,9 +53,7 @@ module.exports = {
       const cd = cardDB[n];
       if (!cd) return false;
       if (cd.cardType === 'Token') return false;
-      const sub = (cd.subtype || '').toLowerCase();
-      if (sub === 'reaction' || sub === 'surprise') return false;
-      return true;
+      return true;   // Al 23.10.: auch Reactions und Surprises (Surprises zählen bei der Aktivierung)
     }).sort((a, b) => a.localeCompare(b));
 
     // Prompt with cardNamePicker
@@ -136,55 +135,9 @@ module.exports = {
       engine.sync();
     },
 
-    /**
-     * Spells/Attacks resolved by opponent.
-     */
-    afterSpellResolved: async (ctx) => {
-      if (ctx._engine.gs._spellNegatedByEffect) return;
-      // Ein Effekt, der nur als Attack/Spell ZÄHLT (`alsAttackKette`: Sword in a Bottle, Heldeneffekte), ist kein gespieltes Spell-Exemplar — die Karte
-      // meldet sich selbst (Trank: `afterPotionUsed`); sonst zählte Luck sie doppelt.
-      if (ctx._alsEffekt) return;
-      await module.exports.hooks._triggerLuck(ctx, ctx.spellName, ctx.casterIdx);
-    },
-
-    /**
-     * Cards entering any zone (creatures, abilities, equipment, surprises).
-     */
-    onCardEnterZone: async (ctx) => {
-      const entering = ctx.enteringCard;
-      if (!entering) return;
-      // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
-      // Guillotine) ist kein Ausspielen.
-      if (ctx._verwahrungRueckkehr) return;
-      // Kontrolle statt Seite (Styx 28.9.): gespielt hat der Kontrolleur —
-      // eine seitenfremd beschworene Kreatur liegt beim Gegner (owner),
-      // ebenso eine ueber Styx an einen uebernommenen Helden angelegte
-      // Ability (owner = Brettseite, Kontrolle ueber den Charme).
-      const spieler = ctx._engine.effektiveSeiten(entering).controller ?? entering.owner;
-      // M02-13: Ein Area-/Attachment-ZAUBER (oder -ANGRIFF: Alliance, Blood Rock) erzeugt beide Ereignisse (Eintritt in die Zone UND
-      // `afterSpellResolved`) — gezählt wird einmal, über `afterSpellResolved`. Tritt die Karte
-      // während der Auflösung GENAU dieses Zaubers ein, ist das derselbe Spielvorgang.
-      if (entering.name === ctx._engine._currentResolvingPlayName()) return;
-      await module.exports.hooks._triggerLuck(ctx, entering.name, spieler);
-    },
-
-    /**
-     * Potions used by opponent.
-     */
-    afterPotionUsed: async (ctx) => {
-      if (ctx.potionName == null) return;
-      await module.exports.hooks._triggerLuck(ctx, ctx.potionName, ctx.potionOwner);
-    },
-
-    /**
-     * Normal Artifacts played by the opponent (W16f, M02-14): they enter no zone (Equipment/Areas do, via onCardEnterZone) and are
-     * neither Spell nor Potion - their only signal is `afterArtifactUsed` (server: doUseArtifactEffect and the targeting-artifact flow).
-     * Board-placing artifacts are excluded there, so nothing counts twice.
-     */
-    afterArtifactUsed: async (ctx) => {
-      if (ctx.artifactName == null) return;
-      await module.exports.hooks._triggerLuck(ctx, ctx.artifactName, ctx.playerIdx);
-    },
+    // Die Ereignisse „Gegner spielt eine Karte" (Spell/Attack, Zonen-Eintritt, Trank, Normal-Artefakt, Surprise-Aktivierung) liefert der gemeinsame
+    // Baustein `_card-played-shared.js` (Entdoppelungen M02-13/14 und Luck-Fixes dort) — gleich für Liquid Luck.
+    ...kartenSpielBeobachter((ctx, name, spieler) => module.exports.hooks._triggerLuck(ctx, name, spieler)),
 
     /**
      * At the start of owner's turn: clear the declared target.

@@ -29,7 +29,7 @@ const H = require('../../lib/h.js');
     R.check('Instanz in der Zone permanent mit Ziel/Spieler', (() => { const i = t.find(LL, 'permanent'); return i && i.counters.liquidLuckZiel === 'Fireball' && i.counters.liquidLuckSpieler === 0; })(), t.find(LL)?.counters);
     R.check('Log liquid_luck_declare', t.lg('liquid_luck_declare').length === 1 && t.lg('liquid_luck_declare')[0].card === 'Fireball', t.lg('liquid_luck_declare'));
     const pn = t.prompts.find(p => p.d.type === 'cardNamePicker')?.d;
-    R.check('Wähler bietet Kartennamen an, aber keine Tokens/Reactions/Surprises', pn && pn.cardNames.includes('Fireball') && !pn.cardNames.some(n => { const c = H.DB[n]; return c.cardType === 'Token' || /reaction|surprise/i.test(c.subtype || ''); }), pn && pn.cardNames.length);
+    R.check('Wähler bietet Kartennamen an (auch Reactions und Surprises, Al 23.10.), aber keine Tokens', pn && pn.cardNames.includes('Fireball') && pn.cardNames.includes('Gold Trap') && pn.cardNames.includes('Anti-Magnet') && !pn.cardNames.some(n => H.DB[n].cardType === 'Token'), pn && pn.cardNames.length);
     R.check('keine Engine-Fehler', t.errors.length === 0, t.errors);
     R.check('Zustand sauber', t.audit().length === 0, t.audit());
   }
