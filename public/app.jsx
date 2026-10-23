@@ -566,7 +566,7 @@ function getRank(elo) {
 
 function ProfileScreen() {
   const { user, setUser, setScreen, notify } = useContext(AppContext);
-  const [color, setColor] = useState(user.color || '#1aedff');
+  const [color, setColor] = useState(user.color || '#66b6ff');
   const [avatar, setAvatar] = useState(user.avatar);
   const [cardback, setCardback] = useState(user.cardback);
   const [bio, setBio] = useState(user.bio || '');
@@ -598,7 +598,7 @@ function ProfileScreen() {
   const [topHeroes, setTopHeroes] = useState([]);
 
   // Dirty tracking — compare against original user values
-  const isDirty = color !== (user.color || '#1aedff')
+  const isDirty = color !== (user.color || '#66b6ff')
     || avatar !== user.avatar
     || cardback !== user.cardback
     || bio !== (user.bio || '');
@@ -723,7 +723,7 @@ function ProfileScreen() {
     setShowAvatarGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: newAvatar, cardback: user.cardback, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -734,7 +734,7 @@ function ProfileScreen() {
     setShowSleeveGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: newSleeve, bio: user.bio || ''
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -745,7 +745,7 @@ function ProfileScreen() {
     setShowBoardGallery(false);
     try {
       const data = await api('/profile', { method: 'PUT', body: JSON.stringify({
-        color: user.color || '#1aedff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
+        color: user.color || '#66b6ff', avatar: user.avatar, cardback: user.cardback, bio: user.bio || '', board: newBoard
       })});
       setUser(data.user);
     } catch (e) { notify(e.message, 'error'); }
@@ -8042,7 +8042,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)' }}>
           {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
         </h2>
-        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+        <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
           {lobby?.type?.toUpperCase() || 'GAME'}
         </span>
       </div>
@@ -8987,7 +8987,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
             <div className="pixel-font" style={{
               fontSize: 28, marginBottom: 12,
               color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(26,237,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
+              textShadow: isSpectator ? '0 0 30px rgba(102,182,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
             }}>
               {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
             </div>
@@ -9268,7 +9268,7 @@ function PlayScreen() {
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>GAME LOBBY</h2>
-          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+          <span className="badge" style={{ background: lobby.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: lobby.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
             {lobby.type.toUpperCase()}
           </span>
         </div>
@@ -9380,7 +9380,7 @@ function PlayScreen() {
                   <span style={{ fontWeight: 700 }}>{r.host}</span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {r.format > 1 && <span className="badge" style={{ background: 'rgba(255,255,255,.08)', color: 'var(--text2)' }}>Bo{r.format}</span>}
-                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(26,237,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
+                    <span className="badge" style={{ background: r.type === 'ranked' ? 'rgba(249,172,32,.12)' : 'rgba(102,182,255,.12)', color: r.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
                       {r.type}
                     </span>
                   </div>
@@ -9594,7 +9594,7 @@ function App() {
 
   // Sync accent color to user's profile color
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#1aedff');
+    document.documentElement.style.setProperty('--accent', user && user.color ? user.color : '#66b6ff');
   }, [user?.color]);
 
   // Escape key → return to main menu from any sub-screen (except play — handled by PlayScreen/GameBoard)

@@ -5758,7 +5758,7 @@ function HandAmbiance({ color }) {
   }, []);
   return (
     <div className="hand-ambiance" aria-hidden="true"
-      style={{ '--amb-me': color || '#1aedff' }}>
+      style={{ '--amb-me': color || '#66b6ff' }}>
       <div className="hand-bloom" />
       <div className="hand-particles">
         {motes.map((p, i) => (
@@ -5815,7 +5815,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
   }, []);
   return (
     <div className="board-ambiance" aria-hidden="true"
-      style={{ '--amb-board-me': colorMe || '#1aedff', '--amb-board-opp': colorOpp || '#ec2d62' }}>
+      style={{ '--amb-board-me': colorMe || '#66b6ff', '--amb-board-opp': colorOpp || '#ec2d62' }}>
       {motes.map((p, i) => (
         <span key={i} className="board-mote" style={{
           top: p.top + '%', left: p.left + '%',
@@ -8537,7 +8537,7 @@ function ppKreuzfunkel(g, x, y, arm, pal, a) {
 //  Flecken (2×2 mit hellem Punkt) steigen auf. Ab ~800 ms dithert alles weg, bei 1100 ms ist es fort. Feste Palette, kein Leuchten.
 // ═════════════════════════════════════════════════════════════════
 const DragoneggShimmerEffect = (() => {
-  const PAL = ['#ffffff', '#fff1a0', '#ffd23a', '#f08a1e', '#c4561a'].map(ppHex);
+  const PAL = ['#ffffff', '#fff196', '#f8ca21', '#ff8b1a', '#cf5f00'].map(ppHex);
   const ENDE = 1100, FADE_AB = 780;
   const ARM = [1, 2, 3, 4, 4, 3, 2, 1];
   const vorbereiten = (sz) => ({
@@ -8573,8 +8573,8 @@ const DragoneggShimmerEffect = (() => {
 //  fallen von seinem Scheitel herab. Ab ~1150 ms dithert alles weg, bei 1500 ms ist es fort. Feste Palette, kein Leuchten.
 // ═════════════════════════════════════════════════════════════════
 const LiquidRainbowEffect = (() => {
-  const BAND = ['#e8412e', '#f58a1f', '#f5d02a', '#46b83c', '#2f8be0', '#3f45b8', '#8a3fb8'].map(ppHex);
-  const GOLD = ['#ffffff', '#fff1a0', '#ffd23a', '#f08a1e', '#c4561a'].map(ppHex);
+  const BAND = ['#e63e33', '#ff8b1a', '#f8ca21', '#20ac37', '#4e82cb', '#0351c9', '#7e41ba'].map(ppHex);
+  const GOLD = ['#ffffff', '#fff196', '#f8ca21', '#ff8b1a', '#cf5f00'].map(ppHex);
   const ENDE = 1500, FADE_AB = 1150, WACHS = 480, DICKE = 3;
   const ARM = [1, 2, 3, 3, 2, 1];
   const vorbereiten = () => ({
@@ -47737,7 +47737,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   const emitPing = useCallback((info) => {
     if (!info || !gameState.roomId || isSpectator) return;
-    socket.emit('ping_card', { roomId: gameState.roomId, ping: info, color: user.color || '#1aedff' });
+    socket.emit('ping_card', { roomId: gameState.roomId, ping: info, color: user.color || '#66b6ff' });
   }, [gameState.roomId, user.color, isSpectator]);
 
   // Tab key + contextmenu (right-click) → ping hovered card
@@ -52424,7 +52424,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // Skill Test: gs.turn zählt 2 je Round — angezeigt wird die Round (stInfo.round).
                 const zaehlerWert = stInfo ? (stInfo.round || 1) : gameState.turn;
                 const amZug = activePlayer === myIdx ? me : opp;
-                const farbe = amZug.color || (activePlayer === myIdx ? '#1aedff' : '#ec2d62');
+                const farbe = amZug.color || (activePlayer === myIdx ? '#66b6ff' : '#ec2d62');
                 return (
                   <div key={stInfo ? zaehlerWert + ':' + activePlayer : gameState.turn} className="board-round-counter" style={{ '--runde-farbe': farbe }}>
                     {/* v1473 (Als Vorgabe 28.9.): gezaehlt wird jeder Zug beider
@@ -53111,12 +53111,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
 
         {/* My hand (bottom player) — drag to reorder for players, face-down for spectators */}
-        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#1aedff' }}>
+        <div className="game-hand game-hand-me" ref={isSpectator ? undefined : handRef} style={{ '--hand-accent': me.color || '#66b6ff' }}>
           <HandAmbiance color={me.color} />
           <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). */}
-            <span className="pp-portraet" style={{ '--portraet': me.color || '#1aedff' }}>
+            <span className="pp-portraet" style={{ '--portraet': me.color || '#66b6ff' }}>
               <HandPortraet src={me.avatar} heroName={portraetHeld(me)}
                 zustand={result ? '' : ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive')} />
               <span className="pp-portraet-zier" aria-hidden="true" />
@@ -55931,7 +55931,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="pixel-font" style={{
               fontSize: 28, marginBottom: 12,
               color: isSpectator ? 'var(--accent)' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 30px rgba(26,237,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
+              textShadow: isSpectator ? '0 0 30px rgba(102,182,255,.3)' : (iWon ? '0 0 30px rgba(76,235,112,.4)' : '0 0 30px rgba(252,28,95,.4)'),
             }}>
               {isSpectator ? `${result.winnerName} wins the round!` : (iWon ? 'ROUND WIN!' : 'ROUND LOSS')}
             </div>
