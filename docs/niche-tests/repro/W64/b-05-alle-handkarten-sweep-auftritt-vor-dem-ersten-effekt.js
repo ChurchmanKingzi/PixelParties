@@ -13,8 +13,14 @@ const kinds = new Set(['Spell', 'Attack', 'Creature', 'Artifact', 'Potion', 'Abi
   let gespielt = 0, mitAuftritt = 0, geprueft = 0, kreaturen = 0; const verstoesse = [], fehler = [];
   for (const c of karten) {
     try {
-      const t = await W.reicheSzene({ seat: 0, karten: [c.name] });
-      const r = await W.spiele(t, 0, c.name, { hero: 0, timeoutMs: 6000, answer: (e) => (e.kind === 'generic' && e.d.type === 'cardNamePicker') ? { cardName: W.REICH.CRE[1] } : undefined });
+      // Unter starker CPU-Last (parallele Läufe) kann die Zugzeit-Uhr der Engine während einer offenen Frage ablaufen und den Zug beenden — ein solcher Lauf (turn_start in der Zeitleiste) ist
+      // gestört und wird wiederholt (höchstens zweimal), statt als Verstoß zu zählen.
+      let t, r;
+      for (let versuch = 0; versuch < 3; versuch++) {
+        t = await W.reicheSzene({ seat: 0, karten: [c.name] });
+        r = await W.spiele(t, 0, c.name, { hero: 0, timeoutMs: 6000, answer: (e) => (e.kind === 'generic' && e.d.type === 'cardNamePicker') ? { cardName: W.REICH.CRE[1] } : undefined });
+        if (!r.tl.some(e => e.k === 'wire' && e.ev === 'action_log' && e.data && e.data.type === 'turn_start')) break;
+      }
       if (t.errors.length) fehler.push(`${c.name}: ${t.errors[0].slice(0, 120)}`);
       if (!(r.handNachher < r.handVorher)) continue;     // in dieser Szene nicht spielbar / nicht gespielt
       gespielt++;
