@@ -8751,6 +8751,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (resolveHi >= 0) { (fromCreation ? ps.creationZone : ps.hand).splice(resolveHi, 1); room.engine.notePlayedFromHand(pi); }
     if (gs._spellPlacedOnBoard) {
       delete gs._spellPlacedOnBoard;
+      // W63b: macht ein Hook aus dem Zauber eine NEUE Brettkarte (Inyas Fantasy Buddy Token, `_spellBecameToken`), räumt die
+      // Engine die gespielte Hand-Instanz ab bzw. behält sie als Wirkungsträger (`_spellKeepInstance`) — siehe dort.
+      if (gs._spellBecameToken) { delete gs._spellBecameToken; room.engine.zauberInstanzNachBrettzug(inst); }
     } else if (gs._spellReturnToHand) {
       // Rocket Fist etc. — the resolved Spell/Attack returns to its
       // caster's hand instead of going to the discard pile. Origin

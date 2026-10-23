@@ -444,6 +444,10 @@ class CardInstance {
 
   /** Load this card's effect script (cached via loader). */
   loadScript() {
+    // ★ W63b: Inyas Fantasy Buddy Token trägt den NAMEN des Zaubers (Bild), ist aber ein Token — der Zauber-Text und seine Hooks
+    // (`afterSpellResolved`-Lauscher, Anhang-/Aura-Hooks wie Idej Projection …) gehören nicht zum Token. Ohne diese Sperre liefe das
+    // Skript des Zaubers auf dem Brett an der Token-Instanz (und verschwände mit ihr).
+    if (this.counters && this.counters._fantasyBuddyToken) return null;
     if (this.script === undefined || this.script === null) {
       this.script = loadCardEffect(this.name) || null;
     }
@@ -24300,6 +24304,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         const _retIdx = Math.min(poolIndex, pool.length);
         pool.splice(_retIdx, 0, cardName);
       }
+      delete this.gs._spellKeepInstance;   // W63b: ein abgebrochener Guss hält keine Instanz fest
       this._untrackCard(inst.id);
       this.gussAuftrittBeenden(_auftritt, { abgebrochen: true });   // v1338/v1339
       delete this.gs._pendingPlayLog;
@@ -24372,7 +24377,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ Hat sich die Hand-Instanz selbst aufs Brett gelegt (Area-Zauber: `placeArea` stellt DIESELBE
     // Instanz in die Area-Zone), gehoert sie jetzt dem Brett — ausgetragen wuerde sie zum Geist:
     // `gs.areaZones` haelt den Namen, aber kein Hook der Area laeuft mehr (The Circles of Hell).
-    if (!(_aufsBrett && inst.zone && inst.zone !== 'hand')) this._untrackCard(inst.id);
+    // W63b: bleibt die gespielte Hand-Instanz übrig, wird sie abgeräumt — ODER als Wirkungsträger in die Ablage umgezont, wenn der Zauber
+    // seine fortwirkende Wirkung an sie gehängt hat (`_spellKeepInstance`, auch beim Sofort-Guss; Inyas Token ersetzt die Karte, nicht den Träger).
+    delete this.gs._spellBecameToken;
+    if (!(_aufsBrett && inst.zone && inst.zone !== 'hand')) this.zauberInstanzNachBrettzug(inst);
     // v1338: ohne Abfrage aufgeloest → jetzt zeigen (idempotent).
     this.gussAuftrittBeenden(_auftritt);
     // W36a (Al): `player` gehoert in den Eintrag — Fire Bolts („first Destruction Magic Spell"), Kitsune Transformation (erster Magic-Arts-Spell) und Tengu Windstorm (erste Aktion) filtern das Log nach
@@ -42860,6 +42868,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // the check so the next link is unaffected.
           const spellPlaced = this.gs._spellPlacedOnBoard === true;
           if (spellPlaced) delete this.gs._spellPlacedOnBoard;
+          delete this.gs._spellBecameToken;   // W63b: Inyas Token-Marke gilt nur für den Weg der Karte selbst
           if (!linkScript?.skipPostResolveDiscard && !spellPlaced) {
             await this._delay(250);
             const ps = this.gs.players[link.owner];
@@ -44559,6 +44568,29 @@ this._deathWatch = (this._deathWatchStack || []).length
       allCards.forEach(c => { this._cardDB[c.name] = c; });
     }
     return this._cardDB;
+  }
+
+  /**
+   * ★ W63b (Al: „Inya macht aus Eraser Beam einen Token … der lingering Effect feuert nie"): was geschieht mit der gespielten
+   * Hand-Instanz eines Zaubers, der NACH dem Auflösen auf dem Brett landet, ohne dass die Instanz selbst mitzieht?
+   * Areas zonen DIESELBE Instanz um (`placeArea`) — hier nichts zu tun. Wer eine NEUE Instanz anlegt (Card Game Player Inya: Fantasy
+   * Buddy Token; Permanents wie Divine Gift of Balance), ließ die gespielte Instanz bisher als Geist in der Zone `hand` zurück
+   * (falsche Rang-Zuordnung `_findHandInstanceAt`, Hand-Hooks einer nie vorhandenen Handkarte, liegengebliebenes `_spellKeepInstance`).
+   * Regel: bleibt die Instanz in `hand`, wird sie entsorgt — AUSSER der Zauber hängt seine fortwirkende Wirkung an die Instanz
+   * (`gs._spellKeepInstance`: Anti Magic Zone, Calm Diatribe, Mission of the Light Brigade, Weapon Unleashing): dann bleibt sie
+   * als Wirkungsträger in `discard`, genau wie nach einer normalen Auflösung — unabhängig davon, ob der Token überlebt oder stirbt.
+   * Das Flag wird in jedem Fall verbraucht (sonst hielte der NÄCHSTE Zauber seine Instanz grundlos fest).
+   */
+  zauberInstanzNachBrettzug(inst) {
+    const behalten = !!this.gs._spellKeepInstance;
+    delete this.gs._spellKeepInstance;
+    if (!inst || inst.zone !== ZONES.HAND) return;   // schon umgezont (Area) — gehört dem Brett
+    if (behalten) {
+      inst.zone = ZONES.DISCARD;
+      inst.zoneSlot = -1;
+    } else {
+      this._untrackCard(inst.id);
+    }
   }
 
   /**

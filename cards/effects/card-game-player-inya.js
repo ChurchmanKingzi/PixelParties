@@ -130,6 +130,8 @@ module.exports = {
       // spell's onPlay; we read it BEFORE setting our own
       // suppress-discard flag below.
       if (gs._spellPlacedOnBoard) return;
+      // W63b: ein Zauber, der die Hand nicht in die Ablage verlässt (kehrt auf die Hand zurück), wird kein Buddy.
+      if (gs._spellReturnToHand) return;
 
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
@@ -158,7 +160,7 @@ module.exports = {
         cancellable: true,
         gerrymanderEligible: true,
       });
-      if (!confirmed) return;
+      if (!engine._confirmSaidYes(confirmed)) return;   // W63b: `{ confirmed: false }` ist ein wahrheitsfähiges Objekt (Rückgabeform-Falle v672)
 
       // safePlaceInSupport finds the first free base zone and creates
       // a fresh tracked inst. Same primitive Biomancy Token uses for
@@ -195,6 +197,9 @@ module.exports = {
       // doPlaySpell (initial casts) AND _resolveReactionChain
       // (chain links — see the matching flag-check block there).
       gs._spellPlacedOnBoard = true;
+      // W63b: die gespielte Instanz ist NICHT der Token (eigene Instanz) — der Server räumt sie ab bzw. behält sie als Wirkungsträger
+      // (`_spellKeepInstance`: Anti Magic Zone, Calm Diatribe, Mission, Weapon Unleashing), `engine.zauberInstanzNachBrettzug`.
+      gs._spellBecameToken = true;
 
       // Sparkle on the Buddy's slot.
       engine._broadcastEvent('play_zone_animation', {
