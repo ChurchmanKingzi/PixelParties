@@ -466,7 +466,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
     // Cancelled mid-prompt — Archibald-style: HOPT was already claimed
     // when the gallery confirmed, treat it as a fizzled cast and send
     // the chosen Spell to discard so the play isn't refunded.
-    ps.discardPile.push(cardName);
+    engine.handKartenBesitzerPs(ps, cardName).discardPile.push(cardName);   // W63c: Ablage des permanenten Besitzers
     if (handInst) engine._untrackCard(handInst.id);
   }
 

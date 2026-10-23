@@ -486,10 +486,10 @@ module.exports = {
             owner: pi, cardName: chosenName, from: 'hand', to: 'hand',
             fromHandIdx: _retIdx, toHandIdx: _retIdx,
           });
-          engine.handZugangSync(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });
+          engine.handZugangRueckgabe(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });   // W63c: Herkunft (gestohlene Handkarte) bleibt
           engine._untrackCard(inst.id);
         } else {
-          ps.discardPile.push(chosenName);
+          engine.handKartenBesitzerPs(ps, chosenName).discardPile.push(chosenName);   // W63c: Ablage des permanenten Besitzers
           engine._untrackCard(inst.id);
           engine.log('love_shot_action', {
             player: ps.username, target: targetHero.name,

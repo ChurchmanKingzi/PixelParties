@@ -164,10 +164,12 @@ async function doJumpCascade(engine, pi) {
     // auch dann, wenn die Kette die Karte später negiert: sie ist
     // verbraucht und wandert so oder so in den Discard — negiert
     // eingesetzt bleibt eingesetzt.
+    const _besitzer = engine._handCardPileOwner(pi, 'Jump in the River', removeIdx);   // W63c: Ablage des permanenten Besitzers
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: 'Jump in the River',
       from: 'hand', to: 'discard',
       fromHandIdx: removeIdx, asPlay: 'sole',
+      ...(_besitzer !== pi ? { fromOwner: pi, toOwner: _besitzer } : {}),
     });
     engine.takeFromPileSync(ps, 'hand', removeIdx);
     // ★ v1262 (Als Befund 21.9.: „als der Gegner Jump in the River
@@ -227,7 +229,7 @@ async function doJumpCascade(engine, pi) {
     });
 
     // Card always goes to discard (whether negated or not)
-    ps.discardPile.push('Jump in the River');
+    engine.handKartenBesitzerPs(ps, 'Jump in the River').discardPile.push('Jump in the River');   // W63c
 
     if (chainResult.negated) {
       engine.log('jump_negated', { player: ps.username, hero: hero.name });

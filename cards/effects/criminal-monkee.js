@@ -170,7 +170,7 @@ module.exports = {
     // selbst (Ablage) dem Spieler, aus dessen Deck sie kam.
     const platz = engine.safePlaceInSupport(NFM, feld, heroIdx, slot);
     if (!platz?.inst) {
-      ps.discardPile.push(NFM);
+      engine.handKartenBesitzerPs(ps, NFM).discardPile.push(NFM);   // W63c: Ablage des permanenten Besitzers
       engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'place_refused' });
       return true;
     }

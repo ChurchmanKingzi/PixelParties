@@ -305,8 +305,9 @@ async function sacrificeSwapAtomar(ctx) {
   //     Suspicious Monster, so a resummon-into-the-freed-slot reaction
   //     (Corpse Cannibal) correctly finds it occupied and skips.
   occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-  if (!fps.discardPile) fps.discardPile = [];
-  fps.discardPile.push(occName);
+  const _occPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;   // W63c: Ablage des permanenten Besitzers des Geopferten
+  if (!_occPs.discardPile) _occPs.discardPile = [];
+  _occPs.discardPile.push(occName);
   await engine.runHooks('onCardLeaveZone', {
     card: occ, leavingCard: occ, fromZone: 'support',
     fromOwner: heroOwner, fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
@@ -427,8 +428,9 @@ module.exports = {
       if (idx >= 0) slotArr.splice(idx, 1);
     }
     occ.zone = 'discard'; occ.heroIdx = -1; occ.zoneSlot = -1;
-    if (!fps.discardPile) fps.discardPile = [];
-    fps.discardPile.push(occName);
+    const _occPs = gs.players[engine.kartenBesitzerVon(occ)] || fps;   // W63c: Ablage des permanenten Besitzers des Geopferten
+    if (!_occPs.discardPile) _occPs.discardPile = [];
+    _occPs.discardPile.push(occName);
     engine.sync();
     await engine.runHooks('onCardLeaveZone', {
       card: occ, leavingCard: occ, fromZone: 'support',

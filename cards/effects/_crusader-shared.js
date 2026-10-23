@@ -205,7 +205,7 @@ async function zugEndeKreislauf(ctx, selbstName) {
 
   const neu = engine.safePlaceInSupport(gewaehlt.name, pi, heroIdx, platz);
   if (!neu?.inst) {
-    ps.discardPile.push(gewaehlt.name);
+    engine.handKartenBesitzerPs(ps, gewaehlt.name).discardPile.push(gewaehlt.name);   // W63c: Ablage des permanenten Besitzers
     return;
   }
   await engine.runHooks('onPlay', {

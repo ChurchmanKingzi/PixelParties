@@ -348,8 +348,9 @@ module.exports = {
 
       if (deletedIdx >= 0 && deletedName) {
         engine.takeFromPileSync(ps, 'hand', deletedIdx);
-        if (!ps.deletedPile) ps.deletedPile = [];
-        ps.deletedPile.push(deletedName);
+        const _loeschPs = engine.handKartenBesitzerPs(ps, deletedName);   // W63c: Loeschstapel des permanenten Besitzers
+        if (!_loeschPs.deletedPile) _loeschPs.deletedPile = [];
+        _loeschPs.deletedPile.push(deletedName);
         engine.log('pollution_piranha_delete', {
           player: ps.username, card: deletedName,
         });
