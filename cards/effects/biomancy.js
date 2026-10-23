@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════
 
 const {
-  tokenStatsForLevel, freeSupportSlots, placeBiomancyToken,
+  tokenStatsForLevel, tokenZonePossible, placeBiomancyToken,
 } = require('./_biomancy-shared');
 
 module.exports = {
@@ -71,8 +71,8 @@ module.exports = {
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
-        // Must have a free support zone
-        if (freeSupportSlots(engine, feld, hi).length === 0) continue;
+        // Must have a free support zone — W64a (Al, 23.10.2026): bei aktiver Alice-Teilung zaehlt auch die Zone eines Biomancy Tokens GLEICHEN Namens
+        if (!tokenZonePossible(engine, pi, feld, hi, ctx.potionName)) continue;
 
         // Soft HOPT: check if this hero's Biomancy was already used this turn
         const hoptKey = `biomancy:${feld}:${hi}`;

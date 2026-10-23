@@ -432,7 +432,9 @@ async function handleBiomancyMirror(ctx) {
   const feld = ctx.cardHeroOwner ?? pi;
   // Lizbeth herself must have a free Support slot.
   const supZones = gs.players[feld]?.supportZones?.[heroIdx] || [[], [], []];
-  if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)) return;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung zaehlt auch die Zone eines Tokens GLEICHEN Namens.
+  if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)
+      && require('./_biomancy-shared').teilbareSlots(engine, pi, feld, heroIdx, ctx.potionName).length === 0) return;
 
   // Soft HOPT per turn.
   if (!gs.hoptUsed) gs.hoptUsed = {};

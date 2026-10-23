@@ -10675,6 +10675,17 @@ class GameEngine {
       }
     }
 
+    // ★ W64a (Al, 23.10.2026: „Ja, 'defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden"): ein Kill-Effekt, der früher
+    // durch die SCHADENS-Pipeline lief (Eraser Beam), behält hier alle EFFEKT-Schutzschichten, die dort griffen — ohne eine einzige Schadensschicht.
+    // Opt-in (`opts.wirkungsSchutz = { damageType }`); die Liste steht in `_heldWirkungsSchutz`.
+    if (opts.wirkungsSchutz && !_u && !opts.isSacrifice && !opts.eigenerAbgang && opts.respectFirstTurnProtection !== false && targetOwner >= 0) {
+      const _wsGrund = await this._heldWirkungsSchutz(source, target, targetOwner, opts.wirkungsSchutz);
+      if (_wsGrund) {
+        this.log('defeat_negated', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat', reason: _wsGrund });
+        return { defeated: false, blocked: true, reason: _wsGrund };
+      }
+    }
+
     // ── KEIN Zerstoerungs-Fenster fuer Helden (v1057) ────────────────
     // Al hatte Helden zunaechst eingeschlossen. Der endgueltige
     // Kartentext sagt aber „would be sent to the DISCARD PILE", und
@@ -10755,6 +10766,89 @@ class GameEngine {
       await this.runHooks('onHeroSacrificed', { hero: target, source, heroOwner: targetOwner, _skipReactionCheck: true });
     }
     return { defeated: true };
+  }
+
+  /**
+   * ★ W64a — WIRKUNGS-SCHUTZ eines Helden gegen einen Kill-EFFEKT („defeat it"): genau die Schutzschichten der Schadens-Pipeline, die sich auf den EFFEKT
+   * beziehen und nicht auf den SCHADEN — Zielschutz „or HIT" (Dive Down, Jetpack, Stealth …), Anti Magic Enchantment, Anti Magic (`magic_immune`),
+   * Charme Lv 3 (`charmed`), Quellen-Immunität (`immuneToSourceNames`, Damus), Versteinerung, Submerged. NICHT dabei (Schadens-Schutz, ein Kill-Effekt umgeht ihn):
+   * `damage_proof`-Status, `beforeDamage`-Hooks („takes no damage": Inya, Schadensreduktion/-schilde, Cloudy, Interference), Carris, Immortal/`capAtHPMinus1`,
+   * `lethalProtection`, Schadens-Handreaktionen. Erstrunden-Schutz, Resistance, Effekt-Immunität (Escape Device), Spell-Schild und das Vor-Niederlage-Fenster
+   * hat `actionDefeatHero` ohnehin. Liefert den Grund des Schutzes oder `null`.
+   * @param {object} source  Quelle ({ name, owner, heroIdx, heroOwner })
+   * @param {object} target  Heldenobjekt · @param {number} owner Brettseite
+   * @param {{ damageType?: string }} info  Schadens-Typ der Karte (für Stufen-Schutz: Spell/Attack, Schule)
+   */
+  async _heldWirkungsSchutz(source, target, owner, info = {}) {
+    const hero = target;
+    const heroIdx = (this.gs.players[owner]?.heroes || []).indexOf(hero);
+    if (heroIdx < 0) return null;
+    const type = info.damageType || 'destruction_spell';
+    // Zielschutz „cannot be chosen OR HIT" (Charmed-/Submerged-ähnlich: Dive Down, Jetpack, Alluring Light …). Ein Kill-Effekt trifft von Natur aus nur dieses Ziel (`festesZiel`).
+    if (this.heroBlocksTargeting(owner, heroIdx, {
+      sourceData: source?.name ? this._getCardDB()[source.name] : null,
+      damageType: type, cardName: source?.name || null, source,
+      chooserIdx: source?.controller ?? source?.owner ?? null,
+      hit: true, festesZiel: this.istEinzelzielTreffer(type, info),   // wie der Schadenspfad: nur Rückstoß/`festesZiel` der Karte, sonst gibt es andere Ziele
+    })) { this.log('targeting_blocked', { hero: this._heroLabel(hero), source: source?.name || null }); return 'targeting_blocked'; }
+    // Anti Magic Enchantment (nur Spells; Rückfrage lazy, je Zauber und Held einmal)
+    if (type === 'destruction_spell' || type === 'spell' || String(type).includes('spell')) {
+      if (await this._maybePromptAntiMagicEnchantment(hero, source)) { this.log('ame_damage_blocked', { target: this._heroLabel(hero), type }); return 'anti_magic_enchantment'; }
+    }
+    // Anti Magic (`magic_immune`): Spell-Stufe <= Stufe des Buffs
+    if (hero.buffs?.magic_immune && source?.name) {
+      const srcLevel = this._spellLevelAlsQuelle(source.name, type, source);
+      const buffLevel = hero.buffs.magic_immune.level;
+      if (srcLevel != null && typeof buffLevel === 'number' && srcLevel <= buffLevel && !loadCardEffect(source.name)?.bypassesMagicImmune) {
+        this._playAntiMagicBlockedAnim(hero);
+        return 'magic_immune';
+      }
+    }
+    // Charme Lv 3 / Love Shot-ähnliche Immunität (Kontrolle: nur Quellen des Nicht-Kontrolleurs)
+    if (this._charmBlocksFrom(hero, source?.controller ?? source?.owner, { loveShotOhneSchutz: true })) return 'charmed';
+    // Quellen-Immunität (Damus: „unaffected by Armageddon")
+    {
+      const liste = this.heroScript(hero)?.immuneToSourceNames;
+      const qName = source?.name;
+      if (Array.isArray(liste) && typeof qName === 'string' && !this._isHeroEffectSilenced(owner, heroIdx) && liste.some(n => qName.includes(n))) {
+        const bed = this.heroScript(hero).immuneToSourceCondition;
+        let gilt = true;
+        if (typeof bed === 'function') { try { gilt = !!bed(this, owner, heroIdx); } catch { gilt = false; } }
+        if (gilt) return 'source_immune';
+      }
+    }
+    if (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) return 'petrified';
+    if (hero.buffs?.submerged && this.isSubmergedProtected(owner, hero, { festesZiel: this.istEinzelzielTreffer(type, info) })) return 'submerged';
+    return null;
+  }
+
+  /**
+   * ★ W64a (Al, 23.10.2026: „'defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden") — DER eine Baustein für „defeat target".
+   * Ein Kill-Effekt (Kartentext „defeat it" / „defeat that target", nicht „deal damage") geht NIE durch die Schadens-Pipeline. Er trifft Helden über
+   * `actionDefeatHero` und Kreaturen über `actionDestroyCard`: SCHADENS-Schutz (Schadensimmunität „takes no damage", Reduktion, Schilde, Cloudy, HP-Böden,
+   * Egg of God, Resilient Monkee …) greift nicht; EFFEKT-Schutz (unaffected by effects, Resistance, Anti Magic, Gate Shield, Monia, Erstrunden-Schutz, „would be
+   * defeated"-Reaktionen) greift weiter. Für Helden schaltet `opts.wirkungsSchutz` zusätzlich die Zielschutz-/Immunitäts-Schichten der Schadens-Pipeline
+   * zu (siehe `_heldWirkungsSchutz`) — für Kill-Effekte, die vorher als Riesenschaden liefen (Eraser Beam).
+   * @param {object} source  Quelle ({ name, owner, controller?, heroIdx?, heroOwner? })
+   * @param {object} target  Heldenobjekt ODER Kreatur-Instanz (`CardInstance`)
+   * @param {object} [opts]  `reason`/`sourceName`, `sourceOwner`, `damageType` (Typ der Karte: `'destruction_spell'` …), `wirkungsSchutz: true`, sonst wie `actionDefeatHero`/`actionDestroyCard`
+   * @returns {Promise<{ defeated: boolean, blocked?: boolean }>}
+   */
+  async actionDefeat(source, target, opts = {}) {
+    if (!target) return { defeated: false };
+    const sourceOwner = opts.sourceOwner ?? source?.controller ?? source?.owner;
+    const sourceName = opts.sourceName ?? source?.name;
+    if (target.zone !== undefined && target.id !== undefined) {   // Kreatur-Instanz
+      if (target.zone !== ZONES.SUPPORT) return { defeated: false };
+      await this.actionDestroyCard(source, target, { sourceOwner, sourceName, fireCreatureDeath: true, ...(opts.destroyOpts || {}) });
+      return { defeated: target.zone !== ZONES.SUPPORT };
+    }
+    const { wirkungsSchutz, damageType, destroyOpts, ...rest } = opts;
+    const r = await this.actionDefeatHero(source, target, {
+      sourceOwner, reason: opts.reason ?? sourceName, ...rest,
+      ...(wirkungsSchutz ? { wirkungsSchutz: { damageType } } : {}),
+    });
+    return r || { defeated: false };
   }
 
   async actionHealHero(source, target, amount) {
@@ -13569,7 +13663,7 @@ class GameEngine {
       // M01-08: Tokens gehen beim Verlassen des Bretts in den Gelöscht-Stapel (s. `_actionMoveCardKern`).
       const _tokenCd = fromZone === ZONES.SUPPORT ? this.getEffectiveCardData(targetCard) : null;
       const _istToken = !!(_tokenCd && hasCardType(_tokenCd, 'Token'));
-      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || targetCard._swagdriRouteToDelete || _selbstLoeschend || _istToken) ? 'deleted' : 'discard';   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
+      const _zielPile = ((targetCard._redirectToDeleted && !targetCard._reviveAfterDeath) || targetCard._swagdriRouteToDelete || _selbstLoeschend || (_istToken && this.tokenStapelZiel(targetCard) === 'deleted')) ? 'deleted' : 'discard';   // W64a: Fantasy Buddy → Ablage   // W16d: eine Wiederbelebung (Extra Life) geht vor der Löschumleitung
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
@@ -14751,7 +14845,8 @@ class GameEngine {
     if ((toZone === ZONES.DISCARD || toZone === ZONES.HAND) && fromZone === 'support') {
       const _tokenCd = this.getEffectiveCardData(cardInstance);
       if (_tokenCd && hasCardType(_tokenCd, 'Token')) {
-        toZone    = ZONES.DELETED;
+        // W64a (Al, 23.10.2026): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (auch bei „zurück auf die Hand").
+        toZone    = this.tokenStapelZiel(cardInstance) === 'discard' ? ZONES.DISCARD : ZONES.DELETED;
         toHeroIdx = -1;
         toSlot    = -1;
       }
@@ -14990,7 +15085,7 @@ class GameEngine {
           const _stapel = (toZone === ZONES.DELETED) ? _zielPs.deletedPile : _zielPs.discardPile;
           if (Array.isArray(_stapel)) {
             // W5a: ein Token landet in keinem Stapel; nur eine echte Karte darunter wird gelöscht (`tokenAbgang`).
-            if (!this.tokenAbgang(cardInstance)) _stapel.push(cardInstance.name);
+            if (!this.tokenAbgang(cardInstance, { geloescht: toZone === ZONES.DELETED })) _stapel.push(cardInstance.name);
             cardInstance._ppSchonGelandet = toZone;
             this.sync();          // damit der Stapel SOFORT sichtbar waechst
           }
@@ -15139,6 +15234,11 @@ this._deathWatch = (this._deathWatchStack || []).length
     cardInstance.heroIdx = toHeroIdx !== undefined ? toHeroIdx : -1;
     cardInstance.zoneSlot = toSlot !== undefined ? toSlot : -1;
     cardInstance.faceDown = toZone === ZONES.SURPRISE;
+    // ★ W64a: ein Fantasy Buddy hat das Brett verlassen — die Instanz ist wieder die gewöhnliche Spell-Karte (Ablage/Gelöscht), kein Token mehr.
+    if (cardInstance.counters?._fantasyBuddyToken && toZone !== ZONES.SUPPORT && fromZone === ZONES.SUPPORT && cardInstance._ppSchonGelandet === toZone) {
+      this._fantasyBuddyEntmarken(cardInstance);
+      cardInstance._buddyAbgang = true;   // die Karte liegt als NAME im Stapel; eine eigene Instanz braucht sie dort nicht (wie jeder abgelegte Zauber)
+    }
 
     // Add to new zone in game state
     // ★ v1136: nicht doppelt ablegen — der Kadaver kann oben schon
@@ -15182,6 +15282,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // die Zeile wird hier nur nicht mehr erzeugt, damit aeltere
     // Spielstaende und Mitschnitte lesbar bleiben.
     await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, { card: cardInstance, toZone, toHeroIdx });
+    if (cardInstance._buddyAbgang) { delete cardInstance._buddyAbgang; this._untrackCard(cardInstance.id); }   // W64a: Fantasy Buddy → Spell-Karte nur als Name im Stapel
     // W5a: ein Token ohne Karte darunter ist nach dem Abgang nirgends mehr — keine Geister-Instanz im Gelöscht-Stapel.
     if (fromZone === ZONES.SUPPORT && toZone === ZONES.DELETED && this.isTokenCard(cardInstance) && !this.tokenUnterkarte(cardInstance)) {
       this._untrackCard(cardInstance.id);
@@ -44901,6 +45002,25 @@ this._deathWatch = (this._deathWatchStack || []).length
    * kein Token). Wer eine Brettkarte „auf die Hand/ins Deck/in die Ablage" schickt, fragt `isTokenCard`
    * und ruft bei einem Token `tokenAbgang` statt die Karte zu bewegen.
    */
+  /**
+   * ★ W64a (Al, 23.10.2026): in welchen Stapel geht die echte Karte UNTER einem Token, wenn er das Brett verlässt? Biomancy-/Boulder-Token: `'deleted'`
+   * (Gelöscht-Stapel). Inyas Fantasy Buddy Token (`counters._fantasyBuddyToken`): `'discard'` — die Spell-Karte geht in die Ablage ihres Besitzers.
+   * Ein ausdrückliches „delete" bleibt Löschen (der Aufrufer nennt es: `tokenAbgang(inst, { geloescht: true })`).
+   */
+  tokenStapelZiel(inst) {
+    return inst?.counters?._fantasyBuddyToken ? 'discard' : 'deleted';
+  }
+
+  /** ★ W64a: Token-Markierungen eines Fantasy Buddys entfernen (die Instanz bleibt als gewöhnliche Karte in Ablage/Gelöscht-Stapel). */
+  _fantasyBuddyEntmarken(inst) {
+    if (!inst?.counters) return;
+    delete inst.counters._fantasyBuddyToken;
+    delete inst.counters._cardDataOverride;
+    delete inst.counters.currentHp;
+    delete inst.counters.maxHp;
+    inst.script = undefined;   // loadScript() erneut: die Karte ist wieder der Zauber
+  }
+
   tokenUnterkarte(inst) {
     if (!inst || !this.isTokenCard(inst)) return null;
     const roh = this._getCardDB()[inst.name];
@@ -44947,14 +45067,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Aufrufer wie bei jeder anderen Karte. Liefert true, wenn `inst` ein Token ist (dann NICHT zusaetzlich in
    * Hand/Deck/Ablage schreiben), sonst false.
    */
-  tokenAbgang(inst) {
+  tokenAbgang(inst, opts = {}) {
     if (!this.isTokenCard(inst)) return false;
     const unter = this.tokenUnterkarte(inst);
     if (unter) {
       const ps = this.gs.players[this.kartenBesitzerVon(inst)];
       if (ps) {
-        if (!ps.deletedPile) ps.deletedPile = [];
-        ps.deletedPile.push(unter);
+        // ★ W64a (Al, 23.10.2026): Inyas Fantasy Buddy — die Zauber-Karte darunter geht in die ABLAGE ihres Besitzers (auf der Karte steht nirgends, dass
+        // sie gelöscht würde); nur ein ausdrückliches „delete" (`opts.geloescht`) löscht sie. Biomancy-/Boulder-Token: unverändert Gelöscht-Stapel.
+        const ziel = opts.geloescht ? 'deleted' : this.tokenStapelZiel(inst);
+        if (ziel === 'discard') {
+          if (!ps.discardPile) ps.discardPile = [];
+          ps.discardPile.push(unter);
+        } else {
+          if (!ps.deletedPile) ps.deletedPile = [];
+          ps.deletedPile.push(unter);
+        }
       }
     }
     this.log('token_not_a_card', { card: inst.name, to: unter ? 'underlying_deleted' : 'gone' });
@@ -45010,7 +45138,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     if (d.to === 'deleted') return d;
     const { toHandIdx, finalHandSize, ...rest } = d;
-    return { ...rest, to: 'deleted', toOwner: this.kartenBesitzerVon(inst) };
+    return { ...rest, to: this.tokenStapelZiel(inst), toOwner: this.kartenBesitzerVon(inst) };   // W64a: Fantasy Buddy → Ablage, Biomancy/Boulder → Gelöscht-Stapel
   }
 
   /**
@@ -52537,8 +52665,10 @@ this._deathWatch = (this._deathWatchStack || []).length
         _creatureDest = 'rescued';
       } else if ((effectiveCd && hasCardType(effectiveCd, 'Token')) || _selbstLoeschend) {
         // W5a: ein Token verschwindet vollstaendig; nur eine echte Karte darunter (Biomancy/Boulder) wird gelöscht.
-        if (!this.tokenAbgang(e.inst)) creatureDiscardPs.deletedPile.push(e.inst.name);
-        _creatureDest = 'deleted';
+        // W64a (Al): Inyas Fantasy Buddy — die Spell-Karte darunter geht in die ABLAGE ihres Besitzers (Ghazma/Selbstlöschen: gelöscht).
+        const _tokenZiel = _selbstLoeschend ? 'deleted' : this.tokenStapelZiel(e.inst);
+        if (!this.tokenAbgang(e.inst, { geloescht: _tokenZiel === 'deleted' })) creatureDiscardPs.deletedPile.push(e.inst.name);
+        _creatureDest = _tokenZiel;
       } else {
         creatureDiscardPs.discardPile.push(e.inst.name);
         _creatureDest = 'discard';
@@ -53978,7 +54108,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       case ZONES.DELETED: {
         // Cards always return to their ORIGINAL owner's deleted pile
-        if (this.tokenAbgang(inst)) return;   // W5a
+        if (this.tokenAbgang(inst, { geloescht: true })) return;   // W5a
         const deletePs = this.gs.players[inst.originalOwner];
         if (deletePs) deletePs.deletedPile.push(inst.name);
         return;

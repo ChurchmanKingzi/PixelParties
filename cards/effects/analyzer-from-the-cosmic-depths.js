@@ -33,7 +33,7 @@
 
 const {
   addChangeCounters, removeChangeCounters, moveChangeCounters,
-  getChangeCounters, allBoardTargets, targetToPromptEntry,
+  getChangeCounters, allBoardTargets, targetToPromptEntry, geteilteSlotsBeiderSeiten,
 } = require('./_cosmic-shared');
 
 const CARD_NAME = 'Analyzer from the Cosmic Depths';
@@ -89,7 +89,8 @@ function allFreeSupportSlotsBothSides(engine) {
       }
     }
   }
-  return out;
+  // W64a (Al, 23.10.2026): bei aktiver Alice-Teilung stoesst ein Invader Token zur Zone eines Invader Tokens dazu — geteilte Zonen VORN.
+  return [...geteilteSlotsBeiderSeiten(engine, INVADER_TOKEN), ...out];
 }
 
 // ── ACTIVE 1: Move counters ────────────────────────────────────────
@@ -154,7 +155,7 @@ async function runSpawn(engine, inst, ctx) {
   if (freeSlots.length === 0) return false;
 
   const maxByCounters = Math.min(have, 6);
-  const maxByTokens = Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
+  const maxByTokens = freeSlots.some(sl => sl.shared) ? Math.floor(maxByCounters / 2) : Math.min(Math.floor(maxByCounters / 2), freeSlots.length);
   if (maxByTokens < 1) return false;
 
   const opts = [];
@@ -195,7 +196,8 @@ async function runSpawn(engine, inst, ctx) {
     } else {
       const zones = slots.map(s => ({
         owner: s.owner, heroIdx: s.heroIdx, slotIdx: s.slotIdx,
-        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}`,
+        label: `${s.owner === pi ? '(You) ' : '(Opp) '}${s.heroName} — Slot ${s.slotIdx + 1}${s.shared ? ` (×${s.stackDepth})` : ''}`,
+        ...(s.shared ? { shared: true, stackDepth: s.stackDepth } : {}),
       }));
       const zp = await promptCtx.promptZonePick(zones, {
         title: CARD_NAME,
