@@ -128,7 +128,7 @@ function imBrowser(zeichen) {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (raster[y][x] === '.' && (voll(x + 1, y) || voll(x - 1, y) || voll(x, y + 1) || voll(x, y - 1))) neu[y][x] = KONTUR;
     const palMap = { Z: '#180e1a' };
     pal.forEach((p, i) => { palMap[buchstaben[i]] = hex(p[0], p[1], p[2]); });
-    ergebnis[z] = { pal: palMap, z: neu.map(r => r.join('')) };
+    ergebnis[z] = { pal: palMap, z: neu.map(r => r.join('')), stil: !!sp };    // `stil`: das Zeichen hatte ein handgezeichnetes Sprite → Handzeichner-Schattierung (stil.js)
     protokoll.farbe.push(z);
   }
   return { ergebnis, protokoll };
@@ -152,6 +152,14 @@ function imBrowser(zeichen) {
     await page.waitForFunction(() => typeof PP_PX_SPRITES !== 'undefined' && typeof PP_PX_ICONS !== 'undefined', null, { timeout: 30000 });
     const { ergebnis, protokoll } = await page.evaluate(`(${imBrowser.toString()})(${JSON.stringify(zeichen)})`);
     // Zeichen mit und ohne Variantenselektor teilen sich EIN Glyph (gleicher Codepunkt): Farbfassung vor Einfarbfassung.
+    // Handzeichner-Stil (stil.js): FORM aus dem System-Emoji, Schattierung/Licht/Dithering wie beim handgezeichneten Sprite. Standard: nur Zeichen, die frueher
+    // ein handgezeichnetes Sprite hatten; PE_STIL=alle wendet ihn auf alle Farb-Emojis an, PE_STIL=aus schaltet ihn ab.
+    const { stilisiere } = require('./stil');
+    const modus = process.env.PE_STIL || 'sprites';
+    for (const [z, g] of Object.entries(ergebnis)) {
+      if (!g.mono && g.pal && g.pal.Z && modus !== 'aus' && (g.stil || modus === 'alle')) Object.assign(g, stilisiere(g));
+      delete g.stil;
+    }
     const nachCp = {};
     for (const [z, g] of Object.entries(ergebnis)) {
       const cp = z.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
