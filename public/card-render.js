@@ -708,10 +708,13 @@
     const supGold = spec.rarity === 'super rare' && !isArti2(t) && !isSuperhero(t) && t !== 'boss' && !isToken(t);
     // Dieselbe Behandlung (Farbe, Münzen-Gold-Bänder, Kontur) bekommen Stufe und Kosten — nur die Höhe des Verlaufs richtet sich nach der jeweiligen Zeile.
     const fillFor = (top, height) => spec.nameGold ? goldFill(ctx, top, height) : supGold ? muenzGoldFill(ctx, top, height) : nameColor(spec);
-    const nameOut = OPT.nameOutline && !isArti2(t) && !textOnly ? (supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;   // Artifacts: dunkle Schrift auf heller Platte — dort keine dunkle Kontur
+    // Artifacts: dunkle Schrift auf heller Platte — dort keine Kontur; nur die goldene Schrift der Super-Rare-Artifacts (Orange auf Hellgelb) bekommt eine deutliche, dunkle Kontur
+    const supArtiGold = spec.rarity === 'super rare' && isArti2(t);
+    const nameOut = OPT.nameOutline && !textOnly ? (supArtiGold ? 'rgb(112,28,0)' : isArti2(t) ? null : supGold ? 'rgb(182,38,0)' : nameOutlineColor(ctx, sup)) : null;
+    const nameOutF = supArtiGold ? 0.7 : 0.5;
     if (!textOnly) drawLine(ctx, spec.name, {
       left: sup ? 48 : 103, top: 48, width: sup ? 654 : 544, height: 55, size: 50, min: 48,
-      align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: 0.5,
+      align: 'center', color: fillFor(48, 55), outline: nameOut, outlineFactor: nameOutF,
     });
 
     // 4) Faehigkeiten-Felder der Helden
@@ -732,7 +735,7 @@
       if (!textOnly && (spec.level != null || spec.lvOver != null)) {
         const ueber = spec.lvOver != null;
         drawLine(ctx, String(ueber ? spec.lvOver : spec.level), Object.assign({}, LEVEL_BOX, {
-          color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : 0.5,
+          color: ueber ? spec.lvColor : fillFor(LEVEL_BOX.top, LEVEL_BOX.height), outline: ueber ? OVER_OUTLINE : nameOut, outlineFactor: ueber ? 1 : nameOutF,
         }));
       }
     }
@@ -766,7 +769,7 @@
       if (!spec.noAtk && !(isArti2(t) && textOnly) && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
         left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
         height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : isArti2(t) ? fillFor(984, 60) : stat, ink: heroBox,
-        outline: kostet ? OVER_OUTLINE : null, costX: isArti2(t),
+        outline: kostet ? OVER_OUTLINE : isArti2(t) ? nameOut : null, outlineFactor: nameOutF, costX: isArti2(t),
       });
     }
 
@@ -1081,6 +1084,17 @@
       drawLine(g, spec.costOver != null ? String(spec.costOver) : String(spec.atk), {
         left: spec.type === 'artifact' ? 296 : 504, top: 984, width: 150, height: 60, size: 38, min: 1, align: 'center', color: '#fff', costX: true,
       });
+    }
+    // Seltenheits-Stempel unten rechts (Stern / Diamant / Saphir) der Foil-Karten: gleicher Glanz wie der Name
+    if (spec.rarity === 'super rare' || spec.rarity === 'diamond' || spec.rarity === 'sapphire') {
+      const stamp = STAMP[spec.rarity];
+      const t2 = document.createElement('canvas'); t2.width = 45; t2.height = 45;
+      const g2 = t2.getContext('2d');
+      const white = isArti2(spec.type) && (stamp !== 'diamond' && stamp !== 'sapphire');
+      if (sprite(g2, (white ? 'cornerW.' : 'corner.') + stamp, 0, 0, 45, 45)) {
+        g2.globalCompositeOperation = 'source-in'; g2.fillStyle = '#fff'; g2.fillRect(0, 0, 45, 45);
+        g.drawImage(t2, 689, 989);
+      }
     }
     return c;
   }
