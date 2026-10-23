@@ -224,6 +224,19 @@
   }
 
   // ── Farben (Style-Skript des Templates) ──
+  // Wertefelder unten (HP links / Angriff rechts): Helden exakt mittig in ihren Feldern (HP x 180–380, Angriff x 470–670), Kreaturen/Artifacts weiter innen.
+  // Gemeinsam fuer `draw` und die Glanzmaske (`nameMaskCanvas`), damit Zahl und Glanz deckungsgleich liegen.
+  function hpBoxFor(t) {
+    const heroBox = (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    return { left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
+      top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', ink: heroBox };
+  }
+  function atkBoxFor(t) {
+    const heroBox = (isHero3(t) || isSuperhero(t)) && t !== 'boss';
+    return { left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
+      height: 60, size: 38, min: 1, align: 'center', ink: heroBox };
+  }
+  const hatHp = t => isHero3(t) || isSuperhero(t) || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature';
   const LEVEL_BOX = { left: 650, top: 550, width: 110, height: 110, size: 65, min: 1, align: 'center', vAlign: 'middle' };   // Stufenzahl (Zauber, Kreaturen)
   const C = {
     white: 'rgb(255,255,255)', boss: 'rgb(200,0,0)', bossText: 'rgb(240,50,50)', token: 'rgb(50,50,50)',
@@ -749,28 +762,23 @@
 
     // 7) Werte (HP, Angriff / Kosten) — `noHp` / `noAtk`: die Zahl weglassen (Brett: dort liegt der Live-Wert darueber)
     const stat = statColor(spec);
-    if (isHero3(t) || sup || t === 'summon' || t === 'tokenCreature' || t === 'artifactCreature') {
+    if (hatHp(t)) {
       // Helden ohne feste Werte (Ascended Hero „stats equal its base Hero's“) zeigen „?“ in beiden Feldern
       const unknown = isHero3(t) || sup;
-      // Helden: die Zahlen stehen exakt mittig in ihren Feldern (HP-Feld x 180–380, Angriffs-Feld x 470–670 im
-      // Rahmen) — egal, wie viele Stellen sie haben. Frueher lagen sie ~18 px zu weit innen (HP zu weit rechts,
-      // ATK zu weit links). Boss-Rahmen: unveraendert.
-      const heroBox = (isHero3(t) || sup) && t !== 'boss';
-      if (!spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', {
-        left: heroBox ? 180 : t === 'artifactCreature' ? 240 : (t === 'summon' || t === 'tokenCreature') ? 275 : t === 'boss' ? 160 : 201,
-        top: 984, width: heroBox ? 200 : 194, height: 60, size: 38, min: 1, align: 'center', color: stat, ink: heroBox,
-      });
+      // HP (Helden, Kreaturen) und Angriff (Helden): wie der Name (Farbe, Münzen-Gold, Kontur); der Glanz liegt in der Namensmaske — deshalb nicht in der Textmaske
+      if (!textOnly && !spec.noHp && (spec.hp != null || unknown)) drawLine(ctx, spec.hp != null ? String(spec.hp) : '?', Object.assign({}, hpBoxFor(t), {
+        color: fillFor(984, 60), outline: nameOut, outlineFactor: nameOutF,
+      }));
     }
     if (isHero3(t) || sup || t === 'summon' || isArti2(t)) {
-      const heroBox = (isHero3(t) || sup) && t !== 'boss';
+      const heroAtk = isHero3(t) || sup;
       // `costOver`: aktuelle Kosten eines Artifacts (sitzen im Wertefeld der Mitte), gruen/rot mit dunkler Kontur
       const kostet = isArti2(t) && spec.costOver != null;
-      // Kosten eines Artifacts: wie der Name (Farbe, Kontur); Glanz über die Namensmaske — deshalb nicht noch einmal in der Textmaske
-      if (!spec.noAtk && !(isArti2(t) && textOnly) && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', {
-        left: heroBox ? 470 : t === 'artifact' ? 296 : 504, top: 984, width: heroBox ? 200 : isArti2(t) ? 150 : 94,
-        height: 60, size: 38, min: 1, align: 'center', color: kostet ? spec.costColor : isArti2(t) ? fillFor(984, 60) : stat, ink: heroBox,
-        outline: kostet ? OVER_OUTLINE : isArti2(t) ? nameOut : null, outlineFactor: nameOutF, costX: isArti2(t),
-      });
+      // Kosten eines Artifacts und Angriff eines Helden: wie der Name (Farbe, Kontur); Glanz über die Namensmaske — deshalb nicht noch einmal in der Textmaske
+      if (!spec.noAtk && !(textOnly && (isArti2(t) || heroAtk)) && (spec.atk != null || kostet || isHero3(t) || sup)) drawLine(ctx, kostet ? String(spec.costOver) : spec.atk != null ? String(spec.atk) : '?', Object.assign({}, atkBoxFor(t), {
+        color: kostet ? spec.costColor : (isArti2(t) || heroAtk) ? fillFor(984, 60) : stat,
+        outline: kostet ? OVER_OUTLINE : (isArti2(t) || heroAtk) ? nameOut : null, outlineFactor: nameOutF, costX: isArti2(t),
+      }));
     }
 
     // 8) Regeltext — Faehigkeiten haben drei Textfelder, alle anderen Karten eines
@@ -1085,6 +1093,10 @@
         left: spec.type === 'artifact' ? 296 : 504, top: 984, width: 150, height: 60, size: 38, min: 1, align: 'center', color: '#fff', costX: true,
       });
     }
+    // HP (Helden, Kreaturen) und Angriff (Helden): gleicher Glanz wie der Name
+    const tt = spec.type, unbekannt = isHero3(tt) || isSuperhero(tt);
+    if (hatHp(tt) && !spec.noHp && (spec.hp != null || unbekannt)) drawLine(g, spec.hp != null ? String(spec.hp) : '?', Object.assign({}, hpBoxFor(tt), { color: '#fff' }));
+    if (unbekannt && !spec.noAtk) drawLine(g, spec.atk != null ? String(spec.atk) : '?', Object.assign({}, atkBoxFor(tt), { color: '#fff' }));
     // Seltenheits-Stempel unten rechts (Stern / Diamant / Saphir) der Foil-Karten: gleicher Glanz wie der Name
     if (spec.rarity === 'super rare' || spec.rarity === 'diamond' || spec.rarity === 'sapphire') {
       const stamp = STAMP[spec.rarity];
