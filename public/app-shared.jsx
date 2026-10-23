@@ -5939,8 +5939,6 @@ function FoilRim({ rim, fkey }) {
     <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
       {daten && breit && <div className="skin-holo-rim"><i /><u /></div>}
     </div>
-      )}
-    </div>
   );
 }
 
