@@ -10281,7 +10281,7 @@ class GameEngine {
    *     OFFENSIVE insta-kill AND a voluntary self-sacrifice alike.
    * Honored BY DEFAULT, waivable via opts:
    *   • firstTurnProtectedPlayer — the absolute game-start grace shield.
-   *     An offensive insta-kill (Golem tier-5, like Eraser Beam) must
+   *     An offensive insta-kill (Golem tier-5, Hand of Death) must
    *     respect it. A VOLUNTARY self-sacrifice (Divine Gift of
    *     Sacrifice) must NOT be blockable by it — the player chose to
    *     give the Hero up — so it passes `respectFirstTurnProtection:
@@ -10676,7 +10676,7 @@ class GameEngine {
     // zwei Stellen ab, `addHeroStatus` an einer — der NIEDERLAGE-Pfad
     // bisher an keiner. Folge: Castling loeste sichtbar aus, und der
     // Held starb trotzdem. Betrifft JEDEN Insta-Kill, nicht nur Kohta
-    // (Eraser Beam, Hand of Death, Golem-Stufe 5 …), denn alle laufen
+    // (Hand of Death, Golem-Stufe 5 …), denn alle laufen
     // hier durch.
     // Bewusst NACH dem Erstrunden-Schild und VOR dem Vor-Niederlage-
     // Fenster: eine Immunitaet ist kein Rettungsversuch, sondern
@@ -10706,9 +10706,9 @@ class GameEngine {
       }
     }
 
-    // ★ W64a (Al, 23.10.2026: „Ja, 'defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden"): ein Kill-Effekt, der früher
-    // durch die SCHADENS-Pipeline lief (Eraser Beam), behält hier alle EFFEKT-Schutzschichten, die dort griffen — ohne eine einzige Schadensschicht.
-    // Opt-in (`opts.wirkungsSchutz = { damageType }`); die Liste steht in `_heldWirkungsSchutz`.
+    // ★ W64a/W66a: ein Kill-Effekt OHNE Schaden („defeat it": Hand of Death, Lunatic Golem, Kohta, Decapitating Strike, Deepsea Siren) behält hier alle EFFEKT-Schutzschichten
+    // der Schadens-Pipeline (Zielschutz, Anti Magic, Charmed, Submerged, Versteinerung …) — ohne eine einzige Schadensschicht (Al 23.10.: „Kill via Effekt statt via Schaden";
+    // Eraser Beam gehört NICHT dazu: er läuft als Schaden, W66a-Rücknahme). Opt-in (`opts.wirkungsSchutz = { damageType }`); die Liste steht in `_heldWirkungsSchutz`.
     if (opts.wirkungsSchutz && !_u && !opts.isSacrifice && !opts.eigenerAbgang && opts.respectFirstTurnProtection !== false && targetOwner >= 0) {
       const _wsGrund = await this._heldWirkungsSchutz(source, target, targetOwner, opts.wirkungsSchutz);
       if (_wsGrund) {
@@ -10728,8 +10728,8 @@ class GameEngine {
 
     // ── VOR-NIEDERLAGE-FENSTER (v718, Als Befund 4.9.) ───────────────
     // „Play this card immediately when a Hero you control would be
-    // defeated" muss auch gegen Insta-Kills greifen (Eraser Beam, Hand
-    // of Death). Bisher hing dieses Fenster ausschliesslich am
+    // defeated" muss auch gegen Insta-Kills greifen (Hand of Death,
+    // Golem-Stufe 5). Bisher hing dieses Fenster ausschliesslich am
     // Schadenspfad, weshalb Escape, Emergency Spell Armor und Paraseed
     // Zombie hier stumm blieben — ein Loch im Weg, kein Kartenfehler.
     //
@@ -10753,6 +10753,13 @@ class GameEngine {
       }
       // Hat eine Reaktion den Helden zwischenzeitlich geheilt oder
       // entfernt, gilt derselbe Abbruch.
+      if (target.hp <= 0) return { defeated: false };
+    }
+
+    // ★ W66a: der Tod steht fest (alle Schutz- und Rettungsschichten sind durch) — Karten, die ihr Bild erst für einen WIRKLICHEN Kill zeigen wollen (Hand of Death),
+    // hängen es an `opts.vorTod`. Hat währenddessen jemand den Helden geheilt/entfernt, gilt derselbe Abbruch wie beim Rettungsfenster.
+    if (typeof opts.vorTod === 'function') {
+      await opts.vorTod();
       if (target.hp <= 0) return { defeated: false };
     }
 
@@ -10859,7 +10866,8 @@ class GameEngine {
    * `actionDefeatHero` und Kreaturen über `actionDestroyCard`: SCHADENS-Schutz (Schadensimmunität „takes no damage", Reduktion, Schilde, Cloudy, HP-Böden,
    * Egg of God, Resilient Monkee …) greift nicht; EFFEKT-Schutz (unaffected by effects, Resistance, Anti Magic, Gate Shield, Monia, Erstrunden-Schutz, „would be
    * defeated"-Reaktionen) greift weiter. Für Helden schaltet `opts.wirkungsSchutz` zusätzlich die Zielschutz-/Immunitäts-Schichten der Schadens-Pipeline
-   * zu (siehe `_heldWirkungsSchutz`) — für Kill-Effekte, die vorher als Riesenschaden liefen (Eraser Beam).
+   * zu (siehe `_heldWirkungsSchutz`) — W66a: für JEDEN Kill-Effekt ohne Schaden (Hand of Death, Lunatic Golem, Kohta, Decapitating Strike, Deepsea Siren).
+   * `opts.vorTod` (W66a): Callback unmittelbar vor dem Tod (nach allen Schutz-/Rettungsschichten) — für Bilder, die nur bei einem WIRKLICHEN Kill laufen.
    * @param {object} source  Quelle ({ name, owner, controller?, heroIdx?, heroOwner? })
    * @param {object} target  Heldenobjekt ODER Kreatur-Instanz (`CardInstance`)
    * @param {object} [opts]  `reason`/`sourceName`, `sourceOwner`, `damageType` (Typ der Karte: `'destruction_spell'` …), `wirkungsSchutz: true`, sonst wie `actionDefeatHero`/`actionDestroyCard`
@@ -24588,6 +24596,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // ★ W16b (A01-pollution-24): Herkunft des Gusses — nur ein Zauber aus der HAND zählt für „plays a Spell from their hand"
           // (Acid Rain). Circle-Replays (Wegwerf-Pool aus dem Gelöscht-Stapel), Deck-/Ablage-Güsse sind keine Handzauber.
           spellFromHand: fromZone === 'hand' && pool === ps.hand,
+          _inyaBuddyWeg: true,   // W66a: dieser Weg räumt `_spellPlacedOnBoard`/`_spellBecameToken` selbst ab (`zauberInstanzNachBrettzug`)
           _skipReactionCheck: true,
         });
       }
@@ -25608,6 +25617,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     await this.runHooks(HOOKS.ON_TURN_START_EARLY, {
       turn: this.gs.turn, activePlayer: this.gs.activePlayer,
     });
+    // ★ W66a: Rückkehr per Spielstand-Auftrag auch ohne Potion-Instanz im Löschstapel (Netz neben dem Hook; verbraucht den Auftrag, kein Doppelfeuer).
+    try { await loadCardEffect('Teleportation Powder')?.rueckkehrNachholen?.(this); }
+    catch (err) { console.error('[Engine] Teleportation-Powder-Rückkehr (Netz):', err.message); }
 
     // Process status effects FIRST — before any card hooks fire
     // This ensures burn damage only hits burns from previous turns,
@@ -25635,12 +25647,23 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Now fire turn-start hooks (Barker, Slime level-ups, Rancher restore, etc.)
     await this.runHooks(HOOKS.ON_TURN_START, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    await this._spielerAuftraegeZugbeginn();
     try { await this._runPostChainActions(); } catch (err) { console.error('[Engine] Nach-Ketten-Aktionen (Zugbeginn):', err.message); }   // Circles of Hell: Loeschungen durch Zugbeginn-Effekte sofort anbieten
     this.sync();
     // Skill Test: Zugbeginn-Effekte laufen je Spieler zu Beginn einer ROUND; die Phasen
     // (Resource/Main/Action) steuert der Round-Treiber (skilltest/rounds.js), nicht diese Kette.
     if (this.gs.skillTest) return;
     await this.runPhase(PHASES.START);
+  }
+
+  /**
+   * ★ W66a — SPIELERgebundene Zugbeginn-Aufträge: verzögerte Wirkungen, die dem SPIELER gehören und nicht an einer Karteninstanz hängen dürfen (Ladder to the Sky: „At the beginning of your next
+   * turn, you may search your deck …", Auftrag `ps._ladderPending`). Nach den Zugbeginn-Hooks, einzeln abgesichert; jede Karte verbraucht ihren Auftrag selbst (kein Doppelfeuer).
+   * Gegenstück am Zugende: `nachholenOhneKarte` von Hand of Death (in `_switchTurnInner`).
+   */
+  async _spielerAuftraegeZugbeginn() {
+    try { await loadCardEffect('Ladder to the Sky')?.nachholen?.(this); }
+    catch (err) { console.error('[Engine] Zugbeginn-Aufträge (Ladder to the Sky):', err.message); }
   }
 
   /**
@@ -26364,9 +26387,6 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
       try {
         await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
-        // Welle 14 (Q171): Hand of Death loest auch ohne Karte in der Ablage aus (haengt am Zauber, nicht an der Karte).
-        await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);
-        await this._runPostChainActions();
       } catch (err) {
         console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
         this.log('turn_end_hooks_aborted', {
@@ -26374,6 +26394,20 @@ this._deathWatch = (this._deathWatchStack || []).length
           player: this.gs.players[this.gs.activePlayer]?.username || null,
           reason: String(err.message || '').slice(0, 240),
         });
+      }
+      // ★ W66a: SPIELERgebundene Zugende-Aufträge (Hand of Death: „at the end of your opponent's next turn … defeat it") laufen in einem EIGENEN Fangnetz —
+      // ein abgebrochener ON_TURN_END (Hook-Obergrenze, Kartenfehler eines anderen Zugende-Lauschers) darf sie nicht verschlucken; sie hängen an
+      // `ps._handOfDeathArmed`, nicht an einer Karteninstanz (Ablage, Hand, Fantasy Buddy Token …). Welle 14 (Q171) hatte den Nachhol-Weg, W66a macht ihn zum einzigen.
+      try {
+        await loadCardEffect('Hand of Death')?.nachholenOhneKarte?.(this);
+      } catch (err) {
+        console.error('[Engine] ⚠️  Spielergebundene Zugende-Aufträge abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
+        this.log('turn_end_player_effects_aborted', { turn: this.gs.turn, reason: String(err.message || '').slice(0, 240) });
+      }
+      try {
+        await this._runPostChainActions();
+      } catch (err) {
+        console.error('[Engine] ⚠️  Nach-Ketten-Aktionen am Zugende abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
       }
     }
     if (this.gs.result) return; // ON_TURN_END resolution itself produced a result
@@ -36047,7 +36081,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // W51c: zwei Stufen — das FRUEHE Fenster (vor dem Multiplikatoren-Durchgang; `opts.early`) fragt nur Karten mit `preDamageEarly`, das SPAETE alle uebrigen.
       if (!!script.preDamageEarly !== !!opts.early) continue;
       // ── INSTA-KILLS (v718, Als Befund 4.9.) ────────────────────────
-      // Eraser Beam und Hand of Death toeten ohne Schaden. Dieses
+      // Hand of Death und Golem-Stufe 5 toeten ohne Schaden (Eraser Beam laeuft seit W66a wieder als Schaden). Dieses
       // Fenster steht ihnen jetzt offen (`actionDefeatHero` ruft es),
       // aber NUR fuer Reaktionen, die den Tod ERSETZEN koennen:
       // „would be defeated" (Escape, Paraseed Zombie). Karten, die
@@ -43341,6 +43375,7 @@ this._deathWatch = (this._deathWatchStack || []).length
                 casterIdx: link.owner,
                 damageTargets: [],
                 isSecondCast: false,
+                _inyaBuddyWeg: true,   // W66a: das Kettenglied wertet `_spellPlacedOnBoard` unten selbst aus
                 _skipReactionCheck: true,
               });
             } catch (err) {
@@ -45093,7 +45128,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   /**
-   * ★ W63b (Al: „Inya macht aus Eraser Beam einen Token … der lingering Effect feuert nie"): was geschieht mit der gespielten
+   * ★ W63b (Al: „Inya macht aus Eraser Beam einen Token … der lingering Effect feuert nie" — W66a: gemeint war Hand of Death): was geschieht mit der gespielten
    * Hand-Instanz eines Zaubers, der NACH dem Auflösen auf dem Brett landet, ohne dass die Instanz selbst mitzieht?
    * Areas zonen DIESELBE Instanz um (`placeArea`) — hier nichts zu tun. Wer eine NEUE Instanz anlegt (Card Game Player Inya: Fantasy
    * Buddy Token; Permanents wie Divine Gift of Balance), ließ die gespielte Instanz bisher als Geist in der Zone `hand` zurück

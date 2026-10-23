@@ -273,7 +273,7 @@ module.exports = {
       if (linked.type === 'creature') {
         await engine.actionDestroyCard(quelle, linked.inst, { fireCreatureDeath: true });
       } else if (linked.hero?.hp > 0) {
-        await engine.actionDefeatHero(quelle, linked.hero);
+        await engine.actionDefeat(quelle, linked.hero, { damageType: 'creature', wirkungsSchutz: true });   // W66a: Effekt-Schutz gilt für JEDE Form von „defeat"
       }
       _clearLinkFlags(engine, linked);
       engine.log('siren_link_defeat', {

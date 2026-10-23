@@ -23863,6 +23863,8 @@ Befunde von Al (Spieldesigner), „wahrscheinlich größere Bug-Klassen": (1) Ei
 
 ## Welle 63 / W63b — Card Game Player Inya: der Fantasy Buddy Token ersetzt die Karte, nicht die Wirkung · Wirkungsträger-Instanz bleibt · Token trägt das Zauber-Skript nicht (Al, 22.10.2026)
 
+> **W66a (Al, 23.10.2026) korrigiert diesen Abschnitt:** Als Meldung „der lingering Effect feuert nie, wenn Inya den Spell als Creature-Token macht" galt **nicht Eraser Beam, sondern Hand of Death** (Verwechslung). Alles hier, was nur wegen Eraser Beam entstand — Befund 1 („Eraser Beam hat keinen nachlaufenden Teil"), die Audit-Zeile „Eraser Beam", Rückfrage 1 („lingering Effect = Spell-Sperre") und Rückfrage 2 („Soll defeat Inyas Schild umgehen?") — ist **hinfällig**. Hand of Death wurde in W66a neu geprüft und gehärtet (siehe „Welle 66 / W66a"). Die Inya-Token-Klasse (Geister-Instanz, `_spellKeepInstance`, `CardInstance.loadScript`, `_spellBecameToken`) bleibt unverändert gültig.
+
 **Al (Spieldesigner), „das Größte":** „Wenn Inya mit ihrem Effekt einen Creature-Token aus dem Spell Eraser Beam macht und dieser dann getötet wird und das Spielfeld verlässt, feuert der lingering Effect von Eraser Beam (also der Instant-Kill) nie! Ich weiß nicht, ob er feuert, wenn der Token überlebt, oder ob das Transformieren in einen Token den Effekt bereits ‚löscht' – so oder so ist es falsch." Repros `docs/niche-tests/repro/W63/b-01` … `b-04` (Exit 0 = korrekt), Zusammenfassung `docs/niche-tests/FIXES-WELLE-63b.md`.
 
 ### 1) Befund: Was ist der „lingering Effect" — und warum feuerte er (nicht) bei Inyas Token?
@@ -24223,6 +24225,8 @@ Regel: eine Creature in einer Zone mit ≥ 2 Karten ist für Effekte, die sie en
 Al: „Auf der Karte steht nirgends, dass er gelöscht würde." Neu: `engine.tokenStapelZiel(inst)` (`'discard'` für `counters._fantasyBuddyToken`, sonst `'deleted'`), `tokenAbgang(inst, { geloescht })`: Schaden, Zerstören, Opfer, Rückgabe (auch „zurück auf die Hand"), Insel-Aufräumen → Ablage des permanenten Besitzers; nur ein ausdrückliches „delete" löscht (`actionMoveCard(…, 'deleted')`, Ghazma/Selbstlöschen). Biomancy-/Boulder-Token: unverändert Gelöscht-Stapel. Gestohlene/geschenkte Zauber: der Buddy trägt `originalOwner` des Zaubers → Ablage des echten Besitzers (W63c). Die Instanz wird beim Abgang entmarkt und abgemeldet (die Karte liegt als Name im Stapel wie jeder abgelegte Zauber); Flüge (`actionDestroyCard`, `_tokenStapelFlug`, Schadens-Tod) zielen auf die Ablage. Ablage-Zähler (Guardian Beast Hu, Core/Gun …) sehen die Karte. `c-01` (72 Prüfungen; alt 40 ✗); `W63/b-02` angepasst (Ablage statt „nicht in der Ablage").
 
 ### 7) D — „defeat" ist ein Kill via EFFEKT, nicht via Schaden
+
+> **W66a (Al, 23.10.2026): Punkt D ist FÜR ERASER BEAM ZURÜCKGENOMMEN.** Der Auslöser („Ja, ‚defeat' umgeht Schadensimmunität") war eine Antwort auf eine irrtümliche Eraser-Beam-Meldung (gemeint war Hand of Death). Eraser Beam läuft wieder als 999999 Schaden durch die Schadens-/Zerstörungs-Pipelines (alle Schutzschichten halten ihn ab; Zeitpunkt: sofort); neu: Resistance fängt sein Helden-„defeat" ab. **Bleibt:** der Baustein `engine.actionDefeat` + `_heldWirkungsSchutz` (W66a nutzt ihn für Hand of Death, Lunatic Golem, Kohta, Decapitating Strike, Deepsea Siren) und die Klassifikation der Schutzschichten unten. Rückfragen 3 und 5 sind beantwortet (siehe W66a).
 Al: „‚Defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden." Klassifikation (Schadens-Schutz greift NICHT, Effekt-Schutz greift WEITER):
 
 | Schicht | Klasse | bei „defeat" |
@@ -26109,6 +26113,8 @@ Befunde von Al (Spieldesigner), „wahrscheinlich größere Bug-Klassen": (1) Ei
 
 ## Welle 63 / W63b — Card Game Player Inya: der Fantasy Buddy Token ersetzt die Karte, nicht die Wirkung · Wirkungsträger-Instanz bleibt · Token trägt das Zauber-Skript nicht (Al, 22.10.2026)
 
+> **W66a (Al, 23.10.2026) korrigiert diesen Abschnitt:** Als Meldung „der lingering Effect feuert nie, wenn Inya den Spell als Creature-Token macht" galt **nicht Eraser Beam, sondern Hand of Death** (Verwechslung). Alles hier, was nur wegen Eraser Beam entstand — Befund 1 („Eraser Beam hat keinen nachlaufenden Teil"), die Audit-Zeile „Eraser Beam", Rückfrage 1 („lingering Effect = Spell-Sperre") und Rückfrage 2 („Soll defeat Inyas Schild umgehen?") — ist **hinfällig**. Hand of Death wurde in W66a neu geprüft und gehärtet (siehe „Welle 66 / W66a"). Die Inya-Token-Klasse (Geister-Instanz, `_spellKeepInstance`, `CardInstance.loadScript`, `_spellBecameToken`) bleibt unverändert gültig.
+
 **Al (Spieldesigner), „das Größte":** „Wenn Inya mit ihrem Effekt einen Creature-Token aus dem Spell Eraser Beam macht und dieser dann getötet wird und das Spielfeld verlässt, feuert der lingering Effect von Eraser Beam (also der Instant-Kill) nie! Ich weiß nicht, ob er feuert, wenn der Token überlebt, oder ob das Transformieren in einen Token den Effekt bereits ‚löscht' – so oder so ist es falsch." Repros `docs/niche-tests/repro/W63/b-01` … `b-04` (Exit 0 = korrekt), Zusammenfassung `docs/niche-tests/FIXES-WELLE-63b.md`.
 
 ### 1) Befund: Was ist der „lingering Effect" — und warum feuerte er (nicht) bei Inyas Token?
@@ -26469,6 +26475,8 @@ Regel: eine Creature in einer Zone mit ≥ 2 Karten ist für Effekte, die sie en
 Al: „Auf der Karte steht nirgends, dass er gelöscht würde." Neu: `engine.tokenStapelZiel(inst)` (`'discard'` für `counters._fantasyBuddyToken`, sonst `'deleted'`), `tokenAbgang(inst, { geloescht })`: Schaden, Zerstören, Opfer, Rückgabe (auch „zurück auf die Hand"), Insel-Aufräumen → Ablage des permanenten Besitzers; nur ein ausdrückliches „delete" löscht (`actionMoveCard(…, 'deleted')`, Ghazma/Selbstlöschen). Biomancy-/Boulder-Token: unverändert Gelöscht-Stapel. Gestohlene/geschenkte Zauber: der Buddy trägt `originalOwner` des Zaubers → Ablage des echten Besitzers (W63c). Die Instanz wird beim Abgang entmarkt und abgemeldet (die Karte liegt als Name im Stapel wie jeder abgelegte Zauber); Flüge (`actionDestroyCard`, `_tokenStapelFlug`, Schadens-Tod) zielen auf die Ablage. Ablage-Zähler (Guardian Beast Hu, Core/Gun …) sehen die Karte. `c-01` (72 Prüfungen; alt 40 ✗); `W63/b-02` angepasst (Ablage statt „nicht in der Ablage").
 
 ### 7) D — „defeat" ist ein Kill via EFFEKT, nicht via Schaden
+
+> **W66a (Al, 23.10.2026): Punkt D ist FÜR ERASER BEAM ZURÜCKGENOMMEN.** Der Auslöser („Ja, ‚defeat' umgeht Schadensimmunität") war eine Antwort auf eine irrtümliche Eraser-Beam-Meldung (gemeint war Hand of Death). Eraser Beam läuft wieder als 999999 Schaden durch die Schadens-/Zerstörungs-Pipelines (alle Schutzschichten halten ihn ab; Zeitpunkt: sofort); neu: Resistance fängt sein Helden-„defeat" ab. **Bleibt:** der Baustein `engine.actionDefeat` + `_heldWirkungsSchutz` (W66a nutzt ihn für Hand of Death, Lunatic Golem, Kohta, Decapitating Strike, Deepsea Siren) und die Klassifikation der Schutzschichten unten. Rückfragen 3 und 5 sind beantwortet (siehe W66a).
 Al: „‚Defeat' umgeht Schadensimmunität, das ist ein Kill via Effekt statt via Schaden." Klassifikation (Schadens-Schutz greift NICHT, Effekt-Schutz greift WEITER):
 
 | Schicht | Klasse | bei „defeat" |
@@ -26682,3 +26690,109 @@ Entscheidung Al (23.10.2026), Ergänzung zu W64c: „Auch **Plant Golem** soll, 
 
 ### Rückfragen an Al (Ja/Nein)
 1. **Wer hält einen vom Kontrolleur ausgespielten Golem?** Spielt O einen (allgemein gebounceten) Golem aus seiner Hand selbst aus, liegt er bei S (`controller` = S), `originalOwner` = S, aber `owner` = O (der ausspielende Spieler). Racket Arrow/Chasing schicken ihn an den ursprünglichen Owner S — gewollt (so umgesetzt)? Alternative: an den Spieler, der ihn zuletzt ausgespielt hat (O).
+## Welle 66 / W66a — Eraser Beam zurückgenommen · Hand of Death: der Auftrag gehört dem Spieler · Effekt-Schutz gegen JEDE Form von „defeat" · Bug-Klasse „verzögerte Wirkung an einer Karteninstanz"
+
+Auslöser: Al (Spieldesigner, 23.10.2026) hat sich geirrt — die W63-Meldung „der lingering Effect feuert nie, wenn Inya den Spell als Creature-Token macht" betraf **Hand of Death**, nicht Eraser Beam. „Bitte nimm alles zurück, was ich fälschlicherweise zu Eraser Beam angemerkt habe." Dazu: „der Resistance-Schutz sollte JEDE Form von defeat abdecken, auch Hand of Death, Lunatic Golem usw. Der Rest hier passt so." Repros `docs/niche-tests/repro/W66/a-01 … a-07`, Übersicht `docs/niche-tests/FIXES-WELLE-66a.md`. Kartentexte (`data/cards.json`) unverändert.
+
+### 1) Eraser Beam — Rücknahme
+| Punkt | Zustand |
+|---|---|
+| W64a-D „defeat umgeht Schadensimmunität" für Eraser Beam | **zurückgenommen.** `eraser-beam.js` ist auf den Stand vor W64a zurückgestellt: 999999 `destruction_spell`-Schaden durch `dealDamage` (Held) bzw. `processCreatureDamageBatch` (Kreatur), also durch ALLE Schutzschichten. Inyas „takes no damage" (lebender Fantasy Buddy), Immortal, Storm Piano (`damage_proof`), Carris, Cloudy-Multiplikator 0, The Egg of God, Resilient Monkee halten ihn wieder ab; Effekt-Schutz (Erstrunden-Schutz, Anti Magic, Submerged, Charmed, Versteinert, Zielschutz, Gate Shield, Monia …) wie zuvor. **Zeitpunkt des Kills: sofort** (`onPlay`, Kartentext „Choose a target … and defeat it"), unverändert. |
+| Resistance gegen Eraser Beam | **neu (Al: „JEDE Form von defeat")**: „defeat it" ist ein Nicht-Schaden-Effekt auf den Helden — `engine.heroNonDamageEffectBlocked(…, 'defeat')` VOR dem Riesenschaden (Lv1/Lv2: erste Karten des Zuges, Lv3: alles außer Schaden). Vor W64a hatte Resistance Eraser Beam NICHT abgefangen (die Schadens-Pipeline kennt kein Resistance); W64a hatte es per `actionDefeat` mitgebracht — jetzt bleibt genau dieser Teil, ohne den Rest von D. |
+| W63b „Eraser Beam hat keinen nachlaufenden Teil", Rückfrage 1 („lingering Effect = Spell-Sperre"), Rückfrage 2 („Soll defeat Inyas Schild umgehen?") | **hinfällig** (Verwechslung); in W63b/W64a-D als zurückgenommen vermerkt. |
+| BLEIBT | die ganze Inya-Token-Klasse aus W63b (Geister-Instanz, `_spellKeepInstance`, `zauberInstanzNachBrettzug`, Anti Magic Zone/Calm Diatribe/Weapon Unleashing/Mission, `CardInstance.loadScript` für Fantasy Buddy, `_spellBecameToken`), Buddy-Tod → Ablage des Besitzers (W64a-C, Al bestätigt), der Baustein `engine.actionDefeat` + `_heldWirkungsSchutz` (jetzt für die ANDEREN defeat-Karten, Abschnitt 4). |
+| Repros | `W66/a-01` (Eraser Beam × Inya-Schild/Immortal/damage_proof/Multiplikator/Effekt-Schutz/Resistance, beide Sitze, 32 Prüfungen; auf W64a-Stand 8 ✗) und `W64/d-01` (auf die alte Auslegung zurückgestellt, 68 Prüfungen; Schadens-Schutz-Zeilen von „besiegt" auf „überlebt" gedreht). |
+
+### 2) Hand of Death — Befund und Umbau
+**Befund (ehrlich):** Ein „feuert nie" ließ sich im Spielfluss NICHT reproduzieren. `W66/a-02` (142 Prüfungen, beide Sitze) fährt den ECHTEN Weg — `doPlaySpell` → Kette → `onPlay`, dann `advanceToPhase(END)` → `switchTurn` → ON_TURN_END → die echte abbrechbare Zielwahl an den Wirker mitten im gegnerischen Zugende (Menschen-Modus, Fragen mit Zug/aktivem Spieler protokolliert) — für Kreatur-/Heldenziele beider Seiten (auch eigene: „any target"), „may" → Nein, Skip-Turn des Wirkers, Bedingung „user not defeated, Frozen or Stunned" (+ Gegenproben), „1 pro Zug" und mehrere Hand of Death in verschiedenen Zügen / beide Spieler, Sofort-Guss (`_castSpellImmediately`, Coffee), von Silence negiert, Inya (Token lebt / stirbt vor dem Gegnerzug / im Gegnerzug / direkt vor dem Fenster / ist selbst das Ziel / Inya eingefroren / Inya lehnt den Buddy ab), Karte nicht mehr in der Ablage (Hand, Deck, gelöscht, Ablage leer), übersprungener Gegnerzug, CPU als Gegner (verschachtelter Zugwechsel), CPU-Gehirn als Wirker (`installCpuBrain`), Charme-Wirker. **Der Stand vor W66a (0146297c) bestand 138 von 142 Prüfungen** — W63b hatte also Recht, dass der Standardfall trägt. Die vier ✗ waren Fragilitäten, keine Alltagsfälle:
+* **Zwei Auslösewege.** Ablage-Listener (`hooks.onTurnEnd` der Karte in der Ablage, über `_ensurePileListeners`) UND der Nachhol-Weg der Engine (Q171) — beide mit dem starren Fenster `gs.turn === armedOnTurn + 1`. Eine verschobene Zugnummer ließ die Marke für immer liegen (✗ „verschobene Zugnummer").
+* **Gemeinsames try.** Der Nachhol-Weg lief im selben `try` wie `runHooks(ON_TURN_END)`: warf irgendein anderer Zugende-Hook (Hook-Obergrenze, Kartenfehler), wurde auch Hand of Death verschluckt (✗ „ON_TURN_END bricht ab").
+* **Kein Effekt-Schutz** über Resistance/Anti Magic hinaus (Abschnitt 4).
+Wo das „feuert nie" Als Spiel herkam, ist damit offen — falls es nach W66a noch auftritt, bitte genauen Ablauf (Held des Wirkers, Gegner Mensch oder CPU, Zustand der Helden am Zugende, Inya ja/nein).
+
+**Umbau (der Effekt gehört dem Spieler, nicht der Karte):**
+* Der Auftrag lebt NUR in `ps._handOfDeathArmed` (`{ armedOnTurn, casterHeroIdx, casterHeroOwner }`). `hooks.onTurnEnd` und `activeIn: ['discard']` sind entfernt; es gibt keinen Karten-Listener mehr. Hand, Ablage, Deck, gelöscht, Fantasy Buddy Token auf dem Brett, Token tot — für das Auslösen egal.
+* **Die Engine löst aus:** `switchTurn` ruft `nachholenOhneKarte(engine)` (Name aus W14/Q171 beibehalten) nach `ON_TURN_END` in einem EIGENEN `try` (auch ein abgebrochener ON_TURN_END verschluckt es nicht). Fenster: `gs.activePlayer !== Wirker && gs.turn > armedOnTurn` — das erste Zugende eines anderen Spielers nach dem Wirken („end of your opponent's next turn"), robust gegen verschobene Zugnummern. Ein übersprungener Gegnerzug (Guardian Beast Zhu) endet formal trotzdem (`_switchTurnInner`) → die Marke feuert dort (wie vorher).
+* **Ablauf:** Marke sofort verbrauchen → Nutzer-Bedingung (besiegt/Frozen/Stunned/Webbed → `hand_of_death_fizzle`) → abbrechbare Zielwahl („you may": Abbruch = Nein, keine Marke mehr, kein Skip) → `engine.actionDefeat(…, { wirkungsSchutz: true, damageType: 'destruction_spell' })` (Held) bzw. `actionDefeat` → `actionDestroyCard` (Kreatur) → bei Erfolg `ps._skipNextTurn`. Kontext der Zielwahl: kurzlebige Hilfsinstanz mit Heldenindex/-seite des Nutzers (Alliance & Co. sehen den richtigen Wähler).
+* `opts.vorTod` (neu in `actionDefeatHero`): Callback unmittelbar vor dem Tod — die Strike-Animation läuft nur bei einem WIRKLICHEN Kill, nicht bei einem abgeprallten Effekt.
+* Repros: `W66/a-02` (142), plus die bestehenden `W14/c-q171`, `S02-spells/11`, `W63/b-03`, `W24/a-01`, `W25/a-04` (alle grün).
+
+### 3) Audit — Bug-Klasse „verzögerte Wirkung hängt an einer Karteninstanz statt am Spieler/Spielstand"
+Methode: (a) Quellenaudit aller Spells/Karten mit „next turn"/„end of … turn"/„until the beginning of …"-Text (Textsuche über `data/cards.json`: 63 Spells, 8 Attacks, 6 Potions, 26 Artifacts, Kreaturen/Helden) × Skripte mit `onTurnStart`/`onTurnEnd`-Hooks, `activeIn` mit `discard`/`deleted`/`permanent`, `expiresAtTurn`-Stempel, `ps._…`/`gs._…`-Marken; (b) **generischer Wirkungs-Äquivalenz-Lauf `W66/a-03`**: jeder spielbare Spell (182 je Sitz, 96 Inya-fähig) wird mit Inya in drei Varianten über ZWEI echte Zugwechsel getrieben — A: Buddy abgelehnt (Referenz), B: Buddy lebt, C: Buddy stirbt sofort — und ein Fingerabdruck (Helden-HP/Status/Buffs, Hände, Decks, Ablagen, Brett inkl. Zähler/Status aller Instanzen, alle `_`-Felder von Spieler und Spielstand, Areas, Permanents) verglichen; B == A und C == A, abzüglich des Tokens selbst. Begründete Abweichungen: Chaos Magic (Zufall), Fire Bolts/Torchure (Inyas „takes no damage" gilt, solange der Buddy lebt: Rückstoß/Gift-Kosten am Wirker). (c) gezielte Repros für die Zeilen mit Instanzbindung.
+
+| Karte | Verzögerung (Kartentext) | hängt an | ohne Inya | Token lebt | Token tot | Ergebnis |
+|---|---|---|---|---|---|---|
+| **Hand of Death** | „at the end of your opponent's next turn … defeat it" | **vorher** Spieler-Marke + Ablage-Listener + Engine-Nachholweg (zwei Wege, starres Fenster, gemeinsames `try`); **jetzt** nur Spieler-Marke, Auslösung durch die Engine | ✓ | ✓ | ✓ | **gehärtet** (`a-02`) |
+| Anti Magic Zone | „until the end of your opponent's next turn" | Träger-Instanz in der Ablage (`_spellKeepInstance`, `_amzExpiresAtTurn`) + `gs._amzFenster` | ✓ | ✓ | ✓ | W63b behoben (Träger bleibt, wenn der Token lebt oder stirbt) |
+| Calm Diatribe | „Action Phase next turn" | Held-Buff `calm` + Träger-Instanz (KEEP) | ✓ | ✓ | ✓ | schon korrekt; Träger überlebt `addCardFromDiscardToHand` (geprüft: Grant gilt im Folgezug) |
+| Weapon Unleashing, Mission of the Light Brigade | zweite Aktion / Ladungen | Träger-Instanz (KEEP) (+ `ps._missionCharges`) | ✓ | ✓ | ✓ | schon korrekt (Träger, W63b `b-02`) |
+| Teleportal | „at the beginning of your next turn add it to your hand" | `ps.permanents` + Instanz in `permanent` | ✓ | ✓ | ✓ | schon korrekt (`W63/b-03`) |
+| Trial of Knowledge | „for the rest of the game" | Marker-Instanz in der Ablage | ✓ | ✓ | ✓ | schon korrekt |
+| Butterfly Cloud, Disruption Ray, Howling in the Night, Forbidden Zone, Null Zone, Medusa's Curse, Petrifier, Poison Pollen, Iceage, Icebolt, Icy Grave, Snowstorm Mischief, The White Army, Refreshing Night, Divine Gift of Biseria | „until …"/„for N turns" | Status/Buff am ZIEL (`expiresAtTurn`, `expiresForPlayer`, Statusdauer) | ✓ | ✓ | ✓ | schon korrekt (`a-03` Fingerabdruck) |
+| Divine Gift of Magic, Looming Threat, Perilous Journey, Mischief Invasion, Rewrite History, Missing People, Torchure, Create Illusion | Zugende-/Folgezug-Fristen | Spieler (`ps._handLevelOffsetsExpireTurn`, `_handLevelCountdown`, `_handAscensionGrants`, `_mischiefInvasionUsedTurn`, `_rewriteLog`), Spielstand (`gs._discardedOnTurn`, Illusions-Register), Heldstatus (`poisoned._torchure`) | ✓ | ✓ | ✓ | schon korrekt |
+| Reaktionen/Surprises/Areas/Anhänge (Barrier of Undying, Deepsea Spores, Dive Down, Frost Rune, Jumpscare, Spider Silk Bridge, Doom Clock, Gathering Storm, Circles of Hell …) | verschiedene | eigene Brettinstanz / Hand-Reaktion | – | – | – | Inya greift nicht (eigene Brettkarte / nicht im eigenen Zug) |
+| **Skull Carpet Bombing** (Surprise-Spell, zündet am EIGENEN Zugende) | – | – | ✓ | **✗ Token UND Ablage (Duplikat), Rest-Flags** | **✗** | **behoben (Fund des generischen Laufs, Abschnitt 5)** |
+| Karten ohne Inya-Bezug (Potions, Artifacts, Kreaturen): | | | | | | |
+| **Teleportation Powder** (Potion) | „At the beginning of your next turn, return …" | Auftrag im Spielstand (`gs._teleportPending`) — Auslöser aber nur die Potion-Instanz im LÖSCHSTAPEL (lazy `_ensurePileListeners` aus dem Pile-Inhalt) | ✓ | – | – | **BUG behoben:** nahm ein Effekt die Potion aus dem Löschstapel (`takeFromPileSync`: Aurora Borealis, Guardian Beast Yang, Ghazma …) oder verließ sie ihn sonst, kam der Held NIE zurück und `_teleportedAway` hielt die Niederlage auf. Jetzt zusätzlich Engine-Netz `rueckkehrNachholen` direkt nach `ON_TURN_START_EARLY` (`a-06`; alt 12 ✗) |
+| **Ladder to the Sky** (Artifact) | „At the beginning of your next turn, you may search …" | Zähler an der Artefakt-Instanz in der Ablage (`_ladderLevel`/`_ladderArmedTurn`) | ✓ | – | – | **gehärtet:** Auftrag jetzt am Spieler (`ps._ladderPending`), Auslösung `_spielerAuftraegeZugbeginn` nach den Zugbeginn-Hooks (`a-07`). Die Träger-Instanz überlebte die echten Stapelwege schon vorher; jetzt gar keine Instanz mehr nötig |
+| Flashbang | „next turn ends after first Action" | eigene Marker-Instanz im Löschstapel (nicht die Karte) | ✓ | – | – | schon korrekt |
+| Elixir of Immortality, Potion of Greed, Smoke Vial, Elixir of Cold, Giga Steroids (nur derselbe Zug) | – | Karte offen vor dem Spieler (`permanent`) / `ps._skipActionPhaseTurn` / Buff mit `expiresAtTurn` / Träger | ✓ | – | – | schon korrekt bzw. Absicht |
+
+### 4) Effekt-Schutz gegen JEDE Form von „defeat" (Auftrag 3)
+Alle Karten mit Kartentext-„defeat" (Kill-Effekt, KEIN Schaden) laufen jetzt über `engine.actionDefeat(source, target, { wirkungsSchutz: true, damageType })`: Held → `actionDefeatHero` mit der Schutz-Reihenfolge Erstrunden-Schutz → **Resistance** → Effekt-Immunität (Escape Device, Castling) → Spell-Schild → **`_heldWirkungsSchutz`** (Zielschutz „or HIT", Anti Magic Enchantment [nur Spells], Anti Magic `magic_immune` [Spell-Stufe ≤ Buff-Stufe], Charme Lv3, Quellen-Immunität, Versteinerung, Submerged) → „would be defeated"-Reaktionen; Kreatur → `actionDestroyCard` (Cardinal, Time Bomblebee, Gate Shield, Puppets-Wächter, Monia, Golden Wings, Erstrunden-Schutz …). SCHADENS-Schutz (Schadensimmunität, Inya-Buddy, Immortal, `damage_proof`, Reduktion, Egg of God, Resilient Monkee) gilt für diese Karten NICHT — es ist kein Schaden.
+
+| Karte | Pfad vorher → nachher | Typ für den Schutz | Anmerkung |
+|---|---|---|---|
+| **Hand of Death** | `actionDefeatHero` + eigene AM-/Resistance-Prüfung → `actionDefeat(wirkungsSchutz)` | `destruction_spell` | Zielschutz, Charmed, Submerged, Versteinert, AME waren vorher NICHT abgedeckt (Submerged-Held starb) |
+| **Lunatic Golem** (Stufe 5) | `actionDefeatHero(source, hero, {reason})` → `actionDefeat(wirkungsSchutz)` | `creature` | Anti Magic/AME gelten nicht (Creature-Effekt, kein Spell) |
+| **Kohta, Master of Super-Killing** | `actionDefeatHero(… type 'attack')` → `actionDefeat(wirkungsSchutz, type 'attack')` | `attack` | zählt als Attack: „cannot be hit by Attacks"-Schutz greift, Anti Magic nicht |
+| **Decapitating Strike** | `actionDefeatHero` → `actionDefeat(wirkungsSchutz)` | `attack` | Reaktion nach Schaden |
+| **Deepsea Siren** (verknüpftes Ziel) | `actionDefeatHero` → `actionDefeat(wirkungsSchutz)` | `creature` | Verknüpfungs-Tod |
+| **Midnight Assault** | `actionDefeatHero(unaufhaltsam)` unverändert | – | Kartentext „ignores any effect that would … prevent the target from being defeated": umgeht alles außer Erstrunden-Schutz und Resistance (W14-Ruling Q6, ausdrücklich „auch das unaufhaltsame Midnight Assault") |
+| **Eraser Beam** | Schadensweg (Abschnitt 1) | `destruction_spell` | Schadens- UND Effekt-Schutz + Resistance |
+| Gift of Sacrifice, Pharaoh, Teocuilatl, Last Resort, Hel, Bonded Companions, Gobbo, Foresta, Puppets (kein Token) | `actionDefeatHero` (`isSacrifice`/`eigenerAbgang`/`hpKosten`) | – | freiwilliges Selbstopfer/Buchführung: umgehen bewusst jeden Schutz (unverändert, Test `a-04`) |
+| Goldify, Burned Contract, Trial of Dominance, Troop Annihilation, Point-Blank Annihilation, Rolling Boulder, Afflicted Vermin, Deepsea Reaper/Siren, Slippery Narw, Spirit of the Super-Killing Knife, Burning Fuse, Censpartan War Counselor, Crusader's Cutlass, Giant Exploding Skull, Aquatic Arrows, 500 Piranhas, Sentient Bomb Golems, Plant Golem, The Creepy Clown of Heaven | `actionDestroyCard` | – | nur Kreaturen; der Pfad hat alle Effekt-Schichten, kein Schadens-Schutz (unverändert) |
+
+**Testmatrix `W66/a-04` (212 Prüfungen, beide Sitze):** Karte × Ziel (Held/Kreatur) × Schutz. Erwartung (✓ = Ziel überlebt):
+
+| Schutz am Held | Hand of Death | Lunatic Golem | Kohta | Decapitating Strike | Midnight Assault | Eraser Beam |
+|---|---|---|---|---|---|---|
+| keiner | stirbt | stirbt | stirbt | stirbt | stirbt | stirbt |
+| Resistance Lv1 / Lv3 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Erstrunden-Schutz | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Submerged | ✓ | ✓ | ✓ | ✓ | stirbt | ✓ |
+| Charme Lv3 | ✓ | ✓ | ✓ | ✓ | stirbt | ✓ |
+| Versteinert | ✓ | ✓ | ✓ | ✓ | stirbt | ✓ |
+| Anti Magic Lv3 (Buff) / AME | ✓ | stirbt | stirbt | stirbt | stirbt | ✓ |
+| Schadensimmunität / Immortal | stirbt | stirbt | stirbt | stirbt | stirbt | ✓ |
+
+Kreatur: Erstrunden-Schutz ✓ für alle; Cardinal-Beast-Immunität und `_damageDestroyImmune` ✓ für alle außer Midnight Assault; Resilient-Monkee-Schadensschild: nur Eraser Beam ✓. Dazu Bausteintests (`actionDefeat` direkt, ohne Kartenskript; Selbstopfer umgeht Resistance Lv3 + Submerged).
+
+### 5) Funde des generischen Inya-Laufs (außerhalb von Hand of Death)
+* **Surprise-Spells und Hand-Reaktionen aus Schadensfenstern machten Inya zum Token-Macher — falsch:** Skull Carpet Bombing (Surprise-Spell, zündet am Ende des EIGENEN Zuges) feuert `afterSpellResolved`; Inya (eigener Zug) beschwor die aktivierte Surprise als Buddy, die Surprise-Auflösung legte die Karte zusätzlich in die Ablage (**Karte doppelt**: Token UND Ablage), und `gs._spellPlacedOnBoard`/`gs._spellBecameToken` blieben stehen — der NÄCHSTE normal gespielte Zauber landete weder im Ablagestapel noch als Token (**Karte verloren**; `W66/a-05`, alt 8 ✗). Fix: Inya wirkt nur auf Wegen, die den Token auswerten — `doPlaySpell`, `_castSpellImmediately`, Kettenglied — markiert mit `_inyaBuddyWeg: true` im `afterSpellResolved`-Kontext (Rückfrage 2).
+
+### 6) Verträge
+* Verzögerte Wirkung („at the end of … next turn", „at the beginning of your next turn") gehört an den **Spieler/Spielstand** (`ps._…`, `gs._…`, Held-/Kreaturen-Status mit `expiresAtTurn`) und wird von der **Engine** an einem festen Punkt ausgelöst (`nachholenOhneKarte` am Zugende, `_spielerAuftraegeZugbeginn` und `rueckkehrNachholen` am Zugbeginn) — nie vom Listener einer Karteninstanz, die in einem Stapel liegt (lazy `_ensurePileListeners`) oder als Token auf dem Brett. Ein Auftrag wird beim Auslösen ZUERST verbraucht (kein Doppelfeuer, falls ein alter Weg ihn noch kennt).
+* Fenster als „erstes Ereignis nach …" formulieren (`turn > armedOnTurn`), nicht als `turn === armedOnTurn + 1`.
+* Kill-Effekt mit Kartentext „defeat" → `engine.actionDefeat(source, target, { wirkungsSchutz: true, damageType })` (Resistance + Effekt-Schutz, kein Schadens-Schutz); „deal damage" bleibt Schaden; freiwilliges Opfer → `actionDefeatHero` mit `isSacrifice`/`eigenerAbgang`.
+* Neue `afterSpellResolved`-Aufrufer, die eine Spell-KARTE auflösen und danach selbst ablegen/auswerten, setzen `_inyaBuddyWeg: true`, wenn sie `_spellPlacedOnBoard`/`_spellBecameToken` auswerten (sonst bekommt Inya keinen Buddy).
+
+### 7) Tests W66a
+| Datei | Inhalt | Prüfungen | alter Stand |
+|---|---|---|---|
+| `W66/a-01-eraser-beam-zurueckgenommen-schadensschutz-haelt-ab.js` | Rücknahme: Inya-Schild, Immortal, damage_proof, Multiplikator 0, Effekt-Schutz, Resistance Lv1/3, Kill sofort | 32 | 8 ✗ |
+| `W66/a-02-hand-of-death-echter-zugwechsel-alle-faelle.js` | Hand of Death über den echten Zug-/Phasenfluss, Menschen-Modus, alle Fälle (A–J) | 142 | 4 ✗ (Zugnummer verschoben, ON_TURN_END bricht ab) |
+| `W66/a-03-inya-token-verzoegerte-wirkungen-aller-zauber.js` | generischer Wirkungs-Äquivalenz-Lauf aller spielbaren Spells (A/B/C × 2 Zugwechsel) | 4 (182 Spells je Sitz) | ✗ (Skull Carpet Bombing) |
+| `W66/a-04-defeat-wirkungsschutz-alle-karten.js` | Effekt-Schutz gegen jede Form von defeat: 6 Karten × Held/Kreatur × Schutz × beide Sitze + Baustein | 212 | 32 ✗ |
+| `W66/a-05-inya-surprise-spell-wird-kein-buddy-kein-duplikat.js` | Skull Carpet Bombing × Inya: kein Buddy/Duplikat/Rest-Flag, Folgezauber unverändert | 16 | 8 ✗ |
+| `W66/a-06-teleportation-powder-ohne-potion-im-loeschstapel.js` | Rückkehr auch ohne Potion im Löschstapel (`takeFromPileSync`, Hand, verschwunden) | 24 | 12 ✗ |
+| `W66/a-07-ladder-to-the-sky-auftrag-gehoert-dem-spieler.js` | Ladder: Auftrag am Spieler, Karte in Ablage/Hand/Deck/gelöscht | 40 | (Auftrag am Spieler neu) |
+| `W64/d-01-…` | zurückgestellt auf den Stand vor W64a (+ Resistance) | 68 | – |
+Angepasst: `W4-kosten/G1` (Ladder: Auftrag am Spieler statt Zähler an der Ablage-Instanz), `W63/a-02` (Ladder: der Zugbeginn-Auftrag läuft über `engine._spielerAuftraegeZugbeginn`; `t.turnStart` feuert nur die Hook-Batterie). Hilfsmodul `docs/niche-tests/lib/hod.js` (Menschen-Modus-Pumpe, Szenenbau, Zielwahl-Funktionen).
+
+### 8) Rückfragen an Al (Ja/Nein)
+1. **Resistance** stoppt jetzt JEDES Helden-„defeat" — auch Eraser Beams (das W64a-Q3 bleibt bestehen, obwohl Eraser Beam sonst wieder reiner Schaden ist). Ja?
+2. **Inya × Surprise-Spells / Hand-Reaktionen aus Schadensfenstern** (z. B. Skull Carpet Bombing am eigenen Zugende): kein Buddy, die Karte geht normal in die Ablage (vorher: Token UND Ablage, Folgezauber verschluckt). Oder soll Inya auch daraus einen Buddy machen?
+3. **Hand of Death bei übersprungenem Gegnerzug** (Guardian Beast Zhu): die Marke feuert am formalen Ende des übersprungenen Zuges (wie bisher). So gewollt, oder „end of your opponent's next turn" erst am nächsten TATSÄCHLICHEN Zugende?
+4. **„you may" abgelehnt:** der Auftrag ist verbraucht (kein Nachholen im Folgezug), ohne Skip. So?
+5. Gibt es einen **konkreten Ablauf**, in dem Hand of Death nach W66a noch nicht feuert? Der Alltagsweg (auch mit Inya-Token lebend/tot) ließ sich im echten Spielfluss nicht zum Scheitern bringen — Held des Wirkers, Gegner Mensch/CPU, Zustand am Zugende, bitte.
