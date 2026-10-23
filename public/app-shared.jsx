@@ -5935,25 +5935,10 @@ function FoilRim({ rim, fkey }) {
   }, [rim.kind, breit]);
   fkey = fkey || 'rim:' + rim.kind;
   const phase = usePhase(fkey);
-  // Funkeln (Al, 23.10.: „den goldenen Rahmen mehr funkeln lassen"): Pixel-Glitzerkreuze auf dem Rahmen, der Rahmen ist 1 Zelle (von 75 × 105) breit.
-  // Lage je Karte gewürfelt (Schlüssel der Karte), in Zellen; die Kreuze liegen ganz auf der Karte, ihre Arme berühren den Rahmen.
-  const funken = useMemo(() => {
-    const rnd = foilZufall(fkey + '|rimfunken');
-    const out = [];
-    for (let i = 0; i < 24; i++) {
-      const seite = i % 4, t = rnd(), k = rnd() < 0.35 ? 7 : 5, r = (k - 1) / 2;     // Kreuz liegt ganz auf der Karte: Mitte r Zellen von der Kante
-      const [x, y] = seite === 0 ? [Math.round(r + 2 + t * (70 - 2 * r)), r] : seite === 1 ? [74 - r, Math.round(r + 2 + t * (100 - 2 * r))] : seite === 2 ? [Math.round(r + 2 + t * (70 - 2 * r)), 104 - r] : [r, Math.round(r + 2 + t * (100 - 2 * r))];
-      out.push({ x, y, k, d: (rnd() * 3.6).toFixed(2), p: (2.6 + rnd() * 1.8).toFixed(2) });
-    }
-    return out;
-  }, [fkey]);
   return (
     <div ref={ref} className={'skin-holo skin-holo-nur-rahmen foil-rim-' + rim.tone} data-foil-key={fkey} style={daten ? { ...daten.vars, '--sh-phase': phase } : undefined} aria-hidden="true">
-      {daten && breit && <div className="skin-holo-rim"><i /></div>}
-      {daten && breit && (
-        <div className="skin-holo-rim-funken">
-          {funken.map((f, i) => <b key={i} style={{ '--fx': f.x, '--fy': f.y, '--k': f.k, '--fd': f.d + 's', '--fp': f.p + 's' }} />)}
-        </div>
+      {daten && breit && <div className="skin-holo-rim"><i /><u /></div>}
+    </div>
       )}
     </div>
   );
