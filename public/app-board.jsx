@@ -52305,8 +52305,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('trigger_treacherous_crystal', { roomId: gameState.roomId });
                   } : undefined))}>
                   {revealEntry ? (
-                    <img src={cardImageUrl(revealEntry.name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
-                      onMouseEnter={() => { const c = CARDS_BY_NAME[revealEntry.name]; if (c) setBoardTooltip(c); }}
+                    <img src={cardImageUrl(revealEntry.name) + (revealEntry.handLevel != null ? '?lv=' + revealEntry.handLevel : '')} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} draggable={false}
+                      onMouseEnter={() => {
+                        const c = CARDS_BY_NAME[revealEntry.name];
+                        // 23.10.: eine aufgedeckte Gegnerkarte mit gesenkter Stufe (Great Vanguard Demon) zeigt sie auf der Karte (`?lv=`, wie die eigene Hand) und im Tooltip
+                        if (c) setBoardTooltip(revealEntry.handLevel != null ? { ...c, _handNotes: [{ color: '#75f091', text: `Level ${revealEntry.handLevel} in their hand (printed ${c.level}).` }] } : c);
+                      }}
                       onMouseLeave={() => setBoardTooltip(null)} />
                   ) : (
                     <img src={opp.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />

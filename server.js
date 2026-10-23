@@ -4659,6 +4659,22 @@ function stSichtHand(gs, pi, hand) {
   return gs && gs.skillTest && gs.skillTest.virtualAttack === pi ? hand.slice(0, -1) : hand;
 }
 
+/**
+ * 23.10. (Great Vanguard Demon): eine AUFGEDECKTE Handkarte des Gegners zeigt ihre gesenkte Stufe — sie ist öffentlich, sobald die Karte aufliegt. `handLevel` = die Stufe in
+ * der Hand (gedruckt + Handindex-Senkungen, nie unter 0), nur gesetzt, wenn sie von der gedruckten abweicht; der Client malt sie wie auf der eigenen Hand.
+ */
+function revealedMitStufe(ps, liste) {
+  if (!Array.isArray(liste) || !liste.length) return liste;
+  const db = getCardDB();
+  return liste.map(e => {
+    const cd = db[e.name];
+    if (!cd || cd.level == null) return e;
+    const off = Math.min(0, (ps._handLevelOffsets || {})[e.index] || 0, (ps._handLevelOffsetsTransient || {})[e.index] || 0);
+    if (!off) return e;
+    return { ...e, handLevel: Math.max(0, cd.level + off) };
+  });
+}
+
 function sendGameState(room, playerIdx, extra) {
   if (room.engine?._fastMode) return; // Silent during MCTS simulations.
   // ── STILLGELEGTE ENGINE SENDET NICHTS MEHR ────────────────────────
@@ -4876,7 +4892,7 @@ function sendGameState(room, playerIdx, extra) {
       hand: (pi === playerIdx
              || (room.type === 'singleplayer' && DEBUG_REVEAL_NPC_HAND)
              || room.type === 'puzzle') ? stSichtHand(gs, pi, ps.hand) : [], handCount: stSichtHand(gs, pi, ps.hand).length,
-      revealedHandCards: pi !== playerIdx ? (() => {
+      revealedHandCards: pi !== playerIdx ? revealedMitStufe(ps, (() => {
         // SINGLEPLAYER debug reveal: show every card in the CPU's hand.
         // The client renders `revealedHandCards` as face-up tiles, so
         // populating all indexes here surfaces the whole hand without
@@ -4992,7 +5008,7 @@ function sendGameState(room, playerIdx, extra) {
           }
         }
         return result;
-      })() : [],
+      })()) : [],
       mainDeckCards: pi === playerIdx ? ps.mainDeck : [], deckCount: ps.mainDeck.length,
       // Public-knowledge top of deck (Premonition stash, etc.) — sent
       // to both players. Validated against `mainDeck` here so any

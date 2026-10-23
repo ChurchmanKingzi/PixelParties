@@ -79,6 +79,22 @@ const H = require('../../lib/h.js');
     R.check('Reaction-ATTACK (Challenge) gespielt: Stufe 8', t.pile(1, 'discardPile').includes('Challenge') && stufe(t, 1, i) === 8, { discard: t.pile(1, 'discardPile'), level: stufe(t, 1, i), hand: t.pile(1, 'hand') });
   }
   {
+    // Der GEGNER sieht die gesenkte Stufe: der Zustand für Sitz 0 trägt bei der aufgedeckten Handkarte von Sitz 1 `handLevel` (Client malt `?lv=`)
+    const gesendet = [];
+    require('socket.io').Server.prototype.to = function (sid) { return { emit: (ev, data) => { if (ev === 'game_state') gesendet.push({ sid, data }); } }; };
+    const t = await fenster('Test Flight', [1, 0, ['Magic Arts', 'Magic Arts']]);
+    t.room.players.forEach((pl, k) => { pl.socketId = 'S' + k; });
+    t.host.sendGameState(t.room, 0);
+    const z = gesendet.filter(g => g.sid === 'S0').pop();
+    const rev = z && z.data.players && z.data.players[1] && z.data.players[1].revealedHandCards;
+    R.check('Gegner-Zustand: aufgedeckte Karte mit handLevel 8 (gedruckt 9)', Array.isArray(rev) && rev.some(e => e.name === GV && e.handLevel === 8), rev);
+    t.gs.players[1]._handLevelOffsetsTransient = {};
+    gesendet.length = 0; t.host.sendGameStateErzwungen(t.room, 0);
+    const z2 = gesendet.filter(g => g.sid === 'S0').pop();
+    const rev2 = z2 && z2.data.players[1].revealedHandCards;
+    R.check('ohne Senkung: kein handLevel am Eintrag (Karte unverändert)', Array.isArray(rev2) && rev2.some(e => e.name === GV && e.handLevel === undefined), rev2);
+  }
+  {
     // Reaction CREATURE (Doomed Town Guard: Beschwörung, wenn eine eigene Creature durch eine gegnerische Karte besiegt wird)
     const t = await frisch([], [GV, 'Doomed Town Guard']);
     t.grantFor(1, 0, 'Doomed Town Guard');
