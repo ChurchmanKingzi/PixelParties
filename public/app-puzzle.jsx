@@ -3969,12 +3969,12 @@ function PuzzleCreator() {
                     // einen Ablegeplatz vortaeuschen, den es nicht gibt.
                     <div key={pm.id} title={pm.name} data-pz-perm={si + '-' + i}
                       onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
-                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,214,26,.5)', background: 'rgba(255,214,26,.08)', cursor: 'pointer' }}>
+                      <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(250,213,74,.5)', background: 'rgba(250,213,74,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>
                     </div>
                   ))}
-                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,214,26,.3)' }}
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(250,213,74,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); entferneAusHandquelle(dragHandSource, dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
