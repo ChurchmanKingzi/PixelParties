@@ -79,6 +79,7 @@ function targetCanBeBurned(engine, t, quelle = null) {
     const hero = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.burned) return false; // Already — not "can-be-newly".
+    if (engine.statusSchutzAufgehoben?.('burned', hero)) return true;   // 23.10. Tearing Mountain: kein Schutz verhindert Burn
     if (hero.statuses?.immune) return false;
     // Charme schuetzt nur in seiner Auspraegung (Styx: gar nicht).
     if (hero.statuses?.charmed && engine._charmBlocksFrom(hero, quelle)) return false;
