@@ -2728,6 +2728,7 @@ const ZONE_ANIM_SFX = {
   modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   level_down:              { name: 'debuff', opts: { rate: 0.9, volume: 0.7 } },   // Looming Threat: Stufe sinkt
   hand_level_down:         { name: 'debuff', opts: { rate: 1.0, volume: 0.6 } },   // Great Vanguard Demon: Stufe sinkt (Pixelart, die Karte bleibt sichtbar)
+  mind_control_hex:        { name: 'elem_dark', opts: { rate: 0.8, volume: 0.6 } },   // Mind Control: Hypnose-Spirale über dem übernommenen Helden (Pixelart)
   loom_swell:              { name: 'elem_dark', opts: { rate: 0.6, volume: 0.9 } },   // Looming Threat: Karte schwillt an
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
@@ -7947,6 +7948,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       key: 'soul_transmitted', icon: '🕯️',
       tooltip: 'Soul Transmitted: The next time this Hero is defeated, it is deleted together with '
         + 'all cards in its Ability and Support Zones, except Creatures. Cannot be removed.',
+    });
+  }
+  // 23.10. („Mind Control"): der Wirtsheld gehört dem Besitzer der Karte, solange sie angelegt ist.
+  if (s.mind_controlled) {
+    badges.push({
+      key: 'mind_controlled', icon: '🧠',
+      tooltip: 'Mind Controlled: Another player has permanent control of this Hero while Mind Control remains attached to it. '
+        + 'Counts as a negative status effect — curing it discards the card and returns control.',
     });
   }
   if (s.aged) {
