@@ -4663,15 +4663,19 @@ function stSichtHand(gs, pi, hand) {
  * 23.10. (Great Vanguard Demon): eine AUFGEDECKTE Handkarte des Gegners zeigt ihre gesenkte Stufe — sie ist öffentlich, sobald die Karte aufliegt. `handLevel` = die Stufe in
  * der Hand (gedruckt + Handindex-Senkungen, nie unter 0), nur gesetzt, wenn sie von der gedruckten abweicht; der Client malt sie wie auf der eigenen Hand.
  */
-function revealedMitStufe(ps, liste) {
+function revealedMitStufe(ps, liste, engine, pi) {
   if (!Array.isArray(liste) || !liste.length) return liste;
   const db = getCardDB();
   return liste.map(e => {
     const cd = db[e.name];
     if (!cd || cd.level == null) return e;
     const off = Math.min(0, (ps._handLevelOffsets || {})[e.index] || 0, (ps._handLevelOffsetsTransient || {})[e.index] || 0);
-    if (!off) return e;
-    return { ...e, handLevel: Math.max(0, cd.level + off) };
+    // 23.10.: absolut gesetzte Stufe der Kopie (Puzzle-Creator, Inconspicuous Lawn Gnome) — die Senkungen wirken darauf weiter.
+    const gesetzt = engine?._handLevelSetFor?.(pi, e.name, e.index);
+    const basis = typeof gesetzt === 'number' ? gesetzt : cd.level;
+    const stufe = Math.max(0, basis + off);
+    if (stufe === cd.level) return e;
+    return { ...e, handLevel: stufe };
   });
 }
 
@@ -5008,7 +5012,7 @@ function sendGameState(room, playerIdx, extra) {
           }
         }
         return result;
-      })()) : [],
+      })(), room.engine, pi) : [],
       mainDeckCards: pi === playerIdx ? ps.mainDeck : [], deckCount: ps.mainDeck.length,
       // Public-knowledge top of deck (Premonition stash, etc.) — sent
       // to both players. Validated against `mainDeck` here so any
@@ -5227,6 +5231,17 @@ function sendGameState(room, playerIdx, extra) {
       // the opponent shouldn't see which copies are reduced. Maps
       // hand-index → numeric offset (currently always negative).
       handLevelOffsets: pi === playerIdx ? { ...(ps._handLevelOffsets || {}) } : {},
+      // 23.10.: absolut gesetzte Stufe je Handkopie (Index → Stufe; Puzzle-Creator, Inconspicuous Lawn Gnome). Nur der Besitzer; der Client malt sie als Basis,
+      // auf die die Senkungen darüber weiterwirken.
+      handLevelSet: pi === playerIdx && room.engine ? (() => {
+        const out = {};
+        if (!room.engine.cardInstances.some(c => c.zone === 'hand' && c.owner === pi && typeof c.counters?.levelSet === 'number')) return out;
+        (ps.hand || []).forEach((n, i) => {
+          const v = room.engine._handLevelSetFor?.(pi, n, i);
+          if (typeof v === 'number') out[i] = v;
+        });
+        return out;
+      })() : {},
       // Applause Counter auf Handkarten (Fun-Fun Circus Elephant): der Besitzer
       // sieht alle, der Gegner nur die der AUFGEDECKTEN Karten (Index → Zahl).
       handApplause: (() => {
@@ -6221,6 +6236,7 @@ function sendSpectatorGameState(room) {
       neverPlayableCards: [],
       cardGateBlockedCards: [],
       handLevelOffsets: {},
+      handLevelSet: {},
       handApplause: {},
       handLevelOffsetsTransient: {},
       handLevelOffsetHeroFilter: {},
@@ -16583,6 +16599,21 @@ io.on('connection', (socket) => {
 
   // ── Puzzle / Single-Player Battle ──────────────────────────────────
 
+  /** Setzt die im Puzzle gewählten Stufen auf die Handinstanzen (s. `createPuzzleGame`). */
+  function wendeHandStufenAn(engine, pi, hand, stufen) {
+    if (!Array.isArray(hand) || !Array.isArray(stufen)) return;
+    const db = getCardDB();
+    stufen.forEach((lv, idx) => {
+      if (!Number.isInteger(lv) || lv < 0 || lv > 99 || idx >= hand.length) return;
+      const cd = db[hand[idx]];
+      if (!cd || cd.level == null || cd.level === lv) return;
+      const inst = engine._findHandInstanceAt(pi, idx);
+      if (!inst) return;
+      if (!inst.counters) inst.counters = {};
+      inst.counters.levelSet = lv;
+    });
+  }
+
   // Shared function: create and start a puzzle game from puzzle data
   async function createPuzzleGame(puzzleData, opts = {}) {
     const roomId = 'pz-' + uuidv4().substring(0, 8);
@@ -16850,6 +16881,13 @@ io.on('connection', (socket) => {
     for (const inst of room.engine.cardInstances) {
       if (VOR_SPIELBEGINN.has(inst.zone)) inst.turnPlayed = 0;
     }
+
+    // ── STUFEN JE HANDKOPIE (23.10., Al: Puzzle-Creator, Linksklick auf eine Handkarte) ──
+    // `handLevels[i]` / `oppHandLevels[i]` = gewählte Stufe der Karte `hand[i]` (null = gedruckt). Gesetzt wird sie als absolute Setzung der
+    // Handinstanz (`counters.levelSet`, dasselbe Mittel wie beim Inconspicuous Lawn Gnome): sie gilt für die Stufenprüfung UND die Anzeige, steigt oder fällt
+    // frei und folgt der Kopie durch jede Handbewegung. Ungültige Einträge (kein Level auf der Karte, keine ganze Zahl) werden ignoriert.
+    wendeHandStufenAn(room.engine, 0, puzzleData.hand, puzzleData.handLevels);
+    wendeHandStufenAn(room.engine, 1, puzzleData.oppHand, puzzleData.oppHandLevels);
 
     // ── ★ ANHAENGSEL-EFFEKTE HERSTELLEN (v1112, Als Vorgabe 15.9.) ──
     //
